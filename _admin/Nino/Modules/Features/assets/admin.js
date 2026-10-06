@@ -31,7 +31,11 @@
  *													stays on this panel, so the workbench comes back where
  *													it was. An install says what it did in a dialog first:
  *													the offer it was pressed on is not an offer afterwards,
- *													so there is no row left to write it on.
+ *													so there is no row left to write it on. An activation
+ *													says what it switched on, and a deactivation where
+ *													the feature's shortcodes still stand, the same way:
+ *													the answer carries both, and the page that could
+ *													show them is the one being reloaded.
  *
  *													features/list answers the catalogue exactly as
  *													\Nino\Catalogue::cached() last left it on disk, so the
@@ -719,6 +723,7 @@
 
 			const copy = dc.createElement('div');
 			copy.textContent = feature.name;
+			Nino.admin.features._badge( copy, feature.maturity );
 
 			const meta = dc.createElement('div');
 			meta.className = 'admin-type-btn-descr';
@@ -752,7 +757,7 @@
 			const row = dc.createElement('li');
 			row.dataset.feature = feature.key;
 
-			const copy = Nino.admin.features._copy( feature.name, Nino.admin.features._meta( feature.category, feature.version, feature.installed, '', feature.description ) );
+			const copy = Nino.admin.features._copy( feature.name, Nino.admin.features._meta( feature.category, feature.version, feature.installed, '', feature.description ), feature.maturity );
 
 			if( feature.requires.length > 0 )
 				copy.appendChild( Nino.admin.features._note( Nino.content.getText('/_admin/features/label/requires').replace( '%s', feature.requires.join( ', ' ) ), false ) );
@@ -810,10 +815,11 @@
 		 *
 		 *	@param		{string}	name
 		 *	@param		{string}	meta
+		 *	@param		{string}	[maturity]	Drawn as a badge after the name, in the element that holds it, where there is one
 		 *
 		 *	@return		{Element}							<div class="nino-admin-list-copy">
 		 */
-		_copy : function( name, meta ) {
+		_copy : function( name, meta, maturity ) {
 
 			const copy = dc.createElement('div');
 			copy.className = 'nino-admin-list-copy';
@@ -821,12 +827,35 @@
 			const title = dc.createElement('strong');
 			title.textContent = name;
 			copy.appendChild( title );
+			Nino.admin.features._badge( title, maturity );
 
 			const line = dc.createElement('small');
 			line.textContent = meta;
 			copy.appendChild( line );
 
 			return copy;
+		},
+
+		/**
+		 *	How far along a feature is, in the author's own words, as a badge
+		 *	after its name. The word is always written out - what it says is
+		 *	not carried by its colour. Nothing is added where the manifest gave
+		 *	none, so a feature that says nothing looks the way it always did
+		 *
+		 *	@param		{Element}	parent			Where the badge goes: the element holding the name
+		 *	@param		{string}	[text]			The maturity as the panel localized it
+		 *
+		 *	@return		void
+		 */
+		_badge : function( parent, text ) {
+
+			if( typeof text !== 'string' || text.trim() === '' )
+				return;
+
+			const badge = dc.createElement('span');
+			badge.className = 'admin-features-badge';
+			badge.textContent = text;
+			parent.appendChild( badge );
 		},
 
 		/**
@@ -948,6 +977,63 @@
 		},
 
 		/**
+		 *	"Switched on: Social media links, Lightbox." - the features an
+		 *	activation or an update turned on, the requirements among them
+		 *
+		 *	@param		{Array}		switchedOn	[ { key, name } ] as the panel answered
+		 *
+		 *	@return		{string}							'' where nothing was switched on
+		 */
+		_switchedOnText : function( switchedOn ) {
+
+			if( switchedOn.length === 0 )
+				return '';
+
+			const names = switchedOn.map( function( entry ) { return entry.name } ).join( ', ' );
+
+			return Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/switched-on'), names );
+		},
+
+		/**
+		 *	What a deactivation leaves behind: one line a shortcode, the places
+		 *	that still contain it - a template, a text, an element. The
+		 *	brackets are written here, because a fill may not carry one
+		 *
+		 *	@param		{Array}		found				[ { shortcode, total, places: [ { kind, where } ] } ]
+		 *
+		 *	@return		{string}							'' where nothing stands
+		 */
+		_foundText : function( found ) {
+
+			if( found.length === 0 )
+				return '';
+
+			const lines = found.map( function( entry ) {
+
+				const places = entry.places.map( function( place ) {
+
+					let text;
+
+					if( place.kind === 'template' )
+						text = Nino.content.getText('/_admin/features/label/found-template');
+					else if( place.kind === 'text' )
+						text = Nino.content.getText('/_admin/features/label/found-text');
+					else
+						text = Nino.content.getText('/_admin/features/label/found-element');
+
+					return Nino.adminUi.format( text, place.where );
+				} );
+
+				if( entry.total > entry.places.length )
+					places.push( Nino.adminUi.format( Nino.content.getText('/_admin/features/label/found-more'), entry.total - entry.places.length ) );
+
+				return '['+ entry.shortcode+ '] '+ places.join( ', ' );
+			} );
+
+			return Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/deactivated-found'), '\n'+ lines.join( '\n' ) );
+		},
+
+		/**
 		 *	Switch a feature on or off, or apply its update - the kernel's
 		 *	one step for an update is activating again, so the two post the
 		 *	same action. Ends in a reload: the rail is rendered server-side
@@ -1001,6 +1087,15 @@
 
 				msg.textContent = done+ ' '+ Nino.content.getText('/_admin/features/msg/reload');
 
+				// Said before the reload takes the screen it could be written on,
+				// and in a dialog for that reason - see _install()
+				const said = what === 'deactivate'
+					? Nino.admin.features._foundText( response.found || [] )
+					: Nino.admin.features._switchedOnText( response.switchedOn || [] );
+
+				if( said !== '' )
+					wn.alert( said );
+
 				// The panel a feature brings only appears - or goes - once the
 				// shell is built again; the hash keeps the workbench on this panel
 				wn.location.hash = '#features';
@@ -1028,7 +1123,7 @@
 			if( offer.state === 'incompatible' )
 				row.setAttribute( 'aria-disabled', 'true' );
 
-			const copy = Nino.admin.features._copy( offer.name, Nino.admin.features._meta( offer.category, offer.version, offer.local, offer.released, offer.description ) );
+			const copy = Nino.admin.features._copy( offer.name, Nino.admin.features._meta( offer.category, offer.version, offer.local, offer.released, offer.description ), offer.maturity );
 
 			if( offer.requires.length > 0 )
 				copy.appendChild( Nino.admin.features._note( Nino.content.getText('/_admin/features/label/requires').replace( '%s', offer.requires.join( ', ' ) ), false ) );
@@ -1144,12 +1239,18 @@
 					that is no longer there. A feature that pulled its requirements in
 					with it names them too: pressing Install on one thing and getting
 					three is not something to find out afterwards	*/
-				const required = response.required || [];
 				const word 		= response.activated === true ? 'installed-active' : 'installed';
+
+				// What was placed where nothing was switched on; what was switched
+				// on - by name, the requirement that was in the directory already
+				// but off among them - where it was
+				const required = response.activated === true
+					? ( response.switchedOn || [] ).filter( function( entry ) { return entry.key !== offer.key } ).map( function( entry ) { return entry.name } )
+					: ( response.required || [] );
 
 				const said = required.length === 0
 					? Nino.content.getText('/_admin/features/msg/'+ word )
-					: Nino.content.getText('/_admin/features/msg/'+ word+ '-with').replace( '%s', required.join( ', ' ) );
+					: Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/'+ word+ '-with'), required.join( ', ' ) );
 
 				/*	Said in a dialog rather than written onto the row it was pressed
 					on, because that row is gone by the time anybody could read it:
@@ -1411,6 +1512,7 @@
 
 			const title = dc.createElement('h2');
 			title.textContent = feature.name;
+			Nino.admin.features._badge( title, feature.maturity );
 			form.appendChild( title );
 
 			// Identity only: what kind of thing this is, and which version of it

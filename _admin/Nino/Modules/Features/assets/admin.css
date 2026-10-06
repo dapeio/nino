@@ -108,6 +108,26 @@
 	opacity: .6;
 }
 
+/*	How far along a feature is - "Beta", "Example" - after its name, in the
+	list and on the screen behind the chevron. A small outlined tag in the
+	muted text colour: the word is always written out, so the meaning is
+	never carried by a colour alone, and the border is only what sets it
+	apart from the name. */
+#features-list .admin-features-badge,
+#features-detail .admin-features-badge {
+	display: inline-block;
+	margin-left: .5rem;
+	padding: 0 .45rem;
+	border: 1px solid var(--editor-separator);
+	border-radius: 999px;
+	color: var(--editor-text-secondary);
+	font-size: .72rem;
+	font-weight: 600;
+	line-height: 1.5;
+	vertical-align: .1em;
+	white-space: nowrap;
+}
+
 /*	A requirement, a reason an activation is refused, what an offer asks of
 	this kernel. The shared list copy ellipsizes one line, which is right for
 	a description and wrong for a reason - these wrap and are read whole. */

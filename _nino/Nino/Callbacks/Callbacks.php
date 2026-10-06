@@ -54,5 +54,27 @@ namespace Nino {
 
 			return $args;
 		}
+
+		/**
+		 *	The callables registered under a name, in the order doCallbacks()
+		 *	calls them - read only, nothing fires. For code that has to ask
+		 *	who answers a hook (see \Nino\Features::shortcodes()), not for
+		 *	calling them
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$name					The hook name
+		 *
+		 *	@return 	array										The callables by priority, then registration; [] for a name nobody registered
+		 */
+		public static function registered( array &$appData, string $name ): array {
+
+			$callbacks = [];
+
+			foreach( $appData['./nino/callbacks'][$name] ?? [] as $prioArray )
+				foreach( $prioArray as $callback )
+					$callbacks[] = $callback;
+
+			return $callbacks;
+		}
 	}
 }

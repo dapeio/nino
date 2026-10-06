@@ -2230,6 +2230,18 @@ $afterBad = [ 'start' => true ];
 \Nino\Callbacks::doCallbacks( $appData, 'test/callbackshapes', $afterBad );
 check( '...and is not registered, so firing the hook still works', ( $afterBad['closure'] ?? false ) === true && count( $callbackTarget->seen ) === 2 );
 
+// The read-only side: who answers a hook, without firing it
+$registered = \Nino\Callbacks::registered( $appData, 'test/callbackshapes' );
+check( 'registered() lists the callables in the order they are called, and fires nothing', count( $registered ) === 4 && $registered[0] === [ $callbackTarget, 'instanceMethod' ]
+	&& $registered[1] === [ KernelSmokeCallbackTarget::class, 'staticMethod' ] && $registered[2] === 'kernelSmokeCallbackFunction' && $registered[3] instanceof \Closure && count( $callbackTarget->seen ) === 2 );
+\Nino\Callbacks::registerCallback( $appData, 'test/callbackshapes', [ KernelSmokeCallbackTarget::class, 'staticMethod' ], 2 );
+check( '...a lower priority number first, as doCallbacks() runs it, and a name nobody registered has none', \Nino\Callbacks::registered( $appData, 'test/callbackshapes' )[0] === [ KernelSmokeCallbackTarget::class, 'staticMethod' ]
+	&& count( \Nino\Callbacks::registered( $appData, 'test/callbackshapes' ) ) === 5 && \Nino\Callbacks::registered( $appData, 'test/nobody-registered-this' ) === [] );
+\Nino\Html::addShortcode( $appData, 'shortcodelist-a', 'kernelSmokeCallbackFunction' );
+\Nino\Html::addShortcode( $appData, 'shortcodelist-b', 'kernelSmokeCallbackFunction' );
+check( 'Html::shortcodes() lists the registered names, the kernel\'s own among them, in the order they were added', array_slice( \Nino\Html::shortcodes( $appData ), -2 ) === [ 'shortcodelist-a', 'shortcodelist-b' ]
+	&& in_array( 'json', \Nino\Html::shortcodes( $appData ), true ) === true );
+
 echo "\n";
 
 

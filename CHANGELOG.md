@@ -645,6 +645,17 @@ All notable changes to Nino are documented in this file.
   touch, `tests/admin-maintenance-js-smoke.js` (new, 16 checks) the notice
   following the state.
 
+- **Features:** an optional manifest key `maturity` - how far along a feature
+  is, in the author's own words, a string or a `locale => string` map of at
+  most 24 characters each - which the Features panel draws as a badge beside
+  the name in the Active, Inactive and Available tabs and on a feature's own
+  screen. `\Nino\Catalogue` reads it from a catalogue entry as tolerantly as
+  `category`: an invalid one is dropped, never a reason to refuse the catalogue,
+  and a catalogue cached before the key existed reads as none (the panel's
+  `?? ''`). Three read-only kernel accessors carry the shortcode report:
+  `\Nino\Callbacks::registered()`, `\Nino\Html::shortcodes()` and
+  `\Nino\Features::shortcodes()`; nothing on the render path changed.
+
 ### Changed
 
 - **Workbench:** what the panels print for a failure. A failure with a code is
@@ -899,6 +910,25 @@ All notable changes to Nino are documented in this file.
   machine without a sendmail, as the output shows; they register a stub transport
   now, and the new ones pin the `500`, the record kept, and the confirmation
   that alone is refused.
+
+- **Features panel:** it says what a switch did. Activate and an Update that
+  switched a requirement on show *Switched on: Social media links, Lightbox.*
+  in a dialog before the workbench reloads - the feature asked for first, the
+  rest by name; `features/activate` answers `switchedOn: [ { key, name } ]`
+  for it, and so does `features/install` for the install that switched on
+  (its `required` keeps saying what was placed, which is not the same: a
+  requirement that was in the directory but off is switched on without being
+  placed). Install's message names the switched-on requirements instead of the
+  placed ones where it switched on. Deactivate answers `found`: the templates,
+  texts and elements that still contain the feature's shortcodes
+  (`[ { shortcode, total, places: [ { kind, where } ] } ]`, ten places a
+  shortcode at most), shown in a dialog after it - a shortcode of a feature that
+  is off stays as the text it is written as. Opening tags and raw brackets only:
+  a shortcode the Text panel stored neutralized, `&#91;...&#93;`, never
+  rendered and is not reported. Which shortcodes are a feature's is read from
+  the callbacks registered, not from its manual. Contract tests in
+  `tests/features-smoke.php`, `tests/catalogue-smoke.php`,
+  `tests/kernel-smoke.php` and `tests/admin-features-js-smoke.js`.
 
 ### Fixed
 

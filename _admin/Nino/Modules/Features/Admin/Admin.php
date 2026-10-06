@@ -58,6 +58,9 @@ namespace Nino\Modules\Features {
 		// accepts in a manifest (Features::VERSION_PATTERN)
 		private const string VERSION_PATTERN = '/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/';
 
+		// How many places of one shortcode the answer to a deactivation names
+		private const int FOUND_PLACES = 10;
+
 		public static function perm(): string {
 			return self::MANAGE_PERM;
 		}
@@ -184,7 +187,9 @@ namespace Nino\Modules\Features {
 		/**
 		 *	Switch a feature on - or, for an active one whose manifest moved
 		 *	ahead of the recorded version, apply the update (the kernel's one
-		 *	step for both, see Features::activate())
+		 *	step for both, see Features::activate()). Answers the feature's
+		 *	entry and 'switchedOn': what is on now that was not before, the
+		 *	requirements among it
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -201,7 +206,8 @@ namespace Nino\Modules\Features {
 
 		/**
 		 *	Switch a feature off - its class leaves the module list, everything
-		 *	it keeps stays
+		 *	it keeps stays. Answers the feature's entry and 'found': where its
+		 *	shortcodes still stand in the project's templates, texts and elements
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -353,8 +359,10 @@ namespace Nino\Modules\Features {
 		 *	Install one catalogue entry: the kernel downloads, verifies and
 		 *	places the directory (see Catalogue::install()), and this switches
 		 *	the feature on unless the project has said otherwise. Answers the
-		 *	feature's entry as the list would show it now, whether an update was
-		 *	applied and whether it was switched on
+		 *	feature's entry as the list would show it now, whether it was switched
+		 *	on ('activated'), whether an update is pending ('pending'), what was
+		 *	placed besides it ('required') and what is on now that was not before
+		 *	('switchedOn', empty unless it was switched on)
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -380,6 +388,11 @@ namespace Nino\Modules\Features {
 			$before 		= \Nino\Features::get( $appData, $key );
 			$wasActive	= $before !== null && $before['active'] === true;
 			$isNew			= $before === null;
+
+			// Taken here, not after: install() forgets the features it read, and
+			// what it placed counts as not on before - which is what names the
+			// ones this switches on
+			$wasOn			= $isNew === true ? self::_activeKeys( $appData ) : [];
 
 			$result = \Nino\Catalogue::install( $appData, $key, $version );
 
@@ -454,12 +467,18 @@ namespace Nino\Modules\Features {
 				'activated'	=> $isNew,
 				'pending'		=> $wasActive,
 				'required'	=> $installed,
+				// What is on now that was not before, the requirements among it -
+				// 'required' says what was placed, which is not the same: a
+				// requirement already in the directory but switched off is not
+				// placed and is switched on all the same
+				'switchedOn'	=> $isNew === true ? self::_switchedOn( $appData, $wasOn, $key ) : [],
 			] );
 		}
 
 		/**
 		 *	The shared half of activate/deactivate: a known key, the kernel's
-		 *	verdict as a 400 when it refuses, else the refreshed entry
+		 *	verdict as a 400 when it refuses, else the refreshed entry - with
+		 *	'switchedOn' after an activation, 'found' after a deactivation
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -476,6 +495,11 @@ namespace Nino\Modules\Features {
 				return;
 			}
 
+			// Read before the switch: the shortcodes only stand registered while
+			// it is on, and what was on decides what this switched on
+			$wasOn	= $on === true ? self::_activeKeys( $appData ) : [];
+			$names	= $on === false ? \Nino\Features::shortcodes( $appData, $key ) : [];
+
 			$result = $on === true ? \Nino\Features::activate( $appData, $key ) : \Nino\Features::deactivate( $appData, $key );
 
 			if( $result !== true ) {
@@ -483,7 +507,149 @@ namespace Nino\Modules\Features {
 				return;
 			}
 
-			self::_answer( $appData, $request, $key );
+			// An update is activating again, and can switch on a requirement the
+			// new version added - so this is not empty only for a first Activate
+			self::_answer( $appData, $request, $key, $on === true
+				? [ 'switchedOn' => self::_switchedOn( $appData, $wasOn, $key ) ]
+				: [ 'found' => $names === [] ? [] : self::_occurrences( $appData, $names ) ] );
+		}
+
+		/**
+		 *	The keys of the features that are switched on
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										Feature keys
+		 */
+		private static function _activeKeys( array &$appData ): array {
+
+			$keys = [];
+
+			foreach( \Nino\Features::all( $appData ) as $feature )
+				if( $feature['active'] === true )
+					$keys[] = $feature['key'];
+
+			return $keys;
+		}
+
+		/**
+		 *	The features that are on now and were not in $before: the one asked
+		 *	for first, the rest by the name a person reads (see _byName())
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$before				Keys that were on before, see _activeKeys()
+		 *	@param		string		$key					The feature the request was about
+		 *
+		 *	@return 	array										[ { key, name } ]
+		 */
+		private static function _switchedOn( array &$appData, array $before, string $key ): array {
+
+			$locale	= \Nino\Admin\Admin::sessionLocale( $appData );
+			$first	= [];
+			$rest		= [];
+
+			foreach( \Nino\Features::all( $appData ) as $feature ) {
+
+				if( $feature['active'] === false || in_array( $feature['key'], $before, true ) === true )
+					continue;
+
+				$entry = [ 'key' => $feature['key'], 'name' => \Nino\Features::localized( $feature['name'], $locale ) ];
+
+				if( $feature['key'] === $key )
+					$first[] = $entry;
+				else
+					$rest[] = $entry;
+			}
+
+			self::_byName( $rest );
+
+			return array_merge( $first, $rest );
+		}
+
+		/**
+		 *	Where the given shortcodes still stand in the project's own files:
+		 *	templates, texts and elements. Read only, and a report - what a
+		 *	shortcode does once its feature is off is the renderer's business
+		 *	(it stays as text), and the scan only says where that will be seen.
+		 *	Opening tags only, the shape the renderer matches
+		 *	(\Nino\Html::_renderShortcodes()), so an enclosing pair counts once;
+		 *	raw brackets only, so a shortcode the Text panel neutralized
+		 *	(&#91;...&#93;) is not reported - it never rendered. A shortcode
+		 *	typed into an element is neutralized when the page is drawn and
+		 *	is reported all the same: it is in the file, and the sentence this
+		 *	feeds says "still contain"
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$names				Shortcode names
+		 *
+		 *	@return 	array										[ { shortcode, total, places: [ { kind, where } ] } ], the places capped at FOUND_PLACES, only shortcodes with a hit
+		 */
+		private static function _occurrences( array &$appData, array $names ): array {
+
+			$pattern	= '/\[('. implode( '|', array_map( static fn( string $name ): string => preg_quote( $name, '/' ), $names ) ). ')(?: [^\]]*)?\]/';
+			$places		= [];
+			$scan			= null;
+
+			$scan = static function( mixed $content, string $kind, string $where ) use ( $pattern, &$places, &$scan ): void {
+
+				if( is_array( $content ) === true ) {
+					foreach( $content as $part )
+						$scan( $part, $kind, $where );
+					return;
+				}
+
+				if( is_string( $content ) === false || preg_match_all( $pattern, $content, $matches ) === false )
+					return;
+
+				foreach( array_unique( $matches[1] ) as $name )
+					$places[$name][$kind. "\0". $where] = [ 'kind' => $kind, 'where' => $where ];
+			};
+
+			foreach( glob( \Nino\Filesystem::path( $appData, '/templates' ). '/*.tpl' ) ?: [] as $file )
+				// Past the switch, which is already written: a file that cannot
+				// be read is left out of the report rather than raising a warning
+				// the request would answer with a 500
+				if( is_file( $file ) === true && is_readable( $file ) === true )
+					$scan( file_get_contents( $file ), 'template', basename( $file ) );
+
+			// A global value is shown by its key alone, a locale's with the locale
+			foreach( \Nino\Text::entries( $appData, true ) as $entry )
+				foreach( $entry['values'] as $locale => $value )
+					$scan( $value, 'text', $locale === '*' ? $entry['key'] : $entry['key']. ' ('. $locale. ')' );
+
+			// A type file holds title, model and perhaps autoincrement beside the
+			// buckets - '*' and one per locale - which hold id => field => value
+			foreach( glob( \Nino\Filesystem::path( $appData, '/elements' ). '/*.php' ) ?: [] as $file ) {
+
+				$type = basename( $file, '.php' );
+				$data = \Nino\Filesystem::getFileContent( $appData, '/elements/'. $type. '.php', [] );
+
+				foreach( is_array( $data ) === true ? $data : [] as $bucket => $elements ) {
+
+					if( in_array( $bucket, [ 'title', 'model', 'autoincrement' ], true ) === true || is_array( $elements ) === false )
+						continue;
+
+					foreach( $elements as $id => $fields )
+						foreach( is_array( $fields ) === true ? $fields : [] as $field => $value )
+							$scan( $value, 'element', $type. '/'. $id. ' '. $field. ( $bucket === '*' ? '' : ' ('. $bucket. ')' ) );
+				}
+			}
+
+			$found = [];
+
+			foreach( $names as $name ) {
+
+				if( isset( $places[$name] ) === false )
+					continue;
+
+				$found[] = [
+					'shortcode'	=> $name,
+					'total'			=> count( $places[$name] ),
+					'places'		=> array_slice( array_values( $places[$name] ), 0, self::FOUND_PLACES ),
+				];
+			}
+
+			return $found;
 		}
 
 		/**
@@ -494,10 +660,11 @@ namespace Nino\Modules\Features {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
 		 *	@param		string		$key					Feature key
+		 *	@param		array 		$extra				Further answer fields, after 'feature'
 		 *
 		 *	@return 	void
 		 */
-		private static function _answer( array &$appData, array &$request, string $key ): void {
+		private static function _answer( array &$appData, array &$request, string $key, array $extra = [] ): void {
 
 			$feature = \Nino\Features::get( $appData, $key );
 
@@ -506,7 +673,7 @@ namespace Nino\Modules\Features {
 				return;
 			}
 
-			\Nino\Http::ok( $request, [ 'feature' => self::_entry( $appData, $feature, \Nino\Admin\Admin::sessionLocale( $appData ) ) ] );
+			\Nino\Http::ok( $request, [ 'feature' => self::_entry( $appData, $feature, \Nino\Admin\Admin::sessionLocale( $appData ) ) ] + $extra );
 		}
 
 		/**
@@ -558,6 +725,9 @@ namespace Nino\Modules\Features {
 					'name'				=> \Nino\Features::localized( $offer['name'], $locale ),
 					'description'	=> \Nino\Features::localized( $offer['description'], $locale ),
 					'category'		=> $offer['category'],
+					// '' where the cached catalogue predates the field: that file
+					// is read back as it was written, and is not rewritten until a Refresh
+					'maturity'		=> \Nino\Features::localized( $offer['maturity'] ?? '', $locale ),
 					'version'			=> $offer['version'],
 					'nino'				=> $offer['nino'],
 					'ext'					=> $offer['php']['ext'],
@@ -668,6 +838,9 @@ namespace Nino\Modules\Features {
 				// category it may meet without a fill - a feature filed under
 				// something this workbench predates - it shows as it stands
 				'category'		=> $feature['category'],
+				// How far along it is, in the interface language: a badge beside
+				// the name, drawn as it stands
+				'maturity'		=> \Nino\Features::localized( $feature['maturity'], $locale ),
 				'version'			=> $feature['version'],
 				'installed'		=> $feature['installed'],
 				'active'			=> $feature['active'],

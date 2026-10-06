@@ -47,7 +47,7 @@ check( 'every readable manifest is listed, sorted by key', array_keys( $all ) ==
 check( 'a directory whose manifest does not validate is skipped with a warning naming it', isset( $all['broken'] ) === false
 	&& count( array_filter( $warnings, static fn( string $w ): bool => str_contains( $w, '/Broken/feature.php' ) && str_contains( $w, 'version' ) ) ) === 1 );
 check( 'the module class is derived from the directory', $all['sample']['module'] === '\\Nino\\Modules\\Sample' && $all['helper']['module'] === '\\Nino\\Modules\\Helper' );
-check( 'the manifest is normalized: every key present', array_keys( $all['helper'] ) === [ 'key', 'dir', 'module', 'name', 'description', 'manual', 'category', 'version', 'nino', 'php', 'requires', 'data', 'settings', 'active', 'installed', 'update', 'problems' ]
+check( 'the manifest is normalized: every key present', array_keys( $all['helper'] ) === [ 'key', 'dir', 'module', 'name', 'description', 'manual', 'category', 'maturity', 'version', 'nino', 'php', 'requires', 'data', 'settings', 'active', 'installed', 'update', 'problems' ]
 	&& $all['helper']['nino'] === '*' && $all['helper']['requires'] === [] && $all['helper']['settings'] === [] );
 check( 'nothing is active or recorded on a fresh project', $all['sample']['active'] === false && $all['sample']['installed'] === null && $all['sample']['update'] === false );
 check( 'a compatible feature has no problems', $all['sample']['problems'] === [] && $all['helper']['problems'] === [] );
@@ -142,6 +142,18 @@ check( 'and so is one this kernel does not publish - a later catalogue files fea
 	&& ninoWarnings() === [] );
 check( 'a category that is not a slug is refused, and the message names the vocabulary', manifestFails( $manifestDir, 'BadCategory', [ 'name' => 'x', 'version' => '1.0.0', 'category' => 'UI Effects' ], '"category"' )
 	&& manifestFails( $manifestDir, 'ArrayCategory', [ 'name' => 'x', 'version' => '1.0.0', 'category' => [ 'security' ] ], 'security, system' ) );
+// The maturity is free text, a word beside the name: one string or one per
+// locale, short, and optional
+check( 'a maturity is optional and defaults to none', \Nino\Features::manifest( $manifestDir. '/Mini' )['maturity'] === '' );
+check( 'one string is kept, and so is a locale => string map', \Nino\Features::manifest( writeManifest( $manifestDir, 'Tagged', [ 'name' => 'x', 'version' => '1.0.0', 'maturity' => 'Beta' ] ) )['maturity'] === 'Beta'
+	&& \Nino\Features::manifest( writeManifest( $manifestDir, 'TaggedMap', [ 'name' => 'x', 'version' => '1.0.0', 'maturity' => [ 'en_US' => 'Example', 'de_DE' => 'Beispiel' ] ] ) )['maturity'] === [ 'en_US' => 'Example', 'de_DE' => 'Beispiel' ] );
+check( 'twenty-four characters are allowed, counted as characters and not as bytes, and not counting the space around them', \Nino\Features::manifest( writeManifest( $manifestDir, 'Long24', [ 'name' => 'x', 'version' => '1.0.0', 'maturity' => str_repeat( 'ä', 24 ) ] ) )['maturity'] === str_repeat( 'ä', 24 )
+	&& \Nino\Features::manifest( writeManifest( $manifestDir, 'Padded', [ 'name' => 'x', 'version' => '1.0.0', 'maturity' => '  '. str_repeat( 'a', 24 ). '  ' ] ) ) !== null );
+check( 'one longer, empty or of another type is refused, and the message names the field', manifestFails( $manifestDir, 'LongMaturity', [ 'name' => 'x', 'version' => '1.0.0', 'maturity' => str_repeat( 'a', 25 ) ], '"maturity"' )
+	&& manifestFails( $manifestDir, 'LongMaturityMap', [ 'name' => 'x', 'version' => '1.0.0', 'maturity' => [ 'en_US' => 'ok', 'de_DE' => str_repeat( 'a', 25 ) ] ], '"maturity"' )
+	&& manifestFails( $manifestDir, 'IntMaturity', [ 'name' => 'x', 'version' => '1.0.0', 'maturity' => 3 ], '"maturity"' )
+	&& manifestFails( $manifestDir, 'BlankMaturity', [ 'name' => 'x', 'version' => '1.0.0', 'maturity' => '   ' ], '"maturity"' )
+	&& manifestFails( $manifestDir, 'MapMaturity', [ 'name' => 'x', 'version' => '1.0.0', 'maturity' => [ 'en_US' => [ 'Beta' ] ] ], '"maturity"' ) );
 // The manual: the prose the panel puts at the top of a feature's screen,
 // localized like the name and the description, and capped so that what does
 // not fit a box in a panel stays a README
@@ -418,6 +430,22 @@ check( 'the module boots on the next request and its shortcode reads its setting
 	return ( $appData['./helper/booted'] ?? false ) === true && \Nino\Html::renderHtml( $appData, '[sample]' ) === 'Again';
 } )() );
 check( 'the workbench lists its panel while it is active', isset( \Nino\Admin\Admin::panels( $appData )['sample'] ) === true );
+
+// Whose a shortcode is: read from the class that answers it, so a feature
+// that registers its own - from its class or from one below its namespace -
+// is found without anybody keeping a list. A closure has the class it was
+// written in, and one written outside any class has none
+check( 'a shortcode belongs to the feature whose class answers it, a closure included where it was written in that class; a feature that registered none, and an unknown key, have none', ( static function() use ( $appData ): bool {
+	\Nino\Modules::callModules( $appData, 'init' );
+	\Nino\Html::addShortcode( $appData, 'sample-below', [ \Nino\Modules\Sample\Admin::class, 'perm' ] );
+	\Nino\Html::addShortcode( $appData, 'sample-closure', static fn( array &$appData, array $args ): string => '' );
+	\Nino\Modules\Sample::addClosureShortcode( $appData );
+	\Nino\Html::addShortcode( $appData, 'sample-function', 'strtoupper' );
+	\Nino\Html::addShortcode( $appData, 'sample-string', \Nino\Modules\Sample::class. '::doShortcode' );
+	\Nino\Html::addShortcode( $appData, 'other', [ new \Nino\Modules\Helper(), 'init' ] );
+	return \Nino\Features::shortcodes( $appData, 'sample' ) === [ 'sample', 'sample-below', 'sample-scoped', 'sample-string' ]
+		&& \Nino\Features::shortcodes( $appData, 'helper' ) === [ 'other' ] && \Nino\Features::shortcodes( $appData, 'nope' ) === [];
+} )() );
 
 // The manifest key 'data' is documented as "what a backup carries", and until
 // Backup::manifest() read it, it was not: only two hardcoded literals for the
@@ -802,12 +830,14 @@ check( 'apiList answers the directory the panel reads from, the catalogue url, w
 	&& array_keys( $body ) === [ 'dir', 'catalogueUrl', 'writable', 'catalogue', 'features' ] && array_column( $body['features'], 'key' ) === [ 'sample', 'helper', 'old' ]
 	&& array_column( $body['features'], 'name' ) === [ 'Beispiel-Feature', 'Helper', 'Old' ] );
 $byKey = array_column( $body['features'], null, 'key' );
-check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'manual', 'manualSections', 'category', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings' ] );
+check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'manual', 'manualSections', 'category', 'maturity', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings' ] );
 check( 'names and descriptions arrive in the session locale - de_DE, the native language, since none was chosen', $byKey['sample']['name'] === 'Beispiel-Feature' && $byKey['sample']['description'] === 'Prüft den ganzen Feature-Vertrag.'
 	&& $byKey['helper']['name'] === 'Helper' && $byKey['helper']['description'] === '' );
 // The slug, not a word: the categories are named in the panel's own fills, so
 // the script labels the ones this workbench knows and shows the rest as they
 // are - see tests/admin-features-js-smoke.js
+// The word is localized here like the name: the badge is drawn as it stands
+check( 'the maturity arrives in the session locale, empty for a feature that names none', $byKey['sample']['maturity'] === 'Beispiel' && $byKey['helper']['maturity'] === '' );
 check( 'the category travels as the slug it is, empty for a feature that names none', $byKey['sample']['category'] === 'content' && $byKey['helper']['category'] === '' );
 check( 'the state travels with each entry', $byKey['sample']['active'] === true && $byKey['sample']['installed'] === '1.2.0' && $byKey['sample']['update'] === false && $byKey['sample']['requires'] === [ 'helper' ]
 	&& $byKey['old']['active'] === false && $byKey['old']['installed'] === null );
@@ -835,18 +865,63 @@ check( 'an unknown, a malformed or a missing key is a 400 before the kernel is a
 check( 'none of that wrote anything', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'] === [ '\\Nino\\Modules\\Helper', '\\Nino\\Modules\\Sample' ] );
 
 [ $status, $body ] = callFeatures( $appData, 'apiDeactivate', [ 'key' => 'helper' ] );
-check( 'deactivating a feature another active one requires is refused with the kernel\'s reason', $status === 400 && $body['error'] === 'feature "helper" is required by "sample"' );
+check( 'deactivating a feature another active one requires is refused with the kernel\'s reason, and says nothing about shortcodes', $status === 400 && $body['error'] === 'feature "helper" is required by "sample"' && isset( $body['found'] ) === false );
+
+/*	What a deactivation leaves behind: the shortcodes of the feature, in the
+	templates, the texts and the elements of the project. Registered on the
+	request first - the panel answers for a request that booted the module	*/
+\Nino\Modules::callModules( $appData, 'init' );
+file_put_contents( \Nino\Filesystem::path( $appData, '/templates/page-x.tpl' ), '<p>[sample]</p><p>[sample-other]</p>' );
+$de = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+$de['[[/found/raw]]']				= 'Vorher [sample x="1"]Mitte[/sample] nachher';
+$de['[[/found/neutralized]]']	= 'Nur &#91;sample&#93; als Text';
+\Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', $de );
+\Nino\Filesystem::putFileContent( $appData, '/elements/found.php', [
+	'title'				=> 'Found [sample]',
+	'model'				=> [ 'body' => [ 'type' => 'string', 'locale' => true ], 'list' => [ 'type' => 'string' ] ],
+	'*'						=> [ 'one' => [ 'list' => [ 'x', '[sample]' ] ] ],
+	'de_DE'				=> [ 'one' => [ 'body' => 'Mit [sample] drin' ], 'two' => [ 'body' => 'Ohne' ] ],
+] );
 
 [ $status, $body ] = callFeatures( $appData, 'apiDeactivate', [ 'key' => 'sample' ] );
 $stored = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+$found = $body['found'] ?? [];
+check( 'deactivating answers, besides the entry, where its shortcodes still stand: opening tags only, one entry per shortcode, a total and the places',
+	$status === 200 && count( $found ) === 1 && $found[0]['shortcode'] === 'sample' && $found[0]['total'] === 4 && array_keys( $found[0] ) === [ 'shortcode', 'total', 'places' ] );
+check( '...a template (the one that has the neighbouring shortcode too), a text with raw brackets, and the element in both its buckets - nothing else', $found[0]['places'] === [
+	[ 'kind' => 'template', 'where' => 'page-x.tpl' ],
+	[ 'kind' => 'text', 'where' => '/found/raw (de_DE)' ],
+	[ 'kind' => 'element', 'where' => 'found/one list' ],
+	[ 'kind' => 'element', 'where' => 'found/one body (de_DE)' ],
+] );
 check( 'deactivating answers the refreshed entry, and only the class left config.php', $status === 200 && $body['feature']['key'] === 'sample' && $body['feature']['active'] === false && $body['feature']['installed'] === '1.2.0'
 	&& $stored['/nino/modules'] === [ '\\Nino\\Modules\\Helper' ] && $stored['/nino/features']['sample']['settings']['title'] === 'Again' );
 check( 'the dashboard tile counts what is active now', \Nino\Modules\Features\Admin::summary( $appData ) === [ 'value' => 1, 'label' => '/_admin/features/label/active' ] );
+[ $status, $body ] = callFeatures( $appData, 'apiDeactivate', [ 'key' => 'helper' ] );
+check( 'a feature that registered no shortcode answers found as an empty list', $status === 200 && $body['found'] === [] );
+\Nino\Features::activate( $appData, 'helper' );
 
 [ $status, $body ] = callFeatures( $appData, 'apiActivate', [ 'key' => 'sample' ] );
 check( 'activating a valid key answers the refreshed entry, localized like the list', $status === 200 && $body['feature']['active'] === true && $body['feature']['update'] === false && $body['feature']['name'] === 'Beispiel-Feature'
 	&& \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'] === [ '\\Nino\\Modules\\Helper', '\\Nino\\Modules\\Sample' ] );
+check( '...and names what it switched on: itself, as the requirement was on already', $body['switchedOn'] === [ [ 'key' => 'sample', 'name' => 'Beispiel-Feature' ] ] && isset( $body['found'] ) === false );
 check( '...and the tile follows', \Nino\Modules\Features\Admin::summary( $appData )['value'] === 2 );
+check( 'activating one that is on already switches nothing on', callFeatures( $appData, 'apiActivate', [ 'key' => 'sample' ] )[1]['switchedOn'] === [] );
+callFeatures( $appData, 'apiDeactivate', [ 'key' => 'sample' ] );
+callFeatures( $appData, 'apiDeactivate', [ 'key' => 'helper' ] );
+check( 'with the requirement off too, both are named: the one asked for first, the requirement after it', callFeatures( $appData, 'apiActivate', [ 'key' => 'sample' ] )[1]['switchedOn'] === [ [ 'key' => 'sample', 'name' => 'Beispiel-Feature' ], [ 'key' => 'helper', 'name' => 'Helper' ] ] );
+check( 'a refused activation is a 400 without switchedOn', ( static function() use ( $appData ): bool {
+	[ $status, $body ] = callFeatures( $appData, 'apiActivate', [ 'key' => 'old' ] );
+	return $status === 400 && isset( $body['switchedOn'] ) === false;
+} )() );
+
+// A shortcode used everywhere is a list nobody reads to the end: ten places are
+// named and the total says how many there are
+for( $n = 1; $n <= 12; $n++ )
+	file_put_contents( \Nino\Filesystem::path( $appData, '/templates/page-cap-'. sprintf( '%02d', $n ). '.tpl' ), '[sample]' );
+$found = callFeatures( $appData, 'apiDeactivate', [ 'key' => 'sample' ] )[1]['found'];
+check( 'at most ten places are named for one shortcode, the total counts all of them', count( $found ) === 1 && $found[0]['total'] === 16 && count( $found[0]['places'] ) === 10 );
+callFeatures( $appData, 'apiActivate', [ 'key' => 'sample' ] );
 
 // Settings through the action
 [ $status, $body ] = callFeatures( $appData, 'apiSettings', [ 'key' => 'sample', 'fields' => [ 'limit' => '99', 'contact' => 'nope', 'title' => 'Not' ] ] );

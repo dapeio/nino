@@ -122,6 +122,18 @@ namespace Nino {
 			$appData['./nino/html/cache'] = false;
 		}
 
+		/**
+		 *	The shortcodes registered so far, by name - read only
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										The names, in registration order
+		 */
+		public static function shortcodes( array &$appData ): array {
+
+			return array_map( 'strval', array_keys( (array) ( $appData['./nino/html/shortcodes'] ?? [] ) ) );
+		}
+
 		public static function addFills( array &$appData, array $fills, string $locale = ''  ): void {
 
 			// Check locale

@@ -11,6 +11,13 @@ namespace Nino\Modules {
 			\Nino\Html::addShortcode( $appData, 'sample', [ self::class, 'doShortcode' ] );
 		}
 
+		// A shortcode answered by a closure written in this class: its scope is
+		// the class, which is how Features::shortcodes() knows whose it is
+		public static function addClosureShortcode( array &$appData ): void {
+
+			\Nino\Html::addShortcode( $appData, 'sample-scoped', static fn( array &$appData, array $args ): string => '' );
+		}
+
 		public static function adminPanels( array &$appData ): array {
 
 			return [ \Nino\Modules\Sample\Admin::class ];

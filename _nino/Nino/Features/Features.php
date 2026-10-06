@@ -87,6 +87,9 @@ namespace Nino {
 		private const int MANUAL_ENTRIES = 40;
 		private const int MANUAL_HANDLE_LENGTH = 120;
 
+		// The longest a maturity word may be: it is drawn beside a name
+		public const int MATURITY_LENGTH = 24;
+
 		// The coarse "what is this for" a feature is filed under, one per
 		// feature: what the Features panel filters by and what a person
 		// browsing a catalogue of forty features navigates by. A vocabulary
@@ -211,6 +214,72 @@ namespace Nino {
 		}
 
 		/**
+		 *	The shortcodes a feature registered, by name. Read from what is
+		 *	registered now rather than from the manual's handles, which are a
+		 *	convention: a shortcode belongs to the feature whose class - or a
+		 *	class below its namespace, like Posts\Shortcodes - answers it.
+		 *	Nothing is asked of Modules::callModules() or Html::addShortcode():
+		 *	the callback is on record, and its owner can be read from it.
+		 *	Only a feature that is active has registered anything
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					Feature key
+		 *
+		 *	@return 	array										The names, sorted; [] for an unknown key or a feature that registered none
+		 */
+		public static function shortcodes( array &$appData, string $key ): array {
+
+			$feature = self::get( $appData, $key );
+			if( $feature === null )
+				return [];
+
+			$module	= ltrim( $feature['module'], '\\' );
+			$names	= [];
+
+			foreach( \Nino\Html::shortcodes( $appData ) as $name )
+				foreach( \Nino\Callbacks::registered( $appData, '/nino/html/shortcode/'. $name ) as $callback ) {
+
+					$owner = self::_callbackClass( $callback );
+
+					if( $owner !== null && ( $owner === $module || str_starts_with( $owner, $module. '\\' ) === true ) ) {
+						$names[] = $name;
+						break;
+					}
+				}
+
+			sort( $names );
+
+			return $names;
+		}
+
+		/**
+		 *	The class a callable belongs to: [class|object, method],
+		 *	'Class::method', or the scope of a Closure
+		 *
+		 *	@param		mixed			$callback
+		 *
+		 *	@return 	string|null							The class name without a leading backslash, null for a plain function
+		 */
+		private static function _callbackClass( mixed $callback ): ?string {
+
+			if( is_array( $callback ) === true && isset( $callback[0] ) === true ) {
+
+				if( is_object( $callback[0] ) === true )
+					return $callback[0]::class;
+
+				return is_string( $callback[0] ) === true ? ltrim( $callback[0], '\\' ) : null;
+			}
+
+			if( is_string( $callback ) === true && str_contains( $callback, '::' ) === true )
+				return ltrim( explode( '::', $callback, 2 )[0], '\\' );
+
+			if( $callback instanceof \Closure )
+				return ( new \ReflectionFunction( $callback ) )->getClosureScopeClass()?->getName();
+
+			return null;
+		}
+
+		/**
 		 *	Read and validate one feature's manifest. Null with a warning when
 		 *	the file is missing or does not describe a feature - a manifest
 		 *	that is half right is not applied half way.
@@ -330,6 +399,13 @@ namespace Nino {
 			if( is_string( $category ) === false || ( $category !== '' && preg_match( self::CATEGORY_PATTERN, $category ) !== 1 ) )
 				return $fail( '"category" must be a slug - one of '. implode( ', ', self::CATEGORIES ) );
 
+			// How far along it is, in the author's own words - "Beta", "Example":
+			// a badge in the panel and nothing a check depends on, so no
+			// vocabulary. Short, because it is drawn beside a name
+			$maturity = $raw['maturity'] ?? '';
+			if( $maturity !== '' && self::maturityValid( $maturity ) === false )
+				return $fail( '"maturity" must be a short string or a locale => string map of them' );
+
 			$version = $raw['version'] ?? '';
 			if( is_string( $version ) === false || preg_match( self::VERSION_PATTERN, $version ) !== 1 )
 				return $fail( '"version" must be major.minor.patch' );
@@ -394,6 +470,7 @@ namespace Nino {
 				'description'	=> $raw['description'] ?? '',
 				'manual'			=> $raw['manual'] ?? '',
 				'category'		=> $category,
+				'maturity'		=> $maturity,
 				'version'			=> $version,
 				'nino'				=> trim( $nino ),
 				'php'					=> [ 'ext' => $extensions ],
@@ -1515,6 +1592,29 @@ namespace Nino {
 
 			foreach( $value as $locale => $string )
 				if( is_string( $locale ) === false || is_string( $string ) === false || trim( $string ) === '' )
+					return false;
+
+			return true;
+		}
+
+		/**
+		 *	Whether a maturity is usable: one short string, or a locale =>
+		 *	string map of them, each at most MATURITY_LENGTH characters once
+		 *	trimmed. Public because \Nino\Catalogue validates the same field
+		 *	of the same manifests once they are published - and treats a bad
+		 *	one as no maturity rather than as a bad catalogue
+		 *
+		 *	@param		mixed			$value
+		 *
+		 *	@return 	bool
+		 */
+		public static function maturityValid( mixed $value ): bool {
+
+			if( self::localizedValid( $value ) === false )
+				return false;
+
+			foreach( is_array( $value ) === true ? $value : [ $value ] as $word )
+				if( mb_strlen( trim( (string) $word ) ) > self::MATURITY_LENGTH )
 					return false;
 
 			return true;

@@ -89,6 +89,9 @@ return [
 	// What it is for, one of \Nino\Features::CATEGORIES - what the panel
 	// groups and filters by. See docs/features.md#categories
 	'category'		=> 'content',
+	// Optional: how far along it is, a badge beside the name - one string or
+	// a locale => string map, each at most 24 characters. Free text
+	'maturity'		=> [ 'en_US' => 'Beta', 'de_DE' => 'Beta' ],
 	'version'			=> '1.1.0',
 	'nino'				=> '^1.3',
 	'php'					=> [ 'ext' => [ 'json' ] ],
@@ -114,6 +117,9 @@ skipped with a warning naming the file and the reason, never applied halfway:
   option label are a string or a `locale => string` map. The panel shows
   features that are not active, whose fills are not loaded, so these words
   travel in the manifest.
+- `maturity` is optional: one string or a `locale => string` map, each at most
+  24 characters once trimmed - a badge the Features panel draws beside the
+  name. A longer one, or one that is not a string, is refused.
 - `version` is `major.minor.patch`, optionally with a pre-release suffix.
 - `nino` is a version constraint (`*`, exact, `>=`/`<=`/`>`/`<`/`!=`, `^1.0`,
   `~1.2`, `~1.2.3`, parts joined by comma or space, `||` alternatives);

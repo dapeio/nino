@@ -287,9 +287,12 @@ let confirmAnswer = true;
 // What an install said before it reloaded, in order - the dialog is where an
 // install's word goes, because the offer it was pressed on is gone afterwards
 const alerts = [];
+// ...and how many reloads there were when it was said: a dialog after the reload
+// would be said to a page that is gone
+const alertsAt = [];
 sandbox.window = {
 	Nino : Nino,
-	alert : function( said ) { alerts.push( said ) },
+	alert : function( said ) { alerts.push( said ); alertsAt.push( reloads ) },
 	confirm : function() { return confirmAnswer },
 	location : { hash : '', reload : function() { reloads++ } },
 };
@@ -315,10 +318,10 @@ const panel 	= Nino.admin.features;
 // - and one category each, 'fresh' deliberately without: a project whose
 // features predate the field is the state the panel has to read well too
 const FEATURES = [
-	{ key : 'old', name : 'Old', description : '', category : 'system', version : '3.0.0', installed : null, active : false, update : false, requires : [ 'nowhere' ],
+	{ key : 'old', name : 'Old', description : '', category : 'system', maturity : '', version : '3.0.0', installed : null, active : false, update : false, requires : [ 'nowhere' ],
 		problems : [ 'requires Nino ^0.9, this is 1.0.0', 'requires the php extension "no_such_extension"' ], settings : [] },
-	{ key : 'plain', name : 'Plain', description : 'Nothing to set.', category : 'ui', version : '1.0.0', installed : '0.9.0', active : true, update : true, requires : [], problems : [], settings : [] },
-	{ key : 'sample', name : 'Beispiel-Feature', description : 'Prüft den ganzen Feature-Vertrag.', manual : 'Setze `data-sample="on"` auf den Container.\nJede Zeile wird nacheinander getippt.\n\nMehr braucht es nicht - <b>kein</b> Markup.\n\nEin Backtick ` allein bleibt Text.', category : 'content', version : '1.2.0', installed : '1.2.0', active : true, update : false, requires : [ 'helper' ], problems : [], settings : [
+	{ key : 'plain', name : 'Plain', description : 'Nothing to set.', category : 'ui', maturity : '', version : '1.0.0', installed : '0.9.0', active : true, update : true, requires : [], problems : [], settings : [] },
+	{ key : 'sample', name : 'Beispiel-Feature', description : 'Prüft den ganzen Feature-Vertrag.', manual : 'Setze `data-sample="on"` auf den Container.\nJede Zeile wird nacheinander getippt.\n\nMehr braucht es nicht - <b>kein</b> Markup.\n\nEin Backtick ` allein bleibt Text.', category : 'content', maturity : 'Beispiel', version : '1.2.0', installed : '1.2.0', active : true, update : false, requires : [ 'helper' ], problems : [], settings : [
 		{ name : 'enabled', type : 'bool', label : 'Aktiv', hint : '', required : false, min : null, max : null, maxlength : null, unit : '', options : [], value : true },
 		{ name : 'limit', type : 'int', label : 'Limit', hint : 'Items per page', required : false, min : 1, max : 50, maxlength : null, unit : 'items', options : [], value : 7 },
 		{ name : 'title', type : 'string', label : 'Title', hint : '', required : true, min : null, max : null, maxlength : 40, unit : '', options : [], value : 'Again' },
@@ -329,7 +332,7 @@ const FEATURES = [
 		{ name : 'apiKey', type : 'secret', label : 'API key', hint : '', required : false, min : null, max : null, maxlength : 1000, unit : '', options : [], set : true },
 		{ name : 'hosts', type : 'lines', label : 'Hosts', hint : '', required : false, min : null, max : null, maxlength : null, unit : '', options : [], value : [ 'one', 'two' ] },
 	] },
-	{ key : 'fresh', name : 'Fresh', description : 'Not switched on yet.', category : '', version : '0.1.0', installed : null, active : false, update : false, requires : [], problems : [], settings : [] },
+	{ key : 'fresh', name : 'Fresh', description : 'Not switched on yet.', category : '', maturity : 'Alpha', version : '0.1.0', installed : null, active : false, update : false, requires : [], problems : [], settings : [] },
 ];
 
 /** A features/list answer: the catalogue url, whether features/ is writable, the cache - null unless given - and the installed features, FEATURES unless a list of its own is given (an install adds one the fixture does not carry) */
@@ -342,11 +345,11 @@ function listAnswer( catalogueUrl, writable, cache, features ) {
 // available, 'helper' an upgrade over what is on disk, 'sample' already
 // current - the one state the Available tab excludes
 const OFFERS = [
-	{ key : 'ancient', name : 'Ancient', description : 'Ein ancient', category : 'content', version : '1.0.0', nino : '^0.9', ext : [], requires : [], directory : 'Ancient', archive : 'https://catalogue.test/features/ancient-1.0.0.tar.gz', size : 10, released : '2026-09-07', state : 'incompatible', fits : false, local : null, active : false },
-	{ key : 'extra', name : 'Zusatz', description : 'Ein extra', category : 'marketing', version : '1.0.0', nino : '^1.0', ext : [], requires : [ 'helper' ], directory : 'Extra', archive : 'https://catalogue.test/features/extra-1.0.0.tar.gz', size : 10, released : '2026-09-07', state : 'available', fits : true, local : null, active : false },
-	{ key : 'helper', name : 'Helper', description : '', category : 'system', version : '1.2.0', nino : '^1.0', ext : [], requires : [], directory : 'Helper', archive : 'https://catalogue.test/features/helper-1.2.0.tar.gz', size : 10, released : '', state : 'upgrade', fits : true, local : '1.1.0', active : true },
-	{ key : 'needy', name : 'Needy', description : 'Ein needy', category : 'security', version : '1.0.0', nino : '^1.0', ext : [ 'no_such_extension', 'other' ], requires : [], directory : 'Needy', archive : 'https://catalogue.test/features/needy-1.0.0.tar.gz', size : 10, released : '2026-09-07', state : 'incompatible', fits : false, local : null, active : false },
-	{ key : 'sample', name : 'Beispiel-Feature', description : 'Ein sample', category : 'content', version : '1.2.0', nino : '^1.0', ext : [], requires : [ 'helper' ], directory : 'Sample', archive : 'https://catalogue.test/features/sample-1.2.0.tar.gz', size : 10, released : '2026-09-07', state : 'current', fits : true, local : '1.2.0', active : true },
+	{ key : 'ancient', name : 'Ancient', description : 'Ein ancient', category : 'content', maturity : '', version : '1.0.0', nino : '^0.9', ext : [], requires : [], directory : 'Ancient', archive : 'https://catalogue.test/features/ancient-1.0.0.tar.gz', size : 10, released : '2026-09-07', state : 'incompatible', fits : false, local : null, active : false },
+	{ key : 'extra', name : 'Zusatz', description : 'Ein extra', category : 'marketing', maturity : 'Beta', version : '1.0.0', nino : '^1.0', ext : [], requires : [ 'helper' ], directory : 'Extra', archive : 'https://catalogue.test/features/extra-1.0.0.tar.gz', size : 10, released : '2026-09-07', state : 'available', fits : true, local : null, active : false },
+	{ key : 'helper', name : 'Helper', description : '', category : 'system', maturity : '', version : '1.2.0', nino : '^1.0', ext : [], requires : [], directory : 'Helper', archive : 'https://catalogue.test/features/helper-1.2.0.tar.gz', size : 10, released : '', state : 'upgrade', fits : true, local : '1.1.0', active : true },
+	{ key : 'needy', name : 'Needy', description : 'Ein needy', category : 'security', maturity : '', version : '1.0.0', nino : '^1.0', ext : [ 'no_such_extension', 'other' ], requires : [], directory : 'Needy', archive : 'https://catalogue.test/features/needy-1.0.0.tar.gz', size : 10, released : '2026-09-07', state : 'incompatible', fits : false, local : null, active : false },
+	{ key : 'sample', name : 'Beispiel-Feature', description : 'Ein sample', category : 'content', maturity : '', version : '1.2.0', nino : '^1.0', ext : [], requires : [ 'helper' ], directory : 'Sample', archive : 'https://catalogue.test/features/sample-1.2.0.tar.gz', size : 10, released : '2026-09-07', state : 'current', fits : true, local : '1.2.0', active : true },
 ];
 
 const CACHE = { url : 'https://catalogue.getnino.dev/catalogue.json', fetched : '2026-09-07 12:00', offers : OFFERS };
@@ -481,6 +484,27 @@ check( 'three tabs, Active first, each labelled with its count - Active 2 (plain
 check( 'Active is the tab a panel opens on, role=tab/tablist throughout, aria-selected in step with it', tabs.every( function( t ) { return t.attributes.role === 'tab' } )
 	&& hasClass( tabs[0], 'is-active' ) && tabs[0].attributes['aria-selected'] === 'true' && hasClass( tabs[1], 'is-active' ) === false && tabs[1].attributes['aria-selected'] === 'false' );
 
+// A maturity is a badge after the name, drawn from a word the panel already
+// localized - in a row of every tab and on the feature's own screen, and not in
+// the line under the name, where it would be one more thing to read past
+const badgeOf = function( el ) { return findAll( el, function( n ) { return hasClass( n, 'admin-features-badge' ) } ).map( function( n ) { return n.textContent } ) };
+// The element the badge stands in. In the grouped list the copy is a grid, so a
+// badge placed beside the name there becomes a row of its own under it: it has
+// to stand inside the element that holds the name
+const badgeParents = function( el ) { return findAll( el, function( n ) { return hasClass( n, 'admin-features-badge' ) } ).map( function( n ) { return n.parent } ) };
+check( 'an active feature that carries a maturity shows it as a badge after the name, one that carries none shows nothing, and the line under the name does not mention it',
+	badgeOf( row( mount, 'sample' ) ).join('|') === 'Beispiel' && badgeOf( row( mount, 'plain' ) ).length === 0 && byTag( row( mount, 'sample' ), 'span' ).filter( function( n ) { return hasClass( n, 'admin-features-badge' ) } )[0].tagName === 'SPAN'
+	&& meta( row( mount, 'sample' ) ).indexOf( 'Beispiel' ) === -1 );
+// The badge itself: what the server sends for a feature without a maturity is '',
+// not a missing key, and a value is text whatever it contains
+const holder = element('strong');
+panel._badge( holder, '' );
+panel._badge( holder, '  ' );
+panel._badge( holder, undefined );
+check( 'an empty, blank or missing maturity draws nothing', holder.children.length === 0 );
+panel._badge( holder, '<b>Beta</b>' );
+check( 'a maturity is text, whatever it contains, and goes into the element it was given', holder.children.length === 1 && holder.children[0].textContent === '<b>Beta</b>' && holder.children[0].children.length === 0 && holder.children[0].parent === holder );
+
 // --- the action bar
 
 check( 'the action bar carries the shared classes and one button plus a status line', hasClass( mount.children[1], 'nino-admin-actionbar' ) && hasClass( mount.children[1], 'nino-admin-list-actions' )
@@ -496,6 +520,10 @@ check( 'the Available tab explains there is nothing cached yet', findAll( mount.
 // --- Inactive and Active
 
 fire( tabs[1], 'click' );
+check( 'an inactive row carries the badge after its name too, in the shared copy, and the line under it does not', badgeOf( row( mount, 'fresh' ) ).join('|') === 'Alpha' && badgeOf( row( mount, 'old' ) ).length === 0
+	&& badgeOf( row( mount, 'fresh' ).children[0] ).length === 1 && meta( row( mount, 'fresh' ) ).indexOf( 'Alpha' ) === -1 );
+check( '...and in the element that holds the name - the <strong> of the shared copy, which is a grid - not beside it',
+	badgeParents( row( mount, 'fresh' ) ).length === 1 && badgeParents( row( mount, 'fresh' ) )[0].tagName === 'STRONG' && badgeParents( row( mount, 'fresh' ) )[0].textContent === 'Fresh' );
 check( 'Inactive is the grouped list, one row per feature that is off, in the backend\'s order', rowKeys( mount, 'feature' ) === 'old,fresh'
 	&& hasClass( byTag( mount.children[2], 'ul' )[0], 'nino-admin-list' ) && row( mount, 'old' ).tagName === 'LI' );
 check( 'a row is the shared name-over-line copy, and carries no status badge', hasClass( row( mount, 'fresh' ).children[0], 'nino-admin-list-copy' )
@@ -763,6 +791,8 @@ check( 'the bar the workbench pins to the bottom holds everything the feature ca
 	&& byTag( bar, 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/deactivate')+ '|'+ text('/_admin/common/label/save')
 	&& save.type === 'submit' && hasClass( off, 'nino-admin-btn-danger' ) && off.type === 'button' );
 
+check( 'the feature\'s own screen carries the badge in its heading', badgeOf( byTag( form, 'h2' )[0] ).join('|') === 'Beispiel' && byTag( form, 'h2' )[0].children[0].tagName === 'SPAN' );
+
 /*	One bar under both tabs, so Save can be pressed from the description. A
 	hidden control is not focusable and the browser cannot report a failed
 	constraint on one - the form would simply never submit - so the settings
@@ -831,8 +861,11 @@ check( 'Activate posts features/activate with the key', requests[requests.length
 answer( 400, { error : 'feature "fresh" cannot be activated: nope' } );
 check( 'a refusal shows the kernel\'s reason and reloads nothing', reloads === 0 && activate.disabled === false && hasClass( freshMsg, 'nino-admin-error' ) && freshMsg.textContent === '(400) feature "fresh" cannot be activated: nope' );
 fire( activate, 'click' );
-answer( 200, { feature : FEATURES[3] } );
+const alertsBeforeActivate = alerts.length;
+answer( 200, { feature : FEATURES[3], switchedOn : [ { key : 'fresh', name : 'Fresh' } ] } );
 check( 'success says so, keeps the hash on the panel and reloads the workbench', reloads === 1 && sandbox.window.location.hash === '#features' && freshMsg.textContent === text('/_admin/features/msg/activated')+ ' '+ text('/_admin/features/msg/reload') );
+check( '...and names what it switched on in a dialog, which is said before the reload and not after', alerts.length === alertsBeforeActivate + 1 && alerts[alerts.length - 1] === 'Switched on: Fresh.'
+	&& alerts[alerts.length - 1] === text('/_admin/features/msg/switched-on').replace( '%s', 'Fresh' ) && alertsAt[alertsAt.length - 1] === 0 );
 
 // --- removing the directory, which deactivating deliberately does not do
 
@@ -899,6 +932,8 @@ check( 'and the category now offers what the catalogue brought as well - it is b
 	byTag( mount.children[0].children[1], 'option' ).map( function( o ) { return o.value } ).join('|') === '|content|ui|marketing|security|system|' );
 
 check( 'the Available tab is one card per offer that is not current, ancient/extra/helper/needy but not sample', rowKeys( mount, 'offer' ) === 'ancient,extra,helper,needy' );
+check( 'an offer carries its maturity as a badge after its name, and the one that names none does not', badgeOf( offer( mount, 'extra' ) ).join('|') === 'Beta' && badgeOf( offer( mount, 'needy' ) ).length === 0 );
+check( '...in the <strong> that holds the name there too', badgeParents( offer( mount, 'extra' ) ).length === 1 && badgeParents( offer( mount, 'extra' ) )[0].tagName === 'STRONG' && badgeParents( offer( mount, 'extra' ) )[0].textContent === 'Zusatz' );
 check( 'an offer is a row of the same grouped list, its name in the shared copy, no status badge', offer( mount, 'extra' ).tagName === 'LI'
 	&& hasClass( offer( mount, 'extra' ).children[0], 'nino-admin-list-copy' ) && offer( mount, 'extra' ).children[0].children[0].textContent === 'Zusatz' );
 check( 'an available offer has Install as the primary action, and one line naming its version, its release date and what it is', byTag( offer( mount, 'extra' ), 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/install') && hasClass( byTag( offer( mount, 'extra' ), 'button' )[0], 'nino-admin-btn-primary' )
@@ -939,9 +974,9 @@ const FEATURES_WITH_EXTRA = FEATURES.concat( [ EXTRA ] );
 // Inactive tab afterwards
 const reloadsBeforeInstall = reloads;
 fire( install, 'click' );
-answer( 200, { feature : EXTRA, updated : false, required : [ 'helper' ] } );
+answer( 200, { feature : EXTRA, updated : false, required : [ 'helper', 'a$&b' ] } );
 answer( 200, listAnswer( CACHE.url, true, CACHE, FEATURES_WITH_EXTRA ) );
-check( 'an install that brought a requirement along says which one', alerts[alerts.length - 1] === text('/_admin/features/msg/installed-with').replace( '%s', 'helper' ) );
+check( 'an install that brought a requirement along says which one', alerts[alerts.length - 1] === text('/_admin/features/msg/installed-with').replace( '%s', function() { return 'helper, a$&b' } ) );
 check( '...and, having switched nothing on, reads the list again rather than building the workbench anew', reloads === reloadsBeforeInstall && requests[requests.length - 1].action === 'features/list' );
 
 /*	And what it says when the install switched the feature on, which is what
@@ -950,13 +985,16 @@ check( '...and, having switched nothing on, reads the list again rather than bui
 fire( byTag( paneHead.children[1], 'button' )[2], 'click' );
 fire( offerButton( mount, 'extra' ), 'click' );
 const requestsBeforeActivating = requests.length;
-answer( 200, { feature : EXTRA, updated : false, activated : true, required : [] } );
+answer( 200, { feature : EXTRA, updated : false, activated : true, required : [], switchedOn : [ { key : 'extra', name : 'Extra' } ] } );
 check( 'an install that switched the feature on says that, not only that it installed', alerts[alerts.length - 1] === text('/_admin/features/msg/installed-active') );
 check( '...and builds the whole workbench again, because a feature that is on brings a panel, assets and words the page was built without', reloads === reloadsBeforeInstall + 1 && sandbox.window.location.hash === '#features' && requests.length === requestsBeforeActivating );
 
 fire( offerButton( mount, 'extra' ), 'click' );
-answer( 200, { feature : EXTRA, updated : false, activated : true, required : [ 'helper' ] } );
-check( '...and names what came with it in the same line', alerts[alerts.length - 1] === text('/_admin/features/msg/installed-active-with').replace( '%s', 'helper' ) && reloads === reloadsBeforeInstall + 2 );
+// What came with it is what was switched on, by name - not what was placed:
+// a requirement that was in the directory already but off is placed by nothing,
+// and is switched on all the same
+answer( 200, { feature : EXTRA, updated : false, activated : true, required : [], switchedOn : [ { key : 'extra', name : 'Extra' }, { key : 'helper', name : 'Helper' } ] } );
+check( '...and names what came with it in the same line, by name and without the feature itself, even where nothing was placed for it', alerts[alerts.length - 1] === text('/_admin/features/msg/installed-active-with').replace( '%s', 'Helper' ) && reloads === reloadsBeforeInstall + 2 );
 
 /*	An update to a feature that is already running: the files are in place,
 	and the answer says the update is pending - the request that placed them
@@ -1128,6 +1166,54 @@ check( 'a failed load is reported through the workbench\'s words', mount.childre
 	panel._switch( { key : 'sample' }, 'deactivate', button, line );
 	check( 'a shell without the registry asks nothing', requests.length === sent + 1 );
 }
+
+/*	What a switch says. _switch() is driven directly - the question about unsaved
+	input was asked already, which is its fifth argument - so none of this adds
+	to the reloads the sections above count	*/
+{
+	const button = { disabled : false };
+	const line = { textContent : '', classList : { add : function() {}, remove : function() {} } };
+	const reloadsBefore = reloads;
+	const dialogs = alerts.length;
+
+	panel._switch( { key : 'plain' }, 'update', button, line, true );
+	answer( 200, { feature : FEATURES[1], switchedOn : [] } );
+	check( 'an update that switched nothing on says nothing, and still reloads', alerts.length === dialogs && reloads === reloadsBefore + 1 );
+
+	panel._switch( { key : 'plain' }, 'update', button, line, true );
+	answer( 200, { feature : FEATURES[1], switchedOn : [ { key : 'newer', name : 'Newer' }, { key : 'newest', name : 'Newest' } ] } );
+	check( 'an update that switched a requirement on says so - the new version asked for something that was off', alerts.length === dialogs + 1 && alerts[alerts.length - 1] === 'Switched on: Newer, Newest.' && reloads === reloadsBefore + 2 && alertsAt[alertsAt.length - 1] === reloadsBefore + 1 );
+
+	panel._switch( { key : 'fresh' }, 'activate', button, line, true );
+	answer( 200, { feature : FEATURES[3] } );
+	check( 'an answer without the list says nothing, as an older server\'s does', alerts.length === dialogs + 1 && reloads === reloadsBefore + 3 );
+
+	// A deactivation says where the feature's shortcodes still stand
+	const found = [
+		{ shortcode : 'sample', total : 4, places : [
+			{ kind : 'template', where : 'page-x.tpl' }, { kind : 'text', where : '/found/raw (de_DE)' },
+			{ kind : 'element', where : 'found/one list' }, { kind : 'element', where : 'found/one body (de_DE)' } ] },
+		{ shortcode : 'sample-b', total : 12, places : [ { kind : 'template', where : 'a$&b.tpl' } ] },
+	];
+	panel._switch( { key : 'sample' }, 'deactivate', button, line, true );
+	answer( 200, { feature : FEATURES[2], found : found } );
+	const said = alerts[alerts.length - 1];
+	check( 'a deactivation that leaves shortcodes behind shows one dialog, before the reload, with a line for each', alerts.length === dialogs + 2 && alertsAt[alertsAt.length - 1] === reloadsBefore + 3 && reloads === reloadsBefore + 4
+		&& said.split('\n').length === 3 && said.indexOf( text('/_admin/features/msg/deactivated-found').split('%s')[0] ) === 0 );
+	check( '...the brackets written by the script, the places in the words of the fills, and what does not fit counted instead of listed', said.split('\n')[1] === '[sample] '
+		+ text('/_admin/features/label/found-template').replace( '%s', 'page-x.tpl' )+ ', '+ text('/_admin/features/label/found-text').replace( '%s', '/found/raw (de_DE)' )+ ', '
+		+ text('/_admin/features/label/found-element').replace( '%s', 'found/one list' )+ ', '+ text('/_admin/features/label/found-element').replace( '%s', 'found/one body (de_DE)' )
+		&& said.split('\n')[2] === '[sample-b] '+ text('/_admin/features/label/found-template').replace( '%s', function() { return 'a$&b.tpl' } )+ ', '+ text('/_admin/features/label/found-more').replace( '%d', '11' ) );
+
+	panel._switch( { key : 'sample' }, 'deactivate', button, line, true );
+	answer( 200, { feature : FEATURES[2], found : [] } );
+	check( 'a deactivation that leaves nothing behind says nothing', alerts.length === dialogs + 2 && reloads === reloadsBefore + 5 );
+}
+
+// The badge is drawn in the tool layer under the ids of the panel's own panes, like the rest of the module's rules
+const css = source('_admin/Nino/Modules/Features/assets/admin.css');
+check( 'the badge rule is in the module\'s stylesheet, for the list and for the screen behind it, with a border of its own so that the word is not carried by colour alone',
+	/#features-list \.admin-features-badge,\s*#features-detail \.admin-features-badge \{[^}]*border:/.test( css ) && css.indexOf( '@layer nino.tool {' ) !== -1 && css.indexOf( '.admin-features-badge' ) > css.indexOf( '@layer nino.tool {' ) );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

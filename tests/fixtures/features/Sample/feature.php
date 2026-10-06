@@ -7,6 +7,7 @@ return [
 	'name'				=> [ 'en_US' => 'Sample feature', 'de_DE' => 'Beispiel-Feature' ],
 	'description'	=> [ 'en_US' => 'Exercises the whole feature contract.', 'de_DE' => 'Prüft den ganzen Feature-Vertrag.' ],
 	'category'		=> 'content',
+	'maturity'		=> [ 'en_US' => 'Example', 'de_DE' => 'Beispiel' ],
 	'version'			=> '1.2.0',
 	'nino'				=> '^1.0',
 	'php'					=> [ 'ext' => [ 'json' ] ],

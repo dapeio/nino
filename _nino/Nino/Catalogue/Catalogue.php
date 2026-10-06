@@ -40,9 +40,10 @@ namespace Nino {
 	 *											"sha256": "...", "size": 12345, "released": "2026-09-07"
 	 *										} ] }
 	 *
-	 *										"category" arrived after format 1 was published and did not
-	 *										raise the number: this reader takes only the keys it knows
-	 *										and ignores the rest, so a kernel written before the field
+	 *										"category" and the optional "maturity" (a short word, or a
+	 *										locale => word map) arrived after format 1 was published and
+	 *										did not raise the number: this reader takes only the keys it
+	 *										knows and ignores the rest, so a kernel written before a field
 	 *										existed reads a catalogue carrying it without noticing.
 	 *										Anything later that a kernel would have to understand is
 	 *										what format 2 is for.
@@ -764,6 +765,13 @@ namespace Nino {
 			if( is_string( $category ) === false || preg_match( \Nino\Features::CATEGORY_PATTERN, $category ) !== 1 )
 				$category = '';
 
+			// Dropped the same way, for the same reason: a badge is not worth
+			// the catalogue. Absent in every catalogue published before the
+			// field existed, hence ''
+			$maturity = $entry['maturity'] ?? '';
+			if( \Nino\Features::maturityValid( $maturity ) === false )
+				$maturity = '';
+
 			$version = (string) ( $entry['version'] ?? '' );
 			if( preg_match( \Nino\Features::VERSION_PATTERN, $version ) !== 1 )
 				return '"version" must be major.minor.patch';
@@ -814,6 +822,7 @@ namespace Nino {
 				'name'				=> $entry['name'],
 				'description'	=> $entry['description'] ?? '',
 				'category'		=> $category,
+				'maturity'		=> $maturity,
 				'version'			=> $version,
 				'nino'				=> $nino,
 				'php'					=> [ 'ext' => $extensions ],
