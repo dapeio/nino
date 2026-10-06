@@ -149,7 +149,7 @@ check( 'insertElement accepts a legitimate 0 for a required integer field', \Nin
 check( 'insertElement accepts a legitimate false for a required boolean field', \Nino\Elements::insertElement( $appData, '/reqtype/item2', [ 'title' => 'x', 'tags' => [ 'a' ], 'count' => 1, 'active' => false ], 'de_DE' ) !== false );
 \Nino\Elements::deleteElement( $appData, '/reqtype/item2', '*' );
 
-// An image is exempt from "required" on purpose: both editing tools upload
+// An image is exempt from "required" on purpose: the element form uploads
 // its file only once the element exists and has a uri to attach it to, so
 // enforcing the flag here would reject the very insert that has to come
 // first - the type could never get an element at all. A model carrying the
@@ -537,7 +537,7 @@ check( 'an empty reference is accepted - "no reference" is a legitimate value',
 	is_array( \Nino\Elements::insertElement( $appData, '/article/none', [ 'headline' => 'x', 'author' => '' ], '*' ) ) === true );
 
 // A target deleted later stays readable rather than being scrubbed: the
-// element forms show it as missing, which is recoverable - silently dropping
+// element form shows it as missing, which is recoverable - silently dropping
 // it is not
 \Nino\Elements::deleteElement( $appData, '/author/ada', '*' );
 check( 'a reference whose target is gone keeps its value',

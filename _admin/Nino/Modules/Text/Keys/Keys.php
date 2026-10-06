@@ -124,8 +124,8 @@ namespace Nino\Modules\Text {
 		}
 
 		/**
-		 *	List every known text key, blacklisted or not (unlike the Text panel's
-		 *	own panel, this is exactly where you'd come to un-blacklist one)
+		 *	List every known text key, blacklisted or not (unlike the Text panel,
+		 *	this is exactly where you'd come to un-blacklist one)
 		 *	- see \Nino\Text::entries() - and what the form that creates or
 		 *	renames a key offers to choose from, 'categories': per namespace the
 		 *	categories a key can go in -

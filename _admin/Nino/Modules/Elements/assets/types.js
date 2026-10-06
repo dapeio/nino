@@ -446,7 +446,7 @@
 				}
 
 				// Which type this reference may point at. Part of the field, not
-				// of the value: it is what both element forms build their select
+				// of the value: it is what the element form builds its select
 				// of elements from, so a reference without one has nothing to
 				// offer (Types.php's _unknownReferencedType() rejects the save).
 				// A brand-new type is not in this list yet - it has no file on
@@ -602,8 +602,8 @@
 			actions.className = 'admin-field-actions';
 
 			// Same ↑/↓ pair the Routes list uses (see its admin.js's _move()) - a
-			// field's position in the model is the order both element forms
-			// render it in, so this is a real editing control, not just a way
+			// field's position in the model is the order the element form
+			// renders it in, so this is a real editing control, not just a way
 			// to tidy up this list
 			const move = dc.createElement('span');
 			move.className = 'admin-field-move';

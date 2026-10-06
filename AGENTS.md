@@ -806,7 +806,7 @@ temporary project and must not rely on a previously installed working tree.
 | Anything a catalogue feature reads from the kernel - the demo catalogue page and its `data-demo-preset` marks, `Nino.css`, the base unit's templates and keys, the feature contract | the catalogue's own checks against this checkout, before the push: `NINO_ROOT=$PWD ../nino-features/bin/check.sh`, with [dapeio/nino-features](https://github.com/dapeio/nino-features) cloned beside it. CI's `features` job runs the same tests after the push - a key renamed on one side alone turns it red, so a rename that spans both repositories is pushed to the catalogue first and to Nino right after, and the push that changes Nino's side finds the catalogue renamed already |
 | Shared public UI slider/tabs | corresponding `tests/nino-ui-*-js-smoke.js` |
 | Shared management UI/CSS structure | owner tests plus `tests/admin-lists-js-smoke.js` |
-| Multi-element reference control | `tests/nino-ui-elementlist-js-smoke.js` plus both element forms' own tests |
+| Multi-element reference control | `tests/nino-ui-elementlist-js-smoke.js` plus the Elements panel's and the Roles tab's own tests (`tests/admin-elements-js-smoke.js`, `tests/admin-roles-js-smoke.js`) |
 
 Complete suite:
 

@@ -1707,8 +1707,8 @@
 		 *	exists and has a uri to attach the upload to (see _renderField()'s
 		 *	image branch), so on a new element it is empty by construction -
 		 *	holding the save back for it would make the element impossible to
-		 *	create. Same rule /_admin's own copy of this module applies, and
-		 *	the one its Element Types editor now enforces when writing a model.
+		 *	create. Same rule \Nino\Elements applies on insert, and the one the
+		 *	Element Types tab enforces when writing a model.
 		 *	Nor is a field this account may not write: the save leaves it out,
 		 *	and it can be neither filled in nor focused
 		 *

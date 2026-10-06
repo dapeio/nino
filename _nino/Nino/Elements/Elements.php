@@ -860,7 +860,7 @@ namespace Nino {
 		 *	a positive number caps the list. An absent key is the single
 		 *	reference the field has always been, which is what makes every model
 		 *	written before this keep its exact meaning - and what lets the
-		 *	setting stay optional in both element forms.
+		 *	setting stay optional in a model.
 		 *
 		 *	@param		array 		$field				One model field definition
 		 *
@@ -886,8 +886,8 @@ namespace Nino {
 		// string against the model, deliberately not against the referenced
 		// file, which a write reads under a lock on this type's file alone,
 		// and a reference whose target is deleted later stays readable either
-		// way (both element forms show it as missing rather than dropping
-		// it). An empty value is "no reference"; 'required' is what makes one
+		// way (the element form shows it as missing rather than dropping it).
+		// An empty value is "no reference"; 'required' is what makes one
 		// mandatory. A list reference holds exactly the uris a single one
 		// holds, so each entry answers the same question; the same element
 		// twice is one choice stored twice, which nothing reading the list
@@ -1042,8 +1042,10 @@ namespace Nino {
 				}
 
 				// Keep the set of fields this update is actually meant to write.
-				// updateElement() also serves deliberately-partial updates (most
-				// notably the Images panel's immediate image upload). The previous wildcard
+				// updateElement() also serves deliberately-partial updates (the
+				// Elements panel's image upload and image removal write one field,
+				// the Language panel's Translations tab one language's text
+				// fields). The previous wildcard
 				// merge filled every omitted key from whichever locale happened to
 				// occur first in the type file, then wrote all of those values into
 				// the requested locale below - uploading an English image could
@@ -1128,11 +1130,11 @@ namespace Nino {
 					// Required - a plain empty() would also reject a legitimate 0/false
 					// value on a boolean/integer/double field, so presence alone is
 					// enough for those; string/array still need an actual non-empty
-					// value. An image is exempt: both editing tools upload its file
+					// value. An image is exempt: the element form uploads its file
 					// separately, only once the element exists and has a uri to
 					// attach the upload to, so a required image would reject the
 					// very insert that has to happen first - making the element
-					// impossible to create at all. Neither tool writes the flag onto
+					// impossible to create at all. The Element Types tab never writes the flag onto
 					// an image field (see the Element Types tab's own cleanModel(),
 					// _admin/Nino/Modules/Elements/Types/Types.php); this
 					// keeps a hand-edited model that does out of that dead end. A

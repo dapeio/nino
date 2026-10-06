@@ -13,6 +13,13 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** there is one element form. The element-types recipe, AGENTS.md's
+  test matrix, the comments in the kernel, the Elements panel, the shared
+  kit and the tests spoke of "both element forms" and "either tool", from the
+  time `_admin` had an element editor of its own, and named an
+  `_admin/assets/elements.js` that no longer exists. They name the element
+  form, and where the shared `Nino.adminUi.elementList()` is meant, the Roles
+  tab's permission picker as its second caller. No code changed.
 - **Source comments:** the kernel's runtime modules describe the workbench and
   the callback order as they are - a module's panel appears in the workbench's
   rail, not a "dev area" or an "editor"; the Navigations nav() entry has its

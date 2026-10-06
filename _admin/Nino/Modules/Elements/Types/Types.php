@@ -284,7 +284,7 @@ namespace Nino\Modules\Elements {
 						everything downstream reads: \Nino\Elements builds the
 						prefix a reference has to start with as
 						'/'. trim( elementType, '/' ). '/', referencedBy() below
-						compares the same way, and both element forms build an
+						compares the same way, and the element form builds an
 						option value as '/'+ elementType+ '/'+ uri - which is
 						'//pages/x' for a type written as '/pages'. A model
 						written by hand with the leading slash therefore ran
@@ -369,7 +369,7 @@ namespace Nino\Modules\Elements {
 		 *
 		 *	Checked before the type file is written rather than silently
 		 *	dropping the field: a reference nobody can satisfy would render as
-		 *	an empty, permanently unusable select in both element forms, and
+		 *	an empty, permanently unusable select in the element form, and
 		 *	the author has no way of telling that from "this type simply has
 		 *	no elements yet". A type deleted *later* is a different case and
 		 *	stays tolerated - the forms show the dangling value rather than

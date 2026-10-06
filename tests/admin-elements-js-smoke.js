@@ -40,7 +40,7 @@ const source = fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/El
 const context = vm.createContext( sandbox );
 
 // The shared admin layer, loaded first exactly as the tool's own shell loads
-// it: elements.js asks Nino.adminUi whether a model field is a multi element
+// it: the panel's admin.js asks Nino.adminUi whether a model field is a multi element
 // reference, so a sandbox without it tests a module the page never runs
 vm.runInContext(
 	fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' ),
@@ -60,9 +60,7 @@ const elements = sandbox.Nino.admin.elements;
 // filename>", a directory no deployment has - every upload is stored under
 // /images (Nino\Images::UPLOAD_DIR). The preview shown right after an upload
 // renders the server's own url and always looked right, so the 404 only
-// appeared once the form was re-rendered from the stored value. Same bug and
-// same guard as _admin's own copy of this module (see
-// tests/admin-elements-js-smoke.js)
+// appeared once the form was re-rendered from the stored value.
 check( 'no image url is built under a /uploads directory', /(?:asset|public)Url\(\s*'\/uploads\//.test( source ) === false );
 check( 'the image preview is built under /images, via the public content prefix', /publicUrl\(\s*'\/images\/'\+ value\s*\)/.test( source ) === true );
 
@@ -88,9 +86,9 @@ check( 'actual text edits are detected', elements._fieldValuesEqual( { type : 's
 // An image field never blocks a save, even when its model says required: its
 // file is uploaded separately, only once the element exists and has a uri to
 // attach it to, so on a new element it is empty by construction. Enforcing it
-// would make the element impossible to create at all - the same rule _admin's
-// own copy of this module and its Element Types editor apply (see
-// tests/admin-elements-js-smoke.js and tests/admin-smoke.php)
+// would make the element impossible to create at all - the same rule the
+// kernel's insertElement() and the Element Types tab apply (see
+// tests/kernel-smoke.php and tests/admin-system-smoke.php)
 sandbox.document.getElementById = function() { return null };
 sandbox.Nino.content = { getText : function() { return '' } };
 

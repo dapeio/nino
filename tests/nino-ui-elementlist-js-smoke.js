@@ -5,9 +5,10 @@
  *											field uses once its model lets it hold more than one
  *											reference.
  *
- *											Both element forms render it (see _admin/assets/
- *											elements.js and _admin/Nino/Modules/Elements/assets/admin.js), so its
- *											behaviour is pinned once here rather than twice
+ *											The element form and the Roles tab's permission
+ *											picker render it (see _admin/Nino/Modules/Elements/
+ *											assets/admin.js and _admin/Nino/Modules/Users/assets/roles.js),
+ *											so its behaviour is pinned once here rather than twice
  *											over there: what the hidden input holds after every
  *											move, the cap, and that a target deleted since is
  *											still shown rather than dropped.
@@ -161,7 +162,7 @@ console.log( 'Nino.adminUi.elementList - the multi-reference control\n' );
 
 // --- the value the form reads back ---------------------------------------
 
-// Every other field in both forms is read out of the dom by [data-field]. A
+// Every other field in the element form is read out of the dom by [data-field]. A
 // control keeping its value in closure state instead would be the one field
 // that breaks locale switching, dirty tracking and save alike
 const empty = build();

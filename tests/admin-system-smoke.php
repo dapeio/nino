@@ -401,7 +401,7 @@ check( 'apiCreate rejects an already-existing type', $duplicateCreateRequest['/n
 
 // --- element reference fields ---
 //
-// The type a reference may point at is what both element forms build their
+// The type a reference may point at is what the element form builds its
 // select from. A reference nobody can satisfy would render as an empty,
 // permanently unusable control - and look exactly like a type that simply has
 // no elements yet - so the save is refused instead of the field being dropped

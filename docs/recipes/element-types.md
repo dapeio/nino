@@ -35,7 +35,7 @@ Common model properties:
 | `suffix` | non-boolean, non-image, non-element | Fixed UI unit such as `€` or `%` |
 | `options` | supported controls, never element | Fixed choices presented by the editing UI |
 | `width`, `height` | image | Required generated image dimensions |
-| `alt` | image | Optional key of a sibling field that holds the image's alt text per language. The target MUST be a `string` field with `locale => true` and without `html`, and not the image itself; the Element Types tab drops any other link on save. The element forms then say in both fields that the one is the other's alt text. `[element]` and `[elements]` render `[[<alt key>]]` as an empty string for an element, or a language, that has no value there, so `alt="[[imageAlt]]"` is `alt=""` (decorative) rather than the literal fill |
+| `alt` | image | Optional key of a sibling field that holds the image's alt text per language. The target MUST be a `string` field with `locale => true` and without `html`, and not the image itself; the Element Types tab drops any other link on save. The element form then says in both fields that the one is the other's alt text. `[element]` and `[elements]` render `[[<alt key>]]` as an empty string for an element, or a language, that has no value there, so `alt="[[imageAlt]]"` is `alt=""` (decorative) rather than the literal fill |
 | `elementType` | element | Required uri of the element type this field may reference |
 | `multiple` | element | Int: the field holds an ordered list of references, capped at this number (`0` = uncapped). Absent = a single reference |
 
@@ -44,12 +44,12 @@ upload path can be created.
 
 An `element` field references another element. Its value is that element's full
 uri (`/<type>/<slug>`) — exactly what `\Nino\Elements::getElement()` takes, so a
-template never re-joins it with the model. Both element forms render it as a
+template never re-joins it with the model. The element form renders it as a
 select of the referenced type's elements, and the kernel rejects a value that
 points outside `elementType`. `elementType` is mandatory: `insertElementType()`
-drops a field without one, and the Admin editor refuses to save a reference to a
+drops a field without one, and the Element Types tab refuses to save a reference to a
 type that does not exist. A target deleted later is tolerated — the stored value
-survives and both forms mark it as missing. Element references never enter a
+survives and the element form marks it as missing. Element references never enter a
 Translations export: a uri is a choice, not translatable text.
 
 Adding `multiple` makes that reference a list. Presence of an **int** is the
@@ -65,14 +65,15 @@ rejects a duplicate, enforces the cap, and stores the result through
 a partial removal left behind. The cap is enforced in the kernel rather than in
 the form that drew the list: an api caller never went near that control.
 
-Both element forms swap the select for `Nino.adminUi.elementList()`, the shared
+The element form swaps the select for `Nino.adminUi.elementList()`, the shared
 multi-reference control (chosen entries with move/remove, plus a search field
-over the options the form already loaded). It owns no strings — both element
-forms pass `Nino.content.getText()` lookups. Pass `ordered: false` for a value
-that is a set rather than a list: the move buttons go away, because offering
-them says the order carries meaning. The Roles tab's permission picker is that
-mode. Do not restate it in a tool; see §6a's trap about tool copies of shared
-components.
+over the options the form already loaded). It owns no strings — its callers,
+the element form and the Roles tab's permission picker, pass
+`Nino.content.getText()` lookups. Pass `ordered: false` for a value that is a
+set rather than a list: the move buttons go away, because offering them says
+the order carries meaning. The Roles tab's permission picker is that mode. Do
+not restate it in a panel; see §6a's trap about restating a shared component
+in a panel.
 
 ## Named or numbered element uris
 

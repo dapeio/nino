@@ -879,8 +879,8 @@
 		 *	than a single uri - the client-side half of
 		 *	\Nino\Elements::isMultiElement(), and deliberately the same rule:
 		 *	presence of a number under 'multiple' is the switch, so a model
-		 *	written before the setting existed stays a single reference in both
-		 *	element forms exactly as it does in the kernel.
+		 *	written before the setting existed stays a single reference in the
+		 *	element form exactly as it does in the kernel.
 		 *
 		 *	@param	{Object}	field		Model field definition
 		 *
@@ -906,13 +906,14 @@
 		 *	in what order".
 		 *
 		 *	Searching is done here, over the options the caller already
-		 *	loaded, rather than against an endpoint of its own. Both element
-		 *	forms fetch the referenced type's elements up front to build the
-		 *	single-reference select (see either tool's
-		 *	_loadReferenceOptions()), so the data is in the page before this
-		 *	control is built - a request per keystroke would ask a second time
-		 *	for what is already here, and would have to grow a debounce and a
-		 *	race guard to do it.
+		 *	loaded, rather than against an endpoint of its own. The element
+		 *	form fetches the referenced type's elements up front to build the
+		 *	single-reference select (see _loadReferenceOptions() in
+		 *	_admin/Nino/Modules/Elements/assets/admin.js), and the Roles tab
+		 *	holds every permission already, so the data is in the page before
+		 *	this control is built - a request per keystroke would ask a second
+		 *	time for what is already here, and would have to grow a debounce
+		 *	and a race guard to do it.
 		 *
 		 *	Owns no strings, same rule as table() and switchField(): /_admin is
 		 *	English and the workbench translates, so every word comes from the
@@ -953,7 +954,7 @@
 			field.appendChild( name );
 
 			// The value itself. A hidden input rather than component state the
-			// form would have to know about: every other field in both forms is
+			// form would have to know about: every other field in the element form is
 			// read back out of the dom by [data-field], and a control that
 			// needed its own read path would be the one field that breaks
 			// locale switching, dirty tracking and save alike

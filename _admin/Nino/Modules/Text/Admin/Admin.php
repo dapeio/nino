@@ -136,8 +136,8 @@ namespace Nino\Modules\Text {
 		 *	global (locale-independent) or per-locale key, whether it currently
 		 *	holds markup (so the editor offers the html editor for it) and a
 		 *	maxlength derived from the longest current value. Blacklisted keys
-		 *	(technical values, not content) are hidden entirely - unlike _admin's
-		 *	own text editor, this one only ever edits existing key values,
+		 *	(technical values, not content) are hidden entirely - unlike the
+		 *	Text Keys tab, this one only ever edits existing key values and
 		 *	never sees the blacklist itself - and so are the words of the
 		 *	workbench, /_admin/..., which are not the site's text.
 		 *
