@@ -218,16 +218,14 @@ namespace Nino\Modules\Elements {
 
 				$elements[] = [
 					'uri' 		=> $uri,
-					'label' 	=> self::label( $model, $element, $uri ),
+					'label' 	=> self::label( $element, $uri ),
 					'values' 	=> $values,
 				];
 			}
 
 			\Nino\Http::ok( $request, [
-				'model' 		=> $model,
 				'columns' 	=> $columns,
 				'elements' 	=> $elements,
-				'total' 		=> count( $elements ),
 			] );
 		}
 
@@ -284,7 +282,6 @@ namespace Nino\Modules\Elements {
 			}
 
 			\Nino\Http::ok( $request, [
-				'model' 	=> $model,
 				'global' 	=> $global,
 				'locales' => $locales,
 				'raw' 		=> self::rawBuckets( $typeData, $uri ),
@@ -887,9 +884,9 @@ namespace Nino\Modules\Elements {
 		 *	image (a file), an array (a structure) and a rich-text string (its
 		 *	value is markup, and a cell renders text).
 		 *
-		 *	Mirrored by Nino.adminUi.tableModel.isDisplayable() on the frontend -
-		 *	the server decides what to send, the client what to draw, and the two
-		 *	have to agree on the same rule.
+		 *	The one place the rule lives: apiList() answers these keys as its
+		 *	columns, and the panel draws exactly those (see assets/admin.js's
+		 *	_renderList()).
 		 *
 		 *	@param		array 		$model				Type model definition
 		 *
@@ -927,13 +924,12 @@ namespace Nino\Modules\Elements {
 		 *	thing the row actually is, and it matches how the type overview
 		 *	already lists its elements (see typeDescr()).
 		 *
-		 *	@param		array 		$model				Type model definition (unused, kept for call-site symmetry)
 		 *	@param		array 		$element			Resolved element data
 		 *	@param		string		$uri					Element uri, used when there is no title
 		 *
 		 *	@return 	string									Label
 		 */
-		private static function label( array $model, array $element, string $uri ): string {
+		private static function label( array $element, string $uri ): string {
 
 			if( isset( $element['title'] ) === true && is_scalar( $element['title'] ) === true && (string) $element['title'] !== '' )
 				return (string) $element['title'];

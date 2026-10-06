@@ -3,8 +3,8 @@
  * (Nino.adminUi.tableModel in _admin/assets/Nino.admin.js).
  *
  * The renderer needs a DOM; the model does not, so the parts that are easy to
- * get wrong - type-aware ordering, page clamping, which fields may appear at
- * all - are tested directly by loading the file into a stub window.
+ * get wrong - type-aware ordering and page clamping - are tested directly by
+ * loading the file into a stub window.
  *
  * Usage: node tests/nino-ui-table-js-smoke.js
  */
@@ -57,20 +57,6 @@ vm.runInContext( source, ctx );
 const model = ctx.Nino.adminUi.tableModel;
 
 console.log('Shared admin data table (model)');
-
-// --- which fields may be a column ----------------------------------------
-
-check( 'a plain string is displayable', model.isDisplayable( { type : 'string' } ) === true );
-check( 'numbers, booleans and dates are displayable',
-	[ 'integer', 'double', 'boolean', 'date', 'datetime' ].every( t => model.isDisplayable( { type : t } ) === true ) );
-check( 'an element reference is displayable - it is a uri, which is text',
-	model.isDisplayable( { type : 'element' } ) === true );
-check( 'an image is not - a cell cannot show a file', model.isDisplayable( { type : 'image' } ) === false );
-check( 'an array is not', model.isDisplayable( { type : 'array' } ) === false );
-// The one that is easy to miss: rich text is a string by type, but its value
-// is markup, and the table renders text
-check( 'a rich-text string is not displayable even though its type is "string"',
-	model.isDisplayable( { type : 'string', html : true } ) === false );
 
 // --- cell text ------------------------------------------------------------
 

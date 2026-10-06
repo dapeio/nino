@@ -13,6 +13,12 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Workbench:** `elements/list` answers `{ columns, elements }` and
+  `elements/get` `{ global, locales, raw }`: the type's `model` and the list's
+  `total` are gone from both, since the panel takes the model with the type
+  and counts its rows itself. `tests/admin-smoke.php` holds the list's shape
+  (1 red before).
+
 - **Workbench:** `users/list` no longer answers `self`, the signed-in
   account's mail beside the list. Every row says whether it is that account
   (`isSelf`), which is what the Users panel reads; nothing read the field.
@@ -277,6 +283,12 @@ All notable changes to Nino are documented in this file.
   wrap is gone.
 
 ### Removed
+
+- **`Nino.adminUi.tableModel.DISPLAYABLE` and `isDisplayable()`**, the
+  browser's copy of the rule which model fields a table cell can show. The
+  server decides it alone (`\Nino\Modules\Elements\Admin::displayableColumns()`)
+  and sends the columns; the Elements panel never asked the copy. A script
+  that called it can read the `columns` of `elements/list` instead.
 
 - **Two workbench fills nothing showed:** `/_admin/elements/label/type`
   ("Type:") and `/_admin/images/label/image` ("Image"), in both locales. No

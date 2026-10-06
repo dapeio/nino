@@ -1329,25 +1329,6 @@
 		 */
 		tableModel : {
 
-			// Field types that fit in a cell. 'image' and 'array' do not,
-			// and a 'string' carrying html:true is markup, not text - see
-			// Types.php's FIELD_TYPES and its 'html' flag
-			DISPLAYABLE : [ 'string', 'integer', 'double', 'boolean', 'date', 'datetime', 'element' ],
-
-			/**
-			 *	Whether one model field belongs in the table
-			 *
-			 *	@param		{Object}	field			Model field definition
-			 *
-			 *	@return		{boolean}
-			 */
-			isDisplayable : function( field ) {
-				const type = ( field || {} ).type || '';
-				if( type === 'string' && ( field || {} ).html === true )
-					return false;
-				return Nino.adminUi.tableModel.DISPLAYABLE.indexOf( type ) !== -1;
-			},
-
 			/**
 			 *	One cell's text. Deliberately language-neutral: a boolean is
 			 *	a glyph rather than "yes"/"no", so the same component reads

@@ -847,6 +847,9 @@ $_POST['data'] = json_encode( [ 'type' => 'demotable', 'locale' => 'de_DE' ] );
 $listed = $request['/nino/http/response']['body'] ?? [];
 check( 'apiList names the columns a cell can show, in model order', ( $listed['columns'] ?? null ) === [ 'title', 'price' ] );
 check( 'apiList answers the translation asked, global fields included', ( $listed['elements'][0]['values'] ?? null ) === [ 'title' => 'Eins', 'price' => 9.5 ] );
+// The model is the type's and reaches the panel with the type (elements/types);
+// the list answers what the table draws and nothing it would carry for nobody
+check( 'apiList answers the columns and the rows, not the type\'s model or a count', array_keys( $listed ) === [ 'columns', 'elements' ] );
 
 $request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $_POST['data'] = json_encode( [ 'type' => 'demotable', 'locale' => 'en_US' ] );
