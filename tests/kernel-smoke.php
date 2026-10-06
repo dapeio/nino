@@ -982,6 +982,236 @@ unset( $appData['./nino/callbacks'][ \Nino\Images::RENDER ] );
 echo "\n";
 
 
+// --- Images - the orientation a camera recorded ------------------------
+
+echo "Images::process / fit / size - EXIF orientation\n";
+
+/**
+ *	A 300x200 picture of four flat quadrants (red, green / blue, yellow),
+ *	stored the way a camera that wrote this EXIF orientation stores it: the
+ *	pixels are the inverse of the turn, so a reader that applies the
+ *	orientation sees the upright picture again. The mapping is the table of
+ *	the EXIF specification - which edge of the stored image is the visual top,
+ *	left, right or bottom - and deliberately not gd's own rotate, which is
+ *	what the kernel is checked against
+ *
+ *	@param		int				$orientation	1-8
+ *
+ *	@return		string										Plain jpeg bytes, no EXIF
+ */
+function makeQuadrantJpeg( int $orientation ): string {
+
+	$displayWidth		= 300;
+	$displayHeight	= 200;
+	$turned					= $orientation >= 5;
+	$storedWidth		= $turned ? $displayHeight : $displayWidth;
+	$storedHeight		= $turned ? $displayWidth : $displayHeight;
+
+	$img = imagecreatetruecolor( $storedWidth, $storedHeight );
+	$colors = [
+		'TL' => imagecolorallocate( $img, 220, 0, 0 ),
+		'TR' => imagecolorallocate( $img, 0, 220, 0 ),
+		'BL' => imagecolorallocate( $img, 0, 0, 220 ),
+		'BR' => imagecolorallocate( $img, 220, 220, 0 ),
+	];
+
+	for( $row = 0; $row < $storedHeight; $row++ )
+		for( $column = 0; $column < $storedWidth; $column++ ) {
+			[ $x, $y ] = match( $orientation ) {
+				1 => [ $column, $row ],
+				2 => [ $displayWidth - 1 - $column, $row ],
+				3 => [ $displayWidth - 1 - $column, $displayHeight - 1 - $row ],
+				4 => [ $column, $displayHeight - 1 - $row ],
+				5 => [ $row, $column ],
+				6 => [ $displayWidth - 1 - $row, $column ],
+				7 => [ $displayWidth - 1 - $row, $displayHeight - 1 - $column ],
+				8 => [ $row, $displayHeight - 1 - $column ],
+			};
+			imagesetpixel( $img, $column, $row, $colors[ ( $y < $displayHeight / 2 ? 'T' : 'B' ). ( $x < $displayWidth / 2 ? 'L' : 'R' ) ] );
+		}
+
+	ob_start();
+	imagejpeg( $img, null, 95 );
+	$bytes = ob_get_clean();
+	imagedestroy( $img );
+
+	return $bytes;
+}
+
+/**
+ *	The payload of an Exif APP1 segment - "Exif\0\0", a TIFF header and an
+ *	IFD0 of two entries (an ASCII one first, so the reader has to walk past
+ *	something before it finds the orientation)
+ *
+ *	@param		string		$order				'II' (little) or 'MM' (big endian)
+ *	@param		int				$orientation
+ *	@param		int				$type					The TIFF type of the orientation entry: 3 SHORT, 4 LONG
+ *	@param		int				$ifdOffset		Where the header says IFD0 starts
+ *
+ *	@return		string
+ */
+function makeExifPayload( string $order, int $orientation, int $type = 3, int $ifdOffset = 8 ): string {
+
+	$short	= $order === 'II' ? 'v' : 'n';
+	$long		= $order === 'II' ? 'V' : 'N';
+	$value	= $type === 3 ? pack( $short, $orientation ). "\0\0" : pack( $long, $orientation );
+
+	$ifd = pack( $short, 2 )
+		. pack( $short, 0x010E ). pack( $short, 2 ). pack( $long, 4 ). "abc\0"
+		. pack( $short, 0x0112 ). pack( $short, $type ). pack( $long, 1 ). $value
+		. pack( $long, 0 );
+
+	return "Exif\0\0". $order. pack( $short, 42 ). pack( $long, $ifdOffset ). $ifd;
+}
+
+/**
+ *	A jpeg with an APP1 segment (or several) put in right behind its start marker
+ *
+ *	@param		string		$jpeg
+ *	@param		string		...$payloads	One segment payload each, in this order
+ *
+ *	@return		string
+ */
+function withApp1( string $jpeg, string ...$payloads ): string {
+
+	$segments = '';
+	foreach( $payloads as $payload )
+		$segments .= "\xFF\xE1". pack( 'n', strlen( $payload ) + 2 ). $payload;
+
+	return substr( $jpeg, 0, 2 ). $segments. substr( $jpeg, 2 );
+}
+
+/**
+ *	Which quadrant colour a pixel is nearest to: R, G, B or Y
+ *
+ *	@param		string		$bytes				An image
+ *	@param		float			$x						As a share of the width
+ *	@param		float			$y						As a share of the height
+ *
+ *	@return		string
+ */
+function quadrantAt( string $bytes, float $x, float $y ): string {
+
+	$img		= imagecreatefromstring( $bytes );
+	$color	= imagecolorat( $img, (int) ( imagesx( $img ) * $x ), (int) ( imagesy( $img ) * $y ) );
+	imagedestroy( $img );
+
+	[ $red, $green, $blue ] = [ ( $color >> 16 ) & 255, ( $color >> 8 ) & 255, $color & 255 ];
+
+	return $blue > 120 ? 'B' : ( $red > 120 && $green > 120 ? 'Y' : ( $red > 120 ? 'R' : 'G' ) );
+}
+
+/**
+ *	The four quadrants of a stored image, top left to bottom right
+ *
+ *	@param		array			&$appData
+ *	@param		string		$filename			Below /images/
+ *
+ *	@return		string
+ */
+function quadrantsOf( array &$appData, string $filename ): string {
+
+	$bytes = (string) file_get_contents( \Nino\Filesystem::path( $appData, '/images/'. $filename ) );
+
+	return quadrantAt( $bytes, 0.25, 0.25 ). quadrantAt( $bytes, 0.75, 0.25 ). quadrantAt( $bytes, 0.25, 0.75 ). quadrantAt( $bytes, 0.75, 0.75 );
+}
+
+$exifRight = true;
+$exifWhy = '';
+foreach( [ 'II', 'MM' ] as $order )
+	foreach( range( 1, 8 ) as $orientation ) {
+
+		$source = withApp1( makeQuadrantJpeg( $orientation ), makeExifPayload( $order, $orientation ) );
+		$read		= \Nino\Images::size( $source );
+		if( $read === false || $read['orientation'] !== $orientation || $read['width'] !== 300 || $read['height'] !== 200 ) {
+			$exifRight = false;
+			$exifWhy .= " size($order $orientation)";
+		}
+
+		// A wide target, a tall one (which crops the sides off the picture as
+		// it is shown, not as it is stored) and a fit - each one has to come
+		// out the size and with the quadrants of the upright picture
+		$crops = [ [ 150, 100 ], [ 100, 150 ] ];
+		foreach( $crops as [ $w, $h ] ) {
+			$stored = \Nino\Images::process( $appData, $source, $w, $h, 'exif/crop-'. $order. $orientation. '-'. $w );
+			$size		= $stored === false ? false : getimagesize( \Nino\Filesystem::path( $appData, '/images/'. $stored ) );
+			if( $stored === false || $size[0] !== $w || $size[1] !== $h || quadrantsOf( $appData, $stored ) !== 'RGBY' ) {
+				$exifRight = false;
+				$exifWhy .= " process($order $orientation {$w}x{$h})";
+			}
+		}
+
+		$stored = \Nino\Images::fit( $appData, $source, 120, 120, 'exif/fit-'. $order. $orientation );
+		$size		= $stored === false ? false : getimagesize( \Nino\Filesystem::path( $appData, '/images/'. $stored ) );
+		if( $stored === false || $size[0] !== 120 || $size[1] !== 80 || quadrantsOf( $appData, $stored ) !== 'RGBY' ) {
+			$exifRight = false;
+			$exifWhy .= " fit($order $orientation)";
+		}
+	}
+check( 'every EXIF orientation 1-8, in both byte orders, comes out upright: process() to 150x100 and 100x150 and fit() to 120x120 keep the size and the quadrants of the upright picture'. $exifWhy, $exifRight === true );
+
+$unturned = \Nino\Images::process( $appData, makeQuadrantJpeg( 6 ), 100, 150, 'exif/none' );
+check( '...while the same stored pixels without an Exif block are not turned - it is the header that decides', $unturned !== false && quadrantsOf( $appData, $unturned ) !== 'RGBY' );
+
+// What a header reader may and may not believe - and that it never raises
+// a warning on the way, which the framework's error handler would make a 500
+$exifWarnings = [];
+set_error_handler( static function( int $no, string $message ) use ( &$exifWarnings ): bool { if( ( error_reporting() & $no ) !== 0 ) $exifWarnings[] = $message; return true; } );
+
+$upright		= makeQuadrantJpeg( 1 );
+$plainPng		= makeTestImage( 40, 30, true );
+$xmp				= "http://ns.adobe.com/xap/1.0/\0<x:xmpmeta/>";
+$exif6			= makeExifPayload( 'MM', 6 );
+$shortOf		= static fn( string $bytes ): int => \Nino\Images::size( $bytes )['orientation'] ?? 0;
+
+check( 'size() of a png is its size and orientation 1', \Nino\Images::size( $plainPng ) === [ 'width' => 40, 'height' => 30, 'type' => IMAGETYPE_PNG, 'orientation' => 1 ] );
+check( '...of a jpeg without an APP1 segment, orientation 1', $shortOf( $upright ) === 1 );
+check( '...of a truncated Exif block, orientation 1', $shortOf( withApp1( $upright, substr( $exif6, 0, -16 ) ) ) === 1 );
+check( '...of an IFD offset past the end of the segment, orientation 1', $shortOf( withApp1( $upright, makeExifPayload( 'II', 6, 3, 4000 ) ) ) === 1 );
+check( '...of an IFD offset inside the header, orientation 1', $shortOf( withApp1( $upright, makeExifPayload( 'II', 6, 3, 4 ) ) ) === 1 );
+check( '...of an orientation that is not a SHORT, orientation 1', $shortOf( withApp1( $upright, makeExifPayload( 'II', 6, 4 ) ) ) === 1 );
+check( '...of an orientation value out of range, orientation 1', $shortOf( withApp1( $upright, makeExifPayload( 'II', 9 ) ) ) === 1 && $shortOf( withApp1( $upright, makeExifPayload( 'MM', 0 ) ) ) === 1 );
+check( '...of a TIFF header that is neither II nor MM, or has no 42, orientation 1', $shortOf( withApp1( $upright, str_replace( 'MM', 'XX', $exif6 ) ) ) === 1
+	&& $shortOf( withApp1( $upright, substr_replace( $exif6, "\x00\x2B", 8, 2 ) ) ) === 1 );
+check( '...an XMP APP1 in front of the Exif one is skipped', $shortOf( withApp1( $upright, $xmp, $exif6 ) ) === 6 );
+check( '...and an APP1 that is not Exif is not read as one', $shortOf( withApp1( $upright, $xmp ) ) === 1 );
+
+$sizeSix		= \Nino\Images::size( withApp1( $upright, makeExifPayload( 'II', 6 ) ) );
+$sizeEight	= \Nino\Images::size( withApp1( $upright, makeExifPayload( 'MM', 8 ) ) );
+$sizeThree	= \Nino\Images::size( withApp1( $upright, makeExifPayload( 'MM', 3 ) ) );
+check( 'size() swaps width and height for 6 and 8, and not for 3', $sizeSix['width'] === 200 && $sizeSix['height'] === 300 && $sizeEight['width'] === 200 && $sizeEight['height'] === 300
+	&& $sizeThree['width'] === 300 && $sizeThree['height'] === 200 && $sizeThree['orientation'] === 3 );
+check( 'size() answers false for what is not an image, or not one the kernel takes', \Nino\Images::size( 'not an image' ) === false && \Nino\Images::size( '' ) === false );
+
+// Fill bytes in front of a marker are legal, and a header of endless
+// segments is not followed to its end
+$app1		= "\xFF\xE1". pack( 'n', strlen( $exif6 ) + 2 ). $exif6;
+$behind	= static fn( string $segments ): string => substr( $upright, 0, 2 ). $segments. substr( $upright, 2 );
+check( 'fill bytes in front of the Exif marker are skipped, and a header with 70 segments in front of it is not followed that far',
+	$shortOf( $behind( "\xFF\xFF\xFF". $app1 ) ) === 6
+	&& $shortOf( $behind( str_repeat( "\xFF\xE2\x00\x02", 70 ). $app1 ) ) === 1
+	&& $shortOf( $behind( str_repeat( "\xFF\xE2\x00\x02", 10 ). $app1 ) ) === 6 );
+check( 'nothing above raised a php warning'. ( $exifWarnings === [] ? '' : ' - '. $exifWarnings[0] ), $exifWarnings === [] );
+
+restore_error_handler();
+
+// A handler that renders the picture itself is told what the pixels need
+$seenSource = null;
+\Nino\Callbacks::registerCallback( $appData, \Nino\Images::RENDER, static function( array &$appData, array &$image ) use ( &$seenSource ): void {
+	$seenSource = $image['source'];
+	$image['filename'] = false;
+} );
+\Nino\Images::process( $appData, withApp1( makeQuadrantJpeg( 6 ), makeExifPayload( 'MM', 6 ) ), 64, 64, 'exif/hooked' );
+check( 'a RENDER handler is told the orientation, while width and height stay the stored pixels', ( $seenSource['orientation'] ?? null ) === 6 && ( $seenSource['width'] ?? null ) === 200 && ( $seenSource['height'] ?? null ) === 300 );
+\Nino\Images::process( $appData, makeTestImage( 40, 30, true ), 64, 64, 'exif/hooked' );
+check( '...and 1 for an image that has none', ( $seenSource['orientation'] ?? null ) === 1 );
+unset( $appData['./nino/callbacks'][ \Nino\Images::RENDER ] );
+
+check( 'the header is read without ext-exif: Images.php calls no exif_ function', preg_match( '/\bexif_[a-z_]+\s*\(/', (string) file_get_contents( __DIR__. '/../_nino/Nino/Images/Images.php' ) ) === 0 );
+
+echo "\n";
+
+
 // --- Images::delete --------------------------------------------------------
 
 echo "Images::delete - never outside its own directory\n";
@@ -1001,6 +1231,8 @@ echo "Images::getSlots / getSlot / setSlotFilename\n";
 $appData['/nino/html/images'] = [
 	'hero' => [ 'label' => 'Hero', 'width' => 1600, 'height' => 600, 'filename' => null ],
 ];
+// The slots live in config.php: the writers below change what that holds, not this request's copy
+\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
 
 check( 'getSlots returns every developer-fixed slot', array_keys( \Nino\Images::getSlots( $appData ) ) === [ 'hero' ] );
 check( 'getSlot returns one slot\'s definition', ( \Nino\Images::getSlot( $appData, 'hero' )['label'] ?? null ) === 'Hero' );
@@ -1013,7 +1245,28 @@ check( 'setSlotFilename updates the in-memory slot immediately', \Nino\Images::g
 $persisted = include \Nino\Filesystem::path( $appData, '/config.php' );
 check( 'setSlotFilename persists to config.php (same as Auth::updateUser)', ( $persisted['/nino/html/images']['hero']['filename'] ?? null ) === 'hero.1600x600.jpg' );
 
+// null is "no image": the record is written, and a slot with none renders nothing
+check( 'setSlotFilename( null ) takes the image out of the slot and persists that', \Nino\Images::setSlotFilename( $appData, 'hero', null ) === true
+	&& \Nino\Images::getSlot( $appData, 'hero' )['filename'] === null
+	&& array_key_exists( 'filename', ( include \Nino\Filesystem::path( $appData, '/config.php' ) )['/nino/html/images']['hero'] ) === true
+	&& ( include \Nino\Filesystem::path( $appData, '/config.php' ) )['/nino/html/images']['hero']['filename'] === null );
+\Nino\Images::setSlotFilename( $appData, 'hero', 'hero.1600x600.jpg' );
+
+/*	A write that cannot happen answers false and leaves the record as it was -
+	the caller decides about a file on the strength of that answer. The lock
+	file's path is made a directory, the way a full disk or a missing right
+	would stop it	*/
+$configLock = $sandbox. '/private/data/.locks/'. sha1( '/config.php' ). '.lock';
+@unlink( $configLock );
+mkdir( $configLock, 0755, true );
+check( 'setSlotFilename answers false where config.php cannot be written, and leaves the filename as it was', \Nino\Images::setSlotFilename( $appData, 'hero', null ) === false
+	&& \Nino\Images::getSlot( $appData, 'hero' )['filename'] === 'hero.1600x600.jpg' );
+rmdir( $configLock );
+check( '...and writes again once it can', \Nino\Images::setSlotFilename( $appData, 'hero', null ) === true );
+\Nino\Images::setSlotFilename( $appData, 'hero', 'hero.1600x600.jpg' );
+
 $appData['/nino/html/images']['logo'] = [ 'label' => 'Logo', 'width' => 400, 'height' => 400, 'filename' => null ];
+\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
 
 \Nino\Modules\Images::init( $appData );
 check( '[image] shortcode renders an <img> tag under the public prefix', str_contains( \Nino\Html::renderHtml( $appData, '[image hero]' ), '<img src="/public/images/hero.1600x600.jpg" width="1600" height="600"' ) === true );
@@ -1048,10 +1301,88 @@ $shippedImg = \Nino\Modules\Images::$html['img'];
 \Nino\Modules\Images::$html['img'] = '<img loading="lazy" src="[[src]]" alt="[[alt]]" data-size="[[width]]x[[height]]">';
 $replacedImg = \Nino\Html::renderHtml( $appData, '[image hero]' );
 \Nino\Modules\Images::$html['img'] = $shippedImg;
-check( 'the <img> fragment is the property, so replacing it replaces what the shortcode renders', $replacedImg === '<img loading="lazy" src="/public/images/hero.1600x600.jpg" alt="Hero" data-size="1600x600">' );
+check( 'the <img> fragment is the property, so replacing it replaces what the shortcode renders', $replacedImg === '<img loading="lazy" src="/public/images/hero.1600x600.jpg" alt="" data-size="1600x600">' );
 check( '...and putting the shipped one back renders the shipped markup again', str_starts_with( \Nino\Html::renderHtml( $appData, '[image hero]' ), '<img src="/public/images/hero.1600x600.jpg"' ) === true );
 
 unset( $appData['./nino/html/shortcodes']['argprobe'], $appData['./nino/callbacks']['/nino/html/shortcode/argprobe'] );
+
+// The alt text of a slot: the one stored for the language, then the template's
+// own, then none - and never the slot's label, which is a name for the person
+// who edits the slot and says nothing about the picture
+check( '[image] with no alt anywhere is alt="" - the label of the slot is not an alt text', str_contains( \Nino\Html::renderHtml( $appData, '[image hero]' ), ' alt="">' ) === true );
+
+check( 'setSlotAlt answers false for an unknown slot, a language the site does not have, a value that is no string and bytes that are not utf-8',
+	\Nino\Images::setSlotAlt( $appData, 'nope', [ 'de_DE' => 'x' ] ) === false
+	&& \Nino\Images::setSlotAlt( $appData, 'hero', [ 'xx_XX' => 'x' ] ) === false
+	&& \Nino\Images::setSlotAlt( $appData, 'hero', [ 'de_DE' => [ 'x' ] ] ) === false
+	&& \Nino\Images::setSlotAlt( $appData, 'hero', [ 'de_DE' => "caf\xE9" ] ) === false
+	&& isset( \Nino\Images::getSlot( $appData, 'hero' )['alt'] ) === false );
+check( 'setSlotAlt trims, and turns control characters - a line break among them - into spaces', \Nino\Images::setSlotAlt( $appData, 'hero', [ 'de_DE' => "  Ein\nHaus\t am See \x07 " ] ) === true
+	&& \Nino\Images::getSlot( $appData, 'hero' )['alt'] === [ 'de_DE' => 'Ein Haus  am See' ] );
+check( '...and persists exactly that to config.php', ( ( include \Nino\Filesystem::path( $appData, '/config.php' ) )['/nino/html/images']['hero']['alt'] ?? null ) === [ 'de_DE' => 'Ein Haus  am See' ] );
+check( 'a language that is not posted keeps its text', \Nino\Images::setSlotAlt( $appData, 'hero', [ 'en_US' => 'A house' ] ) === true
+	&& \Nino\Images::getSlot( $appData, 'hero' )['alt'] === [ 'de_DE' => 'Ein Haus  am See', 'en_US' => 'A house' ] );
+check( 'an empty value removes that language\'s entry, and the last one takes the key away', \Nino\Images::setSlotAlt( $appData, 'hero', [ 'de_DE' => '' ] ) === true
+	&& \Nino\Images::getSlot( $appData, 'hero' )['alt'] === [ 'en_US' => 'A house' ]
+	&& \Nino\Images::setSlotAlt( $appData, 'hero', [ 'en_US' => '  ' ] ) === true
+	&& isset( \Nino\Images::getSlot( $appData, 'hero' )['alt'] ) === false
+	&& isset( ( include \Nino\Filesystem::path( $appData, '/config.php' ) )['/nino/html/images']['hero']['alt'] ) === false );
+check( 'cleanAlt() is the same cleaning, and false for what is no utf-8', \Nino\Images::cleanAlt( " a\r\nb " ) === 'a  b' && \Nino\Images::cleanAlt( "\xFF" ) === false );
+
+// An alt text saved while the slot's record is written by someone else too: only
+// its own entry is changed, so an upload that finished in between survives
+$earlierRequest = $appData;
+$appData['/nino/html/images']['hero']['filename'] = 'stale.jpg';
+\Nino\Images::setSlotAlt( $appData, 'hero', [ 'de_DE' => 'Haus' ] );
+check( 'setSlotAlt changes the alt entry alone: what config.php holds for the rest of the slot stays, whatever this request believes', ( ( include \Nino\Filesystem::path( $appData, '/config.php' ) )['/nino/html/images']['hero']['filename'] ?? null ) === 'hero.1600x600.jpg' );
+$appData['/nino/html/images']['hero']['filename'] = 'hero.1600x600.jpg';
+
+// ...and the other order: a request that booted before the alt text was saved - an
+// upload or a removal that is slow - writes its filename afterwards. Only the filename
+// is changed, so the alt text survives, and the request takes the filename as its own
+check( 'setSlotFilename changes the filename alone: an alt text saved after this request booted stays, whatever this request believes', isset( $earlierRequest['/nino/html/images']['hero']['alt'] ) === false
+	&& \Nino\Images::setSlotFilename( $earlierRequest, 'hero', 'later.1600x600.jpg' ) === true
+	&& ( include \Nino\Filesystem::path( $appData, '/config.php' ) )['/nino/html/images']['hero']['alt'] === [ 'de_DE' => 'Haus' ]
+	&& ( include \Nino\Filesystem::path( $appData, '/config.php' ) )['/nino/html/images']['hero']['filename'] === 'later.1600x600.jpg'
+	&& $earlierRequest['/nino/html/images']['hero']['filename'] === 'later.1600x600.jpg' );
+\Nino\Images::setSlotFilename( $appData, 'hero', 'hero.1600x600.jpg' );
+
+// A slot this request still knows but config.php no longer holds (a developer deleted
+// it in between) is not written back into it
+$staleSlot = $appData;
+$staleSlot['/nino/html/images']['ghost'] = [ 'label' => 'Ghost', 'width' => 10, 'height' => 10, 'filename' => null ];
+check( 'setSlotFilename answers false for a slot config.php does not hold any more, writes nothing and leaves this request as it was', \Nino\Images::setSlotFilename( $staleSlot, 'ghost', 'ghost.10x10.jpg' ) === false
+	&& $staleSlot['/nino/html/images']['ghost']['filename'] === null
+	&& isset( ( include \Nino\Filesystem::path( $appData, '/config.php' ) )['/nino/html/images']['ghost'] ) === false );
+
+check( '[image] prefers the alt stored for the current language over the template\'s own', str_contains( \Nino\Html::renderHtml( $appData, '[image hero alt="tpl"]' ), ' alt="Haus">' ) === true );
+$appData['./nino/locales/current'] = 'en_US';
+check( '...and uses the template\'s where nothing is stored for that language', str_contains( \Nino\Html::renderHtml( $appData, '[image hero alt="tpl"]' ), ' alt="tpl">' ) === true );
+check( '...and none, alt="", where there is neither', str_contains( \Nino\Html::renderHtml( $appData, '[image hero]' ), ' alt="">' ) === true );
+
+// Shortcode output is rendered once more: a text an editor wrote must not open a fill or a shortcode there
+\Nino\Html::addFills( $appData, [ '[[/k]]' => 'FILLED' ], '*' );
+\Nino\Filesystem::putFileContent( $appData, '/templates/t.tpl', 'INCLUDED' );
+\Nino\Modules\Template::init( $appData );
+\Nino\Images::setSlotAlt( $appData, 'hero', [ 'en_US' => 'x [[/k]] [template /templates/t] "q" <b>' ] );
+$hostileAlt = \Nino\Html::renderHtml( $appData, '[image hero]' );
+check( 'a stored alt text is escaped and its brackets neutralised: neither the fill nor the template runs', str_contains( $hostileAlt, 'alt="x &#91;&#91;/k]] &#91;template /templates/t] &quot;q&quot; &lt;b&gt;"' ) === true
+	&& str_contains( $hostileAlt, 'FILLED' ) === false && str_contains( $hostileAlt, 'INCLUDED' ) === false );
+check( '...and it wins over the template\'s own alt text in that language', str_contains( \Nino\Html::renderHtml( $appData, '[image hero alt="y"]' ), 'alt="x &#91;' ) === true );
+// Between the tags the content is what is rendered, and only for a slot that has a picture: where an address and not a <img> is wanted - a meta tag, a mail
+check( '[image]...[/image] renders its content with [[src]] filled in, and an alt text stored for the slot is brackets-neutralised there too', \Nino\Html::renderHtml( $appData, '[image hero]<i data-alt="[[alt]]"></i>[/image]' ) === '<i data-alt="x &#91;&#91;/k]] &#91;template /templates/t] &quot;q&quot; &lt;b&gt;"></i>' );
+\Nino\Images::setSlotAlt( $appData, 'hero', [ 'en_US' => '' ] );
+check( '[image]...[/image] fills [[src]], [[width]], [[height]] and [[alt]] - the alt from the template where nothing is stored', \Nino\Html::renderHtml( $appData, '[image hero alt="Haus"]<meta content="https://example.com[[src]]" data-size="[[width]]x[[height]]" data-alt="[[alt]]">[/image]' )
+	=== '<meta content="https://example.com/public/images/hero.1600x600.jpg" data-size="1600x600" data-alt="Haus">' );
+check( '...and renders nothing at all - no content, no empty tag - for a slot with no file or one that is not there', \Nino\Html::renderHtml( $appData, '[image logo]<meta content="[[src]]">[/image]' ) === '' && \Nino\Html::renderHtml( $appData, '[image nope]<meta content="[[src]]">[/image]' ) === '' );
+check( '...and a bare [image] with no content is the <img> as before', str_starts_with( \Nino\Html::renderHtml( $appData, '[image hero]' ), '<img src="/public/images/hero.1600x600.jpg"' ) === true );
+// The content of a shortcode runs up to the first closing tag, across a second opening of the same one: a bare [image] ahead of the content form has to close itself
+check( '...a bare [image] ahead of the content form in one template is written [image x][/image], and then the two do not run into each other', \Nino\Html::renderHtml( $appData, '<p>[image hero alt=""][/image]</p><h1>T</h1>[image hero]<meta content="[[src]]">[/image]' )
+	=== '<p><img src="/public/images/hero.1600x600.jpg" width="1600" height="600" alt=""></p><h1>T</h1><meta content="/public/images/hero.1600x600.jpg">' );
+$appData['./nino/locales/current'] = 'de_DE';
+\Nino\Images::setSlotAlt( $appData, 'hero', [ 'de_DE' => '' ] );
+unset( $appData['./nino/html/shortcodes']['template'], $appData['./nino/callbacks']['/nino/html/shortcode/template'] );
+$appData['./nino/html/cache'] = false;
 
 echo "\n";
 
@@ -1193,6 +1524,29 @@ check( 'an element value with one invalid utf-8 byte still renders, replacement 
 check( '...and so does a rich field, whose text nodes go through the sanitizer instead', str_contains(
 	\Nino\Html::sanitizeHtml( "<p>Cafe\xE9 Munchen</p>" ), 'Munchen'
 ) === true );
+
+// An image field names the string field that holds its alt text per language.
+// An element, or one language of it, that has no value there carries no key at
+// all - and the template would show the field itself: alt="[[photoAlt]]"
+\Nino\Filesystem::putFileContent( $appData, '/elements/alttest.php', [
+	'title'	=> 'Alt Test',
+	'model'	=> [
+		'photo'			=> [ 'type' => 'image', 'width' => 40, 'height' => 30, 'alt' => 'photoAlt' ],
+		'photoAlt'	=> [ 'type' => 'string', 'locale' => true ],
+		'plain'			=> [ 'type' => 'image', 'width' => 40, 'height' => 30, 'alt' => 'globalAlt' ],
+		'globalAlt'	=> [ 'type' => 'string' ],
+	],
+	'*'			=> [ '*' => [], 'one' => [ 'photo' => 'one.jpg' ], 'two' => [ 'photo' => 'two.jpg' ] ],
+	'de_DE'	=> [ 'one' => [ 'photoAlt' => 'Ein Haus' ] ],
+] );
+$altLoop = '[elements /alttest locale="%s"]<img src="[[photo]]" alt="[[photoAlt]]" data-plain="[[globalAlt]]">|[/elements]';
+check( '[elements] renders the stored alt text of an element, and alt="" for one that has none', \Nino\Html::renderHtml( $appData, sprintf( $altLoop, 'de_DE' ) )
+	=== '<img src="one.jpg" alt="Ein Haus" data-plain="[[globalAlt]]">|<img src="two.jpg" alt="" data-plain="[[globalAlt]]">|' );
+check( '...and alt="" for every element in a language nobody wrote one for', \Nino\Html::renderHtml( $appData, sprintf( $altLoop, 'en_US' ) )
+	=== '<img src="one.jpg" alt="" data-plain="[[globalAlt]]">|<img src="two.jpg" alt="" data-plain="[[globalAlt]]">|' );
+check( '[element] does the same, for a language with a value and for one without', \Nino\Html::renderHtml( $appData, '[element /alttest/one locale="de_DE"][[photoAlt]][/element]' ) === 'Ein Haus'
+	&& \Nino\Html::renderHtml( $appData, '[element /alttest/one locale="en_US"]<[[photoAlt]]>[/element]' ) === '<>' );
+check( 'a link to a field that is global is not read: the fill stays what it was', str_contains( \Nino\Html::renderHtml( $appData, sprintf( $altLoop, 'de_DE' ) ), '[[globalAlt]]' ) === true );
 
 echo "\n";
 

@@ -190,6 +190,91 @@ All notable changes to Nino are documented in this file.
   the shell's words (286 → 296, 8 red before) and `tests/admin-system-smoke.php`
   the bundle order (708 → 711, 3 red before).
 
+- **Images:** an image slot can have its image taken away, tells when a picture
+  was scaled up, says where it is used and keeps an alt text per language. All
+  of it is in the Images panel (`_admin/Nino/Modules/Images/`).
+  **Remove image** (`images/remove`, after a question that names the slot and
+  what follows) writes the slot's record first and deletes the file second, and
+  only a file the slot owns - its name starts with the slot's own
+  `<uri>.`, the deterministic path an upload writes, and no other slot names it:
+  a name written into `config.php` by hand, such as a picture a template includes
+  literally, is cleared from the slot and stays on disk. A slot without an image
+  answers `200` with no filename, so the call can be repeated. An upload answers
+  `source` (the size the picture is shown at) and `belowTarget`; a picture
+  smaller than the slot's target is saved all the same and the line under the
+  control says so in words, in the new `is-warning` style
+  (`.nino-admin-field-image-msg.is-warning`, `.nino-admin-field-hint.is-warning`).
+  The size is the one the picture is shown at, so a photograph with an EXIF
+  orientation of 6 is measured upright. Each slot lists the pages that show it
+  (*Used on: Home (/)*) or warns *Not included anywhere*: `Slots::usage()` reads
+  `templates/*.tpl` and every served `GET` route, follows `[template
+  /templates/<name>]` includes (visited set, depth 20) and reads a body named
+  by `[[/nino/http/response/locale]]` once per language; the Image Slots tab
+  appends *not included anywhere* to such a row, with the templates that
+  mention it. The **alt text** is stored per slot and language
+  (`'/nino/html/images'[<uri>]['alt'] = [ 'de_DE' => '...' ]`), written with
+  `Images::setSlotAlt()` - cleaned (`Images::cleanAlt()`: control characters
+  become spaces, the ends are trimmed), merged per posted language, an empty
+  text removes its entry - by a targeted mutation of `config.php`, as is the
+  filename an upload or a removal writes (`Images::setSlotFilename()`), so an alt
+  text saved while an upload finishes costs neither, in whichever order the two
+  end. An alt text typed and not saved is reported to `Nino.admin.dirty`: the
+  panel asks before a category is opened over it, on a reload and on a log out. `images/alt` answers `400` for a
+  language the site does not have, a value that is no string and more than 250
+  characters. New fills `/_admin/images/*` and `/_admin/slots/label/unused`,
+  `/_admin/slots/label/templates` in both interface languages.
+  `tests/admin-images-js-smoke.js` (new, 40 checks) draws one slot;
+  `tests/kernel-smoke.php` (809 → 850, with the EXIF checks below),
+  `tests/admin-smoke.php` (296 → 336) and `tests/admin-system-smoke.php`
+  (711 → 725) hold the rest.
+
+- **Elements:** an image field has the same two things. **Remove image**
+  (`elements/removeimage`) writes the field empty and deletes the file this
+  element's own upload wrote - `elements/<type>/<uri>[-<key>][-<locale>].<w>x<h>.<ext>`
+  with `-<key>` only where the type has more than one image field and `-<locale>`
+  only for a per-language one - not named by another field or language of the element - and an upload says when
+  the picture was scaled up. A field may name the string field that holds its
+  alt text per language, model property `alt` (`'alt' => 'imageAlt'`): the
+  Element Types tab offers the plain, per-language string fields and
+  `Types::cleanModel()` drops a link to a global field, a rich-text field, the
+  image itself or a field that is not there; both element forms say which field
+  is whose. `[element]` and `[elements]` render `[[imageAlt]]` as an empty string
+  for an element or language that has no value there - not as the literal fill -
+  so `alt="[[imageAlt]]"` is `alt=""`, decorative. The element-types recipe
+  documents the property. `tests/admin-smoke.php`, `tests/admin-system-smoke.php`,
+  `tests/admin-elements-js-smoke.js` (180 → 191) and
+  `tests/admin-elementtypes-js-smoke.js` (48 → 50) hold it.
+
+- **Installer:** a page unit and the base unit may declare image slots,
+  `imageSlots` in their `manifest.php`: `uri => [ 'label' => string or locale
+  map, 'width', 'height', 'filename' ]`, the `filename` a file the unit ships
+  under `files` - or none, for a slot that starts empty. The Routes step (and
+  the Setup step, for the base unit) checks each one (a slot uri, a label for the native locale, a size within
+  `Images::MAX_SOURCE_PIXELS`, a seed file that is there once the files are
+  copied) and fails by name - *could not seed image slot <uri>* - before any
+  route is written; it only adds slots, so a slot the project already has keeps
+  its label, size and image when the step is applied again. Documented in
+  `docs/setup.md`, `docs/setup.de.md` and the installer-package recipe.
+  `tests/install-smoke.php` (280 → 299) seeds the home unit's slot, applies
+  again, fails on a seed that cannot be copied, and checks every page unit: each
+  `[image <uri>]` in its templates is declared, each declared slot has a valid
+  uri, a label, a size and a seed the unit ships, and no template carries a
+  literal `<img>` of the images directory.
+
+- **Images:** `[image <uri>]...[/image]` renders its content instead of the
+  `<img>`, and only for a slot that has an image: `[[src]]` (the path of the
+  file from the site's root), `[[width]]`, `[[height]]` and `[[alt]]` are filled
+  in, escaped and with `[` as `&#91;` like the `<img>`'s own. A place that needs
+  the address and not a picture - a meta tag, a mail - is written
+  `[image /logo]<meta property="og:image" content="https://[[/website/url]][[src]]">[/image]`
+  and is not left as an empty or a broken tag where nothing is uploaded yet. A
+  bare `[image <uri>]` is unchanged - but a shortcode's content runs up to the
+  first closing tag, across a second opening of the same one, so a bare
+  `[image]` ahead of the content form in one template has to be written
+  `[image <uri>][/image]`, or it takes the text up to the closing tag as its own
+  content. The templates the base unit ships do not mix the two. Documented in
+  `docs/development.md` and `docs/development.de.md`; `tests/kernel-smoke.php` (850 → 855) holds it.
+
 ### Changed
 
 - **Workbench:** what the panels print for a failure. A failure with a code is
@@ -257,6 +342,59 @@ All notable changes to Nino are documented in this file.
   `README.md`, `README.de.md`, `docs/concepts.md`, `docs/concepts.de.md` and
   `docs/setup.de.md`, where they said "escape hatch" and "Escape-Hatch". The
   workbench's own label follows with the Templates feature in the catalogue.
+
+- **Images:** `[image]` no longer uses the slot's label as its alt text. The
+  alt text is the one stored for the slot in the language of the page, else the
+  template's own `alt="..."`, else none - `alt=""`, which is how a decorative
+  picture is written and what the hint in the panel promises for an empty
+  field. A slot that relied on its label now renders `alt=""` until an alt
+  text is written. The text is output escaped and with `[` written as
+  `&#91;`.
+
+- **Images:** `\Nino\Images::setSlotFilename()` accepts `null` (no image) and
+  answers whether `config.php` was written; it changes the slot's `filename`
+  there and nothing else (a mutation of `config.php`, like `setSlotAlt()`), is
+  `false` for a slot `config.php` no longer holds, and leaves `$appData` as it
+  was where nothing was written. The Images panel's upload does not give up the
+  slot's previous picture when that write fails: it answers `500`, a file it had
+  just written under a new name is removed, and a re-upload that overwrote the
+  old file under its deterministic name has the old bytes put back.
+
+- **Installer:** the home page's hero is the image slot
+  `/page-home/fullscreen-image/background` (1920 × 1080), seeded with a neutral
+  placeholder drawing - a small SVG of Nino's own,
+  `images/page-home/fullscreen-image/background.svg` of the home unit, which
+  replaces the 2 MB photograph `demo.jpg` (6000 × 4000, above the 20 MP an
+  upload may have). The file carries the slot's own name, so an upload replaces
+  it and **Remove image** deletes it. `page-home.tpl` shows the slot with `[image
+  /page-home/fullscreen-image/background alt=""]` instead of a literal `<img>`;
+  the Template Builder metadata names the slot too, so the next section edit
+  composes the same markup. An existing project migrates by hand: in
+  `templates/page-home.tpl` replace the literal `<img src="[[/nino/public]]/images/demo.jpg" alt="">`
+  with the `[image ...]` line above (and `"backgroundImage":"[[/nino/public]]/images/demo.jpg","backgroundImageSource":"fixed"`
+  in the section comment with `"backgroundImage":"/page-home/fullscreen-image/background","backgroundImageSource":"new"`),
+  create the slot (1920 × 1080) under *Image Slots* and upload the picture.
+
+- **Installer, templates:** the logo is the image slot `/logo` (500 × 100, empty
+  to begin with), declared by the base unit, and every place that showed the
+  THATSNINO logo asks the slot: `theme.header.tpl` (`[image /logo alt=""]`),
+  the burger navigation `html-header-nav.tpl` (in a `.nino-headernav-logo`
+  wrapper, which is empty and takes no room without a logo), the `og:image` and
+  `twitter:image` tags of `html-header.tpl` and the Form module's
+  `mail-header.tpl` (the address through the content form of `[image]` above).
+  With no logo uploaded the header and the navigation show no picture, the mail
+  header none, and the page head carries no `og:image` and no `twitter:image` -
+  no broken `<img>`, no empty tag. The Setup step adds the slot like the Routes
+  step adds the pages': once, never replacing a slot the project has. On a fresh
+  install the *Missing image slots* tile now reads 0: no template of the starter
+  site carries a literal `<img>` of the images directory any more.
+  **Upgrading:** a project set up earlier keeps its `templates/*.tpl` and its
+  `public/images/logo.png`; to use the slot, create `/logo` under *Image Slots*,
+  upload the logo and replace every `images/logo.png` reference in
+  `theme.header.tpl`, `html-header-nav.tpl`, `html-header.tpl` (its `og:image` and
+  `twitter:image` tags too) and `mail-header.tpl` the way the shipped files do. `Nino.css` gains `header .nino-headernav-logo img`
+  and the `:empty` rule. `tests/install-smoke.php` holds the slot, the
+  frames with and without a logo, and the tile.
 
 ### Fixed
 
@@ -329,7 +467,40 @@ All notable changes to Nino are documented in this file.
   `tests/admin-routes-js-smoke.js` (12 → 16) hold the guards; each stops at its
   first new check without the change.
 
+- **Images:** the EXIF orientation of a JPEG is honoured on every upload path -
+  the Images panel, element image fields and anything else that calls
+  `\Nino\Images::process()` or `fit()`, the Gallery's thumbnails and large views
+  included. It is read from the JPEG header without ext-exif
+  (the segments are walked to the first Exif APP1,
+  the TIFF header names the byte order, IFD0 is searched for tag `0x0112`; every
+  read is length-checked and the walk is capped) and applied before the crop:
+  the geometry is worked out on the picture as shown, the rectangle is read from
+  the stored pixels with its sides swapped for 5-8, and only the small target
+  canvas is rotated or flipped, so the 20 MP / 128M budget holds. A photograph
+  stored on its side is no longer cut as a landscape. `\Nino\Images::size()` is
+  new (`width`, `height` as shown, `type`, `orientation`); the `RENDER` payload's
+  `source` gains `orientation` (1-8, a payload without it means 1) - a handler
+  that renders itself has to apply it. Pictures uploaded earlier stay as they
+  were stored and have to be uploaded again. `tests/kernel-smoke.php` builds a
+  four-quadrant picture for each orientation, in both byte orders, and checks
+  `process()` to two shapes and `fit()` against the upright result, the header
+  reader against malformed blocks, that nothing raises a warning, and that
+  `Images.php` calls no `exif_` function.
+
+- **Images:** an alt text can no longer carry a live fill or shortcode. A
+  stored text, or one in a template, with `[[/key]]` or `[template ...]` in it
+  was rendered again after the `<img>` was built, because shortcode output is
+  rendered once more; the brackets are neutralised now.
+
 ### Removed
+
+- **The THATSNINO logo and the photograph `demo.jpg`.** The base unit no longer
+  ships `images/logo.png` and `images/logo-invert.png` and, with no file left,
+  no `images` directory: the logo is the slot `/logo` (see Changed). The home
+  unit no longer ships `images/demo.jpg` (2 MB); its hero is
+  seeded with a placeholder SVG of Nino's own. A feature whose frames or mails
+  name `images/logo.png` or `images/logo-invert.png` literally has to ask the
+  slot too, or show a missing image on a new project.
 
 - **The base unit's cookie banner.** The `<div class="nino-cookie-banner">`
   block in `html-footer.tpl`, its four texts `/cookiebanner/info/text`,

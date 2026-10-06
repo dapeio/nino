@@ -204,7 +204,8 @@ namespace Nino\Modules\Elements {
 		 *	same rules as \Nino\Elements::insertElementType(), plus width/height for
 		 *	image fields, maxlength and inputsize for string fields, the referenced type for
 		 *	element fields, a fixed unit suffix for every type but boolean/
-		 *	image/element, and a plain string list for options
+		 *	image/element, a plain string list for options, and for an image
+		 *	field the string field that holds its alt text (see below)
 		 *
 		 *	@param		mixed			$model				Posted model, expected array<string,array>
 		 *
@@ -246,6 +247,13 @@ namespace Nino\Modules\Elements {
 				if( $data['type'] === 'image' ) {
 					$field['width'] 	= max( 1, (int) ( $data['width'] ?? 0 ) );
 					$field['height'] 	= max( 1, (int) ( $data['height'] ?? 0 ) );
+
+					// The field that holds this picture's alt text, per language.
+					// Only kept as the name here: whether it names a field that can
+					// hold one is decided below, once the whole model is clean
+					$alt = trim( (string) ( $data['alt'] ?? '' ) );
+					if( $alt !== '' )
+						$field['alt'] = $alt;
 				}
 
 				// Which type an element reference may point at. Kept as posted
@@ -315,6 +323,23 @@ namespace Nino\Modules\Elements {
 					$field['options'] = array_values( array_map( 'strval', $data['options'] ) );
 
 				$clean[$key] = $field;
+			}
+
+			// An alt link is kept only where it can be satisfied: it names a
+			// field of this model, other than the image itself, that is a plain
+			// string and written per language. A global field has one text for
+			// every language, and html would put markup in an attribute -
+			// neither is an alt text. A link to anything else is dropped,
+			// not an error: the model is saved without it
+			foreach( $clean as $key => $field ) {
+
+				if( isset( $field['alt'] ) === false )
+					continue;
+
+				$target = $clean[ $field['alt'] ] ?? null;
+
+				if( $field['alt'] === $key || $target === null || $target['type'] !== 'string' || ( $target['locale'] ?? false ) !== true || ( $target['html'] ?? false ) === true )
+					unset( $clean[$key]['alt'] );
 			}
 
 			return $clean;

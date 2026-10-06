@@ -62,12 +62,12 @@ namespace Nino\Modules {
 			if( $callback !== '' )
 				\Nino\Callbacks::doCallbacks( $appData, $callback, $element );
 
-			$fills = [
-				[],
-				[],
-			];
-
 			$element['.id'] = 0;
+
+			// A map, not two parallel lists: the blank alt texts below go in
+			// first and the element's own values over them. Two lists would let
+			// the first entry for a key win in str_replace(), the empty one
+			$fills = self::_altSeed( $model );
 
 			foreach( $element as $key => $value ) {
 				if( is_scalar( $value ) === false )
@@ -75,11 +75,46 @@ namespace Nino\Modules {
 
 				$isHtml = ( isset( $model[$key] ) && isset( $model[$key]['html'] ) && $model[$key]['html'] === true );
 
-				$fills[0][] = '[['. $key. ']]';
-				$fills[1][] = self::_escapeFieldValue( $value, $isHtml );
+				$fills['[['. $key. ']]'] = self::_escapeFieldValue( $value, $isHtml );
 			}
 
-			return str_replace( $fills[0], $fills[1], $content );
+			return str_replace( array_keys( $fills ), array_values( $fills ), $content );
+		}
+
+		/**
+		 *	The alt texts of a type's image fields as blank fills. An image
+		 *	field names the string field that holds its alt text (model
+		 *	property 'alt'), and an element - or one language of it - that has no
+		 *	value there carries no key at all, so the template would show the
+		 *	field literally: alt="[[imageAlt]]". Blank, it is alt="", which is
+		 *	what a decorative picture is and what the form's hint promises
+		 *	for an empty field. A link to a field that is not a plain string
+		 *	written per language is not read (the Element Types tab drops one
+		 *	on save, a hand-edited model is not trusted)
+		 *
+		 *	@param		mixed			$model				The type's model
+		 *
+		 *	@return 	array										[ '[[<altKey>]]' => '' ]
+		 */
+		private static function _altSeed( mixed $model ): array {
+
+			$seed = [];
+
+			if( is_array( $model ) === false )
+				return $seed;
+
+			foreach( $model as $key => $field ) {
+
+				if( ( $field['type'] ?? '' ) !== 'image' || is_string( $field['alt'] ?? null ) === false || $field['alt'] === $key )
+					continue;
+
+				$target = $model[ $field['alt'] ] ?? null;
+
+				if( is_array( $target ) === true && ( $target['type'] ?? '' ) === 'string' && ( $target['locale'] ?? false ) === true && ( $target['html'] ?? false ) !== true )
+					$seed['[['. $field['alt']. ']]'] = '';
+			}
+
+			return $seed;
 		}
 
 		/**
@@ -178,13 +213,11 @@ namespace Nino\Modules {
 			$id = 0;
 
 			$model = \Nino\Elements::getElementModel( $appData, $uri );
+			$altSeed = self::_altSeed( $model );
 
 			foreach( $result as $element ) {
 
-				$fills = [
-					['[[.id]]'],
-					[$id],
-				];
+				$fills = [ '[[.id]]' => $id ] + $altSeed;
 
 				foreach( $element as $key => $value ) {
 					if( is_scalar( $value ) === false )
@@ -192,11 +225,10 @@ namespace Nino\Modules {
 
 					$isHtml = ( isset( $model[$key] ) && isset( $model[$key]['html'] ) && $model[$key]['html'] === true );
 
-					$fills[0][] = '[['. $key. ']]';
-					$fills[1][] = self::_escapeFieldValue( $value, $isHtml );
+					$fills['[['. $key. ']]'] = self::_escapeFieldValue( $value, $isHtml );
 				}
 
-				$html .= str_replace( $fills[0], $fills[1], $content );
+				$html .= str_replace( array_keys( $fills ), array_values( $fills ), $content );
 
 				$id++;
 			}

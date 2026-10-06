@@ -207,10 +207,10 @@
 		/**
 		 *	Render one field's row: key, type, and whichever options apply to
 		 *	that type (locale/html/required always; maxlength and inputsize for string;
-		 *	width+height for image; the referenced type for element; suffix for
+		 *	width+height and the field holding the alt text for image; the referenced type for element; suffix for
 		 *	the types the server names, see _suffixTypes; options for a fixed value list)
 		 *
-		 *	@param		{Object}	field					{ key, type, locale, html, required, maxlength, inputsize, width, height, elementType, suffix, options }
+		 *	@param		{Object}	field					{ key, type, locale, html, required, maxlength, inputsize, width, height, alt, elementType, suffix, options }
 		 *	@param		{number}	index					Index into _fields, for the remove button
 		 *
 		 *	@return		{Element}
@@ -424,6 +424,50 @@
 					heightInput.placeholder = Nino.content.getText('/_admin/common/label/height');
 					heightInput.value = field.height ?? '';
 					optionsWrap.appendChild( heightInput );
+
+					// Which string field holds this picture's alt text. Only a field
+					// that can: written per language, plain text, and not the image
+					// itself (Types.php's cleanModel() decides the same on save).
+					// Offered from the rows as they stand now, so a field added a
+					// moment ago is there - the list is rebuilt when the control
+					// takes the focus, keeping what is chosen
+					const altLabel = dc.createElement('label');
+					altLabel.className = 'nino-admin-field';
+					const altSpan = dc.createElement('span');
+					altSpan.textContent = Nino.content.getText('/_admin/types/label/alt');
+					altLabel.appendChild( altSpan );
+
+					const altSelect = dc.createElement('select');
+					altSelect.className = 'admin-field-alt';
+
+					const fillAlt = function( current ) {
+						altSelect.innerHTML = '';
+
+						const none = dc.createElement('option');
+						none.value = '';
+						none.textContent = Nino.content.getText('/_admin/types/option/alt-none');
+						altSelect.appendChild( none );
+
+						Nino.admin.elementTypes._fields.forEach( function( other ) {
+							if( other.key === '' || other.key === keyInput.value || other.type !== 'string' || other.locale !== true || other.html === true )
+								return;
+							const opt = dc.createElement('option');
+							opt.value = other.key;
+							opt.textContent = other.key;
+							opt.selected = ( other.key === current );
+							altSelect.appendChild( opt );
+						} );
+					};
+
+					fillAlt( field.alt ?? '' );
+					altSelect.addEventListener( 'focus', function() {
+						const current = altSelect.value;
+						Nino.admin.elementTypes._storeFields();
+						fillAlt( current );
+					} );
+
+					altLabel.appendChild( altSelect );
+					optionsWrap.appendChild( altLabel );
 				}
 			}
 
@@ -552,6 +596,8 @@
 					inputsize : row.querySelector('.admin-field-inputsize')?.value,
 					width 		: row.querySelector('.admin-field-width')?.value,
 					height 		: row.querySelector('.admin-field-height')?.value,
+					// The string field that holds an image's alt text - absent on every row but an image
+					alt 			: ( row.querySelector('.admin-field-alt')?.value ) ?? '',
 					suffix 		: ( row.querySelector('.admin-field-suffix')?.value ) ?? '',
 					// Absent on every row but an element reference
 					elementType : ( row.querySelector('.admin-field-element-type')?.value ) ?? '',
@@ -850,6 +896,7 @@
 					inputsize 	: field.inputsize,
 					width 			: field.width,
 					height 			: field.height,
+					alt 				: field.alt,
 					suffix 			: field.suffix,
 					elementType : field.elementType,
 					multiple 		: field.multiple,

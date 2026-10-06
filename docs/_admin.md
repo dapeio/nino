@@ -152,6 +152,8 @@ A field that references other elements is a select or, where the type allows sev
 
 **Duplicate** takes every value of the open entry into a new element – all languages, all fields, except the uri and the images, which belong to the entry they were uploaded for. Nothing is written yet: give the copy a uri and save it.
 
+An image field uploads on its own, as soon as the file is chosen, and says when the picture is smaller than the field's target size and was scaled up. **Remove image** takes it out of the saved element, immediately: the field is emptied and the file this entry's own upload wrote is deleted. A file name that was written by hand stays on disk.
+
 **Delete** removes the entry in every language, and the images only its image fields used. Only a backup brings it back.
 
 ### Text
@@ -165,6 +167,14 @@ A key that does not appear here is either hidden from editing or technical. Crea
 **Images** lists the image slots the developer defined on the **Image Slots** tab, grouped by uri area, with label, shortcode and target dimensions. Choose a file for a slot and start the upload; Nino validates and processes it, rejects an invalid or oversized file, and replaces the current image immediately.
 
 Every upload control says what the server will take, before you choose: *Up to 2 MB and 20 megapixels.* The size is the smallest of three limits - Nino's own 8 MB, PHP's `upload_max_filesize` and PHP's `post_max_size` (0 there means none) - and the pixels are Nino's 20 megapixels: decoding a picture needs about four bytes per pixel, which is what a shared host's memory allows. A file above the limit is refused in the browser, with the reason, before it is sent; a file the browser cannot judge (a format it cannot decode) is left to the server, which names the reason too - larger than 8 MB, more than 20 megapixels, not a JPEG, PNG, WebP or GIF, or larger than PHP lets through (*PHP upload limit: 2 MB*). The last one is a setting of the server, not of Nino: raise `upload_max_filesize` and `post_max_size` in `php.ini` or ask the host.
+
+A photograph keeps the way up its camera recorded: the JPEG's EXIF orientation is read from its header and applied before the picture is cut to the target, so an upright portrait is not stored on its side. Pictures uploaded before that stay as they were stored and have to be uploaded again.
+
+A picture smaller than the slot's target size is saved all the same - and the line under the control says so, with its size (*Saved – but your image is only 300 × 150 px, smaller than the target size, and was scaled up. It may look blurry.*). The size meant is the one the picture is shown at, so a photograph stored on its side is measured upright. **Remove image** takes the image out of a slot after asking: the file is deleted and the website shows no image there until a new one is uploaded; the slot itself stays. The record is written first and the file deleted after it, and only a file the slot owns goes - a file name that was written into `config.php` by hand (a picture a template includes literally) is cleared from the slot and stays on disk.
+
+Under each slot stands where it is used - *Used on: Home (/)* - read from the templates the site's pages render, `[template]` includes followed. A slot no page shows says so (*Not included anywhere*): an image uploaded there does not appear on the website. Below that, one **Alt text** input per language: it describes what the image shows for people who cannot see it, and `[image]` writes it as the `alt` attribute in the language of the page. Empty means decorative (`alt=""`), unless the template gives an alt text of its own. The order is the stored text of the language, then the template's `alt="…"`, then none; the slot's label is never used as one. An alt text is stored with the slot in `config.php`, not in a `text/<locale>.php` file, so it is not part of a Translations export or import.
+
+The site's logo is such a slot too, `/logo`: the header, the navigation, the Open Graph and Twitter tags and the Form module's mails show whatever is uploaded there, and nothing - no broken image, no empty tag - until something is. An upload is cut to the slot's target shape (500 × 100 to begin with), so a logo of another shape needs the slot's size changed on the **Image Slots** tab first.
 
 ### Submissions
 
@@ -209,7 +219,7 @@ Element types describe recurring content. Each type is a file under `elements/`;
 | `image` | an image with fixed target dimensions |
 | `element` | a reference to an element of another type |
 
-Depending on the type, a field is *per translation* or global, required or optional, rich text, limited to fixed values, given dimensions, a unit or suffix, or a number of rows its input opens with. An `element` field names the type it references and may hold several elements, ordered, with **Max. elements** as its ceiling (`0` for none); the kernel enforces that ceiling on save. A deleted target stays as *missing* rather than being dropped, and references are not part of a Translations export.
+Depending on the type, a field is *per translation* or global, required or optional, rich text, limited to fixed values, given dimensions, a unit or suffix, or a number of rows its input opens with. An `image` field may name the **Alt text field**: a plain `string` field of the same type that is written per translation. Both forms then say so, the image's alt text is written per language there, and `alt="[[<field>]]"` in the template is empty - a decorative picture - for an element that has no text yet. A link to a global field, a rich-text field, the image itself or a field that is not there is dropped when the type is saved. An `element` field names the type it references and may hold several elements, ordered, with **Max. elements** as its ceiling (`0` for none); the kernel enforces that ceiling on save. A deleted target stays as *missing* rather than being dropped, and references are not part of a Translations export.
 
 Switching a field between global and per translation migrates the existing values; check the result in every language. Saving a type does not delete existing entries, but a removed field disappears from the form.
 
@@ -256,7 +266,7 @@ Dynamically composed keys are beyond a static scan.
 
 ### Image Slots
 
-**Image Slots** is a tab of the Images panel. An image slot connects a technical uri (`/home/hero`) with a label and fixed target dimensions; editors fill it under **Images**. **Scan templates for missing image slots** finds local `<img src="…">` references under `images/` without a slot. Deleting a slot deletes the image stored in it.
+**Image Slots** is a tab of the Images panel. An image slot connects a technical uri (`/home/hero`) with a label and fixed target dimensions; editors fill it under **Images**. **Scan templates for missing image slots** finds local `<img src="…">` references under `images/` without a slot. Deleting a slot deletes the image stored in it. Each row also says when no page shows the slot - *not included anywhere* - and, if a template mentions it that no route renders, which template. A slot the scan creates shows that until its template uses `[image <uri>]` instead of a literal `<img>`.
 
 ## System
 

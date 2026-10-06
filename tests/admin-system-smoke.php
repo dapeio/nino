@@ -522,6 +522,39 @@ check( 'an unknown type is unknown however it is spelled', $slashUnknownRequest[
 
 check( '"element" is offered as a field type by apiList', in_array( 'element', \Nino\Modules\Elements\Types::FIELD_TYPES, true ) === true );
 
+// An image field may name the string field that holds its alt text per
+// language. The name is kept only where it can be satisfied: a field of the
+// model other than the image itself, plain string, written per language
+$_POST['data'] = json_encode( [ 'uri' => 'alttype', 'title' => 'Alt Type', 'model' => [
+	'photo' 		=> [ 'type' => 'image', 'width' => 40, 'height' => 40, 'alt' => 'caption' ],
+	'caption' 	=> [ 'type' => 'string', 'locale' => true ],
+	'globalpic' => [ 'type' => 'image', 'width' => 40, 'height' => 40, 'alt' => 'globalcap' ],
+	'globalcap' => [ 'type' => 'string' ],
+	'richpic' 	=> [ 'type' => 'image', 'width' => 40, 'height' => 40, 'alt' => 'richcap' ],
+	'richcap' 	=> [ 'type' => 'string', 'locale' => true, 'html' => true ],
+	'lostpic' 	=> [ 'type' => 'image', 'width' => 40, 'height' => 40, 'alt' => 'nothere' ],
+	'selfpic' 	=> [ 'type' => 'image', 'width' => 40, 'height' => 40, 'alt' => 'selfpic' ],
+	'imgpic' 		=> [ 'type' => 'image', 'width' => 40, 'height' => 40, 'alt' => 'photo' ],
+	'note' 			=> [ 'type' => 'string', 'locale' => true, 'alt' => 'caption' ],
+	'blank' 		=> [ 'type' => 'image', 'width' => 40, 'height' => 40, 'alt' => '  ' ],
+] ] );
+$altCreate = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Modules\Elements\Types::apiCreate( $appData, $altCreate );
+$altModel = \Nino\Filesystem::getFileContent( $appData, '/elements/alttype.php', false )['model'] ?? [];
+check( 'an image field keeps its alt link to a plain string field written per language', $altCreate['/nino/http/response']['statusCode'] === 200 && ( $altModel['photo']['alt'] ?? null ) === 'caption' );
+check( '...and loses it to a global field, a rich-text field, a field that is not there, itself, another image and nothing at all',
+	array_filter( [ 'globalpic', 'richpic', 'lostpic', 'selfpic', 'imgpic', 'blank' ], static fn( string $key ): bool => array_key_exists( 'alt', $altModel[$key] ?? [ 'alt' => 'missing field' ] ) ) === [] );
+check( '...and a field that is no image never carries one', array_key_exists( 'alt', $altModel['note'] ?? [ 'alt' => 1 ] ) === false && array_key_exists( 'alt', $altModel['caption'] ?? [ 'alt' => 1 ] ) === false );
+
+// Saving the type again with its field renamed away loses the link: the model is checked as a whole each time
+$_POST['data'] = json_encode( [ 'uri' => 'alttype', 'title' => 'Alt Type', 'model' => [
+	'photo' 		=> [ 'type' => 'image', 'width' => 40, 'height' => 40, 'alt' => 'caption' ],
+	'caption' 	=> [ 'type' => 'string' ],
+] ] );
+$altSave = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Modules\Elements\Types::apiSave( $appData, $altSave );
+check( 'a link whose target stopped being a per-language field is dropped on the next save', array_key_exists( 'alt', \Nino\Filesystem::getFileContent( $appData, '/elements/alttype.php', false )['model']['photo'] ?? [ 'alt' => 1 ] ) === false );
+
 echo "\n";
 
 
@@ -1578,6 +1611,13 @@ $appData['/nino/html/images']['/home/hero']['filename'] = 'elements/home/hero.80
 [ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiSave', [ 'uri' => '/home/hero', 'label' => 'Hero neu 2', 'width' => '800', 'height' => '400' ] );
 check( 'apiSave never touches an existing filename', $appData['/nino/html/images']['/home/hero']['filename'] === 'elements/home/hero.800x400.jpg' );
 
+// The alt texts live on the slot and are the Images panel's: saving the slot's label and size keeps them
+$appData['/nino/html/images']['/home/hero']['alt'] = [ 'de_DE' => 'Ein Bild' ];
+callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiSave', [ 'uri' => '/home/hero', 'label' => 'Hero neu 2', 'width' => '800', 'height' => '400' ] );
+check( 'apiSave keeps the slot\'s alt texts', ( $appData['/nino/html/images']['/home/hero']['alt'] ?? null ) === [ 'de_DE' => 'Ein Bild' ]
+	&& ( ( include \Nino\Filesystem::path( $appData, '/config.php' ) )['/nino/html/images']['/home/hero']['alt'] ?? null ) === [ 'de_DE' => 'Ein Bild' ] );
+unset( $appData['/nino/html/images']['/home/hero']['alt'] );
+
 [ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiSave', [ 'uri' => '/does/not/exist', 'label' => 'x', 'width' => '10', 'height' => '10' ] );
 check( 'apiSave 404s for an unknown slot', $status === 404 );
 
@@ -1996,6 +2036,61 @@ $appData['/nino/html/images']['/probe']['filename'] = 'probe.png';
 check( 'once a slot tracks the file, it no longer shows up as missing', count( $body['missing'] ) === 0 );
 
 unlink( $sandbox. '/private/templates/scan-fixture-img.tpl' );
+
+// --- Slots::usage - where a slot is used -------------------------------------
+//
+// The pages whose templates show a slot, through [template] includes however
+// deep, and the templates that name it - or nothing, which is what the Images
+// panel warns about: an image uploaded to a slot no page shows never appears
+
+$usageTemplates = [
+	'usage-page' 	=> '<section>[image /use/hero alt=""]</section>[template /templates/usage-part][image uri="/use/viauri"]',
+	'usage-part' 	=> '<p>[image /use/inner alt="[[/use/alt]]"]</p>[template /templates/usage-deeper]',
+	'usage-deeper' => '[image /use/deep]',
+	'usage-orphan' => '[image /use/orphan]',
+	'usage-loop' 	=> '[image /use/loop][template /templates/usage-loop][template /templates/usage-loop2]',
+	'usage-loop2' => '[template /templates/usage-loop]',
+	'usage-de_DE' => '[image /use/german]',
+	'usage-en_US' => '[image /use/english]',
+];
+foreach( $usageTemplates as $usageName => $usageSource )
+	file_put_contents( $sandbox. '/private/templates/'. $usageName. '.tpl', $usageSource );
+
+$usageRoutesBefore = $appData['/nino/http/routes'] ?? [];
+$appData['/nino/http/routes']['GET://usage'] 	= [ 'uri' => '/usage-page', 'body' => '[template /templates/usage-page]' ];
+$appData['/nino/http/routes']['GET://looped'] = [ 'uri' => '/looped', 'body' => '[template /templates/usage-loop]' ];
+$appData['/nino/http/routes']['GET://lang'] 	= [ 'uri' => '/lang', 'body' => '[template /templates/usage-[[/nino/http/response/locale]]]' ];
+$appData['/nino/http/routes']['POST://usage'] = [ 'uri' => '/usage-post', 'body' => '[image /use/post]' ];
+
+$usageText = \Nino\Filesystem::getFileContent( $appData, '/text/'. \Nino\Admin\Admin::sessionLocale( $appData ). '.php', [] );
+$usageText['[[/webpage/usage-page/name]]'] = 'Nutzung';
+\Nino\Filesystem::putFileContent( $appData, '/text/'. \Nino\Admin\Admin::sessionLocale( $appData ). '.php', $usageText );
+
+foreach( [ 'hero', 'viauri', 'inner', 'deep', 'orphan', 'loop', 'german', 'english', 'post', 'unused' ] as $usageSlot )
+	$appData['/nino/html/images']['/use/'. $usageSlot] = [ 'label' => 'Use '. $usageSlot, 'width' => 10, 'height' => 10, 'filename' => null ];
+
+$usage = \Nino\Modules\Images\Slots::usage( $appData );
+$usagePage = [ 'httpUri' => '/usage', 'name' => 'Nutzung' ];
+check( 'a slot in the template a route renders: the template, and the page by its name and http uri', ( $usage['/use/hero'] ?? null ) === [ 'templates' => [ 'usage-page' ], 'pages' => [ $usagePage ] ] );
+check( '...the [image uri="..."] form is read like the bare one', ( $usage['/use/viauri']['pages'] ?? null ) === [ $usagePage ] );
+check( 'a slot reached through a [template] include, and one further down that include\'s own', ( $usage['/use/inner'] ?? null ) === [ 'templates' => [ 'usage-part' ], 'pages' => [ $usagePage ] ]
+	&& ( $usage['/use/deep'] ?? null ) === [ 'templates' => [ 'usage-deeper' ], 'pages' => [ $usagePage ] ] );
+check( 'a template no route renders is listed with its templates and no pages', ( $usage['/use/orphan'] ?? null ) === [ 'templates' => [ 'usage-orphan' ], 'pages' => [] ] );
+check( 'templates that include themselves, directly or through another, are read once and do not run away', ( $usage['/use/loop']['pages'] ?? null ) === [ [ 'httpUri' => '/looped', 'name' => '/looped' ] ] );
+check( 'a body that names its template by language is read for every available language, and a page without a name of its own is named by its http uri',
+	( $usage['/use/german']['pages'] ?? null ) === [ [ 'httpUri' => '/lang', 'name' => '/lang' ] ] && ( $usage['/use/english']['pages'] ?? null ) === [ [ 'httpUri' => '/lang', 'name' => '/lang' ] ] );
+check( 'only what is served counts: a POST route is no page', ( $usage['/use/post'] ?? null ) === null );
+check( 'a slot nothing mentions is not in the answer at all', array_key_exists( '/use/unused', $usage ) === false );
+
+[ , $body ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiList' );
+$usageRows = array_column( $body['slots'], null, 'uri' );
+check( 'apiList carries usage on every slot: the used one with its page, the unused one empty', ( $usageRows['/use/hero']['usage']['pages'] ?? null ) === [ $usagePage ] && ( $usageRows['/use/unused']['usage'] ?? null ) === [ 'templates' => [], 'pages' => [] ] );
+
+foreach( array_keys( $usageTemplates ) as $usageName )
+	unlink( $sandbox. '/private/templates/'. $usageName. '.tpl' );
+$appData['/nino/http/routes'] = $usageRoutesBefore;
+foreach( [ 'hero', 'viauri', 'inner', 'deep', 'orphan', 'loop', 'german', 'english', 'post', 'unused' ] as $usageSlot )
+	unset( $appData['/nino/html/images']['/use/'. $usageSlot] );
 
 echo "\n";
 

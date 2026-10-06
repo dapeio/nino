@@ -750,6 +750,74 @@ $_POST['data'] = json_encode( [ 'type' => 'titleddemo', 'uri' => 'item1' ] );
 check( 'deleting an element on a type with a "title" key succeeds (no crash)', $titledDeleteRequest['/nino/http/response']['statusCode'] === 200 );
 check( 'the element is actually gone', \Nino\Elements::getElement( $appData, '/titleddemo/item1', '*' ) === false );
 
+// An image field says, like a slot, when the upload was scaled up - and can
+// have its image taken away: the field is written empty, and only a file this
+// element's own upload wrote is deleted
+/**
+ *	Call Elements::apiRemoveImage
+ *
+ *	@param		array 		&$appData
+ *	@param		array 		$data
+ *	@param		int				$statusBefore
+ *
+ *	@return		array			[ statusCode, body ]
+ */
+function callRemoveImage( array &$appData, array $data, int $statusBefore = 200 ): array {
+	$request = [ '/nino/http/response' => [ 'statusCode' => $statusBefore ] ];
+	$_POST['data'] = json_encode( $data );
+	\Nino\Modules\Elements\Admin::apiRemoveImage( $appData, $request );
+	return [ $request['/nino/http/response']['statusCode'], $request['/nino/http/response']['body'] ?? null ];
+}
+
+\Nino\Elements::insertElementType( $appData, '/imageremove', [
+	'photo' 		=> [ 'type' => 'image', 'width' => 400, 'height' => 400 ],
+	'photoAlt' 	=> [ 'type' => 'string', 'locale' => true ],
+	'label' 		=> [ 'type' => 'string' ],
+] );
+\Nino\Elements::insertElement( $appData, '/imageremove/item1', [ 'label' => 'x' ], 'de_DE' );
+
+[ $status, $body ] = callUploadImage( $appData, [ 'type' => 'imageremove', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ] );
+check( 'an upload below the field\'s target size is saved and says so, with the size it has', $status === 200 && ( $body['belowTarget'] ?? null ) === true && ( $body['source'] ?? null ) === [ 'width' => 300, 'height' => 150 ] );
+$removePath = \Nino\Filesystem::path( $appData, '/images/'. $body['filename'] );
+
+[ $status ] = callRemoveImage( $appData, [ 'type' => 'nosuchtype', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ] );
+check( 'removing from an unknown type is a 400', $status === 400 );
+[ $status ] = callRemoveImage( $appData, [ 'type' => 'imageremove', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'label' ] );
+check( '...and from a field that is not an image field', $status === 400 );
+[ $status ] = callRemoveImage( $appData, [ 'type' => 'imageremove', 'uri' => 'nope', 'locale' => 'de_DE', 'key' => 'photo' ] );
+check( '...and for an element that does not exist a 404', $status === 404 );
+[ $status ] = callRemoveImage( $appData, [ 'type' => 'imageremove', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ], 403 );
+check( 'a request whose status is already 403 (csrf) removes nothing', $status === 403 && is_file( $removePath ) === true );
+
+[ $status, $removeBody ] = callRemoveImage( $appData, [ 'type' => 'imageremove', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ] );
+check( 'removing writes the field empty, deletes the element\'s own file and answers no filename', $status === 200 && array_key_exists( 'filename', $removeBody ) === true && $removeBody['filename'] === null
+	&& ( \Nino\Elements::getElement( $appData, '/imageremove/item1', '*' )['photo'] ?? 'x' ) === '' && is_file( $removePath ) === false
+	&& \Nino\Elements::getElement( $appData, '/imageremove/item1', 'de_DE' )['label'] === 'x' );
+[ $status, $removeBody ] = callRemoveImage( $appData, [ 'type' => 'imageremove', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ] );
+check( 'a field without an image answers 200 with no filename, so the call can be repeated', $status === 200 && $removeBody['filename'] === null );
+
+// A name written by hand is not this element's file
+\Nino\Filesystem::putFileContent( $appData, '/images/shared-logo.png', 'a picture other pages use' );
+\Nino\Elements::updateElement( $appData, '/imageremove/item1', [ 'photo' => 'shared-logo.png' ], 'de_DE' );
+[ $status ] = callRemoveImage( $appData, [ 'type' => 'imageremove', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ] );
+check( 'a hand-set filename is cleared from the field, but its file stays', $status === 200 && \Nino\Filesystem::fileExists( $appData, '/images/shared-logo.png' ) === true
+	&& ( \Nino\Elements::getElement( $appData, '/imageremove/item1', '*' )['photo'] ?? 'x' ) === '' );
+
+// ...and neither is a name that only looks like it: this type has one image field and
+// no per-language one, so its own uploads are never "<uri>-<something>"
+\Nino\Filesystem::putFileContent( $appData, '/images/elements/imageremove/item1-lead.400x400.jpg', 'the picture of another element' );
+\Nino\Elements::updateElement( $appData, '/imageremove/item1', [ 'photo' => 'elements/imageremove/item1-lead.400x400.jpg' ], 'de_DE' );
+[ $status ] = callRemoveImage( $appData, [ 'type' => 'imageremove', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ] );
+check( 'a hand-set name that starts like the element\'s own, with a suffix its uploads never carry here, is cleared but its file stays', $status === 200 && \Nino\Filesystem::fileExists( $appData, '/images/elements/imageremove/item1-lead.400x400.jpg' ) === true
+	&& ( \Nino\Elements::getElement( $appData, '/imageremove/item1', '*' )['photo'] ?? 'x' ) === '' );
+
+// An element whose uri starts with another's does not lose that one's picture
+\Nino\Elements::insertElement( $appData, '/imageremove/item10', [], 'de_DE' );
+[ , $otherBody ] = callUploadImage( $appData, [ 'type' => 'imageremove', 'uri' => 'item10', 'locale' => 'de_DE', 'key' => 'photo' ] );
+\Nino\Elements::updateElement( $appData, '/imageremove/item1', [ 'photo' => $otherBody['filename'] ], 'de_DE' );
+callRemoveImage( $appData, [ 'type' => 'imageremove', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ] );
+check( 'a file named like another element\'s upload is not taken for this element\'s own', is_file( \Nino\Filesystem::path( $appData, '/images/'. $otherBody['filename'] ) ) === true );
+
 echo "\n";
 
 
@@ -760,6 +828,8 @@ echo "Admin\\Images::apiList / apiUpload\n";
 $appData['/nino/html/images'] = [
 	'/hero' => [ 'label' => 'Hero-Banner', 'width' => 60, 'height' => 40, 'filename' => null ],
 ];
+// The slots live in config.php: an upload writes its record there, not into this request's copy
+\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
 
 /**
  *	Call Admin\Images::apiUpload with a fake uploaded file
@@ -803,9 +873,199 @@ check( 'uploading to an unknown slot is rejected', $slotStatusUnknown === 404 );
 // category "home") - a slot uri is just a free-form array key, so this needs no
 // kernel/admin support of its own, but is worth locking in as a real upload
 $appData['/nino/html/images']['/home/hero'] = [ 'label' => 'Hero', 'width' => 60, 'height' => 40, 'filename' => null ];
+\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
 [ $categoryStatus, $categoryBody ] = callUploadSlotImage( $appData, '/home/hero' );
 check( 'uploading to a category-style ("/<category>/<identifier>") slot uri succeeds', $categoryStatus === 200 && $categoryBody['filename'] === 'home/hero.60x40.jpg' );
 check( 'the file lands at the nested deterministic path', is_file( \Nino\Filesystem::path( $appData, '/images/'. $categoryBody['filename'] ) ) === true );
+
+// The answer says how large the picture is as it is shown, and whether that is
+// below what the slot asks for - crop mode scales such a picture up
+/**
+ *	A jpeg of a given size with an Exif orientation of its own
+ *
+ *	@param		int				$width				Stored width
+ *	@param		int				$height				Stored height
+ *	@param		int				$orientation	1-8, 1 writes no Exif block
+ *	@param		int				$red					Red of the plain colour it is filled with, blue is the rest
+ *
+ *	@return		string
+ */
+function orientedJpeg( int $width, int $height, int $orientation, int $red = 0 ): string {
+	$img = imagecreatetruecolor( $width, $height );
+	imagefill( $img, 0, 0, imagecolorallocate( $img, $red, 0, 200 - $red ) );
+	ob_start();
+	imagejpeg( $img, null, 90 );
+	$bytes = ob_get_clean();
+	imagedestroy( $img );
+	if( $orientation === 1 )
+		return $bytes;
+	$tiff = 'MM'. pack( 'n', 42 ). pack( 'N', 8 ). pack( 'n', 1 ). pack( 'n', 0x0112 ). pack( 'n', 3 ). pack( 'N', 1 ). pack( 'n', $orientation ). "\0\0". pack( 'N', 0 );
+	$payload = "Exif\0\0". $tiff;
+	return substr( $bytes, 0, 2 ). "\xFF\xE1". pack( 'n', strlen( $payload ) + 2 ). $payload. substr( $bytes, 2 );
+}
+
+/**
+ *	Call Admin\Images::apiUpload with the given bytes
+ *
+ *	@param		array 		&$appData
+ *	@param		string		$uri
+ *	@param		string		$bytes
+ *
+ *	@return		array			[ statusCode, body ]
+ */
+function callUploadSlotBytes( array &$appData, string $uri, string $bytes ): array {
+	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+	$_POST['data'] = json_encode( [ 'uri' => $uri ] );
+	$path = tempnam( sys_get_temp_dir(), 'nino-upload-' );
+	file_put_contents( $path, $bytes );
+	$_FILES['file'] = [ 'tmp_name' => $path, 'error' => UPLOAD_ERR_OK, 'name' => 'test.jpg', 'size' => filesize( $path ) ];
+	\Nino\Modules\Images\Admin::apiUpload( $appData, $request );
+	@unlink( $path );
+	return [ $request['/nino/http/response']['statusCode'], $request['/nino/http/response']['body'] ];
+}
+
+$appData['/nino/html/images']['/big'] 	= [ 'label' => 'Big', 'width' => 800, 'height' => 600, 'filename' => null ];
+$appData['/nino/html/images']['/small'] = [ 'label' => 'Small', 'width' => 200, 'height' => 150, 'filename' => null ];
+\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
+
+[ , $belowBody ] = callUploadSlotImage( $appData, '/big' );
+check( 'a 300x150 upload into an 800x600 slot is saved and says it is below the target, with its own size', ( $belowBody['belowTarget'] ?? null ) === true
+	&& ( $belowBody['source'] ?? null ) === [ 'width' => 300, 'height' => 150 ] && is_string( $belowBody['filename'] ?? null ) === true );
+[ , $aboveBody ] = callUploadSlotImage( $appData, '/hero' );
+check( 'the same upload into the 60x40 slot is not below it', ( $aboveBody['belowTarget'] ?? null ) === false );
+[ , $upright ] = callUploadSlotBytes( $appData, '/small', orientedJpeg( 300, 160, 1 ) );
+[ , $turned ] = callUploadSlotBytes( $appData, '/small', orientedJpeg( 300, 160, 6 ) );
+check( 'it is decided on the size as shown: 300x160 is large enough for 200x150, the same pixels with Orientation 6 are 160x300 and are not', ( $upright['belowTarget'] ?? null ) === false
+	&& ( $turned['belowTarget'] ?? null ) === true && ( $turned['source'] ?? null ) === [ 'width' => 160, 'height' => 300 ] );
+
+// A write that does not happen leaves the old record and the old file - the old one's
+// bytes, not only a file of that name: a re-upload is stored under the same name and
+// has overwritten it by the time the record is written
+$smallFile = \Nino\Filesystem::path( $appData, '/images/small.200x150.jpg' );
+check( 'the slot\'s file stands before the failing write', $appData['/nino/html/images']['/small']['filename'] === 'small.200x150.jpg' && is_file( $smallFile ) === true );
+$smallBytes = (string) file_get_contents( $smallFile );
+$smallBefore = $appData['/nino/html/images']['/small']['filename'];
+$configLock = $sandbox. '/private/data/.locks/'. sha1( '/config.php' ). '.lock';
+@unlink( $configLock );
+mkdir( $configLock, 0755, true );
+[ $failedStatus ] = callUploadSlotBytes( $appData, '/small', orientedJpeg( 300, 200, 1, 200 ) );
+$persistedSmall = ( include \Nino\Filesystem::path( $appData, '/config.php' ) )['/nino/html/images']['/small']['filename'] ?? null;
+check( 'an upload whose record cannot be written is a 500 that changes nothing: the filename in memory and in config.php, and the old picture\'s bytes, stay', $failedStatus === 500
+	&& $appData['/nino/html/images']['/small']['filename'] === $smallBefore && $persistedSmall === $smallBefore && is_file( $smallFile ) === true && (string) file_get_contents( $smallFile ) === $smallBytes );
+rmdir( $configLock );
+
+// A first upload has no old picture to put back: the file it wrote is nobody's and goes
+$appData['/nino/html/images']['/fresh'] = [ 'label' => 'Fresh', 'width' => 200, 'height' => 150, 'filename' => null ];
+\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
+@unlink( $configLock );
+mkdir( $configLock, 0755, true );
+[ $freshStatus ] = callUploadSlotBytes( $appData, '/fresh', orientedJpeg( 300, 200, 1 ) );
+rmdir( $configLock );
+check( 'a first upload whose record cannot be written is a 500 and leaves no file behind', $freshStatus === 500 && $appData['/nino/html/images']['/fresh']['filename'] === null
+	&& glob( \Nino\Filesystem::path( $appData, '/images' ). '/fresh.*' ) === [] );
+
+// --- apiRemove: the image goes, the slot stays -----------------------------
+
+/**
+ *	Call Admin\Images::apiRemove, or any other action of its map, directly
+ *
+ *	@param		array 		&$appData
+ *	@param		string		$method
+ *	@param		array			$data
+ *	@param		int				$statusBefore			The status the request already carries
+ *
+ *	@return		array			[ statusCode, body ]
+ */
+function callImagesAdmin( array &$appData, string $method, array $data, int $statusBefore = 200 ): array {
+	$request = [ '/nino/http/response' => [ 'statusCode' => $statusBefore ] ];
+	$_POST['data'] = json_encode( $data );
+	\Nino\Modules\Images\Admin::{$method}( $appData, $request );
+	return [ $request['/nino/http/response']['statusCode'], $request['/nino/http/response']['body'] ?? null ];
+}
+
+\Nino\Modules\Images::init( $appData );
+
+[ $status ] = callImagesAdmin( $appData, 'apiRemove', [ 'uri' => '/nope' ] );
+check( 'removing the image of an unknown slot is a 404', $status === 404 );
+
+$appData['/nino/html/images']['/empty'] = [ 'label' => 'Empty', 'width' => 60, 'height' => 40, 'filename' => null ];
+$slotsBeforeEmpty = $appData['/nino/html/images'];
+[ $status, $body ] = callImagesAdmin( $appData, 'apiRemove', [ 'uri' => '/empty' ] );
+check( 'a slot without an image answers 200 with no filename and changes nothing - the call can be repeated', $status === 200 && array_key_exists( 'filename', $body ) === true && $body['filename'] === null && $appData['/nino/html/images'] === $slotsBeforeEmpty );
+
+\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
+check( 'the slot to remove from shows its image', str_contains( \Nino\Html::renderHtml( $appData, '[image /hero]' ), '<img src=' ) === true && is_file( $slotUploadPath ) === true );
+[ $status, $body ] = callImagesAdmin( $appData, 'apiRemove', [ 'uri' => '/hero' ] );
+$persistedSlots = ( include \Nino\Filesystem::path( $appData, '/config.php' ) )['/nino/html/images'];
+check( 'removing answers 200 with no filename; the record is null in memory and in config.php', $status === 200 && array_key_exists( 'filename', $body ) === true && $body['filename'] === null
+	&& $appData['/nino/html/images']['/hero']['filename'] === null && array_key_exists( 'filename', $persistedSlots['/hero'] ) === true && $persistedSlots['/hero']['filename'] === null );
+check( '...the file is deleted, the slot stays with its size, and [image] renders nothing', is_file( $slotUploadPath ) === false
+	&& ( $appData['/nino/html/images']['/hero']['width'] ?? null ) === 60 && \Nino\Html::renderHtml( $appData, '[image /hero]' ) === '' );
+
+// A name an editor wrote into config.php by hand - a logo a template includes literally - is cleared from the slot, and its file is not the slot's to delete
+\Nino\Filesystem::putFileContent( $appData, '/images/logo.png', 'a logo a template includes literally' );
+$appData['/nino/html/images']['/handset'] = [ 'label' => 'Hand set', 'width' => 60, 'height' => 40, 'filename' => 'logo.png' ];
+\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
+[ $status ] = callImagesAdmin( $appData, 'apiRemove', [ 'uri' => '/handset' ] );
+check( 'a hand-set name is cleared from the slot, but its file stays', $status === 200 && $appData['/nino/html/images']['/handset']['filename'] === null && \Nino\Filesystem::fileExists( $appData, '/images/logo.png' ) === true );
+
+// Two slots naming one file: the one that is removed from does not take it away from the other
+\Nino\Filesystem::putFileContent( $appData, '/images/twin.60x40.jpg', 'shared bytes' );
+$appData['/nino/html/images']['/twin'] 		= [ 'label' => 'Twin', 'width' => 60, 'height' => 40, 'filename' => 'twin.60x40.jpg' ];
+$appData['/nino/html/images']['/twin2'] 	= [ 'label' => 'Twin 2', 'width' => 60, 'height' => 40, 'filename' => 'twin.60x40.jpg' ];
+\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
+[ $status ] = callImagesAdmin( $appData, 'apiRemove', [ 'uri' => '/twin' ] );
+check( 'a file another slot still names stays', $status === 200 && $appData['/nino/html/images']['/twin']['filename'] === null && \Nino\Filesystem::fileExists( $appData, '/images/twin.60x40.jpg' ) === true
+	&& $appData['/nino/html/images']['/twin2']['filename'] === 'twin.60x40.jpg' );
+
+// A write that cannot happen: the file and the filename are what they were
+\Nino\Filesystem::putFileContent( $appData, '/images/failing.60x40.jpg', 'bytes' );
+$appData['/nino/html/images']['/failing'] = [ 'label' => 'Failing', 'width' => 60, 'height' => 40, 'filename' => 'failing.60x40.jpg' ];
+\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
+@unlink( $configLock );
+mkdir( $configLock, 0755, true );
+[ $status ] = callImagesAdmin( $appData, 'apiRemove', [ 'uri' => '/failing' ] );
+check( 'a record that cannot be written is a 500, and both the file and the filename stay', $status === 500 && $appData['/nino/html/images']['/failing']['filename'] === 'failing.60x40.jpg'
+	&& \Nino\Filesystem::fileExists( $appData, '/images/failing.60x40.jpg' ) === true );
+rmdir( $configLock );
+
+// A request that already failed its csrf check changes nothing
+[ $status ] = callImagesAdmin( $appData, 'apiRemove', [ 'uri' => '/failing' ], 403 );
+check( 'a request whose status is already 403 (csrf) removes nothing', $status === 403 && $appData['/nino/html/images']['/failing']['filename'] === 'failing.60x40.jpg' && \Nino\Filesystem::fileExists( $appData, '/images/failing.60x40.jpg' ) === true );
+unset( $appData['./nino/html/shortcodes']['image'], $appData['./nino/callbacks']['/nino/html/shortcode/image'] );
+$appData['./nino/html/cache'] = false;
+
+// --- apiAlt: the alt text per language ---------------------------------------
+
+[ $status ] = callImagesAdmin( $appData, 'apiAlt', [ 'uri' => '/nope', 'alt' => [ 'de_DE' => 'x' ] ] );
+check( 'saving alt texts for an unknown slot is a 404', $status === 404 );
+[ $status ] = callImagesAdmin( $appData, 'apiAlt', [ 'uri' => '/small', 'alt' => 'x' ] );
+check( 'alt that is no list of texts by language is a 400', $status === 400 );
+[ $status ] = callImagesAdmin( $appData, 'apiAlt', [ 'uri' => '/small', 'alt' => [ 'xx_XX' => 'x' ] ] );
+check( 'a language the site does not have is a 400', $status === 400 );
+[ $status ] = callImagesAdmin( $appData, 'apiAlt', [ 'uri' => '/small', 'alt' => [ 'de_DE' => [ 'x' ] ] ] );
+check( 'a value that is no string is a 400', $status === 400 );
+[ $status ] = callImagesAdmin( $appData, 'apiAlt', [ 'uri' => '/small', 'alt' => [ 'de_DE' => str_repeat( 'ä', 251 ) ] ] );
+check( '251 characters are a 400', $status === 400 );
+[ $status ] = callImagesAdmin( $appData, 'apiAlt', [ 'uri' => '/small', 'alt' => [ 'de_DE' => str_repeat( 'ä', 250 ). "\n" ] ] );
+check( '...and 250 characters, the trailing line break cleaned away first, are not', $status === 200 );
+check( 'nothing of the refused calls was stored', array_keys( \Nino\Images::getSlot( $appData, '/small' )['alt'] ?? [] ) === [ 'de_DE' ] );
+
+[ $status, $body ] = callImagesAdmin( $appData, 'apiAlt', [ 'uri' => '/small', 'alt' => [ 'de_DE' => ' Ein Haus ', 'en_US' => 'A house' ] ] );
+$persistedAlt = ( include \Nino\Filesystem::path( $appData, '/config.php' ) )['/nino/html/images']['/small']['alt'] ?? null;
+check( 'a valid call answers 200 with the stored map, trimmed, and persists it to config.php', $status === 200 && $body['alt'] === [ 'de_DE' => 'Ein Haus', 'en_US' => 'A house' ] && $persistedAlt === $body['alt'] );
+[ $status, $body ] = callImagesAdmin( $appData, 'apiAlt', [ 'uri' => '/small', 'alt' => [ 'en_US' => '' ] ] );
+check( 'an empty text removes that language, and another one is left as it was', $status === 200 && $body['alt'] === [ 'de_DE' => 'Ein Haus' ] );
+[ $status ] = callImagesAdmin( $appData, 'apiAlt', [ 'uri' => '/small', 'alt' => [ 'de_DE' => 'x' ] ], 403 );
+check( 'a request whose status is already 403 (csrf) saves nothing', $status === 403 && $appData['/nino/html/images']['/small']['alt'] === [ 'de_DE' => 'Ein Haus' ] );
+
+$listRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Modules\Images\Admin::apiList( $appData, $listRequest );
+$listBody = $listRequest['/nino/http/response']['body'];
+$smallRow = array_values( array_filter( $listBody['slots'], static fn( array $s ): bool => $s['uri'] === '/small' ) )[0];
+check( 'apiList carries every slot\'s alt texts and the languages an alt text can be written in', $smallRow['alt'] === [ 'de_DE' => 'Ein Haus' ] && $listBody['locales'] === [ 'de_DE', 'en_US' ] );
+check( '...and where each slot is used: every slot carries usage, a slot no template mentions an empty one', count( array_filter( $listBody['slots'], static fn( array $s ): bool => isset( $s['usage']['pages'], $s['usage']['templates'] ) ) ) === count( $listBody['slots'] )
+	&& $smallRow['usage'] === [ 'templates' => [], 'pages' => [] ] );
 
 echo "\n";
 
@@ -986,6 +1246,15 @@ check( 'a user with no perms is rejected from text/keys', $status === 403 );
 
 [ $status ] = callAdminPost( $appData, 'images/list' );
 check( 'a user with no perms is rejected from images/list', $status === 403 );
+
+[ $status ] = callAdminPost( $appData, 'elements/removeimage', [ 'type' => 'imageremove', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ] );
+check( 'elements/removeimage is the Elements panel\'s: no perms, no removal', $status === 403 );
+
+[ $status ] = callAdminPost( $appData, 'images/remove', [ 'uri' => '/failing' ] );
+check( '...and from images/remove, which would delete a file', $status === 403 && \Nino\Filesystem::fileExists( $appData, '/images/failing.60x40.jpg' ) === true );
+
+[ $status ] = callAdminPost( $appData, 'images/alt', [ 'uri' => '/small', 'alt' => [ 'de_DE' => 'x' ] ] );
+check( '...and from images/alt', $status === 403 && $appData['/nino/html/images']['/small']['alt'] === [ 'de_DE' => 'Ein Haus' ] );
 
 [ $status ] = callAdminPost( $appData, 'submissions/list' );
 check( 'a user with no perms is rejected from submissions/list', $status === 403 );

@@ -6,7 +6,8 @@
  *													slot definitions (label/width/height) - the "set" half of
  *													what the Images panel edits ("values" half: which file
  *													currently fills a slot). Same split as types.js and the
- *													Elements panel. Never touches a slot's filename.
+ *													Elements panel. Never touches a slot's filename. A row
+ *													also says when no page shows its slot.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -129,7 +130,7 @@
 				const li 		= dc.createElement('li');
 				const link	= dc.createElement('a');
 				link.href = '#';
-				link.textContent = slot.label+ ' ('+ slot.uri+ ', '+ slot.width+ '×'+ slot.height+ ( slot.hasImage ? '' : ', '+ Nino.content.getText('/_admin/slots/label/noimage') )+ ')';
+				link.textContent = slot.label+ ' ('+ slot.uri+ ', '+ slot.width+ '×'+ slot.height+ ( slot.hasImage ? '' : ', '+ Nino.content.getText('/_admin/slots/label/noimage') )+ Nino.admin.slots._usageLabel( slot )+ ')';
 				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.slots._openForm( slot ) } );
 				li.appendChild( link );
 				ul.appendChild( li );
@@ -149,6 +150,30 @@
 			scanBtn.textContent = Nino.content.getText('/_admin/slots/label/scan');
 			scanBtn.addEventListener( 'click', function() { Nino.admin.slots._openScanForm() } );
 			wrap.appendChild( Nino.adminUi.listActions( [ scanBtn, addBtn ] ) );
+		},
+
+		/**
+		 *	What the list row says about where a slot is used: nothing when a
+		 *	page shows it, and where no page does, that it is included nowhere -
+		 *	with the templates that name it, if any, since a slot used in a
+		 *	template no route renders is not the same thing as one no template
+		 *	mentions
+		 *
+		 *	@param		{Object}		slot					{ usage : { templates, pages } }
+		 *
+		 *	@return		{string}									'' or ', not included anywhere[, Templates: a, b]'
+		 */
+		_usageLabel : function( slot ) {
+
+			const usage = slot.usage || { templates : [], pages : [] };
+			if( usage.pages.length > 0 )
+				return '';
+
+			let label = ', '+ Nino.content.getText('/_admin/slots/label/unused');
+			if( usage.templates.length > 0 )
+				label += ', '+ Nino.adminUi.format( Nino.content.getText('/_admin/slots/label/templates'), usage.templates.join(', ') );
+
+			return label;
 		},
 
 		/**

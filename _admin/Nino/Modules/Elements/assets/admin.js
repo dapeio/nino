@@ -1058,6 +1058,16 @@
 					label.appendChild( dimensions );
 				}
 
+				// Where the alt text of this picture is written: a field of its
+				// own, per language, which the model names. Said here and on
+				// that field, so neither is found by accident
+				if( field.alt ) {
+					const altHint = dc.createElement('p');
+					altHint.className = 'nino-admin-field-hint';
+					altHint.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/elements/hint/image-alt'), Nino.admin.elements._fieldLabel( field.alt ) );
+					label.appendChild( altHint );
+				}
+
 				const wrap = dc.createElement('div');
 				wrap.className = 'nino-admin-field-image';
 
@@ -1092,16 +1102,29 @@
 					const fileInput = dc.createElement('input');
 					fileInput.type = 'file';
 					fileInput.accept = 'image/*';
+
+					// The field is written empty and its file deleted, right
+					// away like an upload: only there is an image to take away
+					const removeBtn = dc.createElement('button');
+					removeBtn.type = 'button';
+					removeBtn.className = 'nino-admin-btn-danger';
+					removeBtn.textContent = Nino.content.getText('/_admin/elements/label/image-remove');
+					removeBtn.hidden = ! value;
+					removeBtn.addEventListener( 'click', function() {
+						Nino.admin.elements._removeImage( key, displayName, hiddenInput, preview, msg, removeBtn );
+					} );
+
 					fileInput.addEventListener( 'change', function() {
 						if( fileInput.files.length === 0 )
 							return;
-						Nino.admin.elements._uploadImage( key, fileInput.files[0], hiddenInput, preview, msg, fileInput );
+						Nino.admin.elements._uploadImage( key, fileInput.files[0], hiddenInput, preview, msg, fileInput, removeBtn );
 					} );
 					wrap.appendChild( fileInput );
 					// What the server will take, before the file is chosen
 					const hint = Nino.adminUi.uploadHint();
 					if( hint !== null )
 						wrap.appendChild( hint );
+					wrap.appendChild( removeBtn );
 					wrap.appendChild( msg );
 				}
 
@@ -1182,6 +1205,17 @@
 			header.appendChild( counter );
 			label.appendChild( header );
 			label.appendChild( Nino.admin.elements._wrapWithSuffix( input, field ) );
+
+			// The alt text of an image field, said where it is written
+			const model = Nino.admin.elements._currentModel || {};
+			Object.keys( model ).filter( function( imageKey ) {
+				return ( model[imageKey] || {} ).type === 'image' && model[imageKey].alt === key;
+			} ).forEach( function( imageKey ) {
+				const altHint = dc.createElement('p');
+				altHint.className = 'nino-admin-field-hint';
+				altHint.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/elements/hint/alt'), Nino.admin.elements._fieldLabel( imageKey ) );
+				label.appendChild( altHint );
+			} );
 
 			return label;
 		},
@@ -2578,10 +2612,11 @@
 		 *	@param		{Element}	preview					<img> preview element
 		 *	@param		{Element}	msg							Status message element
 		 *	@param		{Element}	fileInput				The <input type=file> itself, disabled while pending
+		 *	@param		{Element}	removeBtn				The Remove button, shown once the field holds an image
 		 *
 		 *	@return		void
 		 */
-		_uploadImage : function( key, file, hiddenInput, preview, msg, fileInput ) {
+		_uploadImage : function( key, file, hiddenInput, preview, msg, fileInput, removeBtn ) {
 
 			fileInput.disabled = true;
 			msg.className = 'nino-admin-field-image-msg';
@@ -2623,8 +2658,66 @@
 					hiddenInput.value = response.filename;
 					preview.src = response.url;
 					preview.hidden = false;
+					removeBtn.hidden = false;
+
+					// Saved either way - but a picture below the target size was
+					// scaled up, which is said in words as well as in colour
+					if( response.belowTarget === true && response.source ) {
+						msg.className = 'nino-admin-field-image-msg is-warning';
+						msg.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/elements/msg/image-below-target'), response.source.width+ ' × '+ response.source.height+ ' px' );
+						return;
+					}
+
 					msg.textContent = Nino.content.getText('/_admin/elements/msg/saved');
 				}, { file : file } );
+			} );
+		},
+
+		/**
+		 *	Take the image out of one field of the saved element, after asking
+		 *	- the question names the field and what follows. The server writes
+		 *	the field empty and deletes the file, immediately like an upload; a
+		 *	cancelled question sends nothing
+		 *
+		 *	@param		{string}		key						The image field
+		 *	@param		{string}		name					Its label, for the question
+		 *	@param		{Element}		hiddenInput		The field's value, emptied
+		 *	@param		{Element}		preview				<img> preview element
+		 *	@param		{Element}		msg						Status message element
+		 *	@param		{Element}		removeBtn			The Remove button itself, disabled while pending
+		 *
+		 *	@return		void
+		 */
+		_removeImage : function( key, name, hiddenInput, preview, msg, removeBtn ) {
+
+			if( wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/elements/confirm/image-remove'), name ) ) === false )
+				return;
+
+			removeBtn.disabled = true;
+			msg.className = 'nino-admin-field-image-msg';
+			msg.textContent = Nino.content.getText('/_admin/elements/msg/pending');
+
+			// The record is taken now, as for an upload: the person may step to
+			// another element or language while the request is on its way
+			Nino.admin.elements._apiCall( 'removeimage', {
+				type 		: Nino.admin.elements._currentType,
+				uri 		: Nino.admin.elements._currentUri,
+				locale 	: Nino.admin.elements._selectedLocale,
+				key 		: key,
+			}, function( status, response ) {
+
+				removeBtn.disabled = false;
+
+				if( status !== 200 || response === null ) {
+					msg.className = 'nino-admin-field-image-msg is-error';
+					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/elements/error/image-remove' );
+					return;
+				}
+
+				hiddenInput.value = '';
+				preview.hidden = true;
+				removeBtn.hidden = true;
+				msg.textContent = Nino.content.getText('/_admin/elements/msg/image-removed');
 			} );
 		},
 

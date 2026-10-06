@@ -30,6 +30,9 @@ namespace Nino\Modules\Images {
 
 		public const string MANAGE_PERM = '/_admin/slots/manage';
 
+		// What usage() says about a slot no template mentions
+		public const array NO_USAGE = [ 'templates' => [], 'pages' => [] ];
+
 		public static function perm(): string {
 			return self::MANAGE_PERM;
 		}
@@ -141,6 +144,8 @@ namespace Nino\Modules\Images {
 			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
 				return;
 
+			$usage = self::usage( $appData );
+
 			$slots = [];
 			foreach( ( $appData['/nino/html/images'] ?? [] ) as $uri => $slot )
 				$slots[] = [
@@ -149,6 +154,7 @@ namespace Nino\Modules\Images {
 					'width' 		=> $slot['width'] ?? 0,
 					'height' 		=> $slot['height'] ?? 0,
 					'hasImage' 	=> ( $slot['filename'] ?? null ) !== null,
+					'usage' 		=> $usage[$uri] ?? self::NO_USAGE,
 				];
 
 			usort( $slots, fn( array $a, array $b ) => strcmp( $a['uri'], $b['uri'] ) );
@@ -290,6 +296,170 @@ namespace Nino\Modules\Images {
 				\Nino\Images::delete( $appData, $slot['filename'] );
 
 			\Nino\Http::ok( $request );
+		}
+
+		/**
+		 *	Where every image slot is used: the templates that show it with
+		 *	[image <uri>] (or [image uri="<uri>"]) and the pages that end up
+		 *	rendering it. A page is a GET route as the project serves it,
+		 *	feature routes included, whose body shows the slot itself or
+		 *	through the [template /templates/<name>] includes that body pulls
+		 *	in, however deep (a visited set and a depth cap keep a template
+		 *	that includes itself from running away). A body that names the
+		 *	template by language - [[/nino/http/response/locale]], as the
+		 *	legal page does - is read once per available language, since there
+		 *	is no single template it points to. A page is named by its
+		 *	[[/webpage<uri>/name]] in the workbench's language, or by its
+		 *	http uri where it has none.
+		 *
+		 *	A slot is a key of the result only where something uses it, in a
+		 *	template or on a page: no key means unused. Templates are
+		 *	templates/*.tpl as _scanMissing() reads them - a template that no
+		 *	route renders is listed under 'templates' alone, which is how the
+		 *	Slots tab can say that a slot is used in a file nobody sees
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										[ slot uri => [ 'templates' => [ name, ... ],
+		 *																		'pages' => [ [ 'httpUri', 'name' ], ... ] ], ... ]
+		 */
+		public static function usage( array &$appData ): array {
+
+			$locales	= \Nino\Locales::getAvailableLocales( $appData );
+			$dir			= \Nino\Filesystem::path( $appData, '/templates' );
+
+			// Every template once, by name without the extension
+			$sources = [];
+			foreach( glob( $dir. '/*.tpl' ) ?: [] as $file ) {
+				$content = file_get_contents( $file );
+				if( $content !== false )
+					$sources[ basename( $file, '.tpl' ) ] = $content;
+			}
+
+			$found = [];
+			foreach( $sources as $name => $content )
+				foreach( array_keys( self::_scanSource( $content, $locales )['images'] ) as $uri )
+					$found[$uri]['templates'][] = $name;
+
+			$text = [];
+			$names = static function( array &$appData, string $uri, string $httpUri ) use ( &$text ): string {
+
+				$locale = \Nino\Admin\Admin::sessionLocale( $appData );
+				$text[$locale] ??= \Nino\Filesystem::getFileContent( $appData, ( $appData['/nino/locales/textfiles'] ?? '/text' ). '/'. $locale. '.php', [] );
+				$name = (string) ( $text[$locale]['[[/webpage'. $uri. '/name]]'] ?? '' );
+
+				return $name === '' ? $httpUri : $name;
+			};
+
+			foreach( ( $appData['/nino/http/routes'] ?? [] ) as $routeKey => $route ) {
+
+				if( str_starts_with( (string) $routeKey, 'GET://' ) === false || is_array( $route ) === false )
+					continue;
+
+				$httpUri = substr( (string) $routeKey, strlen( 'GET:/' ) );
+				$images = [];
+				$visited = [];
+				self::_scanPage( (string) ( $route['body'] ?? '' ), $locales, $sources, $visited, $images, 0 );
+
+				foreach( array_keys( $images ) as $uri )
+					$found[$uri]['pages'][] = [ 'httpUri' => $httpUri, 'name' => $names( $appData, (string) ( $route['uri'] ?? $httpUri ), $httpUri ) ];
+			}
+
+			$usage = [];
+			foreach( $found as $uri => $where )
+				$usage[ (string) $uri ] = [
+					'templates'	=> array_values( array_unique( $where['templates'] ?? [] ) ),
+					'pages'			=> $where['pages'] ?? [],
+				];
+
+			return $usage;
+		}
+
+		/**
+		 *	The slots a page shows: those of its own source and of every
+		 *	template it includes, however deep
+		 *
+		 *	@param		string		$source				A route body or a template
+		 *	@param		array			$locales			Available locales
+		 *	@param		array			$sources			Every template, name => content
+		 *	@param		array			&$visited			Templates already read for this page
+		 *	@param		array			&$images			Slot uris found, as keys
+		 *	@param		int				$depth
+		 *
+		 *	@return 	void
+		 */
+		private static function _scanPage( string $source, array $locales, array $sources, array &$visited, array &$images, int $depth ): void {
+
+			$scan = self::_scanSource( $source, $locales );
+
+			foreach( $scan['images'] as $uri => $true )
+				$images[$uri] = true;
+
+			if( $depth >= 20 )
+				return;
+
+			foreach( array_keys( $scan['includes'] ) as $name ) {
+
+				if( isset( $visited[$name] ) === true || isset( $sources[$name] ) === false )
+					continue;
+
+				$visited[$name] = true;
+				self::_scanPage( $sources[$name], $locales, $sources, $visited, $images, $depth + 1 );
+			}
+		}
+
+		/**
+		 *	The [image] slots and the [template /templates/<name>] includes one
+		 *	source names, read once for each language where the source is
+		 *	about the language ([[/nino/http/response/locale]])
+		 *
+		 *	@param		string		$source
+		 *	@param		array			$locales			Available locales
+		 *
+		 *	@return 	array										[ 'images' => [ uri => true ], 'includes' => [ template name => true ] ]
+		 */
+		private static function _scanSource( string $source, array $locales ): array {
+
+			$fill			= '[[/nino/http/response/locale]]';
+			$variants	= str_contains( $source, $fill ) === true
+				? array_map( static fn( string $locale ): string => str_replace( $fill, $locale, $source ), $locales )
+				: [ $source ];
+
+			$images		= [];
+			$includes	= [];
+
+			foreach( $variants as $variant ) {
+
+				if( preg_match_all( '/\[image(?: ([^\]]*))?\]/', $variant, $matches ) > 0 )
+					foreach( $matches[1] as $arguments ) {
+
+						// Split the way Html::_doShortcode() does, and read the
+						// slot the way Modules\Images does: the first bare
+						// argument, or uri="..."
+						preg_match_all( '/\ ([^\ \=]*)(\=[\"]([^\"]*)[\"])?/i', ' '. $arguments. ' ', $attr );
+						$args = [];
+						foreach( $attr[1] as $id => $key )
+							if( $attr[2][$id] !== '' )
+								$args[$key] = $attr[3][$id];
+							else
+								$args[] = $key;
+
+						// The trailing space given to the pattern adds one empty
+						// bare argument at the end, which is not an argument
+						array_pop( $args );
+
+						$uri = (string) ( $args[0] ?? ( $args['uri'] ?? '' ) );
+						if( $uri !== '' )
+							$images[$uri] = true;
+					}
+
+				// A flat directory: the names a template file can have
+				if( preg_match_all( '#\[template /templates/([A-Za-z0-9._-]+)[\] ]#', $variant, $matches ) > 0 )
+					foreach( $matches[1] as $name )
+						$includes[$name] = true;
+			}
+
+			return [ 'images' => $images, 'includes' => $includes ];
 		}
 
 		/**

@@ -71,6 +71,7 @@ function fakeRow( field ) {
 		'.admin-field-select-options' : field.type === 'string' ? { value : ( field.options ?? [] ).join(', ') } : null,
 		'.admin-field-width' 					: field.type === 'image' ? { value : field.width ?? '' } : null,
 		'.admin-field-height' 				: field.type === 'image' ? { value : field.height ?? '' } : null,
+		'.admin-field-alt' 						: field.type === 'image' ? { value : field.alt ?? '' } : null,
 		'.admin-field-suffix' 				: [ 'boolean', 'image', 'element' ].indexOf( field.type ) === -1 ? { value : field.suffix ?? '' } : null,
 		'.admin-field-element-type' 	: field.type === 'element' ? { value : field.elementType ?? '' } : null,
 		'.admin-field-multiple' 			: field.type === 'element' ? { checked : field.multiple === true } : null,
@@ -138,7 +139,7 @@ check( 'an image row, which renders no "required" checkbox, reads back as not re
 
 elementTypes._fields = [
 	{ key : 'title', 	type : 'string', 	locale : true, required : true, html : true, maxlength : '80', inputsize : '8', suffix : '', elementType : '', options : [ 'a', 'b' ] },
-	{ key : 'photo', 	type : 'image', 	width : '800', height : '600' },
+	{ key : 'photo', 	type : 'image', 	width : '800', height : '600', alt : 'title' },
 	{ key : 'price', 	type : 'double', 	suffix : '\u20ac' },
 	{ key : 'author', type : 'element', 	elementType : 'people' },
 	{ key : '', 			type : 'string' },
@@ -153,6 +154,7 @@ check( '_buildModel carries a string field\'s inputsize', built.title.inputsize 
 check( '_buildModel carries a suffix', built.price.suffix === '\u20ac' );
 check( '_buildModel carries an element field\'s referenced type', built.author.elementType === 'people' );
 check( '_buildModel carries the image dimensions', built.photo.width === '800' && built.photo.height === '600' );
+check( '_buildModel carries the field an image\'s alt text is written in, and nothing for a row that has none', built.photo.alt === 'title' && ( built.price.alt ?? '' ) === '' );
 check( '_buildModel carries locale/required/html and the options list', built.title.locale === true && built.title.required === true && built.title.html === true && built.title.options.join() === 'a,b' );
 
 // The actual guard: whatever _storeFields() knows how to read, _buildModel()
@@ -192,6 +194,9 @@ check( 'the type editor offers the numbering option through the shared switch',
 	typesSource.includes('Nino.adminUi.switchField(') && typesSource.includes("key \t\t\t: 'autoincrement'") );
 // The element branch of _renderFieldRow() is a dom branch this sandbox cannot
 // reach, so its two controls are pinned at source level the same way
+// The image row offers the string fields that can hold an alt text - per language, plain - and is a dom branch like the one above
+check( 'the image row offers a select of the per-language plain string fields as its alt text, refreshed when it takes the focus',
+	typesSource.includes("className = 'admin-field-alt'") && typesSource.includes("addEventListener( 'focus'") && /other\.locale !== true \|\| other\.html === true/.test( typesSource ) );
 check( 'the element branch offers a "several elements" checkbox and a cap',
 	typesSource.includes("className = 'admin-field-multiple'") && typesSource.includes("className = 'admin-field-multiple-max'") );
 // The words are a fill, and a panel's fills travel with its module (see

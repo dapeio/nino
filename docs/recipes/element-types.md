@@ -33,6 +33,7 @@ Common model properties:
 | `suffix` | non-boolean, non-image, non-element | Fixed UI unit such as `€` or `%` |
 | `options` | supported controls, never element | Fixed choices presented by the editing UI |
 | `width`, `height` | image | Required generated image dimensions |
+| `alt` | image | Optional key of a sibling field that holds the image's alt text per language. The target MUST be a `string` field with `locale => true` and without `html`, and not the image itself; the Element Types tab drops any other link on save. The element forms then say in both fields that the one is the other's alt text. `[element]` and `[elements]` render `[[<alt key>]]` as an empty string for an element, or a language, that has no value there, so `alt="[[imageAlt]]"` is `alt=""` (decorative) rather than the literal fill |
 | `elementType` | element | Required uri of the element type this field may reference |
 | `multiple` | element | Int: the field holds an ordered list of references, capped at this number (`0` = uncapped). Absent = a single reference |
 
@@ -153,6 +154,12 @@ return [
 			'type' => 'image',
 			'width' => 1200,
 			'height' => 800,
+			'alt' => 'imageAlt',
+		],
+		'imageAlt' => [
+			'type' => 'string',
+			'locale' => true,
+			'maxlength' => 250,
 		],
 		'featured' => [
 			'type' => 'boolean',
@@ -170,6 +177,7 @@ return [
 			'title' => 'Strategy',
 			'description' => 'A clear foundation for informed decisions.',
 			'linkLabel' => 'Explore strategy',
+			'imageAlt' => 'Two people sketching a plan on a whiteboard',
 		],
 	],
 	'de_DE' => [
@@ -205,7 +213,7 @@ lowercase hyphenated IDs.
 	<img
 		class="nino-article-img"
 		src="[[/nino/public]]/images/[[image]]"
-		alt="[[title]]"
+		alt="[[imageAlt]]"
 	>
 	<div class="nino-article-content">
 		<h2 class="nino-article-title">[[title]]</h2>

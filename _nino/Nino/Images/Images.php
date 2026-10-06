@@ -2,7 +2,7 @@
 declare(strict_types=1);
 /**
  *	Nino								A compact filesystembased php framework
- *	Images					Upload -> validate -> centered crop/resize -> store, shared by every image slot
+ *	Images					Upload -> validate -> orient -> centered crop/resize -> store, shared by every image slot
  *
  *	@package						Dape/Nino
  *	@author							David Perchermeier <mail@dape.io>
@@ -14,7 +14,9 @@ namespace Nino {
 	// "image" field type, any developer-fixed image slot, and whatever a
 	// feature stores. Every image is re-encoded via gd from scratch, never
 	// the uploaded bytes as-is, which also discards anything a crafted file
-	// might carry beyond actual pixel data
+	// might carry beyond actual pixel data - the EXIF block included, so the
+	// orientation a camera recorded there is applied to the pixels first
+	// (see _jpegOrientation()) and is not lost with it
 	//
 	// Two ways to size one: process() crops to exactly the dimensions asked
 	// for, fit() scales the whole picture into a box and keeps its ratio.
@@ -29,8 +31,15 @@ namespace Nino {
 		//   [ 'mode' => 'crop' or 'fit', 'bytes' => the validated source,
 		//     'width' => target or maximum width, 'height' => the same,
 		//     'basePath' => the deterministic path without an extension,
-		//     'source' => [ 'width', 'height', 'type' ] of the upload,
-		//     'filename' => null ]
+		//     'source' => [ 'width', 'height', 'type', 'orientation' ] of the
+		//     upload, 'filename' => null ]
+		//
+		// 'orientation' is the EXIF value 1-8 of a JPEG (1 for everything
+		// else, and for a file that says nothing): width and height stay the
+		// pixels as they are stored, so for 5-8 the picture is shown turned -
+		// a handler that renders it itself has to apply the orientation, or
+		// a photograph taken upright comes out on its side. A payload without
+		// the key, as an older kernel sent it, means 1.
 		//
 		// - and a handler that rendered it sets 'filename' to the path it
 		// wrote below /images/, or false to refuse the upload outright. One
@@ -65,8 +74,8 @@ namespace Nino {
 		public const int MAX_SOURCE_PIXELS 		= 20 * 1000 * 1000;
 		private const string UPLOAD_DIR 				= '/images';
 
-		// Validate, center-crop and resize raw uploaded image bytes to exactly
-		// $targetWidth x $targetHeight, then store the result at $basePath
+		// Validate, turn upright, center-crop and resize raw uploaded image bytes
+		// to exactly $targetWidth x $targetHeight, then store the result at $basePath
 		// with an extension appended for the chosen output format - the
 		// caller picks $basePath deterministically (eg. "elements/<type>/<uri>"),
 		// so re-uploading the *same slot at the same configured dimensions*
@@ -81,9 +90,11 @@ namespace Nino {
 		}
 
 		/**
-		 *	The whole picture, scaled to fit inside $maxWidth x $maxHeight
-		 *	with its own proportions kept - and never scaled up, so a source
-		 *	smaller than the box is stored as it is.
+		 *	The whole picture, turned upright and scaled to fit inside
+		 *	$maxWidth x $maxHeight with its own proportions kept - and never
+		 *	scaled up, so a source smaller than the box is stored as it is.
+		 *	The box is the picture as it is shown, so a photograph that a
+		 *	camera stored on its side is measured upright.
 		 *
 		 *	The counterpart to process(), for everything a fixed frame is the
 		 *	wrong answer for: the large view behind a thumbnail, where cropping
@@ -177,6 +188,146 @@ namespace Nino {
 		}
 
 		/**
+		 *	The size an image is shown at: its pixels, swapped where the
+		 *	JPEG's EXIF orientation (5-8) turns it on its side. What the
+		 *	slot's "smaller than the target size" check has to compare, since
+		 *	that is the picture crop mode scales up - and false for anything
+		 *	this class would not take as an image
+		 *
+		 *	@param		string		$bytes				The uploaded bytes
+		 *
+		 *	@return 	array|false								[ 'width', 'height', 'type', 'orientation' ], or false
+		 */
+		public static function size( string $bytes ): array|false {
+
+			$info = @getimagesizefromstring( $bytes );
+			if( $info === false || in_array( $info[2], [ IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_GIF, IMAGETYPE_WEBP ], true ) === false )
+				return false;
+
+			$orientation	= $info[2] === IMAGETYPE_JPEG ? self::_jpegOrientation( $bytes ) : 1;
+			$turned				= $orientation >= 5;
+
+			return [
+				'width'				=> $turned ? $info[1] : $info[0],
+				'height'			=> $turned ? $info[0] : $info[1],
+				'type'				=> $info[2],
+				'orientation'	=> $orientation,
+			];
+		}
+
+		/**
+		 *	The EXIF orientation (1-8) of a JPEG, read off its header without
+		 *	ext-exif - a host does not have to ship it, and nothing else of the
+		 *	metadata is wanted. 1 is upright, and also the answer for anything
+		 *	that is not a well-formed Exif block: there is no error here, a
+		 *	file that cannot be read is simply not turned.
+		 *
+		 *	The segments are walked from the start marker to the first Exif
+		 *	APP1 (an XMP APP1 before it is skipped), the TIFF header inside it
+		 *	names the byte order, and IFD0 is searched for tag 0x0112. Every
+		 *	read is checked against the length first - unpack() on short input
+		 *	is a warning and an offset past the end a ValueError, and either of
+		 *	them is a failed upload - and the walk is capped, so a crafted
+		 *	file cannot keep it busy.
+		 *
+		 *	@param		string		$bytes				The validated source
+		 *
+		 *	@return 	int
+		 */
+		private static function _jpegOrientation( string $bytes ): int {
+
+			$length = strlen( $bytes );
+			if( $length < 4 || str_starts_with( $bytes, "\xFF\xD8" ) === false )
+				return 1;
+
+			$offset = 2;
+			for( $segments = 0; $segments < 64; $segments++ ) {
+
+				// A marker is FF and its code, with any number of FF fill
+				// bytes in front of the code
+				if( $offset + 1 >= $length || $bytes[$offset] !== "\xFF" )
+					return 1;
+				while( $offset + 1 < $length && $bytes[$offset + 1] === "\xFF" )
+					$offset++;
+				if( $offset + 1 >= $length )
+					return 1;
+
+				$marker = ord( $bytes[$offset + 1] );
+				$offset += 2;
+
+				// The pixels (or the end) come first: no Exif block after them
+				if( $marker === 0xDA || $marker === 0xD9 )
+					return 1;
+				// These carry no length
+				if( $marker === 0x01 || ( $marker >= 0xD0 && $marker <= 0xD7 ) )
+					continue;
+
+				if( $offset + 2 > $length )
+					return 1;
+				$size = unpack( 'n', substr( $bytes, $offset, 2 ) )[1];
+				if( $size < 2 )
+					return 1;
+
+				$payload = substr( $bytes, $offset + 2, $size - 2 );
+				if( $marker === 0xE1 && str_starts_with( $payload, "Exif\0\0" ) === true )
+					return self::_tiffOrientation( substr( $payload, 6 ) );
+
+				$offset += $size;
+			}
+
+			return 1;
+		}
+
+		/**
+		 *	The orientation tag of the TIFF structure inside an Exif block,
+		 *	for _jpegOrientation()
+		 *
+		 *	@param		string		$tiff					The block after "Exif\0\0"
+		 *
+		 *	@return 	int												1-8, or 1
+		 */
+		private static function _tiffOrientation( string $tiff ): int {
+
+			$length = strlen( $tiff );
+			if( $length < 8 )
+				return 1;
+
+			// The byte order of every number below: II little, MM big endian
+			$order = substr( $tiff, 0, 2 );
+			if( $order !== 'II' && $order !== 'MM' )
+				return 1;
+			$short	= $order === 'II' ? 'v' : 'n';
+			$long		= $order === 'II' ? 'V' : 'N';
+
+			if( unpack( $short, substr( $tiff, 2, 2 ) )[1] !== 42 )
+				return 1;
+
+			$ifd = unpack( $long, substr( $tiff, 4, 4 ) )[1];
+			if( $ifd < 8 || $ifd + 2 > $length )
+				return 1;
+
+			$entries = min( unpack( $short, substr( $tiff, $ifd, 2 ) )[1], 256 );
+			for( $index = 0; $index < $entries; $index++ ) {
+
+				$entry = $ifd + 2 + $index * 12;
+				if( $entry + 12 > $length )
+					return 1;
+
+				if( unpack( $short, substr( $tiff, $entry, 2 ) )[1] !== 0x0112 )
+					continue;
+
+				// A SHORT, one of it - its value sits left-aligned in the field
+				$type		= unpack( $short, substr( $tiff, $entry + 2, 2 ) )[1];
+				$count	= unpack( $long, substr( $tiff, $entry + 4, 4 ) )[1];
+				$value	= unpack( $short, substr( $tiff, $entry + 8, 2 ) )[1];
+
+				return ( $type === 3 && $count === 1 && $value >= 1 && $value <= 8 ) ? $value : 1;
+			}
+
+			return 1;
+		}
+
+		/**
 		 *	The header of an image and what is wrong with it: [ getimagesize()
 		 *	of the bytes, or null where they are refused; the refusal, or null ]
 		 *
@@ -233,6 +384,8 @@ namespace Nino {
 			if( $info === null )
 				return false;
 
+			$orientation = $info[2] === IMAGETYPE_JPEG ? self::_jpegOrientation( $bytes ) : 1;
+
 			// Past the gatekeeping, before the encoding: a feature that renders
 			// images its own way gets bytes that are known to be a decodable
 			// image of a sane size, and everything else is its business
@@ -244,7 +397,7 @@ namespace Nino {
 					'width'			=> $width,
 					'height'		=> $height,
 					'basePath'	=> $basePath,
-					'source'		=> [ 'width' => $info[0], 'height' => $info[1], 'type' => $info[2] ],
+					'source'		=> [ 'width' => $info[0], 'height' => $info[1], 'type' => $info[2], 'orientation' => $orientation ],
 					'filename'	=> null,
 				];
 
@@ -272,40 +425,57 @@ namespace Nino {
 			$sourceWidth 	= imagesx( $source );
 			$sourceHeight	= imagesy( $source );
 
+			// What the picture looks like once it is upright: the geometry
+			// below is worked out on that, and only the small target canvas is
+			// turned in the end. Turning the source itself would hold a second
+			// buffer of it, and MAX_SOURCE_PIXELS is what keeps one inside
+			// the memory limit
+			$turned				= $orientation >= 5;
+			$shownWidth		= $turned ? $sourceHeight : $sourceWidth;
+			$shownHeight	= $turned ? $sourceWidth : $sourceHeight;
+
 			if( $mode === 'fit' ) {
 
 				// The whole picture into the box, never past its own size: a
 				// 400px source blown up to a 1600px box is four times the bytes
 				// for the same picture, badly
-				$scale = min( $width / $sourceWidth, $height / $sourceHeight, 1 );
+				$scale = min( $width / $shownWidth, $height / $shownHeight, 1 );
 
-				$cropWidth		= $sourceWidth;
-				$cropHeight		= $sourceHeight;
-				$cropX				= 0;
-				$cropY				= 0;
-				$targetWidth	= max( 1, (int) round( $sourceWidth * $scale ) );
-				$targetHeight	= max( 1, (int) round( $sourceHeight * $scale ) );
+				$cropWidth		= $shownWidth;
+				$cropHeight		= $shownHeight;
+				$targetWidth	= max( 1, (int) round( $shownWidth * $scale ) );
+				$targetHeight	= max( 1, (int) round( $shownHeight * $scale ) );
 
 			} else {
 
 				// Centered crop: the largest rectangle matching the target aspect ratio
-				// that fits inside the source, centered, then resized down/up onto it
+				// that fits inside the picture as shown, centered, then resized down/up onto it
 				$targetWidth	= $width;
 				$targetHeight	= $height;
 				$targetRatio	= $targetWidth / $targetHeight;
-				$sourceRatio	= $sourceWidth / $sourceHeight;
+				$shownRatio		= $shownWidth / $shownHeight;
 
-				if( $sourceRatio > $targetRatio ) {
-					$cropHeight	= $sourceHeight;
-					$cropWidth	= (int) round( $sourceHeight * $targetRatio );
+				if( $shownRatio > $targetRatio ) {
+					$cropHeight	= $shownHeight;
+					$cropWidth	= (int) round( $shownHeight * $targetRatio );
 				} else {
-					$cropWidth	= $sourceWidth;
-					$cropHeight	= (int) round( $sourceWidth / $targetRatio );
+					$cropWidth	= $shownWidth;
+					$cropHeight	= (int) round( $shownWidth / $targetRatio );
 				}
-
-				$cropX = (int) round( ( $sourceWidth - $cropWidth ) / 2 );
-				$cropY = (int) round( ( $sourceHeight - $cropHeight ) / 2 );
 			}
+
+			// The same rectangle in the stored pixels: its sides swapped for
+			// an orientation that turns the picture, and still the centre -
+			// which is the one point every flip and rotation leaves where it is
+			$readWidth	= $turned ? $cropHeight : $cropWidth;
+			$readHeight	= $turned ? $cropWidth : $cropHeight;
+			$cropX			= (int) round( ( $sourceWidth - $readWidth ) / 2 );
+			$cropY			= (int) round( ( $sourceHeight - $readHeight ) / 2 );
+
+			// The canvas is drawn the way the pixels are stored and turned
+			// upright afterwards, so for 5-8 it is the target on its side
+			$canvasWidth	= $turned ? $targetHeight : $targetWidth;
+			$canvasHeight	= $turned ? $targetWidth : $targetHeight;
 
 			/*	Alpha-aware output: png (with transparency preserved) for a source
 				that carries it, jpeg otherwise - keeps photos small, logos crisp.
@@ -322,7 +492,7 @@ namespace Nino {
 			$keepAlpha = in_array( $info[2], [ IMAGETYPE_PNG, IMAGETYPE_GIF ], true )
 				|| ( $info[2] === IMAGETYPE_WEBP && self::_webpHasAlpha( $bytes ) === true );
 
-			$canvas = @imagecreatetruecolor( $targetWidth, $targetHeight );
+			$canvas = @imagecreatetruecolor( $canvasWidth, $canvasHeight );
 
 			// Same allocation-failure class MAX_SOURCE_PIXELS above guards
 			// against, just on the target side - a clean false here beats
@@ -339,8 +509,14 @@ namespace Nino {
 				imagefill( $canvas, 0, 0, imagecolorallocatealpha( $canvas, 0, 0, 0, 127 ) );
 			}
 
-			imagecopyresampled( $canvas, $source, 0, 0, $cropX, $cropY, $targetWidth, $targetHeight, $cropWidth, $cropHeight );
+			imagecopyresampled( $canvas, $source, 0, 0, $cropX, $cropY, $canvasWidth, $canvasHeight, $readWidth, $readHeight );
 			imagedestroy( $source );
+
+			if( $orientation > 1 ) {
+				$canvas = self::_orient( $canvas, $orientation );
+				if( $canvas === false )
+					return false;
+			}
 
 			/*	webp replaces both formats rather than the decision between them.
 				The branch above stays exactly as it was - it is a good guess at
@@ -392,6 +568,37 @@ namespace Nino {
 				return false;
 
 			return $filename;
+		}
+
+		/**
+		 *	Turn a canvas drawn the way a JPEG is stored upright, for its EXIF
+		 *	orientation: 2 mirrored, 3 upside down, 4 mirrored vertically, 5-8
+		 *	on their side (5 and 7 mirrored on top of it). imagerotate() counts
+		 *	counter-clockwise, so the 90 degrees clockwise a 6 asks for is -90.
+		 *	Only ever a JPEG, which has no alpha channel to keep
+		 *
+		 *	@param		\GdImage	$canvas				Consumed: destroyed where it is replaced
+		 *	@param		int				$orientation	2-8
+		 *
+		 *	@return 	\GdImage|false
+		 */
+		private static function _orient( \GdImage $canvas, int $orientation ): \GdImage|false {
+
+			$angle = match( $orientation ) { 3 => 180, 5, 6, 7 => -90, 8 => 90, default => 0 };
+			$flip  = match( $orientation ) { 2, 5 => IMG_FLIP_HORIZONTAL, 4, 7 => IMG_FLIP_VERTICAL, default => 0 };
+
+			if( $angle !== 0 ) {
+				$rotated = imagerotate( $canvas, $angle, 0 );
+				imagedestroy( $canvas );
+				if( $rotated === false )
+					return false;
+				$canvas = $rotated;
+			}
+
+			if( $flip !== 0 )
+				imageflip( $canvas, $flip );
+
+			return $canvas;
 		}
 
 		/**
@@ -481,16 +688,130 @@ namespace Nino {
 			return self::getSlots( $appData )[$uri] ?? false;
 		}
 
-		// Record a new filename for an existing slot and persist it - only
-		// the /nino/html/images key of config.php, same as Auth::updateUser()
-		// only persists /nino/auth/user (see AppData::writeContentData())
-		public static function setSlotFilename( array &$appData, string $uri, string $filename ): bool {
+		// Record a new filename for an existing slot - null for no image at all -
+		// and persist it with a mutation of config.php that changes this one
+		// entry and nothing else, like setSlotAlt(): writeContentData() would
+		// replace the whole /nino/html/images key with this request's copy of
+		// it, and an upload or a removal that finishes after an alt text was
+		// saved would put the old alt texts back. True only where the record
+		// was written: an unknown slot (here or in config.php) and a config.php
+		// that could not be written are both false, and both leave $appData as
+		// it was, so that the caller can leave the file the old record still
+		// names alone
+		public static function setSlotFilename( array &$appData, string $uri, ?string $filename ): bool {
 
 			if( self::getSlot( $appData, $uri ) === false )
 				return false;
 
+			$written = \Nino\Filesystem::mutate( $appData, '/config.php', static function( mixed $content ) use ( $uri, $filename ): ?array {
+
+				if( is_array( $content ) === false || isset( $content['/nino/html/images'][$uri] ) === false )
+					return null;
+
+				$content['/nino/html/images'][$uri]['filename'] = $filename;
+
+				return $content;
+			} );
+
+			if( $written === false )
+				return false;
+
 			$appData['/nino/html/images'][$uri]['filename'] = $filename;
-			\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
+
+			return true;
+		}
+
+		/**
+		 *	One alt text as it is stored: control characters (a line break
+		 *	among them) become spaces and the ends are trimmed - an alt text
+		 *	is one short line of plain text, and it ends up in an attribute.
+		 *	The same cleaning setSlotAlt() applies, public so that a panel can
+		 *	measure what would be stored rather than what was typed
+		 *
+		 *	@param		string		$value
+		 *
+		 *	@return 	string|false							The cleaned text, or false for bytes that are not valid UTF-8
+		 */
+		public static function cleanAlt( string $value ): string|false {
+
+			if( preg_match( '//u', $value ) !== 1 )
+				return false;
+
+			return trim( (string) preg_replace( '/[\x00-\x1F\x7F]/u', ' ', $value ) );
+		}
+
+		/**
+		 *	Set the alt text of a slot per language - [ 'de_DE' => 'Ein Haus' ].
+		 *	Merged per posted language: an empty value removes that language's
+		 *	entry (an empty alt means decorative - the shortcode then falls
+		 *	back to the template's own alt, or to none), and a language that
+		 *	is not posted stays as it is. Only available languages and strings
+		 *	of valid UTF-8 are taken; anything else refuses the whole call,
+		 *	unchanged.
+		 *
+		 *	Persisted with a mutation of config.php that changes this one entry
+		 *	and nothing else, instead of writeContentData() like the other
+		 *	slot writers: that one replaces the whole /nino/html/images key with
+		 *	this request's copy of it, and an alt text saved while an upload
+		 *	finishes would take one of the two with it. The slot has to be in
+		 *	config.php, or there is nothing to change
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$uri					The slot
+		 *	@param		array			$alt					Language => text
+		 *
+		 *	@return 	bool
+		 */
+		public static function setSlotAlt( array &$appData, string $uri, array $alt ): bool {
+
+			if( self::getSlot( $appData, $uri ) === false )
+				return false;
+
+			$clean = [];
+			foreach( $alt as $locale => $value ) {
+
+				if( is_string( $locale ) === false || is_string( $value ) === false || \Nino\Locales::verifyLocale( $appData, $locale ) === false )
+					return false;
+
+				$text = self::cleanAlt( $value );
+				if( $text === false )
+					return false;
+
+				$clean[$locale] = $text;
+			}
+
+			$stored = [];
+			$written = \Nino\Filesystem::mutate( $appData, '/config.php', static function( mixed $content ) use ( $uri, $clean, &$stored ): ?array {
+
+				if( is_array( $content ) === false || isset( $content['/nino/html/images'][$uri] ) === false )
+					return null;
+
+				$current = $content['/nino/html/images'][$uri]['alt'] ?? [];
+				$merged = is_array( $current ) === true ? $current : [];
+
+				foreach( $clean as $locale => $text )
+					if( $text === '' )
+						unset( $merged[$locale] );
+					else
+						$merged[$locale] = $text;
+
+				if( $merged === [] )
+					unset( $content['/nino/html/images'][$uri]['alt'] );
+				else
+					$content['/nino/html/images'][$uri]['alt'] = $merged;
+
+				$stored = $merged;
+
+				return $content;
+			} );
+
+			if( $written === false )
+				return false;
+
+			if( $stored === [] )
+				unset( $appData['/nino/html/images'][$uri]['alt'] );
+			else
+				$appData['/nino/html/images'][$uri]['alt'] = $stored;
 
 			return true;
 		}

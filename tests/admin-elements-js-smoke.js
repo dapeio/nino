@@ -643,13 +643,17 @@ if( typeof elements._renderNav === 'function' ) {
 		'/_admin/common/hint/upload' : 'Up to %s MB and %s megapixels.',
 		'/_admin/elements/msg/pending' : 'Saving',
 		'/_admin/elements/msg/saved' : 'Saved.',
+		'/_admin/elements/msg/image-below-target' : 'Saved - only %s, scaled up.',
+		'/_admin/elements/confirm/image-remove' : 'Remove from "%s"?',
+		'/_admin/elements/msg/image-removed' : 'Removed.',
+		'/_admin/elements/error/image-remove' : 'Removing failed.',
 	};
 	sandbox.document.getElementById = id => id === 'admin-page-wrap' ? wrap : null;
 	sandbox.document.createElement = dom.make;
 	sandbox.Nino.content = { getText : key => texts[key] || '' };
 
 	const sent = [];
-	elements._apiCall = function( endpoint, payload, callback, extra ) { sent.push( { endpoint : endpoint, extra : extra, callback : callback } ) };
+	elements._apiCall = function( endpoint, payload, callback, extra ) { sent.push( { endpoint : endpoint, payload : payload, extra : extra, callback : callback } ) };
 	elements._currentType = 'services';
 	elements._currentUri = 'one';
 	elements._selectedLocale = 'de_DE';
@@ -658,17 +662,41 @@ if( typeof elements._renderNav === 'function' ) {
 	const fileInput = { disabled : false, value : 'C:\\fakepath\\big.jpg' };
 	const hidden = { value : '' };
 	const preview = { src : '', hidden : true };
+	const removeBtn = { hidden : true, disabled : false };
 
-	elements._uploadImage( 'photo', { size : 3 * 1048576 }, hidden, preview, msg, fileInput );
+	elements._uploadImage( 'photo', { size : 3 * 1048576 }, hidden, preview, msg, fileInput, removeBtn );
 	check( 'a file above the limit is refused before it is sent, in the server\'s own words', sent.length === 0 && msg.textContent === 'The image is larger than 2 MB.' );
 	check( '...the message is styled as an error and the control is free to choose another file', msg.className === 'nino-admin-field-image-msg is-error' && fileInput.disabled === false && fileInput.value === '' );
 
-	elements._uploadImage( 'photo', { size : 1000 }, hidden, preview, msg, fileInput );
+	elements._uploadImage( 'photo', { size : 1000 }, hidden, preview, msg, fileInput, removeBtn );
 	check( 'a file within it goes to the server as before, with the file as the extra field', sent.length === 1 && sent[0].endpoint === 'uploadimage' && sent[0].extra.file.size === 1000 && msg.textContent === 'Saving' );
 	sent[0].callback( 200, { filename : 'a.jpg', url : '/images/a.jpg' } );
 	check( '...and the answer lands in the field and the preview', hidden.value === 'a.jpg' && preview.src === '/images/a.jpg' && msg.textContent === 'Saved.' );
+	check( '...and the Remove button is there from then on', removeBtn.hidden === false );
 
-	elements._uploadImage( 'photo', { size : 1000 }, hidden, preview, msg, fileInput );
+	// A picture below the field's target size is saved and said to be scaled up: in words, with its size, and in the warning's colour
+	elements._uploadImage( 'photo', { size : 1000 }, hidden, preview, msg, fileInput, removeBtn );
+	sent[sent.length - 1].callback( 200, { filename : 'b.jpg', url : '/images/b.jpg', belowTarget : true, source : { width : 120, height : 80 } } );
+	check( 'an upload below the target size says so with the size it has, as a warning', msg.className === 'nino-admin-field-image-msg is-warning' && msg.textContent === 'Saved - only 120 \u00d7 80 px, scaled up.' && hidden.value === 'b.jpg' );
+
+	// Remove: asked first, sent for the field, and the field is empty afterwards
+	sandbox.window.confirm = () => false;
+	const sentBeforeRemove = sent.length;
+	elements._removeImage( 'photo', 'Photo', hidden, preview, msg, removeBtn );
+	check( 'a cancelled question removes nothing and sends nothing', sent.length === sentBeforeRemove && hidden.value === 'b.jpg' );
+	let question = '';
+	sandbox.window.confirm = text => { question = text; return true };
+	elements._removeImage( 'photo', 'Photo', hidden, preview, msg, removeBtn );
+	check( 'the question names the field, and the request names the element, language and field', question === 'Remove from "Photo"?' && sent.length === sentBeforeRemove + 1
+		&& sent[sent.length - 1].endpoint === 'removeimage'
+		&& JSON.stringify( sent[sent.length - 1].payload ) === JSON.stringify( { type : 'services', uri : 'one', locale : 'de_DE', key : 'photo' } ) );
+	sent[sent.length - 1].callback( 500, null );
+	check( 'a failed removal is an error and leaves the field as it was', msg.className === 'nino-admin-field-image-msg is-error' && hidden.value === 'b.jpg' && removeBtn.hidden === false && removeBtn.disabled === false );
+	elements._removeImage( 'photo', 'Photo', hidden, preview, msg, removeBtn );
+	sent[sent.length - 1].callback( 200, { filename : null } );
+	check( 'a removal empties the field, hides the preview and the button and says so', hidden.value === '' && preview.hidden === true && removeBtn.hidden === true && msg.textContent === 'Removed.' );
+
+	elements._uploadImage( 'photo', { size : 1000 }, hidden, preview, msg, fileInput, removeBtn );
 	sent[1].callback( 413, { error : 'the file is larger than the server accepts', code : 'upload_too_large', params : [ 2 ] } );
 	check( 'a failure the server worded is shown as an error, in those words and without the status number', msg.className === 'nino-admin-field-image-msg is-error' && msg.textContent === 'The file is larger than this server accepts (PHP upload limit: 2 MB).' );
 
@@ -685,7 +713,7 @@ if( typeof elements._renderNav === 'function' ) {
 		elements._selectedLocale = 'de_DE';
 		elements._apiCall = function( endpoint, payload, callback, extra ) { sent.push( { endpoint : endpoint, payload : payload, extra : extra, callback : callback } ) };
 
-		elements._uploadImage( 'photo', { size : 1000 }, hidden, preview, msg, fileInput );
+		elements._uploadImage( 'photo', { size : 1000 }, hidden, preview, msg, fileInput, removeBtn );
 		check( 'while the picture is decoded nothing is sent yet', sent.length === before && decoded !== null );
 
 		elements._currentUri = 'two';
@@ -855,6 +883,25 @@ function fakeDom() {
 		&& draw( { type : 'array', required : true } ).querySelector('textarea').getAttribute('aria-required') === 'true'
 		&& draw( { type : 'string', required : true, options : [ 'a', 'b' ] } ).querySelector('select').getAttribute('aria-required') === 'true' );
 	check( 'a single reference is marked on its select', draw( { type : 'element', elementType : 'tag', required : true } ).querySelector('select').getAttribute('aria-required') === 'true' );
+	// An image field that names the field holding its alt text says so, and that field says whose it is
+	elements._currentModel = { photo : { type : 'image', width : 40, height : 30, alt : 'caption' }, caption : { type : 'string', locale : true }, plain : { type : 'image', width : 40, height : 30 } };
+	texts['/_admin/elements/hint/image-alt'] = 'ALT IN %s';
+	texts['/_admin/elements/hint/alt'] = 'ALT OF %s';
+	texts['/_admin/elements/label/image-remove'] = 'Remove image';
+	const hintsOf = el => el.querySelectorAll('.nino-admin-field-hint').map( h => h.textContent );
+	check( 'the image field of a model with an alt link names the field it is written in', hintsOf( elements._renderField( 'photo', elements._currentModel.photo, 'a.jpg' ) ).join() === 'ALT IN caption' );
+	check( '...and the linked field names the image it is the alt text of', hintsOf( elements._renderField( 'caption', elements._currentModel.caption, 'x' ) ).join() === 'ALT OF photo' );
+	check( 'an image without the link, and a field nobody links to, carry no such hint', hintsOf( elements._renderField( 'plain', elements._currentModel.plain, '' ) ).length === 0
+		&& hintsOf( elements._renderField( 'other', { type : 'string' }, 'x' ) ).length === 0 );
+	const withImage = elements._renderField( 'photo', elements._currentModel.photo, 'a.jpg' );
+	const withoutImage = elements._renderField( 'photo', elements._currentModel.photo, '' );
+	const removeOf = el => el.querySelectorAll('button').filter( b => b.className === 'nino-admin-btn-danger' )[0];
+	check( 'the remove button is drawn with the image field, shown while there is an image and hidden while there is none', removeOf( withImage ).hidden === false && removeOf( withoutImage ).hidden === true
+		&& removeOf( withImage ).textContent === 'Remove image' );
+	elements._isNew = true;
+	check( 'a new element, which has no image to remove, has no button', removeOf( elements._renderField( 'photo', elements._currentModel.photo, '' ) ) === undefined );
+	elements._isNew = false;
+	elements._currentModel = {};
 	check( 'an image and a yes/no choice are never marked: one is uploaded on its own, the other cannot be empty',
 		stars( draw( { type : 'image', required : true } ) ).length === 0 && stars( draw( { type : 'boolean', required : true } ) ).length === 0 );
 

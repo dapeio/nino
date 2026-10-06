@@ -54,6 +54,7 @@ namespace Nino\Modules\Elements {
 				'elements/list' 			=> [ self::class, 'apiList' ],
 				'elements/get' 				=> [ self::class, 'apiGet' ],
 				'elements/uploadimage' => [ self::class, 'apiUploadImage' ],
+				'elements/removeimage' => [ self::class, 'apiRemoveImage' ],
 				'elements/save' 			=> [ self::class, 'apiSave' ],
 				'elements/delete' 		=> [ self::class, 'apiDelete' ],
 			];
@@ -102,6 +103,7 @@ namespace Nino\Modules\Elements {
 			return match( $action ) {
 				'elements/save' 			=> ( ( $data['isNew'] ?? false ) === true ? 'Add Element /' : 'Edit Element /' ). ( $data['type'] ?? '' ). '/'. ( $data['uri'] ?? '' ),
 				'elements/uploadimage' => 'Upload Element Image /'. ( $data['type'] ?? '' ). '/'. ( $data['uri'] ?? '' ). ' '. ( $data['key'] ?? '' ),
+				'elements/removeimage' => 'Remove Element Image /'. ( $data['type'] ?? '' ). '/'. ( $data['uri'] ?? '' ). ' '. ( $data['key'] ?? '' ),
 				'elements/delete' 		=> 'Delete Element /'. ( $data['type'] ?? '' ). '/'. ( $data['uri'] ?? '' ),
 				default 							=> '',
 			};
@@ -324,7 +326,9 @@ namespace Nino\Modules\Elements {
 		 *	the key/locale only where a real collision is possible), so a
 		 *	replace overwrites in place - the rare leftover (the output format
 		 *	itself changed, eg. jpeg -> png) is cleaned up once the new file is
-		 *	safely written and the element record actually updated
+		 *	safely written and the element record actually updated. The answer
+		 *	says how large the picture is as it is shown and whether that is
+		 *	smaller than the field's target size, which crop mode scales up
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -440,7 +444,98 @@ namespace Nino\Modules\Elements {
 			if( is_string( $oldFilename ) === true && $oldFilename !== '' && $oldFilename !== $filename )
 				\Nino\Images::delete( $appData, $oldFilename );
 
-			\Nino\Http::ok( $request, [ 'filename' => $filename, 'url' => \Nino\Images::getUrl( $appData, $filename ) ] );
+			$body = [ 'filename' => $filename, 'url' => \Nino\Images::getUrl( $appData, $filename ) ];
+
+			$shown = \Nino\Images::size( $bytes );
+			if( $shown !== false ) {
+				$body['source']				= [ 'width' => $shown['width'], 'height' => $shown['height'] ];
+				$body['belowTarget']	= $shown['width'] < $width || $shown['height'] < $height;
+			}
+
+			\Nino\Http::ok( $request, $body );
+		}
+
+		/**
+		 *	Take the image out of one "image"-typed field of a saved element,
+		 *	committed immediately like the upload: the field is written empty,
+		 *	and only then is the file deleted - and only if it is one this
+		 *	element's own upload wrote (exactly the name apiUploadImage()
+		 *	builds for this field and language) and no other image field or
+		 *	language of the element still names it. Answering [ 'filename' => null ] for a field
+		 *	that holds none makes the call safe to repeat
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiRemoveImage( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			$data 		= \Nino\Admin\Admin::postData();
+			$type 		= (string) ( $data['type'] ?? '' );
+			$uri 			= (string) ( $data['uri'] ?? '' );
+			$locale 	= (string) ( $data['locale'] ?? '' );
+			$key 			= (string) ( $data['key'] ?? '' );
+
+			if( in_array( $type, self::types( $appData ), true ) === false || $uri === '' || str_contains( $uri, '/' ) === true || \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
+				\Nino\Http::fail( $request, 400, 'invalid type, uri or locale' );
+				return;
+			}
+
+			$model = self::typeData( $appData, $type )['model'] ?? [];
+			if( ( $model[$key]['type'] ?? '' ) !== 'image' ) {
+				\Nino\Http::fail( $request, 400, 'not an image field' );
+				return;
+			}
+
+			if( self::mayUpdate( $appData, $type, $key ) === false ) {
+				\Nino\Http::fail( $request, 403, 'not allowed to change the field(s) '. $key, 'elements_fields_not_allowed', [ $key ], $key );
+				return;
+			}
+
+			$elementUri 	= '/'. $type. '/'. $uri;
+			$isLocaleField = ( $model[$key]['locale'] ?? false ) === true;
+
+			if( \Nino\Elements::getElement( $appData, $elementUri, '*' ) === false ) {
+				\Nino\Http::fail( $request, 404, 'element not found' );
+				return;
+			}
+
+			$element 	= \Nino\Elements::getElement( $appData, $elementUri, $isLocaleField ? $locale : '*' );
+			$old 			= is_array( $element ) ? ( $element[$key] ?? null ) : null;
+
+			if( is_string( $old ) === false || $old === '' ) {
+				\Nino\Http::ok( $request, [ 'filename' => null ] );
+				return;
+			}
+
+			if( is_array( \Nino\Elements::updateElement( $appData, $elementUri, [ $key => '' ], $locale ) ) === false ) {
+				\Nino\Http::fail( $request, 400, 'save failed' );
+				return;
+			}
+
+			// The exact name apiUploadImage() writes, "-key" and "-locale" only
+			// where it adds them: elements/<type>/<uri>[-<key>][-<locale>].<w>x<h>.<ext>
+			$imageFieldCount = 0;
+			foreach( $model as $modelField )
+				if( ( $modelField['type'] ?? '' ) === 'image' )
+					$imageFieldCount++;
+
+			$basePath = 'elements/'. $type. '/'. $uri;
+			if( $imageFieldCount > 1 )
+				$basePath .= '-'. $key;
+			if( $isLocaleField === true )
+				$basePath .= '-'. $locale;
+
+			$owned = preg_match( '#^'. preg_quote( $basePath, '#' ). '\.\d+x\d+\.[a-z0-9]+$#', $old ) === 1;
+
+			if( $owned === true && in_array( $old, self::imageFilenames( $appData, $type, $elementUri ), true ) === false )
+				\Nino\Images::delete( $appData, $old );
+
+			\Nino\Http::ok( $request, [ 'filename' => null ] );
 		}
 
 		/**

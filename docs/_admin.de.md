@@ -152,6 +152,8 @@ Ein Feld, das auf andere Elemente verweist, ist eine Auswahlliste oder, wo der T
 
 **Duplizieren** übernimmt alle Werte des offenen Eintrags in ein neues Element – alle Sprachen, alle Felder, außer der Uri und den Bildern, die zu dem Eintrag gehören, für den sie hochgeladen wurden. Geschrieben ist noch nichts: Gib der Kopie eine Uri und speichere sie.
 
+Ein Bildfeld lädt für sich hoch, sobald die Datei gewählt ist, und sagt, wenn das Bild kleiner als das Soll-Maß des Feldes ist und hochskaliert wurde. **Bild entfernen** nimmt es sofort aus dem gespeicherten Element: Das Feld wird geleert und die Datei gelöscht, die der Upload dieses Eintrags geschrieben hat. Ein Dateiname, der von Hand geschrieben wurde, bleibt auf der Platte.
+
 **Löschen** entfernt den Eintrag in jeder Sprache und die Bilder, die nur seine Bildfelder nutzten. Nur eine Sicherung bringt ihn zurück.
 
 ### Texte
@@ -163,6 +165,14 @@ Ein Schlüssel, der hier nicht erscheint, ist entweder für die Bearbeitung ausg
 ### Bilder
 
 **Bilder** listet die Bildplätze, die der Entwickler auf dem Tab **Bildplätze** definiert hat, gruppiert nach Uri-Bereich, mit Beschriftung, Shortcode und Zielmaßen. Wähle eine Datei für einen Platz und starte den Upload; Nino prüft und verarbeitet sie, weist eine ungültige oder zu große Datei ab und ersetzt das aktuelle Bild sofort.
+
+Ein Foto behält die Ausrichtung, die seine Kamera festgehalten hat: Die EXIF-Ausrichtung des JPEG wird aus seinem Kopf gelesen und angewendet, bevor das Bild auf das Ziel zugeschnitten wird, ein aufrechtes Hochformat wird also nicht auf der Seite liegend gespeichert. Bilder, die vorher hochgeladen wurden, bleiben, wie sie gespeichert sind, und müssen neu hochgeladen werden.
+
+Ein Bild, das kleiner ist als das Soll-Maß des Platzes, wird trotzdem gespeichert – und die Zeile unter dem Feld sagt es, mit seiner Größe (*Gespeichert – aber Dein Bild ist nur 300 × 150 px groß, kleiner als die Soll-Maße, und wurde hochskaliert. Es kann unscharf wirken.*). Gemeint ist die Größe, in der das Bild angezeigt wird; ein Foto, das die Kamera auf der Seite liegend gespeichert hat, wird also aufrecht gemessen. **Bild entfernen** nimmt das Bild nach einer Rückfrage aus dem Platz: Die Datei wird gelöscht, und die Website zeigt dort kein Bild, bis ein neues hochgeladen wird; der Platz selbst bleibt. Erst wird der Eintrag geschrieben, dann die Datei gelöscht, und nur eine Datei, die dem Platz gehört, wird gelöscht – ein Dateiname, den jemand von Hand in die `config.php` geschrieben hat (ein Bild, das ein Template wörtlich einbindet), wird aus dem Platz entfernt und bleibt auf der Platte.
+
+Unter jedem Platz steht, wo er verwendet wird – *Verwendet auf: Start (/)* –, gelesen aus den Templates, die die Seiten der Website rendern, `[template]`-Einbindungen eingeschlossen. Ein Platz, den keine Seite zeigt, sagt es (*Nirgends eingebunden*): Ein Bild, das dort hochgeladen wird, erscheint nicht auf der Website. Darunter steht je Sprache ein Feld **Alt-Text**: Er beschreibt, was das Bild zeigt, für Menschen, die es nicht sehen, und `[image]` schreibt ihn als `alt`-Attribut in der Sprache der Seite. Leer heißt dekorativ (`alt=""`), es sei denn, das Template gibt einen eigenen Alt-Text vor. Die Reihenfolge ist: der gespeicherte Text der Sprache, dann das `alt="…"` des Templates, dann keiner; die Beschriftung des Platzes wird nie als Alt-Text benutzt. Ein Alt-Text wird mit dem Platz in der `config.php` gespeichert, nicht in einer Datei `text/<Sprache>.php`, und ist deshalb nicht Teil eines Übersetzungs-Exports oder -Imports.
+
+Auch das Logo der Website ist so ein Platz, `/logo`: Header, Navigation, die Open-Graph- und Twitter-Tags und die Mails des Form-Moduls zeigen, was dort hochgeladen ist, und nichts – kein kaputtes Bild, kein leeres Tag –, solange nichts hochgeladen ist. Ein Upload wird auf die Zielform des Platzes zugeschnitten (zunächst 500 × 100); ein Logo anderer Form braucht zuerst ein geändertes Maß des Platzes im Tab **Bildplätze**.
 
 Jedes Upload-Feld sagt, was der Server annimmt, noch bevor du wählst: *Bis zu 2 MB und 20 Megapixel.* Die Größe ist die kleinste von drei Grenzen – Ninos eigene 8 MB, PHPs `upload_max_filesize` und PHPs `post_max_size` (0 heißt dort: keine) – und die Pixel sind Ninos 20 Megapixel: Ein Bild zu dekodieren braucht etwa vier Byte je Pixel, und das ist, was der Speicher eines günstigen Hosters hergibt. Eine Datei über der Grenze lehnt schon der Browser ab, mit Begründung, bevor sie gesendet wird; eine Datei, die der Browser nicht beurteilen kann (ein Format, das er nicht dekodiert), überlässt er dem Server, der den Grund ebenfalls nennt – größer als 8 MB, mehr als 20 Megapixel, kein JPEG, PNG, WebP oder GIF, oder größer, als PHP durchlässt (*PHP-Upload-Limit: 2 MB*). Das Letzte ist eine Einstellung des Servers, nicht von Nino: Erhöhe `upload_max_filesize` und `post_max_size` in der `php.ini` oder frage den Hoster.
 
@@ -209,7 +219,7 @@ Elementtypen beschreiben wiederkehrende Inhalte. Jeder Typ ist eine Datei unter 
 | `image` | ein Bild mit festen Zielmaßen |
 | `element` | ein Verweis auf ein Element eines anderen Typs |
 
-Je nach Typ ist ein Feld *pro Übersetzung* oder global, Pflicht oder optional, Rich Text, auf feste Werte beschränkt, mit Maßen, Einheit oder Suffix versehen oder mit einer Zeilenzahl, mit der sein Eingabefeld öffnet. Ein `element`-Feld nennt den Typ, auf den es verweist, und darf mehrere Elemente halten, geordnet, mit **Max. Elemente** als Obergrenze (`0` für keine); der Kernel setzt diese Grenze beim Speichern durch. Ein gelöschtes Ziel bleibt als *fehlend* stehen, und Verweise sind nicht Teil eines Übersetzungs-Exports.
+Je nach Typ ist ein Feld *pro Übersetzung* oder global, Pflicht oder optional, Rich Text, auf feste Werte beschränkt, mit Maßen, Einheit oder Suffix versehen oder mit einer Zeilenzahl, mit der sein Eingabefeld öffnet. Ein `image`-Feld kann ein **Alt-Text-Feld** nennen: ein einfaches `string`-Feld desselben Typs, das pro Übersetzung geschrieben wird. Beide Formulare sagen es dann, der Alt-Text des Bildes wird dort je Sprache geschrieben, und `alt="[[<Feld>]]"` im Template ist für ein Element, das noch keinen Text hat, leer – ein dekoratives Bild. Ein Verweis auf ein globales Feld, ein Rich-Text-Feld, das Bild selbst oder ein Feld, das es nicht gibt, wird beim Speichern des Typs verworfen. Ein `element`-Feld nennt den Typ, auf den es verweist, und darf mehrere Elemente halten, geordnet, mit **Max. Elemente** als Obergrenze (`0` für keine); der Kernel setzt diese Grenze beim Speichern durch. Ein gelöschtes Ziel bleibt als *fehlend* stehen, und Verweise sind nicht Teil eines Übersetzungs-Exports.
 
 Der Wechsel eines Felds zwischen global und pro Übersetzung migriert die vorhandenen Werte; prüfe das Ergebnis in jeder Sprache. Das Speichern eines Typs löscht keine Einträge, ein entferntes Feld verschwindet aber aus dem Formular.
 
@@ -256,7 +266,7 @@ Dynamisch zusammengesetzte Schlüssel liegen außerhalb eines statischen Scans.
 
 ### Bildplätze
 
-**Bildplätze** ist ein Tab des Panels Bilder. Ein Bildplatz verbindet eine technische Uri (`/home/hero`) mit einer Beschriftung und festen Zielmaßen; Redakteure befüllen ihn unter **Bilder**. **Templates nach fehlenden Bildplätzen durchsuchen** findet lokale `<img src="…">`-Verweise unter `images/` ohne Platz. Das Löschen eines Platzes löscht das darin gespeicherte Bild.
+**Bildplätze** ist ein Tab des Panels Bilder. Ein Bildplatz verbindet eine technische Uri (`/home/hero`) mit einer Beschriftung und festen Zielmaßen; Redakteure befüllen ihn unter **Bilder**. **Templates nach fehlenden Bildplätzen durchsuchen** findet lokale `<img src="…">`-Verweise unter `images/` ohne Platz. Das Löschen eines Platzes löscht das darin gespeicherte Bild. Jede Zeile sagt außerdem, wenn keine Seite den Platz zeigt – *nirgends eingebunden* – und, wenn ein Template ihn nennt, das keine Route rendert, welches. Ein Platz, den der Scan anlegt, zeigt das so lange, bis sein Template `[image <uri>]` statt eines wörtlichen `<img>` benutzt.
 
 ## System
 

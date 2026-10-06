@@ -853,6 +853,13 @@ a {
 	line-height: 1.45;
 }
 
+/* A hint that states a condition worth acting on - an image slot no page uses.
+   The sentence says so itself; the colour only supports it. */
+:where(.nino-admin) .nino-admin-field-hint.is-warning {
+	color: var(--editor-orange);
+	font-weight: 650;
+}
+
 /* The mark after the name of a field that cannot be left empty. Drawn by the
    panel with aria-hidden: what a screen reader gets is aria-required on the
    control, so the star is not read out as "star". */
@@ -1017,6 +1024,13 @@ a {
 
 :where(.nino-admin) .nino-admin-field-image-msg.is-error {
 	color: var(--editor-red);
+	font-weight: 650;
+}
+
+/* A warning is not an error: the picture was saved. The text says what is
+   wrong in words, the colour only supports it. */
+:where(.nino-admin) .nino-admin-field-image-msg.is-warning {
+	color: var(--editor-orange);
 	font-weight: 650;
 }
 

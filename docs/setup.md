@@ -91,6 +91,8 @@ Not a choice, and not a step: the base unit delivers one theme, and every projec
 
 The page templates include the two frames rather than carrying their markup, so either can be rewritten without touching the page frame around it. A missing include resolves to an empty string, which is why the base unit lists both files: a delivery that forgot one would ship a site with no header, silently.
 
+The delivery has no logo of its own. The header, the navigation, the Open Graph and Twitter tags in `html-header.tpl` and the mail header of the Form module all ask the **image slot `/logo`** (500 × 100, the shape of a wordmark) with `[image /logo]`, and the base unit declares it empty - `imageSlots`, see below. Upload the logo under **Images** in the workbench; until then the header and the navigation show no picture, the mail header none, and the page head carries no `og:image` and no `twitter:image`, instead of a broken or an empty one. An upload is cut to the slot's shape, so a logo shaped otherwise needs the slot's size changed on the **Image Slots** tab first.
+
 The order in the css bundle is the whole contract, and each layer owns one slot in it:
 
 ```
@@ -122,8 +124,25 @@ The Element URI is the anchor for page texts like `/webpage<uri>/title`. The HTT
 A new page starts from the selected library template's own suggestions: its HTTP URI, plus Navigation Name, Page Title, and Description in **every** active language, read from the template's `text/<locale>.php` files. Switching the template only updates fields that are still untouched — anything typed by hand survives the switch. A field left empty still falls back to the generic placeholder ("Page", "Page Title").
 
 A page unit may also declare unit-relative `files`. They are copied to the same
-virtual project paths, so `images/demo.jpg` becomes the project's public
-`images/demo.jpg`.
+virtual project paths, so `images/page-home/fullscreen-image/background.svg`
+becomes the project's public `images/page-home/fullscreen-image/background.svg`.
+
+A unit that shows a picture declares it as an **image slot** with
+`imageSlots`, keyed by the slot uri - `'/page-home/fullscreen-image/background'
+=> [ 'label' => [ 'en_US' => 'Home – hero image', 'de_DE' => 'Startseite –
+Titelbild' ], 'width' => 1920, 'height' => 1080, 'filename' =>
+'page-home/fullscreen-image/background.svg' ]` - and its template shows it with
+`[image /page-home/fullscreen-image/background alt=""]` instead of a literal
+`<img>`. The starter site's home hero is seeded with a neutral placeholder
+drawing, a small SVG Nino ships; it carries the slot's own name, so an upload
+replaces it and **Remove image** deletes it, and the library keeps the source.
+A `filename` is a file the unit ships under `files` and is checked once the files
+are copied; without one the slot starts empty, which is how the base unit
+declares `/logo`. The label is one string for the project, in its native
+language. The Routes step - and the Setup step, for the base unit - only **adds** slots: a slot
+the project already has - label, size and image - is left as it is, and the
+first unit to name a uri wins. A seed file that cannot be copied or a slot that
+cannot be declared fails the step by name before any route is written.
 
 A route on the **Blank** template gets its own copy of that template, named after its Element URI: a `/team` route is created as `templates/page-team.tpl` and rendered by `[template /templates/page-team]`. Blank is the empty starting point, so every route picking it needs a page of its own — a shared file would mean editing one blank page rewrote all of them. A nested Element URI flattens into a single name (`/jobs/open` → `page-jobs-open.tpl`), because that is the shape the template pickers list. An existing file is never overwritten, so re-running this step leaves work already done in such a page alone. From then on the route owns its template and reads back as its own page rather than as the Blank unit — the same thing a page created in `/_admin` is. Every other template is a finished page and stays shared. One name it cannot take: an Element URI whose template name a library page already owns — `/home`, `/contact` and the other finished pages — is refused, naming the page that has it, because both would write the same `templates/page-*.tpl`.
 

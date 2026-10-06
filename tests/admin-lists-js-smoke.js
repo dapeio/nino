@@ -992,7 +992,7 @@ localizedScripts.concat( [ [ 'Maintenance/admin.js', moduleAsset( 'Maintenance',
 	for( const m of e[1].matchAll( /(if\( typeof Nino\.admin\.dirty === 'object' \)\s*)?Nino\.admin\.dirty\.(register|watchForm)\( '([a-z]+)'/g ) )
 		registered.push( { file : e[0], name : m[3], guarded : m[1] !== undefined } );
 } );
-const EXPECTED_FORM_PANELS = [ 'config', 'elements', 'features', 'keys', 'language', 'lockout', 'maintenance', 'navs', 'roles', 'routes', 'slots', 'text', 'types', 'users' ];
+const EXPECTED_FORM_PANELS = [ 'config', 'elements', 'features', 'images', 'keys', 'language', 'lockout', 'maintenance', 'navs', 'roles', 'routes', 'slots', 'text', 'types', 'users' ];
 check( 'every form panel of the kernel registers with the shell, once'+ ( ' - registered: '+ registered.map( r => r.name ).sort().join(',') ),
 	registered.map( r => r.name ).sort().join(',') === EXPECTED_FORM_PANELS.join(',') );
 check( '...each behind a check that the shell has the registry', registered.every( r => r.guarded === true ) );
@@ -1102,6 +1102,10 @@ localizedScripts.forEach( e => { for( const m of e[1].matchAll( /nino-admin-fiel
 const unknownModifiers = Array.from( imageMsgModifiers ).filter( mod => stylesheet.includes( '.nino-admin-field-image-msg.'+ mod ) === false );
 check( 'every modifier a script puts beside the image message is one the stylesheet styles'+ ( unknownModifiers.length ? ' - unknown: '+ unknownModifiers.join(', ') : '' ), unknownModifiers.length === 0 );
 check( '...and the check saw the modifier both image controls use', imageMsgModifiers.has('is-error') );
+// The warning that a picture was scaled up, and the one that a slot is used nowhere: the words carry them, the colour supports them
+const hintWarning = localizedScripts.some( e => /nino-admin-field-hint is-warning/.test( e[1] ) );
+check( 'the warning modifiers the Images panel uses - the scaled-up picture and the slot no page shows - are rules of the stylesheet', imageMsgModifiers.has('is-warning') && hintWarning === true
+	&& stylesheet.includes( '.nino-admin-field-hint.is-warning' ) === true );
 
 // A write that went through is reported as done, whatever the list read after it does:
 // the question that asked for the Save would otherwise offer it again, and a second

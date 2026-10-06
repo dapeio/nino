@@ -2064,6 +2064,14 @@ header .nino-headernav-logo {
 	width:50%;
 	margin:var(--space-3) auto 0;
 }
+header .nino-headernav-logo img {
+	width:100%;
+	height:auto;
+}
+/* no logo uploaded: the wrapper is empty, and takes no room */
+header .nino-headernav-logo:empty {
+	display:none;
+}
 
 @media (min-width: 768px) {
 	.nino-nav-burger svg {

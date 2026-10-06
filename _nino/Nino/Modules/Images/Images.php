@@ -50,6 +50,24 @@ namespace Nino\Modules {
 		 *	[image hero] or [image uri="hero" alt="..."]. Renders nothing if
 		 *	the slot doesn't exist or has no image uploaded yet.
 		 *
+		 *	With content - [image logo]...[/image] - that content is what is
+		 *	rendered instead of the <img>, and again only when the slot has an
+		 *	image: [[src]] (the path of the file, from the site's root - an
+		 *	absolute address is "https://[[/website/url]][[src]]"), [[width]],
+		 *	[[height]] and [[alt]] are filled in with the same values the <img>
+		 *	gets. That is how a place that needs the address and not a picture
+		 *	- a meta tag, a mail - is written without being left as an empty
+		 *	tag, or a broken one, where nothing is uploaded yet.
+		 *
+		 *	The alt text is, in this order: the one stored for the slot in
+		 *	the current language (the Images panel keeps it), the template's
+		 *	own alt="...", and none - alt="", which is how a decorative picture
+		 *	is written. The slot's label is not an alt text and is not used as
+		 *	one. Whichever it is, it is output with '[' turned into &#91; as
+		 *	well as escaped: shortcode output is rendered once more, and an
+		 *	alt text an editor wrote must not be able to open a fill or a
+		 *	shortcode there.
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					Shortcode arguments
 		 *
@@ -64,17 +82,19 @@ namespace Nino\Modules {
 				return '';
 
 			$url = \Nino\Images::getUrl( $appData, $slot['filename'] );
-			$alt = (string) ( $args['alt'] ?? ( $slot['label'] ?? '' ) );
+
+			$stored	= $slot['alt'][ \Nino\Locales::getCurrentLocale( $appData ) ] ?? '';
+			$alt		= ( is_string( $stored ) === true && $stored !== '' ) ? $stored : (string) ( $args['alt'] ?? '' );
 
 			return str_replace(
 				[ '[[src]]', '[[width]]', '[[height]]', '[[alt]]' ],
 				[
-					htmlspecialchars( $url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ),
+					str_replace( '[', '&#91;', htmlspecialchars( $url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ) ),
 					(string) (int) ( $slot['width'] ?? 0 ),
 					(string) (int) ( $slot['height'] ?? 0 ),
-					htmlspecialchars( $alt, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ),
+					str_replace( '[', '&#91;', htmlspecialchars( $alt, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ) ),
 				],
-				self::$html['img']
+				trim( (string) ( $args['content'] ?? '' ) ) !== '' ? (string) $args['content'] : self::$html['img']
 			);
 		}
 	}

@@ -92,6 +92,8 @@ Keine Wahl und kein Schritt: Die Base-Einheit liefert ein Theme aus, und jedes P
 
 Die Seitentemplates binden die beiden Frames ein, statt ihr Markup selbst zu tragen – jeder von beiden lässt sich also neu schreiben, ohne den Seitenrahmen darum anzufassen. Ein fehlender Include löst zu einer leeren Zeichenkette auf; deshalb führt die Base-Einheit beide Dateien auf: Eine Auslieferung, die eine davon vergisst, liefert eine Seite ohne Header aus, lautlos.
 
+Die Lieferung hat kein eigenes Logo. Header, Navigation, die Open-Graph- und Twitter-Tags in `html-header.tpl` und der Mail-Header des Form-Moduls fragen den **Bildplatz `/logo`** (500 × 100, die Form einer Wortmarke) mit `[image /logo]`, und die Base-Einheit deklariert ihn leer – `imageSlots`, siehe unten. Das Logo wird in der Workbench unter **Bilder** hochgeladen; bis dahin zeigen Header und Navigation kein Bild, der Mail-Header ebenfalls keines, und der Seitenkopf trägt weder `og:image` noch `twitter:image`, statt eines kaputten oder leeren. Ein Upload wird auf die Form des Platzes zugeschnitten; ein anders geformtes Logo braucht zuerst ein geändertes Maß des Platzes im Tab **Bildplätze**.
+
 Die Reihenfolge im CSS-Bundle ist der ganze Vertrag, und jede Schicht besitzt darin genau einen Platz:
 
 ```
@@ -125,8 +127,28 @@ Element-URI und HTTP-URI müssen innerhalb ihrer jeweiligen Spalte eindeutig sei
 Eine neue Seite startet mit den Vorschlägen der gewählten Library-Vorlage: HTTP-URI sowie Name, Title und Description in **jeder** aktiven Sprache, gelesen aus den `text/<locale>.php`-Dateien der Vorlage. Ein Wechsel der Vorlage aktualisiert nur Felder, die noch unverändert sind – selbst eingetragener Text bleibt erhalten. Ein leer gelassenes Feld fällt weiterhin auf den allgemeinen Platzhalter („Page“, „Page Title“) zurück.
 
 Eine Seiteneinheit darf außerdem einheitenrelative `files` deklarieren. Sie
-werden auf dieselben virtuellen Projektpfade kopiert; aus `images/demo.jpg`
-wird damit das öffentliche `images/demo.jpg` des Projekts.
+werden auf dieselben virtuellen Projektpfade kopiert; aus
+`images/page-home/fullscreen-image/background.svg` wird damit das öffentliche
+`images/page-home/fullscreen-image/background.svg` des Projekts.
+
+Eine Einheit, die ein Bild zeigt, deklariert es als **Bildplatz** mit
+`imageSlots`, mit der Platz-Uri als Schlüssel – `'/page-home/fullscreen-image/background'
+=> [ 'label' => [ 'en_US' => 'Home – hero image', 'de_DE' => 'Startseite –
+Titelbild' ], 'width' => 1920, 'height' => 1080, 'filename' =>
+'page-home/fullscreen-image/background.svg' ]` –, und ihr Template zeigt ihn mit
+`[image /page-home/fullscreen-image/background alt=""]` statt mit einem
+wörtlichen `<img>`. Das Titelbild der Startseite ist mit einer neutralen
+Platzhalterzeichnung belegt, einem kleinen SVG, das Nino mitliefert; es trägt
+den Namen des Platzes, ein Upload ersetzt es also und **Bild entfernen** löscht
+es, die Quelle bleibt in der Bibliothek. Ein `filename` ist eine Datei, die die
+Einheit unter `files` mitliefert und die geprüft wird, sobald die Dateien kopiert
+sind; ohne ihn beginnt der Platz leer, so deklariert die Base-Einheit `/logo`. Die
+Beschriftung ist ein String für das Projekt, in seiner Hauptsprache. Der
+Routen-Schritt – und für die Base-Einheit der Setup-Schritt – **ergänzt** Plätze nur: Ein Platz, den das Projekt
+schon hat – Beschriftung, Maße und Bild –, bleibt, wie er ist, und die erste
+Einheit, die eine Uri nennt, gewinnt. Eine Seed-Datei, die sich nicht kopieren
+lässt, oder ein Platz, der sich nicht deklarieren lässt, lässt den Schritt mit
+Namen scheitern, bevor eine Route geschrieben wird.
 
 Der Assistent speichert keine eigene Liste: Der Schritt schreibt ausschließlich `/nino/http/routes` und die `/webpage<uri>/*`-Textschlüssel – `name`, `title` und `description` je Sprache, dazu einmalig `uri` (den erreichbaren Pfad der Seite) in `text/global.php`, als technischer Wert auf der Blacklist – und liest die angezeigte Liste beim nächsten Aufruf wieder daraus. Aus der angewendeten Liste entstehen außerdem Templates und bei Bedarf Modulabhängigkeiten. Die mitgelieferten Ausgangspunkte umfassen Startseite, Fehlerseite, rechtliche Angaben und Kontakt.
 

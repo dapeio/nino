@@ -256,6 +256,25 @@ check( 'the Setup step seeds the css bundle with the delivered look and the proj
 check( '...and the two files it names are really in the project', is_file( $sandbox. '/private/assets/theme.css' ) === true && is_file( $sandbox. '/private/assets/style.css' ) === true
 	&& is_file( $sandbox. '/private/templates/theme.header.tpl' ) === true && is_file( $sandbox. '/private/templates/theme.footer.tpl' ) === true
 	&& is_file( $sandbox. '/public/fonts/league-spartan.woff2' ) === true );
+// The logo is a slot with nothing in it: the frames, the navigation and the
+// mails show it with [image /logo], and ship no picture of their own
+$logoSlot = $configAfterApply['/nino/html/images']['/logo'] ?? [];
+check( 'the base unit seeds the empty logo slot into config.php', ( $logoSlot['label'] ?? null ) === 'Logo' && ( $logoSlot['width'] ?? null ) === 500 && ( $logoSlot['height'] ?? null ) === 100
+	&& array_key_exists( 'filename', $logoSlot ) === true && $logoSlot['filename'] === null && array_keys( $configAfterApply['/nino/html/images'] ) === [ '/logo' ] );
+check( '...and delivers no logo picture, the unit has no images directory', glob( $sandbox. '/public/images/*' ) === [] && is_dir( __DIR__. '/../_admin/install/library/base/images' ) === false );
+
+// Applying the step again only adds: the label, the size and the picture of a
+// slot the project has stay as they are
+$appData['/nino/html/images']['/logo'] = [ 'label' => 'Firmenlogo', 'width' => 300, 'height' => 100, 'filename' => 'logo.webp' ];
+\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
+$reapplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Setup::apiApply( $appData, $reapplyRequest );
+$logoAfterReapply = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/images']['/logo'] ?? [];
+check( 'applying the Setup step again keeps a logo slot the project changed', $reapplyRequest['/nino/http/response']['statusCode'] === 200 && ( $logoAfterReapply['label'] ?? null ) === 'Firmenlogo'
+	&& ( $logoAfterReapply['width'] ?? null ) === 300 && ( $logoAfterReapply['filename'] ?? null ) === 'logo.webp' );
+$appData['/nino/html/images']['/logo'] = $logoSlot;
+\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
+
 check( 'core structural modules are always present', in_array( '\\Nino\\Modules\\Template', $configAfterApply['/nino/modules'], true ) === true );
 check( 'the always-on Form module is present, with nothing picked', in_array( '\\Nino\\Modules\\Form', $configAfterApply['/nino/modules'], true ) === true );
 check( 'the always-on Navigation module is present too', in_array( '\\Nino\\Modules\\Navigation', $configAfterApply['/nino/modules'], true ) === true );
@@ -655,6 +674,19 @@ check( 'a template the step cannot write fails the apply and names the file', $b
 check( '...before any route is written', isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://kontakt'] ) === false );
 rmdir( $sandbox. '/private/templates/page-contact.tpl' );
 
+/*	The home unit's hero is an image slot seeded with its shipped placeholder.
+	A picture the step cannot put in place fails the step by name, the way the
+	template above did - and no slot is seeded for a file that is not there	*/
+$seedFile = $sandbox. '/public/images/page-home/fullscreen-image/background.svg';
+if( is_file( $seedFile ) === true )
+	unlink( $seedFile );
+mkdir( $seedFile, 0755, true );
+$blockedSeedRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Webpages::apiApply( $appData, $blockedSeedRequest );
+check( 'a seed file the step cannot copy fails the apply and names the file', $blockedSeedRequest['/nino/http/response']['statusCode'] === 500 && str_contains( (string) ( $blockedSeedRequest['/nino/http/response']['body']['error'] ?? '' ), '/images/page-home/fullscreen-image/background.svg' ) === true );
+check( '...and no page image slot is seeded', array_keys( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/images'] ?? [] ) === [ '/logo' ] );
+rmdir( $seedFile );
+
 $wpApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $wpApplyRequest );
 check( 'apply succeeds', $wpApplyRequest['/nino/http/response']['statusCode'] === 200 );
@@ -673,7 +705,61 @@ check( 'a hand-written route outside the library still survives Webpages apply t
 
 check( 'copies "forms"\'s own mail-header/footer templates too, auto-pulled in by "contact"', \Nino\Filesystem::fileExists( $appData, '/templates/mail-header.tpl' ) === true );
 check( 'copies "contact"\'s own template', \Nino\Filesystem::fileExists( $appData, '/templates/page-contact.tpl' ) === true );
-check( 'copies a page unit\'s declared files into the project', is_file( $sandbox. '/public/images/demo.jpg' ) === true );
+check( 'copies a page unit\'s declared files into the project', is_file( $sandbox. '/public/images/page-home/fullscreen-image/background.svg' ) === true );
+
+// The hero is the slot the page template names, and nothing is literal in it
+$heroSlot = $configAfterWpApply['/nino/html/images']['/page-home/fullscreen-image/background'] ?? [];
+// The native locale of this run is en_US (the steps above moved it), so the label is that one
+check( 'seeds the unit\'s image slot into config.php: the native-locale label, 1920x1080 and the shipped placeholder', ( $heroSlot['label'] ?? null ) === 'Home – hero image'
+	&& ( $heroSlot['width'] ?? null ) === 1920 && ( $heroSlot['height'] ?? null ) === 1080 && ( $heroSlot['filename'] ?? null ) === 'page-home/fullscreen-image/background.svg'
+	&& is_file( $sandbox. '/public/images/'. ( $heroSlot['filename'] ?? 'missing' ) ) === true );
+
+check( 'the seeded placeholder carries the slot\'s own name, so an upload replaces it and Remove image deletes it, as for any file the slot wrote', str_starts_with( (string) ( $heroSlot['filename'] ?? '' ), 'page-home/fullscreen-image/background.' ) === true
+	&& is_file( __DIR__. '/../_admin/install/library/pages/home/images/demo.jpg' ) === false );
+\Nino\Modules\Images::init( $appData );
+\Nino\Modules\Template::init( $appData );
+$homeHtml = \Nino\Html::renderHtml( $appData, '[template /templates/page-home]' );
+check( 'the home template renders the slot as an <img> with its size and an empty alt, and no literal image path', str_contains( $homeHtml, '/images/page-home/fullscreen-image/background.svg" width="1920" height="1080" alt="">' ) === true
+	&& str_contains( $homeHtml, '[[/nino/public]]/images/' ) === false && str_contains( $homeHtml, '[image' ) === false );
+
+// The logo, which is a slot too: nothing in the shipped frames, the navigation
+// or the mail names a logo file, and with no logo uploaded none of them
+// leaves a broken <img> or an empty meta tag behind
+\Nino\Modules\Navigation::init( $appData );
+$logoFrames = static function( array &$appData ): array {
+	return [
+		'header'	=> \Nino\Html::renderHtml( $appData, '[template /templates/theme.header]' ),
+		'meta'		=> \Nino\Html::renderHtml( $appData, '[template /templates/html-header]' ),
+		'mail'		=> \Nino\Html::renderHtml( $appData, '[template /templates/mail-header]' ),
+	];
+};
+$logoShipped = '';
+foreach( [ '/templates/theme.header.tpl', '/templates/html-header.tpl', '/templates/mail-header.tpl', '/templates/html-header-nav.tpl' ] as $logoTemplate )
+	$logoShipped .= (string) \Nino\Filesystem::getFileContent( $appData, $logoTemplate, '' );
+check( 'no shipped template names a logo file: every one asks the logo slot', preg_match( '#images/logo#', $logoShipped ) === 0 && substr_count( $logoShipped, '[image /logo' ) === 5 );
+
+\Nino\Html::addFills( $appData, [ '[[/website/url]]' => 'www.example.com', '[[/company/name]]' => 'Acme' ], '*' );
+$noLogo = $logoFrames( $appData );
+check( 'without an uploaded logo the header has no <img> and the mail header no picture at all', str_contains( $noLogo['header'], '<img' ) === false && str_contains( $noLogo['header'], '[image' ) === false
+	&& str_contains( $noLogo['mail'], '<img' ) === false && str_contains( $noLogo['mail'], '[image' ) === false );
+check( '...and the page head has no og:image or twitter:image, not even an empty one', str_contains( $noLogo['meta'], 'og:image' ) === false && str_contains( $noLogo['meta'], 'twitter:image' ) === false && str_contains( $noLogo['meta'], '[image' ) === false );
+check( '...the navigation\'s logo is an empty wrapper', str_contains( $noLogo['header'], '<div class="nino-headernav-logo"></div>' ) === true );
+
+$appData['/nino/html/images']['/logo']['filename'] = 'logo.webp';
+$withLogo = $logoFrames( $appData );
+$logoUrl = \Nino\Images::getUrl( $appData, 'logo.webp' );
+check( 'with a logo the header shows it with an empty alt, as the frame always did', str_contains( $withLogo['header'], '<img src="'. $logoUrl. '" width="500" height="100" alt="">' ) === true );
+check( '...the navigation shows it in its wrapper, with the company name as its alt', preg_match( '#<div class="nino-headernav-logo"><img src="'. preg_quote( $logoUrl, '#' ). '" width="500" height="100" alt="Acme"></div>#', $withLogo['header'] ) === 1 );
+check( '...og:image and twitter:image carry its absolute address', str_contains( $withLogo['meta'], '<meta property="og:image" content="https://www.example.com'. $logoUrl. '">' ) === true
+	&& str_contains( $withLogo['meta'], '<meta name="twitter:image" content="https://www.example.com'. $logoUrl. '">' ) === true );
+check( '...and the mail an <img> with the absolute address and the company name as its alt', preg_match( '#<img src="https://www\.example\.com'. preg_quote( $logoUrl, '#' ). '" width="180" alt="Acme">#', $withLogo['mail'] ) === 1 );
+$appData['/nino/html/images']['/logo']['filename'] = null;
+
+// So the Image Slots tab's scan has nothing to propose for it: the copied template is no literal <img> of the images directory
+check( 'the copied home template names the slot and has no literal <img> of the images directory for the template scan to find', str_contains( (string) file_get_contents( $sandbox. '/private/templates/page-home.tpl' ), '[image /page-home/fullscreen-image/background alt=""]' ) === true
+	&& preg_match( '#<img\b[^>]*src="[^"]*/images/#i', (string) file_get_contents( $sandbox. '/private/templates/page-home.tpl' ) ) === 0 );
+// A fresh install is the thing the dashboard's "Missing image slots" tile counts: with the logo and the hero both slots, no template has an <img> of the images directory left
+check( 'on a fresh install the Missing image slots tile reads 0 - every picture of the starter site is a slot', \Nino\Modules\Images\Slots::missingCount( $appData ) === 0 );
 
 $deAfterWpApply = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
 $enAfterWpApply = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
@@ -703,6 +789,12 @@ check( 'apiList now reflects the persisted, current list', array_column( $librar
 // its own file: with one shared page-blank.tpl, building a second blank page
 // silently rewrote the first one. A finished unit (home, contact, ...) is a
 // one-off and keeps sharing - that is what its template is for
+// An editor has replaced the hero's image and renamed the slot since: applying
+// the step again only adds, it never puts the shipped state back
+$appData['/nino/html/images']['/page-home/fullscreen-image/background']['label'] = 'Mein Titelbild';
+$appData['/nino/html/images']['/page-home/fullscreen-image/background']['filename'] = 'page-home/fullscreen-image/background.1920x1080.jpg';
+\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
+
 $_POST['data'] = json_encode( [ 'webpages' => [
 	[ 'uri' => '/site-home', 'httpUri' => '/', 'libraryKey' => 'home', 'text' => [] ],
 	[ 'uri' => '/site-contact', 'httpUri' => '/kontakt', 'libraryKey' => 'contact', 'text' => [] ],
@@ -714,6 +806,10 @@ $perRouteRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 check( 'applying two blank routes succeeds', $perRouteRequest['/nino/http/response']['statusCode'] === 200 );
 
 $configPerRoute = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+
+$heroAfterSecondApply = $configPerRoute['/nino/html/images']['/page-home/fullscreen-image/background'] ?? [];
+check( 'a second apply keeps a slot the project already has - its label and its changed image', ( $heroAfterSecondApply['label'] ?? null ) === 'Mein Titelbild'
+	&& ( $heroAfterSecondApply['filename'] ?? null ) === 'page-home/fullscreen-image/background.1920x1080.jpg' && array_keys( $configPerRoute['/nino/html/images'] ) === [ '/logo', '/page-home/fullscreen-image/background' ] );
 
 check( 'each blank route gets its own template file, named after its Element-URI', \Nino\Filesystem::fileExists( $appData, '/templates/page-team.tpl' ) === true && \Nino\Filesystem::fileExists( $appData, '/templates/page-jobs-open.tpl' ) === true );
 check( '...and renders it, rather than the unit\'s shared one', ( $configPerRoute['/nino/http/routes']['GET://team']['body'] ?? null ) === '[template /templates/page-team]'
@@ -1241,6 +1337,42 @@ foreach( scandir( $realRoot. '/_admin/install/library/pages' ) ?: [] as $pageEnt
 	foreach( ( $pageManifest['templates'] ?? [] ) as $pageTemplate )
 		if( is_file( $pageDir. '/templates/'. $pageTemplate ) === false )
 			$pageFailures[] = $pageEntry. ': declares '. $pageTemplate. ' and does not ship it';
+
+	/*	The pictures a unit shows are image slots it declares ('imageSlots'),
+		each seeded with a file it ships under 'files' - and none of its
+		templates carries a literal <img> of the public images directory, which
+		is a picture nobody can replace without editing code	*/
+	if( str_starts_with( $pageEntry, '.' ) === false ) {
+
+		$declared = $pageManifest['imageSlots'] ?? [];
+
+		foreach( glob( $pageDir. '/templates/*.tpl' ) ?: [] as $pageFile ) {
+
+			$pageSource = (string) file_get_contents( $pageFile );
+
+			if( preg_match( '#<img\b[^>]*src="\[\[/nino/public\]\]/images/#i', $pageSource ) === 1 )
+				$pageFailures[] = $pageEntry. ': '. basename( $pageFile ). ' has a literal <img> of the images directory';
+
+			if( preg_match_all( '#\[image (/[^\s\]]+)#', $pageSource, $pageImages ) > 0 )
+				foreach( $pageImages[1] as $pageImage )
+					if( isset( $declared[$pageImage] ) === false )
+						$pageFailures[] = $pageEntry. ': '. basename( $pageFile ). ' shows the slot '. $pageImage. ', which the manifest does not declare';
+		}
+
+		foreach( $declared as $slotUri => $slot ) {
+
+			$slotFile = (string) ( $slot['filename'] ?? '' );
+
+			if( preg_match( '#^/[a-z][a-z0-9_-]*(/[a-z][a-z0-9_-]*)*$#', (string) $slotUri ) !== 1 )
+				$pageFailures[] = $pageEntry. ': the slot '. $slotUri. ' is not a slot uri';
+			if( \Nino\Features::localized( $slot['label'] ?? '', 'en_US' ) === '' || \Nino\Features::localized( $slot['label'] ?? '', 'de_DE' ) === '' )
+				$pageFailures[] = $pageEntry. ': the slot '. $slotUri. ' has no label';
+			if( (int) ( $slot['width'] ?? 0 ) < 1 || (int) ( $slot['height'] ?? 0 ) < 1 || (int) $slot['width'] * (int) $slot['height'] > \Nino\Images::MAX_SOURCE_PIXELS )
+				$pageFailures[] = $pageEntry. ': the slot '. $slotUri. ' has a size no upload could fill';
+			if( $slotFile === '' || is_file( $pageDir. '/images/'. $slotFile ) === false || in_array( 'images/'. $slotFile, $pageManifest['files'] ?? [], true ) === false && in_array( 'images', $pageManifest['files'] ?? [], true ) === false )
+				$pageFailures[] = $pageEntry. ': the slot '. $slotUri. ' names a seed file the unit does not ship under \'files\'';
+		}
+	}
 
 	/*	The body is what ties a route to a file on disk. A route naming a
 		template no unit ships is the one failure this whole block exists for.
