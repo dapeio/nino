@@ -4136,6 +4136,18 @@ preg_match_all( '/(--[a-zA-Z0-9-]+)\s*:/', $ninoCss, $declaredProperties );
 $undeclaredProperties = array_values( array_diff( array_unique( $consumedProperties[1] ), $declaredProperties[1] ) );
 check( 'every custom property Nino.css reads without a fallback is declared in Nino.css itself'. ( $undeclaredProperties === [] ? '' : ' - missing: '. implode( ', ', $undeclaredProperties ) ), $undeclaredProperties === [] );
 
+/*	Every manual and every method a Nino.css comment sends its reader to is
+	where the comment says. Two pointed at docs/design-system.md, which this
+	repository never had, and the two shortcode chapters at _nino/Nino.php for
+	methods that live in their modules	*/
+preg_match_all( '#\bdocs/[\w./-]+\.md\b#', $ninoCss, $cssManuals );
+preg_match_all( '#\b(\w+)::(\w+)\(\) in (_nino/[\w./-]+\.php)#', $ninoCss, $cssMethods, PREG_SET_ORDER );
+$cssPointers = array_values( array_filter( array_unique( $cssManuals[0] ), static fn( string $manual ): bool => is_file( __DIR__. '/../'. $manual ) === false ) );
+foreach( $cssMethods as [ , $cssClass, $cssMethod, $cssFile ] )
+	if( preg_match( '/\bclass\s+'. preg_quote( $cssClass, '/' ). '\b.*\bfunction\s+'. preg_quote( $cssMethod, '/' ). '\s*\(/s', (string) @file_get_contents( __DIR__. '/../'. $cssFile ) ) !== 1 )
+		$cssPointers[] = $cssClass. '::'. $cssMethod. '() in '. $cssFile;
+check( 'every manual and every method a Nino.css comment points to is where it says'. ( $cssPointers === [] ? '' : ' - '. implode( ', ', $cssPointers ) ), $cssPointers === [] && $cssMethods !== [] );
+
 // Nino.css uses one for .nino-atf-arrowdown, ie. the framework's own default
 // policy used to block the framework's own icon
 check( 'the default csp allows data: images', str_contains( $seededCsp, 'img-src * data:' ) === true );

@@ -13,6 +13,15 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** `Nino.css`'s comments point at what exists. Two named a
+  `docs/design-system.md` this repository never had (the form fields now
+  point at `docs/development.md`, the vpa block at nothing), the two shortcode
+  chapters named `_nino/Nino.php` for methods in their modules, the 05 Helper
+  index listed the utilities that live in 09, and two comments described the
+  cover's and the filter items' rules wrongly. `tests/kernel-smoke.php` holds
+  every manual and `Class::method()` a `Nino.css` comment names to the file it
+  names (1106 → 1107 checks, 1 red before).
+
 - **Setup wizard:** comments that described an older Routes step are
   corrected: no page list is persisted and `_routeKeys()` serves
   `_applyWebpage()` alone, the hint names one menu checkbox per navigation, and
