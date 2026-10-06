@@ -13,6 +13,15 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Http:** the request's header array carries request headers only.
+  `\Nino\Http::filterHeaderFields()` no longer lets through `Location`,
+  `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`,
+  `Strict-Transport-Security`, `Referrer-Policy`, `Feature-Policy` and
+  `Permissions-Policy` - names Nino sends on a response, which a client could
+  put into `/nino/http/request`'s `header`, where nothing read them. A project
+  that calls the public `filterHeaderFields()` with one of them gets it
+  dropped now. Response headers were never filtered and are not.
+
 - **Core:** seven leftovers go that never changed an outcome: the
   `./nino/auth/currentUser` seed (Auth reads `./nino/auth/current`), the
   method-list parameter of `Http::_cleanRawMethod()`, the status, body and uri

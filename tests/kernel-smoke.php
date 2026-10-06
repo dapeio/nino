@@ -4886,7 +4886,16 @@ $finalizeResponse->invokeArgs( null, [ &$htmlRequest ] );
 check( 'a string body passes through unencoded and untyped', $htmlRequest['/nino/http/response']['body'] === '<html>page</html>'
 	&& isset( $htmlRequest['/nino/http/response']['header']['Content-Type'] ) === false );
 
-check( 'Location (on the request-side whitelist too) still survives', array_key_exists( 'Location', \Nino\Http::filterHeaderFields( [ 'Location' => '/rechtliches' ] ) ) === true );
+/*	The request header allowlist names request headers. Location, the
+	Content-Security-Policy and the other security headers are what Nino
+	sends, never what it reads - one a client sends is dropped like any other
+	name Nino does not know, by the public filter and through Http::request()
+	alike	*/
+$responseOnly = [ 'Location' => '/rechtliches', 'Content-Security-Policy' => 'default-src *', 'X-Frame-Options' => 'DENY', 'X-Content-Type-Options' => 'nosniff', 'Strict-Transport-Security' => 'max-age=1', 'Referrer-Policy' => 'no-referrer', 'Feature-Policy' => 'camera none', 'Permissions-Policy' => 'camera=()' ];
+check( 'a response-only header name is dropped by filterHeaderFields()', \Nino\Http::filterHeaderFields( $responseOnly ) === [] );
+$headerRequest = [ 'REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '/', 'REMOTE_ADDR' => '127.0.0.1', 'HTTP_LOCATION' => '/elsewhere', 'HTTP_CONTENT_SECURITY_POLICY' => 'default-src *', 'HTTP_HOST' => 'example.test', 'HTTP_REFERER' => 'https://example.test/', 'HTTP_ACCEPT_LANGUAGE' => 'de' ];
+\Nino\Http::request( $appData, $headerRequest );
+check( '...and a request that sends one arrives without it, with the request headers beside it under their own names', $headerRequest['/nino/http/request']['header'] === [ 'Host' => 'example.test', 'Referer' => 'https://example.test/', 'Accept-Language' => 'de' ] );
 
 check( 'a bare [assets] shortcode without argument renders nothing instead of erroring', \Nino\Modules\Assets::doShortcode( $appData, [] ) === '' );
 

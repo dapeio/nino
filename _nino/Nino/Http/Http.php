@@ -573,12 +573,12 @@ namespace Nino {
 		// Build the request-side header array from $_SERVER (passed in as
 		// $rawServer). PHP exposes request headers as HTTP_FOO_BAR keys
 		// (Content-Type/-Length are the CGI-spec exception, without the
-		// HTTP_ prefix) - filterHeaderFields() expects real header names
-		// like 'Foo-Bar' as keys, which is what the response side already
-		// has, so this normalizes the request side to match before reusing
-		// it. The exact case reached here doesn't matter - filterHeaderFields()
-		// now matches case-insensitively and returns its own whitelist's
-		// casing, since header names are case-insensitive per HTTP anyway.
+		// HTTP_ prefix) - filterHeaderFields() expects header names like
+		// 'Foo-Bar' as keys, so this turns the underscores into hyphens
+		// first. The case left ('ACCEPT-LANGUAGE') doesn't matter:
+		// filterHeaderFields() matches case-insensitively and returns its
+		// own allowlist's casing, since header names are case-insensitive
+		// per HTTP anyway.
 		static private function _filterRequestHeaderFields( array $rawServer ): array {
 
 			$normalized = [];
@@ -598,14 +598,17 @@ namespace Nino {
 			return self::filterHeaderFields( $normalized );
 		}
 
-		// Filter all non-http keys from an array. Matches case-insensitively
-		// and normalizes to the whitelist's own casing - a naive exact match
-		// would silently drop a header whose casing doesn't match the
-		// whitelist's literal entry (eg. the request side's 'TE' normalized
-		// to 'Te' via ucwords()).
+		// Keep the request headers Nino knows and drop every other key.
+		// Matches case-insensitively and normalizes to the allowlist's own
+		// casing - the request side arrives upper-cased from $_SERVER, and
+		// an exact match would drop nearly every header ('Accept-Language'
+		// arrives as 'ACCEPT-LANGUAGE'). Response-only names -
+		// Location, the Content-Security-Policy and the other security
+		// headers Nino sends - are not on it: a client that sends one is
+		// sending nothing Nino reads.
 		static public function filterHeaderFields( array $headerArray ): array {
 
-			$allowed = [ 'Accept', 'Accept-Charset', 'Accept-Encoding', 'Accept-Language', 'Authorization', 'Cache-Control', 'Connection', 'Content-Length', 'Content-Type', 'Cookie', 'Date', 'Expect', 'From', 'Host', 'If-Modified-Since', 'If-None-Match', 'Location', 'Max-Forwards', 'Origin', 'Pragma', 'Proxy-Authorization', 'Range', 'Referer', 'TE', 'User-Agent', 'Upgrade', 'Via', 'Warning', 'X-CSRF-Token', 'X-Frame-Options', 'X-Content-Type-Options', 'Strict-Transport-Security', 'Content-Security-Policy', 'Referrer-Policy', 'Feature-Policy', 'Permissions-Policy' ];
+			$allowed = [ 'Accept', 'Accept-Charset', 'Accept-Encoding', 'Accept-Language', 'Authorization', 'Cache-Control', 'Connection', 'Content-Length', 'Content-Type', 'Cookie', 'Date', 'Expect', 'From', 'Host', 'If-Modified-Since', 'If-None-Match', 'Max-Forwards', 'Origin', 'Pragma', 'Proxy-Authorization', 'Range', 'Referer', 'TE', 'User-Agent', 'Upgrade', 'Via', 'Warning', 'X-CSRF-Token' ];
 
 			$filteredArray = [];
 
