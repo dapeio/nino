@@ -1,6 +1,6 @@
 /**
  *	Nino										A compact filesystembased php framework
- *	Dev											"Settings" tab of a feature's own panel: the form
+ *	settings.js							"Settings" tab of a feature's own panel: the form
  *													the feature's manifest declares, drawn beside the
  *													screens it belongs to instead of behind the Features
  *													panel. One script for every such tab - the registry

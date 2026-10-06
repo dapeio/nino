@@ -13,11 +13,11 @@ namespace Nino\Modules\Images {
 	/**
 	 *	Nino										A compact filesystembased php framework
 	 *	Modules						The workbench's own screens
-	 *	Images									Admin "Images" panel: developer-fixed image slots
-	 *													(/nino/html/images in config.php) - the admin can only
-	 *													replace a slot's current image or take it away, never
-	 *													add/remove slots themselves, same shape as Users can
-	 *													only edit accounts, not create them
+	 *	Images									Admin "Images" panel: the image slots of
+	 *													/nino/html/images in config.php - this screen replaces a
+	 *													slot's current image or takes it away; creating and
+	 *													removing slots is the Image Slots tab's job (see
+	 *													Slots/Slots.php)
 	 *
 	 *	@package								Dape/Nino
 	 *	@author									David Perchermeier <mail@dape.io>

@@ -12,7 +12,7 @@ namespace Nino\Modules\Features {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Dev								Every feature installed below features/ (see
+	 *	Features					Every feature installed below features/ (see
 	 *												\Nino\Features), one block each: what it is, whether
 	 *												it is switched on, what stands in the way of switching
 	 *												it on, and - behind a button of its own, on a screen of

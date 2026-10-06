@@ -2,9 +2,9 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Dev											"Routes" panel: create/edit/delete the site's actual page
+ *	admin.js								"Routes" panel: create/edit/delete the site's actual page
  *													routes without hand-editing /nino/http/routes as raw json
- *													(Config still covers everything this doesn't). The
+ *													(the Config panel no longer edits that key). The
  *													template select only ever offers a templates/page-*.tpl
  *													file that already exists on disk, and a new route starts
  *													with every field empty - see the panel's own
@@ -86,9 +86,9 @@
 		},
 
 		/**
-		 *	Call a pages/* dev action
+		 *	Call a routes/* admin action
 		 *
-		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "pages/list")
+		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "routes/list")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"
 		 *	@param		{Function}	callback			Called with ( status, body )
 		 *

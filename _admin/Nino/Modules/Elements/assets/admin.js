@@ -437,9 +437,9 @@
 
 		/**
 		 *	Drill-down navigation: types -> list -> form, each level hiding its
-		 *	parent (the main System/Text/Elements bar stays visible throughout,
-		 *	so only the local "‹ Back" links in the list/form need to move
-		 *	back up one level, not the whole page)
+		 *	parent (the shell's rail and the pane's tab strip stay visible
+		 *	throughout, so only the local "‹ Back" links in the list/form need
+		 *	to move back up one level, not the whole page)
 		 *
 		 *	@return		void
 		 */
@@ -558,21 +558,6 @@
 		},
 
 		/**
-		 *	Select a type and load its element list
-		 *
-		 *	@param		{string}	type					Type name
-		 *	@param		{Object}	model					Type model
-		 *	@param		{string}	title					Type display title
-		 *
-		 *	@return		void
-		 */
-		/**
-		 *	Whether the current type assigns its element uris itself (set up in
-		 *	/_admin's Element Types - see Elements::AUTOINCREMENT_PAD)
-		 *
-		 *	@return		{boolean}
-		 */
-		/**
 		 *	Whether this account may add, delete, or change one field of the
 		 *	open type - see \Nino\Modules\Elements\Admin::rights(). A type
 		 *	the server said nothing about is unrestricted: the checks that
@@ -598,6 +583,12 @@
 			return ( ( Nino.admin.elements._rights[Nino.admin.elements._currentType] ?? {} ).update ?? {} )[key] !== false;
 		},
 
+		/**
+		 *	Whether the current type assigns its element uris itself (switched on
+		 *	in its form on the Types tab - see \Nino\Elements::AUTOINCREMENT_PAD)
+		 *
+		 *	@return		{boolean}
+		 */
 		_isNumbered : function() {
 			return Object.prototype.hasOwnProperty.call( Nino.admin.elements._numbered, Nino.admin.elements._currentType );
 		},
@@ -666,6 +657,15 @@
 			return nav;
 		},
 
+		/**
+		 *	Select a type and load its element list
+		 *
+		 *	@param		{string}	type					Type name
+		 *	@param		{Object}	model					Type model
+		 *	@param		{string}	title					Type display title
+		 *
+		 *	@return		void
+		 */
 		_selectType : function( type, model, title ) {
 
 			if( Nino.admin.elements._saving === true )
@@ -1017,11 +1017,11 @@
 				return label;
 			}
 
-			// A boolean field reads clearer as an explicit "Ja"/"Nein" choice than
+			// A boolean field reads clearer as an explicit "Yes"/"No" choice than
 			// a bare checkbox, especially for admins who don't think in booleans.
 			// Both radios share data-field (see _readFieldByKey()'s :checked lookup),
 			// so a plain querySelector('[data-field=...]') would always find the
-			// first ("Ja") one regardless of which is actually selected
+			// first ("Yes") one regardless of which is actually selected
 			if( field.type === 'boolean' ) {
 				const span = dc.createElement('span');
 				span.textContent = displayName;
@@ -1184,7 +1184,7 @@
 			}
 
 			// An image field uploads immediately on file selection (not tied to the
-			// form's "Speichern" button) - a replaced/discarded upload can then never
+			// form's Save button) - a replaced/discarded upload can then never
 			// leave an orphaned file, since the server only deletes the previous one
 			// once the new one is safely committed. Needs an already-saved element
 			// (a uri to attach the upload to), so it's unavailable on a new one.

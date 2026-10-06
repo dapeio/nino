@@ -14,7 +14,7 @@ namespace Nino\Modules\Routes {
 	 *	Nino							A compact filesystembased php framework
 	 *	Routes						The Routes panel: create/edit/delete the site's actual page
 	 *												routes without hand-editing /nino/http/routes as raw json
-	 *												(Config still covers everything this doesn't, see its own
+	 *												(the Config panel no longer edits that key, see its own
 	 *												docblock). A friendlier continuation of the wizard's
 	 *												Webpages step (see _admin/install/Install.php's Webpages class -
 	 *												not depended on here, the same standalone-module reasoning
@@ -136,7 +136,7 @@ namespace Nino\Modules\Routes {
 		}
 
 		/**
-		 *	How many pages are persisted - shared by \Nino\Modules\Dashboard\Admin::apiSummary()
+		 *	How many pages are persisted - the Dashboard tile, see summary()
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *

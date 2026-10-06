@@ -12,7 +12,7 @@ namespace Nino\Modules\Config {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Dev								The project's settings, as a form rather than as raw json:
+	 *	Config						The project's settings, as a form rather than as raw json:
 	 *												error handling, the workbench features that can be
 	 *												switched off, and the page cache. Deliberately excludes
 	 *												"hard" values a wrong edit could brick the whole site

@@ -2,7 +2,7 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Dev											"Config" module: the project's settings as one form -
+ *	admin.js								"Config" module: the project's settings as one form -
  *													error handling, the _admin features that can be
  *													switched off, and the page cache. See
  *													Admin/Admin.php beside it for the field schema this
@@ -79,7 +79,7 @@
 		},
 
 		/**
-		 *	Call a config/* dev action
+		 *	Call a config/* admin action
 		 *
 		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "config/list")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"

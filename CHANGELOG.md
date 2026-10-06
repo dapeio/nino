@@ -13,6 +13,16 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the panels' comments named actions, labels and callers of the
+  `Dev` era. The `_apiCall` docblocks said `devtypes/`, `devtext/`,
+  `devimages/`, `pages/` and `restore/` "dev actions" where the scripts post
+  `types/`, `keys/`, `slots/`, `routes/` and `backups/` admin actions; fourteen
+  file headers still carried the `Dev` label; others named a
+  `Nino.admin.TABS`, an `ElementTypes` class, German button words, a bar the
+  shell no longer has and `assets/style.css` for a rule in the Text panel's
+  own stylesheet; five helpers said the Dashboard's `apiSummary()` called them
+  where only their panel's `summary()` tile does; and three docblocks in the
+  Elements script sat above the wrong methods.
 - **Docs:** the comments of `Nino.admin.js` and `style.css`, and AGENTS.md's
   shared data table section, no longer name screens and hosts the workbench
   does not have (a type editor calling `table()`, a Submissions screen, two

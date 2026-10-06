@@ -3007,7 +3007,7 @@ foreach( [ 'hero', 'viauri', 'inner', 'deep', 'orphan', 'loop', 'german', 'engli
 echo "\n";
 
 
-// --- Dashboard::apiSummary - aggregates Text/Images::missingCount() ---------
+// --- Dashboard::apiSummary - the Text Keys and Image Slots tiles ----------
 
 echo "Dashboard::apiSummary\n";
 

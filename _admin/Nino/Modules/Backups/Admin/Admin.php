@@ -153,7 +153,7 @@ namespace Nino\Modules\Backups {
 
 		/**
 		 *	Available backup dates, most recent first - shared by
-		 *	apiList() and \Nino\Modules\Dashboard\Admin::apiSummary()
+		 *	apiList() and the recovery page (\Nino\Admin\Recovery::handlePost())
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *

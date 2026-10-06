@@ -12,10 +12,10 @@ namespace Nino\Modules\Images {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Dev								Manage image slots (/nino/html/images): create, edit label/
-	 *												width/height, delete - the "set" half of what the Images panel's
-	 *												Images panel edits ("values" half: which file currently
-	 *												fills a slot). Same split as ElementTypes/Elements. Only
+	 *	Slots							Manage image slots (/nino/html/images): create, edit label/
+	 *												width/height, delete - the "set" half of what the Images panel
+	 *												edits ("values" half: which file currently
+	 *												fills a slot). Same split as the Types tab and the Elements panel. Only
 	 *												ever touches a slot's filename when deleting the slot
 	 *												itself (cleans up its uploaded file via \Nino\Images::
 	 *												delete()) - replacing it stays the Images panel's job via the actual
@@ -335,8 +335,8 @@ namespace Nino\Modules\Images {
 				already deleted: a public page rendering a broken <img>, and a
 				panel with nothing left to re-upload over, since the slot still
 				believes it has a file. The other way round the worst case is a
-				file nobody references any more, and the Images panel's own scan
-				already lists those.
+				file nobody references any more, left in images/ - no scan reports
+				it, but no page breaks over it.
 
 				This one slot is taken out of config.php as it is now, see
 				apiSave(), and it is the slot as it stands there whose file is
@@ -568,7 +568,7 @@ namespace Nino\Modules\Images {
 
 		/**
 		 *	How many <img> tags apiScan() above would currently report as
-		 *	missing a slot - shared by \Nino\Modules\Dashboard\Admin::apiSummary
+		 *	missing a slot - the Dashboard tile, see summary()
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *

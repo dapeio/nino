@@ -2,7 +2,7 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Dev											"Backups" panel: lists the encrypted daily
+ *	admin.js								"Backups" panel: lists the encrypted daily
  *													backups the Backup engine (Backups.php beside it) creates,
  *													writes one more on request and restores one on request.
  *													A native confirm() before the
@@ -54,9 +54,9 @@
 		},
 
 		/**
-		 *	Call a restore/* dev action
+		 *	Call a backups/* admin action
 		 *
-		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "restore/list")
+		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "backups/list")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"
 		 *	@param		{Function}	callback			Called with ( status, body )
 		 *

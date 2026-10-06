@@ -1,6 +1,6 @@
 /**
  *	Nino										A compact filesystembased php framework
- *	Dev											"Text" module: find a text key - by its key, the names it
+ *	keys.js									"Text" module: find a text key - by its key, the names it
  *													is read by or what it says, hidden ones included - or
  *													browse the rows the keys fall into (the same ones as the
  *													Text panel, see textkeys.js) and bulk-edit every key of a
@@ -238,9 +238,9 @@
 		},
 
 		/**
-		 *	Call a devtext/* dev action
+		 *	Call a keys/* admin action
 		 *
-		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "devtext/list")
+		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "keys/list")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"
 		 *	@param		{Function}	callback			Called with ( status, body )
 		 *
@@ -607,7 +607,7 @@
 
 			const wrap = dc.createElement('div');
 			// .nino-admin-field-wide marks the three-part (header / value / schema)
-			// shape assets/style.css folds into two rows from 768px up - the
+			// shape the Text panel's assets/admin.css folds into two rows from 48rem up - the
 			// plain .nino-admin-field label/input pairs elsewhere in this module
 			// must not be caught by that grid
 			wrap.className = 'nino-admin-field nino-admin-field-wide admin-text-field';

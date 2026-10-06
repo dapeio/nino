@@ -2,7 +2,7 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Dev											"Element Types" module: create/edit an element type's
+ *	types.js								"Element Types" module: create/edit an element type's
  *													title + model (field definitions) only - never touches a
  *													type's actual content ('*' and locale buckets with real
  *													elements), that part of the file is read back untouched
@@ -81,7 +81,7 @@
 
 		/**
 		 *	Re-show whichever level (list or form) is currently on - called
-		 *	when the tab is switched to, once Nino.admin.TABS grows a second entry
+		 *	by the shell when the Types tab is selected (see _admin/assets/script.js)
 		 *
 		 *	@return		void
 		 */
@@ -97,9 +97,9 @@
 		},
 
 		/**
-		 *	Call a devtypes/* dev action
+		 *	Call a types/* admin action
 		 *
-		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "devtypes/list")
+		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "types/list")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"
 		 *	@param		{Function}	callback			Called with ( status, body )
 		 *
@@ -366,7 +366,7 @@
 
 				// Offered for the types the server keeps a suffix for - the ones
 				// that render an input a unit can sit next to, which is neither
-				// a boolean's "Ja"/"Nein" choice, nor an image's upload area, nor
+				// a boolean's "Yes"/"No" choice, nor an image's upload area, nor
 				// an element reference's select. The editor used to state that
 				// rule itself, one type short, and offered a unit on a reference
 				// that the save then dropped in silence

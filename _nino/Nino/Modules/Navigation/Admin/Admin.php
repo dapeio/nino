@@ -12,7 +12,7 @@ namespace Nino\Modules\Navigation {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Dev								"Navigations" module: which menus this project has, and
+	 *	Navigation				"Navigations" module: which menus this project has, and
 	 *												which routes stand in each of them, in which order.
 	 *
 	 *												The other half of what the Routes module edits. Over

@@ -149,7 +149,7 @@
 		},
 
 		/**
-		 *	Call a navs/* dev action
+		 *	Call a navs/* admin action
 		 *
 		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "navs/list")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"

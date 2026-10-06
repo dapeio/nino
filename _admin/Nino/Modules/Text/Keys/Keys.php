@@ -12,7 +12,7 @@ namespace Nino\Modules\Text {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Dev								Full CRUD for text keys: create, rename, delete, change global/
+	 *	Keys							Full CRUD for text keys: create, rename, delete, change global/
 	 *												per-locale shape, toggle whether a key is hidden from
 	 *												the Text panel (/text/blacklist.php) - plus, same as
 	 *												the Text panel, edit every key's actual value(s).
@@ -899,7 +899,7 @@ namespace Nino\Modules\Text {
 
 		/**
 		 *	How many missing keys apiScan() above would currently
-		 *	report as missing - shared by \Nino\Modules\Dashboard\Admin::apiSummary
+		 *	report as missing - the Dashboard tile, see summary()
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *

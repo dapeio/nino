@@ -2,7 +2,7 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Dev											"Image Slots" tab of the Images panel: create/edit image
+ *	slots.js								"Image Slots" tab of the Images panel: create/edit image
  *													slot definitions (label/width/height) - the "set" half of
  *													what the Images panel edits ("values" half: which file
  *													currently fills a slot). Same split as types.js and the
@@ -76,9 +76,9 @@
 		},
 
 		/**
-		 *	Call a devimages/* dev action
+		 *	Call a slots/* admin action
 		 *
-		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "devimages/list")
+		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "slots/list")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"
 		 *	@param		{Function}	callback			Called with ( status, body )
 		 *
@@ -440,7 +440,7 @@
 		 *	from the tag's own attributes, or the actual file's real pixel
 		 *	size if the tag had none) + an "Ignore" toggle. Submitting
 		 *	creates every non-ignored row's slot via the existing
-		 *	devimages/create action - filename stays empty, same "dev only
+		 *	slots/create action - filename stays empty, same "this tab only
 		 *	ever creates the empty slot, a real upload is the Images panel's job" rule
 		 *	the manual "New image slot" form already follows
 		 *
@@ -559,7 +559,7 @@
 
 		/**
 		 *	Create every non-ignored row's slot (see _renderScanForm()), one
-		 *	devimages/create call at a time, so a per-row failure (eg. a
+		 *	slots/create call at a time, so a per-row failure (eg. a
 		 *	duplicate uri) is reported without swallowing the rest
 		 *
 		 *	@param		{Array}		rows

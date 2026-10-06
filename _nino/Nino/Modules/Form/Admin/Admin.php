@@ -155,7 +155,7 @@ namespace Nino\Modules\Form {
 
 		/**
 		 *	How many submissions are currently on file (retention window) -
-		 *	shared by apiList above and Dashboard::apiSummary
+		 *	the Dashboard tile, see summary()
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *

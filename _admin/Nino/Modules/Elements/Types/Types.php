@@ -12,7 +12,7 @@ namespace Nino\Modules\Elements {
 
 	/**
 	 *	Nino							A compact filesystembased php framework
-	 *	Dev								Manage element types (elements/<type>.php): title + model
+	 *	Types							Manage element types (elements/<type>.php): title + model
 	 *												(field definitions) only - never touches a type's actual
 	 *												content ('*' and locale buckets), so a save here never puts
 	 *												existing elements at risk. Deleting a type does, and is
@@ -37,7 +37,7 @@ namespace Nino\Modules\Elements {
 		public const array FIELD_TYPES = \Nino\Elements::FIELD_TYPES;
 
 		// The field types a fixed unit or suffix applies to: every type that
-		// renders an input a unit can sit next to. Not boolean (a "Ja"/"Nein"
+		// renders an input a unit can sit next to. Not boolean (a "Yes"/"No"
 		// choice has nothing to append), not image (its own preview and
 		// upload area), not element (a select of elements). Stated here once:
 		// cleanModel() keeps a suffix for these types only, apiList() hands

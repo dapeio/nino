@@ -1,6 +1,6 @@
 /**
  *	Nino										A compact filesystembased php framework
- *	Dev											"Features" module: every feature installed under
+ *	admin.js								"Features" module: every feature installed under
  *													features/, sorted into three tabs - Available (what
  *													the catalogue offers that is not already current, so
  *													an install or an update), Inactive and Active - a
