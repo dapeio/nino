@@ -2076,16 +2076,14 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	The cookie banner and html-footer-legal.tpl's own footer link
-		 *	(see _admin/install/library/base/templates/html-footer.tpl and
-		 *	pages/legal/templates/html-footer-legal.tpl) need somewhere to
+		 *	html-footer-legal.tpl's own footer link (see
+		 *	pages/legal/templates/html-footer-legal.tpl) needs somewhere to
 		 *	read "the legal page's real, reachable uri/name" from that isn't
 		 *	tied to a fixed uri - whichever entry actually uses the "legal"
 		 *	template (if any) is mirrored into these well-known keys, its
 		 *	httpUri (not its Element-URI - this becomes an actual href).
 		 *	Only ever set, never cleared: if no entry uses "legal" (yet),
-		 *	those two footer fragments are a known v1 limitation, see
-		 *	docs/setup.md
+		 *	the footer link has nothing to point at - a known v1 limitation
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$webpages			The just-applied, current webpages list

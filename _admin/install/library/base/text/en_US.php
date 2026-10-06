@@ -16,10 +16,4 @@
 	'[[/slider/label/prev]]' => 'Previous',
 	'[[/slider/label/next]]' => 'Next',
 	'[[/slider/label/slide]]' => 'Go to slide %s',
-
-	// Cookie banner
-	'[[/cookiebanner/info/text]]' => 'This website uses cookies to give you the best possible experience.',
-	'[[/cookiebanner/label/legal]]' => 'Learn more',
-	'[[/cookiebanner/label/decline]]' => 'Decline',
-	'[[/cookiebanner/label/accept]]' => 'Got it',
 ];

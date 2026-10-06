@@ -9,7 +9,7 @@ return [
 	'[[/_admin/users/label/mail]]'					=> 'E-Mail-Adresse',
 	'[[/_admin/users/label/newpw]]'				=> 'Neues Passwort (leer lassen, um es nicht zu ändern)',
 	'[[/_admin/users/label/currentpw]]'		=> 'Aktuelles Passwort zur Bestätigung',
-	'[[/_admin/users/label/you]]'					=> 'Sie',
+	'[[/_admin/users/label/you]]'					=> 'Du',
 	'[[/_admin/users/label/save]]'					=> 'Speichern',
 	'[[/_admin/users/label/back]]'					=> 'Zurück zur Liste',
 	'[[/_admin/users/label/logoutall]]'		=> 'Überall abmelden',

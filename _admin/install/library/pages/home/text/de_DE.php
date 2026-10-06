@@ -5,9 +5,9 @@
 	// a project actually mounts this template at, not this folder's name
 
 	'[[/page-home/welcome/title]]' => 'Willkommen.',
-	'[[/page-home/welcome/subtitle]]' => 'Hier steht Ihr erster Eindruck.',
+	'[[/page-home/welcome/subtitle]]' => 'Hier steht Dein erster Eindruck.',
 	'[[/webpage/home/uri]]' => '/',
 	'[[/webpage/home/name]]' => 'Startseite',
 	'[[/webpage/home/title]]' => 'Willkommen.',
-	'[[/webpage/home/description]]' => 'Hier steht Ihr erster Eindruck.',
+	'[[/webpage/home/description]]' => 'Hier steht Dein erster Eindruck.',
 ];

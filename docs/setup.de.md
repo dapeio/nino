@@ -159,7 +159,7 @@ Dieser Schritt legt das Root-Konto der Workbench an: die Rolle **Developer**, Vo
 Anzugeben sind:
 
 - eine gültige **E-Mail-Adresse**;
-- ein **Passwort** mit mindestens 8 Zeichen.
+- ein **Passwort** mit mindestens 8 Zeichen, zur Kontrolle zweimal eingegeben – die Regel steht im Feld selbst.
 
 Beides lässt sich später unter **Nutzer** ändern. Die Konten liegen in der `config.php` unter `/nino/auth/user`.
 
@@ -169,7 +169,7 @@ Der letzte Schritt setzt das **Recovery-Passwort** und sperrt den Assistenten. E
 
 Anzugeben ist:
 
-- ein **Passwort** mit mindestens 8 Zeichen.
+- ein **Passwort** mit mindestens 8 Zeichen, zur Kontrolle zweimal eingegeben – die Regel steht im Feld selbst.
 
 Sein Hash wird nach `private/.auth/pw.php` geschrieben, und das Projekt wird über `/nino/install/completed` in der `config.php` als installiert markiert. Jedes von beiden allein hält den Assistenten gesperrt; der Verlust der Passwortdatei gibt ihn also nicht wieder frei. Keines von beiden liegt in einem Werkzeugordner, weshalb ein Update `_nino/`, `_admin/` und die Module vollständig ersetzen kann.
 
@@ -185,7 +185,7 @@ Prüfe nach dem Abschluss:
 - dass Header, Footer und die Webfonts, die das Theme deklariert, alle da sind;
 - das Speichern eines Testtexts und eines Testbildes.
 
-Entferne anschließend `_admin/install/` aus der produktiven Auslieferung: Nichts außerhalb liest seine Library, und was er bereits kopiert hat, bleibt dort liegen, wo es geschrieben wurde. Siehe [Deployment](deployment.de.md#der-assistent-nach-der-einrichtung). Struktur, Inhalte, Darstellung und Templates werden danach in der Workbench gepflegt; für tiefergehende Strukturarbeit bleiben der HTML+-Escape-Hatch und Code verfügbar.
+Entferne anschließend `_admin/install/` aus der produktiven Auslieferung: Nichts außerhalb liest seine Library, und was er bereits kopiert hat, bleibt dort liegen, wo es geschrieben wurde. Siehe [Deployment](deployment.de.md#der-assistent-nach-der-einrichtung). Struktur, Inhalte, Darstellung und Templates werden danach in der Workbench gepflegt; für tiefergehende Strukturarbeit bleiben der HTML+ Editor und Code verfügbar.
 
 ## Library-Format
 

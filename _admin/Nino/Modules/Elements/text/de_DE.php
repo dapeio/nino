@@ -38,7 +38,7 @@ return [
 	'[[/_admin/elements/error/uri]]'				=> 'Uri muss angegeben werden.',
 	'[[/_admin/elements/error/save]]'			=> 'Speichern fehlgeschlagen.',
 	'[[/_admin/elements/error/load]]'			=> 'Laden fehlgeschlagen.',
-	'[[/_admin/elements/error/required]]'	=> 'Bitte füllen Sie alle Pflichtfelder aus:',
+	'[[/_admin/elements/error/required]]'	=> 'Bitte fülle alle Pflichtfelder aus:',
 	'[[/_admin/elements/confirm/delete]]'	=> 'Dieses Element wirklich löschen?',
 	'[[/_admin/elements/field/deals/title]]'					=> 'Titel',
 	'[[/_admin/elements/field/deals/subtitle]]'			=> 'Untertitel',

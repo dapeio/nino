@@ -229,5 +229,20 @@ check( '...each of them named, and named for its locale', boxes.every( function(
 check( '...with the placeholder still there as the hint it always was, and the value untouched',
 	boxes[0].placeholder === 'Name e.g. "Home"' && boxes[0].value === 'Start' && boxes[1].value === '' );
 
+/*	"New Route" is a list action, and Next is the one action that moves the
+	wizard on. Two buttons painted as primary on the same bar leave the eye
+	without an answer to which one it is, so the shared bar carries exactly one
+	primary - and the list action, which only adds to a step that is still
+	being edited, is the secondary one	*/
+elements['webpages-list'] = Object.assign( recorder('div'), { innerHTML : '' } );
+elements['install-actions-wrap'] = { insertBefore : function( node ) { elements[ node.id ] = node } };
+webpages._entries = [];
+webpages._renderList();
+const contextAction = elements['install-context-action'];
+check( 'the list renders its "New Route" action into the shared bottom bar', contextAction !== undefined && contextAction.textContent === 'New Route' );
+check( '...as a secondary action, not a second primary one', contextAction.className === 'nino-admin-btn-secondary' && contextAction.className.includes('primary') === false );
+check( '...and the bar still has exactly one primary action, Next', ( wizardTemplate.match( /nino-admin-btn-primary/g ) || [] ).length === 1
+	&& /id="install-next" class="nino-admin-btn-primary"/.test( wizardTemplate ) === true );
+
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

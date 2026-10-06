@@ -80,7 +80,8 @@
 					<div id="accounts-list"></div>
 					<form id="accounts-add-form" class="nino-admin-card">
 						<label class="nino-admin-field" for="accounts-add-mail"><span>Email</span><input id="accounts-add-mail" type="email" autocomplete="off" required></label>
-						<label class="nino-admin-field" for="accounts-add-pw"><span>Password</span><input id="accounts-add-pw" type="password" autocomplete="new-password" required></label>
+						<label class="nino-admin-field" for="accounts-add-pw"><span>Password (at least 8 characters)</span><input id="accounts-add-pw" type="password" autocomplete="new-password" minlength="8" required></label>
+						<label class="nino-admin-field" for="accounts-add-pw2"><span>Repeat password</span><input id="accounts-add-pw2" type="password" autocomplete="new-password" minlength="8" required></label>
 						<button type="submit">Create admin</button>
 					</form>
 				</div>
@@ -88,8 +89,8 @@
 				<div id="install-content-finish">
 					<p class="nino-admin-hint nino-admin-hint-lead">Set the recovery password. It is not a login: <code>/_admin/recovery.php</code> asks for it when the accounts themselves are what is broken - to restore a backup or reset a password. This is the last step - once set, the wizard locks itself out for good (no way back short of clearing <code>/nino/install/completed</code> in <code>config.php</code> and removing the stored secret).</p>
 					<form id="finish-form" class="nino-admin-card">
-						<label class="nino-admin-field" for="finish-pw"><span>New recovery password</span><input id="finish-pw" type="password" autocomplete="new-password" required></label>
-						<label class="nino-admin-field" for="finish-pw2"><span>Repeat password</span><input id="finish-pw2" type="password" autocomplete="new-password" required></label>
+						<label class="nino-admin-field" for="finish-pw"><span>New recovery password (at least 8 characters)</span><input id="finish-pw" type="password" autocomplete="new-password" minlength="8" required></label>
+						<label class="nino-admin-field" for="finish-pw2"><span>Repeat password</span><input id="finish-pw2" type="password" autocomplete="new-password" minlength="8" required></label>
 						<button type="submit">Finish installation</button>
 					</form>
 					<div id="finish-done" class="install-hidden">

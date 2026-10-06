@@ -4,6 +4,81 @@ All notable changes to Nino are documented in this file.
 
 ## Unreleased
 
+### Changed
+
+- **Wizard:** "New Route" is a secondary action beside Next, so the bar has
+  one primary button again. The Accounts step names the rule in the password's
+  label - "Password (at least 8 characters)" - sets `minlength` and asks for
+  the password twice, as Finish already did; a repeat that differs posts
+  nothing and says "Passwords do not match." The recovery password's label
+  names the same rule. The server and its API are unchanged, and the repeat
+  stays a typo guard in the browser; `docs/setup.md` and `docs/setup.de.md`
+  say so under Accounts and Finish. `tests/install-script-js-smoke.js` holds that the
+  list action is secondary and Next the only primary (23 → 26 checks, 1 red
+  before); the new `tests/install-accounts-js-smoke.js` holds the mismatch,
+  the one call with `{ mail, pw }` and the cleared fields (9 checks, 4 red
+  before); `tests/install-smoke.php` ties the number the template shows to the
+  one the API enforces, a password one character short being refused and one
+  of the length accepted (see the count below).
+
+- **German, Du:** every German text of the workbench and of the starter site
+  says the capitalised "Du", "Dich", "Dein", with the verbs, imperatives and
+  reflexives that go with it (the German manuals under `docs/` are not part of
+  this). In the workbench - which reaches every project with this update -
+  that is the login screen (the wrong-input hint, the expired-token hint and the
+  welcome line), the Configuration proxies hint, the Elements required-fields
+  message, the Users own-account marker ("(Du)") and the Maintenance hint
+  ("melde Dich ab"). In the texts the wizard writes - which reach **new
+  installations only**: an existing project keeps its words and changes them
+  in the Text panel - it is the base unit, the home, about-me and 404 pages,
+  the privacy policy (every form of address, 54 of them) and the Form and
+  Localepicker units. The Maintenance unit's text has no manifest and the
+  wizard never applies it; it is converted as well, for a project that copies
+  it by hand. Keys and the English texts are unchanged. Three sentences speak
+  about a thing rather than the reader ("Sie ist danach von diesem Server
+  verschwunden") and stay. `tests/install-smoke.php` expects "Wähle Deine
+  Sprache" and holds the rest in one check: it reads the workbench's texts,
+  the kernel modules' and their install units' texts, the base unit's and the
+  page units' texts and templates, takes out fills, shortcodes and tags and
+  fails on any Sie, Ihr..., Ihnen or lowercase du, dich, dein... that is not
+  one of those three sentences, naming the value (29 values in 13 files were
+  flagged before; 1 check, counted below).
+
+- **Docs:** the template editor's code dialog is called "HTML+ Editor" in
+  `README.md`, `README.de.md`, `docs/concepts.md`, `docs/concepts.de.md` and
+  `docs/setup.de.md`, where they said "escape hatch" and "Escape-Hatch". The
+  workbench's own label follows with the Templates feature in the catalogue.
+
+### Removed
+
+- **The base unit's cookie banner.** The `<div class="nino-cookie-banner">`
+  block in `html-footer.tpl`, its four texts `/cookiebanner/info/text`,
+  `/cookiebanner/label/legal`, `/cookiebanner/label/decline` and
+  `/cookiebanner/label/accept`, the `.nino-cookie-banner` rules in
+  `Nino.css`, the code in `Nino.ui.js` that revealed it and the public
+  `Nino.ui.cookieConsent` are gone, with the three class names on the demo
+  catalogue's page. It was a plain two-button notice that stored one
+  cookie; the [Consent
+  feature](https://github.com/dapeio/nino-features/blob/main/features/Consent/README.md)
+  replaces it and answers the question properly - its API is
+  `document.documentElement.dataset.consent` and the `nino:consent` event.
+  `Nino.cookie` stays. **Upgrading:** a project set up with 1.3.2 or
+  earlier keeps the block in its own `templates/html-footer.tpl`, and
+  `Nino.css` and `Nino.ui.js` are replaced with the kernel - without the
+  Consent feature the block would show unstyled, permanently visible, with
+  buttons that do nothing. Delete the `<div class="nino-cookie-banner"
+  id="cookie-banner">` block from `templates/html-footer.tpl` (or switch the
+  Consent feature on, which removes it by itself and for now still reads the old
+  `accepted` and `declined` values), and replace a call to
+  `Nino.ui.cookieConsent` in a project script with the Consent API; the four
+  texts in `text/*.php` can go as well. `tests/install-smoke.php` holds that
+  the installed footer carries no banner and the picked locale no
+  `/cookiebanner/` key (271 → 280 checks with the password checks and the
+  German check above: 7 of the 9 new ones were red before, and so was the
+  changed "Wähle Deine Sprache" expectation); `tests/nino-ui-scroll-js-smoke.js` that
+  `Nino.ui.cookieConsent` is undefined and neither script nor stylesheet
+  mention a banner (13 → 15, 2 red).
+
 ## v1.3.2 - 2026-10-01
 
 ### Added

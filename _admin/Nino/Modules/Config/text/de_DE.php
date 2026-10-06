@@ -17,7 +17,7 @@ return [
 	'[[/_admin/config/label/securecookie]]'	=> 'Session-Cookie immer als secure setzen',
 	'[[/_admin/config/hint/securecookie]]'	=> 'Hinter einem TLS-terminierenden Proxy einschalten, wo PHP selbst kein HTTPS sieht und das Flag sonst weglassen würde.',
 	'[[/_admin/config/label/proxies]]'	=> 'Reverse Proxies vor dieser Website',
-	'[[/_admin/config/hint/proxies]]'	=> 'Eine Adresse oder ein CIDR-Bereich je Zeile, und nur Proxies, die Sie selbst betreiben oder bezahlen. Leer gelassen ist der Besucher, mit wem PHP spricht – hinter einem Proxy also der Proxy, womit jede Grenze je IP alle Besucher als einen zählt. Ausgefüllt wird der Besucher aus X-Forwarded-For gelesen, das jeder setzen kann: Eine Adresse in dieser Liste, die kein Proxy ist, verschenkt genau diese Fälschung.',
+	'[[/_admin/config/hint/proxies]]'	=> 'Eine Adresse oder ein CIDR-Bereich je Zeile, und nur Proxies, die Du selbst betreibst oder bezahlst. Leer gelassen ist der Besucher, mit wem PHP spricht – hinter einem Proxy also der Proxy, womit jede Grenze je IP alle Besucher als einen zählt. Ausgefüllt wird der Besucher aus X-Forwarded-For gelesen, das jeder setzen kann: Eine Adresse in dieser Liste, die kein Proxy ist, verschenkt genau diese Fälschung.',
 	'[[/_admin/config/label/backups]]'	=> 'Tägliche verschlüsselte Sicherung',
 	'[[/_admin/config/hint/backups]]'		=> 'Läuft einmal täglich bei der ersten Anfrage nach Mitternacht und behält vierzehn Tage. Wiederherstellen unter Backups.',
 	'[[/_admin/config/label/logs]]'			=> 'Aktivitätsprotokoll führen',

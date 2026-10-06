@@ -166,16 +166,22 @@ ui.onReady();
 check( '...and is written for everybody else', documentElement.style.scrollBehavior === 'smooth' );
 
 /*	And the stylesheet's own half: the block used to stop three named
-	animations and one transition, while the twenty-five other transitions the
+	animations and one transition, while the twenty-four other transitions the
 	file declares kept their full travel - the slider's 600ms slide, the
-	burger menu, the cookie banner, the toast, the preloader's one-second
-	fade. A clamp on every element is what covers the next component too	*/
+	burger menu, the toast, the preloader's one-second fade. A clamp on every
+	element is what covers the next component too	*/
 const publicCss = fs.readFileSync( path.join( __dirname, '../_nino/Nino.css' ), 'utf8' );
 const reduceBlock = publicCss.slice( publicCss.lastIndexOf('@media (prefers-reduced-motion: reduce) {') );
 check( 'the stylesheet clamps every transition and animation, not a named few',
 	/\*,\s*\*::before,\s*\*::after \{[^}]*animation-duration: \.01ms !important;[^}]*transition-duration: \.01ms !important;/s.test( reduceBlock ) );
 check( '...and the three that run forever are still stopped outright, after the clamp',
 	reduceBlock.indexOf('animation: none !important;') > reduceBlock.indexOf('transition-duration: .01ms !important;') );
+
+/*	The base site ships no cookie banner. Consent is the Consent feature's job:
+	it owns the choice, its storage and the event. A kernel that kept a second
+	copy of that state would answer a question the feature is there to answer	*/
+check( 'the kernel keeps no consent state of its own - that is the Consent feature', ui.cookieConsent === undefined );
+check( '...and neither the script nor the stylesheet still drives or styles a banner', /cookie-banner|cookieConsent|data-cookie-consent/.test( uiSource ) === false && publicCss.includes('cookie-banner') === false );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exit( failures === 0 ? 0 : 1 );

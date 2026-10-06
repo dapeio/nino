@@ -176,7 +176,6 @@
 					arrowDown	: dc.querySelectorAll( '.nino-atf-arrowdown' ),
 					autoheight	: dc.querySelectorAll( '.nino-autoheight' ),
 					backToTop	: dc.querySelectorAll( '.nino-back-to-top' ),
-					cookieBanner	: dc.querySelectorAll( '.nino-cookie-banner' ),
 					cover			: dc.querySelectorAll( '.nino-cover' ),
 					filter		: dc.querySelectorAll( '.nino-filter' ),
 					// .nino-newsletter-form opts out - it keeps .nino-form only for the
@@ -345,25 +344,6 @@
 					setTimeout( function() {
 						e.preloader[0].remove();
 					}, 1100 );
-				} );
-			}
-
-
-			/*
-			 *	nino-cookie-banner - reveal only if no consent choice was made
-			 *	yet (see Nino.ui.cookieConsent below). Buttons carry the
-			 *	choice in data-cookie-consent rather than two separate click
-			 *	handlers, since accept/decline only differ in which value
-			 *	gets stored
-			 */
-			if( e.cookieBanner.length > 0 && ui.cookieConsent.get() === null ) {
-				const banner = e.cookieBanner[0];
-				wn.requestAnimationFrame( () => banner.classList.add('nino-cookie-banner--visible') );
-				banner.querySelectorAll('[data-cookie-consent]').forEach( function( btn ) {
-					btn.addEventListener( 'click', function() {
-						ui.cookieConsent.set( this.getAttribute('data-cookie-consent') );
-						banner.classList.remove('nino-cookie-banner--visible');
-					} );
 				} );
 			}
 
@@ -1449,46 +1429,6 @@
 				setTimeout( () => el.remove(), 300 );
 			}, 4000 );
 		},
-
-		/**
-		 *	Cookie consent state, backed by Nino.cookie (Nino.js) - the
-		 *	.nino-cookie-banner itself only ever calls set(), this is the
-		 *	public read side a project's own analytics/tracking script gates
-		 *	on before loading anything non-essential. Also dispatches
-		 *	'nino:cookieconsent' on document so a script loaded later (eg.
-		 *	after the banner already resolved on a previous visit) can still
-		 *	pick up the current value without polling
-		 */
-		cookieConsent : {
-
-			_key : 'nino_consent',
-
-			/**
-			 *	@return		{string|null}							'accepted', 'declined', or null if no choice was made yet
-			 */
-			get : function() {
-				return Nino.cookie.get( Nino.ui.cookieConsent._key );
-			},
-
-			/**
-			 *	@return		{boolean}									True once the visitor accepted
-			 */
-			isAccepted : function() {
-				return Nino.ui.cookieConsent.get() === 'accepted';
-			},
-
-			/**
-			 *	@param		{string}	value						'accepted' or 'declined'
-			 *
-			 *	@return		void
-			 */
-			set : function( value ) {
-				Nino.cookie.set( Nino.ui.cookieConsent._key, value );
-				dc.dispatchEvent( new CustomEvent( 'nino:cookieconsent', { detail : { consent : value } } ) );
-			},
-
-		},
-
 
 		/**
 		 *	Read the current viewport/scroll metrics once

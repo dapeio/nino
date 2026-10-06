@@ -10,6 +10,6 @@ return [
 	'[[/_admin/maintenance/hint/status]]'		=> 'Jeder Besuch erhält eine 503-Antwort statt der Website, solange dies aktiv ist.',
 	'[[/_admin/maintenance/label/retry]]'		=> 'Besucher um erneuten Versuch bitten nach',
 	'[[/_admin/maintenance/hint/retry]]'			=> 'Wird als Retry-After-Header gesendet, damit ein braver Browser oder Bot so lange wartet, bevor er es erneut versucht.',
-	'[[/_admin/maintenance/hint/signedin]]'	=> 'Ein angemeldetes Konto sieht die Website weiterhin wie gewohnt – öffne sie in einem anderen Browser oder melde dich ab, um zu prüfen, was Besucher sehen.',
+	'[[/_admin/maintenance/hint/signedin]]'	=> 'Ein angemeldetes Konto sieht die Website weiterhin wie gewohnt – öffne sie in einem anderen Browser oder melde Dich ab, um zu prüfen, was Besucher sehen.',
 	'[[/_admin/dashboard/label/maintenance]]'	=> 'Wartungsmodus aktiv',
 ];

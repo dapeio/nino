@@ -98,7 +98,13 @@
 
 			const mail = dc.getElementById('accounts-add-mail');
 			const pw 		= dc.getElementById('accounts-add-pw');
+			const pw2 	= dc.getElementById('accounts-add-pw2');
 			const msg 	= dc.getElementById('accounts-add-msg');
+
+			if( pw.value !== pw2.value ) {
+				msg.textContent = 'Passwords do not match.';
+				return;
+			}
 
 			msg.textContent = 'Creating …';
 
@@ -111,6 +117,7 @@
 				msg.textContent = 'Created.';
 				mail.value = '';
 				pw.value = '';
+				pw2.value = '';
 				Nino.install.accounts._render( response.users );
 			} );
 		},

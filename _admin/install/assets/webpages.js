@@ -216,7 +216,7 @@
 				addBtn = dc.createElement('button');
 				addBtn.type = 'button';
 				addBtn.id = 'install-context-action';
-				addBtn.className = 'nino-admin-btn-primary';
+				addBtn.className = 'nino-admin-btn-secondary';
 				addBtn.textContent = 'New Route';
 				addBtn.addEventListener( 'click', function() { Nino.install.webpages._openForm( null ) } );
 				dc.getElementById('install-actions-wrap').insertBefore( addBtn, dc.getElementById('install-back') );

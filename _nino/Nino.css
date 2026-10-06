@@ -237,7 +237,7 @@ html {
    content ended, which on a page-blank.tpl route (the starting point
    the wizard writes for every Blank page) left it floating mid-viewport above
    a screen-high strip of empty background. `header` is position:fixed and so
-   out of flow either way; .nino-preloader and .nino-cookie-banner are fixed too,
+   out of flow either way; .nino-preloader is fixed too,
    which leaves `main` and `footer` as the only flex items here */
 body {
 	min-height: 100vh;
@@ -1072,7 +1072,7 @@ body.nino-scroll-down .nino-scroll-header {
 	color: var(--color-primary-text);
 }
 /*	The scaled-down padding put a small button at 22px, just under WCAG 2.2 SC
-	2.5.8's 24px, and two of them side by side (the cookie banner's) are too
+	2.5.8's 24px, and two of them side by side are too
 	close for the spacing exception. inline-flex rather than more padding, so
 	the label stays centred in the taller box	*/
 .nino-btn--small {
@@ -1458,41 +1458,6 @@ body.nino-scroll-btf .nino-back-to-top {
 	opacity: 1;
 	pointer-events: auto;
 	transform: translateY(0);
-}
-
-/* Cookie consent banner - shown until Nino.cookie's 'nino_consent' is
-   set, see Nino.ui.js. A bottom bar, not a full-page overlay - the
-   consent choice shouldn't block reading the page while deciding */
-.nino-cookie-banner {
-	position: fixed;
-	left: 0;
-	right: 0;
-	bottom: 0;
-	z-index: 9997;
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	justify-content: space-between;
-	gap: var(--space-2);
-	padding: var(--space-2);
-	background-color: var(--color-section-black-bg);
-	color: var(--color-section-black-text);
-	--color-title: var(--color-section-black-text);
-	--color-accent: var(--color-accent-black);
-	box-shadow: 0 -2px 8px rgba(0, 0, 0, .2);
-	transform: translateY(100%);
-	transition: transform .3s;
-}
-.nino-cookie-banner--visible {
-	transform: translateY(0);
-}
-.nino-cookie-banner a {
-	text-decoration: underline;
-}
-.nino-cookie-banner-actions {
-	display: flex;
-	flex-shrink: 0;
-	gap: var(--space-1);
 }
 
 /* Table - .nino-table-wrap scrolls horizontally on narrow viewports instead
@@ -2888,9 +2853,9 @@ header .nino-headernav-logo {
    rather than a ride.
 
    This used to be the three named animations and one transition below, and
-   nothing else - so the other twenty-five transitions this file declares kept
+   nothing else - so the other twenty-four transitions this file declares kept
    their full travel: the slider slid its 600ms, the burger menu unrolled, the
-   cookie banner rose, the toast faded in, the preloader faded out over a
+   toast faded in, the preloader faded out over a
    second, every button and field crossfaded its colours. The clamp below is
    what says it once, for everything, rather than one rule per component that
    the next component forgets.

@@ -192,7 +192,7 @@ An account holds a role, a role a set of permissions, one per panel or tab; the 
 | Change page title | textfill in `text/` or the Text panel |
 | Add new team member | element in the Elements panel |
 | Compose a page from complete sections | the [Template Builder](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md), a feature from the catalogue (Alpha) |
-| Change lower-level HTML structure | HTML+ escape hatch or `.tpl` file in `templates/` |
+| Change lower-level HTML structure | HTML+ Editor or `.tpl` file in `templates/` |
 | Create new public URL | route in `config.php` or the Routes panel |
 | Output dynamic list | element query or shortcode with callback |
 | Add technical function | project-specific module |

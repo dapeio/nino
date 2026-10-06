@@ -156,7 +156,7 @@ This step creates the root account of the workbench: the **Developer** role, ful
 Provide:
 
 - a valid **email address**;
-- a **password** with at least 8 characters.
+- a **password** with at least 8 characters, entered twice - the form names the rule in the field's label.
 
 Both can be changed later under **Users**. The accounts live in `config.php` under `/nino/auth/user`.
 
@@ -166,7 +166,7 @@ The last step sets the **recovery password** and locks the wizard. It is not a l
 
 Provide:
 
-- a **password** with at least 8 characters.
+- a **password** with at least 8 characters, entered twice - the form names the rule in the field's label.
 
 Its hash is written to `private/.auth/pw.php` and the project is marked installed via `/nino/install/completed` in `config.php`. Either of those alone keeps the wizard locked, so losing the password file does not hand it back. Neither lives in a tool folder, which is what lets an update replace `_nino/`, `_admin/` and the modules wholesale.
 

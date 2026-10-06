@@ -2,7 +2,7 @@
 
 	'[[/website/lang]]' => 'de',
 	'[[/company/country]]' => 'Deutschland',
-	'[[/company/description]]' => 'Kurze Beschreibung Ihres Unternehmens.',
+	'[[/company/description]]' => 'Kurze Beschreibung Deines Unternehmens.',
 
 	'[[/website/header/title/navigation]]' => 'Hauptnavigation',
 	'[[/website/footer/title/navigation]]' => 'Navigation',
@@ -16,10 +16,4 @@
 	'[[/slider/label/prev]]' => 'Zurück',
 	'[[/slider/label/next]]' => 'Weiter',
 	'[[/slider/label/slide]]' => 'Zu Bild %s',
-
-	// Cookie-Banner
-	'[[/cookiebanner/info/text]]' => 'Diese Website verwendet Cookies, um Ihnen die bestmögliche Erfahrung zu bieten.',
-	'[[/cookiebanner/label/legal]]' => 'Mehr erfahren',
-	'[[/cookiebanner/label/decline]]' => 'Ablehnen',
-	'[[/cookiebanner/label/accept]]' => 'Verstanden',
 ];

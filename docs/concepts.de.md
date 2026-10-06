@@ -192,7 +192,7 @@ Ein Konto hält eine Rolle, eine Rolle eine Menge von Berechtigungen, eine je Pa
 | Seitentitel ändern | Textfill in `text/` oder im Panel Texte |
 | neues Teammitglied ergänzen | Element im Panel Elemente |
 | Seite aus vollständigen Sections zusammensetzen | der [Template-Baukasten](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md), ein Feature aus dem Katalog (Alpha) |
-| tiefergehende HTML-Struktur ändern | HTML+-Escape-Hatch oder `.tpl`-Datei in `templates/` |
+| tiefergehende HTML-Struktur ändern | HTML+ Editor oder `.tpl`-Datei in `templates/` |
 | neue öffentliche URL anlegen | Route in `config.php` beziehungsweise im Panel Routes |
 | dynamische Liste ausgeben | Element-Abfrage oder Shortcode mit Callback |
 | technische Funktion ergänzen | projektspezifisches Modul |
