@@ -17,7 +17,17 @@ namespace Nino {
 	// which is what tells a caller "we refused to send this" apart from a
 	// mail() that failed: \Nino\Form::handle() reads the flag and answers
 	// 429 without recording the submission, where a mail no transport took
-	// is recorded and answered ok
+	// is recorded and answered 500 - and what each mail of the call came to
+	// is left in './nino/mail/results', in input order, for a caller that
+	// has to tell the first from the rest
+	//
+	// A call that sent something also keeps one record of how it went,
+	// /data/mail-status.php: since when, when last and how many calls
+	// failed, no address and nothing a transport said - the workbench's
+	// dashboard shows it (see failure()). Written once per call rather than
+	// per mail, since a contact form's owner mail and the confirmation that
+	// follows it are one call: a confirmation that went out must not wipe
+	// the failure of the mail the owner is waiting for
 	//
 	// mail() is the default transport, not the only one: a module or a
 	// feature that delivers another way (smtp, an api) registers a
@@ -28,6 +38,9 @@ namespace Nino {
 
 		private const int MAX_TRIES 	= 5;
 		private const int WINDOW 		= 3600;
+
+		// Where the last failed call is kept - see failure()
+		private const string STATUS_PATH = '/data/mail-status.php';
 
 		// The transport callback. Called with the mail as an array -
 		//
@@ -44,6 +57,8 @@ namespace Nino {
 		// client ip has hit the send cap for this window
 		public static function send( array &$appData, string $to, string $subject, string $body, string $replyTo ): bool {
 
+			$appData['./nino/mail/results'] = [];
+
 			if( self::_hit( $appData, \Nino\Http::getClientIp( $appData ) ) === false ) {
 
 				// Flagged rather than just reported through the return value, so
@@ -55,7 +70,12 @@ namespace Nino {
 				return false;
 			}
 
-			return self::_deliver( $appData, $to, $subject, $body, $replyTo );
+			$sent = self::_deliver( $appData, $to, $subject, $body, $replyTo );
+
+			$appData['./nino/mail/results'] = [ $sent ];
+			self::_recordOutcome( $appData, $sent );
+
+			return $sent;
 		}
 
 		/**
@@ -69,12 +89,21 @@ namespace Nino {
 		 *	left the server. The cap exists to stop a form being used as a
 		 *	relay, and a relay is measured in submissions, not in envelopes.
 		 *
+		 *	What each mail came to is left in './nino/mail/results', one bool
+		 *	per mail in the order they were given - reset on every call, a cap
+		 *	refusal and an empty batch included, so a caller never reads the
+		 *	answer of an earlier one. The failure record (see failure()) is
+		 *	written once for the whole call: a failure if any mail failed,
+		 *	cleared only if every one was delivered.
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$mails				[ { to, subject, body, replyTo }, ... ]
 		 *
 		 *	@return 	bool										Whether every mail was delivered
 		 */
 		public static function sendAll( array &$appData, array $mails ): bool {
+
+			$appData['./nino/mail/results'] = [];
 
 			if( $mails === [] )
 				return true;
@@ -86,14 +115,105 @@ namespace Nino {
 
 			$sent = true;
 
-			foreach( $mails as $mail )
-				$sent = self::_deliver( $appData,
+			foreach( $mails as $mail ) {
+
+				$delivered = self::_deliver( $appData,
 					(string) ( $mail['to'] ?? '' ),
 					(string) ( $mail['subject'] ?? '' ),
 					(string) ( $mail['body'] ?? '' ),
-					(string) ( $mail['replyTo'] ?? '' ) ) && $sent;
+					(string) ( $mail['replyTo'] ?? '' ) );
+
+				$appData['./nino/mail/results'][] = $delivered;
+				$sent = $delivered && $sent;
+			}
+
+			self::_recordOutcome( $appData, $sent );
 
 			return $sent;
+		}
+
+		/**
+		 *	When mail last failed, as the dashboard shows it.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array|null							{ since, last, count } - 'Y-m-d H:i' twice and the number of
+		 *																	failed calls since the first - or null where the last call
+		 *																	went through, none was ever made, or the file is not one
+		 *																	this class wrote
+		 */
+		public static function failure( array &$appData ): ?array {
+
+			return self::_record( \Nino\Filesystem::getFileContent( $appData, self::STATUS_PATH, [] ) );
+		}
+
+		/**
+		 *	What a status file holds, or null where it is not one this class
+		 *	wrote - the file is plain php and editable, so nothing in it is
+		 *	trusted: both dates have to be minutes, the count a whole number
+		 *	of at least one
+		 *
+		 *	@param		mixed			$state
+		 *
+		 *	@return 	array|null
+		 */
+		private static function _record( mixed $state ): ?array {
+
+			if( is_array( $state ) === false )
+				return null;
+
+			$since = $state['since'] ?? null;
+			$last	 = $state['last'] ?? null;
+			$count = $state['count'] ?? null;
+
+			foreach( [ $since, $last ] as $date )
+				if( is_string( $date ) === false || preg_match( '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $date ) !== 1 )
+					return null;
+
+			if( is_int( $count ) === false || $count < 1 )
+				return null;
+
+			return [ 'since' => $since, 'last' => $last, 'count' => $count ];
+		}
+
+		/**
+		 *	Keep what one send() or sendAll() call came to: a failure raises
+		 *	the record - first date kept, last date and count moved on - and a
+		 *	call that delivered everything clears it. Once per call, after its
+		 *	deliveries, and never for a call that sent nothing (the cap, an
+		 *	empty batch). A record that cannot be written changes nothing for
+		 *	the caller: the mail went or did not go either way.
+		 *
+		 *	Holds no address, no subject and no word a transport said - it is
+		 *	shown to everybody who opens the workbench's dashboard
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		bool			$allDelivered	Whether every mail of the call was delivered
+		 *
+		 *	@return 	void
+		 */
+		private static function _recordOutcome( array &$appData, bool $allDelivered ): void {
+
+			// Nothing to clear, and no lock made for it
+			if( $allDelivered === true && \Nino\Filesystem::getFileContent( $appData, self::STATUS_PATH, [] ) === [] )
+				return;
+
+			$now = date( 'Y-m-d H:i' );
+
+			\Nino\Filesystem::mutate( $appData, self::STATUS_PATH, function( mixed $state ) use ( $allDelivered, $now ): ?array {
+
+				// Cleared, and no file made where there was none
+				if( $allDelivered === true )
+					return ( $state === [] || $state === null ) ? null : [];
+
+				$record = self::_record( $state );
+
+				return [
+					'since'	=> $record['since'] ?? $now,
+					'last'	=> $now,
+					'count'	=> ( $record['count'] ?? 0 ) + 1,
+				];
+			}, [] );
 		}
 
 		/**

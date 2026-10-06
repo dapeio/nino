@@ -5,7 +5,9 @@
  *	Maintenance							The Maintenance panel: one pane, one form - the state, the
  *													switch, the Retry-After seconds, and a note about who
  *													still sees the site. See Admin/Admin.php beside it for
- *													the two actions this renders and posts to.
+ *													the two actions this renders and posts to. While the
+ *													switch is on, the notice every screen of the
+ *													workbench carries is drawn from here too (_banner()).
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -39,6 +41,10 @@
 					Nino.admin.maintenance._ready = false;
 					return Nino.admin.maintenance._showError( wrap, status, response );
 				}
+
+				// Whatever is on the form, the site is in the state the server
+				// says
+				Nino.admin.maintenance._banner( response.status === true );
 
 				// Typed into while the answer was on its way: the form is not
 				// rebuilt over it
@@ -96,6 +102,47 @@
 		 */
 		_showError : function( container, status, response ) {
 			Nino.adminUi.showError( container, status, response, '/_admin/common/error/load' );
+		},
+
+		/**
+		 *	The notice that the site shows the maintenance page, at the top of
+		 *	the workbench's content column - above every panel, not in this
+		 *	one's pane, since it is for whoever is working anywhere in it.
+		 *	One at most, put there or taken away as the state says. Drawn for
+		 *	the accounts that have the panel - the status answer is theirs -
+		 *	which is the audience of the dashboard tile as well
+		 *
+		 *	@param		{boolean}		on
+		 *
+		 *	@return		void
+		 */
+		_banner : function( on ) {
+
+			const before = dc.getElementById('maintenance-banner');
+
+			if( on !== true ) {
+				if( before !== null )
+					before.remove();
+				return;
+			}
+
+			const column = dc.getElementById('admin-content-wrap');
+
+			if( before !== null || column === null )
+				return;
+
+			const notice = Nino.adminUi.notice( Nino.content.getText('/_admin/maintenance/banner/text'), {
+				href	: '#maintenance',
+				label	: Nino.content.getText('/_admin/maintenance/banner/link'),
+			} );
+			notice.id = 'maintenance-banner';
+
+			const heading = column.querySelector(':scope > h1');
+
+			if( heading !== null )
+				heading.insertAdjacentElement( 'afterend', notice );
+			else
+				column.insertBefore( notice, column.firstChild );
 		},
 
 		/**
@@ -219,6 +266,7 @@
 				// carries the state config.php now actually holds, and the
 				// state sentence above the form has to follow it
 				Nino.admin.maintenance._render( wrap, response );
+				Nino.admin.maintenance._banner( response.status === true );
 				report( true );
 			} );
 		},

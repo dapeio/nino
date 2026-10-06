@@ -437,6 +437,17 @@ check( 'the empty state is one shared component with a class of its own',
 check( 'every empty list screen renders that component rather than a paragraph of its own',
 	emptyStateScripts.every( s => s.includes( 'Nino.adminUi.emptyState(' ) && s.includes( "empty.className = 'nino-admin-hint'" ) === false ) );
 
+// One way to say "this needs your attention", too - the dashboard's notices and
+// the maintenance banner are the same component, in the design system, and not
+// a class of a panel's own stylesheet (which AGENTS.md section 6a reserves the
+// nino-admin-* prefix against)
+const noticeScripts = [ adminAsset( 'Dashboard', 'admin.js' ), fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Maintenance/assets/admin.js' ), 'utf8' ) ];
+check( 'the notice is one shared component with a class of its own',
+	adminUiSource.includes( 'notice : function' ) && adminUiSource.includes( "notice.className = 'nino-admin-notice'" ) && sharedCss.includes( '.nino-admin-notice {' ) );
+check( 'every screen that has one renders that component, and none styles or builds the class itself',
+	noticeScripts.every( s => s.includes( 'Nino.adminUi.notice(' ) && s.includes( "'nino-admin-notice'" ) === false )
+	&& moduleStyles.every( m => adminAsset( m, 'admin.css' ).includes( '.nino-admin-notice' ) === false ) );
+
 const usersSource = adminAsset( 'Users', 'admin.js' );
 check( 'the user and role forms expose real labels and live status text',
 	usersSource.includes("mailLabel.className = 'nino-admin-field'") &&

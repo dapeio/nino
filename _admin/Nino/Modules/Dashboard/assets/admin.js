@@ -77,10 +77,10 @@
 		},
 
 		/**
-		 *	Render the whole panel: a row of stat tiles, an element-per-type
-		 *	breakdown, then recent activity
+		 *	Render the whole panel: the notices, a row of stat tiles, an
+		 *	element-per-type breakdown, then recent activity
 		 *
-		 *	@param		{Object}	data					{ elements, lastBackup, tiles, recentActivity? }
+		 *	@param		{Object}	data					{ notices?, elements, lastBackup, tiles, recentActivity? }
 		 *
 		 *	@return		void
 		 */
@@ -88,6 +88,13 @@
 
 			const wrap = dc.getElementById('admin-content-dashboard');
 			wrap.innerHTML = '';
+
+			// What needs attention comes first (see the panel's apiSummary()):
+			// a fill key with its values, and the #panel where it is dealt
+			// with, '' for none
+			( Array.isArray( data.notices ) ? data.notices : [] ).forEach( function( notice ) {
+				wrap.appendChild( Nino.admin.dashboard._notice( notice ) );
+			} );
 
 			const tiles = dc.createElement('div');
 			tiles.id = 'admin-dashboard-tiles';
@@ -119,6 +126,25 @@
 				wrap.appendChild( Nino.admin.dashboard._elementsSection( data.elements ) );
 			if( data.recentActivity !== undefined )
 				wrap.appendChild( Nino.admin.dashboard._activitySection( data.recentActivity ) );
+		},
+
+		/**
+		 *	One notice: its text with every %s filled, in order, from the
+		 *	values - the values are text, never markup - and a link into the
+		 *	panel it names
+		 *
+		 *	@param		{Object}	notice				{ text, values, link }
+		 *
+		 *	@return		{Element}
+		 */
+		_notice : function( notice ) {
+
+			const values = ( Array.isArray( notice.values ) ? notice.values : [] ).map( String );
+			const link = typeof notice.link === 'string' && notice.link !== ''
+				? { href : notice.link, label : Nino.content.getText('/_admin/dashboard/notice/open') }
+				: null;
+
+			return Nino.adminUi.notice( Nino.adminUi.format( Nino.adminUi.text( String( notice.text ) ), ...values ), link );
 		},
 
 		/**

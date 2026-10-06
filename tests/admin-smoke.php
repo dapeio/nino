@@ -366,6 +366,37 @@ check( 'Text::apiKeys exposes the session-remembered locale, defaulting to nativ
 echo "\n";
 
 
+// --- Text::untranslatedCounts ------------------------------------------------
+
+echo "Text::untranslatedCounts - what the Dashboard says is not translated yet\n";
+
+/*	Counted per language: a key the native language has a text for and the
+	other has none, or an empty one. Hidden keys and the language-independent
+	ones are no translation work, an empty native text is nothing to translate,
+	and the native language is never counted against itself	*/
+check( 'one key of the sandbox lacks an English text, and that is all there is', \Nino\Modules\Text\Admin::untranslatedCounts( $appData ) === [ 'en_US' => 1 ] );
+
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', fn( array $texts ): array => $texts + [ '[[/gap/empty]]' => 'Leer', '[[/gap/blank]]' => '', '[[/gap/hidden]]' => 'Versteckt', '[[/gap/only-en]]' => '' ] );
+\Nino\Filesystem::mutate( $appData, '/text/en_US.php', fn( array $texts ): array => $texts + [ '[[/gap/empty]]' => '', '[[/gap/only-en]]' => 'Only English' ] );
+\Nino\Text::setBlacklisted( $appData, '/gap/hidden', true );
+$gapAppData = $appData;
+$gapAppData['/nino/locales/available'] = [ 'de_DE', 'en_US', 'fr_FR' ];
+$counts = \Nino\Modules\Text\Admin::untranslatedCounts( $gapAppData );
+check( 'an empty value counts as untranslated, as an absent one does', ( $counts['en_US'] ?? 0 ) === 2 );
+check( '...the native language is never counted against itself', array_keys( $counts ) === [ 'en_US', 'fr_FR' ] );
+check( 'a configured language with no text file counts every native text - and not the hidden key, the global ones or a native text that is empty', ( $counts['fr_FR'] ?? 0 ) === 4 );
+
+\Nino\Filesystem::mutate( $appData, '/text/en_US.php', fn( array $texts ): array => [ '[[/gap/empty]]' => 'Done' ] + $texts );
+check( 'a text written into the language is no longer counted', ( \Nino\Modules\Text\Admin::untranslatedCounts( $gapAppData )['en_US'] ?? 0 ) === 1 );
+
+// Back to what the rest of this suite starts from
+\Nino\Text::setBlacklisted( $appData, '/gap/hidden', false );
+foreach( [ 'de_DE' => [ '[[/gap/empty]]', '[[/gap/blank]]', '[[/gap/hidden]]', '[[/gap/only-en]]' ], 'en_US' => [ '[[/gap/empty]]', '[[/gap/only-en]]' ] ] as $gapLocale => $gapKeys )
+	\Nino\Filesystem::mutate( $appData, '/text/'. $gapLocale. '.php', fn( array $texts ): array => array_diff_key( $texts, array_flip( $gapKeys ) ) );
+
+echo "\n";
+
+
 // --- Admin::sessionLocale / apiSetLocale --------------------------------------
 
 echo "Admin::sessionLocale / apiSetLocale\n";
@@ -1882,6 +1913,10 @@ echo "Submissions (Modules\\Form writes, Modules\\Form\\Editor::apiList reads)\n
 	'[[/form/label/message]]'	=> 'Message',
 ], '*' );
 
+// A transport that takes the mails: a submission whose owner mail did not go
+// out is a 500, and whether this machine has a sendmail is not what is tested
+\Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ): void { $mail['sent'] = true; } );
+
 $_POST = [ 'name' => 'Jo Client', 'email' => 'jo@example.com', 'message' => 'Hallo!', 'location' => '', 'cat' => 'General' ];
 $formRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Modules\Form::callbackResponse( $appData, $formRequest );
@@ -1921,6 +1956,7 @@ check( 'the deletion is what the activity log writes for it', \Nino\Modules\Form
 $_POST = [ 'name' => 'Jo Client', 'email' => 'jo@example.com', 'message' => 'Hallo!', 'location' => '', 'cat' => 'General' ];
 $formRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Modules\Form::callbackResponse( $appData, $formRequest );
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
 
 check( 'forms data lives on the private root, not under _editor', is_file( \Nino\Filesystem::path( $appData, '/data/forms.'. date( 'Y-m' ). '.php' ) ) === true && is_dir( \Nino\Filesystem::getPath( $appData ). '/_admin/data' ) === false );
 

@@ -479,7 +479,7 @@ Die folgende Übersicht ist eine Arbeitsreferenz, keine vollständige Auflistung
 | `Images` | Uploads verarbeiten, Varianten verwalten und URLs erzeugen |
 | `Locales` | aktuelle, native und verfügbare Sprachen verwalten |
 | `Text` | Textdefinitionen lesen, sperren und als Batch speichern |
-| `Mail` | E-Mails über die Projektkonfiguration versenden, durch `mail()` oder einen unter `/nino/mail/send` registrierten Transport |
+| `Mail` | E-Mails über die Projektkonfiguration versenden, durch `mail()` oder einen unter `/nino/mail/send` registrierten Transport; ein gescheiterter Aufruf hinterlässt `/data/mail-status.php` (seit, zuletzt, Anzahl – keine Adresse), gelesen von `Mail::failure()`, und das Ergebnis jeder Mail steht in `./nino/mail/results` |
 | `Modules` | freigegebene Module laden und initialisieren |
 | `Runtime` | Session- und Fehlerbehandlung bereitstellen |
 
@@ -499,7 +499,7 @@ Module werden in `/nino/modules` aktiviert. Die Reihenfolge des Arrays ist relev
 | `Images` | `[image …]` | erzeugt ein escaped `<img>` aus einem Bildslot oder einer URI. Sein `alt` ist der für den Slot in der aktuellen Sprache gespeicherte Text, sonst das eigene `alt="…"` des Shortcodes, sonst leer (`alt=""`, dekorativ) – nie die Beschriftung des Slots. Der Text wird escaped und sein `[` als `&#91;` geschrieben, damit er in der nächsten Rendering-Runde keinen Fill und keinen Shortcode öffnen kann. Mit Inhalt – `[image /logo]...[/image]` – wird der Inhalt statt des `<img>` ausgegeben, und nur, wenn der Platz ein Bild hat: `[[src]]` (der Pfad der Datei ab der Wurzel der Seite; `https://[[/website/url]][[src]]` ist eine absolute Adresse), `[[width]]`, `[[height]]` und `[[alt]]` werden eingesetzt. So fragt ein Meta-Tag oder eine Mail nach der Adresse, ohne leer oder kaputt zu bleiben, wo noch nichts hochgeladen ist. Ein einfaches `[image]` vor dem ersten schließenden `[/image]` eines Templates liest den Text dazwischen als eigenen Inhalt; die Inhaltsform gehört deshalb in ein Template ohne einfaches `[image]` davor, oder das einfache wird als `[image /x][/image]` geschrieben |
 | `Jstext` | `[jstext]` | stellt Textwerte als sicher kodiertes JSON mit CSP-Nonce bereit |
 | `Localepicker` | `[localepicker …]` | wechselt Locale über Query und Redirect |
-| `Maintenance` | `/nino/http/response`, Priorität 1 | beantwortet, solange `/nino/maintenance/status` an ist, jede Seite und jeden Modul-Endpunkt mit 503 und Retry-After-Header, für jeden nicht in der Workbench angemeldeten Besuch |
+| `Maintenance` | `/nino/http/response`, Priorität 1; `/nino/http/output`, Priorität 9 | beantwortet, solange `/nino/maintenance/status` an ist, jede Seite und jeden Modul-Endpunkt mit 503 und Retry-After-Header, für jeden nicht in der Workbench angemeldeten Besuch – die Anmeldung selbst ausgenommen – und setzt oben auf jede Seite, die ein angemeldetes Konto öffnet, einen Hinweis |
 | `Navigation` | `[navigation …]` | rendert Navigationen aus einer kompakten Zeilensyntax |
 | `Template` | `[template /path/name]` | lädt den Rohinhalt einer `.tpl`-Datei; die gemeinsame Render-Pipeline verarbeitet ihn weiter |
 
@@ -556,7 +556,7 @@ Das Markup gehört dem Projekt: `page-contact.tpl` trägt ein von Hand geschrieb
 
 418 statt eines eigenen Status je Ablehnung: Das gemeinsame Skript `.nino-form` zeigt für alles, was nicht 200 oder 400 ist, eine einzige allgemeine Meldung – ein Bot erfährt also nie, an welcher Prüfung er gescheitert ist.
 
-Die eigenen Antworten des Endpunkts folgen derselben Regel. Eine Einsendung, die die Mail-Drossel je IP abweist, ist ein `429`, weder verschickt noch gespeichert – der Besucher sieht die allgemeine Meldung und versucht es später noch einmal, und eine gedrosselte Flut wird nicht zu ungedrosseltem Plattenwachstum. Eine Einsendung, deren Mail kein Transport genommen hat, wird gespeichert und mit `200` beantwortet, wo das Projekt eine Kopie behält, denn die Anfrage steht im Panel Einsendungen; steht `/nino/form/store` auf `false`, hat sie niemand, und die Antwort ist ein `500`.
+Die eigenen Antworten des Endpunkts folgen derselben Regel. Eine Einsendung, die die Mail-Drossel je IP abweist, ist ein `429`, weder verschickt noch gespeichert – der Besucher sieht die allgemeine Meldung und versucht es später noch einmal, und eine gedrosselte Flut wird nicht zu ungedrosseltem Plattenwachstum. Eine Einsendung, deren Mail an den Inhaber kein Transport genommen hat, wird mit `500` beantwortet – die allgemeine Meldung auf der Seite, damit der Besucher weiß, dass sie nicht angekommen ist – und, wo das Projekt eine Kopie behält, trotzdem gespeichert, denn die Anfrage steht im Panel Anfragen; das Dashboard sagt, woran es liegt. Nur die Mail an den Inhaber zählt: Eine Bestätigung an den Besucher, die nicht zugestellt werden konnte, während die Mail an den Inhaber hinausging, wird mit `200` beantwortet.
 
 ### Suchindex für Elements
 

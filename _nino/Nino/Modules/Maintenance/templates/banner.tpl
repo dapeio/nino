@@ -1,0 +1,1 @@
+<div role="status" style="position:relative;z-index:2147483647;margin:0;padding:.6rem 1rem;background:#fef3c7;color:#451a03;border-bottom:2px solid #d97706;font:14px/1.4 system-ui,sans-serif;text-align:center">[[text]][[link]]</div>

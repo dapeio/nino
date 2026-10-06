@@ -130,6 +130,37 @@
 			return empty;
 		},
 
+		/**
+		 *	The one way a screen says "this needs your attention": a failing
+		 *	mail, texts without a translation, a site that shows its
+		 *	maintenance page. A line of text that stays until what it names is
+		 *	fixed, with a link to where that is done where there is one. Owns
+		 *	no strings - the caller says what and where, in the interface
+		 *	language; the text is set as text, never as markup
+		 *
+		 *	@param		{string}		message
+		 *	@param		{Object}		[link]					{ href, label } - drawn only for an href that is a #panel of the workbench
+		 *
+		 *	@return		{Element}
+		 */
+		notice : function( message, link ) {
+
+			const notice = dc.createElement('p');
+			notice.className = 'nino-admin-notice';
+			notice.setAttribute( 'role', 'status' );
+			notice.textContent = message;
+
+			if( typeof link === 'object' && link !== null && /^#[a-z][a-z0-9\/_-]*$/.test( String( link.href ) ) === true ) {
+				const a = dc.createElement('a');
+				a.href = link.href;
+				a.textContent = String( link.label ?? '' );
+				notice.appendChild( dc.createTextNode(' ') );
+				notice.appendChild( a );
+			}
+
+			return notice;
+		},
+
 		// Whether choiceDialog() has a question open - one at a time: a second
 		// call while it stands is the same click arriving twice
 		_choiceOpen : false,

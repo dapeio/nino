@@ -12,4 +12,6 @@ return [
 	'[[/_admin/maintenance/hint/retry]]'			=> 'Sent as the Retry-After header, so a well-behaved browser or bot waits this long before trying again.',
 	'[[/_admin/maintenance/hint/signedin]]'	=> 'A signed-in account still sees the site as it is – open it in another browser, or log out, to check what a visitor sees.',
 	'[[/_admin/dashboard/label/maintenance]]'	=> 'Maintenance on',
+	'[[/_admin/maintenance/banner/text]]'	=> 'Maintenance is on – visitors see the maintenance page.',
+	'[[/_admin/maintenance/banner/link]]'	=> 'Go to Maintenance',
 ];

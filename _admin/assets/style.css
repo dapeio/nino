@@ -78,7 +78,7 @@
  *   Brand      .nino-admin-brand-mark  .nino-admin-brand-copy
  *   Type       .nino-admin-hint  .nino-admin-hint-lead  .nino-admin-eyebrow
  *              .nino-admin-error  .nino-admin-empty  .nino-admin-sr-only
- *              .nino-admin-status
+ *              .nino-admin-status  .nino-admin-notice
  *   Controls   .nino-admin-btn-primary  .nino-admin-btn-secondary
  *              .nino-admin-btn-danger  .nino-admin-linkbutton
  *   Surfaces   .nino-admin-card  .nino-admin-tiles  .nino-admin-tile
@@ -533,6 +533,29 @@ a {
 	font-size: .84rem;
 	line-height: 1.5;
 	text-align: center;
+}
+
+/* Something needs attention and stays until it is dealt with - a failing
+   mail, texts without a translation, a site showing its maintenance page
+   (Nino.adminUi.notice()). The meaning is in the sentence and in its place
+   above the content, never in the colour alone: the amber bar is only the
+   mark the eye finds first, and both themes carry their own amber. */
+:where(.nino-admin) .nino-admin-notice {
+	margin: 0 0 .65rem;
+	padding: .65rem .85rem;
+	border: 1px solid color-mix(in srgb, var(--editor-orange) 45%, transparent);
+	border-inline-start: 4px solid var(--editor-orange);
+	border-radius: var(--editor-radius);
+	background: color-mix(in srgb, var(--editor-orange) 10%, var(--editor-bg-elevated));
+	color: var(--editor-text);
+	font-size: .85rem;
+	line-height: 1.5;
+}
+
+:where(.nino-admin) .nino-admin-notice a {
+	color: var(--editor-blue);
+	font-weight: 650;
+	white-space: nowrap;
 }
 
 /* The hint that introduces a whole screen rather than one field: a tinted
@@ -2487,6 +2510,15 @@ a {
 		padding: 0;
 	}
 
+	/* A notice at the top of such a pane (the maintenance banner) is the
+	   one thing in it with no region of its own to stand in: a full-width
+	   strip, since there is no padding for it to sit inside of */
+	.nino-admin-shell--workspace .nino-admin-pane > .nino-admin-notice {
+		margin: 0;
+		border-inline-end-width: 0;
+		border-radius: 0;
+	}
+
 	/* Folded, the rail is a column of icons: the brand mark, the fold button
 	   and one icon per panel. Everything that needs words - the account row,
 	   the group headings, the labels - waits for the unfold */
@@ -2685,6 +2717,11 @@ a {
 	box-shadow: 0 1px 0 rgba(15,23,42,.025);
 	backdrop-filter: blur(18px) saturate(170%);
 	-webkit-backdrop-filter: blur(18px) saturate(170%);
+}
+/*	A notice above the panel (maintenance, say) leaves the pane's top padding
+ *	to the notice's own margin - the head must not bleed up into it */
+#admin-content-wrap > .nino-admin-notice ~ [data-panel] > .admin-panel-head {
+	margin-top: 0;
 }
 /*	The name: the one heading size the workbench has for a screen, and no
  *	margin of its own - the row's padding is the spacing, so a panel with a

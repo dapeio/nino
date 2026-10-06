@@ -11,4 +11,7 @@ return [
 	'[[/_admin/dashboard/label/all]]'				=> 'Alle anzeigen',
 	'[[/_admin/dashboard/empty/elements]]'	=> 'Noch keine Element-Typen angelegt.',
 	'[[/_admin/dashboard/empty/activity]]'	=> 'Noch keine Einträge.',
+	'[[/_admin/dashboard/notice/mail]]'	=> 'Der Mailversand scheitert seit %s (Fehlversuche: %s). Prüfe mail() auf dem Server, die Einstellungen des Mailers oder die Empfängeradresse.',
+	'[[/_admin/dashboard/notice/untranslated]]'	=> 'Noch nicht übersetzte Texte (%s) in %s.',
+	'[[/_admin/dashboard/notice/open]]'	=> 'Öffnen',
 ];

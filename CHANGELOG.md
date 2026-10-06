@@ -573,6 +573,78 @@ All notable changes to Nino are documented in this file.
   byte for byte, retention, the refusals, and that restoring the archive of
   the afternoon and the daily one give their own states.
 
+- **Workbench, Dashboard:** notices. What needs somebody's attention stands
+  above the tiles until it is dealt with, drawn by one shared component -
+  `Nino.adminUi.notice( message, { href, label } )` and `.nino-admin-notice`
+  in the design system, a status paragraph whose text is always set as text and
+  whose link is only drawn for a `#panel` target (`AGENTS.md` section 6a lists
+  it). `dashboard/summary` answers `notices`, a list of `{ text, values, link }`:
+  a fill key, what fills its `%s` in order, and where it leads.
+  *Mail delivery has been failing since …* is for every account that opens the
+  dashboard, like the date of the latest backup: it rests on a record of the
+  last failed call (`/data/mail-status.php`, below) that holds no address.
+  *Texts not translated yet (N) in …* is for an account that may
+  open the Text panel, once per language, linking to `#text`: a key counts when
+  the native language has a text for it and the other has none or an empty one
+  - `\Nino\Modules\Text\Admin::untranslatedCounts()`, which skips hidden keys,
+  the language-independent ones and a native text that is empty, and counts every
+  such key for a configured language without a text file. Nothing falls back to
+  another language and no key is created. `tests/admin-dashboard-js-smoke.js`
+  (new, 25 checks) holds the component and the panel: the blanks filled in
+  order, a value with markup or `$&` staying text, a link only for `#…`, and no
+  notice for an answer without any; `tests/admin-lists-js-smoke.js` that it is
+  one component; `tests/admin-smoke.php` the counts, `tests/admin-system-smoke.php`
+  the notices for a developer, for an account with no panel permission and
+  after a text is saved.
+
+- **Mail:** a call that did not deliver leaves a record. `\Nino\Mail::send()`
+  and `sendAll()` write `/data/mail-status.php` once per call - the date of the
+  first failure, of the last one and the number of failed calls, no address and
+  nothing a transport said - and a call in which every mail was delivered
+  clears it; a call that sent nothing (the per-ip cap, an empty batch) neither
+  raises nor clears it, and a record that cannot be written changes nothing
+  about the answer. Once per call rather than per mail, because a contact
+  form's owner mail and the confirmation behind it are one call: a confirmation
+  that went out must not wipe the failure of the mail the owner is waiting for.
+  `\Nino\Mail::failure()` reads it, and what each mail of the call came to is
+  left in `./nino/mail/results`, one bool per mail in the order given, reset on
+  every call. The record is never part of a backup (`Backup::NEVER`). A
+  notice that comes and goes with a broken owner address is the known limit: a
+  later call that delivers everything - a newsletter confirmation - clears it.
+  `tests/kernel-smoke.php` holds the record, the count, the date kept, the
+  clearing, the cap and the empty batch leaving it alone, a refused first mail
+  with a delivered second, the results reset and a malformed file, 951 → 1002
+  checks together with the entries below.
+
+- **Maintenance:** the module brings its own page, in two languages - the
+  built-in page used to be one English string in the class. `templates/page-maintenance.de_DE.tpl`
+  and `.en_US.tpl` are self-contained (no include,
+  no fills, `[[title]]` and `[[text]]`), rendered in the site's native
+  language whatever language the route asked for - `useLocale()`, so nothing is
+  written into the visitor's session - with the English one for a native
+  language without a page, and the texts `/maintenance/title` and
+  `/maintenance/text` from the project, else the module's own defaults in that
+  language (`install/text/<locale>.php`), else English. A project's own
+  `templates/page-maintenance.tpl` still wins and keeps the language of the
+  route. The native locale is checked for its shape and for being available
+  before it becomes part of a path; the class constant stays as the last resort
+  for a checkout that lost `templates/`.
+
+- **Maintenance:** a banner while the switch is on. Every public page a signed-in
+  account opens carries one line at the top, put in by `callbackOutput()` on
+  `/nino/http/output` (priority 9, after the cache's own) - in the normal flow
+  after the opening `<body>`, so it covers no sticky header - for an HTML string
+  body with a `</body>`, never for `/_admin`, a json answer, a feed or a
+  fragment. The link to the switch appears only for an account holding
+  `/_admin/maintenance/manage` and is built from the project's directory (the
+  hook runs on the finished page, where a fill is no longer replaced). Every
+  screen of the workbench carries the same notice (`Nino.adminUi.notice()`)
+  for the accounts that have the Maintenance panel, drawn from the status the
+  panel already asks for - no new action. `tests/kernel-smoke.php` holds the
+  page per language and its fallbacks, the banner and everything it must not
+  touch, `tests/admin-maintenance-js-smoke.js` (new, 16 checks) the notice
+  following the state.
+
 ### Changed
 
 - **Workbench:** what the panels print for a failure. A failure with a code is
@@ -814,6 +886,20 @@ All notable changes to Nino are documented in this file.
   `tests/admin-system-smoke.php` posts through the dispatcher with a listener
   registered.
 
+- **Contact form:** an inquiry whose owner mail did not go out is answered with
+  a `500` and no body - the generic message on the page - where it used to be
+  `200`, so that nobody learned a form had stopped reaching them. The inquiry is
+  still recorded where the project keeps a copy (`/nino/form/store`), and the
+  Dashboard says why. Only the owner's mail decides: a visitor confirmation that
+  could not be delivered while the owner's went out answers `200` in both store
+  modes, because the owner has the inquiry and a visitor sent back to the form
+  would only send it twice. A submission the cap refused is still a `429`.
+  The checks in `tests/kernel-smoke.php` and `tests/admin-smoke.php` that submit
+  the form passed only because a failed `mail()` still answered `200` - on a
+  machine without a sendmail, as the output shows; they register a stub transport
+  now, and the new ones pin the `500`, the record kept, and the confirmation
+  that alone is refused.
+
 ### Fixed
 
 - **Workbench, Elements:** a required field is marked and a refused save says
@@ -961,6 +1047,13 @@ All notable changes to Nino are documented in this file.
   `tests/admin-login-js-smoke.js` (30 → 34) the reload and the picker;
   `tests/nino-auth-js-smoke.js` (26 → 29) `login()` with `null`;
   `tests/admin-system-smoke.php` the links as `href="#<panel>"`.
+
+- **Maintenance:** one can sign in while the site shows the maintenance page.
+  `POST /.nino/auth/login` was answered with the 503 like every other route, so
+  an operator who was not signed in yet got the maintenance page instead of a
+  session - from the workbench's login form and from its re-login dialog.
+  That one POST is let through (`Modules\Maintenance::_prepare()`); a `GET` of
+  the address, the logout and every other route stay as they were.
 
 ### Removed
 

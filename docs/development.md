@@ -492,7 +492,7 @@ The following overview is a working reference, not a complete listing of every i
 | `Images` | Process uploads, manage variants, and generate URLs |
 | `Locales` | Manage current, native, and available languages |
 | `Text` | Read text definitions, lock, and save in batch |
-| `Mail` | Send emails via project configuration, through `mail()` or a transport registered under `/nino/mail/send` |
+| `Mail` | Send emails via project configuration, through `mail()` or a transport registered under `/nino/mail/send`; a call that failed leaves `/data/mail-status.php` (since, last, count - no address), read by `Mail::failure()`, and each mail's outcome in `./nino/mail/results` |
 | `Modules` | Load and initialize released modules |
 | `Runtime` | Provide session and error handling |
 
@@ -514,7 +514,7 @@ Modules are activated in `/nino/modules`. The order of the array is relevant if 
 | `Images` | `[image ...]` | creates an escaped `<img>` from an image slot or URI. Its `alt` is the text stored for the slot in the current language, else the shortcode's own `alt="..."`, else empty (`alt=""`, decorative) - never the slot's label. The text is escaped and its `[` written as `&#91;`, so it cannot open a fill or shortcode in the next rendering pass. With content - `[image /logo]...[/image]` - the content is rendered instead of the `<img>`, and only when the slot has an image: `[[src]]` (the file's path from the site's root; `https://[[/website/url]][[src]]` is an absolute address), `[[width]]`, `[[height]]` and `[[alt]]` are filled in. That is how a meta tag or a mail asks for the address without being left empty or broken where nothing is uploaded yet. A bare `[image]` before the first closing `[/image]` of a template reads the text between them as its own content, so keep the content form in a template with no bare `[image]` of the same kind before it, or write the bare one as `[image /x][/image]` |
 | `Jstext` | `[jstext]` | provides text values as securely encoded JSON with CSP nonce |
 | `Localepicker` | `[localepicker ...]` | switches locale via query and redirect |
-| `Maintenance` | `/nino/http/response`, priority 1 | while `/nino/maintenance/status` is on, answers every site page and module endpoint with a 503 and a Retry-After header, for every visitor not signed in to the workbench |
+| `Maintenance` | `/nino/http/response`, priority 1; `/nino/http/output`, priority 9 | while `/nino/maintenance/status` is on, answers every site page and module endpoint with a 503 and a Retry-After header, for every visitor not signed in to the workbench - the login itself excepted - and puts a banner at the top of each page a signed-in account opens |
 | `Navigation` | `[navigation ...]` | renders navigations from a compact line syntax |
 | `Template` | `[template /path/name]` | loads the raw content of a `.tpl` file; the common render pipeline processes it further |
 
@@ -571,7 +571,7 @@ The markup is the project's own: `page-contact.tpl` carries a hand-written `<for
 
 418 rather than a status of its own for every refusal: the shared `.nino-form` script shows one generic message for anything that is not 200 or 400, so a bot never learns which check it tripped.
 
-The endpoint's own answers follow the same rule. A submission the per-ip mail cap refuses is a `429`, neither mailed nor recorded - the visitor sees the generic message and tries again later, and a throttled flood does not become unthrottled disk growth. A submission whose mail no transport took is recorded and answered `200` where the project keeps a copy, since the inquiry is in the Submissions panel; where `/nino/form/store` is `false` nothing has it, and the answer is a `500`.
+The endpoint's own answers follow the same rule. A submission the per-ip mail cap refuses is a `429`, neither mailed nor recorded - the visitor sees the generic message and tries again later, and a throttled flood does not become unthrottled disk growth. A submission whose owner mail no transport took is answered `500` - the generic message on the page, so the visitor knows it did not arrive - and, where the project keeps a copy, still recorded, since the inquiry is in the Submissions panel; the Dashboard says why. Only the owner's mail counts: a visitor confirmation that could not be delivered, with the owner's mail out, answers `200`.
 
 ### Elements Search Index
 

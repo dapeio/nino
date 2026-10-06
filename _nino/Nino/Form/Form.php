@@ -416,14 +416,24 @@ namespace Nino {
 				return;
 			}
 
-			// A mail that did not go out still records - the inquiry did
-			// happen, it is in the panel, and losing it would be worse - and
-			// the visitor is told ok. Where the project keeps no copy nothing
-			// has the inquiry, and ok would be a lie: a 500, the same generic
-			// message on the page
+			// What the visitor is told rests on the owner's mail alone - the
+			// one that is the message. A confirmation nobody could deliver
+			// (a mistyped address) changes nothing about that: the owner has
+			// the inquiry, and a visitor sent back to the form would only
+			// send it twice. Where the mail layer does not say (a transport
+			// that left no result) the aggregate stands in for it
+			$ownerSent = ( $appData['./nino/mail/results'][0] ?? $sent ) === true;
+
+			// The inquiry is recorded whether or not its mail went out - it
+			// did happen, it is in the panel, and losing it would be worse
 			if( self::stores( $appData ) === true )
 				self::record( $appData, $form, $values );
-			elseif( $sent === false ) {
+
+			// But "sent" is not what the visitor is told when the owner's mail
+			// did not go out - it used to be, and nobody learned that a form
+			// had stopped reaching them. A 500, the same generic message on
+			// the page (and the dashboard says why: \Nino\Mail::failure())
+			if( $ownerSent === false ) {
 				$request['/nino/http/response']['statusCode'] = 500;
 				return;
 			}

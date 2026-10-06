@@ -449,6 +449,7 @@ Reach for an existing class first; only invent one when no role fits.
 | Rich-text editor mount | `.nino-admin-richtext` (`Nino.admin.htmlEditor.create()`, its fifth argument the format: `inline`, `lines` or `blocks`) |
 | List of texts, edited as rows | `.nino-admin-stringlist` via `Nino.adminUi.stringList()` (the value is a hidden input carrying the JSON, like `elementList()`'s) |
 | Explanatory text / screen intro | `.nino-admin-hint`, `.nino-admin-hint-lead` |
+| Something needs attention until it is fixed - failing mail, untranslated texts, maintenance on | `.nino-admin-notice` via `Nino.adminUi.notice( message, { href, label } )`; a link only for a `#panel` href, the text always as text |
 | Nothing here yet (a list without entries, a scan that found nothing) | `.nino-admin-empty` via `Nino.adminUi.emptyState()` |
 | Error text | `.nino-admin-error` |
 

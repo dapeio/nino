@@ -238,5 +238,49 @@ namespace Nino\Modules\Text {
 			return \Nino\Admin\Admin::scoped( $appData, self::SCOPE, self::UPDATE_PERM. $key );
 		}
 
+		/**
+		 *	How many keys each language still has no text for: those with a
+		 *	text in the native language and none, or an empty one, in the
+		 *	other - the work the panel's own list shows as empty fields.
+		 *	A language without a text file counts every such key, since its
+		 *	pages render the raw keys. Hidden (blacklisted) keys and the
+		 *	locale-independent ones are no translation work and stay out;
+		 *	nothing is created and no language falls back to another here -
+		 *	shared by \Nino\Modules\Dashboard\Admin::apiSummary
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										locale => count, only those with a count above 0
+		 */
+		public static function untranslatedCounts( array &$appData ): array {
+
+			$native = \Nino\Locales::getNativeLocale( $appData );
+			$counts = [];
+
+			foreach( \Nino\Text::entries( $appData, false ) as $entry ) {
+
+				if( $entry['global'] === true )
+					continue;
+
+				$source = $entry['values'][$native] ?? null;
+
+				if( is_string( $source ) === false || $source === '' )
+					continue;
+
+				foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale ) {
+
+					if( $locale === $native )
+						continue;
+
+					$value = $entry['values'][$locale] ?? null;
+
+					if( $value === null || $value === '' )
+						$counts[$locale] = ( $counts[$locale] ?? 0 ) + 1;
+				}
+			}
+
+			return $counts;
+		}
+
 	}
 }

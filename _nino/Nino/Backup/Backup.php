@@ -25,13 +25,15 @@ namespace Nino {
 			took, since it does start with '/data/' - put every one of these in
 			every backup, and a restore then wrote them back. Restored
 			auth-tries.php re-locks accounts somebody already waited out;
-			restored .locks plants lock files for requests that ended weeks ago.
+			a restored mail-status.php (the record of the last failed mail,
+			\Nino\Mail::failure()) brings back a failure that was fixed long
+			ago; restored .locks plants lock files for requests that ended weeks ago.
 
 			So the promise is kept where it is made rather than by what the list
 			happens not to mention. A leading dot with it: '/data/.locks' is the
 			only one today, and everything hidden under /data/ is this
 			framework's own bookkeeping rather than a project's content	*/
-		private const array NEVER = [ 'auth-tries.php', 'ratelimit.php', 'catalogue.php' ];
+		private const array NEVER = [ 'auth-tries.php', 'ratelimit.php', 'mail-status.php', 'catalogue.php' ];
 
 		/**
 		 *	Whether a path below /data/ is one a backup must not carry
@@ -57,8 +59,9 @@ namespace Nino {
 		// it owns below /data/). Deliberately not developer code (_nino/,
 		// templates, _admin/ itself, ...) - that's already versioned in git
 		// and would just bloat every backup. Also deliberately not
-		// auth-tries.php or ratelimit.php - both are transient throttling
-		// counters, not data a restore should bring back. The workbench's
+		// auth-tries.php, ratelimit.php or mail-status.php - transient
+		// throttling counters and the last failed mail, not data a restore
+		// should bring back. The workbench's
 		// activity log is not in an archive either: it is written to
 		// private/.logs/<day>.php (see \Nino\Modules\Logs\Admin),
 		// which is none of the four directories this walks.

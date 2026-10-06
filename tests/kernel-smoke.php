@@ -2777,6 +2777,13 @@ echo "Modules\\Form::callbackResponse - validate/send/record a contact submissio
 	'[[/form/subject/user]]' 	=> 'Thanks for reaching out',
 ], '*' );
 
+// A transport that takes every mail. A submission whose owner mail did not go
+// out is a 500, so what these checks pin must not depend on whether this
+// machine has a sendmail - it is registered once and the unset after the
+// 'recording off' check removes it, where the checks that want to read the
+// mails register their own
+\Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ): void { $mail['sent'] = true; } );
+
 function submitForm( array &$appData, array $post ): array {
 	$_POST = array_merge( [ 'name' => '', 'email' => '', 'message' => '', 'location' => '', 'cat' => '' ], $post );
 	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
@@ -3000,17 +3007,39 @@ check( 'a submission the per-ip mail cap refuses is a 429, not ok - and neither 
 \Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [] );
 unset( $appData['./nino/mail/ratelimited'] );
 
-// A mail that did not go out: with a copy kept the inquiry is in the panel,
-// so the visitor is told ok; with none kept nothing has it, and ok would be
-// a lie - a 500, which is what a mail server that did not take a mail is
+// A mail that did not go out. The inquiry is recorded where a copy is kept -
+// it did happen, and it is in the panel - but the visitor is told it did not
+// arrive, whether or not a copy is kept: a 500 and no body, the generic
+// message on the page. What the owner reads is the dashboard's notice, and the
+// record behind it stays
 unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
 \Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ): void { $mail['sent'] = false; } );
 $countBefore = count( \Nino\Filesystem::getFileContent( $appData, $formsFile, [] ) );
 $keptRequest = submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'Hi' ] );
-check( 'a mail that did not go out still records where a copy is kept, and the visitor is told ok', $keptRequest['/nino/http/response']['statusCode'] === 200 && count( \Nino\Filesystem::getFileContent( $appData, $formsFile, [] ) ) === $countBefore + 1 );
+check( 'a submission whose owner mail did not go out is a 500, not ok - with no body', $keptRequest['/nino/http/response']['statusCode'] === 500 && isset( $keptRequest['/nino/http/response']['body'] ) === false );
+check( '...and the inquiry is still recorded where a copy is kept', count( \Nino\Filesystem::getFileContent( $appData, $formsFile, [] ) ) === $countBefore + 1 );
+check( '...and the failure is on record for the dashboard', ( \Nino\Mail::failure( $appData )['count'] ?? 0 ) >= 1 );
 $appData[ \Nino\Form::STORE ] = false;
 $lostRequest = submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'Hi' ] );
-check( '...and with none kept it is a 500 - nothing has the inquiry', $lostRequest['/nino/http/response']['statusCode'] === 500 && isset( $lostRequest['/nino/http/response']['body'] ) === false );
+check( '...and with none kept it is a 500 as well - nothing has the inquiry', $lostRequest['/nino/http/response']['statusCode'] === 500 && isset( $lostRequest['/nino/http/response']['body'] ) === false );
+unset( $appData[ \Nino\Form::STORE ] );
+
+// Only the owner's mail decides. A transport that refuses the visitor's
+// confirmation and takes the owner's: the owner has the inquiry, and a visitor
+// sent back to the form would send it twice - 200 whether it is kept or not
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
+\Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ): void { $mail['sent'] = $mail['to'] === 'owner@example.com'; } );
+\Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [] );
+$countBefore = count( \Nino\Filesystem::getFileContent( $appData, $formsFile, [] ) );
+$confirmRequest = submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'Hi' ] );
+check( 'only the visitor\'s confirmation refused, the owner mail out: 200, and recorded', $confirmRequest['/nino/http/response']['statusCode'] === 200
+	&& ( $confirmRequest['/nino/http/response']['body']['status'] ?? '' ) === 'ok' && count( \Nino\Filesystem::getFileContent( $appData, $formsFile, [] ) ) === $countBefore + 1 );
+$appData[ \Nino\Form::STORE ] = false;
+\Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [] );
+$confirmRequest = submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'Hi' ] );
+check( '...and with no copy kept the same: 200', $confirmRequest['/nino/http/response']['statusCode'] === 200 && ( $confirmRequest['/nino/http/response']['body']['status'] ?? '' ) === 'ok' );
+unset( $appData[ \Nino\Form::STORE ] );
+\Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [] );
 /*	The owner's notification goes out in the site's native locale whatever
 	language the visitor wrote in, and that switch was made with
 	setCurrentLocale() - which writes what it is given into the visitor's
@@ -3381,6 +3410,117 @@ check( 'an empty batch is not an action and costs nothing', \Nino\Mail::sendAll(
 
 unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ], $appData['./nino/mail/ratelimited'] );
 \Nino\Html::addFills( $appData, [ '[[/mail/sender]]' => '' ], '*' );
+
+echo "\n";
+
+
+// --- Mail - the record of mail that did not go out --------------------------
+
+echo "Mail::failure - a call that failed leaves a record, one that delivered everything clears it\n";
+
+/*	The workbench's dashboard says "mail has been failing since ...", and
+	what it says rests on this: /data/mail-status.php, written once per call
+	of send() or sendAll() rather than once per mail. A contact form sends the
+	owner's mail and the visitor's confirmation as one call, and a
+	confirmation that went out must not wipe the failure of the mail the owner
+	is waiting for	*/
+$statusPath = '/data/mail-status.php';
+$refused 		= [ 'refused@example.org' ];
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ], $appData['./nino/mail/ratelimited'] );
+\Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ) use ( &$refused ): void {
+	$mail['sent'] = in_array( $mail['to'], $refused, true ) === false;
+} );
+$freshWindow = static function() use ( &$appData, $ratelimitPath ): void {
+	\Nino\Filesystem::putFileContent( $appData, $ratelimitPath, [] );
+	unset( $appData['./nino/mail/ratelimited'] );
+};
+
+@unlink( \Nino\Filesystem::path( $appData, $statusPath ) );
+$freshWindow();
+check( 'with nothing ever refused there is no record', \Nino\Mail::failure( $appData ) === null );
+
+check( 'a delivered mail with no record writes none', \Nino\Mail::send( $appData, 'ok@example.org', 'a', 'b', '' ) === true
+	&& is_file( \Nino\Filesystem::path( $appData, $statusPath ) ) === false && ( $appData['./nino/mail/results'] ?? null ) === [ true ] );
+
+$freshWindow();
+check( 'a refused send answers false and is on record: since, last, count 1', \Nino\Mail::send( $appData, 'refused@example.org', 'a', 'b', '' ) === false
+	&& ( $appData['./nino/mail/results'] ?? null ) === [ false ] );
+$record = \Nino\Mail::failure( $appData );
+check( '...the two dates are minutes, equal for the first failure', $record !== null && preg_match( '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $record['since'] ) === 1
+	&& $record['since'] === $record['last'] && $record['count'] === 1 );
+check( '...and holds no address, no subject and nothing a transport said', str_contains( (string) file_get_contents( \Nino\Filesystem::path( $appData, $statusPath ) ), 'example.org' ) === false );
+
+// since stays where the failing began, last moves, count counts calls
+\Nino\Filesystem::putFileContent( $appData, $statusPath, [ 'since' => '2026-01-02 03:04', 'last' => '2026-01-02 03:04', 'count' => 1 ] );
+$freshWindow();
+$minuteBefore = date( 'Y-m-d H:i' );
+\Nino\Mail::send( $appData, 'refused@example.org', 'a', 'b', '' );
+$record = \Nino\Mail::failure( $appData );
+check( 'a second failure keeps the first date and adds one to the count', $record !== null && $record['since'] === '2026-01-02 03:04' && $record['count'] === 2 && in_array( $record['last'], [ $minuteBefore, date( 'Y-m-d H:i' ) ], true ) );
+
+// A call that sent nothing neither raises nor clears: the cap refused it, or
+// there was nothing to send
+\Nino\Filesystem::putFileContent( $appData, $ratelimitPath, [ '127.0.0.1' => [ 'tries' => 5, 'reset' => time() + 3600 ] ] );
+unset( $appData['./nino/mail/ratelimited'] );
+$appData['./nino/mail/results'] = [ true, true ];
+check( 'a send the cap refused answers false and leaves the record as it was', \Nino\Mail::send( $appData, 'ok@example.org', 'a', 'b', '' ) === false
+	&& ( \Nino\Mail::failure( $appData )['count'] ?? 0 ) === 2 );
+check( '...with no results left over from the call before', ( $appData['./nino/mail/results'] ?? null ) === [] );
+$appData['./nino/mail/results'] = [ true ];
+check( 'a batch the cap refused leaves it as it was too', \Nino\Mail::sendAll( $appData, [ [ 'to' => 'ok@example.org', 'subject' => 'a', 'body' => 'b', 'replyTo' => '' ] ] ) === false
+	&& ( \Nino\Mail::failure( $appData )['count'] ?? 0 ) === 2 && ( $appData['./nino/mail/results'] ?? null ) === [] );
+$freshWindow();
+$appData['./nino/mail/results'] = [ true ];
+check( 'an empty batch is not an action: nothing cleared, results reset', \Nino\Mail::sendAll( $appData, [] ) === true
+	&& ( \Nino\Mail::failure( $appData )['count'] ?? 0 ) === 2 && ( $appData['./nino/mail/results'] ?? null ) === [] );
+
+// The regression the per-call write exists for: the owner's mail refused and
+// the confirmation behind it delivered is one failed call, not a failure
+// wiped by the mail that went out
+$pair = [
+	[ 'to' => 'refused@example.org', 'subject' => 'a', 'body' => 'x', 'replyTo' => 'jo@example.org' ],
+	[ 'to' => 'jo@example.org',      'subject' => 'b', 'body' => 'y', 'replyTo' => 'refused@example.org' ],
+];
+$freshWindow();
+check( 'a batch whose first mail is refused and second delivered is false, one result per mail, in order', \Nino\Mail::sendAll( $appData, $pair ) === false
+	&& ( $appData['./nino/mail/results'] ?? null ) === [ false, true ] );
+check( '...and keeps the record, the count moved on', ( \Nino\Mail::failure( $appData )['count'] ?? 0 ) === 3 );
+
+$freshWindow();
+check( 'a batch whose second mail is refused is the same failure', \Nino\Mail::sendAll( $appData, array_reverse( $pair ) ) === false
+	&& ( $appData['./nino/mail/results'] ?? null ) === [ true, false ] && ( \Nino\Mail::failure( $appData )['count'] ?? 0 ) === 4 );
+
+$freshWindow();
+check( 'a batch in which every mail is delivered clears the record', \Nino\Mail::sendAll( $appData, [ $pair[1], $pair[1] ] ) === true
+	&& ( $appData['./nino/mail/results'] ?? null ) === [ true, true ] && \Nino\Mail::failure( $appData ) === null );
+
+\Nino\Filesystem::putFileContent( $appData, $statusPath, [ 'since' => '2026-01-02 03:04', 'last' => '2026-01-02 03:04', 'count' => 1 ] );
+$freshWindow();
+check( 'so does one delivered mail', \Nino\Mail::send( $appData, 'ok@example.org', 'a', 'b', '' ) === true && \Nino\Mail::failure( $appData ) === null );
+
+// A file that is not what this class writes is no record - and the next
+// failure writes a new one over it
+foreach( [
+	'a string'				=> 'broken',
+	'no dates'				=> [ 'count' => 2 ],
+	'a date that is not one'	=> [ 'since' => 'yesterday', 'last' => '2026-01-02 03:04', 'count' => 1 ],
+	'a count of nought'		=> [ 'since' => '2026-01-02 03:04', 'last' => '2026-01-02 03:04', 'count' => 0 ],
+	'a count that is text'	=> [ 'since' => '2026-01-02 03:04', 'last' => '2026-01-02 03:04', 'count' => '3' ],
+] as $label => $content ) {
+	\Nino\Filesystem::putFileContent( $appData, $statusPath, $content );
+	check( 'a status file holding '. $label. ' is no record', \Nino\Mail::failure( $appData ) === null );
+}
+\Nino\Filesystem::putFileContent( $appData, $statusPath, [ 'since' => 'yesterday', 'count' => 'x' ] );
+$freshWindow();
+$minuteBefore = date( 'Y-m-d H:i' );
+\Nino\Mail::send( $appData, 'refused@example.org', 'a', 'b', '' );
+check( '...and the next failure starts a clean one', ( \Nino\Mail::failure( $appData )['count'] ?? 0 ) === 1 && in_array( \Nino\Mail::failure( $appData )['since'] ?? '', [ $minuteBefore, date( 'Y-m-d H:i' ) ], true ) );
+
+// A transport that takes no mail and leaves 'sent' alone falls through to
+// mail(): not exercised here, the record rests on _deliver()'s answer alone
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ], $appData['./nino/mail/ratelimited'], $appData['./nino/mail/results'] );
+\Nino\Filesystem::putFileContent( $appData, $statusPath, [] );
+$freshWindow();
 
 echo "\n";
 
@@ -5308,7 +5448,7 @@ foreach( array_merge( glob( $kernelRoot. '/_nino/*.js' ), glob( $kernelRoot. '/_
 check( 'no shipped script sends a request to, or a browser to, an address from the domain root'. ( $rootAbsoluteRequests === [] ? '' : ' - '. implode( ', ', $rootAbsoluteRequests ) ), $rootAbsoluteRequests === [] );
 
 $rootAbsoluteTemplates = [];
-foreach( array_merge( glob( $kernelRoot. '/_admin/templates/*.tpl' ), glob( $kernelRoot. '/_admin/install/templates/*.tpl' ) ) as $shippedTemplate )
+foreach( array_merge( glob( $kernelRoot. '/_admin/templates/*.tpl' ), glob( $kernelRoot. '/_admin/install/templates/*.tpl' ), glob( $kernelRoot. '/_nino/Nino/Modules/*/templates/*.tpl' ) ) as $shippedTemplate )
 	if( preg_match( '/\b(?:action|href|src)="\/(?!\/)/', (string) file_get_contents( $shippedTemplate ) ) === 1 )
 		$rootAbsoluteTemplates[] = substr( $shippedTemplate, strlen( $kernelRoot ) + 1 );
 check( 'no template the kernel ships writes an address from the domain root'. ( $rootAbsoluteTemplates === [] ? '' : ' - '. implode( ', ', $rootAbsoluteTemplates ) ), $rootAbsoluteTemplates === [] );
@@ -5845,6 +5985,151 @@ $appData['/nino/maintenance/status'] = false;
 $appData['/nino/cache/status'] = true;
 \Nino\Modules\Maintenance::init( $appData );
 check( '...and left alone while maintenance is off', $appData['/nino/cache/status'] === true );
+
+// The login is the one other thing a signed-out visitor may still reach: an
+// operator who is not signed in has to be able to sign in, and the answer
+// to that POST was the 503 page, the workbench's login form included
+$appData['/nino/maintenance/status'] = true;
+unset( $appData['./nino/auth/current'] );
+$loginPost = maintenanceRequest( '/.nino/auth/login', 'POST' );
+check( 'the login POST of a visitor who is not signed in is not answered with the maintenance page', \Nino\Modules\Maintenance::_prepare( $appData, $loginPost ) === false
+	&& $loginPost['/nino/http/response']['statusCode'] === 200 && $loginPost['/nino/http/response']['body'] === '<html>page</html>' );
+$loginGet = maintenanceRequest( '/.nino/auth/login', 'GET' );
+$logoutPost = maintenanceRequest( '/.nino/auth/logout', 'POST' );
+check( '...only that POST: anything else at the address, and the logout, is still the maintenance page', \Nino\Modules\Maintenance::_prepare( $appData, $loginGet ) === true
+	&& \Nino\Modules\Maintenance::_prepare( $appData, $logoutPost ) === true );
+$appData['/nino/maintenance/status'] = false;
+
+/*	The page the module brings. It is its own template per language, read
+	from the module's directory - the sandbox has no _nino/, so these point
+	the file system at the checkout, as the workbench's own render test does,
+	while the text, the templates and the config stay in the sandbox. The
+	site's native language is the page's, whatever language the route asked
+	for: the visitor has chosen nothing, and this page is not the site's	*/
+$moduleApp = $appData;
+$moduleApp['./nino/filesystem/path'] = dirname( __DIR__ );
+// A path is remembered per file name, and the earlier checks have asked for
+// these names with the sandbox as the root
+unset( $moduleApp['./nino/filesystem/cache'] );
+$moduleApp['/nino/maintenance/status'] = true;
+$moduleApp['/nino/locales/available'] = [ 'de_DE', 'en_US', 'fr_FR' ];
+unset( $moduleApp['./nino/auth/current'] );
+\Nino\Runtime::unsetSessionValue( $moduleApp, './nino/locales/current' );
+
+$german = maintenanceRequest( '/' );
+$german['/nino/http/response']['locale'] = 'en_US';
+\Nino\Locales::useLocale( $moduleApp, 'en_US' );
+check( 'native de_DE: the module\'s German page, though the route asked for en_US', \Nino\Modules\Maintenance::_prepare( $moduleApp, $german ) === true
+	&& str_contains( $german['/nino/http/response']['body'], '<html lang="de">' ) === true );
+check( '...with the module\'s German defaults for the two texts', str_contains( $german['/nino/http/response']['body'], '<h1>Wartungsarbeiten</h1>' ) === true
+	&& str_contains( $german['/nino/http/response']['body'], 'Wir sind in Kürze wieder für Dich da.' ) === true && str_contains( $german['/nino/http/response']['body'], '[[' ) === false );
+check( '...answered as the 503 it is, in the native locale', $german['/nino/http/response']['statusCode'] === 503 && $german['/nino/http/response']['locale'] === 'de_DE' && \Nino\Locales::getCurrentLocale( $moduleApp ) === 'de_DE' );
+check( '...and nothing was written into the visitor\'s session', \Nino\Runtime::getSessionValue( $moduleApp, './nino/locales/current', 'unwritten' ) === 'unwritten' );
+
+$moduleApp['/nino/locales/native'] = 'en_US';
+$english = maintenanceRequest( '/' );
+\Nino\Modules\Maintenance::_prepare( $moduleApp, $english );
+check( 'native en_US: the English page', str_contains( $english['/nino/http/response']['body'], '<html lang="en">' ) === true
+	&& str_contains( $english['/nino/http/response']['body'], '<h1>Under maintenance</h1>' ) === true && str_contains( $english['/nino/http/response']['body'], 'We will be back shortly.' ) === true );
+
+$moduleApp['/nino/locales/native'] = 'fr_FR';
+$french = maintenanceRequest( '/' );
+\Nino\Modules\Maintenance::_prepare( $moduleApp, $french );
+check( 'a native language the module has no page for gets the English one, in that locale', str_contains( $french['/nino/http/response']['body'], '<html lang="en">' ) === true
+	&& str_contains( $french['/nino/http/response']['body'], '<h1>Under maintenance</h1>' ) === true && $french['/nino/http/response']['locale'] === 'fr_FR' );
+
+// What becomes a path is checked first
+$moduleApp['/nino/locales/native'] = '../../x';
+\Nino\Locales::useLocale( $moduleApp, 'de_DE' );
+$odd = maintenanceRequest( '/' );
+check( 'a native locale that is no locale id is not made part of a path: the page of the current one is shown', \Nino\Modules\Maintenance::_prepare( $moduleApp, $odd ) === true
+	&& str_contains( $odd['/nino/http/response']['body'], '<html lang="de">' ) === true );
+$moduleApp['/nino/locales/native'] = 'de_DE';
+
+// A project's own text wins over the module's default, and is escaped - the
+// page is output and a title is something a person typed
+\Nino\Html::addFills( $moduleApp, [ '/maintenance/title' => 'Back <b>soon</b> & "soon"', '/maintenance/text' => "Line one\nLine <two>" ], '*' );
+$filledPage = maintenanceRequest( '/' );
+\Nino\Modules\Maintenance::_prepare( $moduleApp, $filledPage );
+check( 'a project\'s /maintenance/title and /maintenance/text win over the module\'s defaults - on the module\'s page', str_contains( $filledPage['/nino/http/response']['body'], '<h1>Back &lt;b&gt;soon&lt;/b&gt; &amp; &quot;soon&quot;</h1>' ) === true
+	&& str_contains( $filledPage['/nino/http/response']['body'], '<p>Line one<br />' ) === true && str_contains( $filledPage['/nino/http/response']['body'], 'Line &lt;two&gt;' ) === true );
+check( '...and no markup of theirs reaches the page', str_contains( $filledPage['/nino/http/response']['body'], '<b>' ) === false && str_contains( $filledPage['/nino/http/response']['body'], '<two>' ) === false );
+
+// A project's own template keeps the language of the route: it wears the
+// site's design, and the site is in the visitor's language
+$moduleApp['/nino/locales/native'] = 'de_DE';
+\Nino\Filesystem::putFileContent( $moduleApp, '/templates/page-maintenance.tpl', '<main><h1>own</h1></main>' );
+\Nino\Modules\Template::init( $moduleApp );
+$ownRequest = maintenanceRequest( '/' );
+$ownRequest['/nino/http/response']['locale'] = 'en_US';
+\Nino\Modules\Maintenance::_prepare( $moduleApp, $ownRequest );
+check( 'a project\'s page-maintenance.tpl wins, and is rendered in the language of the route, not forced to the native one', str_contains( $ownRequest['/nino/http/response']['body'], '<h1>own</h1>' ) === true
+	&& $ownRequest['/nino/http/response']['locale'] === 'en_US' && \Nino\Locales::getCurrentLocale( $moduleApp ) === 'en_US' );
+@unlink( \Nino\Filesystem::path( $moduleApp, '/templates/page-maintenance.tpl' ) );
+
+// The banner a signed-in account gets while the site shows everybody else the
+// maintenance page. /nino/http/output runs on the finished page, after every
+// fill is replaced, so the link is built from the directory
+$bannerApp = $moduleApp;
+\Nino\Locales::useLocale( $bannerApp, 'de_DE' );
+$bannerApp['/nino/dir'] = '/shop';
+$bannerApp['./nino/auth/current'] = [ 'mail' => 'operator@example.com', 'perms' => [ '/_admin/maintenance/manage' ] ];
+$pageHtml = '<!doctype html><html><head><title>x</title></head><body class="home"><main>page</main></body></html>';
+$outputRequest = static function( string $uri = '/', mixed $body = null, array $header = [] ) use ( $pageHtml ): array {
+	return [
+		'/nino/http/request'	=> [ 'method' => 'GET', 'uri' => $uri ],
+		'/nino/http/response'	=> [ 'statusCode' => 200, 'header' => $header, 'body' => $body ?? $pageHtml ],
+	];
+};
+
+$bannered = $outputRequest();
+\Nino\Modules\Maintenance::callbackOutput( $bannerApp, $bannered );
+$bannerBody = $bannered['/nino/http/response']['body'];
+check( 'a signed-in account gets the banner once, right after the opening <body> - in the flow, not fixed', substr_count( $bannerBody, 'role="status"' ) === 1
+	&& str_contains( $bannerBody, '<body class="home"><div role="status"' ) === true && str_contains( $bannerBody, 'position:fixed' ) === false && str_contains( $bannerBody, 'position:relative' ) === true && preg_match( '/z-index:\d+/', $bannerBody ) === 1 && str_contains( $bannerBody, '<main>page</main>' ) === true );
+check( '...in the current language, with the words of the module\'s own text file', str_contains( $bannerBody, 'Die Wartung ist aktiv – Besucher sehen die Wartungsseite.' ) === true );
+check( '...and with the account\'s permission, a link built from the project directory', str_contains( $bannerBody, '<a href="/shop/_admin#maintenance"' ) === true && str_contains( $bannerBody, '>Zur Wartung</a>' ) === true && str_contains( $bannerBody, '[[' ) === false );
+
+\Nino\Locales::useLocale( $bannerApp, 'fr_FR' );
+$frenchBanner = $outputRequest();
+\Nino\Modules\Maintenance::callbackOutput( $bannerApp, $frenchBanner );
+check( 'a language without words of its own gets the English ones', str_contains( $frenchBanner['/nino/http/response']['body'], 'Maintenance is on – visitors see the maintenance page.' ) === true );
+\Nino\Locales::useLocale( $bannerApp, 'de_DE' );
+
+$noLink = $bannerApp;
+$noLink['./nino/auth/current'] = [ 'mail' => 'editor@example.com', 'perms' => [ '/_admin/text/manage' ] ];
+$editorBanner = $outputRequest();
+\Nino\Modules\Maintenance::callbackOutput( $noLink, $editorBanner );
+check( 'an account without the maintenance permission gets the banner and no link', str_contains( $editorBanner['/nino/http/response']['body'], 'Die Wartung ist aktiv' ) === true
+	&& str_contains( $editorBanner['/nino/http/response']['body'], '<a ' ) === false );
+
+$untouched = [];
+$untouched['an anonymous visitor']				= [ $moduleApp, $outputRequest() ];
+$untouched['/_admin']											= [ $bannerApp, $outputRequest( '/_admin' ) ];
+$untouched['a screen below /_admin']			= [ $bannerApp, $outputRequest( '/_admin/config' ) ];
+$untouched['an array body (a json answer)']	= [ $bannerApp, $outputRequest( '/', [ 'status' => 'ok' ] ) ];
+$untouched['application/xml']							= [ $bannerApp, $outputRequest( '/sitemap.xml', $pageHtml, [ 'Content-Type' => 'application/xml' ] ) ];
+$untouched['a fragment without </body>']	= [ $bannerApp, $outputRequest( '/', '<div>a fragment</div>' ) ];
+$statusOff = $bannerApp;
+$statusOff['/nino/maintenance/status'] = false;
+$untouched['maintenance switched off']		= [ $statusOff, $outputRequest() ];
+foreach( $untouched as $label => [ $app, $req ] ) {
+	$before = $req['/nino/http/response']['body'];
+	\Nino\Modules\Maintenance::callbackOutput( $app, $req );
+	check( 'no banner for '. $label, $req['/nino/http/response']['body'] === $before );
+}
+
+$typed = $outputRequest( '/', $pageHtml, [ 'Content-Type' => 'text/html; charset=utf-8' ] );
+\Nino\Modules\Maintenance::callbackOutput( $bannerApp, $typed );
+check( 'text/html with a charset is a page', str_contains( $typed['/nino/http/response']['body'], 'role="status"' ) === true );
+
+$registered = [];
+$hookApp = $appData;
+$hookApp['./nino/callbacks'] = [];
+\Nino\Modules\Maintenance::init( $hookApp );
+foreach( $hookApp['./nino/callbacks']['/nino/http/output'][9] ?? [] as $hook )
+	$registered[] = $hook;
+check( 'init() registers the banner on /nino/http/output after Cache\'s own callback (priority 5)', $registered === [ [ \Nino\Modules\Maintenance::class, 'callbackOutput' ] ] );
 
 // The fallback page renders both fills - a project's own text (however it
 // got there) always wins over the hardcoded default

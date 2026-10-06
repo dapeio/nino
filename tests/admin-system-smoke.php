@@ -2745,6 +2745,62 @@ unlink( $sandbox. '/private/templates/dashboard-fixture.tpl' );
 check( 'apiSummary requires an authed dev session too', $status === 401 );
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 
+// Notices: what needs attention, above the tiles. Mail that failed is shown to
+// every account that opens the dashboard - the record holds no address - and
+// the texts still to translate to the one that may open the Text panel
+$noticesOf = static function( array $body, string $text ): array {
+	return array_values( array_filter( $body['notices'] ?? [], static fn( array $notice ): bool => $notice['text'] === $text ) );
+};
+@unlink( \Nino\Filesystem::path( $appData, '/data/mail-status.php' ) );
+\Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [] );
+[ , $body ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );
+check( 'notices is an array, and carries no mail notice while nothing failed', is_array( $body['notices'] ?? null ) === true && $noticesOf( $body, '/_admin/dashboard/notice/mail' ) === [] );
+
+\Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ): void { $mail['sent'] = false; } );
+$minuteBefore = date( 'Y-m-d H:i' );
+\Nino\Mail::send( $appData, 'owner@example.com', 'a', 'b', '' );
+[ , $body ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );
+$mailNotice = $noticesOf( $body, '/_admin/dashboard/notice/mail' );
+check( 'a failed mail raises one notice: since when, and how many calls failed - no link', count( $mailNotice ) === 1
+	&& in_array( $mailNotice[0]['values'], [ [ $minuteBefore, '1' ], [ date( 'Y-m-d H:i' ), '1' ] ], true ) && $mailNotice[0]['link'] === '' );
+check( '...which holds no address', str_contains( json_encode( $body['notices'] ), 'example.com' ) === false );
+
+\Nino\Auth::insertUser( $appData, 'nopanels@example.com', 'correct horse battery staple', [] );
+\Nino\Auth::loginUser( $appData, 'nopanels@example.com', 'correct horse battery staple' );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );
+check( 'an account with no panel permission sees the mail notice as well', $status === 200 && count( $noticesOf( $body, '/_admin/dashboard/notice/mail' ) ) === 1 );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
+\Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ): void { $mail['sent'] = true; } );
+\Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [] );
+\Nino\Mail::send( $appData, 'owner@example.com', 'a', 'b', '' );
+[ , $body ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );
+check( 'the next send that delivered everything takes the notice away', $noticesOf( $body, '/_admin/dashboard/notice/mail' ) === [] );
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
+
+// A text the native language has and English does not
+$english = static fn( array $body ): array => array_values( array_filter( $noticesOf( $body, '/_admin/dashboard/notice/untranslated' ), static fn( array $notice ): bool => $notice['values'][1] === 'en_US' ) );
+$untranslatedBefore = $english( callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' )[1] );
+$countBefore = (int) ( \Nino\Modules\Text\Admin::untranslatedCounts( $appData )['en_US'] ?? 0 );
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', fn( array $texts ): array => $texts + [ '[[/notice-test/gap]]' => 'Eine Lücke' ] );
+[ , $body ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );
+$untranslated = $english( $body );
+check( 'an account that may open the Text panel is told, per language, how many texts it still lacks, with a link to the panel', count( $untranslated ) === 1
+	&& $untranslated[0]['values'] === [ (string) ( $countBefore + 1 ), 'en_US' ] && $untranslated[0]['link'] === '#text' );
+
+\Nino\Auth::loginUser( $appData, 'nopanels@example.com', 'correct horse battery staple' );
+[ , $body ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );
+check( '...and an account that may not is told nothing of it', $noticesOf( $body, '/_admin/dashboard/notice/untranslated' ) === [] );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => '/notice-test/gap', 'locale' => 'en_US', 'value' => 'A gap' ] ] ] );
+[ , $body ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );
+$after = $english( $body );
+check( '...and the notice follows the text being saved in that language', ( $after[0]['values'][0] ?? '0' ) === (string) $countBefore );
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', fn( array $texts ): array => array_diff_key( $texts, [ '[[/notice-test/gap]]' => 1 ] ) );
+\Nino\Filesystem::mutate( $appData, '/text/en_US.php', fn( array $texts ): array => array_diff_key( $texts, [ '[[/notice-test/gap]]' => 1 ] ) );
+
 echo "\n";
 
 

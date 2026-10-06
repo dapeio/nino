@@ -73,7 +73,15 @@ namespace Nino\Modules\Dashboard {
 		 *	contributes (see summary() in the panel contract) surfaces that
 		 *	panel's own data and is included only for an admin who actually
 		 *	holds its permission, same as opening the panel directly would
-		 *	require
+		 *	require.
+		 *
+		 *	'notices' are what needs somebody's attention, shown above the
+		 *	tiles: each is { text, values, link } - a fill key, what fills its
+		 *	%s in order, and the #panel it leads to ('' for none). Mail that
+		 *	fails is one for everybody who opens the dashboard, like
+		 *	lastBackup: the record holds no address and no word a transport
+		 *	said. Texts still to translate are the Text panel's business and
+		 *	only an account allowed to open it is told
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -90,7 +98,17 @@ namespace Nino\Modules\Dashboard {
 			// directory a delivery may not have brought: asked for, never
 			// assumed. What is missing is left out of the answer, and the
 			// script draws the card it has data for (see assets/admin.js)
-			$body = [ 'tiles' => [] ];
+			$body = [ 'tiles' => [], 'notices' => [] ];
+
+			$failure = \Nino\Mail::failure( $appData );
+
+			if( $failure !== null )
+				$body['notices'][] = [ 'text' => '/_admin/dashboard/notice/mail', 'values' => [ $failure['since'], (string) $failure['count'] ], 'link' => '' ];
+
+			if( class_exists( '\\Nino\\Modules\\Text\\Admin' ) === true
+				&& \Nino\Auth::checkPermission( $appData, \Nino\Modules\Text\Admin::MANAGE_PERM ) === true )
+				foreach( \Nino\Modules\Text\Admin::untranslatedCounts( $appData ) as $locale => $count )
+					$body['notices'][] = [ 'text' => '/_admin/dashboard/notice/untranslated', 'values' => [ (string) $count, (string) $locale ], 'link' => '#text' ];
 
 			if( class_exists( '\\Nino\\Modules\\Elements\\Admin' ) === true )
 				$body['elements'] = \Nino\Modules\Elements\Admin::typeCounts( $appData );

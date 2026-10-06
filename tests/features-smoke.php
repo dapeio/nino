@@ -454,6 +454,7 @@ check( '...and carries them just the same while the feature is switched off, bec
 \Nino\Filesystem::putFileContent( $appData, '/data/auth-tries.php', [ 'x' => 1 ] );
 \Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [ 'x' => 1 ] );
 \Nino\Filesystem::putFileContent( $appData, '/data/catalogue.php', [ 'x' => 1 ] );
+\Nino\Filesystem::putFileContent( $appData, '/data/mail-status.php', [ 'since' => '2026-01-02 03:04', 'last' => '2026-01-02 03:04', 'count' => 1 ] );
 \Nino\Filesystem::forceDir( $appData, '/data/.locks' );
 file_put_contents( \Nino\Filesystem::path( $appData, '/data/.locks' ). '/probe.lock', '' );
 
@@ -471,6 +472,7 @@ $greedy = array_map( static fn( string $name ): string => (string) preg_replace(
 check( 'a backup carries no throttling counter, whatever a manifest claims', in_array( 'data/auth-tries.php', $greedy, true ) === false
 	&& in_array( 'data/ratelimit.php', $greedy, true ) === false );
 check( '...nor the catalogue cache, which is fetched again when it is wanted', in_array( 'data/catalogue.php', $greedy, true ) === false );
+check( '...nor the record of the last failed mail, which a restore would bring back long after it was fixed', in_array( 'data/mail-status.php', $greedy, true ) === false );
 check( '...nor anything hidden, so a restore plants no lock files', array_values( array_filter( $greedy, static fn( string $name ): bool => str_contains( $name, '/.' ) === true ) ) === [] );
 check( '...and no entry has a doubled slash from a trailing one somebody wrote', array_values( array_filter( \Nino\Backup::manifest( $greedyAppData ), static fn( string $name ): bool => str_contains( $name, '//' ) === true ) ) === [] );
 
