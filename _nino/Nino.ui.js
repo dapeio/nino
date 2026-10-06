@@ -9,7 +9,7 @@
  *													modal/lightbox, toast) - split out of Nino.js since
  *													only the public site needs this, never the workbench.
  *													Load order: Nino.js, then this file (depends on
- *													Nino.client/content/dom/events/http).
+ *													Nino.client/content/events/http).
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -195,37 +195,18 @@
 					vpa				: dc.querySelectorAll( '.nino-vpa' ),
 				};
 
-			/*
-			 *	Store client details
-			 */
-
-			bd.classList.add( Nino.client.isMobile ? 'client-mobile' : 'client-desktop' );
-
-			/*
-			 *	Catch hashchange smooth scroll.
-			 *
-			 *	Written as an inline style, which is the one declaration
-			 *	Nino.css's prefers-reduced-motion block cannot overrule without
-			 *	!important - so the visitor is asked here as well: one who wants
-			 *	less motion got a smooth ride to every anchor on the page
-			 *	regardless, because this line put it back.
-			 */
-			if( ui._reducedMotion() === false )
-				dE.style.scrollBehavior = "smooth";
-
 			/**
-			 *	Smooth-scroll to the element referenced by the current url hash
-			 *
-			 *	@param		{Event}		[ev]						(optional) hashchange event, prevented if scrollable
+			 *	Scroll to the element referenced by the current url hash. How
+			 *	an ordinary anchor travels is the stylesheet's (Nino.css sets
+			 *	html's scroll-behavior and takes it back for a visitor who asked
+			 *	for less motion); this scroll names its own, see below
 			 *
 			 *	@return		void
 			 */
-			const fnHashchange = function( ev ) {
+			const fnHashchange = function() {
 				const el = dc.getElementById( wn.location.hash.substr(1) );
 				if( el === null || typeof el.scrollIntoView === 'undefined' )
 					return;
-				if( typeof ev !== 'undefined' && typeof ev.preventDefault !== 'undefined' )
-					ev.preventDefault();
 
 				// The option wins over the stylesheet, so the preference is asked
 				// here rather than left to the css - see _scrollBehavior()
@@ -292,8 +273,8 @@
 							contW		= ui._coverContainingWidth( e.cover[i], wW ),
 							wrapH		= e.cover[i].querySelector('div')?.offsetHeight ?? 0;
 
-						if( h !== null ) e.cover[i].style.height = Math.max( ( ( wH / 100 * h ) - marginH ), 50 + wrapH ) + 'px';
-						if( w !== null ) e.cover[i].style.width = ( ( contW * w / 100 ) - marginW ) + 'px';
+						e.cover[i].style.height = Math.max( ( ( wH / 100 * h ) - marginH ), 50 + wrapH ) + 'px';
+						e.cover[i].style.width = ( ( contW * w / 100 ) - marginW ) + 'px';
 					}
 				} );
 			}
@@ -1066,20 +1047,9 @@
 						const boundResponse = formResponse.bind( { form : this } );
 						this.classList.add('nino-is-pending');
 
-						// action defaults to '/' (the contact form's own POST
-						// handler) - a form targeting a different endpoint (eg.
-						// the newsletter signup) sets its own action="..."
+						// Without an action the form posts to the Form module's own
+						// endpoint, below the project's directory
 						Nino.http.sendRequest( this.getAttribute('action') || '[[/nino/dir]]/.form', 'POST', boundResponse, data );
-					},
-					/**
-					 *	Toggle the "empty" class on a form field's wrapper,
-					 *	based on the field's current value. Bound via `this` on blur/focus.
-					 *
-					 *	@return		void
-					 */
-					formInputChange = function() {
-						if( this.value.length === 0 )
-							this.parentNode.classList.add('empty');
 					};
 
 				for( let i=0, l=e.form.length; i<l; i++ ) {
@@ -1091,16 +1061,6 @@
 					// Both the validation error and the server's verdict are
 					// written into that paragraph, and it is a project's own markup
 					ui._liveMessage( e.form[i].msg );
-
-					for( let ieI = 0, ieL = e.form[i].fields.length; ieI<ieL; ieI++ ) {
-
-						if(e.form[i].fields[ieI].tagName === 'INPUT' || e.form[i].fields[ieI].tagName === 'TEXTAREA' ) {
-							e.form[i].fields[ieI].addEventListener( 'blur', formInputChange );
-							e.form[i].fields[ieI].addEventListener( 'focus', function(){ this.parentNode.classList.remove('empty') } );
-							formInputChange.call(e.form[i].fields[ieI]);
-						}
-
-					}
 
 					e.form[i].addEventListener( 'submit', formSubmit );
 				}

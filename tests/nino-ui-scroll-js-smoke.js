@@ -56,7 +56,17 @@ const withoutPicture = parallex( null, 200 );
 const frames = [];
 
 const documentElement = { clientHeight : 800, clientWidth : 1440, scrollLeft : 0, scrollTop : 0, style : {} };
-const body = { classList : classList(), scrollLeft : 0, scrollTop : 0 };
+// The body records what is written onto it, so the namespace check below can
+// read it back
+const bodyClasses = new Set();
+const body = {
+	classList : {
+		add : function( value ) { bodyClasses.add( value ) },
+		remove : function( value ) { bodyClasses.delete( value ) },
+		contains : function( value ) { return bodyClasses.has( value ) },
+	},
+	scrollLeft : 0, scrollTop : 0,
+};
 const document = {
 	body : body,
 	documentElement : documentElement,
@@ -145,9 +155,7 @@ check( 'a scroll callback that throws does not leave the gate shut', ranAfterThr
 	scrolls this file starts said the opposite: scrollIntoView and scrollTo
 	take the behaviour as an option, and an option wins over whatever the
 	stylesheet says - so a hash link, the down arrow and "back to top" all
-	rode smoothly however the system was set. onReady() made it worse by
-	writing scroll-behavior: smooth onto <html> as an inline style, which is
-	the one declaration a stylesheet cannot overrule without !important	*/
+	rode smoothly however the system was set	*/
 check( 'a scroll asks the system before it decides how to travel', ui._scrollBehavior() === 'smooth' );
 reducedMotion = true;
 check( '...and a visitor who asked for less motion is simply put there', ui._scrollBehavior() === 'auto' );
@@ -156,14 +164,23 @@ reducedMotion = false;
 const uiSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino.ui.js' ), 'utf8' );
 check( 'no scroll in the file hardcodes the ride', /behavior:\s*'smooth'/.test( uiSource.replace( /^\s*\*.*$/gm, '' ) ) === false );
 
-// The inline style is written only where the visitor did not ask against it
-documentElement.style.scrollBehavior = undefined;
+/*	How an ordinary anchor travels is the stylesheet's to say: Nino.css sets
+	html's scroll-behavior and takes it back for a visitor who asked for less
+	motion, and a project's own stylesheet can say otherwise. An inline style
+	on <html> is the one declaration neither can overrule without !important,
+	so the script writes none, whatever the visitor asked for	*/
+documentElement.style = {};
 reducedMotion = true;
 ui.onReady();
-check( 'the inline scroll-behavior is not written over a visitor who asked against it', documentElement.style.scrollBehavior === undefined );
 reducedMotion = false;
 ui.onReady();
-check( '...and is written for everybody else', documentElement.style.scrollBehavior === 'smooth' );
+check( 'the script leaves html\'s scroll-behavior to the stylesheets, either way the visitor asked', documentElement.style.scrollBehavior === undefined );
+
+/*	Everything the script writes onto <body> is a hook a project's stylesheet
+	may style, and the namespace is the promise that it will not collide with a
+	project's own class	*/
+check( 'every class the script writes onto <body> is in the nino- namespace'+ ( Array.from( bodyClasses ).every( function( name ) { return name.startsWith('nino-') } ) ? '' : ' - '+ Array.from( bodyClasses ).join( ', ' ) ),
+	bodyClasses.size > 0 && Array.from( bodyClasses ).every( function( name ) { return name.startsWith('nino-') } ) );
 
 /*	And the stylesheet's own half: the block used to stop three named
 	animations and one transition, while the twenty-four other transitions the

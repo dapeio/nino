@@ -13,6 +13,21 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Public script:** `Nino.ui.onReady()` no longer writes what nothing reads.
+  `<body>` gets no `client-mobile`/`client-desktop` class and a form field's
+  wrapper no `empty` class - both outside the `nino-` namespace and styled by
+  no stylesheet Nino or its catalogue ships; a project stylesheet that used
+  them has to use its own hook. `<html>` gets no inline `scroll-behavior`
+  any more: `Nino.css` already sets it and takes it back for a visitor who
+  asked for less motion, and a project stylesheet that sets its own now wins
+  without `!important` (the hash scroll, the down arrow and "back to top" keep
+  asking `_scrollBehavior()`). The hashchange handler's `preventDefault()`
+  (the event cannot be cancelled), two always-true cover guards and two
+  stale comments went with them. `tests/nino-ui-scroll-js-smoke.js` holds
+  that no inline scroll style is written in either motion setting and that
+  every class on `<body>` is namespaced (2 replaced checks, both red before);
+  `tests/nino-ui-form-js-smoke.js` that no `empty` class is written
+  (58 → 59 checks, 1 red before).
 - **Features panel:** `features/catalogue` answers `fetched`, `writable` and
   the offers, and the `catalogue` of `features/list` answers `fetched` and the
   offers. The catalogue's `url` and `generated` stamp are gone from both, and

@@ -194,6 +194,13 @@ sandbox.Nino.ui.onReady();
 
 check( 'every .nino-form on the page gets a submit handler', typeof forms[0].listeners.submit === 'function' && typeof forms[1].listeners.submit === 'function' );
 
+/*	The wrapper around a field is the project's markup. The script used to put
+	a bare 'empty' class on it for every empty field, on load and on every
+	blur - outside the nino- namespace, and read by no stylesheet	*/
+check( 'the script puts no bare \'empty\' class on the wrapper of an empty field', forms.every( function( f ) {
+	return f.fieldList.every( function( item ) { return item.parentNode.classList.contains('empty') === false } );
+} ) );
+
 
 // --- What actually reaches the server -----------------------------------
 //
