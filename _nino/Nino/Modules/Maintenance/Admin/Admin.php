@@ -156,12 +156,14 @@ namespace Nino\Modules\Maintenance {
 		/**
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	array										{ status, retry }
+		 *	@return 	array										{ status, retry, min, max } - min and max the bounds apiSet() holds retry to
 		 */
 		private static function _state( array &$appData ): array {
 			return [
 				'status'	=> ( $appData['/nino/maintenance/status'] ?? false ) === true,
 				'retry'		=> \Nino\Modules\Maintenance::retry( $appData ),
+				'min'		=> self::RETRY_MIN,
+				'max'		=> self::RETRY_MAX,
 			];
 		}
 	}

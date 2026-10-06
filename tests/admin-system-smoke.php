@@ -1869,15 +1869,15 @@ echo "\n";
 echo "Modules\\Maintenance\\Admin - the one switch, from the workbench\n";
 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiStatus' );
-check( 'apiStatus answers the current, unconfigured state', $status === 200 && $body === [ 'status' => false, 'retry' => 3600 ] );
+check( 'apiStatus answers the current, unconfigured state', $status === 200 && $body['status'] === false && $body['retry'] === 3600 );
 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiSet', [ 'status' => true, 'retry' => 120 ] );
-check( 'apiSet accepts a valid switch', $status === 200 && $body === [ 'status' => true, 'retry' => 120 ] );
+check( 'apiSet accepts a valid switch', $status === 200 && $body['status'] === true && $body['retry'] === 120 );
 check( '...and writes both keys to config.php', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/maintenance/status'] === true
 	&& \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/maintenance/retry'] === 120 );
 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiStatus' );
-check( 'apiStatus reflects the just-saved state', $status === 200 && $body === [ 'status' => true, 'retry' => 120 ] );
+check( 'apiStatus reflects the just-saved state', $status === 200 && $body['status'] === true && $body['retry'] === 120 );
 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiSet', [ 'status' => 'yes', 'retry' => 120 ] );
 check( 'apiSet rejects a status that is not a bool', $status === 400 && ( $body['code'] ?? '' ) === 'bool' && ( $body['field'] ?? '' ) === 'status' && $body['error'] === 'status: expected true or false' );
@@ -1896,6 +1896,17 @@ check( 'a rejected field leaves config.php exactly as it was', \Nino\Filesystem:
 
 check( 'log() names the direction of the switch', \Nino\Modules\Maintenance\Admin::log( 'maintenance/set', [ 'status' => true ] ) === 'Switch maintenance on'
 	&& \Nino\Modules\Maintenance\Admin::log( 'maintenance/set', [ 'status' => false ] ) === 'Switch maintenance off' );
+
+// The panel draws its retry field from the answer, so the bounds the answer
+// names are the ones apiSet holds a value to: both edges are taken, a second
+// beyond either is refused
+[ , $retryBounds ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiStatus' );
+$retryTaken = function( int $retry ) use ( &$appData ): bool {
+	return callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiSet', [ 'status' => true, 'retry' => $retry ] )[0] === 200;
+};
+check( 'the state names the retry bounds apiSet enforces', is_int( $retryBounds['min'] ?? null ) && is_int( $retryBounds['max'] ?? null )
+	&& $retryTaken( $retryBounds['min'] ) && $retryTaken( $retryBounds['max'] )
+	&& $retryTaken( $retryBounds['min'] - 1 ) === false && $retryTaken( $retryBounds['max'] + 1 ) === false );
 
 // Back off, so the rest of the suite runs against a normal site
 [ $status ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiSet', [ 'status' => false, 'retry' => 3600 ] );

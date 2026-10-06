@@ -13,6 +13,11 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Maintenance:** the `maintenance/status` and `maintenance/set` answers carry
+  `min` and `max`, the bounds `apiSet()` holds the Retry-After seconds to, and
+  the panel's seconds field takes them from there instead of repeating 60 and
+  604800 in its script.
+
 - **Accounts:** the setup wizard's check for a usable admin account compares
   with `\Nino\Auth::STATUS_ACTIVE` instead of a literal `2`, and `\Nino\Auth`
   reads the `status` that `getUser()` always fills without a fallback of its

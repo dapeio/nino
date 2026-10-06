@@ -150,7 +150,7 @@
 		 *	the shared save row
 		 *
 		 *	@param		{Element}		wrap
-		 *	@param		{Object}		data					{ status, retry }
+		 *	@param		{Object}		data					{ status, retry, min, max }
 		 *
 		 *	@return		void
 		 */
@@ -178,8 +178,8 @@
 			fieldset.appendChild( Nino.adminUi.numberField( {
 				key 	: 'retry',
 				value	: data.retry,
-				min 	: 60,
-				max 	: 604800,
+				min 	: data.min,
+				max 	: data.max,
 				unit 	: 'seconds',
 				label	: '/_admin/maintenance/label/retry',
 				hint 	: '/_admin/maintenance/hint/retry',

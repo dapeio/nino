@@ -211,6 +211,8 @@ Nino.adminUi.numberField = function( options ) {
 	const input = element('input');
 	input.attributes['data-key'] = options.key;
 	input.value = String( options.value );
+	input.min = options.min;
+	input.max = options.max;
 	field.appendChild( input );
 	return field;
 };
@@ -295,6 +297,16 @@ requests.length = 0;
 panel.init();
 answer( 403, { error : 'no' } );
 check( 'a refused status request draws no notice - the state is not known', banners( content ).length === 0 );
+
+// --- the bounds ---------------------------------------------------------------
+
+// The seconds field is bounded by what the server answers, not by a copy of it
+present( true );
+requests.length = 0;
+panel.init();
+answer( 200, { status : false, retry : 3600, min : 120, max : 86400 } );
+const retryInput = form.querySelector('[data-key="retry"]');
+check( 'the seconds field takes its bounds from the answer', retryInput !== null && retryInput.min === 120 && retryInput.max === 86400 );
 
 // --- the words ---------------------------------------------------------------
 
