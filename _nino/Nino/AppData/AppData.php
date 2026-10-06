@@ -44,17 +44,18 @@ namespace Nino {
 			particular site decided: its locales, its routes, its pages, its
 			theme, its accounts.
 
-			The module list is the always-on half only. Form, Navigation and
-			Localepicker are units the wizard offers and a project may not
-			want, so they are its answer to give (each ships its unit as
-			install/ beside its class - see \Nino\Install\Setup::units()).	*/
+			The module list is the always-on half only. Form, Navigation,
+			Localepicker and Legal are not in it: the setup wizard applies
+			their units and lists their classes in config.php on every run
+			(\Nino\Install\Setup::ALWAYS_MODULES), and config.php is where a
+			project takes one out again.	*/
 		public const array DEFAULTS = [
 			// The always-on half, and only that: a unit the setup wizard offers as a
 			// checkbox must never be listed here, or unchecking it in the
 			// wizard changes nothing and the step lies about what it controls.
-			// Form, Navigation and Localepicker are such units (each module's
-			// own install/ directory) - Setup::apiApply() adds their
-			// moduleClass when they are picked, and a page unit that needs one
+			// Form, Navigation, Localepicker and Legal are no checkbox any more -
+			// Setup::apiApply() lists their moduleClass on every run (see
+			// Setup::ALWAYS_MODULES) - and a page unit that needs another one
 			// pulls it in through its own requiresModules.
 			'/nino/modules'		=> [
 				'\\Nino\\Modules\\Assets',

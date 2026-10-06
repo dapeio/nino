@@ -125,23 +125,19 @@ namespace Nino {
 				}
 			}
 
+			// The two files a Newsletter keeps: its subscribers, and the removal
+			// record it writes on every unsubscribe (a sha256 per removed
+			// address, not the address itself), which its callbackRestore()
+			// falls back on when the live copy is itself what is being recovered
+			// from. The catalogue's Newsletter declares both in its manifest, so
+			// the loop below carries them as well; these literals are for the
+			// copy a project that started on 1.0.0-beta may still run from
+			// app/Nino/Modules/Newsletter/, which has no manifest for
+			// Features::all() to read. Plain paths, no class constant: a backup
+			// must not autoload a module the project may not have
 			if( is_file( $data. '/newsletter.php' ) === true )
 				$files[$data. '/newsletter.php'] = 'data/newsletter.php';
 
-			// The removal record \Nino\Modules\Newsletter writes on every
-			// unsubscribe (a sha256 per removed address, not the address
-			// itself) - Modules\Newsletter::callbackRestore() needs this
-			// backed up too, as the fallback source of truth for a restore
-			// where the live copy is itself what's being recovered from.
-			// '/data/newsletter-removed.php' as a plain literal, deliberately
-			// not \Nino\Modules\Newsletter::REMOVED_PATH: this runs
-			// unconditionally on every backup (see
-			// \Nino\Modules\Backups::maybeRun()), and a class constant read
-			// autoloads the class just as unconditionally - a project that
-			// deleted this optional module's file (never used its public
-			// signup routes) would get a fatal "Class not found" on every
-			// single backup, admin requests included, for a project that
-			// touched nothing
 			if( is_file( $data. '/newsletter-removed.php' ) === true )
 				$files[$data. '/newsletter-removed.php'] = 'data/newsletter-removed.php';
 

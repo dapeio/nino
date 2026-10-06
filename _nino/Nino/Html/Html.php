@@ -355,9 +355,8 @@ namespace Nino {
 		}
 
 		// Whether a value currently contains one of the allowed inline tags -
-		// used to auto-decide whether a field/key gets the html editor.
-		// Shared by every domain class with a model/entry 'html' flag
-		// (the Text, Text Keys and Elements panels).
+		// the last step of detectFormat() below, which is how \Nino\Text and
+		// the Text Keys tab read the format of a key that names none.
 		public static function containsHtml( string $value ): bool {
 			return preg_match( '/<(?:'. implode( '|', self::HTML_TAGS ). ')[ >]/i', $value ) === 1;
 		}

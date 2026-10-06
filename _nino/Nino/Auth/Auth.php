@@ -442,7 +442,7 @@ namespace Nino {
 		// Update a user's mail and/or password. Role, perms, sessions and
 		// status are left untouched: setRole(), logoutAllSessions() and
 		// setStatus() are the panel's way to the first, the third and the
-		// last, the perms stay a developer-only, direct-json task.
+		// last; perms beside a role are written into config.php by hand.
 		// A tries counter (see TRIES_PATH) follows a mail change so an
 		// in-progress cooldown survives a rename.
 		public static function updateUser( array &$appData, string $username, string $newUsername, string $pw = '' ): array|false {

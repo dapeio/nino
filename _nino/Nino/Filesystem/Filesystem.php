@@ -61,9 +61,9 @@ namespace Nino {
 				return $default;
 
 			// mtime alone has 1-second resolution; comparing size as well
-			// catches most same-second rewrites. Callers that must not miss one
-			// (AppData::writeContentData(), Auth's tries file) still drop their
-			// cache slot explicitly before reading.
+			// catches most same-second rewrites. A read-modify-write cannot
+			// miss one: mutate() drops the fingerprint under its lock before
+			// it reads.
 			$fingerprint = [ 'mtime' => $stat['mtime'], 'size' => $stat['size'] ];
 
 			if( $appData['./nino/filesystem/cache'][$filename]['fstat'] !== $fingerprint ) {
@@ -257,12 +257,13 @@ namespace Nino {
 				return false;
 			}
 
-			// Deliberately NOT in the file's cache slot: several call sites drop
-			// a slot to force a re-read (Auth's tries file, writeContentData),
-			// and _admin drops the whole cache array at once - any of which would
-			// take the only reference to this resource with it, closing the
-			// handle and releasing the lock while the caller still believes it
-			// holds one. Locks live in their own map for that reason.
+			// Deliberately NOT in the file's cache slot: putFileContent() drops
+			// a slot when a write fails, _prepareFileCache() rebuilds one whole
+			// when its path is not set up yet, and _admin drops the whole cache
+			// array at once (the Backups restore) - any of which would take the
+			// only reference to this resource with it, closing the handle and
+			// releasing the lock while the caller still believes it holds one.
+			// Locks live in their own map for that reason.
 			$appData['./nino/filesystem/locks'][$lockKey] = $handle;
 
 			return true;

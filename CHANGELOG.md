@@ -13,6 +13,18 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** comments in the core named callers and a wizard that are gone.
+  `AppData::DEFAULTS` no longer calls Form, Navigation and Localepicker wizard
+  checkboxes, Filesystem no longer says callers drop a cache slot to re-read,
+  `Catalogue::install()` says it places the missing requirements too,
+  `Images::delete()` gives the names `process()` and `fit()` really hand out,
+  the Backup's two Newsletter literals give the reason they still exist, and
+  accounts' extra permissions are a hand edit of config.php, not a
+  "direct-json task". The Form engine's docblocks and the manual's "Refusing a
+  submission" (both languages) no longer credit `\Nino\Csrf::init()` with the
+  route callback: Csrf refuses on the global `/nino/http/response`. No code
+  changed.
+
 - **Workbench:** the Dashboard's element-type tile and the check that a
   reference field points at an existing type read the type names
   (`\Nino\Modules\Elements\Admin::types()`) instead of every type file;

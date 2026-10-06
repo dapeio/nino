@@ -26,9 +26,10 @@ namespace Nino {
 			// fill on the page, the <html lang> and <title> included.
 			//
 			// A native locale that isn't among the available ones is a broken
-			// config (Install\Setup won't produce one, _admin's raw Config
-			// editor can) - the first available locale is still a far better
-			// answer than a locale this project has no text for at all.
+			// config: neither Install\Setup nor the Language panel writes one,
+			// only a hand edit of config.php can - and the first available
+			// locale is still a far better answer than a locale this project
+			// has no text for at all.
 			//
 			// Assigned directly rather than through setCurrentLocale(): a
 			// default nobody chose has no business being written into the
@@ -94,11 +95,13 @@ namespace Nino {
 		 *
 		 *	The key is a parameter because there are two switches, not one:
 		 *	this kernel class answers '?/_nino/locales/current=de_DE', and the
-		 *	optional Localepicker module answers its own
-		 *	'?/_nino/localepicker/current=de_DE' beside it. That module used to
-		 *	carry a verbatim copy of this method under the second key - every
-		 *	comment and every line - which is two places to fix whenever one of
-		 *	them turns out to be wrong.
+		 *	Localepicker module answers its own
+		 *	'?/_nino/localepicker/current=de_DE' beside it. The picker's links
+		 *	carry the second key, and have in every release; nothing Nino
+		 *	draws carries the first, which stays for a link written by hand
+		 *	and for a project that switched the picker off. The module used to
+		 *	carry a verbatim copy of this method - two places to fix whenever
+		 *	one of them turned out to be wrong.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -153,7 +156,7 @@ namespace Nino {
 				return;
 
 			// setCurrentLocale() also persists into the session, same as the
-			// ?/_nino/locales/current switch above - visiting a locale-specific
+			// query switches above - visiting a locale-specific
 			// page is a locale choice like any other
 			$request['/nino/http/response']['locale'] = \Nino\Locales::setCurrentLocale( $appData, $locale );
 		}

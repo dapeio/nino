@@ -27,7 +27,7 @@ namespace Nino\Modules\Users {
 	 *											password recovery.php asks for the RecoveryPassword tab.
 	 *											Every session an account holds is ended from here too
 	 *											(users/logoutall). The permissions an account may hold
-	 *											beside its role stay a developer-only, direct-json task
+	 *											beside its role are written into config.php by hand
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>

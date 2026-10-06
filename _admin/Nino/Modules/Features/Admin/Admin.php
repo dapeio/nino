@@ -363,8 +363,8 @@ namespace Nino\Modules\Features {
 		}
 
 		/**
-		 *	Install one catalogue entry: the kernel downloads, verifies and
-		 *	places the directory (see Catalogue::install()), and this switches
+		 *	Install one catalogue entry and the requirements it brings: the kernel
+		 *	downloads, verifies and places them (see Catalogue::install()), and this switches
 		 *	the feature on unless the project has said otherwise. Answers the
 		 *	feature's entry as the list would show it now, whether it was switched
 		 *	on ('activated'), whether an update is pending ('pending'), what was

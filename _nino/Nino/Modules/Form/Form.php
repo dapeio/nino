@@ -32,9 +32,9 @@ namespace Nino\Modules {
 	 *												- a spam guard, a rate limit - registers on this same
 	 *												route callback ahead of this one and leaves a status
 	 *												behind; \Nino\Form::handle() returns without sending or
-	 *												writing anything. \Nino\Csrf::init() does exactly that
-	 *												at priority 1, and is why there is no callback name of
-	 *												its own for it.
+	 *												writing anything - which is why there is no callback name
+	 *												of its own for it. \Nino\Csrf refuses the same way one step
+	 *												earlier, on the global /nino/http/response at priority 1.
 	 *
 	 *												Submissions are visible in the Submissions panel
 	 *												(Admin/Admin.php beside this), which reads

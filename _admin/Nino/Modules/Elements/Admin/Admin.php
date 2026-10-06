@@ -400,11 +400,13 @@ namespace Nino\Modules\Elements {
 			$height 	= (int) ( $model[$key]['height'] ?? 0 );
 
 			// Deterministic path - re-uploading the same slot overwrites in place,
-			// so there's nothing to clean up beyond the rare case where the output
-			// extension itself changes (handled below via the old/new filename diff).
+			// so there's nothing to clean up beyond the case where the name itself
+			// changes: the type's width or height for this field changed, or the
+			// format did (webp switched on or off, or with webp off a png with
+			// alpha replacing a jpeg) - handled below via the old/new filename diff.
 			// Only disambiguated with "-key"/"-locale" where a collision is actually
 			// possible (more than one image field on this type, or a per-locale one),
-			// so the common case matches exactly "elements/<type>/<uri>.<ext>"
+			// so the common case is exactly "elements/<type>/<uri>.<W>x<H>.<ext>"
 			$imageFieldCount = 0;
 			foreach( $model as $modelField )
 				if( ( $modelField['type'] ?? '' ) === 'image' )

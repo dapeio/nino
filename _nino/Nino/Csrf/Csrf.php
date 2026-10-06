@@ -79,9 +79,8 @@ namespace Nino {
 			// safe-method check above already dereferenced it unconditionally,
 			// so surviving that proves it's set. 'uri' has no such prior use -
 			// a hand-built $request missing it (the smoke tests build exactly
-			// that) would otherwise crash requestRoute(), which requires a
-			// real string and would never terminate its dirname() walk on an
-			// empty one.
+			// that) would otherwise hand requestRoute(), which requires a
+			// string, a null: a TypeError rather than a refusal.
 			$routeData = isset( $request['/nino/http/request']['uri'] ) === true
 				? \Nino\Http::requestRoute( $appData, $request['/nino/http/request']['uri'], $request['/nino/http/request']['method'] )
 				: null;

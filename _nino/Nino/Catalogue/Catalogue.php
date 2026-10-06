@@ -367,14 +367,17 @@ namespace Nino {
 		}
 
 		/**
-		 *	Install one catalogue entry: fetch the catalogue again (what the
-		 *	panel showed is not what is trusted - the signed document is),
-		 *	download the archive, check its size and sha256 against the
-		 *	entry, unpack it below data/ with every entry validated, make
-		 *	sure what came out is the feature the catalogue promised, and
-		 *	move it into features/ - replacing what was there, and putting it
-		 *	back if the move fails half way. Nothing is activated here; the
-		 *	panel does that where an update replaced an active feature.
+		 *	Install one catalogue entry, together with the requirements the
+		 *	project does not carry yet (see _plan()): fetch the catalogue
+		 *	again (what the panel showed is not what is trusted - the signed
+		 *	document is), and for each of them download the archive, check its
+		 *	size and sha256 against the entry, unpack it below data/ with every
+		 *	entry validated, make sure what came out is the feature the
+		 *	catalogue promised, and move it into features/ - replacing what was
+		 *	there, and putting it back if the move fails half way. Nothing is
+		 *	activated here: the panel switches a feature it newly placed on,
+		 *	and applies the update of an active one by activating it again in
+		 *	a request of its own.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$key					Feature key

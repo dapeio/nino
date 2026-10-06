@@ -2135,8 +2135,8 @@ check( '...and the lock is still there afterwards', $readTries( 'locked@example.
 $seedTries( [ 'locked@example.com' => null ] );
 \Nino\Auth::deleteUser( $appData, 'locked@example.com' );
 
-// An account written by hand. Sessions and perms are a developer's direct-json
-// task, and status was until the workbench could set it - so a record that is
+// An account written by hand. Perms beside a role are written into config.php
+// by hand, and status was until the workbench could set it - so a record that is
 // a hash and a permission list and nothing else is a thing a project has, and
 // reading a key that is not there is a warning this framework treats as
 // fatal: a 500 on the login form rather than a refusal
@@ -3347,8 +3347,8 @@ check( 'one submission is removed by its id, and the rest of the month stays', \
 check( 'removing it twice is not an error, it is simply not there', \Nino\Form::remove( $appData, $removeId ) === false );
 
 // The seam a spam guard sits at: the same route callback, ahead of the
-// module - what \Nino\Csrf::init() does at priority 1, and why there is no
-// callback name of its own for it
+// module, and why there is no callback name of its own for it (\Nino\Csrf
+// refuses the same way one step earlier, on the global /nino/http/response)
 $guarded = 0;
 \Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://.form', static function( array &$appData, array &$request ) use ( &$guarded ): void {
 	$guarded++;

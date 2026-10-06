@@ -436,9 +436,10 @@ namespace Nino {
 		 *	The whole endpoint: which form this is, whether the submission
 		 *	may pass, the mail pair it sends and the record it leaves.
 		 *	\Nino\Modules\Form hands POST /.form here; a listener registered
-		 *	ahead of that module on the same callback (see
-		 *	\Nino\Csrf::init(), which does exactly this at priority 1) refuses
-		 *	a submission simply by setting a status other than 200, and this
+		 *	ahead of that module on the same callback refuses a submission
+		 *	simply by setting a status other than 200 (\Nino\Csrf refuses the
+		 *	same way one step earlier, on the global /nino/http/response at
+		 *	priority 1), and this
 		 *	returns without sending or writing anything
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data

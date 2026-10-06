@@ -238,7 +238,7 @@ namespace Nino\Modules {
 					continue;
 
 				// 'GET://' -> '/', 'GET://kontakt' -> '/kontakt' - the same
-				// derivation Locales::callbackResponse() makes for its redirect,
+				// derivation Locales::switchFromQuery() makes for its redirect,
 				// and the same uri space the request carries, so the "active"
 				// match in doShortcode() keeps comparing like for like
 				$entries[] = [

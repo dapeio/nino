@@ -658,9 +658,12 @@ namespace Nino {
 
 		public static function delete( array &$appData, string $filename ): void {
 
-			// process() only ever hands out names it generated itself (nested under
-			// our own upload dir, eg. "elements/<type>/<uri>.jpg"), but a stored
-			// value could in theory have been hand-edited, so never trust it blindly
+			// process() and fit() only ever hand out names they built below our
+			// own upload dir - "<basePath>.<W>x<H>" or "<basePath>.fit<W>x<H>",
+			// then ".webp", or ".png"/".jpg" with webp off (eg.
+			// "elements/<type>/<uri>.800x600.webp") - and a RENDER handler a path
+			// below it too; but a stored value could in theory have been
+			// hand-edited, so never trust it blindly
 			if( $filename === '' || str_contains( $filename, '..' ) === true || str_starts_with( $filename, '/' ) === true )
 				return;
 
