@@ -42,6 +42,8 @@ namespace Nino\Modules\Users {
 
 		// The two settings, in render order - same shape as \Nino\Modules\Config\Admin::FIELDS,
 		// label and hint fill keys the form resolves (see _admin/text/)
+		// A key without a stored value shows \Nino\AppData::DEFAULTS[$key], as
+		// the Config panel's do.
 		private const array FIELDS = [
 			'/nino/auth/maxtries' => [
 				'type' 	=> 'int',
@@ -58,13 +60,6 @@ namespace Nino\Modules\Users {
 				'label'	=> '/_admin/lockout/label/cooldown',
 				'hint' 	=> '/_admin/lockout/hint/cooldown',
 			],
-		];
-
-		// The runtime's own fallback for a missing key (see \Nino\Auth), so
-		// the form never shows a value the site is not actually running with
-		private const array DEFAULTS = [
-			'/nino/auth/maxtries' => 5,
-			'/nino/auth/cooldown' => 3600,
 		];
 
 		public static function actions(): array {
@@ -128,7 +123,7 @@ namespace Nino\Modules\Users {
 			foreach( self::FIELDS as $key => $field )
 				$fields[] = $field + [
 					'key' 	=> $key,
-					'value'	=> array_key_exists( $key, $stored ) === true ? $stored[$key] : self::DEFAULTS[$key],
+					'value'	=> array_key_exists( $key, $stored ) === true ? $stored[$key] : \Nino\AppData::DEFAULTS[$key],
 				];
 
 			\Nino\Http::ok( $request, [ 'fields' => $fields, 'locked' => self::_locked( $appData ) ] );

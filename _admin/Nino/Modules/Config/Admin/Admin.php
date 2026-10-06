@@ -64,6 +64,8 @@ namespace Nino\Modules\Config {
 		// serve - a value reachable by typing a plausible-looking number, so
 		// the bound belongs next to the field rather than in a comment
 		// somewhere (see Lockout for the two the login throttle keeps).
+		// A key without a stored value shows \Nino\AppData::DEFAULTS[$key], so
+		// every key here has to have one there.
 		private const array FIELDS = [
 			'/nino/error/log' => [
 				'type' 	=> 'bool',
@@ -214,7 +216,7 @@ namespace Nino\Modules\Config {
 
 				$fields[] = $field + [
 					'key' 		=> $key,
-					'value'		=> self::_currentValue( $stored, $key, $field['type'] ),
+					'value'		=> array_key_exists( $key, $stored ) === true ? $stored[$key] : \Nino\AppData::DEFAULTS[$key],
 				];
 			}
 
@@ -222,36 +224,6 @@ namespace Nino\Modules\Config {
 				'groups' 	=> self::GROUPS,
 				'fields' 	=> $fields,
 			] );
-		}
-
-		/**
-		 *	One field's value as stored, falling back to the same default the
-		 *	runtime itself applies when the key is missing.
-		 *
-		 *	@param		array 		$stored				config.php as read from disk
-		 *	@param		string		$key
-		 *	@param		string		$type					FIELDS type
-		 *
-		 *	@return 	mixed
-		 */
-		private static function _currentValue( array $stored, string $key, string $type ): mixed {
-
-			if( array_key_exists( $key, $stored ) === true )
-				return $stored[$key];
-
-			// The runtime's own fallback for a missing key, so the form never
-			// shows a value the site is not actually running with
-			return match( $key ) {
-				'/nino/error/log' 									=> true,
-				'/nino/admin/backups', '/nino/admin/logs' => true,
-				'/nino/cache/ttl' 									=> 3600,
-				default 														=> match( $type ) {
-					'bool' 								=> false,
-					'int' 								=> 0,
-					'lines' 							=> [],
-					default 							=> '',
-				},
-			};
 		}
 
 		/**

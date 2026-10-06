@@ -13,6 +13,12 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Workbench:** the Config panel and the Users panel's login protection tab
+  show `\Nino\AppData::DEFAULTS` for a key config.php does not hold, instead of
+  their own copies of the same eleven values; `Lockout`'s private `DEFAULTS`
+  and `Config\Admin::_currentValue()` are gone. Every value shown is the same
+  as before.
+
 - **Features, catalogue:** a feature's directory, key, version and extension
   names are spelled once. `\Nino\Catalogue` drops its private
   `DIRECTORY_PATTERN` and its own extension pattern, the Features panel its
