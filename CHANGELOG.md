@@ -13,6 +13,11 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the comments of `Nino.admin.js` and `style.css`, and AGENTS.md's
+  shared data table section, no longer name screens and hosts the workbench
+  does not have (a type editor calling `table()`, a Submissions screen, two
+  dashboards, a Template Builder shell, "localized panels"); they say that
+  the caller supplies every word.
 - **Docs:** there is one element form. The element-types recipe, AGENTS.md's
   test matrix, the comments in the kernel, the Elements panel, the shared
   kit and the tests spoke of "both element forms" and "either tool", from the

@@ -915,9 +915,8 @@
 		 *	time for what is already here, and would have to grow a debounce
 		 *	and a race guard to do it.
 		 *
-		 *	Owns no strings, same rule as table() and switchField(): /_admin is
-		 *	English and the workbench translates, so every word comes from the
-		 *	caller through options.text.
+		 *	Owns no strings, same rule as table() and switchField(): every word
+		 *	comes from the caller through options.text.
 		 *
 		 *	@param	{Object}	options		{ key, label, value, limit, options, ordered, text, onChange }
 		 *													- key      the model key, written onto the hidden input
@@ -1524,13 +1523,12 @@
 		/**
 		 *	A sortable, searchable, paged data table.
 		 *
-		 *	Owns no strings. Every word it can show comes from `labels`, so
-		 *	the same component reads correctly where a field is labelled by
-		 *	its raw model key (the type editor) and where every label is a
-		 *	fill (the element form, through Nino.content). Everything that can
-		 *	be a number or a glyph - the pager arrows, the row range, a
-		 *	boolean cell - is one, so the caller only has to supply two
-		 *	actual sentences.
+		 *	Owns no strings. Every word it can show comes from the caller
+		 *	through `labels`, translated through Nino.content or not, so the
+		 *	component is never half in one language and half in another.
+		 *	Everything that can be a number or a glyph - the pager arrows, the
+		 *	row range, a boolean cell - is one, so the caller only has to
+		 *	supply two actual sentences.
 		 *
 		 *	What is drawn as a glyph still has to be *called* something: a
 		 *	button whose face is '‹' is announced as "button ‹" and the search
@@ -1790,11 +1788,10 @@
 				prev.disabled = ( view.page <= 1 );
 				next.disabled = ( view.page >= view.pages );
 
-				// .nino-admin-hidden, not /_admin's own .admin-hidden: this
-				// component is shared, and that class is defined in
-				// _admin/assets/style.css only - in the localized panels every toggle
-				// below was a no-op, leaving the empty hint and the pager on
-				// screen for an empty table
+				// .nino-admin-hidden, not the workbench's own .admin-hidden:
+				// this component belongs to the design system, which uses
+				// nino-admin-* classes only and does not lean on a class of
+				// the nino.tool layer (see _admin/assets/style.css)
 				scroller.classList.toggle( 'nino-admin-hidden', view.total === 0 );
 				// The toolbar stays put when a search emptied the table -
 				// hiding it would trap the user with no way to clear the box

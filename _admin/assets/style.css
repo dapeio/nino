@@ -13,8 +13,9 @@
  *
  *													nino.tool - what is genuinely local to the workbench:
  *													the panel switcher, the rail's settings popover, the
- *													dashboard lists and each core panel's own copy. Ids a
- *													panel owns and `admin-*` classes.
+ *													account row and the login form - a core panel's own
+ *													rules are in its module's assets/admin.css. Ids the
+ *													shell owns and `admin-*` classes.
  *
  *													nino.local - deliberate overrides of the half above.
  *
@@ -1786,11 +1787,11 @@ a {
 
 /* ------------------------------------------------------------ Data table */
 
-/* A table of records - the shape Elements, Submissions and any other
-   "many rows of the same thing" screen wants. The grouped list next to it
+/* A table of records - the shape any "many rows of the same thing" screen
+   wants. The grouped list next to it
    stays the right choice for a handful of rows you drill into; this one is
    for the case where the values themselves are what you came to read.
-   Rendered by Nino.adminUi.table(), which owns none of the wording. */
+   Rendered by Nino.adminUi.table(), whose caller supplies every word. */
 
 /*	A heading, a name or an instruction that is there for whoever is not
 	looking at the screen. Every surface of the workbench needs one somewhere:
@@ -1815,11 +1816,10 @@ a {
 	white-space: nowrap;
 }
 
-/* The hide state the shared components switch. It lives here, next to the
-   component that uses it, rather than in a tool's own stylesheet: /_admin
-   has a local .admin-hidden of its own, and a shared
-   component reaching for a class only one of its two hosts defines is a
-   component that silently stops working in the other one. */
+/* The hide state the shared components switch. It lives here, in the
+   design system, because the components that use it do: this layer uses
+   nino-admin-* classes only, and the workbench's own .admin-hidden is a
+   rule of the nino.tool layer, which it does not lean on. */
 :where(.nino-admin) .nino-admin-hidden {
 	display: none !important;
 }
@@ -2050,10 +2050,9 @@ a {
   margin-top: .25rem;
 }
 
-/* A share-of-total bar: a labelled row over a thin track. Both dashboards draw
-   one, which is why it is here rather than twice under two tool prefixes - the
-   number next to the label is what a reader actually goes by, the bar only
-   ranks the rows at a glance. */
+/* A share-of-total bar: a labelled row over a thin track, drawn by the
+   dashboard and open to any panel - the number next to the label is what a
+   reader actually goes by, the bar only ranks the rows at a glance. */
 :where(.nino-admin) .nino-admin-meter-row {
 	display: flex;
 	justify-content: space-between;
@@ -2294,8 +2293,8 @@ a {
 		overflow: hidden;
 	}
 
-	/* Only a rail+pane app: the Template Builder is a .nino-admin-shell too,
-	   and lays its four regions out itself. */
+	/* Only a rail+pane app, the one that asks for it with --rail: a
+	   .nino-admin-shell without it lays its regions out itself. */
 	.nino-admin-shell--rail {
 		display: grid;
 		grid-template-columns: var(--nino-admin-sidebar-width) minmax(0, 1fr);

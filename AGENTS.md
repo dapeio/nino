@@ -555,10 +555,10 @@ stays right for a handful of rows you only drill into.
 
 It owns **no strings**. Everything that can be a number or a glyph is one - the
 pager arrows, the row range, a boolean cell - so a caller supplies only
-`labels: { search, empty, noMatch }`. That is deliberate: the type editor labels
-a field by its raw model key, the element form translates through
-`Nino.content`, and a component that hardcoded one word would be half-translated
-in the other.
+`labels: { search, empty, noMatch }`. That is deliberate: every word comes
+from the caller, translated through `Nino.content` or not, and a component
+that hardcoded one would be half-translated wherever the caller's are not
+English.
 
 Pass the **whole set** and let it page. An element type is one file read whole
 on every request (`\Nino\Elements::queryElements`), so asking for one page costs
