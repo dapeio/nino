@@ -1,7 +1,7 @@
 <?php
 // The Form module's own workbench strings, merged into its fills
 // while the module is active (see the panel's text()) - same keys and
-// shape the editor's own text/<locale>.php has
+// shape the workbench's own text/<locale>.php has
 return [
 	'[[/_admin/nav/submissions]]'		=> 'Anfragen',
 	'[[/_admin/dashboard/label/submissions]]' => 'Anfragen',

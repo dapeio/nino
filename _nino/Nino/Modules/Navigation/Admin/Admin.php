@@ -77,9 +77,10 @@ namespace Nino\Modules\Navigation {
 		}
 
 		/**
-		 *	Nav entry for this module, rendered into the dashboard's tab bar
+		 *	Nav entry for this module - a structure panel, at the weight the rail
+		 *	orders it by within that group
 		 *
-		 *	@return 	array										[ uri, label ]
+		 *	@return 	array										[ uri, label, weight, group ]
 		 */
 		public static function nav(): array {
 			return [ 'navs', '/_admin/nav/navs', 25, 'structure' ];

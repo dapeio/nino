@@ -13,6 +13,12 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Source comments:** the kernel's runtime modules describe the workbench and
+  the callback order as they are - a module's panel appears in the workbench's
+  rail, not a "dev area" or an "editor"; the Navigations nav() entry has its
+  four fields; Maintenance runs after Jstext (0), not before it at 5;
+  `_servable()` adds one condition to `_cacheable()`, not two; and
+  `Modules::callModules()` is called with `init` alone. Comments only.
 - **Docs:** comments in the core named callers and a wizard that are gone.
   `AppData::DEFAULTS` no longer calls Form, Navigation and Localepicker wizard
   checkboxes, Filesystem no longer says callers drop a cache slot to re-read,

@@ -10,7 +10,7 @@ declare(strict_types=1);
  */
 namespace Nino {
 
-	// Modules - calls a method (init/request/response) on every module
+	// Modules - calls a named method on every module (init is the one the kernel uses)
 	// enabled in config.php's '/nino/modules', or collects what every
 	// module answers to one
 	class Modules {

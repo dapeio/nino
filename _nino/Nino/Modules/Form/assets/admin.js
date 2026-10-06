@@ -7,7 +7,7 @@
  *	admin.js								The Form module's /_admin panel, "Submissions": every
  *													submission \Nino\Form records (in addition to the mail
  *													itself) - see Modules\Form\Admin beside this file.
- *													Ships with the module: it is in the editor bundle
+ *													Ships with the module: it is in the workbench bundle
  *													exactly while the module is active.
  *
  *													The panel knows no field names of its own. A project

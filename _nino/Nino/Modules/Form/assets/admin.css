@@ -3,8 +3,8 @@
 /**
  *	Nino										A compact filesystembased php framework
  *	Modules\Form					The form endpoint and its submissions
- *	editor.css							What the module's /_admin panel needs beyond the design
- *													system in _admin/assets/style.css. Joins the editor's own
+ *	admin.css								What the module's /_admin panel needs beyond the design
+ *													system in _admin/assets/style.css. Joins the workbench's
  *													style bundle while the module is active (see the panel's
  *													assets()), so the same layer rules apply: scoped to what
  *													this panel renders, nothing shared restated.

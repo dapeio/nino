@@ -80,8 +80,8 @@ namespace Nino\Modules {
 		private const string NONCE_MARK	= '@@nino-cache-nonce-2f8a@@';
 
 		// A write through one of these drops the cache. The tools are ordinary
-		// requests from here, so this needs no hook inside _admin/
-		// _templates - which a module has no business reaching into anyway.
+		// requests from here, so this needs no hook inside _admin/ - which a module has no business
+		// reaching into anyway.
 		private const array TOOL_PREFIXES = [ '/_admin' ];
 
 		/**
@@ -264,10 +264,9 @@ namespace Nino\Modules {
 
 		/**
 		 *	Whether this request may be answered from the cache. Everything
-		 *	_cacheable() requires, plus the two conditions that only matter for
-		 *	answering: the route resolved to a plain 200, and nothing is
-		 *	registered for this exact route that ending the request here would
-		 *	skip.
+		 *	_cacheable() requires - a handler registered for this exact route
+		 *	among it - plus the one condition that only matters for answering:
+		 *	the route resolved to a plain 200.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$request

@@ -50,7 +50,7 @@ namespace Nino\Modules {
 		/**
 		 *	The /_admin screen this module brings along - collected by
 		 *	Admin::panels() through Modules::collect(), so it appears in the
-		 *	editor exactly while this module is active and vanishes with it
+		 *	workbench's rail exactly while this module is active and vanishes with it
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *

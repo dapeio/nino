@@ -317,7 +317,7 @@
 			navFieldset.appendChild( keyLabel );
 
 			// Renaming leaves templates alone on purpose - see Admin.php's
-			// Navigations::apiSave() for why - so say where the other half of
+			// apiSave() for why - so say where the other half of
 			// a rename has to happen by hand
 			if( Nino.admin.navs._isNew === false ) {
 				const renameHint = dc.createElement('p');

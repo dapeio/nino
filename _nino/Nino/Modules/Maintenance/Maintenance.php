@@ -20,13 +20,15 @@ namespace Nino\Modules {
 	 *											adding one. The setup wizard lists its class on every run
 	 *											(\Nino\Install\Setup::apiApply()): it ships with the kernel,
 	 *											there is no picker checkbox for it and no install/ unit the wizard
-	 *											applies - see install/ beside this file for why that
-	 *											directory still ships content, and _body() below for the
+	 *											applies. Its install/ directory is copied in by hand - a
+	 *											styled page-maintenance.tpl and its two texts, see
+	 *											docs/_admin.md#maintenance - and _body() below is the
 	 *											fallback that makes the switch work without it.
 	 *
 	 *											init() registers callbackResponse() on /nino/http/response
-	 *											at priority 1 - before Modules\Jstext (5) and Modules\Cache
-	 *											(9), and before a route-specific handler such as
+	 *											at priority 1 - after Modules\Jstext (0), which composes
+	 *											the policy the page's inline script needs, before
+	 *											Modules\Cache (9), and before a route-specific handler such as
 	 *											Modules\Form's POST /.form ever runs (see Http::response()):
 	 *											the actual work is _prepare(), which shapes $request into
 	 *											the 503 answer and is what a test calls directly; the
@@ -125,7 +127,7 @@ namespace Nino\Modules {
 		/**
 		 *	The /_admin screen this module brings along - collected by
 		 *	Admin::panels() through Modules::collect(), so it appears in the
-		 *	editor exactly while this module is active and vanishes with it
+		 *	workbench's rail exactly while this module is active and vanishes with it
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
