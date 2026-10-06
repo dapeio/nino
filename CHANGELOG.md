@@ -253,6 +253,13 @@ All notable changes to Nino are documented in this file.
 
 ### Removed
 
+- **Workbench, Navigations:** the line "The Navigation module is not active"
+  above the list of menus, its text `/_admin/navs/inactive` in both languages
+  and the `active` field of the `navs/*` answers. The panel exists only while
+  the module is listed in `/nino/modules`, so the line could only show for a
+  module that was running under another spelling - and then said the opposite,
+  pointing at a Config field that does not exist.
+
 - **Jstext:** the key `/nino/jstext/nonce` in the `[jstext]` table. No script
   read it, and the nonce already stands in the `<script nonce="...">` tag and
   the Content-Security-Policy; the copy in the json was the one a stored page

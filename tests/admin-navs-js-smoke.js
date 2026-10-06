@@ -220,7 +220,6 @@ function payload( entries ) {
 	return {
 		navs : [ { key : 'main', entries : entries.map( function( uri ) { return ROUTES.find( function( route ) { return route.httpUri === uri } ) } ) }, { key : 'footer', entries : [] } ],
 		routes : ROUTES,
-		active : true,
 	};
 }
 
@@ -244,6 +243,11 @@ console.log('Admin Navigations');
 	check( 'the panel asks for the menus', t.requests.length === 1 && t.requests[0].action === 'navs/list' );
 	t.answer( 200, payload( [ '/', '/about' ] ) );
 	check( 'a menu is a row with the number of its entries', findAll( t.list, function( el ) { return el.tagName === 'A' } ).map( function( a ) { return a.textContent } ).join() === 'main (2),footer (0)' );
+
+	// The panel is there only while the Navigation module is, so the list has
+	// nothing to say about the module - whatever else an answer carries
+	t.panel._apply( Object.assign( payload( [ '/' ] ), { active : false } ) );
+	check( 'the list draws the menus and nothing about the module', findAll( t.list, function( el ) { return el.className === 'nino-admin-hint' } ).length === 0 );
 }
 
 
@@ -284,7 +288,7 @@ console.log('Admin Navigations');
 	fire( findAll( t.form, function( el ) { return el.tagName === 'FORM' } )[0], 'submit' );
 	check( 'Save sends one request with the complete order, under the key that was typed', t.requests.length === sent + 1 && t.requests[sent].action === 'navs/save'
 		&& JSON.stringify( t.requests[sent].payload ) === JSON.stringify( { originalKey : 'main', key : 'primary', entries : [ '/about', '/contact' ] } ) );
-	t.answer( 200, { navs : [ { key : 'primary', entries : [ ROUTES[1], ROUTES[2] ] }, { key : 'footer', entries : [] } ], routes : ROUTES, active : true } );
+	t.answer( 200, { navs : [ { key : 'primary', entries : [ ROUTES[1], ROUTES[2] ] }, { key : 'footer', entries : [] } ], routes : ROUTES } );
 	check( 'the answer is drawn: the copy is the saved menu now', t.entries().join() === 'About (/about),Contact (/contact)' && t.panel._isDirty() === false && t.panel._currentKey === 'primary' );
 	check( '...and says it was saved', t.field('navs-form-msg').textContent === text('/_admin/common/msg/saved') );
 }
@@ -359,7 +363,7 @@ console.log('Admin Navigations');
 
 	t.panel.showCurrent();
 	check( 'showing the panel again reads the menus and routes again', t.requests.length === before + 1 && t.requests[before].action === 'navs/list' );
-	t.answer( 200, { navs : [ { key : 'main', entries : [ ROUTES[1] ] }, { key : 'footer', entries : [] } ], routes : ROUTES.concat( [ { httpUri : '/news', uri : '/news', label : 'News', named : true, runtime : true } ] ), active : true } );
+	t.answer( 200, { navs : [ { key : 'main', entries : [ ROUTES[1] ] }, { key : 'footer', entries : [] } ], routes : ROUTES.concat( [ { httpUri : '/news', uri : '/news', label : 'News', named : true, runtime : true } ] ) } );
 	check( '...and draws the open menu from the answer, when it holds nothing unsaved', t.entries().join() === 'About (/about)'
 		&& t.field('navs-form-add').children.some( function( option ) { return option.value === '/news' } ) );
 
@@ -368,7 +372,7 @@ console.log('Admin Navigations');
 	t.field('navs-form-key').value = 'typed';
 	const again = t.requests.length;
 	t.panel.showCurrent();
-	t.answer( 200, { navs : [ { key : 'main', entries : [ ROUTES[0], ROUTES[1], ROUTES[2] ] }, { key : 'footer', entries : [] } ], routes : ROUTES.concat( [ { httpUri : '/shop', uri : '/shop', label : 'Shop', named : true, runtime : true } ] ), active : true } );
+	t.answer( 200, { navs : [ { key : 'main', entries : [ ROUTES[0], ROUTES[1], ROUTES[2] ] }, { key : 'footer', entries : [] } ], routes : ROUTES.concat( [ { httpUri : '/shop', uri : '/shop', label : 'Shop', named : true, runtime : true } ] ) } );
 	check( 'a copy with changes is read over nothing: entries and typed id stay', t.requests.length === again + 1 && t.entries().join() === '' && t.field('navs-form-key').value === 'typed' && t.panel._isDirty() === true );
 	check( '...while the routes it can still pick from are the new ones', t.field('navs-form-add').children.some( function( option ) { return option.value === '/shop' } ) && t.field('navs-form-add').children.some( function( option ) { return option.value === '/news' } ) === false );
 	check( '...and the list of menus has the saved state', findAll( t.list, function( el ) { return el.tagName === 'A' } ).map( function( a ) { return a.textContent } )[0] === 'main (3)' );
@@ -389,7 +393,7 @@ console.log('Admin Navigations');
 	const PRIVACY = { httpUri : '/datenschutz', uri : '/legal/privacy', label : 'Datenschutz', named : true, runtime : true, paths : [ '/datenschutz', '/privacy' ] };
 	const t = load( null );
 	t.panel.init();
-	t.answer( 200, { navs : [ { key : 'legal', entries : [ IMPRINT ] }, { key : 'main', entries : [ ROUTES[0] ] } ], routes : ROUTES.concat( [ IMPRINT, PRIVACY ] ), active : true } );
+	t.answer( 200, { navs : [ { key : 'legal', entries : [ IMPRINT ] }, { key : 'main', entries : [ ROUTES[0] ] } ], routes : ROUTES.concat( [ IMPRINT, PRIVACY ] ) } );
 	t.panel._openForm( t.panel._navs[0] );
 
 	check( 'an entry that has a route per language is one row, with every path of it', t.entries().join() === 'Impressum (/impressum, /imprint)' );
@@ -402,7 +406,7 @@ console.log('Admin Navigations');
 	check( 'Add puts the other page in as one entry too', t.entries().join() === 'Impressum (/impressum, /imprint),Datenschutz (/datenschutz, /privacy)' );
 	fire( findAll( t.form, function( el ) { return el.tagName === 'FORM' } )[0], 'submit' );
 	check( 'Save sends each page once, by the first of its paths: the server finds the Element-URI by it', JSON.stringify( t.requests[t.requests.length - 1].payload.entries ) === '["/impressum","/datenschutz"]' );
-	t.answer( 200, { navs : [ { key : 'legal', entries : [ IMPRINT, PRIVACY ] }, { key : 'main', entries : [ ROUTES[0] ] } ], routes : ROUTES.concat( [ IMPRINT, PRIVACY ] ), active : true } );
+	t.answer( 200, { navs : [ { key : 'legal', entries : [ IMPRINT, PRIVACY ] }, { key : 'main', entries : [ ROUTES[0] ] } ], routes : ROUTES.concat( [ IMPRINT, PRIVACY ] ) } );
 	check( '...and the saved menu is drawn the same way', t.entries().join() === 'Impressum (/impressum, /imprint),Datenschutz (/datenschutz, /privacy)' );
 }
 

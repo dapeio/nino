@@ -4,7 +4,6 @@
 // dieselben Schlüssel und dieselbe Form wie text/<locale>.php der Workbench
 return [
 	'[[/_admin/nav/navs]]'							=> 'Navigationen',
-	'[[/_admin/navs/inactive]]'					=> 'Das Navigation-Modul ist nicht aktiv – diese Menüs sind gespeichert, aber nichts rendert sie. Aktiviere \\Nino\\Modules\\Navigation unter Konfiguration.',
 	'[[/_admin/navs/empty]]'						=> 'Noch keine Navigationen – lege unten eine an.',
 	'[[/_admin/navs/empty-entries]]'		=> 'Noch keine Einträge – füge unten eine Route hinzu.',
 	'[[/_admin/navs/label/new]]'				=> 'Neue Navigation',

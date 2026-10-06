@@ -3589,7 +3589,6 @@ check( 'apiList succeeds', $status === 200 );
 check( 'lists every registered menu, in registry order', $navKeys( $body ) === [ 'main', 'footer' ] );
 check( 'a menu reports its members in running order', $entriesOf( $body, 'main' ) === [ '/', '/contact' ] );
 check( 'a registered menu nobody is in is still listed, empty', $entriesOf( $body, 'footer' ) === [] );
-check( 'reports whether the module that renders any of this is active', $body['active'] === false );
 check( 'offers every GET route as a possible entry, not just the page ones', array_column( $body['routes'], 'httpUri' ) === [ '/', '/robots.txt', '/contact', '/legal' ] );
 check( 'labels a route by the /_nino/webpage<uri>/name key the menu would render', $body['routes'][0]['label'] === 'Start' );
 check( '...and falls back to the path for one nobody named', $body['routes'][1]['label'] === '/robots.txt' );

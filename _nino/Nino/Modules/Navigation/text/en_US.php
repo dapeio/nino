@@ -4,7 +4,6 @@
 // shape the workbench's own text/<locale>.php has
 return [
 	'[[/_admin/nav/navs]]'							=> 'Navigations',
-	'[[/_admin/navs/inactive]]'					=> 'The Navigation module is not active – these menus are stored, but nothing renders them. Activate \\Nino\\Modules\\Navigation under Config.',
 	'[[/_admin/navs/empty]]'						=> 'No navigations yet – add one below.',
 	'[[/_admin/navs/empty-entries]]'		=> 'No entries yet – add a route below.',
 	'[[/_admin/navs/label/new]]'				=> 'New navigation',

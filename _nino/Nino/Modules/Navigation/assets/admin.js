@@ -34,7 +34,6 @@
 
 		_navs 			: [],
 		_routes 		: [],
-		_active 		: true,
 		_currentKey : null,
 		_isNew 			: false,
 		_ready 			: false,
@@ -98,7 +97,6 @@
 				if( Nino.admin.navs._isDirty() === true ) {
 					Nino.admin.navs._navs 		= response.navs;
 					Nino.admin.navs._routes 	= response.routes;
-					Nino.admin.navs._active 	= response.active;
 					Nino.admin.navs._renderList();
 					Nino.admin.navs._renderEntries();
 					return;
@@ -121,7 +119,6 @@
 
 			Nino.admin.navs._navs 		= response.navs;
 			Nino.admin.navs._routes 	= response.routes;
-			Nino.admin.navs._active 	= response.active;
 
 			Nino.admin.navs._renderList();
 
@@ -197,16 +194,6 @@
 
 			const wrap = dc.getElementById('navs-list');
 			wrap.innerHTML = '';
-
-			// The registry is editable either way, but nothing renders from it
-			// while the module that reads it is off - say so instead of leaving
-			// the dialog looking broken
-			if( Nino.admin.navs._active === false ) {
-				const off = dc.createElement('p');
-				off.className = 'nino-admin-hint';
-				off.textContent = Nino.content.getText('/_admin/navs/inactive');
-				wrap.appendChild( off );
-			}
 
 			if( Nino.admin.navs._navs.length === 0 )
 				wrap.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/navs/empty') ) );

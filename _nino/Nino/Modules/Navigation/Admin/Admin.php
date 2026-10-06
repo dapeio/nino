@@ -382,12 +382,9 @@ namespace Nino\Modules\Navigation {
 
 		/**
 		 *	The menu keys this project registered, in the order a picker
-		 *	should list them.
-		 *
-		 *	Unlike \Nino\Modules\Routes\Admin::navKeys() this is not gated on the Navigation
-		 *	module being active: the registry is editable either way, and the
-		 *	frontend is told separately (see _payload()'s 'active') so it can
-		 *	say so rather than show an empty dialog for no visible reason
+		 *	should list them - '/nino/html/navs', which is what
+		 *	\Nino\Modules\Routes\Admin::navKeys() returns while the Navigation
+		 *	module is active, the only state this panel exists in
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -718,9 +715,8 @@ namespace Nino\Modules\Navigation {
 		}
 
 		/**
-		 *	Everything the dialog draws itself from: the menus with their
-		 *	members in order, every route that could join one, and whether
-		 *	the Navigation module that renders any of this is even active
+		 *	Everything the dialog draws itself from: the menus with their members
+		 *	in order and every route that could join one
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$live					The live route array, as it was before this request replaced anything
@@ -748,7 +744,6 @@ namespace Nino\Modules\Navigation {
 			return [
 				'navs' 		=> $navs,
 				'routes' 	=> array_values( $labels ),
-				'active' 	=> in_array( '\\Nino\\Modules\\Navigation', $appData['/nino/modules'] ?? [], true ),
 			];
 		}
 
