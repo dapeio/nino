@@ -101,6 +101,5 @@ return [
 	'[[/_admin/features/error/catalogue]]'		=> 'Der Katalog konnte nicht geladen werden.',
 	'[[/_admin/features/error/catalogue-reason]]'	=> 'Der Katalog konnte nicht geladen werden: %s',
 	'[[/_admin/features/error/catalogue-off]]'	=> 'Der Katalog ist ausgeschaltet: /nino/catalogue/url in der config.php ist leer.',
-	'[[/_admin/features/error/catalogue-key]]'	=> 'Es ist kein Katalog-Schlüssel konfiguriert, also kann keinem Katalog vertraut werden.',
 	'[[/_admin/features/error/activate-after-install]]'	=> 'Das Feature ist an Ort und Stelle, konnte aber nicht eingeschaltet werden: %s',
 ];

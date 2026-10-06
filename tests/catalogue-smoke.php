@@ -465,16 +465,19 @@ $off = $appData;
 $off['/nino/catalogue/url'] = '';
 check( 'switched off', \Nino\Catalogue::fetch( $off ) === 'the catalogue is switched off' );
 
-// An empty configured key falls back to the kernel's own. While that one
-// is empty too there is a keyless state, and nothing may be fetched in it;
-// once the kernel ships a key, there is none - the fallback is the check
+// An empty configured key falls back to the kernel's own, so key() never
+// answers '' and there is no keyless state for anything to refuse. A fork
+// that empties PUBLIC_KEY still fails closed: verify() refuses an empty key,
+// and the catalogue is "the catalogue signature does not verify"
 $noKey = $appData;
 $noKey['/nino/catalogue/key'] = '';
-$requests = [];
-if( \Nino\Catalogue::PUBLIC_KEY === '' )
-	check( 'without a key nothing is fetched at all', \Nino\Catalogue::fetch( $noKey ) === 'no catalogue key is configured, so no catalogue can be trusted' && $requests === [] );
-else
-	check( 'the kernel ships a key: an empty configured key falls back to it', \Nino\Catalogue::key( $noKey ) === \Nino\Catalogue::PUBLIC_KEY && openssl_pkey_get_public( \Nino\Catalogue::PUBLIC_KEY ) !== false );
+check( 'the kernel ships a key: an empty configured key falls back to it', \Nino\Catalogue::key( $noKey ) === \Nino\Catalogue::PUBLIC_KEY && openssl_pkey_get_public( \Nino\Catalogue::PUBLIC_KEY ) !== false );
+$keyless = array_filter( [ '_nino/Nino/Catalogue/Catalogue.php', '_admin/Nino/Modules/Features/Admin/Admin.php', '_admin/Nino/Modules/Features/text/en_US.php', '_admin/Nino/Modules/Features/text/de_DE.php' ],
+	static fn( string $file ): bool => preg_match( '/no catalogue key|catalogue-key/', (string) file_get_contents( dirname( __DIR__ ). '/'. $file ) ) === 1 );
+check( '...so neither the kernel nor the panel has a refusal for a missing key, and an empty one verifies nothing'. ( $keyless === [] ? '' : ' - still in '. implode( ', ', $keyless ) ),
+	$keyless === []
+	&& \Nino\Catalogue::verify( 'catalogue', sign( 'catalogue', $privateKey ), $publicKey ) === true
+	&& \Nino\Catalogue::verify( 'catalogue', sign( 'catalogue', $privateKey ), '' ) === false );
 
 unset( $remote[ \Nino\Catalogue::DEFAULT_URL ], $remote[ \Nino\Catalogue::DEFAULT_URL. '.sig' ] );
 unset( $appData['./nino/catalogue'] );
@@ -900,22 +903,11 @@ rename( NINO_FEATURES_DIR. '.away', NINO_FEATURES_DIR );
 unset( $appData['./nino/features/all'] );
 check( 'without a writable features directory the answer says so, and what is not seen on disk is available', $status === 200 && $body['writable'] === false && array_column( $body['offers'], 'state', 'key' )['helper'] === 'available' );
 
-// The two ways the configuration rules the catalogue out are the panel's
-// own words, in the interface language; anything else is the kernel's
-// sentence behind the panel's phrase
+// A catalogue switched off is the panel's own words, in the interface
+// language; anything else is the kernel's sentence behind the panel's phrase
 $off = $appData;
 $off['/nino/catalogue/url'] = '';
 check( 'switched off: a 400 in the panel\'s own words, in the session locale', callFeatures( $off, 'apiCatalogue' ) === [ 400, [ 'error' => panelWord( 'de_DE', '/_admin/features/error/catalogue-off' ) ] ] && panelWord( 'de_DE', '/_admin/features/error/catalogue-off' ) !== '' );
-
-// The keyless refusal exists only while the kernel ships no key of its own
-// (see the same case above); with one, an empty configured key is no error
-$noKey = $appData;
-$noKey['/nino/catalogue/key'] = '';
-$requests = [];
-if( \Nino\Catalogue::PUBLIC_KEY === '' )
-	check( 'no key: a 400 in the panel\'s words, and nothing was fetched', callFeatures( $noKey, 'apiCatalogue' ) === [ 400, [ 'error' => panelWord( 'de_DE', '/_admin/features/error/catalogue-key' ) ] ] && $requests === [] );
-else
-	check( 'the kernel ships a key, so the panel has no keyless refusal to give - but the phrase for it exists', panelWord( 'de_DE', '/_admin/features/error/catalogue-key' ) !== '' );
 
 \Nino\Runtime::setSessionValue( $appData, './admin/locale', 'en_US' );
 check( 'the words follow the interface language', callFeatures( $off, 'apiCatalogue' ) === [ 400, [ 'error' => panelWord( 'en_US', '/_admin/features/error/catalogue-off' ) ] ] && panelWord( 'en_US', '/_admin/features/error/catalogue-off' ) !== panelWord( 'de_DE', '/_admin/features/error/catalogue-off' ) );

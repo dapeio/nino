@@ -418,7 +418,7 @@ while( ( match = phrasedRe.exec( admin ) ) )
 		phrased.push( match[1] );
 const unphrased = phrased.filter( function( key ) { return moduleEn[key] === undefined || moduleDe[key] === undefined; } );
 check( 'every message the class phrases itself is a fill of the module in both languages'+ ( unphrased.length ? ' - missing: '+ unphrased.join(', ') : '' ), phrased.length >= 4 && unphrased.length === 0
-	&& phrased.indexOf( '/_admin/features/error/catalogue-off' ) !== -1 && phrased.indexOf( '/_admin/features/error/catalogue-key' ) !== -1
+	&& phrased.indexOf( '/_admin/features/error/catalogue-off' ) !== -1
 	&& moduleEn['/_admin/features/error/catalogue-reason'].includes( '%s' ) && moduleDe['/_admin/features/error/catalogue-reason'].includes( '%s' )
 	&& moduleEn['/_admin/features/error/activate-after-install'].includes( '%s' ) && moduleDe['/_admin/features/error/activate-after-install'].includes( '%s' ) );
 check( 'the module\'s two text files declare the same keys', Object.keys( moduleEn ).sort().join(',') === Object.keys( moduleDe ).sort().join(',') && Object.keys( moduleEn ).length > 20 );

@@ -284,6 +284,15 @@ All notable changes to Nino are documented in this file.
 
 ### Removed
 
+- **Catalogue:** the refusal of a missing catalogue key - "no catalogue key is
+  configured, so no catalogue can be trusted" in `\Nino\Catalogue::fetch()`,
+  its twin in the Features panel's `features/catalogue`, and the text key
+  `/_admin/features/error/catalogue-key` in both languages. `Catalogue::key()`
+  falls back to `PUBLIC_KEY` and never answers `''`, so neither refusal could
+  fire. 1.3.0-beta kept both for a fork that empties the constant. Such a fork
+  still fails closed: `verify()` refuses an empty key, and the catalogue is
+  refused as not verifying.
+
 - **`Nino.adminUi.tableModel.DISPLAYABLE` and `isDisplayable()`**, the
   browser's copy of the rule which model fields a table cell can show. The
   server decides it alone (`\Nino\Modules\Elements\Admin::displayableColumns()`)

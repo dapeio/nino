@@ -138,8 +138,6 @@ namespace Nino {
 				return 'the catalogue is switched off';
 
 			$key = self::key( $appData );
-			if( $key === '' )
-				return 'no catalogue key is configured, so no catalogue can be trusted';
 
 			$json = \Nino\Fetch::get( $appData, $url, [ 'maxBytes' => self::MAX_CATALOGUE_BYTES ] );
 			if( $json['ok'] === false )

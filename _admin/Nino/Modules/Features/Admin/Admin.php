@@ -319,9 +319,9 @@ namespace Nino\Modules\Features {
 		 *	pressed. A successful fetch leaves the cache fresh on disk too, so
 		 *	the next apiList() needs no request of its own.
 		 *
-		 *	The two ways the configuration rules it out are said in the
-		 *	interface language; every other reason is the kernel's own English
-		 *	sentence, behind a phrase of ours
+		 *	A catalogue switched off is said in the interface language; every
+		 *	other reason is the kernel's own English sentence, behind a phrase
+		 *	of ours
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -335,11 +335,6 @@ namespace Nino\Modules\Features {
 
 			if( \Nino\Catalogue::url( $appData ) === '' ) {
 				\Nino\Http::fail( $request, 400, self::_say( $appData, '/_admin/features/error/catalogue-off', 'the catalogue is switched off' ) );
-				return;
-			}
-
-			if( \Nino\Catalogue::key( $appData ) === '' ) {
-				\Nino\Http::fail( $request, 400, self::_say( $appData, '/_admin/features/error/catalogue-key', 'no catalogue key is configured, so no catalogue can be trusted' ) );
 				return;
 			}
 
