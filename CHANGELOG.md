@@ -133,6 +133,63 @@ All notable changes to Nino are documented in this file.
   `tests/admin-elements-js-smoke.js` the pre-check and the status line
   (87 → 101).
 
+- **Workbench:** unsaved input survives. `Nino.admin.dirty`
+  (`_admin/assets/script.js`) is the registry the form panels report to:
+  `register( name, { isDirty, save( done ), discard, bar } )`, or
+  `watchForm( name, formGetter, save )` with `snapshot( name )` for a form of
+  plain fields (compared on demand, not on every key; a file input, a search
+  box, a password a browser may fill in and a field marked `data-dirty="ignore"`
+  are not input, and a form that holds no fields - a load error took its
+  place - is clean), `isDirty( names )`, `dirtyNames()`, `refresh()` and
+  `guard( names | null, proceed, onCancel )`. A guarded exit that finds
+  something unsaved asks **Save**, **Discard** or **Cancel**: Save runs the
+  `save( done )` of every dirty entry in order and goes on only when each
+  reports `done( true )`, the first that reports `done( false )` is brought on
+  screen with its errors; Discard lets every entry forget; Cancel runs
+  `onCancel()`, so a select or a checkbox that started the exit can put itself
+  back. While a question stands a second call is ignored - it calls
+  `onCancel()` as well - except from inside a Save the question itself started,
+  which may ask one of its own (an Element Types save drops the Elements form
+  next door); a `save()` that throws ends the question and the Save and the
+  error goes on up, so no exit stays shut.
+  A refused Save puts the focus on the first invalid field once its pane is on
+  screen. The browser's own question (`beforeunload`) is installed only while
+  something is unsaved, so a clean page keeps its fast back and forward, and a
+  form with unsaved input shows
+  *Unsaved changes* in its action bar (`.nino-admin-actionbar-dirty`, a `span`,
+  not a status role, so the phone rule that hides the status line leaves it;
+  a bar that has a status line of its own says it there and hides the marker,
+  except below 38 rem, where that line is hidden). The page's own protection
+  against leaving is taken back after ten seconds, and when the page is shown
+  again, if an exit that was decided on does not happen. Every listener is
+  installed from `onReady()`, never at load. The registration is opt-in and
+  feature-detected: a panel script that finds no registry registers nothing,
+  and a feature panel on an older kernel keeps working. Registered: Elements,
+  Element Types, Text, Text Keys (the group form, the new-key form and the scan
+  form), Routes, Config, Language, Users (a new account, an account with its
+  role), Roles, Login protection, Image Slots (form and scan), Features
+  settings, Navigations and Maintenance. Translations is not: its import
+  textarea is a paste area, not stored input.
+  `Nino.adminUi.choiceDialog( { title, message, choices, onChoose } )`
+  (`_admin/assets/Nino.admin.js`) is the question: a native `<dialog>` in the
+  workbench root, opened modally, built with `createElement` and `textContent`
+  only, one button per choice (`primary`, `danger`, `secondary`), Escape the
+  secondary one, focus back to the opener, one at a time; it owns no words and
+  names no `Nino.admin` member, so the wizard keeps loading the file, and a
+  browser without `showModal()` asks with `confirm()`. The rich-text editor's
+  handle gains `focus()` and `mark( { required, invalid, describedBy } )`, which
+  act on the `role="textbox"` element. New fills
+  `/_admin/common/confirm/unsaved`, `/_admin/common/label/discard` and
+  `/_admin/common/label/cancel`; the admin panel recipe documents the contract.
+  `tests/admin-script-js-smoke.js` holds the registry, the guard in all its
+  answers, `beforeunload`, the back-link capture, the marker, the shell's exits
+  and the dialog (52 → 125 checks, the file stops at the first new check
+  without the change), `tests/admin-html-editor-js-smoke.js` the handle
+  (10 → 17), `tests/admin-lists-js-smoke.js` the registrations, their names,
+  the new classes and fills (141 → 165, 16 red before), `tests/admin-smoke.php`
+  the shell's words (286 → 296, 8 red before) and `tests/admin-system-smoke.php`
+  the bundle order (708 → 711, 3 red before).
+
 ### Changed
 
 - **Workbench:** what the panels print for a failure. A failure with a code is
@@ -200,6 +257,77 @@ All notable changes to Nino are documented in this file.
   `README.md`, `README.de.md`, `docs/concepts.md`, `docs/concepts.de.md` and
   `docs/setup.de.md`, where they said "escape hatch" and "Escape-Hatch". The
   workbench's own label follows with the Templates feature in the catalogue.
+
+### Fixed
+
+- **Workbench, Elements:** a required field is marked and a refused save says
+  where. A required field carries an asterisk after its name (`aria-hidden`,
+  `.nino-admin-required`) and `aria-required` on its control - on the text box
+  of a rich-text field, on the name of a list of references, which has no
+  control that could carry it; an image, a yes/no choice and a field this
+  account may not write are not asked for. A save that finds a required field
+  empty sends nothing, marks each such field `aria-invalid` with a sentence
+  under it (`.nino-admin-field-error`, linked with `aria-describedby`, not an
+  alert), says it once in the form's status line and moves the focus to the
+  first one; if that one is in another language, the form switches to it first -
+  the select, the content locale and the fields. The language switch names the
+  languages a save would write that still have open fields (*de_DE - 2 open*).
+  After a first refusal the marks follow what is typed, and a form whose fields
+  hold what they were drawn with again counts as unchanged again - its status
+  line goes back to idle once nothing is marked. The uri of a new element is a
+  required field of the same kind in place of the browser's own bubble, which
+  came in the browser's language and which a save from the unsaved-changes
+  question never met. `_missingRequiredFields()` is `_validate()`, which returns
+  `{ key, locale, kind, label }` for the uri, the global fields, the language on
+  screen and the other languages a save writes, in that order. The summary
+  *Please fill in the marked required fields.* is a sentence without a list of
+  names (new fills `/_admin/elements/error/field-required` and
+  `/_admin/elements/label/locale-open`). `tests/admin-elements-js-smoke.js`
+  holds the marks, the order of the problems, the focus and the language switch
+  (101 → 180 together with the JSON entry below and the unsaved-input entry
+  above; the file stops at the first new check without the change).
+
+- **Workbench, Elements:** text that is not JSON in a list or object field no
+  longer disappears, and no longer saves as an empty list. The field's text is
+  parsed (`[]` for a blank field, an array or an object as such); anything else
+  - a scalar, `null`, a syntax error - stops the save with *Not valid JSON - a
+  list or an object is expected.* at the field, for a global field and for a
+  translated one, whichever language is on screen. A translated field keeps
+  what was typed when its language is left (the stored value stays, the text is
+  remembered and the language counts as edited) and shows it again when the
+  language comes back. A required list holding a non-empty object counts as
+  filled, the way the kernel counts it. Nothing changes on the server, which
+  already answered a scalar with a 400.
+
+- **Workbench, Text Keys:** Save writes every language edited since the group
+  was opened, as the Text panel does, and not only the one on screen: the other
+  languages were thrown away without a word. One request per language, one
+  after the other, the global keys with the first; a failed request or a key
+  the server did not accept stops the loop, leaves the languages not yet
+  written marked as unsaved and names the key and the language; *Saved.* comes
+  once, after the last. The form is held while it runs, the rename, delete and
+  schema buttons included. `tests/admin-text-js-smoke.js` (17 → 58).
+
+- **Workbench:** leaving a form no longer loses what was typed into it. The
+  Elements previous and next buttons, copying an element, and every write of an
+  Element Type (create, save, delete: each drops the Elements form), the Text
+  Keys schema change, rename and delete (each reloads the tab), switching a
+  feature on or off or installing one, restoring a backup, ending one's own
+  sessions, a log out, the interface language, the back link of every form and
+  a Navigations entry action ask first (see *Added*). A copy of an element
+  carried the stored values, not the typed ones, without saying so; it asks, and
+  copies what is stored or saved. Visiting a language no longer marks it as
+  edited when its rich-text field reads back as other markup than the stored
+  string (`&nbsp;`, a quote in an `href`): it is compared with what the control
+  held when it was drawn. The Maintenance panel is read again every time it is
+  shown, which rebuilt its form over a switch just turned over or a *Retry-After*
+  just typed; it now leaves a form with unsaved input alone. While the
+  Elements form saves, its links are inert and a Discard that comes in meanwhile
+  changes nothing, so the save finishes with the values it was given.
+  `tests/admin-elementtypes-js-smoke.js` (36 → 48), `tests/admin-features-js-smoke.js`
+  (162 → 169), `tests/admin-backups-js-smoke.js` (12 → 16) and
+  `tests/admin-routes-js-smoke.js` (12 → 16) hold the guards; each stops at its
+  first new check without the change.
 
 ### Removed
 

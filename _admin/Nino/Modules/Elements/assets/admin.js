@@ -42,6 +42,33 @@
 		_localeValues		: {},
 		_selectedLocale	: null,
 		_dirtyLocales		: [],
+		// What was typed into a translated list or object field that is not
+		// valid JSON, '<locale>|<key>' -> the text. The stored value stays what
+		// it was, so the translation is not lost when the person switches away
+		// from it; the text is what the field shows when it comes back and what
+		// the save is held back for (see _storeVisibleLocaleFields())
+		_invalidArrays	: {},
+		// A save was refused: from now on the marks follow what is typed and
+		// every freshly drawn translation carries them (see _showProblems())
+		_validated			: false,
+		// What the form's controls held when they were drawn or last saved, as
+		// compared strings: the uri, the global fields, the translation on
+		// screen. isDirty() asks whether they still do
+		_baseline				: { uri : null, global : {}, locale : {} },
+		// Whether the translation on screen already counted as edited when it
+		// was drawn. If not, it is no more than a translation a refused save
+		// stored, and typing back what it was drawn with leaves nothing
+		// unsaved (see isDirty())
+		_localeDirtyAtDraw	: false,
+		// The values as the server last sent or accepted them, { global,
+		// locales } - what discard() goes back to, so a copy made after it
+		// is a copy of the saved element and not of the edits that were thrown away
+		_pristine				: { global : {}, locales : {} },
+		// The form is a copy nobody has saved (see _duplicate())
+		_copy						: false,
+		// The wrapper of every field on screen, by key - where its mark, its
+		// error and its focus go
+		_fieldNodes			: {},
 		// The form's status line - saving, saved at, unsaved, why it failed (see
 		// Nino.adminUi.status()). Drawn again with the form, so always read from
 		// here rather than kept in a local
@@ -197,6 +224,8 @@
 			Nino.admin.elements._elements					= [];
 			Nino.admin.elements._referenceOptions	= {};
 			Nino.admin.elements._pendingUri				= undefined;
+			Nino.admin.elements._resetEdits();
+			Nino.admin.elements._remember();
 
 			if( dc.getElementById('elements-types') === null )
 				return;
@@ -467,7 +496,7 @@
 		 *	Previous/next for the form's context bar: one button each, stepping
 		 *	through the type's elements as the list orders them without going
 		 *	back to it, disabled at either end. Like the back link, stepping
-		 *	away does not save - that is what the save button is for
+		 *	away asks first when the form holds input nobody has saved
 		 *
 		 *	@return		{Element}
 		 */
@@ -490,7 +519,7 @@
 				btn.addEventListener( 'click', function() {
 					if( btn.dataset.uri === '' )
 						return;
-					Nino.admin.elements._openForm( btn.dataset.uri );
+					Nino.admin.elements._guard( function() { Nino.admin.elements._openForm( btn.dataset.uri ) } );
 				} );
 				nav.appendChild( btn );
 			} );
@@ -678,6 +707,8 @@
 				Nino.admin.elements._localeValues	= {};
 				Nino.admin.elements._raw					= {};
 				Nino.admin.elements._dirtyLocales	= [];
+				Nino.admin.elements._resetEdits();
+				Nino.admin.elements._remember();
 				Nino.admin.elements._selectedLocale = Nino.admin.sessionLocale.current ?? Nino.admin.elements._locales[0] ?? '';
 				Nino.admin.elements._loadReferenceOptions( function() {
 					if( requestId !== Nino.admin.elements._formRequest || type !== Nino.admin.elements._currentType )
@@ -709,6 +740,8 @@
 				Nino.admin.elements._localeValues	= response.locales;
 				Nino.admin.elements._raw					= response.raw || {};
 				Nino.admin.elements._dirtyLocales	= [];
+				Nino.admin.elements._resetEdits();
+				Nino.admin.elements._remember();
 				Nino.admin.elements._selectedLocale = ( preferred !== null && response.locales[preferred] !== undefined ) ? preferred : ( Object.keys( response.locales )[0] ?? Nino.admin.elements._locales[0] ?? '' );
 				Nino.admin.elements._loadReferenceOptions( function() {
 					if( requestId !== Nino.admin.elements._formRequest || type !== Nino.admin.elements._currentType )
@@ -772,12 +805,14 @@
 		 *	@param		{string}	key						Field key
 		 *	@param		{Object}	field					Model field definition ({ type, ... })
 		 *	@param		{*}				value					Current value
+		 *	@param		{string}	[rawText]			What a list or object field was last typed as, when that was not valid JSON
 		 *
 		 *	@return		{Element}								Field wrapper
 		 */
-		_renderField : function( key, field, value ) {
+		_renderField : function( key, field, value, rawText ) {
 
-			const label = Nino.admin.elements._renderFieldControl( key, field, value );
+			const label = Nino.admin.elements._renderFieldControl( key, field, value, rawText );
+			Nino.admin.elements._fieldNodes[key] = label;
 
 			// A field this account may not write (see the panel's mayUpdate()):
 			// rendered exactly as it otherwise would be, then locked. Showing
@@ -804,13 +839,15 @@
 		 *	@param		{string}	key						Field key
 		 *	@param		{Object}	field					Its model definition
 		 *	@param		{*}				value					Its current value
+		 *	@param		{string}	[rawText]			What a list or object field was last typed as, when that was not valid JSON
 		 *
 		 *	@return		{Element}
 		 */
-		_renderFieldControl : function( key, field, value ) {
+		_renderFieldControl : function( key, field, value, rawText ) {
 
 			const displayName = Nino.admin.elements._fieldLabel( key );
 			const isHtml = field.type === 'string' && field.html === true;
+			const marked = Nino.admin.elements._isMarkedRequired( key, field );
 			// A contenteditable inside <label> is invalid interactive markup and
 			// can make drag-selection fail in Safari. Rich text gets a semantic
 			// group; ordinary controls retain their native label wrapper.
@@ -826,10 +863,15 @@
 			if( isHtml ) {
 				const span = dc.createElement('span');
 				span.textContent = displayName;
+				if( marked === true )
+					Nino.admin.elements._star( span );
 				label.appendChild( span );
 				const mount = dc.createElement('div');
 				label.appendChild( mount );
 				Nino.admin.elements._htmlEditors[key] = Nino.admin.htmlEditor.create( mount, value ?? '', field.maxlength ?? Nino.admin.elements.DEFAULT_MAXLENGTH, field.inputsize ?? 0 );
+				// On the text box itself, which is what a screen reader lands on
+				if( marked === true && typeof Nino.admin.elements._htmlEditors[key].mark === 'function' )
+					Nino.admin.elements._htmlEditors[key].mark( { required : true } );
 				return label;
 			}
 
@@ -876,6 +918,7 @@
 				const select = dc.createElement('select');
 				select.dataset.field = key;
 				select.dataset.type = field.type;
+				Nino.admin.elements._markRequired( marked, span, select );
 
 				field.options.forEach( function( opt ) {
 					const option = dc.createElement('option');
@@ -927,6 +970,12 @@
 						},
 					} );
 
+					// Only the asterisk: the control is a list and a search box, with
+					// no element a screen reader could be told is required. Its first
+					// child is the name
+					if( marked === true )
+						Nino.admin.elements._star( list.firstChild );
+
 					if( referenceOptions.length === 0 ) {
 						const hint = dc.createElement('p');
 						hint.className = 'nino-admin-field-hint';
@@ -944,14 +993,15 @@
 				const select = dc.createElement('select');
 				select.dataset.field = key;
 				select.dataset.type = field.type;
+				Nino.admin.elements._markRequired( marked, span, select );
 
 				const options = referenceOptions;
 				const current = ( value === null || value === undefined ) ? '' : String( value );
 
 				// Always offered, even on a required field: the browser's own
 				// "select an option" is not what holds the save back - the same
-				// _missingRequiredFields() check every other type goes through
-				// is, and it needs an empty state to be able to catch
+				// _validate() check every other type goes through is, and it
+				// needs an empty state to be able to catch
 				const empty = dc.createElement('option');
 				empty.value = '';
 				empty.textContent = ( field.required === true )
@@ -1076,7 +1126,9 @@
 				input.value = ( value ?? '' );
 			} else if( field.type === 'array' ) {
 				input = dc.createElement('textarea');
-				input.value = JSON.stringify( value ?? [] );
+				// What was typed, if it was not JSON: the value it could not become
+				// is not what the person should find when they come back to it
+				input.value = typeof rawText === 'string' ? rawText : JSON.stringify( value ?? [] );
 			} else {
 				input = dc.createElement('textarea');
 				input.value = ( value ?? '' );
@@ -1091,6 +1143,7 @@
 				const span = dc.createElement('span');
 				span.textContent = displayName;
 				label.appendChild( span );
+				Nino.admin.elements._markRequired( marked, span, input );
 				label.appendChild( Nino.admin.elements._wrapWithSuffix( input, field ) );
 				return label;
 			}
@@ -1111,6 +1164,7 @@
 			const nameSpan = dc.createElement('span');
 			nameSpan.className = 'nino-admin-field-name';
 			nameSpan.textContent = displayName;
+			Nino.admin.elements._markRequired( marked, nameSpan, input );
 			header.appendChild( nameSpan );
 
 			const counter = dc.createElement('span');
@@ -1130,6 +1184,58 @@
 			label.appendChild( Nino.admin.elements._wrapWithSuffix( input, field ) );
 
 			return label;
+		},
+
+		/**
+		 *	Whether a field is drawn as required: its model says so and a save
+		 *	holds the form back for it. An image is uploaded on its own once the
+		 *	element exists, a yes/no choice is never empty, and a field this
+		 *	account may not write can be neither filled nor focused - none of
+		 *	them is something to ask for (see _validate())
+		 *
+		 *	@param		{string}	key
+		 *	@param		{Object}	field					Model field definition
+		 *
+		 *	@return		{boolean}
+		 */
+		_isMarkedRequired : function( key, field ) {
+			return field.required === true && field.type !== 'image' && field.type !== 'boolean' && Nino.admin.elements._mayUpdate( key ) !== false;
+		},
+
+		/**
+		 *	The asterisk after a field's name. Drawn for the eye and hidden
+		 *	from a screen reader, which is told through aria-required on the
+		 *	control instead
+		 *
+		 *	@param		{Element}	name					The field's name element
+		 *
+		 *	@return		void
+		 */
+		_star : function( name ) {
+			const star = dc.createElement('span');
+			star.className = 'nino-admin-required';
+			star.setAttribute( 'aria-hidden', 'true' );
+			star.textContent = '*';
+			name.appendChild( star );
+		},
+
+		/**
+		 *	Mark a field required: the asterisk on its name, aria-required on
+		 *	its control. Nothing for a field that is not drawn as required
+		 *
+		 *	@param		{boolean}	marked
+		 *	@param		{Element}	name
+		 *	@param		{Element}	control
+		 *
+		 *	@return		void
+		 */
+		_markRequired : function( marked, name, control ) {
+
+			if( marked !== true )
+				return;
+
+			Nino.admin.elements._star( name );
+			control.setAttribute( 'aria-required', 'true' );
 		},
 
 		/**
@@ -1197,11 +1303,68 @@
 		},
 
 		/**
+		 *	Read a list or object field's text: blank is an empty list, a
+		 *	JSON array or object is the value, and anything else - a scalar,
+		 *	null, a syntax error - is no value at all. The server answers 400
+		 *	for the last of those on its own (see \Nino\Elements::valueError());
+		 *	this is what lets the form say so before anything is sent, at the
+		 *	field, and keep what was typed
+		 *
+		 *	@param		{string}	text
+		 *
+		 *	@return		{Object}									{ ok, value } - value is [] where ok is false, which is what a read has always fallen back to
+		 */
+		_parseArray : function( text ) {
+
+			const raw = String( text ?? '' ).trim();
+			if( raw === '' )
+				return { ok : true, value : [] };
+
+			let value;
+			try {
+				value = JSON.parse( raw );
+			} catch( e ) {
+				return { ok : false, value : [] };
+			}
+
+			return value !== null && typeof value === 'object' ? { ok : true, value : value } : { ok : false, value : [] };
+		},
+
+		/**
+		 *	Whether a list or object has nothing in it - the way the kernel
+		 *	counts (see \Nino\Elements: count() === 0), so an object with
+		 *	entries satisfies a required field the same as a list does
+		 *
+		 *	@param		{*}				value
+		 *
+		 *	@return		{boolean}
+		 */
+		_isEmptyCollection : function( value ) {
+			return value === null || typeof value !== 'object' || Object.keys( value ).length === 0;
+		},
+
+		/**
+		 *	The text in a field's control, as typed - null where there is none
+		 *	on screen (another translation, a field this form does not draw)
+		 *
+		 *	@param		{string}	key
+		 *
+		 *	@return		{string|null}
+		 */
+		_rawText : function( key ) {
+			const form = dc.getElementById('elements-form');
+			const input = form?.querySelector( '[data-field="'+ CSS.escape( key )+ '"]' );
+			return ( input === null || input === undefined ) ? null : input.value;
+		},
+
+		/**
 		 *	Whether a required field is currently empty - reads the raw dom
 		 *	value rather than _readFieldByKey()'s parsed one: integer/double
 		 *	coerce an empty input to 0 there, which would make "required"
 		 *	unable to ever catch a blank number/date field. Boolean is never
-		 *	considered empty (a radio choice always has a value).
+		 *	considered empty (a radio choice always has a value), and a list or
+		 *	object text that is not valid JSON is not empty either: it is
+		 *	reported for what it is (see _validate()).
 		 *
 		 *	@param		{string}	key
 		 *	@param		{Object}	field					Model field definition ({ type, html, required, ... })
@@ -1218,7 +1381,12 @@
 				return editor === undefined || editor.getValue().replace(/<[^>]+>/g, '').trim() === '';
 			}
 
-			if( field.type === 'array' || Nino.adminUi.isMultiElement( field ) === true ) {
+			if( field.type === 'array' ) {
+				const parsed = Nino.admin.elements._parseArray( Nino.admin.elements._rawText( key ) );
+				return parsed.ok === true && Nino.admin.elements._isEmptyCollection( parsed.value );
+			}
+
+			if( Nino.adminUi.isMultiElement( field ) === true ) {
 				const value = Nino.admin.elements._readFieldByKey( key, field );
 				return Array.isArray( value ) === false || value.length === 0;
 			}
@@ -1250,7 +1418,10 @@
 			if( field.type === 'boolean' )
 				return false;
 
-			if( field.type === 'array' || Nino.adminUi.isMultiElement( field ) === true )
+			if( field.type === 'array' )
+				return Nino.admin.elements._isEmptyCollection( value );
+
+			if( Nino.adminUi.isMultiElement( field ) === true )
 				return Array.isArray( value ) === false || value.length === 0;
 
 			if( field.type === 'string' && field.html === true )
@@ -1260,17 +1431,21 @@
 		},
 
 		/**
-		 *	Labels of every required field that's empty in anything this save
-		 *	is about to write - the global fields, and every locale
-		 *	_saveLocales() queues rather than only the one on screen.
+		 *	Everything that holds this save back, in the order the form shows
+		 *	it: the uri of a new element, the global fields in model order, the
+		 *	translation on screen, then the other translations this save is
+		 *	about to write, in the order they were edited. Each problem is
+		 *	{ key, locale, kind, label } - locale is null for the uri and the
+		 *	global fields, kind is 'required' for an empty required field and
+		 *	'json' for a list or object text that does not parse.
 		 *
-		 *	The visible locale used to be the whole check while every edited
-		 *	translation was submitted: leave a required field empty in one
-		 *	language, switch to another and fill it in there, and the save went
-		 *	through and wrote the empty one - the form saying "saved", the
-		 *	element carrying a required field with nothing in it, and no way
-		 *	for the person to know which language it happened in. A translation
-		 *	that is not on screen is named in the message it is missing from.
+		 *	The translations that are checked are the ones _saveLocales()
+		 *	queues, and the visible one only if it is among them: a translation
+		 *	nobody edited is not written, so an empty required field in it is
+		 *	not this save's business (an element may perfectly well have a
+		 *	language it has no text for yet). One that is named is the one the
+		 *	person could do something about, and its language is in the label of
+		 *	the language switch (see _markLocales()).
 		 *
 		 *	An image field is never among them, even if its model says
 		 *	required: its file is uploaded separately, only once the element
@@ -1278,39 +1453,224 @@
 		 *	image branch), so on a new element it is empty by construction -
 		 *	holding the save back for it would make the element impossible to
 		 *	create. Same rule /_admin's own copy of this module applies, and
-		 *	the one its Element Types editor now enforces when writing a model
+		 *	the one its Element Types editor now enforces when writing a model.
+		 *	Nor is a field this account may not write: the save leaves it out,
+		 *	and it can be neither filled in nor focused
 		 *
-		 *	@return		{Array<string>}
+		 *	@return		{Array<Object>}
 		 */
-		_missingRequiredFields : function() {
+		_validate : function() {
 
-			const required = function( keys ) {
-				return keys
-					.filter( function( key ) { return Nino.admin.elements._currentModel[key].type !== 'image' } )
-					.filter( function( key ) { return ( Nino.admin.elements._currentModel[key].required ?? false ) === true } );
+			const model 	 = Nino.admin.elements._currentModel;
+			const problems = [];
+
+			const field = function( key, locale, visible, stored ) {
+
+				const definition = model[key];
+				if( definition.type === 'image' || definition.type === 'boolean' || Nino.admin.elements._mayUpdate( key ) === false )
+					return;
+
+				let kind = null;
+
+				if( definition.type === 'array' ) {
+					const typed = visible === true ? Nino.admin.elements._rawText( key ) : Nino.admin.elements._invalidArrays[locale+ '|'+ key];
+					if( typeof typed === 'string' && Nino.admin.elements._parseArray( typed ).ok === false )
+						kind = 'json';
+				}
+
+				if( kind === null && definition.required === true ) {
+					const empty = visible === true ? Nino.admin.elements._isFieldEmpty( key, definition ) : Nino.admin.elements._isStoredValueEmpty( definition, stored[key] );
+					if( empty === true )
+						kind = 'required';
+				}
+
+				if( kind !== null )
+					problems.push( { key : key, locale : locale, kind : kind, label : Nino.admin.elements._fieldLabel( key ) } );
 			};
 
-			const missing = required( Nino.admin.elements._globalKeys )
-				.filter( function( key ) { return Nino.admin.elements._isFieldEmpty( key, Nino.admin.elements._currentModel[key] ) } )
-				.map( function( key ) { return Nino.admin.elements._fieldLabel( key ) } );
+			const uriInput = dc.getElementById('elements-form-uri');
+			if( Nino.admin.elements._isNew === true && Nino.admin.elements._isNumbered() === false && uriInput !== null && uriInput.value.trim() === '' )
+				problems.push( { key : '.uri', locale : null, kind : 'required', label : Nino.content.getText('/_admin/elements/label/uri') } );
 
-			Nino.admin.elements._saveLocales().forEach( function( locale ) {
+			Nino.admin.elements._globalKeys.forEach( function( key ) { field( key, null, true, {} ) } );
 
-				const visible = locale === Nino.admin.elements._selectedLocale;
-				const stored 	= Nino.admin.elements._localeValues[locale] ?? {};
+			// The translation on screen first, the rest in edit order
+			const locales = Nino.admin.elements._saveLocales();
+			locales.sort( function( a, b ) { return ( b === Nino.admin.elements._selectedLocale ) - ( a === Nino.admin.elements._selectedLocale ) } );
 
-				required( Nino.admin.elements._localeKeys )
-					.filter( function( key ) {
-						return visible === true
-							? Nino.admin.elements._isFieldEmpty( key, Nino.admin.elements._currentModel[key] )
-							: Nino.admin.elements._isStoredValueEmpty( Nino.admin.elements._currentModel[key], stored[key] );
-					} )
-					.forEach( function( key ) {
-						missing.push( Nino.admin.elements._fieldLabel( key )+ ( visible === true ? '' : ' ('+ locale+ ')' ) );
-					} );
+			locales.forEach( function( locale ) {
+				const stored = Nino.admin.elements._localeValues[locale] ?? {};
+				Nino.admin.elements._localeKeys.forEach( function( key ) { field( key, locale, locale === Nino.admin.elements._selectedLocale, stored ) } );
 			} );
 
-			return missing;
+			return problems;
+		},
+
+		/**
+		 *	Say where a save was refused: every problem on screen gets
+		 *	aria-invalid, a sentence under it that the control points at with
+		 *	aria-describedby, and the form's status line gets the one summary.
+		 *	The sentences are not alerts - a form with six empty fields would
+		 *	announce six at once - the summary is announced, and focus plus
+		 *	aria-describedby tell the rest where the person is standing.
+		 *
+		 *	A translation that is not on screen has its problems counted in the
+		 *	language switch instead (see _markLocales()); if the first problem
+		 *	of all is in one, the form switches to it, so there is something
+		 *	to focus.
+		 *
+		 *	@param		{Array<Object>}	problems			What _validate() found
+		 *	@param		{boolean}				[announce]		Say it in the status line and move the focus - a save was just refused
+		 *
+		 *	@return		void
+		 */
+		_showProblems : function( problems, announce ) {
+
+			const form = dc.getElementById('elements-form');
+
+			if( announce === true && problems.length > 0 && problems[0].locale !== null && problems[0].locale !== Nino.admin.elements._selectedLocale && Nino.admin.elements._localeKeys.length > 0 ) {
+				Nino.admin.elements._switchLocale( problems[0].locale );
+			}
+
+			form.querySelectorAll('.nino-admin-field-error').forEach( function( el ) { el.remove() } );
+			form.querySelectorAll('[aria-invalid]').forEach( function( el ) {
+				el.removeAttribute('aria-invalid');
+				el.removeAttribute('aria-describedby');
+			} );
+			Object.keys( Nino.admin.elements._htmlEditors ).forEach( function( key ) {
+				if( typeof Nino.admin.elements._htmlEditors[key].mark === 'function' )
+					Nino.admin.elements._htmlEditors[key].mark( { invalid : false, describedBy : '' } );
+			} );
+
+			let first = null;
+
+			problems.forEach( function( problem ) {
+
+				if( problem.locale !== null && problem.locale !== Nino.admin.elements._selectedLocale )
+					return;
+
+				const target = Nino.admin.elements._problemTarget( problem );
+				if( target === null )
+					return;
+
+				const id = ( problem.key === '.uri' ? 'elements-error-uri' : 'elements-error-field-'+ problem.key );
+				const error = dc.createElement('p');
+				error.id = id;
+				error.className = 'nino-admin-field-error';
+				error.textContent = Nino.content.getText( problem.key === '.uri' ? '/_admin/elements/error/uri' : ( problem.kind === 'json' ? '/_admin/elements/error/json' : '/_admin/elements/error/field-required' ) );
+				// After a label, not in it: the sentence is the control's description,
+				// and inside the label it would be part of its name as well
+				if( target.wrapper.tagName.toLowerCase() === 'label' )
+					target.wrapper.after( error );
+				else
+					target.wrapper.appendChild( error );
+
+				if( target.handle !== null )
+					target.handle.mark( { invalid : true, describedBy : id } );
+				else {
+					target.control.setAttribute( 'aria-invalid', 'true' );
+					target.control.setAttribute( 'aria-describedby', id );
+				}
+
+				if( first === null )
+					first = target;
+			} );
+
+			Nino.admin.elements._markLocales( problems );
+
+			if( announce !== true || problems.length === 0 )
+				return;
+
+			// One sentence, in the status line, which announces it once. A list that does not parse
+			// is not an empty required field, so its own words stand for it
+			Nino.admin.elements._status.fail( Nino.content.getText( problems.some( function( problem ) { return problem.kind === 'required' } ) ? '/_admin/elements/error/required' : '/_admin/elements/error/json' ) );
+
+			if( first === null )
+				return;
+
+			if( first.handle !== null )
+				first.handle.focus();
+			else if( typeof first.control.focus === 'function' )
+				first.control.focus();
+		},
+
+		/**
+		 *	The parts of a problem's field on screen: the element the sentence
+		 *	goes into, the control that is invalid and takes the focus, and the
+		 *	rich-text handle where the control is an editor
+		 *
+		 *	@param		{Object}	problem				{ key, kind, ... } from _validate()
+		 *
+		 *	@return		{Object|null}						{ wrapper, control, handle }
+		 */
+		_problemTarget : function( problem ) {
+
+			if( problem.key === '.uri' ) {
+				const input = dc.getElementById('elements-form-uri');
+				return input === null ? null : { wrapper : input.parentNode, control : input, handle : null };
+			}
+
+			const wrapper = Nino.admin.elements._fieldNodes[problem.key];
+			if( wrapper === undefined || wrapper === null )
+				return null;
+
+			if( Nino.admin.elements._htmlEditors[problem.key] !== undefined && typeof Nino.admin.elements._htmlEditors[problem.key].mark === 'function' )
+				return { wrapper : wrapper, control : wrapper, handle : Nino.admin.elements._htmlEditors[problem.key] };
+
+			// A list of references has no control that is the field: its search box
+			// is where a person starts, and where the focus goes
+			const control = wrapper.querySelector('.nino-admin-elementlist-search') ?? wrapper.querySelector('input:not([type="hidden"]), textarea, select');
+			return control === null ? null : { wrapper : wrapper, control : control, handle : null };
+		},
+
+		/**
+		 *	Tell the language switch which translations still have problems:
+		 *	their option reads "de_DE – 2 open", every other one its plain code
+		 *	again. Only the translations a save would write are ever named
+		 *	(see _validate())
+		 *
+		 *	@param		{Array<Object>}	problems
+		 *
+		 *	@return		void
+		 */
+		_markLocales : function( problems ) {
+
+			const select = dc.getElementById('elements-form-locale-select');
+			if( select === null )
+				return;
+
+			select.querySelectorAll('option').forEach( function( option ) {
+
+				const open = problems.filter( function( problem ) { return problem.locale === option.value } ).length;
+
+				option.textContent = open === 0
+					? option.value
+					: Nino.adminUi.format( Nino.content.getText('/_admin/elements/label/locale-open'), option.value, open );
+			} );
+		},
+
+		/**
+		 *	After a refused save the marks follow what is typed: the problems
+		 *	that were fixed lose theirs. Nothing is announced again - the status
+		 *	line keeps the refusal until the next save, or until nothing is marked
+		 *	and nothing is unsaved
+		 *
+		 *	@return		void
+		 */
+		_revalidate : function() {
+
+			if( Nino.admin.elements._validated === false || Nino.admin.elements._currentModel === null )
+				return;
+
+			Nino.admin.elements._storeVisibleLocaleFields();
+
+			const problems = Nino.admin.elements._validate();
+			Nino.admin.elements._showProblems( problems, false );
+
+			// Nothing marked and nothing left to save: the refusal no longer
+			// names anything, so the line goes back to idle
+			if( problems.length === 0 && Nino.admin.elements._status !== null && Nino.admin.elements._status.state === 'error' && Nino.admin.elements.isDirty() === false )
+				Nino.admin.elements._status.idle();
 		},
 
 		/**
@@ -1344,7 +1704,7 @@
 			if( input.dataset.type === 'double' )
 				return parseFloat( input.value ) || 0;
 			if( input.dataset.type === 'array' )
-				try { return JSON.parse( input.value ); } catch( e ) { return []; }
+				return Nino.admin.elements._parseArray( input.value ).value;
 
 			// The multi-reference control stores its ordered list as json in a
 			// hidden input, and marks it with data-multiple - a single reference
@@ -1359,6 +1719,17 @@
 		/**
 		 *	Store the currently visible locale fields into _localeValues before switching locale
 		 *
+		 *	A list or object text that is not valid JSON cannot be stored as a
+		 *	value. The previous value stays where it was, the text goes to
+		 *	_invalidArrays (what the field shows again, and what the save is held
+		 *	back for), and the translation counts as edited either way - or
+		 *	nothing would write it, ask about it or warn that it is about to be lost.
+		 *
+		 *	A translation counts as edited when a control differs from what it held
+		 *	when it was drawn, not from the stored value: a rich-text field
+		 *	reads back as the markup it built, which is not always the string the
+		 *	server holds, and merely visiting a translation must not mark it
+		 *
 		 *	@return		void
 		 */
 		_storeVisibleLocaleFields : function() {
@@ -1367,18 +1738,66 @@
 			if( wrap === null || Nino.admin.elements._selectedLocale === null )
 				return;
 
-			const previous = Nino.admin.elements._localeValues[Nino.admin.elements._selectedLocale] ?? {};
+			const locale = Nino.admin.elements._selectedLocale;
+			const previous = Nino.admin.elements._localeValues[locale] ?? {};
 			const values = {};
-			Nino.admin.elements._localeKeys.forEach( function( key ) { values[key] = Nino.admin.elements._readFieldByKey( key, Nino.admin.elements._currentModel[key] ) } );
+			let changed = false;
 
-			const changed = Nino.admin.elements._localeKeys.some( function( key ) {
-				return Nino.admin.elements._fieldValuesEqual( Nino.admin.elements._currentModel[key], previous[key], values[key] ) === false;
+			Nino.admin.elements._localeKeys.forEach( function( key ) {
+
+				const field = Nino.admin.elements._currentModel[key];
+				const slot = locale+ '|'+ key;
+
+				if( field.type === 'array' ) {
+					const typed = Nino.admin.elements._rawText( key );
+					if( typed !== null && Nino.admin.elements._parseArray( typed ).ok === false ) {
+						Nino.admin.elements._invalidArrays[slot] = typed;
+						values[key] = previous[key];
+						changed = true;
+						return;
+					}
+					delete Nino.admin.elements._invalidArrays[slot];
+				}
+
+				values[key] = Nino.admin.elements._readFieldByKey( key, field );
+
+				// What this account may not write is never sent, and a rich text
+				// reads back as the editor's markup rather than the stored string:
+				// it would count as edited just by visiting the language
+				if( field.type === 'image' || Nino.admin.elements._mayUpdate( key ) === false )
+					return;
+
+				const baseline = Nino.admin.elements._baseline.locale[key];
+				if( baseline !== undefined ? Nino.admin.elements._comparable( key, field ) !== baseline : Nino.admin.elements._fieldValuesEqual( field, previous[key], values[key] ) === false )
+					changed = true;
 			} );
 
-			if( changed === true && Nino.admin.elements._dirtyLocales.indexOf( Nino.admin.elements._selectedLocale ) === -1 )
-				Nino.admin.elements._dirtyLocales.push( Nino.admin.elements._selectedLocale );
+			const dirtyAt = Nino.admin.elements._dirtyLocales.indexOf( locale );
+			if( changed === true && dirtyAt === -1 )
+				Nino.admin.elements._dirtyLocales.push( locale );
 
-			Nino.admin.elements._localeValues[Nino.admin.elements._selectedLocale] = values;
+			Nino.admin.elements._localeValues[locale] = values;
+		},
+
+		/**
+		 *	What a field's control holds, as a string to compare: the value it
+		 *	reads back as, or - for a list or object text that does not parse -
+		 *	the text itself, so typing into a field that is already wrong counts
+		 *
+		 *	@param		{string}	key
+		 *	@param		{Object}	field
+		 *
+		 *	@return		{string}
+		 */
+		_comparable : function( key, field ) {
+
+			if( field.type === 'array' ) {
+				const typed = Nino.admin.elements._rawText( key ) ?? '';
+				const parsed = Nino.admin.elements._parseArray( typed );
+				return JSON.stringify( parsed.ok === true ? parsed.value : { invalid : typed } );
+			}
+
+			return JSON.stringify( Nino.admin.elements._readFieldByKey( key, field ) ?? null );
 		},
 
 		/**
@@ -1407,6 +1826,177 @@
 			}
 
 			return JSON.stringify( normalized( before ) ) === JSON.stringify( normalized( after ) );
+		},
+
+		/**
+		 *	Let go of everything a form on screen carries besides its values:
+		 *	the texts that were not JSON, the marks of a refused save, the
+		 *	baselines its controls are compared with, the copy that nobody has
+		 *	saved. Called wherever a form is opened, dropped or discarded
+		 *
+		 *	@return		void
+		 */
+		_resetEdits : function() {
+			Nino.admin.elements._invalidArrays	= {};
+			Nino.admin.elements._validated			= false;
+			Nino.admin.elements._copy						= false;
+			Nino.admin.elements._baseline				= { uri : null, global : {}, locale : {} };
+		},
+
+		/**
+		 *	Take the values as they are now for the ones the server holds -
+		 *	when an element was read, and for each translation as it is saved
+		 *
+		 *	@return		void
+		 */
+		_remember : function() {
+			Nino.admin.elements._pristine = {
+				global	: Nino.admin.elements._clone( Nino.admin.elements._globalValues ),
+				locales	: Nino.admin.elements._clone( Nino.admin.elements._localeValues ),
+			};
+		},
+
+		/**
+		 *	@param		{*}				value					Plain data: what the server sent
+		 *
+		 *	@return		{*}											A copy nothing else holds
+		 */
+		_clone : function( value ) {
+			return JSON.parse( JSON.stringify( value ) );
+		},
+
+		/**
+		 *	What the uri and the global fields hold now, as the baseline the
+		 *	form is compared with. Not an image (an upload commits it by
+		 *	itself) and not a field this account may not write
+		 *
+		 *	@return		void
+		 */
+		_captureGlobalBaseline : function() {
+
+			const uri = dc.getElementById('elements-form-uri');
+
+			Nino.admin.elements._baseline.uri = ( uri === null || uri.type === 'hidden' ) ? null : uri.value.trim();
+			Nino.admin.elements._baseline.global = {};
+			Nino.admin.elements._globalKeys.forEach( function( key ) {
+				if( Nino.admin.elements._currentModel[key].type !== 'image' && Nino.admin.elements._mayUpdate( key ) === true )
+					Nino.admin.elements._baseline.global[key] = Nino.admin.elements._comparable( key, Nino.admin.elements._currentModel[key] );
+			} );
+		},
+
+		/**
+		 *	The same for the translation on screen - after it was drawn
+		 *
+		 *	@return		void
+		 */
+		_captureLocaleBaseline : function() {
+
+			Nino.admin.elements._baseline.locale = {};
+			Nino.admin.elements._localeDirtyAtDraw = Nino.admin.elements._dirtyLocales.indexOf( Nino.admin.elements._selectedLocale ) !== -1;
+			if( dc.getElementById('elements-form-locale-fields') === null )
+				return;
+
+			Nino.admin.elements._localeKeys.forEach( function( key ) {
+				if( Nino.admin.elements._currentModel[key].type !== 'image' && Nino.admin.elements._mayUpdate( key ) === true )
+					Nino.admin.elements._baseline.locale[key] = Nino.admin.elements._comparable( key, Nino.admin.elements._currentModel[key] );
+			} );
+		},
+
+		/**
+		 *	Whether the form on screen holds input nobody has saved - what the
+		 *	shell asks before it lets anything throw that away (see
+		 *	Nino.admin.dirty). Only an open form can: a list or the type picker
+		 *	has nothing typed into it. It is when a translation was edited and
+		 *	left, a list or object text is not JSON, the form is a copy, or a
+		 *	control differs from what it held when it was drawn or last saved
+		 *
+		 *	@return		{boolean}
+		 */
+		isDirty : function() {
+
+			const form = dc.getElementById('elements-form');
+
+			if( form === null || Nino.admin.elements._currentType === null || form.classList.contains('admin-hidden') === true || dc.getElementById('elements-edit-form') === null )
+				return false;
+
+			if( Nino.admin.elements._copy === true || Object.keys( Nino.admin.elements._invalidArrays ).length > 0 )
+				return true;
+
+			const uri = dc.getElementById('elements-form-uri');
+			if( uri !== null && uri.type !== 'hidden' && Nino.admin.elements._baseline.uri !== null && uri.value.trim() !== Nino.admin.elements._baseline.uri )
+				return true;
+
+			const changed = function( keys, baseline ) {
+				return keys.some( function( key ) {
+					return baseline[key] !== undefined && Nino.admin.elements._comparable( key, Nino.admin.elements._currentModel[key] ) !== baseline[key];
+				} );
+			};
+
+			const onScreen = dc.getElementById('elements-form-locale-fields') !== null;
+			const localeChanged = onScreen === true && changed( Nino.admin.elements._localeKeys, Nino.admin.elements._baseline.locale );
+
+			// A translation a refused save stored is not edited once the fields
+			// hold what they were drawn with again
+			const edited = Nino.admin.elements._dirtyLocales.some( function( locale ) {
+				return locale !== Nino.admin.elements._selectedLocale || onScreen === false || Nino.admin.elements._localeDirtyAtDraw === true || localeChanged === true;
+			} );
+
+			return edited === true || localeChanged === true || changed( Nino.admin.elements._globalKeys, Nino.admin.elements._baseline.global );
+		},
+
+		/**
+		 *	Throw the input away: the values go back to what the server holds,
+		 *	and what the controls show now counts as saved. The form is about to
+		 *	be left or drawn again, which is what makes that honest. If the exit
+		 *	then fails without drawing the form (a refused request), the
+		 *	controls still show the discarded text and the next Save writes it.
+		 *	While a save runs nothing is thrown away: it finishes with what it was given
+		 *
+		 *	@return		void
+		 */
+		discard : function() {
+
+			// A running save sends the values it was given: going back to the
+			// stored ones now would change what the languages not yet sent carry
+			if( Nino.admin.elements._saving === true )
+				return;
+
+			Nino.admin.elements._globalValues	= Nino.admin.elements._clone( Nino.admin.elements._pristine.global );
+			Nino.admin.elements._localeValues	= Nino.admin.elements._clone( Nino.admin.elements._pristine.locales );
+			Nino.admin.elements._dirtyLocales	= [];
+			Nino.admin.elements._resetEdits();
+			Nino.admin.elements._captureGlobalBaseline();
+			Nino.admin.elements._captureLocaleBaseline();
+			Nino.admin.elements._refreshDirty();
+		},
+
+		/**
+		 *	Run proceed() - after the shell has asked about unsaved input in
+		 *	this form, where the shell has the registry. A shell without it
+		 *	(an older one, a test) goes straight on
+		 *
+		 *	@param		{Function}	proceed
+		 *
+		 *	@return		void
+		 */
+		_guard : function( proceed ) {
+
+			if( typeof Nino.admin.dirty !== 'object' ) {
+				proceed();
+				return;
+			}
+
+			Nino.admin.dirty.guard( [ 'elements' ], proceed );
+		},
+
+		/**
+		 *	Have the shell look at the markers and the browser's question again
+		 *
+		 *	@return		void
+		 */
+		_refreshDirty : function() {
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.refresh();
 		},
 
 		/**
@@ -1455,6 +2045,16 @@
 			wrap.querySelectorAll('.admin-element-nav button').forEach( function( btn ) {
 				btn.disabled = pending || btn.dataset.uri === '';
 			} );
+			// The back link is one of them: a click on it would ask about input
+			// the running save is already sending
+			wrap.querySelectorAll('a').forEach( function( el ) {
+				// Links inside a rich-text editor are its content: getValue() returns them, so
+				// writing attributes onto them would turn the field's value into a change
+				if( el.closest('[contenteditable]') !== null )
+					return;
+				el.setAttribute( 'aria-disabled', pending ? 'true' : 'false' );
+				el.style.pointerEvents = pending ? 'none' : '';
+			} );
 			wrap.querySelectorAll('[contenteditable]').forEach( function( el ) {
 				const locked = pending || el.closest('.admin-field-readonly') !== null;
 				el.contentEditable = locked ? 'false' : 'true';
@@ -1488,8 +2088,37 @@
 				heading.textContent = Nino.admin.elements._headingText( values );
 
 			Nino.admin.elements._localeKeys.forEach( function( key ) {
-				wrap.appendChild( Nino.admin.elements._renderField( key, Nino.admin.elements._currentModel[key], values[key] ?? null ) );
+				wrap.appendChild( Nino.admin.elements._renderField( key, Nino.admin.elements._currentModel[key], values[key] ?? null, Nino.admin.elements._invalidArrays[Nino.admin.elements._selectedLocale+ '|'+ key] ) );
 			} );
+
+			Nino.admin.elements._captureLocaleBaseline();
+
+			// A fresh translation carries the marks of the refused save too
+			if( Nino.admin.elements._validated === true )
+				Nino.admin.elements._showProblems( Nino.admin.elements._validate(), false );
+		},
+
+		/**
+		 *	Show another translation: what is on screen is stored first, the
+		 *	switch itself follows (the select's own change handler reads the
+		 *	value from the select, so a switch made from code sets it too), and
+		 *	the workbench's content locale moves with it
+		 *
+		 *	@param		{string}	locale
+		 *
+		 *	@return		void
+		 */
+		_switchLocale : function( locale ) {
+
+			Nino.admin.elements._storeVisibleLocaleFields();
+			Nino.admin.elements._selectedLocale = locale;
+
+			const select = dc.getElementById('elements-form-locale-select');
+			if( select !== null )
+				select.value = locale;
+
+			Nino.admin.sessionLocale.set( locale );
+			Nino.admin.elements._renderLocaleFields();
 		},
 
 		/**
@@ -1515,6 +2144,7 @@
 		_renderForm : function() {
 
 			Nino.admin.elements._destroyHtmlEditors();
+			Nino.admin.elements._fieldNodes = {};
 
 			const wrap = dc.getElementById('elements-form');
 			wrap.innerHTML = '';
@@ -1575,7 +2205,10 @@
 				const uriInput = dc.createElement('input');
 				uriInput.type = 'text';
 				uriInput.id = 'elements-form-uri';
-				uriInput.required = true;
+				// Not the native required: its bubble comes in the browser's language
+				// and a save from the unsaved-changes question never meets it. The
+				// uri is the first thing _validate() asks for
+				Nino.admin.elements._markRequired( true, uriSpan, uriInput );
 				uriInput.value = '';
 				uriLabel.appendChild( uriInput );
 				form.appendChild( uriLabel );
@@ -1653,12 +2286,7 @@
 					option.selected = ( locale === Nino.admin.elements._selectedLocale );
 					select.appendChild( option );
 				} );
-				select.addEventListener( 'change', function() {
-					Nino.admin.elements._storeVisibleLocaleFields();
-					Nino.admin.elements._selectedLocale = select.value;
-					Nino.admin.sessionLocale.set( select.value );
-					Nino.admin.elements._renderLocaleFields();
-				} );
+				select.addEventListener( 'change', function() { Nino.admin.elements._switchLocale( select.value ) } );
 				toolbar.appendChild( select );
 
 				const fieldsWrap = dc.createElement('div');
@@ -1720,14 +2348,22 @@
 			// Whether what is on screen is saved: any edit turns "saved at" into
 			// "unsaved changes", and a save says which of the two it ended in
 			Nino.admin.elements._status = Nino.adminUi.status( msg );
-			Nino.admin.elements._status.bind( form );
+			Nino.admin.elements._status.bind( form, Nino.admin.elements.isDirty );
 
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.elements._save() } );
 
+			// After a refused save the marks follow what is typed
+			form.addEventListener( 'input', Nino.admin.elements._revalidate );
+			form.addEventListener( 'change', Nino.admin.elements._revalidate );
+
 			wrap.appendChild( form );
+
+			Nino.admin.elements._captureGlobalBaseline();
 
 			if( Nino.admin.elements._localeKeys.length > 0 )
 				Nino.admin.elements._renderLocaleFields();
+
+			Nino.admin.elements._refreshDirty();
 		},
 
 		/**
@@ -1768,32 +2404,44 @@
 		/**
 		 *	Collect the form's current values and save (insert or update) the element
 		 *
+		 *	Every way this ends reports to done( ok ), if there is one: the
+		 *	shell's question about unsaved input saves through it and goes on
+		 *	only when it hears true (see Nino.admin.dirty.guard())
+		 *
+		 *	@param		{Function}	[done]				Called once with true when everything was written, false otherwise
+		 *
 		 *	@return		void
 		 */
-		_save : function() {
+		_save : function( done ) {
 
-			if( Nino.admin.elements._saving === true )
+			const report = function( ok ) {
+				Nino.admin.elements._refreshDirty();
+				if( typeof done === 'function' )
+					done( ok );
+			};
+
+			if( Nino.admin.elements._saving === true ) {
+				report( false );
 				return;
+			}
 
 			Nino.admin.elements._storeVisibleLocaleFields();
+
+			// Nothing is sent while something holds the save back: the problems are
+			// marked at their fields, with the focus on the first (see _validate())
+			const problems = Nino.admin.elements._validate();
+			if( problems.length > 0 ) {
+				Nino.admin.elements._validated = true;
+				Nino.admin.elements._showProblems( problems, true );
+				report( false );
+				return;
+			}
 
 			// A numbered type is saved with no uri on purpose - that is what asks
 			// the backend for the next number. Reassigned below, once the insert
 			// says which one it got, so the remaining locales of this same save
 			// address the element that now exists.
 			let uri = dc.getElementById('elements-form-uri').value.trim();
-			const numberedInsert = Nino.admin.elements._isNew === true && Nino.admin.elements._isNumbered() === true;
-
-			if( uri === '' && numberedInsert === false ) {
-				Nino.admin.elements._status.fail( Nino.content.getText('/_admin/elements/error/uri') );
-				return;
-			}
-
-			const missing = Nino.admin.elements._missingRequiredFields();
-			if( missing.length > 0 ) {
-				Nino.admin.elements._status.fail( Nino.content.getText('/_admin/elements/error/required')+ ' '+ missing.join(', ') );
-				return;
-			}
 
 			// Only what this account may write: a read-only field has no edit to
 			// carry, and sending it back unchanged would be refused by the same
@@ -1846,6 +2494,7 @@
 						Nino.admin.elements._saving = false;
 						Nino.admin.elements._setFormPending( false );
 						Nino.admin.elements._status.error( status, response, '/_admin/elements/error/save' );
+						report( false );
 						return;
 					}
 
@@ -1871,6 +2520,10 @@
 					Nino.admin.elements._localeValues[locale] = Nino.admin.elements._localeValues[locale] ?? {};
 					Nino.admin.elements._localeKeys.forEach( function( key ) { Nino.admin.elements._localeValues[locale][key] = response.element[key] ?? null } );
 
+					// What the server holds now: what discard() goes back to
+					Nino.admin.elements._pristine.global = Nino.admin.elements._clone( Nino.admin.elements._globalValues );
+					Nino.admin.elements._pristine.locales[locale] = Nino.admin.elements._clone( Nino.admin.elements._localeValues[locale] );
+
 					const dirtyAt = Nino.admin.elements._dirtyLocales.indexOf( locale );
 					if( dirtyAt !== -1 )
 						Nino.admin.elements._dirtyLocales.splice( dirtyAt, 1 );
@@ -1881,19 +2534,33 @@
 						return;
 					}
 
+					// Saved, so nothing is refused or typed-but-wrong any more
+					if( Nino.admin.elements._validated === true )
+						Nino.admin.elements._showProblems( [], false );
+					Nino.admin.elements._resetEdits();
+
 					// Stay on the form after saving. A newly-created element is rendered
 					// once more to lock its uri and expose the delete action; existing
-					// elements keep focus and selection exactly where they were.
+					// elements keep focus and selection exactly where they were - what
+					// their controls hold is what is saved now. The baseline is taken
+					// once the form is enabled again, like Text and Keys do.
 					if( wasNew === true ) {
 						Nino.admin.elements._renderForm();
 						Nino.admin.router.set( 'elements', [ Nino.admin.elements._currentType, Nino.admin.elements._currentUri ] );
 					}
 
-					Nino.admin.elements._status.saved();
 					Nino.admin.elements._saving = false;
 					Nino.admin.elements._setFormPending( false );
 
+					if( wasNew !== true ) {
+						Nino.admin.elements._captureGlobalBaseline();
+						Nino.admin.elements._captureLocaleBaseline();
+					}
+
+					Nino.admin.elements._status.saved();
+
 					Nino.admin.elements._refreshList();
+					report( true );
 				} );
 			}
 
@@ -1987,9 +2654,26 @@
 		 *	writes them all rather than only the one on screen (see
 		 *	_saveLocales()).
 		 *
+		 *	The values of the form on screen are what is copied, so input nobody
+		 *	has saved is asked about first: saved, the copy carries it; thrown
+		 *	away, the copy is of the element as it is stored.
+		 *
 		 *	@return		void
 		 */
 		_duplicate : function() {
+
+			if( Nino.admin.elements._saving === true || Nino.admin.elements._isNew === true )
+				return;
+
+			Nino.admin.elements._guard( Nino.admin.elements._makeCopy );
+		},
+
+		/**
+		 *	The copy itself (see _duplicate())
+		 *
+		 *	@return		void
+		 */
+		_makeCopy : function() {
 
 			if( Nino.admin.elements._saving === true || Nino.admin.elements._isNew === true )
 				return;
@@ -2010,6 +2694,9 @@
 			Nino.admin.elements._currentUri 		= null;
 			Nino.admin.elements._raw 						= {};
 			Nino.admin.elements._dirtyLocales 	= Object.keys( Nino.admin.elements._localeValues );
+			Nino.admin.elements._resetEdits();
+			Nino.admin.elements._copy 					= true;
+			Nino.admin.elements._pristine 			= { global : {}, locales : {} };
 
 			Nino.admin.elements._renderForm();
 			Nino.admin.router.set( 'elements', [ Nino.admin.elements._currentType, 'new' ] );
@@ -2053,5 +2740,14 @@
 			} );
 		},
 	};
+
+	// The shell asks before anything throws this form's input away (see
+	// Nino.admin.dirty). A shell without the registry is simply not asking
+	if( typeof Nino.admin.dirty === 'object' )
+		Nino.admin.dirty.register( 'elements', {
+			isDirty : Nino.admin.elements.isDirty,
+			save		: function( done ) { Nino.admin.elements._save( done ) },
+			discard : Nino.admin.elements.discard,
+		} );
 
 })(window, document, document.documentElement, document.body);

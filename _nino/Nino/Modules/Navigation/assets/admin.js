@@ -317,6 +317,10 @@
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.navs._save() } );
 
 			wrap.appendChild( form );
+
+			// What the form holds now is what is saved
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.snapshot( 'navs' );
 		},
 
 		/**
@@ -399,6 +403,8 @@
 
 			const addSelect = dc.createElement('select');
 			addSelect.id = 'navs-form-add';
+			// Which route the button below would add is a choice, not an edit
+			addSelect.dataset.dirty = 'ignore';
 			addSelect.disabled = free.length === 0;
 			free.forEach( function( route ) {
 				const option = dc.createElement('option');
@@ -426,12 +432,22 @@
 		/**
 		 *	Run one entry-level action against the menu currently open
 		 *
+		 *	The menu is drawn again from the answer, which drops a key typed into
+		 *	its field and not saved yet - so that is asked about first (see
+		 *	Nino.admin.dirty.guard())
+		 *
 		 *	@param		{string}	endpoint			'assign' | 'unassign' | 'move'
 		 *	@param		{Object}	payload				Merged onto { key }
+		 *	@param		{boolean}	[guarded]			The unsaved input was asked about already
 		 *
 		 *	@return		void
 		 */
-		_entryAction : function( endpoint, payload ) {
+		_entryAction : function( endpoint, payload, guarded ) {
+
+			if( guarded !== true && typeof Nino.admin.dirty === 'object' ) {
+				Nino.admin.dirty.guard( [ 'navs' ], function() { Nino.admin.navs._entryAction( endpoint, payload, true ) } );
+				return;
+			}
 
 			const msg = dc.getElementById('navs-form-msg');
 			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
@@ -478,9 +494,19 @@
 		/**
 		 *	Create the menu currently open, or rename it
 		 *
+		 *	Every way this ends reports to done( ok ), if there is one (see
+		 *	Nino.admin.dirty.guard())
+		 *
+		 *	@param		{Function}	[done]				Called once with true when the menu was written, false otherwise
+		 *
 		 *	@return		void
 		 */
-		_save : function() {
+		_save : function( done ) {
+
+			const report = function( ok ) {
+				if( typeof done === 'function' )
+					done( ok );
+			};
 
 			const msg = dc.getElementById('navs-form-msg');
 			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
@@ -494,6 +520,7 @@
 
 				if( status !== 200 || response === null ) {
 					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
+					report( false );
 					return;
 				}
 
@@ -506,6 +533,8 @@
 				const saved = dc.getElementById('navs-form-msg');
 				if( saved !== null )
 					saved.textContent = Nino.content.getText('/_admin/common/msg/saved');
+
+				report( true );
 			} );
 		},
 
@@ -535,5 +564,10 @@
 	};
 
 	Nino.events.bindCallback( 'ready', Nino.admin.navs.init );
+
+	// The shell asks before anything throws the open menu's input away (see
+	// Nino.admin.dirty). A shell without the registry is simply not asking
+	if( typeof Nino.admin.dirty === 'object' )
+		Nino.admin.dirty.watchForm( 'navs', function() { return dc.getElementById('navs-form') }, function( done ) { Nino.admin.navs._save( done ) } );
 
 })(window, document, document.documentElement, document.body);

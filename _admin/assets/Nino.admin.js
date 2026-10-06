@@ -130,6 +130,107 @@
 			return empty;
 		},
 
+		// Whether choiceDialog() has a question open - one at a time: a second
+		// call while it stands is the same click arriving twice
+		_choiceOpen : false,
+
+		/**
+		 *	A modal question with more than two answers (a confirm() has two):
+		 *	a native <dialog> in the workbench root, opened with showModal(),
+		 *	so the page behind keeps everything that was typed into it. Escape
+		 *	is the secondary choice, the one that does nothing; focus goes back
+		 *	to what had it when the question was asked.
+		 *
+		 *	Owns no strings and names no Nino.admin member: the caller says
+		 *	what to ask and what the answers are called, in the interface
+		 *	language. Where the browser has no showModal() the question is
+		 *	asked with confirm() - OK picks the 'primary' choice (the 'danger'
+		 *	one where there is none), Cancel the 'secondary' one: nothing is
+		 *	thrown away by agreeing to the question as it is worded
+		 *
+		 *	@param		{Object}		options
+		 *	@param		{string}		[options.title]
+		 *	@param		{string}		options.message
+		 *	@param		{Array}			options.choices				[ { value, label, kind } ], kind 'primary', 'danger' or 'secondary'
+		 *	@param		{Function}	options.onChoose			Called once with the chosen value
+		 *
+		 *	@return		{boolean}										false when a question is already open
+		 */
+		choiceDialog : function( options ) {
+
+			if( Nino.adminUi._choiceOpen === true )
+				return false;
+
+			const choices = options.choices;
+			const cancel 	= choices.find( function( choice ) { return choice.kind === 'secondary' } ) ?? choices[choices.length - 1];
+			const dialog 	= dc.createElement('dialog');
+
+			if( typeof dialog.showModal !== 'function' ) {
+				const yes = choices.find( function( choice ) { return choice.kind === 'primary' } ) ?? choices.find( function( choice ) { return choice.kind === 'danger' } ) ?? cancel;
+				options.onChoose( wn.confirm( options.message ) === true ? yes.value : cancel.value );
+				return true;
+			}
+
+			Nino.adminUi._choiceOpen = true;
+
+			const opener = dc.activeElement;
+			let chosen = null;
+
+			dialog.className = 'nino-admin-dialog';
+			dialog.setAttribute( 'aria-describedby', 'nino-admin-choice-text' );
+
+			const body = dc.createElement('div');
+			body.className = 'nino-admin-dialog-body';
+
+			if( typeof options.title === 'string' && options.title !== '' ) {
+				const title = dc.createElement('h2');
+				title.id = 'nino-admin-choice-title';
+				title.className = 'nino-admin-dialog-title';
+				title.textContent = options.title;
+				body.appendChild( title );
+				dialog.setAttribute( 'aria-labelledby', 'nino-admin-choice-title' );
+			}
+
+			const text = dc.createElement('p');
+			text.id = 'nino-admin-choice-text';
+			text.textContent = options.message;
+			body.appendChild( text );
+
+			const actions = dc.createElement('div');
+			actions.className = 'nino-admin-dialog-actions';
+
+			choices.forEach( function( choice ) {
+				const btn = dc.createElement('button');
+				btn.type = 'button';
+				btn.className = 'nino-admin-btn-'+ ( choice.kind === 'primary' || choice.kind === 'danger' ? choice.kind : 'secondary' );
+				btn.textContent = choice.label;
+				btn.addEventListener( 'click', function() {
+					chosen = choice;
+					dialog.close();
+				} );
+				actions.appendChild( btn );
+			} );
+
+			body.appendChild( actions );
+			dialog.appendChild( body );
+
+			// The Escape key closes it too, and says no
+			dialog.addEventListener( 'close', function() {
+				dialog.remove();
+				Nino.adminUi._choiceOpen = false;
+				if( opener !== null && typeof opener.focus === 'function' )
+					opener.focus();
+				options.onChoose( ( chosen ?? cancel ).value );
+			} );
+
+			// Inside the workbench root, not the body: the design system's rules
+			// are scoped to .nino-admin and would not reach it there
+			( dc.getElementById('admin-page-wrap') ?? dc.body ).appendChild( dialog );
+			dialog.showModal();
+
+			return true;
+		},
+
 		/**
 		 *	A label the server sends either as a fill key or as literal text:
 		 *	a key ('/…') is looked up in the interface language, anything else

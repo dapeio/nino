@@ -116,7 +116,7 @@
 		 *	@param		{number}		maxlength			Max visible (textContent) character count
 		 *	@param		{number}		rows					Minimum height in lines of text, 0 for the stylesheet's default
 		 *
-		 *	@return		{Object}									{ getValue(), setValue( html ), destroy() }
+		 *	@return		{Object}									{ getValue(), setValue( html ), focus(), mark( state ), destroy() }
 		 */
 		create : function( container, value, maxlength, rows ) {
 
@@ -434,6 +434,42 @@
 				setValue : function( html ) {
 					load( content, html );
 					updateCounter();
+				},
+
+				/**
+				 *	Put the caret in the text, where a person who was told this
+				 *	field is empty can start typing
+				 */
+				focus : function() {
+					content.focus();
+				},
+
+				/**
+				 *	Say on the text box itself what the field is: required, refused
+				 *	(invalid) and the element that explains why (describedBy, an id,
+				 *	'' to let go of it). A state left out stays as it is, false takes
+				 *	the attribute off. The box is the role=textbox element, not the
+				 *	group around the toolbar - that is what a screen reader lands on
+				 *
+				 *	@param		{Object}		state					{ required, invalid, describedBy }
+				 *
+				 *	@return		void
+				 */
+				mark : function( state ) {
+
+					[ [ 'required', 'aria-required' ], [ 'invalid', 'aria-invalid' ] ].forEach( function( pair ) {
+						if( state[pair[0]] === true )
+							content.setAttribute( pair[1], 'true' );
+						else if( state[pair[0]] === false )
+							content.removeAttribute( pair[1] );
+					} );
+
+					if( typeof state.describedBy === 'string' ) {
+						if( state.describedBy === '' )
+							content.removeAttribute('aria-describedby');
+						else
+							content.setAttribute( 'aria-describedby', state.describedBy );
+					}
 				},
 
 				destroy : function() {

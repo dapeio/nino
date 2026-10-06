@@ -30,9 +30,21 @@
 		_currentGroup		: null,
 		_selectedLocale	: null,
 		_localeValues		: {},
+		// The translations edited since the group was opened, in the order they
+		// were edited - what one Save writes (see _saveLocales())
+		_dirtyLocales		: [],
+		// What the controls of the open group held when they were drawn or last
+		// saved, key -> value: the global fields, and the translation on screen
+		// (see Nino.admin.text, which keeps the same)
+		_baseline				: { global : {}, locale : {} },
+		// Which form the pane shows - 'group', 'new' or 'scan' - and the rows
+		// of the scan form, for isDirty()
+		_view						: null,
+		_scanRows				: [],
 		_htmlEditors		: {},
 		_fieldEls				: {},
 		_isNew					: false,
+		_saving					: false,
 		_ready					: false,
 		// What the last scan pass did, shown once above the category list -
 		// the form it happened in is gone by then (see _saveScanResults())
@@ -237,6 +249,9 @@
 			Nino.admin.keys._currentGroup 	= group;
 			Nino.admin.keys._selectedLocale = Nino.admin.keys._locales[0] ?? '';
 			Nino.admin.keys._localeValues 	= {};
+			Nino.admin.keys._dirtyLocales 	= [];
+			Nino.admin.keys._baseline 			= { global : {}, locale : {} };
+			Nino.admin.keys._view 					= 'group';
 			Nino.admin.keys._fieldEls 			= {};
 
 			Nino.admin.keys._renderGroupForm();
@@ -320,7 +335,7 @@
 			globalCheck.type = 'checkbox';
 			globalCheck.checked = entry.global;
 			globalCheck.addEventListener( 'change', function() {
-				Nino.admin.keys._saveSchema( entry.key, globalCheck.checked, blacklistCheck.checked );
+				Nino.admin.keys._saveSchema( entry.key, globalCheck.checked, blacklistCheck.checked, function() { globalCheck.checked = ! globalCheck.checked } );
 			} );
 			globalLabel.appendChild( globalCheck );
 			globalLabel.appendChild( dc.createTextNode( ' '+ Nino.content.getText('/_admin/common/label/global') ) );
@@ -331,7 +346,7 @@
 			blacklistCheck.type = 'checkbox';
 			blacklistCheck.checked = entry.blacklisted;
 			blacklistCheck.addEventListener( 'change', function() {
-				Nino.admin.keys._saveSchema( entry.key, globalCheck.checked, blacklistCheck.checked );
+				Nino.admin.keys._saveSchema( entry.key, globalCheck.checked, blacklistCheck.checked, function() { blacklistCheck.checked = ! blacklistCheck.checked } );
 			} );
 			blacklistLabel.appendChild( blacklistCheck );
 			blacklistLabel.appendChild( dc.createTextNode( ' '+ Nino.content.getText('/_admin/keys/label/blacklist') ) );
@@ -348,20 +363,47 @@
 		 *	since a shape change moves the key between groups' locale/global
 		 *	fieldsets, which the currently-open form can no longer represent
 		 *
+		 *	The reload drops what is typed into the open group, so unsaved input
+		 *	is asked about first (see Nino.admin.dirty.guard()); a Cancel puts the
+		 *	checkbox that was just clicked back
+		 *
 		 *	@param		{string}	key
 		 *	@param		{boolean}	isGlobal
 		 *	@param		{boolean}	blacklisted
+		 *	@param		{Function}	[undo]				Puts the clicked checkbox back
 		 *
 		 *	@return		void
 		 */
-		_saveSchema : function( key, isGlobal, blacklisted ) {
-			Nino.admin.keys._apiCall( 'save', { key : key, global : isGlobal, blacklisted : blacklisted }, function( status, response ) {
-				if( status !== 200 || response === null ) {
-					wn.alert( Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' ) );
-					return;
-				}
-				Nino.admin.keys.init();
-			} );
+		_saveSchema : function( key, isGlobal, blacklisted, undo ) {
+			Nino.admin.keys._guard( function() {
+				Nino.admin.keys._apiCall( 'save', { key : key, global : isGlobal, blacklisted : blacklisted }, function( status, response ) {
+					if( status !== 200 || response === null ) {
+						wn.alert( Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' ) );
+						return;
+					}
+					Nino.admin.keys.init();
+				} );
+			}, undo );
+		},
+
+		/**
+		 *	Run proceed() - after the shell has asked about unsaved input in this
+		 *	tab, where the shell has the registry. A shell without it (an older
+		 *	one, a test) goes straight on
+		 *
+		 *	@param		{Function}	proceed
+		 *	@param		{Function}	[onCancel]
+		 *
+		 *	@return		void
+		 */
+		_guard : function( proceed, onCancel ) {
+
+			if( typeof Nino.admin.dirty !== 'object' ) {
+				proceed();
+				return;
+			}
+
+			Nino.admin.dirty.guard( [ 'keys' ], proceed, onCancel );
 		},
 
 		/**
@@ -379,12 +421,14 @@
 			if( newKey === key )
 				return;
 
-			Nino.admin.keys._apiCall( 'rename', { key : key, newKey : newKey }, function( status, response ) {
-				if( status !== 200 || response === null ) {
-					wn.alert( Nino.adminUi.api.errorText( status, response, '/_admin/common/error/rename' ) );
-					return;
-				}
-				Nino.admin.keys.init();
+			Nino.admin.keys._guard( function() {
+				Nino.admin.keys._apiCall( 'rename', { key : key, newKey : newKey }, function( status, response ) {
+					if( status !== 200 || response === null ) {
+						wn.alert( Nino.adminUi.api.errorText( status, response, '/_admin/common/error/rename' ) );
+						return;
+					}
+					Nino.admin.keys.init();
+				} );
 			} );
 		},
 
@@ -400,12 +444,14 @@
 			if( wn.confirm( Nino.content.getText('/_admin/keys/confirm/delete').replace( '%s', key ) ) === false )
 				return;
 
-			Nino.admin.keys._apiCall( 'delete', { key : key }, function( status, response ) {
-				if( status !== 200 || response === null ) {
-					wn.alert( Nino.adminUi.api.errorText( status, response, '/_admin/common/error/delete' ) );
-					return;
-				}
-				Nino.admin.keys.init();
+			Nino.admin.keys._guard( function() {
+				Nino.admin.keys._apiCall( 'delete', { key : key }, function( status, response ) {
+					if( status !== 200 || response === null ) {
+						wn.alert( Nino.adminUi.api.errorText( status, response, '/_admin/common/error/delete' ) );
+						return;
+					}
+					Nino.admin.keys.init();
+				} );
 			} );
 		},
 
@@ -438,7 +484,11 @@
 
 		/**
 		 *	Snapshot the currently visible locale-scoped fields into
-		 *	_localeValues before switching locale (or before saving)
+		 *	_localeValues before switching locale (or before saving), and note
+		 *	the translation as edited when a control differs from what it held
+		 *	when it was drawn - merely visiting one must not mark it, and a
+		 *	rich-text field reads back as the markup it built, which is not
+		 *	always the string the server holds
 		 *
 		 *	@return		void
 		 */
@@ -450,10 +500,184 @@
 			if( entries.length === 0 || Nino.admin.keys._selectedLocale === null )
 				return;
 
+			const locale = Nino.admin.keys._selectedLocale;
+			const previous = Nino.admin.keys._localeValues[locale] ?? {};
+			const baseline = Nino.admin.keys._baseline.locale;
 			const values = {};
 			entries.forEach( function( entry ) { values[entry.key] = Nino.admin.keys._readKeyValue( entry ) } );
 
-			Nino.admin.keys._localeValues[Nino.admin.keys._selectedLocale] = values;
+			const changed = entries.some( function( entry ) {
+				return String( baseline[entry.key] ?? previous[entry.key] ?? entry.values[locale] ?? '' ) !== String( values[entry.key] ?? '' );
+			} );
+
+			if( changed === true && Nino.admin.keys._dirtyLocales.indexOf( locale ) === -1 )
+				Nino.admin.keys._dirtyLocales.push( locale );
+
+			Nino.admin.keys._localeValues[locale] = values;
+		},
+
+		/**
+		 *	Locales one Save click must persist, in the order they were edited.
+		 *	When only global fields changed, the selected locale is a harmless
+		 *	fallback that gives the save loop one request to carry them in.
+		 *
+		 *	@return		{Array<string>}
+		 */
+		_saveLocales : function() {
+			const locales = Nino.admin.keys._dirtyLocales.slice();
+			if( locales.length === 0 )
+				locales.push( Nino.admin.keys._selectedLocale );
+			return locales;
+		},
+
+		/**
+		 *	Keep controls stable while sequential locale requests are running:
+		 *	the fields, the locale switch, the buttons of every key (rename,
+		 *	delete, the schema checkboxes - each of them reloads the module), the
+		 *	back link. A locale switch in the middle would change which values a
+		 *	later callback believes it just persisted
+		 *
+		 *	@param		{boolean}	pending
+		 *
+		 *	@return		void
+		 */
+		_setFormPending : function( pending ) {
+
+			// '#keys-form', not '#keys-edit-form': the locale select and the back
+			// link are appended to the toolbar beside the form
+			const form = dc.getElementById('keys-form');
+			if( form === null )
+				return;
+
+			form.querySelectorAll('input, textarea, select, button').forEach( function( el ) { el.disabled = pending } );
+			form.querySelectorAll('a').forEach( function( el ) {
+				// Links inside a rich-text editor are its content: getValue() returns them, so
+				// writing attributes onto them would turn the field's value into a change
+				if( el.closest('[contenteditable]') !== null )
+					return;
+				el.setAttribute( 'aria-disabled', pending ? 'true' : 'false' );
+				el.style.pointerEvents = pending ? 'none' : '';
+			} );
+			form.querySelectorAll('[contenteditable]').forEach( function( el ) {
+				el.contentEditable = pending ? 'false' : 'true';
+				el.setAttribute( 'aria-disabled', pending ? 'true' : 'false' );
+			} );
+		},
+
+		/**
+		 *	Take what the controls on screen hold now as what is saved - the
+		 *	translation after it was drawn, the global fields too when the whole
+		 *	form was drawn or saved
+		 *
+		 *	@param		{boolean}	withGlobal
+		 *
+		 *	@return		void
+		 */
+		_captureBaseline : function( withGlobal ) {
+
+			const entries = Nino.admin.keys._groups[Nino.admin.keys._currentGroup] ?? [];
+			const read = function( global ) {
+				const held = {};
+				entries.filter( function( entry ) { return entry.global === global } ).forEach( function( entry ) {
+					held[entry.key] = Nino.admin.keys._readKeyValue( entry );
+				} );
+				return held;
+			};
+
+			Nino.admin.keys._baseline.locale = read( false );
+
+			if( withGlobal === true )
+				Nino.admin.keys._baseline.global = read( true );
+		},
+
+		/**
+		 *	Whether the tab holds input nobody has saved - what the shell asks
+		 *	before it lets anything throw that away (see Nino.admin.dirty). For
+		 *	a category: a translation that was edited and left, or a field that
+		 *	differs from what it held when it was drawn or last saved. For the
+		 *	new-key form and the scan form: anything typed or ticked
+		 *
+		 *	@return		{boolean}
+		 */
+		isDirty : function() {
+
+			const form = dc.getElementById('keys-form');
+
+			if( form === null || form.classList.contains('admin-hidden') === true )
+				return false;
+
+			if( Nino.admin.keys._view === 'new' ) {
+				const value = function( id ) { const el = dc.getElementById( id ); return el === null ? '' : el.value };
+				const isGlobal = dc.getElementById('keys-form-new-global');
+				return value('keys-form-key') !== '' || value('keys-form-new-value') !== '' || ( isGlobal !== null && isGlobal.checked === true );
+			}
+
+			if( Nino.admin.keys._view === 'scan' )
+				return Nino.admin.keys._scanRows.some( function( row ) { return row.valueInput.value !== '' || row.ignoreCheck.checked === true } );
+
+			if( Nino.admin.keys._view !== 'group' || dc.getElementById('keys-edit-form') === null )
+				return false;
+
+			if( Nino.admin.keys._dirtyLocales.length > 0 )
+				return true;
+
+			return ( Nino.admin.keys._groups[Nino.admin.keys._currentGroup] ?? [] ).some( function( entry ) {
+				const held = entry.global === true ? Nino.admin.keys._baseline.global : Nino.admin.keys._baseline.locale;
+				return held[entry.key] !== undefined && Nino.admin.keys._readKeyValue( entry ) !== held[entry.key];
+			} );
+		},
+
+		/**
+		 *	Throw the input away. A category goes back to the stored values the
+		 *	server sent and counts what its controls show as saved; the new-key
+		 *	and scan forms are emptied. The form is about to be left or drawn again;
+		 *	if the exit then fails without drawing it (a refused request), the
+		 *	controls still show the discarded text and the next Save writes it
+		 *
+		 *	@return		void
+		 */
+		discard : function() {
+
+			if( Nino.admin.keys._view === 'new' ) {
+				[ 'keys-form-key', 'keys-form-new-value' ].forEach( function( id ) {
+					const el = dc.getElementById( id );
+					if( el !== null )
+						el.value = '';
+				} );
+				const isGlobal = dc.getElementById('keys-form-new-global');
+				if( isGlobal !== null )
+					isGlobal.checked = false;
+			} else if( Nino.admin.keys._view === 'scan' ) {
+				Nino.admin.keys._scanRows.forEach( function( row ) {
+					row.valueInput.value = '';
+					row.ignoreCheck.checked = false;
+				} );
+			} else {
+				Nino.admin.keys._dirtyLocales = [];
+				Nino.admin.keys._localeValues = {};
+				Nino.admin.keys._captureBaseline( true );
+			}
+
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.refresh();
+		},
+
+		/**
+		 *	Save what the open form holds, whichever form it is (see isDirty())
+		 *
+		 *	@param		{Function}	done				Called once with true or false
+		 *
+		 *	@return		void
+		 */
+		_saveOpen : function( done ) {
+
+			if( Nino.admin.keys._view === 'new' )
+				return Nino.admin.keys._saveNewKey( done );
+
+			if( Nino.admin.keys._view === 'scan' )
+				return Nino.admin.keys._saveScanResults( Nino.admin.keys._scanRows, done );
+
+			Nino.admin.keys._save( done );
 		},
 
 		/**
@@ -482,6 +706,8 @@
 				const value = ( stored[entry.key] !== undefined ) ? stored[entry.key] : ( entry.values[Nino.admin.keys._selectedLocale] ?? '' );
 				wrap.appendChild( Nino.admin.keys._renderKeyField( entry, value ) );
 			} );
+
+			Nino.admin.keys._captureBaseline( false );
 		},
 
 		/**
@@ -592,17 +818,42 @@
 
 			if( localeEntries.length > 0 )
 				Nino.admin.keys._renderLocaleFields();
+
+			Nino.admin.keys._captureBaseline( true );
+
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.refresh();
 		},
 
 		/**
-		 *	Save every key's value of the current category (global fields
-		 *	always, plus the currently selected locale's fields) in one
-		 *	batched request. Deliberately does not navigate back to the
-		 *	list afterwards - only refreshes its preview.
+		 *	Save every key of the current category: the global fields once, plus
+		 *	every translation edited since the group was opened, one batched
+		 *	request per translation, one after the other. Deliberately does not
+		 *	navigate back to the list afterwards - only refreshes its preview.
+		 *
+		 *	A request that fails, or a key the server did not accept, stops the
+		 *	loop: the translations not written yet stay edited, and the message
+		 *	names what failed as key (locale). "Saved." is said once, after the
+		 *	last translation. Every way this ends reports to done( ok ), if there
+		 *	is one (see Nino.admin.dirty.guard())
+		 *
+		 *	@param		{Function}	[done]				Called once with true when everything was written, false otherwise
 		 *
 		 *	@return		void
 		 */
-		_save : function() {
+		_save : function( done ) {
+
+			const report = function( ok ) {
+				if( typeof Nino.admin.dirty === 'object' )
+					Nino.admin.dirty.refresh();
+				if( typeof done === 'function' )
+					done( ok );
+			};
+
+			if( Nino.admin.keys._saving === true ) {
+				report( false );
+				return;
+			}
 
 			Nino.admin.keys._storeVisibleLocaleFields();
 
@@ -610,48 +861,87 @@
 			const entries = Nino.admin.keys._groups[group] ?? [];
 			const msg 		= dc.getElementById('keys-form-msg');
 
-			const items = [];
-
-			entries.filter( function( e ) { return e.global === true } ).forEach( function( entry ) {
-				items.push( { key : entry.key, locale : '*', value : Nino.admin.keys._readKeyValue( entry ) } );
+			const globalItems = entries.filter( function( e ) { return e.global === true } ).map( function( entry ) {
+				return { key : entry.key, locale : '*', value : Nino.admin.keys._readKeyValue( entry ) };
 			} );
+			const localeEntries = entries.filter( function( e ) { return e.global === false } );
+			const locales = Nino.admin.keys._saveLocales();
+			let position = 0;
 
-			const localeValues = Nino.admin.keys._localeValues[Nino.admin.keys._selectedLocale] ?? {};
-			entries.filter( function( e ) { return e.global === false } ).forEach( function( entry ) {
-				items.push( { key : entry.key, locale : Nino.admin.keys._selectedLocale, value : localeValues[entry.key] ?? '' } );
-			} );
-
+			Nino.admin.keys._saving = true;
+			Nino.admin.keys._setFormPending( true );
 			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
 
-			Nino.admin.keys._apiCall( 'savebatch', { items : items }, function( status, response ) {
+			// Ends the loop on a failure: the form is given back, the translations
+			// not written yet are still edited, and the message says what failed
+			function stop( text ) {
+				Nino.admin.keys._saving = false;
+				Nino.admin.keys._setFormPending( false );
+				msg.textContent = text;
+				report( false );
+			}
 
-				if( status !== 200 || response === null ) {
-					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
-					return;
-				}
+			function saveNextLocale() {
 
-				const results = response.results ?? {};
-				const failed 	= [];
-
-				items.forEach( function( item ) {
-					const result = results[item.key];
-					if( result === undefined )
-						return;
-					if( result.ok === true ) {
-						const entry = entries.find( function( e ) { return e.key === item.key } );
-						if( entry !== undefined )
-							entry.values[item.locale] = result.value;
-					} else {
-						failed.push( item.key );
-					}
+				const locale = locales[position];
+				const localeValues = Nino.admin.keys._localeValues[locale] ?? {};
+				const localeItems = localeEntries.map( function( entry ) {
+					return { key : entry.key, locale : locale, value : localeValues[entry.key] ?? entry.values[locale] ?? '' };
 				} );
 
-				msg.textContent = ( failed.length === 0 )
-					? Nino.content.getText('/_admin/common/msg/saved')
-					: Nino.content.getText('/_admin/keys/error/save-partial').replace( '%s', failed.join(', ') );
+				// The global fields need one write: sent again for every translation
+				// they would only repeat what the first request did
+				const items = ( position === 0 ? globalItems : [] ).concat( localeItems );
 
-				Nino.admin.keys._renderCategoryList();
-			} );
+				Nino.admin.keys._apiCall( 'savebatch', { items : items }, function( status, response ) {
+
+					if( status !== 200 || response === null )
+						return stop( Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' )+ ' ('+ locale+ ')' );
+
+					const results = response.results ?? {};
+					const failed 	= [];
+
+					items.forEach( function( item ) {
+						const result = results[item.key];
+						if( result === undefined || result.ok !== true ) {
+							failed.push( item.key+ ' ('+ item.locale+ ')' );
+							return;
+						}
+						const entry = entries.find( function( e ) { return e.key === item.key } );
+						if( entry === undefined )
+							return;
+						entry.values[item.locale] = result.value;
+						if( item.locale !== '*' ) {
+							Nino.admin.keys._localeValues[item.locale] = Nino.admin.keys._localeValues[item.locale] ?? {};
+							Nino.admin.keys._localeValues[item.locale][item.key] = result.value;
+						}
+					} );
+
+					if( failed.length > 0 )
+						return stop( Nino.adminUi.format( Nino.content.getText('/_admin/keys/error/save-partial'), failed.join(', ') ) );
+
+					const dirtyAt = Nino.admin.keys._dirtyLocales.indexOf( locale );
+					if( dirtyAt !== -1 )
+						Nino.admin.keys._dirtyLocales.splice( dirtyAt, 1 );
+
+					position++;
+					if( position < locales.length ) {
+						saveNextLocale();
+						return;
+					}
+
+					Nino.admin.keys._saving = false;
+					Nino.admin.keys._setFormPending( false );
+					msg.textContent = Nino.content.getText('/_admin/common/msg/saved');
+					Nino.admin.keys._renderCategoryList();
+
+					// What the controls hold is what is stored now
+					Nino.admin.keys._captureBaseline( true );
+					report( true );
+				} );
+			}
+
+			saveNextLocale();
 		},
 
 		/**
@@ -661,6 +951,7 @@
 		 */
 		_openNewKeyForm : function() {
 			Nino.admin.keys._isNew = true;
+			Nino.admin.keys._view = 'new';
 			Nino.admin.keys._renderNewKeyForm();
 			Nino.admin.keys._showForm();
 		},
@@ -737,9 +1028,16 @@
 		/**
 		 *	Create the new key currently in the form
 		 *
+		 *	@param		{Function}	[done]				Called once with true when the key was created, false otherwise
+		 *
 		 *	@return		void
 		 */
-		_saveNewKey : function() {
+		_saveNewKey : function( done ) {
+
+			const report = function( ok ) {
+				if( typeof done === 'function' )
+					done( ok );
+			};
 
 			const msg 		= dc.getElementById('keys-form-msg');
 			const key 		= dc.getElementById('keys-form-key').value;
@@ -751,9 +1049,11 @@
 			Nino.admin.keys._apiCall( 'create', { key : key, global : isGlobal, value : value }, function( status, response ) {
 				if( status !== 200 || response === null ) {
 					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
+					report( false );
 					return;
 				}
 				Nino.admin.keys.init();
+				report( true );
 			} );
 		},
 
@@ -764,6 +1064,9 @@
 		 *	@return		void
 		 */
 		_openScanForm : function() {
+
+			Nino.admin.keys._view = 'scan';
+			Nino.admin.keys._scanRows = [];
 
 			const wrap = dc.getElementById('keys-form');
 			wrap.innerHTML = '';
@@ -889,6 +1192,8 @@
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.keys._saveScanResults( rows ) } );
 
 			wrap.appendChild( form );
+
+			Nino.admin.keys._scanRows = rows;
 		},
 
 		/**
@@ -901,10 +1206,16 @@
 		 *	is a single readable line instead of an alert() naming keys.
 		 *
 		 *	@param		{Array}		rows					[ { key, valueInput, ignoreCheck }, ... ]
+		 *	@param		{Function}	[done]			Called once with true when the rows were applied, false otherwise
 		 *
 		 *	@return		void
 		 */
-		_saveScanResults : function( rows ) {
+		_saveScanResults : function( rows, done ) {
+
+			const report = function( ok ) {
+				if( typeof done === 'function' )
+					done( ok );
+			};
 
 			const msg = dc.getElementById('keys-scan-msg');
 			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
@@ -917,6 +1228,7 @@
 
 				if( status !== 200 || response === null ) {
 					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
+					report( false );
 					return;
 				}
 
@@ -930,10 +1242,20 @@
 				// belongs in the list as a hidden key that can be brought back
 				Nino.admin.keys._showList();
 				Nino.admin.keys.init();
+				report( true );
 			} );
 		},
 	};
 
 	Nino.events.bindCallback( 'ready', Nino.admin.keys.init );
+
+	// The shell asks before anything throws the tab's input away (see
+	// Nino.admin.dirty). A shell without the registry is simply not asking
+	if( typeof Nino.admin.dirty === 'object' )
+		Nino.admin.dirty.register( 'keys', {
+			isDirty : Nino.admin.keys.isDirty,
+			save		: Nino.admin.keys._saveOpen,
+			discard : Nino.admin.keys.discard,
+		} );
 
 })(window, document, document.documentElement, document.body);

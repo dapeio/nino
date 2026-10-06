@@ -102,8 +102,13 @@ elements._currentModel	= {
 	title : { type : 'string', required : true },
 };
 
-check( 'a required image field is never reported as missing', elements._missingRequiredFields().indexOf( 'photo' ) === -1 );
-check( '...while an empty required field of any other type still is', JSON.stringify( elements._missingRequiredFields() ) === JSON.stringify( [ 'title' ] ) );
+/** What _validate() holds the save back for, as key@locale (locale empty for the uri and the global fields) and its kind */
+function problems() {
+	return elements._validate().map( function( problem ) { return problem.key+ '@'+ ( problem.locale ?? '' )+ ':'+ problem.kind } );
+}
+
+check( 'a required image field is never reported as missing', problems().some( function( problem ) { return problem.indexOf('photo') === 0 } ) === false );
+check( '...while an empty required field of any other type still is', JSON.stringify( problems() ) === JSON.stringify( [ 'title@en_US:required' ] ) );
 
 /*	One click on Save writes every translation that was edited (see
 	_saveLocales() above), and the required check read the dom - which only
@@ -146,15 +151,22 @@ visibleFields.title = { value : 'Cleaning', dataset : { type : 'string' } };
 visibleFields.tags 	= { value : '["x"]', dataset : { type : 'array' } };
 
 check( 'a required field left empty in another edited translation holds the save back',
-	JSON.stringify( elements._missingRequiredFields() ) === JSON.stringify( [ 'title (de_DE)' ] ) );
+	JSON.stringify( problems() ) === JSON.stringify( [ 'title@de_DE:required' ] ) );
 
 elements._localeValues.de_DE.tags = [];
 check( '...and a required list is empty the same way a required text is',
-	JSON.stringify( elements._missingRequiredFields() ) === JSON.stringify( [ 'title (de_DE)', 'tags (de_DE)' ] ) );
+	JSON.stringify( problems() ) === JSON.stringify( [ 'title@de_DE:required', 'tags@de_DE:required' ] ) );
+
+// The kernel counts what is in a list or an object (count() === 0), so an
+// object with entries satisfies a required field, and an empty one does not
+elements._localeValues.de_DE.tags = { a : 1 };
+check( '...a required object with an entry in it is not empty', JSON.stringify( problems() ) === JSON.stringify( [ 'title@de_DE:required' ] ) );
+elements._localeValues.de_DE.tags = {};
+check( '...and an empty object is', JSON.stringify( problems() ) === JSON.stringify( [ 'title@de_DE:required', 'tags@de_DE:required' ] ) );
 
 elements._localeValues.de_DE = { title : 'Reinigung', tags : [ 'y' ] };
 check( 'a translation that has everything it needs does not hold anything back',
-	JSON.stringify( elements._missingRequiredFields() ) === JSON.stringify( [] ) );
+	JSON.stringify( problems() ) === JSON.stringify( [] ) );
 
 // A translation nobody edited is not submitted, so it is not this save's
 // business either - an element may perfectly well have a language it has no
@@ -162,14 +174,14 @@ check( 'a translation that has everything it needs does not hold anything back',
 elements._dirtyLocales = [ 'en_US' ];
 elements._localeValues.fr_FR = { title : '', tags : [] };
 check( 'an untouched translation is not checked, because it is not written',
-	JSON.stringify( elements._missingRequiredFields() ) === JSON.stringify( [] ) );
+	JSON.stringify( problems() ) === JSON.stringify( [] ) );
 
 // The locale on screen is still read from its controls, and still named
 // without a language nobody needs to be told about
 elements._dirtyLocales = [ 'en_US' ];
 visibleFields.title.value = '   ';
 check( 'the visible locale is still read from the form itself',
-	JSON.stringify( elements._missingRequiredFields() ) === JSON.stringify( [ 'title' ] ) );
+	JSON.stringify( problems() ) === JSON.stringify( [ 'title@en_US:required' ] ) );
 
 sandbox.document.getElementById = function() { return null };
 elements._localeValues = {};
@@ -260,7 +272,7 @@ check( 'a numbered insert renders the uri field hidden rather than dropping it',
 check( '...and keeps its value empty, which is what asks for a number',
 	/_isNumbered\(\) === true \) \{[\s\S]{0,600}uriInput\.value = ''/.test( source ) === true );
 check( 'the "a uri is required" guard is skipped for a numbered insert',
-	/uri === '' && numberedInsert === false/.test( source ) === true );
+	/_isNew === true && Nino\.admin\.elements\._isNumbered\(\) === false && uriInput !== null && uriInput\.value\.trim\(\) === ''/.test( source ) === true );
 check( 'the saved element\'s own .uri is what the form adopts afterwards',
 	/response\.element\['\.uri'\]/.test( source ) === true );
 
@@ -705,9 +717,558 @@ if( typeof elements._renderNav === 'function' ) {
 	check( 'and turns to "unsaved changes" with the first thing typed', line.dataset.state === 'dirty' && line.textContent === 'Unsaved changes' );
 }
 
-check( 'the element form says whether it is saved through the shared status line, bound to the form', /_status = Nino\.adminUi\.status\( msg \);\s*Nino\.admin\.elements\._status\.bind\( form \)/.test( source ) === true );
+check( 'the element form says whether it is saved through the shared status line, bound to the form and to its own word on what is unsaved', /_status = Nino\.adminUi\.status\( msg \);\s*Nino\.admin\.elements\._status\.bind\( form, Nino\.admin\.elements\.isDirty \)/.test( source ) === true );
 check( '...a save marks it saving, saved and - with the server\'s words and field - failed', source.indexOf( '_status.saving()' ) !== -1 && source.indexOf( '_status.saved()' ) !== -1 && /_status\.error\( status, response, '\/_admin\/elements\/error\/save' \)/.test( source ) === true );
 check( '...and the old plain message element no longer carries its own text', source.indexOf( "elements-form-msg')" ) === -1 );
+
+
+// --- required fields, JSON fields and unsaved input -----------------------
+//
+// A dom that can be asked: elements with attributes, a class list, a selector
+// matcher and listeners, so the marks, the sentences under the fields and the
+// focus can be looked at rather than inferred from the source
+
+/**
+ *	A dom of plain objects, just enough for the panel scripts: elements with
+ *	children, attributes, a class list, listeners, a selector matcher that
+ *	knows tags, #ids, .classes, [attributes], :not([attribute="value"]) and
+ *	comma lists, and a document with getElementById over everything attached.
+ */
+function fakeDom() {
+
+	const matchOne = ( node, selector ) => {
+		selector = selector.trim();
+		if( selector.endsWith(':checked') === true ) {
+			if( node.checked !== true )
+				return false;
+			selector = selector.slice( 0, -8 );
+		}
+		const not = /:not\(\[([a-z-]+)="([^"]*)"\]\)/.exec( selector );
+		if( not !== null ) {
+			if( ( node.attr( not[1] ) ?? '' ) === not[2] )
+				return false;
+			selector = selector.replace( not[0], '' );
+		}
+		const parts = selector.match( /(#[\w-]+|\.[\w-]+|\[[\w-]+(?:="[^"]*")?\]|^[a-z]+)/g ) ?? [];
+		return parts.length > 0 && parts.every( part => {
+			if( part[0] === '#' ) return node.id === part.slice( 1 );
+			if( part[0] === '.' ) return node.classList.contains( part.slice( 1 ) );
+			if( part[0] === '[' ) {
+				const m = /\[([\w-]+)(?:="([^"]*)")?\]/.exec( part );
+				const value = node.attr( m[1] );
+				return m[2] === undefined ? value !== null && value !== undefined : String( value ) === m[2];
+			}
+			return node.tagName === part;
+		} );
+	};
+	const matches = ( node, selector ) => selector.split(',').some( one => matchOne( node, one ) );
+	const walk = ( node, out = [] ) => { node.children.forEach( child => { out.push( child ); walk( child, out ) } ); return out };
+
+	const make = tag => {
+		let classes = new Set();
+		const node = {
+			tagName : tag, children : [], parentNode : null, attrs : {}, dataset : {}, listeners : {}, style : {},
+			id : '', value : '', checked : false, disabled : false, hidden : false, type : '', textContent : '', focused : false,
+			classList : {
+				add : ( ...k ) => k.forEach( c => classes.add( c ) ), remove : ( ...k ) => k.forEach( c => classes.delete( c ) ),
+				contains : k => classes.has( k ), toggle : ( k, on ) => { if( on === undefined ? ! classes.has( k ) : on ) classes.add( k ); else classes.delete( k ); return classes.has( k ) },
+			},
+			get className() { return [ ...classes ].join(' ') }, set className( v ) { classes = new Set( String( v ).split( /\s+/ ).filter( Boolean ) ) },
+			get firstChild() { return this.children[0] ?? null },
+			get innerHTML() { return '' }, set innerHTML( v ) { this.children.forEach( c => c.parentNode = null ); this.children = [] },
+			attr( name ) { return name in this.attrs ? this.attrs[name] : ( name === 'type' ? ( this.type || null ) : ( this[name] === undefined || this[name] === '' ? ( name.startsWith('data-') ? this.dataset[name.slice(5)] ?? null : null ) : this[name] ) ) },
+			setAttribute( k, v ) { this.attrs[k] = String( v ) }, getAttribute( k ) { return this.attrs[k] ?? null }, removeAttribute( k ) { delete this.attrs[k] },
+			appendChild( c ) { if( c.parentNode ) c.remove(); c.parentNode = this; this.children.push( c ); return c },
+			insertBefore( c, ref ) { c.parentNode = this; this.children.splice( ref ? this.children.indexOf( ref ) : this.children.length, 0, c ); return c },
+			remove() { if( this.parentNode ) this.parentNode.children.splice( this.parentNode.children.indexOf( this ), 1 ); this.parentNode = null },
+			after( c ) { if( c.parentNode ) c.remove(); c.parentNode = this.parentNode; this.parentNode.children.splice( this.parentNode.children.indexOf( this ) + 1, 0, c ) },
+			replaceWith( c ) { const at = this.parentNode.children.indexOf( this ); c.parentNode = this.parentNode; this.parentNode.children.splice( at, 1, c ); this.parentNode = null },
+			addEventListener( type, fn ) { ( this.listeners[type] = this.listeners[type] ?? [] ).push( fn ) },
+			fire( type, ev = {} ) { ( this.listeners[type] ?? [] ).forEach( fn => fn( Object.assign( { target : this, preventDefault(){} }, ev ) ) ) },
+			click() { this.fire('click') },
+			focus() { this.focused = true; doc.activeElement = this },
+			querySelectorAll( selector ) { return walk( this ).filter( n => matches( n, selector ) ) },
+			querySelector( selector ) { return this.querySelectorAll( selector )[0] ?? null },
+			closest( selector ) { for( let n = this; n; n = n.parentNode ) if( matches( n, selector ) ) return n; return null },
+		};
+		return node;
+	};
+
+	const root = make('body');
+	const doc = {
+		documentElement : make('html'), body : root, activeElement : null,
+		createElement : make,
+		createTextNode : text => Object.assign( make('#text'), { textContent : String( text ) } ),
+		getElementById : id => walk( root ).find( n => n.id === id ) ?? null,
+		querySelector : selector => root.querySelector( selector ),
+		querySelectorAll : selector => root.querySelectorAll( selector ),
+		addEventListener(){}, removeEventListener(){},
+	};
+
+	return { make, doc, root, walk, matches };
+}
+
+
+{
+	const d = fakeDom();
+	Object.assign( sandbox.document, d.doc );
+	sandbox.CSS = { escape : value => String( value ) };
+
+	const texts = {
+		'/_admin/elements/error/required' : 'REQ', '/_admin/elements/error/field-required' : 'FIELD', '/_admin/elements/error/json' : 'JSON',
+		'/_admin/elements/error/uri' : 'URI', '/_admin/elements/error/save' : 'SAVEFAIL', '/_admin/elements/label/locale-open' : '%s - %d open',
+		'/_admin/elements/label/uri' : 'Uri', '/_admin/elements/msg/duplicated' : 'COPY',
+		'/_admin/common/msg/dirty' : 'Unsaved changes', '/_admin/common/msg/savedat' : 'Saved at %s.', '/_admin/common/msg/saving' : 'Saving',
+	};
+	sandbox.Nino.content = { getText : key => texts[key] ?? ( key.indexOf('/field/') !== -1 ? '' : key ) };
+	sandbox.Nino.admin.formToolbar = backLink => { const bar = d.make('div'); bar.className = 'nino-admin-contextbar'; bar.appendChild( backLink ); return bar };
+	const localeSwitches = [];
+	sandbox.Nino.admin.sessionLocale = { current : 'en_US', set : locale => localeSwitches.push( locale ), init(){} };
+	sandbox.Nino.admin.publicUrl = path => '/public'+ path;
+	sandbox.Nino.admin.router = { set(){}, current : () => ( { panel : '', parts : [] } ) };
+	const editorMarks = [];
+	sandbox.Nino.admin.htmlEditor = { create : ( mount, value ) => {
+		const content = d.make('div');
+		content.contentEditable = 'true';
+		mount.appendChild( content );
+		// Reads back as the markup it built, not as the string it was given
+		return { getValue : () => content.textContent !== '' ? content.textContent : String( value ?? '' ).replace( '&nbsp;', '\u00a0' ), setValue(){}, destroy(){}, focus(){}, mark : state => editorMarks.push( state ), content : content };
+	} };
+
+	const stars = el => el.querySelectorAll('.nino-admin-required');
+
+	// ---- the marks, drawn with the field
+	elements._currentType = 'post';
+	elements._rights = {};
+	elements._isNew = false;
+	elements._htmlEditors = {};
+	elements._referenceOptions = { tag : [] };
+	const draw = ( definition, value ) => elements._renderField( 'f', definition, value ?? '' );
+
+	const text = draw( { type : 'string', required : true } );
+	check( 'a required text field carries an asterisk after its name, hidden from a screen reader',
+		stars( text ).length === 1 && stars( text )[0].textContent === '*' && stars( text )[0].getAttribute('aria-hidden') === 'true' && stars( text )[0].parentNode.className === 'nino-admin-field-name' );
+	check( '...and aria-required on the control itself', text.querySelector('textarea').getAttribute('aria-required') === 'true' );
+	check( 'an optional field carries neither', stars( draw( { type : 'string' } ) ).length === 0 && draw( { type : 'string' } ).querySelector('textarea').getAttribute('aria-required') === null );
+	check( 'a required number, list and fixed-value field are marked on their control as well',
+		draw( { type : 'integer', required : true } ).querySelector('input').getAttribute('aria-required') === 'true'
+		&& draw( { type : 'array', required : true } ).querySelector('textarea').getAttribute('aria-required') === 'true'
+		&& draw( { type : 'string', required : true, options : [ 'a', 'b' ] } ).querySelector('select').getAttribute('aria-required') === 'true' );
+	check( 'a single reference is marked on its select', draw( { type : 'element', elementType : 'tag', required : true } ).querySelector('select').getAttribute('aria-required') === 'true' );
+	check( 'an image and a yes/no choice are never marked: one is uploaded on its own, the other cannot be empty',
+		stars( draw( { type : 'image', required : true } ) ).length === 0 && stars( draw( { type : 'boolean', required : true } ) ).length === 0 );
+
+	const list = draw( { type : 'element', elementType : 'tag', multiple : 0, required : true }, [] );
+	check( 'a list of references gets the asterisk on its name only - nothing in it could carry aria-required',
+		stars( list ).length === 1 && stars( list )[0].parentNode === list.firstChild && list.querySelectorAll('[aria-required]').length === 0 );
+
+	editorMarks.length = 0;
+	const rich = draw( { type : 'string', html : true, required : true } );
+	check( 'a rich-text field is marked through the editor, which puts it on its text box',
+		stars( rich ).length === 1 && JSON.stringify( editorMarks ) === '[{"required":true}]' );
+	editorMarks.length = 0;
+	draw( { type : 'string', html : true } );
+	check( '...and an optional one is not', editorMarks.length === 0 );
+
+	elements._rights = { post : { update : { f : false } } };
+	check( 'a field this account may not write is not asked for', stars( draw( { type : 'string', required : true } ) ).length === 0 );
+	elements._rights = {};
+
+	// ---- the form of a new element
+	const formNode = d.make('div');
+	formNode.id = 'elements-form';
+	d.root.appendChild( formNode );
+
+	elements._currentModel = {
+		slug 	: { type : 'string', required : true },
+		tags 	: { type : 'array', required : true },
+		ro 		: { type : 'string', required : true },
+		flag 	: { type : 'boolean', required : true },
+		pic 	: { type : 'image', required : true },
+		name 	: { type : 'string', required : true, locale : true },
+		body 	: { type : 'string', required : true, locale : true },
+		ltags : { type : 'array', locale : true },
+	};
+	elements._globalKeys = [ 'slug', 'tags', 'ro', 'flag', 'pic' ];
+	elements._localeKeys = [ 'name', 'body', 'ltags' ];
+	elements._locales = [ 'de_DE', 'en_US' ];
+	elements._selectedLocale = 'en_US';
+	elements._currentTypeTitle = 'Posts';
+	elements._numbered = {};
+	elements._raw = {};
+	elements._rights = { post : { update : { ro : false } } };
+	elements._isNew = true;
+	elements._currentUri = null;
+	elements._globalValues = {};
+	elements._localeValues = {};
+	elements._dirtyLocales = [];
+	elements._resetEdits();
+	elements._renderForm();
+
+	const uriInput = d.doc.getElementById('elements-form-uri');
+	check( 'the uri of a new element is marked like any other required field, with no native required attribute to show the browser\'s own bubble',
+		uriInput.getAttribute('aria-required') === 'true' && uriInput.required !== true && stars( uriInput.parentNode ).length === 1 );
+
+	const field = key => d.doc.getElementById('elements-form').querySelector('[data-field="'+ key+ '"]');
+	const type = ( key, value ) => { field( key ).value = value; d.doc.getElementById('elements-edit-form').fire('input') };
+	const keys = () => elements._validate().map( p => p.key+ '@'+ ( p.locale ?? '' )+ ':'+ p.kind );
+
+	elements._dirtyLocales = [ 'de_DE', 'en_US' ];
+	elements._localeValues = { de_DE : { name : '', body : 'x' } };
+	check( 'the problems come in the order of the form: the uri, the global fields, the translation on screen, then the other translations',
+		JSON.stringify( keys() ) === JSON.stringify( [ '.uri@:required', 'slug@:required', 'tags@:required', 'name@en_US:required', 'body@en_US:required', 'name@de_DE:required' ] ) );
+	check( '...and a read-only field, a yes/no choice and an image are never among them', keys().every( k => /^(\.uri|slug|tags|name|body)@/.test( k ) ) );
+
+	field('tags').value = '{broken';
+	check( 'a list that is not JSON is reported as that - not as an empty required field', keys().indexOf('tags@:json') !== -1 && keys().indexOf('tags@:required') === -1 );
+	field('tags').value = '[1,';
+	check( '...a scalar and null are no list either', ( field('tags').value = '5', keys().indexOf('tags@:json') !== -1 ) && ( field('tags').value = 'null', keys().indexOf('tags@:json') !== -1 ) );
+	field('tags').value = '{"a":1}';
+	check( 'an object with an entry is valid, and satisfies a required field', keys().some( k => k.indexOf('tags@') === 0 ) === false );
+	field('tags').value = '{}';
+	check( '...an empty object does not', keys().indexOf('tags@:required') !== -1 );
+	field('tags').value = '';
+	check( 'a blank list text is an empty list - required says so, and the rest of the time it is fine', keys().indexOf('tags@:required') !== -1 );
+	field('tags').value = '[]';
+
+	elements._invalidArrays = { 'de_DE|ltags' : '[1,' };
+	check( 'text that is not JSON in another translation holds the save back too', keys().indexOf('ltags@de_DE:json') !== -1 );
+	elements._invalidArrays = {};
+
+	// ---- a save that is refused
+	const sent = [];
+	elements._apiCall = ( endpoint, payload, callback ) => sent.push( { endpoint : endpoint, payload : payload, callback : callback } );
+	let outcome = null;
+	elements._save( ok => { outcome = ok } );
+	check( 'a refused save sends nothing and reports false', sent.length === 0 && outcome === false && elements._validated === true );
+	check( 'the uri is the first problem and takes the focus', uriInput.focused === true );
+	check( '...it is marked invalid, points at its sentence, and the sentence is under it',
+		uriInput.getAttribute('aria-invalid') === 'true' && uriInput.getAttribute('aria-describedby') === 'elements-error-uri'
+		&& d.doc.getElementById('elements-error-uri').textContent === 'URI' && d.doc.getElementById('elements-error-uri').className === 'nino-admin-field-error' && d.doc.getElementById('elements-error-uri').parentNode === uriInput.parentNode.parentNode );
+	check( '...next to the label, not inside it: the sentence describes the control and is not part of its name',
+		uriInput.parentNode.querySelector('#elements-error-uri') === null && field('slug').closest('label').querySelector('.nino-admin-field-error') === null );
+	check( 'every other field on screen is marked the same way', [ 'slug', 'name', 'body' ].every( key => field( key ).getAttribute('aria-invalid') === 'true' && field( key ).getAttribute('aria-describedby') === 'elements-error-field-'+ key ) );
+	check( 'the sentences are not alerts - the status line says it once, in its own words',
+		d.doc.getElementById('elements-error-field-slug').getAttribute('role') === null && d.doc.getElementById('elements-form-msg').textContent === 'REQ' );
+	const optionsText = () => d.doc.getElementById('elements-form-locale-select').querySelectorAll('option').map( o => o.textContent );
+	check( 'the language switch counts the open fields of each translation it would write', JSON.stringify( optionsText() ) === JSON.stringify( [ 'de_DE - 1 open', 'en_US - 2 open' ] ) );
+
+	// fixed by typing: the marks follow
+	type( 'slug', 'hello' );
+	check( 'a field that was fixed loses its mark while the others keep theirs', field('slug').getAttribute('aria-invalid') === null && d.doc.getElementById('elements-error-field-slug') === null && field('name').getAttribute('aria-invalid') === 'true' );
+
+	// the first problem is in another translation: the form goes there
+	uriInput.value = 'first';
+	type( 'tags', '["x"]' );
+	type( 'name', 'Name' );
+	type( 'body', 'Body' );
+	localeSwitches.length = 0;
+	outcome = null;
+	elements._save( ok => { outcome = ok } );
+	check( 'a first problem in a translation that is not on screen switches to it - the select, the content locale and the fields',
+		outcome === false && elements._selectedLocale === 'de_DE' && d.doc.getElementById('elements-form-locale-select').value === 'de_DE' && localeSwitches.join() === 'de_DE' );
+	check( '...and the field there is marked and has the focus', field('name').getAttribute('aria-invalid') === 'true' && field('name').focused === true );
+	check( 'the other translation shows no open fields now', JSON.stringify( optionsText() ) === JSON.stringify( [ 'de_DE - 1 open', 'en_US' ] ) );
+
+	// the marks come back with a translation drawn afresh
+	elements._switchLocale( 'en_US' );
+	elements._switchLocale( 'de_DE' );
+	check( 'a translation drawn again carries the marks of the refused save', field('name').getAttribute('aria-invalid') === 'true' && d.doc.getElementById('elements-error-field-name') !== null );
+
+	type( 'name', 'Name de' );
+	check( '...and the option falls back to its plain code once nothing is open', JSON.stringify( optionsText() ) === JSON.stringify( [ 'de_DE', 'en_US' ] ) );
+
+	// invalid text in a translation is kept, shown again, and blocks the save
+	field('ltags').value = '[oops';
+	elements._switchLocale( 'en_US' );
+	check( 'text that is not JSON is kept when its translation is left: the old value stays, the text is remembered, the translation counts as edited',
+		elements._invalidArrays['de_DE|ltags'] === '[oops' && JSON.stringify( elements._localeValues.de_DE.ltags ) === '[]' && elements._dirtyLocales.indexOf('de_DE') !== -1 );
+	elements._switchLocale( 'de_DE' );
+	check( '...and it is what the field shows when it comes back', field('ltags').value === '[oops' );
+	sent.length = 0;
+	elements._save();
+	check( 'such a translation holds the save back even from another one', sent.length === 0 && elements._validate().some( p => p.key === 'ltags' && p.kind === 'json' ) === true );
+	field('ltags').value = '[1]';
+	elements._switchLocale( 'en_US' );
+	check( 'valid again, the text is let go of', Object.keys( elements._invalidArrays ).length === 0 && JSON.stringify( elements._localeValues.de_DE.ltags ) === '[1]' );
+
+	// ---- unsaved input: what the shell asks about
+	elements._currentModel.rich = { type : 'string', html : true, locale : true };
+	elements._localeKeys = [ 'name', 'body', 'ltags', 'rich' ];
+	elements._isNew = false;
+	elements._currentUri = 'one';
+	elements._globalValues = { slug : 'hello', tags : [ 'x' ], pic : 'a.jpg' };
+	elements._localeValues = {
+		de_DE : { name : 'Name de', body : 'Body de', ltags : [], rich : 'a&nbsp;b' },
+		en_US : { name : 'Name', body : 'Body', ltags : [], rich : 'c&nbsp;d' },
+	};
+	elements._dirtyLocales = [];
+	elements._selectedLocale = 'en_US';
+	elements._resetEdits();
+	elements._remember();
+	elements._renderForm();
+	formNode.classList.remove('admin-hidden');
+
+	check( 'a form nobody touched holds nothing unsaved', elements.isDirty() === false );
+	type( 'slug', 'changed' );
+	check( 'an edited global field does', elements.isDirty() === true );
+	check( '...the status line says so', elements._status.state === 'dirty' );
+	type( 'slug', 'hello' );
+	check( '...and typing it back takes it away again, line and all', elements.isDirty() === false && elements._status.state === 'idle' );
+	type( 'name', 'Name edited' );
+	check( 'an edited field of the translation on screen does', elements.isDirty() === true );
+	type( 'name', 'Name' );
+
+	elements._switchLocale( 'de_DE' );
+	elements._switchLocale( 'en_US' );
+	check( 'merely visiting a translation does not mark it - not even one with a rich-text field that reads back as other markup than the server holds',
+		elements._dirtyLocales.length === 0 && elements.isDirty() === false );
+
+	// a refused save stores the translation on screen; typing the stored value back takes the mark away again
+	type( 'name', '' );
+	sent.length = 0;
+	elements._save();
+	check( 'a refused save of an emptied required field counts the translation as edited', sent.length === 0 && elements._dirtyLocales.join() === 'en_US' && elements.isDirty() === true );
+	type( 'name', 'Name' );
+	check( '...and typing the stored value back leaves nothing unsaved', elements.isDirty() === false );
+	check( '...and the status line no longer names fields that are not marked', elements._status.state === 'idle' );
+	type( 'name', 'Name edited' );
+	elements._switchLocale( 'de_DE' );
+	elements._switchLocale( 'en_US' );
+	type( 'name', 'Name' );
+	check( 'a translation that was edited and left stays unsaved, whatever it is typed back to', elements._dirtyLocales.join() === 'en_US' && elements.isDirty() === true );
+	elements.discard();
+	elements._renderForm();
+
+	// a translation this account may not write: the save never sends it, and a
+	// rich text reads back as other markup than the string the server holds
+	elements._currentModel.note = { type : 'string', html : true, locale : true };
+	elements._localeKeys = [ 'name', 'body', 'ltags', 'rich', 'note' ];
+	elements._localeValues.de_DE.note = 'p&nbsp;q';
+	elements._localeValues.en_US.note = 'r&nbsp;s';
+	elements._rights = { post : { update : { ro : false, note : false } } };
+	elements._resetEdits();
+	elements._renderForm();
+	elements._switchLocale( 'de_DE' );
+	elements._switchLocale( 'en_US' );
+	check( 'visiting a translation does not mark it for a rich-text field the account may not write, whatever markup it reads back as',
+		elements._dirtyLocales.length === 0 && elements.isDirty() === false );
+	delete elements._currentModel.note;
+	elements._localeKeys = [ 'name', 'body', 'ltags', 'rich' ];
+	delete elements._localeValues.de_DE.note;
+	delete elements._localeValues.en_US.note;
+	elements._rights = { post : { update : { ro : false } } };
+	elements._resetEdits();
+	elements._renderForm();
+
+	elements._switchLocale( 'de_DE' );
+	type( 'body', 'Body de edited' );
+	elements._switchLocale( 'en_US' );
+	check( 'a translation that was edited and left stays unsaved', elements._dirtyLocales.join() === 'de_DE' && elements.isDirty() === true );
+
+	field('pic').value = 'b.jpg';
+	elements.discard();
+	check( 'discarding takes the model back to what the server sent and counts the form as saved',
+		elements.isDirty() === false && elements._dirtyLocales.length === 0 && elements._localeValues.de_DE.body === 'Body de' && elements._globalValues.slug === 'hello' );
+
+	field('pic').value = 'c.jpg';
+	check( 'an uploaded image commits by itself and is not an edit of the form', elements.isDirty() === false );
+
+	formNode.classList.add('admin-hidden');
+	elements._dirtyLocales = [ 'de_DE' ];
+	check( 'only a form on screen can be dirty - a list or the type picker has nothing typed into it', elements.isDirty() === false );
+	formNode.classList.remove('admin-hidden');
+	elements._dirtyLocales = [];
+
+	elements._isNew = true;
+	elements._currentUri = null;
+	elements._numbered = {};
+	elements._globalValues = {};
+	elements._localeValues = {};
+	elements._resetEdits();
+	elements._renderForm();
+	check( 'a new element is clean until something is typed', elements.isDirty() === false );
+	d.doc.getElementById('elements-form-uri').value = 'x';
+	check( '...its uri counts', elements.isDirty() === true );
+	d.doc.getElementById('elements-form-uri').value = '';
+
+	// a copy
+	elements._isNew = false;
+	elements._currentUri = 'one';
+	elements._globalValues = { slug : 'hello', tags : [ 'x' ], pic : 'a.jpg' };
+	elements._localeValues = { de_DE : { name : 'Name de', body : 'Body de', ltags : [], rich : '' }, en_US : { name : 'Name', body : 'Body', ltags : [], rich : '' } };
+	elements._resetEdits();
+	elements._remember();
+	elements._renderForm();
+	elements._duplicate();
+	check( 'a copy nobody has saved is unsaved input, even one with nothing edited in it', elements._isNew === true && elements._copy === true && elements.isDirty() === true );
+	check( '...and discarding it goes back to nothing', ( elements.discard(), elements.isDirty() === false ) );
+
+	// ---- every way a save ends reports
+	elements._isNew = false;
+	elements._currentUri = 'one';
+	elements._globalValues = { slug : 'hello', tags : [ 'x' ], pic : 'a.jpg' };
+	elements._localeValues = { de_DE : { name : 'Name de', body : 'Body de', ltags : [], rich : '' }, en_US : { name : 'Name', body : 'Body', ltags : [], rich : '' } };
+	elements._dirtyLocales = [];
+	elements._selectedLocale = 'en_US';
+	elements._resetEdits();
+	elements._remember();
+	elements._renderForm();
+	sent.length = 0;
+	const reports = [];
+	const report = ok => reports.push( ok );
+
+	elements._saving = true;
+	elements._save( report );
+	elements._saving = false;
+	check( 'a save asked for while one runs reports false', reports.join() === 'false' && sent.length === 0 );
+
+	type( 'slug', '' );
+	elements._save( report );
+	check( 'a refusal reports false', reports.join() === 'false,false' && sent.length === 0 );
+
+	type( 'slug', 'new slug' );
+	elements._save( report );
+	check( 'a request that fails reports false and gives the form back', sent.length === 1 && ( sent[0].callback( 500, null ), reports.join() === 'false,false,false' ) && elements._saving === false );
+	check( '...what was typed is still unsaved', elements.isDirty() === true );
+
+	elements._save( report );
+	sent[1].callback( 200, { element : { '.uri' : '/post/one', slug : 'new slug', tags : [ 'x' ], pic : 'a.jpg', name : 'Name', body : 'Body', ltags : [], rich : '' } } );
+	check( 'a save that goes through reports true', reports.join() === 'false,false,false,true' );
+	check( '...the form counts as saved, the line says when, and the model is what the server answered',
+		elements.isDirty() === false && elements._status.state === 'saved' && elements._globalValues.slug === 'new slug' );
+	elements.discard();
+	check( '...and that answer is what a discard goes back to now', elements._globalValues.slug === 'new slug' );
+
+	// ---- a save that runs is not interrupted by the question
+	elements._switchLocale( 'de_DE' );
+	type( 'body', 'DE-RACE' );
+	elements._switchLocale( 'en_US' );
+	type( 'body', 'EN-RACE' );
+	sent.length = 0;
+	elements._save( report );
+	const backLink = d.doc.getElementById('elements-form').querySelector('.nino-admin-back-link');
+	check( 'while a save runs the back link is inert - a click on it cannot open the question',
+		sent.length === 1 && sent[0].payload.locale === 'de_DE' && backLink.getAttribute('aria-disabled') === 'true' && backLink.style.pointerEvents === 'none' );
+	elements.discard();
+	check( 'a discard that comes in during the save leaves the edits of the languages not yet sent alone',
+		elements._localeValues.en_US.body === 'EN-RACE' && elements._dirtyLocales.join() === 'de_DE,en_US' && elements.isDirty() === true );
+	sent[0].callback( 200, { element : { '.uri' : '/post/one', slug : 'new slug', tags : [ 'x' ], pic : 'a.jpg', name : 'Name de', body : 'DE-RACE', ltags : [], rich : '' } } );
+	check( '...so the next request still carries them', sent.length === 2 && sent[1].payload.locale === 'en_US' && sent[1].payload.fields.body === 'EN-RACE' );
+	sent[1].callback( 200, { element : { '.uri' : '/post/one', slug : 'new slug', tags : [ 'x' ], pic : 'a.jpg', name : 'Name', body : 'EN-RACE', ltags : [], rich : '' } } );
+	check( '...and when it is done the link works again, and discarding goes back to what was written',
+		backLink.getAttribute('aria-disabled') === 'false' && backLink.style.pointerEvents === '' && ( elements.discard(), elements._localeValues.en_US.body === 'EN-RACE' && elements._localeValues.de_DE.body === 'DE-RACE' ) );
+
+	// ---- the exits the form guards
+	const guards = [];
+	sandbox.Nino.admin.dirty = { guard : ( names, proceed ) => guards.push( { names : names, proceed : proceed } ), register(){}, refresh(){}, snapshot(){} };
+	const opened = [];
+	elements._openForm = uri => opened.push( uri );
+	elements._elements = [ { uri : 'ada', label : 'Ada' }, { uri : 'one', label : 'One' }, { uri : 'cy', label : 'Cy' } ];
+	const navButtons = elements._renderNav().querySelectorAll('button');
+	navButtons[1].click();
+	check( 'stepping to the next element asks about this form first', guards.length === 1 && guards[0].names.join() === 'elements' && opened.length === 0 );
+	guards[0].proceed();
+	check( '...and goes on once the question is answered', opened.join() === 'cy' );
+
+	const copies = [];
+	elements._makeCopy = () => copies.push( true );
+	elements._duplicate();
+	check( 'duplicating asks first too', guards.length === 2 && copies.length === 0 );
+	guards[1].proceed();
+	check( '...and copies once it may', copies.length === 1 );
+
+	delete sandbox.Nino.admin.dirty;
+	elements._duplicate();
+	navButtons[0].click();
+	check( 'a shell without the registry asks nothing', copies.length === 2 && opened.join() === 'cy,ada' );
+
+	// ---- a link inside a rich text is its content, not a link of the form
+	{
+		const plainEditor = sandbox.Nino.admin.htmlEditor;
+		// An editor whose content really holds the link: it reads back as the markup
+		// of that node, attributes and all, so whatever the form writes onto it shows
+		sandbox.Nino.admin.htmlEditor = { create : ( mount, value ) => {
+			const content = d.make('div');
+			content.setAttribute( 'contenteditable', 'true' );
+			const link = d.make('a');
+			link.attrs.href = /href="([^"]*)"/.exec( String( value ?? '' ) )?.[1] ?? '';
+			content.appendChild( link );
+			mount.appendChild( content );
+			const markup = () => '<a href="'+ link.attrs.href+ '"'
+				+ ( 'aria-disabled' in link.attrs ? ' aria-disabled="'+ link.attrs['aria-disabled']+ '"' : '' )
+				+ ( 'pointerEvents' in link.style ? ' style="'+ ( link.style.pointerEvents === '' ? '' : 'pointer-events: '+ link.style.pointerEvents+ ';' )+ '"' : '' )+ '>l</a>';
+			return { getValue : markup, setValue(){}, destroy(){}, focus(){}, mark(){}, content : content, link : link };
+		} };
+
+		const richLink = '<a href="/x?a=\'b\'">l</a>';
+		const savedElement = ( uri, global ) => ( { '.uri' : '/post/'+ uri, slug : global ?? 'hello', tags : [ 'x' ], pic : 'a.jpg', name : 'Name', body : 'Body', ltags : [], rich : richLink } );
+		const saveRequest = () => sent.filter( r => r.endpoint === 'save' ).pop();
+		const richValue = () => elements._readFieldByKey( 'rich', elements._currentModel.rich );
+
+		elements._isNew = false;
+		elements._currentUri = 'one';
+		elements._globalValues = { slug : 'hello', tags : [ 'x' ], pic : 'a.jpg' };
+		elements._localeValues = {
+			de_DE : { name : 'Name de', body : 'Body de', ltags : [], rich : richLink },
+			en_US : { name : 'Name', body : 'Body', ltags : [], rich : richLink },
+		};
+		elements._dirtyLocales = [];
+		elements._selectedLocale = 'en_US';
+		elements._resetEdits();
+		elements._remember();
+		elements._renderForm();
+
+		const before = richValue();
+		elements._setFormPending( true );
+		const during = richValue();
+		elements._setFormPending( false );
+		check( 'a rich text that holds a link keeps its value while the form is locked for a save and when it is given back',
+			before === richLink && during === richLink && richValue() === richLink && elements.isDirty() === false );
+
+		sent.length = 0;
+		elements._save( report );
+		check( '...the link is not touched while the save runs', saveRequest() !== undefined && richValue() === richLink );
+		saveRequest().callback( 200, { element : savedElement( 'one' ) } );
+		check( '...and an existing element saved with nothing edited is clean afterwards, with the markup it had',
+			elements._saving === false && elements.isDirty() === false && richValue() === richLink && elements._status.state === 'saved' );
+
+		sent.length = 0;
+		elements._save( report );
+		saveRequest().callback( 500, null );
+		check( '...a save that fails leaves an unedited form clean', elements._saving === false && elements.isDirty() === false && richValue() === richLink );
+
+		// a new element, saved once
+		elements._isNew = true;
+		elements._currentUri = null;
+		elements._globalValues = { slug : 'fresh', tags : [ 'x' ], pic : 'a.jpg' };
+		elements._localeValues = { de_DE : { name : 'Name de', body : 'Body de', ltags : [], rich : richLink }, en_US : { name : 'Name', body : 'Body', ltags : [], rich : richLink } };
+		elements._dirtyLocales = [];
+		elements._resetEdits();
+		elements._renderForm();
+		d.doc.getElementById('elements-form-uri').value = 'newone';
+		d.doc.getElementById('elements-edit-form').fire('input');
+		sent.length = 0;
+		elements._save( report );
+		saveRequest().callback( 200, { element : savedElement( 'newone', 'fresh' ) } );
+		check( 'a new element saved with a link in its rich text is clean afterwards, and the link is as it was',
+			elements._isNew === false && elements._saving === false && elements.isDirty() === false && richValue() === richLink && elements._status.state === 'saved' );
+
+		sandbox.Nino.admin.htmlEditor = plainEditor;
+	}
+}
+
+// The registration is the shell's to offer: a shell with it is told about this
+// form, one without it is not asked
+{
+	const registered = [];
+	const box = { console : console, document : { documentElement : null, body : null } };
+	box.window = box;
+	box.Nino = { editor : {}, events : { bindCallback(){} }, admin : { dirty : { register : ( name, entry ) => registered.push( [ name, entry ] ) } } };
+	vm.runInContext( source, vm.createContext( box ), { filename : 'elements.js' } );
+	check( 'the Elements form registers with the shell under its name, with the three words the shell asks it',
+		registered.length === 1 && registered[0][0] === 'elements' && [ 'isDirty', 'save', 'discard' ].every( k => typeof registered[0][1][k] === 'function' ) );
+}
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

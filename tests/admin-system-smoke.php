@@ -3222,6 +3222,30 @@ $getRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[temp
 \Nino\Admin\Admin::init( $withModule );
 check( 'init bundles every panel script, the module\'s included, after the shell\'s own', in_array( '/app/Dummy/assets/admin.js', $withModule['/nino/html/assets']['/_admin/.cache/script.js'], true ) === true && in_array( '/_nino/Nino/Modules/Navigation/assets/admin.js', $withModule['/nino/html/assets']['/_admin/.cache/script.js'], true ) === true && $withModule['/nino/html/assets']['/_admin/.cache/script.js'][0] === '/_nino/Nino.js' );
 check( 'and every panel stylesheet', in_array( '/app/Dummy/assets/admin.css', $withModule['/nino/html/assets']['/_admin/.cache/style.css'], true ) === true );
+// The registry the form panels report to (Nino.admin.dirty) is defined by the
+// shell script, and every panel registers when its own file loads - so the shell
+// script has to come first in the bundle, and the design system's primitives
+// (the question's dialog) before it
+$scriptBundle = $withModule['/nino/html/assets']['/_admin/.cache/script.js'];
+$bundlePositions = array_flip( $scriptBundle );
+$registers = [];
+foreach( $scriptBundle as $file ) {
+	if( str_contains( $file, '/Modules/' ) === true && preg_match( '/Nino\.admin\.dirty\.(?:register|watchForm)\(/', (string) file_get_contents( dirname( __DIR__ ). $file ) ) === 1 )
+		$registers[] = $file;
+}
+check( 'the shell\'s registry is bundled before every panel script that registers with it', count( $registers ) >= 13
+	&& isset( $bundlePositions['/_admin/assets/Nino.admin.js'], $bundlePositions['/_admin/assets/script.js'] ) === true
+	&& $bundlePositions['/_admin/assets/Nino.admin.js'] < $bundlePositions['/_admin/assets/script.js']
+	&& array_filter( $registers, static fn( string $file ): bool => $bundlePositions[$file] < $bundlePositions['/_admin/assets/script.js'] ) === [] );
+// A fill is parsed as a fill key wherever square brackets appear in its value,
+// so the JSON refusal carries none (AGENTS.md, fills)
+foreach( [ 'en_US', 'de_DE' ] as $locale ) {
+	$elementFills = (array) include dirname( __DIR__ ). '/_admin/Nino/Modules/Elements/text/'. $locale. '.php';
+	check( $locale. ': the Elements form words its refusals in fills, the JSON one without bracket characters',
+		isset( $elementFills['[[/_admin/elements/error/json]]'], $elementFills['[[/_admin/elements/error/field-required]]'], $elementFills['[[/_admin/elements/label/locale-open]]'] ) === true
+		&& preg_match( '/[\[\]]/', $elementFills['[[/_admin/elements/error/json]]'] ) === 0
+		&& str_contains( $elementFills['[[/_admin/elements/label/locale-open]]'], '%s' ) === true && str_contains( $elementFills['[[/_admin/elements/label/locale-open]]'], '%d' ) === true );
+}
 check( 'the nav and the panes reach the template as fills', str_contains( \Nino\Html::renderTextfill( $withModule, '/_admin/nav' ), 'data-panel="dummy"' ) === true && str_contains( \Nino\Html::renderTextfill( $withModule, '/_admin/panes' ), 'id="dummy-list"' ) === true );
 
 $request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];

@@ -1091,5 +1091,43 @@ panel.init();
 answer( 500, null );
 check( 'a failed load is reported through the workbench\'s words', mount.children.length === 1 && hasClass( mount.children[0], 'nino-admin-error' ) && mount.children[0].textContent === '(500) '+ text('/_admin/common/error/load') );
 
+/*	Switching a feature on or off and installing one end in a reload of the page
+	(or a list read that builds the open settings screen again): the unsaved
+	input of anything in the workbench is asked about before the request goes
+	out, and the reload follows only the answer	*/
+{
+	const asked = [];
+	Nino.admin.dirty = { guard : function( names, proceed ) { asked.push( { names : names, proceed : proceed } ) }, snapshot : function() {} };
+	const button = { disabled : false };
+	const line = { textContent : '', classList : { add : function() {}, remove : function() {} } };
+	const sentBefore = requests.length;
+	const reloadsBefore = reloads;
+
+	panel._switch( { key : 'sample' }, 'deactivate', button, line );
+	check( 'switching a feature asks about unsaved input in the whole workbench first, and sends nothing before the answer',
+		asked.length === 1 && asked[0].names === null && requests.length === sentBefore && button.disabled === false );
+	asked[0].proceed();
+	check( '...and sends the request once answered', requests.length === sentBefore + 1 && requests[requests.length - 1].action === 'features/deactivate' && button.disabled === true );
+	answer( 200, { feature : FEATURES[2] } );
+	check( '...the reload comes after it', reloads === reloadsBefore + 1 );
+
+	asked.length = 0;
+	panel._install( { key : 'extra', version : '1.0.0' }, button, line );
+	check( 'installing a feature asks first, too', asked.length === 1 && asked[0].names === null && requests[requests.length - 1].action === 'features/deactivate' );
+	asked[0].proceed();
+	check( '...and sends the install once answered', requests[requests.length - 1].action === 'features/install' && requests[requests.length - 1].payload.key === 'extra' );
+
+	// The install that turns out to be an update to a running feature switches it
+	// in a request of its own - the question was asked once, for both
+	asked.length = 0;
+	answer( 200, { feature : FEATURES[2], pending : true } );
+	check( 'an install that goes on to apply an update does not ask a second time', asked.length === 0 && requests[requests.length - 1].action === 'features/activate' );
+
+	delete Nino.admin.dirty;
+	const sent = requests.length;
+	panel._switch( { key : 'sample' }, 'deactivate', button, line );
+	check( 'a shell without the registry asks nothing', requests.length === sent + 1 );
+}
+
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

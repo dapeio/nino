@@ -252,5 +252,41 @@ answer( 403, { error : 'no permission' } );
 answer( 403, null );
 check( 'a move error survives a reload that fails as well', messageText() === '(403) no permission' );
 
+/*	The open page's form is watched by the shell (Nino.admin.dirty), which asks
+	before anything throws what was typed into it away. A second context, with
+	a registry that records what it is told, since the one above has none	*/
+{
+	const calls = [];
+	const watched = [];
+	const sent = [];
+	const nodes = {};
+	const node = id => nodes[id] = nodes[id] ?? { id : id, value : 'x', textContent : '' };
+	const box = {
+		console : console,
+		document : { getElementById : node, querySelectorAll : () => [], documentElement : null, body : null },
+		Nino : {
+			admin : { dirty : { watchForm : ( name, getter, save ) => watched.push( { name : name, getter : getter, save : save } ), snapshot : name => calls.push( 'snapshot '+ name ) } },
+			events : { bindCallback : function() {} },
+			http : { sendRequest : ( uri, method, callback, data ) => sent.push( { action : data.action, callback : callback } ) },
+			content : { getText : key => key },
+			adminUi : { api : { errorText : status => 'error '+ status, call : ( endpoint, payload, callback ) => sent.push( { action : endpoint, callback : callback } ) } },
+		},
+	};
+	box.window = box;
+	vm.runInContext( source('_admin/Nino/Modules/Routes/assets/admin.js'), vm.createContext( box ), { filename : 'admin.js' } );
+
+	check( 'the page form registers with the shell under the panel\'s name', watched.length === 1 && watched[0].name === 'routes' && watched[0].getter() === node('routes-form') );
+
+	const outcomes = [];
+	box.Nino.admin.routes._save( ok => outcomes.push( ok ) );
+	sent[sent.length - 1].callback( 500, null );
+	check( 'a save that fails reports false and takes nothing for stored', outcomes.join() === 'false' && calls.length === 0 );
+
+	box.Nino.admin.routes._save( ok => outcomes.push( ok ) );
+	sent[sent.length - 1].callback( 200, {} );
+	check( 'a save that goes through takes the form as it stands for the stored one, and reports true', outcomes.join() === 'false,true' && calls.join() === 'snapshot routes' );
+	check( '...the shell\'s Save runs the same save', typeof watched[0].save === 'function' );
+}
+
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

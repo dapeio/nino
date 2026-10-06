@@ -978,6 +978,116 @@ const undefinedKeys = [ ...usedKeys ].filter( k => [ 'en_US', 'de_DE' ].some( lo
 check( 'every fill key the workbench asks for is defined in English and in German'+ ( undefinedKeys.length ? ' - missing: '+ undefinedKeys.join(', ') : '' ), undefinedKeys.length === 0 );
 check( 'the checks above saw the whole vocabulary', usedKeys.size > 200 );
 
+console.log('\nUnsaved input');
+
+// A form panel tells the shell when it holds input nobody has saved
+// (Nino.admin.dirty, in the shell script). The registration is opt-in and
+// feature-detected: a panel script runs in suites and on shells without
+// script.js, and a feature panel on an older kernel has no registry at all.
+// The directory is the list of panels, so the names a script registers under
+// are checked against the panes the registry draws: a panel or a tab, named
+// like its module directory
+const registered = [];
+localizedScripts.concat( [ [ 'Maintenance/admin.js', moduleAsset( 'Maintenance', 'admin.js' ) ] ] ).forEach( e => {
+	for( const m of e[1].matchAll( /(if\( typeof Nino\.admin\.dirty === 'object' \)\s*)?Nino\.admin\.dirty\.(register|watchForm)\( '([a-z]+)'/g ) )
+		registered.push( { file : e[0], name : m[3], guarded : m[1] !== undefined } );
+} );
+const EXPECTED_FORM_PANELS = [ 'config', 'elements', 'features', 'keys', 'language', 'lockout', 'maintenance', 'navs', 'roles', 'routes', 'slots', 'text', 'types', 'users' ];
+check( 'every form panel of the kernel registers with the shell, once'+ ( ' - registered: '+ registered.map( r => r.name ).sort().join(',') ),
+	registered.map( r => r.name ).sort().join(',') === EXPECTED_FORM_PANELS.join(',') );
+check( '...each behind a check that the shell has the registry', registered.every( r => r.guarded === true ) );
+const paneUris = new Set( [ 'navs', 'maintenance' ] );
+ADMIN_MODULES.forEach( m => {
+	paneUris.add( m.toLowerCase() );
+	fs.readdirSync( path.join( __dirname, '../_admin/Nino/Modules', m ), { withFileTypes : true } )
+		.filter( d => d.isDirectory() && [ 'Admin', 'assets', 'text' ].indexOf( d.name ) === -1 ).forEach( d => paneUris.add( d.name.toLowerCase() ) );
+} );
+check( '...under the uri of a panel or a tab the registry draws - the id of its pane is what the shell finds it by', registered.every( r => paneUris.has( r.name ) ) );
+check( 'the panels that are not forms - lists, logs, the dashboard, the translations import - do not register',
+	[ 'Dashboard', 'Logs', 'Backups' ].every( m => ADMIN_MODULES.indexOf( m ) !== -1 && registered.some( r => r.file.indexOf( m+ '/' ) === 0 ) === false )
+	&& registered.some( r => r.file.indexOf('translations') !== -1 ) === false );
+
+// Maintenance: the panel is read again every time it is shown, which rebuilt
+// the form over whatever was typed into it
+{
+	const calls = [];
+	const box = { Nino : { admin : { dirty : { isDirty : () => box.unsaved, watchForm(){}, snapshot(){} } }, events : { bindCallback(){} } }, console : console, document : { getElementById : () => null, documentElement : null, body : null } };
+	box.window = box;
+	box.unsaved = false;
+	vm.runInContext( moduleAsset( 'Maintenance', 'admin.js' ), vm.createContext( box ), { filename : 'maintenance.js' } );
+	const panel = box.Nino.admin.maintenance;
+	panel.init = () => calls.push( 'init' );
+	panel.showCurrent();
+	check( 'Maintenance is read again when it is shown and nothing has been drawn yet', calls.length === 1 );
+	panel._ready = true;
+	panel.showCurrent();
+	check( '...and when the form on screen holds nothing unsaved', calls.length === 2 );
+	box.unsaved = true;
+	panel.showCurrent();
+	check( '...but not over a form somebody typed into', calls.length === 2 );
+	delete box.Nino.admin.dirty;
+	panel.showCurrent();
+	check( '...a shell without the registry reads again as it always did', calls.length === 3 );
+}
+
+// ...and a read that fails writes its error over the form: the panel is then
+// not holding input, whatever the registry still remembers, and reads again
+{
+	const reads = [];
+	const shown = [];
+	const wrap = { id : 'maintenance-form', innerHTML : '' };
+	let answerWith = 200;
+	const box = { Nino : {
+		admin : { dirty : { isDirty : () => true, watchForm(){}, snapshot(){} } },
+		adminUi : { api : { call : ( endpoint, payload, callback ) => { reads.push( endpoint ); callback( answerWith, answerWith === 200 ? { status : 'off' } : null ) } }, showError : ( container, status ) => shown.push( status ) },
+		events : { bindCallback(){} },
+	}, console : console, document : { getElementById : id => id === 'maintenance-form' ? wrap : null, documentElement : null, body : null } };
+	box.window = box;
+	vm.runInContext( moduleAsset( 'Maintenance', 'admin.js' ), vm.createContext( box ), { filename : 'maintenance.js' } );
+	const panel = box.Nino.admin.maintenance;
+	panel._render = () => {};
+	panel.init();
+	check( 'Maintenance: the first read draws the form', reads.length === 1 && panel._ready === true );
+	answerWith = 500;
+	box.Nino.admin.dirty.isDirty = () => false;
+	panel.showCurrent();
+	check( '...a read that fails shows its error and the panel no longer counts as drawn', reads.length === 2 && shown.join() === '500' && panel._ready === false );
+	box.Nino.admin.dirty.isDirty = () => true;
+	answerWith = 200;
+	panel.showCurrent();
+	check( '...so the next time it is shown it reads again, whatever the registry says, and recovers', reads.length === 3 && panel._ready === true );
+}
+
+// The question's primitive owns no words and names no workbench member: the
+// setup wizard loads Nino.admin.js without the shell script
+const choiceStart = adminUiSource.indexOf( 'choiceDialog : function' );
+const choiceSource = adminUiSource.slice( choiceStart, adminUiSource.indexOf( '\n\t\t},\n', choiceStart ) );
+check( 'choiceDialog is in the shared primitives and owns no strings', choiceStart !== -1 && /getText|Nino\.content/.test( choiceSource ) === false );
+check( '...names no Nino.admin member, so the wizard keeps loading the file', /Nino\.admin\.(?!htmlEditor\b)/.test( choiceSource.replace( /Nino\.adminUi/g, '' ) ) === false );
+check( '...builds its markup with createElement and textContent only', /innerHTML|insertAdjacentHTML/.test( choiceSource ) === false && choiceSource.includes('textContent') );
+
+const shellSource = asset( 'script.js' );
+check( 'the shell installs its listeners from onReady(), never at load - the DOM-less first context of its test has none',
+	/Nino\.admin\.dirty\.init\(/.test( shellSource ) && shellSource.slice( 0, shellSource.indexOf( 'onReady' ) ).indexOf( "addEventListener( 'beforeunload'" ) === -1 );
+
+const stylesheetSource = asset( 'style.css' );
+const vocabularyEnd = stylesheetSource.indexOf( '*/' );
+const vocabulary = stylesheetSource.slice( 0, vocabularyEnd );
+check( 'the new classes are in the design system\'s vocabulary index and have rules',
+	[ 'nino-admin-required', 'nino-admin-field-error', 'nino-admin-actionbar-dirty' ].every( c => vocabulary.includes( '.'+ c ) && stylesheetSource.indexOf( '.'+ c, vocabularyEnd ) !== -1 ) );
+check( 'the marker is a plain class of the action bar, outside the rule that hides the status line on a phone', stylesheetSource.includes( '.nino-admin-actionbar > .nino-admin-actionbar-dirty' ) );
+check( '...and it is hidden only above the phone width, and only in a bar that has a status line',
+	/@media \(min-width: 38\.001rem\) \{\s*\.nino-admin \.nino-admin-actionbar:has\(> \.nino-admin-status\) > \.nino-admin-actionbar-dirty \{\s*display: none;/.test( stylesheetSource ) === true );
+
+const askTexts = [ '/_admin/common/confirm/unsaved', '/_admin/common/label/discard', '/_admin/common/label/cancel' ];
+const elementTexts = [ '/_admin/elements/error/json', '/_admin/elements/error/field-required', '/_admin/elements/label/locale-open', '/_admin/elements/error/required' ];
+check( 'the words of the question are fills in both interface languages',
+	[ 'en_US', 'de_DE' ].every( l => askTexts.every( k => workbenchText( l ).includes( "'[["+ k+ "]]'" ) ) && elementTexts.every( k => adminModuleText( 'Elements', l ).includes( "'[["+ k+ "]]'" ) ) ) );
+check( '...and the JSON refusal contains no bracket characters (a fill is parsed as a fill key)',
+	[ 'en_US', 'de_DE' ].every( l => { const m = adminModuleText( 'Elements', l ).match( /\[\[\/_admin\/elements\/error\/json\]\]'\s*=>\s*'([^']*)'/ ); return m !== null && /[\[\]]/.test( m[1] ) === false } ) );
+check( 'the required-fields summary no longer ends in a colon that a list of names follows',
+	[ 'en_US', 'de_DE' ].every( l => /error\/required\]\]'\s*=>\s*'[^']*\.'/.test( adminModuleText( 'Elements', l ) ) ) );
+
 console.log('\nOne stylesheet');
 
 // A message beside an image control says what went wrong in the colour the
@@ -992,6 +1102,28 @@ localizedScripts.forEach( e => { for( const m of e[1].matchAll( /nino-admin-fiel
 const unknownModifiers = Array.from( imageMsgModifiers ).filter( mod => stylesheet.includes( '.nino-admin-field-image-msg.'+ mod ) === false );
 check( 'every modifier a script puts beside the image message is one the stylesheet styles'+ ( unknownModifiers.length ? ' - unknown: '+ unknownModifiers.join(', ') : '' ), unknownModifiers.length === 0 );
 check( '...and the check saw the modifier both image controls use', imageMsgModifiers.has('is-error') );
+
+// A write that went through is reported as done, whatever the list read after it does:
+// the question that asked for the Save would otherwise offer it again, and a second
+// create of the same account or role is refused as existing
+{
+	const box = { console : console, document : { documentElement : null, body : null, getElementById : () => ( { textContent : '' } ) } };
+	box.window = box;
+	box.Nino = { admin : {}, content : { getText : key => key }, adminUi : { api : { errorText : () => 'x' } } };
+	vm.runInContext( adminAsset( 'Users', 'roles.js' ), vm.createContext( box ), { filename : 'roles.js' } );
+	const roles = box.Nino.admin.roles;
+	roles._showError = () => {};
+	const answers = [ [ 200, { id : 'editor' } ], [ 500, null ] ];
+	roles._apiCall = ( endpoint, payload, callback ) => callback( ...answers.shift() );
+	const reported = [];
+	roles._save( { value : 'editor' }, { value : 'Editor' }, { fullCheck : { checked : false }, perms : () => [] }, ok => reported.push( ok ) );
+	check( 'a role that was written is reported as saved when only the list read after it fails', reported.join() === 'true' );
+	answers.push( [ 400, {} ] );
+	roles._save( { value : 'editor' }, { value : 'Editor' }, { fullCheck : { checked : false }, perms : () => [] }, ok => reported.push( ok ) );
+	check( '...and one the server refused is not', reported.join() === 'true,false' );
+	check( 'the same for a new account: the list read after the create does not undo it',
+		/_showError\( dc\.getElementById\('users-list'\), listStatus, listResponse \);\s*report\( true \);/.test( usersSource ) === true );
+}
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

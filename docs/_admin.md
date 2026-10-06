@@ -122,9 +122,9 @@ The rail on the left carries the brand, your account, the settings gear and the 
 - **Fold.** The small chevron beside the brand folds the rail to a column of icons. A panel that needs the whole width – the Template Builder – folds it on its own and takes the reading-width ceiling off the pane; open it again by hand and it stays open, on every panel, until you fold it again. The choice is kept in the browser, not on the server.
 - **Deep links.** The address bar follows you: `#elements/team/ada` is the element you are editing, `#types` the Element Types tab. A reload or a bookmark opens exactly that state, and the browser's back button steps through it.
 - **Settings gear.** Interface language and light or dark colour scheme. The language also selects the content locale the Text and Elements forms open with.
-- **Switching panels** never resets a panel: the Template Builder keeps its unsaved document, an element form its unsaved values, until you save or leave the page. Leaving the Templates panel with unsaved changes asks first.
+- **Switching panels** never resets a panel: the Template Builder keeps its unsaved document, an element form its unsaved values, until you save or leave the page. Leaving one of the workbench's own forms that holds unsaved changes asks first - **Save**, **Discard** or **Cancel** - wherever the way out leads: a back link, the previous and next buttons, a copy of an element, a log out, the interface language, switching a feature on or off or installing one, restoring a backup, ending your own sessions, or a change that redraws the form. The browser asks as well when the tab is closed or reloaded, and a form with unsaved input shows *Unsaved changes* at its foot. Cancel stays where you are; a Save that fails brings the form with its errors back on screen. The Templates panel asks with its own OK/Cancel question when it is left, and its unsaved document is not part of the questions about logging out, the interface language or switching a feature on or off.
 
-- **The status line.** The Elements form and the three Users forms (a new account, an account, a role) say what became of the last save at their foot - *Saving …*, *Saved at 09:41.*, *Unsaved changes* as soon as you type again, or why it failed. Typing while a save is on its way leaves *Unsaved changes* behind it, not *Saved*. A refusal names the field it is about and marks it; the next thing you type into the field takes the mark off. The error is said in the interface language, with the limits and values in it (*The password needs at least 8 characters.*) - only a failure Nino has no sentence for shows the server's own message, with its status number in front. A request that never reached the server says so instead of printing a number. The other forms still print a plain *Saved.*, and below a width of about 38 rem a bottom bar hides its status line - an error there shows only after the bar is wide enough again.
+- **The status line.** The Elements form and the three Users forms (a new account, an account, a role) say what became of the last save at their foot - *Saving …*, *Saved at 09:41.*, *Unsaved changes* as soon as you type again, or why it failed. Typing while a save is on its way leaves *Unsaved changes* behind it, not *Saved*. A refusal names the field it is about and marks it; the next thing you type into the field takes the mark off. The error is said in the interface language, with the limits and values in it (*The password needs at least 8 characters.*) - only a failure Nino has no sentence for shows the server's own message, with its status number in front. A request that never reached the server says so instead of printing a number. The other forms still print a plain *Saved.*, and below a width of about 38 rem a bottom bar hides its status line - an error there shows only after the bar is wide enough again; below that width the bar shows *Unsaved changes* in its place.
 - **A session that ends under an open form.** A session ends after a long idle time or a log out in another tab. The page then asks for a login again, in a dialog over everything you have typed - nothing is lost. Once you are in, what you were doing is sent again. *Close* gives the page back without a login: the requests that waited report their failure in their panel and the forms can be used again, so that what you typed can be copied out before you reload. If another account has logged in in another tab of the same browser in the meantime, the dialog only offers to reload: a form filled in for one account must not be saved by another. If the same account has logged in again in another tab of this browser in the meantime, which replaces the page's token, the page mends itself the same way, without asking for anything.
 
 Whatever panel is open, saving writes the project files immediately. There is no draft state and no separate publish step; check the frontend and every affected language afterwards.
@@ -142,13 +142,13 @@ Elements are recurring structured content – team members, services, references
 1. Choose a type. Its entries are a table: one column per field a cell can show (not images, lists or rich text), the uri first, the cells in the translation the workbench is set to – empty where an entry has none yet. Search, sort by a column, page.
 2. Open an entry (its row) or select **New element**. A type that numbers its elements states the uri it is about to create; every other type asks for a slug of lowercase letters, digits, hyphens and underscores.
 3. Fill the global fields once and the translated fields per language – the language switch is inside the form, and unsaved values survive the switch.
-4. **Save**. An image field becomes available only after a new element has been saved once; Nino then processes the upload to the dimensions the type declares.
+4. **Save**. A required field carries an asterisk. A save that finds one empty stops, marks every such field with a sentence under it, moves the focus to the first and names the languages with open fields in the language switch (*de_DE – 2 open*); nothing is sent until they are filled. A list or object field is entered as JSON, and text that is not valid JSON stops the save the same way and stays in the field. Only the languages edited since the form was opened are written and checked, and, if none was, the one on screen. An image field becomes available only after a new element has been saved once; Nino then processes the upload to the dimensions the type declares.
 
 A field that references other elements is a select or, where the type allows several, an ordered list with a search field, move buttons and a maximum the type may set. A referenced element that has been deleted is shown as *missing* rather than dropped.
 
 **Raw storage**, at the foot of the form, shows the buckets the entry is stored in: `*` for the global fields and one per language. It is read-only and meant for diagnosis and migrations.
 
-**‹ Previous element** and **Next element ›**, at the right of the form's context bar, step through the type's entries in the order of the list without returning to it. Like the back link, they do not save.
+**‹ Previous element** and **Next element ›**, at the right of the form's context bar, step through the type's entries in the order of the list without returning to it. Like the back link, they ask first when the form holds unsaved changes.
 
 **Duplicate** takes every value of the open entry into a new element – all languages, all fields, except the uri and the images, which belong to the entry they were uploaded for. Nothing is written yet: give the copy a uri and save it.
 
@@ -203,7 +203,7 @@ Element types describe recurring content. Each type is a file under `elements/`;
 | `integer` | whole numbers |
 | `double` | decimal numbers |
 | `boolean` | yes/no |
-| `array` | simple lists or structured values |
+| `array` | simple lists or structured values, entered as JSON; invalid JSON blocks the save at the field |
 | `date` | a date |
 | `datetime` | date and time |
 | `image` | an image with fixed target dimensions |
@@ -251,6 +251,8 @@ Opening a menu shows its entries as they render, with ↑ / ↓ to move one, × 
 - **Ignore permanently** retires the key: it leaves the scan, the Dashboard tile and the Text panel, and is listed here as a hidden key. Unticking *hidden* on it – or deleting it – brings it back into the scan.
 
 Dynamically composed keys are beyond a static scan.
+
+**Save** in a category writes the global values once and every language edited since the category was opened, one language after another; the confirmation appears after the last. A failure stops there, names the key and the language, and leaves the languages not yet written marked as unsaved.
 
 ### Image Slots
 

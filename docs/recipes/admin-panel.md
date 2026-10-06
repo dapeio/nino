@@ -755,6 +755,73 @@ the catalogue's `\Nino\Modules\Search\Admin` in
 [features/Search/Admin/Admin.php](https://github.com/dapeio/nino-features/tree/main/features/Search/Admin/Admin.php)
 and its `assets/admin.js`.
 
+## Unsaved input
+
+A form that holds something nobody has saved tells the shell, and the shell
+asks **Save**, **Discard** or **Cancel** before anything throws it away: the
+back link of the form, a log out, the interface language, and every exit the
+panel guards itself. The registry is `Nino.admin.dirty`, defined by the shell
+script before any panel file loads; a panel registers when its own file loads,
+behind a feature check, because panel scripts also run in tests and on shells
+that have no registry:
+
+```js
+if( typeof Nino.admin.dirty === 'object' )
+	Nino.admin.dirty.watchForm( 'catalog', function() { return dc.getElementById('catalog-edit') }, function( done ) {
+		Nino.admin.catalog._save( done );
+	} );
+```
+
+`watchForm( name, formGetter, save )` serialises the plain fields of the form
+the getter answers and compares them with what `snapshot( name )` saw: call
+`snapshot( 'catalog' )` after the form is drawn and after a save went through.
+A file input, a search box, a password the browser may fill in and a field with
+`data-dirty="ignore"` are not input. A form whose state is not its plain fields
+(rich text read back as other markup, edits kept in the model, a copy nobody
+saved) registers with `register( name, { isDirty, save, discard, bar } )` and
+answers `isDirty()` itself - compared with what the controls held when they
+were drawn, never with the stored string. `name` is the uri of the panel or tab:
+the shell finds the pane by `admin-tab-<name>`, else `admin-content-<name>`.
+
+Four rules follow:
+
+- `save( done )` calls `done( true )` or `done( false )` on **every** way it can
+  end: a second submit while one runs, a refusal before anything is sent, a
+  failed request, success. The shell goes on only on `true`; on `false` it
+  brings the panel on screen again with its errors.
+- Every exit that would lose the form runs inside
+  `Nino.admin.dirty.guard( [ 'catalog' ], proceed, onCancel )` - `null` for a
+  reload of the whole page (feature activation, a backup restore, a log out).
+  `onCancel` undoes the control that started the exit (a checkbox, a select).
+  Nothing is sent before `proceed`.
+- A form that is rebuilt from the server whenever its panel is shown must not be
+  rebuilt over unsaved input (`showCurrent()` checks `isDirty()` first). A load
+  error written into the watched container leaves no fields: the shell takes
+  that for clean, and a panel that tracks its own drawn state resets it there.
+- `discard()` takes the form as it stands for saved (it re-baselines) *before*
+  the exit runs. When the exit's request then fails without redrawing the form,
+  the discarded text stays in the controls and counts as saved. That is a
+  known limitation, not a rule the exits keep: an exit that wants to avoid it
+  redraws or reloads the form itself when its request fails (the Keys schema,
+  rename and delete exits, the Navigation entry actions and the feature,
+  backup and logout-all exits do not).
+
+The question is `Nino.adminUi.choiceDialog( { title, message, choices, onChoose } )`
+in the design system: it owns no words and names no `Nino.admin` member. A form
+that has a status line (`Nino.adminUi.status()`) shows the unsaved state there;
+every form gets the word *Unsaved changes* in its action bar from
+`Nino.admin.dirty.refresh()`, which a panel calls at the end of its own save -
+the style sheet hides it in a bar that has a status line, except below 38 rem,
+where the status line is hidden. While a save of the form runs, its `discard()`
+leaves the model alone and its links are inert.
+
+A required field is marked the same way everywhere: the asterisk
+(`.nino-admin-required`, `aria-hidden`) after its name, `aria-required` on its
+control, and after a refused save the sentence under it
+(`.nino-admin-field-error`, linked with `aria-describedby`) with the focus on
+the first one. The sentences are not alerts; the form's status line announces
+the refusal once.
+
 ## Panel tests
 
 Backend tests belong in `tests/admin-smoke.php` (content panels, accounts)

@@ -29,6 +29,8 @@
 		_permOptions	: [],
 		// The role on the form, null while a new one is being made
 		_current			: null,
+		// The controls the form's save reads, as _renderForm() made them
+		_parts				: null,
 		_loading			: false,
 		_ready				: false,
 
@@ -298,8 +300,14 @@
 
 			wrap.appendChild( form );
 
+			Nino.admin.roles._parts = { idInput : idInput, nameInput : nameInput, permissions : permissions };
+
 			if( role === null )
 				idInput.focus();
+
+			// What the form holds now is what is saved
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.snapshot( 'roles' );
 		},
 
 		/**
@@ -548,10 +556,16 @@
 		 *	@param		{Element}	idInput
 		 *	@param		{Element}	nameInput
 		 *	@param		{Object}	permissions		See _renderPermissions()
+		 *	@param		{Function}	[done]			Called once with true when the role was written, false otherwise
 		 *
 		 *	@return		void
 		 */
-		_save : function( idInput, nameInput, permissions ) {
+		_save : function( idInput, nameInput, permissions, done ) {
+
+			const report = function( ok ) {
+				if( typeof done === 'function' )
+					done( ok );
+			};
 
 			const msg = dc.getElementById('roles-form-msg');
 
@@ -563,17 +577,24 @@
 
 				if( status !== 200 ) {
 					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/roles/error/save' );
+					report( false );
 					return;
 				}
 
 				Nino.admin.roles._apiCall( 'list', {}, function( listStatus, listResponse ) {
-					if( listStatus !== 200 || listResponse === null )
-						return Nino.admin.roles._showError( dc.getElementById('roles-list'), listStatus, listResponse );
+					if( listStatus !== 200 || listResponse === null ) {
+						// The role is written: only the list failed, and a Save that is
+						// reported as failed would be tried again
+						Nino.admin.roles._showError( dc.getElementById('roles-list'), listStatus, listResponse );
+						report( true );
+						return;
+					}
 					Nino.admin.roles._roles = listResponse.roles;
 					Nino.admin.roles._permOptions = listResponse.permOptions;
 					Nino.admin.roles._renderList();
 					Nino.admin.roles._openRole( response.id );
 					dc.getElementById('roles-form-msg').textContent = Nino.content.getText('/_admin/roles/msg/saved');
+					report( true );
 				} );
 			} );
 		},
@@ -605,5 +626,13 @@
 			} );
 		},
 	};
+
+	// The shell asks before anything throws the open role's input away (see
+	// Nino.admin.dirty). A shell without the registry is simply not asking
+	if( typeof Nino.admin.dirty === 'object' )
+		Nino.admin.dirty.watchForm( 'roles', function() { return dc.getElementById('roles-form') }, function( done ) {
+			const parts = Nino.admin.roles._parts;
+			Nino.admin.roles._save( parts.idInput, parts.nameInput, parts.permissions, done );
+		} );
 
 })(window, document, document.documentElement, document.body);

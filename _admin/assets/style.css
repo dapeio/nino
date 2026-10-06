@@ -96,7 +96,8 @@
  *              .nino-admin-fieldgrid  .nino-admin-checkbox-fieldset
  *              .nino-admin-checkbox-field  .nino-admin-field-header
  *              .nino-admin-char-counter  .nino-admin-field-radios
- *              .nino-admin-changed
+ *              .nino-admin-changed  .nino-admin-required
+ *              .nino-admin-field-error
  *              .nino-admin-field-image  .nino-admin-field-suffixed
  *              .nino-admin-checklist  .nino-admin-checklist-state
  *              .nino-admin-richtext
@@ -116,6 +117,7 @@
  *   Chrome     .nino-admin-contextbar  .nino-admin-contextbar-select
  *              .nino-admin-back-link
  *              .nino-admin-actionbar  .nino-admin-actionbar-status
+ *              .nino-admin-actionbar-dirty
  *              .nino-admin-list-actions
  *   Dialog     .nino-admin-dialog  .nino-admin-dialog-body
  *              .nino-admin-dialog-title  .nino-admin-dialog-actions
@@ -851,6 +853,27 @@ a {
 	line-height: 1.45;
 }
 
+/* The mark after the name of a field that cannot be left empty. Drawn by the
+   panel with aria-hidden: what a screen reader gets is aria-required on the
+   control, so the star is not read out as "star". */
+:where(.nino-admin) .nino-admin-required {
+	margin-left: .2rem;
+	color: var(--editor-red);
+	font-weight: 650;
+}
+
+/* The sentence under a field a save was refused for. A class of its own: the
+   hint's rule is declared above and equally specific, so a hint that was also
+   an error would come out grey. The control is aria-invalid and points here
+   with aria-describedby; the words are not an alert, the form's status line
+   announces the refusal once. */
+:where(.nino-admin) .nino-admin-field-error {
+	margin: .3rem 0 .72rem;
+	color: var(--editor-red);
+	font-size: .74rem;
+	line-height: 1.45;
+}
+
 /* What a field held before it was touched, beside its name - written by
    Nino.adminUi.fieldChange() and shown only while the two differ.
 
@@ -875,7 +898,7 @@ a {
    rules above are more specific than a bare class-plus-attribute, and an
    invalid field that goes back to looking ordinary under the pointer is a
    field that reports its state only when nobody is touching it. */
-:where(.nino-admin) :is(.nino-admin-input, input, textarea, select)[aria-invalid="true"]:not(:disabled) {
+:where(.nino-admin) :is(.nino-admin-input, input, textarea, select, .nino-admin-richtext-content)[aria-invalid="true"]:not(:disabled) {
 	border-color: var(--editor-red);
 	box-shadow: inset 0 0 0 1px var(--editor-red);
 }
@@ -2030,6 +2053,27 @@ a {
 	color: var(--editor-red);
 }
 
+/* The mark a form's bar carries while it holds input nobody has saved -
+   written by Nino.admin.dirty.refresh(). Not a p and not role="status", so the
+   phone rule at the end of this file leaves it standing; the glyph keeps the
+   meaning off the colour, as the status line does. A bar that has a status
+   line says it there and hides the mark - except on a phone, where that line
+   is hidden and the mark is all there is (see the end of this file). */
+.nino-admin .nino-admin-actionbar > .nino-admin-actionbar-dirty {
+	order: -1;
+	flex: 1 1 auto;
+	min-width: 0;
+	color: var(--editor-orange);
+	font-size: .78rem;
+	text-align: right;
+}
+
+.nino-admin .nino-admin-actionbar > .nino-admin-actionbar-dirty::before {
+	content: "\25CF";
+	content: "\25CF" / "";
+	margin-right: .35rem;
+}
+
 .nino-admin .nino-admin-actionbar button {
 	flex: 0 0 auto;
 	width: auto;
@@ -2363,6 +2407,12 @@ a {
 @media (max-width: 63.999rem) {
 	.nino-admin .nino-admin-pane {
 		padding-bottom: calc(var(--nino-admin-actionbar-height) + 1.25rem);
+	}
+}
+
+@media (min-width: 38.001rem) {
+	.nino-admin .nino-admin-actionbar:has(> .nino-admin-status) > .nino-admin-actionbar-dirty {
+		display: none;
 	}
 }
 

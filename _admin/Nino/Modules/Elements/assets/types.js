@@ -688,6 +688,10 @@
 
 			wrap.appendChild( form );
 			Nino.admin.elementTypes._renderFields();
+
+			// What the form holds now is what is saved
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.snapshot( 'types' );
 		},
 
 		/**
@@ -749,6 +753,8 @@
 			confirmInput.type = 'text';
 			confirmInput.id = 'admin-form-delete-confirm';
 			confirmInput.autocomplete = 'off';
+			// The uri typed to confirm a deletion is not an edit of the type
+			confirmInput.dataset.dirty = 'ignore';
 			confirmInput.placeholder = Nino.content.getText('/_admin/types/placeholder/delete').replace( '%s', uri );
 			row.appendChild( confirmInput );
 
@@ -780,9 +786,11 @@
 		 *	freshly loaded list - the type the form was showing is gone, so
 		 *	there is nothing to stay on
 		 *
+		 *	@param		{boolean}	[guarded]			The unsaved input of an open element form was asked about already
+		 *
 		 *	@return		void
 		 */
-		_delete : function() {
+		_delete : function( guarded ) {
 
 			const uri 	= Nino.admin.elementTypes._currentUri;
 			const input = dc.getElementById('admin-form-delete-confirm');
@@ -790,6 +798,11 @@
 
 			if( uri === null || input === null || input.value.trim() !== uri )
 				return;
+
+			if( guarded !== true ) {
+				Nino.admin.elementTypes._guardElements( function() { Nino.admin.elementTypes._delete( true ) } );
+				return;
+			}
 
 			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
 
@@ -869,11 +882,47 @@
 		},
 
 		/**
-		 *	Create or save the type currently open
+		 *	Run proceed() once the Elements form next door has been asked about
+		 *	its unsaved input: every write of a type ends in _invalidateElements(),
+		 *	which drops that form and what is typed into it
+		 *
+		 *	@param		{Function}	proceed
+		 *	@param		{Function}	[onCancel]
 		 *
 		 *	@return		void
 		 */
-		_save : function() {
+		_guardElements : function( proceed, onCancel ) {
+
+			if( typeof Nino.admin.dirty !== 'object' ) {
+				proceed();
+				return;
+			}
+
+			Nino.admin.dirty.guard( [ 'elements' ], proceed, onCancel );
+		},
+
+		/**
+		 *	Create or save the type currently open
+		 *
+		 *	Every way this ends reports to done( ok ), if there is one (see
+		 *	Nino.admin.dirty.guard())
+		 *
+		 *	@param		{Function}	[done]				Called once with true when the type was written, false otherwise
+		 *	@param		{boolean}		[guarded]			The unsaved input of an open element form was asked about already
+		 *
+		 *	@return		void
+		 */
+		_save : function( done, guarded ) {
+
+			const report = function( ok ) {
+				if( typeof done === 'function' )
+					done( ok );
+			};
+
+			if( guarded !== true ) {
+				Nino.admin.elementTypes._guardElements( function() { Nino.admin.elementTypes._save( done, true ) }, function() { report( false ) } );
+				return;
+			}
 
 			const msg 	= dc.getElementById('admin-form-msg');
 			const title = dc.getElementById('admin-form-title').value;
@@ -887,13 +936,16 @@
 				Nino.admin.elementTypes._apiCall( 'create', { uri : uri, title : title, model : model, autoincrement : autoincrement }, function( status, response ) {
 					if( status !== 200 || response === null ) {
 						msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
+						report( false );
 						return;
 					}
 					Nino.admin.elementTypes._isNew 			= false;
 					Nino.admin.elementTypes._currentUri = response.uri;
 					msg.textContent = Nino.content.getText('/_admin/common/msg/saved');
+					Nino.admin.elementTypes._saved();
 					Nino.admin.elementTypes.init();
 					Nino.admin.elementTypes._invalidateElements();
+					report( true );
 				} );
 				return;
 			}
@@ -901,12 +953,25 @@
 			Nino.admin.elementTypes._apiCall( 'save', { uri : Nino.admin.elementTypes._currentUri, title : title, model : model, autoincrement : autoincrement }, function( status, response ) {
 				if( status !== 200 || response === null ) {
 					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
+					report( false );
 					return;
 				}
 				msg.textContent = Nino.content.getText('/_admin/common/msg/saved');
+				Nino.admin.elementTypes._saved();
 				Nino.admin.elementTypes.init();
 				Nino.admin.elementTypes._invalidateElements();
+				report( true );
 			} );
+		},
+
+		/**
+		 *	The form on screen is what is stored now
+		 *
+		 *	@return		void
+		 */
+		_saved : function() {
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.snapshot( 'types' );
 		},
 	};
 
@@ -915,5 +980,10 @@
 	Nino.admin.types = Nino.admin.elementTypes;
 
 	Nino.events.bindCallback( 'ready', Nino.admin.elementTypes.init );
+
+	// The shell asks before anything throws the open type's input away (see
+	// Nino.admin.dirty)
+	if( typeof Nino.admin.dirty === 'object' )
+		Nino.admin.dirty.watchForm( 'types', function() { return dc.getElementById('types-form') }, function( done ) { Nino.admin.elementTypes._save( done ) } );
 
 })(window, document, document.documentElement, document.body);

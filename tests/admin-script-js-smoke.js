@@ -202,6 +202,13 @@ const shellNodes = {
 	'admin-tab-lockout' : lockoutPane,
 };
 
+// The interface-language picker: a select whose current option is the one the page was drawn with
+const pickerOptions = [ { value : '/_admin?locale=de_DE', defaultSelected : true, selected : true }, { value : '/_admin?locale=en_US', defaultSelected : false, selected : false } ];
+const picker = node( 'admin-localepicker', {} );
+picker.options = pickerOptions;
+picker.value = '/_admin?locale=en_US';
+shellNodes['admin-localepicker'] = picker;
+
 const shell = {
 	console : console,
 	location : { hash : '#users' },
@@ -451,6 +458,497 @@ check( 'a 403 from the login whose check finds the session still gone says so', 
 
 withDialog.Nino.admin.sessionLocale.set( 'de_DE' );
 check( 'the locale switch posts through the one request helper', requested[requested.length - 1].uri === '/sub/_admin/' && requested[requested.length - 1].data.action === 'admin/locale' && requested[requested.length - 1].data.data === '{"locale":"de_DE"}' );
+
+/*	Unsaved input. A panel that keeps a form registers with the shell and says
+	when it holds something nobody saved; the shell asks Save / Discard /
+	Cancel before it throws that away. Driven through a context of its own: a
+	registry needs listeners that record what is added to them, and the node
+	above keeps one listener per event	*/
+const dirtyLog = [];
+const dirtyAsked = [];
+const dirtyShown = [];
+const windowEvents = [];
+const wrapListeners = [];
+const frames = [];
+const timers = [];
+const dirtyState = { keys : false, text : false, ok : true };
+
+function append( el ) {
+	el.appendChild = function( child ) { el.children.push( child ); child.parent = el; return child };
+	return el;
+}
+
+const barHolder = { bar : append( node( '', {} ) ) };
+barHolder.bar.classList.add('nino-admin-actionbar');
+const keysPane = node( 'admin-tab-keys', { tab : 'keys' } );
+const textPane = node( 'admin-content-text', { panel : 'text' } );
+keysPane.parent = textPane;
+keysPane.querySelector = function( selector ) { return selector === '.nino-admin-actionbar:not(.nino-admin-list-actions)' ? barHolder.bar : null };
+textPane.querySelector = function() { return null };
+const imagesPane = node( 'admin-content-images', { panel : 'images' } );
+const wrapNode = node( 'admin-content-wrap', {} );
+wrapNode.addEventListener = function( type, fn, capture ) { wrapListeners.push( { type : type, fn : fn, capture : capture === true } ) };
+
+const dirtyNodes = { 'admin-content-wrap' : wrapNode, 'admin-tab-keys' : keysPane, 'admin-content-text' : textPane, 'admin-content-images' : imagesPane };
+const dirtyCtx = {
+	console : console,
+	location : { hash : '', href : '' },
+	history : { replaceState : function() {} },
+	addEventListener : function( type, fn ) { windowEvents.push( [ 'add', type, fn ] ) },
+	removeEventListener : function( type, fn ) { windowEvents.push( [ 'remove', type, fn ] ) },
+	requestAnimationFrame : function( fn ) { frames.push( fn ) },
+	setTimeout : function( fn, ms ) { timers.push( { fn : fn, ms : ms } ); return timers.length },
+	clearTimeout : function( id ) { if( timers[id - 1] !== undefined ) timers[id - 1].cleared = true },
+	document : {
+		documentElement : null, body : null,
+		getElementById : function( id ) { return dirtyNodes[id] ?? null },
+		createElement : function( tag ) { const created = append( node( '', {} ) ); created.tagName = tag; return created },
+		addEventListener : function() {},
+	},
+};
+dirtyCtx.window = dirtyCtx;
+dirtyCtx.Nino = { events : { bindCallback : function() {} }, content : { getText : function( key ) { return key } } };
+const dirtyContext = vm.createContext( dirtyCtx );
+vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' ), dirtyContext, { filename : 'Nino.admin.js' } );
+vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/script.js' ), 'utf8' ), dirtyContext, { filename : 'script.js' } );
+
+// The question itself is checked below; here it records what was asked and is answered by hand
+dirtyCtx.Nino.adminUi.choiceDialog = function( options ) { dirtyAsked.push( options ); return true };
+const dirty = dirtyCtx.Nino.admin.dirty;
+const answer = function( value ) { dirtyAsked[dirtyAsked.length - 1].onChoose( value ) };
+
+check( 'the shell registers no listener of its own at load - a script loaded without a dom (the first context above) did load', windowEvents.length === 0 && typeof sandbox.Nino.admin.dirty.register === 'function' );
+dirty.init( function( name ) { dirtyShown.push( name ) } );
+check( '...init() asks to be told when the page is shown again', windowEvents.length === 1 && windowEvents[0][1] === 'pageshow' && windowEvents[0][2] === dirty._stay );
+
+const entryFor = function( name ) {
+	return {
+		isDirty : function() { return dirtyState[name] },
+		save		: function( done ) { dirtyLog.push( 'save '+ name ); if( dirtyState.ok === true ) dirtyState[name] = false; done( dirtyState.ok ) },
+		discard : function() { dirtyLog.push( 'discard '+ name ); dirtyState[name] = false },
+	};
+};
+dirty.register( 'text', entryFor('text') );
+dirty.register( 'keys', entryFor('keys') );
+
+check( 'nothing is dirty until a panel says so', dirty.isDirty() === false && dirty.dirtyNames().length === 0 );
+let proceeded = 0;
+dirty.guard( null, function() { proceeded++ } );
+check( 'a guard with nothing unsaved goes straight on and asks nothing', proceeded === 1 && dirtyAsked.length === 0 );
+
+dirtyState.keys = true;
+check( 'an entry that says so is dirty, by name or for all', JSON.stringify( dirty.dirtyNames() ) === '["keys"]' && dirty.isDirty() === true && dirty.isDirty( [ 'keys' ] ) === true );
+check( '...and an entry outside the scope of a guard does not count', dirty.isDirty( [ 'text' ] ) === false && dirty.dirtyNames( [ 'text', 'nobody' ] ).length === 0 );
+
+let cancelled = 0;
+proceeded = 0;
+dirty.guard( [ 'keys' ], function() { proceeded++ }, function() { cancelled++ } );
+check( 'unsaved input is asked about: Save, Discard, Cancel, in the interface language',
+	dirtyAsked.length === 1 && dirtyAsked[0].message === '/_admin/common/confirm/unsaved' && dirtyAsked[0].title === '/_admin/common/msg/dirty'
+	&& dirtyAsked[0].choices.map( function( c ) { return c.value+ ':'+ c.kind+ ':'+ c.label } ).join() === 'save:primary:/_admin/common/label/save,discard:danger:/_admin/common/label/discard,cancel:secondary:/_admin/common/label/cancel' );
+dirty.guard( [ 'keys' ], function() { proceeded += 10 } );
+check( 'while a question stands a second call is ignored - it is the same click arriving twice', dirtyAsked.length === 1 && proceeded === 0 );
+answer('cancel');
+check( 'Cancel does nothing but tell the exit it was cancelled', proceeded === 0 && cancelled === 1 && dirty._asking === false );
+
+dirty.guard( [ 'keys' ], function() { proceeded++ }, function() { cancelled++ } );
+answer('save');
+check( 'Save runs the entry and goes on once it reports ok', JSON.stringify( dirtyLog ) === '["save keys"]' && proceeded === 1 && cancelled === 1 );
+
+dirtyState.keys = true;
+dirtyState.ok = false;
+dirtyLog.length = 0;
+proceeded = 0;
+dirty.guard( [ 'keys' ], function() { proceeded++ }, function() { cancelled++ } );
+answer('save');
+check( 'a Save that fails stops: the form that failed is brought on screen with its errors, and the exit is cancelled',
+	proceeded === 0 && cancelled === 2 && dirtyShown.join() === 'keys' && dirty._asking === false );
+
+dirtyState.ok = true;
+dirtyState.text = true;
+dirtyState.keys = true;
+dirtyLog.length = 0;
+dirty.guard( null, function() { proceeded++ } );
+answer('save');
+check( 'Save runs every dirty entry in order', JSON.stringify( dirtyLog ) === '["save text","save keys"]' && proceeded === 1 );
+
+// a Save that has a question of its own: Element Types drops the element form next door
+let nestedSaved = 0;
+dirty.register( 'nester', {
+	isDirty : function() { return true },
+	save		: function( done ) { dirty.guard( [ 'text' ], function() { nestedSaved++; done( true ) }, function() { done( false ) } ) },
+	discard : function() {},
+} );
+dirtyState.text = true;
+dirtyState.keys = false;
+dirtyAsked.length = 0;
+proceeded = 0;
+dirty.guard( [ 'nester' ], function() { proceeded++ } );
+answer('save');
+check( 'a Save may ask a question of its own about something else that is unsaved', dirtyAsked.length === 2 && dirty._saving === 1 && proceeded === 0 );
+answer('discard');
+check( '...and the exit goes on when both are answered, with nothing left asking', nestedSaved === 1 && proceeded === 1 && dirty._asking === false && dirty._saving === 0 );
+dirtyState.text = true;
+dirtyAsked.length = 0;
+dirty.guard( [ 'nester' ], function() { proceeded++ } );
+answer('save');
+answer('cancel');
+check( 'a Cancel of the question inside a Save fails that Save, and the exit with it', proceeded === 1 && dirty._asking === false && dirty._saving === 0 );
+delete dirty._entries.nester;
+dirtyState.text = false;
+proceeded = 1;
+
+// two Saves that fail, one inside the other: only the innermost form is brought on screen
+dirty.register( 'inner', entryFor('inner') );
+dirty.register( 'outer', {
+	isDirty : function() { return true },
+	save		: function( done ) { dirty.guard( [ 'inner' ], function() { done( true ) }, function() { done( false ) } ) },
+	discard : function() {},
+} );
+dirtyState.inner = true;
+dirtyState.ok = false;
+dirtyShown.length = 0;
+dirtyAsked.length = 0;
+cancelled = 0;
+dirty.guard( [ 'outer' ], function() { proceeded += 10 }, function() { cancelled++ } );
+answer('save');
+answer('save');
+check( 'of two failed Saves, one inside the other, only the innermost is brought on screen - the refusal and its marks are in that form',
+	dirtyShown.join() === 'inner' && cancelled === 1 && proceeded === 1 && dirty._saving === 0 && dirty._asking === false && dirty._failShown === false );
+dirtyState.ok = true;
+dirtyState.inner = false;
+delete dirty._entries.inner;
+delete dirty._entries.outer;
+
+// while a Save started from the question runs, a guard that is not the save asking is a stray click
+let slowDone = null;
+dirty.register( 'slow', { isDirty : function() { return true }, save : function( done ) { slowDone = done }, discard : function() {} } );
+dirtyState.text = true;
+dirtyAsked.length = 0;
+dirty.guard( [ 'slow' ], function() { proceeded += 10 } );
+answer('save');
+let strayed = 0;
+dirty.guard( [ 'text' ], function() { strayed++ }, function() { strayed += 10 } );
+check( '...a back link, the logout or the language picker meanwhile asks nothing - and tells the select to go back', dirtyAsked.length === 1 && strayed === 10 && dirty._saving === 1 );
+slowDone( true );
+check( '...and the Save then ends as it would have', proceeded === 11 && dirty._saving === 0 && dirty._asking === false );
+dirtyState.text = false;
+delete dirty._entries.slow;
+proceeded = 1;
+
+dirtyState.text = true;
+dirtyState.keys = true;
+dirtyLog.length = 0;
+dirty.guard( null, function() { proceeded++ }, undefined, true );
+answer('discard');
+check( 'Discard lets every entry forget and goes on', JSON.stringify( dirtyLog ) === '["discard text","discard keys"]' && proceeded === 2 );
+check( '...an exit that leaves the page says so, so the browser does not ask again', dirty._leaving === true );
+check( '...but only for a while: if the page is still here then, the browser\'s question is back',
+	timers.length === 1 && timers[0].ms === 10000 && ( timers[0].fn(), dirty._leaving === false ) );
+dirty._leaving = true;
+dirty._stay();
+check( '...and when the page is shown again', dirty._leaving === false );
+dirty._leaving = false;
+
+// the browser's own question
+dirtyState.keys = true;
+const unload = function() { return { prevented : 0, returnValue : undefined, preventDefault : function() { this.prevented++ } } };
+let ev = unload();
+dirty._beforeUnload( ev );
+check( 'closing or reloading the page with unsaved input is asked about by the browser', ev.prevented === 1 && ev.returnValue === '' );
+dirty._leaving = true;
+ev = unload();
+dirty._beforeUnload( ev );
+check( '...but not once the page has decided to leave', ev.prevented === 0 );
+dirty._leaving = false;
+dirtyState.keys = false;
+ev = unload();
+dirty._beforeUnload( ev );
+check( '...nor when nothing is unsaved', ev.prevented === 0 );
+
+windowEvents.length = 0;
+dirtyState.keys = true;
+dirty.refresh();
+check( 'the browser\'s question is installed only while something is unsaved, so a clean page keeps the browser\'s fast back and forward', windowEvents.length === 1 && windowEvents[0][0] === 'add' && windowEvents[0][1] === 'beforeunload' );
+dirty.refresh();
+check( '...and not twice', windowEvents.length === 1 );
+dirtyState.keys = false;
+dirty.refresh();
+check( '...and taken off again when the page is clean', windowEvents.length === 2 && windowEvents[1][0] === 'remove' && windowEvents[1][1] === 'beforeunload' );
+
+// the marker
+const markerOf = function( bar ) { return bar.children.find( function( c ) { return c.className === 'nino-admin-actionbar-dirty' } ) };
+check( 'a clean form shows no marker', markerOf( barHolder.bar ) === undefined || markerOf( barHolder.bar ).hidden === true );
+dirtyState.keys = true;
+dirty.refresh();
+const mark = markerOf( barHolder.bar );
+check( 'an unsaved form carries the marker in its action bar: a span, not a p and not a status role - the phone rule that hides the status line leaves it',
+	mark !== undefined && mark.tagName === 'span' && mark.textContent === '/_admin/common/msg/dirty' && mark.hidden === false && mark.getAttribute('role') === null );
+dirtyState.keys = false;
+dirty.refresh();
+check( '...hidden again once the form is saved', mark.hidden === true && barHolder.bar.children.length === 1 );
+const oldBar = barHolder.bar;
+barHolder.bar = append( node( '', {} ) );
+barHolder.bar.classList.add('nino-admin-actionbar');
+dirtyState.keys = true;
+dirty.refresh();
+const again = markerOf( barHolder.bar );
+check( 'a bar drawn again gets a new marker - the old one went with the old bar', again !== undefined && again !== mark && markerOf( oldBar ) === mark );
+
+const hasStatus = append( node( '', {} ) );
+hasStatus.classList.add('nino-admin-actionbar');
+const statusLine = node( '', {} );
+statusLine.classList.add('nino-admin-status');
+hasStatus.querySelector = function( selector ) { return selector === '.nino-admin-status' ? statusLine : null };
+hasStatus.children = [ statusLine ];
+statusLine.parent = hasStatus;
+barHolder.bar = hasStatus;
+dirty.refresh();
+check( 'a bar with a status line of its own gets the marker as well - the style sheet hides it there, and shows it where the phone rule hides the line', markerOf( hasStatus ) !== undefined && markerOf( hasStatus ).hidden === false );
+barHolder.bar = oldBar;
+dirtyState.keys = false;
+dirty.refresh();
+
+// input, change and click all re-read the state - once per frame
+const listenerFor = function( type, capture ) { return wrapListeners.find( function( l ) { return l.type === type && l.capture === capture } ) };
+check( 'the wrap listens for input, change and click, and for the back link in the capture phase',
+	listenerFor( 'input', false ) !== undefined && listenerFor( 'change', false ) !== undefined && listenerFor( 'click', false ) !== undefined && listenerFor( 'click', true ) !== undefined );
+dirtyState.keys = true;
+frames.length = 0;
+[ 'input', 'change', 'click' ].forEach( function( type ) { listenerFor( type, false ).fn() } );
+check( 'three events in one frame schedule one refresh', frames.length === 1 && markerOf( barHolder.bar ).hidden === true );
+frames[0]();
+check( '...which shows the marker', barHolder.bar.children.some( function( c ) { return c.className === 'nino-admin-actionbar-dirty' && c.hidden === false } ) );
+
+// the back link
+let clicks = 0;
+const backLink = node( '', {} );
+backLink.parent = keysPane;
+backLink.closest = function( selector ) { return selector === 'a.nino-admin-back-link' ? backLink : null };
+backLink.click = function() { clicks++; listenerFor( 'click', true ).fn( { target : backLink } ) };
+const clickEvent = function( target ) { return { target : target, prevented : 0, stopped : 0, preventDefault : function() { this.prevented++ }, stopImmediatePropagation : function() { this.stopped++ } } };
+dirtyAsked.length = 0;
+ev = clickEvent( backLink );
+listenerFor( 'click', true ).fn( ev );
+check( 'a back link out of a form holding unsaved input is held back and asked about', ev.prevented === 1 && ev.stopped === 1 && dirtyAsked.length === 1 );
+answer('discard');
+check( '...and clicked again, past the question, once the person has answered', clicks === 1 && dirty._bypass === null );
+
+const unregistered = node( '', {} );
+unregistered.parent = imagesPane;
+unregistered.closest = function() { return unregistered };
+ev = clickEvent( unregistered );
+listenerFor( 'click', true ).fn( ev );
+check( 'a back link of a panel that is not registered is left alone', ev.prevented === 0 && ev.stopped === 0 );
+
+dirtyState.keys = false;
+dirtyState.text = true;
+ev = clickEvent( backLink );
+listenerFor( 'click', true ).fn( ev );
+check( 'the owner of a link is the nearest tab, then the panel: the Keys tab is clean even while its panel is registered dirty', ev.prevented === 0 );
+dirtyState.text = false;
+ev = clickEvent( { closest : function() { return null } } );
+listenerFor( 'click', true ).fn( ev );
+check( 'a click that is not on a back link is none of its business', ev.prevented === 0 );
+
+// a form that is only plain fields
+const field = function( type, value, extra ) { return Object.assign( { type : type, value : String( value ), checked : false, autocomplete : '', dataset : {} }, extra || {} ) };
+const plain = {
+	text		: field( 'text', 'a' ),
+	check		: field( 'checkbox', 'on' ),
+	file		: field( 'file', '' ),
+	search	: field( 'search', '' ),
+	secret	: field( 'password', '', { autocomplete : 'current-password' } ),
+	typed		: field( 'text', 'x', { dataset : { dirty : 'ignore' } } ),
+};
+const editable = { innerHTML : '<b>x</b>' };
+const form = node( 'routes-form', {} );
+form.querySelectorAll = function( selector ) { return selector === 'input, textarea, select' ? Object.values( plain ) : ( selector === '[contenteditable]' ? [ editable ] : [] ) };
+form.querySelector = function( selector ) { return selector === 'input, textarea, select, [contenteditable]' ? Object.values( plain )[0] : null };
+let formSaved = 0;
+dirty.watchForm( 'routes', function() { return form }, function( done ) { formSaved++; done( true ) } );
+let savedWith = null;
+dirty._entries.routes.save( function( ok ) { savedWith = ok } );
+check( 'the shell\'s Save of a watched form is the panel\'s own save, and hears how it ended', formSaved === 1 && savedWith === true );
+check( 'a watched form is clean before it was ever drawn', dirty.isDirty( [ 'routes' ] ) === false );
+dirty.snapshot('routes');
+check( '...and right after it was', dirty.isDirty( [ 'routes' ] ) === false );
+plain.text.value = 'b';
+check( 'a changed field makes it dirty', dirty.isDirty( [ 'routes' ] ) === true );
+plain.text.value = 'a';
+check( '...and changing it back takes that away - it is compared, not counted', dirty.isDirty( [ 'routes' ] ) === false );
+plain.check.checked = true;
+check( 'a checkbox counts by its state', dirty.isDirty( [ 'routes' ] ) === true );
+plain.check.checked = false;
+editable.innerHTML = '<b>y</b>';
+check( 'so does the content of a rich-text field', dirty.isDirty( [ 'routes' ] ) === true );
+editable.innerHTML = '<b>x</b>';
+plain.file.value = 'C:\\fakepath\\a.jpg';
+plain.search.value = 'filter';
+plain.secret.value = 'filled in by a password manager';
+plain.typed.value = 'DELETE';
+check( 'a file input, a search box, a password the browser may fill in and a field that says it is no edit are not input', dirty.isDirty( [ 'routes' ] ) === false );
+plain.text.value = 'c';
+form.classList.add('admin-hidden');
+check( 'a form that is not on screen holds nothing the person could lose track of', dirty.isDirty( [ 'routes' ] ) === false );
+form.classList.remove('admin-hidden');
+dirty._entries.routes.discard();
+check( 'discarding takes the form as it stands for the saved one', dirty.isDirty( [ 'routes' ] ) === false );
+
+// a panel that failed to load writes its error into the watched container: no fields, nothing typed
+plain.text.value = 'd';
+check( 'a form with something typed into it is dirty again', dirty.isDirty( [ 'routes' ] ) === true );
+const formQuery = form.querySelector;
+form.querySelector = function() { return null };
+form.querySelectorAll = function() { return [] };
+check( 'an error message in the watched container holds no input - it is not unsaved', dirty.isDirty( [ 'routes' ] ) === false && dirty.dirtyNames().indexOf('routes') === -1 );
+form.querySelector = formQuery;
+
+// a save() that throws must not leave the exits shut
+dirty.register( 'thrower', { isDirty : function() { return true }, save : function() { throw new Error('boom') }, discard : function() {} } );
+dirtyAsked.length = 0;
+let thrownCancelled = 0;
+let thrown = null;
+dirty.guard( [ 'thrower' ], function() { proceeded += 100 }, function() { thrownCancelled++ } );
+try {
+	answer('save');
+}
+catch( error ) {
+	thrown = error;
+}
+check( 'a save() that throws is not swallowed...', thrown !== null && thrown.message === 'boom' && proceeded < 100 );
+check( '...but the question is over (not asking, nothing saving, no Save in flight) and the exit was cancelled', dirty._asking === false && dirty._saving === 0 && dirty._inSave === false && thrownCancelled === 1 );
+delete dirty._entries.thrower;
+dirtyAsked.length = 0;
+dirtyState.text = true;
+dirty.guard( [ 'text' ], function() { proceeded += 1000 } );
+check( '...and the next exit asks as before', dirtyAsked.length === 1 );
+answer('cancel');
+dirtyState.text = false;
+dirtyAsked.length = 0;
+
+// a refused Save asks for the focus on a pane that is still hidden: once shown, the first invalid field takes it
+let focusedAt = [];
+const realTextPane = dirtyNodes['admin-content-text'];
+dirtyNodes['admin-content-text'] = { querySelector : function( selector ) { return selector === '[aria-invalid="true"]' ? { focus : function() { focusedAt.push( dirtyShown.join() ) } } : null } };
+dirtyState.text = true;
+dirtyState.ok = false;
+dirtyShown.length = 0;
+dirty.guard( [ 'text' ], function() {} );
+answer('save');
+check( 'a Save that failed puts the focus on the first invalid field only after the pane is on screen', dirtyShown.join() === 'text' && focusedAt.join() === 'text' );
+dirtyNodes['admin-content-text'] = realTextPane;
+dirtyState.text = false;
+dirtyState.ok = true;
+
+// ---- the shell's own exits. The logout button belongs to the last shell that wired it
+// (the one with the session dialog above), the language picker to this one
+const logoutAsked = [];
+withDialog.Nino.auth = { logout : function( to ) { dirtyLog.push( 'logout '+ to ) } };
+withDialog.Nino.adminUi.choiceDialog = function( options ) { logoutAsked.push( options ); return true };
+const logoutDirty = withDialog.Nino.admin.dirty;
+logoutDirty.register( 'probe', { isDirty : function() { return true }, save : function( done ) { done( true ) }, discard : function() {} } );
+
+dirtyLog.length = 0;
+shellNodes['admin-user-logout'].listeners.click();
+check( 'logout asks first: its request goes out before the page leaves, so the browser would ask after the session is gone', logoutAsked.length === 1 && dirtyLog.length === 0 );
+logoutAsked[0].onChoose('cancel');
+check( '...a Cancel leaves the session alone', dirtyLog.length === 0 );
+shellNodes['admin-user-logout'].listeners.click();
+logoutAsked[1].onChoose('discard');
+check( '...an answer lets it go', dirtyLog.join() === 'logout [[/nino/dir]]/_admin' && logoutDirty._leaving === true );
+logoutDirty._entries.probe.isDirty = function() { return false };
+
+shell.Nino.content = { getText : function( key ) { return key } };
+const shellAsked = [];
+shell.Nino.adminUi.choiceDialog = function( options ) { shellAsked.push( options ); return true };
+const shellDirty = shell.Nino.admin.dirty;
+shellDirty.register( 'probe', { isDirty : function() { return true }, save : function( done ) { done( true ) }, discard : function() {} } );
+
+shell.location.href = '';
+picker.options.forEach( function( option, i ) { option.selected = i === 1 } );
+picker.listeners.change.call( picker );
+check( 'the interface language asks first, before the page is loaded again', shellAsked.length === 1 && shell.location.href === '' );
+shellAsked[0].onChoose('cancel');
+check( '...and a Cancel puts the picker back on the language the page is in', pickerOptions[0].selected === true && pickerOptions[1].selected === false && shell.location.href === '' );
+picker.listeners.change.call( picker );
+shellAsked[1].onChoose('discard');
+check( '...an answer loads the page in the other language', shell.location.href === '/_admin?locale=en_US' );
+shellDirty._leaving = false;
+
+shellDirty._entries.probe.isDirty = function() { return false };
+shell.location.hash = '#x';
+shellDirty._show('roles');
+check( 'a panel or tab that failed to save is brought on screen by its name - a tab of a pane first, since \'roles\' is a tab of the Users pane', shell.location.hash === '#roles' );
+shellDirty._show('dashboard');
+check( '...a panel by its own', shell.location.hash === '#dashboard' );
+
+// ---- the question itself: a native dialog
+function fakeElement( tag, noModal ) {
+	const el = { tagName : tag, children : [], attributes : {}, listeners : {}, className : '', textContent : '', id : '', parent : null, removed : false, open : false, type : '' };
+	el.setAttribute = function( name, value ) { el.attributes[name] = String( value ) };
+	el.appendChild = function( child ) { el.children.push( child ); child.parent = el; return child };
+	el.addEventListener = function( type, fn ) { el.listeners[type] = fn };
+	el.remove = function() { el.removed = true };
+	el.focus = function() { el.focused = true };
+	if( tag === 'dialog' && noModal !== true ) {
+		el.showModal = function() { el.open = true };
+		el.close = function() { el.open = false; el.listeners.close() };
+	}
+	return el;
+}
+
+function choiceWorld( noModal ) {
+	const world = { opener : fakeElement('button'), root : fakeElement('div'), confirms : [], dialogs : [] };
+	world.ctx = {
+		console : console,
+		confirm : function( message ) { world.confirms.push( message ); return world.confirmAnswer },
+		document : {
+			documentElement : null, body : fakeElement('body'), activeElement : world.opener,
+			createElement : function( tag ) { const created = fakeElement( tag, noModal ); if( tag === 'dialog' ) world.dialogs.push( created ); return created },
+			getElementById : function( id ) { return id === 'admin-page-wrap' ? world.root : null },
+			addEventListener : function() {},
+		},
+	};
+	world.ctx.window = world.ctx;
+	world.ctx.Nino = { events : { bindCallback : function() {} } };
+	vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' ), vm.createContext( world.ctx ), { filename : 'Nino.admin.js' } );
+	return world;
+}
+
+const choices = [
+	{ value : 'save', label : 'Save', kind : 'primary' },
+	{ value : 'discard', label : 'Discard', kind : 'danger' },
+	{ value : 'cancel', label : 'Cancel', kind : 'secondary' },
+];
+
+const world = choiceWorld( false );
+const chosen = [];
+const opened = world.ctx.Nino.adminUi.choiceDialog( { title : 'Title', message : '<b>Question</b>', choices : choices, onChoose : function( value ) { chosen.push( value ) } } );
+const box = world.dialogs[0];
+const buttons = box.children[0].children[box.children[0].children.length - 1].children;
+check( 'the question is a native dialog in the workbench root, opened modally - not in the body, where the design system\'s rules do not reach', opened === true && box.open === true && world.root.children[0] === box && box.className === 'nino-admin-dialog' );
+check( '...its words are text, never markup', box.children[0].children.some( function( c ) { return c.textContent === '<b>Question</b>' } ) && box.children[0].children[0].textContent === 'Title' );
+check( '...it has one button per choice, in the three button kinds', buttons.map( function( b ) { return b.className+ ':'+ b.textContent } ).join() === 'nino-admin-btn-primary:Save,nino-admin-btn-danger:Discard,nino-admin-btn-secondary:Cancel' && buttons.every( function( b ) { return b.type === 'button' } ) );
+check( 'a second question while one stands is refused', world.ctx.Nino.adminUi.choiceDialog( { message : 'again', choices : choices, onChoose : function() { chosen.push('second') } } ) === false && world.dialogs.length === 1 );
+buttons[1].listeners.click();
+check( 'a click answers once with its value, removes the dialog and gives the focus back', chosen.join() === 'discard' && box.removed === true && world.opener.focused === true );
+world.ctx.Nino.adminUi.choiceDialog( { message : 'next', choices : choices, onChoose : function( value ) { chosen.push( value ) } } );
+world.dialogs[1].close();
+check( 'Escape - the dialog closing with no button clicked - is the secondary choice, the one that does nothing', chosen.join() === 'discard,cancel' );
+
+const fallback = choiceWorld( true );
+fallback.confirmAnswer = true;
+const fallbackChosen = [];
+fallback.ctx.Nino.adminUi.choiceDialog( { message : 'Sure?', choices : choices, onChoose : function( value ) { fallbackChosen.push( value ) } } );
+fallback.confirmAnswer = false;
+fallback.ctx.Nino.adminUi.choiceDialog( { message : 'Sure?', choices : choices, onChoose : function( value ) { fallbackChosen.push( value ) } } );
+check( 'a browser without showModal asks with confirm(): OK is the primary choice (never the one that throws input away), Cancel the secondary one', fallback.confirms.join() === 'Sure?,Sure?' && fallbackChosen.join() === 'save,cancel' );
+
+// the wiring in the shell's source
+const shellSource = fs.readFileSync( path.join( __dirname, '../_admin/assets/script.js' ), 'utf8' );
+check( 'the shell wires the registry up from onReady()', /Nino\.admin\.dirty\.init\(\s*function\( name \)/.test( shellSource ) === true );
+
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

@@ -75,5 +75,37 @@ check( 'every href a link may not keep is dropped', dropped.every( function( hre
 check( 'an href is trimmed before it is judged', safeHref( '  /contact  ' ) === '/contact' );
 check( 'a scheme hiding behind whitespace is still judged', safeHref( '  javascript:alert(1)' ) === null );
 
+
+// --- The handle ------------------------------------------------------------
+
+console.log( '\nhtml-editor.js - what a form can tell the editor about its field\n' );
+
+check( 'the handle offers focus() and mark() beside the three it had', /return \{\s*getValue[\s\S]*?setValue[\s\S]*?focus : function[\s\S]*?mark : function[\s\S]*?destroy/.test( source ) === true );
+check( 'the box the handle acts on is the role=textbox element', /const content = dc\.createElement\('div'\);[\s\S]{0,200}content\.setAttribute\( 'role', 'textbox' \)/.test( source ) === true );
+
+// Lifted out of the file and run as it stands there, against a stand-in for the text box
+const start = source.indexOf( 'focus : function() {' );
+const end = source.indexOf( 'destroy : function() {' );
+const attributes = {};
+let focused = 0;
+const content = {
+	focus : function() { focused++ },
+	setAttribute : function( name, value ) { attributes[name] = value },
+	removeAttribute : function( name ) { delete attributes[name] },
+};
+const handle = new Function( 'content', 'return { '+ source.slice( start, end ).trim().replace( /,\s*$/, '' ) + ' }' )( content );
+
+handle.focus();
+check( 'focus() puts the caret in the text box', focused === 1 );
+handle.mark( { required : true } );
+check( 'mark() puts aria-required on the text box', attributes['aria-required'] === 'true' && attributes['aria-invalid'] === undefined );
+handle.mark( { invalid : true, describedBy : 'err-1' } );
+check( '...and aria-invalid and the explaining element beside it, leaving what it was not told about as it was',
+	attributes['aria-required'] === 'true' && attributes['aria-invalid'] === 'true' && attributes['aria-describedby'] === 'err-1' );
+handle.mark( { invalid : false, describedBy : '' } );
+check( '...false and an empty id let go of them again', attributes['aria-invalid'] === undefined && attributes['aria-describedby'] === undefined && attributes['aria-required'] === 'true' );
+handle.mark( { required : false } );
+check( '...required: false takes aria-required off', Object.keys( attributes ).length === 0 );
+
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exit( failures === 0 ? 0 : 1 );

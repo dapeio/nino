@@ -104,6 +104,9 @@
 		// Empty while the list is on, or while a screen has only one pane
 		_detailPanes : {},
 		_detailSelect : null,
+		// The open screen's feature, form, Save button and status line - what
+		// the shell's question about unsaved input saves through
+		_detailParts : null,
 
 		/**
 		 *	Load every feature with its state, settings and the cached
@@ -926,6 +929,25 @@
 		},
 
 		/**
+		 *	Run proceed() - after the shell has asked about unsaved input anywhere
+		 *	in the workbench, where the shell has the registry. A shell without it
+		 *	(an older one, a test) goes straight on
+		 *
+		 *	@param		{Function}	proceed
+		 *
+		 *	@return		void
+		 */
+		_guard : function( proceed ) {
+
+			if( typeof Nino.admin.dirty !== 'object' ) {
+				proceed();
+				return;
+			}
+
+			Nino.admin.dirty.guard( null, proceed );
+		},
+
+		/**
 		 *	Switch a feature on or off, or apply its update - the kernel's
 		 *	one step for an update is activating again, so the two post the
 		 *	same action. Ends in a reload: the rail is rendered server-side
@@ -934,10 +956,17 @@
 		 *	@param		{string}	what				'activate', 'update' or 'deactivate'
 		 *	@param		{Element}	btn
 		 *	@param		{Element}	msg
+		 *	@param		{boolean}	[guarded]		The unsaved input of the page was asked about already
 		 *
 		 *	@return		void
 		 */
-		_switch : function( feature, what, btn, msg ) {
+		_switch : function( feature, what, btn, msg, guarded ) {
+
+			// The reload this ends in builds every form of the workbench again
+			if( guarded !== true ) {
+				Nino.admin.features._guard( function() { Nino.admin.features._switch( feature, what, btn, msg, true ) } );
+				return;
+			}
 
 			let busy, done, failKey;
 
@@ -1072,10 +1101,18 @@
 		 *	@param		{Object}	offer
 		 *	@param		{Element}	btn
 		 *	@param		{Element}	msg
+		 *	@param		{boolean}	[guarded]		The unsaved input of the page was asked about already
 		 *
 		 *	@return		void
 		 */
-		_install : function( offer, btn, msg ) {
+		_install : function( offer, btn, msg, guarded ) {
+
+			// The list read or the reload that follows builds the open settings
+			// screen and every other form of the workbench again
+			if( guarded !== true ) {
+				Nino.admin.features._guard( function() { Nino.admin.features._install( offer, btn, msg, true ) } );
+				return;
+			}
 
 			btn.disabled = true;
 			msg.classList.remove('nino-admin-error');
@@ -1097,7 +1134,7 @@
 					is the call Update in the Active tab makes, reload and all: the
 					page holds the version before the update	*/
 				if( response.pending === true ) {
-					Nino.admin.features._switch( { key : offer.key }, 'update', btn, msg );
+					Nino.admin.features._switch( { key : offer.key }, 'update', btn, msg, true );
 					return;
 				}
 
@@ -1504,6 +1541,11 @@
 
 			list.classList.add('admin-hidden');
 			wrap.classList.remove('admin-hidden');
+
+			// What the settings hold now is what is saved
+			Nino.admin.features._detailParts = { feature : feature, form : form, save : save, msg : msg };
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.snapshot( 'features' );
 		},
 
 		/**
@@ -1847,14 +1889,23 @@
 		/**
 		 *	Save one feature's settings in one request
 		 *
+		 *	Every way this ends reports to done( ok ), if there is one (see
+		 *	Nino.admin.dirty.guard())
+		 *
 		 *	@param		{Object}	feature
 		 *	@param		{Element}	form
 		 *	@param		{Element}	save
 		 *	@param		{Element}	msg
+		 *	@param		{Function}	[done]		Called once with true when the settings were written, false otherwise
 		 *
 		 *	@return		void
 		 */
-		_save : function( feature, form, save, msg ) {
+		_save : function( feature, form, save, msg, done ) {
+
+			const report = function( ok ) {
+				if( typeof done === 'function' )
+					done( ok );
+			};
 
 			save.disabled = true;
 			msg.classList.remove('nino-admin-error');
@@ -1867,6 +1918,7 @@
 				if( status !== 200 || response === null ) {
 					msg.classList.add('nino-admin-error');
 					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
+					report( false );
 					return;
 				}
 
@@ -1875,12 +1927,24 @@
 				// exactly as long as the request that follows takes
 				Nino.admin.features._pendingMsg[feature.key] = Nino.content.getText('/_admin/common/msg/saved');
 
+				if( typeof Nino.admin.dirty === 'object' )
+					Nino.admin.dirty.snapshot( 'features' );
+
 				// Reloaded rather than left as typed: the values come back as
 				// config.php now holds them, and the secret's hint says it is set
 				Nino.admin.features.init();
+				report( true );
 			} );
 		},
 	};
+
+	// The shell asks before anything throws the open feature's settings away
+	// (see Nino.admin.dirty). A shell without the registry is simply not asking
+	if( typeof Nino.admin.dirty === 'object' )
+		Nino.admin.dirty.watchForm( 'features', function() { return dc.getElementById('features-detail') }, function( done ) {
+			const parts = Nino.admin.features._detailParts;
+			Nino.admin.features._save( parts.feature, parts.form, parts.save, parts.msg, done );
+		} );
 
 	Nino.events.bindCallback( 'ready', Nino.admin.features.init );
 

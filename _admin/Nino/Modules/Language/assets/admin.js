@@ -40,6 +40,10 @@
 		// The stored native language, held between _renderNative() building the
 		// select and _render() filling it once it is in the document
 		_nativeValue : '',
+		// The ticked languages and the native one as they are stored, for
+		// isDirty(): adding a language writes its file at once and adds a row
+		// to the list, which is not an edit of what Save stores
+		_saved 		: { active : [], native : '' },
 
 		/**
 		 *	Load the schema, the inventory and the native language, and
@@ -174,6 +178,65 @@
 				msg.textContent = Nino.admin.language._pendingMsg;
 				Nino.admin.language._pendingMsg = '';
 			}
+
+			Nino.admin.language._capture();
+		},
+
+		/**
+		 *	Take the ticked languages and the native one as they are now for
+		 *	the ones that are stored - after the form was drawn, and after a
+		 *	save went through
+		 *
+		 *	@return		void
+		 */
+		_capture : function() {
+
+			const native = dc.getElementById('language-native');
+
+			Nino.admin.language._saved = {
+				active	: Nino.admin.language._locales.filter( function( locale ) { return locale.active === true } ).map( function( locale ) { return locale.code } ),
+				native	: native === null ? '' : native.value,
+			};
+
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.refresh();
+		},
+
+		/**
+		 *	Whether the form holds a change nobody has saved: another set of
+		 *	ticked languages, or another native one. What the shell asks before
+		 *	it lets anything throw that away (see Nino.admin.dirty)
+		 *
+		 *	@return		{boolean}
+		 */
+		isDirty : function() {
+
+			if( dc.getElementById('language-form') === null )
+				return false;
+
+			const active = Nino.admin.language._locales.filter( function( locale ) { return locale.active === true } ).map( function( locale ) { return locale.code } );
+			const native = dc.getElementById('language-native');
+
+			return active.join() !== Nino.admin.language._saved.active.join() || ( native !== null && native.value !== Nino.admin.language._saved.native );
+		},
+
+		/**
+		 *	Throw the change away: the languages go back to the ticks that are
+		 *	stored. The form is about to be left or drawn again
+		 *
+		 *	@return		void
+		 */
+		discard : function() {
+
+			Nino.admin.language._locales.forEach( function( locale ) {
+				locale.active = Nino.admin.language._saved.active.indexOf( locale.code ) !== -1;
+			} );
+
+			Nino.admin.language._renderLocaleRows();
+			Nino.admin.language._refreshNative( Nino.admin.language._saved.native );
+
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.refresh();
 		},
 
 		/**
@@ -496,9 +559,19 @@
 		/**
 		 *	Save the ticked languages and the native one in one request
 		 *
+		 *	Every way this ends reports to done( ok ), if there is one (see
+		 *	Nino.admin.dirty.guard())
+		 *
+		 *	@param		{Function}	[done]				Called once with true when the languages were written, false otherwise
+		 *
 		 *	@return		void
 		 */
-		_save : function() {
+		_save : function( done ) {
+
+			const report = function( ok ) {
+				if( typeof done === 'function' )
+					done( ok );
+			};
 
 			const msg = dc.getElementById('language-form-msg');
 			const fields = {};
@@ -519,6 +592,7 @@
 
 				if( status !== 200 || response === null ) {
 					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
+					report( false );
 					return;
 				}
 
@@ -526,13 +600,24 @@
 				// below replaces it, so assigning here shows the confirmation for
 				// exactly as long as the request that follows takes
 				Nino.admin.language._pendingMsg = Nino.content.getText('/_admin/common/msg/saved');
+				Nino.admin.language._capture();
 
 				// Reloaded rather than left as typed: a saved language list
 				// changes what the inventory reports (a new locale is now
 				// configured, its text file may or may not exist)
 				Nino.admin.language.init();
+				report( true );
 			} );
 		},
 	};
+
+	// The shell asks before anything throws the form's changes away (see
+	// Nino.admin.dirty). A shell without the registry is simply not asking
+	if( typeof Nino.admin.dirty === 'object' )
+		Nino.admin.dirty.register( 'language', {
+			isDirty : Nino.admin.language.isDirty,
+			save		: function( done ) { Nino.admin.language._save( done ) },
+			discard : Nino.admin.language.discard,
+		} );
 
 })(window, document, document.documentElement, document.body);

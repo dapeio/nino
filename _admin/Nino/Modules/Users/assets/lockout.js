@@ -141,15 +141,29 @@
 				msg.textContent = Nino.admin.lockout._pendingMsg;
 				Nino.admin.lockout._pendingMsg = '';
 			}
+
+			// What the form holds now is what is saved
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.snapshot( 'lockout' );
 		},
 
 		/**
 		 *	Save both numbers in one request, then reload so the form shows
 		 *	the ints config.php now holds
 		 *
+		 *	Every way this ends reports to done( ok ), if there is one (see
+		 *	Nino.admin.dirty.guard())
+		 *
+		 *	@param		{Function}	[done]				Called once with true when the numbers were written, false otherwise
+		 *
 		 *	@return		void
 		 */
-		_save : function() {
+		_save : function( done ) {
+
+			const report = function( ok ) {
+				if( typeof done === 'function' )
+					done( ok );
+			};
 
 			const msg = dc.getElementById('lockout-form-msg');
 			const fields = {};
@@ -164,13 +178,22 @@
 
 				if( status !== 200 || response === null ) {
 					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
+					report( false );
 					return;
 				}
 
 				Nino.admin.lockout._pendingMsg = Nino.content.getText('/_admin/common/msg/saved');
+				if( typeof Nino.admin.dirty === 'object' )
+					Nino.admin.dirty.snapshot( 'lockout' );
 				Nino.admin.lockout.init();
+				report( true );
 			} );
 		},
 	};
+
+	// The shell asks before anything throws the form's input away (see
+	// Nino.admin.dirty). A shell without the registry is simply not asking
+	if( typeof Nino.admin.dirty === 'object' )
+		Nino.admin.dirty.watchForm( 'lockout', function() { return dc.getElementById('lockout-form') }, function( done ) { Nino.admin.lockout._save( done ) } );
 
 })(window, document, document.documentElement, document.body);

@@ -245,5 +245,27 @@ check( 'a list that could not be loaded is replaced by the error, having nothing
 	mount.children.length === 1 && mount.children[0].className === 'nino-admin-error'
 	&& mount.children[0].textContent === '(403) no permission' );
 
+// A restore ends in a reload of the page and every form on it: whatever the
+// workbench holds unsaved is asked about first, after the restore was confirmed
+mount.innerHTML = '';
+requests.length = 0;
+alerts.length = 0;
+reloaded = 0;
+panel.init();
+answer( 200, { dates : [ '2024-05-03' ] } );
+const asked = [];
+Nino.admin.dirty = { guard : function( names, proceed ) { asked.push( { names : names, proceed : proceed } ) } };
+confirmAnswer = false;
+fire( restoreButton('2024-05-03'), 'click' );
+check( 'a restore that was not confirmed asks the shell nothing', asked.length === 0 && requests.length === 1 );
+confirmAnswer = true;
+fire( restoreButton('2024-05-03'), 'click' );
+check( 'a confirmed restore asks about unsaved input anywhere in the workbench before it is sent', asked.length === 1 && asked[0].names === null && requests.length === 1 );
+asked[0].proceed();
+check( '...and is sent once the question is answered', requests.length === 2 && requests[1].action === 'backups/restore' );
+answer( 200, { ok : true } );
+check( '...and reloads only then', reloaded === 1 );
+delete Nino.admin.dirty;
+
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

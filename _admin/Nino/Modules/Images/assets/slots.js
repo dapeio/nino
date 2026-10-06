@@ -22,6 +22,9 @@
 		_slots 		: [],
 		_currentUri : null,
 		_isNew 		: false,
+		// The rows of the scan form while it is the one on screen, else null -
+		// what the shell's Save tells the two forms apart by
+		_scanRows : null,
 		_ready 		: false,
 
 		/**
@@ -272,6 +275,21 @@
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.slots._save() } );
 
 			wrap.appendChild( form );
+
+			// What the form holds now is what is saved
+			Nino.admin.slots._scanRows = null;
+			Nino.admin.slots._snapshot();
+		},
+
+		/**
+		 *	Have the shell take the form on screen - whichever it is - as the one
+		 *	that is stored (see Nino.admin.dirty)
+		 *
+		 *	@return		void
+		 */
+		_snapshot : function() {
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.snapshot( 'slots' );
 		},
 
 		/**
@@ -300,9 +318,19 @@
 		/**
 		 *	Create or save the slot currently open
 		 *
+		 *	Every way this ends reports to done( ok ), if there is one (see
+		 *	Nino.admin.dirty.guard())
+		 *
+		 *	@param		{Function}	[done]				Called once with true when the slot was written, false otherwise
+		 *
 		 *	@return		void
 		 */
-		_save : function() {
+		_save : function( done ) {
+
+			const report = function( ok ) {
+				if( typeof done === 'function' )
+					done( ok );
+			};
 
 			const msg 		= dc.getElementById('slots-form-msg');
 			const label 	= dc.getElementById('slots-form-label').value;
@@ -316,10 +344,13 @@
 				Nino.admin.slots._apiCall( 'create', { uri : uri, label : label, width : width, height : height }, function( status, response ) {
 					if( status !== 200 || response === null ) {
 						msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
+						report( false );
 						return;
 					}
 					msg.textContent = Nino.content.getText('/_admin/common/msg/saved');
+					Nino.admin.slots._snapshot();
 					Nino.admin.slots.init();
+					report( true );
 				} );
 				return;
 			}
@@ -327,10 +358,13 @@
 			Nino.admin.slots._apiCall( 'save', { uri : Nino.admin.slots._currentUri, label : label, width : width, height : height }, function( status, response ) {
 				if( status !== 200 || response === null ) {
 					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
+					report( false );
 					return;
 				}
 				msg.textContent = Nino.content.getText('/_admin/common/msg/saved');
+				Nino.admin.slots._snapshot();
 				Nino.admin.slots.init();
+				report( true );
 			} );
 		},
 
@@ -362,6 +396,8 @@
 			msg.textContent = Nino.content.getText('/_admin/common/msg/scanning');
 			wrap.appendChild( msg );
 
+			Nino.admin.slots._scanRows = null;
+			Nino.admin.slots._snapshot();
 			Nino.admin.slots._showForm();
 
 			Nino.admin.slots._apiCall( 'scan', {}, function( status, response ) {
@@ -406,6 +442,7 @@
 
 			if( missing.length === 0 ) {
 				wrap.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/slots/scan/none') ) );
+				Nino.admin.slots._snapshot();
 				return;
 			}
 
@@ -489,6 +526,10 @@
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.slots._saveScanResults( rows ) } );
 
 			wrap.appendChild( form );
+
+			// The rows come pre-filled from the scan: that is the baseline
+			Nino.admin.slots._scanRows = rows;
+			Nino.admin.slots._snapshot();
 		},
 
 		/**
@@ -497,16 +538,23 @@
 		 *	duplicate uri) is reported without swallowing the rest
 		 *
 		 *	@param		{Array}		rows
+		 *	@param		{Function}	[done]			Called once with true when every row was created, false otherwise
 		 *
 		 *	@return		void
 		 */
-		_saveScanResults : function( rows ) {
+		_saveScanResults : function( rows, done ) {
+
+			const report = function( ok ) {
+				if( typeof done === 'function' )
+					done( ok );
+			};
 
 			const msg 		= dc.getElementById('slots-scan-msg');
 			const pending = rows.filter( function( row ) { return row.ignoreCheck.checked === false } );
 
 			if( pending.length === 0 ) {
 				Nino.admin.slots._showList();
+				report( true );
 				return;
 			}
 
@@ -518,7 +566,9 @@
 				if( i >= pending.length ) {
 					if( failed.length > 0 )
 						wn.alert( Nino.content.getText('/_admin/slots/scan/created-failed').replace( '%d', created ).replace( '%s', failed.join(', ') ) );
+					Nino.admin.slots._snapshot();
 					Nino.admin.slots.init();
+					report( failed.length === 0 );
 					return;
 				}
 
@@ -544,5 +594,15 @@
 	};
 
 	Nino.events.bindCallback( 'ready', Nino.admin.slots.init );
+
+	// The shell asks before anything throws the open slot's input away (see
+	// Nino.admin.dirty). A shell without the registry is simply not asking
+	if( typeof Nino.admin.dirty === 'object' )
+		Nino.admin.dirty.watchForm( 'slots', function() { return dc.getElementById('slots-form') }, function( done ) {
+			if( Nino.admin.slots._scanRows !== null )
+				Nino.admin.slots._saveScanResults( Nino.admin.slots._scanRows, done );
+			else
+				Nino.admin.slots._save( done );
+		} );
 
 })(window, document, document.documentElement, document.body);

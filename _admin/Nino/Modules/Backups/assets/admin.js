@@ -167,7 +167,7 @@
 		 */
 		_confirmRestore : function( date ) {
 
-			if( wn.confirm( Nino.content.getText('/_admin/backups/confirm/restore').replace( '%s', date ) ) === false )
+			if( wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/backups/confirm/restore'), date ) ) === false )
 				return;
 
 			// Whatever a previous attempt left there is about that attempt
@@ -175,13 +175,24 @@
 			if( message !== null )
 				message.textContent = '';
 
-			Nino.admin.backups._apiCall( 'restore', { date : date }, function( status, response ) {
-				if( status !== 200 || response === null || response.ok !== true )
-					return Nino.admin.backups._showRestoreError( status, response );
+			// The restore ends in a reload of the page and every form on it, and
+			// has put other files in their place by then: unsaved input is asked
+			// about first (see Nino.admin.dirty.guard())
+			const restore = function() {
 
-				wn.alert( Nino.content.getText('/_admin/backups/msg/restored').replace( '%s', date ) );
-				wn.location.reload();
-			} );
+				Nino.admin.backups._apiCall( 'restore', { date : date }, function( status, response ) {
+					if( status !== 200 || response === null || response.ok !== true )
+						return Nino.admin.backups._showRestoreError( status, response );
+
+					wn.alert( Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/restored'), date ) );
+					wn.location.reload();
+				} );
+			};
+
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.guard( null, restore );
+			else
+				restore();
 		},
 	};
 

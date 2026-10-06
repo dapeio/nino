@@ -30,6 +30,9 @@
 		// from here rather than kept in a local
 		_status				: null,
 		_roleStatus		: null,
+		// The open new-account form's save, set while that form is drawn: called
+		// with a function that is told how it ended
+		_create			: null,
 		_canManage		: false,
 		_roles				: [],
 		_loading			: false,
@@ -310,29 +313,54 @@
 			form.appendChild( actions );
 			const line = Nino.adminUi.status( msg );
 			line.bind( form );
-			form.addEventListener( 'submit', function( ev ) {
-				ev.preventDefault();
+
+			// Said once: the form submits it, and the shell's question about
+			// unsaved input saves through it (see Nino.admin.dirty.guard()), which
+			// wants to hear how it ended
+			Nino.admin.users._create = function( done ) {
+
+				const report = function( ok ) {
+					if( typeof done === 'function' )
+						done( ok );
+				};
+
 				line.saving();
 				Nino.admin.users._apiCall( 'create', { mail : mailInput.value.trim(), pw : pwInput.value, role : roleSelect.value }, function( status, response ) {
 					if( status !== 200 ) {
 						line.error( status, response, '/_admin/users/error/create' );
+						report( false );
 						return;
 					}
 					// Reload the list and open the account just created
 					Nino.admin.users._apiCall( 'list', {}, function( listStatus, listResponse ) {
-						if( listStatus !== 200 || listResponse === null )
-							return Nino.admin.users._showError( dc.getElementById('users-list'), listStatus, listResponse );
+						if( listStatus !== 200 || listResponse === null ) {
+							// The account exists: only the list failed, and a Save that is
+							// reported as failed would be tried again
+							Nino.admin.users._showError( dc.getElementById('users-list'), listStatus, listResponse );
+							report( true );
+							return;
+						}
 						Nino.admin.users._users = listResponse.users;
 						Nino.admin.users._renderList( listResponse.users );
 						Nino.admin.users._openUser( response.mail );
+						report( true );
 					} );
 				} );
+			};
+
+			form.addEventListener( 'submit', function( ev ) {
+				ev.preventDefault();
+				Nino.admin.users._create();
 			} );
 			wrap.appendChild( form );
 			dc.getElementById('users-list').classList.add('admin-hidden');
 			wrap.classList.remove('admin-hidden');
 			Nino.admin.router.set( 'users', [ 'new' ] );
 			mailInput.focus();
+
+			// What the form holds now is what is saved
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.snapshot( 'users' );
 		},
 
 		/**
@@ -467,6 +495,90 @@
 			usersWrap.appendChild( form );
 
 			wrap.appendChild( Nino.admin.users._renderRole() );
+
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.snapshot( 'users' );
+		},
+
+		/**
+		 *	Take the account as it is stored for what is saved. The profile and
+		 *	the role save apart, and one saved while the other still holds a
+		 *	change must neither take that change for stored nor lose it: the
+		 *	baseline is the form with both halves at their stored values, and
+		 *	typing the other half back to them leaves the form clean
+		 *
+		 *	@return		void
+		 */
+		_snapshot : function() {
+
+			if( typeof Nino.admin.dirty !== 'object' )
+				return;
+
+			const user = Nino.admin.users._currentUser;
+			const mail = dc.getElementById('users-form-mail');
+			const pw = dc.getElementById('users-form-pw');
+			const role = dc.getElementById('users-form-role-select');
+
+			if( user === null || mail === null || pw === null ) {
+				Nino.admin.dirty.snapshot( 'users' );
+				return;
+			}
+
+			const typed = { mail : mail.value, pw : pw.value, role : role === null ? null : role.value };
+
+			mail.value = user.mail;
+			pw.value = '';
+			if( role !== null )
+				role.value = role.dataset.saved;
+
+			try {
+				Nino.admin.dirty.snapshot( 'users' );
+			}
+			finally {
+				mail.value = typed.mail;
+				pw.value = typed.pw;
+				if( role !== null )
+					role.value = typed.role;
+			}
+
+			Nino.admin.dirty.refresh();
+		},
+
+		/**
+		 *	Save what the open form holds, whichever it is: a new account, or
+		 *	the profile and the role of an existing one, each only if it changed.
+		 *	What the shell's question about unsaved input saves through (see
+		 *	Nino.admin.dirty.guard())
+		 *
+		 *	@param		{Function}	done				Called once with true when everything that changed was written, false otherwise
+		 *
+		 *	@return		void
+		 */
+		_saveOpen : function( done ) {
+
+			if( dc.getElementById('users-create-form') !== null )
+				return Nino.admin.users._create( done );
+
+			const user = Nino.admin.users._currentUser;
+			const role = dc.getElementById('users-form-role-select');
+			const steps = [];
+
+			if( dc.getElementById('users-form-mail').value.trim() !== user.mail || dc.getElementById('users-form-pw').value !== '' )
+				steps.push( function( next ) { Nino.admin.users._save( next ) } );
+
+			if( role !== null && role.value !== role.dataset.saved )
+				steps.push( function( next ) { Nino.admin.users._saveRole( role, next ) } );
+
+			( function run( at ) {
+				if( at >= steps.length ) {
+					// Nothing differed from what is stored (a blank around the mail,
+					// a field typed back): the form as it stands is what is saved
+					if( steps.length === 0 && typeof Nino.admin.dirty === 'object' )
+						Nino.admin.dirty.snapshot( 'users' );
+					return done( true );
+				}
+				steps[at]( function( ok ) { return ok === true ? run( at + 1 ) : done( false ) } );
+			} )( 0 );
 		},
 
 		/**
@@ -507,6 +619,8 @@
 			roleSpan.textContent = Nino.content.getText('/_admin/users/label/role');
 			roleLabel.appendChild( roleSpan );
 			const select = Nino.admin.users._roleSelect( 'users-form-role-select', user.role );
+			// The role the account holds, to tell a change from what is stored
+			select.dataset.saved = select.value;
 			roleLabel.appendChild( select );
 			form.appendChild( roleLabel );
 
@@ -538,10 +652,11 @@
 		 *	Save the current user's role
 		 *
 		 *	@param		{Element}		select				The role select
+		 *	@param		{Function}	[done]				Called once with true when the role was written, false otherwise
 		 *
 		 *	@return		void
 		 */
-		_saveRole : function( select ) {
+		_saveRole : function( select, done ) {
 
 			const user = Nino.admin.users._currentUser;
 			const line = Nino.admin.users._roleStatus;
@@ -552,21 +667,29 @@
 
 				if( status !== 200 ) {
 					line.error( status, response, '/_admin/users/error/save' );
+					if( typeof done === 'function' )
+						done( false );
 					return;
 				}
 
 				user.role = response.role;
+				select.dataset.saved = select.value;
 				line.saved();
 				Nino.admin.users._renderList( Nino.admin.users._users );
+				Nino.admin.users._snapshot();
+				if( typeof done === 'function' )
+					done( true );
 			} );
 		},
 
 		/**
 		 *	Save the current user's mail/password
 		 *
+		 *	@param		{Function}	[done]				Called once with true when the account was written, false otherwise
+		 *
 		 *	@return		void
 		 */
-		_save : function() {
+		_save : function( done ) {
 
 			const user = Nino.admin.users._currentUser;
 			const mail = dc.getElementById('users-form-mail').value.trim();
@@ -584,6 +707,8 @@
 
 				if( status !== 200 ) {
 					line.error( status, response, '/_admin/users/error/save' );
+					if( typeof done === 'function' )
+						done( false );
 					return;
 				}
 
@@ -602,6 +727,9 @@
 
 				line.saved();
 				Nino.admin.router.set( 'users', [ user.mail ] );
+				Nino.admin.users._snapshot();
+				if( typeof done === 'function' )
+					done( true );
 
 				// Refresh the list in the background so a renamed mail is reflected there too
 				Nino.admin.users._apiCall( 'list', {}, function( listStatus, listResponse ) {
@@ -644,22 +772,37 @@
 
 			const user = Nino.admin.users._currentUser;
 
-			Nino.admin.users._apiCall( 'logoutall', { username : user.mail }, function( status, response ) {
+			// Ending your own sessions ends this page's, and with it every form
+			// on it: the unsaved input of all of them is asked about first
+			const request = function() {
 
-				if( status !== 200 ) {
-					Nino.admin.users._status.error( status, response, '/_admin/users/error/save' );
-					return;
-				}
+				Nino.admin.users._apiCall( 'logoutall', { username : user.mail }, function( status, response ) {
 
-				// Logging out yourself invalidates the current session - reload straight to the login form
-				if( response.loggedOutSelf === true ) {
-					wn.location.replace( '[[/nino/dir]]/_admin' );
-					return;
-				}
+					if( status !== 200 ) {
+						Nino.admin.users._status.error( status, response, '/_admin/users/error/save' );
+						return;
+					}
 
-				Nino.admin.users._status.idle( Nino.content.getText('/_admin/users/msg/loggedout') );
-			} );
+					// Logging out yourself invalidates the current session - reload straight to the login form
+					if( response.loggedOutSelf === true ) {
+						wn.location.replace( '[[/nino/dir]]/_admin' );
+						return;
+					}
+
+					Nino.admin.users._status.idle( Nino.content.getText('/_admin/users/msg/loggedout') );
+				} );
+			};
+
+			if( user.isSelf === true && typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.guard( null, request );
+			else
+				request();
 		},
 	};
+
+	// The shell asks before anything throws the open account's input away (see
+	// Nino.admin.dirty). A shell without the registry is simply not asking
+	if( typeof Nino.admin.dirty === 'object' )
+		Nino.admin.dirty.watchForm( 'users', function() { return dc.getElementById('users-form') }, Nino.admin.users._saveOpen );
 
 })(window, document, document.documentElement, document.body);

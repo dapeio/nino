@@ -124,8 +124,8 @@ Important source directories:
 | `_admin/Admin.php` | The workbench: `\Nino\Admin\Admin` (shell, routes, bundles, fills, dispatch), `\Nino\Admin\Panels` (the panel registry: reads a panel class, orders the panels, renders navigation and panes) and `\Nino\Admin\Recovery` (the recovery secret) |
 | `_admin/Nino/Modules/<Name>/` | The workbench's own screens, one module each, in the same shape and the same namespace `_nino/Nino/Modules` and `features/<Name>/` use: `Admin/Admin.php` is the panel, `<Tab>/<Tab>.php` a tab of it, `assets/` its scripts and stylesheet, `text/` its words. `Admin::modules()` reads the directory - there is no list to keep. Take the directory away and `/_admin` is a login and an empty rail, which is the point: `_admin` is the base, the modules fill it |
 | `_admin/assets/style.css` | The workbench's one stylesheet: the design system in the `nino.system` layer (classes only, `nino-admin-*`), the workbench's own rules in `nino.tool` below it |
-| `_admin/assets/Nino.admin.js` | The behaviour half of the design system: `Nino.adminUi`'s DOM primitives and the pure table model - and the one way a panel talks to the server, `Nino.adminUi.api`, with the status line (`status()`) and the messages that say what failed (`errorText()`, `showError()`, `format()`). Loaded after `Nino.js`, by the workbench only |
-| `_admin/assets/script.js`, `login.js`, `html-editor.js` | The shell script (router, theme, rail fold, panel switching), the login screen's, and the rich-text primitive a panel names in its own `assets()`. No panel script lives here; no bundler - `Admin::init()` builds `/_admin/.cache/` from the registry |
+| `_admin/assets/Nino.admin.js` | The behaviour half of the design system: `Nino.adminUi`'s DOM primitives and the pure table model - and the one way a panel talks to the server, `Nino.adminUi.api`, with the status line (`status()`) and the messages that say what failed (`errorText()`, `showError()`, `format()`) - and `choiceDialog()`, the modal question with more than two answers. Loaded after `Nino.js`, by the workbench only |
+| `_admin/assets/script.js`, `login.js`, `html-editor.js` | The shell script (router, theme, rail fold, panel switching, and `Nino.admin.dirty`, the registry the form panels report unsaved input to), the login screen's, and the rich-text primitive a panel names in its own `assets()`. No panel script lives here; no bundler - `Admin::init()` builds `/_admin/.cache/` from the registry |
 | `_admin/templates/page-index.tpl` | The shell; navigation, panes and panel assets are rendered into it from the registry |
 | `_admin/recovery.php`, `templates/page-recovery.tpl`, `assets/recovery.js` | The recovery page: restore a backup, reset a password, with the recovery secret |
 | `_admin/install/Install.php` | The setup wizard - the workbench's first-run mode, served by the same route while `Admin::isInstalled()` says no; deletable after setup |
@@ -430,6 +430,8 @@ Reach for an existing class first; only invent one when no role fits.
 | Fixed bottom actions | `.nino-admin-actionbar` via `Nino.adminUi.actionBar()` |
 | Fixed actions above a list | `.nino-admin-list-actions` via `Nino.adminUi.listActions()` |
 | Status text in a bottom bar - saving, saved at hh:mm, unsaved changes, why it failed | `.nino-admin-status` via `Nino.adminUi.status()` (in the bar it replaces `.nino-admin-actionbar-status`) |
+| Mark after the name of a required field, and the sentence under a refused one | `.nino-admin-required` (drawn `aria-hidden`; the control gets `aria-required`), `.nino-admin-field-error` (linked with `aria-describedby`, never `role="alert"`) |
+| "Unsaved changes" mark in a registered form's action bar | `.nino-admin-actionbar-dirty`, written by `Nino.admin.dirty.refresh()` into every registered form's bar and hidden by the stylesheet only in a bar that has a status line (below 38 rem, where the status line is hidden, it shows again) - not a `p`, not `role="status"` |
 | Primary / destructive button | `.nino-admin-btn-primary`, `.nino-admin-btn-danger` |
 | Raised panel | `.nino-admin-card` (a `fieldset` is one already) |
 | Clickable drill-down list | `.nino-admin-list` (+ `.nino-admin-list-copy` per row) |
@@ -476,6 +478,20 @@ A message with params is filled with `Nino.adminUi.format()`, never with
 in the browser first (`data-upload-bytes`, `data-upload-pixels` on the shell,
 `Nino.adminUi.checkImage()`, `uploadHint()`) and by `Admin::uploadError()` and
 `Images::reject()` on the server.
+
+**Unsaved input.** A panel that keeps a form registers it with the shell,
+`Nino.admin.dirty.register( name, { isDirty, save( done ), discard } )` or, for
+a form of plain fields, `watchForm( name, formGetter, save )` plus `snapshot(
+name )` after every draw and every successful save. The registration is behind
+`if( typeof Nino.admin.dirty === 'object' )`: panel scripts run in suites and on
+older shells without it. The name is the uri of the panel or tab (`admin-tab-<name>`,
+else `admin-content-<name>`). Every exit that drops the form - a request that
+draws it again, a reload, a link to another record - runs inside
+`Nino.admin.dirty.guard( [ names ] | null, proceed, onCancel )`, which asks
+Save / Discard / Cancel through `Nino.adminUi.choiceDialog()`; `save( done )`
+calls `done( true )` or `done( false )` on every way it can end. The shell
+already guards the back link, logout and the interface language. See the
+[admin panel recipe](docs/recipes/admin-panel.md#unsaved-input).
 
 A workspace panel's markup (`templates/panel.tpl`) is the other place a
 sentence hides, and reads ordinary `[[fills]]`. A fill's *value* is substituted
@@ -842,6 +858,7 @@ new, and the tests named in section 10 pass.
 - [ ] JS uses existing UI primitives and safe DOM construction.
 - [ ] Empty, loading, error, list, form, and saved states are usable.
 - [ ] Requests go through `Nino.adminUi.api.call()`; a failure a person can cause carries a code (params and field where they apply), with text in both languages.
+- [ ] A form panel reports unsaved input to `Nino.admin.dirty` (feature-detected) and guards every exit that would drop it; its save reports `done( ok )` on every way it can end.
 - [ ] Backend and JS tests cover denial, mutation, and - for a module panel - absence while the module is off.
 
 ### Runtime module done

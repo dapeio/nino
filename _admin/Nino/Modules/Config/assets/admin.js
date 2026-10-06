@@ -155,6 +155,10 @@
 				msg.textContent = Nino.admin.config._pendingMsg;
 				Nino.admin.config._pendingMsg = '';
 			}
+
+			// What the form holds now is what is saved
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.snapshot( 'config' );
 		},
 
 		/**
@@ -283,9 +287,19 @@
 		/**
 		 *	Collect every field and save the form in one request
 		 *
+		 *	Every way this ends reports to done( ok ), if there is one (see
+		 *	Nino.admin.dirty.guard())
+		 *
+		 *	@param		{Function}	[done]				Called once with true when the settings were written, false otherwise
+		 *
 		 *	@return		void
 		 */
-		_save : function() {
+		_save : function( done ) {
+
+			const report = function( ok ) {
+				if( typeof done === 'function' )
+					done( ok );
+			};
 
 			const msg = dc.getElementById('config-form-msg');
 			const fields = {};
@@ -311,6 +325,7 @@
 
 				if( status !== 200 || response === null ) {
 					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
+					report( false );
 					return;
 				}
 
@@ -318,13 +333,21 @@
 				// below replaces it, so assigning here shows the confirmation for
 				// exactly as long as the request that follows takes
 				Nino.admin.config._pendingMsg = Nino.content.getText('/_admin/common/msg/saved');
+				if( typeof Nino.admin.dirty === 'object' )
+					Nino.admin.dirty.snapshot( 'config' );
 
 				// Reloaded rather than left as typed: the number fields come
 				// back as the ints config.php now holds
 				Nino.admin.config.init();
+				report( true );
 			} );
 		},
 	};
+
+	// The shell asks before anything throws the form's input away (see
+	// Nino.admin.dirty). A shell without the registry is simply not asking
+	if( typeof Nino.admin.dirty === 'object' )
+		Nino.admin.dirty.watchForm( 'config', function() { return dc.getElementById('config-form') }, function( done ) { Nino.admin.config._save( done ) } );
 
 	/*	Not bound to 'ready'. The pane is in the page on every workbench load,
 		hidden, so an init() there fetched config/list for a screen nobody had

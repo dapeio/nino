@@ -1558,6 +1558,17 @@ foreach( [ 'de_DE', 'en_US' ] as $locale ) {
 		str_contains( (string) ( $shellText[$locale]['[[/_admin/login/error/endpoint]]'] ?? '' ), '%s' ) === true );
 }
 
+/*	The question asked before unsaved input is lost (Nino.admin.dirty, see
+	_admin/assets/script.js) is spoken in the interface language, and German
+	addresses the reader as Du - capitalised, as everywhere in the workbench */
+foreach( [ 'de_DE', 'en_US' ] as $locale )
+	foreach( [ 'confirm/unsaved', 'label/discard', 'label/cancel', 'msg/dirty' ] as $key )
+		check( $locale. ' carries /_admin/common/'. $key, trim( (string) ( $shellText[$locale]['[[/_admin/common/'. $key. ']]'] ?? '' ) ) !== '' );
+check( 'the question is addressed with a capitalised Du in German', str_contains( (string) $shellText['de_DE']['[[/_admin/common/confirm/unsaved]]'], 'Du hast' ) === true
+	&& str_contains( (string) $shellText['de_DE']['[[/_admin/common/confirm/unsaved]]'], 'Möchtest Du' ) === true );
+check( 'the three answers are the plain words', $shellText['en_US']['[[/_admin/common/label/save]]'] === 'Save' && $shellText['en_US']['[[/_admin/common/label/discard]]'] === 'Discard' && $shellText['en_US']['[[/_admin/common/label/cancel]]'] === 'Cancel'
+	&& $shellText['de_DE']['[[/_admin/common/label/discard]]'] === 'Verwerfen' && $shellText['de_DE']['[[/_admin/common/label/cancel]]'] === 'Abbrechen' );
+
 echo "\n";
 
 

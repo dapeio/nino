@@ -163,6 +163,572 @@
 		},
 
 		/**
+		 *	Unsaved input, and the questions asked before it is lost. A panel
+		 *	that keeps a form registers itself here and says when that form
+		 *	holds something nobody has saved; the shell asks Save, Discard or
+		 *	Cancel before anything it does would throw that away - leaving by
+		 *	logout, the interface language, a back link - and the browser asks
+		 *	before the page itself goes (beforeunload). A panel that does not
+		 *	register is simply not asked about: the registration is opt-in,
+		 *	and a panel guards its own exits (a link to another record, a
+		 *	reload) with guard().
+		 *
+		 *	A name is the panel's or the tab's uri, the id of its pane without
+		 *	the admin-content- or admin-tab- in front. An entry is
+		 *	{ isDirty(), save( done ), discard(), bar() }: save() reports with
+		 *	done( true ) or done( false ) on every way it can end, discard()
+		 *	forgets the input (the form is about to be left or drawn again),
+		 *	bar() answers the action bar that carries the marker, if the
+		 *	first one in the pane is not it.
+		 *
+		 *	Every listener is installed by init(), from onReady(): a shell
+		 *	script loaded without a dom (a test's first context) has none.
+		 */
+		dirty : {
+
+			// name -> entry
+			_entries : {},
+			// watchForm(): name -> the function that answers its form, and what
+			// that form held when snapshot() last looked
+			_forms : {},
+			_baseline : {},
+			// name -> the marker span in its action bar
+			_marks : {},
+			// A question is open: a second click on the same exit is the same click
+			_asking : false,
+			// How many Saves answered to a question are running. A save that needs
+			// to ask about something of its own (an Element Types save drops the
+			// element form next door) is let through to ask - a second click is
+			// not, so it is only here that a question may be asked while one stands
+			_saving : 0,
+			// An entry's save() is being called right now: a guard() that comes
+			// from inside it is the save asking, any other while a Save runs
+			// (a back link, the logout, the language picker) is a stray click
+			_inSave : false,
+			// A failed Save of a nested question has brought its form on screen;
+			// the Save around it need not bring its own over it
+			_failShown : false,
+			// The page is on its way out and has decided what to do with its input
+			_leaving : false,
+			// Whether the browser's own question is installed (see _sync())
+			_unload : false,
+			_frame : false,
+			// A back link that was asked about and may now go through
+			_bypass : null,
+			// Set by init(): bring the panel or tab that owns a name on screen
+			_show : null,
+			// The timer that takes _leaving back if the page is still here
+			_stayTimer : null,
+
+			/**
+			 *	@param		{string}		name
+			 *	@param		{Object}		entry				{ isDirty, save, discard, bar }
+			 *
+			 *	@return		void
+			 */
+			register : function( name, entry ) {
+				Nino.admin.dirty._entries[name] = entry;
+			},
+
+			/**
+			 *	The registered names in scope that hold unsaved input
+			 *
+			 *	@param		{Array|null}	[names]			null for every entry
+			 *
+			 *	@return		{Array<string>}
+			 */
+			dirtyNames : function( names ) {
+				const entries = Nino.admin.dirty._entries;
+				return ( Array.isArray( names ) === true ? names : Object.keys( entries ) ).filter( function( name ) {
+					return entries[name] !== undefined && entries[name].isDirty() === true;
+				} );
+			},
+
+			/**
+			 *	@param		{Array|null}	[names]
+			 *
+			 *	@return		{boolean}
+			 */
+			isDirty : function( names ) {
+				return Nino.admin.dirty.dirtyNames( names ).length > 0;
+			},
+
+			/**
+			 *	Run proceed() - but ask first when something in scope is unsaved.
+			 *	Save runs the entries in order and goes on only when every one
+			 *	reports ok; the first that does not is brought on screen with
+			 *	its errors and nothing goes on. Discard lets every entry forget
+			 *	and goes on. Cancel, and a Save that failed, call onCancel() so
+			 *	that whatever started this (a select, a checkbox) can undo
+			 *	itself. While a question is open, further calls are ignored - and
+			 *	call onCancel() too - except from inside a Save the question itself
+			 *	started, which may have one of its own; of two failed Saves only the
+			 *	innermost is brought on screen. A save() that throws ends the
+			 *	question and the Save, and the error goes on up
+			 *
+			 *	@param		{Array|null}	names				The entries the exit would lose, null for all
+			 *	@param		{Function}		proceed
+			 *	@param		{Function}		[onCancel]
+			 *	@param		{boolean}			[leaves]		proceed() leaves the page at once, so the browser has nothing to ask
+			 *
+			 *	@return		void
+			 */
+			guard : function( names, proceed, onCancel, leaves ) {
+
+				const open = Nino.admin.dirty.dirtyNames( names );
+
+				if( open.length === 0 ) {
+					proceed();
+					return;
+				}
+
+				// A question asked from inside a Save of the one standing
+				const nested = Nino.admin.dirty._asking === true;
+
+				const cancel = function() {
+					if( typeof onCancel === 'function' )
+						onCancel();
+				};
+
+				// Ignored - whatever started this undoes itself (a select goes back)
+				if( nested === true && ( Nino.admin.dirty._saving === 0 || Nino.admin.dirty._inSave !== true ) ) {
+					cancel();
+					return;
+				}
+
+				// Every way on ends here: the question is over, the markers follow
+				const go = function() {
+					Nino.admin.dirty._asking = nested;
+					if( nested === false )
+						Nino.admin.dirty._leaving = leaves === true;
+					Nino.admin.dirty.refresh();
+					proceed();
+					// An exit that does not happen (another script's own question keeps
+					// the page, the language change is refused) must not leave the
+					// browser's protection off
+					if( nested === false && leaves === true && typeof wn.setTimeout === 'function' ) {
+						wn.clearTimeout( Nino.admin.dirty._stayTimer );
+						Nino.admin.dirty._stayTimer = wn.setTimeout( Nino.admin.dirty._stay, 10000 );
+					}
+				};
+
+				// An entry that cannot save offers nothing to save
+				const choices = [];
+				if( open.every( function( name ) { return typeof Nino.admin.dirty._entries[name].save === 'function' } ) === true )
+					choices.push( { value : 'save', label : Nino.content.getText('/_admin/common/label/save'), kind : 'primary' } );
+				choices.push( { value : 'discard', label : Nino.content.getText('/_admin/common/label/discard'), kind : 'danger' } );
+				choices.push( { value : 'cancel', label : Nino.content.getText('/_admin/common/label/cancel'), kind : 'secondary' } );
+
+				Nino.admin.dirty._asking = true;
+
+				const asked = Nino.adminUi.choiceDialog( {
+					title		: Nino.content.getText('/_admin/common/msg/dirty'),
+					message	: Nino.content.getText('/_admin/common/confirm/unsaved'),
+					choices	: choices,
+					onChoose : function( value ) {
+
+						if( value === 'discard' ) {
+							open.forEach( function( name ) {
+								if( typeof Nino.admin.dirty._entries[name].discard === 'function' )
+									Nino.admin.dirty._entries[name].discard();
+							} );
+							go();
+							return;
+						}
+
+						if( value !== 'save' ) {
+							Nino.admin.dirty._asking = nested;
+							cancel();
+							return;
+						}
+
+						let at = 0;
+						let running = true;
+						Nino.admin.dirty._saving++;
+
+						// Once, whichever way this Save ends - also when a save() throws
+						const stop = function() {
+							if( running === false )
+								return false;
+							running = false;
+							Nino.admin.dirty._saving--;
+							return true;
+						};
+
+						const next = function() {
+
+							if( at >= open.length ) {
+								stop();
+								go();
+								return;
+							}
+
+							const name = open[at++];
+							const was = Nino.admin.dirty._inSave;
+							Nino.admin.dirty._inSave = true;
+							try {
+								Nino.admin.dirty._entries[name].save( function( ok ) {
+									if( ok === true ) {
+										next();
+										return;
+									}
+									stop();
+									Nino.admin.dirty._asking = nested;
+									if( Nino.admin.dirty._failShown === false && typeof Nino.admin.dirty._show === 'function' ) {
+										Nino.admin.dirty._show( name );
+										Nino.admin.dirty._focusProblem( name );
+									}
+									Nino.admin.dirty._failShown = Nino.admin.dirty._saving > 0;
+									Nino.admin.dirty.refresh();
+									cancel();
+								} );
+							}
+							catch( error ) {
+								// Not swallowed - but the exits must not stay shut
+								if( stop() === true ) {
+									Nino.admin.dirty._asking = nested;
+									cancel();
+								}
+								throw error;
+							}
+							finally {
+								Nino.admin.dirty._inSave = was;
+							}
+						};
+						next();
+					},
+				} );
+
+				// A question that could not be opened is not one that is waiting
+				if( asked === false ) {
+					Nino.admin.dirty._asking = nested;
+					cancel();
+				}
+			},
+
+			/**
+			 *	Put the focus on the first field a refused Save marked invalid in
+			 *	a pane. The Save asked for it while the pane was still hidden, where
+			 *	a focus does nothing; it is asked for again once the pane is shown
+			 *
+			 *	@param		{string}		name
+			 *
+			 *	@return		void
+			 */
+			_focusProblem : function( name ) {
+
+				const pane = dc.getElementById( 'admin-tab-'+ name ) ?? dc.getElementById( 'admin-content-'+ name );
+				const field = pane === null || pane === undefined ? null : pane.querySelector('[aria-invalid="true"]');
+
+				if( field !== null && typeof field.focus === 'function' )
+					field.focus();
+			},
+
+			/**
+			 *	Make the page say what is unsaved: the marker in each registered
+			 *	form's action bar, and the browser's question on leaving. Cheap
+			 *	enough to be asked after every input, change and click (see
+			 *	init()), and by a panel at the end of its own save
+			 *
+			 *	@return		void
+			 */
+			refresh : function() {
+
+				Object.keys( Nino.admin.dirty._entries ).forEach( function( name ) {
+					Nino.admin.dirty._mark( name, Nino.admin.dirty._entries[name].isDirty() === true );
+				} );
+
+				Nino.admin.dirty._sync();
+			},
+
+			/**
+			 *	Put the marker in one entry's action bar, or take it out. Not a
+			 *	p and not role=status, so the phone rule that hides the status
+			 *	line leaves it alone. A bar that has a status line of its own
+			 *	(Nino.adminUi.status()) says "unsaved changes" there as well; the
+			 *	style sheet hides the marker in it, except where the phone rule hides
+			 *	that line. A bar drawn again takes a new span - the old one went
+			 *	with the old bar
+			 *
+			 *	@param		{string}		name
+			 *	@param		{boolean}		unsaved
+			 *
+			 *	@return		void
+			 */
+			_mark : function( name, unsaved ) {
+
+				const marks = Nino.admin.dirty._marks;
+				const bar = Nino.admin.dirty._bar( name );
+				let span = marks[name] ?? null;
+
+				if( bar === null ) {
+					if( span !== null )
+						span.hidden = true;
+					return;
+				}
+
+				if( span === null || span.parentNode !== bar ) {
+					if( unsaved === false )
+						return;
+					span = dc.createElement('span');
+					span.className = 'nino-admin-actionbar-dirty';
+					span.textContent = Nino.content.getText('/_admin/common/msg/dirty');
+					bar.appendChild( span );
+					marks[name] = span;
+				}
+
+				span.hidden = unsaved === false;
+			},
+
+			/**
+			 *	The action bar that carries an entry's marker: its own, else the
+			 *	one in its form, else the first form bar in its pane
+			 *
+			 *	@param		{string}		name
+			 *
+			 *	@return		{Element|null}
+			 */
+			_bar : function( name ) {
+
+				const entry = Nino.admin.dirty._entries[name];
+
+				if( typeof entry.bar === 'function' )
+					return entry.bar() ?? null;
+
+				if( typeof Nino.admin.dirty._forms[name] === 'function' ) {
+					const form = Nino.admin.dirty._forms[name]();
+					return form === null || form === undefined ? null : form.querySelector('.nino-admin-actionbar');
+				}
+
+				const pane = dc.getElementById( 'admin-tab-'+ name ) ?? dc.getElementById( 'admin-content-'+ name );
+				return pane === null || pane === undefined ? null : pane.querySelector('.nino-admin-actionbar:not(.nino-admin-list-actions)');
+			},
+
+			/**
+			 *	The browser's own question when the page is closed or reloaded
+			 *	with unsaved input - installed only while there is some, so a
+			 *	clean page keeps the browser's fast back and forward
+			 *
+			 *	@return		void
+			 */
+			_sync : function() {
+
+				const want = Nino.admin.dirty.isDirty() === true && Nino.admin.dirty._leaving === false;
+
+				if( want === Nino.admin.dirty._unload || typeof wn.addEventListener !== 'function' )
+					return;
+
+				Nino.admin.dirty._unload = want;
+				wn[want === true ? 'addEventListener' : 'removeEventListener']( 'beforeunload', Nino.admin.dirty._beforeUnload );
+			},
+
+			/**
+			 *	The page is still here: whatever was leaving it did not, or it is
+			 *	shown again (the browser's back). The browser's question comes back
+			 *	with the input it protects
+			 *
+			 *	@return		void
+			 */
+			_stay : function() {
+				Nino.admin.dirty._leaving = false;
+				Nino.admin.dirty.refresh();
+			},
+
+			/**
+			 *	@param		{Event}			ev
+			 *
+			 *	@return		void
+			 */
+			_beforeUnload : function( ev ) {
+
+				if( Nino.admin.dirty._leaving === true || Nino.admin.dirty.isDirty() === false )
+					return;
+
+				ev.preventDefault();
+				ev.returnValue = '';
+			},
+
+			/**
+			 *	What a form holds, as one string to compare with later: the
+			 *	value of every field in it - a checkbox or a radio by its state -
+			 *	and the content of every rich-text field. Not what a person did
+			 *	not type: a file input (its file is saved by its own upload), a
+			 *	search box (it filters, it stores nothing), a password the
+			 *	browser may fill in by itself and a field that says data-dirty="ignore"
+			 *	(a confirmation typed to unlock a button is not an edit)
+			 *
+			 *	@param		{Element}		form
+			 *
+			 *	@return		{string}
+			 */
+			_serialize : function( form ) {
+
+				const fields = Array.from( form.querySelectorAll('input, textarea, select') ).filter( function( el ) {
+					return el.type !== 'file' && el.type !== 'search' && el.autocomplete !== 'current-password' && ( el.dataset === undefined || el.dataset.dirty !== 'ignore' );
+				} );
+
+				return JSON.stringify( fields.map( function( el ) {
+					return el.type === 'checkbox' || el.type === 'radio' ? el.checked : el.value;
+				} ).concat( Array.from( form.querySelectorAll('[contenteditable]') ).map( function( el ) { return el.innerHTML } ) ) );
+			},
+
+			/**
+			 *	Whether a form is on screen as far as a drill-down goes: no level
+			 *	above it is hidden with admin-hidden. A pane that is hidden because
+			 *	another panel is open does not count - the form is still there, with
+			 *	what was typed into it
+			 *
+			 *	@param		{Element}		form
+			 *
+			 *	@return		{boolean}
+			 */
+			_shown : function( form ) {
+
+				for( let el = form; el !== null && el !== undefined; el = el.parentNode )
+					if( el.classList !== undefined && el.classList.contains('admin-hidden') === true )
+						return false;
+
+				return true;
+			},
+
+			/**
+			 *	Whether a form holds anything to type into. A panel that failed to
+			 *	load writes its error into the very container that is watched; no
+			 *	fields are left to have been edited, so that is not unsaved input
+			 *
+			 *	@param		{Element}		form
+			 *
+			 *	@return		{boolean}
+			 */
+			_hasFields : function( form ) {
+				return form.querySelector('input, textarea, select, [contenteditable]') !== null;
+			},
+
+			/**
+			 *	Take what a watched form holds now as what is saved - after it
+			 *	was drawn, and after a save went through
+			 *
+			 *	@param		{string}		name
+			 *
+			 *	@return		void
+			 */
+			snapshot : function( name ) {
+
+				const form = typeof Nino.admin.dirty._forms[name] === 'function' ? Nino.admin.dirty._forms[name]() : null;
+
+				Nino.admin.dirty._baseline[name] = form === null || form === undefined ? undefined : Nino.admin.dirty._serialize( form );
+				Nino.admin.dirty.refresh();
+			},
+
+			/**
+			 *	Register a panel whose form is plain fields: it is dirty when the
+			 *	form it answers now differs from what snapshot() saw, and clean
+			 *	while that form is not on screen - drawn but under a drill-down
+			 *	level that is hidden (admin-hidden), or not drawn - or holds no
+			 *	fields (an error message took its place). Compared when
+			 *	asked, not on every key. Its discard() takes the form as it stands
+			 *	for saved: the form is about to be left or drawn again
+			 *
+			 *	@param		{string}		name
+			 *	@param		{Function}	formGetter			Answers the form drawn last, or null
+			 *	@param		{Function}	[save]					save( done ), as an entry has it
+			 *
+			 *	@return		void
+			 */
+			watchForm : function( name, formGetter, save ) {
+
+				Nino.admin.dirty._forms[name] = formGetter;
+				Nino.admin.dirty.register( name, {
+					isDirty : function() {
+						const form = formGetter();
+						return form !== null && form !== undefined && Nino.admin.dirty._baseline[name] !== undefined && Nino.admin.dirty._hasFields( form ) === true && Nino.admin.dirty._shown( form ) === true && Nino.admin.dirty._serialize( form ) !== Nino.admin.dirty._baseline[name];
+					},
+					save		: save,
+					discard : function() { Nino.admin.dirty.snapshot( name ) },
+				} );
+			},
+
+			/**
+			 *	The name of the pane a node stands in: the nearest ancestor whose
+			 *	id starts admin-tab- (a tab of a pane) or admin-content- (the
+			 *	panel). Not data-tab - a feature's own markup uses that too
+			 *
+			 *	@param		{Element}		node
+			 *
+			 *	@return		{string|null}
+			 */
+			_owner : function( node ) {
+
+				for( let el = node.parentNode; el !== null && el !== undefined; el = el.parentNode ) {
+					const id = typeof el.id === 'string' ? el.id : '';
+					if( id.indexOf('admin-tab-') === 0 )
+						return id.slice( 10 );
+					if( id.indexOf('admin-content-') === 0 )
+						return id.slice( 14 );
+				}
+
+				return null;
+			},
+
+			/**
+			 *	Wire the page: a back link out of a form that holds unsaved input
+			 *	asks first, and whatever is typed, changed or clicked makes the
+			 *	markers follow. Many changes fire neither input nor change (a
+			 *	reference list's commit, the rich-text toolbar), which is why a
+			 *	click counts as well
+			 *
+			 *	@param		{Function}	show				Brings the panel or tab that owns a name on screen
+			 *
+			 *	@return		void
+			 */
+			init : function( show ) {
+
+				const wrap = dc.getElementById('admin-content-wrap');
+
+				Nino.admin.dirty._show = show;
+
+				if( typeof wn.addEventListener === 'function' )
+					wn.addEventListener( 'pageshow', Nino.admin.dirty._stay );
+
+				if( wrap === null || wrap === undefined )
+					return;
+
+				wrap.addEventListener( 'click', function( ev ) {
+
+					const link = ev.target && typeof ev.target.closest === 'function' ? ev.target.closest('a.nino-admin-back-link') : null;
+					if( link === null || link === undefined || Nino.admin.dirty._bypass === link )
+						return;
+
+					const owner = Nino.admin.dirty._owner( link );
+					if( owner === null || Nino.admin.dirty.isDirty( [ owner ] ) === false )
+						return;
+
+					ev.preventDefault();
+					ev.stopImmediatePropagation();
+					Nino.admin.dirty.guard( [ owner ], function() {
+						Nino.admin.dirty._bypass = link;
+						link.click();
+						Nino.admin.dirty._bypass = null;
+					} );
+				}, true );
+
+				const later = function() {
+
+					if( Nino.admin.dirty._frame === true )
+						return;
+
+					Nino.admin.dirty._frame = true;
+					( typeof wn.requestAnimationFrame === 'function' ? wn.requestAnimationFrame : function( fn ) { fn() } )( function() {
+						Nino.admin.dirty._frame = false;
+						Nino.admin.dirty.refresh();
+					} );
+				};
+
+				[ 'input', 'change', 'click' ].forEach( function( type ) { wrap.addEventListener( type, later ) } );
+			},
+		},
+
+		/**
 		 *	What the shell does when a request finds the session gone (see
 		 *	Nino.adminUi.api): a dialog to log in again, over the page and
 		 *	everything typed into it. The api decides whether the requests that
@@ -750,7 +1316,15 @@
 			// is all that's needed, Admin::init() reads it back server-side
 			const localePicker = dc.getElementById('admin-localepicker');
 			if( localePicker !== null )
-				localePicker.addEventListener( 'change', function(){ wn.location.href = this.value } );
+				localePicker.addEventListener( 'change', function() {
+
+					const picker = this;
+
+					// Another interface language reloads the page and every form on it
+					Nino.admin.dirty.guard( null, function() { wn.location.href = picker.value }, function() {
+						Array.from( picker.options ).forEach( function( option ) { option.selected = option.defaultSelected } );
+					}, true );
+				} );
 
 			const el = {
 				'pageWrap'		: dc.getElementById('admin-page-wrap'),
@@ -906,7 +1480,11 @@
 
 			// Bind events - the rail itself always stays visible, local
 			// "‹ Back" links inside each panel handle drilling back up a level
-			el.userLogout.addEventListener( 'click', function(){ Nino.auth.logout( '[[/nino/dir]]/_admin' ) } );
+			// The logout request goes out first and the page leaves in its answer,
+			// so the browser's own question would come after the session is gone
+			el.userLogout.addEventListener( 'click', function() {
+				Nino.admin.dirty.guard( null, function() { Nino.auth.logout( '[[/nino/dir]]/_admin' ) }, undefined, true );
+			} );
 			Object.keys( panels ).forEach( function( panel ) {
 				panels[panel][0].addEventListener( 'click', function(ev){ ev.preventDefault(); selectTab( panel ) } );
 			} );
@@ -946,6 +1524,15 @@
 			// to real user navigation)
 			selectTabFromHash();
 			wn.addEventListener( 'hashchange', selectTabFromHash );
+
+			// A form that failed to save is brought on screen by the name of
+			// its panel or tab - a tab first, since 'elements' is both
+			Nino.admin.dirty.init( function( name ) {
+				if( tabOwner[name] !== undefined )
+					selectTab( tabOwner[name], name );
+				else
+					selectTab( name );
+			} );
 
 		},
 

@@ -301,5 +301,78 @@ check( 'the danger zone is not rendered while creating a new type',
 	check( 'before the server has answered, no row offers one', unitInputs( { key : 'price', type : 'double' } ) === 0 );
 }
 
+
+// --- unsaved input: the element form next door --------------------------------
+//
+// Every write of a type ends in _invalidateElements(), which drops the Elements
+// form and what is typed into it. So a create, a save and a delete ask the shell
+// about that form first - and, saved from the shell's own question, ask nothing
+// a second time.
+{
+	const msg = { textContent : '' };
+	const confirm = { value : 'people' };
+	const nodes = { 'admin-form-msg' : msg, 'admin-form-delete-msg' : msg, 'admin-form-title' : { value : 'People' }, 'admin-form-uri' : { value : 'people' }, 'admin-form-delete-confirm' : confirm };
+	sandbox.document.getElementById = id => nodes[id] ?? null;
+	sandbox.document.querySelector = () => ( { checked : false } );
+	sandbox.Nino.adminUi = { api : { errorText : status => 'error '+ status } };
+	const calls = [];
+	elementTypes._buildModel = () => ( {} );
+	elementTypes._apiCall = ( endpoint, payload, callback ) => calls.push( { endpoint : endpoint, callback : callback } );
+	elementTypes.init = () => calls.push( { endpoint : 'init' } );
+	elementTypes._invalidateElements = () => calls.push( { endpoint : 'invalidate' } );
+	elementTypes._showList = () => {};
+	elementTypes._currentUri = 'people';
+	elementTypes._isNew = false;
+
+	// no registry: nothing is asked
+	elementTypes._save();
+	check( 'a shell without the registry asks nothing', calls.length === 1 && calls[0].endpoint === 'save' );
+
+	const asked = [];
+	sandbox.Nino.admin.dirty = { guard : ( names, proceed, onCancel ) => asked.push( { names : names, proceed : proceed, onCancel : onCancel } ), snapshot(){}, refresh(){} };
+	calls.length = 0;
+	let outcome = null;
+	elementTypes._save( ok => { outcome = ok } );
+	check( 'saving a type asks about the open element form first, and sends nothing before the answer', asked.length === 1 && JSON.stringify( asked[0].names ) === '["elements"]' && calls.length === 0 );
+	asked[0].onCancel();
+	check( '...a Cancel reports that the save did not happen', outcome === false && calls.length === 0 );
+	asked[0].proceed();
+	check( '...an answer sends it', calls.length === 1 && calls[0].endpoint === 'save' );
+	calls[0].callback( 200, { uri : 'people' } );
+	check( '...and the element form is dropped only after the type was written, which reports true', calls.map( c => c.endpoint ).join() === 'save,init,invalidate' && outcome === true );
+
+	asked.length = 0;
+	calls.length = 0;
+	elementTypes._isNew = true;
+	elementTypes._save();
+	asked[0].proceed();
+	check( 'creating a type asks the same', calls.length === 1 && calls[0].endpoint === 'create' );
+	elementTypes._isNew = false;
+
+	asked.length = 0;
+	calls.length = 0;
+	elementTypes._save( () => {}, true );
+	check( 'a save the shell already asked about does not ask again', asked.length === 0 && calls.length === 1 );
+
+	asked.length = 0;
+	calls.length = 0;
+	elementTypes._delete();
+	check( 'deleting a type asks first, too', asked.length === 1 && calls.length === 0 );
+	asked[0].proceed();
+	check( '...and sends the delete once answered', calls.length === 1 && calls[0].endpoint === 'delete' );
+
+	confirm.value = 'wrong';
+	asked.length = 0;
+	elementTypes._delete();
+	check( 'a delete whose confirmation does not match the uri asks nothing and does nothing', asked.length === 0 );
+	confirm.value = 'people';
+
+	const typesSource2 = fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Elements/assets/types.js' ), 'utf8' );
+	check( 'the type form is watched by the shell under its name, behind a check that the shell has the registry',
+		/if\( typeof Nino\.admin\.dirty === 'object' \)\s*Nino\.admin\.dirty\.watchForm\( 'types', function\(\) \{ return dc\.getElementById\('types-form'\) \}/.test( typesSource2 ) === true );
+	check( 'the uri typed to confirm a deletion is no edit of the type', typesSource2.includes( "confirmInput.dataset.dirty = 'ignore'" ) );
+	delete sandbox.Nino.admin.dirty;
+}
+
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

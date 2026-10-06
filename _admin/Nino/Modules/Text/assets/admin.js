@@ -28,6 +28,12 @@
 		_selectedLocale	: null,
 		_localeValues		: {},
 		_dirtyLocales		: [],
+		// What the controls of the open group held when they were drawn or last
+		// saved, key -> value: the global fields, and the translation on screen.
+		// A rich-text field reads back as the markup it built, which is not
+		// always the string the server holds, so a translation is edited when a
+		// control differs from this - not from the stored value
+		_baseline				: { global : {}, locale : {} },
 		_htmlEditors		: {},
 		_fieldEls				: {},
 		_loading				: false,
@@ -233,6 +239,7 @@
 			Nino.admin.text._selectedLocale = Nino.admin.sessionLocale.current ?? Nino.admin.text._locales[0] ?? '';
 			Nino.admin.text._localeValues 	= {};
 			Nino.admin.text._dirtyLocales 	= [];
+			Nino.admin.text._baseline 			= { global : {}, locale : {} };
 			Nino.admin.text._fieldEls 			= {};
 
 			Nino.admin.text._renderGroupForm();
@@ -380,8 +387,11 @@
 			const values = {};
 			entries.forEach( function( entry ) { values[entry.key] = Nino.admin.text._readKeyValue( entry ) } );
 
+			// Against what the controls held when they were drawn, where that is
+			// known (see _baseline); merely visiting a translation must not mark it
+			const baseline = Nino.admin.text._baseline.locale;
 			const changed = entries.some( function( entry ) {
-				return String( previous[entry.key] ?? '' ) !== String( values[entry.key] ?? '' );
+				return String( baseline[entry.key] ?? previous[entry.key] ?? '' ) !== String( values[entry.key] ?? '' );
 			} );
 
 			if( changed === true && Nino.admin.text._dirtyLocales.indexOf( locale ) === -1 )
@@ -426,6 +436,10 @@
 				return;
 			form.querySelectorAll('input, textarea, select, button').forEach( function( el ) { el.disabled = pending } );
 			form.querySelectorAll('a').forEach( function( el ) {
+				// Links inside a rich-text editor are its content: getValue() returns them, so
+				// writing attributes onto them would turn the field's value into a change
+				if( el.closest('[contenteditable]') !== null )
+					return;
 				el.setAttribute( 'aria-disabled', pending ? 'true' : 'false' );
 				el.style.pointerEvents = pending ? 'none' : '';
 			} );
@@ -461,6 +475,78 @@
 				const value = ( stored[entry.key] !== undefined ) ? stored[entry.key] : ( entry.values[Nino.admin.text._selectedLocale] ?? '' );
 				wrap.appendChild( Nino.admin.text._renderKeyField( entry, value ) );
 			} );
+
+			Nino.admin.text._captureBaseline( false );
+		},
+
+		/**
+		 *	Take what the controls on screen hold now as what is saved - the
+		 *	translation after it was drawn, the global fields too when the whole
+		 *	form was drawn or saved. A key this account may not write has no
+		 *	field to read
+		 *
+		 *	@param		{boolean}	withGlobal
+		 *
+		 *	@return		void
+		 */
+		_captureBaseline : function( withGlobal ) {
+
+			const entries = Nino.admin.text._groups[Nino.admin.text._currentGroup] ?? [];
+			const read = function( global ) {
+				const held = {};
+				entries.filter( function( entry ) { return entry.global === global && Nino.admin.text._writable( entry ) === true } ).forEach( function( entry ) {
+					held[entry.key] = Nino.admin.text._readKeyValue( entry );
+				} );
+				return held;
+			};
+
+			Nino.admin.text._baseline.locale = read( false );
+
+			if( withGlobal === true )
+				Nino.admin.text._baseline.global = read( true );
+		},
+
+		/**
+		 *	Whether the open group holds input nobody has saved - what the shell
+		 *	asks before it lets anything throw that away (see Nino.admin.dirty):
+		 *	a translation that was edited and left, or a writable field that
+		 *	differs from what it held when it was drawn or last saved
+		 *
+		 *	@return		{boolean}
+		 */
+		isDirty : function() {
+
+			const form = dc.getElementById('text-form');
+
+			if( form === null || Nino.admin.text._currentGroup === null || form.classList.contains('admin-hidden') === true || dc.getElementById('text-edit-form') === null )
+				return false;
+
+			if( Nino.admin.text._dirtyLocales.length > 0 )
+				return true;
+
+			const entries = Nino.admin.text._groups[Nino.admin.text._currentGroup] ?? [];
+
+			return entries.some( function( entry ) {
+				const held = entry.global === true ? Nino.admin.text._baseline.global : Nino.admin.text._baseline.locale;
+				return Nino.admin.text._writable( entry ) === true && held[entry.key] !== undefined && Nino.admin.text._readKeyValue( entry ) !== held[entry.key];
+			} );
+		},
+
+		/**
+		 *	Throw the input away: what is stored locally goes, the stored
+		 *	values the server sent stay, and what the controls show counts as
+		 *	saved. The form is about to be left or drawn again; if the exit then
+		 *	fails without drawing it (a refused request), the controls still show
+		 *	the discarded text and the next Save writes it
+		 *
+		 *	@return		void
+		 */
+		discard : function() {
+			Nino.admin.text._dirtyLocales = [];
+			Nino.admin.text._localeValues = {};
+			Nino.admin.text._captureBaseline( true );
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.refresh();
 		},
 
 		/**
@@ -576,6 +662,11 @@
 
 			if( localeEntries.length > 0 )
 				Nino.admin.text._renderLocaleFields();
+
+			Nino.admin.text._captureBaseline( true );
+
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.refresh();
 		},
 
 		/**
@@ -584,12 +675,27 @@
 		 *	Deliberately does not navigate back to the list afterwards - only
 		 *	refreshes its preview.
 		 *
+		 *	Every way this ends reports to done( ok ), if there is one: the
+		 *	shell's question about unsaved input saves through it and goes on
+		 *	only when it hears true (see Nino.admin.dirty.guard())
+		 *
+		 *	@param		{Function}	[done]				Called once with true when everything was written, false otherwise
+		 *
 		 *	@return		void
 		 */
-		_save : function() {
+		_save : function( done ) {
 
-			if( Nino.admin.text._saving === true )
+			const report = function( ok ) {
+				if( typeof Nino.admin.dirty === 'object' )
+					Nino.admin.dirty.refresh();
+				if( typeof done === 'function' )
+					done( ok );
+			};
+
+			if( Nino.admin.text._saving === true ) {
+				report( false );
 				return;
+			}
 
 			Nino.admin.text._storeVisibleLocaleFields();
 
@@ -623,6 +729,7 @@
 						Nino.admin.text._saving = false;
 						Nino.admin.text._setFormPending( false );
 						msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/text/error/save' );
+						report( false );
 						return;
 					}
 
@@ -649,6 +756,7 @@
 						Nino.admin.text._saving = false;
 						Nino.admin.text._setFormPending( false );
 						msg.textContent = Nino.content.getText('/_admin/text/error/save')+ ' ('+ failed.join(', ')+ ')';
+						report( false );
 						return;
 					}
 
@@ -666,11 +774,24 @@
 					Nino.admin.text._setFormPending( false );
 					msg.textContent = Nino.content.getText('/_admin/text/msg/saved');
 					Nino.admin.text._renderCategoryList();
+
+					// What the controls hold is what is stored now
+					Nino.admin.text._captureBaseline( true );
+					report( true );
 				} );
 			}
 
 			saveNextLocale();
 		},
 	};
+
+	// The shell asks before anything throws the open group's input away (see
+	// Nino.admin.dirty). A shell without the registry is simply not asking
+	if( typeof Nino.admin.dirty === 'object' )
+		Nino.admin.dirty.register( 'text', {
+			isDirty : Nino.admin.text.isDirty,
+			save		: function( done ) { Nino.admin.text._save( done ) },
+			discard : Nino.admin.text.discard,
+		} );
 
 })(window, document, document.documentElement, document.body);
