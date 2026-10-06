@@ -263,6 +263,12 @@ check( 'the Setup step seeds the css bundle with the delivered look and the proj
 check( '...and the two files it names are really in the project', is_file( $sandbox. '/private/assets/theme.css' ) === true && is_file( $sandbox. '/private/assets/style.css' ) === true
 	&& is_file( $sandbox. '/private/templates/frame-header.tpl' ) === true && is_file( $sandbox. '/private/templates/frame-footer.tpl' ) === true
 	&& is_file( $sandbox. '/public/fonts/league-spartan.woff2' ) === true );
+// A script in the project's assets is only ever loaded through a bundle - one
+// that no bundle names is a file that looks like the site's own hook and runs
+// nowhere
+$bundled = array_merge( ...array_values( array_map( 'array_values', $configAfterApply['/nino/html/assets'] + \Nino\AppData::DEFAULTS['/nino/html/assets'] ) ) );
+$unbundled = array_filter( glob( $sandbox. '/private/assets/*.js' ) ?: [], static fn( string $file ): bool => in_array( '/assets/'. basename( $file ), $bundled, true ) === false );
+check( 'the Setup step copies no script into the project that no bundle loads', $unbundled === [] );
 // The logo is a slot with nothing in it: the frames, the navigation and the
 // mails show it with [image /logo], and ship no picture of their own
 $logoSlot = $configAfterApply['/nino/html/images']['/logo'] ?? [];

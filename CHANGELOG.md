@@ -226,6 +226,11 @@ All notable changes to Nino are documented in this file.
 
 ### Removed
 
+- **Installer:** the base unit's `assets/script.js`, three empty hooks that no
+  bundle ever loaded. A new project no longer gets `private/assets/script.js`;
+  one set up earlier keeps its copy, which still loads nowhere and can be
+  deleted. A script of the project's own goes into a bundle of
+  `/nino/html/assets` to run.
 - **Workbench:** `style.css` rules and tokens nothing produces or reads:
   `.nino-admin-card[aria-disabled="true"]`, `.nino-admin-rail-actions`,
   `--admin-pane-pad`, and the class index in the file's header (AGENTS.md
