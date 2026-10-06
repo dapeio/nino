@@ -450,6 +450,17 @@ namespace Nino {
 			if( trim( $html ) === '' )
 				return '';
 
+			// A byte that is not utf-8 must not reach the parser: libxml 2.13 ends
+			// the text node at it and drops the rest of the value, silently,
+			// where 2.9 carried it on. It becomes the replacement character, the
+			// way a string field's does (see _sanitizeChildren())
+			if( preg_match( '//u', $html ) !== 1 ) {
+				$substitute = mb_substitute_character();
+				mb_substitute_character( 0xFFFD );
+				$html = mb_convert_encoding( $html, 'UTF-8', 'UTF-8' );
+				mb_substitute_character( $substitute );
+			}
+
 			$doc = new \DOMDocument();
 
 			// Wrapped in a tag no html has, not in a <div>: an unbalanced

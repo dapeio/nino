@@ -1344,6 +1344,17 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **A rich field lost everything behind an invalid byte on libxml 2.13.** The
+  sanitizer gave the value to `DOMDocument::loadHTML()` as it was; libxml 2.9
+  carried a byte that is not utf-8 on, 2.13 ends the text node at it and the
+  rest of the value was dropped, silently, on save. `Html::sanitizeHtml()`
+  now turns such a byte into the replacement character before parsing, the
+  way a string field's is handled, so the result is the same on every libxml.
+
+- **`tests/kernel-smoke.php` failed under `display_errors=On`.** The child
+  process the boot checks spawn printed the fatal to stdout, where the test
+  expected only what the script wrote. It runs with `display_errors=stderr`.
+
 - **Workbench, Elements:** a required field is marked and a refused save says
   where. A required field carries an asterisk after its name (`aria-hidden`,
   `.nino-admin-required`) and `aria-required` on its control - on the text box

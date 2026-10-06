@@ -5117,7 +5117,10 @@ function runIsolated( string $body, string $beforeRequire = '' ): array {
 	// syntax error
 	$script = $beforeRequire. ' require '. var_export( __DIR__. '/../_nino/Nino.php', true ). '; '. $body;
 	$descriptors = [ 1 => [ 'pipe', 'w' ], 2 => [ 'pipe', 'w' ] ];
-	$process = proc_open( [ PHP_BINARY, '-r', $script ], $descriptors, $pipes );
+	// display_errors=stderr: with display_errors=On, which php.ini-development
+	// and every Homebrew/Herd/MAMP php carry, the cli writes a fatal to stdout
+	// and the check against what the script printed reads the message too
+	$process = proc_open( [ PHP_BINARY, '-d', 'display_errors=stderr', '-r', $script ], $descriptors, $pipes );
 	$stdout = stream_get_contents( $pipes[1] );
 	fclose( $pipes[1] );
 	fclose( $pipes[2] );
