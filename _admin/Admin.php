@@ -135,9 +135,10 @@ namespace Nino\Admin {
 
 			$appData['/nino/html/assets']['/_admin/.cache/style.css'] = array_values( array_unique( $styles ) );
 			$appData['/nino/html/assets']['/_admin/.cache/script.js'] = array_values( array_unique( $scripts ) );
+			// The login page is no workbench: the framework and its own
+			// shell, without the kit the panels are built with
 			$appData['/nino/html/assets']['/_admin/.cache/login.js'] = [
 				'/_nino/Nino.js',
-				'/_admin/assets/Nino.admin.js',
 				'/_admin/assets/login.js',
 			];
 

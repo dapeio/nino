@@ -13,6 +13,10 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Workbench:** the login page's bundle no longer carries
+  `_admin/assets/Nino.admin.js`, the kit the panels are built with -
+  `login.js` uses none of it. The page loads about 2,500 fewer lines.
+
 - **Http:** the request's header array carries request headers only.
   `\Nino\Http::filterHeaderFields()` no longer lets through `Location`,
   `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`,

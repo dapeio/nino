@@ -170,6 +170,10 @@ check( 'the panel\'s script joins the editor bundle', in_array( '/app/Dummy/asse
 check( 'the panel\'s stylesheet joins the style bundle', in_array( '/app/Dummy/assets/dummy.css', $withModule['/nino/html/assets']['/_admin/.cache/style.css'], true ) === true );
 check( 'the core files still lead the script bundle', $withModule['/nino/html/assets']['/_admin/.cache/script.js'][0] === '/_nino/Nino.js' );
 
+// The login page is no workbench: the kit the panels are built with
+// (Nino.admin.js) is not in its bundle, and neither is any panel's script
+check( 'the login bundle is the framework and the login shell alone', $withModule['/nino/html/assets']['/_admin/.cache/login.js'] === [ '/_nino/Nino.js', '/_admin/assets/login.js' ] );
+
 $navHtml = \Nino\Admin\Admin::navHtml( $withModule );
 check( 'the nav carries one link per panel, the module\'s included, named for the shell script', str_contains( $navHtml, 'id="admin-nav-dummy" data-panel="dummy"' ) === true && str_contains( $navHtml, 'id="admin-nav-text" data-panel="text"' ) === true );
 check( 'a literal label is escaped for html and against the fill syntax', str_contains( $navHtml, 'Dummy &lt;Panel&gt;' ) === true );
