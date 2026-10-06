@@ -4456,12 +4456,10 @@ $emptyRequest = [ '/nino/http/response' => [ 'header' => [ 'Content-Security-Pol
 \Nino\Modules\Jstext::callbackResponse( $appData, $emptyRequest );
 check( 'an empty policy gets the directive and no stray separator', $emptyRequest['/nino/http/response']['header']['Content-Security-Policy'] === "script-src 'self' 'nonce-". $appData['./nino/jstext/nonce']. "'" );
 
-/*	The nonce reaches the page twice - raw in the script tag, and json
-	encoded in the block beside it - and json_encode() escapes a '/' as
-	'\\/'. A base64 nonce carries one about a third of the time, and
-	Modules\Cache::_stamp() re-stamped the raw one only, so a stored page
-	kept the render-time nonce in its json for as long as the entry lived.
-	Hex carries no character json touches	*/
+/*	The nonce is hex: a base64-value token, as a nonce must be, written with
+	no character json_encode() or html escapes - so it reads the same wherever
+	a module writes it, and Modules\Cache::_stamp(), which swaps it by its raw
+	string, finds every copy	*/
 $freshNonceData = $appData;
 unset( $freshNonceData['./nino/jstext/nonce'] );
 \Nino\Modules\Jstext::init( $freshNonceData );
@@ -4512,6 +4510,14 @@ check( 'the three groups are the form\'s messages, the newsletter\'s and the sli
 	&& ( $jstextTable['/feature/newsletter/info/success'] ?? null ) === 'Eingetragen' && isset( $jstextTable['/template/common/label/phone'] ) === false );
 check( 'the contact form\'s welcome text is no key any more, so nothing of it is published', isset( $jstextTable['/module/form/info/welcome'] ) === false
 	&& str_contains( (string) file_get_contents( dirname( __DIR__ ). '/_nino/Nino/Modules/Form/install/text/en_US.php' ), '/form/info/welcome' ) === false );
+
+// The nonce belongs in the script tag and the policy, nowhere else: no script
+// reads it from the table, and every copy of it is one more place a stored
+// page has to be stamped again
+$jstextBlock = \Nino\Modules\Jstext::doShortcode( $appData, [] );
+check( 'the table carries no nonce - the script tag is the one place in the block that does', isset( $jstextTable['/nino/jstext/nonce'] ) === false
+	&& substr_count( $jstextBlock, (string) $appData['./nino/jstext/nonce'] ) === 1
+	&& str_starts_with( $jstextBlock, '<script nonce="'. $appData['./nino/jstext/nonce']. '">' ) === true );
 
 // A project or a feature whose own script reads a fill says so
 $appData[ \Nino\Modules\Jstext::KEYS ] = [ '/project/company/' ];

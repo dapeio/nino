@@ -253,6 +253,13 @@ All notable changes to Nino are documented in this file.
 
 ### Removed
 
+- **Jstext:** the key `/nino/jstext/nonce` in the `[jstext]` table. No script
+  read it, and the nonce already stands in the `<script nonce="...">` tag and
+  the Content-Security-Policy; the copy in the json was the one a stored page
+  had to have stamped again. A page whose words match no published prefix now
+  carries `NinoJstext=[];`, which `Nino.content.getText()` reads as before.
+  `getText('/nino/jstext/nonce')`, never documented, now answers `''`.
+
 - **Installer:** the base unit's `label`, which nothing read - base is applied,
   never offered.
 
