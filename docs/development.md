@@ -507,7 +507,7 @@ Modules are activated in `/nino/modules`. The order of the array is relevant if 
 | Module | Integration | Key Features |
 | --- | --- | --- |
 | `Assets` | `[assets ...]` | bundles, caches, and optionally minifies CSS/JS |
-| `Cache` | `/nino/http/response`, priority 9; `/nino/http/output` | while `/nino/cache/status` is on, answers an anonymous `GET` from a stored copy and stores every finished page it may; a write through `/_admin` drops the lot |
+| `Cache` | `/nino/http/response`, priority 9; `/nino/http/output`, priority 9 | while `/nino/cache/status` is on, answers an anonymous `GET` from a stored copy and stores every finished page it may, with the `Content-Security-Policy` it was sent with; a write through `/_admin` drops the lot |
 | `Csrf` | `[csrf]` | renders a hidden token field; core protection itself is always active |
 | `Elements` | `[element ...]`, `[elements ...]`, `[elementvalues ...]` | loads typed content; lists support query, `sort`, `offset`, `limit`, and optional callback, and `[elementvalues]` loops the distinct values of one field |
 | `Form` | `POST://.form` | owns the one form endpoint and hands every submission to `\Nino\Form` - see [Forms](#forms) below |
@@ -949,6 +949,7 @@ The following table lists the most important hooks used by the kernel and integr
 | `/nino/http/request` | complete `$request` | supplement normalized request before routing |
 | `/nino/http/response` | complete `$request` | global processing of every response; CSRF, among others, applies here |
 | `/nino/http/response/<METHOD>:/<uri>` | complete `$request` | behavior of a resolved route |
+| `/nino/http/output` | complete `$request`, finished | the one hook with the rendered body and the final header in hand, just before they are sent; a module that adapts the response to what the page actually contains (a `Content-Security-Policy` source for a host the page uses) registers here, since `/nino/http/response` runs before the body exists. Runs in priority order, and `Modules\Cache` stores the page at priority 9, so a callback at the default 5 is part of what it stores. It does not run for a page the cache answers or for the maintenance page, which are sent from inside the response phase; of what a callback here changes, a hit carries the body and the `Content-Security-Policy` (stored by `Modules\Cache` at priority 9, so a change made at the default 5 is in them) and nothing else |
 | `/nino/html/shortcode/<name>` | shortcode arguments | handler of a registered shortcode |
 | `/nino/html/render` | HTML string | final global post-processing of rendered HTML |
 | `/nino/shortcodes/assets/output/<extension>` | link or script template | adapt HTML of the assets shortcode for a file type |

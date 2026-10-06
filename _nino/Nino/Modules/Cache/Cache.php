@@ -40,6 +40,16 @@ namespace Nino\Modules {
 	 *											the header keeps the nonce Jstext just generated. Serving
 	 *											before the boot would mean giving up one or the other.
 	 *
+	 *											The Content-Security-Policy the page was sent with is
+	 *											stored beside it, nonce as a marker, and put back on a
+	 *											hit. A hit never renders, so a module that widens the
+	 *											policy for what a page uses (an embed's frame-src, a
+	 *											consent placeholder's script-src) would not run for it,
+	 *											and the page would be served under the narrower default.
+	 *											That is why the output callback runs at priority 9: after
+	 *											every callback at a lower priority, a feature's at the
+	 *											default 5 among them, so the stored policy is the final one.
+	 *
 	 *											What is never cached, regardless of configuration: any
 	 *											method but GET, anything with query vars, any uri under
 	 *											/_admin (the workbench - see TOOL_PREFIXES) or /. (module
@@ -83,15 +93,18 @@ namespace Nino\Modules {
 		 */
 		public static function init( array &$appData ): void {
 
-			// Priority 9, ie. after \Nino\Csrf (1) and Modules\Jstext (5): a hit
+			// Priority 9, ie. after \Nino\Csrf (1) and Modules\Jstext (0): a hit
 			// is answered from inside this callback and never reaches the render,
 			// so everything that composes the response header has to have run
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response', [ self::class, 'callbackResponse' ], 9 );
 
 			// The only hook with a finished body in hand - registered whether or
 			// not the cache is on, so that switching it off (itself a write
-			// through /_admin) still drops what is stored
-			\Nino\Callbacks::registerCallback( $appData, '/nino/http/output', [ self::class, 'callbackOutput' ] );
+			// through /_admin) still drops what is stored. Priority 9 as well:
+			// it stores the policy, and a feature widens that in its own output
+			// callback (priority 5, and features initialise after the kernel's
+			// modules) - stored earlier, it would be the unwidened one
+			\Nino\Callbacks::registerCallback( $appData, '/nino/http/output', [ self::class, 'callbackOutput' ], 9 );
 		}
 
 		/**
@@ -152,6 +165,13 @@ namespace Nino\Modules {
 			if( is_string( $entry['locale'] ?? null ) === true && $entry['locale'] !== '' )
 				\Nino\Locales::setCurrentLocale( $appData, $entry['locale'] );
 
+			// The policy the page was sent with, widened by whatever the
+			// features that rendered it added. Without one (an entry from
+			// before the policy was stored, or a page sent without any) the
+			// header composed by the response callbacks stands
+			if( is_string( $entry['csp'] ?? null ) === true && $entry['csp'] !== '' )
+				$request['/nino/http/response']['header']['Content-Security-Policy'] = self::_stamp( $appData, $entry['csp'], false );
+
 			$request['/nino/http/response']['body'] 									= self::_stamp( $appData, $entry['body'], false );
 			$request['/nino/http/response']['header']['X-Nino-Cache']	= 'hit';
 
@@ -196,10 +216,13 @@ namespace Nino\Modules {
 			// the cache is doing anything is only visible by timing the request
 			$request['/nino/http/response']['header']['X-Nino-Cache'] = 'miss';
 
+			$policy = $request['/nino/http/response']['header']['Content-Security-Policy'] ?? '';
+
 			\Nino\Filesystem::putFileContent( $appData, self::DIR. '/'. self::_key( $request ). '.php', [
 				'expires'	=> time() + self::_ttl( $appData ),
 				'locale'	=> (string) ( $request['/nino/http/response']['locale'] ?? '' ),
 				'body' 		=> self::_stamp( $appData, $body, true ),
+				'csp' 		=> is_string( $policy ) === true ? self::_stamp( $appData, $policy, true ) : '',
 			] );
 		}
 

@@ -6037,6 +6037,51 @@ check( '...carrying this request\'s token and nonce, with no marker left in it',
 check( '...and saying so in the header', ( $hit['/nino/http/response']['header']['X-Nino-Cache'] ?? '' ) === 'hit' );
 check( '...with the locale the page was rendered in applied to the session', \Nino\Locales::getCurrentLocale( $appData ) === 'de_DE' );
 
+// --- the policy a feature widened -------------------------------------------
+//
+// A hit never renders, so the policy a module widened for what the page uses
+// (an embed's frame-src) has to come out of the entry. The output callback
+// runs at priority 9 so that it stores what the features' own priority 5
+// callbacks made of it, and the nonce in it is the request's, not the stored one.
+
+\Nino\Modules\Cache::_invalidate( $appData );
+$outputCallbacks = $appData['./nino/callbacks']['/nino/http/output'] ?? null;
+$appData['./nino/jstext/nonce'] = 'policy-render-nonce';
+$widened = cacheRequest( '/home', 'GET', [ 'header' => [ 'Content-Security-Policy' => "default-src 'self'; script-src 'self' 'nonce-policy-render-nonce'" ] ] );
+$freshData = [];
+\Nino\Modules\Cache::init( $freshData );
+check( 'the module registers its output callback at priority 9, after the features\' own', in_array( [ \Nino\Modules\Cache::class, 'callbackOutput' ], $freshData['./nino/callbacks']['/nino/http/output'][9] ?? [], true ) === true );
+\Nino\Callbacks::registerCallback( $appData, '/nino/http/output', [ \Nino\Modules\Cache::class, 'callbackOutput' ], 9 );
+\Nino\Callbacks::registerCallback( $appData, '/nino/http/output', static function( array &$appData, array &$request ): void {
+	$request['/nino/http/response']['header']['Content-Security-Policy'] .= "; frame-src 'self' https://www.youtube-nocookie.com";
+} );
+\Nino\Callbacks::doCallbacks( $appData, '/nino/http/output', $widened );
+$policyEntry = \Nino\Filesystem::getFileContent( $appData, '/data/cache/'. sha1( '/home|de_DE' ). '.php', [] );
+check( 'the stored entry keeps the policy a feature widened in the output phase, though Cache\'s callback registered first', str_contains( $policyEntry['csp'] ?? '', "frame-src 'self' https://www.youtube-nocookie.com" ) === true );
+check( '...with the nonce as a marker, not the one of the request that rendered it', str_contains( $policyEntry['csp'] ?? '', 'policy-render-nonce' ) === false
+	&& str_contains( $policyEntry['csp'] ?? '', "'nonce-@@nino-cache-nonce-2f8a@@'" ) === true );
+
+$appData['./nino/jstext/nonce'] = 'policy-hit-nonce';
+$policyHit = cacheRequest( '/home', 'GET', [ 'body' => '', 'header' => [ 'Content-Security-Policy' => "default-src 'self'; script-src 'self' 'nonce-policy-hit-nonce'" ] ] );
+check( 'a hit on that entry is served', \Nino\Modules\Cache::_prepare( $appData, $policyHit ) === true );
+check( '...under the widened policy', str_contains( $policyHit['/nino/http/response']['header']['Content-Security-Policy'], "frame-src 'self' https://www.youtube-nocookie.com" ) === true );
+check( '...carrying this request\'s nonce and no marker', str_contains( $policyHit['/nino/http/response']['header']['Content-Security-Policy'], "'nonce-policy-hit-nonce'" ) === true
+	&& str_contains( $policyHit['/nino/http/response']['header']['Content-Security-Policy'], '@@nino-cache' ) === false );
+
+// An entry without a policy (stored by an earlier kernel, or a page sent
+// without one) keeps the header the response callbacks composed
+unset( $policyEntry['csp'] );
+\Nino\Filesystem::putFileContent( $appData, '/data/cache/'. sha1( '/home|de_DE' ). '.php', $policyEntry );
+$bareHit = cacheRequest( '/home', 'GET', [ 'body' => '', 'header' => [ 'Content-Security-Policy' => "default-src 'self'" ] ] );
+check( 'an entry without a stored policy is still served', \Nino\Modules\Cache::_prepare( $appData, $bareHit ) === true );
+check( '...and leaves the composed header as it was', $bareHit['/nino/http/response']['header']['Content-Security-Policy'] === "default-src 'self'" );
+
+if( $outputCallbacks === null )
+	unset( $appData['./nino/callbacks']['/nino/http/output'] );
+else
+	$appData['./nino/callbacks']['/nino/http/output'] = $outputCallbacks;
+$appData['./nino/jstext/nonce'] = 'the-next-requests-nonce';
+
 // An entry past its lifetime is not served - and goes, rather than sitting
 // there being read and rejected on every request until the next invalidation
 $expiredPath = \Nino\Filesystem::path( $appData, '/data/cache/'. sha1( '/home|de_DE' ). '.php' );
@@ -6283,7 +6328,7 @@ $hookApp['./nino/callbacks'] = [];
 \Nino\Modules\Maintenance::init( $hookApp );
 foreach( $hookApp['./nino/callbacks']['/nino/http/output'][9] ?? [] as $hook )
 	$registered[] = $hook;
-check( 'init() registers the banner on /nino/http/output after Cache\'s own callback (priority 5)', $registered === [ [ \Nino\Modules\Maintenance::class, 'callbackOutput' ] ] );
+check( 'init() registers the banner on /nino/http/output beside Cache\'s own callback (priority 9)', $registered === [ [ \Nino\Modules\Maintenance::class, 'callbackOutput' ] ] );
 
 // The fallback page renders both fills - a project's own text (however it
 // got there) always wins over the hardcoded default

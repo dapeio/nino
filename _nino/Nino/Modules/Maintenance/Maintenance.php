@@ -147,10 +147,11 @@ namespace Nino\Modules {
 
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response', [ self::class, 'callbackResponse' ], 1 );
 
-			// After Modules\Cache's own output callback (5): what it stores is
-			// the page as it was rendered, and a signed-in account is never
-			// served from it or written to it anyway - the banner is for
-			// exactly them
+			// Priority 9, beside Modules\Cache's own output callback (also 9,
+			// and listed before this module, so it runs first). Either order is
+			// safe: a signed-in account is never served from the cache or
+			// written to it, and the switch turns the cache off - the banner is
+			// for exactly them
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/output', [ self::class, 'callbackOutput' ], 9 );
 		}
 

@@ -1147,6 +1147,30 @@ All notable changes to Nino are documented in this file.
   non-ascii text (a German label of 241 bytes); it now cuts at the same bound on
   a character boundary, as `posted()` does.
 
+- **Cache:** a cached page keeps the policy its features widened. A hit never
+  renders, so a module that adds a source to the `Content-Security-Policy`
+  for what a page uses (a feature's output callback on `/nino/http/output`,
+  such as the host of an embedded frame) did not run for it, and the page was
+  served under the narrower default policy - and the embed or script was
+  blocked - for as long as the entry lived. `Modules\Cache` now stores the
+  policy the page was sent with beside its body, the `[jstext]` nonce held as
+  the same marker the body uses, and puts it back on a hit with that
+  request's own nonce, so the nonce still never outlives its response. This
+  needs the callback to run after a feature's own:
+  `Modules\Cache::callbackOutput()` is registered at priority 9 (it was 5, and
+  kernel modules initialise before features, so it ran before a feature's own
+  and would have stored the unwidened policy). An entry stored before has no policy and keeps the header
+  the response callbacks composed, as it did. The Callback Reference lists
+  `/nino/http/output`, which it did not (only the Cache row named it).
+  Upgrade note for third-party modules: a project's own `/nino/http/output`
+  callback at the default priority now runs before the store, so what it writes
+  into the body or the policy is cached and served until the entry expires;
+  before, Cache was registered first at 5 and stored ahead of it.
+  `tests/kernel-smoke.php` holds the registration, a policy widened by a
+  callback at the default priority, registered after Cache's own as a
+  feature's is, coming out of the entry on a hit with the hit's nonce, and an
+  entry without a policy (1039 → 1047 checks).
+
 ### Removed
 
 - **The typed permission field of the Roles form** and its four `custom-*`

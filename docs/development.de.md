@@ -492,7 +492,7 @@ Module werden in `/nino/modules` aktiviert. Die Reihenfolge des Arrays ist relev
 | Modul | Integration | Wichtige Eigenschaften |
 | --- | --- | --- |
 | `Assets` | `[assets …]` | bündelt, zwischenspeichert und optional minifiziert CSS/JS |
-| `Cache` | `/nino/http/response`, Priorität 9; `/nino/http/output` | beantwortet, solange `/nino/cache/status` an ist, ein anonymes `GET` aus einer gespeicherten Kopie und legt jede fertige Seite ab, die es ablegen darf; ein Schreibvorgang über `/_admin` verwirft den gesamten Cache |
+| `Cache` | `/nino/http/response`, Priorität 9; `/nino/http/output`, Priorität 9 | beantwortet, solange `/nino/cache/status` an ist, ein anonymes `GET` aus einer gespeicherten Kopie und legt jede fertige Seite ab, die es ablegen darf, mit der `Content-Security-Policy`, mit der sie gesendet wurde; ein Schreibvorgang über `/_admin` verwirft den gesamten Cache |
 | `Csrf` | `[csrf]` | rendert ein verstecktes Token-Feld; der Kernschutz selbst ist immer aktiv |
 | `Elements` | `[element …]`, `[elements …]`, `[elementvalues …]` | lädt typisierte Inhalte; Listen unterstützen Query, `sort`, `offset`, `limit` und optionalen Callback, und `[elementvalues]` durchläuft die verschiedenen Werte eines Feldes |
 | `Form` | `POST://.form` | besitzt den einen Formular-Endpunkt und reicht jede Einsendung an `\Nino\Form` weiter – siehe [Formulare](#formulare) |
@@ -929,6 +929,7 @@ Die folgende Tabelle nennt die wichtigsten vom Kernel und den integrierten Modul
 | `/nino/http/request` | kompletter `$request` | normalisierten Request vor dem Routing ergänzen |
 | `/nino/http/response` | kompletter `$request` | globale Bearbeitung jeder Response; hier greift unter anderem CSRF |
 | `/nino/http/response/<METHOD>:/<uri>` | kompletter `$request` | Verhalten einer aufgelösten Route |
+| `/nino/http/output` | kompletter `$request`, fertig | der einzige Hook, der den gerenderten Body und den endgültigen Header kurz vor dem Senden in der Hand hat; ein Modul, das die Antwort an das anpasst, was die Seite tatsächlich enthält (eine Quelle der `Content-Security-Policy` für einen Host, den die Seite nutzt), registriert sich hier, denn `/nino/http/response` läuft, bevor der Body existiert. Läuft nach Priorität, und `Modules\Cache` legt die Seite mit Priorität 9 ab; ein Callback mit der Standardpriorität 5 ist also Teil dessen, was gespeichert wird. Er läuft nicht für eine Seite, die der Cache beantwortet, und nicht für die Wartungsseite – beide werden schon in der Response-Phase gesendet; von dem, was ein Callback hier ändert, trägt ein Treffer den Body und die `Content-Security-Policy` (von `Modules\Cache` mit Priorität 9 gespeichert, eine Änderung mit der Standardpriorität 5 ist also darin) und sonst nichts |
 | `/nino/html/shortcode/<name>` | Shortcode-Argumente | Handler eines registrierten Shortcodes |
 | `/nino/html/render` | HTML-String | letzte globale Nachbearbeitung des gerenderten HTML |
 | `/nino/shortcodes/assets/output/<extension>` | Link- oder Script-Template | HTML des Assets-Shortcodes für einen Dateityp anpassen |
