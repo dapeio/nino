@@ -133,9 +133,16 @@ const document = {
 	documentElement : documentElement,
 	getElementById : function() { return null },
 	querySelector : function() { return null },
+	// Answers a selector list the way a browser does: every form on the page
+	// that matches any of its parts - '.a' or '.a:not(.b)' - once, in page order
 	querySelectorAll : function( selector ) {
-		if( selector === '.nino-newsletter-form' ) return newsletterForms;
-		return selector === '.nino-form:not(.nino-newsletter-form)' ? forms : [];
+		return forms.concat( newsletterForms ).filter( function( candidate ) {
+			return selector.split( ',' ).some( function( part ) {
+				const match = /^\.([\w-]+)(?::not\(\.([\w-]+)\))?$/.exec( part.trim() );
+				return match !== null && candidate.classList.contains( match[1] ) === true
+					&& ( match[2] === undefined || candidate.classList.contains( match[2] ) === false );
+			} );
+		} );
 	},
 	createElement : function() { return { classList : classList(), style : {}, setAttribute : function() {}, appendChild : function() {} } },
 	addEventListener : function() {},
@@ -532,6 +539,53 @@ signupConsent.checked = true;
 signup.submit();
 check( 'ticked, the signup is sent with the box reading as ticked', sent.length === 1 && sent[0].uri === '/.newsletter' && sent[0].data.email === 'reader@example.com' && sent[0].data.consent === 'on' );
 check( '...and the mark is gone from the box', signupConsent.classList.contains('nino-is-error') === false && signupConsent.getAttribute('aria-invalid') === null );
+
+
+// --- One handler for both kinds -----------------------------------------
+
+/*	The signup had a handler of its own, a copy of the contact form's kept in
+	step by hand, and it fell behind: it never asked the browser about a url,
+	a number or a date. A signup is a form with other words and another
+	endpoint - and a signup written with only .nino-newsletter-form, as the
+	Newsletter feature describes it, is driven all the same	*/
+const signupOnly = form();
+signupOnly.classList = classList( [ 'nino-newsletter-form' ] );
+signupOnly.fieldList.length = 0;
+const signupSite = field( 'website', 'url', 'my site', false, false );
+signupSite.validity = { typeMismatch : true, badInput : false };
+signupOnly.fieldList.push( field( 'email', 'email', 'reader@example.com', true, false ), signupSite );
+newsletterForms.push( signupOnly );
+sandbox.Nino.ui.onReady();
+
+check( 'a signup and a contact form are submitted by one and the same handler', typeof signupOnly.listeners.submit === 'function' && signupOnly.listeners.submit === forms[0].listeners.submit );
+
+// Refused first - in the address text, since the Newsletter feature has no
+// "invalid" one and an empty line would say nothing - then corrected
+sent.length = 0;
+signupOnly.submit();
+const refusedSignup = sent.length === 0 && signupOnly.msg.textContent === 'Please enter a valid address.' && signupSite.getAttribute('aria-invalid') === 'true';
+signupSite.validity = { typeMismatch : false, badInput : false };
+signupSite.value = 'https://example.com';
+signupOnly.submit();
+respond( sent.length - 1, 200 );
+check( 'a signup refuses a url the browser calls invalid in its own words, and corrected posts to /.newsletter and answers in them',
+	refusedSignup === true && sent.length === 1 && sent[0].uri === '/.newsletter' && signupOnly.msg.textContent === 'You are signed up.' );
+
+/*	The same stand-in on a contact form, on a site installed before the Form
+	module had an "invalid" text: getText() answers '' for it, and an empty
+	refusal blocked the submit while saying nothing	*/
+delete sandbox.Nino.content.text['/module/form/info/invalid'];
+const contactSite = form();
+forms.push( contactSite );
+sandbox.Nino.ui.onReady();
+contactSite.fill( { name : 'Someone', email : 'someone@example.com', message : 'Hello.' } );
+const contactUrl = field( 'website', 'url', 'my site', false, false );
+contactUrl.validity = { typeMismatch : true, badInput : false };
+contactSite.fieldList.push( contactUrl );
+sent.length = 0;
+contactSite.submit();
+check( 'a contact form without that text refuses in the address text rather than an empty line', sent.length === 0 && contactSite.msg.textContent === 'Please enter a valid email address.' );
+sandbox.Nino.content.text['/module/form/info/invalid'] = 'Please check your entries.';
 
 
 // --- A toast nobody was told about --------------------------------------

@@ -13,6 +13,20 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Public script:** a newsletter signup is submitted by the contact form's
+  handler. `Nino.ui.js` carried a copy of it for `.nino-newsletter-form`,
+  kept in step by hand, which had fallen behind: a signup with a url, number
+  or date field was sent without asking the browser about it. One handler
+  binds `.nino-form, .nino-newsletter-form` now - a form with only the
+  newsletter class stays bound - and takes the words and the default
+  endpoint by that class: `/feature/newsletter/info/*` and `/.newsletter`,
+  else `/module/form/info/*` and `/.form`. A refusal for such a field shows
+  the address text where the site has no `invalid` text (the Newsletter
+  feature has none), on a contact form as well, rather than an empty line. No
+  markup, text key or style changes. `tests/nino-ui-form-js-smoke.js` holds
+  one handler for both kinds, the newsletter-only form's refusal, endpoint and
+  words, and the fallback (59 → 62 checks, 3 red before); its document
+  stand-in answers a selector list instead of two fixed strings.
 - **Public script:** `Nino.ui.onReady()` no longer writes what nothing reads.
   `<body>` gets no `client-mobile`/`client-desktop` class and a form field's
   wrapper no `empty` class - both outside the `nino-` namespace and styled by

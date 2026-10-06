@@ -111,7 +111,7 @@
 		/**
 		 *	Make the paragraph a form writes its answer into a live region.
 		 *
-		 *	Both handlers write the validation error and the server's verdict
+		 *	The form handler writes the validation error and the server's verdict
 		 *	into the form's first <p>, and that paragraph is a project's own
 		 *	markup - the shipped contact template's, a template a project wrote
 		 *	itself, a preset the Template Builder composed. None of them can be
@@ -178,14 +178,12 @@
 					backToTop	: dc.querySelectorAll( '.nino-back-to-top' ),
 					cover			: dc.querySelectorAll( '.nino-cover' ),
 					filter		: dc.querySelectorAll( '.nino-filter' ),
-					// .nino-newsletter-form opts out - it keeps .nino-form only for the
-					// shared success/error/pending styling, its own submit handler
-					// below binds it separately (needs its own "already subscribed"
-					// vs "new signup" messaging, not just a generic success/error pair)
-					form			: dc.querySelectorAll( '.nino-form:not(.nino-newsletter-form)' ),
+					// Both kinds, by either class: a signup written with only
+					// .nino-newsletter-form is driven as well, and one comma selector
+					// lists a form carrying both classes once
+					form			: dc.querySelectorAll( '.nino-form, .nino-newsletter-form' ),
 					modal			: dc.querySelectorAll( '.nino-modal' ),
 					modalTrigger	: dc.querySelectorAll( '.nino-modal-trigger' ),
-					newsletterForm	: dc.querySelectorAll( '.nino-newsletter-form' ),
 					parallex	: dc.querySelectorAll( '.nino-parallex' ),
 					preloader	: dc.querySelectorAll( '.nino-preloader' ),
 					slider		: dc.querySelectorAll( '.nino-slider' ),
@@ -822,13 +820,35 @@
 
 
 			/*
-			 *	nino-form
+			 *	nino-form, nino-newsletter-form - one handler for both. A signup
+			 *	differs from a contact form in its words and its endpoint alone,
+			 *	both chosen per form by the .nino-newsletter-form class: the
+			 *	Newsletter feature's /feature/newsletter/info/ texts and
+			 *	/.newsletter, else the Form module's /module/form/info/ and
+			 *	/.form. The signup endpoint answers the same way whether or not
+			 *	the address was on the list already - anything else lets anyone
+			 *	test whether a given address is subscribed - so there is no
+			 *	outcome of its own to show for that case.
 			 */
 			if( e.form.length > 0 ) {
 
 				let
 					/**
-					 *	Handle a .nino-form's xhr response: disable the form and
+					 *	One of the form's own texts
+					 *
+					 *	@param		{Element}	form						The form, its .newsletter set when it was bound
+					 *	@param		{string}	which						required, email, invalid, success or error
+					 *
+					 *	@return		{string}							The text, '' where the site has none
+					 */
+					formText = function( form, which ) {
+						return form.newsletter === true
+							? Nino.content.getText('/feature/newsletter/info/'+ which)
+							: Nino.content.getText('/module/form/info/'+ which);
+					},
+
+					/**
+					 *	Handle a form's xhr response: disable the form and
 					 *	show a success/error message. Bound as `this.form` before use.
 					 *
 					 *	@param		{XMLHttpRequest}	xhr				Completed (normalized) xhr
@@ -868,8 +888,8 @@
 						} );
 
 						this.form.msg.textContent = ( xhr.status === 400 )
-							? ( ( typed === true ? Nino.content.getText('/module/form/info/invalid') : '' ) || Nino.content.getText('/module/form/info/email') )
-							: Nino.content.getText('/module/form/info/'+ ( ok === true ? 'success' : 'error' ));
+							? ( ( typed === true ? formText( this.form, 'invalid' ) : '' ) || formText( this.form, 'email' ) )
+							: formText( this.form, ok === true ? 'success' : 'error' );
 
 						// Only a delivered message locks the form down. Disabling every
 						// field on any response left a visitor who mistyped their address
@@ -884,7 +904,7 @@
 					},
 
 					/**
-					 *	Validate and submit a .nino-form via xhr; blocks submission
+					 *	Validate and submit a form via xhr; blocks submission
 					 *	until all required fields are filled and any email field is valid
 					 *
 					 *	@param		{Event}		e								Submit event
@@ -969,7 +989,7 @@
 								&& ( this.fields[i].type === 'checkbox' ? this.fields[i].checked !== true : this.fields[i].value.length === 0 ) ) {
 								Nino.ui._markField( this.fields[i], true );
 								firstRefused = firstRefused ?? this.fields[i];
-								error = Nino.content.getText('/module/form/info/required');
+								error = formText( this, 'required' );
 							}
 
 							// Check email. The local part uses the character set the html
@@ -984,7 +1004,7 @@
 							if( error === false && this.fields[i].type === 'email' && ( /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/.test(this.fields[i].value) === false ) ) {
 								Nino.ui._markField( this.fields[i], true );
 								firstRefused = firstRefused ?? this.fields[i];
-								error = Nino.content.getText('/module/form/info/email');
+								error = formText( this, 'email' );
 							}
 
 							// A url, a number and a date are validated by Form::validate()
@@ -1005,7 +1025,11 @@
 									|| ( this.fields[i].value.length > 0 && this.fields[i].validity.typeMismatch === true ) ) ) {
 								Nino.ui._markField( this.fields[i], true );
 								firstRefused = firstRefused ?? this.fields[i];
-								error = Nino.content.getText('/module/form/info/invalid');
+								// The Newsletter feature has no text of that name, and a
+								// site installed before the Form module had one has none
+								// either: an empty one would refuse the submit and say
+								// nothing, so the address text stands in
+								error = formText( this, 'invalid' ) || formText( this, 'email' );
 							}
 						}
 
@@ -1015,7 +1039,7 @@
 						if( error === false )
 							for( const name in radioGroups )
 								if( data[name] === '' ) {
-									error = Nino.content.getText('/module/form/info/required');
+									error = formText( this, 'required' );
 									for( let i = 0, l = this.fields.length; i<l; i++)
 										if( this.fields[i].type === 'radio' && this.fields[i].name === name ) {
 											Nino.ui._markField( this.fields[i], true );
@@ -1047,9 +1071,9 @@
 						const boundResponse = formResponse.bind( { form : this } );
 						this.classList.add('nino-is-pending');
 
-						// Without an action the form posts to the Form module's own
-						// endpoint, below the project's directory
-						Nino.http.sendRequest( this.getAttribute('action') || '[[/nino/dir]]/.form', 'POST', boundResponse, data );
+						// Without an action a form posts to its own kind's endpoint,
+						// below the project's directory
+						Nino.http.sendRequest( this.getAttribute('action') || ( this.newsletter === true ? '[[/nino/dir]]/.newsletter' : '[[/nino/dir]]/.form' ), 'POST', boundResponse, data );
 					};
 
 				for( let i=0, l=e.form.length; i<l; i++ ) {
@@ -1057,163 +1081,13 @@
 					e.form[i].fields	= e.form[i].querySelectorAll('input, textarea, select');
 					e.form[i].msg 		= e.form[i].querySelectorAll('p')[0];
 					e.form[i].btn 		= e.form[i].querySelectorAll('button')[0];
+					e.form[i].newsletter	= e.form[i].classList.contains('nino-newsletter-form') === true;
 
 					// Both the validation error and the server's verdict are
 					// written into that paragraph, and it is a project's own markup
 					ui._liveMessage( e.form[i].msg );
 
 					e.form[i].addEventListener( 'submit', formSubmit );
-				}
-			}
-
-
-			/*
-			 *	nino-newsletter-form - same validate-then-xhr shape as nino-form
-			 *	above, kept separate because the signup is disabled after a
-			 *	successful submit and shows /feature/newsletter/info/success.
-			 *	The endpoint deliberately answers the same way whether or not
-			 *	the address was already on the list - anything else lets anyone
-			 *	test whether a given address is subscribed - so there is no
-			 *	'existing' case to distinguish here either.
-			 */
-			if( e.newsletterForm.length > 0 ) {
-
-				let
-					/**
-					 *	Handle a .nino-newsletter-form's xhr response: disable the
-					 *	form and show the matching success/error message.
-					 *	Bound as `this.form` before use.
-					 *
-					 *	@param		{XMLHttpRequest}	xhr				Completed (normalized) xhr
-					 *
-					 *	@return		void
-					 */
-					newsletterResponse = function( xhr ){
-
-						this.form.classList.remove('nino-is-pending');
-
-						const ok = ( xhr.status === 200 );
-
-						this.form.classList.remove( ok === true ? 'nino-is-error' : 'nino-is-success' );
-						this.form.classList.add( ok === true ? 'nino-is-success' : 'nino-is-error' );
-
-						// Same split as the .nino-form handler above: a 400 is the
-						// address itself, anything else stays generic. The
-						// "already subscribed" case deliberately answers 200 like
-						// any other signup (see this block's docblock), so it
-						// still never reaches here as its own outcome
-						this.form.msg.textContent = ( xhr.status === 400 )
-							? Nino.content.getText('/feature/newsletter/info/email')
-							: Nino.content.getText('/feature/newsletter/info/'+ ( ok === true ? 'success' : 'error' ));
-
-						if( ok === false )
-							return;
-
-						this.form.btn.disabled = true;
-						for( let i = 0, l = this.form.fields.length; i<l; i++ )
-							this.form.fields[i].disabled = true;
-					},
-
-					/**
-					 *	Validate and submit a .nino-newsletter-form via xhr
-					 *
-					 *	@param		{Event}		e								Submit event
-					 *
-					 *	@return		void
-					 */
-					newsletterSubmit = function( e ){
-						e.preventDefault();
-
-						if( this.classList.contains('nino-is-success') === true )
-							return;
-
-						// The mark belongs to the attempt - see the .nino-form handler
-						for( let i = 0, l = this.fields.length; i<l; i++ )
-							Nino.ui._markField( this.fields[i], false );
-
-						let error = false, data = {}, radioGroups = {}, firstRefused = null;
-						for( let i = 0, l = this.fields.length; i<l; i++) {
-
-							// Stored as typed - see the .nino-form handler above for why
-							// the character strip that used to sit here was removed, why a
-							// checkbox is asked whether it is checked rather than what its
-							// value reads (a consent box is the likely one here), and why a
-							// radio group is one answer rather than one per member (here
-							// that is a "how often" choice)
-							if( this.fields[i].type === 'checkbox' )
-								data[this.fields[i].name] = this.fields[i].checked === true ? ( this.fields[i].value || 'on' ) : '';
-
-							else if( this.fields[i].type === 'radio' ) {
-
-								if( this.fields[i].checked === true )
-									data[this.fields[i].name] = this.fields[i].value;
-								else if( data[this.fields[i].name] === undefined )
-									data[this.fields[i].name] = '';
-
-								if( this.fields[i].required === true )
-									radioGroups[this.fields[i].name] = true;
-
-								continue;
-							}
-
-							else
-								data[this.fields[i].name] = this.fields[i].value;
-
-							// A required checkbox is missing when it is not ticked, whatever
-							// its .value reads - the .nino-form handler's test, the consent
-							// box being the likely one on a signup
-							if( this.fields[i].required === true
-								&& ( this.fields[i].type === 'checkbox' ? this.fields[i].checked !== true : this.fields[i].value.length === 0 ) ) {
-								Nino.ui._markField( this.fields[i], true );
-								firstRefused = firstRefused ?? this.fields[i];
-								error = Nino.content.getText('/feature/newsletter/info/required');
-							}
-
-							// Same character set as the .nino-form check above
-							if( error === false && this.fields[i].type === 'email' && ( /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/.test(this.fields[i].value) === false ) ) {
-								Nino.ui._markField( this.fields[i], true );
-								firstRefused = firstRefused ?? this.fields[i];
-								error = Nino.content.getText('/feature/newsletter/info/email');
-							}
-						}
-
-						// The group's answer, not any member's - see the .nino-form handler
-						if( error === false )
-							for( const name in radioGroups )
-								if( data[name] === '' ) {
-									error = Nino.content.getText('/feature/newsletter/info/required');
-									for( let i = 0, l = this.fields.length; i<l; i++)
-										if( this.fields[i].type === 'radio' && this.fields[i].name === name ) {
-											Nino.ui._markField( this.fields[i], true );
-											firstRefused = firstRefused ?? this.fields[i];
-										}
-									break;
-								}
-
-						if( error !== false ) {
-							this.msg.textContent = error;
-							// The caret goes where the message points - see .nino-form
-							firstRefused?.focus?.();
-							return error;
-						}
-
-						// Bound per submit - see the .nino-form handler above
-						const boundResponse = newsletterResponse.bind( { form : this } );
-						this.classList.add('nino-is-pending');
-
-						Nino.http.sendRequest( this.getAttribute('action') || '[[/nino/dir]]/.newsletter', 'POST', boundResponse, data );
-					};
-
-				for( let i=0, l=e.newsletterForm.length; i<l; i++ ) {
-
-					e.newsletterForm[i].fields	= e.newsletterForm[i].querySelectorAll('input, textarea, select');
-					e.newsletterForm[i].msg 		= e.newsletterForm[i].querySelectorAll('p')[0];
-					e.newsletterForm[i].btn 		= e.newsletterForm[i].querySelectorAll('button')[0];
-
-					// Same paragraph, same reason - see the .nino-form loop above
-					ui._liveMessage( e.newsletterForm[i].msg );
-
-					e.newsletterForm[i].addEventListener( 'submit', newsletterSubmit );
 				}
 			}
 
