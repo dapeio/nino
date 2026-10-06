@@ -5,9 +5,7 @@
 	// Without one a unit is keyed by its module directory's lowercased name
 	// ("form"); the page library has always said "forms"
 	'key' 				=> 'forms',
-	'label' 			=> 'Contact form',
 	'moduleClass' => '\\Nino\\Modules\\Form',
-	'requiresModules' => [ ],
 	// Templates copied straight into /templates/, no locale gating - the
 	// visitor's own confirmation mail renders in their current locale, the
 	// owner notification always in the site's native locale (see Form.php)

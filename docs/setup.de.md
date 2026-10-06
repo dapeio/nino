@@ -227,7 +227,7 @@ Alles, woraus der Assistent kopiert, ist einmalige Installer-Quelle, in einer vo
 | Pfad | Aufgabe |
 |---|---|
 | `_admin/install/library/base/` | immer angewendete Routen, Templates, Texte und Assets |
-| `_nino/Nino/Modules/<Modul>/install/`, `app/…/<Modul>/install/` | die eigene Einheit eines Moduls: die wählbare funktionale Ergänzung, neben der Klasse, die sie aktiviert |
+| `_nino/Nino/Modules/<Modul>/install/`, `app/…/<Modul>/install/` | die eigene Einheit eines Moduls, neben der Klasse, die sie aktiviert – bei Ninos eigenen bei jedem Lauf angewendet (`ALWAYS_MODULES`), bei denen eines Projekts eine Wahl |
 | `_admin/install/library/modules/<key>/` | eine wählbare Einheit ohne eigene Laufzeitklasse |
 | `_admin/install/library/pages/<key>/` | Ausgangspunkt für eine konkrete Seite |
 

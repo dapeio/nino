@@ -13,6 +13,19 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Installer:** the units the wizard applies on every run state nothing that
+  run never reads. The Navigation unit no longer declares `/nino/html/navs` as
+  a `config` default - `\Nino\AppData::DEFAULTS` holds the same `main` and
+  `footer` under every request, so the unit's copy was never applied and only
+  looked like the place the menus are decided; the Navigation, Localepicker,
+  Form and Legal units drop their picker `label`, Form its empty
+  `requiresModules`, and the AppData comment no longer calls the menu registry
+  empty. A new project gets what it got. `tests/install-smoke.php` gives its
+  sandbox the framework's menus the way `AppData::init()` does, reads the
+  expected registry from `AppData::DEFAULTS`, and checks that no always-applied
+  unit restates a framework default or carries a label (red before; the
+  rewritten menu check pins behaviour that does not change and is not).
+
 - **Docs:** the setup manual says which part of a page unit's route the Routes
   step reads - body, status code, menus, locale - and that it writes the key and
   the `uri` itself; the two checks of `tests/install-smoke.php` that pinned

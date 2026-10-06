@@ -88,9 +88,11 @@ namespace Nino {
 			'/nino/locales/textfiles'	=> '/text',
 			'/nino/auth/maxtries'		=> 5,
 			'/nino/auth/cooldown'		=> 3600,
-			// The four registries the tools fill. Empty is the honest starting
-			// value for all of them: no bundle, no image slots, no menus, no
-			// accounts, no routes - a kernel that boots and serves a 404
+			// The four registries the tools fill, starting with what every
+			// project needs: the kernel's own stylesheet and scripts in the
+			// bundles, and main and footer, the two menus the Navigation
+			// unit's templates render; no image slots, no accounts, no routes
+			// - a kernel that boots and serves a 404
 			'/nino/html/assets'		=> [
 		    '/.cache/style.css' => [
 		      '/_nino/Nino.css',

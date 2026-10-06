@@ -213,7 +213,7 @@ Everything the wizard copies from is one-time installer source, in one of four s
 | Path | Purpose |
 |---|---|
 | `_admin/install/library/base/` | always-applied routes, templates, texts, and assets |
-| `_nino/Nino/Modules/<Module>/install/`, `app/…/<Module>/install/` | a module's own unit: the selectable functional addition, beside the class it activates |
+| `_nino/Nino/Modules/<Module>/install/`, `app/…/<Module>/install/` | a module's own unit, beside the class it activates - applied on every run for Nino's own (`ALWAYS_MODULES`), a choice for a project's |
 | `_admin/install/library/modules/<key>/` | a selectable unit without a runtime class of its own |
 | `_admin/install/library/pages/<key>/` | starting point for one concrete page |
 

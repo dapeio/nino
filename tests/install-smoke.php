@@ -60,6 +60,9 @@ $appData['/nino/locales/native']					= 'de_DE';
 // matters (picking just the native locale must not silently keep some other
 // locale "available" too)
 $appData['/nino/locales/available']			= [ 'de_DE' ];
+// The framework's menus, as AppData::init() merges them under every request
+// the wizard answers - the sandbox only runs prepare()
+$appData['/nino/html/navs']								= \Nino\AppData::DEFAULTS['/nino/html/navs'];
 $appData['/nino/modules']								= [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Elements', '\\Nino\\Modules\\Template', '\\Nino\\Modules\\Jstext', '\\Nino\\Modules\\Csrf', '\\Nino\\Modules\\Images' ];
 
 mkdir( $sandbox. '/private/templates', 0777, true );
@@ -357,15 +360,25 @@ check( '...and "localepicker"\'s, always-on now too', ( $deAfterApply['[[/module
 // wizard writes none of the four fills that block read
 check( 'the installed footer carries no cookie banner', str_contains( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/html-footer.tpl', '' ), 'nino-cookie-banner' ) === false );
 check( '...and the picked locale\'s text has no /cookiebanner/ key', array_filter( array_keys( $deAfterApply ), static fn( string $key ): bool => str_starts_with( $key, '[[/cookiebanner/' ) ) === [] );
-// The menus are whatever the Navigation unit's manifest declares as the
-// config default - read from there, so the unit can change its menus without
-// a second edit here; what this pins is that the default lands at all
-$navigationDefaults = (array) ( ( include __DIR__. '/../_nino/Nino/Modules/Navigation/install/manifest.php' )['config'] ?? [] );
-// The Legal unit asks for a menu of its own on top (its 'navs' key, see
-// Setup::_applyNavs()), so the registry is the Navigation unit's menus and 'legal'
-$expectedNavs = array_merge( (array) ( $navigationDefaults['/nino/html/navs'] ?? [] ), [ 'legal' ] );
-check( 'the navigation unit\'s config default lands even though nothing picked navigation - and the menu the Legal unit asks for stands behind it', isset( $navigationDefaults['/nino/html/navs'] ) === true
-	&& $configAfterApply['/nino/html/navs'] === $expectedNavs );
+// The menus a project starts with are the framework's (AppData::DEFAULTS),
+// and the Legal unit asks for one of its own on top (its 'navs' key, see
+// Setup::_applyNavs()) - so config.php holds both, the framework's first
+$expectedNavs = array_merge( \Nino\AppData::DEFAULTS['/nino/html/navs'], [ 'legal' ] );
+check( 'the setup step writes the framework\'s menus and the one the Legal unit asks for behind them', $configAfterApply['/nino/html/navs'] === $expectedNavs );
+// A unit the wizard applies on every run states nothing that run never reads:
+// a config default for a key AppData::DEFAULTS sets is never applied -
+// applyUnit() fills a key only where $appData has none, and every request
+// carries the defaults - and a label only names a choice in the picker, which
+// leaves these units out
+$deadInAlwaysUnits = [];
+foreach( \Nino\Install\Setup::ALWAYS_MODULES as $unitKey ) {
+	$unitManifest = \Nino\Features::readUnitManifest( \Nino\Install\Setup::units()[$unitKey] ) ?? [];
+	foreach( array_keys( array_intersect_key( (array) ( $unitManifest['config'] ?? [] ), \Nino\AppData::DEFAULTS ) ) as $configKey )
+		$deadInAlwaysUnits[] = $unitKey. ': config '. $configKey;
+	if( isset( $unitManifest['label'] ) === true )
+		$deadInAlwaysUnits[] = $unitKey. ': label';
+}
+check( 'the units the wizard always applies state no default the framework sets already, and no picker label', $deadInAlwaysUnits === [] );
 /*	The Legal unit is one of ALWAYS_MODULES: nothing picked it and it is applied
 	- its two element types seeded in the picked language, its two templates and
 	its path default copied, its menu created. What the unit's own words and

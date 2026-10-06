@@ -3,7 +3,6 @@
 	// never a picker choice. After setup nothing applies it again - a language
 	// added later gets its share from \Nino\Modules\Legal::addLocale()
 	'key'					=> 'legal',
-	'label' 			=> 'Legal texts',
 	'moduleClass' => '\\Nino\\Modules\\Legal',
 	'templates' 	=> [
 		'page-legal-imprint.tpl',
