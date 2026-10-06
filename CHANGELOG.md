@@ -4,6 +4,18 @@ All notable changes to Nino are documented in this file.
 
 ## Unreleased
 
+### Changed
+
+- **Docs:** section 2 of the base unit's `theme.css` no longer explains its
+  colours and sizes through `/_design`, `assets/style.design.css` and a
+  manifest's default knobs, all gone since the look left the core: the tokens
+  it reads are section 1's, compiled once and frozen, and a stylesheet that
+  declares them again - the Design feature's palette - recolours the site.
+  The line offering Basis as "the look to pick" goes with the picker. Only new
+  projects get the new comments; the file is copied at install. The Design
+  feature's `library/base.css` carries these sections byte for byte and
+  follows in its own patch.
+
 ## v1.4.0 - 2026-10-06
 
 ### Added
