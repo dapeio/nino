@@ -1476,7 +1476,7 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	Validate and persist the posted list, then batch-regenerate
+		 *	Validate the posted list, then batch-regenerate
 		 *	routes/templates/text/blacklist/modules from it - in that order,
 		 *	entry by entry, so the response ("Applied N pages") reflects
 		 *	exactly what actually landed.
@@ -1628,10 +1628,9 @@ namespace Nino\Install {
 				$routeBody 	= $route !== null ? (string) ( $route['body'] ?? '' ) : $body;
 
 				// A 'templatePerRoute' unit renders its own copy, so the body
-				// stored here has to be the one _applyWebpage() will actually
-				// write - otherwise the persisted list and the route disagree,
-				// and the status-code comparison below reads a body no route
-				// ever had
+				// compared below has to be the one _applyWebpage() will actually
+				// write - otherwise the status-code comparison reads a body no
+				// route ever had
 				$perRouteBody = $libraryKey !== '' ? self::_perRouteBody( [ 'uri' => $uri ], $libraryKey ) : null;
 				if( $perRouteBody !== null )
 					$routeBody = $perRouteBody;
@@ -1761,7 +1760,8 @@ namespace Nino\Install {
 		/**
 		 *	The route body a 'templatePerRoute' unit produces for one entry,
 		 *	or null for a unit that shares one template. Both apiApply() (which
-		 *	persists the list) and _applyWebpage() (which writes the route)
+		 *	compares the body before anything is written) and
+		 *	_applyWebpage() (which writes the route)
 		 *	resolve it through here, so the two can never disagree about which
 		 *	template a route renders.
 		 *
@@ -1858,10 +1858,7 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	The route key one webpages-list entry produces - factored out
-		 *	of _applyWebpage() so apiApply() can also use it, unapplied, to
-		 *	figure out what the *previous* list's entry once produced (see
-		 *	apiApply()'s docblock).
+		 *	The route key one webpages-list entry produces, for _applyWebpage().
 		 *
 		 *	Always exactly one: \Nino\Http::requestRoute() matches a route
 		 *	by looking up '&lt;METHOD&gt;:/'.$httpUri as a literal array key,
@@ -1893,9 +1890,7 @@ namespace Nino\Install {
 
 			// No library unit behind it (an entry the workbench's Routes panel
 			// created): it still owns exactly one route, keyed the same way -
-			// returning nothing here would leave that route behind on the
-			// next apply, since apiApply() strips the previous list's keys
-			// through this very method
+			// returning nothing here would write no route for it at all
 			if( $libraryKey !== null ) {
 				$manifest = \Nino\Features::readUnitManifest( self::LIBRARY. '/pages/'. $libraryKey );
 				if( $manifest === null || count( $manifest['routes'] ?? [] ) === 0 )

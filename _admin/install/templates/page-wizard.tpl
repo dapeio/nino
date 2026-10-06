@@ -65,7 +65,7 @@
 				</div>
 
 				<div id="install-content-webpages">
-					<p class="nino-admin-hint nino-admin-hint-lead">Build the project's actual routes: click a row to open it, or "New Route" to add one - an Element URI (a stable identifier, eg. <code>/home</code>), the real Http URI it's reachable at (eg. <code>/</code>), a starting template from <code>_admin/install/library/pages</code>, and each active locale's name/title/description - name is also what shows up in the main menu, if the Navigation module (step 2) is active and its "Show in main navigation" box is checked. Click ↑/↓ to reorder, "Next" batch-generates routes/templates/text/blacklist from the list below.</p>
+					<p class="nino-admin-hint nino-admin-hint-lead">Build the project's actual routes: click a row to open it, or "New Route" to add one - an Element URI (a stable identifier, eg. <code>/home</code>), the real Http URI it's reachable at (eg. <code>/</code>), a starting template from <code>_admin/install/library/pages</code>, and each active locale's name/title/description - name is also what a menu shows for the page, in every navigation whose "Show in ... navigation" box is checked. Click ↑/↓ to reorder, "Next" batch-generates routes/templates/text/blacklist from the list below.</p>
 					<div id="webpages-list"></div>
 					<div id="webpages-form" class="install-hidden"></div>
 				</div>

@@ -375,10 +375,11 @@
 
 		/**
 		 *	Render the page editor: back-link, Element/Http URI, template
-		 *	(plus a live "requires modules" hint), nav (only while the
-		 *	Navigation module is active), one name/title/description row per
-		 *	active locale, save/delete - same fieldset shape as _admin's Pages
-		 *	module (see pages.js's _renderForm())
+		 *	(plus a live "requires modules" hint), one menu
+		 *	checkbox per registered navigation, one name/title/description row
+		 *	per active locale, save/delete - the same fieldset shape as the
+		 *	Routes panel's form (_admin/Nino/Modules/Routes/assets/admin.js,
+		 *	_renderForm())
 		 *
 		 *	@param		{Object}	entry
 		 *

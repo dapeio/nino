@@ -13,6 +13,11 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Setup wizard:** comments that described an older Routes step are
+  corrected: no page list is persisted and `_routeKeys()` serves
+  `_applyWebpage()` alone, the hint names one menu checkbox per navigation, and
+  the base unit's `sitemap-xml.tpl` names the Routes step.
+
 - **Workbench:** the Config panel heads its middle group *Workbench* in
   English too, as the German text and the manual do, where it said *Editor
   features*, and its intro no longer points at a 0.12.0-beta changelog entry

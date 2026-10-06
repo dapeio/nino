@@ -1088,7 +1088,7 @@ check( 'the 404 entry really is a 404 in the route too', ( $sharedConfig['/nino/
 check( 'a body that resolves one template per locale reports no single template', $sharedList[2]['body'] === '[template /templates/page-legal.[[/nino/http/response/locale]]]' );
 
 // Now the other direction: open one of those entries in /_admin's Routes module
-// and save it back unchanged, exactly as pages.js posts it
+// and save it back unchanged, exactly as the Routes panel's admin.js posts it
 \Nino\Auth::insertUser( $appData, 'dev@example.com', 'correct horse battery staple', [ '/*' ] );
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 
