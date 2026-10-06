@@ -1992,6 +1992,8 @@ check( 'apiList offers every declared permission, grouped like the navigation - 
 	&& in_array( [ 'perm' => '/_admin/lockout/manage', 'label' => '/_admin/nav/lockout', 'group' => 'system', 'offered' => true ], $body['permOptions'], true ) === true
 	&& in_array( [ 'perm' => '/_admin/translations/manage', 'label' => '/_admin/nav/translations', 'group' => 'system', 'offered' => true ], $body['permOptions'], true ) === true
 	&& count( array_filter( $body['permOptions'], fn( array $o ): bool => $o['perm'] === '/_admin/users/manage' ) ) === 1 );
+check( 'apiList names the groups in the rail\'s order with \'other\' last, and every offered permission sits in one of them', ( $body['groups'] ?? null ) === [ ...\Nino\Admin\Panels::GROUPS, 'other' ]
+	&& array_diff( array_column( $body['permOptions'], 'group' ), $body['groups'] ?? [] ) === [] );
 
 // A permission an account carries directly, with no panel and no role behind
 // it, is in force just the same - so it is on the list, marked as offered by

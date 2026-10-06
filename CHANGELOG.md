@@ -13,6 +13,11 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Workbench:** the roles tab lists the permission groups in the order
+  roles/list now names them (`groups`: `\Nino\Admin\Panels::GROUPS`, then
+  `other`) instead of a copy of that list in `roles.js`, so a group the
+  registry adds can no longer drop its permissions from the picker.
+
 - **Setup wizard:** the Setup step keeps no lists of its own. The always-on
   modules are `\Nino\AppData::DEFAULTS['/nino/modules']`, the languages it
   offers are the base unit's `text/<locale>.php` files, and the Personal

@@ -216,9 +216,10 @@ const OPTIONS = [
 	{ perm : '/_admin/old/thing', label : '/_admin/old/thing', group : 'other', offered : false },
 ];
 
-// The Roles tab only reads these two when it draws
+// The Roles tab only reads these three when it draws
 roles._scopes = SCOPES;
 roles._permOptions = OPTIONS;
+roles._groups = [ 'content', 'structure', 'features', 'system', 'other' ];
 
 const ELEMENTS = text('/_admin/nav/elements');
 const TEXT = text('/_admin/nav/text');
@@ -373,6 +374,14 @@ const options = pickers[pickers.length - 1].options.options;
 check( 'a held scoped permission is named by the tree, one outside it by its string', options.some( function( o ) { return o.value === '/_admin/text/update/page-home/atf/title' && o.label === labels['/_admin/text/update/page-home/atf/title'] } )
 	&& options.some( function( o ) { return o.value === '/_admin/old/thing' && o.label === text('/_admin/roles/group/other')+ ' · /_admin/old/thing' } ) );
 check( 'a role that holds a single permission names its panel under the picker', findAll( parts.fieldset, function( el ) { return el.textContent === Nino.adminUi.format( text('/_admin/roles/scope/detail-hint'), TEXT ) } ).length === 1 );
+
+// The order is the server's, not a copy of it: a group the registry adds
+// reaches the picker without a change here
+roles._groups = [ 'other', 'content' ];
+draw( [] );
+check( 'the picker lists every offered permission, group by group in the order roles/list names them',
+	pickers[pickers.length - 1].options.options.map( function( o ) { return o.value } ).join('|') === [ '/_admin/old/thing', '/_admin/elements/manage', '/_admin/text/manage' ].join('|') );
+roles._groups = [ 'content', 'structure', 'features', 'system', 'other' ];
 
 console.log('\nAdmin Roles - what the role may do');
 

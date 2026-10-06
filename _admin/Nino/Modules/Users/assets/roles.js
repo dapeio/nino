@@ -30,6 +30,8 @@
 
 		_roles				: [],
 		_permOptions	: [],
+		// The order the picker lists the groups in - see Roles::apiList()
+		_groups				: [],
 		// The scoped permissions the panels offer - see Users\Admin::scopeOptions()
 		_scopes				: [],
 		// The role on the form, null while a new one is being made
@@ -62,6 +64,7 @@
 
 				Nino.admin.roles._roles = response.roles;
 				Nino.admin.roles._permOptions = response.permOptions;
+				Nino.admin.roles._groups = response.groups;
 				Nino.admin.roles._scopes = response.scopes || [];
 				Nino.admin.roles._renderList();
 				Nino.admin.roles._ready = true;
@@ -420,14 +423,12 @@
 			fullLabel.appendChild( dc.createTextNode( ' '+ Nino.content.getText('/_admin/roles/label/full') ) );
 			fieldset.appendChild( fullLabel );
 
-			// The rail's own group order, then everything no panel offers -
-			// the group name goes in front of each entry, so the search finds
-			// a whole group by typing its name and the list reads in the same
-			// order the navigation does
-			const GROUPS = [ 'content', 'structure', 'features', 'system', 'other' ];
-
+			// In the order roles/list names the groups - the rail's own, then
+			// everything no panel offers. The group name goes in front of each
+			// entry, so the search finds a whole group by typing its name and
+			// the list reads in the same order the navigation does
 			const options = [];
-			GROUPS.forEach( function( group ) {
+			roles._groups.forEach( function( group ) {
 				roles._permOptions.filter( function( option ) { return option.group === group } ).forEach( function( option ) {
 					options.push( {
 						value : option.perm,
@@ -1006,6 +1007,7 @@
 					}
 					Nino.admin.roles._roles = listResponse.roles;
 					Nino.admin.roles._permOptions = listResponse.permOptions;
+					Nino.admin.roles._groups = listResponse.groups;
 					Nino.admin.roles._scopes = listResponse.scopes || [];
 					Nino.admin.roles._renderList();
 					Nino.admin.roles._openRole( response.id );

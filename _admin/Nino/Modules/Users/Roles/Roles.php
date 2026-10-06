@@ -251,7 +251,8 @@ namespace Nino\Modules\Users {
 		/**
 		 *	Every role, how many accounts hold each, the permissions the picker
 		 *	offers (see \Nino\Modules\Users\Admin::permOptions() - what a role may
-		 *	hold is wider than that, see apiSave()) and the scoped permissions
+		 *	hold is wider than that, see apiSave()), the order it lists their
+		 *	groups in (the rail's, then 'other') and the scoped permissions
 		 *	the panels list for the three selects (see
 		 *	\Nino\Modules\Users\Admin::scopeOptions())
 		 *
@@ -272,6 +273,10 @@ namespace Nino\Modules\Users {
 			\Nino\Http::ok( $request, [
 				'roles' 				=> $roles,
 				'permOptions' => \Nino\Modules\Users\Admin::permOptions( $appData ),
+				// The rail's groups in its order, then 'other' - the group
+				// \Nino\Modules\Users\Admin::permOptions() files a permission
+				// no panel offers under, and the name it alone gives
+				'groups' 			=> [ ...\Nino\Admin\Panels::GROUPS, 'other' ],
 				'scopes' 			=> \Nino\Modules\Users\Admin::scopeOptions( $appData ),
 			] );
 		}
