@@ -95,15 +95,6 @@ namespace Nino {
 		// writes it fresh
 		private const string CACHE_FILE = '/data/catalogue.php';
 
-		/*	A key, a version and a category are \Nino\Features' vocabulary, not
-			this class's: a catalogue entry is a published manifest, so the two
-			readers have to agree on what those three fields look like or a
-			feature is installable and unreadable, or the other way round. They
-			were copies here. The directory name is this reader's own - a
-			manifest never carries one, since a manifest is already inside the
-			directory it describes	*/
-		private const string DIRECTORY_PATTERN = '/^[A-Z][A-Za-z0-9]*$/';
-
 		/**
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -782,7 +773,7 @@ namespace Nino {
 
 			$extensions = [];
 			foreach( (array) ( $entry['php']['ext'] ?? [] ) as $ext ) {
-				if( is_string( $ext ) === false || preg_match( '/^[a-z][a-z0-9_]*$/i', $ext ) !== 1 )
+				if( is_string( $ext ) === false || preg_match( \Nino\Features::EXTENSION_PATTERN, $ext ) !== 1 )
 					return '"php" => "ext" must list extension names';
 				$extensions[] = strtolower( $ext );
 			}
@@ -801,8 +792,11 @@ namespace Nino {
 					$requires[] = $req;
 			}
 
+			// The rule Features::manifest() applies to the directory the
+			// archive lands in: an entry naming any other would install a
+			// feature the kernel then refuses to read
 			$directory = (string) ( $entry['directory'] ?? '' );
-			if( preg_match( self::DIRECTORY_PATTERN, $directory ) !== 1 )
+			if( preg_match( \Nino\Features::DIRECTORY_PATTERN, $directory ) !== 1 )
 				return '"directory" must be a class name segment';
 
 			$archive = (string) ( $entry['archive'] ?? '' );

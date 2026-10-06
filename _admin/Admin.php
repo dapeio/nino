@@ -370,9 +370,11 @@ namespace Nino\Admin {
 
 				$name = basename( dirname( dirname( $file ) ) );
 
-				// Written the way ::class writes it - no leading separator -
-				// so a core panel and a module-contributed one compare equal
-				if( preg_match( '/^[A-Z][A-Za-z0-9]*$/', $name ) === 1 )
+				// A class name segment, as a feature's directory is (see
+				// Features::DIRECTORY_PATTERN). Written the way ::class writes
+				// it - no leading separator - so a core panel and a
+				// module-contributed one compare equal
+				if( preg_match( \Nino\Features::DIRECTORY_PATTERN, $name ) === 1 )
 					$classes[] = 'Nino\\Modules\\'. $name. '\\Admin';
 			}
 

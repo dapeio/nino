@@ -4,7 +4,22 @@ All notable changes to Nino are documented in this file.
 
 ## Unreleased
 
+### Added
+
+- **Features:** `\Nino\Features::DIRECTORY_PATTERN` and
+  `\Nino\Features::EXTENSION_PATTERN`, beside `KEY_PATTERN`,
+  `CATEGORY_PATTERN` and `VERSION_PATTERN`: what a feature's directory and a
+  PHP extension name in `"php" => "ext"` look like.
+
 ### Changed
+
+- **Features, catalogue:** a feature's directory, key, version and extension
+  names are spelled once. `\Nino\Catalogue` drops its private
+  `DIRECTORY_PATTERN` and its own extension pattern, the Features panel its
+  private `KEY_PATTERN` and `VERSION_PATTERN`, and the workbench's module scan
+  reads `Features::DIRECTORY_PATTERN`. Every value accepted or refused before
+  is still accepted or refused. `tests/catalogue-smoke.php` checks that no
+  reader writes the patterns out again.
 
 - **Text:** a site's words live in `/text`, and nothing follows
   `/nino/locales/textfiles` any more. The renderer (`\Nino\Html::getFills()`),

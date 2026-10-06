@@ -55,14 +55,6 @@ namespace Nino\Modules\Features {
 
 		public const string MANAGE_PERM = '/_admin/features/manage';
 
-		// A feature key as the kernel spells it - checked here before the
-		// kernel is asked, so a stray value never reaches an error message
-		private const string KEY_PATTERN = '/^[a-z][a-z0-9-]*$/';
-
-		// A version as the catalogue names one - the same shape the kernel
-		// accepts in a manifest (Features::VERSION_PATTERN)
-		private const string VERSION_PATTERN = '/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/';
-
 		// How many places of one shortcode the answer to a deactivation names
 		private const int FOUND_PLACES = 10;
 
@@ -909,7 +901,9 @@ namespace Nino\Modules\Features {
 
 			$key = $data['key'] ?? null;
 
-			return is_string( $key ) === true && preg_match( self::KEY_PATTERN, $key ) === 1 ? $key : null;
+			// Checked here before the kernel is asked, so a stray value never
+			// reaches an error message
+			return is_string( $key ) === true && preg_match( \Nino\Features::KEY_PATTERN, $key ) === 1 ? $key : null;
 		}
 
 		/**
@@ -923,7 +917,7 @@ namespace Nino\Modules\Features {
 
 			$version = $data['version'] ?? null;
 
-			return is_string( $version ) === true && preg_match( self::VERSION_PATTERN, $version ) === 1 ? $version : null;
+			return is_string( $version ) === true && preg_match( \Nino\Features::VERSION_PATTERN, $version ) === 1 ? $version : null;
 		}
 
 		/**

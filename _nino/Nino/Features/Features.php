@@ -114,6 +114,14 @@ namespace Nino {
 		public const string CATEGORY_PATTERN = '/^[a-z][a-z0-9-]{0,23}$/';
 		public const string VERSION_PATTERN = '/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/';
 
+		/*	What a feature's directory and a PHP extension name look like, for
+			the same reason: the directory is the class name segment
+			(\Nino\Modules\<Directory>), so a catalogue entry that names one has
+			to pass the rule manifest() applies to the directory it lands in,
+			and "php" => "ext" is read by both	*/
+		public const string DIRECTORY_PATTERN = '/^[A-Z][A-Za-z0-9]*$/';
+		public const string EXTENSION_PATTERN = '/^[a-z][a-z0-9_]*$/i';
+
 		private const string SETTING_PATTERN = '/^[a-z][a-zA-Z0-9]*$/';
 
 		private const int MAX_STRING_LENGTH = 1000;
@@ -304,7 +312,7 @@ namespace Nino {
 				return null;
 			};
 
-			if( preg_match( '/^[A-Z][A-Za-z0-9]*$/', $name ) !== 1 )
+			if( preg_match( self::DIRECTORY_PATTERN, $name ) !== 1 )
 				return $fail( 'the directory name must be a class name segment (Newsletter, not newsletter)' );
 
 			if( is_file( $path ) === false )
@@ -431,7 +439,7 @@ namespace Nino {
 
 			$extensions = [];
 			foreach( (array) ( $raw['php']['ext'] ?? [] ) as $ext ) {
-				if( is_string( $ext ) === false || preg_match( '/^[a-z][a-z0-9_]*$/i', $ext ) !== 1 )
+				if( is_string( $ext ) === false || preg_match( self::EXTENSION_PATTERN, $ext ) !== 1 )
 					return $fail( '"php" => "ext" must list extension names' );
 				$extensions[] = strtolower( $ext );
 			}

@@ -362,6 +362,22 @@ check( 'a key, a version and a category are \Nino\Features\' vocabulary, not a s
 check( '...and so is what counts as a usable name or description', method_exists( '\Nino\Features', 'localizedValid' ) === true
 	&& $catalogueClass->hasMethod( '_localizedValid' ) === false );
 
+// ...and nobody writes it out again. A feature's directory, key, version,
+// category and extension names are spelled once, as \Nino\Features'
+// public patterns; this class, the manifest reader and the Features panel
+// name the constant. Copies that had drifted apart once already (4dc04d7)
+$vocabulary = array_filter( ( new ReflectionClass( '\Nino\Features' ) )->getConstants( ReflectionClassConstant::IS_PUBLIC ),
+	static fn( mixed $value, string $name ): bool => str_ends_with( $name, '_PATTERN' ) === true && is_string( $value ) === true, ARRAY_FILTER_USE_BOTH );
+$respelled = [];
+foreach( [ '_nino/Nino/Features/Features.php' => 1, '_nino/Nino/Catalogue/Catalogue.php' => 0, '_admin/Nino/Modules/Features/Admin/Admin.php' => 0 ] as $file => $allowed ) {
+	$source = (string) file_get_contents( dirname( __DIR__ ). '/'. $file );
+	foreach( $vocabulary as $name => $pattern )
+		if( substr_count( $source, "'". $pattern. "'" ) > $allowed )
+			$respelled[] = $file. ' '. $name;
+}
+check( 'a feature\'s directory, key, version, category and extension names are spelled once, and every reader names the constant'. ( $respelled === [] ? '' : ' - written out again: '. implode( ', ', $respelled ) ),
+	isset( $vocabulary['DIRECTORY_PATTERN'], $vocabulary['EXTENSION_PATTERN'] ) === true && $respelled === [] );
+
 // The one field a bad value does not cost the catalogue. Everything else here
 // refuses the whole document (see the checks below) because everything else
 // is something the kernel acts on; a category is a heading in a list, and a
