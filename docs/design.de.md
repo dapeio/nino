@@ -19,6 +19,3 @@
 | **Shortcodes & Komponenten** | Geplant | Integration von Nino-Kernkomponenten (z. B. Navigation, Locale-Picker) |
 | **Eigene Frontend-Elemente** | Geplant | Entwicklung individueller Blöcke und Shortcodes |
 | **Responsive Design** | Geplant | Breakpoints, Media Queries, mobile Optimierung |
-
----
-**Englische Fassung:** Siehe [design.md](design.md) (wird parallel übersetzt).

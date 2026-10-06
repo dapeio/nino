@@ -197,7 +197,7 @@ Ein Konto hält eine Rolle, eine Rolle eine Menge von Berechtigungen, eine je Pa
 | dynamische Liste ausgeben | Element-Abfrage oder Shortcode mit Callback |
 | technische Funktion ergänzen | projektspezifisches Modul |
 | paketierte Funktion ergänzen – ein Newsletter, eine Suche | ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features), nach `features/` kopiert und im Panel Features eingeschaltet |
-| das Aussehen ändern | `assets/theme.css` und `assets/style.css` im Projekt; der Katalog, den der Assistent früher angeboten hat, ist für das Design-Feature geparkt |
+| das Aussehen ändern | `assets/theme.css` und `assets/style.css` im Projekt, von Hand; oder das Design-Feature des Katalogs, das `assets/theme.css` kompiliert und fragt, bevor es eine von Hand bearbeitete ersetzt |
 
 ## Wie es weitergeht
 

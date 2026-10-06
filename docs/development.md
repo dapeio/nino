@@ -833,7 +833,7 @@ public static function assets(): array {
 }
 ```
 
-Every action method guards itself with `\Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM )`, which answers `401` without an account and `403` without the permission. The workbench's own modules are merged first, and a uri or action name one of them already owns is never handed to a runtime module. The shipped modules are the reference: `_nino/Nino/Modules/Form/Admin/Admin.php` is one with fills and a Dashboard tile, and the smallest complete panel in the checkout is the fixture `tests/fixtures/features/Sample/Admin/Admin.php` - in the catalogue, `features/Search/Admin/Admin.php` is the smallest published one and `features/Templates/Admin/Admin.php` one with its own template and a workspace layout. The [panel recipe](recipes/admin-panel.md) of the AI guide walks through a complete panel including its frontend.
+Every action method guards itself with `\Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM )`, which answers `401` without an account and `403` without the permission. The workbench's own modules are merged first, and a uri or action name one of them already owns is never handed to a runtime module. The shipped modules are the reference: `_nino/Nino/Modules/Form/Admin/Admin.php` is one with fills and a Dashboard tile, and the smallest complete panel in the checkout is the fixture `tests/fixtures/features/Sample/Admin/Admin.php` - in the catalogue, `features/Hello/Admin/Admin.php` is the panel of the feature written to be copied, and `features/Templates/Admin/Admin.php` one with its own template and a workspace layout. The [panel recipe](recipes/admin-panel.md) of the AI guide walks through a complete panel including its frontend.
 
 A module that keeps its own files under `data/` registers `'/nino/admin/restore'` in `init()`; the Backups panel calls it with the staged backup and the live data directory, and the module merges what is its own (`Newsletter::callbackRestore()` in the catalogue's Newsletter feature). Finally, an `install/` directory beside the class file - `manifest.php`, `templates/`, `text/` - makes a kernel or project module selectable in the setup wizard; see the [Library Format](setup.md#library-format). A feature carries the same unit, and `\Nino\Features::activate()` applies it - without overwriting anything the project has - when the feature is switched on in the Features panel; the manifest, the settings and the lifecycle are in [Features](features.md).
 
@@ -1061,7 +1061,7 @@ of them may refuse (`/nino/elements<type>/insert` and its siblings return
 **Declaration** is what the `/_admin` panel contract is for. A module answers
 `adminPanels()` with a class, and that class *states what it is* in the
 workbench: uri, label, weight, group, permission, panes, assets, text, tabs
-(see `\Nino\Admin\Panels` and section 7). The tool reads that into a registry
+(see `\Nino\Admin\Panels` and [Panels of the Workbench](#panels-of-the-workbench)). The tool reads that into a registry
 it can validate (a bad uri, a taken uri, a missing `actions()`/`nav()`, an
 asset that is not there - each reported with the class that caused it), sort by
 group and weight, and derive the rail, the panes, the asset bundle, the fills

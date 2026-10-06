@@ -433,8 +433,8 @@ The keys show both namespaces a unit uses. A word of the feature's own function 
 What `\Nino\Features::activate()` reads from the unit: `routes`, `templates`
 (locale-keyed entries only for available locales), `files`, `elementTypes`,
 `elements`, `blacklist`, `config`, and `text/global.php` plus `text/<locale>.php` for
-every available locale. `key`, `label`, `moduleClass`, `requiresModules`,
-`preset` and `active` are the wizard's picker and are not read by an
+every available locale. `key`, `label`, `moduleClass`, `requiresModules`
+and `preset` are the wizard's picker and are not read by an
 activation - the feature manifest carries them in its own form (`key`,
 `name`, the derived class, `requires`).
 

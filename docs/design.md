@@ -19,6 +19,3 @@
 | **Shortcodes & Components** | Planned | Integration of Nino core components (e.g., navigation, locale picker) |
 | **Custom Frontend Elements** | Planned | Development of individual blocks and shortcodes |
 | **Responsive Design** | Planned | Breakpoints, media queries, mobile optimization |
-
----
-**German Version:** See [design.de.md](design.de.md) (will be created in parallel).

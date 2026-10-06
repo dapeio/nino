@@ -197,7 +197,7 @@ An account holds a role, a role a set of permissions, one per panel or tab; the 
 | Output dynamic list | element query or shortcode with callback |
 | Add technical function | project-specific module |
 | Add a packaged function - a newsletter, a search | a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features), copied into `features/` and switched on in the Features panel |
-| Change the look | `assets/theme.css` and `assets/style.css` in the project; the catalogue the wizard used to offer is parked for the Design feature |
+| Change the look | `assets/theme.css` and `assets/style.css` in the project, by hand; or the catalogue's Design feature, which compiles `assets/theme.css` and asks before it replaces a hand-edited one |
 
 ## Next Steps
 

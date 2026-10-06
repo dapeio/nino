@@ -108,7 +108,7 @@ assets/style.css            the project's own, shipped empty
 
 Setup seeds `/nino/html/assets`' bundle with the two project entries if they are not in it yet, and appends rather than replaces - whatever a project added itself keeps its place. `assets/style.css` is written once, empty, and never touched again, so a rule put there overrules everything above it.
 
-Up to Nino 1.1 the wizard asked four questions here - a theme from a catalogue of ten, a header and a footer from thirteen frames, and the design values compiled out of them. It does not any more. The catalogue is parked in [`design-library/`](https://github.com/dapeio/nino-features/tree/main/design-library) of the feature repository, waiting for the **Design** feature, which will compile its own stylesheet over the delivered one.
+Up to Nino 1.1 the wizard asked four questions here - a theme from a catalogue of ten, a header and a footer from thirteen frames, and the design values compiled out of them. It does not any more. The look is changed afterwards by the **Design** feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features/blob/main/features/Design/README.md), which compiles its own `assets/theme.css` and frame templates over the delivered ones - and asks before it replaces a file it did not write.
 
 ## 3. Routes
 

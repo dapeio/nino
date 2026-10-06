@@ -13,6 +13,22 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** AGENTS.md, the recipes and the manuals point at what
+  nino-features holds now. The Design feature changes the look, not a
+  `design-library/` waiting for it (AGENTS.md, setup, concepts, ROADMAP, the
+  screenshots README). Five of the seven recipes are under `docs/recipes/` and
+  two travel with Templates. The section-preset rows and checklist follow the
+  v3 recipe instead of `allow`, a shell and the content module. The preset with
+  several layouts is `image-list-split`, the worked example of
+  `[[section:collection:<areaKey>]]` is `articles-filterable-grid`, and the
+  feature panel to copy is Hello's.
+
+- **Docs:** smaller stale lines. The `--bar` strip is the one the Features
+  panel draws over a feature's screen. `active` is not one of the wizard's
+  unit keys. "Section 7" in the developer manual links to Panels of the
+  Workbench. The design manual no longer promises a German version "created
+  in parallel".
+
 - **Docs:** the 1.3.0-beta entry "`_nino/Nino.css` puts its own design
   decisions in one cascade layer, `@layer nino.base`" describes a change that
   never shipped. `Nino.css` has no `@layer` in 1.3.0-beta, 1.3.0 or since;

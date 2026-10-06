@@ -130,8 +130,8 @@ request:
   shapes), User roles (sharing `/_admin/users/manage`), Login protection
   (`/_admin/lockout/manage`) and Recovery password (`/_admin/recoverypw/manage`)
   under Users, Translations under Language. The
-  strip is the design system's `.nino-admin-tabs--bar`, the same the Design
-  panel renders for its four editors; the registry adds
+  strip is the design system's `.nino-admin-tabs--bar`, the same the Features
+  panel draws over a feature's own screen (Description and Settings); the registry adds
   `.nino-admin-tabs--panel` to a pane's own strip, which is what keeps the
   generic tab rules off it.
 

@@ -26,9 +26,9 @@ Die Dokumentation richtet sich primär an selbstständige Webentwickler und klei
 | `deployment.de.md` | `deployment.md` | Webserver, Go-live, Sicherheit, Backups und Updates | veröffentlicht |
 | `setup.de.md` | `setup.md` | der Einrichtungsassistent: notwendige Ersteinrichtung und Library-Format | veröffentlicht |
 | `_admin.de.md` | `_admin.md` | die Workbench: jedes Panel, Konten, Rollen und Recovery | veröffentlicht |
-| – | – | das Design-Panel und der Template-Baukasten sind seit 1.2 nicht mehr Teil von Nino: `appearance.de.md`/`appearance.md` liegt archiviert in [`design-library/docs/`](https://github.com/dapeio/nino-features/tree/main/design-library/docs), `templates.de.md`/`templates.md` beim Feature in [`features/Templates/docs/`](https://github.com/dapeio/nino-features/tree/main/features/Templates/docs) | ausgelagert |
+| – | – | das Design-Panel und der Template-Baukasten sind seit 1.2 nicht mehr Teil von Nino: `templates.de.md`/`templates.md` liegt beim Feature in [`features/Templates/docs/`](https://github.com/dapeio/nino-features/tree/main/features/Templates/docs), das Aussehen beschreibt die README des Features [`features/Design/`](https://github.com/dapeio/nino-features/blob/main/features/Design/README.md) | ausgelagert |
 | `features.de.md` | `features.md` | Features: das Panel, das Manifest `feature.php`, das Settings-Schema, Aktivierung, Update und Deaktivierung, die Tests eines Features | veröffentlicht |
-| – | `recipes/*.md` | die sieben Erweiterungsrezepte: Panel, Laufzeitmodul, Installer-Paket, Section-Preset, Templates und Seiten-Units, Elementtypen, Feature | veröffentlicht, nur Englisch |
+| – | `recipes/*.md` | fünf der sieben Erweiterungsrezepte: Panel, Laufzeitmodul, Installer-Paket, Elementtypen, Feature; Section-Preset sowie Templates und Seiten-Units liegen beim Feature Templates in [`features/Templates/docs/`](https://github.com/dapeio/nino-features/tree/main/features/Templates/docs) | veröffentlicht, nur Englisch |
 
 ## Laufende Arbeitsreihenfolge
 

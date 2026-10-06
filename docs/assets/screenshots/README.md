@@ -12,8 +12,6 @@ Die englische und die deutsche Root-README zeigen Nino derzeit in vier Bereichen
 
 Ältere Dateien wie `admin.webp`, `admin-elements.webp`, `admin-text.webp`, `editor.webp`, `editor-elements.webp`, `editor-text.webp`, `install.webp` und `templates.webp` liegen weiterhin hier, sind aber in keinem Handbuch eingebunden.
 
-Die drei Design-Panel-Screenshots liegen seit 1.2 nicht mehr hier: Sie sind mit dem Panel und seinem Katalog nach [`design-library/docs/assets/`](https://github.com/dapeio/nino-features/tree/main/design-library/docs/assets) in dapeio/nino-features gewandert und im dort archivierten Handbuch eingebunden.
-
 ## Empfohlene Aufbereitung
 
 - einheitliches Seitenverhältnis, bevorzugt 16:9 oder 16:10;

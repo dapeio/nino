@@ -283,10 +283,11 @@ Elements Area is actually bound to - the auto-generated
 `<page>-<section>-<area>` of a new Area as readily as a type picked under Edit
 Section → Data, so the pair stays correct on the very first insert and after
 any later rebind. The token names a declared Elements Area of the same preset;
-anything else is refused at manifest load. `features/Templates/library/
-filterable-grid/` is a complete worked example: a static block (§10.3a) pairs
-`[elementvalues]` with an Elements Area whose `item.data` stamps each card
-with its own field value per §10.3.
+anything else is refused at manifest load.
+[`features/Templates/library/articles-filterable-grid/`](https://github.com/dapeio/nino-features/tree/main/features/Templates/library/articles-filterable-grid)
+is a complete worked example: a [static block](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/recipe-section-preset.md#static-blocks)
+pairs `[elementvalues]` with an Elements Area whose `item.data` stamps each
+card with its own field value.
 
 Outside a preset - an ordinary hand-written page template - there is no such
 token and no Area to follow, so both loops simply name the same collection.

@@ -3,7 +3,8 @@
 This file is the operational specification for AI agents that modify Nino. It
 is intentionally explicit and repetitive enough for small models. Follow it
 before copying patterns from memory or from another framework. The seven
-extension recipes under `docs/recipes/` are part of it - section 7 lists them.
+extension recipes section 7 lists are part of it - five under `docs/recipes/`,
+two with the Templates feature in the catalogue.
 
 Nino is a filesystem-based PHP website framework. It has no database, Composer
 dependency, JavaScript build step, component framework, or plugin manager.
@@ -118,7 +119,7 @@ Important source directories:
 | `_nino/Nino/Features/Features.php` | The feature contract: discovery below `features/`, manifest validation, version constraints, settings, `activate()`, `deactivate()`, and `applyUnit()` - the unit application the wizard shares (overwrite on there, add-only for a feature). Contract test `tests/features-smoke.php` against `tests/fixtures/features/` |
 | `_nino/Nino/Modules/<Name>/<Name>.php` | Kernel runtime modules: the always-on ones every project needs (Assets, Cache, Csrf, Elements, Images, Jstext, Template) and the optional ones a project switches on or off in `/nino/modules` (`Form`, `Legal`, `Navigation`, `Localepicker`, `Maintenance`). `Legal` - the imprint and the privacy policy as the element types `legal` and `privacy`, `[legal]` and `[privacy]`, per-language runtime routes of both pages, the menu `legal` and the add-only element units of features - is `_nino/Nino/Modules/Legal/`. Replaced wholesale with `_nino/` |
 | `_nino/Nino/Modules/<Name>/Admin/Admin.php`, `assets/`, `text/`, `templates/`, `install/` | A kernel module's own workbench panel class with its scripts, stylesheets, fills and (for a template panel) its markup, and its installer unit - everything the module brings, in one directory |
-| `features/<Name>/` | An installed feature: `feature.php` (the manifest - key, name, version, the `nino` constraint, `requires`, `settings`, `data`), `<Name>.php` (the class `\Nino\Modules\<Name>`, derived from the directory), `Admin/Admin.php` (its panel), `install/` (the unit `\Nino\Features::activate()` applies add-only), `text/`, `assets/`, `tests/<key>-smoke.php`. A checkout ships none: the published ones - `Newsletter`, `Search` - come from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) and are copied in. Denied by `features/.htaccess` and `router.php`; relocated by `NINO_FEATURES_DIR` |
+| `features/<Name>/` | An installed feature: `feature.php` (the manifest - key, name, version, the `nino` constraint, `requires`, `settings`, `data`), `<Name>.php` (the class `\Nino\Modules\<Name>`, derived from the directory), `Admin/Admin.php` (its panel), `install/` (the unit `\Nino\Features::activate()` applies add-only), `text/`, `assets/`, `tests/<key>-smoke.php`. A checkout ships none: they come from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) - `Newsletter` and `Search` among them - and are copied in or installed from the Features panel. Denied by `features/.htaccess` and `router.php`; relocated by `NINO_FEATURES_DIR` |
 | `app/<Namespace>/<Class>/<Class>.php` | Project-owned PHP classes and runtime modules; defaults to this root unless `NINO_APP_DIR` is defined before loading the kernel |
 | `_nino/Nino.js` | Shared browser helpers, workbench and public site alike - so it is in the public script bundle, and anything only one audience needs belongs beside it rather than in it |
 | `_admin/Admin.php` | The workbench: `\Nino\Admin\Admin` (shell, routes, bundles, fills, dispatch), `\Nino\Admin\Panels` (the panel registry: reads a panel class, orders the panels, renders navigation and panes) and `\Nino\Admin\Recovery` (the recovery secret) |
@@ -131,7 +132,7 @@ Important source directories:
 | `_admin/install/Install.php` | The setup wizard - the workbench's first-run mode, served by the same route while `Admin::isInstalled()` says no; deletable after setup |
 | `_admin/install/library/base/`, `modules/`, `pages/<slug>/` | The wizard's library: always-applied base, units without a runtime class, installable page units |
 | `_admin/install/library/base/assets/theme.css`, `base/templates/frame-header.tpl`, `frame-footer.tpl` | The one look every project starts from, delivered by the base unit: the compiled design tokens, the roles they are assigned to, the three webfaces and the css for both frames, plus the two frame templates `html-header.tpl` includes through `[template /templates/frame-header]`. Edited by hand; there is no generator behind it any more |
-| the appearance catalogue | Not here since 1.2: the ten themes, six headers and seven footers the wizard used to offer, and the Design panel that kept them editable, are parked in [`design-library/`](https://github.com/dapeio/nino-features/tree/main/design-library) of [dapeio/nino-features](https://github.com/dapeio/nino-features) - not a feature, never published, waiting for the **Design** feature. Its archived manual carries the token contract |
+| the appearance catalogue | Not here since 1.2: the ten themes, six headers and seven footers the wizard used to offer, and the Design panel that kept them editable, left the kernel and are no wizard step any more. The look is changed afterwards by the catalogue's [Design](https://github.com/dapeio/nino-features/blob/main/features/Design/README.md) feature, which compiles a set per part of the page and two frames into the `assets/theme.css` and frame templates the base unit delivers. The file stays one you may edit by hand: the compiler refuses to replace a file it did not write until the person applying says so. Its README and `library/base.css` carry the token contract |
 | the Template Builder | Not here since 1.2: extracted into the feature [`features/Templates`](https://github.com/dapeio/nino-features/blob/main/features/Templates/README.md) of the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features), with its section preset library, its two tests and its manual. A project that installed it carries it below `features/`, where the autoloader serves `\Nino\Modules\Templates` from - the kernel root resolves first, so a Nino that still shipped the module would shadow it. Which kernels the feature declares itself for is its own manifest's business, in that repository |
 | the social media links | Not in the base unit after 1.3.1: the four network keys, the heading of the social links, `html-socialmedia.tpl` and the `.nino-socialmedia` rules of `Nino.css` are the feature [`features/Social`](https://github.com/dapeio/nino-features/blob/main/features/Social/README.md) of the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) - an element type `/social` the editors keep, drawn by `[social]`, `[social-link]` and `[social-icon]`. The Design feature's frames include the template it installs, `templates/social-links.tpl`, which renders as nothing where the feature is not there |
 | `public/` | The project's public half — everything a browser loads directly: `images/`, `favicon/`, `fonts/`, and the generated `.cache/` bundles. Reached through `Filesystem::path()` on disk and `Filesystem::url()` (or the `[[/nino/public]]` fill) for urls. Never build a public url by hand from `[[/nino/dir]]`. `assets/` is *not* here — the bundle sources are private, see below |
@@ -143,7 +144,7 @@ Important source directories:
 | `tests/*-js-smoke.js` | Standalone Node/browser-logic tests |
 | `phpstan.neon`, `phpstan-baseline.neon`, `eslint.config.mjs`, `.editorconfig` | Static analysis and editor defaults. The baseline lists the findings that were open when the check arrived: remove an entry when its finding is fixed, never add one to silence a new finding |
 | `docs/` | Human manuals in English and German |
-| `docs/recipes/` | The seven extension recipes of this guide, English only |
+| `docs/recipes/` | Five of the seven extension recipes of this guide, English only; the other two travel with the Templates feature, as section 7 lists |
 
 Project content and generated destinations:
 
@@ -602,7 +603,9 @@ formatting as plain functions — extend and test there, not in the renderer.
 
 ## 7. Recipes
 
-The seven extension recipes live under `docs/recipes/`. They are part of this
+The seven extension recipes are listed below: five live under `docs/recipes/`,
+the two about section presets and templates with the Templates feature in the
+catalogue. They are part of this
 specification: every rule above applies inside them, and a change to a
 contract they describe updates the recipe in the same commit. Section 3
 decides which one applies.
@@ -762,10 +765,8 @@ or escaping.
 | Validate only in JavaScript | Repeat strict validation server-side |
 | Make image fields required | Create the Element, then upload |
 | Save one merged Element object to every locale | Split global and locale fields |
-| Invent a Section token | Use only the seven supported token forms |
-| Put an Elements image into `{{image:image}}` | Use local `[[image]]` in the loop |
-| Put `limit` in preset `allow` | Set its default; Composer clamps `1..12` |
-| Choose any globally valid layout | Choose one valid for the content module |
+| Invent a Section token | Use only `[[area:<key>]]` (each declared Area exactly once per Layout), `[[section:id]]` and `[[section:collection:<areaKey>]]` - see the preset recipe's [Static blocks](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/recipe-section-preset.md#static-blocks) |
+| Bind an Elements image to a textfill or a fixed value | An Elements image binds to a `field` of the collection's model |
 | Put several top-level sections in `section.tpl` | Exactly one complete root section |
 | Add `nino-vpa` behavior to preview | Let preview strip VPA and stay visible |
 | Enable scripts/remote forms in preview | Keep the sandbox deterministic and inert |
@@ -940,14 +941,13 @@ new, and the tests named in section 10 pass.
 
 ### Section preset done
 
-- [ ] Slug, name, description, category, tags, version, and shell are valid.
-- [ ] All defaults are complete and content/layout compatible.
-- [ ] `allow` exposes only intended variations.
-- [ ] Generic renderer is used unless custom DOM is necessary.
-- [ ] Custom template has one root and only resolvable tokens.
+- [ ] Slug, name, description, category, tags and version are valid, and `version` is 3.
+- [ ] Every Layout contains each declared `[[area:<key>]]` exactly once and no other Area token.
+- [ ] Each Layout composes to exactly one top-level `<section>` and carries only resolvable tokens.
 - [ ] Native fields, image slots, and Element schema are exact.
 - [ ] Preview is deterministic, visible, inert, and representative.
 - [ ] Composer, invalid-choice, preview, and search tests pass.
+- [ ] The preset recipe's [Validation and output](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/recipe-section-preset.md#validation-and-output) and [Preview and tests](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/recipe-section-preset.md#preview-and-tests) hold.
 
 ### Page/template unit done
 
@@ -994,13 +994,13 @@ Read these before designing a new implementation:
 | Workbench shell, registry, recovery | `_admin/Admin.php` |
 | Workbench panel backend patterns | `_admin/Nino/Modules/Elements/Admin/Admin.php`, `Routes/Admin/Admin.php`, `Users/Admin/Admin.php` |
 | Panel list/form JS | `_admin/Nino/Modules/Elements/assets/types.js` and `admin.js`, `_admin/Nino/Modules/Routes/assets/admin.js`; the shell `_admin/assets/script.js` |
-| Panel contract | `\Nino\Admin\Panels` in `_admin/Admin.php`; smallest panel `tests/fixtures/features/Sample/Admin/Admin.php` (the catalogue's `features/Search/Admin/Admin.php` is the smallest published one); fills and a tile `_nino/Nino/Modules/Form/Admin/Admin.php`; own template and workspace layout `features/Templates/Admin/Admin.php` in the catalogue |
+| Panel contract | `\Nino\Admin\Panels` in `_admin/Admin.php`; smallest panel `tests/fixtures/features/Sample/Admin/Admin.php` (the catalogue's `features/Hello/Admin/Admin.php` is the panel of the feature written to be copied); fills and a tile `_nino/Nino/Modules/Form/Admin/Admin.php`; own template and workspace layout `features/Templates/Admin/Admin.php` in the catalogue |
 | Ordered Admin relationships | `\Nino\Modules\Navigation\Admin` and `_nino/Nino/Modules/Navigation/assets/admin.js` |
 | Shared Admin UI | the `nino.system` half of `_admin/assets/style.css` and `_admin/assets/Nino.admin.js` |
 | Installer package shape | `_nino/Nino/Modules/*/install/manifest.php`; a feature's `features/*/install/manifest.php` has the same shape |
 | Setup wizard semantics | `_admin/install/Install.php` and `tests/install-smoke.php` |
 | Generic Section presets | `features/Templates/library/*/manifest.php` in the catalogue |
-| Section preset with several layouts | `features/Templates/library/feature-split/` in the catalogue |
+| Section preset with several layouts | `features/Templates/library/image-list-split/` in the catalogue |
 | Composer/parser contracts | `features/Templates/Composer/Composer.php`, `SectionDocument/SectionDocument.php`, `AreaComposer/AreaComposer.php` in the catalogue, with its own `tests/templates-smoke.php` |
 | Basic page unit | `_admin/install/library/pages/home/` |
 | Module-dependent page | `_admin/install/library/pages/contact/` |

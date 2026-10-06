@@ -109,7 +109,7 @@ assets/style.css            das eigene des Projekts, leer ausgeliefert
 
 Setup ergänzt das Bundle unter `/nino/html/assets` um die beiden Projekteinträge, sofern sie noch nicht darin stehen, und hängt an, statt zu ersetzen – was ein Projekt selbst hinzugefügt hat, behält seinen Platz. `assets/style.css` wird einmal leer geschrieben und danach nie wieder angefasst, eine Regel dort überschreibt also alles darüber.
 
-Bis Nino 1.1 hat der Assistent hier vier Fragen gestellt – ein Theme aus einem Katalog von zehn, einen Header und einen Footer aus dreizehn Frames und die daraus kompilierten Design-Werte. Das tut er nicht mehr. Der Katalog liegt in [`design-library/`](https://github.com/dapeio/nino-features/tree/main/design-library) des Feature-Repositories und wartet auf das Feature **Design**, das seine eigene CSS über die mitgelieferte kompilieren wird.
+Bis Nino 1.1 hat der Assistent hier vier Fragen gestellt – ein Theme aus einem Katalog von zehn, einen Header und einen Footer aus dreizehn Frames und die daraus kompilierten Design-Werte. Das tut er nicht mehr. Das Aussehen ändert danach das Feature **Design** aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features/blob/main/features/Design/README.md), das seine eigene `assets/theme.css` und eigene Frame-Templates über die mitgelieferten kompiliert – und fragt, bevor es eine Datei ersetzt, die es nicht selbst geschrieben hat.
 
 ## 3. Routes
 
