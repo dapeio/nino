@@ -103,7 +103,7 @@
 }
 
 /*	An offer no version of which fits this kernel: readable, and visibly not
-	something to act on - the same treatment the card version had. */
+	something to act on. */
 #features-list .nino-admin-list > li[aria-disabled="true"] {
 	opacity: .6;
 }

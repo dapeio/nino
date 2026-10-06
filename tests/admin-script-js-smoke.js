@@ -1299,5 +1299,10 @@ check( 'the first heading of the rail loses its top margin also where the phone\
 check( 'on a phone the unsaved marker is a row of its own, so that it never slides under the Save button of a bar of three',
 	/@media \(max-width: 38rem\) \{[^@]*\.nino-admin-actionbar:has\(> \.nino-admin-actionbar-dirty:not\(\[hidden\]\)\) \{\s*flex-wrap: wrap;\s*\}\s*\.nino-admin \.nino-admin-actionbar > \.nino-admin-actionbar-dirty \{\s*flex: 1 0 100%;/.test( shellCss ) === true );
 
+// The rail is a column (.nino-admin-rail, the shell's #admin-bar-wrap):
+// letting it wrap made the page wider than a 320-358px phone screen
+check( 'nothing lets the rail wrap, so it is never wider than a phone screen',
+	/(?:#admin-bar-wrap|\.nino-admin-rail)\s*\{[^}]*flex-wrap/.test( shellCss ) === false );
+
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

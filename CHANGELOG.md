@@ -116,8 +116,18 @@ All notable changes to Nino are documented in this file.
   feature's `library/base.css` carries these sections byte for byte and
   follows in its own patch.
 
+### Fixed
+
+- **Workbench:** on a screen 320 to 358px wide the rail no longer makes the
+  page wider than the screen - the phone rule that let the rail, a column,
+  wrap is gone.
+
 ### Removed
 
+- **Workbench:** `style.css` rules and tokens nothing produces or reads:
+  `.nino-admin-card[aria-disabled="true"]`, `.nino-admin-rail-actions`,
+  `--admin-pane-pad`, and the class index in the file's header (AGENTS.md
+  section 6a is the list by need).
 - **`\Nino\Install\Setup::TOOL_MODULES`**, a public constant whose one entry was
   `Maintenance`, and the private `CORE_MODULES` and `AVAILABLE_LOCALES`.
 

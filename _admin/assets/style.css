@@ -61,73 +61,8 @@
  *    escalation. `nino.local` remains available for a deliberate final
  *    override.
  *
- * The vocabulary, in the order it appears below:
- *
- *   Shell      .nino-admin  .nino-admin-shell  .nino-admin-shell--rail
- *              .nino-admin-rail
- *              .nino-admin-rail-head
- *              .nino-admin-rail-user
- *              .nino-admin-rail-danger  .nino-admin-rail-toggle
- *              .nino-admin-nav  .nino-admin-nav-group
- *              .nino-admin-nav-icon  .nino-admin-nav-label
- *              .nino-admin-nav-select  .nino-admin-nav--select
- *              .nino-admin-nav-collapsed
- *              .nino-admin-shell--workspace  .nino-admin-shell--folded
- *              .nino-admin-pane
- *   Auth       .nino-admin-auth  .nino-admin-auth-card
- *              .nino-admin-auth-brand  .nino-admin-auth-title
- *   Brand      .nino-admin-brand-mark  .nino-admin-brand-copy
- *   Type       .nino-admin-hint  .nino-admin-hint-lead  .nino-admin-eyebrow
- *              .nino-admin-error  .nino-admin-empty  .nino-admin-sr-only
- *              .nino-admin-status  .nino-admin-notice
- *   Controls   .nino-admin-btn-primary  .nino-admin-btn-secondary
- *              .nino-admin-btn-danger  .nino-admin-linkbutton
- *   Surfaces   .nino-admin-card  .nino-admin-tiles  .nino-admin-tile
- *              .nino-admin-tile-value .nino-admin-tile-label
- *              .nino-admin-meter-row  .nino-admin-meter-label
- *              .nino-admin-meter-count  .nino-admin-meter-track
- *              .nino-admin-meter-fill
- *   Lists      .nino-admin-list  .nino-admin-list-copy
- *              .nino-admin-list-dense  .nino-admin-list-buttons
- *   Table      .nino-admin-table  .nino-admin-table-scroll
- *              .nino-admin-table-toolbar  .nino-admin-table-search
- *              .nino-admin-table-sort  .nino-admin-table-num
- *              .nino-admin-table-uri  .nino-admin-table-pager
- *              .nino-admin-table-range  .nino-admin-table-size
- *              .nino-admin-table-step
- *   Forms      .nino-admin-field  .nino-admin-field-wide
- *              .nino-admin-fieldgrid  .nino-admin-checkbox-fieldset
- *              .nino-admin-checkbox-field  .nino-admin-field-header
- *              .nino-admin-char-counter  .nino-admin-field-radios
- *              .nino-admin-changed  .nino-admin-required
- *              .nino-admin-field-error
- *              .nino-admin-field-image  .nino-admin-field-suffixed
- *              .nino-admin-checklist  .nino-admin-checklist-state
- *              .nino-admin-richtext
- *              .nino-admin-elementlist  .nino-admin-elementlist-chosen
- *              .nino-admin-elementlist-results  .nino-admin-elementlist-label
- *              .nino-admin-elementlist-actions  .nino-admin-elementlist-remove
- *              .nino-admin-elementlist-add  .nino-admin-elementlist-search
- *              .nino-admin-elementlist-count  .nino-admin-elementlist-empty
- *              .nino-admin-elementlist-note
- *              .nino-admin-stringlist  .nino-admin-stringlist-rows
- *              .nino-admin-stringlist-input  .nino-admin-stringlist-actions
- *              .nino-admin-stringlist-remove  .nino-admin-stringlist-add
- *              .nino-admin-stringlist-empty
- *   Boolean    .nino-admin-switch  .nino-admin-switch-track
- *              .nino-admin-switch-copy  .nino-admin-switch-state
- *   Tabs       .nino-admin-tabs  .nino-admin-tabs--bar
- *              .nino-admin-tabs--panel  .nino-admin-tab
- *              .nino-admin-tabpanel
- *   Controls   .nino-admin-locale-select
- *              .nino-admin-locale-select--corner
- *   Chrome     .nino-admin-contextbar  .nino-admin-contextbar-select
- *              .nino-admin-back-link
- *              .nino-admin-actionbar  .nino-admin-actionbar-status
- *              .nino-admin-actionbar-dirty
- *              .nino-admin-list-actions
- *   Dialog     .nino-admin-dialog  .nino-admin-dialog-body
- *              .nino-admin-dialog-title  .nino-admin-dialog-actions
+ * Which class serves which need is AGENTS.md, section 6a ("Designing an
+ * admin frontend"), not a list kept here.
  */
 
 @layer nino.system {
@@ -2035,12 +1970,6 @@ a {
 	padding-top:1.85rem;
 }
 
-/* A card that offers nothing - a catalogue feature no version of which
-   fits this kernel - stays readable but steps back */
-:where(.nino-admin) .nino-admin-card[aria-disabled="true"] {
-	opacity: .6;
-}
-
 /*	h2 as well as h3: a panel's own screens sit under the shell's one <h1>,
 	so a card's title is the page's second level, not its third - the levels
 	a screen reader reads out have to be a ladder without a rung missing */
@@ -2480,7 +2409,6 @@ a {
 	}
 
 	.nino-admin .nino-admin-pane {
-		--admin-pane-pad: var(--nino-admin-content-inline);
 		grid-column: 2;
 		height: 100dvh;
 		max-width: none;
@@ -2986,20 +2914,6 @@ body.theme-dark #admin-theme-toggle .admin-theme-toggle-dark {
 	gap: .4rem;
 	margin: .4rem 0 0;
 	font-size: .8rem;
-}
-
-/* -------------------------------------------------------------- Mobile */
-
-@media (max-width: 38rem) {
-	#admin-bar-wrap {
-		flex-wrap: wrap;
-	}
-
-	#admin-page-wrap .nino-admin-rail-actions {
-		gap: .45rem;
-		font-size: .75rem;
-	}
-
 }
 
 }

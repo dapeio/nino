@@ -1087,10 +1087,9 @@ check( 'the shell installs its listeners from onReady(), never at load - the DOM
 	/Nino\.admin\.dirty\.init\(/.test( shellSource ) && shellSource.slice( 0, shellSource.indexOf( 'onReady' ) ).indexOf( "addEventListener( 'beforeunload'" ) === -1 );
 
 const stylesheetSource = asset( 'style.css' );
-const vocabularyEnd = stylesheetSource.indexOf( '*/' );
-const vocabulary = stylesheetSource.slice( 0, vocabularyEnd );
-check( 'the new classes are in the design system\'s vocabulary index and have rules',
-	[ 'nino-admin-required', 'nino-admin-field-error', 'nino-admin-actionbar-dirty' ].every( c => vocabulary.includes( '.'+ c ) && stylesheetSource.indexOf( '.'+ c, vocabularyEnd ) !== -1 ) );
+const headerEnd = stylesheetSource.indexOf( '*/' );
+check( 'the new classes have rules',
+	[ 'nino-admin-required', 'nino-admin-field-error', 'nino-admin-actionbar-dirty' ].every( c => stylesheetSource.indexOf( '.'+ c, headerEnd ) !== -1 ) );
 check( 'the marker is a plain class of the action bar, outside the rule that hides the status line on a phone', stylesheetSource.includes( '.nino-admin-actionbar > .nino-admin-actionbar-dirty' ) );
 check( '...and it is hidden only above the phone width, and only in a bar that has a status line',
 	/@media \(min-width: 38\.001rem\) \{\s*\.nino-admin \.nino-admin-actionbar:has\(> \.nino-admin-status\) > \.nino-admin-actionbar-dirty \{\s*display: none;/.test( stylesheetSource ) === true );
