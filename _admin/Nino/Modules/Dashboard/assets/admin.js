@@ -112,12 +112,12 @@
 			// them: a workbench without Backups has no last backup to show,
 			// one without Elements has no types to chart
 			// Named after the panel whose number it is, like every other tile:
-			// that is what gives it the Backups link, the Backups icon and the
-			// .nino-admin-tile--backups accent the stylesheet has always had
-			// for it. An account that cannot open that panel still sees the
-			// date - basic operational info, deliberately ungated (see the
-			// panel's apiSummary()) - and its link lands on the first panel it
-			// does have, the same as any hash that names no visible pane
+			// that is what gives it the #backups link and the class
+			// nino-admin-tile--backups (see _tile()). An account that cannot
+			// open that panel still sees the date - basic operational info,
+			// deliberately ungated (see the panel's apiSummary()) - and its
+			// link lands on the first panel it does have, the same as any
+			// hash that names no visible pane
 			if( data.lastBackup !== undefined )
 				tiles.appendChild( Nino.admin.dashboard._tile( 'backups', data.lastBackup || '–', Nino.content.getText('/_admin/dashboard/label/lastbackup') ) );
 			wrap.appendChild( tiles );
@@ -149,7 +149,10 @@
 
 		/**
 		 *	One clickable stat tile - #hash link into the panel it
-		 *	summarizes, same tab switch the nav bar itself uses
+		 *	summarizes, same tab switch the nav bar itself uses. The class
+		 *	nino-admin-tile--<panel> is there for a project's own stylesheet
+		 *	(layer nino.local) to set one tile apart; the workbench's own
+		 *	stylesheets do not use it
 		 *
 		 *	@param		{string}	panel					Target panel name (eg. "elements")
 		 *	@param		{string}	value					Big figure

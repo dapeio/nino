@@ -13,6 +13,13 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Workbench:** `users/list` no longer answers `self`, the signed-in
+  account's mail beside the list. Every row says whether it is that account
+  (`isSelf`), which is what the Users panel reads; nothing read the field.
+  The Dashboard's comment no longer promises a Backups icon and a
+  `.nino-admin-tile--backups` accent no stylesheet had; the per-panel class
+  `nino-admin-tile--<panel>` stays, for a project's own stylesheet.
+
 - **Workbench:** the Types tab's script is `Nino.admin.types` only - the
   name the shell looks it up by; `Nino.admin.elementTypes`, under which it was
   declared and then aliased, is gone, so a project script that reached into it

@@ -1436,6 +1436,9 @@ check( 'a plain user cannot log out another user', $status === 403 );
 [ , $body ] = callUsers( $appData, 'apiList' );
 // admin@example.com (from the earlier sections) + manager@example.com + plain2@example.com
 check( 'a manager sees every user in the list', count( $body['users'] ) === 3 );
+check( 'the signed-in account is marked on its own row, and only there', count( array_filter( $body['users'], fn( array $user ): bool => $user['isSelf'] === true && $user['mail'] === 'manager@example.com' ) ) === 1
+	&& count( array_filter( $body['users'], fn( array $user ): bool => $user['isSelf'] === true ) ) === 1
+	&& array_key_exists( 'self', $body ) === false );
 
 [ $status, $body ] = callUsers( $appData, 'apiSave', [ 'username' => 'plain2@example.com', 'mail' => 'plain3@example.com' ] );
 check( 'a manager can rename another user without knowing their password', $status === 200 && $body['mail'] === 'plain3@example.com' );

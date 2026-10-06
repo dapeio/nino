@@ -151,9 +151,6 @@ namespace Nino\Modules\Users {
 				$options[$perm] = [ 'perm' => $perm, 'label' => $label, 'group' => $panel['group'], 'offered' => true ];
 			}
 
-			if( isset( $options[self::MANAGE_PERM] ) === false )
-				$options[self::MANAGE_PERM] = [ 'perm' => self::MANAGE_PERM, 'label' => '/_admin/users/label/permissions-manage', 'group' => 'system', 'offered' => true ];
-
 			foreach( self::permsInUse( $appData ) as $perm )
 				if( isset( $options[$perm] ) === false )
 					$options[$perm] = [ 'perm' => $perm, 'label' => $perm, 'group' => 'other', 'offered' => false ];
@@ -351,7 +348,7 @@ namespace Nino\Modules\Users {
 			foreach( Roles::all( $appData ) as $id => $role )
 				$roles[] = [ 'id' => $id, 'label' => $role['label'] ];
 
-			\Nino\Http::ok( $request, [ 'users' => $users, 'canManage' => $canManage, 'self' => $current['mail'], 'roles' => $roles ] );
+			\Nino\Http::ok( $request, [ 'users' => $users, 'canManage' => $canManage, 'roles' => $roles ] );
 		}
 
 		/**
