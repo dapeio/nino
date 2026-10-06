@@ -80,7 +80,13 @@
 		 *	Re-apply whatever drill-down level this panel is currently on -
 		 *	called when the user switches TO this tab, so the hash (only ever
 		 *	written by router.set() while this panel is the visible one) gets
-		 *	synced to reality instead of staying stale from before the switch
+		 *	synced to reality instead of staying stale from before the switch.
+		 *
+		 *	Where the hash names this panel, the hash wins: a step through the
+		 *	browser's history changes the address and nothing else, so the level
+		 *	it names is shown - and leaving a form that holds unsaved input asks
+		 *	first, as its back link does. A hash that names another panel (a
+		 *	click on the rail) leaves the level in memory as it is
 		 *
 		 *	@return		void
 		 */
@@ -91,10 +97,57 @@
 				return;
 			}
 
+			const hash = Nino.admin.router.current();
+			if( hash.panel === 'users' && Nino.admin.users._follow( hash.parts ) === true )
+				return;
+
+			Nino.admin.users._showLevel();
+		},
+
+		/**
+		 *	Show the level this panel is on, and write it into the address
+		 *
+		 *	@return		void
+		 */
+		_showLevel : function() {
+
 			if( dc.getElementById('users-form').classList.contains('admin-hidden') === false )
 				return Nino.admin.users._showForm();
 
 			Nino.admin.users._showList();
+		},
+
+		/**
+		 *	Move to the level the hash names, if it is not the one on screen:
+		 *	the new-account form, an account's form or the list. An account the
+		 *	list does not hold - and 'new' for one who may not create - is the
+		 *	list. Leaving a form with unsaved input asks first (see
+		 *	Nino.admin.router.leave())
+		 *
+		 *	@param		{Array}		parts					The hash behind the panel's name
+		 *
+		 *	@return		{boolean}									Whether a move was made or is being asked about
+		 */
+		_follow : function( parts ) {
+
+			const open = dc.getElementById('users-form').classList.contains('admin-hidden') === false;
+			const current = Nino.admin.users._currentUser;
+			const user = parts.length === 0 ? undefined : Nino.admin.users._users.find( function( u ) { return u.mail === parts[0] } );
+			const create = parts[0] === 'new' && user === undefined && Nino.admin.users._canManage === true;
+
+			if( create === true ? ( open === true && current === null ) : ( user === undefined ? open === false : ( open === true && current !== null && current.mail === user.mail ) ) )
+				return false;
+
+			Nino.admin.router.leave( [ 'users' ], open, function() {
+				if( create === true )
+					Nino.admin.users._renderCreateForm();
+				else if( user === undefined )
+					Nino.admin.users._showList();
+				else
+					Nino.admin.users._openUser( user.mail );
+			}, Nino.admin.users._showLevel );
+
+			return true;
 		},
 
 		/**
@@ -228,7 +281,7 @@
 				copy.appendChild( role );
 				link.appendChild( copy );
 
-				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.users._openUser( user.mail ) } );
+				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'users', [ user.mail ] ); Nino.admin.users._openUser( user.mail ) } );
 				li.appendChild( link );
 				ul.appendChild( li );
 			} );
@@ -238,7 +291,7 @@
 				add.type = 'button';
 				add.className = 'nino-admin-btn-primary';
 				add.textContent = Nino.content.getText('/_admin/users/label/new');
-				add.addEventListener( 'click', function() { Nino.admin.users._renderCreateForm() } );
+				add.addEventListener( 'click', function() { Nino.admin.router.go( 'users', [ 'new' ] ); Nino.admin.users._renderCreateForm() } );
 				wrap.appendChild( Nino.adminUi.listActions( [ add ] ) );
 			}
 		},
@@ -257,7 +310,7 @@
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/users/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.users._showList() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'users', [] ); Nino.admin.users._showList() } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 			const form = dc.createElement('form');
 			form.id = 'users-create-form';
@@ -400,7 +453,7 @@
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/users/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.users._showList() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'users', [] ); Nino.admin.users._showList() } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const form = dc.createElement('form');

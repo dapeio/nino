@@ -238,5 +238,33 @@ sent.length = 0;
 subBox.Nino.auth.logout( '/sub' );
 check( '...and so does a logout', sent.length === 1 && sent[0].uri === '/sub/.nino/auth/logout' );
 
+// --- where a login goes on to ------------------------------------------------
+//
+// A string is a uri to replace the location with; null is no redirect at all -
+// the page is loaded again where it stands, so the #hash and the ?query of the
+// address a person came in by (a deep link into /_admin) come back with a
+// session. Replacing the location with its own path and a fragment would only
+// navigate inside the document, and the login form would stay on screen
+
+const navigations = [];
+sandbox.location.reload = function() { navigations.push('reload') };
+sandbox.location.replace = function( uri ) { navigations.push( 'replace '+ uri ) };
+
+function loginAnswered( redirect, served ) {
+	sent.length = 0;
+	navigations.length = 0;
+	let failed = null;
+	subBox.Nino.auth.login( 'editor@example.com', 'secret', redirect, function( xhr ) { failed = xhr.status } );
+	sent[0].served = served;
+	sent[0].responseText = '';
+	sent[0].onload( { type : 'load' } );
+	return { navigations : navigations.slice(), failed : failed };
+}
+
+check( 'a login with a uri replaces the location with it', loginAnswered( '/sub/_admin', 200 ).navigations.join() === 'replace /sub/_admin' );
+check( 'a login with null loads the page again where it stands', loginAnswered( null, 200 ).navigations.join() === 'reload' );
+const refused = loginAnswered( null, 401 );
+check( '...and a refused one goes nowhere, whichever it was told, and says so to its caller', refused.navigations.length === 0 && refused.failed === 401 && loginAnswered( '/sub/_admin', 401 ).navigations.length === 0 );
+
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exit( failures === 0 ? 0 : 1 );

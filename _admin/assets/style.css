@@ -69,6 +69,8 @@
  *              .nino-admin-rail-danger  .nino-admin-rail-toggle
  *              .nino-admin-nav  .nino-admin-nav-group
  *              .nino-admin-nav-icon  .nino-admin-nav-label
+ *              .nino-admin-nav-select  .nino-admin-nav--select
+ *              .nino-admin-nav-collapsed
  *              .nino-admin-shell--workspace  .nino-admin-shell--folded
  *              .nino-admin-pane
  *   Auth       .nino-admin-auth  .nino-admin-auth-card
@@ -444,8 +446,28 @@ a {
 	line-height: 1;
 }
 
-:where(.nino-admin) .nino-admin-nav > span.nino-admin-nav-group {
+:where(.nino-admin) .nino-admin-nav > .nino-admin-nav-group {
 	display: none;
+}
+
+/* The phone's stand-in for the strip of links: a select of the same panels,
+   one optgroup per group heading. The script builds it from the rail, and
+   only where it exists is the strip given up (see Nino.admin.navGroups) -
+   the desktop shows the links and never the select. */
+:where(.nino-admin) .nino-admin-nav-select {
+	display: none;
+}
+
+@media (max-width: 63.999rem) {
+	:where(.nino-admin) .nino-admin-nav--select > :is(a, .nino-admin-nav-group) {
+		display: none;
+	}
+
+	:where(.nino-admin) .nino-admin-nav--select > .nino-admin-nav-select {
+		display: block;
+		flex: 1 1 auto;
+		margin: .4rem 0;
+	}
 }
 
 :where(.nino-admin) .nino-admin-pane {
@@ -544,10 +566,11 @@ a {
 	transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, opacity .12s ease;
 }
 
-/* Not the link-shaped one: it has no surface to tint, and this rule weighs
-   more than its own (three classes and an element against three classes), so
-   naming the exception here is the only place it can be made */
-:where(.nino-admin) button:hover:not(:disabled):not(.is-active):not(.nino-admin-linkbutton):not(.nino-admin-btn-primary) {
+/* Not the link-shaped one, and not a rail group heading: they have no surface
+   to tint of their own kind (the heading takes the rail's hover), and this
+   rule weighs more than theirs (three classes and an element against three
+   classes), so naming the exception here is the only place it can be made */
+:where(.nino-admin) button:hover:not(:disabled):not(.is-active):not(.nino-admin-linkbutton):not(.nino-admin-btn-primary):not(.nino-admin-nav-group) {
 	background: var(--editor-blue-soft);
 }
 :where(.nino-admin) button:active {
@@ -2336,23 +2359,69 @@ a {
 		display: inline-grid;
 	}
 
-	/* A group heading is an eyebrow between two runs of links - only ever a
-	   heading, never a link or a step */
-	.nino-admin .nino-admin-nav > span.nino-admin-nav-group {
-		display: block;
+	/* A group heading is an eyebrow between two runs of links, and the button
+	   that folds the run below it: it says which state it is in with a caret
+	   (aria-expanded carries the same for a screen reader). A button has the
+	   whole control baseline to give up first - height, padding, surface,
+	   shadow - which the heading never had as a span */
+	.nino-admin .nino-admin-nav > .nino-admin-nav-group {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: .5rem;
+		width: 100%;
+		min-height: 0;
 		margin: .6rem 0 .1rem;
-		padding: 0 .68rem;
+		padding: .2rem .68rem;
 		border: 0;
+		border-radius: var(--editor-radius-sm);
 		background: transparent;
+		box-shadow: none;
 		color: var(--nino-admin-rail-muted);
+		cursor: pointer;
 		font-size: .64rem;
 		font-weight: 700;
 		letter-spacing: .09em;
+		line-height: 1.4;
+		text-align: left;
 		text-transform: uppercase;
 	}
 
-	.nino-admin .nino-admin-nav > span.nino-admin-nav-group:first-child {
+	.nino-admin .nino-admin-nav > .nino-admin-nav-group:hover {
+		background: var(--nino-admin-rail-hover);
+		color: var(--editor-text);
+	}
+
+	.nino-admin .nino-admin-nav > .nino-admin-nav-group:focus-visible {
+		outline-offset: -2px;
+	}
+
+	.nino-admin .nino-admin-nav > .nino-admin-nav-group::after {
+		content: "";
+		flex: 0 0 auto;
+		width: .38rem;
+		height: .38rem;
+		border-right: 2px solid currentColor;
+		border-bottom: 2px solid currentColor;
+		transform: translateY(-.1rem) rotate(45deg);
+		transition: transform .15s ease;
+	}
+
+	.nino-admin .nino-admin-nav > .nino-admin-nav-group[aria-expanded="false"]::after {
+		transform: translateX(-.1rem) rotate(-45deg);
+	}
+
+	.nino-admin .nino-admin-nav > .nino-admin-nav-group:first-child {
 		margin-top: 0;
+	}
+
+	/* A folded group's links are out of the way - on the open rail only: the
+	   folded one is a column of icons with nothing to save by hiding, and the
+	   phone's strip is the select's business. A class of its own rather than
+	   .nino-admin-hidden, which is display:none !important and would win over
+	   the fold. */
+	.nino-admin-shell:not(.nino-admin-shell--folded) .nino-admin-nav > .nino-admin-nav-collapsed {
+		display: none;
 	}
 
 	/* The fold control: a small square at the end of the brand row */
@@ -2449,11 +2518,22 @@ a {
 		padding-right: 0;
 		padding-left: 0;
 	}
-	.nino-admin-shell--folded.nino-admin .nino-admin-nav > span.nino-admin-nav-group {
+	/* The heading is a divider here, and not one to tab to (the script takes
+	   it out of the order and the fold is ignored) */
+	.nino-admin-shell--folded.nino-admin .nino-admin-nav > .nino-admin-nav-group {
+		display:block;
 		text-indent:-9999rem;
 		height:2px;
+		padding:0;
 		margin:.3rem .5rem .2rem;
+		overflow:hidden;
 		background:var(--editor-border);
+		cursor:default;
+		pointer-events:none;
+	}
+
+	.nino-admin-shell--folded.nino-admin .nino-admin-nav > .nino-admin-nav-group::after {
+		display:none;
 	}
 	.nino-admin-shell--folded.nino-admin .nino-admin-rail-head {
 		margin-bottom:1rem;

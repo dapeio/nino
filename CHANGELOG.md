@@ -404,6 +404,32 @@ All notable changes to Nino are documented in this file.
   refusal, the permission and the alt link; `tests/admin-elementtypes-js-smoke.js`
   the rows, the renames, the question, the request and the copy.
 
+- **Workbench:** the rail's groups fold, and the phone gets a menu. A group
+  heading is a button (`aria-expanded`, a caret, the rail's hover tint, a focus
+  ring) that folds the links under it; the choice is kept per browser in
+  `localStorage` (`nino-admin-nav-groups`), everything is open by default, and
+  the group of the panel on screen is always open - selecting a panel opens its
+  group. On the folded rail nothing is hidden, whatever was folded, and the
+  headings are dividers that are not in the tab order. Below 64rem the strip of
+  links gives way to one `<select class="nino-admin-nav-select">` built from the
+  rail (`Nino.admin.navGroups`, `script.js`), one `<optgroup>` per heading and
+  none for a rail with a single group, named like the nav itself; it shows the
+  panel on screen - a tab selects its owner - and a change opens the panel as a
+  move of the person's own (a history entry, see below). The strip is hidden
+  only where the select exists. `Panels::$html['nav-group']` is a `<button>`
+  now, a project that replaced it must follow; which links a heading folds is
+  the order the server rendered them in, so no markup was added to
+  `nav-link`. The meaning of a group, `Panels::_entry()` and the `features`
+  group of feature panels are unchanged. The shared stylesheet's four
+  `span.nino-admin-nav-group` selectors name the class alone, the button
+  baseline's hover tint leaves the heading out, and the select's and the fold's
+  rules are in the design-system half (classes only, `nino-admin-nav--select`,
+  `nino-admin-nav-collapsed`). `tests/admin-script-js-smoke.js` holds the fold,
+  its persistence, the open group of the selected panel, the folded rail, the
+  select's groups and its change, and a rail with one group;
+  `tests/admin-system-smoke.php` the heading as a button and every link under
+  the heading of its own group.
+
 ### Changed
 
 - **Workbench:** what the panels print for a failure. A failure with a code is
@@ -644,6 +670,50 @@ All notable changes to Nino are documented in this file.
   stored format takes it from its values, so those two are edited as line breaks
   and save as such. The wizard's, the Translations import's and the Templates
   feature's writes through `Text::saveBatch()` follow the same format.
+
+- **Workbench:** Back and Forward walk the workbench, the rail's entries are real
+  links, a deep link survives the login. The rail links are `href="#<panel>"`:
+  Ctrl-click, a middle click or Shift-click open the panel in a new tab or window,
+  a copied link goes to it, and only a plain click is the script's. A move the person
+  makes adds a history entry (`pushState`) - a rail click, a tab, the phone's
+  select, a row or a "new" button opened in Elements, Images, Text, Users and
+  Roles, their back links, the previous and next element - and what only keeps
+  the address true to the screen replaces the one it is on: the page load, a step
+  through the history, the arrow keys of a tab strip, a panel showing its level
+  again, the address a new element gets when it is saved. `router.go()` is the
+  explicit push; `router.set()` pushes only while the shell flags the switch it
+  is in as the person's (a one-shot set by `selectTab( panel, tab, true )`),
+  which keeps a panel that writes its level while it is shown - the Dashboard,
+  every drill-down panel - to one entry instead of overwriting the one before.
+  The five drill-down panels follow the hash when it names them
+  (`showCurrent()`): the picker, a type's list or one element's form; a category
+  or an account or a role or the form for a new one; an unknown target is the
+  top level, and a hash that names another panel (a click on the rail) keeps the
+  level in memory as before. Leaving an open form that way asks Save / Discard /
+  Cancel like its back link (`router.leave()` through `Nino.admin.dirty.guard()`),
+  and a Cancel - or a Save that fails, which the shell answers by bringing the
+  form on screen - writes the level on screen back into the address. Elements keeps
+  the types the picker drew to open one from the hash, and loads another type's
+  list the way a reload does. This also makes the Dashboard's tiles
+  (`#elements/<type>`) work for an Elements panel that is already loaded, and
+  so do the Template Builder's links into `#images/<group>` and
+  `#elements/<type>` where they resolve in the same document. After the
+  login the page loads again where it stands (`Nino.auth.login( user, pw, null )`
+  reloads; a string still redirects) - `location.replace( '/_admin' + hash )`
+  would be a navigation inside the same document that requests nothing and leaves
+  the login form on screen - so the `#hash` and `?locale=` of the address survive,
+  and there is no redirect parameter to guard. The interface-language pickers of
+  the workbench and of the login screen keep the hash. `script.js` keeps
+  `location.hash.replace` and uses no `location.search` (the Templates feature's
+  test reads it). `tests/admin-script-js-smoke.js` (125 → 148 checks) holds the
+  entries (one per rail click and tab click, none for the load, the arrow keys, a
+  hashchange or a modifier or middle click), a Dashboard-like panel and the
+  language picker; `tests/admin-router-js-smoke.js` (new, 50) the router and the
+  follow of Text, Users and Roles and the back links; `tests/admin-elements-js-smoke.js`
+  (203 → 226) and `tests/admin-images-js-smoke.js` (40 → 49) theirs;
+  `tests/admin-login-js-smoke.js` (30 → 34) the reload and the picker;
+  `tests/nino-auth-js-smoke.js` (26 → 29) `login()` with `null`;
+  `tests/admin-system-smoke.php` the links as `href="#<panel>"`.
 
 ### Removed
 

@@ -24,8 +24,18 @@
 		 *	Minimal url-hash "router": lets a panel persist which drill-down
 		 *	level it's on into the hash, so a refresh restores the exact view
 		 *	instead of resetting to the panel's top level. Uses
-		 *	history.replaceState (not location.hash=) so it never scroll-jumps
-		 *	and never fires its own hashchange event.
+		 *	history.replaceState and pushState (not location.hash=) so it never
+		 *	scroll-jumps and never fires its own hashchange event.
+		 *
+		 *	What the browser's Back and Forward walk is the workbench: a
+		 *	person's own move - the rail, a tab, a row opened, a back link -
+		 *	adds an entry (go(), or set() while the shell asked for it), and
+		 *	everything that only keeps the address true to the screen - a
+		 *	panel showing its level again, the arrow keys of a tab strip, a
+		 *	save that names the new element - replaces the entry it is on. A
+		 *	step through the history is a hashchange, which the shell answers
+		 *	by selecting the panel or tab the hash names and the panel by
+		 *	following the rest (see showCurrent() of the drill-down panels).
 		 *
 		 *	Every panel's init() runs unconditionally on page load and each
 		 *	ends by calling its own "show my current state" function - which is
@@ -37,6 +47,17 @@
 		 *	tab synchronously, before any panel's async data can arrive.
 		 */
 		router : {
+
+			// The shell's one-shot "this switch is the person's move" - set by
+			// selectTab() for the length of the switch, consumed by the first
+			// write that changes the address (see set())
+			_push : false,
+
+			// The shell brings a panel on screen as it stands (a form that failed
+			// to save, with its errors): leave() then keeps the level in memory
+			// and does not move on to the one the address names - that move is the
+			// very question that was just answered with a Save that failed
+			_keep : false,
 
 			/**
 			 *	Whether `panel` names a pane the shell rendered - the panes come
@@ -82,8 +103,23 @@
 			},
 
 			/**
-			 *	Replace the hash with #panel/part/part/... - a no-op while
-			 *	`panel` isn't the currently visible tab (see class docblock)
+			 *	The hash for #panel/part/part/...
+			 *
+			 *	@param		{string}	panel
+			 *	@param		{Array}		[parts]
+			 *
+			 *	@return		{string}
+			 */
+			_hash : function( panel, parts ) {
+				return '#'+ [ panel ].concat( parts || [] ).map( encodeURIComponent ).join('/');
+			},
+
+			/**
+			 *	Write #panel/part/part/... into the address: replacing the entry
+			 *	the browser is on - or adding one, when the shell flagged the
+			 *	switch in progress as the person's own move (the one-shot _push)
+			 *	- a no-op while `panel` isn't the currently visible tab (see
+			 *	class docblock) and when the address already says it
 			 *
 			 *	@param		{string}	panel
 			 *	@param		{Array}		[parts]
@@ -95,9 +131,66 @@
 				if( Nino.admin.router.isActive( panel ) === false )
 					return;
 
-				const hash = '#'+ [ panel ].concat( parts || [] ).map( encodeURIComponent ).join('/');
+				const hash = Nino.admin.router._hash( panel, parts );
+				if( wn.location.hash === hash )
+					return;
+
+				const push = Nino.admin.router._push === true;
+				Nino.admin.router._push = false;
+				wn.history[ push === true ? 'pushState' : 'replaceState' ]( null, '', hash );
+			},
+
+			/**
+			 *	A move the person made inside a panel - a row opened, a back
+			 *	link, the next element: a new entry for Back to return to. The
+			 *	same no-op rules as set(), so asking for the address the bar
+			 *	already shows (a level followed from the hash, a restore after
+			 *	a reload) adds nothing. Called before the panel's own set(), which
+			 *	then finds the address true
+			 *
+			 *	@param		{string}	panel
+			 *	@param		{Array}		[parts]
+			 *
+			 *	@return		void
+			 */
+			go : function( panel, parts ) {
+
+				if( Nino.admin.router.isActive( panel ) === false )
+					return;
+
+				const hash = Nino.admin.router._hash( panel, parts );
 				if( wn.location.hash !== hash )
-					wn.history.replaceState( null, '', hash );
+					wn.history.pushState( null, '', hash );
+			},
+
+			/**
+			 *	A panel follows the address to another level (see showCurrent()
+			 *	of the drill-down panels) - a step through the browser's history
+			 *	changed the bar and nothing else. Leaving a form that holds
+			 *	input nobody saved asks first, as its back link does (see
+			 *	Nino.admin.dirty.guard()); a Cancel puts the address back to what
+			 *	the screen shows, which `resync` does
+			 *
+			 *	@param		{Array}			names				The dirty entries the form answers to
+			 *	@param		{boolean}		leaving			A form is on screen and the move leaves it
+			 *	@param		{Function}	proceed			Shows the level the address names
+			 *	@param		{Function}	resync			Shows the level in memory again, writing it into the address
+			 *
+			 *	@return		void
+			 */
+			leave : function( names, leaving, proceed, resync ) {
+
+				if( Nino.admin.router._keep === true ) {
+					resync();
+					return;
+				}
+
+				if( leaving === true && typeof Nino.admin.dirty === 'object' ) {
+					Nino.admin.dirty.guard( names, proceed, resync );
+					return;
+				}
+
+				proceed();
 			},
 
 			/**
@@ -1063,6 +1156,206 @@
 		},
 
 		/**
+		 *	The rail's group headings and the phone's select. A heading is a
+		 *	button that folds the links under it (aria-expanded says which
+		 *	state it is in); the fold is a preference of the browser, kept in
+		 *	localStorage like the rail's own, and everything is open until
+		 *	somebody closes it. The panel on screen always has its group open -
+		 *	selectTab() asks for that through show(). On a folded rail the headings
+		 *	are dividers: nothing is hidden there and they are not in the tab
+		 *	order; below the sidebar breakpoint the headings are not drawn at all.
+		 *
+		 *	Which links belong to which heading is the order the server rendered
+		 *	them in (see Panels::navHtml()): a heading, then its links. Without
+		 *	headings - an account that sees one group - there is nothing to fold.
+		 *
+		 *	Below 64rem the strip of links gives way to a select built from the
+		 *	same rail, one optgroup per heading; picking an entry is the same
+		 *	move as clicking its link. The stylesheet hides the strip only when
+		 *	the select exists (the nav's --select class), the select only on the
+		 *	desktop.
+		 */
+		navGroups : {
+
+			STORAGE_KEY : 'nino-admin-nav-groups',
+
+			_nav			: null,
+			_select		: null,
+			// [ { name, button, links[] } ] in the rail's order
+			_groups		: [],
+
+			/**
+			 *	Read the rail the server rendered, build the select and apply the
+			 *	stored state
+			 *
+			 *	@param		{Function}	choose					Called with a panel name when the select changes
+			 *
+			 *	@return		void
+			 */
+			init : function( choose ) {
+
+				const nav = dc.getElementById('admin-nav-wrap');
+				if( nav === null )
+					return;
+
+				const plain = [];
+				let group = null;
+
+				Array.from( nav.children ).forEach( function( child ) {
+
+					if( child.classList.contains('nino-admin-nav-group') ) {
+						const entry = { name : child.dataset.group, button : child, links : [] };
+						group = entry;
+						Nino.admin.navGroups._groups.push( entry );
+						child.addEventListener( 'click', function() { Nino.admin.navGroups.toggle( entry.name ) } );
+						return;
+					}
+
+					if( child.dataset.panel === undefined )
+						return;
+
+					if( group === null )
+						plain.push( child );
+					else
+						group.links.push( child );
+				} );
+
+				Nino.admin.navGroups._nav = nav;
+
+				const option = function( link ) {
+					const label = link.querySelector('.nino-admin-nav-label');
+					const el = dc.createElement('option');
+					el.value = link.dataset.panel;
+					el.textContent = label === null ? link.dataset.panel : label.textContent;
+					return el;
+				};
+
+				const select = dc.createElement('select');
+				select.className = 'nino-admin-nav-select';
+				select.setAttribute( 'aria-label', nav.getAttribute('aria-label') ?? '' );
+				plain.forEach( function( link ) { select.appendChild( option( link ) ) } );
+				Nino.admin.navGroups._groups.forEach( function( entry ) {
+					const optgroup = dc.createElement('optgroup');
+					optgroup.label = entry.button.textContent;
+					entry.links.forEach( function( link ) { optgroup.appendChild( option( link ) ) } );
+					select.appendChild( optgroup );
+				} );
+				select.addEventListener( 'change', function() { choose( select.value ) } );
+
+				nav.insertBefore( select, nav.firstChild );
+				nav.classList.add('nino-admin-nav--select');
+				Nino.admin.navGroups._select = select;
+
+				Nino.admin.navGroups.apply();
+			},
+
+			/**
+			 *	The names of the groups folded in this browser
+			 *
+			 *	@return		{Array<string>}
+			 */
+			_stored : function() {
+				try {
+					const names = JSON.parse( wn.localStorage.getItem( Nino.admin.navGroups.STORAGE_KEY ) || '[]' );
+					return Array.isArray( names ) ? names : [];
+				} catch(e) {
+					return [];
+				}
+			},
+
+			/**
+			 *	@param		{Array<string>}	names
+			 *
+			 *	@return		void
+			 */
+			_store : function( names ) {
+				try {
+					if( names.length === 0 )
+						wn.localStorage.removeItem( Nino.admin.navGroups.STORAGE_KEY );
+					else
+						wn.localStorage.setItem( Nino.admin.navGroups.STORAGE_KEY, JSON.stringify( names ) );
+				} catch(e) {}
+			},
+
+			/**
+			 *	Fold a group, or open it again
+			 *
+			 *	@param		{string}		name
+			 *
+			 *	@return		void
+			 */
+			toggle : function( name ) {
+
+				// A folded rail shows every link; there is nothing to fold
+				if( Nino.admin.rail.folded() === true )
+					return;
+
+				const names = Nino.admin.navGroups._stored();
+				const at = names.indexOf( name );
+
+				if( at === -1 )
+					names.push( name );
+				else
+					names.splice( at, 1 );
+
+				Nino.admin.navGroups._store( names );
+				Nino.admin.navGroups.apply();
+			},
+
+			/**
+			 *	Say which panel is on screen: its group is opened - folded or not -
+			 *	and the select shows it
+			 *
+			 *	@param		{string}		panel
+			 *
+			 *	@return		void
+			 */
+			show : function( panel ) {
+
+				const groups = Nino.admin.navGroups;
+
+				if( groups._select !== null )
+					groups._select.value = panel;
+
+				const entry = groups._groups.find( function( g ) {
+					return g.links.some( function( link ) { return link.dataset.panel === panel } );
+				} );
+
+				const names = groups._stored();
+				if( entry !== undefined && names.indexOf( entry.name ) !== -1 ) {
+					groups._store( names.filter( function( name ) { return name !== entry.name } ) );
+					groups.apply();
+				}
+			},
+
+			/**
+			 *	Put the stored state on the headings and their links. Not on a
+			 *	folded rail, where every link stays and the headings are dividers
+			 *	nobody tabs to
+			 *
+			 *	@return		void
+			 */
+			apply : function() {
+
+				const groups = Nino.admin.navGroups;
+				if( groups._nav === null )
+					return;
+
+				const folded = Nino.admin.rail.folded();
+				const names = groups._stored();
+
+				groups._groups.forEach( function( entry ) {
+
+					const closed = folded === false && names.indexOf( entry.name ) !== -1;
+
+					entry.button.setAttribute( 'aria-expanded', closed ? 'false' : 'true' );
+					entry.button.tabIndex = folded ? -1 : 0;
+					entry.links.forEach( function( link ) { link.classList.toggle( 'nino-admin-nav-collapsed', closed ) } );
+				} );
+			},
+		},
+
+		/**
 		 *	The rail's fold - desktop only, below the sidebar breakpoint the
 		 *	rail is a top bar and the classes set here are inert (see
 		 *	style.css). Two states an account can pin, open or folded,
@@ -1146,6 +1439,10 @@
 				const btn = dc.getElementById('admin-rail-toggle');
 				if( btn !== null )
 					btn.setAttribute( 'aria-pressed', folded ? 'true' : 'false' );
+
+				// The group headings are dividers on a folded rail, and what they
+				// folded is open again until it is unfolded
+				Nino.admin.navGroups.apply();
 			},
 
 			/**
@@ -1321,7 +1618,9 @@
 					const picker = this;
 
 					// Another interface language reloads the page and every form on it
-					Nino.admin.dirty.guard( null, function() { wn.location.href = picker.value }, function() {
+					// The #hash goes along: the panel and the level the page was on
+					// are what the person comes back to in the other language
+					Nino.admin.dirty.guard( null, function() { wn.location.href = picker.value + wn.location.hash }, function() {
 						Array.from( picker.options ).forEach( function( option ) { option.selected = option.defaultSelected } );
 					}, true );
 				} );
@@ -1392,10 +1691,33 @@
 			 *
 			 *	@param		{string}	panel					Panel name
 			 *	@param		{string}	[tab]					One of its tabs
+			 *	@param		{boolean}	[push]				The person's own move - a click on the rail, a tab or the phone's select - so it adds a history entry for Back to return to. Left out, the address only follows (the hash on load, a step through the history, the arrow keys of a tab strip)
 			 *
 			 *	@return		void
 			 */
-			function selectTab( panel, tab ) {
+			function selectTab( panel, tab, push ) {
+
+				// Consumed by the first write to the address, wherever it comes from:
+				// a panel's own showCurrent() or settle() below
+				Nino.admin.router._push = push === true;
+
+				try {
+					openTab( panel, tab );
+				}
+				finally {
+					Nino.admin.router._push = false;
+				}
+			}
+
+			/**
+			 *	What selectTab() does, without the history entry
+			 *
+			 *	@param		{string}	panel
+			 *	@param		{string}	[tab]
+			 *
+			 *	@return		void
+			 */
+			function openTab( panel, tab ) {
 				const target = panels[panel];
 				if( target === undefined )
 					return;
@@ -1425,6 +1747,8 @@
 				// on the link as data-layout) gets the whole width and, unless
 				// the account pinned the rail, a folded one - see rail
 				Nino.admin.rail.layout( target[0].dataset.layout === 'workspace' );
+				// ...and its group is open, whatever was folded
+				Nino.admin.navGroups.show( panel );
 
 				const pane 			= target[1];
 				const tabPanes	= pane === null ? [] : Array.from( pane.querySelectorAll(':scope > div[data-tab]') );
@@ -1485,8 +1809,16 @@
 			el.userLogout.addEventListener( 'click', function() {
 				Nino.admin.dirty.guard( null, function() { Nino.auth.logout( '[[/nino/dir]]/_admin' ) }, undefined, true );
 			} );
+			// The link is a real one (href="#<panel>"): a click that asks the
+			// browser for something else - a new tab, a new window, a download -
+			// is its own to answer, the plain one is the workbench's
 			Object.keys( panels ).forEach( function( panel ) {
-				panels[panel][0].addEventListener( 'click', function(ev){ ev.preventDefault(); selectTab( panel ) } );
+				panels[panel][0].addEventListener( 'click', function( ev ) {
+					if( ev.defaultPrevented === true || ( ev.button || 0 ) !== 0 || ev.metaKey === true || ev.ctrlKey === true || ev.shiftKey === true || ev.altKey === true )
+						return;
+					ev.preventDefault();
+					selectTab( panel, undefined, true );
+				} );
 			} );
 			// The strip stands in the pane's head, beside the panel's name
 			// (see Panels::panesHtml()) - a strip a panel's own script puts
@@ -1498,7 +1830,7 @@
 
 				buttons.forEach( function( btn, at ) {
 
-					btn.addEventListener( 'click', function() { selectTab( owner, btn.dataset.tab ) } );
+					btn.addEventListener( 'click', function() { selectTab( owner, btn.dataset.tab, true ) } );
 
 					/*	A strip nobody has opened yet still has to say which of its
 						tabs is the one on screen. The panes are rendered with every
@@ -1518,20 +1850,32 @@
 				Nino.adminUi.tabKeys( buttons, function( at ) { selectTab( owner, buttons[at].dataset.tab ) } );
 			} );
 
+			// The group headings and, below 64rem, the select that stands for the
+			// strip - read from the rail as rendered, before the first panel is
+			// selected so that one finds its group and its entry
+			Nino.admin.navGroups.init( function( panel ) { selectTab( panel, undefined, true ) } );
+
 			// Restore the panel from a refresh/deep link, and react to manual hash
 			// edits or the browser back/forward buttons (our own updates use
-			// replaceState, which never fires hashchange, so this only ever reacts
-			// to real user navigation)
+			// pushState and replaceState, which never fire hashchange, so this only
+			// ever reacts to real user navigation - and a step through the history
+			// never adds an entry itself: selectTab() is not asked to push here)
 			selectTabFromHash();
 			wn.addEventListener( 'hashchange', selectTabFromHash );
 
 			// A form that failed to save is brought on screen by the name of
 			// its panel or tab - a tab first, since 'elements' is both
 			Nino.admin.dirty.init( function( name ) {
-				if( tabOwner[name] !== undefined )
-					selectTab( tabOwner[name], name );
-				else
-					selectTab( name );
+				Nino.admin.router._keep = true;
+				try {
+					if( tabOwner[name] !== undefined )
+						selectTab( tabOwner[name], name );
+					else
+						selectTab( name );
+				}
+				finally {
+					Nino.admin.router._keep = false;
+				}
 			} );
 
 		},

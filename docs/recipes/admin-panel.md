@@ -434,9 +434,28 @@ so a panel nobody opens costs no request. Inside the pane the panel owns its
 mount points (`panes()`), and toggles between them with the shell's
 `admin-hidden` class. The url hash is the panel's to deep-link into:
 `Nino.admin.router.set( 'catalog', [ id ] )` while the panel is on screen,
-`Nino.admin.router.current()` to read it back on load. The following is a minimal list/edit
-lifecycle; adapt field names, but preserve the API, DOM safety, and lifecycle
-shape:
+`Nino.admin.router.current()` to read it back on load.
+
+The address is also what the browser's Back and Forward walk, so a panel that
+deep-links has three more things to do. `set()` replaces the entry the browser
+is on: it keeps the address true to the screen, which is what `showCurrent()`
+and a save are for (a new element's address, once it has one). A move the
+person makes inside the panel - a row opened, a back link, a "new" button -
+calls `Nino.admin.router.go( 'catalog', [ id ] )` before the level draws itself:
+that adds an entry, does nothing where the address already says it, and the
+`set()` the level then makes finds it true. The shell does the same for the
+rail, the tabs and the phone's select (`selectTab( panel, tab, true )`); the
+page load, the arrow keys of a tab strip and a step through the history only
+replace. And `showCurrent()` follows the hash: when `router.current().panel`
+names this panel, the level its parts name is shown - a step through the
+history changes the address and nothing else - and a hash that names another
+panel (a click on the rail) keeps the level in memory, as before. Leaving an
+open form that way runs inside `Nino.admin.router.leave( [ 'catalog' ], formIsOpen,
+proceed, resync )`, which asks Save / Discard / Cancel like the back link does;
+`resync` is what a Cancel does, showing the level in memory again and so writing
+it back into the address. The minimal example below keeps no hash, so it needs
+none of it. It is a minimal list/edit lifecycle; adapt field names, but preserve
+the API, DOM safety, and lifecycle shape:
 
 ```js
 ( function(wn,dc) {

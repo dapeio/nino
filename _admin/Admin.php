@@ -1182,8 +1182,8 @@ namespace Nino\Admin {
 			false - the Dashboard - opens on its screen alone	*/
 		public static
 			$html = [
-				'nav-group'		=> '<span class="nino-admin-nav-group" data-group="[[group]]">[[label]]</span>',
-				'nav-link'		=> '<a href="#" id="admin-nav-[[uri]]" data-panel="[[uri]]" data-layout="[[layout]]"><span class="nino-admin-nav-icon" aria-hidden="true">[[icon]]</span><span class="nino-admin-nav-label">[[label]]</span></a>',
+				'nav-group'		=> '<button type="button" class="nino-admin-nav-group" data-group="[[group]]" aria-expanded="true">[[label]]</button>',
+				'nav-link'		=> '<a href="#[[uri]]" id="admin-nav-[[uri]]" data-panel="[[uri]]" data-layout="[[layout]]"><span class="nino-admin-nav-icon" aria-hidden="true">[[icon]]</span><span class="nino-admin-nav-label">[[label]]</span></a>',
 				// The letter that stands in for a panel with no icon of its own
 				'nav-initial'	=> '<b>[[initial]]</b>',
 				'pane'				=> '<div id="admin-content-[[uri]]" data-panel="[[uri]]" data-layout="[[layout]]" hidden>[[head]][[content]]</div>',
@@ -1459,9 +1459,12 @@ namespace Nino\Admin {
 		 *	rendered here rather than written into the shell template, which
 		 *	is what lets a module's panel appear without touching the shell.
 		 *	The link ids follow the convention the tool always had
-		 *	(admin-nav-<uri>); data-panel is what the shell script reads. A
-		 *	heading is only rendered when more than one group is on screen:
-		 *	an account that sees content alone gets a plain list
+		 *	(admin-nav-<uri>); data-panel is what the shell script reads, and
+		 *	the link is a real one (href="#<uri>"): the script answers a plain
+		 *	click, a new tab or a copied link opens the panel on its own. A
+		 *	heading is a button that folds the links under it (see
+		 *	Nino.admin.navGroups) and is only rendered when more than one group
+		 *	is on screen: an account that sees content alone gets a plain list
 		 *
 		 *	@param		array 		$panels				A registry, see collect() - already filtered to what the account may see
 		 *

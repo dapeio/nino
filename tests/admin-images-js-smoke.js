@@ -281,8 +281,18 @@ const registry = {
 };
 const shellForm = element('div');
 const shellList = element('div');
+// The shell's router as far as the panel uses it: what it was asked to write, the hash a step
+// through the history left, and leave() as the shell does it (ask first where a form is left)
+const routed = [];
+let routedHash = { panel : 'images', parts : [] };
+const routerStub = {
+	set : function( panel, parts ) { routed.push( 'set '+ [ panel ].concat( parts ).join('/') ) },
+	go : function( panel, parts ) { routed.push( 'go '+ [ panel ].concat( parts ).join('/') ) },
+	current : function() { return routedHash },
+	leave : function( names, leaving, proceed, resync ) { if( leaving === true ) return registry.guard( names, proceed, resync ); proceed() },
+};
 const shellNino = {
-	admin : { dirty : registry, formToolbar : function( back ) { const bar = element('div'); bar.appendChild( back ); return bar }, router : { set : function() {}, current : function() { return { panel : 'images', parts : [] } } } },
+	admin : { dirty : registry, formToolbar : function( back ) { const bar = element('div'); bar.appendChild( back ); return bar }, router : routerStub },
 	events : { bindCallback : function() {} },
 	http : { sendRequest : function( uri, method, callback, data ) { shellRequests.push( { action : data.action, payload : JSON.parse( data.data ), callback : callback } ) } },
 	content : { getText : text },
@@ -361,6 +371,57 @@ check( '...the first one still ends', ended.join() === 'true,false,false,true' &
 registered.save( function( ok ) { ended.push( ok ) } );
 check( 'a Save with nothing unsaved reports true without a request', ended[ended.length - 1] === true && shellRequests.length === second );
 
+
+// --- the browser's Back and Forward --------------------------------------------------
+// A step through the history changes the address and nothing else: the panel shows the level
+// the hash names, asking first where that leaves a form with unsaved alt texts
+
+shellPanel._ready = true;
+routed.length = 0;
+shellPanel._openGroup( 'page-home' );
+check( 'opening a category is a step Back returns to: the address is pushed before the form writes it', routed.join() === 'go images/page-home,set images/page-home' );
+shellForm.classList.remove('admin-hidden');
+shellList.classList.add('admin-hidden');
+
+routed.length = 0;
+asks.length = 0;
+routedHash = { panel : 'images', parts : [] };
+shellPanel.showCurrent();
+check( 'a hash that names the list shows it, leaving the form with nothing unsaved without a question', asks.length === 0 && shellForm.classList.contains('admin-hidden') === true && shellList.classList.contains('admin-hidden') === false && routed.join() === 'set images' );
+
+routedHash = { panel : 'images', parts : [ 'page-home' ] };
+shellPanel.showCurrent();
+check( '...and one that names a category draws it', shellForm.classList.contains('admin-hidden') === false && shellList.classList.contains('admin-hidden') === true && routed[routed.length - 1] === 'set images/page-home' );
+
+findAll( shellForm, function( el ) { return el.type === 'text' } )[1].value = 'A house';
+routed.length = 0;
+routedHash = { panel : 'images', parts : [] };
+shellPanel.showCurrent();
+check( 'Back out of a form with unsaved alt texts asks first and shows nothing yet', asks.length === 1 && JSON.stringify( asks[0].names ) === '["images"]' && shellForm.classList.contains('admin-hidden') === false && routed.length === 0 );
+asks[0].onCancel();
+check( '...a Cancel keeps the form and writes its level back into the address', shellForm.classList.contains('admin-hidden') === false && routed.join() === 'set images/page-home' );
+shellPanel.showCurrent();
+asks[1].proceed();
+check( '...an answer that lets it go shows the list', shellForm.classList.contains('admin-hidden') === true && routed[routed.length - 1] === 'set images' );
+
+routed.length = 0;
+routedHash = { panel : 'images', parts : [ 'nope' ] };
+shellPanel.showCurrent();
+check( 'a hash that names a category there is not falls back to the list and writes it', shellForm.classList.contains('admin-hidden') === true && routed.join() === 'set images' );
+
+routed.length = 0;
+shellPanel._currentGroup = 'page-home';
+shellForm.classList.remove('admin-hidden');
+shellList.classList.add('admin-hidden');
+routedHash = { panel : 'dashboard', parts : [] };
+shellPanel.showCurrent();
+check( 'a hash that names another panel (a click on the rail) keeps the level in memory and writes it', shellForm.classList.contains('admin-hidden') === false && routed.join() === 'set images/page-home' );
+
+const backLinks = findAll( shellForm, function( el ) { return el.className === 'nino-admin-back-link' } );
+routed.length = 0;
+fire( backLinks[0], 'click' );
+check( 'the back link is a step Back returns to as well', routed.join() === 'go images,set images' && shellForm.classList.contains('admin-hidden') === true );
+shellPanel._ready = false;
 
 // Whatever the server or an editor wrote reaches the page as text: the only innerHTML here empties a container
 check( 'nothing the panel is told is written as markup - innerHTML is only ever emptied', ( source('_admin/Nino/Modules/Images/assets/admin.js').match( /innerHTML[^\n]*/g ) || [] ).every( function( use ) { return /^innerHTML = '';$/.test( use ) } ) );

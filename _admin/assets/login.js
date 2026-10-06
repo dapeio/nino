@@ -33,7 +33,7 @@
 			// is all that's needed, Admin::init() reads it back server-side
 			const localePicker = dc.getElementById('admin-localepicker');
 			if( localePicker !== null )
-				localePicker.addEventListener( 'change', function(){ wn.location.href = this.value } );
+				localePicker.addEventListener( 'change', function(){ wn.location.href = this.value + wn.location.hash } );
 
 			const el = {
 				formMsg 	: dc.getElementById('form-message'),
@@ -102,7 +102,7 @@
 				// Login
 				el.formMsg.className = 'pending';
 				el.formMsg.innerHTML = Nino.content.getText('/_admin/login/msg/pending');
-				Nino.auth.login( el.inputUser.value, el.inputPw.value, '[[/nino/dir]]/_admin', function( xhr ){
+				Nino.auth.login( el.inputUser.value, el.inputPw.value, null, function( xhr ){
 
 					// Replaced rather than added: the request is over, so 'pending'
 					// has to go with it - added on top it left the message carrying

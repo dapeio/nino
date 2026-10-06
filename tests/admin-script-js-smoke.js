@@ -160,8 +160,30 @@ function node( id, attributes ) {
 	return el;
 }
 
-const railLinks = { dashboard : node( 'admin-nav-dashboard', { panel : 'dashboard', layout : 'page' } ),
-                    users 		: node( 'admin-nav-users', { panel : 'users', layout : 'page' } ) };
+// A rail link: the icon, and the label the phone's select takes its text from
+function navLink( panel, label ) {
+	const link = node( 'admin-nav-'+ panel, { panel : panel, layout : 'page' } );
+	const text = node( '', {} );
+	text.textContent = label;
+	link.querySelector = function( selector ) { return selector === '.nino-admin-nav-label' ? text : null };
+	return link;
+}
+
+// A group heading: a button, as Panels::$html renders it
+function navHeading( group, label ) {
+	const heading = node( '', { group : group } );
+	heading.classList.add('nino-admin-nav-group');
+	heading.setAttribute( 'aria-expanded', 'true' );
+	heading.textContent = label;
+	return heading;
+}
+
+const railLinks = { dashboard : navLink( 'dashboard', 'Dashboard' ),
+                    users 		: navLink( 'users', 'Users' ) };
+const railHeadings = { content : navHeading( 'content', 'Content' ), system : navHeading( 'system', 'System' ) };
+const railNav = node( 'admin-nav-wrap', {} );
+railNav.children = [ railHeadings.content, railLinks.dashboard, railHeadings.system, railLinks.users ];
+railNav.setAttribute( 'aria-label', 'Navigation' );
 
 const rolesTab = node( 'admin-tabbutton-roles', { tab : 'roles' } );
 const lockoutTab = node( 'admin-tabbutton-lockout', { tab : 'lockout' } );
@@ -195,6 +217,7 @@ const dashboardPane = node( 'admin-content-dashboard', { panel : 'dashboard', la
 const pageWrap = node( 'admin-page-wrap', {} );
 const shellNodes = {
 	'admin-page-wrap' : pageWrap,
+	'admin-nav-wrap' : railNav,
 	'admin-user-logout' : node( 'admin-user-logout', {} ),
 	'admin-content-dashboard' : dashboardPane,
 	'admin-content-users' : usersPane,
@@ -209,16 +232,30 @@ picker.options = pickerOptions;
 picker.value = '/_admin?locale=en_US';
 shellNodes['admin-localepicker'] = picker;
 
+// The browser's history: what the router writes is what the bar shows, and
+// pushState adds an entry where replaceState overwrites the one it is on - the
+// stub keeps both in step the way a browser does, so the checks below can read
+// the entries and the position back
+const browser = { entries : [ '#users' ], at : 0 };
+const storage = {};
+const windowListeners = {};
 const shell = {
 	console : console,
-	location : { hash : '#users' },
-	// What the router writes is what the bar shows - the stub keeps the two
-	// in step the way a browser does, so the checks below can read it back
-	history : { replaceState : function( state, title, url ) { shell.location.hash = url } },
-	addEventListener : function() {},
+	location : { hash : '#users', href : '' },
+	history : {
+		replaceState : function( state, title, url ) { browser.entries[browser.at] = url; shell.location.hash = url },
+		pushState : function( state, title, url ) { browser.entries.splice( browser.at + 1 ); browser.entries.push( url ); browser.at++; shell.location.hash = url },
+	},
+	localStorage : {
+		getItem : function( key ) { return storage[key] ?? null },
+		setItem : function( key, value ) { storage[key] = String( value ) },
+		removeItem : function( key ) { delete storage[key] },
+	},
+	addEventListener : function( type, fn ) { windowListeners[type] = fn },
 	document : {
 		documentElement : null, body : null,
 		getElementById : function( id ) { return shellNodes[id] ?? null },
+		createElement : function( tag ) { return fakeElement( tag ) },
 		addEventListener : function() {},
 		querySelectorAll : function( selector ) {
 			if( selector === '#admin-nav-wrap a[data-panel]' )
@@ -239,6 +276,7 @@ vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.a
 vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/script.js' ), 'utf8' ), shellContext, { filename : 'script.js' } );
 shell.Nino.admin.onReady();
 
+check( 'the page load selects the panel the hash names without adding an entry - the address is only made true to the screen', browser.entries.join() === '#roles' && browser.at === 0 );
 check( 'the rail says which panel is open rather than only painting it', railLinks.users.getAttribute('aria-current') === 'page' );
 check( '...and no other link claims to be the current page', railLinks.dashboard.getAttribute('aria-current') === null );
 railLinks.dashboard.listeners.click( { preventDefault : function() {} } );
@@ -260,6 +298,95 @@ rolesTab.listeners.keydown( { key : 'ArrowRight', preventDefault : function() {}
 check( 'an arrow key opens the next tab of a pane strip', lockoutTab.getAttribute('aria-selected') === 'true'
 	&& lockoutPane.hidden === false && rolesPane.hidden === true && lockoutTab.focused === true );
 check( '...and the address names the tab now open', shell.location.hash === '#lockout' );
+
+/*	What Back and Forward walk is the workbench. A move the person makes -
+	the rail, a tab - adds an entry; whatever only keeps the address true to
+	the screen (the page load above, the arrow keys, a panel showing its level
+	again) replaces the one it is on, or the history would fill with steps
+	nobody took	*/
+check( 'each click on the rail added one entry; the arrow keys replaced the one they were on', browser.entries.join() === '#roles,#dashboard,#lockout' && browser.at === 2 );
+
+rolesTab.listeners.click();
+check( 'a click on a tab adds an entry', browser.entries.join() === '#roles,#dashboard,#lockout,#roles' && browser.at === 3 );
+
+// A panel that writes its level while it is shown (the Dashboard, the drill-down panels) is
+// settled before the shell looks: the switch is still one entry, and the one before it is kept
+shell.Nino.admin.dashboard = { showCurrent : function() { shell.Nino.admin.router.set( 'dashboard', [] ) } };
+railLinks.dashboard.listeners.click( { preventDefault : function() {} } );
+check( 'a panel that writes the address itself while it is shown still yields exactly one entry, and the previous one survives', browser.entries.join() === '#roles,#dashboard,#lockout,#roles,#dashboard' && browser.at === 4 );
+
+let defaultsPrevented = 0;
+const before = browser.entries.join();
+[ { ctrlKey : true }, { metaKey : true }, { shiftKey : true }, { altKey : true }, { button : 1 }, { defaultPrevented : true } ].forEach( function( flags ) {
+	railLinks.users.listeners.click( Object.assign( { preventDefault : function() { defaultsPrevented++ } }, flags ) );
+} );
+check( 'a click with a modifier key, with another button or already handled is left to the browser: a new tab opens the link\'s own address', defaultsPrevented === 0 && browser.entries.join() === before && railLinks.dashboard.getAttribute('aria-current') === 'page' );
+
+// Back: the browser moves to the previous entry, which changes the hash and nothing else
+browser.at--;
+shell.location.hash = browser.entries[browser.at];
+windowListeners.hashchange();
+check( 'Back selects the panel the earlier entry names - a tab of a pane through its owner', railLinks.users.getAttribute('aria-current') === 'page' && rolesPane.hidden === false && lockoutPane.hidden === true );
+check( '...and adds nothing to the history', browser.entries.length === 5 && browser.at === 3 );
+browser.at++;
+shell.location.hash = browser.entries[browser.at];
+windowListeners.hashchange();
+check( 'Forward selects the one after it, again without an entry', railLinks.dashboard.getAttribute('aria-current') === 'page' && browser.entries.length === 5 && browser.at === 4 );
+
+/*	The rail's group headings and the phone's select. The headings are buttons
+	that fold their links; the fold is the browser's own preference, and the
+	panel on screen always has its group open	*/
+const navSelect = railNav.children[0];
+check( 'the nav gets a select built from the rail, and says so, so the stylesheet hides the strip only where the select exists', navSelect.className === 'nino-admin-nav-select' && railNav.classList.contains('nino-admin-nav--select') === true );
+check( '...one optgroup per heading, labelled by it, holding that group\'s panels by name', navSelect.children.length === 2
+	&& navSelect.children[0].label === 'Content' && navSelect.children[0].children.map( o => o.value+ ':'+ o.textContent ).join() === 'dashboard:Dashboard'
+	&& navSelect.children[1].label === 'System' && navSelect.children[1].children.map( o => o.value+ ':'+ o.textContent ).join() === 'users:Users' );
+check( '...named like the nav itself', navSelect.attributes['aria-label'] === 'Navigation' );
+check( '...and showing the panel on screen', navSelect.value === 'dashboard' );
+
+const GROUPS_KEY = 'nino-admin-nav-groups';
+railHeadings.content.listeners.click();
+check( 'a heading folds its group: its links and no others, aria-expanded says so, the state is kept', railLinks.dashboard.classList.contains('nino-admin-nav-collapsed') === true
+	&& railLinks.users.classList.contains('nino-admin-nav-collapsed') === false
+	&& railHeadings.content.getAttribute('aria-expanded') === 'false' && railHeadings.system.getAttribute('aria-expanded') === 'true'
+	&& storage[GROUPS_KEY] === '["content"]' );
+railHeadings.content.listeners.click();
+check( '...and opens it again', railLinks.dashboard.classList.contains('nino-admin-nav-collapsed') === false && railHeadings.content.getAttribute('aria-expanded') === 'true' && storage[GROUPS_KEY] === undefined );
+
+storage[GROUPS_KEY] = '["content","system"]';
+shell.Nino.admin.navGroups.apply();
+check( 'what the browser kept is what is folded', railLinks.dashboard.classList.contains('nino-admin-nav-collapsed') === true && railLinks.users.classList.contains('nino-admin-nav-collapsed') === true );
+railLinks.dashboard.listeners.click( { preventDefault : function() {} } );
+check( 'selecting a panel opens its group - and only that one', railLinks.dashboard.classList.contains('nino-admin-nav-collapsed') === false
+	&& railHeadings.content.getAttribute('aria-expanded') === 'true' && railLinks.users.classList.contains('nino-admin-nav-collapsed') === true && storage[GROUPS_KEY] === '["system"]' );
+
+navSelect.value = 'users';
+navSelect.listeners.change();
+check( 'a change of the select opens that panel as a person\'s own move: one entry, its group open', railLinks.users.getAttribute('aria-current') === 'page'
+	&& browser.entries[browser.entries.length - 1] === '#roles' && browser.entries.length === 6 && railLinks.users.classList.contains('nino-admin-nav-collapsed') === false && storage[GROUPS_KEY] === undefined );
+
+// A folded rail: the headings are dividers, nothing is hidden, nobody tabs to them
+railHeadings.system.listeners.click();
+check( 'the heading folds the group again', railLinks.users.classList.contains('nino-admin-nav-collapsed') === true );
+storage['nino-admin-rail'] = 'folded';
+shell.Nino.admin.rail._apply();
+check( 'a folded rail shows every link and takes its headings out of the tab order', railLinks.users.classList.contains('nino-admin-nav-collapsed') === false
+	&& railHeadings.system.tabIndex === -1 && railHeadings.system.getAttribute('aria-expanded') === 'true' );
+railHeadings.content.listeners.click();
+check( '...and a click on one does nothing there', storage[GROUPS_KEY] === '["system"]' && railLinks.dashboard.classList.contains('nino-admin-nav-collapsed') === false );
+delete storage['nino-admin-rail'];
+shell.Nino.admin.rail._apply();
+check( 'unfolded again, the folded group is folded again and the headings are reachable', railLinks.users.classList.contains('nino-admin-nav-collapsed') === true && railHeadings.system.tabIndex === 0 );
+railHeadings.system.listeners.click();
+
+// An account that sees one group has no headings: a plain select, nothing to fold
+const lone = { children : [ navLink( 'dashboard', 'Dashboard' ), navLink( 'logs', 'Logs' ) ], classList : { add : function() {} }, getAttribute : function() { return 'Nav' }, insertBefore : function( el, ref ) { this.children.unshift( el ) }, firstChild : null };
+const loneCtx = { console : console, localStorage : { getItem : function() { return null }, setItem : function() {}, removeItem : function() {} }, document : { documentElement : null, body : null, getElementById : function( id ) { return id === 'admin-nav-wrap' ? lone : null }, createElement : function( tag ) { return fakeElement( tag ) } } };
+loneCtx.window = loneCtx;
+loneCtx.Nino = { events : { bindCallback : function() {} } };
+vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/script.js' ), 'utf8' ), vm.createContext( loneCtx ), { filename : 'script.js' } );
+loneCtx.Nino.admin.navGroups.init( function() {} );
+check( 'a rail without headings gets a select of plain options and nothing to fold', lone.children[0].children.length === 2 && lone.children[0].children.every( o => o.tagName === 'option' ) && loneCtx.Nino.admin.navGroups._groups.length === 0 );
 
 /*	The head over every pane but the Dashboard, reached from inside the pane.
 	A panel with tabs of its own - Features, a feature's editors - puts its
@@ -871,9 +998,10 @@ picker.listeners.change.call( picker );
 check( 'the interface language asks first, before the page is loaded again', shellAsked.length === 1 && shell.location.href === '' );
 shellAsked[0].onChoose('cancel');
 check( '...and a Cancel puts the picker back on the language the page is in', pickerOptions[0].selected === true && pickerOptions[1].selected === false && shell.location.href === '' );
+shell.location.hash = '#elements/team';
 picker.listeners.change.call( picker );
 shellAsked[1].onChoose('discard');
-check( '...an answer loads the page in the other language', shell.location.href === '/_admin?locale=en_US' );
+check( '...an answer loads the page in the other language, and the hash goes along - the panel and the level the page was on', shell.location.href === '/_admin?locale=en_US#elements/team' );
 shellDirty._leaving = false;
 
 shellDirty._entries.probe.isDirty = function() { return false };
@@ -882,6 +1010,11 @@ shellDirty._show('roles');
 check( 'a panel or tab that failed to save is brought on screen by its name - a tab of a pane first, since \'roles\' is a tab of the Users pane', shell.location.hash === '#roles' );
 shellDirty._show('dashboard');
 check( '...a panel by its own', shell.location.hash === '#dashboard' );
+let keptDuring = null;
+shell.Nino.admin.roles = { showCurrent : function() { keptDuring = shell.Nino.admin.router._keep } };
+shellDirty._show('roles');
+check( 'it is brought on screen as it stands: while it is shown, a panel that follows the hash is told to keep its level, so a failed Save is not answered with the question again', keptDuring === true && shell.Nino.admin.router._keep === false );
+delete shell.Nino.admin.roles;
 
 // ---- the question itself: a native dialog
 function fakeElement( tag, noModal ) {

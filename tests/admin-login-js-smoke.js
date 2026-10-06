@@ -98,6 +98,7 @@ const el = {
 	'input-pw'			: field(),
 	'submit'				: field(),
 	'form-login'		: field(),
+	'admin-localepicker' : field(),
 };
 
 el['input-user'].value	= 'editor@example.com';
@@ -118,12 +119,13 @@ const document = {
 };
 
 const replaced = [];
+let reloads = 0;
 
 const sandbox = {
 	console : console,
 	document : document,
 	navigator : { userAgent : 'node', language : 'en-US' },
-	location : { pathname : '/_admin', origin : 'https://example.com', search : '', href : 'https://example.com/_admin', replace : function( uri ) { replaced.push( uri ) } },
+	location : { pathname : '/_admin', origin : 'https://example.com', search : '', hash : '#elements/team', href : 'https://example.com/_admin', replace : function( uri ) { replaced.push( uri ) }, reload : function() { reloads++ } },
 	XMLHttpRequest : function() {},
 	FormData : function() { this.append = function() {} },
 	TextEncoder : TextEncoder,
@@ -177,6 +179,22 @@ function attempt( status, policy ) {
 
 check( 'a 401 is the one answer that means the password was wrong', attempt( 401 ) === WRONG );
 check( '...and it is sent to the login endpoint', sentTo === '/.nino/auth/login' );
+
+/*	A deep link survives the login: the page is loaded again where it stands -
+	the same address, now with a session, so the #hash and the ?locale= on it
+	are what comes back. Replacing the location with its own path and a
+	fragment would be a navigation inside the document that requests nothing
+	(the form would stay on screen), and a redirect parameter would be an open
+	redirect to guard	*/
+attempt( 200 );
+check( 'a login the server accepts loads the page again, wherever it was', reloads === 1 && replaced.length === 0 );
+check( '...and the hash is still the one it came with', sandbox.location.hash === '#elements/team' );
+check( '...while a refused one reloads nothing', ( attempt( 401 ), reloads === 1 ) );
+
+// The language picker: another language is another load of the same page
+el['admin-localepicker'].value = '?locale=de_DE';
+el['admin-localepicker'].handler();
+check( 'the language picker keeps the hash, so the person comes back to the page they were on', sandbox.location.href === '?locale=de_DE#elements/team' );
 
 /*	Everything below is a server that answered before Nino could read the pair.
 	403: the csrf guard, or a host that refuses a uri with a dot segment -

@@ -73,7 +73,13 @@
 
 		/**
 		 *	Re-apply whatever drill-down level this tab is currently on -
-		 *	called when it is selected, so the hash gets synced to reality
+		 *	called when it is selected, so the hash gets synced to reality.
+		 *
+		 *	Where the hash names this tab, the hash wins: a step through the
+		 *	browser's history changes the address and nothing else, so the level
+		 *	it names is shown - and leaving a form that holds unsaved input asks
+		 *	first, as its back link does. A hash that names another panel (a
+		 *	click on the rail) leaves the level in memory as it is
 		 *
 		 *	@return		void
 		 */
@@ -84,10 +90,56 @@
 				return;
 			}
 
+			const hash = Nino.admin.router.current();
+			if( hash.panel === 'roles' && Nino.admin.roles._follow( hash.parts ) === true )
+				return;
+
+			Nino.admin.roles._showLevel();
+		},
+
+		/**
+		 *	Show the level this tab is on, and write it into the address
+		 *
+		 *	@return		void
+		 */
+		_showLevel : function() {
+
 			if( dc.getElementById('roles-form').classList.contains('admin-hidden') === false )
 				return Nino.admin.roles._showForm();
 
 			Nino.admin.roles._showList();
+		},
+
+		/**
+		 *	Move to the level the hash names, if it is not the one on screen:
+		 *	the new-role form, a role's form or the list. A role that does not
+		 *	exist is the list. Leaving a form with unsaved input asks first (see
+		 *	Nino.admin.router.leave())
+		 *
+		 *	@param		{Array}		parts					The hash behind the tab's name
+		 *
+		 *	@return		{boolean}									Whether a move was made or is being asked about
+		 */
+		_follow : function( parts ) {
+
+			const open = dc.getElementById('roles-form').classList.contains('admin-hidden') === false;
+			const current = Nino.admin.roles._current;
+			const create = parts[0] === 'new';
+			const role = create === true || parts.length === 0 ? undefined : Nino.admin.roles._roles.find( function( r ) { return r.id === parts[0] } );
+
+			if( create === true ? ( open === true && current === null ) : ( role === undefined ? open === false : ( open === true && current !== null && current.id === role.id ) ) )
+				return false;
+
+			Nino.admin.router.leave( [ 'roles' ], open, function() {
+				if( create === true )
+					Nino.admin.roles._openRole( null );
+				else if( role === undefined )
+					Nino.admin.roles._showList();
+				else
+					Nino.admin.roles._openRole( role.id );
+			}, Nino.admin.roles._showLevel );
+
+			return true;
 		},
 
 		/**
@@ -165,7 +217,7 @@
 				copy.appendChild( descr );
 				link.appendChild( copy );
 
-				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.roles._openRole( role.id ) } );
+				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'roles', [ role.id ] ); Nino.admin.roles._openRole( role.id ) } );
 				li.appendChild( link );
 				ul.appendChild( li );
 			} );
@@ -176,7 +228,7 @@
 			add.type = 'button';
 			add.className = 'nino-admin-btn-primary';
 			add.textContent = Nino.content.getText('/_admin/roles/label/new');
-			add.addEventListener( 'click', function() { Nino.admin.roles._openRole( null ) } );
+			add.addEventListener( 'click', function() { Nino.admin.router.go( 'roles', [ 'new' ] ); Nino.admin.roles._openRole( null ) } );
 			wrap.appendChild( Nino.adminUi.listActions( [ add ] ) );
 		},
 
@@ -210,7 +262,7 @@
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/roles/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.roles._showList() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'roles', [] ); Nino.admin.roles._showList() } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const form = dc.createElement('form');

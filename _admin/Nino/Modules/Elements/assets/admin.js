@@ -32,6 +32,9 @@
 		// from the same type list every form is built from, so the element form
 		// knows whether to ask for a uri at all.
 		_numbered				: {},
+		// The types as the picker last drew them, [ { type, title, model, ... } ]
+		// - what a hash that names a type is opened from (see _follow())
+		_types					: [],
 		_currentTypeTitle	: null,
 		_currentModel		: null,
 		_globalKeys			: [],
@@ -151,7 +154,14 @@
 		 *	Re-apply whatever drill-down level this panel is currently on -
 		 *	called when the user switches TO this tab, so the hash (only ever
 		 *	written by router.set() while this panel is the visible one) gets
-		 *	synced to reality instead of staying stale from before the switch
+		 *	synced to reality instead of staying stale from before the switch.
+		 *
+		 *	Where the hash names this panel, the hash wins: a step through the
+		 *	browser's history changes the address and nothing else, so the level
+		 *	it names is shown - and leaving a form that holds unsaved input asks
+		 *	first, as its back link does. A hash that names another panel (a
+		 *	click on the rail, a Dashboard tile aside) leaves the level in memory
+		 *	as it is
 		 *
 		 *	@return		void
 		 */
@@ -161,6 +171,20 @@
 				Nino.admin.elements.init();
 				return;
 			}
+
+			const hash = Nino.admin.router.current();
+			if( hash.panel === 'elements' && Nino.admin.elements._follow( hash.parts ) === true )
+				return;
+
+			Nino.admin.elements._showLevel();
+		},
+
+		/**
+		 *	Show the level this panel is on, and write it into the address
+		 *
+		 *	@return		void
+		 */
+		_showLevel : function() {
 
 			if( Nino.admin.elements._currentType === null )
 				return Nino.admin.elements._showTypes();
@@ -172,6 +196,82 @@
 				return Nino.admin.elements._showList();
 
 			Nino.admin.elements._showTypes();
+		},
+
+		/**
+		 *	Move to the level the hash names, if it is not the one on screen: the
+		 *	type picker, a type's list or one element's form ('new' for a blank
+		 *	one). A type the picker does not know is the picker. A level of
+		 *	another type, or one that needs the list first, is loaded the way a
+		 *	reload restores it (_selectType() with the element waiting in
+		 *	_pendingUri). Leaving a form with unsaved input asks first (see
+		 *	Nino.admin.router.leave()); while a save runs the screen stays as it is
+		 *
+		 *	@param		{Array}		parts					The hash behind the panel's name
+		 *
+		 *	@return		{boolean}									Whether a move was made or is being asked about
+		 */
+		_follow : function( parts ) {
+
+			if( Nino.admin.elements._saving === true )
+				return false;
+
+			const current = Nino.admin.elements._currentType;
+			const form = current !== null && dc.getElementById('elements-form').classList.contains('admin-hidden') === false;
+			const list = current !== null && dc.getElementById('elements-list').classList.contains('admin-hidden') === false;
+
+			const type = parts.length === 0 ? undefined : Nino.admin.elements._types.find( function( t ) { return t.type === parts[0] } );
+			const uri = type === undefined || parts.length < 2 ? undefined : parts[1];
+
+			if( type === undefined ? ( form === false && list === false ) : ( uri === undefined
+				? ( list === true && current === type.type )
+				: ( form === true && current === type.type && ( uri === 'new' ? Nino.admin.elements._isNew === true : ( Nino.admin.elements._isNew === false && Nino.admin.elements._currentUri === uri ) ) ) ) )
+				return false;
+
+			Nino.admin.router.leave( [ 'elements' ], form, function() {
+
+				if( type === undefined ) {
+					Nino.admin.elements._destroyHtmlEditors();
+					Nino.admin.elements._showTypes();
+					return;
+				}
+
+				if( current === type.type && uri !== undefined ) {
+					Nino.admin.elements._openForm( uri === 'new' ? null : uri );
+					return;
+				}
+
+				if( current === type.type && form === true ) {
+					Nino.admin.elements._destroyHtmlEditors();
+					Nino.admin.elements._showList();
+					// The form's locale switch moves the workbench's content locale
+					if( Nino.admin.elements._listLocale !== ( Nino.admin.sessionLocale.current ?? '' ) )
+						Nino.admin.elements._refreshList();
+					return;
+				}
+
+				Nino.admin.elements._pendingUri = uri;
+				Nino.admin.elements._selectType( type.type, type.model, type.title );
+			}, Nino.admin.elements._showLevel );
+
+			return true;
+		},
+
+		/**
+		 *	Open an element - or a blank one - the way a person does, from the
+		 *	list or the form's previous and next: the step is one Back returns to
+		 *
+		 *	@param		{string|null}	uri			Element uri, or null for a new one
+		 *
+		 *	@return		void
+		 */
+		_visit : function( uri ) {
+
+			if( Nino.admin.elements._saving === true )
+				return;
+
+			Nino.admin.router.go( 'elements', [ Nino.admin.elements._currentType, uri === null ? 'new' : uri ] );
+			Nino.admin.elements._openForm( uri );
 		},
 
 		/**
@@ -224,6 +324,7 @@
 			Nino.admin.elements._elements					= [];
 			Nino.admin.elements._referenceOptions	= {};
 			Nino.admin.elements._pendingUri				= undefined;
+			Nino.admin.elements._types						= [];
 			Nino.admin.elements._resetEdits();
 			Nino.admin.elements._remember();
 
@@ -368,6 +469,7 @@
 			// place that has to record which types number their own elements
 			Nino.admin.elements._numbered = {};
 			Nino.admin.elements._rights 	= {};
+			Nino.admin.elements._types		= types;
 			types.forEach( function( entry ) {
 				if( entry.autoincrement === true )
 					Nino.admin.elements._numbered[entry.type] = entry.nextUri || '';
@@ -412,7 +514,7 @@
 
 				btn.appendChild( titleWrap );
 				btn.appendChild( chev );
-				btn.addEventListener( 'click', function() { Nino.admin.elements._selectType( entry.type, entry.model, entry.title ) } );
+				btn.addEventListener( 'click', function() { Nino.admin.router.go( 'elements', [ entry.type ] ); Nino.admin.elements._selectType( entry.type, entry.model, entry.title ) } );
 
 				wrap.appendChild( btn );
 			} );
@@ -519,7 +621,7 @@
 				btn.addEventListener( 'click', function() {
 					if( btn.dataset.uri === '' )
 						return;
-					Nino.admin.elements._guard( function() { Nino.admin.elements._openForm( btn.dataset.uri ) } );
+					Nino.admin.elements._guard( function() { Nino.admin.elements._visit( btn.dataset.uri ) } );
 				} );
 				nav.appendChild( btn );
 			} );
@@ -614,7 +716,7 @@
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/elements/label/backtypes');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.elements._showTypes() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'elements', [] ); Nino.admin.elements._showTypes() } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const title = dc.createElement('div');
@@ -655,7 +757,7 @@
 						empty 	: Nino.content.getText('/_admin/elements/label/reference-empty'),
 						noMatch : Nino.content.getText('/_admin/elements/label/reference-no-matches'),
 					},
-					onRowClick : function( row ) { Nino.admin.elements._openForm( row['.uri'] ) },
+					onRowClick : function( row ) { Nino.admin.elements._visit( row['.uri'] ) },
 				} );
 			} else {
 				const ul = dc.createElement('ul');
@@ -665,7 +767,7 @@
 					const link	= dc.createElement('a');
 					link.href = '#';
 					link.textContent = element.label;
-					link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.elements._openForm( element.uri ) } );
+					link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.elements._visit( element.uri ) } );
 					li.appendChild( link );
 					ul.appendChild( li );
 				} );
@@ -681,7 +783,7 @@
 			addBtn.type = 'button';
 			addBtn.className = 'nino-admin-btn-primary';
 			addBtn.textContent = Nino.content.getText('/_admin/elements/label/add');
-			addBtn.addEventListener( 'click', function() { Nino.admin.elements._openForm( null ) } );
+			addBtn.addEventListener( 'click', function() { Nino.admin.elements._visit( null ) } );
 			wrap.appendChild( Nino.adminUi.listActions( [ addBtn ] ) );
 		},
 
@@ -2240,6 +2342,7 @@
 				if( Nino.admin.elements._saving === true )
 					return;
 				Nino.admin.elements._destroyHtmlEditors();
+				Nino.admin.router.go( 'elements', [ Nino.admin.elements._currentType ] );
 				Nino.admin.elements._showList();
 				// The form's locale switch moves the workbench's content locale;
 				// the list's cells show one translation, so they follow
@@ -2840,7 +2943,7 @@
 			Nino.admin.elements._pristine 			= { global : {}, locales : {} };
 
 			Nino.admin.elements._renderForm();
-			Nino.admin.router.set( 'elements', [ Nino.admin.elements._currentType, 'new' ] );
+			Nino.admin.router.go( 'elements', [ Nino.admin.elements._currentType, 'new' ] );
 
 			// A copy nobody has saved yet is the one state "unsaved" is for
 			Nino.admin.elements._status.dirty( Nino.content.getText('/_admin/elements/msg/duplicated') );

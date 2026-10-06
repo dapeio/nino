@@ -429,7 +429,7 @@ function countTypesRequests() {
 			callback( { status : 200, responseJSON : { types : [], locales : [ 'de_DE' ], selectedLocale : 'de_DE' } } );
 		} },
 		content : { getText : key => key },
-		admin : { router : { set(){} }, sessionLocale : { init(){} } },
+		admin : { router : { set(){}, go(){}, current : () => ( { panel : '', parts : [] } ), leave : ( names, leaving, proceed ) => proceed() }, sessionLocale : { init(){} } },
 		adminUi : { text : value => value, emptyState : el, listActions : el },
 	};
 
@@ -456,6 +456,147 @@ check( 'opening the panel asks for the type list once, not twice', JSON.stringif
 // _refreshTypes()'s actual job: the count beside a type is content, so coming
 // back to the overview after adding an element has to re-read it
 check( '...and coming back to the overview re-reads it, which is what that second request was for', JSON.stringify( typesRequests.returning ) === '["elements/types"]' );
+
+/*	The browser's Back and Forward. A step through the history changes the
+	address and nothing else, so showCurrent() shows the level the hash names:
+	the picker, a type's list or one element's form. The levels themselves are
+	stubbed out here - what is checked is which one is asked for, whether the
+	shell is asked to put a question in front of leaving a form, and what a
+	person's own move writes into the history	*/
+{
+	const classes = hidden => { const held = { 'admin-hidden' : hidden }; return { add : k => held[k] = true, remove : k => held[k] = false, contains : k => held[k] === true } };
+	const nodes = { 'elements-types' : { classList : classes( false ) }, 'elements-list' : { classList : classes( true ) }, 'elements-form' : { classList : classes( true ) } };
+	const calls = [];
+	const hash = { panel : 'elements', parts : [] };
+	const asked = [];
+
+	const box = { console : console, document : { getElementById : id => nodes[id] || null, querySelectorAll : () => [], documentElement : {}, body : {} } };
+	box.window = box;
+	box.Nino = {
+		editor : {},
+		events : { bindCallback(){} },
+		content : { getText : key => key },
+		admin : {
+			router : {
+				set : ( panel, parts ) => calls.push( 'set '+ [ panel ].concat( parts ).join('/') ),
+				go : ( panel, parts ) => calls.push( 'go '+ [ panel ].concat( parts ).join('/') ),
+				current : () => hash,
+				leave : ( names, leaving, proceed, resync ) => { asked.push( { names : names, leaving : leaving, resync : resync } ); proceed() },
+			},
+			sessionLocale : { current : 'de_DE', init(){} },
+		},
+		adminUi : {},
+	};
+
+	const context = vm.createContext( box );
+	vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' ), context, { filename : 'Nino.admin.js' } );
+	vm.runInContext( source, context, { filename : 'elements.js' } );
+
+	const module = box.Nino.admin.elements;
+	const teamModel = { title : { type : 'string' } };
+	const levels = { form : 'elements-form', list : 'elements-list', types : 'elements-types' };
+
+	// Levels are stubbed, the picker's and the form's markup is not what is checked
+	module._showTypes = () => calls.push( 'types' );
+	module._showList = () => calls.push( 'list' );
+	module._showFormView = () => calls.push( 'form' );
+	module._openForm = uri => calls.push( 'open '+ uri );
+	module._refreshList = () => calls.push( 'refresh' );
+	module._destroyHtmlEditors = () => calls.push( 'destroy' );
+	module._selectType = ( type, model, title ) => calls.push( 'select '+ type+ ' '+ title+ ' '+ module._pendingUri );
+
+	// Which level is on screen, as the panes say it
+	const on = ( level, type, uri ) => {
+		Object.keys( levels ).forEach( name => nodes[levels[name]].classList[ name === level ? 'remove' : 'add' ]( 'admin-hidden' ) );
+		module._currentType = type ?? null;
+		module._isNew = uri === 'new';
+		module._currentUri = uri === 'new' ? null : ( uri ?? null );
+	};
+	const at = ( ...parts ) => { hash.panel = 'elements'; hash.parts = parts; calls.length = 0; asked.length = 0; module._pendingUri = undefined; module.showCurrent() };
+
+	module._ready = true;
+	module._types = [ { type : 'team', title : 'Team', model : teamModel }, { type : 'post', title : 'Post', model : {} } ];
+	module._listLocale = 'de_DE';
+
+	on( 'types' );
+	at( 'team' );
+	check( 'a hash that names a type opens it from the picker: the list is loaded the way a reload loads it', calls.join() === 'select team Team undefined' && asked.length === 1 && asked[0].leaving === false );
+
+	on( 'types' );
+	at( 'team', 'ada' );
+	check( '...one that names an element opens that element once the list is there', calls.join() === 'select team Team ada' );
+	on( 'types' );
+	at( 'team', 'new' );
+	check( '...and a blank form for \'new\'', calls.join() === 'select team Team new' );
+
+	on( 'list', 'team' );
+	at( 'team', 'ada' );
+	check( 'in the type that is open, an element is opened at once', calls.join() === 'open ada' && asked[0].leaving === false );
+	at( 'team', 'new' );
+	check( '...\'new\' is a blank form', calls.join() === 'open null' );
+	at( 'post' );
+	check( 'another type is selected', calls.join() === 'select post Post undefined' );
+	at();
+	check( 'the bare panel is the picker, torn down like the list\'s back link', calls.join() === 'destroy,types' );
+
+	on( 'form', 'team', 'ada' );
+	at( 'team' );
+	check( 'Back from a form to its list asks first - leaving a form is what the shell guards - and then shows the list', asked.length === 1 && asked[0].leaving === true && JSON.stringify( asked[0].names ) === '["elements"]' && typeof asked[0].resync === 'function' && calls.join() === 'destroy,list' );
+	module._listLocale = 'en_US';
+	at( 'team' );
+	check( '...and reads the list again when the form changed the content locale, as the back link does', calls.join() === 'destroy,list,refresh' );
+	module._listLocale = 'de_DE';
+	at();
+	check( 'Back out of the form to the picker leaves it too', asked[0].leaving === true && calls.join() === 'destroy,types' );
+	at( 'team', 'bob' );
+	check( 'another element of the same type is opened in place of this one, asked first', asked[0].leaving === true && calls.join() === 'open bob' );
+	at( 'post', 'x' );
+	check( 'an element of another type goes through that type\'s list', asked[0].leaving === true && calls.join() === 'select post Post x' );
+
+	on( 'form', 'team', 'new' );
+	at( 'team', 'new' );
+	check( 'the level on screen needs no move: it falls to the panel\'s own re-show, which writes the address', calls.length === 1 && calls[0] === 'form' && asked.length === 0 );
+	on( 'list', 'team' );
+	at( 'team' );
+	check( '...the list too', calls.join() === 'list' );
+	on( 'types' );
+	at();
+	check( '...and the picker', calls.join() === 'types' );
+
+	on( 'form', 'team', 'ada' );
+	at( 'nope' );
+	check( 'a type the picker does not know is the picker', calls.join() === 'destroy,types' );
+	on( 'types' );
+	at( 'nope', 'x' );
+	check( '...and when that is on screen already it is only written back', calls.join() === 'types' );
+
+	on( 'form', 'team', 'ada' );
+	module._saving = true;
+	at();
+	check( 'while a save runs the screen stays where it is', asked.length === 0 && calls.join() === 'form' );
+	module._saving = false;
+
+	on( 'form', 'team', 'ada' );
+	hash.panel = 'images';
+	calls.length = 0;
+	module.showCurrent();
+	check( 'a hash that names another panel (a click on the rail) keeps the level in memory and writes it', calls.join() === 'form' && asked.length === 0 );
+
+	// The moves a person makes
+	module._openForm = uri => calls.push( 'open '+ uri );
+	on( 'list', 'team' );
+	calls.length = 0;
+	module._visit( 'ada' );
+	check( 'opening an element from the list is a step Back returns to, pushed before the form writes the address', calls.join() === 'go elements/team/ada,open ada' );
+	calls.length = 0;
+	module._visit( null );
+	check( '...a new one too', calls.join() === 'go elements/team/new,open null' );
+	module._saving = true;
+	calls.length = 0;
+	module._visit( 'ada' );
+	check( '...but not while a save runs', calls.length === 0 );
+	module._saving = false;
+}
 
 // --- inputsize: a model field's rows reach its input ----------------------
 //
@@ -568,6 +709,8 @@ if( typeof elements._renderNav === 'function' ) {
 	elements._isNew = false;
 
 	const opened = [];
+	const stepped = [];
+	sandbox.Nino.admin.router = { set(){}, go : ( panel, parts ) => stepped.push( panel+ '/'+ parts.join('/') ) };
 	elements._openForm = function( uri ) { opened.push( uri ) };
 	const nav = elements._renderNav();
 	const buttons = dom.find( nav, n => n.tagName === 'button' );
@@ -579,6 +722,7 @@ if( typeof elements._renderNav === 'function' ) {
 	buttons[1].listeners.click();
 	atEnd[1].listeners.click();
 	check( 'clicking next opens that element, and a button at the end opens nothing', JSON.stringify( opened ) === '["cy"]' );
+	check( '...as a step Back returns to', stepped.length === 1 && stepped[0] === 'elements/'+ elements._currentType+ '/cy' );
 
 	// Into the form's context bar, after the back link (and the locale
 	// switch, when the type has one) - the shell's toolbar stands in
@@ -889,7 +1033,7 @@ function fakeDom() {
 	const localeSwitches = [];
 	sandbox.Nino.admin.sessionLocale = { current : 'en_US', set : locale => localeSwitches.push( locale ), init(){} };
 	sandbox.Nino.admin.publicUrl = path => '/public'+ path;
-	sandbox.Nino.admin.router = { set(){}, current : () => ( { panel : '', parts : [] } ) };
+	sandbox.Nino.admin.router = { set(){}, go(){}, current : () => ( { panel : '', parts : [] } ), leave : ( names, leaving, proceed ) => proceed() };
 	const editorMarks = [];
 	sandbox.Nino.admin.htmlEditor = { create : ( mount, value ) => {
 		const content = d.make('div');

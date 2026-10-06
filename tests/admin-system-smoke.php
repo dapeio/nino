@@ -3271,6 +3271,24 @@ check( 'nav() is rendered - every panel has its link, the module\'s included, an
 check( 'every label is a fill - structure and system panels the same as the content ones, so the rail speaks one language', str_contains( $navHtml, '>[[/_admin/nav/routes]]</span></a>' ) === true && str_contains( $navHtml, '>[[/_admin/nav/backups]]</span></a>' ) === true && str_contains( $navHtml, '>[[/_admin/nav/text]]</span></a>' ) === true && str_contains( $navHtml, '>[[/_admin/nav/user]]</span></a>' ) === true );
 check( 'the three groups actually on screen get their headings, in the GROUPS order - features carries no heading while nothing sits in it', preg_match( '/nav-group" data-group="content".*data-group="structure".*data-group="system"/s', $navHtml ) === 1
 	&& str_contains( $navHtml, 'data-group="features"' ) === false );
+check( 'every rail link is a real link to its panel - a new tab or a copied link opens it, the script only answers the plain click', preg_match_all( '/<a href="#([a-z][a-z0-9-]*)" id="admin-nav-\1" data-panel="\1"/', $navHtml ) === substr_count( $navHtml, 'data-panel=' )
+	&& str_contains( $navHtml, '<a href="#" ' ) === false );
+check( 'a group heading is a button that folds its links, open as rendered - a button, not a span: Enter and Space need no handler of their own', preg_match_all( '/<button type="button" class="nino-admin-nav-group" data-group="[a-z]+" aria-expanded="true">\[\[\/_admin\/nav\/group\/[a-z]+\]\]<\/button>/', $navHtml ) === substr_count( $navHtml, 'nino-admin-nav-group' )
+	&& str_contains( $navHtml, '<span class="nino-admin-nav-group"' ) === false );
+// The script reads a link's group from the order: a heading, then its links
+$railGroups = [];
+$railOpen 	= null;
+preg_match_all( '/data-group="([a-z]+)"|id="admin-nav-([a-z0-9-]+)"/', $navHtml, $railParts, PREG_SET_ORDER );
+foreach( $railParts as $railPart ) {
+	if( ( $railPart[1] ?? '' ) !== '' )
+		$railOpen = $railPart[1];
+	else
+		$railGroups[$railPart[2]] = $railOpen;
+}
+$railOk = $railGroups !== [];
+foreach( $railGroups as $railUri => $railGroup )
+	$railOk = $railOk && $railGroup === $registry[$railUri]['group'];
+check( 'every link stands under the heading of its own group, which is how the script knows what a heading folds', $railOk === true && count( $railGroups ) === count( $registry ) );
 check( 'GROUPS lists all four, features between structure and system', \Nino\Admin\Panels::GROUPS === [ 'content', 'structure', 'features', 'system' ] );
 
 /*	The registry is built once per request and reused. Building it is a glob

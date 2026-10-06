@@ -50,11 +50,16 @@
 		auth : {
 
 			/**
-			 *	Log in a user and redirect on success
+			 *	Log in a user and redirect on success - or, with no redirect, load
+			 *	the page again where it stands: the same address, now with a
+			 *	session, so a #hash and a ?query on it survive. Replacing the
+			 *	location with its own path and a fragment would be a navigation
+			 *	inside the same document that requests nothing, and the login
+			 *	form would stay on screen
 			 *
 			 *	@param		{string}		user					Username / mail
 			 *	@param		{string}		pw						Password
-			 *	@param		{string}		redirect			Uri to redirect to on success
+			 *	@param		{string|null}	redirect		Uri to redirect to on success, null to reload the page
 			 *	@param		{Function}	[onError]			(optional) Called with the xhr on a failed login
 			 *
 			 *	@return		void
@@ -64,7 +69,14 @@
 				Nino.http.sendRequest(
 					Nino.dir+ '/.nino/auth/login',
 					'POST',
-					function( xhr ) { if( xhr.status !== 200 ) return onError( xhr ); wn.location.replace( redirect ) },
+					function( xhr ) {
+						if( xhr.status !== 200 )
+							return onError( xhr );
+						if( redirect === null )
+							wn.location.reload();
+						else
+							wn.location.replace( redirect );
+					},
 					{},
 					{ 'user' : user, 'pw' : pw }
 				);

@@ -81,7 +81,13 @@
 		 *	Re-apply whatever drill-down level this panel is currently on -
 		 *	called when the user switches TO this tab, so the hash (only ever
 		 *	written by router.set() while this panel is the visible one) gets
-		 *	synced to reality instead of staying stale from before the switch
+		 *	synced to reality instead of staying stale from before the switch.
+		 *
+		 *	Where the hash names this panel, the hash wins: a step through the
+		 *	browser's history changes the address and nothing else, so the level
+		 *	it names is shown - and leaving a form that holds unsaved input asks
+		 *	first, as its back link does. A hash that names another panel (a
+		 *	click on the rail) leaves the level in memory as it is
 		 *
 		 *	@return		void
 		 */
@@ -92,10 +98,54 @@
 				return;
 			}
 
+			const hash = Nino.admin.router.current();
+			if( hash.panel === 'images' && Nino.admin.images._follow( hash.parts ) === true )
+				return;
+
+			Nino.admin.images._showLevel();
+		},
+
+		/**
+		 *	Show the level this panel is on, and write it into the address
+		 *
+		 *	@return		void
+		 */
+		_showLevel : function() {
+
 			if( dc.getElementById('images-form').classList.contains('admin-hidden') === false )
 				return Nino.admin.images._showForm();
 
 			Nino.admin.images._showList();
+		},
+
+		/**
+		 *	Move to the level the hash names, if it is not the one on screen.
+		 *	An unknown group is the list. Leaving a form with unsaved alt texts
+		 *	asks first (see Nino.admin.router.leave())
+		 *
+		 *	@param		{Array}		parts					The hash behind the panel's name
+		 *
+		 *	@return		{boolean}									Whether a move was made or is being asked about
+		 */
+		_follow : function( parts ) {
+
+			const open = dc.getElementById('images-form').classList.contains('admin-hidden') === false;
+			const group = parts.length > 0 && Nino.admin.images._groups[parts[0]] !== undefined ? parts[0] : null;
+
+			if( group === null ? open === false : ( open === true && Nino.admin.images._currentGroup === group ) )
+				return false;
+
+			Nino.admin.router.leave( [ 'images' ], open, function() {
+				if( group === null ) {
+					Nino.admin.images._showList();
+					return;
+				}
+				Nino.admin.images._currentGroup = group;
+				Nino.admin.images._renderGroupForm();
+				Nino.admin.images._showForm();
+			}, Nino.admin.images._showLevel );
+
+			return true;
 		},
 
 		/**
@@ -231,6 +281,7 @@
 			const open = function() {
 				Nino.admin.images._currentGroup = group;
 				Nino.admin.images._renderGroupForm();
+				Nino.admin.router.go( 'images', [ group ] );
 				Nino.admin.images._showForm();
 			};
 
@@ -267,7 +318,7 @@
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/images/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.images._showList() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'images', [] ); Nino.admin.images._showList() } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const title = dc.createElement('div');
