@@ -13,6 +13,12 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Workbench:** the Dashboard's element-type tile and the check that a
+  reference field points at an existing type read the type names
+  (`\Nino\Modules\Elements\Admin::types()`) instead of every type file;
+  `Types::summaries()` is built on `Admin::types()` and `typeData()` and keeps
+  its strcmp order. Nothing the panel shows changes.
+
 - **Text:** the limit a text key derives from its longest value is worked out
   in one place, `\Nino\Text::maxlength()` (internal). The Text Keys tab gave a
   hidden key with no value a hand-written `150`; it asks the same function

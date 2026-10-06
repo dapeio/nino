@@ -67,7 +67,7 @@ namespace Nino\Modules\Elements {
 		 *	@return 	array
 		 */
 		public static function summary( array &$appData ): array {
-			return [ 'value' => count( self::summaries( $appData ) ), 'label' => '/_admin/dashboard/label/types' ];
+			return [ 'value' => count( Admin::types( $appData ) ), 'label' => '/_admin/dashboard/label/types' ];
 		}
 
 		/**
@@ -110,7 +110,7 @@ namespace Nino\Modules\Elements {
 
 		/**
 		 *	Every element type with its title and field count, sorted by
-		 *	uri - shared by apiList() and \Nino\Modules\Dashboard\Admin::apiSummary()
+		 *	uri - what apiList() answers
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -119,10 +119,9 @@ namespace Nino\Modules\Elements {
 		public static function summaries( array &$appData ): array {
 
 			$types = [];
-			foreach( glob( \Nino\Filesystem::path( $appData, '/elements' ). '/*.php' ) ?: [] as $file ) {
+			foreach( Admin::types( $appData ) as $typeUri ) {
 
-				$typeUri 	= basename( $file, '.php' );
-				$typeData = \Nino\Filesystem::getFileContent( $appData, '/elements/'. $typeUri. '.php', [] );
+				$typeData = Admin::typeData( $appData, $typeUri );
 
 				$types[] = [
 					'uri' 				=> $typeUri,
@@ -131,6 +130,11 @@ namespace Nino\Modules\Elements {
 				];
 			}
 
+			// strcmp, not the sort() Admin::types() applies: sort() orders
+			// numeric-looking names as numbers, '9' before '10', and this list
+			// has always been ordered as plain strings - a hand-written type
+			// file may carry such a name (the panel only creates ones that start
+			// with a letter, see isValidTypeUri())
 			usort( $types, fn( array $a, array $b ) => strcmp( $a['uri'], $b['uri'] ) );
 
 			return $types;
@@ -378,7 +382,7 @@ namespace Nino\Modules\Elements {
 		 */
 		private static function _unknownReferencedType( array &$appData, array $model ): ?string {
 
-			$known = array_column( self::summaries( $appData ), 'uri' );
+			$known = Admin::types( $appData );
 
 			foreach( $model as $key => $field ) {
 
