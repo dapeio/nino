@@ -76,7 +76,7 @@
 		// Whether the features directory can be written - features/list and
 		// features/catalogue both answer it fresh, live, every time
 		_writable 	: true,
-		// { url, fetched, offers } from features/list's own 'catalogue', or
+		// { fetched, offers } from features/list's own 'catalogue', or
 		// from a features/catalogue answer once Refresh was pressed; null
 		// before either ever ran
 		_cache 			: null,
@@ -591,7 +591,7 @@
 					return;
 				}
 
-				Nino.admin.features._cache 				= { url : response.url, fetched : response.fetched, offers : response.offers };
+				Nino.admin.features._cache 				= { fetched : response.fetched, offers : response.offers };
 				Nino.admin.features._writable			= response.writable === true;
 				Nino.admin.features._catalogueMsg	= { text : '', error : false, busy : false };
 				Nino.admin.features._renderPanel( Nino.admin.features._holdsInput() );

@@ -859,8 +859,8 @@ check( 'and neither asked the catalogue for anything', $requests === [] );
 publish( $appData, $remote, $features, null, $privateKey );
 $requests = [];
 [ $status, $body ] = callFeatures( $appData, 'apiCatalogue' );
-check( 'apiCatalogue reads the catalogue - two requests - and answers its url, its stamp, when it was fetched, whether features/ is writable, and one offer per key, sorted', $status === 200
-	&& array_keys( $body ) === [ 'url', 'generated', 'fetched', 'writable', 'offers' ] && $body['url'] === \Nino\Catalogue::DEFAULT_URL && $body['generated'] === '2026-09-07T12:00:00Z' && $body['writable'] === true
+check( 'apiCatalogue reads the catalogue - two requests - and answers when it was fetched, whether features/ is writable, and one offer per key, sorted: what the script reads, and nothing else', $status === 200
+	&& array_keys( $body ) === [ 'fetched', 'writable', 'offers' ] && $body['writable'] === true
 	&& is_string( $body['fetched'] ) && $body['fetched'] !== '' && preg_match( '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $body['fetched'] ) === 1
 	&& array_column( $requests, 'url' ) === [ \Nino\Catalogue::DEFAULT_URL, \Nino\Catalogue::DEFAULT_URL. '.sig' ] && array_column( $body['offers'], 'key' ) === [ 'ancient', 'helper', 'needy', 'sample' ] );
 $offers = array_column( $body['offers'], null, 'key' );
@@ -869,10 +869,10 @@ $offers = array_column( $body['offers'], null, 'key' );
 // cached - no further request, and its offers answer the same as apiCatalogue's
 $requests = [];
 [ $listStatus, $listBody ] = callFeatures( $appData, 'apiList' );
-check( 'apiList carries the cached catalogue too - url, fetched and the same offers - with no request of its own', $listStatus === 200 && $requests === []
-	&& is_array( $listBody['catalogue'] ) && array_keys( $listBody['catalogue'] ) === [ 'url', 'fetched', 'offers' ]
-	&& $listBody['catalogue']['url'] === \Nino\Catalogue::DEFAULT_URL && $listBody['catalogue']['fetched'] === $body['fetched'] && $listBody['catalogue']['offers'] === $body['offers'] );
-check( 'every offer has the same keys, the extension list flattened to ext', array_keys( $offers['helper'] ) === [ 'key', 'name', 'description', 'category', 'maturity', 'version', 'nino', 'ext', 'requires', 'directory', 'archive', 'size', 'released', 'state', 'fits', 'local', 'active' ] );
+check( 'apiList carries the cached catalogue too - fetched and the same offers, phrased the same way - with no request of its own', $listStatus === 200 && $requests === []
+	&& is_array( $listBody['catalogue'] ) && array_keys( $listBody['catalogue'] ) === [ 'fetched', 'offers' ]
+	&& $listBody['catalogue']['fetched'] === $body['fetched'] && $listBody['catalogue']['offers'] === $body['offers'] );
+check( 'every offer has the same keys, the extension list flattened to ext - the members the script reads, and no other', array_keys( $offers['helper'] ) === [ 'key', 'name', 'description', 'category', 'maturity', 'version', 'nino', 'ext', 'requires', 'archive', 'released', 'state', 'local' ] );
 check( 'the maturity arrives localized like the name, empty for an offer that names none', $offers['helper']['maturity'] === 'Stabil' && $offers['sample']['maturity'] === '' );
 // The cache is read back as it was written: one written before the key existed
 // carries none, and the panel has to answer rather than fail on the missing key
@@ -888,13 +888,13 @@ check( 'a catalogue cached before the maturity existed still lists, every offer 
 publish( $appData, $remote, $features, null, $privateKey );
 callFeatures( $appData, 'apiCatalogue' );
 check( 'names and descriptions arrive in the session locale - de_DE, the native language, since none was chosen', $offers['helper']['name'] === 'Helper' && $offers['helper']['description'] === 'Ein helper' && $offers['sample']['description'] === 'Ein sample' );
-check( 'the state travels with each offer: helper current and active, sample current and off, ancient and needy incompatible with what they ask for',
-	$offers['helper']['state'] === 'current' && $offers['helper']['version'] === '1.1.0' && $offers['helper']['local'] === '1.1.0' && $offers['helper']['active'] === true && $offers['helper']['fits'] === true
-	&& $offers['sample']['state'] === 'current' && $offers['sample']['local'] === '3.0.0' && $offers['sample']['active'] === false
-	&& $offers['ancient']['state'] === 'incompatible' && $offers['ancient']['fits'] === false && $offers['ancient']['local'] === null && $offers['ancient']['nino'] === '^0.9' && $offers['ancient']['ext'] === []
+check( 'the state travels with each offer: helper and sample current, ancient and needy incompatible with what they ask for',
+	$offers['helper']['state'] === 'current' && $offers['helper']['version'] === '1.1.0' && $offers['helper']['local'] === '1.1.0'
+	&& $offers['sample']['state'] === 'current' && $offers['sample']['local'] === '3.0.0'
+	&& $offers['ancient']['state'] === 'incompatible' && $offers['ancient']['local'] === null && $offers['ancient']['nino'] === '^0.9' && $offers['ancient']['ext'] === []
 	&& $offers['needy']['state'] === 'incompatible' && $offers['needy']['nino'] === '^1.0' && $offers['needy']['ext'] === [ 'no_such_extension' ] );
-check( 'the archive url, size, directory and release date pass through', $offers['sample']['archive'] === 'https://catalogue.test/features/sample-3.0.0.tar.gz' && $offers['sample']['size'] === strlen( $sample300 )
-	&& $offers['sample']['directory'] === 'Sample' && $offers['sample']['released'] === '2026-09-07' && $offers['sample']['requires'] === [] );
+check( 'the archive url and the release date pass through', $offers['sample']['archive'] === 'https://catalogue.test/features/sample-3.0.0.tar.gz'
+	&& $offers['sample']['released'] === '2026-09-07' && $offers['sample']['requires'] === [] );
 
 rename( NINO_FEATURES_DIR, NINO_FEATURES_DIR. '.away' );
 unset( $appData['./nino/features/all'] );
@@ -972,7 +972,7 @@ check( 'the directory is in place, the archive was fetched once, and the class i
 	&& ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/features']['extra']['version'] ?? '' ) === '1.0.0' );
 
 [ $status, $body ] = callFeatures( $appData, 'apiCatalogue' );
-check( 'and the catalogue now says installed, and running', $status === 200 && array_column( $body['offers'], 'state', 'key' )['extra'] === 'current' && array_column( $body['offers'], 'local', 'key' )['extra'] === '1.0.0' && array_column( $body['offers'], 'active', 'key' )['extra'] === true );
+check( 'and the catalogue now says installed, and running', $status === 200 && array_column( $body['offers'], 'state', 'key' )['extra'] === 'current' && array_column( $body['offers'], 'local', 'key' )['extra'] === '1.0.0' && \Nino\Features::get( $appData, 'extra' )['active'] === true );
 
 /*	...and the one case it does not switch on: a feature the project has
 	deliberately switched off. A newer version of it is not somebody changing
@@ -1020,7 +1020,7 @@ publish( $appData, $remote, $withHelper120, null, $privateKey );
 
 [ $status, $body ] = callFeatures( $appData, 'apiCatalogue' );
 check( 'the offer for an active feature on disk in an older version says upgrade, with the local version', $status === 200 && array_column( $body['offers'], 'state', 'key' )['helper'] === 'upgrade'
-	&& array_column( $body['offers'], 'local', 'key' )['helper'] === '1.1.0' && array_column( $body['offers'], 'version', 'key' )['helper'] === '1.2.0' && array_column( $body['offers'], 'active', 'key' )['helper'] === true );
+	&& array_column( $body['offers'], 'local', 'key' )['helper'] === '1.1.0' && array_column( $body['offers'], 'version', 'key' )['helper'] === '1.2.0' && \Nino\Features::get( $appData, 'helper' )['active'] === true );
 check( 'before: on disk as 1.1.0, recorded as 1.0.0, an update waiting', \Nino\Features::get( $appData, 'helper' )['version'] === '1.1.0' && \Nino\Features::get( $appData, 'helper' )['installed'] === '1.0.0' && \Nino\Features::get( $appData, 'helper' )['update'] === true );
 
 /*	Measured before this was the rule: apiInstall() activated again in the

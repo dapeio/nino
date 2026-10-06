@@ -345,18 +345,21 @@ function listAnswer( catalogueUrl, writable, cache, features ) {
 // available, 'helper' an upgrade over what is on disk, 'sample' already
 // current - the one state the Available tab excludes
 const OFFERS = [
-	{ key : 'ancient', name : 'Ancient', description : 'Ein ancient', category : 'content', maturity : '', version : '1.0.0', nino : '^0.9', ext : [], requires : [], directory : 'Ancient', archive : 'https://catalogue.test/features/ancient-1.0.0.tar.gz', size : 10, released : '2026-09-07', state : 'incompatible', fits : false, local : null, active : false },
-	{ key : 'extra', name : 'Zusatz', description : 'Ein extra', category : 'marketing', maturity : 'Beta', version : '1.0.0', nino : '^1.0', ext : [], requires : [ 'helper' ], directory : 'Extra', archive : 'https://catalogue.test/features/extra-1.0.0.tar.gz', size : 10, released : '2026-09-07', state : 'available', fits : true, local : null, active : false },
-	{ key : 'helper', name : 'Helper', description : '', category : 'system', maturity : '', version : '1.2.0', nino : '^1.0', ext : [], requires : [], directory : 'Helper', archive : 'https://catalogue.test/features/helper-1.2.0.tar.gz', size : 10, released : '', state : 'upgrade', fits : true, local : '1.1.0', active : true },
-	{ key : 'needy', name : 'Needy', description : 'Ein needy', category : 'security', maturity : '', version : '1.0.0', nino : '^1.0', ext : [ 'no_such_extension', 'other' ], requires : [], directory : 'Needy', archive : 'https://catalogue.test/features/needy-1.0.0.tar.gz', size : 10, released : '2026-09-07', state : 'incompatible', fits : false, local : null, active : false },
-	{ key : 'sample', name : 'Beispiel-Feature', description : 'Ein sample', category : 'content', maturity : '', version : '1.2.0', nino : '^1.0', ext : [], requires : [ 'helper' ], directory : 'Sample', archive : 'https://catalogue.test/features/sample-1.2.0.tar.gz', size : 10, released : '2026-09-07', state : 'current', fits : true, local : '1.2.0', active : true },
+	{ key : 'ancient', name : 'Ancient', description : 'Ein ancient', category : 'content', maturity : '', version : '1.0.0', nino : '^0.9', ext : [], requires : [], archive : 'https://catalogue.test/features/ancient-1.0.0.tar.gz', released : '2026-09-07', state : 'incompatible', local : null },
+	{ key : 'extra', name : 'Zusatz', description : 'Ein extra', category : 'marketing', maturity : 'Beta', version : '1.0.0', nino : '^1.0', ext : [], requires : [ 'helper' ], archive : 'https://catalogue.test/features/extra-1.0.0.tar.gz', released : '2026-09-07', state : 'available', local : null },
+	{ key : 'helper', name : 'Helper', description : '', category : 'system', maturity : '', version : '1.2.0', nino : '^1.0', ext : [], requires : [], archive : 'https://catalogue.test/features/helper-1.2.0.tar.gz', released : '', state : 'upgrade', local : '1.1.0' },
+	{ key : 'needy', name : 'Needy', description : 'Ein needy', category : 'security', maturity : '', version : '1.0.0', nino : '^1.0', ext : [ 'no_such_extension', 'other' ], requires : [], archive : 'https://catalogue.test/features/needy-1.0.0.tar.gz', released : '2026-09-07', state : 'incompatible', local : null },
+	{ key : 'sample', name : 'Beispiel-Feature', description : 'Ein sample', category : 'content', maturity : '', version : '1.2.0', nino : '^1.0', ext : [], requires : [ 'helper' ], archive : 'https://catalogue.test/features/sample-1.2.0.tar.gz', released : '2026-09-07', state : 'current', local : '1.2.0' },
 ];
 
-const CACHE = { url : 'https://catalogue.getnino.dev/catalogue.json', fetched : '2026-09-07 12:00', offers : OFFERS };
+// The configured catalogue url, as features/list names it under catalogueUrl
+const CATALOGUE_URL = 'https://catalogue.getnino.dev/catalogue.json';
 
-// features/catalogue's own shape - 'generated' and 'writable' beside it, no 'url' collision
+const CACHE = { fetched : '2026-09-07 12:00', offers : OFFERS };
+
+// features/catalogue's own shape - the cache's, and 'writable' beside it
 function catalogueAnswer( writable, offers, fetched ) {
-	return { url : CACHE.url, generated : '2026-09-07T12:00:00Z', fetched : fetched || CACHE.fetched, writable : writable, offers : offers || OFFERS };
+	return { fetched : fetched || CACHE.fetched, writable : writable, offers : offers || OFFERS };
 }
 
 console.log('Features panel');
@@ -460,7 +463,7 @@ panel.init();
 // workbench and not beside it
 check( 'init loads features/list through the shell\'s one endpoint, written from the project root', requests.length === 1 && requests[0].action === 'features/list' && requests[0].uri === Nino.dir+ '/_admin/' && requests[0].method === 'POST' );
 
-answer( 200, listAnswer( CACHE.url, true, null ) );
+answer( 200, listAnswer( CATALOGUE_URL, true, null ) );
 check( 'opening the panel fetches nothing but the list - no catalogue request follows on its own', requests.length === 1 );
 check( 'there is no intro line and no eyebrow badge - just the head, the action bar and the current tab', mount.children.length === 3
 	&& hasClass( mount.children[0], 'admin-features-head' )
@@ -647,11 +650,11 @@ fire( filterNow(), 'input' );
 categoryNow().value = 'ui';
 fire( categoryNow(), 'change' );
 panel.init();
-answer( 200, listAnswer( CACHE.url, true, null, FEATURES.filter( function( f ) { return f.category !== 'ui' } ) ) );
+answer( 200, listAnswer( CATALOGUE_URL, true, null, FEATURES.filter( function( f ) { return f.category !== 'ui' } ) ) );
 check( 'a category gone after a reload stops narrowing instead of emptying the list for good', rowKeys( mount, 'feature' ) === 'sample' && categoryNow().value === '' );
 
 panel.init();
-answer( 200, listAnswer( CACHE.url, true, null ) );
+answer( 200, listAnswer( CATALOGUE_URL, true, null ) );
 check( 'and the whole list is back with the feature', rowKeys( mount, 'feature' ) === 'plain,sample' );
 
 // --- one feature's own screen (from the Active tab)
@@ -816,7 +819,7 @@ check( 'a rejected form shows the fields the backend named, as an error, and fre
 fire( form, 'submit' );
 answer( 200, { feature : FEATURES[2] } );
 check( 'a saved form reloads the list rather than trusting what was typed', requests[requests.length - 1].action === 'features/list' );
-answer( 200, listAnswer( CACHE.url, true, null ) );
+answer( 200, listAnswer( CATALOGUE_URL, true, null ) );
 check( 'the reload comes back to the feature\'s screen rather than dropping to the list', screen.classList.contains('admin-hidden') === false && mount.classList.contains('admin-hidden') === true );
 const rebuilt = byTag( screen, 'form' )[0];
 check( '...on the rebuilt form, where the confirmation survives the re-render', rebuilt !== form && byTag( rebuilt, 'p' ).some( function( el ) { return el.textContent === text('/_admin/common/msg/saved') } ) );
@@ -832,7 +835,7 @@ check( 'the back link returns to the list on the tab it was left on, and empties
 fire( row( mount, 'sample' ), 'click' );
 check( 'stepping into a feature opens on what it is, whatever tab the screen before it was left on - a save keeps its tab, a fresh drill-in starts at the beginning', findAll( screen, function( el ) { return hasClass( el, 'features-about' ) } )[0].hidden === false );
 panel.init();
-answer( 200, listAnswer( CACHE.url, true, null, FEATURES.map( function( f ) { return f.key === 'sample' ? Object.assign( {}, f, { active : false, settings : [], settingsTab : '' } ) : f } ) ) );
+answer( 200, listAnswer( CATALOGUE_URL, true, null, FEATURES.map( function( f ) { return f.key === 'sample' ? Object.assign( {}, f, { active : false, settings : [], settingsTab : '' } ) : f } ) ) );
 check( 'a feature that is no longer switched on drops its screen and comes back to the list', mount.classList.contains('admin-hidden') === false && screen.classList.contains('admin-hidden') === true && screen.children.length === 0 );
 
 // A feature with no settings at all still has a screen - it is where its
@@ -852,7 +855,7 @@ fire( byTag( screen.children[0], 'a' )[0], 'click' );
 	panel (see settings.js): its screen here draws no form and no Save for
 	them, and says where they went	*/
 panel.init();
-answer( 200, listAnswer( CACHE.url, true, null, FEATURES.map( function( f ) { return f.key === 'sample' ? Object.assign( {}, f, { settingsTab : 'sample-settings' } ) : f } ) ) );
+answer( 200, listAnswer( CATALOGUE_URL, true, null, FEATURES.map( function( f ) { return f.key === 'sample' ? Object.assign( {}, f, { settingsTab : 'sample-settings' } ) : f } ) ) );
 fire( row( mount, 'sample' ), 'click' );
 const movedForm = byTag( screen, 'form' )[0];
 const movedBar = movedForm.children[ movedForm.children.length - 1 ];
@@ -866,7 +869,7 @@ check( '...but the description is still there, and a link to the tab says where 
 fire( byTag( screen.children[0], 'a' )[0], 'click' );
 
 panel.init();
-answer( 200, listAnswer( CACHE.url, true, null ) );
+answer( 200, listAnswer( CATALOGUE_URL, true, null ) );
 
 // --- switching on and off (from the tab the feature is on)
 
@@ -911,11 +914,11 @@ answer( 200, { removed : 'old', privacy : [ 'Old', 'Old, too' ] } );
 check( 'a removal that leaves sections of the privacy policy behind says which, in a dialog, before the list is drawn again', alerts.length === dialogsBeforePrivacy + 1
 	&& alerts[alerts.length - 1] === text('/_admin/features/msg/deactivated-privacy').replace( '%s', 'Old, Old, too' ) );
 check( 'a removal reads the whole list again - what it took away may be what another row was waiting for', requests[requests.length - 1].action === 'features/list' );
-answer( 200, listAnswer( CACHE.url, true, null, FEATURES.filter( function( f ) { return f.key !== 'old' } ) ) );
+answer( 200, listAnswer( CATALOGUE_URL, true, null, FEATURES.filter( function( f ) { return f.key !== 'old' } ) ) );
 check( '...and the row is gone with no page reload: no rail entry changes when an inactive feature leaves', rowKeys( mount, 'feature' ) === 'fresh' && reloads === 1 );
 
 panel.init();
-answer( 200, listAnswer( CACHE.url, true, null ) );
+answer( 200, listAnswer( CATALOGUE_URL, true, null ) );
 
 // Deactivate and Update live on the feature's own screen now, not in the list
 fire( tabs[0], 'click' );
@@ -938,7 +941,7 @@ fire( byTag( screen.children[0], 'a' )[0], 'click' );
 // --- opening with a cache already on disk: the Available tab fills with no request
 
 panel.init();
-answer( 200, listAnswer( CACHE.url, true, CACHE ) );
+answer( 200, listAnswer( CATALOGUE_URL, true, CACHE ) );
 check( 'a cached catalogue fills the Available tab straight from features/list - no features/catalogue request at all', requests.filter( function( r ) { return r.action === 'features/catalogue' } ).length === 0 );
 
 // The panel stayed on Active from the previous section (a re-render keeps
@@ -995,7 +998,7 @@ const FEATURES_WITH_EXTRA = FEATURES.concat( [ EXTRA ] );
 const reloadsBeforeInstall = reloads;
 fire( install, 'click' );
 answer( 200, { feature : EXTRA, updated : false, required : [ 'helper', 'a$&b' ] } );
-answer( 200, listAnswer( CACHE.url, true, CACHE, FEATURES_WITH_EXTRA ) );
+answer( 200, listAnswer( CATALOGUE_URL, true, CACHE, FEATURES_WITH_EXTRA ) );
 check( 'an install that brought a requirement along says which one', alerts[alerts.length - 1] === text('/_admin/features/msg/installed-with').replace( '%s', function() { return 'helper, a$&b' } ) );
 check( '...and, having switched nothing on, reads the list again rather than building the workbench anew', reloads === reloadsBeforeInstall && requests[requests.length - 1].action === 'features/list' );
 
@@ -1047,7 +1050,7 @@ check( 'success reads the list again, and only the list - the cached catalogue\'
 // the installed feature itself, which the fixture above did not carry
 const installedOffers = JSON.parse( JSON.stringify( OFFERS ) );
 installedOffers[1] = Object.assign( {}, installedOffers[1], { state : 'current', local : '1.0.0' } );
-answer( 200, listAnswer( CACHE.url, true, Object.assign( {}, CACHE, { offers : installedOffers } ), FEATURES_WITH_EXTRA ) );
+answer( 200, listAnswer( CATALOGUE_URL, true, Object.assign( {}, CACHE, { offers : installedOffers } ), FEATURES_WITH_EXTRA ) );
 check( 'the installed feature now shows on Inactive, off, with Activate - and Available lost it, straight from the cache', byTag( paneHead.children[1], 'button' )[2].textContent === text('/_admin/features/tab/available')+ ' (3)' );
 
 fire( byTag( paneHead.children[1], 'button' )[1], 'click' );
@@ -1068,7 +1071,7 @@ check( '...and updating a feature that is running activates it again in a reques
 // Which is why the readonly panel below is opened rather than read out of
 // that answer: an update ends in a reload, so there is no list read to answer
 panel.init();
-answer( 200, listAnswer( CACHE.url, false, Object.assign( {}, CACHE, { offers : installedOffers } ) ) );
+answer( 200, listAnswer( CATALOGUE_URL, false, Object.assign( {}, CACHE, { offers : installedOffers } ) ) );
 check( 'without a writable directory the tab says so, naming it, and every remaining offer links its archive instead of a button', byTag( mount.children[2], 'p' ).some( function( el ) { return hasClass( el, 'nino-admin-error' ) && el.textContent === text('/_admin/features/hint/catalogue-readonly').replace( '%s', '/features' ) } )
 	&& byTag( offer( mount, 'ancient' ), 'button' ).length === 0 && byTag( offer( mount, 'needy' ), 'button' ).length === 0
 	&& byTag( offer( mount, 'helper' ), 'a' ).length === 1 && byTag( offer( mount, 'helper' ), 'a' )[0].href === CACHE.offers[2].archive && byTag( offer( mount, 'helper' ), 'a' )[0].textContent === text('/_admin/features/label/archive') );
@@ -1076,12 +1079,12 @@ check( 'without a writable directory the tab says so, naming it, and every remai
 // --- an empty catalogue, one offering nothing new, and the catalogue switched off
 
 panel.init();
-answer( 200, listAnswer( CACHE.url, true, Object.assign( {}, CACHE, { offers : [] } ) ) );
+answer( 200, listAnswer( CATALOGUE_URL, true, Object.assign( {}, CACHE, { offers : [] } ) ) );
 check( 'a cached catalogue listing no features at all is the shared empty state, naming none of the module\'s regular hints', findAll( mount.children[2], function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/catalogue-empty') );
 
 panel.init();
 const allCurrent = OFFERS.map( function( o ) { return Object.assign( {}, o, { state : 'current' } ) } );
-answer( 200, listAnswer( CACHE.url, true, Object.assign( {}, CACHE, { offers : allCurrent } ) ) );
+answer( 200, listAnswer( CATALOGUE_URL, true, Object.assign( {}, CACHE, { offers : allCurrent } ) ) );
 check( 'a cache whose offers are all already current says everything is up to date, count 0', findAll( mount.children[2], function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/available-empty')
 	&& byTag( paneHead.children[1], 'button' )[2].textContent === text('/_admin/features/tab/available')+ ' (0)' );
 
@@ -1094,7 +1097,7 @@ check( 'and a fetch was never made on its own throughout all of this', requests.
 // --- Refresh catalogue
 
 panel.showCurrent();
-answer( 200, listAnswer( CACHE.url, true, null ) );
+answer( 200, listAnswer( CATALOGUE_URL, true, null ) );
 const refreshBtn = byTag( mount.children[1], 'button' )[0];
 const requestsBeforeRefresh = requests.length;
 
@@ -1180,7 +1183,7 @@ panel.showCurrent();
 check( 'showCurrent leaves the panel as it is rather than re-fetching', requests.length === beforeShowCurrent );
 
 panel.init();
-answer( 200, { dir : '/features', catalogueUrl : CACHE.url, writable : true, catalogue : null, features : [] } );
+answer( 200, { dir : '/features', catalogueUrl : CATALOGUE_URL, writable : true, catalogue : null, features : [] } );
 check( 'init reloads, and Inactive\'s empty state names the directory - Active empty too, both counted 0', requests[requests.length - 1].action === 'features/list'
 	&& byTag( paneHead.children[1], 'button' )[0].textContent === text('/_admin/features/tab/active')+ ' (0)' && byTag( paneHead.children[1], 'button' )[1].textContent === text('/_admin/features/tab/inactive')+ ' (0)' );
 fire( byTag( paneHead.children[1], 'button' )[1], 'click' );

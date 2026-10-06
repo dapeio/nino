@@ -349,8 +349,6 @@ namespace Nino\Modules\Features {
 			$cached	= \Nino\Catalogue::cached( $appData );
 
 			\Nino\Http::ok( $request, [
-				'url'				=> $catalogue['url'],
-				'generated'	=> $catalogue['generated'],
 				'fetched'		=> self::_fetched( $cached['fetched'] ?? time() ),
 				'writable'	=> \Nino\Catalogue::writable(),
 				'offers'		=> self::_offers( $appData, $catalogue, $locale ),
@@ -707,7 +705,7 @@ namespace Nino\Modules\Features {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$locale				The interface language
 		 *
-		 *	@return 	array|null							{ url, fetched, offers } or null when nothing is cached
+		 *	@return 	array|null							{ fetched, offers } or null when nothing is cached
 		 */
 		private static function _cachedCatalogue( array &$appData, string $locale ): ?array {
 
@@ -717,7 +715,6 @@ namespace Nino\Modules\Features {
 				return null;
 
 			return [
-				'url'			=> $cached['url'],
 				'fetched'	=> self::_fetched( $cached['fetched'] ),
 				'offers'	=> self::_offers( $appData, $cached, $locale ),
 			];
@@ -727,7 +724,10 @@ namespace Nino\Modules\Features {
 		 *	The offers of a parsed catalogue (Catalogue::fetch()'s or
 		 *	Catalogue::cached()'s - both carry 'features'), phrased for the
 		 *	browser: names and descriptions localized, the extension list
-		 *	flattened to 'ext'. Recomputed against Features::all() every time,
+		 *	flattened to 'ext', and only what the panel's script reads - the
+		 *	directory, the size and 'fits' are the kernel's business (see
+		 *	Catalogue::offers()), and an installed feature's switch is the
+		 *	feature list's. Recomputed against Features::all() every time,
 		 *	so an install or activation since the catalogue was last fetched
 		 *	is reflected without a new request
 		 *
@@ -754,14 +754,10 @@ namespace Nino\Modules\Features {
 					'nino'				=> $offer['nino'],
 					'ext'					=> $offer['php']['ext'],
 					'requires'		=> $offer['requires'],
-					'directory'		=> $offer['directory'],
 					'archive'			=> $offer['archive'],
-					'size'				=> $offer['size'],
 					'released'		=> $offer['released'],
 					'state'				=> $offer['state'],
-					'fits'				=> $offer['fits'],
 					'local'				=> $offer['local'],
-					'active'			=> $offer['active'],
 				];
 
 			self::_byName( $offers );

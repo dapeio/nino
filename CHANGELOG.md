@@ -13,6 +13,13 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Features panel:** `features/catalogue` answers `fetched`, `writable` and
+  the offers, and the `catalogue` of `features/list` answers `fetched` and the
+  offers. The catalogue's `url` and `generated` stamp are gone from both, and
+  an offer no longer carries `directory`, `size`, `fits` or `active`. The
+  panel's script read none of them. `\Nino\Catalogue::offers()` still answers
+  all four.
+
 - **Workbench:** `elements/list` answers `{ columns, elements }` and
   `elements/get` `{ global, locales, raw }`: the type's `model` and the list's
   `total` are gone from both, since the panel takes the model with the type
