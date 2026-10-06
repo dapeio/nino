@@ -435,7 +435,7 @@ openRoute( '/about' );
 confirms.length = 0;
 fire( deleteButton(), 'click' );
 check( 'the delete question names the path, the texts that stay with their languages, and the path fill', confirms.length === 1
-	&& confirms[0].includes('“/about”') && confirms[0].includes('/webpage/site-about/name|title (de_DE, en_US)') && confirms[0].includes('/webpage/site-about/uri') );
+	&& confirms[0].includes('“/about”') && confirms[0].includes('/_nino/webpage/site-about/name|title (de_DE, en_US)') && confirms[0].includes('/_nino/webpage/site-about/uri') );
 check( '...and the template, with how many other routes use it', confirms[0].includes('“page-shared”') && confirms[0].includes('used by 2 other routes') );
 check( 'a refused question sends nothing', requests.length === before + 2 );
 
@@ -482,6 +482,59 @@ const sentBefore = requests.length;
 [ 'de_DE', 'en_US' ].forEach( function( locale ) { localeInput( locale, 'name' ).value = 'R'; localeInput( locale, 'title' ).value = 'T' } );
 save();
 check( 'a route with a runtime body saves without choosing a template', requests.length === sentBefore + 1 && requests[sentBefore].payload.template === '' );
+answer( 200, {} );
+answer( 200, listing( [ '/', '/contact' ] ) );
+
+/*	The pages a feature routes at runtime: listed under the persisted ones, with
+	no arrows and no way to delete, and a form of the path - read only - and the
+	three texts per language, saved as routes/savetexts. A project with none
+	draws nothing for them	*/
+const featurePages = listing( [ '/', '/contact' ], { runtime : [
+	{ uri : '/blog/post', httpUri : '/blog/*', body : '[template /templates/page-post]', text : { de_DE : { name : 'Beitrag', title : '', description : '' }, en_US : { name : '', title : '', description : '' } } },
+	{ uri : '/.newsletter', httpUri : '/.newsletter', body : '[template /templates/page-newsletter]', text : { de_DE : { name : '', title : '', description : '' }, en_US : { name : '', title : '', description : '' } } },
+] } );
+panel._pages = featurePages.pages;
+panel._runtime = [];
+panel._renderList();
+check( 'with no feature route nothing is drawn for them: no heading, no second list', findAll( mount, function( el ) { return el.tagName === 'H3' } ).length === 0 && rows().length === 2 );
+
+panel._runtime = featurePages.runtime;
+panel._renderList();
+const runtimeHeading = findAll( mount, function( el ) { return el.tagName === 'H3' } );
+check( 'feature routes have a heading of their own and a sentence saying what they are', runtimeHeading.length === 1 && runtimeHeading[0].textContent === text('/_admin/routes/runtime/title') && text('/_admin/routes/runtime/title') !== ''
+	&& findAll( mount, function( el ) { return el.className === 'nino-admin-hint' && el.textContent === text('/_admin/routes/runtime/hint') } ).length === 1 );
+const featureRows = rows().slice( 2 );
+check( 'they stand below the pages, a row each, named by what was written and by the path', rows().length === 4 && rowPath( featureRows[0] ) === '/blog/*' && rowName( featureRows[0] ) === 'Beitrag' && rowName( featureRows[1] ) === '/.newsletter' );
+check( '...without the arrows and without a link out: none of them is the project\'s to move, and a placeholder is no page', featureRows.every( function( li ) { return li.children.length === 1 } ) );
+
+featureRows[1].children[0].listeners.click[0]( { preventDefault : function() {} } );
+check( 'a feature route opens a form of the path, which is read only', field('routes-form-runtime-path').value === '/.newsletter' && field('routes-form-runtime-path').readOnly === true
+	&& field('routes-form-uri') === undefined && field('routes-form-template') === undefined );
+check( '...with a name, a title and a description per language', [ 'de_DE', 'en_US' ].every( function( locale ) { return [ 'name', 'title', 'description' ].every( function( name ) { return localeInput( locale, name ) !== undefined } ) } ) );
+check( '...and no menu, no status code and no delete', findAll( form, function( el ) { return el.dataset.nav !== undefined || el.id === 'routes-form-status' || el.className === 'nino-admin-btn-danger' } ).length === 0 );
+
+const beforeRuntime = requests.length;
+save();
+check( 'a name and a title are required in every language here as well', requests.length === beforeRuntime && localeInput( 'de_DE', 'name' ).attributes['aria-invalid'] === 'true' && localeInput( 'en_US', 'title' ).attributes['aria-invalid'] === 'true'
+	&& field('routes-form-msg').textContent === text('/_admin/routes/error/required') );
+[ 'de_DE', 'en_US' ].forEach( function( locale ) { localeInput( locale, 'name' ).value = 'Newsletter'; localeInput( locale, 'title' ).value = 'Abonnieren' } );
+localeInput( 'de_DE', 'description' ).value = 'Alle drei Monate.';
+save();
+check( 'a complete form is sent as routes/savetexts for the Element-URI, and only that', requests.length === beforeRuntime + 1 && requests[beforeRuntime].action === 'routes/savetexts'
+	&& requests[beforeRuntime].payload.uri === '/.newsletter' && Object.keys( requests[beforeRuntime].payload ).sort().join() === 'text,uri'
+	&& requests[beforeRuntime].payload.text.de_DE.description === 'Alle drei Monate.' && requests[beforeRuntime].payload.text.en_US.title === 'Abonnieren' );
+answer( 200, { runtime : [] } );
+answer( 200, listing( [ '/', '/contact' ], { templates : [ 'page-contact' ] } ) );
+check( 'once saved the list is read again', requests[requests.length - 1].action === 'routes/list' );
+
+// After a feature's form the next page opened is a page again: the form of a
+// persisted route saves as routes/save
+openRoute( '/contact' );
+check( 'the form of a persisted route is its own again - uri, template and all', field('routes-form-uri') !== undefined && field('routes-form-runtime-path') === undefined );
+const beforePage = requests.length;
+[ 'de_DE', 'en_US' ].forEach( function( locale ) { localeInput( locale, 'name' ).value = 'K'; localeInput( locale, 'title' ).value = 'T' } );
+save();
+check( '...and is saved as routes/save', requests.length === beforePage + 1 && requests[beforePage].action === 'routes/save' );
 answer( 200, {} );
 answer( 200, listing( [ '/', '/contact' ] ) );
 

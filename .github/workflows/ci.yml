@@ -79,6 +79,12 @@ jobs:
       - name: Run install wizard smoke tests
         run: php tests/install-smoke.php
 
+      # The grammar of a text key and everything shipped to it: the units'
+      # texts, the keys the templates read, the key literals in the code, and
+      # no old form left anywhere
+      - name: Run text key smoke tests
+        run: php tests/keys-smoke.php
+
       - name: Run frontend smoke tests
         # || exit 1: a bare loop answers with the last file's status alone,
         # so a failure in the middle would be reported as green
@@ -104,7 +110,25 @@ jobs:
           tools: phpstan:2.2.13
 
       - name: Fetch the feature catalogue
-        run: git clone --depth 1 https://github.com/dapeio/nino-features.git ../nino-features && cp -R ../nino-features/features/. features/
+        run: git clone --depth 1 https://github.com/dapeio/nino-features.git ../nino-features
+
+      # Only a feature whose "nino" condition this checkout satisfies is
+      # copied: one that runs ahead of the kernel (a feature written for the
+      # next minor) says so, is named here with its reason, and does not turn
+      # main red. The same two calls, \Nino\Features::manifest() and
+      # ::satisfies(), are what the kernel itself asks when it offers a feature
+      - name: Copy the features this kernel can run
+        run: |
+          php -r '
+            require "_nino/Nino.php";
+            foreach( glob( "../nino-features/features/*", GLOB_ONLYDIR ) as $dir ) {
+              $m = \Nino\Features::manifest( $dir );
+              if( $m === null ) { fwrite( STDERR, "no manifest: ". basename( $dir ). "\n" ); exit( 1 ); }
+              if( \Nino\Features::satisfies( $m["nino"] ) === false ) { echo "skipped on Nino ". \Nino\VERSION. ": ". $m["key"]. " needs ". $m["nino"]. "\n"; continue; }
+              passthru( "cp -R ". escapeshellarg( $dir ). " features/", $status );
+              if( $status !== 0 ) exit( 1 );
+            }
+          '
 
       - name: Validate every feature's manifest against this kernel
         run: |

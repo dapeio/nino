@@ -30,7 +30,7 @@ return [
 	'[[/_admin/slots/label/templates]]'	=> 'Templates: %s',
 	'[[/_admin/slots/label/new]]'				=> 'New image slot',
 	'[[/_admin/slots/label/scan]]'			=> 'Scan templates for missing image slots',
-	'[[/_admin/slots/label/uri]]'				=> 'Uri (eg. /home/hero)',
+	'[[/_admin/slots/label/uri]]'				=> 'Uri (eg. /template/page-home/hero/image)',
 	'[[/_admin/slots/label/width]]'			=> 'Width (px)',
 	'[[/_admin/slots/label/height]]'		=> 'Height (px)',
 	'[[/_admin/slots/label/delete]]'		=> 'Delete slot',

@@ -1,17 +1,17 @@
 [template /templates/mail-header]
-<h1>[[/mail/user/title]]</h1>
-<p>[[/mail/user/greeting]] [[name]],<br>
-[[/mail/user/intro]]</p>
-<p>[[/mail/user/summary]]</p>
+<h1>[[/template/mail-user/intro/title]]</h1>
+<p>[[/template/mail-user/intro/greeting]] [[name]],<br>
+[[/template/mail-user/intro/text]]</p>
+<p>[[/template/mail-user/summary/title]]</p>
 [[fields]]
 <table>
-	<tr><th>[[/form/label/date]]</th><td>[[date]]</td></tr>
+	<tr><th>[[/template/common/form/date]]</th><td>[[date]]</td></tr>
 </table>
-<p class="mail-note">[[/mail/user/notice]]</p>
+<p class="mail-note">[[/template/mail-user/outro/notice]]</p>
 <table>
-	<tr><th>[[/global/email]]</th><td>[[/company/email]]</td></tr>
-	<tr><th>[[/global/phone]]</th><td>[[/company/phone]]</td></tr>
+	<tr><th>[[/template/common/label/email]]</th><td>[[/project/company/contact/email]]</td></tr>
+	<tr><th>[[/template/common/label/phone]]</th><td>[[/project/company/contact/phone]]</td></tr>
 </table>
-<p>[[/mail/user/closing]]<br>
-[[/company/name]]</p>
+<p>[[/template/mail-user/outro/closing]]<br>
+[[/project/company/general/name]]</p>
 [template /templates/mail-footer]

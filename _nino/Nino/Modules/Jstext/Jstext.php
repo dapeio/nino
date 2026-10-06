@@ -30,7 +30,7 @@ namespace Nino\Modules {
 
 		/*	Which text keys the inline block carries. It used to carry every
 			fill the site has, on every page that renders [jstext] - the legal
-			copy, the addresses, and '/form/email/owner', which is the mailbox a
+			copy, the addresses, and '/project/mail/address/owner', which is the mailbox a
 			contact form delivers to. The scripts reading it ask for three groups
 			(see Nino.ui.js's .nino-form, .nino-newsletter-form and .nino-slider
 			handlers), so those three are what it carries.
@@ -41,7 +41,7 @@ namespace Nino\Modules {
 			is public - it is in the source of every page that renders the block	*/
 		public const string KEYS = '/nino/jstext/keys';
 
-		private const array DEFAULT_KEYS = [ '/form/info/', '/newsletter/info/', '/slider/label/' ];
+		private const array DEFAULT_KEYS = [ '/module/form/info/', '/feature/newsletter/info/', '/template/common/slider/' ];
 
 		/**
 		 *	Module initiating
@@ -79,7 +79,7 @@ namespace Nino\Modules {
 		 *	words; a project does the same thing in config.php under KEYS
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		$prefixes			Key prefixes, '/mine/info/' style
+		 *	@param		array 		$prefixes			Key prefixes, '/project/mine/info/' style
 		 *
 		 *	@return 	void
 		 */

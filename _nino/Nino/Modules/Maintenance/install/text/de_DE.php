@@ -1,5 +1,5 @@
 <?php return [
 
-	'[[/maintenance/title]]' => 'Wartungsarbeiten',
-	'[[/maintenance/text]]' => 'Wir sind in Kürze wieder für Dich da.',
+	'[[/module/maintenance/page/title]]' => 'Wartungsarbeiten',
+	'[[/module/maintenance/page/text]]' => 'Wir sind in Kürze wieder für Dich da.',
 ];

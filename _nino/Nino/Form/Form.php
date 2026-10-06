@@ -97,10 +97,10 @@ namespace Nino {
 			'ownerTemplate'	=> '/templates/mail-owner',
 			'userTemplate'	=> '/templates/mail-user',
 			'fields'				=> [
-				[ 'name' => 'name',			'label' => '[[/form/label/name]]',		'type' => 'text',			'required' => true,		'options' => [] ],
-				[ 'name' => 'email',		'label' => '[[/form/label/email]]',		'type' => 'email',		'required' => true,		'options' => [] ],
-				[ 'name' => 'cat',			'label' => '[[/form/label/cat]]',			'type' => 'text',			'required' => false,	'options' => [] ],
-				[ 'name' => 'message',	'label' => '[[/form/label/message]]',	'type' => 'textarea',	'required' => true,		'options' => [] ],
+				[ 'name' => 'name',			'label' => '[[/template/common/form/name]]',		'type' => 'text',			'required' => true,		'options' => [] ],
+				[ 'name' => 'email',		'label' => '[[/template/common/form/email]]',		'type' => 'email',		'required' => true,		'options' => [] ],
+				[ 'name' => 'cat',			'label' => '[[/template/common/form/reason]]',			'type' => 'text',			'required' => false,	'options' => [] ],
+				[ 'name' => 'message',	'label' => '[[/template/common/form/message]]',	'type' => 'textarea',	'required' => true,		'options' => [] ],
 			],
 		];
 
@@ -549,7 +549,7 @@ namespace Nino {
 			// this runs - \Nino\request() registers them before
 			// Http::response(), precisely so a mail rendered in here resolves
 			// them instead of shipping the literal
-			$owner = $form['to'] !== '' ? $form['to'] : \Nino\Html::renderHtml( $appData, '[[/form/email/owner]]' );
+			$owner = $form['to'] !== '' ? $form['to'] : \Nino\Html::renderHtml( $appData, '[[/project/mail/address/owner]]' );
 			$reply = self::_firstEmail( $form, $values );
 
 			/*	useLocale(), not setCurrentLocale(): the owner's mail goes out
@@ -570,7 +570,7 @@ namespace Nino {
 				'to'			=> $owner,
 				'subject'	=> $form['subject'] !== ''
 					? \Nino\Html::renderHtml( $appData, $form['subject'] )
-					: \Nino\Html::renderHtml( $appData, '[[/form/subject/owner]]' ),
+					: \Nino\Html::renderHtml( $appData, '[[/module/form/subject/owner]]' ),
 				'body'		=> self::render( $appData, $form, $values, $form['ownerTemplate'] ),
 				'replyTo'	=> $reply !== '' ? $reply : $owner,
 			] ];
@@ -580,7 +580,7 @@ namespace Nino {
 			if( $form['confirm'] === true && $reply !== '' )
 				$mails[] = [
 					'to'			=> $reply,
-					'subject'	=> \Nino\Html::renderHtml( $appData, '[[/form/subject/user]]' ),
+					'subject'	=> \Nino\Html::renderHtml( $appData, '[[/module/form/subject/user]]' ),
 					'body'		=> self::render( $appData, $form, $values, $form['userTemplate'] ),
 					'replyTo'	=> $owner,
 				];

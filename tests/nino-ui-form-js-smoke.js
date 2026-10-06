@@ -155,11 +155,11 @@ sandbox.Nino = {
 	events : { bindCallback : function() {} },
 	content : {
 		text : {
-			'/form/info/success'  : 'Thank you – your message has been sent.',
-			'/form/info/error'    : 'Your message could not be sent. Please try again later.',
-			'/form/info/email'    : 'Please enter a valid email address.',
-			'/form/info/required' : 'Please fill in every required field.',
-			'/form/info/invalid'  : 'Please check your entries.',
+			'/module/form/info/success'  : 'Thank you – your message has been sent.',
+			'/module/form/info/error'    : 'Your message could not be sent. Please try again later.',
+			'/module/form/info/email'    : 'Please enter a valid email address.',
+			'/module/form/info/required' : 'Please fill in every required field.',
+			'/module/form/info/invalid'  : 'Please check your entries.',
 		},
 		getText : function( key ) { return sandbox.Nino.content.text[key] || '' },
 	},
@@ -318,16 +318,16 @@ forms[1].submit();
 respond( sent.length - 1, 400 );
 check( 'a 400 on a form with a url field asks the visitor to check their entries, not their address', forms[1].msg.textContent === 'Please check your entries.' );
 
-// A site installed before that fill existed has no '/form/info/invalid',
+// A site installed before that fill existed has no '/module/form/info/invalid',
 // and getText() answers '' for a key it does not have - the address text
 // is the fallback then, as it was before, rather than an empty line
-delete sandbox.Nino.content.text['/form/info/invalid'];
+delete sandbox.Nino.content.text['/module/form/info/invalid'];
 forms[1].classList.remove('nino-is-error');
 forms[1].msg.textContent = '';
 forms[1].submit();
 respond( sent.length - 1, 400 );
 check( '...and a site without that fill is told about the address rather than nothing', forms[1].msg.textContent === 'Please enter a valid email address.' );
-sandbox.Nino.content.text['/form/info/invalid'] = 'Please check your entries.';
+sandbox.Nino.content.text['/module/form/info/invalid'] = 'Please check your entries.';
 
 // The browser's own verdict is what the client refuses on, so a stand-in
 // without one submits and lets the server answer - which is what just

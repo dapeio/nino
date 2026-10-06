@@ -89,10 +89,11 @@ The permissions above are doors: they say which panels an account may open. Insi
 | Every field of it | `/_admin/elements/services/update/*` |
 | Delete one | `/_admin/elements/services/delete` |
 | Everything on that one type | `/_admin/elements/services/*` |
-| Change one text key | `/_admin/text/update/page-home/atf/title` |
-| Every key of a group | `/_admin/text/update/page-home/*` |
+| Change one text key | `/_admin/text/update/template/page-home/hero/title` |
+| Every key of a template | `/_admin/text/update/template/page-home/*` |
+| The page details of a route | `/_admin/text/update/_nino/webpage/home/*` |
 
-These are ordinary permission strings, matched by the same `/*` rule as everything else, so a role is described as coarsely or as finely as it needs to be. The panel permission is still required: `/_admin/elements/manage` is what makes the panel appear at all, and the finer ones say what may be done in it.
+A whole page takes two of them - its template and its page details - because the details of a page, its name in the menu, its title and its description, are the system's keys under `/_nino`, not words of the template. These are ordinary permission strings, matched by the same `/*` rule as everything else, so a role is described as coarsely or as finely as it needs to be. The panel permission is still required: `/_admin/elements/manage` is what makes the panel appear at all, and the finer ones say what may be done in it.
 
 **They are opt-in.** A role holding none of them keeps exactly what its panel permission has always meant – every action on every type and key. Giving a role its first finer permission for a panel is what says "describe this one in detail"; from then on that panel allows what the role names and nothing else. Existing roles are therefore unaffected until you change them.
 
@@ -161,7 +162,7 @@ An image field uploads on its own, as soon as the file is chosen, and says when 
 
 ### Text
 
-**Text** holds the individual textfills of the site – headings, descriptions, contact details, labels – grouped by the first segment of their key: `/home/intro/title` sits in the `home` group. Open a group, edit the global values and the translated ones in the selected language, and **Save**. Formatted fields offer bold, italic, highlight, inline code and links; character counters show the length the developer intended. **Ctrl** or **Cmd** with **B** and **I** make bold and italic, as the two buttons do; **U** does nothing, because underline is not one of the formats.
+**Text** holds the individual textfills of the site – headings, descriptions, contact details, labels – grouped by the first segment of their key: `/template/page-home/intro/title` sits in the `template` group. Open a group, edit the global values and the translated ones in the selected language, and **Save**. Formatted fields offer bold, italic, highlight, inline code and links; character counters show the length the developer intended. **Ctrl** or **Cmd** with **B** and **I** make bold and italic, as the two buttons do; **U** does nothing, because underline is not one of the formats.
 
 What a field holds beyond that is its **format**, which the developer sets on the **Text Keys** tab (for an element field, in the type): *Formatted* is one line with the tags above, *Line breaks* adds Enter as a line break, and *Paragraphs and lists* adds paragraphs and bulleted and numbered lists. There Enter starts a new paragraph or list item and **Shift+Enter** is a line break inside it; **Enter** in an empty item ends the list; **Backspace** at the start of a paragraph or item joins it with the one before. Pasted and dropped text is always plain text: in the two wider formats a line break becomes a break, and in *Paragraphs and lists* a blank line starts a new paragraph. The editor does its own splitting, joining and list changes, so **Ctrl+Z** undoes typing but not those steps – check a larger change before saving.
 
@@ -238,23 +239,25 @@ Switching a field between global and per translation migrates the existing value
 
 ### Routes
 
-**Routes** manages the page routes – the ones the wizard created, the ones added here, and the ones written by hand into `config.php`; they are one list, derived from `/nino/http/routes` and the `/webpage<uri>/*` text keys on every request.
+**Routes** manages the page routes – the ones the wizard created, the ones added here, and the ones written by hand into `config.php`; they are one list, derived from `/nino/http/routes` and the `/_nino/webpage<uri>/*` text keys on every request.
 
-A page has two uris: the **Element URI** is its stable identity, the anchor of its page texts like `/webpage<uri>/title`, and saving it also writes `/webpage<uri>/uri`, the reachable path, so a template links with `[[/webpage/site-contact/uri]]` instead of repeating a path; the **HTTP URI** is that reachable path. A page can be `/about` inside and `/ueber-uns` in the browser.
+A page has two uris: the **Element URI** is its stable identity, the anchor of its page texts like `/_nino/webpage<uri>/title`, and saving it also writes `/_nino/webpage<uri>/uri`, the reachable path, so a template links with `[[/_nino/webpage/site-contact/uri]]` instead of repeating a path; the **HTTP URI** is that reachable path. A page can be `/about` inside and `/ueber-uns` in the browser.
 
-A new page starts from an empty form: no URIs, no texts. Only the template is proposed - `page-blank` when `templates/` has it, and nothing otherwise, so that a template has to be chosen; never another page template, which would publish a copy of a finished page under the new path. A page needs both URIs, a template, and a **name** and **title** in every active language; the description is optional and stays empty if left so. The form checks this itself and marks what is missing, and the server refuses a save without it and writes nothing - a missing key would show as the raw `[[/webpage<uri>/name]]` on the page and in the menus. The wizard's own Webpages step is unchanged.
+A new page starts from an empty form: no URIs, no texts. Only the template is proposed - `page-blank` when `templates/` has it, and nothing otherwise, so that a template has to be chosen; never another page template, which would publish a copy of a finished page under the new path. A page needs both URIs, a template, and a **name** and **title** in every active language; the description is optional and stays empty if left so. The form checks this itself and marks what is missing, and the server refuses a save without it and writes nothing - a missing key would show as the raw `[[/_nino/webpage<uri>/name]]` on the page and in the menus. The wizard's own Webpages step is unchanged.
 
 Besides these a page has an HTTP status code and one checkbox per navigation registered in `/nino/html/navs`. Membership is stored on the route as `'navs' => [ 'main' => 1, ... ]`, the value a priority; a membership added here starts behind everything already in the menu and a priority tuned by hand is never reset. The arrows swap two page routes in `config.php`.
 
 The list shows each page by its name - in the content language last chosen in Elements or Text (the native one before that), else in the first language that has one - over its path, and **↗** opens the page in a new tab.
 
-`/_admin` is reserved and cannot be a public page. A route that selects its template at runtime shows its existing body and keeps it. Deleting a page removes its route and asks first. The question names what stays: the page's texts - `/webpage<uri>/name|title|description` in the languages that hold a value, and `/webpage<uri>/uri` - and its template file, with how many other routes use it. For a route that picks its template at runtime it names the body instead.
+`/_admin` is reserved and cannot be a public page. A route that selects its template at runtime shows its existing body and keeps it. Deleting a page removes its route and asks first. The question names what stays: the page's texts - `/_nino/webpage<uri>/name|title|description` in the languages that hold a value, and `/_nino/webpage<uri>/uri` - and its template file, with how many other routes use it. For a route that picks its template at runtime it names the body instead.
+
+**Feature routes.** A page a feature serves by itself - the blog of Posts, the newsletter page, Hello's `/hello` - is in no `config.php`, so it is not in the list above and cannot be moved or deleted here. Below the pages the panel lists these as **Feature routes**: a row each, by the name written for it, over the path the feature gave it - a placeholder such as `/blog/*` stands for the pages below it. Its form shows that path read-only and nothing else of the route: only the **name**, **title** and **description** in every active language, with the same rules as for a page, saved to `/_nino/webpage<uri>/name`, `…/title` and `…/description`. Nothing else is written: no route, no `uri` key - the feature decides the path, and a stored one would be wrong the day it moves - and nothing on the blacklist. Until a name is written, such a page stays out of every menu, and the page header shows the raw fill.
 
 ### Navigations
 
 **Navigations** is the other half of what Routes edits: one menu at a time, in its running order. It belongs to the Navigation module.
 
-Opening a menu shows its entries as they render, with ↑ / ↓ to move one, × to take it out (the route stays), and a picker that adds any `GET` route at the end. The picker starts on an empty choice and **Add** waits for a route. These change a working copy in the browser and write nothing: **Save** writes the whole running order in one request, under the lock on `config.php`, and the status line says that there are unsaved changes until then. A route that is left out loses its membership; priorities are kept dense, `1..n` per menu. The back link - like logout and the interface language - asks before dropping unsaved changes, and showing the panel again reads the routes again but leaves a changed copy alone. A route without a `/webpage<uri>/name` is marked, because `[navigation]` skips it rather than rendering an empty link.
+Opening a menu shows its entries as they render, with ↑ / ↓ to move one, × to take it out (the route stays), and a picker that adds any `GET` route at the end. The picker starts on an empty choice and **Add** waits for a route. These change a working copy in the browser and write nothing: **Save** writes the whole running order in one request, under the lock on `config.php`, and the status line says that there are unsaved changes until then. A route that is left out loses its membership; priorities are kept dense, `1..n` per menu. The back link - like logout and the interface language - asks before dropping unsaved changes, and showing the panel again reads the routes again but leaves a changed copy alone. A route without a `/_nino/webpage<uri>/name` is marked, because `[navigation]` skips it rather than rendering an empty link.
 
 A route that exists only at runtime - a feature's `/blog`, which has no entry in `config.php` - can be picked as well. Its membership is stored under `/nino/html/navroutes`, e.g. `'GET://blog' => [ 'main' => 3 ]`, and `[navigation]` reads it for a route that is live: a feature that is switched off takes its menu entry with it, and the next save of that menu drops what was stored. Of the runtime routes, wildcard routes (`/blog/*`) and the workbench are not offered; technical routes - `robots.txt`, `/.search` - are.
 
@@ -265,7 +268,7 @@ A route that exists only at runtime - a feature's `/blog`, which has no entry in
 **Text Keys**, a tab of the Text panel, is its technical side: every key of every group, with
 
 - global or per-language storage, switchable with migration of the existing values;
-- **new keys** and **renaming**, again with migration;
+- **new keys** and **renaming**, again with migration - only to keys that follow the key grammar `/<namespace>/<category>/<part>/<name>` (see the [Developer Manual](development.md#the-key-grammar)): the server refuses any other form with a sentence that names it, whatever the form sent, and refuses to rename a key under `/_nino/` or `/_admin/`, which is named after what the code that reads it asks for. Keys a project already has stay as they are and stay editable - saved, hidden, deleted, renamed to one that follows the grammar;
 - hiding a key from the Text panel;
 - its **format** and **limit**;
 - deleting a key from every language – check its use in templates, mails and modules first.
@@ -274,11 +277,15 @@ A route that exists only at runtime - a feature's `/blog`, which has no entry in
 
 The starting value of a new key – also one made by the scan – is held to the format its value shows, like any value saved from the workbench: tags that format does not have and shortcodes are removed.
 
-**Scan templates for missing keys** finds static textfills like `[[/home/intro/title]]` in the `.tpl` files that no key answers to and offers each one three answers, so a long list can be worked through in several sittings:
+**Scan templates for missing keys** finds static textfills like `[[/template/page-home/intro/title]]` in the `.tpl` files that no key answers to and offers each one three answers, so a long list can be worked through in several sittings:
 
 - **a starting value** creates the key with that text in every language;
 - **an empty field** is passed over this once – the key comes back on the next scan;
 - **Ignore permanently** retires the key: it leaves the scan, the Dashboard tile and the Text panel, and is listed here as a hidden key. Unticking *hidden* on it – or deleting it – brings it back into the scan.
+
+The scan lists every key it finds, also the ones it may not create, and says why on the row. A key that follows the grammar gets the input above; for a `/feature` or `/module` key the row adds that it normally belongs to that feature or module, whose install unit delivers it - if it is missing, the feature may not be active, or the key is misspelled. A key that follows no grammar - an old form, a key of the workbench, one invented in a template - has no input: rename it in the template; it can still be ignored. A key of the system under `/_nino/` has no input and no *ignore*, and the row names who writes it: the Routes panel, when a page with that Element URI is saved - for the name, title and description of a feature's page, under *Feature routes* - or the Language panel, when the language is added; where nobody does, change what the template reads. Every row counts in the Dashboard tile. Placeholders a shortcode fills in - `[[name]]` in a mail template, `[[.rel]]` - are no keys and are not listed.
+
+Below the rows the scan notes the keys of one template that another reads as well, *also read by other templates*. It changes nothing and counts nothing: a word several templates read belongs in `/template/common`, and moving it there is the developer's decision.
 
 Dynamically composed keys are beyond a static scan.
 
@@ -286,7 +293,7 @@ Dynamically composed keys are beyond a static scan.
 
 ### Image Slots
 
-**Image Slots** is a tab of the Images panel. An image slot connects a technical uri (`/home/hero`) with a label and fixed target dimensions; editors fill it under **Images**. **Scan templates for missing image slots** finds local `<img src="…">` references under `images/` without a slot. Deleting a slot deletes the image stored in it. Each row also says when no page shows the slot - *not included anywhere* - and, if a template mentions it that no route renders, which template. A slot the scan creates shows that until its template uses `[image <uri>]` instead of a literal `<img>`.
+**Image Slots** is a tab of the Images panel. An image slot connects a technical uri (`/template/page-home/hero/image`) with a label and fixed target dimensions; editors fill it under **Images**. **Scan templates for missing image slots** finds local `<img src="…">` references under `images/` without a slot. Deleting a slot deletes the image stored in it. Each row also says when no page shows the slot - *not included anywhere* - and, if a template mentions it that no route renders, which template. A slot the scan creates shows that until its template uses `[image <uri>]` instead of a literal `<img>`.
 
 ## System
 
@@ -319,7 +326,7 @@ The list says of each account its role, whether it is deactivated, until when it
 | Languages | `/nino/locales/available` | checklist |
 | Native language | `/nino/locales/native` | select |
 
-The language list shows every locale the project knows – the ones `config.php` lists plus every `text/<locale>.php` on disk – and whether that file exists and how many keys it holds. **Adding a language** writes `text/<locale>.php` as a skeleton with empty values and does *not* switch the language on; translate it under Text or import it on the Translations tab, then tick it and save. The native language can only be one of the ticked ones, so both are saved together.
+The language list shows every locale the project knows – the ones `config.php` lists plus every `text/<locale>.php` on disk – and whether that file exists and how many keys it holds. **Adding a language** writes `text/<locale>.php` as a skeleton with empty values and does *not* switch the language on; it also gives the language its name - `/_nino/locale/<code>/name` in `text/global.php`, with the code as the value, unless the key is there already - which the language pickers show; edit that name in the Text panel. A language whose file exists already gets the name the same way, and nothing else of that file is touched. Translate the language under Text or import it on the Translations tab, then tick it and save. The native language can only be one of the ticked ones, so both are saved together.
 
 ### Translations
 
@@ -369,7 +376,7 @@ In production, `/nino/error/display` must be off.
 
 **Maintenance** is one switch: while it is on, every visitor who is not signed in to the workbench gets a 503 answer instead of the site - the page itself, and a module endpoint such as the contact form's `/.form` alike, since the site is down for both. The pane says which of the two states the site is in, the switch itself, and how many seconds to send as the `Retry-After` header so a well-behaved browser or bot waits before trying again. A signed-in account still sees the site as it is - open it in another browser, or log out, to check a change before switching maintenance back off. `/_admin` keeps working throughout, so switching it back off never depends on the switch itself - and so does the login, so an operator who is not signed in yet can still sign in. While maintenance is on, every screen of the workbench carries a notice saying so, for the accounts that have this panel, and every page of the site a signed-in account opens carries a banner at the top, linking to the panel where the account may use it.
 
-The maintenance page wears the site's own header and footer where a project has a `templates/page-maintenance.tpl` - copied in by hand from the module's own `install/` directory, with `/maintenance/title` and `/maintenance/text` as its two texts, from then on editable in the Text panel like any other key. A project without one gets the module's own plain, self-contained page (`templates/page-maintenance.<locale>.tpl` in the module, German and English), in the site's native language and with the same two texts - the module's own defaults in that language where the project has defined none, English for a native language without a page - so the switch works from the moment the module exists; a project's own `page-maintenance.tpl` always wins, and keeps the language of the visitor's route. Nothing in the setup wizard installs the styled version on its own. The full-page cache is taken out of the loop for as long as this is on, so it neither serves an old page over the 503 nor stores the 503 itself.
+The maintenance page wears the site's own header and footer where a project has a `templates/page-maintenance.tpl` - copied in by hand from the module's own `install/` directory, with `/module/maintenance/page/title` and `/module/maintenance/page/text` as its two texts, from then on editable in the Text panel like any other key. A project without one gets the module's own plain, self-contained page (`templates/page-maintenance.<locale>.tpl` in the module, German and English), in the site's native language and with the same two texts - the module's own defaults in that language where the project has defined none, English for a native language without a page - so the switch works from the moment the module exists; a project's own `page-maintenance.tpl` always wins, and keeps the language of the visitor's route. Nothing in the setup wizard installs the styled version on its own. The full-page cache is taken out of the loop for as long as this is on, so it neither serves an old page over the 503 nor stores the 503 itself.
 
 ### Features
 

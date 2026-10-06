@@ -148,7 +148,7 @@ Html::response( $appData, $request );
 
 `Http::request()` does not read directly into arbitrary project variables but normalizes method, URI, query, header, body, basic auth data, and client IP under `/nino/http/request`. Simultaneously, a response is created with an empty body, status `200`, and the preset security headers.
 
-The runtime textfills are added in two passes, and the split matters. `/nino/dir`, `/nino/public`, and `/date/year` answer to `$appData` alone, so they are registered **before** `Http::response()`: a response callback that renders a template is a real caller — `Modules\Form` and `Modules\Newsletter` build their HTML mails in exactly that window, and a fill registered after it would reach them as the literal `[[/nino/public]]`.
+The runtime textfills are added in two passes, and the split matters. `/nino/dir`, `/nino/public`, and `/nino/date/year` answer to `$appData` alone, so they are registered **before** `Http::response()`: a response callback that renders a template is a real caller — `Modules\Form` and `Modules\Newsletter` build their HTML mails in exactly that window, and a fill registered after it would reach them as the literal `[[/nino/public]]`.
 
 `Http::response()` searches for a matching route under `/nino/http/routes`, takes over its values into the prepared response, and then executes the global and route-specific response callbacks. `Locales::response()` takes over the language resolved by the route. Only after that does Nino add the textfills that need the resolved request: request URI, response URI, locale, and current user.
 
@@ -355,8 +355,8 @@ It performs three processing steps:
 Textfills are placeholders with double square brackets:
 
 ```html
-<title>[[/webpage/meta/title]]</title>
-<p>[[/contact/intro]]</p>
+<title>[[/_nino/webpage[[/nino/http/response/uri]]/title]]</title>
+<p>[[/template/page-contact/hero/subtitle]]</p>
 ```
 
 Nino combines:
@@ -371,11 +371,48 @@ Runtime values can be specifically added:
 
 ```php
 \Nino\Html::addFills( $appData, [
-    '/project/catalog/count' => 42,
+    '/project/catalog/list/count' => 42,
 ], '*' );
 ```
 
 The third parameter denotes the language scope. `'*'` stands for language-independent values.
+
+#### The key grammar
+
+Every text key a project or a unit carries has four segments, `/<namespace>/<category>/<part>/<name>`, each of them lower-case words joined by hyphens - `[a-z0-9]+(-[a-z0-9]+)*`. The words are English and spelled out. A key never says which language it is in, or whether it is global or per language, and a name is never a number: a list puts its index in the part (`item-1`).
+
+| Namespace | What it holds | Category | Example |
+| --- | --- | --- | --- |
+| `template` | the words one template reads | the template's file name without `.tpl`, prefix and all | `/template/page-services/item-1/title` |
+| `template` | the words several templates read | always `common` | `/template/common/form/submit` |
+| `project` | the project's facts, settings and own content | `company`, `website`, `mail` or a name of the project's own | `/project/company/contact/email` |
+| `feature` | the words of a catalogue feature's function | the feature's manifest `key` | `/feature/lightbox/controls/close` |
+| `module` | the words of a kernel module | the module's directory, lower case | `/module/form/info/required` |
+
+Who a word belongs to is decided in this order, and the first yes wins:
+
+1. A fact, a setting or content of the project that belongs to no template - the company, the website, the mailbox, the look of the mails, the texts of the project's own modules: `/project/<category>/...`.
+2. A word several templates read and no function ties down - field labels, button words, the label in front of a phone number: `/template/common/<part>/<name>`. That includes a word that code puts into any template that has fitting markup, such as the contact form's field labels, which `\Nino\Form::DEFAULT_FORM` brings into every template showing the form.
+3. A word that belongs to a function of a module or a feature - its code outputs it, sets it at runtime, selects it from a fixed set, or the function ships it for markup any project template writes: `/module/<directory>/...` or `/feature/<key>/...`. A project template reading it as well, or a project replacing the template, changes nothing about that.
+4. Otherwise the word belongs to the one template that reads it, in the category of its file name: `/template/<file name without .tpl>/...`. That holds for the templates a unit ships as well.
+
+The rule applies when a key is created. Nothing moves a key later: if a second template reads a word of another category, the word stays where it is. The scan in the Text Keys tab names such a case; whoever wants the word shared creates it under `common` and changes the places that read it.
+
+The part is the block a word stands in: `intro`, `hero`, `item-<n>`, `form`, `navigation`, `action`, `summary`, `outro`, `label` - or a word naming the block (`welcome`, `pager`, `banner`). The name is the thing itself, preferably `title`, `text`, `button` or `label`. A list with one word per entry puts the identifier in the name (`/feature/modeswitch/mode/dark`), one with several words per entry puts it in the part (`item-1`, `category-necessary`).
+
+A label in front of a fact and the fact are two things. `/template/common/label/phone` is the word "Phone"; the number is `/project/company/contact/phone`, which every template reads from there and from nowhere else.
+
+The category of a template is its file name without `.tpl`: `page-home.tpl` carries `/template/page-home/...`, `html-footer.tpl` carries `/template/html-footer/...`, nothing is cut off or derived. A name that is not a word of a key - a dot, an upper-case letter, an underscore, a slash - gives the template no category: it carries no keys of its own, and may read every other one (`page-legal.de_DE.tpl`, `.demo-catalogue.tpl`). Only files directly below `templates/` have one. `\Nino\Modules\Template::category()` answers it for a file name or for a template as a shortcode or a route body names it (`/templates/page-home`), and is the one place the rule is written.
+
+A key may be put together at runtime in exactly these shapes, and no other: `[[/_nino/webpage[[/nino/http/response/uri]]/<name>]]` and `[[/_nino/locale/[[locale]]/name]]` in a template, and a four-segment key in which one placeholder is a whole name or the identifier of a list's part (`/feature/posts/navigation/` + `prev`, `/feature/consent/category-` + `necessary` + `/name`). Nothing scans the words that can come out of it, so whoever composes a key checks the rendered words in their own smoke test.
+
+Three things are no text key. The kernel's runtime fills live under `/nino/` and are never in a text file (`[[/nino/dir]]`, `[[/nino/public]]`, `[[/nino/date/year]]`, `[[/nino/http/response/uri]]`, ...; `\Nino\Html::runtimeFillKeys()` names them). A local placeholder has no leading slash (`[[name]]` in an element loop or a mail template, `[[.rel]]`). Configuration such as `/nino/jstext/keys` or `/project/catalog` in `config.php` is another store, even where it looks the same.
+
+Two forms are the system's, not the project's: `/_nino/webpage<uri>/<name|title|description|uri>`, the details of a page after its Element-URI (which may hold slashes and dots), and `/_nino/locale/<code>/name`, the name of a language. The setup wizard and the Routes panel write the first - for the pages that features route at runtime, in the Routes panel's section "Feature routes" - and the Localepicker unit and the Language panel write the second; the Language panel gives a language it adds its code as the name. `/_admin/...` are the workbench's own words and stay as they are.
+
+The server holds people to the grammar where they make keys: the Text Keys tab creates and renames only keys that follow it (`\Nino\Text::isGrammarKey()`), and refuses to rename a key under `/_nino/` or `/_admin/`. Keys a project already has are left alone and stay editable. `tests/keys-smoke.php` holds everything Nino ships to it, finds a leftover of an old form, and checks that every key a shipped template reads exists.
+
+Until the Legal module replaces them, the legal page `page-legal.<xx_XX>.tpl` and the footer link it is reached by, `/website/legal/{uri,name}`, are the one exception: they keep their names, and the checks name the exception.
 
 ### Shortcodes
 
@@ -511,7 +548,7 @@ Modules are activated in `/nino/modules`. The order of the array is relevant if 
 | `Csrf` | `[csrf]` | renders a hidden token field; core protection itself is always active |
 | `Elements` | `[element ...]`, `[elements ...]`, `[elementvalues ...]` | loads typed content; lists support query, `sort`, `offset`, `limit`, and optional callback, and `[elementvalues]` loops the distinct values of one field |
 | `Form` | `POST://.form` | owns the one form endpoint and hands every submission to `\Nino\Form` - see [Forms](#forms) below |
-| `Images` | `[image ...]` | creates an escaped `<img>` from an image slot or URI. Its `alt` is the text stored for the slot in the current language, else the shortcode's own `alt="..."`, else empty (`alt=""`, decorative) - never the slot's label. The text is escaped and its `[` written as `&#91;`, so it cannot open a fill or shortcode in the next rendering pass. With content - `[image /logo]...[/image]` - the content is rendered instead of the `<img>`, and only when the slot has an image: `[[src]]` (the file's path from the site's root; `https://[[/website/url]][[src]]` is an absolute address), `[[width]]`, `[[height]]` and `[[alt]]` are filled in. That is how a meta tag or a mail asks for the address without being left empty or broken where nothing is uploaded yet. A bare `[image]` before the first closing `[/image]` of a template reads the text between them as its own content, so keep the content form in a template with no bare `[image]` of the same kind before it, or write the bare one as `[image /x][/image]` |
+| `Images` | `[image ...]` | creates an escaped `<img>` from an image slot or URI. Its `alt` is the text stored for the slot in the current language, else the shortcode's own `alt="..."`, else empty (`alt=""`, decorative) - never the slot's label. The text is escaped and its `[` written as `&#91;`, so it cannot open a fill or shortcode in the next rendering pass. With content - `[image /logo]...[/image]` - the content is rendered instead of the `<img>`, and only when the slot has an image: `[[src]]` (the file's path from the site's root; `https://[[/project/website/general/url]][[src]]` is an absolute address), `[[width]]`, `[[height]]` and `[[alt]]` are filled in. That is how a meta tag or a mail asks for the address without being left empty or broken where nothing is uploaded yet. A bare `[image]` before the first closing `[/image]` of a template reads the text between them as its own content, so keep the content form in a template with no bare `[image]` of the same kind before it, or write the bare one as `[image /x][/image]` |
 | `Jstext` | `[jstext]` | provides text values as securely encoded JSON with CSP nonce |
 | `Localepicker` | `[localepicker ...]` | switches locale via query and redirect |
 | `Maintenance` | `/nino/http/response`, priority 1; `/nino/http/output`, priority 9 | while `/nino/maintenance/status` is on, answers every site page and module endpoint with a 503 and a Retry-After header, for every visitor not signed in to the workbench - the login itself excepted - and puts a banner at the top of each page a signed-in account opens |
@@ -525,7 +562,7 @@ Some details are deliberately defensive:
 - The form limits inputs, protects write operations, and discards old log months.
 - The public signup of the catalogue's Newsletter feature responds independently of whether an address is new or already known. This makes it harder to query foreign addresses.
 - `Jstext` uses JSON hex escaping and adds a random nonce to the Content Security Policy.
-- `Jstext` carries only the text keys that were published to it, not every fill the site has. Shipped are `/form/info/`, `/newsletter/info/` and `/slider/label/`, which are what the public scripts read; the workbench publishes `/_admin/`. A project whose own script reads another key names its prefix under `/nino/http/routes`' neighbour `/nino/jstext/keys` in `config.php`, a module or feature calls `\Nino\Modules\Jstext::publish( $appData, [ '/mine/info/' ] )` in its `init()`. **A published key is public**: it stands in the source of every page that renders the block. Before this, `/form/email/owner` - the mailbox a contact form delivers to - was in the source of every page.
+- `Jstext` carries only the text keys that were published to it, not every fill the site has. Shipped are `/module/form/info/`, `/feature/newsletter/info/` and `/template/common/slider/`, which are what the public scripts read; the workbench publishes `/_admin/`. A project whose own script reads another key names its prefix under `/nino/http/routes`' neighbour `/nino/jstext/keys` in `config.php`, a module or feature calls `\Nino\Modules\Jstext::publish( $appData, [ '/project/mine/info/' ] )` in its `init()`. **A published key is public**: it stands in the source of every page that renders the block. Before this, `/project/mail/address/owner` - the mailbox a contact form delivers to - was in the source of every page.
 
 ### Forms
 
@@ -538,13 +575,13 @@ A project defines its forms under `/nino/form/forms` in `config.php` - beside it
 	[
 		'key'						=> 'quote',
 		'name'					=> 'Quote request',
-		'to'						=> 'sales@example.com',	// '' sends to '[[/form/email/owner]]'
-		'subject'				=> '',									// '' uses '[[/form/subject/owner]]'
+		'to'						=> 'sales@example.com',	// '' sends to '[[/project/mail/address/owner]]'
+		'subject'				=> '',									// '' uses '[[/module/form/subject/owner]]'
 		'confirm'				=> true,								// a confirmation to the first address the visitor gave
 		'ownerTemplate'	=> '/templates/mail-owner',
 		'userTemplate'	=> '/templates/mail-user',
 		'fields'				=> [
-			[ 'name' => 'email',	'label' => '[[/form/label/email]]', 'type' => 'email',		'required' => true ],
+			[ 'name' => 'email',	'label' => '[[/template/common/form/email]]', 'type' => 'email',		'required' => true ],
 			[ 'name' => 'budget',	'label' => 'Budget',								'type' => 'number' ],
 			[ 'name' => 'wishes',	'label' => 'What for?',							'type' => 'textarea' ],
 		],
@@ -900,6 +937,7 @@ Nino uses standalone smoke tests without PHPUnit. Each test creates an isolated 
 | `tests/admin-smoke.php` | the workbench shell and its content panels: the text blacklist and html sanitizer, element and image operations |
 | `tests/admin-system-smoke.php` | the structure and system panels: the session gate, accounts, roles and permissions, element types, backups and recovery, the activity log, and a render of every panel in every interface language |
 | `tests/install-smoke.php` | Installation steps, generated structure, and self-lock |
+| `tests/keys-smoke.php` | the text key grammar and everything Nino ships to it: the units' fragments, every key a shipped template reads, the key literals in the code, and that no old key form is left |
 | `tests/*-js-smoke.js` | browser-like logic of the management interfaces |
 | `tests/concurrency-smoke.php` | parallel and atomic write operations |
 
@@ -912,6 +950,7 @@ php tests/admin-system-smoke.php
 php tests/install-smoke.php
 php tests/features-smoke.php
 php tests/catalogue-smoke.php
+php tests/keys-smoke.php
 for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php

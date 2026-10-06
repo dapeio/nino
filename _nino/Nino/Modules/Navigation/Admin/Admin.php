@@ -43,7 +43,7 @@ namespace Nino\Modules\Navigation {
 	 *
 	 *												No locale picker, deliberately: a menu has nothing
 	 *												per-locale about it. The wording it renders is each
-	 *												page's own /webpage&lt;uri&gt;/name key, edited in Routes (or
+	 *												page's own /_nino/webpage&lt;uri&gt;/name key, edited in Routes (or
 	 *												in Text), and the same running order serves every
 	 *												language.
 	 *
@@ -704,7 +704,7 @@ namespace Nino\Modules\Navigation {
 		 *	module manages - a menu entry is only ever "a path with a name",
 		 *	and a route a module or a developer owns is as good a target as
 		 *	any, one that exists only at runtime included ('runtime').
-		 *	'named' reports whether the /webpage&lt;uri&gt;/name key the menu
+		 *	'named' reports whether the /_nino/webpage&lt;uri&gt;/name key the menu
 		 *	renders from resolves at all: a route without one is skipped by
 		 *	\Nino\Modules\Navigation::routeLines(), so offering it silently
 		 *	would be offering an entry that never shows up
@@ -745,7 +745,7 @@ namespace Nino\Modules\Navigation {
 				$name 		= '';
 
 				foreach( $texts as $fills )
-					if( ( $name = (string) ( $fills['[[/webpage'. $uri. '/name]]'] ?? '' ) ) !== '' )
+					if( ( $name = (string) ( $fills['[[/_nino/webpage'. $uri. '/name]]'] ?? '' ) ) !== '' )
 						break;
 
 				$labels[$routeKey] = [

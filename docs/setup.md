@@ -86,8 +86,8 @@ Not a choice, and not a step: the base unit delivers one theme, and every projec
 | File | What it is |
 |---|---|
 | `assets/theme.css` | the whole look in one stylesheet: the design tokens, the roles they are assigned to, the three webfaces, and the css for both frames below |
-| `templates/theme.header.tpl` | the site's `<header>`, included by `html-header.tpl` through `[template /templates/theme.header]` |
-| `templates/theme.footer.tpl` | the site's `<footer>`, included the same way |
+| `templates/frame-header.tpl` | the site's `<header>`, included by `html-header.tpl` through `[template /templates/frame-header]` |
+| `templates/frame-footer.tpl` | the site's `<footer>`, included the same way |
 
 The page templates include the two frames rather than carrying their markup, so either can be rewritten without touching the page frame around it. A missing include resolves to an empty string, which is why the base unit lists both files: a delivery that forgot one would ship a site with no header, silently.
 
@@ -117,22 +117,22 @@ Each page requires:
 - **Navigation Name**, **Page Title**, and **Description** for each active language;
 - one checkbox per navigation registered in `/nino/html/navs`.
 
-The step keeps no list of its own: it writes `/nino/http/routes` and the `/webpage<uri>/*` text keys — `name`, `title` and `description` per locale, plus `uri` (the page's reachable path) once in `text/global.php`, blacklisted as a technical value — and reads the list back out of them the next time it runs. Menu membership goes onto the page's own route as `'navs' => [ 'main' => 1, ... ]`, using the page's position in the list as its priority — sorting the list here is what orders the menus.
+The step keeps no list of its own: it writes `/nino/http/routes` and the `/_nino/webpage<uri>/*` text keys — `name`, `title` and `description` per locale, plus `uri` (the page's reachable path) once in `text/global.php`, blacklisted as a technical value — and reads the list back out of them the next time it runs. Menu membership goes onto the page's own route as `'navs' => [ 'main' => 1, ... ]`, using the page's position in the list as its priority — sorting the list here is what orders the menus.
 
-The Element URI is the anchor for page texts like `/webpage<uri>/title`. The HTTP URI is the path visible in the browser. This separation allows the internal identity to remain stable even if the public path changes.
+The Element URI is the anchor for page texts like `/_nino/webpage<uri>/title`. The HTTP URI is the path visible in the browser. This separation allows the internal identity to remain stable even if the public path changes.
 
-A new page starts from the selected library template's own suggestions: its HTTP URI, plus Navigation Name, Page Title, and Description in **every** active language, read from the template's `text/<locale>.php` files. Switching the template only updates fields that are still untouched — anything typed by hand survives the switch. A field left empty still falls back to the generic placeholder ("Page", "Page Title").
+A new page starts from the selected library template's own suggestions: its HTTP URI, plus Navigation Name, Page Title, and Description in **every** active language, read from the unit's `suggest` entry in its manifest - a string or one string per language each, `'uri'`, `'name'`, `'title'` and `'description'`. They are no text keys: a `/_nino/webpage<uri>/*` key is the system's, and the step writes it under the Element URI the page is mounted at. Switching the template only updates fields that are still untouched — anything typed by hand survives the switch. A field left empty still falls back to the generic placeholder ("Page", "Page Title").
 
 A page unit may also declare unit-relative `files`. They are copied to the same
-virtual project paths, so `images/page-home/fullscreen-image/background.svg`
-becomes the project's public `images/page-home/fullscreen-image/background.svg`.
+virtual project paths, so `images/template/page-home/fullscreen-image/background.svg`
+becomes the project's public `images/template/page-home/fullscreen-image/background.svg`.
 
 A unit that shows a picture declares it as an **image slot** with
-`imageSlots`, keyed by the slot uri - `'/page-home/fullscreen-image/background'
+`imageSlots`, keyed by the slot uri - `'/template/page-home/fullscreen-image/background'
 => [ 'label' => [ 'en_US' => 'Home – hero image', 'de_DE' => 'Startseite –
 Titelbild' ], 'width' => 1920, 'height' => 1080, 'filename' =>
-'page-home/fullscreen-image/background.svg' ]` - and its template shows it with
-`[image /page-home/fullscreen-image/background alt=""]` instead of a literal
+'template/page-home/fullscreen-image/background.svg' ]` - and its template shows it with
+`[image /template/page-home/fullscreen-image/background alt=""]` instead of a literal
 `<img>`. The starter site's home hero is seeded with a neutral placeholder
 drawing, a small SVG Nino ships; it carries the slot's own name, so an upload
 replaces it and **Remove image** deletes it, and the library keeps the source.
@@ -150,21 +150,21 @@ The reserved path `/_admin` cannot be used as a public page.
 
 ## 4. Personal Information
 
-This step records central company and website values as textfills. It edits nothing else: of the keys the base unit ships, only those under `/company/*` and `/website/*`, and of those only the ones that are not on the blacklist. All of them can be edited later in the workbench's Text panel.
+This step records central company and website values as textfills. It edits nothing else: of the keys the base unit ships, only those under `/project/company/` and `/project/website/general/` - the technical `/project/website/html/` values and the look of the mails are outside both - each labelled by its category and its name ("Company › Address", "Website › Url"), in English like the whole wizard. All of them can be edited later in the workbench's Text panel.
 
 Language-independent, in the order the form shows them:
 
-- `/website/url`
-- `/company/name`
-- `/company/email`
-- `/company/phone`
-- `/company/adress`
-- `/website/author`
-- `/website/host`
+- `/project/website/general/url`
+- `/project/company/general/name`
+- `/project/company/contact/email`
+- `/project/company/contact/phone`
+- `/project/company/contact/address`
+- `/project/website/general/author`
+- `/project/website/general/host`
 
-`/company/country` and `/company/description` are stored per language, so step through every active language and save its values. A `/company/*` or `/website/*` key a library fork adds is offered too, appended after these.
+`/project/company/contact/country` and `/project/company/general/description` are stored per language, so step through every active language and save its values. A key a library fork adds under either of those prefixes is offered too, appended after these.
 
-These textfills are used in templates, meta tags, and possibly in the footer or contact forms. `/website/url` is the site's address without the protocol - `www.example.com` -: the base unit's templates put it behind `https://` for the canonical link, the Open Graph and Twitter tags, the JSON-LD block, `sitemap.xml` and `robots.txt`, and the Form module's mails name it, so set it before the site goes live. The technical ones the base unit blacklists - `/website/charset`, `/website/lang` - are deliberately left out here and are edited on the workbench's Text Keys tab afterwards.
+These textfills are used in templates, meta tags, and possibly in the footer or contact forms. `/project/website/general/url` is the site's address without the protocol - `www.example.com` -: the base unit's templates put it behind `https://` for the canonical link, the Open Graph and Twitter tags, the JSON-LD block, `sitemap.xml` and `robots.txt`, and the Form module's mails name it, so set it before the site goes live. The technical ones the base unit blacklists - `/project/website/html/charset`, `/project/website/html/lang` - are deliberately left out here and are edited on the workbench's Text Keys tab afterwards.
 
 The links to the site's profiles elsewhere - Instagram, YouTube and the like - are not asked for here: they are the catalogue feature [Social links](https://github.com/dapeio/nino-features/blob/main/features/Social/README.md), an element type the editors keep under Elements once it is switched on.
 

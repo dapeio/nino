@@ -87,7 +87,7 @@ Routes are in `config.php` under `/nino/http/routes`. The array key connects HTT
 
 `GET://` denotes the homepage: `GET` is the method, the second slash is the HTTP URI `/`. For `/contact`, the key is `GET://contact` accordingly.
 
-The route separates the public address from the internal page identity. The homepage is accessible in the browser under `/`, but can internally be called `/home`. Text keys like `/webpage/home/title` remain stable even if only the public path changes.
+The route separates the public address from the internal page identity. The homepage is accessible in the browser under `/`, but can internally be called `/home`. Text keys like `/_nino/webpage/home/title` remain stable even if only the public path changes.
 
 In addition to `uri` and `body`, a route can contain, for example, status code, headers, or a fixed language. If there is no match for a request, Nino uses the configured route for `/404`.
 
@@ -121,7 +121,7 @@ The loaded `.tpl` file can contain shortcodes and textfills in addition to HTML:
 ```html
 [template /templates/html-header]
 <main>
-  <h1>[[/webpage/home/title]]</h1>
+  <h1>[[/_nino/webpage/home/title]]</h1>
 
   [elements /services]
     <article>
@@ -139,11 +139,11 @@ Page templates can be composed from complete HTML and `[template]` sections via 
 
 Nino processes an HTML string in a fixed order during each rendering pass:
 
-1. Textfills are replaced (`[[/webpage/home/title]]`).
+1. Textfills are replaced (`[[/_nino/webpage/home/title]]`).
 2. Registered shortcodes are executed (`[template /templates/html-header]`).
 3. Registered callbacks under `/nino/html/render` receive the result.
 
-**Textfills** are individual global or language-dependent values. They are suitable for page titles, descriptions, and other text content at a fixed location.
+**Textfills** are individual global or language-dependent values. They are suitable for page titles, descriptions, and other text content at a fixed location. Their keys follow one grammar - `/<namespace>/<category>/<part>/<name>`, for example `/template/page-home/welcome/title` for a word of the template `page-home.tpl` and `/project/company/contact/email` for a fact of the project; the [Developer Manual](development.md#the-key-grammar) has the rules.
 
 **Elements** represent recurring content according to a predefined type model, such as services, team members, or references. Developers define the fields under Element Types; developers and editors maintain the entries under Elements, each within their permissions.
 

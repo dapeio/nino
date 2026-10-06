@@ -9,7 +9,7 @@ declare(strict_types=1);
  */
 namespace Nino {
 
-	const VERSION = '1.3.2';
+	const VERSION = '1.4.0-dev';
 
 	/**
 	 *	Boot Nino.

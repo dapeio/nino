@@ -238,7 +238,7 @@ lowercase hyphenated IDs.
 - `query` matches model values and supports the existing percent wildcard
   forms.
 
-Do not use absolute `[[/page-*]]` fills for per-record data. Do not use local
+Do not use absolute `[[/template/*]]` fills for per-record data. Do not use local
 `[[title]]` outside an Element block.
 
 ## Render one field's distinct values

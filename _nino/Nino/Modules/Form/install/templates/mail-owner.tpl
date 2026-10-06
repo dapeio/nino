@@ -1,8 +1,8 @@
 [template /templates/mail-header]
-<h1>[[/mail/owner/title]]</h1>
-<p>[[/mail/owner/intro]]</p>
+<h1>[[/template/mail-owner/intro/title]]</h1>
+<p>[[/template/mail-owner/intro/text]]</p>
 [[fields]]
 <table>
-	<tr><th>[[/form/label/date]]</th><td>[[date]]</td></tr>
+	<tr><th>[[/template/common/form/date]]</th><td>[[date]]</td></tr>
 </table>
 [template /templates/mail-footer]

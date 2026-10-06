@@ -270,9 +270,9 @@ Fehlermeldungen sollten im Browser keine Dateipfade, Konfigurationswerte oder St
 
 Dieses Log ist `private/data/logs.<YYYY-MM>.php`, eine Datei pro Monat, Einträge älter als drei Monate fallen heraus. Das Logs-Panel der Workbench liest es – und wenn die Workbench selbst das Kaputte ist, tut es jeder Dateimanager. Dort steht der Grund für einen nackten `500`, und auf einem Produktivsystem ist das der einzige Ort: `/nino/error/display` ist aus, der Browser bekommt also nichts als den Status.
 
-**Die Adresse, unter der Mails hinausgehen,** ist der Textfill `/form/email/owner`, den das Basis-Unit als `[[/company/email]]` mitbringt – standardmäßig trägt also jede Mail dieser Seite das Postfach, das das Projekt ohnehin genannt hat, im `From`-Header und als Envelope-Sender. Ändern Sie ihn im Panel Texte, wenn Antworten woanders ankommen sollen; die Firmenadresse bleibt, was sie ist.
+**Die Adresse, unter der Mails hinausgehen,** ist der Textfill `/project/mail/address/owner`, den das Basis-Unit als `[[/project/company/contact/email]]` mitbringt – standardmäßig trägt also jede Mail dieser Seite das Postfach, das das Projekt ohnehin genannt hat, im `From`-Header und als Envelope-Sender. Ändern Sie ihn im Panel Texte, wenn Antworten woanders ankommen sollen; die Firmenadresse bleibt, was sie ist.
 
-Diese Adresse muss eine sein, für die der sendende Host senden darf. SPF und DMARC werden gegen den Envelope-Sender geprüft, ein Postfach auf einer Domain, für die dieser Server nicht sendet, macht also aus einer zugestellten Mail eine abgelehnte oder gefilterte – und nichts auf der Seite meldet das, weil die Ablehnung auf der Empfängerseite passiert. Wo die beiden auseinandergehen, ist der Textfill `/mail/sender` – das Basis-Unit liefert ihn leer, gesetzt wird er im Panel Texte wie der andere – der Envelope-Sender, und `/form/email/owner` bleibt das Postfach, das Antworten erreicht.
+Diese Adresse muss eine sein, für die der sendende Host senden darf. SPF und DMARC werden gegen den Envelope-Sender geprüft, ein Postfach auf einer Domain, für die dieser Server nicht sendet, macht also aus einer zugestellten Mail eine abgelehnte oder gefilterte – und nichts auf der Seite meldet das, weil die Ablehnung auf der Empfängerseite passiert. Wo die beiden auseinandergehen, ist der Textfill `/project/mail/address/envelope` – das Basis-Unit liefert ihn leer, gesetzt wird er im Panel Texte wie der andere – der Envelope-Sender, und `/project/mail/address/owner` bleibt das Postfach, das Antworten erreicht.
 
 Leer sind beide die Absenderadresse. Steht dort etwas, das keine Adresse ist, antwortet stattdessen die Absenderadresse, und das Protokoll sagt es; ist keines von beiden eine, geht die Mail ganz ohne `From` hinaus – der zuverlässigste Weg in einen Spam-Ordner, den es gibt.
 
@@ -293,7 +293,7 @@ Zusätzlicher Webserver-Schutz für `/_admin` – etwa IP-Freigaben oder HTTP-Au
 
 Schließe den Assistenten vollständig ab. Der letzte Schritt setzt das Recovery-Passwort und sperrt den Assistenten. Entferne anschließend das Verzeichnis `_admin/install/` aus der produktiven Auslieferung.
 
-Damit verschwindet auch die Installer-Library unter `_admin/install/library/`. Das ist beabsichtigt: Die Library ist Einrichtungsmaterial, kein Laufzeitfeature. Alles, was sie kopiert hat, liegt längst im Projekt – das Theme als `assets/theme.css`, die beiden Frames als `templates/theme.header.tpl` und `templates/theme.footer.tpl` – und bleibt von Hand und, für die Frames, über das Templates-Panel bearbeitbar. Zur Laufzeit liest niemand die Library.
+Damit verschwindet auch die Installer-Library unter `_admin/install/library/`. Das ist beabsichtigt: Die Library ist Einrichtungsmaterial, kein Laufzeitfeature. Alles, was sie kopiert hat, liegt längst im Projekt – das Theme als `assets/theme.css`, die beiden Frames als `templates/frame-header.tpl` und `templates/frame-footer.tpl` – und bleibt von Hand und, für die Frames, über das Templates-Panel bearbeitbar. Zur Laufzeit liest niemand die Library.
 
 Die Reihenfolge ist wesentlich:
 
@@ -323,6 +323,7 @@ php tests/admin-system-smoke.php
 php tests/install-smoke.php
 php tests/features-smoke.php
 php tests/catalogue-smoke.php
+php tests/keys-smoke.php
 for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php

@@ -13,7 +13,7 @@
  *			time.
  *
  *			If a token still needs to stay editable per project, define it
- *			as --token: [[/nino/path]]; instead of a literal value.
+ *			as --token: [[/project/website/color/primary]]; instead of a literal value.
  *
  *			--text-1 .. --text-6 is a small type scale for titles/subtitles,
  *			mirroring the existing --space-1 .. --space-6 numbering. Sizes that

@@ -1,5 +1,5 @@
 <?php return [
 
-	'[[/maintenance/title]]' => 'Under maintenance',
-	'[[/maintenance/text]]' => 'We will be back shortly.',
+	'[[/module/maintenance/page/title]]' => 'Under maintenance',
+	'[[/module/maintenance/page/text]]' => 'We will be back shortly.',
 ];

@@ -32,9 +32,9 @@ namespace Nino\Modules\Text {
 		/**
 		 *	One permission per key, the key's own path appended:
 		 *
-		 *	  /_admin/text/update/page-home/atf/title
+		 *	  /_admin/text/update/template/page-home/hero/title
 		 *
-		 *	so '/_admin/text/update/page-home/*' is a whole group and
+		 *	so '/_admin/text/update/template/page-home/*' is a whole template's worth and
 		 *	'/_admin/text/update/*' every key there is - the same
 		 *	\Nino\Auth::checkPermission() wildcard as everywhere else, and
 		 *	nothing here has to enumerate keys. Whether any of it applies is
@@ -95,9 +95,10 @@ namespace Nino\Modules\Text {
 
 		/**
 		 *	The category a batch of text/savebatch items belongs to - the
-		 *	first non-empty path segment of a key (eg. "home" for
-		 *	"/home/welcome/h2"), same grouping assets/admin.js itself uses to
-		 *	present keys as one category's worth of fields per form.
+		 *	first non-empty path segment of a key (eg. "template" for
+		 *	"/template/page-home/welcome/title"), same grouping
+		 *	assets/admin.js itself uses to present keys as one category's
+		 *	worth of fields per form.
 		 *	A batch is always one category's fields saved together, so
 		 *	the first item's key is representative of the whole request
 		 *
@@ -230,7 +231,7 @@ namespace Nino\Modules\Text {
 		 *	Whether this account may change one key's value - see SCOPE
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$key					A text key, leading slash and all (eg. "/page-home/atf/title")
+		 *	@param		string		$key					A text key, leading slash and all (eg. "/template/page-home/hero/title")
 		 *
 		 *	@return 	bool
 		 */

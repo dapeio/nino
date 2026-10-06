@@ -87,8 +87,8 @@ Keine Wahl und kein Schritt: Die Base-Einheit liefert ein Theme aus, und jedes P
 | Datei | Was sie ist |
 |---|---|
 | `assets/theme.css` | das ganze Aussehen in einem Stylesheet: die Design-Token, die Rollen, denen sie zugewiesen sind, die drei Webfaces und die CSS für beide Frames darunter |
-| `templates/theme.header.tpl` | der `<header>` der Seite, von `html-header.tpl` über `[template /templates/theme.header]` eingebunden |
-| `templates/theme.footer.tpl` | der `<footer>` der Seite, auf demselben Weg eingebunden |
+| `templates/frame-header.tpl` | der `<header>` der Seite, von `html-header.tpl` über `[template /templates/frame-header]` eingebunden |
+| `templates/frame-footer.tpl` | der `<footer>` der Seite, auf demselben Weg eingebunden |
 
 Die Seitentemplates binden die beiden Frames ein, statt ihr Markup selbst zu tragen – jeder von beiden lässt sich also neu schreiben, ohne den Seitenrahmen darum anzufassen. Ein fehlender Include löst zu einer leeren Zeichenkette auf; deshalb führt die Base-Einheit beide Dateien auf: Eine Auslieferung, die eine davon vergisst, liefert eine Seite ohne Header aus, lautlos.
 
@@ -124,19 +124,19 @@ Jede Seite besitzt:
 
 Element-URI und HTTP-URI müssen innerhalb ihrer jeweiligen Spalte eindeutig sein. Sie dürfen voneinander abweichen: Die Startseite kann intern `/home` heißen und trotzdem unter `/` erreichbar sein.
 
-Eine neue Seite startet mit den Vorschlägen der gewählten Library-Vorlage: HTTP-URI sowie Name, Title und Description in **jeder** aktiven Sprache, gelesen aus den `text/<locale>.php`-Dateien der Vorlage. Ein Wechsel der Vorlage aktualisiert nur Felder, die noch unverändert sind – selbst eingetragener Text bleibt erhalten. Ein leer gelassenes Feld fällt weiterhin auf den allgemeinen Platzhalter („Page“, „Page Title“) zurück.
+Eine neue Seite startet mit den Vorschlägen der gewählten Library-Vorlage: HTTP-URI sowie Name, Title und Description in **jeder** aktiven Sprache, gelesen aus dem Eintrag `suggest` im Manifest der Einheit – je ein String oder ein String je Sprache für `'uri'`, `'name'`, `'title'` und `'description'`. Das sind keine Textschlüssel: Ein `/_nino/webpage<uri>/*`-Schlüssel gehört dem System, und der Schritt schreibt ihn unter der Element-URI, unter der die Seite eingehängt ist. Ein Wechsel der Vorlage aktualisiert nur Felder, die noch unverändert sind – selbst eingetragener Text bleibt erhalten. Ein leer gelassenes Feld fällt weiterhin auf den allgemeinen Platzhalter („Page“, „Page Title“) zurück.
 
 Eine Seiteneinheit darf außerdem einheitenrelative `files` deklarieren. Sie
 werden auf dieselben virtuellen Projektpfade kopiert; aus
-`images/page-home/fullscreen-image/background.svg` wird damit das öffentliche
-`images/page-home/fullscreen-image/background.svg` des Projekts.
+`images/template/page-home/fullscreen-image/background.svg` wird damit das öffentliche
+`images/template/page-home/fullscreen-image/background.svg` des Projekts.
 
 Eine Einheit, die ein Bild zeigt, deklariert es als **Bildplatz** mit
-`imageSlots`, mit der Platz-Uri als Schlüssel – `'/page-home/fullscreen-image/background'
+`imageSlots`, mit der Platz-Uri als Schlüssel – `'/template/page-home/fullscreen-image/background'
 => [ 'label' => [ 'en_US' => 'Home – hero image', 'de_DE' => 'Startseite –
 Titelbild' ], 'width' => 1920, 'height' => 1080, 'filename' =>
-'page-home/fullscreen-image/background.svg' ]` –, und ihr Template zeigt ihn mit
-`[image /page-home/fullscreen-image/background alt=""]` statt mit einem
+'template/page-home/fullscreen-image/background.svg' ]` –, und ihr Template zeigt ihn mit
+`[image /template/page-home/fullscreen-image/background alt=""]` statt mit einem
 wörtlichen `<img>`. Das Titelbild der Startseite ist mit einer neutralen
 Platzhalterzeichnung belegt, einem kleinen SVG, das Nino mitliefert; es trägt
 den Namen des Platzes, ein Upload ersetzt es also und **Bild entfernen** löscht
@@ -150,7 +150,7 @@ Einheit, die eine Uri nennt, gewinnt. Eine Seed-Datei, die sich nicht kopieren
 lässt, oder ein Platz, der sich nicht deklarieren lässt, lässt den Schritt mit
 Namen scheitern, bevor eine Route geschrieben wird.
 
-Der Assistent speichert keine eigene Liste: Der Schritt schreibt ausschließlich `/nino/http/routes` und die `/webpage<uri>/*`-Textschlüssel – `name`, `title` und `description` je Sprache, dazu einmalig `uri` (den erreichbaren Pfad der Seite) in `text/global.php`, als technischer Wert auf der Blacklist – und liest die angezeigte Liste beim nächsten Aufruf wieder daraus. Aus der angewendeten Liste entstehen außerdem Templates und bei Bedarf Modulabhängigkeiten. Die mitgelieferten Ausgangspunkte umfassen Startseite, Fehlerseite, rechtliche Angaben und Kontakt.
+Der Assistent speichert keine eigene Liste: Der Schritt schreibt ausschließlich `/nino/http/routes` und die `/_nino/webpage<uri>/*`-Textschlüssel – `name`, `title` und `description` je Sprache, dazu einmalig `uri` (den erreichbaren Pfad der Seite) in `text/global.php`, als technischer Wert auf der Blacklist – und liest die angezeigte Liste beim nächsten Aufruf wieder daraus. Aus der angewendeten Liste entstehen außerdem Templates und bei Bedarf Modulabhängigkeiten. Die mitgelieferten Ausgangspunkte umfassen Startseite, Fehlerseite, rechtliche Angaben und Kontakt.
 
 Eine Route mit dem Template **Blank** erhält eine eigene Kopie davon, benannt nach ihrer Element-URI: Aus einer Route `/team` wird `templates/page-team.tpl`, gerendert über `[template /templates/page-team]`. Blank ist der leere Startpunkt, jede Route damit braucht also eine eigene Seite — bei einer gemeinsamen Datei würde das Bearbeiten einer Blank-Seite alle anderen mit überschreiben. Eine verschachtelte Element-URI wird zu einem Namen zusammengezogen (`/jobs/open` → `page-jobs-open.tpl`), denn nur diese Form listen die Template-Auswahlen. Eine vorhandene Datei wird nie überschrieben; ein erneuter Durchlauf dieses Schritts lässt bereits Gebautes unangetastet. Ab da gehört das Template der Route, und sie wird als eigene Seite zurückgelesen statt als Blank-Einheit — genau wie eine im Panel Routen angelegte Seite. Alle anderen Vorlagen sind fertige Seiten und bleiben geteilt. Einen Namen kann sie nicht bekommen: Eine Element-URI, deren Template-Name schon einer Bibliotheksseite gehört — `/home`, `/contact` und die anderen fertigen Seiten —, wird abgelehnt, unter Nennung der Seite, die ihn hat, denn beide würden dieselbe `templates/page-*.tpl` schreiben.
 
@@ -158,11 +158,11 @@ Beim erneuten Anwenden ersetzt die Liste nur die Routen, die aus ihrem vorherige
 
 ## 4. Persönliche Angaben
 
-„Personal Infos“ bündelt zentrale Textwerte, die unabhängig von der Modulauswahl benötigt werden. Der Schritt bearbeitet ausschließlich die vorgesehenen Schlüssel unter `/company/*` und `/website/*`.
+„Personal Infos“ bündelt zentrale Textwerte, die unabhängig von der Modulauswahl benötigt werden. Der Schritt bearbeitet ausschließlich die vorgesehenen Schlüssel unter `/project/company/` und `/project/website/general/` – die technischen Werte unter `/project/website/html/` und die Gestaltung der Mails liegen außerhalb beider. Jedes Feld heißt nach seiner Kategorie und seinem Namen („Company › Address“, „Website › Url“), englisch wie der ganze Assistent.
 
 Sprachunabhängig sind beispielsweise:
 
-- Adresse der Website (`/website/url`) – die Domain ohne Protokoll, etwa `www.example.com`. Die Templates der Basis-Einheit setzen sie hinter `https://` für Canonical-Link, Open-Graph- und Twitter-Tags, JSON-LD, `sitemap.xml` und `robots.txt`, die Mails des Form-Moduls nennen sie; sie gehört also vor dem Livegang gesetzt;
+- Adresse der Website (`/project/website/general/url`) – die Domain ohne Protokoll, etwa `www.example.com`. Die Templates der Basis-Einheit setzen sie hinter `https://` für Canonical-Link, Open-Graph- und Twitter-Tags, JSON-LD, `sitemap.xml` und `robots.txt`, die Mails des Form-Moduls nennen sie; sie gehört also vor dem Livegang gesetzt;
 - Unternehmensname;
 - E-Mail-Adresse und Telefonnummer;
 - Anschrift;

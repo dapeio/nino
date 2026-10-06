@@ -19,7 +19,7 @@
  *
  *													No locale switch anywhere in here: a menu has nothing
  *													per-locale about it, and the wording it renders is each
- *													page's own /webpage<uri>/name key, edited under Routes.
+ *													page's own /_nino/webpage<uri>/name key, edited under Routes.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>

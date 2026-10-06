@@ -24,6 +24,9 @@ namespace Nino\Modules {
 
 	class Template {
 
+		// A word of a text key: lower-case letters and digits, joined by hyphens
+		private const string SEGMENT = '#^[a-z0-9]+(?:-[a-z0-9]+)*$#D';
+
 		/**
 		 *	Module initiating
 		 *
@@ -35,6 +38,31 @@ namespace Nino\Modules {
 			\Nino\Html::addShortcode( $appData, 'template', [ self::class, 'doShortcode' ] );
 		}
 
+
+		/**
+		 *	The category of a template, the second segment of every text key it
+		 *	carries (/template/<category>/<part>/<name>): its file name without
+		 *	.tpl, prefix and all - page-home.tpl is page-home, html-footer.tpl
+		 *	is html-footer. Nothing is derived or cut off. A name that is not a
+		 *	word of a key - a dot, an upper-case letter, a slash - has no
+		 *	category, and the template carries no keys of its own: it may read
+		 *	every other one. Only a file directly in templates/ has one
+		 *
+		 *	@param		string		$name					A file name (page-home.tpl), or a template as a
+		 *																	shortcode or a route body names it (/templates/page-home)
+		 *
+		 *	@return 	string|null							The category, or null
+		 */
+		public static function category( string $name ): ?string {
+
+			if( str_starts_with( $name, '/templates/' ) === true )
+				$name = substr( $name, strlen( '/templates/' ) );
+
+			if( str_ends_with( $name, '.tpl' ) === true )
+				$name = substr( $name, 0, -strlen( '.tpl' ) );
+
+			return preg_match( self::SEGMENT, $name ) === 1 ? $name : null;
+		}
 
 		/**
 		 *	Replace template shortcode

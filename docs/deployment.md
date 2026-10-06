@@ -267,9 +267,9 @@ Error messages should not expose file paths, configuration values, or stack trac
 
 That log is `private/data/logs.<YYYY-MM>.php`, one file per month, with entries older than three months dropped. The workbench's Logs panel reads it - and when the workbench is the thing that is broken, so does any file manager. It is where the reason for a bare `500` is, which on a production host is the only place it is: `/nino/error/display` is off, so the browser gets nothing but the status.
 
-**The address mails go out as** is the textfill `/form/email/owner`, which the base unit ships as `[[/company/email]]` - so by default every mail this site sends carries the mailbox the project already named, in the `From` header and as the envelope sender. Change it in the Text panel where replies should reach somewhere else; the company address stays what it is.
+**The address mails go out as** is the textfill `/project/mail/address/owner`, which the base unit ships as `[[/project/company/contact/email]]` - so by default every mail this site sends carries the mailbox the project already named, in the `From` header and as the envelope sender. Change it in the Text panel where replies should reach somewhere else; the company address stays what it is.
 
-That address has to be one the sending host may send for. SPF and DMARC are checked against the envelope sender, so a mailbox on a domain this server does not send for is what turns a delivered mail into a rejected or a filtered one - and nothing on the site reports that, because the refusal happens at the receiving end. Where the two differ, the textfill `/mail/sender` - shipped empty by the base unit, set in the Text panel like the other one - is the envelope sender, and `/form/email/owner` stays the mailbox replies reach.
+That address has to be one the sending host may send for. SPF and DMARC are checked against the envelope sender, so a mailbox on a domain this server does not send for is what turns a delivered mail into a rejected or a filtered one - and nothing on the site reports that, because the refusal happens at the receiving end. Where the two differ, the textfill `/project/mail/address/envelope` - shipped empty by the base unit, set in the Text panel like the other one - is the envelope sender, and `/project/mail/address/owner` stays the mailbox replies reach.
 
 Left empty, both are the owner address. Set to something that is not an address, the owner address answers instead and the log says so; where neither is one, the mail goes out with no `From` at all, which is the most reliable way there is to land in a spam folder.
 
@@ -290,7 +290,7 @@ Additional web server protection for `/_admin` - such as IP allowances or HTTP a
 
 Complete the wizard fully. The last step sets the recovery password and locks the wizard. Then remove the `_admin/install/` directory from production delivery.
 
-That takes the installer library under `_admin/install/library/` with it. This is deliberate: the library is setup material, not a runtime feature. Everything it copied already lives in the project - the theme as `assets/theme.css`, the two frames as `templates/theme.header.tpl` and `templates/theme.footer.tpl` - editable by hand and, for the frames, through the Templates panel. Nothing at runtime reads the library.
+That takes the installer library under `_admin/install/library/` with it. This is deliberate: the library is setup material, not a runtime feature. Everything it copied already lives in the project - the theme as `assets/theme.css`, the two frames as `templates/frame-header.tpl` and `templates/frame-footer.tpl` - editable by hand and, for the frames, through the Templates panel. Nothing at runtime reads the library.
 
 The order is essential:
 
@@ -320,6 +320,7 @@ php tests/admin-system-smoke.php
 php tests/install-smoke.php
 php tests/features-smoke.php
 php tests/catalogue-smoke.php
+php tests/keys-smoke.php
 for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php

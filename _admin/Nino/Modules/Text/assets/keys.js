@@ -139,7 +139,7 @@
 		},
 
 		/**
-		 *	Group key entries by the first path segment (eg. "/home/welcome/h2" -> "home")
+		 *	Group key entries by the first path segment (eg. "/template/page-home/welcome/title" -> "template")
 		 *
 		 *	@param		{Array}		entries				List of key entries (see \Nino\Text::entries())
 		 *
@@ -714,7 +714,7 @@
 			}
 
 			if( Nino.admin.keys._view === 'scan' )
-				return Nino.admin.keys._scanRows.some( function( row ) { return row.valueInput.value !== '' || row.ignoreCheck.checked === true } );
+				return Nino.admin.keys._scanRows.some( function( row ) { return ( row.valueInput !== null && row.valueInput.value !== '' ) || row.ignoreCheck.checked === true } );
 
 			if( Nino.admin.keys._view !== 'group' || dc.getElementById('keys-edit-form') === null )
 				return false;
@@ -750,7 +750,8 @@
 					isGlobal.checked = false;
 			} else if( Nino.admin.keys._view === 'scan' ) {
 				Nino.admin.keys._scanRows.forEach( function( row ) {
-					row.valueInput.value = '';
+					if( row.valueInput !== null )
+						row.valueInput.value = '';
 					row.ignoreCheck.checked = false;
 				} );
 			} else {
@@ -1196,7 +1197,7 @@
 					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/scan' );
 					return;
 				}
-				Nino.admin.keys._renderScanForm( response.missing );
+				Nino.admin.keys._renderScanForm( response.missing, response.alsoUsed || [] );
 			} );
 		},
 
@@ -1204,6 +1205,13 @@
 		 *	Render the scan results: one row per missing key (starting-value
 		 *	input + "Ignore permanently" toggle) and a submit button that
 		 *	hands the whole list to keys/scanapply.
+		 *
+		 *	A row says what can be done with its key (see Keys::_scanRow()): one
+		 *	that follows the grammar has the input, and a /feature or /module
+		 *	key a note on where it normally comes from; one that does not has no
+		 *	input - it is renamed in the template - and can be ignored; a key of
+		 *	the system has neither, and names who writes it. Below the rows, the
+		 *	keys other templates read as well are listed, as a note and no more.
 		 *
 		 *	Each row has three possible answers, and doing nothing is one of
 		 *	them: a value creates the key (one starting value, copied into
@@ -1213,11 +1221,12 @@
 		 *	That is what makes a long list workable in several sittings
 		 *	instead of one all-or-nothing pass.
 		 *
-		 *	@param		{Array}		missing				[ { key, files[] }, ... ]
+		 *	@param		{Array}		missing				[ { key, files[], kind, writer, hint, owner }, ... ]
+		 *	@param		{Array}		alsoUsed			[ { key, files[] }, ... ]
 		 *
 		 *	@return		void
 		 */
-		_renderScanForm : function( missing ) {
+		_renderScanForm : function( missing, alsoUsed ) {
 
 			const wrap = dc.getElementById('keys-form');
 			wrap.innerHTML = '';
@@ -1236,6 +1245,7 @@
 
 			if( missing.length === 0 ) {
 				wrap.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/keys/scan/none') ) );
+				Nino.admin.keys._appendAlsoUsed( wrap, alsoUsed );
 				return;
 			}
 
@@ -1258,10 +1268,30 @@
 				span.textContent = item.key+ '  ('+ item.files.join(', ')+ ')';
 				field.appendChild( span );
 
-				const valueInput = dc.createElement('input');
-				valueInput.type = 'text';
-				valueInput.placeholder = Nino.content.getText('/_admin/keys/label/scan-value');
-				field.appendChild( valueInput );
+				const kind = item.kind || 'create';
+
+				let valueInput = null;
+				if( kind === 'create' ) {
+					valueInput = dc.createElement('input');
+					valueInput.type = 'text';
+					valueInput.placeholder = Nino.content.getText('/_admin/keys/label/scan-value');
+					field.appendChild( valueInput );
+				}
+
+				const note = Nino.admin.keys._scanNote( item );
+				if( note !== '' ) {
+					const noteEl = dc.createElement('p');
+					noteEl.className = 'nino-admin-hint';
+					noteEl.textContent = note;
+					field.appendChild( noteEl );
+				}
+
+				// A key of the system is not the scan's to retire: it is the
+				// system's to write, and ignoring it would only hide the gap
+				if( kind === 'system' ) {
+					form.appendChild( field );
+					return;
+				}
 
 				const ignoreLabel = dc.createElement('label');
 				ignoreLabel.className = 'admin-scan-ignore';
@@ -1294,7 +1324,67 @@
 
 			wrap.appendChild( form );
 
+			Nino.admin.keys._appendAlsoUsed( wrap, alsoUsed );
+
 			Nino.admin.keys._scanRows = rows;
+		},
+
+		/**
+		 *	What the scan says about one missing key besides its name: why it
+		 *	cannot be created here (the grammar, or the system writing it, and
+		 *	who), or where a /feature or /module key normally comes from. Empty
+		 *	for a key that is simply to be created
+		 *
+		 *	@param		{Object}		item					One row of the scan
+		 *
+		 *	@return		{string}
+		 */
+		_scanNote : function( item ) {
+
+			if( item.kind === 'grammar' )
+				return Nino.content.getText('/_admin/keys/scan/grammar');
+
+			if( item.kind === 'system' )
+				return Nino.content.getText('/_admin/keys/scan/system-'+ ( item.writer || 'none' ) );
+
+			if( item.hint === 'feature' || item.hint === 'module' )
+				return Nino.adminUi.format( Nino.content.getText('/_admin/keys/scan/hint-'+ item.hint ), item.owner );
+
+			return '';
+		},
+
+		/**
+		 *	The keys of one template that another reads as well, under the
+		 *	scan: a note, with no input and nothing counted. Nothing is drawn
+		 *	when there are none
+		 *
+		 *	@param		{Element}		wrap					The form's container
+		 *	@param		{Array}			alsoUsed			[ { key, files[] }, ... ]
+		 *
+		 *	@return		void
+		 */
+		_appendAlsoUsed : function( wrap, alsoUsed ) {
+
+			if( alsoUsed.length === 0 )
+				return;
+
+			const heading = dc.createElement('h3');
+			heading.textContent = Nino.content.getText('/_admin/keys/scan/also-title');
+			wrap.appendChild( heading );
+
+			const hint = dc.createElement('p');
+			hint.className = 'nino-admin-hint';
+			hint.textContent = Nino.content.getText('/_admin/keys/scan/also-hint');
+			wrap.appendChild( hint );
+
+			const ul = dc.createElement('ul');
+			ul.className = 'nino-admin-list-dense';
+			alsoUsed.forEach( function( item ) {
+				const li = dc.createElement('li');
+				li.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/keys/scan/also-line'), item.key, item.files.join(', ') );
+				ul.appendChild( li );
+			} );
+			wrap.appendChild( ul );
 		},
 
 		/**
@@ -1322,7 +1412,7 @@
 			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
 
 			const payload = rows.map( function( row ) {
-				return { key : row.key, value : row.valueInput.value, ignore : row.ignoreCheck.checked };
+				return { key : row.key, value : row.valueInput === null ? '' : row.valueInput.value, ignore : row.ignoreCheck.checked };
 			} );
 
 			Nino.admin.keys._apiCall( 'scanapply', { rows : payload }, function( status, response ) {

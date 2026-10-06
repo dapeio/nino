@@ -49,10 +49,10 @@ mkdir( $sandbox. '/private/text', 0777, true );
 // maxlength is capped at MAX_MAXLENGTH rather than growing past it
 $longValue = str_repeat( 'x', 1900 );
 
-file_put_contents( $sandbox. '/private/text/global.php', '<?php return [ \'[[/company/name]]\' => \'Acme\', \'[[/website/lang]]\' => \'de\' ];' );
+file_put_contents( $sandbox. '/private/text/global.php', '<?php return [ \'[[/project/company/general/name]]\' => \'Acme\', \'[[/project/website/html/lang]]\' => \'de\' ];' );
 file_put_contents( $sandbox. '/private/text/de_DE.php', '<?php return [ \'[[/home/h2]]\' => \'<span>Hallo</span> Welt.\', \'[[/home/plain]]\' => \'Ein Satz.\', \'[[/home/long]]\' => \''. $longValue. '\' ];' );
 file_put_contents( $sandbox. '/private/text/en_US.php', '<?php return [ \'[[/home/h2]]\' => \'<span>Hi</span> World.\', \'[[/home/plain]]\' => \'A sentence.\' ];' );
-file_put_contents( $sandbox. '/private/text/blacklist.php', '<?php return [ \'/website/lang\' ];' );
+file_put_contents( $sandbox. '/private/text/blacklist.php', '<?php return [ \'/project/website/html/lang\' ];' );
 
 $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 
@@ -354,8 +354,8 @@ $byKey = [];
 foreach( $keys as $entry )
 	$byKey[$entry['key']] = $entry;
 
-check( 'blacklisted key is excluded', isset( $byKey['/website/lang'] ) === false );
-check( 'global key is included and flagged global', ( $byKey['/company/name']['global'] ?? null ) === true );
+check( 'blacklisted key is excluded', isset( $byKey['/project/website/html/lang'] ) === false );
+check( 'global key is included and flagged global', ( $byKey['/project/company/general/name']['global'] ?? null ) === true );
 check( 'locale key is included and flagged non-global', ( $byKey['/home/h2']['global'] ?? null ) === false );
 check( 'a key with existing markup is auto-flagged html', ( $byKey['/home/h2']['html'] ?? null ) === true );
 check( 'a key without markup is not flagged html', ( $byKey['/home/plain']['html'] ?? null ) === false );
@@ -442,7 +442,7 @@ function saveText( array &$appData, array $data ): array {
 	return $results[$data['key'] ?? ''] ?? [ 'ok' => false ];
 }
 
-$result = saveText( $appData, [ 'key' => '/website/lang', 'locale' => 'de_DE', 'value' => 'fr' ] );
+$result = saveText( $appData, [ 'key' => '/project/website/html/lang', 'locale' => 'de_DE', 'value' => 'fr' ] );
 check( 'saving a blacklisted key is rejected', $result['ok'] === false && $result['error'] === 'unknown key' );
 
 $result = saveText( $appData, [ 'key' => '/does/not/exist', 'locale' => 'de_DE', 'value' => 'x' ] );
@@ -514,9 +514,9 @@ check( 'a non-html key has all tags stripped, not sanitized-and-kept', ( $result
 $result = saveText( $appData, [
 	'key'			=> '/home/plain',
 	'locale'	=> 'de_DE',
-	'value'		=> 'Lies [template /templates/mail-owner] und [elements /people] - siehe [[/company/name]]',
+	'value'		=> 'Lies [template /templates/mail-owner] und [elements /people] - siehe [[/project/company/general/name]]',
 ] );
-check( 'a shortcode typed into a textfill is stored as an entity, not as a shortcode', ( $result['value'] ?? '' ) === 'Lies &#91;template /templates/mail-owner&#93; und &#91;elements /people&#93; - siehe [[/company/name]]' );
+check( 'a shortcode typed into a textfill is stored as an entity, not as a shortcode', ( $result['value'] ?? '' ) === 'Lies &#91;template /templates/mail-owner&#93; und &#91;elements /people&#93; - siehe [[/project/company/general/name]]' );
 // The saved value, registered the way a page's fills are - the render pass
 // runs shortcodes over what a fill puts in, so a stored entity has to stay one
 \Nino\Html::addFills( $appData, [ '/home/plain' => (string) ( $result['value'] ?? '' ) ], '*' );
@@ -524,7 +524,7 @@ $renderedPlain = \Nino\Html::renderHtml( $appData, '[[/home/plain]]' );
 check( '...so rendering the page shows the words instead of running them', str_contains( $renderedPlain, '&#91;template /templates/mail-owner&#93;' ) === true
 	&& str_contains( $renderedPlain, '[template /templates/mail-owner]' ) === false );
 $result = saveText( $appData, [ 'key' => '/home/plain', 'locale' => 'de_DE', 'value' => (string) ( $result['value'] ?? '' ) ] );
-check( '...and saving that value again changes nothing - the entities carry no bracket', ( $result['value'] ?? '' ) === 'Lies &#91;template /templates/mail-owner&#93; und &#91;elements /people&#93; - siehe [[/company/name]]' );
+check( '...and saving that value again changes nothing - the entities carry no bracket', ( $result['value'] ?? '' ) === 'Lies &#91;template /templates/mail-owner&#93; und &#91;elements /people&#93; - siehe [[/project/company/general/name]]' );
 
 $result = saveText( $appData, [
 	'key'			=> '/home/h2',
@@ -534,10 +534,10 @@ $result = saveText( $appData, [
 check( 'a rich field is held to the same line, after its own sanitizer ran', str_contains( (string) ( $result['value'] ?? '' ), '&#91;template' ) === true
 	&& str_contains( (string) ( $result['value'] ?? '' ), '<strong>Fett</strong>' ) === true );
 
-$result = saveText( $appData, [ 'key' => '/company/name', 'locale' => '*', 'value' => 'New Co' ] );
+$result = saveText( $appData, [ 'key' => '/project/company/general/name', 'locale' => '*', 'value' => 'New Co' ] );
 check( 'saving a global key succeeds', $result['ok'] === true );
 $storedGlobal = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
-check( 'a global key is written to global.php, not a locale file', ( $storedGlobal['[[/company/name]]'] ?? '' ) === 'New Co' );
+check( 'a global key is written to global.php, not a locale file', ( $storedGlobal['[[/project/company/general/name]]'] ?? '' ) === 'New Co' );
 
 /*	The hard limit is a byte count - what the file on disk has to stay under -
 	and the cut used to be substr()'s, which lands inside a multibyte character
@@ -1901,16 +1901,16 @@ echo "\n";
 echo "Submissions (Modules\\Form writes, Modules\\Form\\Editor::apiList reads)\n";
 
 \Nino\Html::addFills( $appData, [
-	'[[/form/email/owner]]' 	=> 'owner@example.com',
-	'[[/form/subject/owner]]' => 'New inquiry',
-	'[[/form/subject/user]]' 	=> 'Thanks for reaching out',
+	'[[/project/mail/address/owner]]' 	=> 'owner@example.com',
+	'[[/module/form/subject/owner]]' => 'New inquiry',
+	'[[/module/form/subject/user]]' 	=> 'Thanks for reaching out',
 	// The labels the contact form's own install unit writes. A definition
 	// carries the fill, not the word, so the panel is what resolves it -
 	// in the interface language of whoever is looking
-	'[[/form/label/name]]'		=> 'Name',
-	'[[/form/label/email]]'		=> 'E-Mail',
-	'[[/form/label/cat]]'			=> 'Subject',
-	'[[/form/label/message]]'	=> 'Message',
+	'[[/template/common/form/name]]'		=> 'Name',
+	'[[/template/common/form/email]]'		=> 'E-Mail',
+	'[[/template/common/form/reason]]'			=> 'Subject',
+	'[[/template/common/form/message]]'	=> 'Message',
 ], '*' );
 
 // A transport that takes the mails: a submission whose owner mail did not go

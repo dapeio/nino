@@ -1380,6 +1380,7 @@ check( 'a known locale gets a readable name', $inventory['de_DE']['name'] === 'G
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiAddLocale', [ 'locale' => 'it_IT' ] );
 check( 'apiAddLocale creates a text file for a new language', $status === 200 && ( $body['created'] ?? null ) === true );
 check( '...copying the key count of the native language', ( $body['keys'] ?? 0 ) === 2 && ( $body['from'] ?? '' ) === 'de_DE' );
+check( '...and names the language, with its code, in global.php: /_nino/locale/<code>/name is the system\'s to write, no editor creates it', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/_nino/locale/it_IT/name]]'] ?? null ) === 'it_IT' );
 
 $skeleton = \Nino\Filesystem::getFileContent( $appData, '/text/it_IT.php', false );
 check( '...the file really is on disk', is_array( $skeleton ) === true );
@@ -1399,8 +1400,28 @@ check( '...but the inventory now offers it as a translated, inactive language', 
 // Reachable from a button, so it must never be one click away from emptying a
 // finished translation
 \Nino\Filesystem::putFileContent( $appData, '/text/it_IT.php', [ '[[/a]]' => 'tradotto', '[[/b]]' => 'anche' ] );
+\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ): array {
+	$global['[[/_nino/locale/it_IT/name]]'] = 'Italiano';
+	return $global;
+} );
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiAddLocale', [ 'locale' => 'it_IT' ] );
 check( 'apiAddLocale refuses to overwrite an existing translation', $status === 200 && ( $body['created'] ?? null ) === false );
+check( '...and keeps the name an editor gave the language since', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/_nino/locale/it_IT/name]]'] ?? null ) === 'Italiano' );
+// A file made by hand or imported has no name: the existing file's answer adds it, and nothing else
+\Nino\Filesystem::putFileContent( $appData, '/text/fr_FR.php', [ '[[/a]]' => 'traduit' ] );
+check( 'a hand-made language file has no name to begin with', isset( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/_nino/locale/fr_FR/name]]'] ) === false );
+[ $handStatus, $handBody ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiAddLocale', [ 'locale' => 'fr_FR' ] );
+check( '...so apiAddLocale names its language when it answers "exists", the one thing it adds', $handStatus === 200 && ( $handBody['created'] ?? null ) === false
+	&& ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/_nino/locale/fr_FR/name]]'] ?? null ) === 'fr_FR' && \Nino\Filesystem::getFileContent( $appData, '/text/fr_FR.php', [] ) === [ '[[/a]]' => 'traduit' ] );
+unlink( \Nino\Filesystem::path( $appData, '/text/fr_FR.php' ) );
+// A name somebody already wrote - the Localepicker unit's, or an editor's - is left alone
+\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ): array {
+	$global['[[/_nino/locale/es_ES/name]]'] = 'Español';
+	return $global;
+} );
+[ $status ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiAddLocale', [ 'locale' => 'es_ES' ] );
+check( 'a language that has a name already keeps it when its file is created', $status === 200 && ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/_nino/locale/es_ES/name]]'] ?? null ) === 'Español' );
+unlink( \Nino\Filesystem::path( $appData, '/text/es_ES.php' ) );
 check( '...reporting what that file actually holds', ( $body['keys'] ?? 0 ) === 2 );
 check( '...and leaving its values untouched', \Nino\Filesystem::getFileContent( $appData, '/text/it_IT.php', [] )['[[/a]]'] === 'tradotto' );
 
@@ -2175,48 +2196,62 @@ echo "\n";
 
 echo "Text - text key schema (existence, global/per-locale, blacklist)\n";
 
-[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/home/welcome/subtitle', 'global' => false, 'value' => 'Start' ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/template/page-home/welcome/subtitle', 'global' => false, 'value' => 'Start' ] );
 check( 'apiCreate creates a per-locale key', $status === 200 );
 
 $deDE = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
 $enUS = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
-check( 'the initial value is written into every available locale', $deDE['[[/home/welcome/subtitle]]'] === 'Start' && $enUS['[[/home/welcome/subtitle]]'] === 'Start' );
+check( 'the initial value is written into every available locale', $deDE['[[/template/page-home/welcome/subtitle]]'] === 'Start' && $enUS['[[/template/page-home/welcome/subtitle]]'] === 'Start' );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/company/tagline', 'global' => true, 'value' => 'Immer' ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/project/company/general/tagline', 'global' => true, 'value' => 'Immer' ] );
 check( 'apiCreate creates a global key', $status === 200 );
 
 $global = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
-check( 'the initial value is written into global.php, not any locale file', $global['[[/company/tagline]]'] === 'Immer' );
+check( 'the initial value is written into global.php, not any locale file', $global['[[/project/company/general/tagline]]'] === 'Immer' );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => 'not-a-valid-key', 'global' => true, 'value' => 'x' ] );
 check( 'apiCreate rejects an invalid key', $status === 400 );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/company/tagline', 'global' => true, 'value' => 'x' ] );
+// The server decides what a key made by hand looks like - /<namespace>/<category>/<part>/<name>,
+// whatever the form sent - and says so in a sentence that names the shape
+$textBefore = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
+foreach( [ '/foo/bar', '/template/page-home/title', '/_nino/webpage/x/title', '/_admin/x/y/z', '/Template/x/y/z', '/template/page_home/x/y', '/project/a/b/c/d' ] as $badKey ) {
+	[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => $badKey, 'global' => true, 'value' => 'x' ] );
+	check( "apiCreate refuses $badKey with the code and the field", $status === 400 && ( $body['code'] ?? '' ) === 'keys_invalid' && ( $body['params'] ?? [] ) === [ $badKey ] && ( $body['field'] ?? '' ) === 'key' );
+}
+check( '...and writes nothing for any of them', \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] ) === $textBefore );
+foreach( [ 'en_US', 'de_DE' ] as $grammarLocale )
+	check( "$grammarLocale: the sentence of the refusal names the form", str_contains( (string) ( include __DIR__. '/../_admin/Nino/Modules/Text/text/'. $grammarLocale. '.php' )['[[/_admin/error/keys_invalid]]'], '/<'. ( $grammarLocale === 'en_US' ? 'namespace' : 'namensraum' ). '>/<'. ( $grammarLocale === 'en_US' ? 'category' : 'kategorie' ). '>/<'. ( $grammarLocale === 'en_US' ? 'part' : 'teil' ). '>/<name>' ) === true );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/project/catalog/list/title', 'global' => false, 'value' => 'Katalog' ] );
+check( 'a key that follows the grammar is created', $status === 200 && ( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/project/catalog/list/title]]'] ?? null ) === 'Katalog' );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/project/catalog/list/title' ] );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/project/company/general/tagline', 'global' => true, 'value' => 'x' ] );
 check( 'apiCreate rejects a key that already exists', $status === 409 );
 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiList' );
 check( 'apiList succeeds', $status === 200 );
 $subtitleEntry = null;
-foreach( $body['keys'] as $entry ) if( $entry['key'] === '/home/welcome/subtitle' ) $subtitleEntry = $entry;
+foreach( $body['keys'] as $entry ) if( $entry['key'] === '/template/page-home/welcome/subtitle' ) $subtitleEntry = $entry;
 check( 'apiList finds the new per-locale key, not blacklisted by default', $subtitleEntry !== null && $subtitleEntry['global'] === false && $subtitleEntry['blacklisted'] === false );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/home/welcome/subtitle', 'global' => true, 'blacklisted' => false ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/template/page-home/welcome/subtitle', 'global' => true, 'blacklisted' => false ] );
 check( 'apiSave converts a per-locale key to global', $status === 200 );
 
 $deDEAfter = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
 $globalAfter = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
-check( 'converting to global removes it from every locale file', isset( $deDEAfter['[[/home/welcome/subtitle]]'] ) === false );
-check( 'converting to global migrates the value instead of discarding it', $globalAfter['[[/home/welcome/subtitle]]'] === 'Start' );
+check( 'converting to global removes it from every locale file', isset( $deDEAfter['[[/template/page-home/welcome/subtitle]]'] ) === false );
+check( 'converting to global migrates the value instead of discarding it', $globalAfter['[[/template/page-home/welcome/subtitle]]'] === 'Start' );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/home/welcome/subtitle', 'global' => false, 'blacklisted' => true ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/template/page-home/welcome/subtitle', 'global' => false, 'blacklisted' => true ] );
 check( 'apiSave converts back to per-locale and blacklists it in the same call', $status === 200 );
 
 $deDEAfter2 = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
 $globalAfter2 = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
 $blacklist = \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] );
-check( 'converting back to per-locale migrates the value into every locale', $deDEAfter2['[[/home/welcome/subtitle]]'] === 'Start' );
-check( 'converting back to per-locale removes it from global.php', isset( $globalAfter2['[[/home/welcome/subtitle]]'] ) === false );
-check( 'the key is now blacklisted', in_array( '/home/welcome/subtitle', $blacklist, true ) === true );
+check( 'converting back to per-locale migrates the value into every locale', $deDEAfter2['[[/template/page-home/welcome/subtitle]]'] === 'Start' );
+check( 'converting back to per-locale removes it from global.php', isset( $globalAfter2['[[/template/page-home/welcome/subtitle]]'] ) === false );
+check( 'the key is now blacklisted', in_array( '/template/page-home/welcome/subtitle', $blacklist, true ) === true );
 
 /*	Per-locale -> global keeps the native locale's value and, says apiSave()'s
 	docblock, falls back to the first non-empty one. '??' only steps aside for
@@ -2225,67 +2260,67 @@ check( 'the key is now blacklisted', in_array( '/home/welcome/subtitle', $blackl
 	project's own language yet, which is what a fresh translation looks like
 	until somebody gets to it, converted to global as '' and took the one
 	language that did have text with it.	*/
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/home/welcome/claim', 'global' => false, 'value' => '' ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/template/page-home/welcome/claim', 'global' => false, 'value' => '' ] );
 callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [
-	[ 'key' => '/home/welcome/claim', 'locale' => 'en_US', 'value' => 'Nothing but the truth' ],
+	[ 'key' => '/template/page-home/welcome/claim', 'locale' => 'en_US', 'value' => 'Nothing but the truth' ],
 ] ] );
 
 $claimLocales = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
 check( 'the native locale carries the key with an empty value, which is not the same as not carrying it',
-	array_key_exists( '[[/home/welcome/claim]]', $claimLocales ) === true && $claimLocales['[[/home/welcome/claim]]'] === '' );
+	array_key_exists( '[[/template/page-home/welcome/claim]]', $claimLocales ) === true && $claimLocales['[[/template/page-home/welcome/claim]]'] === '' );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/home/welcome/claim', 'global' => true, 'blacklisted' => false ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/template/page-home/welcome/claim', 'global' => true, 'blacklisted' => false ] );
 check( 'an empty native value falls back to the first locale that has one, as the docblock says', $status === 200
-	&& ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/home/welcome/claim]]'] ?? null ) === 'Nothing but the truth' );
+	&& ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/template/page-home/welcome/claim]]'] ?? null ) === 'Nothing but the truth' );
 
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/home/welcome/claim', 'global' => false, 'blacklisted' => false ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/template/page-home/welcome/claim', 'global' => false, 'blacklisted' => false ] );
 callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [
-	[ 'key' => '/home/welcome/claim', 'locale' => 'de_DE', 'value' => 'Nichts als die Wahrheit' ],
+	[ 'key' => '/template/page-home/welcome/claim', 'locale' => 'de_DE', 'value' => 'Nichts als die Wahrheit' ],
 ] ] );
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/home/welcome/claim', 'global' => true, 'blacklisted' => false ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/template/page-home/welcome/claim', 'global' => true, 'blacklisted' => false ] );
 check( '...while a native locale that does have a value still wins over every other one',
-	( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/home/welcome/claim]]'] ?? null ) === 'Nichts als die Wahrheit' );
+	( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/template/page-home/welcome/claim]]'] ?? null ) === 'Nichts als die Wahrheit' );
 
 // Empty in every language is the one case where '' really is the value: the
 // key still exists, and converting it must not invent text for it
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/home/welcome/claim', 'global' => false, 'blacklisted' => false ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/template/page-home/welcome/claim', 'global' => false, 'blacklisted' => false ] );
 callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => array_map(
-	static fn( string $locale ): array => [ 'key' => '/home/welcome/claim', 'locale' => $locale, 'value' => '' ],
+	static fn( string $locale ): array => [ 'key' => '/template/page-home/welcome/claim', 'locale' => $locale, 'value' => '' ],
 	\Nino\Locales::getAvailableLocales( $appData )
 ) ] );
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/home/welcome/claim', 'global' => true, 'blacklisted' => false ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/template/page-home/welcome/claim', 'global' => true, 'blacklisted' => false ] );
 $claimEmpty = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
 check( 'a key that is empty everywhere converts to an empty global value, not to no key at all',
-	array_key_exists( '[[/home/welcome/claim]]', $claimEmpty ) === true && $claimEmpty['[[/home/welcome/claim]]'] === '' );
+	array_key_exists( '[[/template/page-home/welcome/claim]]', $claimEmpty ) === true && $claimEmpty['[[/template/page-home/welcome/claim]]'] === '' );
 
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/home/welcome/claim' ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/template/page-home/welcome/claim' ] );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/does/not/exist', 'global' => true, 'blacklisted' => false ] );
 check( 'apiSave 404s for an unknown key', $status === 404 );
 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [
-	[ 'key' => '/company/tagline', 'locale' => '*', 'value' => 'Immer und ewig' ],
-	[ 'key' => '/home/welcome/subtitle', 'locale' => 'de_DE', 'value' => 'Neuer Start' ],
+	[ 'key' => '/project/company/general/tagline', 'locale' => '*', 'value' => 'Immer und ewig' ],
+	[ 'key' => '/template/page-home/welcome/subtitle', 'locale' => 'de_DE', 'value' => 'Neuer Start' ],
 ] ] );
 check( 'apiSaveBatch succeeds', $status === 200 );
-check( 'apiSaveBatch saves a global value', $body['results']['/company/tagline']['ok'] === true );
-check( 'apiSaveBatch saves a blacklisted key\'s value too - blacklist only hides it from _editor', $body['results']['/home/welcome/subtitle']['ok'] === true );
+check( 'apiSaveBatch saves a global value', $body['results']['/project/company/general/tagline']['ok'] === true );
+check( 'apiSaveBatch saves a blacklisted key\'s value too - blacklist only hides it from _editor', $body['results']['/template/page-home/welcome/subtitle']['ok'] === true );
 
 $globalAfterBatch = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
 $deDEAfterBatch 	= \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
-check( 'the global value actually landed in global.php', $globalAfterBatch['[[/company/tagline]]'] === 'Immer und ewig' );
-check( 'the per-locale value actually landed in the right locale file', $deDEAfterBatch['[[/home/welcome/subtitle]]'] === 'Neuer Start' );
+check( 'the global value actually landed in global.php', $globalAfterBatch['[[/project/company/general/tagline]]'] === 'Immer und ewig' );
+check( 'the per-locale value actually landed in the right locale file', $deDEAfterBatch['[[/template/page-home/welcome/subtitle]]'] === 'Neuer Start' );
 
 // html is auto-detected from a key's *current* value (see _entries()) - create one
 // that already holds a whitelisted tag, so this save actually exercises sanitizeHtml()
 // rather than the plain strip_tags() path a fresh/plain-text key would get
-[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/company/note', 'global' => true, 'value' => '<strong>Wichtig</strong>' ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/project/company/general/note', 'global' => true, 'value' => '<strong>Wichtig</strong>' ] );
 check( 'apiCreate creates the html-flagged fixture key', $status === 200 );
 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [
-	[ 'key' => '/company/note', 'locale' => '*', 'value' => '<script>alert(1)</script><strong>Wichtig</strong><em>auch</em><code>x()</code>' ],
+	[ 'key' => '/project/company/general/note', 'locale' => '*', 'value' => '<script>alert(1)</script><strong>Wichtig</strong><em>auch</em><code>x()</code>' ],
 ] ] );
-check( 'apiSaveBatch sanitizes html and preserves inline code', $body['results']['/company/note']['value'] === '<strong>Wichtig</strong><em>auch</em><code>x()</code>' );
+check( 'apiSaveBatch sanitizes html and preserves inline code', $body['results']['/project/company/general/note']['value'] === '<strong>Wichtig</strong><em>auch</em><code>x()</code>' );
 
 // An unbalanced closing tag is what pasting from a web page looks like, and
 // the sanitizer parsed the value inside a <div> of its own - so the first
@@ -2302,7 +2337,7 @@ check( 'a balanced block still contributes its text', \Nino\Html::sanitizeHtml( 
 // and the Language panel all stopped opening until somebody found the line
 \Nino\Filesystem::putFileContent( $appData, '/text/global.php', \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] ) + [
 	'[[/company/founded]]'	=> 2024,
-	'[[/company/list]]'			=> [ 'a', 'b' ],
+	'[[/project/company/general/list]]'			=> [ 'a', 'b' ],
 ] );
 unset( $appData['./nino/filesystem/cache'] );
 
@@ -2310,25 +2345,25 @@ $oddEntries = \Nino\Text::entries( $appData, true );
 $oddKeys		= array_column( $oddEntries, 'key' );
 check( 'a text value that is not a string does not stop the panel opening', in_array( '/company/founded', $oddKeys, true ) === true );
 check( '...and a number is shown as the text it stands for', ( $oddEntries[ array_search( '/company/founded', $oddKeys, true ) ]['values']['*'] ?? null ) === '2024' );
-check( '...while a value that is no text at all is left out rather than rendered as one', in_array( '/company/list', $oddKeys, true ) === false );
+check( '...while a value that is no text at all is left out rather than rendered as one', in_array( '/project/company/general/list', $oddKeys, true ) === false );
 
 // A plain-text value is substituted raw by Html::_renderFills(), attribute
-// values included ('<meta name="author" content="[[/website/author]]">'), so
+// values included ('<meta name="author" content="[[/project/website/general/author]]">'), so
 // a stored quote is an attribute break-out that strip_tags() never sees.
 // Entities render as the character itself in both contexts, and re-encode to
 // themselves on a re-save
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [
-	[ 'key' => '/company/tagline', 'locale' => '*', 'value' => 'x" onmouseover="alert(1)' ],
+	[ 'key' => '/project/company/general/tagline', 'locale' => '*', 'value' => 'x" onmouseover="alert(1)' ],
 ] ] );
-check( 'apiSaveBatch entity-encodes quotes in a plain-text value', $body['results']['/company/tagline']['value'] === 'x&quot; onmouseover=&quot;alert(1)' );
+check( 'apiSaveBatch entity-encodes quotes in a plain-text value', $body['results']['/project/company/general/tagline']['value'] === 'x&quot; onmouseover=&quot;alert(1)' );
 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [
-	[ 'key' => '/company/tagline', 'locale' => '*', 'value' => 'x&quot; onmouseover=&quot;alert(1)' ],
+	[ 'key' => '/project/company/general/tagline', 'locale' => '*', 'value' => 'x&quot; onmouseover=&quot;alert(1)' ],
 ] ] );
-check( '...and saving that value again does not escape it a second time', $body['results']['/company/tagline']['value'] === 'x&quot; onmouseover=&quot;alert(1)' );
+check( '...and saving that value again does not escape it a second time', $body['results']['/project/company/general/tagline']['value'] === 'x&quot; onmouseover=&quot;alert(1)' );
 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [
-	[ 'key' => '/company/tagline', 'locale' => '*', 'value' => 'Immer und ewig' ],
+	[ 'key' => '/project/company/general/tagline', 'locale' => '*', 'value' => 'Immer und ewig' ],
 ] ] );
 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [
@@ -2337,48 +2372,83 @@ check( '...and saving that value again does not escape it a second time', $body[
 check( 'apiSaveBatch reports an unknown key without failing the whole request', $status === 200 && $body['results']['/does/not/exist']['ok'] === false );
 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [
-	[ 'key' => '/home/welcome/subtitle', 'locale' => 'xx_XX', 'value' => 'x' ],
+	[ 'key' => '/template/page-home/welcome/subtitle', 'locale' => 'xx_XX', 'value' => 'x' ],
 ] ] );
-check( 'apiSaveBatch rejects an invalid locale for a per-locale key', $body['results']['/home/welcome/subtitle']['ok'] === false );
+check( 'apiSaveBatch rejects an invalid locale for a per-locale key', $body['results']['/template/page-home/welcome/subtitle']['ok'] === false );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiRename', [ 'key' => '/company/tagline', 'newKey' => '/company/motto' ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiRename', [ 'key' => '/project/company/general/tagline', 'newKey' => '/project/company/general/motto' ] );
 check( 'apiRename succeeds for a global key', $status === 200 );
 
 $globalAfterRename = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
-check( 'the old key is gone from global.php', isset( $globalAfterRename['[[/company/tagline]]'] ) === false );
-check( 'the value moved to the new key', $globalAfterRename['[[/company/motto]]'] === 'Immer und ewig' );
+check( 'the old key is gone from global.php', isset( $globalAfterRename['[[/project/company/general/tagline]]'] ) === false );
+check( 'the value moved to the new key', $globalAfterRename['[[/project/company/general/motto]]'] === 'Immer und ewig' );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiRename', [ 'key' => '/company/motto', 'newKey' => 'not-a-valid-key' ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiRename', [ 'key' => '/project/company/general/motto', 'newKey' => 'not-a-valid-key' ] );
 check( 'apiRename rejects an invalid new key', $status === 400 );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiRename', [ 'key' => '/company/motto', 'newKey' => '/company/note' ] );
+// Renaming holds the new name to the grammar as well, and leaves a key of the
+// system or the workbench where it is - its name is what the code that reads it asks for
+\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ): array {
+	$global['[[/_nino/webpage/legacy/name]]'] = 'Legacy';
+	$global['[[/old/free/form]]'] = 'Frei';
+	$global['[[/_admin/legacy/word/name]]'] = 'Wort';
+	return $global;
+} );
+foreach( [ '/foo/bar', '/template/page-home/title', '/_nino/webpage/x/title', '/_admin/x/y/z' ] as $badKey ) {
+	[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiRename', [ 'key' => '/old/free/form', 'newKey' => $badKey ] );
+	check( "apiRename refuses $badKey as the new name", $status === 400 && ( $body['code'] ?? '' ) === 'keys_invalid' && ( $body['field'] ?? '' ) === 'newKey' );
+}
+check( '...and the key is where it was', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/old/free/form]]'] ?? null ) === 'Frei' );
+foreach( [ '/_nino/webpage/legacy/name', '/_admin/legacy/word/name' ] as $systemKey ) {
+	[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiRename', [ 'key' => $systemKey, 'newKey' => '/project/legacy/page/name' ] );
+	check( "apiRename refuses to rename $systemKey, which is not a project's to name", $status === 400 && ( $body['code'] ?? '' ) === 'keys_system' && ( $body['params'] ?? [] ) === [ $systemKey ] );
+}
+check( '...and the value of a system key stays', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/_nino/webpage/legacy/name]]'] ?? null ) === 'Legacy' );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/_nino/webpage/legacy/name', 'global' => true, 'blacklisted' => false ] );
+check( 'a key that does not follow the grammar stays saveable - what is there is not touched', $status === 200 );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/old/free/form', 'global' => true, 'blacklisted' => true ] );
+check( '...and can be hidden', $status === 200 && in_array( '/old/free/form', \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), true ) === true );
+\Nino\Text::setBlacklisted( $appData, '/old/free/form', false );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiRename', [ 'key' => '/old/free/form', 'newKey' => '/project/old/free/form' ] );
+check( '...and renamed to one that follows the grammar', $status === 200 && ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/project/old/free/form]]'] ?? null ) === 'Frei'
+	&& isset( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/old/free/form]]'] ) === false );
+\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ): array {
+	$global['[[/old/free/form]]'] = 'Frei';
+	return $global;
+} );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/old/free/form' ] );
+check( '...and deleted', $status === 200 && isset( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/old/free/form]]'] ) === false );
+foreach( [ '/project/old/free/form', '/_nino/webpage/legacy/name', '/_admin/legacy/word/name' ] as $cleanKey )
+	callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => $cleanKey ] );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiRename', [ 'key' => '/project/company/general/motto', 'newKey' => '/project/company/general/note' ] );
 check( 'apiRename rejects a new key that already exists', $status === 409 );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiRename', [ 'key' => '/does/not/exist', 'newKey' => '/also/new' ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiRename', [ 'key' => '/project/does/not/exist', 'newKey' => '/project/also/not/new' ] );
 check( 'apiRename 404s for an unknown key', $status === 404 );
 
 // Renaming a key to the name it already has is a no-op, not a delete. The
 // mutate pair below it ("write the new bracket, unset the old one") collapses
 // into a plain unset when both are the same string, so this used to answer 200
 // and drop the value - text.js guards it in the ui, the endpoint has to too
-[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiRename', [ 'key' => '/company/motto', 'newKey' => '/company/motto' ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiRename', [ 'key' => '/project/company/general/motto', 'newKey' => '/project/company/general/motto' ] );
 check( 'apiRename accepts a rename to the key\'s own name', $status === 200 );
-check( '...and leaves the value where it was instead of deleting it', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/company/motto]]'] ?? null ) === 'Immer und ewig' );
+check( '...and leaves the value where it was instead of deleting it', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/project/company/general/motto]]'] ?? null ) === 'Immer und ewig' );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/company/note' ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/project/company/general/note' ] );
 check( 'apiDelete succeeds for a global key', $status === 200 );
 
 $globalAfterDelete = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
-check( 'the deleted global key is gone', isset( $globalAfterDelete['[[/company/note]]'] ) === false );
+check( 'the deleted global key is gone', isset( $globalAfterDelete['[[/project/company/general/note]]'] ) === false );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/home/welcome/subtitle' ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/template/page-home/welcome/subtitle' ] );
 check( 'apiDelete succeeds for a blacklisted per-locale key', $status === 200 );
 
 $deDEAfterDelete 	= \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
 $enUSAfterDelete 	= \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
 $blacklistAfterDelete = \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] );
-check( 'the deleted per-locale key is gone from every locale file', isset( $deDEAfterDelete['[[/home/welcome/subtitle]]'] ) === false && isset( $enUSAfterDelete['[[/home/welcome/subtitle]]'] ) === false );
-check( 'the deleted key is also gone from the blacklist', in_array( '/home/welcome/subtitle', $blacklistAfterDelete, true ) === false );
+check( 'the deleted per-locale key is gone from every locale file', isset( $deDEAfterDelete['[[/template/page-home/welcome/subtitle]]'] ) === false && isset( $enUSAfterDelete['[[/template/page-home/welcome/subtitle]]'] ) === false );
+check( 'the deleted key is also gone from the blacklist', in_array( '/template/page-home/welcome/subtitle', $blacklistAfterDelete, true ) === false );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/does/not/exist' ] );
 check( 'apiDelete 404s for an unknown key', $status === 404 );
@@ -2400,100 +2470,100 @@ $keyEntry = static function( array &$appData, string $key ): ?array {
 $meta = static fn(): array => \Nino\Filesystem::getFileContent( $appData, \Nino\Text::META_PATH, [] );
 
 // A key that holds paragraphs, in a global file and in both locale files
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/legal/body', 'global' => false, 'value' => '<p>Eins</p><ul><li>a</li></ul><p>Zwei<br>drei</p>' ] );
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/legal/note', 'global' => true, 'value' => "Zeile 1\nZeile 2" ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/project/notes/page/body', 'global' => false, 'value' => '<p>Eins</p><ul><li>a</li></ul><p>Zwei<br>drei</p>' ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/project/notes/page/note', 'global' => true, 'value' => "Zeile 1\nZeile 2" ] );
 
-check( 'a key created with paragraphs is read as blocks, from its value', ( $keyEntry( $appData, '/legal/body' )['format'] ?? '' ) === 'blocks' && ( $keyEntry( $appData, '/legal/body' )['formatSet'] ?? true ) === false );
-check( '...and a plain one is stored as it was written', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/legal/note]]'] ?? '' ) === "Zeile 1\nZeile 2" );
+check( 'a key created with paragraphs is read as blocks, from its value', ( $keyEntry( $appData, '/project/notes/page/body' )['format'] ?? '' ) === 'blocks' && ( $keyEntry( $appData, '/project/notes/page/body' )['formatSet'] ?? true ) === false );
+check( '...and a plain one is stored as it was written', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/project/notes/page/note]]'] ?? '' ) === "Zeile 1\nZeile 2" );
 
 // An absent format or limit is "unchanged": the two checkboxes post without them
-[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/project/notes/page/body', 'global' => false, 'blacklisted' => false ] );
 check( 'a save without a format or a limit writes no meta', $status === 200 && $meta() === [] );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'format' => 'blocks', 'maxlength' => 900 ] );
-check( 'a format and a limit are written to /text/meta.php, keyed by the key', $status === 200 && ( $meta()['/legal/body'] ?? null ) === [ 'format' => 'blocks', 'maxlength' => 900 ] );
-$legal = $keyEntry( $appData, '/legal/body' );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/project/notes/page/body', 'global' => false, 'blacklisted' => false, 'format' => 'blocks', 'maxlength' => 900 ] );
+check( 'a format and a limit are written to /text/meta.php, keyed by the key', $status === 200 && ( $meta()['/project/notes/page/body'] ?? null ) === [ 'format' => 'blocks', 'maxlength' => 900 ] );
+$legal = $keyEntry( $appData, '/project/notes/page/body' );
 check( '...and the list reports them, and that they were set', ( $legal['format'] ?? '' ) === 'blocks' && ( $legal['maxlength'] ?? 0 ) === 900 && ( $legal['formatSet'] ?? false ) === true && ( $legal['maxlengthSet'] ?? false ) === true );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => true ] );
-check( 'a later save that leaves them out leaves them as they are', $status === 200 && ( $meta()['/legal/body'] ?? null ) === [ 'format' => 'blocks', 'maxlength' => 900 ] );
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/project/notes/page/body', 'global' => false, 'blacklisted' => true ] );
+check( 'a later save that leaves them out leaves them as they are', $status === 200 && ( $meta()['/project/notes/page/body'] ?? null ) === [ 'format' => 'blocks', 'maxlength' => 900 ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/project/notes/page/body', 'global' => false, 'blacklisted' => false ] );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'maxlength' => null ] );
-check( 'a limit posted as null is automatic again; the format stays', $status === 200 && ( $meta()['/legal/body'] ?? null ) === [ 'format' => 'blocks' ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/project/notes/page/body', 'global' => false, 'blacklisted' => false, 'maxlength' => null ] );
+check( 'a limit posted as null is automatic again; the format stays', $status === 200 && ( $meta()['/project/notes/page/body'] ?? null ) === [ 'format' => 'blocks' ] );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'format' => 'auto' ] );
-check( '"auto" forgets the format, and the entry that is left with nothing is dropped', $status === 200 && array_key_exists( '/legal/body', $meta() ) === false );
-check( '...without touching the values: they are paragraphs still', ( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/legal/body]]'] ?? '' ) === '<p>Eins</p><ul><li>a</li></ul><p>Zwei<br>drei</p>' );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/project/notes/page/body', 'global' => false, 'blacklisted' => false, 'format' => 'auto' ] );
+check( '"auto" forgets the format, and the entry that is left with nothing is dropped', $status === 200 && array_key_exists( '/project/notes/page/body', $meta() ) === false );
+check( '...without touching the values: they are paragraphs still', ( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/project/notes/page/body]]'] ?? '' ) === '<p>Eins</p><ul><li>a</li></ul><p>Zwei<br>drei</p>' );
 
 // Refusals
-[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'format' => 'sideways' ] );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/project/notes/page/body', 'global' => false, 'blacklisted' => false, 'format' => 'sideways' ] );
 check( 'a format that does not exist is a 400 with a code', $status === 400 && ( $body['code'] ?? '' ) === 'keys_format' && ( $body['field'] ?? '' ) === 'format' );
 foreach( [ 0, -3, \Nino\Text::MAX_LIMIT + 1, 'many', 2.5, [ 5 ] ] as $badLimit ) {
-	[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'maxlength' => $badLimit ] );
+	[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/project/notes/page/body', 'global' => false, 'blacklisted' => false, 'maxlength' => $badLimit ] );
 	check( 'a limit of '. json_encode( $badLimit ). ' is a 400 that names the range', $status === 400 && ( $body['code'] ?? '' ) === 'keys_limit' && ( $body['params'] ?? [] ) === [ \Nino\Text::MAX_LIMIT ] );
 }
-[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'maxlength' => 6 ] );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/project/notes/page/body', 'global' => false, 'blacklisted' => false, 'maxlength' => 6 ] );
 check( 'a limit below the longest text the key holds is refused, with that length - the editor would cut the text at it', $status === 400 && ( $body['code'] ?? '' ) === 'keys_limit_short' && ( $body['params'] ?? [] ) === [ 13 ] );
 check( '...and nothing was written', $meta() === [] );
-[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'maxlength' => 13 ] );
-check( 'a limit that is exactly as long as the text is fine', $status === 200 && ( $meta()['/legal/body'] ?? null ) === [ 'maxlength' => 13 ] );
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'maxlength' => null ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/project/notes/page/body', 'global' => false, 'blacklisted' => false, 'maxlength' => 13 ] );
+check( 'a limit that is exactly as long as the text is fine', $status === 200 && ( $meta()['/project/notes/page/body'] ?? null ) === [ 'maxlength' => 13 ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/project/notes/page/body', 'global' => false, 'blacklisted' => false, 'maxlength' => null ] );
 
 // Narrowing converts every stored value, in every locale file
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => '/legal/body', 'locale' => 'en_US', 'value' => '<p>One</p><ol><li>a</li><li>b</li></ol><p><strong>Two</strong></p>' ] ] ] );
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'format' => 'plain' ] );
-$deConverted = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/legal/body]]'] ?? '';
-$enConverted = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] )['[[/legal/body]]'] ?? '';
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => '/project/notes/page/body', 'locale' => 'en_US', 'value' => '<p>One</p><ol><li>a</li><li>b</li></ol><p><strong>Two</strong></p>' ] ] ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/project/notes/page/body', 'global' => false, 'blacklisted' => false, 'format' => 'plain' ] );
+$deConverted = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/project/notes/page/body]]'] ?? '';
+$enConverted = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] )['[[/project/notes/page/body]]'] ?? '';
 check( 'blocks to plain keeps the words and makes lines of the paragraphs, the items and the breaks, in the first locale', $deConverted === "Eins\na\nZwei\ndrei" );
 check( '...and in every other', $enConverted === "One\na\nb\nTwo" );
-check( '...and the format is the one that was asked for', ( $meta()['/legal/body'] ?? null ) === [ 'format' => 'plain' ] && ( $keyEntry( $appData, '/legal/body' )['html'] ?? true ) === false );
+check( '...and the format is the one that was asked for', ( $meta()['/project/notes/page/body'] ?? null ) === [ 'format' => 'plain' ] && ( $keyEntry( $appData, '/project/notes/page/body' )['html'] ?? true ) === false );
 
 // Widening: a newline becomes what the format makes of it
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'format' => 'lines' ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/project/notes/page/body', 'global' => false, 'blacklisted' => false, 'format' => 'lines' ] );
 check( 'plain to lines makes a <br> of every newline, in every locale file',
-	( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/legal/body]]'] ?? '' ) === 'Eins<br>a<br>Zwei<br>drei'
-	&& ( \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] )['[[/legal/body]]'] ?? '' ) === 'One<br>a<br>b<br>Two' );
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'format' => 'blocks' ] );
-check( 'lines to blocks makes one paragraph of it', ( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/legal/body]]'] ?? '' ) === '<p>Eins<br>a<br>Zwei<br>drei</p>' );
+	( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/project/notes/page/body]]'] ?? '' ) === 'Eins<br>a<br>Zwei<br>drei'
+	&& ( \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] )['[[/project/notes/page/body]]'] ?? '' ) === 'One<br>a<br>b<br>Two' );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/project/notes/page/body', 'global' => false, 'blacklisted' => false, 'format' => 'blocks' ] );
+check( 'lines to blocks makes one paragraph of it', ( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/project/notes/page/body]]'] ?? '' ) === '<p>Eins<br>a<br>Zwei<br>drei</p>' );
 
 // The same for a global key, and the shape change that comes with it
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/note', 'global' => true, 'blacklisted' => false, 'format' => 'lines' ] );
-check( 'a global key is converted in global.php', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/legal/note]]'] ?? '' ) === 'Zeile 1<br>Zeile 2' );
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/note', 'global' => false, 'blacklisted' => false, 'format' => 'plain' ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/project/notes/page/note', 'global' => true, 'blacklisted' => false, 'format' => 'lines' ] );
+check( 'a global key is converted in global.php', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/project/notes/page/note]]'] ?? '' ) === 'Zeile 1<br>Zeile 2' );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/project/notes/page/note', 'global' => false, 'blacklisted' => false, 'format' => 'plain' ] );
 check( 'a key that changes its shape and its format in one save lands in the new shape, converted',
-	( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/legal/note]]'] ?? '' ) === "Zeile 1\nZeile 2"
-	&& array_key_exists( '[[/legal/note]]', \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] ) ) === false );
+	( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/project/notes/page/note]]'] ?? '' ) === "Zeile 1\nZeile 2"
+	&& array_key_exists( '[[/project/notes/page/note]]', \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] ) ) === false );
 
 // The log line says what was posted
-$logged = \Nino\Modules\Text\Keys::log( 'keys/save', [ 'key' => '/legal/body', 'format' => 'lines', 'maxlength' => 400 ] );
-check( 'the log names the format and the limit of a save that carries them, and nothing for one that does not', $logged === 'Edit Text Key /legal/body (format lines, limit 400)' && \Nino\Modules\Text\Keys::log( 'keys/save', [ 'key' => '/legal/body', 'global' => true ] ) === '' );
+$logged = \Nino\Modules\Text\Keys::log( 'keys/save', [ 'key' => '/project/notes/page/body', 'format' => 'lines', 'maxlength' => 400 ] );
+check( 'the log names the format and the limit of a save that carries them, and nothing for one that does not', $logged === 'Edit Text Key /project/notes/page/body (format lines, limit 400)' && \Nino\Modules\Text\Keys::log( 'keys/save', [ 'key' => '/project/notes/page/body', 'global' => true ] ) === '' );
 
 // Rename: both branches move the meta; delete drops it
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'format' => 'blocks', 'maxlength' => 700 ] );
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiRename', [ 'key' => '/legal/body', 'newKey' => '/legal/text' ] );
-check( 'a rename takes the format and the limit to the new name and leaves nothing behind', ( $meta()['/legal/text'] ?? null ) === [ 'format' => 'blocks', 'maxlength' => 700 ] && array_key_exists( '/legal/body', $meta() ) === false );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/project/notes/page/body', 'global' => false, 'blacklisted' => false, 'format' => 'blocks', 'maxlength' => 700 ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiRename', [ 'key' => '/project/notes/page/body', 'newKey' => '/project/notes/page/text' ] );
+check( 'a rename takes the format and the limit to the new name and leaves nothing behind', ( $meta()['/project/notes/page/text'] ?? null ) === [ 'format' => 'blocks', 'maxlength' => 700 ] && array_key_exists( '/project/notes/page/body', $meta() ) === false );
 
-\Nino\Text::setBlacklisted( $appData, '/legal/retired', true );
-\Nino\Text::setMeta( $appData, '/legal/retired', 'lines', null );
-check( 'a retired key, which has no value anywhere, lists with the format it was given', ( $keyEntry( $appData, '/legal/retired' )['format'] ?? '' ) === 'lines' );
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiRename', [ 'key' => '/legal/retired', 'newKey' => '/legal/gone' ] );
-check( 'a rename of a retired key moves the meta too', ( $meta()['/legal/gone'] ?? null ) === [ 'format' => 'lines' ] && array_key_exists( '/legal/retired', $meta() ) === false );
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/legal/gone' ] );
-check( 'deleting a retired key drops its meta', array_key_exists( '/legal/gone', $meta() ) === false );
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/legal/text' ] );
-check( 'deleting a key drops its meta', array_key_exists( '/legal/text', $meta() ) === false );
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/legal/note' ] );
+\Nino\Text::setBlacklisted( $appData, '/project/notes/page/retired', true );
+\Nino\Text::setMeta( $appData, '/project/notes/page/retired', 'lines', null );
+check( 'a retired key, which has no value anywhere, lists with the format it was given', ( $keyEntry( $appData, '/project/notes/page/retired' )['format'] ?? '' ) === 'lines' );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiRename', [ 'key' => '/project/notes/page/retired', 'newKey' => '/project/notes/page/gone' ] );
+check( 'a rename of a retired key moves the meta too', ( $meta()['/project/notes/page/gone'] ?? null ) === [ 'format' => 'lines' ] && array_key_exists( '/project/notes/page/retired', $meta() ) === false );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/project/notes/page/gone' ] );
+check( 'deleting a retired key drops its meta', array_key_exists( '/project/notes/page/gone', $meta() ) === false );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/project/notes/page/text' ] );
+check( 'deleting a key drops its meta', array_key_exists( '/project/notes/page/text', $meta() ) === false );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/project/notes/page/note' ] );
 
 // Creating: through the format, like any value saved from the workbench
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/legal/made', 'global' => true, 'value' => "a\nb<script>x</script>", 'format' => 'lines' ] );
-check( 'apiCreate sanitizes the initial value with the format that was asked for, and remembers the choice', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/legal/made]]'] ?? '' ) === 'a<br>b' && ( $meta()['/legal/made'] ?? null ) === [ 'format' => 'lines' ] );
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/legal/read', 'global' => true, 'value' => '<em>x</em><script>y</script> [template /templates/mail-owner]' ] );
-check( '...and without one reads it from the value - shortcodes and scripts are not stored, the choice is not remembered', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/legal/read]]'] ?? '' ) === '<em>x</em> &#91;template /templates/mail-owner&#93;' && array_key_exists( '/legal/read', $meta() ) === false );
-[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/legal/never', 'global' => true, 'value' => 'x', 'format' => 'sideways' ] );
-check( 'apiCreate refuses a format that does not exist, and creates nothing', $status === 400 && ( $body['code'] ?? '' ) === 'keys_format' && \Nino\Text::entry( $appData, '/legal/never' ) === null );
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/legal/made' ] );
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/legal/read' ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/project/notes/page/made', 'global' => true, 'value' => "a\nb<script>x</script>", 'format' => 'lines' ] );
+check( 'apiCreate sanitizes the initial value with the format that was asked for, and remembers the choice', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/project/notes/page/made]]'] ?? '' ) === 'a<br>b' && ( $meta()['/project/notes/page/made'] ?? null ) === [ 'format' => 'lines' ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/project/notes/page/read', 'global' => true, 'value' => '<em>x</em><script>y</script> [template /templates/mail-owner]' ] );
+check( '...and without one reads it from the value - shortcodes and scripts are not stored, the choice is not remembered', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/project/notes/page/read]]'] ?? '' ) === '<em>x</em> &#91;template /templates/mail-owner&#93;' && array_key_exists( '/project/notes/page/read', $meta() ) === false );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/project/notes/page/never', 'global' => true, 'value' => 'x', 'format' => 'sideways' ] );
+check( 'apiCreate refuses a format that does not exist, and creates nothing', $status === 400 && ( $body['code'] ?? '' ) === 'keys_format' && \Nino\Text::entry( $appData, '/project/notes/page/never' ) === null );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/project/notes/page/made' ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/project/notes/page/read' ] );
 check( 'both are cleaned up again', $meta() === [] );
 
 echo "\n";
@@ -2504,30 +2574,30 @@ echo "\n";
 echo "Text::apiScan - missing [[/key]] placeholders in templates/*.tpl\n";
 
 mkdir( $sandbox. '/private/templates', 0777, true );
-file_put_contents( $sandbox. '/private/templates/scan-fixture.tpl', '<p>[[/page-scan-test/heading]]</p><p>[[/page-scan-test/heading]]</p><p>[[/company/name]]</p>' );
+file_put_contents( $sandbox. '/private/templates/scan-fixture.tpl', '<p>[[/template/page-scan-test/intro/heading]]</p><p>[[/template/page-scan-test/intro/heading]]</p><p>[[/project/company/general/name]]</p>' );
 // A nested, dynamically-constructed fill (same shape as html-header.tpl's real
-// [[/webpage[[/nino/http/response/uri]]/title]]) - only the inner, always-
+// [[/_nino/webpage[[/nino/http/response/uri]]/title]]) - only the inner, always-
 // registered kernel fill should ever be visible to a static regex scan
-file_put_contents( $sandbox. '/private/templates/scan-fixture-2.tpl', '<title>[[/webpage[[/nino/http/response/uri]]/title]]</title><img src="[[/nino/public]]/images/example.jpg">' );
+file_put_contents( $sandbox. '/private/templates/scan-fixture-2.tpl', '<title>[[/_nino/webpage[[/nino/http/response/uri]]/title]]</title><img src="[[/nino/public]]/images/example.jpg">' );
 // Every fill the kernel registers at runtime, as the kernel names them - the
 // scan used to keep its own copy of that list, and the copy was one short:
 // a template with the clean uri made the Dashboard report a missing key
 $runtimeFillKeys = method_exists( '\\Nino\\Html', 'runtimeFillKeys' ) === true ? \Nino\Html::runtimeFillKeys( $appData ) : [];
 file_put_contents( $sandbox. '/private/templates/scan-fixture-3.tpl', '<body class="p-[[/nino/http/response/uri/clean]]">'. implode( ' ', array_map( fn( string $key ): string => '[['. $key. ']]', $runtimeFillKeys ) ). '</body>' );
 
-// /company/name is genuinely defined (unlike /page-scan-test/heading) - proves
+// /project/company/general/name is genuinely defined (unlike /template/page-scan-test/intro/heading) - proves
 // a real key is correctly excluded, not just absent from the fixture by accident
 $globalFixture = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
-$globalFixture['[[/company/name]]'] = 'Acme';
+$globalFixture['[[/project/company/general/name]]'] = 'Acme';
 \Nino\Filesystem::putFileContent( $appData, '/text/global.php', $globalFixture );
 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiScan' );
 check( 'apiScan succeeds', $status === 200 );
 
 $missingKeys = array_column( $body['missing'], 'key' );
-check( 'a genuinely undefined key is reported', in_array( '/page-scan-test/heading', $missingKeys, true ) === true );
-check( 'an undefined key found twice in the same file is only reported once', count( array_filter( $missingKeys, fn( $k ) => $k === '/page-scan-test/heading' ) ) === 1 );
-check( 'an already-defined key is not reported', in_array( '/company/name', $missingKeys, true ) === false );
+check( 'a genuinely undefined key is reported', in_array( '/template/page-scan-test/intro/heading', $missingKeys, true ) === true );
+check( 'an undefined key found twice in the same file is only reported once', count( array_filter( $missingKeys, fn( $k ) => $k === '/template/page-scan-test/intro/heading' ) ) === 1 );
+check( 'an already-defined key is not reported', in_array( '/project/company/general/name', $missingKeys, true ) === false );
 check( 'the kernel-injected /nino/http/response/uri fill is never reported, despite appearing inside a nested [[...]] construct', in_array( '/nino/http/response/uri', $missingKeys, true ) === false );
 check( 'the kernel-injected /nino/public fill is never reported as missing', in_array( '/nino/public', $missingKeys, true ) === false );
 check( 'the clean uri the kernel fills at runtime is never reported as missing', in_array( '/nino/http/response/uri/clean', $missingKeys, true ) === false );
@@ -2538,6 +2608,89 @@ unlink( $sandbox. '/private/templates/scan-fixture.tpl' );
 unlink( $sandbox. '/private/templates/scan-fixture-2.tpl' );
 unlink( $sandbox. '/private/templates/scan-fixture-3.tpl' );
 
+// --- what the scan says about each key, and what it leaves alone ----------
+//
+// Every key a template reads and nothing defines is a row, whether it can be
+// created here or not: three kinds - 'create' (it follows the grammar),
+// 'system' (/_nino, written by a panel) and 'grammar' (anything else). A
+// placeholder with no leading slash is the template's own shortcode's and no key.
+\Nino\Filesystem::putFileContent( $appData, '/templates/scan-kinds.tpl', implode( "\n", [
+	'[[/template/scan-kinds/intro/title]]',
+	'[[/feature/consent/banner/title]]',
+	'[[/module/form/info/scan-extra]]',
+	'[[/foo/bar]]',
+	'[[/_admin/scan/word/name]]',
+	'[[/_nino/webpage/contact/uri]]',
+	'[[/_nino/webpage/about/team/title]]',
+	'[[/_nino/locale/fr_CA/name]]',
+	'[[/_nino/webpage/.blog/uri]]',
+	'[[/_nino/webpage/.blog/name]]',
+	'[[/_nino/something/else/here]]',
+	'[[name]] [[email]] [[message]] [[date]] [[subject]] [[.rel]] [[category]] [[section:id]]',
+	'[[/feature/consent/category-[[category]]/name]]',
+] ) );
+// A feature's page, routed at runtime: its Element-URI is /.blog
+$appData['/nino/http/routes']['GET://blog/*'] = [ 'uri' => '/.blog', 'body' => '[template /templates/page-posts]' ];
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiScan' );
+$kinds = array_column( $body['missing'], null, 'key' );
+check( 'the scan reports a key that follows the grammar as one to create', $status === 200 && ( $kinds['/template/scan-kinds/intro/title']['kind'] ?? '' ) === 'create' && ( $kinds['/template/scan-kinds/intro/title']['files'] ?? [] ) === [ 'scan-kinds.tpl' ] );
+check( '...a /feature key with the note where it normally comes from - and still to create', ( $kinds['/feature/consent/banner/title']['kind'] ?? '' ) === 'create' && ( $kinds['/feature/consent/banner/title']['hint'] ?? '' ) === 'feature' && ( $kinds['/feature/consent/banner/title']['owner'] ?? '' ) === 'consent' );
+check( '...a /module key the same', ( $kinds['/module/form/info/scan-extra']['hint'] ?? '' ) === 'module' && ( $kinds['/module/form/info/scan-extra']['owner'] ?? '' ) === 'form' );
+check( 'a key off the grammar is a "grammar" row, a key of the workbench too', ( $kinds['/foo/bar']['kind'] ?? '' ) === 'grammar' && ( $kinds['/_admin/scan/word/name']['kind'] ?? '' ) === 'grammar' && array_key_exists( 'hint', $kinds['/foo/bar'] ) === true && $kinds['/foo/bar']['hint'] === null );
+check( 'a page\'s key is a "system" row whose writer is the Routes panel, however many slashes its Element-URI has', ( $kinds['/_nino/webpage/contact/uri']['kind'] ?? '' ) === 'system' && ( $kinds['/_nino/webpage/contact/uri']['writer'] ?? '' ) === 'routes'
+	&& ( $kinds['/_nino/webpage/about/team/title']['writer'] ?? '' ) === 'routes' );
+check( '...a language\'s name one whose writer is the Language panel', ( $kinds['/_nino/locale/fr_CA/name']['kind'] ?? '' ) === 'system' && ( $kinds['/_nino/locale/fr_CA/name']['writer'] ?? '' ) === 'language' );
+check( '...the name of a feature\'s page one the Routes panel writes, but not its path, which the feature decides', ( $kinds['/_nino/webpage/.blog/name']['writer'] ?? '' ) === 'routes' && ( $kinds['/_nino/webpage/.blog/uri']['kind'] ?? '' ) === 'system' && array_key_exists( 'writer', $kinds['/_nino/webpage/.blog/uri'] ) === true && $kinds['/_nino/webpage/.blog/uri']['writer'] === null );
+check( '...and another form of the system one nobody writes', ( $kinds['/_nino/something/else/here']['kind'] ?? '' ) === 'system' && array_key_exists( 'writer', $kinds['/_nino/something/else/here'] ) === true && $kinds['/_nino/something/else/here']['writer'] === null );
+foreach( [ 'name', 'email', 'message', 'date', 'subject', '.rel', 'category', 'section:id', 'category-[[category' ] as $placeholder )
+	check( "a placeholder of the template's own - [[$placeholder]] - is no key and is not reported", isset( $kinds[$placeholder] ) === false && isset( $kinds['/'. $placeholder] ) === false );
+check( '...nor is the outer half of a key built from one', array_filter( array_keys( $kinds ), static fn( string $key ): bool => str_contains( $key, 'category-' ) ) === [] );
+check( 'the Dashboard counts every row, the ones that cannot be created here as well', \Nino\Modules\Text\Keys::missingCount( $appData ) === count( $body['missing'] ) && count( $body['missing'] ) === 11 );
+
+// What the apply does with each kind
+[ $status, $applied ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiScanApply', [ 'rows' => [
+	[ 'key' => '/template/scan-kinds/intro/title', 'value' => 'Titel', 'ignore' => false ],
+	[ 'key' => '/foo/bar', 'value' => 'Nein', 'ignore' => false ],
+	[ 'key' => '/_admin/scan/word/name', 'value' => '', 'ignore' => true ],
+	[ 'key' => '/_nino/webpage/contact/uri', 'value' => '/kontakt', 'ignore' => false ],
+	[ 'key' => '/_nino/locale/fr_CA/name', 'value' => '', 'ignore' => true ],
+] ] );
+$deScan = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+$blacklistScan = \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] );
+check( 'apiScanApply creates only the keys that may be created here', $status === 200 && ( $deScan['[[/template/scan-kinds/intro/title]]'] ?? null ) === 'Titel' && isset( $deScan['[[/foo/bar]]'] ) === false
+	&& isset( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/_nino/webpage/contact/uri]]'] ) === false );
+check( '...retires a key off the grammar when asked, and leaves a key of the system out of the blacklist', in_array( '/_admin/scan/word/name', $blacklistScan, true ) === true && in_array( '/_nino/locale/fr_CA/name', $blacklistScan, true ) === false );
+check( '...and counts what it did', ( $applied['created'] ?? null ) === 1 && ( $applied['ignored'] ?? null ) === 1 && ( $applied['skipped'] ?? null ) === 1 );
+foreach( [ '/template/scan-kinds/intro/title' ] as $cleanKey )
+	callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => $cleanKey ] );
+\Nino\Text::setBlacklisted( $appData, '/_admin/scan/word/name', false );
+unlink( $sandbox. '/private/templates/scan-kinds.tpl' );
+unset( $appData['/nino/http/routes']['GET://blog/*'] );
+
+// --- the note "also read by" -----------------------------------------------
+//
+// A word that one template carries and another reads as well is named, with
+// the files - once, as a note: nothing is counted, offered or moved. By the
+// rule a word several templates read lives in /template/common, which holds
+// from the day the key is created and no day after
+\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ): array {
+	$global['[[/template/page-alpha/intro/title]]'] = 'Alpha';
+	$global['[[/template/common/form/submit]]'] = 'Senden';
+	return $global;
+} );
+\Nino\Filesystem::putFileContent( $appData, '/templates/page-alpha.tpl', '<h1>[[/template/page-alpha/intro/title]]</h1><button>[[/template/common/form/submit]]</button>' );
+\Nino\Filesystem::putFileContent( $appData, '/templates/page-beta.tpl', '<h1>[[/template/page-alpha/intro/title]]</h1><button>[[/template/common/form/submit]]</button>' );
+\Nino\Filesystem::putFileContent( $appData, '/templates/page-legal.de_DE.tpl', '<h1>[[/template/page-alpha/intro/title]]</h1>' );
+\Nino\Filesystem::putFileContent( $appData, '/templates/page-gamma.tpl', '<h1>[[/project/company/general/name]]</h1>' );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiScan' );
+check( 'apiScan names a key of one template that another reads as well, with the files that do', $status === 200 && ( $body['alsoUsed'] ?? [] ) === [ [ 'key' => '/template/page-alpha/intro/title', 'files' => [ 'page-beta.tpl', 'page-legal.de_DE.tpl' ] ] ] );
+check( '...but not the template\'s own reading, a word of /template/common, or a key of another namespace', array_column( $body['alsoUsed'], 'key' ) === [ '/template/page-alpha/intro/title' ] );
+check( '...and it is no row: the note changes no count', $body['missing'] === [] && \Nino\Modules\Text\Keys::missingCount( $appData ) === 0 );
+foreach( [ 'page-alpha', 'page-beta', 'page-gamma', 'page-legal.de_DE' ] as $scratchTemplate )
+	unlink( $sandbox. '/private/templates/'. $scratchTemplate. '.tpl' );
+foreach( [ '/template/page-alpha/intro/title', '/template/common/form/submit' ] as $cleanKey )
+	callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => $cleanKey ] );
+
 // --- apiScanApply: the three answers a scanned key can get -----------------
 //
 // The scan is a list to work through, not an all-or-nothing pass: a row with
@@ -2546,16 +2699,16 @@ unlink( $sandbox. '/private/templates/scan-fixture-3.tpl' );
 // list can be answered in sittings.
 
 file_put_contents( $sandbox. '/private/templates/scan-apply-fixture.tpl',
-	'<h1>[[/page-apply/heading]]</h1><p>[[/page-apply/subtitle]]</p><small>[[/page-apply/legal]]</small>' );
+	'<h1>[[/template/page-apply/intro/heading]]</h1><p>[[/template/page-apply/intro/subtitle]]</p><small>[[/template/page-apply/intro/legal]]</small>' );
 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiScanApply', [ 'rows' => [
-	[ 'key' => '/page-apply/heading', 	'value' => '  Willkommen  ', 	'ignore' => false ],
-	[ 'key' => '/page-apply/subtitle', 'value' => '', 							'ignore' => false ],
-	[ 'key' => '/page-apply/legal', 		'value' => '', 							'ignore' => true 	],
+	[ 'key' => '/template/page-apply/intro/heading', 	'value' => '  Willkommen  ', 	'ignore' => false ],
+	[ 'key' => '/template/page-apply/intro/subtitle', 'value' => '', 							'ignore' => false ],
+	[ 'key' => '/template/page-apply/intro/legal', 		'value' => '', 							'ignore' => true 	],
 	// Real and defined, so not part of this scan at all - the form's rows come
 	// from apiScan() and nowhere else, and this endpoint is not a way to
 	// blacklist a key the screen never offered
-	[ 'key' => '/company/name', 				'value' => '', 							'ignore' => true 	],
+	[ 'key' => '/project/company/general/name', 				'value' => '', 							'ignore' => true 	],
 ] ] );
 check( 'apiScanApply succeeds', $status === 200 );
 check( 'a row with a value is counted as created', ( $body['created'] ?? null ) === 1 );
@@ -2564,60 +2717,60 @@ check( 'a row left empty is counted as left for later', ( $body['skipped'] ?? nu
 
 $deApply = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
 $enApply = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
-check( 'the created key holds its starting value in every language', ( $deApply['[[/page-apply/heading]]'] ?? null ) === 'Willkommen' && ( $enApply['[[/page-apply/heading]]'] ?? null ) === 'Willkommen' );
+check( 'the created key holds its starting value in every language', ( $deApply['[[/template/page-apply/intro/heading]]'] ?? null ) === 'Willkommen' && ( $enApply['[[/template/page-apply/intro/heading]]'] ?? null ) === 'Willkommen' );
 // A field holding nothing but spaces is the same "not decided yet" an empty
 // one is, and a key created from it would look filled in without being it
-check( 'the starting value is trimmed rather than stored as typed', str_contains( (string) ( $deApply['[[/page-apply/heading]]'] ?? '' ), ' ' ) === false );
-check( 'a row left empty writes nothing at all', isset( $deApply['[[/page-apply/subtitle]]'] ) === false && isset( $enApply['[[/page-apply/subtitle]]'] ) === false );
+check( 'the starting value is trimmed rather than stored as typed', str_contains( (string) ( $deApply['[[/template/page-apply/intro/heading]]'] ?? '' ), ' ' ) === false );
+check( 'a row left empty writes nothing at all', isset( $deApply['[[/template/page-apply/intro/subtitle]]'] ) === false && isset( $enApply['[[/template/page-apply/intro/subtitle]]'] ) === false );
 
 $blacklistAfterApply = \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] );
-check( 'the retired key is in the blacklist', in_array( '/page-apply/legal', $blacklistAfterApply, true ) === true );
-check( '...and a key this scan never offered is not, whatever the request said', in_array( '/company/name', $blacklistAfterApply, true ) === false );
+check( 'the retired key is in the blacklist', in_array( '/template/page-apply/intro/legal', $blacklistAfterApply, true ) === true );
+check( '...and a key this scan never offered is not, whatever the request said', in_array( '/project/company/general/name', $blacklistAfterApply, true ) === false );
 
 [ , $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiScan' );
 $missingAfterApply = array_column( $body['missing'], 'key' );
-check( 'the created key is no longer missing', in_array( '/page-apply/heading', $missingAfterApply, true ) === false );
+check( 'the created key is no longer missing', in_array( '/template/page-apply/intro/heading', $missingAfterApply, true ) === false );
 // The whole point of "permanently": before this, an ignored key was simply
 // skipped client-side and came straight back on the next scan
-check( 'the retired key is no longer asked about', in_array( '/page-apply/legal', $missingAfterApply, true ) === false );
-check( 'the key left for later comes back', in_array( '/page-apply/subtitle', $missingAfterApply, true ) === true );
+check( 'the retired key is no longer asked about', in_array( '/template/page-apply/intro/legal', $missingAfterApply, true ) === false );
+check( 'the key left for later comes back', in_array( '/template/page-apply/intro/subtitle', $missingAfterApply, true ) === true );
 
 // Retiring has to be reversible, or "permanently" is a one-way door with the
 // filesystem as its only way out. The key has no value anywhere, so
 // \Nino\Text::entries() cannot see it - the Text Keys list merges it back in
 [ , $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiList' );
 $listedKeys = array_column( $body['keys'], 'key' );
-check( 'a retired key with no value is still listed by the Text Keys tab', in_array( '/page-apply/legal', $listedKeys, true ) === true );
-check( '...flagged as hidden, so the checkbox that brings it back is ticked', ( array_column( $body['keys'], 'blacklisted', 'key' )['/page-apply/legal'] ?? null ) === true );
+check( 'a retired key with no value is still listed by the Text Keys tab', in_array( '/template/page-apply/intro/legal', $listedKeys, true ) === true );
+check( '...flagged as hidden, so the checkbox that brings it back is ticked', ( array_column( $body['keys'], 'blacklisted', 'key' )['/template/page-apply/intro/legal'] ?? null ) === true );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/page-apply/legal', 'global' => false, 'blacklisted' => false ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/template/page-apply/intro/legal', 'global' => false, 'blacklisted' => false ] );
 check( 'un-ticking "hidden" on it is a valid save, not a 404', $status === 200 );
 
 [ , $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiScan' );
-check( '...and the scan offers it again afterwards', in_array( '/page-apply/legal', array_column( $body['missing'], 'key' ), true ) === true );
+check( '...and the scan offers it again afterwards', in_array( '/template/page-apply/intro/legal', array_column( $body['missing'], 'key' ), true ) === true );
 
 // Same key, deleted rather than un-ignored: there is nothing but the
 // blacklist line to remove, and removing it is the whole deletion
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiScanApply', [ 'rows' => [ [ 'key' => '/page-apply/legal', 'value' => '', 'ignore' => true ] ] ] );
-[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/page-apply/legal' ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiScanApply', [ 'rows' => [ [ 'key' => '/template/page-apply/intro/legal', 'value' => '', 'ignore' => true ] ] ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/template/page-apply/intro/legal' ] );
 check( 'a retired key can be deleted outright too', $status === 200 );
-check( '...which only removes its blacklist line', in_array( '/page-apply/legal', \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), true ) === false );
+check( '...which only removes its blacklist line', in_array( '/template/page-apply/intro/legal', \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), true ) === false );
 
 // Renaming one must move the blacklist line, not write the empty key into
 // every locale file - which is what the value-carrying path below it would do
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiScanApply', [ 'rows' => [ [ 'key' => '/page-apply/legal', 'value' => '', 'ignore' => true ] ] ] );
-[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiRename', [ 'key' => '/page-apply/legal', 'newKey' => '/page-apply/imprint' ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiScanApply', [ 'rows' => [ [ 'key' => '/template/page-apply/intro/legal', 'value' => '', 'ignore' => true ] ] ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiRename', [ 'key' => '/template/page-apply/intro/legal', 'newKey' => '/template/page-apply/intro/imprint' ] );
 $blacklistAfterRename = \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] );
-check( 'renaming a retired key moves its blacklist line', $status === 200 && in_array( '/page-apply/imprint', $blacklistAfterRename, true ) === true && in_array( '/page-apply/legal', $blacklistAfterRename, true ) === false );
-check( '...without creating the empty key in any locale file', isset( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/page-apply/imprint]]'] ) === false );
+check( 'renaming a retired key moves its blacklist line', $status === 200 && in_array( '/template/page-apply/intro/imprint', $blacklistAfterRename, true ) === true && in_array( '/template/page-apply/intro/legal', $blacklistAfterRename, true ) === false );
+check( '...without creating the empty key in any locale file', isset( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/template/page-apply/intro/imprint]]'] ) === false );
 
 // The Dashboard tile counts the same scan (see missingCount()), so a retired
 // key has to leave the tile along with the list
-\Nino\Text::setBlacklisted( $appData, '/page-apply/imprint', false );
+\Nino\Text::setBlacklisted( $appData, '/template/page-apply/intro/imprint', false );
 $countBeforeRetiring = \Nino\Modules\Text\Keys::missingCount( $appData );
-\Nino\Text::setBlacklisted( $appData, '/page-apply/legal', true );
+\Nino\Text::setBlacklisted( $appData, '/template/page-apply/intro/legal', true );
 check( 'retiring a key takes it out of the Dashboard count too', \Nino\Modules\Text\Keys::missingCount( $appData ) === $countBeforeRetiring - 1 );
-\Nino\Text::setBlacklisted( $appData, '/page-apply/legal', false );
+\Nino\Text::setBlacklisted( $appData, '/template/page-apply/intro/legal', false );
 
 unlink( $sandbox. '/private/templates/scan-apply-fixture.tpl' );
 
@@ -2680,7 +2833,7 @@ $appData['/nino/http/routes']['GET://lang'] 	= [ 'uri' => '/lang', 'body' => '[t
 $appData['/nino/http/routes']['POST://usage'] = [ 'uri' => '/usage-post', 'body' => '[image /use/post]' ];
 
 $usageText = \Nino\Filesystem::getFileContent( $appData, '/text/'. \Nino\Admin\Admin::sessionLocale( $appData ). '.php', [] );
-$usageText['[[/webpage/usage-page/name]]'] = 'Nutzung';
+$usageText['[[/_nino/webpage/usage-page/name]]'] = 'Nutzung';
 \Nino\Filesystem::putFileContent( $appData, '/text/'. \Nino\Admin\Admin::sessionLocale( $appData ). '.php', $usageText );
 
 foreach( [ 'hero', 'viauri', 'inner', 'deep', 'orphan', 'loop', 'german', 'english', 'post', 'unused' ] as $usageSlot )
@@ -2893,16 +3046,16 @@ check( 'a 200 status code is not written out (the implicit default)', isset( $co
 check( 'the route is the whole persistence - no second list is written alongside it', isset( $configAfterSave['/nino/install/webpages'] ) === false && count( array_filter( $configAfterSave['/nino/http/routes'], fn( array $r, string $k ): bool => \Nino\Modules\Routes\Admin::isPageRoute( $k, $r ), ARRAY_FILTER_USE_BOTH ) ) === 1 );
 
 $deAfterSave = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
-check( 'writes the page\'s own de_DE meta, keyed by its Element-URI', $deAfterSave['[[/webpage/site-about/name]]'] === 'Über uns' && $deAfterSave['[[/webpage/site-about/title]]'] === 'Über uns' );
+check( 'writes the page\'s own de_DE meta, keyed by its Element-URI', $deAfterSave['[[/_nino/webpage/site-about/name]]'] === 'Über uns' && $deAfterSave['[[/_nino/webpage/site-about/title]]'] === 'Über uns' );
 
 $enAfterSave = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
-check( 'a blank description is stored as it is, empty - there is no filler text any more', $enAfterSave['[[/webpage/site-about/description]]'] === '' && $enAfterSave['[[/webpage/site-about/name]]'] === 'About us' );
+check( 'a blank description is stored as it is, empty - there is no filler text any more', $enAfterSave['[[/_nino/webpage/site-about/description]]'] === '' && $enAfterSave['[[/_nino/webpage/site-about/name]]'] === 'About us' );
 check( '...and no "Page" or "Page Title" placeholder is written anywhere', in_array( 'Page', $enAfterSave, true ) === false && in_array( 'Page Title', $deAfterSave + $enAfterSave, true ) === false );
 
 $globalAfterSave = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
-check( 'writes the page\'s reachable Http-URI as one global fill a template can link to by name', ( $globalAfterSave['[[/webpage/site-about/uri]]'] ?? null ) === '/about'
-	&& isset( $deAfterSave['[[/webpage/site-about/uri]]'], $enAfterSave['[[/webpage/site-about/uri]]'] ) === false );
-check( 'that uri is blacklisted as a technical value, like every other route key', in_array( '/webpage/site-about/uri', \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), true ) );
+check( 'writes the page\'s reachable Http-URI as one global fill a template can link to by name', ( $globalAfterSave['[[/_nino/webpage/site-about/uri]]'] ?? null ) === '/about'
+	&& isset( $deAfterSave['[[/_nino/webpage/site-about/uri]]'], $enAfterSave['[[/_nino/webpage/site-about/uri]]'] ) === false );
+check( 'that uri is blacklisted as a technical value, like every other route key', in_array( '/_nino/webpage/site-about/uri', \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), true ) );
 
 // A name and a title are required in every active language, and a refusal
 // writes nothing: not the route, not one of the texts
@@ -3024,10 +3177,100 @@ check( 'the deleted entry\'s route is gone', isset( $configAfterDelete['/nino/ht
 check( 'the surviving entry\'s route is untouched', isset( $configAfterDelete['/nino/http/routes']['GET://contact'] ) === true );
 
 $deAfterDelete = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
-check( 'the deleted entry\'s own text meta is left in place - additive-only, never auto-deleted', isset( $deAfterDelete['[[/webpage/site-about/name]]'] ) === true );
+check( 'the deleted entry\'s own text meta is left in place - additive-only, never auto-deleted', isset( $deAfterDelete['[[/_nino/webpage/site-about/name]]'] ) === true );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'httpUri' => '/does-not-exist' ] );
 check( 'apiDelete 404s for an unknown httpUri', $status === 404 );
+
+// --- the pages a feature routes at runtime ---------------------------------
+//
+// Posts' /blog, the Newsletter's /.newsletter, Hello's /hello are in no
+// config.php. Their name, title and description are keys of the system the
+// Text Keys tab will not create, so this panel lists them apart and writes
+// those three keys - and nothing else
+$configBeforeRuntime = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+// The text of a post for every language the sandbox has: German and English as given, any other as the English
+$runtimeLocales = \Nino\Locales::getAvailableLocales( $appData );
+$runtimeText = static fn( array $de, array $en ): array => array_combine( $runtimeLocales, array_map( static fn( string $locale ): array => $locale === 'de_DE' ? $de : $en, $runtimeLocales ) );
+$appData['/nino/http/routes']['GET://blog/*'] = [ 'uri' => '/blog/post', 'body' => '[template /templates/page-post]' ];
+$appData['/nino/http/routes']['GET://.newsletter'] = [ 'uri' => '/.newsletter', 'body' => '[template /templates/page-newsletter]' ];
+$appData['/nino/http/routes']['GET://.search'] = [ 'uri' => '/.search' ];
+$appData['/nino/http/routes']['GET://hello'] = [ 'uri' => '/hello', 'body' => '[template /templates/page-hello]' ];
+$appData['/nino/http/routes']['POST://.newsletter'] = [ 'uri' => '/.newsletter' ];
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiList' );
+$runtimeByUri = array_column( $body['runtime'] ?? [], null, 'uri' );
+check( 'routes/list lists the pages features route under "runtime"', $status === 200 && array_keys( $runtimeByUri ) === [ '/blog/post', '/.newsletter', '/hello' ] );
+check( '...with the path as the feature routes it, placeholder and all', array_column( $body['runtime'], 'httpUri', 'uri' ) === [ '/blog/post' => '/blog/*', '/.newsletter' => '/.newsletter', '/hello' => '/hello' ] );
+check( '...a route with no page template (/.search) and a persisted one are not among them', isset( $runtimeByUri['/.search'] ) === false && in_array( '/contact', array_column( $body['runtime'], 'httpUri' ), true ) === false );
+check( '...and the persisted pages still come as before, without the runtime ones', array_column( $body['pages'], 'httpUri' ) === [ '/contact' ] );
+check( '...each with its name, title and description per language, empty while nobody wrote them', array_keys( $runtimeByUri['/hello']['text'] ) === $runtimeLocales && $runtimeByUri['/hello']['text']['de_DE'] === [ 'name' => '', 'title' => '', 'description' => '' ] );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSaveTexts', [ 'uri' => '/.newsletter', 'text' => $runtimeText(
+	[ 'name' => ' Newsletter ', 'title' => 'Newsletter abonnieren', 'description' => 'Alle drei Monate.' ],
+	[ 'name' => 'Newsletter', 'title' => 'Subscribe', 'description' => '' ]
+) ] );
+$deRuntime = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+$enRuntime = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
+check( 'routes/savetexts writes name, title and description per language, trimmed', $status === 200 && ( $deRuntime['[[/_nino/webpage/.newsletter/name]]'] ?? null ) === 'Newsletter' && ( $deRuntime['[[/_nino/webpage/.newsletter/title]]'] ?? null ) === 'Newsletter abonnieren'
+	&& ( $deRuntime['[[/_nino/webpage/.newsletter/description]]'] ?? null ) === 'Alle drei Monate.' && ( $enRuntime['[[/_nino/webpage/.newsletter/title]]'] ?? null ) === 'Subscribe' && ( $enRuntime['[[/_nino/webpage/.newsletter/description]]'] ?? null ) === '' );
+check( '...writes no uri key, so the feature\'s path is not copied and cannot go stale, and nothing goes on the blacklist', isset( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/_nino/webpage/.newsletter/uri]]'] ) === false
+	&& array_filter( \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), static fn( string $key ): bool => str_starts_with( $key, '/_nino/webpage/.newsletter' ) ) === [] );
+check( '...and no route into config.php', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] === $configBeforeRuntime['/nino/http/routes'] );
+check( '...and answers with the list as it stands now', ( array_column( $body['runtime'], null, 'uri' )['/.newsletter']['text']['de_DE']['name'] ?? null ) === 'Newsletter' );
+$appData['/nino/locales/textfiles'] ??= '/text';
+check( 'the key is the one the menu and the page header read, so it renders', \Nino\Html::renderTextfill( $appData, '/_nino/webpage/.newsletter/name' ) === 'Newsletter' );
+
+// A directory where the language file's sidecar lock goes: lockFile() cannot open it, so the
+// write is refused - what a read-only or full disk gives, without needing either
+$runtimeLock = $sandbox. '/private/data/.locks/'. sha1( '/text/de_DE.php' ). '.lock';
+unset( $appData['./nino/filesystem/locks'] );
+@unlink( $runtimeLock );
+@mkdir( $runtimeLock );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSaveTexts', [ 'uri' => '/.newsletter', 'text' => $runtimeText(
+	[ 'name' => 'Neu', 'title' => 'Neu', 'description' => '' ],
+	[ 'name' => 'New', 'title' => 'New', 'description' => '' ]
+) ] );
+check( 'routes/savetexts that could not write the language file says so rather than reporting success', $status === 500 && str_contains( (string) ( $body['error'] ?? '' ), '/text/de_DE.php' ) === true && isset( $body['runtime'] ) === false );
+@rmdir( $runtimeLock );
+unset( $appData['./nino/filesystem/locks'], $appData['./nino/filesystem/cache'] );
+check( '...and the text it had is still there', ( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/_nino/webpage/.newsletter/name]]'] ?? null ) === 'Newsletter' );
+
+// The title and the description land in an attribute of the page head, through a blind str_replace
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSaveTexts', [ 'uri' => '/.newsletter', 'text' => $runtimeText(
+	[ 'name' => '<b>Newsletter</b>', 'title' => 'x" onmouseover="y', 'description' => '<script>z</script>Alle drei Monate.' ],
+	[ 'name' => 'Newsletter', 'title' => 'Subscribe', 'description' => '' ]
+) ] );
+$deRuntime = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+check( 'routes/savetexts stores the words as plain text, as the Text panel does: no markup, no quote that closes an attribute', $status === 200 && $deRuntime['[[/_nino/webpage/.newsletter/name]]'] === 'Newsletter'
+	&& $deRuntime['[[/_nino/webpage/.newsletter/title]]'] === 'x&quot; onmouseover=&quot;y' && str_contains( $deRuntime['[[/_nino/webpage/.newsletter/description]]'], '<' ) === false );
+callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSaveTexts', [ 'uri' => '/.newsletter', 'text' => $runtimeText(
+	[ 'name' => 'Newsletter', 'title' => 'Newsletter abonnieren', 'description' => 'Alle drei Monate.' ],
+	[ 'name' => 'Newsletter', 'title' => 'Subscribe', 'description' => '' ]
+) ] );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSaveTexts', [ 'uri' => '/nowhere', 'text' => $runtimeText( [ 'name' => 'x', 'title' => 'y' ], [ 'name' => 'x', 'title' => 'y' ] ) ] );
+check( 'routes/savetexts is a 404 for an Element-URI no feature route carries', $status === 404 && isset( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/_nino/webpage/nowhere/name]]'] ) === false );
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSaveTexts', [ 'uri' => '/contact', 'text' => $runtimeText( [ 'name' => 'x', 'title' => 'y' ], [ 'name' => 'x', 'title' => 'y' ] ) ] );
+check( '...and for the Element-URI of a persisted page, which is saved the way it always was', $status === 404 );
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSaveTexts', [ 'uri' => '/.search', 'text' => $runtimeText( [ 'name' => 'x', 'title' => 'y' ], [ 'name' => 'x', 'title' => 'y' ] ) ] );
+check( '...and for a route that is no page', $status === 404 );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSaveTexts', [ 'uri' => '/hello', 'text' => $runtimeText( [ 'name' => 'Hallo', 'title' => 'Hallo Welt' ], [ 'name' => 'Hello', 'title' => '' ] ) ] );
+check( 'a title missing in one language is refused with the code and the field, and nothing is written', $status === 400 && ( $body['code'] ?? '' ) === 'routes_missing_title' && ( $body['params'] ?? [] ) === [ 'en_US' ] && ( $body['field'] ?? '' ) === 'title'
+	&& isset( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/_nino/webpage/hello/name]]'] ) === false );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSaveTexts', [ 'uri' => '/hello', 'text' => $runtimeText( [ 'name' => '', 'title' => 'y' ], [ 'name' => 'Hello', 'title' => 'x' ] ) ] );
+check( '...and so is a missing name', $status === 400 && ( $body['code'] ?? '' ) === 'routes_missing_name' );
+check( 'the log has a line for it, with the Element-URI', \Nino\Modules\Routes\Admin::log( 'routes/savetexts', [ 'uri' => '/.newsletter' ] ) === 'Edit Feature Route /.newsletter' );
+\Nino\Auth::logoutUser( $appData );
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSaveTexts', [ 'uri' => '/hello', 'text' => [] ] );
+check( '...and routes/savetexts needs the panel\'s session and permission like every action of it', $status === 401 );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+foreach( [ 'name', 'title', 'description' ] as $runtimeField )
+	foreach( [ '/text/de_DE.php', '/text/en_US.php' ] as $runtimeFile )
+		\Nino\Filesystem::mutate( $appData, $runtimeFile, function( array $content ) use ( $runtimeField ): array {
+			unset( $content['[[/_nino/webpage/.newsletter/'. $runtimeField. ']]'] );
+			return $content;
+		} );
+unset( $appData['/nino/http/routes']['GET://blog/*'], $appData['/nino/http/routes']['GET://.newsletter'], $appData['/nino/http/routes']['GET://.search'], $appData['/nino/http/routes']['GET://hello'], $appData['/nino/http/routes']['POST://.newsletter'] );
 
 array_pop( $appData['/nino/modules'] ); // drop the simulated Navigation module again
 
@@ -3066,7 +3309,7 @@ $appData['/nino/html/navs'] = [ 'main', 'footer' ];
 $appData['/nino/http/routes'] = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
 \Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', array_merge(
 	\Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] ),
-	[ '[[/webpage/home/name]]' => 'Start', '[[/webpage/contact/name]]' => 'Kontakt', '[[/webpage/legal/name]]' => 'Impressum' ]
+	[ '[[/_nino/webpage/home/name]]' => 'Start', '[[/_nino/webpage/contact/name]]' => 'Kontakt', '[[/_nino/webpage/legal/name]]' => 'Impressum' ]
 ) );
 
 $navKeys = fn( array $body ): array => array_column( $body['navs'], 'key' );
@@ -3081,7 +3324,7 @@ check( 'a menu reports its members in running order', $entriesOf( $body, 'main' 
 check( 'a registered menu nobody is in is still listed, empty', $entriesOf( $body, 'footer' ) === [] );
 check( 'reports whether the module that renders any of this is active', $body['active'] === false );
 check( 'offers every GET route as a possible entry, not just the page ones', array_column( $body['routes'], 'httpUri' ) === [ '/', '/robots.txt', '/contact', '/legal' ] );
-check( 'labels a route by the /webpage<uri>/name key the menu would render', $body['routes'][0]['label'] === 'Start' );
+check( 'labels a route by the /_nino/webpage<uri>/name key the menu would render', $body['routes'][0]['label'] === 'Start' );
 check( '...and falls back to the path for one nobody named', $body['routes'][1]['label'] === '/robots.txt' );
 check( 'a route with no name is reported as such - routeLines() would skip it', $body['routes'][1]['named'] === false && $body['routes'][0]['named'] === true );
 check( 'a route that is in config.php is not marked as a runtime one', array_column( $body['routes'], 'runtime' ) === [ false, false, false, false ] );
@@ -3255,15 +3498,15 @@ check( 'an empty navigation registry stays empty', \Nino\Modules\Navigation\Admi
 } );
 \Nino\Filesystem::putFileContent( $appData, '/text/global.php', array_merge(
 	\Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] ),
-	[ '[[/webpage/shared/name]]' => 'Shared', '[[/webpage/press/name]]' => 'Press' ]
+	[ '[[/_nino/webpage/shared/name]]' => 'Shared', '[[/_nino/webpage/press/name]]' => 'Press' ]
 ) );
 \Nino\Filesystem::putFileContent( $appData, '/text/en_US.php', array_merge(
 	\Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] ),
-	[ '[[/webpage/jobs/name]]' => 'Jobs' ]
+	[ '[[/_nino/webpage/jobs/name]]' => 'Jobs' ]
 ) );
 \Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', array_merge(
 	\Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] ),
-	[ '[[/webpage/press/name]]' => 'Presse' ]
+	[ '[[/_nino/webpage/press/name]]' => 'Presse' ]
 ) );
 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiList' );
@@ -3317,7 +3560,7 @@ check( 'the live route array still holds the runtime routes after the save', iss
 // The shortcode's side of it, from the same config: the menu renders the
 // runtime route in its place once it is named
 $appData['/nino/html/navroutes'] = $configAfterRuntime['/nino/html/navroutes'];
-\Nino\Html::addFills( $appData, [ '/webpage/blog/name' => 'Blog', '/webpage/home/name' => 'Start', '/webpage/contact/name' => 'Kontakt' ], 'de_DE' );
+\Nino\Html::addFills( $appData, [ '/_nino/webpage/blog/name' => 'Blog', '/_nino/webpage/home/name' => 'Start', '/_nino/webpage/contact/name' => 'Kontakt' ], 'de_DE' );
 \Nino\Locales::setCurrentLocale( $appData, 'de_DE' );
 check( 'the Navigation shortcode draws the runtime route between the two pages', \Nino\Modules\Navigation::routeLines( $appData, 'main' ) === [ '/:Start', '/blog:Blog', '/contact:Kontakt' ] );
 
@@ -4137,7 +4380,7 @@ foreach( [ 'en_US', 'de_DE', 'fr_FR' ] as $locale ) {
 		// Built here rather than read back from the fill the shell stored at
 		// boot: that one was composed before this test wrote the name
 		$named = $noNames;
-		\Nino\Html::addFills( $named, [ '[[/nino/locales/locale/fr_FR]]' => '<img src=x onerror="alert(1)"> [[/nino/auth/user]]' ], '*' );
+		\Nino\Html::addFills( $named, [ '[[/_nino/locale/fr_FR/name]]' => '<img src=x onerror="alert(1)"> [[/nino/auth/user]]' ], '*' );
 		$pickerMethod = new ReflectionMethod( '\Nino\Admin\Admin', '_localePickerHtml' );
 		$pickerMethod->setAccessible( true );
 		$namedPicker = \Nino\Html::renderHtml( $named, (string) $pickerMethod->invokeArgs( null, [ &$named, 'en_US' ] ) );
@@ -4542,8 +4785,14 @@ callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiDelete', [ 'type' =>
 // The same idea on the Text panel, where the unit is a key rather than a
 // field: the permission is '/_admin/text/update' with the key appended, so a
 // group is a wildcard and a single key is the string itself
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/scoped/one', 'global' => true, 'value' => 'Eins' ] );
-callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/unscoped/one', 'global' => true, 'value' => 'Zwei' ] );
+// - written into the file rather than created, as keys of a project from before
+// the grammar are: the Text Keys tab no longer creates a key that is no
+// /<namespace>/<category>/<part>/<name>, and what is there stays editable
+\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ): array {
+	$global['[[/scoped/one]]'] = 'Eins';
+	$global['[[/unscoped/one]]'] = 'Zwei';
+	return $global;
+} );
 
 \Nino\Auth::insertUser( $appData, 'textscoped@example.com', 'correct horse battery staple', [
 	\Nino\Modules\Text\Admin::MANAGE_PERM,
@@ -4728,6 +4977,7 @@ check( 'the next line is written once the file can be again', str_contains( impl
 $described = [
 	[ \Nino\Modules\Routes\Admin::class,						'routes/save',				[ 'httpUri' => '/x' ],							'/x' ],
 	[ \Nino\Modules\Routes\Admin::class,						'routes/delete',			[ 'httpUri' => '/x' ],							'/x' ],
+	[ \Nino\Modules\Routes\Admin::class,						'routes/savetexts',		[ 'uri' => '/.newsletter' ],				'/.newsletter' ],
 	[ \Nino\Modules\Config\Admin::class,						'config/save',				[ 'fields' => [ '/nino/cache/ttl' => 1 ] ],	'/nino/cache/ttl' ],
 	[ \Nino\Modules\Images\Slots::class,						'slots/delete',				[ 'uri' => '/home/hero' ],					'/home/hero' ],
 	[ \Nino\Modules\Language\Translations::class,	'translations/import',	[ 'targetLocale' => 'fr_FR' ],			'fr_FR' ],

@@ -240,9 +240,17 @@ namespace Nino\Modules\Language {
 		 *	inventory reports and one tick undoes.
 		 *
 		 *	An existing file is never overwritten. It is answered with its own
-		 *	current key count instead: this is reachable from a button, and a
+		 *	current key count instead - after its language got a name, if it
+		 *	had none: this is reachable from a button, and a
 		 *	button must not be one click away from emptying a finished
 		 *	translation.
+		 *
+		 *	The language's name, which the language pickers show, is the
+		 *	system's to create: /_nino/locale/<code>/name goes into
+		 *	global.php with the code as its value, unless the key is there
+		 *	already - the Text Keys tab does not create a /_nino key, and a
+		 *	picker with no name shows the raw fill or the bare code. Editors
+		 *	give it a real name in the Text panel.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -270,6 +278,14 @@ namespace Nino\Modules\Language {
 			// creates nothing, so a project whose native language is itself
 			// unset must still be able to see what an existing file holds
 			if( \Nino\Filesystem::fileExists( $appData, $textDir. '/'. $locale. '.php' ) === true ) {
+
+				// A file made by hand or imported has no name yet: the one thing
+				// this adds to it, in global.php - never a word of the translation
+				if( self::_writeName( $appData, $textDir, $locale ) === false ) {
+					\Nino\Http::fail( $request, 500, 'could not write '. $textDir. '/global.php' );
+					return;
+				}
+
 				$existing = \Nino\Filesystem::getFileContent( $appData, $textDir. '/'. $locale. '.php', [] );
 				\Nino\Http::ok( $request, [
 					'locale' 	=> $locale,
@@ -301,6 +317,13 @@ namespace Nino\Modules\Language {
 			// side by side, in the Text panel and in a diff alike
 			$skeleton = array_fill_keys( array_keys( $nativeContent ), '' );
 
+			// Before the file, so a failure leaves nothing behind that makes
+			// the next attempt answer "exists" without a name
+			if( self::_writeName( $appData, $textDir, $locale ) === false ) {
+				\Nino\Http::fail( $request, 500, 'could not write '. $textDir. '/global.php' );
+				return;
+			}
+
 			if( \Nino\Filesystem::putFileContent( $appData, $textDir. '/'. $locale. '.php', $skeleton ) === false ) {
 				\Nino\Http::fail( $request, 500, 'could not write '. $textDir. '/'. $locale. '.php' );
 				return;
@@ -312,6 +335,29 @@ namespace Nino\Modules\Language {
 				'keys' 		=> count( $skeleton ),
 				'from' 		=> $native,
 			] );
+		}
+
+		/**
+		 *	Name a language in global.php, with its code as the value. A name
+		 *	there already is left as it is, whoever wrote it
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$textDir			Eg. '/text'
+		 *	@param		string		$locale				Eg. 'it_IT'
+		 *
+		 *	@return 	bool								False when global.php could not be written
+		 */
+		private static function _writeName( array &$appData, string $textDir, string $locale ): bool {
+
+			$nameKey = '[[/_nino/locale/'. $locale. '/name]]';
+
+			return \Nino\Filesystem::mutate( $appData, $textDir. '/global.php', function( mixed $global ) use ( $nameKey, $locale ): array {
+
+				$global = is_array( $global ) === true ? $global : [];
+				$global[$nameKey] ??= $locale;
+
+				return $global;
+			}, [] );
 		}
 
 		/**

@@ -1,14 +1,4 @@
 <?php return [
-	// /webpage[[/nino/http/response/uri]]/{name,title,description} - the
-	// per-page meta text - isn't shipped here anymore: the Webpages step
-	// (see Install\Webpages) writes those directly, keyed by whatever uri
-	// a project actually mounts this template at, not this folder's name
-
-	'[[/webpage/contact/uri]]' => '/contact',
-	'[[/webpage/contact/name]]' => 'Contact',
-	'[[/webpage/contact/title]]' => 'Contact us',
-	'[[/webpage/contact/description]]' => 'Get in touch - we usually reply within one business day.',
-
-	'[[/page-contact/hero/title]]' => 'Contact us',
-	'[[/page-contact/hero/subtitle]]' => 'Write us a message.',
+	'[[/template/page-contact/hero/title]]' => 'Contact us',
+	'[[/template/page-contact/hero/subtitle]]' => 'Write us a message.',
 ];

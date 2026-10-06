@@ -1,3 +1,3 @@
 <?php return [
-	'[[/sample/intro]]' => 'Willkommen beim Beispiel.',
+	'[[/feature/sample/intro/text]]' => 'Willkommen beim Beispiel.',
 ];

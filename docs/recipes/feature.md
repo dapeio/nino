@@ -378,7 +378,7 @@ return [
 		'section-catalog.tpl',
 	],
 	'blacklist' => [
-		'/catalog/api-uri',
+		'/feature/catalog/api/uri',
 	],
 ];
 ```
@@ -387,8 +387,8 @@ return [
 
 ```html
 <section class="nino-section" id="catalog">
-	<h2>[[/catalog/title]]</h2>
-	<p>[catalog-count] [[/catalog/label/items]]</p>
+	<h2>[[/template/section-catalog/intro/title]]</h2>
+	<p>[catalog-count] [[/template/section-catalog/intro/label]]</p>
 </section>
 ```
 
@@ -399,7 +399,7 @@ return [
 declare(strict_types=1);
 
 return [
-	'[[/catalog/api-uri]]' => '/api/catalog',
+	'[[/feature/catalog/api/uri]]' => '/api/catalog',
 ];
 ```
 
@@ -410,8 +410,8 @@ return [
 declare(strict_types=1);
 
 return [
-	'[[/catalog/title]]'       => 'Catalog',
-	'[[/catalog/label/items]]' => 'items in the catalogue',
+	'[[/template/section-catalog/intro/title]]' => 'Catalog',
+	'[[/template/section-catalog/intro/label]]' => 'items in the catalogue',
 ];
 ```
 
@@ -422,10 +422,12 @@ return [
 declare(strict_types=1);
 
 return [
-	'[[/catalog/title]]'       => 'Katalog',
-	'[[/catalog/label/items]]' => 'Einträge im Katalog',
+	'[[/template/section-catalog/intro/title]]' => 'Katalog',
+	'[[/template/section-catalog/intro/label]]' => 'Einträge im Katalog',
 ];
 ```
+
+The keys show both namespaces a unit uses. A word of the feature's own function lives under `/feature/<key>/<part>/<name>` - here the technical value `/feature/catalog/api/uri`, which the class sets and the unit blacklists. A word that only a template the unit ships reads lives under `/template/<file name without .tpl>/<part>/<name>`: the heading and the label of `section-catalog.tpl` are `/template/section-catalog/intro/title` and `/template/section-catalog/intro/label`. A unit never delivers a `/project` key, nor `/template/common`, which is the base unit's. The grammar and the order the questions are asked in are in the [Developer Manual](../development.md#the-key-grammar); the manifest `key` is the category, so it has to be one word of lower-case letters, digits and hyphens.
 
 What `\Nino\Features::activate()` reads from the unit: `routes`, `templates`
 (locale-keyed entries only for available locales), `files`, `elementTypes`,
@@ -601,8 +603,8 @@ check( 'activation succeeds', $result === true );
 check( 'the class is listed and the version recorded', in_array( '\\Nino\\Modules\\Catalog', $stored['/nino/modules'], true ) === true
 	&& $stored['/nino/features']['catalog']['version'] === '1.1.0' );
 check( 'the unit copied its template and merged its text', is_file( \Nino\Filesystem::path( $appData, '/templates/section-catalog.tpl' ) ) === true
-	&& \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] )['[[/catalog/title]]'] === 'Catalog'
-	&& in_array( '/catalog/api-uri', \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), true ) === true );
+	&& \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] )['[[/template/section-catalog/intro/title]]'] === 'Catalog'
+	&& in_array( '/feature/catalog/api/uri', \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), true ) === true );
 check( 'the settings answer their defaults', \Nino\Features::settings( $appData, 'catalog' ) === [ 'title' => 'Catalog', 'pageSize' => 12, 'public' => true, 'layout' => 'list' ] );
 
 \Nino\Modules::callModules( $appData, 'init' );

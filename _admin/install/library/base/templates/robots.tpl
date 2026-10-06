@@ -17,4 +17,4 @@ Allow: /
 User-agent: CCBot
 Allow: /
 
-Sitemap: https://[[/website/url]]/sitemap.xml
+Sitemap: https://[[/project/website/general/url]]/sitemap.xml

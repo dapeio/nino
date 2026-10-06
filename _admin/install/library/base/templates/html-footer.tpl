@@ -1,7 +1,7 @@
 
 		</main>
 
-		[template /templates/theme.footer]
+		[template /templates/frame-footer]
 
 		<div class="nino-preloader"></div>
 

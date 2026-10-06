@@ -3,9 +3,9 @@
 	<div class="nino-cover-content">
 	<div class="nino-grid-row">
 		<div class="nino-grid-100">
-			<h2 class="nino-atf-title">[[/webpage[[/nino/http/response/uri]]/name]]</h2>
-			<p class="nino-atf-subtitle">[[/page-404/subtitle]]</p>
-			<a href="[[/nino/dir]]/" class="nino-btn nino-btn--primary">[[/page-404/backhome]]</a>
+			<h2 class="nino-atf-title">[[/_nino/webpage[[/nino/http/response/uri]]/name]]</h2>
+			<p class="nino-atf-subtitle">[[/template/page-404/hero/subtitle]]</p>
+			<a href="[[/nino/dir]]/" class="nino-btn nino-btn--primary">[[/template/page-404/hero/button]]</a>
 		</div>
 		</div>
 	</div>

@@ -188,6 +188,14 @@ delete slider.attributes['data-slider-pos'];
 ui.onReady();
 check( 'a slider without data-slider-pos starts on the middle slide', slider.pos === 1 );
 
+// A word the project has published to [jstext] under /template/common/slider/
+// wins over the dictionary built into the script
+sandbox.Nino.content = { getText : function( key ) { return key === '/template/common/slider/prev' ? 'Zurück' : '' } };
+ui.onReady();
+const ownControls = slider.children.filter( function( c ) { return c.className === 'nino-slider-controls' } ).pop();
+check( 'a word of the project, under /template/common/slider/, wins over the built-in one', ( ownControls.children[0].attributes['aria-label'] ?? '' ) === 'Zurück'
+	&& ( ownControls.children[2].attributes['aria-label'] ?? '' ) === 'Next' );
+
 // A slider is markup a project writes by hand, so it can be markup that is
 // not finished: a <ul> with nothing in it yet, or no <ul> at all. Reading the
 // slide at the start position threw a TypeError out of onReady(), and

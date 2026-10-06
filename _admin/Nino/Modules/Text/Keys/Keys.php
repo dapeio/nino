@@ -123,18 +123,6 @@ namespace Nino\Modules\Text {
 		}
 
 		/**
-		 *	A text key follows the same "/segment/segment" shape the Text panel's
-		 *	Text panel groups by (first segment = category)
-		 *
-		 *	@param		string		$key
-		 *
-		 *	@return 	bool
-		 */
-		private static function isValidKey( string $key ): bool {
-			return preg_match( '#^/[a-z][a-z0-9_-]*(/[a-z0-9_-]+)+$#', $key ) === 1;
-		}
-
-		/**
 		 *	List every known text key, blacklisted or not (unlike the Text panel's
 		 *	own panel, this is exactly where you'd come to un-blacklist one)
 		 *	- see \Nino\Text::entries()
@@ -161,7 +149,13 @@ namespace Nino\Modules\Text {
 		/**
 		 *	Create a brand new key with an initial value - global.php gets
 		 *	one value, or every locale file gets the same starting value,
-		 *	depending on $isGlobal
+		 *	depending on $isGlobal.
+		 *
+		 *	The key has to follow the grammar of a text key,
+		 *	/<namespace>/<category>/<part>/<name> (see
+		 *	\Nino\Text::isGrammarKey()): the server decides that, whatever the
+		 *	form sent. A key the system writes by itself, /_nino/..., is not
+		 *	created by hand
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -179,7 +173,7 @@ namespace Nino\Modules\Text {
 			$value 		= (string) ( $data['value'] ?? '' );
 			$format 	= self::_postedFormat( $data );
 
-			if( self::isValidKey( $key ) === false ) {
+			if( \Nino\Text::isGrammarKey( $key ) === false ) {
 				\Nino\Http::fail( $request, 400, 'invalid key', 'keys_invalid', [ $key ], 'key' );
 				return;
 			}
@@ -212,7 +206,7 @@ namespace Nino\Modules\Text {
 		 *	export/import round-trip)
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$key					A key that passed isValidKey()
+		 *	@param		string		$key					A key that passed \Nino\Text::isGrammarKey()
 		 *	@param		bool			$isGlobal			Whether it lives in global.php
 		 *	@param		string		$value				The starting value
 		 *	@param		string|null	$format			The format it is kept in, null to read it from the value
@@ -512,7 +506,14 @@ namespace Nino\Modules\Text {
 		/**
 		 *	Rename a key, moving its current value(s) and blacklist status
 		 *	to the new name - the file(s)/shape don't change, only the
-		 *	bracket key itself
+		 *	bracket key itself.
+		 *
+		 *	The new name has to follow the grammar (see apiCreate()). A key
+		 *	of the system - /_nino/..., named after a page's Element-URI or a
+		 *	language's code - and one of the workbench - /_admin/... - is not
+		 *	renamed here: its name is what the code that reads it asks for,
+		 *	only its value is editable. Every other key, however it is formed,
+		 *	can be renamed to one that follows the grammar
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -528,8 +529,13 @@ namespace Nino\Modules\Text {
 			$key 		= (string) ( $data['key'] ?? '' );
 			$newKey = (string) ( $data['newKey'] ?? '' );
 
-			if( self::isValidKey( $newKey ) === false ) {
+			if( \Nino\Text::isGrammarKey( $newKey ) === false ) {
 				\Nino\Http::fail( $request, 400, 'invalid new key', 'keys_invalid', [ $newKey ], 'newKey' );
+				return;
+			}
+
+			if( str_starts_with( $key, '/_nino/' ) === true || str_starts_with( $key, '/_admin/' ) === true ) {
+				\Nino\Http::fail( $request, 400, 'a key of the system is not renamed', 'keys_system', [ $key ], 'key' );
 				return;
 			}
 
@@ -725,11 +731,19 @@ namespace Nino\Modules\Text {
 		/**
 		 *	Scan every public-site template (templates/*.tpl - not the workbench's
 		 *	or _admin's own, those are separate text systems entirely) for
-		 *	[[/key]] placeholders that aren't yet defined for any locale -
+		 *	text keys that aren't yet defined for any locale -
 		 *	the exact gap this module exists to close: designing a template,
-		 *	inventing a [[/key]] along the way, then forgetting to actually
-		 *	add it anywhere. Doesn't write anything - apiCreate() (already
-		 *	existing) is what turns an accepted result into a real key
+		 *	inventing a key along the way, then forgetting to actually
+		 *	add it anywhere. Doesn't write anything - apiScanApply() is what
+		 *	turns an accepted result into a real key.
+		 *
+		 *	Every key a template reads and nothing defines is a row, whether it
+		 *	can be created here or not (see _scanRow() for the three kinds). The
+		 *	answer carries a second list as well, 'alsoUsed': a key of the form
+		 *	/template/<category>/... that a template of another category reads
+		 *	too. That is only a note - nothing is counted, offered or moved - for
+		 *	the day somebody wants a word two templates share to live in
+		 *	/template/common
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -741,7 +755,9 @@ namespace Nino\Modules\Text {
 			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
 				return;
 
-			\Nino\Http::ok( $request, [ 'missing' => self::_scanMissing( $appData ) ] );
+			$scan = self::_scan( $appData, true );
+
+			\Nino\Http::ok( $request, [ 'missing' => $scan['missing'], 'alsoUsed' => $scan['alsoUsed'] ] );
 		}
 
 		/**
@@ -763,6 +779,13 @@ namespace Nino\Modules\Text {
 		 *	blacklisting or overwriting an existing key is not what this
 		 *	action is for.
 		 *
+		 *	And only what the row's kind allows: a key is created only where the
+		 *	grammar lets it be, so a value posted for any other is passed over;
+		 *	a key off the grammar can still be retired; a key of the system
+		 *	(/_nino/...) is neither created nor retired - it is the system's to
+		 *	write, and ignoring it would hide a gap that only a page or a
+		 *	language can close
+		 *
 		 *	Retiring a key is reversible: the Text Keys list shows it (see
 		 *	_blacklistOnly()) and unticking "hidden" there brings it back.
 		 *
@@ -781,7 +804,7 @@ namespace Nino\Modules\Text {
 
 			$missing = [];
 			foreach( self::_scanMissing( $appData ) as $entry )
-				$missing[$entry['key']] = true;
+				$missing[$entry['key']] = $entry['kind'];
 
 			$created = 0;
 			$ignored = 0;
@@ -791,7 +814,7 @@ namespace Nino\Modules\Text {
 
 				$key = is_array( $row ) === true ? (string) ( $row['key'] ?? '' ) : '';
 
-				if( isset( $missing[$key] ) === false )
+				if( isset( $missing[$key] ) === false || $missing[$key] === 'system' )
 					continue;
 
 				if( ( $row['ignore'] ?? false ) === true ) {
@@ -804,7 +827,7 @@ namespace Nino\Modules\Text {
 				// "I have not decided yet" an empty field is
 				$value = trim( (string) ( $row['value'] ?? '' ) );
 
-				if( $value === '' ) {
+				if( $value === '' || $missing[$key] !== 'create' ) {
 					$skipped++;
 					continue;
 				}
@@ -817,7 +840,7 @@ namespace Nino\Modules\Text {
 		}
 
 		/**
-		 *	How many [[/key]] placeholders apiScan() above would currently
+		 *	How many missing keys apiScan() above would currently
 		 *	report as missing - shared by \Nino\Modules\Dashboard\Admin::apiSummary
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
@@ -829,19 +852,39 @@ namespace Nino\Modules\Text {
 		}
 
 		/**
-		 *	Scan every public-site template for [[/key]] placeholders that
+		 *	Scan every public-site template for text keys that
 		 *	aren't yet defined for any locale - the actual work behind
 		 *	apiScan()/missingCount() above
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	array										[ [ 'key', 'files' ], ... ]
+		 *	@return 	array										The rows of _scan()
 		 */
 		private static function _scanMissing( array &$appData ): array {
+			return self::_scan( $appData )['missing'];
+		}
 
-			$known = [];
+		/**
+		 *	Read the templates once and answer both lists the scan has.
+		 *
+		 *	A key counts when a template reads it as a textfill and no text file, runtime
+		 *	fill or blacklist line knows it. Only the innermost [[...]] of a
+		 *	nested fill is seen, as a static scan can see no more, and only the
+		 *	ones with a leading slash: [[name]] in mail-user.tpl and [[.rel]] in
+		 *	Posts' page-post.tpl are placeholders the code of the template's own
+		 *	shortcode fills in, not keys, and are no gap in any text file.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		bool			$alsoUsed			Whether to work out 'alsoUsed' too, which the Dashboard count has no use for
+		 *
+		 *	@return 	array										[ 'missing' => [ row, ... ], 'alsoUsed' => [ [ 'key', 'files' ], ... ] ], see _scanRow()
+		 */
+		private static function _scan( array &$appData, bool $alsoUsed = false ): array {
+
+			$known 	= [];
+			$stored = [];
 			foreach( \Nino\Text::entries( $appData ) as $entry )
-				$known[$entry['key']] = true;
+				$known[$entry['key']] = $stored[$entry['key']] = true;
 			// The fills the kernel injects at request time (see
 			// \Nino\Html::bootFills() and requestFills()) are never stored in
 			// any /text/*.php file, so the scan would flag them as missing
@@ -849,7 +892,7 @@ namespace Nino\Modules\Text {
 			// kept here fell one behind and reported the clean uri. Only the
 			// innermost, non-nested [[...]] a static regex scan can even see
 			// (the [[/nino/http/response/uri]] inside html-header.tpl's
-			// [[/webpage[[/nino/http/response/uri]]/title]]) - the outer,
+			// [[/_nino/webpage[[/nino/http/response/uri]]/title]]) - the outer,
 			// dynamically built key is not something a scan of the raw source
 			// can resolve, since its final shape depends on the page rendering
 			foreach( \Nino\Html::runtimeFillKeys( $appData ) as $key )
@@ -863,7 +906,8 @@ namespace Nino\Modules\Text {
 			foreach( array_keys( \Nino\Text::blacklist( $appData ) ) as $key )
 				$known[$key] = true;
 
-			$found = [];
+			$found 	= [];
+			$usedIn = [];
 
 			foreach( glob( \Nino\Filesystem::path( $appData, '/templates' ). '/*.tpl' ) ?: [] as $file ) {
 
@@ -871,19 +915,103 @@ namespace Nino\Modules\Text {
 				if( $content === false || preg_match_all( '/\[\[([^\[\]]+)\]\]/', $content, $matches ) === false )
 					continue;
 
+				$category = \Nino\Modules\Template::category( basename( $file ) );
+
 				foreach( array_unique( $matches[1] ) as $key ) {
 
-					if( isset( $known[$key] ) === true || self::isValidKey( $key ) === false )
+					// Not a key at all: a placeholder the template's own shortcode fills
+					if( str_starts_with( $key, '/' ) === false )
 						continue;
 
-					$found[$key] 			= $found[$key] ?? [];
-					$found[$key][] 		= basename( $file );
+					if( isset( $known[$key] ) === false ) {
+						$found[$key][] = basename( $file );
+						continue;
+					}
+
+					// A word of one template that another reads as well - by
+					// the rule a word several templates read lives in
+					// /template/common, which holds from the day the key is
+					// created and no day after, so this is a note and no more
+					if( $alsoUsed === true && isset( $stored[$key] ) === true
+						&& preg_match( '#^/template/([^/]+)/#', $key, $owner ) === 1 && $owner[1] !== 'common' && $owner[1] !== $category )
+						$usedIn[$key][] = basename( $file );
 				}
 			}
 
 			ksort( $found );
+			ksort( $usedIn );
 
-			return array_map( fn( $key, $files ) => [ 'key' => $key, 'files' => $files ], array_keys( $found ), array_values( $found ) );
+			// Asked once for every row rather than for each: the writer of a
+			// page's keys is the Routes panel, if there is one
+			$runtimeUris = class_exists( '\\Nino\\Modules\\Routes\\Admin' ) === true
+				? array_column( \Nino\Modules\Routes\Admin::runtimeRoutes( $appData ), 'uri' )
+				: null;
+
+			return [
+				'missing' 	=> array_map( fn( $key, $files ) => self::_scanRow( (string) $key, $files, $runtimeUris ), array_keys( $found ), array_values( $found ) ),
+				'alsoUsed' 	=> array_map( fn( $key, $files ) => [ 'key' => (string) $key, 'files' => $files ], array_keys( $usedIn ), array_values( $usedIn ) ),
+			];
+		}
+
+		/**
+		 *	One row of the scan: the key, the templates that read it, and what
+		 *	may be done about it here. Three kinds:
+		 *
+		 *	  - 'create': it follows the grammar (\Nino\Text::isGrammarKey()), so a
+		 *	    value turns it into a key. When it is a /feature or /module key
+		 *	    the row also carries 'hint' ('feature' or 'module') and 'owner'
+		 *	    (the feature's key, the module's directory): such a key normally
+		 *	    belongs to that feature or module, whose install unit delivers
+		 *	    it - if it is missing, the feature may not be active, or the key
+		 *	    misspelled
+		 *	  - 'system': it is a /_nino key, named after a page or a language
+		 *	    and written by the system. No input and no ignoring; 'writer'
+		 *	    says who writes it - 'routes', 'language' - or is null where
+		 *	    nobody does, and the template's reading is what should change
+		 *	  - 'grammar': it follows no grammar - a key of the workbench, one of
+		 *	    an older form, one invented in a template. Not created here; the
+		 *	    template should read a key that follows the grammar. It can be
+		 *	    ignored for good, like any other
+		 *
+		 *	@param		string		$key
+		 *	@param		array 		$files				The templates that read it
+		 *	@param		array|null	$runtimeUris	The Element-URIs of the pages features route (see \Nino\Modules\Routes\Admin::runtimeRoutes()), null where the Routes panel is not there
+		 *
+		 *	@return 	array										[ 'key', 'files', 'kind', 'writer', 'hint', 'owner' ]
+		 */
+		private static function _scanRow( string $key, array $files, ?array $runtimeUris ): array {
+
+			$row = [ 'key' => $key, 'files' => $files, 'kind' => 'create', 'writer' => null, 'hint' => null, 'owner' => null ];
+
+			if( \Nino\Text::isGrammarKey( $key ) === true ) {
+
+				if( preg_match( '#^/(feature|module)/([^/]+)/#', $key, $origin ) === 1 ) {
+					$row['hint'] 	= $origin[1];
+					$row['owner'] = $origin[2];
+				}
+
+				return $row;
+			}
+
+			if( str_starts_with( $key, '/_nino/' ) === false ) {
+				$row['kind'] = 'grammar';
+				return $row;
+			}
+
+			$row['kind'] = 'system';
+
+			// Read from the right: an Element-URI may hold slashes and dots
+			if( preg_match( '#^/_nino/webpage(/.+)/(name|title|description|uri)$#', $key, $page ) === 1 ) {
+
+				// The path of a feature's page is the feature's: no panel writes it
+				if( $runtimeUris !== null && ( $page[2] !== 'uri' || in_array( $page[1], $runtimeUris, true ) === false ) )
+					$row['writer'] = 'routes';
+
+			} elseif( preg_match( '#^/_nino/locale/[^/]+/name$#', $key ) === 1 && class_exists( '\\Nino\\Modules\\Language\\Admin' ) === true ) {
+				$row['writer'] = 'language';
+			}
+
+			return $row;
 		}
 	}
 }

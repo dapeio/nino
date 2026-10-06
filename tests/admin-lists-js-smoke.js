@@ -861,7 +861,7 @@ check( 'no element in any template carries the same attribute twice'
 	+ ( repeatedAttributes.length ? ' - '+ repeatedAttributes.slice( 0, 5 ).join(', ') : '' ), repeatedAttributes.length === 0 );
 
 const editorHeader = read('_admin/templates/html-header.tpl');
-check( 'the Editor document shell uses current HTML without IE conditionals', /^<!doctype html>\s*<html lang="\[\[\/website\/lang\]\]">/.test( editorHeader )
+check( 'the Editor document shell uses current HTML without IE conditionals', /^<!doctype html>\s*<html lang="\[\[\/project\/website\/html\/lang\]\]">/.test( editorHeader )
 	&& editorHeader.includes('X-UA-Compatible') === false
 	&& editorHeader.includes('<!--[if ') === false
 	&& editorHeader.includes('http-equiv="Content-Type"') === false );

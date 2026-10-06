@@ -254,7 +254,7 @@ check( 'the Setup step seeds the css bundle with the delivered look and the proj
 	'/_nino/Nino.css', '/assets/theme.css', '/assets/style.css',
 ] );
 check( '...and the two files it names are really in the project', is_file( $sandbox. '/private/assets/theme.css' ) === true && is_file( $sandbox. '/private/assets/style.css' ) === true
-	&& is_file( $sandbox. '/private/templates/theme.header.tpl' ) === true && is_file( $sandbox. '/private/templates/theme.footer.tpl' ) === true
+	&& is_file( $sandbox. '/private/templates/frame-header.tpl' ) === true && is_file( $sandbox. '/private/templates/frame-footer.tpl' ) === true
 	&& is_file( $sandbox. '/public/fonts/league-spartan.woff2' ) === true );
 // The logo is a slot with nothing in it: the frames, the navigation and the
 // mails show it with [image /logo], and ship no picture of their own
@@ -328,12 +328,15 @@ check( 'copies "navigation"\'s own templates too - always-on now, nothing had to
 check( '...and "localepicker"\'s', \Nino\Filesystem::fileExists( $appData, '/templates/html-footer-localepicker.tpl' ) === true );
 
 $blacklistAfterApply = \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] );
-check( 'base\'s blacklist entries (design tokens) landed in text/blacklist.php', in_array( '/website/lang', $blacklistAfterApply, true ) === true );
-check( '"forms"\'s own blacklist entries (its mail design tokens) landed too', in_array( '/mail/style/color/primary', $blacklistAfterApply, true ) === true );
+check( 'base\'s blacklist entries (design tokens) landed in text/blacklist.php', in_array( '/project/website/html/lang', $blacklistAfterApply, true ) === true );
+check( 'the mail design tokens landed on the blacklist too - they are the base unit\'s now, not the contact form\'s', in_array( '/project/mail/color/primary', $blacklistAfterApply, true ) === true
+	&& in_array( '/project/mail/spacing/large', $blacklistAfterApply, true ) === true );
+check( '"forms" ships no blacklist and no global text of its own any more', isset( ( include __DIR__. '/../_nino/Nino/Modules/Form/install/manifest.php' )['blacklist'] ) === false
+	&& is_file( __DIR__. '/../_nino/Nino/Modules/Form/install/text/global.php' ) === false );
 
 $deAfterApply = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
-check( 'merges the picked locale\'s text fragments (base + forms)', ( $deAfterApply['[[/form/title]]'] ?? null ) !== null );
-check( '...and "localepicker"\'s, always-on now too', ( $deAfterApply['[[/nino/locales/title]]'] ?? null ) === 'Wähle Deine Sprache' );
+check( 'merges the picked locale\'s text fragments (base + forms)', ( $deAfterApply['[[/module/form/info/required]]'] ?? null ) !== null );
+check( '...and "localepicker"\'s, always-on now too', ( $deAfterApply['[[/module/localepicker/menu/title]]'] ?? null ) === 'Wähle Deine Sprache' );
 // The base site ships no cookie banner: consent is the Consent feature's job.
 // The footer a project is set up with carries no banner block, and the
 // wizard writes none of the four fills that block read
@@ -400,7 +403,7 @@ check( 'a posted native locale outside the picked set is ignored, falling back t
 	what a permission or a full disk does, provoked without either. The
 	warning check is a guard - copyFile() is silenced already - kept so the
 	refusal stays the whole outcome	*/
-$blockedTemplate = $sandbox. '/private/templates/theme.header.tpl';
+$blockedTemplate = $sandbox. '/private/templates/frame-header.tpl';
 unlink( $blockedTemplate );
 mkdir( $blockedTemplate, 0755, true );
 $configBeforeBlocked	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
@@ -417,7 +420,7 @@ restore_error_handler();
 rmdir( $blockedTemplate );
 
 check( 'a unit file the step cannot copy is a 500 naming the file', $blockedRequest['/nino/http/response']['statusCode'] === 500
-	&& str_contains( (string) ( $blockedRequest['/nino/http/response']['body']['error'] ?? '' ), '/templates/theme.header.tpl' ) === true );
+	&& str_contains( (string) ( $blockedRequest['/nino/http/response']['body']['error'] ?? '' ), '/templates/frame-header.tpl' ) === true );
 check( '...nothing was written to config.php for that apply', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] ) === $configBeforeBlocked );
 check( '...and no engine warning was raised on the way', array_filter( $blockedWarnings, static fn( string $w ): bool => str_contains( $w, 'file_put_contents' ) ) === [] );
 
@@ -514,7 +517,7 @@ check( 'the stylesheet keeps what the scripts hide hidden', str_contains( $ninoC
 // the base unit ships does not have one, and this is where a replacement that
 // does finds that out
 $fixedHeight 	= [];
-$frameMarkup 	= (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/theme.header.tpl' );
+$frameMarkup 	= (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/frame-header.tpl' );
 $frameStyle 	= (string) file_get_contents( __DIR__. '/../_admin/install/library/base/assets/theme.css' );
 
 if( preg_match( '/class="([^"]*nino-scroll-header[^"]*)"/', $frameMarkup, $match ) === 1 )
@@ -677,13 +680,13 @@ rmdir( $sandbox. '/private/templates/page-contact.tpl' );
 /*	The home unit's hero is an image slot seeded with its shipped placeholder.
 	A picture the step cannot put in place fails the step by name, the way the
 	template above did - and no slot is seeded for a file that is not there	*/
-$seedFile = $sandbox. '/public/images/page-home/fullscreen-image/background.svg';
+$seedFile = $sandbox. '/public/images/template/page-home/fullscreen-image/background.svg';
 if( is_file( $seedFile ) === true )
 	unlink( $seedFile );
 mkdir( $seedFile, 0755, true );
 $blockedSeedRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $blockedSeedRequest );
-check( 'a seed file the step cannot copy fails the apply and names the file', $blockedSeedRequest['/nino/http/response']['statusCode'] === 500 && str_contains( (string) ( $blockedSeedRequest['/nino/http/response']['body']['error'] ?? '' ), '/images/page-home/fullscreen-image/background.svg' ) === true );
+check( 'a seed file the step cannot copy fails the apply and names the file', $blockedSeedRequest['/nino/http/response']['statusCode'] === 500 && str_contains( (string) ( $blockedSeedRequest['/nino/http/response']['body']['error'] ?? '' ), '/images/template/page-home/fullscreen-image/background.svg' ) === true );
 check( '...and no page image slot is seeded', array_keys( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/images'] ?? [] ) === [ '/logo' ] );
 rmdir( $seedFile );
 
@@ -705,21 +708,21 @@ check( 'a hand-written route outside the library still survives Webpages apply t
 
 check( 'copies "forms"\'s own mail-header/footer templates too, auto-pulled in by "contact"', \Nino\Filesystem::fileExists( $appData, '/templates/mail-header.tpl' ) === true );
 check( 'copies "contact"\'s own template', \Nino\Filesystem::fileExists( $appData, '/templates/page-contact.tpl' ) === true );
-check( 'copies a page unit\'s declared files into the project', is_file( $sandbox. '/public/images/page-home/fullscreen-image/background.svg' ) === true );
+check( 'copies a page unit\'s declared files into the project', is_file( $sandbox. '/public/images/template/page-home/fullscreen-image/background.svg' ) === true );
 
 // The hero is the slot the page template names, and nothing is literal in it
-$heroSlot = $configAfterWpApply['/nino/html/images']['/page-home/fullscreen-image/background'] ?? [];
+$heroSlot = $configAfterWpApply['/nino/html/images']['/template/page-home/fullscreen-image/background'] ?? [];
 // The native locale of this run is en_US (the steps above moved it), so the label is that one
 check( 'seeds the unit\'s image slot into config.php: the native-locale label, 1920x1080 and the shipped placeholder', ( $heroSlot['label'] ?? null ) === 'Home – hero image'
-	&& ( $heroSlot['width'] ?? null ) === 1920 && ( $heroSlot['height'] ?? null ) === 1080 && ( $heroSlot['filename'] ?? null ) === 'page-home/fullscreen-image/background.svg'
+	&& ( $heroSlot['width'] ?? null ) === 1920 && ( $heroSlot['height'] ?? null ) === 1080 && ( $heroSlot['filename'] ?? null ) === 'template/page-home/fullscreen-image/background.svg'
 	&& is_file( $sandbox. '/public/images/'. ( $heroSlot['filename'] ?? 'missing' ) ) === true );
 
-check( 'the seeded placeholder carries the slot\'s own name, so an upload replaces it and Remove image deletes it, as for any file the slot wrote', str_starts_with( (string) ( $heroSlot['filename'] ?? '' ), 'page-home/fullscreen-image/background.' ) === true
+check( 'the seeded placeholder carries the slot\'s own name, so an upload replaces it and Remove image deletes it, as for any file the slot wrote', str_starts_with( (string) ( $heroSlot['filename'] ?? '' ), 'template/page-home/fullscreen-image/background.' ) === true
 	&& is_file( __DIR__. '/../_admin/install/library/pages/home/images/demo.jpg' ) === false );
 \Nino\Modules\Images::init( $appData );
 \Nino\Modules\Template::init( $appData );
 $homeHtml = \Nino\Html::renderHtml( $appData, '[template /templates/page-home]' );
-check( 'the home template renders the slot as an <img> with its size and an empty alt, and no literal image path', str_contains( $homeHtml, '/images/page-home/fullscreen-image/background.svg" width="1920" height="1080" alt="">' ) === true
+check( 'the home template renders the slot as an <img> with its size and an empty alt, and no literal image path', str_contains( $homeHtml, '/images/template/page-home/fullscreen-image/background.svg" width="1920" height="1080" alt="">' ) === true
 	&& str_contains( $homeHtml, '[[/nino/public]]/images/' ) === false && str_contains( $homeHtml, '[image' ) === false );
 
 // The logo, which is a slot too: nothing in the shipped frames, the navigation
@@ -728,17 +731,17 @@ check( 'the home template renders the slot as an <img> with its size and an empt
 \Nino\Modules\Navigation::init( $appData );
 $logoFrames = static function( array &$appData ): array {
 	return [
-		'header'	=> \Nino\Html::renderHtml( $appData, '[template /templates/theme.header]' ),
+		'header'	=> \Nino\Html::renderHtml( $appData, '[template /templates/frame-header]' ),
 		'meta'		=> \Nino\Html::renderHtml( $appData, '[template /templates/html-header]' ),
 		'mail'		=> \Nino\Html::renderHtml( $appData, '[template /templates/mail-header]' ),
 	];
 };
 $logoShipped = '';
-foreach( [ '/templates/theme.header.tpl', '/templates/html-header.tpl', '/templates/mail-header.tpl', '/templates/html-header-nav.tpl' ] as $logoTemplate )
+foreach( [ '/templates/frame-header.tpl', '/templates/html-header.tpl', '/templates/mail-header.tpl', '/templates/html-header-nav.tpl' ] as $logoTemplate )
 	$logoShipped .= (string) \Nino\Filesystem::getFileContent( $appData, $logoTemplate, '' );
 check( 'no shipped template names a logo file: every one asks the logo slot', preg_match( '#images/logo#', $logoShipped ) === 0 && substr_count( $logoShipped, '[image /logo' ) === 5 );
 
-\Nino\Html::addFills( $appData, [ '[[/website/url]]' => 'www.example.com', '[[/company/name]]' => 'Acme' ], '*' );
+\Nino\Html::addFills( $appData, [ '[[/project/website/general/url]]' => 'www.example.com', '[[/project/company/general/name]]' => 'Acme' ], '*' );
 $noLogo = $logoFrames( $appData );
 check( 'without an uploaded logo the header has no <img> and the mail header no picture at all', str_contains( $noLogo['header'], '<img' ) === false && str_contains( $noLogo['header'], '[image' ) === false
 	&& str_contains( $noLogo['mail'], '<img' ) === false && str_contains( $noLogo['mail'], '[image' ) === false );
@@ -756,7 +759,7 @@ check( '...and the mail an <img> with the absolute address and the company name 
 $appData['/nino/html/images']['/logo']['filename'] = null;
 
 // So the Image Slots tab's scan has nothing to propose for it: the copied template is no literal <img> of the images directory
-check( 'the copied home template names the slot and has no literal <img> of the images directory for the template scan to find', str_contains( (string) file_get_contents( $sandbox. '/private/templates/page-home.tpl' ), '[image /page-home/fullscreen-image/background alt=""]' ) === true
+check( 'the copied home template names the slot and has no literal <img> of the images directory for the template scan to find', str_contains( (string) file_get_contents( $sandbox. '/private/templates/page-home.tpl' ), '[image /template/page-home/fullscreen-image/background alt=""]' ) === true
 	&& preg_match( '#<img\b[^>]*src="[^"]*/images/#i', (string) file_get_contents( $sandbox. '/private/templates/page-home.tpl' ) ) === 0 );
 // A fresh install is the thing the dashboard's "Missing image slots" tile counts: with the logo and the hero both slots, no template has an <img> of the images directory left
 check( 'on a fresh install the Missing image slots tile reads 0 - every picture of the starter site is a slot', \Nino\Modules\Images\Slots::missingCount( $appData ) === 0 );
@@ -764,20 +767,27 @@ check( 'on a fresh install the Missing image slots tile reads 0 - every picture 
 $deAfterWpApply = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
 $enAfterWpApply = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
 
-check( 'writes the home entry\'s own de_DE meta, keyed by its Element-URI (not its Http-URI or the "home" template name)', $deAfterWpApply['[[/webpage/site-home/name]]'] === 'Start' && $deAfterWpApply['[[/webpage/site-home/title]]'] === 'Willkommen' );
-check( 'writes the home entry\'s own en_US meta too', $enAfterWpApply['[[/webpage/site-home/name]]'] === 'Home' );
-check( 'a field left blank in the post (contact\'s en_US) falls back to the generic placeholder, not the "contact" template\'s own wording', $enAfterWpApply['[[/webpage/site-contact/title]]'] === 'Page Title' );
-check( 'a field that was posted (contact\'s de_DE name) is used as-is', $deAfterWpApply['[[/webpage/site-contact/name]]'] === 'Kontakt' );
-check( 'a template\'s own /webpage/<foldername>/* meta is never merged in - only the Element-URI-keyed one this class writes itself', isset( $deAfterWpApply['[[/webpage/home/name]]'] ) === false );
+check( 'writes the home entry\'s own de_DE meta, keyed by its Element-URI (not its Http-URI or the "home" template name)', $deAfterWpApply['[[/_nino/webpage/site-home/name]]'] === 'Start' && $deAfterWpApply['[[/_nino/webpage/site-home/title]]'] === 'Willkommen' );
+check( 'writes the home entry\'s own en_US meta too', $enAfterWpApply['[[/_nino/webpage/site-home/name]]'] === 'Home' );
+check( 'a field left blank in the post (contact\'s en_US) falls back to the generic placeholder, not the "contact" template\'s own wording', $enAfterWpApply['[[/_nino/webpage/site-contact/title]]'] === 'Page Title' );
+check( 'a field that was posted (contact\'s de_DE name) is used as-is', $deAfterWpApply['[[/_nino/webpage/site-contact/name]]'] === 'Kontakt' );
+check( 'no key named for a library folder is in the project - only the Element-URI-keyed one this class writes itself', isset( $deAfterWpApply['[[/_nino/webpage/home/name]]'] ) === false );
+// The system's own form is a key of the system's: the only /_nino keys the
+// texts of a project hold are the ones written after an Element-URI or a
+// language code. A unit that delivered another would be a unit writing what
+// is not its to write (tests/keys-smoke.php checks the library for it)
+$systemKeys = array_filter( array_merge( array_keys( $deAfterWpApply ), array_keys( $enAfterWpApply ), array_keys( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] ) ) ), static fn( string $key ): bool => str_starts_with( $key, '[[/_nino/' ) );
+check( 'the only /_nino keys of the project texts are the pages\' details and the languages\' names', $systemKeys !== []
+	&& array_filter( $systemKeys, static fn( string $key ): bool => preg_match( '#^\[\[/_nino/(webpage/site-(home|contact)/(name|title|description|uri)|locale/(de_DE|en_US)/name)\]\]$#', $key ) !== 1 ) === [] );
 $globalAfterWpApply = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
 $blacklistAfterWpApply = \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] );
-check( 'writes every page\'s reachable Http-URI as one global fill, so a template can link to it by name', ( $globalAfterWpApply['[[/webpage/site-home/uri]]'] ?? null ) === '/'
-	&& ( $globalAfterWpApply['[[/webpage/site-contact/uri]]'] ?? null ) === '/kontakt'
-	&& isset( $deAfterWpApply['[[/webpage/site-home/uri]]'], $enAfterWpApply['[[/webpage/site-home/uri]]'] ) === false );
-check( 'a page uri is a technical value, blacklisted out of the Text panel like every other route key', in_array( '/webpage/site-home/uri', $blacklistAfterWpApply, true )
-	&& in_array( '/webpage/site-contact/uri', $blacklistAfterWpApply, true )
+check( 'writes every page\'s reachable Http-URI as one global fill, so a template can link to it by name', ( $globalAfterWpApply['[[/_nino/webpage/site-home/uri]]'] ?? null ) === '/'
+	&& ( $globalAfterWpApply['[[/_nino/webpage/site-contact/uri]]'] ?? null ) === '/kontakt'
+	&& isset( $deAfterWpApply['[[/_nino/webpage/site-home/uri]]'], $enAfterWpApply['[[/_nino/webpage/site-home/uri]]'] ) === false );
+check( 'a page uri is a technical value, blacklisted out of the Text panel like every other route key', in_array( '/_nino/webpage/site-home/uri', $blacklistAfterWpApply, true )
+	&& in_array( '/_nino/webpage/site-contact/uri', $blacklistAfterWpApply, true )
 	&& count( array_unique( $blacklistAfterWpApply ) ) === count( $blacklistAfterWpApply ) );
-check( 'a template\'s own deeper content (unprefixed, shared across instances) still merges in', isset( $deAfterWpApply['[[/page-home/welcome/title]]'] ) === true );
+check( 'a template\'s own deeper content (unprefixed, shared across instances) still merges in', isset( $deAfterWpApply['[[/template/page-home/welcome/title]]'] ) === true );
 
 $libraryAfterWpApply = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiList( $appData, $libraryAfterWpApply );
@@ -791,8 +801,8 @@ check( 'apiList now reflects the persisted, current list', array_column( $librar
 // one-off and keeps sharing - that is what its template is for
 // An editor has replaced the hero's image and renamed the slot since: applying
 // the step again only adds, it never puts the shipped state back
-$appData['/nino/html/images']['/page-home/fullscreen-image/background']['label'] = 'Mein Titelbild';
-$appData['/nino/html/images']['/page-home/fullscreen-image/background']['filename'] = 'page-home/fullscreen-image/background.1920x1080.jpg';
+$appData['/nino/html/images']['/template/page-home/fullscreen-image/background']['label'] = 'Mein Titelbild';
+$appData['/nino/html/images']['/template/page-home/fullscreen-image/background']['filename'] = 'template/page-home/fullscreen-image/background.1920x1080.jpg';
 \Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
 
 $_POST['data'] = json_encode( [ 'webpages' => [
@@ -807,9 +817,9 @@ check( 'applying two blank routes succeeds', $perRouteRequest['/nino/http/respon
 
 $configPerRoute = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
-$heroAfterSecondApply = $configPerRoute['/nino/html/images']['/page-home/fullscreen-image/background'] ?? [];
+$heroAfterSecondApply = $configPerRoute['/nino/html/images']['/template/page-home/fullscreen-image/background'] ?? [];
 check( 'a second apply keeps a slot the project already has - its label and its changed image', ( $heroAfterSecondApply['label'] ?? null ) === 'Mein Titelbild'
-	&& ( $heroAfterSecondApply['filename'] ?? null ) === 'page-home/fullscreen-image/background.1920x1080.jpg' && array_keys( $configPerRoute['/nino/html/images'] ) === [ '/logo', '/page-home/fullscreen-image/background' ] );
+	&& ( $heroAfterSecondApply['filename'] ?? null ) === 'template/page-home/fullscreen-image/background.1920x1080.jpg' && array_keys( $configPerRoute['/nino/html/images'] ) === [ '/logo', '/template/page-home/fullscreen-image/background' ] );
 
 check( 'each blank route gets its own template file, named after its Element-URI', \Nino\Filesystem::fileExists( $appData, '/templates/page-team.tpl' ) === true && \Nino\Filesystem::fileExists( $appData, '/templates/page-jobs-open.tpl' ) === true );
 check( '...and renders it, rather than the unit\'s shared one', ( $configPerRoute['/nino/http/routes']['GET://team']['body'] ?? null ) === '[template /templates/page-team]'
@@ -861,6 +871,23 @@ $ownNameRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 check( 'a name no library page owns is a page of your own like any other', $ownNameRequest['/nino/http/response']['statusCode'] === 200
 	&& \Nino\Filesystem::fileExists( $appData, '/templates/page-startseite.tpl' ) === true );
 
+// A template's file name is its category (see \Nino\Modules\Template::category()),
+// and every page of your own is page-<slug>: a slug that is the name of a
+// category elsewhere - /footer, /common - or begins with a digit - /2026-home -
+// is a page like any other, with a category of its own and none to collide with
+$_POST['data'] = json_encode( [ 'webpages' => [
+	[ 'uri' => '/footer', 'httpUri' => '/footer', 'libraryKey' => 'blank', 'text' => [] ],
+	[ 'uri' => '/common', 'httpUri' => '/common', 'libraryKey' => 'blank', 'text' => [] ],
+	[ 'uri' => '/2026-home', 'httpUri' => '/2026-home', 'libraryKey' => 'blank', 'text' => [] ],
+] ] );
+$categoryNameRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Webpages::apiApply( $appData, $categoryNameRequest );
+check( 'pages named /footer, /common and /2026-home are accepted', $categoryNameRequest['/nino/http/response']['statusCode'] === 200 );
+check( '...and get page-footer.tpl, page-common.tpl and page-2026-home.tpl, each of which has a category', \Nino\Filesystem::fileExists( $appData, '/templates/page-footer.tpl' ) === true
+	&& \Nino\Filesystem::fileExists( $appData, '/templates/page-common.tpl' ) === true && \Nino\Filesystem::fileExists( $appData, '/templates/page-2026-home.tpl' ) === true
+	&& \Nino\Modules\Template::category( 'page-footer.tpl' ) === 'page-footer' && \Nino\Modules\Template::category( 'page-common.tpl' ) === 'page-common'
+	&& \Nino\Modules\Template::category( 'page-2026-home.tpl' ) === 'page-2026-home' );
+
 // Navigation: always active now (see ALWAYS_MODULES above). Membership is
 // posted explicitly per entry and stored on its route.
 $_POST['data'] = json_encode( [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
@@ -881,7 +908,7 @@ $enAfterNav = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] 
 // Menu membership lives on the route each entry owns, not in a generated
 // textfill - see \Nino\Modules\Navigation::routeLines(). Nothing is written
 // per locale here at all: the menu is built per request, from the same
-// /webpage<uri>/name keys the entries already carry
+// /_nino/webpage<uri>/name keys the entries already carry
 $routesAfterNav = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
 
 check( 'the Navigation module registers the menus the editors offer', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/navs'] === $navigationDefaults['/nino/html/navs'] );
@@ -956,7 +983,7 @@ echo "\n";
 echo "Webpages <-> _admin's Routes module share one source of truth\n";
 
 // Neither tool keeps a list of its own: both derive one from
-// /nino/http/routes plus the /webpage<uri>/* keys in the text files (see
+// /nino/http/routes plus the /_nino/webpage<uri>/* keys in the text files (see
 // Webpages::pages() and Admin.php's PageEditor::pages()). That only works if
 // the route really carries everything either side needs to reopen an entry -
 // its Element-URI, its body and its status code. Without that, every shipped
@@ -1101,10 +1128,10 @@ echo "PersonalInfos::apiList / apiSaveBatch\n";
 	return $config;
 } );
 $appData['/nino/locales/available'] = [ 'de_DE', 'en_US' ];
-\Nino\Filesystem::putFileContent( $appData, '/text/global.php', [ '[[/company/name]]' => 'Acme Inc', '[[/website/author]]' => 'Acme Inc', '[[/company/instagram]]' => 'https://www.instagram.com/acme' ] );
-\Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', [ '[[/company/country]]' => 'Deutschland', '[[/website/lang]]' => 'de', '[[/home/headline]]' => 'Willkommen', '[[/webpage/kontakt/name]]' => 'Kontakt' ] );
-\Nino\Filesystem::putFileContent( $appData, '/text/en_US.php', [ '[[/company/country]]' => 'Germany', '[[/website/lang]]' => 'en', '[[/home/headline]]' => 'Welcome', '[[/webpage/kontakt/name]]' => 'Contact' ] );
-\Nino\Filesystem::putFileContent( $appData, '/text/blacklist.php', [ '/website/lang' ] );
+\Nino\Filesystem::putFileContent( $appData, '/text/global.php', [ '[[/project/company/general/name]]' => 'Acme Inc', '[[/project/company/contact/address]]' => 'Street 1', '[[/project/website/general/author]]' => 'Acme Inc', '[[/project/company/social/instagram]]' => 'https://www.instagram.com/acme' ] );
+\Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', [ '[[/project/company/contact/country]]' => 'Deutschland', '[[/project/website/html/lang]]' => 'de', '[[/template/page-home/welcome/headline]]' => 'Willkommen', '[[/_nino/webpage/kontakt/name]]' => 'Kontakt' ] );
+\Nino\Filesystem::putFileContent( $appData, '/text/en_US.php', [ '[[/project/company/contact/country]]' => 'Germany', '[[/project/website/html/lang]]' => 'en', '[[/template/page-home/welcome/headline]]' => 'Welcome', '[[/_nino/webpage/kontakt/name]]' => 'Contact' ] );
+\Nino\Filesystem::putFileContent( $appData, '/text/blacklist.php', [ '/project/website/html/lang' ] );
 
 $personalInfosListRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\PersonalInfos::apiList( $appData, $personalInfosListRequest );
@@ -1113,31 +1140,34 @@ $personalInfosEntries = $personalInfosBody['entries'];
 $personalInfosKeys = array_column( $personalInfosEntries, 'key' );
 
 check( 'lists the locales', $personalInfosBody['locales'] === [ 'de_DE', 'en_US' ] );
-check( 'a /company/* key is listed', array_search( '/company/name', $personalInfosKeys, true ) !== false );
-check( 'a /website/* key is listed', array_search( '/company/country', $personalInfosKeys, true ) !== false );
-check( 'a blacklisted key is left out even though it\'s a /website/* key', array_search( '/website/lang', $personalInfosKeys, true ) === false );
-check( 'a key outside /company/* and /website/* is left out', array_search( '/home/headline', $personalInfosKeys, true ) === false );
-check( 'a webpage\'s own meta key is left out too, despite existing in text/*.php', array_search( '/webpage/kontakt/name', $personalInfosKeys, true ) === false );
+check( 'a /project/company/* key is listed', array_search( '/project/company/general/name', $personalInfosKeys, true ) !== false );
+check( 'another /project/company/* key is listed', array_search( '/project/company/contact/country', $personalInfosKeys, true ) !== false );
+check( 'the technical /project/website/html/* keys are left out: they are in no prefix, blacklisted or not', array_search( '/project/website/html/lang', $personalInfosKeys, true ) === false
+	&& array_search( '/project/website/html/charset', $personalInfosKeys, true ) === false );
+check( '...and so is the look of the mails, which the base unit ships under /project/mail/', array_search( '/project/mail/color/primary', $personalInfosKeys, true ) === false );
+check( 'a key outside /project/company/* and /project/website/general/* is left out', array_search( '/template/page-home/welcome/headline', $personalInfosKeys, true ) === false );
+check( 'a webpage\'s own meta key is left out too, despite existing in text/*.php', array_search( '/_nino/webpage/kontakt/name', $personalInfosKeys, true ) === false );
 // The links to a site's profiles elsewhere are the catalogue's Social links
 // feature - an element type the editors keep - and the base unit ships none
 // of the four /company/<network> keys it had, so the step asks for none of
 // them, not even where a project's text still holds one
-check( 'a social network\'s address is not asked for: the base unit ships no such key', array_search( '/company/instagram', $personalInfosKeys, true ) === false );
+check( 'a social network\'s address is not asked for: the base unit ships no such key', array_search( '/project/company/social/instagram', $personalInfosKeys, true ) === false );
 
 $personalInfosLabels = array_column( $personalInfosEntries, 'label', 'key' );
-check( 'derives a friendly label by capitalizing each path segment', $personalInfosLabels['/company/name'] === 'Company Name' );
-check( 'same for a /website/* key', $personalInfosLabels['/website/author'] === 'Website Author' );
+check( 'derives a friendly label from the category and the name, capitalized', $personalInfosLabels['/project/company/general/name'] === 'Company › Name' );
+check( '...also for a key of the website', $personalInfosLabels['/project/website/general/author'] === 'Website › Author' );
+check( '...and an address, spelled right', $personalInfosLabels['/project/company/contact/address'] === 'Company › Address' );
 
 $saveBatchRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $_POST['data'] = json_encode( [ 'items' => [
-	[ 'key' => '/company/country', 'locale' => 'de_DE', 'value' => 'Musterland' ],
-	[ 'key' => '/company/country', 'locale' => 'en_US', 'value' => 'Sample Country' ],
+	[ 'key' => '/project/company/contact/country', 'locale' => 'de_DE', 'value' => 'Musterland' ],
+	[ 'key' => '/project/company/contact/country', 'locale' => 'en_US', 'value' => 'Sample Country' ],
 ] ] );
 \Nino\Install\PersonalInfos::apiSaveBatch( $appData, $saveBatchRequest );
 $saveResults = $saveBatchRequest['/nino/http/response']['body']['results'];
 
-check( 'saves the de_DE value', $saveResults['/company/country']['ok'] === true && ( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/company/country]]'] ?? null ) === 'Musterland' );
-check( 'saves the en_US value', ( \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] )['[[/company/country]]'] ?? null ) === 'Sample Country' );
+check( 'saves the de_DE value', $saveResults['/project/company/contact/country']['ok'] === true && ( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/project/company/contact/country]]'] ?? null ) === 'Musterland' );
+check( 'saves the en_US value', ( \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] )['[[/project/company/contact/country]]'] ?? null ) === 'Sample Country' );
 
 echo "\n";
 
@@ -1454,7 +1484,7 @@ check( 'the base unit ships the one stylesheet the css bundle names, and copies 
 	&& in_array( 'assets', $baseFiles, true ) === true );
 
 /*	And the mailbox every mail this framework sends is addressed from.
-	\Nino\Mail::_getSender() reads '[[/form/email/owner]]' for the From header
+	\Nino\Mail::_getSender() reads '[[/project/mail/address/owner]]' for the From header
 	and the envelope sender of every one of them, and that fill used to ship
 	with the Form module's own install unit - which the wizard offers rather
 	than installs (see Install::units()). A project that did not pick that
@@ -1462,21 +1492,19 @@ check( 'the base unit ships the one stylesheet the css bundle names, and copies 
 	webserver user, which _getSender()'s own comment calls the most reliable
 	way there is to land in a spam folder	*/
 $baseGlobal = (array) ( include $baseUnit. '/text/global.php' );
-$formGlobal = (array) ( include $realRoot. '/_nino/Nino/Modules/Form/install/text/global.php' );
 
-check( 'the base unit ships the mailbox every mail is sent from', isset( $baseGlobal['[[/form/email/owner]]'] ) === true );
-check( '...and it is the only unit that does, so no unit order decides its value', isset( $formGlobal['[[/form/email/owner]]'] ) === false );
+check( 'the base unit ships the mailbox every mail is sent from', isset( $baseGlobal['[[/project/mail/address/owner]]'] ) === true );
 
 /*	As a fill rather than an address: the normal case is the one the project
 	already gave, so there is one answer in one place and changing it changes
 	both. An operator who needs a different one overwrites this key and the
 	company address stays what it is	*/
-check( '...with the company address as its value', $baseGlobal['[[/form/email/owner]]'] === '[[/company/email]]' );
+check( '...with the company address as its value', $baseGlobal['[[/project/mail/address/owner]]'] === '[[/project/company/contact/email]]' );
 // The envelope sender beside it, empty: "the same as the owner address"
 // until an operator whose host may not send for that address sets it
-check( 'the base unit ships the envelope sender fill, empty, beside the owner address', array_key_exists( '[[/mail/sender]]', $baseGlobal ) === true && $baseGlobal['[[/mail/sender]]'] === '' );
-check( '...which the same unit ships, or it would resolve to nothing', isset( $baseGlobal['[[/company/email]]'] ) === true
-	&& str_contains( (string) $baseGlobal['[[/company/email]]'], '[[' ) === false );
+check( 'the base unit ships the envelope sender fill, empty, beside the owner address', array_key_exists( '[[/project/mail/address/envelope]]', $baseGlobal ) === true && $baseGlobal['[[/project/mail/address/envelope]]'] === '' );
+check( '...which the same unit ships, or it would resolve to nothing', isset( $baseGlobal['[[/project/company/contact/email]]'] ) === true
+	&& str_contains( (string) $baseGlobal['[[/project/company/contact/email]]'], '[[' ) === false );
 
 preg_match_all( '#url\(["\']?\[\[/nino/public\]\](/fonts/[^)"\']+)#', $themeCss, $themeFonts );
 check( 'and every webfont it @font-faces', count( $themeFonts[1] ) > 0
@@ -1533,7 +1561,7 @@ check( '...and every one of them ends in a bare generic family'. ( $withoutBacku
 /*	An address a shipped template writes is the project's, and a site may sit
 	in a subdirectory: a form that posts to "/.newsletter" posts beside a site
 	at /shop. [[/nino/dir]] is what the library's own templates put in front
-	of every address - page-contact.tpl's action, theme.header.tpl's links -
+	of every address - page-contact.tpl's action, frame-header.tpl's links -
 	and the demo catalogue page, assembled from the Templates feature's
 	presets, was the one template that did not	*/
 $rootAbsoluteTemplates = [];
@@ -1589,6 +1617,16 @@ foreach( $duSources as $duRelative => $duFile ) {
 	}
 }
 check( 'every German text of the workbench and of the starter site says "Du", none of them "Sie" or lowercase "du"'. ( $duOffenders === [] ? '' : ' - '. implode( '; ', $duOffenders ) ), count( $duSources ) > 20 && $duOffenders === [] );
+// What a page unit proposes for a page's name, title and description is the
+// starter site's German too, and it is read from the manifest now
+$suggestOffenders = [];
+foreach( glob( $realRoot. '/_admin/install/library/pages/{*,.[!.]*}/manifest.php', GLOB_BRACE ) ?: [] as $suggestFile )
+	foreach( [ 'name', 'title', 'description' ] as $suggestField ) {
+		$suggestText = (string) ( ( ( include $suggestFile )['suggest'][$suggestField] ?? [] )['de_DE'] ?? '' );
+		if( preg_match( '/\b(Sie|Ihr|Ihre|Ihrem|Ihren|Ihrer|Ihres|Ihnen|du|dich|dir|dein|deine|deinem|deinen|deiner|deines)\b/u', $suggestText, $suggestMatch ) === 1 )
+			$suggestOffenders[] = basename( dirname( $suggestFile ) ). ' '. $suggestField. ' ('. $suggestMatch[1]. ')';
+	}
+check( 'the German wording the page units propose says "Du" as well'. ( $suggestOffenders === [] ? '' : ' - '. implode( '; ', $suggestOffenders ) ), $suggestOffenders === [] );
 
 /*	The web manifest is copied into public/favicon/ as it is - json, not a
 	template, so the check above never saw it, and its icons pointed from the
@@ -1626,7 +1664,7 @@ check( "every path the base unit's robots.txt disallows exists under the webroot
 // The stylesheet and the markup it styles are one delivery: theme.css names
 // .nino-frame-header and .nino-footer-nav, and nothing else writes either
 // template into a project
-foreach( [ 'theme.header.tpl', 'theme.footer.tpl' ] as $frame )
+foreach( [ 'frame-header.tpl', 'frame-footer.tpl' ] as $frame )
 	check( "the base unit ships $frame and lists it among its templates", is_file( $baseUnit. '/templates/'. $frame ) === true
 		&& in_array( $frame, (array) ( ( include $baseUnit. '/manifest.php' )['templates'] ?? [] ), true ) === true );
 
@@ -1642,6 +1680,29 @@ echo "\n";
 	project classes against, so NINO_APP_DIR moves them along. Nino's own
 	optional modules stay where the kernel is, below _nino/Nino/Modules, and
 	keep their keys against a project unit claiming the same one.	*/
+echo "A starter site leaves no text key missing\n";
+
+// Every page of the wizard's presets, each at the Element-URI and Http-URI its manifest names, with
+// the three modules the wizard always applies. The Missing text keys tile counts every [[/...]] a
+// template names that no file has - a comment is no exception, and a placeholder in one is a row
+// the Text panel cannot clear: it names a key the system writes, and there is no field for it
+$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
+$starterSetupRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Setup::apiApply( $appData, $starterSetupRequest );
+$starterEntries = [];
+foreach( [ 'home' => [ '/home', '/' ], 'contact' => [ '/contact', '/contact' ], 'services' => [ '/services', '/services' ], 'about-me' => [ '/about-me', '/about-me' ], '404' => [ '/404', '/404' ], 'legal' => [ '/legal', '/legal' ] ] as $starterKey => [ $starterUri, $starterHttpUri ] )
+	$starterEntries[] = [ 'uri' => $starterUri, 'httpUri' => $starterHttpUri, 'libraryKey' => (string) $starterKey, 'navs' => [], 'text' => [ 'de_DE' => [ 'name' => 'Seite '. $starterKey ], 'en_US' => [ 'name' => 'Page '. $starterKey ] ] ];
+$_POST['data'] = json_encode( [ 'webpages' => $starterEntries ] );
+$starterRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Webpages::apiApply( $appData, $starterRequest );
+check( 'the whole starter site applies', $starterRequest['/nino/http/response']['statusCode'] === 200 && count( $starterRequest['/nino/http/response']['body']['webpages'] ?? [] ) === 6 );
+$starterMissing = ( new ReflectionMethod( \Nino\Modules\Text\Keys::class, '_scanMissing' ) )->invokeArgs( null, [ &$appData ] );
+check( 'on a fresh install the Missing text keys tile reads 0 - no template names a key nobody writes'
+	. ( $starterMissing === [] ? '' : ' - '. implode( ', ', array_column( $starterMissing, 'key' ) ) ), \Nino\Modules\Text\Keys::missingCount( $appData ) === 0 );
+
+echo "\n";
+
+
 echo "Install units travel with their modules\n";
 
 if( defined( 'NINO_APP_DIR' ) === true ) {

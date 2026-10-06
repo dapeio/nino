@@ -78,12 +78,13 @@ namespace Nino\Modules {
 
 		private const int DEFAULT_RETRY = 3600;
 
-		// Used only where the project defines neither /maintenance/title nor
-		// /maintenance/text anywhere (no text file, no runtime fill) and the
-		// module has no default in the language of the page (install/text/
-		// <locale>.php) - the page always has something to show. English
-		// only, same reasoning as the recovery page and the setup wizard (see
-		// AGENTS.md, "Designing an admin frontend")
+		// Used only where the project defines neither
+		// /module/maintenance/page/title nor /module/maintenance/page/text
+		// anywhere (no text file, no runtime fill) and the module has no
+		// default in the language of the page (install/text/<locale>.php) -
+		// the page always has something to show. English only, same reasoning
+		// as the recovery page and the setup wizard (see AGENTS.md,
+		// "Designing an admin frontend")
 		private const string DEFAULT_TITLE = 'Under maintenance';
 		private const string DEFAULT_TEXT	= 'We will be back shortly.';
 
@@ -267,9 +268,10 @@ namespace Nino\Modules {
 		 *	design; otherwise the module's own template for the language of
 		 *	the page (templates/page-maintenance.<locale>.tpl, en_US where
 		 *	there is none for it) with the same two fills
-		 *	(/maintenance/title, /maintenance/text) resolved directly rather
-		 *	than through the shortcode pipeline, and this module's default in
-		 *	that language (install/text/<locale>.php) or a hardcoded one
+		 *	(/module/maintenance/page/title, /module/maintenance/page/text)
+		 *	resolved directly rather than through the shortcode pipeline, and
+		 *	this module's default in that language (install/text/<locale>.php)
+		 *	or a hardcoded one
 		 *	wherever the project defines neither - so the switch always
 		 *	answers something, on a project that never applied any install
 		 *	content at all. The constant is what is left when no template can
@@ -290,14 +292,14 @@ namespace Nino\Modules {
 			$stock 	= \Nino\Filesystem::getFileContent( $appData, self::DIR. '/install/text/'. $locale. '.php', [] );
 			$stock 	= is_array( $stock ) === true ? $stock : [];
 
-			$title = $fills['[[/maintenance/title]]'] ?? null;
-			$text	 = $fills['[[/maintenance/text]]'] ?? null;
+			$title = $fills['[[/module/maintenance/page/title]]'] ?? null;
+			$text	 = $fills['[[/module/maintenance/page/text]]'] ?? null;
 
 			if( is_string( $title ) === false || $title === '' )
-				$title = $stock['[[/maintenance/title]]'] ?? null;
+				$title = $stock['[[/module/maintenance/page/title]]'] ?? null;
 
 			if( is_string( $text ) === false || $text === '' )
-				$text = $stock['[[/maintenance/text]]'] ?? null;
+				$text = $stock['[[/module/maintenance/page/text]]'] ?? null;
 
 			$title = is_string( $title ) === true && $title !== '' ? $title : self::DEFAULT_TITLE;
 			$text	 = is_string( $text ) === true && $text !== '' ? $text : self::DEFAULT_TEXT;

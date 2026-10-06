@@ -6,6 +6,6 @@
 		'GET://sample-fr' => [ 'uri' => '/exemple', 'locale' => 'fr_FR', 'body' => '[template /templates/page-sample]' ],
 	],
 	'templates'	=> [ 'page-sample.tpl' ],
-	'blacklist'	=> [ '/sample/hidden' ],
+	'blacklist'	=> [ '/feature/sample/intro/hidden' ],
 	'config'		=> [ '/sample/config' => 'unit-default' ],
 ];

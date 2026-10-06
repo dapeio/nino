@@ -86,7 +86,7 @@ Routen stehen in `config.php` unter `/nino/http/routes`. Der Array-Key verbindet
 
 `GET://` bezeichnet die Startseite: `GET` ist die Methode, der zweite Slash die HTTP-URI `/`. Für `/contact` lautet der Schlüssel entsprechend `GET://contact`.
 
-Die Route trennt die öffentliche Adresse von der internen Seitenidentität. Die Startseite ist im Browser unter `/` erreichbar, kann intern aber `/home` heißen. Textschlüssel wie `/webpage/home/title` bleiben dadurch stabil, wenn sich nur der öffentliche Pfad ändert.
+Die Route trennt die öffentliche Adresse von der internen Seitenidentität. Die Startseite ist im Browser unter `/` erreichbar, kann intern aber `/home` heißen. Textschlüssel wie `/_nino/webpage/home/title` bleiben dadurch stabil, wenn sich nur der öffentliche Pfad ändert.
 
 Neben `uri` und `body` kann eine Route beispielsweise Statuscode, Header oder eine feste Sprache enthalten. Gibt es keinen Treffer für eine Anfrage, verwendet Nino die konfigurierte Route für `/404`.
 
@@ -120,7 +120,7 @@ Die geladene `.tpl`-Datei kann neben HTML auch wieder Shortcodes und Textfills e
 ```html
 [template /templates/html-header]
 <main>
-  <h1>[[/webpage/home/title]]</h1>
+  <h1>[[/_nino/webpage/home/title]]</h1>
 
   [elements /services]
     <article>
@@ -138,11 +138,11 @@ Seitentemplates lassen sich über den Template-Baukasten aus vollständigen HTML
 
 Nino verarbeitet einen HTML-String bei jedem Rendering-Durchlauf in einer festen Reihenfolge:
 
-1. Textfills werden ersetzt (`[[/webpage/home/title]]`).
+1. Textfills werden ersetzt (`[[/_nino/webpage/home/title]]`).
 2. Registrierte Shortcodes werden ausgeführt (`[template /templates/html-header]`).
 3. Registrierte Callbacks unter `/nino/html/render` erhalten das Ergebnis.
 
-**Textfills** sind einzelne globale oder sprachabhängige Werte. Sie eignen sich für Seitentitel, Beschreibungen und andere Textinhalte an einer festen Stelle.
+**Textfills** sind einzelne globale oder sprachabhängige Werte. Sie eignen sich für Seitentitel, Beschreibungen und andere Textinhalte an einer festen Stelle. Ihre Schlüssel folgen einer Grammatik – `/<namensraum>/<kategorie>/<teil>/<name>`, etwa `/template/page-home/welcome/title` für ein Wort des Templates `page-home.tpl` und `/project/company/contact/email` für eine Tatsache des Projekts; die Regeln stehen im [Entwickler-Handbuch](development.de.md#die-schlüssel-grammatik).
 
 **Elemente** bilden wiederkehrende Inhalte nach einem vordefinierten Typmodell ab, beispielsweise Leistungen, Teammitglieder oder Referenzen. Entwickler definieren die Felder unter Elementtypen; Entwickler und Redakteure pflegen die Einträge unter Elemente, jeder im Rahmen seiner Rechte.
 

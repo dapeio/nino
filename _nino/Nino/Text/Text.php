@@ -34,6 +34,14 @@ namespace Nino {
 		// hard byte limit above, at four bytes a character
 		public const int MAX_LIMIT = self::HARD_MAXLENGTH / 4;
 
+		// The form a text key a person creates or renames takes:
+		// /<namespace>/<category>/<part>/<name>, the namespace one of a closed
+		// list and every other segment lower-case words joined by hyphens.
+		// What the system writes by itself - /_nino/... - and the workbench's
+		// own words - /_admin/... - are not of this form and are never
+		// created by hand
+		private const string KEY_GRAMMAR = '#^/(?:template|project|feature|module)(?:/[a-z0-9]+(?:-[a-z0-9]+)*){3}$#D';
+
 		// Every known key across global.php + every locale file, with its
 		// current value(s), whether it's global or per-locale, its format
 		// (the one set in meta(), else the widest the values hold - 'html' is
@@ -240,6 +248,13 @@ namespace Nino {
 			return $written === true || $unchanged === true;
 		}
 
+		// Whether a key has the form of a text key a person may create or
+		// rename (see KEY_GRAMMAR). Not a statement about the keys already
+		// there: a project may hold older ones, and they stay as they are
+		public static function isGrammarKey( string $key ): bool {
+			return preg_match( self::KEY_GRAMMAR, $key ) === 1;
+		}
+
 		// How many characters of a value a person sees: the tags are not
 		// text, and an entity is one character. What a key's limit is
 		// measured in - the editor counts the same way
@@ -386,7 +401,7 @@ namespace Nino {
 			// survive an attribute though, and Html::_renderFills() is a blind
 			// str_replace over the finished document: the shipped templates put
 			// plain-text fills inside href/src/alt/content/title (eg.
-			// '<meta name="author" content="[[/website/author]]">' in
+			// '<meta name="author" content="[[/project/website/general/author]]">' in
 			// html-header.tpl), where a stored value of  x" onmouseover="...
 			// closes the attribute and opens an event handler that fires for
 			// every visitor. The quotes go in as entities, which render as
@@ -412,7 +427,7 @@ namespace Nino {
 		 *	one. The Text panel is an editor's, and an editor edits words; what
 		 *	a page includes is a developer's decision.
 		 *
-		 *	So '[[/a/fill/key]]' survives and every other bracket becomes an
+		 *	So '[[/template/page-home/welcome/title]]' survives and every other bracket becomes an
 		 *	entity, which renders as itself and carries no meaning on the next
 		 *	pass. Neither entity contains a bracket, so re-saving a value that
 		 *	went through here changes nothing - the same idempotence the quotes

@@ -8,4 +8,10 @@
 		'GET://404' => [ 'uri' => '/404', 'body' => '[template /templates/page-404]', 'statusCode' => 404 ],
 	],
 	'templates' => [ 'page-404.tpl' ],
+	'suggest' => [
+		'uri' 				=> '/404',
+		'name' 				=> [ 'en_US' => 'Page not found', 'de_DE' => 'Seite nicht gefunden' ],
+		'title' 			=> [ 'en_US' => 'Page not found', 'de_DE' => 'Seite nicht gefunden' ],
+		'description' => [ 'en_US' => 'This page could not be found.', 'de_DE' => 'Diese Seite wurde nicht gefunden.' ],
+	],
 ];

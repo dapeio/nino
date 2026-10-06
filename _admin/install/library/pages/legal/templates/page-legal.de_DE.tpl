@@ -1,5 +1,5 @@
 [template /templates/html-header]
-<h2 class="nino-sr-only">[[/webpage[[/nino/http/response/uri]]/name]]</h2>
+<h2 class="nino-sr-only">[[/_nino/webpage[[/nino/http/response/uri]]/name]]</h2>
 <section id="legal-imprint" class="nino-section">
 	<div class="nino-grid-row">
 		<div class="nino-grid-100">
@@ -8,7 +8,7 @@
 
 		<div class="nino-grid-100">
 		  <h4>Angaben gemäß § 5 Digitale-Dienste-Gesetz (DDG)</h4>
-		  <p>[[/website/author]]<br>[[/company/adress]]<br>[[/global/phone]]: [[/company/phone]]<br>[[/global/email]]: [[/company/email]]</p>
+		  <p>[[/project/website/general/author]]<br>[[/project/company/contact/address]]<br>[[/template/common/label/phone]]: [[/project/company/contact/phone]]<br>[[/template/common/label/email]]: [[/project/company/contact/email]]</p>
 
 		  <h4>Verbraucher&shy;streit&shy;beilegung/Universal&shy;schlichtungs&shy;stelle</h4>
 		  <p>Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.</p>
@@ -41,7 +41,7 @@
 		  <p>Diese Website wird extern gehostet. Die personenbezogenen Daten, die auf dieser Website erfasst werden, werden auf den Servern des Hosters gespeichert. Hierbei kann es sich v. a. um IP-Adressen, Kontaktanfragen, Meta- und Kommunikationsdaten, Vertragsdaten, Kontaktdaten, Namen, Websitezugriffe und sonstige Daten handeln, die über eine Website generiert werden.</p>
 		  <p>Das externe Hosting erfolgt zum Zwecke der Vertragserfüllung gegenüber unseren potenziellen und bestehenden Kunden (Art. 6 Abs. 1 lit. b DSGVO) und im Interesse einer sicheren, schnellen und effizienten Bereitstellung unseres Online-Angebots durch einen professionellen Anbieter (Art. 6 Abs. 1 lit. f DSGVO). Sofern eine entsprechende Einwilligung abgefragt wurde, erfolgt die Verarbeitung ausschließlich auf Grundlage von Art. 6 Abs. 1 lit. a DSGVO und § 25 Abs. 1 TTDSG, soweit die Einwilligung die Speicherung von Cookies oder den Zugriff auf Informationen im Endgerät des Nutzers umfasst. Die Einwilligung ist jederzeit widerrufbar.</p>
 		  <p>Unser Hoster wird Deine Daten nur insoweit verarbeiten, wie dies zur Erfüllung seiner Leistungspflichten erforderlich ist und unsere Weisungen in Bezug auf diese Daten befolgen. Mit unserem Hoster besteht ein Vertrag über Auftragsverarbeitung gemäß Art. 28 DSGVO.</p>
-		  <p><strong>Hoster:</strong><br>[[/website/host]]</p>
+		  <p><strong>Hoster:</strong><br>[[/project/website/general/host]]</p>
 		  <h4>3. Allgemeine Hinweise und Pflichtinformationen</h4>
 		  <h5>Datenschutz</h5>
 		  <p>Die Betreiber dieser Seiten nehmen den Schutz Deiner persönlichen Daten sehr ernst. Wir behandeln Deine personenbezogenen Daten vertraulich und entsprechend den gesetzlichen Datenschutzvorschriften sowie dieser Datenschutzerklärung.</p>
@@ -49,7 +49,7 @@
 		  <p>Wir weisen darauf hin, dass die Datenübertragung im Internet (z.&nbsp;B. bei der Kommunikation per E-Mail) Sicherheitslücken aufweisen kann. Ein lückenloser Schutz der Daten vor dem Zugriff durch Dritte ist nicht möglich.</p>
 		  <h5>Hinweis zur verantwortlichen Stelle</h5>
 		  <p>Die verantwortliche Stelle für die Datenverarbeitung auf dieser Website ist:</p>
-		  <p>[[/website/author]]<br>[[/company/adress]]<br>[[/global/phone]]: [[/company/phone]]<br>[[/global/email]]: [[/company/email]]</p>
+		  <p>[[/project/website/general/author]]<br>[[/project/company/contact/address]]<br>[[/template/common/label/phone]]: [[/project/company/contact/phone]]<br>[[/template/common/label/email]]: [[/project/company/contact/email]]</p>
 		  <h5>Speicherdauer</h5>
 		  <p>Soweit innerhalb dieser Datenschutzerklärung keine speziellere Speicherdauer genannt wurde, verbleiben Deine personenbezogenen Daten bei uns, bis der Zweck für die Datenverarbeitung entfällt. Wenn Du ein berechtigtes Löschersuchen geltend machst oder eine Einwilligung zur Datenverarbeitung widerrufst, werden Deine Daten gelöscht, sofern wir keine anderen rechtlich zulässigen Gründe für die Speicherung Deiner personenbezogenen Daten haben.</p>
 

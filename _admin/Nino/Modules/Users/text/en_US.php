@@ -84,7 +84,7 @@ return [
 	'[[/_admin/users/label/locked-until]]'	=> 'locked until %s',
 	'[[/_admin/users/label/lastlogin]]'	=> 'Last login: %s',
 	'[[/_admin/users/label/never]]'	=> 'Never logged in',
-	'[[/_admin/roles/scope/hint]]'	=> 'Detailed permissions say what somebody may do inside an area: choose the area, then the action and, where there is one, the field.',
+	'[[/_admin/roles/scope/hint]]'	=> 'Detailed permissions say what somebody may do inside an area: choose the area, then the action and, where there is one, the field. A whole page takes two areas: its texts under “/template” and its page details under “/_nino”.',
 	'[[/_admin/roles/scope/area]]'	=> 'Area',
 	'[[/_admin/roles/scope/action]]'	=> 'Action',
 	'[[/_admin/roles/scope/field]]'	=> 'Field',

@@ -1,9 +1,9 @@
-# [[/company/name]]
+# [[/project/company/general/name]]
 
-> [[/company/description]]
+> [[/project/company/general/description]]
 
-Kontakt: [[/company/email]] | [[/company/phone]]
-Adresse: [[/company/adress]], [[/company/country]]
+Kontakt: [[/project/company/contact/email]] | [[/project/company/contact/phone]]
+Adresse: [[/project/company/contact/address]], [[/project/company/contact/country]]
 
-<!-- Add one "- [[/webpage/<page>/name]]: https://[[/website/url]][[/webpage/<page>/uri]]"
-     line per page built in the setup wizard's Routes step -->
+<!-- Add one line per page built in the setup wizard's Routes step, eg.
+     "- <page name>: https://<website url><page path>" -->

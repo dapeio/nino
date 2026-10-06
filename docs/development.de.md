@@ -145,7 +145,7 @@ Html::response( $appData, $request );
 
 `Http::request()` liest nicht direkt in beliebige Projektvariablen, sondern normalisiert Methode, URI, Query, Header, Body, Basic-Auth-Daten und Client-IP unter `/nino/http/request`. Gleichzeitig entsteht eine Response mit leerem Body, Status `200` und den voreingestellten Sicherheitsheadern.
 
-Die Laufzeit-Textfills werden in zwei Durchgängen ergänzt, und die Trennung ist wesentlich. `/nino/dir`, `/nino/public` und `/date/year` hängen nur von `$appData` ab und werden deshalb **vor** `Http::response()` registriert: Ein Response-Callback, der ein Template rendert, ist ein realer Aufrufer — `Modules\Form` und `Modules\Newsletter` bauen ihre HTML-Mails genau in diesem Fenster, und ein danach registrierter Fill erreichte sie als das Literal `[[/nino/public]]`.
+Die Laufzeit-Textfills werden in zwei Durchgängen ergänzt, und die Trennung ist wesentlich. `/nino/dir`, `/nino/public` und `/nino/date/year` hängen nur von `$appData` ab und werden deshalb **vor** `Http::response()` registriert: Ein Response-Callback, der ein Template rendert, ist ein realer Aufrufer — `Modules\Form` und `Modules\Newsletter` bauen ihre HTML-Mails genau in diesem Fenster, und ein danach registrierter Fill erreichte sie als das Literal `[[/nino/public]]`.
 
 `Http::response()` sucht unter `/nino/http/routes` nach einer passenden Route, übernimmt deren Werte in die vorbereitete Response und führt anschließend die globalen und routenspezifischen Response-Callbacks aus. `Locales::response()` übernimmt die durch die Route aufgelöste Sprache. Erst danach ergänzt Nino die Textfills, die den aufgelösten Request brauchen: Request-URI, Response-URI, Locale und aktuellen Nutzer.
 
@@ -344,8 +344,8 @@ Sie führt drei Verarbeitungsschritte aus:
 Textfills sind Platzhalter mit doppelten eckigen Klammern:
 
 ```html
-<title>[[/webpage/meta/title]]</title>
-<p>[[/contact/intro]]</p>
+<title>[[/_nino/webpage[[/nino/http/response/uri]]/title]]</title>
+<p>[[/template/page-contact/hero/subtitle]]</p>
 ```
 
 Nino kombiniert dabei:
@@ -360,11 +360,48 @@ Laufzeitwerte lassen sich gezielt ergänzen:
 
 ```php
 \Nino\Html::addFills( $appData, [
-    '/project/catalog/count' => 42,
+    '/project/catalog/list/count' => 42,
 ], '*' );
 ```
 
 Der dritte Parameter bezeichnet den Sprachbereich. `'*'` steht für sprachunabhängige Werte.
+
+#### Die Schlüssel-Grammatik
+
+Jeder Textschlüssel, den ein Projekt oder eine Unit mitbringt, hat vier Segmente, `/<namensraum>/<kategorie>/<teil>/<name>`, jedes aus kleingeschriebenen Wörtern, die ein Bindestrich verbindet: `[a-z0-9]+(-[a-z0-9]+)*`. Die Wörter sind englisch und ausgeschrieben. Ein Schlüssel nennt weder die Sprache noch, ob er global oder je Sprache gilt, und ein Name ist nie eine Zahl: Eine Liste trägt ihren Index im Teil (`item-1`).
+
+| Namensraum | Was er enthält | Kategorie | Beispiel |
+| --- | --- | --- | --- |
+| `template` | die Wörter, die genau ein Template liest | der Dateiname des Templates ohne `.tpl`, mit Präfix | `/template/page-services/item-1/title` |
+| `template` | die Wörter, die mehrere Templates lesen | immer `common` | `/template/common/form/submit` |
+| `project` | Tatsachen, Einstellungen und eigene Inhalte des Projekts | `company`, `website`, `mail` oder ein Name des Projekts | `/project/company/contact/email` |
+| `feature` | die Wörter einer Funktion eines Katalog-Features | der `key` aus dem Manifest | `/feature/lightbox/controls/close` |
+| `module` | die Wörter eines Kernel-Moduls | das Verzeichnis des Moduls, klein geschrieben | `/module/form/info/required` |
+
+Wem ein Wort gehört, entscheidet diese Reihenfolge; die erste Frage, die mit Ja beantwortet wird, gilt:
+
+1. Ist es eine Tatsache, Einstellung oder ein eigener Inhalt des Projekts, der zu keinem Template gehört – Firma, Website, Postfach, Gestaltung der Mails, Texte der projekteigenen Module? → `/project/<kategorie>/...`
+2. Lesen mehrere Templates das Wort, und ist es an keine Funktion gebunden – Feldbeschriftungen, Knopfwörter, die Beschriftung vor einer Telefonnummer? → `/template/common/<teil>/<name>`. Dazu zählt ein Wort, das Code in beliebige Templates mit passendem Markup einsetzt, etwa die Feldbeschriftungen des Kontaktformulars, die `\Nino\Form::DEFAULT_FORM` in jedes Template bringt, das das Formular zeigt.
+3. Gehört es zu einer Funktion eines Moduls oder Features – ihr Code gibt es aus, setzt es zur Laufzeit, wählt es aus einer festen Menge aus, oder die Funktion liefert es für Markup mit, das beliebige Projekt-Templates schreiben? → `/module/<verzeichnis>/...` oder `/feature/<key>/...`. Daran ändert sich nichts, wenn ein Projekt-Template es ebenfalls liest oder das Projekt das Template austauscht.
+4. Sonst gehört das Wort dem einen Template, das es liest, in der Kategorie seines Dateinamens: `/template/<dateiname ohne .tpl>/...`. Das gilt auch für die Templates, die eine Unit mitliefert.
+
+Die Regel gilt beim Anlegen eines Schlüssels. Nichts zieht ihn später um: Liest ein zweites Template ein Wort einer fremden Kategorie, bleibt es, wo es ist. Der Scan im Tab Textschlüssel nennt so einen Fall; wer das Wort teilen will, legt es unter `common` neu an und ändert die Lesestellen.
+
+Der Teil ist der Block, in dem das Wort steht: `intro`, `hero`, `item-<n>`, `form`, `navigation`, `action`, `summary`, `outro`, `label` – oder ein Wort, das den Block benennt (`welcome`, `pager`, `banner`). Der Name ist das Ding selbst, möglichst `title`, `text`, `button` oder `label`. Hat ein Eintrag einer Liste ein Wort, steht seine Kennung im Namen (`/feature/modeswitch/mode/dark`); hat er mehrere, steht sie im Teil (`item-1`, `category-necessary`).
+
+Eine Beschriftung vor einer Angabe und die Angabe selbst sind zwei Dinge. `/template/common/label/phone` ist das Wort „Telefon“; die Nummer ist `/project/company/contact/phone`, und jedes Template liest sie von dort und von nirgends sonst.
+
+Die Kategorie eines Templates ist sein Dateiname ohne `.tpl`: `page-home.tpl` trägt `/template/page-home/...`, `html-footer.tpl` trägt `/template/html-footer/...`; nichts wird abgeschnitten oder abgeleitet. Ein Name, der kein Wort eines Schlüssels ist – ein Punkt, ein Großbuchstabe, ein Unterstrich, ein Schrägstrich –, gibt dem Template keine Kategorie: Es trägt keine eigenen Schlüssel und darf alle anderen lesen (`page-legal.de_DE.tpl`, `.demo-catalogue.tpl`). Nur Dateien direkt in `templates/` haben eine. `\Nino\Modules\Template::category()` nennt sie für einen Dateinamen oder ein Template, wie ein Shortcode oder ein Routen-Body es angibt (`/templates/page-home`); die Regel steht nur dort.
+
+Zur Laufzeit zusammengesetzt werden darf ein Schlüssel nur in diesen Formen: `[[/_nino/webpage[[/nino/http/response/uri]]/<name>]]` und `[[/_nino/locale/[[locale]]/name]]` in einem Template, dazu ein Schlüssel mit vier Segmenten, in dem ein Platzhalter einen ganzen Namen oder die Kennung eines Listen-Teils ersetzt (`/feature/posts/navigation/` + `prev`, `/feature/consent/category-` + `necessary` + `/name`). Welche Wörter dabei herauskommen, sieht kein Scan; wer einen Schlüssel zusammensetzt, prüft die gerenderten Wörter im eigenen Smoke-Test.
+
+Drei Dinge sind kein Textschlüssel. Die Laufzeit-Fills des Kernels liegen unter `/nino/` und stehen nie in einer Textdatei (`[[/nino/dir]]`, `[[/nino/public]]`, `[[/nino/date/year]]`, `[[/nino/http/response/uri]]`, ...; `\Nino\Html::runtimeFillKeys()` nennt sie). Ein lokaler Platzhalter hat keinen führenden Schrägstrich (`[[name]]` in einer Elements-Schleife oder einem Mail-Template, `[[.rel]]`). Konfiguration wie `/nino/jstext/keys` oder `/project/catalog` in `config.php` ist ein anderer Speicher, auch wo sie gleich aussieht.
+
+Zwei Formen gehören dem System, nicht dem Projekt: `/_nino/webpage<uri>/<name|title|description|uri>`, die Seitenangaben nach der Element-URI (sie darf Schrägstriche und Punkte enthalten), und `/_nino/locale/<code>/name`, der Name einer Sprache. Den ersten schreiben der Assistent und das Panel Routen – für die Seiten, die Features zur Laufzeit routen, im Abschnitt „Feature-Routen“ des Panels –, den zweiten die Localepicker-Unit und das Panel Sprache; es gibt einer Sprache, die es anlegt, ihren Code als Namen. `/_admin/...` sind die Wörter der Workbench und bleiben, wie sie sind.
+
+Der Server hält die Grammatik ein, wo Menschen Schlüssel anlegen: Der Tab Textschlüssel legt nur Schlüssel an und benennt nur zu Schlüsseln um, die ihr folgen (`\Nino\Text::isGrammarKey()`), und benennt keinen Schlüssel unter `/_nino/` oder `/_admin/` um. Schlüssel, die ein Projekt schon hat, bleiben unberührt und bearbeitbar. `tests/keys-smoke.php` prüft alles, was Nino ausliefert, findet Reste alter Formen und stellt sicher, dass jeder Schlüssel, den ein ausgeliefertes Template liest, existiert.
+
+Bis das Modul Legal sie ablöst, sind die Rechtsseite `page-legal.<xx_XX>.tpl` und der Verweis im Fuß, über den man sie erreicht, `/website/legal/{uri,name}`, die eine Ausnahme: Sie behalten ihre Namen, und die Prüfungen nennen die Ausnahme.
 
 ### Shortcodes
 
@@ -496,7 +533,7 @@ Module werden in `/nino/modules` aktiviert. Die Reihenfolge des Arrays ist relev
 | `Csrf` | `[csrf]` | rendert ein verstecktes Token-Feld; der Kernschutz selbst ist immer aktiv |
 | `Elements` | `[element …]`, `[elements …]`, `[elementvalues …]` | lädt typisierte Inhalte; Listen unterstützen Query, `sort`, `offset`, `limit` und optionalen Callback, und `[elementvalues]` durchläuft die verschiedenen Werte eines Feldes |
 | `Form` | `POST://.form` | besitzt den einen Formular-Endpunkt und reicht jede Einsendung an `\Nino\Form` weiter – siehe [Formulare](#formulare) |
-| `Images` | `[image …]` | erzeugt ein escaped `<img>` aus einem Bildslot oder einer URI. Sein `alt` ist der für den Slot in der aktuellen Sprache gespeicherte Text, sonst das eigene `alt="…"` des Shortcodes, sonst leer (`alt=""`, dekorativ) – nie die Beschriftung des Slots. Der Text wird escaped und sein `[` als `&#91;` geschrieben, damit er in der nächsten Rendering-Runde keinen Fill und keinen Shortcode öffnen kann. Mit Inhalt – `[image /logo]...[/image]` – wird der Inhalt statt des `<img>` ausgegeben, und nur, wenn der Platz ein Bild hat: `[[src]]` (der Pfad der Datei ab der Wurzel der Seite; `https://[[/website/url]][[src]]` ist eine absolute Adresse), `[[width]]`, `[[height]]` und `[[alt]]` werden eingesetzt. So fragt ein Meta-Tag oder eine Mail nach der Adresse, ohne leer oder kaputt zu bleiben, wo noch nichts hochgeladen ist. Ein einfaches `[image]` vor dem ersten schließenden `[/image]` eines Templates liest den Text dazwischen als eigenen Inhalt; die Inhaltsform gehört deshalb in ein Template ohne einfaches `[image]` davor, oder das einfache wird als `[image /x][/image]` geschrieben |
+| `Images` | `[image …]` | erzeugt ein escaped `<img>` aus einem Bildslot oder einer URI. Sein `alt` ist der für den Slot in der aktuellen Sprache gespeicherte Text, sonst das eigene `alt="…"` des Shortcodes, sonst leer (`alt=""`, dekorativ) – nie die Beschriftung des Slots. Der Text wird escaped und sein `[` als `&#91;` geschrieben, damit er in der nächsten Rendering-Runde keinen Fill und keinen Shortcode öffnen kann. Mit Inhalt – `[image /logo]...[/image]` – wird der Inhalt statt des `<img>` ausgegeben, und nur, wenn der Platz ein Bild hat: `[[src]]` (der Pfad der Datei ab der Wurzel der Seite; `https://[[/project/website/general/url]][[src]]` ist eine absolute Adresse), `[[width]]`, `[[height]]` und `[[alt]]` werden eingesetzt. So fragt ein Meta-Tag oder eine Mail nach der Adresse, ohne leer oder kaputt zu bleiben, wo noch nichts hochgeladen ist. Ein einfaches `[image]` vor dem ersten schließenden `[/image]` eines Templates liest den Text dazwischen als eigenen Inhalt; die Inhaltsform gehört deshalb in ein Template ohne einfaches `[image]` davor, oder das einfache wird als `[image /x][/image]` geschrieben |
 | `Jstext` | `[jstext]` | stellt Textwerte als sicher kodiertes JSON mit CSP-Nonce bereit |
 | `Localepicker` | `[localepicker …]` | wechselt Locale über Query und Redirect |
 | `Maintenance` | `/nino/http/response`, Priorität 1; `/nino/http/output`, Priorität 9 | beantwortet, solange `/nino/maintenance/status` an ist, jede Seite und jeden Modul-Endpunkt mit 503 und Retry-After-Header, für jeden nicht in der Workbench angemeldeten Besuch – die Anmeldung selbst ausgenommen – und setzt oben auf jede Seite, die ein angemeldetes Konto öffnet, einen Hinweis |
@@ -510,7 +547,7 @@ Einige Details sind absichtlich defensiv gestaltet:
 - Das Formular begrenzt Eingaben, schützt Schreibvorgänge und verwirft alte Protokollmonate.
 - Die öffentliche Anmeldung des Newsletter-Features aus dem Katalog antwortet unabhängig davon gleich, ob eine Adresse neu oder bereits bekannt ist. Das erschwert die Abfrage fremder Adressen.
 - `Jstext` verwendet JSON-Hex-Escaping und ergänzt die Content-Security-Policy um einen zufälligen Nonce.
-- `Jstext` trägt nur die Textschlüssel, die dafür veröffentlicht wurden, nicht jeden Fill der Seite. Mitgeliefert sind `/form/info/`, `/newsletter/info/` und `/slider/label/` – was die öffentlichen Skripte lesen –, die Workbench veröffentlicht `/_admin/`. Wer ein eigenes Skript hat, das einen anderen Schlüssel liest, nennt dessen Präfix in `config.php` unter `/nino/jstext/keys`; ein Modul oder Feature ruft `\Nino\Modules\Jstext::publish( $appData, [ '/mein/info/' ] )` in seinem `init()`. **Ein veröffentlichter Schlüssel ist öffentlich**: Er steht im Quelltext jeder Seite, die den Block rendert. Vorher stand dort `/form/email/owner` – das Postfach, an das ein Kontaktformular zustellt – auf jeder Seite.
+- `Jstext` trägt nur die Textschlüssel, die dafür veröffentlicht wurden, nicht jeden Fill der Seite. Mitgeliefert sind `/module/form/info/`, `/feature/newsletter/info/` und `/template/common/slider/` – was die öffentlichen Skripte lesen –, die Workbench veröffentlicht `/_admin/`. Wer ein eigenes Skript hat, das einen anderen Schlüssel liest, nennt dessen Präfix in `config.php` unter `/nino/jstext/keys`; ein Modul oder Feature ruft `\Nino\Modules\Jstext::publish( $appData, [ '/project/mine/info/' ] )` in seinem `init()`. **Ein veröffentlichter Schlüssel ist öffentlich**: Er steht im Quelltext jeder Seite, die den Block rendert. Vorher stand dort `/project/mail/address/owner` – das Postfach, an das ein Kontaktformular zustellt – auf jeder Seite.
 
 ### Formulare
 
@@ -523,13 +560,13 @@ Ein Projekt definiert seine Formulare unter `/nino/form/forms` in der `config.ph
 	[
 		'key'						=> 'quote',
 		'name'					=> 'Angebotsanfrage',
-		'to'						=> 'vertrieb@example.com',	// '' schickt an '[[/form/email/owner]]'
-		'subject'				=> '',											// '' nutzt '[[/form/subject/owner]]'
+		'to'						=> 'vertrieb@example.com',	// '' schickt an '[[/project/mail/address/owner]]'
+		'subject'				=> '',											// '' nutzt '[[/module/form/subject/owner]]'
 		'confirm'				=> true,										// Bestätigung an die erste Adresse, die der Besucher angegeben hat
 		'ownerTemplate'	=> '/templates/mail-owner',
 		'userTemplate'	=> '/templates/mail-user',
 		'fields'				=> [
-			[ 'name' => 'email',	'label' => '[[/form/label/email]]', 'type' => 'email',		'required' => true ],
+			[ 'name' => 'email',	'label' => '[[/template/common/form/email]]', 'type' => 'email',		'required' => true ],
 			[ 'name' => 'budget',	'label' => 'Budget',								'type' => 'number' ],
 			[ 'name' => 'wishes',	'label' => 'Wofür?',								'type' => 'textarea' ],
 		],
@@ -882,6 +919,7 @@ Nino verwendet eigenständige Smoke-Tests ohne PHPUnit. Jeder Test erstellt ein 
 | `tests/admin-smoke.php` | die Shell des Workbench und seine Inhalts-Panels: Text-Blacklist und HTML-Sanitizer, Element- und Bildoperationen |
 | `tests/admin-system-smoke.php` | die Struktur- und System-Panels: Session-Gate, Konten, Rollen und Rechte, Elementtypen, Backups und Wiederherstellung, das Aktivitätsprotokoll und ein Rendern jedes Panels in jeder Oberflächensprache |
 | `tests/install-smoke.php` | Installationsschritte, erzeugte Struktur und Selbstsperre |
+| `tests/keys-smoke.php` | die Textschlüssel-Grammatik und alles, was Nino ihr nach ausliefert: die Fragmente der Einheiten, jeder Schlüssel, den ein ausgeliefertes Template liest, die Schlüssel-Literale im Code und dass keine alte Schlüsselform übrig ist |
 | `tests/*-js-smoke.js` | browsernahe Logik der Verwaltungsoberflächen |
 | `tests/concurrency-smoke.php` | parallele und atomare Schreibvorgänge |
 
@@ -894,6 +932,7 @@ php tests/admin-system-smoke.php
 php tests/install-smoke.php
 php tests/features-smoke.php
 php tests/catalogue-smoke.php
+php tests/keys-smoke.php
 for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php

@@ -21,19 +21,30 @@
 		'html-header.tpl',
 		'html-footer.tpl',
 		// The site's header and footer markup. html-header.tpl includes them as
-		// [template /templates/theme.header] rather than carrying them inline,
+		// [template /templates/frame-header] rather than carrying them inline,
 		// so a project can rewrite either file without touching the page frame
 		// around it - and a missing include resolves to an empty string, which
 		// is exactly the silent no-header a delivery must never ship
-		'theme.header.tpl',
-		'theme.footer.tpl',
+		'frame-header.tpl',
+		'frame-footer.tpl',
 		'robots.tpl',
 		'sitemap-xml.tpl',
 		'llms-txt.tpl',
 	],
 	'blacklist' => [
-		'/website/lang',
-		'/website/charset',
+		'/project/website/html/lang',
+		'/project/website/html/charset',
+		'/project/mail/color/primary',
+		'/project/mail/color/text',
+		'/project/mail/color/background',
+		'/project/mail/color/border',
+		'/project/mail/color/backdrop',
+		'/project/mail/font/line-height',
+		'/project/mail/font/small',
+		'/project/mail/font/large',
+		'/project/mail/spacing/small',
+		'/project/mail/spacing/medium',
+		'/project/mail/spacing/large',
 	],
 	/*	Copied wherever this project keeps that kind of file, so each entry
 		follows \Nino\Filesystem::path() rather than a literal directory.

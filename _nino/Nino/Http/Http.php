@@ -111,7 +111,7 @@ namespace Nino {
 			// is the plain one - written with the dot, this last-resort
 			// fallback merged in a stray key and left the response uri
 			// pointing at the unmatched request path, so every
-			// [[/webpage[[/nino/http/response/uri]]/...]] fill on the 404
+			// [[/_nino/webpage[[/nino/http/response/uri]]/...]] fill on the 404
 			// resolved against a page that does not exist
 			$routeData = self::requestRoute( $appData, $request['/nino/http/request']['uri'], $request['/nino/http/request']['method'] ) ??
 				self::requestRoute( $appData, '/404', 'GET' ) ??

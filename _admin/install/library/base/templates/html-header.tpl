@@ -1,26 +1,26 @@
 <!doctype html>
-<html lang="[[/website/lang]]">
+<html lang="[[/project/website/html/lang]]">
 		<head>
-			<meta charset="[[/website/charset]]">
+			<meta charset="[[/project/website/html/charset]]">
 
-			<title>[[/webpage[[/nino/http/response/uri]]/title]] | [[/company/name]]</title>
-			<meta name="description" content="[[/webpage[[/nino/http/response/uri]]/description]]">
-			<meta name="author" content="[[/website/author]]">
+			<title>[[/_nino/webpage[[/nino/http/response/uri]]/title]] | [[/project/company/general/name]]</title>
+			<meta name="description" content="[[/_nino/webpage[[/nino/http/response/uri]]/description]]">
+			<meta name="author" content="[[/project/website/general/author]]">
 			<meta name="viewport" content="width=device-width, initial-scale=1">
-			<link rel="canonical" href="https://[[/website/url]][[/nino/http/request/uri]]">
+			<link rel="canonical" href="https://[[/project/website/general/url]][[/nino/http/request/uri]]">
 
 			<!-- Open Graph / social sharing -->
 			<meta property="og:type" content="website">
-			<meta property="og:site_name" content="[[/company/name]]">
-			<meta property="og:title" content="[[/webpage[[/nino/http/response/uri]]/title]] | [[/company/name]]">
-			<meta property="og:description" content="[[/webpage[[/nino/http/response/uri]]/description]]">
-			<meta property="og:url" content="https://[[/website/url]][[/nino/http/request/uri]]">
+			<meta property="og:site_name" content="[[/project/company/general/name]]">
+			<meta property="og:title" content="[[/_nino/webpage[[/nino/http/response/uri]]/title]] | [[/project/company/general/name]]">
+			<meta property="og:description" content="[[/_nino/webpage[[/nino/http/response/uri]]/description]]">
+			<meta property="og:url" content="https://[[/project/website/general/url]][[/nino/http/request/uri]]">
 			<meta property="og:locale" content="[[/nino/http/response/locale]]">
-			[image /logo]<meta property="og:image" content="https://[[/website/url]][[src]]">[/image]
+			[image /logo]<meta property="og:image" content="https://[[/project/website/general/url]][[src]]">[/image]
 			<meta name="twitter:card" content="summary_large_image">
-			<meta name="twitter:title" content="[[/webpage[[/nino/http/response/uri]]/title]] | [[/company/name]]">
-			<meta name="twitter:description" content="[[/webpage[[/nino/http/response/uri]]/description]]">
-			[image /logo]<meta name="twitter:image" content="https://[[/website/url]][[src]]">[/image]
+			<meta name="twitter:title" content="[[/_nino/webpage[[/nino/http/response/uri]]/title]] | [[/project/company/general/name]]">
+			<meta name="twitter:description" content="[[/_nino/webpage[[/nino/http/response/uri]]/description]]">
+			[image /logo]<meta name="twitter:image" content="https://[[/project/website/general/url]][[src]]">[/image]
 
 			<link rel="icon" href="[[/nino/public]]/favicon/favicon.ico" sizes="any">
 			<link rel="apple-touch-icon" sizes="180x180" href="[[/nino/public]]/favicon/apple-touch-icon.png">
@@ -39,7 +39,7 @@
 
 			<!-- Structured data (schema.org). Values go through [json ...]
 			     rather than "[[...]]" inside the quotes: a textfill is
-			     inserted verbatim, and /company/adress is multi-line by
+			     inserted verbatim, and /project/company/contact/address is multi-line by
 			     design (a postal address, offered as a <textarea> in
 			     the setup wizard's own Personal Infos step), so a raw newline
 			     used to land inside a json string and this whole block failed
@@ -49,20 +49,20 @@
 			{
 				"@context": "https://schema.org",
 				"@type": "LocalBusiness",
-				"name": [json /company/name],
-				"description": [json /company/description],
-				"url": "https://[[/website/url]]",
-				"telephone": [json /company/phone],
-				"email": [json /company/email],
+				"name": [json /project/company/general/name],
+				"description": [json /project/company/general/description],
+				"url": "https://[[/project/website/general/url]]",
+				"telephone": [json /project/company/contact/phone],
+				"email": [json /project/company/contact/email],
 				"address": {
 					"@type": "PostalAddress",
-					"streetAddress": [json /company/adress],
-					"addressCountry": [json /company/country]
+					"streetAddress": [json /project/company/contact/address],
+					"addressCountry": [json /project/company/contact/country]
 				}
 			}
 			</script>
 		</head>
 		<body>
 
-		[template /templates/theme.header]
+		[template /templates/frame-header]
   <main>

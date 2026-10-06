@@ -2,8 +2,9 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Install									Step 4: bulk-fill the /company/* and /website/* text keys
- *													every project has (global.php + per-locale
+ *	Install									Step 4: bulk-fill the /project/company/* and
+ *													/project/website/general/* text keys every project
+ *													has (global.php + per-locale
  *													text/<locale>.php) in one form instead of clicking through
  *													_admin's Text panel one key at a time - each with a
  *													friendly label instead of its raw key, see
@@ -37,18 +38,20 @@
 
 		// Fixed display order for the handful of keys base/text/*.php
 		// ships, per the wizard's own field ordering - a key not listed
-		// here (a fork's own /company/* or /website/* addition) still
+		// here (a fork's own /project/company/* or /project/website/general/*
+		// addition) still
 		// renders, just appended after these in whatever order apiList()
 		// returned (alphabetical, see \Nino\Text::entries())
 		ORDER : [
-			'/website/url', '/company/name', '/company/email', '/company/phone', '/company/adress',
-			'/website/author', '/website/host',
-			'/company/country', '/company/description',
+			'/project/website/general/url', '/project/company/general/name',
+			'/project/company/contact/email', '/project/company/contact/phone', '/project/company/contact/address',
+			'/project/website/general/author', '/project/website/general/host',
+			'/project/company/contact/country', '/project/company/general/description',
 		],
 
 		// Every other key renders as a single-line <input> - only these two
 		// are naturally multi-line content and stay a <textarea>
-		TEXTAREA_KEYS : [ '/company/adress', '/company/description' ],
+		TEXTAREA_KEYS : [ '/project/company/contact/address', '/project/company/general/description' ],
 
 		/**
 		 *	Load every key and render the form

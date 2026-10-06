@@ -1,4 +1,4 @@
 <?php return [
-	'[[/nino/locales/locale/de_DE]]' => 'Deutsch',
-	'[[/nino/locales/locale/en_US]]' => 'English (US)',
+	'[[/_nino/locale/de_DE/name]]' => 'Deutsch',
+	'[[/_nino/locale/en_US/name]]' => 'English (US)',
 ];

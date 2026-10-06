@@ -10,8 +10,8 @@
  *									     raster, compiled once and frozen here
  *									  2. the theme - which token goes in which role, plus the
  *									     three webfaces (see the base manifest's `fonts`)
- *									  3. the header frame - the css for theme.header.tpl
- *									  4. the footer frame - the css for theme.footer.tpl
+ *									  3. the header frame - the css for frame-header.tpl
+ *									  4. the footer frame - the css for frame-footer.tpl
  *
  *									Up to Nino 1.1 the wizard asked four questions and wrote
  *									this file from the answers. It does not any more: this is
@@ -619,7 +619,7 @@
 
 
 /*	Everything below styles the two frame templates the base unit delivers
-	beside this file - theme.header.tpl and theme.footer.tpl. Replacing a
+	beside this file - frame-header.tpl and frame-footer.tpl. Replacing a
 	frame means replacing its template and this section together: neither
 	half is any use without the other.	*/
 

@@ -27,7 +27,7 @@ namespace Nino\Modules\Routes {
 	 *												Same Element-URI/Http-URI split Webpages introduced (see
 	 *												_routeKey()'s docblock for why), and the same single
 	 *												source of truth: /nino/http/routes plus the
-	 *												/webpage&lt;uri&gt;/* keys in /text/*.php. There is no
+	 *												/_nino/webpage&lt;uri&gt;/* keys in /text/*.php. There is no
 	 *												second list to keep in sync - pages() derives the whole
 	 *												thing from the routes on every request, so a route
 	 *												written here, in the wizard or by hand in config.php is
@@ -36,6 +36,16 @@ namespace Nino\Modules\Routes {
 	 *												Webpages' own list does while the wizard is still around;
 	 *												the route order is also what breaks a tie between two
 	 *												equal menu priorities (see Modules\Navigation).
+	 *
+	 *												A page a feature routes at runtime - Posts' /blog, the
+	 *												Newsletter's /.newsletter, Hello's /hello - is in no
+	 *												config.php, so none of the above applies to it: it is
+	 *												not listed, ordered or deleted here. Its name, title
+	 *												and description are still the /_nino/webpage&lt;uri&gt;/*
+	 *												keys the menu and html-header.tpl read, and nothing else
+	 *												creates them - the Text Keys tab does not create a
+	 *												/_nino key - so runtimeRoutes() lists those pages and
+	 *												apiSaveTexts() writes exactly those three keys.
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -71,6 +81,7 @@ namespace Nino\Modules\Routes {
 				'routes/save' 		=> [ self::class, 'apiSave' ],
 				'routes/delete' 	=> [ self::class, 'apiDelete' ],
 				'routes/move' 		=> [ self::class, 'apiMove' ],
+				'routes/savetexts' => [ self::class, 'apiSaveTexts' ],
 			];
 		}
 
@@ -135,6 +146,7 @@ namespace Nino\Modules\Routes {
 				'routes/save'		=> ( ( $data['originalHttpUri'] ?? '' ) === '' ? 'Add Route ' : 'Edit Route ' ). ( $data['httpUri'] ?? '' ),
 				'routes/delete'	=> 'Delete Route '. ( $data['httpUri'] ?? '' ),
 				'routes/move'		=> 'Move Route '. ( $data['httpUri'] ?? '' ). ' '. ( $data['direction'] ?? '' ),
+				'routes/savetexts' => 'Edit Feature Route '. ( $data['uri'] ?? '' ),
 				default	=> '',
 			};
 		}
@@ -146,7 +158,8 @@ namespace Nino\Modules\Routes {
 		 *	locales with the one the workbench is on, and the navigations a
 		 *	page can be put into (empty while the Navigation module is
 		 *	inactive, which is what tells the frontend to offer no menu
-		 *	fields at all)
+		 *	fields at all), and the pages features route at runtime
+		 *	(see runtimeRoutes()), apart from the persisted ones
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -165,6 +178,7 @@ namespace Nino\Modules\Routes {
 
 			\Nino\Http::ok( $request, [
 				'pages' 				=> self::pages( $appData, $config['/nino/http/routes'] ?? [], $locales, $navs ),
+				'runtime' 			=> self::runtimePages( $appData, $locales ),
 				'templates' 		=> $templates,
 				'defaultTemplate' => in_array( self::DEFAULT_TEMPLATE, $templates, true ) === true ? self::DEFAULT_TEMPLATE : '',
 				'locales' 			=> $locales,
@@ -204,7 +218,7 @@ namespace Nino\Modules\Routes {
 		 *
 		 *	The route key is the Http-URI, the route's own 'uri' data field
 		 *	the Element-URI, 'navs' the menu membership, and the per-locale
-		 *	name/title/description are the /webpage&lt;uri&gt;/* keys both
+		 *	name/title/description are the /_nino/webpage&lt;uri&gt;/* keys both
 		 *	tools write into /text/&lt;locale&gt;.php
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
@@ -231,14 +245,6 @@ namespace Nino\Modules\Routes {
 				$uri 			= (string) ( $route['uri'] ?? $httpUri );
 				$body 		= (string) ( $route['body'] ?? '' );
 
-				$entryText = [];
-				foreach( $locales as $locale )
-					$entryText[$locale] = [
-						'name' 				=> (string) ( $text[$locale]['[[/webpage'. $uri. '/name]]'] 				?? '' ),
-						'title' 			=> (string) ( $text[$locale]['[[/webpage'. $uri. '/title]]'] 			?? '' ),
-						'description' => (string) ( $text[$locale]['[[/webpage'. $uri. '/description]]'] ?? '' ),
-					];
-
 				$pages[] = [
 					'uri' 				=> $uri,
 					'httpUri' 		=> $httpUri,
@@ -246,11 +252,91 @@ namespace Nino\Modules\Routes {
 					'navs' 				=> array_values( array_intersect( $navKeys, array_keys( (array) ( $route['navs'] ?? [] ) ) ) ),
 					'statusCode' 	=> (int) ( $route['statusCode'] ?? 200 ),
 					'body' 				=> $body,
-					'text' 				=> $entryText,
+					'text' 				=> self::_pageText( $text, $locales, $uri ),
 				];
 			}
 
 			return $pages;
+		}
+
+		/**
+		 *	The pages features route at runtime and no config.php has: a
+		 *	route in the live route array that is a page (see isPageRoute())
+		 *	and whose key is not among the persisted ones. A placeholder
+		 *	route such as GET://blog/* is one, a route with no page template
+		 *	(GET://.search) is not.
+		 *
+		 *	A route whose Element-URI is no safe path (see _normalizeUri())
+		 *	is left out: the keys it would be given are the system's, and
+		 *	not worth guessing at
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										[ [ uri, httpUri, body ], ... ] in route order
+		 */
+		public static function runtimeRoutes( array &$appData ): array {
+
+			$persisted = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
+			$runtime 	 = [];
+
+			foreach( $appData['/nino/http/routes'] ?? [] as $routeKey => $route ) {
+
+				$routeKey = (string) $routeKey;
+
+				if( is_array( $route ) === false || isset( $persisted[$routeKey] ) === true || self::isPageRoute( $routeKey, $route ) === false )
+					continue;
+
+				$httpUri = substr( $routeKey, strlen( 'GET:/' ) );
+				$uri 		 = (string) ( $route['uri'] ?? $httpUri );
+
+				if( self::_normalizeUri( $uri ) !== $uri )
+					continue;
+
+				$runtime[] = [ 'uri' => $uri, 'httpUri' => $httpUri, 'body' => (string) ( $route['body'] ?? '' ) ];
+			}
+
+			return $runtime;
+		}
+
+		/**
+		 *	runtimeRoutes() with each page's name, title and description in
+		 *	every language, the shape pages() gives a persisted one
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$locales			Available locales
+		 *
+		 *	@return 	array										[ [ uri, httpUri, body, text ], ... ]
+		 */
+		public static function runtimePages( array &$appData, array $locales ): array {
+
+			$text = [];
+			foreach( $locales as $locale )
+				$text[$locale] = \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
+
+			return array_map( fn( array $route ): array => $route + [ 'text' => self::_pageText( $text, $locales, $route['uri'] ) ], self::runtimeRoutes( $appData ) );
+		}
+
+		/**
+		 *	One page's name, title and description per language
+		 *
+		 *	@param		array 		$text					Locale => the locale's text file
+		 *	@param		array 		$locales			Available locales
+		 *	@param		string		$uri					The page's Element-URI
+		 *
+		 *	@return 	array										Locale => [ name, title, description ]
+		 */
+		private static function _pageText( array $text, array $locales, string $uri ): array {
+
+			$pageText = [];
+
+			foreach( $locales as $locale )
+				$pageText[$locale] = [
+					'name' 				=> (string) ( $text[$locale]['[[/_nino/webpage'. $uri. '/name]]'] 				?? '' ),
+					'title' 			=> (string) ( $text[$locale]['[[/_nino/webpage'. $uri. '/title]]'] 			?? '' ),
+					'description' => (string) ( $text[$locale]['[[/_nino/webpage'. $uri. '/description]]'] ?? '' ),
+				];
+
+			return $pageText;
 		}
 
 		/**
@@ -348,7 +434,7 @@ namespace Nino\Modules\Routes {
 		 *	The /nino/http/routes array key one page entry occupies - always
 		 *	derived from its httpUri (the real, reachable path), never its
 		 *	uri (a stable identifier used only for the route's own 'uri'
-		 *	data field and this entry's /webpage&lt;uri&gt;/* text meta):
+		 *	data field and this entry's /_nino/webpage&lt;uri&gt;/* text meta):
 		 *	\Nino\Http::requestRoute() matches a route by looking up
 		 *	'&lt;METHOD&gt;:/'.$httpUri as a literal array key, not by scanning
 		 *	for a route whose own 'uri' field matches - see
@@ -516,31 +602,10 @@ namespace Nino\Modules\Routes {
 				}
 
 				// A name and a title in every active language, checked last of the
-				// refusals and before anything is written: a key nobody wrote renders
-				// as the raw [[...]] on the page and in the menu, so a route without
-				// them is not one to create. The description is optional - an empty
-				// one renders nothing, which is a valid description
-				$text = [];
-				foreach( $locales as $locale ) {
-
-					$row = is_array( $data['text'][$locale] ?? null ) ? $data['text'][$locale] : [];
-
-					if( trim( is_string( $row['name'] ?? null ) ? $row['name'] : '' ) === '' ) {
-						\Nino\Http::fail( $request, 400, 'missing name for '. $locale, 'routes_missing_name', [ $locale ], 'name' );
-						return;
-					}
-
-					if( trim( is_string( $row['title'] ?? null ) ? $row['title'] : '' ) === '' ) {
-						\Nino\Http::fail( $request, 400, 'missing title for '. $locale, 'routes_missing_title', [ $locale ], 'title' );
-						return;
-					}
-
-					$text[$locale] = [
-						'name' 				=> trim( $row['name'] ),
-						'title' 			=> trim( $row['title'] ),
-						'description' => trim( is_string( $row['description'] ?? null ) ? $row['description'] : '' ),
-					];
-				}
+				// refusals and before anything is written (see _postedText())
+				$text = self::_postedText( $request, $data, $locales );
+				if( $text === null )
+					return;
 
 				// Menu membership lives on the route and nowhere else - that is
 				// what Modules\Navigation::routeLines() reads, and the only copy
@@ -566,24 +631,128 @@ namespace Nino\Modules\Routes {
 				\Nino\AppData::writeContentData( $appData, [ '/nino/http/routes' ] );
 
 				foreach( $locales as $locale )
-					self::_mergeText( $appData, '/text/'. $locale. '.php', [
-						'[[/webpage'. $uri. '/name]]' 				=> $text[$locale]['name'],
-						'[[/webpage'. $uri. '/title]]' 			=> $text[$locale]['title'],
-						'[[/webpage'. $uri. '/description]]' => $text[$locale]['description'],
-					] );
+					if( self::_mergeText( $appData, '/text/'. $locale. '.php', [
+						'[[/_nino/webpage'. $uri. '/name]]' 				=> $text[$locale]['name'],
+						'[[/_nino/webpage'. $uri. '/title]]' 			=> $text[$locale]['title'],
+						'[[/_nino/webpage'. $uri. '/description]]' => $text[$locale]['description'],
+					] ) === false ) {
+						\Nino\Http::fail( $request, 500, 'could not write /text/'. $locale. '.php' );
+						return;
+					}
 
 				// The page's reachable path as a fill, so a template can link to
-				// it by name - [[/webpage/site-home/uri]] - rather than repeating
+				// it by name - [[/_nino/webpage/site-home/uri]] - rather than repeating
 				// a path this form can change. Global, because an entry has one
 				// Http-URI for every locale, and blacklisted like every other
 				// technical value: /_admin's Text panel edits wording, not routes
-				self::_mergeText( $appData, '/text/global.php', [ '[[/webpage'. $uri. '/uri]]' => $httpUri ] );
-				\Nino\Text::setBlacklisted( $appData, '/webpage'. $uri. '/uri', true );
+				if( self::_mergeText( $appData, '/text/global.php', [ '[[/_nino/webpage'. $uri. '/uri]]' => $httpUri ] ) === false ) {
+					\Nino\Http::fail( $request, 500, 'could not write /text/global.php' );
+					return;
+				}
+
+				\Nino\Text::setBlacklisted( $appData, '/_nino/webpage'. $uri. '/uri', true );
 
 				\Nino\Http::ok( $request, [ 'pages' => self::pages( $appData, $routes, $locales, $navKeys ) ] );
 			} finally {
 				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
 			}
+		}
+
+		/**
+		 *	The name, title and description a request posts, per active
+		 *	language, trimmed and as plain text. A name and a title are required in every one:
+		 *	a key nobody wrote renders as the raw [[...]] on the page and in
+		 *	the menu, so a route without them is not one to create. The
+		 *	description is optional - an empty one renders nothing, which is a
+		 *	valid description. The first thing missing fails the request, and
+		 *	nothing is written
+		 *
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		array 		$data					The posted data
+		 *	@param		array 		$locales			Available locales
+		 *
+		 *	@return 	array|null							Locale => [ name, title, description ], null once the request has failed
+		 */
+		private static function _postedText( array &$request, array $data, array $locales ): ?array {
+
+			$text = [];
+
+			foreach( $locales as $locale ) {
+
+				$row = is_array( $data['text'][$locale] ?? null ) ? $data['text'][$locale] : [];
+
+				if( trim( is_string( $row['name'] ?? null ) ? $row['name'] : '' ) === '' ) {
+					\Nino\Http::fail( $request, 400, 'missing name for '. $locale, 'routes_missing_name', [ $locale ], 'name' );
+					return null;
+				}
+
+				if( trim( is_string( $row['title'] ?? null ) ? $row['title'] : '' ) === '' ) {
+					\Nino\Http::fail( $request, 400, 'missing title for '. $locale, 'routes_missing_title', [ $locale ], 'title' );
+					return null;
+				}
+
+				// Plain text, as the Text panel stores the same keys: the fill pass is a
+				// blind str_replace, and the title and the description land in an
+				// attribute of the page head
+				$text[$locale] = [
+					'name' 				=> \Nino\Text::sanitizeValue( trim( $row['name'] ), 'plain' ),
+					'title' 			=> \Nino\Text::sanitizeValue( trim( $row['title'] ), 'plain' ),
+					'description' => \Nino\Text::sanitizeValue( trim( is_string( $row['description'] ?? null ) ? $row['description'] : '' ), 'plain' ),
+				];
+			}
+
+			return $text;
+		}
+
+		/**
+		 *	Save the name, title and description, per language, of a page a
+		 *	feature routes at runtime (see runtimeRoutes()) - the
+		 *	/_nino/webpage<uri>/{name,title,description} keys, with the rules
+		 *	apiSave() has for them. Nothing else: no route is written to
+		 *	config.php - there is none, and a copy of the feature's would
+		 *	outlive the feature's own change of it - no uri key, because the
+		 *	feature decides the path and a stored one would be wrong the day
+		 *	it moves, and nothing goes on the blacklist.
+		 *
+		 *	Only for an Element-URI a runtime route carries right now: any
+		 *	other is a 404, so this is no way to write a /_nino key for a
+		 *	page that is not there
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiSaveTexts( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			$data = \Nino\Admin\Admin::postData();
+			$uri 	= (string) ( $data['uri'] ?? '' );
+
+			if( in_array( $uri, array_column( self::runtimeRoutes( $appData ), 'uri' ), true ) === false ) {
+				\Nino\Http::fail( $request, 404, 'unknown feature route' );
+				return;
+			}
+
+			$locales = \Nino\Locales::getAvailableLocales( $appData );
+			$text 	 = self::_postedText( $request, $data, $locales );
+
+			if( $text === null )
+				return;
+
+			foreach( $locales as $locale )
+				if( self::_mergeText( $appData, '/text/'. $locale. '.php', [
+					'[[/_nino/webpage'. $uri. '/name]]' 				=> $text[$locale]['name'],
+					'[[/_nino/webpage'. $uri. '/title]]' 			=> $text[$locale]['title'],
+					'[[/_nino/webpage'. $uri. '/description]]' => $text[$locale]['description'],
+				] ) === false ) {
+					\Nino\Http::fail( $request, 500, 'could not write /text/'. $locale. '.php' );
+					return;
+				}
+
+			\Nino\Http::ok( $request, [ 'runtime' => self::runtimePages( $appData, $locales ) ] );
 		}
 
 		/**
@@ -642,7 +811,7 @@ namespace Nino\Modules\Routes {
 		}
 
 		/**
-		 *	Remove one page route. Its /webpage&lt;uri&gt;/* text meta is
+		 *	Remove one page route. Its /_nino/webpage&lt;uri&gt;/* text meta is
 		 *	deliberately left in place - same additive-only philosophy every
 		 *	other apply/save in this codebase follows, deleting a file/key a
 		 *	developer may have since hand-edited is a much riskier "undo" than
@@ -794,10 +963,10 @@ namespace Nino\Modules\Routes {
 		 *	@param		string		$path					Filesystem-relative path, eg. '/text/de_DE.php'
 		 *	@param		array 		$fragment			Bracket-key => value pairs to merge in
 		 *
-		 *	@return 	void
+		 *	@return 	bool								False when the file could not be written
 		 */
-		private static function _mergeText( array &$appData, string $path, array $fragment ): void {
-			\Nino\Filesystem::mutate( $appData, $path, function( array $content ) use ( $fragment ): array {
+		private static function _mergeText( array &$appData, string $path, array $fragment ): bool {
+			return \Nino\Filesystem::mutate( $appData, $path, function( array $content ) use ( $fragment ): array {
 				return array_merge( $content, $fragment );
 			} );
 		}

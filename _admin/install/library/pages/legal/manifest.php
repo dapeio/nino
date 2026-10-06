@@ -20,4 +20,10 @@
 		 'en_US' => 'page-legal.en_US.tpl',
 		 'html-footer-legal.tpl',
 	],
+	'suggest' => [
+		'uri' 				=> [ 'en_US' => '/legal', 'de_DE' => '/rechtliches' ],
+		'name' 				=> [ 'en_US' => 'Imprint and Privacy Policy', 'de_DE' => 'Impressum und Datenschutz' ],
+		'title' 			=> [ 'en_US' => 'Imprint and Privacy Policy', 'de_DE' => 'Impressum und Datenschutz' ],
+		'description' => [ 'en_US' => 'Imprint and privacy policy.', 'de_DE' => 'Impressum und Datenschutzerklärung.' ],
+	],
 ];

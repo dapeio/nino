@@ -250,15 +250,16 @@ namespace Nino {
 			// _headerValue() only strips CR/LF - mail()'s $to also accepts a
 			// plain comma-separated list with no newline involved at all, so
 			// an admin-editable field this comes from (Form's owner notify
-			// uses '[[/form/email/owner]]' verbatim) could silently gain a
-			// second, invisible recipient. One address only: nothing here
-			// currently needs send() to notify more than one.
+			// uses '[[/project/mail/address/owner]]' verbatim) could silently
+			// gain a second, invisible recipient. One address only: nothing
+			// here currently needs send() to notify more than one.
 
 			// FILTER_VALIDATE_EMAIL rejects the display-name form, and
 			// "Max Mustermann <max@site.de>" is a plausible thing for a site owner
-			// to have typed into '[[/form/email/owner]]' back when mail() accepted
-			// it. Take the address out of the angle brackets rather than turn an
-			// existing, working install into one that silently sends nothing.
+			// to have typed into '[[/project/mail/address/owner]]' back when
+			// mail() accepted it. Take the address out of the angle brackets
+			// rather than turn an existing, working install into one that
+			// silently sends nothing.
 			if( preg_match( '/<([^<>]+)>$/', $to, $addressMatch ) === 1 )
 				$to = trim( $addressMatch[1] );
 
@@ -333,8 +334,9 @@ namespace Nino {
 		 *	had neither, and it comes from the same place those two do: an
 		 *	admin-editable textfill, read through renderHtml(). A fill a project
 		 *	never installed renders as its own literal, so
-		 *	'[[/form/email/owner]]' went out as the Reply-To header verbatim -
-		 *	and so did whatever else somebody had typed into the Text panel.
+		 *	'[[/project/mail/address/owner]]' went out as the Reply-To header
+		 *	verbatim - and so did whatever else somebody had typed into the Text
+		 *	panel.
 		 *	That fill is the Form module's install unit's, and the module is one
 		 *	the wizard offers rather than one every project has, so a project
 		 *	running the Newsletter feature without the contact form sent every
@@ -371,8 +373,9 @@ namespace Nino {
 			return '';
 		}
 
-		// The address to send as: the '[[/mail/sender]]' textfill where it is
-		// set, otherwise the site owner's address from the same Text values.
+		// The address to send as: the '[[/project/mail/address/envelope]]'
+		// textfill where it is set, otherwise the site owner's address from the
+		// same Text values.
 		// Two fills rather than a config.php key and a fill, because both are
 		// the operator's to set and the Text panel is where they set the
 		// other one. Separate because the envelope sender has to be an address
@@ -385,14 +388,14 @@ namespace Nino {
 		// From:/-f rather than passing something unchecked to sendmail.
 		private static function _getSender( array &$appData ): string {
 
-			$sender = self::_headerValue( \Nino\Html::renderHtml( $appData, '[[/mail/sender]]' ) );
+			$sender = self::_headerValue( \Nino\Html::renderHtml( $appData, '[[/project/mail/address/envelope]]' ) );
 
 			if( filter_var( $sender, FILTER_VALIDATE_EMAIL ) === false ) {
 
 				if( $sender !== '' )
 					trigger_error( 'Mail: \''. $sender. '\' is no sender address - the mail went out as the owner address.', E_USER_WARNING );
 
-				$sender = self::_headerValue( \Nino\Html::renderHtml( $appData, '[[/form/email/owner]]' ) );
+				$sender = self::_headerValue( \Nino\Html::renderHtml( $appData, '[[/project/mail/address/owner]]' ) );
 			}
 
 			return ( filter_var( $sender, FILTER_VALIDATE_EMAIL ) !== false ) ? $sender : '';

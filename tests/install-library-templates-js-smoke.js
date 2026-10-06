@@ -70,9 +70,9 @@ const publicTemplates = filesBelow( LIBRARY ).concat( moduleUnitFiles ).filter( 
 
 /* The page frames used to be their own library units, one directory per
  * variant; since 1.2 the base unit delivers the one pair every project gets,
- * as theme.header.tpl and theme.footer.tpl beside the stylesheet that styles
+ * as frame-header.tpl and frame-footer.tpl beside the stylesheet that styles
  * them. The audit follows them there. */
-const FRAMES = [ 'base/templates/theme.header.tpl', 'base/templates/theme.footer.tpl' ];
+const FRAMES = [ 'base/templates/frame-header.tpl', 'base/templates/frame-footer.tpl' ];
 
 check( 'the audit reaches every finished public template kind',
 	FRAMES.every( function( frame ) { return publicTemplates.some( function( file ) { return relative( file ).endsWith( frame ); } ); } )
@@ -292,6 +292,8 @@ check( 'frame aria-label fills resolve from base without optional modules'
 	+ ( missingBaseFrameLabels.length === 0 ? '' : ' - '+ missingBaseFrameLabels.join(', ') ),
 	frameAriaLabels.size === 2 && missingBaseFrameLabels.length === 0
 );
+check( '...and they are the two words of the header frame and of the navigation the footer shares: /template/frame-header/navigation/label and /template/common/navigation/footer',
+	Array.from( frameAriaLabels ).sort().join() === '[[/template/common/navigation/footer]],[[/template/frame-header/navigation/label]]' );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

@@ -1,3 +1,3 @@
 <?php return [
-	'[[/sample/label]]' => 'Sample label',
+	'[[/feature/sample/intro/label]]' => 'Sample label',
 ];

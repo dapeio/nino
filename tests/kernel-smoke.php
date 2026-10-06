@@ -1482,7 +1482,7 @@ check( '[elements] with a callback: sorted before it, offset and limit after it'
 	\Nino\Html::renderHtml( $appData, '[elements /sorttest sort="-weight" callback="sorttest-drop-first" offset="1" limit="1"][[title]];[/elements]' ) === 'item 9;' );
 
 /*	Fills are replaced until nothing changes, because a fill's value may name
-	another fill (a mail subject carrying [[/website/url]], say). Proving that
+	another fill (a mail subject carrying [[/project/website/general/url]], say). Proving that
 	the pass just made was the final one meant running a whole further
 	str_replace() over the document, once per fill key - so a project with a
 	few hundred fills paid that many scans of the page to discover that nothing
@@ -1692,7 +1692,7 @@ echo "\n";
 // --- [json] textfills into a hand-written json document -----------------
 //
 // html-header.tpl's schema.org block writes json by hand and used to drop
-// raw fill values into it. '/company/adress' is multi-line by design, and a
+// raw fill values into it. '/project/company/contact/address' is multi-line by design, and a
 // raw newline in a json string is not valid json, so that block failed to
 // parse on every page of every install.
 
@@ -2784,9 +2784,9 @@ echo "\n";
 echo "Modules\\Form::callbackResponse - validate/send/record a contact submission\n";
 
 \Nino\Html::addFills( $appData, [
-	'[[/form/email/owner]]' 	=> 'owner@example.com',
-	'[[/form/subject/owner]]' => 'New inquiry',
-	'[[/form/subject/user]]' 	=> 'Thanks for reaching out',
+	'[[/project/mail/address/owner]]' 	=> 'owner@example.com',
+	'[[/module/form/subject/owner]]' => 'New inquiry',
+	'[[/module/form/subject/user]]' 	=> 'Thanks for reaching out',
 ], '*' );
 
 // A transport that takes every mail. A submission whose owner mail did not go
@@ -3064,7 +3064,7 @@ unset( $appData[ \Nino\Form::STORE ] );
 	was the one thing that wrote it there anyway.
 
 	A fill of its own per locale, because the block above registered
-	[[/form/subject/owner]] for '*': a fill that answers the same in either
+	[[/module/form/subject/owner]] for '*': a fill that answers the same in either
 	locale says nothing about which one a mail was rendered in	*/
 unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
 $localeMails = [];
@@ -3364,7 +3364,7 @@ unset( $appData['./nino/mail/ratelimited'] );
 
 // The envelope sender is a global textfill, like the owner address it
 // falls back to - one place, the Text panel, for both
-\Nino\Html::addFills( $appData, [ '[[/mail/sender]]' => 'noreply@example.org' ], '*' );
+\Nino\Html::addFills( $appData, [ '[[/project/mail/address/envelope]]' => 'noreply@example.org' ], '*' );
 
 $taken = [];
 \Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ) use ( &$taken ): void {
@@ -3392,7 +3392,7 @@ check( 'a nul byte is dropped from the body and every header value, never thrown
 	From and drops it rather than "passing something unchecked to sendmail".
 	The reply address had neither, and it comes from where those two do: an
 	admin-editable textfill read through renderHtml(). A fill the project
-	never installed renders as its own literal, so '[[/form/email/owner]]'
+	never installed renders as its own literal, so '[[/project/mail/address/owner]]'
 	went out as the Reply-To header verbatim. That fill belongs to the Form
 	module's install unit and the wizard offers that module rather than
 	installing it always, so a project running the Newsletter feature without
@@ -3413,7 +3413,7 @@ $replyWarnings = [];
 set_error_handler( static function( int $level, string $message ) use ( &$replyWarnings ): bool { $replyWarnings[] = $message; return true; } );
 
 $replySent = [];
-foreach( [ '[[/form/email/owner]]', 'ask us anything', 'a@example.org, b@example.org', '<script>alert(1)</script>' ] as $notAnAddress )
+foreach( [ '[[/project/mail/address/owner]]', 'ask us anything', 'a@example.org, b@example.org', '<script>alert(1)</script>' ] as $notAnAddress )
 	$replySent[$notAnAddress] = \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', $notAnAddress );
 
 // Six sends, and the per-ip cap is five an hour - a fresh window between the
@@ -3437,18 +3437,18 @@ check( '...and the mail still goes out - the recipient and the body were never t
 check( '...with no Reply-To line on it at all', str_contains( $taken[3]['headers'] ?? '', 'Reply-To:' ) === false );
 check( '...and one recorded line per mail, naming the value, or nothing tells the operator why replies stopped',
 	count( array_filter( $replyWarnings, static fn( string $w ): bool => str_contains( $w, 'is no reply address' ) === true ) ) === 4
-	&& count( array_filter( $replyWarnings, static fn( string $w ): bool => str_contains( $w, '[[/form/email/owner]]' ) === true ) ) === 1 );
+	&& count( array_filter( $replyWarnings, static fn( string $w ): bool => str_contains( $w, '[[/project/mail/address/owner]]' ) === true ) ) === 1 );
 
 // A real address is untouched, and so is the display-name form - valid for
 // this header, unlike mail()'s own $to, and what a site owner types
 /*	Where the From header and the envelope sender come from, which is one
 	textfill for every mail this framework sends. It is shipped as
-	'[[/company/email]]' rather than as an address, so the normal case is the
+	'[[/project/company/contact/email]]' rather than as an address, so the normal case is the
 	mailbox the project already named - one answer, in one place - and an
 	operator who needs another one overwrites the key without touching the
 	company address. A chained fill, and this is the check that it resolves:
-	a value nobody resolves is a From header reading '[[/company/email]]'	*/
-\Nino\Html::addFills( $appData, [ '[[/company/email]]' => 'hallo@example.com', '[[/form/email/owner]]' => '[[/company/email]]', '[[/mail/sender]]' => '' ], '*' );
+	a value nobody resolves is a From header reading '[[/project/company/contact/email]]'	*/
+\Nino\Html::addFills( $appData, [ '[[/project/company/contact/email]]' => 'hallo@example.com', '[[/project/mail/address/owner]]' => '[[/project/company/contact/email]]', '[[/project/mail/address/envelope]]' => '' ], '*' );
 
 $rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
 unset( $rateState['127.0.0.1'] );
@@ -3466,18 +3466,18 @@ check( 'the sender is the company address the owner fill points at', ( $chained[
 check( '...and reaches the From header as an address, not as the fill it was written as', str_contains( $chained[0]['headers'] ?? '', "\r\nFrom: hallo@example.com" ) === true );
 
 // An operator who needs a different mailbox overwrites the one key
-\Nino\Html::addFills( $appData, [ '[[/form/email/owner]]' => 'kontakt@example.org' ], '*' );
+\Nino\Html::addFills( $appData, [ '[[/project/mail/address/owner]]' => 'kontakt@example.org' ], '*' );
 $chained = [];
 \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' );
 check( 'overwriting that one key changes the sender and nothing else', ( $chained[0]['sender'] ?? null ) === 'kontakt@example.org'
-	&& \Nino\Html::renderHtml( $appData, '[[/company/email]]' ) === 'hallo@example.com' );
+	&& \Nino\Html::renderHtml( $appData, '[[/project/company/contact/email]]' ) === 'hallo@example.com' );
 
-/*	...and '[[/mail/sender]]' wins over both where it is set, because the
+/*	...and '[[/project/mail/address/envelope]]' wins over both where it is set, because the
 	envelope sender has to be an address the sending host may send for
 	(spf/dmarc), which is not necessarily the mailbox replies should reach.
 	A textfill like the owner address, not a config.php key: the operator
 	sets both in the Text panel, and an empty one means "the same"	*/
-\Nino\Html::addFills( $appData, [ '[[/mail/sender]]' => 'no-reply@example.net' ], '*' );
+\Nino\Html::addFills( $appData, [ '[[/project/mail/address/envelope]]' => 'no-reply@example.net' ], '*' );
 $chained = [];
 \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' );
 check( 'the sender fill wins over the owner fill', ( $chained[0]['sender'] ?? null ) === 'no-reply@example.net'
@@ -3485,7 +3485,7 @@ check( 'the sender fill wins over the owner fill', ( $chained[0]['sender'] ?? nu
 
 // ...and one that is not an address falls back to the owner rather than
 // costing every mail its From - a typo in the Text panel is one log line
-\Nino\Html::addFills( $appData, [ '[[/mail/sender]]' => 'not an address' ], '*' );
+\Nino\Html::addFills( $appData, [ '[[/project/mail/address/envelope]]' => 'not an address' ], '*' );
 $chained = []; $senderWarnings = [];
 set_error_handler( static function( int $no, string $message ) use ( &$senderWarnings ): bool { if( ( error_reporting() & $no ) !== 0 ) $senderWarnings[] = $message; return true; } );
 \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' );
@@ -3493,7 +3493,7 @@ restore_error_handler();
 check( 'a sender fill that is no address falls back to the owner, and says so', ( $chained[0]['sender'] ?? null ) === 'kontakt@example.org'
 	&& count( array_filter( $senderWarnings, static fn( string $w ): bool => str_contains( $w, 'no sender address' ) ) ) === 1 );
 
-\Nino\Html::addFills( $appData, [ '[[/mail/sender]]' => '' ], '*' );
+\Nino\Html::addFills( $appData, [ '[[/project/mail/address/envelope]]' => '' ], '*' );
 unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
 if( $transportBefore !== null )
 	$appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] = $transportBefore;
@@ -3563,7 +3563,7 @@ check( 'so five submissions fit the window of five, and the sixth is refused who
 check( 'an empty batch is not an action and costs nothing', \Nino\Mail::sendAll( $appData, [] ) === true );
 
 unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ], $appData['./nino/mail/ratelimited'] );
-\Nino\Html::addFills( $appData, [ '[[/mail/sender]]' => '' ], '*' );
+\Nino\Html::addFills( $appData, [ '[[/project/mail/address/envelope]]' => '' ], '*' );
 
 echo "\n";
 
@@ -4274,13 +4274,16 @@ foreach( ( $jstextProbe['./nino/callbacks']['/nino/http/response'] ?? [] ) as $p
 check( 'the csp is composed ahead of everything that can end a request', $jstextPrios !== [] && max( $jstextPrios ) < 1 );
 
 // What the inline block carries. It used to be every fill the site has -
-// including '/form/email/owner', the mailbox a contact form delivers to, and
+// including '/project/mail/address/owner', the mailbox a contact form delivers to, and
 // every address and legal line a project keeps in its text files - on every
 // public page, while the scripts reading it only ever ask for two groups
 \Nino\Html::addFills( $appData, [
-	'[[/form/info/success]]'	=> 'Danke!',
-	'[[/form/email/owner]]'		=> 'post@example.com',
-	'[[/company/street]]' 		=> 'Musterweg 1',
+	'[[/module/form/info/success]]'	=> 'Danke!',
+	'[[/project/mail/address/owner]]'		=> 'post@example.com',
+	'[[/project/company/contact/street]]' 		=> 'Musterweg 1',
+	'[[/template/common/slider/prev]]'	=> 'Zurück',
+	'[[/feature/newsletter/info/success]]'	=> 'Eingetragen',
+	'[[/template/common/label/phone]]'	=> 'Telefon',
 ], '*' );
 /** The block's own table, read back the way the browser reads it */
 function jstextTable( array &$appData ): array {
@@ -4290,24 +4293,28 @@ function jstextTable( array &$appData ): array {
 }
 
 $jstextTable = jstextTable( $appData );
-check( 'the inline block carries the words the shipped scripts ask for', ( $jstextTable['/form/info/success'] ?? null ) === 'Danke!' );
-check( '...and not the mailbox a form delivers to, nor the rest of the site\'s text', isset( $jstextTable['/form/email/owner'] ) === false
-	&& isset( $jstextTable['/company/street'] ) === false );
+check( 'the inline block carries the words the shipped scripts ask for', ( $jstextTable['/module/form/info/success'] ?? null ) === 'Danke!' );
+check( '...and not the mailbox a form delivers to, nor the rest of the site\'s text', isset( $jstextTable['/project/mail/address/owner'] ) === false
+	&& isset( $jstextTable['/project/company/contact/street'] ) === false );
+check( 'the three groups are the form\'s messages, the newsletter\'s and the slider\'s words - and a label like the phone\'s is none of them', ( $jstextTable['/template/common/slider/prev'] ?? null ) === 'Zurück'
+	&& ( $jstextTable['/feature/newsletter/info/success'] ?? null ) === 'Eingetragen' && isset( $jstextTable['/template/common/label/phone'] ) === false );
+check( 'the contact form\'s welcome text is no key any more, so nothing of it is published', isset( $jstextTable['/module/form/info/welcome'] ) === false
+	&& str_contains( (string) file_get_contents( dirname( __DIR__ ). '/_nino/Nino/Modules/Form/install/text/en_US.php' ), '/form/info/welcome' ) === false );
 
 // A project or a feature whose own script reads a fill says so
-$appData[ \Nino\Modules\Jstext::KEYS ] = [ '/company/' ];
+$appData[ \Nino\Modules\Jstext::KEYS ] = [ '/project/company/' ];
 $jstextConfigured = jstextTable( $appData );
-check( 'a project may publish a group of its own', ( $jstextConfigured['/company/street'] ?? null ) === 'Musterweg 1'
-	&& isset( $jstextConfigured['/form/email/owner'] ) === false );
+check( 'a project may publish a group of its own', ( $jstextConfigured['/project/company/contact/street'] ?? null ) === 'Musterweg 1'
+	&& isset( $jstextConfigured['/project/mail/address/owner'] ) === false );
 unset( $appData[ \Nino\Modules\Jstext::KEYS ] );
 
-\Nino\Modules\Jstext::publish( $appData, [ '/form/email/' ] );
-check( '...and a module registers one for the request it is serving', isset( jstextTable( $appData )['/form/email/owner'] ) === true );
+\Nino\Modules\Jstext::publish( $appData, [ '/project/mail/address/' ] );
+check( '...and a module registers one for the request it is serving', isset( jstextTable( $appData )['/project/mail/address/owner'] ) === true );
 unset( $appData['./nino/jstext/keys'] );
 
 // The last-resort 404 fallback, ie. a project without its own /404 route.
 // Written as '.uri' it merged a stray key in and left the response uri on the
-// unmatched request path, so every [[/webpage[[/nino/http/response/uri]]/...]]
+// unmatched request path, so every [[/_nino/webpage[[/nino/http/response/uri]]/...]]
 // fill on that page resolved against a webpage that does not exist
 $noFallbackAppData = $appData;
 unset( $noFallbackAppData['/nino/http/routes']['GET://404'] );
@@ -4369,6 +4376,14 @@ $arrayPickerRequest = fakeRequest( $appData, '/legal?/_nino/localepicker/current
 \Nino\Modules\Localepicker::callbackResponse( $appData, $arrayPickerRequest );
 check( 'the localepicker also ignores an array-shaped locale query', \Nino\Locales::getCurrentLocale( $appData ) === 'en_US' && $arrayPickerRequest['/nino/http/response']['statusCode'] === 201 );
 
+// A language is named by the fill after its code, /_nino/locale/<code>/name, which the
+// module's install unit delivers for the two languages the wizard offers and the
+// Language panel for one it adds
+\Nino\Html::addFills( $appData, [ '[[/_nino/locale/de_DE/name]]' => 'Deutsch', '[[/_nino/locale/en_US/name]]' => 'English (US)' ], '*' );
+$pickerHtml = \Nino\Html::renderHtml( $appData, \Nino\Modules\Localepicker::doShortcode( $appData, [] ) );
+check( 'the localepicker names each language from /_nino/locale/<code>/name', str_contains( $pickerHtml, '>Deutsch</a>' ) === true && str_contains( $pickerHtml, '>English (US)</a>' ) === true
+	&& str_contains( $pickerHtml, '/_nino/locale/' ) === false );
+
 /*	The two switches are one method under two keys now. Modules\Localepicker's
 	callback used to be a verbatim copy of the kernel's - every line and every
 	comment, differing in the query key alone - which is two places to fix
@@ -4406,6 +4421,8 @@ check( 'php calls an address carrying a script element and a bracket valid, so t
 $registeredFills = array_keys( $appData['./nino/html/fills']['*'] ?? [] );
 $namedFills = method_exists( '\\Nino\\Html', 'runtimeFillKeys' ) === true ? array_map( fn( string $key ): string => '[['. $key. ']]', \Nino\Html::runtimeFillKeys( $appData ) ) : [];
 check( 'every fill the kernel names as a runtime fill is registered by a request, the clean uri included', $namedFills !== [] && in_array( '[[/nino/http/response/uri/clean]]', $namedFills, true ) === true && array_diff( $namedFills, $registeredFills ) === [] );
+check( '...and the year is one of them, under /nino/ like the rest: a runtime fill is never a text key', in_array( '[[/nino/date/year]]', $namedFills, true ) === true
+	&& array_filter( $namedFills, static fn( string $fill ): bool => str_starts_with( $fill, '[[/nino/' ) === false ) === [] );
 
 $railSpan = \Nino\Html::renderHtml( $appData, '<span id="admin-user-email">[[/nino/auth/user]]</span>' );
 check( 'the address reaches the page as the text it is, never as markup', str_contains( $railSpan, '<script' ) === false && str_contains( $railSpan, '&lt;script&gt;' ) === true );
@@ -4441,14 +4458,14 @@ $appData['/nino/http/routes'] = [
 
 \Nino\Locales::setCurrentLocale( $appData, 'en_US' );
 \Nino\Html::addFills( $appData, [
-	'/webpage/home/name' 			=> 'Home',
-	'/webpage/contact/name' 	=> 'Contact',
-	'/webpage/legal/name' 		=> 'Legal',
-	'/webpage/top/name' 			=> 'Top',
+	'/_nino/webpage/home/name' 			=> 'Home',
+	'/_nino/webpage/contact/name' 	=> 'Contact',
+	'/_nino/webpage/legal/name' 		=> 'Legal',
+	'/_nino/webpage/top/name' 			=> 'Top',
 ], 'en_US' );
 \Nino\Html::addFills( $appData, [
-	'/webpage/legal-de/name' 	=> 'Rechtliches',
-	'/webpage/home/name' 			=> 'Start',
+	'/_nino/webpage/legal-de/name' 	=> 'Rechtliches',
+	'/_nino/webpage/home/name' 			=> 'Start',
 ], 'de_DE' );
 
 $mainLines = \Nino\Modules\Navigation::routeLines( $appData, 'main' );
@@ -4490,7 +4507,7 @@ check( 'an unknown menu key renders nothing', \Nino\Modules\Navigation::doShortc
 // Sommer") end the title and open the third field, which is written into the
 // <a> tag as attributes - a name typed in the Text panel deciding what the
 // markup says
-\Nino\Html::addFills( $appData, [ '/webpage/top/name' => 'Angebot: Sommer" onmouseover="alert(1)' ], 'en_US' );
+\Nino\Html::addFills( $appData, [ '/_nino/webpage/top/name' => 'Angebot: Sommer" onmouseover="alert(1)' ], 'en_US' );
 $navColon = \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main' ] );
 check( 'a colon in a page name stays part of the name', str_contains( $navColon, 'Angebot: Sommer' ) === true );
 check( '...and none of it reaches the tag', str_contains( $navColon, '" onmouseover="' ) === false
@@ -4498,7 +4515,7 @@ check( '...and none of it reaches the tag', str_contains( $navColon, '" onmouseo
 
 // ...and the name itself is text, not markup - the same rule every other
 // place an editor's words reach a page follows
-\Nino\Html::addFills( $appData, [ '/webpage/top/name' => '<script>alert(1)</script>' ], 'en_US' );
+\Nino\Html::addFills( $appData, [ '/_nino/webpage/top/name' => '<script>alert(1)</script>' ], 'en_US' );
 $navMarkup = \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main' ] );
 check( 'markup in a page name is drawn as text', str_contains( $navMarkup, '&lt;script&gt;' ) === true
 	&& str_contains( $navMarkup, '<script>alert(1)' ) === false );
@@ -4506,11 +4523,11 @@ check( 'markup in a page name is drawn as text', str_contains( $navMarkup, '&lt;
 // ...and a shortcode's result is rendered again, fills and shortcodes
 // included, so a '[' in a name has to be an entity by the time it leaves
 // here - the pass that follows would otherwise fill it
-\Nino\Html::addFills( $appData, [ '/webpage/top/name' => 'Angebot [[/webpage/home/name]] [navigation nav="main"]' ], 'en_US' );
+\Nino\Html::addFills( $appData, [ '/_nino/webpage/top/name' => 'Angebot [[/_nino/webpage/home/name]] [navigation nav="main"]' ], 'en_US' );
 $navBracket = \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main' ] );
 check( 'a bracket in a page name is an entity, so the render pass after the shortcode cannot fill it',
-	str_contains( $navBracket, 'Angebot &#91;&#91;/webpage/home/name&#93;&#93; &#91;navigation nav=&quot;main&quot;&#93;' ) === true
-	&& str_contains( $navBracket, '[[/webpage/home/name]]' ) === false );
+	str_contains( $navBracket, 'Angebot &#91;&#91;/_nino/webpage/home/name&#93;&#93; &#91;navigation nav=&quot;main&quot;&#93;' ) === true
+	&& str_contains( $navBracket, '[[/_nino/webpage/home/name]]' ) === false );
 
 // A hand-written line is the page author's own - three fields, the third of
 // them attributes for the tag, and written as typed. That is what it has
@@ -4520,12 +4537,12 @@ check( 'a hand-written line still carries its attributes in the third field', st
 	&& str_contains( $navAttributes, 'target="_blank"' ) === true );
 check( '...and its markup is still the author\'s own', str_contains( \Nino\Modules\Navigation::doShortcode( $appData, [ 'content' => '/a:<b>A</b>' ] ), '<b>A</b>' ) === true );
 
-\Nino\Html::addFills( $appData, [ '/webpage/top/name' => 'Top' ], 'en_US' );
+\Nino\Html::addFills( $appData, [ '/_nino/webpage/top/name' => 'Top' ], 'en_US' );
 
 // A route that exists only at runtime (a feature's /blog) has no entry in
 // config.php to carry 'navs'. Its memberships are '/nino/html/navroutes', read
 // for a live route and merged with the route's own, which wins for the same menu
-\Nino\Html::addFills( $appData, [ '/webpage/blog/name' => 'Blog' ], 'en_US' );
+\Nino\Html::addFills( $appData, [ '/_nino/webpage/blog/name' => 'Blog' ], 'en_US' );
 $appData['/nino/http/routes']['GET://blog'] = [ 'uri' => '/blog', 'body' => '' ];
 $appData['/nino/html/navroutes'] = [
 	'GET://blog' 		=> [ 'main' => 3 ],
@@ -4536,12 +4553,12 @@ check( 'the route\'s own membership wins for the same menu, the key adds the oth
 check( 'a menu nobody is in through the key renders as before', \Nino\Modules\Navigation::routeLines( $appData, 'nope' ) === [] );
 
 $appData['/nino/html/navroutes']['GET://gone'] = [ 'main' => 1 ];
-\Nino\Html::addFills( $appData, [ '/webpage/gone/name' => 'Gone' ], 'en_US' );
+\Nino\Html::addFills( $appData, [ '/_nino/webpage/gone/name' => 'Gone' ], 'en_US' );
 check( 'a membership of a route that is not live is skipped, though its name exists - the feature is off', in_array( '/gone:Gone', \Nino\Modules\Navigation::routeLines( $appData, 'main' ), true ) === false );
 
-\Nino\Html::addFills( $appData, [ '/webpage/blog/name' => '' ], 'en_US' );
+\Nino\Html::addFills( $appData, [ '/_nino/webpage/blog/name' => '' ], 'en_US' );
 check( 'a runtime route nobody named stays out, like any other', str_contains( implode( '', \Nino\Modules\Navigation::routeLines( $appData, 'main' ) ), 'blog' ) === false );
-\Nino\Html::addFills( $appData, [ '/webpage/blog/name' => 'Blog' ], 'en_US' );
+\Nino\Html::addFills( $appData, [ '/_nino/webpage/blog/name' => 'Blog' ], 'en_US' );
 
 // Whatever else is written there is not a priority
 $appData['/nino/html/navroutes'] = [
@@ -5551,7 +5568,7 @@ $subMenu = \Nino\Modules\Navigation::doShortcode( $subAppData, [ 'content' => "/
 check( 'a menu entry links under the directory', str_contains( $subMenu, 'href="/sub/page"' ) === true && str_contains( $subMenu, 'href="/sub/other"' ) === true );
 check( '...and the requested page is still the active entry', preg_match( '/href="\/sub\/page" class="nino-is-active"/', $subMenu ) === 1 );
 check( '...while a protocol-relative url and a fragment are written as they stand', str_contains( $subMenu, 'href="//example.com/x"' ) === true && str_contains( $subMenu, 'href="#top"' ) === true );
-\Nino\Html::addFills( $subAppData, [ '/webpage/page/name' => 'Page' ], 'en_US' );
+\Nino\Html::addFills( $subAppData, [ '/_nino/webpage/page/name' => 'Page' ], 'en_US' );
 \Nino\Locales::setCurrentLocale( $subAppData, 'en_US' );
 check( 'a generated entry links under the directory too', str_contains( \Nino\Modules\Navigation::doShortcode( $subAppData, [ 'nav' => 'main' ] ), 'href="/sub/en/page"' ) === true );
 
@@ -6247,10 +6264,10 @@ $moduleApp['/nino/locales/native'] = 'de_DE';
 
 // A project's own text wins over the module's default, and is escaped - the
 // page is output and a title is something a person typed
-\Nino\Html::addFills( $moduleApp, [ '/maintenance/title' => 'Back <b>soon</b> & "soon"', '/maintenance/text' => "Line one\nLine <two>" ], '*' );
+\Nino\Html::addFills( $moduleApp, [ '/module/maintenance/page/title' => 'Back <b>soon</b> & "soon"', '/module/maintenance/page/text' => "Line one\nLine <two>" ], '*' );
 $filledPage = maintenanceRequest( '/' );
 \Nino\Modules\Maintenance::_prepare( $moduleApp, $filledPage );
-check( 'a project\'s /maintenance/title and /maintenance/text win over the module\'s defaults - on the module\'s page', str_contains( $filledPage['/nino/http/response']['body'], '<h1>Back &lt;b&gt;soon&lt;/b&gt; &amp; &quot;soon&quot;</h1>' ) === true
+check( 'a project\'s /module/maintenance/page/title and /module/maintenance/page/text win over the module\'s defaults - on the module\'s page', str_contains( $filledPage['/nino/http/response']['body'], '<h1>Back &lt;b&gt;soon&lt;/b&gt; &amp; &quot;soon&quot;</h1>' ) === true
 	&& str_contains( $filledPage['/nino/http/response']['body'], '<p>Line one<br />' ) === true && str_contains( $filledPage['/nino/http/response']['body'], 'Line &lt;two&gt;' ) === true );
 check( '...and no markup of theirs reaches the page', str_contains( $filledPage['/nino/http/response']['body'], '<b>' ) === false && str_contains( $filledPage['/nino/http/response']['body'], '<two>' ) === false );
 
@@ -6334,8 +6351,8 @@ check( 'init() registers the banner on /nino/http/output beside Cache\'s own cal
 // got there) always wins over the hardcoded default
 $appData['/nino/maintenance/status'] = true;
 \Nino\Html::addFills( $appData, [
-	'/maintenance/title'	=> 'Back soon',
-	'/maintenance/text'		=> 'Custom maintenance notice',
+	'/module/maintenance/page/title'	=> 'Back soon',
+	'/module/maintenance/page/text'		=> 'Custom maintenance notice',
 ], '*' );
 
 $filled = maintenanceRequest( '/' );
@@ -6346,7 +6363,7 @@ check( 'the fallback page renders both fills', str_contains( $filled['/nino/http
 // A project's own template wears the site's header, and that header names
 // the request fills \Nino\request() only adds after this callback round -
 // so the module adds them itself before it renders
-\Nino\Filesystem::putFileContent( $appData, '/templates/page-maintenance.tpl', '<main data-uri="[[/nino/http/request/uri]]" data-locale="[[/nino/http/response/locale]]"><h1>[[/maintenance/title]]</h1></main>' );
+\Nino\Filesystem::putFileContent( $appData, '/templates/page-maintenance.tpl', '<main data-uri="[[/nino/http/request/uri]]" data-locale="[[/nino/http/response/locale]]"><h1>[[/module/maintenance/page/title]]</h1></main>' );
 \Nino\Modules\Template::init( $appData );
 $templated = maintenanceRequest( '/kontakt' );
 \Nino\Modules\Maintenance::_prepare( $appData, $templated );

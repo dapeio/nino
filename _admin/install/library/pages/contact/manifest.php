@@ -9,4 +9,10 @@
 		'GET://contact' => [ 'uri' => '/contact', 'body' => '[template /templates/page-contact]', 'navs' => [ 'main' => 5, 'footer' => 5 ] ],
 	],
 	'templates' 			=> [ 'page-contact.tpl' ],
+	'suggest' => [
+		'uri' 				=> '/contact',
+		'name' 				=> [ 'en_US' => 'Contact', 'de_DE' => 'Kontakt' ],
+		'title' 			=> [ 'en_US' => 'Contact us', 'de_DE' => 'Kontakt' ],
+		'description' => [ 'en_US' => 'Get in touch - we usually reply within one business day.', 'de_DE' => 'Nimm Kontakt auf - wir antworten in der Regel innerhalb eines Werktages.' ],
+	],
 ];

@@ -309,7 +309,7 @@ namespace Nino\Modules\Images {
 		 *	template by language - [[/nino/http/response/locale]], as the
 		 *	legal page does - is read once per available language, since there
 		 *	is no single template it points to. A page is named by its
-		 *	[[/webpage<uri>/name]] in the workbench's language, or by its
+		 *	[[/_nino/webpage<uri>/name]] in the workbench's language, or by its
 		 *	http uri where it has none.
 		 *
 		 *	A slot is a key of the result only where something uses it, in a
@@ -346,7 +346,7 @@ namespace Nino\Modules\Images {
 
 				$locale = \Nino\Admin\Admin::sessionLocale( $appData );
 				$text[$locale] ??= \Nino\Filesystem::getFileContent( $appData, ( $appData['/nino/locales/textfiles'] ?? '/text' ). '/'. $locale. '.php', [] );
-				$name = (string) ( $text[$locale]['[[/webpage'. $uri. '/name]]'] ?? '' );
+				$name = (string) ( $text[$locale]['[[/_nino/webpage'. $uri. '/name]]'] ?? '' );
 
 				return $name === '' ? $httpUri : $name;
 			};

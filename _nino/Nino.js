@@ -118,7 +118,7 @@
 			/**
 			 *	Return a translated text for a jstext key
 			 *
-			 *	@param		{string}		key						Text key, eg. '/form/info/success'
+			 *	@param		{string}		key						Text key, eg. '/module/form/info/success'
 			 *
 			 *	@return		{string}									Translated text or an empty string
 			 */

@@ -130,10 +130,10 @@ Important source directories:
 | `_admin/recovery.php`, `templates/page-recovery.tpl`, `assets/recovery.js` | The recovery page: restore a backup, set the password of an account, create an account with full access - with the recovery secret |
 | `_admin/install/Install.php` | The setup wizard - the workbench's first-run mode, served by the same route while `Admin::isInstalled()` says no; deletable after setup |
 | `_admin/install/library/base/`, `modules/`, `pages/<slug>/` | The wizard's library: always-applied base, units without a runtime class, installable page units |
-| `_admin/install/library/base/assets/theme.css`, `base/templates/theme.header.tpl`, `theme.footer.tpl` | The one look every project starts from, delivered by the base unit: the compiled design tokens, the roles they are assigned to, the three webfaces and the css for both frames, plus the two frame templates `html-header.tpl` includes through `[template /templates/theme.header]`. Edited by hand; there is no generator behind it any more |
+| `_admin/install/library/base/assets/theme.css`, `base/templates/frame-header.tpl`, `frame-footer.tpl` | The one look every project starts from, delivered by the base unit: the compiled design tokens, the roles they are assigned to, the three webfaces and the css for both frames, plus the two frame templates `html-header.tpl` includes through `[template /templates/frame-header]`. Edited by hand; there is no generator behind it any more |
 | the appearance catalogue | Not here since 1.2: the ten themes, six headers and seven footers the wizard used to offer, and the Design panel that kept them editable, are parked in [`design-library/`](https://github.com/dapeio/nino-features/tree/main/design-library) of [dapeio/nino-features](https://github.com/dapeio/nino-features) - not a feature, never published, waiting for the **Design** feature. Its archived manual carries the token contract |
 | the Template Builder | Not here since 1.2: extracted into the feature [`features/Templates`](https://github.com/dapeio/nino-features/blob/main/features/Templates/README.md) of the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features), with its section preset library, its two tests and its manual. A project that installed it carries it below `features/`, where the autoloader serves `\Nino\Modules\Templates` from - the kernel root resolves first, so a Nino that still shipped the module would shadow it. Which kernels the feature declares itself for is its own manifest's business, in that repository |
-| the social media links | Not in the base unit after 1.3.1: the four `/company/<network>` keys, the heading `/website/footer/title/followus`, `html-socialmedia.tpl` and the `.nino-socialmedia` rules of `Nino.css` are the feature [`features/Social`](https://github.com/dapeio/nino-features/blob/main/features/Social/README.md) of the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) - an element type `/social` the editors keep, drawn by `[social]`, `[social-link]` and `[social-icon]`. The Design feature's frames include the template it installs, `templates/social-links.tpl`, which renders as nothing where the feature is not there |
+| the social media links | Not in the base unit after 1.3.1: the four network keys, the heading of the social links, `html-socialmedia.tpl` and the `.nino-socialmedia` rules of `Nino.css` are the feature [`features/Social`](https://github.com/dapeio/nino-features/blob/main/features/Social/README.md) of the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) - an element type `/social` the editors keep, drawn by `[social]`, `[social-link]` and `[social-icon]`. The Design feature's frames include the template it installs, `templates/social-links.tpl`, which renders as nothing where the feature is not there |
 | `public/` | The project's public half — everything a browser loads directly: `images/`, `favicon/`, `fonts/`, and the generated `.cache/` bundles. Reached through `Filesystem::path()` on disk and `Filesystem::url()` (or the `[[/nino/public]]` fill) for urls. Never build a public url by hand from `[[/nino/dir]]`. `assets/` is *not* here — the bundle sources are private, see below |
 | project root | `index.php`, `router.php`, `_nino/`, `_admin/`, `app/` and `features/`. `Filesystem::getPath()`. The workbench serves its own js/css from here, so a tool file's url uses the plain project dir, not the public prefix |
 | `private/` | The project's private half — never served, only read by PHP: `config.php` (the accounts among it), `templates/`, `text/`, `elements/`, `data/` (runtime records, the login throttle's counters among them — `auth-tries.php`, see `Auth::TRIES_PATH`), `assets/` (the stylesheet and script sources `Modules\Assets` concatenates into `public/.cache/` — nothing ever requests one directly), plus `.auth/` (the recovery secret and the backup key), `.logs/` and `.backups/`. Reached through `Filesystem::path()` (which resolves `PRIVATE_DIRS` against it) or the virtual `Filesystem::CONTENT_DIR` prefix (`/private`); moved by `NINO_PRIVATE_DIR` (`NINO_CONTENT_DIR`, its name before 1.1, is refused at boot rather than ignored). Never write project state into a tool folder or into `config.php` — the first breaks updates, the second is rolled back by a Restore. **A checkout ships none of this**: the wizard creates the directory, brings its own deny rule (`_admin/install/library/base/private/.htaccess`) and writes the first `config.php` at the end of Setup. Framework defaults live in `\Nino\AppData::DEFAULTS` and sit *under* that file, so config.php holds only what this project decided |
@@ -187,6 +187,28 @@ $request = \Nino\request( $appData, $_SERVER );
 - Keys under `./...` are request-lifecycle-only state.
 - A `/...` value is not persistent merely because it is in `$appData`. A
   writer must explicitly save it.
+
+### Text keys
+
+A textfill key follows one grammar, `/<namespace>/<category>/<part>/<name>`:
+exactly four segments, each `[a-z0-9]+(-[a-z0-9]+)*`, English, never a number as
+a name, never a language or a form (global or per language) in it.
+
+| Namespace | Holds | Category |
+| --- | --- | --- |
+| `template` | the words one template reads | the template's file name without `.tpl`, prefix and all: `page-home.tpl` is `/template/page-home/...`; words several templates read live in `/template/common` |
+| `project` | the project's own facts and settings | `company`, `website`, `mail`, or a name of the project's own |
+| `feature` | the words of a catalogue feature's function | the feature's manifest `key` |
+| `module` | the words of a kernel module | the module's directory, lower case |
+
+The system writes `/_nino/webpage<uri>/<name|title|description|uri>` (a page's
+details, after its Element-URI) and `/_nino/locale/<code>/name` (a language's
+name); the workbench's own words are `/_admin/...`; `/nino/...` names the
+kernel's runtime fills and is no text key. A label in front of a fact is a word
+of its own (`/template/common/label/phone`), the fact comes from
+`/project/company/...` alone. `tests/keys-smoke.php` holds everything shipped to
+this; the Text Keys tab creates and renames only keys that follow it. The rules
+and the reasons are in [docs/development.md](docs/development.md).
 
 ### Response rules
 
@@ -266,9 +288,9 @@ concurrent changes.
 
 HTML+ is processed as textfills, then shortcodes, then final render callbacks.
 
-- Absolute textfill: `[[/page-home/main-hero/title]]`
+- Absolute textfill: `[[/template/page-home/main-hero/title]]`
 - Reusable template: `[template /templates/html-header]`
-- Image slot: `[image /page-home/main-hero/image alt=""]`
+- Image slot: `[image /template/page-home/main-hero/image alt=""]`
 - Element-local field: `[[title]]` only inside `[element]` or `[elements]`
 - CSRF field: `[csrf]`
 
@@ -740,7 +762,8 @@ or escaping.
 | Declare a feature's class in its manifest | The class is `\Nino\Modules\<Directory>`, derived; a `module` entry saying anything else is refused |
 | Let a feature's unit overwrite a project file on update | Activation and update are add-only; migrate the feature's own data in `upgrade()` |
 | Declare a page-unit file that does not exist | Keep `files` paths unit-relative and test the copied output |
-| Put translated words in IDs/fill keys | Use stable semantic slugs |
+| Put translated words in IDs/fill keys | Use stable semantic slugs, in the key grammar |
+| Invent a key shape, glue words together (`adress`, `getintouch`) or keep a table of labels | Follow `/<namespace>/<category>/<part>/<name>`; the workbench names the fields from the key |
 | Update only English or German behavioral docs | Keep both manuals synchronized |
 | Test for a new file but not behavior | Assert observable response/data/DOM contracts |
 
@@ -764,6 +787,7 @@ temporary project and must not rely on a previously installed working tree.
 | The feature contract (`\Nino\Features`, the wizard's unit application) | `tests/features-smoke.php` |
 | The catalogue (`\Nino\Catalogue`, `\Nino\Fetch`, the panel's catalogue and install actions) | `tests/catalogue-smoke.php` - a keypair, signed catalogues and archives built in the test, the network stubbed |
 | A feature (a new one, or one of the catalogue's such as Newsletter or Search) | its own `features/<Name>/tests/<key>-smoke.php`, plus `tests/features-smoke.php`; CI's `features` job runs the catalogue's features against every push |
+| A text key, a template's file name, a unit's text, the key grammar | `tests/keys-smoke.php` - the shipped keys follow the grammar, no old form is left, every key a template reads resolves |
 | Anything a catalogue feature reads from the kernel - the demo catalogue page and its `data-demo-preset` marks, `Nino.css`, the base unit's templates and keys, the feature contract | the catalogue's own checks against this checkout, before the push: `NINO_ROOT=$PWD ../nino-features/bin/check.sh`, with [dapeio/nino-features](https://github.com/dapeio/nino-features) cloned beside it. CI's `features` job runs the same tests after the push - a key renamed on one side alone turns it red, so a rename that spans both repositories is pushed to the catalogue first and to Nino right after, and the push that changes Nino's side finds the catalogue renamed already |
 | Shared public UI slider/tabs | corresponding `tests/nino-ui-*-js-smoke.js` |
 | Shared management UI/CSS structure | owner tests plus `tests/admin-lists-js-smoke.js` |
@@ -778,6 +802,7 @@ php tests/admin-system-smoke.php
 php tests/install-smoke.php
 php tests/features-smoke.php
 php tests/catalogue-smoke.php
+php tests/keys-smoke.php
 for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php
@@ -914,7 +939,8 @@ new, and the tests named in section 10 pass.
 - [ ] Sections have unique semantic IDs and stable fill paths.
 - [ ] Includes omit `.tpl` and resolve to shipped/copied files.
 - [ ] Required text, modules, image slots, and Element types are supplied.
-- [ ] Locale suggestions and actual content are separated.
+- [ ] Every key the unit delivers follows the grammar: `/template/<file name without .tpl>/<part>/<name>` for the words one of its templates reads, `/template/common/...` only in the base unit, no `/project` or `/_nino` key, the same keys in every language, and a template whose name has a dot or an upper-case letter carries no key of its own.
+- [ ] Locale suggestions and actual content are separated: the proposal for a page's name, title and description is the manifest's `suggest`, never a `/_nino` key in a text file.
 - [ ] Install/reapply/render and Template Builder losslessness are tested.
 
 ## 12. Completion report format

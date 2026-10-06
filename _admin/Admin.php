@@ -716,10 +716,10 @@ namespace Nino\Admin {
 		 *	above is where it is checked. A scoped permission describes what
 		 *	the account may do once inside - '/_admin/elements/services/insert',
 		 *	'/_admin/elements/services/update/title',
-		 *	'/_admin/text/update/page-home/atf/title'. Both kinds are ordinary
+		 *	'/_admin/text/update/template/page-home/hero/title'. Both kinds are ordinary
 		 *	strings checked with the same \Nino\Auth::checkPermission(), so
 		 *	'/_admin/elements/services/*' covers every action on that type and
-		 *	'/_admin/text/update/page-home/*' every key of that group, without
+		 *	'/_admin/text/update/template/page-home/*' every key of that template, without
 		 *	this file knowing anything about types, fields or keys.
 		 *
 		 *	Enforcement is opt-in per account, and deliberately so. An account
@@ -810,7 +810,7 @@ namespace Nino\Admin {
 		 *	Build the [[/_admin/localepicker]] fill: a <select> (stays
 		 *	compact regardless of how many locales are configured, unlike a
 		 *	row of links) with one <option> per available locale (label via
-		 *	the same [[/nino/locales/locale/xx]] fills the public site's
+		 *	the same [[/_nino/locale/xx/name]] fills the public site's
 		 *	[localepicker] shortcode uses), the current one pre-selected.
 		 *	Options carry a real ?locale=xx value - login.js/script.js just
 		 *	navigate to it on change, no fetch/POST involved. init()'s query
@@ -832,11 +832,13 @@ namespace Nino\Admin {
 
 				// The name of a language is the project's to give, and the fill
 				// that carries it is written by the Localepicker module's install
-				// step - an optional unit an operator may uncheck, and one that
-				// cannot know about a locale the Language panel adds later either.
-				// Without the fallback every such option renders empty, which is
-				// a language switcher with nothing readable in it
-				$label = \Nino\Html::renderTextfill( $appData, '/nino/locales/locale/'. $locale );
+				// step for the two languages the wizard offers - an optional unit
+				// an operator may uncheck - and by the Language panel, with the
+				// code as the name, for one it adds later. A project that wrote
+				// neither has none. Without the fallback every such option
+				// renders empty, which is a language switcher with nothing
+				// readable in it
+				$label = \Nino\Html::renderTextfill( $appData, '/_nino/locale/'. $locale. '/name' );
 
 				// The name is editor content - the Text panel writes that key -
 				// and this markup is built before the fill and shortcode pass

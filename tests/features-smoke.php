@@ -412,7 +412,7 @@ echo "Features::activate - requirements, the unit, the module list, the record\n
 // The project already has a template and a text key the unit also ships
 \Nino\Filesystem::forceDir( $appData, '/templates' );
 file_put_contents( \Nino\Filesystem::path( $appData, '/templates/page-sample.tpl' ), 'mine' );
-\Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', [ '[[/sample/intro]]' => 'Meins' ] );
+\Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', [ '[[/feature/sample/intro/text]]' => 'Meins' ] );
 
 check( 'an unknown feature cannot be activated', \Nino\Features::activate( $appData, 'nope' ) === 'unknown feature "nope"' );
 check( 'an incompatible feature is refused with its problems', str_starts_with( (string) \Nino\Features::activate( $appData, 'old' ), 'feature "old" cannot be activated: requires Nino ^0.9' ) );
@@ -427,10 +427,10 @@ check( 'the unit\'s routes are added for the available locales, a key the projec
 	&& isset( $stored['/nino/http/routes']['GET://sample-fr'] ) === false && $stored['/nino/http/routes']['GET://sample']['body'] === 'the project\'s own' && isset( $stored['/nino/http/routes']['GET://'] ) === true );
 check( 'the live routes go on with the new ones added', $appData['/nino/http/routes']['GET://sample-de']['uri'] === '/beispiel' );
 check( 'the unit\'s template is copied only where the project has none', file_get_contents( \Nino\Filesystem::path( $appData, '/templates/page-sample.tpl' ) ) === 'mine' );
-check( 'the unit\'s text keys are added, an existing key kept', \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/sample/intro]]'] === 'Meins'
-	&& \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] )['[[/sample/intro]]'] === 'Welcome to the sample.'
-	&& \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/sample/label]]'] === 'Sample label' );
-check( 'the unit\'s blacklist and config default are applied', in_array( '/sample/hidden', \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), true ) === true && $stored['/sample/config'] === 'unit-default' );
+check( 'the unit\'s text keys are added, an existing key kept', \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/feature/sample/intro/text]]'] === 'Meins'
+	&& \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] )['[[/feature/sample/intro/text]]'] === 'Welcome to the sample.'
+	&& \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/feature/sample/intro/label]]'] === 'Sample label' );
+check( 'the unit\'s blacklist and config default are applied', in_array( '/feature/sample/intro/hidden', \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), true ) === true && $stored['/sample/config'] === 'unit-default' );
 check( 'the registry now knows it as active and current', \Nino\Features::get( $appData, 'sample' )['active'] === true && \Nino\Features::get( $appData, 'sample' )['installed'] === '1.2.0' && \Nino\Features::get( $appData, 'sample' )['update'] === false );
 check( 'the module boots on the next request and its shortcode reads its settings', ( static function() use ( $appData ): bool {
 	\Nino\Modules::callModules( $appData, 'init' );

@@ -673,6 +673,68 @@ All notable changes to Nino are documented in this file.
   three types through the endpoint, `tests/nino-ui-form-js-smoke.js` the
   client's side.
 
+- **Routes:** the pages a feature serves by itself - Posts' `/blog`, the
+  Newsletter's `/.newsletter`, Hello's `/hello` - are listed under the pages as
+  **Feature routes**, with no arrows and no delete, because there is no route of
+  the project's to move or remove. Their form shows the path read-only and the
+  name, title and description per language, and `routes/savetexts` writes
+  exactly `/_nino/webpage<uri>/name`, `…/title` and `…/description` for an
+  Element-URI a runtime route carries right now (a `404` for any other), with
+  the rules of `routes/save` for them: no route goes into `config.php`, no `uri`
+  key is stored - the feature decides the path - and nothing goes on the
+  blacklist. It is the one writer of those keys left for a page nobody saved:
+  the Text Keys tab no longer creates a `/_nino` key (see Changed).
+  `\Nino\Modules\Routes\Admin::runtimeRoutes()` names the pages, `routes/list`
+  answers them under `runtime`. A write that fails is answered with a `500`
+  naming the file, here and in `routes/save`, and the three words are stored as
+  plain text, as the Text panel stores the same keys: the title and the
+  description land in an attribute of the page head. `tests/admin-system-smoke.php`
+  holds the list, the three keys and what is not written, the refusals, the
+  failed write and the log line;
+  `tests/admin-routes-js-smoke.js` the rows, the form and the request.
+
+- **Language:** a language added in the panel gets its name. `language/addlocale`
+  writes `/_nino/locale/<code>/name` into `text/global.php` with the code as its
+  value, unless the key is there already, before it writes the language's file
+  - and for a file that exists already too, which it touches in nothing else;
+  before, a language added later had no name and the public picker showed the
+  raw fill. The Text panel is where the name is made a real one.
+
+- **`\Nino\Text::isGrammarKey( $key )`** answers whether a key follows the
+  grammar (see Changed), and **`\Nino\Modules\Template::category( $name )`**
+  the category of a template: a file name (`page-home.tpl`) or a template as a
+  shortcode or route body names it (`/templates/page-home`), without `.tpl`,
+  `null` where the name is no word of a key (a dot, an upper-case letter, a
+  slash).
+
+- **Text Keys scan:** every key a template reads and nothing defines is a row,
+  with what may be done about it: `create` (it follows the grammar, so a value
+  makes it a key - for a `/feature` or `/module` key with the note that it
+  normally belongs to that feature or module), `system` (a `/_nino` key, named
+  after a page or a language: no input, no *ignore*, and the row says who
+  writes it - the Routes panel, the Language panel - or that nobody does) and
+  `grammar` (any other form: no input, can be ignored). Placeholders a shortcode
+  fills in - `[[name]]` in the mail templates, `[[.rel]]` - are no keys and are
+  not listed. The answer carries a second list, `alsoUsed`: a
+  `/template/<category>/...` key that a template of another category reads as
+  well, with the files - a note under the rows, never a count. `keys/scanapply`
+  creates only what may be created and neither creates nor retires a `system`
+  row; the Dashboard counts every row. `tests/admin-system-smoke.php` holds the
+  kinds, the writers, the placeholders, the apply and the note;
+  `tests/admin-text-js-smoke.js` the rows without an input and the notes in
+  both languages.
+
+- **`tests/keys-smoke.php`** (new, 70 checks) holds the grammar and everything
+  Nino ships to it: the text fragments of the base unit, the page units and the
+  modules' units (the grammar, who may deliver what, the same keys in both
+  languages, none global and per language at once, every fill a value names
+  resolves), every key a shipped template reads (a runtime fill, a key of the
+  system, a composed shape that is allowed, or a key the template's unit, the
+  base unit or a required module delivers - and only the template's own
+  category or `common`), the key literals in the kernel's and the workbench's
+  code, no old key family left in any shipped file, and `category()` and
+  `isGrammarKey()` over a table of cases. CI runs it in `lint-and-test`.
+
 ### Changed
 
 - **Workbench:** what the panels print for a failure. A failure with a code is
@@ -980,6 +1042,99 @@ All notable changes to Nino are documented in this file.
   keep the date row. Add-only: a project that installed before keeps its
   templates and copies the placeholder in by hand.
 
+- **Text keys (breaking):** every text key follows one grammar,
+  `/<namespace>/<category>/<part>/<name>` - four segments, each lower-case
+  words joined by hyphens, English, never a number as a name. The namespaces
+  are `template` (the words a template reads, category = its file name without
+  `.tpl`; words several templates read live in `/template/common`), `project`
+  (the project's facts and settings: `company`, `website`, `mail`),
+  `feature` (the words of a catalogue feature's function, category = its key)
+  and `module` (a kernel module's words, category = its directory, lower case).
+  The system's own forms are `/_nino/webpage<uri>/<name|title|description|uri>`
+  and `/_nino/locale/<code>/name`; `/_admin/...` is unchanged; the kernel's
+  runtime fills all live under `/nino/` (`[[/date/year]]` is `[[/nino/date/year]]`).
+  A label in front of a fact and the fact are two keys now: `/template/common/label/phone`
+  is the word, `/project/company/contact/phone` the number, which every template
+  reads from there alone. The rules and the order of the questions that decide
+  where a word belongs are in the Developer Manual, "The key grammar". Every key
+  Nino ships is renamed, with every reader of it - templates, `Form`, `Mail`,
+  `Maintenance`, `Localepicker`, `Navigation`, `Nino.ui.js`, the Routes and
+  Images panels, the wizard - and its documentation:
+
+  | before | now |
+  | --- | --- |
+  | `/company/{name,description}` | `/project/company/general/{name,description}` |
+  | `/company/{adress,phone,email,country}` | `/project/company/contact/{address,phone,email,country}` |
+  | `/website/{url,author,host}` | `/project/website/general/{url,author,host}` |
+  | `/website/{charset,lang}` | `/project/website/html/{charset,lang}` (blacklisted) |
+  | `/form/email/owner`, `/mail/sender` | `/project/mail/address/{owner,envelope}` |
+  | `/mail/style/...` (11) | `/project/mail/{color,font,spacing}/...`, in the base unit now, blacklisted |
+  | `/website/header/title/navigation` | `/template/frame-header/navigation/label` |
+  | `/website/footer/title/navigation` | `/template/common/navigation/footer` |
+  | `/website/footer/title/getintouch` | `/template/frame-footer/contact/title` |
+  | `/global/{adress,phone,email}` | `/template/frame-footer/label/address`, `/template/common/label/{phone,email}` |
+  | `/slider/label/{prev,next,slide}` | `/template/common/slider/{prev,next,slide}` |
+  | `/form/label/{name,email,message,cat,date,submit}`, `/form/required` | `/template/common/form/{name,email,message,reason,date,submit,required}`, in the base unit now |
+  | `/form/info/*`, `/form/subject/*` | `/module/form/info/*`, `/module/form/subject/*` |
+  | `/mail/owner/*`, `/mail/user/*` | `/template/mail-owner/...`, `/template/mail-user/...` (`intro`, `summary`, `outro`) |
+  | `/maintenance/{title,text}` | `/module/maintenance/page/{title,text}` |
+  | `/nino/locales/title`, `/nino/locales/locale/<code>` | `/module/localepicker/menu/title`, `/_nino/locale/<code>/name` |
+  | `/page-<page>/...` | `/template/page-<page>/<part>/<name>` (`/page-services/item/1/title` is `/template/page-services/item-1/title`, `/page-404/backhome` is `/template/page-404/hero/button`) |
+  | `/webpage<uri>/...` | `/_nino/webpage<uri>/...` |
+  | `/newsletter/info/*` (read by `Nino.ui.js`), `Jstext`'s default prefixes | `/feature/newsletter/info/*`, `/module/form/info/`, `/feature/newsletter/info/`, `/template/common/slider/` |
+
+  The Text Keys tab holds people to it: `keys/create`, `keys/rename` and
+  `keys/scanapply` accept only a new key that follows the grammar - a `400` with
+  the code `keys_invalid` and a sentence that names the form - and `keys/rename`
+  refuses to rename a key under `/_nino/` or `/_admin/` (`keys_system`), whose
+  name is what the code that reads it asks for. Keys a project already has are
+  not touched and stay editable: saved, hidden, deleted, renamed to a key that
+  follows the grammar. The tab's form still takes one line; the field per
+  segment comes with the Text panel's rework. The legal page is the one
+  exception until the Legal module replaces it: `page-legal.<xx_XX>.tpl` and the
+  footer link keys `/website/legal/{uri,name}` keep their names, and what the
+  page reads from other units follows the table.
+
+  **No migration, no aliases:** nothing was published with the old keys. A
+  project set up with an earlier version keeps its old texts and renames them
+  with the table - `[[/company/name]]` in a template of its own stays what it
+  is and shows raw until it is changed. `tests/keys-smoke.php` (see Added) is
+  what finds a leftover.
+
+- **Frames:** `theme.header.tpl` and `theme.footer.tpl` are `frame-header.tpl`
+  and `frame-footer.tpl` - a file name is a category now, and a dot is no part
+  of one. `html-header.tpl` and `html-footer.tpl` include them as
+  `[template /templates/frame-header]` and `[template /templates/frame-footer]`.
+  A project that edited a frame renames its file and the include in its own
+  `html-header.tpl`; a feature that writes the frames (Design) writes the new
+  names.
+
+- **Setup:** a page unit's proposal for the name, title and description of its
+  page is the `suggest` entry of its manifest - `uri`, `name`, `title` and
+  `description`, each a string or one string per language - and no longer a
+  `[[/webpage/<folder>/...]]` key in its text files, which were never written as
+  text and were the one place a unit delivered a key of the system. The
+  home page's hero seed is `images/template/page-home/fullscreen-image/background.svg`
+  and its slot `/template/page-home/fullscreen-image/background`; the section
+  JSON of `page-home.tpl` and `page-contact.tpl` names the page `page-home` and
+  `page-contact` (the Template Builder takes the category for its page id). The
+  contact page's, the mails' and the demo catalogue's words for a form are the
+  base unit's `/template/common/form/*` now: the contact form unit keeps its 15
+  words per language (`/module/form/*`, the two mails), and no longer ships a
+  `text/global.php` or a blacklist - the look of the mails is the base unit's, so
+  the Newsletter feature, whose copy was byte-identical, needs no second one.
+  The *Personal information* step offers `/project/company/` and
+  `/project/website/general/`, each field labelled by its category and name
+  (`Company › Address`, `Website › Url`) in English like the rest of the
+  wizard, and `/project/website/html/*` is outside it without a blacklist of its
+  own. `tests/install-smoke.php` holds the proposals read from the manifest, the
+  keys of the project texts, the labels and pages named `/footer`, `/common` and
+  `/2026-home`.
+
+- **Version:** `\Nino\VERSION` is `1.4.0-dev`. Features that read these keys
+  declare `nino ^1.4`; a feature that only reads its own keys is not
+  concerned.
+
 ### Fixed
 
 - **Workbench, Elements:** a required field is marked and a refused save says
@@ -1212,6 +1367,15 @@ All notable changes to Nino are documented in this file.
   changed "Wähle Deine Sprache" expectation); `tests/nino-ui-scroll-js-smoke.js` that
   `Nino.ui.cookieConsent` is undefined and neither script nor stylesheet
   mention a banner (13 → 15, 2 red).
+
+- **Dead keys and the proposals in text files.** `/form/title` and
+  `/form/info/welcome`, which nothing read (the welcome text was published to
+  every page by `Jstext` all the same), the Form unit's `text/global.php` and
+  its blacklist, the eight pages' `/webpage/<folder>/{uri,name,title,description}`
+  proposals and the comment on top of each text file that explained them, the
+  text files of the `blank` and `legal` units, which held nothing else,
+  `Webpages::_withoutWebpageMeta()`, `PersonalInfos::KEY_BLACKLIST` and
+  `Keys::isValidKey()`.
 
 ## v1.3.2 - 2026-10-01
 

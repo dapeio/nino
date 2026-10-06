@@ -913,7 +913,7 @@ namespace Nino\Install {
 	 *												overridden - the same bundle can be mounted more than
 	 *												once, at different uris). "uri" (Element-URI) is a stable
 	 *												identifier that never has to look like a real path - it
-	 *												namespaces this entry's own [[/webpage&lt;uri&gt;/*]] text meta
+	 *												namespaces this entry's own [[/_nino/webpage&lt;uri&gt;/*]] text meta
 	 *												and becomes the route's own 'uri' data field. "httpUri" is
 	 *												the actual browser path a visitor requests - it alone
 	 *												drives the /nino/http/routes array key (see _routeKeys()'s
@@ -927,7 +927,7 @@ namespace Nino\Install {
 	 *
 	 *												Nothing of this is persisted as a list of its own: the
 	 *												routes are the pages (see isPageRoute()/pages()), the
-	 *												/webpage&lt;uri&gt;/* text keys are their wording, and the
+	 *												/_nino/webpage&lt;uri&gt;/* text keys are their wording, and the
 	 *												route's 'navs' its menu membership. The workbench's own
 	 *												Routes panel - _admin/Nino/Modules/Routes/Admin/Admin.php -
 	 *												reads and writes exactly the same routes (its
@@ -1080,10 +1080,10 @@ namespace Nino\Install {
 				inside the tool and nothing writes to it at runtime, while
 				pages() asks _unitFromBody(), which asks this - once per page
 				route it lists. Each reading is a scandir plus a manifest
-				include per unit plus, through _suggestions(), a text fragment
-				include per unit per locale: eight units and two locales is 24
-				includes, and a project with twenty pages paid for that twenty
-				times over to render the wizard's page list once	*/
+				include per unit plus, through _suggestions(), a second manifest
+				include per unit: eight units is 16 includes, and a project with
+				twenty pages paid for that twenty times over to render the
+				wizard's page list once	*/
 			static $cached = [];
 
 			$cacheKey = implode( "\0", $locales );
@@ -1116,21 +1116,21 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	The starter wording a library unit ships for an instance of
-		 *	itself: the [[/webpage/&lt;folder name&gt;/{uri,name,title,
-		 *	description}]] keys its own text/&lt;locale&gt;.php fragments still
-		 *	carry.
+		 *	The starter wording a library unit proposes for an instance of
+		 *	itself: the 'suggest' entry of its manifest, a Http-URI and a
+		 *	name, title and description - each a string or a locale => string
+		 *	map, read with \Nino\Features::localized().
 		 *
-		 *	_applyWebpage() deliberately never merges those as text (see
-		 *	_withoutWebpageMeta()) - keyed by the template's folder name
-		 *	rather than the uri an instance actually gets mounted at, they'd
-		 *	be stale the moment the two differ. As the Webpages form's own
-		 *	prefill they're exactly right though, and the only place a
+		 *	It is the Webpages form's own prefill and the only place a
 		 *	template's per-locale wording exists at all: without it, every
 		 *	locale nobody hand-typed silently lands on DEFAULT_TEXT's generic
 		 *	"Page"/"Page Title" (which stays the fallback for a blank field -
 		 *	see apiApply()'s $text loop - it just isn't what a freshly picked
-		 *	template should start from).
+		 *	template should start from). A unit's text fragments do not carry
+		 *	it: a [[/_nino/webpage/...]] key is the system's, written by
+		 *	_applyWebpage() under the Element-URI an instance is mounted at,
+		 *	and a key named for the unit's folder would be stale the moment the
+		 *	two differ.
 		 *
 		 *	The menus a unit suggests for itself come from its manifest route's
 		 *	own 'navs' instead - a starting point for the form's checkboxes,
@@ -1143,29 +1143,27 @@ namespace Nino\Install {
 		 */
 		private static function _suggestions( string $libraryKey, array $locales ): array {
 
-			$prefix = '[[/webpage/'. $libraryKey. '/';
-			$uri 		= '';
-			$text 	= [];
+			$manifest = \Nino\Features::readUnitManifest( self::LIBRARY. '/pages/'. $libraryKey ) ?? [];
+			$suggest	= is_array( $manifest['suggest'] ?? null ) === true ? $manifest['suggest'] : [];
+			$uri 			= '';
+			$text 		= [];
 
 			foreach( $locales as $locale ) {
 
-				$path 		= self::LIBRARY. '/pages/'. $libraryKey. '/text/'. $locale. '.php';
-				$fragment = is_file( $path ) === true ? include $path : [];
-
 				$text[$locale] = [
-					'name' 				=> (string) ( $fragment[$prefix. 'name]]'] 				?? '' ),
-					'title' 			=> (string) ( $fragment[$prefix. 'title]]'] 			?? '' ),
-					'description' => (string) ( $fragment[$prefix. 'description]]'] ?? '' ),
+					'name' 				=> \Nino\Features::localized( $suggest['name'] ?? '', $locale ),
+					'title' 			=> \Nino\Features::localized( $suggest['title'] ?? '', $locale ),
+					'description' => \Nino\Features::localized( $suggest['description'] ?? '', $locale ),
 				];
 
 				// One Http-URI for every locale - an entry only has the single
 				// one (see _routeKeys()'s docblock), so the first locale that
 				// names one wins rather than the last
 				if( $uri === '' )
-					$uri = (string) ( $fragment[$prefix. 'uri]]'] ?? '' );
+					$uri = \Nino\Features::localized( $suggest['uri'] ?? '', $locale );
 			}
 
-			$manifestRoute = array_values( ( \Nino\Features::readUnitManifest( self::LIBRARY. '/pages/'. $libraryKey ) ?? [] )['routes'] ?? [] )[0] ?? [];
+			$manifestRoute = array_values( $manifest['routes'] ?? [] )[0] ?? [];
 
 			return [
 				'uri' 	=> $uri,
@@ -1206,7 +1204,7 @@ namespace Nino\Install {
 		 *	Every field is recovered from where it actually lives: the
 		 *	route key is the Http-URI, the route's own 'uri' data field the
 		 *	Element-URI, 'navs' the menu membership, and the per-locale
-		 *	name/title/description are the /webpage&lt;uri&gt;/* keys this
+		 *	name/title/description are the /_nino/webpage&lt;uri&gt;/* keys this
 		 *	step writes into /text/&lt;locale&gt;.php. 'libraryKey' is
 		 *	resolved back from the body (see _unitFromBody()) so the form's
 		 *	template picker can still show which library unit a page came
@@ -1251,7 +1249,7 @@ namespace Nino\Install {
 				$entryText = [];
 				foreach( $locales as $locale )
 					foreach( [ 'name', 'title', 'description' ] as $field )
-						$entryText[$locale][$field] = (string) ( $text[$locale]['[[/webpage'. $uri. '/'. $field. ']]']
+						$entryText[$locale][$field] = (string) ( $text[$locale]['[[/_nino/webpage'. $uri. '/'. $field. ']]']
 							?? $suggested[$locale][$field]
 							?? '' );
 
@@ -1796,7 +1794,7 @@ namespace Nino\Install {
 		 *	path its own httpUri names, regardless of how many routes the
 		 *	picked template's manifest declares. The entry's uri (Element-
 		 *	URI) plays no part here - it stays the route's own 'uri' data
-		 *	field (see _applyWebpage()) and the /webpage&lt;uri&gt;/* text
+		 *	field (see _applyWebpage()) and the /_nino/webpage&lt;uri&gt;/* text
 		 *	meta namespace, deliberately decoupled from the real path so
 		 *	eg. the home page can keep a stable '/home' identifier while
 		 *	actually living at '/'. A template needing more than one real,
@@ -1897,11 +1895,11 @@ namespace Nino\Install {
 		 *	it's gated to a locale that isn't picked (same as
 		 *	\Nino\Features::applyUnit() does); copy its template/
 		 *	element-type files, collect its blacklist entries, merge its
-		 *	deeper text/global.php + text/&lt;locale&gt;.php content (any
-		 *	/webpage/&lt;name&gt;/* meta the manifest still ships is filtered
-		 *	out - this method writes that itself, keyed by $entry['uri']
-		 *	rather than the template's own folder name, so html-header.tpl's
-		 *	[[/webpage[[/nino/http/response/uri]]/title]] lookup resolves
+		 *	deeper text/global.php + text/&lt;locale&gt;.php content (a unit
+		 *	carries no /_nino/webpage/... meta there - this method writes that
+		 *	itself, keyed by $entry['uri'] rather than the template's own
+		 *	folder name, so html-header.tpl's
+		 *	[[/_nino/webpage[[/nino/http/response/uri]]/title]] lookup resolves
 		 *	correctly regardless of which uri a template ends up mounted
 		 *	at), and finally the entry's own name/title/description per
 		 *	active locale
@@ -2003,12 +2001,12 @@ namespace Nino\Install {
 					$blacklist[] = $key;
 
 				$globalFragment = $unitDir. '/text/global.php';
-				if( is_file( $globalFragment ) === true && \Nino\Features::mergeText( $appData, '/text/global.php', self::_withoutWebpageMeta( (array) include $globalFragment ) ) === false )
+				if( is_file( $globalFragment ) === true && \Nino\Features::mergeText( $appData, '/text/global.php', (array) include $globalFragment ) === false )
 					return 'could not write /text/global.php';
 
 				foreach( $locales as $locale ) {
 					$localeFragment = $unitDir. '/text/'. $locale. '.php';
-					if( is_file( $localeFragment ) === true && \Nino\Features::mergeText( $appData, '/text/'. $locale. '.php', self::_withoutWebpageMeta( (array) include $localeFragment ) ) === false )
+					if( is_file( $localeFragment ) === true && \Nino\Features::mergeText( $appData, '/text/'. $locale. '.php', (array) include $localeFragment ) === false )
 						return 'could not write /text/'. $locale. '.php';
 				}
 
@@ -2042,18 +2040,18 @@ namespace Nino\Install {
 			}
 
 			// The page's own Http-URI as a fill, so a template can link to a
-			// page by name - [[/webpage/site-home/uri]] - instead of
+			// page by name - [[/_nino/webpage/site-home/uri]] - instead of
 			// hard-coding a path that this step can change on the next apply.
 			// Global rather than per-locale: an entry carries exactly one
 			// Http-URI for every locale (see _suggestions()). Blacklisted for
-			// the same reason /website/charset is - a technical value, not
-			// wording anybody edits in /_admin's Text panel
+			// the same reason /project/website/html/charset is - a technical
+			// value, not wording anybody edits in /_admin's Text panel
 			if( $routeKey !== null ) {
 				if( \Nino\Features::mergeText( $appData, '/text/global.php', [
-					'[[/webpage'. $entry['uri']. '/uri]]' => (string) ( $entry['httpUri'] ?? '' ),
+					'[[/_nino/webpage'. $entry['uri']. '/uri]]' => (string) ( $entry['httpUri'] ?? '' ),
 				] ) === false )
 					return 'could not write /text/global.php';
-				$blacklist[] = '/webpage'. $entry['uri']. '/uri';
+				$blacklist[] = '/_nino/webpage'. $entry['uri']. '/uri';
 			}
 
 			// The entry's own meta, whichever tool created it - this is what
@@ -2064,29 +2062,14 @@ namespace Nino\Install {
 				$meta = $entry['text'][$locale] ?? self::DEFAULT_TEXT;
 
 				if( \Nino\Features::mergeText( $appData, '/text/'. $locale. '.php', [
-					'[[/webpage'. $entry['uri']. '/name]]' 				=> $meta['name'],
-					'[[/webpage'. $entry['uri']. '/title]]' 				=> $meta['title'],
-					'[[/webpage'. $entry['uri']. '/description]]' => $meta['description'],
+					'[[/_nino/webpage'. $entry['uri']. '/name]]' 				=> $meta['name'],
+					'[[/_nino/webpage'. $entry['uri']. '/title]]' 				=> $meta['title'],
+					'[[/_nino/webpage'. $entry['uri']. '/description]]' => $meta['description'],
 				] ) === false )
 					return 'could not write /text/'. $locale. '.php';
 			}
 
 			return true;
-		}
-
-		/**
-		 *	A template's own text fragment isn't expected to declare
-		 *	/webpage/&lt;name&gt;/* meta anymore (that's this class's job, see
-		 *	_applyWebpage()) - filtered out defensively rather than trusted,
-		 *	so a library fork that still ships one doesn't leave a stale,
-		 *	folder-name-keyed key permanently behind
-		 *
-		 *	@param		array 		$fragment
-		 *
-		 *	@return 	array
-		 */
-		private static function _withoutWebpageMeta( array $fragment ): array {
-			return array_filter( $fragment, fn( string $key ): bool => str_starts_with( $key, '[[/webpage/' ) === false, ARRAY_FILTER_USE_KEY );
 		}
 
 		/**
@@ -2193,9 +2176,10 @@ namespace Nino\Install {
 	 *	Nino							A compact filesystembased php framework
 	 *	Install						Step 4: bulk-fill the handful of "Personal Infos" keys every
 	 *												project has regardless of what Setup/Webpages picked -
-	 *												/company/* and /website/* (company/contact details,
-	 *												the site's author/hosting info), each with a friendly
-	 *												label instead of its raw key. Everything else - technical/
+	 *												/project/company/* and /project/website/general/*
+	 *												(company/contact details, the site's author/hosting
+	 *												info), each with a friendly label instead of its raw
+	 *												key. Everything else - technical/
 	 *												design-token keys (text/blacklist.php), a webpage's own
 	 *												name/title/description (Webpages already covers that), and
 	 *												any deeper module/page content - is left out here on
@@ -2220,10 +2204,10 @@ namespace Nino\Install {
 		// internals
 		private const string BASE_TEXT_DIR = __DIR__. '/library/base/text';
 
-		// Only these two prefixes are in scope - see this class's docblock
-		private const array KEY_PREFIXES = [ '/company/', '/website/' ];
-		// Blacklisted text keys
-		private const array KEY_BLACKLIST = [ '/website/charset', '/website/lang' ];
+		// Only these two prefixes are in scope - see this class's docblock.
+		// The technical /project/website/html/* values and the mails' look
+		// are outside both
+		private const array KEY_PREFIXES = [ '/project/company/', '/project/website/general/' ];
 
 		/**
 		 *	This module's action map, merged into Install::handlePost()'s dispatch
@@ -2238,10 +2222,10 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	List "base"'s /company/* and /website/* text keys with their
-		 *	current value(s) and a friendly label - everything else (see
-		 *	this class's docblock, including blacklisted/technical keys) is
-		 *	left out
+		 *	List "base"'s /project/company/* and /project/website/general/*
+		 *	text keys with their current value(s) and a friendly label -
+		 *	everything else (see this class's docblock, including
+		 *	blacklisted/technical keys) is left out
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -2254,7 +2238,7 @@ namespace Nino\Install {
 
 			$entries = array_values( array_filter(
 				\Nino\Text::entries( $appData, true ),
-				fn( array $entry ): bool => ( isset( $keys[$entry['key']] ) && ! in_array( $entry['key'], self::KEY_BLACKLIST ) )
+				fn( array $entry ): bool => isset( $keys[$entry['key']] )
 			) );
 
 			foreach( $entries as &$entry )
@@ -2268,7 +2252,7 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	Every /company/* and /website/* key base/text/global.php and
+		 *	Every key of KEY_PREFIXES base/text/global.php and
 		 *	base/text/<locale>.php declare, stripped of their surrounding
 		 *	[[ ]] - what apiList() filters \Nino\Text::entries() down to
 		 *
@@ -2298,17 +2282,22 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	'/company/adress' -> 'Company Adress', '/website/author' ->
-		 *	'Website Author' - every segment capitalized, joined with a
-		 *	space, no hardcoded per-key lookup table to keep in sync with
-		 *	the library's own key names
+		 *	'/project/company/contact/address' -> 'Company › Address',
+		 *	'/project/website/general/author' -> 'Website › Author' - the
+		 *	category and the name, each capitalized with its hyphens as spaces,
+		 *	no hardcoded per-key lookup table to keep in sync with the
+		 *	library's own key names. English like the whole wizard
 		 *
 		 *	@param		string		$key
 		 *
 		 *	@return 	string
 		 */
 		private static function _label( string $key ): string {
-			return implode( ' ', array_map( 'ucfirst', array_filter( explode( '/', $key ) ) ) );
+
+			$segments = explode( '/', trim( $key, '/' ) );
+			$humanize = static fn( string $segment ): string => ucfirst( str_replace( '-', ' ', $segment ) );
+
+			return $humanize( $segments[1] ?? '' ). ' › '. $humanize( $segments[3] ?? '' );
 		}
 
 		/**

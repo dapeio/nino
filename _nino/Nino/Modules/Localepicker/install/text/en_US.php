@@ -1,3 +1,3 @@
 <?php return [
-	'[[/nino/locales/title]]' => 'Choose your language',
+	'[[/module/localepicker/menu/title]]' => 'Choose your language',
 ];

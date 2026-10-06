@@ -97,6 +97,42 @@ check( '...including the rows left empty, which the server passes over', sent.pa
 check( '...and the ignored ones, which is how they get retired at all', sent.payload.rows[2].key === '/a/three' && sent.payload.rows[2].ignore === true );
 check( 'a filled row carries its value', sent.payload.rows[0].value === 'Value' );
 
+// A row the scan lists without an input - a key off the grammar, which is
+// renamed in the template and can only be ignored - sends no value, and
+// still carries its ignore. A key of the system has no row to send at all
+keys._saveScanResults( [
+	{ key : '/foo/bar', valueInput : null, ignoreCheck : { checked : true } },
+	{ key : '/foo/baz', valueInput : null, ignoreCheck : { checked : false } },
+] );
+check( 'a row without an input sends an empty value and its ignore', sent.payload.rows.length === 2 && sent.payload.rows[0].value === '' && sent.payload.rows[0].ignore === true && sent.payload.rows[1].ignore === false );
+keys._view = 'scan';
+keys._scanRows = [ { key : '/foo/bar', valueInput : null, ignoreCheck : { checked : false } } ];
+keysSandbox.document.getElementById = function() { return { classList : { contains : function() { return false } } } };
+check( 'a form whose rows have no input is not dirty until one is ticked', keys.isDirty() === false );
+keys._scanRows[0].ignoreCheck.checked = true;
+check( '...and is then', keys.isDirty() === true );
+keys.discard();
+check( '...and discarding unticks it without an input to empty', keys._scanRows[0].ignoreCheck.checked === false );
+keys._view = 'group';
+keysSandbox.document.getElementById = function() { return { textContent : '' } };
+
+// What the scan says about a key it cannot create, or about where one comes from: a fill, in the words of the workbench
+keysSandbox.Nino.adminUi = { format : function( text, a ) { return text.replace( '%s', a ) } };
+check( 'a key that is simply to be created has no note', keys._scanNote( { kind : 'create', hint : null } ) === '' );
+check( 'a key off the grammar says so', keys._scanNote( { kind : 'grammar' } ) === '/_admin/keys/scan/grammar' );
+check( 'a key of the system says who writes it - the Routes panel, the Language panel - or that nobody does', keys._scanNote( { kind : 'system', writer : 'routes' } ) === '/_admin/keys/scan/system-routes'
+	&& keys._scanNote( { kind : 'system', writer : 'language' } ) === '/_admin/keys/scan/system-language' && keys._scanNote( { kind : 'system', writer : null } ) === '/_admin/keys/scan/system-none' );
+check( 'a /feature or /module key says whose it normally is', keys._scanNote( { kind : 'create', hint : 'feature', owner : 'consent' } ) === '/_admin/keys/scan/hint-feature'
+	&& keys._scanNote( { kind : 'create', hint : 'module', owner : 'form' } ) === '/_admin/keys/scan/hint-module' );
+// The fills it asks for are put together at runtime ('system-<writer>', 'hint-<kind>'), which the static check of
+// tests/admin-system-smoke.php cannot see: both languages carry every one
+[ 'en_US', 'de_DE' ].forEach( function( locale ) {
+	const words = fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Text/text/'+ locale+ '.php' ), 'utf8' );
+	const has = key => words.includes( "[[/_admin/keys/scan/"+ key+ "]]'" );
+	check( locale+ ': every note of the scan, and the list of keys other templates read as well, has its words',
+		[ 'grammar', 'system-routes', 'system-language', 'system-none', 'hint-feature', 'hint-module', 'also-title', 'also-hint', 'also-line' ].every( has ) && words.includes( "[[/_admin/error/keys_system]]'" ) );
+} );
+
 const keysSource = fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Text/assets/keys.js' ), 'utf8' );
 // Three outcomes are not obvious from three controls, so the form says them
 check( 'the form explains what an empty row and an ignored row each mean',

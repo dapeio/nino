@@ -84,7 +84,7 @@ return [
 	'[[/_admin/users/label/locked-until]]'	=> 'gesperrt bis %s',
 	'[[/_admin/users/label/lastlogin]]'	=> 'Letzte Anmeldung: %s',
 	'[[/_admin/users/label/never]]'	=> 'Noch nie angemeldet',
-	'[[/_admin/roles/scope/hint]]'	=> 'Einzelrechte regeln, was jemand innerhalb eines Bereichs tun darf: Wähle den Bereich, dann die Aktion und, wo es eines gibt, das Feld.',
+	'[[/_admin/roles/scope/hint]]'	=> 'Einzelrechte regeln, was jemand innerhalb eines Bereichs tun darf: Wähle den Bereich, dann die Aktion und, wo es eines gibt, das Feld. Für eine ganze Seite brauchst Du zwei Bereiche: ihre Texte unter „/template“ und ihre Seitenangaben unter „/_nino“.',
 	'[[/_admin/roles/scope/area]]'	=> 'Bereich',
 	'[[/_admin/roles/scope/action]]'	=> 'Aktion',
 	'[[/_admin/roles/scope/field]]'	=> 'Feld',

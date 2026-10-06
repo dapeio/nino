@@ -591,30 +591,30 @@
 		<div class="nino-grid-100 nino-grid-m-50 nino-p-2">
 			<div class="nino-grid-100 nino-mb-3 nino-text-left"><h2 class="nino-section-title" id="kontakt-split-title">Write to us</h2><p class="nino-section-subtitle">We reply within one business day.</p></div>
 			<ul class="nino-list">
-				<li><strong>[[/company/name]]</strong></li>
-				<li>[[/company/adress]]</li>
-				<li><a href="mailto:[[/company/email]]">[[/company/email]]</a></li>
-				<li><a href="tel:[[/company/phone]]">[[/company/phone]]</a></li>
+				<li><strong>[[/project/company/general/name]]</strong></li>
+				<li>[[/project/company/contact/address]]</li>
+				<li><a href="mailto:[[/project/company/contact/email]]">[[/project/company/contact/email]]</a></li>
+				<li><a href="tel:[[/project/company/contact/phone]]">[[/project/company/contact/phone]]</a></li>
 			</ul>
 			<div class="nino-grid-100 nino-mt-3 nino-text-left"><div class="nino-section-text">Your details are sent to us by email and are not shared with third parties.</div></div>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-p-2">
 			<form class="nino-form">
 				[csrf]
-				<label for="kontakt-split-name">[[/form/label/name]]</label>
+				<label for="kontakt-split-name">[[/template/common/form/name]]</label>
 				<input type="text" id="kontakt-split-name" name="name" class="nino-form-input" required>
 
-				<label for="kontakt-split-email">[[/form/label/email]]</label>
+				<label for="kontakt-split-email">[[/template/common/form/email]]</label>
 				<input type="email" id="kontakt-split-email" name="email" class="nino-form-input" required>
 
-				<label for="kontakt-split-message">[[/form/label/message]]</label>
+				<label for="kontakt-split-message">[[/template/common/form/message]]</label>
 				<textarea id="kontakt-split-message" name="message" class="nino-form-textarea" required></textarea>
 
 				<input type="text" name="location" value="" tabindex="-1" autocomplete="off" aria-hidden="true" class="nino-form-trap">
 
 				<p class="nino-form-message"></p>
-				<p><small>[[/form/required]]</small></p>
-				<button type="submit" class="nino-btn nino-btn--primary nino-form-submit">[[/form/label/submit]]</button>
+				<p><small>[[/template/common/form/required]]</small></p>
+				<button type="submit" class="nino-btn nino-btn--primary nino-form-submit">[[/template/common/form/submit]]</button>
 			</form>
 		</div>
 	</div>
@@ -633,20 +633,20 @@
 		<div class="nino-grid-100 nino-grid-m-50 nino-mx-auto">
 			<form class="nino-form">
 				[csrf]
-				<label for="kontakt-centered-name">[[/form/label/name]]</label>
+				<label for="kontakt-centered-name">[[/template/common/form/name]]</label>
 				<input type="text" id="kontakt-centered-name" name="name" class="nino-form-input" required>
 
-				<label for="kontakt-centered-email">[[/form/label/email]]</label>
+				<label for="kontakt-centered-email">[[/template/common/form/email]]</label>
 				<input type="email" id="kontakt-centered-email" name="email" class="nino-form-input" required>
 
-				<label for="kontakt-centered-message">[[/form/label/message]]</label>
+				<label for="kontakt-centered-message">[[/template/common/form/message]]</label>
 				<textarea id="kontakt-centered-message" name="message" class="nino-form-textarea" required></textarea>
 
 				<input type="text" name="location" value="" tabindex="-1" autocomplete="off" aria-hidden="true" class="nino-form-trap">
 
 				<p class="nino-form-message"></p>
-				<p><small>[[/form/required]]</small></p>
-				<button type="submit" class="nino-btn nino-btn--primary nino-form-submit">[[/form/label/submit]]</button>
+				<p><small>[[/template/common/form/required]]</small></p>
+				<button type="submit" class="nino-btn nino-btn--primary nino-form-submit">[[/template/common/form/submit]]</button>
 			</form>
 		</div>
 		<div class="nino-grid-100 nino-mt-3 nino-text-left"><div class="nino-section-text">Your details are sent to us by email and are not shared with third parties.</div></div>
@@ -667,9 +667,9 @@
 			<form class="nino-form nino-newsletter-form nino-form--inline" action="[[/nino/dir]]/.newsletter">
 				[csrf]
 				<input type="text" name="location" value="" tabindex="-1" autocomplete="off" aria-hidden="true" class="nino-form-trap">
-				<label for="newsletter-centered-email" class="nino-sr-only">[[/newsletter/label/email]]</label>
-				<input type="email" id="newsletter-centered-email" name="email" class="nino-form-input" placeholder="[[/newsletter/label/email]]" required>
-				<button type="submit" class="nino-btn nino-btn--primary nino-form-submit">[[/newsletter/label/submit]]</button>
+				<label for="newsletter-centered-email" class="nino-sr-only">[[/template/common/form/email]]</label>
+				<input type="email" id="newsletter-centered-email" name="email" class="nino-form-input" placeholder="[[/template/common/form/email]]" required>
+				<button type="submit" class="nino-btn nino-btn--primary nino-form-submit">[[/feature/newsletter/label/submit]]</button>
 				<p class="nino-form-message nino-grid-100"></p>
 			</form>
 		</div>
@@ -692,9 +692,9 @@
 			<form class="nino-form nino-newsletter-form nino-form--inline" action="[[/nino/dir]]/.newsletter">
 				[csrf]
 				<input type="text" name="location" value="" tabindex="-1" autocomplete="off" aria-hidden="true" class="nino-form-trap">
-				<label for="newsletter-split-email" class="nino-sr-only">[[/newsletter/label/email]]</label>
-				<input type="email" id="newsletter-split-email" name="email" class="nino-form-input" placeholder="[[/newsletter/label/email]]" required>
-				<button type="submit" class="nino-btn nino-btn--primary nino-form-submit">[[/newsletter/label/submit]]</button>
+				<label for="newsletter-split-email" class="nino-sr-only">[[/template/common/form/email]]</label>
+				<input type="email" id="newsletter-split-email" name="email" class="nino-form-input" placeholder="[[/template/common/form/email]]" required>
+				<button type="submit" class="nino-btn nino-btn--primary nino-form-submit">[[/feature/newsletter/label/submit]]</button>
 				<p class="nino-form-message nino-grid-100"></p>
 			</form>
 		</div>

@@ -190,7 +190,7 @@
 		},
 
 		/**
-		 *	Group key entries by the first path segment (eg. "/home/welcome/h2" -> "home")
+		 *	Group key entries by the first path segment (eg. "/template/page-home/welcome/title" -> "template")
 		 *
 		 *	@param		{Array}		entries				List of key entries (see Text::apiKeys())
 		 *

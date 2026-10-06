@@ -208,7 +208,7 @@ refuses a malformed one by name. What an account may do is `\Nino\Auth::permissi
 A panel's own permission is a door. What may be done once inside it can be
 described further with a **scoped permission** - one string per action, and per
 field or key where that is the unit:
-`/_admin/elements/services/update/title`, `/_admin/text/update/page-home/*`.
+`/_admin/elements/services/update/title`, `/_admin/text/update/template/page-home/*`.
 They are ordinary permission strings, so `\Nino\Auth::checkPermission()`'s
 `/*` ancestor rule is what makes a whole type or group grantable at once, and
 `\Nino\Admin\Admin::scoped( $appData, $prefix, $perm )` is what a panel calls:

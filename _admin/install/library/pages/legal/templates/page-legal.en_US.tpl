@@ -1,5 +1,5 @@
 [template /templates/html-header]
-<h2 class="nino-sr-only">[[/webpage[[/nino/http/response/uri]]/name]]</h2>
+<h2 class="nino-sr-only">[[/_nino/webpage[[/nino/http/response/uri]]/name]]</h2>
 <section id="legal-imprint" class="nino-section">
 	<div class="nino-grid-row">
 		<div class="nino-grid-100">
@@ -8,7 +8,7 @@
 
 		<div class="nino-grid-100">
 		  <h4>Information according to § 5 Digital Services Act (DDG)</h4>
-		  <p>[[/website/author]]<br>[[/company/adress]]<br>[[/global/phone]]: [[/company/phone]]<br>[[/global/email]]: [[/company/email]]</p>
+		  <p>[[/project/website/general/author]]<br>[[/project/company/contact/address]]<br>[[/template/common/label/phone]]: [[/project/company/contact/phone]]<br>[[/template/common/label/email]]: [[/project/company/contact/email]]</p>
 
 		  <h4>Consumer dispute resolution / universal dispute resolution board</h4>
 		  <p>We are not willing or obligated to participate in dispute resolution proceedings before a consumer arbitration board.</p>
@@ -41,7 +41,7 @@
 		  <p>This website is hosted externally. The personal data collected on this website is stored on the servers of the hosting provider. This may include IP addresses, contact requests, meta and communication data, contract data, contact information, names, website access, and other data generated through a website.</p>
 		  <p>External hosting is carried out for the purpose of contract fulfillment towards our potential and existing customers (Art. 6 (1) (b) GDPR) and in the interest of a secure, fast and efficient provision of our online services by a professional provider (Art. 6 (1) (f) GDPR). If appropriate consent has been requested, processing is carried out exclusively on the basis of Art. 6 (1) (a) GDPR and § 25 (1) TTDSG, insofar as the consent covers the storage of cookies or access to information on the user's end device. Consent can be revoked at any time.</p>
 		  <p>Our hosting provider will only process your data to the extent necessary to fulfill its performance obligations and will follow our instructions with regard to this data. We have concluded a data processing agreement with our hosting provider in accordance with Art. 28 GDPR.</p>
-		  <p><strong>Hosting provider:</strong><br>[[/website/host]]</p>
+		  <p><strong>Hosting provider:</strong><br>[[/project/website/general/host]]</p>
 		  <h4>3. General information and mandatory disclosures</h4>
 		  <h5>Data protection</h5>
 		  <p>The operators of these pages take the protection of your personal data very seriously. We treat your personal data confidentially and in accordance with statutory data protection regulations and this privacy policy.</p>
@@ -49,7 +49,7 @@
 		  <p>We would like to point out that data transmission over the internet (e.g. when communicating by email) may be subject to security vulnerabilities. Complete protection of data against access by third parties is not possible.</p>
 		  <h5>Information about the responsible party</h5>
 		  <p>The party responsible for data processing on this website is:</p>
-		  <p>[[/website/author]]<br>[[/company/adress]]<br>[[/global/phone]]: [[/company/phone]]<br>[[/global/email]]: [[/company/email]]</p>
+		  <p>[[/project/website/general/author]]<br>[[/project/company/contact/address]]<br>[[/template/common/label/phone]]: [[/project/company/contact/phone]]<br>[[/template/common/label/email]]: [[/project/company/contact/email]]</p>
 		  <h5>Storage duration</h5>
 		  <p>Unless a more specific storage period has been specified within this privacy policy, your personal data will remain with us until the purpose for data processing no longer applies. If you assert a legitimate request for deletion or revoke consent to data processing, your data will be deleted unless we have other legally permissible reasons for storing your personal data.</p>
 

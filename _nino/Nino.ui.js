@@ -619,7 +619,7 @@
 
 					/**
 					 *	What a slider control is called: the project's own text where
-					 *	it has one (published to [jstext] under '/slider/label/'),
+					 *	it has one (published to [jstext] under '/template/common/slider/'),
 					 *	else the language the page declares, else English
 					 *
 					 *	@param		{Element}		wrap					The slider
@@ -633,7 +633,7 @@
 						// loaded on its own (see the tests), and a project may ship
 						// the ui script without the text block
 						const own = wrap.getAttribute( 'data-slider-label-'+ which )
-							|| ( Nino.content?.getText?.( '/slider/label/'+ which ) ?? '' );
+							|| ( Nino.content?.getText?.( '/template/common/slider/'+ which ) ?? '' );
 
 						if( own !== '' )
 							return own;
@@ -887,8 +887,8 @@
 						} );
 
 						this.form.msg.textContent = ( xhr.status === 400 )
-							? ( ( typed === true ? Nino.content.getText('/form/info/invalid') : '' ) || Nino.content.getText('/form/info/email') )
-							: Nino.content.getText('/form/info/'+ ( ok === true ? 'success' : 'error' ));
+							? ( ( typed === true ? Nino.content.getText('/module/form/info/invalid') : '' ) || Nino.content.getText('/module/form/info/email') )
+							: Nino.content.getText('/module/form/info/'+ ( ok === true ? 'success' : 'error' ));
 
 						// Only a delivered message locks the form down. Disabling every
 						// field on any response left a visitor who mistyped their address
@@ -988,7 +988,7 @@
 								&& ( this.fields[i].type === 'checkbox' ? this.fields[i].checked !== true : this.fields[i].value.length === 0 ) ) {
 								Nino.ui._markField( this.fields[i], true );
 								firstRefused = firstRefused ?? this.fields[i];
-								error = Nino.content.getText('/form/info/required');
+								error = Nino.content.getText('/module/form/info/required');
 							}
 
 							// Check email. The local part uses the character set the html
@@ -1003,7 +1003,7 @@
 							if( error === false && this.fields[i].type === 'email' && ( /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/.test(this.fields[i].value) === false ) ) {
 								Nino.ui._markField( this.fields[i], true );
 								firstRefused = firstRefused ?? this.fields[i];
-								error = Nino.content.getText('/form/info/email');
+								error = Nino.content.getText('/module/form/info/email');
 							}
 
 							// A url, a number and a date are validated by Form::validate()
@@ -1024,7 +1024,7 @@
 									|| ( this.fields[i].value.length > 0 && this.fields[i].validity.typeMismatch === true ) ) ) {
 								Nino.ui._markField( this.fields[i], true );
 								firstRefused = firstRefused ?? this.fields[i];
-								error = Nino.content.getText('/form/info/invalid');
+								error = Nino.content.getText('/module/form/info/invalid');
 							}
 						}
 
@@ -1034,7 +1034,7 @@
 						if( error === false )
 							for( const name in radioGroups )
 								if( data[name] === '' ) {
-									error = Nino.content.getText('/form/info/required');
+									error = Nino.content.getText('/module/form/info/required');
 									for( let i = 0, l = this.fields.length; i<l; i++)
 										if( this.fields[i].type === 'radio' && this.fields[i].name === name ) {
 											Nino.ui._markField( this.fields[i], true );
@@ -1110,7 +1110,7 @@
 			/*
 			 *	nino-newsletter-form - same validate-then-xhr shape as nino-form
 			 *	above, kept separate because the signup is disabled after a
-			 *	successful submit and shows /newsletter/info/success.
+			 *	successful submit and shows /feature/newsletter/info/success.
 			 *	The endpoint deliberately answers the same way whether or not
 			 *	the address was already on the list - anything else lets anyone
 			 *	test whether a given address is subscribed - so there is no
@@ -1143,8 +1143,8 @@
 						// any other signup (see this block's docblock), so it
 						// still never reaches here as its own outcome
 						this.form.msg.textContent = ( xhr.status === 400 )
-							? Nino.content.getText('/newsletter/info/email')
-							: Nino.content.getText('/newsletter/info/'+ ( ok === true ? 'success' : 'error' ));
+							? Nino.content.getText('/feature/newsletter/info/email')
+							: Nino.content.getText('/feature/newsletter/info/'+ ( ok === true ? 'success' : 'error' ));
 
 						if( ok === false )
 							return;
@@ -1202,14 +1202,14 @@
 							if( this.fields[i].required === true && this.fields[i].value.length === 0 ) {
 								Nino.ui._markField( this.fields[i], true );
 								firstRefused = firstRefused ?? this.fields[i];
-								error = Nino.content.getText('/newsletter/info/required');
+								error = Nino.content.getText('/feature/newsletter/info/required');
 							}
 
 							// Same character set as the .nino-form check above
 							if( error === false && this.fields[i].type === 'email' && ( /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/.test(this.fields[i].value) === false ) ) {
 								Nino.ui._markField( this.fields[i], true );
 								firstRefused = firstRefused ?? this.fields[i];
-								error = Nino.content.getText('/newsletter/info/email');
+								error = Nino.content.getText('/feature/newsletter/info/email');
 							}
 						}
 
@@ -1217,7 +1217,7 @@
 						if( error === false )
 							for( const name in radioGroups )
 								if( data[name] === '' ) {
-									error = Nino.content.getText('/newsletter/info/required');
+									error = Nino.content.getText('/feature/newsletter/info/required');
 									for( let i = 0, l = this.fields.length; i<l; i++)
 										if( this.fields[i].type === 'radio' && this.fields[i].name === name ) {
 											Nino.ui._markField( this.fields[i], true );

@@ -50,13 +50,14 @@ namespace Nino {
 		}
 
 		/**
-		 *	[json /company/adress] - one textfill as a complete json string
-		 *	literal, surrounding quotes included, for a json document a
-		 *	template writes by hand. The schema.org block in
+		 *	[json /project/company/contact/address] - one textfill as a complete
+		 *	json string literal, surrounding quotes included, for a json
+		 *	document a template writes by hand. The schema.org block in
 		 *	html-header.tpl is the reason it exists: a fill goes into the
-		 *	page verbatim (see _renderFills()), and '/company/adress' is
-		 *	multi-line by design - it renders as a postal address and
-		 *	the wizard's own PersonalInfos step offers it as a <textarea>. A
+		 *	page verbatim (see _renderFills()), and
+		 *	'/project/company/contact/address' is multi-line by design - it
+		 *	renders as a postal address and the wizard's own PersonalInfos
+		 *	step offers it as a <textarea>. A
 		 *	raw newline inside a json string is not valid json, so that
 		 *	block failed to parse on every page of every install. A quote
 		 *	or a backslash in any of the other values does the same.
@@ -69,8 +70,8 @@ namespace Nino {
 		 *	neutralize a '</script>' as a side effect.
 		 *
 		 *	Nested fills are resolved before encoding, so a value that
-		 *	references another one ('[[/website/url]]' inside a subject
-		 *	line, say) still comes out as its final text - and the
+		 *	references another one ('[[/project/website/general/url]]' inside a
+		 *	subject line, say) still comes out as its final text - and the
 		 *	re-render Html::_doShortcode() runs on this return value then
 		 *	has nothing left to substitute back into the encoded string.
 		 *
@@ -161,7 +162,7 @@ namespace Nino {
 			return [
 				'[[/nino/dir]]'					=> \Nino\Filesystem::getDir( $appData ),
 				'[[/nino/public]]'			=> \Nino\Filesystem::getPublicDir( $appData ),
-				'[[/date/year]]'				=> date('Y'),
+				'[[/nino/date/year]]'				=> date('Y'),
 			];
 		}
 
@@ -234,8 +235,9 @@ namespace Nino {
 
 			// Comparing the rendered string itself (not just its '[[' count)
 			// catches fill values that reference another fill of their own
-			// (eg. /form/subject/owner containing [[/website/url]]) - a
-			// same-count swap would otherwise look "stable" after one pass.
+			// (eg. /module/form/subject/owner containing
+			// [[/project/website/general/url]]) - a same-count swap would
+			// otherwise look "stable" after one pass.
 			// The pass cap guards against a fill value that references
 			// itself (possible via the Text panel, not just the
 			// developer-authored defaults).

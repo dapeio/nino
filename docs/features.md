@@ -385,7 +385,7 @@ The class is an ordinary runtime module in the `Nino\Modules` namespace: `init()
 
 The class reads its settings through `\Nino\Features::setting()` - with a default, so it keeps working when the schema does not know a setting yet.
 
-A route the class registers in `init()` is not in `config.php`, and can still be put into a navigation: the Navigations panel offers every live `GET` route and stores a runtime route's membership under `/nino/html/navroutes`, which `[navigation]` merges into the route while it is live. The menu shows it as soon as the route has a name, `/webpage<uri>/name` - create it in the Text Keys tab - and drops it silently when the feature is off.
+A route the class registers in `init()` is not in `config.php`, and can still be put into a navigation: the Navigations panel offers every live `GET` route and stores a runtime route's membership under `/nino/html/navroutes`, which `[navigation]` merges into the route while it is live. The menu shows it as soon as the route has a name, `/_nino/webpage<uri>/name` - write it in the Routes panel, under *Feature routes*, together with the title and the description; the Text Keys tab does not create a `/_nino` key - and drops it silently when the feature is off.
 
 ### The Panel
 
@@ -397,7 +397,7 @@ A panel is a class with `actions()`, `nav()` and `perm()`, like every panel of t
 
 ### Text
 
-There are two kinds of text, and they live in different places. The panel's words - the navigation label, captions, messages - live under `text/<locale>.php` beside the class and are merged into the workbench's fills through the panel's `text()` while the feature is active. The words the website needs - labels in a template the unit copies - live in `install/text/` and are written into the project's `text/` files once, at activation, where the editors maintain them from then on. The feature's own name and description are in the manifest, because the Features panel shows them even when none of that is loaded.
+There are two kinds of text, and they live in different places. The panel's words - the navigation label, captions, messages - live under `text/<locale>.php` beside the class and are merged into the workbench's fills through the panel's `text()` while the feature is active. The words the website needs - labels in a template the unit copies - live in `install/text/`, under `/feature/<key>/...` - or under `/template/<file name without .tpl>/...` where only a template the unit ships reads the word - and are written into the project's `text/` files once, at activation, where the editors maintain them from then on. The feature's own name and description are in the manifest, because the Features panel shows them even when none of that is loaded.
 
 ### Tests
 

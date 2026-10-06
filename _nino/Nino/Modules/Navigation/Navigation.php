@@ -222,7 +222,7 @@ namespace Nino\Modules {
 				// the setup wizard and the Routes panel already write per webpage. A route
 				// nobody named has nothing to show in a menu, so it stays out
 				// rather than appearing as a raw uri or an empty link
-				$title = \Nino\Html::renderTextfill( $appData, '/webpage'. ( $route['uri'] ?? '' ). '/name' );
+				$title = \Nino\Html::renderTextfill( $appData, '/_nino/webpage'. ( $route['uri'] ?? '' ). '/name' );
 
 				if( $title === '' )
 					continue;

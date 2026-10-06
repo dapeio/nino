@@ -387,7 +387,7 @@ Die Klasse ist ein gewöhnliches Laufzeitmodul im Namespace `Nino\Modules`: `ini
 
 Einstellungen liest die Klasse über `\Nino\Features::setting()` – mit einem Default, damit sie auch dann funktioniert, wenn das Schema eine Einstellung noch nicht kennt.
 
-Eine Route, die die Klasse in `init()` registriert, steht nicht in der `config.php` und lässt sich trotzdem in eine Navigation aufnehmen: Das Panel Navigationen bietet jede vorhandene `GET`-Route an und speichert die Zugehörigkeit einer Laufzeitroute unter `/nino/html/navroutes`, das `[navigation]` der Route zumischt, solange sie existiert. Das Menü zeigt sie, sobald die Route einen Namen hat, `/webpage<uri>/name` – lege ihn im Tab Textschlüssel an –, und lässt sie still weg, wenn das Feature aus ist.
+Eine Route, die die Klasse in `init()` registriert, steht nicht in der `config.php` und lässt sich trotzdem in eine Navigation aufnehmen: Das Panel Navigationen bietet jede vorhandene `GET`-Route an und speichert die Zugehörigkeit einer Laufzeitroute unter `/nino/html/navroutes`, das `[navigation]` der Route zumischt, solange sie existiert. Das Menü zeigt sie, sobald die Route einen Namen hat, `/_nino/webpage<uri>/name` – schreibe ihn im Panel Routen unter *Feature-Routen*, zusammen mit Titel und Beschreibung; der Tab Textschlüssel legt keinen `/_nino`-Schlüssel an –, und lässt sie still weg, wenn das Feature aus ist.
 
 ### Das Panel
 
@@ -399,7 +399,7 @@ Ein Panel ist eine Klasse mit `actions()`, `nav()` und `perm()`, so wie jedes Pa
 
 ### Texte
 
-Zwei Arten von Text gibt es, und sie leben an verschiedenen Orten. Die Worte des Panels – Navigationsbezeichnung, Beschriftungen, Meldungen – liegen unter `text/<locale>.php` neben der Klasse und werden über `text()` des Panels mit den Fills der Workbench zusammengeführt, solange das Feature aktiv ist. Die Worte, die die Webseite braucht – Beschriftungen in einem Template, das die Einheit kopiert –, liegen in `install/text/` und werden bei der Aktivierung einmal in die `text/`-Dateien des Projekts geschrieben, wo die Redaktion sie danach pflegt. Der Name und die Beschreibung des Features selbst stehen im Manifest, weil das Panel Features sie auch dann zeigt, wenn nichts davon geladen ist.
+Zwei Arten von Text gibt es, und sie leben an verschiedenen Orten. Die Worte des Panels – Navigationsbezeichnung, Beschriftungen, Meldungen – liegen unter `text/<locale>.php` neben der Klasse und werden über `text()` des Panels mit den Fills der Workbench zusammengeführt, solange das Feature aktiv ist. Die Worte, die die Webseite braucht – Beschriftungen in einem Template, das die Einheit kopiert –, liegen in `install/text/`, unter `/feature/<key>/…` – oder unter `/template/<dateiname ohne .tpl>/…`, wenn nur ein mitgeliefertes Template das Wort wörtlich liest – und werden bei der Aktivierung einmal in die `text/`-Dateien des Projekts geschrieben, wo die Redaktion sie danach pflegt. Der Name und die Beschreibung des Features selbst stehen im Manifest, weil das Panel Features sie auch dann zeigt, wenn nichts davon geladen ist.
 
 ### Tests
 

@@ -1,72 +1,72 @@
 <!DOCTYPE html>
-<html lang="[[/website/lang]]">
+<html lang="[[/project/website/html/lang]]">
 <head>
-	<meta charset="[[/website/charset]]">
+	<meta charset="[[/project/website/html/charset]]">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<style>
 		body {
 			margin: 0;
 			padding: 0;
-			background-color: [[/mail/style/color/section/alt/bg]];
-			color: [[/mail/style/color/text]];
+			background-color: [[/project/mail/color/backdrop]];
+			color: [[/project/mail/color/text]];
 			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 		}
 		.mail-container {
 			width: 100%;
 			max-width: 600px;
 			margin: 0 auto;
-			background: [[/mail/style/color/background]];
+			background: [[/project/mail/color/background]];
 		}
 		.mail-header {
 			width: 100%;
 			text-align: center;
-			background: [[/mail/style/color/primary]];
-			padding: [[/mail/style/spacing/2]] 0;
+			background: [[/project/mail/color/primary]];
+			padding: [[/project/mail/spacing/medium]] 0;
 		}
 		.mail-header img {
 			max-width: 180px;
 			height: auto;
 		}
 		.mail-body {
-			padding: [[/mail/style/spacing/3]] [[/mail/style/spacing/2]];
+			padding: [[/project/mail/spacing/large]] [[/project/mail/spacing/medium]];
 		}
 		h1 {
-			font-size: [[/mail/style/typography/font-big]];
-			color: [[/mail/style/color/text]];
-			margin: 0 0 [[/mail/style/spacing/2]] 0;
+			font-size: [[/project/mail/font/large]];
+			color: [[/project/mail/color/text]];
+			margin: 0 0 [[/project/mail/spacing/medium]] 0;
 		}
 		p {
 			font-size: 1em;
-			line-height: [[/mail/style/typography/line-height]];
-			margin: 0 0 [[/mail/style/spacing/2]] 0;
+			line-height: [[/project/mail/font/line-height]];
+			margin: 0 0 [[/project/mail/spacing/medium]] 0;
 		}
 		table {
 			width: 100%;
 			border-collapse: collapse;
-			margin: 0 0 [[/mail/style/spacing/2]] 0;
+			margin: 0 0 [[/project/mail/spacing/medium]] 0;
 		}
 		th, td {
 			text-align: left;
-			padding: [[/mail/style/spacing/1]] 0;
-			border-bottom: 1px solid [[/mail/style/color/border]];
+			padding: [[/project/mail/spacing/small]] 0;
+			border-bottom: 1px solid [[/project/mail/color/border]];
 			font-size: 1em;
 			vertical-align: top;
 		}
 		th {
 			width: 30%;
-			color: [[/mail/style/color/text]];
+			color: [[/project/mail/color/text]];
 			font-weight: bold;
-			padding-right: [[/mail/style/spacing/2]];
+			padding-right: [[/project/mail/spacing/medium]];
 		}
 		.mail-note {
-			font-size: [[/mail/style/typography/font-small]];
-			color: [[/mail/style/color/text]];
+			font-size: [[/project/mail/font/small]];
+			color: [[/project/mail/color/text]];
 		}
 	</style>
 </head>
 <body>
 	<div class="mail-container">
 		<div class="mail-header">
-			[image /logo]<img src="https://[[/website/url]][[src]]" width="180" alt="[[/company/name]]">[/image]
+			[image /logo]<img src="https://[[/project/website/general/url]][[src]]" width="180" alt="[[/project/company/general/name]]">[/image]
 		</div>
 		<div class="mail-body">

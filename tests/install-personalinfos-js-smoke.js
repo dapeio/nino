@@ -44,22 +44,22 @@ vm.runInContext(
 const personalinfos = sandbox.Nino.install.personalinfos;
 
 personalinfos._entries = [
-	{ key : '/company/name', global : true, values : { '*' : 'Original company' } },
-	{ key : '/company/country', global : false, values : { de_DE : 'Deutschland', en_US : 'Germany' } },
+	{ key : '/project/company/general/name', global : true, values : { '*' : 'Original company' } },
+	{ key : '/project/company/contact/country', global : false, values : { de_DE : 'Deutschland', en_US : 'Germany' } },
 ];
 personalinfos._locales = [ 'de_DE', 'en_US' ];
-personalinfos._fieldEls = { '/company/name' : { value : 'Edited company' } };
+personalinfos._fieldEls = { '/project/company/general/name' : { value : 'Edited company' } };
 personalinfos._localeValues = {
-	de_DE : { '/company/country' : 'Musterland' },
-	en_US : { '/company/country' : 'Sample Country' },
+	de_DE : { '/project/company/contact/country' : 'Musterland' },
+	en_US : { '/project/company/contact/country' : 'Sample Country' },
 };
 
 let items = personalinfos._saveItems();
-check( 'Save queues the global field exactly once', items.filter( function( item ) { return item.key === '/company/name' } ).length === 1 );
+check( 'Save queues the global field exactly once', items.filter( function( item ) { return item.key === '/project/company/general/name' } ).length === 1 );
 check( 'Save includes a locale edited before the visible one', items.some( function( item ) { return item.locale === 'de_DE' && item.value === 'Musterland' } ) );
 check( 'Save includes the other edited locale too', items.some( function( item ) { return item.locale === 'en_US' && item.value === 'Sample Country' } ) );
 
-personalinfos._localeValues = { de_DE : { '/company/country' : 'Musterland' } };
+personalinfos._localeValues = { de_DE : { '/project/company/contact/country' : 'Musterland' } };
 items = personalinfos._saveItems();
 check( 'an untouched locale keeps the value loaded from the server', items.some( function( item ) { return item.locale === 'en_US' && item.value === 'Germany' } ) );
 

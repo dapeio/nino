@@ -53,7 +53,7 @@ namespace Nino\Modules {
 		 *	With content - [image logo]...[/image] - that content is what is
 		 *	rendered instead of the <img>, and again only when the slot has an
 		 *	image: [[src]] (the path of the file, from the site's root - an
-		 *	absolute address is "https://[[/website/url]][[src]]"), [[width]],
+		 *	absolute address is "https://[[/project/website/general/url]][[src]]"), [[width]],
 		 *	[[height]] and [[alt]] are filled in with the same values the <img>
 		 *	gets. That is how a place that needs the address and not a picture
 		 *	- a meta tag, a mail - is written without being left as an empty

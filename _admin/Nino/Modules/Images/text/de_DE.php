@@ -30,7 +30,7 @@ return [
 	'[[/_admin/slots/label/templates]]'	=> 'Templates: %s',
 	'[[/_admin/slots/label/new]]'				=> 'Neuer Bildplatz',
 	'[[/_admin/slots/label/scan]]'			=> 'Templates nach fehlenden Bildplätzen durchsuchen',
-	'[[/_admin/slots/label/uri]]'				=> 'Uri (z. B. /home/hero)',
+	'[[/_admin/slots/label/uri]]'				=> 'Uri (z. B. /template/page-home/hero/image)',
 	'[[/_admin/slots/label/width]]'			=> 'Breite (px)',
 	'[[/_admin/slots/label/height]]'		=> 'Höhe (px)',
 	'[[/_admin/slots/label/delete]]'		=> 'Bildplatz löschen',

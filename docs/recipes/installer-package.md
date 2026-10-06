@@ -79,7 +79,7 @@ return [
 		'catalog-items.php',
 	],
 	'blacklist' => [
-		'/project/catalog/internal-label',
+		'/project/catalog/internal/label',
 	],
 	'config' => [
 		'/project/catalog' => [
@@ -199,7 +199,7 @@ Text files return bracketed textfill keys:
 declare(strict_types=1);
 
 return [
-	'[[/project/catalog/api-uri]]' => '/api/catalog',
+	'[[/project/catalog/api/uri]]' => '/api/catalog',
 ];
 ```
 
@@ -210,8 +210,8 @@ return [
 declare(strict_types=1);
 
 return [
-	'[[/project/catalog/title]]' => 'Catalog',
-	'[[/project/catalog/empty]]' => 'No entries are available.',
+	'[[/project/catalog/list/title]]' => 'Catalog',
+	'[[/project/catalog/list/empty]]' => 'No entries are available.',
 ];
 ```
 
@@ -222,11 +222,18 @@ return [
 declare(strict_types=1);
 
 return [
-	'[[/project/catalog/title]]' => 'Katalog',
-	'[[/project/catalog/empty]]' => 'Es sind keine Einträge verfügbar.',
+	'[[/project/catalog/list/title]]' => 'Katalog',
+	'[[/project/catalog/list/empty]]' => 'Es sind keine Einträge verfügbar.',
 ];
 ```
 
+- A key follows the key grammar, `/<namespace>/<category>/<part>/<name>` (the
+  [Developer Manual](../development.md#the-key-grammar)). A project's own
+  module takes its unit key as the category under `/project` - `/project/catalog/...`
+  here, never `company`, `website` or `mail`, which are the base unit's - and the words of a
+  template the unit ships are `/template/<file name without .tpl>/...`. The
+  same `/project/catalog` is also the module's configuration space in
+  `config.php`: text and configuration are different stores and do not collide.
 - `text/global.php` is merged into live `text/global.php`.
 - `text/<locale>.php` is merged only for selected locales.
 - Later applied units win a duplicate key.
