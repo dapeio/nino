@@ -969,7 +969,8 @@ namespace Nino\Modules\Text {
 
 			foreach( glob( \Nino\Filesystem::path( $appData, '/templates' ). '/*.tpl' ) ?: [] as $file ) {
 
-				$content = file_get_contents( $file );
+				// A directory that is called x.tpl is no template
+				$content = is_file( $file ) === true ? file_get_contents( $file ) : false;
 				if( $content === false || preg_match_all( '/\[\[([^\[\]]+)\]\]/', $content, $matches ) === false )
 					continue;
 

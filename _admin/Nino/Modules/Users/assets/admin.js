@@ -600,6 +600,21 @@
 		},
 
 		/**
+		 *	The action bar of the form on screen - the edit form's or the one
+		 *	that creates an account - which is where the shell puts its
+		 *	"unsaved" marker (see Nino.admin.dirty). Not the first bar of
+		 *	#users-form: that holds whatever else is drawn there
+		 *
+		 *	@return		{Element|null}
+		 */
+		_bar : function() {
+
+			const form = dc.getElementById('users-edit-form') ?? dc.getElementById('users-create-form');
+
+			return form === null || form === undefined ? null : form.querySelector('.nino-admin-actionbar');
+		},
+
+		/**
 		 *	Take the account as it is stored for what is saved: the baseline is
 		 *	the form with its fields at their stored values, and what was typed
 		 *	while the save was on its way is put back afterwards - it is not in
@@ -897,6 +912,6 @@
 	// The shell asks before anything throws the open account's input away (see
 	// Nino.admin.dirty). A shell without the registry is simply not asking
 	if( typeof Nino.admin.dirty === 'object' )
-		Nino.admin.dirty.watchForm( 'users', function() { return dc.getElementById('users-form') }, Nino.admin.users._saveOpen );
+		Nino.admin.dirty.watchForm( 'users', function() { return dc.getElementById('users-form') }, Nino.admin.users._saveOpen, Nino.admin.users._bar );
 
 })(window, document, document.documentElement, document.body);

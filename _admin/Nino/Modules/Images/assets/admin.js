@@ -70,8 +70,10 @@
 				Nino.admin.images._renderCategoryList();
 				Nino.admin.images._ready = true;
 
-				if( hash.panel === 'images' && hash.parts.length > 0 && Nino.admin.images._groups[hash.parts[0]] !== undefined )
-					Nino.admin.images._openGroup( hash.parts[0] );
+				const named = Nino.admin.images._groupOf( hash.parts );
+
+				if( hash.panel === 'images' && named !== null )
+					Nino.admin.images._openGroup( named );
 				else
 					Nino.admin.images._showList();
 			} );
@@ -130,7 +132,7 @@
 		_follow : function( parts ) {
 
 			const open = dc.getElementById('images-form').classList.contains('admin-hidden') === false;
-			const group = parts.length > 0 && Nino.admin.images._groups[parts[0]] !== undefined ? parts[0] : null;
+			const group = Nino.admin.images._groupOf( parts );
 
 			if( group === null ? open === false : ( open === true && Nino.admin.images._currentGroup === group ) )
 				return false;
@@ -146,6 +148,47 @@
 			}, Nino.admin.images._showLevel );
 
 			return true;
+		},
+
+		/**
+		 *	The group a hash names, or null: its parts are the group's segments,
+		 *	the way the Text panel writes a row (#images/template/page-home), and
+		 *	the group as one part (#images/template%2Fpage-home, an address
+		 *	written before) reads the same
+		 *
+		 *	@param		{Array}		parts					The hash behind the panel's name
+		 *
+		 *	@return		{string|null}
+		 */
+		_groupOf : function( parts ) {
+
+			const group = parts.join('/');
+
+			return parts.length > 0 && Nino.admin.images._groups[group] !== undefined ? group : null;
+		},
+
+		/**
+		 *	The parts of the address that name a group: its segments
+		 *
+		 *	@param		{string}	group
+		 *
+		 *	@return		{Array<string>}
+		 */
+		_groupParts : function( group ) {
+			return String( group ).split('/');
+		},
+
+		/**
+		 *	What a group is called in the list and over its form: its category,
+		 *	named by the vocabulary - "Page home" for template/page-home, "Logo"
+		 *	for logo - as the Text panel names the same category
+		 *
+		 *	@param		{string}	group
+		 *
+		 *	@return		{string}
+		 */
+		_groupLabel : function( group ) {
+			return Nino.adminUi.slugLabel( String( group ).split('/').pop() );
 		},
 
 		/**
@@ -192,7 +235,7 @@
 		_showForm : function() {
 			dc.getElementById('images-list').classList.add('admin-hidden');
 			dc.getElementById('images-form').classList.remove('admin-hidden');
-			Nino.admin.router.set( 'images', [ Nino.admin.images._currentGroup ] );
+			Nino.admin.router.set( 'images', Nino.admin.images._groupParts( Nino.admin.images._currentGroup ) );
 		},
 
 		/**
@@ -249,7 +292,7 @@
 				btn.dataset.group = group;
 
 				const titleWrap = dc.createElement('div');
-				titleWrap.textContent = group;
+				titleWrap.textContent = Nino.admin.images._groupLabel( group );
 
 				const descr = dc.createElement('div');
 				descr.className = 'admin-type-btn-descr';
@@ -284,7 +327,7 @@
 			const open = function() {
 				Nino.admin.images._currentGroup = group;
 				Nino.admin.images._renderGroupForm();
-				Nino.admin.router.go( 'images', [ group ] );
+				Nino.admin.router.go( 'images', Nino.admin.images._groupParts( group ) );
 				Nino.admin.images._showForm();
 			};
 
@@ -326,7 +369,7 @@
 
 			const title = dc.createElement('div');
 			title.className = 'main-title';
-			title.textContent = group;
+			title.textContent = Nino.admin.images._groupLabel( group );
 			wrap.appendChild( title );
 
 			slots.forEach( function( slot ) {

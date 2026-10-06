@@ -59,6 +59,30 @@
 			// very question that was just answered with a Save that failed
 			_keep : false,
 
+			// The entries the shell wrote carry their position in history.state,
+			// { nino : n }: a step through the history is then a number of
+			// entries one way or the other (see _step), and one that is refused
+			// can be taken back with history.go() instead of a write over the
+			// entry the browser has already moved to. _index is the entry the
+			// browser is on, _settled the one the screen was last made true to.
+			// An entry the browser made itself (an address typed, a link followed)
+			// has no number and is numbered when it is met; one from before the
+			// stamping has none, and a step to it cannot be measured
+			_index : null,
+			_settled : null,
+
+			// The step through the history being answered right now: { delta,
+			// from }, the entries it moved and the number of the entry it came
+			// from. Set for the length of the hashchange that carries it, and
+			// held by leave() while a question about unsaved input is open
+			_step : null,
+
+			// A traversal the shell asked for to take a refused step back:
+			// { index }, the entry it is going to. Until it arrives the address
+			// is not written to - what a panel shows again belongs to the entry
+			// that is about to be the current one again
+			_undoing : null,
+
 			/**
 			 *	Whether `panel` names a pane the shell rendered - the panes come
 			 *	from the server's panel registry (see Admin::panels()), so the
@@ -137,7 +161,11 @@
 
 				const push = Nino.admin.router._push === true;
 				Nino.admin.router._push = false;
-				wn.history[ push === true ? 'pushState' : 'replaceState' ]( null, '', hash );
+
+				if( Nino.admin.router._holdsAddress() === true )
+					return;
+
+				Nino.admin.router._write( push, hash );
 			},
 
 			/**
@@ -159,8 +187,172 @@
 					return;
 
 				const hash = Nino.admin.router._hash( panel, parts );
-				if( wn.location.hash !== hash )
-					wn.history.pushState( null, '', hash );
+				if( wn.location.hash !== hash && Nino.admin.router._holdsAddress() === false )
+					Nino.admin.router._write( true, hash );
+			},
+
+			/**
+			 *	Write the address: a new entry or over the one the browser is on,
+			 *	either way numbered
+			 *
+			 *	@param		{boolean}	push
+			 *	@param		{string}	hash
+			 *
+			 *	@return		void
+			 */
+			_write : function( push, hash ) {
+
+				const router = Nino.admin.router;
+				const index = ( router._index ?? 0 ) + ( push === true ? 1 : 0 );
+
+				wn.history[ push === true ? 'pushState' : 'replaceState' ]( { nino : index }, '', hash );
+
+				router._index = index;
+				router._settled = index;
+			},
+
+			/**
+			 *	The number the entry the browser is on carries, or null where it
+			 *	has none
+			 *
+			 *	@return		{number|null}
+			 */
+			_stateIndex : function() {
+				const state = wn.history.state;
+				return state !== null && typeof state === 'object' && Number.isInteger( state.nino ) === true ? state.nino : null;
+			},
+
+			/**
+			 *	Whether a traversal the shell asked for is still on its way, so
+			 *	that a write would land on the entry the browser is leaving. One
+			 *	that has arrived is over
+			 *
+			 *	@return		{boolean}
+			 */
+			_holdsAddress : function() {
+
+				const router = Nino.admin.router;
+
+				if( router._undoing === null )
+					return false;
+
+				if( router._stateIndex() !== router._undoing.index )
+					return true;
+
+				router._index = router._settled = router._undoing.index;
+				router._undoing = null;
+
+				return false;
+			},
+
+			/**
+			 *	Take the entries as they are when the shell starts: the one the
+			 *	page was loaded on is numbered if it was not, so that a step back
+			 *	to it can be measured
+			 *
+			 *	@return		void
+			 */
+			start : function() {
+
+				const router = Nino.admin.router;
+				const index = router._stateIndex();
+
+				router._index = index ?? 0;
+				router._settled = router._index;
+
+				if( index === null && typeof wn.history.replaceState === 'function' )
+					wn.history.replaceState( { nino : 0 }, '' );
+			},
+
+			/**
+			 *	The browser stepped through its history: a hashchange. Works out how
+			 *	many entries it moved - by the numbers the entries carry - and holds
+			 *	that as the step being answered while the panels follow the address
+			 *	(see leave()). The traversal that takes a refused step back is
+			 *	recognised and ignored. Returns whether the panels are to follow
+			 *
+			 *	@return		{boolean}
+			 */
+			arrive : function() {
+
+				const router = Nino.admin.router;
+				const to = router._stateIndex();
+
+				if( router._undoing !== null ) {
+
+					if( to !== router._undoing.index )
+						return false;
+
+					router._index = router._settled = to;
+					router._undoing = null;
+					router._step = null;
+
+					return false;
+				}
+
+				// The browser made this entry (an address typed, a link followed):
+				// it comes after the one the page was on
+				if( to === null ) {
+					router._index = ( router._index ?? 0 ) + 1;
+
+					if( typeof wn.history.replaceState === 'function' )
+						wn.history.replaceState( { nino : router._index }, '' );
+
+					router._step = null;
+					router._settled = router._index;
+
+					return true;
+				}
+
+				const from = router._settled;
+
+				router._step = from !== null && to !== from ? { delta : to - from, from : from } : null;
+				router._index = router._settled = to;
+
+				return true;
+			},
+
+			/**
+			 *	Take the step being answered back, if it can be measured: the
+			 *	browser has moved to another entry, and the screen did not follow.
+			 *	history.go() puts it back on the entry the screen is true to,
+			 *	rather than a write that would lay the form's address over the entry
+			 *	the browser has just stepped to. The hashchange this causes is
+			 *	ignored (see arrive())
+			 *
+			 *	@param		{Object|null}	step			{ delta, from }, as held in _step
+			 *
+			 *	@return		{boolean}									Whether the history is being put back
+			 */
+			_undo : function( step ) {
+
+				const router = Nino.admin.router;
+
+				if( step === null || step === undefined || router._undoing !== null || typeof wn.history.go !== 'function' )
+					return false;
+
+				router._undoing = { index : step.from };
+
+				// A traversal that never arrives must not keep the address shut
+				if( typeof wn.setTimeout === 'function' )
+					wn.setTimeout( function() {
+						if( router._undoing !== null && router._undoing.index === step.from )
+							router._undoing = null;
+					}, 1500 );
+
+				wn.history.go( -step.delta );
+
+				return true;
+			},
+
+			/**
+			 *	A panel will not follow the address (a save is running): the step
+			 *	through the history that brought it here is taken back
+			 *
+			 *	@return		{boolean}
+			 */
+			refuse : function() {
+				return Nino.admin.router._undo( Nino.admin.router._step );
 			},
 
 			/**
@@ -169,7 +361,9 @@
 			 *	changed the bar and nothing else. Leaving a form that holds
 			 *	input nobody saved asks first, as its back link does (see
 			 *	Nino.admin.dirty.guard()); a Cancel puts the address back to what
-			 *	the screen shows, which `resync` does
+			 *	the screen shows - by taking the step through the history back
+			 *	where it can be measured (see _undo()), and by `resync`, which shows
+			 *	the level in memory again
 			 *
 			 *	@param		{Array}			names				The dirty entries the form answers to
 			 *	@param		{boolean}		leaving			A form is on screen and the move leaves it
@@ -180,13 +374,24 @@
 			 */
 			leave : function( names, leaving, proceed, resync ) {
 
-				if( Nino.admin.router._keep === true ) {
+				// The step through the history that is being answered now: the
+				// question may stay open after the hashchange that carries it is over
+				const step = Nino.admin.router._step;
+
+				// A move that is not made - Cancel, a Save that failed, a form brought
+				// on screen as it stands - puts the history back where the screen is
+				const refuse = function() {
+					Nino.admin.router._undo( step );
 					resync();
+				};
+
+				if( Nino.admin.router._keep === true ) {
+					refuse();
 					return;
 				}
 
 				if( leaving === true && typeof Nino.admin.dirty === 'object' ) {
-					Nino.admin.dirty.guard( names, proceed, resync );
+					Nino.admin.dirty.guard( names, proceed, refuse );
 					return;
 				}
 
@@ -725,13 +930,17 @@
 			 *	@param		{string}		name
 			 *	@param		{Function}	formGetter			Answers the form drawn last, or null
 			 *	@param		{Function}	[save]					save( done ), as an entry has it
+			 *	@param		{Function}	[bar]						Answers the action bar that carries the marker, where the
+			 *																			first one in the form is not the form's own (a pane that
+			 *																			holds more than one form, or more than one bar)
 			 *
 			 *	@return		void
 			 */
-			watchForm : function( name, formGetter, save ) {
+			watchForm : function( name, formGetter, save, bar ) {
 
 				Nino.admin.dirty._forms[name] = formGetter;
 				Nino.admin.dirty.register( name, {
+					bar			: typeof bar === 'function' ? bar : undefined,
 					isDirty : function() {
 						const form = formGetter();
 						return form !== null && form !== undefined && Nino.admin.dirty._baseline[name] !== undefined && Nino.admin.dirty._hasFields( form ) === true && Nino.admin.dirty._shown( form ) === true && Nino.admin.dirty._serialize( form ) !== Nino.admin.dirty._baseline[name];
@@ -1860,8 +2069,24 @@
 			// pushState and replaceState, which never fire hashchange, so this only
 			// ever reacts to real user navigation - and a step through the history
 			// never adds an entry itself: selectTab() is not asked to push here)
+			Nino.admin.router.start();
 			selectTabFromHash();
-			wn.addEventListener( 'hashchange', selectTabFromHash );
+			wn.addEventListener( 'hashchange', function() {
+				try {
+					if( Nino.admin.router.arrive() === true )
+						selectTabFromHash();
+				}
+				finally {
+					// What was answered synchronously is over; a question that is open
+					// holds its own reference to the step (see router.leave())
+					Nino.admin.router._step = null;
+				}
+			} );
+			// A traversal between two entries of the same address fires no
+			// hashchange; the number of the entry the browser is on still follows
+			wn.addEventListener( 'popstate', function() {
+				Nino.admin.router._index = Nino.admin.router._stateIndex() ?? Nino.admin.router._index;
+			} );
 
 			// A form that failed to save is brought on screen by the name of
 			// its panel or tab - a tab first, since 'elements' is both

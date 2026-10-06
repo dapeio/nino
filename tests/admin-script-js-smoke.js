@@ -240,15 +240,19 @@ shellNodes['admin-localepicker'] = picker;
 // pushState adds an entry where replaceState overwrites the one it is on - the
 // stub keeps both in step the way a browser does, so the checks below can read
 // the entries and the position back
-const browser = { entries : [ '#users' ], at : 0 };
+const browser = { entries : [ '#users' ], states : [ null ], at : 0, traversals : [], timers : [] };
 const storage = {};
 const windowListeners = {};
 const shell = {
 	console : console,
 	location : { hash : '#users', href : '' },
 	history : {
-		replaceState : function( state, title, url ) { browser.entries[browser.at] = url; shell.location.hash = url },
-		pushState : function( state, title, url ) { browser.entries.splice( browser.at + 1 ); browser.entries.push( url ); browser.at++; shell.location.hash = url },
+		// Without an address replaceState keeps the one it is on, as in a browser
+		replaceState : function( state, title, url ) { if( url !== undefined ) { browser.entries[browser.at] = url; shell.location.hash = url } browser.states[browser.at] = state },
+		pushState : function( state, title, url ) { browser.entries.splice( browser.at + 1 ); browser.states.splice( browser.at + 1 ); browser.entries.push( url ); browser.states.push( state ); browser.at++; shell.location.hash = url },
+		get state() { return browser.states[browser.at] },
+		// A traversal is asynchronous: it is queued, and browser.arrive() lets it happen
+		go : function( delta ) { browser.traversals.push( delta ) },
 	},
 	localStorage : {
 		getItem : function( key ) { return storage[key] ?? null },
@@ -256,6 +260,8 @@ const shell = {
 		removeItem : function( key ) { delete storage[key] },
 	},
 	addEventListener : function( type, fn ) { windowListeners[type] = fn },
+	setTimeout : function( fn, ms ) { browser.timers.push( { fn : fn, ms : ms } ); return browser.timers.length },
+	clearTimeout : function() {},
 	document : {
 		documentElement : null, body : null,
 		getElementById : function( id ) { return shellNodes[id] ?? null },
@@ -274,6 +280,28 @@ const shell = {
 };
 shell.window = shell;
 shell.Nino = { events : { bindCallback : function() {} } };
+
+/**
+ *	The browser moves `delta` entries - the Back or Forward button, or a go() it was asked for -
+ *	and tells the page the way it does: popstate always, hashchange when the address differs
+ *
+ *	@param		{number}		delta
+ *
+ *	@return		void
+ */
+browser.step = function( delta ) {
+	const before = browser.entries[browser.at];
+	browser.at += delta;
+	shell.location.hash = browser.entries[browser.at];
+	windowListeners.popstate?.();
+	if( browser.entries[browser.at] !== before )
+		windowListeners.hashchange();
+};
+// The traversals the page asked for arrive
+browser.arrive = function() {
+	while( browser.traversals.length > 0 )
+		browser.step( browser.traversals.shift() );
+};
 
 const shellContext = vm.createContext( shell );
 vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' ), shellContext, { filename : 'Nino.admin.js' } );
@@ -327,14 +355,10 @@ const before = browser.entries.join();
 check( 'a click with a modifier key, with another button or already handled is left to the browser: a new tab opens the link\'s own address', defaultsPrevented === 0 && browser.entries.join() === before && railLinks.dashboard.getAttribute('aria-current') === 'page' );
 
 // Back: the browser moves to the previous entry, which changes the hash and nothing else
-browser.at--;
-shell.location.hash = browser.entries[browser.at];
-windowListeners.hashchange();
+browser.step( -1 );
 check( 'Back selects the panel the earlier entry names - a tab of a pane through its owner', railLinks.users.getAttribute('aria-current') === 'page' && rolesPane.hidden === false && lockoutPane.hidden === true );
 check( '...and adds nothing to the history', browser.entries.length === 5 && browser.at === 3 );
-browser.at++;
-shell.location.hash = browser.entries[browser.at];
-windowListeners.hashchange();
+browser.step( 1 );
 check( 'Forward selects the one after it, again without an entry', railLinks.dashboard.getAttribute('aria-current') === 'page' && browser.entries.length === 5 && browser.at === 4 );
 
 /*	The rail's group headings and the phone's select. The headings are buttons
@@ -368,6 +392,122 @@ navSelect.value = 'users';
 navSelect.listeners.change();
 check( 'a change of the select opens that panel as a person\'s own move: one entry, its group open', railLinks.users.getAttribute('aria-current') === 'page'
 	&& browser.entries[browser.entries.length - 1] === '#roles' && browser.entries.length === 6 && railLinks.users.classList.contains('nino-admin-nav-collapsed') === false && storage[GROUPS_KEY] === undefined );
+
+/*	A step through the history that is refused. Back from a form that holds input
+	nobody saved is a hashchange; the panel asks, and on Cancel the screen stays
+	where it is. What the old shell did then was write the form's address over the
+	entry the browser had just stepped to - the history named the form twice and
+	lost the list. Every entry the shell writes now carries its number, so the
+	direction of a step is known, and a refused one is taken back with history.go()	*/
+{
+	const router = shell.Nino.admin.router;
+	const savedDashboard = shell.Nino.admin.dashboard;
+	const realGuard = shell.Nino.admin.dirty.guard;
+	const questions = [];
+	let level = '';
+	let saving = false;
+	shell.Nino.admin.dirty.guard = function( names, proceed, cancel ) { questions.push( { names : names, proceed : proceed, cancel : cancel } ) };
+	// A drill-down panel as the real ones are: it follows the address, asks before it leaves a form
+	shell.Nino.admin.dashboard = { showCurrent : function() {
+		const hash = router.current();
+		const wanted = hash.panel === 'dashboard' ? ( hash.parts[0] ?? '' ) : level;
+		const own = function() { router.set( 'dashboard', level === '' ? [] : [ level ] ) };
+		if( wanted === level ) {
+			own();
+			return;
+		}
+		if( saving === true ) {
+			router.refuse();
+			own();
+			return;
+		}
+		router.leave( [ 'dashboard' ], level !== '', function() { level = wanted; own() }, own );
+	} };
+
+	railLinks.dashboard.listeners.click( { preventDefault : function() {} } );
+	level = 'form';
+	router.go( 'dashboard', [ 'form' ] );
+	router.set( 'dashboard', [ 'form' ] );
+	const walked = browser.entries.slice();
+	const formEntry = browser.at;
+	check( 'every entry the shell wrote carries its number, the one the page was loaded on included', browser.states.every( function( state ) { return state !== null && Number.isInteger( state.nino ) } )
+		&& browser.states.map( function( state ) { return state.nino } ).join() === browser.states.map( function( state, at ) { return at } ).join() );
+
+	browser.step( -1 );
+	check( 'Back from a form asks, and has written nothing yet', questions.length === 1 && browser.entries.join() === walked.join() && browser.traversals.length === 0 && shell.location.hash === '#dashboard' );
+	questions[0].cancel();
+	check( 'Cancel takes the step back with history.go() - one entry forward - and does not write the form\'s address over the entry the browser is on', browser.traversals.join() === '1' && browser.entries.join() === walked.join() && shell.location.hash === '#dashboard' );
+	check( '...the panel showing its level again writes nothing while the traversal is on its way', router._undoing !== null );
+	browser.arrive();
+	check( 'the traversal arrives on the form\'s entry, the list entry before it is as it was, and the address is the form\'s', browser.at === formEntry && browser.entries.join() === walked.join() && shell.location.hash === '#dashboard/form' );
+	check( '...and the hashchange it caused is not followed: no second question, nothing asked of the panel', questions.length === 1 && router._undoing === null && router._index === formEntry && router._settled === formEntry );
+
+	browser.step( -1 );
+	questions[1].proceed();
+	check( 'Back answered with Discard or Save goes on: no traversal, no entry written, the panel is on the earlier level', questions.length === 2 && browser.traversals.length === 0 && level === '' && browser.entries.join() === walked.join() && browser.at === formEntry - 1 );
+
+	// Several entries at once - the browser's history menu
+	router.go( 'dashboard', [ 'second' ] );
+	level = 'second';
+	router.set( 'dashboard', [ 'second' ] );
+	router.go( 'dashboard', [ 'third' ] );
+	level = 'third';
+	router.set( 'dashboard', [ 'third' ] );
+	const manyEntries = browser.entries.slice();
+	const third = browser.at;
+	questions.length = 0;
+	browser.step( -2 );
+	questions[0].cancel();
+	check( 'a step of two entries is taken back by two', questions.length === 1 && browser.traversals.join() === '2' );
+	browser.arrive();
+	check( '...and lands where the screen is', browser.at === third && browser.entries.join() === manyEntries.join() && shell.location.hash === '#dashboard/third' && questions.length === 1 );
+
+	// A save is running: the panel stays where it is and says so
+	saving = true;
+	questions.length = 0;
+	browser.step( -1 );
+	check( 'a panel that will not follow because a save runs refuses the step through router.refuse(): taken back, no question', questions.length === 0 && browser.traversals.join() === '1' && shell.location.hash === '#dashboard/second' && browser.entries.join() === manyEntries.join() );
+	browser.arrive();
+	check( '...and the entry is the one the screen shows', browser.at === third && shell.location.hash === '#dashboard/third' && browser.entries.join() === manyEntries.join() );
+	saving = false;
+
+	// A traversal that never arrives does not keep the address shut for good
+	browser.step( -1 );
+	questions[0].cancel();
+	const timer = browser.timers[browser.timers.length - 1];
+	check( 'a traversal that is asked for has a limit', timer !== undefined && timer.ms === 1500 && router._undoing !== null );
+	browser.traversals.length = 0;
+	timer.fn();
+	check( '...after which the address is written again', router._undoing === null );
+	browser.step( 1 );
+	router._settled = router._index = third;
+
+	// An entry the browser made itself - an address typed - is numbered when it is met. The one before the stamping cannot be measured: that refusal keeps the old way
+	browser.entries.splice( browser.at + 1 );
+	browser.states.splice( browser.at + 1 );
+	browser.entries.push( '#dashboard/typed' );
+	browser.states.push( null );
+	browser.at++;
+	shell.location.hash = '#dashboard/typed';
+	questions.length = 0;
+	windowListeners.hashchange();
+	check( 'an address typed by hand becomes an entry that is numbered, and is followed like any other', browser.states[browser.at] !== null && browser.states[browser.at].nino === third + 1 && questions.length === 1 );
+	questions[0].cancel();
+	check( 'refusing it is a step that is not measured - it came as a new entry, not as a move along the old ones - so the old way stands: the form\'s address over it', browser.traversals.length === 0 && browser.entries[browser.at] === '#dashboard/third' );
+
+	// A shell without the numbers (an entry written by an older workbench) is followed without them
+	const stamped = browser.states[browser.at];
+	browser.states[browser.at] = null;
+	router._settled = null;
+	questions.length = 0;
+	level = 'third';
+	windowListeners.hashchange();
+	check( 'where the step cannot be measured nothing is taken back', browser.traversals.length === 0 );
+	browser.states[browser.at] = stamped;
+
+	shell.Nino.admin.dirty.guard = realGuard;
+	shell.Nino.admin.dashboard = savedDashboard;
+}
 
 // A folded rail: the headings are dividers, nothing is hidden, nobody tabs to them
 railHeadings.system.listeners.click();
@@ -962,6 +1102,36 @@ form.classList.remove('admin-hidden');
 dirty._entries.routes.discard();
 check( 'discarding takes the form as it stands for the saved one', dirty.isDirty( [ 'routes' ] ) === false );
 
+// a form whose own action bar is not the first one in it: the watcher is told which carries the marker
+{
+	const stray = append( node( '', {} ) );
+	stray.classList.add('nino-admin-actionbar');
+	const own = append( node( '', {} ) );
+	own.classList.add('nino-admin-actionbar');
+	const inputs = { text : field( 'text', 'a' ) };
+	const twoBars = node( 'two-bars', {} );
+	twoBars.querySelectorAll = function( selector ) { return selector === 'input, textarea, select' ? Object.values( inputs ) : [] };
+	twoBars.querySelector = function( selector ) { return selector === 'input, textarea, select, [contenteditable]' ? inputs.text : ( selector === '.nino-admin-actionbar' ? stray : null ) };
+	dirty.watchForm( 'twobars', function() { return twoBars }, function( done ) { done( true ) }, function() { return own } );
+	dirty.snapshot('twobars');
+	inputs.text.value = 'typed';
+	dirty.refresh();
+	check( 'the marker of a watched form goes to the bar its panel names, not to the first bar in the form', markerOf( own ) !== undefined && markerOf( own ).hidden === false && markerOf( stray ) === undefined );
+	inputs.text.value = 'a';
+	dirty.refresh();
+	check( '...and goes away from it when the form is clean again', markerOf( own ).hidden === true );
+
+	// Without a bar of its own a watched form keeps the first bar in it
+	delete dirty._entries.twobars.bar;
+	inputs.text.value = 'typed again';
+	dirty.refresh();
+	check( 'a watched form that names no bar gets the first one in it, as before', markerOf( stray ) !== undefined && markerOf( stray ).hidden === false );
+	delete dirty._entries.twobars;
+	delete dirty._forms.twobars;
+	delete dirty._baseline.twobars;
+	dirty.refresh();
+}
+
 // a panel that failed to load writes its error into the watched container: no fields, nothing typed
 plain.text.value = 'd';
 check( 'a form with something typed into it is dirty again', dirty.isDirty( [ 'routes' ] ) === true );
@@ -1122,6 +1292,12 @@ check( 'a browser without showModal asks with confirm(): OK is the primary choic
 const shellSource = fs.readFileSync( path.join( __dirname, '../_admin/assets/script.js' ), 'utf8' );
 check( 'the shell wires the registry up from onReady()', /Nino\.admin\.dirty\.init\(\s*function\( name \)/.test( shellSource ) === true );
 
+// the stylesheet's two rules that depend on what the script puts into the nav and the bar
+const shellCss = fs.readFileSync( path.join( __dirname, '../_admin/assets/style.css' ), 'utf8' );
+check( 'the first heading of the rail loses its top margin also where the phone\'s select was inserted in front of it',
+	/\.nino-admin \.nino-admin-nav > \.nino-admin-nav-group:first-child,\s*\.nino-admin \.nino-admin-nav > \.nino-admin-nav-select \+ \.nino-admin-nav-group \{\s*margin-top: 0;/.test( shellCss ) === true );
+check( 'on a phone the unsaved marker is a row of its own, so that it never slides under the Save button of a bar of three',
+	/@media \(max-width: 38rem\) \{[^@]*\.nino-admin-actionbar:has\(> \.nino-admin-actionbar-dirty:not\(\[hidden\]\)\) \{\s*flex-wrap: wrap;\s*\}\s*\.nino-admin \.nino-admin-actionbar > \.nino-admin-actionbar-dirty \{\s*flex: 1 0 100%;/.test( shellCss ) === true );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

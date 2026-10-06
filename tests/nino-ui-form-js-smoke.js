@@ -111,6 +111,7 @@ function form() {
 }
 
 const forms = [ form(), form() ];
+const newsletterForms = [];
 
 // Every request sendRequest() would have made, plus the callback it was
 // handed - so a response can be delivered later, and out of order
@@ -133,6 +134,7 @@ const document = {
 	getElementById : function() { return null },
 	querySelector : function() { return null },
 	querySelectorAll : function( selector ) {
+		if( selector === '.nino-newsletter-form' ) return newsletterForms;
 		return selector === '.nino-form:not(.nino-newsletter-form)' ? forms : [];
 	},
 	createElement : function() { return { classList : classList(), style : {}, setAttribute : function() {}, appendChild : function() {} } },
@@ -160,6 +162,10 @@ sandbox.Nino = {
 			'/module/form/info/email'    : 'Please enter a valid email address.',
 			'/module/form/info/required' : 'Please fill in every required field.',
 			'/module/form/info/invalid'  : 'Please check your entries.',
+			'/feature/newsletter/info/required' : 'Please tick the box and fill in every field.',
+			'/feature/newsletter/info/email'    : 'Please enter a valid address.',
+			'/feature/newsletter/info/success'  : 'You are signed up.',
+			'/feature/newsletter/info/error'    : 'The signup failed.',
 		},
 		getText : function( key ) { return sandbox.Nino.content.text[key] || '' },
 	},
@@ -477,6 +483,32 @@ mailField.focused = false;
 refused.submit();
 check( 'a field that was corrected loses its mark', nameField.classList.contains('nino-is-error') === false && nameField.getAttribute('aria-invalid') === null );
 check( '...and the one that is wrong now carries it instead', mailField.getAttribute('aria-invalid') === 'true' && mailField.focused === true );
+
+
+// --- The newsletter signup counts a required checkbox as the form does ---
+
+/*	The .nino-newsletter-form handler asked a required checkbox for its .value,
+	which reads "on" ticked or not - so a signup whose consent box was left
+	empty went to the server	*/
+const signup = form();
+signup.classList = classList( [ 'nino-form', 'nino-newsletter-form' ] );
+signup.fieldList.length = 0;
+const signupMail = field( 'email', 'email', 'reader@example.com', true, false );
+const signupConsent = field( 'consent', 'checkbox', 'on', true, false );
+signup.fieldList.push( field( '_csrf', 'hidden', 'token-value', false ), signupMail, signupConsent );
+newsletterForms.push( signup );
+sandbox.Nino.ui.onReady();
+check( 'a newsletter signup gets a submit handler', typeof signup.listeners.submit === 'function' );
+
+sent.length = 0;
+signup.submit();
+check( 'a required checkbox that is not ticked is refused before the request', sent.length === 0 && signup.msg.textContent === 'Please tick the box and fill in every field.' );
+check( '...and marked, and the caret goes to it', signupConsent.classList.contains('nino-is-error') === true && signupConsent.getAttribute('aria-invalid') === 'true' && signupConsent.focused === true );
+
+signupConsent.checked = true;
+signup.submit();
+check( 'ticked, the signup is sent with the box reading as ticked', sent.length === 1 && sent[0].uri === '/.newsletter' && sent[0].data.email === 'reader@example.com' && sent[0].data.consent === 'on' );
+check( '...and the mark is gone from the box', signupConsent.classList.contains('nino-is-error') === false && signupConsent.getAttribute('aria-invalid') === null );
 
 
 // --- A toast nobody was told about --------------------------------------

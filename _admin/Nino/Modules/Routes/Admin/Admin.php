@@ -686,7 +686,10 @@ namespace Nino\Modules\Routes {
 					return;
 				}
 
-				\Nino\Text::setBlacklisted( $appData, '/_nino/webpage'. $uri. '/uri', true );
+				if( \Nino\Text::setBlacklisted( $appData, '/_nino/webpage'. $uri. '/uri', true ) === false ) {
+					\Nino\Http::fail( $request, 500, 'could not write /text/blacklist.php' );
+					return;
+				}
 
 				\Nino\Http::ok( $request, [ 'pages' => self::pages( $appData, $routes, $locales, $navKeys ) ] );
 			} finally {

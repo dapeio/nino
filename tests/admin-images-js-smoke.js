@@ -285,9 +285,10 @@ const shellList = element('div');
 // through the history left, and leave() as the shell does it (ask first where a form is left)
 const routed = [];
 let routedHash = { panel : 'images', parts : [] };
+const routedParts = [];
 const routerStub = {
-	set : function( panel, parts ) { routed.push( 'set '+ [ panel ].concat( parts ).join('/') ) },
-	go : function( panel, parts ) { routed.push( 'go '+ [ panel ].concat( parts ).join('/') ) },
+	set : function( panel, parts ) { routed.push( 'set '+ [ panel ].concat( parts ).join('/') ); routedParts.push( JSON.stringify( parts ) ) },
+	go : function( panel, parts ) { routed.push( 'go '+ [ panel ].concat( parts ).join('/') ); routedParts.push( JSON.stringify( parts ) ) },
 	current : function() { return routedHash },
 	leave : function( names, leaving, proceed, resync ) { if( leaving === true ) return registry.guard( names, proceed, resync ); proceed() },
 };
@@ -424,6 +425,55 @@ const backLinks = findAll( shellForm, function( el ) { return el.className === '
 routed.length = 0;
 fire( backLinks[0], 'click' );
 check( 'the back link is a step Back returns to as well', routed.join() === 'go images,set images' && shellForm.classList.contains('admin-hidden') === true );
+
+// --- a category of the grammar: its name has a slash, the address has its segments -------
+
+shellPanel._groups = { 'page-home' : [ slot() ], 'template/page-home' : [ slot( { uri : '/template/page-home/hero/image' } ) ], logo : [ slot( { uri : '/logo' } ) ] };
+shellPanel._renderCategoryList();
+const listLabels = {};
+findAll( shellList, function( el ) { return el.className === 'admin-type-btn' } ).forEach( function( btn ) { listLabels[btn.dataset.group] = btn.children[0].textContent } );
+check( 'the list names a category by the vocabulary - the category of a grammar group, the word for any other', listLabels['template/page-home'] === shellNino.adminUi.slugLabel('page-home') && listLabels['template/page-home'] !== 'template/page-home'
+	&& listLabels.logo === shellNino.adminUi.slugLabel('logo') && listLabels.logo !== 'logo' && listLabels['template/page-home'] !== undefined );
+check( '...and that is Nino.adminUi.slugLabel() of the last segment, nothing else', Object.keys( listLabels ).every( function( group ) { return listLabels[group] === shellNino.adminUi.slugLabel( group.split('/').pop() ) } ) );
+
+routed.length = 0;
+routedParts.length = 0;
+shellPanel._openGroup( 'template/page-home' );
+check( 'a category with a slash in its name is written as its segments, as the Text panel writes a row', routedParts.join() === '["template","page-home"],["template","page-home"]' && routed.join() === 'go images/template/page-home,set images/template/page-home' );
+check( '...and the form is headed by the category\'s name', findAll( shellForm, function( el ) { return el.className === 'main-title' } )[0].textContent === shellNino.adminUi.slugLabel('page-home') );
+
+shellForm.classList.add('admin-hidden');
+shellList.classList.remove('admin-hidden');
+shellPanel._currentGroup = null;
+routed.length = 0;
+routedHash = { panel : 'images', parts : [ 'template', 'page-home' ] };
+shellPanel.showCurrent();
+check( 'a hash of segments opens that category', shellForm.classList.contains('admin-hidden') === false && shellPanel._currentGroup === 'template/page-home' && routed[routed.length - 1] === 'set images/template/page-home' );
+
+shellForm.classList.add('admin-hidden');
+shellList.classList.remove('admin-hidden');
+shellPanel._currentGroup = null;
+routedHash = { panel : 'images', parts : [ 'template/page-home' ] };
+shellPanel.showCurrent();
+check( '...and so does an address written with the group as one part, as it was before', shellForm.classList.contains('admin-hidden') === false && shellPanel._currentGroup === 'template/page-home' );
+
+routedHash = { panel : 'images', parts : [ 'template' ] };
+shellForm.classList.add('admin-hidden');
+shellList.classList.remove('admin-hidden');
+routed.length = 0;
+shellPanel.showCurrent();
+check( 'half a category is none: the list', shellForm.classList.contains('admin-hidden') === true && routed.join() === 'set images' );
+
+// The page load restores the same hash: the router parses the parts back to the category
+shellPanel._ready = false;
+shellPanel._groupSlots = function() { return { 'template/page-home' : [ slot( { uri : '/template/page-home/hero/image' } ) ] } };
+shellForm.classList.add('admin-hidden');
+shellList.classList.remove('admin-hidden');
+routedHash = { panel : 'images', parts : [ 'template', 'page-home' ] };
+shellPanel._apiCall = function( endpoint, payload, callback ) { callback( 200, { slots : [], locales : [ 'de_DE', 'en_US' ] } ) };
+shellPanel.init();
+check( 'a reload on #images/template/page-home opens the category', shellPanel._currentGroup === 'template/page-home' && shellForm.classList.contains('admin-hidden') === false );
+
 shellPanel._ready = false;
 
 // Whatever the server or an editor wrote reaches the page as text: the only innerHTML here empties a container

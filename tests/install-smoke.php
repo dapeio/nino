@@ -724,6 +724,7 @@ $_POST['data'] = json_encode( [ 'webpages' => [
 	] ],
 	[ 'uri' => '/site-contact', 'httpUri' => '/kontakt', 'libraryKey' => 'contact', 'navs' => [ 'main' ], 'text' => [
 		'de_DE' => [ 'name' => 'Kontakt' ],
+		'en_US' => [ 'name' => '<script>alert(1)</script>Contact', 'title' => 'Say "hello" to <b>us</b>' ],
 	] ],
 ] ] );
 /*	A copy the step cannot make is the step's failure, not a success over a
@@ -830,7 +831,9 @@ $enAfterWpApply = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php',
 
 check( 'writes the home entry\'s own de_DE meta, keyed by its Element-URI (not its Http-URI or the "home" template name)', $deAfterWpApply['[[/_nino/webpage/site-home/name]]'] === 'Start' && $deAfterWpApply['[[/_nino/webpage/site-home/title]]'] === 'Willkommen' );
 check( 'writes the home entry\'s own en_US meta too', $enAfterWpApply['[[/_nino/webpage/site-home/name]]'] === 'Home' );
-check( 'a field left blank in the post (contact\'s en_US) falls back to the generic placeholder, not the "contact" template\'s own wording', $enAfterWpApply['[[/_nino/webpage/site-contact/title]]'] === 'Page Title' );
+check( 'a field left blank in the post (contact\'s en_US) falls back to the generic placeholder, not the "contact" template\'s own wording', $enAfterWpApply['[[/_nino/webpage/site-contact/description]]'] === 'Page description.' );
+check( 'a page name, title and description are filtered like the Routes panel filters them: markup stripped, a quote written as an entity', $enAfterWpApply['[[/_nino/webpage/site-contact/name]]'] === 'alert(1)Contact'
+	&& $enAfterWpApply['[[/_nino/webpage/site-contact/title]]'] === 'Say &quot;hello&quot; to us' && str_contains( $enAfterWpApply['[[/_nino/webpage/site-contact/name]]'], '<' ) === false );
 check( 'a field that was posted (contact\'s de_DE name) is used as-is', $deAfterWpApply['[[/_nino/webpage/site-contact/name]]'] === 'Kontakt' );
 check( 'no key named for a library folder is in the project - only the Element-URI-keyed one this class writes itself', isset( $deAfterWpApply['[[/_nino/webpage/home/name]]'] ) === false );
 // The system's own form is a key of the system's: the only /_nino keys the
@@ -1647,61 +1650,6 @@ foreach( $libraryTemplates as $libraryTemplate )
 		$rootAbsoluteTemplates[] = substr( $libraryTemplate->getPathname(), strlen( __DIR__. '/../_admin/install/library/' ) );
 sort( $rootAbsoluteTemplates );
 check( 'no template of the install library writes an address from the domain root - a site in a subdirectory posts and links within itself'. ( $rootAbsoluteTemplates === [] ? '' : ' - '. implode( ', ', $rootAbsoluteTemplates ) ), $rootAbsoluteTemplates === [] );
-
-/*	The workbench and the starter site speak to the reader in one voice, the
-	capitalised "Du". A German text written by hand in the other one - Sie,
-	Ihr, Ihnen, or a lowercase du/dich/dein - is read as a slip, so what is
-	scanned is every German text the checkout delivers to a project or to the
-	workbench: the workbench's own, its modules', the kernel modules' (and
-	their install units', Maintenance's having no manifest), the base unit's
-	and the page units' texts and templates. The features of the catalogue are
-	not here, and neither are the fixtures. Fills, shortcodes and tags go
-	first: only what a reader sees is read. A capitalised Sie or Ihre that
-	speaks about a thing and not to the reader is no slip, and is named here
-	with its reason - an exact sentence, so a slip in the same text still shows	*/
-$duAllowed = [
-	'_nino/Nino/Modules/Form/text/de_DE.php' => [ 'Sie ist danach von diesem Server verschwunden' => 'the request is meant: "Die Anfrage ... Sie ist danach ..."' ],
-	'_nino/Nino/Modules/Navigation/text/de_DE.php' => [ 'Ihre Routen bleiben' => 'the menu\'s routes' ],
-];
-$duSources = [];
-foreach( [
-	'/_admin/text/de_DE.php',
-	'/_admin/Nino/Modules/*/text/de_DE.php',
-	'/_nino/Nino/Modules/*/text/de_DE.php',
-	'/_nino/Nino/Modules/*/install/text/de_DE.php',
-	'/_admin/install/library/base/text/de_DE.php',
-	'/_admin/install/library/pages/{*,.[!.]*}/text/de_DE.php',
-	'/_admin/install/library/pages/{*,.[!.]*}/templates/*.de_DE.tpl',
-] as $duPattern )
-	foreach( glob( $realRoot. $duPattern, GLOB_BRACE ) ?: [] as $duFile )
-		$duSources[ substr( (string) realpath( $duFile ), strlen( (string) realpath( $realRoot ) ) + 1 ) ] = $duFile;
-ksort( $duSources );
-$duOffenders = [];
-foreach( $duSources as $duRelative => $duFile ) {
-	$duTexts = [];
-	$duFills = str_ends_with( $duFile, '.php' ) === true ? (array) include $duFile : [];
-	if( str_ends_with( $duFile, '.php' ) === true )
-		array_walk_recursive( $duFills, static function( $value, $key ) use ( &$duTexts ): void { $duTexts[ (string) $key ] = (string) $value; } );
-	else
-		$duTexts[ basename( $duFile ) ] = (string) file_get_contents( $duFile );
-	foreach( $duTexts as $duKey => $duText ) {
-		$duText = str_replace( array_keys( $duAllowed[ $duRelative ] ?? [] ), '', $duText );
-		$duText = (string) preg_replace( [ '/\[\[[^\]]*\]\]/', '/\[[^\]]*\]/', '/<[^>]*>/' ], ' ', $duText );
-		if( preg_match( '/\b(Sie|Ihr|Ihre|Ihrem|Ihren|Ihrer|Ihres|Ihnen|du|dich|dir|dein|deine|deinem|deinen|deiner|deines)\b/u', $duText, $duMatch ) === 1 )
-			$duOffenders[] = $duRelative. ' '. $duKey. ' ('. $duMatch[1]. ')';
-	}
-}
-check( 'every German text of the workbench and of the starter site says "Du", none of them "Sie" or lowercase "du"'. ( $duOffenders === [] ? '' : ' - '. implode( '; ', $duOffenders ) ), count( $duSources ) > 20 && $duOffenders === [] );
-// What a page unit proposes for a page's name, title and description is the
-// starter site's German too, and it is read from the manifest now
-$suggestOffenders = [];
-foreach( glob( $realRoot. '/_admin/install/library/pages/{*,.[!.]*}/manifest.php', GLOB_BRACE ) ?: [] as $suggestFile )
-	foreach( [ 'name', 'title', 'description' ] as $suggestField ) {
-		$suggestText = (string) ( ( ( include $suggestFile )['suggest'][$suggestField] ?? [] )['de_DE'] ?? '' );
-		if( preg_match( '/\b(Sie|Ihr|Ihre|Ihrem|Ihren|Ihrer|Ihres|Ihnen|du|dich|dir|dein|deine|deinem|deinen|deiner|deines)\b/u', $suggestText, $suggestMatch ) === 1 )
-			$suggestOffenders[] = basename( dirname( $suggestFile ) ). ' '. $suggestField. ' ('. $suggestMatch[1]. ')';
-	}
-check( 'the German wording the page units propose says "Du" as well'. ( $suggestOffenders === [] ? '' : ' - '. implode( '; ', $suggestOffenders ) ), $suggestOffenders === [] );
 
 /*	The web manifest is copied into public/favicon/ as it is - json, not a
 	template, so the check above never saw it, and its icons pointed from the

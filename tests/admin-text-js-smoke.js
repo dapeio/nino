@@ -223,6 +223,16 @@ text._fieldEls['/g/title'].value = 'Title!';
 text.discard();
 check( 'discarding forgets the edited translations and takes the form as it stands for the saved one', text._dirtyLocales.length === 0 && text.isDirty() === false );
 
+// ...but not while a save runs: it finishes with what it was given
+text._dirtyLocales = [ 'de_DE' ];
+text._localeValues = { de_DE : { '/g/body' : 'Typed' } };
+text._saving = true;
+text.discard();
+check( 'discarding while a save runs leaves the edited translations and their values alone', JSON.stringify( text._dirtyLocales ) === '["de_DE"]' && text._localeValues.de_DE['/g/body'] === 'Typed' );
+text._saving = false;
+text.discard();
+check( '...and once it has ended discards again', text._dirtyLocales.length === 0 && JSON.stringify( text._localeValues ) === '{}' );
+
 text._selectedLocale = 'en_US';
 text._localeValues = { en_US : { '/g/body' : 'stored' } };
 text._baseline.locale = { '/g/body' : 'Body' };
@@ -314,6 +324,8 @@ check( '...but the links of a rich text are left alone, so what the editor retur
 let blocked = null;
 keys._save( function( ok ) { blocked = ok } );
 check( '...and a second submit while it runs sends nothing and says no', requests.length === 1 && blocked === false );
+keys.discard();
+check( '...and discarding while it runs leaves the translations it still has to send, and their values, alone', JSON.stringify( keys._dirtyLocales ) === '["de_DE","en_US"]' && Object.keys( keys._localeValues ).length > 0 );
 
 answers( requests[0] );
 check( 'the next translation follows once the first is written - without the global keys again, and with nothing said yet',

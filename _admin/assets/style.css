@@ -2434,7 +2434,11 @@ a {
 		transform: translateX(-.1rem) rotate(-45deg);
 	}
 
-	.nino-admin .nino-admin-nav > .nino-admin-nav-group:first-child {
+	/* The first heading sits at the top of the rail. Where the phone's select
+	   was built it is the nav's first child (see Nino.admin.navGroups), and the
+	   heading that follows it is the first one then. */
+	.nino-admin .nino-admin-nav > .nino-admin-nav-group:first-child,
+	.nino-admin .nino-admin-nav > .nino-admin-nav-select + .nino-admin-nav-group {
 		margin-top: 0;
 	}
 
@@ -2635,6 +2639,17 @@ a {
 
 	.nino-admin .nino-admin-actionbar > :is(.nino-admin-actionbar-status, p, [role="status"]) {
 		display: none;
+	}
+
+	/* The mark of unsaved input is a row of its own above the buttons: with
+	   room for it only after the buttons it shrank to nothing in a bar of three
+	   and its words ran under the Save button. */
+	.nino-admin .nino-admin-actionbar:has(> .nino-admin-actionbar-dirty:not([hidden])) {
+		flex-wrap: wrap;
+	}
+
+	.nino-admin .nino-admin-actionbar > .nino-admin-actionbar-dirty {
+		flex: 1 0 100%;
 	}
 }
 

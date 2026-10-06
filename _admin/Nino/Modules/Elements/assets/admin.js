@@ -213,8 +213,13 @@
 		 */
 		_follow : function( parts ) {
 
-			if( Nino.admin.elements._saving === true )
+			// The screen stays as it is, and so does the history: the step that
+			// brought the address here is taken back (see Nino.admin.router)
+			if( Nino.admin.elements._saving === true ) {
+				if( typeof Nino.admin.router.refuse === 'function' )
+					Nino.admin.router.refuse();
 				return false;
+			}
 
 			const current = Nino.admin.elements._currentType;
 			const form = current !== null && dc.getElementById('elements-form').classList.contains('admin-hidden') === false;
@@ -225,10 +230,23 @@
 
 			if( type === undefined ? ( form === false && list === false ) : ( uri === undefined
 				? ( list === true && current === type.type )
-				: ( form === true && current === type.type && ( uri === 'new' ? Nino.admin.elements._isNew === true : ( Nino.admin.elements._isNew === false && Nino.admin.elements._currentUri === uri ) ) ) ) )
+				: ( form === true && current === type.type && ( uri === 'new' ? Nino.admin.elements._isNew === true : ( Nino.admin.elements._isNew === false && Nino.admin.elements._currentUri === uri ) ) ) ) ) {
+
+				// Already on the level the address names - but a request for a
+				// deeper one may still be on its way (an element opened from the
+				// list, a list loading from the picker, and then Back): its
+				// answer must not draw the form or the list over this level
+				Nino.admin.elements._dropRequests( uri === undefined, type === undefined );
 				return false;
+			}
 
 			Nino.admin.router.leave( [ 'elements' ], form, function() {
+
+				// What was asked for before this move is not what the person
+				// asked for last. A level that opens something takes its own
+				// request id (_openForm(), _selectType()); one that only shows
+				// a level retires the ones still in flight
+				Nino.admin.elements._dropRequests( uri === undefined, type === undefined );
 
 				if( type === undefined ) {
 					Nino.admin.elements._destroyHtmlEditors();
@@ -255,6 +273,25 @@
 			}, Nino.admin.elements._showLevel );
 
 			return true;
+		},
+
+		/**
+		 *	Let the answer of a request that is still on its way fall away: it
+		 *	compares its id with the counter and finds it moved. Used when the
+		 *	level it would draw is not the one the address names any more
+		 *
+		 *	@param		{boolean}		form			A form (elements/get) is not wanted any more
+		 *	@param		{boolean}		list			A list (elements/list) is not wanted any more either - the picker is the target
+		 *
+		 *	@return		void
+		 */
+		_dropRequests : function( form, list ) {
+
+			if( form === true )
+				++Nino.admin.elements._formRequest;
+
+			if( list === true )
+				++Nino.admin.elements._listRequest;
 		},
 
 		/**
@@ -2330,13 +2367,18 @@
 		_switchLocale : function( locale ) {
 
 			Nino.admin.elements._storeVisibleLocaleFields();
-			Nino.admin.elements._selectedLocale = locale;
 
 			const select = dc.getElementById('elements-form-locale-select');
 			if( select !== null )
 				select.value = locale;
 
 			Nino.admin.sessionLocale.set( locale );
+
+			// The selection moves in the same breath as the fields: until the
+			// old translation is taken down, anything that reads the form (the
+			// shell's question about unsaved input, a store of the visible
+			// fields) must still find it under its own locale
+			Nino.admin.elements._selectedLocale = locale;
 			Nino.admin.elements._renderLocaleFields();
 		},
 

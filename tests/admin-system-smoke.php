@@ -2132,16 +2132,55 @@ check( 'apiList finds the new slot', in_array( '/home/hero', array_column( $body
 check( 'apiSave edits an existing slot', $status === 200 );
 check( 'the slot metadata actually changed', $appData['/nino/html/images']['/home/hero']['label'] === 'Hero neu' && $appData['/nino/html/images']['/home/hero']['width'] === 800 );
 
-$appData['/nino/html/images']['/home/hero']['filename'] = 'elements/home/hero.800x400.jpg';
+\Nino\Images::setSlotFilename( $appData, '/home/hero', 'elements/home/hero.800x400.jpg' );
 [ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiSave', [ 'uri' => '/home/hero', 'label' => 'Hero neu 2', 'width' => '800', 'height' => '400' ] );
-check( 'apiSave never touches an existing filename', $appData['/nino/html/images']['/home/hero']['filename'] === 'elements/home/hero.800x400.jpg' );
+check( 'apiSave never touches an existing filename', $appData['/nino/html/images']['/home/hero']['filename'] === 'elements/home/hero.800x400.jpg'
+	&& ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/images']['/home/hero']['filename'] ?? null ) === 'elements/home/hero.800x400.jpg' );
 
 // The alt texts live on the slot and are the Images panel's: saving the slot's label and size keeps them
-$appData['/nino/html/images']['/home/hero']['alt'] = [ 'de_DE' => 'Ein Bild' ];
+\Nino\Images::setSlotAlt( $appData, '/home/hero', [ 'de_DE' => 'Ein Bild' ] );
 callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiSave', [ 'uri' => '/home/hero', 'label' => 'Hero neu 2', 'width' => '800', 'height' => '400' ] );
 check( 'apiSave keeps the slot\'s alt texts', ( $appData['/nino/html/images']['/home/hero']['alt'] ?? null ) === [ 'de_DE' => 'Ein Bild' ]
 	&& ( ( include \Nino\Filesystem::path( $appData, '/config.php' ) )['/nino/html/images']['/home/hero']['alt'] ?? null ) === [ 'de_DE' => 'Ein Bild' ] );
-unset( $appData['/nino/html/images']['/home/hero']['alt'] );
+\Nino\Images::setSlotAlt( $appData, '/home/hero', [ 'de_DE' => '' ] );
+
+/*	A slot is written alone, not the whole key from the copy this request
+	booted with. Another request - the Images panel - saves an alt text and a
+	new file after this one booted: $appData still has the slot as it was, and
+	the old code wrote that copy over config.php, so the alt text and the file
+	were gone again and the slot was filled by a file nobody referenced. Here
+	the other request is played by a write straight to config.php, which
+	leaves $appData as it booted	*/
+\Nino\Filesystem::mutate( $appData, '/config.php', static function( array $config ): array {
+	$config['/nino/html/images']['/home/hero']['alt'] = [ 'de_DE' => 'Gespeichert dazwischen' ];
+	$config['/nino/html/images']['/home/hero']['filename'] = 'home/hero.other.jpg';
+	$config['/nino/html/images']['/home/other'] = [ 'label' => 'Added meanwhile', 'width' => 10, 'height' => 10, 'filename' => null ];
+	return $config;
+} );
+check( 'the other request left this one\'s copy as it booted', isset( $appData['/nino/html/images']['/home/hero']['alt'] ) === false && isset( $appData['/nino/html/images']['/home/other'] ) === false );
+[ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiSave', [ 'uri' => '/home/hero', 'label' => 'Hero raced', 'width' => '800', 'height' => '400' ] );
+$racedSlot = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/images'];
+check( 'apiSave changes the three fields and nothing else: the alt text, the file and a slot saved since boot survive', $status === 200 && ( $racedSlot['/home/hero']['label'] ?? null ) === 'Hero raced'
+	&& ( $racedSlot['/home/hero']['alt'] ?? null ) === [ 'de_DE' => 'Gespeichert dazwischen' ] && ( $racedSlot['/home/hero']['filename'] ?? null ) === 'home/hero.other.jpg' && isset( $racedSlot['/home/other'] ) === true );
+[ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiCreate', [ 'uri' => '/home/created', 'label' => 'Created', 'width' => '10', 'height' => '10' ] );
+check( 'apiCreate adds its slot alone: the one saved since boot is still there, and the new one has no file', $status === 200
+	&& isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/images']['/home/other'] ) === true && array_key_exists( 'filename', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/images']['/home/created'] ?? [] ) === true );
+\Nino\Filesystem::mutate( $appData, '/config.php', static function( array $config ): array {
+	$config['/nino/html/images']['/home/late'] = [ 'label' => 'Late', 'width' => 10, 'height' => 10, 'filename' => null ];
+	return $config;
+} );
+[ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiCreate', [ 'uri' => '/home/late', 'label' => 'Late again', 'width' => '10', 'height' => '10' ] );
+check( 'apiCreate does not replace a slot another request created since boot: 409', $status === 409 && ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/images']['/home/late']['label'] ?? null ) === 'Late' );
+callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiDelete', [ 'uri' => '/home/created' ] );
+\Nino\Filesystem::mutate( $appData, '/config.php', static function( array $config ): array {
+	unset( $config['/nino/html/images']['/home/other'], $config['/nino/html/images']['/home/late'] );
+	$config['/nino/html/images']['/home/hero']['filename'] = 'elements/home/hero.800x400.jpg';
+	unset( $config['/nino/html/images']['/home/hero']['alt'] );
+	return $config;
+} );
+unset( $appData['/nino/html/images']['/home/other'], $appData['/nino/html/images']['/home/late'], $appData['/nino/html/images']['/home/hero']['alt'] );
+$appData['/nino/html/images']['/home/hero']['filename'] = 'elements/home/hero.800x400.jpg';
+$appData['/nino/html/images']['/home/hero']['label'] = 'Hero neu 2';
 
 [ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiSave', [ 'uri' => '/does/not/exist', 'label' => 'x', 'width' => '10', 'height' => '10' ] );
 check( 'apiSave 404s for an unknown slot', $status === 404 );
@@ -2162,8 +2201,7 @@ check( 'apiDelete 404s for an unknown slot', $status === 404 );
 $heroFile = \Nino\Filesystem::path( $appData, '/images' ). '/home/hero.800x400.jpg';
 check( 'the slot has a file to lose', is_file( $heroFile ) === true
 	&& $appData['/nino/html/images']['/home/hero']['filename'] === 'elements/home/hero.800x400.jpg' );
-$appData['/nino/html/images']['/home/hero']['filename'] = 'home/hero.800x400.jpg';
-callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiSave', [ 'uri' => '/home/hero', 'label' => 'Hero neu 2', 'width' => '800', 'height' => '400' ] );
+\Nino\Images::setSlotFilename( $appData, '/home/hero', 'home/hero.800x400.jpg' );
 
 // A directory where config.php's sidecar lock file goes: lockFile() cannot
 // open it, so writeContentData() refuses to write - the same answer a
@@ -2681,6 +2719,19 @@ check( 'the kernel-injected /nino/public fill is never reported as missing', in_
 check( 'the clean uri the kernel fills at runtime is never reported as missing', in_array( '/nino/http/response/uri/clean', $missingKeys, true ) === false );
 $reportedRuntimeFills = array_values( array_intersect( $runtimeFillKeys, $missingKeys ) );
 check( 'no fill the kernel names as one it registers at runtime is reported - the scan reads that list, it keeps no copy'. ( $reportedRuntimeFills === [] ? '' : ' - reported: '. implode( ', ', $reportedRuntimeFills ) ), count( $runtimeFillKeys ) >= 8 && $reportedRuntimeFills === [] );
+
+// A directory with the name of a template is no template: the scan skips it, where the read of it answered a warning and a 500
+mkdir( $sandbox. '/private/templates/scan-dir.tpl' );
+$dirWarnings = [];
+set_error_handler( static function( int $no, string $message ) use ( &$dirWarnings ): bool { $dirWarnings[] = $message; return true; } );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiScan' );
+check( 'a directory called x.tpl among the templates is no 500 for the key scan, raises no warning, and the real ones are still read', $status === 200 && $dirWarnings === [] && in_array( '/template/page-scan-test/intro/heading', array_column( $body['missing'], 'key' ), true ) === true );
+[ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiScan' );
+check( '...nor for the Images panel\'s scan of them', $status === 200 && $dirWarnings === [] );
+[ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiList' );
+check( '...nor for the list of the slots and where they are used', $status === 200 && $dirWarnings === [] );
+restore_error_handler();
+rmdir( $sandbox. '/private/templates/scan-dir.tpl' );
 
 unlink( $sandbox. '/private/templates/scan-fixture.tpl' );
 unlink( $sandbox. '/private/templates/scan-fixture-2.tpl' );
@@ -3342,6 +3393,24 @@ check( 'a save keeps the fields of the route it does not edit - it moved to its 
 check( '...and sets the four it does edit: the body, the status code - 200 is no field -, the menus', $keptRoutes['GET://kept-on']['body'] === '[template /templates/page-contact]'
 	&& isset( $keptRoutes['GET://kept-on']['statusCode'] ) === false && isset( $keptRoutes['GET://kept-on']['navs'] ) === false && $keptRoutes['GET://kept-on']['uri'] === '/site-kept' );
 callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'httpUri' => '/kept-on' ] );
+
+// The key of the page's address goes on the blacklist, and a blacklist that
+// cannot be written is an answer of its own: a directory where the sidecar lock
+// of text/blacklist.php goes, so lockFile() cannot open it
+$blacklistLock = $sandbox. '/private/data/.locks/'. sha1( '/text/blacklist.php' ). '.lock';
+unset( $appData['./nino/filesystem/locks'] );
+@unlink( $blacklistLock );
+@mkdir( $blacklistLock );
+check( 'Text::setBlacklisted() says false when the list cannot be written', \Nino\Text::setBlacklisted( $appData, '/_nino/webpage/site-hidden/uri', true ) === false );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
+	'originalHttpUri' => '', 'uri' => '/site-hidden', 'httpUri' => '/hidden', 'template' => 'page-about', 'text' => $pageText('Hidden'),
+] );
+check( 'routes/save that could not write the blacklist says so rather than reporting success', $status === 500 && str_contains( (string) ( $body['error'] ?? '' ), '/text/blacklist.php' ) === true && isset( $body['pages'] ) === false );
+@rmdir( $blacklistLock );
+unset( $appData['./nino/filesystem/locks'], $appData['./nino/filesystem/cache'] );
+check( '...and true when it can, and when the key is already as asked', \Nino\Text::setBlacklisted( $appData, '/_nino/webpage/site-hidden/uri', true ) === true && \Nino\Text::setBlacklisted( $appData, '/_nino/webpage/site-hidden/uri', true ) === true
+	&& \Nino\Text::setBlacklisted( $appData, '/_nino/webpage/site-hidden/uri', false ) === true && \Nino\Text::setBlacklisted( $appData, '/_nino/webpage/site-hidden/uri', false ) === true );
+callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'httpUri' => '/hidden' ] );
 
 // The imprint and the privacy policy are the Legal module's
 $configBeforeReserved = file_get_contents( $sandbox. '/private/config.php' );

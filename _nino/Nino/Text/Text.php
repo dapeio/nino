@@ -270,10 +270,15 @@ namespace Nino {
 		}
 
 		// Add or remove one key from /text/blacklist.php - _admin-only,
-		// the Text panel only ever reads the list
-		public static function setBlacklisted( array &$appData, string $key, bool $blacklisted ): void {
+		// the Text panel only ever reads the list. True when the list is as
+		// asked afterwards: written, or already so. False when it could not be
+		// written - a caller whose answer depends on the key being hidden
+		// says so instead of reporting a success
+		public static function setBlacklisted( array &$appData, string $key, bool $blacklisted ): bool {
 
-			\Nino\Filesystem::mutate( $appData, '/text/blacklist.php', function( array $list ) use ( $key, $blacklisted ): ?array {
+			$unchanged = false;
+
+			$written = \Nino\Filesystem::mutate( $appData, '/text/blacklist.php', function( array $list ) use ( $key, $blacklisted, &$unchanged ): ?array {
 
 				$has = in_array( $key, $list, true );
 
@@ -281,11 +286,15 @@ namespace Nino {
 					$list[] = $key;
 				else if( $blacklisted === false && $has === true )
 					$list = array_values( array_diff( $list, [ $key ] ) );
-				else
+				else {
+					$unchanged = true;
 					return null;
+				}
 
 				return $list;
 			} );
+
+			return $written === true || $unchanged === true;
 		}
 
 		// Save several keys' values in one request, batched per target file

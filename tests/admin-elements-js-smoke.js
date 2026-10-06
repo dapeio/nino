@@ -497,6 +497,7 @@ check( '...and coming back to the overview re-reads it, which is what that secon
 	const levels = { form : 'elements-form', list : 'elements-list', types : 'elements-types' };
 
 	// Levels are stubbed, the picker's and the form's markup is not what is checked
+	const realOpenForm = module._openForm;
 	module._showTypes = () => calls.push( 'types' );
 	module._showList = () => calls.push( 'list' );
 	module._showFormView = () => calls.push( 'form' );
@@ -574,6 +575,11 @@ check( '...and coming back to the overview re-reads it, which is what that secon
 	module._saving = true;
 	at();
 	check( 'while a save runs the screen stays where it is', asked.length === 0 && calls.join() === 'form' );
+	let refused = 0;
+	box.Nino.admin.router.refuse = () => refused++;
+	at();
+	check( '...and the step through the history that came here is refused to the shell, which takes it back', refused === 1 && asked.length === 0 );
+	delete box.Nino.admin.router.refuse;
 	module._saving = false;
 
 	on( 'form', 'team', 'ada' );
@@ -596,6 +602,50 @@ check( '...and coming back to the overview re-reads it, which is what that secon
 	module._visit( 'ada' );
 	check( '...but not while a save runs', calls.length === 0 );
 	module._saving = false;
+
+	/*	An answer that comes late. An element is opened from the list and the
+		person steps Back before elements/get has answered: the address names
+		the list, so the form must not open when the answer arrives	*/
+	module._openForm = realOpenForm;
+	const pending = [];
+	module._apiCall = ( endpoint, payload, callback ) => pending.push( { endpoint : endpoint, payload : payload, callback : callback } );
+	module._loadReferenceOptions = proceed => proceed();
+	module._renderForm = () => calls.push( 'render' );
+	module._remember = () => {};
+	module._resetEdits = () => {};
+	const answered = { global : { title : 'Ada' }, locales : { de_DE : { title : 'Ada' } }, raw : {} };
+
+	on( 'list', 'team' );
+	calls.length = 0;
+	module._visit( 'bob' );
+	pending[pending.length - 1].callback( 200, answered );
+	check( 'an element opened from the list is drawn when its answer arrives', pending[pending.length - 1].payload.uri === 'bob' && calls.join() === 'go elements/team/bob,render,form' );
+
+	on( 'list', 'team' );
+	calls.length = 0;
+	module._visit( 'ada' );
+	at( 'team' );
+	pending[pending.length - 1].callback( 200, answered );
+	check( 'Back before it answered keeps the list: the late answer opens no form', calls.join() === 'list' );
+
+	// ...the same for the picker, where the list of a type may still be loading
+	on( 'types' );
+	module._listRequest = 5;
+	module._formRequest = 5;
+	at();
+	check( 'Back to the picker retires a list and a form still on their way', module._listRequest === 6 && module._formRequest === 6 && calls.join() === 'types' );
+
+	// ...and a move that opens something takes its own id, so its answer is the only one that counts
+	on( 'list', 'team' );
+	module._formRequest = 10;
+	at( 'team', 'ada' );
+	check( 'a move to a form takes one id of its own, and the request it sends is the one that counts', module._formRequest === 11 && pending[pending.length - 1].payload.uri === 'ada' );
+	pending[pending.length - 1].callback( 200, answered );
+	check( '...and its answer draws the form', calls.join() === 'render,form' );
+	on( 'form', 'team', 'ada' );
+	module._formRequest = 20;
+	at( 'team' );
+	check( 'leaving a form for its list retires a form that was loading behind it', module._formRequest === 21 && calls.join() === 'destroy,list' );
 }
 
 // --- inputsize: a model field's rows reach its input ----------------------
@@ -1228,6 +1278,15 @@ check( 'the sentences are not alerts - the status line says it once, in its own 
 		outcome === false && elements._selectedLocale === 'de_DE' && d.doc.getElementById('elements-form-locale-select').value === 'de_DE' && localeSwitches.join() === 'de_DE' );
 	check( '...and the field there is marked and has the focus', field('name').getAttribute('aria-invalid') === 'true' && field('name').focused === true );
 	check( 'the other translation shows no open fields now', JSON.stringify( optionsText() ) === JSON.stringify( [ 'de_DE - 1 open', 'en_US' ] ) );
+
+	// until the old translation is taken down the selection is still its own
+	const realSessionLocale = sandbox.Nino.admin.sessionLocale;
+	const seenDuringSwitch = [];
+	sandbox.Nino.admin.sessionLocale = { current : 'de_DE', set : locale => seenDuringSwitch.push( { to : locale, selected : elements._selectedLocale, name : field('name').value } ), init(){} };
+	elements._switchLocale( 'en_US' );
+	check( 'the content locale is told while the old translation is still on screen and still selected', seenDuringSwitch.length === 1 && seenDuringSwitch[0].to === 'en_US' && seenDuringSwitch[0].selected === 'de_DE' && elements._selectedLocale === 'en_US' );
+	elements._switchLocale( 'de_DE' );
+	sandbox.Nino.admin.sessionLocale = realSessionLocale;
 
 	// the marks come back with a translation drawn afresh
 	elements._switchLocale( 'en_US' );

@@ -197,11 +197,39 @@ namespace Nino\Modules\Images {
 				return;
 			}
 
-			$appData['/nino/html/images'][$uri]['label'] 	= $label;
-			$appData['/nino/html/images'][$uri]['width'] 	= $width;
-			$appData['/nino/html/images'][$uri]['height'] = $height;
+			/*	This one slot, in config.php as it is now. writeContentData()
+				would replace the whole /nino/html/images key with the copy this
+				request booted with, and an alt text or a file saved since - by
+				the Images panel, in another request - would be put back to what
+				it was at boot. Only the three fields this form edits are set,
+				the way \Nino\Images::setSlotAlt() sets the alt texts alone.	*/
+			$stored = [];
+			$gone 	= false;
+			$written = \Nino\Filesystem::mutate( $appData, '/config.php', static function( mixed $content ) use ( $uri, $label, $width, $height, &$stored, &$gone ): ?array {
 
-			\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
+				if( is_array( $content ) === false || is_array( $content['/nino/html/images'][$uri] ?? null ) === false ) {
+					$gone = true;
+					return null;
+				}
+
+				$content['/nino/html/images'][$uri]['label'] 	= $label;
+				$content['/nino/html/images'][$uri]['width'] 	= $width;
+				$content['/nino/html/images'][$uri]['height'] = $height;
+
+				$stored = $content['/nino/html/images'][$uri];
+
+				return $content;
+			} );
+
+			if( $written === false ) {
+				if( $gone === true )
+					\Nino\Http::fail( $request, 404, 'unknown slot' );
+				else
+					\Nino\Http::fail( $request, 500, 'could not save the slot' );
+				return;
+			}
+
+			$appData['/nino/html/images'][$uri] = $stored;
 
 			\Nino\Http::ok( $request );
 		}
@@ -240,14 +268,41 @@ namespace Nino\Modules\Images {
 				return;
 			}
 
-			$appData['/nino/html/images'][$uri] = [
+			// This one slot added to config.php as it is now, see apiSave()
+			$slot = [
 				'label' 		=> $label,
 				'width' 		=> $width,
 				'height' 		=> $height,
 				'filename' 	=> null,
 			];
+			$exists = false;
+			$written = \Nino\Filesystem::mutate( $appData, '/config.php', static function( mixed $content ) use ( $uri, $slot, &$exists ): ?array {
 
-			\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
+				if( is_array( $content ) === false )
+					return null;
+
+				if( isset( $content['/nino/html/images'][$uri] ) === true ) {
+					$exists = true;
+					return null;
+				}
+
+				if( is_array( $content['/nino/html/images'] ?? null ) === false )
+					$content['/nino/html/images'] = [];
+
+				$content['/nino/html/images'][$uri] = $slot;
+
+				return $content;
+			} );
+
+			if( $written === false ) {
+				if( $exists === true )
+					\Nino\Http::fail( $request, 409, 'slot already exists' );
+				else
+					\Nino\Http::fail( $request, 500, 'could not save the slot' );
+				return;
+			}
+
+			$appData['/nino/html/images'][$uri] = $slot;
 
 			\Nino\Http::ok( $request, [ 'ok' => true, 'uri' => $uri ] );
 		}
@@ -268,14 +323,10 @@ namespace Nino\Modules\Images {
 			$data = \Nino\Admin\Admin::postData();
 			$uri 	= (string) ( $data['uri'] ?? '' );
 
-			$slot = $appData['/nino/html/images'][$uri] ?? null;
-
-			if( $slot === null ) {
+			if( isset( $appData['/nino/html/images'][$uri] ) === false ) {
 				\Nino\Http::fail( $request, 404, 'unknown slot' );
 				return;
 			}
-
-			unset( $appData['/nino/html/images'][$uri] );
 
 			/*	The record goes first and the file second, because the two
 				failures are not the same size. A write that does not happen - a
@@ -285,12 +336,37 @@ namespace Nino\Modules\Images {
 				panel with nothing left to re-upload over, since the slot still
 				believes it has a file. The other way round the worst case is a
 				file nobody references any more, and the Images panel's own scan
-				already lists those.	*/
-			if( \Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] ) === false ) {
-				$appData['/nino/html/images'][$uri] = $slot;
-				\Nino\Http::fail( $request, 500, 'could not save the slot list' );
+				already lists those.
+
+				This one slot is taken out of config.php as it is now, see
+				apiSave(), and it is the slot as it stands there whose file is
+				deleted: an upload that finished since boot named another one.	*/
+			$slot = [];
+			$gone = false;
+			$written = \Nino\Filesystem::mutate( $appData, '/config.php', static function( mixed $content ) use ( $uri, &$slot, &$gone ): ?array {
+
+				if( is_array( $content ) === false || is_array( $content['/nino/html/images'][$uri] ?? null ) === false ) {
+					$gone = true;
+					return null;
+				}
+
+				$slot = $content['/nino/html/images'][$uri];
+				unset( $content['/nino/html/images'][$uri] );
+
+				return $content;
+			} );
+
+			if( $written === false ) {
+				if( $gone === true ) {
+					unset( $appData['/nino/html/images'][$uri] );
+					\Nino\Http::fail( $request, 404, 'unknown slot' );
+				}
+				else
+					\Nino\Http::fail( $request, 500, 'could not save the slot list' );
 				return;
 			}
+
+			unset( $appData['/nino/html/images'][$uri] );
 
 			if( ( $slot['filename'] ?? null ) !== null )
 				\Nino\Images::delete( $appData, $slot['filename'] );
@@ -331,7 +407,7 @@ namespace Nino\Modules\Images {
 			// Every template once, by name without the extension
 			$sources = [];
 			foreach( glob( $dir. '/*.tpl' ) ?: [] as $file ) {
-				$content = file_get_contents( $file );
+				$content = is_file( $file ) === true ? file_get_contents( $file ) : false;
 				if( $content !== false )
 					$sources[ basename( $file, '.tpl' ) ] = $content;
 			}
@@ -526,7 +602,7 @@ namespace Nino\Modules\Images {
 
 			foreach( glob( $templates. '/*.tpl' ) ?: [] as $file ) {
 
-				$content = file_get_contents( $file );
+				$content = is_file( $file ) === true ? file_get_contents( $file ) : false;
 				if( $content === false || preg_match_all( '/<img\b[^>]*\bsrc="([^"]+)"[^>]*>/i', $content, $matches, PREG_SET_ORDER ) === false )
 					continue;
 

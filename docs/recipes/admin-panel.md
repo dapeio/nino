@@ -850,8 +850,10 @@ if( typeof Nino.admin.dirty === 'object' )
 	} );
 ```
 
-`watchForm( name, formGetter, save )` serialises the plain fields of the form
-the getter answers and compares them with what `snapshot( name )` saw: call
+`watchForm( name, formGetter, save, bar )` serialises the plain fields of the form
+the getter answers and compares them with what `snapshot( name )` saw - `bar`
+is optional, a function answering the action bar that carries the "unsaved"
+marker, for a pane in which the first bar of the form is not the form's own: call
 `snapshot( 'catalog' )` after the form is drawn and after a save went through.
 A file input, a search box, a password the browser may fill in and a field with
 `data-dirty="ignore"` are not input. A form whose state is not its plain fields

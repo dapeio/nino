@@ -1199,7 +1199,11 @@
 							else
 								data[this.fields[i].name] = this.fields[i].value;
 
-							if( this.fields[i].required === true && this.fields[i].value.length === 0 ) {
+							// A required checkbox is missing when it is not ticked, whatever
+							// its .value reads - the .nino-form handler's test, the consent
+							// box being the likely one on a signup
+							if( this.fields[i].required === true
+								&& ( this.fields[i].type === 'checkbox' ? this.fields[i].checked !== true : this.fields[i].value.length === 0 ) ) {
 								Nino.ui._markField( this.fields[i], true );
 								firstRefused = firstRefused ?? this.fields[i];
 								error = Nino.content.getText('/feature/newsletter/info/required');

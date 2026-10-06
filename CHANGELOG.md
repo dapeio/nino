@@ -837,7 +837,7 @@ All notable changes to Nino are documented in this file.
   `docs/development` (new section "Legal") and `docs/_admin` say so in the
   same words, and the Elements panel shows a hint above the sections of both
   types. `tests/legal-smoke.php` (new, 111 checks, in CI) runs the wizard in a
-  sandbox and holds the unit, the texts (Du, English, anchors, placeholders),
+  sandbox and holds the unit, the texts (English, anchors, placeholders),
   the shortcodes, every way a value tries to become markup, the routes,
   `addLocale()`, the tombstones and `check()`.
 
@@ -954,12 +954,7 @@ All notable changes to Nino are documented in this file.
   it by hand. Keys and the English texts are unchanged. Three sentences speak
   about a thing rather than the reader ("Sie ist danach von diesem Server
   verschwunden") and stay. `tests/install-smoke.php` expects "Wähle Deine
-  Sprache" and holds the rest in one check: it reads the workbench's texts,
-  the kernel modules' and their install units' texts, the base unit's and the
-  page units' texts and templates, takes out fills, shortcodes and tags and
-  fails on any Sie, Ihr..., Ihnen or lowercase du, dich, dein... that is not
-  one of those three sentences, naming the value (29 values in 13 files were
-  flagged before; 1 check, counted below).
+  Sprache"; no test scans the texts for the other forms of address.
 
 - **Docs:** the template editor's code dialog is called "HTML+ Editor" in
   `README.md`, `README.de.md`, `docs/concepts.md`, `docs/concepts.de.md` and
@@ -1134,10 +1129,11 @@ All notable changes to Nino are documented in this file.
   `currentPassword` are blanked, so a listener sees that one was sent and never
   which - the old and the new secret of the Recovery password tab would
   otherwise have reached every listener in plain text. A secret posted under
-  another key is not blanked: a feature's `secret` setting in `features/settings`
-  (an SMTP password, an API key) still arrives as `data.fields.<name>`.
-  `tests/admin-system-smoke.php` posts through the dispatcher with a listener
-  registered.
+  another key is not blanked, with one exception: a feature's `secret` setting
+  in `features/settings` (an SMTP password, an API key) comes out blank as
+  `data.fields.<name>` too - see *Admin events* in the leftovers of the review
+  under Fixed. `tests/admin-system-smoke.php` posts through the dispatcher with
+  a listener registered.
 
 - **Contact form:** an inquiry whose owner mail did not go out is answered with
   a `500` and no body - the generic message on the page - where it used to be
@@ -1537,7 +1533,80 @@ All notable changes to Nino are documented in this file.
   feature's is, coming out of the entry on a hit with the hit's nonce, and an
   entry without a policy (1039 → 1047 checks).
 
+- **Leftovers of the review of the first patches:**
+  - *Wizard:* the name, title and description of a page the Webpages step
+    writes go through the same plain-text filter as in the Routes panel -
+    markup stripped, a quote written as an entity - where `<script>` in a
+    name or a quote in a title reached the page head unfiltered.
+  - *Text:* `\Nino\Text::setBlacklisted()` answers whether the list is as
+    asked (`bool`, it was `void`); `routes/save` answers `500` when the key of
+    the page's address could not be put on the blacklist. A directory called
+    `x.tpl` among the templates is no read of a directory any more in the
+    key scan (`Keys`) and in the Images panel's scans.
+  - *Images, slots:* `slots/save`, `slots/create` and `slots/delete` change
+    their one slot in `config.php` as it is now, through `Filesystem::mutate()`,
+    where each wrote the whole `/nino/html/images` key from the copy the
+    request booted with and took back an alt text or a file saved since.
+    A delete removes the file the slot names in `config.php` now.
+  - *Admin events:* `/nino/admin/action` for `features/settings` carries the
+    fields of the feature's manifest typed `secret` blank (`data.fields.<name>`);
+    the Callback Reference says so, in English and German.
+  - *Cache:* a stored policy with a nonce is not sent on a hit by a request
+    that has none - it would have carried `'nonce-@@...@@'`; the composed
+    header stands then, as for an entry without a policy.
+  - *Maintenance:* the banner goes after the whole opening `<body>` tag also
+    where an attribute value holds a `>`.
+  - *Nino.ui.js:* a required checkbox of a `.nino-newsletter-form` counts as
+    missing when it is not ticked, as in `.nino-form`.
+  - *Workbench:* `discard()` of the Text panel and of the Keys tab leaves the
+    model alone while a save runs (the Elements panel's rule). Refreshing the
+    catalogue in the Features panel draws the list and the status line, and
+    the open feature's screen only where no input is typed into it. The
+    "unsaved" marker of the Users panel goes to the action bar of the form on
+    screen: `Nino.admin.dirty.watchForm( name, formGetter, save, bar )` takes
+    an optional fourth argument for it. The Elements language switch moves the
+    selection in one breath with the fields. On a phone the marker is a row
+    of its own above the buttons, so that it never runs under *Save* in a bar
+    of three. On the desktop rail the first heading loses its top margin also
+    where the phone's select stands in front of it.
+  - *Workbench, history:* the entries the shell writes are numbered
+    (`history.state.nino`), so a step through Back or Forward has a direction
+    and a length. A step that is refused - *Cancel*, a *Save* that failed, a
+    save that is running - is taken back with `history.go()` and the
+    traversal it causes is ignored, where the form's address was written over
+    the entry the browser had just stepped to. `Nino.admin.router.refuse()`
+    is the call for a panel that will not follow. An address typed by hand has
+    no number: refusing it keeps the old way. A late `elements/get` or
+    `elements/list` answer no longer draws a form or a list after Back
+    (`_follow()` retires the requests still on their way).
+  - *Images, groups:* a group is named by the vocabulary
+    (`Nino.adminUi.slugLabel()` of its category: "Page home" for
+    `template/page-home`) and written into the address the way the Text panel
+    writes a row, `#images/template/page-home`, not as `%2F`; the old form
+    still opens it.
+  - *Left as it is, on purpose:* the Keys tab already names the group of page
+    details neutrally ("Seitenangaben") where it has no list of pages; and
+    `_pages()` of the Text panel keeps listing a route to a template whose
+    name has a dot - the demo catalogue's is `.demo-catalogue`, and it is a
+    page.
+  - *Tests:* the `Sie`/`du` scans of `tests/install-smoke.php` (two checks)
+    and of `tests/legal-smoke.php` (one check) are gone, see Removed. New or
+    changed checks, measured: `kernel-smoke` 1098 -> 1104, `admin-system-smoke`
+    1051 -> 1061, `install-smoke` 324 -> 323 (2 gone, 1 new), `features-smoke`
+    259 -> 262, `legal-smoke` 111 -> 110, `admin-elements-js-smoke` 235 -> 243,
+    `admin-features-js-smoke` 192 -> 197, `admin-images-js-smoke` 50 -> 58,
+    `admin-router-js-smoke` 60 -> 63, `admin-script-js-smoke` 151 -> 172,
+    `admin-text-js-smoke` 244 -> 247, `admin-users-js-smoke` 24 -> 28,
+    `nino-ui-form-js-smoke` 52 -> 57.
+
 ### Removed
+
+- **The guard tests against `Sie` and lowercase `du`** in
+  `tests/install-smoke.php` (the scan over the workbench's, the modules' and
+  the library's German texts, and the one over the page units' proposed
+  names) and `tests/legal-smoke.php` (the German texts of the legal pages).
+  The texts are as they were; concrete expectations ("Wähle Deine Sprache")
+  stay.
 
 - **The typed permission field of the Roles form** and its four `custom-*`
   text fills, with the `.admin-perm-add` rules: a finer permission is picked

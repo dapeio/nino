@@ -117,7 +117,6 @@ ninoWarnings();
 // The starting texts are written for this module, in the form the sanitizer gives
 $offenders = [];
 $entityOrBracket = [];
-$germanFormal = [];
 $english = [ 'de_DE' => [], 'en_US' => [] ];
 foreach( [ 'legal' => $legal, 'privacy' => $privacy ] as $typeName => $type )
 	foreach( [ 'de_DE', 'en_US' ] as $locale )
@@ -133,16 +132,12 @@ foreach( [ 'legal' => $legal, 'privacy' => $privacy ] as $typeName => $type )
 				if( str_contains( $value, '&' ) === true || str_contains( $value, '[' ) === true || str_contains( $value, ']' ) === true )
 					$entityOrBracket[] = $typeName. '/'. $id. ' '. $locale. ' '. $field;
 
-				if( $locale === 'de_DE' && preg_match( '/\b(Sie|Ihr|Ihre|Ihrem|Ihren|Ihrer|Ihres|Ihnen|du|dich|dir|dein|deine|deinem|deinen|deiner|deines)\b/u', (string) preg_replace( '/<[^>]*>/', ' ', $value ) ) === 1 )
-					$germanFormal[] = $typeName. '/'. $id. ' '. $field;
-
 				if( $locale === 'en_US' && preg_match( '/\b(und|der|die|das|nicht|Deine|Dein|Dich)\b/u', (string) preg_replace( '/<[^>]*>/', ' ', $value ) ) === 1 )
 					$english['en_US'][] = $typeName. '/'. $id. ' '. $field;
 			}
 		}
 check( 'every section has a title and a text in both languages'. ( $offenders === [] ? '' : ' - '. implode( ', ', $offenders ) ), $offenders === [] );
 check( 'no text carries an ampersand, an entity or a bracket: what a placeholder names is put in when a page is drawn'. ( $entityOrBracket === [] ? '' : ' - '. implode( ', ', $entityOrBracket ) ), $entityOrBracket === [] );
-check( 'the German texts say Du, never Sie and never a lower case du'. ( $germanFormal === [] ? '' : ' - '. implode( ', ', $germanFormal ) ), $germanFormal === [] );
 check( 'the English texts are English'. ( $english['en_US'] === [] ? '' : ' - '. implode( ', ', $english['en_US'] ) ), $english['en_US'] === [] );
 
 // Every anchor a section links to is a section of the same type

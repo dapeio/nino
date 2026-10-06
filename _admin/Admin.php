@@ -580,6 +580,14 @@ namespace Nino\Admin {
 				if( array_key_exists( $secret, $data ) === true )
 					$data[$secret] = '';
 
+			// ...and a feature's secret setting, which travels under the name
+			// its manifest gives it, inside the fields of features/settings:
+			// the ones its manifest types 'secret' come out blank the same way
+			if( $action === 'features/settings' && is_string( $data['key'] ?? null ) === true && is_array( $data['fields'] ?? null ) === true )
+				foreach( ( \Nino\Features::get( $appData, $data['key'] )['settings'] ?? [] ) as $name => $schema )
+					if( ( $schema['type'] ?? '' ) === 'secret' && array_key_exists( $name, $data['fields'] ) === true )
+						$data['fields'][$name] = '';
+
 			// A plain description rather than the request itself: handed the
 			// response by reference, a listener could rewrite an answer the
 			// panel has already given, which is a veto through the back door

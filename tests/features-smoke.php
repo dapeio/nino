@@ -1065,6 +1065,25 @@ check( 'a good form is persisted in one write and echoed back typed', $status ==
 	&& $fields['mode']['value'] === 'safe' && $fields['hosts']['value'] === [ 'x.example', 'y.example' ] && $stored['limit'] === 12 && $stored['enabled'] === false && $stored['hosts'] === [ 'x.example', 'y.example' ] );
 check( 'a field the form did not send keeps its value', $fields['title']['value'] === 'Again' && $stored['title'] === 'Again' );
 check( 'the secret posted empty is kept, and still never echoed', $fields['apiKey']['set'] === true && array_key_exists( 'value', $fields['apiKey'] ) === false && $stored['apiKey'] === 'k-1' );
+// A listener of '/nino/admin/action' sees that a secret was posted, never which: the
+// fields the manifest types 'secret' reach it blank, the others as they were
+$announced = [];
+\Nino\Callbacks::registerCallback( $appData, '/nino/admin/action', static function( array &$appData, array &$event ) use ( &$announced ): void {
+	$announced[] = $event;
+} );
+$_POST['action'] = 'features/settings';
+$_POST['data'] = json_encode( [ 'key' => 'sample', 'fields' => [ 'limit' => '13', 'apiKey' => 'k-secret-2', 'title' => 'Seen' ] ] );
+$announceRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\Admin::handlePost( $appData, $announceRequest );
+check( 'features/settings reaches a listener with the manifest\'s secret blank and the other fields as posted', count( $announced ) === 1 && $announceRequest['/nino/http/response']['statusCode'] === 200
+	&& ( $announced[0]['data']['fields'] ?? null ) === [ 'limit' => '13', 'apiKey' => '', 'title' => 'Seen' ] && ( $announced[0]['data']['key'] ?? null ) === 'sample' && str_contains( json_encode( $announced ), 'k-secret-2' ) === false );
+check( '...while the secret itself was stored', \Nino\Features::setting( $appData, 'sample', 'apiKey' ) === 'k-secret-2' );
+$_POST['data'] = json_encode( [ 'key' => 'sample', 'fields' => [ 'apiKey' => 'k-1', 'limit' => '12' ] ] );
+$announceRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\Admin::handlePost( $appData, $announceRequest );
+check( '...and the same for the next post, the order of the fields being the poster\'s', ( $announced[1]['data']['fields'] ?? null ) === [ 'apiKey' => '', 'limit' => '12' ] && \Nino\Features::setting( $appData, 'sample', 'apiKey' ) === 'k-1' );
+unset( $appData['./nino/callbacks']['/nino/admin/action'], $_POST['action'] );
+
 check( 'fields has to be an array, the key a known feature', callFeatures( $appData, 'apiSettings', [ 'key' => 'sample', 'fields' => 'limit=1' ] ) === [ 400, [ 'error' => 'no fields posted' ] ]
 	&& callFeatures( $appData, 'apiSettings', [ 'key' => 'nope', 'fields' => [] ] ) === [ 400, [ 'error' => 'unknown feature' ] ]
 	&& callFeatures( $appData, 'apiSettings', [ 'fields' => [] ] ) === [ 400, [ 'error' => 'unknown feature' ] ] );

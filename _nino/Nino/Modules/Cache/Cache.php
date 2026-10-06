@@ -168,9 +168,17 @@ namespace Nino\Modules {
 			// The policy the page was sent with, widened by whatever the
 			// features that rendered it added. Without one (an entry from
 			// before the policy was stored, or a page sent without any) the
-			// header composed by the response callbacks stands
-			if( is_string( $entry['csp'] ?? null ) === true && $entry['csp'] !== '' )
-				$request['/nino/http/response']['header']['Content-Security-Policy'] = self::_stamp( $appData, $entry['csp'], false );
+			// header composed by the response callbacks stands - and so it does
+			// when the stored one cannot be completed: a policy stored with a
+			// nonce, read by a request that has none, would otherwise be sent
+			// with 'nonce-@@...@@' in it
+			if( is_string( $entry['csp'] ?? null ) === true && $entry['csp'] !== '' ) {
+
+				$policy = self::_stamp( $appData, $entry['csp'], false );
+
+				if( str_contains( $policy, self::NONCE_MARK ) === false )
+					$request['/nino/http/response']['header']['Content-Security-Policy'] = $policy;
+			}
 
 			$request['/nino/http/response']['body'] 									= self::_stamp( $appData, $entry['body'], false );
 			$request['/nino/http/response']['header']['X-Nino-Cache']	= 'hit';

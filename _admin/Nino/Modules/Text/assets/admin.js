@@ -949,11 +949,19 @@
 		 *	values the server sent stay, and what the controls show counts as
 		 *	saved. The form is about to be left or drawn again; if the exit then
 		 *	fails without drawing it (a refused request), the controls still show
-		 *	the discarded text and the next Save writes it
+		 *	the discarded text and the next Save writes it. While a save runs
+		 *	nothing is thrown away: it finishes with what it was given
 		 *
 		 *	@return		void
 		 */
 		discard : function() {
+
+			// A running save works through the translations still edited and
+			// the values kept for them: forgetting those now would send the
+			// languages not yet written as the stored ones
+			if( Nino.admin.text._saving === true )
+				return;
+
 			Nino.admin.text._dirtyLocales = [];
 			Nino.admin.text._localeValues = {};
 			Nino.admin.text._captureBaseline( true );

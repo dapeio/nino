@@ -6311,6 +6311,28 @@ $bareHit = cacheRequest( '/home', 'GET', [ 'body' => '', 'header' => [ 'Content-
 check( 'an entry without a stored policy is still served', \Nino\Modules\Cache::_prepare( $appData, $bareHit ) === true );
 check( '...and leaves the composed header as it was', $bareHit['/nino/http/response']['header']['Content-Security-Policy'] === "default-src 'self'" );
 
+// ...and so does one stored empty, as a page sent without a policy leaves it
+$policyEntry['csp'] = '';
+\Nino\Filesystem::putFileContent( $appData, '/data/cache/'. sha1( '/home|de_DE' ). '.php', $policyEntry );
+$emptyHit = cacheRequest( '/home', 'GET', [ 'body' => '', 'header' => [ 'Content-Security-Policy' => "default-src 'self'" ] ] );
+check( 'an entry stored with an empty policy is served and leaves the composed header as it was', \Nino\Modules\Cache::_prepare( $appData, $emptyHit ) === true
+	&& $emptyHit['/nino/http/response']['header']['Content-Security-Policy'] === "default-src 'self'" );
+
+// A policy stored with a nonce, read by a request that has none (Jstext off
+// since): the marker cannot be completed and must not be sent as a source -
+// the composed header stands
+$policyEntry['csp'] = "default-src 'self'; script-src 'self' 'nonce-@@nino-cache-nonce-2f8a@@'";
+\Nino\Filesystem::putFileContent( $appData, '/data/cache/'. sha1( '/home|de_DE' ). '.php', $policyEntry );
+$appData['./nino/jstext/nonce'] = '';
+$noNonceHit = cacheRequest( '/home', 'GET', [ 'body' => '', 'header' => [ 'Content-Security-Policy' => "default-src 'self'" ] ] );
+check( 'a stored policy with a nonce marker, read by a request without a nonce, is served', \Nino\Modules\Cache::_prepare( $appData, $noNonceHit ) === true );
+check( '...and sends the composed header, not a policy with "nonce-@@...@@" in it', $noNonceHit['/nino/http/response']['header']['Content-Security-Policy'] === "default-src 'self'"
+	&& str_contains( json_encode( $noNonceHit['/nino/http/response']['header'] ), '@@nino-cache' ) === false );
+$appData['./nino/jstext/nonce'] = 'policy-hit-nonce';
+$withNonceHit = cacheRequest( '/home', 'GET', [ 'body' => '', 'header' => [ 'Content-Security-Policy' => "default-src 'self'" ] ] );
+check( '...while the same entry still gets the nonce of a request that has one', \Nino\Modules\Cache::_prepare( $appData, $withNonceHit ) === true
+	&& str_contains( $withNonceHit['/nino/http/response']['header']['Content-Security-Policy'], "'nonce-policy-hit-nonce'" ) === true );
+
 if( $outputCallbacks === null )
 	unset( $appData['./nino/callbacks']['/nino/http/output'] );
 else
@@ -6564,6 +6586,13 @@ foreach( $untouched as $label => [ $app, $req ] ) {
 	$before = $req['/nino/http/response']['body'];
 	\Nino\Modules\Maintenance::callbackOutput( $app, $req );
 	check( 'no banner for '. $label, $req['/nino/http/response']['body'] === $before );
+}
+
+// A '>' inside a quoted value of the <body> tag is no end of it
+foreach( [ '<body data-x="a>b" class=\'c>d\'>' => '<body data-x="a>b" class=\'c>d\'><div role="status"', '<body class="home">' => '<body class="home"><div role="status"' ] as $bodyTag => $expectedStart ) {
+	$quoted = $outputRequest( '/', '<!doctype html><html><head><title>x</title></head>'. $bodyTag. '<main>page</main></body></html>' );
+	\Nino\Modules\Maintenance::callbackOutput( $bannerApp, $quoted );
+	check( 'the banner goes after the whole opening tag '. $bodyTag, str_contains( $quoted['/nino/http/response']['body'], $expectedStart ) === true && substr_count( $quoted['/nino/http/response']['body'], 'role="status"' ) === 1 );
 }
 
 $typed = $outputRequest( '/', $pageHtml, [ 'Content-Type' => 'text/html; charset=utf-8' ] );

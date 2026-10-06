@@ -2154,10 +2154,14 @@ namespace Nino\Install {
 
 				$meta = $entry['text'][$locale] ?? self::DEFAULT_TEXT;
 
+				// The same filter the Routes panel's routes/save and
+				// routes/savetexts put these three through: a plain text, so
+				// markup is stripped and a quote cannot close the attribute
+				// a template writes the title or description into
 				if( \Nino\Features::mergeText( $appData, '/text/'. $locale. '.php', [
-					'[[/_nino/webpage'. $entry['uri']. '/name]]' 				=> $meta['name'],
-					'[[/_nino/webpage'. $entry['uri']. '/title]]' 				=> $meta['title'],
-					'[[/_nino/webpage'. $entry['uri']. '/description]]' => $meta['description'],
+					'[[/_nino/webpage'. $entry['uri']. '/name]]' 				=> \Nino\Text::sanitizeValue( (string) $meta['name'], 'plain' ),
+					'[[/_nino/webpage'. $entry['uri']. '/title]]' 				=> \Nino\Text::sanitizeValue( (string) $meta['title'], 'plain' ),
+					'[[/_nino/webpage'. $entry['uri']. '/description]]' => \Nino\Text::sanitizeValue( (string) $meta['description'], 'plain' ),
 				] ) === false )
 					return 'could not write /text/'. $locale. '.php';
 			}

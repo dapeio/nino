@@ -1121,6 +1121,51 @@ check( 'the Available tab now shows the refreshed offers, count 4', byTag( paneH
 check( 'switching tabs and back leaves the refreshed cache in place - the tab bar rebuild does not lose state', ( fire( byTag( paneHead.children[1], 'button' )[0], 'click' ), fire( byTag( paneHead.children[1], 'button' )[2], 'click' ), rowKeys( mount, 'offer' ).split(',').filter( Boolean ).length === 4 ) );
 check( '...and every redraw put one strip into the head, in the place after the name, rather than stacking them', paneHead.children.length === 3 && hasClass( paneHead.children[1], 'admin-panel-tabs' ) && paneHead.children[0] === paneTitle );
 
+// --- a refresh does not draw the open feature's screen over settings somebody typed
+
+{
+	const detailDrawn = [];
+	const realDetail = panel._renderDetail;
+	panel._renderDetail = function() { detailDrawn.push( true ); return realDetail.apply( this, arguments ) };
+	const wasOpen = panel._openFeature;
+	panel._openFeature = 'sample';
+
+	// Nothing typed: the screen is drawn again, as it always was
+	Nino.admin.dirty = { isDirty : function() { return false }, snapshot : function() {} };
+	fire( byTag( mount.children[1], 'button' )[0], 'click' );
+	answer( 200, catalogueAnswer( true, OFFERS, '2026-09-09 10:00' ) );
+	check( 'a refresh draws the open feature\'s screen again while nothing is typed into it', detailDrawn.length === 2 );
+
+	// Typed into: the list and the status line follow, the screen stays
+	detailDrawn.length = 0;
+	const asked = [];
+	Nino.admin.dirty = { isDirty : function( names ) { asked.push( names ); return true }, snapshot : function() {} };
+	fire( byTag( mount.children[1], 'button' )[0], 'click' );
+	check( 'a refresh over typed settings leaves the screen alone from the click on, and asks the shell about the feature panel', detailDrawn.length === 0 && asked.length >= 1 && asked.every( function( names ) { return JSON.stringify( names ) === '["features"]' } )
+		&& byTag( mount.children[1], 'p' )[0].textContent === text('/_admin/features/msg/catalogue-loading') );
+	answer( 200, catalogueAnswer( true, OFFERS, '2026-09-10 11:00' ) );
+	check( '...and so does the answer, which still updates the status line and the offers', detailDrawn.length === 0
+		&& byTag( mount.children[1], 'p' )[0].textContent === text('/_admin/features/label/catalogue-status').replace( '%s', '2026-09-10 11:00' ) );
+
+	// A refusal is the same case
+	fire( byTag( mount.children[1], 'button' )[0], 'click' );
+	answer( 500, null );
+	check( '...and a refusal as well', detailDrawn.length === 0 && byTag( mount.children[1], 'p' )[0].textContent === '(500) '+ text('/_admin/features/error/catalogue') );
+
+	// Typed into while the answer was on its way
+	Nino.admin.dirty = { isDirty : function() { return false }, snapshot : function() {} };
+	fire( byTag( mount.children[1], 'button' )[0], 'click' );
+	detailDrawn.length = 0;
+	Nino.admin.dirty = { isDirty : function() { return true }, snapshot : function() {} };
+	answer( 200, catalogueAnswer( true, OFFERS, '2026-09-11 12:00' ) );
+	check( 'input typed while the answer was on its way is not drawn over either', detailDrawn.length === 0 );
+
+	delete Nino.admin.dirty;
+	panel._renderDetail = realDetail;
+	panel._openFeature = wasOpen;
+	panel._renderPanel();
+}
+
 // --- nothing installed at all, and a failed load
 
 /*	showCurrent() does not re-fetch. The shell calls it on every panel

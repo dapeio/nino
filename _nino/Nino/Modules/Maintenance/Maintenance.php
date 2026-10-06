@@ -416,7 +416,9 @@ namespace Nino\Modules {
 			if( is_string( $body ) === false || is_string( $type ) === false || stripos( ltrim( $type ), 'text/html' ) !== 0 || stripos( $body, '</body>' ) === false )
 				return;
 
-			if( preg_match( '/<body\b[^>]*>/i', $body, $open, PREG_OFFSET_CAPTURE ) !== 1 )
+			// A '>' inside a quoted attribute value is no end of the tag:
+			// <body data-x="a>b"> opens where its last '>' is
+			if( preg_match( '/<body\b(?:[^>"\']|"[^"]*"|\'[^\']*\')*>/i', $body, $open, PREG_OFFSET_CAPTURE ) !== 1 )
 				return;
 
 			$template = \Nino\Filesystem::getFileContent( $appData, self::DIR. '/templates/banner.tpl', '' );

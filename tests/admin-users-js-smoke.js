@@ -71,6 +71,8 @@ function matches( el, selector ) {
 			return el.attributes[attribute[1]] === attribute[2] || ( attribute[1].indexOf('data-') === 0 && el.dataset[attribute[1].slice(5)] === attribute[2] );
 		if( part.charAt(0) === '#' )
 			return el.id === part.slice(1);
+		if( part.charAt(0) === '.' )
+			return el.className.split(' ').indexOf( part.slice(1) ) !== -1;
 		return el.tagName === part.toUpperCase();
 	} );
 }
@@ -303,6 +305,27 @@ check( '...and takes the marker away again', toggle.textContent === 'Deactivate 
 panel._openUser( 'me@example.com' );
 check( 'there is no Deactivate button on your own account', byId('users-form-status-toggle') === null );
 check( '...and no role select either: the role is text', byId('users-form-role-select') === null );
+
+// --- where the shell's "unsaved" marker goes -----------------------------------
+
+/*	The shell puts the marker in the first action bar of the watched form unless
+	the panel names one. #users-form holds more than the form: the marker has
+	to go to the bar of the form being edited	*/
+const stray = element('div');
+stray.className = 'nino-admin-actionbar';
+form.children.unshift( stray );
+panel._openUser( 'b@example.com' );
+form.children.unshift( stray );
+const ownBar = panel._bar();
+check( 'the Users panel names the action bar of the edit form, not the first one in #users-form', ownBar !== null && ownBar !== stray
+	&& findAll( ownBar, function( el ) { return el.type === 'submit' } ).length === 1 && byId('users-edit-form').children.indexOf( ownBar ) !== -1 && form.querySelector('.nino-admin-actionbar') === stray );
+panel._renderCreateForm();
+form.children.unshift( stray );
+const createBar = panel._bar();
+check( '...and of the form that creates an account when that is the one on screen', createBar !== null && createBar !== stray && byId('users-create-form').children.indexOf( createBar ) !== -1 );
+form.children.length = 0;
+check( '...and none while no form is drawn', panel._bar() === null );
+check( 'it is handed to the registry with the form', /Nino\.admin\.dirty\.watchForm\( 'users', function\(\) \{ return dc\.getElementById\('users-form'\) \}, Nino\.admin\.users\._saveOpen, Nino\.admin\.users\._bar \)/.test( source('_admin/Nino/Modules/Users/assets/admin.js') ) === true );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

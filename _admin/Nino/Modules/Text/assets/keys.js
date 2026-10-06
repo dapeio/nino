@@ -1056,11 +1056,18 @@
 		 *	server sent and counts what its controls show as saved; the new-key
 		 *	and scan forms are emptied. The form is about to be left or drawn again;
 		 *	if the exit then fails without drawing it (a refused request), the
-		 *	controls still show the discarded text and the next Save writes it
+		 *	controls still show the discarded text and the next Save writes it.
+		 *	While a save runs nothing is thrown away: it finishes with what it
+		 *	was given
 		 *
 		 *	@return		void
 		 */
 		discard : function() {
+
+			// The running save sends the translations still edited, from the
+			// values kept for them - see the Elements panel's discard()
+			if( Nino.admin.keys._saving === true )
+				return;
 
 			if( Nino.admin.keys._view === 'new' ) {
 				// Drawn again as it was opened

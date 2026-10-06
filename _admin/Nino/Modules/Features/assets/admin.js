@@ -206,11 +206,14 @@
 		/**
 		 *	The whole panel, from state: the head that holds the tab strip and
 		 *	the filter, the action bar (only while the catalogue is switched
-		 *	on) and the current tab's content
+		 *	on) and the current tab's content, and the open feature's screen
+		 *	unless it is left as it is
+		 *
+		 *	@param		{boolean}		[keepDetail]	True to leave the open feature's screen alone
 		 *
 		 *	@return		void
 		 */
-		_renderPanel : function() {
+		_renderPanel : function( keepDetail ) {
 
 			const wrap = dc.getElementById('features-list');
 			wrap.innerHTML = '';
@@ -221,7 +224,21 @@
 				wrap.appendChild( Nino.admin.features._renderActionBar() );
 
 			Nino.admin.features._renderTabContent( wrap );
-			Nino.admin.features._renderDetail();
+
+			if( keepDetail !== true )
+				Nino.admin.features._renderDetail();
+		},
+
+		/**
+		 *	Whether the open feature's screen holds input nobody has saved -
+		 *	the shell says (see Nino.admin.dirty); a shell without the registry
+		 *	never does. The same question the Maintenance panel asks before it
+		 *	draws its form again
+		 *
+		 *	@return		{boolean}
+		 */
+		_holdsInput : function() {
+			return Nino.admin.features._openFeature !== '' && typeof Nino.admin.dirty === 'object' && typeof Nino.admin.dirty.isDirty === 'function' && Nino.admin.dirty.isDirty( [ 'features' ] ) === true;
 		},
 
 		/**
@@ -559,21 +576,25 @@
 		 */
 		_refreshCatalogue : function() {
 
+			// The open feature's screen is no part of what a refresh changes
+			// - the list and the action bar are - and it is not drawn again
+			// over settings somebody has typed into, whether that is the
+			// click or the answer, which can come after he opened a feature
 			Nino.admin.features._catalogueMsg = { text : Nino.content.getText('/_admin/features/msg/catalogue-loading'), error : false, busy : true };
-			Nino.admin.features._renderPanel();
+			Nino.admin.features._renderPanel( Nino.admin.features._holdsInput() );
 
 			Nino.admin.features._apiCall( 'catalogue', {}, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
 					Nino.admin.features._catalogueMsg = { text : Nino.adminUi.api.errorText( status, response, '/_admin/features/error/catalogue' ), error : true, busy : false };
-					Nino.admin.features._renderPanel();
+					Nino.admin.features._renderPanel( Nino.admin.features._holdsInput() );
 					return;
 				}
 
 				Nino.admin.features._cache 				= { url : response.url, fetched : response.fetched, offers : response.offers };
 				Nino.admin.features._writable			= response.writable === true;
 				Nino.admin.features._catalogueMsg	= { text : '', error : false, busy : false };
-				Nino.admin.features._renderPanel();
+				Nino.admin.features._renderPanel( Nino.admin.features._holdsInput() );
 			} );
 		},
 

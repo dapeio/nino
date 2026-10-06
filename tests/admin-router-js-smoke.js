@@ -48,8 +48,12 @@ console.log( 'Router' );
 		console : console,
 		location : { hash : '#a' },
 		history : {
-			pushState : ( state, title, url ) => { entries.splice( at + 1 ); entries.push( url ); at++; box.location.hash = url },
-			replaceState : ( state, title, url ) => { entries[at] = url; box.location.hash = url },
+			went : [],
+			states : [ null ],
+			get state() { return this.states[at] },
+			pushState : function( state, title, url ) { entries.splice( at + 1 ); this.states.splice( at + 1 ); entries.push( url ); this.states.push( state ); at++; box.location.hash = url },
+			replaceState : function( state, title, url ) { if( url !== undefined ) { entries[at] = url; box.location.hash = url } this.states[at] = state },
+			go : function( delta ) { this.went.push( delta ) },
 		},
 		document : { documentElement : null, body : null, getElementById : id => id === 'admin-page-wrap' ? { classList : pageClasses } : ( [ 'admin-content-images', 'admin-content-users', 'admin-tab-roles' ].indexOf( id ) !== -1 ? {} : null ) },
 	};
@@ -86,15 +90,24 @@ console.log( 'Router' );
 	router.go( 'images', [ 'a b', 'c/d' ] );
 	check( 'the parts are encoded', box.location.hash === '#images/a%20b/c%2Fd' );
 
+	// Every entry the router writes is numbered, in the order of the history
+	const numbers = () => box.history.states.map( state => state === null ? null : state.nino ).join();
+	check( 'an entry the router pushed carries its position, and one it replaced keeps its own', numbers() === '0,1,2,3' );
+	router.set( 'images', [ 'team', 'again' ] );
+	check( '...replacing writes the number of the entry it is on again', box.history.states[at].nino === at );
+
 	// leave(): the question before a form is left
 	const guarded = [];
 	box.Nino.admin.dirty = { guard : ( names, proceed, cancel ) => guarded.push( { names, proceed, cancel } ) };
 	let shown = 0;
 	router.leave( [ 'x' ], false, () => shown++, () => {} );
 	check( 'leave() goes straight on where no form is left', shown === 1 && guarded.length === 0 );
-	const resync = () => {};
+	let resynced = 0;
+	const resync = () => resynced++;
 	router.leave( [ 'x' ], true, () => shown++, resync );
-	check( '...and asks through the shell where one is, a Cancel being the resync', shown === 1 && guarded.length === 1 && guarded[0].cancel === resync && JSON.stringify( guarded[0].names ) === '["x"]' );
+	check( '...and asks through the shell where one is, a Cancel showing the level in memory again', shown === 1 && guarded.length === 1 && JSON.stringify( guarded[0].names ) === '["x"]' && resynced === 0 );
+	guarded[0].cancel();
+	check( '...and with no step through the history to take back, nothing else happens', resynced === 1 && box.history.went.length === 0 );
 	delete box.Nino.admin.dirty;
 	router.leave( [ 'x' ], true, () => shown++, resync );
 	check( '...and goes on in a shell that has no registry', shown === 2 );

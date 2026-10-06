@@ -516,7 +516,7 @@ in the browser first (`data-upload-bytes`, `data-upload-pixels` on the shell,
 
 **Unsaved input.** A panel that keeps a form registers it with the shell,
 `Nino.admin.dirty.register( name, { isDirty, save( done ), discard } )` or, for
-a form of plain fields, `watchForm( name, formGetter, save )` plus `snapshot(
+a form of plain fields, `watchForm( name, formGetter, save[, bar] )` plus `snapshot(
 name )` after every draw and every successful save. The registration is behind
 `if( typeof Nino.admin.dirty === 'object' )`: panel scripts run in suites and on
 older shells without it. The name is the uri of the panel or tab (`admin-tab-<name>`,
