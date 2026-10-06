@@ -72,9 +72,6 @@ namespace Nino\Modules\Logs {
 
 		private const int RETENTION_DAYS = 14;
 
-		private const string STUB_PREFIX = "<?php http_response_code(403); exit; return '";
-		private const string STUB_SUFFIX = "';\n";
-
 		/**
 		 *	Append one line to today's log file, then prune anything past
 		 *	RETENTION_DAYS. Failures are logged, never thrown - an audit
@@ -98,7 +95,7 @@ namespace Nino\Modules\Logs {
 
 				\Nino\Filesystem::forceDir( $appData, self::LOGS_DIR );
 
-				$dir 	= \Nino\Filesystem::getContentPath( $appData ). substr( self::LOGS_DIR, strlen( \Nino\Filesystem::CONTENT_DIR ) );
+				$dir 	= self::_logDir( $appData );
 				$path = $dir. '/'. date( 'Y-m-d' ). '.php';
 
 				// Locked directly, not via Filesystem::mutate(): this file is
@@ -129,15 +126,14 @@ namespace Nino\Modules\Logs {
 					// not one
 					$lines[] = date( 'Y-m-d H:i' ). '  '. self::_oneLine( $actor ). '  '. self::_oneLine( $message );
 
-					if( \Nino\Admin\Admin::writeFileAtomic( $path, self::STUB_PREFIX. base64_encode( implode( "\n", $lines ) ). self::STUB_SUFFIX ) === false )
+					if( \Nino\Admin\Admin::writeFileAtomic( $path, \Nino\Admin\Recovery::STUB_PREFIX. base64_encode( implode( "\n", $lines ) ). \Nino\Admin\Recovery::STUB_SUFFIX ) === false )
 						throw new \RuntimeException( 'the day\'s file could not be written: '. basename( $path ) );
 				}
 				finally {
 					\Nino\Filesystem::unlockFile( $appData, $relPath );
 				}
 
-				foreach( self::_logDirs( $appData ) as $logDir )
-					self::_prune( $logDir );
+				self::_prune( $dir );
 
 			} catch( \Throwable $e ) {
 				trigger_error( 'Activity log write failed: '. $e->getMessage() );
@@ -197,30 +193,27 @@ namespace Nino\Modules\Logs {
 
 			$lines = [];
 
-			foreach( self::_logDirs( $appData ) as $dir ) {
+			$files = glob( self::_logDir( $appData ). '/*.php' ) ?: [];
 
-				$files = glob( $dir. '/*.php' ) ?: [];
+			sort( $files );
 
-				sort( $files );
-
-				foreach( $files as $file )
-					if( preg_match( '/^\d{4}-\d{2}-\d{2}$/', basename( $file, '.php' ) ) === 1 )
-						$lines = array_merge( $lines, self::_readLines( $file ) );
-			}
+			foreach( $files as $file )
+				if( preg_match( '/^\d{4}-\d{2}-\d{2}$/', basename( $file, '.php' ) ) === 1 )
+					$lines = array_merge( $lines, self::_readLines( $file ) );
 
 			return $lines;
 		}
 
 		/**
-		 *	The directory that holds activity logs.
+		 *	The directory that holds activity logs
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	array										Absolute paths, existing or not
+		 *	@return 	string									Absolute path, existing or not
 		 */
-		private static function _logDirs( array &$appData ): array {
+		private static function _logDir( array &$appData ): string {
 
-			return [ \Nino\Filesystem::getContentPath( $appData ). substr( self::LOGS_DIR, strlen( \Nino\Filesystem::CONTENT_DIR ) ) ];
+			return \Nino\Filesystem::getContentPath( $appData ). substr( self::LOGS_DIR, strlen( \Nino\Filesystem::CONTENT_DIR ) );
 		}
 
 		/**
@@ -240,7 +233,7 @@ namespace Nino\Modules\Logs {
 			if( is_string( $raw ) === false )
 				return [];
 
-			$decoded = base64_decode( substr( $raw, strlen( self::STUB_PREFIX ), -strlen( self::STUB_SUFFIX ) ) );
+			$decoded = base64_decode( substr( $raw, strlen( \Nino\Admin\Recovery::STUB_PREFIX ), -strlen( \Nino\Admin\Recovery::STUB_SUFFIX ) ) );
 
 			return $decoded === '' ? [] : explode( "\n", $decoded );
 		}

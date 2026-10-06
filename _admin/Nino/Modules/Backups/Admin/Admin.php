@@ -41,9 +41,6 @@ namespace Nino\Modules\Backups {
 		// How many safety snapshots a project keeps - see _pruneSnapshots()
 		private const int SNAPSHOT_KEEP = 3;
 
-		private const string STUB_PREFIX = "<?php http_response_code(403); exit; return '";
-		private const string STUB_SUFFIX = "';\n";
-
 		/**
 		 *	This module's action map, merged into \Nino\Admin\Admin::handlePost()'s dispatch
 		 *
@@ -89,42 +86,24 @@ namespace Nino\Modules\Backups {
 		}
 
 		/**
-		 *	Find the private backup directory.
+		 *	The private backup directory, while there is one
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	array
+		 *	@return 	string|false						Absolute path, or false while none exists
 		 */
-		private static function _backupDirs( array &$appData ): array {
+		private static function _backupDir( array &$appData ): string|false {
 
 			// Its own copy of the path rather than \Nino\Modules\Backups'
 			// constant, which that class keeps private: this class exists to
 			// work when nothing else does - Restore is what a broken
-			// installation reaches for - so it depends on no other class being
-			// loadable (see this class's docblock, and the standalone
-			// reasoning every other helper in this file follows)
+			// installation reaches for - so it depends on nothing but the
+			// kernel and the workbench shell, where the stub it reads is
+			// defined (\Nino\Admin\Recovery) - the two a bare boot loads (see
+			// this class's docblock, and the standalone reasoning every other
+			// helper in this file follows)
 			$dir = \Nino\Filesystem::getContentPath( $appData ). '/.backups';
-			return is_dir( $dir ) === true ? [ $dir ] : [];
-		}
-
-		/**
-		 *	The directory one dated archive actually sits in
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$date					"Y-m-d" or "Y-m-d-His", already validated
-		 *
-		 *	@return 	string|false
-		 */
-		private static function _backupDir( array &$appData, string $date = '' ): string|false {
-
-			$dirs = self::_backupDirs( $appData );
-
-			if( $date !== '' )
-				foreach( $dirs as $dir )
-					if( is_file( $dir. '/'. $date. '.php' ) === true )
-						return $dir;
-
-			return $dirs[0] ?? false;
+			return is_dir( $dir ) === true ? $dir : false;
 		}
 
 		/**
@@ -141,7 +120,7 @@ namespace Nino\Modules\Backups {
 				return false;
 
 			$raw = file_get_contents( $path );
-			return base64_decode( substr( $raw, strlen( self::STUB_PREFIX ), -strlen( self::STUB_SUFFIX ) ) );
+			return base64_decode( substr( $raw, strlen( \Nino\Admin\Recovery::STUB_PREFIX ), -strlen( \Nino\Admin\Recovery::STUB_SUFFIX ) ) );
 		}
 
 		/**
@@ -155,7 +134,7 @@ namespace Nino\Modules\Backups {
 		private static function _decrypt( string $path, string $key ): string|false {
 
 			$raw 			= file_get_contents( $path );
-			$payload 	= base64_decode( substr( $raw, strlen( self::STUB_PREFIX ), -strlen( self::STUB_SUFFIX ) ) );
+			$payload 	= base64_decode( substr( $raw, strlen( \Nino\Admin\Recovery::STUB_PREFIX ), -strlen( \Nino\Admin\Recovery::STUB_SUFFIX ) ) );
 			$iv 			= substr( $payload, 0, 12 );
 			$tag 			= substr( $payload, 12, 16 );
 			$cipher 	= substr( $payload, 28 );
@@ -185,21 +164,17 @@ namespace Nino\Modules\Backups {
 			$dates 			= [];
 			$snapshots	= [];
 
-			// Every location, not just the current one: an archive written
-			// before the directory moved is still a restorable archive
-			foreach( self::_backupDirs( $appData ) as $dir )
-				foreach( glob( $dir. '/*.php' ) ?: [] as $file ) {
+			$dir = self::_backupDir( $appData );
 
-					$id = basename( $file, '.php' );
+			foreach( $dir === false ? [] : ( glob( $dir. '/*.php' ) ?: [] ) as $file ) {
 
-					if( preg_match( '/^\d{4}-\d{2}-\d{2}(?:-\d{6})?$/', $id ) === 1 )
-						$dates[] = $id;
-					else if( preg_match( self::ID_PATTERN, $id ) === 1 )
-						$snapshots[] = $id;
-				}
+				$id = basename( $file, '.php' );
 
-			$dates 			= array_values( array_unique( $dates ) );
-			$snapshots	= array_values( array_unique( $snapshots ) );
+				if( preg_match( '/^\d{4}-\d{2}-\d{2}(?:-\d{6})?$/', $id ) === 1 )
+					$dates[] = $id;
+				else if( preg_match( self::ID_PATTERN, $id ) === 1 )
+					$snapshots[] = $id;
+			}
 
 			rsort( $dates );
 			rsort( $snapshots );
@@ -306,7 +281,7 @@ namespace Nino\Modules\Backups {
 		 */
 		public static function restore( array &$appData, string $date ): true|array {
 
-			$dir = self::_backupDir( $appData, $date );
+			$dir = self::_backupDir( $appData );
 			$key = self::_key( $appData );
 
 			if( $dir === false || $key === false ) {
@@ -523,7 +498,7 @@ namespace Nino\Modules\Backups {
 					throw new \RuntimeException( 'the snapshot could not be encrypted' );
 
 				$snapshot	= $dir. '/pre-restore-'. date( 'Y-m-d-His' ). '.php';
-				$stub			= self::STUB_PREFIX. base64_encode( $iv. $tag. $cipher ). self::STUB_SUFFIX;
+				$stub			= \Nino\Admin\Recovery::STUB_PREFIX. base64_encode( $iv. $tag. $cipher ). \Nino\Admin\Recovery::STUB_SUFFIX;
 				$temp			= $snapshot. '.'. bin2hex( random_bytes( 6 ) ). '.tmp';
 
 				// Renamed into place like a backup itself: a snapshot the list

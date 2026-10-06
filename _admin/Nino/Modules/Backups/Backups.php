@@ -30,7 +30,7 @@ namespace Nino\Modules {
 	 *											Three independent layers, the last two of which hold even
 	 *											where the private half is served after all:
 	 *											- kept below the private directory, at private/.backups
-	 *											  (see dirs()) - project data rather than a tool folder, so
+	 *											  (see dir()) - project data rather than a tool folder, so
 	 *											  an update replaces _admin/ without taking the archives
 	 *											  with it, and nothing under private/ is served to begin
 	 *											  with. The one-time random directory name this class used
@@ -89,19 +89,16 @@ namespace Nino\Modules {
 		// they are data
 		public const string KEY_PATH = \Nino\Filesystem::CONTENT_DIR. '/.auth/backup-key.php';
 
-		private const string STUB_PREFIX = "<?php http_response_code(403); exit; return '";
-		private const string STUB_SUFFIX = "';\n";
-
 		/**
-		 *	The directory that holds backup archives.
+		 *	The directory that holds backup archives
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	array										Absolute paths, existing or not
+		 *	@return 	string									Absolute path, existing or not
 		 */
-		public static function dirs( array &$appData ): array {
+		public static function dir( array &$appData ): string {
 
-			return [ \Nino\Filesystem::getContentPath( $appData ). substr( self::BACKUPS_DIR, strlen( \Nino\Filesystem::CONTENT_DIR ) ) ];
+			return \Nino\Filesystem::getContentPath( $appData ). substr( self::BACKUPS_DIR, strlen( \Nino\Filesystem::CONTENT_DIR ) );
 		}
 
 		/**
@@ -127,10 +124,9 @@ namespace Nino\Modules {
 
 			$dates = [];
 
-			foreach( self::dirs( $appData ) as $dir )
-				foreach( glob( $dir. '/*.php' ) ?: [] as $file )
-					if( preg_match( '/^\d{4}-\d{2}-\d{2}$/', basename( $file, '.php' ) ) === 1 )
-						$dates[] = basename( $file, '.php' );
+			foreach( glob( self::dir( $appData ). '/*.php' ) ?: [] as $file )
+				if( preg_match( '/^\d{4}-\d{2}-\d{2}$/', basename( $file, '.php' ) ) === 1 )
+					$dates[] = basename( $file, '.php' );
 
 			if( count( $dates ) === 0 )
 				return null;
@@ -173,15 +169,14 @@ namespace Nino\Modules {
 
 				\Nino\Filesystem::forceDir( $appData, self::BACKUPS_DIR );
 
-				$dir 		= self::dirs( $appData )[0];
+				$dir 		= self::dir( $appData );
 				$path 	= $dir. '/'. date( 'Y-m-d' ). '.php';
 
 				if( is_file( $path ) === true )
 					return;
 
 				self::_create( $appData, $dir, $path );
-				foreach( self::dirs( $appData ) as $backupDir )
-					self::_prune( $backupDir );
+				self::_prune( $dir );
 
 				// Through the shell rather than at the Logs module directly: the
 				// log is a module a delivery may drop, and this line sits inside
@@ -232,7 +227,7 @@ namespace Nino\Modules {
 
 				\Nino\Filesystem::forceDir( $appData, self::BACKUPS_DIR );
 
-				$dir 	= self::dirs( $appData )[0];
+				$dir 	= self::dir( $appData );
 				$id 	= date( 'Y-m-d-His' );
 
 				self::_create( $appData, $dir, $dir. '/'. $id. '.php' );
@@ -250,7 +245,7 @@ namespace Nino\Modules {
 		 *	opens the workbench never gets that config.php key at all. The
 		 *	random directory name this used to generate beside it is gone:
 		 *	the archives sit at a fixed place below the private directory
-		 *	now and need no unguessable name of their own (see dirs()).
+		 *	now and need no unguessable name of their own (see dir()).
 		 *
 		 *	The key also gets an independent copy, written to
 		 *	private/.auth/backup-key.php (behind the same .php exit-stub as
@@ -279,7 +274,7 @@ namespace Nino\Modules {
 			//
 			// Only the key. The directory used to be generated alongside it,
 			// as an unguessable name; the archives live under the content
-			// directory now and need none (see dirs())
+			// directory now and need none (see dir())
 			$candidateKey = base64_encode( random_bytes( 32 ) );
 
 			$written = \Nino\Filesystem::mutate( $appData, '/config.php', function( mixed $content ) use ( &$appData, &$readConfig, &$changed, $candidateKey ): mixed {
@@ -316,7 +311,7 @@ namespace Nino\Modules {
 			\Nino\Filesystem::forceDir( $appData, dirname( self::KEY_PATH ) );
 
 			$keyPath 		= self::keyPath( $appData );
-			$keyContent = self::STUB_PREFIX. $appData['/nino/backup/key']. self::STUB_SUFFIX;
+			$keyContent = \Nino\Admin\Recovery::STUB_PREFIX. $appData['/nino/backup/key']. \Nino\Admin\Recovery::STUB_SUFFIX;
 
 			if( @file_get_contents( $keyPath ) !== $keyContent )
 				self::_writeRawAtomic( $keyPath, $keyContent );
@@ -380,7 +375,7 @@ namespace Nino\Modules {
 				if( $cipher === false )
 					throw new \RuntimeException( 'backup encryption failed' );
 
-				self::_writeRawAtomic( $path, self::STUB_PREFIX. base64_encode( $iv. $tag. $cipher ). self::STUB_SUFFIX );
+				self::_writeRawAtomic( $path, \Nino\Admin\Recovery::STUB_PREFIX. base64_encode( $iv. $tag. $cipher ). \Nino\Admin\Recovery::STUB_SUFFIX );
 			} finally {
 				@unlink( $tmpBase );
 				@unlink( $tmpTar );

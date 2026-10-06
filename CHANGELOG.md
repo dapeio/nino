@@ -13,6 +13,12 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Workbench:** the backups and the activity log each answer their one
+  directory - `\Nino\Modules\Backups::dirs()` (a list of one) is
+  `Backups::dir()` - and read the 403 stub their files are wrapped in from
+  `\Nino\Admin\Recovery::STUB_PREFIX`/`STUB_SUFFIX` instead of three private
+  copies. Files on disk are unchanged.
+
 - **Workbench:** the roles tab lists the permission groups in the order
   roles/list now names them (`groups`: `\Nino\Admin\Panels::GROUPS`, then
   `other`) instead of a copy of that list in `roles.js`, so a group the

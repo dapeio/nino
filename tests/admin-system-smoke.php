@@ -851,7 +851,7 @@ check( 'Backup::maybeRun re-creates a missing key copy on an already-bootstrappe
 // list: what it answers, it found on disk under private/, not in anything this
 // file put there. That is why the panel keeps its own copy of the archive
 // directory and the key path instead of reaching for \Nino\Modules\Backups'
-// private constants (see its _backupDirs() and _key()).
+// private constants (see its _backupDir() and _key()).
 //
 // 'editorLoaded' is what is left of the check this driver was written for, when
 // Backup was \Nino\Editor\Backup in a tool of its own: the class has no name in

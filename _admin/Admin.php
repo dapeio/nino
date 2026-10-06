@@ -1828,8 +1828,9 @@ namespace Nino\Admin {
 
 		// The stub that file is wrapped in - a php file that 403s and exits
 		// before it ever returns the hash, so it stays useless even where a
-		// webserver happily serves it. Same convention (and same constants)
-		// Backup uses for its key and its archives
+		// webserver happily serves it. The one definition: the backup
+		// archives and their key copy (\Nino\Modules\Backups and its panel)
+		// and the activity log (\Nino\Modules\Logs\Admin) are wrapped in it too
 		public const string STUB_PREFIX = "<?php http_response_code(403); exit; return '";
 		public const string STUB_SUFFIX = "';\n";
 

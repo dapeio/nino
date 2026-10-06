@@ -71,7 +71,7 @@ namespace Nino {
 		// exact same manifest for the exact same reason - kept here in the
 		// kernel rather than in either of them, since the panel that restores
 		// an archive has to work where no other class is loadable (see that
-		// panel's own docblock and its _backupDirs()).
+		// panel's own docblock and its _backupDir()).
 		public static function manifest( array &$appData ): array {
 
 			// Defensive: a caller right after writing config.php
