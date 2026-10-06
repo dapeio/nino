@@ -64,7 +64,7 @@ Beim erneuten Anwenden ersetzt die sichtbare Sprachauswahl den bisherigen Stand.
 
 ### Module
 
-Navigation, Sprachauswahl (der Locale Picker), das Kontaktformular und die Rechtstexte sind keine Wahl mehr: `\Nino\Install\Setup::ALWAYS_MODULES` nennt ihre Einheiten-Schlüssel, und jeder Setup-Durchlauf wendet alle vier Einheiten an und trägt alle vier Klassen in `/nino/modules` ein - genau wie bei einem tatsächlich gewählten Modul. Ein Entwicklerwerkzeug, das als Modul ausgeliefert wird, läuft weiter wie bisher - eingetragen, sobald seine Klasse existiert (`TOOL_MODULES`), ohne eigene Einheit. `Maintenance` ist das eine, das Nino noch mitbringt.
+Navigation, Sprachauswahl (der Locale Picker), das Kontaktformular und die Rechtstexte sind keine Wahl mehr: `\Nino\Install\Setup::ALWAYS_MODULES` nennt ihre Einheiten-Schlüssel, und jeder Setup-Durchlauf wendet alle vier Einheiten an und trägt alle vier Klassen in `/nino/modules` ein - genau wie bei einem tatsächlich gewählten Modul. `Maintenance`, das Entwicklerwerkzeug, das als Kernel-Modul mitkommt, hat keine Einheit und wird ebenfalls bei jedem Durchlauf eingetragen.
 
 Die verbleibende Liste bietet jedes *andere* Modul an, das eine Installer-Einheit mitliefert: in einem frischen Checkout keines, dazu jedes Modul, das ein Projekt unter `app/` hinzugefügt hat, oder eine eigene Fassung unter `_admin/install/library/modules/`. Features – etwa Newsletter und Suche aus dem Katalog – werden auch hier nicht angeboten: Ein Feature wird aus [dapeio/nino-features](https://github.com/dapeio/nino-features) nach `features/` kopiert und nach der Einrichtung im [Panel Features](features.de.md) der Workbench eingeschaltet. Benötigt ein gewähltes Modul ein weiteres Modul, nimmt der Assistent diese Abhängigkeit automatisch in die Auswahl auf - und findet sie bereits vorhanden, wenn diese Abhängigkeit eines der vier immer aktiven Module ist. Auch eine verwendete Seitenvorlage kann benötigte Module nachziehen; eine Kontaktseite funktioniert zum Beispiel, weil das Modul des Kontaktformulars ohnehin immer da ist.
 
@@ -75,7 +75,7 @@ Die **Rechtstexte** – das Modul `Legal`, siehe [Entwickler-Handbuch](developme
 Der Schritt schreibt:
 
 - verfügbare und native Sprache nach `config.php`;
-- die aktivierten Modulklassen - die immer aktiven vier, jedes Entwicklerwerkzeug, dessen Klasse existiert, und was sonst gewählt wurde - nach `/nino/modules`;
+- die aktivierten Modulklassen - die immer aktiven Module des Kernels (`\Nino\AppData::DEFAULTS`), die Klassen der vier immer angewandten Einheiten, `Maintenance` und was sonst gewählt wurde - nach `/nino/modules`;
 - die von Basis und jeder angewandten Einheit gelieferten Routen nach `/nino/http/routes`;
 - Templates nach `templates/`;
 - globale und sprachabhängige Texte nach `text/`;
@@ -237,7 +237,7 @@ Zwei Manifest-Schlüssel tragen Inhalt und werden vom selben `applyUnit()` nur e
 
 Nicht durchsucht wird `features/`. Ein Feature trägt eine `install/`-Einheit derselben Form, aber `\Nino\Features::activate()` wendet sie an, wenn das Feature in der Workbench eingeschaltet wird – über dasselbe `applyUnit()`, das der Assistent verwendet, hier mit Überschreiben, dort nur ergänzend, damit die Anwendung der Einheit das Entfernen von `_admin/install/` überlebt. Siehe [Features](features.de.md).
 
-Ein Entwicklerwerkzeug, das als Modul ausgeliefert wird, hat keine Einheit zum Auswählen: `\Nino\Install\Setup` trägt es in `/nino/modules` ein, sobald seine Klasse existiert, sodass sein Panel von der ersten `config.php` an in der Workbench ist.
+`Maintenance` kommt mit dem Kernel und hat keine Einheit zum Auswählen: `\Nino\Install\Setup` trägt es bei jedem Durchlauf in `/nino/modules` ein, sodass sein Panel von der ersten `config.php` an in der Workbench ist.
 
 Die Basis-, Modul- und Seiteneinheiten besitzen je eine `manifest.php`. Das Manifest beschreibt, was angezeigt, kopiert und konfiguriert wird. Je nach Einheit enthält es beispielsweise:
 

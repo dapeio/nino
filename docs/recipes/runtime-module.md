@@ -354,8 +354,7 @@ tools and the installer:
 - `install/manifest.php` beside the class makes a kernel or project module
   selectable in the setup wizard (the [installer package recipe](installer-package.md)). No wizard file lists it. A module with nothing
   to copy - `Maintenance`, which is a switch and a template - has no unit:
-  the wizard's Setup step lists `Install\Setup::TOOL_MODULES` in
-  `/nino/modules` whenever its class exists. A feature carries the same unit and
+  the wizard's Setup step lists it in `/nino/modules` on every run. A feature carries the same unit and
   `\Nino\Features::activate()` applies it, add-only, when the feature is
   switched on in the workbench - the [feature recipe](feature.md).
 - `'/nino/admin/restore'` (args `dataDir`, `staging`) is the callback a module

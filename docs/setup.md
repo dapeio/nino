@@ -63,7 +63,7 @@ When reapplying, the visible language selection replaces the previous state. The
 
 ### Modules
 
-Navigation, language selection (the locale picker), the contact form and the legal texts are no longer a choice: `\Nino\Install\Setup::ALWAYS_MODULES` names their unit keys, and every Setup run applies all four units and lists all four classes in `/nino/modules`, exactly as it would for a module actually picked. A developer tool that ships as a module is handled the same way it always was - listed whenever its class exists (`TOOL_MODULES`), no unit to apply. `Maintenance` is the one Nino still ships.
+Navigation, language selection (the locale picker), the contact form and the legal texts are no longer a choice: `\Nino\Install\Setup::ALWAYS_MODULES` names their unit keys, and every Setup run applies all four units and lists all four classes in `/nino/modules`, exactly as it would for a module actually picked. `Maintenance`, the developer tool that ships as a kernel module, has no unit to apply and is listed on every run as well.
 
 The list that remains offers every *other* module that ships an installer unit: nothing, in a fresh checkout, plus any module a project has added below `app/`, or a fork below `_admin/install/library/modules/`. Features - the catalogue's Newsletter and Search, for instance - are not offered here either: a feature is copied into `features/` from [dapeio/nino-features](https://github.com/dapeio/nino-features) and switched on in the workbench's [Features panel](features.md) after setup. If a selected module requires another module, the assistant automatically includes this dependency in the selection - and finds it already present when that dependency happens to be one of the four always-on ones. A used page template can also pull in required modules; a contact page, for example, works because the contact form's own module is always there.
 
@@ -74,7 +74,7 @@ The **legal texts** - the module `Legal`, see [Developer Manual](development.md#
 The step writes:
 
 - available and native language to `config.php`;
-- the activated module classes - the always-on four, any developer tool whose class exists, and whatever else was picked - to `/nino/modules`;
+- the activated module classes - the kernel's always-on modules (`\Nino\AppData::DEFAULTS`), the four always-applied units' classes, `Maintenance`, and whatever else was picked - to `/nino/modules`;
 - the routes provided by the base and every applied module to `/nino/http/routes`;
 - templates to `templates/`;
 - global and language-dependent texts to `text/`;
@@ -223,7 +223,7 @@ Two manifest keys carry content and are applied add-only by the same `applyUnit(
 
 Not scanned: `features/`. A feature carries an `install/` unit of the same shape, but `\Nino\Features::activate()` applies it when the feature is switched on in the workbench - through the same `applyUnit()` the wizard uses, with overwrite on here and add-only there, so that the unit application survives the removal of `_admin/install/`. See [Features](features.md).
 
-A developer tool that ships as a module has no unit to pick: `\Nino\Install\Setup` lists it in `/nino/modules` whenever its class exists, so its panel is in the workbench from the first `config.php` on.
+`Maintenance` ships with the kernel and has no unit to pick: `\Nino\Install\Setup` lists it in `/nino/modules` on every run, so its panel is in the workbench from the first `config.php` on.
 
 ## What the Wizard Deliberately Does Not Do
 

@@ -13,6 +13,13 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Setup wizard:** the Setup step keeps no lists of its own. The always-on
+  modules are `\Nino\AppData::DEFAULTS['/nino/modules']`, the languages it
+  offers are the base unit's `text/<locale>.php` files, and the Personal
+  Infos step reads every text file of the base unit; `Maintenance` is listed
+  on every run instead of whenever its class exists. The written
+  `/nino/modules` is the same as before.
+
 - **Workbench:** the Config panel and the Users panel's login protection tab
   show `\Nino\AppData::DEFAULTS` for a key config.php does not hold, instead of
   their own copies of the same eleven values; `Lockout`'s private `DEFAULTS`
@@ -46,6 +53,11 @@ All notable changes to Nino are documented in this file.
   projects get the new comments; the file is copied at install. The Design
   feature's `library/base.css` carries these sections byte for byte and
   follows in its own patch.
+
+### Removed
+
+- **`\Nino\Install\Setup::TOOL_MODULES`**, a public constant whose one entry was
+  `Maintenance`, and the private `CORE_MODULES` and `AVAILABLE_LOCALES`.
 
 ## v1.4.0 - 2026-10-06
 

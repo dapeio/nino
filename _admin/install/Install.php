@@ -370,45 +370,14 @@ namespace Nino\Install {
 		private const string BUNDLE_KEY = '/.cache/style.css';
 		private const array BASE_STYLESHEETS = [ '/assets/theme.css', '/assets/style.css' ];
 
-		// Locales the library ships translations for - not every locale a
-		// project could ever support, just the ones with real text/*.php
-		// fragments in _admin/install/library. A project wanting more adds them
-		// by hand afterward, same as any other locale addition (see
-		// docs/development.md)
-		private const array AVAILABLE_LOCALES = [ 'de_DE', 'en_US' ];
-
-		// Structural modules every assembled project needs regardless of
-		// what's picked - Template powers every [template ...] route body,
-		// Elements/Assets/Csrf/Images/Jstext have no content of their own
-		// to opt in or out of. Only modules that ship an install unit are
-		// selectable - see units()
-		private const array CORE_MODULES = [
-			'\\Nino\\Modules\\Assets',
-			'\\Nino\\Modules\\Elements',
-			'\\Nino\\Modules\\Template',
-			'\\Nino\\Modules\\Jstext',
-			'\\Nino\\Modules\\Csrf',
-			'\\Nino\\Modules\\Images',
-			// Inert until '/nino/cache/status' is switched on in /_admin's Config -
-			// present in every project so that switch has something to switch
-			'\\Nino\\Modules\\Cache',
-		];
-
-		// The developer tools delivered as modules (see Setup::apiApply()).
-		// Modules\Maintenance joins them rather than CORE_MODULES above
-		// because it ships no install/ unit the wizard would apply (see the
-		// module's own docblock), so there is nothing for a picker checkbox
-		// to control - only whether its class is part of this delivery
-		public const array TOOL_MODULES = [ '\\Nino\\Modules\\Maintenance' ];
-
 		// Unit keys (see units()) that used to be a picker choice and are now
 		// applied on every apply, exactly like a module a project actually
 		// picked - Navigation, the locale picker, the contact form and the
 		// legal texts (an imprint and a privacy policy are owed by practically
 		// every website, and a link to them forgotten is the dearer mistake).
-		// Not a class list like CORE_MODULES/TOOL_MODULES: a unit key still has
-		// to go through the normal applyUnit()/moduleClass path in apiApply(),
-		// so its routes/templates/text land the same way they always did
+		// Unit keys, not classes: each one still has to go through the
+		// normal applyUnit()/moduleClass path in apiApply(), so its
+		// routes/templates/text land the same way they always did
 		public const array ALWAYS_MODULES = [ 'forms', 'navigation', 'localepicker', 'legal' ];
 
 		private const string LIBRARY = __DIR__. '/library';
@@ -423,6 +392,25 @@ namespace Nino\Install {
 				'setup/library' => [ self::class, 'apiLibrary' ],
 				'setup/apply' 	 => [ self::class, 'apiApply' ],
 			];
+		}
+
+		/**
+		 *	Locales the library ships translations for: every text/<locale>.php of
+		 *	the base unit - not every locale a project could ever support. A
+		 *	project wanting more adds them by hand afterward, same as any other
+		 *	locale addition (see docs/development.md)
+		 *
+		 *	@return 	array			Locale codes, sorted
+		 */
+		private static function _locales(): array {
+
+			$locales = array_values( array_filter(
+				array_map( static fn( string $file ): string => basename( $file, '.php' ), glob( self::LIBRARY. '/base/text/*.php' ) ?: [] ),
+				static fn( string $name ): bool => preg_match( '/^[a-z]{2}_[A-Z]{2}$/', $name ) === 1
+			) );
+			sort( $locales );
+
+			return $locales;
 		}
 
 		/**
@@ -473,7 +461,7 @@ namespace Nino\Install {
 			}
 
 			\Nino\Http::ok( $request, [
-				'locales' 				=> self::AVAILABLE_LOCALES,
+				'locales' 				=> self::_locales(),
 				'activeLocales' 	=> $appData['/nino/locales/available'] ?? [],
 				'nativeLocale' 		=> $appData['/nino/locales/native'] ?? null,
 				'modules' 				=> $modules,
@@ -674,7 +662,7 @@ namespace Nino\Install {
 		public static function apiApply( array &$appData, array &$request ): void {
 
 			$data 		= \Nino\Install\Install::postData();
-			$locales 	= array_values( array_intersect( (array) ( $data['locales'] ?? [] ), self::AVAILABLE_LOCALES ) );
+			$locales 	= array_values( array_intersect( (array) ( $data['locales'] ?? [] ), self::_locales() ) );
 			$units 		= self::units();
 
 			// Navigation, the locale picker, the contact form and the legal
@@ -708,19 +696,15 @@ namespace Nino\Install {
 			elseif( in_array( $appData['/nino/locales/native'] ?? '', $locales, true ) === false )
 				$appData['/nino/locales/native'] = $locales[0];
 
-			$moduleClasses = self::CORE_MODULES;
+			$moduleClasses = \Nino\AppData::DEFAULTS['/nino/modules'];
 			foreach( $modules as $key ) {
 				$manifest = \Nino\Features::readUnitManifest( $units[$key] );
 				if( isset( $manifest['moduleClass'] ) === true )
 					$moduleClasses[] = $manifest['moduleClass'];
 			}
-			// A developer tool that ships as a module has no unit to pick: it
-			// is active whenever its directory is part of the delivery, and a
-			// class listed here that a later delivery dropped is simply never
-			// answered (see \Nino\Modules::callModules())
-			foreach( self::TOOL_MODULES as $toolClass )
-				if( class_exists( $toolClass ) === true )
-					$moduleClasses[] = $toolClass;
+			// Maintenance ships in _nino/ with every delivery and has no unit a
+			// picker could offer, so it is listed on every run - see its docblock
+			$moduleClasses[] = '\\Nino\\Modules\\Maintenance';
 			$appData['/nino/modules'] = array_values( array_unique( $moduleClasses ) );
 
 			/*	The css bundle of a fresh project, in the one order that makes it
@@ -2323,15 +2307,11 @@ namespace Nino\Install {
 
 			$keys = [];
 
-			foreach( [ 'global.php', 'de_DE.php', 'en_US.php' ] as $file ) {
-
-				$path = self::BASE_TEXT_DIR. '/'. $file;
-				if( is_file( $path ) === false )
-					continue;
+			foreach( glob( self::BASE_TEXT_DIR. '/*.php' ) ?: [] as $path ) {
 
 				foreach( array_keys( include $path ) as $bracketKey ) {
 
-					$key = trim( $bracketKey, '[]' );
+					$key = trim( (string) $bracketKey, '[]' );
 
 					foreach( self::KEY_PREFIXES as $prefix )
 						if( str_starts_with( $key, $prefix ) === true )

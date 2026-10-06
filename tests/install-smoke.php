@@ -188,10 +188,9 @@ $libraryRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Setup::apiLibrary( $appData, $libraryRequest );
 $libraryBody = $libraryRequest['/nino/http/response']['body'];
 
-/*	The locales the library lists are the ones it ships translations for -
-	read off the base unit's text files rather than written down here a
-	second time, so a locale added to the unit is listed without a second
-	edit, and one listed without a file is what this catches	*/
+/*	The locales the library lists are its base unit's text files: the wizard
+	derives them as this test does. What this pins is that global.php is not
+	among them and that nothing else is	*/
 $shippedLocales = array_values( array_filter(
 	array_map( static fn( string $file ): string => basename( $file, '.php' ), glob( __DIR__. '/../_admin/install/library/base/text/*.php' ) ?: [] ),
 	static fn( string $locale ): bool => preg_match( '/^[a-z]{2}_[A-Z]{2}$/', $locale ) === 1
@@ -199,6 +198,14 @@ $shippedLocales = array_values( array_filter(
 $listedLocales = $libraryBody['locales'];
 sort( $shippedLocales ); sort( $listedLocales );
 check( 'lists exactly the locales the library ships translations for', $listedLocales === $shippedLocales && count( $shippedLocales ) > 0 );
+/*	The step keeps no list of its own: the always-on modules are
+	AppData::DEFAULTS', the languages the base unit's text files. A class
+	name or a locale written into Install.php is a second copy that the next
+	addition forgets	*/
+$setupSource = (string) file_get_contents( __DIR__. '/../_admin/install/Install.php' );
+$restated = array_filter( \Nino\AppData::DEFAULTS['/nino/modules'], static fn( string $class ): bool => str_contains( $setupSource, "'". str_replace( '\\', '\\\\', $class ). "'" ) );
+check( 'the wizard restates neither the always-on modules nor the shipped locales', $restated === []
+	&& preg_match( "/'[a-z]{2}_[A-Z]{2}(\\.php)?'/", $setupSource ) !== 1 );
 check( 'reports the config\'s current native locale as already active', $libraryBody['activeLocales'] === [ 'de_DE' ] );
 check( 'reports the config\'s current native locale itself, for the Native Locale dropdown to pre-select', $libraryBody['nativeLocale'] === 'de_DE' );
 check( 'lists no module unit at all: forms/navigation/localepicker are no longer a choice, and a fresh checkout ships no other unit - pages have their own step now (Webpages), not listed here', $libraryBody['modules'] === [] );

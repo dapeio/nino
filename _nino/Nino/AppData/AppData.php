@@ -63,6 +63,8 @@ namespace Nino {
 				'\\Nino\\Modules\\Jstext',
 				'\\Nino\\Modules\\Csrf',
 				'\\Nino\\Modules\\Images',
+				// Inert until '/nino/cache/status' is switched on in /_admin's Config -
+				// present in every project so that switch has something to switch
 				'\\Nino\\Modules\\Cache',
 			],
 			'/nino/cache/status'		=> false,
