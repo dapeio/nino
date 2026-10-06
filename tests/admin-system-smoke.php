@@ -2883,6 +2883,7 @@ check( 'the key left for later comes back', in_array( '/template/page-apply/intr
 $listedKeys = array_column( $body['keys'], 'key' );
 check( 'a retired key with no value is still listed by the Text Keys tab', in_array( '/template/page-apply/intro/legal', $listedKeys, true ) === true );
 check( '...flagged as hidden, so the checkbox that brings it back is ticked', ( array_column( $body['keys'], 'blacklisted', 'key' )['/template/page-apply/intro/legal'] ?? null ) === true );
+check( '...with the limit \Nino\Text gives a key that holds nothing, so bringing it back does not change its counter', ( array_column( $body['keys'], 'maxlength', 'key' )['/template/page-apply/intro/legal'] ?? null ) === \Nino\Text::maxlength() );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/template/page-apply/intro/legal', 'global' => false, 'blacklisted' => false ] );
 check( 'un-ticking "hidden" on it is a valid save, not a 404', $status === 200 );

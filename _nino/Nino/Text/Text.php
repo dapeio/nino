@@ -34,6 +34,16 @@ namespace Nino {
 		// hard byte limit above, at four bytes a character
 		public const int MAX_LIMIT = self::HARD_MAXLENGTH / 4;
 
+		// The limit a key without a set one gets: its longest value in
+		// bytes plus room to grow, never under the floor or over the cap.
+		// The one formula - entries() and the Text Keys tab's list of
+		// hidden keys with no value both ask it. Internal: an implementation
+		// detail of entries() and the Text Keys tab, not part of the
+		// documented Text API
+		public static function maxlength( int $longest = 0 ): int {
+			return min( self::MAX_MAXLENGTH, max( self::MIN_MAXLENGTH, $longest + self::MAXLENGTH_BUFFER ) );
+		}
+
 		// The form a text key a person creates or renames takes:
 		// /<namespace>/<category>/<part>/<name>, the namespace one of a closed
 		// list and every other segment lower-case words joined by hyphens.
@@ -126,7 +136,7 @@ namespace Nino {
 					'html' 				=> $format !== 'plain',
 					'format' 			=> $format,
 					'formatSet' 	=> isset( $meta[$key]['format'] ),
-					'maxlength' 	=> $limit !== null ? max( $limit, $visible ) : min( self::MAX_MAXLENGTH, max( self::MIN_MAXLENGTH, $longest + self::MAXLENGTH_BUFFER ) ),
+					'maxlength' 	=> $limit !== null ? max( $limit, $visible ) : self::maxlength( $longest ),
 					'maxlengthSet' => $limit !== null,
 					'values' 			=> $values,
 				];

@@ -340,10 +340,10 @@ namespace Nino\Modules\Text {
 					'html' 				=> $format !== 'plain',
 					'format' 			=> $format,
 					'formatSet' 	=> isset( $meta[$key]['format'] ),
-					// The floor \Nino\Text::entries() itself lands on for an
-					// empty value, so an un-ignored key keeps the same counter
-					// it had a moment before
-					'maxlength' 	=> $meta[$key]['maxlength'] ?? 150,
+					// What \Nino\Text::entries() itself gives an empty value,
+					// so an un-ignored key keeps the same counter it had a
+					// moment before
+					'maxlength' 	=> $meta[$key]['maxlength'] ?? \Nino\Text::maxlength(),
 					'maxlengthSet' => isset( $meta[$key]['maxlength'] ),
 					'values' 			=> $values,
 				];

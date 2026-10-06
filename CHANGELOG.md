@@ -13,6 +13,11 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Text:** the limit a text key derives from its longest value is worked out
+  in one place, `\Nino\Text::maxlength()` (internal). The Text Keys tab gave a
+  hidden key with no value a hand-written `150`; it asks the same function
+  `\Nino\Text::entries()` uses now. Every limit stays what it was.
+
 - **Maintenance:** the `maintenance/status` and `maintenance/set` answers carry
   `min` and `max`, the bounds `apiSet()` holds the Retry-After seconds to, and
   the panel's seconds field takes them from there instead of repeating 60 and

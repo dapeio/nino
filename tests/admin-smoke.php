@@ -361,6 +361,7 @@ check( 'a key with existing markup is auto-flagged html', ( $byKey['/home/h2']['
 check( 'a key without markup is not flagged html', ( $byKey['/home/plain']['html'] ?? null ) === false );
 check( 'maxlength is at least the min floor', ( $byKey['/home/plain']['maxlength'] ?? 0 ) >= 150 );
 check( 'maxlength is capped at 2000 for a key already longer than that, not grown past it', ( $byKey['/home/long']['maxlength'] ?? 0 ) === 2000 );
+check( 'a derived limit is \Nino\Text::maxlength() of the longest value, the one formula', ( $byKey['/home/plain']['maxlength'] ?? 0 ) === \Nino\Text::maxlength( strlen( 'A sentence.' ) ) && ( $byKey['/home/long']['maxlength'] ?? 0 ) === \Nino\Text::maxlength( 1900 ) );
 check( 'Text::apiKeys exposes the session-remembered locale, defaulting to native', ( $request['/nino/http/response']['body']['selectedLocale'] ?? null ) === 'de_DE' );
 
 echo "\n";
