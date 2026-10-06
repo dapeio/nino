@@ -1164,7 +1164,7 @@
 					newsletterSubmit = function( e ){
 						e.preventDefault();
 
-						if( this.classList.contains('nino-is-success') === true || this.classList.contains('nino-is-existing') === true )
+						if( this.classList.contains('nino-is-success') === true )
 							return;
 
 						// The mark belongs to the attempt - see the .nino-form handler

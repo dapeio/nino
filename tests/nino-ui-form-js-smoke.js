@@ -451,6 +451,22 @@ check( 'no form handler writes a textfill through innerHTML', /msg\.innerHTML\s*
 check( 'no form handler strips characters out of a field value', /value\.replace\(\s*\/\[<>/.test( source.replace( /\s/g, '' ) ) === false && source.includes( "value.replace( /[<>'\";(){}[\\]\\\\|]/g, '' )" ) === false );
 
 
+// --- A form state is one the script can reach ---------------------------
+
+/*	Nino.css styled .nino-is-existing like a success, and the newsletter
+	handler refused a second submit on it - while nothing anywhere set it, not
+	since 1.0.0-beta. A state that has a look and a meaning but no way in is a
+	promise to whoever reads the stylesheet that the page never keeps	*/
+const publicCss = fs.readFileSync( path.join( __dirname, '../_nino/Nino.css' ), 'utf8' );
+const askedFor = /classList\.contains\(\s*'(nino-is-[a-z-]+)'\s*\)/g;
+const writtenSource = source.replace( askedFor, '' );
+const formStates = Array.from( publicCss.matchAll( /\.nino-form\.(nino-is-[a-z-]+)/g ), function( match ) { return match[1] } )
+	.concat( Array.from( source.matchAll( askedFor ), function( match ) { return match[1] } ) );
+const unreachable = Array.from( new Set( formStates ) ).filter( function( state ) { return writtenSource.includes( "'"+ state +"'" ) === false } );
+check( 'every form state the stylesheet styles or the script asks for is one the script writes'+ ( unreachable.length === 0 ? '' : ' - '+ unreachable.join( ', ' ) ),
+	formStates.length > 0 && unreachable.length === 0 );
+
+
 // --- What a refused form tells whoever cannot see it --------------------
 
 /*	The handler refuses on the client too - a required field left empty, an

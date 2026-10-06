@@ -1200,13 +1200,12 @@ textarea:disabled {
 	the page ground it lands at 2.6:1 on a dark theme	*/
 .nino-form-message:empty { display: none; }
 .nino-form.nino-is-error .nino-form-message,
-.nino-form.nino-is-success .nino-form-message,
-.nino-form.nino-is-existing .nino-form-message {
+.nino-form.nino-is-success .nino-form-message {
 	padding: var(--space-1) var(--space-2);
 	border-radius: var(--radius);
 }
 .nino-form.nino-is-error .nino-form-message { background-color: var(--color-error); color: var(--color-error-text); }
-.nino-form.nino-is-success .nino-form-message, .nino-form.nino-is-existing .nino-form-message { background-color: var(--color-success); color: var(--color-success-text); }
+.nino-form.nino-is-success .nino-form-message { background-color: var(--color-success); color: var(--color-success-text); }
 .nino-form.nino-is-pending .nino-form-submit { opacity: .6; pointer-events: none; }
 
 .nino-newsletter-form .nino-form-input {

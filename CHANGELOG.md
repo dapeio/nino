@@ -291,6 +291,15 @@ All notable changes to Nino are documented in this file.
 
 ### Removed
 
+- **`.nino-is-existing`**, a form state nothing has set since 1.0.0-beta: its
+  two selectors in `Nino.css`, the newsletter handler's check for it in
+  `Nino.ui.js` and its badge and mention on the demo catalogue page. The
+  signup endpoint answers an address that is on the list already like a new
+  one, on purpose, so there was never an outcome to mark. A project
+  stylesheet that styled the class styled nothing. `tests/nino-ui-form-js-smoke.js`
+  holds that every form state the stylesheet styles or the script asks for is
+  one the script writes (57 → 58 checks, 1 red before).
+
 - **Catalogue:** the refusal of a missing catalogue key - "no catalogue key is
   configured, so no catalogue can be trusted" in `\Nino\Catalogue::fetch()`,
   its twin in the Features panel's `features/catalogue`, and the text key
