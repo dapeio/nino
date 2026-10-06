@@ -131,6 +131,8 @@ Element-URI und HTTP-URI müssen innerhalb ihrer jeweiligen Spalte eindeutig sei
 
 Eine neue Seite startet mit den Vorschlägen der gewählten Library-Vorlage: HTTP-URI sowie Name, Title und Description in **jeder** aktiven Sprache, gelesen aus dem Eintrag `suggest` im Manifest der Einheit – je ein String oder ein String je Sprache für `'uri'`, `'name'`, `'title'` und `'description'`. Das sind keine Textschlüssel: Ein `/_nino/webpage<uri>/*`-Schlüssel gehört dem System, und der Schritt schreibt ihn unter der Element-URI, unter der die Seite eingehängt ist. Ein Wechsel der Vorlage aktualisiert nur Felder, die noch unverändert sind – selbst eingetragener Text bleibt erhalten. Ein leer gelassenes Feld fällt weiterhin auf den allgemeinen Platzhalter („Page“, „Page Title“) zurück.
 
+Von der einen Route in `routes` einer Seiten-Einheit liest der Schritt den `body`, den `statusCode`, die vorgeschlagenen `navs` und ein `locale`, das die Einheit auf eine Sprache beschränkt. Schlüssel und `uri` schreibt der Schritt selbst: Er legt die Route unter der HTTP-URI der Seite an und setzt `uri` auf ihre Element-URI. Die Einheiten der Library schreiben aus, was dabei standardmäßig herauskommt - `GET:/` plus die vorgeschlagene URI (`GET://404` für `/404`, `GET://` für `/`) und `/<Ordner der Einheit>` -, und wer beides im Manifest ändert, verschiebt nichts.
+
 Eine Seiteneinheit darf außerdem einheitenrelative `files` deklarieren. Sie
 werden auf dieselben virtuellen Projektpfade kopiert; aus
 `images/template/page-home/fullscreen-image/background.svg` wird damit das öffentliche

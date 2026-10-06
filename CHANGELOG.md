@@ -13,6 +13,12 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the setup manual says which part of a page unit's route the Routes
+  step reads - body, status code, menus, locale - and that it writes the key and
+  the `uri` itself; the two checks of `tests/install-smoke.php` that pinned
+  those manifest values are gone, and the 404 preset check now also pins the
+  Http-URI the fallback looks up.
+
 - **Workbench, setup wizard:** one minimum password length,
   `\Nino\Admin\Recovery::MIN_PW_LENGTH` (still 8). The Users panel and the
   wizard's Accounts and Finish steps read it instead of keeping private
@@ -233,6 +239,9 @@ All notable changes to Nino are documented in this file.
   wrap is gone.
 
 ### Removed
+
+- **Installer:** the base unit's `label`, which nothing read - base is applied,
+  never offered.
 
 - **Setup wizard:** what its own steps never reach - the deletion of a
   `changeme@domain.com` placeholder account no release ships, the

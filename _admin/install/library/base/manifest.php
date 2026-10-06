@@ -1,5 +1,4 @@
 <?php return [
-	'label' 		=> 'Base',
 	'routes' 		=> [
 		'GET://robots.txt' => [
 			'uri' 		=> '/robots.txt',

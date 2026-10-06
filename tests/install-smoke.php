@@ -650,9 +650,11 @@ check( '...each carrying its own suggested Http-URI, not its folder name', ( $wp
 	&& ( $wpLibraryBody['webpages'][0]['uri'] ?? null ) === '/home' );
 check( '...its own per-locale wording rather than the generic fallback', ( $wpLibraryBody['webpages'][0]['text']['de_DE']['name'] ?? null ) === 'Startseite'
 	&& ( $wpLibraryBody['webpages'][0]['text']['en_US']['name'] ?? null ) === 'Home' );
-// The one field no form offers and apiApply() takes straight off the entry
-check( '...and the status code its manifest route declares', ( array_values( array_filter( $wpLibraryBody['webpages'],
-	static fn( array $e ): bool => $e['libraryKey'] === '404' ) )[0]['statusCode'] ?? null ) === 404 );
+// The one field no form offers and apiApply() takes straight off the entry -
+// and the address Http::response() falls back to, GET://404
+$preset404 = array_values( array_filter( $wpLibraryBody['webpages'], static fn( array $e ): bool => $e['libraryKey'] === '404' ) )[0] ?? [];
+check( '...and the status code its manifest route declares, at the Http-URI the 404 fallback looks up', ( $preset404['statusCode'] ?? null ) === 404
+	&& ( $preset404['httpUri'] ?? null ) === '/404' );
 check( 'navigations are offered - the menus the config holds, since Navigation is always active', $wpLibraryBody['navs'] === $expectedNavs );
 // ...so a preset page proposes whatever menus its own manifest route
 // suggests, intersected with what the project actually registers - home/
@@ -1548,17 +1550,6 @@ check( 'every page unit ships the templates its own routes render'. ( $pageFailu
 // the Routes step has nothing to offer on a fresh install
 check( 'the page library offers the three a starter site is built from', count( array_intersect( [ 'home', 'contact', '404' ], $pageUnits ) ) === 3 );
 check( '...and a blank one to start a page of your own from', in_array( 'blank', $pageUnits, true ) === true );
-
-// The 404 unit is the one whose route Http::response() looks up by an exact
-// key of its own when nothing else matches
-$notFound = ( include $realRoot. '/_admin/install/library/pages/404/manifest.php' )['routes'] ?? [];
-check( 'the 404 unit registers the exact key the fallback lookup needs', isset( $notFound['GET://404'] ) === true
-	&& ( $notFound['GET://404']['statusCode'] ?? null ) === 404 );
-// ...and home is the one that has to register at "/" while carrying its own
-// Element-URI in the data field
-$home = ( include $realRoot. '/_admin/install/library/pages/home/manifest.php' )['routes'] ?? [];
-check( 'the home unit registers at "/" and keeps "/home" as its Element-URI', isset( $home['GET://'] ) === true
-	&& ( $home['GET://']['uri'] ?? null ) === '/home' );
 
 // The optional modules a page can pull in with it are units too, so a page
 // declaring one nobody ships would be a dead requirement. A unit travels
