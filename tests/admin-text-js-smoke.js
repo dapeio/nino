@@ -432,7 +432,7 @@ opened = 0;
 keys._openNewKeyForm( '/g/title' );
 check( 'a shell without the registry asks nothing', opened === 1 && keys._renameFrom === '/g/title' );
 keys._openNewKeyForm();
-check( 'the form that creates a key leaves the list, which has nothing to lose, without asking', opened === 2 && keys._renameFrom === null && keys._isNew === true );
+check( 'the form that creates a key leaves the list, which has nothing to lose, without asking', opened === 2 && keys._renameFrom === null && keys._view === 'new' );
 keys._view = 'group';
 
 // --- a key's format and limit ---------------------------------------------

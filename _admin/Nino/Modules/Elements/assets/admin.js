@@ -1950,11 +1950,11 @@
 		 */
 		_readField : function( input ) {
 
-			// _readFieldByKey() already resolved this to the :checked radio (or
-			// the single checkbox, for callers still passing one directly) - either
-			// way its own .checked is true by definition, so read .value instead
+			// A boolean is a yes/no radio pair (see _renderField()), and
+			// _readFieldByKey() hands over the :checked one - whose own .checked
+			// is true by definition, so the answer is its value
 			if( input.dataset.type === 'boolean' )
-				return input.type === 'radio' ? input.value === 'true' : input.checked;
+				return input.value === 'true';
 			if( input.dataset.type === 'integer' )
 				return parseInt( input.value, 10 ) || 0;
 			if( input.dataset.type === 'double' )

@@ -21,7 +21,9 @@
 
 	wn.Nino.admin = wn.Nino.admin || {};
 
-	Nino.admin.elementTypes = {
+	// Under its nav uri: the shell finds a panel's script as
+	// Nino.admin[uri] (see _admin/assets/script.js)
+	Nino.admin.types = {
 
 		// The keys a field is offered as, before an own one: the words of the
 		// vocabulary fields most often are (/_admin/common/word/<key>, the ones
@@ -60,22 +62,22 @@
 			if( dc.getElementById('types-list') === null )
 				return;
 
-			Nino.admin.elementTypes._apiCall( 'list', {}, function( status, response ) {
+			Nino.admin.types._apiCall( 'list', {}, function( status, response ) {
 				if( status !== 200 || response === null )
-					return Nino.admin.elementTypes._showError( dc.getElementById('types-list'), status, response );
+					return Nino.admin.types._showError( dc.getElementById('types-list'), status, response );
 
-				Nino.admin.elementTypes._types 			= response.types;
-				Nino.admin.elementTypes._fieldTypes = response.fieldTypes;
-				Nino.admin.elementTypes._suffixTypes = response.suffixTypes ?? [];
-				Nino.admin.elementTypes._renderList();
-				Nino.admin.elementTypes._showList();
-				Nino.admin.elementTypes._ready = true;
+				Nino.admin.types._types 			= response.types;
+				Nino.admin.types._fieldTypes = response.fieldTypes;
+				Nino.admin.types._suffixTypes = response.suffixTypes ?? [];
+				Nino.admin.types._renderList();
+				Nino.admin.types._showList();
+				Nino.admin.types._ready = true;
 
-				const open = Nino.admin.elementTypes._openUri;
-				Nino.admin.elementTypes._openUri = null;
+				const open = Nino.admin.types._openUri;
+				Nino.admin.types._openUri = null;
 
 				if( open !== null )
-					Nino.admin.elementTypes._openForm( open );
+					Nino.admin.types._openForm( open );
 			} );
 		},
 
@@ -87,13 +89,13 @@
 		 */
 		showCurrent : function() {
 
-			if( Nino.admin.elementTypes._ready === false )
+			if( Nino.admin.types._ready === false )
 				return;
 
 			if( dc.getElementById('types-form').classList.contains('admin-hidden') === false )
-				return Nino.admin.elementTypes._showForm();
+				return Nino.admin.types._showForm();
 
-			Nino.admin.elementTypes._showList();
+			Nino.admin.types._showList();
 		},
 
 		/**
@@ -142,21 +144,21 @@
 			const wrap = dc.getElementById('types-list');
 			wrap.innerHTML = '';
 
-			if( Nino.admin.elementTypes._notice !== '' ) {
+			if( Nino.admin.types._notice !== '' ) {
 				const notice = dc.createElement('p');
 				notice.className = 'nino-admin-hint';
 				notice.setAttribute( 'aria-live', 'polite' );
-				notice.textContent = Nino.admin.elementTypes._notice;
+				notice.textContent = Nino.admin.types._notice;
 				wrap.appendChild( notice );
-				Nino.admin.elementTypes._notice = '';
+				Nino.admin.types._notice = '';
 			}
 
-			if( Nino.admin.elementTypes._types.length === 0 )
+			if( Nino.admin.types._types.length === 0 )
 				wrap.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/types/empty') ) );
 
 			const ul = dc.createElement('ul');
 			ul.className = 'nino-admin-list';
-			Nino.admin.elementTypes._types.forEach( function( type ) {
+			Nino.admin.types._types.forEach( function( type ) {
 				const li 		= dc.createElement('li');
 				const link	= dc.createElement('a');
 				link.href = '#';
@@ -171,18 +173,18 @@
 				copy.appendChild( descr );
 				link.appendChild( copy );
 
-				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.elementTypes._openForm( type.uri ) } );
+				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.types._openForm( type.uri ) } );
 				li.appendChild( link );
 				ul.appendChild( li );
 			} );
-			if( Nino.admin.elementTypes._types.length > 0 )
+			if( Nino.admin.types._types.length > 0 )
 				wrap.appendChild( ul );
 
 			const addBtn = dc.createElement('button');
 			addBtn.type = 'button';
 			addBtn.className = 'nino-admin-btn-primary';
 			addBtn.textContent = Nino.content.getText('/_admin/types/label/new');
-			addBtn.addEventListener( 'click', function() { Nino.admin.elementTypes._openForm( null ) } );
+			addBtn.addEventListener( 'click', function() { Nino.admin.types._openForm( null ) } );
 			wrap.appendChild( Nino.adminUi.listActions( [ addBtn ] ) );
 		},
 
@@ -196,17 +198,17 @@
 		_openForm : function( uri ) {
 
 			if( uri === null ) {
-				Nino.admin.elementTypes._isNew 			= true;
-				Nino.admin.elementTypes._currentUri = null;
-				Nino.admin.elementTypes._fields 		= [];
-				Nino.admin.elementTypes._elementCount = 0;
-				Nino.admin.elementTypes._referencedBy = [];
-				Nino.admin.elementTypes._renderForm( '', false, '00001' );
-				Nino.admin.elementTypes._showForm();
+				Nino.admin.types._isNew 			= true;
+				Nino.admin.types._currentUri = null;
+				Nino.admin.types._fields 		= [];
+				Nino.admin.types._elementCount = 0;
+				Nino.admin.types._referencedBy = [];
+				Nino.admin.types._renderForm( '', false, '00001' );
+				Nino.admin.types._showForm();
 				return;
 			}
 
-			Nino.admin.elementTypes._apiCall( 'get', { uri : uri }, function( status, response ) {
+			Nino.admin.types._apiCall( 'get', { uri : uri }, function( status, response ) {
 
 				// Shown as well as written - the pane this error goes into is
 				// the one the list is covering, so without the _showForm() the
@@ -215,22 +217,22 @@
 				// nothing visible at all. Same rule as the Elements panel next
 				// door, which its own suite enforces
 				if( status !== 200 || response === null ) {
-					Nino.admin.elementTypes._showError( dc.getElementById('types-form'), status, response );
-					Nino.admin.elementTypes._showForm();
+					Nino.admin.types._showError( dc.getElementById('types-form'), status, response );
+					Nino.admin.types._showForm();
 					return;
 				}
 
-				Nino.admin.elementTypes._isNew 			= false;
-				Nino.admin.elementTypes._currentUri = response.uri;
-				Nino.admin.elementTypes._fields 		= Object.keys( response.model ).map( function( key ) {
+				Nino.admin.types._isNew 			= false;
+				Nino.admin.types._currentUri = response.uri;
+				Nino.admin.types._fields 		= Object.keys( response.model ).map( function( key ) {
 					// The name it is saved under: a field renamed here is moved from this
 					// one to the new (see _renames())
 					return Object.assign( { key : key, originalKey : key }, response.model[key] );
 				} );
-				Nino.admin.elementTypes._elementCount = response.elements ?? 0;
-				Nino.admin.elementTypes._referencedBy = response.referencedBy ?? [];
-				Nino.admin.elementTypes._renderForm( response.title, response.autoincrement === true, response.next );
-				Nino.admin.elementTypes._showForm();
+				Nino.admin.types._elementCount = response.elements ?? 0;
+				Nino.admin.types._referencedBy = response.referencedBy ?? [];
+				Nino.admin.types._renderForm( response.title, response.autoincrement === true, response.next );
+				Nino.admin.types._showForm();
 			} );
 		},
 
@@ -257,7 +259,7 @@
 			const keySelect = dc.createElement('select');
 			keySelect.className = 'admin-field-key-select';
 			keySelect.setAttribute( 'aria-label', Nino.content.getText('/_admin/types/label/fieldname') );
-			Nino.admin.elementTypes.KEY_WORDS.forEach( function( word ) {
+			Nino.admin.types.KEY_WORDS.forEach( function( word ) {
 				const opt = dc.createElement('option');
 				opt.value = word;
 				opt.textContent = Nino.content.getText('/_admin/common/word/'+ word) || word;
@@ -267,7 +269,7 @@
 			const ownOpt = dc.createElement('option');
 			ownOpt.value = '';
 			ownOpt.textContent = Nino.content.getText('/_admin/types/label/ownkey');
-			ownOpt.selected = ( Nino.admin.elementTypes.KEY_WORDS.indexOf( field.key ?? '' ) === -1 );
+			ownOpt.selected = ( Nino.admin.types.KEY_WORDS.indexOf( field.key ?? '' ) === -1 );
 			keySelect.appendChild( ownOpt );
 			row.appendChild( keySelect );
 
@@ -277,7 +279,7 @@
 			keyInput.setAttribute( 'aria-label', Nino.content.getText('/_admin/types/label/ownkey') );
 			keyInput.value = field.key ?? '';
 			keyInput.className = 'admin-field-key';
-			keyInput.hidden = ( Nino.admin.elementTypes.KEY_WORDS.indexOf( field.key ?? '' ) !== -1 );
+			keyInput.hidden = ( Nino.admin.types.KEY_WORDS.indexOf( field.key ?? '' ) !== -1 );
 			row.appendChild( keyInput );
 
 			keySelect.addEventListener( 'change', function() {
@@ -318,7 +320,7 @@
 
 			const typeSelect = dc.createElement('select');
 			typeSelect.className = 'admin-field-type';
-			Nino.admin.elementTypes._fieldTypes.forEach( function( t ) {
+			Nino.admin.types._fieldTypes.forEach( function( t ) {
 				const opt = dc.createElement('option');
 				opt.value = t;
 				opt.textContent = t;
@@ -370,7 +372,7 @@
 				// an element reference's select. The editor used to state that
 				// rule itself, one type short, and offered a unit on a reference
 				// that the save then dropped in silence
-				if( Nino.admin.elementTypes._suffixTypes.indexOf( type ) !== -1 ) {
+				if( Nino.admin.types._suffixTypes.indexOf( type ) !== -1 ) {
 					const suffixInput = dc.createElement('input');
 					suffixInput.type = 'text';
 					suffixInput.className = 'admin-field-suffix';
@@ -462,8 +464,8 @@
 					const refSelect = dc.createElement('select');
 					refSelect.className = 'admin-field-element-type';
 
-					const others = Nino.admin.elementTypes._types.filter( function( t ) {
-						return t.uri !== Nino.admin.elementTypes._currentUri;
+					const others = Nino.admin.types._types.filter( function( t ) {
+						return t.uri !== Nino.admin.types._currentUri;
 					} );
 
 					if( others.length === 0 ) {
@@ -571,7 +573,7 @@
 						none.textContent = Nino.content.getText('/_admin/types/option/alt-none');
 						altSelect.appendChild( none );
 
-						Nino.admin.elementTypes._fields.forEach( function( other ) {
+						Nino.admin.types._fields.forEach( function( other ) {
 							if( other.key === '' || other.key === keyInput.value || other.type !== 'string' || other.locale !== true || other.html === true )
 								return;
 							const name = other.originalKey ?? other.key;
@@ -586,7 +588,7 @@
 					fillAlt( field.alt ?? '' );
 					altSelect.addEventListener( 'focus', function() {
 						const current = altSelect.value;
-						Nino.admin.elementTypes._storeFields();
+						Nino.admin.types._storeFields();
 						fillAlt( current );
 					} );
 
@@ -616,7 +618,7 @@
 			up.setAttribute( 'aria-label', Nino.content.getText('/_admin/common/label/moveup') );
 			up.textContent = '↑';
 			up.disabled = index === 0;
-			up.addEventListener( 'click', function() { Nino.admin.elementTypes._move( index, 'up' ) } );
+			up.addEventListener( 'click', function() { Nino.admin.types._move( index, 'up' ) } );
 			move.appendChild( up );
 
 			const down = dc.createElement('button');
@@ -624,8 +626,8 @@
 			down.title = Nino.content.getText('/_admin/common/label/movedown');
 			down.setAttribute( 'aria-label', Nino.content.getText('/_admin/common/label/movedown') );
 			down.textContent = '↓';
-			down.disabled = index === Nino.admin.elementTypes._fields.length - 1;
-			down.addEventListener( 'click', function() { Nino.admin.elementTypes._move( index, 'down' ) } );
+			down.disabled = index === Nino.admin.types._fields.length - 1;
+			down.addEventListener( 'click', function() { Nino.admin.types._move( index, 'down' ) } );
 			move.appendChild( down );
 
 			actions.appendChild( move );
@@ -639,9 +641,9 @@
 				// every row is re-rendered from _fields below, so without this
 				// dropping one row would silently revert every edit typed into
 				// the others since the last render
-				Nino.admin.elementTypes._storeFields();
-				Nino.admin.elementTypes._fields.splice( index, 1 );
-				Nino.admin.elementTypes._renderFields();
+				Nino.admin.types._storeFields();
+				Nino.admin.types._fields.splice( index, 1 );
+				Nino.admin.types._renderFields();
 			} );
 			actions.appendChild( removeBtn );
 
@@ -671,9 +673,9 @@
 			// Rows are re-rendered from _fields, so whatever is currently typed
 			// into them has to be read back first - otherwise moving a row
 			// would revert every edit made since the last render
-			Nino.admin.elementTypes._storeFields();
+			Nino.admin.types._storeFields();
 
-			const fields 		= Nino.admin.elementTypes._fields;
+			const fields 		= Nino.admin.types._fields;
 			const swapWith 	= direction === 'up' ? index - 1 : index + 1;
 
 			if( swapWith < 0 || swapWith >= fields.length )
@@ -681,7 +683,7 @@
 
 			[ fields[index], fields[swapWith] ] = [ fields[swapWith], fields[index] ];
 
-			Nino.admin.elementTypes._renderFields();
+			Nino.admin.types._renderFields();
 		},
 
 		/**
@@ -692,8 +694,8 @@
 		_renderFields : function() {
 			const wrap = dc.getElementById('admin-fields-wrap');
 			wrap.innerHTML = '';
-			Nino.admin.elementTypes._fields.forEach( function( field, index ) {
-				wrap.appendChild( Nino.admin.elementTypes._renderFieldRow( field, index ) );
+			Nino.admin.types._fields.forEach( function( field, index ) {
+				wrap.appendChild( Nino.admin.types._renderFieldRow( field, index ) );
 			} );
 		},
 
@@ -737,7 +739,7 @@
 					options 	: options ? options.value.split(',').map( function(s) { return s.trim() } ).filter( function(s) { return s !== '' } ) : [],
 				} );
 			} );
-			Nino.admin.elementTypes._fields = fields;
+			Nino.admin.types._fields = fields;
 		},
 
 		/**
@@ -759,12 +761,12 @@
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/common/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.elementTypes._showList() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.types._showList() } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const form = dc.createElement('form');
 
-			if( Nino.admin.elementTypes._isNew === true ) {
+			if( Nino.admin.types._isNew === true ) {
 				const uriLabel = dc.createElement('label');
 				uriLabel.className = 'nino-admin-field';
 				const uriSpan = dc.createElement('span');
@@ -805,7 +807,7 @@
 				key 			: 'autoincrement',
 				checked 	: autoincrement === true,
 				label 		: Nino.content.getText('/_admin/types/label/numbering'),
-				hint 			: Nino.content.getText('/_admin/types/hint/numbering').replace( '%s', '/'+ ( Nino.admin.elementTypes._currentUri ?? '<type>' )+ '/'+ ( next || '00001' ) ),
+				hint 			: Nino.content.getText('/_admin/types/hint/numbering').replace( '%s', '/'+ ( Nino.admin.types._currentUri ?? '<type>' )+ '/'+ ( next || '00001' ) ),
 			} );
 			autoSwitch.id = 'admin-form-autoincrement';
 			autoWrap.appendChild( autoSwitch );
@@ -813,7 +815,7 @@
 			// Only the elements added from here on are numbered. Saying so beats
 			// letting someone discover it, and it is the reason turning this on is
 			// not a destructive change.
-			if( autoincrement !== true && Nino.admin.elementTypes._isNew === false ) {
+			if( autoincrement !== true && Nino.admin.types._isNew === false ) {
 				const autoNote = dc.createElement('p');
 				autoNote.className = 'nino-admin-hint';
 				autoNote.textContent = Nino.content.getText('/_admin/types/hint/numbering-existing');
@@ -830,17 +832,17 @@
 			addFieldBtn.type = 'button';
 			addFieldBtn.textContent = Nino.content.getText('/_admin/types/label/addfield');
 			addFieldBtn.addEventListener( 'click', function() {
-				Nino.admin.elementTypes._storeFields();
-				Nino.admin.elementTypes._fields.push( { key : '', type : 'string' } );
-				Nino.admin.elementTypes._renderFields();
+				Nino.admin.types._storeFields();
+				Nino.admin.types._fields.push( { key : '', type : 'string' } );
+				Nino.admin.types._renderFields();
 			} );
 			form.appendChild( addFieldBtn );
 
 			// Last things in the form body, below the fields and above the
 			// pinned actions row: nothing here is reached on the way to Save
-			if( Nino.admin.elementTypes._isNew === false ) {
-				form.appendChild( Nino.admin.elementTypes._renderDuplicate() );
-				form.appendChild( Nino.admin.elementTypes._renderDangerZone() );
+			if( Nino.admin.types._isNew === false ) {
+				form.appendChild( Nino.admin.types._renderDuplicate() );
+				form.appendChild( Nino.admin.types._renderDangerZone() );
 			}
 
 			// Save + its message in the shared actions row every module's form
@@ -860,10 +862,10 @@
 
 			form.appendChild( actions );
 
-			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.elementTypes._save() } );
+			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.types._save() } );
 
 			wrap.appendChild( form );
-			Nino.admin.elementTypes._renderFields();
+			Nino.admin.types._renderFields();
 
 			// What the form holds now is what is saved
 			if( typeof Nino.admin.dirty === 'object' )
@@ -919,7 +921,7 @@
 			button.type = 'button';
 			button.className = 'nino-admin-btn-secondary';
 			button.textContent = Nino.content.getText('/_admin/types/label/duplicate');
-			button.addEventListener( 'click', function() { Nino.admin.elementTypes._duplicate() } );
+			button.addEventListener( 'click', function() { Nino.admin.types._duplicate() } );
 			row.appendChild( button );
 
 			wrap.appendChild( row );
@@ -943,7 +945,7 @@
 		 */
 		_duplicate : function( guarded ) {
 
-			const uri 		= Nino.admin.elementTypes._currentUri;
+			const uri 		= Nino.admin.types._currentUri;
 			const newUri 	= dc.getElementById('admin-form-duplicate-uri').value.trim();
 			let title 			= dc.getElementById('admin-form-duplicate-title').value.trim();
 			const msg 		= dc.getElementById('admin-form-duplicate-msg');
@@ -954,18 +956,18 @@
 			if( guarded !== true ) {
 
 				if( typeof Nino.admin.dirty !== 'object' ) {
-					Nino.admin.elementTypes._duplicate( true );
+					Nino.admin.types._duplicate( true );
 					return;
 				}
 
-				Nino.admin.dirty.guard( [ 'types', 'elements' ], function() { Nino.admin.elementTypes._duplicate( true ) } );
+				Nino.admin.dirty.guard( [ 'types', 'elements' ], function() { Nino.admin.types._duplicate( true ) } );
 				return;
 			}
 
 			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
 
-			const model 					= Nino.admin.elementTypes._buildModel();
-			const renames 				= Nino.admin.elementTypes._renames();
+			const model 					= Nino.admin.types._buildModel();
+			const renames 				= Nino.admin.types._renames();
 			const autoincrement 	= dc.querySelector('#admin-form-autoincrement input').checked;
 
 			// The copy has no saved names: an alt link is made to the name its
@@ -978,18 +980,18 @@
 			if( title === '' )
 				title = dc.getElementById('admin-form-title').value.trim();
 
-			Nino.admin.elementTypes._apiCall( 'create', { uri : newUri, title : title, model : model, autoincrement : autoincrement }, function( status, response ) {
+			Nino.admin.types._apiCall( 'create', { uri : newUri, title : title, model : model, autoincrement : autoincrement }, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
 					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
 					return;
 				}
 
-				Nino.admin.elementTypes._openUri 		= response.uri;
-				Nino.admin.elementTypes._currentUri = null;
-				Nino.admin.elementTypes._fields 		= [];
-				Nino.admin.elementTypes.init();
-				Nino.admin.elementTypes._invalidateElements();
+				Nino.admin.types._openUri 		= response.uri;
+				Nino.admin.types._currentUri = null;
+				Nino.admin.types._fields 		= [];
+				Nino.admin.types.init();
+				Nino.admin.types._invalidateElements();
 			} );
 		},
 
@@ -1018,7 +1020,7 @@
 		 */
 		_renderDangerZone : function() {
 
-			const uri 	= Nino.admin.elementTypes._currentUri;
+			const uri 	= Nino.admin.types._currentUri;
 			const wrap 	= dc.createElement('fieldset');
 			wrap.className = 'nino-admin-card admin-type-danger';
 
@@ -1030,17 +1032,17 @@
 			hint.className = 'nino-admin-hint';
 			hint.textContent = Nino.content.getText('/_admin/types/hint/delete')
 				.replace( '%s', '/'+ uri )
-				.replace( '%d', String( Nino.admin.elementTypes._elementCount ) );
+				.replace( '%d', String( Nino.admin.types._elementCount ) );
 			wrap.appendChild( hint );
 
 			// Refused rather than warned about: deleting it would leave those
 			// fields pointing at a type that no longer exists, and no later
 			// save of theirs could tell the difference
-			if( Nino.admin.elementTypes._referencedBy.length > 0 ) {
+			if( Nino.admin.types._referencedBy.length > 0 ) {
 				const blocked = dc.createElement('p');
 				blocked.className = 'nino-admin-error';
 				blocked.textContent = Nino.content.getText('/_admin/types/hint/delete-referenced')
-					.replace( '%s', Nino.admin.elementTypes._referencedBy.join(', ') );
+					.replace( '%s', Nino.admin.types._referencedBy.join(', ') );
 				wrap.appendChild( blocked );
 				return wrap;
 			}
@@ -1068,7 +1070,7 @@
 				delBtn.disabled = ( confirmInput.value.trim() !== uri );
 			} );
 
-			delBtn.addEventListener( 'click', function() { Nino.admin.elementTypes._delete() } );
+			delBtn.addEventListener( 'click', function() { Nino.admin.types._delete() } );
 
 			wrap.appendChild( row );
 
@@ -1091,7 +1093,7 @@
 		 */
 		_delete : function( guarded ) {
 
-			const uri 	= Nino.admin.elementTypes._currentUri;
+			const uri 	= Nino.admin.types._currentUri;
 			const input = dc.getElementById('admin-form-delete-confirm');
 			const msg 	= dc.getElementById('admin-form-delete-msg');
 
@@ -1099,25 +1101,25 @@
 				return;
 
 			if( guarded !== true ) {
-				Nino.admin.elementTypes._guardElements( function() { Nino.admin.elementTypes._delete( true ) } );
+				Nino.admin.types._guardElements( function() { Nino.admin.types._delete( true ) } );
 				return;
 			}
 
 			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
 
-			Nino.admin.elementTypes._apiCall( 'delete', { uri : uri, confirm : input.value.trim() }, function( status, response ) {
+			Nino.admin.types._apiCall( 'delete', { uri : uri, confirm : input.value.trim() }, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
 					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
 					return;
 				}
 
-				Nino.admin.elementTypes._isNew 			= false;
-				Nino.admin.elementTypes._currentUri = null;
-				Nino.admin.elementTypes._fields 		= [];
-				Nino.admin.elementTypes._showList();
-				Nino.admin.elementTypes.init();
-				Nino.admin.elementTypes._invalidateElements();
+				Nino.admin.types._isNew 			= false;
+				Nino.admin.types._currentUri = null;
+				Nino.admin.types._fields 		= [];
+				Nino.admin.types._showList();
+				Nino.admin.types.init();
+				Nino.admin.types._invalidateElements();
 			} );
 		},
 
@@ -1133,11 +1135,11 @@
 		 */
 		_renames : function() {
 
-			Nino.admin.elementTypes._storeFields();
+			Nino.admin.types._storeFields();
 
 			const renames = {};
 
-			Nino.admin.elementTypes._fields.forEach( function( field ) {
+			Nino.admin.types._fields.forEach( function( field ) {
 
 				const key = field.key.trim();
 
@@ -1177,10 +1179,10 @@
 		 */
 		_buildModel : function() {
 
-			Nino.admin.elementTypes._storeFields();
+			Nino.admin.types._storeFields();
 
 			const model = {};
-			Nino.admin.elementTypes._fields.forEach( function( field ) {
+			Nino.admin.types._fields.forEach( function( field ) {
 				if( field.key === '' )
 					return;
 				// Every key _storeFields() reads back off a row belongs here.
@@ -1270,15 +1272,15 @@
 			};
 
 			if( guarded !== true ) {
-				Nino.admin.elementTypes._guardElements( function() { Nino.admin.elementTypes._save( done, true ) }, function() { report( false ) } );
+				Nino.admin.types._guardElements( function() { Nino.admin.types._save( done, true ) }, function() { report( false ) } );
 				return;
 			}
 
 			const msg 	= dc.getElementById('admin-form-msg');
 			const title = dc.getElementById('admin-form-title').value;
-			const model = Nino.admin.elementTypes._buildModel();
+			const model = Nino.admin.types._buildModel();
 			const autoincrement = dc.querySelector('#admin-form-autoincrement input').checked;
-			const renames = Nino.admin.elementTypes._isNew === true ? {} : Nino.admin.elementTypes._renames();
+			const renames = Nino.admin.types._isNew === true ? {} : Nino.admin.types._renames();
 
 			// A rename moves stored values and leaves the rest where it is: said
 			// before it is made, with what it does not reach
@@ -1294,36 +1296,36 @@
 
 			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
 
-			if( Nino.admin.elementTypes._isNew === true ) {
+			if( Nino.admin.types._isNew === true ) {
 				const uri = dc.getElementById('admin-form-uri').value;
-				Nino.admin.elementTypes._apiCall( 'create', { uri : uri, title : title, model : model, autoincrement : autoincrement }, function( status, response ) {
+				Nino.admin.types._apiCall( 'create', { uri : uri, title : title, model : model, autoincrement : autoincrement }, function( status, response ) {
 					if( status !== 200 || response === null ) {
 						msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
 						report( false );
 						return;
 					}
-					Nino.admin.elementTypes._isNew 			= false;
-					Nino.admin.elementTypes._currentUri = response.uri;
+					Nino.admin.types._isNew 			= false;
+					Nino.admin.types._currentUri = response.uri;
 					msg.textContent = Nino.content.getText('/_admin/common/msg/saved');
-					Nino.admin.elementTypes._saved();
-					Nino.admin.elementTypes.init();
-					Nino.admin.elementTypes._invalidateElements();
+					Nino.admin.types._saved();
+					Nino.admin.types.init();
+					Nino.admin.types._invalidateElements();
 					report( true );
 				} );
 				return;
 			}
 
-			Nino.admin.elementTypes._apiCall( 'save', { uri : Nino.admin.elementTypes._currentUri, title : title, model : model, autoincrement : autoincrement, renames : renames }, function( status, response ) {
+			Nino.admin.types._apiCall( 'save', { uri : Nino.admin.types._currentUri, title : title, model : model, autoincrement : autoincrement, renames : renames }, function( status, response ) {
 				if( status !== 200 || response === null ) {
 					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
 					report( false );
 					return;
 				}
 				msg.textContent = Nino.content.getText('/_admin/common/msg/saved');
-				Nino.admin.elementTypes._notice = Nino.admin.elementTypes._referenceNotice( response.references );
-				Nino.admin.elementTypes._saved();
-				Nino.admin.elementTypes.init();
-				Nino.admin.elementTypes._invalidateElements();
+				Nino.admin.types._notice = Nino.admin.types._referenceNotice( response.references );
+				Nino.admin.types._saved();
+				Nino.admin.types.init();
+				Nino.admin.types._invalidateElements();
 				report( true );
 			} );
 		},
@@ -1339,15 +1341,11 @@
 		},
 	};
 
-	// The shell looks a panel's script up by its nav uri (see Admin::panels()),
-	// and this panel's uri is 'types' - one name, two spellings
-	Nino.admin.types = Nino.admin.elementTypes;
-
-	Nino.events.bindCallback( 'ready', Nino.admin.elementTypes.init );
+	Nino.events.bindCallback( 'ready', Nino.admin.types.init );
 
 	// The shell asks before anything throws the open type's input away (see
 	// Nino.admin.dirty)
 	if( typeof Nino.admin.dirty === 'object' )
-		Nino.admin.dirty.watchForm( 'types', function() { return dc.getElementById('types-form') }, function( done ) { Nino.admin.elementTypes._save( done ) } );
+		Nino.admin.dirty.watchForm( 'types', function() { return dc.getElementById('types-form') }, function( done ) { Nino.admin.types._save( done ) } );
 
 })(window, document, document.documentElement, document.body);

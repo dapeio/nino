@@ -77,7 +77,6 @@
 		_formInitial		: '',
 		_htmlEditors		: {},
 		_fieldEls				: {},
-		_isNew					: false,
 		_fieldSeq				: 0,
 		_saving					: false,
 		_ready					: false,
@@ -547,7 +546,6 @@
 
 			Nino.admin.keys._destroyHtmlEditors();
 
-			Nino.admin.keys._isNew 					= false;
 			Nino.admin.keys._currentGroup 	= group;
 			Nino.admin.keys._focusKey 			= key ?? null;
 			Nino.admin.keys._selectedLocale = Nino.admin.keys._locale();
@@ -1408,7 +1406,6 @@
 		_openNewKeyForm : function( fromKey ) {
 
 			const open = function() {
-				Nino.admin.keys._isNew = typeof fromKey !== 'string';
 				Nino.admin.keys._renameFrom = typeof fromKey === 'string' ? fromKey : null;
 				Nino.admin.keys._view = 'new';
 				Nino.admin.keys._renderNewKeyForm();

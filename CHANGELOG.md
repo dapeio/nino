@@ -13,6 +13,15 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Workbench:** the Types tab's script is `Nino.admin.types` only - the
+  name the shell looks it up by; `Nino.admin.elementTypes`, under which it was
+  declared and then aliased, is gone, so a project script that reached into it
+  uses `Nino.admin.types`. The Text Keys script drops an `_isNew` flag nothing
+  read, and the Elements form reads a boolean from its radio pair alone.
+  `tests/admin-elementtypes-js-smoke.js` holds the one name (85 → 86
+  checks, 4 red before: the new check and three source checks that spelled the
+  old name).
+
 - **Workbench:** `script.js` and `login.js` no longer register the empty
   `Nino.admin.onResize`/`onScroll` hooks, so a resize or scroll of the
   workbench and the login page no longer calls two functions that do nothing.

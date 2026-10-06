@@ -54,7 +54,12 @@ vm.runInContext(
 	{ filename : 'elementtypes.js' }
 );
 
-const elementTypes = sandbox.Nino.admin.elementTypes;
+const elementTypes = sandbox.Nino.admin.types;
+
+// The shell finds a panel's script by its nav uri alone (Nino.admin[uri]);
+// a second name is one more spelling to keep in step
+check( 'the Types tab\'s script is Nino.admin.types and has no second name',
+	typeof elementTypes === 'object' && typeof elementTypes.init === 'function' && sandbox.Nino.admin.elementTypes === undefined );
 
 // One rendered row, as _storeFields() reads it: every control it looks for,
 // returning null for the ones a row of that type never renders (an image row
@@ -341,10 +346,10 @@ check( '...and a field added in the form has none', elementTypes._fields.find( f
 	check( 'a form with no saved type open duplicates nothing', sent.length === 0 );
 	elementTypes.init = init;
 
-	check( 'the form offers it for a saved type only, above the danger zone', /_isNew === false \) \{\s*form\.appendChild\( Nino\.admin\.elementTypes\._renderDuplicate\(\) \);\s*form\.appendChild\( Nino\.admin\.elementTypes\._renderDangerZone\(\) \);/.test( duplicateSource ) );
+	check( 'the form offers it for a saved type only, above the danger zone', /_isNew === false \) \{\s*form\.appendChild\( Nino\.admin\.types\._renderDuplicate\(\) \);\s*form\.appendChild\( Nino\.admin\.types\._renderDangerZone\(\) \);/.test( duplicateSource ) );
 	check( 'what is typed into it is no edit of the type', duplicateSource.includes( "uriInput.dataset.dirty = 'ignore'" ) && duplicateSource.includes( "titleInput.dataset.dirty = 'ignore'" ) );
-	const open = duplicateSource.slice( duplicateSource.indexOf( 'const open = Nino.admin.elementTypes._openUri' ) );
-	check( 'the copy is opened by the list that loads after it', open.startsWith( 'const open = Nino.admin.elementTypes._openUri;' ) && /_openForm\( open \)/.test( open.slice( 0, 300 ) ) );
+	const open = duplicateSource.slice( duplicateSource.indexOf( 'const open = Nino.admin.types._openUri' ) );
+	check( 'the copy is opened by the list that loads after it', open.startsWith( 'const open = Nino.admin.types._openUri;' ) && /_openForm\( open \)/.test( open.slice( 0, 300 ) ) );
 }
 
 delete sandbox.Nino.content;
@@ -457,7 +462,7 @@ check( 'the cost is named before the click, not after',
 	&& /hint\/delete\]\]'\s*=> '[^']*no undo/.test( enFills ) );
 // Only on a saved type: a form that has never been saved has no file to remove
 check( 'the danger zone is not rendered while creating a new type',
-	/_isNew === false \) \{[\s\S]*?form\.appendChild\( Nino\.admin\.elementTypes\._renderDangerZone\(\) \);\s*\}/.test( typesSource ) );
+	/_isNew === false \) \{[\s\S]*?form\.appendChild\( Nino\.admin\.types\._renderDangerZone\(\) \);\s*\}/.test( typesSource ) );
 
 
 // --- the unit input is offered for the types the server names --------------
