@@ -172,7 +172,7 @@ Für nginx ist das ein `server`-Block. Auszufüllen ist nur der PHP-FPM-Socket �
 index index.php;
 
 # Gesperrt, bevor geroutet wird: ^~ schaltet die Regex-Locations darunter ab,
-# also wird unter diesen vier Bäumen nie etwas an PHP übergeben.
+# also wird unter diesen Bäumen nie etwas an PHP übergeben.
 location ^~ /private/                { deny all; return 404; }
 location ^~ /app/                    { deny all; return 404; }
 location ^~ /features/               { deny all; return 404; }
@@ -268,7 +268,7 @@ Prüfe in `config.php` beziehungsweise über das Config-Panel der Workbench mind
 
 Fehlermeldungen sollten im Browser keine Dateipfade, Konfigurationswerte oder Stacktraces offenlegen. Prüfe nach dem Umschalten, dass Fehler weiterhin in einem geschützten Log ankommen und für den Betreiber erreichbar bleiben.
 
-Dieses Log ist `private/data/logs.<YYYY-MM>.php`, eine Datei pro Monat, Einträge älter als drei Monate fallen heraus. Das Logs-Panel der Workbench liest es – und wenn die Workbench selbst das Kaputte ist, tut es jeder Dateimanager. Dort steht der Grund für einen nackten `500`, und auf einem Produktivsystem ist das der einzige Ort: `/nino/error/display` ist aus, der Browser bekommt also nichts als den Status.
+Dieses Log ist `private/data/logs.<YYYY-MM>.php`, eine Datei pro Monat, Einträge älter als drei Monate fallen heraus. Lies es mit einem Dateimanager oder einer Shell – das Panel **Log** der Workbench zeigt das Aktivitätsprotokoll, nicht dieses. Dort steht der Grund für einen nackten `500`, und auf einem Produktivsystem ist das der einzige Ort: `/nino/error/display` ist aus, der Browser bekommt also nichts als den Status.
 
 **Die Adresse, unter der Mails hinausgehen,** ist der Textfill `/project/mail/address/owner`, den das Basis-Unit als `[[/project/company/contact/email]]` mitbringt – standardmäßig trägt also jede Mail dieser Seite das Postfach, das das Projekt ohnehin genannt hat, im `From`-Header und als Envelope-Sender. Ändern Sie ihn im Panel Texte, wenn Antworten woanders ankommen sollen; die Firmenadresse bleibt, was sie ist.
 
@@ -360,7 +360,7 @@ Behandle ein Nino-Update wie eine Änderung am konkreten Webseitenprojekt, nicht
 
 1. Sichere den aktuellen produktiven Stand außerhalb des Webroots.
 2. Übernimm die Änderung zunächst in eine Entwicklungs- oder Staging-Umgebung.
-3. Lege projekteigene PHP-Klassen in `app/` (oder `NINO_APP_DIR`) ab und vergleiche nur bewusste Kernel-Anpassungen mit dem neuen Stand. `_nino/` kann dann vollständig ersetzt werden – Ninos optionale Module unter `_nino/Nino/Modules/` eingeschlossen, denn ein Projekt schaltet sie in `/nino/modules` ein oder aus, statt sie zu bearbeiten –, und `_admin/` ebenso: Die Workbench trägt keinen Projektzustand – die Konten liegen in der `config.php`, das Recovery-Geheimnis in `private/.auth/pw.php`. Ein Feature wird für sich aktualisiert: Drücke **Update** auf dem Tab Verfügbar des Panels Features der Workbench, oder ersetze sein Verzeichnis unter `features/` von Hand durch die neue Fassung und drücke **Update** auf dem Tab Aktiv oder Inaktiv, wo es gerade steht. Die Install-Einheit des Features ergänzt, was neu ist, und überschreibt nichts, was das Projekt hat, und das Feature migriert seine eigenen Daten, bevor die neue Version aufgezeichnet wird; siehe [Features](features.de.md#aktualisieren).
+3. Lege projekteigene PHP-Klassen in `app/` (oder `NINO_APP_DIR`) ab und vergleiche nur bewusste Kernel-Anpassungen mit dem neuen Stand. `_nino/` kann dann vollständig ersetzt werden – Ninos optionale Module unter `_nino/Nino/Modules/` eingeschlossen, denn ein Projekt schaltet sie in `/nino/modules` ein oder aus, statt sie zu bearbeiten –, und `_admin/` ebenso: Die Workbench trägt keinen Projektzustand – die Konten liegen in der `config.php`, das Recovery-Geheimnis in `private/.auth/pw.php`. Ein Feature wird für sich aktualisiert: Drücke **Update** auf dem Tab Verfügbar des Panels Features der Workbench, oder ersetze sein Verzeichnis unter `features/` von Hand durch die neue Fassung und drücke **Update** auf dem eigenen Bildschirm des Features im Tab Aktiv – ein abgeschaltetes Feature übernimmt das Update, wenn es aktiviert wird. Die Install-Einheit des Features ergänzt, was neu ist, und überschreibt nichts, was das Projekt hat, und das Feature migriert seine eigenen Daten, bevor die neue Version aufgezeichnet wird; siehe [Features](features.de.md#aktualisieren).
 4. Führe Smoke-Tests und projektspezifische Abnahme aus.
 5. Übertrage den geprüften Stand und behalte die vorherige Version für ein Rollback.
 

@@ -13,6 +13,18 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the manuals describe the screens that ship. Search is rebuilt
+  from its panel, one type or all of them; the "Create searchindex" button is
+  gone, a query word that finds nothing lowers a hit's coverage instead of
+  ruling it out, and `init()` registers more than the commit callback. An
+  active feature's screen has two tabs, Description and Settings. The panel
+  installs from the catalogue and reloads the workbench itself, and an Update
+  of a hand-replaced feature is pressed on its own screen. A checkout ships no
+  features. The PHP error log is read with a file manager, not with the Log
+  panel. The wizard's Languages step offers modules only where a project
+  added its own. The nginx comment above the five deny rules says "these
+  trees" instead of "four".
+
 - **Docs:** the eight screenshots in `docs/assets/screenshots/` that no README
   or manual embeds (`admin`, `admin-elements`, `admin-text`, `editor`,
   `editor-elements`, `editor-text`, `install`, `templates`, about 260 KB) are

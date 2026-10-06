@@ -58,7 +58,7 @@ The workbench provides full access for development, diagnostics and corrections,
        width="49%">
 </a>
 
-Every fresh checkout is configured through the wizard, which is what `/_admin` shows until it is done. It checks the environment, guides you through languages and modules, copies the theme the base unit delivers along with the required assets, creates initial pages and basic information, creates the first developer accounts and sets the recovery password. Afterwards it locks itself out, and `_admin/install/` can be removed from a production delivery.
+Every fresh checkout is configured through the wizard, which is what `/_admin` shows until it is done. It checks the environment, guides you through the languages (and the modules a project added itself, if any), copies the theme the base unit delivers along with the required assets, creates initial pages and basic information, creates the first developer accounts and sets the recovery password. Afterwards it locks itself out, and `_admin/install/` can be removed from a production delivery.
 
 #### The Template Builder — a feature, Alpha
 

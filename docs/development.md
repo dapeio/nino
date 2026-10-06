@@ -657,8 +657,8 @@ catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features),
 copied into `features/Search/` and switched on in the workbench's Features
 panel. It keeps a small locale-aware fuzzy index over configured fields of
 flat Element types - defined under `/nino/elements/index` in `config.php`,
-stored as one derived file per type under `data/`, rebuilt by the **Create
-searchindex** action of its Search panel and after every committed Element
+stored as one derived file per type under `data/`, rebuilt from its Search
+panel and after every committed Element
 write - and answers `\Nino\Modules\Search::getElements( $appData, $type,
 $query )` with the matching Elements of the current locale in score order.
 The index configuration, the ranking rules, the lifecycle of the derived
@@ -965,7 +965,7 @@ Nino uses standalone smoke tests without PHPUnit. Each test creates an isolated 
 | Test | Focus |
 | --- | --- |
 | `tests/kernel-smoke.php` | Kernel, routing, rendering, auth, filesystem, and modules |
-| `tests/features-smoke.php` | the feature contract against `tests/fixtures/features/`: discovery, manifest validation, version constraints, every settings type, activation with the unit applied add-only, updates through the upgrade hook, deactivation, and the delivered manifests |
+| `tests/features-smoke.php` | the feature contract against `tests/fixtures/features/`: discovery, manifest validation, version constraints, every settings type, activation with the unit applied add-only, updates through the upgrade hook, deactivation, and that whatever feature the checkout itself carries validates (it ships none) |
 | `tests/catalogue-smoke.php` | the catalogue: the https client behind a stub, the detached signature, what a catalogue document must say, what it offers this kernel, an installation and an update from archive bytes built in the test, and every refusal on the way - a hostile archive among them |
 | `features/<Name>/tests/<key>-smoke.php` | a feature's own test, travelling with it - the catalogue's `features/Search/tests/search-smoke.php`, for one, covers activation, index lifecycle, fuzzy ranking, locales, and the Admin rebuild action. Empty in a checkout, which ships no feature |
 | `tests/admin-smoke.php` | the workbench shell and its content panels: the text blacklist and html sanitizer, element and image operations |

@@ -9,7 +9,7 @@ Dieses Handbuch führt auf dem kürzesten Weg von einem frischen Checkout zu ein
 **Weitere Links:**
 [README](../README.de.md) · [Grundkonzepte](concepts.de.md) · [Entwickler-Handbuch](development.de.md) · [Rezepte](recipes/README.md) · [Erste Schritte](getting-started.de.md) · [Einrichtungsassistent](setup.de.md) · [`/_admin`-Workbench](_admin.de.md) · [Features](features.de.md) · [Deployment](deployment.de.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
-**Wichtig:** Ein frischer Checkout enthält Kernel, Workbench, Module, Features und die Installations-Library, aber noch keinen vollständigen Projektstand. Der Einrichtungsassistent – das, was `/_admin` zeigt, bis er abgeschlossen ist – erzeugt und befüllt die benötigten Projektverzeichnisse; erst danach läuft die Webseite.
+**Wichtig:** Ein frischer Checkout enthält Kernel, Workbench, Module und die Installations-Library, aber noch keinen vollständigen Projektstand. Der Einrichtungsassistent – das, was `/_admin` zeigt, bis er abgeschlossen ist – erzeugt und befüllt die benötigten Projektverzeichnisse; erst danach läuft die Webseite.
 
 ## Voraussetzungen
 
@@ -36,7 +36,7 @@ Solange der Assistent nicht abgeschlossen ist, kannst du zu früheren Schritten 
 | Schritt | Entscheidung |
 |---|---|
 | [1. Umgebung](setup.de.md#1-umgebung) | Sind PHP, Erweiterungen und Schreibrechte einsatzbereit? |
-| [2. Sprachen](setup.de.md#2-sprachen) | Welche Sprachen und funktionalen Module benötigt das Projekt? |
+| [2. Sprachen](setup.de.md#2-sprachen) | Welche Sprachen benötigt das Projekt – und welche Module, wo das Projekt eigene hinzugefügt hat? |
 | [3. Routes](setup.de.md#3-routes) | Welche ersten Seiten, öffentlichen Pfade und Metadaten werden angelegt? |
 | [4. Persönliche Angaben](setup.de.md#4-persönliche-angaben) | Welche zentralen Unternehmens- und Webseitenwerte stehen als Textfills bereit? |
 | [5. Accounts](setup.de.md#5-accounts) | Welche Entwicklerkonten melden sich mit Vollzugriff an der Workbench an? |
@@ -58,7 +58,7 @@ Die Konten aus Schritt 5 sind Entwickler mit vollen Rechten. Redaktionskonten mi
 
 Prüfe außerdem jede Sprache und Route, die Navigation sowie verwendete Formulare. Speichere testweise einen Text und ein Bild. Öffne dort, wo der Template-Baukasten installiert ist, im Templates-Panel ein `page-*.tpl`, ändere zunächst nichts und prüfe, ob seine obersten Sections ohne Warnung erkannt werden.
 
-Newsletter und Suche sind Features, keine Module des Assistenten, und ein Checkout bringt keines mit: Kopiere das Verzeichnis eines Features aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features) nach `features/`, wenn das Projekt es braucht, schalte es im Panel **Features** der Workbench (Gruppe System) ein und lade die Workbench danach neu, damit sein Panel erscheint. Siehe [Features](features.de.md).
+Newsletter und Suche sind Features, keine Module des Assistenten, und ein Checkout bringt keines mit: Wenn das Projekt eines braucht, installiere es im Panel **Features** der Workbench (Gruppe System) aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); das Panel schaltet es ein und lädt die Workbench neu, damit sein Panel erscheint. Ein von Hand nach `features/` kopiertes Verzeichnis schaltest du dort ebenso ein. Siehe [Features](features.de.md).
 
 Der letzte Schritt setzt das Recovery-Passwort und sperrt den Assistenten. Entferne anschließend `_admin/install/` aus der produktiven Auslieferung; alles, was er kopiert hat, bleibt dort liegen, wo er es geschrieben hat. Die korrekte Reihenfolge und weitere Sicherheitsprüfungen stehen im [Deployment-Handbuch](deployment.de.md#der-assistent-nach-der-einrichtung).
 

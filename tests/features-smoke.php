@@ -7,9 +7,11 @@ declare(strict_types=1);
  *											NINO_FEATURES_DIR, manifest validation, version
  *											constraints, settings with every type, activation with
  *											the install unit applied without overwriting, updates
- *											through the upgrade hook, deactivation, and the two
- *											delivered manifests. Runs against tests/fixtures/features,
- *											never against the checkout's own features/.
+ *											through the upgrade hook, deactivation, and that whatever
+ *											feature directory the checkout carries validates (it ships
+ *											none). Runs against tests/fixtures/features; of the
+ *											checkout's own features/ it only checks the deny rule
+ *											and that any directory there validates.
  *
  *	Usage: php tests/features-smoke.php
  */

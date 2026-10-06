@@ -643,8 +643,8 @@ nach `features/Search/` kopiert und im Panel Features der Workbench
 eingeschaltet. Es führt einen kleinen sprachabhängigen Fuzzy-Index über
 konfigurierte Felder flacher Elementtypen – definiert unter
 `/nino/elements/index` in der `config.php`, abgelegt als je eine abgeleitete
-Datei pro Typ unter `data/`, neu aufgebaut durch **Suchindex erstellen** in
-seinem Panel Suche und nach jedem bestätigten Schreiben eines Elements – und
+Datei pro Typ unter `data/`, neu aufgebaut aus seinem Panel Suche heraus
+und nach jedem bestätigten Schreiben eines Elements – und
 beantwortet `\Nino\Modules\Search::getElements( $appData, $type, $query )` mit
 den passenden Elements der aktuellen Sprache in Trefferreihenfolge. Die
 Indexkonfiguration, die Regeln der Rangfolge, der Lebenszyklus der
@@ -947,7 +947,7 @@ Nino verwendet eigenständige Smoke-Tests ohne PHPUnit. Jeder Test erstellt ein 
 | Test | Schwerpunkt |
 | --- | --- |
 | `tests/kernel-smoke.php` | Kernel, Routing, Rendering, Auth, Filesystem und Module |
-| `tests/features-smoke.php` | der Feature-Vertrag gegen `tests/fixtures/features/`: Erkennung, Manifestprüfung, Versions-Constraints, jeder Settings-Typ, Aktivierung mit nur ergänzend angewendeter Einheit, Updates über den Upgrade-Haken, Deaktivierung und die ausgelieferten Manifeste |
+| `tests/features-smoke.php` | der Feature-Vertrag gegen `tests/fixtures/features/`: Erkennung, Manifestprüfung, Versions-Constraints, jeder Settings-Typ, Aktivierung mit nur ergänzend angewendeter Einheit, Updates über den Upgrade-Haken, Deaktivierung und dass jedes Feature, das der Checkout selbst mitbringt, gültig ist (er bringt keines mit) |
 | `tests/catalogue-smoke.php` | der Katalog: der https-Client hinter einem Stub, die abgetrennte Signatur, was ein Katalogdokument sagen muss, was er diesem Kernel anbietet, eine Installation und ein Update aus im Test gebauten Archivbytes und jede Abweisung auf dem Weg – ein feindliches Archiv darunter |
 | `features/<Name>/tests/<key>-smoke.php` | der eigene Test eines Features, der mit ihm reist – `features/Search/tests/search-smoke.php` des Katalogs etwa prüft Aktivierung, Index-Lebenszyklus, Fuzzy-Rangfolge, Sprachen und den Admin-Neuaufbau. In einem Checkout leer, denn der bringt kein Feature mit |
 | `tests/admin-smoke.php` | die Shell des Workbench und seine Inhalts-Panels: Text-Blacklist und HTML-Sanitizer, Element- und Bildoperationen |

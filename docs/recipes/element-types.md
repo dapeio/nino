@@ -324,14 +324,19 @@ $hits = \Nino\Modules\Search::getElements( $appData, 'articles', $query );
 ```
 
 It searches only `Locales::getCurrentLocale()` and returns canonical Elements,
-not index rows or scores. Every normalized query token has to match; priorities
-rank the hits.
+best first; `getHits()` answers the hits themselves - score, coverage, the
+words that matched - without reading an Element. Not every query word has to
+match: one that finds nothing lowers the hit's coverage, and the coverage
+weighs its score; priorities rank the hits. See the feature's README,
+[Coverage, and why not every word has to match](https://github.com/dapeio/nino-features/blob/main/features/Search/README.md#coverage-and-why-not-every-word-has-to-match).
 
 Lifecycle is deliberately small and explicit:
 
-- module `init()` only registers `/nino/elements/committed` and performs no I/O;
-- the Search panel's **Create searchindex** under `/_admin` rebuilds every
-  configured type on every press;
+- the feature's `init()` registers the `/nino/elements/committed` callback,
+  its shortcodes and, where the project switched it on, the JSON endpoint,
+  and performs no I/O;
+- the Search panel under `/_admin` rebuilds one configured type, or every one,
+  on request;
 - a committed insert, update, or delete rebuilds that configured type;
 - one type owns exactly `/data/index-<type>.php`;
 - reads of a missing or malformed file return `[]` and never self-heal;

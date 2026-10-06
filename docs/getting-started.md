@@ -9,7 +9,7 @@ This guide leads you on the shortest path from a fresh checkout to a locally run
 **Additional Links:**
 [README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
 
-**Important:** A fresh checkout contains the kernel, the workbench, the modules, the features and the installation library, but not yet a complete project state. The setup wizard - what `/_admin` shows until it is done - creates and fills the required project directories; only then does the website run.
+**Important:** A fresh checkout contains the kernel, the workbench, the modules and the installation library, but not yet a complete project state. The setup wizard - what `/_admin` shows until it is done - creates and fills the required project directories; only then does the website run.
 
 ## Prerequisites
 
@@ -36,7 +36,7 @@ As long as the wizard is not completed, you can return to earlier steps and reap
 | Step | Decision |
 |---|---|
 | [1. Environment](setup.md#1-environment) | Are PHP, extensions, and write permissions ready for use? |
-| [2. Languages](setup.md#2-languages) | Which languages and functional modules does the project require? |
+| [2. Languages](setup.md#2-languages) | Which languages does the project require - and which modules, where the project added any of its own? |
 | [3. Routes](setup.md#3-routes) | Which first pages, public paths, and metadata are created? |
 | [4. Personal Information](setup.md#4-personal-information) | Which central company and website values are available as textfills? |
 | [5. Accounts](setup.md#5-accounts) | Which developer account(s) sign in to the workbench with full access? |
@@ -58,7 +58,7 @@ After completion, open:
 
 Also check every language and route, the navigation, and used forms. Save a text and an image as a test. Where the Template Builder is installed, open a `page-*.tpl` in the Templates panel, change nothing at first, and check whether its top-level sections are recognized without warnings.
 
-Newsletter and Search are features, not wizard modules, and a checkout ships none: when the project needs one, copy its directory from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) into `features/`, switch it on in the workbench's **Features** panel (System group), then reload the workbench for its panel to appear. See [Features](features.md).
+Newsletter and Search are features, not wizard modules, and a checkout ships none: when the project needs one, install it from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) in the workbench's **Features** panel (System group), which switches it on and reloads the workbench so its panel appears - or copy its directory into `features/` by hand and switch it on there. See [Features](features.md).
 
 The last step sets the recovery password and locks the wizard. Subsequently, remove `_admin/install/` from production delivery; everything it copied stays where it wrote it. The correct order and further security checks are described in the [Deployment Manual](deployment.md#the-wizard-after-setup).
 

@@ -172,7 +172,7 @@ For nginx that is one `server` block. Only the PHP-FPM socket is yours to fill i
 index index.php;
 
 # Denied before routed: ^~ short-circuits the regex locations below, so
-# nothing under these four trees is ever handed to PHP.
+# nothing under these trees is ever handed to PHP.
 location ^~ /private/                { deny all; return 404; }
 location ^~ /app/                    { deny all; return 404; }
 location ^~ /features/               { deny all; return 404; }
@@ -265,7 +265,7 @@ Check in `config.php` or via the workbench's Config panel at least the following
 
 Error messages should not expose file paths, configuration values, or stack traces in the browser. After switching, check that errors still arrive in a protected log and remain accessible to the operator.
 
-That log is `private/data/logs.<YYYY-MM>.php`, one file per month, with entries older than three months dropped. The workbench's Logs panel reads it - and when the workbench is the thing that is broken, so does any file manager. It is where the reason for a bare `500` is, which on a production host is the only place it is: `/nino/error/display` is off, so the browser gets nothing but the status.
+That log is `private/data/logs.<YYYY-MM>.php`, one file per month, with entries older than three months dropped. Read it with a file manager or a shell - the workbench's **Log** panel shows the activity log, not this one. It is where the reason for a bare `500` is, which on a production host is the only place it is: `/nino/error/display` is off, so the browser gets nothing but the status.
 
 **The address mails go out as** is the textfill `/project/mail/address/owner`, which the base unit ships as `[[/project/company/contact/email]]` - so by default every mail this site sends carries the mailbox the project already named, in the `From` header and as the envelope sender. Change it in the Text panel where replies should reach somewhere else; the company address stays what it is.
 
@@ -357,7 +357,7 @@ Treat a Nino update like a change to the specific website project, not like blin
 
 1. Secure the current production state outside the webroot.
 2. First transfer the change to a development or staging environment.
-3. Keep project-owned PHP classes in `app/` (or `NINO_APP_DIR`) and compare only deliberate kernel changes with the new state. `_nino/` can then be replaced wholesale - Nino's optional modules under `_nino/Nino/Modules/` included, since a project switches them on or off in `/nino/modules` rather than editing them - and so can `_admin/`: the workbench holds no project state - the accounts live in `config.php`, the recovery secret in `private/.auth/pw.php`. A feature is updated on its own: press **Update** on the Available tab of the workbench's Features panel, or replace its directory under `features/` with the new release by hand and press **Update** on the Active or Inactive tab, wherever it sits. The feature's install unit adds what is new and overwrites nothing the project has, and the feature migrates its own data before the new version is recorded; see [Features](features.md#updating).
+3. Keep project-owned PHP classes in `app/` (or `NINO_APP_DIR`) and compare only deliberate kernel changes with the new state. `_nino/` can then be replaced wholesale - Nino's optional modules under `_nino/Nino/Modules/` included, since a project switches them on or off in `/nino/modules` rather than editing them - and so can `_admin/`: the workbench holds no project state - the accounts live in `config.php`, the recovery secret in `private/.auth/pw.php`. A feature is updated on its own: press **Update** on the Available tab of the workbench's Features panel, or replace its directory under `features/` with the new release by hand and press **Update** on the feature's own screen on the Active tab - a feature that is switched off takes the update when it is activated. The feature's install unit adds what is new and overwrites nothing the project has, and the feature migrates its own data before the new version is recorded; see [Features](features.md#updating).
 4. Run smoke tests and project-specific acceptance.
 5. Transfer the tested state and keep the previous version for rollback.
 

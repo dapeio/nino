@@ -58,7 +58,7 @@ Die Workbench bietet vollständigen Zugriff für Entwicklung, Diagnose und Korre
        width="49%">
 </a>
 
-Jeder frische Checkout wird über den Assistenten eingerichtet – das, was `/_admin` zeigt, bis er abgeschlossen ist. Er prüft die Umgebung, führt durch Sprachen und Module, übernimmt das Theme der Base-Einheit samt der benötigten Assets, legt erste Seiten und Basisinformationen an, erstellt die ersten Entwicklerkonten und setzt das Recovery-Passwort. Danach sperrt er sich selbst aus, und `_admin/install/` kann aus einer Produktivauslieferung entfernt werden.
+Jeder frische Checkout wird über den Assistenten eingerichtet – das, was `/_admin` zeigt, bis er abgeschlossen ist. Er prüft die Umgebung, führt durch die Sprachen (und die Module, die ein Projekt selbst hinzugefügt hat, falls es welche gibt), übernimmt das Theme der Base-Einheit samt der benötigten Assets, legt erste Seiten und Basisinformationen an, erstellt die ersten Entwicklerkonten und setzt das Recovery-Passwort. Danach sperrt er sich selbst aus, und `_admin/install/` kann aus einer Produktivauslieferung entfernt werden.
 
 #### Der Template-Baukasten – ein Feature, Alpha
 
