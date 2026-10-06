@@ -140,28 +140,8 @@
 			el.inputUser.focus();
 
 		},
-
-		/**
-		 *	Resize hook (currently unused)
-		 *
-		 *	@return		void
-		 */
-		onResize : function() {
-
-		},
-
-		/**
-		 *	Scroll hook (currently unused)
-		 *
-		 *	@return		void
-		 */
-		onScroll : function() {
-
-		},
 	};
 
 	Nino.events.bindCallback( 'ready', Nino.admin.onReady );
-	Nino.events.bindCallback( 'scroll', Nino.admin.onScroll );
-	Nino.events.bindCallback( 'resize', Nino.admin.onResize );
 
 })(window, document, document.documentElement, document.body);

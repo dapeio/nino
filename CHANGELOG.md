@@ -13,6 +13,10 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Workbench:** `script.js` and `login.js` no longer register the empty
+  `Nino.admin.onResize`/`onScroll` hooks, so a resize or scroll of the
+  workbench and the login page no longer calls two functions that do nothing.
+
 - **Docs:** `\Nino\Admin\Admin::DIR` and `LIBRARY` say why they stay public
   (an optional module a 1.0.0-beta setup copied into `app/` reads them), and
   `Panels::collect()` and `panesHtml()` describe the one workbench and where
