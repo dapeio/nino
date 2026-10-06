@@ -4,6 +4,8 @@ All notable changes to Nino are documented in this file.
 
 ## Unreleased
 
+## v1.5.0 - 2026-10-06
+
 ### Added
 
 - **Features:** `\Nino\Features::DIRECTORY_PATTERN` and
