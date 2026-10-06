@@ -13,6 +13,11 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the eight screenshots in `docs/assets/screenshots/` that no README
+  or manual embeds (`admin`, `admin-elements`, `admin-text`, `editor`,
+  `editor-elements`, `editor-text`, `install`, `templates`, about 260 KB) are
+  deleted, with the briefing's sentence about them.
+
 - **Docs:** AGENTS.md, the recipes and the manuals point at what
   nino-features holds now. The Design feature changes the look, not a
   `design-library/` waiting for it (AGENTS.md, setup, concepts, ROADMAP, the

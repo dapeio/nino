@@ -10,8 +10,6 @@ Die englische und die deutsche Root-README zeigen Nino derzeit in vier Bereichen
 | Editor | `_editor1.webp`, `_editor2.webp` – noch nicht aufgenommen | Elementbearbeitung und Bildplatzverwaltung; einfache tägliche Pflege für Redakteure |
 | Templates | `_templates1.webp`, `_templates2.webp`, `_templates3.webp` | Section-Canvas, Preset-Library und Live-Vorschau; visuelle Template-Komposition bei lesbarem Quelltext |
 
-Ältere Dateien wie `admin.webp`, `admin-elements.webp`, `admin-text.webp`, `editor.webp`, `editor-elements.webp`, `editor-text.webp`, `install.webp` und `templates.webp` liegen weiterhin hier, sind aber in keinem Handbuch eingebunden.
-
 ## Empfohlene Aufbereitung
 
 - einheitliches Seitenverhältnis, bevorzugt 16:9 oder 16:10;
