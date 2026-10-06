@@ -3,10 +3,8 @@
 <p>[[/mail/user/greeting]] [[name]],<br>
 [[/mail/user/intro]]</p>
 <p>[[/mail/user/summary]]</p>
+[[fields]]
 <table>
-	<tr><th>[[/form/label/name]]</th><td>[[name]]</td></tr>
-	<tr><th>[[/form/label/email]]</th><td>[[email]]</td></tr>
-	<tr><th>[[/form/label/message]]</th><td>[[message]]</td></tr>
 	<tr><th>[[/form/label/date]]</th><td>[[date]]</td></tr>
 </table>
 <p class="mail-note">[[/mail/user/notice]]</p>

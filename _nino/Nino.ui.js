@@ -867,10 +867,11 @@
 						// already ran - so it gets a field-level message instead of
 						// "please try again later", which sends the visitor away to
 						// wait out a problem only they can fix. Which message depends
-						// on what the form holds: Form::TYPES has url, number and
-						// select in it as well, so a 400 on a form carrying one of
-						// those is not necessarily the address, and saying so anyway
-						// sent the visitor to look at the one field that was fine.
+						// on what the form holds: Form::TYPES has url, number, date,
+						// select, radio and checkbox in it as well, so a 400 on a form
+						// carrying one of those is not necessarily the address, and
+						// saying so anyway sent the visitor to look at the one field
+						// that was fine.
 						// The server names no field on a 400, so the text asks for the
 						// entries, not a highlighted one. A site installed before that
 						// fill existed has none, and getText() answers '' for it - the
@@ -881,7 +882,8 @@
 						// editor-editable textfills, and Modules\Jstext json-encodes
 						// them precisely so they cannot become markup on the way in
 						const typed = Array.prototype.some.call( this.form.fields, function( field ) {
-							return field.type === 'url' || field.type === 'number' || field.tagName === 'SELECT';
+							return field.type === 'url' || field.type === 'number' || field.type === 'date'
+								|| field.type === 'radio' || field.type === 'checkbox' || field.tagName === 'SELECT';
 						} );
 
 						this.form.msg.textContent = ( xhr.status === 400 )
@@ -979,8 +981,11 @@
 							else
 								data[this.fields[i].name] = this.fields[i].value;
 
-							// Check required
-							if( this.fields[i].required === true && this.fields[i].value.length === 0 ) {
+							// Check required. A checkbox's .value is what it would send,
+							// not whether it is ticked - so what it is worth is whether
+							// it is ticked
+							if( this.fields[i].required === true
+								&& ( this.fields[i].type === 'checkbox' ? this.fields[i].checked !== true : this.fields[i].value.length === 0 ) ) {
 								Nino.ui._markField( this.fields[i], true );
 								firstRefused = firstRefused ?? this.fields[i];
 								error = Nino.content.getText('/form/info/required');
@@ -1001,18 +1006,22 @@
 								error = Nino.content.getText('/form/info/email');
 							}
 
-							// A url and a number are validated by Form::validate() too
-							// (FILTER_VALIDATE_URL, is_numeric), and the client checked
-							// neither - so the server's 400 came back for a field this
-							// form had passed, and the visitor was told their email
-							// address was wrong while it was fine. The browser's own
-							// verdict rather than a second regex here: it is the rule
-							// the visitor already sees in the field, so the two cannot
-							// disagree. Absent (a non-browser client, a test stand-in)
-							// it checks nothing and the server still answers
-							if( error === false && ( this.fields[i].type === 'url' || this.fields[i].type === 'number' )
-								&& this.fields[i].value.length > 0 && typeof this.fields[i].validity === 'object' && this.fields[i].validity !== null
-								&& ( this.fields[i].validity.typeMismatch === true || this.fields[i].validity.badInput === true ) ) {
+							// A url, a number and a date are validated by Form::validate()
+							// too (FILTER_VALIDATE_URL, is_numeric, Y-m-d), and the client
+							// checked none of them - so the server's 400 came back for a
+							// field this form had passed, and the visitor was told their
+							// email address was wrong while it was fine. The browser's own
+							// verdict rather than a second regex here: it is the rule the
+							// visitor already sees in the field, so the two cannot
+							// disagree. Absent (a non-browser client, a test stand-in) it
+							// checks nothing and the server still answers.
+							// badInput is asked whatever .value holds: a date that is
+							// half typed, or letters in a number field, read '' - and an
+							// empty value is exactly what the length test would pass
+							if( error === false && ( this.fields[i].type === 'url' || this.fields[i].type === 'number' || this.fields[i].type === 'date' )
+								&& typeof this.fields[i].validity === 'object' && this.fields[i].validity !== null
+								&& ( this.fields[i].validity.badInput === true
+									|| ( this.fields[i].value.length > 0 && this.fields[i].validity.typeMismatch === true ) ) ) {
 								Nino.ui._markField( this.fields[i], true );
 								firstRefused = firstRefused ?? this.fields[i];
 								error = Nino.content.getText('/form/info/invalid');

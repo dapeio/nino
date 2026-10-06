@@ -656,6 +656,23 @@ All notable changes to Nino are documented in this file.
   `\Nino\Callbacks::registered()`, `\Nino\Html::shortcodes()` and
   `\Nino\Features::shortcodes()`; nothing on the render path changed.
 
+- **Forms:** three more field types, `checkbox`, `radio` and `date`
+  (`\Nino\Form::TYPES`). A ticked checkbox posts its value and an unticked one
+  nothing, so a required one has to be ticked; a radio group posts the member
+  that is ticked, which has to be one of its `options` - a radio without one
+  non-empty option is left out of the definition, as a select without options
+  still takes any value; a date is `Y-m-d` and has to be a day that exists. And
+  `\Nino\Form::problems( $entry )`: one `[ 'field' => index | null, 'code' => ... ]`
+  for each case `normalize()` leaves out or replaces (`key`, `field`, `name`,
+  `reserved`, `duplicate`, `type`, `options`, `fields`, `to`, `ownerTemplate`,
+  `userTemplate`), `[]` for a clean definition - for a writer that takes a
+  definition from a person and wants to say where it went wrong instead of
+  saving something else than was typed. `normalize()` and `problems()` are one
+  routine (`_inspect()`), so they cannot disagree. `tests/kernel-smoke.php`
+  holds the codes and places, the equivalence over a set of definitions and the
+  three types through the endpoint, `tests/nino-ui-form-js-smoke.js` the
+  client's side.
+
 ### Changed
 
 - **Workbench:** what the panels print for a failure. A failure with a code is
@@ -955,6 +972,14 @@ All notable changes to Nino are documented in this file.
   `tests/admin-feature-settings-js-smoke.js` (31 checks) the form, its Save and
   its errors, `tests/admin-features-js-smoke.js` (185 → 188) the detail screen.
 
+- **Forms:** the mail templates a new installation starts from carry
+  `[[fields]]`. `mail-owner` and `mail-user` used to fill only `[[name]]`,
+  `[[email]]`, `[[subject]]` and `[[message]]`, so the answer to a field of
+  another name - a checkbox, a date, anything a project added - reached neither
+  the owner nor the visitor. They now show the whole submission as a table and
+  keep the date row. Add-only: a project that installed before keeps its
+  templates and copies the placeholder in by hand.
+
 ### Fixed
 
 - **Workbench, Elements:** a required field is marked and a refused save says
@@ -1109,6 +1134,18 @@ All notable changes to Nino are documented in this file.
   session - from the workbench's login form and from its re-login dialog.
   That one POST is let through (`Modules\Maintenance::_prepare()`); a `GET` of
   the address, the logout and every other route stay as they were.
+
+- **Forms:** the `.nino-form` script refuses what the server would. A required
+  checkbox that is not ticked is a missing field (its `.value` is what it would
+  send, ticked or not, so the length test let it through), and the browser's
+  `badInput` of a date, a number or a url is asked whatever `.value` holds - a
+  half-typed date or letters in a number field read as `''` and were sent as
+  no answer. A `400`
+  on a form with a checkbox, a radio or a date says *check your entries* rather
+  than naming the address. `Form::normalize()` cut a label, an option, a form
+  name and a subject at a byte count, which left invalid utf-8 for a long
+  non-ascii text (a German label of 241 bytes); it now cuts at the same bound on
+  a character boundary, as `posted()` does.
 
 ### Removed
 

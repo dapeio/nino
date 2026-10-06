@@ -67,16 +67,17 @@ namespace Nino {
 		public const string RETENTION	= '/nino/form/retention';
 		public const string STORE			= '/nino/form/store';
 
-		// The field types a form may declare. 'textarea' is the only one that
-		// is not an <input type>.
+		// The field types a form may declare. 'textarea' and 'select' are not
+		// an <input type>, 'select' and 'radio' are the two that list
+		// 'options'.
 		//
-		// No 'checkbox' and no 'radio' yet. The shared .nino-form script posts a
-		// ticked box as its value and an unticked one as '', and a radio group
-		// as the answer of whichever member is ticked (see _nino/Nino.ui.js), so
-		// nothing stands in the way of either; they are simply not declared here
-		// until a form needs them. A hand-written form in a template may use
-		// both today - the script drives whatever markup the project wrote
-		public const array TYPES = [ 'text', 'email', 'tel', 'url', 'number', 'textarea', 'select' ];
+		// What each posts is what the shared .nino-form script (_nino/Nino.ui.js)
+		// sends: a ticked 'checkbox' its value and an unticked one '', a 'radio'
+		// group the value of whichever member is ticked, a 'date' the Y-m-d the
+		// browser's own date input holds. A radio without one non-empty option
+		// asks for an answer nobody can give, so normalize() leaves it out and
+		// problems() says so; a select without options keeps taking any value
+		public const array TYPES = [ 'text', 'email', 'tel', 'url', 'number', 'textarea', 'select', 'checkbox', 'radio', 'date' ];
 
 		// Names a field may not take: the four the endpoint reads off the
 		// post itself, and the four a record carries beside its values. A
@@ -191,18 +192,64 @@ namespace Nino {
 		 */
 		public static function normalize( array $entry ): ?array {
 
-			$key = strtolower( trim( (string) ( $entry['key'] ?? '' ) ) );
+			return self::_inspect( $entry )[0];
+		}
+
+		/**
+		 *	What normalize() leaves out of a definition or replaces in it, one
+		 *	entry for each of the cases below: the form is not usable (no key,
+		 *	no field left), a field is dropped (not an array, a name that is no
+		 *	identifier or a reserved one, a name already taken, a radio with no
+		 *	option) or kept with another value (an unknown type, an address
+		 *	that is none, a template path that is none). A stored definition
+		 *	is read quietly;
+		 *	a writer that takes a definition from a person asks this first and
+		 *	says where it went wrong, rather than saving something that is not
+		 *	what was typed. Both answer from one routine, so they cannot
+		 *	disagree about those cases; normalize() also lowercases the key,
+		 *	cuts a long label, option, name or subject, and drops an option that
+		 *	is empty or no string, none of which is a problem
+		 *
+		 *	The codes: key, field, name, reserved, duplicate, type, options,
+		 *	fields, to, ownerTemplate, userTemplate
+		 *
+		 *	@param		array 		$entry				A definition as stored or as posted
+		 *
+		 *	@return 	array									[ [ 'field' => int|null, 'code' => string ], ... ] -
+		 *															field is the key in the fields list, null for a
+		 *															problem of the definition itself; [] for a clean one
+		 */
+		public static function problems( array $entry ): array {
+
+			return self::_inspect( $entry )[1];
+		}
+
+		/**
+		 *	The one routine behind normalize() and problems()
+		 *
+		 *	@param		array 		$entry				A definition as stored or as posted
+		 *
+		 *	@return 	array									[ the normalized form or null, the problems ]
+		 */
+		private static function _inspect( array $entry ): array {
+
+			$problems = [];
+			$key = is_string( $entry['key'] ?? null ) === true ? strtolower( trim( $entry['key'] ) ) : '';
 
 			if( preg_match( '/^[a-z][a-z0-9-]*$/', $key ) !== 1 )
-				return null;
+				$problems[] = [ 'field' => null, 'code' => 'key' ];
 
 			$fields	= [];
 			$seen		= [];
 
-			foreach( (array) ( $entry['fields'] ?? [] ) as $field ) {
+			foreach( (array) ( $entry['fields'] ?? [] ) as $index => $field ) {
 
-				if( is_array( $field ) === false )
+				$at = is_int( $index ) === true ? $index : null;
+
+				if( is_array( $field ) === false ) {
+					$problems[] = [ 'field' => $at, 'code' => 'field' ];
 					continue;
+				}
 
 				$name = is_string( $field['name'] ?? null ) === true ? trim( $field['name'] ) : '';
 				$type = is_string( $field['type'] ?? null ) === true ? $field['type'] : 'text';
@@ -212,24 +259,43 @@ namespace Nino {
 				// label, and never one of the names something else owns. At
 				// most 64 characters, the same bound posted() reads keys with:
 				// a longer name described a field that could never be submitted
-				if( preg_match( '/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/', $name ) !== 1 || in_array( $name, self::RESERVED, true ) === true )
+				if( preg_match( '/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/', $name ) !== 1 ) {
+					$problems[] = [ 'field' => $at, 'code' => 'name' ];
 					continue;
+				}
 
-				if( in_array( $name, $seen, true ) === true )
+				if( in_array( $name, self::RESERVED, true ) === true ) {
+					$problems[] = [ 'field' => $at, 'code' => 'reserved' ];
 					continue;
+				}
+
+				if( in_array( $name, $seen, true ) === true ) {
+					$problems[] = [ 'field' => $at, 'code' => 'duplicate' ];
+					continue;
+				}
 
 				$seen[] = $name;
+
+				// An absent type is a text field; one that is there and not on
+				// the list is repaired to one, which problems() reports
+				if( ( $field['type'] ?? null ) !== null && ( is_string( $field['type'] ) === false || in_array( $type, self::TYPES, true ) === false ) )
+					$problems[] = [ 'field' => $at, 'code' => 'type' ];
 
 				$options = [];
 				foreach( (array) ( $field['options'] ?? [] ) as $option )
 					if( is_string( $option ) === true && trim( $option ) !== '' )
-						$options[] = substr( trim( $option ), 0, 200 );
+						$options[] = mb_strcut( trim( $option ), 0, 200, 'UTF-8' );
+
+				if( $type === 'radio' && $options === [] ) {
+					$problems[] = [ 'field' => $at, 'code' => 'options' ];
+					continue;
+				}
 
 				$label = is_string( $field['label'] ?? null ) === true ? trim( $field['label'] ) : '';
 
 				$fields[] = [
 					'name'			=> $name,
-					'label'			=> $label === '' ? $name : substr( $label, 0, 200 ),
+					'label'			=> $label === '' ? $name : mb_strcut( $label, 0, 200, 'UTF-8' ),
 					'type'			=> in_array( $type, self::TYPES, true ) === true ? $type : 'text',
 					'required'	=> ( $field['required'] ?? false ) === true,
 					'options'		=> $options,
@@ -237,21 +303,38 @@ namespace Nino {
 			}
 
 			if( $fields === [] )
-				return null;
+				$problems[] = [ 'field' => null, 'code' => 'fields' ];
 
 			$to		= is_string( $entry['to'] ?? null ) === true ? trim( $entry['to'] ) : '';
 			$name	= is_string( $entry['name'] ?? null ) === true ? trim( $entry['name'] ) : '';
 
-			return [
+			if( $to !== '' && filter_var( $to, FILTER_VALIDATE_EMAIL ) === false )
+				$problems[] = [ 'field' => null, 'code' => 'to' ];
+
+			$templates = [];
+
+			foreach( [ 'ownerTemplate' => '/templates/mail-owner', 'userTemplate' => '/templates/mail-user' ] as $role => $default ) {
+
+				$given						= is_string( $entry[ $role ] ?? null ) === true ? trim( $entry[ $role ] ) : '';
+				$templates[ $role ]	= self::_template( $given, $default );
+
+				if( $given !== '' && $templates[ $role ] !== $given )
+					$problems[] = [ 'field' => null, 'code' => $role ];
+			}
+
+			if( preg_match( '/^[a-z][a-z0-9-]*$/', $key ) !== 1 || $fields === [] )
+				return [ null, $problems ];
+
+			return [ [
 				'key'						=> $key,
-				'name'					=> $name === '' ? $key : substr( $name, 0, 100 ),
+				'name'					=> $name === '' ? $key : mb_strcut( $name, 0, 100, 'UTF-8' ),
 				'to'						=> filter_var( $to, FILTER_VALIDATE_EMAIL ) === false ? '' : $to,
-				'subject'				=> is_string( $entry['subject'] ?? null ) === true ? substr( trim( $entry['subject'] ), 0, 200 ) : '',
+				'subject'				=> is_string( $entry['subject'] ?? null ) === true ? mb_strcut( trim( $entry['subject'] ), 0, 200, 'UTF-8' ) : '',
 				'confirm'				=> ( $entry['confirm'] ?? false ) === true,
-				'ownerTemplate'	=> self::_template( $entry['ownerTemplate'] ?? '', '/templates/mail-owner' ),
-				'userTemplate'	=> self::_template( $entry['userTemplate'] ?? '', '/templates/mail-user' ),
+				'ownerTemplate'	=> $templates['ownerTemplate'],
+				'userTemplate'	=> $templates['userTemplate'],
 				'fields'				=> $fields,
-			];
+			], $problems ];
 		}
 
 		/**
@@ -343,6 +426,8 @@ namespace Nino {
 				'url'			=> filter_var( $value, FILTER_VALIDATE_URL ) !== false,
 				'number'	=> is_numeric( $value ) === true,
 				'select'	=> $field['options'] === [] || in_array( $value, $field['options'], true ) === true,
+				'radio'		=> in_array( $value, $field['options'], true ) === true,
+				'date'		=> ( $date = \DateTimeImmutable::createFromFormat( '!Y-m-d', $value ) ) !== false && $date->format( 'Y-m-d' ) === $value,
 				default		=> true,
 			};
 		}

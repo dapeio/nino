@@ -358,6 +358,84 @@ respond( sent.length - 1, 418 );
 check( 'a honeypot rejection stays on the generic message', generic.msg.textContent === 'Your message could not be sent. Please try again later.' );
 
 
+// --- Checkbox, radio and date: what the client refuses ------------------
+
+/*	Form::TYPES has all three. A checkbox's .value is what it would send, ticked
+	or not, so the length test the required check used never saw an unticked one; and a
+	date typed half-way reads '' while its validity says badInput, which a test
+	behind "value.length > 0" cannot see either	*/
+const typedForm = form();
+forms.push( typedForm );
+sandbox.Nino.ui.onReady();
+typedForm.fill( { name : 'Someone', email : 'someone@example.com', message : 'Hello.' } );
+
+const agree = field( 'agree', 'checkbox', '1', true, false );
+const since = field( 'since', 'date', '', false, false );
+typedForm.fieldList.push( agree, since );
+
+sent.length = 0;
+typedForm.submit();
+check( 'a required checkbox that is not ticked is refused before the request', sent.length === 0 && typedForm.msg.textContent === 'Please fill in every required field.' );
+check( '...and marked, and the caret goes to it', agree.classList.contains('nino-is-error') === true && agree.getAttribute('aria-invalid') === 'true' && agree.focused === true );
+
+agree.checked = true;
+typedForm.submit();
+check( 'a ticked one is sent, with the value it carries', sent.length === 1 && sent[0].data.agree === '1' && agree.getAttribute('aria-invalid') === null );
+check( '...an empty date posts as empty', sent[0].data.since === '' );
+
+// The browser's verdict on a date nobody finished typing: value '', badInput
+since.validity = { typeMismatch : false, badInput : true };
+sent.length = 0;
+typedForm.classList.remove('nino-is-success');
+typedForm.submit();
+check( 'a date with no value and badInput is refused as invalid, not sent', sent.length === 0 && typedForm.msg.textContent === 'Please check your entries.' );
+check( '...and marked', since.getAttribute('aria-invalid') === 'true' && since.focused === true );
+
+since.validity = { typeMismatch : false, badInput : false };
+since.value = '2026-02-28';
+typedForm.submit();
+check( 'a date the browser accepts is sent as it stands', sent.length === 1 && sent[0].data.since === '2026-02-28' );
+
+// An optional number or url with badInput is the same case: value '', refused
+const budget = field( 'budget', 'number', '', false, false );
+budget.validity = { typeMismatch : false, badInput : true };
+typedForm.fieldList.push( budget );
+sent.length = 0;
+typedForm.classList.remove('nino-is-success');
+typedForm.submit();
+check( 'letters in a number field, which read as no value, are refused too', sent.length === 0 && budget.getAttribute('aria-invalid') === 'true' );
+typedForm.fieldList.pop();
+
+// A 400 on a form carrying either is not the address
+typedForm.msg.textContent = '';
+typedForm.classList.remove('nino-is-success');
+typedForm.submit();
+respond( sent.length - 1, 400 );
+check( 'a 400 on a form with a checkbox or a date asks to check the entries, not the address', typedForm.msg.textContent === 'Please check your entries.' );
+
+// One of each alone: the check has to hold for every added type, not for the
+// form that happens to carry two of them
+[ 'checkbox', 'radio', 'date' ].forEach( function( type ) {
+	const single = form();
+	forms.push( single );
+	sandbox.Nino.ui.onReady();
+	single.fill( { name : 'Someone', email : 'someone@example.com', message : 'Hello.' } );
+	single.fieldList.push( field( 'extra', type, type === 'date' ? '' : 'x', false, type !== 'date' ) );
+	sent.length = 0;
+	single.submit();
+	respond( sent.length - 1, 400 );
+	check( 'a 400 on a form with only a '+ type +' asks to check the entries', single.msg.textContent === 'Please check your entries.' );
+} );
+
+const plain = form();
+forms.push( plain );
+sandbox.Nino.ui.onReady();
+plain.fill( { name : 'Someone', email : 'someone@example.com', message : 'Hello.' } );
+plain.submit();
+respond( sent.length - 1, 400 );
+check( '...while one with neither still says it is the address', plain.msg.textContent === 'Please enter a valid email address.' );
+
+
 // --- Editor-authored text is never treated as markup --------------------
 
 check( 'messages are written as text, not html', forms[0].msg.innerHTML === '' && forms[1].msg.innerHTML === '' );

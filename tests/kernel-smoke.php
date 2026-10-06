@@ -3165,6 +3165,148 @@ check( 'a guard registered ahead of the module refuses without a callback name o
 unset( $appData['./nino/callbacks']['/nino/http/response/POST://.form'][1], $appData[ \Nino\Form::FORMS ] );
 \Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://.form', [ '\Nino\Modules\Form', 'callbackResponse' ] );
 
+// --- Form - checkbox, radio and date, and what problems() says -------------
+
+echo "Form - checkbox, radio and date fields, and Form::problems()\n";
+
+check( 'the vocabulary holds checkbox, radio and date', array_diff( [ 'checkbox', 'radio', 'date' ], \Nino\Form::TYPES ) === [] );
+
+$typed = \Nino\Form::normalize( [ 'key' => 'typed', 'fields' => [
+	[ 'name' => 'consent',	'type' => 'checkbox',	'required' => true ],
+	[ 'name' => 'plan',			'type' => 'radio',		'options' => [ 'small', ' large ', '', 5 ] ],
+	[ 'name' => 'since',		'type' => 'date' ],
+] ] );
+check( 'the three normalise to what was declared', array_column( $typed['fields'] ?? [], 'type', 'name' ) === [ 'consent' => 'checkbox', 'plan' => 'radio', 'since' => 'date' ]
+	&& $typed['fields'][0]['required'] === true );
+check( '...a radio keeping its non-empty options, trimmed', ( $typed['fields'][1]['options'] ?? [] ) === [ 'small', 'large' ] );
+
+$noOptions = [ 'key' => 'noopts', 'fields' => [ [ 'name' => 'plan', 'type' => 'radio' ], [ 'name' => 'blank', 'type' => 'radio', 'options' => [ '', '  ' ] ], [ 'name' => 'kept', 'type' => 'text' ] ] ];
+check( 'a radio without a non-empty option is left out', array_column( \Nino\Form::normalize( $noOptions )['fields'] ?? [], 'name' ) === [ 'kept' ] );
+check( '...and reported, once for each', \Nino\Form::problems( $noOptions ) === [ [ 'field' => 0, 'code' => 'options' ], [ 'field' => 1, 'code' => 'options' ] ] );
+check( 'a select without options stays what it was: kept, and nothing to report', array_column( \Nino\Form::normalize( [ 'key' => 'sel', 'fields' => [ [ 'name' => 'pick', 'type' => 'select' ] ] ] )['fields'] ?? [], 'name' ) === [ 'pick' ]
+	&& \Nino\Form::problems( [ 'key' => 'sel', 'fields' => [ [ 'name' => 'pick', 'type' => 'select' ] ] ] ) === [] );
+
+// problems(): the code and the place, for each thing normalize() would change
+$oneField = static fn( array $field ): array => [ 'key' => 'probe', 'fields' => [ [ 'name' => 'ok' ], $field ] ];
+
+check( 'a name with a non-ascii letter is reported at its field', \Nino\Form::problems( $oneField( [ 'name' => 'Straße' ] ) ) === [ [ 'field' => 1, 'code' => 'name' ] ] );
+check( '...a label typed into the name box, with its space', \Nino\Form::problems( $oneField( [ 'name' => 'Ihre Nachricht' ] ) ) === [ [ 'field' => 1, 'code' => 'name' ] ] );
+check( '...an empty name and one of 65 characters', \Nino\Form::problems( $oneField( [ 'name' => '' ] ) ) === [ [ 'field' => 1, 'code' => 'name' ] ]
+	&& \Nino\Form::problems( $oneField( [ 'name' => str_repeat( 'n', 65 ) ] ) ) === [ [ 'field' => 1, 'code' => 'name' ] ] );
+check( '...a reserved name', \Nino\Form::problems( $oneField( [ 'name' => 'date' ] ) ) === [ [ 'field' => 1, 'code' => 'reserved' ] ] );
+check( '...a name taken already', \Nino\Form::problems( $oneField( [ 'name' => 'ok' ] ) ) === [ [ 'field' => 1, 'code' => 'duplicate' ] ] );
+check( '...a type that is none of the vocabulary, which normalize() repairs to text', \Nino\Form::problems( $oneField( [ 'name' => 'more', 'type' => 'colour' ] ) ) === [ [ 'field' => 1, 'code' => 'type' ] ]
+	&& \Nino\Form::normalize( $oneField( [ 'name' => 'more', 'type' => 'colour' ] ) )['fields'][1]['type'] === 'text' );
+check( '...while a field with no type is a text field and nothing to report', \Nino\Form::problems( $oneField( [ 'name' => 'more' ] ) ) === [] );
+check( '...a field that is not an array', \Nino\Form::problems( [ 'key' => 'probe', 'fields' => [ [ 'name' => 'ok' ], 'text' ] ] ) === [ [ 'field' => 1, 'code' => 'field' ] ] );
+check( '...a recipient that is no address', \Nino\Form::problems( [ 'to' => 'a@b' ] + $oneField( [ 'name' => 'more' ] ) ) === [ [ 'field' => null, 'code' => 'to' ] ] );
+check( '...a template path that is none, each of the two', \Nino\Form::problems( [ 'ownerTemplate' => '/templates/../x' ] + $oneField( [ 'name' => 'more' ] ) ) === [ [ 'field' => null, 'code' => 'ownerTemplate' ] ]
+	&& \Nino\Form::problems( [ 'userTemplate' => 'templates/mail-user' ] + $oneField( [ 'name' => 'more' ] ) ) === [ [ 'field' => null, 'code' => 'userTemplate' ] ] );
+check( '...a key that is none', \Nino\Form::problems( [ 'key' => 'Not A Key', 'fields' => [ [ 'name' => 'ok' ] ] ] ) === [ [ 'field' => null, 'code' => 'key' ] ]
+	&& \Nino\Form::normalize( [ 'key' => 'Not A Key', 'fields' => [ [ 'name' => 'ok' ] ] ] ) === null );
+check( '...also one that is an array, which is a problem and not a warning', \Nino\Form::problems( [ 'key' => [ 'x' ], 'fields' => [ [ 'name' => 'ok' ] ] ] ) === [ [ 'field' => null, 'code' => 'key' ] ]
+	&& \Nino\Form::normalize( [ 'key' => [ 'x' ], 'fields' => [ [ 'name' => 'ok' ] ] ] ) === null );
+check( '...and a definition with no field left', \Nino\Form::problems( [ 'key' => 'probe', 'fields' => [] ] ) === [ [ 'field' => null, 'code' => 'fields' ] ]
+	&& \Nino\Form::problems( [ 'key' => 'probe', 'fields' => [ [ 'name' => 'Straße' ] ] ] ) === [ [ 'field' => 0, 'code' => 'name' ], [ 'field' => null, 'code' => 'fields' ] ] );
+check( 'a field that is posted at another place keeps its own index', \Nino\Form::problems( [ 'key' => 'probe', 'fields' => [ 3 => [ 'name' => 'Straße' ], 7 => [ 'name' => 'ok' ] ] ] ) === [ [ 'field' => 3, 'code' => 'name' ] ] );
+
+check( 'the shipped contact form has nothing to report', \Nino\Form::problems( \Nino\Form::DEFAULT_FORM ) === [] );
+check( '...nor a clean form of the new types, with an address and templates', \Nino\Form::problems( [
+	'key' => 'quote', 'name' => 'Quote', 'to' => 'sales@example.com', 'ownerTemplate' => '/templates/mail-owner', 'userTemplate' => '/templates/mail-user',
+	'fields' => [
+		[ 'name' => 'email', 'label' => 'Mail', 'type' => 'email', 'required' => true ],
+		[ 'name' => 'since', 'label' => 'Since', 'type' => 'date' ],
+		[ 'name' => 'plan', 'label' => 'Plan', 'type' => 'radio', 'options' => [ 'small', 'large' ] ],
+		[ 'name' => 'consent', 'label' => 'Consent', 'type' => 'checkbox', 'required' => true ],
+	],
+] ) === [] );
+
+// One routine, so the two cannot drift: nothing to report exactly when
+// normalize() keeps every field, the address and both templates
+$entries = [
+	\Nino\Form::DEFAULT_FORM,
+	[ 'key' => 'a', 'fields' => [ [ 'name' => 'x', 'type' => 'radio', 'options' => [ 'one' ] ], [ 'name' => 'y', 'type' => 'date' ] ] ],
+	[ 'key' => 'b', 'fields' => [ [ 'name' => 'x', 'type' => 'radio' ] ] ],
+	[ 'key' => 'c', 'fields' => [ [ 'name' => 'x' ], [ 'name' => 'x' ] ] ],
+	[ 'key' => 'd', 'fields' => [ [ 'name' => 'x', 'type' => 'nope' ] ] ],
+	[ 'key' => 'e', 'to' => 'a@b', 'fields' => [ [ 'name' => 'x' ] ] ],
+	[ 'key' => 'f', 'to' => 'a@b.de', 'ownerTemplate' => '/templates/x', 'userTemplate' => '/templates/y', 'fields' => [ [ 'name' => 'x' ] ] ],
+	[ 'key' => 'g', 'ownerTemplate' => '/templates/../x', 'fields' => [ [ 'name' => 'x' ] ] ],
+	[ 'key' => 'h', 'userTemplate' => 'mail-user', 'fields' => [ [ 'name' => 'x' ] ] ],
+	[ 'key' => 'i', 'fields' => [ [ 'name' => 'Straße' ], [ 'name' => 'date' ], [ 'name' => 'ok' ] ] ],
+	[ 'key' => 'Not A Key', 'fields' => [ [ 'name' => 'x' ] ] ],
+	[ 'key' => 'j', 'fields' => [] ],
+	[ 'key' => 'k', 'fields' => [ 'text', [ 'name' => 'x' ] ] ],
+];
+$agreeing = true;
+foreach( $entries as $entry ) {
+	$normalized = \Nino\Form::normalize( $entry );
+	$declared = array_map( static fn( mixed $f ): array => is_array( $f ) ? [ $f['name'] ?? '', $f['type'] ?? 'text' ] : [ '', '' ], (array) $entry['fields'] );
+	$kept = $normalized !== null
+		&& array_map( static fn( array $f ): array => [ $f['name'], $f['type'] ], $normalized['fields'] ) === $declared
+		&& $normalized['to'] === ( $entry['to'] ?? '' )
+		&& $normalized['ownerTemplate'] === ( $entry['ownerTemplate'] ?? '/templates/mail-owner' )
+		&& $normalized['userTemplate'] === ( $entry['userTemplate'] ?? '/templates/mail-user' );
+	if( ( \Nino\Form::problems( $entry ) === [] ) !== $kept )
+		$agreeing = false;
+}
+check( 'problems() is empty exactly when normalize() keeps every field, the address and both templates', $agreeing === true );
+
+// normalize() cut at bytes: an ascii letter ahead of 120 two-byte letters puts
+// every bound (200, 100) in the middle of one, which left invalid utf-8
+$wide = 'a'. str_repeat( 'ä', 120 );
+$cut = \Nino\Form::normalize( [ 'key' => 'wide', 'name' => $wide, 'subject' => $wide, 'fields' => [ [ 'name' => 'x', 'label' => $wide, 'type' => 'select', 'options' => [ $wide ] ] ] ] );
+check( 'a label, an option, a name and a subject cut at their bound stay valid utf-8', $cut !== null
+	&& mb_check_encoding( $cut['fields'][0]['label'], 'UTF-8' ) === true && mb_check_encoding( $cut['fields'][0]['options'][0], 'UTF-8' ) === true
+	&& mb_check_encoding( $cut['name'], 'UTF-8' ) === true && mb_check_encoding( $cut['subject'], 'UTF-8' ) === true );
+check( '...within the bytes they were bound to', strlen( $cut['fields'][0]['label'] ) <= 200 && strlen( $cut['fields'][0]['options'][0] ) <= 200
+	&& strlen( $cut['name'] ) <= 100 && strlen( $cut['subject'] ) <= 200 );
+
+// What a submission of each is held to, through the endpoint
+$appData[ \Nino\Form::FORMS ] = [ [
+	'key' => 'typed', 'name' => 'Typed', 'to' => 'owner@example.com', 'confirm' => false,
+	'fields' => [
+		[ 'name' => 'consent',	'label' => 'Consent',	'type' => 'checkbox',	'required' => true ],
+		[ 'name' => 'plan',			'label' => 'Plan',		'type' => 'radio',		'options' => [ 'small', 'large' ] ],
+		[ 'name' => 'since',		'label' => 'Since',		'type' => 'date' ],
+	],
+] ];
+\Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ): void { $mail['sent'] = true; } );
+$typedPost = static function( array $post ) use ( &$appData ): int {
+	\Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [] );
+	$_POST = array_merge( [ 'form' => 'typed', 'consent' => 'on', 'plan' => '', 'since' => '', 'location' => '' ], $post );
+	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+	\Nino\Modules\Form::callbackResponse( $appData, $request );
+	return $request['/nino/http/response']['statusCode'];
+};
+
+check( 'a required checkbox that is ticked is accepted', $typedPost( [] ) === 200 );
+check( '...and one that is not ticked is a 400', $typedPost( [ 'consent' => '' ] ) === 400 );
+check( 'a radio takes one of its options, and an empty answer where it is not required', $typedPost( [ 'plan' => 'large' ] ) === 200 && $typedPost( [ 'plan' => '' ] ) === 200 );
+check( '...and a value outside them is a 400', $typedPost( [ 'plan' => 'huge' ] ) === 400 );
+check( 'a date is Y-m-d', $typedPost( [ 'since' => '2026-02-28' ] ) === 200 );
+check( '...a day the month does not have is a 400', $typedPost( [ 'since' => '2026-02-30' ] ) === 400 );
+check( '...and so is the other way round, and a date with no leading zeros', $typedPost( [ 'since' => '28.02.2026' ] ) === 400 && $typedPost( [ 'since' => '2026-2-3' ] ) === 400 );
+
+// [[fields]] is in the mails a project starts from: the answers to the
+// fields nobody knew in advance reach the owner, and the visitor
+$shipped = [ 'mail-owner', 'mail-user' ];
+$shippedFields = true;
+foreach( $shipped as $name )
+	$shippedFields = $shippedFields && str_contains( (string) file_get_contents( __DIR__. '/../_nino/Nino/Modules/Form/install/templates/'. $name. '.tpl' ), '[[fields]]' );
+check( 'both mail templates the form unit ships carry [[fields]]', $shippedFields === true );
+
+$ownerShipped = (string) file_get_contents( __DIR__. '/../_nino/Nino/Modules/Form/install/templates/mail-owner.tpl' );
+\Nino\Filesystem::putFileContent( $appData, '/templates/mail-shipped.tpl', str_replace( [ "[template /templates/mail-header]\n", "\n[template /templates/mail-footer]" ], '', $ownerShipped ) );
+\Nino\Modules\Template::init( $appData );
+$shippedMail = \Nino\Form::render( $appData, \Nino\Form::form( $appData, 'typed' ), [ 'consent' => 'on', 'plan' => 'large', 'since' => '2026-02-28' ], '/templates/mail-shipped' );
+check( 'a submission of fields of its own reaches the owner mail through them', str_contains( $shippedMail, '<th>Consent</th><td>on</td>' )
+	&& str_contains( $shippedMail, '<th>Plan</th><td>large</td>' ) && str_contains( $shippedMail, '<th>Since</th><td>2026-02-28</td>' ) );
+@unlink( \Nino\Filesystem::path( $appData, '/templates/mail-shipped.tpl' ) );
+
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ], $appData['./nino/html/shortcodes']['template'], $appData['./nino/callbacks']['/nino/html/shortcode/template'], $appData[ \Nino\Form::FORMS ] );
+$_POST = [];
+
 echo "\n";
 
 
