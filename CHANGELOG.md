@@ -220,12 +220,23 @@ All notable changes to Nino are documented in this file.
 
 ### Fixed
 
+- **Setup wizard:** the Finish step's "Installation complete" heading has its
+  size again - its rule still named the `h1` the markup had until 1.3.
 - **Workbench:** on a screen 320 to 358px wide the rail no longer makes the
   page wider than the screen - the phone rule that let the rail, a column,
   wrap is gone.
 
 ### Removed
 
+- **Setup wizard:** what its own steps never reach - the deletion of a
+  `changeme@domain.com` placeholder account no release ships, the
+  "git-tracked" flag of the checked directories and the "missing" state it
+  fed, the `json` check (PHP 8 has no build without it; README and the
+  deployment guide no longer list it), the fallbacks `_applyWebpage()` kept for
+  a priority, a status code and texts `apiApply()` always sets, the unused
+  `fields` argument of the wizard's `apiCall()`, and
+  `\Nino\Install\Install::setRecoverySecret()` - the Finish step calls
+  `\Nino\Admin\Recovery::set()` itself.
 - **Installer:** the base unit's `assets/script.js`, three empty hooks that no
   bundle ever loaded. A new project no longer gets `private/assets/script.js`;
   one set up earlier keeps its copy, which still loads nowhere and can be

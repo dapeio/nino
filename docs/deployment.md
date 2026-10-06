@@ -16,7 +16,7 @@ Nino requires neither a database server nor a Composer installation on the targe
 The production system requires:
 
 - PHP 8.4 or newer;
-- the `gd`, `mbstring`, `session`, and `json` extensions plus the `PharData` class provided by `Phar`;
+- the `gd`, `mbstring`, and `session` extensions plus the `PharData` class provided by `Phar`;
 - a web server that delivers public files directly and forwards dynamic requests to Nino;
 - HTTPS for all publicly accessible management interfaces;
 - a writable project root before setup so that the setup wizard can create the still missing project directories.

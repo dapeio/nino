@@ -4,11 +4,11 @@ declare(strict_types=1);
 /**
  *	Nino									A compact filesystembased php framework
  *	install-smoke.php		Dependency-free smoke test for the setup wizard
- *												(_install/Install.php). Runs against an isolated sandbox
+ *												(_admin/install/Install.php). Runs against an isolated sandbox
  *												directory, never touches the real project data - in
  *												particular, it never rewrites the real _admin/Admin.php (see the
- *												Finish section below): setRecoverySecret() only takes a
- *												sandboxed path here, exactly so this file is safe to run
+ *												Finish section below): Recovery::set() writes under the
+ *												sandbox's private directory here, so this file is safe to run
  *												against a real checkout.
  *
  *	Usage: php tests/install-smoke.php
@@ -56,9 +56,9 @@ $appData['./nino/filesystem/contentpath']	= $sandbox. '/private';
 $appData['./nino/filesystem/publicpath'] 	= $sandbox. '/public';
 $appData['/nino/dir']										= '';
 $appData['/nino/locales/native']					= 'de_DE';
-// Matches the real shipped config.php default - only the native locale,
-// see Setup::apiApply()'s docblock for why that matters (picking just the
-// native locale must not silently keep some other locale "available" too)
+// Only the native locale - see Setup::apiApply()'s docblock for why that
+// matters (picking just the native locale must not silently keep some other
+// locale "available" too)
 $appData['/nino/locales/available']			= [ 'de_DE' ];
 $appData['/nino/modules']								= [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Elements', '\\Nino\\Modules\\Template', '\\Nino\\Modules\\Jstext', '\\Nino\\Modules\\Csrf', '\\Nino\\Modules\\Images' ];
 
@@ -76,10 +76,12 @@ mkdir( $sandbox. '/private/assets', 0777, true );
 	'/nino/html/assets'				=> [],
 	'/nino/http/routes'				=> [],
 	'/nino/auth/user' => [
+		'disabled@example.com' => [ 'pw' => '$2y$10$bdAzpYYC2Yyn3wyr.kcIf.gtjBwDKm1yNNX6oTpAoak15QHnCS2gm', 'status' => 0, 'sessions' => [], 'perms' => [ '/*' ] ],
 		'changeme@domain.com' => [ 'pw' => '$2y$10$bdAzpYYC2Yyn3wyr.kcIf.gtjBwDKm1yNNX6oTpAoak15QHnCS2gm', 'status' => 0, 'sessions' => [], 'perms' => [ '/*' ] ],
 	],
 ] );
 $appData['/nino/auth/user'] = [
+	'disabled@example.com' => [ 'pw' => '$2y$10$bdAzpYYC2Yyn3wyr.kcIf.gtjBwDKm1yNNX6oTpAoak15QHnCS2gm', 'status' => 0, 'sessions' => [], 'perms' => [ '/*' ] ],
 	'changeme@domain.com' => [ 'pw' => '$2y$10$bdAzpYYC2Yyn3wyr.kcIf.gtjBwDKm1yNNX6oTpAoak15QHnCS2gm', 'status' => 0, 'sessions' => [], 'perms' => [ '/*' ] ],
 ];
 $appData['./nino/auth/baseline'] = $appData['/nino/auth/user'];
@@ -1270,14 +1272,14 @@ echo "Admin::apiList / apiCreate\n";
 
 $adminListRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Accounts::apiList( $appData, $adminListRequest );
-check( 'does not count the shipped, disabled placeholder as a usable admin account', $adminListRequest['/nino/http/response']['body']['users'] === [] );
+check( 'does not count a disabled account as a usable admin account', $adminListRequest['/nino/http/response']['body']['users'] === [] );
 
 $_POST['data'] = json_encode( [ 'password' => 'a-long-enough-admin-password' ] );
 $finishWithoutAdminRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Finish::apiComplete( $appData, $finishWithoutAdminRequest );
 check( 'refuses to lock the installer before an active _editor account exists', $finishWithoutAdminRequest['/nino/http/response']['statusCode'] === 409 );
 
-/*	The other half of usableUsers()' rule. The placeholder above is disabled;
+/*	The other half of usableUsers()' rule. The account above is disabled;
 	an entry that is enabled but carries no password is an array key rather
 	than an account, and must not satisfy the same "at least one admin"
 	precondition merely because the key exists	*/
@@ -1302,7 +1304,7 @@ $createRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Accounts::apiCreate( $appData, $createRequest );
 check( 'creates the account', \Nino\Auth::getUser( $appData, 'admin@example.com' ) !== false );
 check( 'the root account holds the Developer role the Setup step wrote, and full access through it', \Nino\Auth::getUser( $appData, 'admin@example.com' )['role'] === 'developer' && \Nino\Auth::getUser( $appData, 'admin@example.com' )['perms'] === [] && \Nino\Auth::checkPermission( $appData, '/_admin/config/manage', 'admin@example.com' ) === true );
-check( 'drops the shipped placeholder account once a real admin exists', \Nino\Auth::getUser( $appData, 'changeme@domain.com' ) === false );
+check( 'creating an account leaves every other account as it was', array_diff_key( $appData['/nino/auth/user'], [ 'admin@example.com' => 1 ] ) === $appData['./nino/auth/baseline'] );
 check( 'returns only the newly usable account to the frontend', $createRequest['/nino/http/response']['body']['users'] === [ 'admin@example.com' ] );
 check( 'the new account can actually authenticate', \Nino\Auth::loginUser( $appData, 'admin@example.com', 'a-long-enough-password' ) !== false );
 \Nino\Auth::logoutUser( $appData );
@@ -1341,9 +1343,9 @@ check( '...and one of exactly that length is accepted', $atRuleRequest['/nino/ht
 echo "\n";
 
 
-// --- Finish::apiComplete / Install::setRecoverySecret ------------------------
+// --- Finish::apiComplete / Recovery::set ------------------------------------
 
-echo "Finish::apiComplete / Install::setRecoverySecret\n";
+echo "Finish::apiComplete / Recovery::set\n";
 
 $_POST['data'] = json_encode( [ 'password' => 'short' ] );
 $shortFinishRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
@@ -1355,10 +1357,10 @@ $belowFinishRuleRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Finish::apiComplete( $appData, $belowFinishRuleRequest );
 check( '...also one character below the rule the Finish form shows', $belowFinishRuleRequest['/nino/http/response']['statusCode'] === 400 );
 
-// setRecoverySecret() no longer rewrites php source: it stores the hash under
-// the private directory, outside every tool folder and outside config.php.
-// _admin/Admin.php therefore stays byte-identical, which is what makes it
-// replaceable on an update (see Install::setRecoverySecret()'s docblock)
+// The hash is stored under the private directory, outside every tool folder
+// and outside config.php. _admin/Admin.php therefore stays byte-identical,
+// which is what makes it replaceable on an update (see Recovery::set()'s
+// docblock)
 $adminBefore = file_get_contents( __DIR__. '/../_admin/Admin.php' );
 
 $_POST['data'] = json_encode( [ 'password' => 'a brand new dev password' ] );
@@ -1405,7 +1407,7 @@ check( 'a truncated password file reads as no password at all', \Nino\Admin\Reco
 unlink( $pwPath );
 
 check( 'writePasswordHash() refuses an empty hash rather than storing one nothing can match', \Nino\Admin\Recovery::writeHash( $appData, '' ) === false );
-check( 'setRecoverySecret() can write the file again afterwards', \Nino\Install\Install::setRecoverySecret( $appData, 'another dev password' ) === true );
+check( 'Recovery::set() can write the file again afterwards', \Nino\Admin\Recovery::set( $appData, 'another dev password' ) === true );
 check( '...and the new password is the one that verifies', password_verify( 'another dev password', (string) \Nino\Admin\Recovery::hash( $appData ) ) === true );
 
 check( 'the private directory carries its own deny rule', is_file( $sandbox. '/private/.htaccess' ) === true );
@@ -1413,7 +1415,7 @@ check( 'the private directory carries its own deny rule', is_file( $sandbox. '/p
 echo "\n";
 
 
-// --- Shipped defaults (the real, git-tracked config.php + library) ---------
+// --- Shipped defaults (the real library) -----------------------------------
 
 /*	Read-only sanity check on the actual checkout, not the sandbox above.
 	A checkout ships no project at all now - no private/, no config.php, no

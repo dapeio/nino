@@ -253,7 +253,7 @@
 	width: 1.55rem;
 	height: 1.55rem;
 }
-#install-page-wrap .install-finish-intro h1 {
+#install-page-wrap .install-finish-intro h2 {
 	margin: .1rem 0 .22rem;
 	font-size: clamp(1.35rem, 3vw, 1.8rem);
 }
@@ -363,7 +363,7 @@
 	display: none;
 }
 #install-page-wrap.show-webpages.is-editing-webpage #install-content-webpages > .nino-admin-hint,
-#install-page-wrap.show-finish.is-complete #install-content-finish > :is(.nino-admin-hint, .nino-admin-error) {
+#install-page-wrap.show-finish.is-complete #install-content-finish > .nino-admin-hint {
 	display: none;
 }
 

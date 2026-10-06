@@ -175,28 +175,6 @@ namespace Nino\Install {
 		public static function postData(): array {
 			return \Nino\Admin\Admin::postData();
 		}
-
-		/**
-		 *	Hash the posted recovery secret and store it under the private
-		 *	directory (see \Nino\Admin\Recovery).
-		 *
-		 *	Earlier iterations wrote the hash into _admin/Admin.php itself.
-		 *	That is deliberately no longer supported: a tool folder carrying
-		 *	project state cannot be replaced on an update, and replacing it
-		 *	anyway restored the shipped placeholder - which logged the
-		 *	operator out and, because that placeholder is exactly what
-		 *	Admin::isInstalled() reads, handed the wizard back to whoever asked
-		 *	for it. The hash is deliberately not in config.php either, so a
-		 *	Restore cannot roll back the credential that authorises restoring
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$pw						New plaintext _admin password
-		 *
-		 *	@return 	bool										Whether the hash was stored
-		 */
-		public static function setRecoverySecret( array &$appData, string $pw ): bool {
-			return \Nino\Admin\Recovery::set( $appData, $pw );
-		}
 	}
 
 	/**
@@ -220,25 +198,21 @@ namespace Nino\Install {
 			'gd' 				=> 'image cropping/resizing for uploaded images',
 			'mbstring' 	=> 'multibyte-safe string handling (mail headers, admin exports)',
 			'session' 	=> 'admin/dev login sessions',
-			'json' 			=> 'every api response and .json data file',
 		];
 
-		// path relative to the project root -> whether it's expected to
-		// already exist in a fresh checkout (git-tracked) or gets created on
-		// first use - see README.md's Structure section
-		// Virtual paths, resolved per entry - the private ones land under the
-		// private directory, the public ones stay where the webserver reaches
-		// them (see \Nino\Filesystem::path())
+		// Virtual paths, resolved per entry - the private one lands under the
+		// private directory, the public one stays where the webserver reaches it
+		// (see \Nino\Filesystem::path()). '' is the project root.
 		//
-		// Neither half is tracked any more, so on a fresh checkout this step
-		// is the only thing that says whether the wizard will be able to
+		// A checkout carries neither private/ nor public/, so on a fresh one this
+		// step is the only thing that says whether the wizard will be able to
 		// create them at all - which is why it runs first and why a
 		// not-yet-existing directory is judged by its parent's writability
 		// (see _directories())
 		private const array DIRECTORIES = [
-			''				=> true,	// project root - index.php, the tool folders
-			'private'	=> false,	// config.php, templates, text, elements, data, assets
-			'public'	=> false,	// images, fonts, favicon, the generated bundles
+			'',					// project root - index.php, the tool folders
+			'private',	// config.php, templates, text, elements, data, assets
+			'public',		// images, fonts, favicon, the generated bundles
 		];
 
 		/**
@@ -298,7 +272,7 @@ namespace Nino\Install {
 
 			$result = [];
 
-			foreach( self::DIRECTORIES as $rel => $tracked ) {
+			foreach( self::DIRECTORIES as $rel ) {
 
 				// Resolved, not concatenated: a private directory (templates,
 				// text, elements, data) need not sit under the same root as a
@@ -316,7 +290,6 @@ namespace Nino\Install {
 				$result[( $rel === '' ) ? '.' : $rel] = [
 					'exists' 		=> $exists,
 					'writable' 	=> $writable,
-					'tracked'		=> $tracked,
 					'ok'				=> $writable,
 				];
 			}
@@ -1012,13 +985,6 @@ namespace Nino\Install {
 		// own GET response once its login passes.
 		private const array RESERVED_HTTP_URIS = [ '/_admin' ];
 
-		// The priority a menu membership falls back to when the entry
-		// carries no position of its own - apiApply() numbers every entry by
-		// its place in the list, so this only ever applies to a hand-built
-		// post. The middle of the range, same as
-		// Callbacks::registerCallback()'s own default
-		private const int DEFAULT_NAV_PRIO = 5;
-
 		// A fresh entry's text fields when the frontend doesn't post its
 		// own (or posts a blank one) - see apiApply()'s $text loop.
 		// Deliberately generic: unlike a template's own deeper content
@@ -1302,12 +1268,11 @@ namespace Nino\Install {
 				// A page whose meta has never been written yet starts from the
 				// wording its library unit suggests, in every active locale -
 				// the same starter text a page newly picked in this step gets
-				// (see _suggestions()). This is what the shipped config's four
-				// pages look like on a fresh checkout: their routes are
-				// tracked, the /text files they read from are not (see
-				// docs/setup.md), so without this the wizard would apply
-				// "Page"/"Page Title" over a starter site that ships real
-				// wording for both languages
+				// (see _suggestions()). That is a page route nobody wrote text
+				// keys for - one added to config.php by hand with a unit's body,
+				// for instance - and without this the wizard would apply
+				// "Page"/"Page Title" over a unit that ships real wording for
+				// both languages
 				$suggested = $libraryKey !== '' ? self::_suggestions( $libraryKey, $locales )['text'] : [];
 
 				$entryText = [];
@@ -1977,7 +1942,8 @@ namespace Nino\Install {
 		 *	active locale
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		$entry				One webpages-list entry
+		 *	@param		array 		$entry				One webpages-list entry, as apiApply() built it: 'prio',
+		 *															'statusCode' and 'text' for every one of $locales are always set
 		 *	@param		array 		$locales			Picked locales
 		 *	@param		array 		&$routes			(reference) Routes accumulator - starts from what's on
 		 *																	disk (see apiApply()), never from $appData directly
@@ -2020,7 +1986,7 @@ namespace Nino\Install {
 					// to the same unit and must keep the code it carries.
 					// apiApply() has already decided which of the two that is
 					unset( $route['statusCode'] );
-					if( (int) ( $entry['statusCode'] ?? 200 ) !== 200 )
+					if( (int) $entry['statusCode'] !== 200 )
 						$route['statusCode'] = (int) $entry['statusCode'];
 
 					$routes[$routeKey] = $route;
@@ -2089,7 +2055,7 @@ namespace Nino\Install {
 				// so the route it owns is simply put back as it stands
 				$route = [ 'uri' => $entry['uri'], 'body' => (string) $entry['body'] ];
 
-				if( (int) ( $entry['statusCode'] ?? 200 ) !== 200 )
+				if( (int) $entry['statusCode'] !== 200 )
 					$route['statusCode'] = (int) $entry['statusCode'];
 
 				$routes[$routeKey] = $route;
@@ -2103,7 +2069,7 @@ namespace Nino\Install {
 
 				$navs = [];
 				foreach( ( $entry['navs'] ?? [] ) as $navKey )
-					$navs[$navKey] = (int) ( $entry['prio'] ?? self::DEFAULT_NAV_PRIO );
+					$navs[$navKey] = (int) $entry['prio'];
 
 				if( count( $navs ) > 0 )
 					$routes[$routeKey]['navs'] = $navs;
@@ -2131,7 +2097,7 @@ namespace Nino\Install {
 			// has to be written back for a unit-less entry too
 			foreach( $locales as $locale ) {
 
-				$meta = $entry['text'][$locale] ?? self::DEFAULT_TEXT;
+				$meta = $entry['text'][$locale];
 
 				// The same filter the Routes panel's routes/save and
 				// routes/savetexts put these three through: a plain text, so
@@ -2383,11 +2349,6 @@ namespace Nino\Install {
 	 */
 	class Accounts {
 
-		// The shipped, unusable-password placeholder account from config.php -
-		// dropped the moment a real admin account is created, so it doesn't
-		// linger as a permanent dead entry in '/nino/auth/user'
-		private const string PLACEHOLDER_MAIL = 'changeme@domain.com';
-
 		private const int MIN_PW_LENGTH = 8;
 
 		/**
@@ -2468,9 +2429,6 @@ namespace Nino\Install {
 			if( isset( $appData['/nino/auth/user'][$mail] ) === true )
 				\Nino\Auth::deleteUser( $appData, $mail );
 
-			if( $mail !== self::PLACEHOLDER_MAIL && isset( $appData['/nino/auth/user'][self::PLACEHOLDER_MAIL] ) === true )
-				\Nino\Auth::deleteUser( $appData, self::PLACEHOLDER_MAIL );
-
 			$role = isset( $appData['/nino/auth/roles']['developer'] ) === true ? 'developer' : '';
 			\Nino\Auth::insertUser( $appData, $mail, $pw, $role === '' ? [ '/*' ] : [], $role );
 
@@ -2482,7 +2440,7 @@ namespace Nino\Install {
 	 *	Nino							A compact filesystembased php framework
 	 *	Install						Step 6 - the wizard's last step: set the recovery password.
 	 *												Writes it under the private directory rather than into any
-	 *												tool folder (see Install::setRecoverySecret()), and is the one
+	 *												tool folder (see \Nino\Admin\Recovery), and is the one
 	 *												action whose success is itself what locks the wizard back out -
 	 *												Admin::isInstalled() goes true the moment this returns
 	 *
@@ -2532,7 +2490,7 @@ namespace Nino\Install {
 				return;
 			}
 
-			if( \Nino\Install\Install::setRecoverySecret( $appData, $pw ) === false ) {
+			if( \Nino\Admin\Recovery::set( $appData, $pw ) === false ) {
 				\Nino\Http::fail( $request, 500, 'could not write '. \Nino\Admin\Recovery::PASSWORD_PATH. ' under the private directory - check its file permissions' );
 				return;
 			}

@@ -124,7 +124,7 @@ By dispensing with an open plugin system and third-party runtime packages, Nino 
 
 ## Quick Start
 
-Nino requires **PHP 8.4 or newer** with the `gd`, `mbstring`, `session`, and `json` extensions plus the `PharData` class provided by `Phar`. It starts without a package manager or build step:
+Nino requires **PHP 8.4 or newer** with the `gd`, `mbstring`, and `session` extensions plus the `PharData` class provided by `Phar`. It starts without a package manager or build step:
 
 ```bash
 git clone https://github.com/dapeio/nino.git

@@ -2206,11 +2206,18 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	Hash a new secret and store it - the wizard's last step (see
-		 *	\Nino\Install\Install::setRecoverySecret()) and the Recovery
+		 *	Hash a new secret and store it - the wizard's last step
+		 *	(\Nino\Install\Finish::apiComplete()) and the Recovery
 		 *	password tab of the Users pane (see change(), which checks the old
 		 *	one first). recovery.php offers no way to change it; a forgotten
 		 *	secret is the file written by hand (see docs/_admin.md)
+		 *
+		 *	Earlier versions wrote the hash into _admin/Admin.php itself. A tool
+		 *	folder that carries project state cannot be replaced on an update, and
+		 *	replacing it anyway restored the shipped placeholder - which logged the
+		 *	operator out and handed the wizard back to whoever asked. Hence
+		 *	PASSWORD_PATH, and not config.php either: a Restore must not roll back
+		 *	the credential that authorises restoring
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$password			The plaintext secret

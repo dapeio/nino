@@ -64,7 +64,7 @@
 
 			wrap.appendChild( Nino.install.checks._group( 'Directories', Object.keys( data.directories ).map( function( path ) {
 				const dir = data.directories[path];
-				const detail = dir.exists ? ( dir.writable ? 'writable' : 'not writable' ) : ( dir.tracked ? 'missing' : 'created automatically on first use' );
+				const detail = dir.exists ? ( dir.writable ? 'writable' : 'not writable' ) : 'created automatically on first use';
 				return { name : path, detail : detail, ok : dir.ok };
 			} ) ) );
 		},

@@ -15,7 +15,7 @@ Nino benötigt weder Datenbankserver noch Composer-Installation auf dem Zielsyst
 Das produktive System benötigt:
 
 - PHP 8.4 oder neuer;
-- die Erweiterungen `gd`, `mbstring`, `session` und `json` sowie die von `Phar` bereitgestellte Klasse `PharData`;
+- die Erweiterungen `gd`, `mbstring` und `session` sowie die von `Phar` bereitgestellte Klasse `PharData`;
 - einen Webserver, der öffentliche Dateien direkt ausliefert und dynamische Anfragen an Nino weitergibt;
 - HTTPS für alle öffentlich erreichbaren Verwaltungsoberflächen;
 - vor der Einrichtung eine beschreibbare Projektwurzel, damit der Einrichtungsassistent die noch fehlenden Projektverzeichnisse erzeugen kann.
