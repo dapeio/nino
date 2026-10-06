@@ -329,7 +329,7 @@ namespace Nino\Modules\Language {
 
 			if( is_string( $value ) === true )
 				return $type === 'string' && ( $field['html'] ?? false ) === true
-					? \Nino\Html::sanitizeHtml( $value )
+					? \Nino\Html::sanitizeHtml( $value, \Nino\Html::fieldFormat( $field ) )
 					: strip_tags( $value );
 
 			if( $type === 'array' && is_array( $value ) === true )

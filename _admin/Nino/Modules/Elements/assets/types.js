@@ -8,7 +8,9 @@
  *													elements), that part of the file is read back untouched
  *													and saved right along with it server-side. Deleting a type
  *													does destroy that content, and is offered anyway - behind
- *													a typed confirmation, see _renderDangerZone().
+ *													a typed confirmation, see _renderDangerZone(). A field can
+ *													be renamed - its values move with it, see _renames() -
+ *													and a type duplicated, see _renderDuplicate().
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -36,6 +38,12 @@
 		// fields point at it (any at all means the server refuses)
 		_elementCount 	: 0,
 		_referencedBy 	: [],
+		// The type to open once the list has loaded - the copy a duplication
+		// just made (see _duplicate())
+		_openUri 				: null,
+		// What the last save of a rename left that it cannot move, shown once
+		// above the type list - the form it happened in is gone by then
+		_notice 				: '',
 
 		/**
 		 *	Load every element type and render the list
@@ -57,6 +65,12 @@
 				Nino.admin.elementTypes._renderList();
 				Nino.admin.elementTypes._showList();
 				Nino.admin.elementTypes._ready = true;
+
+				const open = Nino.admin.elementTypes._openUri;
+				Nino.admin.elementTypes._openUri = null;
+
+				if( open !== null )
+					Nino.admin.elementTypes._openForm( open );
 			} );
 		},
 
@@ -122,6 +136,15 @@
 
 			const wrap = dc.getElementById('types-list');
 			wrap.innerHTML = '';
+
+			if( Nino.admin.elementTypes._notice !== '' ) {
+				const notice = dc.createElement('p');
+				notice.className = 'nino-admin-hint';
+				notice.setAttribute( 'aria-live', 'polite' );
+				notice.textContent = Nino.admin.elementTypes._notice;
+				wrap.appendChild( notice );
+				Nino.admin.elementTypes._notice = '';
+			}
 
 			if( Nino.admin.elementTypes._types.length === 0 )
 				wrap.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/types/empty') ) );
@@ -195,7 +218,9 @@
 				Nino.admin.elementTypes._isNew 			= false;
 				Nino.admin.elementTypes._currentUri = response.uri;
 				Nino.admin.elementTypes._fields 		= Object.keys( response.model ).map( function( key ) {
-					return Object.assign( { key : key }, response.model[key] );
+					// The name it is saved under: a field renamed here is moved from this
+					// one to the new (see _renames())
+					return Object.assign( { key : key, originalKey : key }, response.model[key] );
 				} );
 				Nino.admin.elementTypes._elementCount = response.elements ?? 0;
 				Nino.admin.elementTypes._referencedBy = response.referencedBy ?? [];
@@ -210,7 +235,7 @@
 		 *	width+height and the field holding the alt text for image; the referenced type for element; suffix for
 		 *	the types the server names, see _suffixTypes; options for a fixed value list)
 		 *
-		 *	@param		{Object}	field					{ key, type, locale, html, required, maxlength, inputsize, width, height, alt, elementType, suffix, options }
+		 *	@param		{Object}	field					{ key, originalKey, type, locale, html, blocks, breaks, required, maxlength, inputsize, width, height, alt, elementType, suffix, options }
 		 *	@param		{number}	index					Index into _fields, for the remove button
 		 *
 		 *	@return		{Element}
@@ -226,6 +251,27 @@
 			keyInput.value = field.key ?? '';
 			keyInput.className = 'admin-field-key';
 			row.appendChild( keyInput );
+
+			// A field that is saved keeps the name it was saved under on the row, so
+			// a rename can be told from a new field however the rows are moved or
+			// redrawn, and says so while it differs
+			if( field.originalKey !== undefined ) {
+
+				row.dataset.originalKey = field.originalKey;
+
+				const renamed = dc.createElement('p');
+				renamed.className = 'nino-admin-hint admin-field-renamed';
+				renamed.textContent = Nino.content.getText('/_admin/types/hint/renamed');
+
+				const showRenamed = function() {
+					const key = keyInput.value.trim();
+					renamed.hidden = ( key === '' || key === field.originalKey );
+				};
+
+				keyInput.addEventListener( 'input', showRenamed );
+				showRenamed();
+				row.appendChild( renamed );
+			}
 
 			const typeSelect = dc.createElement('select');
 			Nino.admin.elementTypes._fieldTypes.forEach( function( t ) {
@@ -298,6 +344,36 @@
 					htmlLabel.appendChild( htmlCheck );
 					htmlLabel.appendChild( dc.createTextNode( ' '+ Nino.content.getText('/_admin/types/label/richtext') ) );
 					optionsWrap.appendChild( htmlLabel );
+
+					// What goes with the one above: paragraphs and lists for rich
+					// text, line breaks for plain text - each offered only while it
+					// can apply, and dropped by Types.php's cleanModel() where it
+					// cannot
+					const blocksLabel = dc.createElement('label');
+					const blocksCheck = dc.createElement('input');
+					blocksCheck.type = 'checkbox';
+					blocksCheck.className = 'admin-field-blocks';
+					blocksCheck.checked = field.blocks === true;
+					blocksLabel.appendChild( blocksCheck );
+					blocksLabel.appendChild( dc.createTextNode( ' '+ Nino.content.getText('/_admin/types/label/blocks') ) );
+					optionsWrap.appendChild( blocksLabel );
+
+					const breaksLabel = dc.createElement('label');
+					const breaksCheck = dc.createElement('input');
+					breaksCheck.type = 'checkbox';
+					breaksCheck.className = 'admin-field-breaks';
+					breaksCheck.checked = field.breaks === true;
+					breaksLabel.appendChild( breaksCheck );
+					breaksLabel.appendChild( dc.createTextNode( ' '+ Nino.content.getText('/_admin/types/label/breaks') ) );
+					optionsWrap.appendChild( breaksLabel );
+
+					const syncFormat = function() {
+						blocksCheck.disabled = htmlCheck.checked === false;
+						breaksCheck.disabled = htmlCheck.checked === true;
+					};
+
+					htmlCheck.addEventListener( 'change', syncFormat );
+					syncFormat();
 
 					const maxlengthInput = dc.createElement('input');
 					maxlengthInput.type = 'number';
@@ -430,7 +506,10 @@
 					// itself (Types.php's cleanModel() decides the same on save).
 					// Offered from the rows as they stand now, so a field added a
 					// moment ago is there - the list is rebuilt when the control
-					// takes the focus, keeping what is chosen
+					// takes the focus, keeping what is chosen. A field is named by
+					// the name it was saved under (and by its key while it is new),
+					// shown by the key it has now: renaming it does not unlink it,
+					// and apiSave() reads the link through the renames
 					const altLabel = dc.createElement('label');
 					altLabel.className = 'nino-admin-field';
 					const altSpan = dc.createElement('span');
@@ -451,10 +530,11 @@
 						Nino.admin.elementTypes._fields.forEach( function( other ) {
 							if( other.key === '' || other.key === keyInput.value || other.type !== 'string' || other.locale !== true || other.html === true )
 								return;
+							const name = other.originalKey ?? other.key;
 							const opt = dc.createElement('option');
-							opt.value = other.key;
+							opt.value = name;
 							opt.textContent = other.key;
-							opt.selected = ( other.key === current );
+							opt.selected = ( name === current );
 							altSelect.appendChild( opt );
 						} );
 					};
@@ -586,12 +666,16 @@
 				const options = row.querySelector('.admin-field-select-options');
 				fields.push( {
 					key 			: row.querySelector('.admin-field-key').value,
+					// Undefined on a field that is not saved yet - see _renames()
+					originalKey : row.dataset.originalKey,
 					type 			: row.querySelector('select').value,
 					locale 		: row.querySelector('.admin-field-locale').checked,
 					// Absent on an image row, which is never offered the checkbox
 					// (see _renderFieldRow()) - false, not "keep whatever was there"
 					required 	: ( row.querySelector('.admin-field-required')?.checked ) ?? false,
 					html 			: ( row.querySelector('.admin-field-html')?.checked ) ?? false,
+					blocks 		: ( row.querySelector('.admin-field-blocks')?.checked ) ?? false,
+					breaks 		: ( row.querySelector('.admin-field-breaks')?.checked ) ?? false,
 					maxlength : row.querySelector('.admin-field-maxlength')?.value,
 					inputsize : row.querySelector('.admin-field-inputsize')?.value,
 					width 		: row.querySelector('.admin-field-width')?.value,
@@ -708,10 +792,12 @@
 			} );
 			form.appendChild( addFieldBtn );
 
-			// Last thing in the form body, below the fields and above the
+			// Last things in the form body, below the fields and above the
 			// pinned actions row: nothing here is reached on the way to Save
-			if( Nino.admin.elementTypes._isNew === false )
+			if( Nino.admin.elementTypes._isNew === false ) {
+				form.appendChild( Nino.admin.elementTypes._renderDuplicate() );
 				form.appendChild( Nino.admin.elementTypes._renderDangerZone() );
+			}
 
 			// Save + its message in the shared actions row every module's form
 			// ends on - style.css pins that row to the bottom of the
@@ -738,6 +824,129 @@
 			// What the form holds now is what is saved
 			if( typeof Nino.admin.dirty === 'object' )
 				Nino.admin.dirty.snapshot( 'types' );
+		},
+
+		/**
+		 *	Copy the open type under a new uri. The copy is made here, from the form
+		 *	as it stands - its title, its fields and whether it numbers its
+		 *	elements - and created like any new type, so what the server keeps of
+		 *	it is what it keeps of any model: the defaults a new element starts with
+		 *	and a hand-written whitelist or callback stay with the original
+		 *
+		 *	@return		{Element}
+		 */
+		_renderDuplicate : function() {
+
+			const wrap = dc.createElement('fieldset');
+			wrap.className = 'nino-admin-card admin-type-duplicate';
+
+			const legend = dc.createElement('legend');
+			legend.textContent = Nino.content.getText('/_admin/types/label/duplicate');
+			wrap.appendChild( legend );
+
+			const hint = dc.createElement('p');
+			hint.className = 'nino-admin-hint';
+			hint.textContent = Nino.content.getText('/_admin/types/hint/duplicate');
+			wrap.appendChild( hint );
+
+			const row = dc.createElement('div');
+			row.className = 'admin-type-duplicate-row';
+
+			// What is typed here is not an edit of the type
+			const uriInput = dc.createElement('input');
+			uriInput.type = 'text';
+			uriInput.id = 'admin-form-duplicate-uri';
+			uriInput.autocomplete = 'off';
+			uriInput.dataset.dirty = 'ignore';
+			uriInput.placeholder = Nino.content.getText('/_admin/types/placeholder/duplicate-uri');
+			uriInput.setAttribute( 'aria-label', Nino.content.getText('/_admin/types/placeholder/duplicate-uri') );
+			row.appendChild( uriInput );
+
+			const titleInput = dc.createElement('input');
+			titleInput.type = 'text';
+			titleInput.id = 'admin-form-duplicate-title';
+			titleInput.autocomplete = 'off';
+			titleInput.dataset.dirty = 'ignore';
+			titleInput.placeholder = Nino.content.getText('/_admin/types/placeholder/duplicate-title');
+			titleInput.setAttribute( 'aria-label', Nino.content.getText('/_admin/types/placeholder/duplicate-title') );
+			row.appendChild( titleInput );
+
+			const button = dc.createElement('button');
+			button.type = 'button';
+			button.className = 'nino-admin-btn-secondary';
+			button.textContent = Nino.content.getText('/_admin/types/label/duplicate');
+			button.addEventListener( 'click', function() { Nino.admin.elementTypes._duplicate() } );
+			row.appendChild( button );
+
+			wrap.appendChild( row );
+
+			const msg = dc.createElement('p');
+			msg.id = 'admin-form-duplicate-msg';
+			msg.setAttribute( 'aria-live', 'polite' );
+			wrap.appendChild( msg );
+
+			return wrap;
+		},
+
+		/**
+		 *	Send the duplication the form above asks for, then open the copy.
+		 *	Opening it drops this form, and the Elements form next door is
+		 *	dropped by what a new type is, so unsaved input is asked about first
+		 *
+		 *	@param		{boolean}	[guarded]			The unsaved input was asked about already
+		 *
+		 *	@return		void
+		 */
+		_duplicate : function( guarded ) {
+
+			const uri 		= Nino.admin.elementTypes._currentUri;
+			const newUri 	= dc.getElementById('admin-form-duplicate-uri').value.trim();
+			let title 			= dc.getElementById('admin-form-duplicate-title').value.trim();
+			const msg 		= dc.getElementById('admin-form-duplicate-msg');
+
+			if( uri === null )
+				return;
+
+			if( guarded !== true ) {
+
+				if( typeof Nino.admin.dirty !== 'object' ) {
+					Nino.admin.elementTypes._duplicate( true );
+					return;
+				}
+
+				Nino.admin.dirty.guard( [ 'types', 'elements' ], function() { Nino.admin.elementTypes._duplicate( true ) } );
+				return;
+			}
+
+			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
+
+			const model 					= Nino.admin.elementTypes._buildModel();
+			const renames 				= Nino.admin.elementTypes._renames();
+			const autoincrement 	= dc.querySelector('#admin-form-autoincrement input').checked;
+
+			// The copy has no saved names: an alt link is made to the name its
+			// field has now
+			Object.keys( model ).forEach( function( key ) {
+				if( Object.prototype.hasOwnProperty.call( renames, model[key].alt ) === true )
+					model[key].alt = renames[model[key].alt];
+			} );
+
+			if( title === '' )
+				title = dc.getElementById('admin-form-title').value.trim();
+
+			Nino.admin.elementTypes._apiCall( 'create', { uri : newUri, title : title, model : model, autoincrement : autoincrement }, function( status, response ) {
+
+				if( status !== 200 || response === null ) {
+					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
+					return;
+				}
+
+				Nino.admin.elementTypes._openUri 		= response.uri;
+				Nino.admin.elementTypes._currentUri = null;
+				Nino.admin.elementTypes._fields 		= [];
+				Nino.admin.elementTypes.init();
+				Nino.admin.elementTypes._invalidateElements();
+			} );
 		},
 
 		/**
@@ -869,6 +1078,54 @@
 		},
 
 		/**
+		 *	The renames this save carries: { name it was saved under: name it has
+		 *	now } for every field that was loaded from the type and has a different,
+		 *	non-empty key. A field added here has no original key and is never a
+		 *	rename, and a key that was emptied is a field taken out of the model,
+		 *	not one renamed to nothing. Types::apiSave() moves the stored values
+		 *	from the one to the other
+		 *
+		 *	@return		{Object}
+		 */
+		_renames : function() {
+
+			Nino.admin.elementTypes._storeFields();
+
+			const renames = {};
+
+			Nino.admin.elementTypes._fields.forEach( function( field ) {
+
+				const key = field.key.trim();
+
+				if( field.originalKey !== undefined && key !== '' && key !== field.originalKey )
+					renames[field.originalKey] = key;
+			} );
+
+			return renames;
+		},
+
+		/**
+		 *	What a save of renames left that it cannot move, as one line: the
+		 *	templates, the permissions and the label texts that still use the old
+		 *	name, as Types::apiSave() reports them
+		 *
+		 *	@param		{Array}		references		[ { kind, name, field } ]
+		 *
+		 *	@return		{string}									'' when nothing is left
+		 */
+		_referenceNotice : function( references ) {
+
+			if( Array.isArray( references ) === false || references.length === 0 )
+				return '';
+
+			const items = references.map( function( reference ) {
+				return Nino.adminUi.format( Nino.content.getText('/_admin/types/reference/'+ reference.kind ), reference.name, reference.field );
+			} );
+
+			return Nino.adminUi.format( Nino.content.getText('/_admin/types/notice/references'), items.join(', ') );
+		},
+
+		/**
 		 *	Build the model object apiSave()/apiCreate() expect from the
 		 *	current field rows, skipping rows with no key
 		 *
@@ -892,6 +1149,8 @@
 					locale 			: field.locale,
 					required 		: field.required,
 					html 				: field.html,
+					blocks 			: field.blocks,
+					breaks 			: field.breaks,
 					maxlength 	: field.maxlength,
 					inputsize 	: field.inputsize,
 					width 			: field.width,
@@ -975,6 +1234,19 @@
 			const title = dc.getElementById('admin-form-title').value;
 			const model = Nino.admin.elementTypes._buildModel();
 			const autoincrement = dc.querySelector('#admin-form-autoincrement input').checked;
+			const renames = Nino.admin.elementTypes._isNew === true ? {} : Nino.admin.elementTypes._renames();
+
+			// A rename moves stored values and leaves the rest where it is: said
+			// before it is made, with what it does not reach
+			if( Object.keys( renames ).length > 0 ) {
+
+				const pairs = Object.keys( renames ).map( function( old ) { return old+ ' \u2192 '+ renames[old] } ).join(', ');
+
+				if( wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/types/confirm/rename'), pairs ) ) === false ) {
+					report( false );
+					return;
+				}
+			}
 
 			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
 
@@ -997,13 +1269,14 @@
 				return;
 			}
 
-			Nino.admin.elementTypes._apiCall( 'save', { uri : Nino.admin.elementTypes._currentUri, title : title, model : model, autoincrement : autoincrement }, function( status, response ) {
+			Nino.admin.elementTypes._apiCall( 'save', { uri : Nino.admin.elementTypes._currentUri, title : title, model : model, autoincrement : autoincrement, renames : renames }, function( status, response ) {
 				if( status !== 200 || response === null ) {
 					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
 					report( false );
 					return;
 				}
 				msg.textContent = Nino.content.getText('/_admin/common/msg/saved');
+				Nino.admin.elementTypes._notice = Nino.admin.elementTypes._referenceNotice( response.references );
 				Nino.admin.elementTypes._saved();
 				Nino.admin.elementTypes.init();
 				Nino.admin.elementTypes._invalidateElements();

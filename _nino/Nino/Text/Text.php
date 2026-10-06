@@ -24,10 +24,26 @@ namespace Nino {
 		private const int MAXLENGTH_BUFFER = 150;
 		private const int HARD_MAXLENGTH 	= 20000;
 
+		// Where a key's format and limit are kept, when someone has decided
+		// them: ['/the/key' => ['format' => 'blocks', 'maxlength' => 400]].
+		// Neither is required - a key without an entry takes its format from
+		// what it holds and its limit from how long it is
+		public const string META_PATH = '/text/meta.php';
+
+		// The most an explicit limit may be: every character of it fits the
+		// hard byte limit above, at four bytes a character
+		public const int MAX_LIMIT = self::HARD_MAXLENGTH / 4;
+
 		// Every known key across global.php + every locale file, with its
-		// current value(s), whether it's global or per-locale, whether it
-		// currently holds markup, a maxlength derived from its longest
-		// current value, and whether it's blacklisted (see blacklist()).
+		// current value(s), whether it's global or per-locale, its format
+		// (the one set in meta(), else the widest the values hold - 'html' is
+		// whether that is more than plain text), a maxlength (the one set,
+		// else derived from its longest current value), and whether it's
+		// blacklisted (see blacklist()). 'formatSet' and 'maxlengthSet' say
+		// whether the two come from meta() or from the values. A limit that is
+		// set is never shorter than the longest text the key holds - a longer
+		// one written later (an import, the wizard, a feature) is not cut by
+		// the editor at its first keystroke.
 		// $includeBlacklisted controls whether a blacklisted key is skipped
 		// entirely or just flagged - the Text panel hides them, Text Keys
 		// editor needs to see them to be able to un-blacklist one.
@@ -41,6 +57,7 @@ namespace Nino {
 				$localeData[$locale] = \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
 
 			$blacklist = self::blacklist( $appData );
+			$meta 		 = self::meta( $appData );
 
 			$bracketKeys = array_keys( $global );
 			foreach( $localeData as $data )
@@ -63,7 +80,8 @@ namespace Nino {
 					: array_map( fn( array $data ) => $data[$bracketKey] ?? null, $localeData );
 
 				$longest 	= 0;
-				$html 		= false;
+				$visible 	= 0;
+				$detected = 0;
 
 				// A value a developer wrote as something other than a string - an
 				// int year, a list - used to reach strlen(), which under
@@ -83,18 +101,25 @@ namespace Nino {
 
 					$values[$locale]	= (string) $value;
 					$longest 					= max( $longest, strlen( $values[$locale] ) );
-					$html 						= $html || \Nino\Html::containsHtml( $values[$locale] );
+					$visible 					= max( $visible, self::visibleLength( $values[$locale] ) );
+					$detected 				= max( $detected, (int) array_search( \Nino\Html::detectFormat( $values[$locale] ), \Nino\Html::FORMATS, true ) );
 				}
 
 				if( $values === [] )
 					continue;
 
+				$format = $meta[$key]['format'] ?? \Nino\Html::FORMATS[$detected];
+				$limit 	= $meta[$key]['maxlength'] ?? null;
+
 				$entries[] = [
 					'key' 				=> $key,
 					'global' 			=> $isGlobal,
 					'blacklisted' => $isBlacklisted,
-					'html' 				=> $html,
-					'maxlength' 	=> min( self::MAX_MAXLENGTH, max( self::MIN_MAXLENGTH, $longest + self::MAXLENGTH_BUFFER ) ),
+					'html' 				=> $format !== 'plain',
+					'format' 			=> $format,
+					'formatSet' 	=> isset( $meta[$key]['format'] ),
+					'maxlength' 	=> $limit !== null ? max( $limit, $visible ) : min( self::MAX_MAXLENGTH, max( self::MIN_MAXLENGTH, $longest + self::MAXLENGTH_BUFFER ) ),
+					'maxlengthSet' => $limit !== null,
 					'values' 			=> $values,
 				];
 			}
@@ -111,6 +136,115 @@ namespace Nino {
 					return $entry;
 
 			return null;
+		}
+
+		// The format and limit somebody decided for a key, read from
+		// /text/meta.php: ['/the/key' => ['format' => ..., 'maxlength' => ...]].
+		// The file is editable, so what is not a format or a limit is left
+		// out here rather than trusted
+		public static function meta( array &$appData ): array {
+
+			$stored = \Nino\Filesystem::getFileContent( $appData, self::META_PATH, [] );
+			$meta 	= [];
+
+			foreach( is_array( $stored ) === true ? $stored : [] as $key => $settings ) {
+
+				if( is_string( $key ) === false || is_array( $settings ) === false )
+					continue;
+
+				$entry = [];
+
+				if( in_array( $settings['format'] ?? null, \Nino\Html::FORMATS, true ) === true )
+					$entry['format'] = $settings['format'];
+
+				if( is_int( $settings['maxlength'] ?? null ) === true && $settings['maxlength'] >= 1 && $settings['maxlength'] <= self::MAX_LIMIT )
+					$entry['maxlength'] = $settings['maxlength'];
+
+				if( $entry !== [] )
+					$meta[$key] = $entry;
+			}
+
+			return $meta;
+		}
+
+		// Set one key's format and limit in /text/meta.php - what both are to
+		// be afterwards: null takes a setting away, so the key goes back to
+		// what its values say, and an entry left with neither is dropped.
+		// Answers whether the file is as asked
+		public static function setMeta( array &$appData, string $key, ?string $format, ?int $maxlength ): bool {
+			return self::updateMeta( $appData, $key, [ 'format' => $format, 'maxlength' => $maxlength ] );
+		}
+
+		// Change some of one key's settings in /text/meta.php: $changes names
+		// the ones to set ('format', 'maxlength'), null takes one away, and a
+		// setting it leaves out is left as the file has it - read and written
+		// under the one lock, so two requests that change different settings
+		// of a key both land. Answers whether the file is as asked
+		public static function updateMeta( array &$appData, string $key, array $changes ): bool {
+
+			$changes = array_intersect_key( $changes, [ 'format' => 1, 'maxlength' => 1 ] );
+
+			if( isset( $changes['format'] ) === true && in_array( $changes['format'], \Nino\Html::FORMATS, true ) === false )
+				return false;
+
+			if( isset( $changes['maxlength'] ) === true && ( is_int( $changes['maxlength'] ) === false || $changes['maxlength'] < 1 || $changes['maxlength'] > self::MAX_LIMIT ) )
+				return false;
+
+			$unchanged = false;
+
+			$written = \Nino\Filesystem::mutate( $appData, self::META_PATH, function( mixed $meta ) use ( $key, $changes, &$unchanged ): ?array {
+
+				$meta 		= is_array( $meta ) === true ? $meta : [];
+				$settings = array_merge( is_array( $meta[$key] ?? null ) === true ? $meta[$key] : [], $changes );
+				$entry 		= array_filter( [ 'format' => $settings['format'] ?? null, 'maxlength' => $settings['maxlength'] ?? null ], fn( mixed $setting ) => $setting !== null );
+
+				// Nothing to write: mutate() reads a null as "abort", which is
+				// not a failure here
+				if( $entry === [] ? array_key_exists( $key, $meta ) === false : ( $meta[$key] ?? null ) === $entry ) {
+					$unchanged = true;
+					return null;
+				}
+
+				if( $entry === [] )
+					unset( $meta[$key] );
+				else
+					$meta[$key] = $entry;
+
+				return $meta;
+			} );
+
+			return $written === true || $unchanged === true;
+		}
+
+		// Give a key's settings to its new name in /text/meta.php: one
+		// mutation, so nothing is left under the old name and a change made
+		// meanwhile is not lost. A key without settings has nothing to move.
+		// Answers whether the file is as asked
+		public static function moveMeta( array &$appData, string $key, string $newKey ): bool {
+
+			$unchanged = false;
+
+			$written = \Nino\Filesystem::mutate( $appData, self::META_PATH, function( mixed $meta ) use ( $key, $newKey, &$unchanged ): ?array {
+
+				if( is_array( $meta ) === false || array_key_exists( $key, $meta ) === false ) {
+					$unchanged = true;
+					return null;
+				}
+
+				$meta[$newKey] = $meta[$key];
+				unset( $meta[$key] );
+
+				return $meta;
+			} );
+
+			return $written === true || $unchanged === true;
+		}
+
+		// How many characters of a value a person sees: the tags are not
+		// text, and an entity is one character. What a key's limit is
+		// measured in - the editor counts the same way
+		public static function visibleLength( string $value ): int {
+			return mb_strlen( html_entity_decode( strip_tags( $value ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ), 'UTF-8' );
 		}
 
 		// Read the developer-maintained list of keys hidden from the workbench's
@@ -182,7 +316,7 @@ namespace Nino {
 					continue;
 				}
 
-				$value = self::sanitizeValue( $value, $entry['html'] === true );
+				$value = self::sanitizeValue( $value, $entry['format'] );
 
 				$file = ( $entry['global'] === true ) ? '/text/global.php' : '/text/'. $locale. '.php';
 
@@ -213,7 +347,17 @@ namespace Nino {
 		// _admin's JSON translation import. Keeping it here prevents import
 		// from bypassing the hard length limit and HTML whitelist that the form
 		// itself enforces.
-		public static function sanitizeValue( string $value, bool $html ): string {
+		//
+		// $format is one of \Nino\Html::FORMATS; true is 'inline' and false is
+		// 'plain', which is what the parameter was before there were more. A
+		// name that is none of them is read as 'plain': the narrowest answer.
+		// 'lines' and 'blocks' read a newline of the value as a break or a
+		// paragraph - a form posts the text of a textarea, and a value may
+		// move from plain to either with one
+		public static function sanitizeValue( string $value, bool|string $format ): string {
+
+			if( is_bool( $format ) === true )
+				$format = $format === true ? 'inline' : 'plain';
 
 			/*	mb_strcut() rather than substr(): the limit is a byte count -
 				what the file on disk has to stay under - but a cut at a byte
@@ -229,8 +373,13 @@ namespace Nino {
 				one character less of it, and always utf-8.	*/
 			$value = mb_strcut( $value, 0, self::HARD_MAXLENGTH, 'UTF-8' );
 
-			if( $html === true )
-				return self::_neutralizeShortcodes( \Nino\Html::sanitizeHtml( $value ) );
+			if( in_array( $format, [ 'inline', 'lines', 'blocks' ], true ) === true )
+				return self::_neutralizeShortcodes( \Nino\Html::sanitizeHtml( $value, $format ) );
+
+			// A break or the end of a block is a line of the text, not nothing:
+			// strip_tags() alone writes 'Amtsgericht<br>Musterstadt' as
+			// 'AmtsgerichtMusterstadt'
+			$value = \Nino\Html::breaksToNewlines( $value );
 
 			// strip_tags() answers "no markup of its own", which is the whole
 			// requirement as long as a fill lands in text content. It does not

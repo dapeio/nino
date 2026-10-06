@@ -297,7 +297,7 @@
 				label.appendChild( span );
 				const mount = dc.createElement('div');
 				label.appendChild( mount );
-				Nino.admin.text._htmlEditors[entry.key] = Nino.admin.htmlEditor.create( mount, value ?? '', entry.maxlength );
+				Nino.admin.text._htmlEditors[entry.key] = Nino.admin.htmlEditor.create( mount, value ?? '', entry.maxlength, 0, entry.format );
 				return label;
 			}
 

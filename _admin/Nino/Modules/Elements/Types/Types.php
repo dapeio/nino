@@ -204,8 +204,10 @@ namespace Nino\Modules\Elements {
 		 *	same rules as \Nino\Elements::insertElementType(), plus width/height for
 		 *	image fields, maxlength and inputsize for string fields, the referenced type for
 		 *	element fields, a fixed unit suffix for every type but boolean/
-		 *	image/element, a plain string list for options, and for an image
-		 *	field the string field that holds its alt text (see below)
+		 *	image/element, a plain string list for options, for an image
+		 *	field the string field that holds its alt text (see below), and for
+		 *	a string field what goes with its html - 'blocks' for paragraphs and
+		 *	lists - or, without it, 'breaks' for the line breaks of its text
 		 *
 		 *	@param		mixed			$model				Posted model, expected array<string,array>
 		 *
@@ -232,6 +234,17 @@ namespace Nino\Modules\Elements {
 
 				if( $data['type'] === 'string' && ( $data['html'] ?? false ) === true )
 					$field['html'] = true;
+
+				// What the html of a field may hold beyond the inline tags
+				// (paragraphs and lists), and - for a field without html - whether
+				// the line breaks of its text are kept on the page. Each only where
+				// it can mean something, and never both: a field is rich text or it
+				// is plain text (see \Nino\Html::fieldFormat())
+				if( isset( $field['html'] ) === true && ( $data['blocks'] ?? false ) === true )
+					$field['blocks'] = true;
+
+				if( $data['type'] === 'string' && isset( $field['html'] ) === false && ( $data['breaks'] ?? false ) === true )
+					$field['breaks'] = true;
 
 				// Never on an image, whatever was posted: its file is uploaded
 				// separately, once the element already exists and has a uri to
@@ -401,6 +414,24 @@ namespace Nino\Modules\Elements {
 		 *	can legitimately override a global default), that stale locale
 		 *	value would keep winning over the new global one forever.
 		 *
+		 *	A field can also be renamed: 'renames' is { old key: new key }, and
+		 *	every value stored under the old key - in '*' and in every locale
+		 *	bucket, the defaults entry of each included, whether the locale is
+		 *	still available or not - moves to the new one, so renaming a field
+		 *	is not the same as deleting one and adding another. Several renames
+		 *	in one save are read against the type as it was, so a swap (a to
+		 *	b, b to a) and a chain (a to b, b to c) both work. What it refuses,
+		 *	by name and with a 409: two renames to the same key, a key an
+		 *	unrenamed field already has, a key that still holds the values of a
+		 *	field that was removed earlier (the editor never deletes data on
+		 *	removal, and they would turn up in elements that never had them),
+		 *	and an image field renamed onto the key of another one - an
+		 *	upload's file name is made of the field key, so the two would
+		 *	overwrite each other's pictures. An image's link to the field that
+		 *	holds its alt text follows the rename (see _renamedAlts()). What the
+		 *	rename cannot reach is reported instead of changed - see
+		 *	_renameReferences().
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
 		 *
@@ -419,7 +450,16 @@ namespace Nino\Modules\Elements {
 				return;
 			}
 
-			$danglingReference = self::_unknownReferencedType( $appData, self::cleanModel( $data['model'] ?? [] ) );
+			$renames = self::_postedRenames( $data['renames'] ?? [] );
+
+			if( $renames === null ) {
+				\Nino\Http::fail( $request, 400, 'renames must name fields', 'types_renames' );
+				return;
+			}
+
+			$data['model'] = self::_renamedAlts( $data['model'] ?? [], $renames );
+
+			$danglingReference = self::_unknownReferencedType( $appData, self::cleanModel( $data['model'] ) );
 
 			if( $danglingReference !== null ) {
 				\Nino\Http::fail( $request, 400, $danglingReference );
@@ -433,9 +473,10 @@ namespace Nino\Modules\Elements {
 			// could walk away holding the lock (see Filesystem::mutate()'s
 			// docblock)
 			$notFound 			= false;
+			$refused 				= false;
 			$resultTypeData	= null;
 
-			$written = \Nino\Filesystem::mutate( $appData, '/elements/'. $typeUri. '.php', function( mixed $typeData ) use ( $appData, $data, $typeUri, &$notFound, &$resultTypeData ): ?array {
+			$written = \Nino\Filesystem::mutate( $appData, '/elements/'. $typeUri. '.php', function( mixed $typeData ) use ( $appData, $data, $typeUri, $renames, &$request, &$notFound, &$refused, &$resultTypeData ): ?array {
 
 				if( $typeData === false ) {
 					$notFound = true;
@@ -444,7 +485,25 @@ namespace Nino\Modules\Elements {
 
 				$title 		= trim( (string) ( $data['title'] ?? '' ) );
 				$oldModel = $typeData['model'] ?? [];
-				$newModel = self::cleanModel( $data['model'] ?? [] );
+				$newModel = self::cleanModel( $data['model'] );
+
+				if( $renames !== [] ) {
+
+					$refused = self::_refuseRenames( $request, $typeData, $oldModel, $newModel, $renames );
+
+					if( $refused === true )
+						return null;
+
+					self::_renameFields( $typeData, $renames );
+
+					// The old model, as it reads now: what the shape check below
+					// compares a field against is the field it was, under the key it
+					// has been given
+					$renamed = [];
+					foreach( $oldModel as $key => $field )
+						$renamed[ $renames[$key] ?? $key ] = $field;
+					$oldModel = $renamed;
+				}
 
 				foreach( $newModel as $key => $field ) {
 					if( array_key_exists( $key, $oldModel ) === false )
@@ -482,6 +541,11 @@ namespace Nino\Modules\Elements {
 				return;
 			}
 
+			// The refusal is in the response already - said by _refuseRenames()
+			// where it was found, inside the lock
+			if( $refused === true )
+				return;
+
 			if( $written === false ) {
 				\Nino\Http::fail( $request, 500, 'could not save the type file' );
 				return;
@@ -492,7 +556,218 @@ namespace Nino\Modules\Elements {
 				'title' 				=> $resultTypeData['title'],
 				'model' 				=> $resultTypeData['model'],
 				'autoincrement' => \Nino\Elements::readAutoincrement( $resultTypeData ) !== null,
+				'renamed' 			=> $renames,
+				'references' 		=> self::_renameReferences( $appData, $typeUri, $renames ),
 			] );
+		}
+
+		/**
+		 *	The renames of a save, as { old: new } with both sides trimmed like
+		 *	cleanModel() trims a key. A rename to the name a field already has
+		 *	is no rename and is left out.
+		 *
+		 *	@param		mixed			$posted				The posted 'renames'
+		 *
+		 *	@return 	array|null								null when it is not an object of non-empty strings
+		 */
+		private static function _postedRenames( mixed $posted ): ?array {
+
+			if( is_array( $posted ) === false )
+				return null;
+
+			$renames = [];
+
+			foreach( $posted as $old => $new ) {
+
+				if( is_string( $new ) === false )
+					return null;
+
+				$old = trim( (string) $old );
+				$new = trim( $new );
+
+				if( $old === '' || $new === '' )
+					return null;
+
+				if( $old !== $new )
+					$renames[$old] = $new;
+			}
+
+			return $renames;
+		}
+
+		/**
+		 *	The posted model with every image's alt link under the new name of the
+		 *	field it points at. The form names a field the way it was saved while
+		 *	that field is in the form, so a rename in the same save leaves the
+		 *	link at the old name - which cleanModel() would drop without a word,
+		 *	and a rename is not a removal
+		 *
+		 *	@param		mixed			$model				The posted model
+		 *	@param		array 		$renames			{ old: new }, as _postedRenames() returns them
+		 *
+		 *	@return 	mixed											The model, the links renamed
+		 */
+		private static function _renamedAlts( mixed $model, array $renames ): mixed {
+
+			if( is_array( $model ) === false || $renames === [] )
+				return $model;
+
+			foreach( $model as $key => $field ) {
+
+				if( is_array( $field ) === false || is_string( $field['alt'] ?? null ) === false )
+					continue;
+
+				$model[$key]['alt'] = $renames[ trim( $field['alt'] ) ] ?? $field['alt'];
+			}
+
+			return $model;
+		}
+
+		/**
+		 *	Whether a set of renames can be applied to a type as it stands now
+		 *	- see apiSave() for what is refused, and answered here with the
+		 *	reason. Read inside the lock, against the file as it is, not as the
+		 *	form last saw it
+		 *
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		array 		$typeData			The type file's content
+		 *	@param		array 		$oldModel			The model as saved
+		 *	@param		array 		$newModel			The model that is being saved, cleaned
+		 *	@param		array 		$renames			{ old: new }
+		 *
+		 *	@return 	bool											Whether one was refused
+		 */
+		private static function _refuseRenames( array &$request, array $typeData, array $oldModel, array $newModel, array $renames ): bool {
+
+			$targets 		= [];
+			$imageKeys 	= [];
+
+			foreach( $oldModel as $key => $field )
+				if( ( $field['type'] ?? '' ) === 'image' )
+					$imageKeys[$key] = true;
+
+			foreach( $renames as $old => $new ) {
+
+				if( array_key_exists( $old, $oldModel ) === false ) {
+					\Nino\Http::fail( $request, 400, 'unknown field "'. $old. '"', 'types_rename_unknown', [ $old ] );
+					return true;
+				}
+
+				if( array_key_exists( $new, $newModel ) === false ) {
+					\Nino\Http::fail( $request, 400, 'the field "'. $new. '" is not in the model', 'types_rename_missing', [ $new ] );
+					return true;
+				}
+
+				// Two fields cannot become one, and a field that is not itself
+				// renamed away keeps its name
+				if( isset( $targets[$new] ) === true || ( array_key_exists( $new, $oldModel ) === true && array_key_exists( $new, $renames ) === false ) ) {
+					\Nino\Http::fail( $request, 409, 'the field "'. $new. '" already exists', 'types_rename_collision', [ $new ] );
+					return true;
+				}
+
+				$targets[$new] = true;
+
+				if( isset( $imageKeys[$old] ) === true && isset( $imageKeys[$new] ) === true ) {
+					\Nino\Http::fail( $request, 409, 'the image fields "'. $old. '" and "'. $new. '" would share their files', 'types_rename_image', [ $new ] );
+					return true;
+				}
+
+				// A key that is in no field of the old model but still has values
+				// in an element is what a removed field leaves behind
+				if( array_key_exists( $new, $oldModel ) === false )
+					foreach( $typeData as $bucket => $entries ) {
+
+						if( $bucket === 'model' || is_array( $entries ) === false )
+							continue;
+
+						foreach( $entries as $fields )
+							if( is_array( $fields ) === true && array_key_exists( $new, $fields ) === true ) {
+								\Nino\Http::fail( $request, 409, 'the key "'. $new. '" still holds the values of a removed field', 'types_rename_values', [ $new ] );
+								return true;
+							}
+					}
+			}
+
+			return false;
+		}
+
+		/**
+		 *	Give every stored value its field's new key: in every bucket of the
+		 *	file - '*' and each locale, available or not - and in every entry of
+		 *	it, the defaults entry '*' included. Each entry is rebuilt from what
+		 *	it held, key by key, so the order is kept and a swap or a chain
+		 *	cannot read a value it has just written
+		 *
+		 *	@param		array 		&$typeData		(reference) The type file's content
+		 *	@param		array 		$renames			{ old: new }, already checked by _refuseRenames()
+		 *
+		 *	@return 	void
+		 */
+		private static function _renameFields( array &$typeData, array $renames ): void {
+
+			foreach( $typeData as $bucket => $entries ) {
+
+				if( $bucket === 'model' || is_array( $entries ) === false )
+					continue;
+
+				foreach( $entries as $uri => $fields ) {
+
+					if( is_array( $fields ) === false )
+						continue;
+
+					$renamed = [];
+
+					foreach( $fields as $key => $value )
+						$renamed[ $renames[$key] ?? $key ] = $value;
+
+					$typeData[$bucket][$uri] = $renamed;
+				}
+			}
+		}
+
+		/**
+		 *	What still says the old name after a rename, which the rename does not
+		 *	touch and the save only reports: a template that fills [[old]] (it
+		 *	would show literally on the page), a role that is granted
+		 *	/_admin/elements/<type>/update/<old>, and a label fill
+		 *	/_admin/elements/field/<type>/<old>. Moving those is the project's
+		 *	decision, not the type editor's
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$typeUri
+		 *	@param		array 		$renames			{ old: new }
+		 *
+		 *	@return 	array										[ [ 'kind' => 'template'|'role'|'label', 'name' => ..., 'field' => old key ], ... ]
+		 */
+		private static function _renameReferences( array &$appData, string $typeUri, array $renames ): array {
+
+			$references = [];
+
+			if( $renames === [] )
+				return $references;
+
+			$fills 		= \Nino\Html::getFills( $appData );
+			$templates = glob( \Nino\Filesystem::path( $appData, '/templates' ). '/*.tpl' ) ?: [];
+
+			foreach( array_keys( $renames ) as $old ) {
+
+				foreach( $templates as $file )
+					if( str_contains( (string) file_get_contents( $file ), '[['. $old. ']]' ) === true )
+						$references[] = [ 'kind' => 'template', 'name' => basename( $file ), 'field' => $old ];
+
+				$grant = Admin::SCOPE. $typeUri. '/update/'. $old;
+
+				foreach( is_array( $appData['/nino/auth/roles'] ?? null ) === true ? $appData['/nino/auth/roles'] : [] as $id => $role )
+					if( in_array( $grant, is_array( $role['perms'] ?? null ) === true ? $role['perms'] : [], true ) === true )
+						$references[] = [ 'kind' => 'role', 'name' => (string) $id, 'field' => $old ];
+
+				$label = '/_admin/elements/field/'. $typeUri. '/'. $old;
+
+				if( array_key_exists( '[['. $label. ']]', $fills ) === true )
+					$references[] = [ 'kind' => 'label', 'name' => $label, 'field' => $old ];
+			}
+
+			return $references;
 		}
 
 		/**
@@ -638,7 +913,7 @@ namespace Nino\Modules\Elements {
 		 */
 		public static function log( string $action, array $data ): string {
 			return match( $action ) {
-				'types/save' 		=> 'Edit Element Type /'. ( $data['uri'] ?? '' ),
+				'types/save' 		=> 'Edit Element Type /'. ( $data['uri'] ?? '' ). self::_renamedLog( $data['renames'] ?? null ),
 				'types/create' 	=> 'Add Element Type /'. ( $data['uri'] ?? '' ),
 				// Not types/delete: what makes that line worth reading is how many
 				// elements went with the type, and this hook only ever sees the
@@ -647,6 +922,24 @@ namespace Nino\Modules\Elements {
 				'types/delete' 	=> '',
 				default 				=> '',
 			};
+		}
+
+		/**
+		 *	The part of a save's log line that names its renames, ' (renamed a
+		 *	to b, c to d)', or nothing
+		 *
+		 *	@param		mixed			$posted				The posted 'renames'
+		 *
+		 *	@return 	string
+		 */
+		private static function _renamedLog( mixed $posted ): string {
+
+			$renames = self::_postedRenames( $posted ?? [] ) ?? [];
+
+			if( $renames === [] )
+				return '';
+
+			return ' (renamed '. implode( ', ', array_map( fn( int|string $old, string $new ): string => $old. ' to '. $new, array_keys( $renames ), $renames ) ). ')';
 		}
 
 		/**

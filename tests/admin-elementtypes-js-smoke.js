@@ -66,6 +66,8 @@ function fakeRow( field ) {
 		'.admin-field-locale' 				: { checked : field.locale === true },
 		'.admin-field-required' 			: field.type === 'image' ? null : { checked : field.required === true },
 		'.admin-field-html' 					: field.type === 'string' ? { checked : field.html === true } : null,
+		'.admin-field-blocks' 				: field.type === 'string' ? { checked : field.blocks === true } : null,
+		'.admin-field-breaks' 				: field.type === 'string' ? { checked : field.breaks === true } : null,
 		'.admin-field-maxlength' 			: field.type === 'string' ? { value : field.maxlength ?? '' } : null,
 		'.admin-field-inputsize' 			: field.type === 'string' ? { value : field.inputsize ?? '' } : null,
 		'.admin-field-select-options' : field.type === 'string' ? { value : ( field.options ?? [] ).join(', ') } : null,
@@ -77,7 +79,9 @@ function fakeRow( field ) {
 		'.admin-field-multiple' 			: field.type === 'element' ? { checked : field.multiple === true } : null,
 		'.admin-field-multiple-max' 	: field.type === 'element' ? { value : field.multipleMax ?? '' } : null,
 	};
-	return { querySelector : function( selector ) { return controls[selector] ?? null } };
+	// A row that was loaded from the type carries the name it was saved under
+	// (see _renderFieldRow()); a field added in the form has none
+	return { dataset : field.originalKey === undefined ? {} : { originalKey : field.originalKey }, querySelector : function( selector ) { return controls[selector] ?? null } };
 }
 
 // _move() re-renders through the real dom, which this sandbox has none of -
@@ -160,9 +164,191 @@ check( '_buildModel carries locale/required/html and the options list', built.ti
 // The actual guard: whatever _storeFields() knows how to read, _buildModel()
 // has to forward. Comparing the two key sets catches a control added to the
 // editor and forgotten here, which is how maxlength/suffix went missing
-const readBack = Object.keys( elementTypes._fields[0] ).filter( function( k ) { return k !== 'key' } );
+// ('originalKey' is what a rename is made from, not a field of the model)
+const readBack = Object.keys( elementTypes._fields[0] ).filter( function( k ) { return k !== 'key' && k !== 'originalKey' } );
 const forwarded = Object.keys( built.title );
 check( 'every key _storeFields() reads is forwarded by _buildModel()', readBack.every( function( k ) { return forwarded.indexOf( k ) !== -1 } ) );
+
+
+// --- paragraphs and line breaks --------------------------------------------
+//
+// A rich text field may allow paragraphs and lists, a plain one may keep its
+// line breaks; both are read back from their checkboxes and reach the payload.
+
+elementTypes._fields = [
+	{ key : 'body', type : 'string', html : true, blocks : true },
+	{ key : 'note', type : 'string', breaks : true },
+	{ key : 'plain', type : 'string' },
+	{ key : 'count', type : 'integer' },
+];
+mountRows( elementTypes._fields );
+const formatBuilt = elementTypes._buildModel();
+check( 'a rich field\'s blocks and a plain field\'s breaks are read back and sent', formatBuilt.body.blocks === true && formatBuilt.body.breaks === false && formatBuilt.note.breaks === true && formatBuilt.note.blocks === false );
+check( 'a row without either control reads as neither', formatBuilt.count.blocks === false && formatBuilt.count.breaks === false && formatBuilt.plain.blocks === false );
+
+
+// --- renaming a field --------------------------------------------------------
+//
+// A row loaded from the type remembers the name it was saved under, wherever it
+// is moved to, and a save carries { old: new } for every one whose key changed.
+// Types::apiSave() moves the stored values: here it is only said which.
+
+elementTypes._fields = [
+	{ key : 'title', originalKey : 'title', type : 'string' },
+	{ key : 'price', originalKey : 'cost', type : 'double' },
+	{ key : 'photo', originalKey : 'picture', type : 'image' },
+	{ key : ' padded ', originalKey : 'padded', type : 'string' },
+	{ key : 'brandnew', type : 'string' },
+	{ key : '', originalKey : 'emptied', type : 'string' },
+	{ key : 'taken out', originalKey : 'taken out', type : 'string' },
+];
+mountRows( elementTypes._fields );
+check( 'only a saved field whose key changed is a rename - not an unchanged one, a new one or one whose key was emptied', JSON.stringify( elementTypes._renames() ) === '{"cost":"price","picture":"photo"}' );
+check( '...and the key is read trimmed, like the server trims it', elementTypes._renames().padded === undefined );
+check( 'the name a row was saved under survives a move, which re-renders from the stored fields', ( function() {
+	mountRows( elementTypes._fields );
+	elementTypes._move( 1, 'up' );
+	return elementTypes._fields[0].originalKey === 'cost' && elementTypes._fields[0].key === 'price' && elementTypes._fields[1].originalKey === 'title';
+} )() );
+check( '...and a field added in the form has none', elementTypes._fields.find( function( f ) { return f.key === 'brandnew' } ).originalKey === undefined );
+
+// The alt link of an image names its field the way it was saved, so a rename of that
+// field in the form does not unlink it (Types::apiSave() reads it through the renames)
+{
+	const altSource = fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Elements/assets/types.js' ), 'utf8' );
+	check( 'the alt choice is kept by the name a field was saved under, not by the key it has been given since',
+		altSource.includes( 'const name = other.originalKey ?? other.key;' ) && altSource.includes( 'opt.selected = ( name === current );' ) );
+}
+
+// types.js builds '/_admin/types/reference/<kind>' at runtime - the three kinds Types::_renameReferences()
+// reports - which the static fill check of tests/admin-system-smoke.php cannot see
+[ 'en_US', 'de_DE' ].forEach( function( locale ) {
+	const words = fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Elements/text/'+ locale+ '.php' ), 'utf8' );
+	check( locale+ ': every kind of reference a rename leaves behind has words', [ 'template', 'role', 'label' ].every( kind => words.includes( "[[/_admin/types/reference/"+ kind+ "]]'" ) ) );
+} );
+
+// The words, the questions and the payload of a save - against the stubs this
+// sandbox has, which the sections below replace with their own
+{
+	const nodes = { 'admin-form-msg' : { textContent : '' }, 'admin-form-title' : { value : 'Things' }, 'admin-form-uri' : { value : 'things' } };
+	sandbox.document.getElementById = id => nodes[id] ?? null;
+	sandbox.document.querySelector = () => ( { checked : false } );
+	sandbox.Nino.content = { getText : key => key === '/_admin/types/confirm/rename' ? 'Rename %s?' : ( key === '/_admin/types/notice/references' ? 'Still using the old name: %s' : ( key === '/_admin/types/reference/template' ? 'template %s (%s)' : key ) ) };
+	sandbox.Nino.adminUi = { api : { errorText : status => 'error '+ status }, format : ( text, ...params ) => { let at = 0; return String( text ).replace( /%[sdn]/g, token => at < params.length ? String( params[at++] ) : token ) } };
+	const questions = [];
+	let answer = true;
+	sandbox.confirm = question => { questions.push( question ); return answer };
+	const sent = [];
+	elementTypes._apiCall = ( endpoint, payload, callback ) => sent.push( { endpoint : endpoint, payload : payload, callback : callback } );
+	elementTypes._isNew = false;
+	elementTypes._currentUri = 'things';
+	elementTypes._fields = [ { key : 'headline', originalKey : 'title', type : 'string' }, { key : 'sort', originalKey : 'sort', type : 'integer' } ];
+	mountRows( elementTypes._fields );
+
+	let outcome = null;
+	answer = false;
+	elementTypes._save( ok => { outcome = ok } );
+	check( 'a save with a rename asks first, naming it, and a No sends nothing and says so', questions.length === 1 && questions[0] === 'Rename title \u2192 headline?' && sent.length === 0 && outcome === false );
+	answer = true;
+	questions.length = 0;
+	elementTypes._save();
+	check( '...a Yes sends it, with the renames beside the model', sent.length === 1 && sent[0].endpoint === 'save' && JSON.stringify( sent[0].payload.renames ) === '{"title":"headline"}' );
+
+	elementTypes._init = elementTypes.init;
+	elementTypes.init = () => {};
+	elementTypes._invalidateElements = () => {};
+	sent[0].callback( 200, { uri : 'things', references : [ { kind : 'template', name : 'page-things.tpl', field : 'title' } ] } );
+	check( 'what the rename could not move is said once, above the list the save goes back to', elementTypes._notice === 'Still using the old name: template page-things.tpl (title)' );
+	elementTypes._notice = '';
+
+	elementTypes._fields = [ { key : 'headline', originalKey : 'headline', type : 'string' } ];
+	mountRows( elementTypes._fields );
+	sent.length = 0;
+	questions.length = 0;
+	elementTypes._save();
+	check( 'a save without a rename asks nothing, and carries an empty set', questions.length === 0 && sent.length === 1 && JSON.stringify( sent[0].payload.renames ) === '{}' );
+	sent[0].callback( 200, { uri : 'things', references : [] } );
+	check( '...and leaves nothing to say after it', elementTypes._notice === '' );
+
+	elementTypes._isNew = true;
+	elementTypes._fields = [ { key : 'headline', type : 'string' } ];
+	mountRows( elementTypes._fields );
+	sent.length = 0;
+	elementTypes._save();
+	check( 'creating a type posts no renames', sent.length === 1 && sent[0].endpoint === 'create' && 'renames' in sent[0].payload === false );
+	elementTypes._isNew = false;
+	elementTypes.init = elementTypes._init;
+	delete sandbox.confirm;
+}
+
+
+// --- duplicating a type ------------------------------------------------------
+//
+// The copy is made here, from the form as it stands, and created like any new
+// type - what the server keeps of it is what it keeps of any model, so the
+// defaults and callbacks of the original stay with the original. The form asks
+// for the new uri and a title, and opens the copy once it exists.
+
+{
+	const duplicateSource = fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Elements/assets/types.js' ), 'utf8' );
+	const nodes = { 'admin-form-duplicate-uri' : { value : ' things-copy ' }, 'admin-form-duplicate-title' : { value : ' Things, copied ' }, 'admin-form-duplicate-msg' : { textContent : '' }, 'admin-form-title' : { value : ' Things ' } };
+	sandbox.document.getElementById = id => nodes[id] ?? null;
+	let numbered = true;
+	sandbox.document.querySelector = () => ( { checked : numbered } );
+	const sent = [];
+	elementTypes._apiCall = ( endpoint, payload, callback ) => sent.push( { endpoint : endpoint, payload : payload, callback : callback } );
+	const calls = [];
+	const init = elementTypes.init;
+	elementTypes.init = () => calls.push( 'init' );
+	elementTypes._invalidateElements = () => calls.push( 'invalidate' );
+	elementTypes._currentUri = 'things';
+	elementTypes._fields = [
+		{ key : 'headline', originalKey : 'title', type : 'string', locale : true },
+		{ key : 'photo', originalKey : 'photo', type : 'image', width : '10', height : '10', alt : 'title' },
+		{ key : 'sort', type : 'integer' },
+	];
+	mountRows( elementTypes._fields );
+
+	elementTypes._duplicate();
+	check( 'the copy is created under the new uri, as any new type is', sent.length === 1 && sent[0].endpoint === 'create' && sent[0].payload.uri === 'things-copy' && sent[0].payload.title === 'Things, copied' && sent[0].payload.autoincrement === true );
+	check( '...from the form as it stands: every field, a rename already made, and an alt link made to the name its field has now', Object.keys( sent[0].payload.model ).join() === 'headline,photo,sort' && sent[0].payload.model.headline.locale === true && sent[0].payload.model.photo.alt === 'headline' );
+	check( '...and carries nothing the form does not hold: no defaults, no callbacks, no renames', 'renames' in sent[0].payload === false && JSON.stringify( Object.keys( sent[0].payload ).sort() ) === '["autoincrement","model","title","uri"]' );
+	sent[0].callback( 409, { error : 'x', code : 'types_exists' } );
+	check( 'a refusal is said at the form, and the form stays', nodes['admin-form-duplicate-msg'].textContent === 'error 409' && calls.length === 0 );
+	sent[0].callback( 200, { uri : 'things-copy' } );
+	check( 'a success reloads the list, drops the Elements form and opens the copy once the list is there', calls.join() === 'init,invalidate' && elementTypes._openUri === 'things-copy' );
+	elementTypes._openUri = null;
+
+	const asked = [];
+	sandbox.Nino.admin.dirty = { guard : ( names, proceed ) => asked.push( { names : names, proceed : proceed } ) };
+	sent.length = 0;
+	elementTypes._currentUri = 'things';
+	elementTypes._duplicate();
+	check( 'unsaved input - this form\'s and the open element\'s - is asked about before the copy opens', asked.length === 1 && JSON.stringify( asked[0].names ) === '["types","elements"]' && sent.length === 0 );
+	asked[0].proceed();
+	check( '...and the answer lets it go', sent.length === 1 );
+	delete sandbox.Nino.admin.dirty;
+
+	nodes['admin-form-duplicate-title'].value = '';
+	numbered = false;
+	sent.length = 0;
+	elementTypes._duplicate();
+	check( 'without a title the copy takes the one in the form, and a type that does not number is not numbered', sent.length === 1 && sent[0].payload.title === 'Things' && sent[0].payload.autoincrement === false );
+
+	elementTypes._currentUri = null;
+	sent.length = 0;
+	elementTypes._duplicate();
+	check( 'a form with no saved type open duplicates nothing', sent.length === 0 );
+	elementTypes.init = init;
+
+	check( 'the form offers it for a saved type only, above the danger zone', /_isNew === false \) \{\s*form\.appendChild\( Nino\.admin\.elementTypes\._renderDuplicate\(\) \);\s*form\.appendChild\( Nino\.admin\.elementTypes\._renderDangerZone\(\) \);/.test( duplicateSource ) );
+	check( 'what is typed into it is no edit of the type', duplicateSource.includes( "uriInput.dataset.dirty = 'ignore'" ) && duplicateSource.includes( "titleInput.dataset.dirty = 'ignore'" ) );
+	const open = duplicateSource.slice( duplicateSource.indexOf( 'const open = Nino.admin.elementTypes._openUri' ) );
+	check( 'the copy is opened by the list that loads after it', open.startsWith( 'const open = Nino.admin.elementTypes._openUri;' ) && /_openForm\( open \)/.test( open.slice( 0, 300 ) ) );
+}
+
+delete sandbox.Nino.content;
+delete sandbox.Nino.adminUi;
 
 
 // --- an element reference that holds a list -------------------------------
@@ -212,8 +398,8 @@ check( '...whose placeholder says what 0 means instead of leaving it to be guess
 check( 'the checkbox reads the stored int rather than its truthiness',
 	typesSource.includes("typeof field.multiple === 'number'") );
 
-check( 'both save paths send it, so it is not silently dropped on create',
-	typesSource.split('autoincrement : autoincrement').length === 3 );
+check( 'every way a type is written sends it - create, save and the copy a duplication creates - so it is not silently dropped',
+	typesSource.split('autoincrement : autoincrement').length === 4 );
 check( 'the form is told the current setting rather than defaulting to off',
 	/_renderForm\( response\.title, response\.autoincrement === true/.test( typesSource ) === true );
 check( 'and says that existing elements keep their uris',
@@ -271,7 +457,7 @@ check( 'the cost is named before the click, not after',
 	&& /hint\/delete\]\]'\s*=> '[^']*no undo/.test( enFills ) );
 // Only on a saved type: a form that has never been saved has no file to remove
 check( 'the danger zone is not rendered while creating a new type',
-	/_isNew === false \)\s*\n\s*form\.appendChild\( Nino\.admin\.elementTypes\._renderDangerZone\(\) \);/.test( typesSource ) );
+	/_isNew === false \) \{[\s\S]*?form\.appendChild\( Nino\.admin\.elementTypes\._renderDangerZone\(\) \);\s*\}/.test( typesSource ) );
 
 
 // --- the unit input is offered for the types the server names --------------

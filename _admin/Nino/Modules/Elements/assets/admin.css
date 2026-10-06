@@ -153,6 +153,35 @@
 
 /* --------------------------------------------------- Delete a type --- */
 
+/* The copy of a type: two inputs and the button that makes it, laid out the
+   way the deletion below is, in the card colours of an ordinary action */
+#admin-page-wrap .admin-type-duplicate {
+	margin-top: 1.5rem;
+}
+
+#admin-page-wrap .admin-type-duplicate-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: .5rem;
+	margin-top: .65rem;
+}
+
+#admin-page-wrap .admin-type-duplicate-row input[type="text"] {
+	flex: 1 1 12rem;
+	width: auto;
+}
+
+#admin-page-wrap #admin-form-duplicate-msg:empty {
+	display: none;
+}
+
+#admin-page-wrap #admin-form-duplicate-msg {
+	margin: .55rem 0 0;
+	color: var(--editor-text-secondary);
+	font-size: .78rem;
+}
+
 /* The only control in the type form that destroys content, so it does not
    look like the rest of it: its own card, in the red the workbench already
    uses for a destructive button, sitting below every field and above the

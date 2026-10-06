@@ -749,6 +749,32 @@ body.nino-scroll-down .nino-scroll-header {
 	margin-bottom: var(--space-2);
 }
 
+/*	The wrapper of a field or a key that keeps paragraphs and lists - an element
+ *	field with 'blocks', a text key in the format 'blocks' (the editors call it
+ *	"Paragraphs and lists"). The reset at the top takes every margin and marker
+ *	away, so without this its paragraphs run together and its lists show no
+ *	bullets; with it they read as the person wrote them. Put it on the element
+ *	that holds the fill, next to .nino-section-text where that is the text's
+ *	own class. */
+.nino-richtext p,
+.nino-richtext ul,
+.nino-richtext ol {
+	margin-bottom: var(--space-2);
+}
+.nino-richtext > :last-child {
+	margin-bottom: 0;
+}
+.nino-richtext ul,
+.nino-richtext ol {
+	padding-left: 1.4em;
+}
+.nino-richtext ul > li {
+	list-style-type: disc;
+}
+.nino-richtext ol > li {
+	list-style-type: decimal;
+}
+
 /*	--quiet and --loud step one place down or up the type scale, per class.
  *	Each states its own rem size rather than scaling with em: an em font-size
  *	replaces the size the class sets for itself instead of adjusting it, so

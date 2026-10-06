@@ -1332,6 +1332,15 @@
 			<p class="nino-atf-subtitle--loud nino-text-left">.nino-atf-subtitle--loud</p>
 			<p class="nino-atf-subtitle--quiet nino-text-left">.nino-atf-subtitle--quiet</p>
 		</div>
+		<div class="nino-grid-100 nino-mb-3">
+			<p class="nino-badge-cloud nino-badge-cloud--left nino-mb-1"><span class="nino-badge nino-badge--pill">.nino-richtext</span></p>
+			<div class="nino-richtext nino-section-text nino-text-left">
+				<p>.nino-richtext — the wrapper of a text that keeps paragraphs and lists: this paragraph and the next one have a margin between them.</p>
+				<p>The lists below show their markers again, which the reset takes away.</p>
+				<ul><li>A list item with a bullet</li><li>A second item</li></ul>
+				<ol><li>A numbered item</li><li>A second numbered item</li></ol>
+			</div>
+		</div>
 	</div>
 </section>
 

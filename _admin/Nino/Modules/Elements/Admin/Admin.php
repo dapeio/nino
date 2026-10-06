@@ -658,11 +658,13 @@ namespace Nino\Modules\Elements {
 			}
 
 			// A model field with 'html' => true gets the same whitelist-tag sanitizing Text
-			// uses - never trust the client's html
+			// uses - never trust the client's html. Which tags that is depends on the
+			// field: 'blocks' keeps paragraphs and lists too, and a 'breaks' field is
+			// plain text whose newlines are kept as they are
 			$model = self::typeData( $appData, $type )['model'] ?? [];
 			foreach( $fields as $key => $value )
 				if( is_string( $value ) === true && ( $model[$key]['html'] ?? false ) === true )
-					$fields[$key] = \Nino\Html::sanitizeHtml( $value );
+					$fields[$key] = \Nino\Html::sanitizeHtml( $value, \Nino\Html::fieldFormat( $model[$key] ) );
 
 			// Required-field enforcement lives in the kernel itself
 			// (\Nino\Elements::insertElement()/updateElement()) - $errorMsg below

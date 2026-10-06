@@ -16,6 +16,21 @@ namespace Nino {
 
 		private const array HTML_TAGS = [ 'strong', 'em', 'span', 'code', 'a' ];
 
+		// The formats a stored value can be in, from the narrowest to the
+		// widest: plain text, the inline tags above, those plus line breaks,
+		// and paragraphs and lists around them. A format only ever says what a
+		// value may contain - sanitizeHtml() enforces it, the editors offer
+		// what it allows, and Text and Elements keep it beside the value
+		public const array FORMATS = [ 'plain', 'inline', 'lines', 'blocks' ];
+
+		// Tags that end one run of text and start the next. A sanitizer that
+		// unwraps one without a trace glues the words on either side
+		// together ('Grill.' + 'Second' read 'Grill.Second')
+		private const array BOUNDARY_TAGS = [ 'p', 'div', 'li', 'ul', 'ol', 'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'tr', 'section', 'article' ];
+
+		// What the blocks format turns into a paragraph of its own
+		private const array PARAGRAPH_TAGS = [ 'p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote' ];
+
 		// How deep shortcode output may be re-rendered into more shortcodes
 		// before _doShortcode() stops unrolling - see there
 		private const int MAX_RENDER_DEPTH = 20;
@@ -311,11 +326,90 @@ namespace Nino {
 			return preg_match( '/<(?:'. implode( '|', self::HTML_TAGS ). ')[ >]/i', $value ) === 1;
 		}
 
+		// Which format a value is in, read from what it holds - for a value
+		// nobody has named a format for (a text key without one, see
+		// \Nino\Text::entries()). The widest one found wins: paragraphs and
+		// lists, then line breaks, then the inline tags. Shared by every
+		// domain class with a model/entry format
+		public static function detectFormat( string $value ): string {
+
+			if( preg_match( '#<(?:p|ul|ol|li)[ >/]#i', $value ) === 1 )
+				return 'blocks';
+
+			if( preg_match( '#<br[ >/]#i', $value ) === 1 )
+				return 'lines';
+
+			return self::containsHtml( $value ) ? 'inline' : 'plain';
+		}
+
+		// The format an element type's field is kept in. 'html' keeps the
+		// inline tags and, with 'blocks', paragraphs and lists; 'breaks' keeps
+		// the line breaks of a plain text field. Anything else is plain text.
+		// A flag on a field it does not fit is ignored, not an error: a model
+		// written by hand is not trusted
+		public static function fieldFormat( array $field ): string {
+
+			$isString = ( $field['type'] ?? 'string' ) === 'string';
+
+			if( ( $field['html'] ?? false ) === true )
+				return ( $isString === true && ( $field['blocks'] ?? false ) === true ) ? 'blocks' : 'inline';
+
+			return ( $isString === true && ( $field['breaks'] ?? false ) === true ) ? 'breaks' : 'plain';
+		}
+
+		// One element field value, made safe to substitute into a template:
+		// sanitized to the field's format, line breaks turned into <br> for a
+		// 'breaks' field, escaped for a plain one - and then every '[' swapped
+		// for its entity, because the surrounding content is rendered again
+		// right after this and an editor's '[[...]]' or '[shortcode]' must not
+		// be read as one. The one rule every renderer of a field applies, which
+		// is why it is public: a feature that draws a field itself calls this
+		// instead of keeping a copy
+		public static function fieldValue( mixed $value, array $field ): string {
+
+			$format = self::fieldFormat( $field );
+			$value 	= strval( $value );
+
+			if( $format === 'blocks' || $format === 'inline' )
+				$safe = self::sanitizeHtml( $value, $format );
+			else if( $format === 'breaks' )
+				$safe = nl2br( htmlspecialchars( $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ), false );
+			else
+				$safe = htmlspecialchars( $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+
+			return str_replace( '[', '&#91;', $safe );
+		}
+
+		// A value that may hold the tags of a format, as the plain text it
+		// reads as: every <br> and the end of every block becomes a newline.
+		// strip_tags() alone glues 'Amtsgericht<br>Musterstadt' to
+		// 'AmtsgerichtMusterstadt'. Nothing is removed otherwise - the caller
+		// strips what is left
+		public static function breaksToNewlines( string $value ): string {
+
+			$value = (string) preg_replace( '#(?:</(?:p|div|li|ul|ol|h[1-6]|blockquote|tr|section|article)\s*>\s*)+#i', "\n", $value, -1, $blocks );
+			$value = (string) preg_replace( '#<br\s*/?>#i', "\n", $value, -1, $breaks );
+
+			// What the last block end left behind is the end of the value, not a
+			// line of its own
+			return $blocks + $breaks > 0 ? rtrim( $value, "\n" ) : $value;
+		}
+
 		// Rebuild a html value, keeping only whitelisted inline tags (strong/
 		// em/span/code/a) one level deep and a safe href scheme on links. Never
 		// trust the client's html: the editor's "no nesting" toolbar rule is
 		// enforced here too, against a client that bypasses it entirely.
-		public static function sanitizeHtml( string $html ): string {
+		//
+		// $format widens what is kept. 'inline' is the tags above and nothing
+		// else: a block that is unwrapped leaves one space where it ended, so
+		// '<p>One.</p><p>Two.</p>' reads 'One. Two.' rather than 'One.Two.'.
+		// 'lines' adds <br>, and a newline of the text becomes one. 'blocks'
+		// keeps paragraphs and lists: p/ul/ol at the top level, li only in a
+		// list, the inline tags and <br> inside p/li. Every other value - plain
+		// is not html, see \Nino\Text::sanitizeValue() - is read as 'inline'.
+		// What comes out of any of them is stable: sanitizing it again changes
+		// nothing
+		public static function sanitizeHtml( string $html, string $format = 'inline' ): string {
 
 			if( trim( $html ) === '' )
 				return '';
@@ -332,23 +426,61 @@ namespace Nino {
 
 			$wrap = $doc->getElementsByTagName( 'nino-sanitize' )->item( 0 );
 
-			return $wrap === null ? '' : self::_sanitizeChildren( $wrap, false );
+			if( $wrap === null )
+				return '';
+
+			if( $format === 'blocks' )
+				return self::_sanitizeBlocks( $wrap );
+
+			$ended = false;
+			$out 	 = self::_sanitizeChildren( $wrap, false, $format === 'lines', $format === 'lines', $ended );
+
+			// A break at either end of a value is not a line of it
+			return $format === 'lines' ? self::_trimBreaks( $out ) : $out;
 		}
 
 		// Recursively rebuild a node's children, keeping only whitelisted
 		// inline tags one level deep - a whitelisted tag found while already
-		// inside another one is unwrapped (kept as plain content)
-		private static function _sanitizeChildren( \DOMNode $node, bool $insideInline ): string {
+		// inside another one is unwrapped (kept as plain content).
+		// $keepBreaks keeps <br> (otherwise a break is a block boundary like
+		// any other), $newlinesToBreaks turns a newline of the text into one,
+		// and $ended says that a block just ended, so the next text is kept
+		// apart from what came before it
+		private static function _sanitizeChildren( \DOMNode $node, bool $insideInline, bool $keepBreaks, bool $newlinesToBreaks, bool &$ended ): string {
 
 			$out = '';
 
 			foreach( iterator_to_array( $node->childNodes ) as $child ) {
 
 				if( $child->nodeType === XML_TEXT_NODE ) {
+
 					// ENT_NOQUOTES: this is text content, not an attribute value - quotes need no escaping here.
 					// ENT_SUBSTITUTE because spelling the flags out drops php's own: without it one byte that
 					// is not utf-8 anywhere in the node answers '' and takes the whole text with it
-					$out .= htmlspecialchars( $child->textContent, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+					$text = htmlspecialchars( $child->textContent, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+
+					if( $text === '' )
+						continue;
+
+					if( $ended === true )
+						$out .= self::_boundary( $out, $text, $keepBreaks );
+
+					$ended = false;
+
+					// In the blocks format a loose run keeps its newlines until the
+					// paragraphs are cut from it - except inside an inline tag, which
+					// a paragraph break must not cut open
+					if( $newlinesToBreaks === true || ( $insideInline === true && $keepBreaks === true ) ) {
+
+						// A newline straight after a <br> is the source's own
+						// formatting, not a second break
+						if( $child->previousSibling !== null && strtolower( $child->previousSibling->nodeName ) === 'br' )
+							$text = (string) preg_replace( '/^[ \t]*\r?\n/', '', $text );
+
+						$text = str_replace( [ "\r\n", "\r", "\n" ], '<br>', $text );
+					}
+
+					$out .= $text;
 					continue;
 				}
 
@@ -357,12 +489,39 @@ namespace Nino {
 
 				$tag = strtolower( $child->nodeName );
 
-				if( in_array( $tag, self::HTML_TAGS, true ) === false || $insideInline === true ) {
-					$out .= self::_sanitizeChildren( $child, $insideInline );
+				if( $tag === 'br' && $keepBreaks === true ) {
+					$out .= '<br>';
+					$ended = false;
 					continue;
 				}
 
-				$inner = self::_sanitizeChildren( $child, true );
+				if( in_array( $tag, self::BOUNDARY_TAGS, true ) === true ) {
+
+					$innerEnded = false;
+					$inner 			= self::_sanitizeChildren( $child, $insideInline, $keepBreaks, $newlinesToBreaks, $innerEnded );
+
+					if( $inner !== '' )
+						$out .= self::_boundary( $out, $inner, $keepBreaks ). $inner;
+
+					$ended = $out !== '';
+					continue;
+				}
+
+				if( in_array( $tag, self::HTML_TAGS, true ) === false || $insideInline === true ) {
+					$out .= self::_sanitizeChildren( $child, $insideInline, $keepBreaks, $newlinesToBreaks, $ended );
+					continue;
+				}
+
+				$innerEnded = false;
+				$inner 			= self::_sanitizeChildren( $child, true, $keepBreaks, $newlinesToBreaks, $innerEnded );
+
+				if( $inner === '' )
+					continue;
+
+				if( $ended === true )
+					$out .= self::_boundary( $out, $inner, $keepBreaks );
+
+				$ended = false;
 
 				if( $tag === 'a' ) {
 					$href = self::_safeHref( $child->getAttribute( 'href' ) );
@@ -376,11 +535,121 @@ namespace Nino {
 			return $out;
 		}
 
+		// What keeps two runs of text apart where a block between them was
+		// unwrapped: nothing where either side already has a space or a break,
+		// one <br> in a value that keeps breaks, otherwise one space
+		private static function _boundary( string $before, string $after, bool $keepBreaks ): string {
+
+			if( $before === '' || $after === '' || preg_match( '/(\s|<br>)$/u', $before ) === 1 || preg_match( '/^\s/u', $after ) === 1 )
+				return '';
+
+			return $keepBreaks === true ? '<br>' : ' ';
+		}
+
+		// The blocks format: paragraphs and lists. Headings, quotes, divs and an
+		// item that is not inside a list become paragraphs, anything in a list
+		// that is not an item becomes an item of its own - so no word of what
+		// was pasted is lost. Loose text and inline tags between the blocks are
+		// gathered into paragraphs: a blank line in the text starts a new one
+		// (never inside an inline tag, where a newline is a <br>), a single
+		// newline is a <br> (the convention \Nino\Modules\Posts uses for its
+		// body text)
+		private static function _sanitizeBlocks( \DOMNode $wrap ): string {
+
+			$doc 		= $wrap->ownerDocument;
+			$out 		= '';
+			$run 		= null;
+
+			$flush = function( \DOMElement $run ) use ( &$out ): void {
+
+				// One run, so what a block in it unwrapped keeps its neighbours
+				// apart however the run is cut into children
+				$ended = false;
+				$loose = self::_sanitizeChildren( $run, false, true, false, $ended );
+
+				foreach( preg_split( '/\n[ \t]*\n/u', str_replace( [ "\r\n", "\r" ], "\n", $loose ) ) ?: [] as $paragraph ) {
+					$paragraph = self::_trimBreaks( str_replace( "\n", '<br>', $paragraph ) );
+
+					if( $paragraph !== '' )
+						$out .= '<p>'. $paragraph. '</p>';
+				}
+			};
+
+			foreach( iterator_to_array( $wrap->childNodes ) as $child ) {
+
+				$tag = $child->nodeType === XML_ELEMENT_NODE ? strtolower( $child->nodeName ) : '';
+
+				if( in_array( $tag, self::PARAGRAPH_TAGS, true ) === true || $tag === 'li' ) {
+
+					if( $run !== null ) {
+						$flush( $run );
+						$run = null;
+					}
+
+					$ended = false;
+					$inner = self::_trimBreaks( self::_sanitizeChildren( $child, false, true, true, $ended ) );
+
+					if( $inner !== '' )
+						$out .= '<p>'. $inner. '</p>';
+
+					continue;
+				}
+
+				if( $tag === 'ul' || $tag === 'ol' ) {
+
+					if( $run !== null ) {
+						$flush( $run );
+						$run = null;
+					}
+
+					$items = '';
+
+					foreach( iterator_to_array( $child->childNodes ) as $item ) {
+
+						$holder = $item;
+
+						if( $item->nodeType !== XML_ELEMENT_NODE || strtolower( $item->nodeName ) !== 'li' ) {
+							$holder = $doc->createElement( 'nino-item' );
+							$holder->appendChild( $item->cloneNode( true ) );
+						}
+
+						$ended = false;
+						$inner = self::_trimBreaks( self::_sanitizeChildren( $holder, false, true, true, $ended ) );
+
+						if( $inner !== '' )
+							$items .= '<li>'. $inner. '</li>';
+					}
+
+					if( $items !== '' )
+						$out .= '<'. $tag. '>'. $items. '</'. $tag. '>';
+
+					continue;
+				}
+
+				// Text, an inline tag, a <br>: loose content. Its newlines stay as
+				// they are until the paragraphs are cut from it
+				$run = $run ?? $doc->createElement( 'nino-loose' );
+				$run->appendChild( $child->cloneNode( true ) );
+			}
+
+			if( $run !== null )
+				$flush( $run );
+
+			return $out;
+		}
+
+		// A value without the breaks and spaces around it
+		private static function _trimBreaks( string $value ): string {
+			return trim( (string) preg_replace( '/^(?:<br>|\s)+|(?:<br>|\s)+$/u', '', $value ) );
+		}
+
 		// Validate a link href: only relative/fragment uris or a handful of
 		// safe schemes - blocks javascript: and similar injection vectors
 		private static function _safeHref( string $href ): string|null {
 
-			$href = trim( $href );
+			// A browser takes a tab or a line break out of a link; here it would
+			// also cut a paragraph in two inside the tag
+			$href = trim( str_replace( [ "\r", "\n", "\t" ], '', $href ) );
 
 			if( $href === '' )
 				return null;

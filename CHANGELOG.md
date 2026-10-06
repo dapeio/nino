@@ -275,6 +275,135 @@ All notable changes to Nino are documented in this file.
   content. The templates the base unit ships do not mix the two. Documented in
   `docs/development.md` and `docs/development.de.md`; `tests/kernel-smoke.php` (850 → 855) holds it.
 
+- **Text editor, Elements, Text Keys:** paragraphs, lists and line breaks. A
+  value has one of four **formats**, `\Nino\Html::FORMATS`: `plain`, `inline`
+  (`strong`, `em`, `span`, `code`, `a` - what a field with `html` always had),
+  `lines` (those plus `<br>`) and `blocks` (those plus paragraphs and lists:
+  `p`, `ul`, `ol`, `li`). `\Nino\Html::sanitizeHtml( $html, $format = 'inline' )`
+  has a profile for each: `lines` turns a newline of the text into `<br>`, drops
+  one straight after a `<br>` and trims the ends; `blocks` keeps `p`, `ul` and
+  `ol` at the top, `li` only in a list (whatever else is in a list becomes an
+  item of its own, so no word is lost), turns `div`, headings and quotes into
+  paragraphs, gathers loose text into paragraphs (a blank line starts one, a
+  newline is a `<br>`, as `Posts` has it) and drops what is empty; every profile
+  is idempotent, and a name that is none of them is read as `inline`. New:
+  `Html::detectFormat()` (the widest a value holds), `Html::fieldFormat()`
+  (an element field's model: `html` + `blocks` is `blocks`, `html` is `inline`,
+  `breaks` without `html` is `breaks`, anything else `plain` - a flag on a field
+  it does not fit is ignored), `Html::fieldValue( $value, $field )` - the one
+  rule that makes a field's value safe to put into a template: sanitized to the
+  format, `<br>` for the newlines of a `breaks` field, escaped for any other,
+  then `[` as `&#91;` - which `[element]` and `[elements]` call now (it is the
+  public API a feature that draws a field itself takes in place of a copy;
+  `[elementvalues]` keeps escaping plain) and `Html::breaksToNewlines()`.
+  `containsHtml()` is unchanged.
+  An **element type** field takes the model flags `blocks` (with `html`) and
+  `breaks` (without); the Element Types tab offers each only where it applies
+  and `Types::cleanModel()` drops one from a field it does not fit; the Elements
+  form hands `blocks` to the editor, and the save - and the Translations import -
+  hold the value to `Html::fieldFormat()`.
+  A **text key** has a format and a limit of its own: `text/meta.php`,
+  `'/the/key' => [ 'format' => ..., 'maxlength' => ... ]`, read by `Text::meta()`
+  (an entry that is no format or limit is left out) and written by
+  `Text::setMeta( $appData, $key, ?$format, ?$maxlength )`, a mutation of the
+  file that drops an entry left with neither - `Text::updateMeta()` changes only
+  the settings it is given, decided under the same lock, so two saves of one key
+  that change different settings both land, and `Text::moveMeta()` is a rename's
+  one mutation. `Text::entries()` answers `format`
+  (the one set, else the widest the values hold), `html` (not `plain`),
+  `formatSet`, `maxlength` (the one set - never below the longest text the key holds, so a longer one written later by an import is not cut at the first keystroke - else derived as before) and
+  `maxlengthSet`; `Text::sanitizeValue( $value, bool|string $format )` takes a
+  format (`true` is `inline`, `false` `plain`, as before; an unknown name is
+  `plain`) and so does `saveBatch()` for every key - the wizard, the Translations
+  import and the Templates feature included. The Text Keys tab has a **Format**
+  select (*Automatic*, *Plain text*, *Formatted*, *Line breaks*, *Paragraphs and
+  lists*) and a **Limit** per key; **Apply** posts them with the two checkboxes
+  as one `keys/save`, which leaves a setting it is not sent as it was, answers
+  `400` for a format that does not exist (`keys_format`), a limit outside
+  `1..Text::MAX_LIMIT` (5000, `keys_limit`) and a limit below the longest text
+  the key holds (`keys_limit_short` - the editor would cut it at the first
+  keystroke), converts every stored value of the key in every locale file when
+  the format changes (one mutation per file, like a change of shape; *Automatic*
+  only forgets the choice) and asks first when the new format holds less, naming
+  what becomes of the text. `keys/rename` moves the entry and `keys/delete`
+  removes it, for a retired key too; `keys/create` takes a `format`; the log
+  line of `keys/save` names format and limit when they are posted. The editors
+  are handed the key's format: **Enter** is nothing in `inline`, a `<br>` in
+  `lines` and a new paragraph or item in `blocks` (Shift+Enter is the break,
+  Enter in an empty item leaves the list, Backspace and Delete at the edge of a
+  block join it by script); two toolbar buttons make bulleted and numbered lists
+  and `blocks` shows paragraphs and lists in the editor's own style;
+  formatting a selection that crosses a line or a block wraps each run, no
+  longer flattening them into one tag; paste and drop are plain text in the
+  profile's way (a newline is a `<br>`, a blank line a paragraph); **Ctrl/Cmd+B**
+  and **+I** are `strong` and `em`, **+U** is swallowed, and the browser's own
+  `format*` input is cancelled, so no `<b>`, `<i>`, `<u>` or style gets in; the
+  browser's `<span style>` after a block merge, and `<div>`, are cleaned on every
+  input; Enter is also handled on `beforeinput`, where a mobile or IME keyboard
+  reports it. The steps the editor makes itself (splitting, joining, lists) are
+  not on the browser's undo stack: Ctrl+Z undoes typing only. `Nino.css` gains
+  `.nino-richtext`, the class for the element that holds a `blocks` value - the
+  reset at its top takes the paragraph gaps and the list markers away.
+  Documented in `docs/_admin.md` and `docs/_admin.de.md`, `docs/development.md`
+  and `docs/development.de.md`, the element-types recipe and `AGENTS.md`.
+  `tests/kernel-smoke.php` (855 → 901), `tests/admin-smoke.php` (336 → 355),
+  `tests/admin-system-smoke.php` (725 → 809) hold the sanitizer, the helpers, the
+  shortcodes, the Text and Keys actions and the import;
+  `tests/admin-html-editor-js-smoke.js` (17 → 47), `tests/admin-text-js-smoke.js`
+  (58 → 71), `tests/admin-elements-js-smoke.js` (191 → 202) and
+  `tests/admin-elementtypes-js-smoke.js` (50 → 71) the editor, the tab and the
+  forms. Checked in Chromium (Enter, lists, joining, paste, drop, shortcuts,
+  limit); not in Firefox or Safari.
+
+- **Elements:** a list of texts is edited as rows. An `array` field whose value
+  is a list of strings - or is not there yet - gets `Nino.adminUi.stringList()`
+  (`_admin/assets/Nino.admin.js`, `.nino-admin-stringlist*` in the design
+  system): a text input per entry, move up and down, remove, and an add button.
+  Like the list of references it keeps its value in a hidden input carrying the
+  JSON, exactly as stored until a row changes, so the form's reading, comparing
+  and saving are untouched; the rows carry no `data-field`, an empty row is not
+  an entry, and the control owns no words. A list of anything else, and text
+  that was typed and is not JSON, keep the JSON field. New fills
+  `/_admin/elements/label/list-*`. `tests/nino-ui-stringlist-js-smoke.js` (new,
+  24 checks) holds the control, `tests/admin-elements-js-smoke.js` which field
+  gets which.
+
+- **Element Types:** a field can be renamed, and a type duplicated. The name of
+  a field is edited in its row, which says that the stored values move; the save
+  asks and posts `renames` (`{ old: new }`) beside the model. `Types::apiSave()`
+  moves every value of every entry under the lock - `*`, every locale bucket
+  (a locale the project no longer offers included), the defaults entry `*` of
+  each - rebuilding each entry from a snapshot, so a swap and a chain work, and
+  reads the shape check against the old model under its new names, so a rename
+  and a switch between global and per translation in one save migrate the values
+  under the new key. It answers `400` for a field the type does not have
+  (`types_rename_unknown`), a name the model does not have
+  (`types_rename_missing`) and renames that are not an object of strings
+  (`types_renames`), and `409` for two renames to one name or a name an
+  unrenamed field keeps (`types_rename_collision`), a name that still holds the
+  values of a field removed earlier (`types_rename_values`: the editor never
+  deletes data) and an image field renamed onto the key of another
+  (`types_rename_image`: an upload's file is named after its field and would
+  overwrite the other's) - nothing is written. An image's link to the field that
+  holds its alt text follows the rename: the form names a field the way it was
+  saved while it is in the form, and `apiSave()` reads each link through the
+  renames before the model is cleaned, so renaming that field is not a removal of
+  the link. The answer carries `renamed` and `references`: the templates that
+  still fill `[[old]]`, the roles granted `/_admin/elements/<type>/update/<old>`
+  and the label text for the field, which are reported and not changed; the type
+  list shows them once after the reload. A new image field must not take the name
+  an image field had before it was renamed - its uploads would be named the same
+  and overwrite the old file; the manual and the recipe say so. **Duplicate
+  type** is made in the form: it posts the form's model, title and numbering
+  under the new uri through the existing `types/create`, so the copy is what
+  `cleanModel()` keeps of any model - no hand-written default or callback, no `*`
+  defaults, no elements, a numbered type restarting at 1 - and the form asks
+  about unsaved input first and opens the copy. The log names the renames. New
+  fills `/_admin/types/*` and `/_admin/error/types_rename_*`.
+  `tests/admin-system-smoke.php` holds the buckets, the swap and the chain, every
+  refusal, the permission and the alt link; `tests/admin-elementtypes-js-smoke.js`
+  the rows, the renames, the question, the request and the copy.
+
 ### Changed
 
 - **Workbench:** what the panels print for a failure. A failure with a code is
@@ -396,6 +525,22 @@ All notable changes to Nino are documented in this file.
   and the `:empty` rule. `tests/install-smoke.php` holds the slot, the
   frames with and without a logo, and the tile.
 
+- **Html:** `sanitizeHtml()` leaves a space where it unwraps a block that
+  separated two runs of text - `<p>Grill.</p><p>Zweiter</p>` read
+  `Grill.Zweiter`, and the words of a pasted text ran together - unless a space
+  or the end is there already. Every other input and output is as it was (the vectors of the
+  Text, Elements and kernel tests are byte for byte the same; Posts' pinned
+  `<h2>Not a heading</h2>Second.` is `Not a heading Second.`, not a newline,
+  which `Posts::_body()` would turn into a `<br>`).
+
+- **Text:** the starting value of a new key - `keys/create` and the scan's
+  *Apply* - goes through `Text::sanitizeValue()` like every other value saved
+  from the workbench, in the format it was asked for or its value shows. It was
+  stored as typed: tags the key's format does not have and shortcodes included.
+  `Text::sanitizeValue()` also makes a line of every `<br>` and every end of a
+  block before it strips the tags of a plain value (`Html::breaksToNewlines()`),
+  where `Amtsgericht<br>Musterstadt` became `AmtsgerichtMusterstadt`.
+
 ### Fixed
 
 - **Workbench, Elements:** a required field is marked and a refused save says
@@ -491,6 +636,14 @@ All notable changes to Nino are documented in this file.
   stored text, or one in a template, with `[[/key]]` or `[template ...]` in it
   was rendered again after the `<img>` was built, because shortcode output is
   rendered once more; the brackets are neutralised now.
+
+- **Text:** a key that holds a `<br>` keeps it. `/mail/user/closing` and
+  `/mail/newsletter/closing` ship that way, and `containsHtml()` never saw a
+  break: the Text panel showed a plain textarea with a literal `<br>` in it and
+  the next save stripped it, answering `you.Kind regards,`. A key without a
+  stored format takes it from its values, so those two are edited as line breaks
+  and save as such. The wizard's, the Translations import's and the Templates
+  feature's writes through `Text::saveBatch()` follow the same format.
 
 ### Removed
 

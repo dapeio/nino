@@ -40,6 +40,21 @@
 	margin: 0;
 }
 
+/* The format and the limit of a key: a select and a number beside the two
+   checkboxes, as wide as what they hold */
+#admin-page-wrap .admin-text-format-select,
+#admin-page-wrap .admin-text-limit-input {
+	width: auto;
+	min-height: 30px;
+	padding-top: .25rem;
+	padding-bottom: .25rem;
+	font-size: .76rem;
+}
+
+#admin-page-wrap .admin-text-limit-input {
+	width: 6.5rem;
+}
+
 #admin-page-wrap .admin-text-key-input {
 	flex: 1 1 auto;
 	min-width: 8rem;

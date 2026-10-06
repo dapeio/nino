@@ -154,6 +154,7 @@ Project content and generated destinations:
 | `text/global.php` | Locale-independent textfills |
 | `text/<locale>.php` | Translated textfills |
 | `text/blacklist.php` | Technical fills hidden from normal editing |
+| `text/meta.php` | Per key: the format (`plain`, `inline`, `lines`, `blocks`) and the character limit somebody chose, `['/the/key' => ['format' => ..., 'maxlength' => ...]]`. Written by the Text Keys tab, no shipped entries; a key without one takes its format from its values (`\Nino\Html::detectFormat()`) |
 | `elements/<type>.php` | Element schema plus shared and localized records |
 | `images/` | Project and uploaded images |
 | `data/` | Runtime records, locks, logs, caches; normally not versioned |
@@ -279,8 +280,10 @@ Escape at the output context:
   `''` and takes the whole value with it - silently, with no warning and no log
   line. The same holds for `ENT_NOQUOTES` on text content. `tests/kernel-smoke.php`
   greps for it.
-- Rich element text: declare `'html' => true` in its model and rely on
-  `\Nino\Html::sanitizeHtml()` when accepting it.
+- Rich element text: declare `'html' => true` in its model (`'blocks' => true`
+  as well for paragraphs and lists, `'breaks' => true` instead for the line
+  breaks of plain text) and rely on `\Nino\Html::sanitizeHtml()` when accepting
+  it and `\Nino\Html::fieldValue()` when drawing it.
 - Browser DOM: insert untrusted text with `textContent`, not `innerHTML`.
 - URL/path/class/ID: validate against a strict allowlist before escaping.
 - JSON: return arrays through Nino; do not concatenate JSON by hand.
@@ -443,7 +446,8 @@ Reach for an existing class first; only invent one when no role fits.
 | Labelled form field | `.nino-admin-field` (`.nino-admin-field-wide` opts out of the two-column desktop grid) |
 | Container whose fields share that grid | `.nino-admin-fieldgrid` |
 | Run of checkbox rows | `.nino-admin-checklist` |
-| Rich-text editor mount | `.nino-admin-richtext` |
+| Rich-text editor mount | `.nino-admin-richtext` (`Nino.admin.htmlEditor.create()`, its fifth argument the format: `inline`, `lines` or `blocks`) |
+| List of texts, edited as rows | `.nino-admin-stringlist` via `Nino.adminUi.stringList()` (the value is a hidden input carrying the JSON, like `elementList()`'s) |
 | Explanatory text / screen intro | `.nino-admin-hint`, `.nino-admin-hint-lead` |
 | Nothing here yet (a list without entries, a scan that found nothing) | `.nino-admin-empty` via `Nino.adminUi.emptyState()` |
 | Error text | `.nino-admin-error` |

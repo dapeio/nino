@@ -25,6 +25,11 @@
 
 	Nino.admin.keys = {
 
+		// The formats a key can be kept in, from the narrowest to the widest -
+		// \Nino\Html::FORMATS, in the same order, which is what says whether
+		// a change loses anything
+		FORMATS					: [ 'plain', 'inline', 'lines', 'blocks' ],
+
 		_locales				: [],
 		_groups					: {},
 		_currentGroup		: null,
@@ -46,6 +51,9 @@
 		_isNew					: false,
 		_saving					: false,
 		_ready					: false,
+		// The category to open again once the list has loaded - what applying a
+		// key's format and limit comes back to (see _saveSettings())
+		_reopen					: null,
 		// What the last scan pass did, shown once above the category list -
 		// the form it happened in is gone by then (see _saveScanResults())
 		_scanSummary		: '',
@@ -69,6 +77,12 @@
 				Nino.admin.keys._renderCategoryList();
 				Nino.admin.keys._showList();
 				Nino.admin.keys._ready 	= true;
+
+				const reopen = Nino.admin.keys._reopen;
+				Nino.admin.keys._reopen = null;
+
+				if( reopen !== null && Nino.admin.keys._groups[reopen] !== undefined )
+					Nino.admin.keys._openGroup( reopen );
 			} );
 		},
 
@@ -304,7 +318,7 @@
 			if( entry.html === true ) {
 				const mount = dc.createElement('div');
 				wrap.appendChild( mount );
-				Nino.admin.keys._htmlEditors[entry.key] = Nino.admin.htmlEditor.create( mount, value ?? '', entry.maxlength );
+				Nino.admin.keys._htmlEditors[entry.key] = Nino.admin.htmlEditor.create( mount, value ?? '', entry.maxlength, 0, entry.format );
 			} else {
 				const textarea = dc.createElement('textarea');
 				textarea.maxLength = entry.maxlength;
@@ -352,9 +366,96 @@
 			blacklistLabel.appendChild( dc.createTextNode( ' '+ Nino.content.getText('/_admin/keys/label/blacklist') ) );
 			schemaWrap.appendChild( blacklistLabel );
 
+			// The format the value is kept in and the limit its counter counts
+			// to. Neither is saved with the values: applying them converts what is
+			// stored, which is a decision of its own (see _saveSettings())
+			const formatLabel = dc.createElement('label');
+			formatLabel.appendChild( dc.createTextNode( Nino.content.getText('/_admin/keys/label/format')+ ' ' ) );
+			const formatSelect = dc.createElement('select');
+			formatSelect.className = 'admin-text-format-select';
+			[ 'auto' ].concat( Nino.admin.keys.FORMATS ).forEach( function( format ) {
+				const option = dc.createElement('option');
+				option.value = format;
+				option.textContent = Nino.content.getText('/_admin/keys/format/'+ format);
+				option.selected = ( format === ( entry.formatSet === true ? entry.format : 'auto' ) );
+				formatSelect.appendChild( option );
+			} );
+			formatLabel.appendChild( formatSelect );
+			schemaWrap.appendChild( formatLabel );
+
+			const limitLabel = dc.createElement('label');
+			limitLabel.appendChild( dc.createTextNode( Nino.content.getText('/_admin/keys/label/limit')+ ' ' ) );
+			const limitInput = dc.createElement('input');
+			limitInput.type = 'number';
+			limitInput.min = '1';
+			limitInput.className = 'admin-text-limit-input';
+			limitInput.placeholder = Nino.content.getText('/_admin/keys/placeholder/limit');
+			limitInput.value = entry.maxlengthSet === true ? String( entry.maxlength ) : '';
+			limitLabel.appendChild( limitInput );
+			schemaWrap.appendChild( limitLabel );
+
+			const applyBtn = dc.createElement('button');
+			applyBtn.type = 'button';
+			applyBtn.className = 'admin-text-key-btn';
+			applyBtn.textContent = Nino.content.getText('/_admin/keys/label/apply');
+			applyBtn.addEventListener( 'click', function() {
+				Nino.admin.keys._saveSettings( entry, globalCheck.checked, blacklistCheck.checked, formatSelect.value, limitInput.value );
+			} );
+			schemaWrap.appendChild( applyBtn );
+
 			wrap.appendChild( schemaWrap );
 
 			return wrap;
+		},
+
+		/**
+		 *	Apply a key's format and limit - together with the two checkboxes it
+		 *	is posted with, which keys/save takes as one request. A format that
+		 *	holds less than the one before it converts every stored text of the
+		 *	key, in every language, so it is asked about first and the question
+		 *	says what happens to the text. The reload that follows draws the
+		 *	category list, which drops what is typed into the open group: the
+		 *	shell asks about unsaved input first (see _guard()), and the group
+		 *	is opened again afterwards
+		 *
+		 *	@param		{Object}	entry					Key entry
+		 *	@param		{boolean}	isGlobal
+		 *	@param		{boolean}	blacklisted
+		 *	@param		{string}	format				'auto' or one of FORMATS
+		 *	@param		{string}	limit					The limit as typed, '' for automatic
+		 *
+		 *	@return		void
+		 */
+		_saveSettings : function( entry, isGlobal, blacklisted, format, limit ) {
+
+			const formats = Nino.admin.keys.FORMATS;
+
+			if( format !== 'auto' && format !== entry.format && formats.indexOf( format ) < formats.indexOf( entry.format ) ) {
+
+				const question = Nino.adminUi.format( Nino.content.getText('/_admin/keys/confirm/format'),
+					entry.key,
+					Nino.content.getText('/_admin/keys/format/'+ entry.format ),
+					Nino.content.getText('/_admin/keys/format/'+ format ),
+					Nino.content.getText('/_admin/keys/convert/'+ format )
+				);
+
+				if( wn.confirm( question ) === false )
+					return;
+			}
+
+			const group = Nino.admin.keys._currentGroup;
+			const posted = { key : entry.key, global : isGlobal, blacklisted : blacklisted, format : format, maxlength : limit === '' ? null : Number( limit ) };
+
+			Nino.admin.keys._guard( function() {
+				Nino.admin.keys._apiCall( 'save', posted, function( status, response ) {
+					if( status !== 200 || response === null ) {
+						wn.alert( Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' ) );
+						return;
+					}
+					Nino.admin.keys._reopen = group;
+					Nino.admin.keys.init();
+				} );
+			} );
 		},
 
 		/**

@@ -368,6 +368,64 @@ requests.length = 0;
 keys._renameKey( '/g/title', '/g/headline' );
 check( 'a shell without the registry asks nothing', requests.length === 1 );
 
+// --- a key's format and limit ---------------------------------------------
+//
+// Applied together with the two checkboxes through keys/save, which leaves a
+// setting out as "unchanged": the checkboxes alone must keep posting without
+// them. A format that holds less than the one before converts every stored
+// text, so it is asked about first - and the question names the conversion.
+
+check( 'the Keys tab knows the four formats, narrowest first, in the order the server states them', JSON.stringify( keys.FORMATS ) === '["plain","inline","lines","blocks"]' );
+
+const confirms = [];
+keysSandbox.window.confirm = function( question ) { confirms.push( question ); return true };
+keysSandbox.window.alert = function() {};
+const plainWords = keysSandbox.Nino.content.getText;
+keysSandbox.Nino.content.getText = function( key ) { return key === '/_admin/keys/confirm/format' ? 'Change %s from %s to %s? %s' : plainWords( key ) };
+keys._currentGroup = 'g';
+requests.length = 0;
+
+keys._saveSettings( { key : '/g/body', format : 'lines' }, false, false, 'blocks', '400' );
+check( 'applying posts the key, both checkboxes, the format and the limit as one keys/save', requests.length === 1 && requests[0].endpoint === 'save'
+	&& JSON.stringify( requests[0].payload ) === JSON.stringify( { key : '/g/body', global : false, blacklisted : false, format : 'blocks', maxlength : 400 } ) );
+check( '...widening asks nothing', confirms.length === 0 );
+
+keys._saveSettings( { key : '/g/body', format : 'lines' }, true, true, 'auto', '' );
+check( 'a limit left empty is posted as null - automatic - and "auto" as itself', JSON.stringify( requests[1].payload ) === JSON.stringify( { key : '/g/body', global : true, blacklisted : true, format : 'auto', maxlength : null } ) && confirms.length === 0 );
+
+keys._saveSettings( { key : '/g/body', format : 'blocks' }, false, false, 'plain', '' );
+check( 'narrowing asks first, naming the key, the two formats and what becomes of the text', confirms.length === 1 && confirms[0].includes( '/g/body' ) && confirms[0].includes( '/_admin/keys/format/blocks' ) && confirms[0].includes( '/_admin/keys/format/plain' ) && confirms[0].includes( '/_admin/keys/convert/plain' ) === true );
+keysSandbox.window.confirm = function( question ) { confirms.push( question ); return false };
+keys._saveSettings( { key : '/g/body', format : 'blocks' }, false, false, 'inline', '' );
+check( '...and a No sends nothing', requests.length === 3 );
+keysSandbox.window.confirm = function( question ) { confirms.push( question ); return true };
+keys._saveSettings( { key : '/g/body', format : 'lines' }, false, false, 'lines', '' );
+check( 'the format a key already has is no change to ask about', confirms.length === 2 && requests.length === 4 );
+
+requests[0].callback( 200, { ok : true } );
+check( 'a success comes back to the category it was made in', keys._reopen === 'g' );
+keys._reopen = null;
+requests[1].callback( 400, { error : 'x', code : 'keys_limit' } );
+check( 'a refusal says so and reloads nothing', keys._reopen === null );
+
+keysSandbox.Nino.content.getText = plainWords;
+check( 'the controls are drawn from the entry: a format select with "auto" first, a limit input, an Apply button',
+	keysSource.includes( "[ 'auto' ].concat( Nino.admin.keys.FORMATS )" ) && keysSource.includes( "className = 'admin-text-limit-input'" ) && keysSource.includes( "getText('/_admin/keys/label/apply')" ) );
+check( 'the format and the limit show what is set: the stored format or "auto", the limit or empty', keysSource.includes( "entry.formatSet === true ? entry.format : 'auto'" ) && keysSource.includes( "entry.maxlengthSet === true ? String( entry.maxlength ) : ''" ) );
+check( 'both editors are handed the key\'s format - the Text panel and this tab', /htmlEditor\.create\( mount, value \?\? '', entry\.maxlength, 0, entry\.format \)/.test( keysSource )
+	&& /htmlEditor\.create\( mount, value \?\? '', entry\.maxlength, 0, entry\.format \)/.test( fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Text/assets/admin.js' ), 'utf8' ) ) );
+check( 'the group is opened again once the list has loaded', /const reopen = Nino\.admin\.keys\._reopen;[\s\S]{0,300}Nino\.admin\.keys\._openGroup\( reopen \)/.test( keysSource ) );
+
+// keys.js builds '/_admin/keys/format/<format>' and '/_admin/keys/convert/<format>' at runtime, which
+// the static fill check of tests/admin-system-smoke.php cannot see: both languages carry every one.
+// A conversion is asked about only when it narrows, so 'blocks' has no convert text
+[ 'en_US', 'de_DE' ].forEach( function( locale ) {
+	const words = fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Text/text/'+ locale+ '.php' ), 'utf8' );
+	const has = key => words.includes( "[[/_admin/keys/"+ key+ "]]'" );
+	check( locale+ ': every format the select offers has a name, and every format a conversion can narrow to says what happens to the text',
+		[ 'auto' ].concat( keys.FORMATS ).every( format => has( 'format/'+ format ) ) && keys.FORMATS.filter( format => format !== 'blocks' ).every( format => has( 'convert/'+ format ) ) );
+} );
+
 const keysRegistration = keysSource.indexOf( "Nino.admin.dirty.register( 'keys'" );
 check( 'the Keys tab registers with the shell behind a check that the shell has the registry', keysRegistration !== -1 && keysSource.slice( 0, keysRegistration ).trimEnd().endsWith( "if( typeof Nino.admin.dirty === 'object' )" ) );
 

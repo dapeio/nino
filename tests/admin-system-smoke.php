@@ -649,6 +649,169 @@ check( 'deleting it a second time is a plain 404, not a crash', $repeatDelete['/
 echo "\n";
 
 
+// --- ElementTypes: blocks and breaks, rename ------------------------
+
+echo "ElementTypes - paragraphs and line breaks, renaming a field\n";
+
+// The two flags that go with html: paragraphs and lists for rich text, line
+// breaks for plain text - each kept only where it can mean something
+$_POST['data'] = json_encode( [ 'uri' => 'flagtype', 'title' => 'Flags', 'model' => [
+	'rich'		=> [ 'type' => 'string', 'html' => true, 'blocks' => true, 'breaks' => true ],
+	'inline'	=> [ 'type' => 'string', 'html' => true ],
+	'plain'		=> [ 'type' => 'string', 'blocks' => true, 'breaks' => true ],
+	'number'	=> [ 'type' => 'integer', 'blocks' => true, 'breaks' => true ],
+] ] );
+$flagCreate = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Modules\Elements\Types::apiCreate( $appData, $flagCreate );
+$flagModel = \Nino\Filesystem::getFileContent( $appData, '/elements/flagtype.php', false )['model'] ?? [];
+check( 'blocks is kept on a rich text field, and breaks is dropped from it', ( $flagModel['rich'] ?? null ) === [ 'type' => 'string', 'html' => true, 'blocks' => true ] );
+check( 'a rich field without blocks stays as it was', ( $flagModel['inline'] ?? null ) === [ 'type' => 'string', 'html' => true ] );
+check( 'breaks is kept on a plain string field, blocks is dropped from it', ( $flagModel['plain'] ?? null ) === [ 'type' => 'string', 'breaks' => true ] );
+check( 'neither means anything on any other type', ( $flagModel['number'] ?? null ) === [ 'type' => 'integer' ] );
+unlink( \Nino\Filesystem::path( $appData, '/elements/flagtype.php' ) );
+
+/*	A type with content in every bucket: the '*' defaults and an element, and
+	a locale that is available, one that is not any more, and a default entry
+	in a locale	*/
+$typeFile = static fn( string $uri ): array|false => \Nino\Filesystem::getFileContent( $appData, '/elements/'. $uri. '.php', false );
+$seedRenamer = static function() use ( &$appData ): void {
+	\Nino\Filesystem::putFileContent( $appData, '/elements/renamer.php', [
+		'title'	=> 'Renamer',
+		'model'	=> [
+			'title'	=> [ 'type' => 'string', 'locale' => true ],
+			'tags'	=> [ 'type' => 'array' ],
+			'photo'	=> [ 'type' => 'image', 'width' => 10, 'height' => 10 ],
+			'extra'	=> [ 'type' => 'string' ],
+		],
+		'*'			=> [ '*' => [ 'tags' => [ 'default' ] ], 'one' => [ 'tags' => [ 'a', 'b' ], 'photo' => 'one.jpg', 'extra' => 'kept' ] ],
+		'de_DE'	=> [ '*' => [ 'title' => 'Vorgabe' ], 'one' => [ 'title' => 'Eins' ] ],
+		'en_US'	=> [ 'one' => [ 'title' => 'One' ] ],
+		'fr_FR'	=> [ 'one' => [ 'title' => 'Un' ] ],
+	] );
+};
+$renamerModel = static fn( array $overrides = [] ): array => array_replace( [
+	'title'	=> [ 'type' => 'string', 'locale' => true ],
+	'tags'	=> [ 'type' => 'array' ],
+	'photo'	=> [ 'type' => 'image', 'width' => 10, 'height' => 10 ],
+	'extra'	=> [ 'type' => 'string' ],
+], $overrides );
+$saveRenamer = static function( array $model, mixed $renames ) use ( &$appData ): array {
+	return callDev( $appData, \Nino\Modules\Elements\Types::class, 'apiSave', [ 'uri' => 'renamer', 'title' => 'Renamer', 'model' => $model, 'renames' => $renames ] );
+};
+
+$seedRenamer();
+$renamed = [ 'headline' => [ 'type' => 'string', 'locale' => true ], 'tags' => [ 'type' => 'array' ], 'photo' => [ 'type' => 'image', 'width' => 10, 'height' => 10 ], 'extra' => [ 'type' => 'string' ] ];
+[ $status, $body ] = $saveRenamer( $renamed, [ 'title' => 'headline' ] );
+$after = $typeFile( 'renamer' );
+check( 'a rename is saved', $status === 200 && ( $body['renamed'] ?? null ) === [ 'title' => 'headline' ] && array_keys( $after['model'] ) === [ 'headline', 'tags', 'photo', 'extra' ] );
+check( 'every value moves to the new key: the elements of every bucket, a locale that is not available any more among them',
+	( $after['de_DE']['one'] ?? null ) === [ 'headline' => 'Eins' ] && ( $after['en_US']['one'] ?? null ) === [ 'headline' => 'One' ] && ( $after['fr_FR']['one'] ?? null ) === [ 'headline' => 'Un' ] );
+check( '...and the defaults of a locale, which are an entry like any other', ( $after['de_DE']['*'] ?? null ) === [ 'headline' => 'Vorgabe' ] );
+check( '...the fields that were not renamed stay where they were, in the order they were', ( $after['*']['one'] ?? null ) === [ 'tags' => [ 'a', 'b' ], 'photo' => 'one.jpg', 'extra' => 'kept' ] && ( $after['*']['*'] ?? null ) === [ 'tags' => [ 'default' ] ] );
+check( 'the old key is gone from a fresh read, and the new one is there', array_key_exists( 'title', $after['de_DE']['one'] ) === false && array_key_exists( 'headline', $after['de_DE']['one'] ) === true );
+check( 'the log names the rename', \Nino\Modules\Elements\Types::log( 'types/save', [ 'uri' => 'renamer', 'renames' => [ 'title' => 'headline', 'tags' => 'labels' ] ] ) === 'Edit Element Type /renamer (renamed title to headline, tags to labels)'
+	&& \Nino\Modules\Elements\Types::log( 'types/save', [ 'uri' => 'renamer' ] ) === 'Edit Element Type /renamer' );
+
+// Renamed in the same save as its shape: the old model is read as it is now called
+$seedRenamer();
+[ $status ] = $saveRenamer( [ 'headline' => [ 'type' => 'string' ] ] + array_diff_key( $renamerModel(), [ 'title' => 1 ] ), [ 'title' => 'headline' ] );
+$after = $typeFile( 'renamer' );
+check( 'a rename and a switch to global in one save migrate the values under the new key',
+	$status === 200 && ( $after['*']['one']['headline'] ?? null ) === 'Eins' && isset( $after['en_US']['one']['headline'] ) === false && isset( $after['de_DE']['one']['title'] ) === false );
+
+// A swap and a chain are read against the type as it was
+$seedRenamer();
+[ $status ] = $saveRenamer( [ 'extra' => [ 'type' => 'array' ], 'tags' => [ 'type' => 'string' ] ], [ 'tags' => 'extra', 'extra' => 'tags' ] );
+$after = $typeFile( 'renamer' );
+check( 'two fields can swap their names', $status === 200 && ( $after['*']['one']['extra'] ?? null ) === [ 'a', 'b' ] && ( $after['*']['one']['tags'] ?? null ) === 'kept' );
+$seedRenamer();
+[ $status ] = $saveRenamer( [ 'tags' => [ 'type' => 'string' ], 'extra' => [ 'type' => 'array' ], 'last' => [ 'type' => 'string' ] ], [ 'extra' => 'last', 'tags' => 'extra' ] );
+$after = $typeFile( 'renamer' );
+check( 'a chain, a to b and b to c, moves each value once', $status === 200 && ( $after['*']['one']['last'] ?? null ) === 'kept' && ( $after['*']['one']['extra'] ?? null ) === [ 'a', 'b' ] && array_key_exists( 'tags', $after['*']['one'] ) === false );
+
+// Refusals: nothing is written
+$seedRenamer();
+$before = $typeFile( 'renamer' );
+[ $status, $body ] = $saveRenamer( $renamerModel(), [ 'extra' => 'tags' ] );
+check( 'a name another field keeps is a 409 that names it', $status === 409 && ( $body['code'] ?? '' ) === 'types_rename_collision' && ( $body['params'] ?? [] ) === [ 'tags' ] );
+[ $status, $body ] = $saveRenamer( [ 'both' => [ 'type' => 'string' ] ], [ 'extra' => 'both', 'tags' => 'both' ] );
+check( 'two fields renamed to one name are a 409 too', $status === 409 && ( $body['code'] ?? '' ) === 'types_rename_collision' );
+// Values a removed field left behind: the editor never deletes data
+$left = $typeFile( 'renamer' );
+$left['*']['one']['removed'] = 'stale';
+\Nino\Filesystem::putFileContent( $appData, '/elements/renamer.php', $left );
+[ $status, $body ] = $saveRenamer( [ 'removed' => [ 'type' => 'string' ] ] + array_diff_key( $renamerModel(), [ 'extra' => 1 ] ), [ 'extra' => 'removed' ] );
+check( 'a name that still holds the values of a removed field is a 409: they would turn up in elements that never had them', $status === 409 && ( $body['code'] ?? '' ) === 'types_rename_values' && ( $body['params'] ?? [] ) === [ 'removed' ] );
+$seedRenamer();
+$twoImagesModel = $renamerModel( [ 'second' => [ 'type' => 'image', 'width' => 10, 'height' => 10 ] ] );
+\Nino\Filesystem::putFileContent( $appData, '/elements/renamer.php', [ 'model' => $twoImagesModel ] + $typeFile( 'renamer' ) );
+[ $status, $body ] = $saveRenamer( $twoImagesModel, [ 'photo' => 'second', 'second' => 'photo' ] );
+check( 'a swap of two image fields is a 409: an upload\'s file is named after the field, so they would overwrite each other', $status === 409 && ( $body['code'] ?? '' ) === 'types_rename_image' );
+[ $status, $body ] = $saveRenamer( [ 'pic' => [ 'type' => 'image', 'width' => 10, 'height' => 10 ] ] + array_diff_key( $twoImagesModel, [ 'photo' => 1 ] ), [ 'photo' => 'pic' ] );
+check( '...a plain rename of an image field is fine, and the value - the file name - moves with it', $status === 200 && ( $typeFile( 'renamer' )['*']['one']['pic'] ?? null ) === 'one.jpg' );
+
+$seedRenamer();
+$before = $typeFile( 'renamer' );
+[ $status, $body ] = $saveRenamer( $renamerModel(), [ 'nothere' => 'title' ] );
+check( 'a rename of a field the type does not have is a 400', $status === 400 && ( $body['code'] ?? '' ) === 'types_rename_unknown' && ( $body['params'] ?? [] ) === [ 'nothere' ] );
+[ $status, $body ] = $saveRenamer( $renamerModel(), [ 'title' => 'gone' ] );
+check( '...so is a rename to a name the saved model does not have', $status === 400 && ( $body['code'] ?? '' ) === 'types_rename_missing' );
+foreach( [ 'title', [ 'title' => 5 ], [ 'title' => '' ], [ 'title' => [ 'x' ] ], [ '' => 'x' ] ] as $malformed ) {
+	[ $status, $body ] = $saveRenamer( $renamerModel(), $malformed );
+	check( 'renames of '. json_encode( $malformed ). ' are a 400, not a guess', $status === 400 && ( $body['code'] ?? '' ) === 'types_renames' );
+}
+check( 'none of the refusals wrote anything', $typeFile( 'renamer' ) === $before );
+[ $status, $body ] = $saveRenamer( $renamerModel(), [ 'title' => 'title' ] );
+check( 'a rename to the name a field has is none', $status === 200 && ( $body['renamed'] ?? null ) === [] && $typeFile( 'renamer' )['de_DE']['one'] === [ 'title' => 'Eins' ] );
+
+// An old client sends no renames
+$seedRenamer();
+[ $status ] = callDev( $appData, \Nino\Modules\Elements\Types::class, 'apiSave', [ 'uri' => 'renamer', 'title' => 'Renamer', 'model' => $renamerModel() ] );
+check( 'a save without renames behaves as before', $status === 200 && $typeFile( 'renamer' )['de_DE']['one'] === [ 'title' => 'Eins' ] );
+
+// An image's alt link follows the rename of the field it points at: the form
+// names it the way it was saved while that field is in the form
+$altModel = [ 'photo' => [ 'type' => 'image', 'width' => 10, 'height' => 10, 'alt' => 'photoAlt' ], 'photoAlt' => [ 'type' => 'string', 'locale' => true ] ];
+\Nino\Filesystem::putFileContent( $appData, '/elements/renamer.php', [ 'title' => 'Renamer', 'model' => $altModel, '*' => [ '*' => [] ], 'de_DE' => [ 'one' => [ 'photoAlt' => 'Ein Bild' ] ] ] );
+[ $status ] = $saveRenamer( [ 'photo' => [ 'type' => 'image', 'width' => 10, 'height' => 10, 'alt' => 'photoAlt' ], 'altText' => [ 'type' => 'string', 'locale' => true ] ], [ 'photoAlt' => 'altText' ] );
+$after = $typeFile( 'renamer' );
+check( 'renaming the field that holds an image\'s alt text keeps the link, under the new name, and the values move', $status === 200 && ( $after['model']['photo']['alt'] ?? null ) === 'altText' && ( $after['de_DE']['one'] ?? null ) === [ 'altText' => 'Ein Bild' ] );
+[ $status ] = $saveRenamer( [ 'photo' => [ 'type' => 'image', 'width' => 10, 'height' => 10, 'alt' => 'altText' ], 'altText' => [ 'type' => 'string', 'locale' => true ] ], [] );
+check( '...and a link already at the new name is left alone', $status === 200 && ( $typeFile( 'renamer' )['model']['photo']['alt'] ?? null ) === 'altText' );
+
+// What the rename cannot reach is reported, not changed
+$seedRenamer();
+mkdir( $sandbox. '/private/templates', 0777, true );
+file_put_contents( $sandbox. '/private/templates/page-renamer.tpl', '[elements /renamer]<h1>[[title]]</h1>[/elements]' );
+$appData['/nino/auth/roles']['renamer-editor'] = [ 'label' => 'Editor', 'perms' => [ '/_admin/elements/renamer/update/title' ] ];
+\Nino\Html::addFills( $appData, [ '/_admin/elements/field/renamer/title' => 'Headline' ], '*' );
+[ $status, $body ] = $saveRenamer( $renamed, [ 'title' => 'headline' ] );
+$references = $body['references'] ?? [];
+check( 'the save reports the template, the role and the label text that still use the old name',
+	$status === 200
+	&& in_array( [ 'kind' => 'template', 'name' => 'page-renamer.tpl', 'field' => 'title' ], $references, true ) === true
+	&& in_array( [ 'kind' => 'role', 'name' => 'renamer-editor', 'field' => 'title' ], $references, true ) === true
+	&& in_array( [ 'kind' => 'label', 'name' => '/_admin/elements/field/renamer/title', 'field' => 'title' ], $references, true ) === true );
+check( '...and has changed none of them', str_contains( (string) file_get_contents( $sandbox. '/private/templates/page-renamer.tpl' ), '[[title]]' ) === true && $appData['/nino/auth/roles']['renamer-editor']['perms'] === [ '/_admin/elements/renamer/update/title' ] );
+unlink( $sandbox. '/private/templates/page-renamer.tpl' );
+rmdir( $sandbox. '/private/templates' );
+unset( $appData['/nino/auth/roles']['renamer-editor'] );
+
+// Permission
+\Nino\Auth::insertUser( $appData, 'norename@example.com', 'correct horse battery staple', [ '/_admin/text/manage' ] );
+\Nino\Auth::loginUser( $appData, 'norename@example.com', 'correct horse battery staple' );
+$seedRenamer();
+$_POST['action'] = 'types/save';
+$_POST['data'] 	 = json_encode( [ 'uri' => 'renamer', 'title' => 'Renamer', 'model' => $renamed, 'renames' => [ 'title' => 'headline' ] ] );
+$forbiddenRename = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Admin\Admin::handlePost( $appData, $forbiddenRename );
+check( 'an account without the tab\'s permission is refused a rename, and nothing moves', $forbiddenRename['/nino/http/response']['statusCode'] === 403 && ( $typeFile( 'renamer' )['de_DE']['one'] ?? null ) === [ 'title' => 'Eins' ] );
+\Nino\Auth::deleteUser( $appData, 'norename@example.com' );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+echo "\n";
+
+
 // --- Dev\Restore ----------------------------------------------------------
 
 echo "Restore - reads Backup's output independently, doesn't call into _admin/Admin.php\n";
@@ -1882,6 +2045,119 @@ check( 'apiDelete 404s for an unknown key', $status === 404 );
 echo "\n";
 
 
+// --- Text keys: format and limit ----------------------------------------------
+
+echo "Text keys - format and limit, per key\n";
+
+$keyEntry = static function( array &$appData, string $key ): ?array {
+	[ , $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiList' );
+	foreach( $body['keys'] as $entry )
+		if( $entry['key'] === $key )
+			return $entry;
+	return null;
+};
+$meta = static fn(): array => \Nino\Filesystem::getFileContent( $appData, \Nino\Text::META_PATH, [] );
+
+// A key that holds paragraphs, in a global file and in both locale files
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/legal/body', 'global' => false, 'value' => '<p>Eins</p><ul><li>a</li></ul><p>Zwei<br>drei</p>' ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/legal/note', 'global' => true, 'value' => "Zeile 1\nZeile 2" ] );
+
+check( 'a key created with paragraphs is read as blocks, from its value', ( $keyEntry( $appData, '/legal/body' )['format'] ?? '' ) === 'blocks' && ( $keyEntry( $appData, '/legal/body' )['formatSet'] ?? true ) === false );
+check( '...and a plain one is stored as it was written', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/legal/note]]'] ?? '' ) === "Zeile 1\nZeile 2" );
+
+// An absent format or limit is "unchanged": the two checkboxes post without them
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false ] );
+check( 'a save without a format or a limit writes no meta', $status === 200 && $meta() === [] );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'format' => 'blocks', 'maxlength' => 900 ] );
+check( 'a format and a limit are written to /text/meta.php, keyed by the key', $status === 200 && ( $meta()['/legal/body'] ?? null ) === [ 'format' => 'blocks', 'maxlength' => 900 ] );
+$legal = $keyEntry( $appData, '/legal/body' );
+check( '...and the list reports them, and that they were set', ( $legal['format'] ?? '' ) === 'blocks' && ( $legal['maxlength'] ?? 0 ) === 900 && ( $legal['formatSet'] ?? false ) === true && ( $legal['maxlengthSet'] ?? false ) === true );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => true ] );
+check( 'a later save that leaves them out leaves them as they are', $status === 200 && ( $meta()['/legal/body'] ?? null ) === [ 'format' => 'blocks', 'maxlength' => 900 ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false ] );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'maxlength' => null ] );
+check( 'a limit posted as null is automatic again; the format stays', $status === 200 && ( $meta()['/legal/body'] ?? null ) === [ 'format' => 'blocks' ] );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'format' => 'auto' ] );
+check( '"auto" forgets the format, and the entry that is left with nothing is dropped', $status === 200 && array_key_exists( '/legal/body', $meta() ) === false );
+check( '...without touching the values: they are paragraphs still', ( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/legal/body]]'] ?? '' ) === '<p>Eins</p><ul><li>a</li></ul><p>Zwei<br>drei</p>' );
+
+// Refusals
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'format' => 'sideways' ] );
+check( 'a format that does not exist is a 400 with a code', $status === 400 && ( $body['code'] ?? '' ) === 'keys_format' && ( $body['field'] ?? '' ) === 'format' );
+foreach( [ 0, -3, \Nino\Text::MAX_LIMIT + 1, 'many', 2.5, [ 5 ] ] as $badLimit ) {
+	[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'maxlength' => $badLimit ] );
+	check( 'a limit of '. json_encode( $badLimit ). ' is a 400 that names the range', $status === 400 && ( $body['code'] ?? '' ) === 'keys_limit' && ( $body['params'] ?? [] ) === [ \Nino\Text::MAX_LIMIT ] );
+}
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'maxlength' => 6 ] );
+check( 'a limit below the longest text the key holds is refused, with that length - the editor would cut the text at it', $status === 400 && ( $body['code'] ?? '' ) === 'keys_limit_short' && ( $body['params'] ?? [] ) === [ 13 ] );
+check( '...and nothing was written', $meta() === [] );
+[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'maxlength' => 13 ] );
+check( 'a limit that is exactly as long as the text is fine', $status === 200 && ( $meta()['/legal/body'] ?? null ) === [ 'maxlength' => 13 ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'maxlength' => null ] );
+
+// Narrowing converts every stored value, in every locale file
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [ [ 'key' => '/legal/body', 'locale' => 'en_US', 'value' => '<p>One</p><ol><li>a</li><li>b</li></ol><p><strong>Two</strong></p>' ] ] ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'format' => 'plain' ] );
+$deConverted = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/legal/body]]'] ?? '';
+$enConverted = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] )['[[/legal/body]]'] ?? '';
+check( 'blocks to plain keeps the words and makes lines of the paragraphs, the items and the breaks, in the first locale', $deConverted === "Eins\na\nZwei\ndrei" );
+check( '...and in every other', $enConverted === "One\na\nb\nTwo" );
+check( '...and the format is the one that was asked for', ( $meta()['/legal/body'] ?? null ) === [ 'format' => 'plain' ] && ( $keyEntry( $appData, '/legal/body' )['html'] ?? true ) === false );
+
+// Widening: a newline becomes what the format makes of it
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'format' => 'lines' ] );
+check( 'plain to lines makes a <br> of every newline, in every locale file',
+	( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/legal/body]]'] ?? '' ) === 'Eins<br>a<br>Zwei<br>drei'
+	&& ( \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] )['[[/legal/body]]'] ?? '' ) === 'One<br>a<br>b<br>Two' );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'format' => 'blocks' ] );
+check( 'lines to blocks makes one paragraph of it', ( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/legal/body]]'] ?? '' ) === '<p>Eins<br>a<br>Zwei<br>drei</p>' );
+
+// The same for a global key, and the shape change that comes with it
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/note', 'global' => true, 'blacklisted' => false, 'format' => 'lines' ] );
+check( 'a global key is converted in global.php', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/legal/note]]'] ?? '' ) === 'Zeile 1<br>Zeile 2' );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/note', 'global' => false, 'blacklisted' => false, 'format' => 'plain' ] );
+check( 'a key that changes its shape and its format in one save lands in the new shape, converted',
+	( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/legal/note]]'] ?? '' ) === "Zeile 1\nZeile 2"
+	&& array_key_exists( '[[/legal/note]]', \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] ) ) === false );
+
+// The log line says what was posted
+$logged = \Nino\Modules\Text\Keys::log( 'keys/save', [ 'key' => '/legal/body', 'format' => 'lines', 'maxlength' => 400 ] );
+check( 'the log names the format and the limit of a save that carries them, and nothing for one that does not', $logged === 'Edit Text Key /legal/body (format lines, limit 400)' && \Nino\Modules\Text\Keys::log( 'keys/save', [ 'key' => '/legal/body', 'global' => true ] ) === '' );
+
+// Rename: both branches move the meta; delete drops it
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSave', [ 'key' => '/legal/body', 'global' => false, 'blacklisted' => false, 'format' => 'blocks', 'maxlength' => 700 ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiRename', [ 'key' => '/legal/body', 'newKey' => '/legal/text' ] );
+check( 'a rename takes the format and the limit to the new name and leaves nothing behind', ( $meta()['/legal/text'] ?? null ) === [ 'format' => 'blocks', 'maxlength' => 700 ] && array_key_exists( '/legal/body', $meta() ) === false );
+
+\Nino\Text::setBlacklisted( $appData, '/legal/retired', true );
+\Nino\Text::setMeta( $appData, '/legal/retired', 'lines', null );
+check( 'a retired key, which has no value anywhere, lists with the format it was given', ( $keyEntry( $appData, '/legal/retired' )['format'] ?? '' ) === 'lines' );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiRename', [ 'key' => '/legal/retired', 'newKey' => '/legal/gone' ] );
+check( 'a rename of a retired key moves the meta too', ( $meta()['/legal/gone'] ?? null ) === [ 'format' => 'lines' ] && array_key_exists( '/legal/retired', $meta() ) === false );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/legal/gone' ] );
+check( 'deleting a retired key drops its meta', array_key_exists( '/legal/gone', $meta() ) === false );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/legal/text' ] );
+check( 'deleting a key drops its meta', array_key_exists( '/legal/text', $meta() ) === false );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/legal/note' ] );
+
+// Creating: through the format, like any value saved from the workbench
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/legal/made', 'global' => true, 'value' => "a\nb<script>x</script>", 'format' => 'lines' ] );
+check( 'apiCreate sanitizes the initial value with the format that was asked for, and remembers the choice', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/legal/made]]'] ?? '' ) === 'a<br>b' && ( $meta()['/legal/made'] ?? null ) === [ 'format' => 'lines' ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/legal/read', 'global' => true, 'value' => '<em>x</em><script>y</script> [template /templates/mail-owner]' ] );
+check( '...and without one reads it from the value - shortcodes and scripts are not stored, the choice is not remembered', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/legal/read]]'] ?? '' ) === '<em>x</em> &#91;template /templates/mail-owner&#93;' && array_key_exists( '/legal/read', $meta() ) === false );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/legal/never', 'global' => true, 'value' => 'x', 'format' => 'sideways' ] );
+check( 'apiCreate refuses a format that does not exist, and creates nothing', $status === 400 && ( $body['code'] ?? '' ) === 'keys_format' && \Nino\Text::entry( $appData, '/legal/never' ) === null );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/legal/made' ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/legal/read' ] );
+check( 'both are cleaned up again', $meta() === [] );
+
+echo "\n";
+
+
 // --- Text::apiScan / Images::apiScan: template scanners ---------------------
 
 echo "Text::apiScan - missing [[/key]] placeholders in templates/*.tpl\n";
@@ -2851,6 +3127,35 @@ check( 'Element import cannot overwrite global or image fields', $translatedElem
 check( '...nor an element reference, which is a choice rather than a translation', $translatedElements['en_US']['item']['related'] === '/brandnewtype/en' );
 check( 'Element import leaves the native bucket untouched', $translatedElements['de_DE']['item']['title'] === 'Projekt' );
 check( 'a value the kernel would refuse is skipped on its own, and its siblings are imported', $translatedElements['en_US']['item']['code'] === '01' && $translatedElements['en_US']['item']['title'] === 'Project' );
+
+// A key that holds a line break and a field that keeps paragraphs: what comes
+// back from a translator is held to the format, not to the inline tags alone
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', fn( array $content ): array => $content + [ '[[/translation/closing]]' => 'Danke.<br>Grüße' ] );
+\Nino\Filesystem::mutate( $appData, '/text/en_US.php', fn( array $content ): array => $content + [ '[[/translation/closing]]' => 'Thanks.<br>Regards' ] );
+\Nino\Filesystem::putFileContent( $appData, '/elements/translationformats.php', [
+	'title' => 'Translation Formats',
+	'model' => [
+		'body' => [ 'type' => 'string', 'locale' => true, 'html' => true, 'blocks' => true ],
+		'note' => [ 'type' => 'string', 'locale' => true, 'breaks' => true ],
+	],
+	'*'			=> [ '*' => [] ],
+	'de_DE'	=> [ 'item' => [ 'body' => '<p>Eins</p>', 'note' => "Zeile 1\nZeile 2" ] ],
+	'en_US'	=> [ 'item' => [ 'body' => '<p>One</p>', 'note' => 'Line' ] ],
+] );
+unset( $appData['./nino/elements/cache'] );
+
+$formatsTranslation = $translation;
+$formatsTranslation['text'] = [ '/translation/closing' => "Thanks.\nBest regards,<script>x</script>" ];
+$formatsTranslation['elements'] = [ 'translationformats' => [ 'item' => [
+	'body' => '<p>One</p><ul><li>a</li><li>b</li></ul><script>x</script>',
+	'note' => "L1\nL2 <b>x</b>",
+] ] ];
+[ $status, $result ] = callDev( $appData, \Nino\Modules\Language\Translations::class, 'apiImport', [ 'targetLocale' => 'en_US', 'translation' => $formatsTranslation ] );
+$formatsText 			= \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
+$formatsElements 	= \Nino\Filesystem::getFileContent( $appData, '/elements/translationformats.php', [] );
+check( 'a text key that holds a line break takes the newlines of its translation as breaks', $status === 200 && ( $formatsText['[[/translation/closing]]'] ?? '' ) === 'Thanks.<br>Best regards,' );
+check( 'a blocks field keeps the paragraphs and the list of its translation', ( $formatsElements['en_US']['item']['body'] ?? '' ) === '<p>One</p><ul><li>a</li><li>b</li></ul>' );
+check( 'a breaks field keeps its newlines, and loses its tags like any plain field', ( $formatsElements['en_US']['item']['note'] ?? '' ) === "L1\nL2 x" );
 
 $badTranslation = $translation;
 $badTranslation['version'] = 99;

@@ -27,7 +27,9 @@ Common model properties:
 | `type` | all | Required storage type |
 | `locale` | all | Store value per locale instead of globally |
 | `required` | non-image | Reject missing value on insert |
-| `html` | string | Allow sanitized rich inline HTML |
+| `html` | string | Allow sanitized rich inline HTML (`strong`, `em`, `span`, `code`, `a`) |
+| `blocks` | string with `html` | Also allow paragraphs and lists (`p`, `ul`, `ol`, `li`) and the `<br>` inside them. Dropped on save from a field without `html` |
+| `breaks` | string without `html` | Keep the line breaks of the plain text on the page, as `<br>`, after escaping. Dropped on save from a field with `html` |
 | `maxlength` | string | Editing limit/hint |
 | `inputsize` | string | Rows the editing area opens with: the textarea's rows, or the rich-text area's minimum height in lines. A hint for the form, not a limit on the value |
 | `suffix` | non-boolean, non-image, non-element | Fixed UI unit such as `€` or `%` |
@@ -229,7 +231,9 @@ lowercase hyphenated IDs.
 - `[[.id]]` is the internal record ID.
 - `[[field]]` is local to the current Elements block.
 - normal field output is HTML-escaped;
-- `html: true` fields are sanitized by the Elements renderer;
+- `html: true` fields are sanitized by the Elements renderer, to the inline tags, or - with `blocks: true` - to paragraphs and lists as well; a `breaks: true` field is escaped and its newlines become `<br>`. The rule is `\Nino\Html::fieldValue( $value, $field )`, which `[element]` and `[elements]` call and a feature that draws a field itself calls instead of a copy. `[elementvalues]` lists values and always escapes them;
+- wrap the output of a `blocks` field in an element with the class `nino-richtext`: the reset at the top of `Nino.css` takes every paragraph gap and list marker away, and the class restores them;
+- a `breaks` or `blocks` value has `<br>` in it, so it does not belong in an attribute or in a `[json ...]` shortcode that expects plain text;
 - `limit` bounds output;
 - `query` matches model values and supports the existing percent wildcard
   forms.
@@ -358,6 +362,27 @@ Changing an existing field between global and localized is a data migration.
 Admin preserves values using the native locale/fallback rules. A model patch
 must test the migration in both directions and must not leave stale locale
 values that override the new shape.
+
+Renaming a field is a data migration too, and the Element Types tab makes it:
+`types/save` takes `renames` (`{ old key: new key }`) beside the model and moves
+every stored value - the `*` bucket, every locale bucket whether or not the locale
+is still available, the defaults entry `*` of each - under the lock of the type
+file, reading all renames against the type as it was (a swap and a chain work).
+It answers 409 for a target that two renames share, that an unrenamed field has,
+that still holds the values of a removed field, or that is an image field's name
+swapped with another's (an upload's file name is made of the field key - which is
+also why a new image field must not take the name an image field had before it
+was renamed: its uploads would overwrite the old file); an image's alt link
+follows the rename (`_renamedAlts()`); it does not rewrite what lives outside the type file - templates that fill `[[old]]`,
+role grants `/_admin/elements/<type>/update/<old>`, label fills - and lists them
+in the answer (`references`) instead. Duplicating a type has no action of its
+own: the form posts its model, title and numbering under the new uri through
+`types/create`, so the copy has what `cleanModel()` keeps of any model - no
+hand-written default or callback, no `*` defaults, no elements. A patch that
+changes the rename tests the buckets, the refusals and the answer.
+
+An `array` field whose value is a list of strings is edited as rows
+(`Nino.adminUi.stringList()`); a list of anything else keeps the JSON field.
 
 ## Element tests
 

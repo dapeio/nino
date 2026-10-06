@@ -466,6 +466,96 @@ check( 'a value under the limit is not cut at all', ( $underTheCut['value'] ?? '
 echo "\n";
 
 
+// --- Text formats: line breaks, paragraphs and lists, per key ----------------
+
+echo "Text - a key's format and limit\n";
+
+// Two keys that hold a <br> and are in no blacklist: the closing of a mail
+// ships that way. containsHtml() never saw a break, so the panel showed a
+// plain textarea with a literal <br> in it, and the next save stripped it
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', fn( array $texts ): array => $texts + [
+	'[[/mail/closing]]'	=> 'Vielen Dank.<br>Freundliche Grüße,',
+	'[[/mail/plain]]'		=> "Eine Zeile\nund noch eine",
+] );
+\Nino\Filesystem::mutate( $appData, '/text/en_US.php', fn( array $texts ): array => $texts + [
+	'[[/mail/closing]]'	=> 'Thank you.<br>Kind regards,',
+	'[[/mail/plain]]'		=> "One line\nand another",
+] );
+
+function textEntry( array &$appData, string $key ): array {
+	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+	\Nino\Modules\Text\Admin::apiKeys( $appData, $request );
+	foreach( $request['/nino/http/response']['body']['keys'] ?? [] as $entry )
+		if( $entry['key'] === $key )
+			return $entry;
+	return [];
+}
+
+$closing = textEntry( $appData, '/mail/closing' );
+check( 'a key whose value holds a <br> is read as line breaks, and offered the editor', ( $closing['format'] ?? '' ) === 'lines' && ( $closing['html'] ?? false ) === true && ( $closing['formatSet'] ?? true ) === false );
+check( '...a plain one as plain text, a key with inline markup as inline', ( textEntry( $appData, '/mail/plain' )['format'] ?? '' ) === 'plain' && ( textEntry( $appData, '/home/h2' )['format'] ?? '' ) === 'inline' );
+
+$result = saveText( $appData, [ 'key' => '/mail/closing', 'locale' => 'de_DE', 'value' => 'Vielen Dank.<br>Freundliche Grüße,<script>x</script>' ] );
+check( 'saving a key that holds a <br> keeps it - it used to be stripped to "Dank.Freundliche"', ( $result['value'] ?? '' ) === 'Vielen Dank.<br>Freundliche Grüße,' );
+$result = saveText( $appData, [ 'key' => '/mail/closing', 'locale' => 'en_US', 'value' => "Thank you.\nKind regards," ] );
+check( '...and a newline typed into it becomes one', ( $result['value'] ?? '' ) === 'Thank you.<br>Kind regards,' );
+
+// A format somebody chose
+check( 'setMeta stores a format and a limit', \Nino\Text::setMeta( $appData, '/home/plain', 'blocks', 400 ) === true
+	&& ( \Nino\Filesystem::getFileContent( $appData, \Nino\Text::META_PATH, [] )['/home/plain'] ?? null ) === [ 'format' => 'blocks', 'maxlength' => 400 ] );
+$plain = textEntry( $appData, '/home/plain' );
+check( 'the key reports the format and the limit that were set, and says they were', ( $plain['format'] ?? '' ) === 'blocks' && ( $plain['html'] ?? false ) === true && ( $plain['maxlength'] ?? 0 ) === 400 && ( $plain['formatSet'] ?? false ) === true && ( $plain['maxlengthSet'] ?? false ) === true );
+check( '...and a key without an entry says its limit is derived', ( textEntry( $appData, '/home/long' )['maxlengthSet'] ?? true ) === false );
+
+$result = saveText( $appData, [ 'key' => '/home/plain', 'locale' => 'de_DE', 'value' => "<p>Eins</p><ul><li>a</li></ul><script>x</script>\n\nZwei" ] );
+check( 'saving into a blocks key keeps paragraphs and lists, and makes a paragraph of loose text', ( $result['value'] ?? '' ) === '<p>Eins</p><ul><li>a</li></ul><p>Zwei</p>' );
+check( '...and a shortcode in it is made an entity like in any other', ( saveText( $appData, [ 'key' => '/home/plain', 'locale' => 'de_DE', 'value' => '<p>[template /templates/mail-owner]</p>' ] )['value'] ?? '' ) === '<p>&#91;template /templates/mail-owner&#93;</p>' );
+
+check( 'setMeta takes a setting away with null, and drops an entry that is left with none', \Nino\Text::setMeta( $appData, '/home/plain', null, 400 ) === true
+	&& ( \Nino\Filesystem::getFileContent( $appData, \Nino\Text::META_PATH, [] )['/home/plain'] ?? null ) === [ 'maxlength' => 400 ]
+	&& \Nino\Text::setMeta( $appData, '/home/plain', null, null ) === true
+	&& array_key_exists( '/home/plain', \Nino\Filesystem::getFileContent( $appData, \Nino\Text::META_PATH, [] ) ) === false );
+check( '...answers true when there was nothing to change, false for a format or a limit it cannot keep', \Nino\Text::setMeta( $appData, '/home/plain', null, null ) === true
+	&& \Nino\Text::setMeta( $appData, '/home/plain', 'wide', null ) === false
+	&& \Nino\Text::setMeta( $appData, '/home/plain', null, 0 ) === false
+	&& \Nino\Text::setMeta( $appData, '/home/plain', null, \Nino\Text::MAX_LIMIT + 1 ) === false );
+// A limit that is set is never shorter than what the key holds: a longer text written later is not cut by the editor
+\Nino\Text::setMeta( $appData, '/home/long', null, 5 );
+$limited = textEntry( $appData, '/home/long' );
+$longestValue = max( array_map( fn( $value ) => \Nino\Text::visibleLength( (string) $value ), array_filter( $limited['values'], 'is_string' ) ) );
+check( 'a limit that was set and is below what the key already holds reports the longer one, and still says it was set', $longestValue > 5 && ( $limited['maxlength'] ?? 0 ) === $longestValue && ( $limited['maxlengthSet'] ?? false ) === true );
+\Nino\Text::setMeta( $appData, '/home/long', null, null );
+
+// A request that changes one setting leaves the other as the file has it, decided under the lock
+\Nino\Text::setMeta( $appData, '/home/plain', 'lines', 300 );
+check( 'updateMeta changes only the settings it is given',
+	\Nino\Text::updateMeta( $appData, '/home/plain', [ 'format' => 'blocks' ] ) === true
+	&& ( \Nino\Text::meta( $appData )['/home/plain'] ?? null ) === [ 'format' => 'blocks', 'maxlength' => 300 ]
+	&& \Nino\Text::updateMeta( $appData, '/home/plain', [ 'maxlength' => 500 ] ) === true
+	&& ( \Nino\Text::meta( $appData )['/home/plain'] ?? null ) === [ 'format' => 'blocks', 'maxlength' => 500 ] );
+check( '...null takes one away, and a value it cannot keep is refused without a write',
+	\Nino\Text::updateMeta( $appData, '/home/plain', [ 'format' => null ] ) === true
+	&& ( \Nino\Text::meta( $appData )['/home/plain'] ?? null ) === [ 'maxlength' => 500 ]
+	&& \Nino\Text::updateMeta( $appData, '/home/plain', [ 'maxlength' => 0 ] ) === false
+	&& ( \Nino\Text::meta( $appData )['/home/plain'] ?? null ) === [ 'maxlength' => 500 ] );
+check( 'moveMeta gives the settings to the new name and leaves nothing under the old one, and a key without any is nothing to move',
+	\Nino\Text::moveMeta( $appData, '/home/plain', '/home/moved' ) === true
+	&& \Nino\Text::meta( $appData ) === [ '/home/moved' => [ 'maxlength' => 500 ] ]
+	&& \Nino\Text::moveMeta( $appData, '/home/plain', '/home/other' ) === true
+	&& \Nino\Text::meta( $appData ) === [ '/home/moved' => [ 'maxlength' => 500 ] ] );
+\Nino\Text::setMeta( $appData, '/home/moved', null, null );
+\Nino\Filesystem::putFileContent( $appData, \Nino\Text::META_PATH, [ '/a/b' => [ 'format' => 'sideways', 'maxlength' => '12' ], '/c/d' => 'x', '/e/f' => [ 'format' => 'lines', 'maxlength' => 0 ] ] );
+check( 'meta() leaves out what is not a format or a limit, whatever the file says', \Nino\Text::meta( $appData ) === [ '/e/f' => [ 'format' => 'lines' ] ] );
+\Nino\Filesystem::putFileContent( $appData, \Nino\Text::META_PATH, [] );
+
+check( 'sanitizeValue still takes a bool: true is inline, false is plain', \Nino\Text::sanitizeValue( 'a<br>b <em>c</em>', true ) === 'a b <em>c</em>' && \Nino\Text::sanitizeValue( 'a<em>b</em>', false ) === 'ab' );
+check( '...and a plain value keeps the lines the tags were: a break and the end of a block are a newline', \Nino\Text::sanitizeValue( 'Amtsgericht<br>Musterstadt', 'plain' ) === "Amtsgericht\nMusterstadt" && \Nino\Text::sanitizeValue( '<p>a</p><p>b</p>', 'plain' ) === "a\nb" );
+check( '...and a name that is no format is read as plain, the narrowest', \Nino\Text::sanitizeValue( '<strong>a</strong>', 'sideways' ) === 'a' );
+check( 'visibleLength counts what is seen: no tag, one character for an entity', \Nino\Text::visibleLength( '<p>a&amp;b</p><ul><li>c</li></ul>' ) === 4 );
+
+echo "\n";
+
+
 // --- Elements::apiSave: html field sanitizing -------------------------------
 
 echo "Elements::apiSave - html field sanitizing\n";
@@ -500,6 +590,38 @@ $_POST['data'] = json_encode( [
 ] );
 \Nino\Modules\Elements\Admin::apiSave( $appData, $request );
 check( 'a new element uri outside the documented slug syntax is rejected', $request['/nino/http/response']['statusCode'] === 400 );
+
+echo "\n";
+
+
+// --- Elements::apiSave: blocks and breaks ---------------------------------------
+
+echo "Elements::apiSave - a blocks field keeps paragraphs and lists, a breaks field its newlines\n";
+
+\Nino\Elements::insertElementType( $appData, '/demoformats', [
+	'blocks'	=> [ 'type' => 'string', 'locale' => true, 'html' => true, 'blocks' => true ],
+	'rich'		=> [ 'type' => 'string', 'locale' => true, 'html' => true ],
+	'breaks'	=> [ 'type' => 'string', 'locale' => true, 'breaks' => true ],
+] );
+
+$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+$_POST['data'] = json_encode( [
+	'type' 		=> 'demoformats',
+	'uri' 		=> 'item1',
+	'locale' 	=> 'de_DE',
+	'isNew' 	=> true,
+	'fields' 	=> [
+		'blocks'	=> '<p>Eins</p><ul><li>a</li><li>b</li></ul><script>x</script>',
+		'rich'		=> '<p>Eins</p><strong>zwei</strong>',
+		'breaks'	=> "Zeile 1\nZeile 2",
+	],
+] );
+\Nino\Modules\Elements\Admin::apiSave( $appData, $request );
+$element = $request['/nino/http/response']['body']['element'] ?? [];
+
+check( 'a blocks field keeps p and ul', ( $element['blocks'] ?? '' ) === '<p>Eins</p><ul><li>a</li><li>b</li></ul>' );
+check( '...a field with html alone still only the inline tags', ( $element['rich'] ?? '' ) === 'Eins <strong>zwei</strong>' );
+check( '...and a breaks field its newline, as text', ( $element['breaks'] ?? '' ) === "Zeile 1\nZeile 2" );
 
 echo "\n";
 

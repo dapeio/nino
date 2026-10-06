@@ -65,6 +65,14 @@ namespace Nino\Modules\Text {
 		public static function log( string $action, array $data ): string {
 			return match( $action ) {
 				'keys/create' 		=> 'Add Text Key '. ( $data['key'] ?? '' ),
+				// Only when the format or the limit is posted: the other thing
+				// this action does, the shape and the hidden flag, is not logged
+				'keys/save' 			=> ( array_key_exists( 'format', $data ) === true || array_key_exists( 'maxlength', $data ) === true )
+					? 'Edit Text Key '. ( $data['key'] ?? '' ). ' ('. implode( ', ', array_filter( [
+						array_key_exists( 'format', $data ) === true ? 'format '. ( is_string( $data['format'] ) === true ? $data['format'] : '?' ) : '',
+						array_key_exists( 'maxlength', $data ) === true ? 'limit '. ( $data['maxlength'] === null ? 'automatic' : ( is_int( $data['maxlength'] ) === true ? (string) $data['maxlength'] : '?' ) ) : '',
+					] ) ). ')'
+					: '',
 				'keys/rename' 		=> 'Rename Text Key '. ( $data['key'] ?? '' ). ' to '. ( $data['newKey'] ?? '' ),
 				'keys/delete' 		=> 'Delete Text Key '. ( $data['key'] ?? '' ),
 				// The one action that retires keys in bulk, and the reason this
@@ -169,9 +177,15 @@ namespace Nino\Modules\Text {
 			$key 			= (string) ( $data['key'] ?? '' );
 			$isGlobal = ( $data['global'] ?? false ) === true;
 			$value 		= (string) ( $data['value'] ?? '' );
+			$format 	= self::_postedFormat( $data );
 
 			if( self::isValidKey( $key ) === false ) {
 				\Nino\Http::fail( $request, 400, 'invalid key', 'keys_invalid', [ $key ], 'key' );
+				return;
+			}
+
+			if( $format === false ) {
+				\Nino\Http::fail( $request, 400, 'unknown format', 'keys_format', [], 'format' );
 				return;
 			}
 
@@ -180,7 +194,12 @@ namespace Nino\Modules\Text {
 				return;
 			}
 
-			self::_writeKey( $appData, $key, $isGlobal, $value );
+			self::_writeKey( $appData, $key, $isGlobal, $value, $format );
+
+			// A format that was chosen is remembered; one that was only
+			// detected is not, it follows the value
+			if( is_string( $format ) === true )
+				\Nino\Text::setMeta( $appData, $key, $format, null );
 
 			\Nino\Http::ok( $request, [ 'ok' => true, 'key' => $key ] );
 		}
@@ -196,12 +215,19 @@ namespace Nino\Modules\Text {
 		 *	@param		string		$key					A key that passed isValidKey()
 		 *	@param		bool			$isGlobal			Whether it lives in global.php
 		 *	@param		string		$value				The starting value
+		 *	@param		string|null	$format			The format it is kept in, null to read it from the value
 		 *
 		 *	@return 	void
 		 */
-		private static function _writeKey( array &$appData, string $key, bool $isGlobal, string $value ): void {
+		private static function _writeKey( array &$appData, string $key, bool $isGlobal, string $value, ?string $format = null ): void {
 
 			$bracketKey = '[['. $key. ']]';
+
+			// Like any value saved from the workbench: through the format's
+			// whitelist, with the shortcodes taken out. It used to be stored
+			// as it came, which is the one road into a text file that skipped
+			// \Nino\Text::sanitizeValue()
+			$value = \Nino\Text::sanitizeValue( $value, $format ?? \Nino\Html::detectFormat( $value ) );
 
 			if( $isGlobal === true ) {
 				\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ) use ( $bracketKey, $value ): array {
@@ -246,21 +272,27 @@ namespace Nino\Modules\Text {
 				$values[$locale] = null;
 
 			$entries = [];
+			$meta 	 = \Nino\Text::meta( $appData );
 
 			foreach( array_keys( \Nino\Text::blacklist( $appData ) ) as $key ) {
 
 				if( isset( $known[$key] ) === true )
 					continue;
 
+				$format = $meta[$key]['format'] ?? 'plain';
+
 				$entries[] = [
 					'key' 				=> $key,
 					'global' 			=> false,
 					'blacklisted' => true,
-					'html' 				=> false,
+					'html' 				=> $format !== 'plain',
+					'format' 			=> $format,
+					'formatSet' 	=> isset( $meta[$key]['format'] ),
 					// The floor \Nino\Text::entries() itself lands on for an
 					// empty value, so an un-ignored key keeps the same counter
 					// it had a moment before
-					'maxlength' 	=> 150,
+					'maxlength' 	=> $meta[$key]['maxlength'] ?? 150,
+					'maxlengthSet' => isset( $meta[$key]['maxlength'] ),
 					'values' 			=> $values,
 				];
 			}
@@ -284,11 +316,19 @@ namespace Nino\Modules\Text {
 		}
 
 		/**
-		 *	Edit an existing key's global/per-locale shape and/or blacklist
-		 *	status. Converting shape migrates the current value(s) instead
-		 *	of discarding them: global -> per-locale copies the one value
+		 *	Edit an existing key's global/per-locale shape, blacklist status,
+		 *	format and limit. Converting shape migrates the current value(s)
+		 *	instead of discarding them: global -> per-locale copies the one value
 		 *	into every locale; per-locale -> global keeps the native
-		 *	locale's value (falling back to the first non-empty one)
+		 *	locale's value (falling back to the first non-empty one).
+		 *
+		 *	The format ('auto' or one of \Nino\Html::FORMATS) and the limit (an
+		 *	int, null or '' for automatic) are optional: a request that leaves
+		 *	one out leaves it as it is - the two checkboxes of the form post
+		 *	without them. A format that is set converts every stored value to it
+		 *	(see _convertFormat()); 'auto' only forgets the choice, the values
+		 *	stay as they are. A limit below the longest text the key holds is
+		 *	refused: the editor would cut the text at it on the next keystroke
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -305,6 +345,11 @@ namespace Nino\Modules\Text {
 			$isGlobal = ( $data['global'] ?? false ) === true;
 			$blacklisted = ( $data['blacklisted'] ?? false ) === true;
 
+			$formatPosted = array_key_exists( 'format', $data );
+			$limitPosted 	= array_key_exists( 'maxlength', $data );
+			$format 			= self::_postedFormat( $data );
+			$limit 				= self::_postedLimit( $data );
+
 			$entry = \Nino\Text::entry( $appData, $key );
 
 			// A key the scan form retired has no value anywhere, so
@@ -316,12 +361,131 @@ namespace Nino\Modules\Text {
 				return;
 			}
 
+			if( $format === false ) {
+				\Nino\Http::fail( $request, 400, 'unknown format', 'keys_format', [], 'format' );
+				return;
+			}
+
+			if( $limit === false ) {
+				\Nino\Http::fail( $request, 400, 'invalid limit', 'keys_limit', [ \Nino\Text::MAX_LIMIT ], 'maxlength' );
+				return;
+			}
+
+			if( $limit !== null && $entry !== null ) {
+
+				$longest = 0;
+				foreach( $entry['values'] as $value )
+					$longest = max( $longest, \Nino\Text::visibleLength( (string) $value ) );
+
+				if( $limit < $longest ) {
+					\Nino\Http::fail( $request, 400, 'limit below the current text', 'keys_limit_short', [ $longest ], 'maxlength' );
+					return;
+				}
+			}
+
 			if( $entry !== null && $entry['global'] !== $isGlobal )
 				self::_convertShape( $appData, $key, $entry, $isGlobal );
+
+			if( $entry !== null && $format !== null && $format !== $entry['format'] )
+				self::_convertFormat( $appData, $key, $isGlobal, $format );
+
+			if( $formatPosted === true || $limitPosted === true ) {
+
+				// What the request leaves out stays as the file has it - decided
+				// under the file's own lock, not from a read made before it
+				$changes = [];
+
+				if( $formatPosted === true )
+					$changes['format'] = $format;
+
+				if( $limitPosted === true )
+					$changes['maxlength'] = $limit;
+
+				if( \Nino\Text::updateMeta( $appData, $key, $changes ) === false ) {
+					\Nino\Http::fail( $request, 500, 'could not save the format' );
+					return;
+				}
+			}
 
 			\Nino\Text::setBlacklisted( $appData, $key, $blacklisted );
 
 			\Nino\Http::ok( $request );
+		}
+
+		/**
+		 *	The format a request names: a name from \Nino\Html::FORMATS, null for
+		 *	'auto' or when it names none, false for anything else
+		 *
+		 *	@param		array 		$data					The posted data
+		 *
+		 *	@return 	string|false|null
+		 */
+		private static function _postedFormat( array $data ): string|false|null {
+
+			$format = $data['format'] ?? null;
+
+			if( $format === null || $format === '' || $format === 'auto' )
+				return null;
+
+			return ( is_string( $format ) === true && in_array( $format, \Nino\Html::FORMATS, true ) === true ) ? $format : false;
+		}
+
+		/**
+		 *	The limit a request names: a whole number from 1 to
+		 *	\Nino\Text::MAX_LIMIT, null for none (automatic), false for anything else
+		 *
+		 *	@param		array 		$data					The posted data
+		 *
+		 *	@return 	int|false|null
+		 */
+		private static function _postedLimit( array $data ): int|false|null {
+
+			$limit = $data['maxlength'] ?? null;
+
+			if( $limit === null || $limit === '' )
+				return null;
+
+			if( is_string( $limit ) === true && ctype_digit( $limit ) === true )
+				$limit = (int) $limit;
+
+			return ( is_int( $limit ) === true && $limit >= 1 && $limit <= \Nino\Text::MAX_LIMIT ) ? $limit : false;
+		}
+
+		/**
+		 *	Bring a key's stored value(s) into a format, after somebody chose
+		 *	it: through \Nino\Text::sanitizeValue(), so a value that went from
+		 *	paragraphs to plain text keeps its words and its lines, and one that
+		 *	went from plain text to line breaks gets its newlines as <br>.
+		 *	Same migrate-don't-discard reasoning as _convertShape(), and one lock
+		 *	per file the same way
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key
+		 *	@param		bool			$isGlobal			Where the key lives now
+		 *	@param		string		$format				One of \Nino\Html::FORMATS
+		 *
+		 *	@return 	void
+		 */
+		private static function _convertFormat( array &$appData, string $key, bool $isGlobal, string $format ): void {
+
+			$bracketKey = '[['. $key. ']]';
+			$files 			= $isGlobal === true ? [ '/text/global.php' ] : array_map( fn( string $locale ): string => '/text/'. $locale. '.php', \Nino\Locales::getAvailableLocales( $appData ) );
+
+			foreach( $files as $file )
+				\Nino\Filesystem::mutate( $appData, $file, function( array $content ) use ( $bracketKey, $format ): ?array {
+
+					if( is_scalar( $content[$bracketKey] ?? null ) === false )
+						return null;
+
+					$value = \Nino\Text::sanitizeValue( (string) $content[$bracketKey], $format );
+
+					if( $value === (string) $content[$bracketKey] )
+						return null;
+
+					$content[$bracketKey] = $value;
+
+					return $content;
+				} );
 		}
 
 		/**
@@ -403,6 +567,7 @@ namespace Nino\Modules\Text {
 			if( $valueless === true ) {
 				\Nino\Text::setBlacklisted( $appData, $key, false );
 				\Nino\Text::setBlacklisted( $appData, $newKey, true );
+				\Nino\Text::moveMeta( $appData, $key, $newKey );
 				\Nino\Http::ok( $request, [ 'ok' => true, 'key' => $newKey ] );
 				return;
 			}
@@ -429,6 +594,8 @@ namespace Nino\Modules\Text {
 				\Nino\Text::setBlacklisted( $appData, $key, false );
 				\Nino\Text::setBlacklisted( $appData, $newKey, true );
 			}
+
+			\Nino\Text::moveMeta( $appData, $key, $newKey );
 
 			\Nino\Http::ok( $request, [ 'ok' => true, 'key' => $newKey ] );
 		}
@@ -463,6 +630,7 @@ namespace Nino\Modules\Text {
 				}
 
 				\Nino\Text::setBlacklisted( $appData, $key, false );
+				\Nino\Text::setMeta( $appData, $key, null, null );
 				\Nino\Http::ok( $request );
 				return;
 			}
@@ -484,6 +652,8 @@ namespace Nino\Modules\Text {
 
 			if( $entry['blacklisted'] === true )
 				\Nino\Text::setBlacklisted( $appData, $key, false );
+
+			\Nino\Text::setMeta( $appData, $key, null, null );
 
 			\Nino\Http::ok( $request );
 		}

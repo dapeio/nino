@@ -38,6 +38,8 @@ return [
 	'[[/_admin/htmleditor/label/span]]'		=> 'Hervorheben',
 	'[[/_admin/htmleditor/label/code]]'		=> 'Code',
 	'[[/_admin/htmleditor/label/a]]'				=> 'Link',
+	'[[/_admin/htmleditor/label/ul]]'				=> 'Aufzählung',
+	'[[/_admin/htmleditor/label/ol]]'				=> 'Nummerierte Liste',
 	'[[/_admin/htmleditor/label/linkplaceholder]]'	=> 'https://…',
 	'[[/_admin/htmleditor/label/linkok]]'					=> 'Übernehmen',
 	'[[/_admin/htmleditor/label/linkcancel]]'			=> 'Abbrechen',

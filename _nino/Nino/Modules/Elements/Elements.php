@@ -73,9 +73,7 @@ namespace Nino\Modules {
 				if( is_scalar( $value ) === false )
 					continue;
 
-				$isHtml = ( isset( $model[$key] ) && isset( $model[$key]['html'] ) && $model[$key]['html'] === true );
-
-				$fills['[['. $key. ']]'] = self::_escapeFieldValue( $value, $isHtml );
+				$fills['[['. $key. ']]'] = self::_escapeFieldValue( $value, $model[$key] ?? [] );
 			}
 
 			return str_replace( array_keys( $fills ), array_values( $fills ), $content );
@@ -126,22 +124,21 @@ namespace Nino\Modules {
 		 *	being interpreted when the surrounding content is re-rendered by
 		 *	Html::_doShortcode() right after this callback returns.
 		 *
-		 *	A field the model released with 'html' => true goes through
-		 *	Html::sanitizeHtml() instead of htmlspecialchars(): it keeps the
+		 *	What a field keeps is its model's to say: 'html' => true keeps the
 		 *	whitelisted inline tags and drops everything else, which is what
 		 *	makes such a field rich text rather than markup an editor may write
-		 *	freely. The bracket swap is made on either answer.
+		 *	freely, 'blocks' adds paragraphs and lists to it, and 'breaks' turns
+		 *	the line breaks of a plain field into <br>. All of that is
+		 *	\Nino\Html::fieldValue(), which this only hands the field to: it is
+		 *	the same rule a feature that draws a field itself applies.
 		 *
 		 *	@param		mixed			$value				Raw scalar field value
-		 *	@param		bool			$isHtml				Whether the field's model says 'html' => true
+		 *	@param		mixed			$field				The field's model entry, [] for a value that has none
 		 *
 		 *	@return 	string									Safe-to-substitute value
 		 */
-		private static function _escapeFieldValue( mixed $value, bool $isHtml ): string {
-		    $safe = $isHtml === true
-		        ? \Nino\Html::sanitizeHtml( strval( $value ) )
-		        : htmlspecialchars( strval( $value ), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
-		    return str_replace( '[', '&#91;', $safe );
+		private static function _escapeFieldValue( mixed $value, mixed $field ): string {
+			return \Nino\Html::fieldValue( $value, is_array( $field ) === true ? $field : [] );
 		}
 
 		/**
@@ -223,9 +220,7 @@ namespace Nino\Modules {
 					if( is_scalar( $value ) === false )
 						continue;
 
-					$isHtml = ( isset( $model[$key] ) && isset( $model[$key]['html'] ) && $model[$key]['html'] === true );
-
-					$fills['[['. $key. ']]'] = self::_escapeFieldValue( $value, $isHtml );
+					$fills['[['. $key. ']]'] = self::_escapeFieldValue( $value, $model[$key] ?? [] );
 				}
 
 				$html .= str_replace( array_keys( $fills ), array_values( $fills ), $content );
@@ -298,7 +293,7 @@ namespace Nino\Modules {
 
 				$fills = [
 					[ '[[.id]]', '[[.value]]', '[[.count]]' ],
-					[ (string) $id, self::_escapeFieldValue( $row['value'], false ), (string) $row['count'] ],
+					[ (string) $id, self::_escapeFieldValue( $row['value'], [] ), (string) $row['count'] ],
 				];
 
 				$html .= str_replace( $fills[0], $fills[1], $content );

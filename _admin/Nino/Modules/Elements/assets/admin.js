@@ -868,7 +868,7 @@
 				label.appendChild( span );
 				const mount = dc.createElement('div');
 				label.appendChild( mount );
-				Nino.admin.elements._htmlEditors[key] = Nino.admin.htmlEditor.create( mount, value ?? '', field.maxlength ?? Nino.admin.elements.DEFAULT_MAXLENGTH, field.inputsize ?? 0 );
+				Nino.admin.elements._htmlEditors[key] = Nino.admin.htmlEditor.create( mount, value ?? '', field.maxlength ?? Nino.admin.elements.DEFAULT_MAXLENGTH, field.inputsize ?? 0, field.blocks === true ? 'blocks' : 'inline' );
 				// On the text box itself, which is what a screen reader lands on
 				if( marked === true && typeof Nino.admin.elements._htmlEditors[key].mark === 'function' )
 					Nino.admin.elements._htmlEditors[key].mark( { required : true } );
@@ -1132,6 +1132,41 @@
 				return label;
 			}
 
+			// A list of texts is edited as a list of rows. Anything else a list can
+			// hold - objects, numbers, a list inside a list - and a text that was
+			// typed and is not JSON stay in the JSON field below, which can say it
+			if( field.type === 'array' && typeof rawText !== 'string' && Nino.admin.elements._isStringList( value ) === true ) {
+
+				const list = Nino.adminUi.stringList( {
+					key 		: key,
+					label 	: displayName,
+					value 	: Array.isArray( value ) ? value : [],
+					text 		: {
+						add 		: Nino.content.getText('/_admin/elements/label/list-add'),
+						remove 	: Nino.content.getText('/_admin/elements/label/reference-remove'),
+						up 			: Nino.content.getText('/_admin/elements/label/reference-up'),
+						down 		: Nino.content.getText('/_admin/elements/label/reference-down'),
+						empty 	: Nino.content.getText('/_admin/elements/label/list-empty'),
+						item 		: Nino.adminUi.format( Nino.content.getText('/_admin/elements/label/list-item'), displayName, '%d' ),
+					},
+				} );
+
+				// Only the asterisk, as on the list of references: the name is the
+				// control's first child, and a screen reader is told which rows are
+				// the field's by the row names
+				if( marked === true )
+					Nino.admin.elements._star( list.firstChild );
+
+				if( field.suffix ) {
+					const suffix = dc.createElement('span');
+					suffix.className = 'nino-admin-field-suffix';
+					suffix.textContent = field.suffix;
+					list.appendChild( suffix );
+				}
+
+				return list;
+			}
+
 			let input;
 
 			if( field.type === 'integer' || field.type === 'double' ) {
@@ -1270,6 +1305,18 @@
 
 			Nino.admin.elements._star( name );
 			control.setAttribute( 'aria-required', 'true' );
+		},
+
+		/**
+		 *	Whether a value of an array field is a plain list of texts - or
+		 *	nothing yet, which is an empty one - and so can be edited as rows
+		 *
+		 *	@param		{*}				value
+		 *
+		 *	@return		{boolean}
+		 */
+		_isStringList : function( value ) {
+			return value === undefined || value === null || ( Array.isArray( value ) === true && value.every( function( item ) { return typeof item === 'string' } ) === true );
 		},
 
 		/**
@@ -1652,8 +1699,9 @@
 				return { wrapper : wrapper, control : wrapper, handle : Nino.admin.elements._htmlEditors[problem.key] };
 
 			// A list of references has no control that is the field: its search box
-			// is where a person starts, and where the focus goes
-			const control = wrapper.querySelector('.nino-admin-elementlist-search') ?? wrapper.querySelector('input:not([type="hidden"]), textarea, select');
+			// is where a person starts, and where the focus goes - and so does the
+			// add button of a list of texts that has no row yet
+			const control = wrapper.querySelector('.nino-admin-elementlist-search') ?? wrapper.querySelector('input:not([type="hidden"]), textarea, select') ?? wrapper.querySelector('.nino-admin-stringlist-add');
 			return control === null ? null : { wrapper : wrapper, control : control, handle : null };
 		},
 

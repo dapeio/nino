@@ -1001,6 +1001,168 @@
 		},
 
 		/**
+		 *	The control an element field of type array uses while its value is a
+		 *	plain list of texts: one row per text, with move and remove per row and
+		 *	an add button, instead of a JSON field a person has to write brackets
+		 *	and quotes into. A value that is anything else (objects, numbers, a
+		 *	list inside a list) keeps the JSON textarea - this edits strings and
+		 *	cannot tell the rest what it is.
+		 *
+		 *	Like elementList(), the value is a hidden input carrying the JSON, so
+		 *	the form reads, compares and saves it the way it does every other field.
+		 *	It starts as exactly the JSON the value is stored as, and only a
+		 *	change rewrites it: an untouched list is not an edited one. The rows'
+		 *	own inputs carry no data-field - the form takes the first element it
+		 *	finds under a key as the field. A row that is empty is not an entry,
+		 *	and is left out of the value.
+		 *
+		 *	Owns no strings, same rule as elementList(): every word comes from the
+		 *	caller through options.text.
+		 *
+		 *	@param	{Object}	options		{ key, label, value, text, onChange }
+		 *													- key      the model key, written onto the hidden input
+		 *													- value    array of strings, absent for none
+		 *													- text     { add, remove, up, down, empty, item } - item
+		 *													           names a row for a screen reader, with %d for its
+		 *													           number; the field's label is the fallback
+		 *
+		 *	@return	{Element}						The field wrapper; its hidden input carries
+		 *													data-field/data-type and holds the value as json
+		 */
+		stringList : function( options ) {
+
+			const text = options.text || {};
+			const rows = Array.isArray( options.value ) ? options.value.map( String ) : [];
+
+			const field = dc.createElement('div');
+			field.className = 'nino-admin-field nino-admin-stringlist';
+
+			const name = dc.createElement('span');
+			name.textContent = options.label || options.key;
+			field.appendChild( name );
+
+			const store = dc.createElement('input');
+			store.type = 'hidden';
+			store.dataset.field = options.key;
+			store.dataset.type = 'array';
+			store.value = JSON.stringify( Array.isArray( options.value ) ? options.value : [] );
+			field.appendChild( store );
+
+			const list = dc.createElement('ul');
+			list.className = 'nino-admin-stringlist-rows';
+			field.appendChild( list );
+
+			function commit() {
+				store.value = JSON.stringify( rows.filter( function( row ) { return row.trim() !== '' } ) );
+				// Writing the hidden input fires nothing; tell a surrounding form (status line) the value changed
+				if( typeof store.dispatchEvent === 'function' && typeof wn.Event === 'function' )
+					store.dispatchEvent( new wn.Event( 'change', { bubbles : true } ) );
+				if( typeof options.onChange === 'function' )
+					options.onChange( JSON.parse( store.value ) );
+			}
+
+			function move( index, delta ) {
+				const target = index + delta;
+				if( target < 0 || target >= rows.length )
+					return;
+				const moved = rows[index];
+				rows[index] = rows[target];
+				rows[target] = moved;
+				commit();
+				// The button that was pressed is redrawn: the one in its place is
+				// where the focus stays, so the row can be moved again
+				draw( target, delta < 0 ? 'up' : 'down' );
+			}
+
+			function remove( index ) {
+				rows.splice( index, 1 );
+				commit();
+				// The row that took its place offers its own remove button next
+				draw( Math.min( index, rows.length - 1 ), 'remove' );
+				if( rows.length === 0 && typeof add.focus === 'function' )
+					add.focus();
+			}
+
+			function button( className, title, glyph, disabled, onClick ) {
+				const el = dc.createElement('button');
+				el.type = 'button';
+				el.className = className;
+				el.textContent = glyph;
+				if( title ) {
+					el.title = title;
+					el.setAttribute( 'aria-label', title );
+				}
+				el.disabled = disabled === true;
+				el.addEventListener( 'click', onClick );
+				return el;
+			}
+
+			// focusIndex is the row to put the focus in and focusPart the control
+			// of it: 'up', 'down', 'remove', or the text input where it is left out
+			function draw( focusIndex, focusPart ) {
+
+				list.innerHTML = '';
+
+				if( rows.length === 0 ) {
+					const empty = dc.createElement('li');
+					empty.className = 'nino-admin-stringlist-empty';
+					empty.textContent = text.empty || '';
+					list.appendChild( empty );
+					return;
+				}
+
+				rows.forEach( function( row, index ) {
+
+					const item = dc.createElement('li');
+
+					const input = dc.createElement('input');
+					input.type = 'text';
+					input.className = 'nino-admin-stringlist-input';
+					input.value = row;
+					input.setAttribute( 'aria-label', text.item ? Nino.adminUi.format( text.item, index + 1 ) : ( options.label || options.key ) );
+					input.addEventListener( 'input', function() {
+						rows[index] = input.value;
+						commit();
+					} );
+					item.appendChild( input );
+
+					const actions = dc.createElement('span');
+					actions.className = 'nino-admin-stringlist-actions';
+					const up 			= button( '', text.up, '↑', index === 0, function() { move( index, -1 ) } );
+					const down 		= button( '', text.down, '↓', index === rows.length - 1, function() { move( index, 1 ) } );
+					const removal = button( 'nino-admin-stringlist-remove', text.remove, '✕', false, function() { remove( index ) } );
+					actions.appendChild( up );
+					actions.appendChild( down );
+					actions.appendChild( removal );
+					item.appendChild( actions );
+
+					list.appendChild( item );
+
+					if( focusIndex !== index )
+						return;
+
+					// A move button that has nowhere left to go is disabled and cannot
+					// hold the focus: the other one is next, then the text
+					const wanted = { up : [ up, down ], down : [ down, up ], remove : [ removal ] }[focusPart] || [];
+					const target = wanted.concat( [ input ] ).find( function( control ) { return control.disabled !== true } );
+
+					if( typeof target.focus === 'function' )
+						target.focus();
+				} );
+			}
+
+			const add = button( 'nino-admin-stringlist-add', '', text.add || '', false, function() {
+				rows.push( '' );
+				draw( rows.length - 1 );
+			} );
+			field.appendChild( add );
+
+			draw();
+
+			return field;
+		},
+
+		/**
 		 *	The data table's pure half: filtering, sorting, paging and cell
 		 *	formatting as plain functions over arrays, with no DOM and no
 		 *	state. table() below is the rendering half and owns neither.

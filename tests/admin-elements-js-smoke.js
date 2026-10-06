@@ -474,6 +474,7 @@ function domTree() {
 		replaceWith( c ) { const at = this.parentNode.children.indexOf( this ); c.parentNode = this.parentNode; this.parentNode.children.splice( at, 1, c ) },
 		addEventListener( type, fn ) { this.listeners[type] = fn }, setAttribute( k, v ) { this.attrs[k] = v }, removeAttribute(){}, closest : () => null,
 		querySelectorAll( selector ) { return find( this, byTag( selector ) ) }, querySelector( selector ) { return find( this, byTag( selector ) )[0] ?? null },
+		get firstChild() { return this.children[0] ?? null },
 		get innerHTML() { return '' }, set innerHTML( v ) { this.children = [] } } );
 	const byTag = selector => {
 		if( selector === '.admin-element-nav button' )
@@ -490,7 +491,8 @@ function domTree() {
 const dom = domTree();
 sandbox.document.createElement = dom.make;
 let editorRows = null;
-sandbox.Nino.admin.htmlEditor = { create : function( mount, value, maxlength, rows ) { editorRows = rows; return { getValue : () => value, setValue(){}, destroy(){} } } };
+let editorFormat = null;
+sandbox.Nino.admin.htmlEditor = { create : function( mount, value, maxlength, rows, format ) { editorRows = rows; editorFormat = format; return { getValue : () => value, setValue(){}, destroy(){} } } };
 elements._currentType = 'services';
 elements._rights = {};
 elements._htmlEditors = {};
@@ -503,6 +505,40 @@ elements._renderFieldControl( 'body', { type : 'string', html : true, inputsize 
 check( 'a rich-text field hands its rows to the html editor', editorRows === 6 );
 elements._renderFieldControl( 'body', { type : 'string', html : true }, '' );
 check( '...and 0 without one', editorRows === 0 );
+
+// --- blocks: a rich-text field may allow paragraphs and lists ----------------
+
+elements._renderFieldControl( 'body', { type : 'string', html : true, blocks : true }, '' );
+check( 'a rich-text field that allows paragraphs and lists hands the editor the format blocks', editorFormat === 'blocks' );
+elements._renderFieldControl( 'body', { type : 'string', html : true }, '' );
+check( '...one that does not, inline', editorFormat === 'inline' );
+elements._renderFieldControl( 'body', { type : 'string', html : false, blocks : true }, '' );
+check( 'a flag on a field that is not rich text builds no editor at all', editorFormat === 'inline' && dom.find( elements._renderFieldControl( 'body', { type : 'string', blocks : true }, 'x' ), n => n.tagName === 'textarea' ).length === 1 );
+
+
+// --- an array of texts is a list of rows -------------------------------------
+//
+// The value stays what the form reads, compares and saves: a hidden input that
+// carries the JSON, exactly as stored until a row is changed
+
+const listControl = ( value, rawText ) => elements._renderFieldControl( 'tags', { type : 'array' }, value, rawText );
+const hiddenOf = control => dom.find( control, n => n.type === 'hidden' )[0];
+const isList = control => dom.find( control, n => n.className === 'nino-admin-stringlist-rows' ).length === 1;
+
+const tagList = listControl( [ 'php', 'css' ] );
+check( 'an array field holding texts is edited as rows, and no textarea is drawn', isList( tagList ) === true && dom.find( tagList, n => n.tagName === 'textarea' ).length === 0 );
+check( '...its hidden input is the field: data-field, the array type and the stored json untouched', hiddenOf( tagList ).dataset.field === 'tags' && hiddenOf( tagList ).dataset.type === 'array' && hiddenOf( tagList ).value === '["php","css"]' );
+check( '...and the form reads it back as the array it was, without any row being edited', JSON.stringify( elements._readField( hiddenOf( tagList ) ) ) === '["php","css"]' && elements._fieldValuesEqual( { type : 'array' }, [ 'php', 'css' ], elements._readField( hiddenOf( tagList ) ) ) === true );
+check( 'a value that is not there yet is an empty list of rows, and an empty array in the form', isList( listControl( undefined ) ) === true && hiddenOf( listControl( undefined ) ).value === '[]' && isList( listControl( [] ) ) === true );
+check( '...so an untouched empty field is not an edited one', elements._fieldValuesEqual( { type : 'array' }, undefined, elements._readField( hiddenOf( listControl( undefined ) ) ) ) === true );
+
+check( 'a list that holds anything but texts keeps the JSON field', [ [ 'a', 1 ], [ 'a', [ 'b' ] ], [ { name : 'x' } ], { a : 'b' }, 'text', 3 ].every( function( value ) { return isList( listControl( value ) ) === false && dom.find( listControl( value ), n => n.tagName === 'textarea' ).length === 1 } ) );
+check( '...and so does a text that was typed and is not JSON, which is what it has to be shown as', isList( listControl( [ 'a' ], '{broken' ) ) === false && dom.find( listControl( [ 'a' ], '{broken' ), n => n.tagName === 'textarea' )[0].value === '{broken' );
+check( 'a required list carries its asterisk on the name, as the reference list does', ( function() {
+	const field = { type : 'array', required : true };
+	elements._currentModel = { tags : field };
+	return dom.find( elements._renderFieldControl( 'tags', field, [ 'a' ] ), n => n.className === 'nino-admin-required' ).length === 1;
+} )() );
 
 
 // --- previous/next: the form steps through the list's order ---------------
@@ -995,7 +1031,13 @@ function fakeDom() {
 	check( '...next to the label, not inside it: the sentence describes the control and is not part of its name',
 		uriInput.parentNode.querySelector('#elements-error-uri') === null && field('slug').closest('label').querySelector('.nino-admin-field-error') === null );
 	check( 'every other field on screen is marked the same way', [ 'slug', 'name', 'body' ].every( key => field( key ).getAttribute('aria-invalid') === 'true' && field( key ).getAttribute('aria-describedby') === 'elements-error-field-'+ key ) );
-	check( 'the sentences are not alerts - the status line says it once, in its own words',
+	check( 'a required list of texts with no row has no input to mark: the sentence is under the list and its add button is the control',
+	( function() {
+		const add = d.doc.getElementById('elements-form').querySelector('.nino-admin-stringlist-add');
+		const sentence = d.doc.getElementById('elements-error-field-tags');
+		return add !== null && sentence !== null && add.getAttribute('aria-invalid') === 'true' && add.getAttribute('aria-describedby') === 'elements-error-field-tags' && sentence.parentNode === add.parentNode;
+	} )() );
+check( 'the sentences are not alerts - the status line says it once, in its own words',
 		d.doc.getElementById('elements-error-field-slug').getAttribute('role') === null && d.doc.getElementById('elements-form-msg').textContent === 'REQ' );
 	const optionsText = () => d.doc.getElementById('elements-form-locale-select').querySelectorAll('option').map( o => o.textContent );
 	check( 'the language switch counts the open fields of each translation it would write', JSON.stringify( optionsText() ) === JSON.stringify( [ 'de_DE - 1 open', 'en_US - 2 open' ] ) );
