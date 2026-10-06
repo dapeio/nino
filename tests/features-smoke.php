@@ -34,6 +34,13 @@ $appData['/nino/http/routes'] = [
 ninoWarnings();
 
 
+/** A panel of some module that happens to use the uri a Settings tab would ask for */
+class FeaturesSmokeCollider {
+	public static function adminPanels( array &$appData ): array { return [ self::class ]; }
+	public static function actions(): array { return []; }
+	public static function nav(): array { return [ 'sample-settings', 'Collider', 90, 'content' ]; }
+}
+
 // --- Discovery ---------------------------------------------------------------
 
 echo "Features::all - discovery below NINO_FEATURES_DIR\n";
@@ -830,7 +837,7 @@ check( 'apiList answers the directory the panel reads from, the catalogue url, w
 	&& array_keys( $body ) === [ 'dir', 'catalogueUrl', 'writable', 'catalogue', 'features' ] && array_column( $body['features'], 'key' ) === [ 'sample', 'helper', 'old' ]
 	&& array_column( $body['features'], 'name' ) === [ 'Beispiel-Feature', 'Helper', 'Old' ] );
 $byKey = array_column( $body['features'], null, 'key' );
-check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'manual', 'manualSections', 'category', 'maturity', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings' ] );
+check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'manual', 'manualSections', 'category', 'maturity', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings', 'settingsTab' ] );
 check( 'names and descriptions arrive in the session locale - de_DE, the native language, since none was chosen', $byKey['sample']['name'] === 'Beispiel-Feature' && $byKey['sample']['description'] === 'Prüft den ganzen Feature-Vertrag.'
 	&& $byKey['helper']['name'] === 'Helper' && $byKey['helper']['description'] === '' );
 // The slug, not a word: the categories are named in the panel's own fills, so
@@ -854,6 +861,93 @@ check( 'an int carries its bounds and unit, a string its maxlength and whether i
 check( 'values are the effective ones - saved, else the default, else the type\'s zero', $fields['limit']['value'] === 7 && $fields['title']['value'] === 'Again' && $fields['enabled']['value'] === true
 	&& $fields['hosts']['value'] === [ 'one', 'two' ] && $fields['mode']['value'] === 'fast' && $fields['notes']['value'] === '' );
 check( 'a secret never travels - only whether one is stored', array_key_exists( 'value', $fields['apiKey'] ) === false && $fields['apiKey']['set'] === true );
+
+/*	The settings of a feature with a panel live in a tab of that panel: the
+	registry builds the tab, the Features panel's entry says which, and
+	nothing else about the form changes - the fields above are the same	*/
+check( 'the entry says where the settings are edited: the tab of the feature\'s own panel, nothing for one without a panel', $byKey['sample']['settingsTab'] === 'sample-settings'
+	&& $byKey['helper']['settingsTab'] === '' && $byKey['old']['settingsTab'] === '' );
+$tab = \Nino\Admin\Admin::panels( $appData )['sample']['tabs']['sample-settings'] ?? null;
+check( 'a tab joins the feature\'s panel: the Features permission, the system group and label so the Roles list is unchanged, the mount named by the key', $tab !== null
+	&& $tab['perm'] === '/_admin/features/manage' && $tab['group'] === 'system' && $tab['label'] === '/_admin/nav/features'
+	&& $tab['tab'] === '/_admin/features/tab/settings' && $tab['panes'] === [ 'feature-settings-sample' ] && $tab['parent'] === 'sample'
+	&& $tab['class'] === \Nino\Modules\Features\Settings::class && $tab['feature'] === 'sample' && $tab['assets'] === [] && $tab['template'] === '' && $tab['tabs'] === [] );
+check( 'it follows the panel\'s own screen, and carries the Features panel\'s words', array_keys( \Nino\Admin\Admin::panels( $appData )['sample']['tabs'] ) === [ 'sample-settings' ]
+	&& $tab['text'] === \Nino\Modules\Features\Admin::text() && \Nino\Modules\Features\Settings::actions() === [] );
+check( 'a feature without a panel gets no tab, and neither does the Features panel itself', ( static function() use ( $appData ): bool {
+	foreach( \Nino\Admin\Admin::panels( $appData ) as $uri => $panel )
+		if( $uri !== 'sample' && array_filter( $panel['tabs'], static fn( array $t ): bool => isset( $t['feature'] ) ) !== [] )
+			return false;
+	return \Nino\Admin\Admin::panels( $appData )['features']['tabs'] === [];
+} )() );
+check( 'a feature panel without settings gets none either', ( static function() use ( $appData ): bool {
+	$bare = $appData;
+	unset( $bare['./_admin/panels'] );
+	$bare['./nino/features/all']['sample']['settings'] = [];
+	return \Nino\Admin\Admin::panels( $bare )['sample']['tabs'] === [];
+} )() );
+/*	A panel that already holds the tab's uri: the tab is not attached, and the
+	warning names the feature and who holds the uri - a module cannot be made to
+	lose a screen to it	*/
+check( 'a Settings tab whose uri is taken is left out with a warning naming the feature and the holder', ( static function() use ( $appData ): bool {
+	$taken = $appData;
+	unset( $taken['./_admin/panels'] );
+	$taken['/nino/modules'][] = 'FeaturesSmokeCollider';
+	ninoWarnings();
+	$panels = \Nino\Admin\Admin::panels( $taken );
+	$warnings = ninoWarnings();
+	return $panels['sample']['tabs'] === [] && isset( $panels['sample-settings'] ) === true && $panels['sample-settings']['class'] === 'FeaturesSmokeCollider'
+		&& count( $warnings ) === 1 && str_contains( $warnings[0], 'Settings tab of feature \'sample\'' ) && str_contains( $warnings[0], 'sample-settings' ) && str_contains( $warnings[0], 'FeaturesSmokeCollider' );
+} )() );
+check( 'a registry without a feature\'s panel does not read the manifests at all, so a broken one cannot take the workbench down', ( static function() use ( $appData ): bool {
+	$none = $appData;
+	unset( $none['./_admin/panels'], $none['./nino/features/all'] );
+	$none['/nino/modules'] = [];
+	ninoWarnings();
+	$panels = \Nino\Admin\Admin::panels( $none );
+	return isset( $panels['sample'] ) === false && isset( $none['./nino/features/all'] ) === false && ninoWarnings() === [];
+} )() );
+check( 'an inactive feature\'s panel is gone, and its tab with it', ( static function() use ( $appData ): bool {
+	$off = $appData;
+	unset( $off['./_admin/panels'] );
+	$off['/nino/modules'] = [ '\\Nino\\Modules\\Helper' ];
+	unset( $off['./nino/features/all'] );
+	return isset( \Nino\Admin\Admin::panels( $off )['sample'] ) === false;
+} )() );
+check( 'the roles list offers the Features permission once, as it always did', ( static function() use ( $appData ): bool {
+	$offers = array_filter( \Nino\Modules\Users\Admin::permOptions( $appData ), static fn( array $o ): bool => $o['perm'] === '/_admin/features/manage' );
+	return count( $offers ) === 1 && array_values( $offers )[0] === [ 'perm' => '/_admin/features/manage', 'label' => '/_admin/nav/features', 'group' => 'system', 'offered' => true ];
+} )() );
+check( 'every tab of the registry has its action map: the Settings tab brings none, so the seven actions stay the Features panel\'s', ( static function() use ( $appData ): bool {
+	$actions = \Nino\Admin\Admin::actions( $appData );
+	return $actions['features/settings'] === [ \Nino\Modules\Features\Admin::class, 'apiSettings' ] && count( array_filter( array_keys( $actions ), static fn( string $a ): bool => str_starts_with( $a, 'features/' ) ) ) === 7;
+} )() );
+check( 'the dashboard shows one Features tile, not one per tab', ( static function() use ( $appData ): bool {
+	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+	\Nino\Modules\Dashboard\Admin::apiSummary( $appData, $request );
+	return count( array_filter( $request['/nino/http/response']['body']['tiles'], static fn( array $t ): bool => $t['panel'] === 'features' ) ) === 1;
+} )() );
+
+// Whose it is to see: the tab is on the Features permission, so somebody who
+// holds the feature's own permission alone still does not see the settings
+\Nino\Auth::insertUser( $appData, 'sample@example.com', 'correct horse battery staple', [ \Nino\Modules\Sample\Admin::MANAGE_PERM ] );
+\Nino\Auth::loginUser( $appData, 'sample@example.com', 'correct horse battery staple' );
+$visible = \Nino\Admin\Admin::visiblePanels( $appData );
+check( 'an account holding only the feature\'s permission gets the panel, no tab, no strip and no mount', $visible['sample']['own'] === true && $visible['sample']['tabs'] === []
+	&& str_contains( \Nino\Admin\Admin::panesHtml( $appData ), 'admin-tabbutton-sample-settings' ) === false
+	&& str_contains( \Nino\Admin\Admin::panesHtml( $appData ), 'feature-settings-sample' ) === false );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+$visible = \Nino\Admin\Admin::visiblePanels( $appData );
+$html = \Nino\Admin\Admin::panesHtml( $appData );
+check( 'a developer holding the Features permission only gets the tab alone, as a pane with its mount', array_keys( $visible['sample']['tabs'] ) === [ 'sample-settings' ] && $visible['sample']['own'] === false
+	&& str_contains( $html, 'id="feature-settings-sample"' ) === true && str_contains( $html, 'data-tab="sample-settings"' ) === true );
+\Nino\Auth::insertUser( $appData, 'both@example.com', 'correct horse battery staple', [ \Nino\Modules\Features\Admin::MANAGE_PERM, \Nino\Modules\Sample\Admin::MANAGE_PERM ] );
+\Nino\Auth::loginUser( $appData, 'both@example.com', 'correct horse battery staple' );
+$html = \Nino\Admin\Admin::panesHtml( $appData );
+check( 'an account holding both gets a strip with both tabs', array_keys( \Nino\Admin\Admin::visiblePanels( $appData )['sample']['tabs'] ) === [ 'sample-settings' ]
+	&& str_contains( $html, 'id="admin-tabbutton-sample"' ) === true && str_contains( $html, 'id="admin-tabbutton-sample-settings"' ) === true
+	&& strpos( $html, 'id="admin-tabbutton-sample"' ) < strpos( $html, 'id="admin-tabbutton-sample-settings"' ) );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 
 // Activation through the action
 [ $status, $body ] = callFeatures( $appData, 'apiActivate', [ 'key' => 'old' ] );

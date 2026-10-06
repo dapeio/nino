@@ -122,6 +122,10 @@ function node( id, attributes ) {
 		closest : function() { return el.parent === null ? null : ( el.parent.dataset.panel !== undefined ? el.parent : el.parent.closest() ) },
 		// A child by one class, the way the head's parts are reached
 		querySelector : function( selector ) {
+			// The registry's strip: one in the head whose buttons carry data-tab
+			if( selector === ':scope > .admin-panel-tabs > button[data-tab]' )
+				return el.children.filter( function( c ) { return c.classList.contains('admin-panel-tabs') } )
+					.flatMap( function( c ) { return c.children } ).find( function( b ) { return b.dataset.tab !== undefined } ) || null;
 			return el.children.find( function( c ) { return c.classList.contains( selector.replace( ':scope > .', '' ) ) } ) || null;
 		},
 		querySelectorAll : function( selector ) {
@@ -397,6 +401,42 @@ const ui = shell.Nino.adminUi;
 check( 'there is no head to reach from outside a pane', ui.panelHead( node( 'loose', {} ) ) === null && ui.panelHead( null ) === null );
 const reached = ui.panelHead( rolesTab );
 check( 'from inside a pane the head is the row over it, with the name and the actions slot', reached !== null && reached.element === head && reached.title === title && reached.actions === actions );
+
+/*	A pane whose head holds the registry's strip - the Settings tab a feature's
+	panel gets is a button of it - and a screen inside one of its tabs that
+	draws a strip of its own (Redirects does): the registry's strip must stay,
+	and the screen's goes to the top of its tab's pane, replaced on a redraw	*/
+const mountInTab = node( 'roles-mount', {} );
+rolesPane.children = [ mountInTab ];
+mountInTab.parent = rolesPane;
+rolesPane.parent = usersPane;
+const tabStrip = node( 'tab-strip', {} );
+const tabStripAgain = node( 'tab-strip-again', {} );
+const inTab = ui.panelHead( mountInTab );
+inTab.tabs( tabStrip );
+check( 'a screen inside a tab of a pane with the registry strip gets its own strip at the top of that tab, and the registry strip is left alone', rolesPane.children[0] === tabStrip && tabStrip.classList.contains('admin-panel-tabs')
+	&& rolesPane.children[1] === mountInTab && head.children.indexOf( strip ) === 1 && head.children.length === 3 && strip.children.length === 2 );
+inTab.tabs( tabStripAgain );
+check( '...and drawn again it replaces the one before it in the tab rather than stacking, the head still untouched', rolesPane.children.indexOf( tabStrip ) === -1 && rolesPane.children[0] === tabStripAgain && rolesPane.children.length === 2
+	&& head.children.indexOf( strip ) === 1 && head.children.length === 3 );
+tabStripAgain.remove();
+
+/*	The same screen in a tab pane that stands alone - an account holding only
+	the Settings tab's permission gets no registry strip: the screen's strip
+	keeps its old place in the head, after the name	*/
+head.children.splice( head.children.indexOf( strip ), 1 );
+strip.parent = null;
+const loneStrip = node( 'lone-strip', {} );
+ui.panelHead( mountInTab ).tabs( loneStrip );
+check( 'a screen inside a lone tab pane, with no registry strip in the head, keeps the old placement: its strip after the name, the pane untouched', head.children[1] === loneStrip
+	&& loneStrip.classList.contains('admin-panel-tabs') && rolesPane.children.length === 1 && rolesPane.children[0] === mountInTab );
+loneStrip.remove();
+head.children.splice( 1, 0, strip );
+strip.parent = head;
+
+mountInTab.remove();
+rolesPane.parent = null;
+
 const own = node( 'own-strip', {} );
 const ownAgain = node( 'own-strip-again', {} );
 reached.tabs( own );

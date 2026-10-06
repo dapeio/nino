@@ -11,7 +11,10 @@
  *													sentence its manifest describes itself with, and under
  *													it the manual, every kind of thing a feature can add
  *													answered in the same order by every feature - and
- *													Settings. Both panes are built and one is hidden, so
+ *													Settings, for a feature without a panel of its own;
+ *													one that has one edits its settings in a tab of that
+ *													panel (settings.js) and this screen links there.
+ *													Both panes are built and one is hidden, so
  *													a setting typed into and then left to go and read what
  *													it does comes back with what was typed in it, and the
  *													one Save below both collects the whole schema whichever
@@ -1533,8 +1536,22 @@
 				form.appendChild( requires );
 			}
 
+			/*	Where the feature has a panel of its own the settings are edited
+				there, in a tab of that panel (see settings.js): this screen then
+				draws neither the form nor a Save for it - one form of a feature's
+				settings on screen at a time - and says where they went	*/
+			if( feature.settings.length > 0 && feature.settingsTab ) {
+				const where = dc.createElement('p');
+				where.className = 'nino-admin-hint';
+				const link = dc.createElement('a');
+				link.href = '#'+ feature.settingsTab;
+				link.textContent = Nino.content.getText('/_admin/features/hint/settings-tab');
+				where.appendChild( link );
+				form.appendChild( where );
+			}
+
 			const about		= Nino.admin.features._renderAbout( feature );
-			const settings	= feature.settings.length > 0;
+			const settings	= feature.settings.length > 0 && !feature.settingsTab;
 			const panes		= {};
 
 			/*	Both panes built and one of them hidden, rather than one pane built

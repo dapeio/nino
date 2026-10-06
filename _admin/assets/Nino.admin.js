@@ -79,6 +79,9 @@
 		 *	a screen drawn again does not stack two; a panel with buttons
 		 *	over its screen appends them to actions. One row across the
 		 *	workbench, then, rather than a title and a strip per panel.
+		 *	Where the head already holds the registry's strip and the screen
+		 *	is one of its tabs, tabs() leaves that strip alone and puts the
+		 *	panel's own at the top of the tab's pane.
 		 *
 		 *	null where there is no head - the Dashboard, or a script rendered
 		 *	somewhere other than a pane - so a panel keeps its strip where it
@@ -98,6 +101,23 @@
 				title		: head.querySelector(':scope > .admin-panel-title'),
 				actions	: head.querySelector(':scope > .admin-panel-actions'),
 				tabs		: function( strip ) {
+					/*	The head already holds the registry's strip - buttons the
+						shell wires through data-tab - and the screen asking is one
+						of its tabs: a strip of its own goes to the top of that
+						tab's pane instead, and replaces the one it drew there
+						before. Replacing the head's would take the tabs away
+						(the Settings tab a feature's panel gets is one of them)	*/
+					let tabPane = el;
+					while( tabPane && tabPane.parentNode !== pane )
+						tabPane = tabPane.parentNode;
+					if( tabPane && tabPane.dataset && tabPane.dataset.tab !== undefined && head.querySelector(':scope > .admin-panel-tabs > button[data-tab]') !== null ) {
+						const own = tabPane.querySelector(':scope > .admin-panel-tabs');
+						if( own !== null && own !== strip )
+							own.remove();
+						strip.classList.add('admin-panel-tabs');
+						tabPane.insertBefore( strip, tabPane.firstChild );
+						return strip;
+					}
 					const before = head.querySelector(':scope > .admin-panel-tabs');
 					if( before !== null && before !== strip )
 						before.remove();

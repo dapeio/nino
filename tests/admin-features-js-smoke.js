@@ -319,8 +319,8 @@ const panel 	= Nino.admin.features;
 // features predate the field is the state the panel has to read well too
 const FEATURES = [
 	{ key : 'old', name : 'Old', description : '', category : 'system', maturity : '', version : '3.0.0', installed : null, active : false, update : false, requires : [ 'nowhere' ],
-		problems : [ 'requires Nino ^0.9, this is 1.0.0', 'requires the php extension "no_such_extension"' ], settings : [] },
-	{ key : 'plain', name : 'Plain', description : 'Nothing to set.', category : 'ui', maturity : '', version : '1.0.0', installed : '0.9.0', active : true, update : true, requires : [], problems : [], settings : [] },
+		problems : [ 'requires Nino ^0.9, this is 1.0.0', 'requires the php extension "no_such_extension"' ], settings : [], settingsTab : '' },
+	{ key : 'plain', name : 'Plain', description : 'Nothing to set.', category : 'ui', maturity : '', version : '1.0.0', installed : '0.9.0', active : true, update : true, requires : [], problems : [], settings : [], settingsTab : '' },
 	{ key : 'sample', name : 'Beispiel-Feature', description : 'Prüft den ganzen Feature-Vertrag.', manual : 'Setze `data-sample="on"` auf den Container.\nJede Zeile wird nacheinander getippt.\n\nMehr braucht es nicht - <b>kein</b> Markup.\n\nEin Backtick ` allein bleibt Text.', category : 'content', maturity : 'Beispiel', version : '1.2.0', installed : '1.2.0', active : true, update : false, requires : [ 'helper' ], problems : [], settings : [
 		{ name : 'enabled', type : 'bool', label : 'Aktiv', hint : '', required : false, min : null, max : null, maxlength : null, unit : '', options : [], value : true },
 		{ name : 'limit', type : 'int', label : 'Limit', hint : 'Items per page', required : false, min : 1, max : 50, maxlength : null, unit : 'items', options : [], value : 7 },
@@ -331,8 +331,8 @@ const FEATURES = [
 		{ name : 'mode', type : 'select', label : 'Mode', hint : '', required : false, min : null, max : null, maxlength : null, unit : '', options : [ { value : 'fast', label : 'Fast' }, { value : 'safe', label : 'Sicher' } ], value : 'fast' },
 		{ name : 'apiKey', type : 'secret', label : 'API key', hint : '', required : false, min : null, max : null, maxlength : 1000, unit : '', options : [], set : true },
 		{ name : 'hosts', type : 'lines', label : 'Hosts', hint : '', required : false, min : null, max : null, maxlength : null, unit : '', options : [], value : [ 'one', 'two' ] },
-	] },
-	{ key : 'fresh', name : 'Fresh', description : 'Not switched on yet.', category : '', maturity : 'Alpha', version : '0.1.0', installed : null, active : false, update : false, requires : [], problems : [], settings : [] },
+	], settingsTab : '' },
+	{ key : 'fresh', name : 'Fresh', description : 'Not switched on yet.', category : '', maturity : 'Alpha', version : '0.1.0', installed : null, active : false, update : false, requires : [], problems : [], settings : [], settingsTab : '' },
 ];
 
 /** A features/list answer: the catalogue url, whether features/ is writable, the cache - null unless given - and the installed features, FEATURES unless a list of its own is given (an install adds one the fixture does not carry) */
@@ -832,7 +832,7 @@ check( 'the back link returns to the list on the tab it was left on, and empties
 fire( row( mount, 'sample' ), 'click' );
 check( 'stepping into a feature opens on what it is, whatever tab the screen before it was left on - a save keeps its tab, a fresh drill-in starts at the beginning', findAll( screen, function( el ) { return hasClass( el, 'features-about' ) } )[0].hidden === false );
 panel.init();
-answer( 200, listAnswer( CACHE.url, true, null, FEATURES.map( function( f ) { return f.key === 'sample' ? Object.assign( {}, f, { active : false, settings : [] } ) : f } ) ) );
+answer( 200, listAnswer( CACHE.url, true, null, FEATURES.map( function( f ) { return f.key === 'sample' ? Object.assign( {}, f, { active : false, settings : [], settingsTab : '' } ) : f } ) ) );
 check( 'a feature that is no longer switched on drops its screen and comes back to the list', mount.classList.contains('admin-hidden') === false && screen.classList.contains('admin-hidden') === true && screen.children.length === 0 );
 
 // A feature with no settings at all still has a screen - it is where its
@@ -846,6 +846,23 @@ check( '...and with one pane there is no strip over it, and nothing hidden behin
 check( 'an active feature that declares no setting gets the same screen, without a fieldset and without a Save', byTag( screen, 'fieldset' ).length === 0
 	&& byTag( plainBar, 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/deactivate')+ '|'+ text('/_admin/features/label/update').replace( '%s', '1.0.0' )
 	&& byTag( plainBar, 'button' ).every( function( el ) { return el.type === 'button' } ) );
+fire( byTag( screen.children[0], 'a' )[0], 'click' );
+
+/*	A feature that has a panel of its own edits its settings in a tab of that
+	panel (see settings.js): its screen here draws no form and no Save for
+	them, and says where they went	*/
+panel.init();
+answer( 200, listAnswer( CACHE.url, true, null, FEATURES.map( function( f ) { return f.key === 'sample' ? Object.assign( {}, f, { settingsTab : 'sample-settings' } ) : f } ) ) );
+fire( row( mount, 'sample' ), 'click' );
+const movedForm = byTag( screen, 'form' )[0];
+const movedBar = movedForm.children[ movedForm.children.length - 1 ];
+const movedLink = byTag( movedForm, 'a' ).filter( function( el ) { return el.href === '#sample-settings' } )[0];
+check( 'an entry with a settingsTab gets no settings pane, no fieldset, no field and no Settings tab on its screen', byTag( screen, 'fieldset' ).length === 0 && movedForm.querySelectorAll('[data-key]').length === 0
+	&& findAll( screen, function( el ) { return hasClass( el, 'features-detail-tabs' ) } ).length === 0 );
+check( '...and no Save: the bar holds Deactivate alone, nothing submits a form', byTag( movedBar, 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/deactivate')
+	&& byTag( screen, 'button' ).every( function( el ) { return el.type !== 'submit' } ) && movedForm.listeners.submit === undefined );
+check( '...but the description is still there, and a link to the tab says where the settings are', findAll( screen, function( el ) { return hasClass( el, 'features-about' ) } ).length === 1
+	&& movedLink !== undefined && movedLink.textContent === text('/_admin/features/hint/settings-tab') );
 fire( byTag( screen.children[0], 'a' )[0], 'click' );
 
 panel.init();
@@ -960,7 +977,7 @@ fire( install, 'click' );
 answer( 500, null );
 check( 'a failed install falls back to its own error line', byTag( offer( mount, 'extra' ), 'p' ).filter( function( el ) { return el.attributes['aria-live'] === 'polite' } )[0].textContent === '(500) '+ text('/_admin/features/error/install') );
 
-const EXTRA = { key : 'extra', name : 'Extra', description : 'Ein extra', version : '1.0.0', installed : null, active : false, update : false, requires : [ 'helper' ], problems : [], settings : [] };
+const EXTRA = { key : 'extra', name : 'Extra', description : 'Ein extra', version : '1.0.0', installed : null, active : false, update : false, requires : [ 'helper' ], problems : [], settings : [], settingsTab : '' };
 const FEATURES_WITH_EXTRA = FEATURES.concat( [ EXTRA ] );
 
 /*	What an install says, and where. Not on the offer's own row: an offer that

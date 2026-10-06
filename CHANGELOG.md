@@ -930,6 +930,31 @@ All notable changes to Nino are documented in this file.
   `tests/features-smoke.php`, `tests/catalogue-smoke.php`,
   `tests/kernel-smoke.php` and `tests/admin-features-js-smoke.js`.
 
+- **Features panel:** a feature's settings live in a tab of its own panel. An
+  active feature that has a panel and declares settings gets a **Settings** tab
+  in that panel, added by the registry (`\Nino\Modules\Features\Settings`,
+  `_admin/Nino/Modules/Features/Settings/Settings.php`), with no code in the
+  feature: the same form, drawn by the new `Features/assets/settings.js`, over
+  the same `features/list` and `features/settings` actions and the same
+  permission `/_admin/features/manage` - so an account holding only the
+  feature's own permission still does not see the settings, while an account
+  holding only `/_admin/features/manage` gets every such panel in its rail,
+  opened on the Settings tab alone, and the seven actions are still seven. The tab's label and group are the Features panel's,
+  which keeps the Roles list and the Dashboard as they were (one permission
+  entry, one tile). `features/list` entries gain `settingsTab`, the uri of that
+  tab or `''`; on a feature's screen in the Features panel the form and its
+  Save are drawn only where it is `''`, and a link leads to the tab otherwise.
+  A registry without the Features module's directory simply attaches nothing.
+  Behind it, `Nino.adminUi.panelHead().tabs()` no longer replaces the registry's
+  own strip when a screen inside one of the pane's tabs draws a strip of its
+  own: that one goes to the top of the tab's pane, replaced on a redraw, and
+  the head keeps its tabs - a feature that draws a strip (Redirects) would
+  otherwise have lost the Settings tab on its first draw. `tests/features-smoke.php`
+  (237 → 251 checks) holds the tab, who sees it and the unchanged Roles list and
+  tile, `tests/admin-script-js-smoke.js` (148 → 151) the strip, the new
+  `tests/admin-feature-settings-js-smoke.js` (31 checks) the form, its Save and
+  its errors, `tests/admin-features-js-smoke.js` (185 → 188) the detail screen.
+
 ### Fixed
 
 - **Workbench, Elements:** a required field is marked and a refused save says

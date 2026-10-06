@@ -49,6 +49,7 @@ return [
 	'[[/_admin/features/manual/install]]'			=> 'Installs',
 	'[[/_admin/features/manual/none]]'				=> '- none -',
 	'[[/_admin/features/label/settings]]'			=> 'Settings',
+	'[[/_admin/features/hint/settings-tab]]'		=> 'Edit the settings in the Settings tab of this feature\'s own panel.',
 	'[[/_admin/features/label/none]]'					=> '– none –',
 	'[[/_admin/features/label/activate]]'			=> 'Activate',
 	'[[/_admin/features/label/remove]]'				=> 'Remove',

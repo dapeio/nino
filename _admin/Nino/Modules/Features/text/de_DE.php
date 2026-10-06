@@ -49,6 +49,7 @@ return [
 	'[[/_admin/features/manual/install]]'			=> 'Installiert',
 	'[[/_admin/features/manual/none]]'				=> '– keine –',
 	'[[/_admin/features/label/settings]]'			=> 'Einstellungen',
+	'[[/_admin/features/hint/settings-tab]]'		=> 'Die Einstellungen bearbeitest Du im Tab „Einstellungen“ im eigenen Panel des Features.',
 	'[[/_admin/features/label/none]]'					=> '– keine –',
 	'[[/_admin/features/label/activate]]'			=> 'Aktivieren',
 	'[[/_admin/features/label/remove]]'				=> 'Entfernen',

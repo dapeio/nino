@@ -489,7 +489,14 @@ action goes through `\Nino\Features::saveSettings( $appData, 'catalog',
 $posted )`, which validates every setting before any is written and answers
 `name => message` for every rejected one, `[]` when saved. A form posts
 strings and gets the real types back; a `secret` posted as `''` keeps the
-stored value and as `null` clears it. The stored shape in `config.php`:
+stored value and as `null` clears it. Where the form is shown depends on the
+feature: one with a panel of its own and settings gets a **Settings** tab in
+that panel, added by the workbench, and one without a panel has the form on its
+screen in the Features panel. Neither needs code in the feature - the same
+`features/list` and `features/settings` actions and the permission
+`/_admin/features/manage` stand behind both, so an account that holds only the
+feature's own permission does not see the settings. The stored shape in
+`config.php`:
 
 ```php
 '/nino/features' => [

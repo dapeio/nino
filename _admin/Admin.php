@@ -1226,7 +1226,7 @@ namespace Nino\Admin {
 		 *	@param		array 		$core					The tool's own panel classes
 		 *	@param		string		$method				The module question, 'adminPanels'
 		 *
-		 *	@return 	array										[ uri => { class, uri, label, tab, weight, group, perm, panes, template, layout, icon, assets, text, tabs, parent, own } ]
+		 *	@return 	array										[ uri => { class, uri, label, tab, weight, group, perm, panes, template, layout, icon, assets, text, tabs, parent, own, feature? } ] - feature only on a Settings tab, the key it belongs to
 		 */
 		public static function collect( array &$appData, array $core, string $method ): array {
 
@@ -1284,6 +1284,12 @@ namespace Nino\Admin {
 				$panels[$entry['uri']] = $entry;
 			}
 
+			// The shell must work with the Features module's directory
+			// deleted, so the tab it brings is only attached while its class
+			// is there
+			if( class_exists( '\\Nino\\Modules\\Features\\Settings' ) === true )
+				self::_attachSettings( $appData, $panels, $taken );
+
 			// Group first, weight within the group - stable, so two panels
 			// of equal weight keep their registration order
 			$order = array_flip( self::GROUPS );
@@ -1292,6 +1298,94 @@ namespace Nino\Admin {
 			$appData['./_admin/panels'] = [ $cacheKey => $panels ];
 
 			return $panels;
+		}
+
+		/**
+		 *	Give every active feature that has a panel and declares settings a
+		 *	Settings tab in that panel - the form the Features panel would
+		 *	otherwise show (see \Nino\Modules\Features\Settings). The entries
+		 *	are built here rather than by _entry(): the class is one for all
+		 *	of them, and a static nav() cannot answer a uri per feature. So
+		 *	the uri is checked against $taken by hand, and the entry carries
+		 *	what the Features panel brings - its words and its permission,
+		 *	its group and label ('system', so the Roles list keeps offering
+		 *	that permission where it always was) - while its script is
+		 *	bundled through \Nino\Modules\Features\Admin::assets()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$panels			(reference) The registry under construction, uri => entry
+		 *	@param		array 		$taken				uri => class, everything registered so far
+		 *
+		 *	@return 	void
+		 */
+		private static function _attachSettings( array &$appData, array &$panels, array $taken ): void {
+
+			// Reading the features reads every manifest below features/, which
+			// a registry without a feature's panel has no reason to do
+			$featurePanels = array_filter( $panels, static fn( array $panel ): bool => self::_isFeaturePanel( $panel['class'] ) === true );
+
+			if( $featurePanels === [] )
+				return;
+
+			foreach( \Nino\Features::all( $appData ) as $feature ) {
+
+				if( $feature['active'] !== true || $feature['settings'] === [] )
+					continue;
+
+				$dir = realpath( $feature['dir'] );
+
+				if( $dir === false )
+					continue;
+
+				foreach( $featurePanels as $uri => $panel ) {
+
+					try {
+						$file = ( new \ReflectionClass( $panel['class'] ) )->getFileName();
+					} catch( \ReflectionException ) {
+						continue;
+					}
+
+					$file = is_string( $file ) === true ? realpath( $file ) : false;
+
+					// The feature's first panel, by the same test that tells a
+					// feature's panel apart (see _isFeaturePanel())
+					if( $file === false || str_starts_with( $file, $dir. DIRECTORY_SEPARATOR ) === false )
+						continue;
+
+					$tabUri = $uri. '-settings';
+
+					if( isset( $taken[$tabUri] ) === true ) {
+						trigger_error( 'Settings tab of feature \''. $feature['key']. '\' wants uri \''. $tabUri. '\', already taken by '. $taken[$tabUri], E_USER_WARNING );
+						break;
+					}
+
+					$tab = [
+						'class'		=> \Nino\Modules\Features\Settings::class,
+						'uri'			=> $tabUri,
+						'label'		=> '/_admin/nav/features',
+						'tab'			=> '/_admin/features/tab/settings',
+						'weight'	=> 1000,
+						'group'		=> 'system',
+						'perm'		=> \Nino\Modules\Features\Settings::perm(),
+						'panes'		=> [ \Nino\Modules\Features\Settings::MOUNT_PREFIX. $feature['key'] ],
+						'template'=> '',
+						'layout'	=> $panel['layout'],
+						'head'		=> true,
+						'icon'		=> '',
+						'assets'	=> [],
+						'text'		=> \Nino\Modules\Features\Settings::text(),
+						'tabs'		=> [],
+						'parent'	=> $uri,
+						'own'			=> true,
+						'feature'	=> $feature['key'],
+					];
+
+					$panels[$uri]['tabs'][$tabUri] = $tab;
+					uasort( $panels[$uri]['tabs'], static fn( array $a, array $b ): int => $a['weight'] <=> $b['weight'] );
+
+					break;
+				}
+			}
 		}
 
 		/**

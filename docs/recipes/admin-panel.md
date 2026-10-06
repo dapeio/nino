@@ -111,6 +111,20 @@ request:
   the pane, the panel's own first. An account holding a tab's permission but
   not the panel's still gets the pane, on that tab alone
   (`Admin::visiblePanels()`, `'own' => false`). A tab has no tabs of its own.
+- A feature's panel can get a tab it does not name. When an active feature
+  declares settings and has a panel, `Panels::collect()` adds one entry to that
+  panel - uri `<panel>-settings`, class `\Nino\Modules\Features\Settings`, the
+  `/_admin/features/manage` permission, the Features panel's own words and a
+  mount `feature-settings-<key>` whose form `Features/assets/settings.js`
+  draws - and no action of its own: the form is `features/list` and
+  `features/settings`. Its `label` and `group` are the Features panel's, so the
+  Roles list offers that permission where it did. The entry is built by hand
+  because one class serves every feature, which is also why the registry
+  checks its uri against the taken ones itself; it is left out when the Features
+  module's `Settings/` directory is not there. Once the tab is attached, the
+  panel's own mounts move from direct children of `#admin-content-<uri>` into `#admin-tab-<uri>`;
+  CSS or JS keyed on the first structure breaks the day the feature declares
+  settings.
 - The workbench's own modules use it: Element Types under Elements, Text Keys under Text,
   Image Slots under Images (each a structure permission beside the content it
   shapes), User roles (sharing `/_admin/users/manage`), Login protection
@@ -132,7 +146,11 @@ own, then. A panel whose tabs are its own rather than the registry's - the
 Features panel's Active/Inactive/Available, a feature switching between two
 editors - puts its strip beside the name through
 `Nino.adminUi.panelHead( mount ).tabs( strip )`, which replaces the strip
-before it so a screen drawn again does not stack two; a panel that keeps
+before it so a screen drawn again does not stack two. Where the head already
+holds the registry's strip - the mount is inside one of a pane's tabs - `tabs()`
+leaves that strip alone and puts the screen's own at the top of the tab's pane,
+replacing the one it drew there before (a feature's screen that draws its own
+strip keeps the Settings tab the registry gave its panel). A panel that keeps
 buttons over its screen appends them to `.actions`. `panelHead()` answers
 `null` where there is no head, so a script rendered somewhere other than its
 pane keeps its strip where it drew it. `head()` returning `false` drops the

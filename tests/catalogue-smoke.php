@@ -955,7 +955,7 @@ $requests = [];
 	not there at all. Leaving it in the Inactive tab made one intention take
 	two presses.	*/
 check( 'installing a feature the project did not have answers its entry as the list shows it now - on disk, on, recorded', $status === 200 && array_keys( $body ) === [ 'feature', 'activated', 'pending', 'required', 'switchedOn' ] && $body['pending'] === false && $body['activated'] === true && $body['required'] === []
-	&& array_keys( $body['feature'] ) === [ 'key', 'name', 'description', 'manual', 'manualSections', 'category', 'maturity', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings' ]
+	&& array_keys( $body['feature'] ) === [ 'key', 'name', 'description', 'manual', 'manualSections', 'category', 'maturity', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings', 'settingsTab' ]
 	&& $body['switchedOn'] === [ [ 'key' => 'extra', 'name' => 'Extra' ] ]
 	&& $body['feature']['key'] === 'extra' && $body['feature']['name'] === 'Extra' && $body['feature']['version'] === '1.0.0' && $body['feature']['active'] === true && $body['feature']['installed'] === '1.0.0' && $body['feature']['update'] === false && $body['feature']['problems'] === [] );
 check( 'the directory is in place, the archive was fetched once, and the class is in the module list', is_file( NINO_FEATURES_DIR. '/Extra/feature.php' ) && is_file( NINO_FEATURES_DIR. '/Extra/Extra.php' )

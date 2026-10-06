@@ -25,6 +25,11 @@ namespace Nino\Modules\Features {
 	 *												here, once, in the interface language, so the script
 	 *												renders what it gets.
 	 *
+	 *												A feature that has a panel of its own and declares
+	 *												settings gets them there, as a Settings tab (see
+	 *												Settings) - the entry says which, in settingsTab,
+	 *												and this panel's screen then draws no form for it.
+	 *
 	 *												Two panes and one script-built tab strip: Available (what
 	 *												the catalogue offers that is not already current -
 	 *												install or update), Inactive and Active. apiList()
@@ -106,6 +111,9 @@ namespace Nino\Modules\Features {
 		public static function assets(): array {
 			return [
 				\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.js' ),
+				// The form of every Settings tab (see Settings), which the
+				// registry builds without a script of its own
+				\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/settings.js' ),
 				\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.css' ),
 			];
 		}
@@ -793,6 +801,17 @@ namespace Nino\Modules\Features {
 			$values 	= \Nino\Features::settings( $appData, $feature['key'] );
 			$settings	= [];
 
+			// Where the settings are edited when the feature's own panel
+			// holds them: the uri of the Settings tab the registry gave it
+			// (see Settings), '' when there is none and the form is this
+			// panel's to draw
+			$settingsTab = '';
+
+			foreach( \Nino\Admin\Admin::panels( $appData ) as $panel )
+				foreach( $panel['tabs'] as $tab )
+					if( ( $tab['feature'] ?? null ) === $feature['key'] )
+						$settingsTab = $tab['uri'];
+
 			foreach( $feature['settings'] as $name => $schema ) {
 
 				$field = [
@@ -848,6 +867,7 @@ namespace Nino\Modules\Features {
 				'requires'		=> $feature['requires'],
 				'problems'		=> $feature['problems'],
 				'settings'		=> $settings,
+				'settingsTab'	=> $settingsTab,
 			];
 		}
 
