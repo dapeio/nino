@@ -14,43 +14,40 @@ namespace Nino {
 	// redirects
 	class Http {
 
-		private static
-			$_defaultResponse = [
-				'statusCode'	=> 404,
-				'header'			=> [
-					'Strict-Transport-Security' 	=> 'max-age=31536000; includeSubDomains',
-					// frame-ancestors is what actually stops framing in a current
-					// browser - X-Frame-Options below is the legacy fallback, and
-					// only DENY/SAMEORIGIN are valid values there ('same-origin'
-					// was silently ignored, ie. no clickjacking protection at all).
-					// base-uri/form-action are not covered by default-src: without
-					// them an injected <base>/<form action> escapes the policy -
-					// and textfills (Html::_renderFills()) put admin-editable text
-					// into the page unescaped, so the csp is load-bearing here.
-					// img-src needs 'data:' spelled out: the '*' source covers
-					// network schemes only, so without it the browser refused
-					// every data: uri image - including the one Nino's own
-					// Nino.css uses for .nino-atf-arrowdown, which therefore
-					// rendered as an empty button on every page that has one.
-					'Content-Security-Policy' 		=> 'default-src \'self\'; img-src * data:; style-src \'self\' \'unsafe-inline\'; frame-ancestors \'self\'; base-uri \'self\'; form-action \'self\'',
-					'X-Frame-Options' 						=> 'SAMEORIGIN',
-					'X-Content-Type-Options'			=> 'nosniff',
-					// Nino's own answer to whether a response may be stored,
-					// rather than php's: the session used to be started on
-					// every request, and its cache limiter put four no-store
-					// headers on every response as a side effect of that.
-					// Now that a request without session state starts no
-					// session (see Runtime::startSession()), the same answer
-					// has to be given here or it would depend on whether a
-					// page happened to render a form. A project that wants
-					// its public pages cached by browsers and proxies
-					// changes this one value - what a visitor sees is one
-					// render behind an edit for as long as it says.
-					'Cache-Control'								=> 'no-store',
-				],
-				'body'				=> '',
-				'uri'					=> '',
-			];
+		// The headers every response starts with (see request()) and ends
+		// up with (see _finalizeResponse()) - a callback may change one or add
+		// to them, and one it leaves out is put back
+		private const array DEFAULT_HEADERS = [
+			'Strict-Transport-Security' 	=> 'max-age=31536000; includeSubDomains',
+			// frame-ancestors is what actually stops framing in a current
+			// browser - X-Frame-Options below is the legacy fallback, and
+			// only DENY/SAMEORIGIN are valid values there ('same-origin'
+			// was silently ignored, ie. no clickjacking protection at all).
+			// base-uri/form-action are not covered by default-src: without
+			// them an injected <base>/<form action> escapes the policy -
+			// and textfills (Html::_renderFills()) put admin-editable text
+			// into the page unescaped, so the csp is load-bearing here.
+			// img-src needs 'data:' spelled out: the '*' source covers
+			// network schemes only, so without it the browser refused
+			// every data: uri image - including the one Nino's own
+			// Nino.css uses for .nino-atf-arrowdown, which therefore
+			// rendered as an empty button on every page that has one.
+			'Content-Security-Policy' 		=> 'default-src \'self\'; img-src * data:; style-src \'self\' \'unsafe-inline\'; frame-ancestors \'self\'; base-uri \'self\'; form-action \'self\'',
+			'X-Frame-Options' 						=> 'SAMEORIGIN',
+			'X-Content-Type-Options'			=> 'nosniff',
+			// Nino's own answer to whether a response may be stored,
+			// rather than php's: the session used to be started on
+			// every request, and its cache limiter put four no-store
+			// headers on every response as a side effect of that.
+			// Now that a request without session state starts no
+			// session (see Runtime::startSession()), the same answer
+			// has to be given here or it would depend on whether a
+			// page happened to render a form. A project that wants
+			// its public pages cached by browsers and proxies
+			// changes this one value - what a visitor sees is one
+			// render behind an edit for as long as it says.
+			'Cache-Control'								=> 'no-store',
+		];
 
 		public static function request( array &$appData, array &$request ): void {
 
@@ -77,7 +74,7 @@ namespace Nino {
 				// routing - output() needs it to send a HEAD response without a
 				// body, and it keeps that fold from being invisible to anything
 				// else that cares
-				'rawMethod'			=> self::_cleanRawMethod( $request['REQUEST_METHOD'] ?? '', [], false ),
+				'rawMethod'			=> self::_cleanRawMethod( $request['REQUEST_METHOD'] ?? '', false ),
 				'uri'						=> self::_projectUri( $appData, self::cleanUri( $request['REQUEST_URI'] ?? '' ) ),
 				'query'					=> self::_getRequestQueryVarsPart( $request['REQUEST_URI'] ?? '' ),
 				'header'				=> $header,
@@ -93,7 +90,7 @@ namespace Nino {
 			$request['/nino/http/response'] = [
 				'uri'					=> $request['/nino/http/request']['uri'],
 				'locale'			=> $currentLocale,
-				'header'			=> self::$_defaultResponse['header'],
+				'header'			=> self::DEFAULT_HEADERS,
 				'body'				=> '',
 				'statusCode'	=> 200,
 			];
@@ -154,8 +151,8 @@ namespace Nino {
 			exit;
 		}
 
-		// json-encode a non-string body, then merge in the default status/
-		// header/etc. keys - the part of output() that decides what would
+		// json-encode a non-string body, then put back any default header the
+		// response left out - the part of output() that decides what would
 		// actually be sent, split out since output() itself exit()s and so
 		// can't be called from a test.
 		//
@@ -211,8 +208,7 @@ namespace Nino {
 				$request['/nino/http/response']['header']['Content-Type'] = 'application/json; charset=utf-8';
 			}
 
-			$request['/nino/http/response'] = array_merge( self::$_defaultResponse, $request['/nino/http/response'] );
-			$request['/nino/http/response']['header'] = array_merge( self::$_defaultResponse['header'], $request['/nino/http/response']['header'] );
+			$request['/nino/http/response']['header'] = array_merge( self::DEFAULT_HEADERS, $request['/nino/http/response']['header'] );
 		}
 
 		// Set a response's status code and error body in one call - the
@@ -638,10 +634,9 @@ namespace Nino {
 
 
 		// Clean request methods
-		static private function _cleanRawMethod( string $rawMethod, array $legalMethods = [], bool $mapHead = true ): string {
+		static private function _cleanRawMethod( string $rawMethod, bool $mapHead = true ): string {
 
-			if( $legalMethods === [] )
-				$legalMethods = ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH' ];
+			$legalMethods = ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH' ];
 
 			$cleanMethod	= preg_replace( '/[^a-zA-Z]/', '', $rawMethod );
 			$cleanMethod	= strtoupper( $cleanMethod );

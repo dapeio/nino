@@ -446,16 +446,12 @@ namespace Nino {
 			$typeUri = '/'. trim( $typeUri, '/' );
 			$typeFile = self::_typeFile( $typeUri );
 
-			// Check filecache. Under its own key, not beside the elements: both
-			// were keyed by uri in the same map, so once a type had been read,
-			// asking for the type uri as if it were an element handed back that
-			// type's whole locale bucket - every element in it, as one element
-			$appData['./nino/elements/cache']['files'][$typeUri] = \Nino\Filesystem::getFileContent( $appData, $typeFile, false );
+			$file = \Nino\Filesystem::getFileContent( $appData, $typeFile, false );
 
-			if( $appData['./nino/elements/cache']['files'][$typeUri] === false )
+			if( $file === false )
 				trigger_error( 'Invalid element php file \''. $typeFile. '\'' );
 
-			return $appData['./nino/elements/cache']['files'][$typeUri];
+			return $file;
 		}
 
 		// Insert an element type

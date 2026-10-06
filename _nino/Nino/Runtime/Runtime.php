@@ -162,7 +162,7 @@ namespace Nino {
 
 			// php's own cache limiter sends four no-store headers with every
 			// session it starts. Whether a response may be cached is Http's
-			// answer (see Http::$_defaultResponse), not a side effect of
+			// answer (see Http::DEFAULT_HEADERS), not a side effect of
 			// having a session, and left at the default those headers would
 			// now appear on exactly the responses that happen to start one
 			session_cache_limiter( '' );
@@ -273,7 +273,7 @@ namespace Nino {
 				self::$_reported = true;
 
 			// Check, if error/log and error/display are configured yet
-			$configured = self::$_currentInstance !== null && isset( self::$_currentInstance['/nino/error/log'] ) === true && isset( self::$_currentInstance['/nino/error/display'] ) === true;
+			$configured = isset( self::$_currentInstance['/nino/error/log'] ) === true && isset( self::$_currentInstance['/nino/error/display'] ) === true;
 
 			// Log error
 			if( $configured === true && self::$_currentInstance['/nino/error/log'] === true )
@@ -389,8 +389,7 @@ namespace Nino {
 
 			// Same rule as handleError(): both choices have to be known, or this
 			// is a boot-time failure that a production install never opted into
-			$configured = self::$_currentInstance !== null
-				&& isset( self::$_currentInstance['/nino/error/log'] ) === true
+			$configured = isset( self::$_currentInstance['/nino/error/log'] ) === true
 				&& isset( self::$_currentInstance['/nino/error/display'] ) === true;
 
 			if( $configured === true && self::$_currentInstance['/nino/error/log'] === true )

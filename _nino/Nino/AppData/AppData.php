@@ -29,7 +29,6 @@ namespace Nino {
 				// read - Locales::init() replaces it with the project's own
 				// native locale (see its docblock) as soon as that is known
 				'./nino/locales/current'				=> 'de_DE',
-				'./nino/auth/currentUser'			=> [],
 			];
 
 		/*	Everything a project does not have to decide. These are framework

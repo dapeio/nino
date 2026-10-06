@@ -13,6 +13,17 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Core:** seven leftovers go that never changed an outcome: the
+  `./nino/auth/currentUser` seed (Auth reads `./nino/auth/current`), the
+  method-list parameter of `Http::_cleanRawMethod()`, the status, body and uri
+  defaults of `Http::$_defaultResponse` (now `DEFAULT_HEADERS`, the headers
+  only - `request()` seeds the rest before anything reads it), the two checks
+  in `Filesystem::init()` on a root the kernel derives itself, Runtime's null
+  test on an array, `Features::activate()`'s unread `$wasActive` and the copy
+  `Elements` kept of each type file. A callback on `/nino/http/response` that
+  replaces the whole array has to keep `statusCode`, `body` and `header`, as
+  the manual's shape says; they are no longer filled in behind it.
+
 - **Docs:** the manuals describe the screens that ship. Search is rebuilt
   from its panel, one type or all of them; the "Create searchindex" button is
   gone, a query word that finds nothing lowers a hit's coverage instead of

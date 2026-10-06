@@ -15,22 +15,12 @@ namespace Nino {
 	class Filesystem {
 
 
+		// './nino/uid' is what \Nino\init() derives from where _nino/ sits,
+		// the project root - this gives it the name the rest of this class
+		// reads it by
 		public static function init( array &$appData ): void {
 
-			$path = $appData['./nino/uid'];
-			if( is_dir( $path ) === false ) {
-				trigger_error( 'Filesystem path \''. $path. '\' does not exist.', E_USER_ERROR );
-				return;
-			}
-			// Three levels up: this file lives in _nino/Nino/Filesystem/, the
-			// project root is the directory _nino/ sits in
-			if( realpath( $path ) !== realpath( dirname( __DIR__, 3 ) ) ) {
-				trigger_error( 'Filesystem path \''. $path. '\' is not the project root.', E_USER_ERROR );
-				return;
-			}
-
-			$appData['./nino/filesystem/path'] 	= $path;
-
+			$appData['./nino/filesystem/path'] = $appData['./nino/uid'];
 		}
 
 		public static function getFileContent( array &$appData, string $filename, mixed $default = false ): mixed {

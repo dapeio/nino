@@ -776,7 +776,6 @@ namespace Nino {
 			}
 
 			$class 			= $feature['module'];
-			$wasActive	= $feature['active'];
 
 			// The record, not the active flag, says whether this is an update:
 			// deactivate() keeps the recorded version on purpose, and a newer
