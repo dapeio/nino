@@ -13,6 +13,11 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** `\Nino\Admin\Admin::DIR` and `LIBRARY` say why they stay public
+  (an optional module a 1.0.0-beta setup copied into `app/` reads them), and
+  `Panels::collect()` and `panesHtml()` describe the one workbench and where
+  the shell script reads a panel's layout.
+
 - **Installer:** the units the wizard applies on every run state nothing that
   run never reads. The Navigation unit no longer declares `/nino/html/navs` as
   a `config` default - `\Nino\AppData::DEFAULTS` holds the same `main` and

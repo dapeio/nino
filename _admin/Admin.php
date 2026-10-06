@@ -41,15 +41,18 @@ namespace Nino\Admin {
 	 */
 	class Admin {
 
-		// Where the workbench is, and the project root it sits in - the two
-		// anchors a module reaches for when it needs a tool path (the setup
-		// library, the framework stylesheet) rather than a project file
+		// Where the workbench is, and the project root it sits in. The
+		// registry resolves a panel's assets against ROOT. DIR, like LIBRARY
+		// below, is read by no class of this checkout and stays public on
+		// purpose: an optional module a 1.0.0-beta setup copied into app/
+		// (its Design.php) reads both, and the autoloader still serves it
 		public const string DIR = __DIR__;
 		public const string ROOT = __DIR__. '/..';
 
 		// The library the wizard copies a project out of - the base unit, the
-		// units without a runtime class of their own, and the page units. Read
-		// by the wizard alone; nothing after setup looks here
+		// units without a runtime class of their own, and the page units. The
+		// wizard's classes keep their own copy of the path (install/Install.php);
+		// this is its public name, kept for the readers DIR names
 		public const string LIBRARY = __DIR__. '/install/library';
 
 		/*	The language switcher, the one fragment this class renders itself -
@@ -1224,7 +1227,7 @@ namespace Nino\Admin {
 			];
 
 		/**
-		 *	Build one tool's registry: its own panels first, then every
+		 *	Build the workbench's registry: its own panels first, then every
 		 *	panel the active modules contribute, the whole list stable-sorted
 		 *	by nav() weight - which is what lets a module panel sit between
 		 *	two core ones.
@@ -1232,12 +1235,12 @@ namespace Nino\Admin {
 		 *	A second panel claiming an already taken uri is dropped with a
 		 *	warning rather than allowed to shadow the first: a module must
 		 *	not be able to replace a core screen by picking its name. The
-		 *	same goes for a class missing actions() or nav() - the tool keeps
+		 *	same goes for a class missing actions() or nav() - the workbench keeps
 		 *	working without it, and the warning names it.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		$core					The tool's own panel classes
-		 *	@param		string		$method				The module question, 'adminPanels'
+		 *	@param		array 		$core					The workbench's own panel classes (see Admin::modules())
+		 *	@param		string		$method				What every active module is asked for its panels - 'adminPanels'
 		 *
 		 *	@return 	array										[ uri => { class, uri, label, tab, weight, group, perm, panes, template, layout, icon, assets, text, tabs, parent, own, feature? } ] - feature only on a Settings tab, the key it belongs to
 		 */
@@ -1679,7 +1682,8 @@ namespace Nino\Admin {
 		 *	only for a panel that has not answered head() false - and a
 		 *	panel that has, but has tabs, keeps the head for its strip.
 		 *	Every pane and tab pane starts hidden; the shell script shows the
-		 *	selected ones and reads a panel's layout off data-layout
+		 *	selected ones. The pane carries the panel's layout as data-layout
+		 *	for a stylesheet; the script reads it off the nav link (see navHtml())
 		 *
 		 *	@param		array 		$panels				A registry, see collect() - already filtered to what the account may see
 		 *
