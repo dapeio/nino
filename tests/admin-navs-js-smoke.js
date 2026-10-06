@@ -380,6 +380,33 @@ console.log('Admin Navigations');
 }
 
 
+// --- a page with a route per language is one entry -------------------------------
+
+{
+	// The Legal module's pages: one Element-URI, a path in each language. The
+	// server sends the entry once, with the first of its paths and all of them
+	const IMPRINT = { httpUri : '/impressum', uri : '/legal/imprint', label : 'Impressum', named : true, runtime : true, paths : [ '/impressum', '/imprint' ] };
+	const PRIVACY = { httpUri : '/datenschutz', uri : '/legal/privacy', label : 'Datenschutz', named : true, runtime : true, paths : [ '/datenschutz', '/privacy' ] };
+	const t = load( null );
+	t.panel.init();
+	t.answer( 200, { navs : [ { key : 'legal', entries : [ IMPRINT ] }, { key : 'main', entries : [ ROUTES[0] ] } ], routes : ROUTES.concat( [ IMPRINT, PRIVACY ] ), active : true } );
+	t.panel._openForm( t.panel._navs[0] );
+
+	check( 'an entry that has a route per language is one row, with every path of it', t.entries().join() === 'Impressum (/impressum, /imprint)' );
+	check( '...and the picker offers the other page once, with its paths', t.field('navs-form-add').children.filter( function( option ) { return option.value === '/datenschutz' } ).length === 1
+		&& t.field('navs-form-add').children.some( function( option ) { return option.textContent === 'Datenschutz (/datenschutz, /privacy)' } )
+		&& t.field('navs-form-add').children.every( function( option ) { return option.value !== '/imprint' && option.value !== '/privacy' } ) );
+	t.field('navs-form-add').value = '/datenschutz';
+	t.field('navs-form-add').listeners.change[0]();
+	findAll( t.form, function( el ) { return el.textContent === text('/_admin/navs/label/addbtn') } )[0].listeners.click[0]();
+	check( 'Add puts the other page in as one entry too', t.entries().join() === 'Impressum (/impressum, /imprint),Datenschutz (/datenschutz, /privacy)' );
+	fire( findAll( t.form, function( el ) { return el.tagName === 'FORM' } )[0], 'submit' );
+	check( 'Save sends each page once, by the first of its paths: the server finds the Element-URI by it', JSON.stringify( t.requests[t.requests.length - 1].payload.entries ) === '["/impressum","/datenschutz"]' );
+	t.answer( 200, { navs : [ { key : 'legal', entries : [ IMPRINT, PRIVACY ] }, { key : 'main', entries : [ ROUTES[0] ] } ], routes : ROUTES.concat( [ IMPRINT, PRIVACY ] ), active : true } );
+	check( '...and the saved menu is drawn the same way', t.entries().join() === 'Impressum (/impressum, /imprint),Datenschutz (/datenschutz, /privacy)' );
+}
+
+
 // --- the shell -------------------------------------------------------------
 
 {

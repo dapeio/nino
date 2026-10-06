@@ -538,6 +538,22 @@ check( '...and is saved as routes/save', requests.length === beforePage + 1 && r
 answer( 200, {} );
 answer( 200, listing( [ '/', '/contact' ] ) );
 
+// A page of a module that has a route per language - the imprint of the Legal
+// module - is one row, shown with every path it is reached at, and its form says the same
+panel._pages = listing( [ '/', '/contact' ] ).pages;
+panel._runtime = [ { uri : '/legal/imprint', httpUri : '/impressum', httpUris : [ '/impressum', '/imprint' ], body : '[template /templates/page-legal-imprint]',
+	text : { de_DE : { name : 'Impressum', title : 'Impressum', description : '' }, en_US : { name : 'Imprint', title : 'Imprint', description : '' } } } ];
+panel._renderList();
+const perLanguageRows = rows().slice( 2 );
+check( 'a page with a route per language is one row, named by what was written and shown with all its paths', perLanguageRows.length === 1 && rowName( perLanguageRows[0] ) === 'Impressum' && rowPath( perLanguageRows[0] ) === '/impressum, /imprint' );
+perLanguageRows[0].children[0].listeners.click[0]( { preventDefault : function() {} } );
+check( '...and its form shows them read only, in one field', field('routes-form-runtime-path').value === '/impressum, /imprint' && field('routes-form-runtime-path').readOnly === true );
+panel._runtime = [ { uri : '/.newsletter', httpUri : '/.newsletter', body : '', text : { de_DE : { name : '', title : '', description : '' }, en_US : { name : '', title : '', description : '' } } } ];
+panel._renderList();
+check( 'a page without a list of paths - an older server\'s answer - shows its one path', rowPath( rows().slice( 2 )[0] ) === '/.newsletter' );
+panel._runtime = [];
+panel._renderList();
+
 /*	The open page's form is watched by the shell (Nino.admin.dirty), which asks
 	before anything throws what was typed into it away. A second context, with
 	a registry that records what it is told, since the one above has none	*/

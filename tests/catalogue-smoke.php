@@ -1195,7 +1195,7 @@ check( 'a key nothing carries is a 400 before the kernel is asked', callFeatures
 \Nino\Features::deactivate( $appData, 'top' );
 
 [ $status, $body ] = callFeatures( $appData, 'apiRemove', [ 'key' => 'top' ] );
-check( 'an inactive one goes, directory and all', $status === 200 && $body === [ 'removed' => 'top' ]
+check( 'an inactive one goes, directory and all - and nothing of the privacy policy is left to remind of', $status === 200 && $body === [ 'removed' => 'top', 'privacy' => [] ]
 	&& is_dir( NINO_FEATURES_DIR. '/Top' ) === false && \Nino\Features::get( $appData, 'top' ) === null );
 // The same rule deactivation follows: what a feature left behind is the
 // project's now, and putting the feature back finds it again
@@ -1219,10 +1219,36 @@ symlink( $linked, NINO_FEATURES_DIR. '/Linked' );
 unset( $appData['./nino/features/all'] );
 
 [ $status, $body ] = callFeatures( $appData, 'apiRemove', [ 'key' => 'linked' ] );
-check( 'a symlinked feature goes by its link, and what the link points at stays', $status === 200 && $body === [ 'removed' => 'linked' ]
+check( 'a symlinked feature goes by its link, and what the link points at stays', $status === 200 && $body === [ 'removed' => 'linked', 'privacy' => [] ]
 	&& is_link( NINO_FEATURES_DIR. '/Linked' ) === false && is_dir( $linked ) === true );
 
 \Nino\Filesystem::removeDir( $linked );
+
+// What the privacy policy still says about a feature is named when its
+// directory goes too - asked before the directory is deleted, because the
+// sections are read from the feature's own unit, and nothing finds them after
+$described = NINO_FEATURES_DIR. '/Described';
+mkdir( $described. '/install/elements', 0755, true );
+file_put_contents( $described. '/feature.php', '<?php return [ \'key\' => \'described\', \'name\' => \'Described\', \'version\' => \'1.0.0\' ];' );
+file_put_contents( $described. '/Described.php', '<?php namespace Nino\\Modules { class Described {} }' );
+file_put_contents( $described. '/install/manifest.php', '<?php return [ \'elements\' => [ \'privacy\' => \'elements/privacy.php\' ] ];' );
+file_put_contents( $described. '/install/elements/privacy.php', '<?php return '. var_export( [
+	'title' => 'Privacy policy',
+	'model' => [ 'title' => [ 'type' => 'string', 'locale' => true ], 'text' => [ 'type' => 'string', 'locale' => true, 'html' => true, 'blocks' => true ], 'hidden' => [ 'type' => 'boolean' ] ],
+	'*' => [ 'described' => [] ],
+	'de_DE' => [ 'described' => [ 'title' => 'Beschrieben', 'text' => '<p>x</p>' ] ],
+], true ). ';' );
+unset( $appData['./nino/features/all'] );
+check( 'the feature that brings a section is switched on, and the section is there', \Nino\Features::activate( $appData, 'described' ) === true
+	&& ( \Nino\Elements::getElement( $appData, '/privacy/described', 'de_DE' )['title'] ?? '' ) === 'Beschrieben' );
+\Nino\Features::deactivate( $appData, 'described' );
+
+check( 'while the Legal module is not on, nothing is said of the policy', \Nino\Modules\Legal::contributions( $appData, 'described' ) === [] );
+$appData['/nino/modules'][] = '\\Nino\\Modules\\Legal';
+[ $status, $body ] = callFeatures( $appData, 'apiRemove', [ 'key' => 'described' ] );
+check( 'with it on, removing the feature names the sections of the policy that still describe it, and they stay', $status === 200 && $body === [ 'removed' => 'described', 'privacy' => [ 'Beschrieben' ] ]
+	&& is_dir( $described ) === false && ( \Nino\Elements::getElement( $appData, '/privacy/described', 'de_DE' )['title'] ?? '' ) === 'Beschrieben' );
+$appData['/nino/modules'] = array_values( array_diff( $appData['/nino/modules'], [ '\\Nino\\Modules\\Legal' ] ) );
 
 echo "\n";
 

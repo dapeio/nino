@@ -906,7 +906,10 @@ check( 'a refusal shows the kernel\'s reason and frees the button', removeBtn.di
 	&& oldMsg.textContent === '(400) could not remove /features/Old - the web server may not write there' );
 
 fire( removeBtn, 'click' );
-answer( 200, { removed : 'old' } );
+const dialogsBeforePrivacy = alerts.length;
+answer( 200, { removed : 'old', privacy : [ 'Old', 'Old, too' ] } );
+check( 'a removal that leaves sections of the privacy policy behind says which, in a dialog, before the list is drawn again', alerts.length === dialogsBeforePrivacy + 1
+	&& alerts[alerts.length - 1] === text('/_admin/features/msg/deactivated-privacy').replace( '%s', 'Old, Old, too' ) );
 check( 'a removal reads the whole list again - what it took away may be what another row was waiting for', requests[requests.length - 1].action === 'features/list' );
 answer( 200, listAnswer( CACHE.url, true, null, FEATURES.filter( function( f ) { return f.key !== 'old' } ) ) );
 check( '...and the row is gone with no page reload: no rail entry changes when an inactive feature leaves', rowKeys( mount, 'feature' ) === 'fresh' && reloads === 1 );
@@ -1225,6 +1228,22 @@ check( 'a failed load is reported through the workbench\'s words', mount.childre
 	panel._switch( { key : 'sample' }, 'deactivate', button, line, true );
 	answer( 200, { feature : FEATURES[2], found : [] } );
 	check( 'a deactivation that leaves nothing behind says nothing', alerts.length === dialogs + 2 && reloads === reloadsBefore + 5 );
+
+	// ...and which sections of the privacy policy still describe it: no switch deletes them
+	panel._switch( { key : 'sample' }, 'deactivate', button, line, true );
+	answer( 200, { feature : FEATURES[2], found : [], privacy : [ 'Sample', 'a$&b' ] } );
+	check( 'a deactivation that leaves sections of the privacy policy behind names them in a dialog, before the reload', alerts.length === dialogs + 3 && alertsAt[alertsAt.length - 1] === reloadsBefore + 5 && reloads === reloadsBefore + 6
+		&& alerts[alerts.length - 1] === text('/_admin/features/msg/deactivated-privacy').replace( '%s', function() { return 'Sample, a$&b' } ) );
+
+	panel._switch( { key : 'sample' }, 'deactivate', button, line, true );
+	answer( 200, { feature : FEATURES[2], found : found, privacy : [ 'Sample' ] } );
+	const both = alerts[alerts.length - 1].split('\n\n');
+	check( 'shortcodes left behind and sections left behind are two paragraphs of one dialog', alerts.length === dialogs + 4 && both.length === 2 && both[0].indexOf( text('/_admin/features/msg/deactivated-found').split('%s')[0] ) === 0
+		&& both[1] === text('/_admin/features/msg/deactivated-privacy').replace( '%s', 'Sample' ) );
+
+	panel._switch( { key : 'sample' }, 'deactivate', button, line, true );
+	answer( 200, { feature : FEATURES[2], found : [], privacy : [] } );
+	check( 'an empty list of sections says nothing', alerts.length === dialogs + 4 );
 }
 
 // The badge is drawn in the tool layer under the ids of the panel's own panes, like the rest of the module's rules

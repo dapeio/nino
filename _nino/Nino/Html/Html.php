@@ -69,11 +69,11 @@ namespace Nino {
 		 *	quotes) explicitly rather than relying on slash escaping to
 		 *	neutralize a '</script>' as a side effect.
 		 *
-		 *	Nested fills are resolved before encoding, so a value that
-		 *	references another one ('[[/project/website/general/url]]' inside a
-		 *	subject line, say) still comes out as its final text - and the
-		 *	re-render Html::_doShortcode() runs on this return value then
-		 *	has nothing left to substitute back into the encoded string.
+		 *	Nested fills are resolved before encoding (see resolveTextfill()), so
+		 *	a value that references another one ('[[/project/website/general/url]]'
+		 *	inside a subject line, say) still comes out as its final text - and
+		 *	the re-render Html::_doShortcode() runs on this return value then has
+		 *	nothing left to substitute back into the encoded string.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					Shortcode arguments, $args[0] is the fill key
@@ -82,8 +82,7 @@ namespace Nino {
 		 */
 		public static function doJsonShortcode( array &$appData, array $args ): string {
 
-			$value = self::renderTextfill( $appData, (string) ( $args[0] ?? '' ) );
-			$value = self::_renderFills( $appData, $value );
+			$value = self::resolveTextfill( $appData, (string) ( $args[0] ?? '' ) ) ?? '';
 
 			return (string) json_encode( $value, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT );
 		}
@@ -103,6 +102,29 @@ namespace Nino {
 			$fills = self::getFills( $appData );
 
 			return $fills[ '[['. $fill. ']]'] ?? '';
+		}
+
+		/**
+		 *	What [[<key>]] would put into a page here, in the current language:
+		 *	the value of the key with every fill inside it resolved - the same
+		 *	passes _renderFills() makes, at most ten - and nothing else. No
+		 *	shortcode is run and nothing is escaped; that is the caller's
+		 *	business, since it knows where the value is going. Where renderTextfill()
+		 *	answers '' for a key with no value, this answers null, so a caller
+		 *	can tell a key nobody wrote from one that is empty - [json] and
+		 *	Modules\Legal's placeholders both ask it
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					The key without brackets, eg. '/project/company/contact/email'
+		 *
+		 *	@return 	string|null							The resolved value, null for a key with no value
+		 */
+		public static function resolveTextfill( array &$appData, string $key ): ?string {
+
+			$fills = self::getFills( $appData );
+			$value = $fills[ '[['. $key. ']]'] ?? null;
+
+			return is_string( $value ) === true ? self::_renderFills( $appData, $value ) : null;
 		}
 
 		public static function addAsset( array &$appData, string $library, string $assetfile ): void {

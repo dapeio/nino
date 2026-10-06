@@ -6,6 +6,8 @@
 		'GET://sample-fr' => [ 'uri' => '/exemple', 'locale' => 'fr_FR', 'body' => '[template /templates/page-sample]' ],
 	],
 	'templates'	=> [ 'page-sample.tpl' ],
+	// Added to the type, never replacing - see \Nino\Elements::seed()
+	'elements'	=> [ 'privacy' => 'elements/privacy.php' ],
 	'blacklist'	=> [ '/feature/sample/intro/hidden' ],
 	'config'		=> [ '/sample/config' => 'unit-default' ],
 ];

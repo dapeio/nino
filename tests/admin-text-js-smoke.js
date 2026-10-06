@@ -627,7 +627,7 @@ function world( locale, hash, session ) {
 		&& de.U.describeKey( '/_nino/webpage/.demo-catalogue/name' ).uri === '/.demo-catalogue' && de.U.describeKey( '/_nino/webpage/blog/uri' ).field === 'uri' );
 	check( 'the name of a language: its code, unchanged', JSON.stringify( de.U.describeKey( '/_nino/locale/de_DE/name' ) ) === '{"kind":"locale","code":"de_DE"}' );
 	check( 'anything else is free - a key somebody made up, one that is too short or too long, an old form, the legal link, a word of the workbench',
-		[ '/website/legal/uri', '/home/plain', '/company/name', '/template/page-home/welcome', '/template/page-home/a/b/c', '/Template/page-home/a/b', '/template/page_home/a/b', '/_admin/common/word/title', '/nino/dir', 'x' ].every( key => de.U.describeKey( key ).kind === 'free' ) );
+		[ '/website/contact/uri', '/home/plain', '/company/name', '/template/page-home/welcome', '/template/page-home/a/b/c', '/Template/page-home/a/b', '/template/page_home/a/b', '/_admin/common/word/title', '/nino/dir', 'x' ].every( key => de.U.describeKey( key ).kind === 'free' ) );
 
 	// slugLabel: the vocabulary, a number, a compound, a humanized slug - in the language of the interface
 	const label = ( w, slug ) => w.U.slugLabel( slug );
@@ -672,7 +672,7 @@ const homeKeys = [
 	textEntry( '/module/form/info/success', { de_DE : 'Gesendet', en_US : 'Sent' } ),
 	textEntry( '/feature/consent/category-necessary/name', { de_DE : 'Notwendig', en_US : 'Necessary' } ),
 	textEntry( '/feature/consent/banner/title', { de_DE : 'Cookies', en_US : 'Cookies' } ),
-	textEntry( '/website/legal/uri', { '*' : '/legal' } ),
+	textEntry( '/website/contact/uri', { '*' : '/contact' } ),
 	textEntry( '/_admin/elements/field/social/title', { '*' : 'Netzwerk' }, { blacklisted : true } ),
 ];
 const homePages = [
@@ -698,7 +698,7 @@ const homeData = ( extra ) => Object.assign( { entries : homeKeys.filter( e => e
 	check( '...the project in the order of the company, the website, the mail; the blocks and modules by name',
 		JSON.stringify( model.blocks[1].groups[0].rows ) === '["project/company"]' && labels( model.blocks[1].groups[2].rows ).join() === 'Kopfrahmen,Mail an den Besucher' && labels( model.blocks[1].groups[3].rows ).join() === 'Formular' );
 	check( '...a feature named after its manifest, the system as the words of the panel', labels( model.blocks[1].groups[4].rows ).join() === 'Cookie-Einwilligung' && labels( model.blocks[1].groups[5].rows ).join() === 'Sprachnamen,Seitenangaben ohne Seite' );
-	check( 'a key somebody made up is a row by its first segment, in "Weitere" - the link to the legal page among them', JSON.stringify( model.blocks[1].groups[6].rows ) === '["website"]' && model.rowOf['/website/legal/uri'] === 'website' );
+	check( 'a key somebody made up is a row by its first segment, in "Weitere" - the address of the contact page among them', JSON.stringify( model.blocks[1].groups[6].rows ) === '["website"]' && model.rowOf['/website/contact/uri'] === 'website' );
 	check( 'the details of a page without a stored route - a feature\'s - are the system\'s row, a section for each', model.rowOf['/_nino/webpage/blog/name'] === '_nino/webpage'
 		&& w.T.sections( model, model.rows['_nino/webpage'] ).map( s => s.label+ ':'+ s.fields.map( f => f.label ).join('+') ).join() === '/blog:Name im Menü+Seitentitel' );
 	check( 'the names of the languages are the system\'s row too, a section for each language', w.T.sections( model, model.rows['_nino/locale'] ).map( s => s.label+ ':'+ s.fields.map( f => f.label ).join() ).join() === 'de_DE:Name,fr_FR:Name' );
@@ -1133,7 +1133,7 @@ function openedKeys( response, hash ) {
 	k.keys._openGroup( '_admin' );
 	check( '...nor has a word of the workbench', k.form.querySelectorAll('.admin-text-field').every( f => buttonsOf( f ).includes( 'Umbenennen' ) === false ) );
 	k.keys._openGroup( 'website' );
-	check( '...but a key somebody made up can be renamed - into the grammar', buttonsOf( k.form.querySelector('[data-key="/website/legal/uri"]') ).includes( 'Umbenennen' ) );
+	check( '...but a key somebody made up can be renamed - into the grammar', buttonsOf( k.form.querySelector('[data-key="/website/contact/uri"]') ).includes( 'Umbenennen' ) );
 }
 
 {
@@ -1228,10 +1228,10 @@ function openedKeys( response, hash ) {
 	// a key somebody made up starts the form at /project with nothing in it; renaming it moves the key into the grammar
 	const k = openedKeys( keysResponse() );
 	k.keys._openGroup( 'website' );
-	k.form.querySelector('[data-key="/website/legal/uri"]').querySelectorAll('button').find( b => b.textContent === 'Umbenennen' ).click();
+	k.form.querySelector('[data-key="/website/contact/uri"]').querySelectorAll('button').find( b => b.textContent === 'Umbenennen' ).click();
 	const control = id => k.form.querySelector( '#'+ id );
 	check( 'a key that follows no grammar starts at /project with the rest empty - the namespaces to the others locked', control('keys-form-namespace').value === 'project' && control('keys-form-namespace').children.length === 1
-		&& control('keys-form-category').value === '' && control('keys-form-part').value === '' && control('keys-form-name').value === '' && k.keys._renameFrom === '/website/legal/uri' && k.keys.isDirty() === false );
+		&& control('keys-form-category').value === '' && control('keys-form-part').value === '' && control('keys-form-name').value === '' && k.keys._renameFrom === '/website/contact/uri' && k.keys.isDirty() === false );
 	// ...and the form is drawn again as it was opened when its input is thrown away
 	control('keys-form-part').value = 'x';
 	k.keys.discard();

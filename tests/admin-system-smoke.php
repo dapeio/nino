@@ -3032,6 +3032,67 @@ check( '...and the notice follows the text being saved in that language', ( $aft
 \Nino\Filesystem::mutate( $appData, '/text/de_DE.php', fn( array $texts ): array => array_diff_key( $texts, [ '[[/notice-test/gap]]' => 1 ] ) );
 \Nino\Filesystem::mutate( $appData, '/text/en_US.php', fn( array $texts ): array => array_diff_key( $texts, [ '[[/notice-test/gap]]' => 1 ] ) );
 
+// What is wrong with the legal texts: told to an account that may edit elements,
+// while the module is active - and to nobody else
+$legalModulesBefore = $appData['/nino/modules'] ?? [];
+$appData['/nino/modules'] = array_merge( $legalModulesBefore, [ '\\Nino\\Modules\\Legal' ] );
+$legalRoutes = $appData['/nino/http/routes'] ?? [];
+$legalNotices = static fn( array $body ): array => array_values( array_filter( $body['notices'] ?? [], static fn( array $notice ): bool => str_starts_with( $notice['text'], '/_admin/dashboard/notice/legal-' ) ) );
+[ , $body ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );
+$missingTypes = $legalNotices( $body );
+check( 'the module is active and its types are not there: the dashboard says so, once per type, with the file of the unit to copy back and a link to the type', count( array_filter( $missingTypes, static fn( array $notice ): bool => $notice['text'] === '/_admin/dashboard/notice/legal-nothing' ) ) === 2
+	&& $missingTypes[0]['values'][0] === 'legal' && str_ends_with( $missingTypes[0]['values'][1], 'install/elements/legal.php' ) && $missingTypes[0]['link'] === '#elements/legal' );
+
+$legalRoutesOut = []; $legalBlacklistOut = []; $legalConfigOut = [];
+\Nino\Features::applyUnit( $appData, __DIR__. '/../_nino/Nino/Modules/Legal/install', [ 'de_DE' ], $legalRoutesOut, $legalBlacklistOut, $legalConfigOut, true );
+[ , $body ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );
+$legalNav = array_values( array_filter( $legalNotices( $body ), static fn( array $notice ): bool => $notice['text'] === '/_admin/dashboard/notice/legal-nav' ) );
+$legalAll = $legalNotices( $body );
+check( 'with the types there, what is wrong with the texts is told: the placeholder with no value, in the section it stands in, with a link to that section', ( array_values( array_filter( $legalAll, static fn( array $notice ): bool => $notice['text'] === '/_admin/dashboard/notice/legal-unknown' ) )[0]['link'] ?? null ) === '#elements/legal/provider'
+	&& in_array( [ '#/project/company/contact/email#', 'Anbieter dieser Website', 'de_DE' ], array_column( $legalAll, 'values' ), true ) === true );
+check( '...a language that has no version of a section is told with the section named in the native language', in_array( [ 'Anbieter dieser Website', 'en_US' ], array_column( array_filter( $legalAll, static fn( array $notice ): bool => $notice['text'] === '/_admin/dashboard/notice/legal-translation' ), 'values' ), true ) === true );
+check( '...at most eight lines, and one more that counts the rest', count( $legalAll ) === 9 && end( $legalAll )['text'] === '/_admin/dashboard/notice/legal-more' && (int) end( $legalAll )['values'][0] > 1 );
+
+\Nino\Auth::loginUser( $appData, 'nopanels@example.com', 'correct horse battery staple' );
+[ , $body ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );
+check( '...and an account that may not edit elements is told nothing of it', $legalNotices( $body ) === [] );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+$appData['/nino/modules'] = $legalModulesBefore;
+[ , $body ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );
+check( '...nor is anybody, once the module is off', $legalNotices( $body ) === [] );
+
+// A language added later gets what the module brings for it - once the module is active
+$appData['/nino/modules'] = array_merge( $legalModulesBefore, [ '\\Nino\\Modules\\Legal' ] );
+$englishFile = \Nino\Filesystem::path( $appData, '/text/en_US.php' );
+$englishBefore = is_file( $englishFile ) === true ? (string) file_get_contents( $englishFile ) : null;
+@unlink( $englishFile );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiAddLocale', [ 'locale' => 'en_US' ] );
+$englishTexts = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
+check( 'a language the Legal unit has texts for gets its page details and its versions of the sections with the new file', $status === 200 && ( $body['created'] ?? null ) === true
+	&& ( $englishTexts['[[/_nino/webpage/legal/privacy/name]]'] ?? null ) === 'Privacy' && ( $englishTexts['[[/_nino/webpage/legal/privacy/title]]'] ?? null ) === 'Privacy policy'
+	&& ( \Nino\Filesystem::getFileContent( $appData, '/elements/privacy.php', [] )['en_US']['hosting']['title'] ?? null ) === 'Hosting' );
+[ $status ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiAddLocale', [ 'locale' => 'sv_SE' ] );
+$swedishTexts = \Nino\Filesystem::getFileContent( $appData, '/text/sv_SE.php', [] );
+check( 'any other language gets the names of the two pages in the native language, and no sections to translate', $status === 200 && ( $swedishTexts['[[/_nino/webpage/legal/imprint/name]]'] ?? null ) === 'Impressum'
+	&& ( $swedishTexts['[[/_nino/webpage/legal/imprint/title]]'] ?? '' ) === '' && isset( \Nino\Filesystem::getFileContent( $appData, '/elements/privacy.php', [] )['sv_SE'] ) === false );
+unlink( \Nino\Filesystem::path( $appData, '/text/sv_SE.php' ) );
+$appData['/nino/modules'] = $legalModulesBefore;
+[ $status ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiAddLocale', [ 'locale' => 'sv_SE' ] );
+check( 'with the module off the new language gets nothing of it', $status === 200 && ( \Nino\Filesystem::getFileContent( $appData, '/text/sv_SE.php', [] )['[[/_nino/webpage/legal/imprint/name]]'] ?? '' ) === '' );
+unlink( \Nino\Filesystem::path( $appData, '/text/sv_SE.php' ) );
+\Nino\Filesystem::mutate( $appData, '/text/global.php', fn( array $texts ): array => array_diff_key( $texts, [ '[[/_nino/locale/sv_SE/name]]' => 1 ] ) );
+if( $englishBefore !== null )
+	file_put_contents( $englishFile, $englishBefore );
+else
+	@unlink( $englishFile );
+@unlink( \Nino\Filesystem::path( $appData, '/elements/legal.php' ) );
+@unlink( \Nino\Filesystem::path( $appData, '/elements/privacy.php' ) );
+@unlink( \Nino\Filesystem::path( $appData, '/templates/page-legal-imprint.tpl' ) );
+@unlink( \Nino\Filesystem::path( $appData, '/templates/page-legal-privacy.tpl' ) );
+unset( $appData['./nino/elements/cache'] );
+$appData['/nino/http/routes'] = $legalRoutes;
+
 echo "\n";
 
 
@@ -3260,6 +3321,41 @@ check( 'the deleted entry\'s own text meta is left in place - additive-only, nev
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'httpUri' => '/does-not-exist' ] );
 check( 'apiDelete 404s for an unknown httpUri', $status === 404 );
 
+// What a route carries that the form does not edit stays. Somebody put a
+// 'maintenance' => false, a 'locale' and a 'header' on it in config.php - the
+// first keeps a page up while the site is down - and a save used to build the
+// route anew from the form's four fields and drop the rest
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
+	'originalHttpUri' => '', 'uri' => '/site-kept', 'httpUri' => '/kept', 'template' => 'page-about', 'navs' => [ 'main' ], 'text' => $pageText('Kept'),
+] );
+check( 'a page for the fields-kept check is created', $status === 200 );
+\Nino\Filesystem::mutate( $appData, '/config.php', function( array $config ): array {
+	$config['/nino/http/routes']['GET://kept'] = array_merge( $config['/nino/http/routes']['GET://kept'], [ 'maintenance' => false, 'locale' => 'de_DE', 'header' => [ 'X-Kept' => '1' ], 'statusCode' => 201 ] );
+	return $config;
+} );
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
+	'originalHttpUri' => '/kept', 'uri' => '/site-kept', 'httpUri' => '/kept-on', 'template' => 'page-contact', 'statusCode' => 200, 'navs' => [], 'text' => $pageText('Kept'),
+] );
+$keptRoutes = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
+check( 'a save keeps the fields of the route it does not edit - it moved to its new path with them', $status === 200 && isset( $keptRoutes['GET://kept'] ) === false
+	&& ( $keptRoutes['GET://kept-on']['maintenance'] ?? null ) === false && ( $keptRoutes['GET://kept-on']['locale'] ?? null ) === 'de_DE' && ( $keptRoutes['GET://kept-on']['header'] ?? null ) === [ 'X-Kept' => '1' ] );
+check( '...and sets the four it does edit: the body, the status code - 200 is no field -, the menus', $keptRoutes['GET://kept-on']['body'] === '[template /templates/page-contact]'
+	&& isset( $keptRoutes['GET://kept-on']['statusCode'] ) === false && isset( $keptRoutes['GET://kept-on']['navs'] ) === false && $keptRoutes['GET://kept-on']['uri'] === '/site-kept' );
+callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'httpUri' => '/kept-on' ] );
+
+// The imprint and the privacy policy are the Legal module's
+$configBeforeReserved = file_get_contents( $sandbox. '/private/config.php' );
+foreach( [ '/legal/imprint', '/legal/privacy' ] as $reservedUri ) {
+	[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
+		'originalHttpUri' => '', 'uri' => $reservedUri, 'httpUri' => '/mine', 'template' => 'page-about', 'text' => $pageText('Mine'),
+	] );
+	check( 'a page with the Element-URI '. $reservedUri. ' is refused with 409, a code and the uri', $status === 409 && ( $body['code'] ?? '' ) === 'routes_reserved_uri' && ( $body['params'] ?? [] ) === [ $reservedUri ] );
+}
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
+	'originalHttpUri' => '/contact', 'uri' => '/legal/imprint', 'httpUri' => '/contact', 'template' => 'page-contact', 'text' => $pageText('Kontakt'),
+] );
+check( '...and so is an existing page that is moved onto one, and nothing was written', $status === 409 && file_get_contents( $sandbox. '/private/config.php' ) === $configBeforeReserved );
+
 // --- the pages a feature routes at runtime ---------------------------------
 //
 // Posts' /blog, the Newsletter's /.newsletter, Hello's /hello are in no
@@ -3282,6 +3378,18 @@ check( '...with the path as the feature routes it, placeholder and all', array_c
 check( '...a route with no page template (/.search) and a persisted one are not among them', isset( $runtimeByUri['/.search'] ) === false && in_array( '/contact', array_column( $body['runtime'], 'httpUri' ), true ) === false );
 check( '...and the persisted pages still come as before, without the runtime ones', array_column( $body['pages'], 'httpUri' ) === [ '/contact' ] );
 check( '...each with its name, title and description per language, empty while nobody wrote them', array_keys( $runtimeByUri['/hello']['text'] ) === $runtimeLocales && $runtimeByUri['/hello']['text']['de_DE'] === [ 'name' => '', 'title' => '', 'description' => '' ] );
+check( '...every page with its paths: one for a page of its own', $runtimeByUri['/hello']['httpUris'] === [ '/hello' ] );
+
+// A page with a route per language is one page: the imprint of Modules\Legal
+$appData['/nino/http/routes']['GET://impressum'] = [ 'uri' => '/legal/imprint', 'locale' => 'de_DE', 'body' => '[template /templates/page-legal-imprint]', 'maintenance' => false ];
+$appData['/nino/http/routes']['GET://imprint'] = [ 'uri' => '/legal/imprint', 'locale' => 'en_US', 'body' => '[template /templates/page-legal-imprint]', 'maintenance' => false ];
+[ , $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiList' );
+$languageByUri = array_column( $body['runtime'], null, 'uri' );
+check( 'the routes of one Element-URI are one page, with all their paths', array_keys( $languageByUri ) === [ '/blog/post', '/.newsletter', '/hello', '/legal/imprint' ]
+	&& $languageByUri['/legal/imprint']['httpUri'] === '/impressum' && $languageByUri['/legal/imprint']['httpUris'] === [ '/impressum', '/imprint' ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSaveTexts', [ 'uri' => '/legal/imprint', 'text' => $runtimeText( [ 'name' => 'Impressum', 'title' => 'Impressum' ], [ 'name' => 'Imprint', 'title' => 'Imprint' ] ) ] );
+check( '...whose details are written once, under the Element-URI they share', $status === 200 && ( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/_nino/webpage/legal/imprint/name]]'] ?? null ) === 'Impressum' );
+unset( $appData['/nino/http/routes']['GET://impressum'], $appData['/nino/http/routes']['GET://imprint'] );
 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSaveTexts', [ 'uri' => '/.newsletter', 'text' => $runtimeText(
 	[ 'name' => ' Newsletter ', 'title' => 'Newsletter abonnieren', 'description' => 'Alle drei Monate.' ],
@@ -3629,7 +3737,7 @@ $configBeforeRuntime = $configNow();
 check( 'a runtime route can be put into the running order', $status === 200 && $entriesOf( $body, 'main' ) === [ '/', '/blog', '/contact' ] );
 
 $configAfterRuntime = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-check( 'its membership is written under /nino/html/navroutes, at its position in the order', ( $configAfterRuntime['/nino/html/navroutes'] ?? null ) === [ 'GET://blog' => [ 'main' => 2 ] ] );
+check( 'its membership is written under /nino/html/navroutes, by the page\'s Element-URI, at its position in the order', ( $configAfterRuntime['/nino/html/navroutes'] ?? null ) === [ '/blog' => [ 'main' => 2 ] ] );
 check( '...the routes that are in config.php take the numbers around it', [ $configAfterRuntime['/nino/http/routes']['GET://']['navs']['main'], $configAfterRuntime['/nino/http/routes']['GET://contact']['navs']['main'] ] === [ 1, 3 ] );
 check( '...and no stub route for it is written into config.php - nor any other runtime route', array_keys( $configAfterRuntime['/nino/http/routes'] ) === array_keys( $persistedRoutes ) );
 check( 'the live route array still holds the runtime routes after the save', isset( $appData['/nino/http/routes']['GET://blog'], $appData['/nino/http/routes']['GET://_admin/recovery.php'] ) === true
@@ -3659,11 +3767,11 @@ check( 'the next save of that menu drops what was stored for it', $status === 20
 // Rename and delete follow a runtime membership too
 $appData['/nino/http/routes'] = $persistedRoutes + $runtimeRoutes;
 callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'main', 'key' => 'main', 'entries' => [ '/blog', '/', '/.search' ] ] );
-check( 'two runtime routes in one menu, one of them first', ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/navroutes'] ?? null ) === [ 'GET://blog' => [ 'main' => 1 ], 'GET://.search' => [ 'main' => 3 ] ] );
+check( 'two runtime routes in one menu, one of them first', ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/navroutes'] ?? null ) === [ '/blog' => [ 'main' => 1 ], '/.search' => [ 'main' => 3 ] ] );
 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'main', 'key' => 'primary' ] );
 check( 'a rename follows the key onto a runtime membership', $status === 200 && $entriesOf( $body, 'primary' ) === [ '/blog', '/', '/.search' ]
-	&& ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/navroutes']['GET://blog'] ?? null ) === [ 'primary' => 1 ] );
+	&& ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/navroutes']['/blog'] ?? null ) === [ 'primary' => 1 ] );
 [ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => '', 'key' => 'primary' ] );
 check( 'a menu id a runtime membership carries is taken', $status === 409 );
 
@@ -3671,6 +3779,50 @@ check( 'a menu id a runtime membership carries is taken', $status === 409 );
 check( 'deleting a menu takes its runtime memberships away too, and the key with them when none is left', $status === 200
 	&& array_key_exists( '/nino/html/navroutes', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] ) ) === false );
 check( '...and the runtime routes are still live afterwards', isset( $appData['/nino/http/routes']['GET://blog'] ) === true );
+$appData['/nino/http/routes'] = $persistedRoutes;
+unset( $appData['/nino/html/navroutes'] );
+
+/*	A page with a route per language - the imprint of Modules\Legal - is one
+	entry: its routes share an Element-URI, the menu keeps the page by that
+	uri, and a path of any of its routes names it. Nothing is written for it
+	into config.php's routes	*/
+$languageRoutes = [
+	'GET://imprint' 		=> [ 'uri' => '/legal/imprint', 'locale' => 'en_US', 'body' => '', 'maintenance' => false ],
+	'GET://impressum' 	=> [ 'uri' => '/legal/imprint', 'locale' => 'de_DE', 'body' => '', 'maintenance' => false ],
+	'GET://shared-page' => [ 'uri' => '/legal/shared', 'body' => '' ],
+];
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', function( array $content ): array { $content['[[/_nino/webpage/legal/imprint/name]]'] = 'Impressum'; return $content; } );
+\Nino\Filesystem::mutate( $appData, '/text/en_US.php', function( array $content ): array { $content['[[/_nino/webpage/legal/imprint/name]]'] = 'Imprint'; return $content; } );
+$appData['/nino/http/routes'] = $persistedRoutes + $languageRoutes;
+callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => '', 'key' => 'legal' ] );
+[ , $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiList' );
+$languageEntries = array_values( array_filter( $body['routes'], static fn( array $route ): bool => $route['uri'] === '/legal/imprint' ) );
+check( 'the routes of one Element-URI are one entry, named in the native language, with every path', count( $languageEntries ) === 1
+	&& $languageEntries[0]['label'] === 'Impressum' && $languageEntries[0]['runtime'] === true && $languageEntries[0]['named'] === true );
+check( '...the path of the native language names it, all of them are listed', $languageEntries[0]['httpUri'] === '/impressum' && $languageEntries[0]['paths'] === [ '/impressum', '/imprint' ] );
+check( 'a route on its own has its one path', array_column( $body['routes'], 'paths', 'httpUri' )['/contact'] === [ '/contact' ] );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'legal', 'key' => 'legal', 'entries' => [ '/contact', '/imprint' ] ] );
+check( 'any path of the page puts it into the running order, once', $status === 200 && $entriesOf( $body, 'legal' ) === [ '/contact', '/impressum' ] );
+$configAfterLanguage = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+check( '...under its Element-URI in /nino/html/navroutes, and nowhere as a route of config.php', ( $configAfterLanguage['/nino/html/navroutes'] ?? null ) === [ '/legal/imprint' => [ 'legal' => 2 ] ]
+	&& isset( $configAfterLanguage['/nino/http/routes']['GET://imprint'] ) === false && isset( $configAfterLanguage['/nino/http/routes']['GET://impressum'] ) === false );
+[ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'legal', 'key' => 'legal', 'entries' => [ '/imprint', '/impressum' ] ] );
+check( 'two paths of one page are listed twice', $status === 400 );
+check( 'the menu reads it the way the shortcode does, in each language', ( function() use ( &$appData ): bool {
+	\Nino\Locales::setCurrentLocale( $appData, 'en_US' );
+	$english = \Nino\Modules\Navigation::routeLines( $appData, 'legal' );
+	\Nino\Locales::setCurrentLocale( $appData, 'de_DE' );
+	return in_array( '/imprint:Imprint', $english, true ) === true && in_array( '/impressum:Impressum', \Nino\Modules\Navigation::routeLines( $appData, 'legal' ), true ) === true;
+} )() );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => 'legal', 'key' => 'rechtliches' ] );
+check( 'a rename follows the page\'s Element-URI', $status === 200 && ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/navroutes']['/legal/imprint'] ?? null ) === [ 'rechtliches' => 2 ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'originalKey' => '', 'key' => 'rechtliches' ] );
+check( 'a menu id a page is in is taken', $status === 409 );
+callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiDelete', [ 'key' => 'rechtliches' ] );
+check( 'deleting the menu takes the page out of it', array_key_exists( '/nino/html/navroutes', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] ) ) === false
+	&& isset( $appData['/nino/http/routes']['GET://imprint'] ) === true );
 $appData['/nino/http/routes'] = $persistedRoutes;
 unset( $appData['/nino/html/navroutes'] );
 

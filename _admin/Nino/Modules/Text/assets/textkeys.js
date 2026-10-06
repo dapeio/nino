@@ -135,8 +135,8 @@
 		 *
 		 *	  - a page: the template of a stored route and everything the
 		 *	    templates of the pages' kind carry, with the details of the
-		 *	    route in front. A template without a category (the legal page,
-		 *	    the catalogue) has one row per route and only those details
+		 *	    route in front. A template without a category (the
+		 *	    catalogue) has one row per route and only those details
 		 *	  - the keys of a template, of /template/common, of a category of
 		 *	    /project, of a module or a feature
 		 *	  - the details of pages without a stored route, the names of the

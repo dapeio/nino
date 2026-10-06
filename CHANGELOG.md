@@ -799,6 +799,105 @@ All notable changes to Nino are documented in this file.
   grouping of slots; `tests/install-smoke.php` (307 -> 309) the wizard's
   labels.
 
+- **Legal module (`\Nino\Modules\Legal`):** the imprint and the privacy policy
+  are elements. Two types, `legal` and `privacy`, one element per section with
+  a `title` and a `text` per language, an `order` and `hidden`; `[legal]` and
+  `[privacy]` draw them - in the order of `order`, without the hidden ones, in the
+  visitor's language, a section that has neither title nor text in it in the
+  native one with `lang=""` - on two pages the module routes itself. The
+  starting texts are newly written for Nino, German and English (the earlier
+  `page-legal` templates are gone with the page unit), and the Wizard fills the
+  types with them. A text names a fact of the website
+  by a placeholder, `#/project/company/contact/email#`, which is replaced after
+  the text was made safe, only in text and never inside a tag, only for a key
+  of the four-segment grammar below `/project/company/` or
+  `/project/website/general/` (`Legal::PREFIXES`, a constant, no setting): the
+  value is resolved like `[[key]]`, then reduced to text - tags and entities
+  out, the rest escaped, every bracket an entity, a line end a `<br>` - so it
+  can bring no markup, fill or shortcode. A key that is no placeholder, has no
+  value or lies elsewhere stays as written, so that it shows. The module
+  registers one route per page and language (`/impressum`, `/datenschutz`,
+  `/imprint`, `/privacy` from `/nino/legal/paths` in `config.php`, the unit's
+  default), with the Element-URI `/legal/imprint` and `/legal/privacy`, the
+  language and `'maintenance' => false`; a language without a path of its own
+  is routed under its code, `/fr-fr/impressum`; a path that is invalid or taken
+  is left out, and `check()` says so. `Legal::url()` answers the address of a
+  page, `Legal::callbackSeoPages()` tells the Seo feature about the pages, and
+  the callback `/nino/legal/section` lets a feature add to a section before it
+  is drawn. The language panel calls `Legal::addLocale()` for a language added
+  later (page details, labels, hints, the sections' version in that language
+  where the unit has one). `Legal::check()` and `notices()` read what is wrong -
+  placeholder without value, empty or never replaced, a section without
+  text in a language, a missing type with the file to copy back, a bad path, a
+  page in no menu a template outputs, the section of a feature that is off, an
+  active feature without a section - and the Dashboard shows at most eight of
+  them, to an account that may manage elements. **Not legal advice:** the
+  texts are a starting point, not tailored and not legally reviewed, and
+  the operator is responsible for having them checked; the README, `docs/setup`,
+  `docs/development` (new section "Legal") and `docs/_admin` say so in the
+  same words, and the Elements panel shows a hint above the sections of both
+  types. `tests/legal-smoke.php` (new, 111 checks, in CI) runs the wizard in a
+  sandbox and holds the unit, the texts (Du, English, anchors, placeholders),
+  the shortcodes, every way a value tries to become markup, the routes,
+  `addLocale()`, the tombstones and `check()`.
+
+- **Install units, `elements` and `navs`:** a unit's manifest may name element
+  files, `'elements' => [ 'privacy' => 'elements/privacy.php' ]`, in the shape
+  of a type file. `\Nino\Elements::seed()` (new) only adds: it creates a type
+  that is missing when the file brings a model, adds an element that is in none
+  of the type's buckets, adds a language version an element lacks, and
+  replaces and deletes nothing, whatever the caller's overwrite flag says -
+  elements are the editors' content, so a second Wizard run and a feature
+  update leave a changed section as it is. It reads `/nino/elements/removed`
+  (new, in `config.php`): the tombstone list of an element deleted for good,
+  which the Legal module writes for its two types when a section is deleted
+  in every language and removes again when it is created by hand. A value that
+  does not fit the type's model is left out and logged; the write is one lock,
+  the cache is dropped and `/nino/elements/committed` says insert and update.
+  `\Nino\Features::applyUnit()` reads the key for the Wizard and a feature's
+  activation alike, with the file's path checked. `'navs' => [ 'legal' => [
+  '/legal/imprint', '/legal/privacy' ] ]` creates a menu: only the Wizard's
+  apply step reads it, only where the project has no menu of that key, and a
+  second run leaves the editors' entries. `\Nino\Html::resolveTextfill()`
+  (new) resolves one text key with its nested fills, the way `[[key]]` does,
+  and `[json]` uses it. Tests: `tests/kernel-smoke.php` (1051 -> 1098),
+  `tests/features-smoke.php` (251 -> 259, with
+  `tests/fixtures/features/Sample/install/elements/privacy.php`),
+  `tests/install-smoke.php` (309 -> 324), `tests/catalogue-smoke.php`
+  (169 -> 172, the privacy sections a removed feature leaves behind).
+
+- **Route field `maintenance`:** a route with `'maintenance' => false` stays
+  reachable while the site is in maintenance. `Modules\Maintenance` reads the
+  field from the response the route was merged into; the two Legal routes carry
+  it, and the maintenance page that is built in links the imprint and the
+  privacy policy (`[[legal]]` in `page-maintenance.<locale>.tpl`). The
+  Routes panel keeps it - like every field it does not edit, `locale` and
+  `header` among them - when it saves a route.
+
+- **Menu membership of runtime routes by Element-URI:** `/nino/html/navroutes`
+  is keyed by the route's `uri` instead of its route key, so a page with one
+  route per language is one entry in a menu, named in the visitor's language,
+  and `Navigation::routeLines()` picks the route of the current language. The
+  Navigations panel shows such an entry once, with all its paths, and sends the
+  first one; the Routes panel's list of the pages of features and modules does
+  the same (`httpUris`).
+
+- **Workbench, Elements:** a type may have a hint,
+  `/_admin/elements/type/<type>/hint`, shown as a paragraph of the design
+  system above its list and above the form of an element, its words as text.
+  The Legal unit brings the two hints that say the texts are no legal advice.
+
+- **Workbench, Features:** deactivating or removing a feature that brought
+  sections of the privacy policy says so in the dialog - the policy still
+  describes it - with the titles, and the Dashboard keeps saying it.
+  `tests/admin-features-js-smoke.js` (188 -> 192),
+  `tests/admin-elements-js-smoke.js` (230 -> 235),
+  `tests/admin-navs-js-smoke.js` (43 -> 48),
+  `tests/admin-routes-js-smoke.js` (58 -> 61),
+  `tests/admin-dashboard-js-smoke.js` (25 -> 28) and
+  `tests/admin-system-smoke.php` (1023 -> 1051: the Dashboard's legal notices,
+  `language/addlocale`, routes, menus, the reserved Element-URIs).
+
 ### Changed
 
 - **Workbench:** what the panels print for a failure. A failure with a code is
@@ -1222,6 +1321,31 @@ All notable changes to Nino are documented in this file.
 - **Setup wizard:** the personal information fields are labelled from the
   English vocabulary, `Website › URL` instead of `Website › Url`.
 
+- **Wizard, the imprint:** the Legal unit is applied on every run
+  (`Setup::ALWAYS_MODULES`), so a new project has the two pages, the types with
+  their sections and a third menu, **legal**, with both pages as its first
+  entries. The footer of the base frames outputs it with `[navigation
+  nav="legal" id="legal__nav"][/navigation]`. The starter site has three pages (home, contact, 404); the
+  imprint is no longer one of them. The Routes step offers the third menu as a
+  checkbox, refuses the two Element-URIs of the Legal pages (`409`), and the
+  Webpages step scans the units' templates when it asks who owns one
+  (`_unitOwningTemplate()`).
+
+- **Workbench, Routes:** the section for runtime routes is called "Routes of
+  features and modules"; routes of one Element-URI are one row. `routes/save`
+  builds the stored route from the previous one and sets only `uri`, `body`,
+  `statusCode` and `navs` anew, so `maintenance`, `locale`, `header` and other
+  fields of a hand-extended route survive a save; `routes/save` refuses the two
+  Element-URIs of the Legal pages (`routes_reserved_uri`).
+
+- **Maintenance:** the login's exception is the route field `maintenance`
+  (`Auth` carries it on its login route) instead of a constant in
+  `Modules\Maintenance`, one mechanism for both.
+
+- **Text key grammar:** the legal page was the one exception to the grammar
+  (`page-legal.<xx_XX>.tpl`, `/website/legal/{uri,name}`); with the page gone
+  there is no exception, and `tests/keys-smoke.php` (70 -> 74) holds none.
+
 ### Fixed
 
 - **Workbench, Elements:** a required field is marked and a refused save says
@@ -1471,6 +1595,12 @@ All notable changes to Nino are documented in this file.
 
 - **Workbench, Elements:** the sixteen demo labels `/_admin/elements/field/*`
   mentioned above.
+
+- **Page unit `legal`:** `_admin/install/library/pages/legal/` with
+  `page-legal.<locale>.tpl`, `html-footer-legal.tpl`, the footer link
+  `/website/legal/{uri,name}` and `Setup::_applyLegalLink()`. The Legal module
+  and the menu `legal` replace them. A project that has the old page keeps its
+  files and routes: nothing is migrated, and nothing was published that needs it.
 
 ## v1.3.2 - 2026-10-01
 

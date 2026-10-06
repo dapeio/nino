@@ -295,7 +295,7 @@ namespace Nino\Modules\Text {
 		/**
 		 *	The stored routes that are pages, with the template each shows, the
 		 *	category of that template (null where its name is no word of a key,
-		 *	as the legal page's, which picks its file by language) and the
+		 *	as a body that picks its file by language has) and the
 		 *	name the template gives itself - the pages the Routes panel lists,
 		 *	asked of it, and the ones it does not: a route to a template that has
 		 *	no category (the demo catalogue's), with neither

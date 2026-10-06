@@ -214,8 +214,10 @@ namespace Nino\Modules\Features {
 
 		/**
 		 *	Switch a feature off - its class leaves the module list, everything
-		 *	it keeps stays. Answers the feature's entry and 'found': where its
-		 *	shortcodes still stand in the project's templates, texts and elements
+		 *	it keeps stays. Answers the feature's entry, 'found': where its
+		 *	shortcodes still stand in the project's templates, texts and elements,
+		 *	and 'privacy': the titles of the sections of the privacy policy that
+		 *	still describe it
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -235,7 +237,9 @@ namespace Nino\Modules\Features {
 		 *	deliberately leaves out, and the one this panel could not do at
 		 *	all. What the feature kept stays: its settings, its files under
 		 *	data/, the templates and texts its unit copied once. Putting the
-		 *	same feature back therefore finds its settings where it left them
+		 *	same feature back therefore finds its settings where it left them.
+		 *	Answers 'privacy' as the deactivation does - asked before the
+		 *	directory goes, because the sections it brought are read from there
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -254,6 +258,9 @@ namespace Nino\Modules\Features {
 				return;
 			}
 
+			// Before the directory is gone: the sections are read from its unit
+			$privacy = self::_privacy( $appData, $key );
+
 			$result = \Nino\Features::remove( $appData, $key );
 
 			if( $result !== true ) {
@@ -261,7 +268,7 @@ namespace Nino\Modules\Features {
 				return;
 			}
 
-			\Nino\Http::ok( $request, [ 'removed' => $key ] );
+			\Nino\Http::ok( $request, [ 'removed' => $key, 'privacy' => $privacy ] );
 		}
 
 		/**
@@ -519,7 +526,27 @@ namespace Nino\Modules\Features {
 			// new version added - so this is not empty only for a first Activate
 			self::_answer( $appData, $request, $key, $on === true
 				? [ 'switchedOn' => self::_switchedOn( $appData, $wasOn, $key ) ]
-				: [ 'found' => $names === [] ? [] : self::_occurrences( $appData, $names ) ] );
+				: [ 'found' => $names === [] ? [] : self::_occurrences( $appData, $names ), 'privacy' => self::_privacy( $appData, $key ) ] );
+		}
+
+		/**
+		 *	The sections of the privacy policy that still describe a feature -
+		 *	the ones it brought and nobody hid or deleted - by their titles in the
+		 *	language of the workbench. Switching a feature off, or removing it,
+		 *	deletes none of them, so this is what the answer reminds of. Nothing
+		 *	where the Legal module is not there or not on
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					The feature's key
+		 *
+		 *	@return 	array										Titles, [] for none
+		 */
+		private static function _privacy( array &$appData, string $key ): array {
+
+			if( class_exists( '\\Nino\\Modules\\Legal' ) === false )
+				return [];
+
+			return array_column( \Nino\Modules\Legal::contributions( $appData, $key, \Nino\Admin\Admin::sessionLocale( $appData ) ), 'title' );
 		}
 
 		/**

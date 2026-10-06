@@ -775,6 +775,16 @@ body.nino-scroll-down .nino-scroll-header {
 	list-style-type: decimal;
 }
 
+/*	One section of the imprint or the privacy policy (Modules\Legal): its heading
+ *	over a .nino-richtext, and a gap before the next section - the reset has
+ *	taken the heading's own margins away */
+.nino-legal-section > h3 {
+	margin-bottom: var(--space-1);
+}
+.nino-legal-section + .nino-legal-section {
+	margin-top: var(--space-3);
+}
+
 /*	--quiet and --loud step one place down or up the type scale, per class.
  *	Each states its own rem size rather than scaling with em: an em font-size
  *	replaces the size the class sets for itself instead of adjusting it, so

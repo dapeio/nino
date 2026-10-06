@@ -366,6 +366,7 @@ features/Catalog/
 ├── templates/               the markup the runtime class renders, read through \Nino\Filesystem
 ├── install/                 the unit activate() applies
 │   ├── manifest.php
+│   ├── elements/            what the feature adds to the project's element types, e.g. privacy.php
 │   ├── templates/
 │   └── text/
 └── tests/catalog-smoke.php  the feature's own test
@@ -385,7 +386,7 @@ The class is an ordinary runtime module in the `Nino\Modules` namespace: `init()
 
 The class reads its settings through `\Nino\Features::setting()` - with a default, so it keeps working when the schema does not know a setting yet.
 
-A route the class registers in `init()` is not in `config.php`, and can still be put into a navigation: the Navigations panel offers every live `GET` route and stores a runtime route's membership under `/nino/html/navroutes`, which `[navigation]` merges into the route while it is live. The menu shows it as soon as the route has a name, `/_nino/webpage<uri>/name` - write it in the Routes panel, under *Feature routes*, together with the title and the description; the Text Keys tab does not create a `/_nino` key - and drops it silently when the feature is off.
+A route the class registers in `init()` is not in `config.php`, and can still be put into a navigation: the Navigations panel offers every live `GET` route and stores a runtime route's membership under `/nino/html/navroutes`, by the route's Element URI - the `uri` of the route - so that a page with one route per language is one entry, which `[navigation]` merges into the route while it is live. The menu shows it as soon as the route has a name, `/_nino/webpage<uri>/name` - write it in the Routes panel, under *Routes of features and modules*, together with the title and the description; the Text Keys tab does not create a `/_nino` key - and drops it silently when the feature is off.
 
 ### The Panel
 
@@ -393,7 +394,11 @@ A panel is a class with `actions()`, `nav()` and `perm()`, like every panel of t
 
 ### The Install Unit
 
-`install/manifest.php` has the same shape as a kernel module's unit in the wizard - see the [Library Format](setup.md#library-format) and the [installer recipe](recipes/installer-package.md). `activate()` reads `routes`, `templates`, `files`, `elementTypes`, `blacklist` and `config` from it, plus `text/global.php` and `text/<locale>.php` for every available locale; `key`, `label`, `moduleClass`, `requiresModules` and `preset` are the wizard's and are not read by an activation - the feature manifest carries them in its own form. Everything the unit copies belongs to the project from then on and is not touched by an update.
+`install/manifest.php` has the same shape as a kernel module's unit in the wizard - see the [Library Format](setup.md#library-format) and the [installer recipe](recipes/installer-package.md). `activate()` reads `routes`, `templates`, `files`, `elementTypes`, `elements`, `blacklist` and `config` from it, plus `text/global.php` and `text/<locale>.php` for every available locale; `key`, `label`, `moduleClass`, `requiresModules` and `preset` are the wizard's and are not read by an activation - the feature manifest carries them in its own form. Everything the unit copies belongs to the project from then on and is not touched by an update.
+
+**`elements`** puts elements into the project, add-only: a map of an element type's URI (`'privacy'`) to a file of the unit (`'elements/privacy.php'`) that has the shape of a type file under `elements/`: a `title`, a `model` and the buckets `'*'` and one per language, each an element id with its field values. `\Nino\Elements::seed()` creates the type if the project does not have it and the file brings a `model`, adds an element that does not exist and a language version an element does not have, and never replaces or deletes anything - not at an activation, not at an update, and not when the wizard applies a unit with `$overwrite`: elements are the editors' content. An element that is on the tombstone list under `/nino/elements/removed` in `config.php` is not added again; the Legal module writes it for the sections of its two types when somebody deletes one for good. A value that does not fit the model is left out and logged.
+
+This is how a feature that processes personal data brings its **section of the privacy policy**, written in its own words: `install/elements/privacy.php` with the type `privacy` of the Legal module, one section per feature, in every language it ships. The text is a starting point, not legal advice - see [Legal](development.md#legal) for the notice, which applies to it as to the module's own texts; say in your README that the operator has to check it. State only what the code does (a cookie's name and lifetime, what is stored, for how long), and use placeholders (`#/project/company/contact/email#`) instead of writing a fact of the website into the text. A feature that is switched off leaves its section in place; the Dashboard and the dialog say so, and the editor may hide it. `navs` is the wizard's, like `key` and `label`: a feature's activation does not read it.
 
 ### Text
 

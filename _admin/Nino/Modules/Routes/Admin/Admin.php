@@ -37,15 +37,23 @@ namespace Nino\Modules\Routes {
 	 *												the route order is also what breaks a tie between two
 	 *												equal menu priorities (see Modules\Navigation).
 	 *
-	 *												A page a feature routes at runtime - Posts' /blog, the
-	 *												Newsletter's /.newsletter, Hello's /hello - is in no
-	 *												config.php, so none of the above applies to it: it is
-	 *												not listed, ordered or deleted here. Its name, title
-	 *												and description are still the /_nino/webpage&lt;uri&gt;/*
-	 *												keys the menu and html-header.tpl read, and nothing else
-	 *												creates them - the Text Keys tab does not create a
-	 *												/_nino key - so runtimeRoutes() lists those pages and
-	 *												apiSaveTexts() writes exactly those three keys.
+	 *												A page a feature or a module routes at runtime - Posts'
+	 *												/blog, the Newsletter's /.newsletter, Hello's /hello, the
+	 *												imprint of Modules\Legal - is in no config.php, so none
+	 *												of the above applies to it: it is not listed, ordered or
+	 *												deleted here. Its name, title and description are still
+	 *												the /_nino/webpage&lt;uri&gt;/* keys the menu and
+	 *												html-header.tpl read, and nothing else creates them - the
+	 *												Text Keys tab does not create a /_nino key - so
+	 *												runtimeRoutes() lists those pages and apiSaveTexts()
+	 *												writes exactly those three keys. A page that has a route
+	 *												per language is one entry, with its paths.
+	 *
+	 *												Saving a page keeps whatever its route carries that this
+	 *												form does not edit - a 'maintenance' => false, a
+	 *												'locale' or a 'header' somebody put into config.php by
+	 *												hand - and the two Element-URIs of the legal pages are
+	 *												the module's: no page of the project's own may take them.
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -196,8 +204,9 @@ namespace Nino\Modules\Routes {
 		 *	routes with their own headers and no page template) out of the
 		 *	list. Matched on the body's prefix rather than through
 		 *	_templateFromBody(), which deliberately reports null for a body
-		 *	that resolves its file at runtime - the wizard's "legal" unit's
-		 *	[[/nino/http/response/locale]] body is a page like any other
+		 *	that resolves its file at runtime - a hand-written
+		 *	[template /templates/page-x.[[/nino/http/response/locale]]] is a
+		 *	page like any other
 		 *
 		 *	@param		string		$routeKey			Eg. 'GET://kontakt'
 		 *	@param		array 		$route
@@ -260,11 +269,17 @@ namespace Nino\Modules\Routes {
 		}
 
 		/**
-		 *	The pages features route at runtime and no config.php has: a
-		 *	route in the live route array that is a page (see isPageRoute())
+		 *	The pages features and modules route at runtime and no config.php has:
+		 *	a route in the live route array that is a page (see isPageRoute())
 		 *	and whose key is not among the persisted ones. A placeholder
 		 *	route such as GET://blog/* is one, a route with no page template
 		 *	(GET://.search) is not.
+		 *
+		 *	The routes of one Element-URI are one page, whatever their number:
+		 *	the imprint of Modules\Legal has a route per language, and is listed
+		 *	once, with every path it is reached at - 'httpUri' is the first one,
+		 *	'httpUris' all of them. The details a page is given are named after
+		 *	its Element-URI, and that is the same for all of them
 		 *
 		 *	A route whose Element-URI is no safe path (see _normalizeUri())
 		 *	is left out: the keys it would be given are the system's, and
@@ -272,7 +287,7 @@ namespace Nino\Modules\Routes {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	array										[ [ uri, httpUri, body ], ... ] in route order
+		 *	@return 	array										[ [ uri, httpUri, httpUris, body ], ... ] in route order
 		 */
 		public static function runtimeRoutes( array &$appData ): array {
 
@@ -292,10 +307,15 @@ namespace Nino\Modules\Routes {
 				if( self::_normalizeUri( $uri ) !== $uri )
 					continue;
 
-				$runtime[] = [ 'uri' => $uri, 'httpUri' => $httpUri, 'body' => (string) ( $route['body'] ?? '' ) ];
+				if( isset( $runtime[$uri] ) === true ) {
+					$runtime[$uri]['httpUris'][] = $httpUri;
+					continue;
+				}
+
+				$runtime[$uri] = [ 'uri' => $uri, 'httpUri' => $httpUri, 'httpUris' => [ $httpUri ], 'body' => (string) ( $route['body'] ?? '' ) ];
 			}
 
-			return $runtime;
+			return array_values( $runtime );
 		}
 
 		/**
@@ -453,9 +473,9 @@ namespace Nino\Modules\Routes {
 
 		/**
 		 *	The on-disk template a route body names, when it names exactly
-		 *	one. Bodies the wizard's library ships aren't always a plain
-		 *	template reference (its "legal" unit resolves the file per locale
-		 *	via [[/nino/http/response/locale]]); null reports that rather
+		 *	one. A body isn't always a plain template reference (a hand-written
+		 *	one may resolve the file per locale via
+		 *	[[/nino/http/response/locale]]); null reports that rather
 		 *	than handing back something shaped like a filename but isn't one,
 		 *	which is what keeps apiSave() from flattening such an entry. Kept
 		 *	as its own copy rather than reaching into the wizard, same as every
@@ -529,6 +549,15 @@ namespace Nino\Modules\Routes {
 					return;
 				}
 
+				// The imprint and the privacy policy are the Legal module's, with
+				// their routes, names and menu entries: a page of the project's own
+				// under their Element-URI would share the details and the language
+				// switch with them, whatever template it renders
+				if( class_exists( '\\Nino\\Modules\\Legal' ) === true && in_array( $uri, array_column( \Nino\Modules\Legal::PAGES, 'uri' ), true ) === true ) {
+					\Nino\Http::fail( $request, 409, 'the uri "'. $uri. '" belongs to the legal module', 'routes_reserved_uri', [ $uri ], 'uri' );
+					return;
+				}
+
 
 				$statusCode = (int) ( $data['statusCode'] ?? 200 );
 				if( $statusCode < 100 || $statusCode > 599 )
@@ -576,12 +605,12 @@ namespace Nino\Modules\Routes {
 
 				$body = '[template /templates/'. $template. ']';
 
-				// A route body the wizard's library shipped can be more than a
-				// plain template reference - its "legal" unit picks the template
-				// file per locale via [[/nino/http/response/locale]] - and the
-				// template <select> has no way to spell that. Keep the body such
-				// an entry already carries instead of flattening it into
-				// whichever single option happened to be preselected
+				// A route body can be more than a plain template reference - a
+				// hand-written one may pick the template file per locale via
+				// [[/nino/http/response/locale]] - and the template <select> has no
+				// way to spell that. Keep the body such an entry already carries
+				// instead of flattening it into whichever single option happened to
+				// be preselected
 				if( isset( $previous['body'] ) === true && self::_templateFromBody( (string) $previous['body'] ) === null ) {
 					$body 		= (string) $previous['body'];
 					// ...and with it the template field, which for such an entry
@@ -593,9 +622,9 @@ namespace Nino\Modules\Routes {
 
 				// Checked here rather than up front: an entry whose body the
 				// <select> can't spell keeps the template field it already had
-				// (empty, for the wizard's locale-resolving "legal" unit), and
-				// posts an empty value from its own disabled option - neither of
-				// which names a real file, and neither of which is an error
+				// (empty), and posts an empty value from its own disabled
+				// option - neither of which names a real file, and neither of
+				// which is an error
 				if( $body === '[template /templates/'. $template. ']' && in_array( $template, self::_templates( $appData ), true ) === false ) {
 					\Nino\Http::fail( $request, 400, 'unknown template: "'. $template. '"', 'routes_unknown_template', [ $template ], 'template' );
 					return;
@@ -612,7 +641,14 @@ namespace Nino\Modules\Routes {
 				// that renders
 				$navs = self::entryNavs( $data, $navKeys );
 
-				$routeData = [ 'uri' => $uri, 'body' => $body ];
+				// What the route carries and this form does not edit stays: a
+				// 'maintenance' => false that keeps a page up while the site is
+				// down, the 'locale' of a page that exists in one language, a
+				// 'header' - put there by hand in config.php. Only the four
+				// the form is about are set anew, and a status code of 200 is no
+				// field, as before
+				$kept 			= $selfIndex !== null && is_array( $routes[$previousRouteKey] ?? null ) === true ? $routes[$previousRouteKey] : [];
+				$routeData 	= [ 'uri' => $uri, 'body' => $body ] + array_diff_key( $kept, [ 'uri' => true, 'body' => true, 'statusCode' => true, 'navs' => true ] );
 				if( $statusCode !== 200 )
 					$routeData['statusCode'] = $statusCode;
 

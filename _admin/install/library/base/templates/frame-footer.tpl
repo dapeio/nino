@@ -6,7 +6,7 @@
 					</div>
 					<nav class="nino-grid-100 nino-grid-l-50 nino-footer-nav" aria-label="[[/template/common/navigation/footer]]">
 						[template /templates/html-footer-nav]
-						[template /templates/html-footer-legal]
+						[navigation nav="legal" id="legal__nav"][/navigation]
 					</nav>
 					<div class="nino-grid-100 nino-grid-l-25">
 						[template /templates/html-footer-localepicker]

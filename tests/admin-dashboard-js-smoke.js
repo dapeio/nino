@@ -202,6 +202,17 @@ show( { tiles : [], notices : [ { text : '/_admin/dashboard/notice/mail', values
 check( 'a number is filled in as its text, a missing value leaves the blank, and a link that is no string is none', ownText( notices()[0] ) === 'Mail delivery has been failing since 7 (%s failed attempts).'
 	&& links( notices()[0] ).length === 0 );
 
+// What the Legal module tells: the placeholder, the title of a section a person wrote, the language
+const unknownWords = text('/_admin/dashboard/notice/legal-unknown');
+show( { tiles : [], notices : [
+	{ text : '/_admin/dashboard/notice/legal-unknown', values : [ '#/project/company/contact/email#', 'Hosting <i>$&</i>', 'de_DE' ], link : '#elements/privacy/hosting' },
+	{ text : '/_admin/dashboard/notice/legal-more', values : [ '3' ], link : '' },
+] } );
+check( 'a notice of the legal texts fills its three values in as text, whatever a section is called', unknownWords.split('%s').length === 4 && notices().length === 2
+	&& ownText( notices()[0] ).indexOf( unknownWords.split('%s')[0]+ '#/project/company/contact/email#' ) === 0 && ownText( notices()[0] ).indexOf( 'Hosting <i>$&</i>' ) !== -1 && ownText( notices()[0] ).indexOf( '(de_DE)' ) !== -1 );
+check( '...with a link into the section it is about', links( notices()[0] ).length === 1 && links( notices()[0] )[0].href === '#elements/privacy/hosting' );
+check( '...and the line that counts the rest has no link and its number in it', links( notices()[1] ).length === 0 && ownText( notices()[1] ) === text('/_admin/dashboard/notice/legal-more').replace( '%s', '3' ) && text('/_admin/dashboard/notice/legal-more').indexOf( '%s' ) !== -1 );
+
 show( { tiles : [ { panel : 'users', value : '3', label : 'Users' } ] } );
 check( 'an answer without notices draws none, and the tiles as before', notices().length === 0 && wrap.children[0].id === 'admin-dashboard-tiles' );
 

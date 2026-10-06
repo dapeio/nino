@@ -16,7 +16,7 @@
 	// every blank route shares the single page-blank.tpl, so editing one
 	// silently rewrites all of them - which is the opposite of what an
 	// empty starting point is for. A unit whose template is a finished page
-	// (home, contact, legal, ...) is a one-off and deliberately does not
+	// (home, contact, 404, ...) is a one-off and deliberately does not
 	// declare this: there, sharing is the point. See Webpages::_applyWebpage()
 	'templatePerRoute' => true,
 ];

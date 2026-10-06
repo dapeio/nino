@@ -368,6 +368,7 @@ features/Catalog/
 ├── templates/               das Markup, das die Laufzeitklasse rendert, gelesen über \Nino\Filesystem
 ├── install/                 die Einheit, die activate() anwendet
 │   ├── manifest.php
+│   ├── elements/            was das Feature den Elementtypen des Projekts hinzufügt, z. B. privacy.php
 │   ├── templates/
 │   └── text/
 └── tests/catalog-smoke.php  der eigene Test des Features
@@ -387,7 +388,7 @@ Die Klasse ist ein gewöhnliches Laufzeitmodul im Namespace `Nino\Modules`: `ini
 
 Einstellungen liest die Klasse über `\Nino\Features::setting()` – mit einem Default, damit sie auch dann funktioniert, wenn das Schema eine Einstellung noch nicht kennt.
 
-Eine Route, die die Klasse in `init()` registriert, steht nicht in der `config.php` und lässt sich trotzdem in eine Navigation aufnehmen: Das Panel Navigationen bietet jede vorhandene `GET`-Route an und speichert die Zugehörigkeit einer Laufzeitroute unter `/nino/html/navroutes`, das `[navigation]` der Route zumischt, solange sie existiert. Das Menü zeigt sie, sobald die Route einen Namen hat, `/_nino/webpage<uri>/name` – schreibe ihn im Panel Routen unter *Feature-Routen*, zusammen mit Titel und Beschreibung; der Tab Textschlüssel legt keinen `/_nino`-Schlüssel an –, und lässt sie still weg, wenn das Feature aus ist.
+Eine Route, die die Klasse in `init()` registriert, steht nicht in der `config.php` und lässt sich trotzdem in eine Navigation aufnehmen: Das Panel Navigationen bietet jede vorhandene `GET`-Route an und speichert die Zugehörigkeit einer Laufzeitroute unter `/nino/html/navroutes`, und zwar unter der Element-URI der Route – ihrem `uri` –, sodass eine Seite mit einer Route je Sprache ein Eintrag ist, das `[navigation]` der Route zumischt, solange sie existiert. Das Menü zeigt sie, sobald die Route einen Namen hat, `/_nino/webpage<uri>/name` – schreibe ihn im Panel Routen unter *Routen aus Features und Modulen*, zusammen mit Titel und Beschreibung; der Tab Textschlüssel legt keinen `/_nino`-Schlüssel an –, und lässt sie still weg, wenn das Feature aus ist.
 
 ### Das Panel
 
@@ -395,7 +396,11 @@ Ein Panel ist eine Klasse mit `actions()`, `nav()` und `perm()`, so wie jedes Pa
 
 ### Die Install-Einheit
 
-`install/manifest.php` hat dieselbe Form wie die Einheit eines Kernel-Moduls im Assistenten – siehe das [Library-Format](setup.de.md#library-format) und das [Installer-Rezept](recipes/installer-package.md). `activate()` liest daraus `routes`, `templates`, `files`, `elementTypes`, `blacklist` und `config` sowie `text/global.php` und `text/<locale>.php` für jede verfügbare Sprache; `key`, `label`, `moduleClass`, `requiresModules` und `preset` sind Angaben für den Assistenten und werden bei einer Aktivierung nicht gelesen – das Feature-Manifest trägt sie in eigener Form. Alles, was die Einheit kopiert, gehört danach dem Projekt und wird von einer Aktualisierung nicht mehr angefasst.
+`install/manifest.php` hat dieselbe Form wie die Einheit eines Kernel-Moduls im Assistenten – siehe das [Library-Format](setup.de.md#library-format) und das [Installer-Rezept](recipes/installer-package.md). `activate()` liest daraus `routes`, `templates`, `files`, `elementTypes`, `elements`, `blacklist` und `config` sowie `text/global.php` und `text/<locale>.php` für jede verfügbare Sprache; `key`, `label`, `moduleClass`, `requiresModules` und `preset` sind Angaben für den Assistenten und werden bei einer Aktivierung nicht gelesen – das Feature-Manifest trägt sie in eigener Form. Alles, was die Einheit kopiert, gehört danach dem Projekt und wird von einer Aktualisierung nicht mehr angefasst.
+
+**`elements`** legt Elemente im Projekt an, nur hinzufügend: eine Zuordnung der URI eines Elementtyps (`'privacy'`) zu einer Datei der Einheit (`'elements/privacy.php'`), die die Form einer Typdatei unter `elements/` hat: einen `title`, ein `model` und die Buckets `'*'` und je einen pro Sprache, jeder mit Element-Ids und ihren Feldwerten. `\Nino\Elements::seed()` legt den Typ an, wenn das Projekt ihn nicht hat und die Datei ein `model` mitbringt, fügt ein Element hinzu, das es nicht gibt, und eine Sprachfassung, die ein Element nicht hat, und ersetzt oder löscht nie etwas – nicht bei einer Aktivierung, nicht bei einem Update und nicht, wenn der Assistent eine Einheit mit `$overwrite` anwendet: Elemente sind der Inhalt der Redakteure. Ein Element auf der Grabstein-Liste unter `/nino/elements/removed` in der `config.php` wird nicht wieder hinzugefügt; das Modul Legal schreibt sie für die Abschnitte seiner beiden Typen, wenn jemand einen endgültig löscht. Ein Wert, der nicht zum Modell passt, wird ausgelassen und protokolliert.
+
+So bringt ein Feature, das personenbezogene Daten verarbeitet, seinen **Abschnitt der Datenschutzerklärung** mit, in eigenen Worten: `install/elements/privacy.php` mit dem Typ `privacy` des Moduls Legal, ein Abschnitt je Feature, in jeder Sprache, die es mitliefert. Der Text ist ein Ausgangspunkt und keine Rechtsberatung – der Hinweis steht unter [Legal](development.de.md#legal) und gilt für ihn wie für die Texte des Moduls; sag in der README, dass der Betreiber ihn prüfen muss. Nenne nur, was der Code tut (Name und Laufzeit eines Cookies, was gespeichert wird, wie lange), und nimm Platzhalter (`#/project/company/contact/email#`), statt eine Angabe der Website in den Text zu schreiben. Ein ausgeschaltetes Feature lässt seinen Abschnitt stehen; das Dashboard und der Dialog sagen es, und die Redakteure können ihn ausblenden. `navs` gehört dem Assistenten, wie `key` und `label`: Die Aktivierung eines Features liest es nicht.
 
 ### Texte
 

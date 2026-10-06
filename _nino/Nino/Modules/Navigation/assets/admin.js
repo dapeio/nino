@@ -406,7 +406,7 @@
 
 				const label = dc.createElement('span');
 				label.className = 'admin-page-label';
-				label.textContent = ( index + 1 )+ '. '+ entry.label+ '  ('+ entry.httpUri+ ')'+
+				label.textContent = ( index + 1 )+ '. '+ entry.label+ '  ('+ Nino.admin.navs._paths( entry )+ ')'+
 					( entry.named === false ? '  '+ Nino.content.getText('/_admin/navs/label/unnamed') : '' );
 				li.appendChild( label );
 
@@ -480,7 +480,7 @@
 			free.forEach( function( route ) {
 				const option = dc.createElement('option');
 				option.value = route.httpUri;
-				option.textContent = route.label+ ' ('+ route.httpUri+ ')'+ ( route.named === false ? ' '+ Nino.content.getText('/_admin/navs/label/unnamed-short') : '' );
+				option.textContent = route.label+ ' ('+ Nino.admin.navs._paths( route )+ ')'+ ( route.named === false ? ' '+ Nino.content.getText('/_admin/navs/label/unnamed-short') : '' );
 				addSelect.appendChild( option );
 			} );
 			addSelect.addEventListener( 'change', function() { addBtn.disabled = addSelect.value === '' } );
@@ -538,6 +538,19 @@
 			entries[other] = held;
 
 			Nino.admin.navs._changed();
+		},
+
+		/**
+		 *	The paths an entry is reached at, for the list: all of them for a
+		 *	page with a route per language - the panel sends the first one to
+		 *	name it - and the one path of any other
+		 *
+		 *	@param		{Object}	entry					{ httpUri, paths? }
+		 *
+		 *	@return		{string}
+		 */
+		_paths : function( entry ) {
+			return Array.isArray( entry.paths ) === true && entry.paths.length > 0 ? entry.paths.join(', ') : entry.httpUri;
 		},
 
 		/**

@@ -1,1 +1,0 @@
-<a href="[[/website/legal/uri]]">[[/website/legal/name]]</a>

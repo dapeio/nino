@@ -92,10 +92,13 @@ The Template Builder preserves ordinary HTML+ source. Standalone template shortc
 * a file-based content model for textfills and recurring elements
 * one fixed theme, asset bundling, and frontend base components
 * forms, navigation, language selection, and image processing
+* an imprint and a privacy policy as editable starting content, one element per section, in German and English, with the details of the company put in by placeholders
 * installable features with a manifest, settings and versioned updates, switched on in the workbench - a newsletter and a search among those the [dapeio/nino-features](https://github.com/dapeio/nino-features) catalogue provides
 * users, granular permissions, login protection, and activity logs
 * automatic encrypted backups and restoration
 * an integrated callback system for custom modules and integrations
+
+**Important:** The imprint and privacy policy Nino ships are a starting point, not legal advice. They are not tailored to any particular website and have not been legally reviewed. The operator of a website is responsible for having them checked by a qualified person before publication and for adapting them: to what the website actually processes, to the operator's legal form, and to further mandatory details such as a commercial register entry, a VAT identification number or a person responsible for journalistic content. The project gives no warranty that the texts are correct, complete or up to date.
 
 ## Nino vs. WordPress, Laravel, Kirby, and Grav
 

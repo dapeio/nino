@@ -953,6 +953,13 @@
 					return;
 				}
 
+				// What the privacy policy still says about it, before the list
+				// is drawn again: removing the feature deleted none of it
+				const said = Nino.admin.features._privacyText( response.privacy );
+
+				if( said !== '' )
+					wn.alert( said );
+
 				// The whole list again rather than the row taken off screen:
 				// a removed feature may have been what another one required,
 				// and that row now says something different
@@ -1037,6 +1044,22 @@
 		},
 
 		/**
+		 *	What the privacy policy still says about a feature that is off or
+		 *	gone: the titles of its sections, which no switch deletes
+		 *
+		 *	@param		{Array}		titles			The titles of the sections still to be seen
+		 *
+		 *	@return		{string}							'' where there is none
+		 */
+		_privacyText : function( titles ) {
+
+			if( Array.isArray( titles ) === false || titles.length === 0 )
+				return '';
+
+			return Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/deactivated-privacy'), titles.map( String ).join( ', ' ) );
+		},
+
+		/**
 		 *	Switch a feature on or off, or apply its update - the kernel's
 		 *	one step for an update is activating again, so the two post the
 		 *	same action. Ends in a reload: the rail is rendered server-side
@@ -1093,7 +1116,7 @@
 				// Said before the reload takes the screen it could be written on,
 				// and in a dialog for that reason - see _install()
 				const said = what === 'deactivate'
-					? Nino.admin.features._foundText( response.found || [] )
+					? [ Nino.admin.features._foundText( response.found || [] ), Nino.admin.features._privacyText( response.privacy ) ].filter( function( text ) { return text !== '' } ).join( '\n\n' )
 					: Nino.admin.features._switchedOnText( response.switchedOn || [] );
 
 				if( said !== '' )

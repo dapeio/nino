@@ -1025,8 +1025,9 @@ namespace Nino {
 		 *	Apply one unit's manifest.php: merge its routes into $routes
 		 *	(skipping any locale-gated route whose locale is not available),
 		 *	copy its files, templates and element types (same locale gating),
-		 *	collect its blacklist entries and its config defaults for keys the
-		 *	project has nothing for yet, and merge its text/global.php and
+		 *	add its 'elements' to the types they name, collect its blacklist
+		 *	entries and its config defaults for keys the project has nothing
+		 *	for yet, and merge its text/global.php and
 		 *	text/<locale>.php fragments into the real /text files.
 		 *
 		 *	The config defaults are collected, not written. This method used to
@@ -1038,7 +1039,10 @@ namespace Nino {
 		 *	re-applied unit replaces what it copied before. Without it the
 		 *	project wins - a route, a file, a text key that exists stays as it
 		 *	is and only what is missing is added. That is what a feature
-		 *	activation and an update want.
+		 *	activation and an update want. 'elements' are the exception to
+		 *	"the unit wins": they are content, so they are added in both cases
+		 *	and never replaced - a re-run of the wizard keeps what an editor
+		 *	wrote (see \Nino\Elements::seed()).
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$unitDir			Absolute path to the unit
@@ -1097,6 +1101,30 @@ namespace Nino {
 				foreach( $manifest['elementTypes'] as $file )
 					if( self::copyFile( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/elements/'. $file ), $overwrite ) === false )
 						return 'could not copy /elements/'. $file;
+			}
+
+			/*	Elements, which are content: added to a type, whatever $overwrite
+				says, and never replacing a value or an element the project has
+				(\Nino\Elements::seed()). The file is one of the unit's own, named
+				without a way out of its directory - a manifest is trusted like the
+				code beside it, but a path is still no place to be careless	*/
+			foreach( ( $manifest['elements'] ?? [] ) as $typeUri => $file ) {
+
+				$source = is_string( $file ) === true ? $unitDir. '/'. $file : '';
+
+				if( is_string( $typeUri ) === false || is_string( $file ) === false || $file === '' || str_contains( $file, '..' ) === true || str_contains( $file, "\0" ) === true
+					|| str_starts_with( $file, '/' ) === true || is_file( $source ) === false )
+					return 'could not read the elements of "'. ( is_string( $typeUri ) === true ? $typeUri : '' ). '"';
+
+				$content = include $source;
+
+				if( is_array( $content ) === false )
+					return 'could not read the elements of "'. $typeUri. '"';
+
+				$seeded = \Nino\Elements::seed( $appData, $typeUri, $content, $locales );
+
+				if( $seeded !== true )
+					return $seeded;
 			}
 
 			foreach( ( $manifest['blacklist'] ?? [] ) as $key )

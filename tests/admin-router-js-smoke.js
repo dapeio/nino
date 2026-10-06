@@ -167,7 +167,7 @@ console.log( 'Text' );
 	const { module, calls, asked, at, box } = panel( '_admin/Nino/Modules/Text/assets/admin.js', nodes, 'text', [ '_showList', '_showForm', '_openGroup', '_destroyHtmlEditors', '_focusField' ], [ '_admin/Nino/Modules/Text/assets/textkeys.js' ] );
 	// Two rows of the model - a page's template and the company - and the keys in them
 	const entry = key => ( { key : key, global : false, values : { de_DE : 'x' } } );
-	module._model = box.Nino.admin.textKeys.build( { entries : [ entry('/template/page-home/welcome/title'), entry('/template/page-footer/links/title'), entry('/project/company/general/name'), entry('/website/legal/uri') ], locale : 'de_DE' } );
+	module._model = box.Nino.admin.textKeys.build( { entries : [ entry('/template/page-home/welcome/title'), entry('/template/page-footer/links/title'), entry('/project/company/general/name'), entry('/website/contact/uri') ], locale : 'de_DE' } );
 	const on = ( form, group ) => { nodes['text-form'].classList = classes( form === false ); nodes['text-list'].classList = classes( form === true ); module._currentGroup = group ?? null };
 
 	on( false );

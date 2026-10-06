@@ -20,6 +20,11 @@ namespace Nino {
 		// order the editor's type select shows them
 		public const array FIELD_TYPES = [ 'string', 'integer', 'double', 'boolean', 'array', 'date', 'datetime', 'image', 'element' ];
 
+		// config.php's list of the elements a module that lets others contribute
+		// to its types has seen deleted for good - [ '<type>' => [ '<id>', ... ] ]
+		// - which seed() never creates again. See Modules\Legal::callbackCommitted()
+		public const string REMOVED = '/nino/elements/removed';
+
 		static public function getElement( array &$appData, string $uri, string $locale = '', mixed $return = false ): mixed {
 
 			// Verify locale
@@ -463,6 +468,17 @@ namespace Nino {
 			if( \Nino\Filesystem::getFileContent( $appData, $typeFile, '' ) !== '' )
 				return ! trigger_error( 'Element type \''. $typeUri. '\' already exists.' );
 
+			if( \Nino\Filesystem::putFileContent( $appData, $typeFile, self::_newTypeData( $model, $autoincrement ) ) === false )
+				return ! trigger_error( 'Element type \''. $typeUri. '\' could not be written.' );
+
+			return true;
+		}
+
+		// The content of a type file that has no element yet: the model, cut
+		// to the fields the kernel knows, and the defaults those fields carry
+		// in the bucket every element inherits from
+		static private function _newTypeData( array $model, bool $autoincrement = false ): array {
+
 			$typeData = [
 				'model'			=> [],
 				'*'					=> [
@@ -512,10 +528,224 @@ namespace Nino {
 					$typeData['*']['*'][$key] = $data['default'];
 			}
 
-			if( \Nino\Filesystem::putFileContent( $appData, $typeFile, $typeData ) === false )
-				return ! trigger_error( 'Element type \''. $typeUri. '\' could not be written.' );
+			return $typeData;
+		}
+
+		/**
+		 *	Add what an install unit brings to an element type, and nothing
+		 *	else - the way elements are delivered, as opposed to a whole type
+		 *	file that is copied byte for byte (manifest key 'elementTypes').
+		 *	Elements are the project's content: a unit may add to them and never
+		 *	replaces one, whatever its caller's overwrite flag says.
+		 *
+		 *	$data has the shape of a type file: 'title' (a string or a locale =>
+		 *	string map) and 'model' - read only when the type does not exist
+		 *	yet - and the buckets '*' and one per locale, each <id> => [ field
+		 *	=> value ]. What happens, per type and element:
+		 *
+		 *	- no type file and no 'model': nothing, and no failure - a
+		 *	  contribution to a type that is not there waits for nobody
+		 *	- no type file, a 'model': the type is created, its title in the
+		 *	  native language, the model cut to the field types the kernel knows
+		 *	  and the defaults of the fields in '*' - then its elements
+		 *	- an element in none of the type's buckets and not on the type's
+		 *	  tombstone list (REMOVED, [ '<type>' => [ '<id>' ]
+		 *	  ], written by a module that lets others contribute to its type
+		 *	  when somebody deletes one of its elements for good): created, in
+		 *	  '*' and in every language of $locales the unit has a version for
+		 *	- an element that is there without the version of a language of
+		 *	  $locales the unit has: that version is added
+		 *	- everything else is left as it is: the title and the model of the
+		 *	  type, every value, every element the unit does not name
+		 *
+		 *	A value goes where the type's own model puts it - the language bucket
+		 *	of a field that has 'locale', '*' otherwise - and only for a field
+		 *	the model has; a value valueError() refuses is left out with a
+		 *	warning, which only ever shows while a unit is applied. The type
+		 *	file is read, decided and written under one lock, once, so a second
+		 *	run writes nothing. The element cache is dropped and
+		 *	'/nino/elements/committed' says 'insert' for each element created
+		 *	(locale '*') and 'update' for each version added, as a save in the
+		 *	panel does - so a module that keeps an index follows.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$typeUri			The type, with or without its leading slash
+		 *	@param		array 		$data					What the unit brings, see above
+		 *	@param		array 		$locales			The languages to add versions for
+		 *
+		 *	@return 	true|string							true, or why the type file could not be written
+		 */
+		static public function seed( array &$appData, string $typeUri, array $data, array $locales ): true|string {
+
+			$name = trim( $typeUri, '/' );
+
+			if( preg_match( '#^[a-z][a-z0-9_-]*$#', $name ) !== 1 )
+				return 'invalid element type "'. $typeUri. '"';
+
+			$typeUri	= '/'. $name;
+			$typeFile = self::_typeFile( $typeUri );
+			$failed 	= 'could not write /elements/'. $name. '.php';
+
+			if( \Nino\Filesystem::lockFile( $appData, $typeFile ) === false )
+				return $failed;
+
+			$removed 	= array_map( 'strval', (array) ( $appData[ self::REMOVED ][$name] ?? [] ) );
+			$changes 	= [];
+
+			$written = \Nino\Filesystem::mutate( $appData, $typeFile, function( mixed $typeData, array &$appData ) use ( $data, $locales, $removed, $typeUri, $typeFile, &$changes ): ?array {
+
+				if( is_array( $typeData ) === false ) {
+
+					// A file that is there and does not read as one is somebody's
+					// to repair, not this to replace
+					if( \Nino\Filesystem::fileExists( $appData, $typeFile ) === true || is_array( $data['model'] ?? null ) === false )
+						return null;
+
+					$typeData = self::_newTypeData( $data['model'] );
+
+					if( $typeData['model'] === [] )
+						return null;
+
+					// What the unit's '*' bucket says for every element, next to what the
+					// fields' own defaults say
+					$typeData['*']['*'] = array_merge( $typeData['*']['*'], self::_seedValues( $typeData['model'], $typeUri, '*', $data, '*', [] ) );
+
+					$title = \Nino\Features::localized( $data['title'] ?? '', \Nino\Locales::getNativeLocale( $appData ) );
+
+					if( $title !== '' )
+						$typeData = [ 'title' => $title ] + $typeData;
+
+					$changes[] = [ 'operation' => 'type' ];
+				}
+
+				$model = is_array( $typeData['model'] ?? null ) === true ? $typeData['model'] : [];
+
+				// Every id the unit names, in the order it names them
+				$ids = [];
+				foreach( array_merge( [ '*' ], $locales ) as $bucket )
+					if( is_array( $data[$bucket] ?? null ) === true )
+						foreach( array_keys( $data[$bucket] ) as $id )
+							if( $id !== '*' && preg_match( '/^[A-Za-z0-9][A-Za-z0-9_-]*$/', (string) $id ) === 1 )
+								$ids[(string) $id] = true;
+
+				foreach( array_keys( $ids ) as $id ) {
+
+					$exists = false;
+					foreach( $typeData as $bucketName => $bucketData )
+						if( $bucketName !== 'model' && is_array( $bucketData ) === true && array_key_exists( $id, $bucketData ) === true ) {
+							$exists = true;
+							break;
+						}
+
+					if( $exists === false && in_array( $id, $removed, true ) === true )
+						continue;
+
+					if( $exists === false ) {
+						$typeData['*'][$id] = self::_seedValues( $model, $typeUri, $id, $data, '*', $locales );
+						$changes[] = [ 'operation' => 'insert', 'uri' => $typeUri. '/'. $id, 'locale' => '*' ];
+					}
+
+					foreach( $locales as $locale ) {
+
+						if( isset( $typeData[$locale][$id] ) === true || is_array( $data[$locale][$id] ?? null ) === false )
+							continue;
+
+						$typeData[$locale][$id] = self::_seedValues( $model, $typeUri, $id, $data, $locale, $locales );
+
+						if( $exists === true )
+							$changes[] = [ 'operation' => 'update', 'uri' => $typeUri. '/'. $id, 'locale' => $locale ];
+					}
+				}
+
+				if( $changes === [] )
+					return null;
+
+				unset( $appData['./nino/elements/cache'] );
+
+				return $typeData;
+			}, false );
+
+			if( $written === false )
+				return $changes === [] ? true : $failed;
+
+			foreach( $changes as $change ) {
+
+				if( $change['operation'] === 'type' )
+					continue;
+
+				$change = [
+					'operation'		=> $change['operation'],
+					'type'				=> $typeUri,
+					'uri'					=> $change['uri'],
+					'previousUri'	=> null,
+					'locale'			=> $change['locale'],
+				];
+				\Nino\Callbacks::doCallbacks( $appData, '/nino/elements/committed', $change );
+			}
 
 			return true;
+		}
+
+		/**
+		 *	The values of one element for one bucket of a type, as seed() writes
+		 *	them: for '*', the fields the model does not keep per language;
+		 *	for a language, the ones it does. A value comes from the unit's
+		 *	bucket for that language and, for a global field, from the global
+		 *	bucket first and then from the first of $locales that has it
+		 *
+		 *	@param		array 		$model				The model of the type as it is now
+		 *	@param		string		$typeUri			For the warning
+		 *	@param		string		$id						The element's id
+		 *	@param		array 		$data					What the unit brings
+		 *	@param		string		$bucket				'*' or a locale
+		 *	@param		array 		$locales			The languages being seeded
+		 *
+		 *	@return 	array										field => value
+		 */
+		static private function _seedValues( array $model, string $typeUri, string $id, array $data, string $bucket, array $locales ): array {
+
+			$values = [];
+
+			foreach( $model as $key => $field ) {
+
+				if( is_array( $field ) === false )
+					continue;
+
+				$perLocale = ( $field['locale'] ?? false ) === true;
+
+				if( $perLocale !== ( $bucket !== '*' ) )
+					continue;
+
+				$sources = $bucket === '*' ? array_merge( [ '*' ], $locales ) : [ $bucket, '*' ];
+
+				foreach( $sources as $source ) {
+
+					if( is_array( $data[$source][$id] ?? null ) === false || array_key_exists( $key, $data[$source][$id] ) === false )
+						continue;
+
+					$value = $data[$source][$id][$key];
+
+					if( ( $field['type'] ?? '' ) === 'double' && is_int( $value ) === true )
+						$value = (float) $value;
+
+					// What the model's default says is not stored, as a save in the
+					// panel does not store it
+					if( isset( $field['default'] ) === true && $field['default'] === $value )
+						break;
+
+					$error = self::valueError( $field, $value, (string) $key, $typeUri. '/'. $id );
+
+					if( $error !== null ) {
+						trigger_error( 'Element value left out: '. $error, E_USER_WARNING );
+						break;
+					}
+
+					$values[$key] = $value;
+					break;
+				}
+			}
+
+			return $values;
 		}
 
 		// Canonical virtual filename for a type URI. Type URIs intentionally

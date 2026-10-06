@@ -63,21 +63,26 @@ When reapplying, the visible language selection replaces the previous state. The
 
 ### Modules
 
-Navigation, language selection (the locale picker) and the contact form are no longer a choice: `\Nino\Install\Setup::ALWAYS_MODULES` names their unit keys, and every Setup run applies all three units and lists all three classes in `/nino/modules`, exactly as it would for a module actually picked. A developer tool that ships as a module is handled the same way it always was - listed whenever its class exists (`TOOL_MODULES`), no unit to apply. `Maintenance` is the one Nino still ships.
+Navigation, language selection (the locale picker), the contact form and the legal texts are no longer a choice: `\Nino\Install\Setup::ALWAYS_MODULES` names their unit keys, and every Setup run applies all four units and lists all four classes in `/nino/modules`, exactly as it would for a module actually picked. A developer tool that ships as a module is handled the same way it always was - listed whenever its class exists (`TOOL_MODULES`), no unit to apply. `Maintenance` is the one Nino still ships.
 
-The list that remains offers every *other* module that ships an installer unit: nothing, in a fresh checkout, plus any module a project has added below `app/`, or a fork below `_admin/install/library/modules/`. Features - the catalogue's Newsletter and Search, for instance - are not offered here either: a feature is copied into `features/` from [dapeio/nino-features](https://github.com/dapeio/nino-features) and switched on in the workbench's [Features panel](features.md) after setup. If a selected module requires another module, the assistant automatically includes this dependency in the selection - and finds it already present when that dependency happens to be one of the three always-on ones. A used page template can also pull in required modules; a contact page, for example, works because the contact form's own module is always there.
+The list that remains offers every *other* module that ships an installer unit: nothing, in a fresh checkout, plus any module a project has added below `app/`, or a fork below `_admin/install/library/modules/`. Features - the catalogue's Newsletter and Search, for instance - are not offered here either: a feature is copied into `features/` from [dapeio/nino-features](https://github.com/dapeio/nino-features) and switched on in the workbench's [Features panel](features.md) after setup. If a selected module requires another module, the assistant automatically includes this dependency in the selection - and finds it already present when that dependency happens to be one of the four always-on ones. A used page template can also pull in required modules; a contact page, for example, works because the contact form's own module is always there.
+
+The **legal texts** - the module `Legal`, see [Developer Manual](development.md#legal) - are the one always-on unit with content of its own: the imprint and the privacy policy as elements of the types `legal` and `privacy`, one element per section in German and English, two pages that show them, and a third navigation, `legal`, that the footer of the base frame outputs. Practically every website owes its visitors an imprint and a privacy policy, and a link to them that was forgotten is the dearer mistake; whoever does not need them hides sections under **Elements** or takes the module out of `/nino/modules`.
+
+**Important:** The imprint and privacy policy Nino ships are a starting point, not legal advice. They are not tailored to any particular website and have not been legally reviewed. The operator of a website is responsible for having them checked by a qualified person before publication and for adapting them: to what the website actually processes, to the operator's legal form, and to further mandatory details such as a commercial register entry, a VAT identification number or a person responsible for journalistic content. The project gives no warranty that the texts are correct, complete or up to date.
 
 The step writes:
 
 - available and native language to `config.php`;
-- the activated module classes - the always-on three, any developer tool whose class exists, and whatever else was picked - to `/nino/modules`;
+- the activated module classes - the always-on four, any developer tool whose class exists, and whatever else was picked - to `/nino/modules`;
 - the routes provided by the base and every applied module to `/nino/http/routes`;
 - templates to `templates/`;
 - global and language-dependent texts to `text/`;
-- provided element types to `elements/`;
+- provided element types to `elements/` - and the elements a unit brings in its `elements` key, which are only ever added to a type, never replaced: the sections of the legal texts stay as an editor left them when the step is applied again;
+- the menus a unit asks for in its `navs` key - a menu the project does not have yet, with its first entries by Element URI (`legal` with the imprint and the privacy policy) - to `/nino/html/navs` and `/nino/html/navroutes`; where the project has the menu already, a second run leaves it and its entries as the editors set them;
 - other declared files to their project paths.
 
-A file a unit cannot copy - a target that is not writable - ends the step with a 500 naming the file, and nothing is written to `config.php` for that run; once the target is writable, applying again picks up whole. Languages, the picked *other* modules, and the routes this step manages are replaced on a later reapply; the three always-on units and the routes/templates/text they bring are never removed by it. Manually or by other areas created routes remain preserved. Templates, texts, and element types that have already been copied are not deleted by later deselection.
+A file a unit cannot copy - a target that is not writable - ends the step with a 500 naming the file, and nothing is written to `config.php` for that run; once the target is writable, applying again picks up whole. Languages, the picked *other* modules, and the routes this step manages are replaced on a later reapply; the four always-on units and the routes/templates/text they bring are never removed by it. Manually or by other areas created routes remain preserved. Templates, texts, and element types that have already been copied are not deleted by later deselection.
 
 ### The Look
 
@@ -146,7 +151,9 @@ cannot be declared fails the step by name before any route is written.
 
 A route on the **Blank** template gets its own copy of that template, named after its Element URI: a `/team` route is created as `templates/page-team.tpl` and rendered by `[template /templates/page-team]`. Blank is the empty starting point, so every route picking it needs a page of its own — a shared file would mean editing one blank page rewrote all of them. A nested Element URI flattens into a single name (`/jobs/open` → `page-jobs-open.tpl`), because that is the shape the template pickers list. An existing file is never overwritten, so re-running this step leaves work already done in such a page alone. From then on the route owns its template and reads back as its own page rather than as the Blank unit — the same thing a page created in `/_admin` is. Every other template is a finished page and stays shared. One name it cannot take: an Element URI whose template name a library page already owns — `/home`, `/contact` and the other finished pages — is refused, naming the page that has it, because both would write the same `templates/page-*.tpl`.
 
-The reserved path `/_admin` cannot be used as a public page.
+The reserved path `/_admin` cannot be used as a public page. Neither can the two Element URIs `/legal/imprint` and `/legal/privacy`: the Legal module owns them with their routes, their names and their menu entries, and a page of your own with one of them is refused with a 409 - whatever unit or template it picks. A page on the Blank template whose name would write the module's own `page-legal-imprint.tpl` is refused too, naming the unit `legal`.
+
+The step offers every registered navigation as a checkbox, `legal` the third beside `main` and `footer`; the starter pages are in none of them for it. The imprint and the privacy policy are not part of this list: the module registers their routes at runtime, one per language, and the Legal pages are in the navigation `legal` from the first run on.
 
 ## 4. Personal Information
 
@@ -212,6 +219,8 @@ Everything below `_admin/install/` is removed together with the wizard after com
 
 Module units are found, not listed: the wizard scans `_nino/Nino/Modules/*/install/` - Nino's own optional modules - and then the whole application directory (`app/`, or `NINO_APP_DIR`) up to four levels deep, plus `_admin/install/library/modules/`. A unit's key - what the picker posts and what `requiresModules` names - is the manifest's `key` or, without one, the module directory's lowercased name; it must be a slug and unique, and the first unit to claim a key keeps it, so Nino's own modules keep theirs.
 
+Two manifest keys carry content and are applied add-only by the same `applyUnit()`: `elements` - `[ '<type>' => '<file of the unit>' ]`, a file in the shape of an element type file whose elements are *added* to the type, in the languages that are applied, and never replace a value, a title or a model the project has (the type itself is created from the file only where it does not exist) - and, for the wizard alone, `navs` - `[ '<key>' => [ '<Element URI>', ... ] ]`, a menu the project does not have yet with its first entries. `\Nino\Features::activate()` reads `elements` and not `navs`: a feature brings no menu. The second way the wizard applies a module unit, the one a page unit pulls in through `requiresModules`, reads neither - it knows only `templates`, `blacklist`, `config` and `text`, as it never knew `elementTypes`, `files` or `routes`. See [`\Nino\Elements::seed()`](development.md#legal) and the recipe [installer-package](recipes/installer-package.md).
+
 Not scanned: `features/`. A feature carries an `install/` unit of the same shape, but `\Nino\Features::activate()` applies it when the feature is switched on in the workbench - through the same `applyUnit()` the wizard uses, with overwrite on here and add-only there, so that the unit application survives the removal of `_admin/install/`. See [Features](features.md).
 
 A developer tool that ships as a module has no unit to pick: `\Nino\Install\Setup` lists it in `/nino/modules` whenever its class exists, so its panel is in the workbench from the first `config.php` on.
@@ -227,4 +236,5 @@ It also does not create `private/` or `public/`, nor any of the project director
 - [Getting Started](getting-started.md) guides through the necessary initial setup.
 - [`/_admin` Workbench](_admin.md) explains the panels, the accounts and the recovery page.
 - The **Template Builder** - page templates composed from whole sections - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md) is there too.
+- Have the imprint and the privacy policy checked before the site goes live, and adapt them to what the website really processes - see the note in [Modules](#modules) above.
 - [Deployment](deployment.md) describes web server configuration, security, and go-live.

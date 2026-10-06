@@ -70,6 +70,7 @@ return [
 	'[[/_admin/features/msg/deactivated]]'		=> 'Deactivated.',
 	'[[/_admin/features/msg/switched-on]]'		=> 'Switched on: %s.',
 	'[[/_admin/features/msg/deactivated-found]]'	=> 'Deactivated. These places still contain its shortcodes, which show as plain text while it is off: %s',
+	'[[/_admin/features/msg/deactivated-privacy]]'	=> 'The privacy policy still describes it: %s. Hide these sections under Elements › Privacy policy if they no longer apply.',
 	'[[/_admin/features/label/found-template]]'	=> 'Template %s',
 	'[[/_admin/features/label/found-text]]'		=> 'Text %s',
 	'[[/_admin/features/label/found-element]]'	=> 'Element %s',

@@ -1548,6 +1548,186 @@ check( '[element] does the same, for a language with a value and for one without
 	&& \Nino\Html::renderHtml( $appData, '[element /alttest/one locale="en_US"]<[[photoAlt]]>[/element]' ) === '<>' );
 check( 'a link to a field that is global is not read: the fill stays what it was', str_contains( \Nino\Html::renderHtml( $appData, sprintf( $altLoop, 'de_DE' ) ), '[[globalAlt]]' ) === true );
 
+// --- Elements::seed ---------------------------------------------------------
+//
+// What an install unit brings to a type is added, and never replaces: a unit
+// is applied again with every update of a feature, and by the wizard on every
+// run until the setup is done, and what an editor wrote or deleted in between
+// is not the unit's to take back
+
+echo "Elements::seed - what an install unit adds to a type, and nothing else\n";
+
+$seedUnit = [
+	'title' => [ 'de_DE' => 'Abschnitte', 'en_US' => 'Sections' ],
+	'model' => [
+		'title' 	=> [ 'type' => 'string', 'locale' => true, 'required' => true ],
+		'text' 		=> [ 'type' => 'string', 'locale' => true, 'html' => true, 'blocks' => true ],
+		'order' 	=> [ 'type' => 'integer' ],
+		'hidden' 	=> [ 'type' => 'boolean' ],
+		'ghost' 	=> [ 'type' => 'hologram' ],
+	],
+	'*' => [
+		'*' 	=> [ 'hidden' => false ],
+		'one' => [ 'order' => 100 ],
+		'two' => [ 'order' => 200 ],
+	],
+	'de_DE' => [
+		'one' => [ 'title' => 'Eins', 'text' => '<p>a</p>' ],
+		'two' => [ 'title' => 'Zwei', 'text' => '<p>b</p>' ],
+	],
+	'en_US' => [
+		'one' => [ 'title' => 'One', 'text' => '<p>a</p>' ],
+		'two' => [ 'title' => 'Two', 'text' => '<p>b</p>' ],
+	],
+];
+
+$seedCommitted = [];
+\Nino\Callbacks::registerCallback( $appData, '/nino/elements/committed', function( &$appData, &$change ) use ( &$seedCommitted ) { $seedCommitted[] = $change['operation']. ' '. $change['uri']. ' '. $change['locale']; } );
+
+check( 'a type that is not there and a unit with no model: nothing, and no failure', \Nino\Elements::seed( $appData, '/seedtest', [ '*' => [ 'one' => [ 'order' => 1 ] ] ], [ 'de_DE' ] ) === true
+	&& is_file( $sandbox. '/private/elements/seedtest.php' ) === false && $seedCommitted === [] );
+
+check( 'a type name that is none is refused with the reason', is_string( \Nino\Elements::seed( $appData, '/Seed Test', $seedUnit, [ 'de_DE' ] ) ) === true
+	&& is_string( \Nino\Elements::seed( $appData, '/../x', $seedUnit, [ 'de_DE' ] ) ) === true && is_file( $sandbox. '/private/elements/seedtest.php' ) === false );
+
+check( 'with a model the type is created', \Nino\Elements::seed( $appData, '/seedtest', $seedUnit, [ 'de_DE' ] ) === true && is_file( $sandbox. '/private/elements/seedtest.php' ) === true );
+$seedFile = \Nino\Filesystem::getFileContent( $appData, '/elements/seedtest.php', [] );
+check( '...with its title in the native language, the model cut to the field types the kernel knows and the defaults of the unit in the bucket every element inherits',
+	$seedFile['title'] === 'Abschnitte' && array_keys( $seedFile['model'] ) === [ 'title', 'text', 'order', 'hidden' ] && $seedFile['*']['*'] === [ 'hidden' => false ] );
+check( '...its elements in * and in the languages asked for, no others', $seedFile['*']['one'] === [ 'order' => 100 ] && $seedFile['de_DE']['one']['title'] === 'Eins' && isset( $seedFile['en_US'] ) === false );
+check( '...a value in the bucket its field says, a field with "locale" per language and the others global', isset( $seedFile['*']['one']['title'] ) === false && isset( $seedFile['de_DE']['one']['order'] ) === false );
+check( '...seen in the same request: the element cache was dropped', ( \Nino\Elements::getElement( $appData, '/seedtest/two', 'de_DE' )['title'] ?? null ) === 'Zwei' );
+check( '...each element is announced as inserted, as a save in the panel does', $seedCommitted === [ 'insert /seedtest/one *', 'insert /seedtest/two *' ] );
+
+// Idempotent: a second run writes nothing, not even the file's time
+$seedBefore = md5_file( $sandbox. '/private/elements/seedtest.php' );
+$seedCommitted = [];
+clearstatcache();
+$seedTime = filemtime( $sandbox. '/private/elements/seedtest.php' );
+check( 'a second run answers true and writes nothing', \Nino\Elements::seed( $appData, '/seedtest', $seedUnit, [ 'de_DE' ] ) === true
+	&& md5_file( $sandbox. '/private/elements/seedtest.php' ) === $seedBefore && filemtime( $sandbox. '/private/elements/seedtest.php' ) === $seedTime && $seedCommitted === [] );
+
+// What an editor wrote stays; what the unit says about the type does not come back
+\Nino\Elements::updateElement( $appData, '/seedtest/one', [ 'title' => 'Mein Titel' ], 'de_DE' );
+$seedChanged = $seedUnit;
+$seedChanged['title'] = 'Anders';
+$seedChanged['model']['title']['required'] = false;
+$seedChanged['de_DE']['one']['title'] = 'Wieder Eins';
+$seedChanged['*']['one']['order'] = 5;
+$seedCommitted = [];
+check( 'a value, a title and a model the project has are left as they are', \Nino\Elements::seed( $appData, '/seedtest', $seedChanged, [ 'de_DE' ] ) === true
+	&& \Nino\Elements::getElement( $appData, '/seedtest/one', 'de_DE' )['title'] === 'Mein Titel' && \Nino\Elements::getElement( $appData, '/seedtest/one', 'de_DE' )['order'] === 100
+	&& \Nino\Filesystem::getFileContent( $appData, '/elements/seedtest.php', [] )['title'] === 'Abschnitte' && \Nino\Elements::getElementModel( $appData, '/seedtest' )['title']['required'] === true && $seedCommitted === [] );
+
+// A language that is new brings the unit's version for an element that is there
+$seedCommitted = [];
+check( 'a language that was not there is added to the elements that are', \Nino\Elements::seed( $appData, '/seedtest', $seedUnit, [ 'de_DE', 'en_US' ] ) === true
+	&& \Nino\Elements::getElement( $appData, '/seedtest/one', 'en_US' )['title'] === 'One' && \Nino\Elements::getElement( $appData, '/seedtest/one', 'de_DE' )['title'] === 'Mein Titel' );
+check( '...announced as an update with the language', $seedCommitted === [ 'update /seedtest/one en_US', 'update /seedtest/two en_US' ] );
+check( '...and a language the unit has no version for is not made up', \Nino\Elements::seed( $appData, '/seedtest', $seedUnit, [ 'fr_FR' ] ) === true
+	&& isset( \Nino\Filesystem::getFileContent( $appData, '/elements/seedtest.php', [] )['fr_FR'] ) === false );
+
+// Deleted for good, and remembered: the element does not come back
+\Nino\Elements::deleteElement( $appData, '/seedtest/two', '*' );
+check( 'an element somebody deleted comes back with the next run - unless it is on the list of what was removed',
+	( \Nino\Elements::seed( $appData, '/seedtest', $seedUnit, [ 'de_DE', 'en_US' ] ) === true && \Nino\Elements::getElement( $appData, '/seedtest/two', 'de_DE' ) !== false ) === true );
+\Nino\Elements::deleteElement( $appData, '/seedtest/two', '*' );
+$appData[ \Nino\Elements::REMOVED ] = [ 'seedtest' => [ 'two' ], 'another' => [ 'one' ] ];
+check( '...which names it under its type', \Nino\Elements::seed( $appData, '/seedtest', $seedUnit, [ 'de_DE', 'en_US' ] ) === true
+	&& \Nino\Elements::getElement( $appData, '/seedtest/two', 'de_DE' ) === false );
+unset( $appData[ \Nino\Elements::REMOVED ] );
+
+// Fields the project's model does not know, and values it refuses
+$seedWarnings = [];
+set_error_handler( function( int $level, string $message ) use ( &$seedWarnings ) { $seedWarnings[] = $message; return true; } );
+$seedOdd = $seedUnit;
+$seedOdd['*']['three'] = [ 'order' => 'first', 'nofield' => 'x' ];
+$seedOdd['de_DE']['three'] = [ 'title' => 'Drei', 'nofield' => 'y' ];
+$seedOdd['*']['../four'] = [ 'order' => 4 ];
+$seededOdd = \Nino\Elements::seed( $appData, '/seedtest', $seedOdd, [ 'de_DE' ] );
+set_error_handler( function() { return true; } );
+$three = \Nino\Filesystem::getFileContent( $appData, '/elements/seedtest.php', [] );
+check( 'a value the model refuses is left out with a warning, a field it does not have without one, an id that is no slug is skipped', $seededOdd === true
+	&& isset( $three['*']['three']['order'] ) === false && isset( $three['*']['three']['nofield'] ) === false && isset( $three['de_DE']['three']['nofield'] ) === false && $three['de_DE']['three']['title'] === 'Drei'
+	&& count( $seedWarnings ) === 1 && str_contains( $seedWarnings[0], 'order' ) === true && isset( $three['*']['../four'] ) === false );
+
+// An element without its required field is still created: the panel marks it
+$seedRequired = [ '*' => [ 'five' => [ 'order' => 5 ] ] ];
+check( 'an element that lacks a required field is created all the same', \Nino\Elements::seed( $appData, '/seedtest', $seedRequired, [ 'de_DE' ] ) === true
+	&& isset( \Nino\Filesystem::getFileContent( $appData, '/elements/seedtest.php', [] )['*']['five'] ) === true );
+
+// A file that is there but is no type is nobody's to overwrite
+file_put_contents( $sandbox. '/private/elements/brokentype.php', '<?php return "not a type";' );
+check( 'a file that does not read as a type is left alone', \Nino\Elements::seed( $appData, '/brokentype', $seedUnit, [ 'de_DE' ] ) === true && str_contains( (string) file_get_contents( $sandbox. '/private/elements/brokentype.php' ), 'not a type' ) === true );
+
+// Failure: a lock or a write that fails is said, as a string
+$seedUnwritable = $appData;
+$seedUnwritable['./nino/filesystem/cache'] = [];
+$seedUnwritable['./nino/filesystem/contentpath'] = $sandbox. '/not-a-private-directory-either';
+file_put_contents( $sandbox. '/not-a-private-directory-either', 'x' );
+check( 'a type file that cannot be written is a string, the way a unit says it could not copy a file', \Nino\Elements::seed( $seedUnwritable, '/seedfails', $seedUnit, [ 'de_DE' ] ) === 'could not write /elements/seedfails.php' );
+unlink( $sandbox. '/not-a-private-directory-either' );
+check( 'the lock is released after a run that wrote and after one that did not', probeLockFree( $sandbox, '/elements/seedtest.php' ) === true && probeLockFree( $sandbox, '/elements/brokentype.php' ) === true );
+
+echo "\n";
+
+// --- Features::applyUnit and the 'elements' key -------------------------------
+
+echo "Features::applyUnit - 'elements', added whatever the unit's overwrite says\n";
+
+$unitDir = $sandbox. '/unit-with-elements';
+mkdir( $unitDir. '/elements', 0777, true );
+file_put_contents( $unitDir. '/manifest.php', '<?php return [ "elements" => [ "unitseed" => "elements/unitseed.php" ] ];' );
+file_put_contents( $unitDir. '/elements/unitseed.php', '<?php return '. var_export( $seedUnit, true ). ';' );
+$unitRoutes = []; $unitBlacklist = []; $unitConfig = [];
+
+check( 'a unit with "elements" creates the type and its elements', \Nino\Features::applyUnit( $appData, $unitDir, [ 'de_DE', 'en_US' ], $unitRoutes, $unitBlacklist, $unitConfig, true ) === true
+	&& \Nino\Elements::getElement( $appData, '/unitseed/one', 'en_US' )['title'] === 'One' );
+\Nino\Elements::updateElement( $appData, '/unitseed/one', [ 'title' => 'Mein Titel' ], 'de_DE' );
+\Nino\Elements::deleteElement( $appData, '/unitseed/two', '*' );
+$appData[ \Nino\Elements::REMOVED ] = [ 'unitseed' => [ 'two' ] ];
+foreach( [ true, false ] as $overwrite )
+	check( 'applied again with overwrite '. ( $overwrite === true ? 'on' : 'off' ). ': the edit stays, the element that was removed stays removed',
+		\Nino\Features::applyUnit( $appData, $unitDir, [ 'de_DE', 'en_US' ], $unitRoutes, $unitBlacklist, $unitConfig, $overwrite ) === true
+		&& \Nino\Elements::getElement( $appData, '/unitseed/one', 'de_DE' )['title'] === 'Mein Titel' && \Nino\Elements::getElement( $appData, '/unitseed/two', 'de_DE' ) === false );
+unset( $appData[ \Nino\Elements::REMOVED ] );
+
+foreach( [ '../outside.php', '/etc/passwd', 'elements/../../x.php', 'elements/missing.php', '' ] as $badFile ) {
+	file_put_contents( $unitDir. '/manifest.php', '<?php return [ "elements" => [ "unitseed" => '. var_export( $badFile, true ). ' ] ];' );
+	check( 'a file named '. var_export( $badFile, true ). ' is a failure of the unit, not a read of whatever is there', is_string( \Nino\Features::applyUnit( $appData, $unitDir, [ 'de_DE' ], $unitRoutes, $unitBlacklist, $unitConfig, true ) ) === true );
+}
+file_put_contents( $unitDir. '/manifest.php', '<?php return [ "elements" => [ "Bad Type" => "elements/unitseed.php" ] ];' );
+check( 'a type name that is none is a failure of the unit too', is_string( \Nino\Features::applyUnit( $appData, $unitDir, [ 'de_DE' ], $unitRoutes, $unitBlacklist, $unitConfig, true ) ) === true );
+
+echo "\n";
+
+// --- Html::resolveTextfill ---------------------------------------------------
+
+echo "Html::resolveTextfill - what [[key]] would put into a page, nested fills resolved\n";
+
+\Nino\Html::addFills( $appData, [
+	'/seed/resolve/plain' 	=> 'Hello',
+	'/seed/resolve/nested' 	=> 'Dear [[/seed/resolve/plain]], see [[/seed/resolve/deeper]]',
+	'/seed/resolve/deeper' 	=> '[[/seed/resolve/plain]] again',
+	'/seed/resolve/empty' 	=> '',
+	'/seed/resolve/loop' 		=> '[[/seed/resolve/loop]]',
+	'/seed/resolve/code' 		=> 'a [json /seed/resolve/plain] b',
+], 'de_DE' );
+\Nino\Html::addFills( $appData, [ '/seed/resolve/runtime' => 'runtime value' ], '*' );
+\Nino\Locales::setCurrentLocale( $appData, 'de_DE' );
+check( 'a value comes as it is', \Nino\Html::resolveTextfill( $appData, '/seed/resolve/plain' ) === 'Hello' );
+check( '...with the fills inside it resolved, the ones inside those too', \Nino\Html::resolveTextfill( $appData, '/seed/resolve/nested' ) === 'Dear Hello, see Hello again' );
+check( '...a runtime fill as well', \Nino\Html::resolveTextfill( $appData, '/seed/resolve/runtime' ) === 'runtime value' );
+check( 'a key with no value is null, a key with an empty one is the empty string', \Nino\Html::resolveTextfill( $appData, '/seed/resolve/nope' ) === null && \Nino\Html::resolveTextfill( $appData, '/seed/resolve/empty' ) === '' );
+check( 'a value that names itself ends after ten passes', str_contains( (string) \Nino\Html::resolveTextfill( $appData, '/seed/resolve/loop' ), '[[/seed/resolve/loop]]' ) === true );
+check( 'no shortcode is run, and nothing is escaped', \Nino\Html::resolveTextfill( $appData, '/seed/resolve/code' ) === 'a [json /seed/resolve/plain] b' );
+check( 'the language is the current one', \Nino\Html::resolveTextfill( $appData, '/seed/resolve/plain' ) === 'Hello' && ( \Nino\Locales::setCurrentLocale( $appData, 'en_US' ) === 'en_US' ) && \Nino\Html::resolveTextfill( $appData, '/seed/resolve/plain' ) === null );
+\Nino\Locales::setCurrentLocale( $appData, 'de_DE' );
+check( '[json] gives the strings it always gave, from the same rule', \Nino\Html::doJsonShortcode( $appData, [ '/seed/resolve/nested' ] ) === '"Dear Hello, see Hello again"'
+	&& \Nino\Html::doJsonShortcode( $appData, [ '/seed/resolve/nope' ] ) === '""' && \Nino\Html::doJsonShortcode( $appData, [] ) === '""' );
+
+echo "\n";
+
 // --- Html formats: line breaks, paragraphs and lists ---------------------
 //
 // sanitizeHtml() has three profiles. 'inline' is what it always was - the
@@ -4540,19 +4720,20 @@ check( '...and its markup is still the author\'s own', str_contains( \Nino\Modul
 \Nino\Html::addFills( $appData, [ '/_nino/webpage/top/name' => 'Top' ], 'en_US' );
 
 // A route that exists only at runtime (a feature's /blog) has no entry in
-// config.php to carry 'navs'. Its memberships are '/nino/html/navroutes', read
-// for a live route and merged with the route's own, which wins for the same menu
+// config.php to carry 'navs'. Its memberships are '/nino/html/navroutes', by the
+// page's Element-URI, read for a live route and merged with the route's own, which
+// wins for the same menu
 \Nino\Html::addFills( $appData, [ '/_nino/webpage/blog/name' => 'Blog' ], 'en_US' );
 $appData['/nino/http/routes']['GET://blog'] = [ 'uri' => '/blog', 'body' => '' ];
 $appData['/nino/html/navroutes'] = [
-	'GET://blog' 		=> [ 'main' => 3 ],
-	'GET://top' 		=> [ 'main' => 9, 'footer' => 1 ],
+	'/blog' 		=> [ 'main' => 3 ],
+	'/top' 			=> [ 'main' => 9, 'footer' => 1 ],
 ];
 check( 'a runtime route stands in the menu at its priority, in order with the persisted members', \Nino\Modules\Navigation::routeLines( $appData, 'main' ) === [ '/top:Top', '/blog:Blog', '/:Home', '/kontakt:Contact' ] );
 check( 'the route\'s own membership wins for the same menu, the key adds the others', \Nino\Modules\Navigation::routeLines( $appData, 'footer' ) === [ '/top:Top', '/:Home', '/impressum:Legal' ] );
 check( 'a menu nobody is in through the key renders as before', \Nino\Modules\Navigation::routeLines( $appData, 'nope' ) === [] );
 
-$appData['/nino/html/navroutes']['GET://gone'] = [ 'main' => 1 ];
+$appData['/nino/html/navroutes']['/gone'] = [ 'main' => 1 ];
 \Nino\Html::addFills( $appData, [ '/_nino/webpage/gone/name' => 'Gone' ], 'en_US' );
 check( 'a membership of a route that is not live is skipped, though its name exists - the feature is off', in_array( '/gone:Gone', \Nino\Modules\Navigation::routeLines( $appData, 'main' ), true ) === false );
 
@@ -4562,11 +4743,11 @@ check( 'a runtime route nobody named stays out, like any other', str_contains( i
 
 // Whatever else is written there is not a priority
 $appData['/nino/html/navroutes'] = [
-	'GET://blog' 			=> [ 'main' => 3 ],
-	'GET://kontakt' 	=> [ 'footer' => '2', 'side' => 2.5, 'x' => [ 1 ], 'y' => null ],
-	'GET://impressum' => 'main',
-	'GET://intern' 		=> 7,
-	'POST://.form' 		=> [ 'main' => 1 ],
+	'/blog' 			=> [ 'main' => 3 ],
+	'/contact' 		=> [ 'footer' => '2', 'side' => 2.5, 'x' => [ 1 ], 'y' => null ],
+	'/legal' 			=> 'main',
+	'/intern' 		=> 7,
+	'/.form' 			=> [ 'main' => 1 ],
 ];
 check( 'malformed entries are skipped: no menu is changed by them, and none of them throws',
 	\Nino\Modules\Navigation::routeLines( $appData, 'main' ) === [ '/top:Top', '/blog:Blog', '/:Home', '/kontakt:Contact' ]
@@ -4576,6 +4757,43 @@ check( '...and a POST route is no menu entry through the key either', str_contai
 
 unset( $appData['/nino/html/navroutes'] );
 check( 'with no key at all nothing changes', \Nino\Modules\Navigation::routeLines( $appData, 'main' ) === [ '/top:Top', '/:Home', '/kontakt:Contact' ] );
+
+// A page with a route per language - the imprint of Modules\Legal - is one page:
+// the key is its Element-URI, every GET route with that uri is a member, the one
+// of the current language is the entry, and a wildcard is never one
+$appData['/nino/http/routes'] = [
+	'GET://home' 				=> [ 'uri' => '/home', 'body' => '', 'navs' => [ 'legal' => 3 ] ],
+	'GET://impressum' 	=> [ 'uri' => '/legal/imprint', 'locale' => 'de_DE', 'body' => '', 'maintenance' => false ],
+	'GET://imprint' 		=> [ 'uri' => '/legal/imprint', 'locale' => 'en_US', 'body' => '', 'maintenance' => false ],
+	'GET://datenschutz' => [ 'uri' => '/legal/privacy', 'locale' => 'de_DE', 'body' => '' ],
+	'GET://privacy' 		=> [ 'uri' => '/legal/privacy', 'locale' => 'en_US', 'body' => '' ],
+	'GET://wildcard/*' 	=> [ 'uri' => '/legal/imprint', 'body' => '' ],
+	'GET://shared' 			=> [ 'uri' => '/legal/shared', 'body' => '' ],
+	'GET://fr-fr/shared' => [ 'uri' => '/legal/shared', 'locale' => 'fr_FR', 'body' => '' ],
+];
+$appData['/nino/html/navroutes'] = [
+	'/legal/imprint' 	=> [ 'legal' => 1 ],
+	'/legal/privacy' 	=> [ 'legal' => 2 ],
+	'/legal/shared' 	=> [ 'legal' => 4, 'main' => 1 ],
+	'/home' 					=> [ 'legal' => 9 ],
+];
+\Nino\Html::addFills( $appData, [ '/_nino/webpage/legal/imprint/name' => 'Imprint', '/_nino/webpage/legal/privacy/name' => 'Privacy', '/_nino/webpage/legal/shared/name' => 'Shared', '/_nino/webpage/home/name' => 'Home' ], 'en_US' );
+\Nino\Html::addFills( $appData, [ '/_nino/webpage/legal/imprint/name' => 'Impressum', '/_nino/webpage/legal/privacy/name' => 'Datenschutz', '/_nino/webpage/legal/shared/name' => 'Geteilt', '/_nino/webpage/home/name' => 'Start' ], 'de_DE' );
+\Nino\Locales::setCurrentLocale( $appData, 'en_US' );
+check( 'every route of an Element-URI is a member, the one of the current language is the entry, in the order of the priorities',
+	\Nino\Modules\Navigation::routeLines( $appData, 'legal' ) === [ '/imprint:Imprint', '/privacy:Privacy', '/home:Home', '/shared:Shared' ] );
+\Nino\Locales::setCurrentLocale( $appData, 'de_DE' );
+check( '...in each language its own path and name', \Nino\Modules\Navigation::routeLines( $appData, 'legal' ) === [ '/impressum:Impressum', '/datenschutz:Datenschutz', '/home:Start', '/shared:Geteilt' ] );
+check( 'a route without a language is the entry where no route of the current language has the Element-URI', in_array( '/shared:Geteilt', \Nino\Modules\Navigation::routeLines( $appData, 'legal' ), true ) === true
+	&& in_array( '/fr-fr/shared:Geteilt', \Nino\Modules\Navigation::routeLines( $appData, 'legal' ), true ) === false );
+check( '...and a route on a wildcard never is a member through the key', str_contains( implode( '', \Nino\Modules\Navigation::routeLines( $appData, 'legal' ) ), 'wildcard' ) === false );
+check( 'a persisted route\'s own membership goes before the one its Element-URI has', \Nino\Modules\Navigation::routeLines( $appData, 'legal' )[2] === '/home:Start' );
+check( 'an Element-URI is in a menu once', count( array_filter( \Nino\Modules\Navigation::routeLines( $appData, 'legal' ), static fn( string $line ): bool => str_ends_with( $line, ':Impressum' ) ) ) === 1 );
+$appData['/nino/html/navroutes']['/legal/privacy'] = [ 'legal' => '2' ];
+$appData['/nino/html/navroutes']['legal/imprint'] = [ 'legal' => 1 ];
+check( 'an entry that is no whole number is no membership, and a key that is no Element-URI matches no route', \Nino\Modules\Navigation::routeLines( $appData, 'legal' ) === [ '/impressum:Impressum', '/home:Start', '/shared:Geteilt' ] );
+\Nino\Locales::setCurrentLocale( $appData, 'en_US' );
+unset( $appData['/nino/html/navroutes'] );
 
 $appData['/nino/http/routes'] = $routesBeforeNav;
 
@@ -6133,7 +6351,7 @@ echo "Modules\\Maintenance - one switch answers every page with 503\n";
 
 // A request as Http::request()/response() would leave it before this
 // module's global callback runs - same shape as cacheRequest() above.
-function maintenanceRequest( string $uri, string $method = 'GET' ): array {
+function maintenanceRequest( string $uri, string $method = 'GET', array $route = [] ): array {
 	return [
 		'/nino/http/request' => [
 			'method' 		=> $method,
@@ -6141,13 +6359,15 @@ function maintenanceRequest( string $uri, string $method = 'GET' ): array {
 			'uri' 			=> $uri,
 			'query' 		=> [],
 		],
-		'/nino/http/response' => [
+		// The route's own fields are mixed into the answer by Http::response()
+		// before this module's callback runs
+		'/nino/http/response' => array_merge( [
 			'uri' 				=> $uri,
 			'locale' 			=> 'de_DE',
 			'statusCode'	=> 200,
 			'header' 			=> [],
 			'body' 				=> '<html>page</html>',
-		],
+		], $route ),
 	];
 }
 
@@ -6202,18 +6422,29 @@ $appData['/nino/cache/status'] = true;
 \Nino\Modules\Maintenance::init( $appData );
 check( '...and left alone while maintenance is off', $appData['/nino/cache/status'] === true );
 
-// The login is the one other thing a signed-out visitor may still reach: an
-// operator who is not signed in has to be able to sign in, and the answer
-// to that POST was the 503 page, the workbench's login form included
+// A route that says 'maintenance' => false stays reachable. The login is one: an
+// operator who is not signed in has to be able to sign in, and the answer to that
+// POST was the 503 page, the workbench's login form included. Auth carries the
+// field on its route, and the module reads it from the answer Http::response()
+// has mixed the route into - one mechanism, whatever the route is
 $appData['/nino/maintenance/status'] = true;
 unset( $appData['./nino/auth/current'] );
-$loginPost = maintenanceRequest( '/.nino/auth/login', 'POST' );
+$authApp = $appData;
+\Nino\Auth::init( $authApp );
+$loginRoute 	= $authApp['/nino/http/routes']['POST://.nino/auth/login'] ?? [];
+$logoutRoute 	= $authApp['/nino/http/routes']['POST://.nino/auth/logout'] ?? [];
+check( 'Auth\'s login route carries the field, its logout route does not', ( $loginRoute['maintenance'] ?? null ) === false && isset( $logoutRoute['maintenance'] ) === false );
+$loginPost = maintenanceRequest( '/.nino/auth/login', 'POST', $loginRoute );
 check( 'the login POST of a visitor who is not signed in is not answered with the maintenance page', \Nino\Modules\Maintenance::_prepare( $appData, $loginPost ) === false
 	&& $loginPost['/nino/http/response']['statusCode'] === 200 && $loginPost['/nino/http/response']['body'] === '<html>page</html>' );
 $loginGet = maintenanceRequest( '/.nino/auth/login', 'GET' );
-$logoutPost = maintenanceRequest( '/.nino/auth/logout', 'POST' );
-check( '...only that POST: anything else at the address, and the logout, is still the maintenance page', \Nino\Modules\Maintenance::_prepare( $appData, $loginGet ) === true
+$logoutPost = maintenanceRequest( '/.nino/auth/logout', 'POST', $logoutRoute );
+check( '...only a route that says so: anything else at the address, and the logout, is still the maintenance page', \Nino\Modules\Maintenance::_prepare( $appData, $loginGet ) === true
 	&& \Nino\Modules\Maintenance::_prepare( $appData, $logoutPost ) === true );
+$legalPage = maintenanceRequest( '/impressum', 'GET', [ 'uri' => '/legal/imprint', 'maintenance' => false ] );
+check( 'any route with the field is reachable, a page of the Legal module among them', \Nino\Modules\Maintenance::_prepare( $appData, $legalPage ) === false && $legalPage['/nino/http/response']['statusCode'] === 200 );
+$notQuite = [ maintenanceRequest( '/x', 'GET', [ 'maintenance' => true ] ), maintenanceRequest( '/x', 'GET', [ 'maintenance' => 'false' ] ), maintenanceRequest( '/x', 'GET', [ 'maintenance' => 0 ] ), maintenanceRequest( '/x', 'GET', [ 'maintenance' => null ] ) ];
+check( '...and only the boolean false counts: true, a string, 0 and null are the maintenance page', array_unique( array_map( static function( array $request ) use ( &$appData ): bool { return \Nino\Modules\Maintenance::_prepare( $appData, $request ); }, $notQuite ) ) === [ true ] );
 $appData['/nino/maintenance/status'] = false;
 
 /*	The page the module brings. It is its own template per language, read

@@ -202,6 +202,7 @@ A route can provide the following fields, among others:
 | `header` | additional response headers |
 | `locale` | language resolved for this route |
 | `csrf` | explicitly control CSRF check for this route |
+| `maintenance` | `false` keeps the route reachable while the site is in maintenance: `Modules\Maintenance` leaves a response with this field alone. The routes of `Modules\Legal` and the login route of `Auth` carry it; the Routes panel keeps it, like every field it does not edit, when it saves a route. A visitor cannot set it |
 
 If Nino cannot resolve a route, `GET://404` is used. If this route is also missing, a minimal `404` response is created.
 
@@ -402,17 +403,15 @@ The part is the block a word stands in: `intro`, `hero`, `item-<n>`, `form`, `na
 
 A label in front of a fact and the fact are two things. `/template/common/label/phone` is the word "Phone"; the number is `/project/company/contact/phone`, which every template reads from there and from nowhere else.
 
-The category of a template is its file name without `.tpl`: `page-home.tpl` carries `/template/page-home/...`, `html-footer.tpl` carries `/template/html-footer/...`, nothing is cut off or derived. A name that is not a word of a key - a dot, an upper-case letter, an underscore, a slash - gives the template no category: it carries no keys of its own, and may read every other one (`page-legal.de_DE.tpl`, `.demo-catalogue.tpl`). Only files directly below `templates/` have one. `\Nino\Modules\Template::category()` answers it for a file name or for a template as a shortcode or a route body names it (`/templates/page-home`), and is the one place the rule is written.
+The category of a template is its file name without `.tpl`: `page-home.tpl` carries `/template/page-home/...`, `html-footer.tpl` carries `/template/html-footer/...`, nothing is cut off or derived. A name that is not a word of a key - a dot, an upper-case letter, an underscore, a slash - gives the template no category: it carries no keys of its own, and may read every other one (`page-home.de_DE.tpl`, `.demo-catalogue.tpl`). Only files directly below `templates/` have one. `\Nino\Modules\Template::category()` answers it for a file name or for a template as a shortcode or a route body names it (`/templates/page-home`), and is the one place the rule is written.
 
 A key may be put together at runtime in exactly these shapes, and no other: `[[/_nino/webpage[[/nino/http/response/uri]]/<name>]]` and `[[/_nino/locale/[[locale]]/name]]` in a template, and a four-segment key in which one placeholder is a whole name or the identifier of a list's part (`/feature/posts/navigation/` + `prev`, `/feature/consent/category-` + `necessary` + `/name`). Nothing scans the words that can come out of it, so whoever composes a key checks the rendered words in their own smoke test.
 
 Three things are no text key. The kernel's runtime fills live under `/nino/` and are never in a text file (`[[/nino/dir]]`, `[[/nino/public]]`, `[[/nino/date/year]]`, `[[/nino/http/response/uri]]`, ...; `\Nino\Html::runtimeFillKeys()` names them). A local placeholder has no leading slash (`[[name]]` in an element loop or a mail template, `[[.rel]]`). Configuration such as `/nino/jstext/keys` or `/project/catalog` in `config.php` is another store, even where it looks the same.
 
-Two forms are the system's, not the project's: `/_nino/webpage<uri>/<name|title|description|uri>`, the details of a page after its Element-URI (which may hold slashes and dots), and `/_nino/locale/<code>/name`, the name of a language. The setup wizard and the Routes panel write the first - for the pages that features route at runtime, in the Routes panel's section "Feature routes" - and the Localepicker unit and the Language panel write the second; the Language panel gives a language it adds its code as the name. `/_admin/...` are the workbench's own words and stay as they are.
+Two forms are the system's, not the project's: `/_nino/webpage<uri>/<name|title|description|uri>`, the details of a page after its Element-URI (which may hold slashes and dots), and `/_nino/locale/<code>/name`, the name of a language. The setup wizard and the Routes panel write the first - for the pages that features route at runtime, in the Routes panel's section "Routes of features and modules" - and the Localepicker unit and the Language panel write the second; the Language panel gives a language it adds its code as the name. `/_admin/...` are the workbench's own words and stay as they are.
 
 The server holds people to the grammar where they make keys: the Text Keys tab creates and renames only keys that follow it (`\Nino\Text::isGrammarKey()`), and refuses to rename a key under `/_nino/` or `/_admin/`. Keys a project already has are left alone and stay editable. `tests/keys-smoke.php` holds everything Nino ships to it, finds a leftover of an old form, and checks that every key a shipped template reads exists.
-
-Until the Legal module replaces them, the legal page `page-legal.<xx_XX>.tpl` and the footer link it is reached by, `/website/legal/{uri,name}`, are the one exception: they keep their names, and the checks name the exception.
 
 ### Shortcodes
 
@@ -520,11 +519,11 @@ The following overview is a working reference, not a complete listing of every i
 | `Filesystem` | Read/write files, resolve paths, lock, and atomically mutate |
 | `Backup` | Process encrypted backup manifests |
 | `RotatingLog` | Clean dated log files after retention period |
-| `Elements` | Load individual elements, query, create, modify, and delete types and elements |
+| `Elements` | Load individual elements, query, create, modify, and delete types and elements; `seed()` adds the elements of an install unit, add-only, and skips the ones deleted for good |
 | `Features` | Discover the features below `features/`, read and validate their manifests, answer and save their settings, activate and deactivate them, and apply an install unit - the wizard's too |
 | `Fetch` | The kernel's one http client: a GET over https with a timeout and a byte cap, used by the catalogue and by nothing else |
 | `Form` | The form engine behind `POST /.form`: which forms a project defines, what a submission has to look like, the mail pair it sends and the record it leaves |
-| `Html` | Register fills and shortcodes, render HTML+, and sanitize allowed inline HTML |
+| `Html` | Register fills and shortcodes, render HTML+, sanitize allowed inline HTML, and resolve one text key with its nested fills (`resolveTextfill()`) |
 | `Http` | Normalize requests, resolve routes, create and output responses |
 | `Images` | Process uploads, manage variants, and generate URLs |
 | `Locales` | Manage current, native, and available languages |
@@ -550,12 +549,13 @@ Modules are activated in `/nino/modules`. The order of the array is relevant if 
 | `Form` | `POST://.form` | owns the one form endpoint and hands every submission to `\Nino\Form` - see [Forms](#forms) below |
 | `Images` | `[image ...]` | creates an escaped `<img>` from an image slot or URI. Its `alt` is the text stored for the slot in the current language, else the shortcode's own `alt="..."`, else empty (`alt=""`, decorative) - never the slot's label. The text is escaped and its `[` written as `&#91;`, so it cannot open a fill or shortcode in the next rendering pass. With content - `[image /logo]...[/image]` - the content is rendered instead of the `<img>`, and only when the slot has an image: `[[src]]` (the file's path from the site's root; `https://[[/project/website/general/url]][[src]]` is an absolute address), `[[width]]`, `[[height]]` and `[[alt]]` are filled in. That is how a meta tag or a mail asks for the address without being left empty or broken where nothing is uploaded yet. A bare `[image]` before the first closing `[/image]` of a template reads the text between them as its own content, so keep the content form in a template with no bare `[image]` of the same kind before it, or write the bare one as `[image /x][/image]` |
 | `Jstext` | `[jstext]` | provides text values as securely encoded JSON with CSP nonce |
+| `Legal` | `[legal]`, `[privacy]`, the routes of both pages; `/seo/pages`, `/nino/elements/committed` | the imprint and privacy policy as elements, drawn in the visitor's language and linked from the navigation `legal` - see [Legal](#legal) below |
 | `Localepicker` | `[localepicker ...]` | switches locale via query and redirect |
 | `Maintenance` | `/nino/http/response`, priority 1; `/nino/http/output`, priority 9 | while `/nino/maintenance/status` is on, answers every site page and module endpoint with a 503 and a Retry-After header, for every visitor not signed in to the workbench - the login itself excepted - and puts a banner at the top of each page a signed-in account opens |
 | `Navigation` | `[navigation ...]` | renders navigations from a compact line syntax |
 | `Template` | `[template /path/name]` | loads the raw content of a `.tpl` file; the common render pipeline processes it further |
 
-Every module in the table ships in `_nino/Nino/Modules/`: the always-on `Assets`, `Cache`, `Csrf`, `Elements`, `Images`, `Jstext` and `Template`, and the four a project may switch off. `Form` and `Navigation` bring their workbench panels along (Submissions, Navigations), `Maintenance` is nothing but a switch: every one is present exactly while its module is active. `Form`, `Navigation` and `Localepicker` are no longer a setup wizard choice - the wizard applies each one's `install/` unit and lists its class in `/nino/modules` on every run (`\Nino\Install\Setup::ALWAYS_MODULES`), the same way `Maintenance` is listed whenever its class exists. A project may still switch any of the four off by hand in `/nino/modules`, and `_nino/` stays replaceable wholesale. Everything beyond the table is a **feature** - an installable package under `features/<Name>/` with a `feature.php` manifest, switched on in the workbench's Features panel, bringing its panel the same way. A checkout ships none: they come from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) - `Newsletter` (double opt-in, confirmation and unsubscribe under `/.newsletter`) and `Search` (a locale-aware fuzzy index over Element fields) among them - copied into `features/` or installed from the Features panel. See [Features](features.md), [Panels of the Workbench](#panels-of-the-workbench) and [Directory and Autoloading](#directory-and-autoloading) below.
+Every module in the table ships in `_nino/Nino/Modules/`: the always-on `Assets`, `Cache`, `Csrf`, `Elements`, `Images`, `Jstext` and `Template`, and the five a project may switch off (`Form`, `Legal`, `Localepicker`, `Maintenance`, `Navigation`). `Form` and `Navigation` bring their workbench panels along (Submissions, Navigations), `Maintenance` is nothing but a switch: every one is present exactly while its module is active. `Form`, `Legal`, `Navigation` and `Localepicker` are no longer a setup wizard choice - the wizard applies each one's `install/` unit and lists its class in `/nino/modules` on every run (`\Nino\Install\Setup::ALWAYS_MODULES`), the same way `Maintenance` is listed whenever its class exists. A project may still switch any of the five off by hand in `/nino/modules`, and `_nino/` stays replaceable wholesale. Everything beyond the table is a **feature** - an installable package under `features/<Name>/` with a `feature.php` manifest, switched on in the workbench's Features panel, bringing its panel the same way. A checkout ships none: they come from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) - `Newsletter` (double opt-in, confirmation and unsubscribe under `/.newsletter`) and `Search` (a locale-aware fuzzy index over Element fields) among them - copied into `features/` or installed from the Features panel. See [Features](features.md), [Panels of the Workbench](#panels-of-the-workbench) and [Directory and Autoloading](#directory-and-autoloading) below.
 
 Some details are deliberately defensive:
 
@@ -599,6 +599,8 @@ Only `[[fields]]` carries every field into a mail - the whole submission as a ta
 
 Two more keys sit beside them. `/nino/form/retention` is how many months of submissions stay on disk (1 to 60, `\Nino\Form::RETENTION_MONTHS` without one), and `/nino/form/store` set to `false` means the mail goes out and nothing is written at all - a site that answers its inquiries and keeps no copy has less to protect, and the Submissions panel then stays empty because there is nothing to show.
 
+A project that changes the retention or the confirmation mail changes what its privacy policy has to say: the section "Contact form" of the privacy policy (type `privacy`, element `contact-form`) names the period the submissions are kept and the confirmation the visitor gets. Whoever sets `/nino/form/retention` or `/nino/form/store`, or sends no confirmation, adapts that section to it - see [Legal](#legal).
+
 The markup is the project's own: `page-contact.tpl` carries a hand-written `<form class="nino-form">` that the shared script in `Nino.ui.js` drives. A project with several forms writes each one's markup the same way, or installs the catalogue's [Forms feature](https://github.com/dapeio/nino-features/blob/main/features/Forms/README.md), which adds a `[form]` shortcode that renders one from its definition, a builder for the definitions and a set of spam guards.
 
 **Refusing a submission** needs no callback name of its own. A module or feature that wants to turn one away registers on the same route callback ahead of the module - `\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://.form', ..., 1 )` - and leaves a status behind; `\Nino\Form::handle()` sees a status that is not 200 and returns without sending or writing anything. `\Nino\Csrf::init()` does exactly that, which is why the endpoint has no csrf check of its own:
@@ -615,6 +617,38 @@ The markup is the project's own: `page-contact.tpl` carries a hand-written `<for
 418 rather than a status of its own for every refusal: the shared `.nino-form` script shows one generic message for anything that is not 200 or 400, so a bot never learns which check it tripped.
 
 The endpoint's own answers follow the same rule. A submission the per-ip mail cap refuses is a `429`, neither mailed nor recorded - the visitor sees the generic message and tries again later, and a throttled flood does not become unthrottled disk growth. A submission whose owner mail no transport took is answered `500` - the generic message on the page, so the visitor knows it did not arrive - and, where the project keeps a copy, still recorded, since the inquiry is in the Submissions panel; the Dashboard says why. Only the owner's mail counts: a visitor confirmation that could not be delivered, with the owner's mail out, answers `200`.
+
+### Legal
+
+**Important:** The imprint and privacy policy Nino ships are a starting point, not legal advice. They are not tailored to any particular website and have not been legally reviewed. The operator of a website is responsible for having them checked by a qualified person before publication and for adapting them: to what the website actually processes, to the operator's legal form, and to further mandatory details such as a commercial register entry, a VAT identification number or a person responsible for journalistic content. The project gives no warranty that the texts are correct, complete or up to date.
+
+`Modules\Legal` brings the imprint and the privacy policy as **elements**: two types, `legal` (the imprint) and `privacy` (the privacy policy), one element per section, each with a title and a text per language and the fields `order` and `hidden`. The setup wizard applies its `install/` unit on every run (`\Nino\Install\Setup::ALWAYS_MODULES`) and fills the two types with a newly written starting text in German and English. Nothing of it is replaced afterwards: elements are the editors' content, so a second wizard run adds what is missing and leaves every section as it is.
+
+| Part | What it does |
+| --- | --- |
+| `[legal]`, `[privacy]` | draw the sections of one type in the visitor's language, ordered by `order`, without the ones set to `hidden`; a section that has neither a title nor a text in this language is drawn in the native language (or the first that has one) and carries `lang=""` |
+| `\Nino\Modules\Legal::render( $appData, $type )` | what the two shortcodes call; title and text are made safe by the field's own model (`\Nino\Html::fieldValue()`) first |
+| `\Nino\Modules\Legal::placeholders( $appData, $html )` | replaces `#/project/company/contact/email#` with what that text key says in the current language |
+| `\Nino\Modules\Legal::url( $appData, $page, $locale = '' )` | the address of `imprint` or `privacy`, with the directory prefix, per language, falling back to the native one |
+| `\Nino\Modules\Legal::addLocale( $appData, $locale )` | what a language added later gets: the page details, field labels and type hints, the page names, and the section versions of this language the module and the active features ship; called by the Language panel |
+| `\Nino\Modules\Legal::contributions( $appData, $featureKey, $locale = '' )` | the sections a feature's unit brings, for the dialog that deactivates or removes it |
+| `\Nino\Modules\Legal::check( $appData )`, `notices( $appData )` | what is wrong with the setup, for the Dashboard; never called by a page request |
+
+**Pages and routes.** The module routes the two pages itself, in `init()`: one route per language and page, with the language's path from `/nino/legal/paths` in `config.php` (the unit's default is `/impressum`, `/datenschutz` for `de_DE` and `/imprint`, `/privacy` for `en_US`), `locale` set and `'maintenance' => false`, so that the pages stay reachable while the site is in maintenance. A language without a path of its own gets a derived one, `/fr-fr/impressum`; a path that is invalid or taken by another route is left out and reported by `check()` instead of overwriting anything. Both routes of a page share one Element-URI, `/legal/imprint` and `/legal/privacy`, which the setup wizard and the Routes panel keep for these pages. The page text of each is `/_nino/webpage<uri>/{name,title,description}`.
+
+**Placeholders.** A text names a fact of the website by a placeholder instead of writing it: `#/project/company/contact/email#`. Only keys below `\Nino\Modules\Legal::PREFIXES` (`/project/company/` and `/project/website/general/`) in the four-segment form of the key grammar are replaced, only in text and only after the text was made safe, so a value can be nothing but text: tags and entities are removed, the rest is escaped, and every bracket becomes an entity. A key without a value stays as it is written, so that it shows. The list of prefixes is a constant of the kernel and deliberately no setting.
+
+**The legal navigation.** The wizard creates a third navigation, `legal`, with the two pages as its first entries, and the footer of the base frames outputs it with `[navigation nav="legal" id="legal__nav"][/navigation]`. The wizard creates it only while the project does not have one; a second run leaves the entries as the editors set them. Its entries are Element-URIs: a page that has one route per language is one entry.
+
+**Features add their own sections.** A feature that processes personal data names a file in the `elements` key of its install unit (see [Features](features.md#the-install-unit)). Activating the feature adds the sections of that file with `\Nino\Elements::seed()` - add-only, never replacing an element or a language version that exists. Deactivating the feature does not delete them: the Dashboard and the dialog say that the text stays. A section deleted for good - in every language - is remembered in `/nino/elements/removed` in `config.php` (by the listener on `/nino/elements/committed`), so that the next update of the feature does not bring it back; creating the element again by hand removes the entry.
+
+**A section can be changed.** `\Nino\Modules\Legal::SECTION`, `/nino/legal/section`, is the callback a section's text goes through before it is drawn: it receives `[ 'type', 'id', 'html' ]` and may add to `html`. The Consent feature puts its settings button into its own section with it.
+
+**Copying a deleted type back.** A type that was deleted is no section, and the Dashboard names the file of the unit to copy back to `private/elements/<type>.php`: `_nino/Nino/Modules/Legal/install/elements/<type>.php`.
+
+**Switching it off.** A project may remove `\Nino\Modules\Legal` from `/nino/modules` by hand. The two shortcodes, the routes and the Dashboard notices are gone then, and the elements stay where they are. Nothing in the kernel needs the module: the Language panel, the Routes panel and the Dashboard ask for the class before they use it.
+
+**What the module stores about visitors.** Nothing: no cookie, no request to a third party. A reader of a section sees its text and nothing else.
 
 ### Elements Search Index
 
@@ -937,6 +971,7 @@ Nino uses standalone smoke tests without PHPUnit. Each test creates an isolated 
 | `tests/admin-smoke.php` | the workbench shell and its content panels: the text blacklist and html sanitizer, element and image operations |
 | `tests/admin-system-smoke.php` | the structure and system panels: the session gate, accounts, roles and permissions, element types, backups and recovery, the activity log, and a render of every panel in every interface language |
 | `tests/install-smoke.php` | Installation steps, generated structure, and self-lock |
+| `tests/legal-smoke.php` | the Legal module: the two types and their sections in every language, the shortcodes and placeholders (and what a value cannot do), the routes per language with derived and shared paths, the legal navigation, `addLocale()`, `check()`, and the sections a feature's unit brings, add-only, with the tombstone of a deleted one |
 | `tests/keys-smoke.php` | the text key grammar and everything Nino ships to it: the units' fragments, every key a shipped template reads, the key literals in the code, and that no old key form is left |
 | `tests/*-js-smoke.js` | browser-like logic of the management interfaces |
 | `tests/concurrency-smoke.php` | parallel and atomic write operations |
@@ -951,6 +986,7 @@ php tests/install-smoke.php
 php tests/features-smoke.php
 php tests/catalogue-smoke.php
 php tests/keys-smoke.php
+php tests/legal-smoke.php
 for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php
@@ -1000,6 +1036,7 @@ The following table lists the most important hooks used by the kernel and integr
 | `/nino/elements/delete<type-uri>` | element type data | check deletion from a type or reject with `false` |
 | `/nino/elements<type-uri>/update/uri` | element data | react to a change in element URI |
 | `/nino/elements/committed` | `{ operation, type, uri, previousUri, locale }` | notification after an Element insert, update, or delete was persisted; cannot veto the completed write |
+| `/nino/legal/section` | `{ type, id, html }` | a section of the imprint or privacy policy is about to be drawn: a listener may add to `html` (Consent puts its settings button into its section); only the sections of `Modules\Legal` |
 | `/nino/mail/send` | `{ to, subject, body, replyTo, sender, headers, sent }` | deliver a mail another way than `mail()`: a transport that took it sets `sent` to `true` or `false`, and `mail()` is skipped; `sent` left at `null` passes the mail on |
 | `/nino/images/render` | `{ mode, bytes, width, height, basePath, source: { width, height, type, orientation }, filename }` | render an uploaded image another way than gd: a handler that wrote the file sets `filename` to the path below `/images/`, `false` refuses the upload, `null` passes it on |
 | `/nino/admin/restore` | `{ dataDir, staging }` | `/_admin` restores a backup: a module merges its own `data/` files from the staged copy into the live directory |

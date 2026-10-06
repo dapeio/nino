@@ -744,6 +744,16 @@ if( typeof elements._renderNav === 'function' ) {
 	check( 'a new element, which the list does not hold yet, gets none', barNew !== undefined && barNew.children.length === 1 );
 	elements._isNew = false;
 
+	// The note of the type stands in the form too, between the context bar and the fields
+	const contentWas = sandbox.Nino.content;
+	check( 'a form of a type without a note has no hint paragraph', dom.find( formNode, n => n.className === 'nino-admin-hint' ).length === 0 );
+	sandbox.Nino.content = { getText : key => key === '/_admin/elements/type/'+ elements._currentType+ '/hint' ? 'Have it checked.' : '' };
+	elements._renderForm();
+	const formHints = dom.find( formNode, n => n.className === 'nino-admin-hint' );
+	check( 'a form of a type with one shows it, as text, right after the context bar', formHints.length === 1 && formHints[0].textContent === 'Have it checked.'
+		&& formNode.children.indexOf( formHints[0] ) === formNode.children.findIndex( n => n.className === 'nino-admin-contextbar' ) + 1 );
+	sandbox.Nino.content = contentWas;
+
 	// The list comes back after every save; a form open on one of its
 	// elements takes the fresh order without being rendered again
 	elements._currentUri = 'cy';
@@ -807,6 +817,22 @@ if( typeof elements._renderNav === 'function' ) {
 	// No column: the plain list
 	elements._renderList( [ { uri : 'ada', label : 'Ada', values : {} } ], [] );
 	check( 'a type with no field a cell can show keeps the plain list', dom.find( listNode, n => n.tagName === 'table' ).length === 0 && dom.find( listNode, n => n.tagName === 'ul' ).length === 1 );
+
+	// A type that has a note of its own - the legal texts say they are no
+	// legal advice - shows it above its elements, as text; one that has none is as it was
+	const contentBefore = sandbox.Nino.content;
+	const hintsOf = node => dom.find( node, n => n.className === 'nino-admin-hint' );
+	check( 'a type without a hint fill has no note', hintsOf( listNode ).length === 0 && elements._typeHint() === null );
+	sandbox.Nino.content = { getText : key => key === '/_admin/elements/type/services/hint' ? 'A starting point, not legal advice. <b>Check it.</b>' : '' };
+	elements._renderList( [ { uri : 'ada', label : 'Ada', values : { title : 'Ada' } } ], [ 'title' ] );
+	const listHints = hintsOf( listNode );
+	check( 'a type with the fill shows it above the list, as a hint paragraph whose words are text', listHints.length === 1 && listHints[0].tagName === 'p' && listHints[0].textContent === 'A starting point, not legal advice. <b>Check it.</b>'
+		&& dom.find( listNode, n => n.tagName === 'table' ).length === 1 );
+	elements._currentType = 'other';
+	elements._renderList( [ { uri : 'ada', label : 'Ada', values : { title : 'Ada' } } ], [ 'title' ] );
+	check( '...and the note of another type is not shown for this one', hintsOf( listNode ).length === 0 );
+	elements._currentType = 'services';
+	sandbox.Nino.content = contentBefore;
 }
 
 // --- an upload is checked against the server's limits before it is sent --------

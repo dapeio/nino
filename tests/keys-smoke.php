@@ -19,8 +19,10 @@ declare(strict_types=1);
  *										E. \Nino\Modules\Template::category()
  *										F. \Nino\Text::isGrammarKey()
  *
- *									The legal page keeps its names until the Legal module
- *									replaces it; where that is an exception, it is named.
+ *									The unit of the Legal module delivers keys that are no keys of
+ *									the grammar - the details of its two pages and the Elements
+ *									panel's words for its two types; where that is an exception, it
+ *									is named.
  *
  *	Usage: php tests/keys-smoke.php
  */
@@ -38,6 +40,15 @@ $appData['/nino/public'] = '/public';
 // a language's name after its code
 const KEYS_SYSTEM_WEBPAGE 	= '#^/_nino/webpage(/.+)/(name|title|description|uri)$#';
 const KEYS_SYSTEM_LOCALE 		= '#^/_nino/locale/[a-z]{2}_[A-Z]{2}/name$#';
+
+// The keys the unit of the Legal module delivers that follow no grammar: the details
+// of the two pages it routes, named after their Element-URIs - the system's form,
+// which a unit never delivers for a page of the library, whose Element-URI is the
+// project's to choose, but which the module chooses itself and reserves - and the
+// Elements panel's words for its two types, which are the workbench's and sit on
+// the unit's blacklist
+const KEYS_LEGAL_PAGES 	= '#^/_nino/webpage/legal/(imprint|privacy)/(name|title|description)$#';
+const KEYS_LEGAL_ADMIN 	= '#^/_admin/elements/(field/(legal|privacy)/(title|text|order|hidden)|type/(legal|privacy)/hint)$#';
 
 // The one key of a feature a page unit delivers: the demo catalogue's
 // newsletter specimen shows the label the Newsletter feature ships for
@@ -57,8 +68,7 @@ function keysFiles( string $dir, string $extension ): array {
 
 	// A checkout holds the project's own data beside what Nino ships: the wizard
 	// writes private/ and public/, the catalogue features/, the cache _admin/.cache/.
-	// None of it is shipped, and the wizard's legal link writes an old-looking key
-	// into it
+	// None of it is shipped, and the wizard writes into it
 	$project = [ '/private/', '/public/', '/features/', '/app/', '/_admin/.cache/' ];
 
 	$found = [];
@@ -177,7 +187,8 @@ foreach( $units as $unit )
 		foreach( $unit['text'][$file] as $key => $value ) {
 			$allowed = isset( KEYS_NAMED_EXCEPTION[$unit['id']] ) === true && in_array( $key, KEYS_NAMED_EXCEPTION[$unit['id']], true ) === true;
 			if( \Nino\Text::isGrammarKey( $key ) === false && $allowed === false
-				&& ( $unit['id'] === 'module:localepicker' && preg_match( KEYS_SYSTEM_LOCALE, $key ) === 1 ) === false )
+				&& ( $unit['id'] === 'module:localepicker' && preg_match( KEYS_SYSTEM_LOCALE, $key ) === 1 ) === false
+				&& ( $unit['id'] === 'module:legal' && ( preg_match( KEYS_LEGAL_PAGES, $key ) === 1 || preg_match( KEYS_LEGAL_ADMIN, $key ) === 1 ) ) === false )
 				$badShape[] = $unit['id']. ' '. $file. ' '. $key;
 			if( is_string( $value ) === false )
 				$badShape[] = $unit['id']. ' '. $file. ' '. $key. ' (no string)';
@@ -189,7 +200,21 @@ foreach( $units as $unit )
 			$numbered[] = $unit['id']. ' '. $key;
 check( 'no key a unit delivers ends in a number: a name says what the text is, not which one it is'. ( $numbered === [] ? '' : ' - '. implode( ', ', array_slice( $numbered, 0, 6 ) ) ), $numbered === [] );
 
-check( 'every key a unit delivers follows the grammar - or is the one system form a unit may deliver, a language\'s name from the Localepicker'. ( $badShape === [] ? '' : ' - '. implode( ', ', array_slice( $badShape, 0, 6 ) ) ), $badShape === [] );
+check( 'every key a unit delivers follows the grammar - or is a form its unit is named for: a language\'s name from the Localepicker, the details of the two pages and the types\' words of the Legal module'. ( $badShape === [] ? '' : ' - '. implode( ', ', array_slice( $badShape, 0, 6 ) ) ), $badShape === [] );
+
+// ...and those exceptions are exactly what they say, nothing a unit of another module may do, and each one blacklisted that is the workbench's
+$legalKeys = array_values( array_filter( $units['module:legal']['keys'], static fn( string $key ): bool => \Nino\Text::isGrammarKey( $key ) === false ) );
+$legalWords = array_values( array_filter( $legalKeys, static fn( string $key ): bool => preg_match( KEYS_LEGAL_ADMIN, $key ) === 1 ) );
+check( 'the unit of the Legal module delivers 6 details of pages, 8 labels of fields and 2 hints of types, per language, and nothing else outside the grammar', count( array_unique( $legalKeys ) ) === 16
+	&& count( array_filter( $legalKeys, static fn( string $key ): bool => preg_match( KEYS_LEGAL_PAGES, $key ) === 1 ) ) === 12 && count( $legalWords ) === 20 && array_diff( $legalKeys, array_filter( $legalKeys, static fn( string $key ): bool => preg_match( KEYS_LEGAL_PAGES, $key ) === 1 || preg_match( KEYS_LEGAL_ADMIN, $key ) === 1 ) ) === [] );
+check( '...and the words of the workbench are on its blacklist, which delivers no other key', array_values( array_unique( $legalWords ) ) === array_values( $units['module:legal']['manifest']['blacklist'] ?? [] ) );
+$exceptionsElsewhere = [];
+foreach( $units as $unit )
+	if( $unit['id'] !== 'module:legal' )
+		foreach( $unit['keys'] as $key )
+			if( preg_match( KEYS_LEGAL_PAGES, $key ) === 1 || preg_match( KEYS_LEGAL_ADMIN, $key ) === 1 )
+				$exceptionsElsewhere[] = $unit['id']. ' '. $key;
+check( 'no other unit delivers one of them'. ( $exceptionsElsewhere === [] ? '' : ' - '. implode( ', ', $exceptionsElsewhere ) ), $exceptionsElsewhere === [] );
 
 $misplaced = [];
 foreach( $units as $unit ) {
@@ -252,9 +277,9 @@ check( 'every fill a value names - /project/website/general/url in a subject - i
 $badBlacklist = [];
 foreach( $units as $unit )
 	foreach( $unit['manifest']['blacklist'] ?? [] as $entry )
-		if( \Nino\Text::isGrammarKey( (string) $entry ) === false )
+		if( \Nino\Text::isGrammarKey( (string) $entry ) === false && ( $unit['id'] === 'module:legal' && preg_match( KEYS_LEGAL_ADMIN, (string) $entry ) === 1 ) === false )
 			$badBlacklist[] = $unit['id']. ' '. $entry;
-check( 'the blacklist entries of every unit follow the grammar'. ( $badBlacklist === [] ? '' : ' - '. implode( ', ', $badBlacklist ) ), $badBlacklist === [] );
+check( 'the blacklist entries of every unit follow the grammar - the Legal module\'s are the words of the workbench for its two types'. ( $badBlacklist === [] ? '' : ' - '. implode( ', ', $badBlacklist ) ), $badBlacklist === [] );
 
 // What a page unit proposes for its page is the manifest's, and no key
 $badSuggest = [];
@@ -417,10 +442,6 @@ foreach( $templateFiles as $template ) {
 		$key = $read['key'];
 		$readCount++;
 
-		// The legal page's footer link, until the Legal module replaces it
-		if( preg_match( '#^/website/legal/(uri|name)$#', $key ) === 1 && $template['name'] === 'html-footer-legal.tpl' )
-			continue;
-
 		if( $read['composed'] === true ) {
 			if( keysComposedShape( $key ) === false )
 				$unknown[] = $template['name']. ' reads the composed key '. str_replace( "\x01", '[[…]]', $key );
@@ -463,13 +484,14 @@ foreach( $templateFiles as $template ) {
 }
 check( 'the templates read keys ('. $readCount. ' reads): every one is a runtime fill, a key of the system, a placeholder put together in a shape that is allowed, or a key its own unit, the base unit or a module it requires delivers'
 	. ( $unknown === [] ? '' : ' - '. implode( '; ', array_slice( array_unique( $unknown ), 0, 6 ) ) ), $unknown === [] && $readCount > 150 );
-check( 'a template reads template keys of its own category or of /template/common only (the legal page and the demo catalogue have no category, so only common)'
+check( 'a template reads template keys of its own category or of /template/common only (the demo catalogue has no category, so only common)'
 	. ( $strangers === [] ? '' : ' - '. implode( '; ', array_slice( array_unique( $strangers ), 0, 6 ) ) ), $strangers === [] );
 
 // A template without a category carries no keys of its own - what is delivered has a template with that category
-check( 'the two templates without a category deliver no key of a template: .demo-catalogue.tpl and page-legal.<xx_XX>.tpl', \Nino\Modules\Template::category( '.demo-catalogue.tpl' ) === null && \Nino\Modules\Template::category( 'page-legal.de_DE.tpl' ) === null
-	&& array_filter( $units['page:legal']['keys'], static fn( string $key ): bool => str_starts_with( $key, '/template/' ) ) === []
+check( 'the template without a category delivers no key of a template: .demo-catalogue.tpl', \Nino\Modules\Template::category( '.demo-catalogue.tpl' ) === null
 	&& array_filter( $units['page:.demo-catalogue']['keys'], static fn( string $key ): bool => str_starts_with( $key, '/template/' ) ) === [] );
+check( 'the two pages of the Legal module read the details of their page and carry no key of their own', array_filter( $units['module:legal']['keys'], static fn( string $key ): bool => str_starts_with( $key, '/template/' ) ) === []
+	&& array_values( $units['module:legal']['templates'] ) === [ 'page-legal-imprint.tpl', 'page-legal-privacy.tpl' ] && isset( $units['page:legal'] ) === false );
 
 // The frames carry the keys of their own category, delivered by the base unit that delivers the frames
 check( 'the frames are frame-header.tpl and frame-footer.tpl, and their words are delivered with them', in_array( 'frame-header.tpl', $units['base']['templates'], true ) === true && in_array( 'frame-footer.tpl', $units['base']['templates'], true ) === true
@@ -493,10 +515,6 @@ foreach( $codeFiles as $file ) {
 
 	$relative = keysRelative( $file, $root );
 	$source 	= (string) file_get_contents( $file );
-
-	// The legal page's link, until the Legal module replaces it
-	if( $relative === '_admin/install/Install.php' )
-		$source = (string) preg_replace( '#/website/legal/[\w{},*-]*#', '', $source );
 
 	$candidates = [];
 	if( preg_match_all( '/\[\[(\/[^\[\]\s\'"]+)/', $source, $found ) > 0 )
@@ -548,11 +566,6 @@ $old = [
 // ends in a slash goes on into the key
 $oldPattern = '~(?<![\w.-])(?:'. implode( '|', array_map( static fn( string $family ): string => str_ends_with( $family, '/' ) === true ? $family : $family. '(?![\w-])', $old ) ). '|theme\.(?:header|footer)(?![\w-]))~';
 
-// The legal page and its footer link keep their names, until the Legal module
-// replaces them: named here, and in the documents that name the exception
-$legalExempt = static fn( string $relative ): bool => str_starts_with( $relative, '_admin/install/library/pages/legal/' ) === true
-	|| $relative === '_admin/install/Install.php' || in_array( $relative, [ 'docs/development.md', 'docs/development.de.md' ], true ) === true;
-
 $leftovers = [];
 $scanned = 0;
 $shipped = [];
@@ -570,9 +583,6 @@ foreach( $shipped as $file ) {
 	$scanned++;
 
 	foreach( explode( "\n", (string) file_get_contents( $file ) ) as $number => $line ) {
-
-		if( $legalExempt( $relative ) === true )
-			$line = (string) preg_replace( '#/website/legal/[\w{},*-]*#', '', $line );
 
 		if( preg_match( $oldPattern, $line, $hit ) === 1 )
 			$leftovers[] = $relative. ':'. ( $number + 1 ). ' '. trim( $hit[0] );
@@ -609,8 +619,8 @@ $categoryCases = [
 	'mail-user.tpl' 															=> 'mail-user',
 	'common.tpl' 																	=> 'common',
 	'page-common.tpl' 														=> 'page-common',
-	'/templates/page-legal.[[/nino/http/response/locale]]' => null,
-	'page-legal.de_DE.tpl' 												=> null,
+	'/templates/page-x.[[/nino/http/response/locale]]' 		=> null,
+	'page-x.de_DE.tpl' 														=> null,
 	'.demo-catalogue.tpl' 												=> null,
 	'theme.header.tpl' 														=> null,
 	'a/x.tpl' 																		=> null,

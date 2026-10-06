@@ -431,6 +431,11 @@ check( 'the unit\'s text keys are added, an existing key kept', \Nino\Filesystem
 	&& \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] )['[[/feature/sample/intro/text]]'] === 'Welcome to the sample.'
 	&& \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/feature/sample/intro/label]]'] === 'Sample label' );
 check( 'the unit\'s blacklist and config default are applied', in_array( '/feature/sample/intro/hidden', \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), true ) === true && $stored['/sample/config'] === 'unit-default' );
+check( 'the unit\'s "elements" are added: the type is created, its title in the native language, its sections in both available languages', ( static function() use ( $appData ): bool {
+	$privacy = \Nino\Filesystem::getFileContent( $appData, '/elements/privacy.php', [] );
+	return ( $privacy['title'] ?? '' ) === 'Datenschutzerklärung' && array_keys( $privacy['*'] ?? [] ) === [ '*', 'sample', 'sample-more' ] && ( $privacy['de_DE']['sample']['title'] ?? '' ) === 'Beispiel' && ( $privacy['en_US']['sample']['title'] ?? '' ) === 'Sample';
+} )() );
+$privacyAfterActivation = file_get_contents( \Nino\Filesystem::path( $appData, '/elements/privacy.php' ) );
 check( 'the registry now knows it as active and current', \Nino\Features::get( $appData, 'sample' )['active'] === true && \Nino\Features::get( $appData, 'sample' )['installed'] === '1.2.0' && \Nino\Features::get( $appData, 'sample' )['update'] === false );
 check( 'the module boots on the next request and its shortcode reads its settings', ( static function() use ( $appData ): bool {
 	\Nino\Modules::callModules( $appData, 'init' );
@@ -536,6 +541,7 @@ check( 'the Roles tab offers the panel\'s permission under the features group, t
 
 $again = \Nino\Features::activate( $appData, 'sample' );
 check( 'activating again is harmless: nothing changes', $again === true && \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'] === $stored['/nino/modules'] && isset( $appData['./sample/upgraded-from'] ) === false );
+check( '...not even in the elements the unit adds: the file is the one the first activation wrote', file_get_contents( \Nino\Filesystem::path( $appData, '/elements/privacy.php' ) ) === $privacyAfterActivation );
 
 /*	...and "nothing changes" now means nothing is done either. Activating
 	sample re-applied helper's whole unit every time - every file copied or
@@ -585,6 +591,19 @@ $upgraded = \Nino\Features::activate( $appData, 'sample' );
 check( 'the module is asked to upgrade from the recorded version, then the new one is recorded', $upgraded === true && $appData['./sample/upgraded-from'] === '0.5.0'
 	&& \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/features']['sample']['version'] === '1.2.0' && \Nino\Features::get( $appData, 'sample' )['update'] === false );
 check( 'an update never overwrites what the project edited', file_get_contents( \Nino\Filesystem::path( $appData, '/templates/page-sample.tpl' ) ) === 'edited since' );
+
+// ...and neither the elements: an edited section stays, and a section somebody
+// deleted for good - which the module that owns the type writes down under
+// '/nino/elements/removed' - does not come back with the next update
+\Nino\Elements::updateElement( $appData, '/privacy/sample', [ 'title' => 'Mein Beispiel' ], 'de_DE' );
+\Nino\Elements::deleteElement( $appData, '/privacy/sample-more', '*' );
+$appData[ \Nino\Elements::REMOVED ] = [ 'privacy' => [ 'sample-more' ] ];
+$appData['/nino/features']['sample']['version'] = '0.5.0';
+\Nino\AppData::writeContentData( $appData, [ '/nino/features' ] );
+unset( $appData['./nino/features/all'] );
+check( 'an update leaves an edited section and does not bring back a deleted one that was written down', \Nino\Features::activate( $appData, 'sample' ) === true
+	&& \Nino\Elements::getElement( $appData, '/privacy/sample', 'de_DE' )['title'] === 'Mein Beispiel' && \Nino\Elements::getElement( $appData, '/privacy/sample-more', 'de_DE' ) === false );
+unset( $appData[ \Nino\Elements::REMOVED ] );
 
 $appData['/nino/features']['sample']['version'] = '0.0.1';
 \Nino\AppData::writeContentData( $appData, [ '/nino/features' ] );
@@ -658,11 +677,13 @@ echo "Features::deactivate\n";
 check( 'a feature another active one requires stays on', \Nino\Features::deactivate( $appData, 'helper' ) === 'feature "helper" is required by "sample"' );
 check( 'an unknown feature cannot be deactivated', \Nino\Features::deactivate( $appData, 'nope' ) === 'unknown feature "nope"' );
 
+$privacyBeforeOff = file_get_contents( \Nino\Filesystem::path( $appData, '/elements/privacy.php' ) );
 $off = \Nino\Features::deactivate( $appData, 'sample' );
 $stored = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 check( 'deactivation removes the class and nothing else', $off === true && $stored['/nino/modules'] === [ '\\Nino\\Modules\\Helper' ]
 	&& $stored['/nino/features']['sample']['settings']['title'] === 'Again' && isset( $stored['/nino/http/routes']['GET://sample-de'] ) === true
 	&& is_file( \Nino\Filesystem::path( $appData, '/templates/page-sample.tpl' ) ) === true );
+check( 'deactivation deletes none of the sections the unit added', file_get_contents( \Nino\Filesystem::path( $appData, '/elements/privacy.php' ) ) === $privacyBeforeOff );
 check( 'the registry reads it as inactive, its record kept', \Nino\Features::get( $appData, 'sample' )['active'] === false && \Nino\Features::get( $appData, 'sample' )['installed'] === '1.2.0' );
 check( 'the panel is gone with it', isset( \Nino\Admin\Admin::panels( $appData )['sample'] ) === false );
 check( 'now the requirement may go too', \Nino\Features::deactivate( $appData, 'helper' ) === true && \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'] === [] );
@@ -993,6 +1014,7 @@ check( 'deactivating answers the refreshed entry, and only the class left config
 check( 'the dashboard tile counts what is active now', \Nino\Modules\Features\Admin::summary( $appData ) === [ 'value' => 1, 'label' => '/_admin/features/label/active' ] );
 [ $status, $body ] = callFeatures( $appData, 'apiDeactivate', [ 'key' => 'helper' ] );
 check( 'a feature that registered no shortcode answers found as an empty list', $status === 200 && $body['found'] === [] );
+check( '...and privacy as an empty list: it brought no section', $body['privacy'] === [] );
 \Nino\Features::activate( $appData, 'helper' );
 
 [ $status, $body ] = callFeatures( $appData, 'apiActivate', [ 'key' => 'sample' ] );
@@ -1016,6 +1038,20 @@ for( $n = 1; $n <= 12; $n++ )
 $found = callFeatures( $appData, 'apiDeactivate', [ 'key' => 'sample' ] )[1]['found'];
 check( 'at most ten places are named for one shortcode, the total counts all of them', count( $found ) === 1 && $found[0]['total'] === 16 && count( $found[0]['places'] ) === 10 );
 callFeatures( $appData, 'apiActivate', [ 'key' => 'sample' ] );
+
+// What the privacy policy still says about a feature that is switched off - or
+// removed, for which see catalogue-smoke - is named when the Legal module is on:
+// the sections the unit brought that nobody hid or deleted, by their titles in
+// the language of the workbench. Nothing is deleted by switching off
+check( 'while the Legal module is not on, nothing is said about the privacy policy', callFeatures( $appData, 'apiDeactivate', [ 'key' => 'sample' ] )[1]['privacy'] === [] );
+callFeatures( $appData, 'apiActivate', [ 'key' => 'sample' ] );
+$appData['/nino/modules'][] = '\\Nino\\Modules\\Legal';
+\Nino\Elements::updateElement( $appData, '/privacy/sample-more', [ 'hidden' => true ], '*' );
+[ $status, $body ] = callFeatures( $appData, 'apiDeactivate', [ 'key' => 'sample' ] );
+check( 'with it on, switching a feature off names the sections of the policy that still describe it - not the hidden one', $status === 200 && $body['privacy'] === [ 'Mein Beispiel' ] );
+check( '...and the sections are all still there', ( \Nino\Elements::getElement( $appData, '/privacy/sample', 'de_DE' )['title'] ?? '' ) === 'Mein Beispiel' && ( \Nino\Elements::getElement( $appData, '/privacy/sample-more', 'de_DE' )['hidden'] ?? false ) === true );
+callFeatures( $appData, 'apiActivate', [ 'key' => 'sample' ] );
+$appData['/nino/modules'] = array_values( array_diff( $appData['/nino/modules'], [ '\\Nino\\Modules\\Legal' ] ) );
 
 // Settings through the action
 [ $status, $body ] = callFeatures( $appData, 'apiSettings', [ 'key' => 'sample', 'fields' => [ 'limit' => '99', 'contact' => 'nope', 'title' => 'Not' ] ] );

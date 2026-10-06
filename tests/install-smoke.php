@@ -346,8 +346,32 @@ check( '...and the picked locale\'s text has no /cookiebanner/ key', array_filte
 // config default - read from there, so the unit can change its menus without
 // a second edit here; what this pins is that the default lands at all
 $navigationDefaults = (array) ( ( include __DIR__. '/../_nino/Nino/Modules/Navigation/install/manifest.php' )['config'] ?? [] );
-check( 'the navigation unit\'s config default lands even though nothing picked navigation', isset( $navigationDefaults['/nino/html/navs'] ) === true
-	&& $configAfterApply['/nino/html/navs'] === $navigationDefaults['/nino/html/navs'] );
+// The Legal unit asks for a menu of its own on top (its 'navs' key, see
+// Setup::_applyNavs()), so the registry is the Navigation unit's menus and 'legal'
+$expectedNavs = array_merge( (array) ( $navigationDefaults['/nino/html/navs'] ?? [] ), [ 'legal' ] );
+check( 'the navigation unit\'s config default lands even though nothing picked navigation - and the menu the Legal unit asks for stands behind it', isset( $navigationDefaults['/nino/html/navs'] ) === true
+	&& $configAfterApply['/nino/html/navs'] === $expectedNavs );
+/*	The Legal unit is one of ALWAYS_MODULES: nothing picked it and it is applied
+	- its two element types seeded in the picked language, its two templates and
+	its path default copied, its menu created. What the unit's own words and
+	texts say is tests/legal-smoke.php's business.	*/
+$legalManifest = include __DIR__. '/../_nino/Nino/Modules/Legal/install/manifest.php';
+check( 'the Legal unit is always applied - its class is active though nothing picked it', in_array( 'legal', \Nino\Install\Setup::ALWAYS_MODULES, true ) === true
+	&& in_array( '\\Nino\\Modules\\Legal', $configAfterApply['/nino/modules'], true ) === true );
+check( '...its two templates are copied', \Nino\Filesystem::fileExists( $appData, '/templates/page-legal-imprint.tpl' ) === true && \Nino\Filesystem::fileExists( $appData, '/templates/page-legal-privacy.tpl' ) === true );
+check( '...and its path default, which only lands where the project has none', $configAfterApply['/nino/legal/paths'] === $legalManifest['config']['/nino/legal/paths'] );
+$legalAfterApply = \Nino\Filesystem::getFileContent( $appData, '/elements/legal.php', [] );
+$privacyAfterApply = \Nino\Filesystem::getFileContent( $appData, '/elements/privacy.php', [] );
+check( '...the types legal and privacy exist, with the sections in the picked language and none in the other', count( $legalAfterApply['de_DE'] ?? [] ) > 0 && count( $privacyAfterApply['de_DE'] ?? [] ) > 5
+	&& isset( $legalAfterApply['en_US'] ) === false && isset( $privacyAfterApply['en_US'] ) === false );
+check( '...each section with a title and a text, and the global bucket with its position', array_filter( $privacyAfterApply['de_DE'], static fn( array $section ): bool => ( $section['title'] ?? '' ) === '' || ( $section['text'] ?? '' ) === '' ) === []
+	&& ( $privacyAfterApply['*']['hosting']['order'] ?? null ) === 200 );
+check( 'the menu legal is created with the two pages by Element-URI, in that order', ( $configAfterApply['/nino/html/navroutes']['/legal/imprint']['legal'] ?? null ) === 1
+	&& ( $configAfterApply['/nino/html/navroutes']['/legal/privacy']['legal'] ?? null ) === 2 );
+check( '...and the footer of the base frames outputs it', str_contains( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/frame-footer.tpl', '' ), '[navigation nav="legal" id="legal__nav"]' ) === true );
+check( 'the unit\'s words for the Elements panel are on the blacklist', in_array( '/_admin/elements/type/privacy/hint', \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), true ) === true
+	&& in_array( '/_admin/elements/field/legal/text', \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), true ) === true );
+
 check( 'never writes a fragment for a locale that was not picked', \Nino\Filesystem::fileExists( $appData, '/text/en_US.php' ) === false );
 
 $libraryAfterApply = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
@@ -370,6 +394,34 @@ $configAfterSecondApply = \Nino\Filesystem::getFileContent( $appData, '/config.p
 check( 'replaces rather than grows: de_DE is gone, only en_US is available now', $configAfterSecondApply['/nino/locales/available'] === [ 'en_US' ] );
 check( 'the native locale follows along once it is no longer available', $configAfterSecondApply['/nino/locales/native'] === 'en_US' );
 check( 'the always-on Form module survives a reapply that picks nothing at all', in_array( '\\Nino\\Modules\\Form', $configAfterSecondApply['/nino/modules'], true ) === true );
+/*	Elements are the editors' content: the second run, in another language,
+	adds that language's versions and replaces nothing - not a section somebody
+	rewrote, not a menu somebody ordered, whatever the wizard's overwrite says	*/
+$privacyAfterSecond = \Nino\Filesystem::getFileContent( $appData, '/elements/privacy.php', [] );
+check( 'a second run in another language adds that language\'s versions of the sections', count( $privacyAfterSecond['en_US'] ?? [] ) === count( $privacyAfterSecond['de_DE'] ?? [] ) && count( $privacyAfterSecond['en_US'] ?? [] ) > 5
+	&& ( $privacyAfterSecond['de_DE'] ?? [] ) === $privacyAfterApply['de_DE'] );
+check( '...and leaves the menu legal and the path default as they were', ( $configAfterSecondApply['/nino/html/navroutes']['/legal/imprint']['legal'] ?? null ) === 1 && $configAfterSecondApply['/nino/legal/paths'] === $configAfterApply['/nino/legal/paths'] );
+// An editor rewrites a section, deletes one and puts the privacy page first
+\Nino\Filesystem::mutate( $appData, '/elements/privacy.php', static function( array $type ): array {
+	$type['de_DE']['hosting']['title'] = 'Mein Hosting';
+	unset( $type['de_DE']['tls'], $type['en_US']['tls'], $type['*']['tls'] );
+	return $type;
+}, [] );
+$editedNavroutes = $appData['/nino/html/navroutes'];
+$editedNavroutes['/legal/privacy']['legal'] = 1;
+$editedNavroutes['/legal/imprint']['legal'] = 2;
+$appData['/nino/html/navroutes'] = $editedNavroutes;
+\Nino\AppData::writeContentData( $appData, [ '/nino/html/navroutes' ] );
+$_POST['data'] = json_encode( [ 'locales' => [ 'en_US' ], 'modules' => [] ] );
+$thirdApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Setup::apiApply( $appData, $thirdApplyRequest );
+$privacyAfterThird = \Nino\Filesystem::getFileContent( $appData, '/elements/privacy.php', [] );
+check( 'a third run leaves a section an editor rewrote as it is', ( $privacyAfterThird['de_DE']['hosting']['title'] ?? null ) === 'Mein Hosting' );
+check( '...and a section deleted by hand without a tombstone comes back in the language of this run: the wizard only ever adds', isset( $privacyAfterThird['en_US']['tls'] ) === true && isset( $privacyAfterThird['*']['tls'] ) === true );
+check( '...and the menu the editors ordered is theirs: the wizard creates it only while the project has none', ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/navroutes']['/legal/privacy']['legal'] ?? null ) === 1
+	&& ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/navroutes']['/legal/imprint']['legal'] ?? null ) === 2 );
+
+
 check( 'so does Navigation', in_array( '\\Nino\\Modules\\Navigation', $configAfterSecondApply['/nino/modules'], true ) === true );
 check( 'the Editor role keeps the contact form\'s permission - it can no longer be dropped by unpicking a module', in_array( '/_admin/submissions/view', $configAfterSecondApply['/nino/auth/roles']['editor']['perms'], true ) === true );
 check( 'a hand-written route outside the library still survives the replace', isset( $configAfterSecondApply['/nino/http/routes']['GET://custom'] ) === true );
@@ -578,7 +630,7 @@ check( 'starts on the starter site the library declares, in the order its units 
 	array_column( $wpLibraryBody['webpages'], 'libraryKey' ) === $presetKeys );
 // Derived from the units rather than restated here: a page added to or
 // dropped from the starter set is one manifest key, not an edit in two places
-check( '...which is the handful a site is normally built from', count( array_intersect( [ 'home', 'contact', '404', 'legal' ], $presetKeys ) ) === 4 );
+check( '...which is the handful a site is normally built from', count( array_intersect( [ 'home', 'contact', '404' ], $presetKeys ) ) === 3 && in_array( 'legal', $presetKeys, true ) === false );
 check( '...each carrying its own suggested Http-URI, not its folder name', ( $wpLibraryBody['webpages'][0]['httpUri'] ?? null ) === '/'
 	&& ( $wpLibraryBody['webpages'][0]['uri'] ?? null ) === '/home' );
 check( '...its own per-locale wording rather than the generic fallback', ( $wpLibraryBody['webpages'][0]['text']['de_DE']['name'] ?? null ) === 'Startseite'
@@ -586,11 +638,11 @@ check( '...its own per-locale wording rather than the generic fallback', ( $wpLi
 // The one field no form offers and apiApply() takes straight off the entry
 check( '...and the status code its manifest route declares', ( array_values( array_filter( $wpLibraryBody['webpages'],
 	static fn( array $e ): bool => $e['libraryKey'] === '404' ) )[0]['statusCode'] ?? null ) === 404 );
-check( 'navigations are offered - the menus the config holds, since Navigation is always active', $wpLibraryBody['navs'] === $navigationDefaults['/nino/html/navs'] );
+check( 'navigations are offered - the menus the config holds, since Navigation is always active', $wpLibraryBody['navs'] === $expectedNavs );
 // ...so a preset page proposes whatever menus its own manifest route
 // suggests, intersected with what the project actually registers - home/
-// contact suggest both, legal only footer, 404 none
-check( '...and each proposed page carries the menu membership its own unit suggests', array_column( $wpLibraryBody['webpages'], 'navs' ) === [ [ 'main', 'footer' ], [ 'main', 'footer' ], [], [ 'footer' ] ] );
+// contact suggest both, 404 none - the imprint is no page of the starter site, the Legal module has it
+check( '...and each proposed page carries the menu membership its own unit suggests', array_column( $wpLibraryBody['webpages'], 'navs' ) === [ [ 'main', 'footer' ], [ 'main', 'footer' ], [] ] );
 
 // Each template also reports the starter wording its own text fragments
 // ship, so the form can prefill a new entry per locale instead of leaving
@@ -600,7 +652,7 @@ check( '...with de_DE\'s wording read from the unit\'s own de_DE fragment', $wpL
 check( '...and en_US\'s from its own en_US fragment - the locale that used to end up generic', $wpLibraryBody['templates']['home']['text']['en_US']['name'] === 'Home' && $wpLibraryBody['templates']['home']['text']['en_US']['title'] === 'Welcome.' );
 check( 'reports the Http-URI "home" suggests for itself, which is not its folder name', $wpLibraryBody['templates']['home']['uri'] === '/' );
 check( '...and "contact"\'s, which is', $wpLibraryBody['templates']['contact']['uri'] === '/contact' );
-check( 'the legal manifest declares the stable Element-URI its generated route receives', ( array_values( ( include __DIR__. '/../_admin/install/library/pages/legal/manifest.php' )['routes'] )[0]['uri'] ?? null ) === '/legal' );
+check( 'the page library has no legal page any more - the Legal module brings the imprint and the privacy policy', is_dir( __DIR__. '/../_admin/install/library/pages/legal' ) === false && in_array( 'legal', array_keys( $wpLibraryBody['templates'] ), true ) === false );
 check( 'the blank template starts every locale with useful page metadata', $wpLibraryBody['templates']['blank']['text']['de_DE']['name'] === 'Neue Webseite' && $wpLibraryBody['templates']['blank']['text']['en_US']['name'] === 'New webpage' );
 check( 'the blank template suggests a stable Http-URI and its own page template', $wpLibraryBody['templates']['blank']['uri'] === '/new-webpage' && $wpLibraryBody['templates']['blank']['body'] === '[template /templates/page-blank]' );
 check( 'the blank page template deliberately has no section', strpos( (string) file_get_contents( __DIR__. '/../_admin/install/library/pages/blank/templates/page-blank.tpl' ), '<section' ) === false );
@@ -619,6 +671,15 @@ $_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/x', 'httpUri' => '/
 $badTemplateRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $badTemplateRequest );
 check( 'rejects an unknown library key with 400', $badTemplateRequest['/nino/http/response']['statusCode'] === 400 );
+
+// The two Element-URIs of the Legal module's pages are its: a page of the
+// project's own cannot take them, whatever route it brings
+foreach( [ '/legal/imprint', '/legal/privacy' ] as $reservedElementUri ) {
+	$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => $reservedElementUri, 'httpUri' => '/my-page', 'libraryKey' => 'blank', 'text' => [] ] ] ] );
+	$reservedElementRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+	\Nino\Install\Webpages::apiApply( $appData, $reservedElementRequest );
+	check( 'rejects the Legal module\'s Element-URI '. $reservedElementUri. ' with 409', $reservedElementRequest['/nino/http/response']['statusCode'] === 409 && isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://my-page'] ) === false );
+}
 
 $_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/installer-shadow', 'httpUri' => '/_admin', 'libraryKey' => 'home', 'text' => [] ] ] ] );
 $reservedHttpUriRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
@@ -777,8 +838,8 @@ check( 'no key named for a library folder is in the project - only the Element-U
 // language code. A unit that delivered another would be a unit writing what
 // is not its to write (tests/keys-smoke.php checks the library for it)
 $systemKeys = array_filter( array_merge( array_keys( $deAfterWpApply ), array_keys( $enAfterWpApply ), array_keys( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] ) ) ), static fn( string $key ): bool => str_starts_with( $key, '[[/_nino/' ) );
-check( 'the only /_nino keys of the project texts are the pages\' details and the languages\' names', $systemKeys !== []
-	&& array_filter( $systemKeys, static fn( string $key ): bool => preg_match( '#^\[\[/_nino/(webpage/site-(home|contact)/(name|title|description|uri)|locale/(de_DE|en_US)/name)\]\]$#', $key ) !== 1 ) === [] );
+check( 'the only /_nino keys of the project texts are the pages\' details (the two legal pages among them) and the languages\' names', $systemKeys !== []
+	&& array_filter( $systemKeys, static fn( string $key ): bool => preg_match( '#^\[\[/_nino/(webpage/(site-(home|contact)|legal\/(imprint|privacy))/(name|title|description|uri)|locale/(de_DE|en_US)/name)\]\]$#', $key ) !== 1 ) === [] );
 $globalAfterWpApply = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
 $blacklistAfterWpApply = \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] );
 check( 'writes every page\'s reachable Http-URI as one global fill, so a template can link to it by name', ( $globalAfterWpApply['[[/_nino/webpage/site-home/uri]]'] ?? null ) === '/'
@@ -861,6 +922,17 @@ $configAfterCollision = \Nino\Filesystem::getFileContent( $appData, '/config.php
 check( '...and nothing of it was written - no route for it, and the library page\'s template as it was', isset( $configAfterCollision['/nino/http/routes']['GET://eigene-startseite'] ) === false
 	&& trim( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/page-home.tpl', '' ) ) !== '' );
 
+// The same for a module's unit: /legal-imprint would be given the Legal
+// module's own page-legal-imprint.tpl as its copy
+$_POST['data'] = json_encode( [ 'webpages' => [
+	[ 'uri' => '/legal-imprint', 'httpUri' => '/eigenes-impressum', 'libraryKey' => 'blank', 'text' => [] ],
+] ] );
+$moduleCollisionRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Webpages::apiApply( $appData, $moduleCollisionRequest );
+check( 'a page of your own cannot take the template name of a module\'s unit, and the answer names the unit - not a page of the library', $moduleCollisionRequest['/nino/http/response']['statusCode'] === 409
+	&& str_contains( (string) ( $moduleCollisionRequest['/nino/http/response']['body']['error'] ?? '' ), '"legal" unit' ) === true
+	&& isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://eigenes-impressum'] ) === false );
+
 // A name no unit owns is one more page of your own, as before
 $_POST['data'] = json_encode( [ 'webpages' => [
 	[ 'uri' => '/team', 'httpUri' => '/team', 'libraryKey' => 'blank', 'text' => [] ],
@@ -897,7 +969,7 @@ $navSetupRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $_POST['data'] = json_encode( [ 'webpages' => [
 	[ 'uri' => '/site-home', 'httpUri' => '/', 'libraryKey' => 'home', 'navs' => [ 'main' ], 'text' => [ 'de_DE' => [ 'name' => 'Start' ], 'en_US' => [ 'name' => 'Home' ] ] ],
 	[ 'uri' => '/site-contact', 'httpUri' => '/kontakt', 'libraryKey' => 'contact', 'navs' => [ 'main' ], 'text' => [ 'de_DE' => [ 'name' => 'Kontakt' ], 'en_US' => [ 'name' => 'Contact' ] ] ],
-	[ 'uri' => '/site-legal', 'httpUri' => '/impressum', 'libraryKey' => 'legal', 'navs' => [], 'text' => [ 'de_DE' => [ 'name' => 'Recht' ], 'en_US' => [ 'name' => 'Legal' ] ] ],
+	[ 'uri' => '/site-rules', 'httpUri' => '/impressum', 'libraryKey' => 'blank', 'navs' => [], 'text' => [ 'de_DE' => [ 'name' => 'Recht' ], 'en_US' => [ 'name' => 'Rules' ] ] ],
 ] ] );
 $navWpApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $navWpApplyRequest );
@@ -911,7 +983,7 @@ $enAfterNav = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] 
 // /_nino/webpage<uri>/name keys the entries already carry
 $routesAfterNav = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
 
-check( 'the Navigation module registers the menus the editors offer', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/navs'] === $navigationDefaults['/nino/html/navs'] );
+check( 'the Navigation module registers the menus the editors offer, the Legal unit\'s among them', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/navs'] === $expectedNavs );
 check( 'an entry explicitly assigned to main joins that menu at its own position in the list', ( $routesAfterNav['GET://']['navs'] ?? null ) === [ 'main' => 1 ] );
 check( '...and so does the second one, one position further down', ( $routesAfterNav['GET://kontakt']['navs'] ?? null ) === [ 'main' => 2 ] );
 check( 'an entry that is in no menu carries no membership at all', isset( $routesAfterNav['GET://impressum']['navs'] ) === false );
@@ -921,17 +993,15 @@ check( 'nothing is generated into the text files anymore', isset( $deAfterNav['[
 // to - reordering pages is what reorders the menus
 check( 'the applied routes stand in the list\'s own order', array_slice( array_keys( $routesAfterNav ), -3 ) === [ 'GET://', 'GET://kontakt', 'GET://impressum' ] );
 
-// The legal template's single route (see _routeKeys()' docblock) is
-// registered at whatever Http-URI the entry picked, its body driven by
-// [[/nino/http/response/locale]] rather than a locale-gated second route
-check( 'registers "legal" at its own picked Http-URI', isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://impressum'] ) === true );
+// A page is registered at whatever Http-URI the entry picked
+check( 'registers an entry at its own picked Http-URI', isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://impressum'] ) === true );
 
-$globalAfterLegal = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
-check( 'mirrors the legal entry\'s Http-URI (a real href, not its Element-URI) into the well-known /website/legal/uri key', $globalAfterLegal['[[/website/legal/uri]]'] === '/impressum' );
-check( 'mirrors its de_DE name into /website/legal/name too', $deAfterNav['[[/website/legal/name]]'] === 'Recht' );
+// The imprint is the Legal module's, not a page of the wizard: nothing mirrors
+// a legal link into /website/legal/* any more, the menu 'legal' is the link
+$globalAfterNav = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
+check( 'no /website/legal/* key is written for a page', isset( $globalAfterNav['[[/website/legal/uri]]'] ) === false && isset( $deAfterNav['[[/website/legal/name]]'] ) === false && isset( $enAfterNav['[[/website/legal/name]]'] ) === false );
 
-// Dropping legal again narrows the routes (replace semantics) but leaves
-// the /website/legal/* mirror alone - see _applyLegalLink()'s docblock
+// Dropping pages narrows the routes (replace semantics)
 $_POST['data'] = json_encode( [ 'webpages' => [
 	[ 'uri' => '/site-home', 'httpUri' => '/', 'libraryKey' => 'home', 'navs' => [ 'main' ], 'text' => [ 'de_DE' => [ 'name' => 'Start' ], 'en_US' => [ 'name' => 'Home' ] ] ],
 ] ] );
@@ -942,7 +1012,7 @@ $configAfterDrop = \Nino\Filesystem::getFileContent( $appData, '/config.php', []
 check( 'dropping "kontakt"/"impressum" removes their routes (replace, not merge)', isset( $configAfterDrop['/nino/http/routes']['GET://kontakt'] ) === false && isset( $configAfterDrop['/nino/http/routes']['GET://impressum'] ) === false );
 check( 'the home route survives, still keyed the same way', isset( $configAfterDrop['/nino/http/routes']['GET://'] ) === true );
 check( 'a hand-written route still survives this replace too', isset( $configAfterDrop['/nino/http/routes']['GET://custom'] ) === true );
-check( '/website/legal/uri is only ever set, never cleared - a known v1 limitation', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/website/legal/uri]]'] ?? null ) === '/impressum' );
+check( 'the legal menu and its two Element-URIs are not touched by a replace of the pages', ( $configAfterDrop['/nino/html/navroutes']['/legal/privacy']['legal'] ?? null ) === 1 && ( $configAfterDrop['/nino/html/navroutes']['/legal/imprint']['legal'] ?? null ) === 2 );
 
 /*	...and the starter site stays gone. The one property that separates a
 	proposal in the step's list from a default underneath config.php: this
@@ -992,7 +1062,7 @@ echo "Webpages <-> _admin's Routes module share one source of truth\n";
 $_POST['data'] = json_encode( [ 'webpages' => [
 	[ 'uri' => '/site-home', 'httpUri' => '/', 'libraryKey' => 'home', 'navs' => [ 'main' ], 'text' => [ 'de_DE' => [ 'name' => 'Start' ] ] ],
 	[ 'uri' => '/site-404', 'httpUri' => '/404', 'libraryKey' => '404', 'navs' => [], 'text' => [ 'de_DE' => [ 'name' => 'Weg' ] ] ],
-	[ 'uri' => '/site-legal', 'httpUri' => '/legal', 'libraryKey' => 'legal', 'navs' => [], 'text' => [ 'de_DE' => [ 'name' => 'Recht' ] ] ],
+	[ 'uri' => '/site-legal', 'httpUri' => '/legal', 'libraryKey' => '', 'body' => '[template /templates/page-legal.[[/nino/http/response/locale]]]', 'navs' => [], 'text' => [ 'de_DE' => [ 'name' => 'Recht' ] ] ],
 ] ] );
 $sharedApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $sharedApplyRequest );
@@ -1002,10 +1072,10 @@ $sharedConfig = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 $sharedList 	= $sharedApplyRequest['/nino/http/response']['body']['webpages'];
 
 check( 'reports "template" as the on-disk template file /_admin selects from', array_column( $sharedList, 'template' ) === [ 'page-home', 'page-404', '' ] );
-check( 'resolves each entry back to the library unit it came from, from its route body alone', array_column( $sharedList, 'libraryKey' ) === [ 'home', '404', 'legal' ] );
+check( 'resolves each entry back to the library unit it came from, from its route body alone', array_column( $sharedList, 'libraryKey' ) === [ 'home', '404', '' ] );
 check( 'reports each entry\'s status code, read back off its route', array_column( $sharedList, 'statusCode' ) === [ 200, 404, 200 ] );
 check( 'the 404 entry really is a 404 in the route too', ( $sharedConfig['/nino/http/routes']['GET://404']['statusCode'] ?? 200 ) === 404 );
-check( '"legal" reports no single template - its body resolves one per locale', $sharedList[2]['body'] === '[template /templates/page-legal.[[/nino/http/response/locale]]]' );
+check( 'a body that resolves one template per locale reports no single template', $sharedList[2]['body'] === '[template /templates/page-legal.[[/nino/http/response/locale]]]' );
 
 // Now the other direction: open one of those entries in /_admin's Routes module
 // and save it back unchanged, exactly as pages.js posts it
@@ -1036,7 +1106,8 @@ $afterDevSave = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 check( 'saving it there does not quietly reset its 404 to a 200', ( $afterDevSave['/nino/http/routes']['GET://404']['statusCode'] ?? 200 ) === 404 );
 check( 'the entry still resolves to /_install\'s own "404" unit after a save made in /_admin', ( \Nino\Install\Webpages::pages( $appData, $afterDevSave['/nino/http/routes'], [ 'de_DE' ], [] )[1]['libraryKey'] ?? null ) === '404' );
 
-// The locale-resolving body the template <select> can't spell: saving that
+// The locale-resolving body (a hand-made entry: no library unit has one any
+// more) the template <select> can't spell: saving that
 // entry from /_admin keeps the body it already has rather than flattening it
 // into whichever option the disabled select happened to preselect
 $_POST['data'] = json_encode( [
@@ -1422,7 +1493,7 @@ foreach( scandir( $realRoot. '/_admin/install/library/pages' ) ?: [] as $pageEnt
 		if( preg_match( '#\[template /templates/([a-z0-9._-]+)#i', (string) ( $route['body'] ?? '' ), $routeTemplate ) !== 1 )
 			continue;
 
-		// A locale-suffixed body ('page-legal.[[/nino/http/response/locale]]')
+		// A locale-suffixed body ('page-x.[[/nino/http/response/locale]]')
 		// matches whichever locales the unit ships, so the stem is what counts
 		$stem 			= preg_replace( '/\.$/', '', $routeTemplate[1] );
 		$candidates = glob( $pageDir. '/templates/'. $stem. '*.tpl' ) ?: [];
@@ -1433,9 +1504,9 @@ foreach( scandir( $realRoot. '/_admin/install/library/pages' ) ?: [] as $pageEnt
 }
 
 check( 'every page unit ships the templates its own routes render'. ( $pageFailures === [] ? '' : ' - '. implode( ' | ', $pageFailures ) ), $pageFailures === [] );
-// The four a starter site is normally built from have to be among them, or
+// The three a starter site is normally built from have to be among them, or
 // the Routes step has nothing to offer on a fresh install
-check( 'the page library offers the four a starter site is built from', count( array_intersect( [ 'home', 'contact', '404', 'legal' ], $pageUnits ) ) === 4 );
+check( 'the page library offers the three a starter site is built from', count( array_intersect( [ 'home', 'contact', '404' ], $pageUnits ) ) === 3 );
 check( '...and a blank one to start a page of your own from', in_array( 'blank', $pageUnits, true ) === true );
 
 // The 404 unit is the one whose route Http::response() looks up by an exact
@@ -1591,7 +1662,6 @@ check( 'no template of the install library writes an address from the domain roo
 $duAllowed = [
 	'_nino/Nino/Modules/Form/text/de_DE.php' => [ 'Sie ist danach von diesem Server verschwunden' => 'the request is meant: "Die Anfrage ... Sie ist danach ..."' ],
 	'_nino/Nino/Modules/Navigation/text/de_DE.php' => [ 'Ihre Routen bleiben' => 'the menu\'s routes' ],
-	'_admin/install/library/pages/legal/templates/page-legal.de_DE.tpl' => [ 'Sie erläutert auch' => 'the privacy policy is meant, not the reader' ],
 ];
 $duSources = [];
 foreach( [
@@ -1695,12 +1765,12 @@ $_POST['data'] = json_encode( [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => 
 $starterSetupRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Setup::apiApply( $appData, $starterSetupRequest );
 $starterEntries = [];
-foreach( [ 'home' => [ '/home', '/' ], 'contact' => [ '/contact', '/contact' ], 'services' => [ '/services', '/services' ], 'about-me' => [ '/about-me', '/about-me' ], '404' => [ '/404', '/404' ], 'legal' => [ '/legal', '/legal' ] ] as $starterKey => [ $starterUri, $starterHttpUri ] )
+foreach( [ 'home' => [ '/home', '/' ], 'contact' => [ '/contact', '/contact' ], 'services' => [ '/services', '/services' ], 'about-me' => [ '/about-me', '/about-me' ], '404' => [ '/404', '/404' ] ] as $starterKey => [ $starterUri, $starterHttpUri ] )
 	$starterEntries[] = [ 'uri' => $starterUri, 'httpUri' => $starterHttpUri, 'libraryKey' => (string) $starterKey, 'navs' => [], 'text' => [ 'de_DE' => [ 'name' => 'Seite '. $starterKey ], 'en_US' => [ 'name' => 'Page '. $starterKey ] ] ];
 $_POST['data'] = json_encode( [ 'webpages' => $starterEntries ] );
 $starterRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Webpages::apiApply( $appData, $starterRequest );
-check( 'the whole starter site applies', $starterRequest['/nino/http/response']['statusCode'] === 200 && count( $starterRequest['/nino/http/response']['body']['webpages'] ?? [] ) === 6 );
+check( 'the whole starter site applies', $starterRequest['/nino/http/response']['statusCode'] === 200 && count( $starterRequest['/nino/http/response']['body']['webpages'] ?? [] ) === 5 );
 $starterMissing = ( new ReflectionMethod( \Nino\Modules\Text\Keys::class, '_scanMissing' ) )->invokeArgs( null, [ &$appData ] );
 check( 'on a fresh install the Missing text keys tile reads 0 - no template names a key nobody writes'
 	. ( $starterMissing === [] ? '' : ' - '. implode( ', ', array_column( $starterMissing, 'key' ) ) ), \Nino\Modules\Text\Keys::missingCount( $appData ) === 0 );
@@ -1755,14 +1825,14 @@ if( defined( 'NINO_APP_DIR' ) === true ) {
 	$appLibraryBody = $appLibraryRequest['/nino/http/response']['body'];
 	check( 'the Setup step offers the project module', ( $appLibraryBody['modules']['widget']['label'] ?? null ) === 'Widget'
 		&& ( $appLibraryBody['modules']['widget']['requiresModules'] ?? null ) === [ 'forms' ] );
-	check( '...and forms/navigation/localepicker stay excluded even once other project modules exist', array_intersect( [ 'forms', 'navigation', 'localepicker' ], array_keys( $appLibraryBody['modules'] ) ) === [] );
+	check( '...and forms/navigation/localepicker/legal stay excluded even once other project modules exist', array_intersect( [ 'forms', 'navigation', 'localepicker', 'legal' ], array_keys( $appLibraryBody['modules'] ) ) === [] );
 
 	$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE' ], 'modules' => [ 'widget' ] ] );
 	$appApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 	\Nino\Install\Setup::apiApply( $appData, $appApplyRequest );
 	$appApplyBody = $appApplyRequest['/nino/http/response']['body'] ?? [];
 
-	check( 'applying it activates the class and its requirement, alongside the three always-on units', ( $appApplyBody['modules'] ?? null ) === [ 'forms', 'navigation', 'localepicker', 'widget' ]
+	check( 'applying it activates the class and its requirement, alongside the four always-on units', ( $appApplyBody['modules'] ?? null ) === [ 'forms', 'navigation', 'localepicker', 'legal', 'widget' ]
 		&& in_array( '\\Acme\\Widget', $appData['/nino/modules'], true ) === true
 		&& in_array( '\\Nino\\Modules\\Form', $appData['/nino/modules'], true ) === true );
 	check( '...and copies its template out of the module directory', \Nino\Filesystem::fileExists( $appData, '/templates/page-widget.tpl' ) === true );
@@ -1772,7 +1842,7 @@ if( defined( 'NINO_APP_DIR' ) === true ) {
 	$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE' ], 'modules' => [ 'widget' ] ] );
 	$unknownRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 	\Nino\Install\Setup::apiApply( $appData, $unknownRequest );
-	check( 'a requirement no unit answers to is left out of the applied set - only the always-on three plus what was actually picked remain', ( $unknownRequest['/nino/http/response']['body']['modules'] ?? null ) === [ 'forms', 'navigation', 'localepicker', 'widget' ] );
+	check( 'a requirement no unit answers to is left out of the applied set - only the always-on four plus what was actually picked remain', ( $unknownRequest['/nino/http/response']['body']['modules'] ?? null ) === [ 'forms', 'navigation', 'localepicker', 'legal', 'widget' ] );
 }
 
 echo "\n";

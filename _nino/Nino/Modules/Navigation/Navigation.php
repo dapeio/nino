@@ -176,10 +176,18 @@ namespace Nino\Modules {
 		 *	A route that exists only at runtime - a feature's /blog, registered
 		 *	in its init() - has no entry in config.php to carry a 'navs' of its
 		 *	own. Its memberships are the key '/nino/html/navroutes', the same
-		 *	shape one level up: [ 'GET://blog' =&gt; [ 'main' =&gt; 3 ] ]. It is read
-		 *	only for a route that is live right now, so a feature switched off
-		 *	takes its menu entry with it, and a membership the route's own 'navs'
-		 *	states for the same menu wins. Malformed entries are skipped.
+		 *	shape one level up, by the page's Element-URI - the route's own
+		 *	'uri' - rather than by route: [ '/blog' =&gt; [ 'main' =&gt; 3 ] ].
+		 *	A page that has a route per language (Modules\Legal's imprint) is
+		 *	one page, and stays in the menu when a path changes or a language
+		 *	joins. Every GET route with that 'uri' is a member for it, a route
+		 *	on a wildcard ('/blog/*') never is. It is read only for a route
+		 *	that is live right now, so a feature switched off takes its menu
+		 *	entry with it, and a membership the route's own 'navs' states for
+		 *	the same menu wins. A page is in a menu once: where a route of the
+		 *	current language and one without a language share an Element-URI,
+		 *	the one of the current language is the entry. Malformed entries are
+		 *	skipped.
 		 *
 		 *	The value is a priority, same rule Callbacks::registerCallback()
 		 *	uses - lower runs first, 5 is the middle - except it is a plain
@@ -197,6 +205,8 @@ namespace Nino\Modules {
 
 			$locale 	= \Nino\Locales::getCurrentLocale( $appData );
 			$buckets 	= [];
+			$entries 	= [];
+			$ofLocale = [];
 
 			foreach( ( $appData['/nino/http/routes'] ?? [] ) as $routeKey => $route ) {
 
@@ -205,9 +215,9 @@ namespace Nino\Modules {
 				if( str_starts_with( $routeKey, 'GET://' ) === false )
 					continue;
 
-				// The route's own membership first, then the one a runtime-only
-				// route keeps beside the routes (see above)
-				$prio = $route['navs'][$nav] ?? self::_runtimePriority( $appData, (string) $routeKey, $nav );
+				// The route's own membership first, then the one its page keeps
+				// beside the routes (see above)
+				$prio = $route['navs'][$nav] ?? self::_runtimePriority( $appData, (string) $routeKey, (string) ( $route['uri'] ?? '' ), $nav );
 
 				if( $prio === null )
 					continue;
@@ -231,8 +241,20 @@ namespace Nino\Modules {
 				// derivation Locales::callbackResponse() makes for its redirect,
 				// and the same uri space the request carries, so the "active"
 				// match in doShortcode() keeps comparing like for like
-				$buckets[ (int) $prio ][] = substr( $routeKey, strlen( 'GET:/' ) ). ':'. $title;
+				$entries[] = [
+					'prio' 	=> (int) $prio,
+					'uri' 	=> (string) ( $route['uri'] ?? '' ),
+					'bound' => isset( $route['locale'] ),
+					'line' 	=> substr( $routeKey, strlen( 'GET:/' ) ). ':'. $title,
+				];
+
+				if( isset( $route['locale'] ) === true )
+					$ofLocale[ (string) ( $route['uri'] ?? '' ) ] = true;
 			}
+
+			foreach( $entries as $entry )
+				if( $entry['bound'] === true || $entry['uri'] === '' || isset( $ofLocale[ $entry['uri'] ] ) === false )
+					$buckets[ $entry['prio'] ][] = $entry['line'];
 
 			ksort( $buckets );
 
@@ -240,19 +262,24 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	The priority a runtime-only route holds in one navigation,
-		 *	from '/nino/html/navroutes' - null when there is none, or when the
-		 *	value is not a whole number
+		 *	The priority a page holds in one navigation as a runtime-only
+		 *	membership, from '/nino/html/navroutes' - null when there is none,
+		 *	when the value is not a whole number, or for a route on a
+		 *	wildcard, which no link can point at
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$routeKey			Eg. 'GET://blog'
+		 *	@param		string		$uri					The route's Element-URI, eg. '/blog'
 		 *	@param		string		$nav					Navigation key, eg. "main"
 		 *
 		 *	@return 	int|null
 		 */
-		private static function _runtimePriority( array &$appData, string $routeKey, string $nav ): ?int {
+		private static function _runtimePriority( array &$appData, string $routeKey, string $uri, string $nav ): ?int {
 
-			$prio = $appData['/nino/html/navroutes'][$routeKey][$nav] ?? null;
+			if( $uri === '' || str_ends_with( $routeKey, '/*' ) === true )
+				return null;
+
+			$prio = $appData['/nino/html/navroutes'][$uri][$nav] ?? null;
 
 			return is_int( $prio ) === true ? $prio : null;
 		}

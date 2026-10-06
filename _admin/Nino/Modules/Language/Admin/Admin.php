@@ -245,6 +245,11 @@ namespace Nino\Modules\Language {
 		 *	button must not be one click away from emptying a finished
 		 *	translation.
 		 *
+		 *	What the legal texts bring for the language - the names of their pages
+		 *	and the Elements panel's words, the sections' version in it where the
+		 *	module's unit or an active feature's has one - is added by
+		 *	\Nino\Modules\Legal::addLocale(), to the new file only.
+		 *
 		 *	The language's name, which the language pickers show, is the
 		 *	system's to create: /_nino/locale/<code>/name goes into
 		 *	global.php with the code as its value, unless the key is there
@@ -327,6 +332,21 @@ namespace Nino\Modules\Language {
 			if( \Nino\Filesystem::putFileContent( $appData, $textDir. '/'. $locale. '.php', $skeleton ) === false ) {
 				\Nino\Http::fail( $request, 500, 'could not write '. $textDir. '/'. $locale. '.php' );
 				return;
+			}
+
+			// What the legal texts bring for a language - the names of their two
+			// pages, the Elements panel's words for their types and the sections'
+			// version in that language - nothing applies the unit again after the
+			// setup, so it is put into the file that is new here. The file is
+			// new, so nothing of anybody's is lost
+			if( class_exists( '\\Nino\\Modules\\Legal' ) === true ) {
+
+				$added = \Nino\Modules\Legal::addLocale( $appData, $locale );
+
+				if( $added !== true ) {
+					\Nino\Http::fail( $request, 500, $added );
+					return;
+				}
 			}
 
 			\Nino\Http::ok( $request, [

@@ -38,6 +38,7 @@ features/Catalog/
 ├── templates/catalog.tpl    the markup the runtime class renders - php decides what is shown, a template what it looks like
 ├── install/                 the unit activate() applies, add-only (4.)
 │   ├── manifest.php
+│   ├── elements/privacy.php  the feature's section of the privacy policy, if it processes personal data
 │   ├── templates/section-catalog.tpl
 │   └── text/{global,en_US,de_DE}.php
 └── tests/catalog-smoke.php  the feature's own test (9.)
@@ -431,7 +432,7 @@ The keys show both namespaces a unit uses. A word of the feature's own function 
 
 What `\Nino\Features::activate()` reads from the unit: `routes`, `templates`
 (locale-keyed entries only for available locales), `files`, `elementTypes`,
-`blacklist`, `config`, and `text/global.php` plus `text/<locale>.php` for
+`elements`, `blacklist`, `config`, and `text/global.php` plus `text/<locale>.php` for
 every available locale. `key`, `label`, `moduleClass`, `requiresModules`,
 `preset` and `active` are the wizard's picker and are not read by an
 activation - the feature manifest carries them in its own form (`key`,
@@ -451,6 +452,48 @@ whole difference from the wizard, which applies the same unit through the same
 - a route the feature owns at runtime (`GET://api/catalog` above) belongs in
   `init()`, not in the unit; a visitor page the feature ships belongs in the
   unit's `routes`.
+
+**A contribution to the privacy policy.** A feature that processes personal
+data - it stores something about a visitor, sets a cookie, loads something from
+a third party - brings its own section of the privacy policy, with `elements`
+in the unit's manifest:
+
+```php
+'elements' => [ 'privacy' => 'elements/privacy.php' ],
+```
+
+```php
+<?php return [
+	'*' => [
+		'catalog' => [ 'order' => 560 ],
+	],
+	'en_US' => [
+		'catalog' => [
+			'title' => 'Catalog',
+			'text'  => '<p>The catalog remembers your last search in your browser. Nothing is sent to us. Questions: #/project/company/contact/email#</p>',
+		],
+	],
+	'de_DE' => [
+		'catalog' => [
+			'title' => 'Katalog',
+			'text'  => '<p>Der Katalog merkt sich Deine letzte Suche in Deinem Browser. An uns wird nichts übertragen. Fragen: #/project/company/contact/email#</p>',
+		],
+	],
+];
+```
+
+The type `privacy` is the Legal module's. The file has no `model`, so it adds
+to the type and never creates it, and `\Nino\Elements::seed()` only adds: an
+element that exists, a section the editor changed and one deleted for good
+stay as they are. Write the section in your own words, in every language the
+feature ships, state only what the code does, and let a placeholder name a
+fact of the website. The text is a starting point and no legal advice; say so
+in your README and point to the notice in
+[Legal](../development.md#legal). `order` is the position on the page, a hundred apart so a section fits
+between two: the module's own sections stand in 100-399, cookies and consent in
+400-499, contact, forms and mail in 500-599, statistics in 600-699, embedded
+content in 700-799, other features in 800-899, and the closing section at 900 - see `install/elements/privacy.php` of the Legal module. Test that the second activation
+changes nothing.
 
 ## 5. Activate it
 

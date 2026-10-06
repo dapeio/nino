@@ -48,6 +48,9 @@ namespace Nino\Modules {
 	 *											thing known about it. The constant below is only what is
 	 *											left when neither template can be read.
 	 *
+	 *											A route that carries 'maintenance' => false is answered as
+	 *											usual - the login, and the pages of Modules\Legal.
+	 *
 	 *											A signed-in account sees the site as it is, with a banner
 	 *											saying it is down for everybody else: callbackOutput() on
 	 *											/nino/http/output, the one hook that has the finished page.
@@ -63,12 +66,6 @@ namespace Nino\Modules {
 		// /.form, answers the maintenance page too: the site is down for a
 		// visitor, contact form included
 		private const string ADMIN_PREFIX = '/_admin';
-
-		// The one other carve-out: the login. An operator who is not signed
-		// in has to be able to sign in - from the workbench's login form, which
-		// is above, and from its re-login dialog - to switch this back off or
-		// just to see the site as it is
-		private const string LOGIN_URI = '/.nino/auth/login';
 
 		// Where the module's own templates and words are, and what a locale
 		// has to look like before it is made part of a path to one
@@ -93,6 +90,15 @@ namespace Nino\Modules {
 		// last into the banner template's [[link]]
 		private static string $linkHtml = ' <a href="[[href]]" style="color:inherit;font-weight:600;text-decoration:underline">[[label]]</a>';
 
+		// The links to the imprint and the privacy policy on the module's own
+		// page (see _legal()): one line with [[href]] and [[label]] per page,
+		// what stands between two of them, and the paragraph they stand in
+		private static array $legalHtml = [
+			'link'		=> '<a href="[[href]]">[[label]]</a>',
+			'separator'	=> ' &middot; ',
+			'list'		=> '<p>[[links]]</p>',
+		];
+
 		// What is left when neither of the module's own page templates can be
 		// read: a minimal, self-contained page, so the one thing this module
 		// must render - even on a project that has nothing else, or a
@@ -112,6 +118,7 @@ namespace Nino\Modules {
 					<main>
 						<h1>%1$s</h1>
 						<p>%2$s</p>
+						%3$s
 					</main>
 				</body>
 			</html>
@@ -206,9 +213,15 @@ namespace Nino\Modules {
 			if( \Nino\Auth::getCurrentUser( $appData ) !== false )
 				return false;
 
-			// ...and one that is not yet has to be able to become one. The
-			// login's route is only ever a POST, answered by Auth itself
-			if( $uri === self::LOGIN_URI && ( $request['/nino/http/request']['method'] ?? '' ) === 'POST' )
+			// A route that says so stays reachable: 'maintenance' => false in
+			// its definition, which Http::response() has mixed into the answer
+			// by now. The login has to - an operator who is not signed in must
+			// be able to sign in, from the workbench's login form and from its
+			// re-login dialog, to switch this back off or just to see the site
+			// as it is - and so have the imprint and the privacy policy
+			// (Modules\Legal), which a visitor is owed whatever the site is
+			// doing. Set by code or by config.php, never by a request
+			if( ( $request['/nino/http/response']['maintenance'] ?? true ) === false )
 				return false;
 
 			$own = is_file( \Nino\Filesystem::path( $appData, '/templates/page-maintenance.tpl' ) );
@@ -268,7 +281,8 @@ namespace Nino\Modules {
 		 *	design; otherwise the module's own template for the language of
 		 *	the page (templates/page-maintenance.<locale>.tpl, en_US where
 		 *	there is none for it) with the same two fills
-		 *	(/module/maintenance/page/title, /module/maintenance/page/text)
+		 *	(/module/maintenance/page/title, /module/maintenance/page/text) and
+		 *	the links to the imprint and the privacy policy (see _legal())
 		 *	resolved directly rather than through the shortcode pipeline, and
 		 *	this module's default in that language (install/text/<locale>.php)
 		 *	or a hardcoded one
@@ -306,16 +320,49 @@ namespace Nino\Modules {
 
 			$title = htmlspecialchars( $title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
 			$text	 = nl2br( htmlspecialchars( $text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ) );
+			$legal = self::_legal( $appData );
 
 			foreach( array_unique( [ $locale, self::LOCALE_FALLBACK ] ) as $name ) {
 
 				$template = \Nino\Filesystem::getFileContent( $appData, self::DIR. '/templates/page-maintenance.'. $name. '.tpl', '' );
 
 				if( is_string( $template ) === true && $template !== '' )
-					return strtr( $template, [ '[[title]]' => $title, '[[text]]' => $text ] );
+					return strtr( $template, [ '[[title]]' => $title, '[[text]]' => $text, '[[legal]]' => $legal ] );
 			}
 
-			return sprintf( self::FALLBACK_BODY, $title, $text );
+			return sprintf( self::FALLBACK_BODY, $title, $text, $legal );
+		}
+
+		/**
+		 *	The links to the imprint and the privacy policy for the module's own
+		 *	page, in the language of the page: they stay reachable while the
+		 *	site is down (see _prepare()), so a visitor can be sent to them.
+		 *	Nothing where Modules\Legal is not active or a page has no route
+		 *	or no name in this language - an empty string, not a dead link
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string									A paragraph, or ''
+		 */
+		private static function _legal( array &$appData ): string {
+
+			$links = [];
+
+			foreach( \Nino\Modules\Legal::PAGES as $page => $definition ) {
+
+				$url	= \Nino\Modules\Legal::url( $appData, $page );
+				$name	= \Nino\Html::renderTextfill( $appData, '/_nino/webpage'. $definition['uri']. '/name' );
+
+				if( $url === '' || $name === '' )
+					continue;
+
+				$links[] = strtr( self::$legalHtml['link'], [
+					'[[href]]'	=> htmlspecialchars( $url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ),
+					'[[label]]'	=> htmlspecialchars( $name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ),
+				] );
+			}
+
+			return $links === [] ? '' : str_replace( '[[links]]', implode( self::$legalHtml['separator'], $links ), self::$legalHtml['list'] );
 		}
 
 		/**

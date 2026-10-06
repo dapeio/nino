@@ -26,7 +26,7 @@ return [
 	'[[/_admin/keys/scan/result]]'		=> '%c Schlüssel angelegt, %i dauerhaft ignoriert, %s für später gelassen.',
 	'[[/_admin/keys/scan/none]]'				=> 'Keine fehlenden Schlüssel. Jeder in templates/*.tpl referenzierte Schlüssel ist bereits definiert.',
 	'[[/_admin/keys/scan/grammar]]'		=> 'Folgt nicht /<namensraum>/<kategorie>/<teil>/<name> und lässt sich deshalb hier nicht anlegen. Benenne ihn im Template um.',
-	'[[/_admin/keys/scan/system-routes]]'	=> 'Ein Schlüssel des Systems. Das Panel Routen schreibt ihn, wenn eine Seite mit dieser Element-URI gespeichert wird – und für Name, Titel und Beschreibung einer Seite, die ein Feature ausliefert, unter „Feature-Routen“.',
+	'[[/_admin/keys/scan/system-routes]]'	=> 'Ein Schlüssel des Systems. Das Panel Routen schreibt ihn, wenn eine Seite mit dieser Element-URI gespeichert wird – und für Name, Titel und Beschreibung einer Seite, die ein Feature ausliefert, unter „Routen aus Features und Modulen“.',
 	'[[/_admin/keys/scan/system-language]]'	=> 'Ein Schlüssel des Systems. Das Panel Sprache schreibt ihn, wenn die Sprache hinzugefügt wird.',
 	'[[/_admin/keys/scan/system-none]]'	=> 'Ein Schlüssel des Systems, den kein Panel schreibt. Ändere, was das Template liest.',
 	'[[/_admin/keys/scan/hint-feature]]'	=> 'Gehört normalerweise zum Feature „%s“, dessen Install-Einheit ihn liefert. Fehlt er, ist das Feature vielleicht nicht aktiv, oder der Schlüssel ist falsch geschrieben.',

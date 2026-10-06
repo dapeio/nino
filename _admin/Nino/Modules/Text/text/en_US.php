@@ -26,7 +26,7 @@ return [
 	'[[/_admin/keys/scan/result]]'		=> '%c key(s) created, %i permanently ignored, %s left for later.',
 	'[[/_admin/keys/scan/none]]'				=> 'No missing keys found. Every key referenced in templates/*.tpl is already defined.',
 	'[[/_admin/keys/scan/grammar]]'		=> 'Does not follow /<namespace>/<category>/<part>/<name>, so it cannot be created here. Rename it in the template.',
-	'[[/_admin/keys/scan/system-routes]]'	=> 'A key of the system. The Routes panel writes it when a page with this Element URI is saved – and, for the name, title and description of a page a feature serves, under “Feature routes”.',
+	'[[/_admin/keys/scan/system-routes]]'	=> 'A key of the system. The Routes panel writes it when a page with this Element URI is saved – and, for the name, title and description of a page a feature serves, under “Routes of features and modules”.',
 	'[[/_admin/keys/scan/system-language]]'	=> 'A key of the system. The Language panel writes it when the language is added.',
 	'[[/_admin/keys/scan/system-none]]'	=> 'A key of the system that no panel writes. Change what the template reads.',
 	'[[/_admin/keys/scan/hint-feature]]'	=> 'Normally belongs to the feature “%s”, whose install unit delivers it. If it is missing, the feature may not be active, or the key is misspelled.',

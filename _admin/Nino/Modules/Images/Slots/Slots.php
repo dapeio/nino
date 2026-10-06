@@ -306,9 +306,9 @@ namespace Nino\Modules\Images {
 		 *	through the [template /templates/<name>] includes that body pulls
 		 *	in, however deep (a visited set and a depth cap keep a template
 		 *	that includes itself from running away). A body that names the
-		 *	template by language - [[/nino/http/response/locale]], as the
-		 *	legal page does - is read once per available language, since there
-		 *	is no single template it points to. A page is named by its
+		 *	template by language - [[/nino/http/response/locale]], as a
+		 *	hand-written route may - is read once per available language, since
+		 *	there is no single template it points to. A page is named by its
 		 *	[[/_nino/webpage<uri>/name]] in the workbench's language, or by its
 		 *	http uri where it has none.
 		 *

@@ -13,11 +13,11 @@
  *													shape follows slots.js closely; the list's own ↑/↓ buttons
  *													reorder the routes with it, which is what orders every
  *													menu those pages appear in (see \Nino\Modules\Navigation).
- *													The pages a feature routes at runtime - which no
- *													config.php has - are listed below them, without ↑/↓ and
- *													without delete: their form is the path, read-only, and
- *													the name, title and description per language, saved as
- *													routes/savetexts.
+ *													The pages a feature or a module routes at runtime - which no
+ *													config.php has - are listed below them, one row per
+ *													Element-URI, without ↑/↓ and without delete: their form
+ *													is the paths, read-only, and the name, title and
+ *													description per language, saved as routes/savetexts.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -261,7 +261,7 @@
 				name.textContent = Nino.admin.routes._pageName( entry );
 				copy.appendChild( name );
 				const path = dc.createElement('small');
-				path.textContent = entry.httpUri;
+				path.textContent = Nino.admin.routes._paths( entry );
 				copy.appendChild( path );
 				link.appendChild( copy );
 				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.routes._openRuntimeForm( entry ) } );
@@ -270,6 +270,18 @@
 				ul.appendChild( li );
 			} );
 			wrap.appendChild( ul );
+		},
+
+		/**
+		 *	The paths a feature's page is reached at: all of them for a page
+		 *	with a route per language, the one of any other
+		 *
+		 *	@param		{Object}	entry					One entry from _runtime
+		 *
+		 *	@return		{string}
+		 */
+		_paths : function( entry ) {
+			return Array.isArray( entry.httpUris ) === true && entry.httpUris.length > 0 ? entry.httpUris.join(', ') : entry.httpUri;
 		},
 
 		/**
@@ -452,7 +464,7 @@
 			pathInput.type = 'text';
 			pathInput.id = 'routes-form-runtime-path';
 			pathInput.readOnly = true;
-			pathInput.value = entry.httpUri;
+			pathInput.value = Nino.admin.routes._paths( entry );
 			pathLabel.appendChild( pathInput );
 			pageFieldset.appendChild( pathLabel );
 
@@ -605,7 +617,7 @@
 			pageFieldset.appendChild( templateLabel );
 
 			// A route body that isn't a plain template reference can't be
-			// spelled by this select - the setup wizard's "legal" unit resolves its
+			// spelled by this select - a hand-written one may resolve its
 			// file per locale via [[/nino/http/response/locale]]. Saving
 			// keeps that body either way (see Admin.php's apiSave()),
 			// so the select is disabled rather than left looking as if it

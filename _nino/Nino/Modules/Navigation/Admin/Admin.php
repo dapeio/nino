@@ -27,8 +27,12 @@ namespace Nino\Modules\Navigation {
 	 *												[ &lt;key&gt; =&gt; &lt;prio&gt; ] - the membership that actually
 	 *												renders (see \Nino\Modules\Navigation) - and
 	 *												'/nino/html/navroutes', the same memberships for a
-	 *												route that exists only at runtime, such as a feature's
-	 *												/blog and so has no route in config.php to carry them.
+	 *												page that exists only at runtime, such as a feature's
+	 *												/blog and so has no route in config.php to carry them -
+	 *												kept under the page's Element-URI, so a page with a
+	 *												route per language (the imprint of Modules\Legal) is
+	 *												one entry here, listed with its paths, and stays in the
+	 *												menu when a path changes or a language joins.
 	 *												Priorities are kept dense, 1..n per menu, so a position
 	 *												in this list reads as the position in the menu rather
 	 *												than as an arbitrary number someone has to space out by
@@ -146,10 +150,12 @@ namespace Nino\Modules\Navigation {
 		 *	identified by $data['originalKey'] (empty for a new one).
 		 *
 		 *	'entries', when posted, is the menu's whole order: a list of http
-		 *	uris, every one a route the panel offers (see _candidates()), none
-		 *	twice. It is the only way entries change. Every route of the menu
-		 *	that is not in it loses its membership, the ones in it get the dense
-		 *	priorities 1..n, and what is stored for a route that is gone
+		 *	uris, every one an entry the panel offers (see _candidates(); a page
+		 *	with a route per language is one entry, any of its paths names it),
+		 *	none twice. It is the only way entries change. Every entry of the
+		 *	menu that is not in it loses its membership, the ones in it get the
+		 *	dense priorities 1..n - a runtime-only page under its Element-URI in
+		 *	'/nino/html/navroutes' - and what is stored for a page that is gone
 		 *	(a feature switched off) goes with the first save of that menu.
 		 *	Without 'entries' a save only creates or renames, as it always did.
 		 *
@@ -218,7 +224,7 @@ namespace Nino\Modules\Navigation {
 					return;
 				}
 
-				$candidates = self::_candidates( $routes, $live );
+				$candidates = self::_candidates( $routes, $live, \Nino\Locales::getNativeLocale( $appData ) );
 				$order 			= null;
 
 				if( ( $data['entries'] ?? null ) !== null ) {
@@ -237,19 +243,21 @@ namespace Nino\Modules\Navigation {
 							return;
 						}
 
-						$routeKey = self::_routeKey( $httpUri );
+						// A page with a route per language is one entry, and any of its
+						// paths names it
+						$entryKey = self::_entryKey( $candidates, $httpUri );
 
-						if( in_array( $routeKey, $order, true ) === true ) {
+						if( $entryKey !== null && in_array( $entryKey, $order, true ) === true ) {
 							\Nino\Http::fail( $request, 400, 'route listed twice: "'. $httpUri. '"', 'navs_duplicate_entry', [ $httpUri ] );
 							return;
 						}
 
-						if( isset( $candidates[$routeKey] ) === false ) {
+						if( $entryKey === null ) {
 							\Nino\Http::fail( $request, 404, 'unknown route: "'. $httpUri. '"', 'navs_unknown_route', [ $httpUri ] );
 							return;
 						}
 
-						$order[] = $routeKey;
+						$order[] = $entryKey;
 					}
 				}
 
@@ -420,7 +428,7 @@ namespace Nino\Modules\Navigation {
 		 *	@param		string		$key
 		 *	@param		array 		$registry			See registry()
 		 *	@param		array 		$routes				The persisted route array
-		 *	@param		array 		$navroutes		The runtime-only memberships, route key =&gt; [ menu =&gt; prio ]
+		 *	@param		array 		$navroutes		The runtime-only memberships, Element-URI =&gt; [ menu =&gt; prio ]
 		 *
 		 *	@return 	bool
 		 */
@@ -460,29 +468,38 @@ namespace Nino\Modules\Navigation {
 		}
 
 		/**
-		 *	The routes a menu could contain: every persisted GET route, and
-		 *	every GET route that exists only at runtime - live, but not in
+		 *	The entries a menu could contain: every persisted GET route, and
+		 *	every page that exists only at runtime - live, but not in
 		 *	config.php - which a feature or a module registers in its init()
 		 *	(Posts' /blog). Technical routes stay in: robots.txt, sitemap.xml,
 		 *	llms.txt and the dot-routes are routes like any other, and it is the
 		 *	menu's owner who knows what a visitor should see. Out are what no
 		 *	link can point at, among the runtime-only routes: a wildcard route
-		 *	(a key ending in /*), and the workbench itself, /_admin and
-		 *	everything below it, the recovery page included. A route persisted
-		 *	in config.php is offered as it always was
+		 *	(a key ending in /*), a route that names no Element-URI, and the
+		 *	workbench itself, /_admin and everything below it, the recovery page
+		 *	included. A route persisted in config.php is offered as it always
+		 *	was, one entry each.
+		 *
+		 *	The runtime-only routes of one Element-URI are one entry: a page
+		 *	that has a route per language is one page, and it is kept in a menu
+		 *	by that uri (see \Nino\Modules\Navigation::routeLines()). Its key
+		 *	here is the Element-URI - which no route key can equal, those start
+		 *	with GET:// - and 'routeKeys' lists its routes, the one of the native
+		 *	language first.
 		 *
 		 *	@param		array 		$routes				The persisted route array
 		 *	@param		array 		$live					The live route array, as it was before this request replaced anything
+		 *	@param		string		$native				The native locale, whose route leads an entry
 		 *
-		 *	@return 	array										Route key =&gt; [ 'route' =&gt; the route, 'runtime' =&gt; whether it is runtime-only ]
+		 *	@return 	array										Entry key =&gt; [ 'route' =&gt; the leading route, 'runtime' =&gt; whether it is runtime-only, 'routeKeys' =&gt; its route keys ]
 		 */
-		private static function _candidates( array $routes, array $live ): array {
+		private static function _candidates( array $routes, array $live, string $native = '' ): array {
 
 			$candidates = [];
 
 			foreach( $routes as $routeKey => $route )
 				if( str_starts_with( (string) $routeKey, 'GET://' ) === true && is_array( $route ) === true )
-					$candidates[$routeKey] = [ 'route' => $route, 'runtime' => false ];
+					$candidates[$routeKey] = [ 'route' => $route, 'runtime' => false, 'routeKeys' => [ (string) $routeKey ] ];
 
 			foreach( $live as $routeKey => $route ) {
 
@@ -497,40 +514,78 @@ namespace Nino\Modules\Navigation {
 				if( $routeKey === 'GET://_admin' || str_starts_with( $routeKey, 'GET://_admin/' ) === true )
 					continue;
 
-				$candidates[$routeKey] = [ 'route' => $route, 'runtime' => true ];
+				$uri = is_string( $route['uri'] ?? null ) === true ? $route['uri'] : '';
+
+				if( str_starts_with( $uri, '/' ) === false )
+					continue;
+
+				if( isset( $candidates[$uri] ) === false ) {
+					$candidates[$uri] = [ 'route' => $route, 'runtime' => true, 'routeKeys' => [ $routeKey ] ];
+					continue;
+				}
+
+				$candidates[$uri]['routeKeys'][] = $routeKey;
+
+				if( $native !== '' && ( $route['locale'] ?? null ) === $native && ( $candidates[$uri]['route']['locale'] ?? null ) !== $native ) {
+					$candidates[$uri]['route'] = $route;
+					array_unshift( $candidates[$uri]['routeKeys'], array_pop( $candidates[$uri]['routeKeys'] ) );
+				}
 			}
 
 			return $candidates;
 		}
 
 		/**
-		 *	The priority one route holds in one menu: its own 'navs' first,
-		 *	then what '/nino/html/navroutes' says for it - the order the
-		 *	\Nino\Modules\Navigation shortcode reads them in
+		 *	The entry a posted http uri names: the persisted route with that
+		 *	path, or the runtime-only page one of whose routes has it
+		 *
+		 *	@param		array 		$candidates		See _candidates()
+		 *	@param		string		$httpUri
+		 *
+		 *	@return 	string|null							The entry's key, null when no entry has that path
+		 */
+		private static function _entryKey( array $candidates, string $httpUri ): ?string {
+
+			$routeKey = self::_routeKey( $httpUri );
+
+			foreach( $candidates as $key => $candidate )
+				if( in_array( $routeKey, $candidate['routeKeys'], true ) === true )
+					return (string) $key;
+
+			return null;
+		}
+
+		/**
+		 *	The priority one entry holds in one menu: a persisted route's own
+		 *	'navs' first, then what '/nino/html/navroutes' says for the page's
+		 *	Element-URI - the order the \Nino\Modules\Navigation shortcode
+		 *	reads them in
 		 *
 		 *	@param		array 		$routes				The persisted route array
 		 *	@param		array 		$navroutes		The runtime-only memberships
-		 *	@param		string		$routeKey
+		 *	@param		string		$key					The entry's key, see _candidates()
+		 *	@param		array 		$candidate		The entry
 		 *	@param		string		$navKey
 		 *
-		 *	@return 	int|null								Null when the route is not in this menu
+		 *	@return 	int|null								Null when the entry is not in this menu
 		 */
-		private static function _priority( array $routes, array $navroutes, string $routeKey, string $navKey ): ?int {
+		private static function _priority( array $routes, array $navroutes, string $key, array $candidate, string $navKey ): ?int {
 
-			$own = $routes[$routeKey]['navs'][$navKey] ?? null;
+			$own = $routes[$key]['navs'][$navKey] ?? null;
 
 			if( $own !== null )
 				return (int) $own;
 
 			// Only an int counts here, as \Nino\Modules\Navigation::_runtimePriority()
 			// reads it: a hand-written '3' never renders, so it is no member
-			$prio = $navroutes[$routeKey][$navKey] ?? null;
+			$uri	= $candidate['runtime'] === true ? $key : (string) ( $candidate['route']['uri'] ?? '' );
+			$prio = $uri === '' ? null : ( $navroutes[$uri][$navKey] ?? null );
 
 			return is_int( $prio ) === true ? $prio : null;
 		}
 
 		/**
-		 *	The route keys standing in one menu, in their running order -
+		 *	The entries standing in one menu, in their running order -
 		 *	priority first, the order the candidates stand in breaking a tie,
 		 *	which is the order \Nino\Modules\Navigation::routeLines() renders
 		 *
@@ -539,14 +594,14 @@ namespace Nino\Modules\Navigation {
 		 *	@param		array 		$candidates		See _candidates()
 		 *	@param		string		$navKey
 		 *
-		 *	@return 	array										Route keys, eg. [ 'GET://', 'GET://contact' ]
+		 *	@return 	array										Entry keys, eg. [ 'GET://', 'GET://contact', '/legal/imprint' ]
 		 */
 		private static function _members( array $routes, array $navroutes, array $candidates, string $navKey ): array {
 
 			$members = [];
-			foreach( $candidates as $routeKey => $candidate )
-				if( ( $prio = self::_priority( $routes, $navroutes, $routeKey, $navKey ) ) !== null )
-					$members[$routeKey] = $prio;
+			foreach( $candidates as $key => $candidate )
+				if( ( $prio = self::_priority( $routes, $navroutes, (string) $key, $candidate, $navKey ) ) !== null )
+					$members[$key] = $prio;
 
 			// asort() is stable as of php 8, so equal priorities keep the
 			// order the routes stand in rather than an arbitrary one
@@ -556,19 +611,19 @@ namespace Nino\Modules\Navigation {
 		}
 
 		/**
-		 *	Set one menu's running order: its routes in $order get the dense
-		 *	priorities 1..n, every other route of the menu - and whatever is
-		 *	stored for a runtime route that is not there any more - leaves it.
+		 *	Set one menu's running order: its entries in $order get the dense
+		 *	priorities 1..n, every other entry of the menu - and whatever is
+		 *	stored for a runtime page that is not there any more - leaves it.
 		 *	Dense numbers keep config.php readable as positions. A persisted
 		 *	route keeps its membership on itself (and a route with none left
 		 *	carries no 'navs' at all, the shape the wizard writes), a
-		 *	runtime-only one in $navroutes
+		 *	runtime-only page in $navroutes, under its Element-URI
 		 *
 		 *	@param		array 		&$routes			(reference) The persisted route array
 		 *	@param		array 		&$navroutes		(reference) The runtime-only memberships
 		 *	@param		array 		$candidates		See _candidates()
 		 *	@param		string		$navKey
-		 *	@param		array 		$order				Route keys, in the intended order
+		 *	@param		array 		$order				Entry keys, in the intended order
 		 *
 		 *	@return 	void
 		 */
@@ -585,24 +640,24 @@ namespace Nino\Modules\Navigation {
 					unset( $routes[$routeKey]['navs'] );
 			}
 
-			foreach( $navroutes as $routeKey => $memberships ) {
+			foreach( $navroutes as $uri => $memberships ) {
 
 				if( isset( $memberships[$navKey] ) === false )
 					continue;
 
-				unset( $navroutes[$routeKey][$navKey] );
+				unset( $navroutes[$uri][$navKey] );
 
-				if( count( $navroutes[$routeKey] ) === 0 )
-					unset( $navroutes[$routeKey] );
+				if( count( $navroutes[$uri] ) === 0 )
+					unset( $navroutes[$uri] );
 			}
 
 			$prio = 1;
-			foreach( $order as $routeKey ) {
+			foreach( $order as $key ) {
 
-				if( isset( $routes[$routeKey] ) === true )
-					$routes[$routeKey]['navs'][$navKey] = $prio;
+				if( isset( $routes[$key] ) === true )
+					$routes[$key]['navs'][$navKey] = $prio;
 				else
-					$navroutes[$routeKey][$navKey] = $prio;
+					$navroutes[$key][$navKey] = $prio;
 
 				$prio++;
 			}
@@ -676,15 +731,15 @@ namespace Nino\Modules\Navigation {
 			$config 		= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 			$routes 		= (array) ( $config['/nino/http/routes'] ?? [] );
 			$navroutes 	= (array) ( $config['/nino/html/navroutes'] ?? [] );
-			$candidates = self::_candidates( $routes, $live );
+			$candidates = self::_candidates( $routes, $live, \Nino\Locales::getNativeLocale( $appData ) );
 			$labels 		= self::_labels( $appData, $candidates );
 
 			$navs = [];
 			foreach( self::registry( $appData ) as $key ) {
 
 				$entries = [];
-				foreach( self::_members( $routes, $navroutes, $candidates, $key ) as $routeKey )
-					$entries[] = $labels[$routeKey];
+				foreach( self::_members( $routes, $navroutes, $candidates, $key ) as $entryKey )
+					$entries[] = $labels[$entryKey];
 
 				$navs[] = [ 'key' => $key, 'entries' => $entries ];
 			}
@@ -697,7 +752,7 @@ namespace Nino\Modules\Navigation {
 		}
 
 		/**
-		 *	Every route a menu could contain, labelled the way the menu would
+		 *	Every entry a menu could contain, labelled the way the menu would
 		 *	label it.
 		 *
 		 *	Every GET route qualifies, not just the page ones the Routes
@@ -712,7 +767,7 @@ namespace Nino\Modules\Navigation {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$candidates		See _candidates()
 		 *
-		 *	@return 	array										Route key =&gt; { httpUri, uri, label, named, runtime }
+		 *	@return 	array										Entry key =&gt; { httpUri, paths, uri, label, named, runtime } - 'httpUri' the path that names the entry, 'paths' every path of it (more than one for a page with a route per language)
 		 */
 		private static function _labels( array &$appData, array $candidates ): array {
 
@@ -738,9 +793,10 @@ namespace Nino\Modules\Navigation {
 
 			$labels = [];
 
-			foreach( $candidates as $routeKey => $candidate ) {
+			foreach( $candidates as $entryKey => $candidate ) {
 
-				$httpUri 	= substr( $routeKey, strlen( 'GET:/' ) );
+				$paths 		= array_map( static fn( string $routeKey ): string => substr( $routeKey, strlen( 'GET:/' ) ), $candidate['routeKeys'] );
+				$httpUri 	= $paths[0];
 				$uri 			= (string) ( $candidate['route']['uri'] ?? $httpUri );
 				$name 		= '';
 
@@ -748,8 +804,9 @@ namespace Nino\Modules\Navigation {
 					if( ( $name = (string) ( $fills['[[/_nino/webpage'. $uri. '/name]]'] ?? '' ) ) !== '' )
 						break;
 
-				$labels[$routeKey] = [
+				$labels[$entryKey] = [
 					'httpUri' => $httpUri,
+					'paths' 	=> $paths,
 					'uri' 		=> $uri,
 					'label' 	=> $name !== '' ? $name : $httpUri,
 					'named' 	=> $name !== '',

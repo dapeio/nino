@@ -103,6 +103,8 @@ Supported unit keys in the current installer:
 | `files` | Files/directories copied to the same project-relative path |
 | `imageSlots` | The base unit and page units only: image slots the unit's templates show with `[image <uri>]`, `uri => [ 'label' => string or locale map, 'width', 'height', 'filename' ]`. `filename` is optional: a seed file below `images/` that the unit ships under `files`, or none for a slot that starts empty (the base unit's `/logo`). Added to `/nino/html/images` only where the project has no slot of that uri, so a re-applied step never resets an editor's image; the label is resolved for the native locale; a seed that is not there fails the step by name |
 | `elementTypes` | Unit-root files copied into project `elements/` |
+| `elements` | Elements added to element types, add-only: `type uri => file below the unit`, e.g. `'privacy' => 'elements/privacy.php'` - see below |
+| `navs` | Menus the wizard creates when the project does not have them: `nav key => [ Element-URI, ... ]`, e.g. `'legal' => [ '/legal/imprint', '/legal/privacy' ]` - see below |
 | `blacklist` | Text keys merged into `text/blacklist.php` |
 | `config` | Top-level defaults written only when absent |
 
@@ -132,7 +134,8 @@ A page unit that requires this module names the same installer slug:
 Test installing both through the module picker and through a page that
 auto-requires it. The current Webpages auto-require path activates the class and
 applies module templates, text, blacklist, and config; it does not apply a
-module manifest's own `requiresModules`, `routes`, `files`, or `elementTypes`.
+module manifest's own `requiresModules`, `routes`, `files`, `elementTypes`,
+`elements` or `navs`.
 List the complete required-module closure on the page when needed. If the page
 depends on the other resources, either put a supported resource in the page
 unit, ensure it is shipped independently, or extend `Install.php` symmetrically
@@ -187,6 +190,44 @@ The source is
 `app/Project/Catalog/Catalog/install/catalog-items.php` and the destination is
 `elements/catalog-items.php`. Keep these source filenames flat and validate
 them in tests.
+
+`elements` adds elements and never replaces one:
+
+```php
+'elements' => [ 'privacy' => 'elements/privacy.php' ],
+```
+
+The file has the shape of a type file - `title`, `model`, the bucket `'*'`
+and one bucket per language, each an element id with its field values - and
+lies below the unit (`install/elements/privacy.php`). `\Nino\Elements::seed()`
+creates the type where the project has none and the file brings a `model`,
+adds an element that does not exist and a language version an element does
+not have, and leaves everything else as it is - the title and model of the
+type, every value, every element the file does not name. It does so whatever
+the caller's overwrite flag says, which is the difference to `templates` and
+text: elements are the editors' content, so a second wizard run never resets
+one. The key is read by `\Nino\Features::applyUnit()` - the wizard's and a
+feature's activation - and not by the auto-require path of a page. A path
+that leaves the unit, is absolute or is no file fails the step by name; a
+value that does not fit the model is left out and logged. See
+[Features](../features.md#the-install-unit) for a feature's use of it and
+[Legal](../development.md#legal) for the types `legal` and `privacy`.
+
+`navs` creates a menu:
+
+```php
+'navs' => [ 'legal' => [ '/legal/imprint', '/legal/privacy' ] ],
+```
+
+Only the wizard's apply step reads it - a feature's activation and the page
+auto-require path do not, since a feature brings no menu. A key the project
+does not have under `/nino/html/navs` is added to it, and the Element-URIs
+become its members, priority 1, 2, ... in that order, under
+`/nino/html/navroutes`. The entries are Element-URIs - the `uri` of a
+route - not route keys: a page with one route per language is one entry. A
+menu the project has is left as the editors made it, and a key that is no
+usable slug or an entry that does not start with `/` is skipped with a
+warning. Base frames show such a menu with `[navigation nav="legal"]`.
 
 ## Text fragments
 

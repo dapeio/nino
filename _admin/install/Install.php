@@ -329,11 +329,11 @@ namespace Nino\Install {
 	 *	Nino							A compact filesystembased php framework
 	 *	Install						Step 2: assembles the picked locales, plus every module unit,
 	 *												into the project's config.php/templates/text. Navigation,
-	 *												the locale picker and the contact form (each their own
-	 *												text and/or mail templates) are no longer a choice here -
-	 *												ALWAYS_MODULES lists their unit keys, and apiApply() applies
-	 *												their units the same way it applies a picked one, on every
-	 *												run. What the picker (apiLibrary()) still offers is any
+	 *												the locale picker, the contact form and the legal texts
+	 *												(each their own text and/or mail templates) are no
+	 *												longer a choice here - ALWAYS_MODULES lists their unit
+	 *												keys, and apiApply() applies their units the same way it
+	 *												applies a picked one, on every run. What the picker (apiLibrary()) still offers is any
 	 *												*other* unit - a project's own module below the app dir, or
 	 *												a fork below library/modules - which is why the mechanism
 	 *												itself (units(), the posted 'modules' list, requiresModules)
@@ -403,11 +403,13 @@ namespace Nino\Install {
 
 		// Unit keys (see units()) that used to be a picker choice and are now
 		// applied on every apply, exactly like a module a project actually
-		// picked - Navigation, the locale picker and the contact form. Not a
-		// class list like CORE_MODULES/TOOL_MODULES: a unit key still has to
-		// go through the normal applyUnit()/moduleClass path in apiApply(),
+		// picked - Navigation, the locale picker, the contact form and the
+		// legal texts (an imprint and a privacy policy are owed by practically
+		// every website, and a link to them forgotten is the dearer mistake).
+		// Not a class list like CORE_MODULES/TOOL_MODULES: a unit key still has
+		// to go through the normal applyUnit()/moduleClass path in apiApply(),
 		// so its routes/templates/text land the same way they always did
-		public const array ALWAYS_MODULES = [ 'forms', 'navigation', 'localepicker' ];
+		public const array ALWAYS_MODULES = [ 'forms', 'navigation', 'localepicker', 'legal' ];
 
 		private const string LIBRARY = __DIR__. '/library';
 
@@ -633,10 +635,10 @@ namespace Nino\Install {
 		 *	posted selection is the complete, authoritative picture, every
 		 *	time this runs - unchecking a locale/module and re-applying
 		 *	actually removes it, the same way any settings form works. The
-		 *	one exception is ALWAYS_MODULES: Navigation, the locale picker
-		 *	and the contact form are folded into the applied set regardless
-		 *	of what was posted, so they can never be "unchecked" away. Only
-		 *	routes need care doing that: by the time any wizard request
+		 *	one exception is ALWAYS_MODULES: Navigation, the locale picker,
+		 *	the contact form and the legal texts are folded into the applied set
+		 *	regardless of what was posted, so they can never be "unchecked"
+		 *	away. Only routes need care doing that: by the time any wizard request
 		 *	reaches here, $appData['/nino/http/routes'] already carries this
 		 *	request's own runtime-only entries (the wizard's own GET/POST
 		 *	route, and whichever modules are currently active also self-
@@ -652,7 +654,17 @@ namespace Nino\Install {
 		 *	written, never removed just because a later apply() didn't pick
 		 *	that unit again. Deleting a file a developer may have since
 		 *	hand-edited is a different, much riskier kind of "undo" than
-		 *	toggling a config array; see docs/setup.md.
+		 *	toggling a config array; see docs/setup.md. The elements of a
+		 *	unit ('elements') are never replaced, not even by a unit this step
+		 *	applies with 'overwrite' - they are content (\Nino\Elements::seed()).
+		 *
+		 *	A unit can also ask for a menu of its own, 'navs': [ '<key>' =>
+		 *	[ '<Element-URI>', ... ] ]. This step - and only this step - adds the
+		 *	key to '/nino/html/navs' and the pages to '/nino/html/navroutes' in
+		 *	that order, when the project does not have the menu yet. Where it
+		 *	has, the menu is the editors' and a second run leaves it alone.
+		 *	\Nino\Features::activate() and Webpages::_applyModule() do not read
+		 *	'navs': a feature brings no menu. See _applyNavs().
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -665,8 +677,8 @@ namespace Nino\Install {
 			$locales 	= array_values( array_intersect( (array) ( $data['locales'] ?? [] ), self::AVAILABLE_LOCALES ) );
 			$units 		= self::units();
 
-			// Navigation, the locale picker and the contact form are no
-			// longer posted - they are unconditionally part of the applied
+			// Navigation, the locale picker, the contact form and the legal
+			// texts are no longer posted - they are unconditionally part of the applied
 			// set, ahead of whatever else was actually picked, so their
 			// units go through the exact same applyUnit()/moduleClass path
 			// below as any other module a project chose
@@ -798,10 +810,12 @@ namespace Nino\Install {
 			if( count( $imageSlots ) > 0 )
 				$appData['/nino/html/images'] = ( $appData['/nino/html/images'] ?? [] ) + $imageSlots;
 
+			$navKeys = self::_applyNavs( $appData, $modules, $units );
+
 			// The units' config defaults go with the keys this step writes
 			// anyway - applyUnit() collects them now instead of writing one
 			// full config.php rewrite per unit that brings any
-			\Nino\AppData::writeContentData( $appData, array_merge( [ '/nino/locales/available', '/nino/locales/native', '/nino/modules', '/nino/auth/roles', '/nino/http/routes', '/nino/html/assets' ], count( $imageSlots ) > 0 ? [ '/nino/html/images' ] : [], array_keys( $config ) ) );
+			\Nino\AppData::writeContentData( $appData, array_merge( [ '/nino/locales/available', '/nino/locales/native', '/nino/modules', '/nino/auth/roles', '/nino/http/routes', '/nino/html/assets' ], count( $imageSlots ) > 0 ? [ '/nino/html/images' ] : [], $navKeys, array_keys( $config ) ) );
 
 			if( count( $blacklist ) > 0 )
 				\Nino\Filesystem::mutate( $appData, '/text/blacklist.php', function( array $list ) use ( $blacklist ): array {
@@ -809,6 +823,71 @@ namespace Nino\Install {
 				} );
 
 			\Nino\Http::ok( $request, [ 'locales' => $appData['/nino/locales/available'], 'nativeLocale' => $appData['/nino/locales/native'], 'modules' => $modules ] );
+		}
+
+		/**
+		 *	The menus the applied units ask for, 'navs' in their manifests - a key
+		 *	and the pages it starts with, by Element-URI: [ 'legal' => [
+		 *	'/legal/imprint', '/legal/privacy' ] ]. A key the project does not have
+		 *	in '/nino/html/navs' is appended to it, and the Element-URIs become its
+		 *	members in '/nino/html/navroutes', priority 1, 2, ... in that order -
+		 *	by Element-URI, because a page of a module has a route per language and
+		 *	is one page (see \Nino\Modules\Navigation::routeLines()). A key the
+		 *	project has is left alone, its entries with it: from the first run on,
+		 *	the menu is the editors'.
+		 *
+		 *	A key has to be a slug the Navigations panel would take, an entry has to
+		 *	start with '/'; anything else is skipped with a warning, which is said
+		 *	here, once, and never for a page request. Only this step reads 'navs'
+		 *	(see apiApply())
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data - '/nino/html/navs' and '/nino/html/navroutes' are set in it
+		 *	@param		array 		$modules			The applied unit keys
+		 *	@param		array 		$units				units(): key => unit directory
+		 *
+		 *	@return 	array											The config keys that were changed, for the caller to write with its own
+		 */
+		private static function _applyNavs( array &$appData, array $modules, array $units ): array {
+
+			$registry		= array_values( array_unique( array_map( 'strval', (array) ( $appData['/nino/html/navs'] ?? [] ) ) ) );
+			$navroutes	= is_array( $appData['/nino/html/navroutes'] ?? null ) === true ? $appData['/nino/html/navroutes'] : [];
+			$changed		= false;
+
+			foreach( $modules as $key ) {
+
+				foreach( (array) ( ( \Nino\Features::readUnitManifest( $units[$key] ) ?? [] )['navs'] ?? [] ) as $nav => $uris ) {
+
+					if( is_string( $nav ) === false || preg_match( '/^[a-z][a-z0-9_-]*$/', $nav ) !== 1 || is_array( $uris ) === false ) {
+						trigger_error( 'Install unit "'. $key. '" asks for a menu that is no usable key: "'. ( is_string( $nav ) === true ? $nav : '' ). '"', E_USER_WARNING );
+						continue;
+					}
+
+					if( in_array( $nav, $registry, true ) === true )
+						continue;
+
+					$registry[]	= $nav;
+					$changed		= true;
+					$priority		= 1;
+
+					foreach( $uris as $uri ) {
+
+						if( is_string( $uri ) === false || str_starts_with( $uri, '/' ) === false ) {
+							trigger_error( 'Install unit "'. $key. '" puts something that is no Element-URI into its menu "'. $nav. '"', E_USER_WARNING );
+							continue;
+						}
+
+						$navroutes[$uri][$nav] = $priority++;
+					}
+				}
+			}
+
+			if( $changed === false )
+				return [];
+
+			$appData['/nino/html/navs']				= $registry;
+			$appData['/nino/html/navroutes']	= $navroutes;
+
+			return [ '/nino/html/navs', '/nino/html/navroutes' ];
 		}
 
 		/**
@@ -1182,8 +1261,9 @@ namespace Nino\Install {
 		 *	routes with their own headers and no page template) out of a
 		 *	page list. Matched on the body's prefix rather than through
 		 *	_templateFromBody(), which deliberately reports null for a body
-		 *	that resolves its file at runtime - the "legal" unit's
-		 *	[[/nino/http/response/locale]] body is a page like any other
+		 *	that resolves its file at runtime - a hand-written
+		 *	[template /templates/page-x.[[/nino/http/response/locale]]] is a
+		 *	page like any other
 		 *
 		 *	@param		string		$routeKey			Eg. 'GET://kontakt'
 		 *	@param		array 		$route
@@ -1344,9 +1424,10 @@ namespace Nino\Install {
 		}
 
 		/**
-		 *	Which library unit ships a template of this name, if any - so a page
-		 *	that would write its own copy under that name can be refused before
-		 *	the two start writing over each other (see apiApply())
+		 *	Which unit ships a template of this name, if any - a page unit of the
+		 *	library or the install unit of a module - so a page that would write
+		 *	its own copy under that name can be refused before the two start
+		 *	writing over each other (see apiApply())
 		 *
 		 *	@param		string		$file					A template file name, 'page-home.tpl' style
 		 *
@@ -1371,6 +1452,14 @@ namespace Nino\Install {
 					if( (string) $template === $file )
 						return $entry;
 			}
+
+			// A module's unit writes its templates into the same directory: a page
+			// of the project called /legal-imprint would be given the module's
+			// own page-legal-imprint.tpl as its copy
+			foreach( \Nino\Install\Setup::units() as $unitKey => $unitDir )
+				foreach( ( \Nino\Features::readUnitManifest( $unitDir )['templates'] ?? [] ) as $template )
+					if( (string) $template === $file )
+						return (string) $unitKey;
 
 			return '';
 		}
@@ -1478,6 +1567,15 @@ namespace Nino\Install {
 					return;
 				}
 
+				// The two pages of the legal texts have their routes, their names
+				// and their menu entries from the module: a page of the project's
+				// own under the same Element-URI would share the details and the
+				// language switch with them, whatever unit or template it has
+				if( class_exists( '\\Nino\\Modules\\Legal' ) === true && in_array( $uri, array_column( \Nino\Modules\Legal::PAGES, 'uri' ), true ) === true ) {
+					\Nino\Http::fail( $request, 409, 'the uri "'. $uri. '" belongs to the legal module' );
+					return;
+				}
+
 				$routeKey = 'GET://'. trim( $httpUri, '/' );
 				if( isset( $foreignRoutes[$routeKey] ) === true ) {
 					\Nino\Http::fail( $request, 409, 'http uri already belongs to another route: "'. $httpUri. '"' );
@@ -1513,7 +1611,7 @@ namespace Nino\Install {
 				}
 
 				if( $collision !== '' ) {
-					\Nino\Http::fail( $request, 409, 'a page of your own cannot be called "'. $uri. '": the page template it would write is the one the "'. $collision. '" page of the library owns' );
+					\Nino\Http::fail( $request, 409, 'a page of your own cannot be called "'. $uri. '": the page template it would write is the one the "'. $collision. '" unit owns' );
 					return;
 				}
 
@@ -1670,12 +1768,6 @@ namespace Nino\Install {
 					return array_values( array_unique( array_merge( $list, $blacklist ) ) );
 				} );
 
-			$applied = self::_applyLegalLink( $appData, $webpages, $locales );
-			if( $applied !== true ) {
-				\Nino\Http::fail( $request, 500, 'the legal page could not be linked: '. $applied );
-				return;
-			}
-
 			// Derived back off the routes just written, not the working copy
 			// above: what the frontend holds after an apply is then exactly
 			// what a reload would hand it (see apiList())
@@ -1797,14 +1889,15 @@ namespace Nino\Install {
 		 *	field (see _applyWebpage()) and the /_nino/webpage&lt;uri&gt;/* text
 		 *	meta namespace, deliberately decoupled from the real path so
 		 *	eg. the home page can keep a stable '/home' identifier while
-		 *	actually living at '/'. A template needing more than one real,
-		 *	reachable uri per locale (eg. legal content whose actual slug
+		 *	actually living at '/'. A page needing more than one real,
+		 *	reachable uri per locale (eg. the imprint, whose actual slug
 		 *	differs by language) can't express that through a Webpages
-		 *	entry's single httpUri field; it has to pick the locale-
-		 *	specific body some other way (eg. legal's own manifest, which
-		 *	picks the right template file via the same
-		 *	[[/nino/http/response/locale]] fill html-header.tpl already
-		 *	uses for the page uri) rather than through separate routes
+		 *	entry's single httpUri field, and is no entry of this step: a
+		 *	module registers such routes at runtime (Modules\Legal does, and
+		 *	keeps its two Element-URIs from the entries of this step, see
+		 *	apiApply()), a hand-written route can pick a locale-specific body
+		 *	via the [[/nino/http/response/locale]] fill html-header.tpl already
+		 *	uses for the page uri
 		 *
 		 *	@param		array 		$entry				One webpages-list entry
 		 *
@@ -1871,8 +1964,8 @@ namespace Nino\Install {
 
 		/**
 		 *	The on-disk template a route body names, when it names exactly
-		 *	one. A body can be more than a plain template reference - the
-		 *	"legal" unit picks its file per locale via
+		 *	one. A body can be more than a plain template reference - a
+		 *	hand-written one may pick its file per locale via
 		 *	[[/nino/http/response/locale]] - and there is no single template
 		 *	name to report for those; null says so, rather than handing back
 		 *	something that looks like a filename but isn't one
@@ -2079,8 +2172,8 @@ namespace Nino\Install {
 		 *	here: no module in the library currently declares any (they
 		 *	self-register at boot instead, or have none), and a module a
 		 *	template requires has no uri of its own to generate one for
-		 *	anyway; nor are its files and element types, see
-		 *	docs/recipes/installer-package.md
+		 *	anyway; nor are its files, its element types, its 'elements' and
+		 *	its 'navs', see docs/recipes/installer-package.md
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$unitDir			Absolute path to the module unit (modules/<key>)
@@ -2129,47 +2222,6 @@ namespace Nino\Install {
 
 			return true;
 		}
-
-		/**
-		 *	html-footer-legal.tpl's own footer link (see
-		 *	pages/legal/templates/html-footer-legal.tpl) needs somewhere to
-		 *	read "the legal page's real, reachable uri/name" from that isn't
-		 *	tied to a fixed uri - whichever entry actually uses the "legal"
-		 *	template (if any) is mirrored into these well-known keys, its
-		 *	httpUri (not its Element-URI - this becomes an actual href).
-		 *	Only ever set, never cleared: if no entry uses "legal" (yet),
-		 *	the footer link has nothing to point at - a known v1 limitation
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		$webpages			The just-applied, current webpages list
-		 *	@param		array 		$locales			Picked locales
-		 *
-		 *	@return 	true|string							true, or the first text file that could not be written
-		 */
-		private static function _applyLegalLink( array &$appData, array $webpages, array $locales ): true|string {
-
-			$legalEntry = null;
-			foreach( $webpages as $entry )
-				if( self::_libraryKey( $entry ) === 'legal' ) { $legalEntry = $entry; break; }
-
-			if( $legalEntry === null )
-				return true;
-
-			// Fully derived content that has to track its source on every
-			// apply: merged with the fragment winning, which is what
-			// \Nino\Features::mergeText() does
-			if( \Nino\Features::mergeText( $appData, '/text/global.php', [ '[[/website/legal/uri]]' => $legalEntry['httpUri'] ] ) === false )
-				return 'could not write /text/global.php';
-
-			foreach( $locales as $locale ) {
-				$name = $legalEntry['text'][$locale]['name'] ?? self::DEFAULT_TEXT['name'];
-				if( \Nino\Features::mergeText( $appData, '/text/'. $locale. '.php', [ '[[/website/legal/name]]' => $name ] ) === false )
-					return 'could not write /text/'. $locale. '.php';
-			}
-
-			return true;
-		}
-
 	}
 
 	/**

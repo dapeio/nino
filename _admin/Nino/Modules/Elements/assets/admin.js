@@ -729,6 +729,9 @@
 			uri.textContent = '/'+ Nino.admin.elements._currentType;
 			wrap.appendChild( uri );
 
+			const typeHint = Nino.admin.elements._typeHint();
+			if( typeHint !== null )
+				wrap.appendChild( typeHint );
 
 			if( elements.length === 0 ) {
 				const hint = dc.createElement('p');
@@ -1446,6 +1449,29 @@
 			row.appendChild( suffix );
 
 			return row;
+		},
+
+		/**
+		 *	The note a type has for whoever edits its elements, if it has one:
+		 *	the fill /_admin/elements/type/<type>/hint - which a unit may bring,
+		 *	as the legal texts do to say they are no legal advice. A paragraph
+		 *	of the screen's own hint kind, its words set as text. A type without
+		 *	the fill has none, and the panel is as it was
+		 *
+		 *	@return		{Element|null}
+		 */
+		_typeHint : function() {
+
+			const text = Nino.content.getText('/_admin/elements/type/'+ Nino.admin.elements._currentType+ '/hint');
+
+			if( text === '' )
+				return null;
+
+			const hint = dc.createElement('p');
+			hint.className = 'nino-admin-hint';
+			hint.textContent = text;
+
+			return hint;
 		},
 
 		/**
@@ -2360,6 +2386,10 @@
 			} );
 			const toolbar = Nino.admin.formToolbar( backLink );
 			wrap.appendChild( toolbar );
+
+			const typeHint = Nino.admin.elements._typeHint();
+			if( typeHint !== null )
+				wrap.appendChild( typeHint );
 
 			const form = dc.createElement('form');
 			form.id = 'elements-edit-form';

@@ -116,7 +116,7 @@ Important source directories:
 | `_nino/Nino/<Class>/<Class>.php` | The kernel classes and public core APIs: AppData, Auth, Callbacks, Catalogue, Csrf, Features, Fetch, Filesystem, Backup, RotatingLog, Elements, Form, Html, Http, Images, Locales, Text, Mail, Modules, Runtime |
 | `_nino/Nino/Catalogue/Catalogue.php`, `_nino/Nino/Fetch/Fetch.php` | The feature catalogue: `Fetch` is the kernel's one http client (https only, no redirects, a byte cap, stubbed in tests through `./nino/fetch/stub`); `Catalogue` fetches `catalogue.json` and its detached ECDSA signature, verifies it against `PUBLIC_KEY` or `/nino/catalogue/key`, parses format 1, answers `offers()` per key, and `install()`s an archive: re-fetched catalogue, sha256 and size, staging below `data/.features/`, every entry validated, manifest matched, directory replaced. Nothing is fetched unless the Features panel asks. Contract test `tests/catalogue-smoke.php`, no network |
 | `_nino/Nino/Features/Features.php` | The feature contract: discovery below `features/`, manifest validation, version constraints, settings, `activate()`, `deactivate()`, and `applyUnit()` - the unit application the wizard shares (overwrite on there, add-only for a feature). Contract test `tests/features-smoke.php` against `tests/fixtures/features/` |
-| `_nino/Nino/Modules/<Name>/<Name>.php` | Kernel runtime modules: the always-on ones every project needs (Assets, Cache, Csrf, Elements, Images, Jstext, Template) and the optional ones a project switches on or off in `/nino/modules` (`Form`, `Navigation`, `Localepicker`, `Maintenance`). Replaced wholesale with `_nino/` |
+| `_nino/Nino/Modules/<Name>/<Name>.php` | Kernel runtime modules: the always-on ones every project needs (Assets, Cache, Csrf, Elements, Images, Jstext, Template) and the optional ones a project switches on or off in `/nino/modules` (`Form`, `Legal`, `Navigation`, `Localepicker`, `Maintenance`). `Legal` - the imprint and the privacy policy as the element types `legal` and `privacy`, `[legal]` and `[privacy]`, per-language runtime routes of both pages, the menu `legal` and the add-only element units of features - is `_nino/Nino/Modules/Legal/`. Replaced wholesale with `_nino/` |
 | `_nino/Nino/Modules/<Name>/Admin/Admin.php`, `assets/`, `text/`, `templates/`, `install/` | A kernel module's own workbench panel class with its scripts, stylesheets, fills and (for a template panel) its markup, and its installer unit - everything the module brings, in one directory |
 | `features/<Name>/` | An installed feature: `feature.php` (the manifest - key, name, version, the `nino` constraint, `requires`, `settings`, `data`), `<Name>.php` (the class `\Nino\Modules\<Name>`, derived from the directory), `Admin/Admin.php` (its panel), `install/` (the unit `\Nino\Features::activate()` applies add-only), `text/`, `assets/`, `tests/<key>-smoke.php`. A checkout ships none: the published ones - `Newsletter`, `Search` - come from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) and are copied in. Denied by `features/.htaccess` and `router.php`; relocated by `NINO_FEATURES_DIR` |
 | `app/<Namespace>/<Class>/<Class>.php` | Project-owned PHP classes and runtime modules; defaults to this root unless `NINO_APP_DIR` is defined before loading the kernel |
@@ -243,7 +243,15 @@ Route-specific callbacks use the internal identity:
 ```
 
 Technical endpoints owned by a module MAY be registered in its `init()`.
-Normal visitor pages SHOULD be persisted as page routes instead.
+Normal visitor pages SHOULD be persisted as page routes instead. A page a
+module serves in every language by itself (`\Nino\Modules\Legal`) is the
+exception: it registers one route per language in `init()`, all with the same
+`uri` - the Element-URI - and the language's `locale`.
+
+A route MAY carry `'maintenance' => false`: `Modules\Maintenance` then leaves it
+reachable while the site is in maintenance. Only code or `config.php` sets it -
+the legal pages and `Auth`'s login route do - never a request, and the Routes
+panel keeps it when it saves a route.
 
 CSRF protection is active by default. A state-changing browser route MUST keep
 it active and its form MUST render `[csrf]`. Use `'csrf' => false` only when a
@@ -711,6 +719,12 @@ or escaping.
 - Do not log passwords, CSRF tokens, session IDs, authorization/cookie headers,
   backup keys, full request arrays, or unnecessary personal data.
 - Export only the requested content scope.
+- A feature that processes personal data MUST bring its section of the privacy
+  policy: `install/elements/privacy.php` and the unit key `elements` (add-only,
+  see `\Nino\Elements::seed()`), written in its own words and stating only
+  what the code does. The text is a starting point and no legal advice - say so
+  in the feature's README. A value of the website belongs in a placeholder
+  (`#/project/company/contact/email#`), never in the text.
 - Translation import is merge-only and schema/path validated; unknown keys and
   technical/global/image fields remain untouched.
 
@@ -783,6 +797,7 @@ temporary project and must not rely on a previously installed working tree.
 | Structure/system panels, registry contract, recovery | `tests/admin-system-smoke.php` |
 | Workbench frontend | relevant `tests/admin-*-js-smoke.js` |
 | Setup wizard behavior/library | `tests/install-smoke.php` and relevant install JS test |
+| The Legal module, the unit keys `elements` and `navs`, `\Nino\Elements::seed()`, the route field `maintenance` | `tests/legal-smoke.php`, plus `tests/kernel-smoke.php`, `tests/features-smoke.php` and `tests/install-smoke.php` |
 | The delivered look - `theme.css`, the two frame templates | `tests/install-smoke.php` and `tests/install-library-templates-js-smoke.js` |
 | The feature contract (`\Nino\Features`, the wizard's unit application) | `tests/features-smoke.php` |
 | The catalogue (`\Nino\Catalogue`, `\Nino\Fetch`, the panel's catalogue and install actions) | `tests/catalogue-smoke.php` - a keypair, signed catalogues and archives built in the test, the network stubbed |
@@ -803,6 +818,7 @@ php tests/install-smoke.php
 php tests/features-smoke.php
 php tests/catalogue-smoke.php
 php tests/keys-smoke.php
+php tests/legal-smoke.php
 for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
 for test in tests/*-js-smoke.js; do node "$test"; done
 php tests/concurrency-smoke.php
@@ -911,6 +927,7 @@ new, and the tests named in section 10 pass.
 - [ ] Reapply is idempotent for selection/config.
 - [ ] Deselect does not destructively delete copied files.
 - [ ] Direct selection and page auto-require paths are tested.
+- [ ] `elements` only adds (a second apply changes nothing, a deleted section stays deleted where the module keeps a tombstone) and is read by `applyUnit()`, not by the page auto-require path; `navs` creates a menu only in the wizard's apply step and only while the project has none.
 
 ### Feature done
 
@@ -987,8 +1004,8 @@ Read these before designing a new implementation:
 | Composer/parser contracts | `features/Templates/Composer/Composer.php`, `SectionDocument/SectionDocument.php`, `AreaComposer/AreaComposer.php` in the catalogue, with its own `tests/templates-smoke.php` |
 | Basic page unit | `_admin/install/library/pages/home/` |
 | Module-dependent page | `_admin/install/library/pages/contact/` |
-| Locale-structural page | `_admin/install/library/pages/legal/` |
-| Element file example | the complete type file in [docs/recipes/element-types.md](docs/recipes/element-types.md); the checkout ships no element type of its own, and the suites build theirs in `tests/kernel-smoke.php` and `tests/admin-smoke.php` |
+| Locale-structural runtime pages | `_nino/Nino/Modules/Legal/Legal.php` (`routes()`, `url()`) and its unit `_nino/Nino/Modules/Legal/install/` |
+| Element file example | the complete type file in [docs/recipes/element-types.md](docs/recipes/element-types.md); the checkout ships two, `legal` and `privacy`, with the Legal module's unit (`_nino/Nino/Modules/Legal/install/elements/`); the suites build their own in `tests/kernel-smoke.php` and `tests/admin-smoke.php` |
 
 Human behavior changes normally require matching updates in both English and
 German manuals. This AI guide and its recipes under `docs/recipes/` stay in

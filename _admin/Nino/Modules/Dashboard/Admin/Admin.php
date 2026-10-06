@@ -81,7 +81,8 @@ namespace Nino\Modules\Dashboard {
 		 *	fails is one for everybody who opens the dashboard, like
 		 *	lastBackup: the record holds no address and no word a transport
 		 *	said. Texts still to translate are the Text panel's business and
-		 *	only an account allowed to open it is told
+		 *	only an account allowed to open it is told. What is wrong with the
+		 *	legal texts is told to one that may edit elements
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -109,6 +110,17 @@ namespace Nino\Modules\Dashboard {
 				&& \Nino\Auth::checkPermission( $appData, \Nino\Modules\Text\Admin::MANAGE_PERM ) === true )
 				foreach( \Nino\Modules\Text\Admin::untranslatedCounts( $appData ) as $locale => $count )
 					$body['notices'][] = [ 'text' => '/_admin/dashboard/notice/untranslated', 'values' => [ (string) $count, (string) $locale ], 'link' => '#text' ];
+
+			// What is wrong with the imprint and the privacy policy - a placeholder
+			// with no value, a language without a path, a page in no menu - is the
+			// business of whoever may edit elements, and only the module knows. At
+			// most eight lines (see \Nino\Modules\Legal::notices(), which has
+			// none where the module is not active). Read here, on the dashboard,
+			// and never by a page request
+			if( class_exists( '\\Nino\\Modules\\Legal' ) === true && class_exists( '\\Nino\\Modules\\Elements\\Admin' ) === true
+				&& \Nino\Auth::checkPermission( $appData, \Nino\Modules\Elements\Admin::MANAGE_PERM ) === true )
+				foreach( \Nino\Modules\Legal::notices( $appData ) as $notice )
+					$body['notices'][] = $notice;
 
 			if( class_exists( '\\Nino\\Modules\\Elements\\Admin' ) === true )
 				$body['elements'] = \Nino\Modules\Elements\Admin::typeCounts( $appData );

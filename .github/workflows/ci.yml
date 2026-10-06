@@ -85,6 +85,12 @@ jobs:
       - name: Run text key smoke tests
         run: php tests/keys-smoke.php
 
+      # The Legal module: the imprint and the privacy policy as elements,
+      # the wizard's unit, the routes per language, the placeholders, the
+      # sections a feature's unit adds and the tombstone of a deleted one
+      - name: Run legal module smoke tests
+        run: php tests/legal-smoke.php
+
       - name: Run frontend smoke tests
         # || exit 1: a bare loop answers with the last file's status alone,
         # so a failure in the middle would be reported as green

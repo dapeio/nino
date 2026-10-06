@@ -92,10 +92,13 @@ Der Template Builder bewahrt normales HTML+. Alleinstehende Template-Shortcodes 
 * dateibasiertes Content-Modell für Textfills und wiederkehrende Elemente
 * ein festes Theme, Asset-Bundling und Frontend-Basiskomponenten
 * Formulare, Navigation, Sprachauswahl und Bildverarbeitung
+* Impressum und Datenschutzerklärung als bearbeitbarer Startinhalt, ein Element je Abschnitt, auf Deutsch und Englisch, mit den Angaben der Firma als Platzhalter
 * installierbare Features mit Manifest, Einstellungen und versionierten Updates, eingeschaltet in der Workbench – Newsletter und Suche darunter, aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features)
 * Benutzer, granulare Rechte, Login-Schutz und Aktivitätenprotokolle
 * automatische, verschlüsselte Backups und Wiederherstellung
 * integriertes Callback-System für eigene Module und Integrationen
+
+**Wichtig:** Impressum und Datenschutzerklärung, die Nino mitliefert, sind ein Ausgangspunkt und keine Rechtsberatung. Die Texte sind auf keine bestimmte Website zugeschnitten und nicht rechtlich geprüft. Der Betreiber einer Website ist dafür verantwortlich, sie vor der Veröffentlichung fachkundig prüfen zu lassen und anzupassen: an das, was die Website tatsächlich verarbeitet, an seine Rechtsform und an weitere Pflichtangaben wie Registereintrag, Umsatzsteuer-Identifikationsnummer oder eine für journalistische Inhalte verantwortliche Person. Für Richtigkeit, Vollständigkeit und Aktualität der Texte übernimmt das Projekt keine Gewähr.
 
 ## Nino vs. WordPress, Laravel, Kirby und Grav
 
