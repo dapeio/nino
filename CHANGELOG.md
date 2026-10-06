@@ -13,6 +13,18 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Docs:** the 1.3.0-beta entry "`_nino/Nino.css` puts its own design
+  decisions in one cascade layer, `@layer nino.base`" describes a change that
+  never shipped. `Nino.css` has no `@layer` in 1.3.0-beta, 1.3.0 or since;
+  the "four things stay outside the layer" carry no marker, and the
+  `tests/kernel-smoke.php` check said to walk the file does not exist. The
+  measurement in that entry (33, 38, 60 and 76 percent of a section's,
+  atf's, article's and buttons' rules reachable by a single-class set) still
+  describes the cascade as it is: a Design set, `assets/theme.css` or a
+  project stylesheet overrides `Nino.css` by specificity and order, not by
+  being unlayered, and "no project has to migrate" holds because nothing
+  changed. The released entry stays as it was written.
+
 - **Docs:** `Nino.css`'s comments point at what exists. Two named a
   `docs/design-system.md` this repository never had (the form fields now
   point at `docs/development.md`, the vpa block at nothing), the two shortcode
