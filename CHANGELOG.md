@@ -13,6 +13,11 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Tests:** `phpstan-baseline.neon` no longer ignores eleven findings that
+  match nothing - seven in the Design preview and the Template Builder, which
+  left the kernel in 1.2, and four in `Install.php`, `Elements.php` and
+  `Filesystem.php` whose code has been fixed since. With `reportUnmatchedIgnoredErrors` switched on,
+  the analysis reports no unmatched pattern now.
 - **Public script:** a newsletter signup is submitted by the contact form's
   handler. `Nino.ui.js` carried a copy of it for `.nino-newsletter-form`,
   kept in step by hand, which had fallen behind: a signup with a url, number
