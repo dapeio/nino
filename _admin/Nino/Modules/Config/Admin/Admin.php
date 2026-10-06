@@ -28,7 +28,7 @@ namespace Nino\Modules\Config {
 	 *												Three keys this used to edit are gone from here because
 	 *												they now have real editors of their own, and a second,
 	 *												unvalidated way to write the same data is a way to
-	 *												corrupt it: '/nino/http/routes' belongs to Pages,
+	 *												corrupt it: '/nino/http/routes' belongs to Routes,
 	 *												'/nino/html/navs' to the Navigation module's own
 	 *												Navigations panel, and '/nino/html/assets'
 	 *												is a build concern - its order is load-bearing for the css
@@ -38,7 +38,7 @@ namespace Nino\Modules\Config {
 	 *
 	 *												'/nino/html/images' and '/nino/auth/user' were never part of
 	 *												this either, for the same reason: both get their own richer
-	 *												editors (Images and Users below).
+	 *												editors, the Images and the Users panel.
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -54,7 +54,7 @@ namespace Nino\Modules\Config {
 
 		// Every setting this panel offers, in render order: the type its value
 		// has to have, the group it renders under, and the copy that explains
-		// it - as fill keys into _admin/text/<locale>.php, so the form reads
+		// it - as fill keys into the module's own text/<locale>.php, so the form reads
 		// in the interface language. The type is what apiSave() validates
 		// against before anything is written - a value of the wrong shape
 		// would otherwise silently corrupt that key for the rest of the site.
@@ -191,13 +191,13 @@ namespace Nino\Modules\Config {
 		 *	Every setting's current value, plus the schema the frontend renders
 		 *	it with.
 		 *
-		 *	Reads config.php fresh rather than $appData directly: by the time
-		 *	this runs, \Nino\Admin\Admin::init() has already added _admin's own GET/POST
-		 *	/_admin route into $appData['/nino/http/routes'] at runtime (same
-		 *	as \Nino\Admin\Admin::init() does, self-registered, never
-		 *	persisted - see \Nino\Admin\Admin::init()'s docblock). That no longer matters
-		 *	for routes, which this panel stopped editing, but the same applies
-		 *	to anything a module writes at runtime, so the fresh read stays.
+		 *	Reads config.php fresh rather than $appData: by the time this
+		 *	runs, modules have written into $appData for this request alone -
+		 *	\Nino\Modules\Maintenance switches '/nino/cache/status' off while
+		 *	maintenance is on, a feature such as the catalogue's ProtectedArea
+		 *	adds its pages to '/nino/cache/blacklist' - and the form has to
+		 *	show, and save back, what the project decided rather than what
+		 *	this request runs with.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -289,7 +289,7 @@ namespace Nino\Modules\Config {
 		 *	Coerce, because a form posts strings: a number field's "5" is the
 		 *	int 5 and a switch's "true" is the bool true, both of which
 		 *	config.php has to receive as the real type - a "5" written into
-		 *	'/nino/auth/maxtries' compares differently everywhere it is used.
+		 *	'/nino/cache/ttl' compares differently everywhere it is used.
 		 *	Anything that is not exactly one of the accepted forms is rejected
 		 *	rather than cast, so a typo cannot become a 0.
 		 *

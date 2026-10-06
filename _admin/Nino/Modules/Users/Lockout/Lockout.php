@@ -41,7 +41,7 @@ namespace Nino\Modules\Users {
 		public const string MANAGE_PERM = '/_admin/lockout/manage';
 
 		// The two settings, in render order - same shape as \Nino\Modules\Config\Admin::FIELDS,
-		// label and hint fill keys the form resolves (see _admin/text/)
+		// label and hint fill keys the form resolves (see the Users module's text/)
 		// A key without a stored value shows \Nino\AppData::DEFAULTS[$key], as
 		// the Config panel's do.
 		private const array FIELDS = [

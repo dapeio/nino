@@ -7,7 +7,7 @@ return [
 	'[[/_admin/config/group/diagnostics]]'	=> 'Fehler und Diagnose',
 	'[[/_admin/config/intro/diagnostics]]'	=> 'Was passiert, wenn PHP einen Fehler meldet, wie das Session-Cookie gesetzt wird und als welche Adresse ein Besucher zählt.',
 	'[[/_admin/config/group/editor]]'		=> 'Workbench',
-	'[[/_admin/config/intro/editor]]'		=> 'Hintergrundarbeit, die /_admin von selbst erledigt. Beide waren vor 0.12.0-beta in jedem Projekt stillschweigend an – siehe Changelog.',
+	'[[/_admin/config/intro/editor]]'		=> 'Hintergrundarbeit, die /_admin von selbst erledigt.',
 	'[[/_admin/config/group/cache]]'		=> 'Seiten-Cache',
 	'[[/_admin/config/intro/cache]]'		=> 'Eine gespeicherte Kopie auszuliefern spart das Rendern. Standardmäßig aus – schalte ihn ein, wenn die Seite fertig ist, nicht während des Aufbaus.',
 	'[[/_admin/config/label/errorlog]]'	=> 'Fehler in ein Log schreiben',

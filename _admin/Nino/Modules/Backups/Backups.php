@@ -158,9 +158,9 @@ namespace Nino\Modules {
 				if( ( $appData['/nino/admin/backups'] ?? true ) === false )
 					return;
 
-				// The directory name does not exist until _bootstrap(), so it
-				// cannot itself be the lock key. A stable, virtual path serializes
-				// first-use key generation and the once-a-day existence check alike.
+				// A stable, virtual lock path rather than the archive directory:
+				// it serializes the first-use key generation in _bootstrap() and
+				// the once-a-day existence check alike.
 				$locked = \Nino\Filesystem::lockFile( $appData, self::LOCK_PATH );
 				if( $locked === false )
 					throw new \RuntimeException( 'daily backup could not be locked' );

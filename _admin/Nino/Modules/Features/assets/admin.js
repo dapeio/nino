@@ -488,8 +488,8 @@
 
 			// Three literal lookups rather than one built from a key: a fill
 			// that only a concatenated argument ever names is invisible to
-			// the static check every panel script is held to (see the
-			// module's Dev docblock and tests/admin-features-js-smoke.js)
+			// the static check every panel script is held to (see
+			// tests/admin-lists-js-smoke.js and tests/admin-features-js-smoke.js)
 			const labels = {
 				available	: Nino.content.getText('/_admin/features/tab/available'),
 				inactive	: Nino.content.getText('/_admin/features/tab/inactive'),

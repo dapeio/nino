@@ -275,7 +275,7 @@ namespace Nino\Modules\Backups {
 		 *	nobody can log in any more. The caller has validated the date
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$date					"Y-m-d" or "Y-m-d-His"
+		 *	@param		string		$date					"Y-m-d", "Y-m-d-His" or "pre-restore-Y-m-d-His" (see ID_PATTERN)
 		 *
 		 *	@return 	true|array								True, or [ http status, message ]
 		 */

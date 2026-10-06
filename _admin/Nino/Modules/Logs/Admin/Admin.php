@@ -17,10 +17,12 @@ namespace Nino\Modules\Logs {
 	 *											Backup - see that class' docblock for why) audit trail
 	 *											of admin actions: who logged in, and every save/delete
 	 *											that changed something. One line per event, appended to
-	 *											the current day's file; \Nino\Admin\Admin::handlePost() calls
-	 *											record() once per successfully-dispatched mutating
-	 *											action, \Nino\Admin\Admin::init()'s login callback calls it once per
-	 *											successful login. Not encrypted like Backup - there's no
+	 *											the current day's file. Every line comes in through
+	 *											\Nino\Admin\Admin::record(): one per successfully-dispatched
+	 *											mutating action (its _logAction()), one per login (its
+	 *											_logLoginOnce()), and those a panel records itself - a backup
+	 *											made, an element type deleted, a feature installed but not
+	 *											activated. Not encrypted like Backup - there's no
 	 *											key to manage and nothing here is as sensitive as a
 	 *											password hash, the stub alone (no plaintext without
 	 *											executing PHP, which exit()s first) is enough.

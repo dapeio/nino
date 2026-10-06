@@ -13,6 +13,15 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Workbench:** the Config panel heads its middle group *Workbench* in
+  English too, as the German text and the manual do, where it said *Editor
+  features*, and its intro no longer points at a 0.12.0-beta changelog entry
+  in either language. The slug `editor` and the keys
+  `/_admin/config/group/editor` and `/_admin/config/intro/editor` stay, so a
+  project's own value for either still applies. The comments of the Config,
+  Language, Backups and Logs panels and of the login protection tab name the
+  modules' own text files, the Routes panel, the callers of the activity log
+  and the lock of the daily backup as they are.
 - **Docs:** the panels' comments named actions, labels and callers of the
   `Dev` era. The `_apiCall` docblocks said `devtypes/`, `devtext/`,
   `devimages/`, `pages/` and `restore/` "dev actions" where the scripts post

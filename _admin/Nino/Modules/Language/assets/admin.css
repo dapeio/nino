@@ -5,7 +5,7 @@
  *	Modules\Language		The interface languages and their translations
  *	admin.css								What the module's /_admin panel needs beyond the design
  *													system in _admin/assets/style.css: the locale adder, the
- *													Translations tab's three-step layout, and both of them on
+ *													Translations tab's two-step layout, and both of them on
  *													a phone. Bundled while the module is there (see the
  *													panel's assets()), so the same layer rules apply - the
  *													shell's stylesheet fixes the layer order, this one only

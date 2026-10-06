@@ -34,7 +34,7 @@ namespace Nino\Modules\Language {
 		// The two settings, in render order - same shape as \Nino\Modules\Config\Admin::FIELDS.
 		// Their values are not part of the schema: the language list comes
 		// from the inventory (see _localeInventory()), the native language
-		// with its own field. Label and hint are fill keys (_admin/text/),
+		// with its own field. Label and hint are fill keys (the module's text/),
 		// resolved by the form in the interface language
 		private const array FIELDS = [
 			'/nino/locales/available' => [
