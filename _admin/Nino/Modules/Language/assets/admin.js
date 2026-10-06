@@ -86,14 +86,12 @@
 		 *
 		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "language/list")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"
-		 *	@param		{Function}	callback			Called with ( xhr.status, xhr.responseJSON )
+		 *	@param		{Function}	callback			Called with ( status, body )
 		 *
 		 *	@return		void
 		 */
 		_apiCall : function( endpoint, payload, callback ) {
-			Nino.http.sendRequest( '[[/nino/dir]]/_admin/', 'POST', function( xhr ) {
-				callback( xhr.status, xhr.responseJSON );
-			}, { action : 'language/'+ endpoint, data : JSON.stringify( payload ) } );
+			Nino.adminUi.api.call( 'language/'+ endpoint, payload, callback );
 		},
 
 		/**
@@ -106,11 +104,7 @@
 		 *	@return		void
 		 */
 		_showError : function( container, status, response ) {
-			container.innerHTML = '';
-			const p = dc.createElement('p');
-			p.className = 'nino-admin-error';
-			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/common/error/load') );
-			container.appendChild( p );
+			Nino.adminUi.showError( container, status, response, '/_admin/common/error/load' );
 		},
 
 		/**
@@ -393,7 +387,7 @@
 
 				if( status !== 200 || response === null ) {
 					msg.className = 'nino-admin-error';
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/language/error/create') );
+					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/language/error/create' );
 					return;
 				}
 
@@ -524,7 +518,7 @@
 			Nino.admin.language._apiCall( 'save', { fields : fields }, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/common/error/save') );
+					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
 					return;
 				}
 

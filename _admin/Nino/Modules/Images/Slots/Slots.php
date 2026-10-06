@@ -105,7 +105,7 @@ namespace Nino\Modules\Images {
 		 *	in memory at \Nino\Images::MAX_SOURCE_PIXELS - the target buffer is
 		 *	the same kind of allocation as the source one that constant guards.
 		 *	Above it the slot is saved and then cannot be filled: every upload
-		 *	comes back as "invalid or oversized image", which sends the person
+		 *	comes back as "the image could not be processed", which sends the person
 		 *	looking at their photograph rather than at the size they typed. Total
 		 *	pixels rather than either edge, for the same reason the kernel counts
 		 *	them that way.

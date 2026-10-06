@@ -156,6 +156,7 @@ function node( id, attributes ) {
 		},
 	};
 	Object.defineProperty( el, 'firstChild', { get : function() { return el.children[0] || null } } );
+	Object.defineProperty( el, 'parentNode', { get : function() { return el.parent } } );
 	return el;
 }
 
@@ -268,6 +269,188 @@ reached.tabs( own );
 check( 'a strip of the panel\'s own goes in after the name and takes the class the head lays a strip out by', head.children[1] === own && own.classList.contains('admin-panel-tabs') && head.children.indexOf( strip ) === -1 && head.children.length === 3 );
 reached.tabs( ownAgain );
 check( '...and a strip drawn again replaces the one before it rather than stacking', head.children.indexOf( own ) === -1 && head.children[1] === ownAgain && head.children.length === 3 );
+
+check( 'a shell whose page carries no dialog registers no session handler - a session failure is then handed back raw', shell.Nino.adminUi.api._handler === null );
+
+/*	A session that ended under an open form: the dialog the shell puts over
+	the page, the login it posts without leaving it, and what it does with
+	the answer. The api decides whether the waiting requests are sent again
+	(see tests/admin-api-js-smoke.js); this is the dialog and the login that
+	stand between	*/
+const requested = [];
+const dialogNodes = {};
+[ 'dialog', 'form', 'title', 'text', 'user', 'pw', 'msg', 'submit', 'reload', 'close' ].forEach( name => { dialogNodes[name] = node( 'admin-session-'+ name, {} ) } );
+const accountNode = node( 'admin-user-email', {} );
+accountNode.textContent = ' me@example.com ';
+const userField = node( '', {} );
+const pwField = node( '', {} );
+userField.children = [ dialogNodes.user ]; dialogNodes.user.parent = userField;
+pwField.children = [ dialogNodes.pw ]; dialogNodes.pw.parent = pwField;
+dialogNodes.dialog.open = false;
+dialogNodes.dialog.showModal = function() { dialogNodes.dialog.open = true };
+// A browser fires 'close' after every way of closing a dialog
+dialogNodes.dialog.close = function() {
+	dialogNodes.dialog.open = false;
+	dialogNodes.dialog.listeners.close();
+};
+dialogNodes.user.value = '';
+dialogNodes.pw.value = '';
+
+const texts = {
+	'/_admin/common/session/title' : 'title text', '/_admin/common/session/other_title' : 'other title', '/_admin/common/session/expired' : 'expired text', '/_admin/common/session/other' : 'other text',
+	'/_admin/common/session/wrong' : 'wrong text',
+	'/_admin/common/session/error' : 'error %s text',
+};
+let reloaded = 0;
+const withDialog = {
+	console : console,
+	location : { hash : '#users', reload : function() { reloaded++ } },
+	history : { replaceState : function() {} },
+	addEventListener : function() {},
+	document : {
+		documentElement : null, body : null,
+		getElementById : function( id ) { return id === 'admin-page-wrap' ? pageWrap : ( id === 'admin-user-logout' ? shellNodes[id] : ( id === 'admin-user-email' ? accountNode : ( id.indexOf( 'admin-session-' ) === 0 ? dialogNodes[ id.slice( 14 ) ] : null ) ) ) },
+		addEventListener : function() {},
+		querySelectorAll : function() { return [] },
+	},
+};
+withDialog.window = withDialog;
+withDialog.Nino = {
+	dir : '/sub',
+	events : { bindCallback : function() {} },
+	content : { getText : function( key ) { return texts[key] || '' } },
+	http : { sendRequest : function( uri, method, callback, data, auth ) { requested.push( { uri : uri, method : method, callback : callback, data : data, auth : auth } ) } },
+};
+const dialogContext = vm.createContext( withDialog );
+vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' ), dialogContext, { filename : 'Nino.admin.js' } );
+vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/script.js' ), 'utf8' ), dialogContext, { filename : 'script.js' } );
+withDialog.Nino.admin.onReady();
+
+const api = withDialog.Nino.adminUi.api;
+check( 'a shell with the dialog registers it with the api', typeof api._handler === 'function' );
+
+/** A request that finds the session gone, then the check's answer: the api's own path into the dialog */
+function loseSession( user ) {
+	const answers = [];
+	const first = requested.length;
+	api.call( 'x/save', { a : 1 }, function( status, body ) { answers.push( [ status, body ] ) } );
+	requested[first].callback( { status : 401, responseJSON : { error : 'not logged in', code : 'session' }, getAllResponseHeaders : function() { return 'x: y' } } );
+	requested[first + 1].callback( { status : 200, responseJSON : { user : user, csrf : 'token' } } );
+	return answers;
+}
+
+let prevented = 0;
+const escape = function() { prevented = 0; dialogNodes.dialog.listeners.cancel( { preventDefault : function() { prevented++ } } ); return prevented };
+check( 'Escape does not close the dialog while no request waits and it is not open for a login', escape() === 0 );
+dialogNodes.reload.listeners.click();
+check( 'the reload button reloads the page', reloaded === 1 );
+check( 'a dialog closed while no request waits stays closed', ( function() { dialogNodes.dialog.listeners.close(); return dialogNodes.dialog.open === false } )() );
+
+// An expired session with a request waiting: only a login can bring it back
+let answers = loseSession('');
+check( 'an expired session opens the dialog through the api with the waiting request held', dialogNodes.dialog.open === true && api.waiting() === true && answers.length === 0 );
+check( 'Escape does not close it while a login can still bring the waiting request back', escape() === 1 );
+check( '...there is a Close button for the person who cannot log in', typeof dialogNodes.close.listeners.click === 'function' );
+
+// The login fails (the account is gone, the password was changed): the person gives up
+dialogNodes.user.value = 'gone@example.com';
+dialogNodes.pw.value = 'old';
+dialogNodes.form.listeners.submit( { preventDefault : function() {} } );
+requested[requested.length - 1].callback( { status : 401 } );
+check( 'a failed login leaves the dialog and the waiting request where they were', dialogNodes.msg.textContent === 'wrong text' && dialogNodes.dialog.open === true && api.waiting() === true && escape() === 1 );
+dialogNodes.close.listeners.click();
+check( 'Close gives the page back: the dialog is shut and the typed password is gone', dialogNodes.dialog.open === false && dialogNodes.pw.value === '' );
+check( '...the waiting request got the answer it had, so the panel shows its error and gives its form back', answers.length === 1 && answers[0][0] === 401 && answers[0][1].code === 'session' && api.waiting() === false );
+
+// Another account took over the browser's session: nothing to log in for
+answers = loseSession('someone@else.example');
+check( 'another account\'s session opens the dialog with the reload only', dialogNodes.dialog.open === true && dialogNodes.text.textContent === 'other text' && dialogNodes.submit.hidden === true && dialogNodes.close.hidden !== true && answers.length === 0 );
+check( 'Escape closes it: there is no login that could bring the request back', escape() === 0 );
+dialogNodes.dialog.close();
+check( 'closing it releases the request with the answer it had', answers.length === 1 && answers[0][0] === 401 && answers[0][1].code === 'session' && api.waiting() === false && dialogNodes.dialog.open === false );
+
+// Escape closing it in a browser: the same
+answers = loseSession('');
+dialogNodes.dialog.close();
+check( 'a dialog closed by whatever means releases what waited - it is not opened again', answers.length === 1 && api.waiting() === false && dialogNodes.dialog.open === false );
+
+// A check that failed: nothing waits any more, so Escape closes the dialog
+answers = loseSession('');
+dialogNodes.user.value = 'me@example.com';
+dialogNodes.pw.value = 'secret';
+dialogNodes.form.listeners.submit( { preventDefault : function() {} } );
+requested[requested.length - 1].callback( { status : 200 } );
+requested[requested.length - 1].callback( { status : 503, responseJSON : null } );
+check( 'a login whose check then fails releases the request and says so in the dialog', dialogNodes.msg.textContent === 'error 503 text' && answers.length === 1 && api.waiting() === false && dialogNodes.dialog.open === true );
+check( '...and Escape may close the dialog then', escape() === 0 );
+dialogNodes.dialog.close();
+
+let checkedWith = null;
+const askAgain = function( done ) { checkedWith = done };
+api._handler( askAgain, 'expired' );
+check( 'an expired session opens the dialog as a modal with the expired text and the login fields', dialogNodes.dialog.open === true
+	&& dialogNodes.title.textContent === 'title text' && dialogNodes.text.textContent === 'expired text' && userField.hidden === false && pwField.hidden === false && dialogNodes.submit.hidden === false && dialogNodes.user.focused === true );
+
+const sentBefore = requested.length;
+dialogNodes.user.value = '';
+dialogNodes.pw.value = '';
+dialogNodes.form.listeners.submit( { preventDefault : function() {} } );
+check( 'an empty login is refused at once, in words, and nothing is sent', dialogNodes.msg.textContent === 'wrong text' && requested.length === sentBefore );
+
+const lastRequest = function() { return requested[requested.length - 1] };
+
+dialogNodes.user.value = 'me@example.com';
+dialogNodes.pw.value = 'secret';
+dialogNodes.form.listeners.submit( { preventDefault : function() {} } );
+check( 'the login is posted from the dialog, to the project\'s login endpoint, with basic auth and no redirect', requested.length === sentBefore + 1 && lastRequest().uri === '/sub/.nino/auth/login' && lastRequest().method === 'POST'
+	&& lastRequest().auth.user === 'me@example.com' && lastRequest().auth.pw === 'secret' && dialogNodes.submit.disabled === true );
+lastRequest().callback( { status : 401 } );
+check( 'a 401 says the credentials were wrong and lets the person try again', dialogNodes.msg.textContent === 'wrong text' && dialogNodes.submit.disabled === false && dialogNodes.dialog.open === true );
+dialogNodes.form.listeners.submit( { preventDefault : function() {} } );
+lastRequest().callback( { status : 503 } );
+check( 'any other status says what was answered', dialogNodes.msg.textContent === 'error 503 text' );
+
+dialogNodes.form.listeners.submit( { preventDefault : function() {} } );
+lastRequest().callback( { status : 200 } );
+check( 'a successful login does not leave the page - it has the api ask whose session this is', checkedWith !== null && dialogNodes.pw.value === '' && dialogNodes.dialog.open === true );
+checkedWith( 'resumed', 200 );
+check( '...and closes the dialog once the waiting requests were sent again', dialogNodes.dialog.open === false && dialogNodes.submit.disabled === false );
+
+api._handler( askAgain, 'other' );
+check( 'another account\'s session offers only the reload (and Close), under a title of its own', dialogNodes.title.textContent === 'other title' && dialogNodes.text.textContent === 'other text' && userField.hidden === true && pwField.hidden === true && dialogNodes.submit.hidden === true && dialogNodes.reload.focused === true );
+dialogNodes.dialog.close();
+
+dialogNodes.dialog.open = false;
+api._handler( askAgain, 'expired' );
+dialogNodes.user.value = 'me@example.com';
+dialogNodes.pw.value = 'secret';
+dialogNodes.form.listeners.submit( { preventDefault : function() {} } );
+lastRequest().callback( { status : 200 } );
+checkedWith( 'failed', 502 );
+check( 'a check that fails after a login says so', dialogNodes.msg.textContent === 'error 502 text' && dialogNodes.dialog.open === true );
+
+// a 403 from the login: the token was rotated elsewhere - the check fetches the new one
+checkedWith = null;
+dialogNodes.dialog.open = true;
+dialogNodes.pw.value = 'secret';
+dialogNodes.form.listeners.submit( { preventDefault : function() {} } );
+lastRequest().callback( { status : 403 } );
+check( 'a 403 from the login asks whose session this is instead of repeating the status', checkedWith !== null && dialogNodes.msg.textContent === '' && dialogNodes.submit.disabled === true );
+checkedWith( 'resumed', 200 );
+check( '...and closes the dialog if the same account turns out to be signed in', dialogNodes.dialog.open === false && dialogNodes.submit.disabled === false );
+
+// ...and when it turns out that nobody is: the person is told, not left with a button that did nothing
+checkedWith = null;
+dialogNodes.dialog.open = true;
+dialogNodes.pw.value = 'secret';
+dialogNodes.form.listeners.submit( { preventDefault : function() {} } );
+lastRequest().callback( { status : 403 } );
+dialogNodes.msg.textContent = '';
+checkedWith( 'expired', 200 );
+check( 'a 403 from the login whose check finds the session still gone says so', dialogNodes.msg.textContent === 'error 403 text' && dialogNodes.submit.disabled === false );
+
+withDialog.Nino.admin.sessionLocale.set( 'de_DE' );
+check( 'the locale switch posts through the one request helper', requested[requested.length - 1].uri === '/sub/_admin/' && requested[requested.length - 1].data.action === 'admin/locale' && requested[requested.length - 1].data.data === '{"locale":"de_DE"}' );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

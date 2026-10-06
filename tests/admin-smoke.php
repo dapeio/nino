@@ -1397,6 +1397,137 @@ check( 'dashboard/summary requires an authed admin session too', $status === 401
 echo "\n";
 
 
+// --- What a failure says: codes, params, the field - and the session ---------
+
+echo "Failure answers - a code the client can say in its own language, and the end of a session told from a refusal\n";
+
+\Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
+$failBody = fn( array $request ): mixed => $request['/nino/http/response']['body'];
+
+// Http::fail() adds nothing a caller did not give
+$plain = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Http::fail( $plain, 400, 'nope' );
+check( 'Http::fail() with three arguments answers exactly what it always did', $plain['/nino/http/response']['statusCode'] === 400 && $failBody( $plain ) === [ 'error' => 'nope' ] );
+\Nino\Http::fail( $plain, 400, 'nope', 'some_code', [ 3, 'x' ], 'title' );
+check( '...and code, params and field are added when given', $failBody( $plain ) === [ 'error' => 'nope', 'code' => 'some_code', 'params' => [ 3, 'x' ], 'field' => 'title' ] );
+
+// The csrf guard answers a bare 403; the workbench says what it was
+$blocked = [ '/nino/http/response' => [ 'statusCode' => 403, 'body' => false ], './nino/csrf/blocked' => true ];
+\Nino\Admin\Admin::handlePost( $appData, $blocked );
+check( 'a request the csrf guard refused is answered 403 with the code "csrf" and a readable message', $blocked['/nino/http/response']['statusCode'] === 403
+	&& is_string( $failBody( $blocked )['error'] ?? null ) === true && ( $failBody( $blocked )['code'] ?? null ) === 'csrf' && array_key_exists( 'params', $failBody( $blocked ) ) === false );
+
+$post = \Nino\Images::limits()['post'];
+if( $post > 0 ) {
+	$tooBig = [ '/nino/http/response' => [ 'statusCode' => 403, 'body' => false ], './nino/csrf/blocked' => true, '/nino/http/request' => [ 'header' => [ 'Content-Length' => (string) ( $post + 1 ) ] ] ];
+	\Nino\Admin\Admin::handlePost( $appData, $tooBig );
+	check( 'a refused request whose Content-Length is above post_max_size is 413 "post_too_large" with the limit in MB - php dropped its token with the rest of the body', $tooBig['/nino/http/response']['statusCode'] === 413
+		&& ( $failBody( $tooBig )['code'] ?? null ) === 'post_too_large' && $failBody( $tooBig )['params'] === [ \Nino\Admin\Admin::megabytes( $post ) ] );
+
+	$within = [ '/nino/http/response' => [ 'statusCode' => 403, 'body' => false ], './nino/csrf/blocked' => true, '/nino/http/request' => [ 'header' => [ 'Content-Length' => (string) $post ] ] ];
+	\Nino\Admin\Admin::handlePost( $appData, $within );
+	check( '...one within the limit is a stale token, not a size', ( $failBody( $within )['code'] ?? null ) === 'csrf' );
+}
+
+$vetoed = [ '/nino/http/response' => [ 'statusCode' => 409, 'body' => [ 'error' => 'earlier callback' ] ] ];
+\Nino\Admin\Admin::handlePost( $appData, $vetoed );
+check( 'any other refusal of an earlier callback is left as it was', $vetoed['/nino/http/response']['statusCode'] === 409 && $failBody( $vetoed ) === [ 'error' => 'earlier callback' ] );
+
+// The end of a session carries a code of its own; a refusal does not
+$loggedOut = $appData;
+unset( $loggedOut['./nino/auth/current'] );
+[ $status, $body ] = callAdminPost( $loggedOut, 'elements/types' );
+check( 'a logged-out request is 401 with the code "session"', $status === 401 && $body === [ 'error' => 'not logged in', 'code' => 'session' ] );
+
+\Nino\Auth::loginUser( $appData, 'plain3@example.com', 'plain password' );
+[ $status, $body ] = callAdminPost( $appData, 'elements/types' );
+check( 'a permission refusal stays exactly as it was - no code, so no re-login is offered for it', $status === 403 && $body === [ 'error' => 'not allowed' ] );
+
+\Nino\Auth::insertUser( $appData, 'wrongpw@example.com', 'a long enough password' );
+\Nino\Auth::loginUser( $appData, 'wrongpw@example.com', 'a long enough password' );
+[ $status, $body ] = callUsers( $appData, 'apiSave', [ 'username' => 'wrongpw@example.com', 'mail' => 'wrongpw@example.com', 'currentPassword' => 'not it' ] );
+check( 'a wrong current password is 401 with the code "wrong_password" and the field - not the code of a lost session', $status === 401 && $body === [ 'error' => 'wrong current password', 'code' => 'wrong_password', 'field' => 'currentPassword' ] );
+[ $status, $body ] = callUsers( $appData, 'apiSave', [ 'username' => 'wrongpw@example.com', 'mail' => 'not a mail', 'currentPassword' => 'a long enough password' ] );
+check( 'an invalid mail names its code and field', $status === 400 && ( $body['code'] ?? '' ) === 'users_invalid_mail' && ( $body['field'] ?? '' ) === 'mail' );
+[ $status, $body ] = callUsers( $appData, 'apiSave', [ 'username' => 'wrongpw@example.com', 'mail' => 'wrongpw@example.com', 'pw' => 'short', 'currentPassword' => 'a long enough password' ] );
+check( 'a short password names its code, the minimum as param and the field', $status === 400 && ( $body['code'] ?? '' ) === 'users_password_short' && ( $body['params'] ?? [] ) === [ 8 ] && ( $body['field'] ?? '' ) === 'pw' );
+
+// GET ?session=1 - whose session is this, and the token it holds
+\Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
+$_GET['session'] = '1';
+$sessionRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[template /_admin/templates/page-index]' ] ];
+\Nino\Admin\Admin::handleGet( $appData, $sessionRequest );
+check( 'GET ?session=1 answers the account and the session\'s token as json, not the page', $failBody( $sessionRequest ) === [ 'user' => 'manager@example.com', 'csrf' => \Nino\Csrf::getToken( $appData ) ] );
+
+$sessionOut = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[template /_admin/templates/page-index]' ] ];
+\Nino\Admin\Admin::handleGet( $loggedOut, $sessionOut );
+check( '...logged out it answers no account and the anonymous session\'s token - the login that follows needs it, and it comes before the login page', $failBody( $sessionOut ) === [ 'user' => '', 'csrf' => \Nino\Csrf::getToken( $loggedOut ) ] && \Nino\Csrf::getToken( $loggedOut ) !== '' );
+check( '...and neither answer is left to a cache', ( $sessionRequest['/nino/http/response']['header']['Cache-Control'] ?? '' ) === 'no-store' && ( $sessionOut['/nino/http/response']['header']['Cache-Control'] ?? '' ) === 'no-store' );
+unset( $_GET['session'] );
+
+$pageRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[template /_admin/templates/page-index]' ] ];
+\Nino\Admin\Admin::handleGet( $appData, $pageRequest );
+$limits = \Nino\Images::limits();
+check( 'the page carries the upload limits for the browser to check a file against', \Nino\Html::renderTextfill( $appData, '/_admin/upload/bytes' ) === (string) $limits['bytes'] && \Nino\Html::renderTextfill( $appData, '/_admin/upload/pixels' ) === (string) \Nino\Images::MAX_SOURCE_PIXELS );
+
+// What php says about an upload that did not arrive
+$_POST['data'] = json_encode( [ 'type' => 'imagedemo', 'uri' => 'item1', 'locale' => 'en_US', 'key' => 'photo' ] );
+$uploadWith = function( array|null $file, string $target ) use ( &$appData ): array {
+	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+	$_POST['data'] = json_encode( $target === 'slot' ? [ 'uri' => '/hero' ] : [ 'type' => 'imagedemo', 'uri' => 'item1', 'locale' => 'en_US', 'key' => 'photo' ] );
+	if( $file === null )
+		unset( $_FILES['file'] );
+	else
+		$_FILES['file'] = $file;
+	$target === 'slot' ? \Nino\Modules\Images\Admin::apiUpload( $appData, $request ) : \Nino\Modules\Elements\Admin::apiUploadImage( $appData, $request );
+	return [ $request['/nino/http/response']['statusCode'], $request['/nino/http/response']['body'] ];
+};
+
+foreach( [ 'element', 'slot' ] as $target ) {
+	[ $status, $body ] = $uploadWith( [ 'tmp_name' => '', 'error' => UPLOAD_ERR_INI_SIZE ], $target );
+	check( $target. ' upload above upload_max_filesize is 413 "upload_too_large" with the PHP limit in MB', $status === 413 && ( $body['code'] ?? '' ) === 'upload_too_large' && $body['params'] === [ \Nino\Admin\Admin::megabytes( $limits['php'] > 0 ? $limits['php'] : $limits['bytes'] ) ] );
+	[ $status, $body ] = $uploadWith( [ 'tmp_name' => '', 'error' => UPLOAD_ERR_FORM_SIZE ], $target );
+	check( '...so is one above the form\'s own limit', $status === 413 && ( $body['code'] ?? '' ) === 'upload_too_large' );
+	[ $status, $body ] = $uploadWith( [ 'tmp_name' => '', 'error' => UPLOAD_ERR_PARTIAL ], $target );
+	check( '...a partial upload is 400 "upload_partial"', $status === 400 && ( $body['code'] ?? '' ) === 'upload_partial' );
+	[ $status, $body ] = $uploadWith( [ 'tmp_name' => '', 'error' => UPLOAD_ERR_NO_FILE ], $target );
+	check( '...no file is 400 "upload_missing"', $status === 400 && ( $body['code'] ?? '' ) === 'upload_missing' );
+	[ $status, $body ] = $uploadWith( null, $target );
+	check( '...and so is no file field at all', $status === 400 && ( $body['code'] ?? '' ) === 'upload_missing' );
+	foreach( [ UPLOAD_ERR_NO_TMP_DIR, UPLOAD_ERR_CANT_WRITE, UPLOAD_ERR_EXTENSION ] as $serverFault ) {
+		[ $status, $body ] = $uploadWith( [ 'tmp_name' => '', 'error' => $serverFault ], $target );
+		check( '...a fault of the server\'s own ('. $serverFault. ') is a 500 "upload_server", not the person\'s doing', $status === 500 && ( $body['code'] ?? '' ) === 'upload_server' );
+	}
+}
+
+// What the kernel says about the picture itself
+$pngHeader = function( int $width, int $height ): string {
+	$ihdr = pack( 'NN', $width, $height ). "\x08\x02\x00\x00\x00";
+	return "\x89PNG\r\n\x1a\n". pack( 'N', 13 ). 'IHDR'. $ihdr. pack( 'N', crc32( 'IHDR'. $ihdr ) );
+};
+$uploadBytes = function( string $bytes, string $target ) use ( $uploadWith ): array {
+	$path = tempnam( sys_get_temp_dir(), 'nino-upload-' );
+	file_put_contents( $path, $bytes );
+	$result = $uploadWith( [ 'tmp_name' => $path, 'error' => UPLOAD_ERR_OK, 'name' => 'x', 'size' => strlen( $bytes ) ], $target );
+	@unlink( $path );
+	return $result;
+};
+
+foreach( [ 'element', 'slot' ] as $target ) {
+	[ $status, $body ] = $uploadBytes( str_repeat( 'a', \Nino\Images::MAX_UPLOAD_BYTES + 1 ), $target );
+	check( $target. ' upload above the kernel\'s byte cap says "image_too_large" with the limit in MB', $status === 400 && ( $body['code'] ?? '' ) === 'image_too_large' && $body['params'] === [ 8 ] );
+	[ $status, $body ] = $uploadBytes( 'not an image at all', $target );
+	check( '...a file that is no image says "image_type"', $status === 400 && ( $body['code'] ?? '' ) === 'image_type' && array_key_exists( 'params', $body ) === false );
+	[ $status, $body ] = $uploadBytes( $pngHeader( 5000, 5000 ), $target );
+	check( '...a picture of more pixels than the kernel decodes says "image_too_many_pixels" with the megapixels', $status === 400 && ( $body['code'] ?? '' ) === 'image_too_many_pixels' && $body['params'] === [ 20 ] );
+	[ $status, $body ] = $uploadBytes( $pngHeader( 40, 40 ), $target );
+	check( '...and one gd cannot decode after all says "image_unreadable", not that it is oversized', $status === 400 && ( $body['code'] ?? '' ) === 'image_unreadable' );
+}
+unset( $_FILES['file'] );
+
+echo "\n";
+
+
 // --- The shell's own text ---------------------------------------------------
 
 /*	Every key the workbench shell renders exists in both shipped locales. A key

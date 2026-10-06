@@ -22,4 +22,7 @@ return [
 	'[[/_admin/navs/label/add]]'				=> 'Add a route – it joins at the end',
 	'[[/_admin/navs/label/addbtn]]'			=> 'Add to navigation',
 	'[[/_admin/navs/confirm/delete]]'		=> 'Really delete the navigation “%s”? Its routes stay, only their membership goes.',
+	'[[/_admin/error/navs_invalid_id]]'	=> 'The navigation id “%s” is not valid. Start with a lowercase letter, then use lowercase letters, digits, hyphens and underscores.',
+	'[[/_admin/error/navs_id_taken]]'	=> 'The navigation id “%s” is already taken.',
+	'[[/_admin/error/navs_route_present]]'	=> 'This route is already in this navigation.',
 ];

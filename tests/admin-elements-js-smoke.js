@@ -617,5 +617,97 @@ if( typeof elements._renderNav === 'function' ) {
 	check( 'a type with no field a cell can show keeps the plain list', dom.find( listNode, n => n.tagName === 'table' ).length === 0 && dom.find( listNode, n => n.tagName === 'ul' ).length === 1 );
 }
 
+// --- an upload is checked against the server's limits before it is sent --------
+//
+// The shell writes the limits onto its wrapper (see Admin::handleGet()); the
+// control names them before a file is chosen, and a file that cannot work is
+// refused in the server's own words without ever being sent
+
+{
+	const wrap = { dataset : { uploadBytes : '2097152', uploadPixels : '20000000' } };
+	const texts = {
+		'/_admin/error/image_too_large' : 'The image is larger than %s MB.',
+		'/_admin/error/upload_too_large' : 'The file is larger than this server accepts (PHP upload limit: %s MB).',
+		'/_admin/common/hint/upload' : 'Up to %s MB and %s megapixels.',
+		'/_admin/elements/msg/pending' : 'Saving',
+		'/_admin/elements/msg/saved' : 'Saved.',
+	};
+	sandbox.document.getElementById = id => id === 'admin-page-wrap' ? wrap : null;
+	sandbox.document.createElement = dom.make;
+	sandbox.Nino.content = { getText : key => texts[key] || '' };
+
+	const sent = [];
+	elements._apiCall = function( endpoint, payload, callback, extra ) { sent.push( { endpoint : endpoint, extra : extra, callback : callback } ) };
+	elements._currentType = 'services';
+	elements._currentUri = 'one';
+	elements._selectedLocale = 'de_DE';
+
+	const msg = { className : '', textContent : '' };
+	const fileInput = { disabled : false, value : 'C:\\fakepath\\big.jpg' };
+	const hidden = { value : '' };
+	const preview = { src : '', hidden : true };
+
+	elements._uploadImage( 'photo', { size : 3 * 1048576 }, hidden, preview, msg, fileInput );
+	check( 'a file above the limit is refused before it is sent, in the server\'s own words', sent.length === 0 && msg.textContent === 'The image is larger than 2 MB.' );
+	check( '...the message is styled as an error and the control is free to choose another file', msg.className === 'nino-admin-field-image-msg is-error' && fileInput.disabled === false && fileInput.value === '' );
+
+	elements._uploadImage( 'photo', { size : 1000 }, hidden, preview, msg, fileInput );
+	check( 'a file within it goes to the server as before, with the file as the extra field', sent.length === 1 && sent[0].endpoint === 'uploadimage' && sent[0].extra.file.size === 1000 && msg.textContent === 'Saving' );
+	sent[0].callback( 200, { filename : 'a.jpg', url : '/images/a.jpg' } );
+	check( '...and the answer lands in the field and the preview', hidden.value === 'a.jpg' && preview.src === '/images/a.jpg' && msg.textContent === 'Saved.' );
+
+	elements._uploadImage( 'photo', { size : 1000 }, hidden, preview, msg, fileInput );
+	sent[1].callback( 413, { error : 'the file is larger than the server accepts', code : 'upload_too_large', params : [ 2 ] } );
+	check( 'a failure the server worded is shown as an error, in those words and without the status number', msg.className === 'nino-admin-field-image-msg is-error' && msg.textContent === 'The file is larger than this server accepts (PHP upload limit: 2 MB).' );
+
+	// The check waits for the picture to decode; the person may step to
+	// another element or language meanwhile, and the file still belongs to
+	// the one it was chosen on
+	{
+		let decoded = null;
+		// A deferred decode the test settles by hand, so it needs no event loop
+		sandbox.createImageBitmap = function() { return { then : function( resolve ) { decoded = resolve } } };
+		const before = sent.length;
+		elements._currentType = 'services';
+		elements._currentUri = 'one';
+		elements._selectedLocale = 'de_DE';
+		elements._apiCall = function( endpoint, payload, callback, extra ) { sent.push( { endpoint : endpoint, payload : payload, extra : extra, callback : callback } ) };
+
+		elements._uploadImage( 'photo', { size : 1000 }, hidden, preview, msg, fileInput );
+		check( 'while the picture is decoded nothing is sent yet', sent.length === before && decoded !== null );
+
+		elements._currentUri = 'two';
+		elements._selectedLocale = 'en_US';
+		decoded( { width : 100, height : 100 } );
+
+		check( 'a file chosen on one element and language is sent for that one, not for where the person is by then',
+			sent.length === before + 1 && sent[before].payload.type === 'services' && sent[before].payload.uri === 'one' && sent[before].payload.locale === 'de_DE' && sent[before].payload.key === 'photo' );
+
+		delete sandbox.createImageBitmap;
+	}
+
+	const hint = sandbox.Nino.adminUi.uploadHint();
+	check( 'the control carries the limits as permanent text', hint !== null && hint.textContent === 'Up to 2 MB and 20 megapixels.' );
+	check( 'both upload controls draw that hint under the file input', source.indexOf( 'Nino.adminUi.uploadHint()' ) !== -1 && fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Images/assets/admin.js' ), 'utf8' ).indexOf( 'Nino.adminUi.uploadHint()' ) !== -1 );
+}
+
+// --- the form's status line: saved at, unsaved ------------------------------
+
+{
+	const line = dom.make('p');
+	const form = dom.make('form');
+	const status = sandbox.Nino.adminUi.status( line );
+	status.bind( form );
+	sandbox.Nino.content = { getText : key => ( { '/_admin/common/msg/savedat' : 'Saved at %s.', '/_admin/common/msg/dirty' : 'Unsaved changes' } )[key] || '' };
+	status.saved( new Date( 2026, 8, 3, 7, 5 ) );
+	check( 'a saved form says when', line.dataset.state === 'saved' && line.textContent === 'Saved at 07:05.' );
+	form.listeners.input();
+	check( 'and turns to "unsaved changes" with the first thing typed', line.dataset.state === 'dirty' && line.textContent === 'Unsaved changes' );
+}
+
+check( 'the element form says whether it is saved through the shared status line, bound to the form', /_status = Nino\.adminUi\.status\( msg \);\s*Nino\.admin\.elements\._status\.bind\( form \)/.test( source ) === true );
+check( '...a save marks it saving, saved and - with the server\'s words and field - failed', source.indexOf( '_status.saving()' ) !== -1 && source.indexOf( '_status.saved()' ) !== -1 && /_status\.error\( status, response, '\/_admin\/elements\/error\/save' \)/.test( source ) === true );
+check( '...and the old plain message element no longer carries its own text', source.indexOf( "elements-form-msg')" ) === -1 );
+
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

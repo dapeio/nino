@@ -22,7 +22,7 @@ namespace Nino\Modules\Config {
 	 *												login throttle to the Users panel (see Lockout) and the
 	 *												site's languages to the Language panel. The validation
 	 *												they share with this panel lives in the shell
-	 *												(\Nino\Admin\Admin::cleanInt(), typeError()), so no
+	 *												(\Nino\Admin\Admin::cleanInt(), failType()), so no
 	 *												panel depends on another one being delivered.
 	 *
 	 *												Three keys this used to edit are gone from here because
@@ -291,7 +291,7 @@ namespace Nino\Modules\Config {
 				$value = self::_cleanValue( $posted[$key], $field );
 
 				if( $value === null ) {
-					\Nino\Http::fail( $request, 400, \Nino\Admin\Admin::typeError( $key, $field ) );
+					\Nino\Admin\Admin::failType( $request, $key, $field );
 					return;
 				}
 

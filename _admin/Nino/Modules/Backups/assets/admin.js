@@ -56,14 +56,12 @@
 		 *
 		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "restore/list")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"
-		 *	@param		{Function}	callback			Called with ( xhr.status, xhr.responseJSON )
+		 *	@param		{Function}	callback			Called with ( status, body )
 		 *
 		 *	@return		void
 		 */
 		_apiCall : function( endpoint, payload, callback ) {
-			Nino.http.sendRequest( '[[/nino/dir]]/_admin/', 'POST', function( xhr ) {
-				callback( xhr.status, xhr.responseJSON );
-			}, { action : 'backups/'+ endpoint, data : JSON.stringify( payload ) } );
+			Nino.adminUi.api.call( 'backups/'+ endpoint, payload, callback );
 		},
 
 		/**
@@ -76,12 +74,7 @@
 		 *	@return		void
 		 */
 		_showError : function( status, response ) {
-			const wrap = dc.getElementById('backups-list');
-			wrap.innerHTML = '';
-			const p = dc.createElement('p');
-			p.className = 'nino-admin-error';
-			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/common/error/load') );
-			wrap.appendChild( p );
+			Nino.adminUi.showError( dc.getElementById('backups-list'), status, response, '/_admin/common/error/load' );
 		},
 
 		/**
@@ -110,7 +103,7 @@
 				return Nino.admin.backups._showError( status, response );
 
 			message.className = 'nino-admin-error';
-			message.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/common/error/request') );
+			message.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/request' );
 		},
 
 		/**

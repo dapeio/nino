@@ -90,18 +90,17 @@
 		},
 
 		/**
-		 *	Call a text/* admin action - see Elements' admin.js for why /_admin/ (trailing slash)
+		 *	Call a text/* admin action - this panel's name for Nino.adminUi.api.call(),
+		 *	which owns where the request goes
 		 *
 		 *	@param		{string}		endpoint			Action name (eg. "savebatch", becomes "text/savebatch")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"
-		 *	@param		{Function}	callback			Called with ( xhr.status, xhr.responseJSON )
+		 *	@param		{Function}	callback			Called with ( status, body )
 		 *
 		 *	@return		void
 		 */
 		_apiCall : function( endpoint, payload, callback ) {
-			Nino.http.sendRequest( '[[/nino/dir]]/_admin/', 'POST', function( xhr ) {
-				callback( xhr.status, xhr.responseJSON );
-			}, { action : 'text/'+ endpoint, data : JSON.stringify( payload ) } );
+			Nino.adminUi.api.call( 'text/'+ endpoint, payload, callback );
 		},
 
 		/**
@@ -114,11 +113,7 @@
 		 *	@return		void
 		 */
 		_showError : function( container, status, response ) {
-			container.innerHTML = '';
-			const p = dc.createElement('p');
-			p.className = 'nino-admin-error';
-			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/text/error/load') );
-			container.appendChild( p );
+			Nino.adminUi.showError( container, status, response, '/_admin/text/error/load' );
 		},
 
 		/**
@@ -627,7 +622,7 @@
 					if( status !== 200 || response === null ) {
 						Nino.admin.text._saving = false;
 						Nino.admin.text._setFormPending( false );
-						msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/text/error/save') );
+						msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/text/error/save' );
 						return;
 					}
 

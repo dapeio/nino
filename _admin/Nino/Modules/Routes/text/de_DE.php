@@ -25,4 +25,11 @@ return [
 	'[[/_admin/routes/placeholder/description]]'	=> 'HTML-Beschreibung',
 	'[[/_admin/routes/confirm/delete]]'	=> 'Die Route unter „%s“ wirklich löschen?',
 	'[[/_admin/dashboard/label/routes]]'	=> 'Routen',
+	'[[/_admin/error/routes_invalid_uri]]'	=> 'Die Element-URI „%s“ ist ungültig.',
+	'[[/_admin/error/routes_invalid_http_uri]]'	=> 'Die HTTP-URI „%s“ ist ungültig.',
+	'[[/_admin/error/routes_reserved_http_uri]]'	=> 'Die HTTP-URI „%s“ ist von Nino reserviert. Wähle eine andere.',
+	'[[/_admin/error/routes_duplicate_uri]]'	=> 'Eine andere Seite nutzt die Element-URI „%s“ schon.',
+	'[[/_admin/error/routes_duplicate_http_uri]]'	=> 'Eine andere Seite nutzt die HTTP-URI „%s“ schon.',
+	'[[/_admin/error/routes_http_uri_taken]]'	=> 'Die HTTP-URI „%s“ gehört schon zu einer anderen Route.',
+	'[[/_admin/error/routes_unknown_template]]'	=> 'Das Template „%s“ gibt es nicht.',
 ];

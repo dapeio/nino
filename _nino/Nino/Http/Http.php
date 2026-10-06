@@ -218,10 +218,25 @@ namespace Nino {
 		// Set a response's status code and error body in one call - the
 		// statusCode/body pair a handler otherwise sets by hand on every
 		// failure branch, with 'error' as the body key enforced rather
-		// than just remembered by convention
-		public static function fail( array &$request, int $statusCode, string $error ): void {
+		// than just remembered by convention.
+		//
+		// 'error' is the sentence for a developer or a log, in English. A
+		// client that wants to say it in the reader's language needs something
+		// that does not change with the wording, so a failure may also carry
+		// a stable $code (a slug), the values that belong in the sentence as
+		// $params (in the order the client's text uses them) and the $field the
+		// value was refused for. All three are left out of the body when
+		// empty, so a caller that gives none answers exactly what it always did
+		public static function fail( array &$request, int $statusCode, string $error, string $code = '', array $params = [], string $field = '' ): void {
+			$body = [ 'error' => $error ];
+			if( $code !== '' )
+				$body['code'] = $code;
+			if( $params !== [] )
+				$body['params'] = array_values( $params );
+			if( $field !== '' )
+				$body['field'] = $field;
 			$request['/nino/http/response']['statusCode'] = $statusCode;
-			$request['/nino/http/response']['body'] = [ 'error' => $error ];
+			$request['/nino/http/response']['body'] = $body;
 		}
 
 		// Set a response's success body - see fail()

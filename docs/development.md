@@ -222,7 +222,7 @@ Wildcard routes end with `/*`. For a request to `/blog/entry`, Nino also looks f
 );
 ```
 
-`Http::ok()` sets the body of a successful response. `Http::fail()` sets the status code and a uniform `error` field. Both modify the passed `$request` directly and are more readable than manually setting all fields, especially for JSON routes.
+`Http::ok()` sets the body of a successful response. `Http::fail()` sets the status code and a uniform `error` field - the English message for a developer or a log - and, optionally, a stable `code`, its `params` and the `field` the value was refused for, which the workbench turns into a sentence in the interface language. Both modify the passed `$request` directly and are more readable than manually setting all fields, especially for JSON routes.
 
 Route-specific callbacks use the **internal response URI**:
 
@@ -872,7 +872,7 @@ Project code may specifically extend these headers. It should not generally repl
 - Element fields are HTML-encoded or sanitized if explicitly allowed HTML.
 - `Jstext` transfers data JSON-encoded and CSP-bound into JavaScript.
 - The catalogue's Newsletter feature does not reveal whether an email address already exists.
-- Image processing limits uploads to 8 MiB and source files to 20 million pixels before memory-intensive processing begins.
+- Image processing limits uploads to 8 MiB and source files to 20 million pixels before memory-intensive processing begins. `\Nino\Images::limits()` answers all of it for a form to name: the kernel's cap, what php lets a request carry (the smaller of `upload_max_filesize` and `post_max_size`, 0 where there is none) and the pixels. `\Nino\Images::reject( $bytes )` says why the kernel would refuse bytes - `image_too_large`, `image_type` or `image_too_many_pixels`, each with its params - and is what the upload endpoints of the workbench answer with.
 - Every derived image is written as webp where gd can write one: lossless where the alternative was png, so nothing is lost and an alpha channel is carried along, and lossy where it was jpeg. Measured on a 1600x1000 source, that is 1 KB against png's 24 KB for line art and 151 KB against jpeg's 199 KB for a photograph. A gd without webp, or `'/nino/images/webp' => false` in `config.php`, writes png and jpeg as before; the shipped `.htaccess` declares the type for a host whose own `mime.types` predates it.
 - PHP data files in publicly accessible directories receive protection stubs or only return values.
 

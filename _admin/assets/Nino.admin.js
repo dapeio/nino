@@ -2,9 +2,11 @@
  *	Nino										A compact filesystembased php framework
  *	Nino.admin.js						The shared behaviour half of the management design system:
  *													small DOM primitives the tool frontends build their
- *													chrome from, and the pure table model behind the list
- *													views. style.css is the vocabulary, this is what
- *													assembles it.
+ *													chrome from, the pure table model behind the list
+ *													views, and the one way a panel talks to the server:
+ *													Nino.adminUi.api, with the status line and the
+ *													messages that say what failed. style.css is the
+ *													vocabulary, this is what assembles it.
  *
  *													Separate from Nino.js for the same reason Nino.ui.js is:
  *													who needs it. Nino.js is in the public site's script
@@ -737,6 +739,9 @@
 
 			function commit() {
 				store.value = JSON.stringify( chosen );
+				// Writing the hidden input fires nothing; tell a surrounding form (status line) the value changed
+				if( typeof store.dispatchEvent === 'function' && typeof wn.Event === 'function' )
+					store.dispatchEvent( new wn.Event( 'change', { bubbles : true } ) );
 				if( typeof options.onChange === 'function' )
 					options.onChange( chosen.slice() );
 			}
@@ -1414,7 +1419,673 @@
 
 			if( stateClass )
 				shell.classList.add( stateClass );
-		}
+		},
+
+		/**
+		 *	Fill a message's placeholders - %s, %d and %n - from the params, in
+		 *	the order they stand. A function replaces them rather than a string:
+		 *	String.replace() reads '$&' and '$$' in a replacement string, and
+		 *	the params are what a person typed (an uri, a key, a file name), so
+		 *	"a$&b" went in and "a%sb" came out. A placeholder with no param left
+		 *	stays as it is
+		 *
+		 *	@param		{string}	text					The message, eg. 'Saved at %s.'
+		 *	@param		{...*}		params				What goes into it
+		 *
+		 *	@return		{string}
+		 */
+		format : function( text, ...params ) {
+
+			let at = 0;
+
+			// A number with a fraction is written the way the interface language
+			// writes it: 0,5 MB in German
+			const words = function( value ) {
+
+				const plain = String( value );
+				if( typeof value !== 'number' || Number.isInteger( value ) === true || typeof Nino.content !== 'object' || Nino.content === null )
+					return plain;
+
+				const mark = Nino.content.getText('/_admin/common/unit/decimal') || '.';
+				return plain.replace( '.', function() { return mark } );
+			};
+
+			return String( text ?? '' ).replace( /%[sdn]/g, function( token ) {
+				return at < params.length ? words( params[at++] ) : token;
+			} );
+		},
+
+		/**
+		 *	Say a failed request in a container: what errorText() makes of it, in
+		 *	the design system's error text, in place of whatever stood there -
+		 *	the load that failed, where there is nothing else to show
+		 *
+		 *	@param		{Element}		container
+		 *	@param		{number}		status					Xhr status code
+		 *	@param		{*}					response				Parsed response body, if any
+		 *	@param		{string}		[fallbackKey]		The panel's own sentence for this failure
+		 *
+		 *	@return		{Element}										The paragraph written
+		 */
+		showError : function( container, status, response, fallbackKey ) {
+
+			container.innerHTML = '';
+			const p = dc.createElement('p');
+			p.className = 'nino-admin-error';
+			p.textContent = Nino.adminUi.api.errorText( status, response, fallbackKey );
+			container.appendChild( p );
+			return p;
+		},
+
+		/**
+		 *	The limits an image upload runs into, as the shell wrote them onto
+		 *	its wrapper (see \Nino\Admin\Admin::handleGet()) - 0 for one it did
+		 *	not name, which is no check
+		 *
+		 *	@return		{Object}									{ bytes, pixels }
+		 */
+		limits : function() {
+
+			const wrap = typeof dc.getElementById === 'function' ? dc.getElementById('admin-page-wrap') : null;
+			const read = function( name ) {
+				const value = wrap && wrap.dataset ? parseInt( wrap.dataset[name], 10 ) : NaN;
+				return isNaN( value ) === true || value < 1 ? 0 : value;
+			};
+
+			return { bytes : read('uploadBytes'), pixels : read('uploadPixels') };
+		},
+
+		/**
+		 *	What an upload control tells the person before they choose a file:
+		 *	the size and the pixels the server will take. Permanent text rather
+		 *	than an error to be earned - nobody should have to fail an upload to
+		 *	learn the limit
+		 *
+		 *	@return		{Element|null}						null where the limits are unknown
+		 */
+		uploadHint : function() {
+
+			const limits = Nino.adminUi.limits();
+			if( limits.bytes === 0 || limits.pixels === 0 )
+				return null;
+
+			const hint = dc.createElement('p');
+			hint.className = 'nino-admin-hint';
+			hint.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/common/hint/upload'), Nino.adminUi.megabytes( limits.bytes ), limits.pixels / 1000000 );
+			return hint;
+		},
+
+		/**
+		 *	A size in bytes as the megabytes a sentence names: whole where it
+		 *	is whole, one decimal where it is not - the same rounding
+		 *	\Nino\Admin\Admin::megabytes() applies on the server
+		 *
+		 *	@param		{number}	bytes
+		 *
+		 *	@return		{number}
+		 */
+		megabytes : function( bytes ) {
+			return Math.round( bytes / 104857.6 ) / 10;
+		},
+
+		/**
+		 *	Check a chosen image against the server's limits before it is sent,
+		 *	so a file that cannot work fails at once, in words, instead of after
+		 *	an upload of however many megabytes. The server stays the authority
+		 *	- this only spares the wait: what it cannot judge (a format the
+		 *	browser cannot decode, a limit it was not told) it lets through.
+		 *
+		 *	The answer has the shape of a failed request's body, so errorText()
+		 *	says it exactly as it would say the server's
+		 *
+		 *	@param		{File}				file
+		 *	@param		{Function}		done						Called once with null, or { code, params }
+		 *
+		 *	@return		void
+		 */
+		checkImage : function( file, done ) {
+
+			const limits = Nino.adminUi.limits();
+
+			if( limits.bytes > 0 && file.size > limits.bytes ) {
+				done( { code : 'image_too_large', params : [ Nino.adminUi.megabytes( limits.bytes ) ] } );
+				return;
+			}
+
+			if( limits.pixels === 0 || typeof wn.createImageBitmap !== 'function' ) {
+				done( null );
+				return;
+			}
+
+			// The pixels need the picture decoded, which is as much work as
+			// the server will do - and the browser answers for a format it
+			// cannot read with a rejection that says nothing about the file
+			wn.createImageBitmap( file ).then( function( bitmap ) {
+				const tooMany = bitmap.width * bitmap.height > limits.pixels;
+				if( typeof bitmap.close === 'function' )
+					bitmap.close();
+				done( tooMany === true ? { code : 'image_too_many_pixels', params : [ limits.pixels / 1000000 ] } : null );
+			}, function() {
+				done( null );
+			} );
+		},
+
+		/**
+		 *	The state a status line is in, as plain data: which state, and the
+		 *	fill key and params of its words. The pure half of status(), so
+		 *	the states can be tested without a dom. An error has no key of its
+		 *	own - what failed is errorText()'s to say
+		 *
+		 *	@param		{string}	state					idle, dirty, saving, saved or error
+		 *	@param		{Date}		[date]				When it was saved, for 'saved'
+		 *
+		 *	@return		{Object}									{ state, key, params }
+		 */
+		statusModel : function( state, date ) {
+
+			const pad = function( number ) { return String( number ).padStart( 2, '0' ) };
+
+			switch( state ) {
+				case 'saving':
+					return { state : 'saving', key : '/_admin/common/msg/saving', params : [] };
+				case 'dirty':
+					return { state : 'dirty', key : '/_admin/common/msg/dirty', params : [] };
+				case 'saved': {
+					const at = date !== null && typeof date === 'object' && typeof date.getHours === 'function' ? date : new Date();
+					return { state : 'saved', key : '/_admin/common/msg/savedat', params : [ pad( at.getHours() )+ ':'+ pad( at.getMinutes() ) ] };
+				}
+				case 'error':
+					return { state : 'error', key : '', params : [] };
+				default:
+					return { state : 'idle', key : '', params : [] };
+			}
+		},
+
+		/**
+		 *	A panel's status line: one element that says whether what is on
+		 *	screen is saved - "saving", "saved at hh:mm", "unsaved changes", or
+		 *	why it failed - instead of each panel keeping its own "Saved."
+		 *	that stayed on screen long after the next keystroke made it a lie.
+		 *
+		 *	The state is on the element as data-state, for the stylesheet,
+		 *	which gives each one a prefix of its own so the meaning does not
+		 *	rest on a colour. It is announced as a status, and an error as an
+		 *	alert. Owns no strings: its words are the /_admin/common/msg/*
+		 *	fills, and a caller that needs others passes them in labels
+		 *
+		 *	@param		{Element}		el							The line itself - the panel's own, usually in its action bar
+		 *	@param		{Object}		[labels]				Text for a state instead of the fill: { saving, saved, dirty }, 'saved' with a %s for the time
+		 *
+		 *	@return		{Object}										{ element, state, idle( [text] ), saving(), saved( date ), dirty( [text] ), fail( text ), error( status, response, fallbackKey ), bind( form, isDirty ) }
+		 */
+		status : function( el, labels ) {
+
+			labels = labels || {};
+
+			el.classList.add('nino-admin-status');
+
+			// Set before the first words, so that screen readers have the live
+			// region when they arrive
+			el.setAttribute( 'role', 'status' );
+			el.setAttribute( 'aria-live', 'polite' );
+
+			let scope = null;
+			let marked = null;
+			let typed = false;
+
+			const unmark = function() {
+				if( marked !== null )
+					marked.removeAttribute('aria-invalid');
+				marked = null;
+			};
+
+			const show = function( model, text ) {
+
+				// A refused field is let go with the state it was refused in
+				if( model.state !== 'error' )
+					unmark();
+
+				const words = typeof labels[model.state] === 'string' ? labels[model.state] : ( model.key === '' ? '' : Nino.content.getText( model.key ) );
+
+				el.dataset.state = model.state;
+				el.setAttribute( 'role', model.state === 'error' ? 'alert' : 'status' );
+				el.setAttribute( 'aria-live', model.state === 'error' ? 'assertive' : 'polite' );
+				el.textContent = typeof text === 'string' ? text : Nino.adminUi.format( words, ...model.params );
+				control.state = model.state;
+			};
+
+			const control = {
+
+				element : el,
+				state		: 'idle',
+
+				idle	 : function( text ) { show( Nino.adminUi.statusModel('idle'), text ) },
+				saving : function() {
+					typed = false;
+					show( Nino.adminUi.statusModel('saving') );
+				},
+
+				/**
+				 *	Saved - unless something was typed while the save was on its
+				 *	way: that is not in what was sent, and the line says so
+				 */
+				saved	 : function( date ) {
+					if( typed === true ) {
+						typed = false;
+						control.dirty();
+						return;
+					}
+					show( Nino.adminUi.statusModel( 'saved', date ) );
+				},
+
+				/**
+				 *	Unsaved changes - with the panel's own words where it has
+				 *	more to say than that (a copy that has not been named yet)
+				 */
+				dirty	 : function( text ) { show( Nino.adminUi.statusModel('dirty'), text ) },
+
+				/**
+				 *	A refusal the panel made itself, before anything was sent:
+				 *	the error state with the panel's own words
+				 */
+				fail	 : function( text ) {
+					unmark();
+					show( Nino.adminUi.statusModel('error'), text );
+				},
+
+				/**
+				 *	A failed request: what errorText() says of it, and - when the
+				 *	server named the field - that field marked aria-invalid,
+				 *	focused, and let go again by the next thing typed into it
+				 */
+				error : function( status, response, fallbackKey ) {
+
+					unmark();
+					show( Nino.adminUi.statusModel('error'), Nino.adminUi.api.errorText( status, response, fallbackKey ) );
+
+					const name = response !== null && typeof response === 'object' && typeof response.field === 'string' ? response.field : '';
+					const root = scope !== null ? scope : ( typeof el.closest === 'function' ? el.closest('form, [data-panel]') : null );
+					if( name === '' || root === null || /^[A-Za-z0-9_.\/-]+$/.test( name ) === false )
+						return;
+
+					const field = root.querySelector( '[data-field="'+ name+ '"], [name="'+ name+ '"]' );
+					if( field === null )
+						return;
+
+					field.setAttribute( 'aria-invalid', 'true' );
+					marked = field;
+					if( typeof field.focus === 'function' )
+						field.focus();
+					field.addEventListener( 'input', unmark, { once : true } );
+				},
+
+				/**
+				 *	Follow a form: what is typed into it turns a saved (or fresh)
+				 *	line into "unsaved changes" - except for a file input, whose
+				 *	file is saved by its own upload. isDirty() is the panel's own
+				 *	word on it - Elements and Text already know which languages
+				 *	they hold changes in (_dirtyLocales) - and is asked after
+				 *	every change, so a value typed back to what it was can turn
+				 *	the line back. Nothing here keeps a second copy of that state
+				 */
+				bind : function( form, isDirty ) {
+
+					scope = form;
+
+					const follow = function( ev ) {
+
+						// A picked file is not a change to the record: it is saved on
+						// its own, by the upload. A search box is a way to find
+						// something, not a value
+						if( ev && ev.target && ( ev.target.type === 'file' || ev.target.type === 'search' ) )
+							return;
+
+						// The line says "saving" until the answer; what is typed meanwhile
+						// is remembered for saved()
+						if( control.state === 'saving' ) {
+							typed = true;
+							return;
+						}
+
+						if( typeof isDirty === 'function' && isDirty() === false ) {
+							if( control.state === 'dirty' )
+								control.idle();
+							return;
+						}
+
+						// A refusal stays until the next save: it names what to fix, and
+						// the first keystroke into the form is usually that fix
+						if( control.state === 'saved' || control.state === 'idle' )
+							control.dirty();
+					};
+
+					form.addEventListener( 'input', follow );
+					form.addEventListener( 'change', follow );
+				},
+			};
+
+			return control;
+		},
+
+		/**
+		 *	The one way a panel talks to the server. Every panel posts one
+		 *	action with a json payload to the workbench's single endpoint and
+		 *	gets ( status, body ) back, which used to be a copy of the same
+		 *	dozen lines in every panel script - and a copy that could not know
+		 *	the page had outlived its session.
+		 *
+		 *	Names no Nino.admin member and touches nothing at load: the setup
+		 *	wizard loads this file without the workbench shell, and the panels
+		 *	of a project or a feature may be older than the shell that runs
+		 *	them, so Nino.http, Nino.dir and Nino.content are looked up when
+		 *	a request is made
+		 */
+		api : {
+
+			// The shell's answer to a session that is gone, if it registered
+			// one (see onSessionLost()), and the requests waiting on the
+			// check that asks whose session this is now. null while no check
+			// is open - a request sent then waits with the others
+			_handler	: null,
+			_queue		: null,
+
+			/**
+			 *	Where the workbench answers: the project's directory plus the
+			 *	endpoint with its trailing slash, the way every panel posted it
+			 *	(a redirect from the slashless form can end up on the wrong
+			 *	scheme behind a reverse proxy, which browsers block for XHR)
+			 *
+			 *	@return		{string}
+			 */
+			_uri : function() {
+				return ( typeof Nino.dir === 'string' ? Nino.dir : '' )+ '/_admin/';
+			},
+
+			/**
+			 *	Whether an answer is the end of the session rather than a
+			 *	refusal: a 401 with the code 'session' (nobody is logged in) or
+			 *	a 403 with the code 'csrf' (the page's token is not this
+			 *	session's). Other 401s and 403s are the panel's to read - the
+			 *	Users panel answers a 401 for a wrong password
+			 *
+			 *	@param		{Object}		xhr
+			 *
+			 *	@return		{boolean}
+			 */
+			_sessionLost : function( xhr ) {
+
+				const body = xhr.responseJSON;
+				if( body === null || typeof body !== 'object' )
+					return false;
+
+				return ( xhr.status === 401 && body.code === 'session' ) || ( xhr.status === 403 && body.code === 'csrf' );
+			},
+
+			/**
+			 *	Whether the request never got an answer: a failed connection
+			 *	arrives as a 500 (see Nino.http.sendRequest()), the same
+			 *	number a server's own error has, and the only difference is that
+			 *	a server's answer has headers. A caller's xhr without the method
+			 *	(a test's) is taken to be an answer
+			 *
+			 *	@param		{Object}		xhr
+			 *
+			 *	@return		{boolean}
+			 */
+			_offline : function( xhr ) {
+				return typeof xhr.getAllResponseHeaders === 'function' && xhr.getAllResponseHeaders() === '';
+			},
+
+			/**
+			 *	Hand a request's answer to its caller, synchronously and with
+			 *	what the panels have always been given: ( status, body ). A
+			 *	request that never reached the server is given the code
+			 *	'offline' for a body, which errorText() has a sentence for
+			 *
+			 *	@param		{Object}		request
+			 *	@param		{Object}		xhr
+			 *
+			 *	@return		void
+			 */
+			_finish : function( request, xhr ) {
+				request.callback( xhr.status, Nino.adminUi.api._offline( xhr ) === true ? { code : 'offline' } : xhr.responseJSON );
+			},
+
+			/**
+			 *	Post one action
+			 *
+			 *	@param		{string}		action				Eg. 'users/save'
+			 *	@param		{Object}		[payload]			Sent json-encoded as 'data'
+			 *	@param		{Function}	callback			Called with ( status, body ), the body parsed
+			 *	@param		{Object}		[extra]				Extra multipart fields (eg. { file : File })
+			 *
+			 *	@return		void
+			 */
+			call : function( action, payload, callback, extra ) {
+				Nino.adminUi.api._send( { action : action, payload : payload, callback : callback, extra : extra, retried : false, xhr : null } );
+			},
+
+			/**
+			 *	Send a request - or, while a session check is open, let it wait
+			 *	with the others
+			 *
+			 *	@param		{Object}		request
+			 *
+			 *	@return		void
+			 */
+			_send : function( request ) {
+
+				const api = Nino.adminUi.api;
+
+				if( api._queue !== null ) {
+					api._queue.push( request );
+					return;
+				}
+
+				Nino.http.sendRequest( api._uri(), 'POST', function( xhr ) {
+
+					// Anything but the end of the session goes straight back, as
+					// does a second one for a request already sent again once: that
+					// session is not coming back by being asked again
+					if( api._handler === null || request.retried === true || api._sessionLost( xhr ) === false ) {
+						api._finish( request, xhr );
+						return;
+					}
+
+					// Another request found the session gone first: this one waits
+					// with it for the one check
+					request.xhr = xhr;
+					if( api._queue !== null ) {
+						api._queue.push( request );
+						return;
+					}
+
+					api._queue = [ request ];
+					api._check();
+				}, Object.assign( { action : request.action, data : JSON.stringify( request.payload || {} ) }, request.extra || {} ) );
+			},
+
+			/**
+			 *	Ask the workbench whose session this is now, and what its token
+			 *	is - the answer decides what the waiting requests do: with the
+			 *	same account they are sent again, with a session that is gone the
+			 *	handler asks for a login, with another account they are never sent
+			 *	(a form filled in for one account must not be saved by another).
+			 *	The token goes into the csrf fields of the page only where the
+			 *	page can use it: for a session that ended (the login that follows
+			 *	needs the anonymous session's) and for the same account (the
+			 *	requests are sent again). With another account the page keeps
+			 *	its own, dead token - a request that does not go through this api
+			 *	(a feature's panel, still on its own) would otherwise be saved
+			 *	by the account that was not the one the form was filled in for
+			 *
+			 *	@param		{Function}	[done]				Called once it is decided, with 'resumed' (the
+			 *																		requests were sent again), 'expired', 'other'
+			 *																		or 'failed' and the status of the check
+			 *
+			 *	@return		void
+			 */
+			_check : function( done ) {
+
+				const api = Nino.adminUi.api;
+
+				const finish = function( outcome, status ) {
+					if( typeof done === 'function' )
+						done( outcome, status );
+				};
+
+				// The question is asked even when nothing waits any more (a login
+				// that was answered after the requests it was for were given up):
+				// the login rotated the token, and the page has to learn the new one
+				Nino.http.sendRequest( api._uri()+ '?session=1', 'GET', function( xhr ) {
+
+					const info = xhr.status === 200 && xhr.responseJSON !== null && typeof xhr.responseJSON === 'object' ? xhr.responseJSON : null;
+
+					// No answer to the question: the requests that were sent get the
+					// answers they had, which is all there is to tell, and the ones
+					// that only waited are sent after all
+					if( info === null || typeof info.user !== 'string' || typeof info.csrf !== 'string' ) {
+						api._release( false );
+						finish( 'failed', xhr.status );
+						return;
+					}
+
+					if( info.user === '' || info.user === api._account() )
+						dc.querySelectorAll('input[name="_csrf"]').forEach( function( input ) { input.value = info.csrf } );
+
+					if( info.user === '' || info.user !== api._account() ) {
+						const reason = info.user === '' ? 'expired' : 'other';
+						api._handler( api._check, reason );
+						finish( reason, xhr.status );
+						return;
+					}
+
+					const waiting = api._queue === null ? [] : api._queue;
+					api._queue = null;
+					waiting.forEach( function( request ) {
+						request.retried = true;
+						api._send( request );
+					} );
+					finish( 'resumed', xhr.status );
+				} );
+			},
+
+			/**
+			 *	Let the waiting requests go without a session: each one gets the
+			 *	answer it already had, and one that only waited is sent as it
+			 *	is. The panels hear of the failure and take their forms back
+			 *
+			 *	@param		{boolean}		final					true when the person gave up on a login: a request that
+			 *																		only waited is sent once and told what comes back,
+			 *																		not held for another check (and another dialog)
+			 *
+			 *	@return		void
+			 */
+			_release : function( final ) {
+
+				const api = Nino.adminUi.api;
+				const waiting = api._queue === null ? [] : api._queue;
+				api._queue = null;
+
+				waiting.forEach( function( request ) {
+					if( request.xhr !== null ) {
+						api._finish( request, request.xhr );
+						return;
+					}
+					request.retried = final;
+					api._send( request );
+				} );
+			},
+
+			/**
+			 *	Whether requests wait for the session to come back - the dialog
+			 *	holds the page until they are decided
+			 *
+			 *	@return		{boolean}
+			 */
+			waiting : function() {
+				return Nino.adminUi.api._queue !== null;
+			},
+
+			/**
+			 *	The person closed the dialog without logging in: the requests
+			 *	that waited get the answer they already had (see _release()), so
+			 *	that the panels show their error and let the input be copied out.
+			 *	Nothing to do when no request waits
+			 *
+			 *	@return		void
+			 */
+			dismiss : function() {
+				Nino.adminUi.api._release( true );
+			},
+
+			/**
+			 *	The account this page was rendered for, as the shell wrote it
+			 *	into its rail
+			 *
+			 *	@return		{string}
+			 */
+			_account : function() {
+
+				const el = typeof dc.getElementById === 'function' ? dc.getElementById('admin-user-email') : null;
+
+				return el !== null && typeof el.textContent === 'string' ? el.textContent.trim() : '';
+			},
+
+			/**
+			 *	Register what happens when the session is gone and a login can
+			 *	bring it back - the shell's dialog. Called with ( check, reason ):
+			 *	check( done ) asks again whose session this is (call it after a
+			 *	login) and says what became of the waiting requests through
+			 *	done( outcome ), reason is 'expired' for a session that ended or 'other' for one
+			 *	that now belongs to another account, where the page can only be
+			 *	reloaded. Without a handler (the wizard, a test) a session
+			 *	failure is handed back like any other answer
+			 *
+			 *	@param		{Function}	handler
+			 *
+			 *	@return		void
+			 */
+			onSessionLost : function( handler ) {
+				Nino.adminUi.api._handler = typeof handler === 'function' ? handler : null;
+			},
+
+			/**
+			 *	What to tell a person about a failed request. The server's code
+			 *	says it in the interface language ('/_admin/error/<code>', with
+			 *	the params in it); failing that the server's own message, which
+			 *	is content more often than it is a log line - a veto a project's
+			 *	callback wrote, the reason a feature cannot be activated - and
+			 *	failing that the panel's own sentence for what it was doing
+			 *	(fallbackKey, a fill key or text). The status number is in the
+			 *	last two only: with a sentence that says what happened, the
+			 *	number is noise, and without one it is what somebody reports. A
+			 *	request that never reached the server is told as that
+			 *
+			 *	@param		{number}		status
+			 *	@param		{*}					response					Parsed response body, if any
+			 *	@param		{string}		[fallbackKey]			Fill key or text for what the panel was doing
+			 *
+			 *	@return		{string}
+			 */
+			errorText : function( status, response, fallbackKey ) {
+
+				const body = response !== null && typeof response === 'object' ? response : {};
+
+				if( body.code === 'offline' )
+					return Nino.content.getText('/_admin/common/error/offline');
+
+				if( typeof body.code === 'string' && /^[a-z][a-z0-9_]*$/.test( body.code ) === true ) {
+					const known = Nino.content.getText( '/_admin/error/'+ body.code );
+					if( known !== '' )
+						return Nino.adminUi.format( known, ...( Array.isArray( body.params ) === true ? body.params : [] ) );
+				}
+
+				const own = typeof fallbackKey === 'string' && fallbackKey !== '' ? Nino.adminUi.text( fallbackKey ) : '';
+
+				return '('+ status+ ') '+ ( ( typeof body.error === 'string' ? body.error : '' ) || own || Nino.content.getText('/_admin/common/error/request') );
+			},
+		},
 	};
 
 })(window, document, document.documentElement, document.body);

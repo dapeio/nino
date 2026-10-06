@@ -434,17 +434,17 @@ namespace Nino\Modules\Routes {
 				$template = (string) ( $data['template'] ?? '' );
 
 				if( $uri === null ) {
-					\Nino\Http::fail( $request, 400, 'invalid uri: "'. ( (string) ( $data['uri'] ?? '' ) ). '"' );
+					\Nino\Http::fail( $request, 400, 'invalid uri: "'. ( (string) ( $data['uri'] ?? '' ) ). '"', 'routes_invalid_uri', [ (string) ( $data['uri'] ?? '' ) ], 'uri' );
 					return;
 				}
 
 				if( $httpUri === null ) {
-					\Nino\Http::fail( $request, 400, 'invalid http uri: "'. ( (string) ( $data['httpUri'] ?? '' ) ). '"' );
+					\Nino\Http::fail( $request, 400, 'invalid http uri: "'. ( (string) ( $data['httpUri'] ?? '' ) ). '"', 'routes_invalid_http_uri', [ (string) ( $data['httpUri'] ?? '' ) ], 'httpUri' );
 					return;
 				}
 
 				if( in_array( $httpUri, self::RESERVED_HTTP_URIS, true ) === true ) {
-					\Nino\Http::fail( $request, 409, 'reserved http uri: "'. $httpUri. '"' );
+					\Nino\Http::fail( $request, 409, 'reserved http uri: "'. $httpUri. '"', 'routes_reserved_http_uri', [ $httpUri ], 'httpUri' );
 					return;
 				}
 
@@ -480,12 +480,12 @@ namespace Nino\Modules\Routes {
 					}
 
 					if( ( $existing['uri'] ?? null ) === $uri ) {
-						\Nino\Http::fail( $request, 400, 'duplicate uri: "'. $uri. '"' );
+						\Nino\Http::fail( $request, 400, 'duplicate uri: "'. $uri. '"', 'routes_duplicate_uri', [ $uri ], 'uri' );
 						return;
 					}
 
 					if( ( $existing['httpUri'] ?? null ) === $httpUri ) {
-						\Nino\Http::fail( $request, 400, 'duplicate http uri: "'. $httpUri. '"' );
+						\Nino\Http::fail( $request, 400, 'duplicate http uri: "'. $httpUri. '"', 'routes_duplicate_http_uri', [ $httpUri ], 'httpUri' );
 						return;
 					}
 				}
@@ -497,7 +497,7 @@ namespace Nino\Modules\Routes {
 				// never take a uri robots.txt, a module or a developer already
 				// answers on
 				if( isset( $routes[$routeKey] ) === true && $routeKey !== $previousRouteKey ) {
-					\Nino\Http::fail( $request, 409, 'http uri already belongs to another route: "'. $httpUri. '"' );
+					\Nino\Http::fail( $request, 409, 'http uri already belongs to another route: "'. $httpUri. '"', 'routes_http_uri_taken', [ $httpUri ], 'httpUri' );
 					return;
 				}
 
@@ -526,7 +526,7 @@ namespace Nino\Modules\Routes {
 				// posts an empty value from its own disabled option - neither of
 				// which names a real file, and neither of which is an error
 				if( $body === '[template /templates/'. $template. ']' && in_array( $template, self::_templates( $appData ), true ) === false ) {
-					\Nino\Http::fail( $request, 400, 'unknown template: "'. $template. '"' );
+					\Nino\Http::fail( $request, 400, 'unknown template: "'. $template. '"', 'routes_unknown_template', [ $template ], 'template' );
 					return;
 				}
 
@@ -740,7 +740,7 @@ namespace Nino\Modules\Routes {
 				$swapWith = $direction === 'up' ? $index - 1 : $index + 1;
 
 				if( $swapWith < 0 || $swapWith >= count( $pageKeys ) ) {
-					\Nino\Http::fail( $request, 400, 'already at the '. ( $direction === 'up' ? 'top' : 'bottom' ) );
+					\Nino\Http::fail( $request, 400, 'already at the '. ( $direction === 'up' ? 'top' : 'bottom' ), $direction === 'up' ? 'already_top' : 'already_bottom' );
 					return;
 				}
 

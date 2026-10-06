@@ -4,7 +4,159 @@ All notable changes to Nino are documented in this file.
 
 ## Unreleased
 
+### Added
+
+- **Workbench:** one request helper for every panel, `Nino.adminUi.api`
+  (`_admin/assets/Nino.admin.js`). `call( action, payload, callback, extra )`
+  posts one action to `<project directory>/_admin/` - the trailing slash and
+  the directory are the helper's, not each panel's - and calls back
+  synchronously with `( status, body )`, the shape every panel already read.
+  It names no `Nino.admin` member and asks `Nino.http`, `Nino.dir` and
+  `Nino.content` only when a request is made, so the setup wizard can load
+  the file without the shell. The twenty copies of `_apiCall` in the kernel's
+  panels are one-line names for it; the wizard's and the recovery page's own
+  transports stay, both are English by design.
+
+- **Workbench:** a session that ends under an open form no longer loses it.
+  Only a `401` with the code `session` and a `403` with the code `csrf` are
+  the end of a session - the Users panel's `401` for a wrong password and a
+  missing permission's `403` reach their panel as they did. The helper then
+  asks `GET /_admin/?session=1` (new: `{ user, csrf }`, answered before the
+  login page, for a logged-out session too) and decides: the same account and
+  a token that was replaced by a login elsewhere - the second-tab case -
+  sends the waiting requests again, once, with the fresh token written into
+  the page's csrf fields; a session that is gone opens a login dialog over the
+  page (`<dialog id="admin-session-dialog">` in `page-index.tpl`, texts
+  `/_admin/common/session/*`) that posts to the login endpoint without leaving,
+  with the anonymous session's token, and sends the requests on after a login
+  of the same account (a `403` from that login asks again whose session this
+  is, since the token changed under it); another account's session offers
+  only the reload and sends nothing, and leaves the page's own, dead token in
+  its csrf fields, so that a form filled in for one account is never saved by
+  another, not even by a panel that does not use the helper yet. The dialog
+  has a *Close* button, and closing it (Escape included, except while a login
+  of the same account can still bring the requests back) releases what waited
+  - `api.dismiss()`: each request gets the answer it already had, so the
+  panels show their error, give their forms back and let the input be copied
+  out - for the person who cannot log in: an account that was deleted or
+  disabled, a password changed under the page, a login that answers 503 in
+  maintenance. `api.waiting()` tells whether requests wait. The notice for
+  another account has a title of its own, a login whose check finds the session
+  still gone says so instead of doing nothing, and `?session=1` sets
+  `Cache-Control: no-store` itself, whatever a project relaxed globally. A
+  login that is answered after the dialog was dismissed still asks whose
+  session this is, and so teaches the page the new token. Three requests
+  failing together share one check; a second failure
+  of a request already sent again goes to its callback. No keep-alive: a page
+  left open long enough still ends its session, it just no longer costs the
+  input. `tests/admin-api-js-smoke.js` (new, 100 checks) holds the endpoint,
+  the payload and the extras, the synchronous callback, every path above
+  including the 401/403 that are not a session and a check that fails, and
+  offline against a server's own 500 (told apart by the missing response
+  headers, a failed connection arrives as a 500 as well);
+  `tests/admin-script-js-smoke.js` the dialog's wiring, its login, its answers
+  and every way out of it (22 → 52 checks); `tests/admin-smoke.php` the codes,
+  `?session=1` logged in and out and the guard's two bodies.
+
+- **Workbench:** failures say what failed. `\Nino\Http::fail( $request,
+  $status, $error, $code = '', $params = [], $field = '' )` adds the stable
+  `code`, the `params` that fill its sentence and the `field` the value was
+  refused for to the body, and only when given: a call with three arguments
+  answers what it always did. About fifty failures a person can cause carry
+  a code - the type of a value (`int_range`, `bool`, `lines`, `lines_ip`),
+  a wrong password, a role or navigation or route or text key or type that
+  does not fit, a last account with full access, a field the account may not
+  change - and the shell's two languages word them as `/_admin/error/<code>`;
+  a panel's own codes carry its slug and live in its own `text()`.
+  `Admin::failType()` words a value of the wrong type for Config, Login
+  protection and Maintenance (`typeError()` stays). `Nino.adminUi.api.errorText(
+  status, response, fallbackKey )` says a failure in the interface language -
+  the code's text with its params, else the server's own message, else the
+  panel's sentence, those two with the status number in front, and a request
+  that never arrived as that - `showError()` writes it in place of a list,
+  and `format( text, ...params )` fills `%s`, `%d` and `%n` with a function,
+  because a param is what somebody typed and `String.replace()` reads `'$&'`
+  in it, and writes a number with a fraction the way the interface language
+  does (`0,5 MB` in German, from the new fill `/_admin/common/unit/decimal`).
+  `tests/admin-system-smoke.php` finds every code in the source and fails on
+  one without text in both languages (692 → 708 checks, 14 red before), and
+  holds the codes of Config, Login protection, Maintenance, Roles, Text Keys,
+  Element Types, Routes and Navigation.
+
+- **Workbench:** the status line, `Nino.adminUi.status( el, labels )`:
+  *Saving …*, *Saved at 09:41.*, *Unsaved changes* and the error, as one
+  element with its state in `data-state`, a glyph in front of each state so
+  the meaning does not rest on a colour, a status role and, for an error, an
+  alert. `error()` marks the field the server named (`[data-field]` or
+  `[name]` in the bound form) `aria-invalid`, focuses it and lets it go with
+  the next thing typed; `bind( form, isDirty )` turns *saved* into *unsaved*
+  on input without keeping a second copy of the panel's own dirty state (a
+  picked file or a search box is not a change: an upload saves itself, while
+  adding, removing and moving a reference in `Nino.adminUi.elementList()` is,
+  and the control now fires a bubbling `change` for it) and leaves a refusal
+  on screen until the next save; what is typed while a save is on its way
+  ends in *Unsaved changes*, not in *Saved*. The Elements form and the three
+  Users forms use it (the other forms still print a plain *Saved.*), the
+  Users form marks the wrong current password, and a Users account that
+  renames itself updates the rail, which the session check compares against.
+  Known limitation: below 38 rem a bottom action bar still hides its status
+  line, as it hid the old messages - which now includes an error, so on a
+  phone a failed save of the Elements form shows nothing in the bar until the
+  layout of the narrow bar is reworked (not part of this change).
+
+- **Images:** `\Nino\Images::limits()` answers what an upload runs into in one
+  place - the kernel's 8 MiB (`MAX_UPLOAD_BYTES`, now public), what php lets a
+  request carry (the smaller of `upload_max_filesize` and `post_max_size`,
+  where `0` is none) and the 20 megapixels - and a value php cannot read is no
+  limit rather than a warning. `\Nino\Images::reject( $bytes )` says why the
+  kernel would refuse bytes (`image_too_large`, `image_type`,
+  `image_too_many_pixels`, with the limit as param); `process()` and `fit()`
+  use it, so the limits are enforced in one place. `tests/kernel-smoke.php`
+  holds both, `Http::fail()` and that none of it warns (793 → 809 checks).
+
+- **Workbench:** upload limits are named at the control and checked before
+  the file is sent. The shell carries `data-upload-bytes` and
+  `data-upload-pixels` (new fills `/_admin/upload/*`), the Elements image field
+  and the Images slots print *Up to 2 MB and 20 megapixels.* under the file
+  input (`Nino.adminUi.uploadHint()`), and `Nino.adminUi.checkImage( file,
+  done )` refuses a file above the byte limit - and, where the browser can
+  decode it (`createImageBitmap`), above the pixel limit - in the server's own
+  words without sending it. `\Nino\Admin\Admin::uploadError()` maps what php
+  says about an upload that did not arrive: `UPLOAD_ERR_INI_SIZE` and
+  `FORM_SIZE` are a `413` `upload_too_large` naming php's limit in MB,
+  `PARTIAL` a `400`, a missing file a `400`, and a missing temporary
+  directory, a failed write and a blocking extension a `500` - server
+  faults - and a request above `post_max_size`, which php answers by dropping
+  its token with the rest of its body, is a `413` `post_too_large` instead of
+  the `403` for a missing token. `tests/admin-smoke.php` holds every one of
+  them for both upload endpoints (247 → 286 checks),
+  `tests/admin-elements-js-smoke.js` the pre-check and the status line
+  (87 → 101).
+
 ### Changed
+
+- **Workbench:** what the panels print for a failure. A failure with a code is
+  the code's sentence without the number in front; one without keeps
+  `(status) message` - the server's own message first, as before, then the
+  panel's sentence - so a veto a project's callback wrote and a reason a feature
+  cannot be activated, which are content, still reach the person. A request
+  that never reached the server says that instead of `(500)`. The upload
+  endpoints answer what went wrong in a code of its own where they used to say
+  *no file uploaded*, *could not read upload* and *invalid or oversized image*:
+  an unreadable temporary file is a `500`, an image the kernel refuses names
+  its reason, and one gd cannot decode after all is `image_unreadable`.
+  `Admin::guard()`'s `401` carries the code `session`, so a client that
+  matched the whole body must match `{ "error": "not logged in", "code":
+  "session" }`; `tests/features-smoke.php` and `tests/catalogue-smoke.php` do
+  (6 and 2 red before). `tests/admin-lists-js-smoke.js` holds that every panel
+  posts through the helper, keeps no transport of its own and writes no status
+  number itself (138 → 141 checks, 5 red before); `tests/admin-features-js-smoke.js`
+  reads the helper's uri from `Nino.dir` (2 red before).
+
+  Feature panels (`features/<Name>/assets`) are untouched: they keep posting
+  as they do and do not get the session recovery before they adopt the
+  helper, which is for the release after this one - on the kernels before it
+  `Nino.adminUi.api` does not exist, so a feature must detect it.
 
 - **Wizard:** "New Route" is a secondary action beside Next, so the bar has
   one primary button again. The Accounts step names the rule in the password's

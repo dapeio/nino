@@ -83,14 +83,12 @@
 		 *
 		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "submissions/list")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"
-		 *	@param		{Function}	callback			Called with ( xhr.status, xhr.responseJSON )
+		 *	@param		{Function}	callback			Called with ( status, body )
 		 *
 		 *	@return		void
 		 */
 		_apiCall : function( endpoint, payload, callback ) {
-			Nino.http.sendRequest( '[[/nino/dir]]/_admin/', 'POST', function( xhr ) {
-				callback( xhr.status, xhr.responseJSON );
-			}, { action : 'submissions/'+ endpoint, data : JSON.stringify( payload ) } );
+			Nino.adminUi.api.call( 'submissions/'+ endpoint, payload, callback );
 		},
 
 		/**
@@ -102,12 +100,7 @@
 		 *	@return		void
 		 */
 		_showError : function( status, response ) {
-			const wrap = dc.getElementById('submissions-list');
-			wrap.innerHTML = '';
-			const p = dc.createElement('p');
-			p.className = 'nino-admin-error';
-			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/submissions/error/load') );
-			wrap.appendChild( p );
+			Nino.adminUi.showError( dc.getElementById('submissions-list'), status, response, '/_admin/submissions/error/load' );
 		},
 
 		/**

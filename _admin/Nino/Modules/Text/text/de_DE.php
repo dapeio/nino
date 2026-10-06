@@ -28,4 +28,6 @@ return [
 	'[[/_admin/keys/confirm/delete]]'		=> 'Textschlüssel „%s“ wirklich löschen? Der Wert geht in jeder Sprache verloren.',
 	'[[/_admin/keys/error/save-partial]]'	=> 'Speichern fehlgeschlagen für %s',
 	'[[/_admin/dashboard/label/keys]]'	=> 'Fehlende Textschlüssel',
+	'[[/_admin/error/keys_invalid]]'	=> 'Der Schlüssel „%s“ ist ungültig. Ein Schlüssel sieht so aus: /home/welcome/subtitle.',
+	'[[/_admin/error/keys_exists]]'	=> 'Den Schlüssel „%s“ gibt es schon.',
 ];

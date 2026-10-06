@@ -158,7 +158,203 @@
 			 */
 			set : function( locale ) {
 				Nino.admin.sessionLocale.current = locale;
-				Nino.http.sendRequest( '[[/nino/dir]]/_admin/', 'POST', function() {}, { action : 'admin/locale', data : JSON.stringify( { locale : locale } ) } );
+				Nino.adminUi.api.call( 'admin/locale', { locale : locale }, function() {} );
+			},
+		},
+
+		/**
+		 *	What the shell does when a request finds the session gone (see
+		 *	Nino.adminUi.api): a dialog to log in again, over the page and
+		 *	everything typed into it. The api decides whether the requests that
+		 *	waited are sent again - with the same account - or not; this is
+		 *	the dialog and the login that stand between.
+		 *
+		 *	The login is posted from here rather than through Nino.auth.login(),
+		 *	which redirects on success: the page must stay exactly as it is.
+		 *	It goes out with the token of the anonymous session the api just
+		 *	wrote into the page's csrf field - the one the dead session's
+		 *	token on the page would have been refused for
+		 */
+		sessionDialog : {
+
+			// The api's "whose session is this now" while the dialog is open
+			_check : null,
+
+			// Why the dialog was opened last: whether Escape may close it
+			_reason : 'expired',
+
+			/**
+			 *	Register the dialog with the api - if the page has one. A shell
+			 *	without it simply gets a session failure handed back like any
+			 *	other answer
+			 *
+			 *	@return		void
+			 */
+			init : function() {
+
+				const el = Nino.admin.sessionDialog._elements();
+
+				if( el === null || typeof Nino.adminUi !== 'object' || typeof Nino.adminUi.api !== 'object' || typeof Nino.adminUi.api.onSessionLost !== 'function' )
+					return;
+
+				// Escape would give up the requests that wait for a login; while one
+				// can still bring them back it does not. Where it cannot (another
+				// account, or nothing waits any more) the dialog may be closed
+				el.dialog.addEventListener( 'cancel', function( ev ) {
+					if( Nino.admin.sessionDialog._reason === 'expired' && Nino.adminUi.api.waiting() === true )
+						ev.preventDefault();
+				} );
+
+				// However it was closed, the requests that waited are told: the
+				// panels show their error and give their forms back, and the input
+				// can be copied out
+				el.dialog.addEventListener( 'close', function() {
+					el.pw.value = '';
+					Nino.adminUi.api.dismiss();
+				} );
+				el.close.addEventListener( 'click', function() { Nino.admin.sessionDialog._close( el ) } );
+				el.reload.addEventListener( 'click', function() { wn.location.reload() } );
+				el.form.addEventListener( 'submit', function( ev ) {
+					ev.preventDefault();
+					Nino.admin.sessionDialog._login( el, Nino.admin.sessionDialog._check );
+				} );
+
+				Nino.adminUi.api.onSessionLost( Nino.admin.sessionDialog._open );
+			},
+
+			/**
+			 *	The dialog's parts, or null where the page has none
+			 *
+			 *	@return		{Object|null}
+			 */
+			_elements : function() {
+
+				const get = function( name ) { return dc.getElementById( 'admin-session-'+ name ) };
+				const el = { dialog : get('dialog'), form : get('form'), title : get('title'), text : get('text'), user : get('user'), pw : get('pw'), msg : get('msg'), submit : get('submit'), reload : get('reload'), close : get('close') };
+
+				return Object.keys( el ).every( function( name ) { return el[name] !== null && typeof el[name] !== 'undefined' } ) ? el : null;
+			},
+
+			/**
+			 *	Show the dialog: asking for a login where the session ended, or
+			 *	only offering the reload where another account has logged in
+			 *	since - a form filled in for one account must not be saved by
+			 *	another, so there is nothing to log in for
+			 *
+			 *	@param		{Function}	check					The api's "whose session is this now", for after a login
+			 *	@param		{string}		reason				'expired' or 'other'
+			 *
+			 *	@return		void
+			 */
+			_open : function( check, reason ) {
+
+				const el = Nino.admin.sessionDialog._elements();
+				const other = reason === 'other';
+
+				Nino.admin.sessionDialog._check = check;
+				Nino.admin.sessionDialog._reason = reason;
+
+				el.title.textContent = Nino.content.getText( other ? '/_admin/common/session/other_title' : '/_admin/common/session/title' );
+				el.text.textContent = Nino.content.getText( other ? '/_admin/common/session/other' : '/_admin/common/session/expired' );
+				el.user.parentNode.hidden = other;
+				el.pw.parentNode.hidden = other;
+				el.submit.hidden = other;
+				el.msg.textContent = '';
+
+				if( el.dialog.open !== true ) {
+					if( typeof el.dialog.showModal === 'function' )
+						el.dialog.showModal();
+					else
+						el.dialog.setAttribute( 'open', '' );
+				}
+
+				( other ? el.reload : el.user ).focus();
+			},
+
+			/**
+			 *	Close the dialog without a login: the requests that waited are
+			 *	released by the dialog's close (see init()), or here where the
+			 *	browser has no dialog element to fire one
+			 *
+			 *	@param		{Object}		el
+			 *
+			 *	@return		void
+			 */
+			_close : function( el ) {
+
+				if( typeof el.dialog.close === 'function' ) {
+					el.dialog.close();
+					return;
+				}
+
+				el.dialog.removeAttribute('open');
+				el.pw.value = '';
+				Nino.adminUi.api.dismiss();
+			},
+
+			/**
+			 *	Log in from the dialog, then let the api ask again whose session
+			 *	this is
+			 *
+			 *	@param		{Object}		el
+			 *	@param		{Function}	check
+			 *
+			 *	@return		void
+			 */
+			_login : function( el, check ) {
+
+				const say = function( key, ...params ) { el.msg.textContent = Nino.adminUi.format( Nino.content.getText( key ), ...params ) };
+
+				if( el.user.value === '' || el.pw.value === '' ) {
+					say( '/_admin/common/session/wrong' );
+					return;
+				}
+
+				// Ask whose session this is now, and let the dialog follow. A
+				// session that is still gone after the login (the status is the
+				// login's) is said, not left as a button that did nothing
+				const ask = function( loginStatus ) {
+					check( function( outcome, status ) {
+
+						el.submit.disabled = false;
+
+						if( outcome === 'resumed' )
+							el.dialog.close();
+						else if( outcome === 'failed' )
+							say( '/_admin/common/session/error', status );
+						else if( outcome === 'expired' )
+							say( '/_admin/common/session/error', loginStatus );
+					} );
+				};
+
+				el.msg.textContent = '';
+				el.submit.disabled = true;
+
+				Nino.http.sendRequest( Nino.dir+ '/.nino/auth/login', 'POST', function( xhr ) {
+
+					// The same account signed in elsewhere while the dialog was open
+					// and rotated the token: trying again with this one cannot
+					// succeed, the check fetches the new one (and may find the
+					// session back)
+					if( xhr.status === 403 ) {
+						ask( xhr.status );
+						return;
+					}
+
+					if( xhr.status !== 200 ) {
+						el.submit.disabled = false;
+						if( xhr.status === 401 )
+							say( '/_admin/common/session/wrong' );
+						else
+							say( '/_admin/common/session/error', xhr.status );
+						return;
+					}
+
+					// Signing in rotated the session and its token; the api asks for
+					// both again and sends the waiting requests with them
+					el.pw.value = '';
+					ask( xhr.status );
+				}, {}, { user : el.user.value, pw : el.pw.value } );
 			},
 		},
 
@@ -547,6 +743,7 @@
 			Nino.admin.theme.init();
 			Nino.admin.navUi.init();
 			Nino.admin.rail.init();
+			Nino.admin.sessionDialog.init();
 
 			// The picker's <option> values are already real ?locale=xx
 			// targets (see Admin::_localePickerHtml()) - navigating there

@@ -42,6 +42,10 @@
 		_localeValues		: {},
 		_selectedLocale	: null,
 		_dirtyLocales		: [],
+		// The form's status line - saving, saved at, unsaved, why it failed (see
+		// Nino.adminUi.status()). Drawn again with the form, so always read from
+		// here rather than kept in a local
+		_status					: null,
 		// The open type's elements as the list last showed them, [ { uri,
 		// label } ] in the list's order - what the form's previous/next step
 		// through. Refilled with every list the server sends (see
@@ -232,30 +236,22 @@
 		},
 
 		/**
-		 *	Call an elements/* admin action. Always posts to /_admin/ (dispatched
-		 *	server-side via $_POST['action']), so this never depends on the
-		 *	webserver routing anything beyond the already-required /_admin uri.
-		 *	The trailing slash matters here: /_admin is a real directory on disk,
-		 *	so some webservers (eg. nginx) auto-redirect the slash-less uri - and
-		 *	that redirect can end up on the wrong scheme behind a reverse proxy,
-		 *	which browsers block as mixed content for XHR. Nino's own routing
-		 *	treats both forms identically (Http::cleanUri() strips trailing
-		 *	slashes before matching), so posting with the slash is free.
+		 *	Call an elements/* admin action - this panel's name for
+		 *	Nino.adminUi.api.call(), which owns where the request goes (always
+		 *	/_admin/, with its trailing slash, below the project's directory,
+		 *	dispatched server-side via $_POST['action']), why extra multipart
+		 *	fields (eg. a File) just work, and what happens when the session
+		 *	is gone
 		 *
 		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "elements/list")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"
-		 *	@param		{Function}	callback			Called with ( xhr.status, xhr.responseJSON )
-		 *	@param		{Object}		[extra]				Extra multipart fields (eg. { file : File }) -
-		 *																		sendRequest() already posts everything as
-		 *																		multipart/form-data, so a raw File value
-		 *																		just works alongside the usual "data" json
+		 *	@param		{Function}	callback			Called with ( status, body )
+		 *	@param		{Object}		[extra]				Extra multipart fields (eg. { file : File })
 		 *
 		 *	@return		void
 		 */
 		_apiCall : function( endpoint, payload, callback, extra ) {
-			Nino.http.sendRequest( '[[/nino/dir]]/_admin/', 'POST', function( xhr ) {
-				callback( xhr.status, xhr.responseJSON );
-			}, Object.assign( { action : 'elements/'+ endpoint, data : JSON.stringify( payload ) }, extra || {} ) );
+			Nino.adminUi.api.call( 'elements/'+ endpoint, payload, callback, extra );
 		},
 
 		/**
@@ -269,11 +265,7 @@
 		 *	@return		void
 		 */
 		_showError : function( container, status, response ) {
-			container.innerHTML = '';
-			const p = dc.createElement('p');
-			p.className = 'nino-admin-error';
-			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/elements/error/load') );
-			container.appendChild( p );
+			Nino.adminUi.showError( container, status, response, '/_admin/elements/error/load' );
 		},
 
 		/**
@@ -1056,6 +1048,10 @@
 						Nino.admin.elements._uploadImage( key, fileInput.files[0], hiddenInput, preview, msg, fileInput );
 					} );
 					wrap.appendChild( fileInput );
+					// What the server will take, before the file is chosen
+					const hint = Nino.adminUi.uploadHint();
+					if( hint !== null )
+						wrap.appendChild( hint );
 					wrap.appendChild( msg );
 				}
 
@@ -1717,10 +1713,14 @@
 
 			const msg = dc.createElement('p');
 			msg.id = 'elements-form-msg';
-			msg.setAttribute( 'aria-live', 'polite' );
 			actions.appendChild( msg );
 
 			form.appendChild( actions );
+
+			// Whether what is on screen is saved: any edit turns "saved at" into
+			// "unsaved changes", and a save says which of the two it ended in
+			Nino.admin.elements._status = Nino.adminUi.status( msg );
+			Nino.admin.elements._status.bind( form );
 
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.elements._save() } );
 
@@ -1783,16 +1783,15 @@
 			// address the element that now exists.
 			let uri = dc.getElementById('elements-form-uri').value.trim();
 			const numberedInsert = Nino.admin.elements._isNew === true && Nino.admin.elements._isNumbered() === true;
-			let msg = dc.getElementById('elements-form-msg');
 
 			if( uri === '' && numberedInsert === false ) {
-				msg.textContent = Nino.content.getText('/_admin/elements/error/uri');
+				Nino.admin.elements._status.fail( Nino.content.getText('/_admin/elements/error/uri') );
 				return;
 			}
 
 			const missing = Nino.admin.elements._missingRequiredFields();
 			if( missing.length > 0 ) {
-				msg.textContent = Nino.content.getText('/_admin/elements/error/required')+ ' '+ missing.join(', ');
+				Nino.admin.elements._status.fail( Nino.content.getText('/_admin/elements/error/required')+ ' '+ missing.join(', ') );
 				return;
 			}
 
@@ -1811,7 +1810,7 @@
 
 			Nino.admin.elements._saving = true;
 			Nino.admin.elements._setFormPending( true );
-			msg.textContent = Nino.content.getText('/_admin/elements/msg/pending');
+			Nino.admin.elements._status.saving();
 
 			function saveNextLocale() {
 
@@ -1842,12 +1841,11 @@
 						if( wasNew === true && created === true ) {
 							Nino.admin.elements._renderForm();
 							Nino.admin.router.set( 'elements', [ Nino.admin.elements._currentType, Nino.admin.elements._currentUri ] );
-							msg = dc.getElementById('elements-form-msg');
 						}
 
-						msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/elements/error/save') );
 						Nino.admin.elements._saving = false;
 						Nino.admin.elements._setFormPending( false );
+						Nino.admin.elements._status.error( status, response, '/_admin/elements/error/save' );
 						return;
 					}
 
@@ -1891,8 +1889,7 @@
 						Nino.admin.router.set( 'elements', [ Nino.admin.elements._currentType, Nino.admin.elements._currentUri ] );
 					}
 
-					msg = dc.getElementById('elements-form-msg');
-					msg.textContent = Nino.content.getText('/_admin/elements/msg/saved');
+					Nino.admin.elements._status.saved();
 					Nino.admin.elements._saving = false;
 					Nino.admin.elements._setFormPending( false );
 
@@ -1923,27 +1920,45 @@
 			msg.className = 'nino-admin-field-image-msg';
 			msg.textContent = Nino.content.getText('/_admin/elements/msg/pending');
 
-			Nino.admin.elements._apiCall( 'uploadimage', {
+			// The record the file belongs to is taken now: the check below waits
+			// for the picture to decode, and the person may step to another
+			// element or language meanwhile
+			const target = {
 				type 		: Nino.admin.elements._currentType,
 				uri 		: Nino.admin.elements._currentUri,
 				locale 	: Nino.admin.elements._selectedLocale,
 				key 		: key,
-			}, function( status, response ) {
+			};
 
-				fileInput.disabled = false;
-				fileInput.value = '';
+			// A file the server cannot take is refused here, with the reason,
+			// instead of after the upload
+			Nino.adminUi.checkImage( file, function( rejection ) {
 
-				if( status !== 200 || response === null ) {
+				if( rejection !== null ) {
+					fileInput.disabled = false;
+					fileInput.value = '';
 					msg.className = 'nino-admin-field-image-msg is-error';
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/elements/error/save') );
+					msg.textContent = Nino.adminUi.api.errorText( 400, rejection );
 					return;
 				}
 
-				hiddenInput.value = response.filename;
-				preview.src = response.url;
-				preview.hidden = false;
-				msg.textContent = Nino.content.getText('/_admin/elements/msg/saved');
-			}, { file : file } );
+				Nino.admin.elements._apiCall( 'uploadimage', target, function( status, response ) {
+
+					fileInput.disabled = false;
+					fileInput.value = '';
+
+					if( status !== 200 || response === null ) {
+						msg.className = 'nino-admin-field-image-msg is-error';
+						msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/elements/error/save' );
+						return;
+					}
+
+					hiddenInput.value = response.filename;
+					preview.src = response.url;
+					preview.hidden = false;
+					msg.textContent = Nino.content.getText('/_admin/elements/msg/saved');
+				}, { file : file } );
+			} );
 		},
 
 		/**
@@ -1999,9 +2014,8 @@
 			Nino.admin.elements._renderForm();
 			Nino.admin.router.set( 'elements', [ Nino.admin.elements._currentType, 'new' ] );
 
-			const msg = dc.getElementById('elements-form-msg');
-			if( msg !== null )
-				msg.textContent = Nino.content.getText('/_admin/elements/msg/duplicated');
+			// A copy nobody has saved yet is the one state "unsaved" is for
+			Nino.admin.elements._status.dirty( Nino.content.getText('/_admin/elements/msg/duplicated') );
 
 			const uriInput = dc.getElementById('elements-form-uri');
 			if( uriInput !== null && uriInput.type !== 'hidden' )
@@ -2031,9 +2045,7 @@
 				if( status !== 200 ) {
 					Nino.admin.elements._saving = false;
 					Nino.admin.elements._setFormPending( false );
-					const msg = dc.getElementById('elements-form-msg');
-					if( msg !== null )
-						msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/elements/error/save') );
+					Nino.admin.elements._status.error( status, response, '/_admin/elements/error/save' );
 					return;
 				}
 				Nino.admin.elements._saving = false;

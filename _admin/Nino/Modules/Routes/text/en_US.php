@@ -25,4 +25,11 @@ return [
 	'[[/_admin/routes/placeholder/description]]'	=> 'HTML description',
 	'[[/_admin/routes/confirm/delete]]'	=> 'Really delete the route at “%s”?',
 	'[[/_admin/dashboard/label/routes]]'	=> 'Routes',
+	'[[/_admin/error/routes_invalid_uri]]'	=> 'The Element URI “%s” is not valid.',
+	'[[/_admin/error/routes_invalid_http_uri]]'	=> 'The Http URI “%s” is not valid.',
+	'[[/_admin/error/routes_reserved_http_uri]]'	=> 'The Http URI “%s” is reserved by Nino. Choose another one.',
+	'[[/_admin/error/routes_duplicate_uri]]'	=> 'Another page already uses the Element URI “%s”.',
+	'[[/_admin/error/routes_duplicate_http_uri]]'	=> 'Another page already uses the Http URI “%s”.',
+	'[[/_admin/error/routes_http_uri_taken]]'	=> 'The Http URI “%s” already belongs to another route.',
+	'[[/_admin/error/routes_unknown_template]]'	=> 'The template “%s” does not exist.',
 ];

@@ -59,14 +59,12 @@
 		 *
 		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "logs/list")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"
-		 *	@param		{Function}	callback			Called with ( xhr.status, xhr.responseJSON )
+		 *	@param		{Function}	callback			Called with ( status, body )
 		 *
 		 *	@return		void
 		 */
 		_apiCall : function( endpoint, payload, callback ) {
-			Nino.http.sendRequest( '[[/nino/dir]]/_admin/', 'POST', function( xhr ) {
-				callback( xhr.status, xhr.responseJSON );
-			}, { action : 'logs/'+ endpoint, data : JSON.stringify( payload ) } );
+			Nino.adminUi.api.call( 'logs/'+ endpoint, payload, callback );
 		},
 
 		/**
@@ -78,12 +76,7 @@
 		 *	@return		void
 		 */
 		_showError : function( status, response ) {
-			const wrap = dc.getElementById('logs-list');
-			wrap.innerHTML = '';
-			const p = dc.createElement('p');
-			p.className = 'nino-admin-error';
-			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/logs/error/load') );
-			wrap.appendChild( p );
+			Nino.adminUi.showError( dc.getElementById('logs-list'), status, response, '/_admin/logs/error/load' );
 		},
 
 		/**

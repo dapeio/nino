@@ -136,12 +136,12 @@ namespace Nino\Modules\Maintenance {
 			$retry	= \Nino\Admin\Admin::cleanInt( $data['retry'] ?? null, [ 'min' => self::RETRY_MIN, 'max' => self::RETRY_MAX ] );
 
 			if( is_bool( $status ) === false ) {
-				\Nino\Http::fail( $request, 400, 'status: expected true or false' );
+				\Nino\Admin\Admin::failType( $request, 'status', [ 'type' => 'bool' ] );
 				return;
 			}
 
 			if( $retry === null ) {
-				\Nino\Http::fail( $request, 400, 'retry: expected a whole number between '. self::RETRY_MIN. ' and '. self::RETRY_MAX );
+				\Nino\Admin\Admin::failType( $request, 'retry', [ 'type' => 'int', 'min' => self::RETRY_MIN, 'max' => self::RETRY_MAX ] );
 				return;
 			}
 

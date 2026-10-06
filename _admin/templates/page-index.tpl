@@ -1,6 +1,6 @@
 [template /_admin/templates/html-header]
 		[csrf]
-		<div id="admin-page-wrap" class="nino-admin nino-admin-shell nino-admin-shell--rail" data-dir="[[/nino/dir]]" data-public="[[/nino/public]]">
+		<div id="admin-page-wrap" class="nino-admin nino-admin-shell nino-admin-shell--rail" data-dir="[[/nino/dir]]" data-public="[[/nino/public]]" data-upload-bytes="[[/_admin/upload/bytes]]" data-upload-pixels="[[/_admin/upload/pixels]]">
 			<aside id="admin-bar-wrap" class="nino-admin-rail" aria-label="[[/_admin/label/rail]]">
 				<!-- Brand and account sit on one row on a phone and stack in the
 				     sidebar on a desktop. The fold button only exists on the
@@ -48,6 +48,29 @@
 				<h1 class="nino-admin-sr-only">[[/_admin/label/title]]</h1>
 				[[/_admin/panes]]
 			</main>
+			<!-- Where a page that outlived its session asks for a login again
+			     instead of losing what was typed (see Nino.adminUi.api and
+			     Nino.admin.sessionDialog) -->
+			<dialog id="admin-session-dialog" class="nino-admin-dialog" aria-labelledby="admin-session-title" aria-describedby="admin-session-text">
+				<form id="admin-session-form" class="nino-admin-dialog-body">
+					<h2 id="admin-session-title" class="nino-admin-dialog-title">[[/_admin/common/session/title]]</h2>
+					<p id="admin-session-text">[[/_admin/common/session/expired]]</p>
+					<label class="nino-admin-field" for="admin-session-user">
+						<span>[[/_admin/common/session/user]]</span>
+						<input id="admin-session-user" type="email" autocomplete="username">
+					</label>
+					<label class="nino-admin-field" for="admin-session-pw">
+						<span>[[/_admin/common/session/pw]]</span>
+						<input id="admin-session-pw" type="password" autocomplete="current-password">
+					</label>
+					<p id="admin-session-msg" class="nino-admin-error" role="alert"></p>
+					<div class="nino-admin-dialog-actions">
+						<button type="submit" id="admin-session-submit" class="nino-admin-btn-primary">[[/_admin/common/session/submit]]</button>
+						<button type="button" id="admin-session-reload">[[/_admin/common/session/reload]]</button>
+						<button type="button" id="admin-session-close">[[/_admin/common/session/close]]</button>
+					</div>
+				</form>
+			</dialog>
 			[jstext]
 			[assets /_admin/.cache/script.js]
 		</div>

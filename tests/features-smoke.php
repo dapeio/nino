@@ -773,7 +773,7 @@ check( 'the workbench finds it by reading the directory, nothing registered', in
 
 // Nobody is signed in: every action is a 401
 foreach( $panelActions as $method => $data )
-	check( $method. ' is 401 without an account', callFeatures( $appData, $method, $data ) === [ 401, [ 'error' => 'not logged in' ] ] );
+	check( $method. ' is 401 without an account', callFeatures( $appData, $method, $data ) === [ 401, [ 'error' => 'not logged in', 'code' => 'session' ] ] );
 
 // The minimum of the set-up project tests/admin-system-smoke.php seeds: an
 // account without the permission and one with it. The daily backup and the

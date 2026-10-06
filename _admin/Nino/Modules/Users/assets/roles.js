@@ -93,14 +93,12 @@
 		 *
 		 *	@param		{string}		endpoint			Action name (eg. "save", becomes "roles/save")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"
-		 *	@param		{Function}	callback			Called with ( xhr.status, xhr.responseJSON )
+		 *	@param		{Function}	callback			Called with ( status, body )
 		 *
 		 *	@return		void
 		 */
 		_apiCall : function( endpoint, payload, callback ) {
-			Nino.http.sendRequest( '[[/nino/dir]]/_admin/', 'POST', function( xhr ) {
-				callback( xhr.status, xhr.responseJSON );
-			}, { action : 'roles/'+ endpoint, data : JSON.stringify( payload ) } );
+			Nino.adminUi.api.call( 'roles/'+ endpoint, payload, callback );
 		},
 
 		/**
@@ -113,11 +111,7 @@
 		 *	@return		void
 		 */
 		_showError : function( container, status, response ) {
-			container.innerHTML = '';
-			const p = dc.createElement('p');
-			p.className = 'nino-admin-error';
-			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/roles/error/load') );
-			container.appendChild( p );
+			Nino.adminUi.showError( container, status, response, '/_admin/roles/error/load' );
 		},
 
 		/**
@@ -568,7 +562,7 @@
 			Nino.admin.roles._apiCall( 'save', { id : idInput.value.trim(), label : nameInput.value.trim(), perms : perms }, function( status, response ) {
 
 				if( status !== 200 ) {
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/roles/error/save') );
+					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/roles/error/save' );
 					return;
 				}
 
@@ -600,7 +594,7 @@
 			Nino.admin.roles._apiCall( 'delete', { id : role.id }, function( status, response ) {
 
 				if( status !== 200 ) {
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/roles/error/save') );
+					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/roles/error/save' );
 					return;
 				}
 

@@ -45,7 +45,10 @@ namespace Nino {
 		// server can decode
 		public const string RENDER = '/nino/images/render';
 
-		private const int MAX_UPLOAD_BYTES 		= 8 * 1024 * 1024;
+		// Public for the same reason as MAX_SOURCE_PIXELS below: it is what an
+		// upload form has to tell the person before they pick a file (see
+		// limits())
+		public const int MAX_UPLOAD_BYTES 		= 8 * 1024 * 1024;
 		// 20 megapixels, not 40: gd decodes into a 4-bytes-per-pixel truecolor
 		// buffer, so this caps imagecreatefromstring() at roughly 80MB - the raw
 		// bytes and the target canvas come on top of that, and the total still
@@ -103,6 +106,107 @@ namespace Nino {
 		}
 
 		/**
+		 *	The limits an uploaded image runs into, all of them in one answer:
+		 *	the kernel's own byte cap, what php lets a request carry
+		 *	(upload_max_filesize for the file, post_max_size for the whole
+		 *	request - the smaller of the two is what can arrive), and the pixel
+		 *	cap. 'bytes' is the one to show and to check against, the smallest
+		 *	of what applies.
+		 *
+		 *	php's two limits are ini strings ("2M", "8M", "512K", "0"), and a
+		 *	value it cannot read counts as no limit rather than as a warning -
+		 *	a malformed ini setting would otherwise be a failed request on every
+		 *	workbench page, since limits() is asked for by the shell. 0 and
+		 *	below mean no limit, which is what post_max_size = 0 says in php
+		 *
+		 *	@return 	array											[ 'kernel' => int, 'php' => int, 'post' => int, 'bytes' => int, 'pixels' => int ] -
+		 *																		bytes, 'php' and 'post' 0 where php sets none, 'pixels' the
+		 *																		largest source in pixels
+		 */
+		public static function limits(): array {
+
+			return self::_limits( ini_get( 'upload_max_filesize' ), ini_get( 'post_max_size' ) );
+		}
+
+		/**
+		 *	limits() for the two php settings given - which cannot be changed at
+		 *	run time, so a test stands in for them here. Internal - public only so that
+		 *	tests/kernel-smoke.php can call it
+		 *
+		 *	@param		string|false	$uploadMax		upload_max_filesize
+		 *	@param		string|false	$postMax			post_max_size
+		 *
+		 *	@return 	array											See limits()
+		 */
+		public static function _limits( string|false $uploadMax, string|false $postMax ): array {
+
+			$read = static function( string|false $value ): int {
+				return $value === false ? 0 : max( 0, (int) @ini_parse_quantity( $value ) );
+			};
+
+			$upload	= $read( $uploadMax );
+			$post		= $read( $postMax );
+			$php		= array_filter( [ $upload, $post ], static fn( int $bytes ): bool => $bytes > 0 );
+			$php		= $php === [] ? 0 : min( $php );
+
+			return [
+				'kernel'	=> self::MAX_UPLOAD_BYTES,
+				'php'			=> $php,
+				'post'		=> $post,
+				'bytes'		=> $php > 0 ? min( self::MAX_UPLOAD_BYTES, $php ) : self::MAX_UPLOAD_BYTES,
+				'pixels'	=> self::MAX_SOURCE_PIXELS,
+			];
+		}
+
+		/**
+		 *	Why the kernel would refuse these bytes as an image, in the terms
+		 *	a client can say in its own language - or null if it would not.
+		 *	The same checks _render() runs, ahead of everything it does with
+		 *	the picture, so a panel can name the reason instead of answering
+		 *	"invalid image" and there is one place the limits are enforced
+		 *
+		 *	@param		string		$bytes				The uploaded bytes
+		 *
+		 *	@return 	array|null								[ 'code' => string, 'params' => array ], one of
+		 *																		image_too_large (the limit in MB), image_type,
+		 *																		image_too_many_pixels (the limit in megapixels)
+		 */
+		public static function reject( string $bytes ): ?array {
+
+			return self::_inspect( $bytes )[1];
+		}
+
+		/**
+		 *	The header of an image and what is wrong with it: [ getimagesize()
+		 *	of the bytes, or null where they are refused; the refusal, or null ]
+		 *
+		 *	@param		string		$bytes
+		 *
+		 *	@return 	array
+		 */
+		private static function _inspect( string $bytes ): array {
+
+			if( strlen( $bytes ) > self::MAX_UPLOAD_BYTES )
+				return [ null, [ 'code' => 'image_too_large', 'params' => [ self::MAX_UPLOAD_BYTES / 1048576 ] ] ];
+
+			$info = @getimagesizefromstring( $bytes );
+			if( $info === false || in_array( $info[2], [ IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_GIF, IMAGETYPE_WEBP ], true ) === false )
+				return [ null, [ 'code' => 'image_type', 'params' => [] ] ];
+
+			// Total pixel count, not either edge alone: an edge-only check let an
+			// 8000x8000 source through (both edges exactly at the old limit) -
+			// 64 megapixels, which imagecreatefromstring() below decodes into a
+			// ~256MB truecolor buffer on top of the raw bytes and the target
+			// canvas. A small, deceptively compressed source (eg. a flat-color
+			// PNG scan) sails straight past MAX_UPLOAD_BYTES, so the byte-size
+			// check alone never catches this
+			if( $info[0] * $info[1] > self::MAX_SOURCE_PIXELS )
+				return [ null, [ 'code' => 'image_too_many_pixels', 'params' => [ self::MAX_SOURCE_PIXELS / 1000000 ] ] ];
+
+			return [ $info, null ];
+		}
+
+		/**
 		 *	What both of them are: the checks, the callback, and gd where no
 		 *	callback took the image
 		 *
@@ -117,7 +221,7 @@ namespace Nino {
 		 */
 		private static function _render( array &$appData, string $mode, string $bytes, int $width, int $height, string $basePath ): string|false {
 
-			if( $bytes === '' || strlen( $bytes ) > self::MAX_UPLOAD_BYTES || $width < 1 || $height < 1 || $basePath === '' )
+			if( $bytes === '' || $width < 1 || $height < 1 || $basePath === '' )
 				return false;
 
 			// $basePath is built from a type/uri/key that are already each individually
@@ -125,18 +229,8 @@ namespace Nino {
 			if( str_contains( $basePath, '..' ) === true || str_starts_with( $basePath, '/' ) === true )
 				return false;
 
-			$info = @getimagesizefromstring( $bytes );
-			if( $info === false || in_array( $info[2], [ IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_GIF, IMAGETYPE_WEBP ], true ) === false )
-				return false;
-
-			// Total pixel count, not either edge alone: an edge-only check let an
-			// 8000x8000 source through (both edges exactly at the old limit) -
-			// 64 megapixels, which imagecreatefromstring() below decodes into a
-			// ~256MB truecolor buffer on top of the raw bytes and the target
-			// canvas. A small, deceptively compressed source (eg. a flat-color
-			// PNG scan) sails straight past MAX_UPLOAD_BYTES, so the byte-size
-			// check alone never catches this
-			if( $info[0] * $info[1] > self::MAX_SOURCE_PIXELS )
+			[ $info ] = self::_inspect( $bytes );
+			if( $info === null )
 				return false;
 
 			// Past the gatekeeping, before the encoding: a feature that renders

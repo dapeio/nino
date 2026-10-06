@@ -28,4 +28,6 @@ return [
 	'[[/_admin/keys/confirm/delete]]'		=> 'Really delete text key “%s”? The value is lost in every language.',
 	'[[/_admin/keys/error/save-partial]]'	=> 'Save failed for %s',
 	'[[/_admin/dashboard/label/keys]]'	=> 'Missing text keys',
+	'[[/_admin/error/keys_invalid]]'	=> 'The key “%s” is not valid. A key looks like /home/welcome/subtitle.',
+	'[[/_admin/error/keys_exists]]'	=> 'The key “%s” already exists.',
 ];

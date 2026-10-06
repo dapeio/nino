@@ -168,7 +168,7 @@ namespace Nino\Modules\Elements {
 			$typeUri = (string) ( \Nino\Admin\Admin::postData()['uri'] ?? '' );
 
 			if( self::isValidTypeUri( $typeUri ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid type uri' );
+				\Nino\Http::fail( $request, 400, 'invalid type uri', 'types_invalid_uri', [], 'uri' );
 				return;
 			}
 
@@ -390,7 +390,7 @@ namespace Nino\Modules\Elements {
 			$typeUri = (string) ( $data['uri'] ?? '' );
 
 			if( self::isValidTypeUri( $typeUri ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid type uri' );
+				\Nino\Http::fail( $request, 400, 'invalid type uri', 'types_invalid_uri', [], 'uri' );
 				return;
 			}
 
@@ -555,12 +555,12 @@ namespace Nino\Modules\Elements {
 			$typeUri 	= (string) ( $data['uri'] ?? '' );
 
 			if( self::isValidTypeUri( $typeUri ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid type uri' );
+				\Nino\Http::fail( $request, 400, 'invalid type uri', 'types_invalid_uri', [], 'uri' );
 				return;
 			}
 
 			if( \Nino\Filesystem::getFileContent( $appData, '/elements/'. $typeUri. '.php', '' ) !== '' ) {
-				\Nino\Http::fail( $request, 409, 'type already exists' );
+				\Nino\Http::fail( $request, 409, 'type already exists', 'types_exists', [], 'uri' );
 				return;
 			}
 
@@ -680,14 +680,14 @@ namespace Nino\Modules\Elements {
 			// Typing the uri is the confirmation. A dialog answered with the
 			// mouse is one wrong click; this one has to be meant
 			if( $confirm !== $typeUri ) {
-				\Nino\Http::fail( $request, 400, 'type the element type\'s uri to confirm' );
+				\Nino\Http::fail( $request, 400, 'type the element type\'s uri to confirm', 'types_confirm', [], 'confirm' );
 				return;
 			}
 
 			$referencedBy = self::referencedBy( $appData, $typeUri );
 
 			if( $referencedBy !== [] ) {
-				\Nino\Http::fail( $request, 409, 'still referenced by the element field(s) '. implode( ', ', $referencedBy ) );
+				\Nino\Http::fail( $request, 409, 'still referenced by the element field(s) '. implode( ', ', $referencedBy ), 'types_referenced', [ implode( ', ', $referencedBy ) ] );
 				return;
 			}
 

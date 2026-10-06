@@ -163,7 +163,7 @@ namespace Nino\Modules\Navigation {
 			$originalKey 	= trim( (string) ( $data['originalKey'] ?? '' ) );
 
 			if( self::isValidKey( $key ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid navigation id: "'. $key. '"' );
+				\Nino\Http::fail( $request, 400, 'invalid navigation id: "'. $key. '"', 'navs_invalid_id', [ $key ], 'key' );
 				return;
 			}
 
@@ -176,7 +176,7 @@ namespace Nino\Modules\Navigation {
 			// below - and a "new" menu would start out with members nobody
 			// put in it
 			if( $key !== $originalKey && self::_isTaken( $key, $registry, $routes ) === true ) {
-				\Nino\Http::fail( $request, 409, 'navigation id already taken: "'. $key. '"' );
+				\Nino\Http::fail( $request, 409, 'navigation id already taken: "'. $key. '"', 'navs_id_taken', [ $key ], 'key' );
 				return;
 			}
 
@@ -306,7 +306,7 @@ namespace Nino\Modules\Navigation {
 			}
 
 			if( isset( $routes[$routeKey]['navs'][$key] ) === true ) {
-				\Nino\Http::fail( $request, 409, 'route is already in this navigation' );
+				\Nino\Http::fail( $request, 409, 'route is already in this navigation', 'navs_route_present' );
 				return;
 			}
 
@@ -396,7 +396,7 @@ namespace Nino\Modules\Navigation {
 			$swapWith = $direction === 'up' ? $index - 1 : $index + 1;
 
 			if( $swapWith < 0 || $swapWith >= count( $order ) ) {
-				\Nino\Http::fail( $request, 400, 'already at the '. ( $direction === 'up' ? 'top' : 'bottom' ) );
+				\Nino\Http::fail( $request, 400, 'already at the '. ( $direction === 'up' ? 'top' : 'bottom' ), $direction === 'up' ? 'already_top' : 'already_bottom' );
 				return;
 			}
 

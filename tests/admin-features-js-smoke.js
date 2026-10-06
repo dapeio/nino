@@ -250,6 +250,8 @@ const requests = [];
 let reloads = 0;
 
 const Nino = {
+	// A project served from a directory - what the request has to start from
+	dir : '/site',
 	// The shell's own one-line delegation (see _admin/assets/script.js), so
 	// the panel reaches the same context bar every drill-down level uses
 	admin : { formToolbar : function( backLink ) { return Nino.adminUi.contextBar( backLink ) } },
@@ -381,7 +383,7 @@ check( 'the head that carries the tabs and the filter stays at the top of the li
 	&& /\.admin-panel-tabs \{[^}]*position: sticky;/s.test( source('_admin/assets/style.css') ) === false );
 check( 'every action method guards itself with the panel\'s permission', ( admin.match( /guardPerm\( \$appData, \$request, self::MANAGE_PERM \)/g ) || [] ).length === 7 );
 check( 'the script posts those seven actions and no other',
-	script.includes( "action : 'features/'+ endpoint" ) && script.includes( "_apiCall( 'list'" ) && script.includes( "_apiCall( 'settings'" )
+	script.includes( "Nino.adminUi.api.call( 'features/'+ endpoint" ) && script.includes( "_apiCall( 'list'" ) && script.includes( "_apiCall( 'settings'" )
 	&& script.includes( "? 'deactivate' : 'activate'" ) && script.includes( "_apiCall( 'catalogue'" ) && script.includes( "_apiCall( 'install'" )
 	&& script.includes( "_apiCall( 'remove'" ) && ( script.match( /_apiCall\( /g ) || [] ).length === 6 );
 
@@ -450,10 +452,10 @@ check( 'the script writes no sentence of its own into the dom'+ ( hardcoded.leng
 // --- opening the panel: no cache yet
 
 panel.init();
-// The endpoint is written from the project's root: the bundle Modules\Assets
-// builds substitutes the fill, so a site served from a directory posts to
-// its own workbench and not beside it
-check( 'init loads features/list through the shell\'s one endpoint, written from the project root', requests.length === 1 && requests[0].action === 'features/list' && requests[0].uri === '[[/nino/dir]]/_admin/' && requests[0].method === 'POST' );
+// The endpoint is written from the project's directory: Nino.adminUi.api
+// reads it from Nino.dir, so a site served from a directory posts to its own
+// workbench and not beside it
+check( 'init loads features/list through the shell\'s one endpoint, written from the project root', requests.length === 1 && requests[0].action === 'features/list' && requests[0].uri === Nino.dir+ '/_admin/' && requests[0].method === 'POST' );
 
 answer( 200, listAnswer( CACHE.url, true, null ) );
 check( 'opening the panel fetches nothing but the list - no catalogue request follows on its own', requests.length === 1 );
@@ -851,7 +853,7 @@ check( 'Remove posts features/remove with the key alone, holds the button and sa
 
 answer( 400, { error : 'could not remove /features/Old - the web server may not write there' } );
 check( 'a refusal shows the kernel\'s reason and frees the button', removeBtn.disabled === false
-	&& oldMsg.textContent === 'could not remove /features/Old - the web server may not write there' );
+	&& oldMsg.textContent === '(400) could not remove /features/Old - the web server may not write there' );
 
 fire( removeBtn, 'click' );
 answer( 200, { removed : 'old' } );

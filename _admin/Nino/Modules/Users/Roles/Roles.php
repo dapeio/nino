@@ -273,12 +273,12 @@ namespace Nino\Modules\Users {
 			$perms 	= $data['perms'] ?? null;
 
 			if( preg_match( self::ID_PATTERN, $id ) !== 1 ) {
-				\Nino\Http::fail( $request, 400, 'a role id is a slug: lowercase letters, digits and hyphens, starting with a letter' );
+				\Nino\Http::fail( $request, 400, 'a role id is a slug: lowercase letters, digits and hyphens, starting with a letter', 'roles_invalid_id', [], 'id' );
 				return;
 			}
 
 			if( $label === '' || mb_strlen( $label ) > self::MAX_LABEL_LENGTH ) {
-				\Nino\Http::fail( $request, 400, 'a name of at most '. self::MAX_LABEL_LENGTH. ' characters is required' );
+				\Nino\Http::fail( $request, 400, 'a name of at most '. self::MAX_LABEL_LENGTH. ' characters is required', 'roles_name_required', [ self::MAX_LABEL_LENGTH ], 'label' );
 				return;
 			}
 
@@ -294,7 +294,7 @@ namespace Nino\Modules\Users {
 			// the request looks exactly like one the save accepted, and the
 			// role comes back missing it with nothing to explain why
 			if( $malformed !== [] ) {
-				\Nino\Http::fail( $request, 400, 'not a permission: '. implode( ', ', array_slice( $malformed, 0, 5 ) ) );
+				\Nino\Http::fail( $request, 400, 'not a permission: '. implode( ', ', array_slice( $malformed, 0, 5 ) ), 'roles_invalid_perm', [ implode( ', ', array_slice( $malformed, 0, 5 ) ) ] );
 				return;
 			}
 
@@ -305,12 +305,12 @@ namespace Nino\Modules\Users {
 			$next['/nino/auth/roles'][$id] = [ 'label' => $label, 'perms' => $perms ];
 
 			if( \Nino\Auth::checkPermission( $next, self::MANAGE_PERM ) === false ) {
-				\Nino\Http::fail( $request, 409, 'this change would take the permission to manage users away from your own account' );
+				\Nino\Http::fail( $request, 409, 'this change would take the permission to manage users away from your own account', 'roles_locks_self_out' );
 				return;
 			}
 
 			if( self::fullAccessExists( $appData ) === true && self::fullAccessExists( $next ) === false ) {
-				\Nino\Http::fail( $request, 409, 'this change would leave no account with full access' );
+				\Nino\Http::fail( $request, 409, 'this change would leave no account with full access', 'roles_no_full_access' );
 				return;
 			}
 
@@ -320,7 +320,7 @@ namespace Nino\Modules\Users {
 			$missing = self::notHeld( $appData, array_values( array_diff( $perms, self::all( $appData )[$id]['perms'] ?? [] ) ) );
 
 			if( $missing !== '' ) {
-				\Nino\Http::fail( $request, 403, 'cannot grant a permission your own account does not hold: '. $missing );
+				\Nino\Http::fail( $request, 403, 'cannot grant a permission your own account does not hold: '. $missing, 'roles_grant_too_wide', [ $missing ] );
 				return;
 			}
 
@@ -354,7 +354,7 @@ namespace Nino\Modules\Users {
 			$holders = self::holders( $appData, $id );
 
 			if( $holders > 0 ) {
-				\Nino\Http::fail( $request, 409, $holders. ( $holders === 1 ? ' account holds' : ' accounts hold' ). ' this role - give them another one first' );
+				\Nino\Http::fail( $request, 409, $holders. ( $holders === 1 ? ' account holds' : ' accounts hold' ). ' this role - give them another one first', 'roles_in_use', [ $holders ] );
 				return;
 			}
 

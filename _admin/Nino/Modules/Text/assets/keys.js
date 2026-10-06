@@ -81,14 +81,12 @@
 		 *
 		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "devtext/list")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"
-		 *	@param		{Function}	callback			Called with ( xhr.status, xhr.responseJSON )
+		 *	@param		{Function}	callback			Called with ( status, body )
 		 *
 		 *	@return		void
 		 */
 		_apiCall : function( endpoint, payload, callback ) {
-			Nino.http.sendRequest( '[[/nino/dir]]/_admin/', 'POST', function( xhr ) {
-				callback( xhr.status, xhr.responseJSON );
-			}, { action : 'keys/'+ endpoint, data : JSON.stringify( payload ) } );
+			Nino.adminUi.api.call( 'keys/'+ endpoint, payload, callback );
 		},
 
 		/**
@@ -101,11 +99,7 @@
 		 *	@return		void
 		 */
 		_showError : function( container, status, response ) {
-			container.innerHTML = '';
-			const p = dc.createElement('p');
-			p.className = 'nino-admin-error';
-			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/common/error/load') );
-			container.appendChild( p );
+			Nino.adminUi.showError( container, status, response, '/_admin/common/error/load' );
 		},
 
 		_showList : function() {
@@ -363,7 +357,7 @@
 		_saveSchema : function( key, isGlobal, blacklisted ) {
 			Nino.admin.keys._apiCall( 'save', { key : key, global : isGlobal, blacklisted : blacklisted }, function( status, response ) {
 				if( status !== 200 || response === null ) {
-					wn.alert( '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/common/error/save') ) );
+					wn.alert( Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' ) );
 					return;
 				}
 				Nino.admin.keys.init();
@@ -387,7 +381,7 @@
 
 			Nino.admin.keys._apiCall( 'rename', { key : key, newKey : newKey }, function( status, response ) {
 				if( status !== 200 || response === null ) {
-					wn.alert( '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/common/error/rename') ) );
+					wn.alert( Nino.adminUi.api.errorText( status, response, '/_admin/common/error/rename' ) );
 					return;
 				}
 				Nino.admin.keys.init();
@@ -408,7 +402,7 @@
 
 			Nino.admin.keys._apiCall( 'delete', { key : key }, function( status, response ) {
 				if( status !== 200 || response === null ) {
-					wn.alert( '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/common/error/delete') ) );
+					wn.alert( Nino.adminUi.api.errorText( status, response, '/_admin/common/error/delete' ) );
 					return;
 				}
 				Nino.admin.keys.init();
@@ -632,7 +626,7 @@
 			Nino.admin.keys._apiCall( 'savebatch', { items : items }, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/common/error/save') );
+					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
 					return;
 				}
 
@@ -756,7 +750,7 @@
 
 			Nino.admin.keys._apiCall( 'create', { key : key, global : isGlobal, value : value }, function( status, response ) {
 				if( status !== 200 || response === null ) {
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/common/error/save') );
+					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
 					return;
 				}
 				Nino.admin.keys.init();
@@ -795,7 +789,7 @@
 
 			Nino.admin.keys._apiCall( 'scan', {}, function( status, response ) {
 				if( status !== 200 || response === null ) {
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/common/error/scan') );
+					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/scan' );
 					return;
 				}
 				Nino.admin.keys._renderScanForm( response.missing );
@@ -922,7 +916,7 @@
 			Nino.admin.keys._apiCall( 'scanapply', { rows : payload }, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/common/error/save') );
+					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
 					return;
 				}
 

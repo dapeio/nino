@@ -247,17 +247,17 @@ namespace Nino\Modules\Users {
 			$role 	= (string) ( $data['role'] ?? '' );
 
 			if( $mail === '' || filter_var( $mail, FILTER_VALIDATE_EMAIL ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid mail' );
+				\Nino\Http::fail( $request, 400, 'invalid mail', 'users_invalid_mail', [], 'mail' );
 				return;
 			}
 
 			if( strlen( $pw ) < self::MIN_PW_LENGTH ) {
-				\Nino\Http::fail( $request, 400, 'password must be at least '. self::MIN_PW_LENGTH. ' characters' );
+				\Nino\Http::fail( $request, 400, 'password must be at least '. self::MIN_PW_LENGTH. ' characters', 'users_password_short', [ self::MIN_PW_LENGTH ], 'pw' );
 				return;
 			}
 
 			if( $role !== '' && isset( Roles::all( $appData )[$role] ) === false ) {
-				\Nino\Http::fail( $request, 400, 'unknown role' );
+				\Nino\Http::fail( $request, 400, 'unknown role', 'users_unknown_role', [], 'role' );
 				return;
 			}
 
@@ -266,12 +266,12 @@ namespace Nino\Modules\Users {
 			$missing = $role !== '' ? Roles::notHeld( $appData, Roles::all( $appData )[$role]['perms'] ) : '';
 
 			if( $missing !== '' ) {
-				\Nino\Http::fail( $request, 403, 'cannot hand out a role holding a permission your own account does not: '. $missing );
+				\Nino\Http::fail( $request, 403, 'cannot hand out a role holding a permission your own account does not: '. $missing, 'users_role_too_wide', [ $missing ], 'role' );
 				return;
 			}
 
 			if( \Nino\Auth::insertUser( $appData, $mail, $pw, [], $role ) === false ) {
-				\Nino\Http::fail( $request, 409, 'mail already in use' );
+				\Nino\Http::fail( $request, 409, 'mail already in use', 'users_mail_in_use', [], 'mail' );
 				return;
 			}
 
@@ -298,7 +298,7 @@ namespace Nino\Modules\Users {
 			$current 	= \Nino\Auth::getCurrentUser( $appData );
 
 			if( $current !== false && $current['mail'] === $username ) {
-				\Nino\Http::fail( $request, 400, 'cannot delete yourself' );
+				\Nino\Http::fail( $request, 400, 'cannot delete yourself', 'users_delete_self' );
 				return;
 			}
 
@@ -310,7 +310,7 @@ namespace Nino\Modules\Users {
 			}
 
 			if( in_array( '/*', \Nino\Auth::permissions( $appData, $user ), true ) === true && Roles::fullAccessExists( $appData, $username ) === false ) {
-				\Nino\Http::fail( $request, 409, 'the last account with full access cannot be deleted' );
+				\Nino\Http::fail( $request, 409, 'the last account with full access cannot be deleted', 'users_last_admin_delete' );
 				return;
 			}
 
@@ -349,12 +349,12 @@ namespace Nino\Modules\Users {
 			}
 
 			if( $newUsername === '' || filter_var( $newUsername, FILTER_VALIDATE_EMAIL ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid mail' );
+				\Nino\Http::fail( $request, 400, 'invalid mail', 'users_invalid_mail', [], 'mail' );
 				return;
 			}
 
 			if( $pw !== '' && strlen( $pw ) < self::MIN_PW_LENGTH ) {
-				\Nino\Http::fail( $request, 400, 'password must be at least '. self::MIN_PW_LENGTH. ' characters' );
+				\Nino\Http::fail( $request, 400, 'password must be at least '. self::MIN_PW_LENGTH. ' characters', 'users_password_short', [ self::MIN_PW_LENGTH ], 'pw' );
 				return;
 			}
 
@@ -363,7 +363,7 @@ namespace Nino\Modules\Users {
 			if( $isSelf === true ) {
 				$storedUser = \Nino\Auth::getUser( $appData, $username );
 				if( $storedUser === false || password_verify( $currentPw, $storedUser['pw'] ) === false ) {
-					\Nino\Http::fail( $request, 401, 'wrong current password' );
+					\Nino\Http::fail( $request, 401, 'wrong current password', 'wrong_password', [], 'currentPassword' );
 					return;
 				}
 			}
@@ -379,7 +379,7 @@ namespace Nino\Modules\Users {
 				$missing	= ( $target !== false ) ? Roles::notHeld( $appData, \Nino\Auth::permissions( $appData, $target ) ) : '';
 
 				if( $missing !== '' ) {
-					\Nino\Http::fail( $request, 403, 'cannot set the password of an account holding a permission your own account does not: '. $missing );
+					\Nino\Http::fail( $request, 403, 'cannot set the password of an account holding a permission your own account does not: '. $missing, 'users_password_too_wide', [ $missing ], 'pw' );
 					return;
 				}
 			}
@@ -387,7 +387,7 @@ namespace Nino\Modules\Users {
 			$result = \Nino\Auth::updateUser( $appData, $username, $newUsername, $pw );
 
 			if( $result === false ) {
-				\Nino\Http::fail( $request, 400, 'mail already in use' );
+				\Nino\Http::fail( $request, 400, 'mail already in use', 'users_mail_in_use', [], 'mail' );
 				return;
 			}
 
@@ -459,7 +459,7 @@ namespace Nino\Modules\Users {
 			}
 
 			if( $role !== '' && isset( Roles::all( $appData )[$role] ) === false ) {
-				\Nino\Http::fail( $request, 400, 'unknown role' );
+				\Nino\Http::fail( $request, 400, 'unknown role', 'users_unknown_role', [], 'role' );
 				return;
 			}
 
@@ -469,7 +469,7 @@ namespace Nino\Modules\Users {
 			if( in_array( '/*', \Nino\Auth::permissions( $appData, $user ), true ) === true
 				&& in_array( '/*', \Nino\Auth::permissions( $appData, $next ), true ) === false
 				&& Roles::fullAccessExists( $appData, $username ) === false ) {
-				\Nino\Http::fail( $request, 409, 'the last account with full access cannot lose it' );
+				\Nino\Http::fail( $request, 409, 'the last account with full access cannot lose it', 'users_last_admin_role' );
 				return;
 			}
 
@@ -477,7 +477,7 @@ namespace Nino\Modules\Users {
 			$missing = $role !== '' ? Roles::notHeld( $appData, Roles::all( $appData )[$role]['perms'] ) : '';
 
 			if( $missing !== '' ) {
-				\Nino\Http::fail( $request, 403, 'cannot hand out a role holding a permission your own account does not: '. $missing );
+				\Nino\Http::fail( $request, 403, 'cannot hand out a role holding a permission your own account does not: '. $missing, 'users_role_too_wide', [ $missing ], 'role' );
 				return;
 			}
 

@@ -281,12 +281,17 @@ namespace Project\Catalog\Catalog {
 			$body  = trim( (string) ( $data['body'] ?? '' ) );
 
 			if( preg_match( '/^[a-z][a-z0-9-]*$/', $id ) !== 1 ) {
-				\Nino\Http::fail( $request, 400, 'invalid note id' );
+				\Nino\Http::fail( $request, 400, 'invalid note id', 'catalog_invalid_id', [], 'id' );
 				return;
 			}
 
-			if( $title === '' || strlen( $title ) > self::MAX_TITLE_LENGTH || strlen( $body ) > self::MAX_BODY_LENGTH ) {
-				\Nino\Http::fail( $request, 400, 'invalid note content' );
+			if( $title === '' || strlen( $title ) > self::MAX_TITLE_LENGTH ) {
+				\Nino\Http::fail( $request, 400, 'invalid note title', 'catalog_invalid_title', [ self::MAX_TITLE_LENGTH ], 'title' );
+				return;
+			}
+
+			if( strlen( $body ) > self::MAX_BODY_LENGTH ) {
+				\Nino\Http::fail( $request, 400, 'note body too long', 'catalog_body_too_long', [ self::MAX_BODY_LENGTH ], 'body' );
 				return;
 			}
 
@@ -342,8 +347,18 @@ like the tool's own:
 return [
 	'[[/_admin/nav/catalog]]'         => 'Catalog',
 	'[[/_admin/catalog/label/count]]' => 'Catalog entries',
+	'[[/_admin/catalog/error/load]]'  => 'Could not load the catalog.',
+	'[[/_admin/catalog/error/save]]'  => 'Could not save the entry.',
+	'[[/_admin/error/catalog_invalid_id]]'    => 'The id may use lower-case letters, digits and hyphens, and starts with a letter.',
+	'[[/_admin/error/catalog_invalid_title]]' => 'The title is required and may have up to %s characters.',
+	'[[/_admin/error/catalog_body_too_long]]' => 'The text may have up to %s characters.',
 ];
 ```
+
+The first two are what the frontend skeleton below asks for when a request
+fails (see "Saying what happened"): the panel's own sentences for a failed
+load and save. The last three are the texts of the codes the backend skeleton
+above answers with.
 
 A workbench panel has the identical body; it lives in
 `_admin/Nino/Modules/<Name>/Admin/Admin.php` (namespace `Nino\Modules\<Name>`,
@@ -359,7 +374,8 @@ This skeleton demonstrates the required invariants:
 - Payload comes from `Admin::postData()`, which decodes the JSON `data` field.
 - IDs, lengths, and required fields are validated server-side.
 - The file update is atomic.
-- The response uses `Http::ok()` or `Http::fail()`.
+- The response uses `Http::ok()` or `Http::fail()`; a failure a person can
+  cause carries a code, its params and the field (see "Saying what happened").
 - Nothing is directly printed.
 
 For configuration rather than module-owned records, update only the intended
@@ -459,21 +475,21 @@ shape:
 			Nino.admin.catalog._showList();
 		},
 
-		_apiCall : function( endpoint, payload, callback ) {
-			Nino.http.sendRequest( '/_admin/', 'POST', function( xhr ) {
-				callback( xhr.status, xhr.responseJSON );
-			}, {
-				action : 'catalog/'+ endpoint,
-				data : JSON.stringify( payload ),
-			} );
+		// This panel's name for the one request helper. It owns where the
+		// request goes (the project's directory, then /_admin/), why an extra
+		// multipart field such as a File just works, and what happens when the
+		// session has ended - the panel does not post by hand. Keep it a thin
+		// body, not a property evaluated while the object is built: the helper
+		// is looked up when a request is made
+		_apiCall : function( endpoint, payload, callback, extra ) {
+			Nino.adminUi.api.call( 'catalog/'+ endpoint, payload, callback, extra );
 		},
 
+		// The failed load, in place of the list. errorText() says the server's
+		// code in the interface language, and falls back to the server's own
+		// message and then to this panel's sentence (a fill key)
 		_showError : function( container, status, response ) {
-			container.innerHTML = '';
-			const message = dc.createElement('p');
-			message.className = 'nino-admin-error';
-			message.textContent = '('+ status+ ') '+ ( response && response.error ? response.error : 'Request failed.' );
-			container.appendChild( message );
+			Nino.adminUi.showError( container, status, response, '/_admin/catalog/error/load' );
 		},
 
 		_showList : function() {
@@ -593,7 +609,6 @@ shape:
 			body.value = item ? item.body : '';
 
 			message.className = 'admin-form-message';
-			message.setAttribute( 'aria-live', 'polite' );
 
 			save.type = 'submit';
 			save.className = 'nino-admin-btn-primary';
@@ -612,10 +627,16 @@ shape:
 			form.appendChild( message );
 			form.appendChild( actions );
 
+			// "Saving", "Saved at 09:41", "Unsaved changes" - or why it failed,
+			// with the field the server named marked and focused (see
+			// "Saying what happened")
+			const line = Nino.adminUi.status( message );
+			line.bind( form );
+
 			form.addEventListener( 'submit', function( event ) {
 				event.preventDefault();
 				save.disabled = true;
-				message.textContent = 'Saving …';
+				line.saving();
 
 				Nino.admin.catalog._apiCall( 'save', {
 					id : id.value,
@@ -625,9 +646,11 @@ shape:
 					save.disabled = false;
 
 					if( status !== 200 ) {
-						message.textContent = response && response.error ? response.error : 'Could not save.';
+						line.error( status, response, '/_admin/catalog/error/save' );
 						return;
 					}
+
+					line.saved();
 
 					const index = Nino.admin.catalog._items.findIndex( function( current ) {
 						return current.id === response.note.id;
@@ -657,6 +680,69 @@ shape:
 } )(window,document);
 ```
 
+## Saying what happened
+
+Every request goes through `Nino.adminUi.api.call( action, payload, callback,
+extra )`, which calls back with `( status, body )`, synchronously. When the
+page has outlived its session the helper asks for a login again over the page,
+and sends the request on afterwards if the same account signs in - so a panel
+never handles that itself, and a form is never lost to an expired session. A
+page whose session now belongs to another account gets a reload notice instead
+and sends nothing. The dialog can be closed without a login: the requests that
+waited then call back with the answer they had, so a panel shows its error and
+gives its form back, as for any failure. Only a `401` with the code `session` and a `403` with the
+code `csrf` are the end of a session: a panel's own `401` or `403` (a wrong
+password, a missing permission) reaches its callback as it is.
+
+A failure a person can cause names itself, so the client can say it in the
+interface language and mark the field:
+
+```php
+\Nino\Http::fail( $request, 409, 'note id already taken: "'. $id. '"', 'catalog_id_taken', [ $id ], 'id' );
+```
+
+The third argument stays the English message for a developer or a log; the
+code is a stable slug, the params fill the `%s` placeholders of its text in
+order, and the field is the posted key the value was refused for. A panel's own
+codes carry its slug as a prefix and live in its own `text()` directory as
+`'[[/_admin/error/catalog_id_taken]]'`, both languages; the codes every panel
+may meet - an upload that did not arrive, a value of the wrong type - are the
+shell's. Leave a failure nobody can cause (a file that could not be written)
+without a code: the person then sees the English message of the server, with the
+status number in front, and the panel's sentence where there is none.
+
+A feature whose `nino` constraint still admits kernels before this release
+detects `Nino.adminUi.api` and falls back to its own post where it is missing
+(its base is the literal `'[[/nino/dir]]/_admin/'` - `Nino.dir` does not exist
+on kernels before 1.3.2),
+and passes no code, params or field to `\Nino\Http::fail()` (the older
+signature has three parameters) until its constraint requires the release that
+brought them.
+
+On the client, `Nino.adminUi.api.errorText( status, response, fallbackKey )`
+turns a failure into one sentence - the code's text, else the server's own
+message, else the panel's fallback fill, the last two with the status number in
+front - and says so plainly when the request never reached the server.
+`Nino.adminUi.showError( container, status, response, fallbackKey )` writes it
+in place of a list, and `Nino.adminUi.status( el )` is the status line of a
+form (`saving()`, `saved()`, `dirty()`, `error( status, response, fallbackKey )`,
+and `bind( form, isDirty )`, which turns "saved" into "unsaved changes" on
+input). The field the server named is found by `[data-field="<field>"]` or
+`[name="<field>"]` inside the bound form, so give the control one of the two.
+A message with params goes through `Nino.adminUi.format( text, ...params )`,
+never through `String.replace()`: a param is what somebody typed, and
+`'$&'` in it is not a pattern.
+
+An upload endpoint asks `\Nino\Admin\Admin::uploadError( $_FILES['file'] ?? null )`
+first - it maps what php says about a file that did not arrive to a status, a
+code and the limit - and `\Nino\Images::reject( $bytes )` for what is wrong
+with the picture (`image_too_large`, `image_type`, `image_too_many_pixels`).
+The browser knows the limits too (`\Nino\Images::limits()` writes them onto the
+shell as `data-upload-bytes` and `data-upload-pixels`): put
+`Nino.adminUi.uploadHint()` under the file input, and send the file through
+`Nino.adminUi.checkImage( file, done )` first, which refuses one that cannot
+work in the server's own words without sending it.
+
 Do not copy the skeleton blindly if an existing panel already solves the same
 list, locale, upload, rich-text, reorder, relationship, or confirmation
 problem. Reuse its exact public helper and adapt the nearest implementation.
@@ -675,7 +761,10 @@ Backend tests belong in `tests/admin-smoke.php` (content panels, accounts)
 or `tests/admin-system-smoke.php` (structure and system panels, the registry
 contract, recovery). They MUST exercise:
 
-- unauthenticated rejection (`401`) and a missing permission (`403`),
+- unauthenticated rejection (`401`, with the code `session`) and a missing
+  permission (`403`, without one),
+- the code, params and field of every failure a person can cause - and that
+  each code has text in both languages,
 - successful list and save,
 - malformed IDs and fields,
 - maximum lengths and unexpected payload shape,

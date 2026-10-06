@@ -207,7 +207,7 @@ check( '...and showCurrent() is what loads it, so the panel still fills when sho
 check( 'Config no longer carries the login throttle or the languages', [ '/nino/auth/', '/nino/locales/', '_addLocale', '_refreshNative' ].every( function( key ) { return configSource.includes( key ) === false } ) );
 const lockoutSource = adminAsset( 'Users', 'lockout.js' );
 check( 'the login-protection tab renders its two numbers with the shared bounded number field, as Config does', lockoutSource.includes( 'Nino.adminUi.numberField(' ) && configSource.includes( 'Nino.adminUi.numberField(' ) && adminUiSource.includes( 'numberField : function' ) && adminUiSource.includes( 'humanDuration : function' ) );
-check( 'the login-protection tab attaches under its tab uri and saves through its own action', lockoutSource.includes( 'Nino.admin.lockout = {' ) && lockoutSource.includes( "action : 'lockout/'+ endpoint" ) );
+check( 'the login-protection tab attaches under its tab uri and saves through its own action', lockoutSource.includes( 'Nino.admin.lockout = {' ) && lockoutSource.includes( "Nino.adminUi.api.call( 'lockout/'+ endpoint" ) );
 
 const languageSource = adminAsset( 'Language', 'admin.js' );
 check( 'Language attaches under its nav uri and is one form, not a drill-down list', languageSource.includes( 'Nino.admin.language = {' ) && languageSource.includes( "ul.className = 'nino-admin-list'" ) === false );
@@ -442,7 +442,8 @@ check( 'the user and role forms expose real labels and live status text',
 	usersSource.includes("mailLabel.className = 'nino-admin-field'") &&
 	usersSource.includes("pwLabel.className = 'nino-admin-field'") &&
 	usersSource.includes("roleLabel.className = 'nino-admin-field'") &&
-	usersSource.split("setAttribute( 'aria-live', 'polite' )").length >= 4 );
+	// Each of the three forms says whether it is saved through the shared status line
+	usersSource.split("Nino.adminUi.status( msg )").length >= 4 );
 // What a role grants is the roles tab's business: the user form only says
 // which role an account holds, through the one action the backend offers
 check( 'Users hands out roles and no longer edits permissions of its own',
@@ -935,6 +936,22 @@ const localizedScripts = fs2.readdirSync( path2.join( __dirname, '../_admin/asse
 const literalSentence = /\.(?:textContent|placeholder|title|alt) = '[A-Z][^']*'|(?:confirm|alert)\( '[A-Z]|innerHTML = '<[^']*>[A-Za-z]{3,}/;
 const literals = localizedScripts.filter( e => literalSentence.test( e[1] ) ).map( e => e[0] );
 check( 'no workbench script renders a literal English sentence - every word is a fill'+ ( literals.length ? ' - found in '+ literals.join(', ') : '' ), literals.length === 0 );
+
+// The one request helper: a panel's _apiCall is a thin name for
+// Nino.adminUi.api.call(), never its own copy of the transport - a copy cannot
+// know the page outlived its session, which is what the helper is for - and
+// what a failed request says is errorText()'s business, not a status number
+// each script writes in front of the server's message itself. Lazily, in the
+// body: panel scripts run in suites that load no Nino.admin.js, so nothing
+// may ask the helper while the object literal is built
+const apiPanels = localizedScripts.filter( e => /_apiCall\s*:/.test( e[1] ) );
+const apiOdd = apiPanels.filter( e => /_apiCall : function\( endpoint, payload, callback(?:, extra)? \) \{\n\t\t\tNino\.adminUi\.api\.call\( '[a-z]+\/'\+ endpoint, payload, callback(?:, extra)? \);\n\t\t\},/.test( e[1] ) === false ).map( e => e[0] );
+check( 'every workbench panel posts through the one request helper'+ ( apiOdd.length ? ' - not: '+ apiOdd.join(', ') : '' ), apiPanels.length >= 19
+	&& apiPanels.every( e => /_apiCall : function\( endpoint, payload, callback(?:, extra)? \) \{\n\t\t\tNino\.adminUi\.api\.call\( '[a-z]+\/'\+ endpoint, payload, callback(?:, extra)? \);\n\t\t\},/.test( e[1] ) ) );
+const ownTransport = localizedScripts.filter( e => e[0] !== 'Nino.admin.js' && /Nino\.http\.sendRequest\(\s*'\[\[\/nino\/dir\]\]\/_admin\/'/.test( e[1] ) ).map( e => e[0] );
+check( '...and none keeps a transport of its own'+ ( ownTransport.length ? ' - '+ ownTransport.join(', ') : '' ), ownTransport.length === 0 );
+const ownPrefix = localizedScripts.filter( e => e[0] !== 'Nino.admin.js' && /'\('\s*\+\s*status\s*\+\s*'\) '/.test( e[1] ) ).map( e => e[0] );
+check( '...nor writes the status number in front of an error itself'+ ( ownPrefix.length ? ' - '+ ownPrefix.join(', ') : '' ), ownPrefix.length === 0 );
 
 // ...and every key a script asks for exists in both interface languages,
 // whichever file defines it. Keys built at runtime ('/_admin/nav/group/'+

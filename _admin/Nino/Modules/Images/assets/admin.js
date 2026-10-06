@@ -86,20 +86,19 @@
 		},
 
 		/**
-		 *	Call an images/* admin action - see Elements' admin.js for why /_admin/
-		 *	(trailing slash) and why extra multipart fields (eg. a File) just work
+		 *	Call an images/* admin action - this panel's name for
+		 *	Nino.adminUi.api.call(), which owns where the request goes and why
+		 *	extra multipart fields (eg. a File) just work
 		 *
 		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "images/list")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"
-		 *	@param		{Function}	callback			Called with ( xhr.status, xhr.responseJSON )
+		 *	@param		{Function}	callback			Called with ( status, body )
 		 *	@param		{Object}		[extra]				Extra multipart fields (eg. { file : File })
 		 *
 		 *	@return		void
 		 */
 		_apiCall : function( endpoint, payload, callback, extra ) {
-			Nino.http.sendRequest( '[[/nino/dir]]/_admin/', 'POST', function( xhr ) {
-				callback( xhr.status, xhr.responseJSON );
-			}, Object.assign( { action : 'images/'+ endpoint, data : JSON.stringify( payload ) }, extra || {} ) );
+			Nino.adminUi.api.call( 'images/'+ endpoint, payload, callback, extra );
 		},
 
 		/**
@@ -112,11 +111,7 @@
 		 *	@return		void
 		 */
 		_showError : function( container, status, response ) {
-			container.innerHTML = '';
-			const p = dc.createElement('p');
-			p.className = 'nino-admin-error';
-			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/images/error/load') );
-			container.appendChild( p );
+			Nino.adminUi.showError( container, status, response, '/_admin/images/error/load' );
 		},
 
 		/**
@@ -312,6 +307,10 @@
 				Nino.admin.images._uploadImage( slot, fileInput.files[0], preview, msg, fileInput );
 			} );
 			imageWrap.appendChild( fileInput );
+			// What the server will take, before the file is chosen
+			const hint = Nino.adminUi.uploadHint();
+			if( hint !== null )
+				imageWrap.appendChild( hint );
 			imageWrap.appendChild( msg );
 
 			fieldset.appendChild( imageWrap );
@@ -336,30 +335,43 @@
 			msg.className = 'nino-admin-field-image-msg';
 			msg.textContent = Nino.content.getText('/_admin/images/msg/pending');
 
-			Nino.admin.images._apiCall( 'upload', { uri : slot.uri }, function( status, response ) {
+			// A file the server cannot take is refused here, with the reason,
+			// instead of after the upload
+			Nino.adminUi.checkImage( file, function( rejection ) {
 
-				fileInput.disabled = false;
-				fileInput.value = '';
-
-				if( status !== 200 || response === null ) {
+				if( rejection !== null ) {
+					fileInput.disabled = false;
+					fileInput.value = '';
 					msg.className = 'nino-admin-field-image-msg is-error';
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/images/error/save') );
+					msg.textContent = Nino.adminUi.api.errorText( 400, rejection );
 					return;
 				}
 
-				slot.url = response.url;
+				Nino.admin.images._apiCall( 'upload', { uri : slot.uri }, function( status, response ) {
 
-				// The stored name is deterministic per slot, so replacing a
-				// picture answers the url the browser already has in its cache
-				// - and public/images/ is served statically, with no
-				// Cache-Control of its own. The panel said "saved" while the
-				// preview still showed the old picture until a hard reload.
-				// The stamp is on the <img> only; the url the panel keeps and
-				// the page later renders stays the clean one
-				preview.src = response.url + ( response.url.indexOf('?') === -1 ? '?' : '&' ) + 't=' + Date.now();
-				preview.hidden = false;
-				msg.textContent = Nino.content.getText('/_admin/images/msg/saved');
-			}, { file : file } );
+					fileInput.disabled = false;
+					fileInput.value = '';
+
+					if( status !== 200 || response === null ) {
+						msg.className = 'nino-admin-field-image-msg is-error';
+						msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/images/error/save' );
+						return;
+					}
+
+					slot.url = response.url;
+
+					// The stored name is deterministic per slot, so replacing a
+					// picture answers the url the browser already has in its cache
+					// - and public/images/ is served statically, with no
+					// Cache-Control of its own. The panel said "saved" while the
+					// preview still showed the old picture until a hard reload.
+					// The stamp is on the <img> only; the url the panel keeps and
+					// the page later renders stays the clean one
+					preview.src = response.url + ( response.url.indexOf('?') === -1 ? '?' : '&' ) + 't=' + Date.now();
+					preview.hidden = false;
+					msg.textContent = Nino.content.getText('/_admin/images/msg/saved');
+				}, { file : file } );
+			} );
 		},
 	};
 

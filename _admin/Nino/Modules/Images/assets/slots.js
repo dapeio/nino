@@ -76,14 +76,12 @@
 		 *
 		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "devimages/list")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"
-		 *	@param		{Function}	callback			Called with ( xhr.status, xhr.responseJSON )
+		 *	@param		{Function}	callback			Called with ( status, body )
 		 *
 		 *	@return		void
 		 */
 		_apiCall : function( endpoint, payload, callback ) {
-			Nino.http.sendRequest( '[[/nino/dir]]/_admin/', 'POST', function( xhr ) {
-				callback( xhr.status, xhr.responseJSON );
-			}, { action : 'slots/'+ endpoint, data : JSON.stringify( payload ) } );
+			Nino.adminUi.api.call( 'slots/'+ endpoint, payload, callback );
 		},
 
 		/**
@@ -96,11 +94,7 @@
 		 *	@return		void
 		 */
 		_showError : function( container, status, response ) {
-			container.innerHTML = '';
-			const p = dc.createElement('p');
-			p.className = 'nino-admin-error';
-			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/common/error/load') );
-			container.appendChild( p );
+			Nino.adminUi.showError( container, status, response, '/_admin/common/error/load' );
 		},
 
 		_showList : function() {
@@ -296,7 +290,7 @@
 
 			Nino.admin.slots._apiCall( 'delete', { uri : Nino.admin.slots._currentUri }, function( status, response ) {
 				if( status !== 200 || response === null ) {
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/common/error/delete') );
+					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/delete' );
 					return;
 				}
 				Nino.admin.slots.init();
@@ -321,7 +315,7 @@
 				const uri = dc.getElementById('slots-form-uri').value;
 				Nino.admin.slots._apiCall( 'create', { uri : uri, label : label, width : width, height : height }, function( status, response ) {
 					if( status !== 200 || response === null ) {
-						msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/common/error/save') );
+						msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
 						return;
 					}
 					msg.textContent = Nino.content.getText('/_admin/common/msg/saved');
@@ -332,7 +326,7 @@
 
 			Nino.admin.slots._apiCall( 'save', { uri : Nino.admin.slots._currentUri, label : label, width : width, height : height }, function( status, response ) {
 				if( status !== 200 || response === null ) {
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/common/error/save') );
+					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
 					return;
 				}
 				msg.textContent = Nino.content.getText('/_admin/common/msg/saved');
@@ -372,7 +366,7 @@
 
 			Nino.admin.slots._apiCall( 'scan', {}, function( status, response ) {
 				if( status !== 200 || response === null ) {
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/common/error/scan') );
+					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/scan' );
 					return;
 				}
 				Nino.admin.slots._renderScanForm( response.missing );

@@ -217,7 +217,7 @@ Wildcard-Routen enden auf `/*`. Bei einem Request auf `/blog/entry` sucht Nino n
 );
 ```
 
-`Http::ok()` setzt den Body einer erfolgreichen Response. `Http::fail()` setzt Statuscode und ein einheitliches `error`-Feld. Beide verändern den übergebenen `$request` direkt und sind besonders für JSON-Routen lesbarer als das manuelle Setzen aller Felder.
+`Http::ok()` setzt den Body einer erfolgreichen Response. `Http::fail()` setzt Statuscode und ein einheitliches `error`-Feld – die englische Meldung für Entwickler oder ein Log – und optional einen stabilen `code`, seine `params` und das `field`, für das der Wert abgelehnt wurde; die Workbench macht daraus einen Satz in der Oberflächensprache. Beide verändern den übergebenen `$request` direkt und sind besonders für JSON-Routen lesbarer als das manuelle Setzen aller Felder.
 
 Routenspezifische Callbacks verwenden die **interne Response-URI**:
 
@@ -856,7 +856,7 @@ Projektcode darf diese Header gezielt erweitern. Er sollte sie nicht pauschal er
 - Elementfelder werden HTML-kodiert oder bei ausdrücklich erlaubtem HTML bereinigt.
 - `Jstext` überträgt Daten JSON-kodiert und CSP-gebunden in JavaScript.
 - Das Newsletter-Feature des Katalogs verrät nicht, ob eine E-Mail-Adresse bereits existiert.
-- Bildverarbeitung begrenzt Uploads auf 8 MiB und Quelldateien auf 20 Millionen Pixel, bevor speicherintensive Verarbeitung beginnt.
+- Bildverarbeitung begrenzt Uploads auf 8 MiB und Quelldateien auf 20 Millionen Pixel, bevor speicherintensive Verarbeitung beginnt. `\Nino\Images::limits()` beantwortet das alles für ein Formular zum Nennen: die Grenze des Kernels, was PHP durch eine Anfrage lässt (das Kleinere aus `upload_max_filesize` und `post_max_size`, 0 wo es keine gibt) und die Pixel. `\Nino\Images::reject( $bytes )` sagt, warum der Kernel Bytes ablehnen würde – `image_too_large`, `image_type` oder `image_too_many_pixels`, jeweils mit ihren Params – und ist das, womit die Upload-Endpunkte der Workbench antworten.
 - Jedes abgeleitete Bild wird als WEBP geschrieben, wo GD eines schreiben kann: verlustfrei, wo vorher PNG stand – damit geht nichts verloren und ein Alphakanal kommt mit –, verlustbehaftet, wo vorher JPEG stand. Gemessen an einer 1600×1000-Quelle: 1 KB gegenüber 24 KB als PNG bei Strichgrafik, 151 KB gegenüber 199 KB als JPEG beim Foto. Ein GD ohne WEBP oder `'/nino/images/webp' => false` in der `config.php` schreibt weiter PNG und JPEG; die mitgelieferte `.htaccess` deklariert den Typ für Hosts, deren eigene `mime.types` älter ist.
 - PHP-Datendateien in öffentlich erreichbaren Verzeichnissen erhalten Schutzstubs oder liefern ausschließlich Werte zurück.
 

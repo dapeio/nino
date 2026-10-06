@@ -172,14 +172,12 @@
 		 *
 		 *	@param		{string}		endpoint			Action name (eg. "list", becomes "features/list")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"
-		 *	@param		{Function}	callback			Called with ( xhr.status, xhr.responseJSON )
+		 *	@param		{Function}	callback			Called with ( status, body )
 		 *
 		 *	@return		void
 		 */
 		_apiCall : function( endpoint, payload, callback ) {
-			Nino.http.sendRequest( '[[/nino/dir]]/_admin/', 'POST', function( xhr ) {
-				callback( xhr.status, xhr.responseJSON );
-			}, { action : 'features/'+ endpoint, data : JSON.stringify( payload ) } );
+			Nino.adminUi.api.call( 'features/'+ endpoint, payload, callback );
 		},
 
 		/**
@@ -192,11 +190,7 @@
 		 *	@return		void
 		 */
 		_showError : function( container, status, response ) {
-			container.innerHTML = '';
-			const p = dc.createElement('p');
-			p.className = 'nino-admin-error';
-			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/common/error/load') );
-			container.appendChild( p );
+			Nino.adminUi.showError( container, status, response, '/_admin/common/error/load' );
 		},
 
 		/**
@@ -561,7 +555,7 @@
 			Nino.admin.features._apiCall( 'catalogue', {}, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
-					Nino.admin.features._catalogueMsg = { text : '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/features/error/catalogue') ), error : true, busy : false };
+					Nino.admin.features._catalogueMsg = { text : Nino.adminUi.api.errorText( status, response, '/_admin/features/error/catalogue' ), error : true, busy : false };
 					Nino.admin.features._renderPanel();
 					return;
 				}
@@ -920,7 +914,7 @@
 
 				if( status !== 200 || response === null ) {
 					btn.disabled = false;
-					msg.textContent = ( response && response.error ) ? response.error : Nino.content.getText('/_admin/features/error/remove');
+					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/features/error/remove' );
 					return;
 				}
 
@@ -945,22 +939,22 @@
 		 */
 		_switch : function( feature, what, btn, msg ) {
 
-			let busy, done, fallback;
+			let busy, done, failKey;
 
 			if( what === 'deactivate' ) {
 				busy 		 = Nino.content.getText('/_admin/features/msg/deactivating');
 				done 		 = Nino.content.getText('/_admin/features/msg/deactivated');
-				fallback = Nino.content.getText('/_admin/features/error/deactivate');
+				failKey	 = '/_admin/features/error/deactivate';
 			}
 			else if( what === 'update' ) {
 				busy 		 = Nino.content.getText('/_admin/features/msg/updating');
 				done 		 = Nino.content.getText('/_admin/features/msg/updated');
-				fallback = Nino.content.getText('/_admin/features/error/update');
+				failKey	 = '/_admin/features/error/update';
 			}
 			else {
 				busy 		 = Nino.content.getText('/_admin/features/msg/activating');
 				done 		 = Nino.content.getText('/_admin/features/msg/activated');
-				fallback = Nino.content.getText('/_admin/features/error/activate');
+				failKey	 = '/_admin/features/error/activate';
 			}
 
 			btn.disabled = true;
@@ -972,7 +966,7 @@
 				if( status !== 200 || response === null ) {
 					btn.disabled = false;
 					msg.classList.add('nino-admin-error');
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : fallback );
+					msg.textContent = Nino.adminUi.api.errorText( status, response, failKey );
 					return;
 				}
 
@@ -1092,7 +1086,7 @@
 				if( status !== 200 || response === null ) {
 					btn.disabled = false;
 					msg.classList.add('nino-admin-error');
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/features/error/install') );
+					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/features/error/install' );
 					return;
 				}
 
@@ -1872,7 +1866,7 @@
 
 				if( status !== 200 || response === null ) {
 					msg.classList.add('nino-admin-error');
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/common/error/save') );
+					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
 					return;
 				}
 

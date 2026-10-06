@@ -1141,8 +1141,17 @@ check( 'apiSave rejects an int below its minimum', $status === 400 );
 [ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/cache/ttl' => 999999999 ] ] );
 check( 'apiSave rejects an int above its maximum', $status === 400 );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/error/log' => 'yes please' ] ] );
+// The refusal says what it is in a way a client can word: the code of the type,
+// the limits that belong in the sentence, and the field it was posted for
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/cache/ttl' => 1 ] ] );
+check( 'a refused int carries the code "int_range", its bounds as params and the field',
+	$status === 400 && ( $body['code'] ?? '' ) === 'int_range' && is_int( $body['params'][0] ?? null ) === true && is_int( $body['params'][1] ?? null ) === true
+	&& $body['params'][0] < $body['params'][1] && ( $body['field'] ?? '' ) === '/nino/cache/ttl'
+	&& str_starts_with( (string) ( $body['error'] ?? '' ), '/nino/cache/ttl: expected a whole number between ' ) );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/error/log' => 'yes please' ] ] );
 check( 'apiSave rejects a bool that is neither', $status === 400 );
+check( '...with the code "bool" and the field', ( $body['code'] ?? '' ) === 'bool' && ( $body['field'] ?? '' ) === '/nino/error/log' && array_key_exists( 'params', $body ) === false );
 
 /*	The proxy list decides which address every per-ip rule in the site counts
 	a visitor as, so a line that is not an address at all is refused rather
@@ -1151,8 +1160,9 @@ check( 'apiSave rejects a bool that is neither', $status === 400 );
 check( 'apiSave takes addresses and cidr ranges as the proxy list', $status === 200 && $appData['/nino/http/proxies'] === [ '198.51.100.7', '10.0.0.0/8', '2001:db8::/32' ] );
 check( '...and writes them to config.php', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/proxies'] === [ '198.51.100.7', '10.0.0.0/8', '2001:db8::/32' ] );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/http/proxies' => 'cloudflare' ] ] );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/http/proxies' => 'cloudflare' ] ] );
 check( 'apiSave refuses a proxy entry that is no address', $status === 400 && $appData['/nino/http/proxies'] === [ '198.51.100.7', '10.0.0.0/8', '2001:db8::/32' ] );
+check( '...with the code "lines_ip" and the field', ( $body['code'] ?? '' ) === 'lines_ip' && ( $body['field'] ?? '' ) === '/nino/http/proxies' );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/http/proxies' => '10.0.0.0/64' ] ] );
 check( '...and a cidr prefix the address it belongs to cannot have', $status === 400 );
@@ -1179,8 +1189,9 @@ check( '...and writes it to config.php', \Nino\Filesystem::getFileContent( $appD
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Lockout::class, 'apiSave', [ 'fields' => [ '/nino/auth/maxtries' => '5.5' ] ] );
 check( 'Lockout::apiSave rejects a non-integer rather than casting it', $status === 400 && $appData['/nino/auth/maxtries'] === 8 );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Users\Lockout::class, 'apiSave', [ 'fields' => [ '/nino/auth/maxtries' => 0 ] ] );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Lockout::class, 'apiSave', [ 'fields' => [ '/nino/auth/maxtries' => 0 ] ] );
 check( 'Lockout::apiSave rejects an int below its minimum', $status === 400 );
+check( '...with the code "int_range", the bounds 1 and 100 and the field', ( $body['code'] ?? '' ) === 'int_range' && ( $body['params'] ?? [] ) === [ 1, 100 ] && ( $body['field'] ?? '' ) === '/nino/auth/maxtries' );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Lockout::class, 'apiSave', [ 'fields' => [ '/nino/auth/cooldown' => 999999999 ] ] );
 check( 'Lockout::apiSave rejects an int above its maximum', $status === 400 );
@@ -1311,11 +1322,11 @@ check( '...and writes both keys to config.php', \Nino\Filesystem::getFileContent
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiStatus' );
 check( 'apiStatus reflects the just-saved state', $status === 200 && $body === [ 'status' => true, 'retry' => 120 ] );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiSet', [ 'status' => 'yes', 'retry' => 120 ] );
-check( 'apiSet rejects a status that is not a bool', $status === 400 );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiSet', [ 'status' => 'yes', 'retry' => 120 ] );
+check( 'apiSet rejects a status that is not a bool', $status === 400 && ( $body['code'] ?? '' ) === 'bool' && ( $body['field'] ?? '' ) === 'status' && $body['error'] === 'status: expected true or false' );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiSet', [ 'status' => false, 'retry' => 30 ] );
-check( 'apiSet rejects a retry below its minimum', $status === 400 );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiSet', [ 'status' => false, 'retry' => 30 ] );
+check( 'apiSet rejects a retry below its minimum', $status === 400 && ( $body['code'] ?? '' ) === 'int_range' && ( $body['field'] ?? '' ) === 'retry' && count( $body['params'] ?? [] ) === 2 && str_starts_with( $body['error'], 'retry: expected a whole number between ' ) );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Maintenance\Admin::class, 'apiSet', [ 'status' => false, 'retry' => 999999999 ] );
 check( 'apiSet rejects a retry above its maximum', $status === 400 );
@@ -3633,6 +3644,120 @@ foreach( $described as [ $class, $action, $data, $needle ] ) {
 		$silent[] = $action;
 }
 check( 'every one of these writes is described by the class that runs it'. ( $silent === [] ? '' : ' - silent: '. implode( ', ', $silent ) ), $silent === [] );
+
+echo "\n";
+
+
+// --- The refusals a person can cause carry a code, and the code has words -----
+
+echo "Failure codes - the user-triggerable refusals name themselves, and every code the kernel sends is worded in both languages\n";
+
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'Not A Slug', 'label' => 'X', 'perms' => [] ] );
+check( 'a role id that is no slug is "roles_invalid_id" for the field "id"', $status === 400 && ( $body['code'] ?? '' ) === 'roles_invalid_id' && ( $body['field'] ?? '' ) === 'id' );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'tester', 'label' => '', 'perms' => [] ] );
+check( '...a role without a name is "roles_name_required" with the length it may have', $status === 400 && ( $body['code'] ?? '' ) === 'roles_name_required' && is_int( $body['params'][0] ?? null ) === true && ( $body['field'] ?? '' ) === 'label' );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'tester', 'label' => 'Tester', 'perms' => [ 'not a permission' ] ] );
+check( '...a permission that is none is "roles_invalid_perm" naming it', $status === 400 && ( $body['code'] ?? '' ) === 'roles_invalid_perm' && $body['params'] === [ 'not a permission' ] );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => 'nope' ] );
+check( 'a text key that is no key is "keys_invalid" with the key and the field', $status === 400 && ( $body['code'] ?? '' ) === 'keys_invalid' && $body['params'] === [ 'nope' ] && ( $body['field'] ?? '' ) === 'key' );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Elements\Types::class, 'apiCreate', [ 'uri' => 'Bad Uri', 'title' => 'X', 'model' => [] ] );
+check( 'an element type uri that is none is "types_invalid_uri"', $status === 400 && ( $body['code'] ?? '' ) === 'types_invalid_uri' && ( $body['field'] ?? '' ) === 'uri' );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [ 'uri' => '/ok', 'httpUri' => 'no spaces allowed', 'template' => 'page-home' ] );
+check( 'a page with an http uri that is none is "routes_invalid_http_uri" with the value and the field', $status === 400 && ( $body['code'] ?? '' ) === 'routes_invalid_http_uri' && $body['params'] === [ 'no spaces allowed' ] && ( $body['field'] ?? '' ) === 'httpUri' );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'key' => 'Bad Id', 'originalKey' => '' ] );
+check( 'a navigation id that is none is "navs_invalid_id" for the field "key"', $status === 400 && ( $body['code'] ?? '' ) === 'navs_invalid_id' && $body['params'] === [ 'Bad Id' ] && ( $body['field'] ?? '' ) === 'key' );
+
+/*	Every code the kernel sends has words, in both interface languages. The
+	words of the shared ones live in the shell's own text, a panel's own - the
+	ones carrying its slug - in its text() directory, and the client finds
+	either through the same key (/_admin/error/<code>). A code without words
+	is the English sentence under a German page, which is exactly what the
+	codes are there to avoid. Found in the source rather than listed: a code
+	added tomorrow is checked tomorrow	*/
+$codes = [];
+$source = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( dirname( __DIR__ ), FilesystemIterator::SKIP_DOTS ) );
+foreach( $source as $file ) {
+	$path = str_replace( '\\', '/', (string) $file );
+	if( str_ends_with( $path, '.php' ) === false || str_contains( $path, '/tests/' ) === true || str_contains( $path, '/.git/' ) === true || str_contains( $path, '/_admin/install/' ) === true )
+		continue;
+	if( str_contains( $path, '/_admin/' ) === false && str_contains( $path, '/_nino/' ) === false )
+		continue;
+	$text = (string) file_get_contents( $path );
+	$offset = 0;
+	while( ( $at = strpos( $text, 'Http::fail(', $offset ) ) !== false ) {
+		// The arguments of the call, split where the commas are not inside a string or a bracket
+		$arguments = [ '' ];
+		$depth = 0;
+		$quote = '';
+		for( $i = $at + 11, $length = strlen( $text ); $i < $length; $i++ ) {
+			$char = $text[$i];
+			if( $quote !== '' ) {
+				$arguments[count( $arguments ) - 1] .= $char;
+				if( $char === '\\' ) {
+					$arguments[count( $arguments ) - 1] .= $text[++$i];
+				} elseif( $char === $quote ) {
+					$quote = '';
+				}
+				continue;
+			}
+			if( $char === "'" || $char === '"' ) {
+				$quote = $char;
+			} elseif( $char === '(' || $char === '[' ) {
+				$depth++;
+			} elseif( $char === ')' || $char === ']' ) {
+				if( $depth === 0 )
+					break;
+				$depth--;
+			} elseif( $char === ',' && $depth === 0 ) {
+				$arguments[] = '';
+				continue;
+			}
+			$arguments[count( $arguments ) - 1] .= $char;
+		}
+		$offset = $at + 11;
+		// The fourth argument is the code: a literal, or a choice between two
+		$fourth = trim( $arguments[3] ?? '' );
+		if( preg_match( "/^'([a-z][a-z0-9_]*)'\$/", $fourth, $found ) === 1 || preg_match( "/\\?\\s*'([a-z][a-z0-9_]*)'\\s*:\\s*'([a-z][a-z0-9_]*)'\$/", $fourth, $found ) === 1 )
+			foreach( array_slice( $found, 1 ) as $code )
+				$codes[$code] = true;
+	}
+}
+// The ones Admin builds from the type of a field, from a failed upload and from
+// the images the kernel refuses - named by variable at the call
+foreach( [ 'int_range', 'bool', 'lines', 'lines_ip', 'invalid_value', 'upload_too_large', 'upload_partial', 'upload_missing', 'upload_server', 'image_too_large', 'image_type', 'image_too_many_pixels', 'image_unreadable', 'post_too_large', 'csrf', 'session', 'already_top', 'already_bottom' ] as $code )
+	$codes[$code] = true;
+
+$wordFiles = [];
+foreach( [ 'en_US', 'de_DE' ] as $locale ) {
+	$words = (array) require __DIR__. '/../_admin/text/'. $locale. '.php';
+	foreach( array_merge( glob( __DIR__. '/../_admin/Nino/Modules/*/text/'. $locale. '.php' ) ?: [], glob( __DIR__. '/../_nino/Nino/Modules/*/text/'. $locale. '.php' ) ?: [] ) as $moduleText )
+		$words += (array) require $moduleText;
+	$wordFiles[$locale] = $words;
+}
+$unworded = [];
+foreach( array_keys( $codes ) as $code )
+	foreach( [ 'en_US', 'de_DE' ] as $locale )
+		if( trim( (string) ( $wordFiles[$locale]['[[/_admin/error/'. $code. ']]'] ?? '' ) ) === '' )
+			$unworded[] = $code. ' ('. $locale. ')';
+check( 'every code the kernel sends is worded in English and in German'. ( $unworded === [] ? '' : ' - missing: '. implode( ', ', $unworded ) ), count( $codes ) > 40 && $unworded === [] );
+$orphans = array_filter( array_keys( $wordFiles['en_US'] ), fn( string $key ): bool => str_starts_with( $key, '[[/_admin/error/' ) === true && isset( $codes[ substr( $key, 16, -2 ) ] ) === false );
+check( '...and no word is left for a code nobody sends any more'. ( $orphans === [] ? '' : ' - '. implode( ', ', $orphans ) ), $orphans === [] );
+check( 'the two languages word the same codes', array_keys( array_filter( $wordFiles['en_US'], fn( $v, $k ) => str_starts_with( $k, '[[/_admin/error/' ), ARRAY_FILTER_USE_BOTH ) ) === array_keys( array_filter( $wordFiles['de_DE'], fn( $v, $k ) => str_starts_with( $k, '[[/_admin/error/' ), ARRAY_FILTER_USE_BOTH ) ) || count( array_diff_key( array_filter( $wordFiles['en_US'], fn( $v, $k ) => str_starts_with( $k, '[[/_admin/error/' ), ARRAY_FILTER_USE_BOTH ), $wordFiles['de_DE'] ) ) === 0 );
+$placeholders = [];
+foreach( array_keys( $codes ) as $code ) {
+	$en = (string) $wordFiles['en_US']['[[/_admin/error/'. $code. ']]'];
+	$de = (string) $wordFiles['de_DE']['[[/_admin/error/'. $code. ']]'];
+	if( substr_count( $en, '%s' ) !== substr_count( $de, '%s' ) )
+		$placeholders[] = $code;
+}
+check( 'both languages take the same number of params'. ( $placeholders === [] ? '' : ' - differ: '. implode( ', ', $placeholders ) ), $placeholders === [] );
+check( 'no word carries a live shortcode - the page substitutes a value before the shortcodes run', array_filter( $wordFiles['en_US'] + $wordFiles['de_DE'], fn( $v, $k ) => str_starts_with( $k, '[[/_admin/error/' ) && preg_match( '/[\\[\\]]/', (string) $v ) === 1, ARRAY_FILTER_USE_BOTH ) === [] );
 
 echo "\n";
 

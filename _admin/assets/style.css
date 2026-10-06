@@ -76,6 +76,7 @@
  *   Brand      .nino-admin-brand-mark  .nino-admin-brand-copy
  *   Type       .nino-admin-hint  .nino-admin-hint-lead  .nino-admin-eyebrow
  *              .nino-admin-error  .nino-admin-empty  .nino-admin-sr-only
+ *              .nino-admin-status
  *   Controls   .nino-admin-btn-primary  .nino-admin-btn-secondary
  *              .nino-admin-btn-danger  .nino-admin-linkbutton
  *   Surfaces   .nino-admin-card  .nino-admin-tiles  .nino-admin-tile
@@ -116,6 +117,8 @@
  *              .nino-admin-back-link
  *              .nino-admin-actionbar  .nino-admin-actionbar-status
  *              .nino-admin-list-actions
+ *   Dialog     .nino-admin-dialog  .nino-admin-dialog-body
+ *              .nino-admin-dialog-title  .nino-admin-dialog-actions
  */
 
 @layer nino.system {
@@ -670,6 +673,100 @@ a {
 	color: var(--editor-red);
 }
 
+/* Whether what is on screen is saved - written by Nino.adminUi.status(),
+   which puts the state on the element as data-state. Every state has a
+   glyph in front of its words as well as a colour: a reader who cannot tell
+   the colours apart still reads "unsaved" from the mark. The second content
+   declaration gives the glyph an empty text alternative where the browser
+   knows the syntax, so it is drawn and not read out. */
+:where(.nino-admin) .nino-admin-status {
+	color: var(--editor-text-secondary);
+	font-size: .78rem;
+}
+
+:where(.nino-admin) .nino-admin-status[data-state]::before {
+	display: inline-block;
+	margin-right: .35rem;
+	font-weight: 600;
+}
+
+:where(.nino-admin) .nino-admin-status[data-state="saving"]::before {
+	content: "\21BB";
+	content: "\21BB" / "";
+}
+
+:where(.nino-admin) .nino-admin-status[data-state="saved"] {
+	color: var(--editor-green);
+}
+
+:where(.nino-admin) .nino-admin-status[data-state="saved"]::before {
+	content: "\2713";
+	content: "\2713" / "";
+}
+
+:where(.nino-admin) .nino-admin-status[data-state="dirty"] {
+	color: var(--editor-orange);
+}
+
+:where(.nino-admin) .nino-admin-status[data-state="dirty"]::before {
+	content: "\25CF";
+	content: "\25CF" / "";
+}
+
+:where(.nino-admin) .nino-admin-status[data-state="error"] {
+	color: var(--editor-red);
+}
+
+:where(.nino-admin) .nino-admin-status[data-state="error"]::before {
+	content: "\26A0";
+	content: "\26A0" / "";
+}
+
+/* A modal question - the session that ended while a form was open. The
+   page behind keeps everything that was typed into it; closing the dialog
+   gives that page back, with the requests that waited told they failed. */
+:where(.nino-admin) .nino-admin-dialog {
+	width: min(26rem, calc(100vw - 2rem));
+	max-width: 100%;
+	padding: 0;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius);
+	background: var(--editor-bg-elevated);
+	color: var(--editor-text);
+	box-shadow: var(--editor-shadow);
+}
+
+:where(.nino-admin) .nino-admin-dialog::backdrop {
+	background: rgba(15,23,42,.5);
+}
+
+:where(.nino-admin) .nino-admin-dialog-body {
+	display: grid;
+	gap: .75rem;
+	padding: 1.25rem;
+}
+
+:where(.nino-admin) .nino-admin-dialog-body > :is(p, h2, label) {
+	margin: 0;
+}
+
+:where(.nino-admin) .nino-admin-dialog-title {
+	font-size: 1.05rem;
+}
+
+/* A part the dialog hides - the login fields, when the only way on is a
+   reload - stays hidden whatever display its own class gives it. */
+:where(.nino-admin) .nino-admin-dialog-body [hidden] {
+	display: none;
+}
+
+:where(.nino-admin) .nino-admin-dialog-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: .5rem;
+}
+
 /* --------------------------------------------------------- Cards and forms */
 
 /* The one raised surface in the system. A fieldset is one by definition;
@@ -778,7 +875,7 @@ a {
    rules above are more specific than a bare class-plus-attribute, and an
    invalid field that goes back to looking ordinary under the pointer is a
    field that reports its state only when nobody is touching it. */
-:where(.nino-admin) .nino-admin-input[aria-invalid="true"]:not(:disabled) {
+:where(.nino-admin) :is(.nino-admin-input, input, textarea, select)[aria-invalid="true"]:not(:disabled) {
 	border-color: var(--editor-red);
 	box-shadow: inset 0 0 0 1px var(--editor-red);
 }
@@ -1917,6 +2014,20 @@ a {
 	color: var(--editor-text-secondary);
 	font-size: .78rem;
 	text-align: right;
+}
+
+/* The bar's own colour above is more specific than the state colours of the
+   status line, so the line repeats them where it sits in the bar. */
+.nino-admin .nino-admin-actionbar > .nino-admin-status[data-state="saved"] {
+	color: var(--editor-green);
+}
+
+.nino-admin .nino-admin-actionbar > .nino-admin-status[data-state="dirty"] {
+	color: var(--editor-orange);
+}
+
+.nino-admin .nino-admin-actionbar > .nino-admin-status[data-state="error"] {
+	color: var(--editor-red);
 }
 
 .nino-admin .nino-admin-actionbar button {

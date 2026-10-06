@@ -860,6 +860,61 @@ check( 'process() rejects a path-traversal basePath', \Nino\Images::process( $ap
 echo "\n";
 
 
+// --- Images::limits / reject - what an upload form tells, what the kernel refuses
+
+echo "Images::limits / Images::reject\n";
+
+/*	php's two limits are ini strings, so what limits() reads is stood in for by
+	_limits()'s arguments here - upload_max_filesize and post_max_size cannot be changed
+	at run time. The smaller of the two is what can arrive, the kernel's own
+	cap is the other bound, and a value php cannot read counts as no limit
+	instead of raising the warning this framework would treat as fatal	*/
+$limitWarnings = [];
+// - a handler is called under @ too, so it asks error_reporting() the way Runtime::handleError() does
+set_error_handler( function( int $no, string $message ) use ( &$limitWarnings ) {
+	if( ( error_reporting() & $no ) !== 0 )
+		$limitWarnings[] = $message;
+	return true;
+} );
+
+$limits = \Nino\Images::_limits( '2M', '8M' );
+check( 'limits() takes the smaller of php\'s two limits for what can arrive', $limits['php'] === 2 * 1024 * 1024 && $limits['post'] === 8 * 1024 * 1024 && $limits['bytes'] === 2 * 1024 * 1024 );
+$limits = \Nino\Images::_limits( '64M', '16M' );
+check( '...and the kernel\'s own cap when that is smaller still', $limits['php'] === 16 * 1024 * 1024 && $limits['kernel'] === 8 * 1024 * 1024 && $limits['bytes'] === 8 * 1024 * 1024 );
+$limits = \Nino\Images::_limits( '512K', '0' );
+check( 'post_max_size = 0 means no limit - the upload limit alone applies', $limits['php'] === 512 * 1024 && $limits['post'] === 0 && $limits['bytes'] === 512 * 1024 );
+$limits = \Nino\Images::_limits( '0', '0' );
+check( 'no php limit at all leaves the kernel\'s cap', $limits['php'] === 0 && $limits['bytes'] === \Nino\Images::MAX_UPLOAD_BYTES );
+$limits = \Nino\Images::_limits( 'plenty', '-1' );
+check( 'a value php cannot read, or a negative one, counts as no limit', $limits['php'] === 0 && $limits['post'] === 0 && $limits['bytes'] === \Nino\Images::MAX_UPLOAD_BYTES );
+$limits = \Nino\Images::_limits( '1G', '2G' );
+check( 'the pixel cap is the kernel\'s whatever php says', $limits['pixels'] === \Nino\Images::MAX_SOURCE_PIXELS && $limits['bytes'] === \Nino\Images::MAX_UPLOAD_BYTES );
+$limits = \Nino\Images::limits();
+check( 'limits() reads the running php\'s own', $limits['kernel'] === 8 * 1024 * 1024 && $limits['bytes'] > 0 && $limits['bytes'] <= $limits['kernel'] );
+check( '...and none of it raised a warning, malformed values included', $limitWarnings === [] );
+restore_error_handler();
+
+check( 'reject() lets an image the kernel takes through', \Nino\Images::reject( makeTestImage( 40, 30 ) ) === null );
+check( 'reject() names bytes above the cap, with the limit in MB', \Nino\Images::reject( str_repeat( 'a', \Nino\Images::MAX_UPLOAD_BYTES + 1 ) ) === [ 'code' => 'image_too_large', 'params' => [ 8 ] ] );
+check( 'reject() names something that is no image', \Nino\Images::reject( 'not an image' ) === [ 'code' => 'image_type', 'params' => [] ] && \Nino\Images::reject( '' )['code'] === 'image_type' );
+$ihdr = pack( 'NN', 5000, 5000 ). "\x08\x02\x00\x00\x00";
+$hugePng = "\x89PNG\r\n\x1a\n". pack( 'N', 13 ). 'IHDR'. $ihdr. pack( 'N', crc32( 'IHDR'. $ihdr ) );
+check( 'reject() names a picture of more pixels than the kernel decodes, with the megapixels', \Nino\Images::reject( $hugePng ) === [ 'code' => 'image_too_many_pixels', 'params' => [ 20 ] ] );
+check( '_render() refuses the same three through process() - one implementation of the limits', \Nino\Images::process( $appData, str_repeat( 'a', \Nino\Images::MAX_UPLOAD_BYTES + 1 ), 10, 10, 'elements/demo/limit' ) === false
+	&& \Nino\Images::process( $appData, 'not an image', 10, 10, 'elements/demo/limit' ) === false && \Nino\Images::process( $appData, $hugePng, 10, 10, 'elements/demo/limit' ) === false );
+
+// Http::fail() - a code, params and a field only when they are given
+$failRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Http::fail( $failRequest, 400, 'invalid' );
+check( 'Http::fail() with three arguments answers the body it always did', $failRequest['/nino/http/response'] === [ 'statusCode' => 400, 'body' => [ 'error' => 'invalid' ] ] );
+\Nino\Http::fail( $failRequest, 409, 'taken', 'slug_taken' );
+check( '...a code is added when given', $failRequest['/nino/http/response']['body'] === [ 'error' => 'taken', 'code' => 'slug_taken' ] );
+\Nino\Http::fail( $failRequest, 400, 'range', 'int_range', [ 1, 'x' => 100 ], 'maxtries' );
+check( '...and params as a list, and the field', $failRequest['/nino/http/response']['body'] === [ 'error' => 'range', 'code' => 'int_range', 'params' => [ 1, 100 ], 'field' => 'maxtries' ] );
+
+echo "\n";
+
+
 // --- Images::fit - the whole picture, in a box -----------------------------
 
 echo "Images::fit / the render callback\n";

@@ -356,7 +356,7 @@ namespace Nino\Modules\Elements {
 			// An upload is this field's value being changed, only over a
 			// different route than apiSave() - the same permission decides it
 			if( self::mayUpdate( $appData, $type, $key ) === false ) {
-				\Nino\Http::fail( $request, 403, 'not allowed to change the field(s) '. $key );
+				\Nino\Http::fail( $request, 403, 'not allowed to change the field(s) '. $key, 'elements_fields_not_allowed', [ $key ], $key );
 				return;
 			}
 
@@ -368,14 +368,21 @@ namespace Nino\Modules\Elements {
 				return;
 			}
 
-			if( isset( $_FILES['file'] ) === false || $_FILES['file']['error'] !== UPLOAD_ERR_OK ) {
-				\Nino\Http::fail( $request, 400, 'no file uploaded' );
+			$failure = \Nino\Admin\Admin::uploadError( $_FILES['file'] ?? null );
+			if( $failure !== null ) {
+				\Nino\Http::fail( $request, $failure['status'], $failure['error'], $failure['code'], $failure['params'] );
 				return;
 			}
 
 			$bytes = file_get_contents( $_FILES['file']['tmp_name'] );
 			if( $bytes === false ) {
-				\Nino\Http::fail( $request, 400, 'could not read upload' );
+				\Nino\Http::fail( $request, 500, 'could not read upload', 'upload_server' );
+				return;
+			}
+
+			$rejection = \Nino\Images::reject( $bytes );
+			if( $rejection !== null ) {
+				\Nino\Http::fail( $request, 400, 'the image was refused: '. $rejection['code'], $rejection['code'], $rejection['params'] );
 				return;
 			}
 
@@ -407,8 +414,11 @@ namespace Nino\Modules\Elements {
 
 			$filename = \Nino\Images::process( $appData, $bytes, $width, $height, $basePath );
 
+			// The bytes are an image the kernel accepts, so this is gd or a
+			// render callback giving up on one - or the file not being written,
+			// which process() does not tell apart
 			if( $filename === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid or oversized image' );
+				\Nino\Http::fail( $request, 400, 'the image could not be processed', 'image_unreadable' );
 				return;
 			}
 
@@ -548,7 +558,7 @@ namespace Nino\Modules\Elements {
 					$refused[] = (string) $field;
 
 			if( $refused !== [] ) {
-				\Nino\Http::fail( $request, 403, 'not allowed to change the field(s) '. implode( ', ', $refused ) );
+				\Nino\Http::fail( $request, 403, 'not allowed to change the field(s) '. implode( ', ', $refused ), 'elements_fields_not_allowed', [ implode( ', ', $refused ) ], (string) $refused[0] );
 				return;
 			}
 

@@ -22,4 +22,7 @@ return [
 	'[[/_admin/navs/label/add]]'				=> 'Eine Route hinzufügen – sie kommt ans Ende',
 	'[[/_admin/navs/label/addbtn]]'			=> 'Zur Navigation hinzufügen',
 	'[[/_admin/navs/confirm/delete]]'		=> 'Die Navigation „%s“ wirklich löschen? Ihre Routen bleiben, nur die Zugehörigkeit geht.',
+	'[[/_admin/error/navs_invalid_id]]'	=> 'Die Navigations-Kennung „%s“ ist ungültig. Beginne mit einem Kleinbuchstaben; danach sind Kleinbuchstaben, Ziffern, Bindestriche und Unterstriche erlaubt.',
+	'[[/_admin/error/navs_id_taken]]'	=> 'Die Navigations-Kennung „%s“ ist schon vergeben.',
+	'[[/_admin/error/navs_route_present]]'	=> 'Diese Route steht schon in dieser Navigation.',
 ];

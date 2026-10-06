@@ -41,18 +41,11 @@
 		},
 
 		_apiCall : function( endpoint, payload, callback ) {
-			Nino.http.sendRequest( '[[/nino/dir]]/_admin/', 'POST', function( xhr ) {
-				callback( xhr.status, xhr.responseJSON );
-			}, { action : 'translations/'+ endpoint, data : JSON.stringify( payload ) } );
+			Nino.adminUi.api.call( 'translations/'+ endpoint, payload, callback );
 		},
 
 		_showError : function( status, response ) {
-			const wrap = dc.getElementById('translations-content');
-			wrap.innerHTML = '';
-			const p = dc.createElement('p');
-			p.className = 'nino-admin-error';
-			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/common/error/load') );
-			wrap.appendChild( p );
+			Nino.adminUi.showError( dc.getElementById('translations-content'), status, response, '/_admin/common/error/load' );
 		},
 
 		/**
@@ -213,7 +206,7 @@
 					importBtn.disabled = false;
 					importBtn.textContent = Nino.content.getText('/_admin/translations/label/importbtn');
 					if( status !== 200 || response === null )
-						return Nino.admin.translations._setMessage( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/translations/error/import'), true );
+						return Nino.admin.translations._setMessage( Nino.adminUi.api.errorText( status, response, '/_admin/translations/error/import' ), true );
 
 					const imported = response.text.imported+ response.elements.imported;
 					const skipped = response.text.skipped+ response.elements.skipped;

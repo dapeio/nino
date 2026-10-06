@@ -124,7 +124,7 @@ Important source directories:
 | `_admin/Admin.php` | The workbench: `\Nino\Admin\Admin` (shell, routes, bundles, fills, dispatch), `\Nino\Admin\Panels` (the panel registry: reads a panel class, orders the panels, renders navigation and panes) and `\Nino\Admin\Recovery` (the recovery secret) |
 | `_admin/Nino/Modules/<Name>/` | The workbench's own screens, one module each, in the same shape and the same namespace `_nino/Nino/Modules` and `features/<Name>/` use: `Admin/Admin.php` is the panel, `<Tab>/<Tab>.php` a tab of it, `assets/` its scripts and stylesheet, `text/` its words. `Admin::modules()` reads the directory - there is no list to keep. Take the directory away and `/_admin` is a login and an empty rail, which is the point: `_admin` is the base, the modules fill it |
 | `_admin/assets/style.css` | The workbench's one stylesheet: the design system in the `nino.system` layer (classes only, `nino-admin-*`), the workbench's own rules in `nino.tool` below it |
-| `_admin/assets/Nino.admin.js` | The behaviour half of the design system: `Nino.adminUi`'s DOM primitives and the pure table model. Loaded after `Nino.js`, by the workbench only |
+| `_admin/assets/Nino.admin.js` | The behaviour half of the design system: `Nino.adminUi`'s DOM primitives and the pure table model - and the one way a panel talks to the server, `Nino.adminUi.api`, with the status line (`status()`) and the messages that say what failed (`errorText()`, `showError()`, `format()`). Loaded after `Nino.js`, by the workbench only |
 | `_admin/assets/script.js`, `login.js`, `html-editor.js` | The shell script (router, theme, rail fold, panel switching), the login screen's, and the rich-text primitive a panel names in its own `assets()`. No panel script lives here; no bundler - `Admin::init()` builds `/_admin/.cache/` from the registry |
 | `_admin/templates/page-index.tpl` | The shell; navigation, panes and panel assets are rendered into it from the registry |
 | `_admin/recovery.php`, `templates/page-recovery.tpl`, `assets/recovery.js` | The recovery page: restore a backup, reset a password, with the recovery secret |
@@ -350,7 +350,10 @@ workbench user is ever sent it.
 
 - There is no module bundler or transpiler.
 - Admin files use an IIFE and attach behavior below `window.Nino`.
-- Use `const`/`let`, explicit event listeners, and existing HTTP helpers.
+- Use `const`/`let`, explicit event listeners, and existing HTTP helpers. A
+  workbench panel never posts by hand: it calls `Nino.adminUi.api.call()`,
+  which knows where `/_admin/` is below the project's directory and what to
+  do when the session has ended.
 - Do not add inline handlers or depend on globally leaked DOM IDs.
 - Keep pure model functions separately testable where practical.
 - Use `textContent` for all server- or user-derived strings.
@@ -426,7 +429,7 @@ Reach for an existing class first; only invent one when no role fits.
 | Back link inside that row | `.nino-admin-back-link` |
 | Fixed bottom actions | `.nino-admin-actionbar` via `Nino.adminUi.actionBar()` |
 | Fixed actions above a list | `.nino-admin-list-actions` via `Nino.adminUi.listActions()` |
-| Status text in a bottom bar | `.nino-admin-actionbar-status` |
+| Status text in a bottom bar - saving, saved at hh:mm, unsaved changes, why it failed | `.nino-admin-status` via `Nino.adminUi.status()` (in the bar it replaces `.nino-admin-actionbar-status`) |
 | Primary / destructive button | `.nino-admin-btn-primary`, `.nino-admin-btn-danger` |
 | Raised panel | `.nino-admin-card` (a `fieldset` is one already) |
 | Clickable drill-down list | `.nino-admin-list` (+ `.nino-admin-list-copy` per row) |
@@ -447,12 +450,33 @@ Reach for an existing class first; only invent one when no role fits.
 sentence: the workbench's strings are `_admin/text/<locale>.php`, a module's are
 the `text()` directory beside its panel, and `[jstext]` hands all of them to
 `Nino.content.getText()`. A placeholder is `%s`, `%d` or `%n`, filled with
-`.replace()`. A label the backend sends - a schema's `label` and `hint`, a
+`Nino.adminUi.format()`. A label the backend sends - a schema's `label` and `hint`, a
 dashboard tile's or a permission's label - may be a fill key or literal text;
 `Nino.adminUi.text()` resolves it either way - which is also how a value that
 is both shown and compared stays translatable: send a slug and name it on the
 client (see the Template Builder's `includeKind()` and `categoryLabel()`), never
 compare against a word a locale file can change.
+
+**One way to the server, one way to say what failed.** A panel's `_apiCall`
+is a thin name for `Nino.adminUi.api.call( action, payload, callback, extra )`.
+It is a function body, never a property evaluated while the object is built,
+because panel scripts also run where `Nino.admin.js` is not loaded. The helper calls back
+with `( status, body )` synchronously, and handles the end of a session itself:
+only a `401` with the code `session` and a `403` with the code `csrf` are one,
+and the page then asks for a login again over itself (`<dialog>` in
+`page-index.tpl`) and sends the waiting requests on if the same account signs
+in. A failure a person can cause carries a stable code, its params and the
+field, `\Nino\Http::fail( $request, 400, 'English message', 'code', [ param ], 'field' )`,
+and the client says it through `Nino.adminUi.api.errorText()` from the fill
+`/_admin/error/<code>` (the shell's own for the codes every panel meets, a
+panel's in its `text()` directory under its slug prefix). `tests/admin-system-smoke.php`
+finds every code in the source and fails on one without text in both languages.
+A message with params is filled with `Nino.adminUi.format()`, never with
+`String.replace()`. Image uploads are checked against `\Nino\Images::limits()`
+in the browser first (`data-upload-bytes`, `data-upload-pixels` on the shell,
+`Nino.adminUi.checkImage()`, `uploadHint()`) and by `Admin::uploadError()` and
+`Images::reject()` on the server.
+
 A workspace panel's markup (`templates/panel.tpl`) is the other place a
 sentence hides, and reads ordinary `[[fills]]`. A fill's *value* is substituted
 into the page before the shortcode pass runs, and `[jstext]` ships the same
@@ -658,6 +682,11 @@ or escaping.
   public request.
 - Do not swallow programming errors under a broad `catch(Throwable)`.
 - Test the failure branch, not only the happy path.
+- A failure a person can cause and a panel can word carries a code with text
+  in both interface languages (see `\Nino\Http::fail()`); one without a code is
+  shown as the server's English message, so give a new one a code. A `401`
+  that means "the session has ended" carries the code `session` and nothing
+  else does: the workbench offers a login again for exactly that answer.
 
 ## 9. Common incorrect approaches and their correction
 
@@ -812,6 +841,7 @@ new, and the tests named in section 10 pass.
 - [ ] `assets()` names project-relative `.js`/`.css` only (through `Panels::relative()` for a module); the JS namespace equals the nav uri; a `template()` is a fragment with no head, link or script of its own.
 - [ ] JS uses existing UI primitives and safe DOM construction.
 - [ ] Empty, loading, error, list, form, and saved states are usable.
+- [ ] Requests go through `Nino.adminUi.api.call()`; a failure a person can cause carries a code (params and field where they apply), with text in both languages.
 - [ ] Backend and JS tests cover denial, mutation, and - for a module panel - absence while the module is off.
 
 ### Runtime module done

@@ -200,17 +200,39 @@ namespace Nino\Admin {
 
 			self::_logLoginOnce( $appData );
 
+			// What a page that outlived its session asks before it does
+			// anything else (see Nino.adminUi.api): who is signed in here now,
+			// and the token this session holds. Answered before the login
+			// form on purpose - a logged-out session has a token too, and the
+			// login that follows needs it. Nothing but the account's mail
+			// and a token that is no secret from the session it belongs to
+			if( isset( $_GET['session'] ) === true ) {
+				$request['/nino/http/response']['header']['Cache-Control'] = 'no-store';
+				$user = \Nino\Auth::getCurrentUser( $appData );
+				\Nino\Http::ok( $request, [
+					'user' 	=> $user === false ? '' : (string) ( $user['mail'] ?? '' ),
+					'csrf' 	=> \Nino\Csrf::getToken( $appData ),
+				] );
+				return;
+			}
+
 			if( \Nino\Auth::getCurrentUser( $appData ) === false ) {
 				$request['/nino/http/response']['body'] = '[template /_admin/templates/page-login]';
 				return;
 			}
 
+			// The limits an image upload runs into, for the browser to check a
+			// file against before it is sent (see Nino.adminUi.limits())
+			$limits = \Nino\Images::limits();
+
 			// Only the panels this account may use are rendered at all - the
 			// permission checks in every action stay authoritative, this keeps
 			// the navigation honest and the page free of predictable 403s
 			\Nino\Html::addFills( $appData, [
-				'[[/_admin/nav]]'		=> self::navHtml( $appData ),
-				'[[/_admin/panes]]'	=> self::panesHtml( $appData ),
+				'[[/_admin/nav]]'						=> self::navHtml( $appData ),
+				'[[/_admin/panes]]'					=> self::panesHtml( $appData ),
+				'[[/_admin/upload/bytes]]'	=> (string) $limits['bytes'],
+				'[[/_admin/upload/pixels]]'	=> (string) $limits['pixels'],
 			], '*' );
 		}
 
@@ -452,9 +474,14 @@ namespace Nino\Admin {
 		 */
 		public static function handlePost( array &$appData, array &$request ): void {
 
-			// Respect a rejection from an earlier global callback (eg. Csrf)
-			if( $request['/nino/http/response']['statusCode'] !== 200 )
+			// Respect a rejection from an earlier global callback (eg. Csrf) -
+			// and say what it was, because the csrf guard answers a bare 403
+			// and a page that outlived its session reads that as "not allowed"
+			if( $request['/nino/http/response']['statusCode'] !== 200 ) {
+				if( ( $request['./nino/csrf/blocked'] ?? false ) === true )
+					self::_failBlocked( $request );
 				return;
+			}
 
 			$actions = self::actions( $appData );
 			// A non-string action is no action. Left as posted, the isset()
@@ -479,6 +506,32 @@ namespace Nino\Admin {
 				self::_logAction( $appData, $class, $action );
 
 			self::_announce( $appData, $class, $action, $request );
+		}
+
+		/**
+		 *	Answer a request the csrf guard refused: with a token that is no
+		 *	longer this session's (code 'csrf', the page then asks for the
+		 *	current one and sends the request again - see Nino.adminUi.api),
+		 *	or with a body that never arrived at all. php drops the whole
+		 *	body of a post above post_max_size, token included, so such a
+		 *	request is refused for a missing token while the cause is its
+		 *	size - and no retry changes that
+		 *
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		private static function _failBlocked( array &$request ): void {
+
+			$length	= $request['/nino/http/request']['header']['Content-Length'] ?? '';
+			$post		= \Nino\Images::limits()['post'];
+
+			if( $post > 0 && is_string( $length ) === true && ctype_digit( $length ) === true && (int) $length > $post ) {
+				\Nino\Http::fail( $request, 413, 'the request is larger than the server accepts (post_max_size)', 'post_too_large', [ self::megabytes( $post ) ] );
+				return;
+			}
+
+			\Nino\Http::fail( $request, 403, 'the session token is no longer valid - reload the page', 'csrf' );
 		}
 
 		/**
@@ -600,8 +653,11 @@ namespace Nino\Admin {
 
 			self::_logLoginOnce( $appData );
 
+			// The code is what tells a session that ended from a refusal of
+			// somebody who is still signed in (see Nino.adminUi.api) - 401 alone
+			// does not, the Users panel answers one for a wrong password
 			if( \Nino\Auth::getCurrentUser( $appData ) === false ) {
-				\Nino\Http::fail( $request, 401, 'not logged in' );
+				\Nino\Http::fail( $request, 401, 'not logged in', 'session' );
 				return false;
 			}
 
@@ -898,6 +954,74 @@ namespace Nino\Admin {
 				'bool' 		=> $key. ': expected true or false',
 				'lines' 	=> $key. ': expected one entry per line'. ( ( $field['entry'] ?? '' ) === 'ip' ? ', each an ip address or a cidr range' : '' ),
 				default 	=> $key. ': invalid value',
+			};
+		}
+
+		/**
+		 *	Fail a request for a value that does not fit its field's type, the
+		 *	way typeError() words it - and with what a client needs to say it in
+		 *	its own language: the code of the type, the limits that belong in
+		 *	the sentence, and the field the value was posted for
+		 *
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$key					The field's key, as posted
+		 *	@param		array			$field				The field's declaration (type, min, max, entry)
+		 *
+		 *	@return 	void
+		 */
+		public static function failType( array &$request, string $key, array $field ): void {
+
+			[ $code, $params ] = match( $field['type'] ) {
+				'int' 		=> [ 'int_range', [ $field['min'] ?? PHP_INT_MIN, $field['max'] ?? PHP_INT_MAX ] ],
+				'bool' 		=> [ 'bool', [] ],
+				'lines' 	=> [ ( $field['entry'] ?? '' ) === 'ip' ? 'lines_ip' : 'lines', [] ],
+				default 	=> [ 'invalid_value', [] ],
+			};
+
+			\Nino\Http::fail( $request, 400, self::typeError( $key, $field ), $code, $params, $key );
+		}
+
+		/**
+		 *	A size in bytes as the megabytes a sentence names: whole where it
+		 *	is whole (8), one decimal where it is not (0.5)
+		 *
+		 *	@param		int				$bytes
+		 *
+		 *	@return 	int|float
+		 */
+		public static function megabytes( int $bytes ): int|float {
+
+			$megabytes = round( $bytes / 1048576, 1 );
+
+			return $megabytes === floor( $megabytes ) ? (int) $megabytes : $megabytes;
+		}
+
+		/**
+		 *	Why an uploaded file did not arrive, as the failure to answer with
+		 *	- or null when it did. The upload endpoints of the panels all ask
+		 *	this before they open the file: php says what went wrong in the
+		 *	error code of $_FILES, and answering one "no file uploaded" for all
+		 *	of them told somebody whose photo was larger than upload_max_filesize
+		 *	that nothing had been sent
+		 *
+		 *	@param		mixed			$file					$_FILES['file'], whatever is there
+		 *
+		 *	@return 	array|null								[ 'status', 'error', 'code', 'params' ] or null for a file that arrived
+		 */
+		public static function uploadError( mixed $file ): ?array {
+
+			$error 	= is_array( $file ) === true && is_int( $file['error'] ?? null ) === true ? $file['error'] : UPLOAD_ERR_NO_FILE;
+			$limits	= \Nino\Images::limits();
+
+			return match( $error ) {
+				UPLOAD_ERR_OK 			=> null,
+				UPLOAD_ERR_INI_SIZE,
+				UPLOAD_ERR_FORM_SIZE	=> [ 'status' => 413, 'error' => 'the file is larger than the server accepts (upload_max_filesize)', 'code' => 'upload_too_large', 'params' => [ self::megabytes( $limits['php'] > 0 ? $limits['php'] : $limits['bytes'] ) ] ],
+				UPLOAD_ERR_PARTIAL		=> [ 'status' => 400, 'error' => 'the file was only partly uploaded', 'code' => 'upload_partial', 'params' => [] ],
+				UPLOAD_ERR_NO_TMP_DIR,
+				UPLOAD_ERR_CANT_WRITE,
+				UPLOAD_ERR_EXTENSION	=> [ 'status' => 500, 'error' => 'the server could not store the upload', 'code' => 'upload_server', 'params' => [] ],
+				default 						=> [ 'status' => 400, 'error' => 'no file uploaded', 'code' => 'upload_missing', 'params' => [] ],
 			};
 		}
 

@@ -88,4 +88,9 @@ return [
 	'[[/_admin/types/placeholder/inputsize]]'	=> 'Zeilen des Eingabefelds (optional)',
 	'[[/_admin/types/placeholder/max]]'	=> 'Max. Elemente (0 = unbegrenzt)',
 	'[[/_admin/elements/empty]]'					=> 'Noch keine Element-Typen angelegt.',
+	'[[/_admin/error/elements_fields_not_allowed]]'	=> 'Dein Konto darf diese Felder nicht ändern: %s',
+	'[[/_admin/error/types_invalid_uri]]'	=> 'Eine Typ-URI beginnt mit einem Kleinbuchstaben, danach folgen Kleinbuchstaben, Ziffern, Bindestriche und Unterstriche.',
+	'[[/_admin/error/types_exists]]'	=> 'Einen Typ mit dieser URI gibt es schon.',
+	'[[/_admin/error/types_confirm]]'	=> 'Gib zur Bestätigung die URI des Elementtyps ein.',
+	'[[/_admin/error/types_referenced]]'	=> 'Andere Elementtypen verweisen noch auf diesen (%s). Entferne zuerst diese Felder.',
 ];

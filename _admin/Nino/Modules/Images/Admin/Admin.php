@@ -121,14 +121,24 @@ namespace Nino\Modules\Images {
 				return;
 			}
 
-			if( isset( $_FILES['file'] ) === false || $_FILES['file']['error'] !== UPLOAD_ERR_OK ) {
-				\Nino\Http::fail( $request, 400, 'no file uploaded' );
+			$failure = \Nino\Admin\Admin::uploadError( $_FILES['file'] ?? null );
+			if( $failure !== null ) {
+				\Nino\Http::fail( $request, $failure['status'], $failure['error'], $failure['code'], $failure['params'] );
 				return;
 			}
 
 			$bytes = file_get_contents( $_FILES['file']['tmp_name'] );
 			if( $bytes === false ) {
-				\Nino\Http::fail( $request, 400, 'could not read upload' );
+				\Nino\Http::fail( $request, 500, 'could not read upload', 'upload_server' );
+				return;
+			}
+
+			// Said before the picture is touched, and in the terms the limits
+			// are documented in - which of them it was is what the person has
+			// to know to fix it
+			$rejection = \Nino\Images::reject( $bytes );
+			if( $rejection !== null ) {
+				\Nino\Http::fail( $request, 400, 'the image was refused: '. $rejection['code'], $rejection['code'], $rejection['params'] );
 				return;
 			}
 
@@ -136,8 +146,11 @@ namespace Nino\Modules\Images {
 
 			$filename = \Nino\Images::process( $appData, $bytes, (int) ( $slot['width'] ?? 0 ), (int) ( $slot['height'] ?? 0 ), ltrim( $uri, '/' ) );
 
+			// The bytes are an image the kernel accepts, so this is gd or a
+			// render callback giving up on one - or the file not being written,
+			// which process() does not tell apart
 			if( $filename === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid or oversized image' );
+				\Nino\Http::fail( $request, 400, 'the image could not be processed', 'image_unreadable' );
 				return;
 			}
 

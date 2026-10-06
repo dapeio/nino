@@ -25,6 +25,11 @@
 
 		_users				: [],
 		_currentUser	: null,
+		// The profile form's status line, and the role form's - see
+		// Nino.adminUi.status(). Drawn again with their forms, so always read
+		// from here rather than kept in a local
+		_status				: null,
+		_roleStatus		: null,
 		_canManage		: false,
 		_roles				: [],
 		_loading			: false,
@@ -90,18 +95,17 @@
 		},
 
 		/**
-		 *	Call a users/* admin action - see Elements' admin.js for why /_admin/ (trailing slash)
+		 *	Call a users/* admin action - this panel's name for Nino.adminUi.api.call(),
+		 *	which owns where the request goes
 		 *
 		 *	@param		{string}		endpoint			Action name (eg. "save", becomes "users/save")
 		 *	@param		{Object}		payload				Request payload, sent json-encoded as "data"
-		 *	@param		{Function}	callback			Called with ( xhr.status, xhr.responseJSON )
+		 *	@param		{Function}	callback			Called with ( status, body )
 		 *
 		 *	@return		void
 		 */
 		_apiCall : function( endpoint, payload, callback ) {
-			Nino.http.sendRequest( '[[/nino/dir]]/_admin/', 'POST', function( xhr ) {
-				callback( xhr.status, xhr.responseJSON );
-			}, { action : 'users/'+ endpoint, data : JSON.stringify( payload ) } );
+			Nino.adminUi.api.call( 'users/'+ endpoint, payload, callback );
 		},
 
 		/**
@@ -114,11 +118,7 @@
 		 *	@return		void
 		 */
 		_showError : function( container, status, response ) {
-			container.innerHTML = '';
-			const p = dc.createElement('p');
-			p.className = 'nino-admin-error';
-			p.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/users/error/load') );
-			container.appendChild( p );
+			Nino.adminUi.showError( container, status, response, '/_admin/users/error/load' );
 		},
 
 		/**
@@ -174,6 +174,7 @@
 
 			const select = dc.createElement('select');
 			select.id = id;
+			select.name = 'role';
 
 			if( Nino.admin.users._roles.some( function( r ) { return r.id === current } ) === false ) {
 				const none = dc.createElement('option');
@@ -269,6 +270,7 @@
 			const mailInput = dc.createElement('input');
 			mailInput.type = 'email';
 			mailInput.id = 'users-create-mail';
+			mailInput.dataset.field = 'mail';
 			mailInput.required = true;
 			mailInput.autocomplete = 'off';
 			mailLabel.appendChild( mailInput );
@@ -281,6 +283,7 @@
 			const pwInput = dc.createElement('input');
 			pwInput.type = 'password';
 			pwInput.id = 'users-create-pw';
+			pwInput.dataset.field = 'pw';
 			pwInput.required = true;
 			pwInput.minLength = 8;
 			pwInput.autocomplete = 'new-password';
@@ -303,15 +306,16 @@
 			actions.appendChild( saveBtn );
 			const msg = dc.createElement('p');
 			msg.id = 'users-form-msg';
-			msg.setAttribute( 'aria-live', 'polite' );
 			actions.appendChild( msg );
 			form.appendChild( actions );
+			const line = Nino.adminUi.status( msg );
+			line.bind( form );
 			form.addEventListener( 'submit', function( ev ) {
 				ev.preventDefault();
-				msg.textContent = Nino.content.getText('/_admin/users/msg/pending');
+				line.saving();
 				Nino.admin.users._apiCall( 'create', { mail : mailInput.value.trim(), pw : pwInput.value, role : roleSelect.value }, function( status, response ) {
 					if( status !== 200 ) {
-						msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/users/error/create') );
+						line.error( status, response, '/_admin/users/error/create' );
 						return;
 					}
 					// Reload the list and open the account just created
@@ -390,6 +394,7 @@
 			const mailInput = dc.createElement('input');
 			mailInput.type = 'email';
 			mailInput.id = 'users-form-mail';
+			mailInput.dataset.field = 'mail';
 			mailInput.required = true;
 			mailInput.value = user.mail;
 			mailLabel.appendChild( mailInput );
@@ -403,6 +408,7 @@
 			const pwInput = dc.createElement('input');
 			pwInput.type = 'password';
 			pwInput.id = 'users-form-pw';
+			pwInput.dataset.field = 'pw';
 			pwInput.minLength = 8;
 			pwInput.autocomplete = 'new-password';
 			pwLabel.appendChild( pwInput );
@@ -417,6 +423,7 @@
 				const curInput = dc.createElement('input');
 				curInput.type = 'password';
 				curInput.id = 'users-form-currentpw';
+				curInput.dataset.field = 'currentPassword';
 				curInput.required = true;
 				curInput.autocomplete = 'current-password';
 				curLabel.appendChild( curInput );
@@ -448,11 +455,14 @@
 
 			const msg = dc.createElement('p');
 			msg.id = 'users-form-msg';
-			msg.setAttribute( 'aria-live', 'polite' );
 			actions.appendChild( msg );
 
 			form.appendChild( actions );
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.users._save() } );
+
+			// Saved or not, and - for a wrong current password - which field
+			Nino.admin.users._status = Nino.adminUi.status( msg );
+			Nino.admin.users._status.bind( form );
 
 			usersWrap.appendChild( form );
 
@@ -510,10 +520,13 @@
 
 			const msg = dc.createElement('p');
 			msg.id = 'users-role-msg';
-			msg.setAttribute( 'aria-live', 'polite' );
 			actions.appendChild( msg );
 
 			form.appendChild( actions );
+
+			// A line of its own: this form saves on its own, apart from the profile's
+			Nino.admin.users._roleStatus = Nino.adminUi.status( msg );
+			Nino.admin.users._roleStatus.bind( form );
 			form.addEventListener( 'submit', function( ev ) { ev.preventDefault(); Nino.admin.users._saveRole( select ) } );
 
 			wrap.appendChild( form );
@@ -531,19 +544,19 @@
 		_saveRole : function( select ) {
 
 			const user = Nino.admin.users._currentUser;
-			const msg 	= dc.getElementById('users-role-msg');
+			const line = Nino.admin.users._roleStatus;
 
-			msg.textContent = Nino.content.getText('/_admin/users/msg/pending');
+			line.saving();
 
 			Nino.admin.users._apiCall( 'role', { username : user.mail, role : select.value }, function( status, response ) {
 
 				if( status !== 200 ) {
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/users/error/save') );
+					line.error( status, response, '/_admin/users/error/save' );
 					return;
 				}
 
 				user.role = response.role;
-				msg.textContent = Nino.content.getText('/_admin/users/msg/saved');
+				line.saved();
 				Nino.admin.users._renderList( Nino.admin.users._users );
 			} );
 		},
@@ -558,29 +571,36 @@
 			const user = Nino.admin.users._currentUser;
 			const mail = dc.getElementById('users-form-mail').value.trim();
 			const pw 	 = dc.getElementById('users-form-pw').value;
-			const msg 	= dc.getElementById('users-form-msg');
+			const line = Nino.admin.users._status;
 
 			const payload = { username : user.mail, mail : mail, pw : pw };
 
 			if( user.isSelf === true )
 				payload.currentPassword = dc.getElementById('users-form-currentpw').value;
 
-			msg.textContent = Nino.content.getText('/_admin/users/msg/pending');
+			line.saving();
 
 			Nino.admin.users._apiCall( 'save', payload, function( status, response ) {
 
 				if( status !== 200 ) {
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/users/error/save') );
+					line.error( status, response, '/_admin/users/error/save' );
 					return;
 				}
 
 				user.mail = response.mail;
+
+				// The rail names the account the page is for - the api compares a
+				// session it finds later against it
+				const rail = user.isSelf === true ? dc.getElementById('admin-user-email') : null;
+				if( rail !== null )
+					rail.textContent = response.mail;
+
 				dc.getElementById('users-form-pw').value = '';
 				const curInput = dc.getElementById('users-form-currentpw');
 				if( curInput !== null )
 					curInput.value = '';
 
-				msg.textContent = Nino.content.getText('/_admin/users/msg/saved');
+				line.saved();
 				Nino.admin.router.set( 'users', [ user.mail ] );
 
 				// Refresh the list in the background so a renamed mail is reflected there too
@@ -602,10 +622,9 @@
 			if( wn.confirm( Nino.content.getText('/_admin/users/confirm/delete') ) === false )
 				return;
 			const user = Nino.admin.users._currentUser;
-			const msg 	= dc.getElementById('users-form-msg');
 			Nino.admin.users._apiCall( 'delete', { username : user.mail }, function( status, response ) {
 				if( status !== 200 ) {
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/users/error/save') );
+					Nino.admin.users._status.error( status, response, '/_admin/users/error/save' );
 					return;
 				}
 				Nino.admin.users._users = Nino.admin.users._users.filter( function( u ) { return u.mail !== user.mail } );
@@ -624,12 +643,11 @@
 				return;
 
 			const user = Nino.admin.users._currentUser;
-			const msg 	= dc.getElementById('users-form-msg');
 
 			Nino.admin.users._apiCall( 'logoutall', { username : user.mail }, function( status, response ) {
 
 				if( status !== 200 ) {
-					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : Nino.content.getText('/_admin/users/error/save') );
+					Nino.admin.users._status.error( status, response, '/_admin/users/error/save' );
 					return;
 				}
 
@@ -639,7 +657,7 @@
 					return;
 				}
 
-				msg.textContent = Nino.content.getText('/_admin/users/msg/loggedout');
+				Nino.admin.users._status.idle( Nino.content.getText('/_admin/users/msg/loggedout') );
 			} );
 		},
 	};

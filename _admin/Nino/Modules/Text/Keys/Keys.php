@@ -171,12 +171,12 @@ namespace Nino\Modules\Text {
 			$value 		= (string) ( $data['value'] ?? '' );
 
 			if( self::isValidKey( $key ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid key' );
+				\Nino\Http::fail( $request, 400, 'invalid key', 'keys_invalid', [ $key ], 'key' );
 				return;
 			}
 
 			if( \Nino\Text::entry( $appData, $key ) !== null ) {
-				\Nino\Http::fail( $request, 409, 'key already exists' );
+				\Nino\Http::fail( $request, 409, 'key already exists', 'keys_exists', [ $key ], 'key' );
 				return;
 			}
 
@@ -365,7 +365,7 @@ namespace Nino\Modules\Text {
 			$newKey = (string) ( $data['newKey'] ?? '' );
 
 			if( self::isValidKey( $newKey ) === false ) {
-				\Nino\Http::fail( $request, 400, 'invalid new key' );
+				\Nino\Http::fail( $request, 400, 'invalid new key', 'keys_invalid', [ $newKey ], 'newKey' );
 				return;
 			}
 
@@ -392,7 +392,7 @@ namespace Nino\Modules\Text {
 			}
 
 			if( \Nino\Text::entry( $appData, $newKey ) !== null ) {
-				\Nino\Http::fail( $request, 409, 'key already exists' );
+				\Nino\Http::fail( $request, 409, 'key already exists', 'keys_exists', [ $newKey ], 'newKey' );
 				return;
 			}
 

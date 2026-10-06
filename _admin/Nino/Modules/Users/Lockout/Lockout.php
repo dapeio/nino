@@ -153,7 +153,7 @@ namespace Nino\Modules\Users {
 				$value = \Nino\Admin\Admin::cleanInt( $posted[$key], $field );
 
 				if( $value === null ) {
-					\Nino\Http::fail( $request, 400, \Nino\Admin\Admin::typeError( $key, $field ) );
+					\Nino\Admin\Admin::failType( $request, $key, $field );
 					return;
 				}
 

@@ -812,7 +812,7 @@ $panelActions = [
 
 $requests = [];
 foreach( $panelActions as $method => $data )
-	check( $method. ' is 401 without an account', callFeatures( $appData, $method, $data ) === [ 401, [ 'error' => 'not logged in' ] ] );
+	check( $method. ' is 401 without an account', callFeatures( $appData, $method, $data ) === [ 401, [ 'error' => 'not logged in', 'code' => 'session' ] ] );
 
 \Nino\Auth::loginUser( $appData, 'editor@example.com', 'correct horse battery staple' );
 foreach( $panelActions as $method => $data )

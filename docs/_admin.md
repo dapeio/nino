@@ -124,6 +124,9 @@ The rail on the left carries the brand, your account, the settings gear and the 
 - **Settings gear.** Interface language and light or dark colour scheme. The language also selects the content locale the Text and Elements forms open with.
 - **Switching panels** never resets a panel: the Template Builder keeps its unsaved document, an element form its unsaved values, until you save or leave the page. Leaving the Templates panel with unsaved changes asks first.
 
+- **The status line.** The Elements form and the three Users forms (a new account, an account, a role) say what became of the last save at their foot - *Saving …*, *Saved at 09:41.*, *Unsaved changes* as soon as you type again, or why it failed. Typing while a save is on its way leaves *Unsaved changes* behind it, not *Saved*. A refusal names the field it is about and marks it; the next thing you type into the field takes the mark off. The error is said in the interface language, with the limits and values in it (*The password needs at least 8 characters.*) - only a failure Nino has no sentence for shows the server's own message, with its status number in front. A request that never reached the server says so instead of printing a number. The other forms still print a plain *Saved.*, and below a width of about 38 rem a bottom bar hides its status line - an error there shows only after the bar is wide enough again.
+- **A session that ends under an open form.** A session ends after a long idle time or a log out in another tab. The page then asks for a login again, in a dialog over everything you have typed - nothing is lost. Once you are in, what you were doing is sent again. *Close* gives the page back without a login: the requests that waited report their failure in their panel and the forms can be used again, so that what you typed can be copied out before you reload. If another account has logged in in another tab of the same browser in the meantime, the dialog only offers to reload: a form filled in for one account must not be saved by another. If the same account has logged in again in another tab of this browser in the meantime, which replaces the page's token, the page mends itself the same way, without asking for anything.
+
 Whatever panel is open, saving writes the project files immediately. There is no draft state and no separate publish step; check the frontend and every affected language afterwards.
 
 ## Content
@@ -160,6 +163,8 @@ A key that does not appear here is either hidden from editing or technical. Crea
 ### Images
 
 **Images** lists the image slots the developer defined on the **Image Slots** tab, grouped by uri area, with label, shortcode and target dimensions. Choose a file for a slot and start the upload; Nino validates and processes it, rejects an invalid or oversized file, and replaces the current image immediately.
+
+Every upload control says what the server will take, before you choose: *Up to 2 MB and 20 megapixels.* The size is the smallest of three limits - Nino's own 8 MB, PHP's `upload_max_filesize` and PHP's `post_max_size` (0 there means none) - and the pixels are Nino's 20 megapixels: decoding a picture needs about four bytes per pixel, which is what a shared host's memory allows. A file above the limit is refused in the browser, with the reason, before it is sent; a file the browser cannot judge (a format it cannot decode) is left to the server, which names the reason too - larger than 8 MB, more than 20 megapixels, not a JPEG, PNG, WebP or GIF, or larger than PHP lets through (*PHP upload limit: 2 MB*). The last one is a setting of the server, not of Nino: raise `upload_max_filesize` and `post_max_size` in `php.ini` or ask the host.
 
 ### Submissions
 
@@ -373,7 +378,8 @@ Do this in a protected local environment only – a password on a command line m
 |---|---|
 | Login locked after several attempts | Wait out the lockout duration (an hour by default, see **Users › Login protection**); the lock is per account and per address. Behind a reverse proxy, set **Config › Reverse proxies in front of this site**, or every visitor shares one address and one lock. |
 | A panel or a tab is missing | The account lacks its permission, or its module is not active. |
-| Saving fails | Write permissions of the affected file or directory. |
+| Saving fails | The message says why where Nino has a sentence for it (a value out of range, an address already in use, a file over PHP's upload limit). Otherwise: write permissions of the affected file or directory. |
+| A login dialog appears over a form | The session ended; log in again and the request is sent on. *Another account is logged in in another tab* means exactly that: reload the page. |
 | Template missing in **Routes** | Only existing `templates/page-*.tpl` files are offered. |
 | A page cannot be saved in **Templates** | Reload after an external edit, check unique section ids and unmatched `<section>` tags; see the Template Builder's [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md). |
 | Texts or images missing in a scan | Dynamic keys and images are not statically recognizable. |

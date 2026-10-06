@@ -88,4 +88,9 @@ return [
 	'[[/_admin/types/placeholder/inputsize]]'	=> 'Rows of the input (optional)',
 	'[[/_admin/types/placeholder/max]]'	=> 'Max. elements (0 = unlimited)',
 	'[[/_admin/elements/empty]]'					=> 'No element types yet.',
+	'[[/_admin/error/elements_fields_not_allowed]]'	=> 'Your account may not change these fields: %s',
+	'[[/_admin/error/types_invalid_uri]]'	=> 'A type uri starts with a lowercase letter, followed by lowercase letters, digits, hyphens and underscores.',
+	'[[/_admin/error/types_exists]]'	=> 'A type with this uri already exists.',
+	'[[/_admin/error/types_confirm]]'	=> 'Type the uri of the element type to confirm.',
+	'[[/_admin/error/types_referenced]]'	=> 'Other element types still refer to this one (%s). Remove those fields first.',
 ];
