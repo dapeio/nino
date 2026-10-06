@@ -4,7 +4,6 @@
 // workbench's own text/<locale>.php has
 return [
 	'[[/_admin/nav/images]]'				=> 'Images',
-	'[[/_admin/images/label/image]]'				=> 'Image',
 	'[[/_admin/images/label/back]]'				=> 'Back to list',
 	'[[/_admin/images/msg/pending]]'				=> 'Uploading …',
 	'[[/_admin/images/msg/saved]]'					=> 'Saved.',

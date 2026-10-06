@@ -4,7 +4,6 @@
 // Schlüssel und dieselbe Form wie text/<locale>.php der Workbench
 return [
 	'[[/_admin/nav/images]]'				=> 'Bilder',
-	'[[/_admin/images/label/image]]'				=> 'Bild',
 	'[[/_admin/images/label/back]]'				=> 'Zurück zur Liste',
 	'[[/_admin/images/msg/pending]]'				=> 'Wird hochgeladen …',
 	'[[/_admin/images/msg/saved]]'					=> 'Gespeichert.',

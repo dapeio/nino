@@ -4,7 +4,6 @@
 // Schlüssel und dieselbe Form wie text/<locale>.php der Workbench
 return [
 	'[[/_admin/nav/elements]]'			=> 'Elemente',
-	'[[/_admin/elements/label/type]]'			=> 'Typ:',
 	'[[/_admin/elements/label/add]]'				=> 'Neues Element',
 	'[[/_admin/elements/label/uri]]'				=> 'Uri',
 	'[[/_admin/elements/label/uri-hint]]'	=> 'Eindeutige Zeichenfolge (a-z, -, _) zur Identifikation, z. B. „offene-workshops“.',

@@ -4,7 +4,6 @@
 // workbench's own text/<locale>.php has
 return [
 	'[[/_admin/nav/elements]]'			=> 'Elements',
-	'[[/_admin/elements/label/type]]'			=> 'Type:',
 	'[[/_admin/elements/label/add]]'				=> 'New element',
 	'[[/_admin/elements/label/uri]]'				=> 'Uri',
 	'[[/_admin/elements/label/uri-hint]]'	=> 'Unique string (a-z, -, _) used to identify this element, e.g. “open-workshops”.',

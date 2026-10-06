@@ -278,6 +278,11 @@ All notable changes to Nino are documented in this file.
 
 ### Removed
 
+- **Two workbench fills nothing showed:** `/_admin/elements/label/type`
+  ("Type:") and `/_admin/images/label/image` ("Image"), in both locales. No
+  script, template or class read them; a project that overrode one in its own
+  text files keeps a line that is never read.
+
 - **Workbench, Navigations:** the line "The Navigation module is not active"
   above the list of menus, its text `/_admin/navs/inactive` in both languages
   and the `active` field of the `navs/*` answers. The panel exists only while
