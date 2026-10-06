@@ -2433,7 +2433,7 @@ namespace Nino\Install {
 			$users = [];
 
 			foreach( $appData['/nino/auth/user'] ?? [] as $mail => $user )
-				if( is_array( $user ) === true && ( $user['status'] ?? null ) === 2 && is_string( $user['pw'] ?? null ) === true && $user['pw'] !== '' )
+				if( is_array( $user ) === true && ( $user['status'] ?? null ) === \Nino\Auth::STATUS_ACTIVE && is_string( $user['pw'] ?? null ) === true && $user['pw'] !== '' )
 					$users[] = (string) $mail;
 
 			return $users;

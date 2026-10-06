@@ -13,6 +13,11 @@ All notable changes to Nino are documented in this file.
 
 ### Changed
 
+- **Accounts:** the setup wizard's check for a usable admin account compares
+  with `\Nino\Auth::STATUS_ACTIVE` instead of a literal `2`, and `\Nino\Auth`
+  reads the `status` that `getUser()` always fills without a fallback of its
+  own. Nothing changes for any account.
+
 - **Workbench:** the backups and the activity log each answer their one
   directory - `\Nino\Modules\Backups::dirs()` (a list of one) is
   `Backups::dir()` - and read the 403 stub their files are wrapped in from

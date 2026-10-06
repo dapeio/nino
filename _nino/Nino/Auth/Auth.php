@@ -155,16 +155,10 @@ namespace Nino {
 			// nat with it - after maxtries * IP_TRIES_FACTOR clicks. Those
 			// attempts also can't teach an attacker anything; the account is
 			// locked either way.
-			// '?? 0', the way _resumeSession() reads it: any permission held
-			// beside a role is a developer-only, direct-json task by this
-			// class's own account (the Users panel switches an account on and
-			// off, assigns a role and ends sessions, and writes nothing
-			// else), so a record written by hand can plainly be a hash and a
-			// permission list and nothing else - and reading a key that is not
-			// there raises a warning this framework treats as fatal, ie. a 500
-			// on the login form rather than a refusal
-			$cooling	= ( $user !== false && ( $user['status'] ?? 0 ) === self::STATUS_ACTIVE && self::_inCooldown( $appData, $username ) === true );
-			$usable		= ( $user !== false && ( $user['status'] ?? 0 ) === self::STATUS_ACTIVE && $cooling === false );
+			// 'status' is always there: getUser() fills it for every
+			// record, one written by hand without it as disabled
+			$cooling	= ( $user !== false && $user['status'] === self::STATUS_ACTIVE && self::_inCooldown( $appData, $username ) === true );
+			$usable		= ( $user !== false && $user['status'] === self::STATUS_ACTIVE && $cooling === false );
 
 			// Exactly one password_verify() on every path. DUMMY_HASH is a
 			// bcrypt hash of a value nobody holds, at the cost PASSWORD_DEFAULT
@@ -324,7 +318,7 @@ namespace Nino {
 			// this framework treats as fatal, ie. a 500 on the login form
 			// rather than a refusal. Filled in on the way out, once, for
 			// everybody
-			$user['status']		= is_int( $user['status'] ?? null ) === true ? $user['status'] : 0;
+			$user['status']		= is_int( $user['status'] ?? null ) === true ? $user['status'] : self::STATUS_DISABLED;
 			$user['sessions']	= is_array( $user['sessions'] ?? null ) === true ? $user['sessions'] : [];
 
 			return $user;
@@ -737,7 +731,7 @@ namespace Nino {
 			// has no such step, and without this the account stays fully
 			// authorised in every browser still holding a listed token - up
 			// to SESSION_TTL later
-			if( ( $user['status'] ?? 0 ) !== self::STATUS_ACTIVE
+			if( $user['status'] !== self::STATUS_ACTIVE
 				|| ( $user['sessions'][$token]['time'] ?? 0 ) < time() - self::SESSION_TTL ) {
 
 				unset( $appData['/nino/auth/user'][$mail]['sessions'][$token] );
