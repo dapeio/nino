@@ -4,6 +4,8 @@ All notable changes to Nino are documented in this file.
 
 ## Unreleased
 
+## v1.6.0 - 2026-10-06
+
 ### Added
 
 - **Components:** a kernel module, `\Nino\Modules\Components`, always on, where a
