@@ -33,6 +33,7 @@ const elements = {
 	'accounts-add-msg' : { textContent : '' },
 	'accounts-list' : { innerHTML : '', children : [], appendChild : function( child ) { this.children.push( child ) } },
 };
+const csrfField = { value : 'token-the-page-was-rendered-with' };
 
 const sandbox = {
 	console : console,
@@ -40,6 +41,7 @@ const sandbox = {
 		documentElement : null,
 		body : null,
 		getElementById : function( id ) { return elements[id] ?? null },
+		querySelector : function( selector ) { return selector === 'input[name="_csrf"]' ? csrfField : null },
 		createElement : function() { return { className : '', textContent : '', appendChild : function() {} } },
 	},
 };
@@ -88,6 +90,17 @@ answer = { status : 400, response : { error : 'password must be at least 8 chara
 submit( 'admin@example.com', 'short', 'short' );
 check( 'a refusal by the server keeps the typed values', elements['accounts-add-pw'].value === 'short' && elements['accounts-add-pw2'].value === 'short' );
 check( '...and shows the server\'s reason with its status', elements['accounts-add-msg'].textContent === '(400) password must be at least 8 characters' );
+
+// The server signs the account in as it creates it, which rotates the
+// session's csrf token: the page's [csrf] field has to carry the new one,
+// or every request after this one is refused
+answer = { status : 200, response : { users : [ 'admin@example.com' ], csrf : 'the-rotated-token' } };
+submit( 'admin@example.com', 'a-long-enough-password', 'a-long-enough-password' );
+check( 'a created account hands the page the rotated csrf token', csrfField.value === 'the-rotated-token' );
+
+answer = { status : 200, response : { users : [ 'admin@example.com' ] } };
+submit( 'admin@example.com', 'a-long-enough-password', 'a-long-enough-password' );
+check( 'an answer without one leaves the field as it is', csrfField.value === 'the-rotated-token' );
 
 console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
 process.exitCode = failures === 0 ? 0 : 1;

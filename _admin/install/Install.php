@@ -2399,7 +2399,13 @@ namespace Nino\Install {
 		 *	Create (or replace) the root account: the Developer role the Setup
 		 *	step wrote, or - should that step not have run - full access of
 		 *	its own. Can be called more than once in the same wizard run to
-		 *	set up several accounts - see docs/setup.md
+		 *	set up several accounts - see docs/setup.md.
+		 *
+		 *	The account is signed in to this browser's session as it is
+		 *	created - the one moment its password is in hand. Whether that
+		 *	session is kept is decided when the wizard finishes: only the
+		 *	one account of a one-account setup walks into the workbench
+		 *	(see Finish::apiComplete())
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -2432,7 +2438,15 @@ namespace Nino\Install {
 			$role = isset( $appData['/nino/auth/roles']['developer'] ) === true ? 'developer' : '';
 			\Nino\Auth::insertUser( $appData, $mail, $pw, $role === '' ? [ '/*' ] : [], $role );
 
-			\Nino\Http::ok( $request, [ 'users' => self::usableUsers( $appData ) ] );
+			// A refusal here (an ip bucket still cooling down from before the
+			// wizard) costs nothing but the sign-in: the account is created
+			// either way, and the login page takes it after the wizard
+			\Nino\Auth::loginUser( $appData, $mail, $pw );
+
+			// The sign-in rotated the session's csrf token, and the wizard page
+			// still carries the one it was rendered with - every request after
+			// this one would be refused with it. The page is told the new one
+			\Nino\Http::ok( $request, [ 'users' => self::usableUsers( $appData ), 'csrf' => \Nino\Csrf::getToken( $appData ) ] );
 		}
 	}
 
@@ -2466,7 +2480,14 @@ namespace Nino\Install {
 		 *	the password file: without it, deleting one file would re-open
 		 *	the wizard on a live site (see Admin::isInstalled()). Written
 		 *	after the hash, never before - a marker on a project that has no
-		 *	password yet would lock its operator out of both areas at once
+		 *	password yet would lock its operator out of both areas at once.
+		 *
+		 *	Answers { login: bool }: whether this session walks into the
+		 *	workbench. It does when the wizard created exactly one account
+		 *	and that is the one Accounts::apiCreate() signed in - the person
+		 *	who just typed its password is the person at the keyboard. With
+		 *	several accounts the session is ended instead: which of them
+		 *	stays signed in is nobody's decision but the login page's
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -2475,10 +2496,11 @@ namespace Nino\Install {
 		 */
 		public static function apiComplete( array &$appData, array &$request ): void {
 
-			$data = \Nino\Install\Install::postData();
-			$pw 	= (string) ( $data['password'] ?? '' );
+			$data 	= \Nino\Install\Install::postData();
+			$pw 		= (string) ( $data['password'] ?? '' );
+			$users	= \Nino\Install\Accounts::usableUsers( $appData );
 
-			if( count( \Nino\Install\Accounts::usableUsers( $appData ) ) === 0 ) {
+			if( count( $users ) === 0 ) {
 				\Nino\Http::fail( $request, 409, 'create at least one account first' );
 				return;
 			}
@@ -2497,7 +2519,13 @@ namespace Nino\Install {
 
 			\Nino\AppData::writeContentData( $appData, [ '/nino/install/completed' ] );
 
-			\Nino\Http::ok( $request );
+			$current	= \Nino\Auth::getCurrentUser( $appData );
+			$login		= $current !== false && $users === [ $current['mail'] ];
+
+			if( $login === false && $current !== false )
+				\Nino\Auth::logoutUser( $appData );
+
+			\Nino\Http::ok( $request, [ 'login' => $login ] );
 		}
 	}
 }

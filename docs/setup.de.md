@@ -196,6 +196,8 @@ Anzugeben sind:
 
 Beides lässt sich später unter **Nutzer** ändern. Die Konten liegen in der `config.php` unter `/nino/auth/user`.
 
+Jedes Konto wird beim Anlegen in Deinem Browser angemeldet. Ob diese Anmeldung den Assistenten überdauert, entscheidet der letzte Schritt: Bei genau einem Konto öffnet der Abschluss die Workbench mit diesem Konto; bei mehreren beendet er die Sitzung, und `/_admin` fragt, wer Du bist.
+
 ## 6. Finish
 
 Der letzte Schritt setzt das **Recovery-Passwort** und sperrt den Assistenten. Es ist kein Login: `/_admin/recovery.php` fragt danach, wenn die Konten selbst das Problem sind – um eine Sicherung wiederherzustellen, ein Passwort zu setzen oder ein Konto mit Vollzugriff anzulegen –, und die Workbench fragt nur an einer Stelle danach, im Tab Recovery-Passwort von Nutzer, der es ändert (siehe [Recovery](_admin.de.md#recovery)).
@@ -206,7 +208,7 @@ Anzugeben ist:
 
 Sein Hash wird nach `private/.auth/pw.php` geschrieben, und das Projekt wird über `/nino/install/completed` in der `config.php` als installiert markiert. Jedes von beiden allein hält den Assistenten gesperrt; der Verlust der Passwortdatei gibt ihn also nicht wieder frei. Keines von beiden liegt in einem Werkzeugordner, weshalb ein Update `_nino/`, `_admin/` und die Module vollständig ersetzen kann.
 
-Schlägt der Abschluss fehl, prüfe die Schreibrechte des Verzeichnisses `private/`. Nach diesem Schritt liefert `/_admin` die Anmeldung; der Assistent lässt sich nur wieder öffnen, indem `/nino/install/completed` entfernt und das gespeicherte Geheimnis gelöscht wird.
+Schlägt der Abschluss fehl, prüfe die Schreibrechte des Verzeichnisses `private/`. Nach diesem Schritt ist der Assistent gesperrt und lässt sich nur wieder öffnen, indem `/nino/install/completed` entfernt und das gespeicherte Geheimnis gelöscht wird. Eine Einrichtung mit einem Konto geht direkt in die Workbench weiter, mit diesem Konto angemeldet; bei mehreren Konten zeigt der Assistent, wo es weitergeht, und `/_admin` liefert die Anmeldung.
 
 ## Ergebnis prüfen und Assistenten entfernen
 

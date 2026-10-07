@@ -188,6 +188,8 @@ Provide:
 
 Both can be changed later under **Users**. The accounts live in `config.php` under `/nino/auth/user`.
 
+Each account is signed in to your browser as you create it. Whether that sign-in outlives the wizard is decided by the last step: with exactly one account, finishing opens the workbench as that account; with several, finishing ends the session and `/_admin` asks which one you are.
+
 ## 6. Finish
 
 The last step sets the **recovery password** and locks the wizard. It is not a login: `/_admin/recovery.php` asks for it when the accounts themselves are what is broken - to restore a backup, set a password or create an account with full access - and the workbench asks for it in one place only, the Recovery password tab of Users, which changes it (see [Recovery](_admin.md#recovery)).
@@ -198,7 +200,7 @@ Provide:
 
 Its hash is written to `private/.auth/pw.php` and the project is marked installed via `/nino/install/completed` in `config.php`. Either of those alone keeps the wizard locked, so losing the password file does not hand it back. Neither lives in a tool folder, which is what lets an update replace `_nino/`, `_admin/` and the modules wholesale.
 
-If completion fails, check the write permissions of the `private/` directory. After this step, `/_admin` serves the login; the wizard cannot be reopened short of clearing `/nino/install/completed` and removing the stored secret.
+If completion fails, check the write permissions of the `private/` directory. After this step the wizard is locked and cannot be reopened short of clearing `/nino/install/completed` and removing the stored secret. A setup with one account continues straight into the workbench, signed in as that account; with several accounts the wizard shows where to continue and `/_admin` serves the login.
 
 ## Verify the Result and Remove the Wizard
 

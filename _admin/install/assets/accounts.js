@@ -114,6 +114,13 @@
 					return;
 				}
 
+				// The server signed the account in and rotated the csrf token
+				// with it; the [csrf] field is what Nino.http sends from now
+				// on, so it takes the new one
+				const csrf = dc.querySelector( 'input[name="_csrf"]' );
+				if( csrf !== null && typeof response.csrf === 'string' )
+					csrf.value = response.csrf;
+
 				msg.textContent = 'Created.';
 				mail.value = '';
 				pw.value = '';

@@ -4,7 +4,9 @@
  *	Nino										A compact filesystembased php framework
  *	Install									Step 6, the last one: set the recovery password. Success
  *													here is what locks the wizard back out for good - see
- *													_admin/install/Install.php's Finish class.
+ *													_admin/install/Install.php's Finish class. A one-account
+ *													setup goes straight on into the workbench, signed in as
+ *													that account; any other shows where to continue.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -37,6 +39,16 @@
 			Nino.install.apiCall( 'finish/complete', { password : pw.value }, function( status, response ) {
 				if( status !== 200 || response === null ) {
 					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to finish.' );
+					return;
+				}
+
+				// The server kept this session signed in - the one account the
+				// wizard created - so the workbench is the next page, not a
+				// choice. With several accounts it ended the session, and the
+				// panel below offers the login among the next steps
+				if( response.login === true ) {
+					msg.textContent = 'Opening the workbench …';
+					wn.location.href = Nino.dir+ '/_admin/';
 					return;
 				}
 

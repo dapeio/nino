@@ -1321,6 +1321,9 @@ check( 'creates the account', \Nino\Auth::getUser( $appData, 'admin@example.com'
 check( 'the root account holds the Developer role the Setup step wrote, and full access through it', \Nino\Auth::getUser( $appData, 'admin@example.com' )['role'] === 'developer' && \Nino\Auth::getUser( $appData, 'admin@example.com' )['perms'] === [] && \Nino\Auth::checkPermission( $appData, '/_admin/config/manage', 'admin@example.com' ) === true );
 check( 'creating an account leaves every other account as it was', array_diff_key( $appData['/nino/auth/user'], [ 'admin@example.com' => 1 ] ) === $appData['./nino/auth/baseline'] );
 check( 'returns only the newly usable account to the frontend', $createRequest['/nino/http/response']['body']['users'] === [ 'admin@example.com' ] );
+check( 'and signs it in to this session as it is created', ( \Nino\Auth::getCurrentUser( $appData )['mail'] ?? '' ) === 'admin@example.com' );
+check( '...and hands the page the csrf token the sign-in rotated to', ( $createRequest['/nino/http/response']['body']['csrf'] ?? '' ) === \Nino\Csrf::getToken( $appData ) && strlen( $createRequest['/nino/http/response']['body']['csrf'] ) === 64 );
+\Nino\Auth::logoutUser( $appData );
 check( 'the new account can actually authenticate', \Nino\Auth::loginUser( $appData, 'admin@example.com', 'a-long-enough-password' ) !== false );
 \Nino\Auth::logoutUser( $appData );
 
@@ -1404,6 +1407,29 @@ $_POST['data'] = json_encode( [ 'password' => 'a brand new dev password' ] );
 $finishRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 \Nino\Install\Finish::apiComplete( $appData, $finishRequest );
 check( 'apiComplete succeeds once an editor account exists', $finishRequest['/nino/http/response']['statusCode'] === 200 );
+
+/*	Two accounts were created above (admin@ and boundary@), and the last
+	apiCreate() left boundary@ signed in. Which of the two stays signed in
+	is the login page's decision, not the wizard's: the session is ended
+	and the wizard is told so	*/
+check( 'with several accounts the wizard answers login: false', $finishRequest['/nino/http/response']['body'] === [ 'login' => false ] );
+check( '...and the session the Accounts step opened is ended', \Nino\Auth::getCurrentUser( $appData ) === false );
+
+/*	The one-account case: the person who just typed the only password is
+	the person at the keyboard, so that session walks into the workbench	*/
+\Nino\Auth::deleteUser( $appData, 'boundary@example.com' );
+\Nino\Auth::loginUser( $appData, 'admin@example.com', 'a-different-password' );
+$finishOneAccountRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Finish::apiComplete( $appData, $finishOneAccountRequest );
+check( 'with exactly one account, the one signed in, it answers login: true', $finishOneAccountRequest['/nino/http/response']['statusCode'] === 200 && $finishOneAccountRequest['/nino/http/response']['body'] === [ 'login' => true ] );
+check( '...and leaves that session signed in', ( \Nino\Auth::getCurrentUser( $appData )['mail'] ?? '' ) === 'admin@example.com' );
+
+// One account, but nobody signed in (a cooled-down ip, a session that did
+// not survive): the login page is the way in, as before
+\Nino\Auth::logoutUser( $appData );
+$finishSignedOutRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Install\Finish::apiComplete( $appData, $finishSignedOutRequest );
+check( 'with one account and no session it answers login: false', $finishSignedOutRequest['/nino/http/response']['body'] === [ 'login' => false ] );
 
 check( 'the real _admin/Admin.php was not touched', file_get_contents( __DIR__. '/../_admin/Admin.php' ) === $adminBefore );
 

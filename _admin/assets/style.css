@@ -179,6 +179,7 @@
 
 html {
 	-webkit-text-size-adjust: 100%;
+	font-size:15px;
 }
 
 body {
@@ -1442,6 +1443,7 @@ a {
 	display: flex;
 	flex-direction: column;
 	gap: .12rem;
+	font-size:.85rem;
 }
 
 :where(.nino-admin) .nino-admin-checklist label {

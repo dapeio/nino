@@ -4,6 +4,19 @@ All notable changes to Nino are documented in this file.
 
 ## Unreleased
 
+### Added
+
+- **Setup wizard:** a setup with one account continues straight into the
+  workbench. The Accounts step signs each account in as it creates it - the
+  one moment its password is in hand - and the Finish step decides what
+  becomes of that session: exactly one account, and `finish/complete`
+  answers `login: true` and the wizard opens `/_admin` signed in as it;
+  several, and the session is ended, the wizard shows its next steps and
+  `/_admin` serves the login as before. A sign-in the login's own rate limit
+  refuses costs nothing but the shortcut. The sign-in rotates the session's
+  csrf token, so `accounts/create` answers the new one and the page's
+  `[csrf]` field takes it - the wizard's next request is not refused.
+
 ## v1.5.0 - 2026-10-06
 
 ### Added
