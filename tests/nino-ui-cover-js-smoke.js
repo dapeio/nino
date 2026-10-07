@@ -68,7 +68,17 @@ const partialCover = cover( { 'data-cover-width' : '75', 'data-cover-height' : '
 // Detached elements have no containing block to measure. Retaining the
 // viewport fallback keeps the helper deterministic during DOM transitions.
 const detachedCover = cover( { 'data-cover-width' : '50' }, null, {}, 100 );
-const covers = [ railCover, partialCover, detachedCover ];
+
+// A section the Builder wrote opens with .nino-section-bg, a div that lies over
+// the whole cover and is as high as it. Its height is not the content's: the
+// row behind it is, and the cover must not grow by 50px of it on every resize.
+const backgroundCover = cover( { 'data-cover-height' : '50' }, paddedMain, {}, 0 );
+backgroundCover.querySelector = function( selector ) {
+	if( selector === 'div' )
+		return { classList : { contains : function( name ) { return name === 'nino-section-bg'; } }, offsetHeight : 400 };
+	return selector === '.nino-grid-row' ? { offsetHeight : 90 } : null;
+};
+const covers = [ railCover, partialCover, detachedCover, backgroundCover ];
 
 const documentElement = { clientHeight : 800, clientWidth : 1440, scrollLeft : 0, scrollTop : 0, style : {} };
 const body = { classList : classList(), scrollLeft : 0, scrollTop : 0 };
@@ -118,6 +128,10 @@ check( 'cover height remains based on the viewport', railCover.style.height === 
 check( 'custom cover width uses the padded parent content box and precise fixed margins', partialCover.style.width === '618px' );
 check( 'custom cover height remains an independent viewport percentage', partialCover.style.height === '400px' );
 check( 'a detached cover retains the viewport-width fallback', detachedCover.style.width === '720px' );
+
+check( 'a cover that opens with a background block is sized by the viewport, not by the height of that block', backgroundCover.style.height === '400px' );
+ui.onResize();
+check( '...and stays that high when it is sized again', backgroundCover.style.height === '400px' );
 
 railMain.clientWidth = 980;
 documentElement.clientWidth = 1600;

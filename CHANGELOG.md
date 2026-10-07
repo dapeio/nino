@@ -6,6 +6,49 @@ All notable changes to Nino are documented in this file.
 
 ### Added
 
+- **Components:** a kernel module, `\Nino\Modules\Components`, always on, where a
+  shortcode gets a schema. A **component** says where its value comes from -
+  `text`, `image`, `href`, `content` or `none` - and which attributes it has,
+  each with a type (`string`, `int`, `bool`, `select`, `lines`, and `key`,
+  `image` and `href`) and a default; a **stack** loops the elements of one type
+  around its content. `addComponent()` and `addStack()` register them (a
+  component of the same name is replaced, which is how a project changes the
+  markup of one) and refuse a schema that cannot be worked with with an
+  `E_USER_ERROR`; `components()`, `stacks()` and `defaults()` read the
+  registry, `value()` resolves a first argument - a text key, `.id`, `.uri`,
+  a field of the element in a stack, a fixed `text="..."` - escaped and with
+  every `[` written as `&#91;`, `element()` is the element a stack is rendering
+  a cell for, and `renderStack()` is the loop every stack shares. Rendering
+  does not validate: an attribute that is not declared is ignored, a `select`
+  outside its options is the default, and a source that resolves to nothing
+  renders nothing. The kernel brings `[title]`, `[subtitle]`, `[text]`
+  (`format="inline|lines|blocks"`), `[image]`, `[button]`, `[html]` and
+  `[spacer]`, and the stacks `[stack]`, `[slider]`, `[filter]` (with
+  `by="<field>"`) and `[list]`. A stack renders each cell itself, with the
+  element as the context, so the components in it see their element; the loop
+  is the one of `[elements]`, shared as `\Nino\Modules\Elements::queryLoop()`,
+  and `[elements]` is unchanged. A file the Builder writes renders by the
+  kernel alone. See [Components](docs/development.md#components) and the
+  [component recipe](docs/recipes/component.md).
+- **Features:** the manifest keys `components` and `stacks`, `name => schema`,
+  read by the same validation as `addComponent()` and refusing the manifest
+  with the component's name where a schema does not validate. The kernel
+  registers them at every boot while the feature is listed in
+  `/nino/modules` - `\Nino\Features::registerComponents()`, asked by the
+  Components module - with the renderers `[ '\Nino\Modules\<Directory>',
+  'component<Name>' ]` and `stack<Name>`, the name in studly caps. A manifest
+  without the keys is unchanged. The shortcodes belong to the feature.
+- **Nino.css:** `.nino-section-bg`, the picture behind a section in a block of
+  its own before the row (also in a cover and a parallax, where the row is laid
+  out as `.nino-cover-content` is); `.nino-hide-s`, `.nino-hide-m` and
+  `.nino-hide-l`, a column hidden below 768px, from 768px to 1023px and from
+  1024px; `.nino-stack-start`, `-center` and `-end` and `.nino-stack-gap-0` to
+  `-6` on a column, which becomes a grid of its components a gap apart; `.nino-stack`
+  and its cells, the nested row of a stack of elements; `.nino-image` with
+  `--1-1` to `--21-9`, the frame of an `[image]` with a ratio or a focus. A
+  page that uses none of them looks as it did.
+- **Callbacks:** `\Nino\Callbacks::removeCallbacks()`, every callable under a
+  name taken away, for a registration that replaces rather than joins.
 - **Setup wizard:** a setup with one account continues straight into the
   workbench. The Accounts step signs each account in as it creates it - the
   one moment its password is in hand - and the Finish step decides what
@@ -16,6 +59,32 @@ All notable changes to Nino are documented in this file.
   refuses costs nothing but the shortcut. The sign-in rotates the session's
   csrf token, so `accounts/create` answers the new one and the page's
   `[csrf]` field takes it - the wizard's next request is not refused.
+
+### Changed
+
+- **Images:** `[image]` moved from the module `Modules\Images` to `Components`,
+  and the module is gone - nothing else was left in it. The shortcode behaves
+  as it did in every form (`[image hero]`, `[image uri="hero" alt="..."]`, the
+  content form `[image /x]...[/image]`), its markup is
+  `\Nino\Modules\Components::$html['img']` now, and it takes `focus`, `ratio`
+  and `class` and, in a stack, an image field. `\Nino\Images`, the slots and the
+  Images panel stay where they are. `/nino/modules` lists `Components` where it
+  listed `Images`; a `config.php` written before still names `Images`, which
+  is no class any more and is skipped, and the kernel puts `Components` into the
+  list it reads when the file does not name it - where `Images` stood, or else
+  before the first module that is no default, so a project's module that
+  registers a component of a kernel name still boots after the kernel's own and
+  its markup wins.
+- **Shortcodes:** `[title]`, `[subtitle]`, `[text]`, `[button]`, `[html]`,
+  `[spacer]` and the four stacks `[stack]`, `[slider]`, `[filter]` and `[list]`
+  are names the shortcode parser takes now (`[image]` already was one), so a
+  `[[title]]` or `[[text]]` still standing when the shortcodes run - an
+  `[elements]` element that has no such field - renders as `[]` and no longer
+  as the token it was, and a `[[spacer]]` as `[`, a spacer and `]`.
+- **Nino.ui.js:** a cover whose first `div` is the new `.nino-section-bg` is
+  sized by the row behind it. It took the height of the picture block - the
+  cover's own - for its content and grew by 50px at every resize.
+- **Version:** `1.6.0-dev`. The Builder feature that follows asks for `^1.6`.
 
 ## v1.5.0 - 2026-10-06
 

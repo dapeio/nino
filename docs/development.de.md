@@ -431,6 +431,8 @@ Der Handler erhält `first` als `$args[0]`, `3` als `$args['limit']` und den Inh
 
 Die Ausgabe eines Shortcodes wird erneut durch `renderHtml()` geschickt. Deshalb können Templates, Textfills und Shortcodes ineinander verschachtelt werden. Die maximale Render-Tiefe beträgt 20 Ebenen; danach stoppt Nino die weitere Rekursion.
 
+Ein Shortcode, der sagt, was er braucht – eine Quelle für seinen Wert und Attribute mit Typ und Default –, ist eine **Komponente**, und einer, der die Elemente eines Typs um seinen Inhalt herum durchläuft, ein **Stapel**: siehe [Components](#components).
+
 ### Elemente im Template
 
 Die Shortcodes `[element]` und `[elements]` laden strukturierte Inhalte. Innerhalb ihres Blocks werden Felder mit `[[field]]` angesprochen; `[[.id]]` enthält die interne Element-ID.
@@ -529,10 +531,10 @@ Module werden in `/nino/modules` aktiviert. Die Reihenfolge des Arrays ist relev
 | --- | --- | --- |
 | `Assets` | `[assets …]` | bündelt, zwischenspeichert und optional minifiziert CSS/JS |
 | `Cache` | `/nino/http/response`, Priorität 9; `/nino/http/output`, Priorität 9 | beantwortet, solange `/nino/cache/status` an ist, ein anonymes `GET` aus einer gespeicherten Kopie und legt jede fertige Seite ab, die es ablegen darf, mit der `Content-Security-Policy`, mit der sie gesendet wurde; ein Schreibvorgang über `/_admin` verwirft den gesamten Cache |
+| `Components` | `[title]`, `[subtitle]`, `[text]`, `[image]`, `[button]`, `[html]`, `[spacer]`, `[stack]`, `[slider]`, `[filter]`, `[list]` | Shortcodes mit Schema – Komponenten und die Stapel, die Elemente um sie herum durchlaufen – und die Registry, in der beide stehen; `[image …]` erzeugt ein escaped `<img>` aus einem Bildslot oder einer URI. Siehe [Components](#components) unten |
 | `Csrf` | `[csrf]` | rendert ein verstecktes Token-Feld; der Kernschutz selbst ist immer aktiv |
 | `Elements` | `[element …]`, `[elements …]`, `[elementvalues …]` | lädt typisierte Inhalte; Listen unterstützen Query, `sort`, `offset`, `limit` und optionalen Callback, und `[elementvalues]` durchläuft die verschiedenen Werte eines Feldes |
 | `Form` | `POST://.form` | besitzt den einen Formular-Endpunkt und reicht jede Einsendung an `\Nino\Form` weiter – siehe [Formulare](#formulare) |
-| `Images` | `[image …]` | erzeugt ein escaped `<img>` aus einem Bildslot oder einer URI. Sein `alt` ist der für den Slot in der aktuellen Sprache gespeicherte Text, sonst das eigene `alt="…"` des Shortcodes, sonst leer (`alt=""`, dekorativ) – nie die Beschriftung des Slots. Der Text wird escaped und sein `[` als `&#91;` geschrieben, damit er in der nächsten Rendering-Runde keinen Fill und keinen Shortcode öffnen kann. Mit Inhalt – `[image /logo]...[/image]` – wird der Inhalt statt des `<img>` ausgegeben, und nur, wenn der Platz ein Bild hat: `[[src]]` (der Pfad der Datei ab der Wurzel der Seite; `https://[[/project/website/general/url]][[src]]` ist eine absolute Adresse), `[[width]]`, `[[height]]` und `[[alt]]` werden eingesetzt. So fragt ein Meta-Tag oder eine Mail nach der Adresse, ohne leer oder kaputt zu bleiben, wo noch nichts hochgeladen ist. Ein einfaches `[image]` vor dem ersten schließenden `[/image]` eines Templates liest den Text dazwischen als eigenen Inhalt; die Inhaltsform gehört deshalb in ein Template ohne einfaches `[image]` davor, oder das einfache wird als `[image /x][/image]` geschrieben |
 | `Jstext` | `[jstext]` | stellt Textwerte als sicher kodiertes JSON mit CSP-Nonce bereit |
 | `Legal` | `[legal]`, `[privacy]`, die Routen beider Seiten; `/seo/pages`, `/nino/elements/committed` | Impressum und Datenschutzerklärung als Elemente, in der Sprache des Besuchs gezeichnet und aus der Navigation `legal` verlinkt – siehe [Legal](#legal) unten |
 | `Localepicker` | `[localepicker …]` | wechselt Locale über Query und Redirect |
@@ -540,7 +542,7 @@ Module werden in `/nino/modules` aktiviert. Die Reihenfolge des Arrays ist relev
 | `Navigation` | `[navigation …]` | rendert Navigationen aus einer kompakten Zeilensyntax |
 | `Template` | `[template /path/name]` | lädt den Rohinhalt einer `.tpl`-Datei; die gemeinsame Render-Pipeline verarbeitet ihn weiter |
 
-Jedes Modul der Tabelle liegt in `_nino/Nino/Modules/`: die immer aktiven `Assets`, `Cache`, `Csrf`, `Elements`, `Images`, `Jstext` und `Template` und die fünf, die ein Projekt abschalten kann (`Form`, `Legal`, `Localepicker`, `Maintenance`, `Navigation`). `Form` und `Navigation` bringen ihre Workbench-Panels mit (Anfragen, Navigationen), `Maintenance` ist nichts als ein Schalter: Jedes ist genau dann vorhanden, wenn sein Modul aktiv ist. `Form`, `Legal`, `Navigation` und `Localepicker` sind im Einrichtungsassistenten keine Wahl mehr - der Assistent wendet die `install/`-Einheit jedes einzelnen an und trägt seine Klasse bei jedem Durchlauf in `/nino/modules` ein (`\Nino\Install\Setup::ALWAYS_MODULES`), und trägt `Maintenance` ebenso bei jedem Durchlauf ein. Ein Projekt kann jedes der fünf weiterhin von Hand in `/nino/modules` aus- oder einschalten, und `_nino/` bleibt vollständig ersetzbar. Alles jenseits der Tabelle ist ein **Feature** – ein installierbares Paket unter `features/<Name>/` mit einem Manifest `feature.php`, eingeschaltet im Panel Features der Workbench, das sein Panel auf dieselbe Weise mitbringt. Ein Checkout bringt keines mit: Sie kommen aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features) – `Newsletter` (Double-Opt-in, Bestätigung und Abmeldung unter `/.newsletter`) und `Search` (ein sprachabhängiger Fuzzy-Index über Element-Felder) darunter –, nach `features/` kopiert oder aus dem Panel Features installiert. Siehe [Features](features.de.md), [Panels der Workbench](#panels-der-workbench) und [Verzeichnis und Autoloading](#verzeichnis-und-autoloading) weiter unten.
+Jedes Modul der Tabelle liegt in `_nino/Nino/Modules/`: die immer aktiven `Assets`, `Cache`, `Components`, `Csrf`, `Elements`, `Jstext` und `Template` und die fünf, die ein Projekt abschalten kann (`Form`, `Legal`, `Localepicker`, `Maintenance`, `Navigation`). `Form` und `Navigation` bringen ihre Workbench-Panels mit (Anfragen, Navigationen), `Maintenance` ist nichts als ein Schalter: Jedes ist genau dann vorhanden, wenn sein Modul aktiv ist. `Form`, `Legal`, `Navigation` und `Localepicker` sind im Einrichtungsassistenten keine Wahl mehr - der Assistent wendet die `install/`-Einheit jedes einzelnen an und trägt seine Klasse bei jedem Durchlauf in `/nino/modules` ein (`\Nino\Install\Setup::ALWAYS_MODULES`), und trägt `Maintenance` ebenso bei jedem Durchlauf ein. Ein Projekt kann jedes der fünf weiterhin von Hand in `/nino/modules` aus- oder einschalten, und `_nino/` bleibt vollständig ersetzbar. Alles jenseits der Tabelle ist ein **Feature** – ein installierbares Paket unter `features/<Name>/` mit einem Manifest `feature.php`, eingeschaltet im Panel Features der Workbench, das sein Panel auf dieselbe Weise mitbringt. Ein Checkout bringt keines mit: Sie kommen aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features) – `Newsletter` (Double-Opt-in, Bestätigung und Abmeldung unter `/.newsletter`) und `Search` (ein sprachabhängiger Fuzzy-Index über Element-Felder) darunter –, nach `features/` kopiert oder aus dem Panel Features installiert. Siehe [Features](features.de.md), [Panels der Workbench](#panels-der-workbench) und [Verzeichnis und Autoloading](#verzeichnis-und-autoloading) weiter unten.
 
 Einige Details sind absichtlich defensiv gestaltet:
 
@@ -548,6 +550,97 @@ Einige Details sind absichtlich defensiv gestaltet:
 - Die öffentliche Anmeldung des Newsletter-Features aus dem Katalog antwortet unabhängig davon gleich, ob eine Adresse neu oder bereits bekannt ist. Das erschwert die Abfrage fremder Adressen.
 - `Jstext` verwendet JSON-Hex-Escaping und ergänzt die Content-Security-Policy um einen zufälligen Nonce.
 - `Jstext` trägt nur die Textschlüssel, die dafür veröffentlicht wurden, nicht jeden Fill der Seite. Mitgeliefert sind `/module/form/info/`, `/feature/newsletter/info/` und `/template/common/slider/` – was die öffentlichen Skripte lesen –, die Workbench veröffentlicht `/_admin/`. Wer ein eigenes Skript hat, das einen anderen Schlüssel liest, nennt dessen Präfix in `config.php` unter `/nino/jstext/keys`; ein Modul oder Feature ruft `\Nino\Modules\Jstext::publish( $appData, [ '/project/mine/info/' ] )` in seinem `init()`. **Ein veröffentlichter Schlüssel ist öffentlich**: Er steht im Quelltext jeder Seite, die den Block rendert. Vorher stand dort `/project/mail/address/owner` – das Postfach, an das ein Kontaktformular zustellt – auf jeder Seite.
+
+### Components
+
+`Modules\Components` ist der Ort, an dem ein Shortcode ein Schema bekommt. Eine **Komponente** ist ein Shortcode, der sagt, was er braucht – eine Quelle für seinen Wert und einige Attribute mit je einem Typ und einem Default –, damit ein Werkzeug ihn anbieten kann und ein Template trotzdem von Hand geschrieben bleibt. Ein **Stapel** ist eine Komponente, die die Elemente eines Typs um ihren Inhalt herum durchläuft. Beide stehen in einer Registry, die das `init()` des Moduls mit denen des Kernels füllt und der das Manifest eines Features oder das `MyApp` eines Projekts etwas hinzufügt. Das Modul ist immer aktiv, und `[image]` lebt hier, seit es das Modul `Images` verlassen hat, das es nicht mehr gibt.
+
+```php
+\Nino\Modules\Components::addComponent( $appData, 'countdown', [ Countdown::class, 'componentCountdown' ], [
+	'label'      => [ 'en_US' => 'Countdown', 'de_DE' => 'Countdown' ],
+	'source'     => 'text',          // text | image | href | content | none
+	'loop'       => true,            // darf in einem Stapel stehen, wo die Quelle ein Feld sein darf
+	'attributes' => [
+		'style' => [ 'type' => 'select', 'options' => [ '', 'big' ], 'default' => '', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ] ],
+	],
+	'preview'    => 'block',         // title | text | image | button | block | cells
+] );
+```
+
+| Teil | Wirkung |
+| --- | --- |
+| `addComponent( &$appData, $name, $callback, $schema )` | registriert eine Komponente. Sie ruft `\Nino\Html::addShortcode()` mit einem Wrapper um den Callback auf und **ersetzt** eine Komponente oder einen Shortcode gleichen Namens – so ändert ein Projekt das Markup einer Komponente |
+| `addStack( &$appData, $name, $callback, $schema )` | registriert einen Stapel, in einer eigenen Liste |
+| `components( &$appData )`, `stacks( &$appData )` | die Registry, nur lesend: `name => schema`, wie das Modul sie normalisiert hat |
+| `defaults( &$appData, $name, $stack = false )` | der Wert, den jedes Attribut hat, wo ein Shortcode es nicht setzt – aus dem Schema und von nirgends sonst. Immer Strings, wie ein Shortcode sie trägt: Ein Bool ist `'1'` oder `'0'`. Ein Stapel hat neben seinen eigenen die Attribute seines Loops und seines Rasters |
+| `value( &$appData, $source, $kind, $format = 'plain', $fixed = null )` | löst das erste Argument einer Komponente auf – die Tabelle unten |
+| `element( &$appData )` | das Element, für das ein Stapel gerade eine Zelle rendert, `[ 'uri', 'id', 'element', 'model' ]`, sonst `null` |
+| `renderStack( &$appData, $args, $cell )` | der Loop aller Stapel |
+| `escape( $string )` | für HTML-Text oder ein Attribut escaped, jedes `[` als `&#91;` geschrieben – damit schreibt der Renderer einer eigenen Komponente einen eigenen Wert |
+
+**Das Schema.** `label` ist ein String oder eine Locale-Map, und jedes Attribut braucht einen `default`. Ein Attribut ist ein `string`, ein `int` (`min`, `max`), ein `bool`, ein `select` (`options`, eine Liste, mit dem Default darin) oder `lines`, dazu drei Typen, die es nur hier gibt: `key` (ein Textschlüssel), `image` (ein Bildslot) und `href` (ein Schlüssel oder eine Adresse). `label` und `hint` eines Attributs sind optional. `class` ist bei jeder Komponente erlaubt, ohne deklariert zu sein: Der Renderer hängt es ans Ende der Klassen seines äußeren Elements. Ein Stapel sagt `grid => true`, wenn er `cols`, `gap` und `autoheight` annimmt und Zellen zeichnet, und kann `assets` (`css` und `js`, Projektpfade) nennen, damit ein Werkzeug dem Entwickler sagen kann, welche Dateien er braucht – hinzugefügt wird davon nichts. `preview` nennt eines der festen Bilder, als die ein Builder sie zeichnet. Die Namen `value`, `source`, `content`, `text`, `uri` und `grid` sind vergeben, ebenso die Argumente des Loops eines Stapels. **Ein Schema, mit dem das Modul nicht arbeiten kann, wird bei der Registrierung abgelehnt**, mit einem `E_USER_ERROR`, der sagt, warum: ein Name, der kein Slug ist, eine unbekannte `source` oder ein unbekannter Typ, ein `select` ohne Optionen oder mit einem Default außerhalb davon, ein Attribut ohne Default, ein `int` außerhalb seiner Grenzen. Ein Manifest wird ebenso gelesen, bevor es angewendet wird (siehe [Features](features.de.md)). Das Rendern prüft nichts: Ein nicht deklariertes Attribut wird ignoriert, ein `select` außerhalb seiner Optionen ist der Default, eine Zahl, die keine ist, ebenso – eine von Hand geschriebene Datei darf also unvollständig sein und rendert trotzdem.
+
+**Was ein Renderer bekommt.** `public static function componentTitle( array &$appData, array $args ): string`, mit aufbereiteten `$args`: `value` (aufgelöst und escaped), `source` (das erste Argument, wie geschrieben), `content` (was zwischen öffnendem und schließendem Tag steht), jedes Attribut unter seinem Namen – fehlende aus den Defaults, Selects auf ihre Optionen reduziert – und `text`, wo der Shortcode einen festen Wert hatte. Eine Komponente, deren Wert `null` ist – oder leer, wo sie eine Quelle hat –, rendert nichts: Ein leerer Slot ist kein kaputtes Bild und ein fehlendes Feld keine leere Überschrift. Was ein Renderer zurückgibt, wird wie die Ausgabe jedes Shortcodes noch einmal gerendert; deshalb ist `value` schon sicher.
+
+**Quellen.** `value()` ist die eine Stelle, die weiß, was das erste Argument ist:
+
+| Argument | Außerhalb eines Stapels | In einem Stapel |
+| --- | --- | --- |
+| beginnt mit `/` | der Textschlüssel in der aktuellen Sprache über `\Nino\Html::resolveTextfill()`; `null`, wenn er keinen Wert hat | ebenso |
+| `.id`, `.uri` | nichts | die Nummer des Elements im Loop, seine URI (`<typ>/<id>`) |
+| jeder andere Name | nichts (es gibt kein Element) | das Feld dieses Namens am aktuellen Element, nach seinem Typ über `\Nino\Html::fieldValue()` gezeichnet; `null`, wenn das Modell kein solches Feld kennt |
+| `text="..."` statt des ersten Arguments | der feste Wert, escaped | ebenso |
+
+Jeder Wert, der ins HTML gelangt, ist escaped und hat sein `[` als `&#91;` geschrieben, weil die Ausgabe eines Shortcodes noch einmal gerendert wird: Das `[[/key]]` eines Redakteurs darf dort keinen Fill öffnen. Die Art, die eine Komponente deklariert, ändert zwei Dinge. Bei `image` ist der Wert kein Text, sondern der Verweis auf das Bild – die URI eines Slots (`hero`, `/template/page-home/hero/background`) oder in einem Stapel der Dateiname, den ein Bildfeld hält –, der wie Text escaped ist und sich so gefahrlos schreiben lässt; der Renderer sucht das Bild über `\Nino\Images` anhand der URI des Slots (`$args['source']`) oder des Bildfelds des Elements und fragt nach Datei, Größe und Alt-Text. Bei `href` wird ein Schlüssel aufgelöst und eine Adresse durchgereicht (`#contact`, `/contact`, `https://...`), beides escaped, und ein Schema, das nicht `http`, `https`, `mailto` oder `tel` ist – oder eine Adresse, die mit `//` beginnt oder ein Steuerzeichen enthält –, wird zu `#`. Der Wert eines einfachen Schlüssels ist mit seinen Anführungszeichen und Klammern als Entities gespeichert; sie werden vor dem einen Escaping dekodiert, damit Besucher die Zeichen lesen und nicht die Codes. `text` hat das Attribut `format` (`inline`, `lines` oder `blocks`, der Default): Ein Schlüssel wird von `\Nino\Html::sanitizeHtml()` darauf gereinigt, ein Feld behält das Format, das sein Typ vorgibt. `[html]` ist die eine Komponente mit Inhalt statt einer Quelle, und ihr Inhalt gehört dem Template selbst, deshalb bleiben seine `[` stehen.
+
+**Die Komponenten, die der Kernel mitbringt:**
+
+| Komponente | Quelle | Attribute | Rendert |
+| --- | --- | --- | --- |
+| `[title]` | text | `level` 1–4 (2), `style` `loud`/`quiet`, `class` | `<h<n> class="nino-section-title ...">` |
+| `[subtitle]` | text | `style`, `class` | `<p class="nino-section-subtitle ...">` |
+| `[text]` | text | `format`, `style`, `class` | `<div class="nino-section-text ...">`, bei `blocks` mit `nino-richtext` |
+| `[image]` | image | `alt`, `focus` 1–9, `ratio` (`1-1`, `4-3`, `3-2`, `16-9`, `21-9`), `class` | das `<img>` |
+| `[button]` | text (Beschriftung) | `href`, `style` `primary`/`outline`/`light`/`dark`/`brand-alt`, `size` `small`/`big`, `target` `_blank`, `class` | `<a class="nino-btn ...">` |
+| `[html]` | content | – (`class` meldet `defaults()`, es gibt aber kein Element, das es tragen könnte) | der Inhalt als Rich Text, `blocks` |
+| `[spacer]` | none | `size` 1–6 (2) | `<div class="nino-mt-<n>"></div>` |
+
+`[image]` ist der Shortcode, den `Modules\Images` hatte, und er verhält sich in jeder Form wie zuvor. Sein `alt` ist der für den Slot in der aktuellen Sprache gespeicherte Text, sonst das eigene `alt="..."` des Shortcodes, sonst leer (`alt=""`, dekorativ) – nie die Beschriftung des Slots. Der Text wird escaped und sein `[` als `&#91;` geschrieben, damit er in der nächsten Rendering-Runde keinen Fill und keinen Shortcode öffnen kann. Mit Inhalt – `[image /logo]...[/image]` – wird der Inhalt statt des `<img>` gerendert, und nur dann, wenn der Slot ein Bild hat: `[[src]]` (der Pfad der Datei ab dem Wurzelverzeichnis der Website; `https://[[/project/website/general/url]][[src]]` ist eine absolute Adresse), `[[width]]`, `[[height]]` und `[[alt]]` werden gefüllt. So fragt ein Meta-Tag oder eine Mail nach der Adresse, ohne leer oder kaputt zu bleiben, wo noch nichts hochgeladen ist. Ein nacktes `[image]` vor dem ersten schließenden `[/image]` eines Templates liest den Text dazwischen als eigenen Inhalt; halte die Inhaltsform deshalb in einem Template ohne nacktes `[image]` derselben Art davor, oder schreibe das nackte als `[image /x][/image]`. In einem Stapel zeichnet `[image image]` das Bildfeld des Elements: seine Datei, die Größe, die das Feld vorgibt, und den Alt-Text aus dem Feld, das der Typ dafür nennt. Ein `focus`, ein `ratio` oder eine eigene `class` setzt das `<img>` in einen Rahmen, `<div class="nino-image ...">`, der es zuschneidet. Das Markup jeder Komponente ist eine Property, `\Nino\Modules\Components::$html`, darin `$html['img']` – ersetze einen Eintrag oder registriere eine Komponente gleichen Namens.
+
+**Stapel.** Ein Stapel wird mit dem Typ als erstem Argument und der Zelle zwischen seinen Tags geschrieben:
+
+```html
+[stack /services sort="title" limit="6" cols="100 50 50" gap="2" autoheight="1" id="services"]
+    [image image focus="5"]
+    [title title level="3"]
+    [text summary]
+    [button .uri text="Mehr"]
+[/stack]
+```
+
+Jeder Stapel liest den Loop von `[elements]` – `sort`, `offset`, `limit`, `query`, `callback`, `locale` – und eine `id`; mit Raster `cols` (die Breiten in den drei Viewports als Klassen des Rasters – `100 50 33` – oder ein Wert für alle), `gap` (0–6, die Klasse `nino-stack-gap-<n>` an der Row) und `autoheight` (`nino-autoheight` an jeder Zelle, in der Gruppe der `id`). Der Kernel bringt vier:
+
+| Stapel | Zeichnet | Eigene Attribute |
+| --- | --- | --- |
+| `[stack]` | `<div class="nino-grid-row nino-stack ...">` mit einer Zelle je Element | – |
+| `[slider]` | einen `.nino-slider` um ein `<ul>` mit einem `<li>` je Element, dem `Nino.ui.js` seine Bedienelemente und das Wischen gibt; kein Raster | `width` (`75%` oder Pixel: `320px`), `min` |
+| `[filter]` | einen `.nino-filter`: eine Reihe `.nino-filter-btn`-Knöpfe – der erste für alles – und die Zellen, jede mit `.nino-filter-item` und ihrem Wert als `data-filter-item` | `by` (das Feld, dessen Werte die Knöpfe sind, gefunden wie `[elementvalues]` sie findet), `all` (die Beschriftung des ersten Knopfs; leer nimmt den Text `/template/common/filter/all`, sonst das Wort der Seitensprache) |
+| `[list]` | `<ul class="nino-list ...">`, ein `<li>` je Element; kein Raster | `style` `check`/`numbered`/`columns` |
+
+Ein Stapel **rendert jede Zelle selbst**. `[elements]` füllt seinen Inhalt mit `str_replace()` und gibt ihn zurück, damit er danach gerendert wird – dann liefe jede Komponente darin erst nach dem Loop, ohne Element. `renderStack()` setzt das Element als Kontext (`./nino/components/element`, was `element()` zurückgibt), rendert den Inhalt mit `\Nino\Html::renderHtml()`, stellt den vorigen Kontext wieder her und gibt die Zelle an die Funktion, die es bekommen hat: `fn( string $inner, array $element, int $index, array $cell ): string`, wobei `$cell` `[ 'class' => ..., 'attributes' => ... ]` ist – die Klassen der Zelle im Raster und `data-autoheight-group`, beides leer ohne Raster –, damit die Zelle sie an das Element setzt, das sie zeichnet; das tut `\Nino\Modules\Components::cell( $cell, $inner, $class, $attributes )`. Was ein Stapel zurückgibt, enthält keinen Shortcode mehr. Der Loop ist der von `[elements]` – `\Nino\Modules\Elements::queryLoop()`, das beide aufrufen –, also bedeuten `sort`, `offset`, `limit`, `query` und `callback` in beiden dasselbe, und `[elements]` bleibt, wie es ist, für Templates von Hand.
+
+Daraus folgen zwei Regeln. **Ein Stapel steht nie direkt in einem Stapel**: Der Shortcode liest seinen Inhalt bis zum ersten schließenden Tag, und der Kontext ist das Element der einen Zelle. Ein Stapel in einem Template, das ein Stapel einbindet, ist in Ordnung – der Kontext wird zurückgesetzt. Und ein Fill im Argument einer Komponente (`[title "[[/some/key]]"]`) ist keine Quelle: Die Quelle ist der Schlüssel selbst, nicht sein Wert.
+
+```php
+public static function stackSlider( array &$appData, array $args ): string {
+	$cells = \Nino\Modules\Components::renderStack( $appData, $args, static fn( string $inner ): string => '<li>'. $inner. '</li>' );
+	return '<div class="nino-slider">...<ul>'. $cells. '</ul></div>';
+}
+```
+
+**Aus einem Feature.** Ein Manifest, das `components` und `stacks` nennt (siehe [Features](features.de.md#components-und-stacks)), lässt sie bei jedem Boot registrieren, mit den Renderern `[ '\Nino\Modules\<Name>', 'component<Name>' ]` und `stack<Name>`; `MyApp` ruft `addComponent()` in seinem `init()` auf. Eine Komponente wird auf dem einen oder dem anderen Weg registriert, nicht auf beiden: `Html::addShortcode()` fügt neben den ersten einen zweiten Callback, wo `addComponent()` ihn ersetzt. Ein Shortcode ohne Schema bleibt ein Shortcode und ist keine Komponente. [Das Rezept](recipes/component.md) schreibt je eine (nur englisch).
+
+Die Klassen, die das Markup benutzt, stehen in `Nino.css`: `.nino-section-bg` (das Bild hinter einer Section, in einem eigenen Block vor der Row), `.nino-hide-s`, `.nino-hide-m` und `.nino-hide-l` (eine Spalte, unter 768px, von 768px bis 1023px, ab 1024px verborgen), `.nino-stack-start|center|end` und `.nino-stack-gap-0` bis `-6` an einer Spalte (ihre Komponenten untereinander, einen Abstand voneinander – eine Spalte entscheidet sich dafür; andere werden nicht zum Raster) und `.nino-stack` mit seinen Zellen für einen Stapel von Elementen. `nino-img-focus--1` bis `--9` und `.nino-image` mit `--1-1` bis `--21-9` schneiden ein Bild zu.
 
 ### Formulare
 

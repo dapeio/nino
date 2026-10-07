@@ -56,7 +56,7 @@ check( 'every readable manifest is listed, sorted by key', array_keys( $all ) ==
 check( 'a directory whose manifest does not validate is skipped with a warning naming it', isset( $all['broken'] ) === false
 	&& count( array_filter( $warnings, static fn( string $w ): bool => str_contains( $w, '/Broken/feature.php' ) && str_contains( $w, 'version' ) ) ) === 1 );
 check( 'the module class is derived from the directory', $all['sample']['module'] === '\\Nino\\Modules\\Sample' && $all['helper']['module'] === '\\Nino\\Modules\\Helper' );
-check( 'the manifest is normalized: every key present', array_keys( $all['helper'] ) === [ 'key', 'dir', 'module', 'name', 'description', 'manual', 'category', 'maturity', 'version', 'nino', 'php', 'requires', 'data', 'settings', 'active', 'installed', 'update', 'problems' ]
+check( 'the manifest is normalized: every key present', array_keys( $all['helper'] ) === [ 'key', 'dir', 'module', 'name', 'description', 'manual', 'category', 'maturity', 'version', 'nino', 'php', 'requires', 'data', 'settings', 'components', 'stacks', 'active', 'installed', 'update', 'problems' ]
 	&& $all['helper']['nino'] === '*' && $all['helper']['requires'] === [] && $all['helper']['settings'] === [] );
 check( 'nothing is active or recorded on a fresh project', $all['sample']['active'] === false && $all['sample']['installed'] === null && $all['sample']['update'] === false );
 check( 'a compatible feature has no problems', $all['sample']['problems'] === [] && $all['helper']['problems'] === [] );
@@ -138,6 +138,21 @@ check( 'data paths stay below /data/', manifestFails( $manifestDir, 'BadData', [
 	backup, and a restore wrote them back	*/
 check( '...and the data directory itself is not a path below itself', manifestFails( $manifestDir, 'RootData', [ 'name' => 'x', 'version' => '1.0.0', 'data' => [ '/data/' ] ], '"data"' )
 	&& manifestFails( $manifestDir, 'RootData2', [ 'name' => 'x', 'version' => '1.0.0', 'data' => [ '/data//' ] ], '"data"' ) );
+
+// The components and the stacks a manifest declares are read by the schema the
+// Components module registers them by, so a bad one is refused here, with the
+// name of the component, and not when a request renders a page
+$goodComponent = [ 'label' => 'Probe', 'source' => 'text', 'attributes' => [ 'tone' => [ 'type' => 'select', 'options' => [ 'a', 'b' ], 'default' => 'a' ] ] ];
+check( 'components and stacks are a name => schema map', manifestFails( $manifestDir, 'BadComponents', [ 'name' => 'x', 'version' => '1.0.0', 'components' => 'title' ], '"components"' )
+	&& manifestFails( $manifestDir, 'BadStacks', [ 'name' => 'x', 'version' => '1.0.0', 'stacks' => 'rows' ], '"stacks"' ) );
+check( 'a component whose schema does not validate refuses the manifest and names the component', manifestFails( $manifestDir, 'BadComponent', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => [ 'label' => 'x', 'source' => 'weird' ] ] ], 'component "probe": "source"' )
+	&& manifestFails( $manifestDir, 'BadComponentName', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'Not A Slug' => $goodComponent ] ], 'a slug' )
+	&& manifestFails( $manifestDir, 'BadStack', [ 'name' => 'x', 'version' => '1.0.0', 'stacks' => [ 'rows' => [ 'label' => 'x', 'grid' => 'yes' ] ] ], 'stack "rows": "grid"' ) );
+check( 'a manifest that declares them is read complete, the schemas normalized; one that does not has none', \Nino\Features::manifest( writeManifest( $manifestDir, 'WithComponents', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent ], 'stacks' => [ 'rows' => [ 'label' => 'Rows', 'grid' => true ] ] ] ) ) === \Nino\Features::manifest( $manifestDir. '/WithComponents' )
+	&& \Nino\Features::manifest( $manifestDir. '/WithComponents' )['components']['probe']['preview'] === 'block'
+	&& \Nino\Features::manifest( $manifestDir. '/WithComponents' )['components']['probe']['attributes']['tone']['options'] === [ 'a', 'b' ]
+	&& \Nino\Features::manifest( $manifestDir. '/WithComponents' )['stacks']['rows'] === [ 'label' => 'Rows', 'grid' => true, 'preview' => 'cells', 'attributes' => [] ]
+	&& \Nino\Features::manifest( $manifestDir. '/Mini' )['components'] === [] && \Nino\Features::manifest( $manifestDir. '/Mini' )['stacks'] === [] && ninoWarnings() === [] );
 check( 'extensions are names', manifestFails( $manifestDir, 'BadExt', [ 'name' => 'x', 'version' => '1.0.0', 'php' => [ 'ext' => [ 'g d' ] ] ], '"php"' ) );
 
 // The vocabulary is CATEGORIES, the rule is a slug. A feature written for a
@@ -460,6 +475,37 @@ check( 'a shortcode belongs to the feature whose class answers it, a closure inc
 	return \Nino\Features::shortcodes( $appData, 'sample' ) === [ 'sample', 'sample-below', 'sample-scoped', 'sample-string' ]
 		&& \Nino\Features::shortcodes( $appData, 'helper' ) === [ 'other' ] && \Nino\Features::shortcodes( $appData, 'nope' ) === [];
 } )() );
+
+// What the manifest declares becomes shortcodes, once per boot, for the features
+// that are listed in '/nino/modules' and for no other
+echo "Features::registerComponents - the components and stacks of a manifest\n";
+
+check( 'the reference feature declares a component and a stack, a feature without the keys none', array_keys( $all['sample']['components'] ) === [ 'greeting' ] && array_keys( $all['sample']['stacks'] ) === [ 'rows' ]
+	&& $all['helper']['components'] === [] && $all['helper']['stacks'] === [] );
+
+ninoWarnings();
+$declared = ninoSandbox( 'components' );
+$declared['/nino/dir'] = '';
+\Nino\Html::init( $declared );
+$declared['/nino/modules'] = [ '\\Nino\\Modules\\Helper' ];
+\Nino\Features::registerComponents( $declared );
+check( 'a feature that is not listed registers nothing, and one that declares nothing none either', \Nino\Modules\Components::components( $declared ) === [] && \Nino\Modules\Components::stacks( $declared ) === [] && ninoWarnings() === [] );
+
+$declared['/nino/modules'] = [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Sample' ];
+\Nino\Features::registerComponents( $declared );
+check( 'a listed feature\'s components and stacks are registered with the schema of its manifest', array_keys( \Nino\Modules\Components::components( $declared ) ) === [ 'greeting' ] && array_keys( \Nino\Modules\Components::stacks( $declared ) ) === [ 'rows' ]
+	&& \Nino\Modules\Components::components( $declared )['greeting'] === $all['sample']['components']['greeting'] && \Nino\Modules\Components::stacks( $declared )['rows'] === $all['sample']['stacks']['rows']
+	&& \Nino\Modules\Components::defaults( $declared, 'greeting' ) === [ 'shout' => '0', 'class' => '' ] && ninoWarnings() === [] );
+\Nino\Filesystem::putFileContent( $declared, '/text/global.php', [ '[[/feature/sample/greeting/text]]' => 'Hello [there]' ] );
+check( 'the renderer is componentGreeting() of the class: the name in studly caps behind the kind', \Nino\Html::renderHtml( $declared, '[greeting /feature/sample/greeting/text]' ) === '<p class="sample-greeting">Hello &#91;there]</p>'
+	&& \Nino\Html::renderHtml( $declared, '[greeting /feature/sample/greeting/text shout="1"]' ) === '<p class="sample-greeting">HELLO &#91;THERE]</p>' && \Nino\Html::renderHtml( $declared, '[greeting /nope/nope/nope/nope]' ) === '' );
+\Nino\Elements::insertElementType( $declared, '/rowtype', [ 'title' => [ 'type' => 'string', 'locale' => true ] ] );
+\Nino\Elements::insertElement( $declared, '/rowtype/one', [ 'title' => 'One' ], 'de_DE' );
+\Nino\Elements::insertElement( $declared, '/rowtype/two', [ 'title' => 'Two' ], 'de_DE' );
+check( 'a stack of a feature loops the elements through the kernel\'s renderStack()', \Nino\Html::renderHtml( $declared, '[rows /rowtype sort="-title"][greeting title][/rows]' ) === '<div class="sample-rows"><span><p class="sample-greeting">Two</p></span><span><p class="sample-greeting">One</p></span></div>' );
+check( '...and the shortcodes are the feature\'s: the class of the renderer is what says whose they are', \Nino\Features::shortcodes( $declared, 'sample' ) === [ 'greeting', 'rows' ] );
+
+echo "\n";
 
 // The manifest key 'data' is documented as "what a backup carries", and until
 // Backup::manifest() read it, it was not: only two hardcoded literals for the

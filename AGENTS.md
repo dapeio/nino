@@ -2,8 +2,8 @@
 
 This file is the operational specification for AI agents that modify Nino. It
 is intentionally explicit and repetitive enough for small models. Follow it
-before copying patterns from memory or from another framework. The seven
-extension recipes section 7 lists are part of it - five under `docs/recipes/`,
+before copying patterns from memory or from another framework. The eight
+extension recipes section 7 lists are part of it - six under `docs/recipes/`,
 two with the Templates feature in the catalogue.
 
 Nino is a filesystem-based PHP website framework. It has no database, Composer
@@ -76,6 +76,7 @@ Do not use “page”, “template”, “module”, and “admin module” inte
 | --- | --- |
 | Add a screen to the workbench `/_admin` | Panel - answered by a runtime module's `adminPanels()`, or a module directory under `_admin/Nino/Modules/` |
 | Add behavior to public requests or a new shortcode | Runtime module |
+| Add a shortcode that a tool can offer - a source for its value and typed attributes with defaults - or one that loops the elements of a type around its content | Component or stack - `\Nino\Modules\Components::addComponent()` and `addStack()` from a module's `init()`, or the `components` and `stacks` keys of a feature manifest, see the [component recipe](docs/recipes/component.md) |
 | Make a kernel or project module selectable and copyable during the setup wizard | Installer module package |
 | Package an installable feature - a module with a manifest, settings and a version, switched on in the workbench after setup | Feature - `features/<Name>/` with `feature.php`, see the [feature recipe](docs/recipes/feature.md) |
 | Add an insertable visual building block to the Templates panel | Section preset - in the Template Builder feature of the catalogue, not here |
@@ -117,7 +118,7 @@ Important source directories:
 | `_nino/Nino/<Class>/<Class>.php` | The kernel classes and public core APIs: AppData, Auth, Callbacks, Catalogue, Csrf, Features, Fetch, Filesystem, Backup, RotatingLog, Elements, Form, Html, Http, Images, Locales, Text, Mail, Modules, Runtime |
 | `_nino/Nino/Catalogue/Catalogue.php`, `_nino/Nino/Fetch/Fetch.php` | The feature catalogue: `Fetch` is the kernel's one http client (https only, no redirects, a byte cap, stubbed in tests through `./nino/fetch/stub`); `Catalogue` fetches `catalogue.json` and its detached ECDSA signature, verifies it against `PUBLIC_KEY` or `/nino/catalogue/key`, parses format 1, answers `offers()` per key, and `install()`s an archive: re-fetched catalogue, sha256 and size, staging below `data/.features/`, every entry validated, manifest matched, directory replaced. Nothing is fetched unless the Features panel asks. Contract test `tests/catalogue-smoke.php`, no network |
 | `_nino/Nino/Features/Features.php` | The feature contract: discovery below `features/`, manifest validation, version constraints, settings, `activate()`, `deactivate()`, and `applyUnit()` - the unit application the wizard shares (overwrite on there, add-only for a feature). Contract test `tests/features-smoke.php` against `tests/fixtures/features/` |
-| `_nino/Nino/Modules/<Name>/<Name>.php` | Kernel runtime modules: the always-on ones every project needs (Assets, Cache, Csrf, Elements, Images, Jstext, Template) and the optional ones a project switches on or off in `/nino/modules` (`Form`, `Legal`, `Navigation`, `Localepicker`, `Maintenance`). `Legal` - the imprint and the privacy policy as the element types `legal` and `privacy`, `[legal]` and `[privacy]`, per-language runtime routes of both pages, the menu `legal` and the add-only element units of features - is `_nino/Nino/Modules/Legal/`. Replaced wholesale with `_nino/` |
+| `_nino/Nino/Modules/<Name>/<Name>.php` | Kernel runtime modules: the always-on ones every project needs (Assets, Cache, Components, Csrf, Elements, Jstext, Template) and the optional ones a project switches on or off in `/nino/modules` (`Form`, `Legal`, `Navigation`, `Localepicker`, `Maintenance`). `Legal` - the imprint and the privacy policy as the element types `legal` and `privacy`, `[legal]` and `[privacy]`, per-language runtime routes of both pages, the menu `legal` and the add-only element units of features - is `_nino/Nino/Modules/Legal/`. `Components` - the registry of components and stacks, `[title]`, `[subtitle]`, `[text]`, `[image]`, `[button]`, `[html]`, `[spacer]`, `[stack]`, `[slider]`, `[filter]` and `[list]` - is `_nino/Nino/Modules/Components/`; it took `[image]` over from the former `Images` module. Replaced wholesale with `_nino/` |
 | `_nino/Nino/Modules/<Name>/Admin/Admin.php`, `assets/`, `text/`, `templates/`, `install/` | A kernel module's own workbench panel class with its scripts, stylesheets, fills and (for a template panel) its markup, and its installer unit - everything the module brings, in one directory |
 | `features/<Name>/` | An installed feature: `feature.php` (the manifest - key, name, version, the `nino` constraint, `requires`, `settings`, `data`), `<Name>.php` (the class `\Nino\Modules\<Name>`, derived from the directory), `Admin/Admin.php` (its panel), `install/` (the unit `\Nino\Features::activate()` applies add-only), `text/`, `assets/`, `tests/<key>-smoke.php`. A checkout ships none: they come from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) - `Newsletter` and `Search` among them - and are copied in or installed from the Features panel. Denied by `features/.htaccess` and `router.php`; relocated by `NINO_FEATURES_DIR` |
 | `app/<Namespace>/<Class>/<Class>.php` | Project-owned PHP classes and runtime modules; defaults to this root unless `NINO_APP_DIR` is defined before loading the kernel |
@@ -144,7 +145,7 @@ Important source directories:
 | `tests/*-js-smoke.js` | Standalone Node/browser-logic tests |
 | `phpstan.neon`, `phpstan-baseline.neon`, `eslint.config.mjs`, `.editorconfig` | Static analysis and editor defaults. The baseline lists the findings that were open when the check arrived: remove an entry when its finding is fixed, never add one to silence a new finding |
 | `docs/` | Human manuals in English and German |
-| `docs/recipes/` | Five of the seven extension recipes of this guide, English only; the other two travel with the Templates feature, as section 7 lists |
+| `docs/recipes/` | Six of the eight extension recipes of this guide, English only; the other two travel with the Templates feature, as section 7 lists |
 
 Project content and generated destinations:
 
@@ -300,6 +301,8 @@ HTML+ is processed as textfills, then shortcodes, then final render callbacks.
 - Absolute textfill: `[[/template/page-home/main-hero/title]]`
 - Reusable template: `[template /templates/html-header]`
 - Image slot: `[image /template/page-home/main-hero/image alt=""]`
+- Component: `[title /template/page-home/main-hero/title level="1"]` - a shortcode with a schema, its first argument the source of its value
+- Stack: `[stack /services sort="title"]...[/stack]` - a component for a loop, its components reading the fields of the element
 - Element-local field: `[[title]]` only inside `[element]` or `[elements]`
 - CSRF field: `[csrf]`
 
@@ -322,6 +325,23 @@ Escape at the output context:
 Shortcode output is rendered again. If untrusted content can contain `[`, it can
 otherwise become a new fill or shortcode on the next rendering pass. Escape or
 neutralize it for the intended context.
+
+A component is a shortcode with a schema (`\Nino\Modules\Components`), and
+the rules above apply to it unchanged. The kernel resolves its first argument
+through `Components::value()` before the renderer runs, and what that returns is
+escaped for its context and has every `[` written as `&#91;`: **`[` in a
+resolved value is always `&#91;`**, for a text key, a fixed `text="..."`, a field
+of the element in a stack and an address alike. A renderer writes what it made
+itself and what `$args['value']` holds, and escapes the rest with
+`Components::escape()`. Two kinds of source differ in what the value is, and a
+renderer treats them as such: for `image` it is the *reference* to the picture,
+escaped like text - to look up through `\Nino\Images` by `$args['source']`
+(the uri of a slot) or by the image field of the element, and never to write
+as it is; for `content` it is the template's own markup between the tags,
+which is not an editor's value and keeps its `[`. A stack renders each cell itself through
+`Components::renderStack()` and returns html with no shortcode in it; it does not
+fill fields into its content and leave the rendering to the next pass, as
+`[elements]` does.
 
 ### Callback rules
 
@@ -603,7 +623,7 @@ formatting as plain functions — extend and test there, not in the renderer.
 
 ## 7. Recipes
 
-The seven extension recipes are listed below: five live under `docs/recipes/`,
+The eight extension recipes are listed below: six live under `docs/recipes/`,
 the two about section presets and templates with the Templates feature in the
 catalogue. They are part of this
 specification: every rule above applies inside them, and a change to a
@@ -614,6 +634,7 @@ decides which one applies.
 | --- | --- |
 | [Add a panel to the workbench](docs/recipes/admin-panel.md) | a new screen in `/_admin`, as a module panel or a workbench panel |
 | [Add a runtime module](docs/recipes/runtime-module.md) | PHP behaviour at boot, a shortcode, a state-changing endpoint, module configuration |
+| [Add a component](docs/recipes/component.md) | a shortcode with a schema - a component, or a stack that loops the elements of a type - from a project or a feature's manifest |
 | [Add an installer module package](docs/recipes/installer-package.md) | a module the setup wizard can select, copy and configure |
 | [Add a Section Library preset](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/recipe-section-preset.md) | an insertable building block for the Template Builder - the recipe travels with the feature, in the catalogue |
 | [Write templates and installable page units](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/recipe-templates-and-pages.md) | page and reusable `.tpl` templates, header/footer slots, installable page units |
@@ -779,6 +800,8 @@ or escaping.
 | Declare a page-unit file that does not exist | Keep `files` paths unit-relative and test the copied output |
 | Put translated words in IDs/fill keys | Use stable semantic slugs, in the key grammar |
 | Invent a key shape, glue words together (`adress`, `getintouch`) or keep a table of labels | Follow `/<namespace>/<category>/<part>/<name>`; the workbench names the fields from the key |
+| Fill the fields of an element into the content of a stack with `str_replace()` | A stack calls `\Nino\Modules\Components::renderStack()`: the content is rendered once per element, with the element as the context components read |
+| Register a shortcode a tool is meant to offer with `Html::addShortcode()` alone | `Components::addComponent()` or `addStack()`, or the manifest keys `components` and `stacks`; `addShortcode()` adds a second callback beside an existing one, `addComponent()` replaces it |
 | Update only English or German behavioral docs | Keep both manuals synchronized |
 | Test for a new file but not behavior | Assert observable response/data/DOM contracts |
 
@@ -793,6 +816,7 @@ temporary project and must not rely on a previously installed working tree.
 | Changed area | Minimum targeted tests |
 | --- | --- |
 | Kernel, callbacks, rendering, runtime module | `tests/kernel-smoke.php` |
+| The Components module, a component's or a stack's schema, the manifest keys `components` and `stacks` | `tests/kernel-smoke.php` (the registry, the sources, the stacks, the page of the Builder in `tests/fixtures/builder-page-home.tpl`), `tests/features-smoke.php` |
 | Shared writes, locks, logs | `tests/concurrency-smoke.php` plus owner test |
 | Workbench shell, accounts, content panels | `tests/admin-smoke.php` |
 | Structure/system panels, registry contract, recovery | `tests/admin-system-smoke.php` |
@@ -918,6 +942,15 @@ new, and the tests named in section 10 pass.
 - [ ] Shared files use atomic mutation and bounded retention.
 - [ ] Activation, API, shortcode, failure, and concurrency are tested.
 
+### Component done
+
+- [ ] The schema validates: every attribute has a `default`, every `select` its `options` with the default among them; `addComponent()` or `addStack()` raises no `E_USER_ERROR`.
+- [ ] The renderer has the signature `( array &$appData, array $args ): string` and returns what it made itself and `$args['value']` - everything else goes through `Components::escape()`. For `image` the value is an escaped reference to look the picture up by (`$args['source']`), not a filename to write; for `content` it is the template's own markup.
+- [ ] A source that resolves to nothing renders nothing, a hand-written shortcode with an unknown or wrong attribute still renders.
+- [ ] A stack renders through `renderStack()` and leaves no shortcode in what it returns; the cell function takes the cell's grid classes and attributes as its fourth argument and puts them on the cell, `Components::cell()` does that.
+- [ ] Registered one way, by `init()` or by manifest, not both.
+- [ ] The registry, the defaults, a render, a `[` in a value and a refused schema are in a smoke test.
+
 ### Installer module package done
 
 - [ ] The unit is the module's own `install/` directory and its key is a unique slug.
@@ -987,6 +1020,7 @@ Read these before designing a new implementation:
 | --- | --- |
 | Runtime lifecycle/APIs | `docs/development.md`, `_nino/Nino.php` and `_nino/Nino/<Class>/<Class>.php` |
 | Simple shortcode module | `_nino/Nino/Modules/Navigation/Navigation.php` |
+| Components, stacks and their registry | `_nino/Nino/Modules/Components/Components.php`, `tests/kernel-smoke.php` (section "Modules\Components"), `tests/fixtures/features/Sample/` (a feature that declares one of each) |
 | Public validated form | `_nino/Nino/Modules/Form/Form.php` |
 | Privacy-sensitive public flow | the catalogue's [features/Newsletter/Newsletter.php](https://github.com/dapeio/nino-features/blob/main/features/Newsletter/Newsletter.php) |
 | Feature contract and manifests | `_nino/Nino/Features/Features.php`, `tests/fixtures/features/Sample/`, `tests/features-smoke.php`; the published manifests in the catalogue, [features/Newsletter/feature.php](https://github.com/dapeio/nino-features/blob/main/features/Newsletter/feature.php) and [features/Search/feature.php](https://github.com/dapeio/nino-features/blob/main/features/Search/feature.php) |

@@ -349,6 +349,7 @@ p {
  *			.nino-grid-row(--*), .nino-grid(-25, -33, -50, -66, -75, -100)
  *			.nino-grid(-top, -middle, -bottom, -center)
  *			.nino-grid(-s,-m, -l, -xl)(-25, -33, -50, -66, -75, -100)
+ *			.nino-hide-(s, m, l), .nino-stack(-start, -center, -end, -gap-0...6)
  *
  *
  ****************************************************************************************************/
@@ -435,6 +436,78 @@ p {
 	.nino-grid-xl-75 { width: 75%; }
 	.nino-grid-xl-100 { width: 100%; }
 }
+
+/*	Visibility per viewport - what a section written by the Builder says of a
+	column. The three ranges are the ones the widths above end up in: a
+	-s- width applies from 640px and is replaced by the -m- one at 768px, so
+	"s" is everything below 768px, "m" 768px up to 1024px and "l" from there.
+	!important because a column that is a stack sets a display of its own
+	(below), and a class that hides has to win over it wherever it stands	*/
+@media (max-width: 767.98px) {
+	.nino-hide-s { display: none !important; }
+}
+@media (min-width: 768px) and (max-width: 1023.98px) {
+	.nino-hide-m { display: none !important; }
+}
+@media (min-width: 1024px) {
+	.nino-hide-l { display: none !important; }
+}
+
+/*	The stack a column is: its components one below the other with one gap
+	between them, and the room they leave in the column placed at the start,
+	the middle or the end of it. A column opts in with a class of its own - the
+	gap or the placement - rather than every child of a row becoming a grid,
+	which would change what a page that never heard of it looks like: grid
+	items do not collapse their margins, and a link beside a word is two of
+	them. --nino-stack-gap is what the classes set and what a nested stack
+	reads, with the space the theme calls 2 where nobody chose	*/
+.nino-grid-row > .nino-stack-start,
+.nino-grid-row > .nino-stack-center,
+.nino-grid-row > .nino-stack-end,
+.nino-grid-row > [class*="nino-stack-gap-"]:not(.nino-stack) {
+	display: grid;
+	gap: var(--nino-stack-gap, var(--space-2));
+	align-content: start;
+}
+.nino-grid-row > .nino-stack-center { align-content: center; }
+.nino-grid-row > .nino-stack-end { align-content: end; }
+/*	A grid item stretches over its column; a button is as wide as its label,
+	and sits where the column's text does	*/
+.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)) > .nino-btn { justify-self: start; }
+.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-center > .nino-btn { justify-self: center; }
+.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-right > .nino-btn { justify-self: end; }
+
+/*	A stack of elements - the row [stack], [filter] and the rest draw their
+	cells in. The cells are the grid's own, with widths from the classes above;
+	the gap is padding, half of it on every side of a cell, and the row reaches
+	half a gap past its container to take the outer halves back, so that
+	neighbours are one gap apart and the stack's edges are the column's.
+	The row's width is stated, not left to "auto": it also stands in a flex
+	container (.nino-filter), where auto would shrink it to its content.
+	Inside, the pieces of a cell are one below the other, a space apart	*/
+.nino-stack {
+	--nino-stack-gap: var(--space-2);
+	width: calc(100% + var(--nino-stack-gap));
+	max-width: none;
+	margin: calc(var(--nino-stack-gap) / -2);
+	padding: 0;
+}
+.nino-stack > * {
+	display: grid;
+	align-content: start;
+	gap: var(--space-1);
+	padding: calc(var(--nino-stack-gap) / 2);
+}
+.nino-stack > * > .nino-btn { justify-self: start; }
+/*	After .nino-stack, which sets a gap of its own: the class on the same
+	element has to be the later one	*/
+.nino-stack-gap-0 { --nino-stack-gap: 0px; }
+.nino-stack-gap-1 { --nino-stack-gap: var(--space-1); }
+.nino-stack-gap-2 { --nino-stack-gap: var(--space-2); }
+.nino-stack-gap-3 { --nino-stack-gap: var(--space-3); }
+.nino-stack-gap-4 { --nino-stack-gap: var(--space-4); }
+.nino-stack-gap-5 { --nino-stack-gap: var(--space-5); }
+.nino-stack-gap-6 { --nino-stack-gap: var(--space-6); }
 
 /****************************************************************************************************
  *
@@ -1233,6 +1306,24 @@ textarea:disabled {
 .nino-img-focus--7 > img { object-position: left bottom; }
 .nino-img-focus--8 > img { object-position: center bottom; }
 .nino-img-focus--9 > img { object-position: right bottom; }
+/* The frame [image] puts around a picture that has a ratio or a focus: the
+   box takes the shape, the picture covers it, and nino-img-focus-- above
+   decides which part of it is kept */
+.nino-image {
+	position: relative;
+	overflow: hidden;
+}
+.nino-image > img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+.nino-image--1-1 { aspect-ratio: 1 / 1; }
+.nino-image--4-3 { aspect-ratio: 4 / 3; }
+.nino-image--3-2 { aspect-ratio: 3 / 2; }
+.nino-image--16-9 { aspect-ratio: 16 / 9; }
+.nino-image--21-9 { aspect-ratio: 21 / 9; }
 /* A nino-badge placed as a sibling of the img instead of inside it floats
    free in the top-right corner - eg. "New"/a discount/a category label */
 .nino-img-cover > .nino-badge {
@@ -2264,7 +2355,7 @@ header .nino-headernav-logo:empty {
  *
  *			Ensure Nino.ui.js functionality.
  *
- *			.nino-parallex(--dim), .nino-cover(--dim), .nino-slider, .nino-vpa, .nino-preloader
+ *			.nino-parallex(--dim), .nino-cover(--dim), .nino-section-bg, .nino-slider, .nino-vpa, .nino-preloader
  *			.nino-tabs-nav, .nino-tabs-tab, .nino-tabs-panel
  *			.nino-filter-nav, .nino-filter-btn, .nino-filter-count
  *			.nino-modal(--lightbox, --video), .nino-modal-close
@@ -2349,8 +2440,58 @@ header .nino-headernav-logo:empty {
 	box-sizing: border-box;
 }
 
+/*	The picture behind a section, in a block of its own that the section's
+	content follows - what a section the Builder writes has instead of an
+	image directly in the cover. It lies over the whole section and is cut at
+	its edges, the picture covers it, and the content stands above it (and
+	above the scrim of a --dim cover, which sits at 50). A section that is no
+	cover has nothing that makes it the box the picture is placed in, so it
+	becomes one. In a cover or a parallax the content is laid out the way
+	.nino-cover-content is: over the middle, or the top or the bottom where
+	the section says so	*/
+.nino-section-bg {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	z-index: 1;
+}
+.nino-section-bg > img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+.nino-section:has(> .nino-section-bg) {
+	position: relative;
+}
+.nino-section-bg + .nino-grid-row {
+	position: relative;
+	z-index: 101;
+}
+.nino-parallex > .nino-section-bg + .nino-grid-row,
+.nino-cover > .nino-section-bg + .nino-grid-row {
+	position: absolute;
+	top: 50%;
+	left: 0;
+	right: 0;
+	transform: translateY(-50%);
+}
+.nino-parallex.nino-cover-top > .nino-section-bg + .nino-grid-row,
+.nino-cover.nino-cover-top > .nino-section-bg + .nino-grid-row { top: 0; transform: none; }
+.nino-parallex.nino-cover-bottom > .nino-section-bg + .nino-grid-row,
+.nino-cover.nino-cover-bottom > .nino-section-bg + .nino-grid-row { top: auto; bottom: 0; transform: none; }
+.nino-parallex > .nino-section-bg > img {
+	position: absolute;
+	top: 0;
+	left: 0;
+	height: 180%;
+	will-change: transform;
+}
 @media (prefers-reduced-motion: reduce), (pointer: coarse) {
 	.nino-parallex > img { top: 0 !important; height: 100%; transform: none !important; will-change: auto; animation: none; }
+}
+@media (prefers-reduced-motion: reduce), (pointer: coarse) {
+	.nino-parallex > .nino-section-bg > img { top: 0 !important; height: 100%; transform: none !important; will-change: auto; animation: none; }
 }
 
 /* Contentslider */

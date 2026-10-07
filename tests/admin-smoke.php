@@ -1303,7 +1303,7 @@ function callImagesAdmin( array &$appData, string $method, array $data, int $sta
 	return [ $request['/nino/http/response']['statusCode'], $request['/nino/http/response']['body'] ?? null ];
 }
 
-\Nino\Modules\Images::init( $appData );
+\Nino\Modules\Components::init( $appData );
 
 [ $status ] = callImagesAdmin( $appData, 'apiRemove', [ 'uri' => '/nope' ] );
 check( 'removing the image of an unknown slot is a 404', $status === 404 );

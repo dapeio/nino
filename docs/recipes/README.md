@@ -3,7 +3,7 @@
 **Additional Links:**
 [Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Features](../features.md)
 
-Step-by-step recipes for the seven ways Nino is extended. They are the
+Step-by-step recipes for the eight ways Nino is extended. They are the
 practical half of the [agent guide](../../AGENTS.md): that file states the rules
 every change has to keep, a recipe walks one kind of change from the first file
 to its test. Section 3 of the guide, "Choose the correct extension type",
@@ -20,4 +20,5 @@ humans and agents alike, so nobody receives two diverging instructions.
 | [Add a Section Library preset](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/recipe-section-preset.md) | an insertable building block for the Template Builder - travels with the feature |
 | [Write templates and installable page units](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/recipe-templates-and-pages.md) | page and reusable `.tpl` templates, header/footer slots, installable page units - travels with the Template Builder feature |
 | [Define Element types for repeated content](element-types.md) | repeated structured content: model fields, uris, rendering, search |
+| [Add a component](component.md) | a shortcode with a schema - a component, or a stack that loops the elements of a type - registered from a project or declared in a feature's manifest |
 | [Package a feature](feature.md) | a module delivered as one directory under `features/` with a manifest, settings, a version and its own test, switched on in the workbench's Features panel |

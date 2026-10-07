@@ -28,7 +28,7 @@ Die Dokumentation richtet sich primär an selbstständige Webentwickler und klei
 | `_admin.de.md` | `_admin.md` | die Workbench: jedes Panel, Konten, Rollen und Recovery | veröffentlicht |
 | – | – | das Design-Panel und der Template-Baukasten sind seit 1.2 nicht mehr Teil von Nino: `templates.de.md`/`templates.md` liegt beim Feature in [`features/Templates/docs/`](https://github.com/dapeio/nino-features/tree/main/features/Templates/docs), das Aussehen beschreibt die README des Features [`features/Design/`](https://github.com/dapeio/nino-features/blob/main/features/Design/README.md) | ausgelagert |
 | `features.de.md` | `features.md` | Features: das Panel, das Manifest `feature.php`, das Settings-Schema, Aktivierung, Update und Deaktivierung, die Tests eines Features | veröffentlicht |
-| – | `recipes/*.md` | fünf der sieben Erweiterungsrezepte: Panel, Laufzeitmodul, Installer-Paket, Elementtypen, Feature; Section-Preset sowie Templates und Seiten-Units liegen beim Feature Templates in [`features/Templates/docs/`](https://github.com/dapeio/nino-features/tree/main/features/Templates/docs) | veröffentlicht, nur Englisch |
+| – | `recipes/*.md` | sechs der acht Erweiterungsrezepte: Panel, Laufzeitmodul, Komponente, Installer-Paket, Elementtypen, Feature; Section-Preset sowie Templates und Seiten-Units liegen beim Feature Templates in [`features/Templates/docs/`](https://github.com/dapeio/nino-features/tree/main/features/Templates/docs) | veröffentlicht, nur Englisch |
 
 ## Laufende Arbeitsreihenfolge
 

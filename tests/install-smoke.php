@@ -63,7 +63,7 @@ $appData['/nino/locales/available']			= [ 'de_DE' ];
 // The framework's menus, as AppData::init() merges them under every request
 // the wizard answers - the sandbox only runs prepare()
 $appData['/nino/html/navs']								= \Nino\AppData::DEFAULTS['/nino/html/navs'];
-$appData['/nino/modules']								= [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Elements', '\\Nino\\Modules\\Template', '\\Nino\\Modules\\Jstext', '\\Nino\\Modules\\Csrf', '\\Nino\\Modules\\Images' ];
+$appData['/nino/modules']								= [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Elements', '\\Nino\\Modules\\Template', '\\Nino\\Modules\\Jstext', '\\Nino\\Modules\\Csrf', '\\Nino\\Modules\\Components' ];
 
 mkdir( $sandbox. '/private/templates', 0777, true );
 mkdir( $sandbox. '/public/images', 0777, true );
@@ -811,7 +811,7 @@ check( 'seeds the unit\'s image slot into config.php: the native-locale label, 1
 
 check( 'the seeded placeholder carries the slot\'s own name, so an upload replaces it and Remove image deletes it, as for any file the slot wrote', str_starts_with( (string) ( $heroSlot['filename'] ?? '' ), 'template/page-home/fullscreen-image/background.' ) === true
 	&& is_file( __DIR__. '/../_admin/install/library/pages/home/images/demo.jpg' ) === false );
-\Nino\Modules\Images::init( $appData );
+\Nino\Modules\Components::init( $appData );
 \Nino\Modules\Template::init( $appData );
 $homeHtml = \Nino\Html::renderHtml( $appData, '[template /templates/page-home]' );
 check( 'the home template renders the slot as an <img> with its size and an empty alt, and no literal image path', str_contains( $homeHtml, '/images/template/page-home/fullscreen-image/background.svg" width="1920" height="1080" alt="">' ) === true

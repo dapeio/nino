@@ -17,7 +17,7 @@ A Nino project has three kinds of modules, and the difference is who owns the di
 
 | Kind | Where | Who switches it on |
 |---|---|---|
-| **Kernel module** | `_nino/Nino/Modules/<Name>/` - the always-on ones (`Assets`, `Cache`, `Csrf`, `Elements`, `Images`, `Jstext`, `Template`) and the optional ones (`Form`, `Navigation`, `Localepicker`, `Maintenance`) | the setup wizard, or by hand in `/nino/modules` |
+| **Kernel module** | `_nino/Nino/Modules/<Name>/` - the always-on ones (`Assets`, `Cache`, `Components`, `Csrf`, `Elements`, `Jstext`, `Template`) and the optional ones (`Form`, `Navigation`, `Localepicker`, `Maintenance`) | the setup wizard, or by hand in `/nino/modules` |
 | **Feature** | `features/<Name>/`, one directory per feature, with `feature.php` | the Features panel |
 | **Project module** | `app/<Vendor>/…` under a namespace of its own | by hand in `/nino/modules` |
 
@@ -115,8 +115,32 @@ return [
 | `requires` | keys of other features that must be active first; the feature's own key and duplicates are dropped |
 | `settings` | `name => schema`, see [The Settings Schema](#the-settings-schema); a name is a lowerCamel identifier (`/^[a-z][a-zA-Z0-9]*$/`) |
 | `data` | paths below `/data/` the feature owns - what a backup carries and a restore callback merges; `..` is refused |
+| `components` | `name => schema`, see [Components and Stacks](#components-and-stacks): the shortcodes of the feature that have a schema; optional |
+| `stacks` | `name => schema`, the same for the shortcodes that loop the elements of a type around their content; optional |
 
 A localized value - `name`, `description`, a `label`, a `hint`, an option of a `select` - is read through `\Nino\Features::localized( $value, $locale )`: the locale asked for, else `en_US`, else the first entry, else an empty string.
+
+### Components and Stacks
+
+A shortcode a feature brings stays a shortcode, and a builder cannot offer it. Give it a schema and it is a **component**: the kernel's `\Nino\Modules\Components` knows what its first argument is and which attributes it takes, and a tool can list it. A shortcode that loops the elements of one type around its content is a **stack**. Both are declared in the manifest as `name => schema`, with the schema written as [Components](development.md#components) describes it:
+
+```php
+'components'	=> [
+	'countdown'	=> [
+		'label'				=> [ 'en_US' => 'Countdown', 'de_DE' => 'Countdown' ],
+		'source'			=> 'text',
+		'attributes'	=> [
+			'style'			=> [ 'type' => 'select', 'options' => [ '', 'big' ], 'default' => '', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ] ],
+		],
+		'preview'			=> 'block',
+	],
+],
+'stacks'			=> [
+	'gallery'		=> [ 'label' => 'Gallery', 'grid' => true, 'preview' => 'cells' ],
+],
+```
+
+The renderer is not declared but derived, like the class: `[ '\Nino\Modules\<Directory>', 'component<Name>' ]` for a component and `stack<Name>` for a stack, the name in studly caps - `componentCountdown()`, `componentNewsletterSignup()` for `newsletter-signup`, `stackGallery()` - each with the signature `( array &$appData, array $args ): string`. The kernel registers them at every boot while the feature is listed in `/nino/modules`, before the feature's own `init()`; the shortcodes then belong to the feature, as `\Nino\Features::shortcodes()` reads it from the class of the renderer. A renderer the class does not have is said in a warning and left out. A schema that does not validate refuses the whole manifest, with the name of the component in the message. A feature registers a component by manifest or by `\Nino\Modules\Components::addComponent()` in its `init()`, not both. The [component recipe](recipes/component.md) shows each.
 
 ### The Manual
 

@@ -119,7 +119,7 @@ namespace Nino\Modules {
 		 *	Escape a single element field value before it is substituted into a
 		 *	template. Values are editor content, not developer-authored markup -
 		 *	htmlspecialchars() neutralizes raw HTML/script (matches
-		 *	Modules\Images::doShortcode()'s existing pattern), and the extra '['
+		 *	Modules\Components::escape()'s pattern), and the extra '['
 		 *	swap stops an editor-supplied "[[...]]" or "[shortcode]" string from
 		 *	being interpreted when the surrounding content is re-rendered by
 		 *	Html::_doShortcode() right after this callback returns.
@@ -171,17 +171,21 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	Replace elements shortcode
+		 *	The elements an [elements] block - or a stack, see
+		 *	\Nino\Modules\Components::renderStack() - loops over: queried with
+		 *	the shortcode's own arguments, handed to its callback, then cut to
+		 *	the offset and the limit. One place, so that the two read the same
+		 *	arguments the same way
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array			$args					Shortcode arguments
+		 *	@param		array			$args					The arguments of the shortcode: the type uri at 0, and
+		 *																	locale, callback, sort, offset, limit and query
 		 *
-		 *	@return 	string							Rendered html
+		 *	@return 	array										The elements, [] when the type has none
 		 */
-		public static function doShortcodeElements( array &$appData, array $args ): string {
+		public static function queryLoop( array &$appData, array $args ): array {
 
 			$uri			= $args[0] ?? '';
-			$content	= $args['content'] ?? '';
 			$locale 	= $args['locale'] ?? '';
 			$callback	= $args['callback'] ?? '';
 			$sort			= (string) ( $args['sort'] ?? '' );
@@ -194,7 +198,7 @@ namespace Nino\Modules {
 			// is a page of what the callback let through
 			$result = \Nino\Elements::queryElements( $appData, $uri, $queryArr, $locale, [], [ 'sort' => $sort ] );
 			if( $result === [] )
-				return '';
+				return [];
 
 			if( $callback !== '' )
 				\Nino\Callbacks::doCallbacks( $appData, $callback, $result );
@@ -204,6 +208,26 @@ namespace Nino\Modules {
 
 			if( $limit > 0 )
 				$result = array_slice( $result, 0, $limit );
+
+			return $result;
+		}
+
+		/**
+		 *	Replace elements shortcode
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$args					Shortcode arguments
+		 *
+		 *	@return 	string							Rendered html
+		 */
+		public static function doShortcodeElements( array &$appData, array $args ): string {
+
+			$uri			= $args[0] ?? '';
+			$content	= $args['content'] ?? '';
+
+			$result = self::queryLoop( $appData, $args );
+			if( $result === [] )
+				return '';
 
 			$html = '';
 

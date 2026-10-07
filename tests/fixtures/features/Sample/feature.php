@@ -26,4 +26,23 @@ return [
 		'apiKey'	=> [ 'type' => 'secret', 'label' => 'API key' ],
 		'hosts'		=> [ 'type' => 'lines', 'label' => 'Hosts' ],
 	],
+	// A component and a stack, the way a feature declares them: the kernel
+	// registers each as a shortcode whose renderer is componentGreeting() and
+	// stackRows() of the class
+	'components'	=> [
+		'greeting'	=> [
+			'label'				=> [ 'en_US' => 'Greeting', 'de_DE' => 'Begrüßung' ],
+			'source'			=> 'text',
+			'attributes'	=> [
+				'shout'		=> [ 'type' => 'bool', 'default' => false, 'label' => [ 'en_US' => 'Shout', 'de_DE' => 'Rufen' ] ],
+			],
+			'preview'			=> 'text',
+		],
+	],
+	'stacks'			=> [
+		'rows'			=> [
+			'label'				=> [ 'en_US' => 'Rows', 'de_DE' => 'Zeilen' ],
+			'preview'			=> 'block',
+		],
+	],
 ];

@@ -269,7 +269,15 @@
 							marginH		= ( parseFloat( style.getPropertyValue('margin-top') ) || 0 ) + ( parseFloat( style.getPropertyValue('margin-bottom') ) || 0 ),
 							marginW		= ( parseFloat( style.getPropertyValue('margin-left') ) || 0 ) + ( parseFloat( style.getPropertyValue('margin-right') ) || 0 ),
 							contW		= ui._coverContainingWidth( e.cover[i], wW ),
-							wrapH		= e.cover[i].querySelector('div')?.offsetHeight ?? 0;
+							wrap		= e.cover[i].querySelector('div');
+
+						// The background block of a section the Builder wrote is a div as
+						// well, and it lies over the whole cover: its height is the cover's
+						// own, not the content's - which is the row that follows it
+						if( wrap?.classList?.contains( 'nino-section-bg' ) === true )
+							wrap = e.cover[i].querySelector( '.nino-grid-row' );
+
+						let wrapH = wrap?.offsetHeight ?? 0;
 
 						e.cover[i].style.height = Math.max( ( ( wH / 100 * h ) - marginH ), 50 + wrapH ) + 'px';
 						e.cover[i].style.width = ( ( contW * w / 100 ) - marginW ) + 'px';

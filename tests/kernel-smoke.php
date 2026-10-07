@@ -1268,7 +1268,7 @@ check( '...and writes again once it can', \Nino\Images::setSlotFilename( $appDat
 $appData['/nino/html/images']['logo'] = [ 'label' => 'Logo', 'width' => 400, 'height' => 400, 'filename' => null ];
 \Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
 
-\Nino\Modules\Images::init( $appData );
+\Nino\Modules\Components::init( $appData );
 check( '[image] shortcode renders an <img> tag under the public prefix', str_contains( \Nino\Html::renderHtml( $appData, '[image hero]' ), '<img src="/public/images/hero.1600x600.jpg" width="1600" height="600"' ) === true );
 check( '[image] shortcode renders nothing for a slot with no file uploaded yet', \Nino\Html::renderHtml( $appData, '[image logo]' ) === '' );
 check( '[image] shortcode renders nothing for an unknown slot', \Nino\Html::renderHtml( $appData, '[image nope]' ) === '' );
@@ -1297,10 +1297,10 @@ check( 'a decorative picture is written with an empty alt and keeps it', str_con
 	what makes it one place to read and something a project can replace. Proven
 	by replacing it: a project that wants loading="lazy" on every picture sets
 	the entry, and the shortcode renders through it	*/
-$shippedImg = \Nino\Modules\Images::$html['img'];
-\Nino\Modules\Images::$html['img'] = '<img loading="lazy" src="[[src]]" alt="[[alt]]" data-size="[[width]]x[[height]]">';
+$shippedImg = \Nino\Modules\Components::$html['img'];
+\Nino\Modules\Components::$html['img'] = '<img loading="lazy" src="[[src]]" alt="[[alt]]" data-size="[[width]]x[[height]]">';
 $replacedImg = \Nino\Html::renderHtml( $appData, '[image hero]' );
-\Nino\Modules\Images::$html['img'] = $shippedImg;
+\Nino\Modules\Components::$html['img'] = $shippedImg;
 check( 'the <img> fragment is the property, so replacing it replaces what the shortcode renders', $replacedImg === '<img loading="lazy" src="/public/images/hero.1600x600.jpg" alt="" data-size="1600x600">' );
 check( '...and putting the shipped one back renders the shipped markup again', str_starts_with( \Nino\Html::renderHtml( $appData, '[image hero]' ), '<img src="/public/images/hero.1600x600.jpg"' ) === true );
 
@@ -5258,6 +5258,41 @@ check( '...and a key it does carry overrides that default', ( $partial['/nino/ca
 // project that drops a locale has to actually lose it
 check( '...including a list, which is replaced rather than appended to', ( $partial['/nino/locales/available'] ?? null ) === [ 'en_US', 'fr_FR' ] );
 
+// A config.php written before Components: it lists Images, and a project module
+// that registers a component of a kernel name. Components has to stand where
+// Images stood, so that the project's module boots after it and its markup wins
+class KernelSmokeTitleOverride {
+	public static function init( array &$appData ): void {
+		\Nino\Modules\Components::addComponent( $appData, 'title', static fn( array &$appData, array $args ): string => '<b class="mine">'. $args['value']. '</b>', [ 'label' => 'Title', 'source' => 'text' ] );
+	}
+}
+$migrations = [
+	'with Images'		=> [ [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Elements', '\\Nino\\Modules\\Template', '\\Nino\\Modules\\Jstext', '\\Nino\\Modules\\Csrf', '\\Nino\\Modules\\Images', '\\Nino\\Modules\\Cache', '\\KernelSmokeTitleOverride' ], 5 ],
+	'without Images'	=> [ [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Elements', '\\Nino\\Modules\\Cache', '\\KernelSmokeTitleOverride', '\\Nino\\Modules\\Form' ], 3 ],
+];
+foreach( $migrations as $label => [ $modules, $position ] ) {
+
+	$oldRoot = $sandbox. '/oldmodules-'. strlen( $label );
+	mkdir( $oldRoot. '/private', 0777, true );
+	file_put_contents( $oldRoot. '/private/config.php', '<?php return '. var_export( [ '/nino/modules' => $modules ], true ). ';' );
+
+	$old = [ './nino/uid' => $oldRoot ];
+	\Nino\AppData::prepare( $old );
+	$old['./nino/filesystem/path'] 				= $oldRoot;
+	$old['./nino/filesystem/configpath'] 	= $oldRoot. '/private';
+	$old['./nino/filesystem/contentpath'] = $oldRoot. '/private';
+	$old['./nino/filesystem/publicpath'] 	= $oldRoot. '/public';
+	\Nino\AppData::init( $old );
+
+	check( 'a config.php of 1.5 ('. $label. '): Components is listed once, where it takes the place before the project\'s own modules', array_search( '\\Nino\\Modules\\Components', $old['/nino/modules'], true ) === $position
+		&& count( array_keys( $old['/nino/modules'], '\\Nino\\Modules\\Components', true ) ) === 1 && in_array( '\\Nino\\Modules\\Images', $old['/nino/modules'], true ) === false
+		&& array_search( '\\KernelSmokeTitleOverride', $old['/nino/modules'], true ) > $position );
+
+	\Nino\Modules::callModules( $old, 'init' );
+	\Nino\Html::addFills( $old, [ '/t/k' => 'Hi' ], '*' );
+	check( '...and the project\'s [title] is the one that renders', \Nino\Html::renderHtml( $old, '[title /t/k]' ) === '<b class="mine">Hi</b>' );
+}
+
 $bootstrap = '
 	$sandbox = sys_get_temp_dir(). "/nino-handleerror-". bin2hex( random_bytes( 4 ) );
 	mkdir( $sandbox, 0755, true );
@@ -6684,6 +6719,341 @@ check( 'a project\'s page-maintenance.tpl renders with the request fills the ker
 $appData['/nino/maintenance/status'] = false;
 $appData['/nino/cache/status'] = false;
 unset( $appData['/nino/maintenance/retry'] );
+
+echo "\n";
+
+// --- Modules\Components ----------------------------------------------------
+
+echo "Modules\\Components - the registry, the sources, the stacks\n";
+
+// The registry the module's own init() fills, read before the test adds to it
+check( 'the module registers the components of the kernel, in order', array_keys( \Nino\Modules\Components::components( $appData ) ) === [ 'title', 'subtitle', 'text', 'image', 'button', 'html', 'spacer' ] );
+check( '...and its stacks', array_keys( \Nino\Modules\Components::stacks( $appData ) ) === [ 'stack', 'slider', 'filter', 'list' ] );
+check( 'a registered schema is complete and carries its label in both languages', \Nino\Modules\Components::components( $appData )['title']['label'] === [ 'en_US' => 'Title', 'de_DE' => 'Titel' ]
+	&& \Nino\Modules\Components::components( $appData )['title']['source'] === 'text'
+	&& \Nino\Modules\Components::components( $appData )['title']['preview'] === 'title'
+	&& \Nino\Modules\Components::components( $appData )['title']['loop'] === true
+	&& array_keys( \Nino\Modules\Components::components( $appData )['title']['attributes'] ) === [ 'level', 'style' ] );
+check( 'a stack\'s schema says whether it draws a grid', \Nino\Modules\Components::stacks( $appData )['stack']['grid'] === true
+	&& \Nino\Modules\Components::stacks( $appData )['slider']['grid'] === false
+	&& \Nino\Modules\Components::stacks( $appData )['filter']['grid'] === true
+	&& \Nino\Modules\Components::stacks( $appData )['list']['grid'] === false );
+check( 'every component and stack of the kernel is a shortcode', array_diff( [ 'title', 'subtitle', 'text', 'image', 'button', 'html', 'spacer', 'stack', 'slider', 'filter', 'list' ], \Nino\Html::shortcodes( $appData ) ) === [] );
+\Nino\Modules\Components::init( $appData );
+check( 'the module registers again without registering twice - a second init leaves one callback per shortcode', count( \Nino\Callbacks::registered( $appData, '/nino/html/shortcode/title' ) ) === 1
+	&& count( \Nino\Callbacks::registered( $appData, '/nino/html/shortcode/image' ) ) === 1 );
+
+// Defaults come from the schema and nowhere else, as the strings a shortcode carries
+check( 'defaults() are the schema\'s, as strings, with the class every component takes', \Nino\Modules\Components::defaults( $appData, 'title' ) === [ 'level' => '2', 'style' => '', 'class' => '' ]
+	&& \Nino\Modules\Components::defaults( $appData, 'text' )['format'] === 'blocks'
+	&& \Nino\Modules\Components::defaults( $appData, 'spacer' ) === [ 'size' => '2', 'class' => '' ] );
+check( '...a stack has those of the loop, of its grid where it has one, and its own', \Nino\Modules\Components::defaults( $appData, 'stack', true ) === [ 'sort' => '', 'offset' => '0', 'limit' => '0', 'query' => '', 'callback' => '', 'locale' => '', 'id' => '', 'cols' => '100 50 33', 'gap' => '2', 'autoheight' => '0', 'class' => '' ]
+	&& isset( \Nino\Modules\Components::defaults( $appData, 'slider', true )['cols'] ) === false
+	&& \Nino\Modules\Components::defaults( $appData, 'slider', true )['width'] === '75%'
+	&& \Nino\Modules\Components::defaults( $appData, 'filter', true )['autoheight'] === '0' );
+check( '...and nothing for a name that is not registered', \Nino\Modules\Components::defaults( $appData, 'nope' ) === [] && \Nino\Modules\Components::defaults( $appData, 'title', true ) === [] );
+
+// The schema is checked where the component is registered
+$schemaErrors = [];
+// php 8.4 adds a deprecation of its own to every E_USER_ERROR: not what is asked about here
+set_error_handler( static function( int $no, string $message ) use ( &$schemaErrors ): bool { if( $no !== E_DEPRECATED ) $schemaErrors[] = [ $no, $message ]; return true; } );
+$noop = static fn( array &$appData, array $args ): string => '';
+$goodSchema = [ 'label' => 'Probe', 'source' => 'text', 'attributes' => [ 'tone' => [ 'type' => 'select', 'options' => [ 'a', 'b' ], 'default' => 'a' ] ] ];
+$badSchemas = [
+	'a name that is no slug'										=> [ 'Not A Slug', $goodSchema, 'a slug' ],
+	'a schema without a label'									=> [ 'nolabel', [ 'source' => 'text' ], '"label"' ],
+	'a label with an empty language'						=> [ 'emptylabel', [ 'label' => [ 'en_US' => '' ], 'source' => 'text' ], '"label"' ],
+	'a source that is none of the five'					=> [ 'weirdsource', [ 'label' => 'x', 'source' => 'weird' ], '"source" must be one of text, image, href, content, none' ],
+	'a preview that is not one of the pictures'	=> [ 'weirdpreview', [ 'label' => 'x', 'source' => 'text', 'preview' => 'sparkles' ], '"preview"' ],
+	'an attribute of an unknown type'						=> [ 'unknowntype', [ 'label' => 'x', 'source' => 'text', 'attributes' => [ 'tone' => [ 'type' => 'color', 'default' => '#fff' ] ] ], 'unknown type "color"' ],
+	'a select without options'									=> [ 'nooptions', [ 'label' => 'x', 'source' => 'text', 'attributes' => [ 'tone' => [ 'type' => 'select', 'default' => 'a' ] ] ], 'needs "options"' ],
+	'a select whose default is not an option'		=> [ 'baddefault', [ 'label' => 'x', 'source' => 'text', 'attributes' => [ 'tone' => [ 'type' => 'select', 'options' => [ 'a' ], 'default' => 'z' ] ] ], 'not one of the options' ],
+	'an attribute without a default'						=> [ 'nodefault', [ 'label' => 'x', 'source' => 'text', 'attributes' => [ 'tone' => [ 'type' => 'string' ] ] ], 'no "default"' ],
+	'an int outside its own bounds'							=> [ 'badint', [ 'label' => 'x', 'source' => 'text', 'attributes' => [ 'n' => [ 'type' => 'int', 'min' => 1, 'max' => 5, 'default' => 9 ] ] ], 'within its bounds' ],
+	'a bool whose default is no bool'						=> [ 'badbool', [ 'label' => 'x', 'source' => 'text', 'attributes' => [ 'on' => [ 'type' => 'bool', 'default' => 'yes' ] ] ], 'true or false' ],
+	'an attribute the kernel reads itself'			=> [ 'reserved', [ 'label' => 'x', 'source' => 'text', 'attributes' => [ 'content' => [ 'type' => 'string', 'default' => '' ] ] ], 'reads itself' ],
+	'an attribute that is no identifier'				=> [ 'badname', [ 'label' => 'x', 'source' => 'text', 'attributes' => [ 'Not-Camel' => [ 'type' => 'string', 'default' => '' ] ] ], 'lowerCamel' ],
+];
+foreach( $badSchemas as $what => [ $name, $schema, $why ] ) {
+	$schemaErrors = [];
+	\Nino\Modules\Components::addComponent( $appData, $name, $noop, $schema );
+	check( 'addComponent() refuses '. $what. ' with an E_USER_ERROR that says why, and registers nothing', count( $schemaErrors ) === 1 && $schemaErrors[0][0] === E_USER_ERROR
+		&& str_contains( $schemaErrors[0][1], $why ) === true && isset( \Nino\Modules\Components::components( $appData )[$name] ) === false );
+}
+$schemaErrors = [];
+\Nino\Modules\Components::addStack( $appData, 'badstack', $noop, [ 'label' => 'x', 'grid' => 'yes' ] );
+check( 'addStack() refuses a stack whose "grid" is no bool', count( $schemaErrors ) === 1 && $schemaErrors[0][0] === E_USER_ERROR && isset( \Nino\Modules\Components::stacks( $appData )['badstack'] ) === false );
+$schemaErrors = [];
+\Nino\Modules\Components::addStack( $appData, 'loopattr', $noop, [ 'label' => 'x', 'attributes' => [ 'sort' => [ 'type' => 'string', 'default' => '' ] ] ] );
+check( '...and one that declares an attribute of the loop as its own', count( $schemaErrors ) === 1 && str_contains( $schemaErrors[0][1], 'reads itself' ) === true );
+$schemaErrors = [];
+\Nino\Modules\Components::addStack( $appData, 'badassets', $noop, [ 'label' => 'x', 'assets' => [ 'css' => [ '../x.css' ] ] ] );
+check( '...and one whose assets climb out of the project', count( $schemaErrors ) === 1 && str_contains( $schemaErrors[0][1], 'assets' ) === true );
+restore_error_handler();
+check( 'the registry was left alone by every refusal', array_keys( \Nino\Modules\Components::components( $appData ) ) === [ 'title', 'subtitle', 'text', 'image', 'button', 'html', 'spacer' ]
+	&& array_keys( \Nino\Modules\Components::stacks( $appData ) ) === [ 'stack', 'slider', 'filter', 'list' ] );
+check( 'a schema that validates is returned complete, a stack with its assets', \Nino\Modules\Components::validate( 'rows', [ 'label' => 'Rows', 'grid' => true, 'assets' => [ 'css' => [ '/features/Rows/assets/rows.css' ] ] ], true ) === [
+	'label' => 'Rows', 'grid' => true, 'preview' => 'cells', 'attributes' => [], 'assets' => [ 'css' => [ '/features/Rows/assets/rows.css' ] ],
+] );
+check( 'a clean schema validates again as it is - what a manifest hands over after Features::manifest() has read it', \Nino\Modules\Components::validate( 'title', \Nino\Modules\Components::components( $appData )['title'] ) === \Nino\Modules\Components::components( $appData )['title']
+	&& \Nino\Modules\Components::validate( 'filter', \Nino\Modules\Components::stacks( $appData )['filter'], true ) === \Nino\Modules\Components::stacks( $appData )['filter'] );
+\Nino\Callbacks::registerCallback( $appData, '/test/removable', static fn( array &$appData, mixed &$args ): string => 'x' );
+\Nino\Callbacks::registerCallback( $appData, '/test/removable', static fn( array &$appData, mixed &$args ): string => 'y' );
+check( 'Callbacks::removeCallbacks() takes every callable under a name away, and only those', count( \Nino\Callbacks::registered( $appData, '/test/removable' ) ) === 2
+	&& ( static function() use ( &$appData ): bool {
+		\Nino\Callbacks::removeCallbacks( $appData, '/test/removable' );
+		return \Nino\Callbacks::registered( $appData, '/test/removable' ) === [] && count( \Nino\Callbacks::registered( $appData, '/nino/html/shortcode/title' ) ) === 1;
+	} )() );
+
+// What the pages below read: an element type with the fields a stack draws, two
+// elements - one with a title that tries to be markup and a summary with a fill
+// in it - the slots of a hero, and the texts
+$appData['/nino/dir'] = '';
+\Nino\Elements::insertElementType( $appData, '/services', [
+	'title'			=> [ 'type' => 'string', 'locale' => true ],
+	'summary'		=> [ 'type' => 'string', 'locale' => true, 'html' => true, 'blocks' => true ],
+	'category'	=> [ 'type' => 'string', 'options' => [ 'web', 'app' ] ],
+	'image'			=> [ 'type' => 'image', 'width' => 400, 'height' => 300, 'alt' => 'imageAlt' ],
+	'imageAlt'	=> [ 'type' => 'string', 'locale' => true ],
+] );
+\Nino\Elements::insertElement( $appData, '/services/web', [ 'title' => 'Web <b>[x]</b>', 'summary' => 'Hello [[/k]] [button x]', 'category' => 'web', 'image' => 'services/web/image.webp', 'imageAlt' => 'Alt "q"' ], 'de_DE' );
+\Nino\Elements::insertElement( $appData, '/services/app', [ 'title' => 'App', 'summary' => 'Two', 'category' => 'app' ], 'de_DE' );
+$appData['/nino/html/images']['/template/page-home/hero/background'] = [ 'label' => 'Hero', 'width' => 1600, 'height' => 900, 'filename' => 'bg.1600x900.jpg' ];
+$appData['/nino/html/images']['/template/page-home/hero/empty'] = [ 'label' => 'Empty', 'width' => 10, 'height' => 10, 'filename' => null ];
+\Nino\Html::addFills( $appData, [
+	'/template/page-home/hero/title'			=> 'Hi [there]',
+	'/template/page-home/hero/subtitle'		=> 'Sub',
+	'/template/page-home/services/title'	=> 'Services',
+	'/template/page-home/services/text'		=> '<p>One</p><ul><li>a</li></ul>',
+	'/template/page-home/contact/title'		=> 'Contact',
+	'/template/page-home/empty/title'			=> '',
+	'/_nino/webpage/contact/name'					=> 'Contact us',
+	'/_nino/webpage/contact/uri'					=> '/contact',
+], '*' );
+\Nino\Filesystem::putFileContent( $appData, '/templates/html-header.tpl', '<header>Header</header>' );
+\Nino\Filesystem::putFileContent( $appData, '/templates/html-footer.tpl', '<footer>Footer</footer>' );
+
+$render = static function( string $html ) use ( &$appData ): string {
+	return \Nino\Html::renderHtml( $appData, $html );
+};
+
+// value(): the table of the sources, one row at a time. Outside a stack first
+check( 'value(): a key is its text in the current language, escaped, with its [ written as &#91;', \Nino\Modules\Components::value( $appData, '/template/page-home/hero/title', 'text' ) === 'Hi &#91;there]' );
+check( 'value(): a key nobody wrote is null - and one that is empty is empty, where a component then renders nothing', \Nino\Modules\Components::value( $appData, '/template/page-home/nope/title', 'text' ) === null
+	&& \Nino\Modules\Components::value( $appData, '/template/page-home/empty/title', 'text' ) === '' );
+check( 'value(): .id, .uri and a field name mean nothing without a stack', \Nino\Modules\Components::value( $appData, '.id', 'text' ) === null && \Nino\Modules\Components::value( $appData, '.uri', 'text' ) === null
+	&& \Nino\Modules\Components::value( $appData, 'title', 'text' ) === null && \Nino\Modules\Components::element( $appData ) === null );
+check( 'value(): text="..." is the value instead of the argument - escaped, and its [ written as &#91;', \Nino\Modules\Components::value( $appData, '', 'text', 'plain', '<b>"Go" [now' ) === '&lt;b&gt;&quot;Go&quot; &#91;now'
+	&& \Nino\Modules\Components::value( $appData, '/template/page-home/hero/title', 'text', 'plain', 'fixed' ) === 'fixed' );
+check( 'value(): a key read as a format is sanitized to it, not escaped', \Nino\Modules\Components::value( $appData, '/template/page-home/services/text', 'text', 'blocks' ) === '<p>One</p><ul><li>a</li></ul>'
+	&& \Nino\Modules\Components::value( $appData, '/template/page-home/services/text', 'text', 'inline' ) === 'One a' );
+check( 'value(): no argument is nothing, and a component without a source says its piece anyway', \Nino\Modules\Components::value( $appData, '', 'text' ) === null && \Nino\Modules\Components::value( $appData, '', 'none' ) === '' );
+check( 'value(): an address passes, a scheme that is none a link may take does not, nor does a protocol-relative one',
+	\Nino\Modules\Components::value( $appData, '#top', 'href' ) === '#top'
+	&& \Nino\Modules\Components::value( $appData, 'https://example.com/a?b=1&c=2', 'href' ) === 'https://example.com/a?b=1&amp;c=2'
+	&& \Nino\Modules\Components::value( $appData, 'mailto:a@example.com', 'href' ) === 'mailto:a@example.com'
+	&& \Nino\Modules\Components::value( $appData, 'javascript:alert(1)', 'href' ) === '#'
+	&& \Nino\Modules\Components::value( $appData, '//evil.example', 'href' ) === '#'
+	&& \Nino\Modules\Components::value( $appData, '/_nino/webpage/contact/uri', 'href' ) === '/contact'
+	&& \Nino\Modules\Components::value( $appData, '/not-a-key', 'href' ) === '/not-a-key' );
+check( 'value(): a fixed text="..." of an href source is checked like a key', \Nino\Modules\Components::value( $appData, '', 'href', 'plain', 'javascript:alert(1)' ) === '#'
+	&& \Nino\Modules\Components::value( $appData, '', 'href', 'plain', '/contact' ) === '/contact' );
+check( 'value(): a control character in front of a scheme - a browser drops it before it reads the address - is a #, wherever in the address it stands',
+	\Nino\Modules\Components::value( $appData, "\x01javascript:alert(1)", 'href' ) === '#'
+	&& \Nino\Modules\Components::value( $appData, "\x1fjavascript:alert(1)", 'href' ) === '#'
+	&& \Nino\Modules\Components::value( $appData, "\x08 javascript:alert(1)", 'href' ) === '#'
+	&& \Nino\Modules\Components::value( $appData, "/a\x7fb", 'href' ) === '#'
+	&& \Nino\Modules\Components::value( $appData, "java\tscript:alert(1)", 'href' ) === '#'
+	&& \Nino\Modules\Components::value( $appData, "\x01#top", 'href' ) === '#'
+	&& \Nino\Modules\Components::value( $appData, '\\\\evil.example', 'href' ) === '#' );
+
+// A plain value as the panels store it: through Text::sanitizeValue(), with its
+// quotes and brackets as entities. A visitor has to read the characters
+\Nino\Html::addFills( $appData, [
+	'/template/page-home/stored/title'	=> \Nino\Text::sanitizeValue( 'Let\'s talk about "us" [today]', 'plain' ),
+	'/template/page-home/stored/link'		=> \Nino\Text::sanitizeValue( '/a?b="c"&d=1', 'plain' ),
+], '*' );
+check( 'value(): a stored plain value is decoded before it is escaped once, not escaped on top of its entities', \Nino\Modules\Components::value( $appData, '/template/page-home/stored/title', 'text' ) === 'Let&#039;s talk about &quot;us&quot; &#91;today]'
+	&& \Nino\Modules\Components::value( $appData, '/template/page-home/stored/link', 'href' ) === '/a?b=&quot;c&quot;&amp;d=1' );
+check( '[title] and a [button] label of a stored value show the characters', $render( '[title /template/page-home/stored/title]' ) === '<h2 class="nino-section-title">Let&#039;s talk about &quot;us&quot; &#91;today]</h2>'
+	&& $render( '[button /template/page-home/stored/title href="#x"]' ) === '<a class="nino-btn" href="#x">Let&#039;s talk about &quot;us&quot; &#91;today]</a>' );
+
+// Two components written the way a project's own are: one that says what it
+// sees, one that reads value() inside a stack
+\Nino\Modules\Components::addComponent( $appData, 'probe', static function( array &$appData, array $args ): string {
+	$element = \Nino\Modules\Components::element( $appData );
+	return $element === null ? 'outside' : 'inside:'. $element['uri']. '#'. $element['id']. '#'. $element['element']['.uri']. '#'. ( $element['model']['title']['type'] ?? '-' );
+}, [ 'label' => 'Probe', 'source' => 'none' ] );
+\Nino\Modules\Components::addComponent( $appData, 'values', static function( array &$appData, array $args ): string {
+	$value = \Nino\Modules\Components::value( $appData, $args['of'], $args['kind'] );
+	return '<i>'. ( $value === null ? 'NULL' : $value ). '</i>';
+}, [ 'label' => 'Values', 'source' => 'none', 'attributes' => [
+	'of'		=> [ 'type' => 'string', 'default' => '' ],
+	'kind'	=> [ 'type' => 'select', 'options' => [ 'text', 'image', 'href' ], 'default' => 'text' ],
+] ] );
+
+check( 'the loop context: a component in a stack sees its element, its place and the type\'s model', $render( '[stack /services sort="title" gap="1"][probe][/stack]' ) === '<div class="nino-grid-row nino-stack nino-stack-gap-1">'
+	. '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33">inside:/services#0#/services/app#string</div>'
+	. '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33">inside:/services#1#/services/web#string</div></div>' );
+check( '...and after the stack it does not: the context is gone, and a component outside sees none', \Nino\Modules\Components::element( $appData ) === null && $render( '[probe]' ) === 'outside' );
+
+\Nino\Filesystem::putFileContent( $appData, '/templates/probe-stack.tpl', '[stack /services sort="title" limit="1"][probe][/stack]' );
+check( 'a stack in a template that a stack includes leaves the outer one as it found it', $render( '[stack /services sort="title" gap="1"][template /templates/probe-stack][probe][/stack]' ) === '<div class="nino-grid-row nino-stack nino-stack-gap-1">'
+	. '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><div class="nino-grid-row nino-stack nino-stack-gap-2"><div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33">inside:/services#0#/services/app#string</div></div>inside:/services#0#/services/app#string</div>'
+	. '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><div class="nino-grid-row nino-stack nino-stack-gap-2"><div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33">inside:/services#0#/services/app#string</div></div>inside:/services#1#/services/web#string</div></div>'
+	&& \Nino\Modules\Components::element( $appData ) === null );
+
+// value() inside a stack: a field after its type, .id, .uri, and what the model does not know
+check( 'value(): in a stack, a field is drawn after its type, .id is the place in the loop and .uri the element\'s uri, a name the model does not know is nothing',
+	$render( '[stack /services sort="title" offset="1" limit="1" cols="100"][values of="title"][values of="summary"][values of=".id"][values of=".uri"][values of="nope"][values of="category"][values of="image" kind="image"][values of="image"][values of="title" kind="href"][values of=".uri" kind="href"][values of="#top" kind="href"][/stack]' )
+	=== '<div class="nino-grid-row nino-stack nino-stack-gap-2"><div class="nino-grid-s-100 nino-grid-m-100 nino-grid-l-100">'
+	. '<i>Web &lt;b&gt;&#91;x]&lt;/b&gt;</i><i><p>Hello &#91;&#91;/k]] &#91;button x]</p></i><i>0</i><i>/services/web</i><i>NULL</i><i>web</i>'
+	. '<i>services/web/image.webp</i><i>services/web/image.webp</i><i>Web &lt;b&gt;&#91;x]&lt;/b&gt;</i><i>/services/web</i><i>#top</i></div></div>' );
+
+// The components, one by one
+check( '[title] is a heading with the class of a section title, a level and a style', $render( '[title /template/page-home/hero/title level="1" style="loud"]' ) === '<h1 class="nino-section-title nino-section-title--loud">Hi &#91;there]</h1>'
+	&& $render( '[title /template/page-home/hero/title]' ) === '<h2 class="nino-section-title">Hi &#91;there]</h2>' );
+check( '[title] takes a class of its own at the end of its classes, escaped', $render( '[title /template/page-home/hero/title class="a b&c"]' ) === '<h2 class="nino-section-title a b&amp;c">Hi &#91;there]</h2>' );
+check( '[subtitle] is a paragraph with the class of a subtitle', $render( '[subtitle /template/page-home/hero/subtitle style="quiet"]' ) === '<p class="nino-section-subtitle nino-section-subtitle--quiet">Sub</p>' );
+check( '[text] keeps the paragraphs and lists of its key and marks the wrapper as rich text', $render( '[text /template/page-home/services/text]' ) === '<div class="nino-section-text nino-richtext"><p>One</p><ul><li>a</li></ul></div>' );
+check( '[text format="inline"] sanitizes to that format', $render( '[text /template/page-home/services/text format="inline" style="quiet"]' ) === '<div class="nino-section-text nino-section-text--quiet">One a</div>' );
+check( '[spacer] is an empty box with a margin of the size it says', $render( '[spacer size="4"]' ) === '<div class="nino-mt-4"></div>' && $render( '[spacer]' ) === '<div class="nino-mt-2"></div>' );
+check( '[html] is its content as rich text, and nothing without content', $render( '[html]<p>Hi</p><script>alert(1)</script>[/html]' ) === '<p>Hi</p>' && $render( '[html][/html]' ) === '' );
+check( '[button] is a link drawn as one: label from a key, address from a key, a style', $render( '[button /_nino/webpage/contact/name href="/_nino/webpage/contact/uri" style="primary"]' ) === '<a class="nino-btn nino-btn--primary" href="/contact">Contact us</a>' );
+check( '[button] takes a fixed label, a size, a target - and a target that is another window says it is no concern of the opener', $render( '[button text="Go" href="https://example.com" size="big" target="_blank"]' ) === '<a class="nino-btn nino-btn--big" href="https://example.com" target="_blank" rel="noopener">Go</a>' );
+check( '[button] with a fixed label reads its first argument as the address', $render( '[button /_nino/webpage/contact/uri text="Mehr"]' ) === '<a class="nino-btn" href="/contact">Mehr</a>' );
+check( '[button] with a scheme that is no safe one is a link to nowhere, and its fixed label is escaped', $render( '[button text="<i>[x" href="javascript:alert(1)"]' ) === '<a class="nino-btn" href="#">&lt;i&gt;&#91;x</a>' );
+
+// Whatever a hand-written file gets wrong still renders
+check( 'an attribute that is not declared is ignored', $render( '[title /template/page-home/hero/title bogus="x" onclick="y"]' ) === $render( '[title /template/page-home/hero/title]' ) );
+check( 'a select outside its options is the default', $render( '[title /template/page-home/hero/title level="9" style="weird"]' ) === '<h2 class="nino-section-title">Hi &#91;there]</h2>'
+	&& $render( '[spacer size="99"]' ) === '<div class="nino-mt-2"></div>' && $render( '[text /template/page-home/services/text format="nonsense"]' ) === $render( '[text /template/page-home/services/text]' ) );
+check( 'a source that resolves to nothing renders nothing - not a heading with nothing in it', $render( '[title /template/page-home/nope/title]' ) === '' && $render( '[subtitle /template/page-home/nope/title]' ) === ''
+	&& $render( '[text /template/page-home/nope/title]' ) === '' && $render( '[button /template/page-home/nope/title href="#"]' ) === '' && $render( '[title]' ) === ''
+	&& $render( '[title /template/page-home/empty/title]' ) === '' && $render( '[title title]' ) === '' );
+check( 'a fill in the first argument is not a thing: the source is the key, not its value', str_contains( $render( '[title [[/template/page-home/hero/title]]]' ), 'nino-section-title' ) === false );
+
+// [image] is a component now, and what it did it still does
+check( '[image] of a slot: the same <img> as before', $render( '[image /template/page-home/hero/background alt="A"]' ) === '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="A">' );
+check( '[image] as before in the named form, with the alt of the template', $render( '[image uri="/template/page-home/hero/background" alt="B"]' ) === '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="B">' );
+check( '[image] with content as before: the content, filled, and nothing for a slot with no file', $render( '[image /template/page-home/hero/background]<meta content="[[src]]" data-size="[[width]]x[[height]]">[/image]' ) === '<meta content="/public/images/bg.1600x900.jpg" data-size="1600x900">'
+	&& $render( '[image /template/page-home/hero/empty]<meta content="[[src]]">[/image]' ) === '' && $render( '[image /template/page-home/hero/empty]' ) === '' );
+check( '[image] with a focus, a ratio or a class of its own is framed - the frame is what crops', $render( '[image /template/page-home/hero/background focus="5" ratio="16-9" class="x"]' ) === '<div class="nino-image nino-image--16-9 nino-img-focus--5 x"><img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt=""></div>'
+	&& $render( '[image /template/page-home/hero/background focus="12" ratio="2-1"]' ) === '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="">' );
+$image = $render( '[stack /services sort="title" offset="1" limit="1"][image image focus="2"][image /template/page-home/hero/background][image nope][/stack]' );
+check( '[image] in a stack: an image field is the file it holds, its size is the field\'s, its alt text the field the type names', str_contains( $image, '<div class="nino-image nino-img-focus--2"><img src="/public/images/services/web/image.webp" width="400" height="300" alt="Alt &quot;q&quot;"></div>' ) === true );
+check( '...a slot still works there, and a name that is neither a field nor a slot renders nothing', str_contains( $image, '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="">' ) === true && substr_count( $image, '<img' ) === 2 );
+check( '...and an image field with no file renders nothing', substr_count( $render( '[stack /services sort="title" limit="1"][image image][/stack]' ), '<img' ) === 0 );
+
+// A project's own component replaces the one of the kernel, and nothing else answers for it
+\Nino\Modules\Components::addComponent( $appData, 'title', static function( array &$appData, array $args ): string {
+	return '<h'. $args['level']. ' class="mine">'. $args['value']. '</h'. $args['level']. '>';
+}, [ 'label' => 'Title', 'source' => 'text', 'attributes' => [ 'level' => [ 'type' => 'select', 'options' => [ '1', '2', '3' ], 'default' => '3', 'label' => 'Level' ] ] ] );
+check( 'a component registered again replaces the one before it: its renderer, its defaults, its options', $render( '[title /template/page-home/hero/title]' ) === '<h3 class="mine">Hi &#91;there]</h3>'
+	&& $render( '[title /template/page-home/hero/title level="4"]' ) === '<h3 class="mine">Hi &#91;there]</h3>'
+	&& \Nino\Modules\Components::defaults( $appData, 'title' ) === [ 'level' => '3', 'class' => '' ] && count( \Nino\Callbacks::registered( $appData, '/nino/html/shortcode/title' ) ) === 1 );
+\Nino\Modules\Components::init( $appData );
+check( '...and the kernel takes it back by registering its own again', $render( '[title /template/page-home/hero/title]' ) === '<h2 class="nino-section-title">Hi &#91;there]</h2>' );
+
+// The four stacks of the kernel
+check( '[stack] draws a nested grid row, one cell to an element, in the widths of cols, with the gap as a class of the row',
+	$render( '[stack /services sort="title" cols="100 50" gap="4" id="svc"][title title level="3"][/stack]' ) === '<div class="nino-grid-row nino-stack nino-stack-gap-4" id="svc">'
+		. '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><h3 class="nino-section-title">App</h3></div>'
+		. '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><h3 class="nino-section-title">Web &lt;b&gt;&#91;x]&lt;/b&gt;</h3></div></div>' );
+check( '[stack] with autoheight marks every cell as one group, named by the id', substr_count( $render( '[stack /services autoheight="1" id="svc"][probe][/stack]' ), 'nino-autoheight" data-autoheight-group="svc"' ) === 2 );
+preg_match_all( '/data-autoheight-group="(stack-\d+)"/', $render( '[stack /services autoheight="1"][probe][/stack]' ), $groups );
+preg_match( '/data-autoheight-group="(stack-\d+)"/', $render( '[stack /services autoheight="1"][probe][/stack]' ), $other );
+check( '...and a stack without an id gets a group of its own that no other stack shares', count( $groups[1] ) === 2 && $groups[1][0] === $groups[1][1] && ( $other[1] ?? '' ) !== '' && $other[1] !== $groups[1][0] );
+check( 'cols that are no widths of the grid are the default of their place, and one value is all three', str_contains( $render( '[stack /services limit="1" cols="100 7 evil&quot;"][probe][/stack]' ), 'nino-grid-s-100 nino-grid-m-7 ' ) === false
+	&& str_contains( $render( '[stack /services limit="1" cols="100 7 evil&quot;"][probe][/stack]' ), 'nino-grid-s-100 nino-grid-m-50 nino-grid-l-33' )
+	&& str_contains( $render( '[stack /services limit="1" cols="50"][probe][/stack]' ), 'nino-grid-s-50 nino-grid-m-50 nino-grid-l-50' ) );
+check( '[stack] of a type with no elements, or of none, is nothing - and so is one with a query nothing matches', $render( '[stack /nothing][probe][/stack]' ) === '' && $render( '[stack][probe][/stack]' ) === ''
+	&& $render( '[stack /services query="category=nope"][probe][/stack]' ) === '' );
+check( '[stack] reads sort, offset, limit and query as [elements] does', substr_count( $render( '[stack /services sort="-title" limit="1"][title title level="4"][/stack]' ), '<h4' ) === 1
+	&& str_contains( $render( '[stack /services sort="-title" limit="1"][title title level="4"][/stack]' ), 'Web' ) === true
+	&& str_contains( $render( '[stack /services sort="-title" offset="1"][title title level="4"][/stack]' ), '>App<' ) === true
+	&& str_contains( $render( '[stack /services query="category=app"][title title level="4"][/stack]' ), '>App<' ) === true
+	&& str_contains( $render( '[stack /services query="category=app"][title title level="4"][/stack]' ), 'Web' ) === false );
+\Nino\Callbacks::registerCallback( $appData, '/test/stack/reverse', static function( array &$appData, array &$hits ): array { return array_reverse( $hits ); } );
+check( '...and the callback, which sees the sorted hits before the window is cut, as [elements] does',
+	$render( '[elements /services sort="title" callback="/test/stack/reverse" limit="1"][[.id]]:[[title]][/elements]' ) === '0:Web &lt;b&gt;&#91;x]&lt;/b&gt;'
+	&& str_contains( $render( '[stack /services sort="title" callback="/test/stack/reverse" limit="1"][title title level="4"][/stack]' ), 'Web &lt;b&gt;' ) === true );
+
+check( '[slider] is a .nino-slider around a list of its cells, which is what Nino.ui.js wires up',
+	$render( '[slider /services sort="title" width="60%" min="240px" id="sl"][title title level="3"][/slider]' ) === '<div class="nino-slider" id="sl" data-slider-width="60%" data-slider-min="240px"><ul>'
+		. '<li><h3 class="nino-section-title">App</h3></li><li><h3 class="nino-section-title">Web &lt;b&gt;&#91;x]&lt;/b&gt;</h3></li></ul></div>' );
+check( '...a width that is no size is left out, and a slider with no elements is nothing', $render( '[slider /services sort="title" limit="1" width="12em"][probe][/slider]' ) === '<div class="nino-slider"><ul><li>inside:/services#0#/services/app#string</li></ul></div>'
+	&& $render( '[slider /nothing][probe][/slider]' ) === '' );
+check( '[list] is a .nino-list of items, in the style it names, with no grid',
+	$render( '[list /services sort="title" style="check" id="faq"][title title level="4"][/list]' ) === '<ul class="nino-list nino-list--check" id="faq"><li><h4 class="nino-section-title">App</h4></li><li><h4 class="nino-section-title">Web &lt;b&gt;&#91;x]&lt;/b&gt;</h4></li></ul>'
+	&& $render( '[list /services sort="title" limit="1" style="weird"][probe][/list]' ) === '<ul class="nino-list"><li>inside:/services#0#/services/app#string</li></ul>' );
+$filter = $render( '[filter /services sort="title" by="category" id="f"][title title level="4"][/filter]' );
+check( '[filter] is a .nino-filter: the buttons, the first of them for everything, and the cells that carry the value they are filtered by',
+	str_starts_with( $filter, '<div class="nino-filter" id="f"><nav class="nino-filter-nav" aria-label="Filter">' )
+	&& str_contains( $filter, '<button type="button" class="nino-filter-btn nino-is-active" data-filter-value="" aria-pressed="true">Alle <span class="nino-filter-count">(2)</span></button>' ) === true
+	&& str_contains( $filter, '<button type="button" class="nino-filter-btn" data-filter-value="app" aria-pressed="false">app <span class="nino-filter-count">(1)</span></button>' ) === true
+	&& str_contains( $filter, '<button type="button" class="nino-filter-btn" data-filter-value="web" aria-pressed="false">web <span class="nino-filter-count">(1)</span></button>' ) === true
+	&& str_contains( $filter, '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33 nino-filter-item" data-filter-item="app"><h4 class="nino-section-title">App</h4></div>' ) === true
+	&& str_contains( $filter, '</nav><div class="nino-grid-row nino-stack nino-stack-gap-2">' ) === true );
+check( '...the label of the first button is the attribute, else the key /template/common/filter/all, else the word of the page\'s language',
+	str_contains( $render( '[filter /services by="category" all="Everything"][probe][/filter]' ), 'aria-pressed="true">Everything <span' ) === true
+	&& ( static function() use ( &$appData, $render ): bool {
+		\Nino\Html::addFills( $appData, [ '/template/common/filter/all' => 'Sämtliche' ], '*' );
+		$own = str_contains( $render( '[filter /services by="category"][probe][/filter]' ), 'aria-pressed="true">Sämtliche <span' );
+		unset( $appData['./nino/html/fills']['*']['[[/template/common/filter/all]]'] );
+		$appData['./nino/locales/current'] = 'en_US';
+		$english = str_contains( $render( '[filter /services by="category"][probe][/filter]' ), 'aria-pressed="true">All <span' );
+		$appData['./nino/locales/current'] = 'de_DE';
+		return $own === true && $english === true;
+	} )() );
+check( '...and without a field to filter by there are the cells and no row of buttons', str_contains( $render( '[filter /services][probe][/filter]' ), 'nino-filter-nav' ) === false
+	&& str_contains( $render( '[filter /services][probe][/filter]' ), 'nino-filter-item' ) === true );
+
+// The page of the Builder, as the Builder feature would write it, rendered by the kernel alone
+$home = (string) file_get_contents( __DIR__. '/fixtures/builder-page-home.tpl' );
+$page = $render( $home );
+$foreign = '<!-- nino:html -->'. "\n". '<section id="map" class="nino-section nino-section--alt">'. "\n". '	<div class="nino-grid-row"><div class="nino-grid-100">[osm lat="48.1" lon="11.5" zoom="12"]</div></div>'. "\n". '</section>'. "\n". '<!-- /nino:html -->';
+check( 'a file of the Builder renders by the kernel alone: no shortcode of it is left standing', str_contains( str_replace( $foreign, '', $page ), '[' ) === false );
+check( '...the section, the row and the columns are the markup of the file', str_contains( $page, '<section id="hero" class="nino-section nino-section--fullwidth nino-section--black nino-cover nino-cover--dim nino-vpa" data-cover-height="100">' ) === true
+	&& str_contains( $page, '<div class="nino-section-bg nino-img-focus--5"><img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt=""></div>' ) === true
+	&& str_contains( $page, '<div class="nino-grid-s-100 nino-grid-m-100 nino-grid-l-66 nino-text-left">' ) === true
+	&& str_contains( $page, '<section id="contact" class="nino-section nino-section--primary nino-text-center">' ) === true
+	&& str_starts_with( $page, '<!-- nino:template-name Home -->'. "\n". '<header>Header</header>' ) && str_ends_with( rtrim( $page ), '<footer>Footer</footer>' ) );
+check( '...the statics are drawn from their keys: a heading with its level and style, a button with the address of a key', str_contains( $page, '<h1 class="nino-section-title nino-section-title--loud">Hi &#91;there]</h1>' ) === true
+	&& str_contains( $page, '<a class="nino-btn nino-btn--primary" href="/contact">Contact us</a>' ) === true && str_contains( $page, '<a class="nino-btn nino-btn--light" href="/contact">Contact us</a>' ) === true );
+check( '...the stack is two cells for the two elements, in the order of sort, with the title escaped', substr_count( $page, 'nino-autoheight" data-autoheight-group="stack-' ) === 2
+	&& str_contains( $page, '<h3 class="nino-section-title">Web &lt;b&gt;&#91;x]&lt;/b&gt;</h3>' ) === true && strpos( $page, '>App<' ) < strpos( $page, 'Web &lt;b&gt;' )
+	&& str_contains( $page, '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-50 nino-autoheight"' ) === true
+	&& str_contains( $page, '<a class="nino-btn" href="/services/web">Mehr</a>' ) === true && str_contains( $page, 'FILLED' ) === false );
+check( '...and the block of somebody\'s own is untouched, byte for byte', str_contains( $page, $foreign ) === true );
+check( '...and it renders the same each time', preg_replace( '/stack-\d+/', 'stack-N', $render( $home ) ) === preg_replace( '/stack-\d+/', 'stack-N', $page ) );
+
+check( '...a [button] in a stack whose href field holds a control character before a scheme is a #', ( static function() use ( $render, &$appData ): bool {
+	\Nino\Elements::insertElementType( $appData, '/links', [ 'title' => [ 'type' => 'string' ], 'link' => [ 'type' => 'string' ] ] );
+	\Nino\Elements::insertElement( $appData, '/links/a', [ 'title' => 'A', 'link' => "\x01javascript:alert(1)" ], 'de_DE' );
+	\Nino\Elements::insertElement( $appData, '/links/b', [ 'title' => 'B', 'link' => "\x1fjavascript:alert(1)" ], 'de_DE' );
+	$out = $render( '[stack /links sort="title"][button title href="link"][/stack]' );
+	return substr_count( $out, 'href="#"' ) === 2 && str_contains( $out, 'javascript' ) === false;
+} )() );
+
+// The label of the filter button for everything, stored the way the panels store it
+\Nino\Html::addFills( $appData, [ '/template/common/filter/all' => \Nino\Text::sanitizeValue( 'All "of" it', 'plain' ) ], '*' );
+check( '[filter] says a stored label as the characters it is', str_contains( $render( '[filter /services by="category"][probe][/filter]' ), 'aria-pressed="true">All &quot;of&quot; it <span' ) === true );
+
+// class: every component takes it, and the renderer puts it on its outer element
+check( '[spacer] and the four stacks carry the class they are given on their outer element',
+	$render( '[spacer class="x"]' ) === '<div class="nino-mt-2 x"></div>'
+	&& str_contains( $render( '[stack /services class="x"][probe][/stack]' ), '<div class="nino-grid-row nino-stack nino-stack-gap-2 x">' ) === true
+	&& str_contains( $render( '[slider /services class="x"][probe][/slider]' ), '<div class="nino-slider x" data-slider-width="75%"><ul>' ) === true
+	&& str_contains( $render( '[filter /services class="x"][probe][/filter]' ), '<div class="nino-filter x">' ) === true
+	&& str_contains( $render( '[list /services class="x"][probe][/list]' ), '<ul class="nino-list x"><li>' ) === true
+	&& str_contains( $render( '[stack /services class="a b"][probe][/stack]' ), 'stack-gap-2 a b"' ) === true );
+
+// An image's value is the escaped reference, and the picture is looked up by the reference itself
+check( 'value(): the value of an image is escaped, and the slot is still found by its uri',
+	\Nino\Modules\Components::value( $appData, '"><x>[', 'image' ) === '&quot;&gt;&lt;x&gt;&#91;'
+	&& str_contains( $render( '[image /template/page-home/hero/background]' ), 'src="/public/images/bg.1600x900.jpg"' ) === true
+	&& $render( '[image "><x>]' ) === '' );
 
 echo "\n";
 

@@ -28,6 +28,19 @@ namespace Nino\Modules {
 			return htmlspecialchars( (string) \Nino\Features::setting( $appData, 'sample', 'title', '' ), ENT_QUOTES, 'UTF-8' );
 		}
 
+		// The renderer of the component 'greeting' of the manifest: the name in
+		// studly caps behind 'component'
+		public static function componentGreeting( array &$appData, array $args ): string {
+
+			return '<p class="sample-greeting">'. ( $args['shout'] === '1' ? strtoupper( $args['value'] ) : $args['value'] ). '</p>';
+		}
+
+		// ...and of the stack 'rows': the cells, one row of the feature's own around them
+		public static function stackRows( array &$appData, array $args ): string {
+
+			return '<div class="sample-rows">'. \Nino\Modules\Components::renderStack( $appData, $args, static fn( string $inner ): string => '<span>'. $inner. '</span>' ). '</div>';
+		}
+
 		// Called by Features::activate() when the recorded version differs
 		// from the manifest's. Records what it was asked, refuses one version
 		// so the refusal path can be tested

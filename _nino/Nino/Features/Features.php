@@ -470,6 +470,27 @@ namespace Nino {
 				$settings[$settingName] = $clean;
 			}
 
+			// The components and the stacks a feature declares: name => schema,
+			// each read the way \Nino\Modules\Components registers a schema, so
+			// that the manifest is refused here and not when a request is
+			// rendered. The callbacks are not declared but derived (see
+			// registerComponents())
+			$declared = [ 'components' => [], 'stacks' => [] ];
+			foreach( $declared as $what => $none ) {
+
+				if( is_array( $raw[$what] ?? [] ) === false )
+					return $fail( '"'. $what. '" must be a name => schema map' );
+
+				foreach( (array) ( $raw[$what] ?? [] ) as $name => $schema ) {
+
+					$clean = \Nino\Modules\Components::validate( (string) $name, $schema, $what === 'stacks' );
+					if( is_string( $clean ) === true )
+						return $fail( $clean );
+
+					$declared[$what][(string) $name] = $clean;
+				}
+			}
+
 			return [
 				'key'					=> $key,
 				'dir'					=> $dir,
@@ -485,7 +506,63 @@ namespace Nino {
 				'requires'		=> $requires,
 				'data'				=> $data,
 				'settings'		=> $settings,
+				'components'	=> $declared['components'],
+				'stacks'			=> $declared['stacks'],
 			];
+		}
+
+		/**
+		 *	Register what the active features declare as 'components' and
+		 *	'stacks' in their manifest - the other way into the registry of
+		 *	\Nino\Modules\Components, beside a module calling addComponent()
+		 *	itself. Each name is a shortcode whose renderer is by convention
+		 *	[ '\Nino\Modules\<Directory>', 'component<Name>' ] - or 'stack<Name>' -
+		 *	with the name written in studly caps: 'newsletter-signup' is
+		 *	componentNewsletterSignup(). A renderer the class does not have is
+		 *	said out loud and skipped, the way a callback that is not callable is.
+		 *
+		 *	Asked at every boot, by the Components module, and so only the
+		 *	manifests of the features listed in '/nino/modules' are read: not
+		 *	all() with its scan of the directory and its record of which are
+		 *	active, which the workbench needs and a visitor does not
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		public static function registerComponents( array &$appData ): void {
+
+			foreach( (array) ( $appData['/nino/modules'] ?? [] ) as $class ) {
+
+				if( preg_match( '/^\\\\?Nino\\\\Modules\\\\([A-Z][A-Za-z0-9]*)$/D', (string) $class, $match ) !== 1 )
+					continue;
+
+				$dir = self::dir(). '/'. $match[1];
+
+				if( is_file( $dir. '/'. self::MANIFEST ) === false )
+					continue;
+
+				$manifest = self::manifest( $dir );
+
+				if( $manifest === null || ( $manifest['components'] === [] && $manifest['stacks'] === [] ) )
+					continue;
+
+				foreach( [ 'component' => 'components', 'stack' => 'stacks' ] as $prefix => $what )
+					foreach( $manifest[$what] as $name => $schema ) {
+
+						$callback = [ $manifest['module'], $prefix. str_replace( ' ', '', ucwords( str_replace( '-', ' ', (string) $name ) ) ) ];
+
+						if( is_callable( $callback ) === false ) {
+							trigger_error( 'Feature manifest '. $dir. '/'. self::MANIFEST. ': the '. $prefix. ' "'. $name. '" has no renderer '. $callback[0]. '::'. $callback[1]. '()', E_USER_WARNING );
+							continue;
+						}
+
+						if( $what === 'stacks' )
+							\Nino\Modules\Components::addStack( $appData, (string) $name, $callback, $schema );
+						else
+							\Nino\Modules\Components::addComponent( $appData, (string) $name, $callback, $schema );
+					}
+			}
 		}
 
 		/**
