@@ -4136,6 +4136,15 @@ preg_match_all( '/(--[a-zA-Z0-9-]+)\s*:/', $ninoCss, $declaredProperties );
 $undeclaredProperties = array_values( array_diff( array_unique( $consumedProperties[1] ), $declaredProperties[1] ) );
 check( 'every custom property Nino.css reads without a fallback is declared in Nino.css itself'. ( $undeclaredProperties === [] ? '' : ' - missing: '. implode( ', ', $undeclaredProperties ) ), $undeclaredProperties === [] );
 
+/*	A page that opens with a hero loses main's top padding - also when the
+	Builder's div.nino-wrap puts the hero one level down	*/
+$heroSelectors = [];
+foreach( [ '.nino-cover.nino-atf', '.nino-parallex.nino-atf', '.nino-atf--fullscreen' ] as $hero )
+	foreach( [ 'main:has(> ', 'main:has(> .nino-wrap > ' ] as $head )
+		$heroSelectors[] = $head. $hero. ':first-child)';
+check( 'Nino.css takes main\'s top padding away for a hero, directly below main and inside the Builder\'s wrap', preg_match( '/((?:main:has\([^)]*\)\)?,\s*){5}main:has\([^)]*\)\)?)\s*\{\s*padding-top:\s*0;/', $ninoCss, $heroRule ) === 1
+	&& array_filter( $heroSelectors, static fn( string $selector ): bool => str_contains( $heroRule[1], $selector ) === false ) === [] );
+
 /*	Every manual and every method a Nino.css comment sends its reader to is
 	where the comment says. Two pointed at docs/design-system.md, which this
 	repository never had, and the two shortcode chapters at _nino/Nino.php for
@@ -5017,10 +5026,10 @@ check( 'a project class in app/ autoloads on a direct reference without going th
 
 /*	The one namespace every root serves: Nino\Modules\* is looked for below
 	_nino/ first - where the runtime modules Nino ships live, the optional
-	ones (Form, Navigation, Localepicker, Design, Templates) among them -
+	ones (Form, Navigation, Localepicker, Legal, Maintenance) among them -
 	then below _admin/, then below features/, where a project installs a
-	feature as one directory (see \Nino\Features), then below the
-	application root.	*/
+	feature as one directory (see \Nino\Features; Design and the Builder
+	come from the catalogue that way), then below the application root.	*/
 check( 'an optional kernel module below _nino/Nino/Modules/ autoloads through the Nino\Modules namespace', class_exists( '\Nino\Modules\Navigation\Admin' ) === true
 	&& class_exists( '\Nino\Modules\Form' ) === true );
 check( 'a feature below features/ autoloads through the same namespace, the directory standing for the Nino/Modules prefix', class_exists( '\Nino\Modules\Sample' ) === true

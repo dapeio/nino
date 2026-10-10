@@ -26,9 +26,9 @@ Die Dokumentation richtet sich primär an selbstständige Webentwickler und klei
 | `deployment.de.md` | `deployment.md` | Webserver, Go-live, Sicherheit, Backups und Updates | veröffentlicht |
 | `setup.de.md` | `setup.md` | der Einrichtungsassistent: notwendige Ersteinrichtung und Library-Format | veröffentlicht |
 | `_admin.de.md` | `_admin.md` | die Workbench: jedes Panel, Konten, Rollen und Recovery | veröffentlicht |
-| – | – | das Design-Panel und der Template-Baukasten sind seit 1.2 nicht mehr Teil von Nino: `templates.de.md`/`templates.md` liegt beim Feature in [`features/Templates/docs/`](https://github.com/dapeio/nino-features/tree/main/features/Templates/docs), das Aussehen beschreibt die README des Features [`features/Design/`](https://github.com/dapeio/nino-features/blob/main/features/Design/README.md) | ausgelagert |
+| – | – | das Design-Panel und der Template-Baukasten sind seit 1.2 nicht mehr Teil von Nino: Das Aussehen beschreibt das Handbuch des Features [`features/Design/`](https://github.com/dapeio/nino-features/blob/main/features/Design/feature.php) in seiner `feature.php`, Seitentemplates setzt das Feature [`features/Builder/`](https://github.com/dapeio/nino-features/tree/main/features/Builder) zusammen (Panel Builder in der Gruppe Struktur, sein Handbuch in der `feature.php`) | ausgelagert |
 | `features.de.md` | `features.md` | Features: das Panel, das Manifest `feature.php`, das Settings-Schema, Aktivierung, Update und Deaktivierung, die Tests eines Features | veröffentlicht |
-| – | `recipes/*.md` | sechs der acht Erweiterungsrezepte: Panel, Laufzeitmodul, Komponente, Installer-Paket, Elementtypen, Feature; Section-Preset sowie Templates und Seiten-Units liegen beim Feature Templates in [`features/Templates/docs/`](https://github.com/dapeio/nino-features/tree/main/features/Templates/docs) | veröffentlicht, nur Englisch |
+| – | `recipes/*.md` | die sechs Erweiterungsrezepte: Panel, Laufzeitmodul, Komponente, Installer-Paket, Elementtypen, Feature | veröffentlicht, nur Englisch |
 
 ## Laufende Arbeitsreihenfolge
 

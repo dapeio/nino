@@ -1151,9 +1151,10 @@ namespace Nino\Admin {
 	 *											fill pass; anything else is literal text.
 	 *
 	 *											A panel whose class file lies below \Nino\Features::dir()
-	 *											always lands in 'features', whatever its own nav() names -
-	 *											see _entry()'s docblock. Naming 'features' from anywhere
-	 *											else is refused the same way an unknown group is.
+	 *											lands in the group its nav() names when that is one of the
+	 *											four, else in 'features' - see the comment in _entry(). Naming
+	 *											'features' from anywhere else is refused the same way an
+	 *											unknown group is.
 	 *
 	 *	Where a panel			lives is what kind of panel it is. The workbench's own
 	 *											screens are modules under _admin/Nino/Modules/<Name>/, one
@@ -1497,16 +1498,17 @@ namespace Nino\Admin {
 			if( $icon !== '' && ( str_starts_with( $icon, '<svg' ) === false || stripos( $icon, '<script' ) !== false || stripos( $icon, 'on' ) !== false && preg_match( '/\son[a-z]+\s*=/i', $icon ) === 1 ) )
 				$icon = '';
 
-			// A panel a feature brought lands in 'features' regardless of
-			// what it named - see self::_isFeaturePanel() - so an editor
-			// granted that one group sees every feature's panel and nothing
-			// a kernel or app/ module could pick its way into. Naming
-			// 'features' from outside features/ is refused exactly like an
-			// unknown group: the value a panel names is never trusted to
-			// place itself in a group only a feature may sit in
+			// A panel a feature brought may name its group, one of the four
+			// - the Builder sits in 'structure' - and lands in 'features'
+			// when it names none or something else: see
+			// self::_isFeaturePanel(). Any other panel naming 'features' is
+			// refused exactly like an unknown group: the value a panel names
+			// is never trusted to place itself in a group only a feature
+			// may sit in, so an editor granted that one group sees nothing
+			// a kernel or app/ module could pick its way into
 			$group = (string) ( $nav[3] ?? 'content' );
 			if( self::_isFeaturePanel( $class ) === true ) {
-				$group = 'features';
+				$group = in_array( (string) ( $nav[3] ?? '' ), self::GROUPS, true ) === true ? (string) $nav[3] : 'features';
 			} elseif( in_array( $group, self::GROUPS, true ) === false || $group === 'features' ) {
 				trigger_error( 'Panel '. $class. ' names an unknown nav group \''. $group. '\'', E_USER_WARNING );
 				$group = 'content';

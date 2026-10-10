@@ -134,7 +134,7 @@ Die geladene `.tpl`-Datei kann neben HTML auch wieder Shortcodes und Textfills e
 
 So können mehrere Template-Dateien zu einer komplexen HTML-Struktur zusammengesetzt werden.
 
-Seitentemplates lassen sich über den Template-Baukasten aus vollständigen HTML- und `[template]`-Sections zusammensetzen. Er ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); sein [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) liegt dort ebenfalls. Er speichert normales, lesbares `.tpl`-Markup und ersetzt nicht die Prüfung der fertigen Webseite im Browser; tiefergehende Strukturarbeit bleibt über HTML+ oder Code möglich.
+Seitentemplates lassen sich über den Builder aus Sections, Spalten und Komponenten zusammensetzen. Er ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); sein Handbuch steht in seiner [`feature.php`](https://github.com/dapeio/nino-features/blob/main/features/Builder/feature.php). Er speichert normales, lesbares `.tpl`-Markup und ersetzt nicht die Prüfung der fertigen Webseite im Browser; tiefergehende Strukturarbeit bleibt über HTML+ oder Code möglich.
 
 Nino verarbeitet einen HTML-String bei jedem Rendering-Durchlauf in einer festen Reihenfolge:
 
@@ -174,13 +174,13 @@ Projekts unter `app/`. Siehe
 
 ## Die Workbench `/_admin`
 
-Eine Verwaltungsoberfläche mit einer Anmeldung. Sie hat einen eigenen Einstiegspunkt (`_admin/index.php`) und ist kein Frontend-Modul aus `/nino/modules`; jeder Bildschirm darin ist ein Panel, und ein Modul oder ein installiertes Feature kann eines beisteuern, das dann in der eigenen Gruppe Features der Leiste landet:
+Eine Verwaltungsoberfläche mit einer Anmeldung. Sie hat einen eigenen Einstiegspunkt (`_admin/index.php`) und ist kein Frontend-Modul aus `/nino/modules`; jeder Bildschirm darin ist ein Panel, und ein Modul oder ein installiertes Feature kann eines beisteuern: Das eines Features steht in der Gruppe der Leiste, die sein `nav()` nennt, wenn das eine der vier ist, und in der eigenen Gruppe Features, wenn es keine oder etwas anderes nennt; das eines Moduls steht in der Gruppe, die es nennt, nie in Features, und unter Inhalt, wenn es keine nennt:
 
 | Gruppe | Panels | Verantwortung |
 |---|---|---|
 | Inhalt | Dashboard, Elemente (mit Elementtypen), Texte (mit Textschlüsseln), Bilder (mit Bildplätzen), Anfragen, Log | tägliche Pflege von Inhalten, Bildern und Betriebsdaten; die Tabs in Klammern halten die Form dieser Inhalte und gehören dem Entwickler |
 | Struktur | Routen, Navigationen | die Struktur des Projekts: seine Routen und Menüs |
-| Features | was die aktiven Features mitbringen | eine Gruppe für das Panel jedes installierten Features, gleich welche Gruppe sein eigenes `nav()` nennt; ohne Überschrift, solange nichts darin liegt |
+| Features | Feature-Panels, die Features, keine der vier Gruppen oder ein anderes Wort nennen | das Panel eines installierten Features, das Features, keine der vier Gruppen oder ein anderes Wort nennt; ohne Überschrift, solange nichts darin liegt |
 | System | Nutzer (mit Nutzerrollen und Anmeldeschutz), Sprache (mit Übersetzungen), Backups, Konfiguration, Features | Konten und Rollen, Sprachen und Übersetzungsübergabe, Wiederherstellung, technische Konfiguration, installierte Features |
 
 Ein Konto hält eine Rolle, eine Rolle eine Menge von Berechtigungen, eine je Panel oder Tab; der Assistent schreibt **Editor** (jede Inhalt-Berechtigung) und **Developer** (`/*`), und der Tab Nutzerrollen des Panels Nutzer bearbeitet sie. Ein Panel, das ein Konto nicht verwenden darf, wird nicht gerendert. Die Abgrenzung verläuft damit zwischen vollständigem Entwicklungszugriff und berechtigungsgesteuerter redaktioneller Arbeit – innerhalb eines Werkzeugs. Solange das Projekt noch nicht existiert, liefert dieselbe Route den [Einrichtungsassistenten](setup.de.md); `/_admin/recovery.php` ist der Weg zurück, wenn die Konten selbst kaputt sind. Siehe das [`/_admin`-Handbuch](_admin.de.md).
@@ -191,7 +191,7 @@ Ein Konto hält eine Rolle, eine Rolle eine Menge von Berechtigungen, eine je Pa
 |---|---|
 | Seitentitel ändern | Textfill in `text/` oder im Panel Texte |
 | neues Teammitglied ergänzen | Element im Panel Elemente |
-| Seite aus vollständigen Sections zusammensetzen | der [Template-Baukasten](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md), ein Feature aus dem Katalog (Alpha) |
+| Seite aus Sections, Spalten und Komponenten zusammensetzen | der [Builder](https://github.com/dapeio/nino-features/tree/main/features/Builder), ein Feature aus dem Katalog |
 | tiefergehende HTML-Struktur ändern | HTML+ Editor oder `.tpl`-Datei in `templates/` |
 | neue öffentliche URL anlegen | Route in `config.php` beziehungsweise im Panel Routes |
 | dynamische Liste ausgeben | Element-Abfrage oder Shortcode mit Callback |
@@ -203,6 +203,6 @@ Ein Konto hält eine Rolle, eine Rolle eine Menge von Berechtigungen, eine je Pa
 
 - [Erste Schritte](getting-started.de.md) führt durch die notwendige Ersteinrichtung.
 - [`/_admin`-Workbench](_admin.de.md) erklärt jedes Panel, die Rollen und die Recovery-Seite.
-- Der **Template-Baukasten** – Seitentemplates aus ganzen Abschnitten – ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); sein [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) liegt dort ebenfalls.
+- Der **Builder** – Seitentemplates aus Sections, Spalten und Komponenten – ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); sein Handbuch steht in seiner [`feature.php`](https://github.com/dapeio/nino-features/blob/main/features/Builder/feature.php).
 - [Features](features.de.md) erklärt installierbare Features und ihr Manifest.
 - [Deployment](deployment.de.md) beschreibt den Weg von der lokalen Webseite in den sicheren Betrieb.

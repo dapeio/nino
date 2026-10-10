@@ -3,7 +3,7 @@
 **Additional Links:**
 [Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Features](../features.md)
 
-One of the eight extension recipes of the [Nino agent guide](../../AGENTS.md). Its
+One of the six extension recipes of the [Nino agent guide](../../AGENTS.md). Its
 rules - the required workflow, the core runtime model, the conventions and the
 security review - apply to every step below.
 
@@ -22,7 +22,7 @@ Two kinds of panel exist, and the class looks the same for both:
   recipe](runtime-module.md)) and exists exactly while that module is active. Prefer it whenever the
   screen belongs to a module or a feature: it then ships, and is removed, as
   one directory. `Modules\Form` (Submissions) and `Modules\Navigation` are
-  built this way as kernel modules, `Modules\Templates`,
+  built this way as kernel modules, `Modules\Builder`,
   `Modules\Newsletter` and `Modules\Search` as features from the
   catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features),
   copied under `features/` (the [feature recipe](feature.md)).
@@ -84,20 +84,21 @@ request:
   heading the link sits under; an unknown group falls back to `content` with
   a warning. `features` is not a free choice: it is refused the same way an
   unknown group is unless the panel's own class file lies below
-  `\Nino\Features::dir()`, and a panel that does live there lands in
-  `features` regardless of what it names - see `Panels::_isFeaturePanel()`.
+  `\Nino\Features::dir()`. A panel that does live there sits in the group its
+  `nav()` names when that is one of the four - the Builder names `structure` -
+  and in `features` when it names none or anything else; see
+  `Panels::_isFeaturePanel()`.
   The **Editor** role the wizard writes is every `content` panel's `perm()`
   at that moment (`Roles::defaults()`); a content panel a module brings later
   is offered on the roles tab like every other, and so is a feature's under
-  the `features` group.
+  the group it sits in.
 - `weight` orders the navigation within the group, lowest first, stable for
   equal weights. Core content panels sit at 0 (Dashboard), 20 (Elements), 30
   (Text), 40 (Images) and 90 (Logs); structure at 20 (Routes); system at
   2 (Users), 5 (Language), 10 (Backups), 15 (Features) and 20
   (Config). A module panel picks the slot it wants: Submissions 60,
-  Navigations 25 (after Routes), Maintenance 18; the catalogue's Newsletter
-  and Search name weights of their own too, but land in `features` rather
-  than wherever they name, since both ship below `features/`.
+  Navigations 25 (after Routes), Maintenance 18; a feature's panel names a
+  weight of its own just as well, within the group it sits in.
 
 `tabs()` rules:
 
@@ -459,7 +460,7 @@ its fills (`[[/nino/dir]]`, the panel's own text keys) resolve like the
 shell's. The file is a fragment: no `<html>`, no `[csrf]` (the page has one),
 no `<link>` or `<script>` (the panel's `assets()` are bundled). Every id and
 class in it is the panel's own; the components are the design system's.
-The Template Builder feature (`features/Templates` once copied in,
+The Builder feature (`features/Builder` once copied in,
 `layout()` = `'workspace'`) is the reference:
 
 ```php
@@ -472,7 +473,7 @@ public static function layout(): string {
 }
 
 public static function icon(): string {
-	return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="7" x="3" y="3" rx="1"/><rect width="9" height="7" x="3" y="14" rx="1"/><rect width="5" height="7" x="16" y="14" rx="1"/></svg>';
+	return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>';
 }
 ```
 

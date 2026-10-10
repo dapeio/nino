@@ -3,7 +3,7 @@
 **Additional Links:**
 [Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Features](../features.md)
 
-One of the eight extension recipes of the [Nino agent guide](../../AGENTS.md). Its
+One of the six extension recipes of the [Nino agent guide](../../AGENTS.md). Its
 rules - the required workflow, the core runtime model, the conventions and the
 security review - apply to every step below.
 
@@ -171,7 +171,7 @@ namespace Nino\Modules {
 
 `[ '\Nino\Modules\Countdown', 'componentCountdown' ]` is the convention - the
 name in studly caps behind `component`, or `stack` for a stack
-(`stackGallery()`, `componentNewsletterSignup()` for `newsletter-signup`). A
+(`stackSlider()`, `componentNewsletterSignup()` for `newsletter-signup`). A
 manifest whose schema does not validate is refused as a whole, naming the
 component, and a renderer the class lacks is a warning and skipped. The kernel
 registers the feature's components at boot while it is listed in

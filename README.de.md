@@ -41,7 +41,7 @@ Das mitgelieferte Design-System mit Basiskomponenten und Modulen bietet einen sc
 
 ![Textfill-Übersicht in der Nino-Workbench](docs/assets/screenshots/_admin1.webp)
 
-Eine Verwaltungsoberfläche mit einer Anmeldung. Entwickler richten das Projekt hier ein und bauen Struktur und Erscheinungsbild; Redakteure pflegen hier die Inhalte. Jeder Bildschirm ist ein Panel, gruppiert in **Inhalt** (Elemente, Texte, Bilder, Anfragen, Log), **Struktur** (Routen, Navigationen), **Features** (das eigene Panel eines installierten Features, gleich welche Gruppe es selbst nennt) und **System** (Nutzer und Rollen, Sprachen und Übersetzungen, Backups, Konfiguration, Features); die Form der Inhalte – Elementtypen, Textschlüssel, Bildplätze – liegt auf Tabs daneben. Ein Konto hält eine Rolle, eine Rolle eine Berechtigung je Panel oder Tab; der Assistent schreibt Editor und Developer, und ein Panel, das ein Konto nicht verwenden darf, wird nicht gerendert.
+Eine Verwaltungsoberfläche mit einer Anmeldung. Entwickler richten das Projekt hier ein und bauen Struktur und Erscheinungsbild; Redakteure pflegen hier die Inhalte. Jeder Bildschirm ist ein Panel, gruppiert in **Inhalt** (Elemente, Texte, Bilder, Anfragen, Log), **Struktur** (Routen, Navigationen), **Features** (das Panel eines installierten Features, das Features, keine der vier Gruppen oder ein anderes Wort nennt) und **System** (Nutzer und Rollen, Sprachen und Übersetzungen, Backups, Konfiguration, Features); die Form der Inhalte – Elementtypen, Textschlüssel, Bildplätze – liegt auf Tabs daneben. Ein Konto hält eine Rolle, eine Rolle eine Berechtigung je Panel oder Tab; der Assistent schreibt Editor und Developer, und ein Panel, das ein Konto nicht verwenden darf, wird nicht gerendert.
 
 Die Workbench bietet vollständigen Zugriff für Entwicklung, Diagnose und Korrekturen und eine schmale, berechtigungsgesteuerte Oberfläche für die tägliche redaktionelle Arbeit. Alle Änderungen lassen sich alternativ direkt im Dateisystem vornehmen. `/_admin/recovery.php` ist der Weg zurück, wenn die Konten selbst kaputt sind.
 
@@ -60,35 +60,17 @@ Die Workbench bietet vollständigen Zugriff für Entwicklung, Diagnose und Korre
 
 Jeder frische Checkout wird über den Assistenten eingerichtet – das, was `/_admin` zeigt, bis er abgeschlossen ist. Er prüft die Umgebung, führt durch die Sprachen (und die Module, die ein Projekt selbst hinzugefügt hat, falls es welche gibt), übernimmt das Theme der Base-Einheit samt der benötigten Assets, legt erste Seiten und Basisinformationen an, erstellt die ersten Entwicklerkonten und setzt das Recovery-Passwort. Danach sperrt er sich selbst aus, und `_admin/install/` kann aus einer Produktivauslieferung entfernt werden.
 
-#### Der Template-Baukasten – ein Feature, Alpha
+#### Der Builder – ein Feature
 
-<a href="docs/assets/screenshots/_templates1.webp" target="_blank">
-  <img src="docs/assets/screenshots/_templates1.webp"
-       alt="Template-Übersicht und Section-Canvas im Nino Template Builder"
-       width="31%">
-</a>
-<a href="docs/assets/screenshots/_templates2.webp" target="_blank">
-  <img src="docs/assets/screenshots/_templates2.webp"
-       alt="Section-Preset-Bibliothek im Nino Template Builder"
-       width="31%">
-</a>
-<a href="docs/assets/screenshots/_templates3.webp" target="_blank">
-  <img src="docs/assets/screenshots/_templates3.webp"
-       alt="Konfiguration einer Articles-Section mit Live-Vorschau"
-       width="31%">
-</a>
+Der Builder setzt ein Seitentemplate aus Sections, Zeilen, Spalten und Komponenten zusammen und schreibt es als die `page-*.tpl`-Datei zurück, die er gelesen hat: Die Datei ist die Wahrheit, und was der Builder nicht liest, lässt er Byte für Byte stehen. Sein Panel steht in der Gruppe Struktur der Leiste und ist ein Workspace-Panel – die Leiste klappt zu ihren Symbolen zusammen, und die Vorschau, die zugleich der Editor ist und an jedem Rahmen Werkzeuge trägt, nimmt die ganze Breite ein. Eine Komponente ist ein Shortcode mit Schema; das Kernel-Modul `Components` ist das Register, das der Builder liest, und Features melden ihre eigenen in ihrem Manifest an.
 
-Der Template Builder macht aus `page-*.tpl`-Dateien eine übersichtliche Abfolge vollständiger HTML- und `[template]`-Sections. Entwickler können ein Template anlegen, aus verschiedenen Section-Presets wählen, sinnvolle IDs vergeben, Content und Layout konfigurieren und Textfills unmittelbar in der nativen Sprache befüllen oder mit einer Elements-Collection verbinden. Er ist ein Workspace-Panel: Die Leiste klappt zu ihren Symbolen zusammen, und Templateliste, Section-Canvas und Inspektor teilen sich die ganze Breite.
-
-Der Template Builder bewahrt normales HTML+. Alleinstehende Template-Shortcodes lassen sich direkt über **Add section** wählen und bleiben verschiebbare Canvas-Bausteine; Header und Footer sind gewöhnliche `[template]`-Shortcodes, werden aber sicher über feste Template Settings verwaltet. Anzeigename und VPA-Standard stehen als inerte Metadaten am Dateianfang. Sonstiger Quelltext bleibt gesperrt und bytegenau erhalten. Für codebasierte Sections gibt es den HTML+ Editor.
-
-> **Status: Alpha.** Preset-Manifeste und erzeugtes `.tpl`-Markup bleiben lesbar und erweiterbar; Library und Arbeitsablauf können sich noch weiterentwickeln. Das Panel gehört zum Template-Baukasten-Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features) und ist da, solange das Feature nach `features/` kopiert und im Panel Features eingeschaltet ist.
+Der Builder ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features) (`features/Builder`) und ist da, solange er nach `features/` kopiert und im Panel Features eingeschaltet ist. Sein Handbuch ist das der `feature.php`, das dieses Panel zeigt.
 
 ## Was Nino mitbringt
 
 * mehrsprachiges Routing sowie mehrsprachige Texte und Inhalte
 * eigenes Template-System mit Shortcodes und klarer Trennung von HTML und PHP
-* optionaler sectionbasierter Template Builder für `.tpl`-Dateien (Alpha)
+* optionaler Builder für `.tpl`-Dateien, ein Feature aus dem Katalog
 * dateibasiertes Content-Modell für Textfills und wiederkehrende Elemente
 * ein festes Theme, Asset-Bundling und Frontend-Basiskomponenten
 * Formulare, Navigation, Sprachauswahl und Bildverarbeitung
@@ -219,11 +201,11 @@ Nino hält seine Architektur bewusst klein: Ein zentrales `$appData`-Array träg
 
 * **[Grundkonzepte](docs/concepts.de.md):** Architektur, Datenfluss und Aufgabentrennung
 * **[Entwickler-Handbuch](docs/development.de.md):** Laufzeitverträge, APIs, Module und Tests
-* **[Erweiterungsrezepte](docs/recipes/README.md):** ein Panel, ein Laufzeitmodul, ein Installer-Paket, ein Section-Preset, Templates und Seiten-Units, Elementtypen, ein Feature - Schritt für Schritt (englisch)
+* **[Erweiterungsrezepte](docs/recipes/README.md):** ein Panel, ein Laufzeitmodul, eine Komponente, ein Installer-Paket, Elementtypen, ein Feature - Schritt für Schritt (englisch)
 * **[Erste Schritte](docs/getting-started.de.md):** vom Checkout zur eingerichteten Webseite
 * **[Einrichtungsassistent](docs/setup.de.md):** Schritte, Schreibregeln und Library-Format
 * **[`/_admin`-Workbench](docs/_admin.de.md):** jedes Panel, Konten, Rollen, Konfiguration, Backups und Recovery
-* **[Template-Baukasten](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md):** Seitentemplates aus vollständigen HTML- und Template-Sections zusammensetzen – ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features)
+* **[Builder](https://github.com/dapeio/nino-features/tree/main/features/Builder):** Seitentemplates aus Sections, Spalten und Komponenten zusammensetzen – ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features), sein Handbuch steht in der `feature.php`
 * **[Features](docs/features.de.md):** installierbare Pakete – Manifest, Einstellungen, Aktivierung und Updates
 * **[Feature-Katalog](https://github.com/dapeio/nino-features):** die Features, die Nino veröffentlicht – Newsletter und Suche darunter –, installiert durch Kopieren eines Verzeichnisses nach `features/`
 * **[Deployment](docs/deployment.de.md):** Webserver, Sicherheit, Backups und Go-live
@@ -233,12 +215,7 @@ Nino hält seine Architektur bewusst klein: Ein zentrales `$appData`-Array träg
 
 ## Status und Sicherheit
 
-Kernel, Frontend, Workbench und Projektgrundlage von Nino sind **veröffentlicht** – 1.3.0 ist das erste Release. Einzelne optionale Werkzeuge besitzen einen eigenen, niedrigeren Reifegrad:
-
-| Bereich                                          | Status                                    |
-| ------------------------------------------------ | ----------------------------------------- |
-| Kernel, Frontend, Workbench und bestehende Projektgrundlage | Veröffentlicht                 |
-| Template-Baukasten (Feature aus dem [Katalog](https://github.com/dapeio/nino-features)) | Alpha                                     |
+Kernel, Frontend, Workbench und Projektgrundlage von Nino sind **veröffentlicht** – 1.3.0 ist das erste Release. Ein Feature trägt seinen eigenen Reifegrad, den das Panel Features als Badge neben dem Namen zeigt.
 
 Sicherheitskorrekturen landen direkt auf `main`; eine separate LTS-Version gibt es noch nicht.
 

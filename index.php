@@ -27,8 +27,9 @@ declare(strict_types=1);
 
 // The application half - the project's own PHP classes and modules. It
 // defaults to <project>/app. The Nino\ namespace always stays in _nino/,
-// the optional modules Nino ships (Design, Templates, Form, Navigation,
-// Localepicker) among them.
+// the optional modules Nino ships (Form, Navigation, Localepicker, Legal,
+// Maintenance) among them. Design and the Builder are not among them: they
+// are features of the catalogue, see NINO_FEATURES_DIR below.
 // define( 'NINO_APP_DIR', '/absolute/path/to/app' );
 
 // The installed features - one directory each, activated in the workbench's

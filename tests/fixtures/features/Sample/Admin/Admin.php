@@ -3,8 +3,8 @@ declare(strict_types=1);
 
 namespace Nino\Modules\Sample {
 
-	// The reference feature's workbench panel - a content panel, so the
-	// roles tab offers its permission like any other
+	// The reference feature's workbench panel - it names no group, so it sits
+	// in the features group, and the roles tab offers its permission like any other
 	class Admin {
 
 		public const string MANAGE_PERM = '/_admin/sample/manage';
@@ -18,7 +18,7 @@ namespace Nino\Modules\Sample {
 		}
 
 		public static function nav(): array {
-			return [ 'sample', '/_admin/nav/sample', 70, 'content' ];
+			return [ 'sample', '/_admin/nav/sample', 70 ];
 		}
 
 		public static function text(): string {

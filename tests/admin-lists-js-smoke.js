@@ -942,8 +942,7 @@ console.log('\nOne language');
 // panel, and [jstext] hands all of them to Nino.content.getText(). A literal
 // English sentence in a script is what the German interface used to show
 // halfway down a screen. The recovery page is English by design (it has no
-// session to take a language from) and the Template Builder is not part of
-// this yet - neither is checked here.
+// session to take a language from), so it is not checked here.
 const localizedScripts = fs2.readdirSync( path2.join( __dirname, '../_admin/assets' ) ).filter( f => f.endsWith('.js') && f !== 'recovery.js' ).map( f => [ f, asset( f ) ] )
 	.concat( moduleScripts( '_admin/Nino/Modules', ADMIN_MODULES ) )
 	.concat( moduleScripts( '_nino/Nino/Modules', [ 'Form', 'Navigation' ] ) )

@@ -11,7 +11,7 @@ Dieses Handbuch erklärt, was ein Feature ist, wie ein Betreiber es im Panel **F
 
 ## Was ein Feature ist
 
-Ein Feature ist ein installierbares Paket: ein Verzeichnis unterhalb von `features/`, das ein Modul mitbringt – seine Laufzeitklasse, bei Bedarf ein Panel der Workbench, eine Install-Einheit mit Templates und Texten, und ein Manifest `feature.php`, das sagt, was es ist, für welche Nino-Version es geschrieben wurde und welche Einstellungen es anbietet. Ein Feature ist ein Verzeichnis: Es wird vom Panel Features aus dem Katalog installiert oder von Hand nach `features/` gelegt und in der Workbench eingeschaltet. Ein Checkout bringt kein Feature mit; `features/` enthält nichts als seine `.htaccess`. Die Features, die Nino veröffentlicht – `Newsletter` und `Search` darunter –, liegen im Katalog-Repository [dapeio/nino-features](https://github.com/dapeio/nino-features), dort je ein Verzeichnis unterhalb von `features/` mit Manifest – und Test, README und Changelog, wo das Feature sie mitbringt –, und kommen über **Installieren** im Panel in ein Projekt – oder indem dieses Verzeichnis in dessen eigenes `features/` kopiert wird.
+Ein Feature ist ein installierbares Paket: ein Verzeichnis unterhalb von `features/`, das ein Modul mitbringt – seine Laufzeitklasse, bei Bedarf ein Panel der Workbench, eine Install-Einheit mit Templates und Texten, und ein Manifest `feature.php`, das sagt, was es ist, für welche Nino-Version es geschrieben wurde und welche Einstellungen es anbietet. Ein Feature ist ein Verzeichnis: Es wird vom Panel Features aus dem Katalog installiert oder von Hand nach `features/` gelegt und in der Workbench eingeschaltet. Ein Checkout bringt kein Feature mit; `features/` enthält nichts als seine `.htaccess`. Die Features, die Nino veröffentlicht – `Newsletter` und `Search` darunter –, liegen im Katalog-Repository [dapeio/nino-features](https://github.com/dapeio/nino-features), dort je ein Verzeichnis unterhalb von `features/` mit Manifest – und Tests, wo das Feature sie mitbringt –, und kommen über **Installieren** im Panel in ein Projekt – oder indem dieses Verzeichnis in dessen eigenes `features/` kopiert wird.
 
 Drei Arten von Modulen gibt es in einem Nino-Projekt, und der Unterschied ist, wem das Verzeichnis gehört:
 
@@ -37,7 +37,7 @@ Der Autoloader löst `Nino\Modules\*` als zusammengeführte Sicht über vier Roo
 
 ## Das Panel Features
 
-Das Panel liegt in der Gruppe System der Workbench und verlangt bei jeder Aktion `/_admin/features/manage` – eine Entwicklerberechtigung. Es sortiert jedes Verzeichnis unter `features/`, das ein gültiges Manifest trägt, in drei Tabs – **Aktiv**, **Inaktiv**, **Verfügbar** –, jeder mit einer Anzahl beschriftet, Aktiv zuerst und offen. Daneben stehen zwei Filter: ein Suchfeld über Name, Schlüssel, Beschreibung und Kategorie, und eine Auswahl, die auf eine einzelne Kategorie einschränkt – gebaut aus den Kategorien, die die Features und Angebote auf dem Bildschirm tatsächlich tragen, sie bietet also nie eine Überschrift an, unter der nichts liegt. Beide schränken alle Tabs zugleich ein, und die Anzahlen schränken sich mit ihnen ein, sodass eine Suche sagt, wo der Treffer liegt. Tabs und Filter bleiben oben in der Pane stehen, während die Zeilen scrollen, und innerhalb eines Tabs sind die Features nach dem lokalisierten Namen sortiert; die Kategorie führt die Zeile unter jedem Namen an. Wo auch immer ein Feature steht, zeigt es Name und Beschreibung in der Oberflächensprache, die Version aus dem Manifest und das, was einer Aktivierung entgegensteht: eine Nino-Version, für die das Feature nicht geschrieben wurde, eine PHP-Erweiterung, die fehlt, ein benötigtes Feature, das nicht im Verzeichnis liegt. Die Namen kommen aus dem Manifest selbst, nicht aus Textfills, denn die Fills eines Features, das nicht aktiv ist, sind nicht geladen.
+Das Panel liegt in der Gruppe System der Workbench und verlangt bei jeder Aktion `/_admin/features/manage` – eine Entwicklerberechtigung. Die Panels der Features, die es verwaltet, stehen in der Gruppe, die ihr eigenes `nav()` nennt, und in der Gruppe Features, wenn sie keine nennen – siehe [Das Panel](#das-panel). Es sortiert jedes Verzeichnis unter `features/`, das ein gültiges Manifest trägt, in drei Tabs – **Aktiv**, **Inaktiv**, **Verfügbar** –, jeder mit einer Anzahl beschriftet, Aktiv zuerst und offen. Daneben stehen zwei Filter: ein Suchfeld über Name, Schlüssel, Beschreibung und Kategorie, und eine Auswahl, die auf eine einzelne Kategorie einschränkt – gebaut aus den Kategorien, die die Features und Angebote auf dem Bildschirm tatsächlich tragen, sie bietet also nie eine Überschrift an, unter der nichts liegt. Beide schränken alle Tabs zugleich ein, und die Anzahlen schränken sich mit ihnen ein, sodass eine Suche sagt, wo der Treffer liegt. Tabs und Filter bleiben oben in der Pane stehen, während die Zeilen scrollen, und innerhalb eines Tabs sind die Features nach dem lokalisierten Namen sortiert; die Kategorie führt die Zeile unter jedem Namen an. Wo auch immer ein Feature steht, zeigt es Name und Beschreibung in der Oberflächensprache, die Version aus dem Manifest und das, was einer Aktivierung entgegensteht: eine Nino-Version, für die das Feature nicht geschrieben wurde, eine PHP-Erweiterung, die fehlt, ein benötigtes Feature, das nicht im Verzeichnis liegt. Die Namen kommen aus dem Manifest selbst, nicht aus Textfills, denn die Fills eines Features, das nicht aktiv ist, sind nicht geladen.
 
 Die sieben Aktionen des Panels sind `features/list`, `features/activate`, `features/deactivate`, `features/settings`, `features/remove`, `features/catalogue` und `features/install`; hinter den ersten fünfen stehen `\Nino\Features::all()`, `activate()`, `deactivate()`, `saveSettings()` und `remove()`, hinter den letzten beiden `\Nino\Catalogue::fetch()` und `install()`:
 
@@ -49,7 +49,7 @@ Die sieben Aktionen des Panels sind `features/list`, `features/activate`, `featu
 
 Der Tab **Verfügbar** ist der Katalog: was er anbietet und diese Installation noch nicht aktuell hat. Über den Tabs schickt der Knopf **Katalog aktualisieren** der Aktionsleiste `features/catalogue`, hinter dem `\Nino\Catalogue::fetch()` und `offers()` stehen (`features/install` steht hinter `install()`), und eine Statuszeile nennt, wann der Katalog zuletzt gelesen wurde, oder dass er noch nicht gelesen wurde. Nichts wird von selbst geladen: `features/list` antwortet mit dem, was `\Nino\Catalogue::cached()` zuletzt unter `data/catalogue.php` hinterlassen hat, sodass Verfügbar sich beim Öffnen des Panels sofort füllt, ohne eine eigene Anfrage; nur Aktualisieren ruft `fetch()` erneut auf. Geladen, bietet Verfügbar **Installieren** für ein Feature, das nicht im Verzeichnis liegt, **Update** für eines, das dort in einer älteren Version liegt, und graut, mit dem, was es verlangt, eines aus, von dem keine Version passt – eines, das schon aktuell ist, erscheint hier gar nicht erst. Das Installieren lädt das Archiv, prüft es gegen den signierten Katalog, legt das Verzeichnis an und schaltet das Feature ein; eine Aktualisierung ersetzt das Verzeichnis und wendet bei einem aktiven Feature das Update in einer zweiten Anfrage an, die das Panel von sich aus stellt – die Anfrage, die die Dateien abgelegt hat, ist mit der Klasse der vorigen Version gestartet, und der Hook, den die neue Version mitbringt, kann nur in einer Anfrage laufen, die die neue lädt –, während ein Feature, das das Projekt abgeschaltet hat, abgeschaltet bleibt. Die Angebote selbst werden immer gegen die Features abgeglichen, die gerade auf der Platte liegen, also zeigt sich eine Installation auf Verfügbar auch ohne ein neues Laden. Wo `features/` nicht beschreibbar ist, verlinkt der Tab stattdessen das Archiv, zum Entpacken von Hand. Siehe [Der Katalog](#der-katalog).
 
-**Wichtig:** Ein Panel, das ein Feature mitbringt, erscheint nach dem Aktivieren erst mit dem nächsten Laden der Workbench, und verschwindet nach dem Deaktivieren ebenso erst dann – die Leiste wird einmal je Seitenaufruf aus der Panel-Registry gebaut. Das Panel lädt die Workbench danach selbst neu. Es landet in der eigenen **Features**-Gruppe der Leiste, gleich was sein eigenes `nav()` nennt – siehe [Panels der Workbench](development.de.md#panels-der-workbench) – und bietet seine Berechtigung auf dem Tab Nutzerrollen des Panels Nutzer unter genau dieser Gruppenbezeichnung an; die Rolle **Editor**, die der Assistent vor der Aktivierung geschrieben hat, erhält sie nicht von selbst – gib sie ihr dort.
+**Wichtig:** Ein Panel, das ein Feature mitbringt, erscheint nach dem Aktivieren erst mit dem nächsten Laden der Workbench, und verschwindet nach dem Deaktivieren ebenso erst dann – die Leiste wird einmal je Seitenaufruf aus der Panel-Registry gebaut. Das Panel lädt die Workbench danach selbst neu. Es steht in der Gruppe der Leiste, die sein eigenes `nav()` nennt, wenn das eine der vier ist, und in der eigenen **Features**-Gruppe, wenn es keine oder etwas anderes nennt – siehe [Panels der Workbench](development.de.md#panels-der-workbench) – und bietet seine Berechtigung auf dem Tab Nutzerrollen des Panels Nutzer unter genau dieser Gruppenbezeichnung an; die Rolle **Editor**, die der Assistent vor der Aktivierung geschrieben hat, erhält sie nicht von selbst – gib sie ihr dort.
 
 ## Das Manifest `feature.php`
 
@@ -128,19 +128,29 @@ Ein Shortcode, den ein Feature mitbringt, bleibt ein Shortcode, und ein Builder 
 'components'	=> [
 	'countdown'	=> [
 		'label'				=> [ 'en_US' => 'Countdown', 'de_DE' => 'Countdown' ],
-		'source'			=> 'text',
+		'source'			=> 'none',
 		'attributes'	=> [
-			'style'			=> [ 'type' => 'select', 'options' => [ '', 'big' ], 'default' => '', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ] ],
+			'to'				=> [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Moment', 'de_DE' => 'Zeitpunkt' ] ],
+			'tz'				=> [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Timezone', 'de_DE' => 'Zeitzone' ] ],
+			// der Countdown des Katalogs erklärt units, done und format genauso
 		],
 		'preview'			=> 'block',
 	],
-],
-'stacks'			=> [
-	'gallery'		=> [ 'label' => 'Gallery', 'grid' => true, 'preview' => 'cells' ],
+	'gallery'		=> [
+		'label'				=> [ 'en_US' => 'Gallery', 'de_DE' => 'Galerie' ],
+		'source'			=> 'none',
+		'attributes'	=> [
+			'album'			=> [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Album', 'de_DE' => 'Album' ] ],
+			'columns'		=> [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Columns', 'de_DE' => 'Spalten' ] ],
+		],
+		'preview'			=> 'image',
+	],
 ],
 ```
 
-Der Renderer wird nicht deklariert, sondern abgeleitet wie die Klasse: `[ '\Nino\Modules\<Verzeichnis>', 'component<Name>' ]` für eine Komponente und `stack<Name>` für einen Stack, der Name in Großschreibung der Wortanfänge – `componentCountdown()`, `componentNewsletterSignup()` für `newsletter-signup`, `stackGallery()` –, jeweils mit der Signatur `( array &$appData, array $args ): string`. Der Kernel registriert sie bei jedem Boot, solange das Feature in `/nino/modules` steht, vor dem eigenen `init()` des Features; die Shortcodes gehören dann dem Feature, wie `\Nino\Features::shortcodes()` es an der Klasse des Renderers abliest. Einen Renderer, den die Klasse nicht hat, meldet eine Warnung, und er wird ausgelassen. Ein Schema, das nicht validiert, lehnt das ganze Manifest ab, mit dem Namen der Komponente in der Meldung. Ein Feature registriert eine Komponente per Manifest oder per `\Nino\Modules\Components::addComponent()` in seinem `init()`, nicht beides. Das [Rezept zur Komponente](recipes/component.md) zeigt je eines (nur englisch).
+Der Schlüssel `stacks` nimmt dieselbe Form. Die eigenen Stacks des Kernels – `[stack]`, `[slider]`, `[filter]` und `[list]`, in `Components::init()` registriert – sind dafür das Beispiel, und die Features des Katalogs deklarieren nur Komponenten.
+
+Der Renderer wird nicht deklariert, sondern abgeleitet wie die Klasse: `[ '\Nino\Modules\<Verzeichnis>', 'component<Name>' ]` für eine Komponente und `stack<Name>` für einen Stack, der Name in Großschreibung der Wortanfänge – `componentCountdown()`, `componentNewsletterSignup()` für `newsletter-signup`, das `stackSlider()` des Kernels –, jeweils mit der Signatur `( array &$appData, array $args ): string`. Der Kernel registriert sie bei jedem Boot, solange das Feature in `/nino/modules` steht, vor dem eigenen `init()` des Features; die Shortcodes gehören dann dem Feature, wie `\Nino\Features::shortcodes()` es an der Klasse des Renderers abliest. Einen Renderer, den die Klasse nicht hat, meldet eine Warnung, und er wird ausgelassen. Ein Schema, das nicht validiert, lehnt das ganze Manifest ab, mit dem Namen der Komponente in der Meldung. Ein Feature registriert eine Komponente per Manifest oder per `\Nino\Modules\Components::addComponent()` in seinem `init()`, nicht beides. Das [Rezept zur Komponente](recipes/component.md) zeigt je eines (nur englisch).
 
 ### Das Handbuch
 
@@ -189,8 +199,8 @@ Zeile desselben Tabs, und die **Einstellungen** sind der andere Tab – oder der
 eigenen Panels des Features – mit den Labels und Hinweisen aus dem Manifest. Beides noch einmal zu schreiben heißt, es
 anders zu schreiben.
 
-Das **PHP, das ein Feature anderem Code anbietet**, ist eine README-Frage. Diesen
-Tab öffnet ein Betreiber, um zu erfahren, was auf seiner Seite angekommen ist;
+Das **PHP, das ein Feature anderem Code anbietet**, ist eine Frage des Codes und
+seiner Docblocks. Diesen Tab öffnet ein Betreiber, um zu erfahren, was auf seiner Seite angekommen ist;
 `Modules\Search::getElements()` dazwischen macht beides schwerer zu lesen.
 
 Ein Eintrag, der als einfacher Listeneintrag geschrieben ist, hat keinen Griff
@@ -198,12 +208,12 @@ und ist eine Zeile, die für sich steht – für den Fall, dass das Zusagende ei
 Satz ist und kein Schnipsel:
 
 ```php
-'markup' => [ 'Das Feature bringt kein Formular mit: setze die Section aus dem Panel Templates.' ],
+'markup' => [ 'Das Feature bringt kein Formular mit: setze den Shortcode mit dem Builder.' ],
 ```
 
 Ein Griff ist höchstens 120 Zeichen lang, eine Zeile höchstens 1000, ein
-Abschnitt hat höchstens 40 Einträge. Alles Längere ist ein README, und eines
-davon bringt ein Feature ohnehin mit.
+Abschnitt hat höchstens 40 Einträge. Alles Längere gehört in den Code und seine
+Docblocks, nicht ins Handbuch.
 
 Die ältere Form – ein String oder eine Map `locale => string` davon – wird
 weiterhin gelesen, ein Katalog aus der Zeit vor den Abschnitten funktioniert
@@ -416,7 +426,7 @@ Eine Route, die die Klasse in `init()` registriert, steht nicht in der `config.p
 
 ### Das Panel
 
-Ein Panel ist eine Klasse mit `actions()`, `nav()` und `perm()`, so wie jedes Panel der Workbench; das [Entwickler-Handbuch](development.de.md#panels-der-workbench) listet den ganzen Vertrag, das [Panel-Rezept](recipes/admin-panel.md) führt durch ein vollständiges Panel samt Frontend. Ein Feature-Panel benennt seine Dateien von dort aus, wo seine Klasse liegt – `\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/text' )` –, damit sie mit dem Verzeichnis umziehen, und schützt jede Aktion mit `\Nino\Admin\Admin::guardPerm()`. Eine URI oder ein Aktionsname, den ein Panel der Workbench selbst bereits besitzt, geht nie an ein Feature. Gleich welche Gruppe sein eigenes `nav()` nennt, setzt die Registry es in die **Features**-Gruppe der Leiste – geprüft wird, ob die Klassendatei des Panels unterhalb von `\Nino\Features::dir()` liegt, nicht der Wert, den das Panel selbst geschrieben hat – sodass eine Person mit genau dieser Gruppe jedes aktive Feature-Panel sieht und keines, das ein Kernel- oder `app/`-Modul dort platziert hat.
+Ein Panel ist eine Klasse mit `actions()`, `nav()` und `perm()`, so wie jedes Panel der Workbench; das [Entwickler-Handbuch](development.de.md#panels-der-workbench) listet den ganzen Vertrag, das [Panel-Rezept](recipes/admin-panel.md) führt durch ein vollständiges Panel samt Frontend. Ein Feature-Panel benennt seine Dateien von dort aus, wo seine Klasse liegt – `\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/text' )` –, damit sie mit dem Verzeichnis umziehen, und schützt jede Aktion mit `\Nino\Admin\Admin::guardPerm()`. Eine URI oder ein Aktionsname, den ein Panel der Workbench selbst bereits besitzt, geht nie an ein Feature. `nav()` darf die Gruppe der Leiste als vierten Eintrag nennen: `content`, `structure`, `features` oder `system`, und die Registry behält sie – der Builder nennt `structure`, sein Panel steht also neben Routen. Ein Panel, das keine oder keine der vier nennt, steht in der Gruppe **Features** der Leiste; dort findet eine Person mit genau dieser Gruppe jedes Feature-Panel, das sich keinen Platz gewählt hat. Was ein Panel zu dem eines Features macht, ist seine Klassendatei unterhalb von `\Nino\Features::dir()`, die die Registry prüft, nicht ein Wert, den das Panel selbst geschrieben hat: Ein Kernel- oder `app/`-Modul, das `features` nennt, wird wie eine unbekannte Gruppe abgelehnt.
 
 ### Die Install-Einheit
 
@@ -424,7 +434,7 @@ Ein Panel ist eine Klasse mit `actions()`, `nav()` und `perm()`, so wie jedes Pa
 
 **`elements`** legt Elemente im Projekt an, nur hinzufügend: eine Zuordnung der URI eines Elementtyps (`'privacy'`) zu einer Datei der Einheit (`'elements/privacy.php'`), die die Form einer Typdatei unter `elements/` hat: einen `title`, ein `model` und die Buckets `'*'` und je einen pro Sprache, jeder mit Element-Ids und ihren Feldwerten. `\Nino\Elements::seed()` legt den Typ an, wenn das Projekt ihn nicht hat und die Datei ein `model` mitbringt, fügt ein Element hinzu, das es nicht gibt, und eine Sprachfassung, die ein Element nicht hat, und ersetzt oder löscht nie etwas – nicht bei einer Aktivierung, nicht bei einem Update und nicht, wenn der Assistent eine Einheit mit `$overwrite` anwendet: Elemente sind der Inhalt der Redakteure. Ein Element auf der Grabstein-Liste unter `/nino/elements/removed` in der `config.php` wird nicht wieder hinzugefügt; das Modul Legal schreibt sie für die Abschnitte seiner beiden Typen, wenn jemand einen endgültig löscht. Ein Wert, der nicht zum Modell passt, wird ausgelassen und protokolliert.
 
-So bringt ein Feature, das personenbezogene Daten verarbeitet, seinen **Abschnitt der Datenschutzerklärung** mit, in eigenen Worten: `install/elements/privacy.php` mit dem Typ `privacy` des Moduls Legal, ein Abschnitt je Feature, in jeder Sprache, die es mitliefert. Der Text ist ein Ausgangspunkt und keine Rechtsberatung – der Hinweis steht unter [Legal](development.de.md#legal) und gilt für ihn wie für die Texte des Moduls; sag in der README, dass der Betreiber ihn prüfen muss. Nenne nur, was der Code tut (Name und Laufzeit eines Cookies, was gespeichert wird, wie lange), und nimm Platzhalter (`#/project/company/contact/email#`), statt eine Angabe der Website in den Text zu schreiben. Ein ausgeschaltetes Feature lässt seinen Abschnitt stehen; das Dashboard und der Dialog sagen es, und die Redakteure können ihn ausblenden. `navs` gehört dem Assistenten, wie `key` und `label`: Die Aktivierung eines Features liest es nicht.
+So bringt ein Feature, das personenbezogene Daten verarbeitet, seinen **Abschnitt der Datenschutzerklärung** mit, in eigenen Worten: `install/elements/privacy.php` mit dem Typ `privacy` des Moduls Legal, ein Abschnitt je Feature, in jeder Sprache, die es mitliefert. Der Text ist ein Ausgangspunkt und keine Rechtsberatung – der Hinweis steht unter [Legal](development.de.md#legal) und gilt für ihn wie für die Texte des Moduls; sag im Handbuch, dass der Betreiber ihn prüfen muss. Nenne nur, was der Code tut (Name und Laufzeit eines Cookies, was gespeichert wird, wie lange), und nimm Platzhalter (`#/project/company/contact/email#`), statt eine Angabe der Website in den Text zu schreiben. Ein ausgeschaltetes Feature lässt seinen Abschnitt stehen; das Dashboard und der Dialog sagen es, und die Redakteure können ihn ausblenden. `navs` gehört dem Assistenten, wie `key` und `label`: Die Aktivierung eines Features liest es nicht.
 
 ### Texte
 
@@ -447,7 +457,7 @@ CI führt `php tests/features-smoke.php` – den Vertragstest gegen `tests/fixtu
 
 ## Ausblick
 
-Die Features, die Nino veröffentlicht, kommen aus dem Katalog-Repository [dapeio/nino-features](https://github.com/dapeio/nino-features): dort je ein Verzeichnis unterhalb von `features/`, mit Manifest und – wo das Feature sie mitbringt – Test, README und Changelog, von Hand in das `features/` eines Projekts kopiert, oder aus dem signierten Katalog installiert, den das Repository auf getnino.dev veröffentlicht, siehe [Der Katalog](#der-katalog). Und ein eigener Katalog ist eine Frage von URL und Schlüssel – das Format ist klein genug, um es mit dem `bin/build.php` des Repositorys aus einem Verzeichnis voller Features zu veröffentlichen.
+Die Features, die Nino veröffentlicht, kommen aus dem Katalog-Repository [dapeio/nino-features](https://github.com/dapeio/nino-features): dort je ein Verzeichnis unterhalb von `features/`, mit Manifest und – wo das Feature sie mitbringt – Tests, von Hand in das `features/` eines Projekts kopiert, oder aus dem signierten Katalog installiert, den das Repository auf getnino.dev veröffentlicht, siehe [Der Katalog](#der-katalog). Und ein eigener Katalog ist eine Frage von URL und Schlüssel – das Format ist klein genug, um es mit dem `bin/build.php` des Repositorys aus einem Verzeichnis voller Features zu veröffentlichen.
 
 ## Weiterführende Handbücher
 

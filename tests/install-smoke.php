@@ -298,11 +298,11 @@ check( 'the always-on Form module is present, with nothing picked', in_array( '\
 check( 'the always-on Navigation module is present too', in_array( '\\Nino\\Modules\\Navigation', $configAfterApply['/nino/modules'], true ) === true );
 check( 'and so is the always-on Localepicker module', in_array( '\\Nino\\Modules\\Localepicker', $configAfterApply['/nino/modules'], true ) === true );
 check( 'the one developer tool that still ships as a module is active from the first config on', in_array( '\\Nino\\Modules\\Maintenance', $configAfterApply['/nino/modules'], true ) === true
-	// Neither of the other two is among them any more: the Template Builder is
-	// a feature installed from the catalogue, and the look is no longer a
-	// choice at all - the base unit delivers one theme.css, and the Design
-	// feature that composes a look is a catalogue feature the Features panel
-	// installs, not a module this config could list
+	// Neither of the other two is among them any more: the template editor is
+	// the Builder, a feature installed from the catalogue, and the look is no
+	// longer a choice at all - the base unit delivers one theme.css, and the
+	// Design feature that composes a look is a catalogue feature the Features
+	// panel installs, not a module this config could list
 	&& in_array( '\\Nino\\Modules\\Templates', $configAfterApply['/nino/modules'], true ) === false
 	&& in_array( '\\Nino\\Modules\\Design', $configAfterApply['/nino/modules'], true ) === false );
 // The roles a project starts with are the Users module's defaults, whatever
@@ -620,6 +620,15 @@ if( preg_match( '/class="([^"]*nino-scroll-header[^"]*)"/', $frameMarkup, $match
 
 check( 'the header markup carries the class that rule acts on', preg_match( '/class="[^"]*nino-scroll-header/', $frameMarkup ) === 1 );
 check( 'and the delivered frame gives its bar no height the collapsed state cannot take back'. ( $fixedHeight === [] ? '' : ' - '. implode( ', ', array_unique( $fixedHeight ) ) ), $fixedHeight === [] );
+
+// The Builder writes a div.nino-wrap around a page's sections, and its hero
+// carries no nino-atf - so the rule that takes main's top padding away for a
+// first-child cover or parallax is the frame's own, and it has to know the wrap
+$heroRule 	= preg_match( '/body main:has\(> \.nino-cover:first-child\)([^{}]*)\{\s*padding-top:\s*0;/', $frameStyle, $match ) === 1 ? $match[1] : '';
+
+check( 'the delivered frame takes main\'s top padding away for a cover and a parallax hero', $heroRule !== '' );
+check( '...also when the Builder\'s wrap stands between main and the hero', str_contains( $heroRule, 'main:has(> .nino-wrap > .nino-cover:first-child)' ) === true
+	&& str_contains( $heroRule, 'main:has(> .nino-wrap > .nino-parallex:first-child)' ) === true );
 
 echo "\n";
 

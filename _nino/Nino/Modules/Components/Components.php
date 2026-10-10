@@ -35,8 +35,8 @@ namespace Nino\Modules {
 			for a token of its own	*/
 		public static
 			$html = [
-				'title'				=> '<h[[level]] class="nino-section-title[[style]][[class]]">[[value]]</h[[level]]>',
-				'subtitle'		=> '<p class="nino-section-subtitle[[style]][[class]]">[[value]]</p>',
+				'title'				=> '<[[tag]] class="nino-[[pos]]-title[[style]][[class]]">[[value]]</[[tag]]>',
+				'subtitle'		=> '<[[tag]] class="nino-[[pos]]-subtitle[[style]][[class]]">[[value]]</[[tag]]>',
 				'text'				=> '<div class="nino-section-text[[richtext]][[style]][[class]]">[[value]]</div>',
 				'img'					=> '<img src="[[src]]" width="[[width]]" height="[[height]]" alt="[[alt]]">',
 				'image'				=> '<div class="nino-image[[ratio]][[focus]][[class]]">[[img]]</div>',
@@ -118,10 +118,13 @@ namespace Nino\Modules {
 
 			$components = [
 				[ 'title', 'Title', 'Titel', 'title', 'text', [
-					'level' => [ 'type' => 'select', 'options' => [ '1', '2', '3', '4' ], 'default' => '2', 'label' => [ 'en_US' => 'Level', 'de_DE' => 'Ebene' ] ],
+					'tag' => [ 'type' => 'select', 'options' => [ 'div', 'h2', 'h3', 'h4', 'h5' ], 'default' => 'h3', 'label' => [ 'en_US' => 'HTML-Tag', 'de_DE' => 'HTML-Tag' ] ],
+					'pos' => [ 'type' => 'select', 'options' => [ 'section', 'article' ], 'default' => 'section', 'label' => [ 'en_US' => 'Position', 'de_DE' => 'Position' ] ],
 					'style' => self::_style(),
 				] ],
 				[ 'subtitle', 'Subtitle', 'Untertitel', 'title', 'text', [
+					'tag' => [ 'type' => 'select', 'options' => [ 'div', 'h2', 'h3', 'h4', 'h5' ], 'default' => 'h3', 'label' => [ 'en_US' => 'HTML-Tag', 'de_DE' => 'HTML-Tag' ] ],
+					'pos' => [ 'type' => 'select', 'options' => [ 'section', 'article' ], 'default' => 'section', 'label' => [ 'en_US' => 'Position', 'de_DE' => 'Position' ] ],
 					'style' => self::_style(),
 				] ],
 				[ 'text', 'Text', 'Text', 'text', 'text', [
@@ -1015,8 +1018,8 @@ namespace Nino\Modules {
 		 */
 		public static function componentTitle( array &$appData, array $args ): string {
 			return str_replace(
-				[ '[[level]]', '[[style]]', '[[class]]', '[[value]]' ],
-				[ $args['level'], self::_modifier( 'nino-section-title--', $args['style'] ), self::_modifier( '', $args['class'] ), $args['value'] ],
+				[ '[[tag]]', '[[pos]]', '[[style]]', '[[class]]', '[[value]]' ],
+				[ $args['tag'], $args['pos'], self::_modifier( 'nino-'.$args['pos'].'-title--', $args['style'] ), self::_modifier( '', $args['class'] ), $args['value'] ],
 				self::$html['title']
 			);
 		}
@@ -1031,8 +1034,8 @@ namespace Nino\Modules {
 		 */
 		public static function componentSubtitle( array &$appData, array $args ): string {
 			return str_replace(
-				[ '[[style]]', '[[class]]', '[[value]]' ],
-				[ self::_modifier( 'nino-section-subtitle--', $args['style'] ), self::_modifier( '', $args['class'] ), $args['value'] ],
+				[ '[[tag]]', '[[pos]]', '[[style]]', '[[class]]', '[[value]]' ],
+				[ $args['tag'], $args['pos'], self::_modifier( 'nino-'.$args['pos'].'-subtitle--', $args['style'] ), self::_modifier( '', $args['class'] ), $args['value'] ],
 				self::$html['subtitle']
 			);
 		}

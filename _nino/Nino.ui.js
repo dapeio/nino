@@ -114,7 +114,7 @@
 		 *	The form handler writes the validation error and the server's verdict
 		 *	into the form's first <p>, and that paragraph is a project's own
 		 *	markup - the shipped contact template's, a template a project wrote
-		 *	itself, a preset the Template Builder composed. None of them can be
+		 *	itself, a page the Builder composed. None of them can be
 		 *	asked to remember the attribute, so the component that writes into
 		 *	it is what puts it there. Left alone where the markup already says
 		 *	something, so a form that wants role="alert" keeps it

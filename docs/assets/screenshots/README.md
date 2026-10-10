@@ -1,6 +1,6 @@
 # Screenshot-Briefing
 
-Die englische und die deutsche Root-README zeigen Nino derzeit in vier Bereichen; der fünfte, Editor, ist noch offen. Die Dateien werden unter diesem Verzeichnis abgelegt und relativ als `docs/assets/screenshots/<datei>.webp` eingebunden.
+Die englische und die deutsche Root-README zeigen Nino derzeit in drei Bereichen; der vierte, Editor, ist noch offen. Die Dateien werden unter diesem Verzeichnis abgelegt und relativ als `docs/assets/screenshots/<datei>.webp` eingebunden.
 
 | Bereich | Dateien | Inhalt und Aussage |
 |---|---|---|
@@ -8,7 +8,6 @@ Die englische und die deutsche Root-README zeigen Nino derzeit in vier Bereichen
 | Install | `_install1.webp`, `_install2.webp` | Routenkonfiguration und Abschlussansicht; geführte, notwendige Ersteinrichtung |
 | Admin | `_admin1.webp` | Textfill-Übersicht; technische Kontrolle für Entwickler |
 | Editor | `_editor1.webp`, `_editor2.webp` – noch nicht aufgenommen | Elementbearbeitung und Bildplatzverwaltung; einfache tägliche Pflege für Redakteure |
-| Templates | `_templates1.webp`, `_templates2.webp`, `_templates3.webp` | Section-Canvas, Preset-Library und Live-Vorschau; visuelle Template-Komposition bei lesbarem Quelltext |
 
 ## Empfohlene Aufbereitung
 

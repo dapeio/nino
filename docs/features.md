@@ -11,7 +11,7 @@ This manual explains what a feature is, how an operator switches one on in the w
 
 ## What a Feature Is
 
-A feature is an installable package: one directory below `features/` that brings a module - its runtime class, a workbench panel when it has one, an install unit with templates and texts, and a manifest `feature.php` that says what it is, which Nino version it was written for and which settings it offers. A feature is a directory: it is installed from the catalogue by the Features panel or dropped into `features/` by hand, and switched on in the workbench. A checkout ships no feature at all; `features/` holds nothing but its `.htaccess`. The features Nino publishes - `Newsletter` and `Search` among them - live in the catalogue repository [dapeio/nino-features](https://github.com/dapeio/nino-features), one directory each below `features/` there with its manifest - a test, a README and a changelog where the feature carries them - and arrive in a project through the panel's **Install**, or by copying that directory into its own `features/`.
+A feature is an installable package: one directory below `features/` that brings a module - its runtime class, a workbench panel when it has one, an install unit with templates and texts, and a manifest `feature.php` that says what it is, which Nino version it was written for and which settings it offers. A feature is a directory: it is installed from the catalogue by the Features panel or dropped into `features/` by hand, and switched on in the workbench. A checkout ships no feature at all; `features/` holds nothing but its `.htaccess`. The features Nino publishes - `Newsletter` and `Search` among them - live in the catalogue repository [dapeio/nino-features](https://github.com/dapeio/nino-features), one directory each below `features/` there with its manifest - its tests where the feature carries them - and arrive in a project through the panel's **Install**, or by copying that directory into its own `features/`.
 
 A Nino project has three kinds of modules, and the difference is who owns the directory:
 
@@ -37,7 +37,7 @@ The autoloader resolves `Nino\Modules\*` as a merged view over four roots, in th
 
 ## The Features Panel
 
-The panel sits in the workbench's System group and asks for `/_admin/features/manage` on every action - a developer's permission. It sorts every directory below `features/` that carries a valid manifest into three tabs - **Active**, **Inactive**, **Available** - each labelled with a count, Active first and open. Beside them sit two filters: a search box over name, key, description and category, and a select that narrows to one category - built from the categories the features and offers on screen actually carry, so it never offers a heading nothing is filed under. Both narrow every tab at once and the counts narrow with them, so a search says where the match is. Tabs and filters stay at the top of the pane while the rows scroll, and within a tab the features are sorted by the localized name; the category leads the line under each name. Wherever a feature sits, it shows name and description in the interface language, the version from the manifest, and whatever stands in the way of an activation: a Nino version the feature was not written for, a PHP extension that is missing, a required feature that is not in the directory. The names come from the manifest itself, not from text fills, because the fills of a feature that is not active are not loaded.
+The panel sits in the workbench's System group and asks for `/_admin/features/manage` on every action - a developer's permission. The panels of the features it manages sit in the group their own `nav()` names, and in the Features group when they name none - see [The Panel](#the-panel). It sorts every directory below `features/` that carries a valid manifest into three tabs - **Active**, **Inactive**, **Available** - each labelled with a count, Active first and open. Beside them sit two filters: a search box over name, key, description and category, and a select that narrows to one category - built from the categories the features and offers on screen actually carry, so it never offers a heading nothing is filed under. Both narrow every tab at once and the counts narrow with them, so a search says where the match is. Tabs and filters stay at the top of the pane while the rows scroll, and within a tab the features are sorted by the localized name; the category leads the line under each name. Wherever a feature sits, it shows name and description in the interface language, the version from the manifest, and whatever stands in the way of an activation: a Nino version the feature was not written for, a PHP extension that is missing, a required feature that is not in the directory. The names come from the manifest itself, not from text fills, because the fills of a feature that is not active are not loaded.
 
 The panel's seven actions are `features/list`, `features/activate`, `features/deactivate`, `features/settings`, `features/remove`, `features/catalogue` and `features/install`; behind the first five stand `\Nino\Features::all()`, `activate()`, `deactivate()`, `saveSettings()` and `remove()`, behind the last two `\Nino\Catalogue::fetch()` and `install()`:
 
@@ -49,7 +49,7 @@ The panel's seven actions are `features/list`, `features/activate`, `features/de
 
 The **Available** tab is the catalogue: what it offers that this installation does not already have current. Above the tabs, an action bar's **Refresh catalogue** button posts `features/catalogue`, behind which stand `\Nino\Catalogue::fetch()` and `offers()` (`features/install` stands behind `install()`), and a status line names when the catalogue was last read, or that it has not been read yet. Nothing is fetched on its own: `features/list` answers whatever `\Nino\Catalogue::cached()` last left under `data/catalogue.php`, so Available fills the moment the panel opens without a request of its own; only Refresh calls `fetch()` again. Loaded, Available offers **Install** for a feature not in the directory, **Update** for one there in an older version, and greys out, with what it asks for, one no version of which fits - a feature already current does not appear here at all. Installing downloads the archive, checks it against the signed catalogue, puts the directory in place and switches the feature on; an update replaces the directory and, for an active feature, applies the update in a second request the panel makes on its own - the request that placed the files booted with the previous version's class, and the hook the new version brought can only run in a request that loads the new one - while a feature the project has switched off stays off. The offers themselves are always recomputed against the features on disk now, so an install is reflected on Available without a new fetch either. Where `features/` is not writable, the tab links the archive instead, to unpack by hand. See [The Catalogue](#the-catalogue).
 
-**Important:** A panel a feature brings appears only with the next load of the workbench after activating, and goes only then after deactivating - the rail is built once per page load from the panel registry. The panel reloads the workbench itself after each of them. It lands in the rail's own **Features** group regardless of what its own `nav()` names - see [Panels of the Workbench](development.md#panels-of-the-workbench) - and offers its permission on the roles tab of the Users panel under that same group label; the **Editor** role the wizard wrote before the activation does not receive it by itself - grant it there.
+**Important:** A panel a feature brings appears only with the next load of the workbench after activating, and goes only then after deactivating - the rail is built once per page load from the panel registry. The panel reloads the workbench itself after each of them. It sits in the rail group its own `nav()` names when that is one of the four, and in the rail's own **Features** group when it names none or something else - see [Panels of the Workbench](development.md#panels-of-the-workbench) - and offers its permission on the roles tab of the Users panel under that same group label; the **Editor** role the wizard wrote before the activation does not receive it by itself - grant it there.
 
 ## The Manifest `feature.php`
 
@@ -128,19 +128,29 @@ A shortcode a feature brings stays a shortcode, and a builder cannot offer it. G
 'components'	=> [
 	'countdown'	=> [
 		'label'				=> [ 'en_US' => 'Countdown', 'de_DE' => 'Countdown' ],
-		'source'			=> 'text',
+		'source'			=> 'none',
 		'attributes'	=> [
-			'style'			=> [ 'type' => 'select', 'options' => [ '', 'big' ], 'default' => '', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ] ],
+			'to'				=> [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Moment', 'de_DE' => 'Zeitpunkt' ] ],
+			'tz'				=> [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Timezone', 'de_DE' => 'Zeitzone' ] ],
+			// the catalogue's countdown declares units, done and format the same way
 		],
 		'preview'			=> 'block',
 	],
-],
-'stacks'			=> [
-	'gallery'		=> [ 'label' => 'Gallery', 'grid' => true, 'preview' => 'cells' ],
+	'gallery'		=> [
+		'label'				=> [ 'en_US' => 'Gallery', 'de_DE' => 'Galerie' ],
+		'source'			=> 'none',
+		'attributes'	=> [
+			'album'			=> [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Album', 'de_DE' => 'Album' ] ],
+			'columns'		=> [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Columns', 'de_DE' => 'Spalten' ] ],
+		],
+		'preview'			=> 'image',
+	],
 ],
 ```
 
-The renderer is not declared but derived, like the class: `[ '\Nino\Modules\<Directory>', 'component<Name>' ]` for a component and `stack<Name>` for a stack, the name in studly caps - `componentCountdown()`, `componentNewsletterSignup()` for `newsletter-signup`, `stackGallery()` - each with the signature `( array &$appData, array $args ): string`. The kernel registers them at every boot while the feature is listed in `/nino/modules`, before the feature's own `init()`; the shortcodes then belong to the feature, as `\Nino\Features::shortcodes()` reads it from the class of the renderer. A renderer the class does not have is said in a warning and left out. A schema that does not validate refuses the whole manifest, with the name of the component in the message. A feature registers a component by manifest or by `\Nino\Modules\Components::addComponent()` in its `init()`, not both. The [component recipe](recipes/component.md) shows each.
+The `stacks` key takes the same shape. The kernel's own stacks - `[stack]`, `[slider]`, `[filter]` and `[list]`, registered in `Components::init()` - are the example for it, and the catalogue's features declare components only.
+
+The renderer is not declared but derived, like the class: `[ '\Nino\Modules\<Directory>', 'component<Name>' ]` for a component and `stack<Name>` for a stack, the name in studly caps - `componentCountdown()`, `componentNewsletterSignup()` for `newsletter-signup`, the kernel's own `stackSlider()` - each with the signature `( array &$appData, array $args ): string`. The kernel registers them at every boot while the feature is listed in `/nino/modules`, before the feature's own `init()`; the shortcodes then belong to the feature, as `\Nino\Features::shortcodes()` reads it from the class of the renderer. A renderer the class does not have is said in a warning and left out. A schema that does not validate refuses the whole manifest, with the name of the component in the message. A feature registers a component by manifest or by `\Nino\Modules\Components::addComponent()` in its `init()`, not both. The [component recipe](recipes/component.md) shows each.
 
 ### The Manual
 
@@ -187,8 +197,8 @@ The **description** is the manifest's own `description`, printed as the first
 line of the same tab, and the **settings** are the other tab - or the Settings tab of the feature's
 own panel - with the labels and hints the manifest declares. Writing either again is writing it differently.
 
-The **PHP a feature exposes to other code** is a README question. This tab is
-what an operator opens to find out what arrived on their site; mixing
+The **PHP a feature exposes to other code** is a question for the code and its
+docblocks. This tab is what an operator opens to find out what arrived on their site; mixing
 `Modules\Search::getElements()` into it makes both harder to scan.
 
 An entry written as a plain list item has no handle and is a line that stands on
@@ -196,11 +206,11 @@ its own — for the case where the thing to say is a sentence rather than a
 snippet:
 
 ```php
-'markup' => [ 'The feature ships no form: place the section from the Templates panel.' ],
+'markup' => [ 'The feature ships no form: place the shortcode with the Builder.' ],
 ```
 
 A handle is at most 120 characters, a line at most 1000, a section at most 40
-entries. Anything longer is a README, and a feature carries one of those already.
+entries. Anything longer belongs in the code and its docblocks, not in the manual.
 
 The older form — a string, or a `locale => string` map of one — is still read, so
 a catalogue written before the sections existed keeps working. It is not the one
@@ -414,7 +424,7 @@ A route the class registers in `init()` is not in `config.php`, and can still be
 
 ### The Panel
 
-A panel is a class with `actions()`, `nav()` and `perm()`, like every panel of the workbench; the [Developer Manual](development.md#panels-of-the-workbench) lists the whole contract, the [panel recipe](recipes/admin-panel.md) walks through a complete panel including its frontend. A feature panel names its files from where its class is - `\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/text' )` - so they move with the directory, and guards every action with `\Nino\Admin\Admin::guardPerm()`. A uri or an action name one of the workbench's own panels already owns is never handed to a feature. Whatever group its own `nav()` names, the registry places it in the rail's **Features** group - a panel's class file lying below `\Nino\Features::dir()` is what the registry checks, not the value the panel wrote - so an editor granted that one group sees every active feature's panel and nothing a kernel or `app/` module placed there instead.
+A panel is a class with `actions()`, `nav()` and `perm()`, like every panel of the workbench; the [Developer Manual](development.md#panels-of-the-workbench) lists the whole contract, the [panel recipe](recipes/admin-panel.md) walks through a complete panel including its frontend. A feature panel names its files from where its class is - `\Nino\Admin\Panels::relative( dirname( __DIR__ ). '/text' )` - so they move with the directory, and guards every action with `\Nino\Admin\Admin::guardPerm()`. A uri or an action name one of the workbench's own panels already owns is never handed to a feature. `nav()` may name the rail group as its fourth entry: `content`, `structure`, `features` or `system`, and the registry keeps it - the Builder names `structure`, so its panel sits beside Routes. A panel that names none, or a name that is none of the four, sits in the rail's **Features** group, which is where an editor granted that one group finds every feature's panel that did not choose a place. What makes a panel a feature's is its class file lying below `\Nino\Features::dir()`, which the registry checks, not a value the panel wrote: a kernel or `app/` module naming `features` is refused like an unknown group.
 
 ### The Install Unit
 
@@ -422,7 +432,7 @@ A panel is a class with `actions()`, `nav()` and `perm()`, like every panel of t
 
 **`elements`** puts elements into the project, add-only: a map of an element type's URI (`'privacy'`) to a file of the unit (`'elements/privacy.php'`) that has the shape of a type file under `elements/`: a `title`, a `model` and the buckets `'*'` and one per language, each an element id with its field values. `\Nino\Elements::seed()` creates the type if the project does not have it and the file brings a `model`, adds an element that does not exist and a language version an element does not have, and never replaces or deletes anything - not at an activation, not at an update, and not when the wizard applies a unit with `$overwrite`: elements are the editors' content. An element that is on the tombstone list under `/nino/elements/removed` in `config.php` is not added again; the Legal module writes it for the sections of its two types when somebody deletes one for good. A value that does not fit the model is left out and logged.
 
-This is how a feature that processes personal data brings its **section of the privacy policy**, written in its own words: `install/elements/privacy.php` with the type `privacy` of the Legal module, one section per feature, in every language it ships. The text is a starting point, not legal advice - see [Legal](development.md#legal) for the notice, which applies to it as to the module's own texts; say in your README that the operator has to check it. State only what the code does (a cookie's name and lifetime, what is stored, for how long), and use placeholders (`#/project/company/contact/email#`) instead of writing a fact of the website into the text. A feature that is switched off leaves its section in place; the Dashboard and the dialog say so, and the editor may hide it. `navs` is the wizard's, like `key` and `label`: a feature's activation does not read it.
+This is how a feature that processes personal data brings its **section of the privacy policy**, written in its own words: `install/elements/privacy.php` with the type `privacy` of the Legal module, one section per feature, in every language it ships. The text is a starting point, not legal advice - see [Legal](development.md#legal) for the notice, which applies to it as to the module's own texts; say in your manual that the operator has to check it. State only what the code does (a cookie's name and lifetime, what is stored, for how long), and use placeholders (`#/project/company/contact/email#`) instead of writing a fact of the website into the text. A feature that is switched off leaves its section in place; the Dashboard and the dialog say so, and the editor may hide it. `navs` is the wizard's, like `key` and `label`: a feature's activation does not read it.
 
 ### Text
 
@@ -445,7 +455,7 @@ CI runs `php tests/features-smoke.php` - the contract test against `tests/fixtur
 
 ## Outlook
 
-The features Nino publishes come from the catalogue repository [dapeio/nino-features](https://github.com/dapeio/nino-features): one directory per feature below `features/` there, each with its manifest and, where the feature carries them, a test, a README and a changelog - copied into a project's `features/` by hand, or installed from the signed catalogue the repository publishes at getnino.dev, see [The Catalogue](#the-catalogue). And a catalogue of your own is a matter of a url and a key - the format is small enough to publish from a directory of features with the repository's `bin/build.php`.
+The features Nino publishes come from the catalogue repository [dapeio/nino-features](https://github.com/dapeio/nino-features): one directory per feature below `features/` there, each with its manifest and, where the feature carries them, its tests - copied into a project's `features/` by hand, or installed from the signed catalogue the repository publishes at getnino.dev, see [The Catalogue](#the-catalogue). And a catalogue of your own is a matter of a url and a key - the format is small enough to publish from a directory of features with the repository's `bin/build.php`.
 
 ## Further Manuals
 

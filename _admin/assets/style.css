@@ -872,9 +872,9 @@ a {
    Nino.adminUi.fieldChange() and shown only while the two differ.
 
    Orange rather than red: an unsaved change is a state, not a mistake. It is
-   the same orange the Template Builder marks its unsaved state with, which
-   is what makes it readable as one across the tools rather than as this
-   pane's own invention.
+   the same orange the status line marks unsaved changes with, which is what
+   makes it readable as one across the tools rather than as this pane's own
+   invention.
 
    A span, so a rule a tool writes for the <small> notes in its own fields
    does not also land here. */
@@ -2324,8 +2324,8 @@ a {
 		gap: .5rem;
 		width: 100%;
 		min-height: 0;
-		margin: .6rem 0 .1rem;
-		padding: .2rem .68rem;
+    margin: .1rem 0;
+    padding: .8rem .68rem;
 		border: 0;
 		border-radius: var(--editor-radius-sm);
 		background: transparent;

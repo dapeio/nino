@@ -87,6 +87,43 @@ All notable changes to Nino are documented in this file.
   sized by the row behind it. It took the height of the picture block - the
   cover's own - for its content and grew by 50px at every resize.
 - **Version:** `1.6.0-dev`. The Builder feature that follows asks for `^1.6`.
+- **Nino.css:** a page that opens with a hero behind the header - a cover, a
+  parallax or a fullscreen above the fold - loses the top padding of `main`
+  also when the hero stands inside the Builder's `div.nino-wrap`: each of the
+  three `main:has(> ...:first-child)` rules has a sibling selector
+  `main:has(> .nino-wrap > ...:first-child)`. The wrap itself has no rule. The
+  delivered frame's `theme.css` has the same rule for a first-child cover or
+  parallax - the Builder's own heroes carry no `nino-atf` - and the same
+  wrapped siblings. An existing project keeps its copy of `theme.css`: add
+  `body main:has(> .nino-wrap > .nino-cover:first-child)` and
+  `body main:has(> .nino-wrap > .nino-parallex:first-child)` to the selector
+  list of its `body main:has(> .nino-cover:first-child)` rule in
+  `assets/theme.css`.
+- **Workbench:** a panel a feature brings sits in the rail group its `nav()`
+  names when that is one of `content`, `structure`, `features` and `system`,
+  and in `features` when it names none or anything else, as before - the
+  Builder names `structure`. A panel of anything but a feature that names
+  `features` is still refused like an unknown group. The fixture feature
+  `Sample` names no group now and still lands in `features`. The catalogue's
+  panels already name their groups, so on this kernel they leave Features:
+  Gallery, Forms, Newsletter and Stats go to Content, Builder and Design to
+  Structure (above Routes), Search, Mailer, Protected and Redirects to System;
+  only Hello stays.
+- **Docs:** every reference to the Template Builder, the Templates feature and
+  its manuals points at the Builder feature (`features/Builder` of the
+  catalogue, panel Builder in the Structure group, its manual in `feature.php`):
+  the READMEs, AGENTS.md, ROADMAP.de.md, the workbench, features, concepts,
+  development, deployment, getting-started and setup manuals, and the recipes.
+  The two recipes that travelled with Templates (the section preset and the
+  templates and page units) are gone from the lists, which name six recipes,
+  and the READMEs' status table, which held the kernel's Released row and the
+  Template Builder's Alpha row, gives way to a sentence about a feature's own
+  maturity. The component example in the features manual declares what the
+  catalogue does - `countdown` with the source `none` and its attributes,
+  `gallery` as a component - and keeps the kernel's own stacks as the stack
+  example. The Design feature's manual is its `feature.php`, not a README. The
+  three `_templates` screenshots no README embeds any more are deleted, with
+  their row in the screenshot briefing.
 
 ## v1.5.0 - 2026-10-06
 

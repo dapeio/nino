@@ -3,7 +3,7 @@
 **Additional Links:**
 [Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Features](../features.md)
 
-One of the eight extension recipes of the [Nino agent guide](../../AGENTS.md). Its
+One of the six extension recipes of the [Nino agent guide](../../AGENTS.md). Its
 rules - the required workflow, the core runtime model, the conventions and the
 security review - apply to every step below.
 
@@ -276,21 +276,7 @@ answers that, built on `\Nino\Elements::queryElementValues()`:
   Element field is.
 
 `[elementvalues]` and the `[elements]` loop it filters MUST read the same
-collection, or the buttons match nothing. Inside a Section Library preset do
-not write that slug by hand: a Layout MAY use the compile token
-`[[section:collection:<areaKey>]]`, which resolves to the collection the named
-Elements Area is actually bound to - the auto-generated
-`<page>-<section>-<area>` of a new Area as readily as a type picked under Edit
-Section → Data, so the pair stays correct on the very first insert and after
-any later rebind. The token names a declared Elements Area of the same preset;
-anything else is refused at manifest load.
-[`features/Templates/library/articles-filterable-grid/`](https://github.com/dapeio/nino-features/tree/main/features/Templates/library/articles-filterable-grid)
-is a complete worked example: a [static block](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/recipe-section-preset.md#static-blocks)
-pairs `[elementvalues]` with an Elements Area whose `item.data` stamps each
-card with its own field value.
-
-Outside a preset - an ordinary hand-written page template - there is no such
-token and no Area to follow, so both loops simply name the same collection.
+collection, or the buttons match nothing: both name the same slug.
 
 ## Search indexed Elements
 
@@ -327,8 +313,9 @@ It searches only `Locales::getCurrentLocale()` and returns canonical Elements,
 best first; `getHits()` answers the hits themselves - score, coverage, the
 words that matched - without reading an Element. Not every query word has to
 match: one that finds nothing lowers the hit's coverage, and the coverage
-weighs its score; priorities rank the hits. See the feature's README,
-[Coverage, and why not every word has to match](https://github.com/dapeio/nino-features/blob/main/features/Search/README.md#coverage-and-why-not-every-word-has-to-match).
+weighs its score; priorities rank the hits. The feature's manual, in its
+[`feature.php`](https://github.com/dapeio/nino-features/blob/main/features/Search/feature.php),
+lists its shortcodes, its route, its panel and its callbacks.
 
 Lifecycle is deliberately small and explicit:
 

@@ -376,7 +376,7 @@ namespace Nino\Modules\Text {
 
 		/**
 		 *	The name a template gives itself in its first line,
-		 *	<!-- nino:template-name Home -->, as the Template Builder writes it
+		 *	<!-- nino:template-name Home -->, as the Builder writes it
 		 *
 		 *	@param		string		$file
 		 *

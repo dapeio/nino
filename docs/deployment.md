@@ -157,7 +157,7 @@ Transfer the same behavior explicitly to the server configuration:
 - deny access to dotfiles and dot directories;
 - **deny `private/` entirely** — it is never requested by a browser, only read by PHP;
 - **deny `app/`, `features/` and `tests/` entirely** — the project's own classes and the installed features are server-side source, never requested by a browser, and the suites are run from a shell; each ships its own `.htaccess` for Apache;
-- **deny `_admin/install/library/` entirely** — it is what the wizard copies a project out of, server-side source with nothing public in it; the same goes for the section presets under `features/Templates/library/`, where a project that installed the Template Builder keeps them;
+- **deny `_admin/install/library/` entirely** — it is what the wizard copies a project out of, server-side source with nothing public in it; the same goes for the install units and libraries a feature brings below `features/`;
 - disable directory listing;
 - forward the HTTP `Authorization` header to PHP. With nginx/PHP-FPM this normally requires `fastcgi_param HTTP_AUTHORIZATION $http_authorization;` in the PHP location;
 - do not deliver PHP source and data files as text;
@@ -211,7 +211,7 @@ The paths and PHP-FPM settings of a specific hosting cannot be guessed reliably,
 
 Before initial setup, PHP must be able to create directories and files in the project root. The still missing project paths are created by the wizard or, if needed, by the kernel and are not a manually required prerequisite.
 
-During operation, Nino only needs write permissions for actually changeable content. Depending on usage, this includes `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `private/assets/`, `public/images/`, and `public/.cache/`. The Templates panel additionally needs `private/templates/`; it can create native text keys, Element Types, and image-slot definitions in the configuration. The installer library under `_admin/install/library/` itself remains read-only, as does `_admin/.cache/`'s content once built - the workbench writes its bundles there, so that one directory inside the tool folder needs write access. The project root and PHP source can otherwise remain read-only after installation. Installing a feature from the catalogue in the Features panel is the one exception: it writes `features/` and stages the download below `private/data/.features/`. Without write access to `features/` the panel offers the archive for a manual copy instead, so the directory can stay read-only where features are deployed with the project.
+During operation, Nino only needs write permissions for actually changeable content. Depending on usage, this includes `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `private/assets/`, `public/images/`, and `public/.cache/`. The Builder panel (where the feature is installed) additionally needs `private/templates/`; on save it creates the text keys and image slots its sections name. The installer library under `_admin/install/library/` itself remains read-only, as does `_admin/.cache/`'s content once built - the workbench writes its bundles there, so that one directory inside the tool folder needs write access. The project root and PHP source can otherwise remain read-only after installation. Installing a feature from the catalogue in the Features panel is the one exception: it writes `features/` and stages the download below `private/data/.features/`. Without write access to `features/` the panel offers the archive for a manual copy instead, so the directory can stay read-only where features are deployed with the project.
 
 Grant these permissions to the user under which PHP is executed. World-writable permissions such as `0777` are not a suitable permanent solution. After deployment, the kernel and other PHP source code should not be generally writable.
 
@@ -284,13 +284,13 @@ Grant editor permissions as narrowly as practically possible; the accounts the w
 
 HTTPS protects not only login data but also session cookies and all editorially transmitted content. Permanently redirect HTTP requests to HTTPS and only test login via the final public address.
 
-Additional web server protection for `/_admin` - such as IP allowances or HTTP authentication - can form a useful second barrier under suitable operating conditions. It does not replace the accounts. The Template Builder is a feature, so its whole directory can go from `features/` - which is the point of it being one; the workbench itself stays, because the editors work in it.
+Additional web server protection for `/_admin` - such as IP allowances or HTTP authentication - can form a useful second barrier under suitable operating conditions. It does not replace the accounts. The Builder is a feature, so its whole directory can go from `features/` - which is the point of it being one; the workbench itself stays, because the editors work in it.
 
 ## The Wizard After Setup
 
 Complete the wizard fully. The last step sets the recovery password and locks the wizard. Then remove the `_admin/install/` directory from production delivery.
 
-That takes the installer library under `_admin/install/library/` with it. This is deliberate: the library is setup material, not a runtime feature. Everything it copied already lives in the project - the theme as `assets/theme.css`, the two frames as `templates/frame-header.tpl` and `templates/frame-footer.tpl` - editable by hand and, for the frames, through the Templates panel. Nothing at runtime reads the library.
+That takes the installer library under `_admin/install/library/` with it. This is deliberate: the library is setup material, not a runtime feature. Everything it copied already lives in the project - the theme as `assets/theme.css`, the two frames as `templates/frame-header.tpl` and `templates/frame-footer.tpl` - editable by hand and, for the frames, through the catalogue's Design feature. Nothing at runtime reads the library.
 
 The order is essential:
 
@@ -334,7 +334,7 @@ The smoke tests do not replace project-specific acceptance testing. Additionally
 - forms including validation, sending, and error messages;
 - login, logout, and the permissions of an editor account in `/_admin`;
 - a developer account's access to the Structure and System panels;
-- access and unchanged round-trip in the Template Builder, where the feature is installed;
+- access and unchanged round-trip in the Builder, where the feature is installed;
 - writing and reloading editorial content;
 - behavior behind CDN, proxy, or cache, if used.
 
@@ -345,7 +345,7 @@ A successful call to the homepage does not yet prove that sensitive files are pr
 - dotfiles and dot directories;
 - `config.php` and PHP data files;
 - hidden log and backup directories;
-- internal files from `_admin/`, `app/`, `features/` and `tests/` that are not intended as public assets - the panel templates, the section presets and a feature's install unit among them;
+- internal files from `_admin/`, `app/`, `features/` and `tests/` that are not intended as public assets - the panel templates and a feature's install unit among them;
 - any file below `_admin/install/library/`;
 - `_admin/install/`, after it has been removed.
 
@@ -386,7 +386,7 @@ Security fixes appear on `main`; there is currently no separate LTS line. Theref
 - [ ] Write permissions are limited to the required paths after setup.
 - [ ] The setup wizard was fully completed and `_admin/install/` subsequently removed from production.
 - [ ] Developer and editor accounts are tested, and the recovery password is stored safely.
-- [ ] The Template Builder is either removed from `features/` or consciously kept, and only developer accounts reach it.
+- [ ] The Builder is either removed from `features/` or consciously kept, and only developer accounts reach it.
 - [ ] Editor accounts only have the necessary permissions.
 - [ ] HTTPS and secure session cookies work at the final address.
 - [ ] Error display is disabled and error logging is checked.
@@ -399,5 +399,5 @@ Security fixes appear on `main`; there is currently no separate LTS line. Theref
 
 - [Getting Started](getting-started.md) describes the necessary initial setup.
 - [`/_admin` Workbench](_admin.md) explains every panel, the accounts, backups and the recovery page.
-- The **Template Builder** - page templates composed from whole sections - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md) is there too.
+- The **Builder** - page templates composed from sections, columns and components - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its manual is in its [`feature.php`](https://github.com/dapeio/nino-features/blob/main/features/Builder/feature.php).
 - [Concepts](concepts.md) explains the technical structure behind the deployed project.

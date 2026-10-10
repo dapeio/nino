@@ -1861,7 +1861,7 @@
 			// tab name -> the panel whose pane holds it, and per panel the tab
 			// last open, so coming back to a panel lands where you left it.
 			// Only a pane's direct children count: a panel's own markup (the
-			// Template Builder's, say) may use data-tab for its own purposes
+			// Builder's, say) may use data-tab for its own purposes
 			const tabOwner = {};
 			const lastTab  = {};
 			Object.keys( panels ).forEach( function( panel ) {

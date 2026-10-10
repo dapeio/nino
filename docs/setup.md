@@ -108,7 +108,7 @@ assets/style.css            the project's own, shipped empty
 
 Setup seeds `/nino/html/assets`' bundle with the two project entries if they are not in it yet, and appends rather than replaces - whatever a project added itself keeps its place. `assets/style.css` is written once, empty, and never touched again, so a rule put there overrules everything above it.
 
-Up to Nino 1.1 the wizard asked four questions here - a theme from a catalogue of ten, a header and a footer from thirteen frames, and the design values compiled out of them. It does not any more. The look is changed afterwards by the **Design** feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features/blob/main/features/Design/README.md), which compiles its own `assets/theme.css` and frame templates over the delivered ones - and asks before it replaces a file it did not write.
+Up to Nino 1.1 the wizard asked four questions here - a theme from a catalogue of ten, a header and a footer from thirteen frames, and the design values compiled out of them. It does not any more. The look is changed afterwards by the **Design** feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features/blob/main/features/Design/feature.php), which compiles its own `assets/theme.css` and frame templates over the delivered ones - and asks before it replaces a file it did not write.
 
 ## 3. Routes
 
@@ -175,7 +175,7 @@ Language-independent, in the order the form shows them:
 
 These textfills are used in templates, meta tags, and possibly in the footer or contact forms. `/project/website/general/url` is the site's address without the protocol - `www.example.com` -: the base unit's templates put it behind `https://` for the canonical link, the Open Graph and Twitter tags, the JSON-LD block, `sitemap.xml` and `robots.txt`, and the Form module's mails name it, so set it before the site goes live. The technical ones the base unit blacklists - `/project/website/html/charset`, `/project/website/html/lang` - are deliberately left out here and are edited on the workbench's Text Keys tab afterwards.
 
-The links to the site's profiles elsewhere - Instagram, YouTube and the like - are not asked for here: they are the catalogue feature [Social links](https://github.com/dapeio/nino-features/blob/main/features/Social/README.md), an element type the editors keep under Elements once it is switched on.
+The links to the site's profiles elsewhere - Instagram, YouTube and the like - are not asked for here: they are the catalogue feature [Social links](https://github.com/dapeio/nino-features/blob/main/features/Social/feature.php), an element type the editors keep under Elements once it is switched on.
 
 ## 5. Accounts
 
@@ -239,6 +239,6 @@ It also does not create `private/` or `public/`, nor any of the project director
 
 - [Getting Started](getting-started.md) guides through the necessary initial setup.
 - [`/_admin` Workbench](_admin.md) explains the panels, the accounts and the recovery page.
-- The **Template Builder** - page templates composed from whole sections - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md) is there too.
+- The **Builder** - page templates composed from sections, columns and components - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its manual is in its [`feature.php`](https://github.com/dapeio/nino-features/blob/main/features/Builder/feature.php).
 - Have the imprint and the privacy policy checked before the site goes live, and adapt them to what the website really processes - see the note in [Modules](#modules) above.
 - [Deployment](deployment.md) describes web server configuration, security, and go-live.

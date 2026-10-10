@@ -156,7 +156,7 @@ curl -sSI https://…/ | grep -i 'content-security-policy\|content-type'
 - Zugriffe auf Dotfiles und Dot-Verzeichnisse verweigern;
 - **`private/` vollständig sperren** – es wird nie von einem Browser angefragt, sondern nur von PHP gelesen;
 - **`app/`, `features/` und `tests/` vollständig sperren** – die eigenen Klassen des Projekts und die installierten Features sind serverseitiger Quelltext, den nie ein Browser anfragt, und die Test-Suiten laufen aus der Shell; alle drei bringen für Apache eine eigene `.htaccess` mit;
-- **`_admin/install/library/` vollständig sperren** – es ist das, woraus der Assistent ein Projekt kopiert, serverseitige Quelle ohne irgendetwas Öffentliches darin; dasselbe gilt für die Section-Presets unter `features/Templates/library/`, wo ein Projekt sie liegen hat, das den Template-Baukasten installiert hat;
+- **`_admin/install/library/` vollständig sperren** – es ist das, woraus der Assistent ein Projekt kopiert, serverseitige Quelle ohne irgendetwas Öffentliches darin; dasselbe gilt für die Install-Einheiten und Bibliotheken, die ein Feature unterhalb von `features/` mitbringt;
 - Verzeichnisauflistung deaktivieren;
 - den HTTP-Header `Authorization` an PHP weitergeben. Bei nginx/PHP-FPM ist dafür normalerweise `fastcgi_param HTTP_AUTHORIZATION $http_authorization;` in der PHP-Location erforderlich;
 - PHP-Quell- und Datendateien nicht als Text ausliefern;
@@ -212,7 +212,7 @@ Die Pfade und PHP-FPM-Einstellungen eines konkreten Hostings lassen sich nicht z
 
 Vor der Ersteinrichtung muss PHP in der Projektwurzel Verzeichnisse und Dateien anlegen dürfen. Die noch fehlenden Projektpfade werden vom Assistenten beziehungsweise bei Bedarf vom Kernel erzeugt und sind keine manuell anzulegende Voraussetzung.
 
-Im laufenden Betrieb benötigt Nino Schreibrechte nur für tatsächlich veränderliche Inhalte. Dazu gehören je nach Nutzung `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `private/assets/`, `public/images/` und `public/.cache/`. Das Templates-Panel benötigt zusätzlich `private/templates/`; es kann native Textschlüssel, Elementtypen und Bildplatz-Definitionen in der Konfiguration anlegen. Die Installer-Library unter `_admin/install/library/` selbst bleibt schreibgeschützt; `_admin/.cache/` dagegen braucht Schreibrechte, weil die Workbench ihre Bundles dort baut – das eine Verzeichnis im Werkzeugordner. Projektwurzel und PHP-Quellcode können ansonsten nach der Installation schreibgeschützt bleiben. Das Installieren eines Features aus dem Katalog im Panel Features ist die eine Ausnahme: Es schreibt `features/` und legt den Download unterhalb von `private/data/.features/` zwischen. Ohne Schreibrecht auf `features/` bietet das Panel stattdessen das Archiv zum Kopieren von Hand an, das Verzeichnis kann also schreibgeschützt bleiben, wo Features mit dem Projekt ausgeliefert werden.
+Im laufenden Betrieb benötigt Nino Schreibrechte nur für tatsächlich veränderliche Inhalte. Dazu gehören je nach Nutzung `private/config.php`, `private/text/`, `private/elements/`, `private/data/`, `private/.logs/`, `private/.backups/`, `private/assets/`, `public/images/` und `public/.cache/`. Das Panel Builder (wo das Feature installiert ist) benötigt zusätzlich `private/templates/`; beim Speichern legt es die Textschlüssel und Bildplätze an, die seine Sections nennen. Die Installer-Library unter `_admin/install/library/` selbst bleibt schreibgeschützt; `_admin/.cache/` dagegen braucht Schreibrechte, weil die Workbench ihre Bundles dort baut – das eine Verzeichnis im Werkzeugordner. Projektwurzel und PHP-Quellcode können ansonsten nach der Installation schreibgeschützt bleiben. Das Installieren eines Features aus dem Katalog im Panel Features ist die eine Ausnahme: Es schreibt `features/` und legt den Download unterhalb von `private/data/.features/` zwischen. Ohne Schreibrecht auf `features/` bietet das Panel stattdessen das Archiv zum Kopieren von Hand an, das Verzeichnis kann also schreibgeschützt bleiben, wo Features mit dem Projekt ausgeliefert werden.
 
 Vergib diese Rechte an den Benutzer, unter dem PHP ausgeführt wird. Weltweit beschreibbare Rechte wie `0777` sind keine geeignete Dauerlösung. Nach dem Deployment sollten Kernel und übriger PHP-Quellcode nicht allgemein beschreibbar sein.
 
@@ -287,13 +287,13 @@ Vergib Redaktionsrechte so eng wie praktisch möglich; die Konten, die der Assis
 
 HTTPS schützt nicht nur Anmeldedaten, sondern auch Sitzungs-Cookies und alle redaktionell übertragenen Inhalte. Leite HTTP-Anfragen dauerhaft auf HTTPS um und teste die Anmeldung nur über die endgültige öffentliche Adresse.
 
-Zusätzlicher Webserver-Schutz für `/_admin` – etwa IP-Freigaben oder HTTP-Authentifizierung – kann bei passenden Betriebsbedingungen eine sinnvolle zweite Barriere bilden. Er ersetzt die Konten nicht. Der Template-Baukasten ist ein Feature, sein ganzes Verzeichnis kann also aus `features/` verschwinden – genau dafür ist er eines; die Workbench selbst bleibt, weil die Redaktion darin arbeitet.
+Zusätzlicher Webserver-Schutz für `/_admin` – etwa IP-Freigaben oder HTTP-Authentifizierung – kann bei passenden Betriebsbedingungen eine sinnvolle zweite Barriere bilden. Er ersetzt die Konten nicht. Der Builder ist ein Feature, sein ganzes Verzeichnis kann also aus `features/` verschwinden – genau dafür ist er eines; die Workbench selbst bleibt, weil die Redaktion darin arbeitet.
 
 ## Der Assistent nach der Einrichtung
 
 Schließe den Assistenten vollständig ab. Der letzte Schritt setzt das Recovery-Passwort und sperrt den Assistenten. Entferne anschließend das Verzeichnis `_admin/install/` aus der produktiven Auslieferung.
 
-Damit verschwindet auch die Installer-Library unter `_admin/install/library/`. Das ist beabsichtigt: Die Library ist Einrichtungsmaterial, kein Laufzeitfeature. Alles, was sie kopiert hat, liegt längst im Projekt – das Theme als `assets/theme.css`, die beiden Frames als `templates/frame-header.tpl` und `templates/frame-footer.tpl` – und bleibt von Hand und, für die Frames, über das Templates-Panel bearbeitbar. Zur Laufzeit liest niemand die Library.
+Damit verschwindet auch die Installer-Library unter `_admin/install/library/`. Das ist beabsichtigt: Die Library ist Einrichtungsmaterial, kein Laufzeitfeature. Alles, was sie kopiert hat, liegt längst im Projekt – das Theme als `assets/theme.css`, die beiden Frames als `templates/frame-header.tpl` und `templates/frame-footer.tpl` – und bleibt von Hand und, für die Frames, über das Design-Feature des Katalogs bearbeitbar. Zur Laufzeit liest niemand die Library.
 
 Die Reihenfolge ist wesentlich:
 
@@ -337,7 +337,7 @@ Die Smoke-Tests ersetzen keinen projektspezifischen Abnahmetest. Prüfe zusätzl
 - Formulare einschließlich Validierung, Versand und Fehlermeldungen;
 - Anmeldung, Abmeldung und die Rechte eines Redaktionskontos in `/_admin`;
 - den Zugang eines Entwicklerkontos zu den Panels von Struktur und System;
-- Zugriff und unveränderten Round-Trip im Template-Baukasten, sofern das Feature installiert ist;
+- Zugriff und unveränderten Round-Trip im Builder, sofern das Feature installiert ist;
 - Schreiben und erneutes Laden eines redaktionellen Inhalts;
 - Verhalten hinter CDN, Proxy oder Cache, sofern eingesetzt.
 
@@ -348,7 +348,7 @@ Ein erfolgreicher Aufruf der Startseite belegt noch nicht, dass sensible Dateien
 - Dotfiles und Dot-Verzeichnisse;
 - `config.php` und PHP-Datendateien;
 - versteckte Log- und Backup-Verzeichnisse;
-- interne Dateien aus `_admin/`, `app/`, `features/` und `tests/`, die nicht als öffentliche Assets vorgesehen sind – die Panel-Templates, die Section-Presets und die Install-Einheit eines Features darunter;
+- interne Dateien aus `_admin/`, `app/`, `features/` und `tests/`, die nicht als öffentliche Assets vorgesehen sind – die Panel-Templates und die Install-Einheit eines Features darunter;
 - jede Datei unter `_admin/install/library/`;
 - `_admin/install/`, nachdem es entfernt wurde.
 
@@ -391,7 +391,7 @@ Sicherheitskorrekturen erscheinen auf `main`; eine getrennte LTS-Linie gibt es d
 - [ ] Schreibrechte sind nach der Einrichtung auf die benötigten Pfade begrenzt.
 - [ ] Der Einrichtungsassistent wurde vollständig abgeschlossen und `_admin/install/` anschließend produktiv entfernt.
 - [ ] Entwickler- und Redaktionskonten sind getestet, und das Recovery-Passwort ist sicher verwahrt.
-- [ ] Der Template-Baukasten ist entweder aus `features/` entfernt oder bewusst behalten, und nur Entwicklerkonten erreichen ihn.
+- [ ] Der Builder ist entweder aus `features/` entfernt oder bewusst behalten, und nur Entwicklerkonten erreichen ihn.
 - [ ] Editor-Nutzer haben nur die benötigten Berechtigungen.
 - [ ] HTTPS und sichere Session-Cookies funktionieren an der endgültigen Adresse.
 - [ ] Fehleranzeige ist deaktiviert und Fehlerprotokollierung geprüft.
@@ -404,5 +404,5 @@ Sicherheitskorrekturen erscheinen auf `main`; eine getrennte LTS-Linie gibt es d
 
 - [Erste Schritte](getting-started.de.md) beschreibt die notwendige Ersteinrichtung.
 - [`/_admin`-Workbench](_admin.de.md) erklärt jedes Panel, die Konten, Sicherungen und die Recovery-Seite.
-- Der **Template-Baukasten** – Seitentemplates aus ganzen Abschnitten – ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); sein [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) liegt dort ebenfalls.
+- Der **Builder** – Seitentemplates aus Sections, Spalten und Komponenten – ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); sein Handbuch steht in seiner [`feature.php`](https://github.com/dapeio/nino-features/blob/main/features/Builder/feature.php).
 - [Grundkonzepte](concepts.de.md) erklärt die technische Struktur hinter dem deployten Projekt.

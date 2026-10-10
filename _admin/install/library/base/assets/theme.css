@@ -662,7 +662,9 @@ body main {
 }
 
 body main:has(> .nino-cover:first-child),
-body main:has(> .nino-parallex:first-child) {
+body main:has(> .nino-wrap > .nino-cover:first-child),
+body main:has(> .nino-parallex:first-child),
+body main:has(> .nino-wrap > .nino-parallex:first-child) {
 	padding-top: 0;
 }
 

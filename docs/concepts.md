@@ -135,7 +135,7 @@ The loaded `.tpl` file can contain shortcodes and textfills in addition to HTML:
 
 This way, multiple template files can be combined into a complex HTML structure.
 
-Page templates can be composed from complete HTML and `[template]` sections via the Template Builder. It is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md) is there too. It saves normal, readable `.tpl` markup and does not replace testing the finished website in the browser; lower-level structure work remains possible through HTML+ or code.
+Page templates can be composed from sections, columns and components via the Builder. It is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its manual is in its [`feature.php`](https://github.com/dapeio/nino-features/blob/main/features/Builder/feature.php). It saves normal, readable `.tpl` markup and does not replace testing the finished website in the browser; lower-level structure work remains possible through HTML+ or code.
 
 Nino processes an HTML string in a fixed order during each rendering pass:
 
@@ -174,13 +174,13 @@ settings. A **project module** is the project's own code under
 
 ## The Workbench `/_admin`
 
-One management interface with one login. It has its own entry point (`_admin/index.php`) and is not a frontend module from `/nino/modules`; every screen in it is a panel, and a module or an installed feature can contribute one, which lands in the rail's own Features group:
+One management interface with one login. It has its own entry point (`_admin/index.php`) and is not a frontend module from `/nino/modules`; every screen in it is a panel, and a module or an installed feature can contribute one: a feature's sits in the rail group its `nav()` names when that is one of the four, and in the rail's own Features group when it names none or something else; a module's sits in the group it names, never Features, and in Content when it names none:
 
 | Group | Panels | Responsibility |
 |---|---|---|
 | Content | Dashboard, Elements (with Element Types), Text (with Text Keys), Images (with Image Slots), Submissions, Log | daily maintenance of content, images and operational data; the tabs in brackets hold the shape of that content and are the developer's |
 | Structure | Routes, Navigations | the project's structure: its routes and menus |
-| Features | whatever the active features bring | one group for every installed feature's panel, whatever group its own `nav()` names; no heading while nothing is in it |
+| Features | feature panels that name Features, none of the four groups, or another word | the panel of an installed feature that names Features, none of the four groups, or another word; no heading while nothing is in it |
 | System | Users (with User roles and Login protection), Language (with Translations), Backups, Config, Features | accounts and roles, languages and the translation hand-off, restore, technical configuration, installed features |
 
 An account holds a role, a role a set of permissions, one per panel or tab; the wizard writes **Editor** (every Content permission) and **Developer** (`/*`), and the Users panel's roles tab edits them. A panel an account may not use is not rendered. The separation therefore runs between full development access and permission-controlled editorial work - inside one tool. Until the project exists, the same route serves the [setup wizard](setup.md); `/_admin/recovery.php` is the way back in when the accounts themselves are broken. See the [`/_admin` manual](_admin.md).
@@ -191,7 +191,7 @@ An account holds a role, a role a set of permissions, one per panel or tab; the 
 |---|---|
 | Change page title | textfill in `text/` or the Text panel |
 | Add new team member | element in the Elements panel |
-| Compose a page from complete sections | the [Template Builder](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md), a feature from the catalogue (Alpha) |
+| Compose a page from sections, columns and components | the [Builder](https://github.com/dapeio/nino-features/tree/main/features/Builder), a feature from the catalogue |
 | Change lower-level HTML structure | HTML+ Editor or `.tpl` file in `templates/` |
 | Create new public URL | route in `config.php` or the Routes panel |
 | Output dynamic list | element query or shortcode with callback |
@@ -203,6 +203,6 @@ An account holds a role, a role a set of permissions, one per panel or tab; the 
 
 - [Getting Started](getting-started.md) guides through the necessary initial setup.
 - [`/_admin` Workbench](_admin.md) explains every panel, the roles and the recovery page.
-- The **Template Builder** - page templates composed from whole sections - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md) is there too.
+- The **Builder** - page templates composed from sections, columns and components - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its manual is in its [`feature.php`](https://github.com/dapeio/nino-features/blob/main/features/Builder/feature.php).
 - [Features](features.md) explains installable features and their manifest.
 - [Deployment](deployment.md) describes the path from the local website to secure operation.

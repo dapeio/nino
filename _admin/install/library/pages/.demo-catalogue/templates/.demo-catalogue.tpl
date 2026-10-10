@@ -4,17 +4,18 @@
 <!-- =====================================================================
      Demo: Katalog
 
-     Zwei Hälften. Oben jedes Section-Preset des Template Builders, in jedem
-     Layout, das es mitbringt, dazu die Varianten, die sein Aussehen ändern:
-     die Stile seiner Bereiche und die Rahmen-Einstellungen der Section.
-     Unten jeder Baustein, den Nino.css mitbringt, in derselben Reihenfolge,
-     in der die Stylesheet-Abschnitte sortiert sind.
+     Zwei Hälften. Oben jedes Section-Preset des früheren Template Builders,
+     in jedem Layout, das es mitbrachte, dazu die Varianten, die sein Aussehen
+     änderten: die Stile seiner Bereiche und die Rahmen-Einstellungen der
+     Section. Unten jeder Baustein, den Nino.css mitbringt, in derselben
+     Reihenfolge, in der die Stylesheet-Abschnitte sortiert sind.
 
-     Die Sections der oberen Hälfte sind echte Ausgabe des Builders: sie
-     wurden mit ihm zusammengesetzt, ihre Elements-Schleifen sind mit
-     Beispieldaten ausgeschrieben und ihre Bild-Slots mit den drei SVGs
-     dieser Einheit gefüllt. Deshalb braucht die Seite weder Element-Typen
-     noch Textbausteine - sie rendert direkt nach der Installation.
+     Die Sections der oberen Hälfte sind Muster dessen, was Nino.css
+     gestaltet; der frühere Template Builder hat sie zusammengesetzt, ihre
+     Elements-Schleifen sind mit Beispieldaten ausgeschrieben und ihre
+     Bild-Slots mit den drei SVGs dieser Einheit gefüllt. Deshalb braucht
+     die Seite weder Element-Typen noch Textbausteine - sie rendert direkt
+     nach der Installation.
      ===================================================================== -->
 
 <section class="nino-section nino-section--dark nino-mt-0 nino-mb-0" id="katalog" aria-labelledby="katalog-title">
@@ -22,7 +23,7 @@
 		<div class="nino-grid-100">
 			<h2 class="nino-section-title nino-text-left" id="katalog-title">Catalogue</h2>
 			<p class="nino-section-subtitle nino-text-left">17 section presets in 37 layouts and every component from Nino.css — on a single page, using the typography and colours of the installed theme.</p>
-			<p class="nino-section-text nino-text-left">Every section here is actual output from the Template Builder. The bar above each example names the preset, layout and frame settings used to build it.</p>
+			<p class="nino-section-text nino-text-left">Every section here is a specimen of what Nino.css styles; the presets are those of the former Template Builder. The bar above each example names the preset, layout and frame settings used to build it.</p>
 		</div>
 	</div>
 </section>
@@ -93,7 +94,7 @@
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100">
 			<h2 class="nino-section-title nino-text-left" id="katalog-presets-title">1 · Section-Presets</h2>
-			<p class="nino-section-subtitle nino-text-left">What the Template Builder inserts when “Add Section” is selected in the editor.</p>
+			<p class="nino-section-subtitle nino-text-left">What the former Template Builder inserted when “Add Section” was selected in the editor.</p>
 		</div>
 	</div>
 </section>
@@ -1044,7 +1045,7 @@
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100">
 			<h2 class="nino-section-title nino-text-left">Frame</h2>
-			<p class="nino-section-subtitle nino-text-left">The same section, once for each frame setting in the Builder.</p>
+			<p class="nino-section-subtitle nino-text-left">The same section, once for each frame setting of the former Template Builder.</p>
 		</div>
 	</div>
 </section>

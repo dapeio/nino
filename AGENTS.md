@@ -2,9 +2,8 @@
 
 This file is the operational specification for AI agents that modify Nino. It
 is intentionally explicit and repetitive enough for small models. Follow it
-before copying patterns from memory or from another framework. The eight
-extension recipes section 7 lists are part of it - six under `docs/recipes/`,
-two with the Templates feature in the catalogue.
+before copying patterns from memory or from another framework. The six
+extension recipes section 7 lists, under `docs/recipes/`, are part of it.
 
 Nino is a filesystem-based PHP website framework. It has no database, Composer
 dependency, JavaScript build step, component framework, or plugin manager.
@@ -79,7 +78,7 @@ Do not use “page”, “template”, “module”, and “admin module” inte
 | Add a shortcode that a tool can offer - a source for its value and typed attributes with defaults - or one that loops the elements of a type around its content | Component or stack - `\Nino\Modules\Components::addComponent()` and `addStack()` from a module's `init()`, or the `components` and `stacks` keys of a feature manifest, see the [component recipe](docs/recipes/component.md) |
 | Make a kernel or project module selectable and copyable during the setup wizard | Installer module package |
 | Package an installable feature - a module with a manifest, settings and a version, switched on in the workbench after setup | Feature - `features/<Name>/` with `feature.php`, see the [feature recipe](docs/recipes/feature.md) |
-| Add an insertable visual building block to the Templates panel | Section preset - in the Template Builder feature of the catalogue, not here |
+| Compose a page template out of sections, columns and components in the workbench | The Builder - the feature `features/Builder` of the catalogue, panel Builder in the Structure group, not here |
 | Add a complete starting page to the installation library | Page library unit |
 | Add reusable HTML+ included by other templates | Reusable `.tpl` template |
 | Map a public HTTP URL to output | Route |
@@ -90,8 +89,9 @@ These pieces can cooperate but remain separate:
 
 - A **route** maps an HTTP method and public URI to a response.
 - A **page template** is a `templates/page-*.tpl` file rendered by a route.
-- A **section preset** is source copied into a page template by the Template
-  Builder. It has no runtime identity after insertion.
+- The **Builder** is a feature of the catalogue that reads a page template into
+  sections, rows, columns and components and writes it back: the `.tpl` file is
+  the truth, and what the Builder does not read it leaves byte for byte.
 - A **runtime module** registers PHP behavior at boot.
 - An **installer module package** selects, copies, and configures a runtime
   module in the setup wizard. It is not the runtime module itself.
@@ -102,6 +102,9 @@ These pieces can cooperate but remain separate:
 - A **panel** is one screen of the workbench `/_admin`. It is not an entry in
   `/nino/modules`; a runtime module answers `adminPanels()` with it, and an
   account sees it only with the permission the panel declares.
+  A feature's panel sits in the rail group its `nav()` names when that is one
+  of `content`, `structure`, `features` and `system`, else in `features`; a
+  panel of anything but a feature may not name `features`.
 
 When a feature spans types, implement each layer explicitly. For example, a
 catalog can need a runtime module, an installer package, an element type, a
@@ -133,9 +136,9 @@ Important source directories:
 | `_admin/install/Install.php` | The setup wizard - the workbench's first-run mode, served by the same route while `Admin::isInstalled()` says no; deletable after setup |
 | `_admin/install/library/base/`, `modules/`, `pages/<slug>/` | The wizard's library: always-applied base, units without a runtime class, installable page units |
 | `_admin/install/library/base/assets/theme.css`, `base/templates/frame-header.tpl`, `frame-footer.tpl` | The one look every project starts from, delivered by the base unit: the compiled design tokens, the roles they are assigned to, the three webfaces and the css for both frames, plus the two frame templates `html-header.tpl` includes through `[template /templates/frame-header]`. Edited by hand; there is no generator behind it any more |
-| the appearance catalogue | Not here since 1.2: the ten themes, six headers and seven footers the wizard used to offer, and the Design panel that kept them editable, left the kernel and are no wizard step any more. The look is changed afterwards by the catalogue's [Design](https://github.com/dapeio/nino-features/blob/main/features/Design/README.md) feature, which compiles a set per part of the page and two frames into the `assets/theme.css` and frame templates the base unit delivers. The file stays one you may edit by hand: the compiler refuses to replace a file it did not write until the person applying says so. Its README and `library/base.css` carry the token contract |
-| the Template Builder | Not here since 1.2: extracted into the feature [`features/Templates`](https://github.com/dapeio/nino-features/blob/main/features/Templates/README.md) of the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features), with its section preset library, its two tests and its manual. A project that installed it carries it below `features/`, where the autoloader serves `\Nino\Modules\Templates` from - the kernel root resolves first, so a Nino that still shipped the module would shadow it. Which kernels the feature declares itself for is its own manifest's business, in that repository |
-| the social media links | Not in the base unit after 1.3.1: the four network keys, the heading of the social links, `html-socialmedia.tpl` and the `.nino-socialmedia` rules of `Nino.css` are the feature [`features/Social`](https://github.com/dapeio/nino-features/blob/main/features/Social/README.md) of the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) - an element type `/social` the editors keep, drawn by `[social]`, `[social-link]` and `[social-icon]`. The Design feature's frames include the template it installs, `templates/social-links.tpl`, which renders as nothing where the feature is not there |
+| the appearance catalogue | Not here since 1.2: the ten themes, six headers and seven footers the wizard used to offer, and the Design panel that kept them editable, left the kernel and are no wizard step any more. The look is changed afterwards by the catalogue's [Design](https://github.com/dapeio/nino-features/blob/main/features/Design/feature.php) feature, which compiles a set per part of the page and two frames into the `assets/theme.css` and frame templates the base unit delivers. The file stays one you may edit by hand: the compiler refuses to replace a file it did not write until the person applying says so. `library/base.css` carries the token contract |
+| the Builder | Not here: the feature [`features/Builder`](https://github.com/dapeio/nino-features/tree/main/features/Builder) of the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features), panel Builder in the Structure group of the rail, its manual in its `feature.php`. It replaces the Template Builder (`features/Templates`) that left the kernel with 1.2 and the catalogue after it: a project that installed that one carries it below `features/` until it is removed. The kernel's part of it is the `Components` module, the registry the Builder reads, and the `div.nino-wrap` rules of `Nino.css`. A project that installed the Builder carries it below `features/`, where the autoloader serves `\Nino\Modules\Builder` from. Which kernels the feature declares itself for is its own manifest's business, in that repository |
+| the social media links | Not in the base unit after 1.3.1: the four network keys, the heading of the social links, `html-socialmedia.tpl` and the `.nino-socialmedia` rules of `Nino.css` are the feature [`features/Social`](https://github.com/dapeio/nino-features/blob/main/features/Social/feature.php) of the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) - an element type `/social` the editors keep, drawn by `[social]`, `[social-link]` and `[social-icon]`. The Design feature's frames include the template it installs, `templates/social-links.tpl`, which renders as nothing where the feature is not there |
 | `public/` | The project's public half — everything a browser loads directly: `images/`, `favicon/`, `fonts/`, and the generated `.cache/` bundles. Reached through `Filesystem::path()` on disk and `Filesystem::url()` (or the `[[/nino/public]]` fill) for urls. Never build a public url by hand from `[[/nino/dir]]`. `assets/` is *not* here — the bundle sources are private, see below |
 | project root | `index.php`, `router.php`, `_nino/`, `_admin/`, `app/` and `features/`. `Filesystem::getPath()`. The workbench serves its own js/css from here, so a tool file's url uses the plain project dir, not the public prefix |
 | `private/` | The project's private half — never served, only read by PHP: `config.php` (the accounts among it), `templates/`, `text/`, `elements/`, `data/` (runtime records, the login throttle's counters among them — `auth-tries.php`, see `Auth::TRIES_PATH`), `assets/` (the stylesheet and script sources `Modules\Assets` concatenates into `public/.cache/` — nothing ever requests one directly), plus `.auth/` (the recovery secret and the backup key), `.logs/` and `.backups/`. Reached through `Filesystem::path()` (which resolves `PRIVATE_DIRS` against it) or the virtual `Filesystem::CONTENT_DIR` prefix (`/private`); moved by `NINO_PRIVATE_DIR` (`NINO_CONTENT_DIR`, its name before 1.1, is refused at boot rather than ignored). Never write project state into a tool folder or into `config.php` — the first breaks updates, the second is rolled back by a Restore. **A checkout ships none of this**: the wizard creates the directory, brings its own deny rule (`_admin/install/library/base/private/.htaccess`) and writes the first `config.php` at the end of Setup. Framework defaults live in `\Nino\AppData::DEFAULTS` and sit *under* that file, so config.php holds only what this project decided |
@@ -145,7 +148,7 @@ Important source directories:
 | `tests/*-js-smoke.js` | Standalone Node/browser-logic tests |
 | `phpstan.neon`, `phpstan-baseline.neon`, `eslint.config.mjs`, `.editorconfig` | Static analysis and editor defaults. The baseline lists the findings that were open when the check arrived: remove an entry when its finding is fixed, never add one to silence a new finding |
 | `docs/` | Human manuals in English and German |
-| `docs/recipes/` | Six of the eight extension recipes of this guide, English only; the other two travel with the Templates feature, as section 7 lists |
+| `docs/recipes/` | The six extension recipes of this guide, English only |
 
 Project content and generated destinations:
 
@@ -391,7 +394,7 @@ Three shapes MAY carry markup in PHP, and nothing else:
 
 Two things that look like exceptions and are not: a **document format** built
 from data (`sitemap.xml`, `robots.txt`, an RSS feed) is a serialisation rather
-than a view, and a **builder whose product is markup** (the Template Builder
+than a view, and a **builder whose product is markup** (the Builder
 feature composes `.tpl` source) is writing its output, not rendering itself.
 Both MUST say so where the markup is.
 
@@ -512,7 +515,7 @@ the `text()` directory beside its panel, and `[jstext]` hands all of them to
 dashboard tile's or a permission's label - may be a fill key or literal text;
 `Nino.adminUi.text()` resolves it either way - which is also how a value that
 is both shown and compared stays translatable: send a slug and name it on the
-client (see the Template Builder's `includeKind()` and `categoryLabel()`), never
+client (see the Features panel's `_categoryLabel()`), never
 compare against a word a locale file can change.
 
 **One way to the server, one way to say what failed.** A panel's `_apiCall`
@@ -563,10 +566,7 @@ end - it renders the whole workbench in both interface languages and fails on an
 `[[fill]]` that came out the other side unresolved, which is the only version a
 key its regexes do not recognise cannot slip past. A schema two surfaces share keeps its English as the
 fallback, and the panel looks for a fill of its own first. The recovery page
-and the setup wizard are English by design, as is the section library's own
-preset content (a manifest's `name`, `description`, `category` and area
-labels) - the panel renders all of it through `Nino.adminUi.text()`, so a
-manifest may use fill keys instead.
+and the setup wizard are English by design.
 
 ### The shared data table
 
@@ -623,10 +623,8 @@ formatting as plain functions — extend and test there, not in the renderer.
 
 ## 7. Recipes
 
-The eight extension recipes are listed below: six live under `docs/recipes/`,
-the two about section presets and templates with the Templates feature in the
-catalogue. They are part of this
-specification: every rule above applies inside them, and a change to a
+The six extension recipes are listed below, under `docs/recipes/`. They are
+part of this specification: every rule above applies inside them, and a change to a
 contract they describe updates the recipe in the same commit. Section 3
 decides which one applies.
 
@@ -636,8 +634,6 @@ decides which one applies.
 | [Add a runtime module](docs/recipes/runtime-module.md) | PHP behaviour at boot, a shortcode, a state-changing endpoint, module configuration |
 | [Add a component](docs/recipes/component.md) | a shortcode with a schema - a component, or a stack that loops the elements of a type - from a project or a feature's manifest |
 | [Add an installer module package](docs/recipes/installer-package.md) | a module the setup wizard can select, copy and configure |
-| [Add a Section Library preset](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/recipe-section-preset.md) | an insertable building block for the Template Builder - the recipe travels with the feature, in the catalogue |
-| [Write templates and installable page units](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/recipe-templates-and-pages.md) | page and reusable `.tpl` templates, header/footer slots, installable page units |
 | [Define Element types for repeated content](docs/recipes/element-types.md) | repeated structured content: model fields, uris, rendering, search |
 | [Package a feature](docs/recipes/feature.md) | a module delivered as one directory under `features/`, with a manifest, settings, a version and its own test, switched on in the Features panel |
 
@@ -747,7 +743,7 @@ or escaping.
   policy: `install/elements/privacy.php` and the unit key `elements` (add-only,
   see `\Nino\Elements::seed()`), written in its own words and stating only
   what the code does. The text is a starting point and no legal advice - say so
-  in the feature's README. A value of the website belongs in a placeholder
+  in the feature's manual. A value of the website belongs in a placeholder
   (`#/project/company/contact/email#`), never in the text.
 - Translation import is merge-only and schema/path validated; unknown keys and
   technical/global/image fields remain untouched.
@@ -786,11 +782,7 @@ or escaping.
 | Validate only in JavaScript | Repeat strict validation server-side |
 | Make image fields required | Create the Element, then upload |
 | Save one merged Element object to every locale | Split global and locale fields |
-| Invent a Section token | Use only `[[area:<key>]]` (each declared Area exactly once per Layout), `[[section:id]]` and `[[section:collection:<areaKey>]]` - see the preset recipe's [Static blocks](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/recipe-section-preset.md#static-blocks) |
 | Bind an Elements image to a textfill or a fixed value | An Elements image binds to a `field` of the collection's model |
-| Put several top-level sections in `section.tpl` | Exactly one complete root section |
-| Add `nino-vpa` behavior to preview | Let preview strip VPA and stay visible |
-| Enable scripts/remote forms in preview | Keep the sandbox deterministic and inert |
 | Prefix reusable includes with `page-` | Reserve `page-*` for full page templates |
 | Add metadata below markup | Put both metadata comments at byte zero |
 | Remove copied installer files on deselect | Update selection only; preserve edited files |
@@ -972,16 +964,6 @@ new, and the tests named in section 10 pass.
 - [ ] `upgrade()` migrates only the feature's own data and is idempotent for the versions it handles; a `data/` owner registers `/nino/admin/restore`.
 - [ ] `features/<Name>/tests/<key>-smoke.php` loads `tests/harness.php` (three levels up or `NINO_ROOT`) and covers manifest, activation, the unit's files, settings, the panel's presence and absence, update and deactivation; `php tests/features-smoke.php` still passes.
 
-### Section preset done
-
-- [ ] Slug, name, description, category, tags and version are valid, and `version` is 3.
-- [ ] Every Layout contains each declared `[[area:<key>]]` exactly once and no other Area token.
-- [ ] Each Layout composes to exactly one top-level `<section>` and carries only resolvable tokens.
-- [ ] Native fields, image slots, and Element schema are exact.
-- [ ] Preview is deterministic, visible, inert, and representative.
-- [ ] Composer, invalid-choice, preview, and search tests pass.
-- [ ] The preset recipe's [Validation and output](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/recipe-section-preset.md#validation-and-output) and [Preview and tests](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/recipe-section-preset.md#preview-and-tests) hold.
-
 ### Page/template unit done
 
 - [ ] Route and template are separate and have one owner each.
@@ -991,7 +973,7 @@ new, and the tests named in section 10 pass.
 - [ ] Required text, modules, image slots, and Element types are supplied.
 - [ ] Every key the unit delivers follows the grammar: `/template/<file name without .tpl>/<part>/<name>` for the words one of its templates reads, `/template/common/...` only in the base unit, no `/project` or `/_nino` key, the same keys in every language, and a template whose name has a dot or an upper-case letter carries no key of its own.
 - [ ] Locale suggestions and actual content are separated: the proposal for a page's name, title and description is the manifest's `suggest`, never a `/_nino` key in a text file.
-- [ ] Install/reapply/render and Template Builder losslessness are tested.
+- [ ] Install/reapply/render are tested, and a page template the Builder reads is written back byte for byte.
 
 ## 12. Completion report format
 
@@ -1028,14 +1010,12 @@ Read these before designing a new implementation:
 | Workbench shell, registry, recovery | `_admin/Admin.php` |
 | Workbench panel backend patterns | `_admin/Nino/Modules/Elements/Admin/Admin.php`, `Routes/Admin/Admin.php`, `Users/Admin/Admin.php` |
 | Panel list/form JS | `_admin/Nino/Modules/Elements/assets/types.js` and `admin.js`, `_admin/Nino/Modules/Routes/assets/admin.js`; the shell `_admin/assets/script.js` |
-| Panel contract | `\Nino\Admin\Panels` in `_admin/Admin.php`; smallest panel `tests/fixtures/features/Sample/Admin/Admin.php` (the catalogue's `features/Hello/Admin/Admin.php` is the panel of the feature written to be copied); fills and a tile `_nino/Nino/Modules/Form/Admin/Admin.php`; own template and workspace layout `features/Templates/Admin/Admin.php` in the catalogue |
+| Panel contract | `\Nino\Admin\Panels` in `_admin/Admin.php`; smallest panel `tests/fixtures/features/Sample/Admin/Admin.php` (the catalogue's `features/Hello/Admin/Admin.php` is the panel of the feature written to be copied); fills and a tile `_nino/Nino/Modules/Form/Admin/Admin.php`; own template and workspace layout `features/Builder/Admin/Admin.php` in the catalogue |
 | Ordered Admin relationships | `\Nino\Modules\Navigation\Admin` and `_nino/Nino/Modules/Navigation/assets/admin.js` |
 | Shared Admin UI | the `nino.system` half of `_admin/assets/style.css` and `_admin/assets/Nino.admin.js` |
 | Installer package shape | `_nino/Nino/Modules/*/install/manifest.php`; a feature's `features/*/install/manifest.php` has the same shape |
 | Setup wizard semantics | `_admin/install/Install.php` and `tests/install-smoke.php` |
-| Generic Section presets | `features/Templates/library/*/manifest.php` in the catalogue |
-| Section preset with several layouts | `features/Templates/library/image-list-split/` in the catalogue |
-| Composer/parser contracts | `features/Templates/Composer/Composer.php`, `SectionDocument/SectionDocument.php`, `AreaComposer/AreaComposer.php` in the catalogue, with its own `tests/templates-smoke.php` |
+| Reader/writer contracts | `features/Builder/Reader/Reader.php`, `Writer/Writer.php`, `Document/Document.php` in the catalogue, with its own `tests/builder-smoke.php` |
 | Basic page unit | `_admin/install/library/pages/home/` |
 | Module-dependent page | `_admin/install/library/pages/contact/` |
 | Locale-structural runtime pages | `_nino/Nino/Modules/Legal/Legal.php` (`routes()`, `url()`) and its unit `_nino/Nino/Modules/Legal/install/` |

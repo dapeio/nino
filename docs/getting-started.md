@@ -54,9 +54,9 @@ After completion, open:
 |---|---|
 | `/` | The configured website is delivered, in the theme the base unit brought. |
 | `/_admin` | The root account opens the workbench with every panel: content, structure and system. |
-| `/_admin#templates` | Only where the Template Builder is installed: the Templates panel, the section-first builder (Alpha). A fresh checkout ships no feature, so this panel is not there yet. |
+| `/_admin#builder` | Only where the Builder is installed: the Builder panel in the Structure group, which composes a page template out of sections, columns and components. A fresh checkout ships no feature, so this panel is not there yet. |
 
-Also check every language and route, the navigation, and used forms. Save a text and an image as a test. Where the Template Builder is installed, open a `page-*.tpl` in the Templates panel, change nothing at first, and check whether its top-level sections are recognized without warnings.
+Also check every language and route, the navigation, and used forms. Save a text and an image as a test. Where the Builder is installed, open a `page-*.tpl` in the Builder panel, change nothing at first, and check whether its sections are recognized without warnings.
 
 Newsletter and Search are features, not wizard modules, and a checkout ships none: when the project needs one, install it from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) in the workbench's **Features** panel (System group), which switches it on and reloads the workbench so its panel appears - or copy its directory into `features/` by hand and switch it on there. See [Features](features.md).
 
@@ -68,6 +68,6 @@ The last step sets the recovery password and locks the wizard. Subsequently, rem
 - [Developer Manual](development.md) deepens kernel, APIs, callbacks, and custom modules.
 - [Setup Wizard](setup.md) documents all options and writing processes.
 - [`/_admin` Workbench](_admin.md) guides through every panel, the accounts and the recovery page.
-- The **Template Builder** - page templates composed from whole sections - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its [manual](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.md) is there too.
+- The **Builder** - page templates composed from sections, columns and components - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its manual is in its [`feature.php`](https://github.com/dapeio/nino-features/blob/main/features/Builder/feature.php).
 - [Features](features.md) explains how an installable feature is switched on, configured and updated.
 - [Deployment](deployment.md) guides through web server configuration, security, backups, and go-live.

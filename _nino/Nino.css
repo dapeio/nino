@@ -624,9 +624,14 @@ main {
 	   container, so position:sticky inside it keeps working */
 	overflow-x: clip;
 }
+/* The Builder writes a div.nino-wrap around a page's sections, which puts the
+   hero one level down - the second selector of each pair is that form */
 main:has(> .nino-cover.nino-atf:first-child),
+main:has(> .nino-wrap > .nino-cover.nino-atf:first-child),
 main:has(> .nino-parallex.nino-atf:first-child),
-main:has(> .nino-atf--fullscreen:first-child) {
+main:has(> .nino-wrap > .nino-parallex.nino-atf:first-child),
+main:has(> .nino-atf--fullscreen:first-child),
+main:has(> .nino-wrap > .nino-atf--fullscreen:first-child) {
 	padding-top: 0;
 }
 /* Scroll-driven header show/hide, opt-in via .nino-scroll-header */

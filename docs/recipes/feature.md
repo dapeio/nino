@@ -3,7 +3,7 @@
 **Additional Links:**
 [Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Features](../features.md)
 
-One of the eight extension recipes of the [Nino agent guide](../../AGENTS.md). Its
+One of the six extension recipes of the [Nino agent guide](../../AGENTS.md). Its
 rules - the required workflow, the core runtime model, the conventions and the
 security review - apply to every step below.
 
@@ -324,13 +324,13 @@ class Admin {
 }
 ```
 
-The `nav()` above names `content`, but the registry never actually places it
-there: a panel whose class file lies below `\Nino\Features::dir()` always
-lands in the rail's own **Features** group, between Structure and System,
-whatever it names - and the roles tab offers its permission under that same
-group. Naming `content` (or leaving the fourth entry off, since it defaults
-to `content`) costs nothing and reads naturally if the class is ever moved
-out of `features/`.
+The `nav()` above names `content`, and the registry places the panel there:
+a panel whose class file lies below `\Nino\Features::dir()` sits in the group
+its `nav()` names when that is one of the four (`content`, `structure`,
+`features`, `system`), and in the rail's own **Features** group, between
+Structure and System, when it names none or something else - so leaving the
+fourth entry off puts it in Features, not in Content. The roles tab offers
+its permission under the group it sits in.
 
 `features/Catalog/text/en_US.php`:
 

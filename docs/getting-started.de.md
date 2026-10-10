@@ -54,9 +54,9 @@ Die Konten aus Schritt 5 sind Entwickler mit vollen Rechten. Redaktionskonten mi
 |---|---|
 | `/` | Die eingerichtete Webseite wird mit dem ausgelieferten Theme dargestellt. |
 | `/_admin` | Das Root-Konto öffnet die Workbench mit jedem Panel: Inhalt, Struktur und System. |
-| `/_admin#templates` | Nur dort, wo der Template-Baukasten installiert ist: das Templates-Panel, der sectionbasierte Baukasten (Alpha). Ein frischer Checkout bringt kein Feature mit, dieses Panel gibt es also noch nicht. |
+| `/_admin#builder` | Nur dort, wo der Builder installiert ist: das Panel Builder in der Gruppe Struktur, das ein Seitentemplate aus Sections, Spalten und Komponenten zusammensetzt. Ein frischer Checkout bringt kein Feature mit, dieses Panel gibt es also noch nicht. |
 
-Prüfe außerdem jede Sprache und Route, die Navigation sowie verwendete Formulare. Speichere testweise einen Text und ein Bild. Öffne dort, wo der Template-Baukasten installiert ist, im Templates-Panel ein `page-*.tpl`, ändere zunächst nichts und prüfe, ob seine obersten Sections ohne Warnung erkannt werden.
+Prüfe außerdem jede Sprache und Route, die Navigation sowie verwendete Formulare. Speichere testweise einen Text und ein Bild. Öffne dort, wo der Builder installiert ist, im Panel Builder ein `page-*.tpl`, ändere zunächst nichts und prüfe, ob seine Sections ohne Warnung erkannt werden.
 
 Newsletter und Suche sind Features, keine Module des Assistenten, und ein Checkout bringt keines mit: Wenn das Projekt eines braucht, installiere es im Panel **Features** der Workbench (Gruppe System) aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); das Panel schaltet es ein und lädt die Workbench neu, damit sein Panel erscheint. Ein von Hand nach `features/` kopiertes Verzeichnis schaltest du dort ebenso ein. Siehe [Features](features.de.md).
 
@@ -68,6 +68,6 @@ Der letzte Schritt setzt das Recovery-Passwort und sperrt den Assistenten. Entfe
 - [Entwickler-Handbuch](development.de.md) vertieft Kernel, APIs, Callbacks und eigene Module.
 - [Einrichtungsassistent](setup.de.md) dokumentiert alle Optionen und Schreibvorgänge.
 - [`/_admin`-Workbench](_admin.de.md) führt durch jedes Panel, die Konten und die Recovery-Seite.
-- Der **Template-Baukasten** – Seitentemplates aus ganzen Abschnitten – ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); sein [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) liegt dort ebenfalls.
+- Der **Builder** – Seitentemplates aus Sections, Spalten und Komponenten – ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); sein Handbuch steht in seiner [`feature.php`](https://github.com/dapeio/nino-features/blob/main/features/Builder/feature.php).
 - [Features](features.de.md) erklärt, wie ein installierbares Feature eingeschaltet, konfiguriert und aktualisiert wird.
 - [Deployment](deployment.de.md) führt durch Webserver-Konfiguration, Sicherheit, Backups und Go-live.

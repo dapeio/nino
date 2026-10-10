@@ -679,7 +679,7 @@ Zwei weitere Schlüssel stehen daneben. `/nino/form/retention` ist die Zahl der 
 
 Ein Projekt, das die Aufbewahrung oder die Bestätigungsmail ändert, ändert, was seine Datenschutzerklärung sagen muss: Der Abschnitt „Kontaktformular“ der Datenschutzerklärung (Typ `privacy`, Element `contact`) nennt die Frist, nach der Einsendungen gelöscht werden, und die Bestätigung, die der Besuch bekommt. Wer `/nino/form/retention` oder `/nino/form/store` setzt oder keine Bestätigung schickt, passt diesen Abschnitt daran an – siehe [Legal](#legal).
 
-Das Markup gehört dem Projekt: `page-contact.tpl` trägt ein von Hand geschriebenes `<form class="nino-form">`, das das gemeinsame Skript in `Nino.ui.js` steuert. Ein Projekt mit mehreren Formularen schreibt jedes Markup genauso – oder installiert das [Forms-Feature](https://github.com/dapeio/nino-features/blob/main/features/Forms/README.md) aus dem Katalog, das einen Shortcode `[form]` mitbringt, der eines aus seiner Definition zeichnet, dazu einen Builder für die Definitionen und eine Reihe Spam-Wächter.
+Das Markup gehört dem Projekt: `page-contact.tpl` trägt ein von Hand geschriebenes `<form class="nino-form">`, das das gemeinsame Skript in `Nino.ui.js` steuert. Ein Projekt mit mehreren Formularen schreibt jedes Markup genauso – oder installiert das [Forms-Feature](https://github.com/dapeio/nino-features/blob/main/features/Forms/feature.php) aus dem Katalog, das einen Shortcode `[form]` mitbringt, der eines aus seiner Definition zeichnet, dazu einen Builder für die Definitionen und eine Reihe Spam-Wächter.
 
 **Eine Einsendung abweisen** braucht keinen eigenen Callback-Namen. Ein Modul oder Feature, das eine abweisen will, registriert sich auf demselben Route-Callback vor dem Modul – `\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://.form', ..., 1 )` – und hinterlässt einen Status; `\Nino\Form::handle()` sieht einen Status, der nicht 200 ist, und kehrt zurück, ohne etwas zu verschicken oder zu schreiben. `\Nino\Csrf` weist auf dieselbe Weise einen Schritt früher ab – auf dem globalen `/nino/http/response`, mit Priorität 1, der vor jedem Route-Callback läuft –, und deshalb hat der Endpunkt keine eigene CSRF-Prüfung:
 
@@ -741,8 +741,8 @@ und nach jedem bestätigten Schreiben eines Elements – und
 beantwortet `\Nino\Modules\Search::getElements( $appData, $type, $query )` mit
 den passenden Elements der aktuellen Sprache in Trefferreihenfolge. Die
 Indexkonfiguration, die Regeln der Rangfolge, der Lebenszyklus der
-abgeleiteten Dateien und die API stehen in der eigenen README des Features im
-Katalog: [features/Search/README.md](https://github.com/dapeio/nino-features/blob/main/features/Search/README.md).
+abgeleiteten Dateien und die API stehen im eigenen Handbuch des Features im
+Katalog: [features/Search/feature.php](https://github.com/dapeio/nino-features/blob/main/features/Search/feature.php).
 
 ## Ein eigenes Modul entwickeln
 
@@ -894,7 +894,7 @@ Die eigenen Ansichten der Workbench sind dasselbe in einem anderen Root: `_admin
 | Methode | Rückgabe |
 | --- | --- |
 | `actions()` | `[ 'catalog/list' => [ Class::class, 'apiList' ], ... ]` – vom `POST`-Handler der Workbench verteilt |
-| `nav()` | `[ uri, label, weight = 50, group = 'content' ]` – die URI ist ein Slug und benennt Link, Inhaltsbereich und JS-Namensraum (`Nino.admin.<uri>`); ein Label, das mit `/` beginnt, ist ein Textfill-Schlüssel, alles andere wörtlicher Text – jedes ausgelieferte Panel nutzt einen Schlüssel, ein Modul liefert dafür seine `text/<locale>.php` mit; die Gruppe ist `content`, `structure`, `features` oder `system` – außer ein Panel, das ein Feature mitbringt (seine Klassendatei liegt unterhalb von `\Nino\Features::dir()`): das landet immer in `features`, gleich was es selbst nennt, und `features` von außerhalb zu nennen wird wie eine unbekannte Gruppe abgelehnt |
+| `nav()` | `[ uri, label, weight = 50, group = 'content' ]` – die URI ist ein Slug und benennt Link, Inhaltsbereich und JS-Namensraum (`Nino.admin.<uri>`); ein Label, das mit `/` beginnt, ist ein Textfill-Schlüssel, alles andere wörtlicher Text – jedes ausgelieferte Panel nutzt einen Schlüssel, ein Modul liefert dafür seine `text/<locale>.php` mit; die Gruppe ist `content`, `structure`, `features` oder `system` – ein Panel, das ein Feature mitbringt (seine Klassendatei liegt unterhalb von `\Nino\Features::dir()`), steht in der Gruppe, die es nennt, wenn sie eine der vier ist, und in `features`, wenn es keine oder eine andere nennt; `features` von außerhalb zu nennen wird wie eine unbekannte Gruppe abgelehnt |
 | `perm()` | die Berechtigung, die den Link zeigt und die Aktionen schützt – per Konvention `/_admin/<uri>/manage`; auf dem Tab Nutzerrollen des Panels Nutzer automatisch als Kästchen angeboten und Teil der Rolle **Editor**, die der Assistent schreibt, wenn die Gruppe `content` ist |
 | `panes()` | Mount-Ids innerhalb des Inhaltsbereichs, Standard `[ '<uri>-list' ]` |
 | `template()` | statt Mount-Ids: ein `.tpl`, das ganz in den Inhaltsbereich gerendert wird, projektrelativ und ohne Endung – für ein Panel, das seine Bereiche selbst anordnet |
@@ -916,7 +916,7 @@ public static function assets(): array {
 }
 ```
 
-Jede Aktionsmethode schützt sich selbst mit `\Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM )`, das ohne Konto mit `401` und ohne Berechtigung mit `403` antwortet. Die Panels der Workbench selbst werden zuerst zusammengeführt; eine URI oder ein Aktionsname, den ein solches Panel bereits besitzt, geht nie an ein Modul. Die mitgelieferten Module sind die Referenz: `_nino/Nino/Modules/Form/Admin/Admin.php` ist eines mit Textfills und Dashboard-Kachel, und das kleinste vollständige Panel im Checkout ist die Fixture `tests/fixtures/features/Sample/Admin/Admin.php` – im Katalog ist `features/Hello/Admin/Admin.php` das Panel des Features, das zum Kopieren geschrieben ist, und `features/Templates/Admin/Admin.php` eines mit eigenem Template und Workspace-Layout. Das [Panel-Rezept](recipes/admin-panel.md) des KI-Leitfadens führt durch ein vollständiges Panel samt Frontend.
+Jede Aktionsmethode schützt sich selbst mit `\Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM )`, das ohne Konto mit `401` und ohne Berechtigung mit `403` antwortet. Die Panels der Workbench selbst werden zuerst zusammengeführt; eine URI oder ein Aktionsname, den ein solches Panel bereits besitzt, geht nie an ein Modul. Die mitgelieferten Module sind die Referenz: `_nino/Nino/Modules/Form/Admin/Admin.php` ist eines mit Textfills und Dashboard-Kachel, und das kleinste vollständige Panel im Checkout ist die Fixture `tests/fixtures/features/Sample/Admin/Admin.php` – im Katalog ist `features/Hello/Admin/Admin.php` das Panel des Features, das zum Kopieren geschrieben ist, und `features/Builder/Admin/Admin.php` eines mit eigenem Template und Workspace-Layout. Das [Panel-Rezept](recipes/admin-panel.md) des KI-Leitfadens führt durch ein vollständiges Panel samt Frontend.
 
 Ein Modul, das eigene Dateien unter `data/` führt, registriert in `init()` den Callback `'/nino/admin/restore'`; das Panel Backups ruft ihn mit dem entpackten Backup und dem aktiven Datenverzeichnis auf, und das Modul führt zusammen, was ihm gehört (`Newsletter::callbackRestore()` im Newsletter-Feature des Katalogs). Ein Verzeichnis `install/` neben der Klassendatei – `manifest.php`, `templates/`, `text/` – macht ein Kernel- oder Projektmodul schließlich im Einrichtungsassistenten wählbar; siehe das [Library-Format](setup.de.md#library-format). Ein Feature trägt dieselbe Einheit, und `\Nino\Features::activate()` wendet sie an – ohne etwas zu überschreiben, das das Projekt hat –, wenn das Feature im Panel Features eingeschaltet wird; Manifest, Einstellungen und Lebenszyklus stehen unter [Features](features.de.md).
 
@@ -1156,7 +1156,7 @@ besitzen.
 - [Erste Schritte](getting-started.de.md) führt vom Checkout zum eingerichteten Projekt.
 - [Einrichtungsassistent](setup.de.md) dokumentiert alle Installationsschritte und Schreibregeln.
 - [`/_admin`-Workbench](_admin.de.md) beschreibt jedes Panel, die Rollen und die Recovery-Seite.
-- Der **Template-Baukasten** – Seitentemplates aus ganzen Abschnitten – ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); sein [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) liegt dort ebenfalls.
+- Der **Builder** – Seitentemplates aus Sections, Spalten und Komponenten – ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); sein Handbuch steht in seiner [`feature.php`](https://github.com/dapeio/nino-features/blob/main/features/Builder/feature.php).
 - [Features](features.de.md) erklärt installierbare Features: Manifest, Einstellungen, Aktivierung, Updates und die Tests eines Features.
 - [Deployment](deployment.de.md) beschreibt Webserver, Sicherheit und Go-live.
 - [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) erklärt den Umgang mit Sicherheitsmeldungen.

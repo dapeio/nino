@@ -109,7 +109,7 @@ assets/style.css            das eigene des Projekts, leer ausgeliefert
 
 Setup ergänzt das Bundle unter `/nino/html/assets` um die beiden Projekteinträge, sofern sie noch nicht darin stehen, und hängt an, statt zu ersetzen – was ein Projekt selbst hinzugefügt hat, behält seinen Platz. `assets/style.css` wird einmal leer geschrieben und danach nie wieder angefasst, eine Regel dort überschreibt also alles darüber.
 
-Bis Nino 1.1 hat der Assistent hier vier Fragen gestellt – ein Theme aus einem Katalog von zehn, einen Header und einen Footer aus dreizehn Frames und die daraus kompilierten Design-Werte. Das tut er nicht mehr. Das Aussehen ändert danach das Feature **Design** aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features/blob/main/features/Design/README.md), das seine eigene `assets/theme.css` und eigene Frame-Templates über die mitgelieferten kompiliert – und fragt, bevor es eine Datei ersetzt, die es nicht selbst geschrieben hat.
+Bis Nino 1.1 hat der Assistent hier vier Fragen gestellt – ein Theme aus einem Katalog von zehn, einen Header und einen Footer aus dreizehn Frames und die daraus kompilierten Design-Werte. Das tut er nicht mehr. Das Aussehen ändert danach das Feature **Design** aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features/blob/main/features/Design/feature.php), das seine eigene `assets/theme.css` und eigene Frame-Templates über die mitgelieferten kompiliert – und fragt, bevor es eine Datei ersetzt, die es nicht selbst geschrieben hat.
 
 ## 3. Routes
 
@@ -181,7 +181,7 @@ Sprachunabhängig sind beispielsweise:
 
 Land und Beschreibung werden je Sprache gespeichert. Wechsle deshalb jede aktive Sprache durch und speichere deren Werte.
 
-Links zu den Profilen der Website anderswo – Instagram, YouTube und Co. – fragt der Schritt nicht ab: Sie sind das Katalog-Feature [Social-Media-Links](https://github.com/dapeio/nino-features/blob/main/features/Social/README.md), ein Elementtyp, den die Redaktion unter Elemente pflegt, sobald es eingeschaltet ist.
+Links zu den Profilen der Website anderswo – Instagram, YouTube und Co. – fragt der Schritt nicht ab: Sie sind das Katalog-Feature [Social-Media-Links](https://github.com/dapeio/nino-features/blob/main/features/Social/feature.php), ein Elementtyp, den die Redaktion unter Elemente pflegt, sobald es eingeschaltet ist.
 
 Der Schritt zeigt bewusst nicht alle Textfills des Projekts. Technische Schlüssel, Design-Tokens und tiefere Seiten- oder Modulinhalte werden später in der Workbench gepflegt – unter Texte und Textschlüssel.
 
@@ -271,6 +271,6 @@ Diese Grenze ist beabsichtigt: Der Assistent automatisiert wiederkehrende techni
 - [Erste Schritte](getting-started.de.md) beschreibt den vollständigen Erfolgsweg.
 - [Grundkonzepte](concepts.de.md) erklärt Datenfluss, Routing und Rendering.
 - [`/_admin`-Workbench](_admin.de.md) erklärt die Panels, die Konten und die Recovery-Seite.
-- Der **Template-Baukasten** – Seitentemplates aus ganzen Abschnitten – ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); sein [Handbuch](https://github.com/dapeio/nino-features/blob/main/features/Templates/docs/templates.de.md) liegt dort ebenfalls.
+- Der **Builder** – Seitentemplates aus Sections, Spalten und Komponenten – ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features); sein Handbuch steht in seiner [`feature.php`](https://github.com/dapeio/nino-features/blob/main/features/Builder/feature.php).
 - Lass Impressum und Datenschutzerklärung prüfen, bevor die Website online geht, und passe sie an das an, was die Website wirklich verarbeitet – siehe den Hinweis unter [Module](#module) oben.
 - [Deployment](deployment.de.md) führt durch Sicherheit, Tests und Go-live.

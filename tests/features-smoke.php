@@ -43,6 +43,11 @@ class FeaturesSmokeCollider {
 	public static function nav(): array { return [ 'sample-settings', 'Collider', 90, 'content' ]; }
 }
 
+/** A module answering the two feature panels that name a group of their own */
+class FeaturesSmokePlacedModule {
+	public static function adminPanels( array &$appData ): array { return [ \Nino\Modules\Sample\PlacedStructure::class, \Nino\Modules\Sample\PlacedNowhere::class ]; }
+}
+
 // --- Discovery ---------------------------------------------------------------
 
 echo "Features::all - discovery below NINO_FEATURES_DIR\n";
@@ -216,11 +221,11 @@ check( 'an empty section stays, so the panel can say there is nothing', $cards['
 	a line that stands on its own, which is what a section like 'markup'
 	sometimes needs	*/
 $bare = \Nino\Features::manifest( writeManifest( $manifestDir, 'Bare', [ 'name' => 'x', 'version' => '1.0.0', 'manual' => [
-	'markup' => [ 'The feature ships no form - place the section from the Templates panel.' ],
+	'markup' => [ 'The feature ships no form - build one in the Builder.' ],
 ] ] ) );
 
 check( 'an entry with no handle is a line of its own', ( \Nino\Features::manualSections( $bare['manual'], 'en_US' )['markup'][0] ?? [] )
-	=== [ 'handle' => '', 'text' => 'The feature ships no form - place the section from the Templates panel.' ] );
+	=== [ 'handle' => '', 'text' => 'The feature ships no form - build one in the Builder.' ] );
 
 check( 'a section that is not one is refused, and named', manifestFails( $manifestDir, 'BadSection', [ 'name' => 'x', 'version' => '1.0.0',
 	'manual' => [ 'shortcode' => [ '[x]' => 'y' ] ] ], 'not "shortcode"' ) );
@@ -575,8 +580,21 @@ $owned = \Nino\Backup::manifest( $ownedAppData );
 check( 'a directory a feature declares is still carried, trailing slash and all', in_array( 'data/sample-dir/one.php', $owned, true ) === true
 	&& in_array( 'data/sample-dir/deeper/two.php', $owned, true ) === true );
 
-check( 'its class file sits below NINO_FEATURES_DIR, so the registry moves it into the features group though its own nav() names content', \Nino\Admin\Admin::panels( $appData )['sample']['group'] === 'features' );
-check( 'the registry sits it in the rail between the structure and the system panels, GROUPS order rather than its own nav()', ( static function() use ( $appData ): bool {
+check( 'its class file sits below NINO_FEATURES_DIR and its nav() names no group, so the registry puts it into the features group', \Nino\Admin\Admin::panels( $appData )['sample']['group'] === 'features' );
+require_once __DIR__. '/fixtures/features/Sample/Admin/Placed.php';
+$placed = $appData;
+$placed['/nino/modules'][] = 'FeaturesSmokePlacedModule';
+
+check( 'a feature panel naming one of the four groups sits there, one naming something else falls back to features without a warning', ( static function() use ( $placed ): bool {
+	ninoWarnings();
+	$panels = \Nino\Admin\Admin::panels( $placed );
+	return ( $panels['sample-placed']['group'] ?? null ) === 'structure'
+		&& ( $panels['sample-nowhere']['group'] ?? null ) === 'features'
+		&& $panels['sample']['group'] === 'features'
+		&& array_search( 'sample-placed', array_keys( $panels ), true ) < array_search( 'sample', array_keys( $panels ), true )
+		&& ninoWarnings() === [];
+} )() );
+check( 'the registry sits it in the rail between the structure and the system panels, in GROUPS order', ( static function() use ( $appData ): bool {
 	$order = array_keys( \Nino\Admin\Admin::panels( $appData ) );
 	return array_search( 'routes', $order, true ) < array_search( 'sample', $order, true )
 		&& array_search( 'sample', $order, true ) < array_search( 'users', $order, true );
@@ -584,6 +602,11 @@ check( 'the registry sits it in the rail between the structure and the system pa
 check( 'the Roles tab offers the panel\'s permission under the features group, the same way it offers a content panel\'s', in_array(
 	[ 'perm' => \Nino\Modules\Sample\Admin::MANAGE_PERM, 'label' => '/_admin/nav/sample', 'group' => 'features', 'offered' => true ],
 	\Nino\Modules\Users\Admin::permOptions( $appData ),
+	true
+) === true );
+check( 'the Roles tab offers the permission of a feature panel under the group it names, structure here, not under features', in_array(
+	[ 'perm' => \Nino\Modules\Sample\PlacedStructure::MANAGE_PERM, 'label' => 'Placed', 'group' => 'structure', 'offered' => true ],
+	\Nino\Modules\Users\Admin::permOptions( $placed ),
 	true
 ) === true );
 

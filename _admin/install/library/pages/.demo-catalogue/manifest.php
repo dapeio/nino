@@ -21,8 +21,8 @@
 		'name' 				=> [ 'en_US' => 'Catalogue', 'de_DE' => 'Katalog' ],
 		'title' 			=> [ 'en_US' => 'Catalogue: presets and building blocks', 'de_DE' => 'Katalog: Presets und Bausteine' ],
 		'description' => [
-			'en_US' => 'Every section preset the Template Builder ships and every building block in Nino.css, in this project\'s own design.',
-			'de_DE' => 'Jedes Section-Preset des Template Builders und jeder Baustein aus Nino.css, im Design dieses Projekts.',
+			'en_US' => 'Every section preset of the former Template Builder and every building block in Nino.css as specimens, in this project\'s own design.',
+			'de_DE' => 'Jedes Section-Preset des früheren Template Builders und jeder Baustein aus Nino.css als Muster, im Design dieses Projekts.',
 		],
 	],
 ];
