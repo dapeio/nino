@@ -4139,7 +4139,7 @@ check( 'every custom property Nino.css reads without a fallback is declared in N
 /*	A page that opens with a hero loses main's top padding - also when the
 	Builder's div.nino-wrap puts the hero one level down	*/
 $heroSelectors = [];
-foreach( [ '.nino-cover.nino-atf', '.nino-parallex.nino-atf', '.nino-atf--fullscreen' ] as $hero )
+foreach( [ '.nino-cover.nino-hero', '.nino-parallex.nino-hero', '.nino-hero--fullscreen' ] as $hero )
 	foreach( [ 'main:has(> ', 'main:has(> .nino-wrap > ' ] as $head )
 		$heroSelectors[] = $head. $hero. ':first-child)';
 check( 'Nino.css takes main\'s top padding away for a hero, directly below main and inside the Builder\'s wrap', preg_match( '/((?:main:has\([^)]*\)\)?,\s*){5}main:has\([^)]*\)\)?)\s*\{\s*padding-top:\s*0;/', $ninoCss, $heroRule ) === 1
@@ -4157,7 +4157,7 @@ foreach( $cssMethods as [ , $cssClass, $cssMethod, $cssFile ] )
 		$cssPointers[] = $cssClass. '::'. $cssMethod. '() in '. $cssFile;
 check( 'every manual and every method a Nino.css comment points to is where it says'. ( $cssPointers === [] ? '' : ' - '. implode( ', ', $cssPointers ) ), $cssPointers === [] && $cssMethods !== [] );
 
-// Nino.css uses one for .nino-atf-arrowdown, ie. the framework's own default
+// Nino.css uses one for .nino-hero-arrowdown, ie. the framework's own default
 // policy used to block the framework's own icon
 check( 'the default csp allows data: images', str_contains( $seededCsp, 'img-src * data:' ) === true );
 check( '...which is what Nino.css\'s own data: uri needs', str_contains(
@@ -6078,6 +6078,164 @@ foreach( $languageSources as $languageFile ) {
 }
 check( 'no comment in the kernel or the workbench is written in german'. ( $languageOffenders === [] ? '' : ' - '. implode( ' | ', $languageOffenders ) ), $languageOffenders === [] );
 check( '...and the rule has something to find: the sources were actually read', count( $languageSources ) > 60 );
+
+echo "\n";
+
+
+// --- What Nino.css hands a design layer -----------------------------------
+
+echo "Nino.css - the hero is the hero, the font roles, the scale and the hooks\n";
+
+/*	The hero had another name up to 1.5 and has no alias: a class of the old name
+	anywhere in what the kernel ships is a class nothing styles any more. The
+	scroll state is the fold's, and the fold stays a fold
+	(body.nino-scroll-atf), so that name is not the one looked for. Binary
+	files - the screenshots of the manuals - are not read. The old name is
+	written in two pieces, so that a search for it finds the changelog and
+	nothing else.	*/
+$heroOld			= 'nino-'. 'atf';
+$heroSources	= [];
+foreach( [ '/../_nino', '/../_admin', '/../docs' ] as $heroRoot )
+	foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( __DIR__. $heroRoot, \FilesystemIterator::SKIP_DOTS ) ) as $heroFile )
+		$heroSources[] = $heroFile->getPathname();
+foreach( [ 'README.md', 'README.de.md', 'AGENTS.md' ] as $heroTop )
+	$heroSources[] = __DIR__. '/../'. $heroTop;
+
+$heroLeft = [];
+$heroRead = 0;
+foreach( $heroSources as $heroSource ) {
+	$heroText = (string) @file_get_contents( $heroSource );
+	if( str_contains( $heroText, "\0" ) === true )
+		continue;
+	$heroRead++;
+	if( str_contains( $heroText, $heroOld ) === true )
+		$heroLeft[] = substr( (string) realpath( $heroSource ), strlen( (string) realpath( __DIR__. '/..' ) ) + 1 );
+}
+check( 'no class of the old hero name is left in the kernel, the workbench, the manuals and the guide'. ( $heroLeft === [] ? '' : ' - '. implode( ', ', $heroLeft ) ), $heroLeft === [] );
+check( '...and the rule has something to find: the sources were actually read', $heroRead > 200 );
+
+$hookCss = (string) preg_replace( '#/\*.*?\*/#s', '', (string) file_get_contents( __DIR__. '/../_nino/Nino.css' ) );
+check( 'the fold keeps its name: body.nino-scroll-atf is still what Nino.css and Nino.ui.js say', str_contains( $hookCss, 'body.nino-scroll-atf ' ) === true
+	&& str_contains( (string) file_get_contents( __DIR__. '/../_nino/Nino.ui.js' ), "'nino-scroll-atf'" ) === true );
+check( 'the arrow Nino.ui.js listens on is the one Nino.css draws', str_contains( (string) file_get_contents( __DIR__. '/../_nino/Nino.ui.js' ), "'.nino-hero-arrowdown'" ) === true
+	&& str_contains( $hookCss, '.nino-hero-arrowdown {' ) === true );
+
+/*	Three small readers of the stylesheet, comments gone: the declarations of
+	every rule whose selector list is exactly the one given (the media query
+	that states a size again is a rule too), the first :root and the one the
+	768px query holds, and the value of a property in a block.	*/
+$hookRules = static function( string $selector ) use ( $hookCss ): string {
+	preg_match_all( '/(?:^|[{}])\s*'. preg_quote( $selector, '/' ). '\s*\{([^{}]*)\}/', $hookCss, $found );
+	return implode( ' ', $found[1] );
+};
+$hookRoot			= preg_match( '/(?:^|\})\s*:root\s*\{([^{}]*)\}/', $hookCss, $found ) === 1 ? $found[1] : '';
+$hookRootWide	= preg_match( '/@media\s*\(min-width:\s*768px\)\s*\{\s*:root\s*\{([^{}]*)\}/', $hookCss, $found ) === 1 ? $found[1] : '';
+$hookValue		= static function( string $block, string $property ): ?string {
+	return preg_match( '/(?<![\w-])'. preg_quote( $property, '/' ). '\s*:\s*([^;]+?)\s*(?:;|$)/', $block, $found ) === 1 ? $found[1] : null;
+};
+
+// The five roles: title, subtitle, text, button and code each have a family, a weight, a transform and a size
+$hookRoles		= [ 'title', 'subtitle', 'text', 'button', 'code' ];
+$hookMissing	= [];
+foreach( $hookRoles as $hookRole )
+	foreach( [ '--fontfamily-'. $hookRole, '--font-'. $hookRole. '-weight', '--font-'. $hookRole. '-transform', '--font-'. $hookRole. '-size' ] as $hookProperty )
+		if( $hookValue( $hookRoot, $hookProperty ) === null )
+			$hookMissing[] = $hookProperty;
+check( 'Nino.css declares the five font roles in :root, each with a family, a weight, a transform and a size'. ( $hookMissing === [] ? '' : ' - missing: '. implode( ', ', $hookMissing ) ), $hookMissing === [] );
+check( '...no role transforms anything until a design layer says so, and the button has the face of the text',
+	array_filter( $hookRoles, static fn( string $role ): bool => $hookValue( $hookRoot, '--font-'. $role. '-transform' ) !== 'none' ) === []
+	&& $hookValue( $hookRoot, '--fontfamily-button' ) === 'var(--fontfamily-text)' );
+
+// What the rules had before there were roles
+$hookDefaults = [
+	'--font-title-weight' => 'bold', '--font-subtitle-weight' => 'normal', '--font-text-weight' => 'normal', '--font-button-weight' => 'bold', '--font-code-weight' => 'normal',
+	'--font-title-size' => 'var(--text-4)', '--font-subtitle-size' => 'var(--text-2)', '--font-text-size' => '1rem', '--font-button-size' => 'var(--fontsize-btn)', '--font-code-size' => '.875rem',
+];
+$hookChanged = [];
+foreach( $hookDefaults as $hookProperty => $hookExpected )
+	if( $hookValue( $hookRoot, $hookProperty ) !== $hookExpected )
+		$hookChanged[] = $hookProperty;
+check( '...with the weights and the sizes the rules had before they were roles'. ( $hookChanged === [] ? '' : ' - changed: '. implode( ', ', $hookChanged ) ), $hookChanged === [] );
+
+// Each rule reads the role it belongs to
+$hookReads = [
+	'body'											=> [ '--font-text-weight', '--font-text-transform' ],
+	'h1, h2, h3, h4, h5, h6'		=> [ '--font-title-weight', '--font-title-transform' ],
+	'.nino-section-title'				=> [ '--fontfamily-title', '--font-title-size', '--font-title-transform' ],
+	'.nino-article-title'				=> [ '--fontfamily-title', '--font-title-size', '--font-title-transform', '--article-title-scale' ],
+	'.nino-hero-title'					=> [ '--fontfamily-title', '--font-title-size', '--font-title-transform', '--hero-title-scale' ],
+	'.nino-section-subtitle'		=> [ '--fontfamily-subtitle', '--font-subtitle-size', '--font-subtitle-weight', '--font-subtitle-transform' ],
+	'.nino-article-subtitle'		=> [ '--fontfamily-subtitle', '--font-subtitle-size', '--font-subtitle-weight', '--font-subtitle-transform' ],
+	'.nino-hero-subtitle'				=> [ '--fontfamily-subtitle', '--font-subtitle-size', '--font-subtitle-weight', '--font-subtitle-transform', '--hero-text-scale' ],
+	'.nino-btn'									=> [ '--fontfamily-button', '--font-button-size', '--font-button-weight', '--font-button-transform' ],
+	'.nino-code'								=> [ '--fontfamily-code', '--font-code-size', '--font-code-weight', '--font-code-transform' ],
+];
+$hookUnread = [];
+foreach( $hookReads as $hookSelector => $hookProperties )
+	foreach( $hookProperties as $hookProperty )
+		if( str_contains( $hookRules( $hookSelector ), 'var('. $hookProperty. ')' ) === false )
+			$hookUnread[] = $hookSelector. ' does not read '. $hookProperty;
+check( 'the page, the headings, the titles, the subtitles, the button and the code block read their role'. ( $hookUnread === [] ? '' : ' - '. implode( ', ', $hookUnread ) ), $hookUnread === [] );
+check( '...the small and the big button scale the size of the role, and the filter button is as large as the button',
+	str_contains( $hookRules( '.nino-btn--small' ), 'var(--font-button-size)' ) === true && str_contains( $hookRules( '.nino-btn--big' ), 'var(--font-button-size)' ) === true
+	&& str_contains( $hookRules( '.nino-filter-btn' ), 'font-size: var(--font-button-size)' ) === true );
+// A size in rem on body takes the browser's smaller size for a bare code, kbd, samp and pre away - measured: 13px beside text of 16px
+check( '...and the page reads no size of the text role on body, which would change the code, kbd, samp and pre that have no class of their own', preg_match( '/font-size/', $hookRules( 'body' ) ) !== 1 );
+
+// The scale is relative to the text size, with the factors its rem values were
+$hookScale = $hookValue( $hookRoot, '--text-1' ) === 'var(--font-text-size)';
+foreach( [ 2 => '1.125', 3 => '1.25', 4 => '1.5', 5 => '1.8', 6 => '2.5' ] as $hookStep => $hookFactor )
+	$hookScale = $hookScale && $hookValue( $hookRoot, '--text-'. $hookStep ) === 'calc(var(--font-text-size) * '. $hookFactor. ')';
+foreach( [ 4 => '1.6', 5 => '2', 6 => '3' ] as $hookStep => $hookFactor )
+	$hookScale = $hookScale && $hookValue( $hookRootWide, '--text-'. $hookStep ) === 'calc(var(--font-text-size) * '. $hookFactor. ')';
+check( '--text-1 is the text size, and --text-2 to --text-6 are factors of it - the ones from 768px their own', $hookScale );
+
+// The hero and the variants are numbers a design layer moves
+check( 'the hero takes the title and the subtitle role times a number of its own: one below 768px and another from there',
+	$hookValue( $hookRoot, '--hero-title-scale' ) === '1.2' && $hookValue( $hookRootWide, '--hero-title-scale' ) === '1.25'
+	&& $hookValue( $hookRoot, '--hero-text-scale' ) === '1.2' && $hookValue( $hookRootWide, '--hero-text-scale' ) === 'calc(10 / 9)' );
+check( 'an article title takes the title role times a number of its own: 5 / 6, what --text-3 was of --text-4, and 25 / 32 from 768px, where --text-4 steps up and --text-3 does not',
+	$hookValue( $hookRoot, '--article-title-scale' ) === 'calc(5 / 6)' && $hookValue( $hookRootWide, '--article-title-scale' ) === 'calc(25 / 32)' );
+$hookVariants = [
+	'quiet'	=> [ '.nino-section-title--quiet', '.nino-section-subtitle--quiet', '.nino-section-text--quiet', '.nino-article-title--quiet', '.nino-article-descr--quiet', '.nino-hero-title--quiet', '.nino-hero-subtitle--quiet' ],
+	'loud'	=> [ '.nino-section-title--loud', '.nino-section-subtitle--loud', '.nino-section-text--loud', '.nino-article-title--loud', '.nino-article-descr--loud', '.nino-hero-title--loud', '.nino-hero-subtitle--loud' ],
+];
+$hookUnscaled = [];
+foreach( $hookVariants as $hookKind => $hookSelectors )
+	foreach( $hookSelectors as $hookSelector ) {
+
+		// The size is the step times the number, and so is the leading where the variant states one
+		preg_match_all( '/(?<![\w-])(?:font-size|line-height)\s*:([^;]*);/', $hookRules( $hookSelector ), $hookSizes );
+
+		if( $hookSizes[1] === [] || array_filter( $hookSizes[1], static fn( string $size ): bool => str_contains( $size, 'var(--scale-'. $hookKind. ')' ) === false ) !== [] )
+			$hookUnscaled[] = $hookSelector;
+	}
+check( 'the quiet and the loud variants of a section, an article and a hero multiply their step by --scale-quiet and --scale-loud, which are 1'. ( $hookUnscaled === [] ? '' : ' - not: '. implode( ', ', $hookUnscaled ) ),
+	$hookUnscaled === [] && $hookValue( $hookRoot, '--scale-quiet' ) === '1' && $hookValue( $hookRoot, '--scale-loud' ) === '1' );
+
+// The gutter of a row and the shadow of a card
+check( '--grid-gutter is the padding of a row: one step below 768px, the next from there, and no other rule sets it',
+	$hookValue( $hookRoot, '--grid-gutter' ) === 'var(--space-2)' && $hookValue( $hookRootWide, '--grid-gutter' ) === 'var(--space-3)'
+	&& preg_match_all( '/padding\s*:/', $hookRules( '.nino-grid-row' ) ) === 1 && str_contains( $hookRules( '.nino-grid-row' ), 'padding: 0 var(--grid-gutter)' ) === true );
+check( '--shadow-card is none until a design layer says otherwise, and the two cards - .nino-article and .nino-pricing-item - read it as their box-shadow',
+	$hookValue( $hookRoot, '--shadow-card' ) === 'none'
+	&& str_contains( $hookRules( '.nino-article' ), 'box-shadow: var(--shadow-card)' ) === true
+	&& str_contains( $hookRules( '.nino-pricing-item' ), 'box-shadow: var(--shadow-card)' ) === true );
+check( '...a borderless article is without a surface, and a shadow is part of one: it keeps none', str_contains( $hookRules( '.nino-article--borderless' ), 'box-shadow: none' ) === true );
+
+// What the card shadow leaves alone is what the manuals name: no rule but these two writes a box-shadow of its own
+$hookShadows = [];
+preg_match_all( '/([^{}]+)\{([^{}]*)\}/', $hookCss, $hookBlocks, PREG_SET_ORDER );
+foreach( $hookBlocks as [ , $hookBlockSelector, $hookBlockBody ] )
+	if( preg_match_all( '/(?<![\w-])box-shadow\s*:\s*([^;]+?)\s*(?:;|$)/', $hookBlockBody, $hookBlockShadows ) > 0 )
+		foreach( $hookBlockShadows[1] as $hookBlockShadow )
+			if( in_array( $hookBlockShadow, [ 'var(--shadow-card)', 'none' ], true ) === false )
+				$hookShadows[] = trim( (string) preg_replace( '/\s+/', ' ', $hookBlockSelector ) );
+check( 'the only box-shadows Nino.css writes itself are those of the middle card of .nino-pricing-row--feature-middle and of the toast'. ( $hookShadows === [] ? ' - none found' : ' - found: '. implode( ', ', $hookShadows ) ),
+	$hookShadows === [ '.nino-pricing-row--feature-middle > .nino-pricing-item:nth-child(2)', '.nino-toast' ] );
+check( '...and both manuals name the middle card of the feature-middle row as one that keeps its shadow',
+	str_contains( (string) file_get_contents( __DIR__. '/../docs/design.md' ), '`.nino-pricing-row--feature-middle`' ) === true
+	&& str_contains( (string) file_get_contents( __DIR__. '/../docs/design.de.md' ), '`.nino-pricing-row--feature-middle`' ) === true );
 
 echo "\n";
 

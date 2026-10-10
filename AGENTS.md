@@ -423,6 +423,15 @@ the workbench - the shell, a panel, the setup wizard or the recovery page.
 - Maintain keyboard focus, labels, error text, small viewports, coarse pointers,
   and `prefers-reduced-motion`.
 - Do not encode meaning only by color or hover.
+- A design layer turns `_nino/Nino.css` through the custom properties it
+  declares in `:root`: the font roles, the type scale, the hero, article title
+  and variant scales, `--grid-gutter` and `--shadow-card` (listed in the
+  design manual, [docs/design.md](docs/design.md#hooks-in-ninocss)). A rule
+  for a title, a subtitle, the page, a button or a code block reads its role
+  rather than a literal, and a new default is declared in `Nino.css`:
+  sections 1 and 2 of the delivered `theme.css` are compared byte for byte
+  with the catalogue's Design library, so a change there is made in both
+  repositories.
 
 ## 6a. Designing an admin frontend
 

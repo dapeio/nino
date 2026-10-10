@@ -30,7 +30,7 @@ namespace Nino {
 			// img-src needs 'data:' spelled out: the '*' source covers
 			// network schemes only, so without it the browser refused
 			// every data: uri image - including the one Nino's own
-			// Nino.css uses for .nino-atf-arrowdown, which therefore
+			// Nino.css uses for .nino-hero-arrowdown, which therefore
 			// rendered as an empty button on every page that has one.
 			'Content-Security-Policy' 		=> 'default-src \'self\'; img-src * data:; style-src \'self\' \'unsafe-inline\'; frame-ancestors \'self\'; base-uri \'self\'; form-action \'self\'',
 			'X-Frame-Options' 						=> 'SAMEORIGIN',

@@ -580,7 +580,7 @@ if( preg_match( '/@media \(prefers-reduced-motion: reduce\) \{(.*?)\n\}/s', $nin
 	$reducedMotion = $match[1];
 
 check( 'what runs forever on its own stops for a visitor who asked for less motion', $reducedMotion !== ''
-	&& str_contains( $reducedMotion, '.nino-atf-arrowdown' ) === true
+	&& str_contains( $reducedMotion, '.nino-hero-arrowdown' ) === true
 	&& str_contains( $reducedMotion, '.nino-fx-vertical-bounce' ) === true
 	&& str_contains( $reducedMotion, 'animation: none' ) === true );
 check( '...a viewport animation is simply there rather than arriving', str_contains( $reducedMotion, '.nino-vpa' ) === true
@@ -622,13 +622,44 @@ check( 'the header markup carries the class that rule acts on', preg_match( '/cl
 check( 'and the delivered frame gives its bar no height the collapsed state cannot take back'. ( $fixedHeight === [] ? '' : ' - '. implode( ', ', array_unique( $fixedHeight ) ) ), $fixedHeight === [] );
 
 // The Builder writes a div.nino-wrap around a page's sections, and its hero
-// carries no nino-atf - so the rule that takes main's top padding away for a
+// carries no nino-hero - so the rule that takes main's top padding away for a
 // first-child cover or parallax is the frame's own, and it has to know the wrap
 $heroRule 	= preg_match( '/body main:has\(> \.nino-cover:first-child\)([^{}]*)\{\s*padding-top:\s*0;/', $frameStyle, $match ) === 1 ? $match[1] : '';
 
 check( 'the delivered frame takes main\'s top padding away for a cover and a parallax hero', $heroRule !== '' );
 check( '...also when the Builder\'s wrap stands between main and the hero', str_contains( $heroRule, 'main:has(> .nino-wrap > .nino-cover:first-child)' ) === true
 	&& str_contains( $heroRule, 'main:has(> .nino-wrap > .nino-parallex:first-child)' ) === true );
+
+// The hero had another name up to 1.5 and has no alias: the pages of the library
+// that carried the classes carry them under the new name, and no page is
+// left with a class that nothing styles any more
+$libraryHeroes = [
+	'404'			=> [ 'class="nino-hero nino-section', 'class="nino-hero-title"', 'class="nino-hero-subtitle"' ],
+	'home'		=> [ 'class="nino-hero-title nino-hero-title--loud"', 'class="nino-hero-subtitle"' ],
+	'contact'	=> [ 'class="nino-hero-title"', 'class="nino-hero-subtitle"' ],
+];
+$libraryHeroOld		= 'nino-'. 'atf';
+$libraryHeroGaps	= [];
+foreach( $libraryHeroes as $libraryHeroPage => $libraryHeroMarks ) {
+	$libraryHeroMarkup = (string) file_get_contents( __DIR__. '/../_admin/install/library/pages/'. $libraryHeroPage. '/templates/page-'. $libraryHeroPage. '.tpl' );
+	foreach( $libraryHeroMarks as $libraryHeroMark )
+		if( str_contains( $libraryHeroMarkup, $libraryHeroMark ) === false )
+			$libraryHeroGaps[] = $libraryHeroPage. ' lacks '. $libraryHeroMark;
+	if( str_contains( $libraryHeroMarkup, $libraryHeroOld ) === true )
+		$libraryHeroGaps[] = $libraryHeroPage. ' still has the old name';
+}
+check( 'the home, contact and 404 pages carry the hero classes where they carried the old ones'. ( $libraryHeroGaps === [] ? '' : ' - '. implode( ', ', $libraryHeroGaps ) ), $libraryHeroGaps === [] );
+
+// ...and the page that draws every class of Nino.css draws the nine of the hero
+preg_match_all( '/\.(nino-hero[a-z0-9-]*)/', (string) preg_replace( '#/\*.*?\*/#s', '', $ninoCss ), $heroDefined );
+$heroDefined = array_values( array_unique( $heroDefined[1] ) );
+preg_match_all( '/class="([^"]*)"/', (string) file_get_contents( __DIR__. '/../_admin/install/library/pages/.demo-catalogue/templates/.demo-catalogue.tpl' ), $demoClasses );
+$demoDrawn = [];
+foreach( $demoClasses[1] as $demoAttribute )
+	foreach( preg_split( '/\s+/', trim( $demoAttribute ) ) ?: [] as $demoClass )
+		$demoDrawn[$demoClass] = true;
+$heroUndrawn = array_values( array_filter( $heroDefined, static fn( string $class ): bool => isset( $demoDrawn[$class] ) === false ) );
+check( 'the catalogue page draws the nine hero classes Nino.css defines, by their new names'. ( $heroUndrawn === [] ? '' : ' - missing: '. implode( ', ', $heroUndrawn ) ), $heroUndrawn === [] && count( $heroDefined ) === 9 );
 
 echo "\n";
 
@@ -1695,10 +1726,24 @@ $quotedWhole	= [];
 $withoutBackup	= [];
 
 foreach( [ '/../_nino/Nino.css', '/../_admin/install/library/base/assets/theme.css' ] as $file )
-	if( preg_match_all( '/--fontfamily-[a-z]+:\s*([^;]+);/', (string) file_get_contents( __DIR__. $file ), $found ) > 0 )
-		foreach( $found[1] as $value ) {
+	if( preg_match_all( '/(--fontfamily-[a-z]+):\s*([^;]+);/', (string) file_get_contents( __DIR__. $file ), $found, PREG_SET_ORDER ) > 0 ) {
+
+		$stacksOf = array_column( $found, 2, 1 );
+
+		foreach( $found as [ , $name, $value ] ) {
 
 			$stack = trim( $value );
+
+			// A role with the face of another - --fontfamily-button is
+			// var(--fontfamily-text) until a theme names one - has that one's
+			// stack, which is checked as itself; what it names has to be a
+			// stack, and not an alias of another
+			if( preg_match( '/^var\((--fontfamily-[a-z]+)\)$/', $stack, $alias ) === 1 ) {
+				if( isset( $stacksOf[$alias[1]] ) === false || str_starts_with( trim( $stacksOf[$alias[1]] ), 'var(' ) === true )
+					$withoutBackup[] = $file. ': '. $name. ': '. $stack;
+				continue;
+			}
+
 			$fontStacks++;
 
 			if( preg_match( '/^(?:\'[^\']*\'|"[^"]*")$/', $stack ) === 1 )
@@ -1709,6 +1754,7 @@ foreach( [ '/../_nino/Nino.css', '/../_admin/install/library/base/assets/theme.c
 			if( preg_match( '/,\s*(?:sans-serif|serif|monospace|system-ui|cursive|fantasy)$/', $stack ) !== 1 )
 				$withoutBackup[] = $file. ': '. $stack;
 		}
+	}
 
 check( 'every font stack of both files is a list of names and not one quoted name'. ( $quotedWhole === [] ? '' : ' - '. implode( ', ', $quotedWhole ) ), $fontStacks > 0 && $quotedWhole === [] );
 check( '...and every one of them ends in a bare generic family'. ( $withoutBackup === [] ? '' : ' - '. implode( ', ', $withoutBackup ) ), $withoutBackup === [] );

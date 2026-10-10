@@ -16,9 +16,16 @@
  *			as --token: [[/project/website/color/primary]]; instead of a literal value.
  *
  *			--text-1 .. --text-6 is a small type scale for titles/subtitles,
- *			mirroring the existing --space-1 .. --space-6 numbering. Sizes that
- *			aren't part of that heading hierarchy (buttons, form fields, badges,
- *			one-off components) are intentionally left as plain literals.
+ *			mirroring the existing --space-1 .. --space-6 numbering. It is
+ *			relative to --font-text-size, the size of the text role: that is
+ *			the first step, the others are factors of it. Sizes that aren't
+ *			part of that heading hierarchy (form fields, badges, one-off
+ *			components) are intentionally left as plain literals.
+ *
+ *			Title, subtitle, text, button and code are the five font roles,
+ *			each with a family (--fontfamily-<role>), a weight, a transform
+ *			and a size (--font-<role>-weight, -transform and -size). What
+ *			reads which is said beside the defaults in :root.
  *
  *			--base-size and --text-4/-5/-6 step up at the 768px breakpoint (see
  *			the @media block right below :root) - mobile-first fluid type, not
@@ -157,7 +164,46 @@
 	--fontfamily-text: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 	--fontfamily-title: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 	--fontfamily-subtitle: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	--fontfamily-button: var(--fontfamily-text);
 	--fontfamily-code: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+	/*	The rest of the five font roles - a weight, a transform and a size each;
+		with the family above that is everything a rule in this file reads of a
+		role. The title role is read by .nino-section-title,
+		.nino-article-title and .nino-hero-title, and its weight and transform
+		by every h1 to h6 as well: a heading without a class keeps the face of
+		the text and the size the browser gives it. The subtitle role is read
+		by the three subtitles, the text role by the page (weight and
+		transform), the button role by .nino-btn and the code role by
+		.nino-code.
+
+		Each default is what the rules had before there were roles, so a page
+		that sets none looks as it did: titles and buttons are bold, the rest
+		normal, nothing is transformed, a title is the --text-4 step of the
+		scale below and a subtitle the --text-2, a button is as large as
+		--fontsize-btn says and the code block is .875rem.
+
+		The text size is the root of that scale and reaches the text through
+		it. The page does not read it on body: a size in rem there would take
+		away the smaller size the browser gives a code, kbd, samp or pre that
+		has no class of its own, and they would come out as large as the text
+		around them.	*/
+	--font-title-weight: bold;
+	--font-title-transform: none;
+	--font-title-size: var(--text-4);
+	--font-subtitle-weight: normal;
+	--font-subtitle-transform: none;
+	--font-subtitle-size: var(--text-2);
+	--font-text-weight: normal;
+	--font-text-transform: none;
+	--font-text-size: 1rem;
+	--font-button-weight: bold;
+	--font-button-transform: none;
+	--font-button-size: var(--fontsize-btn);
+	--font-code-weight: normal;
+	--font-code-transform: none;
+	--font-code-size: .875rem;
+
 	/*	Relative, not 16px: a font-size on html resolves against the browser's
 		own default, so 100% is whatever the visitor set it to. A length here
 		would silently overrule someone who raised their default to 20px, which
@@ -172,12 +218,29 @@
 	--fontsize-big: 1.25em;
 	--fontsize-btn: 1rem;
 
-	--text-1: 1rem;
-	--text-2: 1.125rem;
-	--text-3: 1.25rem;
-	--text-4: 1.5rem;
-	--text-5: 1.8rem;
-	--text-6: 2.5rem;
+	/*	The scale is relative to the text size, with the factors its rem values
+		were. --text-4 to --text-6 have factors of their own from 768px (see
+		below)	*/
+	--text-1: var(--font-text-size);
+	--text-2: calc(var(--font-text-size) * 1.125);
+	--text-3: calc(var(--font-text-size) * 1.25);
+	--text-4: calc(var(--font-text-size) * 1.5);
+	--text-5: calc(var(--font-text-size) * 1.8);
+	--text-6: calc(var(--font-text-size) * 2.5);
+
+	/*	What a design layer scales without choosing a size. The hero takes the
+		size of the title and of the subtitle role times a number of its own,
+		and so does an article title - the size of the title role times 5 / 6,
+		because it stood on --text-3 where the other titles stand on --text-4.
+		Each is another number from 768px, where the scale above steps up (see
+		below). The --quiet and --loud variants of a section, an article and a
+		hero stand on a step of the scale, and --scale-quiet and --scale-loud
+		multiply that step: 1 is the step itself.	*/
+	--hero-title-scale: 1.2;
+	--hero-text-scale: 1.2;
+	--article-title-scale: calc(5 / 6);
+	--scale-quiet: 1;
+	--scale-loud: 1;
 
 	--space-1: .5rem;
 	--space-2: 1rem;
@@ -189,19 +252,31 @@
 	--article-img-max-width: 12vw;
 	--article-img-max-height: 20vh;
 	--grid-max-width: 120rem;
+	/*	The space between the viewport and a row - the row's own padding, which
+		is one step wider from 768px (see below)	*/
+	--grid-gutter: var(--space-2);
 	--radius: .2rem;
 	--radius-small: .1rem;
 	/*	The third step the scale always implied and never named: .1 / .2 / .4
 		is exactly what the Design feature's raster publishes as --nino-radius-1 to -3,
 		so the framework's own radii and the generated ones are one ladder */
-	--radius-large: .4rem
+	--radius-large: .4rem;
+	/*	The shadow of a card: .nino-article and .nino-pricing-item read it, and
+		it is none until a design layer gives a card one. A borderless article
+		has none, and the middle card of .nino-pricing-row--feature-middle and
+		the toast keep the shadows they have	*/
+	--shadow-card: none;
 }
 @media (min-width: 768px){
   :root{
 		--base-size: 112.5%;
-    --text-4: 1.6rem;
-    --text-5: 2rem;
-    --text-6: 3rem;
+    --text-4: calc(var(--font-text-size) * 1.6);
+    --text-5: calc(var(--font-text-size) * 2);
+    --text-6: calc(var(--font-text-size) * 3);
+		--hero-title-scale: 1.25;
+		--hero-text-scale: calc(10 / 9);
+		--article-title-scale: calc(25 / 32);
+		--grid-gutter: var(--space-3);
   }
 }
 
@@ -244,6 +319,8 @@ body {
 	display: flex;
 	flex-direction: column;
 	line-height: inherit;
+	font-weight: var(--font-text-weight);
+	text-transform: var(--font-text-transform);
 	color: var(--color-text);
 	background-color: var(--color-background);
 	width: 100%;
@@ -336,6 +413,17 @@ p {
 	line-height: var(--line-height);
 }
 
+/*	A heading takes two things of the title role, its weight and its
+	transform. Its family and its size are the title classes' own
+	(.nino-section-title, .nino-article-title, .nino-hero-title): a heading
+	with no class has always had the face of the text and the size of the
+	browser, and keeps both. The weight is not on the classes because a title
+	class on a p - the catalogue shows them so - has never been bold	*/
+h1, h2, h3, h4, h5, h6 {
+	font-weight: var(--font-title-weight);
+	text-transform: var(--font-title-transform);
+}
+
 
 /****************************************************************************************************
  *
@@ -357,7 +445,7 @@ p {
 .nino-grid-row {
 	display: flex;
 	flex-wrap: wrap;
-	padding: 0 var(--space-2);
+	padding: 0 var(--grid-gutter);
 	margin: 0 auto;
 	width: 100%;
 	max-width: var(--grid-max-width);
@@ -404,13 +492,6 @@ p {
 }
 
 @media (min-width: 768px) {
-	.nino-grid-row {
-		padding: 0 var(--space-3);
-	}
-	.nino-grid--fullwidth {
-		padding-left: 0;
-		padding-right: 0;
-	}
 	.nino-grid-m-25 { width: 25%; }
 	.nino-grid-m-33 { width: calc(100% / 3); }
 	.nino-grid-m-50 { width: 50%; }
@@ -626,12 +707,12 @@ main {
 }
 /* The Builder writes a div.nino-wrap around a page's sections, which puts the
    hero one level down - the second selector of each pair is that form */
-main:has(> .nino-cover.nino-atf:first-child),
-main:has(> .nino-wrap > .nino-cover.nino-atf:first-child),
-main:has(> .nino-parallex.nino-atf:first-child),
-main:has(> .nino-wrap > .nino-parallex.nino-atf:first-child),
-main:has(> .nino-atf--fullscreen:first-child),
-main:has(> .nino-wrap > .nino-atf--fullscreen:first-child) {
+main:has(> .nino-cover.nino-hero:first-child),
+main:has(> .nino-wrap > .nino-cover.nino-hero:first-child),
+main:has(> .nino-parallex.nino-hero:first-child),
+main:has(> .nino-wrap > .nino-parallex.nino-hero:first-child),
+main:has(> .nino-hero--fullscreen:first-child),
+main:has(> .nino-wrap > .nino-hero--fullscreen:first-child) {
 	padding-top: 0;
 }
 /* Scroll-driven header show/hide, opt-in via .nino-scroll-header */
@@ -675,42 +756,52 @@ body.nino-scroll-down .nino-scroll-header {
  *			04 Content
  *
  *
- *			.nino-atf(--fullscreen), .nino-atf(-title, -subtitle, -arrowdown)
+ *			.nino-hero(--fullscreen), .nino-hero(-title, -subtitle, -arrowdown)
  *			.nino-section(--dark, --black, --primary, --alt, --fullwidth, --border-1/2/3), .nino-section(-title, -subtitle)
  *			.nino-article(--alt, --fullwidth), .nino-article(-content, -title, -subtitle, -descr, -img, -price)
  *
  *
  ****************************************************************************************************/
 
-.nino-atf {
+.nino-hero {
 	position: relative;
 }
-.nino-atf-title {
+/*	The hero takes the face of the title and of the subtitle role, and their
+	size times a number of its own (--hero-title-scale, --hero-text-scale).
+	The leading keeps its ratio to the size - 1.3 / 1.2 below 768px, 1.2 from
+	there - and moves with it	*/
+.nino-hero-title {
 	font-family: var(--fontfamily-title);
-	font-size: calc( var(--text-4) *1.2 );
+	font-size: calc( var(--font-title-size) * var(--hero-title-scale) );
+	text-transform: var(--font-title-transform);
 	color: var(--color-title);
 	margin-bottom: var(--space-3);
-	line-height: calc( var(--text-4) *1.3 );
+	line-height: calc( var(--font-title-size) * var(--hero-title-scale) *1.3 / 1.2 );
 }
-.nino-atf-subtitle {
+.nino-hero-subtitle {
 	font-family: var(--fontfamily-subtitle);
-	font-size: calc( var(--text-2) *1.2 );
+	font-size: calc( var(--font-subtitle-size) * var(--hero-text-scale) );
+	font-weight: var(--font-subtitle-weight);
+	text-transform: var(--font-subtitle-transform);
 	color: var(--color-subtitle);
 	opacity: .8;
-	line-height: calc( var(--text-2) *1.3 );
+	line-height: calc( var(--font-subtitle-size) * var(--hero-text-scale) *1.3 / 1.2 );
 	margin-bottom: var(--space-3);
 }
-.nino-atf-title--quiet { font-size: calc( var(--text-3) *1.2 ); line-height: calc( var(--text-3) *1.3 ); }
-.nino-atf-title--loud { font-size: calc( var(--text-5) *1.2 ); line-height: calc( var(--text-5) *1.2 ); }
-.nino-atf-subtitle--quiet { font-size: calc( var(--text-1) *1.2 ); line-height: calc( var(--text-1) *1.4 ); opacity: .7; }
-.nino-atf-subtitle--loud { font-size: calc( var(--text-3) *1.2 ); line-height: calc( var(--text-3) *1.3 ); opacity: 1; }
+/*	The variants stand on a step of the scale times 1.2, and multiply it by
+	--scale-quiet or --scale-loud: not by the hero's own scale, which is 1.25
+	from 768px where they have always been 1.2	*/
+.nino-hero-title--quiet { font-size: calc( var(--text-3) *1.2 * var(--scale-quiet) ); line-height: calc( var(--text-3) *1.3 * var(--scale-quiet) ); }
+.nino-hero-title--loud { font-size: calc( var(--text-5) *1.2 * var(--scale-loud) ); line-height: calc( var(--text-5) *1.2 * var(--scale-loud) ); }
+.nino-hero-subtitle--quiet { font-size: calc( var(--text-1) *1.2 * var(--scale-quiet) ); line-height: calc( var(--text-1) *1.4 * var(--scale-quiet) ); opacity: .7; }
+.nino-hero-subtitle--loud { font-size: calc( var(--text-3) *1.2 * var(--scale-loud) ); line-height: calc( var(--text-3) *1.3 * var(--scale-loud) ); opacity: 1; }
 /*	Self-contained: the chevron is a background SVG (currentColor, so it
  *	always matches the hero's own text color - dark hero, light hero,
- *	whatever), so using it is just <button class="nino-atf-arrowdown"
+ *	whatever), so using it is just <button class="nino-hero-arrowdown"
  *	data-arrow-target="#some-id">label</button> - no icon markup, no extra
  *	CSS file. Click behavior (smooth-scroll to data-arrow-target) is wired
  *	in Nino.ui.js */
-.nino-atf-arrowdown {
+.nino-hero-arrowdown {
 	position: absolute;
 	bottom: var(--space-2);
 	left: 50%;
@@ -727,17 +818,17 @@ body.nino-scroll-down .nino-scroll-header {
 	background-size: contain;
 	color: inherit;
 	cursor: pointer;
-	animation: nino-atf-arrowdown-bounce 1.8s ease-in-out infinite;
+	animation: nino-hero-arrowdown-bounce 1.8s ease-in-out infinite;
 }
-@keyframes nino-atf-arrowdown-bounce {
+@keyframes nino-hero-arrowdown-bounce {
 	0%, 100% { transform: translateX(-50%) translateY(0); }
 	50% { transform: translateX(-50%) translateY(.4rem); }
 }
 
 /* Fullscreen hero without an image - nino-cover/nino-parallex size themselves
    via data-cover-height (JS), this is the CSS-only equivalent for a plain
-   nino-atf section with no image to size against */
-.nino-atf--fullscreen {
+   nino-hero section with no image to size against */
+.nino-hero--fullscreen {
 	min-height: 100vh;
 	display: flex;
 	align-items: center;
@@ -806,17 +897,20 @@ body.nino-scroll-down .nino-scroll-header {
 .nino-section-title {
 	font-family: var(--fontfamily-title);
 	text-align: center;
-	font-size: var(--text-4);
+	font-size: var(--font-title-size);
+	text-transform: var(--font-title-transform);
 	color: var(--color-title);
-	line-height: calc( var(--text-4) *1.3 );
+	line-height: calc( var(--font-title-size) *1.3 );
 	margin: var(--space-1) 0;
 }
 .nino-section-subtitle {
 	font-family: var(--fontfamily-subtitle);
 	text-align: center;
-	font-size: var(--text-2);
+	font-size: var(--font-subtitle-size);
+	font-weight: var(--font-subtitle-weight);
+	text-transform: var(--font-subtitle-transform);
 	color: var(--color-subtitle);
-	line-height: calc( var(--text-2) *1.3 );
+	line-height: calc( var(--font-subtitle-size) *1.3 );
 	opacity: .8;
 	margin-bottom: var(--space-2);
 }
@@ -867,42 +961,45 @@ body.nino-scroll-down .nino-scroll-header {
  *	Each states its own rem size rather than scaling with em: an em font-size
  *	replaces the size the class sets for itself instead of adjusting it, so
  *	"loud" on a 1.5rem title used to make it smaller, not bigger. Line height
- *	moves with the step, otherwise the new size sits in the old leading. */
-.nino-section-title--quiet { font-size: var(--text-3); line-height: calc( var(--text-3) *1.3 ); opacity: .8; }
-.nino-section-title--loud { font-size: var(--text-5); line-height: calc( var(--text-5) *1.2 ); }
-.nino-section-subtitle--quiet { font-size: var(--text-1); line-height: calc( var(--text-1) *1.4 ); opacity: .7; }
-.nino-section-subtitle--loud { font-size: var(--text-3); line-height: calc( var(--text-3) *1.3 ); opacity: 1; }
-.nino-section-text--quiet { font-size: calc( var(--text-1) *.9 ); opacity: .8; }
-.nino-section-text--loud { font-size: var(--text-2); line-height: calc( var(--text-2) *1.4 ); max-width: 52rem; }
+ *	moves with the step, otherwise the new size sits in the old leading.
+ *	The step is multiplied by --scale-quiet or --scale-loud, which are 1: a
+ *	design layer that wants every quiet variant smaller sets one number, and
+ *	the steps stay where the scale puts them. */
+.nino-section-title--quiet { font-size: calc( var(--text-3) * var(--scale-quiet) ); line-height: calc( var(--text-3) * var(--scale-quiet) *1.3 ); opacity: .8; }
+.nino-section-title--loud { font-size: calc( var(--text-5) * var(--scale-loud) ); line-height: calc( var(--text-5) * var(--scale-loud) *1.2 ); }
+.nino-section-subtitle--quiet { font-size: calc( var(--text-1) * var(--scale-quiet) ); line-height: calc( var(--text-1) * var(--scale-quiet) *1.4 ); opacity: .7; }
+.nino-section-subtitle--loud { font-size: calc( var(--text-3) * var(--scale-loud) ); line-height: calc( var(--text-3) * var(--scale-loud) *1.3 ); opacity: 1; }
+.nino-section-text--quiet { font-size: calc( var(--text-1) *.9 * var(--scale-quiet) ); opacity: .8; }
+.nino-section-text--loud { font-size: calc( var(--text-2) * var(--scale-loud) ); line-height: calc( var(--text-2) * var(--scale-loud) *1.4 ); max-width: 52rem; }
 .nino-text-center > .nino-section-text--loud { margin-right: auto; margin-left: auto; }
 .nino-section--alt .nino-section-title, .nino-section--alt .nino-section-subtitle,
-.nino-section--alt .nino-atf-title, .nino-section--alt .nino-atf-subtitle, .nino-section--alt .nino-atf-arrowdown {
+.nino-section--alt .nino-hero-title, .nino-section--alt .nino-hero-subtitle, .nino-section--alt .nino-hero-arrowdown {
 	color: var(--color-section-alt-text);
 }
 .nino-section--tint .nino-section-title, .nino-section--tint .nino-section-subtitle,
-.nino-section--tint .nino-atf-title, .nino-section--tint .nino-atf-subtitle, .nino-section--tint .nino-atf-arrowdown {
+.nino-section--tint .nino-hero-title, .nino-section--tint .nino-hero-subtitle, .nino-section--tint .nino-hero-arrowdown {
 	color: var(--color-section-tint-text);
 }
 .nino-section--dark .nino-section-title, .nino-section--dark .nino-section-subtitle,
-.nino-section--dark .nino-atf-title, .nino-section--dark .nino-atf-subtitle, .nino-section--dark .nino-atf-arrowdown,
+.nino-section--dark .nino-hero-title, .nino-section--dark .nino-hero-subtitle, .nino-section--dark .nino-hero-arrowdown,
 .nino-section--dark .nino-btn--outline, .nino-section--dark .nino-filter-btn {
 	color: var(--color-section-dark-text);
 }
 .nino-section--black .nino-section-title, .nino-section--black .nino-section-subtitle,
-.nino-section--black .nino-atf-title, .nino-section--black .nino-atf-subtitle, .nino-section--black .nino-atf-arrowdown,
+.nino-section--black .nino-hero-title, .nino-section--black .nino-hero-subtitle, .nino-section--black .nino-hero-arrowdown,
 .nino-section--black .nino-btn--outline, .nino-section--black .nino-filter-btn {
 	color: var(--color-section-black-text);
 }
 .nino-section--primary .nino-section-title, .nino-section--primary .nino-section-subtitle,
-.nino-section--primary .nino-atf-title, .nino-section--primary .nino-atf-subtitle, .nino-section--primary .nino-atf-arrowdown {
+.nino-section--primary .nino-hero-title, .nino-section--primary .nino-hero-subtitle, .nino-section--primary .nino-hero-arrowdown {
 	color: var(--color-primary-text);
 }
 .nino-section--brand-alt .nino-section-title, .nino-section--brand-alt .nino-section-subtitle,
-.nino-section--brand-alt .nino-atf-title, .nino-section--brand-alt .nino-atf-subtitle, .nino-section--brand-alt .nino-atf-arrowdown {
+.nino-section--brand-alt .nino-hero-title, .nino-section--brand-alt .nino-hero-subtitle, .nino-section--brand-alt .nino-hero-arrowdown {
 	color: var(--color-brand-alt-text);
 }
 .nino-cover--dim .nino-section-title, .nino-cover--dim .nino-section-subtitle,
-.nino-cover--dim .nino-atf-title, .nino-cover--dim .nino-atf-subtitle, .nino-cover--dim .nino-atf-arrowdown,
+.nino-cover--dim .nino-hero-title, .nino-cover--dim .nino-hero-subtitle, .nino-cover--dim .nino-hero-arrowdown,
 .nino-cover--dim .nino-btn--outline, .nino-cover--dim .nino-filter-btn {
 	color: var(--color-section-black-text);
 }
@@ -933,8 +1030,12 @@ body.nino-scroll-down .nino-scroll-header {
 }
 
 @media (min-width: 768px) {
-	.nino-atf-title { font-size: var(--text-5); line-height: calc( var(--text-5) *1.2 );}
-	.nino-atf-subtitle { font-size: var(--text-3); line-height: calc( var(--text-3) *1.2 );}
+	/*	From 768px the hero states its size and its leading again, after the
+		--quiet and --loud rules above: an element with the base class and a
+		variant gets the base size there, so the variant only acts below
+		768px on it	*/
+	.nino-hero-title { font-size: calc( var(--font-title-size) * var(--hero-title-scale) ); line-height: calc( var(--font-title-size) * var(--hero-title-scale) *1.2 );}
+	.nino-hero-subtitle { font-size: calc( var(--font-subtitle-size) * var(--hero-text-scale) ); line-height: calc( var(--font-subtitle-size) * var(--hero-text-scale) *1.2 );}
 	.nino-section { padding: var(--space-5) var(--space-3); }
 	.nino-section--fullwidth { padding-left: 0; padding-right: 0; }
 	.nino-section--fullheight { padding-top: 0; padding-bottom: 0; }
@@ -945,6 +1046,7 @@ body.nino-scroll-down .nino-scroll-header {
 	padding: 0 0 var(--space-1);
 	box-sizing: border-box;
 	border-radius: var(--radius-small);
+	box-shadow: var(--shadow-card);
 }
 .nino-article--fullwidth, .nino-article--fullwidth.nino-article--alt {
 	padding-left: 0;
@@ -963,7 +1065,7 @@ body.nino-scroll-down .nino-scroll-header {
 	border: 1px solid var(--color-border);
 	padding: var(--space-1);
 }
-.nino-article--borderless { border: 0; background: transparent; }
+.nino-article--borderless { border: 0; background: transparent; box-shadow: none; }
 .nino-section--alt .nino-article--alt, .nino-section--tint .nino-article--alt {
 	background-color: var(--color-section-default-bg);
 	color: var(--color-section-default-text);
@@ -988,13 +1090,17 @@ body.nino-scroll-down .nino-scroll-header {
 
 .nino-article-title {
 	font-family: var(--fontfamily-title);
+	text-transform: var(--font-title-transform);
 	color: var(--color-title);
-	font-size: var(--text-3);
+	font-size: calc( var(--font-title-size) * var(--article-title-scale) );
 	margin-bottom: var(--space-2);
 }
 
 .nino-article-subtitle {
-	font-size: var(--text-2);
+	font-family: var(--fontfamily-subtitle);
+	font-size: var(--font-subtitle-size);
+	font-weight: var(--font-subtitle-weight);
+	text-transform: var(--font-subtitle-transform);
 	margin-bottom: var(--space-2);
 }
 
@@ -1014,10 +1120,10 @@ body.nino-scroll-down .nino-scroll-header {
 }
 
 
-.nino-article-title--quiet { font-size: var(--text-2); opacity: .8; }
-.nino-article-title--loud { font-size: var(--text-4); line-height: calc( var(--text-4) *1.3 ); }
-.nino-article-descr--quiet { font-size: calc( var(--text-1) *.9 ); opacity: .8; }
-.nino-article-descr--loud { font-size: var(--text-2); line-height: calc( var(--text-2) *1.4 ); }
+.nino-article-title--quiet { font-size: calc( var(--text-2) * var(--scale-quiet) ); opacity: .8; }
+.nino-article-title--loud { font-size: calc( var(--text-4) * var(--scale-loud) ); line-height: calc( var(--text-4) * var(--scale-loud) *1.3 ); }
+.nino-article-descr--quiet { font-size: calc( var(--text-1) *.9 * var(--scale-quiet) ); opacity: .8; }
+.nino-article-descr--loud { font-size: calc( var(--text-2) * var(--scale-loud) ); line-height: calc( var(--text-2) * var(--scale-loud) *1.4 ); }
 
 .nino-article-img--maxheight {
 	max-height: var(--article-img-max-height);
@@ -1131,8 +1237,10 @@ body.nino-scroll-down .nino-scroll-header {
 	padding: var(--space-1) var(--space-2);
 	border-radius: var(--radius);
 	text-align: center;
-	font-size: var(--fontsize-btn);
-	font-weight:bold;
+	font-family: var(--fontfamily-button);
+	font-size: var(--font-button-size);
+	font-weight: var(--font-button-weight);
+	text-transform: var(--font-button-transform);
 	cursor: pointer;
 	transition: background-color .2s ease, color .2s ease, border-color .2s ease;
 }
@@ -1187,7 +1295,7 @@ body.nino-scroll-down .nino-scroll-header {
 	the label stays centred in the taller box	*/
 .nino-btn--small {
 	padding: calc( var(--space-1) *.7) calc( var(--space-2) * .7 );
-	font-size: calc( var(--fontsize-btn) * .7);
+	font-size: calc( var(--font-button-size) * .7);
 	border-radius: calc( var(--radius) * .7 );
 	display: inline-flex;
 	align-items: center;
@@ -1196,7 +1304,7 @@ body.nino-scroll-down .nino-scroll-header {
 }
 .nino-btn--big {
 	padding: calc( var(--space-1) *1.3) calc( var(--space-2) * 1.3 );
-	font-size: calc( var(--fontsize-btn) * 1.3);
+	font-size: calc( var(--font-button-size) * 1.3);
 	border-radius: calc( var(--radius) * 1.3 );
 }
 
@@ -1517,7 +1625,9 @@ textarea:disabled {
 	background-color: var(--color-code-bg);
 	color: var(--color-code-text);
 	font-family: var(--fontfamily-code);
-	font-size: .875rem;
+	font-size: var(--font-code-size);
+	font-weight: var(--font-code-weight);
+	text-transform: var(--font-code-transform);
 	line-height: 1.65;
 	tab-size: 2;
 	text-align: left;
@@ -1643,6 +1753,7 @@ body.nino-scroll-btf .nino-back-to-top {
 	padding: var(--space-2);
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius);
+	box-shadow: var(--shadow-card);
 	text-align: center;
 }
 .nino-pricing-item--featured {
@@ -2439,8 +2550,8 @@ header .nino-headernav-logo:empty {
 .nino-cover.nino-cover-top > .nino-cover-content { top: 0; transform: none; }
 .nino-parallex.nino-cover-bottom > .nino-cover-content,
 .nino-cover.nino-cover-bottom > .nino-cover-content { top: auto; bottom: 0; transform: none; }
-.nino-parallex.nino-atf,
-.nino-cover.nino-atf {
+.nino-parallex.nino-hero,
+.nino-cover.nino-hero {
 	margin-top: 0 !important;
 	box-sizing: border-box;
 }
@@ -2787,7 +2898,7 @@ header .nino-headernav-logo:empty {
 	border: 1px solid var(--color-border);
 	background: none;
 	font: inherit;
-	font-size: var(--fontsize-btn);
+	font-size: var(--font-button-size);
 	color: inherit;
 	cursor: pointer;
 	transition: background-color .2s ease, color .2s ease, border-color .2s ease;
@@ -2978,9 +3089,9 @@ header .nino-headernav-logo:empty {
 /* nino-section-title and its siblings center themselves, so an alignment set on
    the block around them has to reach in - otherwise "left" moves everything
    except the heading */
-.nino-text-left :is(.nino-section-title, .nino-section-subtitle, .nino-atf-title, .nino-atf-subtitle) { text-align: left; }
-.nino-text-center :is(.nino-section-title, .nino-section-subtitle, .nino-atf-title, .nino-atf-subtitle) { text-align: center; }
-.nino-text-right :is(.nino-section-title, .nino-section-subtitle, .nino-atf-title, .nino-atf-subtitle) { text-align: right; }
+.nino-text-left :is(.nino-section-title, .nino-section-subtitle, .nino-hero-title, .nino-hero-subtitle) { text-align: left; }
+.nino-text-center :is(.nino-section-title, .nino-section-subtitle, .nino-hero-title, .nino-hero-subtitle) { text-align: center; }
+.nino-text-right :is(.nino-section-title, .nino-section-subtitle, .nino-hero-title, .nino-hero-subtitle) { text-align: right; }
 .nino-text-center > .nino-btn { margin-right: calc(var(--space-1) / 2); margin-left: calc(var(--space-1) / 2); }
 .nino-text-right > .nino-btn { margin-left: var(--space-1); }
 
@@ -3068,7 +3179,7 @@ header .nino-headernav-logo:empty {
 	}
 
 	/* The three that run forever without anybody doing anything */
-	.nino-atf-arrowdown,
+	.nino-hero-arrowdown,
 	.nino-fx-vertical-bounce,
 	.nino-preloader::after {
 		animation: none !important;

@@ -173,7 +173,7 @@
 			const
 				ui			= Nino.ui,
 				e 			= {
-					arrowDown	: dc.querySelectorAll( '.nino-atf-arrowdown' ),
+					arrowDown	: dc.querySelectorAll( '.nino-hero-arrowdown' ),
 					autoheight	: dc.querySelectorAll( '.nino-autoheight' ),
 					backToTop	: dc.querySelectorAll( '.nino-back-to-top' ),
 					cover			: dc.querySelectorAll( '.nino-cover' ),
@@ -502,7 +502,7 @@
 
 
 			/*
-			 *	nino-atf-arrowdown - scrolls to whichever element its own
+			 *	nino-hero-arrowdown - scrolls to whichever element its own
 			 *	data-arrow-target (a css selector, eg. "#next-section") points
 			 *	at. The icon itself is a background-image (see Nino.css), so
 			 *	using it never needs more than the one data attribute.

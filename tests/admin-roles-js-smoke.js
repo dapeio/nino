@@ -204,7 +204,7 @@ const SCOPES = [
 	{ scope : '/_admin/text/', door : '/_admin/text/manage', label : '/_admin/nav/text', areas : [
 		{ id : 'page-home', label : '/page-home', actions : [
 			{ id : 'update', label : '/_admin/text/scope/update', perm : '/_admin/text/update/page-home/*', fields : [
-				{ id : '/page-home/atf/title', label : '/page-home/atf/title', perm : '/_admin/text/update/page-home/atf/title' },
+				{ id : '/page-home/hero/title', label : '/page-home/hero/title', perm : '/_admin/text/update/page-home/hero/title' },
 			] },
 		] },
 	] },
@@ -232,7 +232,7 @@ check( 'the words the checks below rely on exist', ELEMENTS !== '' && TEXT !== '
 check( 'a blanket over a panel covers its door', roles.covers( [ '/_admin/elements/*' ], '/_admin/elements/manage' ) === true );
 check( '/_admin/* covers the door of every panel', roles.covers( [ '/_admin/*' ], '/_admin/elements/manage' ) === true );
 check( 'the string itself covers itself', roles.covers( [ '/_admin/elements/manage' ], '/_admin/elements/manage' ) === true );
-check( 'full access covers anything', roles.covers( [ '/*' ], '/_admin/text/update/page-home/atf/title' ) === true );
+check( 'full access covers anything', roles.covers( [ '/*' ], '/_admin/text/update/page-home/hero/title' ) === true );
 check( 'a blanket over one type covers its actions and fields, not another type', roles.covers( [ '/_admin/elements/services/*' ], '/_admin/elements/services/update/title' ) === true
 	&& roles.covers( [ '/_admin/elements/services/*' ], '/_admin/elements/posts/insert' ) === false );
 check( 'a door does not cover what is inside it', roles.covers( [ '/_admin/elements/manage' ], '/_admin/elements/services/insert' ) === false );
@@ -369,9 +369,9 @@ lastPicker().options.onChange( [] );
 check( 'taking away a permission that is not a single one of a panel does not ask', confirms.length === 2 && parts.perms().length === 0 );
 
 // A permission that is held but not offered any more, and is in the tree
-parts = draw( [ '/_admin/text/update/page-home/atf/title', '/_admin/old/thing' ] );
+parts = draw( [ '/_admin/text/update/page-home/hero/title', '/_admin/old/thing' ] );
 const options = pickers[pickers.length - 1].options.options;
-check( 'a held scoped permission is named by the tree, one outside it by its string', options.some( function( o ) { return o.value === '/_admin/text/update/page-home/atf/title' && o.label === labels['/_admin/text/update/page-home/atf/title'] } )
+check( 'a held scoped permission is named by the tree, one outside it by its string', options.some( function( o ) { return o.value === '/_admin/text/update/page-home/hero/title' && o.label === labels['/_admin/text/update/page-home/hero/title'] } )
 	&& options.some( function( o ) { return o.value === '/_admin/old/thing' && o.label === text('/_admin/roles/group/other')+ ' · /_admin/old/thing' } ) );
 check( 'a role that holds a single permission names its panel under the picker', findAll( parts.fieldset, function( el ) { return el.textContent === Nino.adminUi.format( text('/_admin/roles/scope/detail-hint'), TEXT ) } ).length === 1 );
 

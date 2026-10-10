@@ -93,7 +93,7 @@ All notable changes to Nino are documented in this file.
   three `main:has(> ...:first-child)` rules has a sibling selector
   `main:has(> .nino-wrap > ...:first-child)`. The wrap itself has no rule. The
   delivered frame's `theme.css` has the same rule for a first-child cover or
-  parallax - the Builder's own heroes carry no `nino-atf` - and the same
+  parallax - the Builder's own heroes carry no `nino-hero` - and the same
   wrapped siblings. An existing project keeps its copy of `theme.css`: add
   `body main:has(> .nino-wrap > .nino-cover:first-child)` and
   `body main:has(> .nino-wrap > .nino-parallex:first-child)` to the selector
@@ -124,6 +124,71 @@ All notable changes to Nino are documented in this file.
   example. The Design feature's manual is its `feature.php`, not a README. The
   three `_templates` screenshots no README embeds any more are deleted, with
   their row in the screenshot briefing.
+- **Nino.css:** the hero is the hero. `nino-atf`, `nino-atf--fullscreen`,
+  `nino-atf-arrowdown`, `nino-atf-title` and `nino-atf-subtitle`, the last two
+  with their `--quiet` and `--loud`, are `nino-hero`, `nino-hero--fullscreen`,
+  `nino-hero-arrowdown`, `nino-hero-title` and `nino-hero-subtitle` - in the
+  stylesheet (the three `main:has(> ...:first-child)` rules and their
+  `.nino-wrap` siblings among them, and the keyframes of the arrow), in
+  `Nino.ui.js`, which listens on `.nino-hero-arrowdown`, in the pages of the
+  library (home, 404, contact) and in the demo catalogue, where the
+  specimens, their ids and their words say hero. **There is no alias:** a
+  class `nino-atf...` in a project's own template or stylesheet, or in a
+  feature, is styled by nothing any more and has to be renamed there. The
+  scroll state is not renamed - `body.nino-scroll-atf` and `nino-scroll-btf`
+  name the fold, and the fold stays a fold.
+- **Nino.css:** the fonts are roles. Title, subtitle, text, button and code
+  each have a family (`--fontfamily-<role>`; `--fontfamily-button` is new and
+  has the face of the text until a theme names one), a weight, a transform
+  and a size (`--font-<role>-weight`, `-transform` and `-size`), and the
+  rules read nothing else of a role: the section, article and hero titles and
+  subtitles, `.nino-btn` (with its `--small` and `--big` forms, and the filter
+  button for the size) and `.nino-code` their own, every `h1` to `h6` the
+  weight and the transform of the title role - a heading without a class
+  keeps the face of the text and the size of the browser - and the page the
+  weight and the transform of the text role. Every default is what the rules
+  had, so a page that sets none looks as it did: titles and buttons bold, the
+  rest normal, nothing transformed, the title role the `--text-4` step, the
+  subtitle role the `--text-2`, the button role `--fontsize-btn` and the code
+  role `.875rem`. One case differs: a subtitle class, or `.nino-code`, on an
+  element the browser makes bold - an `h1` to `h6`, or anything inside a
+  `strong` - takes the weight of its role, `normal`, where it was bold. The
+  size of a role is resolved on `:root` (`--font-title-size` is the root's
+  `--text-4`), so a `--text-n` or `--fontsize-btn` that a section or a column
+  sets for itself no longer reaches the titles, subtitles and buttons in it,
+  as it did when they read the step themselves; set the `--font-<role>-size`
+  there as well.
+- **Nino.css:** the scale is relative to the text size, and the hero and the
+  variants are numbers. `--text-1` is `--font-text-size`, and `--text-2` to
+  `--text-6` are that size times 1.125, 1.25, 1.5, 1.8 and 2.5 - from 768px
+  `--text-4` to `--text-6` times 1.6, 2 and 3 - which are the rem values they
+  had. The hero takes the size of the title and of the subtitle role times
+  `--hero-title-scale` and `--hero-text-scale` (1.2 and 1.2, from 768px 1.25
+  and 10 / 9) and its leading keeps its ratio to the size; an article title
+  takes the size of the title role times `--article-title-scale`, 5 / 6 and
+  from 768px 25 / 32, which is the `--text-3` it stood on where the other
+  titles stand on `--text-4`. The `--quiet` and `--loud` variants of a
+  section, an article and a hero stand on the step of the scale they stood on
+  and multiply it by `--scale-quiet` and `--scale-loud`, both 1: they are
+  steps, and no constant factor of the size they vary, so the two numbers
+  move them together.
+- **Nino.css:** the page does not read `--font-text-size` on `body`. A size
+  in rem there takes the smaller size the browser gives a `code`, `kbd`,
+  `samp` or `pre` with no class of its own away - 13px beside text of 16px -
+  and every page that has one would change. The delivered `assets/theme.css`
+  is unchanged and assigns `--text-1` to `--text-6` from its own raster, which
+  wins over the scale of `Nino.css`: on a project made from it the scale
+  follows `--font-text-size` once those six lines are gone.
+- **Nino.css:** `--grid-gutter` is the space between the viewport and a row,
+  the padding `.nino-grid-row` had - `--space-2`, and from 768px `--space-3`,
+  which the `@media` block now states in the property instead of in a second
+  rule - and `--shadow-card` is the `box-shadow` of a card, `none` until a
+  design layer gives one: `.nino-article` (and a `.nino-bento-item` that
+  carries it, as the demo catalogue draws them) and `.nino-pricing-item` read
+  it, a `.nino-article--borderless` has none, and the middle card of
+  `.nino-pricing-row--feature-middle` and the toast keep the shadows they
+  have. The design manual lists all the properties under "Hooks in
+  `Nino.css`".
 
 ## v1.5.0 - 2026-10-06
 

@@ -7,7 +7,7 @@
 	[image /template/page-home/fullscreen-image/background alt=""]
 	<div class="nino-cover-content">
 		<div class="nino-grid-row nino-grid-row--wide nino-vpa">
-			<div class="nino-grid-100 nino-text-left"><h2 class="nino-atf-title nino-atf-title--loud" id="fullscreen-image-title">[[/template/page-home/welcome/title]]</h2><p class="nino-atf-subtitle">[[/template/page-home/welcome/subtitle]]</p><a href="[[/_nino/webpage/contact/uri]]" class="nino-btn nino-btn--primary">[[/_nino/webpage/contact/name]]</a></div>
+			<div class="nino-grid-100 nino-text-left"><h2 class="nino-hero-title nino-hero-title--loud" id="fullscreen-image-title">[[/template/page-home/welcome/title]]</h2><p class="nino-hero-subtitle">[[/template/page-home/welcome/subtitle]]</p><a href="[[/_nino/webpage/contact/uri]]" class="nino-btn nino-btn--primary">[[/_nino/webpage/contact/name]]</a></div>
 		</div>
 	</div>
 </section><!-- nino:template-slot footer -->

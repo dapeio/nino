@@ -6,7 +6,7 @@
 	<!-- nino:section {"version":3,"preset":"image-banner","pageId":"page-contact","id":"hero","pageMotion":"on","layout":"plain","frame":{"screen":"50","vertical":"auto","background":"dark","container":"auto","padding":"auto","margin":"auto","focus":"auto","overlay":"auto","backgroundImage":"/template/page-contact/hero/background","backgroundImageSource":"new"},"areas":{"content":{"style":"left","components":[{"id":"title","type":"title","style":"auto","settings":{"target":"same"},"bindings":{"text":"/template/page-contact/hero/title"},"bindingSources":{"text":"new"}},{"id":"subtitle","type":"subtitle","style":"auto","settings":{"target":"same"},"bindings":{"text":"/template/page-contact/hero/subtitle"},"bindingSources":{"text":"new"}}],"source":{"elementMode":"new","elementType":"preview-preview-image-banner-content","shortcode":{"locale":"","callback":"","limit":6,"query":""}}}}} -->
 	<div class="nino-cover-content">
 		<div class="nino-grid-row nino-vpa">
-			<div class="nino-grid-100 nino-text-left"><h2 class="nino-atf-title" id="hero-title">[[/template/page-contact/hero/title]]</h2><p class="nino-atf-subtitle">[[/template/page-contact/hero/subtitle]]</p></div>
+			<div class="nino-grid-100 nino-text-left"><h2 class="nino-hero-title" id="hero-title">[[/template/page-contact/hero/title]]</h2><p class="nino-hero-subtitle">[[/template/page-contact/hero/subtitle]]</p></div>
 		</div>
 	</div>
 </section><section id="contact-form" class="nino-section nino-mt-0 nino-mb-0" aria-labelledby="contact-form-title">
