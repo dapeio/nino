@@ -132,12 +132,12 @@ namespace Nino\Modules {
 		public static function init( array &$appData ): void {
 
 			$components = [
-				[ 'title', 'Title', 'Titel', 'title', 'text', self::_titled(), [ 'section' ], 'h{level} .nino-section-title' ],
-				[ 'article-title', 'Article title', 'Article-Titel', 'title', 'text', self::_titled(), [ 'card' ], 'h{level} .nino-article-title' ],
-				[ 'hero-title', 'Hero title', 'Hero-Titel', 'title', 'text', self::_titled(), [ 'hero' ], 'h{level} .nino-hero-title' ],
-				[ 'subtitle', 'Subtitle', 'Untertitel', 'title', 'text', [ 'style' => self::_style() ], [ 'section' ], 'p .nino-section-subtitle' ],
-				[ 'article-subtitle', 'Article subtitle', 'Article-Untertitel', 'title', 'text', [ 'style' => self::_style() ], [ 'card' ], 'p .nino-article-subtitle' ],
-				[ 'hero-subtitle', 'Hero subtitle', 'Hero-Untertitel', 'title', 'text', [ 'style' => self::_style() ], [ 'hero' ], 'p .nino-hero-subtitle' ],
+				[ 'title', 'Title (Section)', 'Titel (Sektion)', 'title', 'text', self::_titled(), [ 'section' ], 'h{level} .nino-section-title' ],
+				[ 'subtitle', 'Subtitle (Section)', 'Untertitel (Sektion)', 'title', 'text', [ 'style' => self::_style() ], [ 'section' ], 'p .nino-section-subtitle' ],
+				[ 'article-title', 'Title (Article)', 'Titel (Artikel)', 'title', 'text', self::_titled(), [ 'card' ], 'h{level} .nino-article-title' ],
+				[ 'article-subtitle', 'Subtitle (Article)', 'Untertitel (Artikel)', 'title', 'text', [ 'style' => self::_style() ], [ 'card' ], 'p .nino-article-subtitle' ],
+				[ 'hero-title', 'Title (Hero)', 'Titel (Hero)', 'title', 'text', self::_titled(), [ 'hero' ], 'h{level} .nino-hero-title' ],
+				[ 'hero-subtitle', 'Subtitle (Hero)', 'Untertitel (Hero)', 'title', 'text', [ 'style' => self::_style() ], [ 'hero' ], 'p .nino-hero-subtitle' ],
 				[ 'text', 'Text', 'Text', 'text', 'text', [
 					'format' => [ 'type' => 'select', 'options' => [ 'inline', 'lines', 'blocks' ], 'default' => 'blocks', 'label' => [ 'en_US' => 'Format', 'de_DE' => 'Format' ],
 						'hint' => [ 'en_US' => 'What the text may hold: inline tags, line breaks, or paragraphs and lists.', 'de_DE' => 'Was der Text enthalten darf: Auszeichnungen, Zeilenumbrüche oder Absätze und Listen.' ] ],
