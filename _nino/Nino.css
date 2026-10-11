@@ -679,41 +679,18 @@ h1, h2, h3, h4, h5, h6 {
 	gap: var(--space-1);
 	padding: calc(var(--nino-stack-gap) / 2);
 }
+/*	A card in a cell takes no margin of its own: the half gap of its cell is the
+	room between neighbours, and the stack's edges are the column's. A card's own
+	margins are for a card that stands in a column	*/
+.nino-stack > * > .nino-article { margin: 0; }
 .nino-stack > * > .nino-btn { justify-self: start; }
-/*	A card as the cell of a stack - the stack's article attribute makes a cell an
-	article that carries the classes of the grid. A plain cell holds the half gap
-	as padding and is painted by what is in it; a card is painted by its own box,
-	so it takes the half gap as its margin instead, and its width is that of its
-	place in the grid less the whole gap: neighbours are one gap apart and the
-	stack's edges are the column's, as with the cells above. Its padding and its
-	border stay what they are on any card	*/
-.nino-stack > .nino-article {
-	margin: calc(var(--nino-stack-gap) / 2);
-	width: calc(100% - var(--nino-stack-gap));
-}
-@media (min-width: 640px) {
-	.nino-stack > .nino-article.nino-grid-s-25 { width: calc(25% - var(--nino-stack-gap)); }
-	.nino-stack > .nino-article.nino-grid-s-33 { width: calc(100% / 3 - var(--nino-stack-gap)); }
-	.nino-stack > .nino-article.nino-grid-s-50 { width: calc(50% - var(--nino-stack-gap)); }
-	.nino-stack > .nino-article.nino-grid-s-66 { width: calc(100% / 1.5 - var(--nino-stack-gap)); }
-	.nino-stack > .nino-article.nino-grid-s-75 { width: calc(75% - var(--nino-stack-gap)); }
-	.nino-stack > .nino-article.nino-grid-s-100 { width: calc(100% - var(--nino-stack-gap)); }
-}
-@media (min-width: 768px) {
-	.nino-stack > .nino-article.nino-grid-m-25 { width: calc(25% - var(--nino-stack-gap)); }
-	.nino-stack > .nino-article.nino-grid-m-33 { width: calc(100% / 3 - var(--nino-stack-gap)); }
-	.nino-stack > .nino-article.nino-grid-m-50 { width: calc(50% - var(--nino-stack-gap)); }
-	.nino-stack > .nino-article.nino-grid-m-66 { width: calc(100% / 1.5 - var(--nino-stack-gap)); }
-	.nino-stack > .nino-article.nino-grid-m-75 { width: calc(75% - var(--nino-stack-gap)); }
-	.nino-stack > .nino-article.nino-grid-m-100 { width: calc(100% - var(--nino-stack-gap)); }
-}
-@media (min-width: 1024px) {
-	.nino-stack > .nino-article.nino-grid-l-25 { width: calc(25% - var(--nino-stack-gap)); }
-	.nino-stack > .nino-article.nino-grid-l-33 { width: calc(100% / 3 - var(--nino-stack-gap)); }
-	.nino-stack > .nino-article.nino-grid-l-50 { width: calc(50% - var(--nino-stack-gap)); }
-	.nino-stack > .nino-article.nino-grid-l-66 { width: calc(100% / 1.5 - var(--nino-stack-gap)); }
-	.nino-stack > .nino-article.nino-grid-l-75 { width: calc(75% - var(--nino-stack-gap)); }
-	.nino-stack > .nino-article.nino-grid-l-100 { width: calc(100% - var(--nino-stack-gap)); }
+/*	The cells of a stack are one below the other on a phone. The classes of the
+	grid are the only width a cell has, and the three widths of a stack start at
+	640px (-s-), 768px (-m-) and 1024px (-l-): below 640px a cell would be as wide
+	as its content, and a loop of cards with short texts would draw narrow cards
+	side by side	*/
+@media (max-width: 639.98px) {
+	.nino-stack > * { width: 100%; }
 }
 /*	After .nino-stack, which sets a gap of its own: the class on the same
 	element has to be the later one	*/
@@ -894,7 +871,7 @@ body.nino-scroll-down .nino-scroll-header {
  *			.nino-hero(--fullscreen), .nino-hero(-title, -subtitle, -arrowdown)
  *			.nino-section(--alt, --tint, --dark, --black, --primary, --brand-alt, --fullwidth, --border-1/2/3), .nino-section(-title, -subtitle)
  *			.nino-grid(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim)
- *			.nino-article(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --fullwidth), .nino-article(-content, -title, -subtitle, -descr, -img, -price)
+ *			.nino-article(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim, --fill, --middle, --bottom, --last-bottom, --fullwidth), .nino-article(-content, -title, -subtitle, -descr, -img, -price, -bg)
  *
  *
  ****************************************************************************************************/
@@ -1444,7 +1421,7 @@ body.nino-scroll-down .nino-scroll-header {
 	border-radius: var(--radius-small);
 	box-shadow: var(--shadow-card);
 }
-.nino-article--fullwidth, .nino-article--fullwidth:is(.nino-article--alt, .nino-article--tint, .nino-article--dark, .nino-article--black, .nino-article--primary, .nino-article--brand-alt, .nino-article--counter) {
+.nino-article--fullwidth, .nino-article--fullwidth:is(.nino-article--alt, .nino-article--tint, .nino-article--dark, .nino-article--black, .nino-article--primary, .nino-article--brand-alt, .nino-article--counter, .nino-article--dim) {
 	padding-left: 0;
 	padding-right: 0;
 	padding-top: 0;
@@ -1457,7 +1434,7 @@ body.nino-scroll-down .nino-scroll-header {
 	the one it sits on, and with nothing it works out by looking at that one:
 	an alt card in an alt section is alt on alt, and a card that wants to
 	stand out of its section says so with counter	*/
-.nino-article--alt, .nino-article--tint, .nino-article--dark, .nino-article--black, .nino-article--primary, .nino-article--brand-alt, .nino-article--counter {
+.nino-article--alt, .nino-article--tint, .nino-article--dark, .nino-article--black, .nino-article--primary, .nino-article--brand-alt, .nino-article--counter, .nino-article--dim {
 	border: 1px solid var(--color-border);
 	padding: var(--space-1);
 }
@@ -1478,6 +1455,31 @@ body.nino-scroll-down .nino-scroll-header {
 	--color-accent: var(--counter-card-accent);
 	--color-focus: var(--counter-card-focus);
 	--color-border: var(--counter-card-border);
+	color: var(--color-ink);
+}
+/*	A dimmed card is the dark ground whatever else it names, as a dimmed column
+	is (.nino-grid--dim): the scrim darkens the picture behind it, so the card
+	writes in the ink of the dark ground, hands that ground's roles to what stands
+	in it and paints the pair under the picture - a borderless card too, for the
+	picture needs a ground under it. This block comes once, after every ground of
+	a card, the counter and the borderless card - rules of the same specificity,
+	so the last one wins - and a card that says --dim and --alt or --counter is
+	not dark ink on a darkened picture. A card holds no card, so it hands no
+	counter family on. --color-text is the page's ink also where a rule reads
+	that (an icon, a legend). Its border and its padding are those of a card of a
+	ground: it is in the list of the rule that gives them, as .nino-grid--dim is
+	in the column's, and without them a dimmed card below 768px writes its title
+	flush against the edge of the dark card	*/
+.nino-article--dim {
+	--color-ground: var(--color-section-dark-bg);
+	--color-ink: var(--color-section-dark-text);
+	--color-title: var(--color-section-dark-text);
+	--color-subtitle: var(--color-section-dark-text);
+	--color-accent: var(--color-accent-dark);
+	--color-focus: var(--color-focus-dark);
+	--color-border: var(--color-border-dark);
+	--color-text: var(--color-section-dark-text);
+	background-color: var(--color-ground);
 	color: var(--color-ink);
 }
 
@@ -1585,6 +1587,46 @@ body.nino-scroll-down .nino-scroll-header {
 	.nino-article-cols-xl { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
 	.nino-article-cols-xl > .nino-article-img { max-height: none; max-width: var(--article-img-max-width); }
 }
+
+/*	A card as tall as the column or the cell it stands in, so that the cards of one
+	row end on one line. It has no margin at all, or it would not be that box: the
+	bottom margin pushes it out of the box by exactly that much, and from 768px,
+	where a card has a margin on all four sides, the top one stands it that far
+	lower and the sides take it in from the edges - so the rule comes after the
+	768px block above. The percentage needs a box with a height to resolve against.
+	A plain column is a stretched item of its row and has one. A column with a stack
+	class and the slot of a stack are grids that place their content at the start,
+	whose row is as tall as that content - and the percentage with it. So the one
+	grid that holds a filling card stretches its row: on the grid, because the card
+	cannot make the box it fills taller than the box is. A row aligned to the middle
+	or the bottom does not stretch its columns, and a card that fills one has
+	nothing to fill. nino-autoheight on the cells of a stack makes the slots of
+	different rows one height; the card fills its slot, whatever height that is	*/
+.nino-article--fill { height: 100%; margin: 0; }
+.nino-stack > :has(> .nino-article--fill),
+.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)):has(> .nino-article--fill) {
+	align-content: stretch;
+}
+
+/*	Where the content stands in a card taller than it, which is a flex column's
+	to say: in the middle, at the bottom, or - last-bottom - with the last element
+	pushed to the bottom by an automatic margin above it, so that a title stays at the
+	top and a button ends the card. The pieces of a card have a bottom margin only and
+	the global img rule is height: auto, so for them the column changes no spacing and
+	no picture. The margins of the items of a flex column do not collapse, though: a
+	spacer keeps its whole top margin, and two buttons that stood side by side stand
+	one under the other. A flex item is stretched over the column; a button is as wide
+	as its label and sits where the text does, as in the stack above	*/
+.nino-article--middle, .nino-article--bottom, .nino-article--last-bottom {
+	display: flex;
+	flex-direction: column;
+}
+.nino-article--middle { justify-content: center; }
+.nino-article--bottom { justify-content: flex-end; }
+.nino-article--last-bottom > :last-child { margin-top: auto; }
+:is(.nino-article--middle, .nino-article--bottom, .nino-article--last-bottom) > .nino-btn { align-self: flex-start; }
+:is(.nino-article--middle, .nino-article--bottom, .nino-article--last-bottom).nino-text-center > .nino-btn { align-self: center; }
+:is(.nino-article--middle, .nino-article--bottom, .nino-article--last-bottom).nino-text-right > .nino-btn { align-self: flex-end; }
 
 
 /****************************************************************************************************
@@ -3088,11 +3130,37 @@ header .nino-headernav-logo:empty {
 	height: 100%;
 	object-fit: cover;
 }
-:has(> .nino-grid-bg) {
+:has(> .nino-grid-bg, > .nino-article-bg) {
 	position: relative;
 	isolation: isolate;
 }
 .nino-grid--dim > .nino-grid-bg::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background-color: var(--color-background-dim);
+}
+
+/*	The picture behind a card, in a block of its own that the content of the card
+	follows: what .nino-grid-bg is to a column, for a card, and the rule above makes
+	the card the box it is placed in and a stacking context of its own. It lies over
+	the whole card and is cut at its corners, and the picture covers it. --dim
+	darkens it with the scrim of a dimmed cover, and the card writes in the ink of
+	the dark ground	*/
+.nino-article-bg {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	border-radius: inherit;
+	z-index: -1;
+}
+.nino-article-bg > img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+.nino-article--dim > .nino-article-bg::after {
 	content: '';
 	position: absolute;
 	inset: 0;

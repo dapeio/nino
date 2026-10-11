@@ -4,29 +4,26 @@
  *									stylesheets in the css bundle - the project's own
  *									assets/style.css comes after it and overrules it.
  *
- *									Four layers, in this order, and the order is the point:
+ *									Everything below this comment is what the catalogue's
+ *									Design feature compiles at its defaults: the twelve
+ *									numbered sections, every part on the first set of its
+ *									tab, every knob in the middle. It is regenerated from
+ *									that compiler with each kernel release, so that the look
+ *									a project starts from and the look Design compiles have
+ *									one source. Nino.css carries the defaults; this file is
+ *									what the tokens, the roles, the webfaces and the two
+ *									frames make of them.
  *
- *									  1. the design tokens - the whole --nino-* palette and
- *									     raster, compiled once and frozen here
- *									  2. the theme - which token goes in which role, plus the
- *									     three webfaces (see the base manifest's `fonts`)
- *									  3. the header frame - the css for frame-header.tpl
- *									  4. the footer frame - the css for frame-footer.tpl
- *
- *									Up to Nino 1.1 the wizard asked four questions and wrote
- *									this file from the answers. It does not any more: this is
- *									one fixed look, edited by hand or replaced wholesale. The
- *									Design feature is what compiles a stylesheet of its own
- *									over it. The whole-page themes the wizard used to offer
- *									are gone: a project composes its look from the part sets,
- *									and a presets field that combines them may come later.
+ *									This header is the kernel's own, and the file carries no
+ *									stamp of the compiler's: Design treats it as the delivered
+ *									file it is, and asks before it writes over it. The file
+ *									stays one that may be edited by hand or replaced wholesale.
  *
  *	@package				Dape/Nino
  *	@author					David Perchermeier <mail@dape.io>
  *	@link						https://github.com/dapeio/nino
  */
-
-/* ---- 1. the design tokens ---- */
+/* ==== 1. the design tokens ==== */
 :root {
 	color-scheme: light dark;
 	--nino-default: #ffffff;
@@ -35,8 +32,6 @@
 	--nino-default-link: #387cab;
 	--nino-default-border: #949596;
 	--nino-default-focus: #469cd7;
-	--nino-default-hover: #f0f0f0;
-	--nino-default-active: #e0e0e0;
 	--nino-default-disabled: #aeaeaf;
 	--nino-default-shadow: rgb(15 23 42 / 12%);
 	--nino-alt: #eef4fa;
@@ -45,8 +40,6 @@
 	--nino-alt-link: #3075a4;
 	--nino-alt-border: #8c8d8e;
 	--nino-alt-focus: #3c94cd;
-	--nino-alt-hover: #dfe5eb;
-	--nino-alt-active: #cfd5db;
 	--nino-alt-disabled: #a5a6a7;
 	--nino-alt-shadow: rgb(15 23 42 / 12%);
 	--nino-tint: #e3f3ff;
@@ -55,8 +48,6 @@
 	--nino-tint-link: #2e73a2;
 	--nino-tint-border: #868c91;
 	--nino-tint-focus: #3b92cc;
-	--nino-tint-hover: #d4e4f0;
-	--nino-tint-active: #c4d4e0;
 	--nino-tint-disabled: #9fa4a9;
 	--nino-tint-shadow: rgb(15 23 42 / 12%);
 	--nino-dark: #2a2f32;
@@ -65,8 +56,6 @@
 	--nino-dark-link: #589ccc;
 	--nino-dark-border: #757777;
 	--nino-dark-focus: #207db5;
-	--nino-dark-hover: #383d40;
-	--nino-dark-active: #484d50;
 	--nino-dark-disabled: #616262;
 	--nino-dark-shadow: rgb(15 23 42 / 12%);
 	--nino-black: #0e1216;
@@ -75,8 +64,6 @@
 	--nino-black-link: #3d82b1;
 	--nino-black-border: #5f6161;
 	--nino-black-focus: #00669a;
-	--nino-black-hover: #1a1f23;
-	--nino-black-active: #292d32;
 	--nino-black-disabled: #4c4d4d;
 	--nino-black-shadow: rgb(15 23 42 / 12%);
 	--nino-brand: #4faae8;
@@ -85,8 +72,6 @@
 	--nino-brand-link: #003d5f;
 	--nino-brand-border: #475560;
 	--nino-brand-focus: #005887;
-	--nino-brand-hover: #409cd9;
-	--nino-brand-active: #2d8cc9;
 	--nino-brand-disabled: #5e6972;
 	--nino-brand-shadow: rgb(15 23 42 / 12%);
 	--nino-brand-safe: #147bb7;
@@ -95,28 +80,14 @@
 	--nino-brand-safe-link: #f9fdff;
 	--nino-brand-safe-border: #c2d3df;
 	--nino-brand-safe-focus: #a1d7ff;
-	--nino-brand-safe-hover: #2d8cc9;
-	--nino-brand-safe-active: #439fdd;
 	--nino-brand-safe-disabled: #a9b5be;
 	--nino-brand-safe-shadow: rgb(15 23 42 / 12%);
-	--nino-accent: #4faae8;
-	--nino-on-accent: #0b0e10;
-	--nino-on-accent-muted: #273b4b;
-	--nino-accent-link: #003d5f;
-	--nino-accent-border: #475560;
-	--nino-accent-focus: #005887;
-	--nino-accent-hover: #409cd9;
-	--nino-accent-active: #2d8cc9;
-	--nino-accent-disabled: #5e6972;
-	--nino-accent-shadow: rgb(15 23 42 / 12%);
 	--nino-accent-safe: #147bb7;
 	--nino-on-accent-safe: #fcfcfc;
 	--nino-on-accent-safe-muted: #fcfcfc;
 	--nino-accent-safe-link: #f9fdff;
 	--nino-accent-safe-border: #c2d3df;
 	--nino-accent-safe-focus: #a1d7ff;
-	--nino-accent-safe-hover: #2d8cc9;
-	--nino-accent-safe-active: #439fdd;
 	--nino-accent-safe-disabled: #a9b5be;
 	--nino-accent-safe-shadow: rgb(15 23 42 / 12%);
 	--nino-success: #438061;
@@ -125,8 +96,6 @@
 	--nino-success-link: #eefff5;
 	--nino-success-border: #c7d2cb;
 	--nino-success-focus: #7ee3b0;
-	--nino-success-hover: #549171;
-	--nino-success-active: #66a383;
 	--nino-success-disabled: #acb4af;
 	--nino-success-shadow: rgb(15 23 42 / 12%);
 	--nino-warning: #986d00;
@@ -135,8 +104,6 @@
 	--nino-warning-link: #fffbf4;
 	--nino-warning-border: #d9cfbd;
 	--nino-warning-focus: #fcc863;
-	--nino-warning-hover: #a97d21;
-	--nino-warning-active: #bc9038;
 	--nino-warning-disabled: #b9b2a5;
 	--nino-warning-shadow: rgb(15 23 42 / 12%);
 	--nino-danger: #cf4438;
@@ -145,8 +112,6 @@
 	--nino-danger-link: #fffbfa;
 	--nino-danger-border: #e8cac5;
 	--nino-danger-focus: #ffc2b8;
-	--nino-danger-hover: #e35648;
-	--nino-danger-active: #f86a5b;
 	--nino-danger-disabled: #c4aeaa;
 	--nino-danger-shadow: rgb(15 23 42 / 12%);
 	--nino-scrim: rgb(14 18 22 / 67%);
@@ -156,12 +121,6 @@
 	--nino-base-size: 100%;
 	--nino-line-height: 1.5;
 	--nino-measure: 120rem;
-	--nino-text-1: 1rem;
-	--nino-text-2: 1.125rem;
-	--nino-text-3: 1.25rem;
-	--nino-text-4: 1.5rem;
-	--nino-text-5: 1.8rem;
-	--nino-text-6: 2.5rem;
 	--nino-space-1: 0.5rem;
 	--nino-space-2: 1rem;
 	--nino-space-3: 2rem;
@@ -177,10 +136,101 @@
 @media (min-width: 768px) {
 	:root {
 		--nino-base-size: 112.5%;
-		--nino-text-4: 1.6rem;
-		--nino-text-5: 2rem;
-		--nino-text-6: 3rem;
 	}
+}
+
+
+/* ==== 2. the palette ==== */
+:root {
+	--nino-default: #ffffff;
+	--nino-on-default: #0b0e10;
+	--nino-on-default-muted: #757778;
+	--nino-default-link: #387cab;
+	--nino-default-border: #949596;
+	--nino-default-focus: #469cd7;
+	--nino-default-disabled: #aeaeaf;
+	--nino-default-shadow: rgb(15 23 42 / 12%);
+	--nino-alt: #eef4fa;
+	--nino-on-alt: #0b0e10;
+	--nino-on-alt-muted: #6e6f71;
+	--nino-alt-link: #3075a4;
+	--nino-alt-border: #8c8d8e;
+	--nino-alt-focus: #3c94cd;
+	--nino-alt-disabled: #a5a6a7;
+	--nino-alt-shadow: rgb(15 23 42 / 12%);
+	--nino-tint: #e3f3ff;
+	--nino-on-tint: #0b0e10;
+	--nino-on-tint-muted: #666f77;
+	--nino-tint-link: #2e73a2;
+	--nino-tint-border: #868c91;
+	--nino-tint-focus: #3b92cc;
+	--nino-tint-disabled: #9fa4a9;
+	--nino-tint-shadow: rgb(15 23 42 / 12%);
+	--nino-dark: #2a2f32;
+	--nino-on-dark: #fcfcfc;
+	--nino-on-dark-muted: #939597;
+	--nino-dark-link: #589ccc;
+	--nino-dark-border: #757777;
+	--nino-dark-focus: #207db5;
+	--nino-dark-disabled: #616262;
+	--nino-dark-shadow: rgb(15 23 42 / 12%);
+	--nino-black: #0e1216;
+	--nino-on-black: #fcfcfc;
+	--nino-on-black-muted: #7b7c7e;
+	--nino-black-link: #3d82b1;
+	--nino-black-border: #5f6161;
+	--nino-black-focus: #00669a;
+	--nino-black-disabled: #4c4d4d;
+	--nino-black-shadow: rgb(15 23 42 / 12%);
+	--nino-brand: #4faae8;
+	--nino-on-brand: #0b0e10;
+	--nino-on-brand-muted: #273b4b;
+	--nino-brand-link: #003d5f;
+	--nino-brand-border: #475560;
+	--nino-brand-focus: #005887;
+	--nino-brand-disabled: #5e6972;
+	--nino-brand-shadow: rgb(15 23 42 / 12%);
+	--nino-brand-safe: #147bb7;
+	--nino-on-brand-safe: #fcfcfc;
+	--nino-on-brand-safe-muted: #fcfcfc;
+	--nino-brand-safe-link: #f9fdff;
+	--nino-brand-safe-border: #c2d3df;
+	--nino-brand-safe-focus: #a1d7ff;
+	--nino-brand-safe-disabled: #a9b5be;
+	--nino-brand-safe-shadow: rgb(15 23 42 / 12%);
+	--nino-accent-safe: #147bb7;
+	--nino-on-accent-safe: #fcfcfc;
+	--nino-on-accent-safe-muted: #fcfcfc;
+	--nino-accent-safe-link: #f9fdff;
+	--nino-accent-safe-border: #c2d3df;
+	--nino-accent-safe-focus: #a1d7ff;
+	--nino-accent-safe-disabled: #a9b5be;
+	--nino-accent-safe-shadow: rgb(15 23 42 / 12%);
+	--nino-success: #438061;
+	--nino-on-success: #fcfcfc;
+	--nino-on-success-muted: #eefff5;
+	--nino-success-link: #eefff5;
+	--nino-success-border: #c7d2cb;
+	--nino-success-focus: #7ee3b0;
+	--nino-success-disabled: #acb4af;
+	--nino-success-shadow: rgb(15 23 42 / 12%);
+	--nino-warning: #986d00;
+	--nino-on-warning: #fcfcfc;
+	--nino-on-warning-muted: #fffbf4;
+	--nino-warning-link: #fffbf4;
+	--nino-warning-border: #d9cfbd;
+	--nino-warning-focus: #fcc863;
+	--nino-warning-disabled: #b9b2a5;
+	--nino-warning-shadow: rgb(15 23 42 / 12%);
+	--nino-danger: #cf4438;
+	--nino-on-danger: #fcfcfc;
+	--nino-on-danger-muted: #fffbfa;
+	--nino-danger-link: #fffbfa;
+	--nino-danger-border: #e8cac5;
+	--nino-danger-focus: #ffc2b8;
+	--nino-danger-disabled: #c4aeaa;
+	--nino-danger-shadow: rgb(15 23 42 / 12%);
+	--nino-scrim: rgb(14 18 22 / 67%);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -191,8 +241,6 @@
 		--nino-default-link: #3f83b3;
 		--nino-default-border: #606262;
 		--nino-default-focus: #00679b;
-		--nino-default-hover: #1c2125;
-		--nino-default-active: #2b2f34;
 		--nino-default-disabled: #4d4e4e;
 		--nino-default-shadow: rgb(0 0 0 / 55%);
 		--nino-alt: #1a1f22;
@@ -201,8 +249,6 @@
 		--nino-alt-link: #478cbb;
 		--nino-alt-border: #676969;
 		--nino-alt-focus: #046fa6;
-		--nino-alt-hover: #272c2f;
-		--nino-alt-active: #363c3f;
 		--nino-alt-disabled: #545555;
 		--nino-alt-shadow: rgb(0 0 0 / 55%);
 		--nino-tint: #04253b;
@@ -211,8 +257,6 @@
 		--nino-tint-link: #4c90bf;
 		--nino-tint-border: #676d72;
 		--nino-tint-focus: #0d72aa;
-		--nino-tint-hover: #13334a;
-		--nino-tint-active: #23435b;
 		--nino-tint-disabled: #54595c;
 		--nino-tint-shadow: rgb(0 0 0 / 55%);
 		--nino-dark: #2a2f32;
@@ -221,8 +265,6 @@
 		--nino-dark-link: #589ccc;
 		--nino-dark-border: #757777;
 		--nino-dark-focus: #207db5;
-		--nino-dark-hover: #383d40;
-		--nino-dark-active: #484d50;
 		--nino-dark-disabled: #616262;
 		--nino-dark-shadow: rgb(0 0 0 / 55%);
 		--nino-black: #05080b;
@@ -231,8 +273,6 @@
 		--nino-black-link: #397eac;
 		--nino-black-border: #5b5d5d;
 		--nino-black-focus: #006294;
-		--nino-black-hover: #0f1417;
-		--nino-black-active: #1d2225;
 		--nino-black-disabled: #484949;
 		--nino-black-shadow: rgb(0 0 0 / 55%);
 		--nino-brand: #4faae8;
@@ -241,8 +281,6 @@
 		--nino-brand-link: #003d5f;
 		--nino-brand-border: #475560;
 		--nino-brand-focus: #005887;
-		--nino-brand-hover: #409cd9;
-		--nino-brand-active: #2d8cc9;
 		--nino-brand-disabled: #5e6972;
 		--nino-brand-shadow: rgb(0 0 0 / 55%);
 		--nino-brand-safe: #1d81bc;
@@ -251,28 +289,14 @@
 		--nino-brand-safe-link: #00101e;
 		--nino-brand-safe-border: #26333d;
 		--nino-brand-safe-focus: #003554;
-		--nino-brand-safe-hover: #0073ad;
-		--nino-brand-safe-active: #006498;
 		--nino-brand-safe-disabled: #3d474f;
 		--nino-brand-safe-shadow: rgb(0 0 0 / 55%);
-		--nino-accent: #4faae8;
-		--nino-on-accent: #0b0e10;
-		--nino-on-accent-muted: #273b4b;
-		--nino-accent-link: #003d5f;
-		--nino-accent-border: #475560;
-		--nino-accent-focus: #005887;
-		--nino-accent-hover: #409cd9;
-		--nino-accent-active: #2d8cc9;
-		--nino-accent-disabled: #5e6972;
-		--nino-accent-shadow: rgb(0 0 0 / 55%);
 		--nino-accent-safe: #1d81bc;
 		--nino-on-accent-safe: #0b0e10;
 		--nino-on-accent-safe-muted: #00101d;
 		--nino-accent-safe-link: #00101e;
 		--nino-accent-safe-border: #26333d;
 		--nino-accent-safe-focus: #003554;
-		--nino-accent-safe-hover: #0073ad;
-		--nino-accent-safe-active: #006498;
 		--nino-accent-safe-disabled: #3d474f;
 		--nino-accent-safe-shadow: rgb(0 0 0 / 55%);
 		--nino-success: #488666;
@@ -281,8 +305,6 @@
 		--nino-success-link: #001107;
 		--nino-success-border: #2a332e;
 		--nino-success-focus: #003923;
-		--nino-success-hover: #3a7959;
-		--nino-success-active: #2b6a4c;
 		--nino-success-disabled: #404743;
 		--nino-success-shadow: rgb(0 0 0 / 55%);
 		--nino-warning: #b38100;
@@ -291,8 +313,6 @@
 		--nino-warning-link: #312000;
 		--nino-warning-border: #473e30;
 		--nino-warning-focus: #553b00;
-		--nino-warning-hover: #a27400;
-		--nino-warning-active: #906700;
 		--nino-warning-disabled: #595347;
 		--nino-warning-shadow: rgb(0 0 0 / 55%);
 		--nino-danger: #d54a3d;
@@ -301,8 +321,6 @@
 		--nino-danger-link: #260000;
 		--nino-danger-border: #432b28;
 		--nino-danger-focus: #6a0001;
-		--nino-danger-hover: #c53b2f;
-		--nino-danger-active: #b42820;
 		--nino-danger-disabled: #54413f;
 		--nino-danger-shadow: rgb(0 0 0 / 55%);
 		--nino-scrim: rgb(5 8 11 / 64%);
@@ -316,8 +334,6 @@
 	--nino-default-link: #3f83b3;
 	--nino-default-border: #606262;
 	--nino-default-focus: #00679b;
-	--nino-default-hover: #1c2125;
-	--nino-default-active: #2b2f34;
 	--nino-default-disabled: #4d4e4e;
 	--nino-default-shadow: rgb(0 0 0 / 55%);
 	--nino-alt: #1a1f22;
@@ -326,8 +342,6 @@
 	--nino-alt-link: #478cbb;
 	--nino-alt-border: #676969;
 	--nino-alt-focus: #046fa6;
-	--nino-alt-hover: #272c2f;
-	--nino-alt-active: #363c3f;
 	--nino-alt-disabled: #545555;
 	--nino-alt-shadow: rgb(0 0 0 / 55%);
 	--nino-tint: #04253b;
@@ -336,8 +350,6 @@
 	--nino-tint-link: #4c90bf;
 	--nino-tint-border: #676d72;
 	--nino-tint-focus: #0d72aa;
-	--nino-tint-hover: #13334a;
-	--nino-tint-active: #23435b;
 	--nino-tint-disabled: #54595c;
 	--nino-tint-shadow: rgb(0 0 0 / 55%);
 	--nino-dark: #2a2f32;
@@ -346,8 +358,6 @@
 	--nino-dark-link: #589ccc;
 	--nino-dark-border: #757777;
 	--nino-dark-focus: #207db5;
-	--nino-dark-hover: #383d40;
-	--nino-dark-active: #484d50;
 	--nino-dark-disabled: #616262;
 	--nino-dark-shadow: rgb(0 0 0 / 55%);
 	--nino-black: #05080b;
@@ -356,8 +366,6 @@
 	--nino-black-link: #397eac;
 	--nino-black-border: #5b5d5d;
 	--nino-black-focus: #006294;
-	--nino-black-hover: #0f1417;
-	--nino-black-active: #1d2225;
 	--nino-black-disabled: #484949;
 	--nino-black-shadow: rgb(0 0 0 / 55%);
 	--nino-brand: #4faae8;
@@ -366,8 +374,6 @@
 	--nino-brand-link: #003d5f;
 	--nino-brand-border: #475560;
 	--nino-brand-focus: #005887;
-	--nino-brand-hover: #409cd9;
-	--nino-brand-active: #2d8cc9;
 	--nino-brand-disabled: #5e6972;
 	--nino-brand-shadow: rgb(0 0 0 / 55%);
 	--nino-brand-safe: #1d81bc;
@@ -376,28 +382,14 @@
 	--nino-brand-safe-link: #00101e;
 	--nino-brand-safe-border: #26333d;
 	--nino-brand-safe-focus: #003554;
-	--nino-brand-safe-hover: #0073ad;
-	--nino-brand-safe-active: #006498;
 	--nino-brand-safe-disabled: #3d474f;
 	--nino-brand-safe-shadow: rgb(0 0 0 / 55%);
-	--nino-accent: #4faae8;
-	--nino-on-accent: #0b0e10;
-	--nino-on-accent-muted: #273b4b;
-	--nino-accent-link: #003d5f;
-	--nino-accent-border: #475560;
-	--nino-accent-focus: #005887;
-	--nino-accent-hover: #409cd9;
-	--nino-accent-active: #2d8cc9;
-	--nino-accent-disabled: #5e6972;
-	--nino-accent-shadow: rgb(0 0 0 / 55%);
 	--nino-accent-safe: #1d81bc;
 	--nino-on-accent-safe: #0b0e10;
 	--nino-on-accent-safe-muted: #00101d;
 	--nino-accent-safe-link: #00101e;
 	--nino-accent-safe-border: #26333d;
 	--nino-accent-safe-focus: #003554;
-	--nino-accent-safe-hover: #0073ad;
-	--nino-accent-safe-active: #006498;
 	--nino-accent-safe-disabled: #3d474f;
 	--nino-accent-safe-shadow: rgb(0 0 0 / 55%);
 	--nino-success: #488666;
@@ -406,8 +398,6 @@
 	--nino-success-link: #001107;
 	--nino-success-border: #2a332e;
 	--nino-success-focus: #003923;
-	--nino-success-hover: #3a7959;
-	--nino-success-active: #2b6a4c;
 	--nino-success-disabled: #404743;
 	--nino-success-shadow: rgb(0 0 0 / 55%);
 	--nino-warning: #b38100;
@@ -416,8 +406,6 @@
 	--nino-warning-link: #312000;
 	--nino-warning-border: #473e30;
 	--nino-warning-focus: #553b00;
-	--nino-warning-hover: #a27400;
-	--nino-warning-active: #906700;
 	--nino-warning-disabled: #595347;
 	--nino-warning-shadow: rgb(0 0 0 / 55%);
 	--nino-danger: #d54a3d;
@@ -426,35 +414,47 @@
 	--nino-danger-link: #260000;
 	--nino-danger-border: #432b28;
 	--nino-danger-focus: #6a0001;
-	--nino-danger-hover: #c53b2f;
-	--nino-danger-active: #b42820;
 	--nino-danger-disabled: #54413f;
 	--nino-danger-shadow: rgb(0 0 0 / 55%);
 	--nino-scrim: rgb(5 8 11 / 64%);
 }
 
-/* ---- 2. the theme - which token goes in which role ---- */
+/* ==== 3. the type ==== */
 @font-face {
-	font-family: 'Text';
+	font-family: 'League Spartan';
 	font-style: normal;
-	font-weight: normal;
+	font-weight: 700;
 	font-display: swap;
-	src: local('Text Regular'), url('[[/nino/public]]/fonts/source-sans-3-regular.woff2') format('woff2');
+	src: url('[[/nino/public]]/fonts/league-spartan.woff2') format('woff2');
 }
 @font-face {
-	font-family: 'Text';
+	font-family: 'Source Sans 3';
 	font-style: normal;
-	font-weight: bold;
+	font-weight: 400;
 	font-display: swap;
-	src: local('Text Bold'), url('[[/nino/public]]/fonts/source-sans-3-bold.woff2') format('woff2');
+	src: url('[[/nino/public]]/fonts/source-sans-3-regular.woff2') format('woff2');
 }
 @font-face {
-	font-family: 'Title';
+	font-family: 'Source Sans 3';
 	font-style: normal;
-	font-weight: bold;
+	font-weight: 700;
 	font-display: swap;
-	src: local('Title Bold'), url('[[/nino/public]]/fonts/league-spartan.woff2') format('woff2');
+	src: url('[[/nino/public]]/fonts/source-sans-3-bold.woff2') format('woff2');
 }
+
+:root {
+	--fontfamily-title: "League Spartan", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	--font-title-weight: 700;
+	--fontfamily-subtitle: "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	--font-subtitle-weight: 400;
+	--fontfamily-text: "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	--font-text-weight: 400;
+	--fontfamily-button: "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	--font-button-weight: 700;
+	--font-code-weight: normal;
+}
+
+/* ==== 4. the roles ==== */
 
 /*	Basis.
 
@@ -462,28 +462,31 @@
 	every size straight off the framework scale.
 
 	Colours here are assignments, never values. The --nino-* tokens this file
-	reads are section 1's, compiled once with every background/text pair
-	measured and frozen there; what this section decides is which surface each
-	role sits on. A stylesheet that declares the tokens again - the palette the
-	Design feature compiles over this layer, say - recolours the site, and
-	nothing below has to change.
+	reads are section 1's, and the palette the Design feature compiles over
+	them solves every background/text pair against a contrast target; what
+	this section decides is which surface each role sits on. A stylesheet that
+	declares the tokens again recolours the site, and nothing below has to
+	change.
 
 	Three rules follow. Never write a literal colour into a role - a hex here
 	is a pair nobody measured. Never pair across surfaces, because
 	--color-section-alt-text belongs to --nino-on-alt and to nothing else. And
-	never put text on --nino-brand or --nino-accent: those are the two brand
-	colours exactly as they were picked, so they are the surfaces with no
-	contrast promise attached - --nino-brand-safe and --nino-accent-safe are the
-	same two colours made safe, and those are what carry ink.	*/
+	never put text on --nino-brand: it is the first brand colour exactly as it
+	was picked, so it is the surface with no contrast promise attached -
+	--nino-brand-safe and --nino-accent-safe are the two brand colours made
+	safe, and those are what carry ink. The second colour as it was picked is
+	no surface at all: nothing in Nino.css reads it.	*/
 :root {
 
-	/* Brand. Four roles from two questions - is it the first brand colour or the
-	   second, and is it the one that was picked or the one text survives on.
-	   --color-secondary is the primary exactly as it was picked and is only ever
-	   shown; --color-primary is that same colour with its lightness solved until
-	   the text on it clears the contrast target, and is what every button and
-	   filled surface uses. --color-brand-alt is the second colour playing the
-	   same part as --color-primary: filled with, written on, and safe.
+	/* Brand. Three roles from two questions - is it the first brand colour or the
+	   second, and is it the one that was picked or the one text survives on -
+	   and the second colour as it was picked is left out, because nothing may be
+	   written on it. --color-secondary is the primary exactly as it was picked
+	   and is only ever shown; --color-primary is that same colour with its
+	   lightness solved until the text on it clears the contrast target, and is
+	   what every button and filled surface uses. --color-brand-alt is the second
+	   colour playing the same part as --color-primary: filled with, written on,
+	   and safe.
 
 	   The palette used to publish one safe surface for whichever of the two
 	   colours had been settled on, so setting a Secondary quietly moved every
@@ -530,6 +533,20 @@
 	--color-border: var(--nino-default-border);
 	--color-header-bg: var(--nino-default);
 
+	/* The border of each ground, handed down with the roles that follow it:
+	   inside a section, a column or a card of a ground, --color-border is the
+	   one solved for that surface. The two brand grounds are filled with the
+	   safe colours, so their line is solved against those. Nino.css declares
+	   the seven as the border of the page; the delivered theme.css is this
+	   file compiled at the defaults, so both assign them */
+	--color-border-default: var(--nino-default-border);
+	--color-border-alt: var(--nino-alt-border);
+	--color-border-tint: var(--nino-tint-border);
+	--color-border-dark: var(--nino-dark-border);
+	--color-border-black: var(--nino-black-border);
+	--color-border-primary: var(--nino-brand-safe-border);
+	--color-border-brand-alt: var(--nino-accent-safe-border);
+
 	/* The scrim over a cover image. The palette solves it against the worst
 	   photograph it could be asked to cover - a white one - so this is the
 	   lightest scrim that still carries the ink on top of it, and the most
@@ -542,7 +559,6 @@
 	--color-footer-text-main: var(--nino-on-black-muted);
 	--color-footer-bg-legal: var(--nino-black);
 	--color-footer-text-legal: var(--nino-on-black-muted);
-	--color-footer-text: var(--nino-on-black-muted);
 
 	/* Sections - the four grounds a page alternates between */
 	--color-section-default-bg: var(--nino-default);
@@ -572,29 +588,19 @@
 	--color-warning: var(--nino-warning);
 	--color-warning-text: var(--nino-on-warning);
 
-	/* Typefaces are the one thing a theme cannot be handed: a webfont is a
-	   file this unit ships, not a value anything can generate */
-	--fontfamily-text: 'Text', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-	--fontfamily-title: 'Title', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-	--fontfamily-subtitle: 'Text', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-	--fontsize-small: .75em;
-	--fontsize-big: 1.25em;
-	--fontsize-btn: 1rem;
+	/* The type is the compiler's: the five font roles (--fontfamily-<role>,
+	   --font-<role>-weight, -transform and -size) and the @font-face rules
+	   behind them are written from the setup's fonts, a section of their own
+	   before this one. A webface is a file this unit ships, not a value
+	   anything can generate */
 
 	/* Sizes are assignments too. The raster is section 1's: the framework's
 	   own sizes, frozen there like the colours, where a hand-tuned block here
-	   used to spell them out one number at a time. The wide-screen half of the
-	   type scale is the raster's own media query; there is nothing to repeat
-	   for it here */
+	   used to spell them out one number at a time. The type scale is not in
+	   it: Nino.css derives --text-1 to --text-6 from the size of the text
+	   role, so a fixed size in the fonts table moves the whole ladder */
 	--base-size: var(--nino-base-size);
 	--line-height: var(--nino-line-height);
-
-	--text-1: var(--nino-text-1);
-	--text-2: var(--nino-text-2);
-	--text-3: var(--nino-text-3);
-	--text-4: var(--nino-text-4);
-	--text-5: var(--nino-text-5);
-	--text-6: var(--nino-text-6);
 
 	--space-1: var(--nino-space-1);
 	--space-2: var(--nino-space-2);
@@ -618,12 +624,24 @@
 }
 
 
-/*	Everything below styles the two frame templates the base unit delivers
-	beside this file - frame-header.tpl and frame-footer.tpl. Replacing a
-	frame means replacing its template and this section together: neither
-	half is any use without the other.	*/
+/* ==== 5. the root size ==== */
+:root { --nino-base-size: 100%; }
+@media (min-width: 768px) { :root { --nino-base-size: 112.5%; } }
 
-/* ---- 3. the header frame ---- */
+/* ==== 6. the page ==== */
+/* a row of the width Nino.css gives it, and the animation Nino.css has */
+
+/* ==== 7. header: v1 ==== */
+/*	Nino Design - header v1
+ *
+ *	@name				Plain bar
+ *	@description	A bar on the page ground with a rule under it, five rem tall. The one a fresh Nino installs.
+ *
+ *	The name and the description are what the Design panel lists this
+ *	variant as. Every library file carries them; a file without a @name
+ *	is offered under its own file name instead.
+ */
+
 .nino-frame-header {
 	border-bottom: 1px solid var(--color-border);
 }
@@ -703,7 +721,18 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 	}
 }
 
-/* ---- 4. the footer frame ---- */
+
+/* ==== 8. footer: v1 ==== */
+/*	Nino Design - footer v1
+ *
+ *	@name				One legal row
+ *	@description	Copyright, the footer navigation and the legal links on a single row. The smallest footer there is.
+ *
+ *	The name and the description are what the Design panel lists this
+ *	variant as. Every library file carries them; a file without a @name
+ *	is offered under its own file name instead.
+ */
+
 .nino-footer-nav .nino-footer-title {
 	display:none;
 }
@@ -715,4 +744,523 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 .nino-footer-copyright {
 	display:flex;
 	align-items: center;
+}
+
+
+/* ==== 9. content: v1 (hero-title default, hero-text default, quiet default, loud default, section-space default, article-space default, corners default, border default, shadow default) ==== */
+/*	Nino Design - content v1
+ *
+ *	@name			Nino
+ *	@description	The framework as it is, with its own values on every knob. The hero, the sections and the cards of the page.
+ *
+ *	@knob	hero-title		Size of the title of a hero
+ *	@knob	hero-text		Size of the text of a hero
+ *	@knob	quiet			Size of a quiet title, subtitle and text
+ *	@knob	loud			Size of a loud title, subtitle and text
+ *	@knob	section-space	Space above and below the content of a section
+ *	@knob	article-space	Space inside a card and between its parts
+ *	@knob	corners			Corners of a card
+ *	@knob	border			Line round a card that has a ground
+ *	@knob	shadow			Shadow of a card
+ *
+ *	v1 is the starting point, not a design. Every value it declares is the
+ *	framework's own, so a page under it looks as it does under Nino.css alone -
+ *	and every one of them is a triple, so each knob has something to reach.
+ *	The middle of a triple is Nino.css, the other two are one step to each
+ *	side. Where Nino.css changes a number at 768px the triple does the same,
+ *	in a media query of its own.
+ *
+ *	Two rules for a set:
+ *
+ *	  - Only the classes of this template: the hero, the section, the column
+ *	    on a ground and the card. A set of buttons does not touch a section
+ *	    title, however tempting.
+ *	  - Colours through the roles, never as literals: var(--color-title),
+ *	    var(--color-primary), var(--color-section-tint-bg). A ground is a
+ *	    class of Nino.css (nino-section--alt, nino-grid--counter ...) that
+ *	    sets the pair and the roles solved against it; a set never paints
+ *	    one, and never compares one ground with another.
+ *
+ *	A value a knob should reach declares its three steps instead of one
+ *	value, named after the tab and the knob (--content-section-space--less,
+ *	--default, --more), and the rule reads the knob (var(--content-section-space)).
+ *	The knobs of Nino.css itself - the factors of the hero and of the variants,
+ *	the shadow of a card - need no rule: the set only points them at the
+ *	triple. Copy this file to v2.css and start there.
+ */
+
+:root {
+	/*	The factors Nino.css multiplies the size of the title role and of the
+		subtitle role by, in a hero: 1.2 and 1.2, from 768px 1.25 and 10 / 9.
+		A step to either side is .85 and 1.2 times that	*/
+	--content-hero-title--less: 		1.02;
+	--content-hero-title--default: 	1.2;
+	--content-hero-title--more: 		1.44;
+
+	--content-hero-text--less: 			1.02;
+	--content-hero-text--default: 	1.2;
+	--content-hero-text--more: 			1.44;
+
+	/*	How much smaller a --quiet variant is than the class it varies, and how
+		much larger a --loud one: .85 and 1.2	*/
+	--content-quiet--less: 					.75;
+	--content-quiet--default: 			.85;
+	--content-quiet--more: 					.95;
+
+	--content-loud--less: 					1.1;
+	--content-loud--default: 				1.2;
+	--content-loud--more: 					1.35;
+
+	/*	The space above and below what is in a section: --space-4, and --space-5
+		from 768px	*/
+	--content-section-space--less: 		var(--space-3);
+	--content-section-space--default: var(--space-4);
+	--content-section-space--more: 		var(--space-5);
+
+	/*	Twice the padding of a card's content, and the space under its title,
+		subtitle and description. The picture above them has half of it	*/
+	--content-article-space--less: 		var(--space-1);
+	--content-article-space--default: var(--space-2);
+	--content-article-space--more: 		var(--space-3);
+
+	--content-corners--less: 					0rem;
+	--content-corners--default: 			var(--radius-small);
+	--content-corners--more: 					var(--radius-large);
+
+	/*	The line round a card that names a ground - a plain card has none	*/
+	--content-border--less: 					0px;
+	--content-border--default: 				1px;
+	--content-border--more: 					2px;
+
+	/*	A card casts none until a design layer gives it one	*/
+	--content-shadow--less: 					none;
+	--content-shadow--default: 				none;
+	--content-shadow--more: 					0 .125rem .75rem var(--nino-default-shadow);
+}
+
+@media (min-width: 768px) {
+	:root {
+		--content-hero-title--less: 		1.0625;
+		--content-hero-title--default: 	1.25;
+		--content-hero-title--more: 		1.5;
+
+		--content-hero-text--less: 			calc(.85 * 10 / 9);
+		--content-hero-text--default: 	calc(10 / 9);
+		--content-hero-text--more: 			calc(1.2 * 10 / 9);
+
+		--content-section-space--less: 		var(--space-4);
+		--content-section-space--default: var(--space-5);
+		--content-section-space--more: 		var(--space-6);
+	}
+}
+
+/*	The four numbers and the shadow Nino.css reads by name	*/
+:root {
+	--hero-title-scale: var(--content-hero-title);
+	--hero-text-scale: var(--content-hero-text);
+	--scale-quiet: var(--content-quiet);
+	--scale-loud: var(--content-loud);
+	--shadow-card: var(--content-shadow);
+}
+
+/*	The space of a section, unless the section says its own: the spacing
+	classes of Nino.css (nino-pt-3, nino-p-2 ...) come last in its stylesheet so
+	that they win, and a rule of a design layer that came after them would
+	beat them - so a section that names a padding is left alone. One with the
+	fullheight class keeps the padding Nino.css gives it from 768px, none	*/
+.nino-section:where(:not(.nino-section--fullheight, [class*="nino-pt-"], [class*="nino-p-"])) {
+	padding-top: var(--content-section-space);
+}
+.nino-section:where(:not(.nino-section--fullheight, [class*="nino-pb-"], [class*="nino-p-"])) {
+	padding-bottom: var(--content-section-space);
+}
+
+.nino-article-content:where(:not([class*="nino-pt-"], [class*="nino-pb-"], [class*="nino-p-"])) {
+	padding: calc( var(--content-article-space) / 2 ) var(--content-article-space);
+}
+.nino-article-title:where(:not([class*="nino-mb-"], [class*="nino-m-"])),
+.nino-article-subtitle:where(:not([class*="nino-mb-"], [class*="nino-m-"])),
+.nino-article-descr:where(:not([class*="nino-mb-"], [class*="nino-m-"])) {
+	margin-bottom: var(--content-article-space);
+}
+.nino-article-img:where(:not([class*="nino-mb-"], [class*="nino-m-"])) {
+	margin-bottom: calc( var(--content-article-space) / 2 );
+}
+
+/*	A card, its picture inside it, and a column that paints a ground - rounded
+	as a card is, twice	*/
+.nino-article {
+	border-radius: var(--content-corners);
+}
+.nino-article-img {
+	border-radius: calc( var(--content-corners) * .7 );
+}
+.nino-article--fullwidth .nino-article-img {
+	border-radius: var(--content-corners) var(--content-corners) 0 0;
+}
+.nino-grid--alt, .nino-grid--tint, .nino-grid--dark, .nino-grid--black, .nino-grid--primary, .nino-grid--brand-alt, .nino-grid--counter, .nino-grid--dim {
+	border-radius: calc( var(--content-corners) * 2 );
+}
+
+.nino-article--alt, .nino-article--tint, .nino-article--dark, .nino-article--black, .nino-article--primary, .nino-article--brand-alt, .nino-article--counter, .nino-article--dim {
+	border-width: var(--content-border);
+}
+
+
+/* ==== 10. buttons: v1 (small default, big default, space default, corners default) ==== */
+/*	Nino Design - buttons v1
+ *
+ *	@name			Nino
+ *	@description	The framework as it is, with its own values on every knob. Every .nino-btn variant, and the link that looks like one.
+ *
+ *	@knob	small		Size of a small button
+ *	@knob	big			Size of a big button
+ *	@knob	space		Space around the label
+ *	@knob	corners		Corner radius
+ *
+ *	v1 is the starting point, not a design. Every value it declares is the
+ *	framework's own, so a button under it looks as it does under Nino.css
+ *	alone, and every one of them is a triple, so each knob has something to
+ *	reach: the middle of a triple is Nino.css, the other two are one step to
+ *	each side.
+ *
+ *	Two rules for a set:
+ *
+ *	  - Only the classes of this template: the button and its variants. A
+ *	    button set does not touch a section title, however tempting.
+ *	  - Colours through the roles, never as literals. Nor the font: the face,
+ *	    the weight and the case of a button are the button role of the Fonts
+ *	    tab (--font-button-*), and a set that wrote its own would contradict
+ *	    the panel.
+ *
+ *	The variants are the size of the button times a number, in Nino.css as
+ *	here: the padding, the type and the radius of a small button are the
+ *	button's own times the small knob. Copy this file to v2.css and start
+ *	there.
+ */
+
+:root {
+	/*	The number a small and a big button are scaled by: .7 and 1.3	*/
+	--buttons-small--less: 		.6;
+	--buttons-small--default: .7;
+	--buttons-small--more: 		.8;
+
+	--buttons-big--less: 			1.15;
+	--buttons-big--default: 	1.3;
+	--buttons-big--more: 			1.5;
+
+	/*	Twice the padding above and below the label, and the padding beside it	*/
+	--buttons-space--less: 		var(--space-1);
+	--buttons-space--default: var(--space-2);
+	--buttons-space--more: 		var(--space-3);
+
+	/*	A pill is no large number but a radius past half the height, where it stops growing	*/
+	--buttons-corners--less: 		0rem;
+	--buttons-corners--default: var(--radius);
+	--buttons-corners--more: 		999rem;
+}
+
+/*	Not where the button names a padding of its own: the spacing classes of
+	Nino.css come last in its stylesheet so that they win	*/
+.nino-btn:where(:not([class*="nino-pt-"], [class*="nino-pb-"], [class*="nino-p-"])) {
+	padding: calc( var(--buttons-space) / 2 ) var(--buttons-space);
+}
+.nino-btn {
+	border-radius: var(--buttons-corners);
+}
+.nino-btn--small:where(:not([class*="nino-pt-"], [class*="nino-pb-"], [class*="nino-p-"])) {
+	padding: calc( var(--buttons-space) / 2 * var(--buttons-small) ) calc( var(--buttons-space) * var(--buttons-small) );
+}
+.nino-btn--small {
+	font-size: calc( var(--font-button-size) * var(--buttons-small) );
+	border-radius: calc( var(--buttons-corners) * var(--buttons-small) );
+}
+.nino-btn--big:where(:not([class*="nino-pt-"], [class*="nino-pb-"], [class*="nino-p-"])) {
+	padding: calc( var(--buttons-space) / 2 * var(--buttons-big) ) calc( var(--buttons-space) * var(--buttons-big) );
+}
+.nino-btn--big {
+	font-size: calc( var(--font-button-size) * var(--buttons-big) );
+	border-radius: calc( var(--buttons-corners) * var(--buttons-big) );
+}
+
+
+/* ==== 11. components: v1 (scale default, space default, corners default, border default, zebra default, labels default) ==== */
+/*	Nino Design - components v1
+ *
+ *	@name			Nino
+ *	@description	The framework as it is, with its own values on every knob. Fields, labels, tables, lists, alerts, badges and the building blocks.
+ *
+ *	@knob	scale		Type size of the fields and the tables
+ *	@knob	space		Space inside a field, a cell, a block and between them
+ *	@knob	corners		Corner radius of a field and of everything boxed
+ *	@knob	border		Weight of the lines of a field, a table and a block
+ *	@knob	zebra		Stripes of a table that asks for them
+ *	@knob	labels		Where the label of a field stands
+ *
+ *	v1 is the starting point, not a design. Every value it declares is the
+ *	framework's own, so a form, a table or a block under it looks as it does
+ *	under Nino.css alone - and every one of them is a triple, so each knob has
+ *	something to reach: the middle of a triple is Nino.css, the other two
+ *	are one step to each side.
+ *
+ *	Two rules for a set:
+ *
+ *	  - Only the classes of this template: the field, the table, the list,
+ *	    the badge, the alert, the accordion, the pricing table and the
+ *	    timeline. A set of buttons does not touch a field, however tempting.
+ *	  - Colours through the roles, never as literals. Nor the font: the face,
+ *	    the weight and the case of the text are the roles of the Fonts tab.
+ *
+ *	A knob that is more than one value - the stripes of a table are a
+ *	background and a colour of text, the place of a label is a layout and a
+ *	lift - declares one more triple for each, named after the knob and an
+ *	aspect of it (--components-zebra-ink--less ...). They move together: the
+ *	compiler selects every triple of a knob where it stands. An aspect at its
+ *	middle step names the value the property has anyway, so a rule that reads
+ *	it changes nothing there.
+ *
+ *	The spacing classes of Nino.css (nino-p-2, nino-mb-3 ...) come last in its
+ *	stylesheet so that they win. A rule of a design layer would beat them, so
+ *	a box that names a padding or a margin of its own is left alone.
+ *	Copy this file to v2.css and start there.
+ */
+
+:root {
+	/*	The type size of a field is 1rem and of a table is the size of the text
+		around it, times this	*/
+	--components-scale--less: 		.875;
+	--components-scale--default: 	1;
+	--components-scale--more: 		1.125;
+
+	/*	Half the padding of a cell, the padding of a field and the space under
+		it, and a quarter of the padding of a block	*/
+	--components-space--less: 		calc( var(--space-1) * .6 );
+	--components-space--default: 	var(--space-1);
+	--components-space--more: 		var(--space-2);
+
+	/*	The radius of a field. A badge, an alert and a block are twice it	*/
+	--components-corners--less: 	0rem;
+	--components-corners--default: 	var(--radius-small);
+	--components-corners--more: 	var(--radius-large);
+
+	--components-border--less: 		0px;
+	--components-border--default: 	1px;
+	--components-border--more: 		2px;
+
+	/*	The even rows of a table that has the class: none, the second ground of
+		the page, or that with a line over it. The text on them is the ink of
+		that ground - or, with no stripe, the text round the table	*/
+	--components-zebra--less: 		transparent;
+	--components-zebra--default: 	var(--color-section-alt-bg);
+	--components-zebra--more: 		linear-gradient( var(--color-border), var(--color-border) ) top / 100% 1px no-repeat var(--color-section-alt-bg);
+
+	--components-zebra-ink--less: 		initial;
+	--components-zebra-ink--default: 	var(--color-section-alt-text);
+	--components-zebra-ink--more: 		var(--color-section-alt-text);
+
+	/*	Where a label stands. Above the field is Nino.css: the form is a block
+		and the label a line of text. In the row the form is a grid of a column
+		for the labels and a column for the fields, this far apart. Floating, the
+		label is lifted onto the top edge of its field, a little smaller, on the
+		ground the field stands on	*/
+	--components-labels--less: 		var(--space-2);
+	--components-labels--default: 	normal;
+	--components-labels--more: 		normal;
+
+	--components-labels-form--less: 		grid;
+	--components-labels-form--default: 		block;
+	--components-labels-form--more: 		block;
+
+	--components-labels-cols--less: 		max-content minmax(0, 1fr);
+	--components-labels-cols--default: 		none;
+	--components-labels-cols--more: 		none;
+
+	--components-labels-align--less: 		baseline;
+	--components-labels-align--default: 	normal;
+	--components-labels-align--more: 		normal;
+
+	--components-labels-wide--less: 		1 / -1;
+	--components-labels-wide--default: 		auto;
+	--components-labels-wide--more: 		auto;
+
+	--components-labels-start--less: 		start;
+	--components-labels-start--default: 		auto;
+	--components-labels-start--more: 		auto;
+
+	--components-labels-block--less: 		inline;
+	--components-labels-block--default: 	inline;
+	--components-labels-block--more: 		table;
+
+	--components-labels-pos--less: 			static;
+	--components-labels-pos--default: 		static;
+	--components-labels-pos--more: 			relative;
+
+	--components-labels-lift--less: 		0em;
+	--components-labels-lift--default: 		0em;
+	--components-labels-lift--more: 		.8em;
+
+	--components-labels-cut--less: 			transparent;
+	--components-labels-cut--default: 		transparent;
+	--components-labels-cut--more: 			var(--color-ground);
+}
+
+/* ---- fields ---- */
+
+.nino-form-input,
+.nino-form-textarea,
+.nino-form-select {
+	border-width: var(--components-border);
+	border-radius: var(--components-corners);
+	font-size: calc( 1rem * var(--components-scale) );
+}
+.nino-form-input:where(:not([class*="nino-p-"], [class*="nino-pt-"], [class*="nino-pb-"])),
+.nino-form-textarea:where(:not([class*="nino-p-"], [class*="nino-pt-"], [class*="nino-pb-"])),
+.nino-form-select:where(:not([class*="nino-p-"], [class*="nino-pt-"], [class*="nino-pb-"])) {
+	padding: var(--components-space);
+}
+.nino-form-select:where(:not([class*="nino-p-"], [class*="nino-pt-"], [class*="nino-pb-"])) {
+	padding-right: 2.5rem;
+}
+.nino-form-input:where(:not([class*="nino-mb-"], [class*="nino-m-"])),
+.nino-form-textarea:where(:not([class*="nino-mb-"], [class*="nino-m-"])),
+.nino-form-select:where(:not([class*="nino-mb-"], [class*="nino-m-"])) {
+	margin-bottom: var(--components-space);
+}
+
+.nino-form.nino-is-error .nino-form-message,
+.nino-form.nino-is-success .nino-form-message {
+	padding: var(--components-space) calc( var(--components-space) * 2 );
+	border-radius: calc( var(--components-corners) * 2 );
+}
+
+/* ---- labels ---- */
+
+/*	A form of rows - not the inline one, nor the newsletter's, which are flex
+	boxes of their own. In the grid a label and the field after it share a row;
+	everything else (a checkbox, a message, the button) takes the whole of it -
+	but for a button and a checkbox, which a form of blocks leaves as wide as
+	their words and a grid would stretch to the row	*/
+.nino-form:where(:not(.nino-form--inline, .nino-newsletter-inline)) {
+	display: var(--components-labels-form);
+	grid-template-columns: var(--components-labels-cols);
+	column-gap: var(--components-labels);
+	align-items: var(--components-labels-align);
+}
+.nino-form:where(:not(.nino-form--inline, .nino-newsletter-inline)) > :where(:not(
+	label:not(.nino-forms-check, .nino-sr-only),
+	label:not(.nino-forms-check, .nino-sr-only) + :is(.nino-form-input, .nino-form-select, .nino-form-textarea),
+	.nino-form-trap, .nino-sr-only
+)) {
+	grid-column: var(--components-labels-wide);
+}
+.nino-form:where(:not(.nino-form--inline, .nino-newsletter-inline)) > :is(.nino-btn, .nino-forms-check) {
+	justify-self: var(--components-labels-start);
+}
+.nino-form:where(:not(.nino-form--inline, .nino-newsletter-inline)) > label:where(:not(.nino-forms-check, .nino-sr-only)) {
+	display: var(--components-labels-block);
+	position: var(--components-labels-pos);
+	margin: 0 0 calc( var(--components-labels-lift) * -.55 ) var(--components-labels-lift);
+	padding: 0 calc( var(--components-labels-lift) / 4 );
+	background-color: var(--components-labels-cut);
+	font-size: calc( 1em - var(--components-labels-lift) * .25 );
+}
+
+/* ---- tables ---- */
+
+.nino-table {
+	font-size: calc( 1em * var(--components-scale) );
+}
+.nino-table th,
+.nino-table td {
+	padding: var(--components-space) calc( var(--components-space) * 2 );
+	border-bottom-width: var(--components-border);
+}
+.nino-table--bordered th,
+.nino-table--bordered td {
+	border-width: var(--components-border);
+}
+.nino-table--striped tbody tr:nth-child(even) {
+	background: var(--components-zebra);
+	color: var(--components-zebra-ink, currentcolor);
+}
+
+/* ---- lists, badges, alerts ---- */
+
+.nino-list:not(.nino-list--columns) {
+	gap: var(--components-space);
+}
+.nino-badge:not(.nino-badge--pill) {
+	border-radius: calc( var(--components-corners) * 2 );
+}
+.nino-alert {
+	border-width: var(--components-border);
+	border-radius: calc( var(--components-corners) * 2 );
+}
+.nino-alert:where(:not([class*="nino-p-"], [class*="nino-pt-"], [class*="nino-pb-"])) {
+	padding: calc( var(--components-space) * 2 );
+}
+.nino-alert--content {
+	border-radius: calc( var(--components-corners) * 4 );
+}
+.nino-alert--content:where(:not([class*="nino-p-"], [class*="nino-pt-"], [class*="nino-pb-"])) {
+	padding: calc( var(--components-space) * 4 );
+}
+
+/* ---- blocks ---- */
+
+.nino-pricing-row {
+	gap: calc( var(--components-space) * 2 );
+}
+.nino-pricing-item {
+	border-radius: calc( var(--components-corners) * 2 );
+}
+.nino-pricing-item:where(:not([class*="nino-p-"], [class*="nino-pt-"], [class*="nino-pb-"])) {
+	padding: calc( var(--components-space) * 2 );
+}
+.nino-pricing-item:not(.nino-pricing-item--featured) {
+	border-width: var(--components-border);
+}
+
+.nino-accordion {
+	border-bottom-width: var(--components-border);
+}
+.nino-accordion-trigger {
+	padding: calc( var(--components-space) * 2 ) 0;
+}
+.nino-accordion-panel {
+	padding: 0 0 calc( var(--components-space) * 2 ) 1em;
+}
+
+
+/* ==== 12. the knob positions ==== */
+:root {
+	--buttons-big: var(--buttons-big--default);
+	--buttons-corners: var(--buttons-corners--default);
+	--buttons-small: var(--buttons-small--default);
+	--buttons-space: var(--buttons-space--default);
+	--components-border: var(--components-border--default);
+	--components-corners: var(--components-corners--default);
+	--components-labels: var(--components-labels--default);
+	--components-labels-align: var(--components-labels-align--default);
+	--components-labels-block: var(--components-labels-block--default);
+	--components-labels-cols: var(--components-labels-cols--default);
+	--components-labels-cut: var(--components-labels-cut--default);
+	--components-labels-form: var(--components-labels-form--default);
+	--components-labels-lift: var(--components-labels-lift--default);
+	--components-labels-pos: var(--components-labels-pos--default);
+	--components-labels-start: var(--components-labels-start--default);
+	--components-labels-wide: var(--components-labels-wide--default);
+	--components-scale: var(--components-scale--default);
+	--components-space: var(--components-space--default);
+	--components-zebra: var(--components-zebra--default);
+	--components-zebra-ink: var(--components-zebra-ink--default);
+	--content-article-space: var(--content-article-space--default);
+	--content-border: var(--content-border--default);
+	--content-corners: var(--content-corners--default);
+	--content-hero-text: var(--content-hero-text--default);
+	--content-hero-title: var(--content-hero-title--default);
+	--content-loud: var(--content-loud--default);
+	--content-quiet: var(--content-quiet--default);
+	--content-section-space: var(--content-section-space--default);
+	--content-shadow: var(--content-shadow--default);
 }

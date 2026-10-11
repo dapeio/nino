@@ -90,7 +90,7 @@ Not a choice, and not a step: the base unit delivers one theme, and every projec
 
 | File | What it is |
 |---|---|
-| `assets/theme.css` | the whole look in one stylesheet: the design tokens, the roles they are assigned to, the three webfaces, and the css for both frames below |
+| `assets/theme.css` | the whole look in one stylesheet: the design tokens, the roles they are assigned to, the three webfaces, and the css for both frames below - what the **Design** feature compiles at its defaults, under a header of the kernel's own |
 | `templates/frame-header.tpl` | the site's `<header>`, included by `html-header.tpl` through `[template /templates/frame-header]` |
 | `templates/frame-footer.tpl` | the site's `<footer>`, included the same way |
 
@@ -108,7 +108,7 @@ assets/style.css            the project's own, shipped empty
 
 Setup seeds `/nino/html/assets`' bundle with the two project entries if they are not in it yet, and appends rather than replaces - whatever a project added itself keeps its place. `assets/style.css` is written once, empty, and never touched again, so a rule put there overrules everything above it.
 
-Up to Nino 1.1 the wizard asked four questions here - a theme from a catalogue of ten, a header and a footer from thirteen frames, and the design values compiled out of them. It does not any more. The look is changed afterwards by the **Design** feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features/blob/main/features/Design/feature.php), which compiles its own `assets/theme.css` and frame templates over the delivered ones - and asks before it replaces a file it did not write.
+Up to Nino 1.1 the wizard asked four questions here - a theme from a catalogue of ten, a header and a footer from thirteen frames, and the design values compiled out of them. It does not any more. The look is changed afterwards by the **Design** feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features/blob/main/features/Design/feature.php), which compiles its own `assets/theme.css` and frame templates over the delivered ones - and asks before it replaces a file it did not write. The delivered `assets/theme.css` is the body of what that compiler writes at its defaults, regenerated from it with each kernel release, so the look a project starts from and the first look Design compiles are one: its file carries the kernel's header and no stamp of the compiler's, which is why Design asks.
 
 ## 3. Routes
 

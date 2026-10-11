@@ -1439,24 +1439,88 @@
 	</div>
 </section>
 
-<!--	What a stack draws where its attribute article says counter: a row of cells, each
-			of them a card on the counter ground with the classes of the grid on the card
-			itself. The row is the one of any stack; the gap between the cards is its own.
-			The subtitle of a card is the article's own, in its three sizes.	-->
+<!--	What a stack draws where its content holds an article on the counter ground: a row
+			of cells, each of them a div with the classes of the grid, and the card in it. The
+			row and the cells are the stack's, the gap between the cards its own, and the card
+			is the content. The subtitle of a card is the article's own, in its three sizes.	-->
 <section class="nino-section nino-pt-3 nino-pb-3 nino-mt-0 nino-mb-0" id="v-levels-stack">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-2">
-			<span class="nino-badge nino-badge--pill">article="counter"</span>
+			<span class="nino-badge nino-badge--pill">&#91;article ground="counter"&#93;</span>
 			<span class="nino-badge nino-badge--pill">.nino-article--counter</span>
 			<span class="nino-badge nino-badge--pill">.nino-article-subtitle--quiet</span>
 			<span class="nino-badge nino-badge--pill">.nino-article-subtitle--loud</span>
 		</div>
 		<div class="nino-grid-100">
 			<div class="nino-grid-row nino-stack nino-stack-gap-2">
-				<article class="nino-article nino-article--counter nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><h4 class="nino-article-title">A cell that is a card</h4><p class="nino-article-subtitle nino-article-subtitle--quiet">A quiet subtitle</p><p>The ground is the counter of the section it stands in.</p></article>
-				<article class="nino-article nino-article--counter nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><h4 class="nino-article-title">Another</h4><p class="nino-article-subtitle">A subtitle</p><p>The classes of the grid are on the card, so it is the cell.</p></article>
-				<article class="nino-article nino-article--counter nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><h4 class="nino-article-title">A third</h4><p class="nino-article-subtitle nino-article-subtitle--loud">A loud subtitle</p><p>Neighbours are one gap apart.</p></article>
+				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><article class="nino-article nino-article--counter"><h4 class="nino-article-title">A cell that holds a card</h4><p class="nino-article-subtitle nino-article-subtitle--quiet">A quiet subtitle</p><p>The ground is the counter of the section it stands in.</p></article></div>
+				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><article class="nino-article nino-article--counter"><h4 class="nino-article-title">Another</h4><p class="nino-article-subtitle">A subtitle</p><p>The classes of the grid are on the cell, and the card is what it holds.</p></article></div>
+				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><article class="nino-article nino-article--counter"><h4 class="nino-article-title">A third</h4><p class="nino-article-subtitle nino-article-subtitle--loud">A loud subtitle</p><p>Neighbours are one gap apart, and the edges of the stack are the edges of its column.</p></article></div>
 			</div>
+		</div>
+	</div>
+</section>
+
+<!--	A card that fills is as tall as the cell it stands in, so the cards of a row end on one
+			line whatever they hold. The cells carry nino-autoheight in one group, as a stack with
+			autoheight writes them: that makes the cells of different rows one height, and the
+			card fills its cell.	-->
+<section class="nino-section nino-pt-3 nino-pb-3 nino-mt-0 nino-mb-0" id="v-levels-fill">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-2">
+			<span class="nino-badge nino-badge--pill">&#91;article fill="1"&#93;</span>
+			<span class="nino-badge nino-badge--pill">.nino-article--fill</span>
+			<span class="nino-badge nino-badge--pill">.nino-article--counter</span>
+			<span class="nino-badge nino-badge--pill">.nino-autoheight</span>
+		</div>
+		<div class="nino-grid-100">
+			<div class="nino-grid-row nino-stack nino-stack-gap-2">
+				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33 nino-autoheight" data-autoheight-group="v-levels-fill"><article class="nino-article nino-article--counter nino-article--fill"><h4 class="nino-article-title">A card that fills</h4><div class="nino-section-text">It is as tall as the cell it stands in, however tall the cells beside it are.</div></article></div>
+				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33 nino-autoheight" data-autoheight-group="v-levels-fill"><article class="nino-article nino-article--counter nino-article--fill"><h4 class="nino-article-title">A card with a lot to say</h4><div class="nino-section-text">It sets the height of the row, and the cards beside it fill the same height.</div><div class="nino-section-text">So they end on one line, whatever they hold, and none of them needs to know how much the others have to say.</div></article></div>
+				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33 nino-autoheight" data-autoheight-group="v-levels-fill"><article class="nino-article nino-article--counter nino-article--fill"><h4 class="nino-article-title">A short one</h4><div class="nino-section-text">Short, and as tall as the tallest of its row, because it fills.</div></article></div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!--	Where the content stands in a card taller than it: in the middle, at the bottom, or with
+			the last element at the bottom while the title stays at the top. The cards fill their
+			cells, which are one height, and the card beside them with the most to say is the tallest.	-->
+<section class="nino-section nino-section--alt nino-pt-3 nino-pb-3 nino-mt-0 nino-mb-0" id="v-levels-vertical">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-2">
+			<span class="nino-badge nino-badge--pill">&#91;article vertical="middle"&#93;</span>
+			<span class="nino-badge nino-badge--pill">.nino-article--middle</span>
+			<span class="nino-badge nino-badge--pill">.nino-article--bottom</span>
+			<span class="nino-badge nino-badge--pill">.nino-article--last-bottom</span>
+			<span class="nino-badge nino-badge--pill">.nino-article--fill</span>
+		</div>
+		<div class="nino-grid-100">
+			<div class="nino-grid-row nino-stack nino-stack-gap-2">
+				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-25 nino-autoheight" data-autoheight-group="v-levels-vertical"><article class="nino-article nino-article--counter nino-article--fill nino-article--middle"><h4 class="nino-article-title">In the middle</h4><div class="nino-section-text">The content stands in the middle of a card that is taller than it.</div><a href="#v-levels-vertical" class="nino-btn nino-btn--outline nino-btn--small">More</a></article></div>
+				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-25 nino-autoheight" data-autoheight-group="v-levels-vertical"><article class="nino-article nino-article--counter nino-article--fill nino-article--bottom"><h4 class="nino-article-title">At the bottom</h4><div class="nino-section-text">The content stands at the bottom of a card that is taller than it.</div><a href="#v-levels-vertical" class="nino-btn nino-btn--outline nino-btn--small">More</a></article></div>
+				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-25 nino-autoheight" data-autoheight-group="v-levels-vertical"><article class="nino-article nino-article--counter nino-article--fill nino-article--last-bottom"><h4 class="nino-article-title">The last at the bottom</h4><div class="nino-section-text">The title stays at the top, and the button ends the card.</div><a href="#v-levels-vertical" class="nino-btn nino-btn--outline nino-btn--small">More</a></article></div>
+				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-25 nino-autoheight" data-autoheight-group="v-levels-vertical"><article class="nino-article nino-article--counter nino-article--fill"><h4 class="nino-article-title">The tallest</h4><div class="nino-section-text">A card with more to say than the others sets the height of the row.</div><div class="nino-section-text">The three beside it fill that height, and where their content stands in it is their own say.</div><div class="nino-section-text">A card that names none keeps its content at the top.</div></article></div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<!--	A picture behind a card, in a block of its own before the content and cut at the corners
+			of the card, and --dim: a scrim over the picture, and the card writes in the ink of
+			the dark ground.	-->
+<section class="nino-section nino-pt-3 nino-pb-3 nino-mt-0 nino-mb-0" id="v-levels-article-picture">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-2">
+			<span class="nino-badge nino-badge--pill">.nino-article-bg</span>
+			<span class="nino-badge nino-badge--pill">.nino-article--dim</span>
+			<span class="nino-badge nino-badge--pill">.nino-article--fill</span>
+		</div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-p-1">
+			<article class="nino-article nino-article--fill nino-p-3"><div class="nino-article-bg nino-img-focus--5"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy"></div><h4 class="nino-article-title">A card with a picture</h4><p>The picture lies behind the content and is cut at the corners of the card.</p></article>
+		</div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-p-1">
+			<article class="nino-article nino-article--dim nino-article--fill nino-p-3"><div class="nino-article-bg"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="" loading="lazy"></div><h4 class="nino-article-title">A dimmed card</h4><p>A scrim darkens the picture, and the text is white.</p></article>
 		</div>
 	</div>
 </section>

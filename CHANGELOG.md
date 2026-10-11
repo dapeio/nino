@@ -26,8 +26,9 @@ All notable changes to Nino are documented in this file.
   renders nothing. The kernel brings the six titles `[title]`,
   `[article-title]`, `[hero-title]`, `[subtitle]`, `[article-subtitle]` and
   `[hero-subtitle]`, `[text]` (`format="inline|lines|blocks"`), `[image]`,
-  `[button]`, `[html]` and `[spacer]`, and the stacks `[stack]`, `[slider]`,
-  `[filter]` (with `by="<field>"`) and `[list]`. A stack renders each cell
+  `[button]`, `[html]`, `[spacer]` and `[article]`, the card that holds
+  components, and the stacks `[stack]`, `[slider]`, `[filter]` (with
+  `by="<field>"`) and `[list]`. A stack renders each cell
   itself, with the element as the context, so the components in it see their
   element; the loop is the one of `[elements]`, shared as
   `\Nino\Modules\Elements::queryLoop()`, and `[elements]` is unchanged. A
@@ -197,10 +198,9 @@ All notable changes to Nino are documented in this file.
   bare `code` inside any other element that states its size in rem - one of a
   project's own, or a menu link, the footer title, a logos item or a glyph
   button of the kernel's - had the size of that element and is `.8125em` of
-  it now. The delivered `assets/theme.css` is unchanged and assigns `--text-1`
-  to `--text-6` from its own raster, which wins over the scale of `Nino.css`:
-  on a project made from it the scale follows `--font-text-size` once those
-  six lines are gone.
+  it now. The delivered `assets/theme.css` assigns none of `--text-1` to
+  `--text-6` (see the entry on the delivered theme below), so on a project made
+  from it the scale follows `--font-text-size`.
 - **Nino.css:** `--grid-gutter` is the space between the viewport and a row,
   the padding `.nino-grid-row` had - `--space-2`, and from 768px `--space-3`,
   which the `@media` block now states in the property instead of in a second
@@ -223,7 +223,8 @@ All notable changes to Nino are documented in this file.
   a role is right on every ground. `--color-border-<ground>` for `default`,
   `alt`, `tint`, `dark`, `black`, `primary` and `brand-alt` is the border of
   each ground, the page's `--color-border` until a design layer says
-  otherwise; the delivered `theme.css` sets none of them and stays as it is.
+  otherwise; the delivered `theme.css` is such a layer and sets all seven (see
+  the entry on the delivered theme below).
   What puts the page ground back inside a section - an alert, a modal, the
   open burger menu and language picker, the toast, the striped rows of a
   table, a dimmed cover and a dimmed picture - sets the pair it paints, and
@@ -312,45 +313,157 @@ All notable changes to Nino are documented in this file.
   darkened picture. The demo catalogue draws all of this in a new group,
   *Grounds on three levels*: a section with a counter column and counter cards,
   a column on each ground with a counter card in it, a card on each ground, a
-  column with a picture and `--dim`, the three levels nested, and the cells of
-  a stack as counter cards with a quiet, a plain and a loud subtitle.
-- **Components:** `[stack]` and `[filter]` take the attribute `article`, the
-  fourth attribute of a grid beside `cols`, `gap` and `autoheight`, labelled
-  *Cards* / *Karten*: empty, a cell is the `<div>` it was; `card`, `counter`,
-  `alt`, `tint`, `dark`, `black`, `primary` or `brand-alt` make it an
-  `<article class="nino-article[ nino-article--<x>]">` followed by the classes
-  of the grid and the cell's own, `card` without a modifier. `renderStack()`
-  hands the value to the cell function in the last argument and
-  `Components::cell()` draws it; `[slider]` and `[list]` have no grid and do
-  not take it, and a word that is none of the nine is empty. `Nino.css` lays
-  such a card into its row (`.nino-stack > .nino-article`): the half gap a
-  plain cell holds as padding is the card's margin, and its width is that of
-  its place in the grid less the gap, so neighbours are one gap apart and the
-  edges of the stack are the column's, at every width of `cols`. The Builder
-  writes an attribute only where it differs from the default, so files that
-  exist are untouched; `defaults()` of a grid stack carries `article` as `''`.
-- **Components:** what a component draws and where it belongs. The schema
-  takes two optional keys, validated in `Components::validate()` and carried in
-  the registry - also for a feature's manifest, which is read by the same
-  function: `draws`, a non-empty string of at most 64 characters from `a-z`,
-  `0-9`, space, `.`, `{`, `}` and `-` in which every `{name}` is an attribute
-  of the schema, the tag, a space and the one class a theme addresses the
-  element by (`h{level} .nino-section-title`); and `in`, a non-empty list of
-  distinct words from `section`, `cell` and `hero`, where a tool offers the
-  component. A wrong value is refused like any other, an empty `draws` too (a
-  component with none leaves the key out). The kernel's titles are six
+  column with a picture and `--dim`, the three levels nested, and the cards of
+  a stack, each in a cell of its own, as counter cards with a quiet, a plain
+  and a loud subtitle.
+- **Components:** `[article]`, the card, is a component that holds components,
+  registered last of the kernel's, after `[spacer]`. What stands between its
+  tags is the calls of the components of a card - a title, a text, an image, a
+  button - and it draws the `<article class="nino-article">` around them. Its
+  attributes, in the order the Builder writes them, are `ground` (`counter`,
+  `alt`, `tint`, `dark`, `black`, `primary` or `brand-alt`; *Ground* /
+  *Fläche*), `padding` (0 to 6, a step of the space scale, `nino-p-<n>`;
+  *Padding* / *Innenabstand*), `fill` (the card takes the whole height of its
+  column or cell; *Full height* / *Volle Höhe*), `vertical` (`middle`,
+  `bottom` or `last-bottom`, where the content stands in a card taller than it;
+  *Vertical* / *Vertikal*), `align` (`left`, `center` or `right`,
+  `nino-text-<x>`; *Horizontal*), `background` (a picture behind the content,
+  an image slot or in a stack an image field of the element; *Picture* /
+  *Bild*), `focus` (the nine positions of `[image]`), `dim` (a scrim over the
+  picture, and the dark ground; *Dim the picture* / *Bild abdunkeln*),
+  `borderless` (*Without border* / *Ohne Rahmen*) and the `class` every
+  component takes. The two alignments are `align` and `vertical` because
+  `text` and `content` are taken. The classes are written in the order of the
+  markup - the ground, `--dim`, `--borderless`, `--fill`, the place of the
+  content, `nino-text-<x>`, `nino-p-<n>`, the class - a word outside what an
+  attribute offers is the default, and the kernel writes every class it is
+  told to: a `dim` without a picture is the author's mistake and a builder's
+  business, as the dim of a column is. The picture is looked up as `[image]`
+  looks its picture up - a slot by its uri, in a stack an image field of the
+  element by its name, through one private helper, `Components::_picture()`,
+  which `[image]` uses as well and renders what it rendered - and is drawn as
+  an `<img>` with an empty alt text in a
+  `<div class="nino-article-bg">`, with the focus as `nino-img-focus--<n>`,
+  in front of the content; a slot with no file and a field that holds none
+  draw no `<div>`. The renderer does not render the content: the engine
+  renders the output of a shortcode again, so the components in a card are
+  rendered with the card and, in a stack, with the element still their context
+  - `renderStack()` holds it around the rendering. A card with nothing between
+  its tags renders nothing, one whose components render nothing is an empty
+  `<article>`, and an `[article]` directly inside an `[article]` is not
+  supported, for the reason a stack in a stack is not. The same component
+  stands once in a column - a card beside a picture - and once per element in
+  a stack, the cards of a loop; the stack brings the grid and nothing about
+  what a cell looks like: the cell of `[stack]` and `[filter]` is a `<div>`
+  with the classes of the grid, `renderStack()` hands the cell function
+  `[ 'class' => ..., 'attributes' => ... ]` and `Components::cell()` always
+  draws the `<div>`.
+- **Components:** what a component draws, where it belongs and what it holds.
+  The schema takes three optional keys, validated in `Components::validate()`
+  and carried in the registry - also for a feature's manifest, which is read by
+  the same function: `draws`, a non-empty string of at most 64 characters from
+  `a-z`, `0-9`, space, `.`, `{`, `}` and `-` in which every `{name}` is an
+  attribute of the schema, the tag, a space and the one class a theme
+  addresses the element by (`h{level} .nino-section-title`); `in`, a non-empty
+  list of distinct words from the places `section` (directly in a column, also
+  in the cell of a stack that holds no card), `card` (in an `[article]`) and
+  `hero` (directly in a column of the hero section), where a tool offers the
+  component; and `holds`, one of the same three words and only with the source
+  `content` - the content of the component is the calls of the components of
+  that place, which are rendered with it and which a builder edits as children.
+  A wrong value is refused like any other (`"holds" names a place: section,
+  card or hero`, `"holds" needs the source content`), an empty `draws` too (a
+  component with none leaves the key out), and a stack drops all three. The
+  kernel's titles are six
   components now, each drawing one class, and no renderer reads a context:
   `title`, `article-title` and `hero-title` draw `<h[[level]]
   class="nino-section-title|nino-article-title|nino-hero-title...">` with
   `level` and `style`, `subtitle`, `article-subtitle` and `hero-subtitle` draw
   `<p class="nino-...-subtitle...">` with `style`. Their `in` is `section` for
-  the first pair, `cell` for the second and `hero` for the third, their
+  the first pair, `card` for the second and `hero` for the third, their
   `draws` is `h{level} .nino-...-title` or `p .nino-...-subtitle`, and the new
   four are labelled *Article title*, *Hero title*, *Article subtitle* and
   *Hero subtitle* (*Article-Titel*, *Hero-Titel*, *Article-Untertitel*,
   *Hero-Untertitel*). `[title]` and `[subtitle]` render as they did;
-  `[button]` declares `draws` (`a .nino-btn`); `[text]`, `[image]`, `[html]`,
-  `[spacer]` and the stacks declare neither key.
+  `[button]` declares `draws` (`a .nino-btn`); `[article]` declares all three
+  (`in` `section` and `hero`, `draws` `article .nino-article`, `holds` `card`);
+  `[text]`, `[image]`, `[html]`, `[spacer]` and the stacks declare none.
+- **Nino.css:** the card is the box of a component that holds components, and
+  says how tall it is, where its content stands and what is behind it.
+  `.nino-article--fill` makes a card as tall as the column or the cell it
+  stands in - `height: 100%` and no margin at all, for a margin would push it
+  out of that box - so that the cards of one row end on one line. It is the
+  only thing in its column or cell: a sibling above it overflows a plain
+  column by the height of that sibling, and in a stacked column or a cell the
+  stretch is shared with it. A percentage needs a box with a height: a plain
+  column is a stretched item of its row and has one, and the one grid that
+  holds a card that fills - the slot of a stack, or a column with a stack
+  class - stretches its row (`align-content: stretch`, through `:has()`)
+  rather than the card growing past its box; a row aligned to the middle or
+  the bottom does not stretch its columns, and a card that fills one has
+  nothing to fill. `.nino-article--middle`, `--bottom` and `--last-bottom`
+  make the card a flex column whose content stands in the middle, at the
+  bottom, or - the last element after an automatic margin - with the title at
+  the top and the button at the end; a button in it is as wide as its label
+  and stands where the text does, as in a stack. The column changes no
+  picture, and no spacing of the pieces of a card, which have a bottom margin
+  only; but the margins of a flex column do not collapse, so a `[spacer]`
+  keeps its whole top margin where the margin above it would have swallowed
+  part of it, two buttons that stood side by side stand one under the other,
+  and `--last-bottom` moves only the last element. `.nino-article-bg` is the
+  picture behind a card, in a block of its own before the content: it lies
+  over the whole card, is cut at its corners and its image covers it, and the
+  card is the box it is placed in, by the rule that `.nino-grid-bg` has and
+  that names both now. `.nino-article--dim` darkens it with
+  `--color-background-dim` and is the dark ground whatever else the card names
+  or sits on, as `.nino-grid--dim` is: it writes in the ink of that ground,
+  hands its roles to what stands in it and paints the pair under the picture,
+  also when it is borderless; it stands after every ground of a card, the
+  counter and the borderless card, so a card that says `--dim` with `--alt` or
+  `--counter` is not dark ink on a darkened picture, and it hands no counter
+  family on, for a card holds no card. It has the border and the padding of a
+  card of a ground, as a dimmed column has the padding of a column of a
+  ground: without them a dimmed card below 768px would write its title flush
+  against the edge of the dark card. The full-width rule lists it with the
+  grounds, so a full-width dimmed card has no side padding either, and the
+  delivered theme.css sets its border width with theirs, as the Design
+  feature's Content tab does. `.nino-p-<n>` on a card wins over the
+  padding the card and its ground give, by its place in the file. What goes is
+  the card as the cell of a stack, `.nino-stack > .nino-article` with its
+  margin and its eighteen widths: the cell is a `<div>` again, and the card in
+  it has the padding and the border it has in a column and no margin of its
+  own (`.nino-stack > * > .nino-article` says `margin: 0`). The half gap of
+  the cell is the room between neighbours and the edges of the stack are the
+  column's, so neighbours are one gap apart and the first card begins at the
+  column's edge, and the margins of a card are for a card that stands in a
+  column. Below 640px the cells are one below the other, each as wide as the
+  row of the stack, so each card is the column's width
+  (`.nino-stack > * { width: 100% }` up to 639.98px): the classes of the grid
+  are the only width a cell has, and the three widths of a stack begin at
+  640px, 768px and 1024px, so without it a loop of cards with short texts
+  would draw narrow cards side by side at 375px. A page that uses none of the
+  new classes looks as it did: the demo catalogue measured at 375px and at
+  1280px, in the light and the dark scheme, has the same colour, background
+  colour, border colour, font, size, line height and box for each of the 2954
+  elements in its 169 sections, its frame and its body that were there before
+  (11816 comparisons, no difference). The demo catalogue rewrites its specimen
+  of the cards of a loop as the cell and the card in it, and draws the new
+  classes in three specimens of the group *Grounds on three levels*: cards
+  that fill, in the cells of a stack with `nino-autoheight`, one tall and the
+  others filling; a card each that stands in the middle, at the bottom and
+  last at the bottom, with a title, a text and a button; and a card with a
+  picture behind it and one with `--dim`. Measured at the same widths, a card
+  that fills is the content box of its cell, edge to edge, and the cell as
+  tall as the tallest of its group; in a plain column it ends at the column's
+  content edge; a card that stands somewhere is as tall as a plain card with
+  the same content, in six paddings and grounds; the button of a card that
+  stands last at the bottom ends at the edge of the content box; an `[image]`
+  in a card that stands somewhere keeps its ratio; and the picture is cut at
+  the corners of the card (46 checks, none failed). The cards of a stack are
+  one gap apart (18px at 1280px with a gap of 2) and the first begins at the
+  column's edge; at 375px three cards with short texts are each the column's
+  width, one below the other; and a dimmed card without a padding of its own
+  has the padding of a card of a ground and the border of the dark ground.
 - **Nino.css:** the `--quiet` and `--loud` variants of the section title,
   section subtitle, section text, article title, article subtitle, article
   description, hero title and hero subtitle are factors of their role: the
@@ -398,6 +511,43 @@ All notable changes to Nino are documented in this file.
   the size times the quiet or the loud factor.* (*Leiser oder lauter als die
   Rolle: die Größe mal dem Quiet- oder dem Loud-Faktor.*), where it said *A
   step up or down the type scale.*
+- **Theme:** the delivered `assets/theme.css` is the body that the Design
+  feature compiles at its defaults - the twelve numbered sections, every
+  template on its first set, every knob in the middle - under a header of the
+  kernel's own. It is regenerated from that compiler with each kernel release,
+  so that the look that is delivered and the look that is compiled have one
+  source, and it carries no stamp of the compiler's: Design treats it as the
+  delivered file it is and asks before it writes over it. What changes for a
+  page: the border of each ground is assigned (`--color-border-default`,
+  `-alt`, `-tint`, `-dark`, `-black`, `-primary` and `-brand-alt`), so a line, a
+  badge fill and a marker on an `alt`, `tint`, `dark`, `black`, `primary` or
+  `brand-alt` ground take the border solved for that surface instead of the
+  page's; the two webfaces are named *Source Sans 3* and *League Spartan* where
+  the file said *Text* and *Title*, and the fallback after them begins at
+  `-apple-system` instead of `system-ui` - the same files, the same faces
+  drawn; `--text-1` to `--text-6` are no longer assigned, so the scale follows
+  `--font-text-size`; and the three part sets *v1* of Design read their knob
+  triples at the middle and draw what `Nino.css` draws. A project that exists
+  keeps the file it has. Measured on the home page and the demo catalogue of a
+  sandbox install at 375px and 1280px in the light and the dark scheme, the
+  file of before against the new one, over 12348 pairs of elements: no box
+  differs and one drawn face does (below), 10438 pairs differ in the family
+  names of `font-family` alone, 104 not at all, and 1806 more in a colour or a
+  marker - 1172 badge fills (`.nino-badge--pill` on `black` 564, `alt` 552,
+  `dark` 40, `tint` 8 and `brand-alt` 8), 534 border colours (cards, alerts,
+  pricing items, table cells, filter buttons, inputs, the tab bar and the
+  dimmed card of the picture specimen: `alt` 446, `counter` 56, `dark` 12,
+  `tint`, `black`, `primary`, `brand-alt` and `dim` 4 each) and 100 markers:
+  the line of a timeline step (16) and the separator of a breadcrumb (8) on
+  `alt`, and the width of the check mark of `.nino-list--check` (76, `alt` 40
+  and the page's ground 36; the glyph is not in the webface, so a fallback
+  draws it, and it is positioned absolutely, so nothing moves). That check
+  mark (`li::before`, U+2713) is the one face that differs: Chromium on Linux
+  draws it in DejaVu Sans instead of DejaVu Sans Bold under the compiled
+  stack, which begins at `-apple-system` where the delivered one began at
+  `system-ui` - the same family, a lighter cut, 13px instead of 13.4px wide;
+  on macOS, Windows and Android both stacks resolve to one face. This is
+  accepted, not fixed, for the body is the compiler's byte for byte.
 
 ## v1.5.0 - 2026-10-06
 

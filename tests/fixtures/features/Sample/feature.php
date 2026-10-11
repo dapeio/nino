@@ -38,7 +38,7 @@ return [
 			],
 			'preview'			=> 'text',
 			// Where the editor may put it and what it draws, the two keys the kernel's own titles carry
-			'in'					=> [ 'section', 'cell' ],
+			'in'					=> [ 'section', 'card' ],
 			'draws'				=> 'p .sample-greeting',
 		],
 	],

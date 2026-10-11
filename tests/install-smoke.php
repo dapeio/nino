@@ -650,11 +650,12 @@ foreach( $libraryHeroes as $libraryHeroPage => $libraryHeroMarks ) {
 }
 check( 'the home, contact and 404 pages carry the hero classes where they carried the old ones'. ( $libraryHeroGaps === [] ? '' : ' - '. implode( ', ', $libraryHeroGaps ) ), $libraryHeroGaps === [] );
 
-// ...and the page that draws every class of Nino.css draws those of the hero, of the three levels of grounds and the two variants of the
-// subtitle of a card: a prefix each, with the number of classes it finds, so that a class added under one of them is one the page has to be given
-$demoPrefixes	= [ 'nino-hero' => 9, 'nino-grid--' => 10, 'nino-article--' => 11, 'nino-grid-bg' => 1, 'nino-article-subtitle--' => 2 ];
-$demoNames		= [ 'nino-hero' => 'nine hero classes', 'nino-grid--' => 'ten modifiers of a column', 'nino-article--' => 'eleven modifiers of a card', 'nino-grid-bg' => 'picture of a column',
-	'nino-article-subtitle--' => 'two variants of the subtitle of a card' ];
+// ...and the page that draws every class of Nino.css draws those of the hero, of the three levels of grounds, the pictures of a column and of a
+// card and the two variants of the subtitle of a card: a prefix each, with the number of classes it finds, so that a class added under one of
+// them is one the page has to be given
+$demoPrefixes	= [ 'nino-hero' => 9, 'nino-grid--' => 10, 'nino-article--' => 16, 'nino-grid-bg' => 1, 'nino-article-bg' => 1, 'nino-article-subtitle--' => 2 ];
+$demoNames		= [ 'nino-hero' => 'nine hero classes', 'nino-grid--' => 'ten modifiers of a column', 'nino-article--' => 'sixteen modifiers of a card', 'nino-grid-bg' => 'picture of a column',
+	'nino-article-bg' => 'picture of a card', 'nino-article-subtitle--' => 'two variants of the subtitle of a card' ];
 preg_match_all( '/class="([^"]*)"/', (string) file_get_contents( __DIR__. '/../_admin/install/library/pages/.demo-catalogue/templates/.demo-catalogue.tpl' ), $demoClasses );
 $demoDrawn = [];
 foreach( $demoClasses[1] as $demoAttribute )
@@ -1708,14 +1709,20 @@ check( '...and names fonts among the files it copies, so they reach the project 
 	their default to 20px, and that is the one setting a visitor changes
 	because they need it rather than because they prefer it. theme.css matters
 	as much as Nino.css: it assigns --base-size from its own token, so a px
-	there wins over a correct kernel.	*/
+	there wins over a correct kernel. Each file sets it at least twice - the
+	root's and the wide screen's - and how often is the compiler's to say: its
+	tokens and its section of the root size both carry the pair, so theme.css
+	sets it four times and Nino.css twice.	*/
 $rootSizes = [];
+$rootSizeSets = [];
 foreach( [ '/../_nino/Nino.css' => '--base-size', '/../_admin/install/library/base/assets/theme.css' => '--nino-base-size' ] as $file => $token )
-	if( preg_match_all( '/'. preg_quote( $token, '/' ). ':\s*([^;]+);/', (string) file_get_contents( __DIR__. $file ), $found ) > 0 )
+	if( preg_match_all( '/'. preg_quote( $token, '/' ). ':\s*([^;]+);/', (string) file_get_contents( __DIR__. $file ), $found ) > 0 ) {
+		$rootSizeSets[$file] = count( $found[1] );
 		foreach( $found[1] as $value )
 			$rootSizes[] = $file. ': '. trim( $value );
+	}
 
-check( 'both files set the root size, and neither as a length'. ( $rootSizes === [] ? ' - none found' : '' ), count( $rootSizes ) === 4
+check( 'both files set the root size, at least twice each, and neither as a length'. ( $rootSizes === [] ? ' - none found' : '' ), count( $rootSizeSets ) === 2 && min( $rootSizeSets ) >= 2
 	&& array_filter( $rootSizes, static fn( string $entry ): bool => str_ends_with( $entry, '%' ) === false ) === [] );
 
 /*	A font stack is a comma separated list of family names, and the quotes in

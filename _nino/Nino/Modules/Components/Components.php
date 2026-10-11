@@ -46,8 +46,9 @@ namespace Nino\Modules {
 				'image'				=> '<div class="nino-image[[ratio]][[focus]][[class]]">[[img]]</div>',
 				'button'			=> '<a class="nino-btn[[style]][[size]][[class]]"[[href]][[target]]>[[value]]</a>',
 				'spacer'			=> '<div class="nino-mt-[[size]][[class]]"></div>',
+				'article'			=> '<article class="nino-article[[ground]][[dim]][[borderless]][[fill]][[vertical]][[align]][[padding]][[class]]">[[background]][[inner]]</article>',
+				'article-bg'		=> '<div class="nino-article-bg[[focus]]">[[img]]</div>',
 				'cell'				=> '<div[[class]][[attributes]]>[[inner]]</div>',
-				'card'				=> '<article[[class]][[attributes]]>[[inner]]</article>',
 				'stack'				=> '<div class="nino-grid-row nino-stack[[gap]][[class]]"[[id]]>[[cells]]</div>',
 				'slider'			=> '<div class="nino-slider[[class]]"[[id]][[width]][[min]]><ul>[[cells]]</ul></div>',
 				'slide'				=> '<li>[[inner]]</li>',
@@ -82,14 +83,11 @@ namespace Nino\Modules {
 		// list, so that no feature can break the preview with one of its own
 		public const array PREVIEWS = [ 'title', 'text', 'image', 'button', 'block', 'cells' ];
 
-		// Where a tool offers a component, see validate(): in a column of a
-		// section, in the cell of a loop, in a hero
-		public const array PLACES = [ 'section', 'cell', 'hero' ];
-
-		// What the cell of a stack with a grid may be: nothing, a card on the
-		// ground it sits on, on the counter ground of it, or on a ground of
-		// its own - the words of the grounds of Nino.css
-		private const array CARDS = [ '', 'card', 'counter', 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt' ];
+		// Where a component stands, and so where a tool offers it - see validate():
+		// directly in a column of a section (the cell of a stack that holds no
+		// card is such a column), in a card, which is an [article], or directly
+		// in a column of the hero
+		public const array PLACES = [ 'section', 'card', 'hero' ];
 
 		// The widths a cell may have in a grid, as Nino.css has them
 		private const array WIDTHS = [ '25', '33', '50', '66', '75', '100' ];
@@ -104,8 +102,9 @@ namespace Nino\Modules {
 		// The attributes every stack has, as a schema's attributes are written:
 		// the loop of [elements] and the id that filter, autoheight and slider
 		// find a stack by - and, for a stack with a grid, what its cells are:
-		// their widths, the gap between them, whether they are one height and
-		// whether each is a card
+		// their widths, the gap between them and whether they are one height.
+		// What a cell looks like is not the stack's business: a card is an
+		// [article] in its content
 		private const array LOOP = [
 			'sort'				=> [ 'type' => 'string', 'default' => '' ],
 			'offset'			=> [ 'type' => 'int', 'min' => 0, 'default' => 0 ],
@@ -119,8 +118,6 @@ namespace Nino\Modules {
 			'cols'				=> [ 'type' => 'string', 'default' => self::COLS ],
 			'gap'					=> [ 'type' => 'int', 'min' => 0, 'max' => 6, 'default' => 2 ],
 			'autoheight'	=> [ 'type' => 'bool', 'default' => false ],
-			'article'			=> [ 'type' => 'select', 'options' => self::CARDS, 'default' => '', 'label' => [ 'en_US' => 'Cards', 'de_DE' => 'Karten' ],
-				'hint' => [ 'en_US' => 'What a cell is: nothing, a card on the ground it sits on, a card on the counter ground, or a card on a ground of its own.', 'de_DE' => 'Was eine Zelle ist: nichts, eine Karte auf ihrer Fläche, eine Karte auf der Gegenfläche oder eine Karte auf einer eigenen Fläche.' ] ],
 		];
 
 		/**
@@ -136,10 +133,10 @@ namespace Nino\Modules {
 
 			$components = [
 				[ 'title', 'Title', 'Titel', 'title', 'text', self::_titled(), [ 'section' ], 'h{level} .nino-section-title' ],
-				[ 'article-title', 'Article title', 'Article-Titel', 'title', 'text', self::_titled(), [ 'cell' ], 'h{level} .nino-article-title' ],
+				[ 'article-title', 'Article title', 'Article-Titel', 'title', 'text', self::_titled(), [ 'card' ], 'h{level} .nino-article-title' ],
 				[ 'hero-title', 'Hero title', 'Hero-Titel', 'title', 'text', self::_titled(), [ 'hero' ], 'h{level} .nino-hero-title' ],
 				[ 'subtitle', 'Subtitle', 'Untertitel', 'title', 'text', [ 'style' => self::_style() ], [ 'section' ], 'p .nino-section-subtitle' ],
-				[ 'article-subtitle', 'Article subtitle', 'Article-Untertitel', 'title', 'text', [ 'style' => self::_style() ], [ 'cell' ], 'p .nino-article-subtitle' ],
+				[ 'article-subtitle', 'Article subtitle', 'Article-Untertitel', 'title', 'text', [ 'style' => self::_style() ], [ 'card' ], 'p .nino-article-subtitle' ],
 				[ 'hero-subtitle', 'Hero subtitle', 'Hero-Untertitel', 'title', 'text', [ 'style' => self::_style() ], [ 'hero' ], 'p .nino-hero-subtitle' ],
 				[ 'text', 'Text', 'Text', 'text', 'text', [
 					'format' => [ 'type' => 'select', 'options' => [ 'inline', 'lines', 'blocks' ], 'default' => 'blocks', 'label' => [ 'en_US' => 'Format', 'de_DE' => 'Format' ],
@@ -177,6 +174,41 @@ namespace Nino\Modules {
 					'attributes'	=> $attributes,
 					'preview'			=> $preview,
 				] + ( $in !== null ? [ 'in' => $in ] : [] ) + ( $draws !== null ? [ 'draws' => $draws ] : [] ) );
+
+			// The card is the one component that holds components: what stands between
+			// its tags is the calls of the components of a card, which are rendered
+			// when its output is (see componentArticle()), and 'holds' says so to a
+			// tool. It stands once in a column and, in the content of a stack, once
+			// per element
+			self::addComponent( $appData, 'article', [ self::class, 'componentArticle' ], [
+				'label'				=> [ 'en_US' => 'Card', 'de_DE' => 'Karte' ],
+				'source'			=> 'content',
+				'loop'				=> true,
+				'attributes'	=> [
+					'ground' => [ 'type' => 'select', 'options' => [ '', 'counter', 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt' ], 'default' => '', 'label' => [ 'en_US' => 'Ground', 'de_DE' => 'Fläche' ],
+						'hint' => [ 'en_US' => 'The surface the card paints: none, the counter of the ground it sits on, or one of the six.', 'de_DE' => 'Die Fläche, die die Karte malt: keine, die Gegenfläche der Fläche, auf der sie steht, oder eine der sechs.' ] ],
+					'padding' => [ 'type' => 'select', 'options' => [ '', '0', '1', '2', '3', '4', '5', '6' ], 'default' => '', 'label' => [ 'en_US' => 'Padding', 'de_DE' => 'Innenabstand' ],
+						'hint' => [ 'en_US' => 'The room between the edge of the card and its content, as a step of the space scale; empty is what the ground gives.', 'de_DE' => 'Der Raum zwischen dem Rand der Karte und ihrem Inhalt, als Stufe der Abstandsskala; leer ist, was die Fläche vorgibt.' ] ],
+					'fill' => [ 'type' => 'bool', 'default' => false, 'label' => [ 'en_US' => 'Full height', 'de_DE' => 'Volle Höhe' ],
+						'hint' => [ 'en_US' => 'The card takes the whole height of its column or cell, so the cards of one row end on one line.', 'de_DE' => 'Die Karte nimmt die ganze Höhe ihrer Spalte oder Zelle, so dass die Karten einer Zeile auf einer Linie enden.' ] ],
+					'vertical' => [ 'type' => 'select', 'options' => [ '', 'middle', 'bottom', 'last-bottom' ], 'default' => '', 'label' => [ 'en_US' => 'Vertical', 'de_DE' => 'Vertikal' ],
+						'hint' => [ 'en_US' => 'Where the content stands in a card taller than it: at the top, in the middle, at the bottom, or spread so that the last element stands at the bottom.', 'de_DE' => 'Wo der Inhalt in einer Karte steht, die höher ist als er: oben, in der Mitte, unten oder so verteilt, dass das letzte Element unten steht.' ] ],
+					'align' => [ 'type' => 'select', 'options' => [ '', 'left', 'center', 'right' ], 'default' => '', 'label' => [ 'en_US' => 'Horizontal', 'de_DE' => 'Horizontal' ],
+						'hint' => [ 'en_US' => 'How the text and the buttons are aligned.', 'de_DE' => 'Wie Text und Knöpfe ausgerichtet sind.' ] ],
+					'background' => [ 'type' => 'image', 'default' => '', 'label' => [ 'en_US' => 'Picture', 'de_DE' => 'Bild' ],
+						'hint' => [ 'en_US' => 'A slot, or in a stack an image field of the element, laid behind the content.', 'de_DE' => 'Ein Slot oder in einem Stapel ein Bildfeld des Elements, hinter den Inhalt gelegt.' ] ],
+					'focus' => [ 'type' => 'select', 'options' => [ '', '1', '2', '3', '4', '5', '6', '7', '8', '9' ], 'default' => '', 'label' => [ 'en_US' => 'Focus', 'de_DE' => 'Fokus' ],
+						'hint' => [ 'en_US' => 'Which part of the picture survives a crop, as one of nine positions.', 'de_DE' => 'Welcher Teil des Bildes beim Zuschneiden bleibt, als eine von neun Positionen.' ] ],
+					'dim' => [ 'type' => 'bool', 'default' => false, 'label' => [ 'en_US' => 'Dim the picture', 'de_DE' => 'Bild abdunkeln' ],
+						'hint' => [ 'en_US' => 'A scrim over the picture, and the card writes in the ink of the dark ground.', 'de_DE' => 'Ein Schleier über dem Bild, und die Karte schreibt in der Tinte der dunklen Fläche.' ] ],
+					'borderless' => [ 'type' => 'bool', 'default' => false, 'label' => [ 'en_US' => 'Without border', 'de_DE' => 'Ohne Rahmen' ],
+						'hint' => [ 'en_US' => 'No line and no shadow; a ground keeps its fill.', 'de_DE' => 'Keine Linie und kein Schatten; eine Fläche behält ihre Füllung.' ] ],
+				],
+				'preview'			=> 'block',
+				'in'					=> [ 'section', 'hero' ],
+				'draws'				=> 'article .nino-article',
+				'holds'				=> 'card',
+			] );
 
 			$stacks = [
 				[ 'stack', 'Stack', 'Stapel', 'cells', true, [] ],
@@ -384,7 +416,7 @@ namespace Nino\Modules {
 		 *
 		 *	@param		string		$name					The shortcode, a slug
 		 *	@param		mixed			$schema				label, source (not for a stack), loop, attributes, preview;
-		 *																	in and draws for a component, grid and assets for a stack.
+		 *																	in, draws and holds for a component, grid and assets for a stack.
 		 *																	See docs/development.md
 		 *	@param		bool			$stack				Read it as a stack's
 		 *
@@ -453,10 +485,11 @@ namespace Nino\Modules {
 				$clean['attributes'][$attribute] = $result;
 			}
 
-			// Where a tool offers the component, and what it draws, both optional:
-			// left out of the clean schema where the schema leaves them out - no
-			// 'in' is everywhere, no 'draws' is nothing to show, and an empty one is
-			// refused, so that leaving the key out is the one way to say so
+			// Where a tool offers the component, what it draws and what it holds, all
+			// three optional: left out of the clean schema where the schema leaves them
+			// out - no 'in' is everywhere, no 'draws' is nothing to show, no 'holds' is
+			// a component with nothing inside - and an empty one is refused, so that
+			// leaving the key out is the one way to say so
 			if( $stack === false ) {
 
 				if( isset( $schema['in'] ) === true ) {
@@ -493,6 +526,20 @@ namespace Nino\Modules {
 						return $what. ': "draws" has a brace that closes or opens no placeholder';
 
 					$clean['draws'] = $draws;
+				}
+
+				// What the content is: the calls of the components of that place, which
+				// are rendered with it and which a builder edits as children. Only a
+				// component whose source is its content has one
+				if( isset( $schema['holds'] ) === true ) {
+
+					if( is_string( $schema['holds'] ) === false || in_array( $schema['holds'], self::PLACES, true ) === false )
+						return $what. ': "holds" names a place: '. implode( ', ', array_slice( self::PLACES, 0, -1 ) ). ' or '. self::PLACES[count( self::PLACES ) - 1];
+
+					if( $clean['source'] !== 'content' )
+						return $what. ': "holds" needs the source content';
+
+					$clean['holds'] = $schema['holds'];
 				}
 			}
 
@@ -927,16 +974,19 @@ namespace Nino\Modules {
 		 *
 		 *	With a grid, each cell is told the classes of its width in the
 		 *	viewports (nino-grid-s-, -m- and -l-, from 'cols'), nino-autoheight
-		 *	and its group if 'autoheight' is set, and whether it is a card
-		 *	('article'); without, nothing. The cell function dresses it, and
-		 *	puts those on the element it draws as the cell - cell() does that.
+		 *	and its group if 'autoheight' is set; without, nothing. The cell
+		 *	function dresses it, and puts those on the element it draws as
+		 *	the cell - cell() does that. The cell is the grid's and nothing
+		 *	more: a card is an [article] in the content of the stack, which is
+		 *	rendered here, so that the card is drawn once per element with
+		 *	the element as its context.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					What a stack's callback is given: source (the type's uri),
 		 *																	content, grid, id and the attributes of the loop and the grid
 		 *	@param		callable	$cell					( string $inner, array $element, int $index, array $cell ): string -
-		 *																	$cell is [ 'class' => ..., 'attributes' => ..., 'article' => ... ],
-		 *																	all empty without a grid
+		 *																	$cell is [ 'class' => ..., 'attributes' => ... ], both empty
+		 *																	without a grid
 		 *
 		 *	@return 	string									The cells, '' where there is no element
 		 */
@@ -964,15 +1014,12 @@ namespace Nino\Modules {
 				return '';
 
 			$model	= \Nino\Elements::getElementModel( $appData, $typeUri );
-			$info		= [ 'class' => '', 'attributes' => '', 'article' => '' ];
+			$info		= [ 'class' => '', 'attributes' => '' ];
 
 			if( ( $args['grid'] ?? false ) === true ) {
 
 				$widths	= self::_cols( (string) ( $args['cols'] ?? self::COLS ) );
 				$info['class'] = 'nino-grid-s-'. $widths[0]. ' nino-grid-m-'. $widths[1]. ' nino-grid-l-'. $widths[2];
-
-				$article = $args['article'] ?? '';
-				$info['article'] = in_array( $article, self::CARDS, true ) === true ? (string) $article : '';
 
 				if( ( $args['autoheight'] ?? '0' ) === '1' || ( $args['autoheight'] ?? false ) === true ) {
 
@@ -1051,10 +1098,8 @@ namespace Nino\Modules {
 		/**
 		 *	One cell of a stack as an element: the dressing renderStack() hands
 		 *	the cell function, a class and attributes of the cell function's
-		 *	own added to it. The element is a div; a stack whose 'article' says
-		 *	so has an article of the class nino-article, with the modifier of
-		 *	the ground it names ('card' is none), in front of the classes of
-		 *	the grid and of the cell's own
+		 *	own added to it. The element is a div, the slot of the grid, and
+		 *	nothing else: a card is an [article] in what the cell holds
 		 *
 		 *	@param		array			$cell					The last argument of the cell function
 		 *	@param		string		$inner				The rendered content
@@ -1065,19 +1110,12 @@ namespace Nino\Modules {
 		 */
 		public static function cell( array $cell, string $inner, string $class = '', string $attributes = '' ): string {
 
-			$article = (string) ( $cell['article'] ?? '' );
-			$card = $article !== '' && in_array( $article, self::CARDS, true ) === true;
-
-			$classes = implode( ' ', array_filter( [
-				$card === true ? 'nino-article'. ( $article === 'card' ? '' : self::_modifier( 'nino-article--', $article ) ) : '',
-				trim( (string) ( $cell['class'] ?? '' ) ),
-				trim( $class ),
-			], static fn( string $part ): bool => $part !== '' ) );
+			$classes = trim( (string) ( $cell['class'] ?? '' ). ' '. $class );
 
 			return str_replace(
 				[ '[[class]]', '[[attributes]]', '[[inner]]' ],
 				[ $classes !== '' ? ' class="'. $classes. '"' : '', (string) ( $cell['attributes'] ?? '' ). $attributes, $inner ],
-				self::$html[$card === true ? 'card' : 'cell']
+				self::$html['cell']
 			);
 		}
 
@@ -1207,6 +1245,60 @@ namespace Nino\Modules {
 		}
 
 		/**
+		 *	The picture a reference names, looked up the way [image] looks it up:
+		 *	in a stack, a name that is a field of the type image in the model of
+		 *	the element is the file that field holds; anything else is the uri of
+		 *	a slot. What the picture is drawn as is the caller's business, and so
+		 *	is the alt text it chooses: this gives the one stored with the picture
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$reference		The uri of a slot, or the name of an image field of the element
+		 *
+		 *	@return 	array|null							[ 'url', 'width', 'height', 'alt' ], the alt text as it is stored for
+		 *																	the language of the page and '' where there is none; null where
+		 *																	the slot has no file and where the field holds none
+		 */
+		private static function _picture( array &$appData, string $reference ): ?array {
+
+			if( $reference === '' )
+				return null;
+
+			$context = self::element( $appData );
+
+			if( $context !== null && $reference[0] !== '/' && ( $context['model'][$reference]['type'] ?? '' ) === 'image' ) {
+
+				$filename = $context['element'][$reference] ?? '';
+
+				if( is_string( $filename ) === false || $filename === '' )
+					return null;
+
+				$link		= $context['model'][$reference]['alt'] ?? null;
+				$stored	= is_string( $link ) === true ? ( $context['element'][$link] ?? '' ) : '';
+
+				return [
+					'url'			=> \Nino\Images::getUrl( $appData, $filename ),
+					'width'		=> (int) ( $context['model'][$reference]['width'] ?? 0 ),
+					'height'	=> (int) ( $context['model'][$reference]['height'] ?? 0 ),
+					'alt'			=> is_string( $stored ) === true ? $stored : '',
+				];
+			}
+
+			$slot = \Nino\Images::getSlot( $appData, $reference );
+
+			if( $slot === false || empty( $slot['filename'] ) === true )
+				return null;
+
+			$stored = $slot['alt'][ \Nino\Locales::getCurrentLocale( $appData ) ] ?? '';
+
+			return [
+				'url'			=> \Nino\Images::getUrl( $appData, $slot['filename'] ),
+				'width'		=> (int) ( $slot['width'] ?? 0 ),
+				'height'	=> (int) ( $slot['height'] ?? 0 ),
+				'alt'			=> is_string( $stored ) === true ? $stored : '',
+			];
+		}
+
+		/**
 		 *	Replace [image]: the picture of a slot - or in a stack of an image
 		 *	field - as an <img>, or as what the content between [image] and
 		 *	[/image] makes of it. Everything the shortcode did before it was a
@@ -1242,40 +1334,20 @@ namespace Nino\Modules {
 		 */
 		public static function componentImage( array &$appData, array $args ): string {
 
-			$source		= (string) $args['source'];
-			$context	= self::element( $appData );
-			$field		= $context !== null && $source !== '' && $source[0] !== '/' && ( $context['model'][$source]['type'] ?? '' ) === 'image';
+			// The value is the reference made safe to write; the lookup takes the
+			// reference itself
+			$picture = self::_picture( $appData, (string) $args['source'] );
 
-			if( $field === true ) {
+			if( $picture === null )
+				return '';
 
-				// The value is the reference made safe to write; the lookup takes
-				// what the field holds
-				$url		= \Nino\Images::getUrl( $appData, (string) ( $context['element'][$source] ?? '' ) );
-				$width	= (int) ( $context['model'][$source]['width'] ?? 0 );
-				$height	= (int) ( $context['model'][$source]['height'] ?? 0 );
-				$link		= $context['model'][$source]['alt'] ?? null;
-				$stored	= is_string( $link ) === true ? ( $context['element'][$link] ?? '' ) : '';
-			}
-			else {
-
-				$slot	= \Nino\Images::getSlot( $appData, $source );
-
-				if( $slot === false || empty( $slot['filename'] ) === true )
-					return '';
-
-				$url		= \Nino\Images::getUrl( $appData, $slot['filename'] );
-				$width	= (int) ( $slot['width'] ?? 0 );
-				$height	= (int) ( $slot['height'] ?? 0 );
-				$stored	= $slot['alt'][ \Nino\Locales::getCurrentLocale( $appData ) ] ?? '';
-			}
-
-			$alt = ( is_string( $stored ) === true && $stored !== '' ) ? $stored : $args['alt'];
+			$alt = $picture['alt'] !== '' ? $picture['alt'] : $args['alt'];
 
 			$content = trim( $args['content'] ) !== '' ? $args['content'] : null;
 
 			$img = str_replace(
 				[ '[[src]]', '[[width]]', '[[height]]', '[[alt]]' ],
-				[ self::escape( $url ), (string) $width, (string) $height, self::escape( $alt ) ],
+				[ self::escape( $picture['url'] ), (string) $picture['width'], (string) $picture['height'], self::escape( $alt ) ],
 				$content ?? self::$html['img']
 			);
 
@@ -1349,9 +1421,86 @@ namespace Nino\Modules {
 		}
 
 		/**
+		 *	Replace [article]: the card, a component that holds components. What
+		 *	stands between its tags is the calls of the components of a card, and
+		 *	this draws the <article> around them: its ground, its padding, whether
+		 *	it takes the whole height of its column or cell, where its content
+		 *	stands in it, a picture behind the content, its border, and a class of
+		 *	its own. It stands once in a column - a card beside a picture - and in
+		 *	the content of a stack once per element: the cards of a loop.
+		 *
+		 *	The content is $args['value'] as it is, and it is not rendered here.
+		 *	The engine renders the output of a shortcode again
+		 *	(\Nino\Html::_doShortcode(), to a depth it caps), which is what makes
+		 *	[template] work, so the components in the card are rendered as soon as
+		 *	this returns - in a stack with the element still their context,
+		 *	because renderStack() holds it around the \Nino\Html::renderHtml()
+		 *	this card is rendered in. That is why the renderer calls no
+		 *	renderHtml() of its own. A card with nothing between its tags renders
+		 *	nothing (dispatch() sees to that for a source of content); a card whose
+		 *	components all render nothing is an empty <article>, as a section with
+		 *	nothing in it is a section.
+		 *
+		 *	The picture is looked up as [image] looks its picture up - a slot by
+		 *	its uri, in a stack a field of the element's model of the type image
+		 *	by its name - and is an <img> with alt="" in a <div> of its own in
+		 *	front of the content: behind a card it is decoration. A slot with no
+		 *	file and a field that holds none draw no <div>. The kernel writes every
+		 *	class it is told to: a dim without a picture is the author's mistake
+		 *	and a builder's business, as the dim of a column is.
+		 *
+		 *	An [article] directly inside an [article] is not supported, for the
+		 *	reason a stack inside a stack is not: the shortcode reads its content
+		 *	up to the first closing tag.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$args					The arguments made ready by dispatch()
+		 *
+		 *	@return 	string
+		 */
+		public static function componentArticle( array &$appData, array $args ): string {
+
+			$picture		= self::_picture( $appData, $args['background'] );
+			$background	= '';
+
+			if( $picture !== null ) {
+
+				$img = str_replace(
+					[ '[[src]]', '[[width]]', '[[height]]', '[[alt]]' ],
+					[ self::escape( $picture['url'] ), (string) $picture['width'], (string) $picture['height'], '' ],
+					self::$html['img']
+				);
+
+				$background = str_replace(
+					[ '[[focus]]', '[[img]]' ],
+					[ self::_modifier( 'nino-img-focus--', $args['focus'] ), $img ],
+					self::$html['article-bg']
+				);
+			}
+
+			return str_replace(
+				[ '[[ground]]', '[[dim]]', '[[borderless]]', '[[fill]]', '[[vertical]]', '[[align]]', '[[padding]]', '[[class]]', '[[background]]', '[[inner]]' ],
+				[
+					self::_modifier( 'nino-article--', $args['ground'] ),
+					self::_modifier( 'nino-article--', $args['dim'] === '1' ? 'dim' : '' ),
+					self::_modifier( 'nino-article--', $args['borderless'] === '1' ? 'borderless' : '' ),
+					self::_modifier( 'nino-article--', $args['fill'] === '1' ? 'fill' : '' ),
+					self::_modifier( 'nino-article--', $args['vertical'] ),
+					self::_modifier( 'nino-text-', $args['align'] ),
+					self::_modifier( 'nino-p-', $args['padding'] ),
+					self::_modifier( '', $args['class'] ),
+					$background,
+					$args['value'],
+				],
+				self::$html['article']
+			);
+		}
+
+		/**
 		 *	Replace [stack]: a stack of the elements of a type, one cell each,
 		 *	in a grid row nested where the stack stands. The gap is a class of
-		 *	the row, nino-stack-gap-<n>, and the cells carry the widths of 'cols'
+		 *	the row, nino-stack-gap-<n>, and the cells carry the widths of 'cols'.
+		 *	A cell is a div: the cards of a loop are [article]s in its content
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments made ready by dispatch()

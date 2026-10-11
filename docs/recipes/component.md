@@ -101,11 +101,16 @@ The rules the module keeps for you, and the ones it leaves to the renderer:
 - A schema that cannot be worked with is an `E_USER_ERROR` at registration - a
   name that is no slug, an unknown `source` or type, a `select` without options
   or with a default outside them, an attribute without a default.
-- `draws` and `in` are optional and change nothing about the rendering: the tag
-  and the class the renderer draws (`'p .project-countdown'`, with a name in
-  braces for an attribute of the schema) and where a tool offers the component
-  (a list of `section`, `cell` and `hero`). A renderer reads no context, so a
-  component that is drawn another way in another place is another component.
+- `draws`, `in` and `holds` are optional and change nothing about the
+  rendering: the tag and the class the renderer draws (`'p .project-countdown'`,
+  with a name in braces for an attribute of the schema), where a tool offers the
+  component (a list of the places `section`, `card` and `hero`) and, for a
+  component whose source is `content`, the place whose components its content
+  is the calls of (`'holds' => 'card'` is the kernel's `[article]`). A renderer
+  reads no context, so a component that is drawn another way in another place
+  is another component. A container does not render its content itself: the
+  engine renders the output of a shortcode again, so what it returns inside its
+  own markup is rendered when it is - with a stack's element still the context.
 
 ## 2. A stack from the project
 
@@ -134,12 +139,13 @@ public static function stackPeople( array &$appData, array $args ): string {
 `renderStack()` runs the loop of `[elements]` with the same `sort`, `offset`,
 `limit`, `query` and `callback`, renders the content once per element with the
 element as the context, and gives each cell to the function. `grid => true`
-adds `cols`, `gap`, `autoheight` and `article` and passes the cell's classes
-and the card it asks for as the fourth argument;
-`\Nino\Modules\Components::cell()` puts them on the element you draw - a
-`<div>`, or the `<article class="nino-article ...">` of a card where `article`
-says so. Inside the content a component's source is a field of the element
-(`[title name]`). A stack never stands directly inside another.
+adds `cols`, `gap` and `autoheight` and passes the cell's classes and
+attributes as the fourth argument; `\Nino\Modules\Components::cell()` puts
+them on the element you draw - the `<div>` of the cell, which is never a card:
+a card is an `[article]` in the content. Inside the content a component's
+source is a field of the element (`[title name]`). A stack never stands
+directly inside another, and an `[article]` never stands directly inside
+another.
 
 ## 3. A component from a feature
 

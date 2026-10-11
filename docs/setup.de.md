@@ -91,7 +91,7 @@ Keine Wahl und kein Schritt: Die Base-Einheit liefert ein Theme aus, und jedes P
 
 | Datei | Was sie ist |
 |---|---|
-| `assets/theme.css` | das ganze Aussehen in einem Stylesheet: die Design-Token, die Rollen, denen sie zugewiesen sind, die drei Webfaces und die CSS für beide Frames darunter |
+| `assets/theme.css` | das ganze Aussehen in einem Stylesheet: die Design-Token, die Rollen, denen sie zugewiesen sind, die drei Webfaces und die CSS für beide Frames darunter – das, was das Feature **Design** an seinen Vorgaben kompiliert, unter einem Kopf des Kernels |
 | `templates/frame-header.tpl` | der `<header>` der Seite, von `html-header.tpl` über `[template /templates/frame-header]` eingebunden |
 | `templates/frame-footer.tpl` | der `<footer>` der Seite, auf demselben Weg eingebunden |
 
@@ -109,7 +109,7 @@ assets/style.css            das eigene des Projekts, leer ausgeliefert
 
 Setup ergänzt das Bundle unter `/nino/html/assets` um die beiden Projekteinträge, sofern sie noch nicht darin stehen, und hängt an, statt zu ersetzen – was ein Projekt selbst hinzugefügt hat, behält seinen Platz. `assets/style.css` wird einmal leer geschrieben und danach nie wieder angefasst, eine Regel dort überschreibt also alles darüber.
 
-Bis Nino 1.1 hat der Assistent hier vier Fragen gestellt – ein Theme aus einem Katalog von zehn, einen Header und einen Footer aus dreizehn Frames und die daraus kompilierten Design-Werte. Das tut er nicht mehr. Das Aussehen ändert danach das Feature **Design** aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features/blob/main/features/Design/feature.php), das seine eigene `assets/theme.css` und eigene Frame-Templates über die mitgelieferten kompiliert – und fragt, bevor es eine Datei ersetzt, die es nicht selbst geschrieben hat.
+Bis Nino 1.1 hat der Assistent hier vier Fragen gestellt – ein Theme aus einem Katalog von zehn, einen Header und einen Footer aus dreizehn Frames und die daraus kompilierten Design-Werte. Das tut er nicht mehr. Das Aussehen ändert danach das Feature **Design** aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features/blob/main/features/Design/feature.php), das seine eigene `assets/theme.css` und eigene Frame-Templates über die mitgelieferten kompiliert – und fragt, bevor es eine Datei ersetzt, die es nicht selbst geschrieben hat. Die mitgelieferte `assets/theme.css` ist der Body dessen, was dieser Compiler an seinen Vorgaben schreibt, mit jedem Kernel-Release daraus neu erzeugt, sodass das Aussehen, mit dem ein Projekt beginnt, und das erste, das Design kompiliert, eines sind: Die Datei trägt den Kopf des Kernels und keinen Stempel des Compilers, und deshalb fragt Design.
 
 ## 3. Routes
 
