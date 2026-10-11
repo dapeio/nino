@@ -36,18 +36,18 @@ namespace Nino\Modules {
 		public static
 			$html = [
 				'title'				=> '<h[[level]] class="nino-section-title[[style]][[class]]">[[value]]</h[[level]]>',
-				'article-title'	=> '<h[[level]] class="nino-article-title[[style]][[class]]">[[value]]</h[[level]]>',
+				'card-title'	=> '<h[[level]] class="nino-card-title[[style]][[class]]">[[value]]</h[[level]]>',
 				'hero-title'	=> '<h[[level]] class="nino-hero-title[[style]][[class]]">[[value]]</h[[level]]>',
 				'subtitle'		=> '<p class="nino-section-subtitle[[style]][[class]]">[[value]]</p>',
-				'article-subtitle'	=> '<p class="nino-article-subtitle[[style]][[class]]">[[value]]</p>',
+				'card-subtitle'	=> '<p class="nino-card-subtitle[[style]][[class]]">[[value]]</p>',
 				'hero-subtitle'	=> '<p class="nino-hero-subtitle[[style]][[class]]">[[value]]</p>',
 				'text'				=> '<div class="nino-section-text[[richtext]][[style]][[class]]">[[value]]</div>',
 				'img'					=> '<img src="[[src]]" width="[[width]]" height="[[height]]" alt="[[alt]]">',
 				'image'				=> '<div class="nino-image[[ratio]][[focus]][[class]]">[[img]]</div>',
 				'button'			=> '<a class="nino-btn[[style]][[size]][[class]]"[[href]][[target]]>[[value]]</a>',
 				'spacer'			=> '<div class="nino-mt-[[size]][[class]]"></div>',
-				'article'			=> '<article class="nino-article[[ground]][[dim]][[borderless]][[fill]][[vertical]][[align]][[padding]][[class]]">[[background]][[inner]]</article>',
-				'article-bg'		=> '<div class="nino-article-bg[[focus]]">[[img]]</div>',
+				'card'				=> '<article class="nino-card[[ground]][[dim]][[borderless]][[fill]][[vertical]][[align]][[padding]][[class]]">[[background]][[inner]]</article>',
+				'card-bg'			=> '<div class="nino-card-bg[[focus]]">[[img]]</div>',
 				'cell'				=> '<div[[class]][[attributes]]>[[inner]]</div>',
 				'stack'				=> '<div class="nino-grid-row nino-stack[[gap]][[class]]"[[id]]>[[cells]]</div>',
 				'slider'			=> '<div class="nino-slider[[class]]"[[id]][[width]][[min]]><ul>[[cells]]</ul></div>',
@@ -85,8 +85,8 @@ namespace Nino\Modules {
 
 		// Where a component stands, and so where a tool offers it - see validate():
 		// directly in a column of a section (the cell of a stack that holds no
-		// card is such a column), in a card, which is an [article], or directly
-		// in a column of the hero
+		// card is such a column), in a [card], or directly in a column of the
+		// hero
 		public const array PLACES = [ 'section', 'card', 'hero' ];
 
 		// The widths a cell may have in a grid, as Nino.css has them
@@ -103,8 +103,8 @@ namespace Nino\Modules {
 		// the loop of [elements] and the id that filter, autoheight and slider
 		// find a stack by - and, for a stack with a grid, what its cells are:
 		// their widths, the gap between them and whether they are one height.
-		// What a cell looks like is not the stack's business: a card is an
-		// [article] in its content
+		// What a cell looks like is not the stack's business: put a [card] in
+		// its content
 		private const array LOOP = [
 			'sort'				=> [ 'type' => 'string', 'default' => '' ],
 			'offset'			=> [ 'type' => 'int', 'min' => 0, 'default' => 0 ],
@@ -134,8 +134,8 @@ namespace Nino\Modules {
 			$components = [
 				[ 'title', 'Title (Section)', 'Titel (Sektion)', 'title', 'text', self::_titled(), [ 'section' ], 'h{level} .nino-section-title' ],
 				[ 'subtitle', 'Subtitle (Section)', 'Untertitel (Sektion)', 'title', 'text', [ 'style' => self::_style() ], [ 'section' ], 'p .nino-section-subtitle' ],
-				[ 'article-title', 'Title (Article)', 'Titel (Artikel)', 'title', 'text', self::_titled(), [ 'card' ], 'h{level} .nino-article-title' ],
-				[ 'article-subtitle', 'Subtitle (Article)', 'Untertitel (Artikel)', 'title', 'text', [ 'style' => self::_style() ], [ 'card' ], 'p .nino-article-subtitle' ],
+				[ 'card-title', 'Title (Card)', 'Titel (Karte)', 'title', 'text', self::_titled(), [ 'card' ], 'h{level} .nino-card-title' ],
+				[ 'card-subtitle', 'Subtitle (Card)', 'Untertitel (Karte)', 'title', 'text', [ 'style' => self::_style() ], [ 'card' ], 'p .nino-card-subtitle' ],
 				[ 'hero-title', 'Title (Hero)', 'Titel (Hero)', 'title', 'text', self::_titled(), [ 'hero' ], 'h{level} .nino-hero-title' ],
 				[ 'hero-subtitle', 'Subtitle (Hero)', 'Untertitel (Hero)', 'title', 'text', [ 'style' => self::_style() ], [ 'hero' ], 'p .nino-hero-subtitle' ],
 				[ 'text', 'Text', 'Text', 'text', 'text', [
@@ -177,10 +177,10 @@ namespace Nino\Modules {
 
 			// The card is the one component that holds components: what stands between
 			// its tags is the calls of the components of a card, which are rendered
-			// when its output is (see componentArticle()), and 'holds' says so to a
+			// when its output is (see componentCard()), and 'holds' says so to a
 			// tool. It stands once in a column and, in the content of a stack, once
 			// per element
-			self::addComponent( $appData, 'article', [ self::class, 'componentArticle' ], [
+			self::addComponent( $appData, 'card', [ self::class, 'componentCard' ], [
 				'label'				=> [ 'en_US' => 'Card', 'de_DE' => 'Karte' ],
 				'source'			=> 'content',
 				'loop'				=> true,
@@ -206,7 +206,7 @@ namespace Nino\Modules {
 				],
 				'preview'			=> 'block',
 				'in'					=> [ 'section', 'hero' ],
-				'draws'				=> 'article .nino-article',
+				'draws'				=> 'article .nino-card',
 				'holds'				=> 'card',
 			] );
 
@@ -977,9 +977,9 @@ namespace Nino\Modules {
 		 *	and its group if 'autoheight' is set; without, nothing. The cell
 		 *	function dresses it, and puts those on the element it draws as
 		 *	the cell - cell() does that. The cell is the grid's and nothing
-		 *	more: a card is an [article] in the content of the stack, which is
-		 *	rendered here, so that the card is drawn once per element with
-		 *	the element as its context.
+		 *	more: a card is drawn by a [card] in the content of the stack,
+		 *	which is rendered here, so that the card is drawn once per element
+		 *	with the element as its context.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					What a stack's callback is given: source (the type's uri),
@@ -1099,7 +1099,7 @@ namespace Nino\Modules {
 		 *	One cell of a stack as an element: the dressing renderStack() hands
 		 *	the cell function, a class and attributes of the cell function's
 		 *	own added to it. The element is a div, the slot of the grid, and
-		 *	nothing else: a card is an [article] in what the cell holds
+		 *	nothing else: a card is drawn by a [card] in what the cell holds
 		 *
 		 *	@param		array			$cell					The last argument of the cell function
 		 *	@param		string		$inner				The rendered content
@@ -1165,15 +1165,15 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	Replace [article-title]: the heading of a card
+		 *	Replace [card-title]: the heading of a card
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments made ready by dispatch()
 		 *
 		 *	@return 	string
 		 */
-		public static function componentArticleTitle( array &$appData, array $args ): string {
-			return self::_title( 'article-title', 'nino-article-title--', $args );
+		public static function componentCardTitle( array &$appData, array $args ): string {
+			return self::_title( 'card-title', 'nino-card-title--', $args );
 		}
 
 		/**
@@ -1201,15 +1201,15 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	Replace [article-subtitle]: the line under the heading of a card
+		 *	Replace [card-subtitle]: the line under the heading of a card
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments made ready by dispatch()
 		 *
 		 *	@return 	string
 		 */
-		public static function componentArticleSubtitle( array &$appData, array $args ): string {
-			return self::_title( 'article-subtitle', 'nino-article-subtitle--', $args );
+		public static function componentCardSubtitle( array &$appData, array $args ): string {
+			return self::_title( 'card-subtitle', 'nino-card-subtitle--', $args );
 		}
 
 		/**
@@ -1421,12 +1421,12 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	Replace [article]: the card, a component that holds components. What
-		 *	stands between its tags is the calls of the components of a card, and
-		 *	this draws the <article> around them: its ground, its padding, whether
-		 *	it takes the whole height of its column or cell, where its content
-		 *	stands in it, a picture behind the content, its border, and a class of
-		 *	its own. It stands once in a column - a card beside a picture - and in
+		 *	Replace [card]: a component that holds components. What stands
+		 *	between its tags is the calls of the components of a card, and this
+		 *	draws the <article> around them: its ground, its padding, whether it
+		 *	takes the whole height of its column or cell, where its content stands
+		 *	in it, a picture behind the content, its border, and a class of its
+		 *	own. It stands once in a column - a card beside a picture - and in
 		 *	the content of a stack once per element: the cards of a loop.
 		 *
 		 *	The content is $args['value'] as it is, and it is not rendered here.
@@ -1449,7 +1449,7 @@ namespace Nino\Modules {
 		 *	class it is told to: a dim without a picture is the author's mistake
 		 *	and a builder's business, as the dim of a column is.
 		 *
-		 *	An [article] directly inside an [article] is not supported, for the
+		 *	A [card] directly inside a [card] is not supported, for the
 		 *	reason a stack inside a stack is not: the shortcode reads its content
 		 *	up to the first closing tag.
 		 *
@@ -1458,7 +1458,7 @@ namespace Nino\Modules {
 		 *
 		 *	@return 	string
 		 */
-		public static function componentArticle( array &$appData, array $args ): string {
+		public static function componentCard( array &$appData, array $args ): string {
 
 			$picture		= self::_picture( $appData, $args['background'] );
 			$background	= '';
@@ -1474,25 +1474,25 @@ namespace Nino\Modules {
 				$background = str_replace(
 					[ '[[focus]]', '[[img]]' ],
 					[ self::_modifier( 'nino-img-focus--', $args['focus'] ), $img ],
-					self::$html['article-bg']
+					self::$html['card-bg']
 				);
 			}
 
 			return str_replace(
 				[ '[[ground]]', '[[dim]]', '[[borderless]]', '[[fill]]', '[[vertical]]', '[[align]]', '[[padding]]', '[[class]]', '[[background]]', '[[inner]]' ],
 				[
-					self::_modifier( 'nino-article--', $args['ground'] ),
-					self::_modifier( 'nino-article--', $args['dim'] === '1' ? 'dim' : '' ),
-					self::_modifier( 'nino-article--', $args['borderless'] === '1' ? 'borderless' : '' ),
-					self::_modifier( 'nino-article--', $args['fill'] === '1' ? 'fill' : '' ),
-					self::_modifier( 'nino-article--', $args['vertical'] ),
+					self::_modifier( 'nino-card--', $args['ground'] ),
+					self::_modifier( 'nino-card--', $args['dim'] === '1' ? 'dim' : '' ),
+					self::_modifier( 'nino-card--', $args['borderless'] === '1' ? 'borderless' : '' ),
+					self::_modifier( 'nino-card--', $args['fill'] === '1' ? 'fill' : '' ),
+					self::_modifier( 'nino-card--', $args['vertical'] ),
 					self::_modifier( 'nino-text-', $args['align'] ),
 					self::_modifier( 'nino-p-', $args['padding'] ),
 					self::_modifier( '', $args['class'] ),
 					$background,
 					$args['value'],
 				],
-				self::$html['article']
+				self::$html['card']
 			);
 		}
 
@@ -1500,7 +1500,7 @@ namespace Nino\Modules {
 		 *	Replace [stack]: a stack of the elements of a type, one cell each,
 		 *	in a grid row nested where the stack stands. The gap is a class of
 		 *	the row, nino-stack-gap-<n>, and the cells carry the widths of 'cols'.
-		 *	A cell is a div: the cards of a loop are [article]s in its content
+		 *	A cell is a div: the cards of a loop are [card]s in its content
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments made ready by dispatch()

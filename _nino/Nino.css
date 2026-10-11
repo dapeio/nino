@@ -181,9 +181,9 @@
 		accent, focus, border). The framework alone sets them; a theme never
 		writes one:
 			--counter-grid-*        what a .nino-grid--counter becomes
-			--counter-grid-next-*   what a .nino-article--counter in a
+			--counter-grid-next-*   what a .nino-card--counter in a
 			                        .nino-grid--counter becomes
-			--counter-card-*        what a .nino-article--counter becomes
+			--counter-card-*        what a .nino-card--counter becomes
 		These are the page's, whose ground is default: a column stands out of it
 		as alt and a card in that column as default again, a card straight on the
 		page as alt. A section answers for its own ground, a column with a ground
@@ -229,7 +229,7 @@
 	/*	The rest of the five font roles - a weight, a transform and a size each;
 		with the family above that is everything a rule in this file reads of a
 		role. The title role is read by .nino-section-title,
-		.nino-article-title and .nino-hero-title, and its weight and transform
+		.nino-card-title and .nino-hero-title, and its weight and transform
 		by every h1 to h6 as well: a heading without a class keeps the face of
 		the text and the size the browser gives it. The subtitle role is read
 		by the three subtitles, the text role by the page (size, weight and
@@ -288,17 +288,17 @@
 
 	/*	What a design layer scales without choosing a size. The hero takes the
 		size of the title and of the subtitle role times a number of its own,
-		and so does an article title - the size of the title role times 5 / 6,
+		and so does a card title - the size of the title role times 5 / 6,
 		because it stood on --text-3 where the other titles stand on --text-4.
 		Each is another number from 768px, where the scale above steps up (see
-		below). The --quiet and --loud variants of a section, an article and a
-		hero are the size of the class they vary - the role, and for an article
+		below). The --quiet and --loud variants of a section, a card and a
+		hero are the size of the class they vary - the role, and for a card
 		title and a hero the role times its number - times --scale-quiet or
 		--scale-loud: a title that is made larger has a quiet and a loud
 		variant that follow it.	*/
 	--hero-title-scale: 1.2;
 	--hero-text-scale: 1.2;
-	--article-title-scale: calc(5 / 6);
+	--card-title-scale: calc(5 / 6);
 	--scale-quiet: .85;
 	--scale-loud: 1.2;
 
@@ -309,8 +309,8 @@
 	--space-5: 5rem;
 	--space-6: 8rem;
 
-	--article-img-max-width: 12vw;
-	--article-img-max-height: 20vh;
+	--card-img-max-width: 12vw;
+	--card-img-max-height: 20vh;
 	--grid-max-width: 120rem;
 	/*	The space between the viewport and a row - the row's own padding, which
 		is one step wider from 768px (see below)	*/
@@ -321,8 +321,8 @@
 		is exactly what the Design feature's raster publishes as --nino-radius-1 to -3,
 		so the framework's own radii and the generated ones are one ladder */
 	--radius-large: .4rem;
-	/*	The shadow of a card: .nino-article and .nino-pricing-item read it, and
-		it is none until a design layer gives a card one. A borderless article
+	/*	The shadow of a card: .nino-card and .nino-pricing-item read it, and
+		it is none until a design layer gives a card one. A borderless card
 		has none, and the middle card of .nino-pricing-row--feature-middle and
 		the toast keep the shadows they have	*/
 	--shadow-card: none;
@@ -335,7 +335,7 @@
     --text-6: calc(var(--font-text-size) * 3);
 		--hero-title-scale: 1.25;
 		--hero-text-scale: calc(10 / 9);
-		--article-title-scale: calc(25 / 32);
+		--card-title-scale: calc(25 / 32);
 		--grid-gutter: var(--space-3);
   }
 }
@@ -480,25 +480,25 @@ pre {
 	length ends the chain, so a code in such an element had the size of that
 	element. The kernel's sized classes for text, titles, prices, counts and
 	labels are such elements - the text and the description, the titles and the
-	subtitles of a section, an article and a hero, and the title and the price
-	of the pricing table, each with its --quiet and --loud, the price of an
-	article, the stat counter, the message of a form, the button and the filter
+	subtitles of a section, a card and a hero, and the title and the price
+	of the pricing table, each with its --quiet and --loud, the price of a
+	card, the stat counter, the message of a form, the button and the filter
 	button - so a code in one of them says 1em, and is not made 13px beside 16,
 	19.5px beside 24 or 11.4px beside 14. :where() adds no specificity: the
 	rule is as specific as the one above and wins by coming after it, and a
 	class with a size of its own (.nino-code) wins over both	*/
 :where(
 	.nino-section-text, .nino-section-text--quiet, .nino-section-text--loud,
-	.nino-article-descr, .nino-article-descr--quiet, .nino-article-descr--loud,
+	.nino-card-descr, .nino-card-descr--quiet, .nino-card-descr--loud,
 	.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud,
-	.nino-article-title, .nino-article-title--quiet, .nino-article-title--loud,
+	.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud,
 	.nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud,
 	.nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud,
-	.nino-article-subtitle, .nino-article-subtitle--quiet, .nino-article-subtitle--loud,
+	.nino-card-subtitle, .nino-card-subtitle--quiet, .nino-card-subtitle--loud,
 	.nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud,
 	.nino-pricing-title, .nino-pricing-title--quiet, .nino-pricing-title--loud,
 	.nino-pricing-price, .nino-pricing-price--quiet, .nino-pricing-price--loud,
-	.nino-article-price, .nino-stat-counter, .nino-form-message,
+	.nino-card-price, .nino-stat-counter, .nino-form-message,
 	.nino-btn, .nino-filter-btn
 ) :is(code, kbd, samp, pre):not(:is(code, kbd, samp, pre) *) {
 	font-size: 1em;
@@ -515,7 +515,7 @@ p {
 
 /*	A heading takes two things of the title role, its weight and its
 	transform. Its family and its size are the title classes' own
-	(.nino-section-title, .nino-article-title, .nino-hero-title): a heading
+	(.nino-section-title, .nino-card-title, .nino-hero-title): a heading
 	with no class has always had the face of the text and the size of the
 	browser, and keeps both. The weight is not on the classes because a title
 	class on a p - the catalogue shows them so - has never been bold	*/
@@ -682,7 +682,7 @@ h1, h2, h3, h4, h5, h6 {
 /*	A card in a cell takes no margin of its own: the half gap of its cell is the
 	room between neighbours, and the stack's edges are the column's. A card's own
 	margins are for a card that stands in a column	*/
-.nino-stack > * > .nino-article { margin: 0; }
+.nino-stack > * > .nino-card { margin: 0; }
 .nino-stack > * > .nino-btn { justify-self: start; }
 /*	The cells of a stack are one below the other on a phone. The classes of the
 	grid are the only width a cell has, and the three widths of a stack start at
@@ -871,7 +871,7 @@ body.nino-scroll-down .nino-scroll-header {
  *			.nino-hero(--fullscreen), .nino-hero(-title, -subtitle, -arrowdown)
  *			.nino-section(--alt, --tint, --dark, --black, --primary, --brand-alt, --fullwidth, --border-1/2/3), .nino-section(-title, -subtitle)
  *			.nino-grid(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim)
- *			.nino-article(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim, --fill, --middle, --bottom, --last-bottom, --fullwidth), .nino-article(-content, -title, -subtitle, -descr, -img, -price, -bg)
+ *			.nino-card(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim, --fill, --middle, --bottom, --last-bottom, --fullwidth), .nino-card(-content, -title, -subtitle, -descr, -img, -price, -bg)
  *
  *
  ****************************************************************************************************/
@@ -964,7 +964,7 @@ body.nino-scroll-down .nino-scroll-header {
 }
 /*	Grounds. A section, a column and a card paint a ground with the same
 	words - alt, tint, dark, black, primary and brand-alt, written
-	.nino-section--<x>, .nino-grid--<x> and .nino-article--<x> - and a column
+	.nino-section--<x>, .nino-grid--<x> and .nino-card--<x> - and a column
 	and a card may also ask for the counter ground, below. A ground is a
 	surface, the ink solved for it and the roles solved against the pair: it
 	paints itself with the first two and hands all of them to what stands in
@@ -974,14 +974,14 @@ body.nino-scroll-down .nino-scroll-header {
 	--color-border are the roles that follow it, and a rule that reads one of
 	them is right on every ground. Nothing compares the ground of a thing
 	with the ground it sits on - there is no .nino-section--alt
-	.nino-article--alt - and an author who names a ground twice gets it
+	.nino-card--alt - and an author who names a ground twice gets it
 	twice. That goes for what is written on a ground as well: the title and
 	the subtitle of a section and of a hero read --color-title and
 	--color-subtitle, the outline button --color-accent, and the filter button
 	and the arrow of a hero take the ink the ground paints. No rule of a
 	section stands above them, because it would reach past a column or a card
 	of another ground in between and write the ink of the section on it.	*/
-.nino-section--dark, .nino-grid--dark, .nino-article--dark {
+.nino-section--dark, .nino-grid--dark, .nino-card--dark {
 	--color-ground: var(--color-section-dark-bg);
 	--color-ink: var(--color-section-dark-text);
 	--color-title: var(--color-section-dark-text);
@@ -992,7 +992,7 @@ body.nino-scroll-down .nino-scroll-header {
 	background-color: var(--color-ground);
 	color: var(--color-ink);
 }
-.nino-section--black, .nino-grid--black, .nino-article--black {
+.nino-section--black, .nino-grid--black, .nino-card--black {
 	--color-ground: var(--color-section-black-bg);
 	--color-ink: var(--color-section-black-text);
 	--color-title: var(--color-section-black-text);
@@ -1007,7 +1007,7 @@ body.nino-scroll-down .nino-scroll-header {
 	the ink solved for it, and that ink is also what a title, a link and a
 	ring on them are: an accent solved against a page would not clear the
 	target on a brand surface	*/
-.nino-section--primary, .nino-grid--primary, .nino-article--primary {
+.nino-section--primary, .nino-grid--primary, .nino-card--primary {
 	--color-ground: var(--color-primary);
 	--color-ink: var(--color-primary-text);
 	--color-title: var(--color-primary-text);
@@ -1018,7 +1018,7 @@ body.nino-scroll-down .nino-scroll-header {
 	background-color: var(--color-ground);
 	color: var(--color-ink);
 }
-.nino-section--alt, .nino-grid--alt, .nino-article--alt {
+.nino-section--alt, .nino-grid--alt, .nino-card--alt {
 	--color-ground: var(--color-section-alt-bg);
 	--color-ink: var(--color-section-alt-text);
 	--color-title: var(--color-section-alt-text);
@@ -1029,7 +1029,7 @@ body.nino-scroll-down .nino-scroll-header {
 	background-color: var(--color-ground);
 	color: var(--color-ink);
 }
-.nino-section--tint, .nino-grid--tint, .nino-article--tint {
+.nino-section--tint, .nino-grid--tint, .nino-card--tint {
 	--color-ground: var(--color-section-tint-bg);
 	--color-ink: var(--color-section-tint-text);
 	--color-title: var(--color-section-tint-text);
@@ -1040,7 +1040,7 @@ body.nino-scroll-down .nino-scroll-header {
 	background-color: var(--color-ground);
 	color: var(--color-ink);
 }
-.nino-section--brand-alt, .nino-grid--brand-alt, .nino-article--brand-alt {
+.nino-section--brand-alt, .nino-grid--brand-alt, .nino-card--brand-alt {
 	--color-ground: var(--color-brand-alt);
 	--color-ink: var(--color-brand-alt-text);
 	--color-title: var(--color-brand-alt-text);
@@ -1059,7 +1059,7 @@ body.nino-scroll-down .nino-scroll-header {
 	page: a card of the alt surface on it reads worse than the page's own,
 	and default is what an alt card on a tint section has always become. A
 	column and a card ask for it by name, .nino-grid--counter and
-	.nino-article--counter, and nothing is told which ground they sit on: the
+	.nino-card--counter, and nothing is told which ground they sit on: the
 	answer travels in the three families of :root, one property for each part
 	of a ground. A section sets them to the counter of its own ground (grid,
 	card) and to the counter of that (grid-next); a column with a ground sets
@@ -1354,7 +1354,7 @@ body.nino-scroll-down .nino-scroll-header {
 
 /*	--quiet and --loud are the size of the class they vary, smaller and larger,
  *	per class: the size of the title role for a section title, of the subtitle
- *	role for a subtitle, of the text role for the text - and for an article
+ *	role for a subtitle, of the text role for the text - and for a card
  *	title and a hero the size their base class has - times --scale-quiet or
  *	--scale-loud (.85 and 1.2). Each states its own size rather than scaling
  *	with em: an em font-size replaces the size the class sets for itself
@@ -1414,14 +1414,14 @@ body.nino-scroll-down .nino-scroll-header {
 	.nino-section--fullheight { padding-top: 0; padding-bottom: 0; }
 }
 
-.nino-article {
+.nino-card {
 	margin: 0 0 var(--space-1);
 	padding: 0 0 var(--space-1);
 	box-sizing: border-box;
 	border-radius: var(--radius-small);
 	box-shadow: var(--shadow-card);
 }
-.nino-article--fullwidth, .nino-article--fullwidth:is(.nino-article--alt, .nino-article--tint, .nino-article--dark, .nino-article--black, .nino-article--primary, .nino-article--brand-alt, .nino-article--counter, .nino-article--dim) {
+.nino-card--fullwidth, .nino-card--fullwidth:is(.nino-card--alt, .nino-card--tint, .nino-card--dark, .nino-card--black, .nino-card--primary, .nino-card--brand-alt, .nino-card--counter, .nino-card--dim) {
 	padding-left: 0;
 	padding-right: 0;
 	padding-top: 0;
@@ -1434,20 +1434,20 @@ body.nino-scroll-down .nino-scroll-header {
 	the one it sits on, and with nothing it works out by looking at that one:
 	an alt card in an alt section is alt on alt, and a card that wants to
 	stand out of its section says so with counter	*/
-.nino-article--alt, .nino-article--tint, .nino-article--dark, .nino-article--black, .nino-article--primary, .nino-article--brand-alt, .nino-article--counter, .nino-article--dim {
+.nino-card--alt, .nino-card--tint, .nino-card--dark, .nino-card--black, .nino-card--primary, .nino-card--brand-alt, .nino-card--counter, .nino-card--dim {
 	border: 1px solid var(--color-border);
 	padding: var(--space-1);
 }
-.nino-article--borderless { border: 0; background: transparent; box-shadow: none; }
+.nino-card--borderless { border: 0; background: transparent; box-shadow: none; }
 /*	After the borderless card: a card that names a ground is painted with it also
 	when it has no border, as the card that stepped out of its section by itself
 	always was. The fill is what it stands out with and what its ink was solved
 	for; a border is not what it needs. A borderless card of no ground stays
 	transparent. The six grounds set the pair above, the counter ground below	*/
-.nino-article--alt, .nino-article--tint, .nino-article--dark, .nino-article--black, .nino-article--primary, .nino-article--brand-alt, .nino-article--counter {
+.nino-card--alt, .nino-card--tint, .nino-card--dark, .nino-card--black, .nino-card--primary, .nino-card--brand-alt, .nino-card--counter {
 	background-color: var(--color-ground);
 }
-.nino-article--counter {
+.nino-card--counter {
 	--color-ground: var(--counter-card-bg);
 	--color-ink: var(--counter-card-text);
 	--color-title: var(--counter-card-title);
@@ -1470,7 +1470,7 @@ body.nino-scroll-down .nino-scroll-header {
 	ground: it is in the list of the rule that gives them, as .nino-grid--dim is
 	in the column's, and without them a dimmed card below 768px writes its title
 	flush against the edge of the dark card	*/
-.nino-article--dim {
+.nino-card--dim {
 	--color-ground: var(--color-section-dark-bg);
 	--color-ink: var(--color-section-dark-text);
 	--color-title: var(--color-section-dark-text);
@@ -1483,21 +1483,21 @@ body.nino-scroll-down .nino-scroll-header {
 	color: var(--color-ink);
 }
 
-.nino-article-content {
+.nino-card-content {
 	padding: var(--space-1) var(--space-2);
 	padding-top: var(--space-1);
 	box-sizing: border-box;
 }
 
-.nino-article-title {
+.nino-card-title {
 	font-family: var(--fontfamily-title);
 	text-transform: var(--font-title-transform);
 	color: var(--color-title);
-	font-size: calc( var(--font-title-size) * var(--article-title-scale) );
+	font-size: calc( var(--font-title-size) * var(--card-title-scale) );
 	margin-bottom: var(--space-2);
 }
 
-.nino-article-subtitle {
+.nino-card-subtitle {
 	font-family: var(--fontfamily-subtitle);
 	font-size: var(--font-subtitle-size);
 	font-weight: var(--font-subtitle-weight);
@@ -1505,13 +1505,13 @@ body.nino-scroll-down .nino-scroll-header {
 	margin-bottom: var(--space-2);
 }
 
-.nino-article-descr {
+.nino-card-descr {
 	font-size: var(--text-1);
 	line-height: var(--line-height);
 	margin-bottom: var(--space-2);
 }
 
-.nino-article-img {
+.nino-card-img {
 	height: auto;
 	width: 100%;
 	object-fit: cover;
@@ -1521,71 +1521,71 @@ body.nino-scroll-down .nino-scroll-header {
 }
 
 
-.nino-article-title--quiet { font-size: calc( var(--font-title-size) * var(--article-title-scale) * var(--scale-quiet) ); opacity: .8; }
-.nino-article-title--loud { font-size: calc( var(--font-title-size) * var(--article-title-scale) * var(--scale-loud) ); line-height: calc( var(--font-title-size) * var(--article-title-scale) * var(--scale-loud) *1.3 ); }
-.nino-article-subtitle--quiet { font-size: calc( var(--font-subtitle-size) * var(--scale-quiet) ); opacity: .7; }
-.nino-article-subtitle--loud { font-size: calc( var(--font-subtitle-size) * var(--scale-loud) ); }
-.nino-article-descr--quiet { font-size: calc( var(--font-text-size) * var(--scale-quiet) ); opacity: .8; }
-.nino-article-descr--loud { font-size: calc( var(--font-text-size) * var(--scale-loud) ); line-height: calc( var(--font-text-size) * var(--scale-loud) *1.4 ); }
+.nino-card-title--quiet { font-size: calc( var(--font-title-size) * var(--card-title-scale) * var(--scale-quiet) ); opacity: .8; }
+.nino-card-title--loud { font-size: calc( var(--font-title-size) * var(--card-title-scale) * var(--scale-loud) ); line-height: calc( var(--font-title-size) * var(--card-title-scale) * var(--scale-loud) *1.3 ); }
+.nino-card-subtitle--quiet { font-size: calc( var(--font-subtitle-size) * var(--scale-quiet) ); opacity: .7; }
+.nino-card-subtitle--loud { font-size: calc( var(--font-subtitle-size) * var(--scale-loud) ); }
+.nino-card-descr--quiet { font-size: calc( var(--font-text-size) * var(--scale-quiet) ); opacity: .8; }
+.nino-card-descr--loud { font-size: calc( var(--font-text-size) * var(--scale-loud) ); line-height: calc( var(--font-text-size) * var(--scale-loud) *1.4 ); }
 
-.nino-article-img--maxheight {
-	max-height: var(--article-img-max-height);
+.nino-card-img--maxheight {
+	max-height: var(--card-img-max-height);
 }
-.nino-article--fullwidth .nino-article-img {
+.nino-card--fullwidth .nino-card-img {
 	border-radius:var(--radius-small) var(--radius-small) 0 0;
 }
-.nino-section--fullheight .nino-article-content {
+.nino-section--fullheight .nino-card-content {
 	padding: var(--space-4) var(--space-2) var(--space-3);
 }
-/* Price display for an .nino-article used as a product/service card - distinct
+/* Price display for a .nino-card that presents a product or a service - distinct
    from .nino-pricing-price (used inside .nino-pricing-item, see 05 Helper), for
-   when a priced item is presented as a regular article-grid card instead of
+   when a priced item is presented as a regular card of a grid instead of
    a dedicated pricing table */
-.nino-article-price {
+.nino-card-price {
 	text-align:center;
 	font-size: 2rem;
 	font-weight: bold;
 	color: var(--color-accent);
 }
 
-/* Multi-column layout, one breakpoint tier at a time (eg. nino-article-cols-m
+/* Multi-column layout, one breakpoint tier at a time (eg. nino-card-cols-m
    only switches to a row layout from the "m" breakpoint up) */
-.nino-article-cols {
+.nino-card-cols {
 	display: flex;
 	flex-direction: row;
 	justify-content: center;
 	column-gap: var(--space-2);
 }
-.nino-article-cols > .nino-article-img {
+.nino-card-cols > .nino-card-img {
 	max-height: none;
-	max-width: var(--article-img-max-width);
+	max-width: var(--card-img-max-width);
 }
 
 @media (min-width: 640px) {
-	.nino-article-cols-s { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
-	.nino-article-cols-s > .nino-article-img { max-height: none; max-width: var(--article-img-max-width); }
+	.nino-card-cols-s { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
+	.nino-card-cols-s > .nino-card-img { max-height: none; max-width: var(--card-img-max-width); }
 }
 @media (min-width: 768px) {
-	.nino-article { margin: var(--space-1); padding: var(--space-1); }
-	/* nino-article adds horizontal card margins from here on. Account for those
-	   gutters when the article itself is also the grid column */
-	.nino-article--grid.nino-grid-m-25 { width: calc(25% - var(--space-1) - var(--space-1)); }
-	.nino-article--grid.nino-grid-m-33 { width: calc((100% / 3) - var(--space-1) - var(--space-1)); }
-	.nino-article--grid.nino-grid-m-50 { width: calc(50% - var(--space-1) - var(--space-1)); }
-	.nino-article-cols-m { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
-	.nino-article-cols-m > .nino-article-img { max-height: none; max-width: var(--article-img-max-width); }
+	.nino-card { margin: var(--space-1); padding: var(--space-1); }
+	/* nino-card adds horizontal margins from here on. Account for those
+	   gutters when the card itself is also the grid column */
+	.nino-card--grid.nino-grid-m-25 { width: calc(25% - var(--space-1) - var(--space-1)); }
+	.nino-card--grid.nino-grid-m-33 { width: calc((100% / 3) - var(--space-1) - var(--space-1)); }
+	.nino-card--grid.nino-grid-m-50 { width: calc(50% - var(--space-1) - var(--space-1)); }
+	.nino-card-cols-m { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
+	.nino-card-cols-m > .nino-card-img { max-height: none; max-width: var(--card-img-max-width); }
 }
 @media (min-width: 1024px) {
-	.nino-article-cols-l { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
-	.nino-article-cols-l > .nino-article-img { max-height: none; max-width: var(--article-img-max-width); }
+	.nino-card-cols-l { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
+	.nino-card-cols-l > .nino-card-img { max-height: none; max-width: var(--card-img-max-width); }
 }
 @media (min-width: 1280px) {
-	.nino-article { padding: var(--space-2); }
-	.nino-article--wide { padding: var(--space-1); }
-	.nino-article--fullwidth { padding:0; }
-	.nino-article--fullwidth .nino-article-content { padding: var(--space-1) var(--space-2); }
-	.nino-article-cols-xl { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
-	.nino-article-cols-xl > .nino-article-img { max-height: none; max-width: var(--article-img-max-width); }
+	.nino-card { padding: var(--space-2); }
+	.nino-card--wide { padding: var(--space-1); }
+	.nino-card--fullwidth { padding:0; }
+	.nino-card--fullwidth .nino-card-content { padding: var(--space-1) var(--space-2); }
+	.nino-card-cols-xl { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
+	.nino-card-cols-xl > .nino-card-img { max-height: none; max-width: var(--card-img-max-width); }
 }
 
 /*	A card as tall as the column or the cell it stands in, so that the cards of one
@@ -1602,9 +1602,9 @@ body.nino-scroll-down .nino-scroll-header {
 	or the bottom does not stretch its columns, and a card that fills one has
 	nothing to fill. nino-autoheight on the cells of a stack makes the slots of
 	different rows one height; the card fills its slot, whatever height that is	*/
-.nino-article--fill { height: 100%; margin: 0; }
-.nino-stack > :has(> .nino-article--fill),
-.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)):has(> .nino-article--fill) {
+.nino-card--fill { height: 100%; margin: 0; }
+.nino-stack > :has(> .nino-card--fill),
+.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)):has(> .nino-card--fill) {
 	align-content: stretch;
 }
 
@@ -1617,16 +1617,16 @@ body.nino-scroll-down .nino-scroll-header {
 	spacer keeps its whole top margin, and two buttons that stood side by side stand
 	one under the other. A flex item is stretched over the column; a button is as wide
 	as its label and sits where the text does, as in the stack above	*/
-.nino-article--middle, .nino-article--bottom, .nino-article--last-bottom {
+.nino-card--middle, .nino-card--bottom, .nino-card--last-bottom {
 	display: flex;
 	flex-direction: column;
 }
-.nino-article--middle { justify-content: center; }
-.nino-article--bottom { justify-content: flex-end; }
-.nino-article--last-bottom > :last-child { margin-top: auto; }
-:is(.nino-article--middle, .nino-article--bottom, .nino-article--last-bottom) > .nino-btn { align-self: flex-start; }
-:is(.nino-article--middle, .nino-article--bottom, .nino-article--last-bottom).nino-text-center > .nino-btn { align-self: center; }
-:is(.nino-article--middle, .nino-article--bottom, .nino-article--last-bottom).nino-text-right > .nino-btn { align-self: flex-end; }
+.nino-card--middle { justify-content: center; }
+.nino-card--bottom { justify-content: flex-end; }
+.nino-card--last-bottom > :last-child { margin-top: auto; }
+:is(.nino-card--middle, .nino-card--bottom, .nino-card--last-bottom) > .nino-btn { align-self: flex-start; }
+:is(.nino-card--middle, .nino-card--bottom, .nino-card--last-bottom).nino-text-center > .nino-btn { align-self: center; }
+:is(.nino-card--middle, .nino-card--bottom, .nino-card--last-bottom).nino-text-right > .nino-btn { align-self: flex-end; }
 
 
 /****************************************************************************************************
@@ -3130,7 +3130,7 @@ header .nino-headernav-logo:empty {
 	height: 100%;
 	object-fit: cover;
 }
-:has(> .nino-grid-bg, > .nino-article-bg) {
+:has(> .nino-grid-bg, > .nino-card-bg) {
 	position: relative;
 	isolation: isolate;
 }
@@ -3147,20 +3147,20 @@ header .nino-headernav-logo:empty {
 	the whole card and is cut at its corners, and the picture covers it. --dim
 	darkens it with the scrim of a dimmed cover, and the card writes in the ink of
 	the dark ground	*/
-.nino-article-bg {
+.nino-card-bg {
 	position: absolute;
 	inset: 0;
 	overflow: hidden;
 	border-radius: inherit;
 	z-index: -1;
 }
-.nino-article-bg > img {
+.nino-card-bg > img {
 	display: block;
 	width: 100%;
 	height: 100%;
 	object-fit: cover;
 }
-.nino-article--dim > .nino-article-bg::after {
+.nino-card--dim > .nino-card-bg::after {
 	content: '';
 	position: absolute;
 	inset: 0;

@@ -106,7 +106,7 @@ The rules the module keeps for you, and the ones it leaves to the renderer:
   with a name in braces for an attribute of the schema), where a tool offers the
   component (a list of the places `section`, `card` and `hero`) and, for a
   component whose source is `content`, the place whose components its content
-  is the calls of (`'holds' => 'card'` is the kernel's `[article]`). A renderer
+  is the calls of (`'holds' => 'card'` is the kernel's `[card]`). A renderer
   reads no context, so a component that is drawn another way in another place
   is another component. A container does not render its content itself: the
   engine renders the output of a shortcode again, so what it returns inside its
@@ -142,9 +142,9 @@ element as the context, and gives each cell to the function. `grid => true`
 adds `cols`, `gap` and `autoheight` and passes the cell's classes and
 attributes as the fourth argument; `\Nino\Modules\Components::cell()` puts
 them on the element you draw - the `<div>` of the cell, which is never a card:
-a card is an `[article]` in the content. Inside the content a component's
+a card is a `[card]` in the content. Inside the content a component's
 source is a field of the element (`[title name]`). A stack never stands
-directly inside another, and an `[article]` never stands directly inside
+directly inside another, and a `[card]` never stands directly inside
 another.
 
 ## 3. A component from a feature

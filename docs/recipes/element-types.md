@@ -212,15 +212,15 @@ lowercase hyphenated IDs.
 
 ```html
 [elements /services limit="6" query="featured=1"]
-<article id="service-[[.id]]" class="nino-article">
+<article id="service-[[.id]]" class="nino-card">
 	<img
-		class="nino-article-img"
+		class="nino-card-img"
 		src="[[/nino/public]]/images/[[image]]"
 		alt="[[imageAlt]]"
 	>
-	<div class="nino-article-content">
-		<h2 class="nino-article-title">[[title]]</h2>
-		<div class="nino-article-descr">[[description]]</div>
+	<div class="nino-card-content">
+		<h2 class="nino-card-title">[[title]]</h2>
+		<div class="nino-card-descr">[[description]]</div>
 		<a class="nino-btn nino-btn--primary" href="[[link]]">
 			[[linkLabel]]
 		</a>

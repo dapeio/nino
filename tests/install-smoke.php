@@ -653,9 +653,9 @@ check( 'the home, contact and 404 pages carry the hero classes where they carrie
 // ...and the page that draws every class of Nino.css draws those of the hero, of the three levels of grounds, the pictures of a column and of a
 // card and the two variants of the subtitle of a card: a prefix each, with the number of classes it finds, so that a class added under one of
 // them is one the page has to be given
-$demoPrefixes	= [ 'nino-hero' => 9, 'nino-grid--' => 10, 'nino-article--' => 16, 'nino-grid-bg' => 1, 'nino-article-bg' => 1, 'nino-article-subtitle--' => 2 ];
-$demoNames		= [ 'nino-hero' => 'nine hero classes', 'nino-grid--' => 'ten modifiers of a column', 'nino-article--' => 'sixteen modifiers of a card', 'nino-grid-bg' => 'picture of a column',
-	'nino-article-bg' => 'picture of a card', 'nino-article-subtitle--' => 'two variants of the subtitle of a card' ];
+$demoPrefixes	= [ 'nino-hero' => 9, 'nino-grid--' => 10, 'nino-card--' => 16, 'nino-grid-bg' => 1, 'nino-card-bg' => 1, 'nino-card-subtitle--' => 2 ];
+$demoNames		= [ 'nino-hero' => 'nine hero classes', 'nino-grid--' => 'ten modifiers of a column', 'nino-card--' => 'sixteen modifiers of a card', 'nino-grid-bg' => 'picture of a column',
+	'nino-card-bg' => 'picture of a card', 'nino-card-subtitle--' => 'two variants of the subtitle of a card' ];
 preg_match_all( '/class="([^"]*)"/', (string) file_get_contents( __DIR__. '/../_admin/install/library/pages/.demo-catalogue/templates/.demo-catalogue.tpl' ), $demoClasses );
 $demoDrawn = [];
 foreach( $demoClasses[1] as $demoAttribute )

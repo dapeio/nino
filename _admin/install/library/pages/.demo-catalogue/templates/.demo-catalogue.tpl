@@ -56,7 +56,7 @@
 				<a href="#buttons" class="nino-btn nino-btn--outline nino-btn--small">Buttons</a>
 				<a href="#icons" class="nino-btn nino-btn--outline nino-btn--small">Icons</a>
 				<a href="#badges" class="nino-btn nino-btn--outline nino-btn--small">Badges</a>
-				<a href="#artikel" class="nino-btn nino-btn--outline nino-btn--small">Articles and cards</a>
+				<a href="#karten" class="nino-btn nino-btn--outline nino-btn--small">Cards</a>
 				<a href="#listen" class="nino-btn nino-btn--outline nino-btn--small">Lists</a>
 				<a href="#tabellen" class="nino-btn nino-btn--outline nino-btn--small">Tables</a>
 				<a href="#code" class="nino-btn nino-btn--outline nino-btn--small">Code block</a>
@@ -80,10 +80,10 @@
 				<a href="#raster-stufen" class="nino-btn nino-btn--outline nino-btn--small">Grid, all breakpoints</a>
 				<a href="#ausrichtung-stufen" class="nino-btn nino-btn--outline nino-btn--small">Alignment, all breakpoints</a>
 				<a href="#preise" class="nino-btn nino-btn--outline nino-btn--small">Pricing table</a>
-				<a href="#artikelspalten" class="nino-btn nino-btn--outline nino-btn--small">Articles, all column breakpoints</a>
+				<a href="#kartenspalten" class="nino-btn nino-btn--outline nino-btn--small">Cards, all column breakpoints</a>
 				<a href="#bewegungsvarianten" class="nino-btn nino-btn--outline nino-btn--small">Motion, all variants</a>
 				<a href="#raster-fest" class="nino-btn nino-btn--outline nino-btn--small">Grid without breakpoint</a>
-				<a href="#artikel-fest" class="nino-btn nino-btn--outline nino-btn--small">Articles without breakpoint</a>
+				<a href="#karten-fest" class="nino-btn nino-btn--outline nino-btn--small">Cards without breakpoint</a>
 			</p>
 		</div>
 	</div>
@@ -169,7 +169,7 @@
 	<div class="nino-img-background-content">
 		<div class="nino-grid-row">
 			<div class="nino-grid-100 nino-grid-m-66 nino-grid-center">
-				<div class="nino-article nino-article--alt nino-p-2">
+				<div class="nino-card nino-card--alt nino-p-2">
 					<div class="nino-grid-100 nino-text-left"><h2 class="nino-hero-title" id="banner-card-title">Twelve years, not a single return</h2><p class="nino-hero-subtitle">We maintain what we build — for as long as it stands.</p><a href="#katalog-presets" class="nino-btn nino-btn--outline">References</a></div>
 				</div>
 			</div>
@@ -196,7 +196,7 @@
 <section id="karten-three-columns" class="nino-section nino-section--alt nino-mt-0 nino-mb-0" aria-labelledby="karten-three-columns-title">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-mb-3 nino-text-center"><h2 class="nino-section-title" id="karten-three-columns-title">What we do</h2><p class="nino-section-subtitle">Four services that build on one another.</p><div class="nino-section-text">Each card comes from an Elements collection and is maintained in the backend.</div></div>
-		<article class="nino-article nino-article--counter nino-mb-3 nino-article--grid nino-grid-m-33"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="Consulting" loading="lazy" class="nino-article-img nino-article-img--maxheight"><h3 class="nino-article-title nino-autoheight" data-autoheight-group="article-title-karten-three-columns" data-autoheight-mobile="skip">Consulting</h3><div class="nino-article-descr nino-autoheight" data-autoheight-group="article-descr-karten-three-columns" data-autoheight-mobile="skip">In a conversation, we determine what the project really needs.</div><a href="#">Learn more</a></article><article class="nino-article nino-article--counter nino-mb-3 nino-article--grid nino-grid-m-33"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="Design" loading="lazy" class="nino-article-img nino-article-img--maxheight"><h3 class="nino-article-title nino-autoheight" data-autoheight-group="article-title-karten-three-columns" data-autoheight-mobile="skip">Design</h3><div class="nino-article-descr nino-autoheight" data-autoheight-group="article-descr-karten-three-columns" data-autoheight-mobile="skip">The requirements become a design that works in practice.</div><a href="#">Learn more</a></article><article class="nino-article nino-article--counter nino-mb-3 nino-article--grid nino-grid-m-33"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="Implementation" loading="lazy" class="nino-article-img nino-article-img--maxheight"><h3 class="nino-article-title nino-autoheight" data-autoheight-group="article-title-karten-three-columns" data-autoheight-mobile="skip">Implementation</h3><div class="nino-article-descr nino-autoheight" data-autoheight-group="article-descr-karten-three-columns" data-autoheight-mobile="skip">Clean markup, clear structure, maintainable for years.</div><a href="#">Learn more</a></article>
+		<article class="nino-card nino-card--counter nino-mb-3 nino-card--grid nino-grid-m-33"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="Consulting" loading="lazy" class="nino-card-img nino-card-img--maxheight"><h3 class="nino-card-title nino-autoheight" data-autoheight-group="card-title-karten-three-columns" data-autoheight-mobile="skip">Consulting</h3><div class="nino-card-descr nino-autoheight" data-autoheight-group="card-descr-karten-three-columns" data-autoheight-mobile="skip">In a conversation, we determine what the project really needs.</div><a href="#">Learn more</a></article><article class="nino-card nino-card--counter nino-mb-3 nino-card--grid nino-grid-m-33"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="Design" loading="lazy" class="nino-card-img nino-card-img--maxheight"><h3 class="nino-card-title nino-autoheight" data-autoheight-group="card-title-karten-three-columns" data-autoheight-mobile="skip">Design</h3><div class="nino-card-descr nino-autoheight" data-autoheight-group="card-descr-karten-three-columns" data-autoheight-mobile="skip">The requirements become a design that works in practice.</div><a href="#">Learn more</a></article><article class="nino-card nino-card--counter nino-mb-3 nino-card--grid nino-grid-m-33"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="Implementation" loading="lazy" class="nino-card-img nino-card-img--maxheight"><h3 class="nino-card-title nino-autoheight" data-autoheight-group="card-title-karten-three-columns" data-autoheight-mobile="skip">Implementation</h3><div class="nino-card-descr nino-autoheight" data-autoheight-group="card-descr-karten-three-columns" data-autoheight-mobile="skip">Clean markup, clear structure, maintainable for years.</div><a href="#">Learn more</a></article>
 		<div class="nino-grid-100 nino-mt-3 nino-text-center"><a href="#katalog-presets" class="nino-btn nino-btn--outline">All services</a></div>
 	</div>
 </section>
@@ -211,7 +211,7 @@
 <section id="karten-two-columns" class="nino-section nino-section--alt nino-mt-0 nino-mb-0" aria-labelledby="karten-two-columns-title">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-mb-3 nino-text-center"><h2 class="nino-section-title" id="karten-two-columns-title">What we do</h2></div>
-		<article class="nino-article nino-article--counter nino-mb-3 nino-article--grid nino-grid-m-50"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="Consulting" loading="lazy" class="nino-article-img nino-article-img--maxheight"><h3 class="nino-article-title nino-autoheight" data-autoheight-group="article-title-karten-two-columns" data-autoheight-mobile="skip">Consulting</h3><div class="nino-article-descr nino-autoheight" data-autoheight-group="article-descr-karten-two-columns" data-autoheight-mobile="skip">In a conversation, we determine what the project really needs.</div><a href="#">Learn more</a></article><article class="nino-article nino-article--counter nino-mb-3 nino-article--grid nino-grid-m-50"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="Design" loading="lazy" class="nino-article-img nino-article-img--maxheight"><h3 class="nino-article-title nino-autoheight" data-autoheight-group="article-title-karten-two-columns" data-autoheight-mobile="skip">Design</h3><div class="nino-article-descr nino-autoheight" data-autoheight-group="article-descr-karten-two-columns" data-autoheight-mobile="skip">The requirements become a design that works in practice.</div><a href="#">Learn more</a></article>
+		<article class="nino-card nino-card--counter nino-mb-3 nino-card--grid nino-grid-m-50"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="Consulting" loading="lazy" class="nino-card-img nino-card-img--maxheight"><h3 class="nino-card-title nino-autoheight" data-autoheight-group="card-title-karten-two-columns" data-autoheight-mobile="skip">Consulting</h3><div class="nino-card-descr nino-autoheight" data-autoheight-group="card-descr-karten-two-columns" data-autoheight-mobile="skip">In a conversation, we determine what the project really needs.</div><a href="#">Learn more</a></article><article class="nino-card nino-card--counter nino-mb-3 nino-card--grid nino-grid-m-50"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="Design" loading="lazy" class="nino-card-img nino-card-img--maxheight"><h3 class="nino-card-title nino-autoheight" data-autoheight-group="card-title-karten-two-columns" data-autoheight-mobile="skip">Design</h3><div class="nino-card-descr nino-autoheight" data-autoheight-group="card-descr-karten-two-columns" data-autoheight-mobile="skip">The requirements become a design that works in practice.</div><a href="#">Learn more</a></article>
 	</div>
 </section>
 
@@ -225,7 +225,7 @@
 <section id="karten-four-columns" class="nino-section nino-section--alt nino-mt-0 nino-mb-0" aria-labelledby="karten-four-columns-title">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-mb-3 nino-text-center"><h2 class="nino-section-title" id="karten-four-columns-title">What we do</h2></div>
-		<article class="nino-article nino-article--counter nino-mb-3 nino-article--grid nino-grid-m-25"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="Consulting" loading="lazy" class="nino-article-img nino-article-img--maxheight"><h3 class="nino-article-title nino-autoheight" data-autoheight-group="article-title-karten-four-columns" data-autoheight-mobile="skip">Consulting</h3><div class="nino-article-descr nino-autoheight" data-autoheight-group="article-descr-karten-four-columns" data-autoheight-mobile="skip">In a conversation, we determine what the project really needs.</div><a href="#">Learn more</a></article><article class="nino-article nino-article--counter nino-mb-3 nino-article--grid nino-grid-m-25"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="Design" loading="lazy" class="nino-article-img nino-article-img--maxheight"><h3 class="nino-article-title nino-autoheight" data-autoheight-group="article-title-karten-four-columns" data-autoheight-mobile="skip">Design</h3><div class="nino-article-descr nino-autoheight" data-autoheight-group="article-descr-karten-four-columns" data-autoheight-mobile="skip">The requirements become a design that works in practice.</div><a href="#">Learn more</a></article><article class="nino-article nino-article--counter nino-mb-3 nino-article--grid nino-grid-m-25"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="Implementation" loading="lazy" class="nino-article-img nino-article-img--maxheight"><h3 class="nino-article-title nino-autoheight" data-autoheight-group="article-title-karten-four-columns" data-autoheight-mobile="skip">Implementation</h3><div class="nino-article-descr nino-autoheight" data-autoheight-group="article-descr-karten-four-columns" data-autoheight-mobile="skip">Clean markup, clear structure, maintainable for years.</div><a href="#">Learn more</a></article><article class="nino-article nino-article--counter nino-mb-3 nino-article--grid nino-grid-m-25"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="Support" loading="lazy" class="nino-article-img nino-article-img--maxheight"><h3 class="nino-article-title nino-autoheight" data-autoheight-group="article-title-karten-four-columns" data-autoheight-mobile="skip">Support</h3><div class="nino-article-descr nino-autoheight" data-autoheight-group="article-descr-karten-four-columns" data-autoheight-mobile="skip">Updates, small changes and one contact person who knows the site.</div><a href="#">Learn more</a></article>
+		<article class="nino-card nino-card--counter nino-mb-3 nino-card--grid nino-grid-m-25"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="Consulting" loading="lazy" class="nino-card-img nino-card-img--maxheight"><h3 class="nino-card-title nino-autoheight" data-autoheight-group="card-title-karten-four-columns" data-autoheight-mobile="skip">Consulting</h3><div class="nino-card-descr nino-autoheight" data-autoheight-group="card-descr-karten-four-columns" data-autoheight-mobile="skip">In a conversation, we determine what the project really needs.</div><a href="#">Learn more</a></article><article class="nino-card nino-card--counter nino-mb-3 nino-card--grid nino-grid-m-25"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="Design" loading="lazy" class="nino-card-img nino-card-img--maxheight"><h3 class="nino-card-title nino-autoheight" data-autoheight-group="card-title-karten-four-columns" data-autoheight-mobile="skip">Design</h3><div class="nino-card-descr nino-autoheight" data-autoheight-group="card-descr-karten-four-columns" data-autoheight-mobile="skip">The requirements become a design that works in practice.</div><a href="#">Learn more</a></article><article class="nino-card nino-card--counter nino-mb-3 nino-card--grid nino-grid-m-25"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="Implementation" loading="lazy" class="nino-card-img nino-card-img--maxheight"><h3 class="nino-card-title nino-autoheight" data-autoheight-group="card-title-karten-four-columns" data-autoheight-mobile="skip">Implementation</h3><div class="nino-card-descr nino-autoheight" data-autoheight-group="card-descr-karten-four-columns" data-autoheight-mobile="skip">Clean markup, clear structure, maintainable for years.</div><a href="#">Learn more</a></article><article class="nino-card nino-card--counter nino-mb-3 nino-card--grid nino-grid-m-25"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="Support" loading="lazy" class="nino-card-img nino-card-img--maxheight"><h3 class="nino-card-title nino-autoheight" data-autoheight-group="card-title-karten-four-columns" data-autoheight-mobile="skip">Support</h3><div class="nino-card-descr nino-autoheight" data-autoheight-group="card-descr-karten-four-columns" data-autoheight-mobile="skip">Updates, small changes and one contact person who knows the site.</div><a href="#">Learn more</a></article>
 	</div>
 </section>
 
@@ -239,7 +239,7 @@
 <section id="karten-borderless" class="nino-section nino-section--alt nino-mt-0 nino-mb-0" aria-labelledby="karten-borderless-title">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-mb-3 nino-text-center"><h2 class="nino-section-title" id="karten-borderless-title">What we do</h2></div>
-		<article class="nino-article nino-article--counter nino-mb-3 nino-article--grid nino-grid-m-33 nino-article--borderless"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="Consulting" loading="lazy" class="nino-article-img nino-article-img--maxheight"><h3 class="nino-article-title nino-autoheight" data-autoheight-group="article-title-karten-borderless" data-autoheight-mobile="skip">Consulting</h3><div class="nino-article-descr nino-autoheight" data-autoheight-group="article-descr-karten-borderless" data-autoheight-mobile="skip">In a conversation, we determine what the project really needs.</div><a href="#">Learn more</a></article><article class="nino-article nino-article--counter nino-mb-3 nino-article--grid nino-grid-m-33 nino-article--borderless"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="Design" loading="lazy" class="nino-article-img nino-article-img--maxheight"><h3 class="nino-article-title nino-autoheight" data-autoheight-group="article-title-karten-borderless" data-autoheight-mobile="skip">Design</h3><div class="nino-article-descr nino-autoheight" data-autoheight-group="article-descr-karten-borderless" data-autoheight-mobile="skip">The requirements become a design that works in practice.</div><a href="#">Learn more</a></article><article class="nino-article nino-article--counter nino-mb-3 nino-article--grid nino-grid-m-33 nino-article--borderless"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="Implementation" loading="lazy" class="nino-article-img nino-article-img--maxheight"><h3 class="nino-article-title nino-autoheight" data-autoheight-group="article-title-karten-borderless" data-autoheight-mobile="skip">Implementation</h3><div class="nino-article-descr nino-autoheight" data-autoheight-group="article-descr-karten-borderless" data-autoheight-mobile="skip">Clean markup, clear structure, maintainable for years.</div><a href="#">Learn more</a></article>
+		<article class="nino-card nino-card--counter nino-mb-3 nino-card--grid nino-grid-m-33 nino-card--borderless"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="Consulting" loading="lazy" class="nino-card-img nino-card-img--maxheight"><h3 class="nino-card-title nino-autoheight" data-autoheight-group="card-title-karten-borderless" data-autoheight-mobile="skip">Consulting</h3><div class="nino-card-descr nino-autoheight" data-autoheight-group="card-descr-karten-borderless" data-autoheight-mobile="skip">In a conversation, we determine what the project really needs.</div><a href="#">Learn more</a></article><article class="nino-card nino-card--counter nino-mb-3 nino-card--grid nino-grid-m-33 nino-card--borderless"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="Design" loading="lazy" class="nino-card-img nino-card-img--maxheight"><h3 class="nino-card-title nino-autoheight" data-autoheight-group="card-title-karten-borderless" data-autoheight-mobile="skip">Design</h3><div class="nino-card-descr nino-autoheight" data-autoheight-group="card-descr-karten-borderless" data-autoheight-mobile="skip">The requirements become a design that works in practice.</div><a href="#">Learn more</a></article><article class="nino-card nino-card--counter nino-mb-3 nino-card--grid nino-grid-m-33 nino-card--borderless"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="Implementation" loading="lazy" class="nino-card-img nino-card-img--maxheight"><h3 class="nino-card-title nino-autoheight" data-autoheight-group="card-title-karten-borderless" data-autoheight-mobile="skip">Implementation</h3><div class="nino-card-descr nino-autoheight" data-autoheight-group="card-descr-karten-borderless" data-autoheight-mobile="skip">Clean markup, clear structure, maintainable for years.</div><a href="#">Learn more</a></article>
 	</div>
 </section>
 
@@ -272,7 +272,7 @@
 				</button>
 
 			</nav>
-			<article class="nino-article nino-article--counter nino-mb-3 nino-article--grid nino-filter-item nino-grid-m-33" data-filter-item="Consulting"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="Consulting" loading="lazy" class="nino-article-img nino-article-img--maxheight"><h3 class="nino-article-title">Consulting</h3><div class="nino-article-descr">In a conversation, we determine what the project really needs.</div><a href="#">Learn more</a></article><article class="nino-article nino-article--counter nino-mb-3 nino-article--grid nino-filter-item nino-grid-m-33" data-filter-item="Design"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="Design" loading="lazy" class="nino-article-img nino-article-img--maxheight"><h3 class="nino-article-title">Design</h3><div class="nino-article-descr">The requirements become a design that works in practice.</div><a href="#">Learn more</a></article><article class="nino-article nino-article--counter nino-mb-3 nino-article--grid nino-filter-item nino-grid-m-33" data-filter-item="Development"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="Implementation" loading="lazy" class="nino-article-img nino-article-img--maxheight"><h3 class="nino-article-title">Implementation</h3><div class="nino-article-descr">Clean markup, clear structure, maintainable for years.</div><a href="#">Learn more</a></article><article class="nino-article nino-article--counter nino-mb-3 nino-article--grid nino-filter-item nino-grid-m-33" data-filter-item="Consulting"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="Support" loading="lazy" class="nino-article-img nino-article-img--maxheight"><h3 class="nino-article-title">Support</h3><div class="nino-article-descr">Updates, small changes and one contact person who knows the site.</div><a href="#">Learn more</a></article>
+			<article class="nino-card nino-card--counter nino-mb-3 nino-card--grid nino-filter-item nino-grid-m-33" data-filter-item="Consulting"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="Consulting" loading="lazy" class="nino-card-img nino-card-img--maxheight"><h3 class="nino-card-title">Consulting</h3><div class="nino-card-descr">In a conversation, we determine what the project really needs.</div><a href="#">Learn more</a></article><article class="nino-card nino-card--counter nino-mb-3 nino-card--grid nino-filter-item nino-grid-m-33" data-filter-item="Design"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="Design" loading="lazy" class="nino-card-img nino-card-img--maxheight"><h3 class="nino-card-title">Design</h3><div class="nino-card-descr">The requirements become a design that works in practice.</div><a href="#">Learn more</a></article><article class="nino-card nino-card--counter nino-mb-3 nino-card--grid nino-filter-item nino-grid-m-33" data-filter-item="Development"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="Implementation" loading="lazy" class="nino-card-img nino-card-img--maxheight"><h3 class="nino-card-title">Implementation</h3><div class="nino-card-descr">Clean markup, clear structure, maintainable for years.</div><a href="#">Learn more</a></article><article class="nino-card nino-card--counter nino-mb-3 nino-card--grid nino-filter-item nino-grid-m-33" data-filter-item="Consulting"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="Support" loading="lazy" class="nino-card-img nino-card-img--maxheight"><h3 class="nino-card-title">Support</h3><div class="nino-card-descr">Updates, small changes and one contact person who knows the site.</div><a href="#">Learn more</a></article>
 		</div>
 	</div>
 </section>
@@ -1008,15 +1008,15 @@
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
 			<span class="nino-badge nino-badge--pill">.nino-section--tint</span>
-			<span class="nino-badge nino-badge--pill">.nino-article--counter</span>
+			<span class="nino-badge nino-badge--pill">.nino-card--counter</span>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-66">
 			<h3 class="nino-section-title nino-text-left">A band that carries the brand quietly</h3>
 			<p>Body copy sits on it for a whole section, and <a href="#grundflaechen">a link</a> is solved against this ground rather than the page it steps away from.</p>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-33">
-			<div class="nino-article nino-article--counter">
-				<h4 class="nino-article-title">A card on the tint</h4>
+			<div class="nino-card nino-card--counter">
+				<h4 class="nino-card-title">A card on the tint</h4>
 				<p>Steps onto the page ground, the way it does on the alternate band.</p>
 			</div>
 		</div>
@@ -1286,7 +1286,7 @@
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-2">
 			<span class="nino-badge nino-badge--pill">.nino-section--dark</span>
 			<span class="nino-badge nino-badge--pill">.nino-grid--counter</span>
-			<span class="nino-badge nino-badge--pill">.nino-article--counter</span>
+			<span class="nino-badge nino-badge--pill">.nino-card--counter</span>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-p-1">
 			<div class="nino-grid-100 nino-grid--counter">
@@ -1295,12 +1295,12 @@
 			</div>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-p-1">
-			<article class="nino-article nino-article--counter">
-				<h4 class="nino-article-title">A card on the counter ground</h4>
+			<article class="nino-card nino-card--counter">
+				<h4 class="nino-card-title">A card on the counter ground</h4>
 				<p>Black as well, and a second one beneath it.</p>
 			</article>
-			<article class="nino-article nino-article--counter">
-				<h4 class="nino-article-title">Another card</h4>
+			<article class="nino-card nino-card--counter">
+				<h4 class="nino-card-title">Another card</h4>
 				<p>Change the section to alt and both become the page ground.</p>
 			</article>
 		</div>
@@ -1319,42 +1319,42 @@
 			<span class="nino-badge nino-badge--pill">.nino-grid--black</span>
 			<span class="nino-badge nino-badge--pill">.nino-grid--primary</span>
 			<span class="nino-badge nino-badge--pill">.nino-grid--brand-alt</span>
-			<span class="nino-badge nino-badge--pill">.nino-article--counter</span>
+			<span class="nino-badge nino-badge--pill">.nino-card--counter</span>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-grid-l-33 nino-p-1">
 			<div class="nino-grid-100 nino-grid--alt">
 				<h3 class="nino-section-title nino-text-left">A column on alt</h3>
-				<article class="nino-article nino-article--counter"><p>The card is default.</p></article>
+				<article class="nino-card nino-card--counter"><p>The card is default.</p></article>
 			</div>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-grid-l-33 nino-p-1">
 			<div class="nino-grid-100 nino-grid--tint">
 				<h3 class="nino-section-title nino-text-left">A column on tint</h3>
-				<article class="nino-article nino-article--counter"><p>The card is default.</p></article>
+				<article class="nino-card nino-card--counter"><p>The card is default.</p></article>
 			</div>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-grid-l-33 nino-p-1">
 			<div class="nino-grid-100 nino-grid--dark">
 				<h3 class="nino-section-title nino-text-left">A column on dark</h3>
-				<article class="nino-article nino-article--counter"><p>The card is black.</p></article>
+				<article class="nino-card nino-card--counter"><p>The card is black.</p></article>
 			</div>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-grid-l-33 nino-p-1">
 			<div class="nino-grid-100 nino-grid--black">
 				<h3 class="nino-section-title nino-text-left">A column on black</h3>
-				<article class="nino-article nino-article--counter"><p>The card is dark.</p></article>
+				<article class="nino-card nino-card--counter"><p>The card is dark.</p></article>
 			</div>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-grid-l-33 nino-p-1">
 			<div class="nino-grid-100 nino-grid--primary">
 				<h3 class="nino-section-title nino-text-left">A column on primary</h3>
-				<article class="nino-article nino-article--counter"><p>The card is brand-alt.</p></article>
+				<article class="nino-card nino-card--counter"><p>The card is brand-alt.</p></article>
 			</div>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-grid-l-33 nino-p-1">
 			<div class="nino-grid-100 nino-grid--brand-alt">
 				<h3 class="nino-section-title nino-text-left">A column on brand-alt</h3>
-				<article class="nino-article nino-article--counter"><p>The card is primary.</p></article>
+				<article class="nino-card nino-card--counter"><p>The card is primary.</p></article>
 			</div>
 		</div>
 	</div>
@@ -1365,30 +1365,30 @@
 <section class="nino-section nino-section--alt nino-pt-3 nino-pb-3 nino-mt-0 nino-mb-0" id="v-levels-card">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-2">
-			<span class="nino-badge nino-badge--pill">.nino-article--alt</span>
-			<span class="nino-badge nino-badge--pill">.nino-article--tint</span>
-			<span class="nino-badge nino-badge--pill">.nino-article--dark</span>
-			<span class="nino-badge nino-badge--pill">.nino-article--black</span>
-			<span class="nino-badge nino-badge--pill">.nino-article--primary</span>
-			<span class="nino-badge nino-badge--pill">.nino-article--brand-alt</span>
+			<span class="nino-badge nino-badge--pill">.nino-card--alt</span>
+			<span class="nino-badge nino-badge--pill">.nino-card--tint</span>
+			<span class="nino-badge nino-badge--pill">.nino-card--dark</span>
+			<span class="nino-badge nino-badge--pill">.nino-card--black</span>
+			<span class="nino-badge nino-badge--pill">.nino-card--primary</span>
+			<span class="nino-badge nino-badge--pill">.nino-card--brand-alt</span>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-33 nino-p-1">
-			<article class="nino-article nino-article--alt"><h4 class="nino-article-title">alt</h4><p>On an alt section: alt on alt.</p></article>
+			<article class="nino-card nino-card--alt"><h4 class="nino-card-title">alt</h4><p>On an alt section: alt on alt.</p></article>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-33 nino-p-1">
-			<article class="nino-article nino-article--tint"><h4 class="nino-article-title">tint</h4><p>A wash of the brand.</p></article>
+			<article class="nino-card nino-card--tint"><h4 class="nino-card-title">tint</h4><p>A wash of the brand.</p></article>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-33 nino-p-1">
-			<article class="nino-article nino-article--dark"><h4 class="nino-article-title">dark</h4><p>Dark, with its own ink.</p></article>
+			<article class="nino-card nino-card--dark"><h4 class="nino-card-title">dark</h4><p>Dark, with its own ink.</p></article>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-33 nino-p-1">
-			<article class="nino-article nino-article--black"><h4 class="nino-article-title">black</h4><p>The deepest surface.</p></article>
+			<article class="nino-card nino-card--black"><h4 class="nino-card-title">black</h4><p>The deepest surface.</p></article>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-33 nino-p-1">
-			<article class="nino-article nino-article--primary"><h4 class="nino-article-title">primary</h4><p>The brand as a surface.</p></article>
+			<article class="nino-card nino-card--primary"><h4 class="nino-card-title">primary</h4><p>The brand as a surface.</p></article>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-33 nino-p-1">
-			<article class="nino-article nino-article--brand-alt"><h4 class="nino-article-title">brand-alt</h4><p>The second brand colour.</p></article>
+			<article class="nino-card nino-card--brand-alt"><h4 class="nino-card-title">brand-alt</h4><p>The second brand colour.</p></article>
 		</div>
 	</div>
 </section>
@@ -1401,15 +1401,15 @@
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-2">
 			<span class="nino-badge nino-badge--pill">.nino-grid-bg</span>
 			<span class="nino-badge nino-badge--pill">.nino-grid--dim</span>
-			<span class="nino-badge nino-badge--pill">.nino-article--counter</span>
+			<span class="nino-badge nino-badge--pill">.nino-card--counter</span>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-66 nino-p-1">
 			<div class="nino-grid-100 nino-grid--dim">
 				<div class="nino-grid-bg"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy"></div>
 				<h3 class="nino-section-title nino-text-left">A column with a picture</h3>
 				<p>The picture lies behind the content and is cut at the corners of the column, a scrim darkens it, and the text is white.</p>
-				<article class="nino-article nino-article--counter">
-					<h4 class="nino-article-title">A card in it</h4>
+				<article class="nino-card nino-card--counter">
+					<h4 class="nino-card-title">A card in it</h4>
 					<p>Black, the counter of dark.</p>
 				</article>
 			</div>
@@ -1424,14 +1424,14 @@
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-2">
 			<span class="nino-badge nino-badge--pill">.nino-section--alt</span>
 			<span class="nino-badge nino-badge--pill">.nino-grid--counter</span>
-			<span class="nino-badge nino-badge--pill">.nino-article--counter</span>
+			<span class="nino-badge nino-badge--pill">.nino-card--counter</span>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-66 nino-p-1">
 			<div class="nino-grid-100 nino-grid--counter">
 				<h3 class="nino-section-title nino-text-left">alt &gt; counter &gt; counter</h3>
 				<p>A default column on an alt section.</p>
-				<article class="nino-article nino-article--counter">
-					<h4 class="nino-article-title">A card in it</h4>
+				<article class="nino-card nino-card--counter">
+					<h4 class="nino-card-title">A card in it</h4>
 					<p>Alt again.</p>
 				</article>
 			</div>
@@ -1439,23 +1439,23 @@
 	</div>
 </section>
 
-<!--	What a stack draws where its content holds an article on the counter ground: a row
+<!--	What a stack draws where its content holds a card on the counter ground: a row
 			of cells, each of them a div with the classes of the grid, and the card in it. The
 			row and the cells are the stack's, the gap between the cards its own, and the card
-			is the content. The subtitle of a card is the article's own, in its three sizes.	-->
+			is the content. The subtitle of a card is its own class, in its three sizes.	-->
 <section class="nino-section nino-pt-3 nino-pb-3 nino-mt-0 nino-mb-0" id="v-levels-stack">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-2">
-			<span class="nino-badge nino-badge--pill">&#91;article ground="counter"&#93;</span>
-			<span class="nino-badge nino-badge--pill">.nino-article--counter</span>
-			<span class="nino-badge nino-badge--pill">.nino-article-subtitle--quiet</span>
-			<span class="nino-badge nino-badge--pill">.nino-article-subtitle--loud</span>
+			<span class="nino-badge nino-badge--pill">&#91;card ground="counter"&#93;</span>
+			<span class="nino-badge nino-badge--pill">.nino-card--counter</span>
+			<span class="nino-badge nino-badge--pill">.nino-card-subtitle--quiet</span>
+			<span class="nino-badge nino-badge--pill">.nino-card-subtitle--loud</span>
 		</div>
 		<div class="nino-grid-100">
 			<div class="nino-grid-row nino-stack nino-stack-gap-2">
-				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><article class="nino-article nino-article--counter"><h4 class="nino-article-title">A cell that holds a card</h4><p class="nino-article-subtitle nino-article-subtitle--quiet">A quiet subtitle</p><p>The ground is the counter of the section it stands in.</p></article></div>
-				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><article class="nino-article nino-article--counter"><h4 class="nino-article-title">Another</h4><p class="nino-article-subtitle">A subtitle</p><p>The classes of the grid are on the cell, and the card is what it holds.</p></article></div>
-				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><article class="nino-article nino-article--counter"><h4 class="nino-article-title">A third</h4><p class="nino-article-subtitle nino-article-subtitle--loud">A loud subtitle</p><p>Neighbours are one gap apart, and the edges of the stack are the edges of its column.</p></article></div>
+				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><article class="nino-card nino-card--counter"><h4 class="nino-card-title">A cell that holds a card</h4><p class="nino-card-subtitle nino-card-subtitle--quiet">A quiet subtitle</p><p>The ground is the counter of the section it stands in.</p></article></div>
+				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><article class="nino-card nino-card--counter"><h4 class="nino-card-title">Another</h4><p class="nino-card-subtitle">A subtitle</p><p>The classes of the grid are on the cell, and the card is what it holds.</p></article></div>
+				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><article class="nino-card nino-card--counter"><h4 class="nino-card-title">A third</h4><p class="nino-card-subtitle nino-card-subtitle--loud">A loud subtitle</p><p>Neighbours are one gap apart, and the edges of the stack are the edges of its column.</p></article></div>
 			</div>
 		</div>
 	</div>
@@ -1468,16 +1468,16 @@
 <section class="nino-section nino-pt-3 nino-pb-3 nino-mt-0 nino-mb-0" id="v-levels-fill">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-2">
-			<span class="nino-badge nino-badge--pill">&#91;article fill="1"&#93;</span>
-			<span class="nino-badge nino-badge--pill">.nino-article--fill</span>
-			<span class="nino-badge nino-badge--pill">.nino-article--counter</span>
+			<span class="nino-badge nino-badge--pill">&#91;card fill="1"&#93;</span>
+			<span class="nino-badge nino-badge--pill">.nino-card--fill</span>
+			<span class="nino-badge nino-badge--pill">.nino-card--counter</span>
 			<span class="nino-badge nino-badge--pill">.nino-autoheight</span>
 		</div>
 		<div class="nino-grid-100">
 			<div class="nino-grid-row nino-stack nino-stack-gap-2">
-				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33 nino-autoheight" data-autoheight-group="v-levels-fill"><article class="nino-article nino-article--counter nino-article--fill"><h4 class="nino-article-title">A card that fills</h4><div class="nino-section-text">It is as tall as the cell it stands in, however tall the cells beside it are.</div></article></div>
-				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33 nino-autoheight" data-autoheight-group="v-levels-fill"><article class="nino-article nino-article--counter nino-article--fill"><h4 class="nino-article-title">A card with a lot to say</h4><div class="nino-section-text">It sets the height of the row, and the cards beside it fill the same height.</div><div class="nino-section-text">So they end on one line, whatever they hold, and none of them needs to know how much the others have to say.</div></article></div>
-				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33 nino-autoheight" data-autoheight-group="v-levels-fill"><article class="nino-article nino-article--counter nino-article--fill"><h4 class="nino-article-title">A short one</h4><div class="nino-section-text">Short, and as tall as the tallest of its row, because it fills.</div></article></div>
+				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33 nino-autoheight" data-autoheight-group="v-levels-fill"><article class="nino-card nino-card--counter nino-card--fill"><h4 class="nino-card-title">A card that fills</h4><div class="nino-section-text">It is as tall as the cell it stands in, however tall the cells beside it are.</div></article></div>
+				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33 nino-autoheight" data-autoheight-group="v-levels-fill"><article class="nino-card nino-card--counter nino-card--fill"><h4 class="nino-card-title">A card with a lot to say</h4><div class="nino-section-text">It sets the height of the row, and the cards beside it fill the same height.</div><div class="nino-section-text">So they end on one line, whatever they hold, and none of them needs to know how much the others have to say.</div></article></div>
+				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33 nino-autoheight" data-autoheight-group="v-levels-fill"><article class="nino-card nino-card--counter nino-card--fill"><h4 class="nino-card-title">A short one</h4><div class="nino-section-text">Short, and as tall as the tallest of its row, because it fills.</div></article></div>
 			</div>
 		</div>
 	</div>
@@ -1489,18 +1489,18 @@
 <section class="nino-section nino-section--alt nino-pt-3 nino-pb-3 nino-mt-0 nino-mb-0" id="v-levels-vertical">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-2">
-			<span class="nino-badge nino-badge--pill">&#91;article vertical="middle"&#93;</span>
-			<span class="nino-badge nino-badge--pill">.nino-article--middle</span>
-			<span class="nino-badge nino-badge--pill">.nino-article--bottom</span>
-			<span class="nino-badge nino-badge--pill">.nino-article--last-bottom</span>
-			<span class="nino-badge nino-badge--pill">.nino-article--fill</span>
+			<span class="nino-badge nino-badge--pill">&#91;card vertical="middle"&#93;</span>
+			<span class="nino-badge nino-badge--pill">.nino-card--middle</span>
+			<span class="nino-badge nino-badge--pill">.nino-card--bottom</span>
+			<span class="nino-badge nino-badge--pill">.nino-card--last-bottom</span>
+			<span class="nino-badge nino-badge--pill">.nino-card--fill</span>
 		</div>
 		<div class="nino-grid-100">
 			<div class="nino-grid-row nino-stack nino-stack-gap-2">
-				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-25 nino-autoheight" data-autoheight-group="v-levels-vertical"><article class="nino-article nino-article--counter nino-article--fill nino-article--middle"><h4 class="nino-article-title">In the middle</h4><div class="nino-section-text">The content stands in the middle of a card that is taller than it.</div><a href="#v-levels-vertical" class="nino-btn nino-btn--outline nino-btn--small">More</a></article></div>
-				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-25 nino-autoheight" data-autoheight-group="v-levels-vertical"><article class="nino-article nino-article--counter nino-article--fill nino-article--bottom"><h4 class="nino-article-title">At the bottom</h4><div class="nino-section-text">The content stands at the bottom of a card that is taller than it.</div><a href="#v-levels-vertical" class="nino-btn nino-btn--outline nino-btn--small">More</a></article></div>
-				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-25 nino-autoheight" data-autoheight-group="v-levels-vertical"><article class="nino-article nino-article--counter nino-article--fill nino-article--last-bottom"><h4 class="nino-article-title">The last at the bottom</h4><div class="nino-section-text">The title stays at the top, and the button ends the card.</div><a href="#v-levels-vertical" class="nino-btn nino-btn--outline nino-btn--small">More</a></article></div>
-				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-25 nino-autoheight" data-autoheight-group="v-levels-vertical"><article class="nino-article nino-article--counter nino-article--fill"><h4 class="nino-article-title">The tallest</h4><div class="nino-section-text">A card with more to say than the others sets the height of the row.</div><div class="nino-section-text">The three beside it fill that height, and where their content stands in it is their own say.</div><div class="nino-section-text">A card that names none keeps its content at the top.</div></article></div>
+				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-25 nino-autoheight" data-autoheight-group="v-levels-vertical"><article class="nino-card nino-card--counter nino-card--fill nino-card--middle"><h4 class="nino-card-title">In the middle</h4><div class="nino-section-text">The content stands in the middle of a card that is taller than it.</div><a href="#v-levels-vertical" class="nino-btn nino-btn--outline nino-btn--small">More</a></article></div>
+				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-25 nino-autoheight" data-autoheight-group="v-levels-vertical"><article class="nino-card nino-card--counter nino-card--fill nino-card--bottom"><h4 class="nino-card-title">At the bottom</h4><div class="nino-section-text">The content stands at the bottom of a card that is taller than it.</div><a href="#v-levels-vertical" class="nino-btn nino-btn--outline nino-btn--small">More</a></article></div>
+				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-25 nino-autoheight" data-autoheight-group="v-levels-vertical"><article class="nino-card nino-card--counter nino-card--fill nino-card--last-bottom"><h4 class="nino-card-title">The last at the bottom</h4><div class="nino-section-text">The title stays at the top, and the button ends the card.</div><a href="#v-levels-vertical" class="nino-btn nino-btn--outline nino-btn--small">More</a></article></div>
+				<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-25 nino-autoheight" data-autoheight-group="v-levels-vertical"><article class="nino-card nino-card--counter nino-card--fill"><h4 class="nino-card-title">The tallest</h4><div class="nino-section-text">A card with more to say than the others sets the height of the row.</div><div class="nino-section-text">The three beside it fill that height, and where their content stands in it is their own say.</div><div class="nino-section-text">A card that names none keeps its content at the top.</div></article></div>
 			</div>
 		</div>
 	</div>
@@ -1509,18 +1509,18 @@
 <!--	A picture behind a card, in a block of its own before the content and cut at the corners
 			of the card, and --dim: a scrim over the picture, and the card writes in the ink of
 			the dark ground.	-->
-<section class="nino-section nino-pt-3 nino-pb-3 nino-mt-0 nino-mb-0" id="v-levels-article-picture">
+<section class="nino-section nino-pt-3 nino-pb-3 nino-mt-0 nino-mb-0" id="v-levels-card-picture">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-2">
-			<span class="nino-badge nino-badge--pill">.nino-article-bg</span>
-			<span class="nino-badge nino-badge--pill">.nino-article--dim</span>
-			<span class="nino-badge nino-badge--pill">.nino-article--fill</span>
+			<span class="nino-badge nino-badge--pill">.nino-card-bg</span>
+			<span class="nino-badge nino-badge--pill">.nino-card--dim</span>
+			<span class="nino-badge nino-badge--pill">.nino-card--fill</span>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-p-1">
-			<article class="nino-article nino-article--fill nino-p-3"><div class="nino-article-bg nino-img-focus--5"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy"></div><h4 class="nino-article-title">A card with a picture</h4><p>The picture lies behind the content and is cut at the corners of the card.</p></article>
+			<article class="nino-card nino-card--fill nino-p-3"><div class="nino-card-bg nino-img-focus--5"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy"></div><h4 class="nino-card-title">A card with a picture</h4><p>The picture lies behind the content and is cut at the corners of the card.</p></article>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-p-1">
-			<article class="nino-article nino-article--dim nino-article--fill nino-p-3"><div class="nino-article-bg"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="" loading="lazy"></div><h4 class="nino-article-title">A dimmed card</h4><p>A scrim darkens the picture, and the text is white.</p></article>
+			<article class="nino-card nino-card--dim nino-card--fill nino-p-3"><div class="nino-card-bg"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="" loading="lazy"></div><h4 class="nino-card-title">A dimmed card</h4><p>A scrim darkens the picture, and the text is white.</p></article>
 		</div>
 	</div>
 </section>
@@ -1560,7 +1560,7 @@
 			<div class="nino-grid-row nino-grid-center nino-mb-1"><div class="nino-grid-50 nino-p-1"><p class="nino-alert nino-alert--info">nino-grid-center</p></div><div class="nino-grid-50 nino-p-1"><p class="nino-alert nino-pt-4 nino-pb-4">taller neighbour</p></div></div>
 		</div>
 		<div class="nino-grid-100">
-			<div class="nino-grid-row nino-grid-row--narrow nino-article nino-article--alt"><div class="nino-grid-100"><p class="nino-section-text">nino-grid-row--narrow — 52rem, the width at which body text remains readable.</p></div></div>
+			<div class="nino-grid-row nino-grid-row--narrow nino-card nino-card--alt"><div class="nino-grid-100"><p class="nino-section-text">nino-grid-row--narrow — 52rem, the width at which body text remains readable.</p></div></div>
 		</div>
 	</div>
 </section>
@@ -1737,19 +1737,19 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--alt nino-mt-0 nino-mb-0" id="artikel" aria-labelledby="artikel-title">
+<section class="nino-section nino-section--alt nino-mt-0 nino-mb-0" id="karten" aria-labelledby="karten-title">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-mb-2">
-			<h3 class="nino-section-title nino-text-left" id="artikel-title">Articles and cards</h3>
+			<h3 class="nino-section-title nino-text-left" id="karten-title">Cards</h3>
 			<p class="nino-section-subtitle nino-text-left">The component behind every card preset: image, title, subtitle, text and price — in four variants.</p>
 		</div>
-		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-article</span> <span class="nino-badge nino-badge--pill">.nino-article--alt</span> <span class="nino-badge nino-badge--pill">.nino-article--tint</span> <span class="nino-badge nino-badge--pill">.nino-article--dark</span> <span class="nino-badge nino-badge--pill">.nino-article--black</span> <span class="nino-badge nino-badge--pill">.nino-article--primary</span> <span class="nino-badge nino-badge--pill">.nino-article--brand-alt</span> <span class="nino-badge nino-badge--pill">.nino-article--counter</span> <span class="nino-badge nino-badge--pill">.nino-article--borderless</span> <span class="nino-badge nino-badge--pill">.nino-article--wide</span> <span class="nino-badge nino-badge--pill">.nino-article--grid</span> <span class="nino-badge nino-badge--pill">.nino-article--fullwidth</span> <span class="nino-badge nino-badge--pill">.nino-article-content</span> <span class="nino-badge nino-badge--pill">.nino-article-title</span> <span class="nino-badge nino-badge--pill">.nino-article-subtitle</span> <span class="nino-badge nino-badge--pill">.nino-article-descr</span> <span class="nino-badge nino-badge--pill">.nino-article-price</span> <span class="nino-badge nino-badge--pill">.nino-article-img</span> <span class="nino-badge nino-badge--pill">.nino-article-img--dim</span> <span class="nino-badge nino-badge--pill">.nino-article-img--maxheight</span> <span class="nino-badge nino-badge--pill">.nino-article-cols-s|m|l|xl</span></div>
-		<div class="nino-grid-100 nino-grid-m-33 nino-p-1"><article class="nino-article nino-article--counter"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="" loading="lazy" class="nino-article-img nino-article-img--maxheight"><div class="nino-article-content"><h4 class="nino-article-title">article--counter</h4><p class="nino-article-subtitle">.nino-article-subtitle</p><div class="nino-article-descr">Card on the counter ground</div><div class="nino-article-price">89 €</div></div></article></div>
-		<div class="nino-grid-100 nino-grid-m-33 nino-p-1"><article class="nino-article nino-article--borderless"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="" loading="lazy" class="nino-article-img nino-article-img--maxheight"><div class="nino-article-content"><h4 class="nino-article-title">article--borderless</h4><p class="nino-article-subtitle">.nino-article-subtitle</p><div class="nino-article-descr">without border or surface</div><div class="nino-article-price">89 €</div></div></article></div>
-		<div class="nino-grid-100 nino-grid-m-33 nino-p-1"><article class="nino-article nino-article--counter nino-article--grid"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="" loading="lazy" class="nino-article-img nino-article-img--maxheight"><div class="nino-article-content"><h4 class="nino-article-title">article--grid</h4><p class="nino-article-subtitle">.nino-article-subtitle</p><div class="nino-article-descr">equal-height grid card</div><div class="nino-article-price">89 €</div></div></article></div>
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-card</span> <span class="nino-badge nino-badge--pill">.nino-card--alt</span> <span class="nino-badge nino-badge--pill">.nino-card--tint</span> <span class="nino-badge nino-badge--pill">.nino-card--dark</span> <span class="nino-badge nino-badge--pill">.nino-card--black</span> <span class="nino-badge nino-badge--pill">.nino-card--primary</span> <span class="nino-badge nino-badge--pill">.nino-card--brand-alt</span> <span class="nino-badge nino-badge--pill">.nino-card--counter</span> <span class="nino-badge nino-badge--pill">.nino-card--borderless</span> <span class="nino-badge nino-badge--pill">.nino-card--wide</span> <span class="nino-badge nino-badge--pill">.nino-card--grid</span> <span class="nino-badge nino-badge--pill">.nino-card--fullwidth</span> <span class="nino-badge nino-badge--pill">.nino-card-content</span> <span class="nino-badge nino-badge--pill">.nino-card-title</span> <span class="nino-badge nino-badge--pill">.nino-card-subtitle</span> <span class="nino-badge nino-badge--pill">.nino-card-descr</span> <span class="nino-badge nino-badge--pill">.nino-card-price</span> <span class="nino-badge nino-badge--pill">.nino-card-img</span> <span class="nino-badge nino-badge--pill">.nino-card-img--dim</span> <span class="nino-badge nino-badge--pill">.nino-card-img--maxheight</span> <span class="nino-badge nino-badge--pill">.nino-card-cols-s|m|l|xl</span></div>
+		<div class="nino-grid-100 nino-grid-m-33 nino-p-1"><article class="nino-card nino-card--counter"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="" loading="lazy" class="nino-card-img nino-card-img--maxheight"><div class="nino-card-content"><h4 class="nino-card-title">card--counter</h4><p class="nino-card-subtitle">.nino-card-subtitle</p><div class="nino-card-descr">Card on the counter ground</div><div class="nino-card-price">89 €</div></div></article></div>
+		<div class="nino-grid-100 nino-grid-m-33 nino-p-1"><article class="nino-card nino-card--borderless"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="" loading="lazy" class="nino-card-img nino-card-img--maxheight"><div class="nino-card-content"><h4 class="nino-card-title">card--borderless</h4><p class="nino-card-subtitle">.nino-card-subtitle</p><div class="nino-card-descr">without border or surface</div><div class="nino-card-price">89 €</div></div></article></div>
+		<div class="nino-grid-100 nino-grid-m-33 nino-p-1"><article class="nino-card nino-card--counter nino-card--grid"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="" loading="lazy" class="nino-card-img nino-card-img--maxheight"><div class="nino-card-content"><h4 class="nino-card-title">card--grid</h4><p class="nino-card-subtitle">.nino-card-subtitle</p><div class="nino-card-descr">equal-height grid card</div><div class="nino-card-price">89 €</div></div></article></div>
 		<div class="nino-grid-100">
-			<div class="nino-grid-100 nino-mb-2"><article class="nino-article nino-article--counter nino-article--wide nino-article-cols-m"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy" class="nino-article-img nino-article-img--dim"><div class="nino-article-content"><h4 class="nino-article-title nino-article-title--loud">.nino-article-cols-m</h4><div class="nino-article-descr nino-article-descr--quiet">Image and text side by side from the m breakpoint. The variant exists for every level: -s, -m, -l and -xl.</div><a href="#artikel" class="nino-btn nino-btn--outline nino-btn--small">More</a></div></article></div>
-			<div class="nino-grid-100"><article class="nino-article nino-article--counter nino-article--fullwidth"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="" loading="lazy" class="nino-article-img"><div class="nino-article-content"><h4 class="nino-article-title nino-article-title--quiet">.nino-article--fullwidth</h4><div class="nino-article-descr nino-article-descr--loud">The image extends to the edges of the card.</div></div></article></div>
+			<div class="nino-grid-100 nino-mb-2"><article class="nino-card nino-card--counter nino-card--wide nino-card-cols-m"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy" class="nino-card-img nino-card-img--dim"><div class="nino-card-content"><h4 class="nino-card-title nino-card-title--loud">.nino-card-cols-m</h4><div class="nino-card-descr nino-card-descr--quiet">Image and text side by side from the m breakpoint. The variant exists for every level: -s, -m, -l and -xl.</div><a href="#karten" class="nino-btn nino-btn--outline nino-btn--small">More</a></div></article></div>
+			<div class="nino-grid-100"><article class="nino-card nino-card--counter nino-card--fullwidth"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="" loading="lazy" class="nino-card-img"><div class="nino-card-content"><h4 class="nino-card-title nino-card-title--quiet">.nino-card--fullwidth</h4><div class="nino-card-descr nino-card-descr--loud">The image extends to the edges of the card.</div></div></article></div>
 		</div>
 	</div>
 </section>
@@ -1949,12 +1949,12 @@
 		</div>
 		<div class="nino-grid-100">
 			<div class="nino-bento">
-				<article class="nino-bento-item nino-article nino-article--alt"><div class="nino-article-content"><h4 class="nino-article-title">Workshop</h4><div class="nino-article-descr">Bento tile 1 — the width changes in a six-item rhythm.</div></div></article>
-				<article class="nino-bento-item nino-article nino-article--alt"><div class="nino-article-content"><h4 class="nino-article-title">Material</h4><div class="nino-article-descr">Bento tile 2 — the width changes in a six-item rhythm.</div></div></article>
-				<article class="nino-bento-item nino-article nino-article--alt"><div class="nino-article-content"><h4 class="nino-article-title">Team</h4><div class="nino-article-descr">Bento tile 3 — the width changes in a six-item rhythm.</div></div></article>
-				<article class="nino-bento-item nino-article nino-article--alt"><div class="nino-article-content"><h4 class="nino-article-title">Projects</h4><div class="nino-article-descr">Bento tile 4 — the width changes in a six-item rhythm.</div></div></article>
-				<article class="nino-bento-item nino-article nino-article--alt"><div class="nino-article-content"><h4 class="nino-article-title">Directions</h4><div class="nino-article-descr">Bento tile 5 — the width changes in a six-item rhythm.</div></div></article>
-				<article class="nino-bento-item nino-article nino-article--alt"><div class="nino-article-content"><h4 class="nino-article-title">Contact</h4><div class="nino-article-descr">Bento tile 6 — the width changes in a six-item rhythm.</div></div></article>
+				<article class="nino-bento-item nino-card nino-card--alt"><div class="nino-card-content"><h4 class="nino-card-title">Workshop</h4><div class="nino-card-descr">Bento tile 1 — the width changes in a six-item rhythm.</div></div></article>
+				<article class="nino-bento-item nino-card nino-card--alt"><div class="nino-card-content"><h4 class="nino-card-title">Material</h4><div class="nino-card-descr">Bento tile 2 — the width changes in a six-item rhythm.</div></div></article>
+				<article class="nino-bento-item nino-card nino-card--alt"><div class="nino-card-content"><h4 class="nino-card-title">Team</h4><div class="nino-card-descr">Bento tile 3 — the width changes in a six-item rhythm.</div></div></article>
+				<article class="nino-bento-item nino-card nino-card--alt"><div class="nino-card-content"><h4 class="nino-card-title">Projects</h4><div class="nino-card-descr">Bento tile 4 — the width changes in a six-item rhythm.</div></div></article>
+				<article class="nino-bento-item nino-card nino-card--alt"><div class="nino-card-content"><h4 class="nino-card-title">Directions</h4><div class="nino-card-descr">Bento tile 5 — the width changes in a six-item rhythm.</div></div></article>
+				<article class="nino-bento-item nino-card nino-card--alt"><div class="nino-card-content"><h4 class="nino-card-title">Contact</h4><div class="nino-card-descr">Bento tile 6 — the width changes in a six-item rhythm.</div></div></article>
 			</div>
 		</div>
 	</div>
@@ -2184,7 +2184,7 @@
 			</p>
 			<dialog class="nino-modal" id="katalog-modal">
 				<button type="button" class="nino-modal-close" aria-label="Close">&times;</button>
-				<h4 class="nino-article-title">Dialog</h4>
+				<h4 class="nino-card-title">Dialog</h4>
 				<p class="nino-section-text">Any content — a form, a follow-up question or a detail view.</p>
 			</dialog>
 			<dialog class="nino-modal nino-modal--lightbox" id="katalog-lightbox">
@@ -2203,10 +2203,10 @@
 		</div>
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-section--border-1</span> <span class="nino-badge nino-badge--pill">.nino-section--border-2</span> <span class="nino-badge nino-badge--pill">.nino-section--border-3</span> <span class="nino-badge nino-badge--pill">.nino-section--border-primary</span> <span class="nino-badge nino-badge--pill">.nino-section--fullheight</span> <span class="nino-badge nino-badge--pill">.nino-section--fullwidth</span> <span class="nino-badge nino-badge--pill">.nino-hero--fullscreen</span> <span class="nino-badge nino-badge--pill">.nino-hero-arrowdown</span> <span class="nino-badge nino-badge--pill">.nino-cover-top</span> <span class="nino-badge nino-badge--pill">.nino-cover-center</span> <span class="nino-badge nino-badge--pill">.nino-cover-bottom</span></div>
 		<div class="nino-grid-100">
-			<div class="nino-article nino-article--alt nino-section--border-1 nino-mb-2"><p class="nino-section-text">.nino-section--border-1</p></div>
-			<div class="nino-article nino-article--alt nino-section--border-2 nino-mb-2"><p class="nino-section-text">.nino-section--border-2</p></div>
-			<div class="nino-article nino-article--alt nino-section--border-3 nino-mb-2"><p class="nino-section-text">.nino-section--border-3</p></div>
-			<div class="nino-article nino-article--alt nino-section--border-2 nino-section--border-primary nino-mb-2"><p class="nino-section-text">.nino-section--border-primary &mdash; the same rule in the brand colour</p></div>
+			<div class="nino-card nino-card--alt nino-section--border-1 nino-mb-2"><p class="nino-section-text">.nino-section--border-1</p></div>
+			<div class="nino-card nino-card--alt nino-section--border-2 nino-mb-2"><p class="nino-section-text">.nino-section--border-2</p></div>
+			<div class="nino-card nino-card--alt nino-section--border-3 nino-mb-2"><p class="nino-section-text">.nino-section--border-3</p></div>
+			<div class="nino-card nino-card--alt nino-section--border-2 nino-section--border-primary nino-mb-2"><p class="nino-section-text">.nino-section--border-primary &mdash; the same rule in the brand colour</p></div>
 			<p class="nino-section-text--quiet">The height and cover-image variants are shown in the presets section: <a href="#gruppe-frame">Frame</a>.</p>
 		</div>
 	</div>
@@ -2367,17 +2367,17 @@
 	</div>
 </section>
 
-<section class="nino-section nino-mt-0 nino-mb-0" id="artikelspalten" aria-labelledby="artikelspalten-title">
+<section class="nino-section nino-mt-0 nino-mb-0" id="kartenspalten" aria-labelledby="kartenspalten-title">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-mb-2">
-			<h3 class="nino-section-title nino-text-left" id="artikelspalten-title">Articles, all column breakpoints</h3>
+			<h3 class="nino-section-title nino-text-left" id="kartenspalten-title">Cards, all column breakpoints</h3>
 			<p class="nino-section-subtitle nino-text-left">The card level determines from which breakpoint image and text sit side by side.</p>
 		</div>
-		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-article-cols-s</span> <span class="nino-badge nino-badge--pill">.nino-article-cols-m</span> <span class="nino-badge nino-badge--pill">.nino-article-cols-l</span> <span class="nino-badge nino-badge--pill">.nino-article-cols-xl</span></div>
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-card-cols-s</span> <span class="nino-badge nino-badge--pill">.nino-card-cols-m</span> <span class="nino-badge nino-badge--pill">.nino-card-cols-l</span> <span class="nino-badge nino-badge--pill">.nino-card-cols-xl</span></div>
 		<div class="nino-grid-100">
-			<article class="nino-article nino-article--alt nino-article--wide nino-article-cols-s nino-mb-2"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="" loading="lazy" class="nino-article-img"><div class="nino-article-content"><h4 class="nino-article-title">.nino-article-cols-s</h4><div class="nino-article-descr">Image and text side by side from 480px.</div></div></article>
-			<article class="nino-article nino-article--alt nino-article--wide nino-article-cols-l nino-mb-2"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy" class="nino-article-img"><div class="nino-article-content"><h4 class="nino-article-title">.nino-article-cols-l</h4><div class="nino-article-descr">Image and text side by side from 1024px.</div></div></article>
-			<article class="nino-article nino-article--alt nino-article--wide nino-article-cols-xl nino-mb-2"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="" loading="lazy" class="nino-article-img"><div class="nino-article-content"><h4 class="nino-article-title">.nino-article-cols-xl</h4><div class="nino-article-descr">Image and text side by side from 1280px.</div></div></article>
+			<article class="nino-card nino-card--alt nino-card--wide nino-card-cols-s nino-mb-2"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="" loading="lazy" class="nino-card-img"><div class="nino-card-content"><h4 class="nino-card-title">.nino-card-cols-s</h4><div class="nino-card-descr">Image and text side by side from 480px.</div></div></article>
+			<article class="nino-card nino-card--alt nino-card--wide nino-card-cols-l nino-mb-2"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy" class="nino-card-img"><div class="nino-card-content"><h4 class="nino-card-title">.nino-card-cols-l</h4><div class="nino-card-descr">Image and text side by side from 1024px.</div></div></article>
+			<article class="nino-card nino-card--alt nino-card--wide nino-card-cols-xl nino-mb-2"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="" loading="lazy" class="nino-card-img"><div class="nino-card-content"><h4 class="nino-card-title">.nino-card-cols-xl</h4><div class="nino-card-descr">Image and text side by side from 1280px.</div></div></article>
 		</div>
 	</div>
 </section>
@@ -2426,20 +2426,20 @@
 	</div>
 </section>
 
-<section class="nino-section nino-section--alt nino-mt-0 nino-mb-0" id="artikel-fest" aria-labelledby="artikel-fest-title">
+<section class="nino-section nino-section--alt nino-mt-0 nino-mb-0" id="karten-fest" aria-labelledby="karten-fest-title">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-mb-2">
-			<h3 class="nino-section-title nino-text-left" id="artikel-fest-title">Articles without breakpoint</h3>
+			<h3 class="nino-section-title nino-text-left" id="karten-fest-title">Cards without breakpoint</h3>
 			<p class="nino-section-subtitle nino-text-left">The same rule applies to the card: without a breakpoint suffix, image and text are always side by side.</p>
 		</div>
-		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-article-cols</span> <span class="nino-badge nino-badge--pill">.nino-newsletter-inline</span> <span class="nino-badge nino-badge--pill">.nino-video--4-3</span> <span class="nino-badge nino-badge--pill">.nino-vpa--speed-fast</span> <span class="nino-badge nino-badge--pill">.nino-vpa--speed-medium</span></div>
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-card-cols</span> <span class="nino-badge nino-badge--pill">.nino-newsletter-inline</span> <span class="nino-badge nino-badge--pill">.nino-video--4-3</span> <span class="nino-badge nino-badge--pill">.nino-vpa--speed-fast</span> <span class="nino-badge nino-badge--pill">.nino-vpa--speed-medium</span></div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-pr-2 nino-mb-3">
-			<article class="nino-article nino-article--counter nino-article--wide nino-article-cols nino-mb-3">
-				<img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="" loading="lazy" class="nino-article-img">
-				<div class="nino-article-content"><h4 class="nino-article-title">.nino-article-cols</h4>
-					<div class="nino-article-descr">Image left, text right — regardless of breakpoint.</div></div>
+			<article class="nino-card nino-card--counter nino-card--wide nino-card-cols nino-mb-3">
+				<img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="" loading="lazy" class="nino-card-img">
+				<div class="nino-card-content"><h4 class="nino-card-title">.nino-card-cols</h4>
+					<div class="nino-card-descr">Image left, text right — regardless of breakpoint.</div></div>
 			</article>
-			<form class="nino-form nino-newsletter-inline nino-mb-3" action="#artikel-fest">
+			<form class="nino-form nino-newsletter-inline nino-mb-3" action="#karten-fest">
 				<label for="katalog-inline" class="nino-sr-only">E-Mail</label>
 				<input type="email" id="katalog-inline" name="email" class="nino-form-input" placeholder=".nino-newsletter-inline">
 				<button type="submit" class="nino-btn nino-btn--primary">Subscribe</button>

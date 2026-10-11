@@ -618,8 +618,8 @@
 	reproduces Nino.css exactly, which is the guarantee the whole design
 	layer rests on: switching it on must not move a project that has not
 	asked for anything.	*/
-	--article-img-max-width: 12vw;
-	--article-img-max-height: 20vh;
+	--card-img-max-width: 12vw;
+	--card-img-max-height: 20vh;
 	--grid-max-width: var(--nino-measure);
 }
 
@@ -747,7 +747,7 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 }
 
 
-/* ==== 9. content: v1 (hero-title default, hero-text default, quiet default, loud default, section-space default, article-space default, corners default, border default, shadow default) ==== */
+/* ==== 9. content: v1 (hero-title default, hero-text default, quiet default, loud default, section-space default, card-space default, corners default, border default, shadow default) ==== */
 /*	Nino Design - content v1
  *
  *	@name			Nino
@@ -758,7 +758,7 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
  *	@knob	quiet			Size of a quiet title, subtitle and text
  *	@knob	loud			Size of a loud title, subtitle and text
  *	@knob	section-space	Space above and below the content of a section
- *	@knob	article-space	Space inside a card and between its parts
+ *	@knob	card-space		Space inside a card and between its parts
  *	@knob	corners			Corners of a card
  *	@knob	border			Line round a card that has a ground
  *	@knob	shadow			Shadow of a card
@@ -819,9 +819,9 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 
 	/*	Twice the padding of a card's content, and the space under its title,
 		subtitle and description. The picture above them has half of it	*/
-	--content-article-space--less: 		var(--space-1);
-	--content-article-space--default: var(--space-2);
-	--content-article-space--more: 		var(--space-3);
+	--content-card-space--less: 		var(--space-1);
+	--content-card-space--default: var(--space-2);
+	--content-card-space--more: 		var(--space-3);
 
 	--content-corners--less: 					0rem;
 	--content-corners--default: 			var(--radius-small);
@@ -875,34 +875,34 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 	padding-bottom: var(--content-section-space);
 }
 
-.nino-article-content:where(:not([class*="nino-pt-"], [class*="nino-pb-"], [class*="nino-p-"])) {
-	padding: calc( var(--content-article-space) / 2 ) var(--content-article-space);
+.nino-card-content:where(:not([class*="nino-pt-"], [class*="nino-pb-"], [class*="nino-p-"])) {
+	padding: calc( var(--content-card-space) / 2 ) var(--content-card-space);
 }
-.nino-article-title:where(:not([class*="nino-mb-"], [class*="nino-m-"])),
-.nino-article-subtitle:where(:not([class*="nino-mb-"], [class*="nino-m-"])),
-.nino-article-descr:where(:not([class*="nino-mb-"], [class*="nino-m-"])) {
-	margin-bottom: var(--content-article-space);
+.nino-card-title:where(:not([class*="nino-mb-"], [class*="nino-m-"])),
+.nino-card-subtitle:where(:not([class*="nino-mb-"], [class*="nino-m-"])),
+.nino-card-descr:where(:not([class*="nino-mb-"], [class*="nino-m-"])) {
+	margin-bottom: var(--content-card-space);
 }
-.nino-article-img:where(:not([class*="nino-mb-"], [class*="nino-m-"])) {
-	margin-bottom: calc( var(--content-article-space) / 2 );
+.nino-card-img:where(:not([class*="nino-mb-"], [class*="nino-m-"])) {
+	margin-bottom: calc( var(--content-card-space) / 2 );
 }
 
 /*	A card, its picture inside it, and a column that paints a ground - rounded
 	as a card is, twice	*/
-.nino-article {
+.nino-card {
 	border-radius: var(--content-corners);
 }
-.nino-article-img {
+.nino-card-img {
 	border-radius: calc( var(--content-corners) * .7 );
 }
-.nino-article--fullwidth .nino-article-img {
+.nino-card--fullwidth .nino-card-img {
 	border-radius: var(--content-corners) var(--content-corners) 0 0;
 }
 .nino-grid--alt, .nino-grid--tint, .nino-grid--dark, .nino-grid--black, .nino-grid--primary, .nino-grid--brand-alt, .nino-grid--counter, .nino-grid--dim {
 	border-radius: calc( var(--content-corners) * 2 );
 }
 
-.nino-article--alt, .nino-article--tint, .nino-article--dark, .nino-article--black, .nino-article--primary, .nino-article--brand-alt, .nino-article--counter, .nino-article--dim {
+.nino-card--alt, .nino-card--tint, .nino-card--dark, .nino-card--black, .nino-card--primary, .nino-card--brand-alt, .nino-card--counter, .nino-card--dim {
 	border-width: var(--content-border);
 }
 
@@ -1254,8 +1254,8 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 	--components-space: var(--components-space--default);
 	--components-zebra: var(--components-zebra--default);
 	--components-zebra-ink: var(--components-zebra-ink--default);
-	--content-article-space: var(--content-article-space--default);
 	--content-border: var(--content-border--default);
+	--content-card-space: var(--content-card-space--default);
 	--content-corners: var(--content-corners--default);
 	--content-hero-text: var(--content-hero-text--default);
 	--content-hero-title: var(--content-hero-title--default);
