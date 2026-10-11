@@ -650,16 +650,22 @@ foreach( $libraryHeroes as $libraryHeroPage => $libraryHeroMarks ) {
 }
 check( 'the home, contact and 404 pages carry the hero classes where they carried the old ones'. ( $libraryHeroGaps === [] ? '' : ' - '. implode( ', ', $libraryHeroGaps ) ), $libraryHeroGaps === [] );
 
-// ...and the page that draws every class of Nino.css draws the nine of the hero
-preg_match_all( '/\.(nino-hero[a-z0-9-]*)/', (string) preg_replace( '#/\*.*?\*/#s', '', $ninoCss ), $heroDefined );
-$heroDefined = array_values( array_unique( $heroDefined[1] ) );
+// ...and the page that draws every class of Nino.css draws those of the hero, of the three levels of grounds and the two variants of the
+// subtitle of a card: a prefix each, with the number of classes it finds, so that a class added under one of them is one the page has to be given
+$demoPrefixes	= [ 'nino-hero' => 9, 'nino-grid--' => 10, 'nino-article--' => 11, 'nino-grid-bg' => 1, 'nino-article-subtitle--' => 2 ];
+$demoNames		= [ 'nino-hero' => 'nine hero classes', 'nino-grid--' => 'ten modifiers of a column', 'nino-article--' => 'eleven modifiers of a card', 'nino-grid-bg' => 'picture of a column',
+	'nino-article-subtitle--' => 'two variants of the subtitle of a card' ];
 preg_match_all( '/class="([^"]*)"/', (string) file_get_contents( __DIR__. '/../_admin/install/library/pages/.demo-catalogue/templates/.demo-catalogue.tpl' ), $demoClasses );
 $demoDrawn = [];
 foreach( $demoClasses[1] as $demoAttribute )
 	foreach( preg_split( '/\s+/', trim( $demoAttribute ) ) ?: [] as $demoClass )
 		$demoDrawn[$demoClass] = true;
-$heroUndrawn = array_values( array_filter( $heroDefined, static fn( string $class ): bool => isset( $demoDrawn[$class] ) === false ) );
-check( 'the catalogue page draws the nine hero classes Nino.css defines, by their new names'. ( $heroUndrawn === [] ? '' : ' - missing: '. implode( ', ', $heroUndrawn ) ), $heroUndrawn === [] && count( $heroDefined ) === 9 );
+foreach( $demoPrefixes as $demoPrefix => $demoCount ) {
+	preg_match_all( '/\.('. preg_quote( $demoPrefix, '/' ). '[a-z0-9-]*)/', (string) preg_replace( '#/\*.*?\*/#s', '', $ninoCss ), $demoDefined );
+	$demoDefined = array_values( array_unique( $demoDefined[1] ) );
+	$demoUndrawn = array_values( array_filter( $demoDefined, static fn( string $class ): bool => isset( $demoDrawn[$class] ) === false ) );
+	check( 'the catalogue page draws the '. $demoNames[$demoPrefix]. ' Nino.css defines'. ( $demoPrefix === 'nino-hero' ? ', by their new names' : '' ). ( $demoUndrawn === [] ? '' : ' - missing: '. implode( ', ', $demoUndrawn ) ), $demoUndrawn === [] && count( $demoDefined ) === $demoCount );
+}
 
 echo "\n";
 

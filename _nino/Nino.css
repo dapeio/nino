@@ -27,6 +27,12 @@
  *			and a size (--font-<role>-weight, -transform and -size). What
  *			reads which is said beside the defaults in :root.
  *
+ *			A section, a column and a card paint a ground with the same words
+ *			(alt, tint, dark, black, primary, brand-alt, and counter on a
+ *			column and a card): --color-ground and --color-ink name the one a
+ *			thing sits on, and the roles solved against it follow. That is said
+ *			beside the defaults in :root and under Grounds in chapter 04.
+ *
  *			--base-size and --text-4/-5/-6 step up at the 768px breakpoint (see
  *			the @media block right below :root) - mobile-first fluid type, not
  *			a fixed size scaled down for small screens. A project overriding
@@ -148,6 +154,59 @@
 	--color-focus-dark: var(--color-accent-dark);
 	--color-focus-black: var(--color-accent-black);
 
+	/*	The ground a thing sits on and the ink on it. :root answers for the
+		page; a section, a column and a card that paint a ground of their own
+		answer for it (see Grounds in chapter 04), and so does everything that
+		puts the page ground back or paints a surface of its own - an alert and a
+		toast with their status surfaces, a modal, the overlays - so that a rule
+		or a design layer that wants the pair, to mix a hover out of it or to draw
+		a hairline on it, reads it from here and not from the section it hopes it
+		is in.	*/
+	--color-ground: var(--color-section-default-bg);
+	--color-ink: var(--color-text);
+
+	/*	The border of each ground, handed down with the roles above. It is the
+		page's border until a design layer gives a ground one of its own - the
+		delivered theme.css sets none of them	*/
+	--color-border-default: var(--color-border);
+	--color-border-alt: var(--color-border);
+	--color-border-tint: var(--color-border);
+	--color-border-dark: var(--color-border);
+	--color-border-black: var(--color-border);
+	--color-border-primary: var(--color-border);
+	--color-border-brand-alt: var(--color-border);
+
+	/*	What a column and a card become on the counter ground, in three
+		families of properties, one for each part of a ground (bg, text, title,
+		accent, focus, border). The framework alone sets them; a theme never
+		writes one:
+			--counter-grid-*        what a .nino-grid--counter becomes
+			--counter-grid-next-*   what a .nino-article--counter in a
+			                        .nino-grid--counter becomes
+			--counter-card-*        what a .nino-article--counter becomes
+		These are the page's, whose ground is default: a column stands out of it
+		as alt and a card in that column as default again, a card straight on the
+		page as alt. A section answers for its own ground, a column with a ground
+		for the cards in it - Grounds in chapter 04 has the rules and the pairs.	*/
+	--counter-grid-bg: var(--color-section-alt-bg);
+	--counter-grid-text: var(--color-section-alt-text);
+	--counter-grid-title: var(--color-section-alt-text);
+	--counter-grid-accent: var(--color-accent-alt);
+	--counter-grid-focus: var(--color-focus-alt);
+	--counter-grid-border: var(--color-border-alt);
+	--counter-grid-next-bg: var(--color-section-default-bg);
+	--counter-grid-next-text: var(--color-section-default-text);
+	--counter-grid-next-title: var(--color-title-default);
+	--counter-grid-next-accent: var(--color-accent-default);
+	--counter-grid-next-focus: var(--color-focus-default);
+	--counter-grid-next-border: var(--color-border-default);
+	--counter-card-bg: var(--color-section-alt-bg);
+	--counter-card-text: var(--color-section-alt-text);
+	--counter-card-title: var(--color-section-alt-text);
+	--counter-card-accent: var(--color-accent-alt);
+	--counter-card-focus: var(--color-focus-alt);
+	--counter-card-border: var(--color-border-alt);
+
 	/*	Deliberately under the text target: the one state that must not look
 		actionable. --nino-*-disabled is solved to 2.2:1 - identifiable, and
 		clearly not offered. */
@@ -173,7 +232,7 @@
 		.nino-article-title and .nino-hero-title, and its weight and transform
 		by every h1 to h6 as well: a heading without a class keeps the face of
 		the text and the size the browser gives it. The subtitle role is read
-		by the three subtitles, the text role by the page (weight and
+		by the three subtitles, the text role by the page (size, weight and
 		transform), the button role by .nino-btn and the code role by
 		.nino-code.
 
@@ -183,11 +242,10 @@
 		scale below and a subtitle the --text-2, a button is as large as
 		--fontsize-btn says and the code block is .875rem.
 
-		The text size is the root of that scale and reaches the text through
-		it. The page does not read it on body: a size in rem there would take
-		away the smaller size the browser gives a code, kbd, samp or pre that
-		has no class of its own, and they would come out as large as the text
-		around them.	*/
+		The text size is the root of that scale, and the page reads it on body.
+		A size in rem there takes away the smaller size the browser gives a
+		code, kbd, samp or pre - 13px beside text of 16px - so the reset states
+		it again for those four.	*/
 	--font-title-weight: bold;
 	--font-title-transform: none;
 	--font-title-size: var(--text-4);
@@ -234,13 +292,15 @@
 		because it stood on --text-3 where the other titles stand on --text-4.
 		Each is another number from 768px, where the scale above steps up (see
 		below). The --quiet and --loud variants of a section, an article and a
-		hero stand on a step of the scale, and --scale-quiet and --scale-loud
-		multiply that step: 1 is the step itself.	*/
+		hero are the size of the class they vary - the role, and for an article
+		title and a hero the role times its number - times --scale-quiet or
+		--scale-loud: a title that is made larger has a quiet and a loud
+		variant that follow it.	*/
 	--hero-title-scale: 1.2;
 	--hero-text-scale: 1.2;
 	--article-title-scale: calc(5 / 6);
-	--scale-quiet: 1;
-	--scale-loud: 1;
+	--scale-quiet: .85;
+	--scale-loud: 1.2;
 
 	--space-1: .5rem;
 	--space-2: 1rem;
@@ -319,6 +379,7 @@ body {
 	display: flex;
 	flex-direction: column;
 	line-height: inherit;
+	font-size: var(--font-text-size);
 	font-weight: var(--font-text-weight);
 	text-transform: var(--font-text-transform);
 	color: var(--color-text);
@@ -402,6 +463,45 @@ textarea {
 pre {
 	max-width: 100%;
 	overflow: auto;
+}
+
+/*	The browser sets a code, kbd, samp or pre smaller than the text around it -
+	13px beside 16px, from 768px 14.625px beside 18px - but only while nothing
+	above it has a size in rem, and the page reads one on body. So the ratio is
+	stated, once, for one that stands in none of the four: the one inside it
+	has the size of the first, as it had, and a class with a size of its own
+	(.nino-code) wins by its specificity	*/
+:is(code, kbd, samp, pre):not(:is(code, kbd, samp, pre) *) {
+	font-size: .8125em;
+}
+/*	The rule above gives every code that size, also inside an element that
+	states its size in rem - and there the browser never did: its quirk applies
+	only where the size around the code comes from a chain of keywords, and a
+	length ends the chain, so a code in such an element had the size of that
+	element. The kernel's sized classes for text, titles, prices, counts and
+	labels are such elements - the text and the description, the titles and the
+	subtitles of a section, an article and a hero, and the title and the price
+	of the pricing table, each with its --quiet and --loud, the price of an
+	article, the stat counter, the message of a form, the button and the filter
+	button - so a code in one of them says 1em, and is not made 13px beside 16,
+	19.5px beside 24 or 11.4px beside 14. :where() adds no specificity: the
+	rule is as specific as the one above and wins by coming after it, and a
+	class with a size of its own (.nino-code) wins over both	*/
+:where(
+	.nino-section-text, .nino-section-text--quiet, .nino-section-text--loud,
+	.nino-article-descr, .nino-article-descr--quiet, .nino-article-descr--loud,
+	.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud,
+	.nino-article-title, .nino-article-title--quiet, .nino-article-title--loud,
+	.nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud,
+	.nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud,
+	.nino-article-subtitle, .nino-article-subtitle--quiet, .nino-article-subtitle--loud,
+	.nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud,
+	.nino-pricing-title, .nino-pricing-title--quiet, .nino-pricing-title--loud,
+	.nino-pricing-price, .nino-pricing-price--quiet, .nino-pricing-price--loud,
+	.nino-article-price, .nino-stat-counter, .nino-form-message,
+	.nino-btn, .nino-filter-btn
+) :is(code, kbd, samp, pre):not(:is(code, kbd, samp, pre) *) {
+	font-size: 1em;
 }
 
 li {
@@ -580,6 +680,41 @@ h1, h2, h3, h4, h5, h6 {
 	padding: calc(var(--nino-stack-gap) / 2);
 }
 .nino-stack > * > .nino-btn { justify-self: start; }
+/*	A card as the cell of a stack - the stack's article attribute makes a cell an
+	article that carries the classes of the grid. A plain cell holds the half gap
+	as padding and is painted by what is in it; a card is painted by its own box,
+	so it takes the half gap as its margin instead, and its width is that of its
+	place in the grid less the whole gap: neighbours are one gap apart and the
+	stack's edges are the column's, as with the cells above. Its padding and its
+	border stay what they are on any card	*/
+.nino-stack > .nino-article {
+	margin: calc(var(--nino-stack-gap) / 2);
+	width: calc(100% - var(--nino-stack-gap));
+}
+@media (min-width: 640px) {
+	.nino-stack > .nino-article.nino-grid-s-25 { width: calc(25% - var(--nino-stack-gap)); }
+	.nino-stack > .nino-article.nino-grid-s-33 { width: calc(100% / 3 - var(--nino-stack-gap)); }
+	.nino-stack > .nino-article.nino-grid-s-50 { width: calc(50% - var(--nino-stack-gap)); }
+	.nino-stack > .nino-article.nino-grid-s-66 { width: calc(100% / 1.5 - var(--nino-stack-gap)); }
+	.nino-stack > .nino-article.nino-grid-s-75 { width: calc(75% - var(--nino-stack-gap)); }
+	.nino-stack > .nino-article.nino-grid-s-100 { width: calc(100% - var(--nino-stack-gap)); }
+}
+@media (min-width: 768px) {
+	.nino-stack > .nino-article.nino-grid-m-25 { width: calc(25% - var(--nino-stack-gap)); }
+	.nino-stack > .nino-article.nino-grid-m-33 { width: calc(100% / 3 - var(--nino-stack-gap)); }
+	.nino-stack > .nino-article.nino-grid-m-50 { width: calc(50% - var(--nino-stack-gap)); }
+	.nino-stack > .nino-article.nino-grid-m-66 { width: calc(100% / 1.5 - var(--nino-stack-gap)); }
+	.nino-stack > .nino-article.nino-grid-m-75 { width: calc(75% - var(--nino-stack-gap)); }
+	.nino-stack > .nino-article.nino-grid-m-100 { width: calc(100% - var(--nino-stack-gap)); }
+}
+@media (min-width: 1024px) {
+	.nino-stack > .nino-article.nino-grid-l-25 { width: calc(25% - var(--nino-stack-gap)); }
+	.nino-stack > .nino-article.nino-grid-l-33 { width: calc(100% / 3 - var(--nino-stack-gap)); }
+	.nino-stack > .nino-article.nino-grid-l-50 { width: calc(50% - var(--nino-stack-gap)); }
+	.nino-stack > .nino-article.nino-grid-l-66 { width: calc(100% / 1.5 - var(--nino-stack-gap)); }
+	.nino-stack > .nino-article.nino-grid-l-75 { width: calc(75% - var(--nino-stack-gap)); }
+	.nino-stack > .nino-article.nino-grid-l-100 { width: calc(100% - var(--nino-stack-gap)); }
+}
 /*	After .nino-stack, which sets a gap of its own: the class on the same
 	element has to be the later one	*/
 .nino-stack-gap-0 { --nino-stack-gap: 0px; }
@@ -757,8 +892,9 @@ body.nino-scroll-down .nino-scroll-header {
  *
  *
  *			.nino-hero(--fullscreen), .nino-hero(-title, -subtitle, -arrowdown)
- *			.nino-section(--dark, --black, --primary, --alt, --fullwidth, --border-1/2/3), .nino-section(-title, -subtitle)
- *			.nino-article(--alt, --fullwidth), .nino-article(-content, -title, -subtitle, -descr, -img, -price)
+ *			.nino-section(--alt, --tint, --dark, --black, --primary, --brand-alt, --fullwidth, --border-1/2/3), .nino-section(-title, -subtitle)
+ *			.nino-grid(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim)
+ *			.nino-article(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --fullwidth), .nino-article(-content, -title, -subtitle, -descr, -img, -price)
  *
  *
  ****************************************************************************************************/
@@ -788,13 +924,13 @@ body.nino-scroll-down .nino-scroll-header {
 	line-height: calc( var(--font-subtitle-size) * var(--hero-text-scale) *1.3 / 1.2 );
 	margin-bottom: var(--space-3);
 }
-/*	The variants stand on a step of the scale times 1.2, and multiply it by
-	--scale-quiet or --scale-loud: not by the hero's own scale, which is 1.25
-	from 768px where they have always been 1.2	*/
-.nino-hero-title--quiet { font-size: calc( var(--text-3) *1.2 * var(--scale-quiet) ); line-height: calc( var(--text-3) *1.3 * var(--scale-quiet) ); }
-.nino-hero-title--loud { font-size: calc( var(--text-5) *1.2 * var(--scale-loud) ); line-height: calc( var(--text-5) *1.2 * var(--scale-loud) ); }
-.nino-hero-subtitle--quiet { font-size: calc( var(--text-1) *1.2 * var(--scale-quiet) ); line-height: calc( var(--text-1) *1.4 * var(--scale-quiet) ); opacity: .7; }
-.nino-hero-subtitle--loud { font-size: calc( var(--text-3) *1.2 * var(--scale-loud) ); line-height: calc( var(--text-3) *1.3 * var(--scale-loud) ); opacity: 1; }
+/*	The variants are the size the hero has, times --scale-quiet or
+	--scale-loud, and the leading keeps its ratio to the size: 1.3 / 1.2 for a
+	quiet title, 1 for a loud one, 1.4 / 1.2 and 1.3 / 1.2 for the subtitles	*/
+.nino-hero-title--quiet { font-size: calc( var(--font-title-size) * var(--hero-title-scale) * var(--scale-quiet) ); line-height: calc( var(--font-title-size) * var(--hero-title-scale) * var(--scale-quiet) *1.3 / 1.2 ); }
+.nino-hero-title--loud { font-size: calc( var(--font-title-size) * var(--hero-title-scale) * var(--scale-loud) ); line-height: calc( var(--font-title-size) * var(--hero-title-scale) * var(--scale-loud) ); }
+.nino-hero-subtitle--quiet { font-size: calc( var(--font-subtitle-size) * var(--hero-text-scale) * var(--scale-quiet) ); line-height: calc( var(--font-subtitle-size) * var(--hero-text-scale) * var(--scale-quiet) *1.4 / 1.2 ); opacity: .7; }
+.nino-hero-subtitle--loud { font-size: calc( var(--font-subtitle-size) * var(--hero-text-scale) * var(--scale-loud) ); line-height: calc( var(--font-subtitle-size) * var(--hero-text-scale) * var(--scale-loud) *1.3 / 1.2 ); opacity: 1; }
 /*	Self-contained: the chevron is a background SVG (currentColor, so it
  *	always matches the hero's own text color - dark hero, light hero,
  *	whatever), so using it is just <button class="nino-hero-arrowdown"
@@ -836,6 +972,8 @@ body.nino-scroll-down .nino-scroll-header {
 }
 
 .nino-section {
+	--color-ground: var(--color-section-default-bg);
+	--color-ink: var(--color-section-default-text);
 	padding: var(--space-4) 0;
 	background-color: var(--color-section-default-bg);
 	color: var(--color-section-default-text);
@@ -847,51 +985,331 @@ body.nino-scroll-down .nino-scroll-header {
 	padding-right: 0;
 	margin: 0;
 }
-/*	A section that paints its own ground also owns the ink on it - the plain
-	`color` below only reaches what inherits, and a component that names a
-	colour role (a title, a price, an outline button) would otherwise keep the
-	page ground's value and pair it across surfaces.	*/
-.nino-section--dark {
-	background-color: var(--color-section-dark-bg);
-	color: var(--color-section-dark-text);
+/*	Grounds. A section, a column and a card paint a ground with the same
+	words - alt, tint, dark, black, primary and brand-alt, written
+	.nino-section--<x>, .nino-grid--<x> and .nino-article--<x> - and a column
+	and a card may also ask for the counter ground, below. A ground is a
+	surface, the ink solved for it and the roles solved against the pair: it
+	paints itself with the first two and hands all of them to what stands in
+	it, so that a title, a link, a button or a ring never has to know which
+	ground it was dropped onto. --color-ground and --color-ink name the pair;
+	--color-title, --color-subtitle, --color-accent, --color-focus and
+	--color-border are the roles that follow it, and a rule that reads one of
+	them is right on every ground. Nothing compares the ground of a thing
+	with the ground it sits on - there is no .nino-section--alt
+	.nino-article--alt - and an author who names a ground twice gets it
+	twice. That goes for what is written on a ground as well: the title and
+	the subtitle of a section and of a hero read --color-title and
+	--color-subtitle, the outline button --color-accent, and the filter button
+	and the arrow of a hero take the ink the ground paints. No rule of a
+	section stands above them, because it would reach past a column or a card
+	of another ground in between and write the ink of the section on it.	*/
+.nino-section--dark, .nino-grid--dark, .nino-article--dark {
+	--color-ground: var(--color-section-dark-bg);
+	--color-ink: var(--color-section-dark-text);
 	--color-title: var(--color-section-dark-text);
+	--color-subtitle: var(--color-section-dark-text);
 	--color-accent: var(--color-accent-dark);
 	--color-focus: var(--color-focus-dark);
+	--color-border: var(--color-border-dark);
+	background-color: var(--color-ground);
+	color: var(--color-ink);
 }
-.nino-section--black {
-	background-color: var(--color-section-black-bg);
-	color: var(--color-section-black-text);
+.nino-section--black, .nino-grid--black, .nino-article--black {
+	--color-ground: var(--color-section-black-bg);
+	--color-ink: var(--color-section-black-text);
 	--color-title: var(--color-section-black-text);
+	--color-subtitle: var(--color-section-black-text);
 	--color-accent: var(--color-accent-black);
 	--color-focus: var(--color-focus-black);
+	--color-border: var(--color-border-black);
+	background-color: var(--color-ground);
+	color: var(--color-ink);
 }
-.nino-section--primary {
-	background-color: var(--color-primary);
-	color: var(--color-primary-text);
+/*	The two brand grounds are filled with a brand colour and written on in
+	the ink solved for it, and that ink is also what a title, a link and a
+	ring on them are: an accent solved against a page would not clear the
+	target on a brand surface	*/
+.nino-section--primary, .nino-grid--primary, .nino-article--primary {
+	--color-ground: var(--color-primary);
+	--color-ink: var(--color-primary-text);
 	--color-title: var(--color-primary-text);
+	--color-subtitle: var(--color-primary-text);
 	--color-accent: var(--color-primary-text);
 	--color-focus: var(--color-primary-text);
+	--color-border: var(--color-border-primary);
+	background-color: var(--color-ground);
+	color: var(--color-ink);
 }
-.nino-section--alt {
-	background-color: var(--color-section-alt-bg);
-	color: var(--color-section-alt-text);
+.nino-section--alt, .nino-grid--alt, .nino-article--alt {
+	--color-ground: var(--color-section-alt-bg);
+	--color-ink: var(--color-section-alt-text);
 	--color-title: var(--color-section-alt-text);
+	--color-subtitle: var(--color-section-alt-text);
 	--color-accent: var(--color-accent-alt);
 	--color-focus: var(--color-focus-alt);
+	--color-border: var(--color-border-alt);
+	background-color: var(--color-ground);
+	color: var(--color-ink);
 }
-.nino-section--tint {
-	background-color: var(--color-section-tint-bg);
-	color: var(--color-section-tint-text);
+.nino-section--tint, .nino-grid--tint, .nino-article--tint {
+	--color-ground: var(--color-section-tint-bg);
+	--color-ink: var(--color-section-tint-text);
 	--color-title: var(--color-section-tint-text);
+	--color-subtitle: var(--color-section-tint-text);
 	--color-accent: var(--color-accent-tint);
 	--color-focus: var(--color-focus-tint);
+	--color-border: var(--color-border-tint);
+	background-color: var(--color-ground);
+	color: var(--color-ink);
 }
-.nino-section--brand-alt {
-	background-color: var(--color-brand-alt);
-	color: var(--color-brand-alt-text);
+.nino-section--brand-alt, .nino-grid--brand-alt, .nino-article--brand-alt {
+	--color-ground: var(--color-brand-alt);
+	--color-ink: var(--color-brand-alt-text);
 	--color-title: var(--color-brand-alt-text);
+	--color-subtitle: var(--color-brand-alt-text);
 	--color-accent: var(--color-brand-alt-text);
 	--color-focus: var(--color-brand-alt-text);
+	--color-border: var(--color-border-brand-alt);
+	background-color: var(--color-ground);
+	color: var(--color-ink);
+}
+
+/*	The counter ground is the ground that sets a thing off from the one it
+	sits on, and follows it when the section changes colour: alt for default,
+	default for alt, black for dark and dark for black, brand-alt for primary
+	and primary for brand-alt - and default for tint, which is a wash of the
+	page: a card of the alt surface on it reads worse than the page's own,
+	and default is what an alt card on a tint section has always become. A
+	column and a card ask for it by name, .nino-grid--counter and
+	.nino-article--counter, and nothing is told which ground they sit on: the
+	answer travels in the three families of :root, one property for each part
+	of a ground. A section sets them to the counter of its own ground (grid,
+	card) and to the counter of that (grid-next); a column with a ground sets
+	the card family; and a counter column sets its own ground from grid and
+	the card family from grid-next - a var() that resolves against what the
+	section left for it, so it needs no condition. Section alt > column
+	counter > card counter is default and then alt; every nesting of the three
+	levels is the same two steps, with no selector that names one ground
+	above another.	*/
+.nino-section--dark {
+	--counter-grid-bg: var(--color-section-black-bg);
+	--counter-grid-text: var(--color-section-black-text);
+	--counter-grid-title: var(--color-section-black-text);
+	--counter-grid-accent: var(--color-accent-black);
+	--counter-grid-focus: var(--color-focus-black);
+	--counter-grid-border: var(--color-border-black);
+	--counter-grid-next-bg: var(--color-section-dark-bg);
+	--counter-grid-next-text: var(--color-section-dark-text);
+	--counter-grid-next-title: var(--color-section-dark-text);
+	--counter-grid-next-accent: var(--color-accent-dark);
+	--counter-grid-next-focus: var(--color-focus-dark);
+	--counter-grid-next-border: var(--color-border-dark);
+	--counter-card-bg: var(--color-section-black-bg);
+	--counter-card-text: var(--color-section-black-text);
+	--counter-card-title: var(--color-section-black-text);
+	--counter-card-accent: var(--color-accent-black);
+	--counter-card-focus: var(--color-focus-black);
+	--counter-card-border: var(--color-border-black);
+}
+.nino-section--black {
+	--counter-grid-bg: var(--color-section-dark-bg);
+	--counter-grid-text: var(--color-section-dark-text);
+	--counter-grid-title: var(--color-section-dark-text);
+	--counter-grid-accent: var(--color-accent-dark);
+	--counter-grid-focus: var(--color-focus-dark);
+	--counter-grid-border: var(--color-border-dark);
+	--counter-grid-next-bg: var(--color-section-black-bg);
+	--counter-grid-next-text: var(--color-section-black-text);
+	--counter-grid-next-title: var(--color-section-black-text);
+	--counter-grid-next-accent: var(--color-accent-black);
+	--counter-grid-next-focus: var(--color-focus-black);
+	--counter-grid-next-border: var(--color-border-black);
+	--counter-card-bg: var(--color-section-dark-bg);
+	--counter-card-text: var(--color-section-dark-text);
+	--counter-card-title: var(--color-section-dark-text);
+	--counter-card-accent: var(--color-accent-dark);
+	--counter-card-focus: var(--color-focus-dark);
+	--counter-card-border: var(--color-border-dark);
+}
+.nino-section--primary {
+	--counter-grid-bg: var(--color-brand-alt);
+	--counter-grid-text: var(--color-brand-alt-text);
+	--counter-grid-title: var(--color-brand-alt-text);
+	--counter-grid-accent: var(--color-brand-alt-text);
+	--counter-grid-focus: var(--color-brand-alt-text);
+	--counter-grid-border: var(--color-border-brand-alt);
+	--counter-grid-next-bg: var(--color-primary);
+	--counter-grid-next-text: var(--color-primary-text);
+	--counter-grid-next-title: var(--color-primary-text);
+	--counter-grid-next-accent: var(--color-primary-text);
+	--counter-grid-next-focus: var(--color-primary-text);
+	--counter-grid-next-border: var(--color-border-primary);
+	--counter-card-bg: var(--color-brand-alt);
+	--counter-card-text: var(--color-brand-alt-text);
+	--counter-card-title: var(--color-brand-alt-text);
+	--counter-card-accent: var(--color-brand-alt-text);
+	--counter-card-focus: var(--color-brand-alt-text);
+	--counter-card-border: var(--color-border-brand-alt);
+}
+.nino-section--alt {
+	--counter-grid-bg: var(--color-section-default-bg);
+	--counter-grid-text: var(--color-section-default-text);
+	--counter-grid-title: var(--color-title-default);
+	--counter-grid-accent: var(--color-accent-default);
+	--counter-grid-focus: var(--color-focus-default);
+	--counter-grid-border: var(--color-border-default);
+	--counter-grid-next-bg: var(--color-section-alt-bg);
+	--counter-grid-next-text: var(--color-section-alt-text);
+	--counter-grid-next-title: var(--color-section-alt-text);
+	--counter-grid-next-accent: var(--color-accent-alt);
+	--counter-grid-next-focus: var(--color-focus-alt);
+	--counter-grid-next-border: var(--color-border-alt);
+	--counter-card-bg: var(--color-section-default-bg);
+	--counter-card-text: var(--color-section-default-text);
+	--counter-card-title: var(--color-title-default);
+	--counter-card-accent: var(--color-accent-default);
+	--counter-card-focus: var(--color-focus-default);
+	--counter-card-border: var(--color-border-default);
+}
+.nino-section--tint {
+	--counter-grid-bg: var(--color-section-default-bg);
+	--counter-grid-text: var(--color-section-default-text);
+	--counter-grid-title: var(--color-title-default);
+	--counter-grid-accent: var(--color-accent-default);
+	--counter-grid-focus: var(--color-focus-default);
+	--counter-grid-border: var(--color-border-default);
+	--counter-grid-next-bg: var(--color-section-alt-bg);
+	--counter-grid-next-text: var(--color-section-alt-text);
+	--counter-grid-next-title: var(--color-section-alt-text);
+	--counter-grid-next-accent: var(--color-accent-alt);
+	--counter-grid-next-focus: var(--color-focus-alt);
+	--counter-grid-next-border: var(--color-border-alt);
+	--counter-card-bg: var(--color-section-default-bg);
+	--counter-card-text: var(--color-section-default-text);
+	--counter-card-title: var(--color-title-default);
+	--counter-card-accent: var(--color-accent-default);
+	--counter-card-focus: var(--color-focus-default);
+	--counter-card-border: var(--color-border-default);
+}
+.nino-section--brand-alt {
+	--counter-grid-bg: var(--color-primary);
+	--counter-grid-text: var(--color-primary-text);
+	--counter-grid-title: var(--color-primary-text);
+	--counter-grid-accent: var(--color-primary-text);
+	--counter-grid-focus: var(--color-primary-text);
+	--counter-grid-border: var(--color-border-primary);
+	--counter-grid-next-bg: var(--color-brand-alt);
+	--counter-grid-next-text: var(--color-brand-alt-text);
+	--counter-grid-next-title: var(--color-brand-alt-text);
+	--counter-grid-next-accent: var(--color-brand-alt-text);
+	--counter-grid-next-focus: var(--color-brand-alt-text);
+	--counter-grid-next-border: var(--color-border-brand-alt);
+	--counter-card-bg: var(--color-primary);
+	--counter-card-text: var(--color-primary-text);
+	--counter-card-title: var(--color-primary-text);
+	--counter-card-accent: var(--color-primary-text);
+	--counter-card-focus: var(--color-primary-text);
+	--counter-card-border: var(--color-border-primary);
+}
+
+/*	A column that paints a ground keeps its content off the colour, and is
+	rounded as a card is. The cards in it take the counter of its ground	*/
+.nino-grid--alt, .nino-grid--tint, .nino-grid--dark, .nino-grid--black, .nino-grid--primary, .nino-grid--brand-alt, .nino-grid--counter, .nino-grid--dim {
+	padding: var(--space-2);
+	border-radius: var(--radius);
+}
+.nino-grid--dark {
+	--counter-card-bg: var(--color-section-black-bg);
+	--counter-card-text: var(--color-section-black-text);
+	--counter-card-title: var(--color-section-black-text);
+	--counter-card-accent: var(--color-accent-black);
+	--counter-card-focus: var(--color-focus-black);
+	--counter-card-border: var(--color-border-black);
+}
+.nino-grid--black {
+	--counter-card-bg: var(--color-section-dark-bg);
+	--counter-card-text: var(--color-section-dark-text);
+	--counter-card-title: var(--color-section-dark-text);
+	--counter-card-accent: var(--color-accent-dark);
+	--counter-card-focus: var(--color-focus-dark);
+	--counter-card-border: var(--color-border-dark);
+}
+.nino-grid--primary {
+	--counter-card-bg: var(--color-brand-alt);
+	--counter-card-text: var(--color-brand-alt-text);
+	--counter-card-title: var(--color-brand-alt-text);
+	--counter-card-accent: var(--color-brand-alt-text);
+	--counter-card-focus: var(--color-brand-alt-text);
+	--counter-card-border: var(--color-border-brand-alt);
+}
+.nino-grid--alt {
+	--counter-card-bg: var(--color-section-default-bg);
+	--counter-card-text: var(--color-section-default-text);
+	--counter-card-title: var(--color-title-default);
+	--counter-card-accent: var(--color-accent-default);
+	--counter-card-focus: var(--color-focus-default);
+	--counter-card-border: var(--color-border-default);
+}
+.nino-grid--tint {
+	--counter-card-bg: var(--color-section-default-bg);
+	--counter-card-text: var(--color-section-default-text);
+	--counter-card-title: var(--color-title-default);
+	--counter-card-accent: var(--color-accent-default);
+	--counter-card-focus: var(--color-focus-default);
+	--counter-card-border: var(--color-border-default);
+}
+.nino-grid--brand-alt {
+	--counter-card-bg: var(--color-primary);
+	--counter-card-text: var(--color-primary-text);
+	--counter-card-title: var(--color-primary-text);
+	--counter-card-accent: var(--color-primary-text);
+	--counter-card-focus: var(--color-primary-text);
+	--counter-card-border: var(--color-border-primary);
+}
+.nino-grid--counter {
+	--color-ground: var(--counter-grid-bg);
+	--color-ink: var(--counter-grid-text);
+	--color-title: var(--counter-grid-title);
+	--color-subtitle: var(--counter-grid-text);
+	--color-accent: var(--counter-grid-accent);
+	--color-focus: var(--counter-grid-focus);
+	--color-border: var(--counter-grid-border);
+	--counter-card-bg: var(--counter-grid-next-bg);
+	--counter-card-text: var(--counter-grid-next-text);
+	--counter-card-title: var(--counter-grid-next-title);
+	--counter-card-accent: var(--counter-grid-next-accent);
+	--counter-card-focus: var(--counter-grid-next-focus);
+	--counter-card-border: var(--counter-grid-next-border);
+	background-color: var(--color-ground);
+	color: var(--color-ink);
+}
+/*	A dimmed column is the dark ground whatever else it names, as a dimmed cover
+	is what it is whatever its section is: the scrim darkens the picture, so the
+	column writes in the ink of the dark ground, hands that ground's roles to what
+	stands in it and the counter of it to its cards, and paints the pair under
+	the picture. It comes once, after every ground of a column and after the
+	counter - rules of the same specificity, so the last one wins - and a column
+	that says --dim and --alt, --tint, --primary or --counter is not dark ink on
+	a darkened picture. --color-text is the page's ink also where a rule reads
+	that (an icon, a legend)	*/
+.nino-grid--dim {
+	--color-ground: var(--color-section-dark-bg);
+	--color-ink: var(--color-section-dark-text);
+	--color-title: var(--color-section-dark-text);
+	--color-subtitle: var(--color-section-dark-text);
+	--color-accent: var(--color-accent-dark);
+	--color-focus: var(--color-focus-dark);
+	--color-border: var(--color-border-dark);
+	--color-text: var(--color-section-dark-text);
+	--counter-card-bg: var(--color-section-black-bg);
+	--counter-card-text: var(--color-section-black-text);
+	--counter-card-title: var(--color-section-black-text);
+	--counter-card-accent: var(--color-accent-black);
+	--counter-card-focus: var(--color-focus-black);
+	--counter-card-border: var(--color-border-black);
+	background-color: var(--color-ground);
+	color: var(--color-ink);
 }
 
 .nino-section-title {
@@ -957,59 +1375,37 @@ body.nino-scroll-down .nino-scroll-header {
 	margin-top: var(--space-3);
 }
 
-/*	--quiet and --loud step one place down or up the type scale, per class.
- *	Each states its own rem size rather than scaling with em: an em font-size
- *	replaces the size the class sets for itself instead of adjusting it, so
- *	"loud" on a 1.5rem title used to make it smaller, not bigger. Line height
- *	moves with the step, otherwise the new size sits in the old leading.
- *	The step is multiplied by --scale-quiet or --scale-loud, which are 1: a
- *	design layer that wants every quiet variant smaller sets one number, and
- *	the steps stay where the scale puts them. */
-.nino-section-title--quiet { font-size: calc( var(--text-3) * var(--scale-quiet) ); line-height: calc( var(--text-3) * var(--scale-quiet) *1.3 ); opacity: .8; }
-.nino-section-title--loud { font-size: calc( var(--text-5) * var(--scale-loud) ); line-height: calc( var(--text-5) * var(--scale-loud) *1.2 ); }
-.nino-section-subtitle--quiet { font-size: calc( var(--text-1) * var(--scale-quiet) ); line-height: calc( var(--text-1) * var(--scale-quiet) *1.4 ); opacity: .7; }
-.nino-section-subtitle--loud { font-size: calc( var(--text-3) * var(--scale-loud) ); line-height: calc( var(--text-3) * var(--scale-loud) *1.3 ); opacity: 1; }
-.nino-section-text--quiet { font-size: calc( var(--text-1) *.9 * var(--scale-quiet) ); opacity: .8; }
-.nino-section-text--loud { font-size: calc( var(--text-2) * var(--scale-loud) ); line-height: calc( var(--text-2) * var(--scale-loud) *1.4 ); max-width: 52rem; }
+/*	--quiet and --loud are the size of the class they vary, smaller and larger,
+ *	per class: the size of the title role for a section title, of the subtitle
+ *	role for a subtitle, of the text role for the text - and for an article
+ *	title and a hero the size their base class has - times --scale-quiet or
+ *	--scale-loud (.85 and 1.2). Each states its own size rather than scaling
+ *	with em: an em font-size replaces the size the class sets for itself
+ *	instead of adjusting it, so "loud" on a 1.5rem title used to make it
+ *	smaller, not bigger. A title role that a design layer makes larger takes
+ *	its quiet and its loud variant with it, and two numbers move every
+ *	variant. Line height moves with the size, otherwise the new size sits in
+ *	the old leading. */
+.nino-section-title--quiet { font-size: calc( var(--font-title-size) * var(--scale-quiet) ); line-height: calc( var(--font-title-size) * var(--scale-quiet) *1.3 ); opacity: .8; }
+.nino-section-title--loud { font-size: calc( var(--font-title-size) * var(--scale-loud) ); line-height: calc( var(--font-title-size) * var(--scale-loud) *1.2 ); }
+.nino-section-subtitle--quiet { font-size: calc( var(--font-subtitle-size) * var(--scale-quiet) ); line-height: calc( var(--font-subtitle-size) * var(--scale-quiet) *1.4 ); opacity: .7; }
+.nino-section-subtitle--loud { font-size: calc( var(--font-subtitle-size) * var(--scale-loud) ); line-height: calc( var(--font-subtitle-size) * var(--scale-loud) *1.3 ); opacity: 1; }
+.nino-section-text--quiet { font-size: calc( var(--font-text-size) * var(--scale-quiet) ); opacity: .8; }
+.nino-section-text--loud { font-size: calc( var(--font-text-size) * var(--scale-loud) ); line-height: calc( var(--font-text-size) * var(--scale-loud) *1.4 ); max-width: 52rem; }
 .nino-text-center > .nino-section-text--loud { margin-right: auto; margin-left: auto; }
-.nino-section--alt .nino-section-title, .nino-section--alt .nino-section-subtitle,
-.nino-section--alt .nino-hero-title, .nino-section--alt .nino-hero-subtitle, .nino-section--alt .nino-hero-arrowdown {
-	color: var(--color-section-alt-text);
-}
-.nino-section--tint .nino-section-title, .nino-section--tint .nino-section-subtitle,
-.nino-section--tint .nino-hero-title, .nino-section--tint .nino-hero-subtitle, .nino-section--tint .nino-hero-arrowdown {
-	color: var(--color-section-tint-text);
-}
-.nino-section--dark .nino-section-title, .nino-section--dark .nino-section-subtitle,
-.nino-section--dark .nino-hero-title, .nino-section--dark .nino-hero-subtitle, .nino-section--dark .nino-hero-arrowdown,
-.nino-section--dark .nino-btn--outline, .nino-section--dark .nino-filter-btn {
-	color: var(--color-section-dark-text);
-}
-.nino-section--black .nino-section-title, .nino-section--black .nino-section-subtitle,
-.nino-section--black .nino-hero-title, .nino-section--black .nino-hero-subtitle, .nino-section--black .nino-hero-arrowdown,
-.nino-section--black .nino-btn--outline, .nino-section--black .nino-filter-btn {
-	color: var(--color-section-black-text);
-}
-.nino-section--primary .nino-section-title, .nino-section--primary .nino-section-subtitle,
-.nino-section--primary .nino-hero-title, .nino-section--primary .nino-hero-subtitle, .nino-section--primary .nino-hero-arrowdown {
-	color: var(--color-primary-text);
-}
-.nino-section--brand-alt .nino-section-title, .nino-section--brand-alt .nino-section-subtitle,
-.nino-section--brand-alt .nino-hero-title, .nino-section--brand-alt .nino-hero-subtitle, .nino-section--brand-alt .nino-hero-arrowdown {
-	color: var(--color-brand-alt-text);
-}
-.nino-cover--dim .nino-section-title, .nino-cover--dim .nino-section-subtitle,
-.nino-cover--dim .nino-hero-title, .nino-cover--dim .nino-hero-subtitle, .nino-cover--dim .nino-hero-arrowdown,
-.nino-cover--dim .nino-btn--outline, .nino-cover--dim .nino-filter-btn {
-	color: var(--color-section-black-text);
-}
 /*	The scrim is a dark ground like any other, so the roles follow it - the
-	ink itself included. Body copy, icons and anything else placed in a cover
-	take their colour from the page, and on a dimmed photograph the page's ink
-	is dark ink on a dark ground	*/
+	ink itself included, and the title and the subtitle: the titles and
+	subtitles of a section and of a hero, the outline button, the filter button
+	and the arrow of a hero take the colours of the scrim without a rule of the
+	cover's own. Body copy, icons and anything else placed in a cover take
+	their colour from the page, and on a dimmed photograph the page's ink is
+	dark ink on a dark ground	*/
 .nino-cover--dim {
 	color: var(--color-section-black-text);
+	--color-ground: var(--color-section-black-bg);
+	--color-ink: var(--color-section-black-text);
 	--color-title: var(--color-section-black-text);
+	--color-subtitle: var(--color-section-black-text);
 	--color-text: var(--color-section-black-text);
 	--color-accent: var(--color-accent-black);
 }
@@ -1048,7 +1444,7 @@ body.nino-scroll-down .nino-scroll-header {
 	border-radius: var(--radius-small);
 	box-shadow: var(--shadow-card);
 }
-.nino-article--fullwidth, .nino-article--fullwidth.nino-article--alt {
+.nino-article--fullwidth, .nino-article--fullwidth:is(.nino-article--alt, .nino-article--tint, .nino-article--dark, .nino-article--black, .nino-article--primary, .nino-article--brand-alt, .nino-article--counter) {
 	padding-left: 0;
 	padding-right: 0;
 	padding-top: 0;
@@ -1056,30 +1452,33 @@ body.nino-scroll-down .nino-scroll-header {
 /*	A card is a surface of its own, so it takes a solved pair rather than a
 	wash: rgba(0,0,0,.05) over the page ground darkened it just enough that
 	the ink the Design feature solved against that ground no longer cleared the target,
-	and the ink named here belonged to a surface the card was not on	*/
-.nino-article--alt {
-	background-color: var(--color-section-alt-bg);
-	color: var(--color-section-alt-text);
-	--color-title: var(--color-section-alt-text);
-	--color-accent: var(--color-accent-alt);
+	and the ink named here belonged to a surface the card was not on. It is
+	painted with the ground it names (above) or with the counter ground of
+	the one it sits on, and with nothing it works out by looking at that one:
+	an alt card in an alt section is alt on alt, and a card that wants to
+	stand out of its section says so with counter	*/
+.nino-article--alt, .nino-article--tint, .nino-article--dark, .nino-article--black, .nino-article--primary, .nino-article--brand-alt, .nino-article--counter {
 	border: 1px solid var(--color-border);
 	padding: var(--space-1);
 }
 .nino-article--borderless { border: 0; background: transparent; box-shadow: none; }
-.nino-section--alt .nino-article--alt, .nino-section--tint .nino-article--alt {
-	background-color: var(--color-section-default-bg);
-	color: var(--color-section-default-text);
-	--color-title: var(--color-title-default);
-	--color-accent: var(--color-accent-default);
+/*	After the borderless card: a card that names a ground is painted with it also
+	when it has no border, as the card that stepped out of its section by itself
+	always was. The fill is what it stands out with and what its ink was solved
+	for; a border is not what it needs. A borderless card of no ground stays
+	transparent. The six grounds set the pair above, the counter ground below	*/
+.nino-article--alt, .nino-article--tint, .nino-article--dark, .nino-article--black, .nino-article--primary, .nino-article--brand-alt, .nino-article--counter {
+	background-color: var(--color-ground);
 }
-/*	...and on a dark section the card steps down to the deepest surface for
-	the same reason - a white wash over a dark ground is a value nothing
-	solved an ink against	*/
-.nino-section--dark .nino-article--alt, .nino-section--dark.nino-article--alt {
-	background-color: var(--color-section-black-bg);
-	color: var(--color-section-black-text);
-	--color-title: var(--color-section-black-text);
-	--color-accent: var(--color-accent-black);
+.nino-article--counter {
+	--color-ground: var(--counter-card-bg);
+	--color-ink: var(--counter-card-text);
+	--color-title: var(--counter-card-title);
+	--color-subtitle: var(--counter-card-text);
+	--color-accent: var(--counter-card-accent);
+	--color-focus: var(--counter-card-focus);
+	--color-border: var(--counter-card-border);
+	color: var(--color-ink);
 }
 
 .nino-article-content {
@@ -1120,10 +1519,12 @@ body.nino-scroll-down .nino-scroll-header {
 }
 
 
-.nino-article-title--quiet { font-size: calc( var(--text-2) * var(--scale-quiet) ); opacity: .8; }
-.nino-article-title--loud { font-size: calc( var(--text-4) * var(--scale-loud) ); line-height: calc( var(--text-4) * var(--scale-loud) *1.3 ); }
-.nino-article-descr--quiet { font-size: calc( var(--text-1) *.9 * var(--scale-quiet) ); opacity: .8; }
-.nino-article-descr--loud { font-size: calc( var(--text-2) * var(--scale-loud) ); line-height: calc( var(--text-2) * var(--scale-loud) *1.4 ); }
+.nino-article-title--quiet { font-size: calc( var(--font-title-size) * var(--article-title-scale) * var(--scale-quiet) ); opacity: .8; }
+.nino-article-title--loud { font-size: calc( var(--font-title-size) * var(--article-title-scale) * var(--scale-loud) ); line-height: calc( var(--font-title-size) * var(--article-title-scale) * var(--scale-loud) *1.3 ); }
+.nino-article-subtitle--quiet { font-size: calc( var(--font-subtitle-size) * var(--scale-quiet) ); opacity: .7; }
+.nino-article-subtitle--loud { font-size: calc( var(--font-subtitle-size) * var(--scale-loud) ); }
+.nino-article-descr--quiet { font-size: calc( var(--font-text-size) * var(--scale-quiet) ); opacity: .8; }
+.nino-article-descr--loud { font-size: calc( var(--font-text-size) * var(--scale-loud) ); line-height: calc( var(--font-text-size) * var(--scale-loud) *1.4 ); }
 
 .nino-article-img--maxheight {
 	max-height: var(--article-img-max-height);
@@ -1383,15 +1784,27 @@ textarea:disabled {
 }
 /*	The status carries its own surface and the ink solved for it, exactly like
 	.nino-alert--error does: --color-error is a background, and used as text on
-	the page ground it lands at 2.6:1 on a dark theme	*/
+	the page ground it lands at 2.6:1 on a dark theme. It also says the pair it
+	is painted with, as the alert does, so that what is written in it reads
+	--color-ground and --color-ink and not those of the section it stands in	*/
 .nino-form-message:empty { display: none; }
 .nino-form.nino-is-error .nino-form-message,
 .nino-form.nino-is-success .nino-form-message {
 	padding: var(--space-1) var(--space-2);
 	border-radius: var(--radius);
 }
-.nino-form.nino-is-error .nino-form-message { background-color: var(--color-error); color: var(--color-error-text); }
-.nino-form.nino-is-success .nino-form-message { background-color: var(--color-success); color: var(--color-success-text); }
+.nino-form.nino-is-error .nino-form-message {
+	background-color: var(--color-error);
+	color: var(--color-error-text);
+	--color-ground: var(--color-error);
+	--color-ink: var(--color-error-text);
+}
+.nino-form.nino-is-success .nino-form-message {
+	background-color: var(--color-success);
+	color: var(--color-success-text);
+	--color-ground: var(--color-success);
+	--color-ink: var(--color-success-text);
+}
 .nino-form.nino-is-pending .nino-form-submit { opacity: .6; pointer-events: none; }
 
 .nino-newsletter-form .nino-form-input {
@@ -1490,8 +1903,20 @@ textarea:disabled {
 }
 .nino-badge--pill { border-radius: 999px; }
 .nino-badge--primary { background-color: var(--color-primary); color: var(--color-primary-text); }
-.nino-badge--success { background-color: var(--color-success); color: var(--color-success-text); }
-.nino-badge--error { background-color: var(--color-error); color: var(--color-error-text); }
+/*	A badge that reports a status paints the surface of the status and says so,
+	as the alert and the toast of a status do	*/
+.nino-badge--success {
+	background-color: var(--color-success);
+	color: var(--color-success-text);
+	--color-ground: var(--color-success);
+	--color-ink: var(--color-success-text);
+}
+.nino-badge--error {
+	background-color: var(--color-error);
+	color: var(--color-error-text);
+	--color-ground: var(--color-error);
+	--color-ink: var(--color-error-text);
+}
 .nino-badge-cloud {
 	display: flex;
 	flex-wrap: wrap;
@@ -1650,19 +2075,42 @@ textarea:disabled {
 /* Alert / inline feedback (static - form-specific feedback is .nino-form-message) */
 /*	Paints the page ground wherever it is dropped, so it restores that
 	ground's ink roles too - inside a dark section the -info variant would
-	otherwise take that section's accent onto its own light box	*/
+	otherwise take that section's accent onto its own light box - and says
+	which pair it is painted with	*/
 .nino-alert {
 	padding: var(--space-2);
 	border-radius: var(--radius);
 	border: 1px solid var(--color-border);
 	background-color: var(--color-background);
 	color: var(--color-text);
+	--color-ground: var(--color-background);
+	--color-ink: var(--color-text);
 	--color-title: var(--color-title-default);
 	--color-accent: var(--color-accent-default);
 }
-.nino-alert--success { background-color: var(--color-success); border-color: var(--color-success); color: var(--color-success-text); }
-.nino-alert--error { background-color: var(--color-error); border-color: var(--color-error); color: var(--color-error-text); }
-.nino-alert--warning { background-color: var(--color-warning); border-color: var(--color-warning); color: var(--color-warning-text); }
+/*	A status is a surface with ink of its own, and says so: the three paint the
+	pair of their role and not the page's that .nino-alert set	*/
+.nino-alert--success {
+	background-color: var(--color-success);
+	border-color: var(--color-success);
+	color: var(--color-success-text);
+	--color-ground: var(--color-success);
+	--color-ink: var(--color-success-text);
+}
+.nino-alert--error {
+	background-color: var(--color-error);
+	border-color: var(--color-error);
+	color: var(--color-error-text);
+	--color-ground: var(--color-error);
+	--color-ink: var(--color-error-text);
+}
+.nino-alert--warning {
+	background-color: var(--color-warning);
+	border-color: var(--color-warning);
+	color: var(--color-warning-text);
+	--color-ground: var(--color-warning);
+	--color-ink: var(--color-warning-text);
+}
 .nino-alert--info { border-color: var(--color-accent); color: var(--color-accent); }
 /*	The large variant takes the large radius: a box at three times the padding
 	keeps the same corner as a badge otherwise, which is what --radius-large
@@ -1723,6 +2171,8 @@ body.nino-scroll-btf .nino-back-to-top {
 .nino-table--striped tbody tr:nth-child(even) {
 	background-color: var(--color-section-alt-bg);
 	color: var(--color-section-alt-text);
+	--color-ground: var(--color-section-alt-bg);
+	--color-ink: var(--color-section-alt-text);
 	--color-title: var(--color-section-alt-text);
 	--color-accent: var(--color-accent-alt);
 }
@@ -2165,7 +2615,10 @@ body.nino-scroll-btf .nino-back-to-top {
 	page's	*/
 .nino-img-background--dim {
 	color: var(--color-section-black-text);
+	--color-ground: var(--color-section-black-bg);
+	--color-ink: var(--color-section-black-text);
 	--color-title: var(--color-section-black-text);
+	--color-subtitle: var(--color-section-black-text);
 	--color-text: var(--color-section-black-text);
 	--color-accent: var(--color-accent-black);
 }
@@ -2260,6 +2713,8 @@ body.nino-scroll-btf .nino-back-to-top {
 .nino-nav-burger input:checked ~ .nino-nav-content {
 	max-height: 100vh;
 	color: var(--color-text);
+	--color-ground: var(--color-background);
+	--color-ink: var(--color-text);
 	--color-title: var(--color-title-default);
 	--color-accent: var(--color-accent-default);
 }
@@ -2392,6 +2847,8 @@ header .nino-headernav-logo:empty {
 
 .nino-localepicker-wrap input:checked + div {
 	display:block;
+	--color-ground: var(--color-background);
+	--color-ink: var(--color-text);
 	--color-title: var(--color-title-default);
 	--color-accent: var(--color-accent-default);
 	position:fixed;
@@ -2471,7 +2928,7 @@ header .nino-headernav-logo:empty {
  *
  *			Ensure Nino.ui.js functionality.
  *
- *			.nino-parallex(--dim), .nino-cover(--dim), .nino-section-bg, .nino-slider, .nino-vpa, .nino-preloader
+ *			.nino-parallex(--dim), .nino-cover(--dim), .nino-section-bg, .nino-grid-bg, .nino-slider, .nino-vpa, .nino-preloader
  *			.nino-tabs-nav, .nino-tabs-tab, .nino-tabs-panel
  *			.nino-filter-nav, .nino-filter-btn, .nino-filter-count
  *			.nino-modal(--lightbox, --video), .nino-modal-close
@@ -2608,6 +3065,38 @@ header .nino-headernav-logo:empty {
 }
 @media (prefers-reduced-motion: reduce), (pointer: coarse) {
 	.nino-parallex > .nino-section-bg > img { top: 0 !important; height: 100%; transform: none !important; will-change: auto; animation: none; }
+}
+
+/*	The picture behind a column, in a block of its own that the content of the
+	column follows: what .nino-section-bg is to a section, for a column. It
+	lies over the whole column and is cut at its edges, in the corners of the
+	column, and the picture covers it. A column with a picture is the box the
+	picture is placed in and a stacking context of its own, so that the
+	picture goes behind the content without leaving the column and the
+	content stays where it was in the flow. --dim darkens it with the scrim
+	of a dimmed cover, and the column writes in the ink of the dark ground	*/
+.nino-grid-bg {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	border-radius: inherit;
+	z-index: -1;
+}
+.nino-grid-bg > img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+:has(> .nino-grid-bg) {
+	position: relative;
+	isolation: isolate;
+}
+.nino-grid--dim > .nino-grid-bg::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background-color: var(--color-background-dim);
 }
 
 /* Contentslider */
@@ -2930,6 +3419,8 @@ header .nino-headernav-logo:empty {
 	width: 480px;
 	background-color: var(--color-background);
 	color: var(--color-text);
+	--color-ground: var(--color-background);
+	--color-ink: var(--color-text);
 	--color-title: var(--color-title-default);
 	--color-accent: var(--color-accent-default);
 }
@@ -2980,6 +3471,8 @@ header .nino-headernav-logo:empty {
 	border-radius: var(--radius);
 	background-color: var(--color-section-black-bg);
 	color: var(--color-section-black-text);
+	--color-ground: var(--color-section-black-bg);
+	--color-ink: var(--color-section-black-text);
 	--color-title: var(--color-section-black-text);
 	--color-accent: var(--color-accent-black);
 	box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
@@ -2991,13 +3484,18 @@ header .nino-headernav-logo:empty {
 	opacity: 1;
 	transform: translateY(0);
 }
+/*	A toast that reports a status paints the surface of the status, and says so */
 .nino-toast--success {
 	background-color: var(--color-success);
 	color: var(--color-success-text);
+	--color-ground: var(--color-success);
+	--color-ink: var(--color-success-text);
 }
 .nino-toast--error {
 	background-color: var(--color-error);
 	color: var(--color-error-text);
+	--color-ground: var(--color-error);
+	--color-ink: var(--color-error-text);
 }
 
 /****************************************************************************************************

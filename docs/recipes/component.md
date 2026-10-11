@@ -101,6 +101,11 @@ The rules the module keeps for you, and the ones it leaves to the renderer:
 - A schema that cannot be worked with is an `E_USER_ERROR` at registration - a
   name that is no slug, an unknown `source` or type, a `select` without options
   or with a default outside them, an attribute without a default.
+- `draws` and `in` are optional and change nothing about the rendering: the tag
+  and the class the renderer draws (`'p .project-countdown'`, with a name in
+  braces for an attribute of the schema) and where a tool offers the component
+  (a list of `section`, `cell` and `hero`). A renderer reads no context, so a
+  component that is drawn another way in another place is another component.
 
 ## 2. A stack from the project
 
@@ -129,9 +134,11 @@ public static function stackPeople( array &$appData, array $args ): string {
 `renderStack()` runs the loop of `[elements]` with the same `sort`, `offset`,
 `limit`, `query` and `callback`, renders the content once per element with the
 element as the context, and gives each cell to the function. `grid => true`
-adds `cols`, `gap` and `autoheight` and passes the cell's classes as the
-fourth argument; `\Nino\Modules\Components::cell()` puts them on the element
-you draw. Inside the content a component's source is a field of the element
+adds `cols`, `gap`, `autoheight` and `article` and passes the cell's classes
+and the card it asks for as the fourth argument;
+`\Nino\Modules\Components::cell()` puts them on the element you draw - a
+`<div>`, or the `<article class="nino-article ...">` of a card where `article`
+says so. Inside the content a component's source is a field of the element
 (`[title name]`). A stack never stands directly inside another.
 
 ## 3. A component from a feature

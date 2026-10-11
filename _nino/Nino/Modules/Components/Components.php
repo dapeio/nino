@@ -35,14 +35,19 @@ namespace Nino\Modules {
 			for a token of its own	*/
 		public static
 			$html = [
-				'title'				=> '<[[tag]] class="nino-[[pos]]-title[[style]][[class]]">[[value]]</[[tag]]>',
-				'subtitle'		=> '<[[tag]] class="nino-[[pos]]-subtitle[[style]][[class]]">[[value]]</[[tag]]>',
+				'title'				=> '<h[[level]] class="nino-section-title[[style]][[class]]">[[value]]</h[[level]]>',
+				'article-title'	=> '<h[[level]] class="nino-article-title[[style]][[class]]">[[value]]</h[[level]]>',
+				'hero-title'	=> '<h[[level]] class="nino-hero-title[[style]][[class]]">[[value]]</h[[level]]>',
+				'subtitle'		=> '<p class="nino-section-subtitle[[style]][[class]]">[[value]]</p>',
+				'article-subtitle'	=> '<p class="nino-article-subtitle[[style]][[class]]">[[value]]</p>',
+				'hero-subtitle'	=> '<p class="nino-hero-subtitle[[style]][[class]]">[[value]]</p>',
 				'text'				=> '<div class="nino-section-text[[richtext]][[style]][[class]]">[[value]]</div>',
 				'img'					=> '<img src="[[src]]" width="[[width]]" height="[[height]]" alt="[[alt]]">',
 				'image'				=> '<div class="nino-image[[ratio]][[focus]][[class]]">[[img]]</div>',
 				'button'			=> '<a class="nino-btn[[style]][[size]][[class]]"[[href]][[target]]>[[value]]</a>',
 				'spacer'			=> '<div class="nino-mt-[[size]][[class]]"></div>',
 				'cell'				=> '<div[[class]][[attributes]]>[[inner]]</div>',
+				'card'				=> '<article[[class]][[attributes]]>[[inner]]</article>',
 				'stack'				=> '<div class="nino-grid-row nino-stack[[gap]][[class]]"[[id]]>[[cells]]</div>',
 				'slider'			=> '<div class="nino-slider[[class]]"[[id]][[width]][[min]]><ul>[[cells]]</ul></div>',
 				'slide'				=> '<li>[[inner]]</li>',
@@ -77,6 +82,15 @@ namespace Nino\Modules {
 		// list, so that no feature can break the preview with one of its own
 		public const array PREVIEWS = [ 'title', 'text', 'image', 'button', 'block', 'cells' ];
 
+		// Where a tool offers a component, see validate(): in a column of a
+		// section, in the cell of a loop, in a hero
+		public const array PLACES = [ 'section', 'cell', 'hero' ];
+
+		// What the cell of a stack with a grid may be: nothing, a card on the
+		// ground it sits on, on the counter ground of it, or on a ground of
+		// its own - the words of the grounds of Nino.css
+		private const array CARDS = [ '', 'card', 'counter', 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt' ];
+
 		// The widths a cell may have in a grid, as Nino.css has them
 		private const array WIDTHS = [ '25', '33', '50', '66', '75', '100' ];
 
@@ -89,7 +103,9 @@ namespace Nino\Modules {
 
 		// The attributes every stack has, as a schema's attributes are written:
 		// the loop of [elements] and the id that filter, autoheight and slider
-		// find a stack by - and, for a stack with a grid, what its cells are
+		// find a stack by - and, for a stack with a grid, what its cells are:
+		// their widths, the gap between them, whether they are one height and
+		// whether each is a card
 		private const array LOOP = [
 			'sort'				=> [ 'type' => 'string', 'default' => '' ],
 			'offset'			=> [ 'type' => 'int', 'min' => 0, 'default' => 0 ],
@@ -103,6 +119,8 @@ namespace Nino\Modules {
 			'cols'				=> [ 'type' => 'string', 'default' => self::COLS ],
 			'gap'					=> [ 'type' => 'int', 'min' => 0, 'max' => 6, 'default' => 2 ],
 			'autoheight'	=> [ 'type' => 'bool', 'default' => false ],
+			'article'			=> [ 'type' => 'select', 'options' => self::CARDS, 'default' => '', 'label' => [ 'en_US' => 'Cards', 'de_DE' => 'Karten' ],
+				'hint' => [ 'en_US' => 'What a cell is: nothing, a card on the ground it sits on, a card on the counter ground, or a card on a ground of its own.', 'de_DE' => 'Was eine Zelle ist: nichts, eine Karte auf ihrer Fläche, eine Karte auf der Gegenfläche oder eine Karte auf einer eigenen Fläche.' ] ],
 		];
 
 		/**
@@ -117,49 +135,48 @@ namespace Nino\Modules {
 		public static function init( array &$appData ): void {
 
 			$components = [
-				[ 'title', 'Title', 'Titel', 'title', 'text', [
-					'tag' => [ 'type' => 'select', 'options' => [ 'div', 'h2', 'h3', 'h4', 'h5' ], 'default' => 'h3', 'label' => [ 'en_US' => 'HTML-Tag', 'de_DE' => 'HTML-Tag' ] ],
-					'pos' => [ 'type' => 'select', 'options' => [ 'section', 'article' ], 'default' => 'section', 'label' => [ 'en_US' => 'Position', 'de_DE' => 'Position' ] ],
-					'style' => self::_style(),
-				] ],
-				[ 'subtitle', 'Subtitle', 'Untertitel', 'title', 'text', [
-					'tag' => [ 'type' => 'select', 'options' => [ 'div', 'h2', 'h3', 'h4', 'h5' ], 'default' => 'h3', 'label' => [ 'en_US' => 'HTML-Tag', 'de_DE' => 'HTML-Tag' ] ],
-					'pos' => [ 'type' => 'select', 'options' => [ 'section', 'article' ], 'default' => 'section', 'label' => [ 'en_US' => 'Position', 'de_DE' => 'Position' ] ],
-					'style' => self::_style(),
-				] ],
+				[ 'title', 'Title', 'Titel', 'title', 'text', self::_titled(), [ 'section' ], 'h{level} .nino-section-title' ],
+				[ 'article-title', 'Article title', 'Article-Titel', 'title', 'text', self::_titled(), [ 'cell' ], 'h{level} .nino-article-title' ],
+				[ 'hero-title', 'Hero title', 'Hero-Titel', 'title', 'text', self::_titled(), [ 'hero' ], 'h{level} .nino-hero-title' ],
+				[ 'subtitle', 'Subtitle', 'Untertitel', 'title', 'text', [ 'style' => self::_style() ], [ 'section' ], 'p .nino-section-subtitle' ],
+				[ 'article-subtitle', 'Article subtitle', 'Article-Untertitel', 'title', 'text', [ 'style' => self::_style() ], [ 'cell' ], 'p .nino-article-subtitle' ],
+				[ 'hero-subtitle', 'Hero subtitle', 'Hero-Untertitel', 'title', 'text', [ 'style' => self::_style() ], [ 'hero' ], 'p .nino-hero-subtitle' ],
 				[ 'text', 'Text', 'Text', 'text', 'text', [
 					'format' => [ 'type' => 'select', 'options' => [ 'inline', 'lines', 'blocks' ], 'default' => 'blocks', 'label' => [ 'en_US' => 'Format', 'de_DE' => 'Format' ],
 						'hint' => [ 'en_US' => 'What the text may hold: inline tags, line breaks, or paragraphs and lists.', 'de_DE' => 'Was der Text enthalten darf: Auszeichnungen, Zeilenumbrüche oder Absätze und Listen.' ] ],
 					'style' => self::_style(),
-				] ],
+				], null, null ],
 				[ 'image', 'Image', 'Bild', 'image', 'image', [
 					'alt' => [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Alternative text', 'de_DE' => 'Alternativtext' ],
 						'hint' => [ 'en_US' => 'Used where the slot has no text of its own. Empty marks the picture as decoration.', 'de_DE' => 'Gilt, wo der Slot keinen eigenen Text hat. Leer kennzeichnet das Bild als Dekoration.' ] ],
 					'focus' => [ 'type' => 'select', 'options' => [ '', '1', '2', '3', '4', '5', '6', '7', '8', '9' ], 'default' => '', 'label' => [ 'en_US' => 'Focus', 'de_DE' => 'Fokus' ],
 						'hint' => [ 'en_US' => 'Which part of the picture survives a crop, as one of nine positions.', 'de_DE' => 'Welcher Teil des Bildes beim Zuschneiden bleibt, als eine von neun Positionen.' ] ],
 					'ratio' => [ 'type' => 'select', 'options' => [ '', '1-1', '4-3', '3-2', '16-9', '21-9' ], 'default' => '', 'label' => [ 'en_US' => 'Ratio', 'de_DE' => 'Seitenverhältnis' ] ],
-				] ],
+				], null, null ],
 				[ 'button', 'Button', 'Knopf', 'button', 'text', [
 					'href' => [ 'type' => 'href', 'default' => '', 'label' => [ 'en_US' => 'Link', 'de_DE' => 'Ziel' ],
 						'hint' => [ 'en_US' => 'A text key, an address, or in a stack a field of the element.', 'de_DE' => 'Ein Textschlüssel, eine Adresse oder in einem Stapel ein Feld des Elements.' ] ],
 					'style' => [ 'type' => 'select', 'options' => [ '', 'primary', 'outline', 'light', 'dark', 'brand-alt' ], 'default' => '', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ] ],
 					'size' => [ 'type' => 'select', 'options' => [ '', 'small', 'big' ], 'default' => '', 'label' => [ 'en_US' => 'Size', 'de_DE' => 'Größe' ] ],
 					'target' => [ 'type' => 'select', 'options' => [ '', '_blank' ], 'default' => '', 'label' => [ 'en_US' => 'Opens in', 'de_DE' => 'Öffnet in' ] ],
-				] ],
-				[ 'html', 'HTML', 'HTML', 'block', 'content', [] ],
+				], null, 'a .nino-btn' ],
+				[ 'html', 'HTML', 'HTML', 'block', 'content', [], null, null ],
 				[ 'spacer', 'Spacer', 'Abstand', 'block', 'none', [
 					'size' => [ 'type' => 'select', 'options' => [ '1', '2', '3', '4', '5', '6' ], 'default' => '2', 'label' => [ 'en_US' => 'Size', 'de_DE' => 'Größe' ] ],
-				] ],
+				], null, null ],
 			];
 
-			foreach( $components as [ $name, $en, $de, $preview, $source, $attributes ] )
-				self::addComponent( $appData, $name, [ self::class, 'component'. ucfirst( $name ) ], [
+			// Each class is a component of its own, and the schema says where a tool
+			// offers it ('in') and what it draws ('draws'): the renderer reads no
+			// context, so a title in a card is the one that draws the title of a card
+			foreach( $components as [ $name, $en, $de, $preview, $source, $attributes, $in, $draws ] )
+				self::addComponent( $appData, $name, [ self::class, 'component'. str_replace( ' ', '', ucwords( str_replace( '-', ' ', $name ) ) ) ], [
 					'label'				=> [ 'en_US' => $en, 'de_DE' => $de ],
 					'source'			=> $source,
 					'loop'				=> true,
 					'attributes'	=> $attributes,
 					'preview'			=> $preview,
-				] );
+				] + ( $in !== null ? [ 'in' => $in ] : [] ) + ( $draws !== null ? [ 'draws' => $draws ] : [] ) );
 
 			$stacks = [
 				[ 'stack', 'Stack', 'Stapel', 'cells', true, [] ],
@@ -198,7 +215,19 @@ namespace Nino\Modules {
 		 */
 		private static function _style(): array {
 			return [ 'type' => 'select', 'options' => [ '', 'loud', 'quiet' ], 'default' => '', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ],
-				'hint' => [ 'en_US' => 'A step up or down the type scale.', 'de_DE' => 'Eine Stufe größer oder kleiner in der Schriftgröße.' ] ];
+				'hint' => [ 'en_US' => 'Quieter or louder than the role: the size times the quiet or the loud factor.', 'de_DE' => 'Leiser oder lauter als die Rolle: die Größe mal dem Quiet- oder dem Loud-Faktor.' ] ];
+		}
+
+		/**
+		 *	The attributes the three titles share, a level and a style
+		 *
+		 *	@return 	array										The attributes' schemas
+		 */
+		private static function _titled(): array {
+			return [
+				'level' => [ 'type' => 'select', 'options' => [ '1', '2', '3', '4' ], 'default' => '2', 'label' => [ 'en_US' => 'Level', 'de_DE' => 'Ebene' ] ],
+				'style' => self::_style(),
+			];
 		}
 
 		/**
@@ -355,7 +384,8 @@ namespace Nino\Modules {
 		 *
 		 *	@param		string		$name					The shortcode, a slug
 		 *	@param		mixed			$schema				label, source (not for a stack), loop, attributes, preview;
-		 *																	for a stack grid and assets. See docs/development.md
+		 *																	in and draws for a component, grid and assets for a stack.
+		 *																	See docs/development.md
 		 *	@param		bool			$stack				Read it as a stack's
 		 *
 		 *	@return 	array|string						The clean schema, or what is wrong with it
@@ -421,6 +451,49 @@ namespace Nino\Modules {
 					return $result;
 
 				$clean['attributes'][$attribute] = $result;
+			}
+
+			// Where a tool offers the component, and what it draws, both optional:
+			// left out of the clean schema where the schema leaves them out - no
+			// 'in' is everywhere, no 'draws' is nothing to show, and an empty one is
+			// refused, so that leaving the key out is the one way to say so
+			if( $stack === false ) {
+
+				if( isset( $schema['in'] ) === true ) {
+
+					if( is_array( $schema['in'] ) === false || array_is_list( $schema['in'] ) === false || $schema['in'] === [] )
+						return $what. ': "in" must be a non-empty list of '. implode( ', ', self::PLACES );
+
+					foreach( $schema['in'] as $place )
+						if( in_array( $place, self::PLACES, true ) === false )
+							return $what. ': "in" lists only '. implode( ', ', self::PLACES );
+
+					if( count( array_unique( $schema['in'] ) ) !== count( $schema['in'] ) )
+						return $what. ': "in" names a place twice';
+
+					$clean['in'] = $schema['in'];
+				}
+
+				if( isset( $schema['draws'] ) === true ) {
+
+					$draws = $schema['draws'];
+
+					if( is_string( $draws ) === false || strlen( $draws ) > 64 || preg_match( '/^[a-z0-9 .{}-]+$/D', $draws ) !== 1 )
+						return $what. ': "draws" must be a non-empty string of at most 64 characters from a-z, 0-9, space, ".", "-", "{" and "}"';
+
+					// Every placeholder names an attribute the schema declares, and no
+					// brace is left that is none
+					preg_match_all( '/\{([^{}]*)\}/', $draws, $placeholders );
+
+					foreach( $placeholders[1] as $placeholder )
+						if( array_key_exists( $placeholder, $clean['attributes'] ) === false )
+							return $what. ': "draws" has the placeholder {'. $placeholder. '}, and no attribute of that name';
+
+					if( preg_match( '/[{}]/', (string) preg_replace( '/\{[^{}]*\}/', '', $draws ) ) === 1 )
+						return $what. ': "draws" has a brace that closes or opens no placeholder';
+
+					$clean['draws'] = $draws;
+				}
 			}
 
 			if( $stack === true && isset( $schema['assets'] ) === true ) {
@@ -854,16 +927,16 @@ namespace Nino\Modules {
 		 *
 		 *	With a grid, each cell is told the classes of its width in the
 		 *	viewports (nino-grid-s-, -m- and -l-, from 'cols'), nino-autoheight
-		 *	and its group if 'autoheight' is set; without, nothing. The cell
-		 *	function dresses it, and puts those on the element it draws as
-		 *	the cell - cell() does that.
+		 *	and its group if 'autoheight' is set, and whether it is a card
+		 *	('article'); without, nothing. The cell function dresses it, and
+		 *	puts those on the element it draws as the cell - cell() does that.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					What a stack's callback is given: source (the type's uri),
 		 *																	content, grid, id and the attributes of the loop and the grid
 		 *	@param		callable	$cell					( string $inner, array $element, int $index, array $cell ): string -
-		 *																	$cell is [ 'class' => ..., 'attributes' => ... ], both empty
-		 *																	without a grid
+		 *																	$cell is [ 'class' => ..., 'attributes' => ..., 'article' => ... ],
+		 *																	all empty without a grid
 		 *
 		 *	@return 	string									The cells, '' where there is no element
 		 */
@@ -891,12 +964,15 @@ namespace Nino\Modules {
 				return '';
 
 			$model	= \Nino\Elements::getElementModel( $appData, $typeUri );
-			$info		= [ 'class' => '', 'attributes' => '' ];
+			$info		= [ 'class' => '', 'attributes' => '', 'article' => '' ];
 
 			if( ( $args['grid'] ?? false ) === true ) {
 
 				$widths	= self::_cols( (string) ( $args['cols'] ?? self::COLS ) );
 				$info['class'] = 'nino-grid-s-'. $widths[0]. ' nino-grid-m-'. $widths[1]. ' nino-grid-l-'. $widths[2];
+
+				$article = $args['article'] ?? '';
+				$info['article'] = in_array( $article, self::CARDS, true ) === true ? (string) $article : '';
 
 				if( ( $args['autoheight'] ?? '0' ) === '1' || ( $args['autoheight'] ?? false ) === true ) {
 
@@ -975,7 +1051,10 @@ namespace Nino\Modules {
 		/**
 		 *	One cell of a stack as an element: the dressing renderStack() hands
 		 *	the cell function, a class and attributes of the cell function's
-		 *	own added to it
+		 *	own added to it. The element is a div; a stack whose 'article' says
+		 *	so has an article of the class nino-article, with the modifier of
+		 *	the ground it names ('card' is none), in front of the classes of
+		 *	the grid and of the cell's own
 		 *
 		 *	@param		array			$cell					The last argument of the cell function
 		 *	@param		string		$inner				The rendered content
@@ -986,12 +1065,19 @@ namespace Nino\Modules {
 		 */
 		public static function cell( array $cell, string $inner, string $class = '', string $attributes = '' ): string {
 
-			$classes = trim( (string) ( $cell['class'] ?? '' ). ' '. $class );
+			$article = (string) ( $cell['article'] ?? '' );
+			$card = $article !== '' && in_array( $article, self::CARDS, true ) === true;
+
+			$classes = implode( ' ', array_filter( [
+				$card === true ? 'nino-article'. ( $article === 'card' ? '' : self::_modifier( 'nino-article--', $article ) ) : '',
+				trim( (string) ( $cell['class'] ?? '' ) ),
+				trim( $class ),
+			], static fn( string $part ): bool => $part !== '' ) );
 
 			return str_replace(
 				[ '[[class]]', '[[attributes]]', '[[inner]]' ],
 				[ $classes !== '' ? ' class="'. $classes. '"' : '', (string) ( $cell['attributes'] ?? '' ). $attributes, $inner ],
-				self::$html['cell']
+				self::$html[$card === true ? 'card' : 'cell']
 			);
 		}
 
@@ -1009,6 +1095,26 @@ namespace Nino\Modules {
 		}
 
 		/**
+		 *	The part of the six titles they share: the fragment of the one that
+		 *	is rendered, filled with its level where it has one, its style as
+		 *	a modifier of the class the fragment draws, its own class and its
+		 *	value
+		 *
+		 *	@param		string		$fragment			The key of its markup in $html
+		 *	@param		string		$modifier			What a style is written behind: the class of the fragment and two hyphens
+		 *	@param		array			$args					The arguments made ready by dispatch()
+		 *
+		 *	@return 	string
+		 */
+		private static function _title( string $fragment, string $modifier, array $args ): string {
+			return str_replace(
+				[ '[[level]]', '[[style]]', '[[class]]', '[[value]]' ],
+				[ $args['level'] ?? '', self::_modifier( $modifier, $args['style'] ), self::_modifier( '', $args['class'] ), $args['value'] ],
+				self::$html[$fragment]
+			);
+		}
+
+		/**
 		 *	Replace [title]: the heading of a section
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
@@ -1017,11 +1123,31 @@ namespace Nino\Modules {
 		 *	@return 	string
 		 */
 		public static function componentTitle( array &$appData, array $args ): string {
-			return str_replace(
-				[ '[[tag]]', '[[pos]]', '[[style]]', '[[class]]', '[[value]]' ],
-				[ $args['tag'], $args['pos'], self::_modifier( 'nino-'.$args['pos'].'-title--', $args['style'] ), self::_modifier( '', $args['class'] ), $args['value'] ],
-				self::$html['title']
-			);
+			return self::_title( 'title', 'nino-section-title--', $args );
+		}
+
+		/**
+		 *	Replace [article-title]: the heading of a card
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$args					The arguments made ready by dispatch()
+		 *
+		 *	@return 	string
+		 */
+		public static function componentArticleTitle( array &$appData, array $args ): string {
+			return self::_title( 'article-title', 'nino-article-title--', $args );
+		}
+
+		/**
+		 *	Replace [hero-title]: the heading of a hero
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$args					The arguments made ready by dispatch()
+		 *
+		 *	@return 	string
+		 */
+		public static function componentHeroTitle( array &$appData, array $args ): string {
+			return self::_title( 'hero-title', 'nino-hero-title--', $args );
 		}
 
 		/**
@@ -1033,11 +1159,31 @@ namespace Nino\Modules {
 		 *	@return 	string
 		 */
 		public static function componentSubtitle( array &$appData, array $args ): string {
-			return str_replace(
-				[ '[[tag]]', '[[pos]]', '[[style]]', '[[class]]', '[[value]]' ],
-				[ $args['tag'], $args['pos'], self::_modifier( 'nino-'.$args['pos'].'-subtitle--', $args['style'] ), self::_modifier( '', $args['class'] ), $args['value'] ],
-				self::$html['subtitle']
-			);
+			return self::_title( 'subtitle', 'nino-section-subtitle--', $args );
+		}
+
+		/**
+		 *	Replace [article-subtitle]: the line under the heading of a card
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$args					The arguments made ready by dispatch()
+		 *
+		 *	@return 	string
+		 */
+		public static function componentArticleSubtitle( array &$appData, array $args ): string {
+			return self::_title( 'article-subtitle', 'nino-article-subtitle--', $args );
+		}
+
+		/**
+		 *	Replace [hero-subtitle]: the line under the heading of a hero
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$args					The arguments made ready by dispatch()
+		 *
+		 *	@return 	string
+		 */
+		public static function componentHeroSubtitle( array &$appData, array $args ): string {
+			return self::_title( 'hero-subtitle', 'nino-hero-subtitle--', $args );
 		}
 
 		/**

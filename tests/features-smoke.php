@@ -158,6 +158,23 @@ check( 'a manifest that declares them is read complete, the schemas normalized; 
 	&& \Nino\Features::manifest( $manifestDir. '/WithComponents' )['components']['probe']['attributes']['tone']['options'] === [ 'a', 'b' ]
 	&& \Nino\Features::manifest( $manifestDir. '/WithComponents' )['stacks']['rows'] === [ 'label' => 'Rows', 'grid' => true, 'preview' => 'cells', 'attributes' => [] ]
 	&& \Nino\Features::manifest( $manifestDir. '/Mini' )['components'] === [] && \Nino\Features::manifest( $manifestDir. '/Mini' )['stacks'] === [] && ninoWarnings() === [] );
+// ...and so are the two keys that say where a component may stand and what it draws: the manifest is read by the same
+// validate() the kernel's own components are, so a wrong word is refused here with the name of the component
+check( 'the places a component may stand in, and what it draws, are carried by the manifest when good',
+	\Nino\Features::manifest( writeManifest( $manifestDir, 'WithPlaces', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'in' => [ 'section', 'hero' ], 'draws' => 'p .x-probe-{tone}' ] ] ] ) )['components']['probe']['in'] === [ 'section', 'hero' ]
+	&& \Nino\Features::manifest( $manifestDir. '/WithPlaces' )['components']['probe']['draws'] === 'p .x-probe-{tone}'
+	&& array_key_exists( 'in', \Nino\Features::manifest( $manifestDir. '/WithComponents' )['components']['probe'] ) === false
+	&& array_key_exists( 'draws', \Nino\Features::manifest( $manifestDir. '/WithComponents' )['components']['probe'] ) === false && ninoWarnings() === [] );
+check( '...so a place outside section, cell and hero, a place twice, none and not a list are refused',
+	manifestFails( $manifestDir, 'BadIn', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'in' => [ 'page' ] ] ] ], 'component "probe": "in"' )
+	&& manifestFails( $manifestDir, 'TwiceIn', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'in' => [ 'cell', 'cell' ] ] ] ], 'component "probe": "in"' )
+	&& manifestFails( $manifestDir, 'NoIn', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'in' => [] ] ] ], 'component "probe": "in"' )
+	&& manifestFails( $manifestDir, 'StringIn', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'in' => 'cell' ] ] ], 'component "probe": "in"' ) );
+check( '...and what it draws is a short selector of letters, digits, space, dot and dash whose placeholders are attributes it declares, and not empty',
+	manifestFails( $manifestDir, 'BadDraws', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'draws' => 'p > .x' ] ] ], 'component "probe": "draws"' )
+	&& manifestFails( $manifestDir, 'LongDraws', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'draws' => str_repeat( 'a', 65 ) ] ] ], 'component "probe": "draws"' )
+	&& manifestFails( $manifestDir, 'LostDraws', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'draws' => 'h{level} .x' ] ] ], 'component "probe": "draws"' )
+	&& manifestFails( $manifestDir, 'EmptyDraws', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'draws' => '' ] ] ], 'component "probe": "draws"' ) );
 check( 'extensions are names', manifestFails( $manifestDir, 'BadExt', [ 'name' => 'x', 'version' => '1.0.0', 'php' => [ 'ext' => [ 'g d' ] ] ], '"php"' ) );
 
 // The vocabulary is CATEGORIES, the rule is a slug. A feature written for a
@@ -501,6 +518,9 @@ $declared['/nino/modules'] = [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Samp
 check( 'a listed feature\'s components and stacks are registered with the schema of its manifest', array_keys( \Nino\Modules\Components::components( $declared ) ) === [ 'greeting' ] && array_keys( \Nino\Modules\Components::stacks( $declared ) ) === [ 'rows' ]
 	&& \Nino\Modules\Components::components( $declared )['greeting'] === $all['sample']['components']['greeting'] && \Nino\Modules\Components::stacks( $declared )['rows'] === $all['sample']['stacks']['rows']
 	&& \Nino\Modules\Components::defaults( $declared, 'greeting' ) === [ 'shout' => '0', 'class' => '' ] && ninoWarnings() === [] );
+check( '...and the places and the drawing of a component arrive in the registry with it, as the Builder reads them',
+	\Nino\Modules\Components::components( $declared )['greeting']['in'] === [ 'section', 'cell' ] && \Nino\Modules\Components::components( $declared )['greeting']['draws'] === 'p .sample-greeting'
+	&& $all['sample']['components']['greeting']['in'] === [ 'section', 'cell' ] && $all['sample']['components']['greeting']['draws'] === 'p .sample-greeting' );
 \Nino\Filesystem::putFileContent( $declared, '/text/global.php', [ '[[/feature/sample/greeting/text]]' => 'Hello [there]' ] );
 check( 'the renderer is componentGreeting() of the class: the name in studly caps behind the kind', \Nino\Html::renderHtml( $declared, '[greeting /feature/sample/greeting/text]' ) === '<p class="sample-greeting">Hello &#91;there]</p>'
 	&& \Nino\Html::renderHtml( $declared, '[greeting /feature/sample/greeting/text shout="1"]' ) === '<p class="sample-greeting">HELLO &#91;THERE]</p>' && \Nino\Html::renderHtml( $declared, '[greeting /nope/nope/nope/nope]' ) === '' );

@@ -23,14 +23,16 @@ All notable changes to Nino are documented in this file.
   a cell for, and `renderStack()` is the loop every stack shares. Rendering
   does not validate: an attribute that is not declared is ignored, a `select`
   outside its options is the default, and a source that resolves to nothing
-  renders nothing. The kernel brings `[title]`, `[subtitle]`, `[text]`
-  (`format="inline|lines|blocks"`), `[image]`, `[button]`, `[html]` and
-  `[spacer]`, and the stacks `[stack]`, `[slider]`, `[filter]` (with
-  `by="<field>"`) and `[list]`. A stack renders each cell itself, with the
-  element as the context, so the components in it see their element; the loop
-  is the one of `[elements]`, shared as `\Nino\Modules\Elements::queryLoop()`,
-  and `[elements]` is unchanged. A file the Builder writes renders by the
-  kernel alone. See [Components](docs/development.md#components) and the
+  renders nothing. The kernel brings the six titles `[title]`,
+  `[article-title]`, `[hero-title]`, `[subtitle]`, `[article-subtitle]` and
+  `[hero-subtitle]`, `[text]` (`format="inline|lines|blocks"`), `[image]`,
+  `[button]`, `[html]` and `[spacer]`, and the stacks `[stack]`, `[slider]`,
+  `[filter]` (with `by="<field>"`) and `[list]`. A stack renders each cell
+  itself, with the element as the context, so the components in it see their
+  element; the loop is the one of `[elements]`, shared as
+  `\Nino\Modules\Elements::queryLoop()`, and `[elements]` is unchanged. A
+  file the Builder writes renders by the kernel alone. See
+  [Components](docs/development.md#components) and the
   [component recipe](docs/recipes/component.md).
 - **Features:** the manifest keys `components` and `stacks`, `name => schema`,
   read by the same validation as `addComponent()` and refusing the manifest
@@ -168,17 +170,37 @@ All notable changes to Nino are documented in this file.
   takes the size of the title role times `--article-title-scale`, 5 / 6 and
   from 768px 25 / 32, which is the `--text-3` it stood on where the other
   titles stand on `--text-4`. The `--quiet` and `--loud` variants of a
-  section, an article and a hero stand on the step of the scale they stood on
-  and multiply it by `--scale-quiet` and `--scale-loud`, both 1: they are
-  steps, and no constant factor of the size they vary, so the two numbers
-  move them together.
-- **Nino.css:** the page does not read `--font-text-size` on `body`. A size
-  in rem there takes the smaller size the browser gives a `code`, `kbd`,
-  `samp` or `pre` with no class of its own away - 13px beside text of 16px -
-  and every page that has one would change. The delivered `assets/theme.css`
-  is unchanged and assigns `--text-1` to `--text-6` from its own raster, which
-  wins over the scale of `Nino.css`: on a project made from it the scale
-  follows `--font-text-size` once those six lines are gone.
+  section, an article and a hero are the size of the class they vary times
+  `--scale-quiet` and `--scale-loud` (`.85` and `1.2`), so the two numbers
+  move them together; their sizes are listed below.
+- **Nino.css:** the page reads the text size, and a bare `code` says its own.
+  `body` has `font-size: var(--font-text-size)`, which takes the smaller size
+  the browser gives a `code`, `kbd`, `samp` or `pre` with no class of its own
+  away (13px beside text of 16px), so these four state it themselves: `.8125em`
+  of the size around them, which is 13px beside 16px and 14.625px from 768px,
+  where the root is 112.5%. The rule leaves the ones inside another of the
+  four alone, so a `code` in a `pre` is not made smaller twice, and
+  `.nino-code` keeps the code role. The browser's quirk stops where an element
+  states its size in a length, so a bare `code` inside one had the size of
+  that element, and `.8125em` of it would be smaller than it was. In the
+  kernel's own sized classes for text, titles, prices, counts and labels -
+  `.nino-section-text` and `.nino-article-descr`, the title and the subtitle
+  of a section, of an article and of a hero, the title and the price of the
+  pricing table, each with its `--quiet` and `--loud`, `.nino-article-price`,
+  `.nino-stat-counter`, `.nino-form-message`, `.nino-btn` and
+  `.nino-filter-btn` - a bare `code`, `kbd`, `samp` or `pre` says
+  `font-size: 1em` instead, in one rule right after the first, and keeps the
+  size of its text: 16px in a `[text]`, 24px in a section title and 14px in a
+  form message at 375px, as before. The two in the quiet paragraph of the
+  demo catalogue's include template, the only ones in such text on that page,
+  follow their paragraph, 13.6px and from 768px 15.3px. One thing differs: a
+  bare `code` inside any other element that states its size in rem - one of a
+  project's own, or a menu link, the footer title, a logos item or a glyph
+  button of the kernel's - had the size of that element and is `.8125em` of
+  it now. The delivered `assets/theme.css` is unchanged and assigns `--text-1`
+  to `--text-6` from its own raster, which wins over the scale of `Nino.css`:
+  on a project made from it the scale follows `--font-text-size` once those
+  six lines are gone.
 - **Nino.css:** `--grid-gutter` is the space between the viewport and a row,
   the padding `.nino-grid-row` had - `--space-2`, and from 768px `--space-3`,
   which the `@media` block now states in the property instead of in a second
@@ -189,6 +211,193 @@ All notable changes to Nino are documented in this file.
   `.nino-pricing-row--feature-middle` and the toast keep the shadows they
   have. The design manual lists all the properties under "Hooks in
   `Nino.css`".
+- **Nino.css:** grounds on three levels. A section, a column and a card paint
+  a ground with the same words - `.nino-section--<x>`, `.nino-grid--<x>` and
+  `.nino-article--<x>`, with `<x>` one of `alt`, `tint`, `dark`, `black`,
+  `primary` and `brand-alt` - and a column and a card may ask for `counter`,
+  below. Two new roles name the ground a thing is on and the ink on it,
+  `--color-ground` and `--color-ink` (`:root` is the page, `.nino-section` the
+  default pair), and every ground sets them with `--color-title`,
+  `--color-subtitle`, `--color-accent`, `--color-focus` and `--color-border`
+  for what stands in it and paints itself with the pair, so a rule that reads
+  a role is right on every ground. `--color-border-<ground>` for `default`,
+  `alt`, `tint`, `dark`, `black`, `primary` and `brand-alt` is the border of
+  each ground, the page's `--color-border` until a design layer says
+  otherwise; the delivered `theme.css` sets none of them and stays as it is.
+  What puts the page ground back inside a section - an alert, a modal, the
+  open burger menu and language picker, the toast, the striped rows of a
+  table, a dimmed cover and a dimmed picture - sets the pair it paints, and
+  the status alerts, toasts, badges and form messages, which paint a surface
+  of their own, the pair of their status. The section title and subtitle of a
+  ground are in the colour of the roles now, and their per-section rules are
+  gone, as are those of the hero and of the buttons, in the next entry. A
+  column that paints a ground has `padding: var(--space-2)` and the radius of
+  a card, and a card of every ground has the border and the padding
+  `.nino-article--alt` had. A `.nino-article--borderless` takes the border and
+  the shadow away and keeps the ground a card names, ink and surface
+  together; only a plain card without a border is transparent. A card of a
+  ground re-points the subtitle as a section does: a `.nino-section-subtitle`
+  in an explicit `.nino-article--alt` on a default section is written in the
+  card's ink now, where it was the page's muted subtitle colour; the demo
+  catalogue draws no such pair. At the defaults no computed colour of the demo
+  catalogue changes by it, but for those the next entry names.
+- **Nino.css:** what is written on a ground is in the colours of the nearest
+  one. The title, the subtitle and the arrow of a hero, the outline button and
+  the filter button of a dark and a black section, and in a dimmed cover the
+  title and the subtitle of a section too, had a rule of the section they
+  stood in - `.nino-section--dark .nino-btn--outline` and its like - which
+  wrote the ink of that section on whatever stood in a column or a card of
+  another ground inside it: measured, an outline button, a filter button or a
+  hero title in a `.nino-grid--alt` column in a dark section was white on the
+  alt ground, 1.08:1. **Removed:** all of those rules. A title reads
+  `--color-title` and a subtitle `--color-subtitle`, the outline button
+  `--color-accent` for its text, as it did for its border, and the filter
+  button and the arrow of a hero take the ink the ground paints; a dimmed
+  cover and a dimmed picture set `--color-subtitle` beside `--color-title`, so
+  that nothing has to be said for each thing in them. Measured in Chromium, in
+  both colour schemes at 375px and 1280px: of 5488 combinations - the titles
+  and subtitles of a section and of a hero, the arrow, an outline button and a
+  filter button in a column and in a card of every ground, in a dimmed cover
+  and in a dimmed picture, in a section of every ground - 1100 were under
+  4.5:1 before and none is now. Two things differ in the computed colours of
+  the demo catalogue, and nothing else does. The outline button of a dark and
+  a black section is written in the accent of that ground now, the colour of
+  its border, where it was the ink of the section: with the delivered theme
+  that accent is the link colour of the ground, so the buttons of the two
+  call-to-action sections and of the plain image banner are blue in both
+  colour schemes and no longer white (with `Nino.css` alone the accent of a
+  dark ground is its ink, and they stay white). And what stood in a card or a
+  picture of another ground is in the colours of that ground: in the light
+  scheme the title, the subtitle and the outline button of the image banner in
+  a card were white on the alt card and are in its ink and, for the button,
+  its accent, and the title and the subtitle of the dimmed picture in the
+  Images section, an alt section, were dark on the picture and are white.
+- **Nino.css:** the counter ground is explicit, and a card no longer flips by
+  itself. **Removed:** the three rules that made a `.nino-article--alt` in an
+  alt or tint section the default ground and one in a dark section the black
+  one. Nothing compares the ground of a thing with the ground it sits on any
+  more: an explicit `.nino-article--alt` in an alt section is alt on alt, and
+  a card or a column that should stand out of its surroundings asks for
+  `.nino-article--counter` or `.nino-grid--counter` and follows the section
+  when it changes colour. The pairs are fixed: default to alt, alt to default,
+  tint to default (an alt card on a wash of the page reads worse than the
+  page's own, and default is what the flip gave there), dark to black, black
+  to dark, primary to brand-alt and brand-alt to primary. The answer travels
+  in three families of properties, `--counter-grid-<part>` for a counter
+  column, `--counter-grid-next-<part>` for a counter card in it and
+  `--counter-card-<part>` for a counter card, with `<part>` one of `bg`,
+  `text`, `title`, `accent`, `focus` and `border`: `:root` sets them for the
+  page, a section for its own ground, a column with a ground for the cards in
+  it, and a counter column takes its ground from the first family and hands
+  the second to its cards - alt section, counter column, counter card is
+  default and then alt, and every other nesting of the three levels is the
+  same two steps without a selector that names one ground above another.
+  `.nino-cover--dim` and `.nino-img-background--dim` set the dark pair but not
+  the counter families, so a counter column or a counter card inside a dimmed
+  cover or picture takes the counter of its section - alt on a plain
+  section - while `.nino-grid--dim` hands its cards the counter of dark. The
+  framework sets these properties; a design layer never does. **A page that
+  relied on the flip** writes `.nino-article--counter` where it had
+  `.nino-article--alt` in an alt, tint or dark section; the demo catalogue
+  did so in its card, filter and article sections and in the tint specimen.
+- **Nino.css:** `.nino-grid-bg`, the picture behind a column, in a block of
+  its own before the content, as `.nino-section-bg` is for a section: it lies
+  over the whole column, is cut at its corners, its image covers it, and the
+  column is the box it is placed in. `.nino-grid--dim` darkens it with
+  `--color-background-dim`, as `.nino-cover--dim` does, and is the dark ground
+  whatever else the column names or sits on: it writes in the ink of that
+  ground, hands its roles to what stands in it and the counter of dark to its
+  cards, and paints the pair under the picture, so a column that says `--dim`
+  with `--alt`, `--tint`, `--primary` or `--counter` is not dark ink on a
+  darkened picture. The demo catalogue draws all of this in a new group,
+  *Grounds on three levels*: a section with a counter column and counter cards,
+  a column on each ground with a counter card in it, a card on each ground, a
+  column with a picture and `--dim`, the three levels nested, and the cells of
+  a stack as counter cards with a quiet, a plain and a loud subtitle.
+- **Components:** `[stack]` and `[filter]` take the attribute `article`, the
+  fourth attribute of a grid beside `cols`, `gap` and `autoheight`, labelled
+  *Cards* / *Karten*: empty, a cell is the `<div>` it was; `card`, `counter`,
+  `alt`, `tint`, `dark`, `black`, `primary` or `brand-alt` make it an
+  `<article class="nino-article[ nino-article--<x>]">` followed by the classes
+  of the grid and the cell's own, `card` without a modifier. `renderStack()`
+  hands the value to the cell function in the last argument and
+  `Components::cell()` draws it; `[slider]` and `[list]` have no grid and do
+  not take it, and a word that is none of the nine is empty. `Nino.css` lays
+  such a card into its row (`.nino-stack > .nino-article`): the half gap a
+  plain cell holds as padding is the card's margin, and its width is that of
+  its place in the grid less the gap, so neighbours are one gap apart and the
+  edges of the stack are the column's, at every width of `cols`. The Builder
+  writes an attribute only where it differs from the default, so files that
+  exist are untouched; `defaults()` of a grid stack carries `article` as `''`.
+- **Components:** what a component draws and where it belongs. The schema
+  takes two optional keys, validated in `Components::validate()` and carried in
+  the registry - also for a feature's manifest, which is read by the same
+  function: `draws`, a non-empty string of at most 64 characters from `a-z`,
+  `0-9`, space, `.`, `{`, `}` and `-` in which every `{name}` is an attribute
+  of the schema, the tag, a space and the one class a theme addresses the
+  element by (`h{level} .nino-section-title`); and `in`, a non-empty list of
+  distinct words from `section`, `cell` and `hero`, where a tool offers the
+  component. A wrong value is refused like any other, an empty `draws` too (a
+  component with none leaves the key out). The kernel's titles are six
+  components now, each drawing one class, and no renderer reads a context:
+  `title`, `article-title` and `hero-title` draw `<h[[level]]
+  class="nino-section-title|nino-article-title|nino-hero-title...">` with
+  `level` and `style`, `subtitle`, `article-subtitle` and `hero-subtitle` draw
+  `<p class="nino-...-subtitle...">` with `style`. Their `in` is `section` for
+  the first pair, `cell` for the second and `hero` for the third, their
+  `draws` is `h{level} .nino-...-title` or `p .nino-...-subtitle`, and the new
+  four are labelled *Article title*, *Hero title*, *Article subtitle* and
+  *Hero subtitle* (*Article-Titel*, *Hero-Titel*, *Article-Untertitel*,
+  *Hero-Untertitel*). `[title]` and `[subtitle]` render as they did;
+  `[button]` declares `draws` (`a .nino-btn`); `[text]`, `[image]`, `[html]`,
+  `[spacer]` and the stacks declare neither key.
+- **Nino.css:** the `--quiet` and `--loud` variants of the section title,
+  section subtitle, section text, article title, article subtitle, article
+  description, hero title and hero subtitle are factors of their role: the
+  size of the class they vary (`--font-title-size`, `--font-subtitle-size`,
+  `--font-text-size`, and for the article title and the hero times
+  `--article-title-scale`, `--hero-title-scale` and `--hero-text-scale`) times
+  `--scale-quiet` or `--scale-loud`, which are `.85` and `1.2`, each keeping
+  its leading ratio and its opacity. They no longer stand on a step of the
+  `--text` ladder, so a design layer that makes the title role larger takes
+  the quiet and the loud title with it. **This changes the sizes of the
+  variants** (the pricing table's four stay on the ladder). Computed font
+  sizes in px at 375px and at 1280px, old to new:
+
+  | Variant | 375px | 1280px |
+  |---|---|---|
+  | `.nino-section-title--quiet` | 20 to 20.4 | 22.5 to 24.48 |
+  | `.nino-section-title--loud` | 28.8 to 28.8 | 36 to 34.56 |
+  | `.nino-section-subtitle--quiet` | 16 to 15.3 | 18 to 17.2125 |
+  | `.nino-section-subtitle--loud` | 20 to 21.6 | 22.5 to 24.3 |
+  | `.nino-section-text--quiet` | 14.4 to 13.6 | 16.2 to 15.3 |
+  | `.nino-section-text--loud` | 18 to 19.2 | 20.25 to 21.6 |
+  | `.nino-article-title--quiet` | 18 to 17 | 20.25 to 19.125 |
+  | `.nino-article-title--loud` | 24 to 24 | 28.8 to 27 |
+  | `.nino-article-subtitle--quiet` | new, 15.3 | new, 17.2125 |
+  | `.nino-article-subtitle--loud` | new, 21.6 | new, 24.3 |
+  | `.nino-article-descr--quiet` | 14.4 to 13.6 | 16.2 to 15.3 |
+  | `.nino-article-descr--loud` | 18 to 19.2 | 20.25 to 21.6 |
+  | `.nino-hero-title--quiet` | 24 to 24.48 | 27 to 30.6 |
+  | `.nino-hero-title--loud` | 34.56 to 34.56 | 43.2 to 43.2 |
+  | `.nino-hero-subtitle--quiet` | 19.2 to 18.36 | 21.6 to 19.125 |
+  | `.nino-hero-subtitle--loud` | 24 to 25.92 | 27 to 27 |
+
+  The 1280px values of the two hero variants are those of an element that
+  carries the variant alone. With the base class next to it, which is how
+  `[hero-title]` and `[hero-subtitle]` write them, the base class states its
+  size again from 768px, as it did before, and the variant acts below 768px
+  only.
+
+  The two article subtitle variants are new: `[article-subtitle
+  style="quiet"]` and `"loud"` wrote the classes, and no rule styled them.
+  The leading moves with the size and keeps its ratio. The design manual lists
+  `--scale-quiet` and `--scale-loud` and the new properties under "Hooks in
+  `Nino.css`". The hint of the `style` attribute of the six titles and of
+  `[text]` says what the variants are now, *Quieter or louder than the role:
+  the size times the quiet or the loud factor.* (*Leiser oder lauter als die
+  Rolle: die Größe mal dem Quiet- oder dem Loud-Faktor.*), where it said *A
+  step up or down the type scale.*
 
 ## v1.5.0 - 2026-10-06
 

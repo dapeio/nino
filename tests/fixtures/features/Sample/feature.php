@@ -37,6 +37,9 @@ return [
 				'shout'		=> [ 'type' => 'bool', 'default' => false, 'label' => [ 'en_US' => 'Shout', 'de_DE' => 'Rufen' ] ],
 			],
 			'preview'			=> 'text',
+			// Where the editor may put it and what it draws, the two keys the kernel's own titles carry
+			'in'					=> [ 'section', 'cell' ],
+			'draws'				=> 'p .sample-greeting',
 		],
 	],
 	'stacks'			=> [
