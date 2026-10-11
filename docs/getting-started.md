@@ -54,7 +54,7 @@ After completion, open:
 |---|---|
 | `/` | The configured website is delivered, in the theme the base unit brought. |
 | `/_admin` | The root account opens the workbench with every panel: content, structure and system. |
-| `/_admin#builder` | Only where the Builder is installed: the Builder panel in the Structure group, which composes a page template out of sections, columns and components. A fresh checkout ships no feature, so this panel is not there yet. |
+| `/_admin#builder` | Only where the Builder is installed: the Builder panel in the Features group, which composes a page template out of sections, columns and components. A fresh checkout ships no feature, so this panel is not there yet. |
 
 Also check every language and route, the navigation, and used forms. Save a text and an image as a test. Where the Builder is installed, open a `page-*.tpl` in the Builder panel, change nothing at first, and check whether its sections are recognized without warnings.
 

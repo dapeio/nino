@@ -174,13 +174,13 @@ Projekts unter `app/`. Siehe
 
 ## Die Workbench `/_admin`
 
-Eine Verwaltungsoberfläche mit einer Anmeldung. Sie hat einen eigenen Einstiegspunkt (`_admin/index.php`) und ist kein Frontend-Modul aus `/nino/modules`; jeder Bildschirm darin ist ein Panel, und ein Modul oder ein installiertes Feature kann eines beisteuern: Das eines Features steht in der Gruppe der Leiste, die sein `nav()` nennt, wenn das eine der vier ist, und in der eigenen Gruppe Features, wenn es keine oder etwas anderes nennt; das eines Moduls steht in der Gruppe, die es nennt, nie in Features, und unter Inhalt, wenn es keine nennt:
+Eine Verwaltungsoberfläche mit einer Anmeldung. Sie hat einen eigenen Einstiegspunkt (`_admin/index.php`) und ist kein Frontend-Modul aus `/nino/modules`; jeder Bildschirm darin ist ein Panel, und ein Modul oder ein installiertes Feature kann eines beisteuern: Das eines Features steht immer in der eigenen Gruppe Features der Leiste, gleich was sein `nav()` nennt; das eines Moduls steht in der Gruppe, die es nennt, nie in Features, und unter Inhalt, wenn es keine nennt:
 
 | Gruppe | Panels | Verantwortung |
 |---|---|---|
 | Inhalt | Dashboard, Elemente (mit Elementtypen), Texte (mit Textschlüsseln), Bilder (mit Bildplätzen), Anfragen, Log | tägliche Pflege von Inhalten, Bildern und Betriebsdaten; die Tabs in Klammern halten die Form dieser Inhalte und gehören dem Entwickler |
 | Struktur | Routen, Navigationen | die Struktur des Projekts: seine Routen und Menüs |
-| Features | Feature-Panels, die Features, keine der vier Gruppen oder ein anderes Wort nennen | das Panel eines installierten Features, das Features, keine der vier Gruppen oder ein anderes Wort nennt; ohne Überschrift, solange nichts darin liegt |
+| Features | was die aktiven Features mitbringen | eine Gruppe für das Panel jedes installierten Features, gleich welche Gruppe sein eigenes `nav()` nennt; ohne Überschrift, solange nichts darin liegt |
 | System | Nutzer (mit Nutzerrollen und Anmeldeschutz), Sprache (mit Übersetzungen), Backups, Konfiguration, Features | Konten und Rollen, Sprachen und Übersetzungsübergabe, Wiederherstellung, technische Konfiguration, installierte Features |
 
 Ein Konto hält eine Rolle, eine Rolle eine Menge von Berechtigungen, eine je Panel oder Tab; der Assistent schreibt **Editor** (jede Inhalt-Berechtigung) und **Developer** (`/*`), und der Tab Nutzerrollen des Panels Nutzer bearbeitet sie. Ein Panel, das ein Konto nicht verwenden darf, wird nicht gerendert. Die Abgrenzung verläuft damit zwischen vollständigem Entwicklungszugriff und berechtigungsgesteuerter redaktioneller Arbeit – innerhalb eines Werkzeugs. Solange das Projekt noch nicht existiert, liefert dieselbe Route den [Einrichtungsassistenten](setup.de.md); `/_admin/recovery.php` ist der Weg zurück, wenn die Konten selbst kaputt sind. Siehe das [`/_admin`-Handbuch](_admin.de.md).

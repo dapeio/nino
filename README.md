@@ -41,7 +41,7 @@ The included design system, with its base components and modules, provides a qui
 
 ![Textfill overview in the Nino workbench](docs/assets/screenshots/_admin1.webp)
 
-One management interface with one login. Developers set the project up and build its structure and appearance here; editors maintain its content here. Every screen is a panel, grouped into **Content** (elements, texts, images, submissions, log), **Structure** (routes, navigations), **Features** (the panel of an installed feature that names Features, none of the four groups, or another word) and **System** (users and roles, languages and translations, backups, config, features); the shape of the content – element types, text keys, image slots – sits on tabs beside it. An account holds a role, a role one permission per panel or tab; the wizard writes Editor and Developer, and a panel an account may not use is not rendered.
+One management interface with one login. Developers set the project up and build its structure and appearance here; editors maintain its content here. Every screen is a panel, grouped into **Content** (elements, texts, images, submissions, log), **Structure** (routes, navigations), **Features** (an installed feature's own panel, whatever group it names) and **System** (users and roles, languages and translations, backups, config, features); the shape of the content – element types, text keys, image slots – sits on tabs beside it. An account holds a role, a role one permission per panel or tab; the wizard writes Editor and Developer, and a panel an account may not use is not rendered.
 
 The workbench provides full access for development, diagnostics and corrections, and a narrow, permission-controlled surface for daily editorial work. All changes can alternatively be made directly in the file system. `/_admin/recovery.php` is the way back in when the accounts themselves are broken.
 
@@ -62,7 +62,7 @@ Every fresh checkout is configured through the wizard, which is what `/_admin` s
 
 #### The Builder - a feature
 
-The Builder composes a page template out of sections, rows, columns and components, and writes it back as the `page-*.tpl` file it read: the file is the truth, and what the Builder does not read it leaves byte for byte. Its panel sits in the Structure group of the rail and is a workspace panel - the rail folds to its icons, and the preview, which is the editor with tools on every frame, takes the whole width. A component is a shortcode with a schema; the kernel's `Components` module is the registry the Builder reads, and features declare their own in their manifest.
+The Builder composes a page template out of sections, rows, columns and components, and writes it back as the `page-*.tpl` file it read: the file is the truth, and what the Builder does not read it leaves byte for byte. Its panel sits in the Features group of the rail and is a workspace panel - the rail folds to its icons, and the preview, which is the editor with tools on every frame, takes the whole width. A component is a shortcode with a schema; the kernel's `Components` module is the registry the Builder reads, and features declare their own in their manifest.
 
 The Builder is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) (`features/Builder`) and is there while it is copied into `features/` and switched on in the Features panel. Its manual is the one of its `feature.php`, shown in that panel.
 

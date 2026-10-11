@@ -84,21 +84,21 @@ request:
   heading the link sits under; an unknown group falls back to `content` with
   a warning. `features` is not a free choice: it is refused the same way an
   unknown group is unless the panel's own class file lies below
-  `\Nino\Features::dir()`. A panel that does live there sits in the group its
-  `nav()` names when that is one of the four - the Builder names `structure` -
-  and in `features` when it names none or anything else; see
-  `Panels::_isFeaturePanel()`.
+  `\Nino\Features::dir()`, and a panel that does live there lands in
+  `features` regardless of what it names - a group, none or a word that is no
+  group - and with no warning, since the entry is read for the kernel's own
+  and `app/` panels only; see `Panels::_isFeaturePanel()`.
   The **Editor** role the wizard writes is every `content` panel's `perm()`
   at that moment (`Roles::defaults()`); a content panel a module brings later
   is offered on the roles tab like every other, and so is a feature's under
-  the group it sits in.
+  the `features` group.
 - `weight` orders the navigation within the group, lowest first, stable for
   equal weights. Core content panels sit at 0 (Dashboard), 20 (Elements), 30
   (Text), 40 (Images) and 90 (Logs); structure at 20 (Routes); system at
   2 (Users), 5 (Language), 10 (Backups), 15 (Features) and 20
   (Config). A module panel picks the slot it wants: Submissions 60,
   Navigations 25 (after Routes), Maintenance 18; a feature's panel names a
-  weight of its own just as well, within the group it sits in.
+  weight of its own just as well, which orders it within `features`.
 
 `tabs()` rules:
 

@@ -43,9 +43,9 @@ class FeaturesSmokeCollider {
 	public static function nav(): array { return [ 'sample-settings', 'Collider', 90, 'content' ]; }
 }
 
-/** A module answering the two feature panels that name a group of their own */
+/** A module answering the three feature panels that name a group of their own */
 class FeaturesSmokePlacedModule {
-	public static function adminPanels( array &$appData ): array { return [ \Nino\Modules\Sample\PlacedStructure::class, \Nino\Modules\Sample\PlacedNowhere::class ]; }
+	public static function adminPanels( array &$appData ): array { return [ \Nino\Modules\Sample\PlacedStructure::class, \Nino\Modules\Sample\PlacedNowhere::class, \Nino\Modules\Sample\PlacedContent::class ]; }
 }
 
 // --- Discovery ---------------------------------------------------------------
@@ -613,18 +613,21 @@ $owned = \Nino\Backup::manifest( $ownedAppData );
 check( 'a directory a feature declares is still carried, trailing slash and all', in_array( 'data/sample-dir/one.php', $owned, true ) === true
 	&& in_array( 'data/sample-dir/deeper/two.php', $owned, true ) === true );
 
-check( 'its class file sits below NINO_FEATURES_DIR and its nav() names no group, so the registry puts it into the features group', \Nino\Admin\Admin::panels( $appData )['sample']['group'] === 'features' );
+check( 'its class file sits below NINO_FEATURES_DIR, so the registry puts it into the features group', \Nino\Admin\Admin::panels( $appData )['sample']['group'] === 'features' );
 require_once __DIR__. '/fixtures/features/Sample/Admin/Placed.php';
 $placed = $appData;
-$placed['/nino/modules'][] = 'FeaturesSmokePlacedModule';
+// Asked before the reference feature's own module, so that the order of the
+// rail is the weights' and not the order the modules were asked in
+array_unshift( $placed['/nino/modules'], 'FeaturesSmokePlacedModule' );
 
-check( 'a feature panel naming one of the four groups sits there, one naming something else falls back to features without a warning', ( static function() use ( $placed ): bool {
+check( 'a feature panel sits in features whatever its nav() names - one of the four groups or a word that is no group - without a warning, and the weights order them there', ( static function() use ( $placed ): bool {
 	ninoWarnings();
 	$panels = \Nino\Admin\Admin::panels( $placed );
-	return ( $panels['sample-placed']['group'] ?? null ) === 'structure'
+	return ( $panels['sample-placed']['group'] ?? null ) === 'features'
 		&& ( $panels['sample-nowhere']['group'] ?? null ) === 'features'
+		&& ( $panels['sample-content']['group'] ?? null ) === 'features'
 		&& $panels['sample']['group'] === 'features'
-		&& array_search( 'sample-placed', array_keys( $panels ), true ) < array_search( 'sample', array_keys( $panels ), true )
+		&& array_values( array_intersect( array_keys( $panels ), [ 'sample', 'sample-placed', 'sample-nowhere', 'sample-content' ] ) ) === [ 'sample', 'sample-placed', 'sample-nowhere', 'sample-content' ]
 		&& ninoWarnings() === [];
 } )() );
 check( 'the registry sits it in the rail between the structure and the system panels, in GROUPS order', ( static function() use ( $appData ): bool {
@@ -637,11 +640,18 @@ check( 'the Roles tab offers the panel\'s permission under the features group, t
 	\Nino\Modules\Users\Admin::permOptions( $appData ),
 	true
 ) === true );
-check( 'the Roles tab offers the permission of a feature panel under the group it names, structure here, not under features', in_array(
-	[ 'perm' => \Nino\Modules\Sample\PlacedStructure::MANAGE_PERM, 'label' => 'Placed', 'group' => 'structure', 'offered' => true ],
+check( 'the Roles tab offers the permission of a feature panel under features, whatever its nav() names - structure here', in_array(
+	[ 'perm' => \Nino\Modules\Sample\PlacedStructure::MANAGE_PERM, 'label' => 'Placed', 'group' => 'features', 'offered' => true ],
 	\Nino\Modules\Users\Admin::permOptions( $placed ),
 	true
 ) === true );
+// The Editor role the wizard writes is every content panel's permission - a
+// feature's panel that names 'content' is not one of them, it sits in features
+check( '...and one naming content is offered under features too, and is not among the permissions the Editor role starts with', in_array(
+	[ 'perm' => \Nino\Modules\Sample\PlacedContent::MANAGE_PERM, 'label' => 'Placed content', 'group' => 'features', 'offered' => true ],
+	\Nino\Modules\Users\Admin::permOptions( $placed ),
+	true
+) === true && in_array( \Nino\Modules\Sample\PlacedContent::MANAGE_PERM, \Nino\Modules\Users\Roles::defaults( $placed )['editor']['perms'], true ) === false );
 
 $again = \Nino\Features::activate( $appData, 'sample' );
 check( 'activating again is harmless: nothing changes', $again === true && \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'] === $stored['/nino/modules'] && isset( $appData['./sample/upgraded-from'] ) === false );

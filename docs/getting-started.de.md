@@ -54,7 +54,7 @@ Die Konten aus Schritt 5 sind Entwickler mit vollen Rechten. Redaktionskonten mi
 |---|---|
 | `/` | Die eingerichtete Webseite wird mit dem ausgelieferten Theme dargestellt. |
 | `/_admin` | Das Root-Konto öffnet die Workbench mit jedem Panel: Inhalt, Struktur und System. |
-| `/_admin#builder` | Nur dort, wo der Builder installiert ist: das Panel Builder in der Gruppe Struktur, das ein Seitentemplate aus Sections, Spalten und Komponenten zusammensetzt. Ein frischer Checkout bringt kein Feature mit, dieses Panel gibt es also noch nicht. |
+| `/_admin#builder` | Nur dort, wo der Builder installiert ist: das Panel Builder in der Gruppe Features, das ein Seitentemplate aus Sections, Spalten und Komponenten zusammensetzt. Ein frischer Checkout bringt kein Feature mit, dieses Panel gibt es also noch nicht. |
 
 Prüfe außerdem jede Sprache und Route, die Navigation sowie verwendete Formulare. Speichere testweise einen Text und ein Bild. Öffne dort, wo der Builder installiert ist, im Panel Builder ein `page-*.tpl`, ändere zunächst nichts und prüfe, ob seine Sections ohne Warnung erkannt werden.
 

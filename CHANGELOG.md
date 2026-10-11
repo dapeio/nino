@@ -102,19 +102,9 @@ All notable changes to Nino are documented in this file.
   `body main:has(> .nino-wrap > .nino-parallex:first-child)` to the selector
   list of its `body main:has(> .nino-cover:first-child)` rule in
   `assets/theme.css`.
-- **Workbench:** a panel a feature brings sits in the rail group its `nav()`
-  names when that is one of `content`, `structure`, `features` and `system`,
-  and in `features` when it names none or anything else, as before - the
-  Builder names `structure`. A panel of anything but a feature that names
-  `features` is still refused like an unknown group. The fixture feature
-  `Sample` names no group now and still lands in `features`. The catalogue's
-  panels already name their groups, so on this kernel they leave Features:
-  Gallery, Forms, Newsletter and Stats go to Content, Builder and Design to
-  Structure (above Routes), Search, Mailer, Protected and Redirects to System;
-  only Hello stays.
 - **Docs:** every reference to the Template Builder, the Templates feature and
   its manuals points at the Builder feature (`features/Builder` of the
-  catalogue, panel Builder in the Structure group, its manual in `feature.php`):
+  catalogue, panel Builder in the Features group, its manual in `feature.php`):
   the READMEs, AGENTS.md, ROADMAP.de.md, the workbench, features, concepts,
   development, deployment, getting-started and setup manuals, and the recipes.
   The two recipes that travelled with Templates (the section preset and the

@@ -3,8 +3,9 @@ declare(strict_types=1);
 
 namespace Nino\Modules\Sample {
 
-	// The reference feature's workbench panel - it names no group, so it sits
-	// in the features group, and the roles tab offers its permission like any other
+	// The reference feature's workbench panel - it names no group, and a
+	// feature's panel sits in the features group whatever it names, so the roles
+	// tab offers its permission there like any other
 	class Admin {
 
 		public const string MANAGE_PERM = '/_admin/sample/manage';

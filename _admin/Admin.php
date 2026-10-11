@@ -1151,8 +1151,9 @@ namespace Nino\Admin {
 	 *											fill pass; anything else is literal text.
 	 *
 	 *											A panel whose class file lies below \Nino\Features::dir()
-	 *											lands in the group its nav() names when that is one of the
-	 *											four, else in 'features' - see the comment in _entry(). Naming
+	 *											always lands in 'features', whatever its own nav() names:
+	 *											the group is read for the kernel's own panels and those of
+	 *											app/ modules only - see the comment in _entry(). Naming
 	 *											'features' from anywhere else is refused the same way an
 	 *											unknown group is.
 	 *
@@ -1498,20 +1499,26 @@ namespace Nino\Admin {
 			if( $icon !== '' && ( str_starts_with( $icon, '<svg' ) === false || stripos( $icon, '<script' ) !== false || stripos( $icon, 'on' ) !== false && preg_match( '/\son[a-z]+\s*=/i', $icon ) === 1 ) )
 				$icon = '';
 
-			// A panel a feature brought may name its group, one of the four
-			// - the Builder sits in 'structure' - and lands in 'features'
-			// when it names none or something else: see
-			// self::_isFeaturePanel(). Any other panel naming 'features' is
-			// refused exactly like an unknown group: the value a panel names
-			// is never trusted to place itself in a group only a feature
-			// may sit in, so an editor granted that one group sees nothing
-			// a kernel or app/ module could pick its way into
-			$group = (string) ( $nav[3] ?? 'content' );
+			// A panel a feature brought sits in 'features', always - see
+			// self::_isFeaturePanel(). The group its nav() names is not read
+			// for it, so there is no warning whether it names a group, none
+			// or a word that is no group, and a feature written against
+			// another kernel keeps working. The rail stays readable with a
+			// dozen features in it, an editor granted that one group finds
+			// every feature's panel there, and no feature can pick its way
+			// between the kernel's own screens. Any other panel naming
+			// 'features' is refused exactly like an unknown group: the value
+			// a panel names is never trusted to place itself in a group only
+			// a feature may sit in. The entry is not even cast for a feature's
+			// panel: whatever stands there is left alone
 			if( self::_isFeaturePanel( $class ) === true ) {
-				$group = in_array( (string) ( $nav[3] ?? '' ), self::GROUPS, true ) === true ? (string) $nav[3] : 'features';
-			} elseif( in_array( $group, self::GROUPS, true ) === false || $group === 'features' ) {
-				trigger_error( 'Panel '. $class. ' names an unknown nav group \''. $group. '\'', E_USER_WARNING );
-				$group = 'content';
+				$group = 'features';
+			} else {
+				$group = (string) ( $nav[3] ?? 'content' );
+				if( in_array( $group, self::GROUPS, true ) === false || $group === 'features' ) {
+					trigger_error( 'Panel '. $class. ' names an unknown nav group \''. $group. '\'', E_USER_WARNING );
+					$group = 'content';
+				}
 			}
 
 			$label = (string) ( $nav[1] ?? $uri );
