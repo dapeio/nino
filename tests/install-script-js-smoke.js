@@ -11,34 +11,7 @@
 const fs 	= require('fs');
 const path 	= require('path');
 const vm 		= require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
-
-function classList() {
-	const values = new Set();
-	return {
-		add : function( value ) { values.add( value ) },
-		remove : function( value ) { values.delete( value ) },
-		contains : function( value ) { return values.has( value ) },
-		toggle : function( value, force ) {
-			if( force === true ) values.add( value );
-			else if( force === false ) values.delete( value );
-			else if( values.has( value ) ) values.delete( value );
-			else values.add( value );
-		},
-	};
-}
+const { check, done, load, classList, element } = require( './harness.js' );
 
 // A rail span carries what step the wizard is on twice over: the class the
 // stylesheet paints, and the attribute a screen reader reads
@@ -61,28 +34,13 @@ const elements = {
 	elements['install-nav-'+ key] = navSpan();
 } );
 
-// A recording element, for the parts of a step that build their own dom
-function recorder( tag ) {
-	const el = {
-		tagName : String( tag ).toUpperCase(), className : '', textContent : '', value : '',
-		type : '', placeholder : '', rows : 0,
-		dataset : {}, attributes : {}, children : [], listeners : {},
-		classList : classList(),
-		appendChild : function( child ) { el.children.push( child ); return child },
-		setAttribute : function( name, value ) { el.attributes[name] = String( value ) },
-		getAttribute : function( name ) { return el.attributes[name] ?? null },
-		addEventListener : function( name, fn ) { el.listeners[name] = fn },
-	};
-	return el;
-}
-
 const sandbox = {
 	console : console,
 	document : {
 		documentElement : null,
 		body : null,
 		getElementById : function( id ) { return elements[id] ?? null },
-		createElement : recorder,
+		createElement : element,
 	},
 };
 sandbox.window = sandbox;
@@ -93,11 +51,7 @@ sandbox.Nino = {
 };
 
 const context = vm.createContext( sandbox );
-vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_admin/install/assets/script.js' ), 'utf8' ),
-	context,
-	{ filename : 'script.js' }
-);
+load( '_admin/install/assets/script.js', context );
 
 const install = sandbox.Nino.install;
 
@@ -186,11 +140,7 @@ commitCallback( true );
 check( 'a successful callback advances from its captured starting index', shown === 2 );
 check( 'navigation unlocks after the commit callback', install._busy === false && elements['install-back'].disabled === false && elements['install-next'].disabled === false );
 
-vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_admin/install/assets/webpages.js' ), 'utf8' ),
-	context,
-	{ filename : 'webpages.js' }
-);
+load( '_admin/install/assets/webpages.js', context );
 
 const webpages = sandbox.Nino.install.webpages;
 let apiCalls = 0;
@@ -234,7 +184,7 @@ check( '...with the placeholder still there as the hint it always was, and the v
 	without an answer to which one it is, so the shared bar carries exactly one
 	primary - and the list action, which only adds to a step that is still
 	being edited, is the secondary one	*/
-elements['webpages-list'] = Object.assign( recorder('div'), { innerHTML : '' } );
+elements['webpages-list'] = element('div');
 elements['install-actions-wrap'] = { insertBefore : function( node ) { elements[ node.id ] = node } };
 webpages._entries = [];
 webpages._renderList();
@@ -244,5 +194,4 @@ check( '...as a secondary action, not a second primary one', contextAction.class
 check( '...and the bar still has exactly one primary action, Next', ( wizardTemplate.match( /nino-admin-btn-primary/g ) || [] ).length === 1
 	&& /id="install-next" class="nino-admin-btn-primary"/.test( wizardTemplate ) === true );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();

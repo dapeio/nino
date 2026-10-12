@@ -7,26 +7,8 @@
 
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
 const vm = require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
-
-function source( relative ) {
-	return fs.readFileSync( path.join( __dirname, '..', relative ), 'utf8' );
-}
+const { check, done, source, load } = require( './harness.js' );
 
 const callbacks = [];
 const Nino = {
@@ -45,7 +27,7 @@ const context = vm.createContext( {
 	TypeError : TypeError,
 } );
 
-vm.runInContext( source('_admin/Nino/Modules/Language/assets/translations.js'), context, { filename : 'translations.js' } );
+load( '_admin/Nino/Modules/Language/assets/translations.js', context );
 
 console.log('Admin Translations');
 
@@ -88,5 +70,4 @@ check( 'the editable surface explicitly restores drag selection', editorCss.incl
 check( 'rich text is not nested inside an interactive label', editorText.includes("createElement('label')") === false && editorText.includes( "wrap.setAttribute( 'aria-labelledby', nameSpan.id )" ) && editorElements.includes("dc.createElement( isHtml ? 'div' : 'label' )") && adminElements.includes("dc.createElement( isHtml ? 'div' : 'label' )") );
 check( 'code receives a readable monospace treatment', editorCss.includes('.nino-admin-richtext-content code') && editorCss.includes('ui-monospace') );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();

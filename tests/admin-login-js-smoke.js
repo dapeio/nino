@@ -16,19 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
+const { check, done, load } = require( './harness.js' );
 
 // The two messages, read out of the shipped text file rather than written
 // here - a key login.js asks for and no locale carries renders as an empty
@@ -148,8 +136,8 @@ sandbox.window = sandbox;
 sandbox.self = sandbox;
 
 const context = vm.createContext( sandbox );
-vm.runInContext( fs.readFileSync( path.join( __dirname, '../_nino/Nino.js' ), 'utf8' ), context, { filename : 'Nino.js' } );
-vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/login.js' ), 'utf8' ), context, { filename : 'login.js' } );
+load( '_nino/Nino.js', context );
+load( '_admin/assets/login.js', context );
 
 check( 'login.js boots and takes the Nino.admin slot', typeof sandbox.Nino.admin.onReady === 'function' );
 
@@ -259,5 +247,7 @@ check( '...and says the request is pending, and nothing else', el['form-message'
 attempt( 401 );
 check( 'the answer replaces the pending state rather than joining it', el['form-message'].className === 'error' );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exit( failures === 0 ? 0 : 1 );
+// Nino.js leaves its ready callback behind, one millisecond out, and that one
+// reaches for an Event this context has not got: the suite ends here
+done();
+process.exit();

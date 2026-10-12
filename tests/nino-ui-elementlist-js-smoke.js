@@ -21,84 +21,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
-
-function classList( el ) {
-	const values = new Set();
-	return {
-		add : function( value ) { values.add( value ) },
-		remove : function( value ) { values.delete( value ) },
-		contains : function( value ) { return values.has( value ) },
-		toggle : function( value, force ) {
-			if( force === true ) values.add( value );
-			else if( force === false ) values.delete( value );
-			else if( values.has( value ) ) values.delete( value );
-			else values.add( value );
-			return values.has( value );
-		},
-	};
-}
-
-function element( tag ) {
-	const el = {
-		tagName : String( tag ).toUpperCase(),
-		className : '',
-		textContent : '',
-		value : '',
-		type : '',
-		placeholder : '',
-		title : '',
-		disabled : false,
-		dataset : {},
-		attributes : {},
-		children : [],
-		listeners : {},
-		appendChild : function( child ) { el.children.push( child ); return child },
-		setAttribute : function( name, value ) { el.attributes[name] = String( value ) },
-		addEventListener : function( name, fn ) {
-			el.listeners[name] = el.listeners[name] || [];
-			el.listeners[name].push( fn );
-		},
-	};
-	el.classList = classList( el );
-	// The control empties both lists by assigning innerHTML before redrawing
-	Object.defineProperty( el, 'innerHTML', {
-		get : function() { return '' },
-		set : function() { el.children.length = 0 },
-	} );
-	return el;
-}
-
-function fire( el, name ) {
-	( el.listeners[name] || [] ).forEach( function( fn ) { fn() } );
-}
-
-/**
- *	Every descendant matching a predicate, in document order
- */
-function findAll( root, predicate ) {
-	const found = [];
-	( function walk( node ) {
-		( node.children || [] ).forEach( function( child ) {
-			if( predicate( child ) === true )
-				found.push( child );
-			walk( child );
-		} );
-	} )( root );
-	return found;
-}
+const { check, done, load, element, findAll, fire } = require( './harness.js' );
 
 function byClass( root, name ) {
 	return findAll( root, function( el ) { return String( el.className ).split(' ').indexOf( name ) !== -1 } );
@@ -111,11 +34,7 @@ const sandbox = {
 sandbox.window = sandbox;
 sandbox.Nino = {};
 
-vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' ),
-	vm.createContext( sandbox ),
-	{ filename : 'Nino.admin.js' }
-);
+load( '_admin/assets/Nino.admin.js', vm.createContext( sandbox ) );
 
 const adminUi = sandbox.Nino.adminUi;
 
@@ -277,5 +196,4 @@ const source = fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.adm
 const control = source.slice( source.indexOf('elementList : function'), source.indexOf('tableModel : {') );
 check( 'the control hard-codes no user-facing words', /textContent = '[A-Za-z]/.test( control ) === false );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exit( failures === 0 ? 0 : 1 );
+done();

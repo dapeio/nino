@@ -16,99 +16,8 @@
 
 'use strict';
 
-const fs 		= require('fs');
-const path	= require('path');
 const vm 		= require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
-
-function source( relative ) {
-	return fs.readFileSync( path.join( __dirname, '..', relative ), 'utf8' );
-}
-
-/** The fills of one text file, key => value - enough of the php to read a `'[[/key]]' => 'value',` line */
-function fills( relative ) {
-	const map = {};
-	const re = /'\[\[(\/_admin\/[^\]]+)\]\]'\s*=>\s*'((?:[^'\\]|\\.)*)'/g;
-	const text = source( relative );
-	let match;
-	while( ( match = re.exec( text ) ) )
-		map[match[1]] = match[2].replace( /\\'/g, "'" );
-	return map;
-}
-
-
-// --- an element stand-in ---------------------------------------------------
-
-function classList( el ) {
-	return {
-		add : function( value ) { if( el.className.split(' ').indexOf( value ) === -1 ) el.className = ( el.className+ ' '+ value ).trim() },
-		remove : function( value ) { el.className = el.className.split(' ').filter( function( v ) { return v !== value } ).join(' ') },
-		contains : function( value ) { return el.className.split(' ').indexOf( value ) !== -1 },
-	};
-}
-
-function findAll( root, predicate ) {
-	const found = [];
-	( function walk( node ) {
-		( node.children || [] ).forEach( function( child ) {
-			if( predicate( child ) === true )
-				found.push( child );
-			walk( child );
-		} );
-	} )( root );
-	return found;
-}
-
-function element( tag ) {
-	const el = {
-		tagName : String( tag ).toUpperCase(),
-		className : '',
-		textContent : '',
-		type : '',
-		href : '',
-		id : '',
-		value : '',
-		maxLength : -1,
-		disabled : false,
-		hidden : false,
-		src : '',
-		dataset : {},
-		attributes : {},
-		children : [],
-		listeners : {},
-		appendChild : function( child ) { el.children.push( child ); return child },
-		setAttribute : function( name, value ) { el.attributes[name] = String( value ) },
-		getAttribute : function( name ) { return el.attributes[name] ?? null },
-		addEventListener : function( name, fn ) {
-			el.listeners[name] = el.listeners[name] || [];
-			el.listeners[name].push( fn );
-		},
-	};
-	el.classList = classList( el );
-	Object.defineProperty( el, 'innerHTML', {
-		get : function() { return '' },
-		set : function() { el.children.length = 0 },
-	} );
-	return el;
-}
-
-function fire( el, name ) {
-	if( el === null || el === undefined )
-		return;
-	( el.listeners[name] || [] ).forEach( function( fn ) { fn( { preventDefault : function() {} } ) } );
-}
+const { check, done, source, fills, load, element, findAll, fire } = require( './harness.js' );
 
 const byClass = function( root, name ) {
 	return findAll( root, function( el ) { return el.className.split(' ').indexOf( name ) !== -1 } );
@@ -153,9 +62,9 @@ sandbox.window = {
 };
 
 const context = vm.createContext( sandbox );
-vm.runInContext( source('_admin/assets/Nino.admin.js'), context, { filename : 'Nino.admin.js' } );
-vm.runInContext( source('_admin/Nino/Modules/Images/assets/admin.js'), context, { filename : 'admin.js' } );
-vm.runInContext( source('_admin/Nino/Modules/Images/assets/slots.js'), context, { filename : 'slots.js' } );
+load( '_admin/assets/Nino.admin.js', context );
+load( '_admin/Nino/Modules/Images/assets/admin.js', context );
+load( '_admin/Nino/Modules/Images/assets/slots.js', context );
 
 const panel = Nino.admin.images;
 panel._locales = [ 'de_DE', 'en_US' ];
@@ -305,7 +214,7 @@ const shellSandbox = {
 };
 shellSandbox.window = { Nino : shellNino, location : { hash : '' }, confirm : function() { return true } };
 const shellContext = vm.createContext( shellSandbox );
-vm.runInContext( source('_admin/assets/Nino.admin.js'), shellContext, { filename : 'Nino.admin.js' } );
+load( '_admin/assets/Nino.admin.js', shellContext );
 const imagesSource = source('_admin/Nino/Modules/Images/assets/admin.js');
 vm.runInContext( imagesSource, shellContext, { filename : 'admin.js' } );
 
@@ -488,5 +397,4 @@ check( 'a slot no page shows says it is not included anywhere', slots._usageLabe
 check( '...and names the templates that mention it, if any', slots._usageLabel( { usage : { templates : [ 'page-a', 'page-b' ], pages : [] } } ) === ', not included anywhere, Templates: page-a, page-b' );
 check( 'a slot without usage data reads as unused rather than throwing', slots._usageLabel( {} ) === ', not included anywhere' );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();

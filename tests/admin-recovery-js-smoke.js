@@ -16,66 +16,8 @@
 
 'use strict';
 
-const fs 		= require('fs');
-const path	= require('path');
 const vm 		= require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
-
-function source( relative ) {
-	return fs.readFileSync( path.join( __dirname, '..', relative ), 'utf8' );
-}
-
-
-// --- an element stand-in ---------------------------------------------------
-
-function element( tag ) {
-	const values = new Set();
-	const el = {
-		tagName : String( tag ).toUpperCase(),
-		className : '',
-		textContent : '',
-		type : '',
-		id : '',
-		value : '',
-		disabled : false,
-		dataset : {},
-		children : [],
-		listeners : {},
-		appendChild : function( child ) { el.children.push( child ); return child },
-		focus : function() {},
-		addEventListener : function( name, fn ) {
-			el.listeners[name] = el.listeners[name] || [];
-			el.listeners[name].push( fn );
-		},
-		classList : {
-			add : function( value ) { values.add( value ) },
-			remove : function( value ) { values.delete( value ) },
-			contains : function( value ) { return values.has( value ) },
-		},
-	};
-	Object.defineProperty( el, 'innerHTML', {
-		get : function() { return '' },
-		set : function() { el.children.length = 0 },
-	} );
-	return el;
-}
-
-function fire( el, name ) {
-	( el.listeners[name] || [] ).forEach( function( fn ) { fn( { preventDefault : function() {} } ) } );
-}
-
+const { check, done, source, load, element, fire } = require( './harness.js' );
 
 // --- the page, as the template has it ---------------------------------------
 
@@ -121,7 +63,7 @@ sandbox.window = {
 	location : { reload : function() {} },
 };
 
-vm.runInContext( source('_admin/assets/recovery.js'), vm.createContext( sandbox ), { filename : 'recovery.js' } );
+load( '_admin/assets/recovery.js', vm.createContext( sandbox ) );
 
 /** Answer the request with that action, the way Nino.http.sendRequest() calls back */
 function answer( action, status, body ) {
@@ -202,5 +144,4 @@ ready();
 answer( 'recovery/list', 200, { dates : [], users : [] } );
 check( 'an empty list gives a select that says so and a button that is off', options().join(',') === '' && page['recovery-reset-mail'].children[0].textContent === 'No accounts' && page['recovery-reset-submit'].disabled === true );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();

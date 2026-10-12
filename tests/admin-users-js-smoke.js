@@ -18,118 +18,8 @@
 
 'use strict';
 
-const fs 		= require('fs');
-const path	= require('path');
 const vm 		= require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
-
-function source( relative ) {
-	return fs.readFileSync( path.join( __dirname, '..', relative ), 'utf8' );
-}
-
-/** The fills of one text file, key => value - enough of the php to read a `'[[/key]]' => 'value',` line */
-function fills( relative ) {
-	const map = {};
-	const re = /'\[\[(\/_admin\/[^\]]+)\]\]'\s*=>\s*'((?:[^'\\]|\\.)*)'/g;
-	const text = source( relative );
-	let match;
-	while( ( match = re.exec( text ) ) )
-		map[match[1]] = match[2].replace( /\\'/g, "'" );
-	return map;
-}
-
-
-// --- an element stand-in: enough tree to find things in -------------------
-
-function classList( el ) {
-	const values = new Set();
-	return {
-		add : function( value ) { values.add( value ) },
-		remove : function( value ) { values.delete( value ) },
-		contains : function( value ) { return values.has( value ) },
-		toggle : function( value, force ) { ( force === undefined ? values.has( value ) === false : force ) ? values.add( value ) : values.delete( value ) },
-	};
-}
-
-function matches( el, selector ) {
-	return selector.split(',').some( function( part ) {
-		part = part.trim();
-		const attribute = /^\[([a-z-]+)="([^"]*)"\]$/.exec( part );
-		if( attribute !== null )
-			return el.attributes[attribute[1]] === attribute[2] || ( attribute[1].indexOf('data-') === 0 && el.dataset[attribute[1].slice(5)] === attribute[2] );
-		if( part.charAt(0) === '#' )
-			return el.id === part.slice(1);
-		if( part.charAt(0) === '.' )
-			return el.className.split(' ').indexOf( part.slice(1) ) !== -1;
-		return el.tagName === part.toUpperCase();
-	} );
-}
-
-function findAll( root, predicate ) {
-	const found = [];
-	( function walk( node ) {
-		( node.children || [] ).forEach( function( child ) {
-			if( predicate( child ) === true )
-				found.push( child );
-			walk( child );
-		} );
-	} )( root );
-	return found;
-}
-
-function element( tag ) {
-	const el = {
-		tagName : String( tag ).toUpperCase(),
-		className : '',
-		textContent : '',
-		type : '',
-		id : '',
-		value : '',
-		disabled : false,
-		style : {},
-		dataset : {},
-		attributes : {},
-		children : [],
-		listeners : {},
-		parentNode : null,
-		appendChild : function( child ) { child.parentNode = el; el.children.push( child ); return child },
-		setAttribute : function( name, value ) { el.attributes[name] = String( value ); if( name === 'id' ) el.id = String( value ) },
-		removeAttribute : function( name ) { delete el.attributes[name] },
-		addEventListener : function( name, fn ) {
-			el.listeners[name] = el.listeners[name] || [];
-			el.listeners[name].push( fn );
-		},
-		querySelector : function( selector ) { return findAll( el, function( node ) { return matches( node, selector ) } )[0] ?? null },
-		querySelectorAll : function( selector ) { return findAll( el, function( node ) { return matches( node, selector ) } ) },
-		closest : function() { return null },
-		focus : function() {},
-	};
-	el.classList = classList( el );
-	Object.defineProperty( el, 'innerHTML', {
-		get : function() { return '' },
-		set : function() { el.children.length = 0 },
-	} );
-	return el;
-}
-
-function fire( el, name ) {
-	if( el === null || el === undefined )
-		return;
-	( el.listeners[name] || [] ).forEach( function( fn ) { fn( { preventDefault : function() {} } ) } );
-}
-
+const { check, done, source, fills, load, element, findAll, fire } = require( './harness.js' );
 
 // --- the words -------------------------------------------------------------
 
@@ -181,8 +71,8 @@ const sandbox = {
 sandbox.window = { Nino : Nino, confirm : function( message ) { confirms.push( message ); return confirmAnswer }, location : { replace : function() {} } };
 
 const context = vm.createContext( sandbox );
-vm.runInContext( source('_admin/assets/Nino.admin.js'), context, { filename : 'Nino.admin.js' } );
-vm.runInContext( source('_admin/Nino/Modules/Users/assets/admin.js'), context, { filename : 'admin.js' } );
+load( '_admin/assets/Nino.admin.js', context );
+load( '_admin/Nino/Modules/Users/assets/admin.js', context );
 
 const panel = Nino.admin.users;
 
@@ -327,5 +217,4 @@ form.children.length = 0;
 check( '...and none while no form is drawn', panel._bar() === null );
 check( 'it is handed to the registry with the form', /Nino\.admin\.dirty\.watchForm\( 'users', function\(\) \{ return dc\.getElementById\('users-form'\) \}, Nino\.admin\.users\._saveOpen, Nino\.admin\.users\._bar \)/.test( source('_admin/Nino/Modules/Users/assets/admin.js') ) === true );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();

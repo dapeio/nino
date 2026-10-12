@@ -8,26 +8,8 @@
 
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
 const vm = require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
-
-function classList() {
-	return { add : function() {}, remove : function() {}, contains : function() { return false; } };
-}
+const { check, done, load, classList } = require( './harness.js' );
 
 /**
  *	One .nino-autoheight element: its own content height is what it measures
@@ -89,11 +71,7 @@ sandbox.Nino = {
 	events : { bindCallback : function() {} },
 };
 
-vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_nino/Nino.ui.js' ), 'utf8' ),
-	vm.createContext( sandbox ),
-	{ filename : 'Nino.ui.js' }
-);
+load( '_nino/Nino.ui.js', vm.createContext( sandbox ) );
 
 const ui = sandbox.Nino.ui;
 ui.onReady();
@@ -117,5 +95,4 @@ check( 'the opt-out does not survive onto a desktop client', optedOut.style.heig
 check( '...and the group follows the card that was left out of it before', short.style.height === '180px' && tall.style.height === '180px' );
 check( '...and the single card is equalized against itself', alone.style.height === '200px' );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();

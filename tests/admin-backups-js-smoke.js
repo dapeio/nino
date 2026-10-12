@@ -15,98 +15,8 @@
 
 'use strict';
 
-const fs 		= require('fs');
-const path	= require('path');
 const vm 		= require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
-
-function source( relative ) {
-	return fs.readFileSync( path.join( __dirname, '..', relative ), 'utf8' );
-}
-
-/**
- *	The fills of one text file, key => value - enough of the php to read
- *	a `'[[/key]]' => 'value',` line
- */
-function fills( relative ) {
-	const map = {};
-	const re = /'\[\[(\/_admin\/[^\]]+)\]\]'\s*=>\s*'((?:[^'\\]|\\.)*)'/g;
-	const text = source( relative );
-	let match;
-	while( ( match = re.exec( text ) ) )
-		map[match[1]] = match[2].replace( /\\'/g, "'" );
-	return map;
-}
-
-
-// --- an element stand-in, the same shape the other panel tests build -------
-
-function classList() {
-	const values = new Set();
-	return {
-		add : function( value ) { values.add( value ) },
-		remove : function( value ) { values.delete( value ) },
-		contains : function( value ) { return values.has( value ) },
-	};
-}
-
-function findAll( root, predicate ) {
-	const found = [];
-	( function walk( node ) {
-		( node.children || [] ).forEach( function( child ) {
-			if( predicate( child ) === true )
-				found.push( child );
-			walk( child );
-		} );
-	} )( root );
-	return found;
-}
-
-function element( tag ) {
-	const el = {
-		tagName : String( tag ).toUpperCase(),
-		className : '',
-		textContent : '',
-		type : '',
-		id : '',
-		style : {},
-		attributes : {},
-		children : [],
-		listeners : {},
-		appendChild : function( child ) { el.children.push( child ); return child },
-		setAttribute : function( name, value ) { el.attributes[name] = String( value ) },
-		addEventListener : function( name, fn ) {
-			el.listeners[name] = el.listeners[name] || [];
-			el.listeners[name].push( fn );
-		},
-	};
-	el.classList = classList();
-	Object.defineProperty( el, 'innerHTML', {
-		get : function() { return '' },
-		set : function() { el.children.length = 0 },
-	} );
-	return el;
-}
-
-// Tolerates a control that is not on screen, so a panel that threw its own
-// buttons away reports as failed checks rather than as a crashed test
-function fire( el, name ) {
-	if( el === null || el === undefined )
-		return;
-	( el.listeners[name] || [] ).forEach( function( fn ) { fn( { preventDefault : function() {} } ) } );
-}
+const { check, done, fills, load, documentOf, element, findAll, fire } = require( './harness.js' );
 
 /** The restore buttons currently on screen, in the order they stand in */
 function dateRows() {
@@ -167,14 +77,7 @@ const Nino = {
 };
 const sandbox = {
 	console : console,
-	document : {
-		createElement : element,
-		getElementById : function( id ) {
-			return id === 'backups-list' ? mount : findAll( mount, function( el ) { return el.id === id } )[0] ?? null;
-		},
-		documentElement : null,
-		body : null,
-	},
+	document : documentOf( mount ),
 	Nino : Nino,
 };
 sandbox.window = {
@@ -185,8 +88,8 @@ sandbox.window = {
 };
 
 const context = vm.createContext( sandbox );
-vm.runInContext( source('_admin/assets/Nino.admin.js'), context, { filename : 'Nino.admin.js' } );
-vm.runInContext( source('_admin/Nino/Modules/Backups/assets/admin.js'), context, { filename : 'admin.js' } );
+load( '_admin/assets/Nino.admin.js', context );
+load( '_admin/Nino/Modules/Backups/assets/admin.js', context );
 
 const panel = Nino.admin.backups;
 
@@ -313,5 +216,4 @@ answer( 200, { ok : true } );
 check( '...and reloads only then', reloaded === 1 );
 delete Nino.admin.dirty;
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();

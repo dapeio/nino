@@ -8,22 +8,8 @@
 
 'use strict';
 
-const fs 	= require('fs');
-const path 	= require('path');
 const vm 		= require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
+const { check, done, load } = require( './harness.js' );
 
 const sandbox = {
 	console : console,
@@ -35,11 +21,7 @@ sandbox.Nino = {
 	events : { bindCallback : function() {} },
 };
 
-vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_admin/install/assets/personalinfos.js' ), 'utf8' ),
-	vm.createContext( sandbox ),
-	{ filename : 'personalinfos.js' }
-);
+load( '_admin/install/assets/personalinfos.js', vm.createContext( sandbox ) );
 
 const personalinfos = sandbox.Nino.install.personalinfos;
 
@@ -63,5 +45,4 @@ personalinfos._localeValues = { de_DE : { '/project/company/contact/country' : '
 items = personalinfos._saveItems();
 check( 'an untouched locale keeps the value loaded from the server', items.some( function( item ) { return item.locale === 'en_US' && item.value === 'Germany' } ) );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();

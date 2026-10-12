@@ -13,35 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
-
-function classList( initial ) {
-	const values = new Set( initial || [] );
-	return {
-		add : function( value ) { values.add( value ) },
-		remove : function( value ) { values.delete( value ) },
-		contains : function( value ) { return values.has( value ) },
-		toggle : function( value, force ) {
-			if( force === true ) values.add( value );
-			else if( force === false ) values.delete( value );
-			else if( values.has( value ) ) values.delete( value );
-			else values.add( value );
-			return values.has( value );
-		},
-	};
-}
+const { check, done, classList } = require( './harness.js' );
 
 function field( name, type, value, required, checked ) {
 	return {
@@ -89,7 +61,7 @@ function form() {
 		fieldList : fields,
 		msg : msg,
 		btn : btn,
-		classList : classList( [ 'nino-form' ] ),
+		classList : classList( null, [ 'nino-form' ] ),
 		listeners : {},
 		attributes : {},
 		addEventListener : function( event, callback ) { this.listeners[event] = callback },
@@ -521,7 +493,7 @@ check( '...and the one that is wrong now carries it instead', mailField.getAttri
 	which reads "on" ticked or not - so a signup whose consent box was left
 	empty went to the server	*/
 const signup = form();
-signup.classList = classList( [ 'nino-form', 'nino-newsletter-form' ] );
+signup.classList = classList( null, [ 'nino-form', 'nino-newsletter-form' ] );
 signup.fieldList.length = 0;
 const signupMail = field( 'email', 'email', 'reader@example.com', true, false );
 const signupConsent = field( 'consent', 'checkbox', 'on', true, false );
@@ -549,7 +521,7 @@ check( '...and the mark is gone from the box', signupConsent.classList.contains(
 	endpoint - and a signup written with only .nino-newsletter-form, as the
 	Newsletter feature describes it, is driven all the same	*/
 const signupOnly = form();
-signupOnly.classList = classList( [ 'nino-newsletter-form' ] );
+signupOnly.classList = classList( null, [ 'nino-newsletter-form' ] );
 signupOnly.fieldList.length = 0;
 const signupSite = field( 'website', 'url', 'my site', false, false );
 signupSite.validity = { typeMismatch : true, badInput : false };
@@ -610,5 +582,4 @@ sandbox.Nino.ui.toast( 'Saved.', 'success' );
 const toast = toasts[toasts.length - 1];
 check( 'a toast is announced rather than only drawn', toast.textContent === 'Saved.' && toast.getAttribute('role') === 'status' && toast.getAttribute('aria-live') === 'polite' );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();

@@ -15,119 +15,8 @@
 
 'use strict';
 
-const fs 		= require('fs');
-const path	= require('path');
 const vm 		= require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
-
-function source( relative ) {
-	return fs.readFileSync( path.join( __dirname, '..', relative ), 'utf8' );
-}
-
-/**
- *	The fills of one text file, key => value - enough of the php to read
- *	a `'[[/key]]' => 'value',` line
- */
-function fills( relative ) {
-	const map = {};
-	const re = /'\[\[(\/_admin\/[^\]]+)\]\]'\s*=>\s*'((?:[^'\\]|\\.)*)'/g;
-	const text = source( relative );
-	let match;
-	while( ( match = re.exec( text ) ) )
-		map[match[1]] = match[2].replace( /\\'/g, "'" );
-	return map;
-}
-
-
-// --- an element stand-in, the same shape the Routes test builds -------------
-
-function classList() {
-	const values = new Set();
-	return {
-		add : function( value ) { values.add( value ) },
-		remove : function( value ) { values.delete( value ) },
-		contains : function( value ) { return values.has( value ) },
-	};
-}
-
-function findAll( root, predicate ) {
-	const found = [];
-	( function walk( node ) {
-		( node.children || [] ).forEach( function( child ) {
-			if( predicate( child ) === true )
-				found.push( child );
-			walk( child );
-		} );
-	} )( root );
-	return found;
-}
-
-function element( tag ) {
-	const el = {
-		tagName : String( tag ).toUpperCase(),
-		className : '',
-		textContent : '',
-		title : '',
-		type : '',
-		href : '',
-		id : '',
-		disabled : false,
-		style : {},
-		attributes : {},
-		dataset : {},
-		children : [],
-		listeners : {},
-		value : '',
-		appendChild : function( child ) { el.children.push( child ); return child },
-		setAttribute : function( name, value ) { el.attributes[name] = String( value ) },
-		querySelector : function( selector ) { return el.querySelectorAll( selector )[0] ?? null },
-		querySelectorAll : function( selector ) {
-			// Only the class selector the shell's bar lookup uses
-			const match = /^\.([\w-]+)$/.exec( selector );
-			return findAll( el, function( child ) { return match !== null && child.className === match[1] } );
-		},
-		addEventListener : function( name, fn ) {
-			el.listeners[name] = el.listeners[name] || [];
-			el.listeners[name].push( fn );
-		},
-	};
-	el.classList = classList();
-	// A select's value is its selected option's, the way a browser reads it
-	if( el.tagName === 'SELECT' )
-		Object.defineProperty( el, 'value', {
-			get : function() {
-				const chosen = el.children.filter( function( option ) { return option.selected === true } ).pop() ?? el.children[0];
-				return chosen === undefined ? '' : chosen.value;
-			},
-			set : function( value ) { el.children.forEach( function( option ) { option.selected = option.value === value } ) },
-		} );
-	Object.defineProperty( el, 'innerHTML', {
-		get : function() { return '' },
-		set : function() { el.children.length = 0 },
-	} );
-	return el;
-}
-
-// Tolerates a control that is not on screen, so a panel that threw its own
-// buttons away reports as failed checks rather than as a crashed test
-function fire( el, name ) {
-	if( el === null || el === undefined )
-		return;
-	( el.listeners[name] || [] ).forEach( function( fn ) { fn( { preventDefault : function() {} } ) } );
-}
-
+const { check, done, fills, load, element, findAll, fire } = require( './harness.js' );
 
 // --- the words -------------------------------------------------------------
 
@@ -145,7 +34,7 @@ function text( key ) {
  *	One panel in its own context. `shell` is the registry the workbench's
  *	script.js would provide, or null for a shell that has none
  */
-function load( shell ) {
+function build( shell ) {
 
 	const list = element('div');
 	list.id = 'navs-list';
@@ -185,8 +74,8 @@ function load( shell ) {
 	sandbox.window = { Nino : Nino, location : { hash : '' }, confirm : function( message ) { confirms.push( message ); return box.confirmAnswer } };
 
 	const context = vm.createContext( sandbox );
-	vm.runInContext( source('_admin/assets/Nino.admin.js'), context, { filename : 'Nino.admin.js' } );
-	vm.runInContext( source('_nino/Nino/Modules/Navigation/assets/admin.js'), context, { filename : 'admin.js' } );
+	load( '_admin/assets/Nino.admin.js', context );
+	load( '_nino/Nino/Modules/Navigation/assets/admin.js', context );
 
 	return {
 		panel : Nino.admin.navs,
@@ -225,7 +114,7 @@ function payload( entries ) {
 
 /** A panel that has read its list and has the menu "main" open */
 function opened( shell ) {
-	const t = load( shell );
+	const t = build( shell );
 	t.panel.init();
 	t.answer( 200, payload( [ '/', '/about' ] ) );
 	t.panel._openForm( t.panel._navs[0] );
@@ -238,7 +127,7 @@ console.log('Admin Navigations');
 // --- reading ---------------------------------------------------------------
 
 {
-	const t = load( null );
+	const t = build( null );
 	t.panel.init();
 	check( 'the panel asks for the menus', t.requests.length === 1 && t.requests[0].action === 'navs/list' );
 	t.answer( 200, payload( [ '/', '/about' ] ) );
@@ -391,7 +280,7 @@ console.log('Admin Navigations');
 	// server sends the entry once, with the first of its paths and all of them
 	const IMPRINT = { httpUri : '/impressum', uri : '/legal/imprint', label : 'Impressum', named : true, runtime : true, paths : [ '/impressum', '/imprint' ] };
 	const PRIVACY = { httpUri : '/datenschutz', uri : '/legal/privacy', label : 'Datenschutz', named : true, runtime : true, paths : [ '/datenschutz', '/privacy' ] };
-	const t = load( null );
+	const t = build( null );
 	t.panel.init();
 	t.answer( 200, { navs : [ { key : 'legal', entries : [ IMPRINT ] }, { key : 'main', entries : [ ROUTES[0] ] } ], routes : ROUTES.concat( [ IMPRINT, PRIVACY ] ) } );
 	t.panel._openForm( t.panel._navs[0] );
@@ -449,5 +338,4 @@ console.log('Admin Navigations');
 	check( 'Discard lets the changes go', registered.navs.isDirty() === false );
 }
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();

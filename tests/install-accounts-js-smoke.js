@@ -9,22 +9,8 @@
 
 'use strict';
 
-const fs 	= require('fs');
-const path 	= require('path');
 const vm 		= require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
+const { check, done, load } = require( './harness.js' );
 
 const elements = {
 	'accounts-add-mail' : { value : '' },
@@ -51,11 +37,7 @@ sandbox.Nino = {
 	events : { bindCallback : function() {} },
 };
 
-vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_admin/install/assets/accounts.js' ), 'utf8' ),
-	vm.createContext( sandbox ),
-	{ filename : 'accounts.js' }
-);
+load( '_admin/install/assets/accounts.js', vm.createContext( sandbox ) );
 
 const accounts = sandbox.Nino.install.accounts;
 
@@ -102,5 +84,4 @@ answer = { status : 200, response : { users : [ 'admin@example.com' ] } };
 submit( 'admin@example.com', 'a-long-enough-password', 'a-long-enough-password' );
 check( 'an answer without one leaves the field as it is', csrfField.value === 'the-rotated-token' );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();

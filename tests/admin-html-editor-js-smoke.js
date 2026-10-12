@@ -23,19 +23,7 @@
 
 const fs = require('fs');
 const path = require('path');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
+const { check, done } = require( './harness.js' );
 
 const source = fs.readFileSync( path.join( __dirname, '../_admin/assets/html-editor.js' ), 'utf8' );
 
@@ -176,5 +164,4 @@ check( '...false and an empty id let go of them again', attributes['aria-invalid
 handle.mark( { required : false } );
 check( '...required: false takes aria-required off', Object.keys( attributes ).length === 0 );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exit( failures === 0 ? 0 : 1 );
+done();

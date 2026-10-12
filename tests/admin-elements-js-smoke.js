@@ -11,19 +11,7 @@
 const fs 	= require('fs');
 const path 	= require('path');
 const vm 		= require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
+const { check, done, load } = require( './harness.js' );
 
 const sandbox = {
 	console : console,
@@ -42,11 +30,7 @@ const context = vm.createContext( sandbox );
 // The shared admin layer, loaded first exactly as the tool's own shell loads
 // it: the panel's admin.js asks Nino.adminUi whether a model field is a multi element
 // reference, so a sandbox without it tests a module the page never runs
-vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' ),
-	context,
-	{ filename : 'Nino.admin.js' }
-);
+load( '_admin/assets/Nino.admin.js', context );
 
 vm.runInContext(
 	source,
@@ -206,10 +190,10 @@ elements._currentModel = {
 	broken 		: { type : 'element' },
 };
 
-let done = false;
-elements._loadReferenceOptions( function() { done = true } );
+let answered = false;
+elements._loadReferenceOptions( function() { answered = true } );
 
-check( 'the continuation runs once every referenced type has answered', done === true );
+check( 'the continuation runs once every referenced type has answered', answered === true );
 check( 'one list request per distinct referenced type, not per field', calls.length === 2 );
 check( '...and each asks for the type the field declares', calls.join() === 'list:{"type":"people"},list:{"type":"journals"}' );
 check( 'a field with no referenced type is skipped rather than requested as ""', calls.some( function( c ) { return c.indexOf( '""' ) !== -1 } ) === false );
@@ -432,7 +416,7 @@ function countTypesRequests() {
 	};
 
 	const box_context = vm.createContext( box );
-	vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' ), box_context, { filename : 'Nino.admin.js' } );
+	load( '_admin/assets/Nino.admin.js', box_context );
 	vm.runInContext( source, box_context, { filename : 'elements.js' } );
 
 	const module = box.Nino.admin.elements;
@@ -487,7 +471,7 @@ check( '...and coming back to the overview re-reads it, which is what that secon
 	};
 
 	const context = vm.createContext( box );
-	vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' ), context, { filename : 'Nino.admin.js' } );
+	load( '_admin/assets/Nino.admin.js', context );
 	vm.runInContext( source, context, { filename : 'elements.js' } );
 
 	const module = box.Nino.admin.elements;
@@ -1609,5 +1593,4 @@ check( 'the sentences are not alerts - the status line says it once, in its own 
 	} ) );
 }
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();

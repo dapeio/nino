@@ -14,97 +14,11 @@
 const fs 	= require('fs');
 const path 	= require('path');
 const vm 		= require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
+const { check, done, fills, load, element, fire } = require( './harness.js' );
 
 // --- the words: the real fills, as the workbench's own text files carry them
 
-function fills( file ) {
-	const out = {};
-	for( const m of fs.readFileSync( path.join( __dirname, '..', file ), 'utf8' ).matchAll( /'\[\[(\/[^\]]+)\]\]'\s*=>\s*'((?:[^'\\]|\\.)*)'/g ) )
-		out[m[1]] = m[2].replace( /\\(.)/g, '$1' );
-	return out;
-}
-
 const TEXT = { en_US : fills('_admin/text/en_US.php'), de_DE : fills('_admin/text/de_DE.php') };
-
-// --- a stand-in element: enough of a DOM for the status line and the dialog's inputs
-
-function element( tag ) {
-	const classes = new Set();
-	const el = {
-		tagName : String( tag ).toUpperCase(),
-		textContent : '',
-		value : '',
-		dataset : {},
-		attributes : {},
-		children : [],
-		listeners : {},
-		parent : null,
-		focused : false,
-		classList : {
-			add : function( name ) { classes.add( name ) },
-			remove : function( name ) { classes.delete( name ) },
-			toggle : function( name, force ) { if( force === true ) classes.add( name ); else classes.delete( name ) },
-			contains : function( name ) { return classes.has( name ) },
-		},
-		appendChild : function( child ) { el.children.push( child ); child.parent = el; return child },
-		setAttribute : function( name, value ) {
-			el.attributes[name] = String( value );
-			if( name.indexOf( 'data-' ) === 0 )
-				el.dataset[ name.slice( 5 ) ] = String( value );
-		},
-		getAttribute : function( name ) { return name in el.attributes ? el.attributes[name] : null },
-		removeAttribute : function( name ) { delete el.attributes[name] },
-		addEventListener : function( name, fn, options ) {
-			el.listeners[name] = el.listeners[name] || [];
-			el.listeners[name].push( { fn : fn, once : !!( options && options.once ) } );
-		},
-		focus : function() { el.focused = true },
-		// The two selectors the status line asks for, and nothing else
-		querySelector : function( selector ) {
-			const wanted = Array.from( selector.matchAll( /\[(data-field|name)="([^"]+)"\]/g ) ).map( m => [ m[1], m[2] ] );
-			let found = null;
-			( function walk( node ) {
-				node.children.forEach( function( child ) {
-					if( found === null && wanted.some( w => ( w[0] === 'name' ? child.attributes.name : child.dataset.field ) === w[1] ) )
-						found = child;
-					walk( child );
-				} );
-			} )( el );
-			return found;
-		},
-		closest : function() { return null },
-		// The picker empties its lists by assigning innerHTML
-		set innerHTML( value ) { el.children.length = 0 },
-		// An event goes from its target up through the parents, as in a page
-		dispatchEvent : function( event ) {
-			for( let node = el; node !== null; node = node.parent )
-				fire( node, event.type, el );
-			return true;
-		},
-	};
-	return el;
-}
-
-function fire( el, name, target ) {
-	( el.listeners[name] || [] ).slice().forEach( function( entry ) {
-		if( entry.once )
-			el.listeners[name].splice( el.listeners[name].indexOf( entry ), 1 );
-		entry.fn( { preventDefault : function() {}, target : target || el } );
-	} );
-}
 
 // --- the sandbox
 
@@ -140,7 +54,7 @@ function sandboxFor( locale, options ) {
 	};
 	sandbox.window = sandbox;
 
-	vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' ), vm.createContext( sandbox ), { filename : 'Nino.admin.js' } );
+	load( '_admin/assets/Nino.admin.js', vm.createContext( sandbox ) );
 
 	return { sent : sent, Nino : Nino, sandbox : sandbox, csrfInputs : csrfInputs, account : account };
 }
@@ -358,7 +272,6 @@ check( 'a code that is not a slug is never looked up', errorText( 'en_US', 400, 
 // showError() writes the error text into a container, replacing what stood there
 const container = element('div');
 container.appendChild( element('span') );
-Object.defineProperty( container, 'innerHTML', { set : function() { container.children.length = 0 }, get : function() { return '' } } );
 const shown = T.Nino.adminUi.showError( container, 500, { error : 'boom' }, '/_admin/common/error/load' );
 check( 'showError() replaces the container\'s content with one error paragraph', container.children.length === 1 && container.children[0] === shown && shown.className === 'nino-admin-error' && shown.textContent === '(500) boom' );
 
@@ -387,11 +300,11 @@ check( 'typing into the form turns saved into unsaved changes', line.dataset.sta
 const upload = element('input');
 upload.type = 'file';
 status.saved( new Date( 2026, 0, 5, 9, 4 ) );
-fire( form, 'change', upload );
+fire( form, 'change', { target : upload } );
 check( 'a picked file does not turn saved into unsaved - the upload saves it', line.dataset.state === 'saved' );
 const searchBox = element('input');
 searchBox.type = 'search';
-fire( form, 'input', searchBox );
+fire( form, 'input', { target : searchBox } );
 check( 'a search box (the element picker) is not an edit', line.dataset.state === 'saved' );
 
 // ...but what the picker chooses is: add, move and remove each write the hidden value and say so
@@ -405,7 +318,6 @@ function buttons( node, glyph ) {
 	( function walk( n ) { n.children.forEach( function( c ) { if( c.tagName === 'BUTTON' && c.textContent === glyph ) hits.push( c ); walk( c ) } ) } )( node );
 	return hits;
 }
-function click( el ) { ( el.listeners.click || [] ).forEach( function( entry ) { entry.fn( { preventDefault : function() {}, target : el } ) } ) }
 const picker = ui.elementList( { key : 'related', label : 'Related', value : [], limit : 0, text : {},
 	options : [ { value : '/posts/a', label : 'Alpha' }, { value : '/posts/b', label : 'Beta' } ] } );
 form.appendChild( picker );
@@ -414,19 +326,19 @@ status.saved( new Date( 2026, 0, 5, 9, 41 ) );
 pickerSearch.value = 'alp';
 fire( pickerSearch, 'input' );
 check( 'typing into the picker\'s search box alone leaves saved as it is', line.dataset.state === 'saved' );
-click( buttons( picker, '+' )[0] );
+buttons( picker, '+' )[0].click();
 check( 'adding a reference turns saved into unsaved changes', line.dataset.state === 'dirty' && findIn( picker, c => c.dataset.field === 'related' ).value === '["/posts/a"]' );
 pickerSearch.value = '';
 fire( pickerSearch, 'input' );
-click( buttons( picker, '+' )[0] );
+buttons( picker, '+' )[0].click();
 status.saved( new Date( 2026, 0, 5, 9, 42 ) );
-click( buttons( picker, '↓' )[0] );
+buttons( picker, '↓' )[0].click();
 check( 'moving a reference turns saved into unsaved changes', line.dataset.state === 'dirty' && findIn( picker, c => c.dataset.field === 'related' ).value === '["/posts/b","/posts/a"]' );
 status.saved( new Date( 2026, 0, 5, 9, 43 ) );
-click( buttons( picker, '✕' )[0] );
+buttons( picker, '✕' )[0].click();
 check( 'removing a reference turns saved into unsaved changes', line.dataset.state === 'dirty' && findIn( picker, c => c.dataset.field === 'related' ).value === '["/posts/a"]' );
 status.saved( new Date( 2026, 0, 5, 9, 4 ) );
-fire( form, 'input', pw );
+fire( form, 'input', { target : pw } );
 status.saving();
 fire( form, 'change' );
 check( 'a save in flight stays "saving" whatever is typed', line.dataset.state === 'saving' && line.textContent === 'Saving …' );
@@ -556,6 +468,5 @@ Promise.all( [ big, small, unreadable ].map( file => new Promise( function( reso
 		&& all.en_US['/_admin/error/int_range'].split( '%s' ).length === 3 && all.de_DE['/_admin/error/int_range'].split( '%s' ).length === 3
 		&& all.en_US['/_admin/error/upload_too_large'].includes( '%s' ) && all.de_DE['/_admin/error/image_too_large'].includes( '%s' ) );
 
-	console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-	process.exitCode = failures === 0 ? 0 : 1;
+	done();
 } );

@@ -17,19 +17,7 @@
 const fs 	= require('fs');
 const path 	= require('path');
 const vm 		= require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
+const { check, done, fills, load } = require( './harness.js' );
 
 const sandbox = {
 	console : console,
@@ -41,11 +29,7 @@ sandbox.Nino = {
 	events : { bindCallback : function() {} },
 };
 
-vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Text/assets/admin.js' ), 'utf8' ),
-	vm.createContext( sandbox ),
-	{ filename : 'text.js' }
-);
+load( '_admin/Nino/Modules/Text/assets/admin.js', vm.createContext( sandbox ), 'text.js' );
 
 const text = sandbox.Nino.admin.text;
 
@@ -78,11 +62,7 @@ keysSandbox.Nino = {
 	events : { bindCallback : function() {} },
 };
 
-vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Text/assets/keys.js' ), 'utf8' ),
-	vm.createContext( keysSandbox ),
-	{ filename : 'keys.js' }
-);
+load( '_admin/Nino/Modules/Text/assets/keys.js', vm.createContext( keysSandbox ) );
 
 const keys = keysSandbox.Nino.admin.keys;
 
@@ -505,11 +485,8 @@ check( 'the Keys tab registers with the shell behind a check that the shell has 
 // read from the files themselves, so what is checked is what ships
 function workbenchWords( locale ) {
 	const out = {};
-	for( const file of [ '_admin/text/', '_admin/Nino/Modules/Text/text/' ] ) {
-		const source = fs.readFileSync( path.join( __dirname, '..', file+ locale+ '.php' ), 'utf8' );
-		for( const m of source.matchAll( /'\[\[(\/_admin\/[^\]]+)\]\]'\s*=>\s*'((?:[^'\\]|\\.)*)'/g ) )
-			out[m[1]] = m[2].replace( /\\'/g, "'" );
-	}
+	for( const file of [ '_admin/text/', '_admin/Nino/Modules/Text/text/' ] )
+		Object.assign( out, fills( file+ locale+ '.php' ) );
 	return out;
 }
 
@@ -617,7 +594,7 @@ function world( locale, hash, session ) {
 
 	const context = vm.createContext( box );
 	[ '_admin/assets/Nino.admin.js', '_admin/Nino/Modules/Text/assets/textkeys.js', '_admin/Nino/Modules/Text/assets/admin.js', '_admin/Nino/Modules/Text/assets/keys.js' ]
-		.forEach( file => vm.runInContext( fs.readFileSync( path.join( __dirname, '..', file ), 'utf8' ), context, { filename : file } ) );
+		.forEach( file => load( file, context, file ) );
 
 	const mount = ( ...ids ) => ids.map( id => { const el = dom.make('div'); el.id = id; dom.root.appendChild( el ); return el } );
 
@@ -1277,5 +1254,4 @@ function openedKeys( response, hash ) {
 	check( 'the row of the details of pages is called by the neutral "Seitenangaben" in the Keys tab', k.list.querySelectorAll('a').find( a => a.dataset.group === '_nino/webpage' ).querySelector('strong').textContent === 'Seitenangaben' );
 }
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();

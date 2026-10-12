@@ -8,57 +8,8 @@
 
 'use strict';
 
-const fs 	= require('fs');
-const path 	= require('path');
 const vm 		= require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
-
-function classList() {
-	const values = new Set();
-	return {
-		add 	: function( value ) { values.add( value ); },
-		remove 	: function( value ) { values.delete( value ); },
-		contains: function( value ) { return values.has( value ); },
-	};
-}
-
-function element( tagName ) {
-	const el = {
-		tagName 	: tagName,
-		children 	: [],
-		attributes	: {},
-		classList 	: classList(),
-		listeners 	: {},
-		style 		: {},
-		textContent : '',
-		addEventListener : function( type, callback, options ) {
-			this.listeners[type] = { callback : callback, options : options };
-		},
-		appendChild : function( child ) {
-			this.children.push( child );
-			return child;
-		},
-		setAttribute : function( name, value ) { this.attributes[name] = String( value ) },
-		getAttribute : function( name ) { return this.attributes[name] ?? null },
-	};
-
-	// What the slider's dots read back through (see sliderMove())
-	Object.defineProperty( el, 'firstChild', { get : function() { return el.children[0] ?? null } } );
-
-	return el;
-}
+const { check, done, load, classList, element, fire } = require( './harness.js' );
 
 const slides = [ element('LI'), element('LI'), element('LI') ];
 const stage = element('UL');
@@ -97,11 +48,7 @@ sandbox.Nino = {
 	events 	: { bindCallback : function() {} },
 };
 
-vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_nino/Nino.ui.js' ), 'utf8' ),
-	vm.createContext( sandbox ),
-	{ filename : 'Nino.ui.js' }
-);
+load( '_nino/Nino.ui.js', vm.createContext( sandbox ) );
 
 const ui = sandbox.Nino.ui;
 
@@ -114,14 +61,14 @@ ui.onReady();
 ui._onResize[0]();
 
 check( 'the slider explicitly permits vertical pan and pinch zoom', slider.style.touchAction === 'pan-y pinch-zoom' );
-check( 'touchmove is registered as non-passive for horizontal preventDefault', slider.listeners.touchmove.options.passive === false );
+check( 'touchmove is registered as non-passive for horizontal preventDefault', slider.listenerOptions.touchmove.passive === false );
 
 function touch( type, clientX, clientY, touchCount ) {
 	let prevented = false;
 	const points = [];
 	for( let i=0; i<( touchCount ?? 1 ); i++ )
 		points.push( { clientX : clientX + i, clientY : clientY + i } );
-	slider.listeners[type].callback.call( slider, {
+	fire( slider, type, {
 		changedTouches : [ points[points.length - 1] ],
 		touches 		: points,
 		preventDefault : function() { prevented = true; },
@@ -146,7 +93,7 @@ check( 'touchend leaves the track centered and animated', slider.classList.conta
 
 touch( 'touchstart', 200, 100 );
 touch( 'touchmove', 170, 103 );
-slider.listeners.touchcancel.callback.call( slider );
+fire( slider, 'touchcancel' );
 check( 'touchcancel clears dragging mode', slider.classList.contains('nino-is-touch') === false );
 check( 'touchcancel restores the centered track', stage.style.left === slider.posLeft +'px' );
 
@@ -225,5 +172,4 @@ check( 'a slider with no slides in it is left alone rather than throwing out of 
 check( '...and one with no list at all too - nothing appended, nothing wired', readyThrew === null && noStage.children.length === 0 && noStage.pos === undefined );
 check( '...while the finished slider beside them is still wired', slider.pos === 1 );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();

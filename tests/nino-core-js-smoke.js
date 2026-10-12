@@ -9,22 +9,8 @@
 
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
 const vm = require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
+const { check, done, load } = require( './harness.js' );
 
 /**
  *	Nino.js in a page of its own: the listeners it registers are kept, and so
@@ -72,11 +58,7 @@ function page() {
 	sandbox.window = sandbox;
 	sandbox.self = sandbox;
 
-	vm.runInContext(
-		fs.readFileSync( path.join( __dirname, '../_nino/Nino.js' ), 'utf8' ),
-		vm.createContext( sandbox ),
-		{ filename : 'Nino.js' }
-	);
+	load( '_nino/Nino.js', vm.createContext( sandbox ) );
 
 	return {
 		Nino : sandbox.Nino,
@@ -119,5 +101,7 @@ check( 'a burst of resize events asks for one animation frame too', resizing.fra
 resizing.runFrames();
 check( '...and a resize callback is handed the resize event, not the last scroll', resizeEvent !== null && resizeEvent.type === 'resize' );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exit( failures === 0 ? 0 : 1 );
+// Nino.js leaves its ready callback behind, one millisecond out, and that one
+// reaches for an Event this context has not got: the suite ends here
+done();
+process.exit();

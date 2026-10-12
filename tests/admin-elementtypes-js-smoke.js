@@ -24,19 +24,7 @@
 const fs 	= require('fs');
 const path 	= require('path');
 const vm 		= require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
+const { check, done, load, element, findAll, fire } = require( './harness.js' );
 
 const sandbox = {
 	console : console,
@@ -48,11 +36,7 @@ sandbox.Nino = {
 	events : { bindCallback : function() {} },
 };
 
-vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Elements/assets/types.js' ), 'utf8' ),
-	vm.createContext( sandbox ),
-	{ filename : 'elementtypes.js' }
-);
+load( '_admin/Nino/Modules/Elements/assets/types.js', vm.createContext( sandbox ), 'elementtypes.js' );
 
 const elementTypes = sandbox.Nino.admin.types;
 
@@ -472,18 +456,10 @@ check( 'the danger zone is not rendered while creating a new type',
 // editor beside the field types. The editor used to state the rule itself,
 // one type short, and offered a unit on an element reference that the save
 // then dropped in silence. So the input follows the list, and nothing else.
-// A recording dom of plain objects, since the sandbox above has none
+// A recording dom, since the sandbox above has none
 
 {
-	const make = tag => ( { tagName : tag, children : [], className : '', dataset : {}, classList : { add(){}, remove(){}, toggle(){} },
-		appendChild( c ) { this.children.push( c ); return c }, addEventListener( type, fn ) { ( this.listeners[type] = this.listeners[type] ?? [] ).push( fn ) }, setAttribute(){},
-		listeners : {}, fire( type ) { ( this.listeners[type] ?? [] ).forEach( fn => fn( { type : type } ) ) }, dispatchEvent( ev ) { this.fire( ev.type ) }, focus() { this.focused = true },
-		// a select answers with its selected option, as the real one does
-		get value() { if( tag !== 'select' ) return this._value; const chosen = this.children.find( o => o.selected === true ) || this.children[0]; return chosen ? chosen.value : '' },
-		set value( v ) { this._value = v },
-		get innerHTML() { return '' }, set innerHTML( v ) { this.children = [] } } );
-	const find = ( node, test, out = [] ) => { ( node.children || [] ).forEach( c => { if( test( c ) ) out.push( c ); find( c, test, out ) } ); return out };
-	sandbox.document.createElement = make;
+	sandbox.document.createElement = element;
 	sandbox.document.createTextNode = text => ( { nodeType : 3, textContent : text, children : [] } );
 	sandbox.Nino.content = { getText : key => key };
 	elementTypes._fields = [ { key : 'a', type : 'double' } ];
@@ -491,7 +467,7 @@ check( 'the danger zone is not rendered while creating a new type',
 	elementTypes._currentUri = null;
 	elementTypes._fieldTypes = [ 'string', 'integer', 'double', 'boolean', 'array', 'date', 'datetime', 'image', 'element' ];
 	elementTypes._suffixTypes = [ 'string', 'integer', 'double', 'array', 'date', 'datetime' ];
-	const unitInputs = field => find( elementTypes._renderFieldRow( field, 0 ), n => n.className === 'admin-field-suffix' ).length;
+	const unitInputs = field => findAll( elementTypes._renderFieldRow( field, 0 ), n => n.className === 'admin-field-suffix' ).length;
 	check( 'a row of a type the server names offers the unit input', unitInputs( { key : 'price', type : 'double' } ) === 1 && unitInputs( { key : 'title', type : 'string' } ) === 1 );
 	check( '...and a row of a type it does not name - an element reference, an image, a boolean - does not', unitInputs( { key : 'ref', type : 'element', elementType : 'people' } ) === 0 && unitInputs( { key : 'photo', type : 'image' } ) === 0 && unitInputs( { key : 'live', type : 'boolean' } ) === 0 );
 	elementTypes._suffixTypes = [];
@@ -502,8 +478,8 @@ check( 'the danger zone is not rendered while creating a new type',
 	// an own key, which shows the text field it always was. The text field stays
 	// what is read back and saved
 	const WORDS = [ 'title', 'subtitle', 'text', 'description', 'image', 'alt', 'caption', 'link', 'label', 'name', 'email', 'phone', 'address', 'date', 'author', 'price', 'icon' ];
-	const choice = field => find( elementTypes._renderFieldRow( field, 0 ), n => n.className === 'admin-field-key-select' )[0];
-	const keyField = field => find( elementTypes._renderFieldRow( field, 0 ), n => n.className === 'admin-field-key' )[0];
+	const choice = field => findAll( elementTypes._renderFieldRow( field, 0 ), n => n.className === 'admin-field-key-select' )[0];
+	const keyField = field => findAll( elementTypes._renderFieldRow( field, 0 ), n => n.className === 'admin-field-key' )[0];
 	check( 'the choice offers the 17 words of the vocabulary that name a field, and "own key"', JSON.stringify( elementTypes.KEY_WORDS ) === JSON.stringify( WORDS )
 		&& choice( { key : 'a', type : 'string' } ).children.map( o => o.value ).join() === WORDS.concat( [ '' ] ).join() );
 	check( '...each named by its word', choice( { key : 'a', type : 'string' } ).children.slice( 0, 17 ).every( o => o.textContent === '/_admin/common/word/'+ o.value ) );
@@ -513,13 +489,13 @@ check( 'the danger zone is not rendered while creating a new type',
 	// the choice at work: a word fills the text field and hides it, "own key" shows it again
 	sandbox.Event = function( type ) { this.type = type };
 	const row = elementTypes._renderFieldRow( { key : 'price_default', type : 'double' }, 0 );
-	const select = find( row, n => n.className === 'admin-field-key-select' )[0];
-	const input = find( row, n => n.className === 'admin-field-key' )[0];
+	const select = findAll( row, n => n.className === 'admin-field-key-select' )[0];
+	const input = findAll( row, n => n.className === 'admin-field-key' )[0];
 	select.children.forEach( o => { o.selected = ( o.value === 'author' ) } );
-	select.fire('change');
+	fire( select, 'change' );
 	check( 'picking a word puts it into the text field, which is what is saved, and hides the field', input.value === 'author' && input.hidden === true );
 	select.children.forEach( o => { o.selected = ( o.value === '' ) } );
-	select.fire('change');
+	fire( select, 'change' );
 	check( '...and "own key" shows the field again, with the word still in it, and puts the cursor there', input.hidden === false && input.value === 'author' && input.focused === true );
 	check( '_storeFields() reads the type from its own select, not from the first select of the row', typesSource.includes( "row.querySelector('.admin-field-type').value" ) && typesSource.includes( "row.querySelector('select').value" ) === false );
 }
@@ -597,5 +573,4 @@ check( 'the danger zone is not rendered while creating a new type',
 	delete sandbox.Nino.admin.dirty;
 }
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();

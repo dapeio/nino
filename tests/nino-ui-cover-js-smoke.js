@@ -8,26 +8,8 @@
 
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
 const vm = require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
-
-function classList() {
-	return { add : function() {}, remove : function() {}, contains : function() { return false; } };
-}
+const { check, done, load, classList } = require( './harness.js' );
 
 function parent( width, paddingLeft, paddingRight ) {
 	return {
@@ -111,11 +93,7 @@ sandbox.Nino = {
 	events : { bindCallback : function() {} },
 };
 
-vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_nino/Nino.ui.js' ), 'utf8' ),
-	vm.createContext( sandbox ),
-	{ filename : 'Nino.ui.js' }
-);
+load( '_nino/Nino.ui.js', vm.createContext( sandbox ) );
 
 const ui = sandbox.Nino.ui;
 ui.onReady();
@@ -138,5 +116,4 @@ documentElement.clientWidth = 1600;
 ui.onResize();
 check( 'a later resize follows the changed container rather than the wider viewport', railCover.style.width === '980px' );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();

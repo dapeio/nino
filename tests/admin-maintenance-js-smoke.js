@@ -17,111 +17,8 @@
 
 'use strict';
 
-const fs 		= require('fs');
-const path	= require('path');
 const vm 		= require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
-
-function source( relative ) {
-	return fs.readFileSync( path.join( __dirname, '..', relative ), 'utf8' );
-}
-
-/**
- *	The fills of one text file, key => value - enough of the php to read
- *	a `'[[/key]]' => 'value',` line
- */
-function fills( relative ) {
-	const map = {};
-	const re = /'\[\[(\/_admin\/[^\]]+)\]\]'\s*=>\s*'((?:[^'\\]|\\.)*)'/g;
-	const text = source( relative );
-	let match;
-	while( ( match = re.exec( text ) ) )
-		map[match[1]] = match[2].replace( /\\'/g, "'" );
-	return map;
-}
-
-
-// --- an element stand-in: a tree that knows its parent ---------------------
-
-function findAll( root, predicate ) {
-	const found = [];
-	( function walk( node ) {
-		( node.children || [] ).forEach( function( child ) {
-			if( predicate( child ) === true )
-				found.push( child );
-			walk( child );
-		} );
-	} )( root );
-	return found;
-}
-
-function element( tag ) {
-	const el = {
-		tagName : String( tag ).toUpperCase(),
-		className : '',
-		textContent : '',
-		id : '',
-		href : '',
-		type : '',
-		value : '',
-		checked : false,
-		style : {},
-		attributes : {},
-		children : [],
-		parent : null,
-		listeners : {},
-		appendChild : function( child ) { child.parent = el; el.children.push( child ); return child },
-		insertBefore : function( child, ref ) {
-			child.parent = el;
-			const at = ref === null ? -1 : el.children.indexOf( ref );
-			if( at < 0 )
-				el.children.push( child );
-			else
-				el.children.splice( at, 0, child );
-			return child;
-		},
-		insertAdjacentElement : function( where, child ) {
-			if( where !== 'afterend' )
-				throw new Error( 'only afterend is stood in for' );
-			child.parent = el.parent;
-			el.parent.children.splice( el.parent.children.indexOf( el ) + 1, 0, child );
-			return child;
-		},
-		remove : function() {
-			if( el.parent !== null )
-				el.parent.children.splice( el.parent.children.indexOf( el ), 1 );
-			el.parent = null;
-		},
-		setAttribute : function( name, value ) { el.attributes[name] = String( value ) },
-		addEventListener : function( name, fn ) {
-			el.listeners[name] = el.listeners[name] || [];
-			el.listeners[name].push( fn );
-		},
-		querySelector : function( selector ) {
-			if( selector === ':scope > h1' )
-				return el.children.find( function( child ) { return child.tagName === 'H1' } ) ?? null;
-			const key = /^\[data-key="([a-z]+)"\]$/.exec( selector );
-			return key === null ? null : ( findAll( el, function( child ) { return child.attributes['data-key'] === key[1] } )[0] ?? null );
-		},
-	};
-	Object.defineProperty( el, 'innerHTML', {
-		get : function() { return '' },
-		set : function() { el.children.length = 0 },
-	} );
-	return el;
-}
+const { check, done, fills, load, element, findAll } = require( './harness.js' );
 
 function banners( root ) {
 	return findAll( root, function( el ) { return el.id === 'maintenance-banner' } );
@@ -194,7 +91,7 @@ const sandbox = {
 sandbox.window = { Nino : Nino };
 
 const context = vm.createContext( sandbox );
-vm.runInContext( source('_admin/assets/Nino.admin.js'), context, { filename : 'Nino.admin.js' } );
+load( '_admin/assets/Nino.admin.js', context );
 
 // The form's own fields are the design system's business, and have their own
 // tests - here they are only there. The save reads them back by their key
@@ -217,7 +114,7 @@ Nino.adminUi.numberField = function( options ) {
 	return field;
 };
 
-vm.runInContext( source('_nino/Nino/Modules/Maintenance/assets/admin.js'), context, { filename : 'admin.js' } );
+load( '_nino/Nino/Modules/Maintenance/assets/admin.js', context );
 
 const panel = Nino.admin.maintenance;
 
@@ -248,7 +145,7 @@ panel.init();
 answer( 200, { status : true, retry : 3600 } );
 let drawn = banners( content );
 check( 'a site that shows its maintenance page gets one notice', drawn.length === 1 );
-check( '...in the workbench\'s content column, right after the heading - above every panel, not in the form\'s pane', content.children[1] === drawn[0] && content.children[0].tagName === 'H1' && drawn[0].parent === content );
+check( '...in the workbench\'s content column, right after the heading - above every panel, not in the form\'s pane', content.children[1] === drawn[0] && content.children[0].tagName === 'H1' && drawn[0].parentNode === content );
 check( '...a status notice of the design system, saying so in the interface language', drawn[0].className === 'nino-admin-notice' && drawn[0].attributes.role === 'status'
 	&& drawn[0].textContent === text('/_admin/maintenance/banner/text') && text('/_admin/maintenance/banner/text') !== '' );
 
@@ -315,5 +212,4 @@ check( 'both interface languages have the two words', [ moduleEn, moduleDe ].eve
 		&& map['/_admin/maintenance/banner/link'] !== undefined && map['/_admin/maintenance/banner/link'] !== '';
 } ) );
 
-console.log( '\n'+ checks +' checks, '+ failures +' failed' );
-process.exit( failures > 0 ? 1 : 0 );
+done();

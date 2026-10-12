@@ -8,50 +8,8 @@
 
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
 const vm = require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
-
-function classList( initial ) {
-	const values = new Set( initial || [] );
-	return {
-		add : function( value ) { values.add( value ) },
-		remove : function( value ) { values.delete( value ) },
-		contains : function( value ) { return values.has( value ) },
-		toggle : function( value, force ) {
-			if( force === true ) values.add( value );
-			else if( force === false ) values.delete( value );
-			else if( values.has( value ) ) values.delete( value );
-			else values.add( value );
-			return values.has( value );
-		},
-	};
-}
-
-function element() {
-	return {
-		hidden : false,
-		attributes : {},
-		listeners : {},
-		classList : classList(),
-		setAttribute : function( name, value ) { this.attributes[name] = String( value ) },
-		getAttribute : function( name ) { return this.attributes[name] ?? null },
-		addEventListener : function( name, callback ) { this.listeners[name] = callback },
-	};
-}
+const { check, done, load, classList, element, fire } = require( './harness.js' );
 
 function makeFilterRoot( buttons, items ) {
 	return {
@@ -65,28 +23,28 @@ function makeFilterRoot( buttons, items ) {
 
 // A normal filter: "Alle" starts active/pressed, two category buttons, three
 // cards - two "Design", one "Consulting" - none hidden yet (markup default).
-const allBtn = element();
+const allBtn = element('button');
 allBtn.attributes['data-filter-value'] = '';
 allBtn.classList.add('nino-is-active');
 allBtn.attributes['aria-pressed'] = 'true';
 
-const designBtn = element();
+const designBtn = element('button');
 designBtn.attributes['data-filter-value'] = 'Design';
 designBtn.attributes['aria-pressed'] = 'false';
 
-const consultingBtn = element();
+const consultingBtn = element('button');
 consultingBtn.attributes['data-filter-value'] = 'Consulting';
 consultingBtn.attributes['aria-pressed'] = 'false';
 
-const cardA = element(); cardA.attributes['data-filter-item'] = 'Design';
-const cardB = element(); cardB.attributes['data-filter-item'] = 'Design';
-const cardC = element(); cardC.attributes['data-filter-item'] = 'Consulting';
+const cardA = element('div'); cardA.attributes['data-filter-item'] = 'Design';
+const cardB = element('div'); cardB.attributes['data-filter-item'] = 'Design';
+const cardC = element('div'); cardC.attributes['data-filter-item'] = 'Consulting';
 
 const filterRoot = makeFilterRoot( [ allBtn, designBtn, consultingBtn ], [ cardA, cardB, cardC ] );
 
 // A second root with buttons but no cards yet - must be skipped without
 // wiring any click handler and without throwing.
-const strayBtn = element();
+const strayBtn = element('button');
 const emptyRoot = makeFilterRoot( [ strayBtn ], [] );
 
 const body = { classList : classList(), scrollLeft : 0, scrollTop : 0 };
@@ -96,7 +54,7 @@ const document = {
 	documentElement : documentElement,
 	getElementById : function() { return null },
 	querySelectorAll : function( selector ) { return selector === '.nino-filter' ? [ filterRoot, emptyRoot ] : [] },
-	createElement : function() { return element() },
+	createElement : element,
 };
 
 const sandbox = {
@@ -115,11 +73,7 @@ sandbox.Nino = {
 	events : { bindCallback : function() {} },
 };
 
-vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_nino/Nino.ui.js' ), 'utf8' ),
-	vm.createContext( sandbox ),
-	{ filename : 'Nino.ui.js' }
-);
+load( '_nino/Nino.ui.js', vm.createContext( sandbox ) );
 
 sandbox.Nino.ui.onReady();
 
@@ -127,27 +81,26 @@ sandbox.Nino.ui.onReady();
 // unless onReady actually wired this root, since an untouched DOM trivially
 // satisfies them - deleting the whole nino-filter block used to pass three
 // checks before the first click threw.
-check( 'onReady wires a click handler onto every button of a complete filter', typeof allBtn.listeners.click === 'function'
-	&& typeof designBtn.listeners.click === 'function'
-	&& typeof consultingBtn.listeners.click === 'function' );
-check( '...but skips a filter root that has buttons and no cards yet', typeof strayBtn.listeners.click === 'undefined' );
+check( 'onReady wires a click handler onto every button of a complete filter', typeof allBtn.listeners.click?.[0] === 'function'
+	&& typeof designBtn.listeners.click?.[0] === 'function'
+	&& typeof consultingBtn.listeners.click?.[0] === 'function' );
+check( '...but skips a filter root that has buttons and no cards yet', strayBtn.listeners.click === undefined );
 check( 'onReady does not force an initial selection - markup keeps deciding the active button', allBtn.classList.contains('nino-is-active') === true
 	&& designBtn.classList.contains('nino-is-active') === false
 	&& allBtn.attributes['aria-pressed'] === 'true' );
 check( '...and does not hide any card before the first click', cardA.hidden === false && cardB.hidden === false && cardC.hidden === false );
 
-designBtn.listeners.click.call( designBtn );
+fire( designBtn, 'click' );
 check( 'clicking a category button activates it and deactivates the previous one', designBtn.classList.contains('nino-is-active') === true && allBtn.classList.contains('nino-is-active') === false );
 check( '...and updates aria-pressed on both', designBtn.attributes['aria-pressed'] === 'true' && allBtn.attributes['aria-pressed'] === 'false' );
 check( 'matching cards stay visible', cardA.hidden === false && cardB.hidden === false );
 check( 'non-matching cards are hidden', cardC.hidden === true );
 
-consultingBtn.listeners.click.call( consultingBtn );
+fire( consultingBtn, 'click' );
 check( 'clicking a different category switches the visible cards', cardC.hidden === false && cardA.hidden === true && cardB.hidden === true );
 
-allBtn.listeners.click.call( allBtn );
+fire( allBtn, 'click' );
 check( '"Alle" (data-filter-value="") shows every card again', cardA.hidden === false && cardB.hidden === false && cardC.hidden === false );
 check( '...and re-activates the "Alle" button', allBtn.classList.contains('nino-is-active') === true && consultingBtn.classList.contains('nino-is-active') === false );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();

@@ -15,116 +15,8 @@
 
 'use strict';
 
-const fs 		= require('fs');
-const path	= require('path');
 const vm 		= require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
-
-function source( relative ) {
-	return fs.readFileSync( path.join( __dirname, '..', relative ), 'utf8' );
-}
-
-/** The fills of one text file, key => value - enough of the php to read a `'[[/key]]' => 'value',` line */
-function fills( relative ) {
-	const map = {};
-	const re = /'\[\[(\/_admin\/[^\]]+)\]\]'\s*=>\s*'((?:[^'\\]|\\.)*)'/g;
-	const text = source( relative );
-	let match;
-	while( ( match = re.exec( text ) ) )
-		map[match[1]] = match[2].replace( /\\'/g, "'" );
-	return map;
-}
-
-
-// --- an element stand-in: enough tree to find things in -------------------
-
-function classList( el ) {
-	const values = new Set();
-	return {
-		add : function( value ) { values.add( value ) },
-		remove : function( value ) { values.delete( value ) },
-		contains : function( value ) { return values.has( value ) },
-		toggle : function( value, force ) { ( force === undefined ? values.has( value ) === false : force ) ? values.add( value ) : values.delete( value ) },
-	};
-}
-
-function matches( el, selector ) {
-	return selector.split(',').some( function( part ) {
-		part = part.trim();
-		const attribute = /^\[([a-z-]+)="([^"]*)"\]$/.exec( part );
-		if( attribute !== null )
-			return el.attributes[attribute[1]] === attribute[2] || ( attribute[1].indexOf('data-') === 0 && el.dataset[attribute[1].slice(5)] === attribute[2] );
-		if( part.charAt(0) === '#' )
-			return el.id === part.slice(1);
-		return el.tagName === part.toUpperCase();
-	} );
-}
-
-function findAll( root, predicate ) {
-	const found = [];
-	( function walk( node ) {
-		( node.children || [] ).forEach( function( child ) {
-			if( predicate( child ) === true )
-				found.push( child );
-			walk( child );
-		} );
-	} )( root );
-	return found;
-}
-
-function element( tag ) {
-	const el = {
-		tagName : String( tag ).toUpperCase(),
-		className : '',
-		textContent : '',
-		type : '',
-		id : '',
-		value : '',
-		disabled : false,
-		style : {},
-		dataset : {},
-		attributes : {},
-		children : [],
-		listeners : {},
-		parentNode : null,
-		appendChild : function( child ) { child.parentNode = el; el.children.push( child ); return child },
-		setAttribute : function( name, value ) { el.attributes[name] = String( value ); if( name === 'id' ) el.id = String( value ) },
-		removeAttribute : function( name ) { delete el.attributes[name] },
-		addEventListener : function( name, fn ) {
-			el.listeners[name] = el.listeners[name] || [];
-			el.listeners[name].push( fn );
-		},
-		querySelector : function( selector ) { return findAll( el, function( node ) { return matches( node, selector ) } )[0] ?? null },
-		querySelectorAll : function( selector ) { return findAll( el, function( node ) { return matches( node, selector ) } ) },
-		closest : function() { return null },
-		focus : function() {},
-	};
-	el.classList = classList( el );
-	Object.defineProperty( el, 'innerHTML', {
-		get : function() { return '' },
-		set : function() { el.children.length = 0 },
-	} );
-	return el;
-}
-
-function fire( el, name ) {
-	if( el === null || el === undefined )
-		return;
-	( el.listeners[name] || [] ).forEach( function( fn ) { fn( { preventDefault : function() {} } ) } );
-}
-
+const { check, done, fills, load, documentOf, element, findAll, fire } = require( './harness.js' );
 
 // --- the words -------------------------------------------------------------
 
@@ -162,22 +54,16 @@ const Nino = {
 };
 const sandbox = {
 	console : console,
-	document : {
-		createElement : element,
-		getElementById : function( id ) {
-			return id === 'recoverypw-form' ? mount : findAll( mount, function( el ) { return el.id === id } )[0] ?? null;
-		},
+	document : Object.assign( documentOf( mount ), {
 		querySelectorAll : function( selector ) { return mount.querySelectorAll( selector.replace( '#recoverypw-form ', '' ) ) },
-		documentElement : null,
-		body : null,
-	},
+	} ),
 	Nino : Nino,
 };
 sandbox.window = { Nino : Nino };
 
 const context = vm.createContext( sandbox );
-vm.runInContext( source('_admin/assets/Nino.admin.js'), context, { filename : 'Nino.admin.js' } );
-vm.runInContext( source('_admin/Nino/Modules/Users/assets/recoverypw.js'), context, { filename : 'recoverypw.js' } );
+load( '_admin/assets/Nino.admin.js', context );
+load( '_admin/Nino/Modules/Users/assets/recoverypw.js', context );
 
 const tab = Nino.admin.recoverypw;
 
@@ -212,7 +98,7 @@ check( 'the form has the three password fields, each a password input', [ 'curre
 check( '...with the autocomplete hints that keep a password manager from filling the wrong one', field('current').attributes.autocomplete === 'current-password'
 	&& field('new').attributes.autocomplete === 'new-password' && field('repeat').attributes.autocomplete === 'new-password' );
 check( '...the two new ones with the minimum length the server holds to', field('new').minLength === 8 && field('repeat').minLength === 8 );
-check( 'the status line is the action bar\'s own', field('msg') !== null && field('msg').className === 'nino-admin-actionbar-status' );
+check( 'the status line is the action bar\'s own', field('msg') !== null && field('msg').classList.contains('nino-admin-actionbar-status') );
 check( 'the form is registered with the shell\'s dirty registry, and drawn means saved', dirty.forms.recoverypw !== undefined && dirty.forms.recoverypw.getter() === mount && dirty.snapshots.join() === 'recoverypw' );
 check( 'the inputs carry the field names the server\'s refusals use', field('current').dataset.field === 'current' && field('new').dataset.field === 'pw' );
 check( 'the tab shows again without being rebuilt', ( function() { const before = field('current'); tab.showCurrent(); return field('current') === before && requests.length === 0 } )() );
@@ -267,5 +153,4 @@ check( 'the registry\'s save reports done( false ) on a failed request and done(
 const keys = [ '/_admin/nav/recoverypw', '/_admin/recoverypw/intro', '/_admin/recoverypw/label/current', '/_admin/recoverypw/label/new', '/_admin/recoverypw/label/repeat', '/_admin/recoverypw/msg/saved', '/_admin/recoverypw/error/mismatch', '/_admin/error/recoverypw_wrong', '/_admin/error/recoverypw_password_short', '/_admin/error/recoverypw_locked', '/_admin/error/recoverypw_unset' ];
 check( 'every word of the tab is worded in English and in German', keys.every( function( key ) { return typeof moduleEn[key] === 'string' && moduleEn[key] !== '' && typeof moduleDe[key] === 'string' && moduleDe[key] !== '' } ) );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();

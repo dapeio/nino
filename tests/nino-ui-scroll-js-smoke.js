@@ -14,23 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
-
-function classList() {
-	return { add : function() {}, remove : function() {}, contains : function() { return false; } };
-}
+const { check, done, load, classList } = require( './harness.js' );
 
 /**
  *	One .nino-parallex box, with or without the picture inside it
@@ -98,11 +82,7 @@ sandbox.Nino = {
 	events : { bindCallback : function() {} },
 };
 
-vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_nino/Nino.ui.js' ), 'utf8' ),
-	vm.createContext( sandbox ),
-	{ filename : 'Nino.ui.js' }
-);
+load( '_nino/Nino.ui.js', vm.createContext( sandbox ) );
 
 const ui = sandbox.Nino.ui;
 
@@ -200,5 +180,4 @@ check( '...and the three that run forever are still stopped outright, after the 
 check( 'the kernel keeps no consent state of its own - that is the Consent feature', ui.cookieConsent === undefined );
 check( '...and neither the script nor the stylesheet still drives or styles a banner', /cookie-banner|cookieConsent|data-cookie-consent/.test( uiSource ) === false && publicCss.includes('cookie-banner') === false );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exit( failures === 0 ? 0 : 1 );
+done();

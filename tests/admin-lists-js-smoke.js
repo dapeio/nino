@@ -9,19 +9,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
+const { check, done, element, fire } = require( './harness.js' );
 
 function asset( filename ) {
 	return fs.readFileSync( path.join( __dirname, '../_admin/assets/', filename ), 'utf8' );
@@ -128,21 +116,9 @@ check( 'Config renders booleans with that shared switch', configSource.includes(
 
 	Driven here rather than read: what this is about is which tab ends up
 	focused and which one is left in the page's tab order	*/
-function tabStub() {
-	const node = {
-		tabIndex : 0, focused : false, attributes : {}, listeners : {},
-		classList : { toggle : function() {} },
-		setAttribute : function( name, value ) { this.attributes[name] = String( value ) },
-		getAttribute : function( name ) { return this.attributes[name] ?? null },
-		addEventListener : function( name, fn ) { this.listeners[name] = fn },
-		focus : function() { this.focused = true },
-	};
-	return node;
-}
-
 const tabSandbox = {
 	console 	: console,
-	document 	: { createElement : function() { return tabStub() }, documentElement : {}, body : {} },
+	document 	: { createElement : element, documentElement : {}, body : {} },
 	Nino 			: { content : { getText : function() { return '' } } },
 };
 tabSandbox.window = tabSandbox;
@@ -151,32 +127,32 @@ const adminUi = tabSandbox.Nino.adminUi;
 
 check( 'the design system owns the tab strip\'s keyboard half', typeof adminUi.tabKeys === 'function' );
 
-const strip = [ tabStub(), tabStub(), tabStub() ];
+const strip = [ element('button'), element('button'), element('button') ];
 const moved = [];
 adminUi.tabKeys( strip, function( at ) { moved.push( at ) } );
 
 let stripPrevented = false;
-strip[0].listeners.keydown.call( strip[0], { key : 'ArrowRight', preventDefault : function() { stripPrevented = true } } );
+fire( strip[0], 'keydown', { key : 'ArrowRight', preventDefault : function() { stripPrevented = true } } );
 check( 'an arrow on a tab moves the strip rather than the page', stripPrevented === true && moved[0] === 1 && strip[1].focused === true );
 check( '...and takes the one tab stop with it', strip[1].tabIndex === 0 && strip[0].tabIndex === -1 && strip[2].tabIndex === -1 );
 
-strip[1].listeners.keydown.call( strip[1], { key : 'End', preventDefault : function() {} } );
+fire( strip[1], 'keydown', { key : 'End', preventDefault : function() {} } );
 check( 'End jumps to the last tab', moved[1] === 2 && strip[2].focused === true && strip[2].tabIndex === 0 );
-strip[2].listeners.keydown.call( strip[2], { key : 'ArrowRight', preventDefault : function() {} } );
+fire( strip[2], 'keydown', { key : 'ArrowRight', preventDefault : function() {} } );
 check( '...and the strip wraps rather than stopping at its end', moved[2] === 0 && strip[0].tabIndex === 0 );
 
 // The row component is what the Features panel builds its two strips with,
 // so a row flagged as a tablist has to come out of it with the same contract
-const rowButtons = { a : tabStub(), b : tabStub() };
+const rowButtons = { a : element('button'), b : element('button') };
 const rowPicked = [];
 adminUi.buttonRow( rowButtons, 'a', function( key ) { rowPicked.push( key ) }, 'aria-selected' );
 check( 'a button row flagged as a tablist is one tab stop, on the selected tab', rowButtons.a.tabIndex === 0 && rowButtons.b.tabIndex === -1 );
-rowButtons.a.listeners.keydown.call( rowButtons.a, { key : 'ArrowRight', preventDefault : function() {} } );
+fire( rowButtons.a, 'keydown', { key : 'ArrowRight', preventDefault : function() {} } );
 check( '...and the arrows pick the next tab, not just focus it', rowPicked[0] === 'b' && rowButtons.b.attributes['aria-selected'] === 'true' && rowButtons.b.tabIndex === 0 );
 
 // A switch is not a tablist: aria-pressed buttons are ordinary buttons and
 // each of them is its own tab stop
-const switchButtons = { on : tabStub(), off : tabStub() };
+const switchButtons = { on : element('button'), off : element('button') };
 adminUi.buttonRow( switchButtons, 'on', function() {} );
 check( 'a row of pressed-state buttons keeps every button in the tab order', switchButtons.on.tabIndex === 0 && switchButtons.off.tabIndex === 0
 	&& switchButtons.on.listeners.keydown === undefined );
@@ -1143,5 +1119,4 @@ check( 'the warning modifiers the Images panel uses - the scaled-up picture and 
 		/_showError\( dc\.getElementById\('users-list'\), listStatus, listResponse \);\s*report\( true \);/.test( usersSource ) === true );
 }
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();

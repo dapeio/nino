@@ -111,7 +111,7 @@ group, always, since the group a `nav()` names is read for the kernel's own and
 | `app/` | The project's own PHP classes and runtime modules, under namespaces of their own |
 | `features/` | Installed features, one directory each with a `feature.php` manifest; the `nino` constraint it names is the kernel whose vocabulary the feature uses. A checkout ships none: they come from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) |
 | `docs/` | The manuals, and the six extension recipes in `docs/recipes/` |
-| `tests/` | Standalone contract tests (`*-smoke.php`, `*-js-smoke.js`), `harness.php` (`check()`, `ninoSandbox()`, `ninoSandboxDir()`, `ninoWarnings()`, `ninoErrors()`, `ninoCall()`, `ninoUser()`, `ninoVisit()`, `ninoDone()`) and `fixtures/` |
+| `tests/` | Standalone contract tests (`*-smoke.php`, `*-js-smoke.js`), `harness.php` (`check()`, `ninoSandbox()`, `ninoSandboxDir()`, `ninoWarnings()`, `ninoErrors()`, `ninoCall()`, `ninoUser()`, `ninoVisit()`, `ninoDone()`), its JS counterpart `harness.js` for the forty JS suites, and `fixtures/` |
 | `history/` | The frozen `CHANGELOG.md` up to 1.7.0; from there the history is the git log and the tags |
 | `private/`, `public/` | One installation's own state, written by the wizard and tracked by nobody. `private/` is never served: `config.php`, `templates/`, `text/`, `elements/`, `assets/`, `data/`, `.auth/`, `.logs/`, `.backups/`. `public/` is what a browser loads directly: `images/`, `fonts/`, `favicon/` and the generated `.cache/` |
 

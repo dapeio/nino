@@ -13,19 +13,7 @@
 
 const fs = require('fs');
 const path = require('path');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition, detail ) {
-	checks++;
-	if( condition ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label+ ( detail ? '  ('+ detail+ ')' : '' ) );
-}
+const { check, done, element, fire } = require( './harness.js' );
 
 // Nino.admin.js is an IIFE over (window, document, documentElement, body) and ends by
 // bootstrapping itself, so it needs a context where `window` is the global -
@@ -146,36 +134,7 @@ check( 'page size 0 cannot divide by zero', model.pageCount( 10, 0 ) >= 1 );
 	the moment somebody types in it - so the table had four controls and one
 	name between them. The component owns no strings, so the names come from
 	the caller where there is a word and from the workbench's shared fills
-	where there is not.
-
-	A recording element, rather than the no-op stub the model checks share:
-	what is under test is exactly which attributes the renderer sets	*/
-function recorder( tag ) {
-	const el = {
-		tagName : String( tag ).toUpperCase(), className : '', textContent : '', value : '',
-		type : '', placeholder : '', disabled : false, selected : false, tabIndex : 0,
-		dataset : {}, style : {}, attributes : {}, children : [], listeners : {},
-		appendChild : function( child ) { el.children.push( child ); return child },
-		setAttribute : function( name, value ) { el.attributes[name] = String( value ) },
-		getAttribute : function( name ) { return el.attributes[name] ?? null },
-		addEventListener : function( name, fn ) { el.listeners[name] = fn },
-		classList : { add : noop, remove : noop, toggle : noop, contains : () => false },
-		querySelectorAll : function( selector ) {
-			const want = String( selector ).toUpperCase();
-			const found = [];
-			( function walk( node ) {
-				( node.children || [] ).forEach( function( child ) {
-					if( child.tagName === want ) found.push( child );
-					walk( child );
-				} );
-			} )( el );
-			return found;
-		},
-	};
-	Object.defineProperty( el, 'innerHTML', { get : () => '', set : function() { el.children.length = 0 } } );
-	return el;
-}
-
+	where there is not	*/
 function descendants( root ) {
 	const found = [];
 	( function walk( node ) {
@@ -184,10 +143,12 @@ function descendants( root ) {
 	return found;
 }
 
-ctx.document.createElement = recorder;
+// A recording element, rather than the no-op stub the model checks share:
+// what is under test is exactly which attributes the renderer sets
+ctx.document.createElement = element;
 ctx.Nino.content = { getText : function( key ) { return 'fill:'+ key } };
 
-const mount = recorder('div');
+const mount = element('div');
 ctx.Nino.adminUi.table( {
 	mount 	: mount,
 	columns	: [ { key : 'uri', label : 'Uri', type : 'string' } ],
@@ -209,7 +170,7 @@ check( 'both pager arrows carry a name rather than only a glyph',
 check( '...and so does the rows-per-page select', sizeSelect.getAttribute('aria-label') === 'fill:/_admin/common/label/perpage' );
 
 // A caller with a word of its own is still the one that decides
-const named = recorder('div');
+const named = element('div');
 ctx.Nino.adminUi.table( {
 	mount 	: named,
 	columns	: [ { key : 'uri', label : 'Uri', type : 'string' } ],
@@ -224,7 +185,7 @@ check( 'a caller\'s own words win over the shared fills', namedSteps[0].getAttri
 	what a screen reader is not handed, so the header says it in the attribute
 	the pattern has for it - and an unsorted header saying "none" is what
 	tells the reader the column can be sorted at all	*/
-const sortable = recorder('div');
+const sortable = element('div');
 ctx.Nino.adminUi.table( {
 	mount 	: sortable,
 	columns	: [ { key : 'uri', label : 'Uri', type : 'string' }, { key : 'n', label : 'N', type : 'integer' } ],
@@ -235,12 +196,11 @@ const headers = descendants( sortable ).filter( el => el.tagName === 'TH' );
 check( 'an unsorted table says every column may be sorted', headers.length === 2 && headers.every( th => th.getAttribute('aria-sort') === 'none' ) );
 
 const sortButtons = descendants( sortable ).filter( el => el.className === 'nino-admin-table-sort' );
-sortButtons[1].listeners.click();
+fire( sortButtons[1], 'click' );
 check( 'the column the table is ordered by says so, and in which direction', headers[1].getAttribute('aria-sort') === 'ascending' && headers[0].getAttribute('aria-sort') === 'none' );
-sortButtons[1].listeners.click();
+fire( sortButtons[1], 'click' );
 check( '...and says it again the other way round on a second press', headers[1].getAttribute('aria-sort') === 'descending' );
-sortButtons[0].listeners.click();
+fire( sortButtons[0], 'click' );
 check( '...and the column that lost the sort goes back to none', headers[1].getAttribute('aria-sort') === 'none' && headers[0].getAttribute('aria-sort') === 'ascending' );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exit( failures === 0 ? 0 : 1 );
+done();

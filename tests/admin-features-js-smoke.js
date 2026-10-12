@@ -24,145 +24,11 @@
 
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
 const vm = require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
-
-function source( relative ) {
-	return fs.readFileSync( path.join( __dirname, '..', relative ), 'utf8' );
-}
-
-/**
- *	The fills of one text file, key => value - enough of the php to read
- *	a `'[[/key]]' => 'value',` line
- */
-function fills( relative ) {
-	const map = {};
-	const re = /'\[\[(\/_admin\/[^\]]+)\]\]'\s*=>\s*'((?:[^'\\]|\\.)*)'/g;
-	const text = source( relative );
-	let match;
-	while( ( match = re.exec( text ) ) )
-		map[match[1]] = match[2].replace( /\\'/g, "'" );
-	return map;
-}
-
-// --- an element stand-in, the same shape tests/nino-ui-elementlist-js-smoke.js builds
-
-function classList( el ) {
-	const values = new Set();
-	return {
-		add : function( value ) { values.add( value ) },
-		remove : function( value ) { values.delete( value ) },
-		contains : function( value ) { return values.has( value ) },
-		toggle : function( value, force ) {
-			if( force === true ) values.add( value );
-			else if( force === false ) values.delete( value );
-			else if( values.has( value ) ) values.delete( value );
-			else values.add( value );
-			return values.has( value );
-		},
-	};
-}
-
-function findAll( root, predicate ) {
-	const found = [];
-	( function walk( node ) {
-		( node.children || [] ).forEach( function( child ) {
-			if( predicate( child ) === true )
-				found.push( child );
-			walk( child );
-		} );
-	} )( root );
-	return found;
-}
-
-function element( tag ) {
-	const el = {
-		tagName : String( tag ).toUpperCase(),
-		className : '',
-		textContent : '',
-		value : '',
-		type : '',
-		checked : false,
-		disabled : false,
-		hidden : false,
-		id : '',
-		href : '',
-		style : {},
-		dataset : {},
-		attributes : {},
-		children : [],
-		listeners : {},
-		parent : null,
-		appendChild : function( child ) { el.children.push( child ); child.parent = el; return child },
-		// Enough of a live tree for the strip to be put into the pane's head
-		// (Nino.adminUi.panelHead()) and drawn again there
-		closest : function() { let at = el.parent; while( at !== null && at.dataset.panel === undefined ) at = at.parent; return at },
-		querySelector : function( selector ) { return el.children.find( function( c ) { return hasClass( c, selector.replace( ':scope > .', '' ) ) } ) || null },
-		insertAdjacentElement : function( where, other ) { const at = el.parent.children.indexOf( el ); el.parent.children.splice( at + 1, 0, other ); other.parent = el.parent; return other },
-		insertBefore : function( other, reference ) { el.children.splice( reference ? el.children.indexOf( reference ) : el.children.length, 0, other ); other.parent = el; return other },
-		remove : function() { if( el.parent === null ) return; el.parent.children.splice( el.parent.children.indexOf( el ), 1 ); el.parent = null },
-		// A data-* attribute is a dataset entry, as in a browser - the shared
-		// select writes its key with setAttribute(), the panel reads dataset
-		setAttribute : function( name, value ) {
-			el.attributes[name] = String( value );
-			if( name.indexOf( 'data-' ) === 0 )
-				el.dataset[ name.slice( 5 ).replace( /-([a-z])/g, function( m, c ) { return c.toUpperCase() } ) ] = String( value );
-		},
-		addEventListener : function( name, fn ) {
-			el.listeners[name] = el.listeners[name] || [];
-			el.listeners[name].push( fn );
-		},
-		// The one query the panel makes: every control carrying a setting name
-		querySelectorAll : function( selector ) {
-			return selector === '[data-key]' ? findAll( el, function( node ) { return typeof node.dataset.key === 'string' } ) : [];
-		},
-		// Enough of a text field for the filter: what a browser gives an
-		// <input> so that a re-render can put the caret back where it was
-		focus : function() { focused = el },
-		selectionStart : 0,
-		selectionEnd : 0,
-		setSelectionRange : function( start, end ) {
-			el.selectionStart = start;
-			el.selectionEnd 	= end;
-		},
-	};
-	el.classList = classList( el );
-	Object.defineProperty( el, 'innerHTML', {
-		get : function() { return '' },
-		set : function() { el.children.length = 0 },
-	} );
-	// A control's value is always a string in a browser, whatever was
-	// assigned - the shared number field assigns a number, the panel trims
-	let value = '';
-	Object.defineProperty( el, 'value', {
-		get : function() { return value },
-		set : function( next ) { value = String( next ) },
-	} );
-	return el;
-}
+const { check, done, source, fills, load, element, findAll, fire } = require( './harness.js' );
 
 function textNode( text ) {
-	const node = { nodeType : 3, textContent : String( text ), className : '', children : [], dataset : {} };
-	node.classList = classList( node );
-	return node;
-}
-
-function fire( el, name ) {
-	( el.listeners[name] || [] ).forEach( function( fn ) { fn( { preventDefault : function() {} } ) } );
+	return Object.assign( element('#text'), { nodeType : 3, textContent : String( text ) } );
 }
 
 function byTag( root, tag ) {
@@ -282,7 +148,6 @@ const sandbox = {
 	},
 	Nino : Nino,
 };
-let focused = null;
 let confirmAnswer = true;
 // What an install said before it reloaded, in order - the dialog is where an
 // install's word goes, because the offer it was pressed on is gone afterwards
@@ -298,8 +163,8 @@ sandbox.window = {
 };
 
 const context = vm.createContext( sandbox );
-vm.runInContext( source('_admin/assets/Nino.admin.js'), context, { filename : 'Nino.admin.js' } );
-vm.runInContext( source('_admin/Nino/Modules/Features/assets/admin.js'), context, { filename : 'admin.js' } );
+load( '_admin/assets/Nino.admin.js', context );
+load( '_admin/Nino/Modules/Features/assets/admin.js', context );
 
 /** Answer the last request the panel made, the way Nino.http.sendRequest() calls back */
 function answer( status, body ) {
@@ -328,7 +193,7 @@ const FEATURES = [
 		{ name : 'notes', type : 'text', label : 'Notes', hint : '', required : false, min : null, max : null, maxlength : 10000, unit : '', options : [], value : 'a\nb' },
 		{ name : 'contact', type : 'email', label : 'Contact', hint : '', required : false, min : null, max : null, maxlength : 1000, unit : '', options : [], value : '' },
 		{ name : 'site', type : 'url', label : 'Site', hint : '', required : false, min : null, max : null, maxlength : 1000, unit : '', options : [], value : 'https://example.com' },
-		{ name : 'mode', type : 'select', label : 'Mode', hint : '', required : false, min : null, max : null, maxlength : null, unit : '', options : [ { value : 'fast', label : 'Fast' }, { value : 'safe', label : 'Sicher' } ], value : 'fast' },
+		{ name : 'mode', type : 'select', label : 'Mode', hint : '', required : false, min : null, max : null, maxlength : null, unit : '', options : [ { value : 'fast', label : 'Fast' }, { value : 'safe', label : 'Sicher' } ], value : 'safe' },
 		{ name : 'apiKey', type : 'secret', label : 'API key', hint : '', required : false, min : null, max : null, maxlength : 1000, unit : '', options : [], set : true },
 		{ name : 'hosts', type : 'lines', label : 'Hosts', hint : '', required : false, min : null, max : null, maxlength : null, unit : '', options : [], value : [ 'one', 'two' ] },
 	], settingsTab : '' },
@@ -494,7 +359,7 @@ const badgeOf = function( el ) { return findAll( el, function( n ) { return hasC
 // The element the badge stands in. In the grouped list the copy is a grid, so a
 // badge placed beside the name there becomes a row of its own under it: it has
 // to stand inside the element that holds the name
-const badgeParents = function( el ) { return findAll( el, function( n ) { return hasClass( n, 'admin-features-badge' ) } ).map( function( n ) { return n.parent } ) };
+const badgeParents = function( el ) { return findAll( el, function( n ) { return hasClass( n, 'admin-features-badge' ) } ).map( function( n ) { return n.parentNode } ) };
 check( 'an active feature that carries a maturity shows it as a badge after the name, one that carries none shows nothing, and the line under the name does not mention it',
 	badgeOf( row( mount, 'sample' ) ).join('|') === 'Beispiel' && badgeOf( row( mount, 'plain' ) ).length === 0 && byTag( row( mount, 'sample' ), 'span' ).filter( function( n ) { return hasClass( n, 'admin-features-badge' ) } )[0].tagName === 'SPAN'
 	&& meta( row( mount, 'sample' ) ).indexOf( 'Beispiel' ) === -1 );
@@ -506,7 +371,7 @@ panel._badge( holder, '  ' );
 panel._badge( holder, undefined );
 check( 'an empty, blank or missing maturity draws nothing', holder.children.length === 0 );
 panel._badge( holder, '<b>Beta</b>' );
-check( 'a maturity is text, whatever it contains, and goes into the element it was given', holder.children.length === 1 && holder.children[0].textContent === '<b>Beta</b>' && holder.children[0].children.length === 0 && holder.children[0].parent === holder );
+check( 'a maturity is text, whatever it contains, and goes into the element it was given', holder.children.length === 1 && holder.children[0].textContent === '<b>Beta</b>' && holder.children[0].children.length === 0 && holder.children[0].parentNode === holder );
 
 // --- the action bar
 
@@ -576,7 +441,7 @@ editing.value = 'beispieX';
 editing.setSelectionRange( 7, 7 );
 fire( editing, 'input' );
 check( 'the caret comes back where it was, not at the end of what was typed', filterNow().selectionStart === 7 && filterNow().selectionEnd === 7 );
-check( '...and the focus is on the filter that replaced it', focused === filterNow() );
+check( '...and the focus is on the filter that replaced it', filterNow().focused === true );
 
 filterNow().value = 'beispiel';
 fire( filterNow(), 'input' );
@@ -781,7 +646,7 @@ check( 'an int is the shared bounded number input, its unit written into the lab
 check( 'a string, an email and a url are inputs of that type, required and capped as the schema says', byKey.title.type === 'text' && byKey.title.value === 'Again' && byKey.title.required === true && byKey.title.maxLength === 40
 	&& byKey.contact.type === 'email' && byKey.contact.value === '' && byKey.site.type === 'url' && byKey.site.value === 'https://example.com' );
 check( 'a text and a list are textareas, the list one entry per line', byKey.notes.tagName === 'TEXTAREA' && byKey.notes.value === 'a\nb' && byKey.hosts.tagName === 'TEXTAREA' && byKey.hosts.value === 'one\ntwo' );
-check( 'a select carries its options with their localized labels and the current value', byKey.mode.tagName === 'SELECT' && byKey.mode.value === 'fast' && byKey.mode.children.map( function( el ) { return el.value+ '='+ el.textContent } ).join(',') === 'fast=Fast,safe=Sicher' );
+check( 'a select carries its options with their localized labels and the current value', byKey.mode.tagName === 'SELECT' && byKey.mode.value === 'safe' && byKey.mode.children.map( function( el ) { return el.value+ '='+ el.textContent } ).join(',') === 'fast=Fast,safe=Sicher' );
 check( 'a secret is a password input that renders empty although one is stored', byKey.apiKey.type === 'password' && byKey.apiKey.value === '' && byKey.apiKey.autocomplete === 'new-password' );
 const apiKeyLabel = findAll( form, function( el ) { return el.tagName === 'LABEL' && el.children.indexOf( byKey.apiKey ) !== -1 } )[0];
 check( 'and its hint says one is stored and how to keep it', byTag( apiKeyLabel, 'small' ).some( function( el ) { return el.textContent === text('/_admin/features/hint/secret-set') } ) );
@@ -809,7 +674,7 @@ const posted = requests[requests.length - 1];
 check( 'saving posts features/settings with the feature\'s key and every field collected by data-key', posted.action === 'features/settings' && posted.payload.key === 'sample'
 	&& Object.keys( posted.payload.fields ).sort().join(',') === 'apiKey,contact,enabled,hosts,limit,mode,notes,site,title' );
 check( 'a switch posts its state, a number its text, a list its raw lines, the secret the empty string that keeps it', posted.payload.fields.enabled === true && posted.payload.fields.limit === '7'
-	&& posted.payload.fields.hosts === 'one\ntwo' && posted.payload.fields.apiKey === '' && posted.payload.fields.mode === 'fast' && posted.payload.fields.title === 'Again' );
+	&& posted.payload.fields.hosts === 'one\ntwo' && posted.payload.fields.apiKey === '' && posted.payload.fields.mode === 'safe' && posted.payload.fields.title === 'Again' );
 const saveMsg = byTag( form, 'p' ).filter( function( el ) { return el.attributes['aria-live'] === 'polite' } )[0];
 check( 'while it saves, the button is held and the status says so', save.disabled === true && saveMsg.textContent === text('/_admin/common/msg/saving') );
 
@@ -1299,5 +1164,4 @@ const css = source('_admin/Nino/Modules/Features/assets/admin.css');
 check( 'the badge rule is in the module\'s stylesheet, for the list and for the screen behind it, with a border of its own so that the word is not carried by colour alone',
 	/#features-list \.admin-features-badge,\s*#features-detail \.admin-features-badge \{[^}]*border:/.test( css ) && css.indexOf( '@layer nino.tool {' ) !== -1 && css.indexOf( '.admin-features-badge' ) > css.indexOf( '@layer nino.tool {' ) );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();

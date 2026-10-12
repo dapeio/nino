@@ -22,88 +22,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
-
-function classList( el ) {
-	const values = new Set();
-	return {
-		add : function( value ) { values.add( value ) },
-		remove : function( value ) { values.delete( value ) },
-		contains : function( value ) { return values.has( value ) },
-		toggle : function( value, force ) {
-			if( force === true ) values.add( value );
-			else if( force === false ) values.delete( value );
-			else if( values.has( value ) ) values.delete( value );
-			else values.add( value );
-			return values.has( value );
-		},
-	};
-}
-
-// The control that has the focus, as the last focus() left it
-let focused = null;
-
-function element( tag ) {
-	const el = {
-		tagName : String( tag ).toUpperCase(),
-		className : '',
-		textContent : '',
-		value : '',
-		type : '',
-		placeholder : '',
-		title : '',
-		disabled : false,
-		dataset : {},
-		attributes : {},
-		children : [],
-		listeners : {},
-		appendChild : function( child ) { el.children.push( child ); return child },
-		setAttribute : function( name, value ) { el.attributes[name] = String( value ) },
-		focus : function() { focused = el },
-		addEventListener : function( name, fn ) {
-			el.listeners[name] = el.listeners[name] || [];
-			el.listeners[name].push( fn );
-		},
-	};
-	el.classList = classList( el );
-	// The control empties both lists by assigning innerHTML before redrawing
-	Object.defineProperty( el, 'innerHTML', {
-		get : function() { return '' },
-		set : function() { el.children.length = 0 },
-	} );
-	return el;
-}
-
-function fire( el, name ) {
-	( el.listeners[name] || [] ).forEach( function( fn ) { fn() } );
-}
-
-/**
- *	Every descendant matching a predicate, in document order
- */
-function findAll( root, predicate ) {
-	const found = [];
-	( function walk( node ) {
-		( node.children || [] ).forEach( function( child ) {
-			if( predicate( child ) === true )
-				found.push( child );
-			walk( child );
-		} );
-	} )( root );
-	return found;
-}
+const { check, done, load, element, findAll, fire } = require( './harness.js' );
 
 function byClass( root, name ) {
 	return findAll( root, function( el ) { return String( el.className ).split(' ').indexOf( name ) !== -1 } );
@@ -116,11 +35,7 @@ const sandbox = {
 sandbox.window = sandbox;
 sandbox.Nino = {};
 
-vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' ),
-	vm.createContext( sandbox ),
-	{ filename : 'Nino.admin.js' }
-);
+load( '_admin/assets/Nino.admin.js', vm.createContext( sandbox ) );
 
 const adminUi = sandbox.Nino.adminUi;
 
@@ -217,21 +132,20 @@ check( 'the last row removed leaves an empty list, and the empty word', stored( 
 // that was pressed: the focus goes to the one in its place
 
 const kept = build();
-focused = null;
 fire( rowButtons( kept, 2 )[0], 'click' );
-check( 'moving a row up leaves the focus on the up button of the row, where it now stands', focused === rowButtons( kept, 1 )[0] );
+check( 'moving a row up leaves the focus on the up button of the row, where it now stands', rowButtons( kept, 1 )[0].focused === true );
 fire( rowButtons( kept, 1 )[0], 'click' );
-check( '...and at the top, where up has nowhere to go, on down', stored( kept ) === '["c","a","b"]' && focused === rowButtons( kept, 0 )[1] );
+check( '...and at the top, where up has nowhere to go, on down', stored( kept ) === '["c","a","b"]' && rowButtons( kept, 0 )[1].focused === true );
 fire( rowButtons( kept, 0 )[1], 'click' );
-check( 'moving down does the same', focused === rowButtons( kept, 1 )[1] );
+check( 'moving down does the same', rowButtons( kept, 1 )[1].focused === true );
 fire( rowButtons( kept, 1 )[2], 'click' );
-check( 'removing a row puts the focus on the remove button of the row that took its place', focused === rowButtons( kept, 1 )[2] );
+check( 'removing a row puts the focus on the remove button of the row that took its place', rowButtons( kept, 1 )[2].focused === true );
 fire( rowButtons( kept, 1 )[2], 'click' );
-check( '...of the last one that is left, when it was the last', rows( kept ).length === 1 && focused === rowButtons( kept, 0 )[2] );
+check( '...of the last one that is left, when it was the last', rows( kept ).length === 1 && rowButtons( kept, 0 )[2].focused === true );
 fire( rowButtons( kept, 0 )[2], 'click' );
-check( 'and on the add button once no row is left', focused === addButton( kept ) );
+check( 'and on the add button once no row is left', addButton( kept ).focused === true );
 fire( addButton( kept ), 'click' );
-check( 'adding a row still puts the focus in its text', focused === rowInput( kept, 0 ) );
+check( 'adding a row still puts the focus in its text', rowInput( kept, 0 ).focused === true );
 
 // --- the form is told -----------------------------------------------------
 
@@ -248,5 +162,4 @@ const source = fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.adm
 const control = source.slice( source.indexOf('stringList : function'), source.indexOf('tableModel : {') );
 check( 'the control hard-codes no user-facing words', /textContent = '[A-Za-z]/.test( control ) === false && /aria-label', '[A-Za-z]/.test( control ) === false );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exit( failures === 0 ? 0 : 1 );
+done();

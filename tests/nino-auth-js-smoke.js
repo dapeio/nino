@@ -23,19 +23,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
+const { check, done, load } = require( './harness.js' );
 
 // Every header sendRequest() set on its xhr, and the body it sent
 const sent = [];
@@ -96,11 +84,7 @@ const sandbox = {
 sandbox.window = sandbox;
 sandbox.self = sandbox;
 
-vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_nino/Nino.js' ), 'utf8' ),
-	vm.createContext( sandbox ),
-	{ filename : 'Nino.js' }
-);
+load( '_nino/Nino.js', vm.createContext( sandbox ) );
 
 check( 'Nino.js boots and exposes sendRequest', typeof sandbox.Nino.http.sendRequest === 'function' );
 
@@ -266,5 +250,7 @@ check( 'a login with null loads the page again where it stands', loginAnswered( 
 const refused = loginAnswered( null, 401 );
 check( '...and a refused one goes nowhere, whichever it was told, and says so to its caller', refused.navigations.length === 0 && refused.failed === 401 && loginAnswered( '/sub/_admin', 401 ).navigations.length === 0 );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exit( failures === 0 ? 0 : 1 );
+// Nino.js leaves its ready callback behind, one millisecond out, and that one
+// reaches for an Event this context has not got: the suite ends here
+done();
+process.exit();

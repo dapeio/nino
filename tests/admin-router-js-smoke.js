@@ -12,29 +12,10 @@
 
 'use strict';
 
-const fs 	= require('fs');
-const path 	= require('path');
 const vm 		= require('vm');
+const { check, done, source, load, classList } = require( './harness.js' );
 
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
-
-const read = relative => fs.readFileSync( path.join( __dirname, '..', relative ), 'utf8' );
-
-const classes = hidden => {
-	const held = { 'admin-hidden' : hidden };
-	return { add : k => held[k] = true, remove : k => held[k] = false, contains : k => held[k] === true, toggle(){} };
-};
+const classes = hidden => classList( null, hidden ? [ 'admin-hidden' ] : [] );
 
 
 // --- the router ---------------------------------------------------------------------
@@ -59,7 +40,7 @@ console.log( 'Router' );
 	};
 	box.window = box;
 	box.Nino = { events : { bindCallback(){} } };
-	vm.runInContext( read('_admin/assets/script.js'), vm.createContext( box ), { filename : 'script.js' } );
+	load( '_admin/assets/script.js', vm.createContext( box ) );
 	const router = box.Nino.admin.router;
 	const screen = name => { pageClasses.contains = k => k === 'show-'+ name };
 
@@ -161,9 +142,9 @@ function panel( file, nodes, name, levels, before = [] ) {
 	};
 
 	const context = vm.createContext( box );
-	vm.runInContext( read('_admin/assets/Nino.admin.js'), context, { filename : 'Nino.admin.js' } );
-	before.forEach( extra => vm.runInContext( read( extra ), context, { filename : extra } ) );
-	vm.runInContext( read( file ), context, { filename : file } );
+	load( '_admin/assets/Nino.admin.js', context );
+	before.forEach( extra => load( extra, context, extra ) );
+	load( file, context, file );
 
 	const module = box.Nino.admin[name];
 	levels.forEach( level => { module[level] = ( ...args ) => calls.push( level.replace( /^_/, '' )+ ( args.length > 0 ? ' '+ args.map( String ).join(' ') : '' ) ) } );
@@ -311,17 +292,16 @@ console.log( 'Back links and rows' );
 	// Back then has something to return to, and the level it leaves is the one the link leaves
 	[ '_admin/Nino/Modules/Elements/assets/admin.js', '_admin/Nino/Modules/Images/assets/admin.js', '_admin/Nino/Modules/Text/assets/admin.js', '_admin/Nino/Modules/Users/assets/admin.js', '_admin/Nino/Modules/Users/assets/roles.js' ].forEach( function( file ) {
 
-		const source = read( file );
-		const links = source.split( 'backLink.addEventListener(' ).slice( 1 );
+		const script = source( file );
+		const links = script.split( 'backLink.addEventListener(' ).slice( 1 );
 
 		check( file+ ': every back link adds an entry before it shows the level above', links.length > 0 && links.every( function( link ) { return /Nino\.admin\.router\.go\(/.test( link.slice( 0, 400 ) ) } ) );
-		check( file+ ': a level opened from a list is pushed, never replaced, and the state syncs are not', source.split( 'router.go(' ).length > 2 );
+		check( file+ ': a level opened from a list is pushed, never replaced, and the state syncs are not', script.split( 'router.go(' ).length > 2 );
 	} );
 
 	// A state sync - the address made true to what is saved - replaces the entry it is on
-	const elements = read('_admin/Nino/Modules/Elements/assets/admin.js');
+	const elements = source('_admin/Nino/Modules/Elements/assets/admin.js');
 	check( 'saving a new element writes its uri over the \'new\' entry instead of adding one', ( elements.match( /router\.set\( 'elements', \[ Nino\.admin\.elements\._currentType, Nino\.admin\.elements\._currentUri \] \)/g ) || [] ).length === 2 );
 }
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();

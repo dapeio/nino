@@ -16,76 +16,8 @@
 
 'use strict';
 
-const fs 		= require('fs');
-const path	= require('path');
 const vm 		= require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
-
-function source( relative ) {
-	return fs.readFileSync( path.join( __dirname, '..', relative ), 'utf8' );
-}
-
-/**
- *	The fills of one text file, key => value - enough of the php to read
- *	a `'[[/key]]' => 'value',` line
- */
-function fills( relative ) {
-	const map = {};
-	const re = /'\[\[(\/_admin\/[^\]]+)\]\]'\s*=>\s*'((?:[^'\\]|\\.)*)'/g;
-	const text = source( relative );
-	let match;
-	while( ( match = re.exec( text ) ) )
-		map[match[1]] = match[2].replace( /\\'/g, "'" );
-	return map;
-}
-
-
-// --- an element stand-in, the same shape the other panel tests build -------
-
-function findAll( root, predicate ) {
-	const found = [];
-	( function walk( node ) {
-		( node.children || [] ).forEach( function( child ) {
-			if( predicate( child ) === true )
-				found.push( child );
-			walk( child );
-		} );
-	} )( root );
-	return found;
-}
-
-function element( tag ) {
-	const el = {
-		tagName : String( tag ).toUpperCase(),
-		className : '',
-		textContent : '',
-		id : '',
-		href : '',
-		style : {},
-		attributes : {},
-		children : [],
-		appendChild : function( child ) { el.children.push( child ); return child },
-		setAttribute : function( name, value ) { el.attributes[name] = String( value ) },
-		addEventListener : function() {},
-	};
-	Object.defineProperty( el, 'innerHTML', {
-		get : function() { return '' },
-		set : function() { el.children.length = 0 },
-	} );
-	return el;
-}
+const { check, done, fills, load, documentOf, findAll, element } = require( './harness.js' );
 
 /** The text a notice shows: its own, and the label of its link */
 function notices() {
@@ -130,20 +62,16 @@ const Nino = {
 };
 const sandbox = {
 	console : console,
-	document : {
-		createElement : element,
+	document : Object.assign( documentOf( wrap ), {
 		createTextNode : function( value ) { return { nodeType : 3, textContent : String( value ), children : [] } },
-		getElementById : function( id ) { return id === 'admin-content-dashboard' ? wrap : null },
-		documentElement : null,
-		body : null,
-	},
+	} ),
 	Nino : Nino,
 };
 sandbox.window = { Nino : Nino };
 
 const context = vm.createContext( sandbox );
-vm.runInContext( source('_admin/assets/Nino.admin.js'), context, { filename : 'Nino.admin.js' } );
-vm.runInContext( source('_admin/Nino/Modules/Dashboard/assets/admin.js'), context, { filename : 'admin.js' } );
+load( '_admin/assets/Nino.admin.js', context );
+load( '_admin/Nino/Modules/Dashboard/assets/admin.js', context );
 
 const panel = Nino.admin.dashboard;
 
@@ -222,5 +150,4 @@ check( '...an empty list the same', notices().length === 0 );
 show( { tiles : [], notices : 'broken' } );
 check( '...and a notices that is no list is ignored rather than thrown at', notices().length === 0 );
 
-console.log( '\n'+ checks +' checks, '+ failures +' failed' );
-process.exit( failures > 0 ? 1 : 0 );
+done();

@@ -11,19 +11,7 @@
 const fs 	= require('fs');
 const path 	= require('path');
 const vm 		= require('vm');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
+const { check, done, load } = require( './harness.js' );
 
 const sandbox = {
 	console : console,
@@ -38,11 +26,7 @@ sandbox.Nino = {
 	events : { bindCallback : function() {} },
 };
 
-vm.runInContext(
-	fs.readFileSync( path.join( __dirname, '../_admin/assets/script.js' ), 'utf8' ),
-	vm.createContext( sandbox ),
-	{ filename : 'script.js' }
-);
+load( '_admin/assets/script.js', vm.createContext( sandbox ) );
 
 const editor = sandbox.Nino.admin;
 
@@ -304,8 +288,8 @@ browser.arrive = function() {
 };
 
 const shellContext = vm.createContext( shell );
-vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' ), shellContext, { filename : 'Nino.admin.js' } );
-vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/script.js' ), 'utf8' ), shellContext, { filename : 'script.js' } );
+load( '_admin/assets/Nino.admin.js', shellContext );
+load( '_admin/assets/script.js', shellContext );
 shell.Nino.admin.onReady();
 
 check( 'the page load selects the panel the hash names without adding an entry - the address is only made true to the screen', browser.entries.join() === '#roles' && browser.at === 0 );
@@ -528,7 +512,7 @@ const lone = { children : [ navLink( 'dashboard', 'Dashboard' ), navLink( 'logs'
 const loneCtx = { console : console, localStorage : { getItem : function() { return null }, setItem : function() {}, removeItem : function() {} }, document : { documentElement : null, body : null, getElementById : function( id ) { return id === 'admin-nav-wrap' ? lone : null }, createElement : function( tag ) { return fakeElement( tag ) } } };
 loneCtx.window = loneCtx;
 loneCtx.Nino = { events : { bindCallback : function() {} } };
-vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/script.js' ), 'utf8' ), vm.createContext( loneCtx ), { filename : 'script.js' } );
+load( '_admin/assets/script.js', vm.createContext( loneCtx ) );
 loneCtx.Nino.admin.navGroups.init( function() {} );
 check( 'a rail without headings gets a select of plain options and nothing to fold', lone.children[0].children.length === 2 && lone.children[0].children.every( o => o.tagName === 'option' ) && loneCtx.Nino.admin.navGroups._groups.length === 0 );
 
@@ -636,8 +620,8 @@ withDialog.Nino = {
 	http : { sendRequest : function( uri, method, callback, data, auth ) { requested.push( { uri : uri, method : method, callback : callback, data : data, auth : auth } ) } },
 };
 const dialogContext = vm.createContext( withDialog );
-vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' ), dialogContext, { filename : 'Nino.admin.js' } );
-vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/script.js' ), 'utf8' ), dialogContext, { filename : 'script.js' } );
+load( '_admin/assets/Nino.admin.js', dialogContext );
+load( '_admin/assets/script.js', dialogContext );
 withDialog.Nino.admin.onReady();
 
 const api = withDialog.Nino.adminUi.api;
@@ -816,8 +800,8 @@ const dirtyCtx = {
 dirtyCtx.window = dirtyCtx;
 dirtyCtx.Nino = { events : { bindCallback : function() {} }, content : { getText : function( key ) { return key } } };
 const dirtyContext = vm.createContext( dirtyCtx );
-vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' ), dirtyContext, { filename : 'Nino.admin.js' } );
-vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/script.js' ), 'utf8' ), dirtyContext, { filename : 'script.js' } );
+load( '_admin/assets/Nino.admin.js', dirtyContext );
+load( '_admin/assets/script.js', dirtyContext );
 
 // The question itself is checked below; here it records what was asked and is answered by hand
 dirtyCtx.Nino.adminUi.choiceDialog = function( options ) { dirtyAsked.push( options ); return true };
@@ -1255,7 +1239,7 @@ function choiceWorld( noModal ) {
 	};
 	world.ctx.window = world.ctx;
 	world.ctx.Nino = { events : { bindCallback : function() {} } };
-	vm.runInContext( fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' ), vm.createContext( world.ctx ), { filename : 'Nino.admin.js' } );
+	load( '_admin/assets/Nino.admin.js', vm.createContext( world.ctx ) );
 	return world;
 }
 
@@ -1304,5 +1288,4 @@ check( 'on a phone the unsaved marker is a row of its own, so that it never slid
 check( 'nothing lets the rail wrap, so it is never wider than a phone screen',
 	/(?:#admin-bar-wrap|\.nino-admin-rail)\s*\{[^}]*flex-wrap/.test( shellCss ) === false );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();

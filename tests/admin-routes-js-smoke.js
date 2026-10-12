@@ -16,122 +16,17 @@
 
 'use strict';
 
-const fs 		= require('fs');
-const path	= require('path');
 const vm 		= require('vm');
+const { check, done, fills, load, element, findAll, fire } = require( './harness.js' );
 
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
-
-function source( relative ) {
-	return fs.readFileSync( path.join( __dirname, '..', relative ), 'utf8' );
-}
-
-/**
- *	The fills of one text file, key => value - enough of the php to read
- *	a `'[[/key]]' => 'value',` line
- */
-function fills( relative ) {
-	const map = {};
-	const re = /'\[\[(\/_admin\/[^\]]+)\]\]'\s*=>\s*'((?:[^'\\]|\\.)*)'/g;
-	const text = source( relative );
-	let match;
-	while( ( match = re.exec( text ) ) )
-		map[match[1]] = match[2].replace( /\\'/g, "'" );
-	return map;
-}
-
-
-// --- an element stand-in, the same shape the other panel tests build -------
-
-function classList() {
-	const values = new Set();
-	return {
-		add : function( value ) { values.add( value ) },
-		remove : function( value ) { values.delete( value ) },
-		contains : function( value ) { return values.has( value ) },
-	};
-}
-
+// Every focus() the panel asks for, in order: a check counts them, which the
+// element's own focused flag cannot
 const focused = [];
 
-function findAll( root, predicate ) {
-	const found = [];
-	( function walk( node ) {
-		( node.children || [] ).forEach( function( child ) {
-			if( predicate( child ) === true )
-				found.push( child );
-			walk( child );
-		} );
-	} )( root );
-	return found;
-}
-
-function element( tag ) {
-	const el = {
-		tagName : String( tag ).toUpperCase(),
-		className : '',
-		textContent : '',
-		title : '',
-		type : '',
-		href : '',
-		id : '',
-		disabled : false,
-		style : {},
-		attributes : {},
-		dataset : {},
-		children : [],
-		listeners : {},
-		value : '',
-		appendChild : function( child ) { el.children.push( child ); return child },
-		setAttribute : function( name, value ) { el.attributes[name] = String( value ) },
-		removeAttribute : function( name ) { delete el.attributes[name] },
-		focus : function() { focused.push( el ) },
-		insertBefore : function( child, ref ) { el.children.splice( Math.max( el.children.indexOf( ref ), 0 ), 0, child ); return child },
-		querySelector : function( selector ) { return el.querySelectorAll( selector )[0] ?? null },
-		querySelectorAll : function( selector ) {
-			// Only the attribute selectors the panel asks a row or the form for
-			const match = /^\[data-field="(\w+)"\]$/.exec( selector );
-			return findAll( el, function( child ) { return match !== null && child.dataset.field === match[1] } );
-		},
-		addEventListener : function( name, fn ) {
-			el.listeners[name] = el.listeners[name] || [];
-			el.listeners[name].push( fn );
-		},
-	};
-	el.classList = classList();
-	// A select's value is its selected option's, the way a browser reads it
-	if( el.tagName === 'SELECT' )
-		Object.defineProperty( el, 'value', {
-			get : function() {
-				const chosen = el.children.filter( function( option ) { return option.selected === true } ).pop() ?? el.children.find( function( option ) { return option.disabled !== true } );
-				return chosen === undefined ? '' : chosen.value;
-			},
-			set : function( value ) { el.children.forEach( function( option ) { option.selected = option.value === value } ) },
-		} );
-	Object.defineProperty( el, 'innerHTML', {
-		get : function() { return '' },
-		set : function() { el.children.length = 0 },
-	} );
+function control( tag ) {
+	const el = element( tag );
+	el.focus = function() { focused.push( el ) };
 	return el;
-}
-
-// Tolerates a control that is not on screen, so a panel that threw its own
-// buttons away reports as failed checks rather than as a crashed test
-function fire( el, name ) {
-	if( el === null || el === undefined )
-		return;
-	( el.listeners[name] || [] ).forEach( function( fn ) { fn( { preventDefault : function() {} } ) } );
 }
 
 /** The route rows on screen, in the order they stand in */
@@ -208,7 +103,7 @@ const Nino = {
 const sandbox = {
 	console : console,
 	document : {
-		createElement : element,
+		createElement : control,
 		getElementById : function( id ) {
 			if( id === 'routes-list' ) return mount;
 			if( id === 'routes-form' ) return form;
@@ -232,8 +127,8 @@ const sandbox = {
 sandbox.window = { Nino : Nino, location : { hash : '' }, confirm : function( message ) { confirms.push( message ); return confirmAnswer } };
 
 const context = vm.createContext( sandbox );
-vm.runInContext( source('_admin/assets/Nino.admin.js'), context, { filename : 'Nino.admin.js' } );
-vm.runInContext( source('_admin/Nino/Modules/Routes/assets/admin.js'), context, { filename : 'admin.js' } );
+load( '_admin/assets/Nino.admin.js', context );
+load( '_admin/Nino/Modules/Routes/assets/admin.js', context );
 
 const panel = Nino.admin.routes;
 
@@ -575,7 +470,7 @@ panel._renderList();
 		},
 	};
 	box.window = box;
-	vm.runInContext( source('_admin/Nino/Modules/Routes/assets/admin.js'), vm.createContext( box ), { filename : 'admin.js' } );
+	load( '_admin/Nino/Modules/Routes/assets/admin.js', vm.createContext( box ) );
 
 	check( 'the page form registers with the shell under the panel\'s name', watched.length === 1 && watched[0].name === 'routes' && watched[0].getter() === node('routes-form') );
 
@@ -590,5 +485,4 @@ panel._renderList();
 	check( '...the shell\'s Save runs the same save', typeof watched[0].save === 'function' );
 }
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();

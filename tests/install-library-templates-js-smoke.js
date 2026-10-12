@@ -10,19 +10,7 @@
 
 const fs = require('fs');
 const path = require('path');
-
-let checks = 0;
-let failures = 0;
-
-function check( label, condition ) {
-	checks++;
-	if( condition === true ) {
-		console.log( '  ok  - '+ label );
-		return;
-	}
-	failures++;
-	console.log( 'FAIL  - '+ label );
-}
+const { check, done } = require( './harness.js' );
 
 const ROOT = path.join( __dirname, '..' );
 const LIBRARY = path.join( ROOT, '_admin/install/library' );
@@ -295,5 +283,4 @@ check( 'frame aria-label fills resolve from base without optional modules'
 check( '...and they are the two words of the header frame and of the navigation the footer shares: /template/frame-header/navigation/label and /template/common/navigation/footer',
 	Array.from( frameAriaLabels ).sort().join() === '[[/template/common/navigation/footer]],[[/template/frame-header/navigation/label]]' );
 
-console.log( '\n'+ checks+ ' checks, '+ failures+ ' failed' );
-process.exitCode = failures === 0 ? 0 : 1;
+done();
