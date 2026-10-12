@@ -1,11 +1,8 @@
 /**
  *	Nino									A compact filesystembased php framework
- *	nino-core-js-smoke.js	The two halves of Nino.js every page uses and no test
- *												covered: readQueryVars(), which reads the address a
- *												visitor arrived with, and the resize/scroll throttle
- *												every registered callback hangs off - one of them
- *												reading something a stranger wrote, the other running
- *												on every frame of a scroll.
+ *	nino-core-js-smoke.js	The resize/scroll throttle of Nino.js, which every page
+ *												uses and no test covered: every registered callback
+ *												hangs off it, and it runs on every frame of a scroll.
  *
  *	Usage: node tests/nino-core-js-smoke.js
  */
@@ -33,11 +30,9 @@ function check( label, condition ) {
  *	Nino.js in a page of its own: the listeners it registers are kept, and so
  *	are the animation frames it asks for, so a test can run them by hand
  *
- *	@param		{string}	search			The query string, '?a=b' style
- *
  *	@return		{Object}
  */
-function page( search ) {
+function page() {
 
 	const listeners = {};
 	const frames = [];
@@ -61,7 +56,7 @@ function page( search ) {
 		console : console,
 		document : document,
 		navigator : { userAgent : 'node', language : 'en-US' },
-		location : { pathname : '/', origin : 'https://example.com', search : search || '', href : 'https://example.com/' },
+		location : { pathname : '/', origin : 'https://example.com', href : 'https://example.com/' },
 		XMLHttpRequest : function() {},
 		FormData : function() {},
 		TextEncoder : TextEncoder,
@@ -92,42 +87,11 @@ function page( search ) {
 }
 
 
-// --- readQueryVars ---------------------------------------------------------
-
-console.log( 'Nino.http.readQueryVars - the address a visitor arrived with\n' );
-
-const plain = page( '?page=2&sort=name' ).Nino.http.readQueryVars();
-check( 'reads the pairs of the query string', plain['page'] === '2' && plain['sort'] === 'name' );
-
-const encoded = page( '?q=caf%C3%A9%20au%20lait' ).Nino.http.readQueryVars();
-check( 'decodes what the browser encoded', encoded['q'] === 'café au lait' );
-
-// A query variable is whatever somebody put in the address. Both of these
-// used to reach decodeURIComponent() unguarded: a stray '%' is a URIError,
-// which took out whatever called this, and a key without a value read the
-// string 'undefined' - the one value a page would then act on
-let broken = null;
-try { broken = page( '?q=100%' ).Nino.http.readQueryVars(); }
-catch( error ) { broken = 'threw '+ error.name; }
-check( 'a value that is not valid percent-encoding is the raw text, not a thrown error', broken !== null && broken['q'] === '100%' );
-
-const flag = page( '?flag&page=2' ).Nino.http.readQueryVars();
-check( 'a key with no value is an empty string, not the word "undefined"', flag['flag'] === '' && flag['page'] === '2' );
-
-const empty = page( '' ).Nino.http.readQueryVars();
-check( 'no query at all is no variables', Object.keys( empty ).length === 0 );
-
-const equals = page( '?filter=a=b' ).Nino.http.readQueryVars();
-check( 'a value carrying its own "=" survives whole', equals['filter'] === 'a=b' );
-
-console.log( '' );
-
-
 // --- The resize and scroll throttle ----------------------------------------
 
 console.log( 'Nino.events - one callback round per frame, not one per event\n' );
 
-const scrolling = page( '' );
+const scrolling = page();
 let scrollRuns = 0;
 scrolling.Nino.events.bindCallback( 'scroll', function() { scrollRuns++ } );
 
@@ -144,7 +108,7 @@ check( 'the next event after that frame is taken again', scrolling.frames() === 
 scrolling.runFrames();
 check( '...and runs the callbacks again', scrollRuns === 2 );
 
-const resizing = page( '' );
+const resizing = page();
 let resizeEvent = null;
 resizing.Nino.events.bindCallback( 'resize', function( event ) { resizeEvent = event } );
 

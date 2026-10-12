@@ -41,19 +41,9 @@ namespace Nino\Admin {
 	 */
 	class Admin {
 
-		// Where the workbench is, and the project root it sits in. The
-		// registry resolves a panel's assets against ROOT. DIR, like LIBRARY
-		// below, is read by no class of this checkout and stays public on
-		// purpose: an optional module a 1.0.0-beta setup copied into app/
-		// (its Design.php) reads both, and the autoloader still serves it
-		public const string DIR = __DIR__;
+		// The project root the workbench sits in. The registry resolves a
+		// panel's assets against it
 		public const string ROOT = __DIR__. '/..';
-
-		// The library the wizard copies a project out of - the base unit, the
-		// units without a runtime class of their own, and the page units. The
-		// wizard's classes keep their own copy of the path (install/Install.php);
-		// this is its public name, kept for the readers DIR names
-		public const string LIBRARY = __DIR__. '/install/library';
 
 		/*	The language switcher, the one fragment this class renders itself -
 			declared once rather than concatenated inside _localePickerHtml().

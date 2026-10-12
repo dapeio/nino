@@ -75,8 +75,8 @@ return [
 		sentence above: one section per kind of thing a feature adds, each a
 		handle and one line. Always the same sections, always in the same order,
 		the empty ones included - what a developer does with this is look
-		something up. See docs/features.md#the-manual; the README is the other
-		one	*/
+		something up. See docs/features.md#the-manual; the manual is the
+		documentation of a feature, the catalogue keeps no README per feature	*/
 	'manual'			=> [
 		'shortcodes'	=> [
 			'[catalog]' => [ 'en_US' => 'The list. `limit` and `sort` narrow it.', 'de_DE' => 'Die Liste. `limit` und `sort` schränken sie ein.' ],
@@ -489,7 +489,7 @@ element that exists, a section the editor changed and one deleted for good
 stay as they are. Write the section in your own words, in every language the
 feature ships, state only what the code does, and let a placeholder name a
 fact of the website. The text is a starting point and no legal advice; say so
-in your README and point to the notice in
+in the feature's manual and point to the notice in
 [Legal](../development.md#legal). `order` is the position on the page, a hundred apart so a section fits
 between two: the module's own sections stand in 100-399, cookies and consent in
 400-499, contact, forms and mail in 500-599, statistics in 600-699, embedded

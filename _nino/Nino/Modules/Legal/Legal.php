@@ -316,7 +316,7 @@ namespace Nino\Modules {
 		 *	Tell the Seo feature about the pages, which are in no config.php: one
 		 *	entry per route - per language that shares one - with the details of
 		 *	the page in that language and the day the type's file was changed.
-		 *	Listener of '/seo/pages', see that feature's README
+		 *	Listener of '/seo/pages', see the Seo feature's manual, feature.php
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$pages				(reference) The pages so far, entries are appended

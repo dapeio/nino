@@ -174,8 +174,9 @@ php tests/install-smoke.php
 php tests/features-smoke.php
 php tests/catalogue-smoke.php
 php tests/keys-smoke.php
-for test in features/*/tests/*-smoke.php; do [ -e "$test" ] && php "$test"; done
-for test in tests/*-js-smoke.js; do node "$test"; done
+php tests/legal-smoke.php
+for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
+for test in tests/*-js-smoke.js; do node "$test" || exit 1; done
 php tests/concurrency-smoke.php
 ```
 

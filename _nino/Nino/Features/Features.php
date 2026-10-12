@@ -78,8 +78,9 @@ namespace Nino {
 
 			What is deliberately not a section: the php a feature exposes to
 			other code. This is the card an operator opens to find out what
-			arrived on their site; Modules\Search::getElements() is a README
-			question, and mixing the two makes both harder to scan.	*/
+			arrived on their site; Modules\Search::getElements() is a question
+			for the class's own docblock, and mixing the two makes both harder
+			to scan.	*/
 		public const array MANUAL_SECTIONS = [ 'shortcodes', 'markup', 'routes', 'panel', 'callbacks', 'install' ];
 
 		// One manual entry is a handle and a line about it - not a paragraph,
@@ -343,7 +344,7 @@ namespace Nino {
 			// The prose a manifest may carry beyond its description: how the
 			// feature is used, which the panel puts at the top of its screen.
 			// Capped like a text setting - what does not fit a box in a panel
-			// is a README, and a feature carries one of those already
+			// belongs in the docblock of the class, not in the manual
 			if( isset( $raw['manual'] ) === true && self::_manualSectioned( $raw['manual'] ) === true ) {
 
 				/*	The sectioned form: section => handle => one line, localized

@@ -690,55 +690,6 @@
 		},
 
 		/**
-		 *	Mark a field as changed from what is stored, and say what the
-		 *	stored value was.
-		 *
-		 *	A dirty state that only counts is a dirty state the operator has to
-		 *	trust: it says something is different but not what, so the only way
-		 *	back to a known position is to discard everything. Naming the value
-		 *	each field started from turns that into an ordinary comparison -
-		 *	which is the whole of "saved vs current" for a pane of settings.
-		 *
-		 *	The mark lives inside the field's name, beside any note it carries,
-		 *	and is created once and then hidden - a marker that is removed and
-		 *	rebuilt on every keystroke is a marker a screen reader announces on
-		 *	every keystroke.
-		 *
-		 *	@param	{Element}	field			A field built by selectField(), or any
-		 *														label whose first child is its name
-		 *	@param	{string}	text			What the value was, or '' for unchanged
-		 *
-		 *	@return	void
-		 */
-		fieldChange : function( field, text,  ) {
-
-			if( field === null || typeof field === 'undefined' )
-				return;
-
-			const name = field.children[0];
-
-			if( name === null || typeof name === 'undefined' )
-				return;
-
-			let mark = field.changeMark;
-
-			if( mark === null || typeof mark === 'undefined' ) {
-				// A span rather than a <small>: tools style the notes in their
-				// own fields by element, and this is not one of those
-				mark = dc.createElement('span');
-				mark.className = 'nino-admin-changed';
-				name.appendChild( mark );
-				field.changeMark = mark;
-			}
-
-			const changed = typeof text === 'string' && text !== '';
-
-			mark.textContent = changed === true ? text : '';
-			mark.hidden = changed === false;
-			field.classList.toggle( 'is-changed', changed );
-		},
-
-		/**
 		 *	One boolean setting as the design system's switch. The written
 		 *	on/off state next to the knob is the point of it: knob position
 		 *	alone is the one signal a low-vision reader loses, so the words

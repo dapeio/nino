@@ -134,7 +134,7 @@ Important source directories:
 | `_admin/templates/page-index.tpl` | The shell; navigation, panes and panel assets are rendered into it from the registry |
 | `_admin/recovery.php`, `templates/page-recovery.tpl`, `assets/recovery.js` | The recovery page: restore a backup, set the password of an account, create an account with full access - with the recovery secret |
 | `_admin/install/Install.php` | The setup wizard - the workbench's first-run mode, served by the same route while `Admin::isInstalled()` says no; deletable after setup |
-| `_admin/install/library/base/`, `modules/`, `pages/<slug>/` | The wizard's library: always-applied base, units without a runtime class, installable page units |
+| `_admin/install/library/base/`, `pages/<slug>/`, and `modules/` where a checkout adds one | The wizard's library: always-applied base and installable page units; a checkout that adds units without a runtime class of its own puts them in `modules/`, which the wizard scans when it exists - none is shipped |
 | `_admin/install/library/base/assets/theme.css`, `base/templates/frame-header.tpl`, `frame-footer.tpl` | The one look every project starts from, delivered by the base unit: the compiled design tokens, the roles they are assigned to, the three webfaces and the css for both frames, plus the two frame templates `html-header.tpl` includes through `[template /templates/frame-header]`. The body of `theme.css` is what the catalogue's Design feature compiles at its defaults - its twelve numbered sections - under a header of the kernel's own, and is regenerated from that compiler with each kernel release, so that the delivered look and the compiled one have one source: a change of a default or a role is made in the compiler's library and the file regenerated, never by editing the body here. The header carries no stamp of the compiler's, so Design treats the file as the delivered one and asks before it writes over it; a project may still edit its copy by hand |
 | the appearance catalogue | Not here since 1.2: the ten themes, six headers and seven footers the wizard used to offer, and the Design panel that kept them editable, left the kernel and are no wizard step any more. The look is changed afterwards by the catalogue's [Design](https://github.com/dapeio/nino-features/blob/main/features/Design/feature.php) feature, which compiles a set per part of the page and two frames into the `assets/theme.css` and frame templates the base unit delivers. The file stays one you may edit by hand: the compiler refuses to replace a file it did not write until the person applying says so. `library/base.css` carries the token contract |
 | the Builder | Not here: the feature [`features/Builder`](https://github.com/dapeio/nino-features/tree/main/features/Builder) of the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features), panel Builder in the Features group of the rail, its manual in its `feature.php`. It replaces the Template Builder (`features/Templates`) that left the kernel with 1.2 and the catalogue after it: a project that installed that one carries it below `features/` until it is removed. The kernel's part of it is the `Components` module, the registry the Builder reads, and the `div.nino-wrap` rules of `Nino.css`. A project that installed the Builder carries it below `features/`, where the autoloader serves `\Nino\Modules\Builder` from. Which kernels the feature declares itself for is its own manifest's business, in that repository |
@@ -853,7 +853,7 @@ php tests/catalogue-smoke.php
 php tests/keys-smoke.php
 php tests/legal-smoke.php
 for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
-for test in tests/*-js-smoke.js; do node "$test"; done
+for test in tests/*-js-smoke.js; do node "$test" || exit 1; done
 php tests/concurrency-smoke.php
 ```
 
@@ -985,7 +985,7 @@ new, and the tests named in section 10 pass.
 ### Page/template unit done
 
 - [ ] Route and template are separate and have one owner each.
-- [ ] `page-*.tpl` filename, display metadata, VPA, and slots are valid.
+- [ ] `page-*.tpl` filename, display metadata, and VPA are valid.
 - [ ] Sections have unique semantic IDs and stable fill paths.
 - [ ] Includes omit `.tpl` and resolve to shipped/copied files.
 - [ ] Required text, modules, image slots, and Element types are supplied.

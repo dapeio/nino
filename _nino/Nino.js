@@ -1,7 +1,7 @@
 /**
  *	Nino										A compact filesystembased php framework
  *	Modules									Optional modules
- *	NinoJS									Basic js functionality & helper - client detection, cookies,
+ *	NinoJS									Basic js functionality & helper - client detection,
  *													dom-ready/resize/scroll events, xhr requests, auth,
  *													jstext lookups. Used by the tool frontends and the public
  *													site alike, which is what decides what belongs here: this
@@ -132,50 +132,16 @@
 		controller : {
 
 			/**
-			 *	Bootstrap Nino: load js text translations, capture the current
-			 *	request and initialize client detection and the event system
+			 *	Bootstrap Nino: load js text translations and initialize client
+			 *	detection and the event system
 			 *
 			 *	@return		void
 			 */
 			init : function() {
 				Nino.content.text = ( typeof wn.NinoJstext !== 'undefined' ) ? wn.NinoJstext : [];
-				Nino.http.request	= {
-					'uri'						: wn.location.pathname,
-					'domain'				: wn.location.origin,
-					'query'					: Nino.http.readQueryVars(),
-				};
 				Nino.client.init();
 				Nino.events.init();
 			},
-		},
-
-		cookie : {
-
-			/**
-			 *	Set a cookie for one year, valid for the whole site
-			 *
-			 *	@param		{string}		key						Cookie name
-			 *	@param		{string}		val						Cookie value (will be uri-encoded)
-			 *
-			 *	@return		void
-			 */
-			set : function(key,val) {
-        dc.cookie = key + '=' + encodeURIComponent(val) + '; expires=' + ( new Date(Date.now() + 365 * 864e5).toUTCString() ) + '; path=/';
-			},
-
-			/**
-			 *	Read a cookie value by name
-			 *
-			 *	@param		{string}		key						Cookie name
-			 *
-			 *	@return		{string|null}							Cookie value, or null if not set
-			 */
-			get : function(key) {
-				if(!key) return null;
-			  const match = document.cookie.match( new RegExp('(?:^|; )' + key.replace(/([.*+?^${}()|[\]\\])/g, '\\$1') + '=([^;]*)') );
-			  return match ? decodeURIComponent(match[1]) : null;
-			},
-
 		},
 
 		events : {
@@ -285,66 +251,6 @@
 
 
 		http : {
-
-			/**
-			 *	Navigate the browser to a uri
-			 *
-			 *	@param		{string}		uri						Target uri
-			 *
-			 *	@return		void
-			 */
-			redirect : function( uri ) {
-				wn.location.replace(uri);
-			},
-
-			/**
-			 *	Parse the current location's query string into a key/value object
-			 *
-			 *	@return		{Object}										Parsed query vars
-			 */
-			readQueryVars : function( ) {
-
-				const result = {};
-				const pairs = location.search.replace( /^\?/, '' ).split( '&' );
-
-				for( let i = 0; i < pairs.length; i++ ) {
-
-					// An empty query is one empty pair, which used to become a
-					// variable named '' holding the string 'undefined'
-					if( pairs[i] === '' )
-						continue;
-
-					const at = pairs[i].indexOf( '=' );
-
-					// Split on the first '=' only: a value may carry its own
-					const rawKey		= at === -1 ? pairs[i] : pairs[i].slice( 0, at );
-					const rawValue	= at === -1 ? '' : pairs[i].slice( at + 1 );
-
-					result[ Nino.http.decodeQueryPart( rawKey ) ] = Nino.http.decodeQueryPart( rawValue );
-				}
-
-				return result;
-			},
-
-			/**
-			 *	One key or value of a query string, decoded. Whatever somebody
-			 *	put in the address ends up here, and decodeURIComponent() answers
-			 *	a stray '%' with a URIError - which took out whatever was reading
-			 *	the address. Text that is not valid percent-encoding is the text
-			 *	itself, which is what the visitor sees in the address bar anyway
-			 *
-			 *	@param		{string}		part					A raw key or value
-			 *
-			 *	@return		{string}									The decoded part, or the raw one
-			 */
-			decodeQueryPart : function( part ) {
-
-				try {
-					return decodeURIComponent( part.replace( /\+/g, ' ' ) );
-				} catch( error ) {
-					return part;
-				}
-			},
 
 			/**
 			 *	Send an xhr request with optional form data and basic-auth

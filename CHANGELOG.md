@@ -525,6 +525,81 @@ All notable changes to Nino are documented in this file.
   `tests/install-smoke.php` counts the classes of the card the demo catalogue
   draws by their new prefixes.
 
+### Fixed
+
+- **Docs:** the blocks that list the test commands say what CI runs. The README
+  and the deployment guide, in both languages, lacked
+  `php tests/legal-smoke.php`; it stands after `php tests/keys-smoke.php` now,
+  as in AGENTS.md. The loop over the JavaScript tests ends in `|| exit 1` in all
+  seven blocks that have it - those four, AGENTS.md and the developer manual in
+  both languages - as it does in `ci.yml`, where the comment says why: a bare
+  loop answers with the last file's status alone, so a failure in the middle is
+  reported as green. The loop over a feature's own tests in the two READMEs is
+  the one CI runs (`|| continue`, `|| exit 1`) in place of
+  `[ -e "$test" ] && php "$test"`.
+- **Docs:** the feature recipe no longer speaks of a feature's README. The
+  catalogue keeps none - the manual in `feature.php` is the documentation of a
+  feature - and the notice that a privacy section is no legal advice goes into
+  that manual. The docblock of `\Nino\Modules\Legal::callbackSeoPages()` sends
+  the reader to the Seo feature's manual, `feature.php`, where the hook
+  `/seo/pages` is documented.
+- **Docs:** `_admin/install/library/modules/` is not shipped, and the setup
+  manual, the features manual (both languages) and the library map of AGENTS.md
+  read as if it held units. They say now that the wizard scans the directory
+  when it exists, for a checkout that adds units of its own. The checklist of a
+  page unit in AGENTS.md stops asking for valid "slots": they were the header
+  and footer markers of the Template Builder, which no page ships any more (see
+  below).
+
+### Removed
+
+- **`Nino.cookie`, `Nino.http.redirect` and `Nino.http.request`:** helpers in
+  the public script bundle that nothing called. `Nino.cookie.set()` and `get()`
+  wrote and read a cookie, `Nino.http.redirect()` replaced the location, and
+  `Nino.http.request` - `{ uri, domain, query }` - was set when the script
+  loaded and read by no script; `Nino.http.readQueryVars()` and
+  `decodeQueryPart()`, which only filled its `query`, go with it. No script of
+  the kernel or of the catalogue and no manual called any of them. `Nino.js` is
+  in the bundle every page loads, so a script of a project's own that did call
+  one finds this note: `document.cookie`, `window.location.replace()` and
+  `new URLSearchParams( location.search )` do what they did. The header of the
+  file no longer lists cookies. `tests/nino-core-js-smoke.js` loses the six
+  checks of `readQueryVars()` and the query argument of its page stand-in
+  (12 → 6 checks); the six of the resize and scroll throttle stay.
+- **`Nino.adminUi.fieldChange()`:** marked a field as changed from what was
+  stored and said what the stored value was. No panel called it, and its
+  parameter list ended in a stray comma. The rule `.nino-admin-changed` of
+  `_admin/assets/style.css`, which only it wrote, the class `is-changed` it
+  toggled, which no stylesheet read, and the custom property `--editor-gap`,
+  which was declared and read by no rule, go with it.
+- **`\Nino\Elements::prevElement()` and `nextElement()`:** the element before
+  and after one in the list of its type (1.3.2), and the private
+  `_neighbourElement()` behind them. Only `tests/kernel-smoke.php` called them -
+  the Elements panel steps through its list in the browser - and the developer
+  manual named them in both languages. A project that did call them reads the
+  list with `queryElements( $appData, $typeUri, $query, $locale, [], [ 'sort'
+  => ... ] )` - the query they took under `$options` is its third argument -
+  and takes the entry beside the uri it looks for.
+- **`\Nino\Filesystem::getPrivatePath()`:** an alias of `getContentPath()`,
+  which answers the one private root; its only caller was the check that the two
+  names answer the same directory. `tests/kernel-smoke.php` loses that check and
+  the ten of `prevElement()` and `nextElement()` (1318 → 1307 checks).
+- **`\Nino\Admin\Admin::DIR` and `LIBRARY`:** two public constants kept for an
+  optional module that a 1.0.0-beta setup copied into `app/`. No class of this
+  checkout read them - the wizard's classes keep a path of their own - and no
+  project of that age exists. `Admin::ROOT` stays.
+- **The Template Builder's markers in two library pages:** the comments
+  `<!-- nino:section {...} -->` (one in `page-home.tpl`, two in
+  `page-contact.tpl`) and `<!-- nino:template-slot header -->` and `footer` in
+  both, which went to every visitor in the page source. Nothing reads them: the
+  Builder looks for `nino:template-name`, `nino:template-vpa` and its own
+  `nino:html` blocks. Of the keys their JSON names, two stand in no body and in
+  no text or image-slot entry of the units - the backgrounds
+  `/template/page-contact/hero/background` and
+  `/template/page-contact/contact-form/background` - so there was no text to
+  remove with them. `tests/keys-smoke.php` read keys out of that JSON too, and
+  no longer does (247 → 236 reads of the templates); its 74 checks are the same.
+
 ## v1.6.0 - 2026-10-06
 
 ### Added

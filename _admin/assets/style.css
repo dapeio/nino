@@ -91,7 +91,6 @@
 	--editor-focus: 0 0 0 3px rgba(37,99,235,.2);
 	--editor-radius: 10px;
 	--editor-radius-sm: 7px;
-	--editor-gap: .75rem;
 	--editor-shadow: 0 1px 2px rgba(15,23,42,.06), 0 8px 24px rgba(15,23,42,.07);
 	--editor-shadow-sm: 0 1px 2px rgba(15,23,42,.055), 0 3px 10px rgba(15,23,42,.05);
 
@@ -866,23 +865,6 @@ a {
 	color: var(--editor-red);
 	font-size: .74rem;
 	line-height: 1.45;
-}
-
-/* What a field held before it was touched, beside its name - written by
-   Nino.adminUi.fieldChange() and shown only while the two differ.
-
-   Orange rather than red: an unsaved change is a state, not a mistake. It is
-   the same orange the status line marks unsaved changes with, which is what
-   makes it readable as one across the tools rather than as this pane's own
-   invention.
-
-   A span, so a rule a tool writes for the <small> notes in its own fields
-   does not also land here. */
-:where(.nino-admin) .nino-admin-changed {
-	margin-left: .35rem;
-	color: var(--editor-orange);
-	font-size: .72rem;
-	font-weight: 600;
 }
 
 /* A control holding something that is not yet a value - a half-typed colour,

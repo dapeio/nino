@@ -314,8 +314,8 @@ echo "\n";
 echo "B. Templates: every key they read exists, in their own category or common\n";
 
 /**
- *	The keys one template reads: every [[/...]] from the inside out, [json /...],
- *	[image /...] and the strings of a section's json that name a key
+ *	The keys one template reads: every [[/...]] from the inside out, [json /...]
+ *	and [image /...]
  *
  *	@param		string		$source
  *
@@ -347,17 +347,6 @@ function keysReadBy( string $source ): array {
 	if( preg_match_all( '/\[image\s+(\/[^\s\]]+)/', $source, $image ) > 0 )
 		foreach( $image[1] as $key )
 			$reads[] = [ 'key' => $key, 'composed' => false, 'image' => true ];
-
-	// The bindings and the background of a section the Template Builder wrote
-	if( preg_match_all( '/<!--\s*nino:section\s+(\{.*?\})\s*-->/s', $source, $sections ) > 0 )
-		foreach( $sections[1] as $json ) {
-			preg_match_all( '/"backgroundImage":"(\/[^"]+)"/', $json, $backgrounds );
-			foreach( $backgrounds[1] as $key )
-				$reads[] = [ 'key' => $key, 'composed' => false, 'image' => true ];
-			preg_match_all( '/"(\/(?:template|project|feature|module|_nino)\/[^"]+)"/', preg_replace( '/"backgroundImage":"[^"]*"/', '', $json ), $bound );
-			foreach( $bound[1] as $key )
-				$reads[] = [ 'key' => $key, 'composed' => false, 'image' => false ];
-		}
 
 	return $reads;
 }

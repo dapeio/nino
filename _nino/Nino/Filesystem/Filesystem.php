@@ -522,17 +522,6 @@ namespace Nino {
 
 		}
 
-		// The project's *private* root - config.php, templates, text,
-		// elements, data and the asset sources (see PRIVATE_DIRS). The same
-		// directory getContentPath() answers with, under the name the
-		// PRIVATE_DIRS half of the resolution uses: there is one private root,
-		// and it is stored once
-		public static function getPrivatePath( array &$appData ): string {
-
-			return self::getContentPath( $appData );
-
-		}
-
 		// The project's *public content* root - images, fonts, the favicon
 		// set and the generated bundles (see PUBLIC_DIRS). Inside the
 		// webroot, one level down from it, so the project root keeps only
