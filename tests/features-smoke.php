@@ -186,7 +186,7 @@ check( '...so a place that is none, a list, a number, an empty word, and a compo
 check( '...and what it draws is a short selector of letters, digits, space, dot and dash whose placeholders are attributes it declares, and not empty',
 	manifestFails( $manifestDir, 'BadDraws', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'draws' => 'p > .x' ] ] ], 'component "probe": "draws"' )
 	&& manifestFails( $manifestDir, 'LongDraws', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'draws' => str_repeat( 'a', 65 ) ] ] ], 'component "probe": "draws"' )
-	&& manifestFails( $manifestDir, 'LostDraws', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'draws' => 'h{level} .x' ] ] ], 'component "probe": "draws"' )
+	&& manifestFails( $manifestDir, 'LostDraws', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'draws' => '{tag} .x' ] ] ], 'component "probe": "draws"' )
 	&& manifestFails( $manifestDir, 'EmptyDraws', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'draws' => '' ] ] ], 'component "probe": "draws"' ) );
 check( 'extensions are names', manifestFails( $manifestDir, 'BadExt', [ 'name' => 'x', 'version' => '1.0.0', 'php' => [ 'ext' => [ 'g d' ] ] ], '"php"' ) );
 
