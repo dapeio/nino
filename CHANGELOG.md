@@ -524,6 +524,28 @@ All notable changes to Nino are documented in this file.
   six titles had left behind, and the markup of `[card]` under its new name;
   `tests/install-smoke.php` counts the classes of the card the demo catalogue
   draws by their new prefixes.
+- **Theme:** the delivered `assets/theme.css` is regenerated from the Design
+  compiler at its defaults, as its header says it is with each kernel release.
+  The sets of that compiler declare a ladder of five values per scale knob where
+  they declared a triple, and so do the sections of the three sets in this file
+  (content, buttons and components): `--<tab>-<knob>--least`, `--less`,
+  `--default`, `--more` and `--most` stand where `--less`, `--default` and
+  `--more` stood, in the media query of 768px as well. The stripes of a table
+  and the place of a label are a choice, not a scale, and keep their three.
+  `--buttons-small` and `--buttons-big` are gone: the knobs are
+  `--buttons-size`, what the padding, the type and the radius of a button are
+  multiplied by, and `--buttons-spread`, how far a small and a big button stand
+  from it - `.nino-btn` reads the size, `.nino-btn--small` the size times 1 less
+  the spread and `.nino-btn--big` the size times 1 plus it. The last section
+  selects `--default` for every knob, as before. **The look of a project at the
+  defaults does not change:** the middle of a ladder is the value the middle of
+  the triple was, and a button of size 1 and spread .3 is the small .7 and the
+  big 1.3 it was; the header and the sections 1 to 8 - the tokens, the palette,
+  the type, the roles, the root size, the page and the two frames - are byte for
+  byte what they were. The body is 49576 bytes (45956 before) and its sha256
+  begins `b60b04d4a6d7`; the catalogue's Design test compares it with what the
+  compiler writes at the defaults, byte for byte, so it is regenerated and not
+  edited. A project that exists keeps the file it has.
 
 ### Fixed
 

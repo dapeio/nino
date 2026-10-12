@@ -765,10 +765,10 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
  *
  *	v1 is the starting point, not a design. Every value it declares is the
  *	framework's own, so a page under it looks as it does under Nino.css alone -
- *	and every one of them is a triple, so each knob has something to reach.
- *	The middle of a triple is Nino.css, the other two are one step to each
- *	side. Where Nino.css changes a number at 768px the triple does the same,
- *	in a media query of its own.
+ *	and every one of them is a ladder of five, so each knob has something to
+ *	reach. The middle of a ladder is Nino.css, the others are two steps to
+ *	each side. Where Nino.css changes a number at 768px the ladder does the
+ *	same, in a media query of its own.
  *
  *	Two rules for a set:
  *
@@ -781,76 +781,109 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
  *	    sets the pair and the roles solved against it; a set never paints
  *	    one, and never compares one ground with another.
  *
- *	A value a knob should reach declares its three steps instead of one
- *	value, named after the tab and the knob (--content-section-space--less,
- *	--default, --more), and the rule reads the knob (var(--content-section-space)).
- *	The knobs of Nino.css itself - the factors of the hero and of the variants,
- *	the shadow of a card - need no rule: the set only points them at the
- *	triple. Copy this file to v2.css and start there.
+ *	A value a knob should reach declares its five steps instead of one
+ *	value, named after the tab and the knob (--content-section-space--least,
+ *	--less, --default, --more, --most), and the rule reads the knob
+ *	(var(--content-section-space)). The knobs of Nino.css itself - the factors
+ *	of the hero and of the variants, the shadow of a card - need no rule: the
+ *	set only points them at the ladder. Copy this file to v2.css and start there.
  */
 
 :root {
 	/*	The factors Nino.css multiplies the size of the title role and of the
 		subtitle role by, in a hero: 1.2 and 1.2, from 768px 1.25 and 10 / 9.
-		A step to either side is .85 and 1.2 times that	*/
-	--content-hero-title--less: 		1.02;
+		A step is the ratio 1.25 to either side of the middle, twice: times .64,
+		.8, 1, 1.25 and 1.5625	*/
+	--content-hero-title--least: 		.768;
+	--content-hero-title--less: 		.96;
 	--content-hero-title--default: 	1.2;
-	--content-hero-title--more: 		1.44;
+	--content-hero-title--more: 		1.5;
+	--content-hero-title--most: 		1.875;
 
-	--content-hero-text--less: 			1.02;
+	--content-hero-text--least: 		.768;
+	--content-hero-text--less: 			.96;
 	--content-hero-text--default: 	1.2;
-	--content-hero-text--more: 			1.44;
+	--content-hero-text--more: 			1.5;
+	--content-hero-text--most: 			1.875;
 
 	/*	How much smaller a --quiet variant is than the class it varies, and how
-		much larger a --loud one: .85 and 1.2	*/
+		much larger a --loud one: .85 and 1.2. The quiet ones stay under 1 and
+		the loud ones over it, whatever the position	*/
+	--content-quiet--least: 				.6;
 	--content-quiet--less: 					.75;
 	--content-quiet--default: 			.85;
-	--content-quiet--more: 					.95;
+	--content-quiet--more: 					.92;
+	--content-quiet--most: 					.97;
 
+	--content-loud--least: 					1.05;
 	--content-loud--less: 					1.1;
 	--content-loud--default: 				1.2;
 	--content-loud--more: 					1.35;
+	--content-loud--most: 					1.6;
 
 	/*	The space above and below what is in a section: --space-4, and --space-5
-		from 768px	*/
+		from 768px. Two steps of the scale to either side	*/
+	--content-section-space--least: 	var(--space-2);
 	--content-section-space--less: 		var(--space-3);
 	--content-section-space--default: var(--space-4);
 	--content-section-space--more: 		var(--space-5);
+	--content-section-space--most: 		var(--space-6);
 
 	/*	Twice the padding of a card's content, and the space under its title,
-		subtitle and description. The picture above them has half of it	*/
+		subtitle and description. The picture above them has half of it. The
+		scale ends below --space-1, so the least is half of that	*/
+	--content-card-space--least: 		calc( var(--space-1) * .5 );
 	--content-card-space--less: 		var(--space-1);
 	--content-card-space--default: var(--space-2);
 	--content-card-space--more: 		var(--space-3);
+	--content-card-space--most: 		var(--space-4);
 
+	/*	The kernel's radii are .1rem, .2rem and .4rem. Between 0 and .1rem there
+		is nothing worth a position, so the sharp end is a plateau: the two least
+		are square. The ends are well apart, a corner and a curve	*/
+	--content-corners--least: 				0rem;
 	--content-corners--less: 					0rem;
 	--content-corners--default: 			var(--radius-small);
 	--content-corners--more: 					var(--radius-large);
+	--content-corners--most: 					1rem;
 
-	/*	The line round a card that names a ground - a plain card has none	*/
-	--content-border--less: 					0px;
+	/*	The line round a card that names a ground - a plain card has none. The
+		half pixel is a hairline where the screen can draw one, and a line of
+		1px where it cannot	*/
+	--content-border--least: 					0px;
+	--content-border--less: 					.5px;
 	--content-border--default: 				1px;
 	--content-border--more: 					2px;
+	--content-border--most: 					3px;
 
-	/*	A card casts none until a design layer gives it one	*/
+	/*	A card casts none until a design layer gives it one: none up to the middle,
+		then the shadow of a card that is lifted, and one that is lifted high	*/
+	--content-shadow--least: 					none;
 	--content-shadow--less: 					none;
 	--content-shadow--default: 				none;
 	--content-shadow--more: 					0 .125rem .75rem var(--nino-default-shadow);
+	--content-shadow--most: 					0 .25rem 1.5rem var(--nino-default-shadow), 0 .0625rem .25rem var(--nino-default-shadow);
 }
 
 @media (min-width: 768px) {
 	:root {
-		--content-hero-title--less: 		1.0625;
+		--content-hero-title--least: 		.8;
+		--content-hero-title--less: 		1;
 		--content-hero-title--default: 	1.25;
-		--content-hero-title--more: 		1.5;
+		--content-hero-title--more: 		1.5625;
+		--content-hero-title--most: 		1.953;
 
-		--content-hero-text--less: 			calc(.85 * 10 / 9);
+		--content-hero-text--least: 		calc(.64 * 10 / 9);
+		--content-hero-text--less: 			calc(.8 * 10 / 9);
 		--content-hero-text--default: 	calc(10 / 9);
-		--content-hero-text--more: 			calc(1.2 * 10 / 9);
+		--content-hero-text--more: 			calc(1.25 * 10 / 9);
+		--content-hero-text--most: 			calc(1.5625 * 10 / 9);
 
+		--content-section-space--least: 	var(--space-3);
 		--content-section-space--less: 		var(--space-4);
 		--content-section-space--default: var(--space-5);
 		--content-section-space--more: 		var(--space-6);
+		--content-section-space--most: 		calc( var(--space-6) * 1.25 );
 	}
 }
 
@@ -907,22 +940,22 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 }
 
 
-/* ==== 10. buttons: v1 (small default, big default, space default, corners default) ==== */
+/* ==== 10. buttons: v1 (size default, spread default, space default, corners default) ==== */
 /*	Nino Design - buttons v1
  *
  *	@name			Nino
  *	@description	The framework as it is, with its own values on every knob. Every .nino-btn variant, and the link that looks like one.
  *
- *	@knob	small		Size of a small button
- *	@knob	big			Size of a big button
+ *	@knob	size		Size of a button
+ *	@knob	spread		How far a small and a big button stand from it
  *	@knob	space		Space around the label
  *	@knob	corners		Corner radius
  *
  *	v1 is the starting point, not a design. Every value it declares is the
  *	framework's own, so a button under it looks as it does under Nino.css
- *	alone, and every one of them is a triple, so each knob has something to
- *	reach: the middle of a triple is Nino.css, the other two are one step to
- *	each side.
+ *	alone, and every one of them is a ladder of five, so each knob has
+ *	something to reach: the middle of a ladder is Nino.css, the others are
+ *	two steps to each side.
  *
  *	Two rules for a set:
  *
@@ -933,54 +966,66 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
  *	    tab (--font-button-*), and a set that wrote its own would contradict
  *	    the panel.
  *
- *	The variants are the size of the button times a number, in Nino.css as
- *	here: the padding, the type and the radius of a small button are the
- *	button's own times the small knob. Copy this file to v2.css and start
- *	there.
+ *	The size is what the padding, the type and the radius of a button are
+ *	multiplied by. The variants are that size times a number, in Nino.css as
+ *	here: a small button is the size times 1 less the spread, a big one the
+ *	size times 1 plus it. Copy this file to v2.css and start there.
  */
 
 :root {
-	/*	The number a small and a big button are scaled by: .7 and 1.3	*/
-	--buttons-small--less: 		.6;
-	--buttons-small--default: .7;
-	--buttons-small--more: 		.8;
+	/*	What a button is multiplied by: 1 is Nino.css as it is	*/
+	--buttons-size--least: 		.8;
+	--buttons-size--less: 		.9;
+	--buttons-size--default: 	1;
+	--buttons-size--more: 		1.12;
+	--buttons-size--most: 		1.25;
 
-	--buttons-big--less: 			1.15;
-	--buttons-big--default: 	1.3;
-	--buttons-big--more: 			1.5;
+	/*	How far the variants stand from the size, as a part of it: .3 is the
+		.7 of a small button and the 1.3 of a big one	*/
+	--buttons-spread--least: 		.1;
+	--buttons-spread--less: 		.2;
+	--buttons-spread--default: 	.3;
+	--buttons-spread--more: 		.4;
+	--buttons-spread--most: 		.5;
 
-	/*	Twice the padding above and below the label, and the padding beside it	*/
-	--buttons-space--less: 		var(--space-1);
+	/*	Twice the padding above and below the label, and the padding beside it.
+		The scale ends below --space-1, so the least is half of that	*/
+	--buttons-space--least: 		calc( var(--space-1) * .5 );
+	--buttons-space--less: 			var(--space-1);
 	--buttons-space--default: var(--space-2);
-	--buttons-space--more: 		var(--space-3);
+	--buttons-space--more: 			var(--space-3);
+	--buttons-space--most: 			var(--space-4);
 
 	/*	A pill is no large number but a radius past half the height, where it stops growing	*/
-	--buttons-corners--less: 		0rem;
+	--buttons-corners--least: 		0rem;
+	--buttons-corners--less: 		var(--radius-small);
 	--buttons-corners--default: var(--radius);
-	--buttons-corners--more: 		999rem;
+	--buttons-corners--more: 		var(--radius-large);
+	--buttons-corners--most: 		999rem;
 }
 
 /*	Not where the button names a padding of its own: the spacing classes of
 	Nino.css come last in its stylesheet so that they win	*/
 .nino-btn:where(:not([class*="nino-pt-"], [class*="nino-pb-"], [class*="nino-p-"])) {
-	padding: calc( var(--buttons-space) / 2 ) var(--buttons-space);
+	padding: calc( var(--buttons-space) / 2 * var(--buttons-size) ) calc( var(--buttons-space) * var(--buttons-size) );
 }
 .nino-btn {
-	border-radius: var(--buttons-corners);
+	font-size: calc( var(--font-button-size) * var(--buttons-size) );
+	border-radius: calc( var(--buttons-corners) * var(--buttons-size) );
 }
 .nino-btn--small:where(:not([class*="nino-pt-"], [class*="nino-pb-"], [class*="nino-p-"])) {
-	padding: calc( var(--buttons-space) / 2 * var(--buttons-small) ) calc( var(--buttons-space) * var(--buttons-small) );
+	padding: calc( var(--buttons-space) / 2 * var(--buttons-size) * ( 1 - var(--buttons-spread) ) ) calc( var(--buttons-space) * var(--buttons-size) * ( 1 - var(--buttons-spread) ) );
 }
 .nino-btn--small {
-	font-size: calc( var(--font-button-size) * var(--buttons-small) );
-	border-radius: calc( var(--buttons-corners) * var(--buttons-small) );
+	font-size: calc( var(--font-button-size) * var(--buttons-size) * ( 1 - var(--buttons-spread) ) );
+	border-radius: calc( var(--buttons-corners) * var(--buttons-size) * ( 1 - var(--buttons-spread) ) );
 }
 .nino-btn--big:where(:not([class*="nino-pt-"], [class*="nino-pb-"], [class*="nino-p-"])) {
-	padding: calc( var(--buttons-space) / 2 * var(--buttons-big) ) calc( var(--buttons-space) * var(--buttons-big) );
+	padding: calc( var(--buttons-space) / 2 * var(--buttons-size) * ( 1 + var(--buttons-spread) ) ) calc( var(--buttons-space) * var(--buttons-size) * ( 1 + var(--buttons-spread) ) );
 }
 .nino-btn--big {
-	font-size: calc( var(--font-button-size) * var(--buttons-big) );
-	border-radius: calc( var(--buttons-corners) * var(--buttons-big) );
+	font-size: calc( var(--font-button-size) * var(--buttons-size) * ( 1 + var(--buttons-spread) ) );
+	border-radius: calc( var(--buttons-corners) * var(--buttons-size) * ( 1 + var(--buttons-spread) ) );
 }
 
 
@@ -999,9 +1044,9 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
  *
  *	v1 is the starting point, not a design. Every value it declares is the
  *	framework's own, so a form, a table or a block under it looks as it does
- *	under Nino.css alone - and every one of them is a triple, so each knob has
- *	something to reach: the middle of a triple is Nino.css, the other two
- *	are one step to each side.
+ *	under Nino.css alone - and every one of them is a ladder, so each knob has
+ *	something to reach: the five values of a scale, the middle of them Nino.css
+ *	and the others two steps to each side, or the three of a choice.
  *
  *	Two rules for a set:
  *
@@ -1013,11 +1058,13 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
  *
  *	A knob that is more than one value - the stripes of a table are a
  *	background and a colour of text, the place of a label is a layout and a
- *	lift - declares one more triple for each, named after the knob and an
- *	aspect of it (--components-zebra-ink--less ...). They move together: the
- *	compiler selects every triple of a knob where it stands. An aspect at its
- *	middle step names the value the property has anyway, so a rule that reads
- *	it changes nothing there.
+ *	lift - declares one more ladder for each, named after the knob and an
+ *	aspect of it (--components-zebra-ink--less ...), as long as the knob's own.
+ *	They move together: the compiler selects every ladder of a knob where it
+ *	stands. An aspect at its middle step names the value the property has
+ *	anyway, so a rule that reads it changes nothing there. The stripes and the
+ *	label are a choice of three, declared under less, default and more; the
+ *	rest are scales of five.
  *
  *	The spacing classes of Nino.css (nino-p-2, nino-mb-3 ...) come last in its
  *	stylesheet so that they win. A rule of a design layer would beat them, so
@@ -1028,24 +1075,36 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 :root {
 	/*	The type size of a field is 1rem and of a table is the size of the text
 		around it, times this	*/
-	--components-scale--less: 		.875;
+	--components-scale--least: 		.75;
+	--components-scale--less: 		.87;
 	--components-scale--default: 	1;
-	--components-scale--more: 		1.125;
+	--components-scale--more: 		1.15;
+	--components-scale--most: 		1.32;
 
 	/*	Half the padding of a cell, the padding of a field and the space under
-		it, and a quarter of the padding of a block	*/
-	--components-space--less: 		calc( var(--space-1) * .6 );
+		it, and a quarter of the padding of a block. A field's space is finer than
+		a card's, so the steps are fractions of the middle and not steps of the scale	*/
+	--components-space--least: 		calc( var(--space-1) * .4 );
+	--components-space--less: 		calc( var(--space-1) * .7 );
 	--components-space--default: 	var(--space-1);
-	--components-space--more: 		var(--space-2);
+	--components-space--more: 		calc( var(--space-1) * 1.5 );
+	--components-space--most: 		calc( var(--space-1) * 2.2 );
 
-	/*	The radius of a field. A badge, an alert and a block are twice it	*/
+	/*	The radius of a field. A badge, an alert and a block are twice it. Nothing
+		between square and .1rem is worth a position, so the sharp end is a plateau
+		- the two least are square	*/
+	--components-corners--least: 	0rem;
 	--components-corners--less: 	0rem;
 	--components-corners--default: 	var(--radius-small);
 	--components-corners--more: 	var(--radius-large);
+	--components-corners--most: 	1rem;
 
-	--components-border--less: 		0px;
+	/*	The half pixel is a hairline where the screen can draw one, and 1px where it cannot	*/
+	--components-border--least: 	0px;
+	--components-border--less: 		.5px;
 	--components-border--default: 	1px;
 	--components-border--more: 		2px;
+	--components-border--most: 		3px;
 
 	/*	The even rows of a table that has the class: none, the second ground of
 		the page, or that with a line over it. The text on them is the ink of
@@ -1234,10 +1293,10 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 
 /* ==== 12. the knob positions ==== */
 :root {
-	--buttons-big: var(--buttons-big--default);
 	--buttons-corners: var(--buttons-corners--default);
-	--buttons-small: var(--buttons-small--default);
+	--buttons-size: var(--buttons-size--default);
 	--buttons-space: var(--buttons-space--default);
+	--buttons-spread: var(--buttons-spread--default);
 	--components-border: var(--components-border--default);
 	--components-corners: var(--components-corners--default);
 	--components-labels: var(--components-labels--default);
