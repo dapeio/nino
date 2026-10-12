@@ -4,6 +4,8 @@ All notable changes to Nino are documented in this file.
 
 ## Unreleased
 
+## v1.7.0 - 2026-10-12
+
 ### Changed
 
 - **Nino.css:** a page that opens with a hero behind the header - a cover, a
