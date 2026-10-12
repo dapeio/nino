@@ -2,11 +2,10 @@
 declare(strict_types=1);
 /**
  *	Nino
- *	harness.php		The shared bootstrap of a smoke test: the kernel and the
- *								workbench shell, a sandbox project directory, check() and
- *								the summary line. The older suites carry the same few
- *								lines themselves; a new test, and every feature's own
- *								test, loads this instead.
+ *	harness.php		The one bootstrap of every PHP suite under tests/ and of
+ *								every feature's own test: the kernel and the workbench shell,
+ *								a sandbox project directory, check(), the helpers below and
+ *								the summary line with the seconds the run took.
  *
  *								A feature's test lives in its own directory
  *								(features/<Name>/tests/<key>-smoke.php) and finds the
@@ -16,6 +15,16 @@ declare(strict_types=1);
  *
  *									$root = getenv( 'NINO_ROOT' ) ?: dirname( __DIR__, 3 );
  *									require $root. '/tests/harness.php';
+ *
+ *								check()				One assertion, one line of output
+ *								ninoSandbox()		A fresh, isolated project directory
+ *								ninoSandboxDir()	The directory of a sandbox
+ *								ninoWarnings()		The warnings raised since the last call
+ *								ninoErrors()		Every error one call raises, with its level
+ *								ninoCall()			One workbench request, as a panel sees it
+ *								ninoUser()			An account, inserted and signed in
+ *								ninoVisit()			One request of the site, through Http::request()
+ *								ninoDone()			The summary and its seconds, the sandbox removed
  *
  *	Usage: require it, build a sandbox with ninoSandbox(), check() away,
  *	end with ninoDone().
@@ -32,6 +41,7 @@ require_once __DIR__. '/../_admin/Admin.php';
 $GLOBALS['ninoChecks']		= 0;
 $GLOBALS['ninoFailures']	= 0;
 $GLOBALS['ninoWarnings']	= [];
+$GLOBALS['ninoStarted']		= microtime( true );
 
 /**
  *	One assertion, one line of output
@@ -110,7 +120,119 @@ function ninoWarnings(): array {
 }
 
 /**
- *	Print the summary, remove the sandbox, exit with the suite's status
+ *	Every error one call raises, the level with it: the call runs under a
+ *	handler of its own that records [ level, message ] and swallows the error
+ *	- E_USER_ERROR too, which the handler below hands on to php as the fatal
+ *	it is. What the code silenced with @ is not recorded. The handler in
+ *	force before is back when this returns. A test that needs the result of
+ *	the call sets it inside the closure:
+ *
+ *		$result = null;
+ *		$errors = ninoErrors( function() use ( &$appData, &$result ) { $result = \Nino\Foo::bar( $appData ); } );
+ *
+ *	@param		callable	$run						The call to watch
+ *
+ *	@return 	array										[ level, message ] per error, oldest first
+ */
+function ninoErrors( callable $run ): array {
+
+	$errors = [];
+
+	set_error_handler( static function( int $level, string $message ) use ( &$errors ): bool {
+
+		// Silenced with @ by the code itself: not an error anyone meant to see
+		if( ( error_reporting() & $level ) === 0 )
+			return true;
+
+		$errors[] = [ $level, $message ];
+
+		return true;
+	} );
+
+	try {
+		$run();
+	}
+	finally {
+		restore_error_handler();
+	}
+
+	return $errors;
+}
+
+/**
+ *	One workbench request, as Admin::handlePost() and every api* method of a
+ *	panel see it: $_POST['data'] is the json of $data, $_POST['action'] is
+ *	set when an action is given (and left as it is when not), and the
+ *	response starts with the status the request already carries. The target
+ *	is called directly, so $appData and the request travel by reference the
+ *	way the panel methods declare them:
+ *
+ *		[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Users\Admin::class, 'apiList' ] );
+ *		[ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [ 'type' => 'news' ], 'elements/list' );
+ *
+ *	@param		array 		&$appData			(reference) A sandbox's app data
+ *	@param		callable	$target				A method ( array &$appData, array &$request ), eg. [ \Nino\Modules\Users\Admin::class, 'apiList' ]
+ *	@param		array 		$data					Becomes $_POST['data'], json encoded
+ *	@param		string|null	$action			Becomes $_POST['action'] when given, null leaves it as it is
+ *	@param		int				$statusBefore	The status the request carries into the call, eg. 403 after a failed csrf check
+ *
+ *	@return 	array										[ statusCode, body, request ] - the body null where the answer has none, the request for a header or the whole response
+ */
+function ninoCall( array &$appData, callable $target, array $data = [], ?string $action = null, int $statusBefore = 200 ): array {
+
+	$_POST['data'] = json_encode( $data );
+
+	if( $action !== null )
+		$_POST['action'] = $action;
+
+	$request = [ '/nino/http/response' => [ 'statusCode' => $statusBefore ] ];
+
+	$target( $appData, $request );
+
+	return [ $request['/nino/http/response']['statusCode'], $request['/nino/http/response']['body'] ?? null, $request ];
+}
+
+/**
+ *	An account that exists and is signed in: inserted with the permissions
+ *	given - full access unless the test says otherwise - and logged in with
+ *	the password the suites use everywhere
+ *
+ *	@param		array 		&$appData			(reference) A sandbox's app data
+ *	@param		string		$mail
+ *	@param		array 		$perms				[] for an account that may do nothing
+ *	@param		string		$password			Another one, where the test signs in again with it
+ *
+ *	@return 	void
+ */
+function ninoUser( array &$appData, string $mail, array $perms = [ '/*' ], string $password = 'correct horse battery staple' ): void {
+
+	\Nino\Auth::insertUser( $appData, $mail, $password, $perms );
+	\Nino\Auth::loginUser( $appData, $mail, $password );
+}
+
+/**
+ *	One request of the site, the way a web server hands it over: the server
+ *	array run through Http::request(), the response and the headers it
+ *	composes included
+ *
+ *	@param		array 		&$appData			(reference) A sandbox's app data
+ *	@param		string		$uri					eg. '/legal?x=1'
+ *	@param		string		$method
+ *	@param		array 		$server				More of $_SERVER, or what replaces the defaults (REMOTE_ADDR is 127.0.0.1)
+ *
+ *	@return 	array										The request after Http::request(), response and all
+ */
+function ninoVisit( array &$appData, string $uri, string $method = 'GET', array $server = [] ): array {
+
+	$request = array_merge( [ 'REQUEST_METHOD' => $method, 'REQUEST_URI' => $uri, 'REMOTE_ADDR' => '127.0.0.1' ], $server );
+	\Nino\Http::request( $appData, $request );
+
+	return $request;
+}
+
+/**
+ *	Print the summary - checks, failures and the seconds the run took -
+ *	remove the sandbox, exit with the suite's status
  *
  *	@param		array 		&$appData			(reference) A sandbox's app data, or [] for none
  *
@@ -125,7 +247,10 @@ function ninoDone( array &$appData ): never {
 
 	unset( $_POST['action'], $_POST['data'] );
 
-	echo "\n". $GLOBALS['ninoChecks']. " checks, ". $GLOBALS['ninoFailures']. " failed\n";
+	// One decimal every time, so the columns of a run over all suites line up
+	$seconds = sprintf( '%.1f', microtime( true ) - $GLOBALS['ninoStarted'] );
+
+	echo "\n". $GLOBALS['ninoChecks']. " checks, ". $GLOBALS['ninoFailures']. " failed, {$seconds}s\n";
 
 	exit( $GLOBALS['ninoFailures'] === 0 ? 0 : 1 );
 }

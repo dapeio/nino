@@ -14,48 +14,16 @@ declare(strict_types=1);
  *	Usage: php tests/install-smoke.php
  */
 
-require __DIR__. '/../_nino/Nino.php';
-require __DIR__. '/../_admin/Admin.php';
+require __DIR__. '/harness.php';
 require __DIR__. '/../_admin/install/Install.php';
 
-$failures = 0;
-$checks		= 0;
-
-/**
- *	Assert a condition and print the result
- *
- *	@param		string		$label				Description of the check
- *	@param		bool			$condition		Result to assert
- *
- *	@return		void
- */
-function check( string $label, bool $condition ): void {
-	global $failures, $checks;
-	$checks++;
-	if( $condition === true ) {
-		echo "  ok  - $label\n";
-		return;
-	}
-	$failures++;
-	echo "FAIL  - $label\n";
-}
-
-set_error_handler( function() { return true; } );
-
-$sandbox = sys_get_temp_dir(). '/nino-install-smoke-'. uniqid();
-mkdir( $sandbox, 0777, true );
+$appData = ninoSandbox( 'install' );
+$sandbox = ninoSandboxDir( $appData );
 
 
 $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 
-$appData = [ './nino/uid' => $sandbox ];
-\Nino\AppData::prepare( $appData );
-$appData['./nino/filesystem/path']				= $sandbox;
-$appData['./nino/filesystem/configpath']	= $sandbox. '/private';
-$appData['./nino/filesystem/contentpath']	= $sandbox. '/private';
-$appData['./nino/filesystem/publicpath'] 	= $sandbox. '/public';
 $appData['/nino/dir']										= '';
-$appData['/nino/locales/native']					= 'de_DE';
 // Only the native locale - see Setup::apiApply()'s docblock for why that
 // matters (picking just the native locale must not silently keep some other
 // locale "available" too)
@@ -139,17 +107,12 @@ echo "\n";
 
 echo "Install::handlePost dispatch\n";
 
-$_POST['action'] = 'checks/run';
-$_POST['data']	 = '{}';
-$dispatchRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Install::handlePost( $appData, $dispatchRequest );
-check( 'a known action dispatches and succeeds', $dispatchRequest['/nino/http/response']['statusCode'] === 200 );
-check( 'checks/run responds with a php/extensions/directories shape', isset( $dispatchRequest['/nino/http/response']['body']['php'], $dispatchRequest['/nino/http/response']['body']['extensions'], $dispatchRequest['/nino/http/response']['body']['directories'] ) );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Install::class, 'handlePost' ], [], 'checks/run' );
+check( 'a known action dispatches and succeeds', $status === 200 );
+check( 'checks/run responds with a php/extensions/directories shape', isset( $body['php'], $body['extensions'], $body['directories'] ) );
 
-$_POST['action'] = 'install/does-not-exist';
-$unknownRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Install::handlePost( $appData, $unknownRequest );
-check( 'an unknown action is rejected with 404', $unknownRequest['/nino/http/response']['statusCode'] === 404 );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Install::class, 'handlePost' ], [], 'install/does-not-exist' );
+check( 'an unknown action is rejected with 404', $status === 404 );
 
 // 'action[]=x' is an "Illegal offset type in isset" in the dispatcher, ie. a
 // 500 on the wizard's address where the answer is the 404 above
@@ -166,9 +129,7 @@ echo "\n";
 
 echo "Checks::apiRun\n";
 
-$checksRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Checks::apiRun( $appData, $checksRequest );
-$checksBody = $checksRequest['/nino/http/response']['body'];
+[ , $checksBody ] = ninoCall( $appData, [ \Nino\Install\Checks::class, 'apiRun' ] );
 
 check( 'reports the running php version', $checksBody['php']['version'] === PHP_VERSION );
 check( 'gd is reported as loaded (required by CI)', $checksBody['extensions']['gd']['ok'] === true );
@@ -189,9 +150,7 @@ echo "\n";
 
 echo "Setup::apiLibrary / apiApply\n";
 
-$libraryRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Setup::apiLibrary( $appData, $libraryRequest );
-$libraryBody = $libraryRequest['/nino/http/response']['body'];
+[ , $libraryBody ] = ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiLibrary' ] );
 
 /*	The locales the library lists are its base unit's text files: the wizard
 	derives them as this test does. What this pins is that global.php is not
@@ -215,10 +174,8 @@ check( 'reports the config\'s current native locale as already active', $library
 check( 'reports the config\'s current native locale itself, for the Native Locale dropdown to pre-select', $libraryBody['nativeLocale'] === 'de_DE' );
 check( 'lists no module unit at all: forms/navigation/localepicker are no longer a choice, and a fresh checkout ships no other unit - pages have their own step now (Webpages), not listed here', $libraryBody['modules'] === [] );
 
-$_POST['data'] = json_encode( [ 'locales' => [], 'modules' => [] ] );
-$noLocaleRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Setup::apiApply( $appData, $noLocaleRequest );
-check( 'rejects a selection with no locale at all', $noLocaleRequest['/nino/http/response']['statusCode'] === 400 );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [], 'modules' => [] ] );
+check( 'rejects a selection with no locale at all', $status === 400 );
 
 // A route _install itself never wrote - eg. added by hand later through
 // _admin - has to survive every apply() below untouched: apply() only ever
@@ -243,12 +200,9 @@ $appData['/nino/http/routes']['POST://.form'] 		= [ 'uri' => '/.form' ];
 
 // de_DE only, nothing left to pick - forms/navigation/localepicker are
 // applied regardless
-$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE' ], 'modules' => [] ] );
-$applyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Setup::apiApply( $appData, $applyRequest );
-$applyBody = $applyRequest['/nino/http/response']['body'];
+[ $status, $applyBody ] = ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE' ], 'modules' => [] ] );
 
-check( 'apply succeeds', $applyRequest['/nino/http/response']['statusCode'] === 200 );
+check( 'apply succeeds', $status === 200 );
 // Every always-on unit, and nothing else since nothing was picked - and
 // every key the constant names has a unit to apply, or apply() would drop
 // it on the floor without a word
@@ -285,10 +239,9 @@ check( '...and delivers no logo picture, the unit has no images directory', glob
 // slot the project has stay as they are
 $appData['/nino/html/images']['/logo'] = [ 'label' => 'Firmenlogo', 'width' => 300, 'height' => 100, 'filename' => 'logo.webp' ];
 \Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
-$reapplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Setup::apiApply( $appData, $reapplyRequest );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE' ], 'modules' => [] ] );
 $logoAfterReapply = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/images']['/logo'] ?? [];
-check( 'applying the Setup step again keeps a logo slot the project changed', $reapplyRequest['/nino/http/response']['statusCode'] === 200 && ( $logoAfterReapply['label'] ?? null ) === 'Firmenlogo'
+check( 'applying the Setup step again keeps a logo slot the project changed', $status === 200 && ( $logoAfterReapply['label'] ?? null ) === 'Firmenlogo'
 	&& ( $logoAfterReapply['width'] ?? null ) === 300 && ( $logoAfterReapply['filename'] ?? null ) === 'logo.webp' );
 $appData['/nino/html/images']['/logo'] = $logoSlot;
 \Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
@@ -402,9 +355,7 @@ check( 'the unit\'s words for the Elements panel are on the blacklist', in_array
 
 check( 'never writes a fragment for a locale that was not picked', \Nino\Filesystem::fileExists( $appData, '/text/en_US.php' ) === false );
 
-$libraryAfterApply = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Setup::apiLibrary( $appData, $libraryAfterApply );
-$libraryAfterApplyBody = $libraryAfterApply['/nino/http/response']['body'];
+[ , $libraryAfterApplyBody ] = ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiLibrary' ] );
 
 check( 'apiLibrary now reports de_DE as the active locale', $libraryAfterApplyBody['activeLocales'] === [ 'de_DE' ] );
 check( 'apiLibrary still lists no module choice at all - forms/navigation/localepicker never appear here', $libraryAfterApplyBody['modules'] === [] );
@@ -413,10 +364,8 @@ check( 'apiLibrary still lists no module choice at all - forms/navigation/locale
 // locales, exactly as before - but nothing about the always-on three can be
 // "unpicked" any more, so this only ever exercises the locale replace now.
 // The hand-written and runtime-only routes above still have to survive
-$_POST['data'] = json_encode( [ 'locales' => [ 'en_US' ], 'modules' => [] ] );
-$secondApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Setup::apiApply( $appData, $secondApplyRequest );
-check( 'second apply succeeds', $secondApplyRequest['/nino/http/response']['statusCode'] === 200 );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'en_US' ], 'modules' => [] ] );
+check( 'second apply succeeds', $status === 200 );
 
 $configAfterSecondApply = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 check( 'replaces rather than grows: de_DE is gone, only en_US is available now', $configAfterSecondApply['/nino/locales/available'] === [ 'en_US' ] );
@@ -440,9 +389,7 @@ $editedNavroutes['/legal/privacy']['legal'] = 1;
 $editedNavroutes['/legal/imprint']['legal'] = 2;
 $appData['/nino/html/navroutes'] = $editedNavroutes;
 \Nino\AppData::writeContentData( $appData, [ '/nino/html/navroutes' ] );
-$_POST['data'] = json_encode( [ 'locales' => [ 'en_US' ], 'modules' => [] ] );
-$thirdApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Setup::apiApply( $appData, $thirdApplyRequest );
+ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'en_US' ], 'modules' => [] ] );
 $privacyAfterThird = \Nino\Filesystem::getFileContent( $appData, '/elements/privacy.php', [] );
 check( 'a third run leaves a section an editor rewrote as it is', ( $privacyAfterThird['de_DE']['hosting']['title'] ?? null ) === 'Mein Hosting' );
 check( '...and a section deleted by hand without a tombstone comes back in the language of this run: the wizard only ever adds', isset( $privacyAfterThird['en_US']['tls'] ) === true && isset( $privacyAfterThird['*']['tls'] ) === true );
@@ -461,19 +408,15 @@ check( 'text/en_US.php now exists, written by the second run', \Nino\Filesystem:
 // (the current native) is still among them, so the "keep current if still
 // picked" fallback would ordinarily leave it alone - posting native=de_DE
 // overrides that
-$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [], 'native' => 'de_DE' ] );
-$nativeSwitchRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Setup::apiApply( $appData, $nativeSwitchRequest );
-check( 'apply succeeds with a native locale posted explicitly', $nativeSwitchRequest['/nino/http/response']['statusCode'] === 200 );
-check( 'response echoes the newly picked native locale', $nativeSwitchRequest['/nino/http/response']['body']['nativeLocale'] === 'de_DE' );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [], 'native' => 'de_DE' ] );
+check( 'apply succeeds with a native locale posted explicitly', $status === 200 );
+check( 'response echoes the newly picked native locale', $body['nativeLocale'] === 'de_DE' );
 check( 'a posted native locale wins even though the previous native is still among the picked locales', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/locales/native'] === 'de_DE' );
 
 // A posted native locale that isn't among this call's own picked locales
 // is ignored - falls back to the same rule as posting none at all: keep
 // the current native if it's still picked, else the first picked locale
-$_POST['data'] = json_encode( [ 'locales' => [ 'en_US' ], 'modules' => [], 'native' => 'de_DE' ] );
-$staleNativeRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Setup::apiApply( $appData, $staleNativeRequest );
+ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'en_US' ], 'modules' => [], 'native' => 'de_DE' ] );
 check( 'a posted native locale outside the picked set is ignored, falling back to the (only) picked locale', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/locales/native'] === 'en_US' );
 
 /*	A unit file the step cannot copy. \Nino\Features::applyUnit() answers the
@@ -487,20 +430,13 @@ $blockedTemplate = $sandbox. '/private/templates/frame-header.tpl';
 unlink( $blockedTemplate );
 mkdir( $blockedTemplate, 0755, true );
 $configBeforeBlocked	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-$blockedWarnings			= [];
-set_error_handler( static function( int $no, string $message ) use ( &$blockedWarnings ): bool {
-	if( ( error_reporting() & $no ) !== 0 )
-		$blockedWarnings[] = $message;
-	return true;
-} );
-$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
-$blockedRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Setup::apiApply( $appData, $blockedRequest );
-restore_error_handler();
+ninoWarnings();
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
+$blockedWarnings = ninoWarnings();
 rmdir( $blockedTemplate );
 
-check( 'a unit file the step cannot copy is a 500 naming the file', $blockedRequest['/nino/http/response']['statusCode'] === 500
-	&& str_contains( (string) ( $blockedRequest['/nino/http/response']['body']['error'] ?? '' ), '/templates/frame-header.tpl' ) === true );
+check( 'a unit file the step cannot copy is a 500 naming the file', $status === 500
+	&& str_contains( (string) ( $body['error'] ?? '' ), '/templates/frame-header.tpl' ) === true );
 check( '...nothing was written to config.php for that apply', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] ) === $configBeforeBlocked );
 check( '...and no engine warning was raised on the way', array_filter( $blockedWarnings, static fn( string $w ): bool => str_contains( $w, 'file_put_contents' ) ) === [] );
 
@@ -676,13 +612,9 @@ echo "\n";
 echo "Webpages::apiList / apiApply\n";
 
 // Back to a clean, known Setup state - de_DE + en_US, no content modules
-$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
-$resetSetupRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Setup::apiApply( $appData, $resetSetupRequest );
+ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
 
-$wpLibraryRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiList( $appData, $wpLibraryRequest );
-$wpLibraryBody = $wpLibraryRequest['/nino/http/response']['body'];
+[ , $wpLibraryBody ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiList' ] );
 
 check( 'lists every page template, one per _admin/install/library/pages/<key>', in_array( 'home', array_keys( $wpLibraryBody['templates'] ), true ) === true && in_array( 'blank', array_keys( $wpLibraryBody['templates'] ), true ) === true && in_array( 'contact', array_keys( $wpLibraryBody['templates'] ), true ) === true );
 // What a page template requires is its manifest's business - every listed
@@ -734,57 +666,41 @@ check( 'the blank template starts every locale with useful page metadata', $wpLi
 check( 'the blank template suggests a stable Http-URI and its own page template', $wpLibraryBody['templates']['blank']['uri'] === '/new-webpage' && $wpLibraryBody['templates']['blank']['body'] === '[template /templates/page-blank]' );
 check( 'the blank page template deliberately has no section', strpos( (string) file_get_contents( __DIR__. '/../_admin/install/library/pages/blank/templates/page-blank.tpl' ), '<section' ) === false );
 
-$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '../etc/passwd', 'httpUri' => '/x', 'libraryKey' => 'home', 'text' => [] ] ] ] );
-$badUriRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiApply( $appData, $badUriRequest );
-check( 'rejects an unsafe Element-URI with 400', $badUriRequest['/nino/http/response']['statusCode'] === 400 );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [ [ 'uri' => '../etc/passwd', 'httpUri' => '/x', 'libraryKey' => 'home', 'text' => [] ] ] ] );
+check( 'rejects an unsafe Element-URI with 400', $status === 400 );
 
-$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/x', 'httpUri' => '../etc/passwd', 'libraryKey' => 'home', 'text' => [] ] ] ] );
-$badHttpUriRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiApply( $appData, $badHttpUriRequest );
-check( 'rejects an unsafe Http-URI with 400', $badHttpUriRequest['/nino/http/response']['statusCode'] === 400 );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [ [ 'uri' => '/x', 'httpUri' => '../etc/passwd', 'libraryKey' => 'home', 'text' => [] ] ] ] );
+check( 'rejects an unsafe Http-URI with 400', $status === 400 );
 
-$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/x', 'httpUri' => '/x', 'libraryKey' => 'does-not-exist', 'text' => [] ] ] ] );
-$badTemplateRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiApply( $appData, $badTemplateRequest );
-check( 'rejects an unknown library key with 400', $badTemplateRequest['/nino/http/response']['statusCode'] === 400 );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [ [ 'uri' => '/x', 'httpUri' => '/x', 'libraryKey' => 'does-not-exist', 'text' => [] ] ] ] );
+check( 'rejects an unknown library key with 400', $status === 400 );
 
 // The two Element-URIs of the Legal module's pages are its: a page of the
 // project's own cannot take them, whatever route it brings
 foreach( [ '/legal/imprint', '/legal/privacy' ] as $reservedElementUri ) {
-	$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => $reservedElementUri, 'httpUri' => '/my-page', 'libraryKey' => 'blank', 'text' => [] ] ] ] );
-	$reservedElementRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-	\Nino\Install\Webpages::apiApply( $appData, $reservedElementRequest );
-	check( 'rejects the Legal module\'s Element-URI '. $reservedElementUri. ' with 409', $reservedElementRequest['/nino/http/response']['statusCode'] === 409 && isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://my-page'] ) === false );
+	[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [ [ 'uri' => $reservedElementUri, 'httpUri' => '/my-page', 'libraryKey' => 'blank', 'text' => [] ] ] ] );
+	check( 'rejects the Legal module\'s Element-URI '. $reservedElementUri. ' with 409', $status === 409 && isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://my-page'] ) === false );
 }
 
-$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/installer-shadow', 'httpUri' => '/_admin', 'libraryKey' => 'home', 'text' => [] ] ] ] );
-$reservedHttpUriRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiApply( $appData, $reservedHttpUriRequest );
-check( 'rejects a Webpage mounted on the installer\'s own runtime uri', $reservedHttpUriRequest['/nino/http/response']['statusCode'] === 409 );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [ [ 'uri' => '/installer-shadow', 'httpUri' => '/_admin', 'libraryKey' => 'home', 'text' => [] ] ] ] );
+check( 'rejects a Webpage mounted on the installer\'s own runtime uri', $status === 409 );
 
 
-$_POST['data'] = json_encode( [ 'webpages' => [ [ 'uri' => '/custom-page', 'httpUri' => '/custom', 'libraryKey' => 'home', 'text' => [] ] ] ] );
-$foreignRouteRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiApply( $appData, $foreignRouteRequest );
-check( 'rejects an Http-URI already owned by a non-Webpages route', $foreignRouteRequest['/nino/http/response']['statusCode'] === 409 );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [ [ 'uri' => '/custom-page', 'httpUri' => '/custom', 'libraryKey' => 'home', 'text' => [] ] ] ] );
+check( 'rejects an Http-URI already owned by a non-Webpages route', $status === 409 );
 check( 'the colliding hand-written route remains untouched', ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://custom']['body'] ?? null ) === 'hand-written route' );
 
-$_POST['data'] = json_encode( [ 'webpages' => [
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [
 	[ 'uri' => '/x', 'httpUri' => '/x', 'libraryKey' => 'home', 'text' => [] ],
 	[ 'uri' => '/x', 'httpUri' => '/y', 'libraryKey' => 'contact', 'text' => [] ],
 ] ] );
-$dupeUriRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiApply( $appData, $dupeUriRequest );
-check( 'rejects a duplicate Element-URI with 400', $dupeUriRequest['/nino/http/response']['statusCode'] === 400 );
+check( 'rejects a duplicate Element-URI with 400', $status === 400 );
 
-$_POST['data'] = json_encode( [ 'webpages' => [
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [
 	[ 'uri' => '/x', 'httpUri' => '/x', 'libraryKey' => 'home', 'text' => [] ],
 	[ 'uri' => '/y', 'httpUri' => '/x', 'libraryKey' => 'contact', 'text' => [] ],
 ] ] );
-$dupeHttpUriRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiApply( $appData, $dupeHttpUriRequest );
-check( 'rejects a duplicate Http-URI with 400, even when the Element-URIs differ', $dupeHttpUriRequest['/nino/http/response']['statusCode'] === 400 );
+check( 'rejects a duplicate Http-URI with 400, even when the Element-URIs differ', $status === 400 );
 
 // The actual, first real apply: home at Element-URI "/site-home" / Http-URI
 // "/" + contact at "/site-contact" / "/kontakt" (drags in
@@ -794,7 +710,7 @@ check( 'rejects a duplicate Http-URI with 400, even when the Element-URIs differ
 // template name, for the meta namespace (see _routeKeys()'s docblock).
 // Only de_DE's text is posted for one field, proving the missing en_US/
 // other fields fall back to the generic placeholder rather than failing
-$_POST['data'] = json_encode( [ 'webpages' => [
+$firstApply = [ 'webpages' => [
 	[ 'uri' => '/site-home', 'httpUri' => '/', 'libraryKey' => 'home', 'navs' => [ 'main' ], 'text' => [
 		'de_DE' => [ 'name' => 'Start', 'title' => 'Willkommen', 'description' => 'Startseite' ],
 		'en_US' => [ 'name' => 'Home', 'title' => 'Welcome', 'description' => 'Home page' ],
@@ -803,16 +719,15 @@ $_POST['data'] = json_encode( [ 'webpages' => [
 		'de_DE' => [ 'name' => 'Kontakt' ],
 		'en_US' => [ 'name' => '<script>alert(1)</script>Contact', 'title' => 'Say "hello" to <b>us</b>' ],
 	] ],
-] ] );
+] ];
 /*	A copy the step cannot make is the step's failure, not a success over a
 	route that renders a file that is not there. The Routes step kept its own
 	copy of the unit helpers, and that copy swallowed a failed write - here a
 	directory stands where contact's template has to go, so the write fails
 	the way a permission or a full disk would	*/
 mkdir( $sandbox. '/private/templates/page-contact.tpl', 0755, true );
-$blockedApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiApply( $appData, $blockedApplyRequest );
-check( 'a template the step cannot write fails the apply and names the file', $blockedApplyRequest['/nino/http/response']['statusCode'] === 500 && str_contains( (string) ( $blockedApplyRequest['/nino/http/response']['body']['error'] ?? '' ), '/templates/page-contact.tpl' ) === true );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], $firstApply );
+check( 'a template the step cannot write fails the apply and names the file', $status === 500 && str_contains( (string) ( $body['error'] ?? '' ), '/templates/page-contact.tpl' ) === true );
 check( '...before any route is written', isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://kontakt'] ) === false );
 rmdir( $sandbox. '/private/templates/page-contact.tpl' );
 
@@ -823,16 +738,14 @@ $seedFile = $sandbox. '/public/images/template/page-home/fullscreen-image/backgr
 if( is_file( $seedFile ) === true )
 	unlink( $seedFile );
 mkdir( $seedFile, 0755, true );
-$blockedSeedRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiApply( $appData, $blockedSeedRequest );
-check( 'a seed file the step cannot copy fails the apply and names the file', $blockedSeedRequest['/nino/http/response']['statusCode'] === 500 && str_contains( (string) ( $blockedSeedRequest['/nino/http/response']['body']['error'] ?? '' ), '/images/template/page-home/fullscreen-image/background.svg' ) === true );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], $firstApply );
+check( 'a seed file the step cannot copy fails the apply and names the file', $status === 500 && str_contains( (string) ( $body['error'] ?? '' ), '/images/template/page-home/fullscreen-image/background.svg' ) === true );
 check( '...and no page image slot is seeded', array_keys( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/images'] ?? [] ) === [ '/logo' ] );
 rmdir( $seedFile );
 
-$wpApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiApply( $appData, $wpApplyRequest );
-check( 'apply succeeds', $wpApplyRequest['/nino/http/response']['statusCode'] === 200 );
-check( 'response echoes both entries back', count( $wpApplyRequest['/nino/http/response']['body']['webpages'] ) === 2 );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], $firstApply );
+check( 'apply succeeds', $status === 200 );
+check( 'response echoes both entries back', count( $body['webpages'] ) === 2 );
 
 $configAfterWpApply = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
@@ -930,9 +843,8 @@ check( 'a page uri is a technical value, blacklisted out of the Text panel like 
 	&& count( array_unique( $blacklistAfterWpApply ) ) === count( $blacklistAfterWpApply ) );
 check( 'a template\'s own deeper content (unprefixed, shared across instances) still merges in', isset( $deAfterWpApply['[[/template/page-home/welcome/title]]'] ) === true );
 
-$libraryAfterWpApply = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiList( $appData, $libraryAfterWpApply );
-check( 'apiList now reflects the persisted, current list', array_column( $libraryAfterWpApply['/nino/http/response']['body']['webpages'], 'httpUri' ) === [ '/', '/kontakt' ] );
+[ , $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiList' ] );
+check( 'apiList now reflects the persisted, current list', array_column( $body['webpages'], 'httpUri' ) === [ '/', '/kontakt' ] );
 
 // --- a 'templatePerRoute' unit gets one template per route ----------------
 //
@@ -946,15 +858,14 @@ $appData['/nino/html/images']['/template/page-home/fullscreen-image/background']
 $appData['/nino/html/images']['/template/page-home/fullscreen-image/background']['filename'] = 'template/page-home/fullscreen-image/background.1920x1080.jpg';
 \Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
 
-$_POST['data'] = json_encode( [ 'webpages' => [
+$perRoute = [ 'webpages' => [
 	[ 'uri' => '/site-home', 'httpUri' => '/', 'libraryKey' => 'home', 'text' => [] ],
 	[ 'uri' => '/site-contact', 'httpUri' => '/kontakt', 'libraryKey' => 'contact', 'text' => [] ],
 	[ 'uri' => '/team', 'httpUri' => '/team', 'libraryKey' => 'blank', 'text' => [] ],
 	[ 'uri' => '/jobs/open', 'httpUri' => '/jobs', 'libraryKey' => 'blank', 'text' => [] ],
-] ] );
-$perRouteRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiApply( $appData, $perRouteRequest );
-check( 'applying two blank routes succeeds', $perRouteRequest['/nino/http/response']['statusCode'] === 200 );
+] ];
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], $perRoute );
+check( 'applying two blank routes succeeds', $status === 200 );
 
 $configPerRoute = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
@@ -973,16 +884,14 @@ check( 'a unit without the flag still shares one template', \Nino\Filesystem::fi
 // Re-applying must not undo work done in a per-route template since - it is
 // that route's page now, not a copy of the library's starting point
 \Nino\Filesystem::putFileContent( $appData, '/templates/page-team.tpl', 'edited by hand' );
-$perRouteAgain = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiApply( $appData, $perRouteAgain );
+ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], $perRoute );
 check( 're-applying leaves an edited per-route template alone', trim( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/page-team.tpl', '' ) ) === 'edited by hand' );
 
 // Reading the list back: the route no longer carries the unit's body, so it
 // reports as a page of its own - the same thing an /_admin-created page is,
 // and exactly what it has become
-$perRouteList = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiList( $appData, $perRouteList );
-$teamEntry = array_values( array_filter( $perRouteList['/nino/http/response']['body']['webpages'], fn( array $e ): bool => $e['httpUri'] === '/team' ) )[0] ?? [];
+[ , $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiList' ] );
+$teamEntry = array_values( array_filter( $body['webpages'], fn( array $e ): bool => $e['httpUri'] === '/team' ) )[0] ?? [];
 check( 'a per-route page reads back as owning its template rather than as the library unit', ( $teamEntry['libraryKey'] ?? null ) === '' && ( $teamEntry['body'] ?? null ) === '[template /templates/page-team]' );
 
 // A page of your own whose Element-URI is the name of a library unit: its own
@@ -991,50 +900,42 @@ check( 'a per-route page reads back as owning its template rather than as the li
 // the wizard read the page back as that unit and the next apply wrote the
 // library's home page over whatever had been built in it. Refused where it is
 // typed, naming the page of the library that has the name
-$_POST['data'] = json_encode( [ 'webpages' => [
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [
 	[ 'uri' => '/home', 'httpUri' => '/eigene-startseite', 'libraryKey' => 'blank', 'text' => [] ],
 ] ] );
-$collisionRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiApply( $appData, $collisionRequest );
-check( 'a page of your own cannot take a library page\'s template name', $collisionRequest['/nino/http/response']['statusCode'] === 409
-	&& str_contains( (string) ( $collisionRequest['/nino/http/response']['body']['error'] ?? '' ), '"home"' ) === true );
+check( 'a page of your own cannot take a library page\'s template name', $status === 409
+	&& str_contains( (string) ( $body['error'] ?? '' ), '"home"' ) === true );
 $configAfterCollision = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 check( '...and nothing of it was written - no route for it, and the library page\'s template as it was', isset( $configAfterCollision['/nino/http/routes']['GET://eigene-startseite'] ) === false
 	&& trim( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/page-home.tpl', '' ) ) !== '' );
 
 // The same for a module's unit: /legal-imprint would be given the Legal
 // module's own page-legal-imprint.tpl as its copy
-$_POST['data'] = json_encode( [ 'webpages' => [
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [
 	[ 'uri' => '/legal-imprint', 'httpUri' => '/eigenes-impressum', 'libraryKey' => 'blank', 'text' => [] ],
 ] ] );
-$moduleCollisionRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiApply( $appData, $moduleCollisionRequest );
-check( 'a page of your own cannot take the template name of a module\'s unit, and the answer names the unit - not a page of the library', $moduleCollisionRequest['/nino/http/response']['statusCode'] === 409
-	&& str_contains( (string) ( $moduleCollisionRequest['/nino/http/response']['body']['error'] ?? '' ), '"legal" unit' ) === true
+check( 'a page of your own cannot take the template name of a module\'s unit, and the answer names the unit - not a page of the library', $status === 409
+	&& str_contains( (string) ( $body['error'] ?? '' ), '"legal" unit' ) === true
 	&& isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://eigenes-impressum'] ) === false );
 
 // A name no unit owns is one more page of your own, as before
-$_POST['data'] = json_encode( [ 'webpages' => [
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [
 	[ 'uri' => '/team', 'httpUri' => '/team', 'libraryKey' => 'blank', 'text' => [] ],
 	[ 'uri' => '/startseite', 'httpUri' => '/eigene-startseite', 'libraryKey' => 'blank', 'text' => [] ],
 ] ] );
-$ownNameRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiApply( $appData, $ownNameRequest );
-check( 'a name no library page owns is a page of your own like any other', $ownNameRequest['/nino/http/response']['statusCode'] === 200
+check( 'a name no library page owns is a page of your own like any other', $status === 200
 	&& \Nino\Filesystem::fileExists( $appData, '/templates/page-startseite.tpl' ) === true );
 
 // A template's file name is its category (see \Nino\Modules\Template::category()),
 // and every page of your own is page-<slug>: a slug that is the name of a
 // category elsewhere - /footer, /common - or begins with a digit - /2026-home -
 // is a page like any other, with a category of its own and none to collide with
-$_POST['data'] = json_encode( [ 'webpages' => [
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [
 	[ 'uri' => '/footer', 'httpUri' => '/footer', 'libraryKey' => 'blank', 'text' => [] ],
 	[ 'uri' => '/common', 'httpUri' => '/common', 'libraryKey' => 'blank', 'text' => [] ],
 	[ 'uri' => '/2026-home', 'httpUri' => '/2026-home', 'libraryKey' => 'blank', 'text' => [] ],
 ] ] );
-$categoryNameRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiApply( $appData, $categoryNameRequest );
-check( 'pages named /footer, /common and /2026-home are accepted', $categoryNameRequest['/nino/http/response']['statusCode'] === 200 );
+check( 'pages named /footer, /common and /2026-home are accepted', $status === 200 );
 check( '...and get page-footer.tpl, page-common.tpl and page-2026-home.tpl, each of which has a category', \Nino\Filesystem::fileExists( $appData, '/templates/page-footer.tpl' ) === true
 	&& \Nino\Filesystem::fileExists( $appData, '/templates/page-common.tpl' ) === true && \Nino\Filesystem::fileExists( $appData, '/templates/page-2026-home.tpl' ) === true
 	&& \Nino\Modules\Template::category( 'page-footer.tpl' ) === 'page-footer' && \Nino\Modules\Template::category( 'page-common.tpl' ) === 'page-common'
@@ -1042,17 +943,13 @@ check( '...and get page-footer.tpl, page-common.tpl and page-2026-home.tpl, each
 
 // Navigation: always active now (see ALWAYS_MODULES above). Membership is
 // posted explicitly per entry and stored on its route.
-$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
-$navSetupRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Setup::apiApply( $appData, $navSetupRequest );
+ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
 
-$_POST['data'] = json_encode( [ 'webpages' => [
+ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [
 	[ 'uri' => '/site-home', 'httpUri' => '/', 'libraryKey' => 'home', 'navs' => [ 'main' ], 'text' => [ 'de_DE' => [ 'name' => 'Start' ], 'en_US' => [ 'name' => 'Home' ] ] ],
 	[ 'uri' => '/site-contact', 'httpUri' => '/kontakt', 'libraryKey' => 'contact', 'navs' => [ 'main' ], 'text' => [ 'de_DE' => [ 'name' => 'Kontakt' ], 'en_US' => [ 'name' => 'Contact' ] ] ],
 	[ 'uri' => '/site-rules', 'httpUri' => '/impressum', 'libraryKey' => 'blank', 'navs' => [], 'text' => [ 'de_DE' => [ 'name' => 'Recht' ], 'en_US' => [ 'name' => 'Rules' ] ] ],
 ] ] );
-$navWpApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiApply( $appData, $navWpApplyRequest );
 
 $deAfterNav = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
 $enAfterNav = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
@@ -1082,11 +979,9 @@ $globalAfterNav = \Nino\Filesystem::getFileContent( $appData, '/text/global.php'
 check( 'no /website/legal/* key is written for a page', isset( $globalAfterNav['[[/website/legal/uri]]'] ) === false && isset( $deAfterNav['[[/website/legal/name]]'] ) === false && isset( $enAfterNav['[[/website/legal/name]]'] ) === false );
 
 // Dropping pages narrows the routes (replace semantics)
-$_POST['data'] = json_encode( [ 'webpages' => [
+ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [
 	[ 'uri' => '/site-home', 'httpUri' => '/', 'libraryKey' => 'home', 'navs' => [ 'main' ], 'text' => [ 'de_DE' => [ 'name' => 'Start' ], 'en_US' => [ 'name' => 'Home' ] ] ],
 ] ] );
-$dropWpApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiApply( $appData, $dropWpApplyRequest );
 
 $configAfterDrop = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 check( 'dropping "kontakt"/"impressum" removes their routes (replace, not merge)', isset( $configAfterDrop['/nino/http/routes']['GET://kontakt'] ) === false && isset( $configAfterDrop['/nino/http/routes']['GET://impressum'] ) === false );
@@ -1099,9 +994,8 @@ check( 'the legal menu and its two Element-URIs are not touched by a replace of 
 	project has decided which pages it has, so reopening the step shows that
 	decision rather than putting the four back. Seeded in AppData::DEFAULTS
 	the dropped pages would be merged in again on the very next boot	*/
-$reopenWpRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiList( $appData, $reopenWpRequest );
-$reopened = $reopenWpRequest['/nino/http/response']['body']['webpages'] ?? [];
+[ , $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiList' ] );
+$reopened = $body['webpages'] ?? [];
 
 check( 'reopening the step shows the pages this project kept, not the starter site again',
 	array_column( $reopened, 'httpUri' ) === [ '/' ] );
@@ -1109,13 +1003,10 @@ check( 'reopening the step shows the pages this project kept, not the starter si
 // One step earlier, re-applying with nothing posted still leaves navigation,
 // the locale picker and the contact form active - there is no "opening
 // position" to decline any more, nor a choice that could outlive it
-$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
-$declineRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Setup::apiApply( $appData, $declineRequest );
+ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
 
-$reopenSetupRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Setup::apiLibrary( $appData, $reopenSetupRequest );
-$reopenedModules = $reopenSetupRequest['/nino/http/response']['body']['modules'] ?? [];
+[ , $body ] = ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiLibrary' ] );
+$reopenedModules = $body['modules'] ?? [];
 $configAfterDecline = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
 check( 'reopening the step still offers nothing to choose - nothing else ships in this checkout',
@@ -1139,17 +1030,15 @@ echo "Webpages <-> _admin's Routes module share one source of truth\n";
 // its Element-URI, its body and its status code. Without that, every shipped
 // page is unopenable in /_admin, and saving the 404 page there quietly turns
 // it into a 200.
-$_POST['data'] = json_encode( [ 'webpages' => [
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [
 	[ 'uri' => '/site-home', 'httpUri' => '/', 'libraryKey' => 'home', 'navs' => [ 'main' ], 'text' => [ 'de_DE' => [ 'name' => 'Start' ] ] ],
 	[ 'uri' => '/site-404', 'httpUri' => '/404', 'libraryKey' => '404', 'navs' => [], 'text' => [ 'de_DE' => [ 'name' => 'Weg' ] ] ],
 	[ 'uri' => '/site-legal', 'httpUri' => '/legal', 'libraryKey' => '', 'body' => '[template /templates/page-legal.[[/nino/http/response/locale]]]', 'navs' => [], 'text' => [ 'de_DE' => [ 'name' => 'Recht' ] ] ],
 ] ] );
-$sharedApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiApply( $appData, $sharedApplyRequest );
-check( 'apply succeeds', $sharedApplyRequest['/nino/http/response']['statusCode'] === 200 );
+check( 'apply succeeds', $status === 200 );
 
 $sharedConfig = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-$sharedList 	= $sharedApplyRequest['/nino/http/response']['body']['webpages'];
+$sharedList 	= $body['webpages'];
 
 check( 'reports "template" as the on-disk template file /_admin selects from', array_column( $sharedList, 'template' ) === [ 'page-home', 'page-404', '' ] );
 check( 'resolves each entry back to the library unit it came from, from its route body alone', array_column( $sharedList, 'libraryKey' ) === [ 'home', '404', '' ] );
@@ -1159,28 +1048,23 @@ check( 'a body that resolves one template per locale reports no single template'
 
 // Now the other direction: open one of those entries in /_admin's Routes module
 // and save it back unchanged, exactly as the Routes panel's admin.js posts it
-\Nino\Auth::insertUser( $appData, 'dev@example.com', 'correct horse battery staple', [ '/*' ] );
-\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+ninoUser( $appData, 'dev@example.com' );
 
-$adminListRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data'] 	= json_encode( [] );
-\Nino\Modules\Routes\Admin::apiList( $appData, $adminListRequest );
-$adminPages = $adminListRequest['/nino/http/response']['body']['pages'];
-$adminTemplates = $adminListRequest['/nino/http/response']['body']['templates'];
+[ , $body ] = ninoCall( $appData, [ \Nino\Modules\Routes\Admin::class, 'apiList' ] );
+$adminPages = $body['pages'];
+$adminTemplates = $body['templates'];
 
 check( 'every Webpages-made entry names a template /_admin actually offers', count( array_filter(
 	$adminPages,
 	fn( array $entry ): bool => $entry['template'] !== '' && in_array( $entry['template'], $adminTemplates, true ) === false
 ) ) === 0 );
 
-$_POST['data'] = json_encode( [
+[ $status ] = ninoCall( $appData, [ \Nino\Modules\Routes\Admin::class, 'apiSave' ], [
 	'originalHttpUri' => '/404', 'uri' => '/site-404', 'httpUri' => '/404',
 	'template' => $adminPages[1]['template'], 'navs' => [],
 	'statusCode' => $adminPages[1]['statusCode'], 'text' => $adminPages[1]['text'],
 ] );
-$adminSaveRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Modules\Routes\Admin::apiSave( $appData, $adminSaveRequest );
-check( 'saving a Webpages-made entry from /_admin succeeds', $adminSaveRequest['/nino/http/response']['statusCode'] === 200 );
+check( 'saving a Webpages-made entry from /_admin succeeds', $status === 200 );
 
 $afterDevSave = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 check( 'saving it there does not quietly reset its 404 to a 200', ( $afterDevSave['/nino/http/routes']['GET://404']['statusCode'] ?? 200 ) === 404 );
@@ -1190,13 +1074,11 @@ check( 'the entry still resolves to /_install\'s own "404" unit after a save mad
 // more) the template <select> can't spell: saving that
 // entry from /_admin keeps the body it already has rather than flattening it
 // into whichever option the disabled select happened to preselect
-$_POST['data'] = json_encode( [
+[ $status ] = ninoCall( $appData, [ \Nino\Modules\Routes\Admin::class, 'apiSave' ], [
 	'originalHttpUri' => '/legal', 'uri' => '/site-legal', 'httpUri' => '/legal',
 	'template' => '', 'navs' => [], 'statusCode' => 200, 'text' => $adminPages[2]['text'],
 ] );
-$adminLegalRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Modules\Routes\Admin::apiSave( $appData, $adminLegalRequest );
-check( 'saving the locale-resolving entry from /_admin succeeds', $adminLegalRequest['/nino/http/response']['statusCode'] === 200 );
+check( 'saving the locale-resolving entry from /_admin succeeds', $status === 200 );
 
 $afterLegalSave = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 check( 'its runtime-resolved body is kept, not flattened to one locale\'s file', $afterLegalSave['/nino/http/routes']['GET://legal']['body'] === '[template /templates/page-legal.[[/nino/http/response/locale]]]' );
@@ -1204,34 +1086,28 @@ check( '...and the derived list claims no template for it', ( \Nino\Install\Webp
 
 // An entry /_admin created has no library unit at all - Webpages has to carry
 // it through its own replace rather than reject it as an unknown template
-$_POST['data'] = json_encode( [
+[ $status ] = ninoCall( $appData, [ \Nino\Modules\Routes\Admin::class, 'apiSave' ], [
 	'originalHttpUri' => '', 'uri' => '/dev-made', 'httpUri' => '/dev-made',
 	'template' => 'page-home', 'navs' => [], 'statusCode' => 201,
 	// A name and a title in every active language are required there
 	'text' => array_fill_keys( \Nino\Locales::getAvailableLocales( $appData ), [ 'name' => 'Dev made', 'title' => 'Dev made' ] ),
 ] );
-$adminNewRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Modules\Routes\Admin::apiSave( $appData, $adminNewRequest );
-check( 'creating a page in /_admin succeeds', $adminNewRequest['/nino/http/response']['statusCode'] === 200 );
+check( 'creating a page in /_admin succeeds', $status === 200 );
 
 $beforeReapply = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-$_POST['data'] = json_encode( [ 'webpages' => \Nino\Install\Webpages::pages( $appData, $beforeReapply['/nino/http/routes'], [ 'de_DE' ], [] ) ] );
-$reapplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiApply( $appData, $reapplyRequest );
-check( 'Webpages re-applies a list containing a /_admin-made entry', $reapplyRequest['/nino/http/response']['statusCode'] === 200 );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => \Nino\Install\Webpages::pages( $appData, $beforeReapply['/nino/http/routes'], [ 'de_DE' ], [] ) ] );
+check( 'Webpages re-applies a list containing a /_admin-made entry', $status === 200 );
 
 $afterReapply = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 check( 'the /_admin-made entry keeps its route through that replace', isset( $afterReapply['/nino/http/routes']['GET://dev-made'] ) === true );
 check( '...including its own status code', ( $afterReapply['/nino/http/routes']['GET://dev-made']['statusCode'] ?? 200 ) === 201 );
 check( 'the library-backed entries still resolve their own units too', ( $afterReapply['/nino/http/routes']['GET://404']['statusCode'] ?? 200 ) === 404 );
 
-$_POST['data'] = json_encode( [
+[ $status ] = ninoCall( $appData, [ \Nino\Modules\Routes\Admin::class, 'apiSave' ], [
 	'originalHttpUri' => '/404', 'uri' => '/site-404', 'httpUri' => '/404',
 	'template' => 'page-nope', 'navs' => [], 'statusCode' => 404, 'text' => [],
 ] );
-$adminBadRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Modules\Routes\Admin::apiSave( $appData, $adminBadRequest );
-check( 'a genuinely unknown template is still rejected', $adminBadRequest['/nino/http/response']['statusCode'] === 400 );
+check( 'a genuinely unknown template is still rejected', $status === 400 );
 
 // Saving, deleting and moving a route all read the routes, decide against
 // what they find and write the whole key back - so two editors saving two
@@ -1284,9 +1160,7 @@ $appData['/nino/locales/available'] = [ 'de_DE', 'en_US' ];
 \Nino\Filesystem::putFileContent( $appData, '/text/en_US.php', [ '[[/project/company/contact/country]]' => 'Germany', '[[/project/website/html/lang]]' => 'en', '[[/template/page-home/welcome/headline]]' => 'Welcome', '[[/_nino/webpage/kontakt/name]]' => 'Contact' ] );
 \Nino\Filesystem::putFileContent( $appData, '/text/blacklist.php', [ '/project/website/html/lang' ] );
 
-$personalInfosListRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\PersonalInfos::apiList( $appData, $personalInfosListRequest );
-$personalInfosBody = $personalInfosListRequest['/nino/http/response']['body'];
+[ , $personalInfosBody ] = ninoCall( $appData, [ \Nino\Install\PersonalInfos::class, 'apiList' ] );
 $personalInfosEntries = $personalInfosBody['entries'];
 $personalInfosKeys = array_column( $personalInfosEntries, 'key' );
 
@@ -1314,13 +1188,11 @@ check( 'every label of the step is made of words of the vocabulary', array_filte
 	return count( array_filter( explode( ' › ', $label ), static fn( string $word ): bool => in_array( $word, $english, true ) === false ) ) > 0;
 } ) === [] );
 
-$saveBatchRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['data'] = json_encode( [ 'items' => [
+[ , $body ] = ninoCall( $appData, [ \Nino\Install\PersonalInfos::class, 'apiSaveBatch' ], [ 'items' => [
 	[ 'key' => '/project/company/contact/country', 'locale' => 'de_DE', 'value' => 'Musterland' ],
 	[ 'key' => '/project/company/contact/country', 'locale' => 'en_US', 'value' => 'Sample Country' ],
 ] ] );
-\Nino\Install\PersonalInfos::apiSaveBatch( $appData, $saveBatchRequest );
-$saveResults = $saveBatchRequest['/nino/http/response']['body']['results'];
+$saveResults = $body['results'];
 
 check( 'saves the de_DE value', $saveResults['/project/company/contact/country']['ok'] === true && ( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/project/company/contact/country]]'] ?? null ) === 'Musterland' );
 check( 'saves the en_US value', ( \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] )['[[/project/company/contact/country]]'] ?? null ) === 'Sample Country' );
@@ -1332,52 +1204,40 @@ echo "\n";
 
 echo "Admin::apiList / apiCreate\n";
 
-$adminListRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Accounts::apiList( $appData, $adminListRequest );
-check( 'does not count a disabled account as a usable admin account', $adminListRequest['/nino/http/response']['body']['users'] === [] );
+[ , $body ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiList' ] );
+check( 'does not count a disabled account as a usable admin account', $body['users'] === [] );
 
-$_POST['data'] = json_encode( [ 'password' => 'a-long-enough-admin-password' ] );
-$finishWithoutAdminRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Finish::apiComplete( $appData, $finishWithoutAdminRequest );
-check( 'refuses to lock the installer before an active _editor account exists', $finishWithoutAdminRequest['/nino/http/response']['statusCode'] === 409 );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Finish::class, 'apiComplete' ], [ 'password' => 'a-long-enough-admin-password' ] );
+check( 'refuses to lock the installer before an active _editor account exists', $status === 409 );
 
 /*	The other half of usableUsers()' rule. The account above is disabled;
 	an entry that is enabled but carries no password is an array key rather
 	than an account, and must not satisfy the same "at least one admin"
 	precondition merely because the key exists	*/
 $appData['/nino/auth/user']['no-password@example.com'] = [ 'pw' => '', 'status' => 2, 'sessions' => [], 'perms' => [ '/*' ] ];
-$finishWithoutPasswordRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Finish::apiComplete( $appData, $finishWithoutPasswordRequest );
-check( '...nor an enabled entry that carries no password', \Nino\Install\Accounts::usableUsers( $appData ) === [] && $finishWithoutPasswordRequest['/nino/http/response']['statusCode'] === 409 );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Finish::class, 'apiComplete' ], [ 'password' => 'a-long-enough-admin-password' ] );
+check( '...nor an enabled entry that carries no password', \Nino\Install\Accounts::usableUsers( $appData ) === [] && $status === 409 );
 unset( $appData['/nino/auth/user']['no-password@example.com'] );
 
-$_POST['data'] = json_encode( [ 'mail' => 'not-an-email', 'pw' => 'a-long-enough-password' ] );
-$invalidMailRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Accounts::apiCreate( $appData, $invalidMailRequest );
-check( 'rejects an invalid email with 400', $invalidMailRequest['/nino/http/response']['statusCode'] === 400 );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'not-an-email', 'pw' => 'a-long-enough-password' ] );
+check( 'rejects an invalid email with 400', $status === 400 );
 
-$_POST['data'] = json_encode( [ 'mail' => 'admin@example.com', 'pw' => 'short' ] );
-$shortPwRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Accounts::apiCreate( $appData, $shortPwRequest );
-check( 'rejects a too-short password with 400', $shortPwRequest['/nino/http/response']['statusCode'] === 400 );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'admin@example.com', 'pw' => 'short' ] );
+check( 'rejects a too-short password with 400', $status === 400 );
 
-$_POST['data'] = json_encode( [ 'mail' => 'admin@example.com', 'pw' => 'a-long-enough-password' ] );
-$createRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Accounts::apiCreate( $appData, $createRequest );
+[ , $body ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'admin@example.com', 'pw' => 'a-long-enough-password' ] );
 check( 'creates the account', \Nino\Auth::getUser( $appData, 'admin@example.com' ) !== false );
 check( 'the root account holds the Developer role the Setup step wrote, and full access through it', \Nino\Auth::getUser( $appData, 'admin@example.com' )['role'] === 'developer' && \Nino\Auth::getUser( $appData, 'admin@example.com' )['perms'] === [] && \Nino\Auth::checkPermission( $appData, '/_admin/config/manage', 'admin@example.com' ) === true );
 check( 'creating an account leaves every other account as it was', array_diff_key( $appData['/nino/auth/user'], [ 'admin@example.com' => 1 ] ) === $appData['./nino/auth/baseline'] );
-check( 'returns only the newly usable account to the frontend', $createRequest['/nino/http/response']['body']['users'] === [ 'admin@example.com' ] );
+check( 'returns only the newly usable account to the frontend', $body['users'] === [ 'admin@example.com' ] );
 check( 'and signs it in to this session as it is created', ( \Nino\Auth::getCurrentUser( $appData )['mail'] ?? '' ) === 'admin@example.com' );
-check( '...and hands the page the csrf token the sign-in rotated to', ( $createRequest['/nino/http/response']['body']['csrf'] ?? '' ) === \Nino\Csrf::getToken( $appData ) && strlen( $createRequest['/nino/http/response']['body']['csrf'] ) === 64 );
+check( '...and hands the page the csrf token the sign-in rotated to', ( $body['csrf'] ?? '' ) === \Nino\Csrf::getToken( $appData ) && strlen( $body['csrf'] ) === 64 );
 \Nino\Auth::logoutUser( $appData );
 check( 'the new account can actually authenticate', \Nino\Auth::loginUser( $appData, 'admin@example.com', 'a-long-enough-password' ) !== false );
 \Nino\Auth::logoutUser( $appData );
 
-$_POST['data'] = json_encode( [ 'mail' => 'admin@example.com', 'pw' => 'a-different-password' ] );
-$replaceRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Accounts::apiCreate( $appData, $replaceRequest );
-check( 'creating the same address again replaces it rather than failing', $replaceRequest['/nino/http/response']['statusCode'] === 200 );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'admin@example.com', 'pw' => 'a-different-password' ] );
+check( 'creating the same address again replaces it rather than failing', $status === 200 );
 check( 'the replaced account uses the new password', \Nino\Auth::loginUser( $appData, 'admin@example.com', 'a-different-password' ) !== false );
 \Nino\Auth::logoutUser( $appData );
 
@@ -1417,15 +1277,11 @@ foreach( [
 check( 'one minimum password length, Recovery::MIN_PW_LENGTH, declared once and named by every form, script and label', $minPwDeclared === 1
 	&& array_filter( $minPwShown, static fn( array $numbers ): bool => $numbers !== [ \Nino\Admin\Recovery::MIN_PW_LENGTH ] ) === [] );
 
-$_POST['data'] = json_encode( [ 'mail' => 'boundary@example.com', 'pw' => str_repeat( 'x', max( 0, $minPw - 1 ) ) ] );
-$belowRuleRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Accounts::apiCreate( $appData, $belowRuleRequest );
-check( 'a password one character below the rule the form shows is refused by the server', $belowRuleRequest['/nino/http/response']['statusCode'] === 400 );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'boundary@example.com', 'pw' => str_repeat( 'x', max( 0, $minPw - 1 ) ) ] );
+check( 'a password one character below the rule the form shows is refused by the server', $status === 400 );
 
-$_POST['data'] = json_encode( [ 'mail' => 'boundary@example.com', 'pw' => str_repeat( 'x', $minPw ) ] );
-$atRuleRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Accounts::apiCreate( $appData, $atRuleRequest );
-check( '...and one of exactly that length is accepted', $atRuleRequest['/nino/http/response']['statusCode'] === 200 );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'boundary@example.com', 'pw' => str_repeat( 'x', $minPw ) ] );
+check( '...and one of exactly that length is accepted', $status === 200 );
 
 echo "\n";
 
@@ -1434,15 +1290,11 @@ echo "\n";
 
 echo "Finish::apiComplete / Recovery::set\n";
 
-$_POST['data'] = json_encode( [ 'password' => 'short' ] );
-$shortFinishRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Finish::apiComplete( $appData, $shortFinishRequest );
-check( 'rejects a too-short _admin password with 400', $shortFinishRequest['/nino/http/response']['statusCode'] === 400 );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Finish::class, 'apiComplete' ], [ 'password' => 'short' ] );
+check( 'rejects a too-short _admin password with 400', $status === 400 );
 
-$_POST['data'] = json_encode( [ 'password' => str_repeat( 'x', max( 0, $minPw - 1 ) ) ] );
-$belowFinishRuleRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Finish::apiComplete( $appData, $belowFinishRuleRequest );
-check( '...also one character below the rule the Finish form shows', $belowFinishRuleRequest['/nino/http/response']['statusCode'] === 400 );
+[ $status ] = ninoCall( $appData, [ \Nino\Install\Finish::class, 'apiComplete' ], [ 'password' => str_repeat( 'x', max( 0, $minPw - 1 ) ) ] );
+check( '...also one character below the rule the Finish form shows', $status === 400 );
 
 // The hash is stored under the private directory, outside every tool folder
 // and outside config.php. _admin/Admin.php therefore stays byte-identical,
@@ -1450,33 +1302,29 @@ check( '...also one character below the rule the Finish form shows', $belowFinis
 // docblock)
 $adminBefore = file_get_contents( __DIR__. '/../_admin/Admin.php' );
 
-$_POST['data'] = json_encode( [ 'password' => 'a brand new dev password' ] );
-$finishRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Finish::apiComplete( $appData, $finishRequest );
-check( 'apiComplete succeeds once an editor account exists', $finishRequest['/nino/http/response']['statusCode'] === 200 );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Finish::class, 'apiComplete' ], [ 'password' => 'a brand new dev password' ] );
+check( 'apiComplete succeeds once an editor account exists', $status === 200 );
 
 /*	Two accounts were created above (admin@ and boundary@), and the last
 	apiCreate() left boundary@ signed in. Which of the two stays signed in
 	is the login page's decision, not the wizard's: the session is ended
 	and the wizard is told so	*/
-check( 'with several accounts the wizard answers login: false', $finishRequest['/nino/http/response']['body'] === [ 'login' => false ] );
+check( 'with several accounts the wizard answers login: false', $body === [ 'login' => false ] );
 check( '...and the session the Accounts step opened is ended', \Nino\Auth::getCurrentUser( $appData ) === false );
 
 /*	The one-account case: the person who just typed the only password is
 	the person at the keyboard, so that session walks into the workbench	*/
 \Nino\Auth::deleteUser( $appData, 'boundary@example.com' );
 \Nino\Auth::loginUser( $appData, 'admin@example.com', 'a-different-password' );
-$finishOneAccountRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Finish::apiComplete( $appData, $finishOneAccountRequest );
-check( 'with exactly one account, the one signed in, it answers login: true', $finishOneAccountRequest['/nino/http/response']['statusCode'] === 200 && $finishOneAccountRequest['/nino/http/response']['body'] === [ 'login' => true ] );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Finish::class, 'apiComplete' ], [ 'password' => 'a brand new dev password' ] );
+check( 'with exactly one account, the one signed in, it answers login: true', $status === 200 && $body === [ 'login' => true ] );
 check( '...and leaves that session signed in', ( \Nino\Auth::getCurrentUser( $appData )['mail'] ?? '' ) === 'admin@example.com' );
 
 // One account, but nobody signed in (a cooled-down ip, a session that did
 // not survive): the login page is the way in, as before
 \Nino\Auth::logoutUser( $appData );
-$finishSignedOutRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Finish::apiComplete( $appData, $finishSignedOutRequest );
-check( 'with one account and no session it answers login: false', $finishSignedOutRequest['/nino/http/response']['body'] === [ 'login' => false ] );
+[ , $body ] = ninoCall( $appData, [ \Nino\Install\Finish::class, 'apiComplete' ], [ 'password' => 'a brand new dev password' ] );
+check( 'with one account and no session it answers login: false', $body === [ 'login' => false ] );
 
 check( 'the real _admin/Admin.php was not touched', file_get_contents( __DIR__. '/../_admin/Admin.php' ) === $adminBefore );
 
@@ -1844,16 +1692,12 @@ echo "A starter site leaves no text key missing\n";
 // the three modules the wizard always applies. The Missing text keys tile counts every [[/...]] a
 // template names that no file has - a comment is no exception, and a placeholder in one is a row
 // the Text panel cannot clear: it names a key the system writes, and there is no field for it
-$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
-$starterSetupRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Setup::apiApply( $appData, $starterSetupRequest );
+ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
 $starterEntries = [];
 foreach( [ 'home' => [ '/home', '/' ], 'contact' => [ '/contact', '/contact' ], 'services' => [ '/services', '/services' ], 'about-me' => [ '/about-me', '/about-me' ], '404' => [ '/404', '/404' ] ] as $starterKey => [ $starterUri, $starterHttpUri ] )
 	$starterEntries[] = [ 'uri' => $starterUri, 'httpUri' => $starterHttpUri, 'libraryKey' => (string) $starterKey, 'navs' => [], 'text' => [ 'de_DE' => [ 'name' => 'Seite '. $starterKey ], 'en_US' => [ 'name' => 'Page '. $starterKey ] ] ];
-$_POST['data'] = json_encode( [ 'webpages' => $starterEntries ] );
-$starterRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Webpages::apiApply( $appData, $starterRequest );
-check( 'the whole starter site applies', $starterRequest['/nino/http/response']['statusCode'] === 200 && count( $starterRequest['/nino/http/response']['body']['webpages'] ?? [] ) === 5 );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => $starterEntries ] );
+check( 'the whole starter site applies', $status === 200 && count( $body['webpages'] ?? [] ) === 5 );
 $starterMissing = ( new ReflectionMethod( \Nino\Modules\Text\Keys::class, '_scanMissing' ) )->invokeArgs( null, [ &$appData ] );
 check( 'on a fresh install the Missing text keys tile reads 0 - no template names a key nobody writes'
 	. ( $starterMissing === [] ? '' : ' - '. implode( ', ', array_column( $starterMissing, 'key' ) ) ), \Nino\Modules\Text\Keys::missingCount( $appData ) === 0 );
@@ -1903,17 +1747,13 @@ if( defined( 'NINO_APP_DIR' ) === true ) {
 
 	// The picker offers it like any other unit, and applying it activates
 	// the class and copies the template - with its requirement pulled in
-	$appLibraryRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-	\Nino\Install\Setup::apiLibrary( $appData, $appLibraryRequest );
-	$appLibraryBody = $appLibraryRequest['/nino/http/response']['body'];
+	[ , $appLibraryBody ] = ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiLibrary' ] );
 	check( 'the Setup step offers the project module', ( $appLibraryBody['modules']['widget']['label'] ?? null ) === 'Widget'
 		&& ( $appLibraryBody['modules']['widget']['requiresModules'] ?? null ) === [ 'forms' ] );
 	check( '...and forms/navigation/localepicker/legal stay excluded even once other project modules exist', array_intersect( [ 'forms', 'navigation', 'localepicker', 'legal' ], array_keys( $appLibraryBody['modules'] ) ) === [] );
 
-	$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE' ], 'modules' => [ 'widget' ] ] );
-	$appApplyRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-	\Nino\Install\Setup::apiApply( $appData, $appApplyRequest );
-	$appApplyBody = $appApplyRequest['/nino/http/response']['body'] ?? [];
+	[ , $body ] = ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE' ], 'modules' => [ 'widget' ] ] );
+	$appApplyBody = $body ?? [];
 
 	check( 'applying it activates the class and its requirement, alongside the four always-on units', ( $appApplyBody['modules'] ?? null ) === [ 'forms', 'navigation', 'localepicker', 'legal', 'widget' ]
 		&& in_array( '\\Acme\\Widget', $appData['/nino/modules'], true ) === true
@@ -1922,19 +1762,11 @@ if( defined( 'NINO_APP_DIR' ) === true ) {
 
 	// A requirement nobody answers to is skipped, not applied
 	file_put_contents( $appDir. '/Acme/Widget/install/manifest.php', '<?php return '. var_export( [ 'label' => 'Widget', 'moduleClass' => '\\Acme\\Widget', 'requiresModules' => [ 'nonexistent' ] ], true ). ';' );
-	$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE' ], 'modules' => [ 'widget' ] ] );
-	$unknownRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-	\Nino\Install\Setup::apiApply( $appData, $unknownRequest );
-	check( 'a requirement no unit answers to is left out of the applied set - only the always-on four plus what was actually picked remain', ( $unknownRequest['/nino/http/response']['body']['modules'] ?? null ) === [ 'forms', 'navigation', 'localepicker', 'legal', 'widget' ] );
+	[ , $body ] = ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE' ], 'modules' => [ 'widget' ] ] );
+	check( 'a requirement no unit answers to is left out of the applied set - only the always-on four plus what was actually picked remain', ( $body['modules'] ?? null ) === [ 'forms', 'navigation', 'localepicker', 'legal', 'widget' ] );
 }
-
-echo "\n";
 
 
 // --- Cleanup ---------------------------------------------------------------
 
-\Nino\Filesystem::removeDir( $sandbox );
-
-echo "$checks checks, $failures failed\n";
-
-exit( $failures > 0 ? 1 : 0 );
+ninoDone( $appData );

@@ -17,29 +17,7 @@ declare(strict_types=1);
 // below needs one to resolve. Before the kernel loads, like every constant
 define( 'NINO_FEATURES_DIR', __DIR__. '/fixtures/features' );
 
-require __DIR__. '/../_nino/Nino.php';
-
-$failures = 0;
-$checks		= 0;
-
-/**
- *	Assert a condition and print the result
- *
- *	@param		string		$label				Description of the check
- *	@param		bool			$condition		Result to assert
- *
- *	@return		void
- */
-function check( string $label, bool $condition ): void {
-	global $failures, $checks;
-	$checks++;
-	if( $condition === true ) {
-		echo "  ok  - $label\n";
-		return;
-	}
-	$failures++;
-	echo "FAIL  - $label\n";
-}
+require __DIR__. '/harness.php';
 
 /**
  *	Probe whether a Filesystem::lockFile()'d path's sidecar .lock file is
@@ -66,26 +44,13 @@ function probeLockFree( string $sandbox, string $filename ): bool {
 	return $free;
 }
 
-// Silence trigger_error() output (we're using the plain php handler, no Nino\Runtime error handler
-// is registered here on purpose - keeps expected-failure paths from being noisy)
-set_error_handler( function() { return true; } );
-
 // Build an isolated sandbox appData, bypassing Nino\init()'s session/error-handler bootstrap
-$sandbox = sys_get_temp_dir(). '/nino-kernel-smoke-'. uniqid();
-mkdir( $sandbox, 0777, true );
+$appData = ninoSandbox( 'kernel' );
+$sandbox = ninoSandboxDir( $appData );
 
 $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 
-$appData = [ './nino/uid' => $sandbox ];
-\Nino\AppData::prepare( $appData );
-$appData['./nino/filesystem/path']			= $sandbox;
-// Mirrors \Nino\init()'s fixed private/public split.
-$appData['./nino/filesystem/configpath']	= $sandbox. '/private';
-$appData['./nino/filesystem/contentpath']	= $sandbox. '/private';
-$appData['./nino/filesystem/publicpath'] 	= $sandbox. '/public';
 $appData['/nino/dir']				= '';
-$appData['/nino/locales/native']				= 'de_DE';
-$appData['/nino/locales/available']			= [ 'de_DE', 'en_US' ];
 $appData['/nino/auth/maxtries']					= 3;
 $appData['/nino/auth/cooldown']					= 3600;
 $appData['/nino/auth/user']							= [];
@@ -323,10 +288,9 @@ check( 'a type uri is not an element, however often the type has been read', \Ni
 $writeElement = new ReflectionMethod( '\Nino\Elements', '_writeElementData' );
 $writeElement->setAccessible( true );
 
-$raceWarnings = [];
-set_error_handler( static function( int $no, string $message ) use ( &$raceWarnings ): bool { $raceWarnings[] = $message; return true; } );
+ninoWarnings();
 $secondInsert = $writeElement->invokeArgs( null, [ &$appData, '/racetest/one', [ 'title' => 'Second' ], '*', false ] );
-restore_error_handler();
+$raceWarnings = ninoWarnings();
 check( 'inserting an element that is already there is refused where the write happens, not only before it', $secondInsert === false
 	&& str_contains( implode( ' ', $raceWarnings ), 'already exists' ) === true );
 check( '...and leaves the one that is there as it was', ( \Nino\Elements::getElement( $appData, '/racetest/one', '*' )['title'] ?? null ) === 'First' );
@@ -840,13 +804,8 @@ echo "Images::limits / Images::reject\n";
 	at run time. The smaller of the two is what can arrive, the kernel's own
 	cap is the other bound, and a value php cannot read counts as no limit
 	instead of raising the warning this framework would treat as fatal	*/
-$limitWarnings = [];
-// - a handler is called under @ too, so it asks error_reporting() the way Runtime::handleError() does
-set_error_handler( function( int $no, string $message ) use ( &$limitWarnings ) {
-	if( ( error_reporting() & $no ) !== 0 )
-		$limitWarnings[] = $message;
-	return true;
-} );
+// - a handler is called under @ too, so the harness's handler asks error_reporting() the way Runtime::handleError() does
+ninoWarnings();
 
 $limits = \Nino\Images::_limits( '2M', '8M' );
 check( 'limits() takes the smaller of php\'s two limits for what can arrive', $limits['php'] === 2 * 1024 * 1024 && $limits['post'] === 8 * 1024 * 1024 && $limits['bytes'] === 2 * 1024 * 1024 );
@@ -862,8 +821,8 @@ $limits = \Nino\Images::_limits( '1G', '2G' );
 check( 'the pixel cap is the kernel\'s whatever php says', $limits['pixels'] === \Nino\Images::MAX_SOURCE_PIXELS && $limits['bytes'] === \Nino\Images::MAX_UPLOAD_BYTES );
 $limits = \Nino\Images::limits();
 check( 'limits() reads the running php\'s own', $limits['kernel'] === 8 * 1024 * 1024 && $limits['bytes'] > 0 && $limits['bytes'] <= $limits['kernel'] );
+$limitWarnings = ninoWarnings();
 check( '...and none of it raised a warning, malformed values included', $limitWarnings === [] );
-restore_error_handler();
 
 check( 'reject() lets an image the kernel takes through', \Nino\Images::reject( makeTestImage( 40, 30 ) ) === null );
 check( 'reject() names bytes above the cap, with the limit in MB', \Nino\Images::reject( str_repeat( 'a', \Nino\Images::MAX_UPLOAD_BYTES + 1 ) ) === [ 'code' => 'image_too_large', 'params' => [ 8 ] ] );
@@ -1126,8 +1085,7 @@ check( '...while the same stored pixels without an Exif block are not turned - i
 
 // What a header reader may and may not believe - and that it never raises
 // a warning on the way, which the framework's error handler would make a 500
-$exifWarnings = [];
-set_error_handler( static function( int $no, string $message ) use ( &$exifWarnings ): bool { if( ( error_reporting() & $no ) !== 0 ) $exifWarnings[] = $message; return true; } );
+ninoWarnings();
 
 $upright		= makeQuadrantJpeg( 1 );
 $plainPng		= makeTestImage( 40, 30, true );
@@ -1162,9 +1120,8 @@ check( 'fill bytes in front of the Exif marker are skipped, and a header with 70
 	$shortOf( $behind( "\xFF\xFF\xFF". $app1 ) ) === 6
 	&& $shortOf( $behind( str_repeat( "\xFF\xE2\x00\x02", 70 ). $app1 ) ) === 1
 	&& $shortOf( $behind( str_repeat( "\xFF\xE2\x00\x02", 10 ). $app1 ) ) === 6 );
+$exifWarnings = ninoWarnings();
 check( 'nothing above raised a php warning'. ( $exifWarnings === [] ? '' : ' - '. $exifWarnings[0] ), $exifWarnings === [] );
-
-restore_error_handler();
 
 // A handler that renders the picture itself is told what the pixels need
 $seenSource = null;
@@ -1609,14 +1566,13 @@ check( '...which names it under its type', \Nino\Elements::seed( $appData, '/see
 unset( $appData[ \Nino\Elements::REMOVED ] );
 
 // Fields the project's model does not know, and values it refuses
-$seedWarnings = [];
-set_error_handler( function( int $level, string $message ) use ( &$seedWarnings ) { $seedWarnings[] = $message; return true; } );
+ninoWarnings();
 $seedOdd = $seedUnit;
 $seedOdd['*']['three'] = [ 'order' => 'first', 'nofield' => 'x' ];
 $seedOdd['de_DE']['three'] = [ 'title' => 'Drei', 'nofield' => 'y' ];
 $seedOdd['*']['../four'] = [ 'order' => 4 ];
 $seededOdd = \Nino\Elements::seed( $appData, '/seedtest', $seedOdd, [ 'de_DE' ] );
-set_error_handler( function() { return true; } );
+$seedWarnings = ninoWarnings();
 $three = \Nino\Filesystem::getFileContent( $appData, '/elements/seedtest.php', [] );
 check( 'a value the model refuses is left out with a warning, a field it does not have without one, an id that is no slug is skipped', $seededOdd === true
 	&& isset( $three['*']['three']['order'] ) === false && isset( $three['*']['three']['nofield'] ) === false && isset( $three['de_DE']['three']['nofield'] ) === false && $three['de_DE']['three']['title'] === 'Drei'
@@ -2112,17 +2068,15 @@ $seedTries( [ 'locked@example.com' => null ] );
 // reading a key that is not there is a warning this framework treats as
 // fatal: a 500 on the login form rather than a refusal
 $appData['/nino/auth/user']['handwritten@example.com'] = [ 'pw' => password_hash( 'correct horse battery staple', PASSWORD_DEFAULT ), 'perms' => [ '/*' ] ];
-$handWarnings = [];
-set_error_handler( static function( int $no, string $message ) use ( &$handWarnings ): bool { $handWarnings[] = $message; return true; } );
+ninoWarnings();
 $handLogin = \Nino\Auth::loginUser( $appData, 'handwritten@example.com', 'correct horse battery staple' );
-restore_error_handler();
+$handWarnings = ninoWarnings();
 check( 'a hand-written account without a status is refused, not raised at', $handLogin === false && $handWarnings === [] );
 
 $appData['/nino/auth/user']['handwritten@example.com']['status'] = 2;
-$handWarnings = [];
-set_error_handler( static function( int $no, string $message ) use ( &$handWarnings ): bool { $handWarnings[] = $message; return true; } );
+ninoWarnings();
 $handEnabled = \Nino\Auth::loginUser( $appData, 'handwritten@example.com', 'correct horse battery staple' );
-restore_error_handler();
+$handWarnings = ninoWarnings();
 check( '...and one with a status but no sessions list logs in', is_array( $handEnabled ) === true && $handWarnings === [] );
 check( '...with the session it just opened', count( \Nino\Auth::getUser( $appData, 'handwritten@example.com' )['sessions'] ) === 1 );
 \Nino\Auth::deleteUser( $appData, 'handwritten@example.com' );
@@ -2130,8 +2084,7 @@ check( '...with the session it just opened', count( \Nino\Auth::getUser( $appDat
 // Disabling an account must end the sessions it already holds. _resumeSession()
 // checked only that the token was listed and unexpired, so a disabled account
 // stayed fully authorised in every browser holding one - for up to SESSION_TTL
-\Nino\Auth::insertUser( $appData, 'disabled@example.com', 'correct horse battery staple' );
-\Nino\Auth::loginUser( $appData, 'disabled@example.com', 'correct horse battery staple' );
+ninoUser( $appData, 'disabled@example.com', [] );
 
 unset( $appData['./nino/auth/current'] );
 \Nino\Auth::init( $appData );
@@ -2388,10 +2341,9 @@ check( 'a closure callback ran', ( $callbackResult['closure'] ?? false ) === tru
 	registration left behind, a typo in 'callbackRespones'. The registration
 	returned in silence, the hook never fired, and nothing anywhere said why:
 	the symptom is a feature that quietly does not work	*/
-$badCallbackWarnings = [];
-set_error_handler( static function( int $no, string $message ) use ( &$badCallbackWarnings ): bool { $badCallbackWarnings[] = $message; return true; } );
+ninoWarnings();
 \Nino\Callbacks::registerCallback( $appData, 'test/callbackshapes', [ KernelSmokeCallbackTarget::class, 'methodThatIsNotThere' ] );
-restore_error_handler();
+$badCallbackWarnings = ninoWarnings();
 
 check( 'a callback that is not callable is refused with a warning naming the hook', count( $badCallbackWarnings ) === 1
 	&& str_contains( $badCallbackWarnings[0], "test/callbackshapes" ) === true
@@ -2622,17 +2574,11 @@ $writeFailAppData['./nino/filesystem/path']				= $writeFailDir;
 $writeFailAppData['./nino/filesystem/configpath']	= $brokenConfigBase;
 $writeFailAppData['/nino/auth/user'] = [ 'someone@example.com' => [] ];
 
-$capturedErrors = [];
-set_error_handler( function( int $errno, string $errstr ) use ( &$capturedErrors ): bool {
-	$capturedErrors[] = [ 'errno' => $errno, 'errstr' => $errstr ];
-	return true;
+$capturedErrors = ninoErrors( function() use ( &$writeFailAppData ) {
+	\Nino\AppData::writeContentData( $writeFailAppData, [ '/nino/auth/user' ] );
 } );
 
-\Nino\AppData::writeContentData( $writeFailAppData, [ '/nino/auth/user' ] );
-
-restore_error_handler();
-
-$sawWriteFailure = count( array_filter( $capturedErrors, fn( $e ) => $e['errno'] === E_USER_ERROR && str_contains( $e['errstr'], 'failed to write config.php' ) ) ) === 1;
+$sawWriteFailure = count( array_filter( $capturedErrors, fn( $e ) => $e[0] === E_USER_ERROR && str_contains( $e[1], 'failed to write config.php' ) ) ) === 1;
 check( 'writeContentData() surfaces a failed config.php write via trigger_error(E_USER_ERROR)', $sawWriteFailure );
 
 \Nino\Filesystem::removeDir( $writeFailDir );
@@ -2880,12 +2826,6 @@ else
 $csrfUser = 'csrfpipeline@example.com';
 \Nino\Auth::insertUser( $appData, $csrfUser, 'correct horse battery staple' );
 
-$capturedErrors = [];
-set_error_handler( function( int $errno, string $errstr ) use ( &$capturedErrors ): bool {
-	$capturedErrors[] = [ 'errno' => $errno, 'errstr' => $errstr ];
-	return true;
-} );
-
 // Wrong token - same order the real pipeline runs in: Csrf at priority 1
 // sets the blocked flag before Auth's own route callback ever sees it
 $_POST['_csrf'] = 'not-the-real-token';
@@ -2893,10 +2833,10 @@ $badLoginRequest = [
 	'/nino/http/request' 	=> [ 'method' => 'POST', 'user' => $csrfUser, 'pw' => 'correct horse battery staple' ],
 	'/nino/http/response'	=> [ 'statusCode' => 200 ],
 ];
-\Nino\Csrf::callbackResponse( $appData, $badLoginRequest );
-\Nino\Auth::callbackLoginResponse( $appData, $badLoginRequest );
-
-restore_error_handler();
+$capturedErrors = ninoErrors( function() use ( &$appData, &$badLoginRequest ) {
+	\Nino\Csrf::callbackResponse( $appData, $badLoginRequest );
+	\Nino\Auth::callbackLoginResponse( $appData, $badLoginRequest );
+} );
 
 check( 'callbackLoginResponse no longer hard-refuses regardless of /nino/modules', count( $capturedErrors ) === 0 );
 check( 'callbackLoginResponse still respects a Csrf rejection (403, not the 401/200 it sets itself)', $badLoginRequest['/nino/http/response']['statusCode'] === 403 );
@@ -3020,10 +2960,9 @@ unset( $_POST['_csrf'] );
 $arrayRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 $_POST = [ 'name' => [ 'x' ], 'email' => 'jo@example.com', 'message' => 'Hi', 'location' => '' ];
 
-$raised = [];
-set_error_handler( static function( int $no, string $message ) use ( &$raised ): bool { $raised[] = $message; return true; } );
+ninoWarnings();
 \Nino\Modules\Form::callbackResponse( $appData, $arrayRequest );
-restore_error_handler();
+$raised = ninoWarnings();
 
 check( 'a field posted as an array is a 400, and raises nothing the error handler would turn fatal', $arrayRequest['/nino/http/response']['statusCode'] === 400 && $raised === [] );
 
@@ -3570,9 +3509,9 @@ check( 'a nul byte is dropped from the body and every header value, never thrown
 	the contact form sent every confirmation mail with a header naming a fill.
 
 	It is dropped, not refused: the recipient and the body are fine, and a
-	confirmation nobody receives is worse than one nobody can reply to. This
-	suite silences trigger_error() wholesale, so the line it records is
-	captured around the calls	*/
+	confirmation nobody receives is worse than one nobody can reply to. The
+	harness silences the warnings trigger_error() raises, so the line it
+	records is read back after the calls	*/
 // Six more mails than this block budgeted for - a fresh window, the same way
 // the block above opened one
 $rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
@@ -3580,8 +3519,7 @@ unset( $rateState['127.0.0.1'] );
 \Nino\Filesystem::putFileContent( $appData, $ratelimitPath, $rateState );
 unset( $appData['./nino/mail/ratelimited'] );
 
-$replyWarnings = [];
-set_error_handler( static function( int $level, string $message ) use ( &$replyWarnings ): bool { $replyWarnings[] = $message; return true; } );
+ninoWarnings();
 
 $replySent = [];
 foreach( [ '[[/project/mail/address/owner]]', 'ask us anything', 'a@example.org, b@example.org', '<script>alert(1)</script>' ] as $notAnAddress )
@@ -3598,7 +3536,7 @@ $replyKept = [];
 foreach( [ 'reply@example.org', 'Max Mustermann <max@example.org>' ] as $isAnAddress )
 	$replyKept[$isAnAddress] = \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', $isAnAddress );
 
-restore_error_handler();
+$replyWarnings = ninoWarnings();
 
 $replyHeaders = array_map( static fn( array $mail ): string => (string) $mail['replyTo'], array_slice( $taken, 3 ) );
 
@@ -3657,10 +3595,10 @@ check( 'the sender fill wins over the owner fill', ( $chained[0]['sender'] ?? nu
 // ...and one that is not an address falls back to the owner rather than
 // costing every mail its From - a typo in the Text panel is one log line
 \Nino\Html::addFills( $appData, [ '[[/project/mail/address/envelope]]' => 'not an address' ], '*' );
-$chained = []; $senderWarnings = [];
-set_error_handler( static function( int $no, string $message ) use ( &$senderWarnings ): bool { if( ( error_reporting() & $no ) !== 0 ) $senderWarnings[] = $message; return true; } );
+$chained = [];
+ninoWarnings();
 \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' );
-restore_error_handler();
+$senderWarnings = ninoWarnings();
 check( 'a sender fill that is no address falls back to the owner, and says so', ( $chained[0]['sender'] ?? null ) === 'kontakt@example.org'
 	&& count( array_filter( $senderWarnings, static fn( string $w ): bool => str_contains( $w, 'no sender address' ) ) ) === 1 );
 
@@ -4060,12 +3998,6 @@ check( '...and unset again', \Nino\Runtime::getSessionValue( $appData, './nino/t
 check( 'reading an unwritten key answers the default', \Nino\Runtime::getSessionValue( $appData, './nino/test/never-written', 'default' ) === 'default'
 	&& session_status() !== PHP_SESSION_ACTIVE );
 
-function fakeRequest( array &$appData, string $uri, string $method = 'GET', array $server = [] ): array {
-	$request = array_merge( [ 'REQUEST_METHOD' => $method, 'REQUEST_URI' => $uri, 'REMOTE_ADDR' => '127.0.0.1' ], $server );
-	\Nino\Http::request( $appData, $request );
-	return $request;
-}
-
 /**
  *	The uri request() resolves for one server array, or the class name of
  *	whatever it threw instead. Every case below used to throw, and a suite
@@ -4082,7 +4014,7 @@ function resolvedUri( array &$appData, array $server ): string {
 	}
 }
 
-$homeRequest = fakeRequest( $appData, '/' );
+$homeRequest = ninoVisit( $appData, '/' );
 $seededCsp = $homeRequest['/nino/http/response']['header']['Content-Security-Policy'] ?? '';
 check( 'the response header is seeded with the default csp', str_contains( $seededCsp, "default-src 'self'" ) === true );
 
@@ -4157,10 +4089,10 @@ check( 'a uri starting with a fragment marker does not route to the fragment', r
 check( '...nor one starting with a query marker to the query', resolvedUri( $appData, [ 'REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '?a=b' ] ) === '/' );
 
 // The cut itself is unchanged: the path is what precedes the first '?' or '#'
-check( 'the path is still everything before the query and the fragment', fakeRequest( $appData, '/a/b?x=1#f' )['/nino/http/request']['uri'] === '/a/b' );
-check( '...whichever of the two comes first', fakeRequest( $appData, '/a/b#f?x=1' )['/nino/http/request']['uri'] === '/a/b' );
-check( '...and the query is still read off the raw uri', ( fakeRequest( $appData, '/a/b?x=1' )['/nino/http/request']['query']['x'] ?? '' ) === '1' );
-check( '...and a trailing slash is still dropped', fakeRequest( $appData, '/a/b/' )['/nino/http/request']['uri'] === '/a/b' );
+check( 'the path is still everything before the query and the fragment', ninoVisit( $appData, '/a/b?x=1#f' )['/nino/http/request']['uri'] === '/a/b' );
+check( '...whichever of the two comes first', ninoVisit( $appData, '/a/b#f?x=1' )['/nino/http/request']['uri'] === '/a/b' );
+check( '...and the query is still read off the raw uri', ( ninoVisit( $appData, '/a/b?x=1' )['/nino/http/request']['query']['x'] ?? '' ) === '1' );
+check( '...and a trailing slash is still dropped', ninoVisit( $appData, '/a/b/' )['/nino/http/request']['uri'] === '/a/b' );
 
 /*	Http::getClientIp() - who the visitor is behind a reverse proxy.
 
@@ -4185,7 +4117,7 @@ check( 'a forwarded address is read where the peer is a configured proxy', \Nino
 
 // What the rest of the request sees - the ip field is where every consumer
 // reads it from
-$proxiedRequest = fakeRequest( $proxyAppData, '/' );
+$proxiedRequest = ninoVisit( $proxyAppData, '/' );
 check( 'the resolved address is what the request carries', ( $proxiedRequest['/nino/http/request']['ip'] ?? '' ) === '198.51.100.7' );
 
 // Only the rightmost hop was written by our own proxy. Everything left of it
@@ -4260,13 +4192,13 @@ else
 	$_SERVER['HTTP_X_FORWARDED_FOR'] = $forwardedBefore;
 
 $basicHeader = 'Basic '. base64_encode( 'editor@example.com:secret:with-colons' );
-$basicRequest = fakeRequest( $appData, '/.nino/auth/login', 'POST', [ 'HTTP_AUTHORIZATION' => $basicHeader ] );
+$basicRequest = ninoVisit( $appData, '/.nino/auth/login', 'POST', [ 'HTTP_AUTHORIZATION' => $basicHeader ] );
 check( 'Http::request keeps a CGI/FastCGI Authorization header', ( $basicRequest['/nino/http/request']['header']['Authorization'] ?? '' ) === $basicHeader );
 check( 'Http::request decodes Basic credentials when PHP_AUTH_* is absent',
 	( $basicRequest['/nino/http/request']['user'] ?? '' ) === 'editor@example.com'
 	&& ( $basicRequest['/nino/http/request']['pw'] ?? '' ) === 'secret:with-colons' );
 
-$nativeBasicRequest = fakeRequest( $appData, '/.nino/auth/login', 'POST', [
+$nativeBasicRequest = ninoVisit( $appData, '/.nino/auth/login', 'POST', [
 	'PHP_AUTH_USER' 			=> 'native@example.com',
 	'PHP_AUTH_PW' 				=> 'native-secret',
 	'HTTP_AUTHORIZATION'	=> $basicHeader,
@@ -4275,7 +4207,7 @@ check( 'PHP_AUTH_* stays authoritative when the SAPI already parsed Basic auth',
 	( $nativeBasicRequest['/nino/http/request']['user'] ?? '' ) === 'native@example.com'
 	&& ( $nativeBasicRequest['/nino/http/request']['pw'] ?? '' ) === 'native-secret' );
 
-$malformedBasicRequest = fakeRequest( $appData, '/.nino/auth/login', 'POST', [ 'HTTP_AUTHORIZATION' => 'Basic not!base64' ] );
+$malformedBasicRequest = ninoVisit( $appData, '/.nino/auth/login', 'POST', [ 'HTTP_AUTHORIZATION' => 'Basic not!base64' ] );
 check( 'a malformed Basic header produces no partial credentials',
 	( $malformedBasicRequest['/nino/http/request']['user'] ?? '' ) === ''
 	&& ( $malformedBasicRequest['/nino/http/request']['pw'] ?? '' ) === '' );
@@ -4286,23 +4218,23 @@ check( 'a malformed Basic header produces no partial credentials',
 	variable instead, and Apache prefixes a variable set during an internal
 	redirect with REDIRECT_, once per redirect. The login used to see nothing
 	on exactly the hosts the documented fallback was written for */
-$redirectedBasicRequest = fakeRequest( $appData, '/.nino/auth/login', 'POST', [ 'REDIRECT_HTTP_AUTHORIZATION' => $basicHeader ] );
+$redirectedBasicRequest = ninoVisit( $appData, '/.nino/auth/login', 'POST', [ 'REDIRECT_HTTP_AUTHORIZATION' => $basicHeader ] );
 check( 'Basic credentials survive the REDIRECT_ prefix Apache\'s rewrite fallback produces',
 	( $redirectedBasicRequest['/nino/http/request']['user'] ?? '' ) === 'editor@example.com'
 	&& ( $redirectedBasicRequest['/nino/http/request']['pw'] ?? '' ) === 'secret:with-colons' );
 
-$nestedBasicRequest = fakeRequest( $appData, '/.nino/auth/login', 'POST', [ 'REDIRECT_REDIRECT_HTTP_AUTHORIZATION' => $basicHeader ] );
+$nestedBasicRequest = ninoVisit( $appData, '/.nino/auth/login', 'POST', [ 'REDIRECT_REDIRECT_HTTP_AUTHORIZATION' => $basicHeader ] );
 check( '...and the second prefix a nested redirect adds',
 	( $nestedBasicRequest['/nino/http/request']['user'] ?? '' ) === 'editor@example.com' );
 
 // A request header lands in $_SERVER as HTTP_<NAME>, so the one name a client
 // could try reads as HTTP_REDIRECT_HTTP_AUTHORIZATION and matches nothing
-$forgedBasicRequest = fakeRequest( $appData, '/.nino/auth/login', 'POST', [ 'HTTP_REDIRECT_HTTP_AUTHORIZATION' => $basicHeader ] );
+$forgedBasicRequest = ninoVisit( $appData, '/.nino/auth/login', 'POST', [ 'HTTP_REDIRECT_HTTP_AUTHORIZATION' => $basicHeader ] );
 check( 'a client cannot reach that path with a header of its own',
 	( $forgedBasicRequest['/nino/http/request']['user'] ?? '' ) === ''
 	&& ( $forgedBasicRequest['/nino/http/request']['pw'] ?? '' ) === '' );
 
-$emptyRedirectRequest = fakeRequest( $appData, '/.nino/auth/login', 'POST', [ 'REDIRECT_HTTP_AUTHORIZATION' => '' ] );
+$emptyRedirectRequest = ninoVisit( $appData, '/.nino/auth/login', 'POST', [ 'REDIRECT_HTTP_AUTHORIZATION' => '' ] );
 check( 'an empty variant is skipped rather than read as a credential',
 	( $emptyRedirectRequest['/nino/http/request']['user'] ?? '' ) === '' );
 
@@ -4516,7 +4448,7 @@ unset( $appData['./nino/jstext/keys'] );
 // fill on that page resolved against a webpage that does not exist
 $noFallbackAppData = $appData;
 unset( $noFallbackAppData['/nino/http/routes']['GET://404'] );
-$unmatchedRequest = fakeRequest( $noFallbackAppData, '/no-such-page-xyz' );
+$unmatchedRequest = ninoVisit( $noFallbackAppData, '/no-such-page-xyz' );
 \Nino\Http::response( $noFallbackAppData, $unmatchedRequest );
 check( 'a project without a /404 route still answers 404', $unmatchedRequest['/nino/http/response']['statusCode'] === 404 );
 check( '...and points the response uri at /404 rather than the unmatched path', ( $unmatchedRequest['/nino/http/response']['uri'] ?? '' ) === '/404' );
@@ -4534,42 +4466,38 @@ check( '...leaving no stray \'.uri\' key behind', isset( $unmatchedRequest['/nin
 $uriLessAppData = $appData;
 $uriLessAppData['/nino/http/routes'] = [ 'GET://broken-entry' => [ 'body' => 'no uri key here' ] ] + $appData['/nino/http/routes'];
 
-$routeWarnings = [];
-set_error_handler( function( int $level, string $message ) use ( &$routeWarnings ): bool {
-	$routeWarnings[] = $message;
-	return true;
-} );
+ninoWarnings();
 $foundGerman  = \Nino\Http::findRouteUri( $uriLessAppData, '/legal', 'de_DE' );
 $foundNothing = \Nino\Http::findRouteUri( $uriLessAppData, '/nowhere', 'de_DE' );
-restore_error_handler();
+$routeWarnings = ninoWarnings();
 
 check( 'findRouteUri() raises nothing on a route entry without a uri', $routeWarnings === [] );
 check( '...walks past it to the route that does match', $foundGerman === 'GET://rechtliches' );
 check( '...and still returns null for a response uri no route renders', $foundNothing === null );
 
-$robotsRequest = fakeRequest( $appData, '/robots.txt' );
+$robotsRequest = ninoVisit( $appData, '/robots.txt' );
 \Nino\Http::response( $appData, $robotsRequest );
 check( 'a route-level header extends the response header', ( $robotsRequest['/nino/http/response']['header']['Content-Type'] ?? '' ) === 'text/plain; charset=utf-8' );
 check( 'a route-level header does not wipe the seeded security headers', isset( $robotsRequest['/nino/http/response']['header']['X-Content-Type-Options'] ) === true );
 
-$localesRedirect = fakeRequest( $appData, '/legal?/_nino/locales/current=de_DE' );
+$localesRedirect = ninoVisit( $appData, '/legal?/_nino/locales/current=de_DE' );
 \Nino\Http::response( $appData, $localesRedirect );
 check( 'a locale switch redirects with a 302 status code even on a route with its own statusCode', $localesRedirect['/nino/http/response']['statusCode'] === 302 );
 check( 'the Location points at the locale variant of the page, without the route-key method prefix', ( $localesRedirect['/nino/http/response']['header']['Location'] ?? '' ) === '/rechtliches' );
 
 \Nino\Locales::setCurrentLocale( $appData, 'en_US' );
-$pickerRedirect = fakeRequest( $appData, '/legal?/_nino/localepicker/current=de_DE' );
+$pickerRedirect = ninoVisit( $appData, '/legal?/_nino/localepicker/current=de_DE' );
 \Nino\Http::response( $appData, $pickerRedirect );
 \Nino\Modules\Localepicker::callbackResponse( $appData, $pickerRedirect );
 check( 'the localepicker redirects with a 302 status code too', $pickerRedirect['/nino/http/response']['statusCode'] === 302 );
 check( 'and its Location points at the locale variant of the page', ( $pickerRedirect['/nino/http/response']['header']['Location'] ?? '' ) === '/rechtliches' );
 
 \Nino\Locales::setCurrentLocale( $appData, 'en_US' );
-$arrayLocaleRequest = fakeRequest( $appData, '/legal?/_nino/locales/current[]=de_DE' );
+$arrayLocaleRequest = ninoVisit( $appData, '/legal?/_nino/locales/current[]=de_DE' );
 \Nino\Http::response( $appData, $arrayLocaleRequest );
 check( 'an array-shaped locale query is ignored instead of causing a TypeError', \Nino\Locales::getCurrentLocale( $appData ) === 'en_US' && $arrayLocaleRequest['/nino/http/response']['statusCode'] === 201 );
 
-$arrayPickerRequest = fakeRequest( $appData, '/legal?/_nino/localepicker/current[]=de_DE' );
+$arrayPickerRequest = ninoVisit( $appData, '/legal?/_nino/localepicker/current[]=de_DE' );
 \Nino\Http::response( $appData, $arrayPickerRequest );
 \Nino\Modules\Localepicker::callbackResponse( $appData, $arrayPickerRequest );
 check( 'the localepicker also ignores an array-shaped locale query', \Nino\Locales::getCurrentLocale( $appData ) === 'en_US' && $arrayPickerRequest['/nino/http/response']['statusCode'] === 201 );
@@ -4587,7 +4515,7 @@ check( 'the localepicker names each language from /_nino/locale/<code>/name', st
 	comment, differing in the query key alone - which is two places to fix
 	whenever one of them turns out to be wrong	*/
 \Nino\Locales::setCurrentLocale( $appData, 'en_US' );
-$ownKeyRequest = fakeRequest( $appData, '/legal?/_project/language=de_DE' );
+$ownKeyRequest = ninoVisit( $appData, '/legal?/_project/language=de_DE' );
 \Nino\Http::response( $appData, $ownKeyRequest );
 \Nino\Locales::switchFromQuery( $appData, $ownKeyRequest, '/_project/language' );
 check( 'the locale switch is one method taking the query key, so a project can answer under its own', $ownKeyRequest['/nino/http/response']['statusCode'] === 302
@@ -4609,8 +4537,7 @@ check( 'requestRoute rejects a relative URI without entering its parent walk', \
 $hostileMail = '"<script>alert(1)</script>[x]"@example.com';
 check( 'php calls an address carrying a script element and a bracket valid, so the FILTER_VALIDATE_EMAIL every account panel runs stores one', filter_var( $hostileMail, FILTER_VALIDATE_EMAIL ) !== false );
 
-\Nino\Auth::insertUser( $appData, $hostileMail, 'correct horse battery staple' );
-\Nino\Auth::loginUser( $appData, $hostileMail, 'correct horse battery staple' );
+ninoUser( $appData, $hostileMail, [] );
 \Nino\request( $appData, [ 'REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '/', 'REMOTE_ADDR' => '127.0.0.1' ] );
 
 // The fills a request registers are the ones the kernel names as its runtime
@@ -4844,11 +4771,10 @@ check( 'a malformed utf-8 byte no longer costs the whole response', is_array( $b
 check( '...the byte is substituted and the rest of the value arrives', ( $badUtf8Body['files'][0] ?? '' ) === "Gru\u{FFFD}e.jpg" );
 check( '...and the status stays the one the handler set', $badUtf8Request['/nino/http/response']['statusCode'] === 200 );
 
-// What cannot be substituted - Inf/NaN, a resource, a recursion. This suite
-// silences trigger_error() wholesale (see the handler at the top), so the one
-// warning worth reading is captured around the call
-$recordedWarnings = [];
-set_error_handler( static function( int $level, string $message ) use ( &$recordedWarnings ): bool { $recordedWarnings[] = $message; return true; } );
+// What cannot be substituted - Inf/NaN, a resource, a recursion. The harness
+// silences the warnings trigger_error() raises, so the one worth reading is
+// read back after the calls
+ninoWarnings();
 
 $unencodableRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'header' => [], 'body' => [ 'n' => INF ] ] ];
 $finalizeResponse->invokeArgs( null, [ &$unencodableRequest ] );
@@ -4858,7 +4784,7 @@ $finalizeResponse->invokeArgs( null, [ &$unencodableRequest ] );
 $failedBodyRequest = [ '/nino/http/response' => [ 'statusCode' => 403, 'header' => [], 'body' => [ 'n' => NAN ] ] ];
 $finalizeResponse->invokeArgs( null, [ &$failedBodyRequest ] );
 
-restore_error_handler();
+$recordedWarnings = ninoWarnings();
 
 $unencodableBody = json_decode( (string) $unencodableRequest['/nino/http/response']['body'], true );
 check( 'a body that cannot be encoded at all is not answered as a 200', $unencodableRequest['/nino/http/response']['statusCode'] === 500 );
@@ -5694,8 +5620,7 @@ check( 'a path under a private directory follows it', \Nino\Filesystem::path( $p
 	that builds a url - resolved a traversal and handed it on. Every call site
 	is still expected to validate its own input; this is what catches the one
 	that forgot	*/
-$traversalWarnings = [];
-set_error_handler( static function( int $no, string $message ) use ( &$traversalWarnings ): bool { $traversalWarnings[] = $message; return true; } );
+ninoWarnings();
 
 $refused = [
 	'path'				=> \Nino\Filesystem::path( $pathAppData, '/text/../../etc/passwd' ),
@@ -5708,7 +5633,7 @@ $refused = [
 ];
 
 \Nino\Filesystem::forceDir( $appData, '/data/../../escape-dir' );
-restore_error_handler();
+$traversalWarnings = ninoWarnings();
 
 /*	A nul byte is the same rule with a sharper edge. Every i/o call in the
 	class carries an @ so a failure comes back as false - but @ does not
@@ -5716,8 +5641,7 @@ restore_error_handler();
 	ValueError for a path containing one. So where a '..' answered false, a
 	nul was an uncaught 500, for any caller whose own allowlist let one
 	through	*/
-$nulWarnings = [];
-set_error_handler( static function( int $no, string $message ) use ( &$nulWarnings ): bool { $nulWarnings[] = $message; return true; } );
+ninoWarnings();
 
 $nulRefused = [
 	'path'				=> \Nino\Filesystem::path( $pathAppData, "/text/de_DE\0.php" ),
@@ -5730,7 +5654,7 @@ $nulRefused = [
 ];
 
 \Nino\Filesystem::forceDir( $appData, "/data/nul\0dir" );
-restore_error_handler();
+$nulWarnings = ninoWarnings();
 
 check( 'a nul byte is refused at every door too, rather than thrown out of', $nulRefused === [
 	'path' => '', 'url' => '', 'fileExists' => false, 'lockFile' => false, 'read' => 'the default', 'write' => false, 'mutate' => false,
@@ -5825,18 +5749,18 @@ $subAppData['/nino/http/routes'] = [
 ];
 $subAppData['./nino/http/requests'] = [];
 
-$subRequest = fakeRequest( $subAppData, '/sub/page' );
+$subRequest = ninoVisit( $subAppData, '/sub/page' );
 \Nino\Http::response( $subAppData, $subRequest );
 check( 'the request path is read without the directory, and the route is found', $subRequest['/nino/http/request']['uri'] === '/page' && $subRequest['/nino/http/response']['uri'] === '/page' && $subRequest['/nino/http/response']['statusCode'] === 200 );
-check( 'the directory alone is the root', fakeRequest( $subAppData, '/sub' )['/nino/http/request']['uri'] === '/' );
-check( '...with a trailing slash too', fakeRequest( $subAppData, '/sub/' )['/nino/http/request']['uri'] === '/' );
-check( 'a path that merely begins with the same letters is left as it is', fakeRequest( $subAppData, '/subway' )['/nino/http/request']['uri'] === '/subway' );
-check( 'the query part is read as before', fakeRequest( $subAppData, '/sub/page?x=1' )['/nino/http/request']['query'] === [ 'x' => '1' ] );
-check( 'a root install reads the path as it came', fakeRequest( $appData, '/page' )['/nino/http/request']['uri'] === '/page' );
+check( 'the directory alone is the root', ninoVisit( $subAppData, '/sub' )['/nino/http/request']['uri'] === '/' );
+check( '...with a trailing slash too', ninoVisit( $subAppData, '/sub/' )['/nino/http/request']['uri'] === '/' );
+check( 'a path that merely begins with the same letters is left as it is', ninoVisit( $subAppData, '/subway' )['/nino/http/request']['uri'] === '/subway' );
+check( 'the query part is read as before', ninoVisit( $subAppData, '/sub/page?x=1' )['/nino/http/request']['query'] === [ 'x' => '1' ] );
+check( 'a root install reads the path as it came', ninoVisit( $appData, '/page' )['/nino/http/request']['uri'] === '/page' );
 
 // The route key a locale switch redirects to is project-relative too, and
 // the browser is sent to the address, not the key
-$switchRequest = fakeRequest( $subAppData, '/sub/page?lang=en_US' );
+$switchRequest = ninoVisit( $subAppData, '/sub/page?lang=en_US' );
 \Nino\Locales::switchFromQuery( $subAppData, $switchRequest, 'lang' );
 check( 'a locale switch redirects under the directory', ( $switchRequest['/nino/http/response']['header']['Location'] ?? '' ) === '/sub/en/page' && $switchRequest['/nino/http/response']['statusCode'] === 302 );
 
@@ -5845,7 +5769,7 @@ check( 'a locale switch redirects under the directory', ( $switchRequest['/nino/
 // The entry for the requested page is the active one, compared before the
 // directory goes in front
 $subAppData['./nino/http/requests'] = [];
-fakeRequest( $subAppData, '/sub/page' );
+ninoVisit( $subAppData, '/sub/page' );
 $subMenu = \Nino\Modules\Navigation::doShortcode( $subAppData, [ 'content' => "/page:Page\n/other:Other\n//example.com/x:Elsewhere\n#top:Top" ] );
 check( 'a menu entry links under the directory', str_contains( $subMenu, 'href="/sub/page"' ) === true && str_contains( $subMenu, 'href="/sub/other"' ) === true );
 check( '...and the requested page is still the active entry', preg_match( '/href="\/sub\/page" class="nino-is-active"/', $subMenu ) === 1 );
@@ -7397,9 +7321,8 @@ check( '...a stack has those of the loop, of its grid where it has one, and its 
 check( '...and nothing for a name that is not registered', \Nino\Modules\Components::defaults( $appData, 'nope' ) === [] && \Nino\Modules\Components::defaults( $appData, 'title', true ) === [] );
 
 // The schema is checked where the component is registered
-$schemaErrors = [];
 // php 8.4 adds a deprecation of its own to every E_USER_ERROR: not what is asked about here
-set_error_handler( static function( int $no, string $message ) use ( &$schemaErrors ): bool { if( $no !== E_DEPRECATED ) $schemaErrors[] = [ $no, $message ]; return true; } );
+$errorsOf = static fn( callable $run ): array => array_values( array_filter( ninoErrors( $run ), static fn( array $error ): bool => $error[0] !== E_DEPRECATED ) );
 $noop = static fn( array &$appData, array $args ): string => '';
 $goodSchema = [ 'label' => 'Probe', 'source' => 'text', 'attributes' => [ 'tone' => [ 'type' => 'select', 'options' => [ 'a', 'b' ], 'default' => 'a' ] ] ];
 $badSchemas = [
@@ -7433,21 +7356,16 @@ $badSchemas = [
 	'a drawing with a brace that is none'			=> [ 'bracedraws', [ 'label' => 'x', 'source' => 'text', 'attributes' => [ 'tone' => [ 'type' => 'string', 'default' => '' ] ], 'draws' => 'p .x{tone}}' ], '"draws" has a brace' ],
 ];
 foreach( $badSchemas as $what => [ $name, $schema, $why ] ) {
-	$schemaErrors = [];
-	\Nino\Modules\Components::addComponent( $appData, $name, $noop, $schema );
+	$schemaErrors = $errorsOf( function() use ( &$appData, $noop, $name, $schema ) { \Nino\Modules\Components::addComponent( $appData, $name, $noop, $schema ); } );
 	check( 'addComponent() refuses '. $what. ' with an E_USER_ERROR that says why, and registers nothing', count( $schemaErrors ) === 1 && $schemaErrors[0][0] === E_USER_ERROR
 		&& str_contains( $schemaErrors[0][1], $why ) === true && isset( \Nino\Modules\Components::components( $appData )[$name] ) === false );
 }
-$schemaErrors = [];
-\Nino\Modules\Components::addStack( $appData, 'badstack', $noop, [ 'label' => 'x', 'grid' => 'yes' ] );
+$schemaErrors = $errorsOf( function() use ( &$appData, $noop ) { \Nino\Modules\Components::addStack( $appData, 'badstack', $noop, [ 'label' => 'x', 'grid' => 'yes' ] ); } );
 check( 'addStack() refuses a stack whose "grid" is no bool', count( $schemaErrors ) === 1 && $schemaErrors[0][0] === E_USER_ERROR && isset( \Nino\Modules\Components::stacks( $appData )['badstack'] ) === false );
-$schemaErrors = [];
-\Nino\Modules\Components::addStack( $appData, 'loopattr', $noop, [ 'label' => 'x', 'attributes' => [ 'sort' => [ 'type' => 'string', 'default' => '' ] ] ] );
+$schemaErrors = $errorsOf( function() use ( &$appData, $noop ) { \Nino\Modules\Components::addStack( $appData, 'loopattr', $noop, [ 'label' => 'x', 'attributes' => [ 'sort' => [ 'type' => 'string', 'default' => '' ] ] ] ); } );
 check( '...and one that declares an attribute of the loop as its own', count( $schemaErrors ) === 1 && str_contains( $schemaErrors[0][1], 'reads itself' ) === true );
-$schemaErrors = [];
-\Nino\Modules\Components::addStack( $appData, 'badassets', $noop, [ 'label' => 'x', 'assets' => [ 'css' => [ '../x.css' ] ] ] );
+$schemaErrors = $errorsOf( function() use ( &$appData, $noop ) { \Nino\Modules\Components::addStack( $appData, 'badassets', $noop, [ 'label' => 'x', 'assets' => [ 'css' => [ '../x.css' ] ] ] ); } );
 check( '...and one whose assets climb out of the project', count( $schemaErrors ) === 1 && str_contains( $schemaErrors[0][1], 'assets' ) === true );
-restore_error_handler();
 check( 'the registry was left alone by every refusal', array_keys( \Nino\Modules\Components::components( $appData ) ) === [ 'title', 'subtitle', 'card-title', 'card-subtitle', 'hero-title', 'hero-subtitle', 'text', 'image', 'button', 'html', 'spacer', 'card' ]
 	&& array_keys( \Nino\Modules\Components::stacks( $appData ) ) === [ 'stack', 'slider', 'filter', 'list' ] );
 check( 'a schema that validates is returned complete, a stack with its assets', \Nino\Modules\Components::validate( 'rows', [ 'label' => 'Rows', 'grid' => true, 'assets' => [ 'css' => [ '/features/Rows/assets/rows.css' ] ] ], true ) === [
@@ -7980,12 +7898,6 @@ check( 'cell() draws a div, always: the classes and the attributes it is given a
 	&& \Nino\Modules\Components::cell( [ 'class' => 'a', 'card' => 'card' ], 'in', 'b', ' id="c"' ) === '<div class="a b" id="c">in</div>'
 	&& \Nino\Modules\Components::cell( [ 'card' => 'brand-alt' ], 'in' ) === '<div>in</div>' );
 
-echo "\n";
-
 // --- Cleanup ------------------------------------------------------------
 
-\Nino\Filesystem::removeDir( $sandbox );
-
-echo "$checks checks, $failures failed\n";
-
-exit( $failures > 0 ? 1 : 0 );
+ninoDone( $appData );

@@ -802,10 +802,7 @@ echo "Features panel - catalogue and install over the same kernel\n";
  *	@return		array										[ statusCode, body ]
  */
 function callFeatures( array &$appData, string $method, array $data = [] ): array {
-	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-	$_POST['data'] = json_encode( $data );
-	\Nino\Modules\Features\Admin::{$method}( $appData, $request );
-	return [ $request['/nino/http/response']['statusCode'], $request['/nino/http/response']['body'] ];
+	return array_slice( ninoCall( $appData, [ \Nino\Modules\Features\Admin::class, $method ], $data ), 0, 2 );
 }
 
 /**

@@ -19,29 +19,9 @@ declare(strict_types=1);
  *	Usage: php tests/concurrency-smoke.php
  */
 
-require __DIR__. '/../_nino/Nino.php';
-require __DIR__. '/../_admin/Admin.php';
+require __DIR__. '/harness.php';
 
 const ROUNDS = 50;
-
-$failures = 0;
-$checks		= 0;
-
-/**
- *	Assert a condition and print the result
- *
- *	@param		string		$label				Description of the check
- *	@param		bool			$condition		Result to assert
- *
- *	@return		void
- */
-function check( string $label, bool $condition ): void {
-	global $failures, $checks;
-	$checks++;
-	if( $condition === false )
-		$failures++;
-	echo ( $condition === true ? '  ok  ' : 'FAIL  ' ), '- ', $label, "\n";
-}
 
 /**
  *	Boot an appData against the sandbox, the way a request would
@@ -199,7 +179,8 @@ function runParallel( string $mode, string $sandbox, array $args ): void {
 			proc_close( $process );
 }
 
-$sandbox = sys_get_temp_dir(). '/nino-concurrency-'. bin2hex( random_bytes( 6 ) );
+$appData = ninoSandbox( 'concurrency' );
+$sandbox = ninoSandboxDir( $appData );
 mkdir( $sandbox. '/private/data', 0755, true );
 
 file_put_contents( $sandbox. '/private/config.php', '<?php return '. var_export( [
@@ -311,8 +292,5 @@ check( 'and neither run overwrote the other: every entry of both is there', coun
 check( 'one sidecar lock, not two', count( glob( $aliasSandbox. '/private/data/.locks/*.lock' ) ?: [] ) === 1 );
 
 \Nino\Filesystem::removeDir( $aliasSandbox );
-\Nino\Filesystem::removeDir( $sandbox );
 
-echo "\n", $checks, ' checks, ', $failures, " failed\n";
-
-exit( $failures === 0 ? 0 : 1 );
+ninoDone( $appData );

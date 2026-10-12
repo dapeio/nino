@@ -38,10 +38,8 @@ foreach( [ 'private/templates', 'private/text', 'private/assets', 'public/images
 
 // The setup wizard, as it runs on a fresh project: nothing is picked, and the
 // Legal unit is applied all the same
-$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
-$setupRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 ob_start();
-\Nino\Install\Setup::apiApply( $appData, $setupRequest );
+ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
 ob_end_clean();
 ninoWarnings();
 
@@ -470,9 +468,7 @@ $lone['/nino/locales/available'] = [ 'de_DE' ];
 foreach( [ 'private/templates', 'private/text', 'private/assets', 'public/images' ] as $directory )
 	mkdir( $loneDir. '/'. $directory, 0777, true );
 \Nino\Filesystem::putFileContent( $lone, '/config.php', [ '/nino/locales/native' => 'de_DE', '/nino/locales/available' => [ 'de_DE' ], '/nino/modules' => [], '/nino/html/assets' => [], '/nino/http/routes' => [] ] );
-$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE' ], 'modules' => [] ] );
-$loneRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Install\Setup::apiApply( $lone, $loneRequest );
+ninoCall( $lone, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE' ], 'modules' => [] ] );
 $lone['/nino/modules'] = \Nino\Filesystem::getFileContent( $lone, '/config.php', [] )['/nino/modules'];
 \Nino\Elements::updateElement( $lone, '/privacy/hosting', [ 'title' => 'Mein Hosting' ], 'de_DE' );
 \Nino\Elements::deleteElement( $lone, '/privacy/rights', '*' );
@@ -564,9 +560,7 @@ function legalProject( string $name ): array {
 		mkdir( $sandbox. '/'. $directory, 0777, true );
 
 	\Nino\Filesystem::putFileContent( $appData, '/config.php', [ '/nino/locales/native' => 'de_DE', '/nino/locales/available' => [ 'de_DE', 'en_US' ], '/nino/modules' => [], '/nino/html/assets' => [], '/nino/http/routes' => [] ] );
-	$_POST['data'] = json_encode( [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
-	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-	\Nino\Install\Setup::apiApply( $appData, $request );
+	ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
 	$_POST['data'] = json_encode( [] );
 	$appData['/nino/modules'] = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'];
 

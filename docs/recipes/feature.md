@@ -706,8 +706,11 @@ ninoDone( $appData );
 The harness gives a test `check()`, `ninoSandbox()` (a fresh isolated project
 directory with two locales and no modules), `ninoSandboxDir()`,
 `ninoWarnings()` (the warnings recorded since the last call - assert on a
-warning you expect rather than scrolling past it) and `ninoDone()` (the
-summary, the sandbox removed, the exit status). Test the visible contract: the
+warning you expect rather than scrolling past it), `ninoErrors()` (what one
+call raised, level and message), `ninoCall()` (one workbench request against
+a panel method), `ninoUser()` (an account, logged in), `ninoVisit()` (one
+request of the site) and `ninoDone()` (the summary with the seconds, the
+sandbox removed, the exit status). Test the visible contract: the
 manifest validates, activation lists the class and records the version, the
 unit's files land add-only, the shortcode and the endpoint answer, the panel
 is present while the feature is active and absent after, settings are typed

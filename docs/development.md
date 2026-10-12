@@ -774,7 +774,7 @@ These precautions do not absolve project code of responsibility. Data from reque
 
 ## Tests and Change Workflow
 
-Nino uses standalone smoke tests without PHPUnit: each file under `tests/` creates an isolated temporary project and checks one area. The commands CI runs - the nine PHP suites, the JavaScript loop, PHPStan and ESLint - are the one block in [Deployment](deployment.md#tests-before-go-live), and the [agent guide](../AGENTS.md#10-tests-and-validation) says when to run the whole block. A feature's own test, `features/<Name>/tests/<key>-smoke.php`, loads `tests/harness.php` from the checkout three levels up, or from the one `NINO_ROOT` names - which is how the same test runs against another Nino version; the [feature recipe](recipes/feature.md#9-the-features-own-test) writes one.
+Nino uses standalone smoke tests without PHPUnit: each file under `tests/` creates an isolated temporary project and checks one area, and every PHP suite loads `tests/harness.php` for the sandbox, `check()` and the summary. The commands CI runs - the nine PHP suites, the JavaScript loop, PHPStan and ESLint - are the one block in [Deployment](deployment.md#tests-before-go-live), and the [agent guide](../AGENTS.md#10-tests-and-validation) says when to run the whole block. A feature's own test, `features/<Name>/tests/<key>-smoke.php`, loads `tests/harness.php` from the checkout three levels up, or from the one `NINO_ROOT` names - which is how the same test runs against another Nino version; the [feature recipe](recipes/feature.md#9-the-features-own-test) writes one.
 
 For changes to the kernel or a module, the following workflow is recommended:
 

@@ -909,9 +909,9 @@ echo "\n";
 echo "Features panel - the workbench's actions over the same kernel\n";
 
 /**
- *	Dispatch one action directly against the panel class, the way
- *	tests/admin-system-smoke.php's callDev() does: the payload as the json
- *	"data" post field, the answer as [ statusCode, body ]
+ *	Dispatch one action directly against the panel class through the
+ *	harness's ninoCall(): the payload as the json "data" post field, the
+ *	answer sliced to [ statusCode, body ], since the checks compare it whole
  *
  *	@param		array 		&$appData
  *	@param		string		$method				eg. "apiList"
@@ -920,10 +920,7 @@ echo "Features panel - the workbench's actions over the same kernel\n";
  *	@return		array										[ statusCode, body ]
  */
 function callFeatures( array &$appData, string $method, array $data = [] ): array {
-	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-	$_POST['data'] = json_encode( $data );
-	\Nino\Modules\Features\Admin::{$method}( $appData, $request );
-	return [ $request['/nino/http/response']['statusCode'], $request['/nino/http/response']['body'] ];
+	return array_slice( ninoCall( $appData, [ \Nino\Modules\Features\Admin::class, $method ], $data ), 0, 2 );
 }
 
 // The state the sections above left behind: sample and helper active,
@@ -1058,15 +1055,13 @@ check( 'every tab of the registry has its action map: the Settings tab brings no
 	return $actions['features/settings'] === [ \Nino\Modules\Features\Admin::class, 'apiSettings' ] && count( array_filter( array_keys( $actions ), static fn( string $a ): bool => str_starts_with( $a, 'features/' ) ) ) === 7;
 } )() );
 check( 'the dashboard shows one Features tile, not one per tab', ( static function() use ( $appData ): bool {
-	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-	\Nino\Modules\Dashboard\Admin::apiSummary( $appData, $request );
-	return count( array_filter( $request['/nino/http/response']['body']['tiles'], static fn( array $t ): bool => $t['panel'] === 'features' ) ) === 1;
+	[ , $body ] = ninoCall( $appData, [ \Nino\Modules\Dashboard\Admin::class, 'apiSummary' ] );
+	return count( array_filter( $body['tiles'], static fn( array $t ): bool => $t['panel'] === 'features' ) ) === 1;
 } )() );
 
 // Whose it is to see: the tab is on the Features permission, so somebody who
 // holds the feature's own permission alone still does not see the settings
-\Nino\Auth::insertUser( $appData, 'sample@example.com', 'correct horse battery staple', [ \Nino\Modules\Sample\Admin::MANAGE_PERM ] );
-\Nino\Auth::loginUser( $appData, 'sample@example.com', 'correct horse battery staple' );
+ninoUser( $appData, 'sample@example.com', [ \Nino\Modules\Sample\Admin::MANAGE_PERM ] );
 $visible = \Nino\Admin\Admin::visiblePanels( $appData );
 check( 'an account holding only the feature\'s permission gets the panel, no tab, no strip and no mount', $visible['sample']['own'] === true && $visible['sample']['tabs'] === []
 	&& str_contains( \Nino\Admin\Admin::panesHtml( $appData ), 'admin-tabbutton-sample-settings' ) === false
@@ -1076,8 +1071,7 @@ $visible = \Nino\Admin\Admin::visiblePanels( $appData );
 $html = \Nino\Admin\Admin::panesHtml( $appData );
 check( 'a developer holding the Features permission only gets the tab alone, as a pane with its mount', array_keys( $visible['sample']['tabs'] ) === [ 'sample-settings' ] && $visible['sample']['own'] === false
 	&& str_contains( $html, 'id="feature-settings-sample"' ) === true && str_contains( $html, 'data-tab="sample-settings"' ) === true );
-\Nino\Auth::insertUser( $appData, 'both@example.com', 'correct horse battery staple', [ \Nino\Modules\Features\Admin::MANAGE_PERM, \Nino\Modules\Sample\Admin::MANAGE_PERM ] );
-\Nino\Auth::loginUser( $appData, 'both@example.com', 'correct horse battery staple' );
+ninoUser( $appData, 'both@example.com', [ \Nino\Modules\Features\Admin::MANAGE_PERM, \Nino\Modules\Sample\Admin::MANAGE_PERM ] );
 $html = \Nino\Admin\Admin::panesHtml( $appData );
 check( 'an account holding both gets a strip with both tabs', array_keys( \Nino\Admin\Admin::visiblePanels( $appData )['sample']['tabs'] ) === [ 'sample-settings' ]
 	&& str_contains( $html, 'id="admin-tabbutton-sample"' ) === true && str_contains( $html, 'id="admin-tabbutton-sample-settings"' ) === true
@@ -1185,16 +1179,11 @@ $announced = [];
 \Nino\Callbacks::registerCallback( $appData, '/nino/admin/action', static function( array &$appData, array &$event ) use ( &$announced ): void {
 	$announced[] = $event;
 } );
-$_POST['action'] = 'features/settings';
-$_POST['data'] = json_encode( [ 'key' => 'sample', 'fields' => [ 'limit' => '13', 'apiKey' => 'k-secret-2', 'title' => 'Seen' ] ] );
-$announceRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Admin\Admin::handlePost( $appData, $announceRequest );
-check( 'features/settings reaches a listener with the manifest\'s secret blank and the other fields as posted', count( $announced ) === 1 && $announceRequest['/nino/http/response']['statusCode'] === 200
+[ $status ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [ 'key' => 'sample', 'fields' => [ 'limit' => '13', 'apiKey' => 'k-secret-2', 'title' => 'Seen' ] ], 'features/settings' );
+check( 'features/settings reaches a listener with the manifest\'s secret blank and the other fields as posted', count( $announced ) === 1 && $status === 200
 	&& ( $announced[0]['data']['fields'] ?? null ) === [ 'limit' => '13', 'apiKey' => '', 'title' => 'Seen' ] && ( $announced[0]['data']['key'] ?? null ) === 'sample' && str_contains( json_encode( $announced ), 'k-secret-2' ) === false );
 check( '...while the secret itself was stored', \Nino\Features::setting( $appData, 'sample', 'apiKey' ) === 'k-secret-2' );
-$_POST['data'] = json_encode( [ 'key' => 'sample', 'fields' => [ 'apiKey' => 'k-1', 'limit' => '12' ] ] );
-$announceRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-\Nino\Admin\Admin::handlePost( $appData, $announceRequest );
+ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [ 'key' => 'sample', 'fields' => [ 'apiKey' => 'k-1', 'limit' => '12' ] ], 'features/settings' );
 check( '...and the same for the next post, the order of the fields being the poster\'s', ( $announced[1]['data']['fields'] ?? null ) === [ 'apiKey' => '', 'limit' => '12' ] && \Nino\Features::setting( $appData, 'sample', 'apiKey' ) === 'k-1' );
 unset( $appData['./nino/callbacks']['/nino/admin/action'], $_POST['action'] );
 
