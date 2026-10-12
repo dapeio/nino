@@ -439,8 +439,8 @@ check( 'every empty list screen renders that component rather than a paragraph o
 
 // One way to say "this needs your attention", too - the dashboard's notices and
 // the maintenance banner are the same component, in the design system, and not
-// a class of a panel's own stylesheet (which AGENTS.md section 6a reserves the
-// nino-admin-* prefix against)
+// a class of a panel's own stylesheet (which docs/recipes/admin-panel.md,
+// "Designing an admin frontend", reserves the nino-admin-* prefix against)
 const noticeScripts = [ adminAsset( 'Dashboard', 'admin.js' ), fs.readFileSync( path.join( __dirname, '../_nino/Nino/Modules/Maintenance/assets/admin.js' ), 'utf8' ) ];
 check( 'the notice is one shared component with a class of its own',
 	adminUiSource.includes( 'notice : function' ) && adminUiSource.includes( "notice.className = 'nino-admin-notice'" ) && sharedCss.includes( '.nino-admin-notice {' ) );
@@ -572,7 +572,7 @@ check( 'destructive Admin controls all use the shared danger treatment',
 
 console.log('\nDesign system contracts');
 
-// --- design-system conventions (see AGENTS.md, "Designing an admin frontend")
+// --- design-system conventions (see docs/recipes/admin-panel.md, "Designing an admin frontend")
 
 const cssRoot = require('path').join(__dirname, '..');
 const read = p => require('fs').readFileSync( require('path').join(cssRoot, p), 'utf8' );

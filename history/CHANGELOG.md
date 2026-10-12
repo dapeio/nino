@@ -1,8 +1,6 @@
 # Changelog
 
-All notable changes to Nino are documented in this file.
-
-## Unreleased
+This file is frozen with 1.7.0. From there the history is the git log and the tags (`git log --oneline v1.7.0..`): a change is described by its commit, whose title is `Added|Changed|Fixed|Removed(/scope): one sentence` and whose body says why.
 
 ## v1.7.0 - 2026-10-12
 
@@ -650,8 +648,8 @@ All notable changes to Nino are documented in this file.
   element as the context, so the components in it see their element; the loop
   is the one of `[elements]`, shared as `\Nino\Modules\Elements::queryLoop()`,
   and `[elements]` is unchanged. A file the Builder writes renders by the
-  kernel alone. See [Components](docs/development.md#components) and the
-  [component recipe](docs/recipes/component.md).
+  kernel alone. See [Components](../docs/development.md#components) and the
+  [component recipe](../docs/recipes/component.md).
 - **Features:** the manifest keys `components` and `stacks`, `name => schema`,
   read by the same validation as `addComponent()` and refusing the manifest
   with the component's name where a schema does not validate. The kernel

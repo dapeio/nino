@@ -566,7 +566,7 @@ foreach( $shipped as $file ) {
 
 	$relative = keysRelative( $file, $root );
 
-	if( str_starts_with( $relative, 'tests/' ) === true || str_starts_with( $relative, '.git/' ) === true || $relative === 'CHANGELOG.md' || str_contains( $relative, 'node_modules/' ) === true || str_starts_with( $relative, 'vendor/' ) === true )
+	if( str_starts_with( $relative, 'tests/' ) === true || str_starts_with( $relative, '.git/' ) === true || str_starts_with( $relative, 'history/' ) === true || str_contains( $relative, 'node_modules/' ) === true || str_starts_with( $relative, 'vendor/' ) === true )
 		continue;
 
 	$scanned++;

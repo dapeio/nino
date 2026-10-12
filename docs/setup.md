@@ -1,13 +1,6 @@
 # The Setup Wizard — Reference Manual
 
-**Language:** English · [Deutsch](setup.de.md)
-
-**Last updated:** September 22, 2026 · **Nino version:** 1.3.1
-
-This manual explains the decisions and writing processes of the six steps of the setup wizard - the first-run mode of the [`/_admin` workbench](_admin.md). If you instead want to take the shortest path from checkout to a configured website, start with [Getting Started](getting-started.md); the later production operation is covered in [Deployment](deployment.md).
-
-**Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+This manual explains the decisions and writing processes of the six steps of the setup wizard - the first-run mode of the [`/_admin` workbench](_admin.md). The shortest path from checkout to a configured website is the [Quick Start](../README.md#quick-start); the later production operation is covered in [Deployment](deployment.md).
 
 **Important:** The wizard creates the first functional project state from a fresh Nino checkout. It is necessary: before its execution a checkout carries neither `private/` nor `public/`, so none of the project directories inside them - `private/templates/`, `private/text/`, `private/elements/`, `public/images/` - exists yet.
 
@@ -204,9 +197,9 @@ If completion fails, check the write permissions of the `private/` directory. Af
 
 ## Verify the Result and Remove the Wizard
 
-After completion, open the frontend and the workbench. Check at least the start page, every configured language, the login to `/_admin` with the root account, and that the header, the footer and the webfonts the theme declares are all there.
+After completion, open the frontend and the workbench. Check at least the start page, every configured language, the login to `/_admin` with the root account, and that the header, the footer and the webfonts the theme declares are all there. Then create the editor accounts under Users and check what they see.
 
-The wizard is intended only for initial setup. Remove `_admin/install/` from the production delivery: nothing outside it reads its library, and what it already copied stays where it was written. See [Deployment](deployment.md#the-wizard-after-setup).
+The wizard is intended only for initial setup. Once it is complete and checked, remove `_admin/install/` from the production delivery: nothing outside it reads its library - it is setup material, not a runtime feature - and everything it copied already lives in the project and stays where it was written. An incomplete installation does not become valid by deleting its wizard.
 
 ## Library Format
 
@@ -223,7 +216,7 @@ Everything below `_admin/install/` is removed together with the wizard after com
 
 Module units are found, not listed: the wizard scans `_nino/Nino/Modules/*/install/` - Nino's own optional modules - and then the whole application directory (`app/`, or `NINO_APP_DIR`) up to four levels deep, plus `_admin/install/library/modules/`. A unit's key - what the picker posts and what `requiresModules` names - is the manifest's `key` or, without one, the module directory's lowercased name; it must be a slug and unique, and the first unit to claim a key keeps it, so Nino's own modules keep theirs.
 
-Two manifest keys carry content and are applied add-only by the same `applyUnit()`: `elements` - `[ '<type>' => '<file of the unit>' ]`, a file in the shape of an element type file whose elements are *added* to the type, in the languages that are applied, and never replace a value, a title or a model the project has (the type itself is created from the file only where it does not exist) - and, for the wizard alone, `navs` - `[ '<key>' => [ '<Element URI>', ... ] ]`, a menu the project does not have yet with its first entries. `\Nino\Features::activate()` reads `elements` and not `navs`: a feature brings no menu. The second way the wizard applies a module unit, the one a page unit pulls in through `requiresModules`, reads neither - it knows only `templates`, `blacklist`, `config` and `text`, as it never knew `elementTypes`, `files` or `routes`. See [`\Nino\Elements::seed()`](development.md#legal) and the recipe [installer-package](recipes/installer-package.md).
+The manifest keys of a unit - what each does, and which of them a page unit's `requiresModules` reaches - are listed in the [installer package recipe](recipes/installer-package.md), which is also the step-by-step for writing one. The two keys that carry content, `elements` and `navs`, are applied add-only by the same `applyUnit()` that a feature's activation uses; see [Legal](development.md#legal) for `\Nino\Elements::seed()`.
 
 Not scanned: `features/`. A feature carries an `install/` unit of the same shape, but `\Nino\Features::activate()` applies it when the feature is switched on in the workbench - through the same `applyUnit()` the wizard uses, with overwrite on here and add-only there, so that the unit application survives the removal of `_admin/install/`. See [Features](features.md).
 
@@ -234,11 +227,3 @@ Not scanned: `features/`. A feature carries an `install/` unit of the same shape
 The wizard creates the first working project state, but it does not replace project-specific development. Templates, content models, callbacks, integrations, detailed design, and production configuration remain part of the implementation.
 
 It also does not create `private/` or `public/`, nor any of the project directories inside them, before setup begins. These directories and their initial content are generated from the selected installation library during the process.
-
-## Next Steps
-
-- [Getting Started](getting-started.md) guides through the necessary initial setup.
-- [`/_admin` Workbench](_admin.md) explains the panels, the accounts and the recovery page.
-- The **Builder** - page templates composed from sections, columns and components - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its manual is in its [`feature.php`](https://github.com/dapeio/nino-features/blob/main/features/Builder/feature.php).
-- Have the imprint and the privacy policy checked before the site goes live, and adapt them to what the website really processes - see the note in [Modules](#modules) above.
-- [Deployment](deployment.md) describes web server configuration, security, and go-live.

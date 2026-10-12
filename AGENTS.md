@@ -1,9 +1,8 @@
 # Nino repository guide for AI coding agents
 
-This file is the operational specification for AI agents that modify Nino. It
-is intentionally explicit and repetitive enough for small models. Follow it
-before copying patterns from memory or from another framework. The six
-extension recipes section 7 lists, under `docs/recipes/`, are part of it.
+This file is the operational specification for AI agents that modify Nino.
+Follow it before copying patterns from memory or from another framework. The
+six extension recipes of section 7 are part of it.
 
 Nino is a filesystem-based PHP website framework. It has no database, Composer
 dependency, JavaScript build step, component framework, or plugin manager.
@@ -16,56 +15,65 @@ The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative.
 1. The current user request and repository instructions have priority.
 2. This file defines repository-wide defaults.
 3. Existing source code and tests define the current runtime contract.
-4. Human manuals in `docs/` explain intent and operation.
-5. If documentation and source disagree, inspect the tests and implementation,
-   follow the current behavior, and update stale documentation in the same
-   change when that is within scope.
+4. The manuals in `docs/` explain intent and operation.
+5. If documentation and source disagree, follow the current behavior and update
+   the stale documentation in the same change when that is within scope.
+6. A pattern in existing code that contradicts this guide is not authority for
+   new code: check the current runtime and the tests before copying it.
 
 Do not invent an API because its name seems plausible. Search for the actual
 method, its signature, and at least one current call site.
 
-## 2. Required workflow for every change
+## 2. The working method
 
-Before editing:
+A change is made by four roles, one patch at a time. A role is a role: whoever
+fills it - a person or an agent - keeps to it.
 
-1. Read the complete user request and list its observable requirements.
-2. Run `git status --short --branch`. Preserve all unrelated user changes.
-3. Find the nearest implementation, test, and documentation with `rg`.
-4. Read complete functions or classes around every line that will change.
-5. Decide which extension type in the next section actually applies.
-6. Identify authentication, CSRF, validation, persistence, escaping,
-   concurrency, locale, and backward-compatibility consequences.
-7. Define a test that fails for the old behavior and passes for the new one.
+1. **The plan.** A written plan per patch, the "Bauplan": numbered parts; every
+   decision of the owner quoted and marked as binding; the tests that must stay
+   green and the ones the patch adds; the constraints - what stays untouched, no
+   version bump unless the owner said so, no fallback for projects that do not
+   exist, no guard test against an old name.
+2. **The build.** One agent implements the whole plan on a branch of its own.
+   - It reads the plan and this file in full first, works only in its clone and
+     in throwaway copies, and runs every suite the plan names before it commits.
+   - It commits once. The title is `Added|Changed|Fixed|Removed(/scope): one sentence`,
+     the scope being `/nino` for the kernel, `/feature` for the catalogue, a
+     module or file name where the change is one thing. The body says what and
+     why in prose; the trailers are the ones the harness hands it.
+   - It reports the commit, a file-by-file summary, every test with its counts,
+     and what is *open*: anything left out, deviating or uncertain, each with
+     its reason.
+   - It never pushes and never rewrites history.
+3. **The review.** A second agent reads the whole diff against the plan.
+   - It runs every suite in copies of its own, never in the work clone, with
+     PHPStan, ESLint, `php -l`, `node --check` and `git diff --check`; it greps
+     for what the plan says must be gone, and drives the real thing in a browser
+     where the patch touches a screen.
+   - It reports findings with `file:line` and the exact search that proved each,
+     sorted into *blocking* (the build is wrong against the plan or breaks
+     something) and *non-blocking* (a nit, a wording, a judgement call), a fix
+     for each, and a verdict: ok or fix.
+   - At most two fix rounds, each a commit of its own on the branch.
+4. **The acceptance.** The planner reads build and review and takes or declines
+   each non-blocking finding, in one commit. The patch is exported with
+   `git diff --binary <base>..<tip>`, the commit title as its first line `# ...`,
+   applied on a fresh clone of the owner's branch, and the tree hash compared.
+   The suites run once more and the numbers are recorded. The owner applies the
+   patch and pushes: GitHub is version control, and nothing in the chain
+   depends on it.
 
-While editing:
+Coupled patches - a kernel change and the catalogue's half of it - are named as
+a pair, with the push order that keeps CI green.
 
-- Make the smallest coherent change.
-- Follow local formatting and naming. Do not reformat unrelated code.
-- Use public APIs; methods beginning with `_` are internal unless the class
-  itself is being maintained.
-- Keep PHP, JavaScript, CSS, templates, tests, and documentation synchronized.
-- Do not add a runtime dependency or build step without explicit approval.
-- Do not silently delete, rename, or migrate existing project data.
-- Never trust request, file, template, element, or external-service data.
-
-After editing:
-
-1. Review `git diff --check` and the complete diff.
-2. Run syntax checks for every changed PHP and JavaScript file, then the
-   static analysis: `phpstan analyse` and `npx eslint .`.
-3. Run the targeted smoke test and all tests named in the relevant recipe.
-4. Run the complete suite for shared kernel, security, filesystem, installer,
-   or cross-interface changes.
-5. Report changed files, behavior, tests, and any remaining limitation.
-
-If the user requests a patch-only handoff, do not commit. Generate a plain
-`git diff --binary` patch against the requested base and verify it with
-`git apply --check` in a clean checkout of that exact base.
-
-Repository-owner delivery policy: do not create a commit and do not push.
-Deliver the changes as a named `.patch` file unless the user explicitly asks
-only for an inline answer. A request to “implement”, “finish”, or “apply” is not
-permission to commit.
+Whoever builds also keeps to these: read the complete function or class around
+every line that changes, and find its nearest implementation, test and
+documentation with `rg`; make the smallest coherent change in the local
+formatting and naming; use public APIs - methods beginning with `_` are internal
+unless the class itself is being maintained; keep PHP, JavaScript, CSS,
+templates, tests and documentation synchronized; add no runtime dependency or
+build step without explicit approval; and delete, rename or migrate no existing
+project data silently.
 
 ## 3. Choose the correct extension type
 
@@ -73,106 +81,47 @@ Do not use “page”, “template”, “module”, and “admin module” inte
 
 | Goal | Correct extension |
 | --- | --- |
-| Add a screen to the workbench `/_admin` | Panel - answered by a runtime module's `adminPanels()`, or a module directory under `_admin/Nino/Modules/` |
-| Add behavior to public requests or a new shortcode | Runtime module |
+| Add a screen to the workbench `/_admin` | Panel - answered by a runtime module's `adminPanels()`, or a module directory under `_admin/Nino/Modules/`, see the [panel recipe](docs/recipes/admin-panel.md) |
+| Add behavior to public requests or a new shortcode | Runtime module, see the [runtime module recipe](docs/recipes/runtime-module.md) |
 | Add a shortcode that a tool can offer - a source for its value and typed attributes with defaults - or one that loops the elements of a type around its content | Component or stack - `\Nino\Modules\Components::addComponent()` and `addStack()` from a module's `init()`, or the `components` and `stacks` keys of a feature manifest, see the [component recipe](docs/recipes/component.md) |
-| Make a kernel or project module selectable and copyable during the setup wizard | Installer module package |
+| Make a kernel or project module selectable and copyable during the setup wizard | Installer module package, see the [installer package recipe](docs/recipes/installer-package.md) |
 | Package an installable feature - a module with a manifest, settings and a version, switched on in the workbench after setup | Feature - `features/<Name>/` with `feature.php`, see the [feature recipe](docs/recipes/feature.md) |
 | Compose a page template out of sections, columns and components in the workbench | The Builder - the feature `features/Builder` of the catalogue, panel Builder in the Features group, not here |
 | Add a complete starting page to the installation library | Page library unit |
 | Add reusable HTML+ included by other templates | Reusable `.tpl` template |
 | Map a public HTTP URL to output | Route |
-| Store repeated structured content | Element type and Elements |
+| Store repeated structured content | Element type and Elements, see the [Element types recipe](docs/recipes/element-types.md) |
 | Store a short editable value | Textfill |
 
-These pieces can cooperate but remain separate:
+These pieces cooperate but stay separate. A route does not create the page
+template (`templates/page-*.tpl`) it renders; an installer module package is not
+the runtime module it selects and copies; a feature - a runtime module with its
+panel and install unit in one directory below `features/` - is never a wizard
+unit. A panel is answered by a runtime module's `adminPanels()` or is a directory
+below `_admin/Nino/Modules/`; a feature's panel sits in the rail's `features`
+group, always, since the group a `nav()` names is read for the kernel's own and
+`app/` panels only. A feature that spans types implements each layer explicitly.
 
-- A **route** maps an HTTP method and public URI to a response.
-- A **page template** is a `templates/page-*.tpl` file rendered by a route.
-- The **Builder** is a feature of the catalogue that reads a page template into
-  sections, rows, columns and components and writes it back: the `.tpl` file is
-  the truth, and what the Builder does not read it leaves byte for byte.
-- A **runtime module** registers PHP behavior at boot.
-- An **installer module package** selects, copies, and configures a runtime
-  module in the setup wizard. It is not the runtime module itself.
-- A **feature** is one directory below `features/` with a `feature.php`
-  manifest: a runtime module, its panel and its install unit, versioned and
-  switched on in the workbench's Features panel - never a wizard unit.
-  `\Nino\Features` reads the manifest and applies the unit add-only.
-- A **panel** is one screen of the workbench `/_admin`. It is not an entry in
-  `/nino/modules`; a runtime module answers `adminPanels()` with it, and an
-  account sees it only with the permission the panel declares.
-  A feature's panel sits in the rail's `features` group, always: the group its
-  `nav()` names is read for the kernel's own and `app/` panels only, and a
-  panel of anything but a feature may not name `features`.
+## 4. Repository map
 
-When a feature spans types, implement each layer explicitly. For example, a
-catalog can need a runtime module, an installer package, an element type, a
-reusable template, and an `/_admin` panel. One of those does not automatically
-create the others - though a module's directory is where all of its own live.
-
-## 4. Repository map and ownership
-
-Important source directories:
-
-| Path | Ownership |
+| Path | What it is |
 | --- | --- |
-| `_nino/Nino.php` | Boot: `\Nino\init()`, `request()`, `output()` and the autoloader. `Nino\*` resolves below `_nino/` alone, every other namespace below `app/` (or `NINO_APP_DIR`) alone; `Nino\Modules\*` is a merged view over four roots in this order: `_nino/`, `_admin/`, `features/` (or `NINO_FEATURES_DIR`, where the `Nino/Modules/` prefix is the directory itself), `app/` |
-| `_nino/Nino/<Class>/<Class>.php` | The kernel classes and public core APIs: AppData, Auth, Callbacks, Catalogue, Csrf, Features, Fetch, Filesystem, Backup, RotatingLog, Elements, Form, Html, Http, Images, Locales, Text, Mail, Modules, Runtime |
-| `_nino/Nino/Catalogue/Catalogue.php`, `_nino/Nino/Fetch/Fetch.php` | The feature catalogue: `Fetch` is the kernel's one http client (https only, no redirects, a byte cap, stubbed in tests through `./nino/fetch/stub`); `Catalogue` fetches `catalogue.json` and its detached ECDSA signature, verifies it against `PUBLIC_KEY` or `/nino/catalogue/key`, parses format 1, answers `offers()` per key, and `install()`s an archive: re-fetched catalogue, sha256 and size, staging below `data/.features/`, every entry validated, manifest matched, directory replaced. Nothing is fetched unless the Features panel asks. Contract test `tests/catalogue-smoke.php`, no network |
-| `_nino/Nino/Features/Features.php` | The feature contract: discovery below `features/`, manifest validation, version constraints, settings, `activate()`, `deactivate()`, and `applyUnit()` - the unit application the wizard shares (overwrite on there, add-only for a feature). Contract test `tests/features-smoke.php` against `tests/fixtures/features/` |
-| `_nino/Nino/Modules/<Name>/<Name>.php` | Kernel runtime modules: the always-on ones every project needs (Assets, Cache, Components, Csrf, Elements, Jstext, Template) and the optional ones a project switches on or off in `/nino/modules` (`Form`, `Legal`, `Navigation`, `Localepicker`, `Maintenance`). `Legal` - the imprint and the privacy policy as the element types `legal` and `privacy`, `[legal]` and `[privacy]`, per-language runtime routes of both pages, the menu `legal` and the add-only element units of features - is `_nino/Nino/Modules/Legal/`. `Components` - the registry of components and stacks, `[title]`, `[subtitle]`, `[card-title]`, `[card-subtitle]`, `[hero-title]`, `[hero-subtitle]`, `[text]`, `[image]`, `[button]`, `[html]`, `[spacer]`, `[card]`, `[stack]`, `[slider]`, `[filter]` and `[list]` - is `_nino/Nino/Modules/Components/`; it took `[image]` over from the former `Images` module. Replaced wholesale with `_nino/` |
-| `_nino/Nino/Modules/<Name>/Admin/Admin.php`, `assets/`, `text/`, `templates/`, `install/` | A kernel module's own workbench panel class with its scripts, stylesheets, fills and (for a template panel) its markup, and its installer unit - everything the module brings, in one directory |
-| `features/<Name>/` | An installed feature: `feature.php` (the manifest - key, name, version, the `nino` constraint, `requires`, `settings`, `data`), `<Name>.php` (the class `\Nino\Modules\<Name>`, derived from the directory), `Admin/Admin.php` (its panel), `install/` (the unit `\Nino\Features::activate()` applies add-only), `text/`, `assets/`, `tests/<key>-smoke.php`. A checkout ships none: they come from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) - `Newsletter` and `Search` among them - and are copied in or installed from the Features panel. Denied by `features/.htaccess` and `router.php`; relocated by `NINO_FEATURES_DIR` |
-| `app/<Namespace>/<Class>/<Class>.php` | Project-owned PHP classes and runtime modules; defaults to this root unless `NINO_APP_DIR` is defined before loading the kernel |
-| `_nino/Nino.js` | Shared browser helpers, workbench and public site alike - so it is in the public script bundle, and anything only one audience needs belongs beside it rather than in it |
-| `_admin/Admin.php` | The workbench: `\Nino\Admin\Admin` (shell, routes, bundles, fills, dispatch), `\Nino\Admin\Panels` (the panel registry: reads a panel class, orders the panels, renders navigation and panes) and `\Nino\Admin\Recovery` (the recovery secret) |
-| `_admin/Nino/Modules/<Name>/` | The workbench's own screens, one module each, in the same shape and the same namespace `_nino/Nino/Modules` and `features/<Name>/` use: `Admin/Admin.php` is the panel, `<Tab>/<Tab>.php` a tab of it, `assets/` its scripts and stylesheet, `text/` its words. `Admin::modules()` reads the directory - there is no list to keep. Take the directory away and `/_admin` is a login and an empty rail, which is the point: `_admin` is the base, the modules fill it |
-| `_admin/assets/style.css` | The workbench's one stylesheet: the design system in the `nino.system` layer (classes only, `nino-admin-*`), the workbench's own rules in `nino.tool` below it |
-| `_admin/assets/Nino.admin.js` | The behaviour half of the design system: `Nino.adminUi`'s DOM primitives and the pure table model - and the one way a panel talks to the server, `Nino.adminUi.api`, with the status line (`status()`) and the messages that say what failed (`errorText()`, `showError()`, `format()`) - and `choiceDialog()`, the modal question with more than two answers. Loaded after `Nino.js`, by the workbench only |
-| `_admin/assets/script.js`, `login.js`, `html-editor.js` | The shell script (router and the history behind Back and Forward, theme, rail fold and groups, panel switching, and `Nino.admin.dirty`, the registry the form panels report unsaved input to), the login screen's, and the rich-text primitive a panel names in its own `assets()`. No panel script lives here; no bundler - `Admin::init()` builds `/_admin/.cache/` from the registry |
-| `_admin/templates/page-index.tpl` | The shell; navigation, panes and panel assets are rendered into it from the registry |
-| `_admin/recovery.php`, `templates/page-recovery.tpl`, `assets/recovery.js` | The recovery page: restore a backup, set the password of an account, create an account with full access - with the recovery secret |
-| `_admin/install/Install.php` | The setup wizard - the workbench's first-run mode, served by the same route while `Admin::isInstalled()` says no; deletable after setup |
-| `_admin/install/library/base/`, `pages/<slug>/`, and `modules/` where a checkout adds one | The wizard's library: always-applied base and installable page units; a checkout that adds units without a runtime class of its own puts them in `modules/`, which the wizard scans when it exists - none is shipped |
-| `_admin/install/library/base/assets/theme.css`, `base/templates/frame-header.tpl`, `frame-footer.tpl` | The one look every project starts from, delivered by the base unit: the compiled design tokens, the roles they are assigned to, the three webfaces and the css for both frames, plus the two frame templates `html-header.tpl` includes through `[template /templates/frame-header]`. The body of `theme.css` is what the catalogue's Design feature compiles at its defaults - its twelve numbered sections - under a header of the kernel's own, and is regenerated from that compiler with each kernel release, so that the delivered look and the compiled one have one source: a change of a default or a role is made in the compiler's library and the file regenerated, never by editing the body here. The header carries no stamp of the compiler's, so Design treats the file as the delivered one and asks before it writes over it; a project may still edit its copy by hand |
-| the appearance catalogue | Not here since 1.2: the ten themes, six headers and seven footers the wizard used to offer, and the Design panel that kept them editable, left the kernel and are no wizard step any more. The look is changed afterwards by the catalogue's [Design](https://github.com/dapeio/nino-features/blob/main/features/Design/feature.php) feature, which compiles a set per part of the page and two frames into the `assets/theme.css` and frame templates the base unit delivers. The file stays one you may edit by hand: the compiler refuses to replace a file it did not write until the person applying says so. `library/base.css` carries the token contract |
-| the Builder | Not here: the feature [`features/Builder`](https://github.com/dapeio/nino-features/tree/main/features/Builder) of the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features), panel Builder in the Features group of the rail, its manual in its `feature.php`. It replaces the Template Builder (`features/Templates`) that left the kernel with 1.2 and the catalogue after it: a project that installed that one carries it below `features/` until it is removed. The kernel's part of it is the `Components` module, the registry the Builder reads, and the `div.nino-wrap` rules of `Nino.css`. A project that installed the Builder carries it below `features/`, where the autoloader serves `\Nino\Modules\Builder` from. Which kernels the feature declares itself for is its own manifest's business, in that repository |
-| the social media links | Not in the base unit after 1.3.1: the four network keys, the heading of the social links, `html-socialmedia.tpl` and the `.nino-socialmedia` rules of `Nino.css` are the feature [`features/Social`](https://github.com/dapeio/nino-features/blob/main/features/Social/feature.php) of the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) - an element type `/social` the editors keep, drawn by `[social]`, `[social-link]` and `[social-icon]`. The Design feature's frames include the template it installs, `templates/social-links.tpl`, which renders as nothing where the feature is not there |
-| `public/` | The project's public half — everything a browser loads directly: `images/`, `favicon/`, `fonts/`, and the generated `.cache/` bundles. Reached through `Filesystem::path()` on disk and `Filesystem::url()` (or the `[[/nino/public]]` fill) for urls. Never build a public url by hand from `[[/nino/dir]]`. `assets/` is *not* here — the bundle sources are private, see below |
-| project root | `index.php`, `router.php`, `_nino/`, `_admin/`, `app/` and `features/`. `Filesystem::getPath()`. The workbench serves its own js/css from here, so a tool file's url uses the plain project dir, not the public prefix |
-| `private/` | The project's private half — never served, only read by PHP: `config.php` (the accounts among it), `templates/`, `text/`, `elements/`, `data/` (runtime records, the login throttle's counters among them — `auth-tries.php`, see `Auth::TRIES_PATH`), `assets/` (the stylesheet and script sources `Modules\Assets` concatenates into `public/.cache/` — nothing ever requests one directly), plus `.auth/` (the recovery secret and the backup key), `.logs/` and `.backups/`. Reached through `Filesystem::path()` (which resolves `PRIVATE_DIRS` against it) or the virtual `Filesystem::CONTENT_DIR` prefix (`/private`); moved by `NINO_PRIVATE_DIR` (`NINO_CONTENT_DIR`, its name before 1.1, is refused at boot rather than ignored). Never write project state into a tool folder or into `config.php` — the first breaks updates, the second is rolled back by a Restore. **A checkout ships none of this**: the wizard creates the directory, brings its own deny rule (`_admin/install/library/base/private/.htaccess`) and writes the first `config.php` at the end of Setup. Framework defaults live in `\Nino\AppData::DEFAULTS` and sit *under* that file, so config.php holds only what this project decided |
-| `tests/*-smoke.php` | Standalone PHP contract tests |
-| `tests/harness.php` | The shared bootstrap of a smoke test: `check()`, `ninoSandbox()`, `ninoSandboxDir()`, `ninoWarnings()`, `ninoDone()`. A feature's own test under `features/<Name>/tests/` loads it from the checkout three levels up, or from `NINO_ROOT` |
-| `tests/fixtures/features/` | The fixture features the contract test runs against; `Sample/` exercises every settings type, an install unit, a panel and `upgrade()` |
-| `tests/*-js-smoke.js` | Standalone Node/browser-logic tests |
-| `phpstan.neon`, `phpstan-baseline.neon`, `eslint.config.mjs`, `.editorconfig` | Static analysis and editor defaults. The baseline lists the findings that were open when the check arrived: remove an entry when its finding is fixed, never add one to silence a new finding |
-| `docs/` | Human manuals in English and German |
-| `docs/recipes/` | The six extension recipes of this guide, English only |
+| `_nino/` | The kernel: `Nino.php` (boot and autoloader), one class per file in `_nino/Nino/<Class>/`, the modules Nino ships in `_nino/Nino/Modules/<Name>/` - each with its own `Admin/`, `assets/`, `text/`, `templates/` and `install/` - and the public `Nino.css`, `Nino.js` and `Nino.ui.js` |
+| `_admin/` | The workbench: the shell (`Admin.php`, `recovery.php`, `assets/style.css`, `assets/Nino.admin.js`, which only the workbench loads), its screens as modules in `_admin/Nino/Modules/<Name>/`, and the setup wizard with its library in `_admin/install/`, deletable after setup |
+| `app/` | The project's own PHP classes and runtime modules, under namespaces of their own |
+| `features/` | Installed features, one directory each with a `feature.php` manifest; the `nino` constraint it names is the kernel whose vocabulary the feature uses. A checkout ships none: they come from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) |
+| `docs/` | The manuals, and the six extension recipes in `docs/recipes/` |
+| `tests/` | Standalone contract tests (`*-smoke.php`, `*-js-smoke.js`), `harness.php` and `fixtures/` |
+| `history/` | The frozen `CHANGELOG.md` up to 1.7.0; from there the history is the git log and the tags |
+| `private/`, `public/` | One installation's own state, written by the wizard and tracked by nobody. `private/` is never served: `config.php`, `templates/`, `text/`, `elements/`, `assets/`, `data/`, `.auth/`, `.logs/`, `.backups/`. `public/` is what a browser loads directly: `images/`, `fonts/`, `favicon/` and the generated `.cache/` |
 
-Project content and generated destinations:
-
-| Path | Data |
-| --- | --- |
-| `config.php` | Stable application configuration and routes |
-| `templates/*.tpl` | Runtime HTML+ templates |
-| `text/global.php` | Locale-independent textfills |
-| `text/<locale>.php` | Translated textfills |
-| `text/blacklist.php` | Technical fills hidden from normal editing |
-| `text/meta.php` | Per key: the format (`plain`, `inline`, `lines`, `blocks`) and the character limit somebody chose, `['/the/key' => ['format' => ..., 'maxlength' => ...]]`. Written by the Text Keys tab, no shipped entries; a key without one takes its format from its values (`\Nino\Html::detectFormat()`) |
-| `elements/<type>.php` | Element schema plus shared and localized records |
-| `images/` | Project and uploaded images |
-| `data/` | Runtime records, locks, logs, caches; normally not versioned |
-| `data/index-<type>.php` | Derived locale-grouped Elements search index; recreated from the type file, never source content |
-
-A fresh checkout may not yet contain all generated destination directories.
-Do not “fix” their absence by adding empty placeholders. The setup wizard creates and
-populates them.
-
-Library files are sources, not live project files. Editing
-`_admin/install/library/pages/home/templates/page-home.tpl` changes future
-installations; it does not update an already generated
-`templates/page-home.tpl`. Modify the correct ownership layer.
+Reach project state through `Filesystem::path()` and `Filesystem::url()` (or the
+`[[/nino/public]]` fill), never a url built by hand from `[[/nino/dir]]`. Write
+no project state into a tool folder (that breaks updates) or into `config.php`
+(a Restore rolls it back); `\Nino\AppData::DEFAULTS` sit under that file, so it
+holds only what the project decided. A fresh checkout has no `private/` or
+`public/` - the wizard creates them, so add no placeholders - and a file under
+`_admin/install/library/` is a source: editing it changes future installations.
 
 ## 5. Core runtime model that every extension must preserve
 
@@ -184,14 +133,11 @@ $request = \Nino\request( $appData, $_SERVER );
 \Nino\output( $appData, $request );
 ```
 
-- `$appData` is application state, configuration, callbacks, caches, and
-  runtime state.
-- `$request` is one normalized request and its response.
-- Both are passed by reference.
-- Keys under `/...` are stable configuration/data space.
-- Keys under `./...` are request-lifecycle-only state.
-- A `/...` value is not persistent merely because it is in `$appData`. A
-  writer must explicitly save it.
+`$appData` is application state, configuration, callbacks, caches, and runtime
+state; `$request` is one normalized request and its response. Both are passed by
+reference. Keys under `/...` are stable configuration/data space, keys under
+`./...` request-lifecycle-only state. A `/...` value is not persistent merely
+because it is in `$appData`: a writer must explicitly save it.
 
 ### Text keys
 
@@ -213,7 +159,7 @@ kernel's runtime fills and is no text key. A label in front of a fact is a word
 of its own (`/template/common/label/phone`), the fact comes from
 `/project/company/...` alone. `tests/keys-smoke.php` holds everything shipped to
 this; the Text Keys tab creates and renames only keys that follow it. The rules
-and the reasons are in [docs/development.md](docs/development.md).
+and the reasons are in [docs/development.md](docs/development.md#the-key-grammar).
 
 ### Response rules
 
@@ -362,7 +308,6 @@ events; `/nino/*` is reserved for Nino.
 - Match nearby tabs, spaces, braces, docblocks, and explicit types.
 - Validate array shape before reading nested user data.
 - Catch failures only when the caller can recover safely; do not hide bugs.
-- Do not call internal `_method()` APIs across class boundaries.
 
 ### Markup belongs in a template
 
@@ -405,641 +350,176 @@ workbench user is ever sent it.
 
 ### JavaScript
 
-- There is no module bundler or transpiler.
-- Admin files use an IIFE and attach behavior below `window.Nino`.
-- Use `const`/`let`, explicit event listeners, and existing HTTP helpers. A
-  workbench panel never posts by hand: it calls `Nino.adminUi.api.call()`,
-  which knows where `/_admin/` is below the project's directory and what to
-  do when the session has ended.
+- There is no module bundler or transpiler. Admin files use an IIFE and attach
+  behavior below `window.Nino`.
+- Use `const`/`let`, explicit event listeners, and existing HTTP helpers: a
+  workbench panel never posts by hand but calls `Nino.adminUi.api.call()`.
 - Do not add inline handlers or depend on globally leaked DOM IDs.
 - Keep pure model functions separately testable where practical.
 - Use `textContent` for all server- or user-derived strings.
 
 ### CSS and management UI
 
-See "Designing an admin frontend" below before writing any markup or CSS for
-the workbench - the shell, a panel, the setup wizard or the recovery page.
+See "Designing an admin frontend" in the
+[admin panel recipe](docs/recipes/admin-panel.md#designing-an-admin-frontend)
+before writing markup or CSS for the workbench: the shell, a panel, the wizard
+or the recovery page.
 
 - Maintain keyboard focus, labels, error text, small viewports, coarse pointers,
-  and `prefers-reduced-motion`.
-- Do not encode meaning only by color or hover.
-- A design layer turns `_nino/Nino.css` through the custom properties it
-  declares in `:root`: the font roles, the type scale, the hero, card title
-  and variant scales, `--grid-gutter`, `--shadow-card`, the ground pair
-  `--color-ground` and `--color-ink` and the border of each ground (listed in
-  the design manual, [docs/design.md](docs/design.md#hooks-in-ninocss)). A rule
-  for a title, a subtitle, the page, a button or a code block reads its role
-  rather than a literal, and a new default is declared in `Nino.css`:
-  the delivered `theme.css` is the body the catalogue's Design feature
-  compiles at its defaults, and the catalogue's tests compare the two byte
-  for byte, so a change there is made in both repositories.
-- A section, a column and a card paint a ground with the same words (`alt`,
-  `tint`, `dark`, `black`, `primary`, `brand-alt`) and set the roles for what
-  stands in it. No rule compares the ground of a thing with the ground it sits
-  on: a column or a card that should stand out of its surroundings asks for
-  `counter`, and the `--counter-*` properties that answer are the framework's -
-  a design layer sets the colours they are taken from and never one of them.
-
-## 6a. Designing an admin frontend
-
-The `nino.system` half of `_admin/assets/style.css` is the design system for
-the workbench and every panel in it, the setup wizard and the recovery page
-included. It is not a stylesheet one screen happens to share - it defines the
-vocabulary, and a panel's own stylesheet - `assets/admin.css` beside its
-class, whether the module is the workbench's own or a project's - supplies only
-what is genuinely local to it. The `nino.tool` half of the same file is the
-shell's own: the rail, the panel switching, the login screen.
-`_admin/assets/Nino.admin.js` is the same idea for behaviour: a component that assembles
-markup (`Nino.adminUi.switchField()`, `.table()`, `.selectField()`) lives there,
-never as a per-tool copy. It extends the namespace `Nino.js` creates, so it loads
-after it - and it is deliberately *not* in the public script bundle, which is why
-it is a file of its own rather than more of `Nino.js`.
-
-**A panel ships its own stylesheet and nothing else.** A panel's `assets()`
-join the workbench's bundle after the shell's own files, and a module panel's
-template is a fragment that links nothing. The old tools used to load each
-other's complete stylesheets for a handful of classes; copy the class you need
-into the panel that needs it, or promote it to the design system - never
-restate the shell. Every rule of a panel stylesheet is loaded on every screen
-of the workbench, so scope every one of them to the panel's own root
-(`#pd-app .pd-canvas`, `#features-list .admin-features-head`) - a bare `body {}` or
-`code {}` in a panel file lands on the whole workbench.
-
-### The five rules
-
-1. **The shared file contains no id selectors.** An id names one element in one
-   tool. A tool's own stylesheet may use ids freely - that is where one-off
-   layout belongs.
-2. **Shared classes are namespaced `nino-admin-*`.** If a class does not carry
-   that prefix it belongs to one tool, and the shared file must not style it.
-3. **`.nino-admin` is the scope root**, on the outermost element of any admin
-   surface. Add `.nino-admin-shell` for a full-height application surface,
-   `.nino-admin-shell--rail` if it is the usual rail+pane layout, or
-   `.nino-admin-auth` for a centered login card.
-4. **A class name describes a role, never a place.** `.nino-admin-btn-primary`
-   is "the primary action", not "the button under a list". A class carrying the
-   margins of wherever it first appeared breaks the moment it is reused - which
-   is exactly how the wizard's "New Route" button once inherited a stray
-   `margin-top` from another screen's list class.
-5. **Cascade layers decide who wins before specificity.** Every stylesheet of
-   the workbench opens with `@layer nino.system, nino.tool, nino.local;`. The
-   design system lives in `nino.system`; normal screen and component rules
-   live in the later `nino.tool` layer, so they can refine the low-specificity
-   `:where(.nino-admin)` baseline without selector escalation. Reserve
-   `nino.local` for a deliberate final override, not every normal component
-   difference.
-
-### When adding a screen
-
-Reach for an existing class first; only invent one when no role fits.
-
-| Need | Class |
-|---|---|
-| Surface root | `.nino-admin` + `.nino-admin-shell` (+ `--rail`) |
-| Sidebar, its brand block, its nav | `.nino-admin-rail`, `.nino-admin-rail-head`, `.nino-admin-nav` |
-| Scrolling content column | `.nino-admin-pane` |
-| Sticky top row (back link, locale switch) | `.nino-admin-contextbar` via `Nino.adminUi.contextBar()` |
-| Back link inside that row | `.nino-admin-back-link` |
-| Fixed bottom actions | `.nino-admin-actionbar` via `Nino.adminUi.actionBar()` |
-| Fixed actions above a list | `.nino-admin-list-actions` via `Nino.adminUi.listActions()` |
-| Status text in a bottom bar - saving, saved at hh:mm, unsaved changes, why it failed | `.nino-admin-status` via `Nino.adminUi.status()` (in the bar it replaces `.nino-admin-actionbar-status`) |
-| Mark after the name of a required field, and the sentence under a refused one | `.nino-admin-required` (drawn `aria-hidden`; the control gets `aria-required`), `.nino-admin-field-error` (linked with `aria-describedby`, never `role="alert"`) |
-| "Unsaved changes" mark in a registered form's action bar | `.nino-admin-actionbar-dirty`, written by `Nino.admin.dirty.refresh()` into every registered form's bar and hidden by the stylesheet only in a bar that has a status line (below 38 rem, where the status line is hidden, it shows again) - not a `p`, not `role="status"` |
-| Primary / destructive button | `.nino-admin-btn-primary`, `.nino-admin-btn-danger` |
-| Raised panel | `.nino-admin-card` (a `fieldset` is one already) |
-| Clickable drill-down list | `.nino-admin-list` (+ `.nino-admin-list-copy` per row) |
-| Many rows of the same record, with search/sort/paging | `Nino.adminUi.table()` — see below |
-| List of rows that are read, not opened | `.nino-admin-list-dense` |
-| List whose rows are `button`s | `.nino-admin-list-buttons` |
-| Dashboard tiles | `.nino-admin-tiles`, `.nino-admin-tile` |
-| Share-of-total bar under a label | `.nino-admin-meter-row` + `-label`/`-count`, `.nino-admin-meter-track` + `-fill` |
-| Labelled form field | `.nino-admin-field` (`.nino-admin-field-wide` opts out of the two-column desktop grid) |
-| Container whose fields share that grid | `.nino-admin-fieldgrid` |
-| Run of checkbox rows | `.nino-admin-checklist` |
-| Rich-text editor mount | `.nino-admin-richtext` (`Nino.admin.htmlEditor.create()`, its fifth argument the format: `inline`, `lines` or `blocks`) |
-| List of texts, edited as rows | `.nino-admin-stringlist` via `Nino.adminUi.stringList()` (the value is a hidden input carrying the JSON, like `elementList()`'s) |
-| Explanatory text / screen intro | `.nino-admin-hint`, `.nino-admin-hint-lead` |
-| Something needs attention until it is fixed - failing mail, untranslated texts, maintenance on | `.nino-admin-notice` via `Nino.adminUi.notice( message, { href, label } )`; a link only for a `#panel` href, the text always as text |
-| Nothing here yet (a list without entries, a scan that found nothing) | `.nino-admin-empty` via `Nino.adminUi.emptyState()` |
-| Error text | `.nino-admin-error` |
-
-**Every word is a fill.** A panel script never renders a literal English
-sentence: the workbench's strings are `_admin/text/<locale>.php`, a module's are
-the `text()` directory beside its panel, and `[jstext]` hands all of them to
-`Nino.content.getText()`. A placeholder is `%s`, `%d` or `%n`, filled with
-`Nino.adminUi.format()`. A label the backend sends - a schema's `label` and `hint`, a
-dashboard tile's or a permission's label - may be a fill key or literal text;
-`Nino.adminUi.text()` resolves it either way - which is also how a value that
-is both shown and compared stays translatable: send a slug and name it on the
-client (see the Features panel's `_categoryLabel()`), never
-compare against a word a locale file can change.
-
-**One way to the server, one way to say what failed.** A panel's `_apiCall`
-is a thin name for `Nino.adminUi.api.call( action, payload, callback, extra )`.
-It is a function body, never a property evaluated while the object is built,
-because panel scripts also run where `Nino.admin.js` is not loaded. The helper calls back
-with `( status, body )` synchronously, and handles the end of a session itself:
-only a `401` with the code `session` and a `403` with the code `csrf` are one,
-and the page then asks for a login again over itself (`<dialog>` in
-`page-index.tpl`) and sends the waiting requests on if the same account signs
-in. A failure a person can cause carries a stable code, its params and the
-field, `\Nino\Http::fail( $request, 400, 'English message', 'code', [ param ], 'field' )`,
-and the client says it through `Nino.adminUi.api.errorText()` from the fill
-`/_admin/error/<code>` (the shell's own for the codes every panel meets, a
-panel's in its `text()` directory under its slug prefix). `tests/admin-system-smoke.php`
-finds every code in the source and fails on one without text in both languages.
-A message with params is filled with `Nino.adminUi.format()`, never with
-`String.replace()`. Image uploads are checked against `\Nino\Images::limits()`
-in the browser first (`data-upload-bytes`, `data-upload-pixels` on the shell,
-`Nino.adminUi.checkImage()`, `uploadHint()`) and by `Admin::uploadError()` and
-`Images::reject()` on the server.
-
-**Unsaved input.** A panel that keeps a form registers it with the shell,
-`Nino.admin.dirty.register( name, { isDirty, save( done ), discard } )` or, for
-a form of plain fields, `watchForm( name, formGetter, save[, bar] )` plus `snapshot(
-name )` after every draw and every successful save. The registration is behind
-`if( typeof Nino.admin.dirty === 'object' )`: panel scripts run in suites and on
-older shells without it. The name is the uri of the panel or tab (`admin-tab-<name>`,
-else `admin-content-<name>`). Every exit that drops the form - a request that
-draws it again, a reload, a link to another record - runs inside
-`Nino.admin.dirty.guard( [ names ] | null, proceed, onCancel )`, which asks
-Save / Discard / Cancel through `Nino.adminUi.choiceDialog()`; `save( done )`
-calls `done( true )` or `done( false )` on every way it can end. The shell
-already guards the back link, logout and the interface language. See the
-[admin panel recipe](docs/recipes/admin-panel.md#unsaved-input).
-
-A workspace panel's markup (`templates/panel.tpl`) is the other place a
-sentence hides, and reads ordinary `[[fills]]`. A fill's *value* is substituted
-into the page before the shortcode pass runs, and `[jstext]` ships the same
-stored value, so a value must never contain a live shortcode token: escape the
-bracket (`&#91;template]`) in a value that is only ever markup, and put a `%s`
-in one a script renders, filling it from the script's own source - a `.js` file
-is a static asset and is never rendered.
-`tests/admin-lists-js-smoke.js` fails on a literal sentence in a panel script
-or in that markup, and `tests/admin-system-smoke.php` twice over: statically on
-a key a panel's scripts or markup ask for that either language lacks, and end to
-end - it renders the whole workbench in both interface languages and fails on any
-`[[fill]]` that came out the other side unresolved, which is the only version a
-key its regexes do not recognise cannot slip past. A schema two surfaces share keeps its English as the
-fallback, and the panel looks for a fill of its own first. The recovery page
-and the setup wizard are English by design.
-
-### The shared data table
-
-`Nino.adminUi.table()` renders a sortable, searchable, paged table of records.
-Use it where the values themselves are what the screen is for; the grouped list
-stays right for a handful of rows you only drill into.
-
-It owns **no strings**. Everything that can be a number or a glyph is one - the
-pager arrows, the row range, a boolean cell - so a caller supplies only
-`labels: { search, empty, noMatch }`. That is deliberate: every word comes
-from the caller, translated through `Nino.content` or not, and a component
-that hardcoded one would be half-translated wherever the caller's are not
-English.
-
-Pass the **whole set** and let it page. An element type is one file read whole
-on every request (`\Nino\Elements::queryElements`), so asking for one page costs
-exactly what asking for everything costs, and searching locally is instant
-instead of a round trip per keystroke. 1000 rows of eight columns is 14 KB
-gzipped. Roughly 1000 elements per type is also where the storage model itself
-stops being the right tool — past that, use SQLite or MySQL.
-
-A column may carry `render(value, row)` returning an Element, for a cell that
-holds a link or a per-row action; sorting and searching still use the plain
-value, so behaviour never depends on how a cell is drawn.
-
-The pure half (`Nino.adminUi.tableModel`) is filtering, sorting, paging and cell
-formatting as plain functions — extend and test there, not in the renderer.
-`tests/nino-ui-table-js-smoke.js` covers it.
-
-### Three traps
-
-- **Never assign `className` on an element that carries a design-system class.**
-  The shells carry `.nino-admin` plus their `show-<panel>` state, so switching
-  panels with `el.className = 'show-x'` silently deletes the entire shared
-  layout. Use `Nino.adminUi.setStateClass()`, or `classList` for anything else.
-- **A panel stylesheet must scope every `nino-admin-*` rule to its own root**
-  (`#pd-app .nino-admin-btn-primary`, not `.nino-admin-btn-primary`) - see the
-  bundling note above.
-- **Restating a shared component in a panel is not "refining" it.** A panel copy
-  sits in the later `nino.tool` layer, so it wins over the design system whole
-  and the two drift apart silently. The old editor carried a second copy of every
-  token, button, input, field, tile, card and rich-text rule this way. Delete
-  the copy; if the shared version is genuinely wrong for every screen, fix it in
-  the design-system half of `style.css`.
+  and `prefers-reduced-motion`; do not encode meaning only by color or hover.
+- A design layer turns `_nino/Nino.css` through the custom properties its
+  `:root` declares, and the comments there are the reference. A new default is
+  declared in `Nino.css`; the delivered `theme.css` is the body the catalogue's
+  Design feature compiles at its defaults, and the catalogue's tests compare the
+  two byte for byte, so a change there is made in both repositories.
 
 ### Templates
 
-- `.tpl` files contain HTML+, never PHP.
-- Use valid semantic HTML and accessible names.
-- Use real `button` controls for actions and real `a` elements for navigation.
-- Every form control needs a label; every content image needs suitable alt text.
-- Do not add inline event handlers.
+- `.tpl` files contain HTML+, never PHP, and no inline event handlers.
+- Use valid semantic HTML and accessible names: real `button` controls for
+  actions, real `a` elements for navigation, a label on every form control and
+  suitable alt text on every content image.
 - Do not assume JavaScript is available for essential content.
 
 ## 7. Recipes
 
-The six extension recipes are listed below, under `docs/recipes/`. They are
-part of this specification: every rule above applies inside them, and a change to a
-contract they describe updates the recipe in the same commit. Section 3
-decides which one applies.
-
-| Recipe | Use it for |
-| --- | --- |
-| [Add a panel to the workbench](docs/recipes/admin-panel.md) | a new screen in `/_admin`, as a module panel or a workbench panel |
-| [Add a runtime module](docs/recipes/runtime-module.md) | PHP behaviour at boot, a shortcode, a state-changing endpoint, module configuration |
-| [Add a component](docs/recipes/component.md) | a shortcode with a schema - a component, or a stack that loops the elements of a type - from a project or a feature's manifest |
-| [Add an installer module package](docs/recipes/installer-package.md) | a module the setup wizard can select, copy and configure |
-| [Define Element types for repeated content](docs/recipes/element-types.md) | repeated structured content: model fields, uris, rendering, search |
-| [Package a feature](docs/recipes/feature.md) | a module delivered as one directory under `features/`, with a manifest, settings, a version and its own test, switched on in the Features panel |
+The six extension recipes linked from the table in section 3 are part of this
+specification: every rule above applies inside them, and a change to a contract
+they describe updates the recipe in the same commit.
 
 ## 8. Security review required for every extension
 
 Security is not a separate cleanup pass. Apply the following questions while
 designing the behavior and assert important boundaries in tests.
 
-### 8.1 Trust boundaries
+### 8.1 Trust, authentication and CSRF
 
-Treat all of these as untrusted:
-
-- `$_GET`, `$_POST`, headers, cookies, request body, uploaded bytes, and IP
-  forwarding headers;
-- Admin and Editor payloads, even after login;
-- values loaded from editable `config.php`, text, Elements, and templates;
-- filenames and IDs supplied by a browser;
-- imported translation JSON;
-- external API, webhook, feed, and mail data;
-- and HTML returned from a project callback.
-
-Authentication proves who sent data. It does not make the data structurally
-valid or safe for HTML, a path, a header, or a class name.
-
-### 8.2 Authentication and authorization
+Treat all of these as untrusted: `$_GET`, `$_POST`, headers, cookies, the request
+body, uploaded bytes, and IP forwarding headers; Admin and Editor payloads, even
+after login; values loaded from editable `config.php`, text, Elements, and
+templates; filenames and IDs supplied by a browser; imported translation JSON;
+external API, webhook, feed, and mail data; and HTML returned from a project
+callback. Authentication proves who sent data, not that it is valid or safe for
+HTML, a path, a header, or a class name. Validation in the browser is a
+convenience: repeat it on the server.
 
 - Every panel API method calls `Admin::guardPerm()` with the panel's own
-  permission; `Admin::guard()` alone is for the one screen every account may
-  use.
-- Runtime management endpoints check a specific
-  `Auth::checkPermission()` value.
-- Read and write permissions are distinct when their risk differs.
+  permission; `Admin::guard()` alone is for the one screen every account may use.
+- Runtime management endpoints check a specific `Auth::checkPermission()`
+  value; read and write permissions are distinct when their risk differs.
 - Do not accept a username in the request and check that user's permission as
-  authorization for the current caller.
-- Do not expose workbench actions through a new public route.
-- Session fixation protection and cookie policy remain in the kernel; do not
-  implement parallel ad-hoc auth cookies.
+  authorization for the current caller, expose workbench actions through a new
+  public route, or implement parallel ad-hoc auth cookies: session fixation
+  protection and the cookie policy stay in the kernel.
+- Respect `./nino/csrf/blocked` before runtime write behavior; admin guards also
+  respect an already failed response. Do not exempt JSON requests merely because
+  their content type is JSON. A signed webhook exemption validates raw bytes,
+  timestamp/replay window, algorithm, and secret using constant-time comparison.
 
-### 8.3 CSRF
+### 8.2 Identifiers, paths, classes, URLs and output
 
-- Keep core CSRF active on state changes.
-- Render `[csrf]` in browser forms.
-- Respect `./nino/csrf/blocked` before runtime write behavior.
-- Admin guards also respect an already failed response.
-- Do not exempt JSON requests merely because their content type is JSON.
-- A signed webhook exemption validates raw bytes, timestamp/replay window,
-  algorithm, and secret using constant-time comparison.
-
-### 8.4 Identifiers, paths, classes, and URLs
-
-- Define a full-match allowlist regex for IDs and slugs.
-- Reject `..`, slashes where a flat segment is expected, null/control
-  characters, and empty normalized values.
-- Resolve project paths through `Filesystem` or a fixed owned base directory. Never concatenate onto `Filesystem::getPath()` for a private path — that is the public, webserver-facing root. Use `Filesystem::path( $appData, '/text' )`, which resolves `Filesystem::PRIVATE_DIRS` against the private root instead.
-- Never pass a request-derived class string to autoloading or
-  `method_exists()`.
-- Never let a request choose an arbitrary callback method.
-- Validate schemes for links. Reject `javascript:` and unexpected data schemes
+- Define a full-match allowlist regex for IDs and slugs. Reject `..`, slashes
+  where a flat segment is expected, null/control characters, and empty
+  normalized values. Validate structure before resolving or escaping.
+- Resolve project paths through `Filesystem` or a fixed owned base directory.
+  Never concatenate onto `Filesystem::getPath()` for a private path - that is
+  the public, webserver-facing root; `Filesystem::path( $appData, '/text' )`
+  resolves `Filesystem::PRIVATE_DIRS` against the private root instead.
+- Never pass a request-derived class string to autoloading or `method_exists()`,
+  and never let a request choose an arbitrary callback method.
+- Validate schemes for links: reject `javascript:` and unexpected data schemes
   where the value can enter an `href` or `src`.
-- For outbound HTTP, allowlist destinations where possible, set time/size
-  limits, and prevent redirects to local/private addresses. The kernel's one
-  client is `\Nino\Fetch::get()` - https only, no redirects, a timeout and a
-  byte cap, stubbed in tests - and the catalogue is its only caller; a
-  feature that needs the network goes through it rather than calling curl
-  itself, and never on a page request.
+- For outbound HTTP, allowlist destinations where possible and set time and size
+  limits; a feature that needs the network goes through `\Nino\Fetch::get()`
+  (https only, no redirects), and never on a page request.
+- Escape at the output context (section 5); a CSS, JS, mail header or shell
+  context needs handling of its own. Do not trust a rich-text editor's client
+  filtering or concatenate request data into inline scripts or styles; keep CSP
+  nonces and the security headers, and add no `unsafe-inline` or remote CSP
+  source merely to make one widget work.
 
-Escaping does not make path traversal safe. Validate structure before resolving
-or escaping.
+### 8.3 Files, uploads and privacy
 
-### 8.5 HTML and browser DOM
-
-- Plain strings become text with `htmlspecialchars` or `textContent`.
-- Rich text passes `Html::sanitizeHtml()` on the server.
-- Do not trust a rich-text editor's client filtering.
-- Do not concatenate request data into `innerHTML`.
-- Do not concatenate strings into inline scripts/styles.
-- Preserve CSP nonces and existing security headers.
-- Do not add `unsafe-inline` or a remote CSP source merely to make one widget
-  work.
-- Neutralize Nino bracket syntax when untrusted data enters a recursively
-  rendered shortcode result.
-- Attribute, URL, HTML, CSS, JS, JSON, mail header, and shell contexts require
-  different handling.
-
-### 8.6 Files and uploads
-
-- Use Nino's image processing API for uploads.
-- Enforce size, decoded format, width/height, and an owned destination.
-- Store generated relative filenames, not a browser filename or absolute path.
-- Do not delete a previous image until the new value was successfully
-  persisted; restore/cleanup on veto as current image flows do.
-- Delete only files proven to be owned by the exact record/slot.
-- Never recursively delete a path assembled from a request.
-- Use atomic mutation for array files.
-- Keep secrets and runtime records out of versioned templates/text.
-
-### 8.7 Privacy, enumeration, and retention
-
+- Use Nino's image processing API for uploads: enforce size, decoded format,
+  width/height, and an owned destination, and store generated relative
+  filenames, not a browser filename or absolute path.
+- Do not delete a previous image until the new value was persisted (restore or
+  clean up on veto, as current image flows do). Delete only files proven to be
+  owned by the exact record or slot, and never recursively delete a path
+  assembled from a request. Keep secrets and runtime records out of versioned
+  templates and text.
 - Public login, reset, newsletter, and account-like flows return generic
-  responses that do not reveal whether a record exists.
-- Rate-limit authentication, public mail, signup, and expensive endpoints.
-- Bound log and submission retention.
+  responses that do not reveal whether a record exists. Rate-limit
+  authentication, public mail, signup, and expensive endpoints, and bound log
+  and submission retention.
 - Do not log passwords, CSRF tokens, session IDs, authorization/cookie headers,
-  backup keys, full request arrays, or unnecessary personal data.
-- Export only the requested content scope.
+  backup keys, full request arrays, or unnecessary personal data. Export only the
+  requested content scope.
+- A translation import is merge-only and validated against schema and path;
+  unknown keys and the technical, global and image fields stay untouched.
 - A feature that processes personal data MUST bring its section of the privacy
-  policy: `install/elements/privacy.php` and the unit key `elements` (add-only,
-  see `\Nino\Elements::seed()`), written in its own words and stating only
-  what the code does. The text is a starting point and no legal advice - say so
-  in the feature's manual. A value of the website belongs in a placeholder
-  (`#/project/company/contact/email#`), never in the text.
-- Translation import is merge-only and schema/path validated; unknown keys and
-  technical/global/image fields remain untouched.
+  policy, as the [feature recipe](docs/recipes/feature.md#4-the-install-unit) writes it.
 
-### 8.8 Failure behavior
+### 8.4 Failure behavior
 
 - Use `400` for malformed input, `401` for missing authentication, `403` for
   insufficient permission, `404` for an intentionally public missing resource,
   `409` for conflicts, `429` for rate limits, and `500` for an internal write
   failure where the operation did not complete.
-- Do not report success before persistence succeeds.
-- Do not turn a recoverable logging failure into loss of a successfully handled
-  public request.
-- Do not swallow programming errors under a broad `catch(Throwable)`.
-- Test the failure branch, not only the happy path.
-- A failure a person can cause and a panel can word carries a code with text
-  in both interface languages (see `\Nino\Http::fail()`); one without a code is
-  shown as the server's English message, so give a new one a code. A `401`
-  that means "the session has ended" carries the code `session` and nothing
-  else does: the workbench offers a login again for exactly that answer.
+- Do not report success before persistence succeeds, do not turn a recoverable
+  logging failure into loss of a successfully handled public request, and do not
+  swallow programming errors under a broad `catch(Throwable)`.
+- A failure a person can cause carries a code with text in both interface
+  languages, and only a `401` for an ended session carries the code `session`;
+  see `\Nino\Http::fail()` and the [panel recipe](docs/recipes/admin-panel.md#saying-what-happened).
 
 ## 9. Common incorrect approaches and their correction
 
 | Incorrect | Correct |
 | --- | --- |
-| Edit a generated `templates/` file when changing future installs | Edit the owning `_admin/install/library/...` source |
-| Assume a page template creates a route | Add a route separately |
-| Call a route “the template” | Keep public route, internal URI, and template body distinct |
-| Register a workbench panel in a list | Nothing to register - put the module under `_admin/Nino/Modules/<Name>/`, `Admin::modules()` reads the directory |
-| Edit the shell template or a tab list to add a screen | Write a panel class; a runtime module answers `adminPanels()`, a workbench module is a directory under `_admin/Nino/Modules/` |
-| Rely only on dispatcher auth | Guard every API method |
-| Use direct `echo`/`header()` | Modify `$request` / use `Http` |
-| Read then write a shared PHP array | Use `Filesystem::mutate()` |
-| Serialize all `$appData` | Persist selected keys with the owning writer |
-| Use `innerHTML` for an API label | Construct DOM and use `textContent` |
-| Validate only in JavaScript | Repeat strict validation server-side |
-| Make image fields required | Create the Element, then upload |
-| Save one merged Element object to every locale | Split global and locale fields |
 | Bind an Elements image to a textfill or a fixed value | An Elements image binds to a `field` of the collection's model |
-| Prefix reusable includes with `page-` | Reserve `page-*` for full page templates |
-| Add metadata below markup | Put both metadata comments at byte zero |
-| Remove copied installer files on deselect | Update selection only; preserve edited files |
-| Put an installable feature under `app/Nino/Modules/` or offer it in the wizard | One directory under `features/<Name>/` with `feature.php`; the Features panel activates it after setup |
-| Declare a feature's class in its manifest | The class is `\Nino\Modules\<Directory>`, derived; a `module` entry saying anything else is refused |
-| Let a feature's unit overwrite a project file on update | Activation and update are add-only; migrate the feature's own data in `upgrade()` |
-| Declare a page-unit file that does not exist | Keep `files` paths unit-relative and test the copied output |
-| Put translated words in IDs/fill keys | Use stable semantic slugs, in the key grammar |
-| Invent a key shape, glue words together (`adress`, `getintouch`) or keep a table of labels | Follow `/<namespace>/<category>/<part>/<name>`; the workbench names the fields from the key |
-| Fill the fields of an element into the content of a stack with `str_replace()` | A stack calls `\Nino\Modules\Components::renderStack()`: the content is rendered once per element, with the element as the context components read |
-| Register a shortcode a tool is meant to offer with `Html::addShortcode()` alone | `Components::addComponent()` or `addStack()`, or the manifest keys `components` and `stacks`; `addShortcode()` adds a second callback beside an existing one, `addComponent()` replaces it |
-| Update only English or German behavioral docs | Keep both manuals synchronized |
-| Test for a new file but not behavior | Assert observable response/data/DOM contracts |
+| Prefix reusable includes with `page-`, or add metadata below markup | Reserve `page-*` for full page templates; put both metadata comments at byte zero |
 
-When an existing pattern appears to violate this guide, inspect the current
-runtime and tests. A stale pattern is not authority for new code.
+## 10. Tests and validation
 
-## 10. Test and validation matrix
+Every test is a standalone script that creates its own isolated temporary
+project and does not rely on a previously installed working tree. The commands CI
+runs - the nine PHP suites, the JavaScript loop, PHPStan and ESLint - are one
+block in [docs/deployment.md](docs/deployment.md#tests-before-go-live): run the
+suite of the area you changed, and the whole block for a change to the shared
+kernel, security, the filesystem, the installer or an interface two parts share.
+PHPStan and ESLint MUST report nothing new: a finding listed in
+`phpstan-baseline.neon` may be fixed and its entry removed, a new finding is
+never added to the baseline. Report a check whose interpreter, extension,
+browser capability or fixture was unavailable as not run, with the reason.
 
-Every test is a standalone script. It creates or should create its own isolated
-temporary project and must not rely on a previously installed working tree.
+A change to what a catalogue feature reads from the kernel - the demo page and
+its `data-demo-preset` marks, `Nino.css`, the base unit's templates and keys, the
+feature contract - is also checked by the catalogue itself, before the push:
+`NINO_ROOT=$PWD ../nino-features/bin/check.sh`, with
+[dapeio/nino-features](https://github.com/dapeio/nino-features) cloned beside
+it. A rename that spans both repositories is a coupled pair (section 2).
 
-| Changed area | Minimum targeted tests |
-| --- | --- |
-| Kernel, callbacks, rendering, runtime module | `tests/kernel-smoke.php` |
-| The Components module, a component's or a stack's schema, the manifest keys `components` and `stacks` | `tests/kernel-smoke.php` (the registry, the sources, the stacks, the page of the Builder in `tests/fixtures/builder-page-home.tpl`), `tests/features-smoke.php` |
-| Shared writes, locks, logs | `tests/concurrency-smoke.php` plus owner test |
-| Workbench shell, accounts, content panels | `tests/admin-smoke.php` |
-| Structure/system panels, registry contract, recovery | `tests/admin-system-smoke.php` |
-| Workbench frontend | relevant `tests/admin-*-js-smoke.js` |
-| Setup wizard behavior/library | `tests/install-smoke.php` and relevant install JS test |
-| The Legal module, the unit keys `elements` and `navs`, `\Nino\Elements::seed()`, the route field `maintenance` | `tests/legal-smoke.php`, plus `tests/kernel-smoke.php`, `tests/features-smoke.php` and `tests/install-smoke.php` |
-| The delivered look - `theme.css`, the two frame templates | `tests/install-smoke.php` and `tests/install-library-templates-js-smoke.js` |
-| The feature contract (`\Nino\Features`, the wizard's unit application) | `tests/features-smoke.php` |
-| The catalogue (`\Nino\Catalogue`, `\Nino\Fetch`, the panel's catalogue and install actions) | `tests/catalogue-smoke.php` - a keypair, signed catalogues and archives built in the test, the network stubbed |
-| A feature (a new one, or one of the catalogue's such as Newsletter or Search) | its own `features/<Name>/tests/<key>-smoke.php`, plus `tests/features-smoke.php`; CI's `features` job runs the catalogue's features against every push |
-| A text key, a template's file name, a unit's text, the key grammar | `tests/keys-smoke.php` - the shipped keys follow the grammar, no old form is left, every key a template reads resolves |
-| Anything a catalogue feature reads from the kernel - the demo catalogue page and its `data-demo-preset` marks, `Nino.css`, the base unit's templates and keys, the feature contract | the catalogue's own checks against this checkout, before the push: `NINO_ROOT=$PWD ../nino-features/bin/check.sh`, with [dapeio/nino-features](https://github.com/dapeio/nino-features) cloned beside it. CI's `features` job runs the same tests after the push - a key renamed on one side alone turns it red, so a rename that spans both repositories is pushed to the catalogue first and to Nino right after, and the push that changes Nino's side finds the catalogue renamed already |
-| Shared public UI slider/tabs | corresponding `tests/nino-ui-*-js-smoke.js` |
-| Shared management UI/CSS structure | owner tests plus `tests/admin-lists-js-smoke.js` |
-| Multi-element reference control | `tests/nino-ui-elementlist-js-smoke.js` plus the Elements panel's and the Roles tab's own tests (`tests/admin-elements-js-smoke.js`, `tests/admin-roles-js-smoke.js`) |
+A useful smoke assertion tests what a caller can see: the exact status and a safe
+response shape, the data persisted after a fresh read, two independent changes
+that both survive, the denial of a missing permission or CSRF token, sanitized
+rendered output, and a stable UI state after a request - on the failure branch as
+well as the happy path. It does not assert only that a method exists, snapshot an
+entire unstable page, check a CSS class with no behavioral reason, call a private
+method instead of the public flow, or pass because errors were globally suppressed.
 
-Complete suite:
+## 11. Definition of done
 
-```bash
-php tests/kernel-smoke.php
-php tests/admin-smoke.php
-php tests/admin-system-smoke.php
-php tests/install-smoke.php
-php tests/features-smoke.php
-php tests/catalogue-smoke.php
-php tests/keys-smoke.php
-php tests/legal-smoke.php
-for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
-for test in tests/*-js-smoke.js; do node "$test" || exit 1; done
-php tests/concurrency-smoke.php
-```
+For every artifact: the syntax checks, PHPStan and ESLint pass with nothing new,
+and the tests named in section 10 pass. In addition:
 
-Syntax and diff checks:
-
-```bash
-find . -name '*.php' -not -path './.git/*' -print0 \
-	| xargs -0 -n1 php -l
-find . -name '*.js' -not -path './.git/*' -print0 \
-	| xargs -0 -n1 node --check
-phpstan analyse
-npx eslint .
-git diff --check
-```
-
-PHPStan and ESLint MUST report nothing new. A finding listed in
-`phpstan-baseline.neon` may be fixed and its entry removed; a new finding is
-never added to the baseline.
-
-Do not claim a check passed if the required interpreter, extension, browser
-capability, or fixture was unavailable. Report it as not run and explain why.
-
-### 10.1 What a useful smoke assertion tests
-
-Prefer:
-
-- exact HTTP status and safe response shape;
-- exact persisted data after a fresh read;
-- atomic survival of two independent changes;
-- route ownership and unrelated-route survival;
-- permission/CSRF denial;
-- sanitized rendered output;
-- lossless source reconstruction;
-- real component/preset behavior;
-- and stable UI state after a request.
-
-Avoid:
-
-- asserting only that a method exists;
-- snapshotting an entire unstable HTML page;
-- checking a CSS class with no behavioral reason;
-- calling private methods directly instead of the public flow;
-- or passing because errors were globally suppressed.
-
-### 10.2 Patch verification
-
-For patch-only delivery:
-
-```bash
-git diff --binary --no-ext-diff > nino-change.patch
-# git diff does not include untracked files. Append each new file explicitly:
-git diff --no-index --binary -- /dev/null AGENTS.md \
-	>> nino-change.patch || test $? -eq 1
-git diff --check
-git diff --no-index --check -- /dev/null AGENTS.md || test $? -eq 1
-```
-
-In a clean checkout at the intended base:
-
-```bash
-git apply --check /path/to/nino-change.patch
-git apply /path/to/nino-change.patch
-git diff --check
-```
-
-Then run the relevant tests in that checkout. A patch that applies only on a
-dirty or older tree is not a valid handoff.
-
-## 11. Definition of done by artifact
-
-For every artifact: the syntax checks, PHPStan and ESLint pass with nothing
-new, and the tests named in section 10 pass.
-
-### Panel done
-
-- [ ] The class answers `actions()`, `nav()` and `perm()`; a runtime module's panel is returned by `adminPanels()`, a workbench one is `_admin/Nino/Modules/<Name>/Admin/Admin.php`.
-- [ ] Actions carry the panel's slug and every method guards itself with `Admin::guardPerm()` and the panel's permission.
-- [ ] Payload, IDs, enums, lengths, and paths are validated.
-- [ ] Persistence is atomic and failures are returned.
-- [ ] `assets()` names project-relative `.js`/`.css` only (through `Panels::relative()` for a module); the JS namespace equals the nav uri; a `template()` is a fragment with no head, link or script of its own.
-- [ ] JS uses existing UI primitives and safe DOM construction.
-- [ ] Empty, loading, error, list, form, and saved states are usable.
-- [ ] Requests go through `Nino.adminUi.api.call()`; a failure a person can cause carries a code (params and field where they apply), with text in both languages.
-- [ ] A form panel reports unsaved input to `Nino.admin.dirty` (feature-detected) and guards every exit that would drop it; its save reports `done( ok )` on every way it can end.
-- [ ] Backend and JS tests cover denial, mutation, and - for a module panel - absence while the module is off.
-
-### Runtime module done
-
-- [ ] Class and autoload path match exactly.
-- [ ] `init()` registers behavior without output or incidental writes.
-- [ ] Technical routes have one owner and correct callback identity.
-- [ ] Shortcode/response output is context-safe.
-- [ ] Writes enforce CSRF/auth/validation/rate limit as applicable.
-- [ ] Shared files use atomic mutation and bounded retention.
-- [ ] Activation, API, shortcode, failure, and concurrency are tested.
-
-### Component done
-
-- [ ] The schema validates: every attribute has a `default`, every `select` its `options` with the default among them; `addComponent()` or `addStack()` raises no `E_USER_ERROR`.
-- [ ] The renderer has the signature `( array &$appData, array $args ): string` and returns what it made itself and `$args['value']` - everything else goes through `Components::escape()`. For `image` the value is an escaped reference to look the picture up by (`$args['source']`), not a filename to write; for `content` it is the template's own markup.
-- [ ] A source that resolves to nothing renders nothing, a hand-written shortcode with an unknown or wrong attribute still renders.
-- [ ] A stack renders through `renderStack()` and leaves no shortcode in what it returns; the cell function takes the cell's grid classes and attributes as its fourth argument and puts them on the cell, `Components::cell()` does that. The cell is a `div`: a card is drawn by a `[card]` in the content.
-- [ ] `draws` is declared where a theme addresses the element by tag and class, `in` only where the place matters; a component that is drawn another way in another place is another component, because a renderer reads no context.
-- [ ] A component that holds components declares `holds` - the place of the ones it holds, with the source `content` - and returns its content as it is inside its own markup: the engine renders the output of a shortcode again, a stack's element still the context, so the renderer calls no `renderHtml()` of its own. It never stands directly inside itself, as a stack does not: the shortcode reads to the first closing tag.
-- [ ] Registered one way, by `init()` or by manifest, not both.
-- [ ] The registry, the defaults, a render, a `[` in a value and a refused schema are in a smoke test.
-
-### Installer module package done
-
-- [ ] The unit is the module's own `install/` directory and its key is a unique slug.
-- [ ] Runtime class exists independently of the manifest.
-- [ ] Manifest uses recognized keys and installer slugs for requirements.
-- [ ] Templates/files/types/text land in exact paths.
-- [ ] Config defaults preserve existing custom values.
-- [ ] Reapply is idempotent for selection/config.
-- [ ] Deselect does not destructively delete copied files.
-- [ ] Direct selection and page auto-require paths are tested.
-- [ ] `elements` only adds (a second apply changes nothing, a deleted section stays deleted where the module keeps a tombstone) and is read by `applyUnit()`, not by the page auto-require path; `navs` creates a menu only in the wizard's apply step and only while the project has none.
-
-### Feature done
-
-- [ ] One directory `features/<Name>/` whose name is the class name; `feature.php` returns a valid manifest (`\Nino\Features::manifest()` answers an array without a warning) and the class file lies beside it.
-- [ ] `key` is a unique slug, `version` is `major.minor.patch`, `nino` names the constraint it was written against, `requires` lists feature keys, `data` lists the `/data/` files it owns.
-- [ ] Every setting has a known type, a validating default where it has one, no default on a `secret`; the class reads settings through `\Nino\Features::setting()` with a default.
-- [ ] The install unit is add-only safe: nothing relies on overwriting, no uninstall is promised, runtime routes live in `init()`.
-- [ ] `upgrade()` migrates only the feature's own data and is idempotent for the versions it handles; a `data/` owner registers `/nino/admin/restore`.
-- [ ] `features/<Name>/tests/<key>-smoke.php` loads `tests/harness.php` (three levels up or `NINO_ROOT`) and covers manifest, activation, the unit's files, settings, the panel's presence and absence, update and deactivation; `php tests/features-smoke.php` still passes.
-
-### Page/template unit done
-
-- [ ] Route and template are separate and have one owner each.
-- [ ] `page-*.tpl` filename, display metadata, and VPA are valid.
-- [ ] Sections have unique semantic IDs and stable fill paths.
-- [ ] Includes omit `.tpl` and resolve to shipped/copied files.
-- [ ] Required text, modules, image slots, and Element types are supplied.
-- [ ] Every key the unit delivers follows the grammar: `/template/<file name without .tpl>/<part>/<name>` for the words one of its templates reads, `/template/common/...` only in the base unit, no `/project` or `/_nino` key, the same keys in every language, and a template whose name has a dot or an upper-case letter carries no key of its own.
-- [ ] Locale suggestions and actual content are separated: the proposal for a page's name, title and description is the manifest's `suggest`, never a `/_nino` key in a text file.
-- [ ] Install/reapply/render are tested, and a page template the Builder reads is written back byte for byte.
-
-## 12. Completion report format
-
-At the end of an implementation, report:
-
-1. **Outcome:** one sentence describing the observable result.
-2. **Changed:** exact files grouped by backend, frontend, template/library,
-   tests, and docs.
-3. **Security/data:** auth, CSRF, validation, escaping, persistence, migration,
-   and deletion behavior that mattered.
-4. **Validation:** every command actually run and its result.
-5. **Not run:** unavailable or deliberately omitted checks.
-6. **Handoff:** patch filename and exact base revision when patch delivery was
-   requested.
-7. **Limitations:** only real remaining constraints; do not hide them in the
-   implementation narrative.
-
-Never say “done” when only the happy path was implemented or when the generated
-artifact was not checked against its consumer.
-
-## 13. High-value source references
-
-Read these before designing a new implementation:
-
-| Need | Start with |
-| --- | --- |
-| Runtime lifecycle/APIs | `docs/development.md`, `_nino/Nino.php` and `_nino/Nino/<Class>/<Class>.php` |
-| Simple shortcode module | `_nino/Nino/Modules/Navigation/Navigation.php` |
-| Components, stacks and their registry | `_nino/Nino/Modules/Components/Components.php`, `tests/kernel-smoke.php` (section "Modules\Components"), `tests/fixtures/features/Sample/` (a feature that declares one of each) |
-| Public validated form | `_nino/Nino/Modules/Form/Form.php` |
-| Privacy-sensitive public flow | the catalogue's [features/Newsletter/Newsletter.php](https://github.com/dapeio/nino-features/blob/main/features/Newsletter/Newsletter.php) |
-| Feature contract and manifests | `_nino/Nino/Features/Features.php`, `tests/fixtures/features/Sample/`, `tests/features-smoke.php`; the published manifests in the catalogue, [features/Newsletter/feature.php](https://github.com/dapeio/nino-features/blob/main/features/Newsletter/feature.php) and [features/Search/feature.php](https://github.com/dapeio/nino-features/blob/main/features/Search/feature.php) |
-| A feature's own test | `tests/harness.php`, and the catalogue's [features/Search/tests/search-smoke.php](https://github.com/dapeio/nino-features/blob/main/features/Search/tests/search-smoke.php) |
-| Workbench shell, registry, recovery | `_admin/Admin.php` |
-| Workbench panel backend patterns | `_admin/Nino/Modules/Elements/Admin/Admin.php`, `Routes/Admin/Admin.php`, `Users/Admin/Admin.php` |
-| Panel list/form JS | `_admin/Nino/Modules/Elements/assets/types.js` and `admin.js`, `_admin/Nino/Modules/Routes/assets/admin.js`; the shell `_admin/assets/script.js` |
-| Panel contract | `\Nino\Admin\Panels` in `_admin/Admin.php`; smallest panel `tests/fixtures/features/Sample/Admin/Admin.php` (the catalogue's `features/Hello/Admin/Admin.php` is the panel of the feature written to be copied); fills and a tile `_nino/Nino/Modules/Form/Admin/Admin.php`; own template and workspace layout `features/Builder/Admin/Admin.php` in the catalogue |
-| Ordered Admin relationships | `\Nino\Modules\Navigation\Admin` and `_nino/Nino/Modules/Navigation/assets/admin.js` |
-| Shared Admin UI | the `nino.system` half of `_admin/assets/style.css` and `_admin/assets/Nino.admin.js` |
-| Installer package shape | `_nino/Nino/Modules/*/install/manifest.php`; a feature's `features/*/install/manifest.php` has the same shape |
-| Setup wizard semantics | `_admin/install/Install.php` and `tests/install-smoke.php` |
-| Reader/writer contracts | `features/Builder/Reader/Reader.php`, `Writer/Writer.php`, `Document/Document.php` in the catalogue, with its own `tests/builder-smoke.php` |
-| Basic page unit | `_admin/install/library/pages/home/` |
-| Module-dependent page | `_admin/install/library/pages/contact/` |
-| Locale-structural runtime pages | `_nino/Nino/Modules/Legal/Legal.php` (`routes()`, `url()`) and its unit `_nino/Nino/Modules/Legal/install/` |
-| Element file example | the complete type file in [docs/recipes/element-types.md](docs/recipes/element-types.md); the checkout ships two, `legal` and `privacy`, with the Legal module's unit (`_nino/Nino/Modules/Legal/install/elements/`); the suites build their own in `tests/kernel-smoke.php` and `tests/admin-smoke.php` |
-
-Human behavior changes normally require matching updates in both English and
-German manuals. This AI guide and its recipes under `docs/recipes/` stay in
-canonical English only, so agents do not receive two divergent machine
-instructions.
+- [ ] The class is where the autoloader looks for it, and it answers what its kind asks for: a panel `actions()`, `nav()` and `perm()` (a runtime module's panel is returned by `adminPanels()`, a workbench one is `_admin/Nino/Modules/<Name>/Admin/Admin.php`); a runtime module `init()`, which registers behavior without output or incidental writes; a feature a `feature.php` that `\Nino\Features::manifest()` reads without a warning, with the class file beside it.
+- [ ] Every panel action carries the panel's slug and guards itself with `Admin::guardPerm()` and the panel's permission; payload, IDs, enums, lengths and paths are validated; persistence is atomic and failures are returned.
+- [ ] A technical route has one owner and the right callback identity; shortcode and response output is context-safe; a write enforces CSRF, auth, validation and a rate limit as applicable; shared files use atomic mutation and bounded retention.
+- [ ] A panel's `assets()` names project-relative `.js`/`.css` only (through `Panels::relative()` for a module), its JS namespace equals the nav uri, and its `template()` is a fragment with no head, link or script of its own. It uses the existing UI primitives and safe DOM construction, sends requests through `Nino.adminUi.api.call()`, gives a failure a person can cause a code with text in both languages, and reports unsaved input to `Nino.admin.dirty` (feature-detected), with a save that ends in `done( ok )` on every way it can end.
+- [ ] A component's schema validates - every attribute has a `default`, every `select` its `options` with the default among them - and its renderer has the signature `( array &$appData, array $args ): string` and keeps the rendering rules of section 5: it returns what it made itself and `$args['value']`, and escapes everything else through `Components::escape()`. A source that resolves to nothing renders nothing, and a hand-written shortcode with an unknown attribute still renders. A stack renders through `renderStack()` and leaves no shortcode in what it returns; a component that holds components declares `holds` and returns its content as it is inside its own markup. A component or stack is registered one way, by `init()` or by manifest, not both.
+- [ ] An installer unit is the module's own `install/` directory with a unique slug as its key; the manifest uses recognized keys and installer slugs for requirements; templates, files, types and text land in exact paths; config defaults preserve existing custom values; a reapply is idempotent and a deselect deletes no copied file. `elements` only adds (a deleted section stays deleted where the module keeps a tombstone) and `navs` creates a menu only in the wizard's apply step and only while the project has none.
+- [ ] A feature's `key` is a unique slug, `version` is `major.minor.patch`, `nino` names the constraint it was written against - its floor is the kernel whose vocabulary the feature uses - `requires` lists feature keys and `data` the `/data/` files it owns. Every setting has a known type and a validating default (no default on a `secret`) and is read through `\Nino\Features::setting()` with a default. The unit is add-only safe: nothing relies on overwriting, no uninstall is promised, runtime routes live in `init()`; `upgrade()` migrates only the feature's own data and is idempotent, and an owner of `data/` registers `/nino/admin/restore`.
+- [ ] A page unit keeps route and template separate, with one owner each; its `page-*.tpl` filename, display metadata and VPA are valid; sections have unique semantic IDs and stable fill paths; includes omit `.tpl` and resolve to shipped or copied files; required text, modules, image slots and Element types are supplied. Every key it delivers follows the grammar: `/template/<file name without .tpl>/<part>/<name>`, `/template/common/...` only in the base unit, no `/project` or `/_nino` key, the same keys in every language, and a template whose name has a dot or an upper-case letter carries no key of its own. A page's name, title and description are proposed by the manifest's `suggest`, never by a `/_nino` key in a text file. A page template the Builder reads is written back byte for byte.
+- [ ] Activation, API, shortcode, failure, denial and - for a module panel - its absence while the module is off are covered by a test; a feature's own test, `features/<Name>/tests/<key>-smoke.php`, loads `tests/harness.php` (three levels up or `NINO_ROOT`).
+- [ ] The documentation says what the code now does: the manual or recipe that states a changed contract changes in the same commit, a link into it still lands on a heading, and `README.de.md` follows `README.md` - English is canonical, the German mirrors it with the same commands and paths, so a change to one is made in both. Every other document is English only.

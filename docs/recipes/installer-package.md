@@ -1,10 +1,7 @@
 # Recipe: Add an installer module package
 
-**Additional Links:**
-[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Features](../features.md)
-
 One of the six extension recipes of the [Nino agent guide](../../AGENTS.md). Its
-rules - the required workflow, the core runtime model, the conventions and the
+rules - the working method, the core runtime model, the conventions and the
 security review - apply to every step below.
 
 
@@ -21,6 +18,10 @@ It does not execute as the runtime module. The unit is a directory named
 Nothing in `_admin/install/` lists a module. A runtime class must already be
 shipped at its valid autoload path - `_nino/Nino/Modules/<Name>/` for a kernel
 module, `app/<Vendor>/...` (or below `NINO_APP_DIR`) for a project's own.
+
+The reference for the wizard - its six steps, what each writes, the four
+shapes of the library - is the [Setup Wizard](../setup.md#library-format)
+manual; this recipe is the step-by-step for one unit.
 
 The wizard does not scan `features/`. A feature's `install/` has the same
 shape, but `\Nino\Features::activate()` applies it - add-only, through the

@@ -64,8 +64,6 @@ Every fresh checkout is configured through the wizard, which is what `/_admin` s
 
 The Builder composes a page template out of sections, rows, columns and components, and writes it back as the `page-*.tpl` file it read: the file is the truth, and what the Builder does not read it leaves byte for byte. Its panel sits in the Features group of the rail and is a workspace panel - the rail folds to its icons, and the preview, which is the editor with tools on every frame, takes the whole width. A component is a shortcode with a schema; the kernel's `Components` module is the registry the Builder reads, and features declare their own in their manifest.
 
-The Builder is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) (`features/Builder`) and is there while it is copied into `features/` and switched on in the Features panel. Its manual is the one of its `feature.php`, shown in that panel.
-
 ## What Nino includes
 
 * multilingual routing, texts, and content
@@ -109,109 +107,60 @@ By dispensing with an open plugin system and third-party runtime packages, Nino 
 Nino requires **PHP 8.4 or newer** with the `gd`, `mbstring`, and `session` extensions plus the `PharData` class provided by `Phar`. It starts without a package manager or build step:
 
 ```bash
-git clone https://github.com/dapeio/nino.git
-cd nino
+git clone https://github.com/dapeio/nino.git my-website
+cd my-website
 php -S 127.0.0.1:8000 router.php
 ```
 
-Then open <http://127.0.0.1:8000/_admin>.
+Then open <http://127.0.0.1:8000/_admin>. `router.php` is the routing of PHP's built-in server and for local work only; a web server needs the configuration in [Deployment](docs/deployment.md#webroot-and-routing).
 
-The setup wizard is required for a fresh checkout and creates the first working project state.
+A fresh checkout is not a project yet. The setup wizard, which `/_admin` shows until it is done, creates `private/` and `public/` with everything in them. It has no access protection of its own and no account exists yet, so run it locally or in another protected environment. As long as it is not completed, you can return to an earlier step and apply it again. The six steps, each with its reference in the [Setup Wizard](docs/setup.md) manual:
 
-The complete process is described in **[Getting Started](docs/getting-started.md)**. All options and write operations are covered in the **[Setup Wizard](docs/setup.md)** reference.
+| Step | Decision |
+|---|---|
+| [1. Environment](docs/setup.md#1-environment) | Are PHP, extensions, and write permissions ready for use? |
+| [2. Languages](docs/setup.md#2-languages) | Which languages does the project require - and which modules, where the project added any of its own? |
+| [3. Routes](docs/setup.md#3-routes) | Which first pages, public paths, and metadata are created? |
+| [4. Personal Information](docs/setup.md#4-personal-information) | Which central company and website values are available as textfills? |
+| [5. Accounts](docs/setup.md#5-accounts) | Which developer account(s) sign in to the workbench with full access? |
+| [6. Finish](docs/setup.md#6-finish) | Which recovery password opens `/_admin/recovery.php` when the accounts are broken - and locks the wizard? |
 
-## Project Structure
+The look is not among its questions: the base unit delivers one theme and the two frame templates it is drawn against ([The Look](docs/setup.md#the-look)). Editor accounts are created later, in the workbench's Users panel.
 
-A checkout is code and nothing else. Everything below `private/` and
-`public/` is one installation's own state, created by the wizard and tracked
-by nobody:
-
-```text
-index.php        Main entry point of the website
-router.php       Built-in server routing, for local development
-
-_nino/           Kernel and frontend core, one class per file under _nino/Nino/,
-                 with every module Nino ships under _nino/Nino/Modules/: the
-                 ones every project needs and the optional Form, Navigation
-                 and Localepicker, switched on or off in /nino/modules
-app/             Project-owned PHP classes under their own namespace
-features/        The features a project installs, one directory each with a
-                 feature.php manifest, installed from the signed catalogue of
-                 github.com/dapeio/nino-features in the workbench's Features
-                 panel or copied in by hand, and switched on there - a
-                 checkout ships none
-_admin/          The workbench: the shell alone, recovery.php, its own screens
-                 as modules under _admin/Nino/Modules/ (Dashboard, Elements,
-                 Text, Images, Logs, Routes, Users, Language, Backups,
-                 Features, Config), and the setup wizard with its library
-                 under _admin/install/
-docs/            Documentation, with the extension recipes under docs/recipes/
-
-private/         Never served, only read by PHP - created by the wizard
-  config.php       Site configuration
-  templates/       Page and section templates
-  text/            Texts by language and global settings
-  elements/        Element types
-  assets/          Project-specific CSS and JavaScript, bundled into public/.cache/
-  data/            Runtime data
-
-public/          Everything a browser loads directly - created by the wizard
-  images/          Uploaded images
-  fonts/           Webfonts the theme declares
-  favicon/         The generated favicon set
-  .cache/          The css and js bundles, built from private/assets/
-```
-
-## Tests
-
-Each file is a standalone script and runs against an isolated sandbox directory:
-
-```bash
-php tests/kernel-smoke.php
-php tests/admin-smoke.php
-php tests/admin-system-smoke.php
-php tests/install-smoke.php
-php tests/features-smoke.php
-php tests/catalogue-smoke.php
-php tests/keys-smoke.php
-php tests/legal-smoke.php
-for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
-for test in tests/*-js-smoke.js; do node "$test" || exit 1; done
-php tests/concurrency-smoke.php
-```
-
-`tests/harness.php` is the bootstrap they share; a feature's own test lives
-in its directory and loads it from there.
-
-Static analysis runs beside them, without a package manager: PHPStan reads
-`phpstan.neon`, ESLint `eslint.config.mjs`. `phpstan-baseline.neon` lists the
-findings that were open when the check arrived, so only something new fails.
-CI runs both after the syntax checks.
-
-```bash
-phpstan analyse
-npx eslint .
-```
+Then check the result. `/` delivers the configured website and `/_admin` opens the workbench with every panel for the root account. Look at every language and route, the navigation and the forms, and save a text and an image as a test. Once the wizard is complete, remove `_admin/install/` from a production delivery; everything it copied stays where it wrote it. The order and the checks are in [Verify the Result and Remove the Wizard](docs/setup.md#verify-the-result-and-remove-the-wizard).
 
 ## Philosophy and technology
 
 Nino deliberately keeps its architecture small: a central `$appData` array carries the application state, `$request` remains responsible for the HTTP request and response, and callbacks connect the kernel, modules, and templates.
 
-## Further documentation
+## Documentation
 
-* **[Concepts](docs/concepts.md):** architecture, data flow, and separation of concerns
-* **[Developer Manual](docs/development.md):** runtime contracts, APIs, modules, and tests
-* **[Extension recipes](docs/recipes/README.md):** a panel, a runtime module, a component, an installer package, element types, a feature - step by step
-* **[Getting Started](docs/getting-started.md):** from checkout to a configured website
-* **[Setup Wizard](docs/setup.md):** steps, writing rules, and library format
-* **[`/_admin` Workbench](docs/_admin.md):** every panel, accounts, roles, configuration, backups and recovery
-* **[Builder](https://github.com/dapeio/nino-features/tree/main/features/Builder):** composing page templates from sections, columns and components - a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features), its manual in `feature.php`
-* **[Features](docs/features.md):** installable packages - the manifest, the settings, activation and updates
-* **[Feature catalogue](https://github.com/dapeio/nino-features):** the features Nino publishes - newsletter and search among them - installed by copying a directory into `features/`
-* **[Deployment](docs/deployment.md):** web server, security, backups, and go-live
-* **[Design Manual](docs/design.md):** frontend, design system, CSS, and template work **(WIP)**
+The manuals and the recipes are in English. The agent guide and the recipes are the working text of whoever extends Nino.
+
+**Manuals**
+
+* **[Developer Manual](docs/development.md):** how Nino runs - the request, routing, callbacks, rendering, modules, and security
+* **[Setup Wizard](docs/setup.md):** the six steps, what they write, and the library format
+* **[`/_admin` Workbench](docs/_admin.md):** roles and rights, recovery, and troubleshooting
+* **[Features](docs/features.md):** installable packages - the panel, the manifest, the lifecycle, and the catalogue
+* **[Deployment](docs/deployment.md):** web server, permissions, production settings, tests, and go-live
+* **[Agent guide](AGENTS.md):** the rules every change keeps, and the method a change is made by
+
+**Recipes** ([index](docs/recipes/README.md))
+
+* **[Add a panel to the workbench](docs/recipes/admin-panel.md):** a new screen in `/_admin`
+* **[Add a runtime module](docs/recipes/runtime-module.md):** PHP behavior at boot, a shortcode, an endpoint
+* **[Add a component](docs/recipes/component.md):** a shortcode with a schema, or a stack that loops elements
+* **[Add an installer module package](docs/recipes/installer-package.md):** a module the setup wizard can select
+* **[Define Element types](docs/recipes/element-types.md):** repeated structured content
+* **[Package a feature](docs/recipes/feature.md):** a module delivered as one directory with a manifest, settings, and a version
+
+**Elsewhere**
+
+* **[Builder](https://github.com/dapeio/nino-features/tree/main/features/Builder):** composing page templates from sections, columns and components - a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features), copied into `features/` and switched on in the Features panel; its manual is the one of its `feature.php`
+* **[Feature catalogue](https://github.com/dapeio/nino-features):** the features Nino publishes - newsletter and search among them - installed from the Features panel or by copying a directory into `features/`
 * **[Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md):** security reports and supported versions
-* **[Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md):** changes between versions
+* **[Changelog](history/CHANGELOG.md):** the archive of the changes up to 1.7.0; from there the history is the git log
 
 ## Status and Security
 

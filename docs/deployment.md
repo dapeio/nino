@@ -1,25 +1,12 @@
 # Deployment and Go-Live
 
-**Language:** English · [Deutsch](deployment.de.md)
-
-**Last updated:** September 22, 2026 · **Nino version:** 1.3.1
-
-This manual guides a fully developed Nino website into production. If you instead want to set up a fresh project, start with [Getting Started](getting-started.md); technical extensions are covered in the [Developer Manual](development.md).
-
-**Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+This manual guides a fully developed Nino website into production. If you instead want to set up a fresh project, start with the [Quick Start](../README.md#quick-start); technical extensions are covered in the [Developer Manual](development.md).
 
 ## Target System Requirements
 
 Nino requires neither a database server nor a Composer installation on the target system. While this simplifies deployment, it makes the project files all the more important: Configuration and editorial data are stored directly in the file system and must be fully considered when transferring, securing, and authorizing.
 
-The production system requires:
-
-- PHP 8.4 or newer;
-- the `gd`, `mbstring`, and `session` extensions plus the `PharData` class provided by `Phar`;
-- a web server that delivers public files directly and forwards dynamic requests to Nino;
-- HTTPS for all publicly accessible management interfaces;
-- a writable project root before setup so that the setup wizard can create the still missing project directories.
+Besides what the [Quick Start](../README.md#quick-start) names - PHP 8.4 or newer and its extensions - the production system requires a web server that delivers public files directly and forwards dynamic requests to Nino, HTTPS for all publicly accessible management interfaces, and a writable project root before setup so that the setup wizard can create the still missing project directories.
 
 Run the environment check of the wizard on an environment that corresponds to the later hosting. A locally successful installation does not yet prove that the web hosting plan provides the same PHP extensions and write permissions.
 
@@ -30,7 +17,7 @@ For small projects, there are two sensible approaches:
 1. The website is set up in a protected target environment and only then switched to public.
 2. The website is fully set up locally and then transferred as a complete project state.
 
-In both cases, the setup wizard must convert a fresh checkout into a valid project state once. If you transfer an already configured project, the generated project directories must be fully included in the deployment. Details on the initial setup are in [Getting Started](getting-started.md); the wizard is not an update tool for running projects.
+In both cases the setup wizard converts a fresh checkout into a valid project state once ([Quick Start](../README.md#quick-start)); it is not an update tool for running projects. If you transfer an already configured project, the generated project directories must be fully included in the deployment.
 
 **Security:** If the setup is done on the target system, `/_admin` must be protected by a front-end access control, internal network, or a not yet public environment until the wizard is completed - it has no access protection of its own until then.
 
@@ -38,13 +25,7 @@ In both cases, the setup wizard must convert a fresh checkout into a valid proje
 
 The entry point of the public website is `index.php`. The workbench `/_admin` has its own (`_admin/index.php`), which serves the setup wizard until the project exists; `/_admin/recovery.php` is a third. The web server must deliver existing static files directly and forward all other website requests to Nino.
 
-For local development, `router.php` takes over this behavior:
-
-```bash
-php -S 127.0.0.1:8000 router.php
-```
-
-This is a development server, not a production configuration.
+For local development, `router.php` takes over this behavior when PHP's built-in server runs (see the [Quick Start](../README.md#quick-start)). It is a development server, not a production configuration.
 
 ### Apache
 
@@ -286,21 +267,6 @@ HTTPS protects not only login data but also session cookies and all editorially 
 
 Additional web server protection for `/_admin` - such as IP allowances or HTTP authentication - can form a useful second barrier under suitable operating conditions. It does not replace the accounts. The Builder is a feature, so its whole directory can go from `features/` - which is the point of it being one; the workbench itself stays, because the editors work in it.
 
-## The Wizard After Setup
-
-Complete the wizard fully. The last step sets the recovery password and locks the wizard. Then remove the `_admin/install/` directory from production delivery.
-
-That takes the installer library under `_admin/install/library/` with it. This is deliberate: the library is setup material, not a runtime feature. Everything it copied already lives in the project - the theme as `assets/theme.css`, the two frames as `templates/frame-header.tpl` and `templates/frame-footer.tpl` - editable by hand and, for the frames, through the catalogue's Design feature. Nothing at runtime reads the library.
-
-The order is essential:
-
-1. create the developer account(s) in the Accounts step;
-2. set the recovery password and complete the wizard;
-3. check the frontend and the workbench with a developer account, then create the editor accounts and check what they see;
-4. remove `_admin/install/` from the production system.
-
-An incomplete installation does not become valid by deleting its wizard.
-
 ## Backups and Restoration
 
 With activated backups, the workbench automatically creates an encrypted backup on the first authenticated request of the day. The daily backups rotate over 14 days and are stored under `private/.backups/`; **Back up now** in the Backups panel adds an archive of its own, named by date and time, that is kept for the same 14 days (at most the newest ten); the archives are encrypted with AES-256-GCM, the key lives under `private/.auth/`.
@@ -311,21 +277,30 @@ These backups protect against many editorial errors but are not a complete hosti
 
 ## Tests Before Go-Live
 
-Run the included smoke tests with the same PHP major version that will later run in production:
+This is what CI (`.github/workflows/ci.yml`) runs, in its order: PHP 8.4, Node 22, PHPStan 2.2.13 and ESLint 9.39.0. Run it with the same PHP major version that will later run in production:
 
 ```bash
+find . -name "*.php" -not -path "./.git/*" -print0 | xargs -0 -n1 php -l
+find . -name "*.js" -not -path "./.git/*" -print0 | xargs -0 -n1 node --check
+for dir in app features; do [ -f "$dir/.htaccess" ] || { echo "$dir/.htaccess is missing"; exit 1; }; done
+phpstan analyse --no-progress --memory-limit=1G
+npx --yes eslint@9.39.0 .
 php tests/kernel-smoke.php
+php tests/features-smoke.php
+php tests/catalogue-smoke.php
+for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
 php tests/admin-smoke.php
 php tests/admin-system-smoke.php
 php tests/install-smoke.php
-php tests/features-smoke.php
-php tests/catalogue-smoke.php
 php tests/keys-smoke.php
 php tests/legal-smoke.php
-for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
 for test in tests/*-js-smoke.js; do node "$test" || exit 1; done
 php tests/concurrency-smoke.php
 ```
+
+Every file under `tests/` is a standalone script that creates an isolated sandbox directory. The `.htaccess` loop is a guard rather than a test: a checkout holds nothing in `app/` and `features/` but that file, which keeps the directories and denies them to a browser. The loops end with `|| exit 1` because a bare loop answers with the last file's status alone. `[ -e "$test" ] || continue` is for a checkout that ships no feature: `features/*/tests/` then matches nothing. PHPStan reads `phpstan.neon` (level 5: the kernel, the workbench, `app/` and `features/`, without a feature's own tests); `phpstan-baseline.neon` lists the findings that were open when the check arrived, so only a new finding fails - fixing one means removing its entry, and a new finding is never added to silence it. ESLint reads `eslint.config.mjs` and checks the browser scripts for undefined names, unused code and `==`. Neither is a dependency of the product: there is no `composer.json` and no `package.json`.
+
+A second CI job, `features`, clones the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features), copies every feature of it that this kernel can run into the checkout, validates their manifests and runs their own tests and PHPStan against it - the gate against a kernel change that breaks a published feature. The catalogue's CI does the reverse, against Nino's `main` and its latest tag.
 
 The smoke tests do not replace project-specific acceptance testing. Additionally, check in the browser:
 
@@ -372,7 +347,7 @@ can replace the project application root and `NINO_FEATURES_DIR` the features
 root. A non-`Nino\` class resolves against the app root and nowhere else -
 `_nino/` holds the kernel and nothing of the project's own.
 
-Security fixes appear on `main`; there is currently no separate LTS line. Therefore, plan updates as active project maintenance and check `SECURITY.md` and the changelog before an update.
+Security fixes appear on `main`; there is currently no separate LTS line. Therefore, plan updates as active project maintenance and check `SECURITY.md` and the commits since your version before an update (`git log --oneline <your tag>..`; up to 1.7.0 the changes are in `history/CHANGELOG.md`).
 
 ## Go-Live Checklist
 
@@ -395,10 +370,3 @@ Security fixes appear on `main`; there is currently no separate LTS line. Theref
 - [ ] Backups are running, additionally stored externally, and can be restored.
 - [ ] Every feature the site needs is activated in the Features panel and shows no pending update; every feature it does not need is deactivated.
 - [ ] The previous project state is available for rollback.
-
-## Next Steps
-
-- [Getting Started](getting-started.md) describes the necessary initial setup.
-- [`/_admin` Workbench](_admin.md) explains every panel, the accounts, backups and the recovery page.
-- The **Builder** - page templates composed from sections, columns and components - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its manual is in its [`feature.php`](https://github.com/dapeio/nino-features/blob/main/features/Builder/feature.php).
-- [Concepts](concepts.md) explains the technical structure behind the deployed project.

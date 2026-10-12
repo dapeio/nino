@@ -1007,7 +1007,7 @@ $backupDir = $sandbox. '/private/.backups';
 check( 'a pre-restore safety snapshot of the (corrupted) state was made first', count( glob( $backupDir. '/pre-restore-*.php' ) ?: [] ) === 1 );
 
 /*	...and that snapshot is a way back out, which is what the panel's confirm
-	text and both manuals promise. It used to match nothing: not the list,
+	text promises. It used to match nothing: not the list,
 	not apiRestore(), not recovery.php - so "a wrong pick can itself be
 	undone" was true of a file only ssh could reach. It is also the one
 	archive nothing ever pruned, so every restore a project did stayed on
@@ -4766,7 +4766,8 @@ check( 'the shell\'s registry is bundled before every panel script that register
 	&& $bundlePositions['/_admin/assets/Nino.admin.js'] < $bundlePositions['/_admin/assets/script.js']
 	&& array_filter( $registers, static fn( string $file ): bool => $bundlePositions[$file] < $bundlePositions['/_admin/assets/script.js'] ) === [] );
 // A fill is parsed as a fill key wherever square brackets appear in its value,
-// so the JSON refusal carries none (AGENTS.md, fills)
+// so the JSON refusal carries none (docs/recipes/admin-panel.md, "Designing an
+// admin frontend")
 foreach( [ 'en_US', 'de_DE' ] as $locale ) {
 	$elementFills = (array) include dirname( __DIR__ ). '/_admin/Nino/Modules/Elements/text/'. $locale. '.php';
 	check( $locale. ': the Elements form words its refusals in fills, the JSON one without bracket characters',

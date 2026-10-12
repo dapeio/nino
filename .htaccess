@@ -75,8 +75,8 @@ SetEnv NINO_HTACCESS 1
 # ...and the contents of a dot *directory*, which the rule above cannot see:
 # it matches filenames, so a checkout's .git/config reads as a plain "config"
 # to it and is served - local history, remotes and hooks with it.
-# docs/getting-started.md installs by cloning into the webroot, so that is the
-# normal case rather than an exotic one, and docs/deployment.md already
+# The quick start in README.md installs by cloning into the webroot, so that is
+# the normal case rather than an exotic one, and docs/deployment.md already
 # requires the equivalent for nginx.
 # Conditioned on the request actually resolving to something on disk, which is
 # the same line router.php draws on the dev server: dot-uris that are routes

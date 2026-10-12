@@ -64,13 +64,11 @@ Jeder frische Checkout wird über den Assistenten eingerichtet – das, was `/_a
 
 Der Builder setzt ein Seitentemplate aus Sections, Zeilen, Spalten und Komponenten zusammen und schreibt es als die `page-*.tpl`-Datei zurück, die er gelesen hat: Die Datei ist die Wahrheit, und was der Builder nicht liest, lässt er Byte für Byte stehen. Sein Panel steht in der Gruppe Features der Leiste und ist ein Workspace-Panel – die Leiste klappt zu ihren Symbolen zusammen, und die Vorschau, die zugleich der Editor ist und an jedem Rahmen Werkzeuge trägt, nimmt die ganze Breite ein. Eine Komponente ist ein Shortcode mit Schema; das Kernel-Modul `Components` ist das Register, das der Builder liest, und Features melden ihre eigenen in ihrem Manifest an.
 
-Der Builder ist ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features) (`features/Builder`) und ist da, solange er nach `features/` kopiert und im Panel Features eingeschaltet ist. Sein Handbuch ist das der `feature.php`, das dieses Panel zeigt.
-
 ## Was Nino mitbringt
 
 * mehrsprachiges Routing sowie mehrsprachige Texte und Inhalte
 * eigenes Template-System mit Shortcodes und klarer Trennung von HTML und PHP
-* optionaler Builder für `.tpl`-Dateien, ein Feature aus dem Katalog
+* eine Workbench für Entwickler und Redakteure, mit Rollen, Recovery und einem optionalen Builder für `.tpl`-Dateien, einem Feature aus dem Katalog
 * dateibasiertes Content-Modell für Textfills und wiederkehrende Elemente
 * ein festes Theme, Asset-Bundling und Frontend-Basiskomponenten
 * Formulare, Navigation, Sprachauswahl und Bildverarbeitung
@@ -109,110 +107,60 @@ Durch den Verzicht auf ein offenes Plugin-System und fremde Laufzeitpakete reduz
 Nino benötigt **PHP 8.4 oder neuer** mit den Erweiterungen `gd`, `mbstring` und `session` sowie der von `Phar` bereitgestellten Klasse `PharData`. Es wird ohne Paketmanager oder Build-Schritt gestartet:
 
 ```bash
-git clone https://github.com/dapeio/nino.git
-cd nino
+git clone https://github.com/dapeio/nino.git my-website
+cd my-website
 php -S 127.0.0.1:8000 router.php
 ```
 
-Öffne anschließend <http://127.0.0.1:8000/_admin>.
+Öffne anschließend <http://127.0.0.1:8000/_admin>. `router.php` ist das Routing des eingebauten PHP-Servers und nur für die lokale Arbeit; ein Webserver braucht die Konfiguration aus dem [Deployment](docs/deployment.md#webroot-and-routing) (englisch).
 
-Der Assistent ist für einen frischen Checkout notwendig und erzeugt den ersten lauffähigen Projektstand.
+Ein frischer Checkout ist noch kein Projekt. Der Einrichtungsassistent, den `/_admin` zeigt, bis er abgeschlossen ist, legt `private/` und `public/` mit allem Inhalt an. Er hat keinen eigenen Zugriffsschutz, und noch existiert kein Konto; führe ihn deshalb lokal oder in einer anderen geschützten Umgebung aus. Solange er nicht abgeschlossen ist, kannst Du zu einem früheren Schritt zurückkehren und ihn erneut anwenden. Die sechs Schritte, jeder mit seiner Referenz im Handbuch [Setup Wizard](docs/setup.md) (englisch):
 
-Der vollständige Ablauf steht unter **[Erste Schritte](docs/getting-started.de.md)**. Alle Optionen und Schreibvorgänge erklärt die Referenz **[Einrichtungsassistent](docs/setup.de.md)**.
+| Schritt | Entscheidung |
+|---|---|
+| [1. Environment](docs/setup.md#1-environment) | Sind PHP, Erweiterungen und Schreibrechte einsatzbereit? |
+| [2. Languages](docs/setup.md#2-languages) | Welche Sprachen braucht das Projekt – und welche Module, falls das Projekt eigene mitbringt? |
+| [3. Routes](docs/setup.md#3-routes) | Welche ersten Seiten, öffentlichen Pfade und Metadaten werden angelegt? |
+| [4. Personal Information](docs/setup.md#4-personal-information) | Welche zentralen Firmen- und Webseitenwerte stehen als Textfills bereit? |
+| [5. Accounts](docs/setup.md#5-accounts) | Welche Entwicklerkonten melden sich mit vollem Zugriff an der Workbench an? |
+| [6. Finish](docs/setup.md#6-finish) | Welches Recovery-Passwort öffnet `/_admin/recovery.php`, wenn die Konten kaputt sind – und sperrt den Assistenten? |
 
-## Projektstruktur
+Das Erscheinungsbild gehört nicht zu seinen Fragen: Die Base-Einheit liefert ein Theme und die beiden Rahmen-Templates, gegen die es gezeichnet ist ([The Look](docs/setup.md#the-look)). Redakteurskonten entstehen später im Panel Users der Workbench.
 
-Ein Checkout enthält nur Code. Alles unterhalb von `private/` und `public/`
-ist der Zustand einer einzelnen Installation, wird vom Assistenten angelegt
-und von niemandem getrackt:
-
-```text
-index.php        Haupt-Einstiegspunkt der Webseite
-router.php       Routing für den eingebauten Server, lokale Entwicklung
-
-_nino/           Kernel und Frontend-Core, eine Klasse je Datei unter _nino/Nino/,
-                 mit jedem Modul, das Nino unter _nino/Nino/Modules/ mitbringt:
-                 denen, die jedes Projekt braucht, und den optionalen Form,
-                 Navigation und Localepicker, die in /nino/modules ein- oder
-                 ausgeschaltet werden
-app/             Projekteigene PHP-Klassen unter eigenem Namespace
-features/        Die Features, die ein Projekt installiert, je ein Verzeichnis
-                 mit feature.php-Manifest, aus dem signierten Katalog von
-                 github.com/dapeio/nino-features im Panel Features der
-                 Workbench installiert oder von Hand kopiert, und dort
-                 eingeschaltet - ein Checkout bringt keines mit
-_admin/          Die Workbench: nur die Shell, recovery.php, ihre eigenen
-                 Ansichten als Module unter _admin/Nino/Modules/ (Dashboard,
-                 Elements, Text, Images, Logs, Routes, Users, Language,
-                 Backups, Features, Config) und der Einrichtungsassistent mit
-                 seiner Bibliothek unter _admin/install/
-docs/            Dokumentation, mit den Erweiterungsrezepten unter docs/recipes/
-
-private/         Wird nie ausgeliefert, nur von PHP gelesen - vom Assistenten angelegt
-  config.php       Site-Konfiguration
-  templates/       Seiten- und Sektions-Templates
-  text/            Texte je Sprache und globale Einstellungen
-  elements/        Element-Typen
-  assets/          Projekt-eigenes CSS und JavaScript, gebündelt nach public/.cache/
-  data/            Laufzeitdaten
-
-public/          Alles, was ein Browser direkt lädt - vom Assistenten angelegt
-  images/          Hochgeladene Bilder
-  fonts/           Webfonts, die das Theme deklariert
-  favicon/         Der erzeugte Favicon-Satz
-  .cache/          Die CSS- und JS-Bundles, gebaut aus private/assets/
-```
-
-## Tests
-
-Jede Datei ist ein eigenständiges Skript und läuft gegen ein isoliertes Sandbox-Verzeichnis:
-
-```bash
-php tests/kernel-smoke.php
-php tests/admin-smoke.php
-php tests/admin-system-smoke.php
-php tests/install-smoke.php
-php tests/features-smoke.php
-php tests/catalogue-smoke.php
-php tests/keys-smoke.php
-php tests/legal-smoke.php
-for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
-for test in tests/*-js-smoke.js; do node "$test" || exit 1; done
-php tests/concurrency-smoke.php
-```
-
-`tests/harness.php` ist der gemeinsame Bootstrap; der eigene Test eines
-Features liegt in dessen Verzeichnis und lädt ihn von dort.
-
-Daneben läuft statische Analyse, ohne Paketmanager: PHPStan liest
-`phpstan.neon`, ESLint `eslint.config.mjs`. `phpstan-baseline.neon` führt die
-Funde, die beim Einführen der Prüfung offen waren, sodass nur Neues
-fehlschlägt. CI führt beide nach den Syntaxchecks aus.
-
-```bash
-phpstan analyse
-npx eslint .
-```
+Prüfe danach das Ergebnis. `/` liefert die eingerichtete Webseite, und `/_admin` öffnet die Workbench mit jedem Panel für das Root-Konto. Sieh Dir jede Sprache und Route, die Navigation und die Formulare an und speichere zur Probe einen Text und ein Bild. Ist der Assistent abgeschlossen, entferne `_admin/install/` aus einer Produktivauslieferung; alles, was er kopiert hat, bleibt dort, wo er es geschrieben hat. Reihenfolge und Prüfungen stehen unter [Verify the Result and Remove the Wizard](docs/setup.md#verify-the-result-and-remove-the-wizard).
 
 ## Philosophie und Technik
 
 Nino hält seine Architektur bewusst klein: Ein zentrales `$appData`-Array trägt den Anwendungszustand, `$request` bleibt für HTTP-Anfrage und -Antwort zuständig, und Callbacks verbinden Kernel, Module und Templates.
 
-## Weitere Dokumente
+## Dokumentation
 
-* **[Grundkonzepte](docs/concepts.de.md):** Architektur, Datenfluss und Aufgabentrennung
-* **[Entwickler-Handbuch](docs/development.de.md):** Laufzeitverträge, APIs, Module und Tests
-* **[Erweiterungsrezepte](docs/recipes/README.md):** ein Panel, ein Laufzeitmodul, eine Komponente, ein Installer-Paket, Elementtypen, ein Feature - Schritt für Schritt (englisch)
-* **[Erste Schritte](docs/getting-started.de.md):** vom Checkout zur eingerichteten Webseite
-* **[Einrichtungsassistent](docs/setup.de.md):** Schritte, Schreibregeln und Library-Format
-* **[`/_admin`-Workbench](docs/_admin.de.md):** jedes Panel, Konten, Rollen, Konfiguration, Backups und Recovery
-* **[Builder](https://github.com/dapeio/nino-features/tree/main/features/Builder):** Seitentemplates aus Sections, Spalten und Komponenten zusammensetzen – ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features), sein Handbuch steht in der `feature.php`
-* **[Features](docs/features.de.md):** installierbare Pakete – Manifest, Einstellungen, Aktivierung und Updates
-* **[Feature-Katalog](https://github.com/dapeio/nino-features):** die Features, die Nino veröffentlicht – Newsletter und Suche darunter –, installiert durch Kopieren eines Verzeichnisses nach `features/`
-* **[Deployment](docs/deployment.de.md):** Webserver, Sicherheit, Backups und Go-live
-* **[Design-Handbuch](docs/design.de.md):** Frontend, Design-System, CSS und Template-Arbeit **(WIP)**
+Die Handbücher und die Rezepte sind englisch. Der Agent-Leitfaden und die Rezepte sind der Arbeitstext dessen, der Nino erweitert.
+
+**Handbücher**
+
+* **[Developer Manual](docs/development.md):** wie Nino läuft – Anfrage, Routing, Callbacks, Rendering, Module und Sicherheit
+* **[Setup Wizard](docs/setup.md):** die sechs Schritte, was sie schreiben, und das Library-Format
+* **[`/_admin` Workbench](docs/_admin.md):** Rollen und Rechte, Recovery und Fehlersuche
+* **[Features](docs/features.md):** installierbare Pakete – Panel, Manifest, Lebenszyklus und Katalog
+* **[Deployment](docs/deployment.md):** Webserver, Schreibrechte, Produktionseinstellungen, Tests und Go-live
+* **[Agent-Leitfaden](AGENTS.md):** die Regeln, die jede Änderung einhält, und das Verfahren, nach dem sie entsteht
+
+**Rezepte** ([Übersicht](docs/recipes/README.md))
+
+* **[Add a panel to the workbench](docs/recipes/admin-panel.md):** ein neuer Bildschirm in `/_admin`
+* **[Add a runtime module](docs/recipes/runtime-module.md):** PHP-Verhalten beim Start, ein Shortcode, ein Endpunkt
+* **[Add a component](docs/recipes/component.md):** ein Shortcode mit Schema oder ein Stack, der Elemente durchläuft
+* **[Add an installer module package](docs/recipes/installer-package.md):** ein Modul, das der Assistent auswählen kann
+* **[Define Element types](docs/recipes/element-types.md):** wiederkehrende strukturierte Inhalte
+* **[Package a feature](docs/recipes/feature.md):** ein Modul als ein Verzeichnis mit Manifest, Einstellungen und Version
+
+**Anderswo**
+
+* **[Builder](https://github.com/dapeio/nino-features/tree/main/features/Builder):** Seitentemplates aus Sections, Spalten und Komponenten zusammensetzen – ein Feature aus dem Katalog [dapeio/nino-features](https://github.com/dapeio/nino-features), nach `features/` kopiert und im Panel Features eingeschaltet; sein Handbuch ist das der `feature.php`
+* **[Feature-Katalog](https://github.com/dapeio/nino-features):** die Features, die Nino veröffentlicht – Newsletter und Suche darunter –, installiert aus dem Panel Features oder durch Kopieren eines Verzeichnisses nach `features/`
 * **[Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md):** Sicherheitsmeldungen und unterstützte Versionen
-* **[Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md):** Änderungen zwischen den Versionen
+* **[Changelog](history/CHANGELOG.md):** das Archiv der Änderungen bis 1.7.0; danach ist die Geschichte das Git-Log (englisch)
 
 ## Status und Sicherheit
 

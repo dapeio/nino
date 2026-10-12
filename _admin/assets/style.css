@@ -28,8 +28,8 @@
  *	@link										https://github.com/dapeio/nino
  *
  * ---------------------------------------------------------------------------
- * Convention for the design-system half (see AGENTS.md, "Designing an admin
- * frontend")
+ * Convention for the design-system half (see docs/recipes/admin-panel.md,
+ * "Designing an admin frontend")
  * ---------------------------------------------------------------------------
  *
  * 1. The nino.system half contains no id selectors. An id identifies one
@@ -61,7 +61,7 @@
  *    escalation. `nino.local` remains available for a deliberate final
  *    override.
  *
- * Which class serves which need is AGENTS.md, section 6a ("Designing an
+ * Which class serves which need is docs/recipes/admin-panel.md ("Designing an
  * admin frontend"), not a list kept here.
  */
 

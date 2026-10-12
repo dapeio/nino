@@ -1,10 +1,7 @@
 # Recipe: Add a panel to the workbench
 
-**Additional Links:**
-[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Features](../features.md)
-
 One of the six extension recipes of the [Nino agent guide](../../AGENTS.md). Its
-rules - the required workflow, the core runtime model, the conventions and the
+rules - the working method, the core runtime model, the conventions and the
 security review - apply to every step below.
 
 
@@ -190,7 +187,7 @@ public static function assets(): array {
 
 A panel's stylesheet opens with `@layer nino.system, nino.tool, nino.local;`
 and puts its rules in `@layer nino.tool {}`, every one scoped to the panel's
-own root (6a).
+own root (see [Designing an admin frontend](#designing-an-admin-frontend)).
 
 Permissions declared through `perm()` are offered automatically: the Users
 panel's roles tab (`Users\Admin::permOptions()`) lists every active panel's and
@@ -785,9 +782,11 @@ order, and the field is the posted key the value was refused for. A panel's own
 codes carry its slug as a prefix and live in its own `text()` directory as
 `'[[/_admin/error/catalog_id_taken]]'`, both languages; the codes every panel
 may meet - an upload that did not arrive, a value of the wrong type - are the
-shell's. Leave a failure nobody can cause (a file that could not be written)
-without a code: the person then sees the English message of the server, with the
-status number in front, and the panel's sentence where there is none.
+shell's. `tests/admin-system-smoke.php` finds every code in the source and fails
+on one without text in both languages. Leave a failure nobody can cause (a file
+that could not be written) without a code: the person then sees the English
+message of the server, with the status number in front, and the panel's sentence
+where there is none.
 
 A feature whose `nino` constraint still admits kernels before this release
 detects `Nino.adminUi.api` and falls back to its own post where it is missing
@@ -902,6 +901,162 @@ control, and after a refused save the sentence under it
 (`.nino-admin-field-error`, linked with `aria-describedby`) with the focus on
 the first one. The sentences are not alerts; the form's status line announces
 the refusal once.
+
+## Designing an admin frontend
+
+The `nino.system` half of `_admin/assets/style.css` is the design system for
+the workbench and every panel in it, the setup wizard and the recovery page
+included. It is not a stylesheet one screen happens to share - it defines the
+vocabulary, and a panel's own stylesheet - `assets/admin.css` beside its
+class, whether the module is the workbench's own or a project's - supplies only
+what is genuinely local to it. The `nino.tool` half of the same file is the
+shell's own: the rail, the panel switching, the login screen.
+`_admin/assets/Nino.admin.js` is the same idea for behaviour: a component that assembles
+markup (`Nino.adminUi.switchField()`, `.table()`, `.selectField()`) lives there,
+never as a per-tool copy. It extends the namespace `Nino.js` creates, so it loads
+after it - and it is deliberately *not* in the public script bundle, which is why
+it is a file of its own rather than more of `Nino.js`.
+
+**A panel ships its own stylesheet and nothing else.** A panel's `assets()`
+join the workbench's bundle after the shell's own files, and a module panel's
+template is a fragment that links nothing. The old tools used to load each
+other's complete stylesheets for a handful of classes; copy the class you need
+into the panel that needs it, or promote it to the design system - never
+restate the shell. Every rule of a panel stylesheet is loaded on every screen
+of the workbench, so scope every one of them to the panel's own root
+(`#pd-app .pd-canvas`, `#features-list .admin-features-head`) - a bare `body {}` or
+`code {}` in a panel file lands on the whole workbench.
+
+### The five rules
+
+1. **The shared file contains no id selectors.** An id names one element in one
+   tool. A tool's own stylesheet may use ids freely - that is where one-off
+   layout belongs.
+2. **Shared classes are namespaced `nino-admin-*`.** If a class does not carry
+   that prefix it belongs to one tool, and the shared file must not style it.
+3. **`.nino-admin` is the scope root**, on the outermost element of any admin
+   surface. Add `.nino-admin-shell` for a full-height application surface,
+   `.nino-admin-shell--rail` if it is the usual rail+pane layout, or
+   `.nino-admin-auth` for a centered login card.
+4. **A class name describes a role, never a place.** `.nino-admin-btn-primary`
+   is "the primary action", not "the button under a list". A class carrying the
+   margins of wherever it first appeared breaks the moment it is reused - which
+   is exactly how the wizard's "New Route" button once inherited a stray
+   `margin-top` from another screen's list class.
+5. **Cascade layers decide who wins before specificity.** Every stylesheet of
+   the workbench opens with `@layer nino.system, nino.tool, nino.local;`. The
+   design system lives in `nino.system`; normal screen and component rules
+   live in the later `nino.tool` layer, so they can refine the low-specificity
+   `:where(.nino-admin)` baseline without selector escalation. Reserve
+   `nino.local` for a deliberate final override, not every normal component
+   difference.
+
+### When adding a screen
+
+Reach for an existing class first; only invent one when no role fits.
+
+| Need | Class |
+|---|---|
+| Surface root | `.nino-admin` + `.nino-admin-shell` (+ `--rail`) |
+| Sidebar, its brand block, its nav | `.nino-admin-rail`, `.nino-admin-rail-head`, `.nino-admin-nav` |
+| Scrolling content column | `.nino-admin-pane` |
+| Sticky top row (back link, locale switch) | `.nino-admin-contextbar` via `Nino.adminUi.contextBar()` |
+| Back link inside that row | `.nino-admin-back-link` |
+| Fixed bottom actions | `.nino-admin-actionbar` via `Nino.adminUi.actionBar()` |
+| Fixed actions above a list | `.nino-admin-list-actions` via `Nino.adminUi.listActions()` |
+| Status text in a bottom bar - saving, saved at hh:mm, unsaved changes, why it failed | `.nino-admin-status` via `Nino.adminUi.status()` (in the bar it replaces `.nino-admin-actionbar-status`) |
+| Mark after the name of a required field, and the sentence under a refused one | `.nino-admin-required` (drawn `aria-hidden`; the control gets `aria-required`), `.nino-admin-field-error` (linked with `aria-describedby`, never `role="alert"`) |
+| "Unsaved changes" mark in a registered form's action bar | `.nino-admin-actionbar-dirty`, written by `Nino.admin.dirty.refresh()` into every registered form's bar and hidden by the stylesheet only in a bar that has a status line (below 38 rem, where the status line is hidden, it shows again) - not a `p`, not `role="status"` |
+| Primary / destructive button | `.nino-admin-btn-primary`, `.nino-admin-btn-danger` |
+| Raised panel | `.nino-admin-card` (a `fieldset` is one already) |
+| Clickable drill-down list | `.nino-admin-list` (+ `.nino-admin-list-copy` per row) |
+| Many rows of the same record, with search/sort/paging | `Nino.adminUi.table()` — see below |
+| List of rows that are read, not opened | `.nino-admin-list-dense` |
+| List whose rows are `button`s | `.nino-admin-list-buttons` |
+| Dashboard tiles | `.nino-admin-tiles`, `.nino-admin-tile` |
+| Share-of-total bar under a label | `.nino-admin-meter-row` + `-label`/`-count`, `.nino-admin-meter-track` + `-fill` |
+| Labelled form field | `.nino-admin-field` (`.nino-admin-field-wide` opts out of the two-column desktop grid) |
+| Container whose fields share that grid | `.nino-admin-fieldgrid` |
+| Run of checkbox rows | `.nino-admin-checklist` |
+| Rich-text editor mount | `.nino-admin-richtext` (`Nino.admin.htmlEditor.create()`, its fifth argument the format: `inline`, `lines` or `blocks`) |
+| List of texts, edited as rows | `.nino-admin-stringlist` via `Nino.adminUi.stringList()` (the value is a hidden input carrying the JSON, like `elementList()`'s) |
+| Explanatory text / screen intro | `.nino-admin-hint`, `.nino-admin-hint-lead` |
+| Something needs attention until it is fixed - failing mail, untranslated texts, maintenance on | `.nino-admin-notice` via `Nino.adminUi.notice( message, { href, label } )`; a link only for a `#panel` href, the text always as text |
+| Nothing here yet (a list without entries, a scan that found nothing) | `.nino-admin-empty` via `Nino.adminUi.emptyState()` |
+| Error text | `.nino-admin-error` |
+
+**Every word is a fill.** A panel script never renders a literal English
+sentence: the workbench's strings are `_admin/text/<locale>.php`, a module's are
+the `text()` directory beside its panel, and `[jstext]` hands all of them to
+`Nino.content.getText()`. A placeholder is `%s`, `%d` or `%n`, filled with
+`Nino.adminUi.format()`. A label the backend sends - a schema's `label` and `hint`, a
+dashboard tile's or a permission's label - may be a fill key or literal text;
+`Nino.adminUi.text()` resolves it either way - which is also how a value that
+is both shown and compared stays translatable: send a slug and name it on the
+client (see the Features panel's `_categoryLabel()`), never
+compare against a word a locale file can change.
+
+How a request goes to the server and how a failure is worded is [Saying what happened](#saying-what-happened); a form that holds unsaved input is [Unsaved input](#unsaved-input).
+
+A workspace panel's markup (`templates/panel.tpl`) is the other place a
+sentence hides, and reads ordinary `[[fills]]`. A fill's *value* is substituted
+into the page before the shortcode pass runs, and `[jstext]` ships the same
+stored value, so a value must never contain a live shortcode token: escape the
+bracket (`&#91;template]`) in a value that is only ever markup, and put a `%s`
+in one a script renders, filling it from the script's own source - a `.js` file
+is a static asset and is never rendered.
+`tests/admin-lists-js-smoke.js` fails on a literal sentence in a panel script
+or in that markup, and `tests/admin-system-smoke.php` twice over: statically on
+a key a panel's scripts or markup ask for that either language lacks, and end to
+end - it renders the whole workbench in both interface languages and fails on any
+`[[fill]]` that came out the other side unresolved, which is the only version a
+key its regexes do not recognise cannot slip past. A schema two surfaces share keeps its English as the
+fallback, and the panel looks for a fill of its own first. The recovery page
+and the setup wizard are English by design.
+
+### The shared data table
+
+`Nino.adminUi.table()` renders a sortable, searchable, paged table of records.
+Use it where the values themselves are what the screen is for; the grouped list
+stays right for a handful of rows you only drill into.
+
+It owns **no strings**. Everything that can be a number or a glyph is one - the
+pager arrows, the row range, a boolean cell - so a caller supplies only
+`labels: { search, empty, noMatch }`. That is deliberate: every word comes
+from the caller, translated through `Nino.content` or not, and a component
+that hardcoded one would be half-translated wherever the caller's are not
+English.
+
+Pass the **whole set** and let it page. An element type is one file read whole
+on every request (`\Nino\Elements::queryElements`), so asking for one page costs
+exactly what asking for everything costs, and searching locally is instant
+instead of a round trip per keystroke. 1000 rows of eight columns is 14 KB
+gzipped. Roughly 1000 elements per type is also where the storage model itself
+stops being the right tool — past that, use SQLite or MySQL.
+
+A column may carry `render(value, row)` returning an Element, for a cell that
+holds a link or a per-row action; sorting and searching still use the plain
+value, so behaviour never depends on how a cell is drawn.
+
+The pure half (`Nino.adminUi.tableModel`) is filtering, sorting, paging and cell
+formatting as plain functions — extend and test there, not in the renderer.
+`tests/nino-ui-table-js-smoke.js` covers it.
+
+### Three traps
+
+- **Never assign `className` on an element that carries a design-system class.**
+  The shells carry `.nino-admin` plus their `show-<panel>` state, so switching
+  panels with `el.className = 'show-x'` silently deletes the entire shared
+  layout. Use `Nino.adminUi.setStateClass()`, or `classList` for anything else.
+- **A panel stylesheet must scope every `nino-admin-*` rule to its own root**
+  (`#pd-app .nino-admin-btn-primary`, not `.nino-admin-btn-primary`) - see the
+  bundling note above.
+- **Restating a shared component in a panel is not "refining" it.** A panel copy
+  sits in the later `nino.tool` layer, so it wins over the design system whole
+  and the two drift apart silently. The old editor carried a second copy of every
+  token, button, input, field, tile, card and rich-text rule this way. Delete
+  the copy; if the shared version is genuinely wrong for every screen, fix it in
+  the design-system half of `style.css`.
 
 ## Panel tests
 

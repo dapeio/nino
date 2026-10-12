@@ -1,10 +1,7 @@
 # Recipe: Define Element types for repeated content
 
-**Additional Links:**
-[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Features](../features.md)
-
 One of the six extension recipes of the [Nino agent guide](../../AGENTS.md). Its
-rules - the required workflow, the core runtime model, the conventions and the
+rules - the working method, the core runtime model, the conventions and the
 security review - apply to every step below.
 
 
@@ -72,8 +69,8 @@ the element form and the Roles tab's permission picker, pass
 `Nino.content.getText()` lookups. Pass `ordered: false` for a value that is a
 set rather than a list: the move buttons go away, because offering them says
 the order carries meaning. The Roles tab's permission picker is that mode. Do
-not restate it in a panel; see §6a's trap about restating a shared component
-in a panel.
+not restate it in a panel; the [panel recipe](admin-panel.md#three-traps) has the trap
+about restating a shared component in a panel.
 
 ## Named or numbered element uris
 
@@ -278,68 +275,6 @@ answers that, built on `\Nino\Elements::queryElementValues()`:
 `[elementvalues]` and the `[elements]` loop it filters MUST read the same
 collection, or the buttons match nothing: both name the same slug.
 
-## Search indexed Elements
-
-`\Nino\Modules\Search` is a feature from the catalogue
-[dapeio/nino-features](https://github.com/dapeio/nino-features), copied into
-`features/Search/`: it is switched on in the workbench's Features panel, or by
-listing its class by hand, and its fields are configured manually. Do not add it to the wizard or infer its
-fields from templates:
-
-```php
-'/nino/modules' => [
-	// ...
-	'\\Nino\\Modules\\Search',
-],
-'/nino/elements/index' => [
-	'articles' => [
-		0 => 'title',
-		1 => 'summary',
-		2 => 'keywords',
-		3 => 'author',
-	],
-],
-```
-
-The outer key is one flat Element type. Priorities are integer keys `0` through
-`3`, strongest to weakest, and each names one existing model field. The public
-read API is:
-
-```php
-$hits = \Nino\Modules\Search::getElements( $appData, 'articles', $query );
-```
-
-It searches only `Locales::getCurrentLocale()` and returns canonical Elements,
-best first; `getHits()` answers the hits themselves - score, coverage, the
-words that matched - without reading an Element. Not every query word has to
-match: one that finds nothing lowers the hit's coverage, and the coverage
-weighs its score; priorities rank the hits. The feature's manual, in its
-[`feature.php`](https://github.com/dapeio/nino-features/blob/main/features/Search/feature.php),
-lists its shortcodes, its route, its panel and its callbacks.
-
-Lifecycle is deliberately small and explicit:
-
-- the feature's `init()` registers the `/nino/elements/committed` callback,
-  its shortcodes and, where the project switched it on, the JSON endpoint,
-  and performs no I/O;
-- the Search panel under `/_admin` rebuilds one configured type, or every one,
-  on request;
-- a committed insert, update, or delete rebuilds that configured type;
-- one type owns exactly `/data/index-<type>.php`;
-- reads of a missing or malformed file return `[]` and never self-heal;
-- stale files for no-longer-configured types are inert because the read API
-  checks the current configuration.
-
-Search indexes are the explicit exception to the general mutable-file rule in
-the agent guide. They are expendable derived data and use one direct, non-atomic
-full-file write: no `Filesystem::mutate()`, temporary rename, sidecar lock,
-signature, or revision. Keep that contract visible in code and docs. Test it in
-the feature's own test, `features/Search/tests/search-smoke.php` in the
-catalogue, including
-inactive/active module behavior, all-index
-Admin rebuilds, current-locale search, weighted fuzzy ranking, committed-write
-refresh, missing/malformed reads, and write-failure reporting.
-
 ## Element changes and translations
 
 When saving a record with global and localized fields:
@@ -381,8 +316,6 @@ An `array` field whose value is a list of strings is edited as rows
 ## Element tests
 
 Use `tests/kernel-smoke.php` for model/runtime behavior,
-the catalogue's `features/Search/tests/search-smoke.php` for the derived
-search-index contract,
 `tests/admin-smoke.php` for type CRUD and migrations, and the relevant JS tests
 for forms/uploads. Test:
 

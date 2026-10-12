@@ -385,7 +385,7 @@ namespace Nino\Admin {
 		 *	can add a screen but never take one over. A panel is a class
 		 *	with actions() and nav(), and optionally perm(), panes(),
 		 *	assets(), text(), summary() and log() (see Panels, and
-		 *	docs/development.md).
+		 *	docs/recipes/admin-panel.md, "The panel contract").
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *

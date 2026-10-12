@@ -24,7 +24,7 @@ namespace Nino\Modules {
 	 *											What the module ships is a starting point and no legal
 	 *											advice: the texts are not tailored to any website and not
 	 *											legally reviewed, and the operator of a website is the one
-	 *											who answers for them - see "Legal" in docs/development.md,
+	 *											who answers for them - see "Modules" in docs/setup.md,
 	 *											which says it in full.
 	 *
 	 *											An address, a phone number, the host is not written into

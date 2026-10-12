@@ -703,6 +703,20 @@ namespace Nino {
 		 *	keeps its current value; a 'secret' sent as '' keeps its current
 		 *	value too (the form never shows one) and as null is cleared.
 		 *
+		 *	Per type - the form posts strings, the clean value has the type:
+		 *	bool takes 'true'/'false', 1/0 and '1'/'0' and nothing else; int a
+		 *	string of digits within min and max ('5.5' is none); string one
+		 *	trimmed line of at most maxlength (1 to 1000, default 1000) that
+		 *	matches its pattern where it has one, an empty optional value
+		 *	passing the pattern by; text the same over several lines, maxlength
+		 *	up to 10000; email FILTER_VALIDATE_EMAIL; url FILTER_VALIDATE_URL
+		 *	with an http or https scheme; select exactly one of its options, or
+		 *	'' unless required; secret '' keeps, null clears, anything else
+		 *	replaces; lines a textarea split at line breaks or a list as it is,
+		 *	every line trimmed, empty lines and duplicates dropped, at most
+		 *	1000 characters per line and 200 lines. 'required' refuses an empty
+		 *	value of any type.
+		 *
 		 *	@param		array 		$schema				The manifest's 'settings'
 		 *	@param		array 		$posted				name => value as posted
 		 *	@param		array 		$current			name => value as stored

@@ -1,10 +1,7 @@
 # Recipe: Add a runtime module
 
-**Additional Links:**
-[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Features](../features.md)
-
 One of the six extension recipes of the [Nino agent guide](../../AGENTS.md). Its
-rules - the required workflow, the core runtime model, the conventions and the
+rules - the working method, the core runtime model, the conventions and the
 security review - apply to every step below.
 
 

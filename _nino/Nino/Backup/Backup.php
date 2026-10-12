@@ -148,11 +148,12 @@ namespace Nino {
 				$files[$file] = 'data/'. basename( $file );
 
 			// What an installed feature says it owns under /data/. The manifest
-			// key is documented as "what a backup carries" (see docs/features.md),
-			// and until this read it it was not: the two entries above are
-			// hardcoded literals for the one feature that predates the catalogue,
-			// and anything else - a directory a feature owns, a file a feature
-			// nobody here knows about writes - was simply never in a backup.
+			// key is documented as what a backup carries (see docs/features.md,
+			// "Data, Backups and Restore"), and until this read it it was not:
+			// the two entries above are hardcoded literals for the one feature
+			// that predates the catalogue, and anything else - a directory a
+			// feature owns, a file a feature nobody here knows about writes -
+			// was simply never in a backup.
 			//
 			// \Nino\Features::all() reads the manifests, which are plain array
 			// files; no feature class is autoloaded on a backup's behalf, which

@@ -417,7 +417,7 @@ namespace Nino\Modules {
 		 *	@param		string		$name					The shortcode, a slug
 		 *	@param		mixed			$schema				label, source (not for a stack), loop, attributes, preview;
 		 *																	in, draws and holds for a component, grid and assets for a stack.
-		 *																	See docs/development.md
+		 *																	See docs/development.md, "Components"
 		 *	@param		bool			$stack				Read it as a stack's
 		 *
 		 *	@return 	array|string						The clean schema, or what is wrong with it

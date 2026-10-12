@@ -2,7 +2,7 @@
 declare(strict_types=1);
 /**
  *	Nino								A compact filesystembased php framework
- *	Nino\Modules\Maintenance\Admin	The /_admin panel of the Maintenance module - see docs/development.md
+ *	Nino\Modules\Maintenance\Admin	The /_admin panel of the Maintenance module - see docs/development.md, "Panels of the Workbench"
  *
  *	@package						Dape/Nino
  *	@author							David Perchermeier <mail@dape.io>

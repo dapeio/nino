@@ -1,21 +1,23 @@
 # Nino — Developer Manual
 
-**Language:** English · [Deutsch](development.de.md)
-
-**Last updated:** September 22, 2026 · **Nino version:** 1.3.1
-
-This manual describes the technical work with Nino — from the entry point through routing and rendering to custom modules, persistent data, and tests. If you instead want to first learn about the architecture or set up a fresh project, read the [Concepts](concepts.md) or [Getting Started](getting-started.md).
-
-**Additional Links:**
-[README](../README.md) · [Concepts](concepts.md) · [Developer Manual](development.md) · [Recipes](recipes/README.md) · [Getting Started](getting-started.md) · [Setup Wizard](setup.md) · [`/_admin` Workbench](_admin.md) · [Features](features.md) · [Deployment](deployment.md) · [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) · [Changelog](https://github.com/dapeio/nino/blob/main/CHANGELOG.md)
+This manual describes the technical work with Nino — from the entry point through routing and rendering to custom modules, persistent data, and security. Where the code states a list itself — the callbacks the kernel fires, the classes, the modules, the methods of a panel — the manual names the place instead of copying the list. Setting up a project is the [Setup Wizard](setup.md) manual; one kind of change at a time is walked through in the [recipes](recipes/README.md).
 
 **Developer Profile:** For simple websites, solid knowledge of HTML, CSS, and JavaScript as well as PHP basics is sufficient. Templates consist of HTML+, i.e., HTML with textfills and shortcodes. Only custom application logic, external interfaces, or new modules require deeper PHP knowledge. A finished project can then be largely maintained in the workbench, `/_admin`.
 
 ---
 
-## Entry Point and Runtime Model
+## The Pillars
 
-Every public request goes through three calls:
+A website is a few clearly separated parts. `config.php` holds the technical structure - routes, modules, languages, accounts; `text/` and `elements/` the multilingual editorial data; `templates/` the HTML, as `.tpl` files; `data/` what the running system writes; PHP modules extend the process through callbacks. Everything a web server must never deliver lives in `private/`, everything a browser loads directly in `public/`; the short forms used throughout - `/text`, `/data`, `/images` - are virtual paths that Nino resolves into one of the two.
+
+| Pillar | Consequence |
+| --- | --- |
+| **No dependencies** | No external runtime packages, no Composer bootstrap, no database: kernel and included modules are part of the project, and only PHP and the documented extensions are needed |
+| **File-based project** | Configuration, texts, elements and templates are readable files, so the project can be transferred together, versioned with Git and checked without database tools. Large relational data or transactions belong in a database behind a module of the project |
+| **Central state** | `$appData` is one array: `init()` creates it once, the kernel and the callbacks receive it by reference and change their own part. The request and its response stay apart in `$request` |
+| **Logic and presentation apart** | `.tpl` files hold HTML, textfills and shortcodes, never PHP; modules and callbacks do the logic, and shortcodes are the controlled link between the two |
+
+Every request runs the same three calls:
 
 ```php
 $appData = \Nino\init();
@@ -23,13 +25,25 @@ $request = \Nino\request( $appData, $_SERVER );
 \Nino\output( $appData, $request );
 ```
 
-These few lines represent the entire runtime:
+A key of `$appData` under `/...` belongs to the stable configuration and data space (`/nino/http/routes`), a key under `./...` to the current request alone (`./nino/locales/current`). The notation decides nothing about persistence: a `/...` value is saved only when a writer is asked to, see [Persistent Data](#persistent-data-and-concurrent-write-access).
 
-1. `init()` builds `$appData`, starts the session, and initializes the kernel and modules.
-2. `request()` normalizes the request, resolves the route, and renders the response via the kernel and registered callbacks.
-3. `output()` sends status, headers, and body, and ends the script.
+### Where does a change belong?
 
-There is no subsequent teardown phase. Everything that needs to be permanently preserved before the end must be explicitly written to the file system.
+| Task | Location |
+| --- | --- |
+| Change a page title | a textfill in `text/`, or the Text panel |
+| Add a team member | an element, in the Elements panel |
+| Compose a page from sections, columns and components | the Builder, a feature from the catalogue |
+| Change lower-level HTML | the HTML+ editor, or the `.tpl` file in `templates/` |
+| Create a public URL | a route in `config.php`, or the Routes panel |
+| Output a dynamic list | an element query, or a shortcode with a callback |
+| Add technical function | a module of the project |
+| Add a packaged function - a newsletter, a search | a feature from the catalogue, copied into `features/` and switched on in the Features panel |
+| Change the look | `assets/theme.css` and `assets/style.css` by hand, or the catalogue's Design feature |
+
+## Entry Point and Runtime Model
+
+The three calls are the entire runtime, and the next section takes them one by one. There is no teardown phase: whatever has to outlive the request must be written to the file system explicitly.
 
 ### `$appData` and `$request`
 
@@ -39,13 +53,6 @@ Nino separates the state of the application from the state of a single HTTP oper
 - `$request` contains the normalized input and the resulting response.
 
 Both arrays are passed by reference. This keeps it visible which method reads or modifies data; a hidden container or global service locator is not necessary.
-
-In `$appData`, the following convention applies:
-
-- Keys under `/...` belong to the stable configuration and data space, e.g., `/nino/http/routes`.
-- Keys under `./...` apply only to the current PHP lifecycle, e.g., `./nino/locales/current`.
-
-This notation does not automatically decide persistence. Even a `/...` value is only persistent if a suitable write method explicitly saves it.
 
 The relevant part of `$request` looks simplified like this:
 
@@ -71,34 +78,7 @@ The relevant part of `$request` looks simplified like this:
 
 ### Configuration Outside the Document Root
 
-Without an override, Nino reads `config.php` from `private/`. To move the complete private tree or only this file outside the publicly accessible directory, define the path before loading the kernel:
-
-```php
-define( 'NINO_PRIVATE_DIR', '/var/www/private/nino-example' );
-// Or, to move config.php alone:
-// define( 'NINO_CONFIG_DIR', '/var/www/private/nino-example' );
-require_once __DIR__. '/_nino/Nino.php';
-```
-
-Use `NINO_PRIVATE_DIR` for the complete private tree and `NINO_CONFIG_DIR` only for a separate `config.php`. Each explicitly configured target must exist and be writable; an invalid path is not silently replaced. Every entry point boots the kernel on its own - `index.php`, `_admin/index.php` and `_admin/recovery.php` - so define the constants you use in all three, with the same values: one defined in the site's `index.php` alone leaves the workbench on the default path, where it finds no `config.php` and offers the setup wizard.
-
-Project-owned PHP classes use a separate source root. It is `app/` in the
-project directory by default. Define `NINO_APP_DIR` as an absolute directory
-path before loading the kernel when those classes live elsewhere. The root is
-replaced as a whole. Installed features have a root of their own, `features/`,
-which `NINO_FEATURES_DIR` relocates the same way - and replaces as a whole
-too: a project that points it elsewhere moves its features along, or the
-kernel skips a module it can no longer load without a word.
-
-```php
-define( 'NINO_APP_DIR', '/var/www/nino-example-app' );
-define( 'NINO_FEATURES_DIR', '/var/www/nino-example-features' );
-require_once __DIR__. '/_nino/Nino.php';
-```
-
-This changes only the two source roots. It does not move project data, and it
-never changes where classes in the kernel-owned `Nino\` namespace - Nino's
-own modules among them - are loaded from.
+`NINO_PRIVATE_DIR` moves the complete private tree out of the webroot, `NINO_CONFIG_DIR` only `config.php`, `NINO_APP_DIR` the root of the project's own PHP classes (`app/`) and `NINO_FEATURES_DIR` the root of the installed features (`features/`). Each is defined before the kernel is loaded - in every entry point, with the same value - and replaces its directory as a whole; none of them moves the kernel's own `Nino\` classes. The examples and the pitfalls are in [Deployment](deployment.md#configuration-and-application-source-outside-the-webroot).
 
 ---
 
@@ -192,17 +172,7 @@ Routes are located under `/nino/http/routes` in `config.php`. The public key con
 
 The array key describes the route requested from outside. The `uri` field is its internal identity. This separation is useful when multiple public URLs should show the same behavior or a localized route should remain internally stable.
 
-A route can provide the following fields, among others:
-
-| Field | Meaning |
-| --- | --- |
-| `uri` | internal identity of the response |
-| `body` | string for HTML or structured value for JSON |
-| `statusCode` | HTTP status code |
-| `header` | additional response headers |
-| `locale` | language resolved for this route |
-| `csrf` | explicitly control CSRF check for this route |
-| `maintenance` | `false` keeps the route reachable while the site is in maintenance: `Modules\Maintenance` leaves a response with this field alone. The routes of `Modules\Legal` and the login route of `Auth` carry it; the Routes panel keeps it, like every field it does not edit, when it saves a route. A visitor cannot set it |
+A route carries `uri`, `body`, `statusCode`, `header`, `locale`, `csrf` and `maintenance`, among others. `\Nino\Http` reads the first five where it resolves the route and builds the response; `csrf` is read by `\Nino\Csrf` and `maintenance` by `Modules\Maintenance`, and each is documented where it is read.
 
 If Nino cannot resolve a route, `GET://404` is used. If this route is also missing, a minimal `404` response is created.
 
@@ -283,7 +253,7 @@ Nino stores all content in the file system. This is easy to secure and transfer 
 
 ### Save Configuration Targetedly
 
-Which content belongs in `config.php`, `text/`, `elements/`, `templates/`, and `data/` is shown in the section [Persistent Project Data](concepts.md#persistent-project-data). For development, it is especially important that loaded values are not automatically written back.
+Which content belongs in `config.php`, `text/`, `elements/`, `templates/`, and `data/` is named in [The Pillars](#the-pillars). For development, it is especially important that loaded values are not automatically written back.
 
 `config.php` is loaded into `$appData` at startup. Selected top-level keys can be saved targetedly:
 
@@ -307,15 +277,7 @@ The method reads the current file state again, only takes over the specified key
 - Locks are sidecar files under `/data/.locks`; their name is derived from the target path.
 - Paths with `..` or a nul byte are rejected as an additional protective layer - by every door of `Filesystem`, not only by the two that read and write content: `path()` and `url()` answer `''`, `fileExists()`, `lockFile()`, `putFileContent()` and `mutate()` answer `false`, `getFileContent()` answers its default, and `forceDir()` creates nothing. `path()`, `url()` and `forceDir()` say so in the log, so a call site that forgot to validate its own input is findable; the reads, the writes, the existence check and the lock refuse as quietly as they would a missing file. The nul byte is the half that is not merely a second layer: PHP's own `mkdir()`, `fopen()`, `rename()` and `glob()` throw a `ValueError` for one, which the `@` in front of them does not suppress, so without this rule a nul byte where a `..` would have answered `false` was an uncaught 500.
 
-For a simple, complete replacement, `putFileContent()` is sufficient:
-
-```php
-\Nino\Filesystem::putFileContent(
-    $appData,
-    '/data/example.php',
-    [ 'updated' => time() ]
-);
-```
+For a simple, complete replacement, `\Nino\Filesystem::putFileContent( $appData, '/data/example.php', $content )` is sufficient.
 
 For a read-modify-write operation, `mutate()` should always be used:
 
@@ -382,13 +344,7 @@ The third parameter denotes the language scope. `'*'` stands for language-indepe
 
 Every text key a project or a unit carries has four segments, `/<namespace>/<category>/<part>/<name>`, each of them lower-case words joined by hyphens - `[a-z0-9]+(-[a-z0-9]+)*`. The words are English and spelled out. A key never says which language it is in, or whether it is global or per language, and a name is never a number: a list puts its index in the part (`item-1`).
 
-| Namespace | What it holds | Category | Example |
-| --- | --- | --- | --- |
-| `template` | the words one template reads | the template's file name without `.tpl`, prefix and all | `/template/page-services/item-1/title` |
-| `template` | the words several templates read | always `common` | `/template/common/form/submit` |
-| `project` | the project's facts, settings and own content | `company`, `website`, `mail` or a name of the project's own | `/project/company/contact/email` |
-| `feature` | the words of a catalogue feature's function | the feature's manifest `key` | `/feature/lightbox/controls/close` |
-| `module` | the words of a kernel module | the module's directory, lower case | `/module/form/info/required` |
+The first segment is the namespace: `template` for the words of a template (`/template/page-services/item-1/title`, or `/template/common/form/submit` for words several templates read), `project` for the project's own facts, settings and content (`/project/company/contact/email`), `feature` for the function of a catalogue feature (`/feature/lightbox/controls/close`) and `module` for that of a kernel module (`/module/form/info/required`). What each holds and which category it takes is the table in [AGENTS.md](../AGENTS.md#text-keys); `\Nino\Text::isGrammarKey()` is the rule.
 
 Who a word belongs to is decided in this order, and the first yes wins:
 
@@ -509,66 +465,17 @@ This hook is suitable for clearly limited, global post-processing. Project logic
 
 ## Important Kernel APIs
 
-The following overview is a working reference, not a complete listing of every internal method.
-
-| Class | Important Public Tasks |
-| --- | --- |
-| `AppData` | Prepare basic state, load `config.php`, save selected keys with `writeContentData()` |
-| `Auth` | Login, logout, user management, session revocation, and permission checking |
-| `Callbacks` | Register and execute callbacks |
-| `Catalogue` | Fetch and verify the signed feature catalogue, say what it offers this kernel, and install an archive below `features/` |
-| `Csrf` | Read/rotate tokens and check requests |
-| `Filesystem` | Read/write files, resolve paths, lock, and atomically mutate |
-| `Backup` | Process encrypted backup manifests |
-| `RotatingLog` | Clean dated log files after retention period |
-| `Elements` | Load individual elements, query, create, modify, and delete types and elements; `seed()` adds the elements of an install unit, add-only, and skips the ones deleted for good |
-| `Features` | Discover the features below `features/`, read and validate their manifests, answer and save their settings, activate and deactivate them, and apply an install unit - the wizard's too |
-| `Fetch` | The kernel's one http client: a GET over https with a timeout and a byte cap, used by the catalogue and by nothing else |
-| `Form` | The form engine behind `POST /.form`: which forms a project defines, what a submission has to look like, the mail pair it sends and the record it leaves |
-| `Html` | Register fills and shortcodes, render HTML+, sanitize allowed inline HTML, and resolve one text key with its nested fills (`resolveTextfill()`) |
-| `Http` | Normalize requests, resolve routes, create and output responses |
-| `Images` | Process uploads, manage variants, and generate URLs |
-| `Locales` | Manage current, native, and available languages |
-| `Text` | Read text definitions, lock, and save in batch |
-| `Mail` | Send emails via project configuration, through `mail()` or a transport registered under `/nino/mail/send`; a call that failed leaves `/data/mail-status.php` (since, last, count - no address), read by `Mail::failure()`, and each mail's outcome in `./nino/mail/results` |
-| `Modules` | Load and initialize released modules |
-| `Runtime` | Provide session and error handling |
-
-Use the public methods instead of internal implementations starting with `_`. This keeps project code decoupled from details like cache invalidation, file format, and session rotation.
+The kernel classes live one per file, in `_nino/Nino/<Class>/<Class>.php`, and are loaded on first use; the docblocks of each state its public tasks. Use the public methods instead of the internal implementations starting with `_`. This keeps project code decoupled from details like cache invalidation, file format, and session rotation.
 
 ---
 
 ## Integrated Modules
 
-Modules are activated in `/nino/modules`. The order of the array is relevant if multiple modules register callbacks of the same priority.
-
-| Module | Integration | Key Features |
-| --- | --- | --- |
-| `Assets` | `[assets ...]` | bundles, caches, and optionally minifies CSS/JS |
-| `Cache` | `/nino/http/response`, priority 9; `/nino/http/output`, priority 9 | while `/nino/cache/status` is on, answers an anonymous `GET` from a stored copy and stores every finished page it may, with the `Content-Security-Policy` it was sent with; a write through `/_admin` drops the lot |
-| `Components` | `[title]`, `[subtitle]`, `[card-title]`, `[card-subtitle]`, `[hero-title]`, `[hero-subtitle]`, `[text]`, `[image]`, `[button]`, `[html]`, `[spacer]`, `[card]`, `[stack]`, `[slider]`, `[filter]`, `[list]` | shortcodes with a schema - components and the stacks that loop elements around them - and the registry both are listed in; `[image ...]` creates an escaped `<img>` from an image slot or URI, `[card]` draws a card that holds components. See [Components](#components) below |
-| `Csrf` | `[csrf]` | renders a hidden token field; core protection itself is always active |
-| `Elements` | `[element ...]`, `[elements ...]`, `[elementvalues ...]` | loads typed content; lists support query, `sort`, `offset`, `limit`, and optional callback, and `[elementvalues]` loops the distinct values of one field |
-| `Form` | `POST://.form` | owns the one form endpoint and hands every submission to `\Nino\Form` - see [Forms](#forms) below |
-| `Jstext` | `[jstext]` | provides text values as securely encoded JSON with CSP nonce |
-| `Legal` | `[legal]`, `[privacy]`, the routes of both pages; `/seo/pages`, `/nino/elements/committed` | the imprint and privacy policy as elements, drawn in the visitor's language and linked from the navigation `legal` - see [Legal](#legal) below |
-| `Localepicker` | `[localepicker ...]` | switches locale via query and redirect |
-| `Maintenance` | `/nino/http/response`, priority 1; `/nino/http/output`, priority 9 | while `/nino/maintenance/status` is on, answers every site page and module endpoint with a 503 and a Retry-After header, for every visitor not signed in to the workbench - the login itself excepted - and puts a banner at the top of each page a signed-in account opens |
-| `Navigation` | `[navigation ...]` | renders navigations from a compact line syntax |
-| `Template` | `[template /path/name]` | loads the raw content of a `.tpl` file; the common render pipeline processes it further |
-
-Every module in the table ships in `_nino/Nino/Modules/`: the always-on `Assets`, `Cache`, `Components`, `Csrf`, `Elements`, `Jstext` and `Template`, and the five a project may switch off (`Form`, `Legal`, `Localepicker`, `Maintenance`, `Navigation`). `Form` and `Navigation` bring their workbench panels along (Submissions, Navigations), `Maintenance` is nothing but a switch: every one is present exactly while its module is active. `Form`, `Legal`, `Navigation` and `Localepicker` are no longer a setup wizard choice - the wizard applies each one's `install/` unit and lists its class in `/nino/modules` on every run (`\Nino\Install\Setup::ALWAYS_MODULES`), and lists `Maintenance` on every run as well. A project may still switch any of the five off by hand in `/nino/modules`, and `_nino/` stays replaceable wholesale. Everything beyond the table is a **feature** - an installable package under `features/<Name>/` with a `feature.php` manifest, switched on in the workbench's Features panel, bringing its panel the same way. A checkout ships none: they come from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) - `Newsletter` (double opt-in, confirmation and unsubscribe under `/.newsletter`) and `Search` (a locale-aware fuzzy index over Element fields) among them - copied into `features/` or installed from the Features panel. See [Features](features.md), [Panels of the Workbench](#panels-of-the-workbench) and [Directory and Autoloading](#directory-and-autoloading) below.
-
-Some details are deliberately defensive:
-
-- The form limits inputs, protects write operations, and discards old log months.
-- The public signup of the catalogue's Newsletter feature responds independently of whether an address is new or already known. This makes it harder to query foreign addresses.
-- `Jstext` uses JSON hex escaping and adds a random nonce to the Content Security Policy.
-- `Jstext` carries only the text keys that were published to it, not every fill the site has. Shipped are `/module/form/info/`, `/feature/newsletter/info/` and `/template/common/slider/`, which are what the public scripts read; the workbench publishes `/_admin/`. A project whose own script reads another key names its prefix under `/nino/http/routes`' neighbour `/nino/jstext/keys` in `config.php`, a module or feature calls `\Nino\Modules\Jstext::publish( $appData, [ '/project/mine/info/' ] )` in its `init()`. **A published key is public**: it stands in the source of every page that renders the block. Before this, `/project/mail/address/owner` - the mailbox a contact form delivers to - was in the source of every page.
+Modules are activated in `/nino/modules`. The order of the array is relevant if several of them register callbacks of the same priority. The modules Nino ships are the directories of `_nino/Nino/Modules/` (`\Nino\Modules\*`): the always-on ones, which `\Nino\AppData::DEFAULTS` lists, and `Form`, `Legal`, `Localepicker`, `Maintenance` and `Navigation`, which the setup wizard applies on every run and a project may still switch off by hand. `_nino/` stays replaceable wholesale. Everything beyond is a **feature**: an installable package under `features/<Name>/` with a `feature.php` manifest, switched on in the workbench's Features panel and bringing its panel the same way. A checkout ships none; they come from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features), and each documents itself in the `manual` of its manifest. See [Features](features.md), [Panels of the Workbench](#panels-of-the-workbench) and the [autoload layout](recipes/runtime-module.md#autoload-layout).
 
 ### Components
 
-`Modules\Components` is where a shortcode gets a schema. A **component** is a shortcode that says what it takes - one source for its value and a few attributes, each with a type and a default - so that a tool can offer it and a template can still be written by hand. A **stack** is a component that loops the elements of one type around its content. Both are registered in one registry, which the module's `init()` fills with the kernel's own and which a feature's manifest or a project's `MyApp` adds to. The module is always on, and `[image]` lives here since it left the module `Images`, which no longer exists.
+`Modules\Components` is where a shortcode gets a schema. A **component** is a shortcode that says what it takes - one source for its value and a few attributes, each with a type and a default - so that a tool can offer it and a template can still be written by hand. A **stack** is a component that loops the elements of one type around its content. Both are registered in one registry, which the module's `init()` fills with the kernel's own - `\Nino\Modules\Components::init()` lists them, each with its schema - and which a feature's manifest or a project's `MyApp` adds to. The module is always on, and `[image]` lives here since it left the module `Images`, which no longer exists.
 
 ```php
 \Nino\Modules\Components::addComponent( $appData, 'countdown', [ Countdown::class, 'componentCountdown' ], [
@@ -584,54 +491,19 @@ Some details are deliberately defensive:
 ] );
 ```
 
-| Part | What it does |
-| --- | --- |
-| `addComponent( &$appData, $name, $callback, $schema )` | registers a component. It calls `\Nino\Html::addShortcode()` with a wrapper around the callback, and **replaces** a component or a shortcode of the same name - that is how a project changes the markup of one |
-| `addStack( &$appData, $name, $callback, $schema )` | registers a stack, in its own list |
-| `components( &$appData )`, `stacks( &$appData )` | the registry, read only: `name => schema`, as the module normalized them |
-| `defaults( &$appData, $name, $stack = false )` | the value every attribute has where a shortcode does not set it, from the schema and nowhere else. Always strings, as a shortcode carries them: a bool is `'1'` or `'0'`. A stack has the attributes of its loop and of its grid besides its own |
-| `value( &$appData, $source, $kind, $format = 'plain', $fixed = null )` | resolves the first argument of a component - the table below |
-| `element( &$appData )` | the element a stack is rendering a cell for, `[ 'uri', 'id', 'element', 'model' ]`, else `null` |
-| `renderStack( &$appData, $args, $cell )` | the loop of every stack |
-| `escape( $string )` | escaped for html text or an attribute, with every `[` written as `&#91;` - what a renderer of a project's own writes a value of its own with |
+`addComponent()` and `addStack()` register one: they call `\Nino\Html::addShortcode()` with a wrapper around the callback, and **replace** a component or a shortcode of the same name, which is how a project changes the markup of one. The rest of the API - `components()` and `stacks()`, `defaults()`, `value()`, `element()`, `renderStack()`, `cell()` and `escape()` - is documented where it stands, in `Components.php`.
 
 **The schema.** `label` is a string or a locale map, and every attribute needs a `default`. An attribute is a `string`, an `int` (`min`, `max`), a `bool`, a `select` (`options`, a list, with the default among them) or `lines`, and three types that only exist here: `key` (a text key), `image` (an image slot) and `href` (a key or an address). `label` and `hint` of an attribute are optional. `class` is allowed on every component without being declared: the renderer puts it at the end of the classes of its outer element. `draws`, `in` and `holds` are optional and tell a tool something about a component without changing how it renders. `draws` is what the renderer draws on the outside, written the way a builder shows it: the tag, a space, the one class a theme addresses the element by - `h{level} .nino-section-title`, `a .nino-btn`. It is a non-empty string of at most 64 characters from `a-z`, `0-9`, space, `.`, `{`, `}` and `-`, and a name in braces is an attribute of the schema, put in from the shortcode or else from the default. `in` says where a tool offers the component, and a place says where a component stands: a non-empty list of distinct words from `section` (directly in a column - also in the cell of a stack that holds no card), `card` (in a card) and `hero` (directly in a column of the hero section, the first section of a page when it has a cover); without it the component is offered everywhere. `holds` is one of the same three words, and only a component whose source is its `content` may have it: what stands between its tags is then the calls of the components of that place, which are rendered with it and which a builder edits as its children. The kernel has one, `[card]`, which holds `card`. A component that draws another element in another place is another component - the kernel has six titles - because no renderer reads a context. A stack declares none of the three. A stack says `grid => true` if it takes `cols`, `gap` and `autoheight` and draws cells, and may name `assets` (`css` and `js`, project paths) for a tool to tell the developer which files it needs - nothing adds them to a page. `preview` names one of the fixed pictures a builder draws it as. The names `value`, `source`, `content`, `text`, `uri` and `grid` are taken, and so are the arguments of a stack's loop. **A schema the module cannot work with is refused at registration** with an `E_USER_ERROR` that says why: a name that is no slug, an unknown `source` or type, a `select` with no options or a default outside them, an attribute without a default, an `int` outside its bounds, a place in `in` that is none of the three or is named twice, a `holds` that names no place or stands with another source than `content`, a `draws` that is empty, of other characters or more than 64 or with a placeholder that no attribute answers. A manifest is read the same way, before it is applied (see [Features](features.md)). Rendering does not validate: an attribute that is not declared is ignored, a `select` outside its options is the default, a number that is none too, so a file written by hand may be incomplete and still renders.
 
-**What a renderer receives.** `public static function componentTitle( array &$appData, array $args ): string`, with `$args` made ready: `value` (resolved and escaped), `source` (the first argument as written), `content` (what stands between the opening and closing tag), every attribute under its name - missing ones from the defaults, selects reduced to their options - and `text` where the shortcode had a fixed one. A component whose value is `null` - or empty, where it has a source - renders nothing: an empty slot is no broken picture, and a missing field no empty heading. What a renderer returns is rendered again like the output of any shortcode, which is why `value` is already safe.
+**What a renderer receives.** `public static function componentTitle( array &$appData, array $args ): string`, with `$args` made ready by `dispatch()`: the first argument resolved by `value()` and made safe (`value`, and `source` as it was written), what stands between the tags (`content`), every attribute under its name with the defaults filled in and a `select` reduced to its options, and `text` where the shortcode had a fixed one. A component whose value is `null` - or empty, where it has a source - renders nothing: an empty slot is no broken picture, and a missing field no empty heading. What a renderer returns is rendered again like the output of any shortcode, which is why `value` is escaped and has every `[` written as `&#91;` (the rule is in [AGENTS.md](../AGENTS.md#rendering-and-escaping-rules)); `value()` documents what the first argument can be - a text key, a field or the place in the loop in a stack, a fixed `text="..."`, a picture reference, an address.
 
-**Sources.** `value()` is the one place that knows what the first argument is:
-
-| Argument | Outside a stack | In a stack |
-| --- | --- | --- |
-| begins with `/` | the text key in the current language through `\Nino\Html::resolveTextfill()`; `null` if it has no value | the same |
-| `.id`, `.uri` | nothing | the number of the element in the loop, its uri (`<type>/<id>`) |
-| any other name | nothing (there is no element) | the field of that name of the current element, drawn by its type through `\Nino\Html::fieldValue()`; `null` if the model has no such field |
-| `text="..."` instead of the first argument | the fixed value, escaped | the same |
-
-Every value that reaches the html is escaped and has its `[` written as `&#91;`, because the output of a shortcode is rendered once more: an editor's `[[/key]]` must not open a fill there. The kind a component declares changes two things. For `image` the value is the reference to the picture, not text - the uri of a slot (`hero`, `/template/page-home/hero/background`), or in a stack the filename an image field holds - escaped like text, so safe to write; the renderer looks the picture up through `\Nino\Images` by the slot's uri (`$args['source']`) or by the element's image field, and asks it for file, size and alt text. For `href` a key is resolved and an address passes (`#contact`, `/contact`, `https://...`), both escaped, and a scheme that is not `http`, `https`, `mailto` or `tel` - or an address that starts with `//` or holds a control character - becomes `#`. A plain key's value is stored with its quotes and brackets as entities; they are decoded before the one escaping, so a visitor reads the characters, not the codes. `text` has the attribute `format` (`inline`, `lines` or `blocks`, the default): a key is sanitized to it by `\Nino\Html::sanitizeHtml()`, a field keeps the format its type declares. `[html]` is the one component with content instead of a source, and its content is the template's own, so its `[` stay.
-
-**The components the kernel brings:**
-
-| Component | Source | Attributes | Renders |
-| --- | --- | --- | --- |
-| `[title]` | text | `level` 1-4 (2), `style` `loud`/`quiet`, `class` | `<h<n> class="nino-section-title ...">` |
-| `[subtitle]` | text | `style`, `class` | `<p class="nino-section-subtitle ...">` |
-| `[card-title]` | text | as `[title]` | `<h<n> class="nino-card-title ...">` |
-| `[card-subtitle]` | text | as `[subtitle]` | `<p class="nino-card-subtitle ...">` |
-| `[hero-title]` | text | as `[title]` | `<h<n> class="nino-hero-title ...">` |
-| `[hero-subtitle]` | text | as `[subtitle]` | `<p class="nino-hero-subtitle ...">` |
-| `[text]` | text | `format`, `style`, `class` | `<div class="nino-section-text ...">`, with `nino-richtext` for `blocks` |
-| `[image]` | image | `alt`, `focus` 1-9, `ratio` (`1-1`, `4-3`, `3-2`, `16-9`, `21-9`), `class` | the `<img>` |
-| `[button]` | text (label) | `href`, `style` `primary`/`outline`/`light`/`dark`/`brand-alt`, `size` `small`/`big`, `target` `_blank`, `class` | `<a class="nino-btn ...">` |
-| `[html]` | content | - (`class` is reported by `defaults()` but has no element to sit on) | the content as rich text, `blocks` |
-| `[spacer]` | none | `size` 1-6 (2) | `<div class="nino-mt-<n>"></div>` |
-| `[card]` | content | `ground` (`counter`, `alt`, `tint`, `dark`, `black`, `primary`, `brand-alt`), `padding` 0-6, `fill`, `vertical` `middle`/`bottom`/`last-bottom`, `align` `left`/`center`/`right`, `background` (a slot, or in a stack an image field), `focus` 1-9, `dim`, `borderless`, `class` | `<article class="nino-card ...">` around the content, a `<div class="nino-card-bg ...">` with the picture first |
+The kernel brings the titles and subtitles of a section, a card and a hero, `[text]`, `[image]`, `[button]`, `[html]`, `[spacer]` and `[card]` as components, and `[stack]`, `[slider]`, `[filter]` and `[list]` as stacks.
 
 The six titles share one renderer and differ in the class they draw, which is their place: `title` and `subtitle` are for a section (`in` is `[ 'section' ]`), `card-title` and `card-subtitle` for a card (`[ 'card' ]`), `hero-title` and `hero-subtitle` for a hero (`[ 'hero' ]`), and `draws` names the tag and the class (`h{level} .nino-card-title`, `p .nino-hero-subtitle`). `[button]` declares `draws` too, `a .nino-btn`, and is offered everywhere; `[text]`, `[image]`, `[html]` and `[spacer]` declare neither, and neither does a stack. `[card]` declares all three: `in` is `[ 'section', 'hero' ]`, `draws` is `article .nino-card` and `holds` is `card`. The registry carries the keys as the schema has them - `components()` and a feature's manifest are both read by `validate()`.
 
-`[card]` is a component that holds components: what stands between its tags is the calls of the components of a card - a title, a text, an image, a button - and it draws the `<article>` around them with its ground, its padding, whether it takes the whole height of its column or cell (`fill`), where its content stands in a card taller than it (`vertical`: at the top, in the middle, at the bottom, or with the last element at the bottom), how the text and the buttons are aligned, a picture behind the content, its border and a class of its own. The classes are written in the order of the markup - the ground, `nino-card--dim`, `nino-card--borderless`, `nino-card--fill`, `nino-card--<vertical>`, `nino-text-<align>`, `nino-p-<padding>` and the class - and a word outside what an attribute offers is the default. The names `align` and `vertical` are what they are because `text` and `content` are taken. The same component stands once in a column - a card beside a picture - and once per element in a stack: the cards of a loop. It reads no context itself; the components in it do. The content is not rendered by the renderer, which calls no `renderHtml()` of its own: the engine renders the output of a shortcode again (`\Nino\Html::_doShortcode()`, to a depth it caps - that is what makes `[template]` work), so the components in the card are rendered when the card is, and in a stack with the element still their context, because `renderStack()` holds it around the rendering of the stack's content. A card with nothing between its tags renders nothing; a card whose components all render nothing is an empty `<article>`, as a section with nothing in it is a section. The picture, `background`, is looked up as `[image]` looks its picture up - a slot by its uri, in a stack an image field of the element by its name - and is an `<img>` with an empty alt text in a `<div class="nino-card-bg">` in front of the content, with the focus as `nino-img-focus--<n>` on the `<div>`; a slot with no file and a field that holds none draw no `<div>`. The kernel writes every class it is told to: `dim` without a picture is the author's mistake, as the dim of a column is. The markup of both is `$html['card']` and `$html['card-bg']`.
+`[card]` is a component that holds components: what stands between its tags is the calls of the components of a card - a title, a text, an image, a button - and it draws the `<article>` around them with its ground, its padding, whether it takes the whole height of its column or cell (`fill`), where its content stands in a card taller than it (`vertical`), how the text and the buttons are aligned, a picture behind the content, its border and a class of its own; `componentCard()` documents the attributes and the order of the classes. The same component stands once in a column - a card beside a picture - and once per element in a stack: the cards of a loop. It reads no context itself; the components in it do. The content is not rendered by the renderer, which calls no `renderHtml()` of its own: the engine renders the output of a shortcode again (`\Nino\Html::_doShortcode()`, to a depth it caps - that is what makes `[template]` work), so the components in the card are rendered when the card is, and in a stack with the element still their context, because `renderStack()` holds it around the rendering of the stack's content. A card with nothing between its tags renders nothing; a card whose components all render nothing is an empty `<article>`, as a section with nothing in it is a section. The markup of the card and of its picture is `$html['card']` and `$html['card-bg']`.
 
-`[image]` is the shortcode `Modules\Images` had, and it behaves as it did in every form. Its `alt` is the text stored for the slot in the current language, else the shortcode's own `alt="..."`, else empty (`alt=""`, decorative) - never the slot's label. The text is escaped and its `[` written as `&#91;`, so it cannot open a fill or shortcode in the next rendering pass. With content - `[image /logo]...[/image]` - the content is rendered instead of the `<img>`, and only when the slot has an image: `[[src]]` (the file's path from the site's root; `https://[[/project/website/general/url]][[src]]` is an absolute address), `[[width]]`, `[[height]]` and `[[alt]]` are filled in. That is how a meta tag or a mail asks for the address without being left empty or broken where nothing is uploaded yet. A bare `[image]` before the first closing `[/image]` of a template reads the text between them as its own content, so keep the content form in a template with no bare `[image]` of the same kind before it, or write the bare one as `[image /x][/image]`. In a stack `[image image]` draws the image field of the element: its file, the size the field declares and the alt text of the field the type names for it. A `focus`, a `ratio` or a `class` puts the `<img>` in a frame, `<div class="nino-image ...">`, which crops it. The markup of every component is a property, `\Nino\Modules\Components::$html`, `$html['img']` among them - replace an entry, or register a component of the same name.
+`[image]` is the shortcode `Modules\Images` had, and it behaves as it did in every form; `componentImage()` documents the alt text, the content form that a meta tag or a mail asks for the address with, and the frame that crops. One thing the code does not say: the content of a shortcode runs up to the first closing tag, so a bare `[image]` ahead of the content form `[image /logo]...[/image]` in one template reads the text between them as its own content. Write the bare one as `[image /x][/image]`. The markup of every component is a property, `\Nino\Modules\Components::$html`, `$html['img']` among them - replace an entry, or register a component of the same name.
 
 **Stacks.** A stack is written with the type as its first argument and the cell between its tags:
 
@@ -656,29 +528,15 @@ Every stack reads the loop of `[elements]` - `sort`, `offset`, `limit`, `query`,
 [/stack]
 ```
 
-The cells are the stack's and the card is the content, so the two are told apart in `Nino.css` too: the cell holds the half gap as padding, and the card in it has its padding and its border as in a column but no margin of its own, the half gap being the room between neighbours (see [Grounds](design.md#hooks-in-ninocss)). Below 640px, where the classes of the grid begin, the cells are one below the other and a card in one is as wide as the column. The kernel brings four:
-
-| Stack | Draws | Own attributes |
-| --- | --- | --- |
-| `[stack]` | `<div class="nino-grid-row nino-stack ...">` with one `<div>` cell to an element | - |
-| `[slider]` | a `.nino-slider` around a `<ul>` with one `<li>` to an element, which `Nino.ui.js` gives its controls and touch; no grid | `width` (`75%`, or pixels: `320px`), `min` |
-| `[filter]` | a `.nino-filter`: a row of `.nino-filter-btn` buttons - the first for everything - and the cells, each a `<div>` with `.nino-filter-item` and its value as `data-filter-item` | `by` (the field the buttons are the values of, found as `[elementvalues]` finds them), `all` (the first button's label; empty takes the text `/template/common/filter/all`, else the word of the page's language) |
-| `[list]` | `<ul class="nino-list ...">`, one `<li>` to an element; no grid | `style` `check`/`numbered`/`columns` |
+The cells are the stack's and the card is the content, so the two are told apart in `Nino.css` too: the cell holds the half gap as padding, and the card in it has its padding and its border as in a column but no margin of its own, the half gap being the room between neighbours. Below 640px, where the classes of the grid begin, the cells are one below the other and a card in one is as wide as the column. The kernel brings four stacks - `[stack]`, `[slider]`, `[filter]` and `[list]` - and their schemas, with the attributes of each, are in `Components::init()`.
 
 A stack **renders each cell itself**. `[elements]` fills its content with `str_replace()` and returns it, to be rendered afterwards - which would run every component in it once the loop is over, with no element. `renderStack()` sets the element as the context (`./nino/components/element`, what `element()` returns), renders the content with `\Nino\Html::renderHtml()`, puts the previous context back and gives the cell to the function it was handed: `fn( string $inner, array $element, int $index, array $cell ): string`, where `$cell` is `[ 'class' => ..., 'attributes' => ... ]` - the classes of the cell in the grid and `data-autoheight-group`, both empty without a grid - for the cell to put on the element it draws; `\Nino\Modules\Components::cell( $cell, $inner, $class, $attributes )` does that and draws the `<div>` of the cell. A stack that draws a cell of its own, as the slider does its `<li>`, puts them on that. What a stack returns has no shortcode left in it. The loop is the one of `[elements]` - `\Nino\Modules\Elements::queryLoop()`, which both call - so `sort`, `offset`, `limit`, `query` and `callback` mean the same in both, and `[elements]` stays as it is, for templates written by hand.
 
 Two rules follow. **A stack never stands directly inside another, and a `[card]` never stands directly inside another**: the shortcode reads its content up to the first closing tag, and the context is the element of the one cell. A stack in a template that a stack includes is fine - the context is put back. And a fill in the argument of a component (`[title "[[/some/key]]"]`) is not a source: the source is the key itself, not its value.
 
-```php
-public static function stackSlider( array &$appData, array $args ): string {
-	$cells = \Nino\Modules\Components::renderStack( $appData, $args, static fn( string $inner ): string => '<li>'. $inner. '</li>' );
-	return '<div class="nino-slider">...<ul>'. $cells. '</ul></div>';
-}
-```
-
 **From a feature.** A manifest that names `components` and `stacks` (see [Features](features.md#components-and-stacks)) has them registered at every boot, with the renderers `[ '\Nino\Modules\<Name>', 'component<Name>' ]` and `stack<Name>`; `MyApp` calls `addComponent()` in its `init()`. A component is registered one way or the other, not both: `Html::addShortcode()` adds a second callback beside the first, where `addComponent()` replaces it. A shortcode without a schema stays a shortcode, and is no component. [The recipe](recipes/component.md) writes one of each.
 
-The classes the markup uses are in `Nino.css`: `.nino-section-bg` (the picture behind a section, in a block of its own before the row), `.nino-hide-s`, `.nino-hide-m` and `.nino-hide-l` (a column hidden below 768px, from 768px to 1023px, from 1024px), `.nino-stack-start|center|end` and `.nino-stack-gap-0` to `-6` on a column (its components one below the other, a gap apart - a column opts in; others are not made a grid), and `.nino-stack` with its cells for a stack of elements. `nino-img-focus--1` to `--9` and `.nino-image` with `--1-1` to `--21-9` crop a picture. A card is `.nino-card`: `--fill` takes the height of the column or the cell it stands in, `--middle`, `--bottom` and `--last-bottom` say where its content stands, `.nino-card-bg` is the picture behind it and `--dim` darkens it (see [Hooks in `Nino.css`](design.md#hooks-in-ninocss)).
+The classes the markup uses are in `Nino.css`, and the custom properties a design layer sets to turn it - the font roles, the type scale, the grounds and the rest - are declared and commented at its `:root`. The catalogue's Design feature documents what it compiles from them in the manual of its `feature.php`.
 
 ### Forms
 
@@ -705,11 +563,7 @@ A project defines its forms under `/nino/form/forms` in `config.php` - beside it
 ],
 ```
 
-A field's `type` is one of `\Nino\Form::TYPES` (`text`, `email`, `tel`, `url`, `number`, `textarea`, `select`, `checkbox`, `radio`, `date`; a `select` and a `radio` list their `options`), its `label` may be a textfill, and its `name` is an identifier of at most 64 characters (a letter, then letters, digits, `_` or `-`) that is not one of `\Nino\Form::RESERVED` - the four keys the endpoint reads off the post itself and the four a record carries beside the values. A definition with no usable field left is dropped rather than half-read: a form nobody can submit is better than one that mails to an address a hand edit mistyped.
-
-What each type posts is what the shared script sends: a ticked `checkbox` its value and an unticked one nothing, so a required one has to be ticked; a `radio` group the value of the member that is ticked, which has to be one of its `options` - a `radio` without one non-empty option asks for an answer nobody can give and is left out, where a `select` without options keeps taking any value; a `date` is `Y-m-d`, a day that exists. A value of the wrong shape is a `400`.
-
-`\Nino\Form::normalize()` repairs a definition quietly. A writer that takes one from a person asks `\Nino\Form::problems( $entry )` first: one `[ 'field' => index | null, 'code' => ... ]` for each case `normalize()` would leave out or replace (the codes are `key`, `field`, `name`, `reserved`, `duplicate`, `type`, `options`, `fields`, `to`, `ownerTemplate` and `userTemplate`; the index is the key in the posted `fields` list, `null` for a problem of the definition itself), `[]` for a clean one. Both answer from one routine, so they cannot disagree.
+The field types are `\Nino\Form::TYPES` and the names a field may not take `\Nino\Form::RESERVED`; `\Nino\Form` documents what each type posts and how `normalize()` and `problems()` treat a definition.
 
 Only `[[fields]]` carries every field into a mail - the whole submission as a table, whatever the form asks for. The `mail-owner` and `mail-user` templates a new installation starts from carry it; a project that installed before copies it into its own templates by hand. A template that fills only `[[name]]`, `[[email]]`, `[[subject]]` (the field `cat`) and `[[message]]`, as the earlier ones did, mails nothing of a field of another name.
 
@@ -717,7 +571,7 @@ Two more keys sit beside them. `/nino/form/retention` is how many months of subm
 
 A project that changes the retention or the confirmation mail changes what its privacy policy has to say: the section "Contact form" of the privacy policy (type `privacy`, element `contact-form`) names the period the submissions are kept and the confirmation the visitor gets. Whoever sets `/nino/form/retention` or `/nino/form/store`, or sends no confirmation, adapts that section to it - see [Legal](#legal).
 
-The markup is the project's own: `page-contact.tpl` carries a hand-written `<form class="nino-form">` that the shared script in `Nino.ui.js` drives. A project with several forms writes each one's markup the same way, or installs the catalogue's [Forms feature](https://github.com/dapeio/nino-features/blob/main/features/Forms/feature.php), which adds a `[form]` shortcode that renders one from its definition, a builder for the definitions and a set of spam guards.
+The markup is the project's own: `page-contact.tpl` carries a hand-written `<form class="nino-form">` that the shared script in `Nino.ui.js` drives. A project with several forms writes each one's markup the same way; the catalogue's Forms feature draws one from its definition.
 
 **Refusing a submission** needs no callback name of its own. A module or feature that wants to turn one away registers on the same route callback ahead of the module - `\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://.form', ..., 1 )` - and leaves a status behind; `\Nino\Form::handle()` sees a status that is not 200 and returns without sending or writing anything. `\Nino\Csrf` refuses the same way one step earlier - on the global `/nino/http/response`, at priority 1, which runs before any route's callback - which is why the endpoint has no csrf check of its own:
 
@@ -736,9 +590,7 @@ The endpoint's own answers follow the same rule. A submission the per-ip mail ca
 
 ### Legal
 
-**Important:** The imprint and privacy policy Nino ships are a starting point, not legal advice. They are not tailored to any particular website and have not been legally reviewed. The operator of a website is responsible for having them checked by a qualified person before publication and for adapting them: to what the website actually processes, to the operator's legal form, and to further mandatory details such as a commercial register entry, a VAT identification number or a person responsible for journalistic content. The project gives no warranty that the texts are correct, complete or up to date.
-
-`Modules\Legal` brings the imprint and the privacy policy as **elements**: two types, `legal` (the imprint) and `privacy` (the privacy policy), one element per section, each with a title and a text per language and the fields `order` and `hidden`. The setup wizard applies its `install/` unit on every run (`\Nino\Install\Setup::ALWAYS_MODULES`) and fills the two types with a newly written starting text in German and English. Nothing of it is replaced afterwards: elements are the editors' content, so a second wizard run adds what is missing and leaves every section as it is.
+`Modules\Legal` brings the imprint and the privacy policy as **elements**: two types, `legal` (the imprint) and `privacy` (the privacy policy), one element per section, each with a title and a text per language and the fields `order` and `hidden`. The setup wizard applies its `install/` unit on every run (`\Nino\Install\Setup::ALWAYS_MODULES`) and fills the two types with a newly written starting text in German and English. Nothing of it is replaced afterwards: elements are the editors' content, so a second wizard run adds what is missing and leaves every section as it is. The notice that these texts are a starting point and no legal advice stands in full in the [setup manual](setup.md#modules).
 
 | Part | What it does |
 | --- | --- |
@@ -766,149 +618,20 @@ The endpoint's own answers follow the same rule. A submission the per-ip mail ca
 
 **What the module stores about visitors.** Nothing: no cookie, no request to a third party. A reader of a section sees its text and nothing else.
 
-### Elements Search Index
-
-`Modules\Search` is a feature, not part of the checkout: it comes from the
-catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features),
-copied into `features/Search/` and switched on in the workbench's Features
-panel. It keeps a small locale-aware fuzzy index over configured fields of
-flat Element types - defined under `/nino/elements/index` in `config.php`,
-stored as one derived file per type under `data/`, rebuilt from its Search
-panel and after every committed Element
-write - and answers `\Nino\Modules\Search::getElements( $appData, $type,
-$query )` with the matching Elements of the current locale in score order.
-The index configuration, the ranking rules, the lifecycle of the derived
-files and the API are documented in the feature's own manual in the
-catalogue: [features/Search/feature.php](https://github.com/dapeio/nino-features/blob/main/features/Search/feature.php).
-
 ---
 
 ## Developing a Custom Module
 
-### Directory and Autoloading
-
-Nino's autoloader maps namespaces directly to directories. For the
-project-owned class `Project\Catalog\Catalog`, the default file is:
-
-```text
-/app/Project/Catalog/Catalog/Catalog.php
-```
-
-The resolution rules are intentionally asymmetric:
-
-| Class namespace | Search roots |
-| --- | --- |
-| `Nino\Modules\...` | `_nino/` first, then `_admin/`, then `features/` (`NINO_FEATURES_DIR` when defined), then `app/` (`NINO_APP_DIR` when defined) |
-| every other `Nino\...` | `_nino/` only |
-| every other namespace | `NINO_APP_DIR` when defined, otherwise `app/` |
-
-The `Nino\` namespace is kernel-owned and cannot be shadowed from the project
-application root - with one deliberate opening: `Nino\Modules\*` is a merged
-view over four roots rather than one directory. The runtime modules Nino ships
-live in `_nino/` - the always-on ones and the optional ones a project switches
-on or off in `/nino/modules` (`Form`, `Navigation`, `Localepicker`,
-`Maintenance`); the workbench's own screens in `_admin/Nino/Modules/`
-(`Dashboard`, `Elements`, `Text`, `Images`, `Logs`, `Routes`, `Users`,
-`Language`, `Backups`, `Config`, `Features`); the features a project installs
-below `features/` (or `NINO_FEATURES_DIR`), one directory each with a
-`feature.php` manifest - the catalogue's features arrive this
-way, a checkout ships none; and the application root, where a project's own
-code lives. Below the features root
-the `Nino/Modules/` prefix is the directory itself: `features/Newsletter/Newsletter.php`
-is `\Nino\Modules\Newsletter`, not `features/Nino/Modules/Newsletter/`. The
-order is what each root may do to the others: `_nino/` first, so a shipped
-module can never be shadowed; `_admin/` before `features/`, so a feature
-cannot replace a workbench screen; `features/` before `app/`, so a project
-cannot replace an installed feature by dropping a file next to its own
-modules; `app/` last, which can only add.
-
-It is the whole relative path that is resolved, not the first segment, so one
-module name may hold classes in more than one root: `\Nino\Modules\Elements`
-is the kernel's runtime module in `_nino/`, `\Nino\Modules\Elements\Admin`
-the workbench screen for it in `_admin/` - two halves of one module, each where
-it belongs. A project's own modules keep their own namespace under `app/`.
-
-Within the selected root, the full class name becomes a directory path and the
-class basename is appended once more as the filename. Therefore, the basename
-of the class and the PHP file must match. Class paths are limited to allowed
-characters; dynamically composed or user-controlled class names still do not
-belong in the module list.
-
-The kernel follows the same layout. `_nino/Nino.php` holds only the boot
-functions `\Nino\init()`, `request()` and `output()` plus the autoloader; every
-kernel class lives in its own file below `_nino/Nino/` - `\Nino\Filesystem` in
-`_nino/Nino/Filesystem/Filesystem.php`, `\Nino\Auth` in
-`_nino/Nino/Auth/Auth.php`, and so on - and is loaded on first use.
-
-### Example: Minimal Module
-
-```php
-<?php
-
-namespace Project\Catalog;
-
-class Catalog {
-
-    public static function init( array &$appData ): void {
-        \Nino\Html::addShortcode(
-            $appData,
-            'catalog-count',
-            self::class. '::shortcodeCount'
-        );
-
-        \Nino\Callbacks::registerCallback(
-            $appData,
-            '/nino/http/response/GET://api/catalog',
-            self::class. '::responseCatalog'
-        );
-    }
-
-    public static function shortcodeCount( array &$appData, array &$args ): string {
-        $rows = \Nino\Filesystem::getFileContent(
-            $appData,
-            '/data/catalog.php',
-            []
-        );
-
-        return (string) count( $rows );
-    }
-
-    public static function responseCatalog( array &$appData, array &$request ): void {
-        \Nino\Http::ok( $request, [
-            'items' => \Nino\Filesystem::getFileContent(
-                $appData,
-                '/data/catalog.php',
-                []
-            ),
-        ] );
-    }
-}
-```
-
-Subsequently, the class is released in `config.php`:
-
-```php
-return [
-    '/nino/modules' => [
-        // integrated modules ...
-        '\\Project\\Catalog\\Catalog',
-    ],
-
-    '/nino/http/routes' => [
-        // existing routes ...
-        'GET://api/catalog' => [
-            'uri' => '/api/catalog',
-        ],
-    ],
-];
-```
-
-A good module adheres to four rules:
+A module is a class with a static `init( array &$appData )` that the kernel calls for every class listed in `/nino/modules`: a feature's in the `Nino\Modules` namespace, a project's in one of its own below `app/`. The [runtime module recipe](recipes/runtime-module.md) writes a complete one - shortcode, endpoint, configuration, tests. A good module adheres to four rules:
 
 1. `init()` registers behavior but does not produce output.
 2. HTTP handlers modify the central response or use `Http::ok()`/`Http::fail()`.
 3. Templating remains in shortcodes and `.tpl` files; PHP does not output page fragments unplanned via `echo`.
 4. Variable files are protected during read-modify-write with `Filesystem::mutate()`.
+
+### Directory and Autoloading
+
+Nino's autoloader maps a class name to a file: the project-owned class `Project\Catalog\Catalog` is `app/Project/Catalog/Catalog/Catalog.php`, and `Nino\Modules\*` is a merged view over `_nino/`, `_admin/`, `features/` and `app/`, in that order. The roots, the rule and what it keeps a project from doing are the [autoload layout](recipes/runtime-module.md#autoload-layout) of the recipe. The kernel follows the same layout: `_nino/Nino.php` holds only the boot functions `\Nino\init()`, `request()` and `output()` plus the autoloader; every kernel class lives in its own file below `_nino/Nino/` - `\Nino\Filesystem` in `_nino/Nino/Filesystem/Filesystem.php`, `\Nino\Auth` in `_nino/Nino/Auth/Auth.php`, and so on - and is loaded on first use.
 
 ### Panels of the Workbench
 
@@ -922,34 +645,9 @@ public static function adminPanels( array &$appData ): array {
 
 The kernel asks every active module in `/nino/modules` order (`\Nino\Modules::collect()`), so the screen exists exactly while the module does.
 
-The workbench's own screens are the same thing in a different root: `_admin` holds the shell - the login, the rail, the panes, the registry, the bundles - and nothing else, and every screen in it is a module under `_admin/Nino/Modules/<Name>/`, laid out exactly like the ones above: `Admin/Admin.php` is the panel, `<Tab>/<Tab>.php` a tab of it, `assets/` its scripts and stylesheet, `text/` its words. `\Nino\Admin\Admin::modules()` reads the directory rather than a list, so a screen is added by adding a directory and removed by deleting one; without the directory `/_admin` is a login and an empty rail. A panel is a class with two required and a handful of optional static methods, no interface, no base class:
+The workbench's own screens are the same thing in a different root: `_admin` holds the shell - the login, the rail, the panes, the registry, the bundles - and nothing else, and every screen in it is a module under `_admin/Nino/Modules/<Name>/`, laid out exactly like the ones above: `Admin/Admin.php` is the panel, `<Tab>/<Tab>.php` a tab of it, `assets/` its scripts and stylesheet, `text/` its words. `\Nino\Admin\Admin::modules()` reads the directory rather than a list, so a screen is added by adding a directory and removed by deleting one; without the directory `/_admin` is a login and an empty rail. A panel is a class with two required and a handful of optional static methods, no interface, no base class. `\Nino\Admin\Panels` lists them in its docblock, and the [panel recipe](recipes/admin-panel.md#the-panel-contract) has the table: what each method returns, and how `nav()`, `tabs()` and `scopes()` are read.
 
-| Method | Returns |
-| --- | --- |
-| `actions()` | `[ 'catalog/list' => [ Class::class, 'apiList' ], ... ]` - dispatched by the workbench's `POST` handler |
-| `nav()` | `[ uri, label, weight = 50, group = 'content' ]` - the uri is a slug and names the link, the pane and the JS namespace (`Nino.admin.<uri>`); a label starting with `/` is a fill key, anything else literal text - every shipped panel uses a fill, a module brings its `text/<locale>.php` for it; the group is `content`, `structure`, `features` or `system`, read for the kernel's own panels and those of `app/` modules only - a panel a feature brought (its class file lies below `\Nino\Features::dir()`) always sits in `features`, whatever it names, and naming `features` from anywhere else is refused like an unknown group |
-| `perm()` | the permission that shows the link and gates the actions - `/_admin/<uri>/manage` by convention; offered as a checkbox on the Users panel's roles tab automatically, and part of the **Editor** role the wizard writes when the group is `content` |
-| `panes()` | mount ids rendered inside the pane, default `[ '<uri>-list' ]` |
-| `template()` | instead of mount points: a `.tpl` rendered whole into the pane, project-relative and without the extension - for a panel that lays out its own regions |
-| `layout()` | `'page'` (default: a column of content at reading width) or `'workspace'` (the whole width, the rail folded to its icons) |
-| `head()` | `false` opens the pane on its screen alone; every other panel opens with the head that names it - the label as the screen's `<h2>`, the tab strip beside it, a slot for the panel's own buttons - so a panel draws no title of its own. The Dashboard is the one shipped panel without; a panel with tabs of its own puts them there through `Nino.adminUi.panelHead()` - and where the head already holds the registry's strip, a screen inside one of its tabs gets its own strip at the top of that tab's pane instead, the registry's left alone |
-| `icon()` | an inline `<svg>` for the rail; a panel without one shows its label's initial when the rail is folded |
-| `tabs()` | further panel classes shown as tabs of this panel's pane - each a complete panel with its own `perm()`, script and hash prefix, ordered in the strip by its `nav()` weight; `tab()` names this panel's own tab when the nav label will not do. The workbench's own modules do this: Element Types under Elements, Text Keys under Text, Image Slots under Images, User roles, Login protection and Recovery password under Users, Translations under Language. A feature's panel gets one more without naming it: when the feature declares settings, the registry adds a **Settings** tab (`\Nino\Modules\Features\Settings`, permission `/_admin/features/manage`) to its pane |
-| `assets()` | project-relative `.js`/`.css` files, bundled into `/_admin/.cache/` after the workbench's own |
-| `text()` | a directory of `<locale>.php` fill files, merged into the workbench's own |
-| `summary( &$appData )` | a Dashboard tile `[ 'value' => ..., 'label' => ... ]` |
-| `log( $action, $data )` | the activity-log line for a completed action, `''` for none |
-| `scopes( &$appData )` | the scoped permissions the panel knows, for the three lists of the roles tab: `[ { scope, door, label, areas: [ { id, label, perm?, actions: [ { id, label, perm, fields?: [ { id, label, perm } ] } ] } ] } ]` - `scope` the prefix `Admin::isScoped()` reads, `door` the panel's permission, every `perm` shaped like a permission and below `scope`; an entry that is not is dropped by `Users\Admin::scopeOptions()`. A panel without it offers none |
-
-A module names its files from where its class is, so they move with it:
-
-```php
-public static function assets(): array {
-    return [ \Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.js' ) ];
-}
-```
-
-Every action method guards itself with `\Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM )`, which answers `401` without an account and `403` without the permission. The workbench's own modules are merged first, and a uri or action name one of them already owns is never handed to a runtime module. The shipped modules are the reference: `_nino/Nino/Modules/Form/Admin/Admin.php` is one with fills and a Dashboard tile, and the smallest complete panel in the checkout is the fixture `tests/fixtures/features/Sample/Admin/Admin.php` - in the catalogue, `features/Hello/Admin/Admin.php` is the panel of the feature written to be copied, and `features/Builder/Admin/Admin.php` one with its own template and a workspace layout. The [panel recipe](recipes/admin-panel.md) of the AI guide walks through a complete panel including its frontend.
+Every action method guards itself with `\Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM )`, which answers `401` without an account and `403` without the permission. The workbench's own modules are merged first, and a uri or action name one of them already owns is never handed to a runtime module. The shipped modules are the reference: `_nino/Nino/Modules/Form/Admin/Admin.php` is one with fills and a Dashboard tile, and the smallest complete panel in the checkout is the fixture `tests/fixtures/features/Sample/Admin/Admin.php` - in the catalogue, `features/Hello/Admin/Admin.php` is the panel of the feature written to be copied, and `features/Builder/Admin/Admin.php` one with its own template and a workspace layout. The [panel recipe](recipes/admin-panel.md) walks through a complete panel including its frontend.
 
 A module that keeps its own files under `data/` registers `'/nino/admin/restore'` in `init()`; the Backups panel calls it with the staged backup and the live data directory, and the module merges what is its own (`Newsletter::callbackRestore()` in the catalogue's Newsletter feature). Finally, an `install/` directory beside the class file - `manifest.php`, `templates/`, `text/` - makes a kernel or project module selectable in the setup wizard; see the [Library Format](setup.md#library-format). A feature carries the same unit, and `\Nino\Features::activate()` applies it - without overwriting anything the project has - when the feature is switched on in the Features panel; the manifest, the settings and the lifecycle are in [Features](features.md).
 
@@ -1076,48 +774,7 @@ These precautions do not absolve project code of responsibility. Data from reque
 
 ## Tests and Change Workflow
 
-Nino uses standalone smoke tests without PHPUnit. Each test creates an isolated temporary project and checks a different area:
-
-| Test | Focus |
-| --- | --- |
-| `tests/kernel-smoke.php` | Kernel, routing, rendering, auth, filesystem, and modules |
-| `tests/features-smoke.php` | the feature contract against `tests/fixtures/features/`: discovery, manifest validation, version constraints, every settings type, activation with the unit applied add-only, updates through the upgrade hook, deactivation, and that whatever feature the checkout itself carries validates (it ships none) |
-| `tests/catalogue-smoke.php` | the catalogue: the https client behind a stub, the detached signature, what a catalogue document must say, what it offers this kernel, an installation and an update from archive bytes built in the test, and every refusal on the way - a hostile archive among them |
-| `features/<Name>/tests/<key>-smoke.php` | a feature's own test, travelling with it - the catalogue's `features/Search/tests/search-smoke.php`, for one, covers activation, index lifecycle, fuzzy ranking, locales, and the Admin rebuild action. Empty in a checkout, which ships no feature |
-| `tests/admin-smoke.php` | the workbench shell and its content panels: the text blacklist and html sanitizer, element and image operations |
-| `tests/admin-system-smoke.php` | the structure and system panels: the session gate, accounts, roles and permissions, element types, backups and recovery, the activity log, and a render of every panel in every interface language |
-| `tests/install-smoke.php` | Installation steps, generated structure, and self-lock |
-| `tests/legal-smoke.php` | the Legal module: the two types and their sections in every language, the shortcodes and placeholders (and what a value cannot do), the routes per language with derived and shared paths, the legal navigation, `addLocale()`, `check()`, and the sections a feature's unit brings, add-only, with the tombstone of a deleted one |
-| `tests/keys-smoke.php` | the text key grammar and everything Nino ships to it: the units' fragments, every key a shipped template reads, the key literals in the code, and that no old key form is left |
-| `tests/*-js-smoke.js` | browser-like logic of the management interfaces |
-| `tests/concurrency-smoke.php` | parallel and atomic write operations |
-
-Locally, they are executed individually:
-
-```bash
-php tests/kernel-smoke.php
-php tests/admin-smoke.php
-php tests/admin-system-smoke.php
-php tests/install-smoke.php
-php tests/features-smoke.php
-php tests/catalogue-smoke.php
-php tests/keys-smoke.php
-php tests/legal-smoke.php
-for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
-for test in tests/*-js-smoke.js; do node "$test" || exit 1; done
-php tests/concurrency-smoke.php
-```
-
-`tests/harness.php` is the bootstrap they share: it loads the kernel and the workbench shell and provides `check()`, `ninoSandbox()` (an isolated project directory, two locales, no modules), `ninoSandboxDir()`, `ninoWarnings()` (the warnings recorded since the last call, for a test that expects one) and `ninoDone()`. A feature's test loads it from the checkout three levels up, or from the one `NINO_ROOT` names - which is how the same test runs against another Nino version.
-
-Static analysis runs beside the tests. PHPStan reads `phpstan.neon` (level 5, the kernel, the workbench, `app/` and `features/`, without a feature's own tests); `phpstan-baseline.neon` next to it lists the findings that were open when the check arrived, so only a new finding fails. Fixing one of the listed findings means removing its entry; a new finding is never added to the baseline to silence it. ESLint reads `eslint.config.mjs` and checks the browser scripts for undefined names, unused code and `==`; it declares the browser globals and the `Nino` namespace, nothing else. Neither is a dependency of the product: there is no `composer.json` and no `package.json`, CI installs both tools itself.
-
-```bash
-phpstan analyse
-npx eslint .
-```
-
-The GitHub Actions pipeline uses PHP 8.4 and Node 22, runs the syntax checks across all PHP and JavaScript files, then PHPStan and ESLint, then these PHP and JavaScript smoke tests. A second job, `features`, clones the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) and copies every feature of it into the checkout, then validates their manifests and runs their own tests and PHPStan against it - the gate against a kernel change that breaks a published feature; the catalogue's CI does the reverse against Nino's `main` and its latest tag. `features/*/tests/` itself is empty in a checkout, which is why the loop above skips a glob that matched nothing.
+Nino uses standalone smoke tests without PHPUnit: each file under `tests/` creates an isolated temporary project and checks one area. The commands CI runs - the nine PHP suites, the JavaScript loop, PHPStan and ESLint - are the one block in [Deployment](deployment.md#tests-before-go-live), and the [agent guide](../AGENTS.md#10-tests-and-validation) says when to run the whole block. A feature's own test, `features/<Name>/tests/<key>-smoke.php`, loads `tests/harness.php` from the checkout three levels up, or from the one `NINO_ROOT` names - which is how the same test runs against another Nino version; the [feature recipe](recipes/feature.md#9-the-features-own-test) writes one.
 
 For changes to the kernel or a module, the following workflow is recommended:
 
@@ -1133,36 +790,9 @@ Avoid assertions that only fix internal intermediate steps. A good smoke test ch
 
 ## Callback Reference
 
-The following table lists the most important hooks used by the kernel and integrated modules. Additional, area-specific hooks can be found directly in the respective source code.
+The hooks the kernel and the integrated modules fire are the call sites of `\Nino\Callbacks::doCallbacks()`, each next to the code that fires it and the argument it passes. Callback names are simple strings. Still, treat the established names and argument forms like an API: a rename or changed argument type can affect every registered module. The names under `/nino/*` are the kernel's.
 
-| Callback | Argument | Purpose |
-| --- | --- | --- |
-| `/nino/http/request` | complete `$request` | supplement normalized request before routing |
-| `/nino/http/response` | complete `$request` | global processing of every response; CSRF, among others, applies here |
-| `/nino/http/response/<METHOD>:/<uri>` | complete `$request` | behavior of a resolved route |
-| `/nino/http/output` | complete `$request`, finished | the one hook with the rendered body and the final header in hand, just before they are sent; a module that adapts the response to what the page actually contains (a `Content-Security-Policy` source for a host the page uses) registers here, since `/nino/http/response` runs before the body exists. Runs in priority order, and `Modules\Cache` stores the page at priority 9, so a callback at the default 5 is part of what it stores. It does not run for a page the cache answers or for the maintenance page, which are sent from inside the response phase; of what a callback here changes, a hit carries the body and the `Content-Security-Policy` (stored by `Modules\Cache` at priority 9, so a change made at the default 5 is in them) and nothing else |
-| `/nino/html/shortcode/<name>` | shortcode arguments | handler of a registered shortcode |
-| `/nino/html/render` | HTML string | final global post-processing of rendered HTML |
-| `/nino/shortcodes/assets/output/<extension>` | link or script template | adapt HTML of the assets shortcode for a file type |
-| `/nino/auth/login` | user data | react to a successful login |
-| `/nino/auth/logout` | user data | react to a logout |
-| `/nino/auth/user/{insert\|update\|delete}` | user data | supplement changes to user accounts |
-| `/nino/elements<type-uri>/insert` | element type data | check insertion into a type or reject with `false` |
-| `/nino/elements<type-uri>/update` | element type data | check modification in a type or reject with `false` |
-| `/nino/elements/delete<type-uri>` | element type data | check deletion from a type or reject with `false` |
-| `/nino/elements<type-uri>/update/uri` | element data | react to a change in element URI |
-| `/nino/elements/committed` | `{ operation, type, uri, previousUri, locale }` | notification after an Element insert, update, or delete was persisted; cannot veto the completed write |
-| `/nino/legal/section` | `{ type, id, html }` | a section of the imprint or privacy policy is about to be drawn: a listener may add to `html` (Consent puts its settings button into its section); only the sections of `Modules\Legal` |
-| `/nino/mail/send` | `{ to, subject, body, replyTo, sender, headers, sent }` | deliver a mail another way than `mail()`: a transport that took it sets `sent` to `true` or `false`, and `mail()` is skipped; `sent` left at `null` passes the mail on |
-| `/nino/images/render` | `{ mode, bytes, width, height, basePath, source: { width, height, type, orientation }, filename }` | render an uploaded image another way than gd: a handler that wrote the file sets `filename` to the path below `/images/`, `false` refuses the upload, `null` passes it on |
-| `/nino/admin/restore` | `{ dataDir, staging }` | `/_admin` restores a backup: a module merges its own `data/` files from the staged copy into the live directory |
-| `/nino/admin/action` | `{ action, panel, status, user, data }` | a `/_admin` panel action has run and answered - notification only, and fired for a failed action too. Says who did what in the workbench; *what changed* is the kernel's own events above. `data` is the posted payload with its top-level `pw`, `current` and `currentPassword` blanked - a listener sees that a password was sent, never which. In `features/settings` the same is done to every posted field its feature's manifest types `secret` (`data.fields.<name>`) |
-
-`/nino/mail/send` and `/nino/images/render` are the two hooks that replace a kernel action rather than reacting to it. `\Nino\Mail::send()` fires the first after the per-ip cap and after every header value was cleaned - with the subject still raw, since how a subject is encoded is the transport's business - and calls `mail()` only where no handler set `sent`. A module or feature that delivers over SMTP or an API registers here in `init()`; `\Nino\Mail::TRANSPORT` is the name.
-
-`\Nino\Images::process()` and `\Nino\Images::fit()` fire the second **after the checks and before the encoding**, and that split is the point: the byte cap, the path, the image type and the pixel cap are what keep an upload endpoint safe, and a feature must not be able to switch them off by registering. What a handler receives is bytes already known to be a decodable image of a sane size, plus `mode` (`crop` for `process()`, `fit` for `fit()`), the target box, the deterministic `basePath` without an extension, and the source's own dimensions, type and `orientation`. `source.width` and `source.height` are the pixels as stored; `orientation` is the EXIF value 1-8 of a JPEG (1 for everything else), and for 5-8 the picture is shown turned on its side, so a handler that renders the image itself has to apply it - a payload without the key, as older kernels sent it, means 1. A handler that rendered the image writes it below `/images/` itself and sets `filename` to the relative path; one that returns a path climbing out of that directory is ignored and gd renders after all. `\Nino\Images::RENDER` is the name. This is where a richer uploader belongs - a srcset, an imagick pipeline, an upload that goes somewhere else entirely - rather than in a fork of the two methods. webp used to be the example here and is the kernel's own output now, wherever gd can write one.
-
-Callback names are simple strings. Still, treat the established names and argument forms like an API: A rename or changed argument type can affect every registered module.
+Most hooks say that something happened. `/nino/mail/send` and `/nino/images/render` are the two that replace a kernel action instead: `\Nino\Mail::TRANSPORT` and `\Nino\Images::RENDER` document what a handler receives and what it sets to take the job over. Both are fired after the checks that keep an endpoint safe - the per-ip mail cap, the byte cap, the image type and the pixel cap - so that a feature cannot switch them off by registering.
 
 ### Two extension surfaces, one idea
 
@@ -1172,7 +802,7 @@ versus methods - it is *reaction* versus *declaration*.
 **Reaction** is what callbacks are for. Something happened; whoever cares runs.
 The firing side knows no listener, several may run in priority order, and some
 of them may refuse (`/nino/elements<type>/insert` and its siblings return
-`false` to veto). Every name in the table above is of this kind.
+`false` to veto). Every callback name is of this kind.
 
 **Declaration** is what the `/_admin` panel contract is for. A module answers
 `adminPanels()` with a class, and that class *states what it is* in the
@@ -1191,16 +821,3 @@ So the boundary is: **events across the tool's edge, contract inside it.**
 `/_admin` registers its own routes as callbacks like anything else, and
 `/nino/admin/action` and `/nino/admin/restore` are the two points where a
 module reacts to what the workbench does without owning a panel there.
-
----
-
-## Further Manuals
-
-- [Concepts](concepts.md) explains the core pillars and the overall technical context.
-- [Getting Started](getting-started.md) guides from checkout to configured project.
-- [Setup Wizard](setup.md) documents all installation steps and writing rules.
-- [`/_admin` Workbench](_admin.md) describes every panel, the roles and the recovery page.
-- The **Builder** - page templates composed from sections, columns and components - is a feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features); its manual is in its [`feature.php`](https://github.com/dapeio/nino-features/blob/main/features/Builder/feature.php).
-- [Features](features.md) explains installable features: the manifest, the settings, activation, updates and a feature's tests.
-- [Deployment](deployment.md) describes web servers, security, and go-live.
-- [Security Policy](https://github.com/dapeio/nino/blob/main/SECURITY.md) explains how to handle security reports.

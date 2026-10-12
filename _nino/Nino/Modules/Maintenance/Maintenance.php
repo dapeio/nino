@@ -80,8 +80,8 @@ namespace Nino\Modules {
 		// anywhere (no text file, no runtime fill) and the module has no
 		// default in the language of the page (install/text/<locale>.php) -
 		// the page always has something to show. English only, same reasoning
-		// as the recovery page and the setup wizard (see AGENTS.md,
-		// "Designing an admin frontend")
+		// as the recovery page and the setup wizard (see
+		// docs/recipes/admin-panel.md, "Designing an admin frontend")
 		private const string DEFAULT_TITLE = 'Under maintenance';
 		private const string DEFAULT_TEXT	= 'We will be back shortly.';
 

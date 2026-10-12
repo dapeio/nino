@@ -1,10 +1,7 @@
 # Recipe: Package a feature
 
-**Additional Links:**
-[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Features](../features.md)
-
 One of the six extension recipes of the [Nino agent guide](../../AGENTS.md). Its
-rules - the required workflow, the core runtime model, the conventions and the
+rules - the working method, the core runtime model, the conventions and the
 security review - apply to every step below.
 
 
@@ -136,9 +133,11 @@ skipped with a warning naming the file and the reason, never applied halfway:
 - A `module` entry MAY name `\Nino\Modules\Catalog`; naming anything else is
   refused. The class file `Catalog.php` MUST exist beside the manifest.
 
-Do not add decorative keys and assume the panel uses them. The [Features
-manual](../features.md#the-manifest-featurephp) has the full reference,
-including every setting type's own keys and validation.
+Do not add decorative keys and assume the panel uses them.
+`\Nino\Features::manifest()` is where the keys are read and
+`\Nino\Features::validateSettings()` where every setting type's own keys and
+validation are; the [Features manual](../features.md#the-manifest-featurephp) has
+the rest of the contract.
 
 ## 2. The class
 
@@ -273,6 +272,17 @@ Everything in the [runtime module recipe](runtime-module.md) about
 shortcodes, state-changing endpoints, escaping and CSRF applies unchanged. A
 feature that keeps files under `data/` registers `'/nino/admin/restore'` in
 `init()` as well (8.).
+
+A route the class registers in `init()` is not in `config.php`, and can still
+be put into a navigation: the Navigations panel offers every live `GET` route
+and stores a runtime route's membership under `/nino/html/navroutes`, by the
+route's Element URI - the `uri` of the route - so that a page with one route per
+language is one entry, which `[navigation]` merges into the route while it is
+live. The menu shows it as soon as the route has a name,
+`/_nino/webpage<uri>/name` - write it in the Routes panel, under *Routes of
+features and modules*, together with the title and the description; the Text
+Keys tab does not create a `/_nino` key - and drops it silently when the feature
+is off.
 
 ## 3. The panel
 
@@ -489,8 +499,8 @@ element that exists, a section the editor changed and one deleted for good
 stay as they are. Write the section in your own words, in every language the
 feature ships, state only what the code does, and let a placeholder name a
 fact of the website. The text is a starting point and no legal advice; say so
-in the feature's manual and point to the notice in
-[Legal](../development.md#legal). `order` is the position on the page, a hundred apart so a section fits
+in the feature's manual and point to the notice in the
+[Setup Wizard](../setup.md#modules) manual. `order` is the position on the page, a hundred apart so a section fits
 between two: the module's own sections stand in 100-399, cookies and consent in
 400-499, contact, forms and mail in 500-599, statistics in 600-699, embedded
 content in 700-799, other features in 800-899, and the closing section at 900 - see `install/elements/privacy.php` of the Legal module. Test that the second activation

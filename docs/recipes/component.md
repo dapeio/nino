@@ -1,10 +1,7 @@
 # Recipe: Add a component
 
-**Additional Links:**
-[Agent guide](../../AGENTS.md) · [All recipes](README.md) · [Developer Manual](../development.md) · [Concepts](../concepts.md) · [`/_admin` Workbench](../_admin.md) · [Setup Wizard](../setup.md) · [Features](../features.md)
-
 One of the six extension recipes of the [Nino agent guide](../../AGENTS.md). Its
-rules - the required workflow, the core runtime model, the conventions and the
+rules - the working method, the core runtime model, the conventions and the
 security review - apply to every step below.
 
 
@@ -213,7 +210,7 @@ Add the cases to the module's own test, or to the feature's
 
 Run `tests/kernel-smoke.php`, `tests/features-smoke.php` and the feature's own
 test, then the syntax checks and the static analysis of the
-[agent guide](../../AGENTS.md#10-test-and-validation-matrix).
+[agent guide](../../AGENTS.md#10-tests-and-validation).
 
 ## Definition of done
 

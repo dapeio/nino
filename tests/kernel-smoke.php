@@ -5994,7 +5994,7 @@ echo "Comments in the kernel and the workbench are written in one language\n";
 
 /*	The project is written in English - code, comments and docblocks alike -
 	and German belongs in the two places that are about German: a locale's
-	text file and a *.de.md manual. What kept turning up instead was a
+	text file and README.de.md. What kept turning up instead was a
 	docblock naming the screen it belongs to in the language the screenshot
 	was taken in ("Elemente nach Typ", "ueberall abmelden"), which reads fine
 	to whoever wrote it and not at all to the next person.
@@ -6242,7 +6242,7 @@ check( '--shadow-card is none until a design layer says otherwise, and the two c
 	&& str_contains( $hookRules( '.nino-pricing-item' ), 'box-shadow: var(--shadow-card)' ) === true );
 check( '...a borderless card is without a surface, and a shadow is part of one: it keeps none', str_contains( $hookRules( '.nino-card--borderless' ), 'box-shadow: none' ) === true );
 
-// What the card shadow leaves alone is what the manuals name: no rule but these two writes a box-shadow of its own
+// What the card shadow leaves alone: no rule but these two writes a box-shadow of its own
 $hookShadows = [];
 preg_match_all( '/([^{}]+)\{([^{}]*)\}/', $hookCss, $hookBlocks, PREG_SET_ORDER );
 foreach( $hookBlocks as [ , $hookBlockSelector, $hookBlockBody ] )
@@ -6252,9 +6252,6 @@ foreach( $hookBlocks as [ , $hookBlockSelector, $hookBlockBody ] )
 				$hookShadows[] = trim( (string) preg_replace( '/\s+/', ' ', $hookBlockSelector ) );
 check( 'the only box-shadows Nino.css writes itself are those of the middle card of .nino-pricing-row--feature-middle and of the toast'. ( $hookShadows === [] ? ' - none found' : ' - found: '. implode( ', ', $hookShadows ) ),
 	$hookShadows === [ '.nino-pricing-row--feature-middle > .nino-pricing-item:nth-child(2)', '.nino-toast' ] );
-check( '...and both manuals name the middle card of the feature-middle row as one that keeps its shadow',
-	str_contains( (string) file_get_contents( __DIR__. '/../docs/design.md' ), '`.nino-pricing-row--feature-middle`' ) === true
-	&& str_contains( (string) file_get_contents( __DIR__. '/../docs/design.de.md' ), '`.nino-pricing-row--feature-middle`' ) === true );
 
 echo "\n";
 
