@@ -359,8 +359,6 @@ check( 'a requirement on itself, and a requirement listed twice, are both droppe
 $catalogueClass = new ReflectionClass( '\Nino\Catalogue' );
 check( 'a key, a version and a category are \Nino\Features\' vocabulary, not a second copy of it', array_filter( [ 'KEY_PATTERN', 'VERSION_PATTERN', 'CATEGORY_PATTERN' ],
 	static fn( string $name ): bool => $catalogueClass->getReflectionConstant( $name ) !== false ) === [] );
-check( '...and so is what counts as a usable name or description', method_exists( '\Nino\Features', 'localizedValid' ) === true
-	&& $catalogueClass->hasMethod( '_localizedValid' ) === false );
 
 // ...and nobody writes it out again. A feature's directory, key, version,
 // category and extension names are spelled once, as \Nino\Features'

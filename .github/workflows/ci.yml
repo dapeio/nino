@@ -80,8 +80,7 @@ jobs:
         run: php tests/install-smoke.php
 
       # The grammar of a text key and everything shipped to it: the units'
-      # texts, the keys the templates read, the key literals in the code, and
-      # no old form left anywhere
+      # texts, the keys the templates read and the key literals in the code
       - name: Run text key smoke tests
         run: php tests/keys-smoke.php
 

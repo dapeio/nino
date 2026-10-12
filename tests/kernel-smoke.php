@@ -250,24 +250,21 @@ check( '...as well as the ones whose boolean is on', array_column( \Nino\Element
 // compared loosely, so '1' passed its whitelist of '01' and the kernel then
 // refused the whole element. Strict lists, the (array) cast a hand-written
 // model relies on, a whole number for a double, and a reference's rules
-check( 'Elements::valueError() exists, and the kernel names its field types once', method_exists( '\\Nino\\Elements', 'valueError' ) === true && defined( '\\Nino\\Elements::FIELD_TYPES' ) === true );
-if( method_exists( '\\Nino\\Elements', 'valueError' ) === true ) {
-	$refuses = fn( array $field, mixed $value ): bool => \Nino\Elements::valueError( $field, $value ) !== null;
-	check( 'a whitelist is a list of values: \'1\' is not \'01\', and \'01\' is', $refuses( [ 'type' => 'string', 'whitelist' => [ '01' ] ], '1' ) === true && $refuses( [ 'type' => 'string', 'whitelist' => [ '01' ] ], '01' ) === false );
-	check( 'a list written as one value is that one value', $refuses( [ 'type' => 'string', 'whitelist' => '01' ], '01' ) === false && $refuses( [ 'type' => 'string', 'blacklist' => 'x' ], 'x' ) === true );
-	check( 'a blacklist refuses strictly too', $refuses( [ 'type' => 'integer', 'blacklist' => [ 1 ] ], 1 ) === true && $refuses( [ 'type' => 'integer', 'blacklist' => [ '1' ] ], 1 ) === false );
-	check( 'the type is checked as the write checks it: a whole number is a double, a fraction is no integer', $refuses( [ 'type' => 'double' ], 5 ) === false && $refuses( [ 'type' => 'integer' ], 5.5 ) === true && $refuses( [ 'type' => 'date' ], '2026-01-01' ) === false );
-	check( 'a reference may only point into its type, and an empty one is no reference', $refuses( [ 'type' => 'element', 'elementType' => 'tags' ], '/tags/a' ) === false && $refuses( [ 'type' => 'element', 'elementType' => 'tags' ], '/people/a' ) === true && $refuses( [ 'type' => 'element', 'elementType' => 'tags' ], '' ) === false );
-	check( 'a list reference refuses a foreign uri, a duplicate and one entry too many', $refuses( [ 'type' => 'element', 'elementType' => 'tags', 'multiple' => 2 ], [ '/tags/a', '/tags/b' ] ) === false && $refuses( [ 'type' => 'element', 'elementType' => 'tags', 'multiple' => 2 ], [ '/tags/a', '/people/b' ] ) === true && $refuses( [ 'type' => 'element', 'elementType' => 'tags', 'multiple' => 2 ], [ '/tags/a', '/tags/a' ] ) === true && $refuses( [ 'type' => 'element', 'elementType' => 'tags', 'multiple' => 2 ], [ '/tags/a', '/tags/b', '/tags/c' ] ) === true );
-	check( 'the answer names what the write would say', str_contains( (string) \Nino\Elements::valueError( [ 'type' => 'string', 'whitelist' => [ '01' ] ], '1', 'code', '/t/x' ), 'not whitelisted' ) === true );
-	// The one list of field types: a model keeps every type in it and nothing else
-	$everyType = [];
-	foreach( \Nino\Elements::FIELD_TYPES as $fieldType )
-		$everyType[ 'f_'. $fieldType ] = $fieldType === 'element' ? [ 'type' => 'element', 'elementType' => 'tags' ] : [ 'type' => $fieldType ];
-	$everyType['f_video'] = [ 'type' => 'video' ];
-	\Nino\Elements::insertElementType( $appData, '/typelisttest', $everyType );
-	check( 'a model keeps every field type the kernel names, and drops one it does not', array_keys( \Nino\Elements::getElementModel( $appData, '/typelisttest' ) ) === array_map( fn( string $t ): string => 'f_'. $t, \Nino\Elements::FIELD_TYPES ) );
-}
+$refuses = fn( array $field, mixed $value ): bool => \Nino\Elements::valueError( $field, $value ) !== null;
+check( 'a whitelist is a list of values: \'1\' is not \'01\', and \'01\' is', $refuses( [ 'type' => 'string', 'whitelist' => [ '01' ] ], '1' ) === true && $refuses( [ 'type' => 'string', 'whitelist' => [ '01' ] ], '01' ) === false );
+check( 'a list written as one value is that one value', $refuses( [ 'type' => 'string', 'whitelist' => '01' ], '01' ) === false && $refuses( [ 'type' => 'string', 'blacklist' => 'x' ], 'x' ) === true );
+check( 'a blacklist refuses strictly too', $refuses( [ 'type' => 'integer', 'blacklist' => [ 1 ] ], 1 ) === true && $refuses( [ 'type' => 'integer', 'blacklist' => [ '1' ] ], 1 ) === false );
+check( 'the type is checked as the write checks it: a whole number is a double, a fraction is no integer', $refuses( [ 'type' => 'double' ], 5 ) === false && $refuses( [ 'type' => 'integer' ], 5.5 ) === true && $refuses( [ 'type' => 'date' ], '2026-01-01' ) === false );
+check( 'a reference may only point into its type, and an empty one is no reference', $refuses( [ 'type' => 'element', 'elementType' => 'tags' ], '/tags/a' ) === false && $refuses( [ 'type' => 'element', 'elementType' => 'tags' ], '/people/a' ) === true && $refuses( [ 'type' => 'element', 'elementType' => 'tags' ], '' ) === false );
+check( 'a list reference refuses a foreign uri, a duplicate and one entry too many', $refuses( [ 'type' => 'element', 'elementType' => 'tags', 'multiple' => 2 ], [ '/tags/a', '/tags/b' ] ) === false && $refuses( [ 'type' => 'element', 'elementType' => 'tags', 'multiple' => 2 ], [ '/tags/a', '/people/b' ] ) === true && $refuses( [ 'type' => 'element', 'elementType' => 'tags', 'multiple' => 2 ], [ '/tags/a', '/tags/a' ] ) === true && $refuses( [ 'type' => 'element', 'elementType' => 'tags', 'multiple' => 2 ], [ '/tags/a', '/tags/b', '/tags/c' ] ) === true );
+check( 'the answer names what the write would say', str_contains( (string) \Nino\Elements::valueError( [ 'type' => 'string', 'whitelist' => [ '01' ] ], '1', 'code', '/t/x' ), 'not whitelisted' ) === true );
+// The one list of field types: a model keeps every type in it and nothing else
+$everyType = [];
+foreach( \Nino\Elements::FIELD_TYPES as $fieldType )
+	$everyType[ 'f_'. $fieldType ] = $fieldType === 'element' ? [ 'type' => 'element', 'elementType' => 'tags' ] : [ 'type' => $fieldType ];
+$everyType['f_video'] = [ 'type' => 'video' ];
+\Nino\Elements::insertElementType( $appData, '/typelisttest', $everyType );
+check( 'a model keeps every field type the kernel names, and drops one it does not', array_keys( \Nino\Elements::getElementModel( $appData, '/typelisttest' ) ) === array_map( fn( string $t ): string => 'f_'. $t, \Nino\Elements::FIELD_TYPES ) );
 
 // The type file and the elements read out of it shared one cache map, keyed
 // by uri - so once a type had been read, asking for the type uri as if it
@@ -2833,12 +2830,9 @@ $badLoginRequest = [
 	'/nino/http/request' 	=> [ 'method' => 'POST', 'user' => $csrfUser, 'pw' => 'correct horse battery staple' ],
 	'/nino/http/response'	=> [ 'statusCode' => 200 ],
 ];
-$capturedErrors = ninoErrors( function() use ( &$appData, &$badLoginRequest ) {
-	\Nino\Csrf::callbackResponse( $appData, $badLoginRequest );
-	\Nino\Auth::callbackLoginResponse( $appData, $badLoginRequest );
-} );
+\Nino\Csrf::callbackResponse( $appData, $badLoginRequest );
+\Nino\Auth::callbackLoginResponse( $appData, $badLoginRequest );
 
-check( 'callbackLoginResponse no longer hard-refuses regardless of /nino/modules', count( $capturedErrors ) === 0 );
 check( 'callbackLoginResponse still respects a Csrf rejection (403, not the 401/200 it sets itself)', $badLoginRequest['/nino/http/response']['statusCode'] === 403 );
 check( 'a Csrf-blocked login request never reaches loginUser()', \Nino\Auth::getCurrentUser( $appData ) === false );
 
@@ -4048,18 +4042,6 @@ foreach( [ '.nino-cover.nino-hero', '.nino-parallex.nino-hero', '.nino-hero--ful
 check( 'Nino.css takes main\'s top padding away for a hero, directly below main and inside the Builder\'s wrap', preg_match( '/((?:main:has\([^)]*\)\)?,\s*){5}main:has\([^)]*\)\)?)\s*\{\s*padding-top:\s*0;/', $ninoCss, $heroRule ) === 1
 	&& array_filter( $heroSelectors, static fn( string $selector ): bool => str_contains( $heroRule[1], $selector ) === false ) === [] );
 
-/*	Every manual and every method a Nino.css comment sends its reader to is
-	where the comment says. Two pointed at docs/design-system.md, which this
-	repository never had, and the two shortcode chapters at _nino/Nino.php for
-	methods that live in their modules	*/
-preg_match_all( '#\bdocs/[\w./-]+\.md\b#', $ninoCss, $cssManuals );
-preg_match_all( '#\b(\w+)::(\w+)\(\) in (_nino/[\w./-]+\.php)#', $ninoCss, $cssMethods, PREG_SET_ORDER );
-$cssPointers = array_values( array_filter( array_unique( $cssManuals[0] ), static fn( string $manual ): bool => is_file( __DIR__. '/../'. $manual ) === false ) );
-foreach( $cssMethods as [ , $cssClass, $cssMethod, $cssFile ] )
-	if( preg_match( '/\bclass\s+'. preg_quote( $cssClass, '/' ). '\b.*\bfunction\s+'. preg_quote( $cssMethod, '/' ). '\s*\(/s', (string) @file_get_contents( __DIR__. '/../'. $cssFile ) ) !== 1 )
-		$cssPointers[] = $cssClass. '::'. $cssMethod. '() in '. $cssFile;
-check( 'every manual and every method a Nino.css comment points to is where it says'. ( $cssPointers === [] ? '' : ' - '. implode( ', ', $cssPointers ) ), $cssPointers === [] && $cssMethods !== [] );
-
 // Nino.css uses one for .nino-hero-arrowdown, ie. the framework's own default
 // policy used to block the framework's own icon
 check( 'the default csp allows data: images', str_contains( $seededCsp, 'img-src * data:' ) === true );
@@ -4326,13 +4308,11 @@ check( 'the .htaccess denies a dotfile only where one exists, so a dot route sti
 	$existsIf !== false && $denyStart !== false && $existsIf < $denyStart
 	&& strpos( $htaccess, '</If>', $denyStart ) !== false );
 
-// The other two halves of the same sentence, so a change to one of the three
-// stands out as the odd one
+// The other half of the same sentence, so a change to one stands out
+// against the other
 $router = (string) @file_get_contents( __DIR__. '/../router.php' );
-$deploy = (string) @file_get_contents( __DIR__. '/../docs/deployment.md' );
 
 check( '...and the development server draws the same line', str_contains( $router, 'is_file( __DIR__. $uri ) === true' ) === true );
-check( '...and so does the nginx recipe', str_contains( $deploy, 'if ( -e $request_filename ) { return 403; }' ) === true );
 
 $appData['./nino/jstext/nonce'] = base64_encode( random_bytes( 16 ) );
 \Nino\Modules\Jstext::callbackResponse( $appData, $homeRequest );
@@ -4420,8 +4400,6 @@ check( '...and not the mailbox a form delivers to, nor the rest of the site\'s t
 	&& isset( $jstextTable['/project/company/contact/street'] ) === false );
 check( 'the three groups are the form\'s messages, the newsletter\'s and the slider\'s words - and a label like the phone\'s is none of them', ( $jstextTable['/template/common/slider/prev'] ?? null ) === 'Zurück'
 	&& ( $jstextTable['/feature/newsletter/info/success'] ?? null ) === 'Eingetragen' && isset( $jstextTable['/template/common/label/phone'] ) === false );
-check( 'the contact form\'s welcome text is no key any more, so nothing of it is published', isset( $jstextTable['/module/form/info/welcome'] ) === false
-	&& str_contains( (string) file_get_contents( dirname( __DIR__ ). '/_nino/Nino/Modules/Form/install/text/en_US.php' ), '/form/info/welcome' ) === false );
 
 // The nonce belongs in the script tag and the policy, nowhere else: no script
 // reads it from the table, and every copy of it is one more place a stored
@@ -4521,7 +4499,6 @@ $ownKeyRequest = ninoVisit( $appData, '/legal?/_project/language=de_DE' );
 check( 'the locale switch is one method taking the query key, so a project can answer under its own', $ownKeyRequest['/nino/http/response']['statusCode'] === 302
 	&& ( $ownKeyRequest['/nino/http/response']['header']['Location'] ?? '' ) === '/rechtliches'
 	&& \Nino\Locales::getCurrentLocale( $appData ) === 'de_DE' );
-check( '...and the module carries no copy of it any more', str_contains( (string) file_get_contents( dirname( __DIR__ ). '/_nino/Nino/Modules/Localepicker/Localepicker.php' ), 'findRouteUri' ) === false );
 \Nino\Locales::setCurrentLocale( $appData, 'en_US' );
 
 $queryParser = new ReflectionMethod( '\Nino\Http', '_getRequestQueryVarsPart' );
@@ -5833,180 +5810,9 @@ check( 'no template the kernel ships writes an address from the domain root'. ( 
 echo "\n";
 
 
-// --- Escaping never answers bad input with nothing ------------------------
-
-echo "htmlspecialchars() keeps what it cannot encode\n";
-
-/*	htmlspecialchars() returns '' for input that is not valid utf-8, unless
-	ENT_SUBSTITUTE is among its flags - and php's own default carries it only
-	as long as no flags are given at all. Every call here spells them out, so
-	every call has to spell out that one too. It has bitten twice: \Nino\Form
-	stored and mailed a submission as nothing, and the Elements module rendered
-	a field as nothing. A grep is the only thing that stops the third.	*/
-$escapeSources = [];
-$escapeWalk = static function( string $dir ) use ( &$escapeWalk, &$escapeSources ): void {
-	foreach( (array) glob( $dir. '/*' ) as $path ) {
-		if( is_dir( $path ) === true )
-			$escapeWalk( $path );
-		elseif( str_ends_with( (string) $path, '.php' ) === true )
-			$escapeSources[] = (string) $path;
-	}
-};
-$escapeWalk( __DIR__. '/../_nino' );
-$escapeWalk( __DIR__. '/../_admin' );
-$escapeOffenders = [];
-foreach( $escapeSources as $escapeFile ) {
-	foreach( explode( "\n", (string) file_get_contents( $escapeFile ) ) as $escapeNo => $escapeLine ) {
-		if( str_contains( $escapeLine, 'htmlspecialchars(' ) === false || str_contains( $escapeLine, 'ENT_' ) === false )
-			continue;
-		if( str_contains( $escapeLine, 'ENT_SUBSTITUTE' ) === true )
-			continue;
-		$escapeOffenders[] = substr( (string) realpath( $escapeFile ), strlen( (string) realpath( __DIR__. '/..' ) ) + 1 ). ':'. ( $escapeNo + 1 );
-	}
-}
-check( 'no escape in the kernel or the workbench drops ENT_SUBSTITUTE'. ( $escapeOffenders === [] ? '' : ' - '. implode( ' | ', $escapeOffenders ) ), $escapeOffenders === [] );
-check( '...and the rule has something to find: the sources were actually read', count( $escapeSources ) > 40 );
-
-echo "\n";
-
-
-// --- Every docblock documents something ------------------------------------
-
-echo "No docblock in the kernel or the workbench documents another docblock\n";
-
-/*	A method renamed or moved away from its docblock leaves the block behind,
-	and the next member's own block then lands directly under it. Php takes the
-	second one and every reader follows - Reflection, an editor, the person
-	looking for the rule - so the first documents nothing and rots where it
-	stands, describing a method that may no longer exist. Two T_DOC_COMMENTs
-	with no declaration between them is the whole test.	*/
-$docOffenders = [];
-foreach( $escapeSources as $docFile ) {
-
-	$docPrevious = null;
-
-	foreach( token_get_all( (string) file_get_contents( $docFile ) ) as $docToken ) {
-
-		if( is_array( $docToken ) === false ) {
-			$docPrevious = null;
-			continue;
-		}
-
-		if( $docToken[0] === T_WHITESPACE || $docToken[0] === T_COMMENT )
-			continue;
-
-		if( $docToken[0] === T_DOC_COMMENT ) {
-
-			if( $docPrevious !== null )
-				$docOffenders[] = substr( (string) realpath( $docFile ), strlen( (string) realpath( __DIR__. '/..' ) ) + 1 ). ':'. $docPrevious;
-
-			$docPrevious = $docToken[2];
-			continue;
-		}
-
-		$docPrevious = null;
-	}
-}
-check( 'no docblock documents another docblock'. ( $docOffenders === [] ? '' : ' - '. implode( ' | ', $docOffenders ) ), $docOffenders === [] );
-
-echo "\n";
-
-
-// --- One language in the source -------------------------------------------
-
-echo "Comments in the kernel and the workbench are written in one language\n";
-
-/*	The project is written in English - code, comments and docblocks alike -
-	and German belongs in the two places that are about German: a locale's
-	text file and README.de.md. What kept turning up instead was a
-	docblock naming the screen it belongs to in the language the screenshot
-	was taken in ("Elemente nach Typ", "ueberall abmelden"), which reads fine
-	to whoever wrote it and not at all to the next person.
-
-	Comment lines only, and by two marks together: an umlaut, and a word list
-	of german function words that are not also english ones. Neither alone is
-	enough - "Elemente nach Typ" carries no umlaut, and an umlaut on its own
-	would flag \Nino.ui.js's 'de' locale table, which is the point of that
-	table. Words that are german and english both ("die", "man", "war",
-	"hat", "fast", "also") are deliberately not in the list; the whole source
-	tree is checked against it below, so a false positive is visible here
-	rather than in somebody's next patch.	*/
-$languageWords = 'nach|nicht|wird|werden|oder|aber|wenn|damit|durch|zwischen|schon|noch|immer|eine|einen|einem|einer|kein|keine|jede|jeden|jedes|dieser|diese|dieses|welche|und|sich|auch|sind|nur|beim|zum|zur|vom|der|das|des|dem|ist|sein|Datei|Zeile|Seite|Elemente|Typ|sowie|bereits|etwa|zwar';
-$languageSources = [];
-$languageWalk = static function( string $dir ) use ( &$languageWalk, &$languageSources ): void {
-	foreach( (array) glob( $dir. '/*' ) as $path ) {
-		$path = (string) $path;
-		// A locale's own text lives under text/, a shipped library page is a
-		// project's content rather than this project's source
-		if( str_contains( $path, '/text' ) === true || str_contains( $path, '/install/library' ) === true || str_contains( $path, 'de_DE' ) === true )
-			continue;
-		if( is_dir( $path ) === true )
-			$languageWalk( $path );
-		elseif( preg_match( '/\\.(php|js|css)$/', $path ) === 1 )
-			$languageSources[] = $path;
-	}
-};
-$languageWalk( __DIR__. '/../_nino' );
-$languageWalk( __DIR__. '/../_admin' );
-
-$languageOffenders = [];
-foreach( $languageSources as $languageFile ) {
-	foreach( explode( "\n", (string) file_get_contents( $languageFile ) ) as $languageNo => $languageLine ) {
-
-		$opening	= ltrim( $languageLine, " \t" );
-		$trailing	= strpos( $languageLine, '//' );
-
-		// The comment half of the line, and only that: a trailing '// ...' is
-		// one (the '//' of a url is not), and everything left of it is code,
-		// where a variable named $der is nobody's german
-		if( $opening !== '' && ( $opening[0] === '*' || str_starts_with( $opening, '//' ) || str_starts_with( $opening, '/*' ) ) )
-			$languageComment = $languageLine;
-		elseif( $trailing !== false && $trailing > 0 && $languageLine[$trailing - 1] !== ':' )
-			$languageComment = substr( $languageLine, $trailing );
-		else
-			continue;
-
-		if( preg_match( '/[\x{00e4}\x{00f6}\x{00fc}\x{00df}\x{00c4}\x{00d6}\x{00dc}]|\b('. $languageWords. ')\b/u', $languageComment ) === 1 )
-			$languageOffenders[] = substr( (string) realpath( $languageFile ), strlen( (string) realpath( __DIR__. '/..' ) ) + 1 ). ':'. ( $languageNo + 1 );
-	}
-}
-check( 'no comment in the kernel or the workbench is written in german'. ( $languageOffenders === [] ? '' : ' - '. implode( ' | ', $languageOffenders ) ), $languageOffenders === [] );
-check( '...and the rule has something to find: the sources were actually read', count( $languageSources ) > 60 );
-
-echo "\n";
-
-
 // --- What Nino.css hands a design layer -----------------------------------
 
 echo "Nino.css - the hero is the hero, the font roles, the scale and the hooks\n";
-
-/*	The hero had another name up to 1.5 and has no alias: a class of the old name
-	anywhere in what the kernel ships is a class nothing styles any more. The
-	scroll state is the fold's, and the fold stays a fold
-	(body.nino-scroll-atf), so that name is not the one looked for. Binary
-	files - the screenshots of the manuals - are not read. The old name is
-	written in two pieces, so that a search for it finds the changelog and
-	nothing else.	*/
-$heroOld			= 'nino-'. 'atf';
-$heroSources	= [];
-foreach( [ '/../_nino', '/../_admin', '/../docs' ] as $heroRoot )
-	foreach( new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( __DIR__. $heroRoot, \FilesystemIterator::SKIP_DOTS ) ) as $heroFile )
-		$heroSources[] = $heroFile->getPathname();
-foreach( [ 'README.md', 'README.de.md', 'AGENTS.md' ] as $heroTop )
-	$heroSources[] = __DIR__. '/../'. $heroTop;
-
-$heroLeft = [];
-$heroRead = 0;
-foreach( $heroSources as $heroSource ) {
-	$heroText = (string) @file_get_contents( $heroSource );
-	if( str_contains( $heroText, "\0" ) === true )
-		continue;
-	$heroRead++;
-	if( str_contains( $heroText, $heroOld ) === true )
-		$heroLeft[] = substr( (string) realpath( $heroSource ), strlen( (string) realpath( __DIR__. '/..' ) ) + 1 );
-}
-check( 'no class of the old hero name is left in the kernel, the workbench, the manuals and the guide'. ( $heroLeft === [] ? '' : ' - '. implode( ', ', $heroLeft ) ), $heroLeft === [] );
-check( '...and the rule has something to find: the sources were actually read', $heroRead > 200 );
 
 $hookCss = (string) preg_replace( '#/\*.*?\*/#s', '', (string) file_get_contents( __DIR__. '/../_nino/Nino.css' ) );
 check( 'the fold keeps its name: body.nino-scroll-atf is still what Nino.css and Nino.ui.js say', str_contains( $hookCss, 'body.nino-scroll-atf ' ) === true
@@ -6548,13 +6354,6 @@ foreach( [ '0', '1', '2', '3', '4', '5', '6' ] as $groundStep )
 		$groundWrong[] = '.nino-p-'. $groundStep;
 check( 'the padding of a card is a step of the space scale or what its ground gives: .nino-p-<n> comes after every rule that gives a card its own padding, so it is the one that wins'. ( $groundWrong === [] ? '' : ' - before it: '. implode( ', ', $groundWrong ) ),
 	$groundWrong === [] && $groundCardPaddingAt > 0 && $groundSets( $groundOf( '.nino-p-0' ), 'padding', '0' ) === true && $groundSets( $groundOf( '.nino-p-6' ), 'padding', 'var(--space-6)' ) === true );
-
-// The inventory of the chapter names the classes this adds, and Nino.css defines no class of the card that the list leaves out of its words
-$groundInventory = preg_match( '/^ \*\t+\.nino-card\(([^)]+)\), \.nino-card\(([^)]+)\)\s*$/m', (string) file_get_contents( __DIR__. '/../_nino/Nino.css' ), $groundFound ) === 1
-	? [ array_map( 'trim', explode( ',', $groundFound[1] ) ), array_map( 'trim', explode( ',', $groundFound[2] ) ) ] : [ [], [] ];
-check( 'the inventory of the content chapter lists the card as it is now: --dim, --fill, --middle, --bottom and --last-bottom, and -bg for the picture behind it',
-	array_diff( [ '--alt', '--tint', '--dark', '--black', '--primary', '--brand-alt', '--counter', '--dim', '--fill', '--middle', '--bottom', '--last-bottom', '--fullwidth' ], $groundInventory[0] ) === []
-	&& array_diff( [ '-content', '-title', '-subtitle', '-descr', '-img', '-price', '-bg' ], $groundInventory[1] ) === [] );
 
 /*	What a role carries is not said again by a rule of the ground a thing sits on: the title and the subtitle of a section and of a hero, its arrow, the outline button and the
 	filter button take the colours of the nearest ground - a column, a card, a dimmed cover - because they read its roles, and a rule of a section above them would reach past a

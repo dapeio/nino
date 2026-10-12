@@ -477,11 +477,8 @@ check( 'the danger zone is not rendered while creating a new type',
 	// vocabulary's, in the language of the interface, the slug as the value - and
 	// an own key, which shows the text field it always was. The text field stays
 	// what is read back and saved
-	const WORDS = [ 'title', 'subtitle', 'text', 'description', 'image', 'alt', 'caption', 'link', 'label', 'name', 'email', 'phone', 'address', 'date', 'author', 'price', 'icon' ];
 	const choice = field => findAll( elementTypes._renderFieldRow( field, 0 ), n => n.className === 'admin-field-key-select' )[0];
 	const keyField = field => findAll( elementTypes._renderFieldRow( field, 0 ), n => n.className === 'admin-field-key' )[0];
-	check( 'the choice offers the 17 words of the vocabulary that name a field, and "own key"', JSON.stringify( elementTypes.KEY_WORDS ) === JSON.stringify( WORDS )
-		&& choice( { key : 'a', type : 'string' } ).children.map( o => o.value ).join() === WORDS.concat( [ '' ] ).join() );
 	check( '...each named by its word', choice( { key : 'a', type : 'string' } ).children.slice( 0, 17 ).every( o => o.textContent === '/_admin/common/word/'+ o.value ) );
 	check( '...and a key that is one of them is chosen, its text field hidden', choice( { key : 'title', type : 'string' } ).value === 'title' && keyField( { key : 'title', type : 'string' } ).hidden === true );
 	check( 'any other key shows "own key" with its text field filled', choice( { key : 'price_default', type : 'double' } ).value === '' && keyField( { key : 'price_default', type : 'double' } ).hidden === false && keyField( { key : 'price_default', type : 'double' } ).value === 'price_default' );

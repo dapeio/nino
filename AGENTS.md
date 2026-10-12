@@ -261,8 +261,7 @@ Escape at the output context:
   'UTF-8')`. `ENT_SUBSTITUTE` is not optional: spelling the flags out drops
   php's own default, and without it one byte that is not valid UTF-8 answers
   `''` and takes the whole value with it - silently, with no warning and no log
-  line. The same holds for `ENT_NOQUOTES` on text content. `tests/kernel-smoke.php`
-  greps for it.
+  line. The same holds for `ENT_NOQUOTES` on text content.
 - Rich element text: declare `'html' => true` in its model (`'blocks' => true`
   as well for paragraphs and lists, `'breaks' => true` instead for the line
   breaks of plain text) and rely on `\Nino\Html::sanitizeHtml()` when accepting

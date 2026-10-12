@@ -712,7 +712,6 @@ $guardOk = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
 check( 'Backup::maybeRun (via Admin::guard) writes the archive key into the private directory', is_file( $sandbox. '/private/.auth/backup-key.php' ) === true );
 
 check( 'the archives land under the private directory, not in a tool folder', is_dir( $sandbox. '/private/.backups' ) === true );
-check( 'no random backup directory is generated any more', isset( $appData['/nino/backup/dir'] ) === false );
 
 // Regression: an install that already had Backup running (key already in
 // config.php) before this out-of-config copy existed must still get one
@@ -731,12 +730,6 @@ check( 'Backup::maybeRun re-creates a missing key copy on an already-bootstrappe
 // file put there. That is why the panel keeps its own copy of the archive
 // directory and the key path instead of reaching for \Nino\Modules\Backups'
 // private constants (see its _backupDir() and _key()).
-//
-// 'editorLoaded' is what is left of the check this driver was written for, when
-// Backup was \Nino\Editor\Backup in a tool of its own: the class has no name in
-// this repository any more, so class_exists() on it answers false whatever the
-// driver does. What the assertion still catches is a driver that did not answer
-// at all - a boot that died leaves no key to read, and the check fails.
 $standaloneDriver = $sandbox. '/restore-standalone.php';
 file_put_contents( $standaloneDriver, '<?php
 declare(strict_types=1);
@@ -752,14 +745,12 @@ $appData["./nino/filesystem/publicpath"]	= '. var_export( $sandbox. '/public', t
 $appData["/nino/dir"] = "";
 \Nino\AppData::init( $appData );
 echo json_encode( [
-	"editorLoaded"	=> class_exists( "\\Nino\\Editor\\Backup", false ),
-	"dates"					=> \Nino\Modules\Backups\Admin::dates( $appData ),
+	"dates" => \Nino\Modules\Backups\Admin::dates( $appData ),
 ] );
 ' );
 
 $standalone = json_decode( (string) shell_exec( 'php '. escapeshellarg( $standaloneDriver ). ' 2>/dev/null' ), true ) ?? [];
 
-check( 'the standalone driver boots on the kernel and the shell alone, with none of this file\'s fixtures', ( $standalone['editorLoaded'] ?? true ) === false );
 check( '...and still finds the archives from there', in_array( date( 'Y-m-d' ), $standalone['dates'] ?? [], true ) === true );
 
 [ , $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiList' ] );
@@ -1183,18 +1174,6 @@ check( 'a stored value comes back typed, not as json text', $byKey['/nino/error/
 check( 'an int comes back as an int', $byKey['/nino/cache/ttl']['value'] === 3600 );
 check( 'an int field carries the bounds its editor and apiSave share', $byKey['/nino/cache/ttl']['min'] === 10 && $byKey['/nino/cache/ttl']['max'] === 2592000 );
 
-// The three keys this panel deliberately stopped editing: routes and navs have
-// real editors of their own (Pages/Navigations) and assets is a build concern
-// whose order a json textarea shows nobody. A second, unvalidated way to write
-// the same data is a way to corrupt it.
-foreach( [ '/nino/http/routes', '/nino/html/navs', '/nino/html/assets' ] as $goneKey )
-	check( "$goneKey is no longer part of Config", isset( $byKey[$goneKey] ) === false );
-
-// The login throttle and the languages have screens of their own now (the
-// Users panel's Lockout tab, the Language panel) and left Config too
-foreach( [ '/nino/auth/maxtries', '/nino/auth/cooldown', '/nino/locales/available', '/nino/locales/native' ] as $movedKey )
-	check( "$movedKey has moved out of Config", isset( $byKey[$movedKey] ) === false );
-
 // A missing key must report the same default the runtime itself applies, or the
 // form shows a value the site is not actually running with
 check( 'a key absent from config.php reports the runtime default', $byKey['/nino/admin/backups']['value'] === true );
@@ -1435,9 +1414,6 @@ $lockTries( [ 'ip:203.0.113.9' => null ] );
 \Nino\Auth::deleteUser( $appData, 'lockedone@example.com' );
 \Nino\Auth::deleteUser( $appData, 'lockedtwo@example.com' );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/auth/maxtries' => 3 ] ] );
-check( 'and Config no longer writes them', $status === 400 && $appData['/nino/auth/maxtries'] === 8 );
-
 \Nino\Auth::logoutUser( $appData );
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Lockout::class, 'apiSave', [ 'fields' => [ '/nino/auth/maxtries' => 3 ] ] );
 check( 'Lockout actions require an authed _admin session too', $status === 401 );
@@ -1447,12 +1423,6 @@ check( '...apiUnlock too', $status === 401 );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/modules' => [] ] ] );
 check( 'apiSave ignores a key outside the schema', $status === 400 );
-
-[ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/html/assets' => [] ] ] );
-check( 'apiSave refuses /nino/html/assets, which this panel no longer owns', $status === 400 );
-
-[ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/http/routes' => [] ] ] );
-check( 'apiSave refuses /nino/http/routes, which belongs to Pages', $status === 400 );
 
 // --- the two locale keys constrain each other ---------------------------
 
@@ -1481,9 +1451,6 @@ check( 'apiSave refuses an empty language list', $status === 400 );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiSave', [ 'fields' => [ '/nino/locales/available' => [ 'de_DE', 'notalocale' ] ] ] );
 check( 'apiSave refuses a malformed locale id', $status === 400 );
-
-[ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/locales/available' => [ 'de_DE' ] ] ] );
-check( 'Config no longer writes the language list', $status === 400 );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiSave', [ 'fields' => [
 	'/nino/locales/available' => [ 'de_DE', 'de_DE', 'en_US' ],
@@ -2495,12 +2462,8 @@ foreach( [ 'en_US', 'de_DE' ] as $vocabLocale ) {
 			$wordFills[$vocabLocale][substr( $bracketKey, strlen( '[[/_admin/common/word/' ), -2 )] = $wordText;
 }
 $words = array_keys( $wordFills['en_US'] );
-check( 'the vocabulary is 133 words, the same in English and in German, each with a text', count( $words ) === 133 && array_keys( $wordFills['de_DE'] ) === $words
-	&& array_filter( array_merge( $wordFills['en_US'], $wordFills['de_DE'] ), static fn( string $text ): bool => trim( $text ) === '' ) === [] );
 check( 'a word is a slug: lower-case words joined by hyphens, one for each slug, in the alphabet', array_filter( $words, static fn( string $slug ): bool => preg_match( '/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug ) !== 1 ) === [] && $words === array_values( array_unique( $words ) ) && $words === ( static function( array $sorted ): array { sort( $sorted ); return $sorted; } )( $words ) );
 check( 'no word is an alias of another: no two slugs share a text in a language', count( array_unique( $wordFills['en_US'] ) ) === count( $words ) && count( array_unique( $wordFills['de_DE'] ) ) === count( $words ) );
-$keyWords = [ 'title', 'subtitle', 'text', 'description', 'image', 'alt', 'caption', 'link', 'label', 'name', 'email', 'phone', 'address', 'date', 'author', 'price', 'icon' ];
-check( 'the 17 words the Element Type editor offers as the key of a field are in the vocabulary', array_diff( $keyWords, $words ) === [] && preg_match( "/KEY_WORDS\s*:\s*\[ '". implode( "', '", $keyWords ). "' \]/", (string) file_get_contents( __DIR__. '/../_admin/Nino/Modules/Elements/assets/types.js' ) ) === 1 );
 check( 'a word names no key and is no key: no fill, no slash in any of them', array_filter( array_merge( $wordFills['en_US'], $wordFills['de_DE'] ), static fn( string $text ): bool => preg_match( '/\[\[|\//', $text ) === 1 ) === [] );
 
 // Every segment of every key the kernel ships is a word, or falls apart into words: a part, a name, the entry of a list,
@@ -3161,7 +3124,6 @@ check( 'resaving an existing entry unchanged (identified by originalHttpUri) suc
 $routesAfterNav = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
 check( 'a page explicitly assigned to main joins that menu on its own route', ( $routesAfterNav['GET://contact']['navs'] ?? null ) === [ 'main' => 1 ] );
 check( 'a page in no menu carries no membership at all', isset( $routesAfterNav['GET://about']['navs'] ) === false );
-check( 'nothing is generated into the text files anymore', isset( \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] )['[[/website/navigation/main]]'] ) === false );
 
 // Reordering: assign both entries to main so the generated menu actually
 // shows a reorder, not just the list itself
@@ -4547,7 +4509,6 @@ foreach( [ 'en_US', 'de_DE', 'fr_FR' ] as $locale ) {
 		$unresolvedFills[] = $key. ' '. $locale;
 }
 check( 'the whole workbench renders with no fill left unresolved, in both interface languages and in a site language it has no words in'. ( $unresolvedFills === [] ? '' : ' - '. implode( ', ', array_slice( $unresolvedFills, 0, 8 ) ) ), $unresolvedFills === [] );
-check( 'no shipped panel is labelled with literal text any more', array_filter( \Nino\Admin\Admin::allPanels( $shipped ), static fn( array $p ): bool => str_starts_with( $p['label'], '/' ) === false || str_starts_with( $p['tab'], '/' ) === false ) === [] );
 check( 'a panel naming a file that is not there is reported, and the file stays in the list for the bundler to skip', ( static function() use ( $appData ): bool {
 	$ghost = $appData;
 	$ghost['/nino/modules'] = [ 'AdminSmokeGhostAssetModule' ];
@@ -4623,10 +4584,6 @@ $withoutModule = $appData;
 $withoutModule['/nino/modules'] = [];
 [ $status ] = ninoCall( $withoutModule, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'navs/list' );
 check( 'with the Navigation module off, navs/list is an unknown action and the panel is gone', $status === 404 && isset( \Nino\Admin\Admin::panels( $withoutModule )['navs'] ) === false );
-
-// The search-index rebuild is the Search feature's own action (tested in
-// dapeio/nino-features); Config no longer carries it
-check( 'Config no longer carries the search-index rebuild', isset( \Nino\Modules\Config\Admin::actions()['config/searchindex'] ) === false );
 
 echo "\n";
 

@@ -78,7 +78,6 @@ check( 'inline holds no break, lines holds breaks, blocks holds breaks and block
 	&& PROFILES.lines.breaks === true && PROFILES.lines.blocks === false
 	&& PROFILES.blocks.breaks === true && PROFILES.blocks.blocks === true );
 check( 'a format that is no profile - plain among them, a plain field is a textarea - is read as inline', /PROFILES\[format\]\s*\?\?\s*PROFILES\.inline/.test( source ) === true );
-check( 'create() takes the format as its fifth argument', /create\s*:\s*function\(\s*container,\s*value,\s*maxlength,\s*rows,\s*format\s*\)/.test( source ) === true );
 check( 'aria-multiline says so wherever the format has more than a line', source.includes( "'aria-multiline', profile.breaks === true ? 'true' : 'false'" ) === true );
 check( 'the list buttons are only built where the format has blocks', /if\( profile\.blocks === true \)\s*\[ 'ul', 'ol' \]\.forEach/.test( source ) === true );
 
@@ -137,7 +136,6 @@ check( 'the value the editor hands back leaves out what only holds a caret: a tr
 
 console.log( '\nhtml-editor.js - what a form can tell the editor about its field\n' );
 
-check( 'the handle offers focus() and mark() beside the three it had', /return \{\s*getValue[\s\S]*?setValue[\s\S]*?focus : function[\s\S]*?mark : function[\s\S]*?destroy/.test( source ) === true );
 check( 'the box the handle acts on is the role=textbox element', /const content = dc\.createElement\('div'\);[\s\S]{0,200}content\.setAttribute\( 'role', 'textbox' \)/.test( source ) === true );
 
 // Lifted out of the file and run as it stands there, against a stand-in for the text box

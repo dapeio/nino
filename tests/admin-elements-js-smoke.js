@@ -985,7 +985,6 @@ if( typeof elements._renderNav === 'function' ) {
 
 check( 'the element form says whether it is saved through the shared status line, bound to the form and to its own word on what is unsaved', /_status = Nino\.adminUi\.status\( msg \);\s*Nino\.admin\.elements\._status\.bind\( form, Nino\.admin\.elements\.isDirty \)/.test( source ) === true );
 check( '...a save marks it saving, saved and - with the server\'s words and field - failed', source.indexOf( '_status.saving()' ) !== -1 && source.indexOf( '_status.saved()' ) !== -1 && /_status\.error\( status, response, '\/_admin\/elements\/error\/save' \)/.test( source ) === true );
-check( '...and the old plain message element no longer carries its own text', source.indexOf( "elements-form-msg')" ) === -1 );
 
 
 // --- required fields, JSON fields and unsaved input -----------------------

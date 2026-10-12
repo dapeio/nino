@@ -322,8 +322,6 @@
 
 			key = String( key ?? '' );
 
-			// The one pattern written out of a string, which the guard of the key forms (tests/keys-smoke.php) reads
-			// without taking an escaped slash for the start of an old family
 			let match = new RegExp( '^/_nino/webpage(/.+)/(name|title|description|uri)$' ).exec( key );
 			if( match !== null )
 				return { kind : 'webpage', uri : match[1], field : match[2] };

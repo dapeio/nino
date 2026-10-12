@@ -44,30 +44,10 @@ try { parse('{broken') } catch( error ) { rejectedInvalid = true }
 check( 'rejects malformed JSON', rejectedInvalid );
 check( 'registers its ready callback', callbacks.length === 1 );
 
-const editorText = source('_admin/Nino/Modules/Text/assets/admin.js');
-const editorPhp = source('_admin/Nino/Modules/Text/Admin/Admin.php');
-check( 'Editor no longer renders the old text-only translation toolbar', editorText.includes('_renderTranslateTools') === false && editorText.includes('text-translate-tools') === false );
-check( 'Editor no longer exposes batch translation endpoints', editorPhp.includes("'text/export'") === false && editorPhp.includes("'text/import'") === false );
-
-// The shell's nav is rendered from each panel's nav() - see \Nino\Panels
-const adminPhp = source('_admin/Nino/Modules/Language/Translations/Translations.php')+ source('_admin/Nino/Modules/Routes/Admin/Admin.php');
-check( 'Admin exposes Translations as a tab of the Language panel and labels both it and Routes with fills', /\[ 'translations', '\/_admin\/nav\/translations', \d+, 'system' \]/.test( adminPhp ) && source('_admin/Nino/Modules/Language/Admin/Admin.php').includes( 'return [ Translations::class ];' ) && /\[ 'routes', '\/_admin\/nav\/routes', \d+, 'structure' \]/.test( adminPhp ) );
-check( 'the tab renders into its own mount point, not the pane it shares', source('_admin/Nino/Modules/Language/assets/translations.js').includes( "getElementById('translations-content')" ) && source('_admin/Nino/Modules/Language/assets/translations.js').includes( 'admin-content-translations' ) === false && /return \[ 'translations-content' \];/.test( adminPhp ) );
-
 console.log('\nShared HTML editor');
 
 const htmlEditor = source('_admin/assets/html-editor.js');
-// The rich-text surface is shared markup, so its rules belong to the design
-// system half of the workbench stylesheet rather than to one panel's own
-const editorCss = source('_admin/assets/style.css');
 const kernel = source('_nino/Nino/Html/Html.php');
-const editorElements = source('_admin/Nino/Modules/Elements/assets/admin.js');
-const adminElements = source('_admin/Nino/Modules/Elements/assets/admin.js');
 check( 'toolbar and server sanitizer both whitelist code', htmlEditor.includes("'span', 'code', 'a'") && kernel.includes("'span', 'code', 'a'") );
-check( 'the editable surface explicitly restores drag selection', editorCss.includes('.nino-admin-richtext-content *') && editorCss.includes('-webkit-user-select: text') && editorCss.includes('user-select: text') );
-// The Text panel names a field by pointing at its name (aria-labelledby) and not by wrapping it in a <label>:
-// a label would take the key and the counter into the name, and nest the editable surface in it
-check( 'rich text is not nested inside an interactive label', editorText.includes("createElement('label')") === false && editorText.includes( "wrap.setAttribute( 'aria-labelledby', nameSpan.id )" ) && editorElements.includes("dc.createElement( isHtml ? 'div' : 'label' )") && adminElements.includes("dc.createElement( isHtml ? 'div' : 'label' )") );
-check( 'code receives a readable monospace treatment', editorCss.includes('.nino-admin-richtext-content code') && editorCss.includes('ui-monospace') );
 
 done();

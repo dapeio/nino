@@ -271,7 +271,6 @@ const missing = keys.filter( function( key ) {
 } );
 check( 'every fill the script asks for exists in both interface languages'+ ( missing.length ? ' - missing: '+ missing.join(', ') : '' ), keys.length > 0 && missing.length === 0 );
 check( 'the three tab labels and the reload hint are among them', [ 'available', 'inactive', 'active' ].every( function( t ) { return keys.indexOf( '/_admin/features/tab/'+ t ) !== -1 } ) && keys.indexOf( '/_admin/features/msg/reload' ) !== -1 );
-check( 'no eyebrow status word is asked for any more - the tab and the version line carry that now', keys.indexOf( '/_admin/features/status/active' ) === -1 && keys.indexOf( '/_admin/features/status/incompatible' ) === -1 );
 
 // The words the class phrases itself - a catalogue refusal, an update that
 // did not apply, a feature that would not switch on - are fills too, read

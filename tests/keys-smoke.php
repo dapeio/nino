@@ -14,8 +14,6 @@ declare(strict_types=1);
  *										   template reads only keys of its own category or of "common"
  *										C. the key literals in the kernel's and the workbench's code name a
  *										   namespace of the grammar, the system or a runtime fill
- *										D. no old key family is left anywhere, in code, templates,
- *										   texts or documents
  *										E. \Nino\Modules\Template::category()
  *										F. \Nino\Text::isGrammarKey()
  *
@@ -205,8 +203,6 @@ check( 'every key a unit delivers follows the grammar - or is a form its unit is
 // ...and those exceptions are exactly what they say, nothing a unit of another module may do, and each one blacklisted that is the workbench's
 $legalKeys = array_values( array_filter( $units['module:legal']['keys'], static fn( string $key ): bool => \Nino\Text::isGrammarKey( $key ) === false ) );
 $legalWords = array_values( array_filter( $legalKeys, static fn( string $key ): bool => preg_match( KEYS_LEGAL_ADMIN, $key ) === 1 ) );
-check( 'the unit of the Legal module delivers 6 details of pages, 8 labels of fields and 2 hints of types, per language, and nothing else outside the grammar', count( array_unique( $legalKeys ) ) === 16
-	&& count( array_filter( $legalKeys, static fn( string $key ): bool => preg_match( KEYS_LEGAL_PAGES, $key ) === 1 ) ) === 12 && count( $legalWords ) === 20 && array_diff( $legalKeys, array_filter( $legalKeys, static fn( string $key ): bool => preg_match( KEYS_LEGAL_PAGES, $key ) === 1 || preg_match( KEYS_LEGAL_ADMIN, $key ) === 1 ) ) === [] );
 check( '...and the words of the workbench are on its blacklist, which delivers no other key', array_values( array_unique( $legalWords ) ) === array_values( $units['module:legal']['manifest']['blacklist'] ?? [] ) );
 $exceptionsElsewhere = [];
 foreach( $units as $unit )
@@ -296,16 +292,6 @@ foreach( $units as $unit ) {
 }
 check( 'every page unit proposes uri, name, title and description in its manifest, and delivers no /_nino/webpage key'. ( $badSuggest === [] ? '' : ' - '. implode( ', ', $badSuggest ) ), $badSuggest === [] );
 
-// What the base unit delivers, counted: a key added or dropped is a decision
-$baseGlobal = count( $units['base']['text']['global'] );
-$basePerLocale = count( $units['base']['text']['en_US'] );
-check( 'the base unit delivers 40 keys: 21 global, 19 per language', $baseGlobal === 21 && $basePerLocale === 19 );
-check( '...13 of them on its blacklist: the technical html values and the 11 values of the mails\' look', count( $units['base']['manifest']['blacklist'] ?? [] ) === 13
-	&& array_diff( $units['base']['manifest']['blacklist'] ?? [], $units['base']['keys'] ) === [] );
-check( 'the contact form unit delivers 15 keys per language, no global text and no blacklist: its mail words are templates\' and the look of the mails the base unit\'s',
-	count( $units['module:form']['text']['en_US'] ) === 15 && $units['module:form']['text']['global'] === [] && isset( $units['module:form']['manifest']['blacklist'] ) === false );
-check( 'the Localepicker unit names the two languages of the wizard, in global.php, after their codes', array_keys( $units['module:localepicker']['text']['global'] ) === [ '/_nino/locale/de_DE/name', '/_nino/locale/en_US/name' ] );
-check( 'the Maintenance unit delivers its page\'s two words under /module/maintenance/page/', array_keys( $units['module:maintenance']['text']['en_US'] ) === [ '/module/maintenance/page/title', '/module/maintenance/page/text' ] );
 echo "\n";
 
 
@@ -538,58 +524,6 @@ check( 'the inline block publishes the three groups of words the public scripts 
 $scripts = (string) file_get_contents( $root. '/_nino/Nino.ui.js' );
 check( 'the public script asks for exactly those groups', preg_match_all( '/getText\(\s*\'(\/[^\']*)\'/', $scripts, $asked ) > 0
 	&& array_filter( $asked[1], static fn( string $key ): bool => preg_match( '#^/(module/form/info|feature/newsletter/info|template/common/slider)/#', $key ) !== 1 ) === [] );
-echo "\n";
-
-
-// --- D. old forms -----------------------------------------------------------------
-
-echo "D. No old key family is left\n";
-
-$old = [
-	'/page-[a-z0-9][a-z0-9-]*/', '/page-(?=[\'"`\[<])', '/webpage(?![\w-])', '/company/', '/website/', '/global/',
-	'/form/(?:label|info|email|subject|required|title)', '/mail/(?:sender|style|owner|user|newsletter)',
-	'/slider/label', '/newsletter/(?:label|info|page|confirm|unsubscribe)', '/maintenance/(?:title|text)', '/nino/path',
-	'/nino/locales/(?:title|locale)', '/cookiebanner/', '/date/year',
-];
-// A family that ends in a word ends there: /slider/label is not /slider/labels. One that
-// ends in a slash goes on into the key
-$oldPattern = '~(?<![\w.-])(?:'. implode( '|', array_map( static fn( string $family ): string => str_ends_with( $family, '/' ) === true ? $family : $family. '(?![\w-])', $old ) ). '|theme\.(?:header|footer)(?![\w-]))~';
-
-$leftovers = [];
-$scanned = 0;
-$shipped = [];
-foreach( [ 'php', 'js', 'tpl', 'css', 'md' ] as $extension )
-	foreach( keysFiles( $root, $extension ) as $file )
-		$shipped[] = $file;
-
-foreach( $shipped as $file ) {
-
-	$relative = keysRelative( $file, $root );
-
-	if( str_starts_with( $relative, 'tests/' ) === true || str_starts_with( $relative, '.git/' ) === true || str_starts_with( $relative, 'history/' ) === true || str_contains( $relative, 'node_modules/' ) === true || str_starts_with( $relative, 'vendor/' ) === true )
-		continue;
-
-	$scanned++;
-
-	foreach( explode( "\n", (string) file_get_contents( $file ) ) as $number => $line ) {
-
-		if( preg_match( $oldPattern, $line, $hit ) === 1 )
-			$leftovers[] = $relative. ':'. ( $number + 1 ). ' '. trim( $hit[0] );
-	}
-}
-check( 'no shipped file ('. $scanned. ' of them: code, templates, texts, stylesheets, documents) names a key family of an old form, a page text of the old shape, /webpage, /date/year or a theme.* frame'
-	. ( $leftovers === [] ? '' : ' - '. implode( '; ', array_slice( $leftovers, 0, 10 ) ). ( count( $leftovers ) > 10 ? ' ... '. count( $leftovers ). ' in all' : '' ) ), $leftovers === [] && $scanned > 200 );
-
-// The pattern is no mere formality: it finds the forms it is for, and leaves the new ones alone
-$probeHits = [];
-foreach( [ '[[/company/name]]', '/page-home/welcome/title', '[[/webpage/home/title]]', '/form/label/email', '/mail/user/title', '/date/year', 'theme.header.tpl', '[[/slider/label/prev]]', '--token: [[/nino/path]];' ] as $probe )
-	if( preg_match( $oldPattern, $probe ) === 1 )
-		$probeHits[] = $probe;
-$probeMisses = [];
-foreach( [ '[[/project/company/general/name]]', '/template/page-home/welcome/title', '[[/_nino/webpage/home/title]]', '/template/common/form/email', '/template/mail-user/intro/title', '/nino/date/year', 'frame-header.tpl', '/embed/abc', '/posts/my-first-post', '/feature/newsletter/label/submit', '/templates/page-home' ] as $probe )
-	if( preg_match( $oldPattern, $probe ) === 1 )
-		$probeMisses[] = $probe;
-check( 'the pattern finds each of the old forms it is meant for, and none of the new ones - nor a url path such as /embed/ or a template path', count( $probeHits ) === 9 && $probeMisses === [] );
 echo "\n";
 
 

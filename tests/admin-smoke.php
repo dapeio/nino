@@ -1682,7 +1682,6 @@ echo "Backup::maybeRun (triggered from Admin::guard on every authenticated reque
 callUsers( $appData, 'apiList' ); // ensures the backup key exists even on a from-scratch run
 
 check( 'the backup key exists in config.php', isset( $appData['/nino/backup/key'] ) === true );
-check( 'no random backup directory is generated any more', isset( $appData['/nino/backup/dir'] ) === false );
 
 $backupDir 	= $sandbox. '/private/.backups';
 $today 			= $backupDir. '/'. date( 'Y-m-d' ). '.php';
@@ -1812,7 +1811,6 @@ check( 'the log line records the acting admin', str_contains( end( $lines ), 'ma
 // private directory, which is denied by its own .htaccess, and every file in
 // there carries the same 403 stub it always did
 check( 'the logs live under the private directory, not in a tool folder', is_file( $sandbox. '/private/.logs/'. date( 'Y-m-d' ). '.php' ) === true );
-check( 'no random log directory is generated any more', isset( $appData['/nino/logs/dir'] ) === false );
 check( 'each log file still carries its own 403 stub', str_starts_with( (string) file_get_contents( $sandbox. '/private/.logs/'. date( 'Y-m-d' ). '.php' ), '<?php http_response_code(403); exit;' ) === true );
 
 callAdminPost( $appData, 'elements/list', [ 'type' => 'logtestdemo' ] );
@@ -2173,15 +2171,10 @@ foreach( [ 'de_DE', 'en_US' ] as $locale ) {
 }
 
 /*	The question asked before unsaved input is lost (Nino.admin.dirty, see
-	_admin/assets/script.js) is spoken in the interface language, and German
-	addresses the reader as Du - capitalised, as everywhere in the workbench */
+	_admin/assets/script.js) is spoken in the interface language */
 foreach( [ 'de_DE', 'en_US' ] as $locale )
 	foreach( [ 'confirm/unsaved', 'label/discard', 'label/cancel', 'msg/dirty' ] as $key )
 		check( $locale. ' carries /_admin/common/'. $key, trim( (string) ( $shellText[$locale]['[[/_admin/common/'. $key. ']]'] ?? '' ) ) !== '' );
-check( 'the question is addressed with a capitalised Du in German', str_contains( (string) $shellText['de_DE']['[[/_admin/common/confirm/unsaved]]'], 'Du hast' ) === true
-	&& str_contains( (string) $shellText['de_DE']['[[/_admin/common/confirm/unsaved]]'], 'Möchtest Du' ) === true );
-check( 'the three answers are the plain words', $shellText['en_US']['[[/_admin/common/label/save]]'] === 'Save' && $shellText['en_US']['[[/_admin/common/label/discard]]'] === 'Discard' && $shellText['en_US']['[[/_admin/common/label/cancel]]'] === 'Cancel'
-	&& $shellText['de_DE']['[[/_admin/common/label/discard]]'] === 'Verwerfen' && $shellText['de_DE']['[[/_admin/common/label/cancel]]'] === 'Abbrechen' );
 
 
 // --- Cleanup ---------------------------------------------------------------

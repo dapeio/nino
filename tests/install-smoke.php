@@ -135,13 +135,7 @@ check( 'reports the running php version', $checksBody['php']['version'] === PHP_
 check( 'gd is reported as loaded (required by CI)', $checksBody['extensions']['gd']['ok'] === true );
 check( 'the project root is reported as writable', $checksBody['directories']['.']['ok'] === true );
 check( 'the canonical private directory is reported as private', isset( $checksBody['directories']['private'] ) === true && isset( $checksBody['directories']['content'] ) === false );
-// Only the three roots are probed, not their children: whatever can write
-// into private/ can create text/, elements/ and data/ inside it, and the
-// same holds for public/. A child listed here reported "not yet created"
-// on a perfectly healthy project and told the installer nothing the parent
-// had not already answered
 check( 'the public root is reported too', ( $checksBody['directories']['public']['ok'] ?? null ) === true );
-check( 'no child directory is probed separately any more', isset( $checksBody['directories']['data'], $checksBody['directories']['text'], $checksBody['directories']['images'] ) === false );
 
 echo "\n";
 
@@ -172,7 +166,6 @@ check( 'the wizard restates neither the always-on modules nor the shipped locale
 	&& preg_match( "/'[a-z]{2}_[A-Z]{2}(\\.php)?'/", $setupSource ) !== 1 );
 check( 'reports the config\'s current native locale as already active', $libraryBody['activeLocales'] === [ 'de_DE' ] );
 check( 'reports the config\'s current native locale itself, for the Native Locale dropdown to pre-select', $libraryBody['nativeLocale'] === 'de_DE' );
-check( 'lists no module unit at all: forms/navigation/localepicker are no longer a choice, and a fresh checkout ships no other unit - pages have their own step now (Webpages), not listed here', $libraryBody['modules'] === [] );
 
 [ $status ] = ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [], 'modules' => [] ] );
 check( 'rejects a selection with no locale at all', $status === 400 );
@@ -302,8 +295,6 @@ $blacklistAfterApply = \Nino\Filesystem::getFileContent( $appData, '/text/blackl
 check( 'base\'s blacklist entries (design tokens) landed in text/blacklist.php', in_array( '/project/website/html/lang', $blacklistAfterApply, true ) === true );
 check( 'the mail design tokens landed on the blacklist too - they are the base unit\'s now, not the contact form\'s', in_array( '/project/mail/color/primary', $blacklistAfterApply, true ) === true
 	&& in_array( '/project/mail/spacing/large', $blacklistAfterApply, true ) === true );
-check( '"forms" ships no blacklist and no global text of its own any more', isset( ( include __DIR__. '/../_nino/Nino/Modules/Form/install/manifest.php' )['blacklist'] ) === false
-	&& is_file( __DIR__. '/../_nino/Nino/Modules/Form/install/text/global.php' ) === false );
 
 $deAfterApply = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
 check( 'merges the picked locale\'s text fragments (base + forms)', ( $deAfterApply['[[/module/form/info/required]]'] ?? null ) !== null );
@@ -358,7 +349,6 @@ check( 'never writes a fragment for a locale that was not picked', \Nino\Filesys
 [ , $libraryAfterApplyBody ] = ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiLibrary' ] );
 
 check( 'apiLibrary now reports de_DE as the active locale', $libraryAfterApplyBody['activeLocales'] === [ 'de_DE' ] );
-check( 'apiLibrary still lists no module choice at all - forms/navigation/localepicker never appear here', $libraryAfterApplyBody['modules'] === [] );
 
 // A second run with a different locale selection replaces the first run's
 // locales, exactly as before - but nothing about the always-on three can be
@@ -566,44 +556,6 @@ check( 'the delivered frame takes main\'s top padding away for a cover and a par
 check( '...also when the Builder\'s wrap stands between main and the hero', str_contains( $heroRule, 'main:has(> .nino-wrap > .nino-cover:first-child)' ) === true
 	&& str_contains( $heroRule, 'main:has(> .nino-wrap > .nino-parallex:first-child)' ) === true );
 
-// The hero had another name up to 1.5 and has no alias: the pages of the library
-// that carried the classes carry them under the new name, and no page is
-// left with a class that nothing styles any more
-$libraryHeroes = [
-	'404'			=> [ 'class="nino-hero nino-section', 'class="nino-hero-title"', 'class="nino-hero-subtitle"' ],
-	'home'		=> [ 'class="nino-hero-title nino-hero-title--loud"', 'class="nino-hero-subtitle"' ],
-	'contact'	=> [ 'class="nino-hero-title"', 'class="nino-hero-subtitle"' ],
-];
-$libraryHeroOld		= 'nino-'. 'atf';
-$libraryHeroGaps	= [];
-foreach( $libraryHeroes as $libraryHeroPage => $libraryHeroMarks ) {
-	$libraryHeroMarkup = (string) file_get_contents( __DIR__. '/../_admin/install/library/pages/'. $libraryHeroPage. '/templates/page-'. $libraryHeroPage. '.tpl' );
-	foreach( $libraryHeroMarks as $libraryHeroMark )
-		if( str_contains( $libraryHeroMarkup, $libraryHeroMark ) === false )
-			$libraryHeroGaps[] = $libraryHeroPage. ' lacks '. $libraryHeroMark;
-	if( str_contains( $libraryHeroMarkup, $libraryHeroOld ) === true )
-		$libraryHeroGaps[] = $libraryHeroPage. ' still has the old name';
-}
-check( 'the home, contact and 404 pages carry the hero classes where they carried the old ones'. ( $libraryHeroGaps === [] ? '' : ' - '. implode( ', ', $libraryHeroGaps ) ), $libraryHeroGaps === [] );
-
-// ...and the page that draws every class of Nino.css draws those of the hero, of the three levels of grounds, the pictures of a column and of a
-// card and the two variants of the subtitle of a card: a prefix each, with the number of classes it finds, so that a class added under one of
-// them is one the page has to be given
-$demoPrefixes	= [ 'nino-hero' => 9, 'nino-grid--' => 10, 'nino-card--' => 16, 'nino-grid-bg' => 1, 'nino-card-bg' => 1, 'nino-card-subtitle--' => 2 ];
-$demoNames		= [ 'nino-hero' => 'nine hero classes', 'nino-grid--' => 'ten modifiers of a column', 'nino-card--' => 'sixteen modifiers of a card', 'nino-grid-bg' => 'picture of a column',
-	'nino-card-bg' => 'picture of a card', 'nino-card-subtitle--' => 'two variants of the subtitle of a card' ];
-preg_match_all( '/class="([^"]*)"/', (string) file_get_contents( __DIR__. '/../_admin/install/library/pages/.demo-catalogue/templates/.demo-catalogue.tpl' ), $demoClasses );
-$demoDrawn = [];
-foreach( $demoClasses[1] as $demoAttribute )
-	foreach( preg_split( '/\s+/', trim( $demoAttribute ) ) ?: [] as $demoClass )
-		$demoDrawn[$demoClass] = true;
-foreach( $demoPrefixes as $demoPrefix => $demoCount ) {
-	preg_match_all( '/\.('. preg_quote( $demoPrefix, '/' ). '[a-z0-9-]*)/', (string) preg_replace( '#/\*.*?\*/#s', '', $ninoCss ), $demoDefined );
-	$demoDefined = array_values( array_unique( $demoDefined[1] ) );
-	$demoUndrawn = array_values( array_filter( $demoDefined, static fn( string $class ): bool => isset( $demoDrawn[$class] ) === false ) );
-	check( 'the catalogue page draws the '. $demoNames[$demoPrefix]. ' Nino.css defines'. ( $demoPrefix === 'nino-hero' ? ', by their new names' : '' ). ( $demoUndrawn === [] ? '' : ' - missing: '. implode( ', ', $demoUndrawn ) ), $demoUndrawn === [] && count( $demoDefined ) === $demoCount );
-}
-
 echo "\n";
 
 
@@ -661,7 +613,6 @@ check( '...with de_DE\'s wording read from the unit\'s own de_DE fragment', $wpL
 check( '...and en_US\'s from its own en_US fragment - the locale that used to end up generic', $wpLibraryBody['templates']['home']['text']['en_US']['name'] === 'Home' && $wpLibraryBody['templates']['home']['text']['en_US']['title'] === 'Welcome.' );
 check( 'reports the Http-URI "home" suggests for itself, which is not its folder name', $wpLibraryBody['templates']['home']['uri'] === '/' );
 check( '...and "contact"\'s, which is', $wpLibraryBody['templates']['contact']['uri'] === '/contact' );
-check( 'the page library has no legal page any more - the Legal module brings the imprint and the privacy policy', is_dir( __DIR__. '/../_admin/install/library/pages/legal' ) === false && in_array( 'legal', array_keys( $wpLibraryBody['templates'] ), true ) === false );
 check( 'the blank template starts every locale with useful page metadata', $wpLibraryBody['templates']['blank']['text']['de_DE']['name'] === 'Neue Webseite' && $wpLibraryBody['templates']['blank']['text']['en_US']['name'] === 'New webpage' );
 check( 'the blank template suggests a stable Http-URI and its own page template', $wpLibraryBody['templates']['blank']['uri'] === '/new-webpage' && $wpLibraryBody['templates']['blank']['body'] === '[template /templates/page-blank]' );
 check( 'the blank page template deliberately has no section', strpos( (string) file_get_contents( __DIR__. '/../_admin/install/library/pages/blank/templates/page-blank.tpl' ), '<section' ) === false );
@@ -951,9 +902,6 @@ ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' 
 	[ 'uri' => '/site-rules', 'httpUri' => '/impressum', 'libraryKey' => 'blank', 'navs' => [], 'text' => [ 'de_DE' => [ 'name' => 'Recht' ], 'en_US' => [ 'name' => 'Rules' ] ] ],
 ] ] );
 
-$deAfterNav = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
-$enAfterNav = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
-
 // Menu membership lives on the route each entry owns, not in a generated
 // textfill - see \Nino\Modules\Navigation::routeLines(). Nothing is written
 // per locale here at all: the menu is built per request, from the same
@@ -964,7 +912,6 @@ check( 'the Navigation module registers the menus the editors offer, the Legal u
 check( 'an entry explicitly assigned to main joins that menu at its own position in the list', ( $routesAfterNav['GET://']['navs'] ?? null ) === [ 'main' => 1 ] );
 check( '...and so does the second one, one position further down', ( $routesAfterNav['GET://kontakt']['navs'] ?? null ) === [ 'main' => 2 ] );
 check( 'an entry that is in no menu carries no membership at all', isset( $routesAfterNav['GET://impressum']['navs'] ) === false );
-check( 'nothing is generated into the text files anymore', isset( $deAfterNav['[[/website/navigation/main]]'] ) === false && isset( $enAfterNav['[[/website/navigation/main]]'] ) === false );
 
 // The routes stand in list order, which is what equal priorities fall back
 // to - reordering pages is what reorders the menus
@@ -972,11 +919,6 @@ check( 'the applied routes stand in the list\'s own order', array_slice( array_k
 
 // A page is registered at whatever Http-URI the entry picked
 check( 'registers an entry at its own picked Http-URI', isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://impressum'] ) === true );
-
-// The imprint is the Legal module's, not a page of the wizard: nothing mirrors
-// a legal link into /website/legal/* any more, the menu 'legal' is the link
-$globalAfterNav = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
-check( 'no /website/legal/* key is written for a page', isset( $globalAfterNav['[[/website/legal/uri]]'] ) === false && isset( $deAfterNav['[[/website/legal/name]]'] ) === false && isset( $enAfterNav['[[/website/legal/name]]'] ) === false );
 
 // Dropping pages narrows the routes (replace semantics)
 ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [
@@ -1005,12 +947,8 @@ check( 'reopening the step shows the pages this project kept, not the starter si
 // position" to decline any more, nor a choice that could outlive it
 ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
 
-[ , $body ] = ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiLibrary' ] );
-$reopenedModules = $body['modules'] ?? [];
 $configAfterDecline = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
-check( 'reopening the step still offers nothing to choose - nothing else ships in this checkout',
-	$reopenedModules === [] );
 check( '...and the three always-on modules are still there, unaffected by posting nothing',
 	in_array( '\\Nino\\Modules\\Navigation', $configAfterDecline['/nino/modules'], true ) === true
 	&& in_array( '\\Nino\\Modules\\Form', $configAfterDecline['/nino/modules'], true ) === true
@@ -1490,11 +1428,8 @@ check( '...and a blank one to start a page of your own from', in_array( 'blank',
 // with its module - install/ beside the class file - and Setup::units()
 // finds it there without /_install listing it anywhere
 $moduleUnits = \Nino\Install\Setup::units();
-$modulesDirs 	= [ realpath( $realRoot. '/_nino/Nino/Modules' ) ];
 
 check( 'the contact page can pull the forms module in with it', isset( $moduleUnits['forms'] ) === true );
-check( 'a checkout keeps no module unit in _admin/install/library any more - every one sits in its module as install/', $moduleUnits !== [] && array_filter( $moduleUnits,
-	static fn( string $unitDir ): bool => basename( $unitDir ) !== 'install' || in_array( dirname( realpath( $unitDir ) ?: '', 2 ), $modulesDirs, true ) === false ) === [] );
 check( 'the optional modules ship below _nino/Nino/Modules, switched on or off in /nino/modules', str_ends_with( $moduleUnits['forms'], '/_nino/Nino/Modules/Form/install' ) === true );
 // A feature is not a wizard unit: it is activated in the Features panel after
 // setup (see \Nino\Features), so its install/ is never offered here

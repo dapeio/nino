@@ -367,7 +367,7 @@ Three things are no text key. The kernel's runtime fills live under `/nino/` and
 
 Two forms are the system's, not the project's: `/_nino/webpage<uri>/<name|title|description|uri>`, the details of a page after its Element-URI (which may hold slashes and dots), and `/_nino/locale/<code>/name`, the name of a language. The setup wizard and the Routes panel write the first - for the pages that features route at runtime, in the Routes panel's section "Routes of features and modules" - and the Localepicker unit and the Language panel write the second; the Language panel gives a language it adds its code as the name. `/_admin/...` are the workbench's own words and stay as they are.
 
-The server holds people to the grammar where they make keys: the Text Keys tab creates and renames only keys that follow it (`\Nino\Text::isGrammarKey()`), and refuses to rename a key under `/_nino/` or `/_admin/`. Keys a project already has are left alone and stay editable. `tests/keys-smoke.php` holds everything Nino ships to it, finds a leftover of an old form, and checks that every key a shipped template reads exists.
+The server holds people to the grammar where they make keys: the Text Keys tab creates and renames only keys that follow it (`\Nino\Text::isGrammarKey()`), and refuses to rename a key under `/_nino/` or `/_admin/`. Keys a project already has are left alone and stay editable. `tests/keys-smoke.php` holds everything Nino ships to it and checks that every key a shipped template reads exists.
 
 ### Shortcodes
 

@@ -140,8 +140,8 @@ namespace Nino\Modules {
 		public static function init( array &$appData ): void {
 
 			$components = [
-				[ 'title', 'Title (Section)', 'Titel (Sektion)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'h3', 'h4' ], 'h3' ), 'style' => self::_style() ], [ 'section' ], '{tag} .nino-section-title', null ],
-				[ 'subtitle', 'Subtitle (Section)', 'Untertitel (Sektion)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'p', 'h4', 'h5' ], 'div' ), 'style' => self::_style() ], [ 'section' ], '{tag} .nino-section-subtitle', null ],
+				[ 'title', 'Title (Section)', 'Titel (Sektion)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'h3', 'h4' ], 'h3' ), 'style' => self::_style() ], [ 'hero', 'section' ], '{tag} .nino-section-title', null ],
+				[ 'subtitle', 'Subtitle (Section)', 'Untertitel (Sektion)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'p', 'h4', 'h5' ], 'div' ), 'style' => self::_style() ], [ 'hero', 'section' ], '{tag} .nino-section-subtitle', null ],
 				[ 'card-title', 'Title (Card)', 'Titel (Karte)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'h3', 'h4' ], 'h4' ), 'style' => self::_style() ], [ 'card' ], '{tag} .nino-card-title', null ],
 				[ 'card-subtitle', 'Subtitle (Card)', 'Untertitel (Karte)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'p', 'h5', 'h6' ], 'p' ), 'style' => self::_style() ], [ 'card' ], '{tag} .nino-card-subtitle', null ],
 				[ 'hero-title', 'Title (Hero)', 'Titel (Hero)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'h2', 'h3' ], 'h2' ), 'style' => self::_style() ], [ 'hero' ], '{tag} .nino-hero-title', null ],
