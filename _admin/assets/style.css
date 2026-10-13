@@ -1303,7 +1303,7 @@ a {
      </label> */
 :where(.nino-admin) .nino-admin-switch {
 	display: flex;
-	align-items: flex-start;
+	align-items: center;
 	gap: .7rem;
 	min-height: var(--nino-admin-row-height);
 	padding: .5rem .1rem;
