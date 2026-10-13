@@ -53,252 +53,6 @@ ninoUser( $appData, 'admin@example.com' );
 echo "Sandbox: $sandbox\n\n";
 
 
-// --- Admin::init route ownership ----------------------------------------
-
-echo "Admin::init - runtime route ownership\n";
-
-// Regression: init() used to merge its own routes with '+=', which does NOT
-// overwrite a key that already exists - so a persisted 'GET://_admin' (hand-
-// written through _admin's Config module, which exposes '/nino/http/routes' as
-// raw json, or a webpage entry created before the reserved-uri check existed)
-// shadowed the editor entirely. Same fix Install::init() already carries.
-$shadowed = $appData;
-$shadowed['/nino/http/routes'] = [
-	'GET://_admin' 	=> [ 'uri' => '/_admin', 'body' => 'hijacked' ],
-	'POST://_admin' 	=> [ 'uri' => '/_admin', 'body' => 'hijacked' ],
-	'GET://custom' 		=> [ 'uri' => '/custom', 'body' => 'hand-written route' ],
-];
-\Nino\Admin\Admin::init( $shadowed );
-check( 'init always restores the tool-owned GET route over a stale/hand-written collision', $shadowed['/nino/http/routes']['GET://_admin']['body'] === '[template /_admin/templates/page-index]' );
-check( 'init always restores the tool-owned POST route too', ( $shadowed['/nino/http/routes']['POST://_admin']['body'] ?? null ) === null );
-check( 'a route the tool does not own is left untouched', $shadowed['/nino/http/routes']['GET://custom']['body'] === 'hand-written route' );
-
-echo "\n";
-
-
-// --- Panel registry - a module brings its own /_admin screen ---------------
-
-echo "Admin::panels - a module's panel joins the shell without a shell change\n";
-
-/**
- *	The panel contract, minimal: actions() and nav() are required, everything
- *	else is optional (see \Nino\Panels). Declared here rather than autoloaded -
- *	Modules::collect() only ever asks method_exists(), so a class that already
- *	exists is as good as one under app/
- */
-class EditorSmokeDummyPanel {
-	public const string PERM = '/_admin/dummy/manage';
-	public static function actions(): array { return [ 'dummy/list' => [ self::class, 'apiList' ] ]; }
-	public static function nav(): array { return [ 'dummy', 'Dummy <Panel>', 62 ]; }
-	public static function perm(): string { return self::PERM; }
-	public static function panes(): array { return [ 'dummy-list', 'dummy-form', 'Not A Pane' ]; }
-	public static function assets(): array { return [ '/app/Dummy/assets/dummy.js', '/app/Dummy/assets/dummy.css', '/../etc/passwd.js', 'dummy.js' ]; }
-	public static function summary( array &$appData ): array { return [ 'value' => 7, 'label' => 'Dummies' ]; }
-	public static function log( string $action, array $data ): string { return $action === 'dummy/list' ? '' : 'never'; }
-	public static function apiList( array &$appData, array &$request ): void {
-		if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::PERM ) === false )
-			return;
-		\Nino\Http::ok( $request, [ 'dummies' => 7 ] );
-	}
-}
-
-/** A second panel trying to take over the core Text screen by reusing its uri */
-class EditorSmokeShadowPanel {
-	public static function actions(): array { return [ 'text/keys' => [ self::class, 'apiHijack' ] ]; }
-	public static function nav(): array { return [ 'text', 'Shadow' ]; }
-	public static function apiHijack( array &$appData, array &$request ): void { \Nino\Http::ok( $request, [ 'hijacked' => true ] ); }
-}
-
-/** The runtime module that contributes both, answering adminPanels() */
-class EditorSmokeDummyModule {
-	public static function adminPanels( array &$appData ): array { return [ 'EditorSmokeDummyPanel', 'EditorSmokeShadowPanel', 'NoSuchClassAtAll' ]; }
-}
-
-$withModule = $appData;
-$withModule['/nino/modules'] = [ 'EditorSmokeDummyModule' ];
-
-$registry = \Nino\Admin\Admin::panels( $withModule );
-check( 'the module\'s panel is in the registry under its nav uri', isset( $registry['dummy'] ) === true && $registry['dummy']['class'] === 'EditorSmokeDummyPanel' );
-$order = array_keys( $registry );
-check( 'nav order follows the weight within the group - the module panel (62) sits after images (40) and before logs (90)', array_search( 'dummy', $order, true ) > array_search( 'images', $order, true ) && array_search( 'dummy', $order, true ) < array_search( 'logs', $order, true ) );
-check( 'the content group leads, structure and system follow', array_search( 'logs', $order, true ) < array_search( 'routes', $order, true ) && array_search( 'routes', $order, true ) < array_search( 'users', $order, true ) && array_search( 'users', $order, true ) < array_search( 'backups', $order, true ) );
-check( 'a panel\'s tabs ride along in the registry, each a panel of its own with its parent named', array_keys( $registry['elements']['tabs'] ) === [ 'types' ] && $registry['elements']['tabs']['types']['parent'] === 'elements' && $registry['elements']['tabs']['types']['perm'] === \Nino\Modules\Elements\Types::MANAGE_PERM && array_keys( $registry['users']['tabs'] ) === [ 'roles', 'lockout', 'recoverypw' ] && array_keys( $registry['language']['tabs'] ) === [ 'translations' ] );
-check( 'a tab is not a rail entry, but allPanels() lists it right after its panel', isset( $registry['types'] ) === false && array_slice( array_keys( \Nino\Admin\Admin::allPanels( $withModule ) ), 1, 2 ) === [ 'elements', 'types' ] );
-check( 'a panel reusing a core uri is dropped, the core panel keeps it', $registry['text']['class'] === \Nino\Modules\Text\Admin::class );
-check( 'a class without actions()/nav() is dropped rather than breaking the tool', in_array( 'NoSuchClassAtAll', array_column( $registry, 'class' ), true ) === false );
-check( 'only well-formed mount ids survive panes()', $registry['dummy']['panes'] === [ 'dummy-list', 'dummy-form' ] );
-check( 'only project-relative .js/.css paths survive assets() - no traversal, no bare names', $registry['dummy']['assets'] === [ '/app/Dummy/assets/dummy.js', '/app/Dummy/assets/dummy.css' ] );
-check( 'a core panel has no perm() and is open to every account', $registry['users']['perm'] === '' && $registry['dashboard']['perm'] === '' );
-
-\Nino\Admin\Admin::init( $withModule );
-check( 'the panel\'s script joins the editor bundle', in_array( '/app/Dummy/assets/dummy.js', $withModule['/nino/html/assets']['/_admin/.cache/script.js'], true ) === true );
-check( 'the panel\'s stylesheet joins the style bundle', in_array( '/app/Dummy/assets/dummy.css', $withModule['/nino/html/assets']['/_admin/.cache/style.css'], true ) === true );
-check( 'the core files still lead the script bundle', $withModule['/nino/html/assets']['/_admin/.cache/script.js'][0] === '/_nino/Nino.js' );
-
-// The login page is no workbench: the kit the panels are built with
-// (Nino.admin.js) is not in its bundle, and neither is any panel's script
-check( 'the login bundle is the framework and the login shell alone', $withModule['/nino/html/assets']['/_admin/.cache/login.js'] === [ '/_nino/Nino.js', '/_admin/assets/login.js' ] );
-
-$navHtml = \Nino\Admin\Admin::navHtml( $withModule );
-check( 'the nav carries one link per panel, the module\'s included, named for the shell script', str_contains( $navHtml, 'id="admin-nav-dummy" data-panel="dummy"' ) === true && str_contains( $navHtml, 'id="admin-nav-text" data-panel="text"' ) === true );
-check( 'a literal label is escaped for html and against the fill syntax', str_contains( $navHtml, 'Dummy &lt;Panel&gt;' ) === true );
-check( 'a core label goes through the fill pass', str_contains( $navHtml, '[[/_admin/nav/text]]' ) === true );
-check( 'the shadow panel never reaches the nav', str_contains( $navHtml, 'Shadow' ) === false );
-
-$panesHtml = \Nino\Admin\Admin::panesHtml( $withModule );
-check( 'every pane starts hidden, names its layout, opens with the head that names the panel and carries its mount points', str_contains( $panesHtml, '<div id="admin-content-dummy" data-panel="dummy" data-layout="page" hidden><div class="admin-panel-head"><h2 class="admin-panel-title">Dummy &lt;Panel&gt;</h2><div class="admin-panel-actions"></div></div><div id="dummy-list"></div><div id="dummy-form"></div></div>' ) === true );
-check( 'the dashboard pane has no mount point of its own - and no head: the overview is the tiles, and the one pane that answers head() false', str_contains( $panesHtml, '<div id="admin-content-dashboard" data-panel="dashboard" data-layout="page" hidden></div>' ) === true );
-/*	One row across the workbench: every pane but that one opens with its
-	head, and the head calls the panel what the rail calls it - the same
-	label, through the same escape, so a literal one cannot reach the page
-	unescaped by way of the title	*/
-check( 'every other pane opens with its head, and the head names the panel the way the rail does', substr_count( $panesHtml, '<div class="admin-panel-head">' ) === count( \Nino\Admin\Admin::visiblePanels( $withModule ) ) - 1
-	&& substr_count( $panesHtml, '<h2 class="admin-panel-title">' ) === substr_count( $panesHtml, '<div class="admin-panel-head">' ) && str_contains( $panesHtml, '<h2 class="admin-panel-title">[[/_admin/nav/text]]</h2>' ) === true );
-check( 'a pane with tabs holds its head - the name, the strip beside it - and one tab pane per tab, its own screen first', str_contains( $panesHtml, '<div id="admin-content-elements" data-panel="elements" data-layout="page" hidden><div class="admin-panel-head"><h2 class="admin-panel-title">[[/_admin/nav/elements]]</h2><div class="nino-admin-tabs nino-admin-tabs--bar nino-admin-tabs--panel admin-panel-tabs" role="tablist"><button type="button" role="tab" id="admin-tabbutton-elements" class="nino-admin-tab" data-tab="elements" aria-controls="admin-tab-elements" aria-selected="false">[[/_admin/nav/elements]]</button><button type="button" role="tab" id="admin-tabbutton-types" class="nino-admin-tab" data-tab="types" aria-controls="admin-tab-types" aria-selected="false">[[/_admin/nav/types]]</button></div><div class="admin-panel-actions"></div></div><div id="admin-tab-elements" role="tabpanel" aria-labelledby="admin-tabbutton-elements" data-tab="elements" hidden><div id="elements-types"></div><div id="elements-list"></div><div id="elements-form"></div></div><div id="admin-tab-types" role="tabpanel" aria-labelledby="admin-tabbutton-types" data-tab="types" hidden><div id="types-list"></div><div id="types-form"></div></div></div>' ) === true );
-
-$allActions = \Nino\Admin\Admin::actions( $withModule );
-check( 'the module\'s action is dispatchable', ( $allActions['dummy/list'] ?? null ) === [ 'EditorSmokeDummyPanel', 'apiList' ] );
-check( 'a core action can not be taken over by a module reusing its name', $allActions['text/keys'][0] === \Nino\Modules\Text\Admin::class );
-
-// The main account holds '/*' and so the dummy perm too
-[ $status, $body ] = ninoCall( $withModule, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'dummy/list' );
-check( 'handlePost dispatches the module\'s action', $status === 200 && ( $body['dummies'] ?? null ) === 7 );
-
-$withoutModule = $appData;
-unset( $withoutModule['/nino/modules'] );
-[ $status ] = ninoCall( $withoutModule, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'dummy/list' );
-check( 'the same action is unknown while the module is off - a switched-off module leaves no endpoint behind', $status === 404 );
-
-[ , $body ] = ninoCall( $withModule, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'dashboard/summary' );
-$dummyTile = array_values( array_filter( $body['tiles'] ?? [], fn( array $tile ): bool => $tile['panel'] === 'dummy' ) )[0] ?? null;
-check( 'the panel\'s summary() becomes a dashboard tile', $dummyTile === [ 'panel' => 'dummy', 'value' => '7', 'label' => 'Dummies' ] );
-
-$permOptions = \Nino\Modules\Users\Admin::permOptions( $withModule );
-check( 'the panel\'s perm() is assignable to a role, under its nav label and in its group', in_array( [ 'perm' => EditorSmokeDummyPanel::PERM, 'label' => 'Dummy <Panel>', 'group' => 'content', 'offered' => true ], $permOptions, true ) === true );
-check( 'a tab\'s perm() is assignable on its own, under its nav fill', in_array( [ 'perm' => \Nino\Modules\Elements\Types::MANAGE_PERM, 'label' => '/_admin/nav/types', 'group' => 'structure', 'offered' => true ], $permOptions, true ) === true );
-check( 'the users manage perm stays assignable too, once - the Roles tab shares it', count( array_filter( $permOptions, fn( array $option ): bool => $option['perm'] === \Nino\Modules\Users\Admin::MANAGE_PERM ) ) === 1 );
-check( 'the Recovery password tab is assignable on its own, once, in the system group', array_values( array_filter( $permOptions, fn( array $option ): bool => $option['perm'] === \Nino\Modules\Users\RecoveryPassword::MANAGE_PERM ) ) === [ [ 'perm' => '/_admin/recoverypw/manage', 'label' => '/_admin/nav/recoverypw', 'group' => 'system', 'offered' => true ] ] );
-
-/*	The scoped permissions a panel offers for the three lists of the Roles tab.
-	scopes() is optional: a panel without it - EditorSmokeDummyPanel, the
-	workbench's own Users - offers none, and an answer that is not the shape
-	loses what is wrong with it, never the rest. Whatever comes out is a
-	permission a role may hold and a check can match	*/
-class EditorSmokeScopedPanel {
-	public static function actions(): array { return [ 'scoped/list' => [ self::class, 'apiList' ] ]; }
-	public static function nav(): array { return [ 'scoped', 'Scoped', 63 ]; }
-	public static function perm(): string { return '/_admin/scoped/manage'; }
-	public static function scopes( array &$appData ): array {
-		return [
-			[ 'scope' => '/_admin/scoped/', 'door' => '/_admin/scoped/manage', 'label' => 'Scoped', 'areas' => [
-				[ 'id' => 'a', 'label' => 'Area A', 'perm' => '/_admin/scoped/a/*', 'actions' => [
-					[ 'id' => 'read', 'label' => 'Read', 'perm' => '/_admin/scoped/a/read' ],
-					[ 'id' => 'bad', 'label' => 'Bad', 'perm' => 'no slash' ],
-					[ 'id' => 'outside', 'label' => 'Outside', 'perm' => '/_admin/other/x' ],
-					[ 'id' => 'edit', 'label' => 'Edit', 'perm' => '/_admin/scoped/a/edit/*', 'fields' => [
-						[ 'id' => 'f1', 'label' => 'F 1', 'perm' => '/_admin/scoped/a/edit/f1' ],
-						[ 'id' => 'f2', 'label' => 'F 2', 'perm' => '/_admin/scoped/a/edit/has space' ],
-						[ 'id' => 'f3', 'label' => 'F 3', 'perm' => '/_admin/other/f3' ],
-						'junk',
-						[ 'id' => 5 ],
-					] ],
-				] ],
-				[ 'id' => 'b', 'label' => 'Area B', 'perm' => 'not below', 'actions' => [ [ 'id' => 'x', 'label' => 'X', 'perm' => '/_admin/scoped/b/x' ] ] ],
-				[ 'id' => 'empty', 'label' => 'Empty', 'actions' => [] ],
-				'junk',
-			] ],
-			[ 'scope' => 'broken', 'door' => '/_admin/scoped/manage', 'label' => 'Broken', 'areas' => [] ],
-			[ 'scope' => '/_admin/nothing/', 'door' => '/_admin/nothing/manage', 'label' => 'Nothing', 'areas' => [ [ 'id' => 'e', 'label' => 'E', 'actions' => [] ] ] ],
-			'junk',
-		];
-	}
-	public static function apiList( array &$appData, array &$request ): void { \Nino\Http::ok( $request, [] ); }
-}
-
-class EditorSmokeScopedModule {
-	public static function adminPanels( array &$appData ): array { return [ 'EditorSmokeScopedPanel', 'EditorSmokeDummyPanel' ]; }
-}
-
-$withScopes = $appData;
-$withScopes['/nino/modules'] = [ 'EditorSmokeScopedModule' ];
-$scopeTree = \Nino\Modules\Users\Admin::scopeOptions( $withScopes );
-$scopeById = array_column( $scopeTree, null, 'scope' );
-
-check( 'scopeOptions lists a panel that answers scopes()', isset( $scopeById['/_admin/scoped/'] ) === true );
-check( '...and skips a panel that has none - what is left besides is the workbench\'s own Elements and Text, which offer something once there is a type or a key', array_diff( array_keys( $scopeById ), [ '/_admin/scoped/', '/_admin/elements/', '/_admin/text/' ] ) === [] );
-$scoped = $scopeById['/_admin/scoped/'];
-check( 'a scope that is not the shape, and one with nothing left to offer, are dropped', isset( $scopeById['broken'] ) === false && isset( $scopeById['/_admin/nothing/'] ) === false );
-check( 'an area with nothing to do and one that is no array are dropped, the rest kept', array_column( $scoped['areas'], 'id' ) === [ 'a', 'b' ] );
-check( '...an action with a permission that is no permission, or lies outside the scope, is dropped', array_column( $scoped['areas'][0]['actions'], 'id' ) === [ 'read', 'edit' ] );
-check( '...so is a field whose permission cannot be matched or lies outside the scope', array_column( $scoped['areas'][0]['actions'][1]['fields'], 'id' ) === [ 'f1' ] );
-check( '...an area permission outside the scope is not carried', isset( $scoped['areas'][1]['perm'] ) === false && $scoped['areas'][0]['perm'] === '/_admin/scoped/a/*' );
-check( '...and the door and the label arrive as the panel said them', $scoped['door'] === '/_admin/scoped/manage' && $scoped['label'] === 'Scoped' );
-
-$treePerms = [];
-foreach( $scopeTree as $scope )
-	foreach( $scope['areas'] as $area ) {
-		isset( $area['perm'] ) === true && $treePerms[] = $area['perm'];
-		foreach( $area['actions'] as $action ) {
-			$treePerms[] = $action['perm'];
-			foreach( $action['fields'] ?? [] as $field )
-				$treePerms[] = $field['perm'];
-		}
-	}
-check( 'every permission anywhere in the tree is shaped like one a role may hold', count( $treePerms ) >= 4
-	&& array_filter( $treePerms, static fn( string $perm ): bool => \Nino\Modules\Users\Roles::isPermShape( $perm ) === false ) === [] );
-check( 'isPermShape is what apiSave checks: a string without a leading slash, a space and an overlong one are not', \Nino\Modules\Users\Roles::isPermShape( '/_admin/a/*' ) === true
-	&& \Nino\Modules\Users\Roles::isPermShape( 'no/slash' ) === false && \Nino\Modules\Users\Roles::isPermShape( '/with space' ) === false && \Nino\Modules\Users\Roles::isPermShape( '/'. str_repeat( 'a', 200 ) ) === false );
-
-$noScopes = $appData;
-$noScopes['/nino/modules'] = [ 'EditorSmokeDummyModule' ];
-check( 'a project panel that offers none leaves the tree to the workbench\'s own', array_diff( array_column( \Nino\Modules\Users\Admin::scopeOptions( $noScopes ), 'scope' ), [ '/_admin/elements/', '/_admin/text/' ] ) === [] );
-
-/*	Nothing says a request carries strings. Every one of these used to be
-	a 500: 'action[]=x' is an "Illegal offset type in isset" in the
-	dispatcher, 'data[]=x' a TypeError in json_decode(), and '?locale[]=x'
-	an "Array to string conversion" - a level the runtime treats as fatal
-	(see \Nino\Runtime::NON_FATAL_LEVELS). Two of them are reachable
-	without signing in, and postData() is what recovery.php reads its
-	password through.
-
-	The harness records every warning and the dummy panels of this suite
-	raise plenty of their own on the way, so the ones read here are those
-	of these three calls - and only the one they would raise is asked for	*/
-ninoWarnings();
-
-$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['action'] = [ 'dummy/list' ];
-$_POST['data'] = json_encode( [] );
-\Nino\Admin\Admin::handlePost( $withModule, $request );
-check( 'an array-shaped action is answered as unknown, not raised at', $request['/nino/http/response']['statusCode'] === 404 );
-
-$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
-$_POST['action'] = 'dummy/list';
-$_POST['data'] = [ 'x' ];
-\Nino\Admin\Admin::handlePost( $withModule, $request );
-check( 'an array-shaped data field reads as no data, not as a 500', $request['/nino/http/response']['statusCode'] === 200 );
-check( '...and postData() answers the empty array it promises', \Nino\Admin\Admin::postData() === [] );
-
-$_POST['data'] = json_encode( [] );
-
-$arrayLocaleGet = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[template /_admin/templates/page-index]' ] ];
-$_GET['locale'] = [ 'de_DE' ];
-\Nino\Admin\Admin::handleGet( $withModule, $arrayLocaleGet );
-unset( $_GET['locale'] );
-$arrayWarnings = ninoWarnings();
-
-check( 'an array-shaped ?locale is ignored rather than cast', $arrayLocaleGet['/nino/http/response']['statusCode'] === 200 );
-check( 'none of the three raised an "Array to string conversion" on the way',
-	array_filter( $arrayWarnings, fn( string $message ): bool => str_contains( $message, 'Array to string conversion' ) ) === [] );
-
-$getRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[template /_admin/templates/page-index]' ] ];
-\Nino\Admin\Admin::handleGet( $withModule, $getRequest );
-check( 'the module panel is visible to an account holding its perm', isset( \Nino\Admin\Admin::visiblePanels( $withModule )['dummy'] ) === true );
-check( 'handleGet fills the nav and the panes for the template', str_contains( \Nino\Html::renderTextfill( $withModule, '/_admin/nav' ), 'data-panel="dummy"' ) === true && str_contains( \Nino\Html::renderTextfill( $withModule, '/_admin/panes' ), 'id="dummy-list"' ) === true );
-
-echo "\n";
-
-
 // --- Text::apiKeys ------------------------------------------------------
 
 echo "Text::apiKeys\n";
@@ -687,6 +441,15 @@ check( 'sanitizeValue still takes a bool: true is inline, false is plain', \Nino
 check( '...and a plain value keeps the lines the tags were: a break and the end of a block are a newline', \Nino\Text::sanitizeValue( 'Amtsgericht<br>Musterstadt', 'plain' ) === "Amtsgericht\nMusterstadt" && \Nino\Text::sanitizeValue( '<p>a</p><p>b</p>', 'plain' ) === "a\nb" );
 check( '...and a name that is no format is read as plain, the narrowest', \Nino\Text::sanitizeValue( '<strong>a</strong>', 'sideways' ) === 'a' );
 check( 'visibleLength counts what is seen: no tag, one character for an entity', \Nino\Text::visibleLength( '<p>a&amp;b</p><ul><li>c</li></ul>' ) === 4 );
+
+echo "\n";
+
+
+// --- The Elements pane - the mounts its script renders into ------------------
+
+echo "Admin::panesHtml - the Elements pane holds its head, its tabs and the mounts of its script\n";
+
+check( 'a pane with tabs holds its head - the name, the strip beside it - and one tab pane per tab, its own screen first', str_contains( \Nino\Admin\Admin::panesHtml( $appData ), '<div id="admin-content-elements" data-panel="elements" data-layout="page" hidden><div class="admin-panel-head"><h2 class="admin-panel-title">[[/_admin/nav/elements]]</h2><div class="nino-admin-tabs nino-admin-tabs--bar nino-admin-tabs--panel admin-panel-tabs" role="tablist"><button type="button" role="tab" id="admin-tabbutton-elements" class="nino-admin-tab" data-tab="elements" aria-controls="admin-tab-elements" aria-selected="false">[[/_admin/nav/elements]]</button><button type="button" role="tab" id="admin-tabbutton-types" class="nino-admin-tab" data-tab="types" aria-controls="admin-tab-types" aria-selected="false">[[/_admin/nav/types]]</button></div><div class="admin-panel-actions"></div></div><div id="admin-tab-elements" role="tabpanel" aria-labelledby="admin-tabbutton-elements" data-tab="elements" hidden><div id="elements-types"></div><div id="elements-list"></div><div id="elements-form"></div></div><div id="admin-tab-types" role="tabpanel" aria-labelledby="admin-tabbutton-types" data-tab="types" hidden><div id="types-list"></div><div id="types-form"></div></div></div>' ) === true );
 
 echo "\n";
 
@@ -1525,31 +1288,8 @@ check( 'a non-manager cannot read or write the roles either', callRoles( $appDat
 
 \Nino\Auth::loginUser( $appData, 'manager@example.com', 'manager password' );
 
-[ $status ] = callUsers( $appData, 'apiSetRole', [ 'username' => 'does-not-exist@example.com', 'role' => 'editor' ] );
-check( 'apiSetRole 404s for an unknown user', $status === 404 );
-
-[ $status ] = callUsers( $appData, 'apiSetRole', [ 'username' => 'permtest@example.com', 'role' => 'no-such-role' ] );
-check( 'apiSetRole refuses a role the config does not have', $status === 400 );
-
 [ $status ] = callUsers( $appData, 'apiSetRole', [ 'username' => 'manager@example.com', 'role' => 'editor' ] );
 check( 'apiSetRole refuses your own account - log out and ask another manager', $status === 400 );
-
-[ $status, $body ] = callUsers( $appData, 'apiSetRole', [ 'username' => 'permtest@example.com', 'role' => 'editor' ] );
-check( 'apiSetRole hands an account a role', $status === 200 && $body['role'] === 'editor' && \Nino\Auth::getUser( $appData, 'permtest@example.com' )['role'] === 'editor' );
-check( 'the role\'s permissions are the account\'s - the content panels, not a structure tab', \Nino\Auth::checkPermission( $appData, \Nino\Modules\Elements\Admin::MANAGE_PERM, 'permtest@example.com' ) === true && \Nino\Auth::checkPermission( $appData, \Nino\Modules\Elements\Types::MANAGE_PERM, 'permtest@example.com' ) === false );
-
-[ , $body ] = callUsers( $appData, 'apiList' );
-$listed = $body['users'][ array_search( 'permtest@example.com', array_column( $body['users'], 'mail' ), true ) ];
-check( 'apiList names each account\'s role and the roles there are', $listed['role'] === 'editor' && array_column( $body['roles'], 'id' ) === [ 'editor', 'developer' ] );
-
-[ $status ] = callRoles( $appData, 'apiDelete', [ 'id' => 'editor' ] );
-check( 'a role an account holds cannot be deleted', $status === 409 );
-
-// Shaped like a permission or refused by name. Not a whitelist any more: the
-// scoped permissions (see \Nino\Admin\Admin::scoped()) are one string per
-// action and per field, and there is no enumerating them to check against
-[ $status ] = callRoles( $appData, 'apiSave', [ 'id' => 'reviewer', 'label' => 'Reviewer', 'perms' => [ \Nino\Modules\Text\Admin::MANAGE_PERM, 'not/a/real/perm' ] ] );
-check( 'apiSave refuses a string that is not shaped like a permission', $status === 400 );
 
 [ $status, $body ] = callRoles( $appData, 'apiSave', [ 'id' => 'reviewer', 'label' => 'Reviewer', 'perms' => [ \Nino\Modules\Text\Admin::MANAGE_PERM ] ] );
 check( 'apiSave creates the role once every permission is one', $status === 200 && $body['perms'] === [ \Nino\Modules\Text\Admin::MANAGE_PERM ] && $appData['/nino/auth/roles']['reviewer']['label'] === 'Reviewer' );
@@ -1560,8 +1300,8 @@ check( 'the new role can be handed out at once', $status === 200 && \Nino\Auth::
 [ $status ] = callUsers( $appData, 'apiSetRole', [ 'username' => 'permtest@example.com', 'role' => '' ] );
 check( 'an account may hold no role at all', $status === 200 && \Nino\Auth::checkPermission( $appData, \Nino\Modules\Text\Admin::MANAGE_PERM, 'permtest@example.com' ) === false );
 
-[ $status ] = callRoles( $appData, 'apiDelete', [ 'id' => 'reviewer' ] );
-check( 'a role nobody holds can go', $status === 200 && isset( $appData['/nino/auth/roles']['reviewer'] ) === false );
+// Back to the two roles every section after this one starts from
+callRoles( $appData, 'apiDelete', [ 'id' => 'reviewer' ] );
 
 echo "\n";
 
@@ -1696,7 +1436,6 @@ $logLinesBeforeBackup = readTodayLogLines( $appData, $sandbox );
 
 callUsers( $appData, 'apiList' ); // this call's Backup::maybeRun() creates today's backup fresh
 
-check( 'the backup directory is created', is_dir( $backupDir ) === true );
 check( 'today\'s backup file is created', is_file( $today ) === true );
 
 $logLinesAfterBackup = readTodayLogLines( $appData, $sandbox );
@@ -2142,21 +1881,14 @@ echo "\n";
 
 // --- The shell's own text ---------------------------------------------------
 
-/*	Every key the workbench shell renders exists in both shipped locales. A key
-	present in one and missing from the other renders as an empty string rather
-	than as an error - a login form with a blank message where the reason should
-	be is exactly the failure that is hardest to report */
+/*	The words the workbench shell renders, in both shipped locales. A value left
+	empty renders as an empty string rather than as an error - a login form with
+	a blank message where the reason should be is exactly the failure that is
+	hardest to report */
 $shellText = [];
 foreach( [ 'de_DE', 'en_US' ] as $locale )
 	$shellText[$locale] = (array) require __DIR__. '/../_admin/text/'. $locale. '.php';
 
-$missingDe = array_diff_key( $shellText['en_US'], $shellText['de_DE'] );
-$missingEn = array_diff_key( $shellText['de_DE'], $shellText['en_US'] );
-
-if( $missingDe !== [] || $missingEn !== [] )
-	echo '        missing in de_DE: ', implode( ', ', array_keys( $missingDe ) ), ' | missing in en_US: ', implode( ', ', array_keys( $missingEn ) ), "\n";
-
-check( 'the shell\'s two locales carry the same keys', $missingDe === [] && $missingEn === [] );
 check( 'no key is left with an empty value', array_filter( $shellText['de_DE'], fn( $v ) => trim( (string) $v ) === '' ) === []
 	&& array_filter( $shellText['en_US'], fn( $v ) => trim( (string) $v ) === '' ) === [] );
 

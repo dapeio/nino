@@ -4398,8 +4398,14 @@ $jstextTable = jstextTable( $appData );
 check( 'the inline block carries the words the shipped scripts ask for', ( $jstextTable['/module/form/info/success'] ?? null ) === 'Danke!' );
 check( '...and not the mailbox a form delivers to, nor the rest of the site\'s text', isset( $jstextTable['/project/mail/address/owner'] ) === false
 	&& isset( $jstextTable['/project/company/contact/street'] ) === false );
+// What the module publishes when nobody asked for more is its private DEFAULT_KEYS,
+// and the public script's words are read against exactly those
+$jstextGroups = ( new ReflectionClassConstant( '\Nino\Modules\Jstext', 'DEFAULT_KEYS' ) )->getValue();
 check( 'the three groups are the form\'s messages, the newsletter\'s and the slider\'s words - and a label like the phone\'s is none of them', ( $jstextTable['/template/common/slider/prev'] ?? null ) === 'Zurück'
-	&& ( $jstextTable['/feature/newsletter/info/success'] ?? null ) === 'Eingetragen' && isset( $jstextTable['/template/common/label/phone'] ) === false );
+	&& ( $jstextTable['/feature/newsletter/info/success'] ?? null ) === 'Eingetragen' && isset( $jstextTable['/template/common/label/phone'] ) === false
+	&& $jstextGroups === [ '/module/form/info/', '/feature/newsletter/info/', '/template/common/slider/' ] );
+check( 'the public script asks for exactly those groups', preg_match_all( '/getText\(\s*\'(\/[^\']*)\'/', (string) file_get_contents( __DIR__. '/../_nino/Nino.ui.js' ), $jstextAsked ) > 0
+	&& array_filter( $jstextAsked[1], static fn( string $key ): bool => array_filter( $jstextGroups, static fn( string $group ): bool => str_starts_with( $key, $group ) ) === [] ) === [] );
 
 // The nonce belongs in the script tag and the policy, nowhere else: no script
 // reads it from the table, and every copy of it is one more place a stored

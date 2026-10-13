@@ -168,11 +168,12 @@ check( 'every class the script writes onto <body> is in the nino- namespace'+ ( 
 	burger menu, the toast, the preloader's one-second fade. A clamp on every
 	element is what covers the next component too	*/
 const publicCss = fs.readFileSync( path.join( __dirname, '../_nino/Nino.css' ), 'utf8' );
-const reduceBlock = publicCss.slice( publicCss.lastIndexOf('@media (prefers-reduced-motion: reduce) {') );
+const reduceBlock = ( publicCss.match( /@media \(prefers-reduced-motion: reduce\) \{(.*?)\n\}/s ) || [ '', '' ] )[1];
 check( 'the stylesheet clamps every transition and animation, not a named few',
 	/\*,\s*\*::before,\s*\*::after \{[^}]*animation-duration: \.01ms !important;[^}]*transition-duration: \.01ms !important;/s.test( reduceBlock ) );
 check( '...and the three that run forever are still stopped outright, after the clamp',
-	reduceBlock.indexOf('animation: none !important;') > reduceBlock.indexOf('transition-duration: .01ms !important;') );
+	reduceBlock.indexOf('animation: none !important;') > reduceBlock.indexOf('transition-duration: .01ms !important;')
+	&& reduceBlock.includes('.nino-hero-arrowdown') && reduceBlock.includes('.nino-fx-vertical-bounce') );
 
 /*	The base site ships no cookie banner. Consent is the Consent feature's job:
 	it owns the choice, its storage and the event. A kernel that kept a second

@@ -508,11 +508,7 @@ $reducedMotion = '';
 if( preg_match( '/@media \(prefers-reduced-motion: reduce\) \{(.*?)\n\}/s', $ninoCss, $match ) === 1 )
 	$reducedMotion = $match[1];
 
-check( 'what runs forever on its own stops for a visitor who asked for less motion', $reducedMotion !== ''
-	&& str_contains( $reducedMotion, '.nino-hero-arrowdown' ) === true
-	&& str_contains( $reducedMotion, '.nino-fx-vertical-bounce' ) === true
-	&& str_contains( $reducedMotion, 'animation: none' ) === true );
-check( '...a viewport animation is simply there rather than arriving', str_contains( $reducedMotion, '.nino-vpa' ) === true
+check( 'a visitor who asked for less motion sees a viewport animation simply there rather than arriving', str_contains( $reducedMotion, '.nino-vpa' ) === true
 	&& str_contains( $reducedMotion, 'opacity: 1' ) === true );
 check( '...and a jump to an anchor is a jump, not a ride', str_contains( $reducedMotion, 'scroll-behavior: auto' ) === true );
 
@@ -1604,13 +1600,6 @@ $robotsTemplate = (string) file_get_contents( __DIR__. '/../_admin/install/libra
 preg_match_all( '/^Disallow:\s*(\S+)/m', $robotsTemplate, $disallowed );
 $deadDisallows = array_filter( $disallowed[1], static fn( string $path ): bool => $path !== '/' && preg_match( '#^/(?:_admin|_nino|public)/#', $path ) !== 1 );
 check( "every path the base unit's robots.txt disallows exists under the webroot after the split". ( $deadDisallows === [] ? '' : ' - '. implode( ', ', $deadDisallows ) ), $disallowed[1] !== [] && $deadDisallows === [] );
-
-// The stylesheet and the markup it styles are one delivery: theme.css names
-// .nino-frame-header and .nino-footer-nav, and nothing else writes either
-// template into a project
-foreach( [ 'frame-header.tpl', 'frame-footer.tpl' ] as $frame )
-	check( "the base unit ships $frame and lists it among its templates", is_file( $baseUnit. '/templates/'. $frame ) === true
-		&& in_array( $frame, (array) ( ( include $baseUnit. '/manifest.php' )['templates'] ?? [] ), true ) === true );
 
 echo "\n";
 

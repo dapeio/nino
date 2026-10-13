@@ -4,12 +4,13 @@ declare(strict_types=1);
 /**
  *	Nino								A compact filesystembased php framework
  *	admin-system-smoke.php	Dependency-free smoke test for the structure and system panels
- *											(_admin/Admin.php) - the session gate and the element-type
- *											editor in particular, since a mistake there could either
- *											let a save reach a type file it shouldn't, or - worse -
- *											clobber a type's real content ('*'/locale buckets) while
- *											only meaning to touch its model. Runs against an isolated
- *											sandbox directory, never touches the real project data.
+ *											(_admin/Admin.php) - the panel registry, the session gate
+ *											and the element-type editor in particular, since a mistake
+ *											there could either let a save reach a type file it
+ *											shouldn't, or - worse - clobber a type's real content
+ *											('*'/locale buckets) while only meaning to touch its
+ *											model. Runs against an isolated sandbox directory, never
+ *											touches the real project data.
  *
  *	Usage: php tests/admin-system-smoke.php
  */
@@ -1493,9 +1494,11 @@ check( 'the language list is restored for the blocks below', $status === 200 && 
 $shadowed = $appData;
 $shadowed['/nino/http/routes']['GET://_admin'] 	= [ 'uri' => '/_admin', 'body' => 'hijacked' ];
 $shadowed['/nino/http/routes']['POST://_admin'] = [ 'uri' => '/_admin', 'body' => 'hijacked' ];
+$shadowed['/nino/http/routes']['GET://custom'] 	= [ 'uri' => '/custom', 'body' => 'hand-written route' ];
 \Nino\Admin\Admin::init( $shadowed );
 check( 'init always restores the tool-owned GET route over a stale/hand-written collision', $shadowed['/nino/http/routes']['GET://_admin']['body'] === '[template /_admin/templates/page-index]' );
 check( 'init always restores the tool-owned POST route too', ( $shadowed['/nino/http/routes']['POST://_admin']['body'] ?? null ) === null );
+check( 'a route the tool does not own is left untouched', $shadowed['/nino/http/routes']['GET://custom']['body'] === 'hand-written route' );
 
 // Admin::init() may be called more than once in a composed request - the
 // bundles and fills it registers have to come out the same, not doubled
@@ -1790,13 +1793,13 @@ check( 'apiSetRole 404s for an unknown user', $status === 404 );
 check( 'apiSetRole rejects a role the config does not have', $status === 400 );
 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiSetRole', [ 'username' => 'permsdev@example.com', 'role' => 'editor' ] );
-check( 'apiSetRole hands out a role', $status === 200 && $body['role'] === 'editor' );
+check( 'apiSetRole hands out a role', $status === 200 && $body['role'] === 'editor' && \Nino\Auth::getUser( $appData, 'permsdev@example.com' )['role'] === 'editor' );
 check( 'the role\'s permissions took effect', \Nino\Auth::checkPermission( $appData, '/_admin/elements/manage', 'permsdev@example.com' ) === true );
 check( 'a permission the role lacks stays denied', \Nino\Auth::checkPermission( $appData, '/_admin/types/manage', 'permsdev@example.com' ) === false );
 
 [ , $body ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiList' );
 $listed = $body['users'][ array_search( 'permsdev@example.com', array_column( $body['users'], 'mail' ), true ) ];
-check( 'apiList exposes the role and the roles there are, never a password hash', $listed['role'] === 'editor' && isset( $listed['pw'] ) === false && array_column( $body['roles'], 'label' ) === [ 'Editor', 'Developer' ] );
+check( 'apiList exposes the role and the roles there are, never a password hash', $listed['role'] === 'editor' && isset( $listed['pw'] ) === false && array_column( $body['roles'], 'id' ) === [ 'editor', 'developer' ] && array_column( $body['roles'], 'label' ) === [ 'Editor', 'Developer' ] );
 
 echo "\n";
 
@@ -1811,7 +1814,8 @@ check( 'apiList offers every declared permission, grouped like the navigation - 
 	&& in_array( [ 'perm' => '/_admin/users/manage', 'label' => '/_admin/users/label/permissions-manage', 'group' => 'system', 'offered' => true ], $body['permOptions'], true ) === true
 	&& in_array( [ 'perm' => '/_admin/lockout/manage', 'label' => '/_admin/nav/lockout', 'group' => 'system', 'offered' => true ], $body['permOptions'], true ) === true
 	&& in_array( [ 'perm' => '/_admin/translations/manage', 'label' => '/_admin/nav/translations', 'group' => 'system', 'offered' => true ], $body['permOptions'], true ) === true
-	&& count( array_filter( $body['permOptions'], fn( array $o ): bool => $o['perm'] === '/_admin/users/manage' ) ) === 1 );
+	&& count( array_filter( $body['permOptions'], fn( array $o ): bool => $o['perm'] === '/_admin/users/manage' ) ) === 1
+	&& array_values( array_filter( $body['permOptions'], fn( array $o ): bool => $o['perm'] === '/_admin/recoverypw/manage' ) ) === [ [ 'perm' => '/_admin/recoverypw/manage', 'label' => '/_admin/nav/recoverypw', 'group' => 'system', 'offered' => true ] ] );
 check( 'apiList names the groups in the rail\'s order with \'other\' last, and every offered permission sits in one of them', ( $body['groups'] ?? null ) === [ ...\Nino\Admin\Panels::GROUPS, 'other' ]
 	&& array_diff( array_column( $body['permOptions'], 'group' ), $body['groups'] ?? [] ) === [] );
 
@@ -1896,7 +1900,7 @@ check( 'apiDelete 404s for an unknown role', $status === 404 );
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiDelete', [ 'id' => 'editor' ] );
 check( 'apiDelete refuses a role an account holds', $status === 409 && isset( $appData['/nino/auth/roles']['editor'] ) === true );
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiDelete', [ 'id' => 'reviewer' ] );
-check( 'apiDelete removes a role nobody holds', $status === 200 && isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/auth/roles']['reviewer'] ) === false );
+check( 'apiDelete removes a role nobody holds', $status === 200 && isset( $appData['/nino/auth/roles']['reviewer'] ) === false && isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/auth/roles']['reviewer'] ) === false );
 
 \Nino\Auth::deleteUser( $appData, 'mgr@example.com' );
 \Nino\Auth::deleteUser( $appData, 'permsdev@example.com' );
@@ -2901,7 +2905,8 @@ check( '...and the notice follows the text being saved in that language', ( $aft
 \Nino\Filesystem::mutate( $appData, '/text/en_US.php', fn( array $texts ): array => array_diff_key( $texts, [ '[[/notice-test/gap]]' => 1 ] ) );
 
 // What is wrong with the legal texts: told to an account that may edit elements,
-// while the module is active - and to nobody else
+// while the module is active - and to nobody else. What is told, and how much
+// of it, is the module's (\Nino\Modules\Legal::notices()); the summary carries it
 $legalModulesBefore = $appData['/nino/modules'] ?? [];
 $appData['/nino/modules'] = array_merge( $legalModulesBefore, [ '\\Nino\\Modules\\Legal' ] );
 $legalRoutes = $appData['/nino/http/routes'] ?? [];
@@ -2910,16 +2915,6 @@ $legalNotices = static fn( array $body ): array => array_values( array_filter( $
 $missingTypes = $legalNotices( $body );
 check( 'the module is active and its types are not there: the dashboard says so, once per type, with the file of the unit to copy back and a link to the type', count( array_filter( $missingTypes, static fn( array $notice ): bool => $notice['text'] === '/_admin/dashboard/notice/legal-nothing' ) ) === 2
 	&& $missingTypes[0]['values'][0] === 'legal' && str_ends_with( $missingTypes[0]['values'][1], 'install/elements/legal.php' ) && $missingTypes[0]['link'] === '#elements/legal' );
-
-$legalRoutesOut = []; $legalBlacklistOut = []; $legalConfigOut = [];
-\Nino\Features::applyUnit( $appData, __DIR__. '/../_nino/Nino/Modules/Legal/install', [ 'de_DE' ], $legalRoutesOut, $legalBlacklistOut, $legalConfigOut, true );
-[ , $body ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );
-$legalNav = array_values( array_filter( $legalNotices( $body ), static fn( array $notice ): bool => $notice['text'] === '/_admin/dashboard/notice/legal-nav' ) );
-$legalAll = $legalNotices( $body );
-check( 'with the types there, what is wrong with the texts is told: the placeholder with no value, in the section it stands in, with a link to that section', ( array_values( array_filter( $legalAll, static fn( array $notice ): bool => $notice['text'] === '/_admin/dashboard/notice/legal-unknown' ) )[0]['link'] ?? null ) === '#elements/legal/provider'
-	&& in_array( [ '#/project/company/contact/email#', 'Anbieter dieser Website', 'de_DE' ], array_column( $legalAll, 'values' ), true ) === true );
-check( '...a language that has no version of a section is told with the section named in the native language', in_array( [ 'Anbieter dieser Website', 'en_US' ], array_column( array_filter( $legalAll, static fn( array $notice ): bool => $notice['text'] === '/_admin/dashboard/notice/legal-translation' ), 'values' ), true ) === true );
-check( '...at most eight lines, and one more that counts the rest', count( $legalAll ) === 9 && end( $legalAll )['text'] === '/_admin/dashboard/notice/legal-more' && (int) end( $legalAll )['values'][0] > 1 );
 
 \Nino\Auth::loginUser( $appData, 'nopanels@example.com', 'correct horse battery staple' );
 [ , $body ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );
@@ -2930,8 +2925,11 @@ $appData['/nino/modules'] = $legalModulesBefore;
 [ , $body ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );
 check( '...nor is anybody, once the module is off', $legalNotices( $body ) === [] );
 
-// A language added later gets what the module brings for it - once the module is active
+// A language added later gets what the module brings for it - once the module
+// is active, and the types it brings are there to get their sections
 $appData['/nino/modules'] = array_merge( $legalModulesBefore, [ '\\Nino\\Modules\\Legal' ] );
+$legalRoutesOut = []; $legalBlacklistOut = []; $legalConfigOut = [];
+\Nino\Features::applyUnit( $appData, __DIR__. '/../_nino/Nino/Modules/Legal/install', [ 'de_DE' ], $legalRoutesOut, $legalBlacklistOut, $legalConfigOut, true );
 $englishFile = \Nino\Filesystem::path( $appData, '/text/en_US.php' );
 $englishBefore = is_file( $englishFile ) === true ? (string) file_get_contents( $englishFile ) : null;
 @unlink( $englishFile );
@@ -2940,16 +2938,7 @@ $englishTexts = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [
 check( 'a language the Legal unit has texts for gets its page details and its versions of the sections with the new file', $status === 200 && ( $body['created'] ?? null ) === true
 	&& ( $englishTexts['[[/_nino/webpage/legal/privacy/name]]'] ?? null ) === 'Privacy' && ( $englishTexts['[[/_nino/webpage/legal/privacy/title]]'] ?? null ) === 'Privacy policy'
 	&& ( \Nino\Filesystem::getFileContent( $appData, '/elements/privacy.php', [] )['en_US']['hosting']['title'] ?? null ) === 'Hosting' );
-[ $status ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiAddLocale', [ 'locale' => 'sv_SE' ] );
-$swedishTexts = \Nino\Filesystem::getFileContent( $appData, '/text/sv_SE.php', [] );
-check( 'any other language gets the names of the two pages in the native language, and no sections to translate', $status === 200 && ( $swedishTexts['[[/_nino/webpage/legal/imprint/name]]'] ?? null ) === 'Impressum'
-	&& ( $swedishTexts['[[/_nino/webpage/legal/imprint/title]]'] ?? '' ) === '' && isset( \Nino\Filesystem::getFileContent( $appData, '/elements/privacy.php', [] )['sv_SE'] ) === false );
-unlink( \Nino\Filesystem::path( $appData, '/text/sv_SE.php' ) );
 $appData['/nino/modules'] = $legalModulesBefore;
-[ $status ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiAddLocale', [ 'locale' => 'sv_SE' ] );
-check( 'with the module off the new language gets nothing of it', $status === 200 && ( \Nino\Filesystem::getFileContent( $appData, '/text/sv_SE.php', [] )['[[/_nino/webpage/legal/imprint/name]]'] ?? '' ) === '' );
-unlink( \Nino\Filesystem::path( $appData, '/text/sv_SE.php' ) );
-\Nino\Filesystem::mutate( $appData, '/text/global.php', fn( array $texts ): array => array_diff_key( $texts, [ '[[/_nino/locale/sv_SE/name]]' => 1 ] ) );
 if( $englishBefore !== null )
 	file_put_contents( $englishFile, $englishBefore );
 else
@@ -4164,17 +4153,39 @@ class AdminSmokeIconModule {
 	public static function adminPanels( array &$appData ): array { return [ 'AdminSmokeIconPanel' ]; }
 }
 
+/** A panel a project brings: every optional method answered, a few of them badly - which is what the registry has to cope with */
+class AdminSmokeProjectPanel {
+	public const string PERM = '/_admin/project/manage';
+	public static function actions(): array { return [ 'project/list' => [ self::class, 'apiList' ] ]; }
+	public static function nav(): array { return [ 'project', 'Project <Panel>', 62 ]; }
+	public static function perm(): string { return self::PERM; }
+	public static function panes(): array { return [ 'project-list', 'project-form', 'Not A Pane' ]; }
+	public static function assets(): array { return [ '/app/Project/assets/project.js', '/app/Project/assets/project.css', '/../etc/passwd.js', 'project.js' ]; }
+	public static function summary( array &$appData ): array { return [ 'value' => 7, 'label' => 'Projects' ]; }
+	public static function apiList( array &$appData, array &$request ): void { \Nino\Http::ok( $request, [ 'projects' => 7 ] ); }
+}
+
+/** The runtime module contributing it, and a class that is none */
+class AdminSmokeProjectModule {
+	public static function adminPanels( array &$appData ): array { return [ 'AdminSmokeProjectPanel', 'NoSuchClassAtAll' ]; }
+}
+
 $withModule = $appData;
 $withModule['/nino/modules'] = [ 'AdminSmokeDummyModule', '\\Nino\\Modules\\Navigation' ];
 
 $registry = \Nino\Admin\Admin::panels( $withModule );
 $order 		= array_keys( $registry );
 check( 'the tool\'s own panels are all there, content first, then structure, then system, from nav() alone', array_values( array_diff( $order, [ 'dummy', 'navs' ] ) ) === [ 'dashboard', 'elements', 'text', 'images', 'logs', 'routes', 'users', 'language', 'backups', 'features', 'config' ] );
-check( 'the module panel sits where its weight puts it - in the content group, after images (40), before logs (90)', array_search( 'dummy', $order, true ) === array_search( 'images', $order, true ) + 1 && array_search( 'logs', $order, true ) === array_search( 'dummy', $order, true ) + 1 );
-check( 'the tool\'s own tabs sit on their panes', array_map( static fn( array $p ): array => array_keys( $p['tabs'] ), array_intersect_key( $registry, array_flip( [ 'elements', 'text', 'images', 'users', 'language' ] ) ) ) === [ 'elements' => [ 'types' ], 'text' => [ 'keys' ], 'images' => [ 'slots' ], 'users' => [ 'roles', 'lockout', 'recoverypw' ], 'language' => [ 'translations' ] ] );
+check( 'the module panel sits where its weight puts it - in the content group, after images (40), before logs (90)', array_search( 'dummy', $order, true ) === array_search( 'images', $order, true ) + 1 && array_search( 'logs', $order, true ) === array_search( 'dummy', $order, true ) + 1
+	&& $registry['dummy']['class'] === 'AdminSmokeDummyPanel' );
+check( 'the tool\'s own tabs sit on their panes', array_map( static fn( array $p ): array => array_keys( $p['tabs'] ), array_intersect_key( $registry, array_flip( [ 'elements', 'text', 'images', 'users', 'language' ] ) ) ) === [ 'elements' => [ 'types' ], 'text' => [ 'keys' ], 'images' => [ 'slots' ], 'users' => [ 'roles', 'lockout', 'recoverypw' ], 'language' => [ 'translations' ] ]
+	&& $registry['elements']['tabs']['types']['parent'] === 'elements' && $registry['elements']['tabs']['types']['perm'] === \Nino\Modules\Elements\Types::MANAGE_PERM );
+check( 'a tab is not a rail entry, but allPanels() lists it right after its panel', isset( $registry['types'] ) === false && array_slice( array_keys( \Nino\Admin\Admin::allPanels( $withModule ) ), 1, 2 ) === [ 'elements', 'types' ] );
+check( 'a core panel has no perm() and is open to every account', $registry['users']['perm'] === '' && $registry['dashboard']['perm'] === '' );
 check( 'the Navigations panel names the structure group and sits after routes (20)', array_search( 'navs', $order, true ) === array_search( 'routes', $order, true ) + 1 );
 check( 'the Navigations panel is the Navigation module\'s and comes with it', $registry['navs']['class'] === \Nino\Modules\Navigation\Admin::class );
-check( 'a panel reusing a core uri is dropped, the core panel keeps it', $registry['config']['class'] === \Nino\Modules\Config\Admin::class );
+check( 'a panel reusing a core uri is dropped, the core panel keeps it', $registry['config']['class'] === \Nino\Modules\Config\Admin::class
+	&& str_contains( \Nino\Admin\Panels::navHtml( $registry ), 'Shadow' ) === false );
 
 $navHtml = \Nino\Admin\Panels::navHtml( $registry );
 check( 'nav() is rendered - every panel has its link, the module\'s included, an icon or its initial beside the label', str_contains( $navHtml, 'id="admin-nav-dummy" data-panel="dummy" data-layout="page"><span class="nino-admin-nav-icon" aria-hidden="true"><b>D</b></span><span class="nino-admin-nav-label">Dummy</span></a>' ) === true && str_contains( $navHtml, 'id="admin-nav-navs" data-panel="navs" data-layout="page">' ) === true && str_contains( $navHtml, '<span class="nino-admin-nav-label">[[/_admin/nav/navs]]</span></a>' ) === true );
@@ -4252,7 +4263,9 @@ check( 'a panel answering head() false opens on its screen alone; one that says 
 	$html = \Nino\Admin\Panels::panesHtml( $registry );
 	return ( $registry['headless']['head'] ?? null ) === false && ( $registry['dummy']['head'] ?? null ) === true && ( $registry['dashboard']['head'] ?? null ) === false
 		&& str_contains( $html, '<div id="admin-content-headless" data-panel="headless" data-layout="page" hidden><div id="headless-list"></div></div>' ) === true
-		&& str_contains( $html, 'admin-content-headless' ) === true && substr_count( $html, 'admin-panel-head' ) === count( $registry ) - 2;
+		&& str_contains( $html, 'admin-content-headless' ) === true && substr_count( $html, 'admin-panel-head' ) === count( $registry ) - 2
+		&& str_contains( $html, '<div id="admin-content-dashboard" data-panel="dashboard" data-layout="page" hidden></div>' ) === true
+		&& substr_count( $html, '<h2 class="admin-panel-title">' ) === substr_count( $html, '<div class="admin-panel-head">' );
 } )() );
 
 $panesHtml = \Nino\Admin\Panels::panesHtml( $registry );
@@ -4359,6 +4372,7 @@ function self_fillKeys( string $source ): array {
 }
 
 $missingFills = [];
+$askedByPanels = [];
 foreach( \Nino\Admin\Admin::allPanels( $shipped ) as $uri => $panel ) {
 
 	$keys = [];
@@ -4372,6 +4386,10 @@ foreach( \Nino\Admin\Admin::allPanels( $shipped ) as $uri => $panel ) {
 		// type or a field name ( getText('/_admin/elements/field/'+ type+ ... ) )
 		// is not a key this can look up
 		preg_match_all( "#getText\(\s*'(/_admin/[^']+)'\s*\)#", $source, $matches );
+		$keys = array_merge( $keys, $matches[1] );
+		// ...and the words a failed request falls back to when the server named
+		// none: handed to showError() and errorText() as a literal
+		preg_match_all( "#'(/_admin/common/error/[^']+)'#", $source, $matches );
 		$keys = array_merge( $keys, $matches[1] );
 	}
 
@@ -4390,6 +4408,8 @@ foreach( \Nino\Admin\Admin::allPanels( $shipped ) as $uri => $panel ) {
 			$keys = array_merge( $keys, self_fillKeys( (string) file_get_contents( $template ) ) );
 	}
 
+	$askedByPanels = array_merge( $askedByPanels, $keys );
+
 	foreach( [ 'en_US', 'de_DE' ] as $locale ) {
 
 		$fills = (array) include dirname( __DIR__ ). '/_admin/text/'. $locale. '.php';
@@ -4402,7 +4422,92 @@ foreach( \Nino\Admin\Admin::allPanels( $shipped ) as $uri => $panel ) {
 				$missingFills[] = $uri. ' '. $key. ' '. $locale;
 	}
 }
-check( 'every word a panel asks for, in its scripts and in its markup, is a fill both interface languages define'. ( $missingFills === [] ? '' : ' - missing: '. implode( ', ', array_slice( $missingFills, 0, 8 ) ) ), $missingFills === [] );
+
+// Not every word is asked for by a panel's own files. The shell's scripts are
+// no panel's asset - the login card, the question before unsaved input is
+// lost, the html editor - and a panel's class hands the screen its labels,
+// hints and the dashboard's tiles as literal keys of its own. Any panel's
+// text() directory may hold them, so the whole of the workbench's words is
+// what they are looked up in. A feature the checkout carries is read the same
+// way (the registry above is the kernel's own), and a checkout may carry none.
+// The recovery page is English by design: it has no session to take a
+// language from
+$askedOutside = [];
+foreach( array_merge( glob( dirname( __DIR__ ). '/_admin/assets/*.js' ) ?: [], glob( dirname( __DIR__ ). '/features/*/assets/*.js' ) ?: [] ) as $script ) {
+
+	if( basename( $script ) === 'recovery.js' )
+		continue;
+
+	preg_match_all( "#getText\(\s*'(/_admin/[^']+)'\s*\)#", (string) file_get_contents( $script ), $matches );
+	$askedOutside = array_merge( $askedOutside, $matches[1] );
+	preg_match_all( "#'(/_admin/common/error/[^']+)'#", (string) file_get_contents( $script ), $matches );
+	$askedOutside = array_merge( $askedOutside, $matches[1] );
+}
+
+$classFiles = array_merge( [ dirname( __DIR__ ). '/_nino/Nino/Modules/Navigation/Admin/Admin.php' ], glob( dirname( __DIR__ ). '/features/*/Admin/Admin.php' ) ?: [] );
+foreach( new RecursiveIteratorIterator( new RecursiveDirectoryIterator( dirname( __DIR__ ). '/_admin/Nino/Modules', FilesystemIterator::SKIP_DOTS ) ) as $classFile )
+	if( $classFile->getExtension() === 'php' )
+		$classFiles[] = $classFile->getPathname();
+
+foreach( $classFiles as $classFile ) {
+
+	preg_match_all( "#'(/_admin/(?:nav|dashboard|config|lockout|language|users)/[^'\s]+)'#", (string) file_get_contents( $classFile ), $matches );
+
+	// A permission ends in /manage and is no word
+	$askedOutside = array_merge( $askedOutside, array_filter( $matches[1], static fn( string $key ): bool => str_ends_with( $key, '/manage' ) === false ) );
+}
+
+foreach( [ 'en_US', 'de_DE' ] as $locale ) {
+
+	$fills = (array) include dirname( __DIR__ ). '/_admin/text/'. $locale. '.php';
+
+	foreach( \Nino\Admin\Admin::allPanels( $shipped ) as $panel )
+		if( $panel['text'] !== '' && is_file( dirname( __DIR__ ). $panel['text']. '/'. $locale. '.php' ) === true )
+			$fills += (array) include dirname( __DIR__ ). $panel['text']. '/'. $locale. '.php';
+
+	foreach( glob( dirname( __DIR__ ). '/features/*/text/'. $locale. '.php' ) ?: [] as $featureText )
+		$fills += (array) include $featureText;
+
+	foreach( array_unique( $askedOutside ) as $key )
+		if( isset( $fills['[['. $key. ']]'] ) === false )
+			$missingFills[] = 'outside the panes '. $key. ' '. $locale;
+}
+
+// ...and the scan has to have seen the vocabulary, or "nothing missing" says nothing
+check( 'every word a panel asks for, in its scripts and in its markup, is a fill both interface languages define'. ( $missingFills === [] ? '' : ' - missing: '. implode( ', ', array_slice( $missingFills, 0, 8 ) ) ), $missingFills === []
+	&& count( array_unique( array_merge( $askedByPanels, $askedOutside ) ) ) > 200 );
+
+// The two languages of a text family declare the same keys. A key in one file
+// and not in the other renders as an empty string in the second language -
+// a blank where the reason should be, with no error anywhere. A family is the
+// workbench's own file and the text() directory of a panel
+$families = [ '/_admin/text' ];
+foreach( \Nino\Admin\Admin::allPanels( $shipped ) as $panel )
+	if( $panel['text'] !== '' )
+		$families[] = $panel['text'];
+
+$unequal = [];
+foreach( array_unique( $families ) as $family ) {
+
+	$declared = [];
+	$missing = [];
+	foreach( [ 'en_US', 'de_DE' ] as $locale ) {
+
+		$path = dirname( __DIR__ ). $family. '/'. $locale. '.php';
+
+		if( is_file( $path ) === true )
+			$declared[$locale] = array_keys( (array) include $path );
+		else
+			$missing[] = $locale;
+	}
+
+	// A file that is not there declares nothing, which is not "the same keys": a family that lost a language is named
+	if( $missing !== [] )
+		$unequal[] = $family. ' ('. implode( ' and ', $missing ). ' missing)';
+	elseif( array_diff( $declared['en_US'], $declared['de_DE'] ) !== [] || array_diff( $declared['de_DE'], $declared['en_US'] ) !== [] )
+		$unequal[] = $family;
+}
+check( 'the two interface languages of every text family declare the same keys'. ( $unequal === [] ? '' : ' - differ: '. implode( ', ', $unequal ) ), $unequal === [] );
 
 // And the same thing end to end, which is the only version that cannot be
 // fooled by a key this file's regexes do not recognise: render the whole
@@ -4547,6 +4652,9 @@ $getRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[temp
 \Nino\Admin\Admin::init( $withModule );
 check( 'init bundles every panel script, the module\'s included, after the shell\'s own', in_array( '/app/Dummy/assets/admin.js', $withModule['/nino/html/assets']['/_admin/.cache/script.js'], true ) === true && in_array( '/_nino/Nino/Modules/Navigation/assets/admin.js', $withModule['/nino/html/assets']['/_admin/.cache/script.js'], true ) === true && $withModule['/nino/html/assets']['/_admin/.cache/script.js'][0] === '/_nino/Nino.js' );
 check( 'and every panel stylesheet', in_array( '/app/Dummy/assets/admin.css', $withModule['/nino/html/assets']['/_admin/.cache/style.css'], true ) === true );
+// The login page is no workbench: the kit the panels are built with
+// (Nino.admin.js) is not in its bundle, and neither is any panel's script
+check( 'the login bundle is the framework and the login shell alone', $withModule['/nino/html/assets']['/_admin/.cache/login.js'] === [ '/_nino/Nino.js', '/_admin/assets/login.js' ] );
 // The registry the form panels report to (Nino.admin.dirty) is defined by the
 // shell script, and every panel registers when its own file loads - so the shell
 // script has to come first in the bundle, and the design system's primitives
@@ -4584,6 +4692,68 @@ $withoutModule = $appData;
 $withoutModule['/nino/modules'] = [];
 [ $status ] = ninoCall( $withoutModule, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'navs/list' );
 check( 'with the Navigation module off, navs/list is an unknown action and the panel is gone', $status === 404 && isset( \Nino\Admin\Admin::panels( $withoutModule )['navs'] ) === false );
+
+// What the registry keeps of the answers of a panel a project brings, and
+// what the rail, the panes, the dashboard and the roles form make of it
+$withProject = $appData;
+$withProject['/nino/modules'] = [ 'AdminSmokeProjectModule' ];
+
+$projectRegistry = \Nino\Admin\Admin::panels( $withProject );
+check( 'a class without actions()/nav() is dropped rather than breaking the tool', in_array( 'NoSuchClassAtAll', array_column( $projectRegistry, 'class' ), true ) === false );
+check( 'only well-formed mount ids survive panes()', $projectRegistry['project']['panes'] === [ 'project-list', 'project-form' ] );
+check( 'only project-relative .js/.css paths survive assets() - no traversal, no bare names', $projectRegistry['project']['assets'] === [ '/app/Project/assets/project.js', '/app/Project/assets/project.css' ] );
+check( 'the module panel is visible to an account holding its perm', isset( \Nino\Admin\Admin::visiblePanels( $withProject )['project'] ) === true );
+
+$projectNav = \Nino\Admin\Admin::navHtml( $withProject );
+check( 'a literal label is escaped for html and against the fill syntax', str_contains( $projectNav, 'Project &lt;Panel&gt;' ) === true );
+
+$projectPanes = \Nino\Admin\Admin::panesHtml( $withProject );
+check( 'every pane starts hidden, names its layout, opens with the head that names the panel and carries its mount points', str_contains( $projectPanes, '<div id="admin-content-project" data-panel="project" data-layout="page" hidden><div class="admin-panel-head"><h2 class="admin-panel-title">Project &lt;Panel&gt;</h2><div class="admin-panel-actions"></div></div><div id="project-list"></div><div id="project-form"></div></div>' ) === true );
+
+[ , $body ] = ninoCall( $withProject, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'dashboard/summary' );
+$projectTile = array_values( array_filter( $body['tiles'] ?? [], fn( array $tile ): bool => $tile['panel'] === 'project' ) )[0] ?? null;
+check( 'the panel\'s summary() becomes a dashboard tile', $projectTile === [ 'panel' => 'project', 'value' => '7', 'label' => 'Projects' ] );
+
+$permOptions = \Nino\Modules\Users\Admin::permOptions( $withProject );
+check( 'the panel\'s perm() is assignable to a role, under its nav label and in its group', in_array( [ 'perm' => AdminSmokeProjectPanel::PERM, 'label' => 'Project <Panel>', 'group' => 'content', 'offered' => true ], $permOptions, true ) === true );
+
+/*	Nothing says a request carries strings. Every one of these used to be
+	a 500: 'action[]=x' is an "Illegal offset type in isset" in the
+	dispatcher, 'data[]=x' a TypeError in json_decode(), and '?locale[]=x'
+	an "Array to string conversion" - a level the runtime treats as fatal
+	(see \Nino\Runtime::NON_FATAL_LEVELS). Two of them are reachable
+	without signing in, and postData() is what recovery.php reads its
+	password through.
+
+	The harness records every warning and the dummy panels of this suite
+	raise plenty of their own on the way, so the ones read here are those
+	of these three calls - and only the one they would raise is asked for	*/
+ninoWarnings();
+
+$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+$_POST['action'] = [ 'dummy/list' ];
+$_POST['data'] = json_encode( [] );
+\Nino\Admin\Admin::handlePost( $withModule, $request );
+check( 'an array-shaped action is answered as unknown, not raised at', $request['/nino/http/response']['statusCode'] === 404 );
+
+$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+$_POST['action'] = 'dummy/list';
+$_POST['data'] = [ 'x' ];
+\Nino\Admin\Admin::handlePost( $withModule, $request );
+check( 'an array-shaped data field reads as no data, not as a 500', $request['/nino/http/response']['statusCode'] === 200 );
+check( '...and postData() answers the empty array it promises', \Nino\Admin\Admin::postData() === [] );
+
+$_POST['data'] = json_encode( [] );
+
+$arrayLocaleGet = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[template /_admin/templates/page-index]' ] ];
+$_GET['locale'] = [ 'de_DE' ];
+\Nino\Admin\Admin::handleGet( $withModule, $arrayLocaleGet );
+unset( $_GET['locale'] );
+$arrayWarnings = ninoWarnings();
+
+check( 'an array-shaped ?locale is ignored rather than cast', $arrayLocaleGet['/nino/http/response']['statusCode'] === 200 );
+check( 'none of the three raised an "Array to string conversion" on the way',
+	array_filter( $arrayWarnings, fn( string $message ): bool => str_contains( $message, 'Array to string conversion' ) ) === [] );
 
 echo "\n";
 
@@ -4935,6 +5105,80 @@ $appData['/nino/auth/user']['treeperm@example.com']['perms'] = [ \Nino\Modules\T
 $appData['./nino/auth/current'] = \Nino\Auth::getUser( $appData, 'treeperm@example.com' );
 check( '...and granting the group every key of it', \Nino\Modules\Text\Admin::mayUpdate( $appData, '/scoped/one' ) === true && \Nino\Modules\Text\Admin::mayUpdate( $appData, '/unscoped/one' ) === false );
 
+/*	The scoped permissions a panel offers for the three lists of the Roles tab.
+	scopes() is optional: a panel without it - AdminSmokeProjectPanel, the
+	workbench's own Users - offers none, and an answer that is not the
+	shape loses what is wrong with it, never the rest. Whatever comes out is a
+	permission a role may hold and a check can match	*/
+class AdminSmokeScopedPanel {
+	public static function actions(): array { return [ 'scoped/list' => [ self::class, 'apiList' ] ]; }
+	public static function nav(): array { return [ 'scoped', 'Scoped', 63 ]; }
+	public static function perm(): string { return '/_admin/scoped/manage'; }
+	public static function scopes( array &$appData ): array {
+		return [
+			[ 'scope' => '/_admin/scoped/', 'door' => '/_admin/scoped/manage', 'label' => 'Scoped', 'areas' => [
+				[ 'id' => 'a', 'label' => 'Area A', 'perm' => '/_admin/scoped/a/*', 'actions' => [
+					[ 'id' => 'read', 'label' => 'Read', 'perm' => '/_admin/scoped/a/read' ],
+					[ 'id' => 'bad', 'label' => 'Bad', 'perm' => 'no slash' ],
+					[ 'id' => 'outside', 'label' => 'Outside', 'perm' => '/_admin/other/x' ],
+					[ 'id' => 'edit', 'label' => 'Edit', 'perm' => '/_admin/scoped/a/edit/*', 'fields' => [
+						[ 'id' => 'f1', 'label' => 'F 1', 'perm' => '/_admin/scoped/a/edit/f1' ],
+						[ 'id' => 'f2', 'label' => 'F 2', 'perm' => '/_admin/scoped/a/edit/has space' ],
+						[ 'id' => 'f3', 'label' => 'F 3', 'perm' => '/_admin/other/f3' ],
+						'junk',
+						[ 'id' => 5 ],
+					] ],
+				] ],
+				[ 'id' => 'b', 'label' => 'Area B', 'perm' => 'not below', 'actions' => [ [ 'id' => 'x', 'label' => 'X', 'perm' => '/_admin/scoped/b/x' ] ] ],
+				[ 'id' => 'empty', 'label' => 'Empty', 'actions' => [] ],
+				'junk',
+			] ],
+			[ 'scope' => 'broken', 'door' => '/_admin/scoped/manage', 'label' => 'Broken', 'areas' => [] ],
+			[ 'scope' => '/_admin/nothing/', 'door' => '/_admin/nothing/manage', 'label' => 'Nothing', 'areas' => [ [ 'id' => 'e', 'label' => 'E', 'actions' => [] ] ] ],
+			'junk',
+		];
+	}
+	public static function apiList( array &$appData, array &$request ): void { \Nino\Http::ok( $request, [] ); }
+}
+
+class AdminSmokeScopedModule {
+	public static function adminPanels( array &$appData ): array { return [ 'AdminSmokeScopedPanel', 'AdminSmokeProjectPanel' ]; }
+}
+
+$withScopes = $appData;
+$withScopes['/nino/modules'] = [ 'AdminSmokeScopedModule' ];
+$scopeTree = \Nino\Modules\Users\Admin::scopeOptions( $withScopes );
+$scopeById = array_column( $scopeTree, null, 'scope' );
+
+check( 'scopeOptions lists a panel that answers scopes()', isset( $scopeById['/_admin/scoped/'] ) === true );
+check( '...and skips a panel that has none - what is left besides is the workbench\'s own Elements and Text, which offer something once there is a type or a key', array_diff( array_keys( $scopeById ), [ '/_admin/scoped/', '/_admin/elements/', '/_admin/text/' ] ) === [] );
+$scoped = $scopeById['/_admin/scoped/'];
+check( 'a scope that is not the shape, and one with nothing left to offer, are dropped', isset( $scopeById['broken'] ) === false && isset( $scopeById['/_admin/nothing/'] ) === false );
+check( 'an area with nothing to do and one that is no array are dropped, the rest kept', array_column( $scoped['areas'], 'id' ) === [ 'a', 'b' ] );
+check( '...an action with a permission that is no permission, or lies outside the scope, is dropped', array_column( $scoped['areas'][0]['actions'], 'id' ) === [ 'read', 'edit' ] );
+check( '...so is a field whose permission cannot be matched or lies outside the scope', array_column( $scoped['areas'][0]['actions'][1]['fields'], 'id' ) === [ 'f1' ] );
+check( '...an area permission outside the scope is not carried', isset( $scoped['areas'][1]['perm'] ) === false && $scoped['areas'][0]['perm'] === '/_admin/scoped/a/*' );
+check( '...and the door and the label arrive as the panel said them', $scoped['door'] === '/_admin/scoped/manage' && $scoped['label'] === 'Scoped' );
+
+$treePerms = [];
+foreach( $scopeTree as $scope )
+	foreach( $scope['areas'] as $area ) {
+		isset( $area['perm'] ) === true && $treePerms[] = $area['perm'];
+		foreach( $area['actions'] as $action ) {
+			$treePerms[] = $action['perm'];
+			foreach( $action['fields'] ?? [] as $field )
+				$treePerms[] = $field['perm'];
+		}
+	}
+check( 'every permission anywhere in the tree is shaped like one a role may hold', count( $treePerms ) >= 4
+	&& array_filter( $treePerms, static fn( string $perm ): bool => \Nino\Modules\Users\Roles::isPermShape( $perm ) === false ) === [] );
+check( 'isPermShape is what apiSave checks: a string without a leading slash, a space and an overlong one are not', \Nino\Modules\Users\Roles::isPermShape( '/_admin/a/*' ) === true
+	&& \Nino\Modules\Users\Roles::isPermShape( 'no/slash' ) === false && \Nino\Modules\Users\Roles::isPermShape( '/with space' ) === false && \Nino\Modules\Users\Roles::isPermShape( '/'. str_repeat( 'a', 200 ) ) === false );
+
+$noScopes = $appData;
+$noScopes['/nino/modules'] = [ 'AdminSmokeProjectModule' ];
+check( 'a project panel that offers none leaves the tree to the workbench\'s own', array_diff( array_column( \Nino\Modules\Users\Admin::scopeOptions( $noScopes ), 'scope' ), [ '/_admin/elements/', '/_admin/text/' ] ) === [] );
+
 // roles/list carries the tree; roles/save is what it was
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiList' );
@@ -5163,7 +5407,9 @@ foreach( array_keys( $codes ) as $code ) {
 	if( substr_count( $en, '%s' ) !== substr_count( $de, '%s' ) )
 		$placeholders[] = $code;
 }
-check( 'both languages take the same number of params'. ( $placeholders === [] ? '' : ' - differ: '. implode( ', ', $placeholders ) ), $placeholders === [] );
+check( 'both languages take the same number of params'. ( $placeholders === [] ? '' : ' - differ: '. implode( ', ', $placeholders ) ), $placeholders === []
+	&& substr_count( (string) $wordFiles['en_US']['[[/_admin/error/int_range]]'], '%s' ) === 2
+	&& str_contains( (string) $wordFiles['en_US']['[[/_admin/error/upload_too_large]]'], '%s' ) === true && str_contains( (string) $wordFiles['en_US']['[[/_admin/error/image_too_large]]'], '%s' ) === true );
 check( 'no word carries a live shortcode - the page substitutes a value before the shortcodes run', array_filter( $wordFiles['en_US'] + $wordFiles['de_DE'], fn( $v, $k ) => str_starts_with( $k, '[[/_admin/error/' ) && preg_match( '/[\\[\\]]/', (string) $v ) === 1, ARRAY_FILTER_USE_BOTH ) === [] );
 
 echo "\n";

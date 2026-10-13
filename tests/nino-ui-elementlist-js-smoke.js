@@ -18,8 +18,6 @@
 
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
 const vm = require('vm');
 const { check, done, load, element, findAll, fire } = require( './harness.js' );
 
@@ -189,11 +187,5 @@ check( '...and says how many it actually found', resultRows( large )[adminUi.ELE
 const dangling = build( { value : [ '/tag/php', '/tag/removed' ] } );
 check( 'a reference whose target is gone keeps its place in the value', JSON.stringify( stored( dangling ) ) === '["/tag/php","/tag/removed"]' );
 check( '...and is shown as its uri, marked missing', chosenRows( dangling )[1].children[0].textContent === '/tag/removed (missing)' );
-
-// --- the caller owns every string -----------------------------------------
-
-const source = fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' );
-const control = source.slice( source.indexOf('elementList : function'), source.indexOf('tableModel : {') );
-check( 'the control hard-codes no user-facing words', /textContent = '[A-Za-z]/.test( control ) === false );
 
 done();

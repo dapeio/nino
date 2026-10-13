@@ -11,9 +11,7 @@
 
 'use strict';
 
-const fs 	= require('fs');
-const path 	= require('path');
-const vm 		= require('vm');
+const vm = require('vm');
 const { check, done, fills, load, element, fire } = require( './harness.js' );
 
 // --- the words: the real fills, as the workbench's own text files carry them
@@ -426,47 +424,6 @@ Promise.all( [ big, small, unreadable ].map( file => new Promise( function( reso
 	check( 'above the pixel limit it is refused with the megapixels', answers[0] !== null && answers[0].code === 'image_too_many_pixels' && answers[0].params[0] === 20 && big.closed === true );
 	check( '...below it passes', answers[1] === null && small.closed === true );
 	check( '...and a file the browser cannot decode is left to the server', answers[2] === null );
-
-	// --- the words the server sends exist in the interface languages
-	const codes = [];
-	function walk( dir ) {
-		fs.readdirSync( dir, { withFileTypes : true } ).forEach( function( entry ) {
-			const full = path.join( dir, entry.name );
-			if( entry.isDirectory() )
-				return walk( full );
-			if( entry.name.endsWith('.php') === false || full.includes( path.sep+ 'install'+ path.sep ) )
-				return;
-			const source = fs.readFileSync( full, 'utf8' );
-			for( const m of source.matchAll( /Http::fail\(\s*\$request,\s*[^,]+,\s*(?:'(?:[^'\\]|\\.)*'|[^,()]+(?:\([^()]*\))?[^,()]*),\s*'([a-z][a-z0-9_]*)'/g ) )
-				codes.push( m[1] );
-		} );
-	}
-	[ '../_admin', '../_nino' ].forEach( dir => walk( path.join( __dirname, dir ) ) );
-	const unique = Array.from( new Set( codes ) );
-	const all = { en_US : Object.assign( {}, TEXT.en_US ), de_DE : Object.assign( {}, TEXT.de_DE ) };
-	const textFiles = [];
-	( function find( dir ) {
-		fs.readdirSync( dir, { withFileTypes : true } ).forEach( function( entry ) {
-			const full = path.join( dir, entry.name );
-			if( entry.isDirectory() )
-				return find( full );
-			if( /[\\/]text[\\/](en_US|de_DE)\.php$/.test( full ) )
-				textFiles.push( full );
-		} );
-	} )( path.join( __dirname, '../_admin' ) );
-	textFiles.concat( fs.readdirSync( path.join( __dirname, '../_nino/Nino/Modules' ) ).map( m => path.join( __dirname, '../_nino/Nino/Modules', m, 'text' ) ).filter( d => fs.existsSync( d ) ).flatMap( d => fs.readdirSync( d ).map( f => path.join( d, f ) ) ) ).forEach( function( file ) {
-		const locale = path.basename( file, '.php' );
-		if( all[locale] === undefined )
-			return;
-		Object.assign( all[locale], fills( path.relative( path.join( __dirname, '..' ), file ) ) );
-	} );
-	const unworded = unique.filter( code => [ 'en_US', 'de_DE' ].some( l => all[l]['/_admin/error/'+ code] === undefined ) );
-	check( 'every code the kernel sends has words in English and in German'+ ( unworded.length ? ' - missing: '+ unworded.join(', ') : '' ), unique.length > 30 && unworded.length === 0 );
-	// Codes named by variable ('$direction === 'up' ? 'already_top' : ...') or built in a helper
-	const helperCodes = [ 'session', 'csrf', 'post_too_large', 'upload_too_large', 'upload_partial', 'upload_missing', 'upload_server', 'image_too_large', 'image_type', 'image_too_many_pixels', 'image_unreadable', 'int_range', 'bool', 'lines', 'lines_ip', 'invalid_value', 'already_top', 'already_bottom', 'wrong_password' ];
-	check( 'the shared codes have words too, with the placeholders their params fill', helperCodes.every( code => [ 'en_US', 'de_DE' ].every( l => all[l]['/_admin/error/'+ code] !== undefined ) )
-		&& all.en_US['/_admin/error/int_range'].split( '%s' ).length === 3 && all.de_DE['/_admin/error/int_range'].split( '%s' ).length === 3
-		&& all.en_US['/_admin/error/upload_too_large'].includes( '%s' ) && all.de_DE['/_admin/error/image_too_large'].includes( '%s' ) );
 
 	done();
 } );

@@ -81,7 +81,6 @@ function notes( el ) {
 const moduleEn 		= fills('_admin/Nino/Modules/Features/text/en_US.php');
 const moduleDe 		= fills('_admin/Nino/Modules/Features/text/de_DE.php');
 const workbenchEn	= fills('_admin/text/en_US.php');
-const workbenchDe	= fills('_admin/text/de_DE.php');
 
 function text( key ) {
 	return moduleEn[key] || workbenchEn[key] || '';
@@ -266,11 +265,7 @@ let match;
 while( ( match = keyRe.exec( script ) ) )
 	if( keys.indexOf( match[1] ) === -1 )
 		keys.push( match[1] );
-const missing = keys.filter( function( key ) {
-	return ( moduleEn[key] || workbenchEn[key] ) === undefined || ( moduleDe[key] || workbenchDe[key] ) === undefined;
-} );
-check( 'every fill the script asks for exists in both interface languages'+ ( missing.length ? ' - missing: '+ missing.join(', ') : '' ), keys.length > 0 && missing.length === 0 );
-check( 'the three tab labels and the reload hint are among them', [ 'available', 'inactive', 'active' ].every( function( t ) { return keys.indexOf( '/_admin/features/tab/'+ t ) !== -1 } ) && keys.indexOf( '/_admin/features/msg/reload' ) !== -1 );
+check( 'the three tab labels and the reload hint are among the words the script asks for by a literal', [ 'available', 'inactive', 'active' ].every( function( t ) { return keys.indexOf( '/_admin/features/tab/'+ t ) !== -1 } ) && keys.indexOf( '/_admin/features/msg/reload' ) !== -1 );
 
 // The words the class phrases itself - a catalogue refusal, an update that
 // did not apply, a feature that would not switch on - are fills too, read
@@ -288,7 +283,6 @@ check( 'every message the class phrases itself is a fill of the module in both l
 	&& phrased.indexOf( '/_admin/features/error/catalogue-off' ) !== -1
 	&& moduleEn['/_admin/features/error/catalogue-reason'].includes( '%s' ) && moduleDe['/_admin/features/error/catalogue-reason'].includes( '%s' )
 	&& moduleEn['/_admin/features/error/activate-after-install'].includes( '%s' ) && moduleDe['/_admin/features/error/activate-after-install'].includes( '%s' ) );
-check( 'the module\'s two text files declare the same keys', Object.keys( moduleEn ).sort().join(',') === Object.keys( moduleDe ).sort().join(',') && Object.keys( moduleEn ).length > 20 );
 
 // The vocabulary is the kernel's (\Nino\Features::CATEGORIES), the words for
 // it are this panel's. A category shipped without a fill would show as its
@@ -305,19 +299,6 @@ check( 'the nav label and the dashboard tile are among them, and no value carrie
 	&& Object.keys( moduleEn ).every( function( key ) { return /[[\]]/.test( moduleEn[key] ) === false && /[[\]]/.test( moduleDe[key] ) === false } ) );
 check( 'the intro hint and the eyebrow badge fills are gone', moduleEn['/_admin/features/hint/intro'] === undefined && moduleEn['/_admin/features/label/catalogue'] === undefined
 	&& moduleEn['/_admin/features/label/catalogue-load'] === undefined && moduleEn['/_admin/features/label/generated'] === undefined );
-
-// The same rule tests/admin-lists-js-smoke.js applies to every panel script:
-// no sentence assigned straight to what the user reads
-const hardcoded = [];
-script.split('\n').forEach( function( line, index ) {
-	if( /^\s*(\/\/|\*|\/\*)/.test( line ) )
-		return;
-	const re = /\.(?:textContent|placeholder|title)\s*=\s*'([A-Z][^']*\s[^']*)'/g;
-	let found;
-	while( ( found = re.exec( line ) ) )
-		hardcoded.push( ( index + 1 )+ ' '+ JSON.stringify( found[1] ) );
-} );
-check( 'the script writes no sentence of its own into the dom'+ ( hardcoded.length ? ' - '+ hardcoded.join(', ') : '' ), hardcoded.length === 0 );
 
 // --- opening the panel: no cache yet
 

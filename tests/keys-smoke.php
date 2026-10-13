@@ -516,14 +516,6 @@ foreach( $codeFiles as $file ) {
 	}
 }
 check( 'every key literal in the kernel and the workbench ('. $literals. ') names a namespace of the grammar, the system or a runtime fill'. ( $stray === [] ? '' : ' - '. implode( '; ', array_slice( array_unique( $stray ), 0, 8 ) ) ), $stray === [] && $literals > 40 );
-
-$jstextKeys = (string) file_get_contents( $root. '/_nino/Nino/Modules/Jstext/Jstext.php' );
-check( 'the inline block publishes the three groups of words the public scripts read, and each follows the grammar',
-	preg_match( '/DEFAULT_KEYS\s*=\s*\[\s*\'\/module\/form\/info\/\',\s*\'\/feature\/newsletter\/info\/\',\s*\'\/template\/common\/slider\/\'\s*\]/', $jstextKeys ) === 1 );
-
-$scripts = (string) file_get_contents( $root. '/_nino/Nino.ui.js' );
-check( 'the public script asks for exactly those groups', preg_match_all( '/getText\(\s*\'(\/[^\']*)\'/', $scripts, $asked ) > 0
-	&& array_filter( $asked[1], static fn( string $key ): bool => preg_match( '#^/(module/form/info|feature/newsletter/info|template/common/slider)/#', $key ) !== 1 ) === [] );
 echo "\n";
 
 

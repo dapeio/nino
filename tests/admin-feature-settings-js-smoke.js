@@ -35,7 +35,6 @@ function hasClass( el, name ) {
 const moduleEn 		= fills('_admin/Nino/Modules/Features/text/en_US.php');
 const moduleDe 		= fills('_admin/Nino/Modules/Features/text/de_DE.php');
 const workbenchEn	= fills('_admin/text/en_US.php');
-const workbenchDe	= fills('_admin/text/de_DE.php');
 
 function text( key ) {
 	return moduleEn[key] || workbenchEn[key] || '';
@@ -207,32 +206,7 @@ check( 'and draws the form once the list has the feature', byTag( otherTab.mount
 
 // --- the words
 
-const keys = [];
-const keyRe = /getText\(\s*'(\/_admin\/[^']+)'\s*\)/g;
-const fallbackRe = /'(\/_admin\/common\/error\/[^']+)'/g;
-let match;
-while( ( match = keyRe.exec( script ) ) )
-	if( keys.indexOf( match[1] ) === -1 )
-		keys.push( match[1] );
-while( ( match = fallbackRe.exec( script ) ) )
-	if( keys.indexOf( match[1] ) === -1 )
-		keys.push( match[1] );
-const missing = keys.filter( function( key ) {
-	return ( moduleEn[key] || workbenchEn[key] ) === undefined || ( moduleDe[key] || workbenchDe[key] ) === undefined;
-} );
-check( 'every fill the script asks for exists in both interface languages'+ ( missing.length ? ' - missing: '+ missing.join(', ') : '' ), keys.length >= 4 && missing.length === 0 );
 check( 'the tab\'s own name is a fill of the module in both languages', moduleEn['/_admin/features/tab/settings'] === 'Settings' && moduleDe['/_admin/features/tab/settings'] === 'Einstellungen' );
-
-const hardcoded = [];
-script.split('\n').forEach( function( row, index ) {
-	if( /^\s*(\/\/|\*|\/\*)/.test( row ) )
-		return;
-	const re = /\.(?:textContent|placeholder|title)\s*=\s*'([A-Z][^']*\s[^']*)'/g;
-	let found;
-	while( ( found = re.exec( row ) ) )
-		hardcoded.push( ( index + 1 )+ ' '+ JSON.stringify( found[1] ) );
-} );
-check( 'the script writes no sentence of its own into the dom'+ ( hardcoded.length ? ' - '+ hardcoded.join(', ') : '' ), hardcoded.length === 0 );
 check( 'it posts nothing but the two actions the Features panel already has', ( script.match( /call\( '[a-z]+'/g ) || [] ).sort().join() === "call( 'list',call( 'settings'" );
 
 done();

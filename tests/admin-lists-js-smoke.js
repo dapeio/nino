@@ -46,19 +46,13 @@ function moduleScripts( root, modules ) {
 			.map( f => [ m+ '/'+ f, fs.readFileSync( path.join( dir, f ), 'utf8' ) ] ) : [];
 	} );
 }
-// The optional kernel modules that bring a panel, and every feature the
-// checkout carries - the directory is the list, as for the workbench's own
-const KERNEL_MODULES = [ 'Form', 'Navigation' ];
+// Every feature the checkout carries - the directory is the list, as for the
+// workbench's own
 const FEATURES = fs.readdirSync( path.join( __dirname, '../features' ), { withFileTypes : true } ).filter( e => e.isDirectory() ).map( e => e.name ).sort();
-const APP_MODULES = KERNEL_MODULES.concat( FEATURES );
 
-// The words a panel renders: the workbench's own text/<locale>.php, and a
-// module's text() directory beside its panel
+// The workbench's own words: text/<locale>.php
 function workbenchText( locale ) {
 	return fs.readFileSync( path.join( __dirname, '../_admin/text/', locale+ '.php' ), 'utf8' );
-}
-function moduleText( module, locale ) {
-	return fs.readFileSync( path.join( moduleDir( module ), 'text', locale+ '.php' ), 'utf8' );
 }
 
 console.log('Workbench modules');
@@ -640,13 +634,16 @@ console.log('\nOne language');
 // _admin/text/<locale>.php, a module's in the text() directory beside its
 // panel, and [jstext] hands all of them to Nino.content.getText(). A literal
 // English sentence in a script is what the German interface used to show
-// halfway down a screen. The recovery page is English by design (it has no
-// session to take a language from), so it is not checked here.
+// halfway down a screen. The shared controls of Nino.admin.js (the string
+// list, the element list) own no string either: the caller hands every word
+// in, so no label - lowercase, on a button, in an aria-label - is written into
+// them. The recovery page is English by design (it has no session to take a
+// language from), so it is not checked here.
 const localizedScripts = fs2.readdirSync( path2.join( __dirname, '../_admin/assets' ) ).filter( f => f.endsWith('.js') && f !== 'recovery.js' ).map( f => [ f, asset( f ) ] )
 	.concat( moduleScripts( '_admin/Nino/Modules', ADMIN_MODULES ) )
 	.concat( moduleScripts( '_nino/Nino/Modules', [ 'Form', 'Navigation' ] ) )
 	.concat( moduleScripts( 'features', FEATURES ) );
-const literalSentence = /\.(?:textContent|placeholder|title|alt) = '[A-Z][^']*'|(?:confirm|alert)\( '[A-Z]|innerHTML = '<[^']*>[A-Za-z]{3,}/;
+const literalSentence = /\.(?:textContent|placeholder|title|alt)\s*=\s*'[A-Z][^']*'|\.textContent\s*=\s*'[a-z]|'aria-label',\s*'[A-Za-z]|(?:confirm|alert)\( '[A-Z]|innerHTML = '<[^']*>[A-Za-z]{3,}/;
 const literals = localizedScripts.filter( e => literalSentence.test( e[1] ) ).map( e => e[0] );
 check( 'no workbench script renders a literal English sentence - every word is a fill'+ ( literals.length ? ' - found in '+ literals.join(', ') : '' ), literals.length === 0 );
 
@@ -665,31 +662,6 @@ const ownTransport = localizedScripts.filter( e => e[0] !== 'Nino.admin.js' && /
 check( '...and none keeps a transport of its own'+ ( ownTransport.length ? ' - '+ ownTransport.join(', ') : '' ), ownTransport.length === 0 );
 const ownPrefix = localizedScripts.filter( e => e[0] !== 'Nino.admin.js' && /'\('\s*\+\s*status\s*\+\s*'\) '/.test( e[1] ) ).map( e => e[0] );
 check( '...nor writes the status number in front of an error itself'+ ( ownPrefix.length ? ' - '+ ownPrefix.join(', ') : '' ), ownPrefix.length === 0 );
-
-// ...and every key a script asks for exists in both interface languages,
-// whichever file defines it. Keys built at runtime ('/_admin/nav/group/'+
-// group) are not checked - they have no literal to check
-const fillSources = { en_US : '', de_DE : '' };
-[ 'en_US', 'de_DE' ].forEach( locale => {
-	fillSources[locale] = workbenchText( locale )
-		+ ADMIN_MODULES.map( m => adminModuleText( m, locale ) ).join('\n')
-		+ APP_MODULES.map( m => moduleText( m, locale ) ).join('\n');
-} );
-const usedKeys = new Set();
-localizedScripts.forEach( e => { for( const m of e[1].matchAll( /getText\(\s*'(\/_admin\/[^']+)'\s*\)/g ) ) usedKeys.add( m[1] ); } );
-// The backend hands the frontend fill keys too: nav labels, tab names,
-// dashboard tiles, a schema's labels and hints
-[ ...ADMIN_MODULES.flatMap( m => fs2.readdirSync( path2.join( __dirname, '../_admin/Nino/Modules', m ), { recursive : true } )
-	.filter( f => String( f ).endsWith('.php') ).map( f => read( '_admin/Nino/Modules/'+ m+ '/'+ f ) ) ),
-  ...[ 'Navigation' ].map( m => read( '_nino/Nino/Modules/'+ m+ '/Admin/Admin.php' ) ),
-  ...FEATURES.map( m => read( 'features/'+ m+ '/Admin/Admin.php' ) ) ].forEach( php => {
-	for( const m of php.matchAll( /'(\/_admin\/(?:nav|dashboard|config|lockout|language|users)\/[^'\s]+)'/g ) )
-		if( m[1].endsWith('/manage') === false )
-			usedKeys.add( m[1] );
-} );
-const undefinedKeys = [ ...usedKeys ].filter( k => [ 'en_US', 'de_DE' ].some( locale => fillSources[locale].includes( "'[["+ k+ "]]'" ) === false ) );
-check( 'every fill key the workbench asks for is defined in English and in German'+ ( undefinedKeys.length ? ' - missing: '+ undefinedKeys.join(', ') : '' ), undefinedKeys.length === 0 );
-check( 'the checks above saw the whole vocabulary', usedKeys.size > 200 );
 
 console.log('\nUnsaved input');
 

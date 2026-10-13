@@ -10,17 +10,14 @@
  *											the way elementList()'s does, so the form reads,
  *											compares and saves it like every other field: that
  *											is what is pinned here - what the input holds at the
- *											start and after every change, that the rows carry no
- *											data-field of their own, and that the control owns
- *											no words.
+ *											start and after every change, and that the rows carry
+ *											no data-field of their own.
  *
  *	Usage: node tests/nino-ui-stringlist-js-smoke.js
  */
 
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
 const vm = require('vm');
 const { check, done, load, element, findAll, fire } = require( './harness.js' );
 
@@ -155,11 +152,5 @@ type( rowInput( watched, 0 ), 'x' );
 fire( rowButtons( watched, 0 )[2], 'click' );
 check( 'onChange hears every change with the value as the form will read it', told.join( '|' ) === '["x","b","c"]|["b","c"]' );
 check( 'nothing is sent while nothing changes - an untouched list is not an edited one', told.length === 2 && stored( build() ) === '["a","b","c"]' );
-
-// --- the caller owns every string -----------------------------------------
-
-const source = fs.readFileSync( path.join( __dirname, '../_admin/assets/Nino.admin.js' ), 'utf8' );
-const control = source.slice( source.indexOf('stringList : function'), source.indexOf('tableModel : {') );
-check( 'the control hard-codes no user-facing words', /textContent = '[A-Za-z]/.test( control ) === false && /aria-label', '[A-Za-z]/.test( control ) === false );
 
 done();

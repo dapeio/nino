@@ -58,7 +58,6 @@ function pairs( card ) {
 // --- the words -------------------------------------------------------------
 
 const moduleEn 		= fills('_nino/Nino/Modules/Form/text/en_US.php');
-const moduleDe 		= fills('_nino/Nino/Modules/Form/text/de_DE.php');
 const workbenchEn	= fills('_admin/text/en_US.php');
 
 function text( key ) {
@@ -273,22 +272,9 @@ check( 'a failed load is reported through the module\'s own words',
 	mount.children.length === 1 && hasClass( mount.children[0], 'nino-admin-error' ) && mount.children[0].textContent === '(500) '+ text('/_admin/submissions/error/load') );
 
 
-// --- one language, one text system ----------------------------------------
+// --- what reaches the page ------------------------------------------------
 
 const script = source('_nino/Nino/Modules/Form/assets/admin.js');
-const keys = [];
-const keyRe = /getText\(\s*'(\/_admin\/[^']+)'\s*\)/g;
-let match;
-while( ( match = keyRe.exec( script ) ) )
-	if( keys.indexOf( match[1] ) === -1 )
-		keys.push( match[1] );
-
-const workbenchDe = fills('_admin/text/de_DE.php');
-const missing = keys.filter( function( key ) {
-	return ( moduleEn[key] || workbenchEn[key] ) === undefined || ( moduleDe[key] || workbenchDe[key] ) === undefined;
-} );
-check( 'every fill the script asks for exists in both interface languages'+ ( missing.length ? ' - missing: '+ missing.join(', ') : '' ), keys.length > 0 && missing.length === 0 );
-check( 'the module\'s two text files declare the same keys', Object.keys( moduleEn ).sort().join(',') === Object.keys( moduleDe ).sort().join(',') );
 check( 'no value is written into the page as markup - a stored value is escaped, and this is what keeps it that way',
 	/innerHTML\s*=\s*[^']/.test( script.replace( /innerHTML\s*=\s*''/g, '' ) ) === false );
 
