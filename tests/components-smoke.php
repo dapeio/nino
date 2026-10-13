@@ -717,6 +717,9 @@ check( '...and nothing for a name that is not registered', \Nino\Modules\Compone
 $errorsOf = static fn( callable $run ): array => array_values( array_filter( ninoErrors( $run ), static fn( array $error ): bool => $error[0] !== E_DEPRECATED ) );
 $noop = static fn( array &$appData, array $args ): string => '';
 $goodSchema = [ 'label' => 'Probe', 'source' => 'text', 'attributes' => [ 'tone' => [ 'type' => 'select', 'options' => [ 'a', 'b' ], 'default' => 'a' ] ] ];
+// An icon is the parts of a 24 by 24 picture, each a tag and the attributes of that tag
+$goodIcon = [ [ 'path', [ 'd' => 'M6 12h12' ] ] ];
+$withIcon = static fn( mixed $icon ): array => [ 'label' => 'x', 'source' => 'text', 'icon' => $icon ];
 $badSchemas = [
 	'a name that is no slug'										=> [ 'Not A Slug', $goodSchema, 'a slug' ],
 	'a schema without a label'									=> [ 'nolabel', [ 'source' => 'text' ], '"label"' ],
@@ -746,6 +749,37 @@ $badSchemas = [
 	'an empty drawing'								=> [ 'emptydraws', [ 'label' => 'x', 'source' => 'text', 'draws' => '' ], '"draws" must be a non-empty string' ],
 	'a drawing with a placeholder no attribute has'	=> [ 'lostdraws', [ 'label' => 'x', 'source' => 'text', 'draws' => '{tag} .x' ], '"draws" has the placeholder {tag}' ],
 	'a drawing with a brace that is none'			=> [ 'bracedraws', [ 'label' => 'x', 'source' => 'text', 'attributes' => [ 'tone' => [ 'type' => 'string', 'default' => '' ] ], 'draws' => 'p .x{tone}}' ], '"draws" has a brace' ],
+	'an icon that is no list'						=> [ 'wordicon', $withIcon( 'M6 12h12' ), '"icon" is a list of parts, each a tag and its attributes' ],
+	'an icon that is a map'							=> [ 'mapicon', $withIcon( [ 'main' => $goodIcon[0] ] ), '"icon" is a list of parts, each a tag and its attributes' ],
+	'an icon with a gap in its numbering'			=> [ 'gapicon', $withIcon( [ 0 => $goodIcon[0], 2 => $goodIcon[0] ] ), '"icon" is a list of parts, each a tag and its attributes' ],
+	'an icon of no part'							=> [ 'emptyicon', $withIcon( [] ), '"icon" is a list of parts, each a tag and its attributes' ],
+	'an icon part that is no list'					=> [ 'wordparticon', $withIcon( [ 'path' ] ), '"icon" is a list of parts, each a tag and its attributes' ],
+	'an icon part that is a map'					=> [ 'mapparticon', $withIcon( [ [ 'tag' => 'path', 'attributes' => [ 'd' => 'M6 12h12' ] ] ] ), '"icon" is a list of parts, each a tag and its attributes' ],
+	'an icon part that is a tag alone'				=> [ 'tagicon', $withIcon( [ [ 'path' ] ] ), '"icon" is a list of parts, each a tag and its attributes' ],
+	'an icon part of three'							=> [ 'threeicon', $withIcon( [ [ 'path', [ 'd' => 'M6 12h12' ], 'x' ] ] ), '"icon" is a list of parts, each a tag and its attributes' ],
+	'an icon part whose tag is no string'			=> [ 'numbertagicon', $withIcon( [ [ 5, [ 'd' => 'M6 12h12' ] ] ] ), '"icon" is a list of parts, each a tag and its attributes' ],
+	'an icon part whose attributes are no map'		=> [ 'wordattricon', $withIcon( [ [ 'path', 'M6 12h12' ] ] ), '"icon" is a list of parts, each a tag and its attributes' ],
+	'an icon tag that is none of the seven'			=> [ 'scripticon', $withIcon( [ $goodIcon[0], [ 'script', [ 'd' => 'M6 12h12' ] ] ] ), '"icon" part 2 names "script", which is no tag of an icon' ],
+	'an icon tag in the wrong case'					=> [ 'caseicon', $withIcon( [ [ 'Path', [ 'd' => 'M6 12h12' ] ] ] ), '"icon" part 1 names "Path", which is no tag of an icon' ],
+	'an icon attribute that is none of its tag'		=> [ 'clickicon', $withIcon( [ [ 'circle', [ 'cx' => '9', 'cy' => '9', 'r' => '2', 'onclick' => 'alert(1)' ] ] ] ), '"icon" part 1: "onclick" is none of a circle' ],
+	'an icon attribute of another tag'				=> [ 'radiusicon', $withIcon( [ [ 'path', [ 'd' => 'M6 12h12', 'r' => '2' ] ] ] ), '"icon" part 1: "r" is none of a path' ],
+	'an icon ellipse with the radius of a circle'	=> [ 'ellipseicon', $withIcon( [ [ 'ellipse', [ 'cx' => '9', 'cy' => '9', 'rx' => '2', 'ry' => '1', 'r' => '2' ] ] ] ), '"icon" part 1: "r" is none of an ellipse' ],
+	'an icon attribute its tag needs, left out'		=> [ 'lostattricon', $withIcon( [ [ 'circle', [ 'cx' => '9', 'cy' => '9' ] ] ] ), '"icon" part 1: a circle needs "r"' ],
+	'an icon rect without its width'				=> [ 'widthicon', $withIcon( [ [ 'rect', [ 'x' => '3', 'y' => '3', 'height' => '18', 'rx' => '2' ] ] ] ), '"icon" part 1: a rect needs "width"' ],
+	'an icon ellipse without a radius'				=> [ 'lostradiusicon', $withIcon( [ [ 'ellipse', [ 'cx' => '9', 'cy' => '9', 'rx' => '2' ] ] ] ), '"icon" part 1: an ellipse needs "ry"' ],
+	'an icon value that is no string'				=> [ 'intvalueicon', $withIcon( [ [ 'circle', [ 'cx' => 9, 'cy' => '9', 'r' => '2' ] ] ] ), '"icon" part 1: "cx" is not a number' ],
+	'an icon number with a unit'					=> [ 'unitvalueicon', $withIcon( [ [ 'circle', [ 'cx' => '9', 'cy' => '9', 'r' => '2px' ] ] ] ), '"icon" part 1: "r" is not a number' ],
+	'an icon path with a character outside its set'	=> [ 'badpathicon', $withIcon( [ $goodIcon[0], $goodIcon[0], [ 'path', [ 'd' => 'M6 12h12"' ] ] ] ), '"icon" part 3: "d" is not a path' ],
+	'an icon path with a line break at its end'		=> [ 'newlineicon', $withIcon( [ [ 'path', [ 'd' => "M6 12h12\n" ] ] ] ), '"icon" part 1: "d" is not a path' ],
+	'an icon list of points with a letter in it'	=> [ 'badpointsicon', $withIcon( [ [ 'polyline', [ 'points' => '3 3 a' ] ] ] ), '"icon" part 1: "points" is not a list of points' ],
+	'an icon number with a line break at its end'	=> [ 'lfnumbericon', $withIcon( [ [ 'circle', [ 'cx' => "9\n", 'cy' => '9', 'r' => '2' ] ] ] ), '"icon" part 1: "cx" is not a number' ],
+	'an icon number in exponent notation'			=> [ 'expnumbericon', $withIcon( [ [ 'circle', [ 'cx' => '9', 'cy' => '9', 'r' => '1e1' ] ] ] ), '"icon" part 1: "r" is not a number' ],
+	'an icon list of points with a line break at its end'	=> [ 'lfpointsicon', $withIcon( [ [ 'polyline', [ 'points' => "3 3\n" ] ] ] ), '"icon" part 1: "points" is not a list of points' ],
+	'an icon number of 13 characters'				=> [ 'longnumbericon', $withIcon( [ [ 'circle', [ 'cx' => '9', 'cy' => '9', 'r' => '-1234567.1234' ] ] ] ), '"icon" part 1: "r" is longer than 12 characters' ],
+	'an icon path of 513 characters'				=> [ 'longpathicon', $withIcon( [ [ 'path', [ 'd' => 'M'. str_repeat( '1', 512 ) ] ] ] ), '"icon" part 1: "d" is longer than 512 characters' ],
+	'an icon list of points of 257 characters'		=> [ 'longpointsicon', $withIcon( [ [ 'polygon', [ 'points' => str_repeat( '1', 257 ) ] ] ] ), '"icon" part 1: "points" is longer than 256 characters' ],
+	'an icon of 13 parts'							=> [ 'manyicon', $withIcon( array_fill( 0, 13, $goodIcon[0] ) ), '"icon" holds more than 12 parts' ],
+	'an icon of 2049 characters in all'				=> [ 'heavyicon', $withIcon( array_merge( array_fill( 0, 4, [ 'path', [ 'd' => 'M'. str_repeat( '1', 511 ) ] ] ), [ [ 'path', [ 'd' => 'M' ] ] ] ) ), '"icon" is longer than 2048 characters' ],
 ];
 foreach( $badSchemas as $what => [ $name, $schema, $why ] ) {
 	$schemaErrors = $errorsOf( function() use ( &$appData, $noop, $name, $schema ) { \Nino\Modules\Components::addComponent( $appData, $name, $noop, $schema ); } );
@@ -792,6 +826,50 @@ check( '...and gives the sentence of the first thing wrong with it: a place that
 	array_filter( [ 'page', 'cell', 'Card', [ 'card' ], 5, '', true ], static fn( mixed $wrong ): bool => str_contains( $holdsAnswer( $holding + [ 'holds' => $wrong ] ), '"holds" names a place: section, card or hero' ) === false ) === []
 	&& array_filter( [ 'text', 'image', 'href', 'none' ], static fn( string $source ): bool => str_contains( $holdsAnswer( [ 'source' => $source, 'holds' => 'card' ] + $holding ), '"holds" needs the source content' ) === false ) === []
 	&& $holdsAnswer( [ 'holds' => 'weird', 'source' => 'text' ] + $holding ) !== '' && str_contains( $holdsAnswer( [ 'holds' => 'weird', 'source' => 'text' ] + $holding ), 'names a place' ) === true );
+// An icon: the parts of a 24 by 24 picture that a tool draws with a stroke, which validate() carries into the clean schema as it was given - the refusals are in the table above
+$iconAnswer = static fn( mixed $icon ): array|string => \Nino\Modules\Components::validate( 'probe', $placed + [ 'icon' => $icon ] );
+$iconSeven = [
+	[ 'path', [ 'd' => 'M6 12h12' ] ],
+	[ 'circle', [ 'cx' => '9', 'cy' => '9', 'r' => '2' ] ],
+	[ 'ellipse', [ 'cx' => '12', 'cy' => '12', 'rx' => '8', 'ry' => '4' ] ],
+	[ 'rect', [ 'x' => '3', 'y' => '3', 'width' => '18', 'height' => '18' ] ],
+	[ 'line', [ 'x1' => '3', 'y1' => '3', 'x2' => '21', 'y2' => '21' ] ],
+	[ 'polyline', [ 'points' => '3 3 12 12 21 3' ] ],
+	[ 'polygon', [ 'points' => '12 2.5 22 21.5 2 21.5' ] ],
+];
+$iconAnyOrder = [ [ 'rect', [ 'height' => '18', 'width' => '18', 'y' => '3', 'x' => '3' ] ], [ 'circle', [ 'r' => '2', 'cy' => '9', 'cx' => '9' ] ] ];
+$iconRect = static fn( array $radii ): array => [ [ 'rect', [ 'x' => '3', 'y' => '3', 'width' => '18', 'height' => '18' ] + $radii ] ];
+check( 'validate() takes an icon with parts of each of the seven tags and carries it in the clean schema as it was given: part by part, the attributes of a part in the order given, every value the string it was',
+	( $iconAnswer( $iconSeven )['icon'] ?? null ) === $iconSeven && ( $iconAnswer( $iconAnyOrder )['icon'] ?? null ) === $iconAnyOrder );
+check( '...a schema that says no icon has none, and a rect has both of its radii, one of them or none, where every other tag has all the attributes it takes',
+	array_key_exists( 'icon', \Nino\Modules\Components::validate( 'probe', $placed ) ) === false
+	&& array_filter( [ [ 'rx' => '2', 'ry' => '2' ], [ 'rx' => '2' ], [ 'ry' => '2' ], [] ], static fn( array $radii ): bool => is_array( $iconAnswer( $iconRect( $radii ) ) ) === false ) === [] );
+check( '...up to the limits - 12 parts, a number of 12 characters, a path of 512, a list of points of 256 and 2048 characters in all - of each of which the table above refuses one more',
+	is_array( $iconAnswer( array_fill( 0, 12, $goodIcon[0] ) ) ) === true
+	&& is_array( $iconAnswer( [ [ 'circle', [ 'cx' => '9', 'cy' => '9', 'r' => '-1234567.123' ] ] ] ) ) === true
+	&& is_array( $iconAnswer( [ [ 'path', [ 'd' => 'M'. str_repeat( '1', 511 ) ] ] ] ) ) === true
+	&& is_array( $iconAnswer( [ [ 'polygon', [ 'points' => str_repeat( '1', 256 ) ] ] ] ) ) === true
+	&& is_array( $iconAnswer( array_fill( 0, 4, [ 'path', [ 'd' => 'M'. str_repeat( '1', 511 ) ] ] ) ) ) === true );
+$iconRows = array_filter( $badSchemas, static fn( array $row ): bool => isset( $row[1]['icon'] ) === true );
+check( '...and the message of every icon that is refused starts with the name of the component and says that it is the icon, which is how a manifest names what it is refused for',
+	$iconRows !== [] && array_filter( $iconRows, static fn( array $row ): bool => str_starts_with( (string) \Nino\Modules\Components::validate( $row[0], $row[1] ), 'component "'. $row[0]. '": "icon" ' ) === false ) === [] );
+check( '...a stack has no icon: the key is dropped from its clean schema, a good one and a bad one alike, and the stack is registered all the same',
+	array_key_exists( 'icon', \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'icon' => $iconSeven ], true ) ) === false
+	&& is_array( \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'icon' => 'not an icon' ], true ) ) === true
+	&& array_key_exists( 'icon', \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'icon' => 'not an icon' ], true ) ) === false
+	&& ( static function() use ( &$appData, $noop, $iconSeven ): bool {
+		\Nino\Modules\Components::addStack( $appData, 'pictured-rows', $noop, [ 'label' => 'x', 'icon' => $iconSeven ] );
+		return isset( \Nino\Modules\Components::stacks( $appData )['pictured-rows'] ) === true && array_key_exists( 'icon', \Nino\Modules\Components::stacks( $appData )['pictured-rows'] ) === false;
+	} )() );
+// A component registered with an icon hands it on: to a tool that asks the registry for it, and to one that reads the json of the registry
+$pictured = [ [ 'circle', [ 'cx' => '12', 'cy' => '12', 'r' => '4' ] ], [ 'path', [ 'd' => 'M4 12h16' ] ], [ 'rect', [ 'rx' => '2', 'x' => '3', 'y' => '3', 'width' => '18', 'height' => '18' ] ] ];
+\Nino\Modules\Components::addComponent( $appData, 'pictured', $noop, [ 'label' => 'Pictured', 'source' => 'none', 'icon' => $pictured ] );
+check( 'a component registered with an icon carries it in the registry as it was given',
+	( \Nino\Modules\Components::components( $appData )['pictured']['icon'] ?? null ) === $pictured
+	&& array_key_exists( 'icon', \Nino\Modules\Components::components( $appData )['pictured'] ) === true );
+check( '...and in the json of the registry, which a tool reads: the parts are lists and the attributes of a part maps, in the order given',
+	str_contains( (string) json_encode( \Nino\Modules\Components::components( $appData )['pictured'] ), '"icon":[["circle",{"cx":"12","cy":"12","r":"4"}],["path",{"d":"M4 12h16"}],["rect",{"rx":"2","x":"3","y":"3","width":"18","height":"18"}]]' ) === true
+	&& ( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), true ) )['pictured']['icon'] === $pictured );
 // Where a tool offers the six titles, and what each of them draws
 $kernelPlaces = [ 'title' => [ 'section' ], 'card-title' => [ 'card' ], 'hero-title' => [ 'hero' ], 'subtitle' => [ 'section' ], 'card-subtitle' => [ 'card' ], 'hero-subtitle' => [ 'hero' ] ];
 $kernelDraws = [ 'title' => '{tag} .nino-section-title', 'card-title' => '{tag} .nino-card-title', 'hero-title' => '{tag} .nino-hero-title',
@@ -815,12 +893,54 @@ check( '...and every title has a tag of its own - the tags it may be drawn as, a
 		|| \Nino\Modules\Components::components( $appData )[$name]['attributes']['tag']['label'] !== [ 'en_US' => 'Tag', 'de_DE' => 'Tag' ], ARRAY_FILTER_USE_BOTH ) === []
 	&& array_filter( array_keys( $kernelPlaces ), static fn( string $name ): bool => \Nino\Modules\Components::components( $appData )[$name]['label'] === \Nino\Modules\Components::components( $appData )['title']['label']
 		|| \Nino\Modules\Components::components( $appData )[$name]['preview'] !== 'title' || \Nino\Modules\Components::components( $appData )[$name]['source'] !== 'text' ) === [ 'title' ] );
+// The icons of the twelve: each component of the kernel is shown by the parts of a 24 by 24 icon of Lucide, which the registry hands to a tool
+$kernelTwelve = [ 'title', 'subtitle', 'card-title', 'card-subtitle', 'hero-title', 'hero-subtitle', 'text', 'card', 'button', 'image', 'html', 'spacer' ];
+$iconTags = [ 'path' => [ [ 'd' ], [] ], 'circle' => [ [ 'cx', 'cy', 'r' ], [] ], 'ellipse' => [ [ 'cx', 'cy', 'rx', 'ry' ], [] ], 'rect' => [ [ 'x', 'y', 'width', 'height' ], [ 'rx', 'ry' ] ],
+	'line' => [ [ 'x1', 'y1', 'x2', 'y2' ], [] ], 'polyline' => [ [ 'points' ], [] ], 'polygon' => [ [ 'points' ], [] ] ];
+$iconOf = static fn( string $name ): mixed => \Nino\Modules\Components::components( $appData )[$name]['icon'] ?? null;
+$iconWrong = [];
+foreach( $kernelTwelve as $iconName ) {
+	$iconParts = $iconOf( $iconName );
+	if( is_array( $iconParts ) === false || array_is_list( $iconParts ) === false || count( $iconParts ) < 1 || count( $iconParts ) > 5 ) {
+		$iconWrong[] = $iconName. ' has no list of one to five parts';
+		continue;
+	}
+	foreach( $iconParts as $iconNumber => $iconPart ) {
+		$iconPart = is_array( $iconPart ) === true ? $iconPart : [];
+		$iconRule = is_string( $iconPart[0] ?? null ) === true ? ( $iconTags[ $iconPart[0] ] ?? null ) : null;
+		$iconAttributes = is_array( $iconPart[1] ?? null ) === true ? $iconPart[1] : null;
+		if( $iconRule === null || $iconAttributes === null || array_diff( $iconRule[0], array_keys( $iconAttributes ) ) !== [] || array_diff( array_keys( $iconAttributes ), $iconRule[0], $iconRule[1] ) !== []
+			|| array_filter( $iconAttributes, 'is_string' ) !== $iconAttributes )
+			$iconWrong[] = $iconName. ' part '. ( $iconNumber + 1 ). ' is no complete part of an icon';
+	}
+}
+check( 'each of the twelve components of the kernel carries an icon: a list of one to five parts, each a tag among the seven and a map of strings that holds the attributes of that tag'. ( $iconWrong === [] ? '' : ' - '. implode( ', ', $iconWrong ) ), $iconWrong === [] );
+check( '...the title is drawn by the three paths of the heading of Lucide, the card by a rect and a path, and the image by a rect, a circle and a path',
+	$iconOf( 'title' ) === [ [ 'path', [ 'd' => 'M6 12h12' ] ], [ 'path', [ 'd' => 'M6 20V4' ] ], [ 'path', [ 'd' => 'M18 20V4' ] ] ]
+	&& array_column( (array) $iconOf( 'card' ), 0 ) === [ 'rect', 'path' ] && array_column( (array) $iconOf( 'image' ), 0 ) === [ 'rect', 'circle', 'path' ] );
+$iconKinds = [ 'title', 'subtitle', 'text', 'card', 'button', 'image', 'html', 'spacer' ];
+check( '...the three titles are drawn alike and so are the three subtitles, and the title, the subtitle, the text, the card, the button, the image, the html and the spacer each have a picture of their own',
+	$iconOf( 'title' ) === $iconOf( 'card-title' ) && $iconOf( 'title' ) === $iconOf( 'hero-title' )
+	&& $iconOf( 'subtitle' ) === $iconOf( 'card-subtitle' ) && $iconOf( 'subtitle' ) === $iconOf( 'hero-subtitle' )
+	&& count( array_unique( array_map( static fn( string $name ): string => (string) json_encode( $iconOf( $name ) ), $iconKinds ) ) ) === count( $iconKinds ) );
+// Which icon of Lucide a component carries shows in the first part of it: the eight icons begin with eight different parts
+$iconFirst = [
+	'title' => [ 'path', [ 'd' => 'M6 12h12' ] ], 'subtitle' => [ 'path', [ 'd' => 'M12 4v16' ] ], 'text' => [ 'path', [ 'd' => 'M21 5H3' ] ],
+	'card' => [ 'rect', [ 'width' => '18', 'height' => '18', 'x' => '3', 'y' => '3', 'rx' => '2' ] ], 'button' => [ 'path', [ 'd' => 'M14 4.1 12 6' ] ],
+	'image' => [ 'rect', [ 'width' => '18', 'height' => '18', 'x' => '3', 'y' => '3', 'rx' => '2', 'ry' => '2' ] ], 'html' => [ 'path', [ 'd' => 'm16 18 6-6-6-6' ] ], 'spacer' => [ 'path', [ 'd' => 'm16 16-4 4-4-4' ] ],
+];
+$iconKindOf = [ 'title' => 'title', 'card-title' => 'title', 'hero-title' => 'title', 'subtitle' => 'subtitle', 'card-subtitle' => 'subtitle', 'hero-subtitle' => 'subtitle',
+	'text' => 'text', 'card' => 'card', 'button' => 'button', 'image' => 'image', 'html' => 'html', 'spacer' => 'spacer' ];
+check( '...the titles are drawn as the heading of Lucide, the subtitles as its type, the text as lines, the card as a panel, the button as a pointer, the image as a picture, the html as code and the spacer as a separator',
+	array_filter( $iconKindOf, static fn( string $kind, string $name ): bool => ( $iconOf( $name )[0] ?? null ) !== $iconFirst[$kind], ARRAY_FILTER_USE_BOTH ) === [] );
+check( '...and the json of the registry gives each of the twelve back as it is: the parts as lists and the attributes of a part as maps',
+	array_filter( $kernelTwelve, static fn( string $name ): bool => ( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), true ) )[$name]['icon'] !== $iconOf( $name ) ) === [] );
 // The card: a component that holds components. What the registry says of it, and of nothing else of the kernel
 $cardSchema = \Nino\Modules\Components::components( $appData )['card'];
-check( 'the card is declared as the registry says: a label in both languages, the source content, the picture of a block, offered in a section and a hero, drawing the <article> with its class, and holding the components of a card',
+check( 'the card is declared as the registry says: a label in both languages, the source content, the picture of a block, its icon, offered in a section and a hero, drawing the <article> with its class, and holding the components of a card',
 	$cardSchema['label'] === [ 'en_US' => 'Card', 'de_DE' => 'Karte' ] && $cardSchema['source'] === 'content' && $cardSchema['loop'] === true && $cardSchema['preview'] === 'block'
 	&& $cardSchema['in'] === [ 'section', 'hero' ] && $cardSchema['draws'] === 'article .nino-card' && $cardSchema['holds'] === 'card'
-	&& array_keys( $cardSchema ) === [ 'label', 'source', 'loop', 'preview', 'attributes', 'in', 'draws', 'holds' ] );
+	&& array_keys( $cardSchema ) === [ 'label', 'source', 'loop', 'preview', 'icon', 'attributes', 'in', 'draws', 'holds' ] );
 check( '...its attributes are nine, in the order the Builder writes them: the ground, the padding, whether it fills, where its content stands, how it is aligned, the picture, its focus, the dim and the border',
 	array_keys( $cardSchema['attributes'] ) === [ 'ground', 'padding', 'fill', 'vertical', 'align', 'background', 'focus', 'dim', 'borderless' ] );
 $cardTypes = [ 'ground' => 'select', 'padding' => 'select', 'fill' => 'bool', 'vertical' => 'select', 'align' => 'select', 'background' => 'image', 'focus' => 'select', 'dim' => 'bool', 'borderless' => 'bool' ];
@@ -861,6 +981,8 @@ check( '...and the style of the six titles and of the text says what its variant
 	array_filter( [ 'title', 'card-title', 'hero-title', 'subtitle', 'card-subtitle', 'hero-subtitle', 'text' ], static fn( string $name ): bool => ( \Nino\Modules\Components::components( $appData )[$name]['attributes']['style']['hint'] ?? null ) !== $styleHint ) === [] );
 check( 'a clean schema validates again as it is - what a manifest hands over after Features::manifest() has read it', \Nino\Modules\Components::validate( 'title', \Nino\Modules\Components::components( $appData )['title'] ) === \Nino\Modules\Components::components( $appData )['title']
 	&& \Nino\Modules\Components::validate( 'filter', \Nino\Modules\Components::stacks( $appData )['filter'], true ) === \Nino\Modules\Components::stacks( $appData )['filter'] );
+check( '...icon and all: each of the twelve, and a component registered with an icon of its own, validates again as it is, the parts and the maps of the icon in the order they were in',
+	array_filter( array_merge( $kernelTwelve, [ 'pictured' ] ), static fn( string $name ): bool => \Nino\Modules\Components::validate( $name, \Nino\Modules\Components::components( $appData )[$name] ) !== \Nino\Modules\Components::components( $appData )[$name] ) === [] );
 \Nino\Callbacks::registerCallback( $appData, '/test/removable', static fn( array &$appData, mixed &$args ): string => 'x' );
 \Nino\Callbacks::registerCallback( $appData, '/test/removable', static fn( array &$appData, mixed &$args ): string => 'y' );
 check( 'Callbacks::removeCallbacks() takes every callable under a name away, and only those', count( \Nino\Callbacks::registered( $appData, '/test/removable' ) ) === 2

@@ -108,6 +108,15 @@ The rules the module keeps for you, and the ones it leaves to the renderer:
   is another component. A container does not render its content itself: the
   engine renders the output of a shortcode again, so what it returns inside its
   own markup is rendered when it is - with a stack's element still the context.
+- `icon` is optional as well, and as little a matter of rendering: the picture a
+  tool shows the component by, where a tool without it shows one of its own. It
+  is geometry and not markup - a list of 1 to 12 parts, each a tag (`path`,
+  `circle`, `ellipse`, `rect`, `line`, `polyline` or `polygon`) and the map of
+  the attributes that tag takes, every value a string.
+  `'icon' => [ [ 'path', [ 'd' => 'M4 12h16' ] ] ]` is a line across the middle.
+  A 24 by 24 stroke icon of Lucide is the shape the workbench draws, so an icon
+  of that kind sits among the kernel's own; the tool builds the elements from
+  the parts.
 
 ## 2. A stack from the project
 

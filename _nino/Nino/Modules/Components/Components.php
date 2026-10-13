@@ -89,6 +89,31 @@ namespace Nino\Modules {
 		// hero
 		public const array PLACES = [ 'section', 'card', 'hero' ];
 
+		// What an icon is made of - see validate(): the tags a part may be, each
+		// with the attributes it takes (a part holds all of them and none other;
+		// the radii of a rect may be left out, ICON_OPTIONAL); how a value is
+		// written, how long it may be and what a message calls it - a number,
+		// unless it is the d of a path or the points of a polyline or a polygon;
+		// and how many parts an icon has and how many characters its values have
+		// together
+		private const array ICON_TAGS = [
+			'path'		=> [ 'd' ],
+			'circle'	=> [ 'cx', 'cy', 'r' ],
+			'ellipse'	=> [ 'cx', 'cy', 'rx', 'ry' ],
+			'rect'		=> [ 'x', 'y', 'width', 'height', 'rx', 'ry' ],
+			'line'		=> [ 'x1', 'y1', 'x2', 'y2' ],
+			'polyline'	=> [ 'points' ],
+			'polygon'	=> [ 'points' ],
+		];
+		private const array ICON_OPTIONAL = [ 'rect' => [ 'rx', 'ry' ] ];
+		private const array ICON_VALUES = [
+			'number'	=> [ '/^-?\d+(\.\d+)?$/D', 12, 'a number' ],
+			'd'			=> [ '/^[MmLlHhVvCcSsQqTtAaZz0-9 .,-]+$/D', 512, 'a path' ],
+			'points'	=> [ '/^[0-9 .,-]+$/D', 256, 'a list of points' ],
+		];
+		private const int ICON_PARTS = 12;
+		private const int ICON_LENGTH = 2048;
+
 		// The widths a cell may have in a grid, as Nino.css has them
 		private const array WIDTHS = [ '25', '33', '50', '66', '75', '100' ];
 
@@ -120,6 +145,74 @@ namespace Nino\Modules {
 			'autoheight'	=> [ 'type' => 'bool', 'default' => false ],
 		];
 
+		// The icons of the kernel's components: eight icons of Lucide 0.577.0
+		// (lucide.dev, ISC - see THIRD-PARTY-NOTICES.md) under the names Lucide
+		// gives them. Each is 24 by 24 and drawn with a stroke by the tool that
+		// shows it, and is kept as parts - the elements inside the <svg> of its
+		// file, each a tag and its attributes as the file spells them, in its
+		// order - and not as markup, which is the shape AGENTS.md, "Markup
+		// belongs in a template", wants an icon in: the tool builds the elements
+		// from the parts it is handed
+		private const array SHAPES = [
+			'heading' => [
+				[ 'path', [ 'd' => 'M6 12h12' ] ],
+				[ 'path', [ 'd' => 'M6 20V4' ] ],
+				[ 'path', [ 'd' => 'M18 20V4' ] ],
+			],
+			'type' => [
+				[ 'path', [ 'd' => 'M12 4v16' ] ],
+				[ 'path', [ 'd' => 'M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2' ] ],
+				[ 'path', [ 'd' => 'M9 20h6' ] ],
+			],
+			'text-align-start' => [
+				[ 'path', [ 'd' => 'M21 5H3' ] ],
+				[ 'path', [ 'd' => 'M15 12H3' ] ],
+				[ 'path', [ 'd' => 'M17 19H3' ] ],
+			],
+			'panel-top' => [
+				[ 'rect', [ 'width' => '18', 'height' => '18', 'x' => '3', 'y' => '3', 'rx' => '2' ] ],
+				[ 'path', [ 'd' => 'M3 9h18' ] ],
+			],
+			'mouse-pointer-click' => [
+				[ 'path', [ 'd' => 'M14 4.1 12 6' ] ],
+				[ 'path', [ 'd' => 'm5.1 8-2.9-.8' ] ],
+				[ 'path', [ 'd' => 'm6 12-1.9 2' ] ],
+				[ 'path', [ 'd' => 'M7.2 2.2 8 5.1' ] ],
+				[ 'path', [ 'd' => 'M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z' ] ],
+			],
+			'image' => [
+				[ 'rect', [ 'width' => '18', 'height' => '18', 'x' => '3', 'y' => '3', 'rx' => '2', 'ry' => '2' ] ],
+				[ 'circle', [ 'cx' => '9', 'cy' => '9', 'r' => '2' ] ],
+				[ 'path', [ 'd' => 'm21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21' ] ],
+			],
+			'code' => [
+				[ 'path', [ 'd' => 'm16 18 6-6-6-6' ] ],
+				[ 'path', [ 'd' => 'm8 6-6 6 6 6' ] ],
+			],
+			'separator-horizontal' => [
+				[ 'path', [ 'd' => 'm16 16-4 4-4-4' ] ],
+				[ 'path', [ 'd' => 'M3 12h18' ] ],
+				[ 'path', [ 'd' => 'm8 8 4-4 4 4' ] ],
+			],
+		];
+
+		// Which of them each component carries: the three titles are one heading,
+		// the three subtitles one line of type
+		private const array ICONS = [
+			'title'			=> 'heading',
+			'subtitle'		=> 'type',
+			'card-title'	=> 'heading',
+			'card-subtitle'	=> 'type',
+			'hero-title'	=> 'heading',
+			'hero-subtitle'	=> 'type',
+			'text'			=> 'text-align-start',
+			'card'			=> 'panel-top',
+			'button'		=> 'mouse-pointer-click',
+			'image'			=> 'image',
+			'html'			=> 'code',
+			'spacer'		=> 'separator-horizontal',
+		];
+
 		/**
 		 *	Module initiating: the components and the stacks the kernel brings,
 		 *	and then those of the active features that declare them in their
@@ -132,6 +225,10 @@ namespace Nino\Modules {
 		 *	and of a hero come first, in pairs, then the text, the card, the button,
 		 *	the image, the html and the spacer - and for any one place ('in') that
 		 *	is the order its column has. The components of a feature follow these.
+		 *
+		 *	Each of the kernel's components carries an icon, so that the registry that
+		 *	lists them hands a tool the picture to show each by: ICONS names the shape
+		 *	it takes and SHAPES holds the parts of it. A stack has none.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -199,7 +296,8 @@ namespace Nino\Modules {
 			// Each class is a component of its own, and the schema says where a tool
 			// offers it ('in'), what it draws ('draws') and what it holds ('holds', the
 			// card's): the renderer reads no context, so a title in a card is the one
-			// that draws the title of a card
+			// that draws the title of a card. Its icon is the shape ICONS names, as the
+			// parts SHAPES holds
 			foreach( $components as [ $name, $en, $de, $preview, $source, $attributes, $in, $draws, $holds ] )
 				self::addComponent( $appData, $name, [ self::class, 'component'. str_replace( ' ', '', ucwords( str_replace( '-', ' ', $name ) ) ) ], [
 					'label'				=> [ 'en_US' => $en, 'de_DE' => $de ],
@@ -207,6 +305,7 @@ namespace Nino\Modules {
 					'loop'				=> true,
 					'attributes'	=> $attributes,
 					'preview'			=> $preview,
+					'icon'				=> self::SHAPES[ self::ICONS[$name] ],
 				] + ( $in !== null ? [ 'in' => $in ] : [] ) + ( $draws !== null ? [ 'draws' => $draws ] : [] ) + ( $holds !== null ? [ 'holds' => $holds ] : [] ) );
 
 			$stacks = [
@@ -417,7 +516,7 @@ namespace Nino\Modules {
 		 *
 		 *	@param		string		$name					The shortcode, a slug
 		 *	@param		mixed			$schema				label, source (not for a stack), loop, attributes, preview;
-		 *																	in, draws and holds for a component, grid and assets for a stack.
+		 *																	icon, in, draws and holds for a component, grid and assets for a stack.
 		 *																	See docs/development.md, "Components"
 		 *	@param		bool			$stack				Read it as a stack's
 		 *
@@ -462,6 +561,22 @@ namespace Nino\Modules {
 				return $what. ': "preview" must be one of '. implode( ', ', self::PREVIEWS );
 
 			$clean['preview'] = $preview;
+
+			// The icon a tool shows the component by, optional and a component's
+			// alone: the key of a stack is dropped unread, as 'in', 'draws' and
+			// 'holds' are below. Left out of the clean schema where the schema
+			// leaves it out, and an empty one is refused, so that leaving the key
+			// out is the one way to say so; the clean one is the list as it was
+			// given
+			if( $stack === false && isset( $schema['icon'] ) === true ) {
+
+				$icon = self::_icon( $what, $schema['icon'] );
+
+				if( is_string( $icon ) === true )
+					return $icon;
+
+				$clean['icon'] = $icon;
+			}
 
 			$taken = $stack === true ? array_merge( array_keys( self::LOOP ), array_keys( self::GRID ), self::RESERVED ) : self::RESERVED;
 
@@ -664,6 +779,79 @@ namespace Nino\Modules {
 				return $where. 'the default must be a string';
 
 			$clean['default'] = $default;
+
+			return $clean;
+		}
+
+		/**
+		 *	The icon of a component, checked and complete: the parts of a 24 by 24
+		 *	icon that a tool draws with a stroke. It is geometry and no markup, and
+		 *	checked as such, so that the tool builds its elements from the parts with
+		 *	no parser or sanitiser of its own: a list of 1 to ICON_PARTS parts, each a
+		 *	list of two, a tag of ICON_TAGS and the map of its attributes, which holds
+		 *	every one the tag takes (but for ICON_OPTIONAL) and no other, in any order -
+		 *	each value a string of the characters ICON_VALUES allows it and no longer
+		 *	than that, and all the values together at most ICON_LENGTH characters
+		 *
+		 *	@param		string		$what					How the message names the component
+		 *	@param		mixed			$icon
+		 *
+		 *	@return 	array|string						The clean list of parts, as it was given, or what is wrong with it
+		 */
+		private static function _icon( string $what, mixed $icon ): array|string {
+
+			$where = $what. ': "icon" ';
+
+			if( is_array( $icon ) === false || array_is_list( $icon ) === false || $icon === [] )
+				return $where. 'is a list of parts, each a tag and its attributes';
+
+			if( count( $icon ) > self::ICON_PARTS )
+				return $where. 'holds more than '. self::ICON_PARTS. ' parts';
+
+			$clean = [];
+			$length = 0;
+
+			foreach( $icon as $index => $part ) {
+
+				if( is_array( $part ) === false || array_is_list( $part ) === false || count( $part ) !== 2 || is_string( $part[0] ) === false || is_array( $part[1] ) === false )
+					return $where. 'is a list of parts, each a tag and its attributes';
+
+				[ $tag, $attributes ] = $part;
+
+				$which = $where. 'part '. ( $index + 1 );
+
+				if( array_key_exists( $tag, self::ICON_TAGS ) === false )
+					return $which. ' names "'. $tag. '", which is no tag of an icon';
+
+				$article = in_array( $tag[0], [ 'a', 'e', 'i', 'o', 'u' ], true ) === true ? 'an' : 'a';
+
+				// What the part may say, then what it has to say, then how it says it
+				foreach( array_keys( $attributes ) as $name )
+					if( in_array( $name, self::ICON_TAGS[$tag], true ) === false )
+						return $which. ': "'. $name. '" is none of '. $article. ' '. $tag;
+
+				foreach( array_diff( self::ICON_TAGS[$tag], self::ICON_OPTIONAL[$tag] ?? [] ) as $name )
+					if( array_key_exists( $name, $attributes ) === false )
+						return $which. ': '. $article. ' '. $tag. ' needs "'. $name. '"';
+
+				foreach( $attributes as $name => $value ) {
+
+					[ $pattern, $most, $kind ] = self::ICON_VALUES[$name] ?? self::ICON_VALUES['number'];
+
+					if( is_string( $value ) === false || preg_match( $pattern, $value ) !== 1 )
+						return $which. ': "'. $name. '" is not '. $kind;
+
+					if( strlen( $value ) > $most )
+						return $which. ': "'. $name. '" is longer than '. $most. ' characters';
+
+					$length += strlen( $value );
+				}
+
+				$clean[] = [ $tag, $attributes ];
+			}
+
+			if( $length > self::ICON_LENGTH )
+				return $where. 'is longer than '. self::ICON_LENGTH. ' characters';
 
 			return $clean;
 		}

@@ -188,6 +188,18 @@ check( '...and what it draws is a short selector of letters, digits, space, dot 
 	&& manifestFails( $manifestDir, 'LongDraws', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'draws' => str_repeat( 'a', 65 ) ] ] ], 'component "probe": "draws"' )
 	&& manifestFails( $manifestDir, 'LostDraws', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'draws' => '{tag} .x' ] ] ], 'component "probe": "draws"' )
 	&& manifestFails( $manifestDir, 'EmptyDraws', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'draws' => '' ] ] ], 'component "probe": "draws"' ) );
+// ...and the icon: the parts of a 24 by 24 picture a tool shows a component by, which the manifest hands on as they are written
+$goodIcon = [ [ 'path', [ 'd' => 'M4 12h16' ] ], [ 'circle', [ 'cx' => '12', 'cy' => '12', 'r' => '3' ] ] ];
+check( 'the icon of a component is carried by the manifest as it was written, and a schema that says none has none; a stack has no icon to carry',
+	\Nino\Features::manifest( writeManifest( $manifestDir, 'WithIcon', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'icon' => $goodIcon ] ], 'stacks' => [ 'rows' => [ 'label' => 'Rows', 'icon' => $goodIcon ] ] ] ) )['components']['probe']['icon'] === $goodIcon
+	&& array_key_exists( 'icon', \Nino\Features::manifest( $manifestDir. '/WithIcon' )['stacks']['rows'] ) === false
+	&& array_key_exists( 'icon', \Nino\Features::manifest( $manifestDir. '/WithComponents' )['components']['probe'] ) === false && ninoWarnings() === [] );
+check( '...so an icon that is no list of parts, a tag of none of the seven, an attribute that is none of its tag\'s, a value that is no path and a 13th part are refused, with the name of the component',
+	manifestFails( $manifestDir, 'WordIcon', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'icon' => 'M4 12h16' ] ] ], 'component "probe": "icon" is a list of parts, each a tag and its attributes' )
+	&& manifestFails( $manifestDir, 'ScriptIcon', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'icon' => [ [ 'script', [ 'd' => 'M4 12h16' ] ] ] ] ] ], 'component "probe": "icon" part 1 names "script", which is no tag of an icon' )
+	&& manifestFails( $manifestDir, 'ClickIcon', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'icon' => [ [ 'path', [ 'd' => 'M4 12h16', 'onclick' => 'x' ] ] ] ] ] ], 'component "probe": "icon" part 1: "onclick" is none of a path' )
+	&& manifestFails( $manifestDir, 'PathIcon', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'icon' => [ [ 'path', [ 'd' => 'M4 12h16' ] ], [ 'path', [ 'd' => 'M4 12h16;' ] ] ] ] ] ], 'component "probe": "icon" part 2: "d" is not a path' )
+	&& manifestFails( $manifestDir, 'ManyIcon', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'icon' => array_fill( 0, 13, $goodIcon[0] ) ] ] ], 'component "probe": "icon" holds more than 12 parts' ) );
 check( 'extensions are names', manifestFails( $manifestDir, 'BadExt', [ 'name' => 'x', 'version' => '1.0.0', 'php' => [ 'ext' => [ 'g d' ] ] ], '"php"' ) );
 
 // The vocabulary is CATEGORIES, the rule is a slug. A feature written for a
@@ -534,6 +546,9 @@ check( 'a listed feature\'s components and stacks are registered with the schema
 check( '...and the places and the drawing of a component arrive in the registry with it, as the Builder reads them',
 	\Nino\Modules\Components::components( $declared )['greeting']['in'] === [ 'section', 'card' ] && \Nino\Modules\Components::components( $declared )['greeting']['draws'] === 'p .sample-greeting'
 	&& $all['sample']['components']['greeting']['in'] === [ 'section', 'card' ] && $all['sample']['components']['greeting']['draws'] === 'p .sample-greeting' );
+check( '...and so does its icon, the parts of the picture a tool shows it by: the registry has them as the manifest wrote them',
+	\Nino\Modules\Components::components( $declared )['greeting']['icon'] === [ [ 'path', [ 'd' => 'M4 12h16' ] ] ]
+	&& $all['sample']['components']['greeting']['icon'] === [ [ 'path', [ 'd' => 'M4 12h16' ] ] ] );
 \Nino\Filesystem::putFileContent( $declared, '/text/global.php', [ '[[/feature/sample/greeting/text]]' => 'Hello [there]' ] );
 check( 'the renderer is componentGreeting() of the class: the name in studly caps behind the kind', \Nino\Html::renderHtml( $declared, '[greeting /feature/sample/greeting/text]' ) === '<p class="sample-greeting">Hello &#91;there]</p>'
 	&& \Nino\Html::renderHtml( $declared, '[greeting /feature/sample/greeting/text shout="1"]' ) === '<p class="sample-greeting">HELLO &#91;THERE]</p>' && \Nino\Html::renderHtml( $declared, '[greeting /nope/nope/nope/nope]' ) === '' );

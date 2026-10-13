@@ -37,6 +37,8 @@ return [
 				'shout'		=> [ 'type' => 'bool', 'default' => false, 'label' => [ 'en_US' => 'Shout', 'de_DE' => 'Rufen' ] ],
 			],
 			'preview'			=> 'text',
+			// What a tool shows it by: the parts of a 24 by 24 icon, a tag and its attributes each
+			'icon'				=> [ [ 'path', [ 'd' => 'M4 12h16' ] ] ],
 			// Where the editor may put it and what it draws, the two keys the kernel's own titles carry
 			'in'					=> [ 'section', 'card' ],
 			'draws'				=> 'p .sample-greeting',
