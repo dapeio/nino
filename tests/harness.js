@@ -432,6 +432,8 @@ function element( tag ) {
 			el.selectionStart = start;
 			el.selectionEnd = end;
 		},
+		// Nothing to select in a document that has no layout; a script that selects the text of a field before it copies it (Nino.clipboard()) is let through
+		select : function() {},
 	};
 
 	el.classList = classList( el );
@@ -476,7 +478,8 @@ function element( tag ) {
 
 /**
  *	A document over one mount element: createElement() is element(),
- *	getElementById() finds the mount, or what is drawn under it, and the
+ *	createTextNode() makes a text node of one (see element()) that holds the
+ *	text, getElementById() finds the mount, or what is drawn under it, and the
  *	queries run over the mount. No root, no body, nothing in focus
  *
  *	@param		{Object}	mount
@@ -486,6 +489,7 @@ function element( tag ) {
 function documentOf( mount ) {
 	return {
 		createElement : element,
+		createTextNode : function( text ) { return Object.assign( element('#text'), { textContent : String( text ) } ) },
 		getElementById : function( id ) {
 			return mount.id === id ? mount : ( findAll( mount, function( el ) { return el.id === id } )[0] ?? null );
 		},

@@ -6,10 +6,11 @@
  *	Nino										Framework
  *	Nino.ui.js							Frontend design-system behaviors (cover, parallax, vpa,
  *													autoheight, slider, scroll-header, generic forms, tabs,
- *													modal/lightbox, toast) - split out of Nino.js since
- *													only the public site needs this, never the workbench.
- *													Load order: Nino.js, then this file (depends on
- *													Nino.client/content/events/http).
+ *													modal/lightbox, toast) and the helpers a site script of a
+ *													feature calls (reducedMotion, options, whenVisible) -
+ *													split out of Nino.js since only the public site needs
+ *													this, never the workbench. Load order: Nino.js, then this
+ *													file (depends on Nino.client/content/events/http).
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -17,6 +18,13 @@
  */
 
 ( function(wn,dc,dE,bd) {
+
+	/*	The words options() reads a flag by: the words a component's bool attribute
+		is read by (\Nino\Modules\Components::ON and OFF) and a flag of a shortcode
+		without a schema (\Nino\Feature::flag()), so that a word cannot mean yes in
+		one place and no in another. The three must stay equal	*/
+	const ON = [ '1', 'true', 'yes', 'on' ];
+	const OFF = [ '0', 'false', 'no', 'off' ];
 
 	wn.Nino.ui = {
 
@@ -61,9 +69,12 @@
 		 *	once at boot: the setting can change while the page is open, on
 		 *	every system that offers it beside a light/dark switch.
 		 *
+		 *	Public, since a script that moves something by itself - a ticker, a
+		 *	typewriter - has the same question to answer
+		 *
 		 *	@return		{boolean}								false where the browser cannot be asked
 		 */
-		_reducedMotion : function() {
+		reducedMotion : function() {
 
 			if( typeof wn.matchMedia !== 'function' )
 				return false;
@@ -77,7 +88,7 @@
 		 *	@return		{string}								'smooth' or 'auto'
 		 */
 		_scrollBehavior : function() {
-			return Nino.ui._reducedMotion() === true ? 'auto' : 'smooth';
+			return Nino.ui.reducedMotion() === true ? 'auto' : 'smooth';
 		},
 
 		/**
@@ -720,8 +731,11 @@
 						slider.ips[ip] = document.createElement('LI');
 
 						// The button inside the dot, so the dot keeps being the
-						// element the stylesheet paints
-						const dot = sliderButton( 'nino-slider-point', '', sliderLabel( slider, 'slide' ).replace( '%s', String( ip + 1 ) ), ( function( to ) {
+						// element the stylesheet paints. The %s is filled through a
+						// function and never a string, which String.replace() reads a
+						// '$&' in - Nino.adminUi.format() does it that way, but this file
+						// loads without Nino.admin.js
+						const dot = sliderButton( 'nino-slider-point', '', sliderLabel( slider, 'slide' ).replace( '%s', function() { return String( ip + 1 ) } ), ( function( to ) {
 							return function(){ sliderMove( slider, to ) };
 						} )( ip ) );
 
@@ -1283,6 +1297,141 @@
 				el.classList.remove('nino-toast--visible');
 				setTimeout( () => el.remove(), 300 );
 			}, 4000 );
+		},
+
+		/**
+		 *	The settings of an element, read off its data attributes against a
+		 *	schema: data-<prefix>-<name> for every name of the schema, each as the
+		 *	type the schema says it is, and the fallback wherever the attribute is
+		 *	missing or cannot be read as that type - one attribute that is written
+		 *	wrongly costs that attribute and nothing else.
+		 *
+		 *	The schema is an object keyed by the name of the setting, each rule
+		 *	{ type, fallback, values, empty }:
+		 *
+		 *	  - text      the attribute as it is; '' gives the fallback, unless empty
+		 *	              is true and the empty string is a value
+		 *	  - int       read with parseInt( value, 10 ): a whole number, 0 and
+		 *	              up, and a leading one counts ('12px' is 12, '3.9' is 3);
+		 *	              anything else the fallback
+		 *	  - number    read with parseFloat(): a number above 0, a leading one
+		 *	              counts ('1.5em' is 1.5); anything else the fallback
+		 *	  - flag      a word of ON is true and a word of OFF is false, whatever
+		 *	              its case and with a space around it; any other word, and
+		 *	              none, the fallback - the rule \Nino\Feature::flag() reads a
+		 *	              shortcode's flag by
+		 *	  - enum      the attribute when it is one of values, else the fallback
+		 *	  - selector  the elements of el that the attribute's selector finds; a
+		 *	              selector the browser refuses, or none, gives the fallback,
+		 *	              which is a selector as well and applied the same way ([]
+		 *	              where it is none)
+		 *
+		 *	The attribute is read with getAttribute() and not from dataset, so that
+		 *	a prefix with a hyphen in it is written the way the markup has it
+		 *
+		 *	@param		{Element}		el						The element whose attributes are read
+		 *	@param		{string}		prefix				'ticker' for data-ticker-speed
+		 *	@param		{Object}		schema				{ name : { type, fallback, values, empty } }
+		 *
+		 *	@return		{Object}									Every name of the schema, with its value or its fallback
+		 */
+		options : function( el, prefix, schema ) {
+
+			const found = function( selector ) {
+				try {
+					return Array.from( el.querySelectorAll( selector ) );
+				}
+				catch( error ) {
+					return null;
+				}
+			};
+
+			const options = {};
+
+			Object.keys( schema ).forEach( function( name ) {
+
+				const rule		= schema[name];
+				const raw			= el.getAttribute( 'data-'+ prefix+ '-'+ name );
+				const absent	= raw === null;
+
+				options[name] = rule.fallback;
+
+				switch( rule.type ) {
+
+					case 'text':
+						if( absent === false && ( raw !== '' || rule.empty === true ) )
+							options[name] = raw;
+						break;
+
+					case 'int': {
+						const value = parseInt( raw, 10 );
+						if( absent === false && isNaN( value ) === false && value >= 0 )
+							options[name] = value;
+						break;
+					}
+
+					case 'number': {
+						const value = parseFloat( raw );
+						if( absent === false && value > 0 )
+							options[name] = value;
+						break;
+					}
+
+					case 'flag': {
+						const word = absent ? '' : raw.trim().toLowerCase();
+						if( ON.indexOf( word ) !== -1 )
+							options[name] = true;
+						else if( OFF.indexOf( word ) !== -1 )
+							options[name] = false;
+						break;
+					}
+
+					case 'enum':
+						if( absent === false && Array.isArray( rule.values ) === true && rule.values.indexOf( raw ) !== -1 )
+							options[name] = raw;
+						break;
+
+					case 'selector': {
+						const own = ( absent || raw === '' ) ? null : found( raw );
+						options[name] = own !== null ? own : ( typeof rule.fallback === 'string' ? ( found( rule.fallback ) ?? [] ) : [] );
+						break;
+					}
+				}
+			} );
+
+			return options;
+		},
+
+		/**
+		 *	Call back once the element has been in the viewport, and only then - an
+		 *	animation nobody has scrolled to yet would otherwise be through before
+		 *	it is looked at. One observer on the element, which lets go of it on the
+		 *	first entry that intersects. Without IntersectionObserver there is
+		 *	nothing to wait for and the callback runs at once
+		 *
+		 *	@param		{Element}		el						The element to wait for
+		 *	@param		{Function}	callback			Called once, when el is visible
+		 *
+		 *	@return		void
+		 */
+		whenVisible : function( el, callback ) {
+
+			if( typeof wn.IntersectionObserver !== 'function' ) {
+				callback();
+				return;
+			}
+
+			const observer = new wn.IntersectionObserver( function( entries ) {
+				for( let i = 0; i < entries.length; i++ ) {
+					if( entries[i].isIntersecting !== true )
+						continue;
+					observer.disconnect();
+					callback();
+					return;
+				}
+			} );
+
+			observer.observe( el );
 		},
 
 		/**

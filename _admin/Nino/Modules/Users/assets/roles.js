@@ -293,7 +293,9 @@
 			idInput.required = true;
 			idInput.autocomplete = 'off';
 			idInput.spellcheck = false;
-			idInput.pattern = '[a-z][a-z0-9-]{0,39}';
+			// Escaped: a browser compiles the pattern with the v flag, where a bare
+			// hyphen inside a class is a syntax error and the pattern is dropped
+			idInput.pattern = '[a-z][a-z0-9\\-]{0,39}';
 			idInput.value = role === null ? '' : role.id;
 			idInput.disabled = role !== null;
 			idLabel.appendChild( idInput );

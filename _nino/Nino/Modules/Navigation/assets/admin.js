@@ -398,7 +398,7 @@
 				li.appendChild( label );
 
 				const moveWrap = dc.createElement('span');
-				moveWrap.className = 'admin-page-move';
+				moveWrap.className = 'nino-admin-move';
 
 				const upBtn = dc.createElement('button');
 				upBtn.type = 'button';
@@ -681,7 +681,7 @@
 		 */
 		_delete : function() {
 
-			if( wn.confirm( Nino.content.getText('/_admin/navs/confirm/delete').replace( '%s', Nino.admin.navs._currentKey ) ) === false )
+			if( wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/navs/confirm/delete'), Nino.admin.navs._currentKey ) ) === false )
 				return;
 
 			const msg = dc.getElementById('navs-form-msg');

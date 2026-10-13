@@ -47,7 +47,7 @@ function moveButton( httpUri, direction ) {
 	const row = rows().find( function( li ) { return rowPath( li ) === httpUri } );
 	if( row === undefined )
 		return null;
-	return row.children.find( function( child ) { return child.className === 'admin-page-move' } ).children[ direction === 'up' ? 0 : 1 ];
+	return row.children.find( function( child ) { return child.className === 'nino-admin-move' } ).children[ direction === 'up' ? 0 : 1 ];
 }
 
 /** The ↗ link of a row, if it has one */
@@ -213,7 +213,7 @@ const withOpen = openLink( '/about' );
 check( 'the link to the page is a real link, in a tab of its own, under the project directory', withOpen !== null && withOpen.href === '/site/about' && withOpen.target === '_blank' && withOpen.rel === 'noopener'
 	&& withOpen.attributes['aria-label'] === text('/_admin/routes/label/open') && withOpen.textContent === '↗' );
 check( '...but none for a path that would leave the site or is no path', openLink( '//evil.example' ) === null && openLink( 'relative' ) === null );
-check( 'the ↑/↓ cluster is still on every row', rows().every( function( li ) { return li.children.some( function( child ) { return child.className === 'admin-page-move' } ) } ) );
+check( 'the ↑/↓ cluster is still on every row', rows().every( function( li ) { return li.children.some( function( child ) { return child.className === 'nino-admin-move' } ) } ) );
 
 // A name is the language the workbench is on first, and then any other
 panel._selectedLocale = 'en_US';

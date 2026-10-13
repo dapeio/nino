@@ -102,19 +102,18 @@
 			exportCard.className = 'nino-admin-card admin-translation-card';
 			exportCard.innerHTML = '<span class="admin-step-number">1</span><div class="admin-translation-card-copy"><h2></h2><p></p></div>';
 			exportCard.querySelector('h2').textContent = Nino.content.getText('/_admin/translations/label/export');
-			exportCard.querySelector('p').textContent = Nino.content.getText('/_admin/translations/hint/export')
-				.replace( '%d', String( info.textCount ) ).replace( '%n', String( info.elementCount ) );
+			exportCard.querySelector('p').textContent = Nino.adminUi.format( Nino.content.getText('/_admin/translations/hint/export'), info.textCount, info.elementCount );
 
 			const exportBtn = dc.createElement('button');
 			exportBtn.type = 'button';
 			exportBtn.className = 'nino-admin-btn-primary';
-			exportBtn.textContent = Nino.content.getText('/_admin/translations/label/download').replace( '%s', info.nativeLocale );
+			exportBtn.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/translations/label/download'), info.nativeLocale );
 			exportBtn.addEventListener( 'click', function() {
 				exportBtn.disabled = true;
 				exportBtn.textContent = Nino.content.getText('/_admin/translations/msg/preparing');
 				Nino.admin.translations._apiCall( 'export', {}, function( status, response ) {
 					exportBtn.disabled = false;
-					exportBtn.textContent = Nino.content.getText('/_admin/translations/label/download').replace( '%s', info.nativeLocale );
+					exportBtn.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/translations/label/download'), info.nativeLocale );
 					if( status !== 200 || response === null )
 						return Nino.admin.translations._setMessage( Nino.content.getText('/_admin/translations/error/export'), true );
 
@@ -181,7 +180,7 @@
 				const file = fileInput.files[0];
 				if( file === undefined )
 					return;
-				file.text().then( function( value ) { textarea.value = value; Nino.admin.translations._setMessage( Nino.content.getText('/_admin/translations/msg/loaded').replace( '%s', file.name ), false ) } )
+				file.text().then( function( value ) { textarea.value = value; Nino.admin.translations._setMessage( Nino.adminUi.format( Nino.content.getText('/_admin/translations/msg/loaded'), file.name ), false ) } )
 					.catch( function() { Nino.admin.translations._setMessage( Nino.content.getText('/_admin/translations/error/read'), true ) } );
 			} );
 
@@ -194,7 +193,7 @@
 				try {
 					translation = Nino.admin.translations._parseJson( textarea.value );
 				} catch( error ) {
-					return Nino.admin.translations._setMessage( Nino.content.getText('/_admin/translations/error/json').replace( '%s', error.message ), true );
+					return Nino.admin.translations._setMessage( Nino.adminUi.format( Nino.content.getText('/_admin/translations/error/json'), error.message ), true );
 				}
 
 				if( localeSelect.value === info.nativeLocale && wn.confirm( Nino.content.getText('/_admin/translations/confirm/native') ) === false )
@@ -210,7 +209,7 @@
 
 					const imported = response.text.imported+ response.elements.imported;
 					const skipped = response.text.skipped+ response.elements.skipped;
-					let message = Nino.content.getText('/_admin/translations/msg/imported').replace( '%d', String( imported ) ).replace( '%s', response.targetLocale ).replace( '%n', String( skipped ) );
+					let message = Nino.adminUi.format( Nino.content.getText('/_admin/translations/msg/imported'), imported, response.targetLocale, skipped );
 					if( response.errors.length > 0 )
 						message += ' '+ response.errors.join(' ');
 					Nino.admin.translations._setMessage( message, response.errors.length > 0 );

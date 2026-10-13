@@ -487,10 +487,58 @@ The shell shows the pane whose `data-panel` matches the selected link and
 calls `Nino.admin.<uri>.showCurrent()` when a tab is selected, if such a
 function exists - which is also where a panel loads its data the first time,
 so a panel nobody opens costs no request. Inside the pane the panel owns its
-mount points (`panes()`), and toggles between them with the shell's
-`admin-hidden` class. The url hash is the panel's to deep-link into:
-`Nino.admin.router.set( 'catalog', [ id ] )` while the panel is on screen,
-`Nino.admin.router.current()` to read it back on load.
+mount points (`panes()`).
+
+That lifecycle is `Nino.adminUi.panel( spec )`, written once. The script
+publishes what it answers - `Nino.admin.catalog = Nino.adminUi.panel( { ... } )` -
+and the shell calls `showCurrent()` on it. The spec:
+
+- `uri`, `mount` and `render( data, panel )` are required: the pane's uri (the
+  endpoints are `<uri>/<action>`, and the dirty registry knows the panel by it),
+  the id of the element the panel draws into - a page without it is never asked
+  for anything - and the function that draws the screen from the body of an
+  answer.
+- `action` is the first endpoint (`'list'`) and `payload` what goes with it, an
+  object or a function answering one (`{}`).
+- `show` is what showing the panel again does, in one of three policies.
+  `'once'`, the default, asks while the panel is not loaded and does nothing
+  afterwards. `'always'` asks on every showing. `'keep'` asks while the panel is
+  not loaded and afterwards draws the last answer again, from `panel.data` and
+  without a request - and not at all while the dirty registry says the panel
+  holds input nobody has saved.
+- `boot` is `'lazy'` (the default: the first showing starts the panel) or
+  `'ready'`, which starts it at the ready event too. A request that is out is
+  asked for once, so a `'ready'` panel that the shell shows first - as it does on
+  a page opened at the panel's hash - no longer asks twice.
+- `dirty` is `{ isDirty, save, discard, bar }`, registered under the uri with
+  `Nino.admin.dirty` at the first load where the shell has the registry (see
+  [Unsaved input](#unsaved-input)).
+- `error` is the fill key of a failed load, `/_admin/<uri>/error/load` unless
+  it is given, and `onError( status, response, panel )` is called once the
+  failure is shown.
+
+What it answers is a plain object: `uri`, `ready` (false until a load
+succeeded), `loading` (true while a request is out) and `data` (the body of the
+last answer); `mount()`, the element or `null`; `call( action, payload, done,
+extra )`, which is `Nino.adminUi.api.call()` for `<uri>/<action>`, so a panel
+still never posts by hand; `fail( container, status, response, key )`, which
+says a failure in a container the way a failed load is said, with the panel's
+key unless it is given another; `init( then )` and `reload( then )`, which ask
+for the screen, draw it and call `then()`; and `showCurrent()`. The script may
+add members to it and replace `showCurrent()` with its own - a drill-down panel,
+which follows the hash into a level (below), keeps its own, since `panel()` reads
+nothing of the hash. It names no `Nino.admin` member when it is called: the
+dirty registry is looked up when it is needed, so the same panel runs on a page
+that has none, as the setup wizard is.
+
+The levels of the pane - `catalog-list`, `catalog-form` - are shown one at a
+time. `Nino.adminUi.levels( 'catalog', [ 'list', 'form' ] ).show( 'form' )` shows
+the one and hides the others with the shell's `admin-hidden` class (an id the
+page does not have is skipped), and `show( 'form', [ id ] )` writes the level
+into the address through the router as well. What goes with a level - a redraw,
+a refresh, a dropped working copy - stays with the panel. The url hash is the
+panel's to deep-link into: `Nino.admin.router.set( 'catalog', [ id ] )` while
+the panel is on screen, `Nino.admin.router.current()` to read it back on load.
 
 The address is also what the browser's Back and Forward walk, so a panel that
 deep-links has three more things to do. `set()` replaces the entry the browser
@@ -510,72 +558,32 @@ open form that way runs inside `Nino.admin.router.leave( [ 'catalog' ], formIsOp
 proceed, resync )`, which asks Save / Discard / Cancel like the back link does;
 `resync` is what a Cancel does, showing the level in memory again and so writing
 it back into the address. The minimal example below keeps no hash, so it needs
-none of it. It is a minimal list/edit lifecycle; adapt field names, but preserve
-the API, DOM safety, and lifecycle shape:
+none of it. It is a minimal list/edit lifecycle on `panel()`; adapt field names,
+but preserve the API, DOM safety, and lifecycle shape:
 
 ```js
 ( function(wn,dc) {
 
 	wn.Nino.admin = wn.Nino.admin || {};
 
-	Nino.admin.catalog = {
+	// Asks for the list when the panel is first shown, draws the answer and
+	// says a failed load in the mount: the lifecycle is panel()'s
+	Nino.admin.catalog = Nino.adminUi.panel( {
+		uri			: 'catalog',
+		mount		: 'catalog-list',
+		render	: function( data ) {
+			Nino.admin.catalog._items = data.notes || [];
+			Nino.admin.catalog._renderList();
+			Nino.admin.catalog._levels.show( 'list' );
+		},
+	} );
+
+	Object.assign( Nino.admin.catalog, {
 
 		_items : [],
-		_ready : false,
 
-		init : function() {
-
-			if( dc.getElementById('catalog-list') === null )
-				return;
-
-			Nino.admin.catalog._apiCall( 'list', {}, function( status, response ) {
-				if( status !== 200 || response === null )
-					return Nino.admin.catalog._showError( dc.getElementById('catalog-list'), status, response );
-
-				Nino.admin.catalog._items = response.notes || [];
-				Nino.admin.catalog._renderList();
-				Nino.admin.catalog._showList();
-				Nino.admin.catalog._ready = true;
-			} );
-		},
-
-		showCurrent : function() {
-
-			if( Nino.admin.catalog._ready === false )
-				return;
-
-			if( dc.getElementById('catalog-form').classList.contains('admin-hidden') === false )
-				return;
-
-			Nino.admin.catalog._showList();
-		},
-
-		// This panel's name for the one request helper. It owns where the
-		// request goes (the project's directory, then /_admin/), why an extra
-		// multipart field such as a File just works, and what happens when the
-		// session has ended - the panel does not post by hand. Keep it a thin
-		// body, not a property evaluated while the object is built: the helper
-		// is looked up when a request is made
-		_apiCall : function( endpoint, payload, callback, extra ) {
-			Nino.adminUi.api.call( 'catalog/'+ endpoint, payload, callback, extra );
-		},
-
-		// The failed load, in place of the list. errorText() says the server's
-		// code in the interface language, and falls back to the server's own
-		// message and then to this panel's sentence (a fill key)
-		_showError : function( container, status, response ) {
-			Nino.adminUi.showError( container, status, response, '/_admin/catalog/error/load' );
-		},
-
-		_showList : function() {
-			dc.getElementById('catalog-list').classList.remove('admin-hidden');
-			dc.getElementById('catalog-form').classList.add('admin-hidden');
-		},
-
-		_showForm : function() {
-			dc.getElementById('catalog-list').classList.add('admin-hidden');
-			dc.getElementById('catalog-form').classList.remove('admin-hidden');
-		},
+		// The two levels of the pane: catalog-list and catalog-form
+		_levels : Nino.adminUi.levels( 'catalog', [ 'list', 'form' ] ),
 
 		_renderList : function() {
 
@@ -618,13 +626,9 @@ the API, DOM safety, and lifecycle shape:
 
 			wrap.appendChild( list );
 
-			const add = dc.createElement('button');
-			add.type = 'button';
-			add.className = 'nino-admin-btn-primary';
-			add.textContent = 'New note';
-			add.addEventListener( 'click', function() {
+			const add = Nino.adminUi.button( 'New note', function() {
 				Nino.admin.catalog._renderForm( null );
-			} );
+			}, { className : 'nino-admin-btn-primary' } );
 			wrap.appendChild( Nino.adminUi.listActions( [ add ] ) );
 		},
 
@@ -639,43 +643,25 @@ the API, DOM safety, and lifecycle shape:
 			back.textContent = 'Back to catalog';
 			back.addEventListener( 'click', function( event ) {
 				event.preventDefault();
-				Nino.admin.catalog._showList();
+				Nino.admin.catalog._levels.show( 'list' );
 			} );
 			wrap.appendChild( Nino.admin.formToolbar( back ) );
 
 			const form = dc.createElement('form');
-			const heading = dc.createElement('h2');
-			const idLabel = dc.createElement('label');
-			const id = dc.createElement('input');
-			const titleLabel = dc.createElement('label');
-			const title = dc.createElement('input');
-			const bodyLabel = dc.createElement('label');
-			const body = dc.createElement('textarea');
-			const message = dc.createElement('p');
-			const save = dc.createElement('button');
-			const actions = dc.createElement('div');
+			const heading = Nino.adminUi.el( 'h2', '', item ? 'Edit note' : 'New note' );
 
-			heading.textContent = item ? 'Edit note' : 'New note';
-
-			idLabel.textContent = 'ID';
-			idLabel.htmlFor = 'catalog-id';
-			id.id = 'catalog-id';
-			id.type = 'text';
+			const idField = Nino.adminUi.textField( { label : 'ID', id : 'catalog-id', value : item ? item.id : '', required : true } );
+			const id = idField.querySelector('input');
 			id.name = 'id';
-			id.pattern = '[a-z][a-z0-9-]*';
-			id.required = true;
-			id.value = item ? item.id : '';
+			id.pattern = '[a-z][a-z0-9\\-]*';
 			id.disabled = item !== null;
 
-			titleLabel.textContent = 'Title';
-			titleLabel.htmlFor = 'catalog-title';
-			title.id = 'catalog-title';
-			title.type = 'text';
+			const titleField = Nino.adminUi.textField( { label : 'Title', id : 'catalog-title', value : item ? item.title : '', required : true, maxLength : 160 } );
+			const title = titleField.querySelector('input');
 			title.name = 'title';
-			title.maxLength = 160;
-			title.required = true;
-			title.value = item ? item.title : '';
 
+			const bodyLabel = dc.createElement('label');
+			const body = dc.createElement('textarea');
 			bodyLabel.textContent = 'Body';
 			bodyLabel.htmlFor = 'catalog-body';
 			body.id = 'catalog-body';
@@ -683,20 +669,15 @@ the API, DOM safety, and lifecycle shape:
 			body.maxLength = 5000;
 			body.value = item ? item.body : '';
 
-			message.className = 'admin-form-message';
+			const message = Nino.adminUi.el( 'p', 'admin-form-message' );
 
-			save.type = 'submit';
-			save.className = 'nino-admin-btn-primary';
-			save.textContent = 'Save';
-
-			actions.className = 'nino-admin-actionbar';
+			const save = Nino.adminUi.button( 'Save', null, { type : 'submit', className : 'nino-admin-btn-primary' } );
+			const actions = Nino.adminUi.actionBar( Nino.adminUi.el( 'div' ) );
 			actions.appendChild( save );
 
 			form.appendChild( heading );
-			form.appendChild( idLabel );
-			form.appendChild( id );
-			form.appendChild( titleLabel );
-			form.appendChild( title );
+			form.appendChild( idField );
+			form.appendChild( titleField );
 			form.appendChild( bodyLabel );
 			form.appendChild( body );
 			form.appendChild( message );
@@ -713,7 +694,8 @@ the API, DOM safety, and lifecycle shape:
 				save.disabled = true;
 				line.saving();
 
-				Nino.admin.catalog._apiCall( 'save', {
+				// panel.call() is Nino.adminUi.api.call() for catalog/save
+				Nino.admin.catalog.call( 'save', {
 					id : id.value,
 					title : title.value,
 					body : body.value,
@@ -739,21 +721,30 @@ the API, DOM safety, and lifecycle shape:
 						return a.id.localeCompare( b.id );
 					} );
 					Nino.admin.catalog._renderList();
-					Nino.admin.catalog._showList();
+					Nino.admin.catalog._levels.show( 'list' );
 				} );
 			} );
 
 			wrap.appendChild( form );
-			Nino.admin.catalog._showForm();
+			Nino.admin.catalog._levels.show( 'form' );
 			title.focus();
 		},
-
-	};
-
-	Nino.events.bindCallback( 'ready', Nino.admin.catalog.init );
+	} );
 
 } )(window,document);
 ```
+
+The rest of the screen is built from `Nino.adminUi`'s small builders, which own no
+strings - every word is the caller's, and a caller that has a fill key runs it
+through `text()`. `hint( text, kind )` is a line of explanation (`'error'` for the
+error colour); `textField( options )` the labelled line of text beside
+`selectField()`, `switchField()` and `numberField()` - the label with the star
+and the `aria-required` of a required field, its `input` the control;
+`button( text, onClick, options )` a real button, whose `name` is the title and
+the `aria-label` of a glyph; `el( tag, className, text )` an element with a class
+and a text; and `localeSelect( options )` the switch of the translation a form
+shows, for the context bar - what a change does is the panel's. Their docblocks in
+`_admin/assets/Nino.admin.js` are the reference.
 
 ## Saying what happened
 
@@ -849,6 +840,11 @@ if( typeof Nino.admin.dirty === 'object' )
 		Nino.admin.catalog._save( done );
 	} );
 ```
+
+A panel built on `Nino.adminUi.panel()` passes a `register()` entry -
+`{ isDirty, save, discard, bar }`, described below - as the `dirty` of its spec
+and is registered behind the same check at its first load; a panel that watches
+its form calls `watchForm()` itself.
 
 `watchForm( name, formGetter, save, bar )` serialises the plain fields of the form
 the getter answers and compares them with what `snapshot( name )` saw - `bar`
@@ -960,14 +956,18 @@ Reach for an existing class first; only invent one when no role fits.
 | Surface root | `.nino-admin` + `.nino-admin-shell` (+ `--rail`) |
 | Sidebar, its brand block, its nav | `.nino-admin-rail`, `.nino-admin-rail-head`, `.nino-admin-nav` |
 | Scrolling content column | `.nino-admin-pane` |
-| Sticky top row (back link, locale switch) | `.nino-admin-contextbar` via `Nino.adminUi.contextBar()` |
+| Sticky top row (back link, locale switch) | `.nino-admin-contextbar` via `Nino.adminUi.contextBar()`; the switch is `Nino.adminUi.localeSelect()` (`.nino-admin-locale-select`) |
 | Back link inside that row | `.nino-admin-back-link` |
 | Fixed bottom actions | `.nino-admin-actionbar` via `Nino.adminUi.actionBar()` |
 | Fixed actions above a list | `.nino-admin-list-actions` via `Nino.adminUi.listActions()` |
 | Status text in a bottom bar - saving, saved at hh:mm, unsaved changes, why it failed | `.nino-admin-status` via `Nino.adminUi.status()` (in the bar it replaces `.nino-admin-actionbar-status`) |
 | Mark after the name of a required field, and the sentence under a refused one | `.nino-admin-required` (drawn `aria-hidden`; the control gets `aria-required`), `.nino-admin-field-error` (linked with `aria-describedby`, never `role="alert"`) |
 | "Unsaved changes" mark in a registered form's action bar | `.nino-admin-actionbar-dirty`, written by `Nino.admin.dirty.refresh()` into every registered form's bar and hidden by the stylesheet only in a bar that has a status line (below 38 rem, where the status line is hidden, it shows again) - not a `p`, not `role="status"` |
-| Primary / destructive button | `.nino-admin-btn-primary`, `.nino-admin-btn-danger` |
+| Primary / destructive button | `.nino-admin-btn-primary`, `.nino-admin-btn-danger`, built with `Nino.adminUi.button()` |
+| A button small enough for a row - the actions of one entry, a button beside a field | `.nino-admin-btn--small` beside the variant that says what it does (30px high, where the base button is as high as a field) |
+| Buttons and a status line in one row inside a form or under a list - not the fixed bar | `.nino-admin-actions` (wraps; `--end` stands it at the right edge, `--between` spreads it); the space above it is the screen's own rule |
+| A short word as a pill beside a name - a state, a kind, a count | `.nino-admin-badge`; `data-state="ok"`, `"warn"`, `"error"` or `"muted"` colours it like the status line's saved, unsaved, failed and quiet text, and the word says it too |
+| Up, down and remove at the end of a row of an ordered list | `.nino-admin-move` around the square buttons (inside a `.nino-admin-list` row it keeps off the row's edge) |
 | Raised panel | `.nino-admin-card` (a `fieldset` is one already) |
 | Clickable drill-down list | `.nino-admin-list` (+ `.nino-admin-list-copy` per row) |
 | Many rows of the same record, with search/sort/paging | `Nino.adminUi.table()` — see below |
@@ -975,12 +975,12 @@ Reach for an existing class first; only invent one when no role fits.
 | List whose rows are `button`s | `.nino-admin-list-buttons` |
 | Dashboard tiles | `.nino-admin-tiles`, `.nino-admin-tile` |
 | Share-of-total bar under a label | `.nino-admin-meter-row` + `-label`/`-count`, `.nino-admin-meter-track` + `-fill` |
-| Labelled form field | `.nino-admin-field` (`.nino-admin-field-wide` opts out of the two-column desktop grid) |
+| Labelled form field | `.nino-admin-field` (`.nino-admin-field-wide` opts out of the two-column desktop grid), built with `Nino.adminUi.textField()`, `selectField()`, `switchField()` or `numberField()` |
 | Container whose fields share that grid | `.nino-admin-fieldgrid` |
 | Run of checkbox rows | `.nino-admin-checklist` |
 | Rich-text editor mount | `.nino-admin-richtext` (`Nino.admin.htmlEditor.create()`, its fifth argument the format: `inline`, `lines` or `blocks`) |
 | List of texts, edited as rows | `.nino-admin-stringlist` via `Nino.adminUi.stringList()` (the value is a hidden input carrying the JSON, like `elementList()`'s) |
-| Explanatory text / screen intro | `.nino-admin-hint`, `.nino-admin-hint-lead` |
+| Explanatory text / screen intro | `.nino-admin-hint`, `.nino-admin-hint-lead`; `Nino.adminUi.hint( text, kind )` builds the line |
 | Something needs attention until it is fixed - failing mail, untranslated texts, maintenance on | `.nino-admin-notice` via `Nino.adminUi.notice( message, { href, label } )`; a link only for a `#panel` href, the text always as text |
 | Nothing here yet (a list without entries, a scan that found nothing) | `.nino-admin-empty` via `Nino.adminUi.emptyState()` |
 | Error text | `.nino-admin-error` |

@@ -4,11 +4,11 @@
  *	Nino										A compact filesystembased php framework
  *	Modules\Navigation		The menus and their running order
  *	admin.css								What the module's /_admin panel needs beyond the design
- *													system in _admin/assets/style.css and the row helpers
- *													(.admin-page-move, .admin-page-label) /_admin's own
- *													stylesheet shares with its Routes panel. Linked while the
- *													module is active (see the panel's assets()), so the same
- *													layer rules apply: scoped to this panel's own ids.
+ *													system in _admin/assets/style.css and the row helper
+ *													(.admin-page-label) /_admin's own stylesheet shares with
+ *													its Routes panel. Linked while the module is active (see
+ *													the panel's assets()), so the same layer rules apply:
+ *													scoped to this panel's own ids.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>

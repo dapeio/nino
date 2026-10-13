@@ -3,10 +3,10 @@
  *	Nino.admin.js						The shared behaviour half of the management design system:
  *													small DOM primitives the tool frontends build their
  *													chrome from, the pure table model behind the list
- *													views, and the one way a panel talks to the server:
- *													Nino.adminUi.api, with the status line and the
- *													messages that say what failed. style.css is the
- *													vocabulary, this is what assembles it.
+ *													views, the lifecycle of a panel, and the one way a
+ *													panel talks to the server: Nino.adminUi.api, with the
+ *													status line and the messages that say what failed.
+ *													style.css is the vocabulary, this is what assembles it.
  *
  *													Separate from Nino.js for the same reason Nino.ui.js is:
  *													who needs it. Nino.js is in the public site's script
@@ -18,9 +18,12 @@
  *
  *													Loaded after Nino.js, which owns the namespace this
  *													extends - on its own it has nothing to attach to.
- *													Names no Nino.admin member itself, which is what lets
+ *													Names no Nino.admin member at load, which is what lets
  *													the setup wizard load it without the workbench shell
- *													in assets/script.js.
+ *													in assets/script.js: panel() and levels() look the
+ *													shell's dirty registry and router up when a panel asks
+ *													for them, feature-detected, as api looks Nino.http up
+ *													when a request is made, and work without them.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -31,6 +34,19 @@
 
 	if( typeof wn.Nino === 'undefined' )
 		return;
+
+	/**
+	 *	The workbench shell's namespace, looked up when a panel asks for it and
+	 *	never at load: this file runs on the setup wizard's page as well, where
+	 *	script.js - and with it Nino.admin - does not exist, and a panel of a
+	 *	project or a feature may be older than the shell that runs it. Whoever
+	 *	asks feature-detects what it wants of it (the dirty registry, the router)
+	 *
+	 *	@return		{Object}									Nino.admin, or an empty object where there is none
+	 */
+	const shell = function() {
+		return typeof Nino.admin === 'object' && Nino.admin !== null ? Nino.admin : {};
+	};
 
 	/**
 	 *	Small DOM primitives shared by Nino's administration surfaces.
@@ -179,6 +195,26 @@
 			}
 
 			return notice;
+		},
+
+		/**
+		 *	One line of explanation: a paragraph in the hint's quiet type, and in
+		 *	the error colour as well for a hint that is a refusal. The words are
+		 *	used as they are - a caller that has a fill key runs it through text()
+		 *	itself. A line that is announced when it changes is status() or
+		 *	notice(), which exist. Owns no strings
+		 *
+		 *	@param		{string}		text
+		 *	@param		{string}		[kind]					'error' for the error colour too
+		 *
+		 *	@return		{Element}										The paragraph
+		 */
+		hint : function( text, kind ) {
+
+			const hint = dc.createElement('p');
+			hint.className = kind === 'error' ? 'nino-admin-hint nino-admin-error' : 'nino-admin-hint';
+			hint.textContent = text;
+			return hint;
 		},
 
 		// Whether choiceDialog() has a question open - one at a time: a second
@@ -492,6 +528,72 @@
 			}
 
 			return fit;
+		},
+
+		/**
+		 *	An element with a class and a text, in one call: the tag, the class
+		 *	set only when there is one, the text set as text - never as markup -
+		 *	only when there is one. Owns no strings
+		 *
+		 *	@param		{string}		tag
+		 *	@param		{string}		[className]
+		 *	@param		{string}		[text]
+		 *
+		 *	@return		{Element}
+		 */
+		el : function( tag, className, text ) {
+
+			const el = dc.createElement( tag );
+
+			if( typeof className === 'string' && className !== '' )
+				el.className = className;
+
+			if( text !== undefined )
+				el.textContent = text;
+
+			return el;
+		},
+
+		/**
+		 *	A button: a real button, which does not submit unless it is asked to,
+		 *	showing a word or a glyph. A glyph is no name - a screen reader says
+		 *	"button ↑" - so a button whose face is one is given its name, which
+		 *	becomes its title and its aria-label both. The look is the caller's
+		 *	class (nino-admin-btn-primary, nino-admin-btn--small...). Owns no
+		 *	strings: the face and the name are the caller's
+		 *
+		 *	@param		{string}		text						What the button shows
+		 *	@param		{Function}	[onClick]				Called on a click
+		 *	@param		{Object}		[options]				{ className, name, disabled, id, type } - type 'submit' for a button that submits
+		 *
+		 *	@return		{Element}
+		 */
+		button : function( text, onClick, options ) {
+
+			options = options || {};
+
+			const button = dc.createElement('button');
+			button.type = options.type === 'submit' ? 'submit' : 'button';
+
+			if( options.className )
+				button.className = options.className;
+
+			button.textContent = text;
+
+			if( options.name ) {
+				button.title = options.name;
+				button.setAttribute( 'aria-label', options.name );
+			}
+
+			button.disabled = options.disabled === true;
+
+			if( options.id )
+				button.id = options.id;
+
+			if( typeof onClick === 'function' )
+				button.addEventListener( 'click', onClick );
+
+			return button;
 		},
 
 		/**
@@ -824,6 +926,132 @@
 		},
 
 		/**
+		 *	One line of text as a labelled input, beside selectField(),
+		 *	switchField() and numberField() and by the select's rule: the words
+		 *	are used as they are, so a caller that has a fill key runs it through
+		 *	text() itself. A required field is marked the way the workbench marks
+		 *	every one: the asterisk behind its name, drawn aria-hidden, and
+		 *	aria-required on the control. Owns no strings, the asterisk apart
+		 *
+		 *	@param	{Object}	options		{ key, type, value, placeholder, label, hint, required, maxLength, minLength, autocomplete, id, onInput, className }
+		 *													- type       the input's type, text by default
+		 *													- key        written onto the input as data-key
+		 *													- onInput    called with the input's value on every input
+		 *													- className  the label's class instead of nino-admin-field
+		 *
+		 *	@return	{Element}						The label; the control is its input
+		 */
+		textField : function( options ) {
+
+			const field = dc.createElement('label');
+			field.className = options.className || 'nino-admin-field';
+
+			const name = dc.createElement('span');
+			name.appendChild( dc.createTextNode( options.label ?? '' ) );
+
+			if( options.required === true ) {
+				const star = dc.createElement('span');
+				star.className = 'nino-admin-required';
+				star.setAttribute( 'aria-hidden', 'true' );
+				star.textContent = '*';
+				name.appendChild( star );
+			}
+
+			field.appendChild( name );
+
+			const input = dc.createElement('input');
+			input.className = 'nino-admin-input';
+			input.type = options.type || 'text';
+
+			if( options.key )
+				input.dataset.key = options.key;
+
+			if( options.value !== undefined && options.value !== null )
+				input.value = options.value;
+
+			if( options.placeholder )
+				input.placeholder = options.placeholder;
+
+			if( typeof options.maxLength === 'number' )
+				input.maxLength = options.maxLength;
+
+			if( typeof options.minLength === 'number' )
+				input.minLength = options.minLength;
+
+			if( options.autocomplete )
+				input.autocomplete = options.autocomplete;
+
+			if( options.id )
+				input.id = options.id;
+
+			if( options.required === true ) {
+				input.required = true;
+				input.setAttribute( 'aria-required', 'true' );
+			}
+
+			input.addEventListener( 'input', function() {
+				if( typeof options.onInput === 'function' )
+					options.onInput( input.value );
+			} );
+
+			field.appendChild( input );
+
+			if( options.hint ) {
+				const hint = dc.createElement('small');
+				hint.className = 'nino-admin-hint';
+				hint.textContent = options.hint;
+				field.appendChild( hint );
+			}
+
+			return field;
+		},
+
+		/**
+		 *	The "which translation am I looking at" switch of a form: a select of
+		 *	the locale codes, the current one picked. It says what the form below
+		 *	it shows rather than collecting a value, so it is the compact pill of
+		 *	the design system (.nino-admin-locale-select) and sits in the pinned
+		 *	context bar. What a change does is the caller's - the Elements and
+		 *	Text panels also tell the session (Nino.admin.sessionLocale), the Keys
+		 *	tab does not. Owns no strings: the name of the select is the caller's
+		 *
+		 *	@param		{Object}		options					{ locales, current, label, id, onChange }
+		 *														- locales    the codes, which are also what the options say
+		 *														- current    the code that is picked
+		 *														- label      the select's aria-label
+		 *														- onChange   called with the picked code on every change
+		 *
+		 *	@return		{Element}										The select
+		 */
+		localeSelect : function( options ) {
+
+			const select = dc.createElement('select');
+
+			if( options.id )
+				select.id = options.id;
+
+			select.className = 'nino-admin-locale-select nino-admin-contextbar-select';
+
+			if( options.label )
+				select.setAttribute( 'aria-label', options.label );
+
+			( options.locales || [] ).forEach( function( locale ) {
+				const option = dc.createElement('option');
+				option.value = locale;
+				option.textContent = locale;
+				option.selected = ( locale === options.current );
+				select.appendChild( option );
+			} );
+
+			select.addEventListener( 'change', function() {
+				if( typeof options.onChange === 'function' )
+					options.onChange( select.value );
+			} );
+
+			return select;
+		},
+
+		/**
 		 *	Whether one model field holds a list of element references rather
 		 *	than a single uri - the client-side half of
 		 *	\Nino\Elements::isMultiElement(), and deliberately the same rule:
@@ -983,20 +1211,6 @@
 				draw();
 			}
 
-			function button( className, title, glyph, disabled, onClick ) {
-				const el = dc.createElement('button');
-				el.type = 'button';
-				el.className = className;
-				el.textContent = glyph;
-				if( title ) {
-					el.title = title;
-					el.setAttribute( 'aria-label', title );
-				}
-				el.disabled = disabled === true;
-				el.addEventListener( 'click', onClick );
-				return el;
-			}
-
 			function drawChosen() {
 
 				list.innerHTML = '';
@@ -1022,10 +1236,10 @@
 					const actions = dc.createElement('span');
 					actions.className = 'nino-admin-elementlist-actions';
 					if( ordered === true ) {
-						actions.appendChild( button( '', text.up, '↑', index === 0, function() { move( index, -1 ) } ) );
-						actions.appendChild( button( '', text.down, '↓', index === chosen.length - 1, function() { move( index, 1 ) } ) );
+						actions.appendChild( Nino.adminUi.button( '↑', function() { move( index, -1 ) }, { name : text.up, disabled : index === 0 } ) );
+						actions.appendChild( Nino.adminUi.button( '↓', function() { move( index, 1 ) }, { name : text.down, disabled : index === chosen.length - 1 } ) );
 					}
-					actions.appendChild( button( 'nino-admin-elementlist-remove', text.remove, '✕', false, function() { remove( index ) } ) );
+					actions.appendChild( Nino.adminUi.button( '✕', function() { remove( index ) }, { className : 'nino-admin-elementlist-remove', name : text.remove } ) );
 					row.appendChild( actions );
 
 					list.appendChild( row );
@@ -1076,7 +1290,7 @@
 				// thing it must not mean
 				matches.slice( 0, Nino.adminUi.ELEMENTLIST_RESULTS ).forEach( function( option ) {
 					const row = dc.createElement('li');
-					const addButton = button( 'nino-admin-elementlist-add', text.add, '+', false, function() { add( option.value ) } );
+					const addButton = Nino.adminUi.button( '+', function() { add( option.value ) }, { className : 'nino-admin-elementlist-add', name : text.add } );
 					const rowLabel = dc.createElement('span');
 					rowLabel.className = 'nino-admin-elementlist-label';
 					rowLabel.textContent = option.label;
@@ -1089,7 +1303,7 @@
 				if( matches.length > Nino.adminUi.ELEMENTLIST_RESULTS && text.more ) {
 					const more = dc.createElement('li');
 					more.className = 'nino-admin-elementlist-note';
-					more.textContent = text.more.replace( '%d', String( matches.length ) );
+					more.textContent = Nino.adminUi.format( text.more, matches.length );
 					results.appendChild( more );
 				}
 			}
@@ -1190,20 +1404,6 @@
 					add.focus();
 			}
 
-			function button( className, title, glyph, disabled, onClick ) {
-				const el = dc.createElement('button');
-				el.type = 'button';
-				el.className = className;
-				el.textContent = glyph;
-				if( title ) {
-					el.title = title;
-					el.setAttribute( 'aria-label', title );
-				}
-				el.disabled = disabled === true;
-				el.addEventListener( 'click', onClick );
-				return el;
-			}
-
 			// focusIndex is the row to put the focus in and focusPart the control
 			// of it: 'up', 'down', 'remove', or the text input where it is left out
 			function draw( focusIndex, focusPart ) {
@@ -1235,9 +1435,9 @@
 
 					const actions = dc.createElement('span');
 					actions.className = 'nino-admin-stringlist-actions';
-					const up 			= button( '', text.up, '↑', index === 0, function() { move( index, -1 ) } );
-					const down 		= button( '', text.down, '↓', index === rows.length - 1, function() { move( index, 1 ) } );
-					const removal = button( 'nino-admin-stringlist-remove', text.remove, '✕', false, function() { remove( index ) } );
+					const up 			= Nino.adminUi.button( '↑', function() { move( index, -1 ) }, { name : text.up, disabled : index === 0 } );
+					const down 		= Nino.adminUi.button( '↓', function() { move( index, 1 ) }, { name : text.down, disabled : index === rows.length - 1 } );
+					const removal = Nino.adminUi.button( '✕', function() { remove( index ) }, { className : 'nino-admin-stringlist-remove', name : text.remove } );
 					actions.appendChild( up );
 					actions.appendChild( down );
 					actions.appendChild( removal );
@@ -1258,10 +1458,10 @@
 				} );
 			}
 
-			const add = button( 'nino-admin-stringlist-add', '', text.add || '', false, function() {
+			const add = Nino.adminUi.button( text.add || '', function() {
 				rows.push( '' );
 				draw( rows.length - 1 );
-			} );
+			}, { className : 'nino-admin-stringlist-add' } );
 			field.appendChild( add );
 
 			draw();
@@ -2114,6 +2314,202 @@
 			};
 
 			return control;
+		},
+
+		/**
+		 *	The levels of a panel: its types, its list and its form are elements of
+		 *	the pane, ids that start alike (<prefix>-list, <prefix>-form), and the
+		 *	panel shows one of them at a time. Nearly every panel wrote the same
+		 *	function to hide the others - toggling the shell's admin-hidden class,
+		 *	the one every copy and the panel recipe use, which is not the
+		 *	design system's own nino-admin-hidden - and several of them wrote the
+		 *	level into the url hash as well.
+		 *
+		 *	Only that: a redraw, a refresh or a dropped working copy that goes
+		 *	with showing a level stays with the panel that needs it. Where the
+		 *	shell has its router, show() writes the level into the hash when it
+		 *	is given the parts; where it has not (the wizard, a test) it leaves
+		 *	the address alone. Owns no strings
+		 *
+		 *	@param		{string}		prefix					The ids' beginning: 'catalog' for catalog-list
+		 *	@param		{Array}			names						The levels, in the ids' endings: [ 'list', 'form' ]
+		 *
+		 *	@return		{Object}										{ show( name, parts ) } - shows the level of that name and hides the others (an id the page does not have is skipped); with parts, an array, it also asks the router to write #<prefix>/<parts>
+		 */
+		levels : function( prefix, names ) {
+
+			return {
+				show : function( name, parts ) {
+
+					names.forEach( function( level ) {
+						const el = dc.getElementById( prefix+ '-'+ level );
+						if( el !== null )
+							el.classList.toggle( 'admin-hidden', level !== name );
+					} );
+
+					const router = shell().router;
+					if( Array.isArray( parts ) === true && typeof router === 'object' && router !== null )
+						router.set( prefix, parts );
+				},
+			};
+		},
+
+		/**
+		 *	The lifecycle of a panel, from a spec: when the panel asks the server
+		 *	for its screen, what it does with the answer, what a second showing
+		 *	does and how it says that a load failed. Every panel script wrote its
+		 *	own init() and showCurrent() for this - the mount that may be missing,
+		 *	the request, the failure line, the flag that says the panel was loaded,
+		 *	the rule for the next showing - and a panel bound to the ready event
+		 *	asked for its list twice on a page opened at its hash: the shell shows
+		 *	the panel before the panel's own ready callback runs. This is that
+		 *	once, and a request that is in flight is asked for once.
+		 *
+		 *	The spec:
+		 *
+		 *	  - uri      the pane's uri, required: the endpoints are <uri>/<action>,
+		 *	             the dirty registry knows the panel by it and the default
+		 *	             error key is made of it
+		 *	  - mount    the id of the element the panel draws into, required:
+		 *	             where the page has none, nothing is ever requested
+		 *	  - render   render( data, panel ), required: draws the screen from the
+		 *	             body of an answer
+		 *	  - action   the first endpoint, 'list' by default
+		 *	  - payload  an object, or a function answering one, sent with the first
+		 *	             request - {} by default
+		 *	  - show     what showCurrent() does: 'once' (the default) asks while the
+		 *	             panel is not loaded and does nothing afterwards, 'always'
+		 *	             asks on every showing, 'keep' asks while the panel is not
+		 *	             loaded and afterwards draws the last answer again - unless
+		 *	             the dirty registry says the panel holds input nobody has
+		 *	             saved, which it leaves alone
+		 *	  - boot     'lazy' (the default): the first showCurrent() starts the
+		 *	             panel; 'ready': the ready event does, and a showCurrent()
+		 *	             that comes first starts it too, once
+		 *	  - dirty    { isDirty, save, discard, bar }, registered under the uri at
+		 *	             the first init() where the shell has its registry
+		 *	  - error    the fill key of a failed load, '/_admin/<uri>/error/load'
+		 *	             unless it is given
+		 *	  - onError  onError( status, response, panel ), called once the
+		 *	             failure is shown
+		 *
+		 *	It answers a plain object. The script publishes it itself, as
+		 *	Nino.admin.<uri> = Nino.adminUi.panel( { ... } ), and may add members
+		 *	to it or replace some: a panel that follows the url hash into a level
+		 *	of its own keeps its own showCurrent(), since panel() reads nothing of
+		 *	the hash (levels() is the helper for the level). Its members:
+		 *
+		 *	  - uri, ready (false until a load succeeded), loading (true while a
+		 *	    request is out), data (the body of the last answer, null before)
+		 *	  - mount()               the element, or null
+		 *	  - call( action, payload, done, extra )   Nino.adminUi.api.call() for
+		 *	                          <uri>/<action>
+		 *	  - fail( container, status, response, [key] )   showError() with the
+		 *	                          panel's key; answers its paragraph
+		 *	  - init( [then] )        asks for the screen: nothing while a request is
+		 *	                          out or the mount is missing; on an answer draws
+		 *	                          it and calls then(), on a failure shows it. The
+		 *	                          request is over before render() or fail() run,
+		 *	                          so that a render may ask again
+		 *	  - reload( [then] )      init() by the name a caller reads better
+		 *	  - showCurrent()         what the shell calls when the panel is shown
+		 *
+		 *	The dirty registry is the shell's (Nino.admin.dirty), looked up when the
+		 *	panel needs it and not at load: without it the panel works the same,
+		 *	and 'keep' counts it as clean. Owns no strings
+		 *
+		 *	@param		{Object}		spec						{ uri, mount, render, action, payload, show, boot, dirty, error, onError }
+		 *
+		 *	@return		{Object}										The panel
+		 */
+		panel : function( spec ) {
+
+			const fallback	= spec.error ?? '/_admin/'+ spec.uri+ '/error/load';
+			let registered	= false;
+
+			const dirty = function() {
+				const registry = shell().dirty;
+				return typeof registry === 'object' && registry !== null && registry.isDirty( [ spec.uri ] ) === true;
+			};
+
+			const panel = {
+
+				uri			: spec.uri,
+				ready		: false,
+				loading	: false,
+				data		: null,
+
+				mount : function() {
+					return dc.getElementById( spec.mount );
+				},
+
+				call : function( action, payload, done, extra ) {
+					Nino.adminUi.api.call( spec.uri+ '/'+ action, payload, done, extra );
+				},
+
+				fail : function( container, status, response, key ) {
+					return Nino.adminUi.showError( container, status, response, key || fallback );
+				},
+
+				init : function( then ) {
+
+					const mount = panel.mount();
+
+					if( panel.loading === true || mount === null )
+						return;
+
+					// The payload is made before the panel counts as loading: a payload
+					// function that throws is the script's error to see, not a request
+					// that is out for good and blocks every showing after it
+					const payload = typeof spec.payload === 'function' ? spec.payload() : ( spec.payload ?? {} );
+
+					panel.loading = true;
+
+					if( registered === false && typeof spec.dirty === 'object' && spec.dirty !== null && typeof shell().dirty === 'object' && shell().dirty !== null ) {
+						shell().dirty.register( spec.uri, spec.dirty );
+						registered = true;
+					}
+
+					panel.call( spec.action ?? 'list', payload, function( status, response ) {
+
+						panel.loading = false;
+
+						if( status === 200 ) {
+							panel.data = response;
+							panel.ready = true;
+							spec.render( panel.data, panel );
+							if( typeof then === 'function' )
+								then();
+							return;
+						}
+
+						panel.fail( panel.mount(), status, response );
+						panel.ready = false;
+						if( typeof spec.onError === 'function' )
+							spec.onError( status, response, panel );
+					} );
+				},
+
+				reload : function( then ) {
+					panel.init( then );
+				},
+
+				showCurrent : function() {
+
+					if( panel.ready === false || spec.show === 'always' ) {
+						panel.init();
+						return;
+					}
+
+					if( spec.show === 'keep' && dirty() === false )
+						spec.render( panel.data, panel );
+				},
+			};
+
+			if( spec.boot === 'ready' )
+				Nino.events.bindCallback( 'ready', function() { panel.init() } );
+
+			return panel;
 		},
 
 		/**

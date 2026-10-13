@@ -711,17 +711,12 @@
 			let select = null;
 
 			if( config.select !== null && config.select !== undefined ) {
-				select = dc.createElement('select');
-				select.className = 'nino-admin-locale-select nino-admin-contextbar-select';
-				select.setAttribute( 'aria-label', Nino.content.getText('/_admin/text/label/language') );
-				config.select.locales.forEach( function( locale ) {
-					const option = dc.createElement('option');
-					option.value = locale;
-					option.textContent = locale;
-					select.appendChild( option );
+				select = Nino.adminUi.localeSelect( {
+					label : Nino.content.getText('/_admin/text/label/language'),
+					locales : config.select.locales,
+					current : config.select.value,
+					onChange : function( locale ) { config.select.onChange( locale ) },
 				} );
-				select.value = config.select.value;
-				select.addEventListener( 'change', function() { config.select.onChange( select.value ) } );
 				bar.appendChild( select );
 			}
 

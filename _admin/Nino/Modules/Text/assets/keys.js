@@ -860,7 +860,7 @@
 		 */
 		_deleteKey : function( key ) {
 
-			if( wn.confirm( Nino.content.getText('/_admin/keys/confirm/delete').replace( '%s', key ) ) === false )
+			if( wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/keys/confirm/delete'), key ) ) === false )
 				return;
 
 			Nino.admin.keys._guard( function() {
@@ -1218,26 +1218,19 @@
 				legend.textContent = Nino.content.getText('/_admin/keys/label/perlocale');
 				localeWrap.appendChild( legend );
 
-				const select = dc.createElement('select');
-				select.id = 'keys-form-locale-select';
-				select.className = 'nino-admin-locale-select nino-admin-contextbar-select';
-				Nino.admin.keys._locales.forEach( function( locale ) {
-					const option = dc.createElement('option');
-					option.value = locale;
-					option.textContent = locale;
-					option.selected = ( locale === Nino.admin.keys._selectedLocale );
-					select.appendChild( option );
-				} );
-				select.addEventListener( 'change', function() {
-					Nino.admin.keys._storeVisibleLocaleFields();
-					Nino.admin.keys._selectedLocale = select.value;
-					Nino.admin.keys._renderLocaleFields();
-				} );
-
 				// In the pinned toolbar, not in this fieldset's own corner:
 				// which translation you are looking at has to stay switchable
 				// from anywhere in a long category, not only from its top
-				toolbar.appendChild( select );
+				toolbar.appendChild( Nino.adminUi.localeSelect( {
+					id : 'keys-form-locale-select',
+					locales : Nino.admin.keys._locales,
+					current : Nino.admin.keys._selectedLocale,
+					onChange : function( locale ) {
+						Nino.admin.keys._storeVisibleLocaleFields();
+						Nino.admin.keys._selectedLocale = locale;
+						Nino.admin.keys._renderLocaleFields();
+					},
+				} ) );
 
 				const fieldsWrap = dc.createElement('div');
 				fieldsWrap.id = 'keys-form-locale-fields';

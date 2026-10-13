@@ -485,7 +485,7 @@
 		 */
 		_delete : function( entry ) {
 
-			if( wn.confirm( Nino.content.getText('/_admin/submissions/confirm/delete').replace( '%s', entry.date || '' ) ) === false )
+			if( wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/submissions/confirm/delete'), entry.date || '' ) ) === false )
 				return;
 
 			Nino.admin.submissions._apiCall( 'delete', { id : entry.id }, function( status, response ) {

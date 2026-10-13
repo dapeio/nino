@@ -562,7 +562,7 @@
 			const cache = Nino.admin.features._cache;
 
 			return cache !== null
-				? Nino.content.getText('/_admin/features/label/catalogue-status').replace( '%s', cache.fetched )
+				? Nino.adminUi.format( Nino.content.getText('/_admin/features/label/catalogue-status'), cache.fetched )
 				: Nino.content.getText('/_admin/features/label/catalogue-unloaded');
 		},
 
@@ -647,7 +647,7 @@
 			// be told, and the second one is not a reason to explain what a
 			// feature directory is
 			if( all.length === 0 ) {
-				panel.appendChild( Nino.adminUi.emptyState( Nino.content.getText( active === true ? '/_admin/features/hint/active-empty' : '/_admin/features/hint/empty' ).replace( '%s', Nino.admin.features._dir ) ) );
+				panel.appendChild( Nino.adminUi.emptyState( Nino.adminUi.format( Nino.content.getText( active === true ? '/_admin/features/hint/active-empty' : '/_admin/features/hint/empty' ), Nino.admin.features._dir ) ) );
 				return;
 			}
 
@@ -684,7 +684,7 @@
 		_fillAvailable : function( panel ) {
 
 			if( Nino.admin.features._catalogueUrl === '' ) {
-				panel.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/features/hint/catalogue-off').replace( '%s', Nino.admin.features._dir ) ) );
+				panel.appendChild( Nino.adminUi.emptyState( Nino.adminUi.format( Nino.content.getText('/_admin/features/hint/catalogue-off'), Nino.admin.features._dir ) ) );
 				return;
 			}
 
@@ -717,7 +717,7 @@
 			if( Nino.admin.features._writable === false ) {
 				const readonly = dc.createElement('p');
 				readonly.className = 'nino-admin-error';
-				readonly.textContent = Nino.content.getText('/_admin/features/hint/catalogue-readonly').replace( '%s', Nino.admin.features._dir );
+				readonly.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/features/hint/catalogue-readonly'), Nino.admin.features._dir );
 				panel.appendChild( readonly );
 			}
 
@@ -784,7 +784,7 @@
 			const copy = Nino.admin.features._copy( feature.name, Nino.admin.features._meta( feature.category, feature.version, feature.installed, '', feature.description ), feature.maturity );
 
 			if( feature.requires.length > 0 )
-				copy.appendChild( Nino.admin.features._note( Nino.content.getText('/_admin/features/label/requires').replace( '%s', feature.requires.join( ', ' ) ), false ) );
+				copy.appendChild( Nino.admin.features._note( Nino.adminUi.format( Nino.content.getText('/_admin/features/label/requires'), feature.requires.join( ', ' ) ), false ) );
 
 			// What stands in the way of switching it on, one line each - the
 			// kernel's own words, which is where the check lives. These wrap
@@ -824,11 +824,11 @@
 
 			return [
 				category ? Nino.admin.features._categoryLabel( category ) : '',
-				Nino.content.getText('/_admin/features/label/version').replace( '%s', version )
+				Nino.adminUi.format( Nino.content.getText('/_admin/features/label/version'), version )
 					+ ( installed !== null && installed !== undefined && installed !== version
-						? ' \u2013 '+ Nino.content.getText('/_admin/features/label/installed').replace( '%s', installed )
+						? ' \u2013 '+ Nino.adminUi.format( Nino.content.getText('/_admin/features/label/installed'), installed )
 						: '' )
-					+ ( released !== '' ? ' \u2013 '+ Nino.content.getText('/_admin/features/label/released').replace( '%s', released ) : '' ),
+					+ ( released !== '' ? ' \u2013 '+ Nino.adminUi.format( Nino.content.getText('/_admin/features/label/released'), released ) : '' ),
 				description,
 			].filter( Boolean ).join( ' \u00b7 ' );
 		},
@@ -960,7 +960,7 @@
 		 */
 		_remove : function( feature, btn, msg ) {
 
-			if( wn.confirm( Nino.content.getText('/_admin/features/confirm/remove').replace( '%s', feature.name ) ) === false )
+			if( wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/features/confirm/remove'), feature.name ) ) === false )
 				return;
 
 			btn.disabled = true;
@@ -1173,15 +1173,15 @@
 			const copy = Nino.admin.features._copy( offer.name, Nino.admin.features._meta( offer.category, offer.version, offer.local, offer.released, offer.description ), offer.maturity );
 
 			if( offer.requires.length > 0 )
-				copy.appendChild( Nino.admin.features._note( Nino.content.getText('/_admin/features/label/requires').replace( '%s', offer.requires.join( ', ' ) ), false ) );
+				copy.appendChild( Nino.admin.features._note( Nino.adminUi.format( Nino.content.getText('/_admin/features/label/requires'), offer.requires.join( ', ' ) ), false ) );
 
 			// What it asks of this kernel, for one no version of which fits -
 			// the only thing that makes such a row worth showing at all
 			if( offer.state === 'incompatible' ) {
-				copy.appendChild( Nino.admin.features._note( Nino.content.getText('/_admin/features/label/nino').replace( '%s', offer.nino ), false ) );
+				copy.appendChild( Nino.admin.features._note( Nino.adminUi.format( Nino.content.getText('/_admin/features/label/nino'), offer.nino ), false ) );
 
 				if( offer.ext.length > 0 )
-					copy.appendChild( Nino.admin.features._note( Nino.content.getText('/_admin/features/label/extensions').replace( '%s', offer.ext.join( ', ' ) ), false ) );
+					copy.appendChild( Nino.admin.features._note( Nino.adminUi.format( Nino.content.getText('/_admin/features/label/extensions'), offer.ext.join( ', ' ) ), false ) );
 			}
 
 			row.appendChild( copy );
@@ -1217,7 +1217,7 @@
 				install.type = 'button';
 				install.className = 'nino-admin-btn-primary';
 				install.textContent = offer.state === 'upgrade'
-					? Nino.content.getText('/_admin/features/label/update').replace( '%s', offer.version )
+					? Nino.adminUi.format( Nino.content.getText('/_admin/features/label/update'), offer.version )
 					: Nino.content.getText('/_admin/features/label/install');
 				install.addEventListener( 'click', function() { Nino.admin.features._install( offer, install, msg ) } );
 				actions.appendChild( install );
@@ -1576,7 +1576,7 @@
 			if( feature.requires.length > 0 ) {
 				const requires = dc.createElement('p');
 				requires.className = 'nino-admin-hint';
-				requires.textContent = Nino.content.getText('/_admin/features/label/requires').replace( '%s', feature.requires.join( ', ' ) );
+				requires.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/features/label/requires'), feature.requires.join( ', ' ) );
 				form.appendChild( requires );
 			}
 
@@ -1657,7 +1657,7 @@
 				const update = dc.createElement('button');
 				update.type = 'button';
 				update.className = 'nino-admin-btn-primary';
-				update.textContent = Nino.content.getText('/_admin/features/label/update').replace( '%s', feature.version );
+				update.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/features/label/update'), feature.version );
 				update.addEventListener( 'click', function() { Nino.admin.features._switch( feature, 'update', update, msg ) } );
 				actions.appendChild( update );
 			}

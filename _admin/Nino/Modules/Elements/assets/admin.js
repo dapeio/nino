@@ -2542,18 +2542,12 @@
 				legend.textContent = Nino.content.getText('/_admin/common/label/locale');
 				localeWrap.appendChild( legend );
 
-				const select = dc.createElement('select');
-				select.id = 'elements-form-locale-select';
-				select.className = 'nino-admin-locale-select nino-admin-contextbar-select';
-				Nino.admin.elements._locales.forEach( function( locale ) {
-					const option = dc.createElement('option');
-					option.value = locale;
-					option.textContent = locale;
-					option.selected = ( locale === Nino.admin.elements._selectedLocale );
-					select.appendChild( option );
-				} );
-				select.addEventListener( 'change', function() { Nino.admin.elements._switchLocale( select.value ) } );
-				toolbar.appendChild( select );
+				toolbar.appendChild( Nino.adminUi.localeSelect( {
+					id : 'elements-form-locale-select',
+					locales : Nino.admin.elements._locales,
+					current : Nino.admin.elements._selectedLocale,
+					onChange : function( locale ) { Nino.admin.elements._switchLocale( locale ) },
+				} ) );
 
 				const fieldsWrap = dc.createElement('div');
 				fieldsWrap.id = 'elements-form-locale-fields';

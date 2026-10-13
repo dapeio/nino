@@ -129,11 +129,14 @@
 							the person types will change that */
 					const fromKernel = typeof xhr.getResponseHeader === 'function'
 						&& xhr.getResponseHeader('Content-Security-Policy') !== null;
+					// The %s is filled through a function and never a string, which
+					// String.replace() reads a '$&' in - Nino.adminUi.format() does it that
+					// way, but this page loads without Nino.admin.js
 					el.formMsg.innerHTML = xhr.status === 401
 						? Nino.content.getText('/_admin/login/error/wrong')
 						: ( xhr.status === 403 && fromKernel
 							? Nino.content.getText('/_admin/login/error/csrf')
-							: Nino.content.getText('/_admin/login/error/endpoint').replace( '%s', String( xhr.status ) ) );
+							: Nino.content.getText('/_admin/login/error/endpoint').replace( '%s', function() { return String( xhr.status ) } ) );
 				} );
 			} );
 

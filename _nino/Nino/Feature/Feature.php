@@ -44,7 +44,7 @@ namespace Nino {
 		private const string NAME_PATTERN = '/^[a-z][a-z0-9-]*$/D';
 
 		/*	What slug() makes of the letters ascii does not have. Lower case only,
-			since the text is lower-cased first. The script twin, Nino.ui.slug(),
+			since the text is lower-cased first. The script twin, Nino.slug(),
 			has to carry the same table, and the two must stay equal: a slug a
 			page derives in the browser has to be the one the server derives from
 			the same words	*/
@@ -458,7 +458,7 @@ namespace Nino {
 		 *	at either end, and at most $max characters of it - the cut never
 		 *	leaves a hyphen at the end. '' for a text that holds no letter or digit.
 		 *
-		 *	The same rule for a page script is Nino.ui.slug(); its table and
+		 *	The same rule for a page script is Nino.slug(); its table and
 		 *	TRANSLITERATIONS must stay equal. The normalizer a search builds for
 		 *	comparing words is another thing and stays its own.
 		 *

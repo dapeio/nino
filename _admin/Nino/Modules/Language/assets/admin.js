@@ -374,8 +374,8 @@
 				const state = dc.createElement('small');
 				state.className = 'nino-admin-checklist-state';
 				state.textContent = locale.hasText === true
-					? Nino.content.getText('/_admin/language/label/keys').replace( '%d', String( locale.keys ) )
-					: Nino.content.getText('/_admin/language/label/notext').replace( '%s', locale.code );
+					? Nino.adminUi.format( Nino.content.getText('/_admin/language/label/keys'), locale.keys )
+					: Nino.adminUi.format( Nino.content.getText('/_admin/language/label/notext'), locale.code );
 				label.appendChild( state );
 
 				list.appendChild( label );
@@ -408,7 +408,7 @@
 			}
 
 			msg.className = 'nino-admin-error';
-			msg.textContent = Nino.content.getText('/_admin/language/error/missing').replace( '%s', missing.join( ', ' ) );
+			msg.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/language/error/missing'), missing.join( ', ' ) );
 		},
 
 		/**
@@ -441,7 +441,7 @@
 			}
 
 			msg.className = 'nino-admin-hint';
-			msg.textContent = Nino.content.getText('/_admin/language/msg/creating').replace( '%s', code );
+			msg.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/language/msg/creating'), code );
 
 			// The file comes first, then the row: a language whose text file
 			// exists is a language that renders, and the row can then report
@@ -480,10 +480,9 @@
 				// _refreshLocaleWarning(), so the outcome goes in afterwards
 				const after = dc.getElementById('language-locale-msg');
 				after.className = 'nino-admin-hint';
-				after.textContent = ( response.created === true
-					? Nino.content.getText('/_admin/language/msg/created').replace( '%n', String( response.from ) )
-					: Nino.content.getText('/_admin/language/msg/existed') )
-					.replaceAll( '%s', code ).replace( '%d', String( response.keys ) );
+				after.textContent = response.created === true
+					? Nino.adminUi.format( Nino.content.getText('/_admin/language/msg/created'), code, response.keys, response.from, code )
+					: Nino.adminUi.format( Nino.content.getText('/_admin/language/msg/existed'), code, response.keys );
 			} );
 		},
 

@@ -3,10 +3,10 @@
  *	Modules									Optional modules
  *	NinoJS									Basic js functionality & helper - client detection,
  *													dom-ready/resize/scroll events, xhr requests, auth,
- *													jstext lookups. Used by the tool frontends and the public
- *													site alike, which is what decides what belongs here: this
- *													file is in the public script bundle, so anything only one
- *													audience needs is a file of its own.
+ *													jstext lookups, a slug and the clipboard. Used by the tool
+ *													frontends and the public site alike, which is what decides
+ *													what belongs here: this file is in the public script bundle,
+ *													so anything only one audience needs is a file of its own.
  *
  *													Frontend design-system behaviors (cover, parallax, vpa,
  *													autoheight, slider, generic forms) live in Nino.ui.js;
@@ -21,6 +21,42 @@
  */
 
 ( function(wn,dc,dE,bd) {
+
+	/*	What slug() makes of the letters ascii does not have. Lower case only,
+		since the text is lower-cased first. This is \Nino\Feature::TRANSLITERATIONS
+		pair for pair, and the two must stay equal: a slug a page derives in the
+		browser has to be the one the server derives from the same words	*/
+	const TRANSLITERATIONS = {
+		'ä' : 'ae', 'ö' : 'oe', 'ü' : 'ue', 'ß' : 'ss', 'æ' : 'ae', 'œ' : 'oe',
+		'à' : 'a', 'á' : 'a', 'â' : 'a', 'ã' : 'a', 'å' : 'a',
+		'è' : 'e', 'é' : 'e', 'ê' : 'e', 'ë' : 'e',
+		'ì' : 'i', 'í' : 'i', 'î' : 'i', 'ï' : 'i',
+		'ò' : 'o', 'ó' : 'o', 'ô' : 'o', 'õ' : 'o', 'ø' : 'o',
+		'ù' : 'u', 'ú' : 'u', 'û' : 'u',
+		'ñ' : 'n', 'ç' : 'c', 'ý' : 'y', 'ÿ' : 'y', 'ð' : 'd', 'þ' : 'th',
+		'ł' : 'l', 'š' : 's', 'ž' : 'z', 'č' : 'c', 'ř' : 'r', 'ě' : 'e',
+	};
+
+	const TRANSLITERATED = new RegExp( '['+ Object.keys( TRANSLITERATIONS ).join('')+ ']', 'g' );
+
+	/**
+	 *	Run one callback of an event on its own. A callback that throws is
+	 *	reported by the browser like any error nobody caught - it is thrown again
+	 *	from a timer, which stops nothing - and the callbacks after it still run:
+	 *	one script's bug is not every script's after it
+	 *
+	 *	@param		{Function}	call					Calls the callback
+	 *
+	 *	@return		void
+	 */
+	const isolate = function( call ) {
+		try {
+			call();
+		}
+		catch( error ) {
+			setTimeout( function() { throw error }, 0 );
+		}
+	};
 
 	wn.Nino = {
 
@@ -202,7 +238,7 @@
 					wn.dispatchEvent( new Event( 'scroll' ) );
 
 					Nino.events._calls['ready'] = e;
-					Nino.events._events['ready'].forEach( cb => { cb(Nino.events._calls['ready']) } );
+					Nino.events._events['ready'].forEach( cb => { isolate( () => { cb(Nino.events._calls['ready']) } ) } );
 				};
 
 				if( dc.readyState === 'complete' || dc.readyState === 'interactive' )
@@ -212,7 +248,8 @@
 
 				// onResize
 				const resizeEvent = ( Nino.client.isMobile === false ) ? 'resize' : 'deviceorientation';
-				// Throttle native resize/orientation events and notify registered 'resize' callbacks
+				// Throttle native resize/orientation events and notify registered 'resize' callbacks.
+				// Passive, like the scroll listener below
 				wn.addEventListener( resizeEvent, ( e ) => {
 					if( Nino.events._calls['resize'] !== false )
 						return;
@@ -228,12 +265,13 @@
 					window.requestAnimationFrame( () => {
 						const event = Nino.events._calls['resize'];
 						Nino.events._calls['resize'] = false;
-						Nino.events._events['resize'].forEach( cb => { cb.call(cb,event) } );
+						Nino.events._events['resize'].forEach( cb => { isolate( () => { cb.call(cb,event) } ) } );
 					} );
-				} );
+				}, { passive : true } );
 
 				// onScroll
-				// Throttle native scroll events and notify registered 'scroll' callbacks
+				// Throttle native scroll events and notify registered 'scroll' callbacks. Passive: none
+				// of the callbacks cancels a scroll, so the browser need not wait for them to go on with it
 				wn.addEventListener( 'scroll', ( e ) => {
 					if( Nino.events._calls['scroll'] !== false )
 						return;
@@ -243,9 +281,9 @@
 					window.requestAnimationFrame( () => {
 						const event = Nino.events._calls['scroll'];
 						Nino.events._calls['scroll'] = false;
-						Nino.events._events['scroll'].forEach( cb => { cb.call(cb,event) } );
+						Nino.events._events['scroll'].forEach( cb => { isolate( () => { cb.call(cb,event) } ) } );
 					} );
-				} );
+				}, { passive : true } );
 			},
 		},
 
@@ -352,6 +390,103 @@
 
 				xhr.send( formdata );
 			},
+		},
+
+		/**
+		 *	A text made into a slug: lower case, the letters ascii does not have
+		 *	written the way TRANSLITERATIONS says (the umlauts as ae, oe and ue,
+		 *	the sharp s as ss, an accented vowel as the plain one), every run of
+		 *	anything but letters and digits as one hyphen, no hyphen at either
+		 *	end, and at most max characters of it - the cut never leaves a hyphen
+		 *	at the end.
+		 *
+		 *	The twin of \Nino\Feature::slug(): the same result for the same words,
+		 *	which is what lets a slug a page derives in the browser be the one the
+		 *	server derives from them. The table at the top of this file and
+		 *	\Nino\Feature::TRANSLITERATIONS must stay equal
+		 *
+		 *	@param		{string}		text					The words; anything but a string is taken for none
+		 *	@param		{number}		[max]					(optional) The longest slug, in characters; 60 for none and for anything but a positive whole number
+		 *
+		 *	@return		{string}								'' for a text that holds no letter or digit
+		 */
+		slug : function( text, max ) {
+
+			if( typeof text !== 'string' )
+				return '';
+
+			const slug = text.toLowerCase()
+				.replace( TRANSLITERATED, function( letter ) { return TRANSLITERATIONS[letter] } )
+				.replace( /[^a-z0-9]+/g, '-' )
+				.replace( /^-+|-+$/g, '' );
+
+			return slug.slice( 0, Number.isInteger( max ) === true && max > 0 ? max : 60 ).replace( /-+$/, '' );
+		},
+
+		/**
+		 *	Copy a text to the clipboard. The clipboard api is asked first - a
+		 *	browser has it over https only, and may still refuse it - and where
+		 *	there is none, or it refuses, the older way is tried before anything
+		 *	is said: a textarea made for the moment, selected, and the browser's
+		 *	own copy command. The textarea is gone again in every case.
+		 *
+		 *	Owns no strings: whether a person is told, and how, is the caller's.
+		 *	A caller that wants a refusal to be an error reads the answer
+		 *
+		 *	@param		{string}		text					What to copy
+		 *
+		 *	@return		{Promise}								Resolves to true when the text was copied and to false when it was not; never rejects
+		 */
+		clipboard : function( text ) {
+
+			text = String( text ?? '' );
+
+			/**
+			 *	The older way
+			 *
+			 *	@return		{boolean}							Whether the browser's copy command took the text
+			 */
+			const older = function() {
+
+				const field = dc.createElement('textarea');
+
+				try {
+					field.value = text;
+					field.setAttribute( 'readonly', '' );
+					field.setAttribute( 'aria-hidden', 'true' );
+					field.style.position = 'fixed';
+					field.style.top = '-1000px';
+					field.style.opacity = '0';
+
+					dc.body.appendChild( field );
+					field.select();
+
+					return dc.execCommand( 'copy' ) === true;
+				}
+				catch( error ) {
+					return false;
+				}
+				finally {
+					field.remove();
+				}
+			};
+
+			const api = navigator.clipboard;
+
+			if( api === undefined || api === null || typeof api.writeText !== 'function' )
+				return Promise.resolve( older() );
+
+			return new Promise( function( resolve ) {
+
+				const refused = function() { resolve( older() ) };
+
+				try {
+					Promise.resolve( api.writeText( text ) ).then( function() { resolve( true ) }, refused );
+				}
+				catch( error ) {
+					refused();
+				}
+			} );
 		},
 	};
 

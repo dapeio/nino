@@ -467,7 +467,7 @@ This hook is suitable for clearly limited, global post-processing. Project logic
 
 ## Important Kernel APIs
 
-The kernel classes live one per file, in `_nino/Nino/<Class>/<Class>.php`, and are loaded on first use; the docblocks of each state its public tasks. Use the public methods instead of the internal implementations starting with `_`. This keeps project code decoupled from details like cache invalidation, file format, and session rotation. `\Nino\Feature` is the class a feature calls for what every feature needs - the template its markup lives in, the class attribute, a flag, a counter per client, a slug, the widening of the Content-Security-Policy - and its docblocks are the reference.
+The kernel classes live one per file, in `_nino/Nino/<Class>/<Class>.php`, and are loaded on first use; the docblocks of each state its public tasks. Use the public methods instead of the internal implementations starting with `_`. This keeps project code decoupled from details like cache invalidation, file format, and session rotation. `\Nino\Feature` is the class a feature calls for what every feature needs - the template its markup lives in, the class attribute, a flag, a counter per client, a slug, the widening of the Content-Security-Policy - and its docblocks are the reference. The browser has the same for a feature's scripts, in `Nino.js`, `Nino.ui.js` and `Nino.admin.js` (the docblocks are the reference there too): `Nino.adminUi.panel()` is the lifecycle of a workbench panel, with `levels()`, `hint()`, `textField()`, `button()`, `el()` and `localeSelect()` beside it; `Nino.ui.options()`, `whenVisible()` and `reducedMotion()` serve a site script; and `Nino.slug()` and `Nino.clipboard()` serve a site script and a panel alike.
 
 ---
 

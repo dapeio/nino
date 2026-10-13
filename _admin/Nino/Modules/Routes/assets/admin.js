@@ -176,7 +176,7 @@
 				}
 
 				const moveWrap = dc.createElement('span');
-				moveWrap.className = 'admin-page-move';
+				moveWrap.className = 'nino-admin-move';
 
 				const upBtn = dc.createElement('button');
 				upBtn.type = 'button';
@@ -637,7 +637,7 @@
 
 				const fixedHint = dc.createElement('p');
 				fixedHint.className = 'nino-admin-hint';
-				fixedHint.textContent = Nino.content.getText('/_admin/routes/hint/runtime').replace( '%s', entry.body );
+				fixedHint.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/routes/hint/runtime'), entry.body );
 				pageFieldset.appendChild( fixedHint );
 			}
 
@@ -668,7 +668,7 @@
 				navInput.dataset.nav = navKey;
 				navInput.checked = ( entry.navs || [] ).indexOf( navKey ) !== -1;
 				navLabel.appendChild( navInput );
-				navLabel.appendChild( dc.createTextNode( ' '+ Nino.content.getText('/_admin/routes/label/nav').replace( '%s', navKey ) ) );
+				navLabel.appendChild( dc.createTextNode( ' '+ Nino.adminUi.format( Nino.content.getText('/_admin/routes/label/nav'), navKey ) ) );
 				pageFieldset.appendChild( navLabel );
 			} );
 

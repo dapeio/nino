@@ -168,7 +168,7 @@
 				const title = dc.createElement('strong');
 				title.textContent = type.title;
 				const descr = dc.createElement('small');
-				descr.textContent = '/'+ type.uri+ ' · '+ Nino.content.getText( type.fieldCount === 1 ? '/_admin/types/label/field' : '/_admin/types/label/fields' ).replace( '%d', String( type.fieldCount ) );
+				descr.textContent = '/'+ type.uri+ ' · '+ Nino.adminUi.format( Nino.content.getText( type.fieldCount === 1 ? '/_admin/types/label/field' : '/_admin/types/label/fields' ), type.fieldCount );
 				copy.appendChild( title );
 				copy.appendChild( descr );
 				link.appendChild( copy );
@@ -608,7 +608,7 @@
 			// renders it in, so this is a real editing control, not just a way
 			// to tidy up this list
 			const move = dc.createElement('span');
-			move.className = 'admin-field-move';
+			move.className = 'nino-admin-move';
 
 			const up = dc.createElement('button');
 			up.type = 'button';
@@ -807,7 +807,7 @@
 				key 			: 'autoincrement',
 				checked 	: autoincrement === true,
 				label 		: Nino.content.getText('/_admin/types/label/numbering'),
-				hint 			: Nino.content.getText('/_admin/types/hint/numbering').replace( '%s', '/'+ ( Nino.admin.types._currentUri ?? '<type>' )+ '/'+ ( next || '00001' ) ),
+				hint 			: Nino.adminUi.format( Nino.content.getText('/_admin/types/hint/numbering'), '/'+ ( Nino.admin.types._currentUri ?? '<type>' )+ '/'+ ( next || '00001' ) ),
 			} );
 			autoSwitch.id = 'admin-form-autoincrement';
 			autoWrap.appendChild( autoSwitch );
@@ -1030,9 +1030,7 @@
 
 			const hint = dc.createElement('p');
 			hint.className = 'nino-admin-hint';
-			hint.textContent = Nino.content.getText('/_admin/types/hint/delete')
-				.replace( '%s', '/'+ uri )
-				.replace( '%d', String( Nino.admin.types._elementCount ) );
+			hint.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/types/hint/delete'), '/'+ uri, Nino.admin.types._elementCount );
 			wrap.appendChild( hint );
 
 			// Refused rather than warned about: deleting it would leave those
@@ -1041,8 +1039,7 @@
 			if( Nino.admin.types._referencedBy.length > 0 ) {
 				const blocked = dc.createElement('p');
 				blocked.className = 'nino-admin-error';
-				blocked.textContent = Nino.content.getText('/_admin/types/hint/delete-referenced')
-					.replace( '%s', Nino.admin.types._referencedBy.join(', ') );
+				blocked.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/types/hint/delete-referenced'), Nino.admin.types._referencedBy.join(', ') );
 				wrap.appendChild( blocked );
 				return wrap;
 			}
@@ -1056,7 +1053,7 @@
 			confirmInput.autocomplete = 'off';
 			// The uri typed to confirm a deletion is not an edit of the type
 			confirmInput.dataset.dirty = 'ignore';
-			confirmInput.placeholder = Nino.content.getText('/_admin/types/placeholder/delete').replace( '%s', uri );
+			confirmInput.placeholder = Nino.adminUi.format( Nino.content.getText('/_admin/types/placeholder/delete'), uri );
 			row.appendChild( confirmInput );
 
 			const delBtn = dc.createElement('button');

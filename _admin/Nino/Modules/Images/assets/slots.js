@@ -325,7 +325,7 @@
 		 */
 		_delete : function() {
 
-			if( wn.confirm( Nino.content.getText('/_admin/slots/confirm/delete').replace( '%s', Nino.admin.slots._currentUri ) ) === false )
+			if( wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/slots/confirm/delete'), Nino.admin.slots._currentUri ) ) === false )
 				return;
 
 			const msg = dc.getElementById('slots-form-msg');
@@ -590,7 +590,7 @@
 
 				if( i >= pending.length ) {
 					if( failed.length > 0 )
-						wn.alert( Nino.content.getText('/_admin/slots/scan/created-failed').replace( '%d', created ).replace( '%s', failed.join(', ') ) );
+						wn.alert( Nino.adminUi.format( Nino.content.getText('/_admin/slots/scan/created-failed'), created, failed.join(', ') ) );
 					Nino.admin.slots._snapshot();
 					Nino.admin.slots.init();
 					report( failed.length === 0 );
@@ -598,7 +598,7 @@
 				}
 
 				const row = pending[i];
-				msg.textContent = Nino.content.getText('/_admin/common/msg/creating').replace( '%s', row.uriInput.value ).replace( '%d', String( i + 1 ) ).replace( '%n', String( pending.length ) );
+				msg.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/common/msg/creating'), row.uriInput.value, i + 1, pending.length );
 
 				Nino.admin.slots._apiCall( 'create', {
 					uri 		: row.uriInput.value,

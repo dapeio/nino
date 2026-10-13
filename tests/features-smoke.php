@@ -871,11 +871,13 @@ check( '...and registers nothing where a component of that name is in the regist
 
 // slug(): a name made into a word of a url or a file
 check( 'slug() lower-cases, writes the letters ascii lacks as its table says, and turns every run of anything else into one hyphen', \Nino\Feature::slug( 'Äpfel & Öl, groß!' ) === 'aepfel-oel-gross'
-	&& \Nino\Feature::slug( 'ÄÖÜ Straße É' ) === 'aeoeue-strasse-e' && \Nino\Feature::slug( 'Crème brûlée à la Française' ) === 'creme-brulee-a-la-francaise' );
+	&& \Nino\Feature::slug( 'ÄÖÜ Straße É' ) === 'aeoeue-strasse-e' && \Nino\Feature::slug( 'Crème brûlée à la Française' ) === 'creme-brulee-a-la-francaise'
+	&& \Nino\Feature::slug( 'Ærøskøbing' ) === 'aeroskobing' && \Nino\Feature::slug( 'Crème brûlée' ) === 'creme-brulee' );
 check( '...no hyphen at either end', \Nino\Feature::slug( '  --Hello,  World--  ' ) === 'hello-world' );
 check( '...cut at the longest asked for, and never with a hyphen at the end of the cut', \Nino\Feature::slug( 'alpha beta gamma', 6 ) === 'alpha' && \Nino\Feature::slug( 'alpha beta', 10 ) === 'alpha-beta' && \Nino\Feature::slug( 'abcdef', 3 ) === 'abc'
-	&& \Nino\Feature::slug( 'abc', 0 ) === '' && strlen( \Nino\Feature::slug( str_repeat( 'wort ', 40 ) ) ) <= 60 );
-check( '...nothing for a text that holds no letter or digit', \Nino\Feature::slug( '' ) === '' && \Nino\Feature::slug( ' -- !? ' ) === '' );
+	&& \Nino\Feature::slug( 'abc', 0 ) === '' && strlen( \Nino\Feature::slug( str_repeat( 'wort ', 40 ) ) ) <= 60
+	&& \Nino\Feature::slug( str_repeat( 'a', 59 ). ' b' ) === str_repeat( 'a', 59 ) && strlen( \Nino\Feature::slug( str_repeat( 'a', 100 ) ) ) === 60 );
+check( '...nothing for a text that holds no letter or digit', \Nino\Feature::slug( '' ) === '' && \Nino\Feature::slug( ' -- !? ' ) === '' && \Nino\Feature::slug( '---' ) === '' );
 
 \Nino\Filesystem::removeDir( ninoSandboxDir( $toolset ) );
 

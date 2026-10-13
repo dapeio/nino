@@ -582,6 +582,102 @@ a {
 	color: #fff;
 }
 
+/* A button small enough for a row: the actions of one entry of a list, a
+   button beside a field. The base button is as high as a form control; this
+   changes the size and nothing else, so it goes beside the variant that says
+   what the button does (primary, secondary, danger) */
+:where(.nino-admin) .nino-admin-btn--small {
+	min-height: 30px;
+	padding: .25rem .55rem;
+	font-size: .76rem;
+}
+
+/* Buttons - and a line of status, a link - in one row inside a form or under
+   a list; the fixed bar at the bottom of the pane is .nino-admin-actionbar.
+   The row wraps, so a narrow pane puts the last of them on a row of its own.
+   --end stands it at the right edge, --between spreads it to both. The space
+   above it is the screen's own rule, since it is the screen that knows what
+   it follows */
+:where(.nino-admin) .nino-admin-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: .5rem;
+}
+
+:where(.nino-admin) .nino-admin-actions--end {
+	justify-content: flex-end;
+}
+
+:where(.nino-admin) .nino-admin-actions--between {
+	justify-content: space-between;
+}
+
+/* A short word set as a pill beside a name: a state, a kind, a count. The
+   state is data-state - ok, warn, error or muted - in the colours the status
+   line paints saved, unsaved, failed and quiet text in, so the two agree in
+   both colour schemes. Its word says it as well: the colour is never the
+   only signal */
+:where(.nino-admin) .nino-admin-badge {
+	display: inline-block;
+	padding: .1rem .55rem;
+	border: 1px solid currentColor;
+	border-radius: 999px;
+	font-size: .72rem;
+	line-height: 1.4;
+	white-space: nowrap;
+}
+
+:where(.nino-admin) .nino-admin-badge[data-state="ok"] {
+	color: var(--editor-green);
+}
+
+:where(.nino-admin) .nino-admin-badge[data-state="warn"] {
+	color: var(--editor-orange);
+}
+
+:where(.nino-admin) .nino-admin-badge[data-state="error"] {
+	color: var(--editor-red);
+}
+
+:where(.nino-admin) .nino-admin-badge[data-state="muted"] {
+	color: var(--editor-text-secondary);
+}
+
+/* The square buttons at the end of a row of an ordered list - up, down,
+   remove - as one cluster. A disabled one keeps the ring that the base rule
+   for a disabled button takes off, and is dimmed further (.32 against .45), so
+   that the end of a list - no way up from the first row, none down from the
+   last - reads as spent. The rules stand after the base rules for a button and
+   for a disabled one, since they have to outrank them */
+:where(.nino-admin) .nino-admin-move {
+	display: flex;
+	flex: 0 0 auto;
+	gap: .25rem;
+}
+
+:where(.nino-admin) .nino-admin-move button {
+	display: inline-grid;
+	place-items: center;
+	width: 1.85rem;
+	height: 1.85rem;
+	min-height: 0;
+	padding: 0;
+	border-radius: var(--editor-radius-sm);
+	box-shadow: inset 0 0 0 1px var(--editor-border);
+	font-size: .76rem;
+	line-height: 1;
+}
+
+:where(.nino-admin) .nino-admin-move button:disabled {
+	opacity: .32;
+}
+
+/* ...and at the end of a row of a list it stands off the row's edge */
+:where(.nino-admin) .nino-admin-list > li > .nino-admin-move {
+	padding: 0 .65rem;
+}
+
 :where(.nino-admin) :is(
 	input[type="text"],
 	input[type="search"],
@@ -2858,38 +2954,11 @@ body.theme-dark #admin-theme-toggle .admin-theme-toggle-dark {
 	box-shadow: 0 0 0 3px var(--editor-red-soft);
 }
 
-#admin-page-wrap :is(.admin-field-move, .admin-page-move) {
-	display: flex;
-	flex: 0 0 auto;
-	gap: .25rem;
-}
-
-#admin-page-wrap :is(.admin-field-move, .admin-page-move) button {
-	display: inline-grid;
-	place-items: center;
-	width: 1.85rem;
-	height: 1.85rem;
-	min-height: 0;
-	padding: 0;
-	border-radius: var(--editor-radius-sm);
-	box-shadow: inset 0 0 0 1px var(--editor-border);
-	font-size: .76rem;
-	line-height: 1;
-}
-
-#admin-page-wrap :is(.admin-field-move, .admin-page-move) button:disabled {
-	opacity: .32;
-}
-
 #admin-page-wrap .admin-page-label {
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-}
-
-#admin-page-wrap .admin-page-move {
-	padding: 0 .65rem;
 }
 
 #admin-page-wrap .admin-scan-ignore {

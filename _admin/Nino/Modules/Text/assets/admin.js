@@ -1014,25 +1014,19 @@
 
 			if( localeEntries.length > 0 ) {
 
-				const select = dc.createElement('select');
-				select.id = 'text-form-locale-select';
-				select.className = 'nino-admin-locale-select nino-admin-contextbar-select';
-				select.setAttribute( 'aria-label', Nino.content.getText('/_admin/text/label/language') );
-				Nino.admin.text._locales.forEach( function( locale ) {
-					const option = dc.createElement('option');
-					option.value = locale;
-					option.textContent = locale;
-					option.selected = ( locale === Nino.admin.text._selectedLocale );
-					select.appendChild( option );
-				} );
-				select.addEventListener( 'change', function() {
-					Nino.admin.text._storeVisibleLocaleFields();
-					Nino.admin.text._selectedLocale = select.value;
-					Nino.admin.text._model.locale = select.value;
-					Nino.admin.sessionLocale.set( select.value );
-					Nino.admin.text._renderLocaleFields();
-				} );
-				toolbar.appendChild( select );
+				toolbar.appendChild( Nino.adminUi.localeSelect( {
+					id : 'text-form-locale-select',
+					label : Nino.content.getText('/_admin/text/label/language'),
+					locales : Nino.admin.text._locales,
+					current : Nino.admin.text._selectedLocale,
+					onChange : function( locale ) {
+						Nino.admin.text._storeVisibleLocaleFields();
+						Nino.admin.text._selectedLocale = locale;
+						Nino.admin.text._model.locale = locale;
+						Nino.admin.sessionLocale.set( locale );
+						Nino.admin.text._renderLocaleFields();
+					},
+				} ) );
 			}
 
 			const stored = Nino.admin.text._localeValues[Nino.admin.text._selectedLocale] ?? {};
