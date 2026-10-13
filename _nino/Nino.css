@@ -3084,7 +3084,10 @@ header .nino-headernav-logo:empty {
 	cover has nothing that makes it the box the picture is placed in, so it
 	becomes one. In a cover or a parallax the content is laid out the way
 	.nino-cover-content is: over the middle, or the top or the bottom where
-	the section says so	*/
+	the section says so - with or without a picture in front of it: the cover
+	is the section's height, not the picture's. The row is a direct child of
+	the section either way, which no hand-written cover has: its row stands
+	in .nino-cover-content	*/
 .nino-section-bg {
 	position: absolute;
 	inset: 0;
@@ -3104,18 +3107,19 @@ header .nino-headernav-logo:empty {
 	position: relative;
 	z-index: 101;
 }
-.nino-parallex > .nino-section-bg + .nino-grid-row,
-.nino-cover > .nino-section-bg + .nino-grid-row {
+.nino-parallex > .nino-grid-row,
+.nino-cover > .nino-grid-row {
 	position: absolute;
 	top: 50%;
 	left: 0;
 	right: 0;
+	z-index: 101;
 	transform: translateY(-50%);
 }
-.nino-parallex.nino-cover-top > .nino-section-bg + .nino-grid-row,
-.nino-cover.nino-cover-top > .nino-section-bg + .nino-grid-row { top: 0; transform: none; }
-.nino-parallex.nino-cover-bottom > .nino-section-bg + .nino-grid-row,
-.nino-cover.nino-cover-bottom > .nino-section-bg + .nino-grid-row { top: auto; bottom: 0; transform: none; }
+.nino-parallex.nino-cover-top > .nino-grid-row,
+.nino-cover.nino-cover-top > .nino-grid-row { top: 0; transform: none; }
+.nino-parallex.nino-cover-bottom > .nino-grid-row,
+.nino-cover.nino-cover-bottom > .nino-grid-row { top: auto; bottom: 0; transform: none; }
 .nino-parallex > .nino-section-bg > img {
 	position: absolute;
 	top: 0;

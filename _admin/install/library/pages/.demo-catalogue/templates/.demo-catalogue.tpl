@@ -1243,7 +1243,7 @@
 		</div>
 	</div>
 </section>
-<section id="hoehe-75" class="nino-section nino-section--dark nino-cover nino-mt-0 nino-mb-0" data-cover-height="75" aria-labelledby="hoehe-75-title">
+<section id="hoehe-75" class="nino-section nino-section--dark nino-cover nino-cover-center nino-mt-0 nino-mb-0" data-cover-height="75" aria-labelledby="hoehe-75-title">
 	<div class="nino-cover-content">
 		<div class="nino-grid-row">
 			<div class="nino-grid-100 nino-mb-3 nino-text-center"><h2 class="nino-section-title" id="hoehe-75-title">screen: 75 / vertical: middle</h2></div>
@@ -2459,12 +2459,12 @@
 <!-- Ein Hero füllt den ersten Bildschirm und bringt den Pfeil mit, der zum
      nächsten Abschnitt scrollt. Deshalb steht er hier als eigene Section und
      nicht im Raster der Blöcke darüber. -->
-<section class="nino-hero nino-hero--fullscreen nino-section nino-section--fullwidth nino-section--fullheight nino-section--dark nino-cover nino-cover-center nino-mt-0 nino-mb-0" id="hero-fullscreen" aria-labelledby="hero-fullscreen-title">
+<section class="nino-hero nino-hero--fullscreen nino-section nino-section--fullwidth nino-section--fullheight nino-section--dark nino-mt-0 nino-mb-0" id="hero-fullscreen" aria-labelledby="hero-fullscreen-title">
 	<div class="nino-grid-row nino-grid--fullwidth nino-grid--fullheight nino-grid-middle">
 		<div class="nino-grid-100 nino-text-center">
 			<h3 class="nino-hero-title" id="hero-fullscreen-title">Fullscreen hero</h3>
-			<p class="nino-hero-subtitle">.nino-hero--fullscreen fills the first viewport, .nino-cover-center centres the content, and the arrow at the bottom scrolls to the next section.</p>
-			<p class="nino-badge-cloud"><span class="nino-badge nino-badge--pill">.nino-hero</span> <span class="nino-badge nino-badge--pill">.nino-hero--fullscreen</span> <span class="nino-badge nino-badge--pill">.nino-section--fullheight</span> <span class="nino-badge nino-badge--pill">.nino-cover-center</span> <span class="nino-badge nino-badge--pill">.nino-grid--fullwidth</span> <span class="nino-badge nino-badge--pill">.nino-grid--fullheight</span> <span class="nino-badge nino-badge--pill">.nino-hero-arrowdown</span></p>
+			<p class="nino-hero-subtitle">.nino-hero--fullscreen fills the first viewport and centres the content, and the arrow at the bottom scrolls to the next section.</p>
+			<p class="nino-badge-cloud"><span class="nino-badge nino-badge--pill">.nino-hero</span> <span class="nino-badge nino-badge--pill">.nino-hero--fullscreen</span> <span class="nino-badge nino-badge--pill">.nino-section--fullheight</span> <span class="nino-badge nino-badge--pill">.nino-grid-middle</span> <span class="nino-badge nino-badge--pill">.nino-grid--fullwidth</span> <span class="nino-badge nino-badge--pill">.nino-grid--fullheight</span> <span class="nino-badge nino-badge--pill">.nino-hero-arrowdown</span></p>
 		</div>
 	</div>
 	<button type="button" class="nino-hero-arrowdown" data-arrow-target="#laufzeit" aria-label="Go to next section"></button>
