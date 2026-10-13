@@ -291,14 +291,24 @@
 		and so does a card title - the size of the title role times 5 / 6,
 		because it stood on --text-3 where the other titles stand on --text-4.
 		Each is another number from 768px, where the scale above steps up (see
-		below). The --quiet and --loud variants of a section, a card and a
-		hero are the size of the class they vary - the role, and for a card
-		title and a hero the role times its number - times --scale-quiet or
-		--scale-loud: a title that is made larger has a quiet and a loud
-		variant that follow it.	*/
+		below). A section title, a section subtitle and a card subtitle have a
+		number of their own too, 1 at every width, and a section title has a
+		rule under it, none until a design layer gives it a thickness:
+			--section-title-scale     times the title role: a section title
+			--section-subtitle-scale  times the subtitle role: a section subtitle
+			--card-subtitle-scale     times the subtitle role: a card subtitle
+			--section-line            the thickness of the rule under a section title
+		The --quiet and --loud variants of a section, a card and a hero are
+		the size of the class they vary - the role times its number, where the
+		class has one - times --scale-quiet or --scale-loud: a title that is
+		made larger has a quiet and a loud variant that follow it.	*/
 	--hero-title-scale: 1.2;
 	--hero-text-scale: 1.2;
 	--card-title-scale: calc(5 / 6);
+	--section-title-scale: 1;
+	--section-subtitle-scale: 1;
+	--card-subtitle-scale: 1;
+	--section-line: 0px;
 	--scale-quiet: .85;
 	--scale-loud: 1.2;
 
@@ -1289,23 +1299,32 @@ body.nino-scroll-down .nino-scroll-header {
 	color: var(--color-ink);
 }
 
+/*	A section title and a section subtitle take the size of their role times a
+	number of their own (--section-title-scale, --section-subtitle-scale), and
+	the leading keeps its ratio to the size - 1.3 - and moves with it. Under the
+	title runs a rule of --section-line, with six times that much air between:
+	none, and no air, until a design layer gives it a thickness. The --quiet and
+	--loud variants draw it too, since a page may use one without the class it
+	varies	*/
 .nino-section-title {
 	font-family: var(--fontfamily-title);
 	text-align: center;
-	font-size: var(--font-title-size);
+	font-size: calc( var(--font-title-size) * var(--section-title-scale) );
 	text-transform: var(--font-title-transform);
 	color: var(--color-title);
-	line-height: calc( var(--font-title-size) *1.3 );
+	line-height: calc( var(--font-title-size) * var(--section-title-scale) *1.3 );
 	margin: var(--space-1) 0;
+	border-bottom: var(--section-line) solid var(--color-border);
+	padding-bottom: calc( var(--section-line) * 6 );
 }
 .nino-section-subtitle {
 	font-family: var(--fontfamily-subtitle);
 	text-align: center;
-	font-size: var(--font-subtitle-size);
+	font-size: calc( var(--font-subtitle-size) * var(--section-subtitle-scale) );
 	font-weight: var(--font-subtitle-weight);
 	text-transform: var(--font-subtitle-transform);
 	color: var(--color-subtitle);
-	line-height: calc( var(--font-subtitle-size) *1.3 );
+	line-height: calc( var(--font-subtitle-size) * var(--section-subtitle-scale) *1.3 );
 	opacity: .8;
 	margin-bottom: var(--space-2);
 }
@@ -1353,20 +1372,22 @@ body.nino-scroll-down .nino-scroll-header {
 }
 
 /*	--quiet and --loud are the size of the class they vary, smaller and larger,
- *	per class: the size of the title role for a section title, of the subtitle
- *	role for a subtitle, of the text role for the text - and for a card
- *	title and a hero the size their base class has - times --scale-quiet or
- *	--scale-loud (.85 and 1.2). Each states its own size rather than scaling
- *	with em: an em font-size replaces the size the class sets for itself
- *	instead of adjusting it, so "loud" on a 1.5rem title used to make it
- *	smaller, not bigger. A title role that a design layer makes larger takes
- *	its quiet and its loud variant with it, and two numbers move every
- *	variant. Line height moves with the size, otherwise the new size sits in
- *	the old leading. */
-.nino-section-title--quiet { font-size: calc( var(--font-title-size) * var(--scale-quiet) ); line-height: calc( var(--font-title-size) * var(--scale-quiet) *1.3 ); opacity: .8; }
-.nino-section-title--loud { font-size: calc( var(--font-title-size) * var(--scale-loud) ); line-height: calc( var(--font-title-size) * var(--scale-loud) *1.2 ); }
-.nino-section-subtitle--quiet { font-size: calc( var(--font-subtitle-size) * var(--scale-quiet) ); line-height: calc( var(--font-subtitle-size) * var(--scale-quiet) *1.4 ); opacity: .7; }
-.nino-section-subtitle--loud { font-size: calc( var(--font-subtitle-size) * var(--scale-loud) ); line-height: calc( var(--font-subtitle-size) * var(--scale-loud) *1.3 ); opacity: 1; }
+ *	per class: the size of the title role times --section-title-scale for a
+ *	section title, of the subtitle role times --section-subtitle-scale for a
+ *	section subtitle, of the text role for the text - and for a card title, a
+ *	card subtitle and a hero the size their base class has - times
+ *	--scale-quiet or --scale-loud (.85 and 1.2). Each states its own size
+ *	rather than scaling with em: an em font-size replaces the size the class
+ *	sets for itself instead of adjusting it, so "loud" on a 1.5rem title used
+ *	to make it smaller, not bigger. A title role that a design layer makes
+ *	larger takes its quiet and its loud variant with it, and two numbers move
+ *	every variant. Line height moves with the size, otherwise the new size
+ *	sits in the old leading. A section title's variants draw its rule too
+ *	(--section-line), the air under it included. */
+.nino-section-title--quiet { font-size: calc( var(--font-title-size) * var(--section-title-scale) * var(--scale-quiet) ); line-height: calc( var(--font-title-size) * var(--section-title-scale) * var(--scale-quiet) *1.3 ); opacity: .8; border-bottom: var(--section-line) solid var(--color-border); padding-bottom: calc( var(--section-line) * 6 ); }
+.nino-section-title--loud { font-size: calc( var(--font-title-size) * var(--section-title-scale) * var(--scale-loud) ); line-height: calc( var(--font-title-size) * var(--section-title-scale) * var(--scale-loud) *1.2 ); border-bottom: var(--section-line) solid var(--color-border); padding-bottom: calc( var(--section-line) * 6 ); }
+.nino-section-subtitle--quiet { font-size: calc( var(--font-subtitle-size) * var(--section-subtitle-scale) * var(--scale-quiet) ); line-height: calc( var(--font-subtitle-size) * var(--section-subtitle-scale) * var(--scale-quiet) *1.4 ); opacity: .7; }
+.nino-section-subtitle--loud { font-size: calc( var(--font-subtitle-size) * var(--section-subtitle-scale) * var(--scale-loud) ); line-height: calc( var(--font-subtitle-size) * var(--section-subtitle-scale) * var(--scale-loud) *1.3 ); opacity: 1; }
 .nino-section-text--quiet { font-size: calc( var(--font-text-size) * var(--scale-quiet) ); opacity: .8; }
 .nino-section-text--loud { font-size: calc( var(--font-text-size) * var(--scale-loud) ); line-height: calc( var(--font-text-size) * var(--scale-loud) *1.4 ); max-width: 52rem; }
 .nino-text-center > .nino-section-text--loud { margin-right: auto; margin-left: auto; }
@@ -1499,7 +1520,7 @@ body.nino-scroll-down .nino-scroll-header {
 
 .nino-card-subtitle {
 	font-family: var(--fontfamily-subtitle);
-	font-size: var(--font-subtitle-size);
+	font-size: calc( var(--font-subtitle-size) * var(--card-subtitle-scale) );
 	font-weight: var(--font-subtitle-weight);
 	text-transform: var(--font-subtitle-transform);
 	margin-bottom: var(--space-2);
@@ -1523,8 +1544,8 @@ body.nino-scroll-down .nino-scroll-header {
 
 .nino-card-title--quiet { font-size: calc( var(--font-title-size) * var(--card-title-scale) * var(--scale-quiet) ); opacity: .8; }
 .nino-card-title--loud { font-size: calc( var(--font-title-size) * var(--card-title-scale) * var(--scale-loud) ); line-height: calc( var(--font-title-size) * var(--card-title-scale) * var(--scale-loud) *1.3 ); }
-.nino-card-subtitle--quiet { font-size: calc( var(--font-subtitle-size) * var(--scale-quiet) ); opacity: .7; }
-.nino-card-subtitle--loud { font-size: calc( var(--font-subtitle-size) * var(--scale-loud) ); }
+.nino-card-subtitle--quiet { font-size: calc( var(--font-subtitle-size) * var(--card-subtitle-scale) * var(--scale-quiet) ); opacity: .7; }
+.nino-card-subtitle--loud { font-size: calc( var(--font-subtitle-size) * var(--card-subtitle-scale) * var(--scale-loud) ); }
 .nino-card-descr--quiet { font-size: calc( var(--font-text-size) * var(--scale-quiet) ); opacity: .8; }
 .nino-card-descr--loud { font-size: calc( var(--font-text-size) * var(--scale-loud) ); line-height: calc( var(--font-text-size) * var(--scale-loud) *1.4 ); }
 

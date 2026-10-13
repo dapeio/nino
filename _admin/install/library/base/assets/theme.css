@@ -421,35 +421,35 @@
 
 /* ==== 3. the type ==== */
 @font-face {
-	font-family: 'League Spartan';
+	font-family: 'Open Sans';
 	font-style: normal;
-	font-weight: 700;
+	font-weight: 300;
 	font-display: swap;
-	src: url('[[/nino/public]]/fonts/league-spartan.woff2') format('woff2');
+	src: url('[[/nino/public]]/fonts/open-sans-light.woff2') format('woff2');
 }
 @font-face {
-	font-family: 'Source Sans 3';
+	font-family: 'Open Sans';
 	font-style: normal;
 	font-weight: 400;
 	font-display: swap;
-	src: url('[[/nino/public]]/fonts/source-sans-3-regular.woff2') format('woff2');
+	src: url('[[/nino/public]]/fonts/open-sans-regular.woff2') format('woff2');
 }
 @font-face {
-	font-family: 'Source Sans 3';
+	font-family: 'Open Sans';
 	font-style: normal;
 	font-weight: 700;
 	font-display: swap;
-	src: url('[[/nino/public]]/fonts/source-sans-3-bold.woff2') format('woff2');
+	src: url('[[/nino/public]]/fonts/open-sans-bold.woff2') format('woff2');
 }
 
 :root {
-	--fontfamily-title: "League Spartan", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	--fontfamily-title: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 	--font-title-weight: 700;
-	--fontfamily-subtitle: "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	--fontfamily-subtitle: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 	--font-subtitle-weight: 400;
-	--fontfamily-text: "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	--fontfamily-text: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 	--font-text-weight: 400;
-	--fontfamily-button: "Source Sans 3", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	--fontfamily-button: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 	--font-button-weight: 700;
 	--font-code-weight: normal;
 }
@@ -747,21 +747,26 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 }
 
 
-/* ==== 9. content: v1 (hero-title default, hero-text default, quiet default, loud default, section-space default, card-space default, corners default, border default, shadow default) ==== */
+/* ==== 9. content: v1 (hero-title default, hero-text default, quiet default, loud default, section-title default, section-subtitle default, section-space default, section-line default, card-title default, card-subtitle default, card-space default, corners default, border default, shadow default) ==== */
 /*	Nino Design - content v1
  *
  *	@name			Nino
  *	@description	The framework as it is, with its own values on every knob. The hero, the sections and the cards of the page.
  *
- *	@knob	hero-title		Size of the title of a hero
- *	@knob	hero-text		Size of the text of a hero
- *	@knob	quiet			Size of a quiet title, subtitle and text
- *	@knob	loud			Size of a loud title, subtitle and text
- *	@knob	section-space	Space above and below the content of a section
- *	@knob	card-space		Space inside a card and between its parts
- *	@knob	corners			Corners of a card
- *	@knob	border			Line round a card that has a ground
- *	@knob	shadow			Shadow of a card
+ *	@knob	hero-title			Size of the title of a hero
+ *	@knob	hero-text			Size of the text of a hero
+ *	@knob	quiet				Size of a quiet title, subtitle and text
+ *	@knob	loud				Size of a loud title, subtitle and text
+ *	@knob	section-title		Size of the title of a section
+ *	@knob	section-subtitle	Size of the subtitle of a section
+ *	@knob	section-space		Space above and below the content of a section
+ *	@knob	section-line		Rule under the title of a section
+ *	@knob	card-title			Size of the title of a card
+ *	@knob	card-subtitle		Size of the subtitle of a card
+ *	@knob	card-space			Space inside a card and between its parts
+ *	@knob	corners				Corners of a card
+ *	@knob	border				Line round a card that has a ground
+ *	@knob	shadow				Shadow of a card
  *
  *	v1 is the starting point, not a design. Every value it declares is the
  *	framework's own, so a page under it looks as it does under Nino.css alone -
@@ -785,8 +790,10 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
  *	value, named after the tab and the knob (--content-section-space--least,
  *	--less, --default, --more, --most), and the rule reads the knob
  *	(var(--content-section-space)). The knobs of Nino.css itself - the factors
- *	of the hero and of the variants, the shadow of a card - need no rule: the
- *	set only points them at the ladder. Copy this file to v2.css and start there.
+ *	of the hero, of a section's and a card's title and subtitle and of the
+ *	variants, the rule under a section title, the shadow of a card - need no
+ *	rule: the set only points them at the ladder. Copy this file to v2.css and
+ *	start there.
  */
 
 :root {
@@ -821,6 +828,22 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 	--content-loud--more: 					1.35;
 	--content-loud--most: 					1.6;
 
+	/*	The factors Nino.css multiplies the size of the title role by in a section
+		title, and the size of the subtitle role by in a section subtitle: 1 and 1.
+		The steps run from .8 to 1.3 for a title and from .85 to 1.2 for a subtitle,
+		each a tenth or so of the size from the next	*/
+	--content-section-title--least: 	.8;
+	--content-section-title--less: 		.9;
+	--content-section-title--default: 	1;
+	--content-section-title--more: 		1.15;
+	--content-section-title--most: 		1.3;
+
+	--content-section-subtitle--least: 		.85;
+	--content-section-subtitle--less: 		.92;
+	--content-section-subtitle--default: 	1;
+	--content-section-subtitle--more: 		1.1;
+	--content-section-subtitle--most: 		1.2;
+
 	/*	The space above and below what is in a section: --space-4, and --space-5
 		from 768px. Two steps of the scale to either side	*/
 	--content-section-space--least: 	var(--space-2);
@@ -828,6 +851,31 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 	--content-section-space--default: var(--space-4);
 	--content-section-space--more: 		var(--space-5);
 	--content-section-space--most: 		var(--space-6);
+
+	/*	The rule under the title of a section: none, as Nino.css has it, up to the
+		middle, then a hairline and twice that. Nino.css leaves six times its
+		thickness of air between the title and it	*/
+	--content-section-line--least: 		0px;
+	--content-section-line--less: 		0px;
+	--content-section-line--default: 	0px;
+	--content-section-line--more: 		1px;
+	--content-section-line--most: 		2px;
+
+	/*	The factors Nino.css multiplies the size of the title role by in a card
+		title, 5 / 6 and from 768px 25 / 32, and the size of the subtitle role by in
+		a card subtitle, 1. The steps are a section's, taken times the number
+		Nino.css has for the title, so that the middle is the card as it is	*/
+	--content-card-title--least: 	calc(.8 * 5 / 6);
+	--content-card-title--less: 	calc(.9 * 5 / 6);
+	--content-card-title--default: 	calc(5 / 6);
+	--content-card-title--more: 	calc(1.15 * 5 / 6);
+	--content-card-title--most: 	calc(1.3 * 5 / 6);
+
+	--content-card-subtitle--least: 	.85;
+	--content-card-subtitle--less: 		.92;
+	--content-card-subtitle--default: 	1;
+	--content-card-subtitle--more: 		1.1;
+	--content-card-subtitle--most: 		1.2;
 
 	/*	Twice the padding of a card's content, and the space under its title,
 		subtitle and description. The picture above them has half of it. The
@@ -884,13 +932,24 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 		--content-section-space--default: var(--space-5);
 		--content-section-space--more: 		var(--space-6);
 		--content-section-space--most: 		calc( var(--space-6) * 1.25 );
+
+		--content-card-title--least: 	calc(.8 * 25 / 32);
+		--content-card-title--less: 	calc(.9 * 25 / 32);
+		--content-card-title--default: 	calc(25 / 32);
+		--content-card-title--more: 	calc(1.15 * 25 / 32);
+		--content-card-title--most: 	calc(1.3 * 25 / 32);
 	}
 }
 
-/*	The four numbers and the shadow Nino.css reads by name	*/
+/*	The eight numbers, the line and the shadow Nino.css reads by name	*/
 :root {
 	--hero-title-scale: var(--content-hero-title);
 	--hero-text-scale: var(--content-hero-text);
+	--section-title-scale: var(--content-section-title);
+	--section-subtitle-scale: var(--content-section-subtitle);
+	--card-title-scale: var(--content-card-title);
+	--card-subtitle-scale: var(--content-card-subtitle);
+	--section-line: var(--content-section-line);
 	--scale-quiet: var(--content-quiet);
 	--scale-loud: var(--content-loud);
 	--shadow-card: var(--content-shadow);
@@ -1315,11 +1374,16 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 	--components-zebra-ink: var(--components-zebra-ink--default);
 	--content-border: var(--content-border--default);
 	--content-card-space: var(--content-card-space--default);
+	--content-card-subtitle: var(--content-card-subtitle--default);
+	--content-card-title: var(--content-card-title--default);
 	--content-corners: var(--content-corners--default);
 	--content-hero-text: var(--content-hero-text--default);
 	--content-hero-title: var(--content-hero-title--default);
 	--content-loud: var(--content-loud--default);
 	--content-quiet: var(--content-quiet--default);
+	--content-section-line: var(--content-section-line--default);
 	--content-section-space: var(--content-section-space--default);
+	--content-section-subtitle: var(--content-section-subtitle--default);
+	--content-section-title: var(--content-section-title--default);
 	--content-shadow: var(--content-shadow--default);
 }

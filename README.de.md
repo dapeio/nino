@@ -173,5 +173,6 @@ Sicherheitsprobleme sollten nicht als öffentliches Issue gemeldet werden. Konta
 ## Lizenz
 
 [MIT](https://github.com/dapeio/nino/blob/main/LICENSE). Die Icons der Workbench stammen von
-[Lucide](https://lucide.dev) (ISC, die aus Feather übernommenen zusätzlich MIT); ihre Lizenzhinweise stehen in
+[Lucide](https://lucide.dev) (ISC, die aus Feather übernommenen zusätzlich MIT) und die Schrift, die die Base-Einheit
+ausliefert, ist [Open Sans](https://github.com/googlefonts/opensans) (SIL Open Font License 1.1); ihre Lizenzhinweise stehen in
 [THIRD-PARTY-NOTICES.md](https://github.com/dapeio/nino/blob/main/THIRD-PARTY-NOTICES.md).

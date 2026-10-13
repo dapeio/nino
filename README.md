@@ -173,5 +173,6 @@ Security issues should not be reported as public issues. Contact details and the
 ## License
 
 [MIT](https://github.com/dapeio/nino/blob/main/LICENSE). The icons of the workbench come from
-[Lucide](https://lucide.dev) (ISC, the ones taken over from Feather also MIT); their notices are in
+[Lucide](https://lucide.dev) (ISC, the ones taken over from Feather also MIT) and the typeface the base unit
+delivers is [Open Sans](https://github.com/googlefonts/opensans) (SIL Open Font License 1.1); their notices are in
 [THIRD-PARTY-NOTICES.md](https://github.com/dapeio/nino/blob/main/THIRD-PARTY-NOTICES.md).

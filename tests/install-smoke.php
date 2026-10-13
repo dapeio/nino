@@ -213,8 +213,11 @@ check( 'the Setup step seeds the css bundle with the delivered look and the proj
 	'/_nino/Nino.css', '/assets/theme.css', '/assets/style.css',
 ] );
 check( '...and the two files it names are really in the project', is_file( $sandbox. '/private/assets/theme.css' ) === true && is_file( $sandbox. '/private/assets/style.css' ) === true
-	&& is_file( $sandbox. '/private/templates/frame-header.tpl' ) === true && is_file( $sandbox. '/private/templates/frame-footer.tpl' ) === true
-	&& is_file( $sandbox. '/public/fonts/league-spartan.woff2' ) === true );
+	&& is_file( $sandbox. '/private/templates/frame-header.tpl' ) === true && is_file( $sandbox. '/private/templates/frame-footer.tpl' ) === true );
+// One face is delivered: Open Sans in three weights, with the license it is released under, and no file of any face before it
+$deliveredFonts = array_map( 'basename', glob( $sandbox. '/public/fonts/*' ) ?: [] );
+sort( $deliveredFonts );
+check( '...and so are the fonts it @font-faces: the three files of Open Sans and the license they are released under, and no file of another face', $deliveredFonts === [ 'open-sans-OFL.txt', 'open-sans-bold.woff2', 'open-sans-light.woff2', 'open-sans-regular.woff2' ] );
 // A script in the project's assets is only ever loaded through a bundle - one
 // that no bundle names is a file that looks like the site's own hook and runs
 // nowhere

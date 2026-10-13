@@ -5861,11 +5861,11 @@ check( '...with the weights and the sizes the rules had before they were roles'.
 $hookReads = [
 	'body'											=> [ '--font-text-size', '--font-text-weight', '--font-text-transform' ],
 	'h1, h2, h3, h4, h5, h6'		=> [ '--font-title-weight', '--font-title-transform' ],
-	'.nino-section-title'				=> [ '--fontfamily-title', '--font-title-size', '--font-title-transform' ],
+	'.nino-section-title'				=> [ '--fontfamily-title', '--font-title-size', '--font-title-transform', '--section-title-scale' ],
 	'.nino-card-title'					=> [ '--fontfamily-title', '--font-title-size', '--font-title-transform', '--card-title-scale' ],
 	'.nino-hero-title'					=> [ '--fontfamily-title', '--font-title-size', '--font-title-transform', '--hero-title-scale' ],
-	'.nino-section-subtitle'		=> [ '--fontfamily-subtitle', '--font-subtitle-size', '--font-subtitle-weight', '--font-subtitle-transform' ],
-	'.nino-card-subtitle'			=> [ '--fontfamily-subtitle', '--font-subtitle-size', '--font-subtitle-weight', '--font-subtitle-transform' ],
+	'.nino-section-subtitle'		=> [ '--fontfamily-subtitle', '--font-subtitle-size', '--font-subtitle-weight', '--font-subtitle-transform', '--section-subtitle-scale' ],
+	'.nino-card-subtitle'			=> [ '--fontfamily-subtitle', '--font-subtitle-size', '--font-subtitle-weight', '--font-subtitle-transform', '--card-subtitle-scale' ],
 	'.nino-hero-subtitle'				=> [ '--fontfamily-subtitle', '--font-subtitle-size', '--font-subtitle-weight', '--font-subtitle-transform', '--hero-text-scale' ],
 	'.nino-btn'									=> [ '--fontfamily-button', '--font-button-size', '--font-button-weight', '--font-button-transform' ],
 	'.nino-code'								=> [ '--fontfamily-code', '--font-code-size', '--font-code-weight', '--font-code-transform' ],
@@ -5925,15 +5925,25 @@ check( 'the hero takes the title and the subtitle role times a number of its own
 	&& $hookValue( $hookRoot, '--hero-text-scale' ) === '1.2' && $hookValue( $hookRootWide, '--hero-text-scale' ) === 'calc(10 / 9)' );
 check( 'a card title takes the title role times a number of its own: 5 / 6, what --text-3 was of --text-4, and 25 / 32 from 768px, where --text-4 steps up and --text-3 does not',
 	$hookValue( $hookRoot, '--card-title-scale' ) === 'calc(5 / 6)' && $hookValue( $hookRootWide, '--card-title-scale' ) === 'calc(25 / 32)' );
-/*	A variant is a factor of its role: the size is the size of the class it varies - the role, and for a card title and a hero the
-	scale that class has - times --scale-quiet or --scale-loud, and so is the leading where the variant states one. The variants of
-	the pricing table are not: they stay on the ladder	*/
+check( 'a section title, a section subtitle and a card subtitle take their role times a number of their own, 1 at every width, and the rule under a section title is 0px until a design layer gives it a thickness',
+	$hookValue( $hookRoot, '--section-title-scale' ) === '1' && $hookValue( $hookRoot, '--section-subtitle-scale' ) === '1' && $hookValue( $hookRoot, '--card-subtitle-scale' ) === '1' && $hookValue( $hookRoot, '--section-line' ) === '0px'
+	&& $hookValue( $hookRootWide, '--section-title-scale' ) === null && $hookValue( $hookRootWide, '--section-subtitle-scale' ) === null && $hookValue( $hookRootWide, '--card-subtitle-scale' ) === null && $hookValue( $hookRootWide, '--section-line' ) === null );
+// The rule, its thickness and the air under it, is a title's own and its quiet and loud variants carry it too: a page may use one without the class it varies
+$hookUnruled = [];
+foreach( [ '.nino-section-title', '.nino-section-title--quiet', '.nino-section-title--loud' ] as $hookTitle )
+	foreach( [ 'border-bottom: var(--section-line) solid var(--color-border)', 'padding-bottom: calc( var(--section-line) * 6 )' ] as $hookDeclaration )
+		if( str_contains( $hookRules( $hookTitle ), $hookDeclaration ) === false )
+			$hookUnruled[] = $hookTitle. ' does not say '. $hookDeclaration;
+check( 'a section title draws a rule of --section-line under itself, with six times that much air, and so do its quiet and its loud variant'. ( $hookUnruled === [] ? '' : ' - '. implode( '; ', $hookUnruled ) ), $hookUnruled === [] );
+/*	A variant is a factor of its role: the size is the size of the class it varies - the role, and for every title and subtitle of a
+	section, a card and a hero the scale that class has - times --scale-quiet or --scale-loud, and so is the leading where the variant
+	states one. The variants of the pricing table are not: they stay on the ladder	*/
 $hookVariants = [
-	'.nino-section-title'			=> [ 'var(--font-title-size)' ],
-	'.nino-section-subtitle'	=> [ 'var(--font-subtitle-size)' ],
+	'.nino-section-title'			=> [ 'var(--font-title-size)', 'var(--section-title-scale)' ],
+	'.nino-section-subtitle'	=> [ 'var(--font-subtitle-size)', 'var(--section-subtitle-scale)' ],
 	'.nino-section-text'			=> [ 'var(--font-text-size)' ],
 	'.nino-card-title'				=> [ 'var(--font-title-size)', 'var(--card-title-scale)' ],
-	'.nino-card-subtitle'		=> [ 'var(--font-subtitle-size)' ],
+	'.nino-card-subtitle'		=> [ 'var(--font-subtitle-size)', 'var(--card-subtitle-scale)' ],
 	'.nino-card-descr'				=> [ 'var(--font-text-size)' ],
 	'.nino-hero-title'				=> [ 'var(--font-title-size)', 'var(--hero-title-scale)' ],
 	'.nino-hero-subtitle'			=> [ 'var(--font-subtitle-size)', 'var(--hero-text-scale)' ],
@@ -5952,8 +5962,20 @@ foreach( $hookVariants as $hookBase => $hookFactors )
 				if( str_contains( $hookSize, $hookFactor ) === false )
 					$hookUnscaled[] = $hookBase. '--'. $hookKind. ' does not read '. $hookFactor;
 	}
-check( 'the quiet and the loud variants of a section, a card and a hero are their role times --scale-quiet and --scale-loud, which are .85 and 1.2'. ( $hookUnscaled === [] ? '' : ' - not: '. implode( ', ', $hookUnscaled ) ),
+check( 'the quiet and the loud variants of a section, a card and a hero are their role times the number of their class, where it has one, times --scale-quiet and --scale-loud, which are .85 and 1.2'. ( $hookUnscaled === [] ? '' : ' - not: '. implode( ', ', $hookUnscaled ) ),
 	$hookUnscaled === [] && $hookValue( $hookRoot, '--scale-quiet' ) === '.85' && $hookValue( $hookRoot, '--scale-loud' ) === '1.2' );
+// The three classes that took a number of their own are the same factors themselves: the size, and the leading of the two section classes, which moves with it
+$hookUnscaledBase = [];
+foreach( [ '.nino-section-title', '.nino-section-subtitle', '.nino-card-subtitle' ] as $hookBase ) {
+	preg_match_all( '/(?<![\w-])(?:font-size|line-height)\s*:([^;]*);/', $hookRules( $hookBase ), $hookSizes );
+	if( count( $hookSizes[1] ) < 1 )
+		$hookUnscaledBase[] = $hookBase;
+	foreach( $hookSizes[1] as $hookSize )
+		foreach( $hookVariants[$hookBase] as $hookFactor )
+			if( str_contains( $hookSize, $hookFactor ) === false )
+				$hookUnscaledBase[] = $hookBase. ' does not read '. $hookFactor;
+}
+check( '...and so are a section title, a section subtitle and a card subtitle themselves - the leading of the two section classes with their size'. ( $hookUnscaledBase === [] ? '' : ' - not: '. implode( ', ', $hookUnscaledBase ) ), $hookUnscaledBase === [] );
 $hookVariantRules = '';
 foreach( array_keys( $hookVariants ) as $hookBase )
 	$hookVariantRules .= $hookRules( $hookBase. '--quiet' ). ' '. $hookRules( $hookBase. '--loud' ). ' ';
