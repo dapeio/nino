@@ -73,22 +73,34 @@ class AdminSmokeDummyPanel {
 }
 
 /** A second panel trying to take over the core Config screen by reusing its uri */
-class AdminSmokeShadowPanel {
-	public static function actions(): array { return [ 'config/get' => [ self::class, 'apiHijack' ] ]; }
-	public static function nav(): array { return [ 'config', 'Shadow' ]; }
-	public static function apiHijack( array &$appData, array &$request ): void { \Nino\Http::ok( $request, [ 'hijacked' => true ] ); }
+class AdminSmokeTwinPanel {
+	public static function actions(): array { return [ 'twin/list' => [ self::class, 'apiList' ] ]; }
+	public static function nav(): array { return [ 'config', 'Twin' ]; }
+	public static function apiList( array &$appData, array &$request ): void { \Nino\Http::ok( $request ); }
 }
 
 /** The runtime module contributing both, answering adminPanels() */
 class AdminSmokeDummyModule {
 	/** Once per registry build - the counter the caching check below reads */
 	public static int $asked = 0;
-	public static function adminPanels( array &$appData ): array { self::$asked++; return [ 'AdminSmokeDummyPanel', 'AdminSmokeShadowPanel' ]; }
+	public static function adminPanels( array &$appData ): array { self::$asked++; return [ 'AdminSmokeDummyPanel', 'AdminSmokeTwinPanel' ]; }
 }
 
 /** A module that brings no panel at all - a second entry in the module list, and nothing else */
 class AdminSmokeSilentModule {
 	public static function adminPanels( array &$appData ): array { return []; }
+}
+
+/** A panel with a uri of its own that the rail puts ahead of the panels it names (content group, weight 5): it claims two actions the tool's panels dispatch, the Config panel's and the Roles tab's */
+class AdminSmokeShadowPanel {
+	public static function actions(): array { return [ 'config/list' => [ self::class, 'apiHijack' ], 'roles/list' => [ self::class, 'apiHijack' ] ]; }
+	public static function nav(): array { return [ 'shadow', 'Shadow', 5 ]; }
+	public static function apiHijack( array &$appData, array &$request ): void { \Nino\Http::ok( $request, [ 'hijacked' => true ] ); }
+}
+
+/** The runtime module contributing it alone, switched on by the checks that need it */
+class AdminSmokeShadowModule {
+	public static function adminPanels( array &$appData ): array { return [ 'AdminSmokeShadowPanel' ]; }
 }
 
 /** A panel naming a script that is not on disk - the registry has to say so */
@@ -171,7 +183,7 @@ check( 'a core panel has no perm() and is open to every account', $registry['use
 check( 'the Navigations panel names the structure group and sits after routes (20)', array_search( 'navs', $order, true ) === array_search( 'routes', $order, true ) + 1 );
 check( 'the Navigations panel is the Navigation module\'s and comes with it', $registry['navs']['class'] === \Nino\Modules\Navigation\Admin::class );
 check( 'a panel reusing a core uri is dropped, the core panel keeps it', $registry['config']['class'] === \Nino\Modules\Config\Admin::class
-	&& str_contains( \Nino\Admin\Panels::navHtml( $registry ), 'Shadow' ) === false );
+	&& str_contains( \Nino\Admin\Panels::navHtml( $registry ), 'Twin' ) === false );
 
 $navHtml = \Nino\Admin\Panels::navHtml( $registry );
 check( 'nav() is rendered - every panel has its link, the module\'s included, an icon or its initial beside the label', str_contains( $navHtml, 'id="admin-nav-dummy" data-panel="dummy" data-layout="page"><span class="nino-admin-nav-icon" aria-hidden="true"><b>D</b></span><span class="nino-admin-nav-label">Dummy</span></a>' ) === true && str_contains( $navHtml, 'id="admin-nav-navs" data-panel="navs" data-layout="page">' ) === true && str_contains( $navHtml, '<span class="nino-admin-nav-label">[[/_admin/nav/navs]]</span></a>' ) === true );
@@ -671,8 +683,24 @@ check( 'the nav and the panes reach the template as fills', str_contains( \Nino\
 [ $status, $body ] = ninoCall( $withModule, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'dummy/list' );
 check( 'handlePost dispatches the module\'s action', $status === 200 && ( $body['dummies'] ?? null ) === 3 );
 
-[ , $body ] = ninoCall( $withModule, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'config/get' );
-check( 'a core action can not be taken over by a module reusing its name', ( $body['hijacked'] ?? false ) === false );
+/*	The registry keeps a panel whatever actions it names - only a taken uri
+	drops one - so a name two panels claim is settled by the action map. The
+	Shadow panel comes ahead of the panels whose actions it names: if the
+	order of the rail settled it, it would dispatch both names it claims	*/
+$shadowed = $appData;
+$shadowed['/nino/modules'] = [ 'AdminSmokeShadowModule' ];
+$shadowPanels = \Nino\Admin\Admin::allPanels( $shadowed );
+$shadowOrder = array_keys( $shadowPanels );
+check( 'a module panel naming actions of the tool\'s own panels is kept, ahead of them in the registry', ( $shadowPanels['shadow']['class'] ?? '' ) === 'AdminSmokeShadowPanel'
+	&& array_search( 'shadow', $shadowOrder, true ) < array_search( 'users', $shadowOrder, true )
+	&& array_search( 'shadow', $shadowOrder, true ) < array_search( 'config', $shadowOrder, true ) );
+
+$shadowActions = \Nino\Admin\Admin::actions( $shadowed );
+[ $status, $body ] = ninoCall( $shadowed, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'config/list' );
+[ , $coreBody ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiList' );
+check( 'a core action can not be taken over by a module reusing its name', $shadowActions['config/list'] === [ \Nino\Modules\Config\Admin::class, 'apiList' ]
+	&& $shadowActions['roles/list'] === [ \Nino\Modules\Users\Roles::class, 'apiList' ]
+	&& $status === 200 && $body === $coreBody );
 
 $withoutModule = $appData;
 $withoutModule['/nino/modules'] = [];
@@ -730,16 +758,24 @@ check( 'an array-shaped data field reads as no data, not as a 500', $request['/n
 check( '...and postData() answers the empty array it promises', \Nino\Admin\Admin::postData() === [] );
 
 $_POST['data'] = json_encode( [] );
+// What the two posts above raised, kept apart from what the query raises below
+$postWarnings = ninoWarnings();
 
-$arrayLocaleGet = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[template /_admin/templates/page-index]' ] ];
+// The query is read in init(), which handleGet() does not call. The copy's native
+// language is the second one and the session remembers no choice, so the default
+// is not the locale the array holds - a read of it would show
+$arrayLocale = $appData;
+$arrayLocale['/nino/locales/native'] = 'en_US';
+\Nino\Runtime::unsetSessionValue( $arrayLocale, './admin/locale' );
 $_GET['locale'] = [ 'de_DE' ];
-\Nino\Admin\Admin::handleGet( $withModule, $arrayLocaleGet );
+\Nino\Admin\Admin::init( $arrayLocale );
 unset( $_GET['locale'] );
-$arrayWarnings = ninoWarnings();
+$localeWarnings = ninoWarnings();
 
-check( 'an array-shaped ?locale is ignored rather than cast', $arrayLocaleGet['/nino/http/response']['statusCode'] === 200 );
-check( 'none of the three raised an "Array to string conversion" on the way',
-	array_filter( $arrayWarnings, fn( string $message ): bool => str_contains( $message, 'Array to string conversion' ) ) === [] );
+$conversions = static fn( array $warnings ): array => array_filter( $warnings, static fn( string $message ): bool => str_contains( $message, 'Array to string conversion' ) );
+check( 'an array-shaped ?locale is ignored rather than cast', \Nino\Locales::getCurrentLocale( $arrayLocale ) === 'en_US'
+	&& \Nino\Runtime::getSessionValue( $arrayLocale, './admin/locale', '' ) === '' && $conversions( $localeWarnings ) === [] );
+check( 'none of the three raised an "Array to string conversion" on the way', $conversions( array_merge( $postWarnings, $localeWarnings ) ) === [] );
 
 echo "\n";
 

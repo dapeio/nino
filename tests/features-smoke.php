@@ -1066,8 +1066,11 @@ check( 'the roles list offers the Features permission once, as it always did', (
 	return count( $offers ) === 1 && array_values( $offers )[0] === [ 'perm' => '/_admin/features/manage', 'label' => '/_admin/nav/features', 'group' => 'system', 'offered' => true ];
 } )() );
 check( 'every tab of the registry has its action map: the Settings tab brings none, so the seven actions stay the Features panel\'s', ( static function() use ( $appData ): bool {
+	// The tab's entry is built by hand, and a key actions() reads that it lacks
+	// is a warning of php's - only recorded here, fatal in the runtime
+	ninoWarnings();
 	$actions = \Nino\Admin\Admin::actions( $appData );
-	return $actions['features/settings'] === [ \Nino\Modules\Features\Admin::class, 'apiSettings' ] && count( array_filter( array_keys( $actions ), static fn( string $a ): bool => str_starts_with( $a, 'features/' ) ) ) === 7;
+	return $actions['features/settings'] === [ \Nino\Modules\Features\Admin::class, 'apiSettings' ] && count( array_filter( array_keys( $actions ), static fn( string $a ): bool => str_starts_with( $a, 'features/' ) ) ) === 7 && ninoWarnings() === [];
 } )() );
 check( 'the dashboard shows one Features tile, not one per tab', ( static function() use ( $appData ): bool {
 	[ , $body ] = ninoCall( $appData, [ \Nino\Modules\Dashboard\Admin::class, 'apiSummary' ] );

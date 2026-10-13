@@ -397,8 +397,14 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	Every action every panel dispatches, core first so a module can
-		 *	never take over a core action by reusing its name
+		 *	Every action every panel dispatches. The shell's own action comes
+		 *	first, then those of the tool's own panels - the classes modules()
+		 *	lists - and their tabs, then those of the panels a module brought
+		 *	through adminPanels(), each with +=, so the first claim
+		 *	of a name stands: a module can add an action but never take over
+		 *	a core one by reusing its name, however far ahead of the core
+		 *	panel its weight puts its own in the rail. Between two module
+		 *	panels the registry's order decides
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -407,8 +413,12 @@ namespace Nino\Admin {
 		public static function actions( array &$appData ): array {
 
 			$actions = [ 'admin/locale' => [ Admin::class, 'apiSetLocale' ] ];
+			$panels	 = self::allPanels( $appData );
+			$core		 = array_filter( $panels, static fn( array $panel ): bool => $panel['core'] === true );
 
-			foreach( self::allPanels( $appData ) as $panel )
+			// A union keeps the order of its left side and appends what only
+			// the right side holds: the core panels, then the others as they come
+			foreach( $core + $panels as $panel )
 				$actions += $panel['class']::actions();
 
 			return $actions;
@@ -1230,11 +1240,17 @@ namespace Nino\Admin {
 		 *	same goes for a class missing actions() or nav() - the workbench keeps
 		 *	working without it, and the warning names it.
 		 *
+		 *	An entry says whose it is: core is true for the workbench's own
+		 *	panels and their tabs, false for the panels a module brought and
+		 *	theirs. The rail does not care, Admin::actions() does - the first
+		 *	claim of an action name stands, and the workbench's own panels
+		 *	claim first.
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$core					The workbench's own panel classes (see Admin::modules())
 		 *	@param		string		$method				What every active module is asked for its panels - 'adminPanels'
 		 *
-		 *	@return 	array										[ uri => { class, uri, label, tab, weight, group, perm, panes, template, layout, icon, assets, text, tabs, parent, own, feature? } ] - feature only on a Settings tab, the key it belongs to
+		 *	@return 	array										[ uri => { class, uri, label, tab, weight, group, perm, panes, template, layout, icon, assets, text, tabs, parent, own, core, feature? } ] - feature only on a Settings tab, the key it belongs to
 		 */
 		public static function collect( array &$appData, array $core, string $method ): array {
 
@@ -1267,13 +1283,17 @@ namespace Nino\Admin {
 				if( $entry === null )
 					continue;
 
+				// Whether the workbench brought the panel itself or a module
+				// did, which Admin::actions() reads
+				$entry['core'] = in_array( $class, $core, true );
 				$taken[$entry['uri']] = $class;
 
 				// A panel may bring further panels along as tabs of its own
 				// pane - each a complete panel with its own permission,
 				// script and hash prefix, placed here rather than in the rail.
-				// A uri is taken across panels and tabs alike, and a tab has no
-				// tabs of its own
+				// A uri is taken across panels and tabs alike, a tab has no
+				// tabs of its own, and it is the workbench's or a module's
+				// as the panel it sits on is
 				if( method_exists( $class, 'tabs' ) === true )
 					foreach( (array) $class::tabs() as $tabClass ) {
 
@@ -1283,6 +1303,7 @@ namespace Nino\Admin {
 							continue;
 
 						$tab['parent'] = $entry['uri'];
+						$tab['core'] = $entry['core'];
 						$taken[$tab['uri']] = $tabClass;
 						$entry['tabs'][$tab['uri']] = $tab;
 					}
@@ -1385,6 +1406,7 @@ namespace Nino\Admin {
 						'tabs'		=> [],
 						'parent'	=> $uri,
 						'own'			=> true,
+						'core'		=> $panel['core'],
 						'feature'	=> $feature['key'],
 					];
 
