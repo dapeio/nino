@@ -944,7 +944,7 @@ check( 'the workbench finds it by reading the directory, nothing registered', in
 foreach( $panelActions as $method => $data )
 	check( $method. ' is 401 without an account', callFeatures( $appData, $method, $data ) === [ 401, [ 'error' => 'not logged in', 'code' => 'session' ] ] );
 
-// The minimum of the set-up project tests/admin-system-smoke.php seeds: an
+// The minimum of the set-up project the tests/admin-*-smoke.php suites seed: an
 // account without the permission and one with it. The daily backup and the
 // activity log the gate would otherwise run are off - not what this tests
 $appData['/nino/admin/backups']	= false;

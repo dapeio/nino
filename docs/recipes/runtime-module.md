@@ -311,8 +311,10 @@ an intentional write operation.
 
 ## Module tests
 
-Add focused coverage to `tests/kernel-smoke.php` or a dedicated standalone
-smoke script consistent with the suite. Test:
+Add focused coverage to the suite of its area under `tests/` -
+`runtime-smoke.php` for the autoloader and the boot, `http-smoke.php` for
+routes and responses - or a dedicated standalone smoke script consistent with
+the suites. Test:
 
 - autoloading from the exact default or `NINO_APP_DIR` path, including the
   kernel namespace guard and the `Nino\Modules\*` roots;
@@ -331,7 +333,8 @@ Run at least:
 
 ```bash
 php -l app/Project/Catalog/Catalog/Catalog.php
-php tests/kernel-smoke.php
+php tests/runtime-smoke.php
+php tests/http-smoke.php
 php tests/concurrency-smoke.php
 ```
 

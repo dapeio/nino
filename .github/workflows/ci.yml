@@ -38,7 +38,7 @@ jobs:
       # app/ and features/ hold nothing but their .htaccess in a checkout, and
       # git keeps no empty directory: without the file there is no directory,
       # and PHPStan - phpstan.neon analyses both - stops with "Path ... does
-      # not exist" before kernel-smoke.php gets to name what is missing
+      # not exist" before http-smoke.php gets to name what is missing
       - name: Check the directories a checkout ships
         run: for dir in app features; do [ -f "$dir/.htaccess" ] || { echo "::error file=$dir/.htaccess::$dir/.htaccess is missing - it is what keeps $dir/ in a checkout and what denies it to a browser"; exit 1; }; done
 
@@ -55,14 +55,12 @@ jobs:
       - name: Analyse JS with ESLint
         run: npx --yes eslint@9.39.0 .
 
-      - name: Run kernel smoke tests
-        run: php tests/kernel-smoke.php
-
-      - name: Run features smoke tests
-        run: php tests/features-smoke.php
-
-      - name: Run catalogue smoke tests
-        run: php tests/catalogue-smoke.php
+      # Every PHP suite of tests/ is a script named <module>-smoke.php, run in
+      # alphabetical order: a suite more is no edit of this file. || exit 1
+      # because a bare loop answers with the last file's status alone, so a
+      # failure in the middle would be reported as green
+      - name: Run the PHP smoke tests
+        run: for test in tests/*-smoke.php; do php "$test" || exit 1; done
 
       # A feature's own tests travel with it - features/<Name>/tests/ - and
       # run against this checkout (see tests/harness.php). A checkout ships
@@ -70,33 +68,10 @@ jobs:
       - name: Run every feature's own smoke tests
         run: for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
 
-      - name: Run workbench shell and content panel smoke tests
-        run: php tests/admin-smoke.php
-
-      - name: Run workbench structure and system panel smoke tests
-        run: php tests/admin-system-smoke.php
-
-      - name: Run install wizard smoke tests
-        run: php tests/install-smoke.php
-
-      # The grammar of a text key and everything shipped to it: the units'
-      # texts, the keys the templates read and the key literals in the code
-      - name: Run text key smoke tests
-        run: php tests/keys-smoke.php
-
-      # The Legal module: the imprint and the privacy policy as elements,
-      # the wizard's unit, the routes per language, the placeholders, the
-      # sections a feature's unit adds and the tombstone of a deleted one
-      - name: Run legal module smoke tests
-        run: php tests/legal-smoke.php
-
       - name: Run frontend smoke tests
         # || exit 1: a bare loop answers with the last file's status alone,
         # so a failure in the middle would be reported as green
         run: for test in tests/*-js-smoke.js; do node "$test" || exit 1; done
-
-      - name: Run concurrency smoke tests
-        run: php tests/concurrency-smoke.php
 
   # The gate against a kernel change that breaks a feature: every feature of
   # the catalogue (dapeio/nino-features) is copied into this checkout and its

@@ -72,7 +72,7 @@ check( 'actual text edits are detected', elements._fieldValuesEqual( { type : 's
 // attach it to, so on a new element it is empty by construction. Enforcing it
 // would make the element impossible to create at all - the same rule the
 // kernel's insertElement() and the Element Types tab apply (see
-// tests/kernel-smoke.php and tests/admin-system-smoke.php)
+// tests/elements-smoke.php and tests/admin-elements-smoke.php)
 sandbox.document.getElementById = function() { return null };
 sandbox.Nino.content = { getText : function() { return '' } };
 

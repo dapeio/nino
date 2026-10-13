@@ -142,7 +142,7 @@ namespace Nino {
 		/**
 		 *	limits() for the two php settings given - which cannot be changed at
 		 *	run time, so a test stands in for them here. Internal - public only so that
-		 *	tests/kernel-smoke.php can call it
+		 *	tests/images-smoke.php can call it
 		 *
 		 *	@param		string|false	$uploadMax		upload_max_filesize
 		 *	@param		string|false	$postMax			post_max_size

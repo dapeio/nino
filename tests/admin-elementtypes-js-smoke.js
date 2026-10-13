@@ -210,7 +210,7 @@ check( '...and a field added in the form has none', elementTypes._fields.find( f
 }
 
 // types.js builds '/_admin/types/reference/<kind>' at runtime - the three kinds Types::_renameReferences()
-// reports - which the static fill check of tests/admin-system-smoke.php cannot see
+// reports - which the static fill check of tests/admin-shell-smoke.php cannot see
 [ 'en_US', 'de_DE' ].forEach( function( locale ) {
 	const words = fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Elements/text/'+ locale+ '.php' ), 'utf8' );
 	check( locale+ ': every kind of reference a rename leaves behind has words', [ 'template', 'role', 'label' ].every( kind => words.includes( "[[/_admin/types/reference/"+ kind+ "]]'" ) ) );

@@ -75,7 +75,7 @@ request:
   `text/<locale>.php` for every interface language rather than an English
   literal. The same goes for `tab()`, a `summary()` tile's label and the
   labels and hints a schema hands to the frontend (`Nino.adminUi.text()`
-  resolves a value that starts with `/`, `tests/admin-system-smoke.php` fails
+  resolves a value that starts with `/`, `tests/admin-shell-smoke.php` fails
   on a key one of the two languages lacks).
 - `group` is `content`, `structure`, `features` or `system` and decides the
   heading the link sits under; an unknown group falls back to `content` with
@@ -782,7 +782,7 @@ order, and the field is the posted key the value was refused for. A panel's own
 codes carry its slug as a prefix and live in its own `text()` directory as
 `'[[/_admin/error/catalog_id_taken]]'`, both languages; the codes every panel
 may meet - an upload that did not arrive, a value of the wrong type - are the
-shell's. `tests/admin-system-smoke.php` finds every code in the source and fails
+shell's. `tests/admin-shell-smoke.php` finds every code in the source and fails
 on one without text in both languages. Leave a failure nobody can cause (a file
 that could not be written) without a code: the person then sees the English
 message of the server, with the status number in front, and the panel's sentence
@@ -1006,7 +1006,7 @@ bracket (`&#91;template]`) in a value that is only ever markup, and put a `%s`
 in one a script renders, filling it from the script's own source - a `.js` file
 is a static asset and is never rendered.
 `tests/admin-lists-js-smoke.js` fails on a literal sentence in a panel script
-or in that markup, and `tests/admin-system-smoke.php` twice over: statically on
+or in that markup, and `tests/admin-shell-smoke.php` twice over: statically on
 a key a panel's scripts or markup ask for that either language lacks, and end to
 end - it renders the whole workbench in both interface languages and fails on any
 `[[fill]]` that came out the other side unresolved, which is the only version a
@@ -1061,8 +1061,11 @@ formatting as plain functions — extend and test there, not in the renderer.
 ## Panel tests
 
 Backend tests belong in `tests/admin-smoke.php` (content panels, accounts)
-or `tests/admin-system-smoke.php` (structure and system panels, the registry
-contract, recovery). They MUST exercise:
+or in the `tests/admin-*-smoke.php` suite of the panel's area:
+`admin-system-smoke.php` (recovery, backups, config, languages, users),
+`admin-shell-smoke.php` (the registry contract, scoped permissions, failure
+codes), `admin-elements-smoke.php`, `admin-text-smoke.php` and
+`admin-pages-smoke.php`. They MUST exercise:
 
 - unauthenticated rejection (`401`, with the code `session`) and a missing
   permission (`403`, without one),
@@ -1097,7 +1100,7 @@ Run:
 php -l app/Project/Catalog/Catalog/Admin/Admin.php
 node --check app/Project/Catalog/Catalog/assets/admin.js
 php tests/admin-smoke.php
-php tests/admin-system-smoke.php
+for test in tests/admin-*-smoke.php; do php "$test" || exit 1; done
 node tests/admin-catalog-js-smoke.js
 node tests/admin-lists-js-smoke.js
 ```

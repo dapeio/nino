@@ -81,7 +81,7 @@ check( 'a format that is no profile - plain among them, a plain field is a texta
 check( 'aria-multiline says so wherever the format has more than a line', source.includes( "'aria-multiline', profile.breaks === true ? 'true' : 'false'" ) === true );
 check( 'the list buttons are only built where the format has blocks', /if\( profile\.blocks === true \)\s*\[ 'ul', 'ol' \]\.forEach/.test( source ) === true );
 
-// A value is read into blocks the way \Nino\Html::_sanitizeBlocks() reads it (tests/kernel-smoke.php
+// A value is read into blocks the way \Nino\Html::_sanitizeBlocks() reads it (tests/html-smoke.php
 // holds the vectors): an item outside a list is a paragraph, and loose content is one walk, so what a
 // block in it unwrapped keeps its neighbours apart
 check( 'an item outside a list is a paragraph, as on the server', source.includes( "PARAGRAPHS.indexOf( tag ) !== -1 || tag === 'li'" ) === true );

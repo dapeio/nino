@@ -108,7 +108,7 @@ check( 'a key of the system says who writes it - the Routes panel, the Language 
 check( 'a /feature or /module key says whose it normally is', keys._scanNote( { kind : 'create', hint : 'feature', owner : 'consent' } ) === '/_admin/keys/scan/hint-feature'
 	&& keys._scanNote( { kind : 'create', hint : 'module', owner : 'form' } ) === '/_admin/keys/scan/hint-module' );
 // The fills it asks for are put together at runtime ('system-<writer>', 'hint-<kind>'), which the static check of
-// tests/admin-system-smoke.php cannot see: both languages carry every one
+// tests/admin-shell-smoke.php cannot see: both languages carry every one
 [ 'en_US', 'de_DE' ].forEach( function( locale ) {
 	const words = fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Text/text/'+ locale+ '.php' ), 'utf8' );
 	const has = key => words.includes( "[[/_admin/keys/scan/"+ key+ "]]'" );
@@ -464,7 +464,7 @@ check( 'both editors are handed the key\'s format - the Text panel and this tab'
 check( 'the group is opened again once the list has loaded', /const reopen = Nino\.admin\.keys\._reopen;[\s\S]{0,300}Nino\.admin\.keys\._openGroup\( reopen \)/.test( keysSource ) );
 
 // keys.js builds '/_admin/keys/format/<format>' and '/_admin/keys/convert/<format>' at runtime, which
-// the static fill check of tests/admin-system-smoke.php cannot see: both languages carry every one.
+// the static fill check of tests/admin-shell-smoke.php cannot see: both languages carry every one.
 // A conversion is asked about only when it narrows, so 'blocks' has no convert text
 [ 'en_US', 'de_DE' ].forEach( function( locale ) {
 	const words = fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Text/text/'+ locale+ '.php' ), 'utf8' );

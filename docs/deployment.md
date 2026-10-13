@@ -285,20 +285,12 @@ find . -name "*.js" -not -path "./.git/*" -print0 | xargs -0 -n1 node --check
 for dir in app features; do [ -f "$dir/.htaccess" ] || { echo "$dir/.htaccess is missing"; exit 1; }; done
 phpstan analyse --no-progress --memory-limit=1G
 npx --yes eslint@9.39.0 .
-php tests/kernel-smoke.php
-php tests/features-smoke.php
-php tests/catalogue-smoke.php
+for test in tests/*-smoke.php; do php "$test" || exit 1; done
 for test in features/*/tests/*-smoke.php; do [ -e "$test" ] || continue; php "$test" || exit 1; done
-php tests/admin-smoke.php
-php tests/admin-system-smoke.php
-php tests/install-smoke.php
-php tests/keys-smoke.php
-php tests/legal-smoke.php
 for test in tests/*-js-smoke.js; do node "$test" || exit 1; done
-php tests/concurrency-smoke.php
 ```
 
-Every file under `tests/` is a standalone script that creates an isolated sandbox directory; every PHP suite loads `tests/harness.php` for it, and so does a feature's own test, from the checkout it sits in or the one `NINO_ROOT` names. The `.htaccess` loop is a guard rather than a test: a checkout holds nothing in `app/` and `features/` but that file, which keeps the directories and denies them to a browser. The loops end with `|| exit 1` because a bare loop answers with the last file's status alone. `[ -e "$test" ] || continue` is for a checkout that ships no feature: `features/*/tests/` then matches nothing. PHPStan reads `phpstan.neon` (level 5: the kernel, the workbench, `app/` and `features/`, without a feature's own tests); `phpstan-baseline.neon` lists the findings that were open when the check arrived, so only a new finding fails - fixing one means removing its entry, and a new finding is never added to silence it. ESLint reads `eslint.config.mjs` and checks the browser scripts for undefined names, unused code and `==`. Neither is a dependency of the product: there is no `composer.json` and no `package.json`.
+Every file under `tests/` is a standalone script that creates an isolated sandbox directory; every PHP suite loads `tests/harness.php` for it, and so does a feature's own test, from the checkout it sits in or the one `NINO_ROOT` names. A PHP suite is named for its module or panel - `auth-smoke.php`, `http-smoke.php`, `admin-text-smoke.php` - and the first loop runs every `tests/*-smoke.php` in alphabetical order, so a suite added needs no edit here or in `ci.yml`. The `.htaccess` loop is a guard rather than a test: a checkout holds nothing in `app/` and `features/` but that file, which keeps the directories and denies them to a browser. The loops end with `|| exit 1` because a bare loop answers with the last file's status alone. `[ -e "$test" ] || continue` is for a checkout that ships no feature: `features/*/tests/` then matches nothing. PHPStan reads `phpstan.neon` (level 5: the kernel, the workbench, `app/` and `features/`, without a feature's own tests); `phpstan-baseline.neon` lists the findings that were open when the check arrived, so only a new finding fails - fixing one means removing its entry, and a new finding is never added to silence it. ESLint reads `eslint.config.mjs` and checks the browser scripts for undefined names, unused code and `==`. Neither is a dependency of the product: there is no `composer.json` and no `package.json`.
 
 A second CI job, `features`, clones the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features), copies every feature of it that this kernel can run into the checkout, validates their manifests and runs their own tests and PHPStan against it - the gate against a kernel change that breaks a published feature. The catalogue's CI does the reverse, against Nino's `main` and its latest tag.
 
@@ -355,7 +347,7 @@ Security fixes appear on `main`; there is currently no separate LTS line. Theref
 - [ ] Public routes are correctly forwarded to Nino.
 - [ ] Dotfiles, dot directories, and PHP data files are not directly accessible.
 - [ ] On Apache: the `.htaccess` is actually applied — `$_SERVER['NINO_HTACCESS']` is `1`, or, on a host that drops `SetEnv`, an address that does not exist answers with Nino's own 404 rather than the server's. Everything below that relies on `.htaccess` is worth nothing if it is not.
-- [ ] `app/`, `features/` and `tests/` are not served — each carries its own `.htaccess`; `/tests/kernel-smoke.php` must answer `403` or `404`, never a list of checks; verify with a request for a file of an installed feature, e.g. `/features/Newsletter/install/templates/mail-header.tpl` once the catalogue's Newsletter feature is in place - a checkout ships no feature, so there has to be one to ask for.
+- [ ] `app/`, `features/` and `tests/` are not served — each carries its own `.htaccess`; `/tests/http-smoke.php` must answer `403` or `404`, never a list of checks; verify with a request for a file of an installed feature, e.g. `/features/Newsletter/install/templates/mail-header.tpl` once the catalogue's Newsletter feature is in place - a checkout ships no feature, so there has to be one to ask for.
 - [ ] `private/` is not served — its own `.htaccess` denies it, and each PHP file inside carries a 403 stub; verify both apply on your webserver, or move the directory out of the webroot with `NINO_PRIVATE_DIR`. The templates and the asset sources are not PHP and have only the server rule.
 - [ ] Directory listing is disabled.
 - [ ] The setup wizard was able to create the project directories from the writable project root itself — a checkout ships neither `private/` nor `public/`, so the first step of the wizard is where that is confirmed.

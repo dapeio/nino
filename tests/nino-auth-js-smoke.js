@@ -6,7 +6,7 @@
  *												On the wire: HTTP Basic authorization. The pair is base64
  *												of the bytes the server decodes and compares against the
  *												account's hash (see \Nino\Http::_getBasicAuthCredentials()
- *												and kernel-smoke.php), so the encoding is the contract
+ *												and http-smoke.php), so the encoding is the contract
  *												between the two halves - and a password is exactly where
  *												a non-ascii character shows up.
  *

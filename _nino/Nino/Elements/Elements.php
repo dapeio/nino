@@ -372,7 +372,7 @@ namespace Nino {
 				return ! trigger_error( 'Element type \''. $typeUri. '\' does not exist.' );
 
 			/*	Still a success, and deliberately so: "already gone" is what
-				was asked for, and admin-system-smoke.php pins that contract
+				was asked for, and admin-elements-smoke.php pins that contract
 				("deleting an already-deleted element is an idempotent no-op,
 				not an error"). What is gone is the work - no rewrite of the
 				type file, and no '/nino/elements/committed' for a deletion that

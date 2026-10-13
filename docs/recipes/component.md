@@ -208,8 +208,8 @@ Add the cases to the module's own test, or to the feature's
   `E_USER_ERROR` (capture it with a handler of the test's own; php 8.4 raises
   a deprecation beside it).
 
-Run `tests/kernel-smoke.php`, `tests/features-smoke.php` and the feature's own
-test, then the syntax checks and the static analysis of the
+Run `tests/components-smoke.php`, `tests/features-smoke.php` and the feature's
+own test, then the syntax checks and the static analysis of the
 [agent guide](../../AGENTS.md#10-tests-and-validation).
 
 ## Definition of done

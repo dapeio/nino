@@ -1132,7 +1132,7 @@ check( 'a manager can set the password of an account no wider than their own', $
 \Nino\Auth::deleteUser( $appData, 'usersonly@example.com' );
 
 // An account written by hand has a hash, a status and permissions and no
-// 'role' key (see kernel-smoke.php). Changing its own password must answer
+// 'role' key (see auth-smoke.php). Changing its own password must answer
 // ok: reading the missing key would raise a warning the framework makes fatal
 // on a real request - after the password was already stored. The harness
 // records warnings, so the ones of this call are read

@@ -43,7 +43,7 @@ if( preg_match( '#^/app(?:/|$)#', $uri ) === 1 ) {
 }
 
 // The suites are run from a shell, never from a browser - reachable over http,
-// tests/kernel-smoke.php would run its seven hundred checks for whoever asked.
+// a suite of tests/ would run its checks for whoever asked.
 // Mirrors tests/.htaccess
 if( preg_match( '#^/tests(?:/|$)#', $uri ) === 1 ) {
 	http_response_code( 404 );

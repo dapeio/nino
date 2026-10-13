@@ -315,9 +315,9 @@ An `array` field whose value is a list of strings is edited as rows
 
 ## Element tests
 
-Use `tests/kernel-smoke.php` for model/runtime behavior,
-`tests/admin-smoke.php` for type CRUD and migrations, and the relevant JS tests
-for forms/uploads. Test:
+Use `tests/elements-smoke.php` for model/runtime behavior,
+`tests/admin-elements-smoke.php` for type CRUD and migrations, and the
+relevant JS tests for forms/uploads. Test:
 
 - valid and invalid field types;
 - required zero/false values;
