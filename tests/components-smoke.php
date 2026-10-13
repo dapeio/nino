@@ -870,8 +870,8 @@ check( 'a component registered with an icon carries it in the registry as it was
 check( '...and in the json of the registry, which a tool reads: the parts are lists and the attributes of a part maps, in the order given',
 	str_contains( (string) json_encode( \Nino\Modules\Components::components( $appData )['pictured'] ), '"icon":[["circle",{"cx":"12","cy":"12","r":"4"}],["path",{"d":"M4 12h16"}],["rect",{"rx":"2","x":"3","y":"3","width":"18","height":"18"}]]' ) === true
 	&& ( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), true ) )['pictured']['icon'] === $pictured );
-// Where a tool offers the six titles, and what each of them draws
-$kernelPlaces = [ 'title' => [ 'section' ], 'card-title' => [ 'card' ], 'hero-title' => [ 'hero' ], 'subtitle' => [ 'section' ], 'card-subtitle' => [ 'card' ], 'hero-subtitle' => [ 'hero' ] ];
+// Where a tool offers the six titles, and what each of them draws: the section's title and subtitle are offered in the hero as well, beside the hero's own
+$kernelPlaces = [ 'title' => [ 'hero', 'section' ], 'card-title' => [ 'card' ], 'hero-title' => [ 'hero' ], 'subtitle' => [ 'hero', 'section' ], 'card-subtitle' => [ 'card' ], 'hero-subtitle' => [ 'hero' ] ];
 $kernelDraws = [ 'title' => '{tag} .nino-section-title', 'card-title' => '{tag} .nino-card-title', 'hero-title' => '{tag} .nino-hero-title',
 	'subtitle' => '{tag} .nino-section-subtitle', 'card-subtitle' => '{tag} .nino-card-subtitle', 'hero-subtitle' => '{tag} .nino-hero-subtitle', 'button' => 'a .nino-btn' ];
 // The tags each of the six may be drawn as, with the one it is where the shortcode names none first: a title in a hero is an h2, a section's an h3, a card's an h4
