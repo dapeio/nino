@@ -689,6 +689,240 @@ check( 'and the shell draws the address through exactly that fill', str_contains
 echo "\n";
 
 
+// --- Http::pages, matchesPath and answersHtml --------------------------------
+
+echo "Http::pages, matchesPath and answersHtml - the routes as a feature reads them\n";
+
+$pageTable = [
+	'GET://'						=> [ 'uri' => '/home', 'body' => '' ],
+	'GET://about'				=> [ 'uri' => '/about-us', 'body' => '', 'locale' => 'en_US' ],
+	'GET://blog/*'			=> [ 'uri' => '/blog', 'body' => '' ],
+	'GET://404'					=> [ 'uri' => '/404', 'body' => '', 'statusCode' => 404 ],
+	'GET://_admin'			=> [ 'uri' => '/_admin', 'body' => '' ],
+	'GET://_admin/*'		=> [ 'uri' => '/_admin', 'body' => '' ],
+	'GET://.form'				=> [ 'uri' => '/.form', 'body' => '' ],
+	'POST://contact'		=> [ 'uri' => '/contact', 'body' => '' ],
+	'GET://robots.txt'	=> [ 'uri' => '/robots.txt', 'body' => '', 'header' => [ 'Content-Type' => 'text/plain; charset=utf-8' ] ],
+	'GET://*'						=> [ 'uri' => '/everything', 'body' => '' ],
+	'GET://two words'		=> [ 'uri' => '/two-words', 'body' => '' ],
+	'GET://a*b'					=> [ 'uri' => '/a-b', 'body' => '' ],
+	'GET:///evil.example/x'	=> [ 'uri' => '/evil', 'body' => '' ],
+	'GET:///*'					=> [ 'uri' => '/evil-tree', 'body' => '' ],
+	'GET://\\evil.example'	=> [ 'uri' => '/evil-too', 'body' => '' ],
+	'GET://bare'				=> [ 'body' => '' ],
+	'GET://scalar'			=> 'a route that is no array',
+	7										=> [ 'uri' => '/seven', 'body' => '' ],
+];
+
+check( 'pages() answers a row for every page of a route table, in its order, with the fields a feature lists or matches by - a GET route that is a public address, and none for another method, the workbench, a module endpoint, a path with a space or a star in it, a path a browser reads as another host (//host, /\host), a route that is no array, a key that is no string', \Nino\Http::pages( $pageTable ) === [
+	[ 'path' => '/', 'wildcard' => false, 'uri' => '/home', 'locale' => '', 'status' => 200, 'html' => true ],
+	[ 'path' => '/about', 'wildcard' => false, 'uri' => '/about-us', 'locale' => 'en_US', 'status' => 200, 'html' => true ],
+	[ 'path' => '/blog', 'wildcard' => true, 'uri' => '/blog', 'locale' => '', 'status' => 200, 'html' => true ],
+	[ 'path' => '/404', 'wildcard' => false, 'uri' => '/404', 'locale' => '', 'status' => 404, 'html' => true ],
+	[ 'path' => '/robots.txt', 'wildcard' => false, 'uri' => '/robots.txt', 'locale' => '', 'status' => 200, 'html' => false ],
+	[ 'path' => '/', 'wildcard' => true, 'uri' => '/everything', 'locale' => '', 'status' => 200, 'html' => true ],
+	[ 'path' => '/bare', 'wildcard' => false, 'uri' => '/bare', 'locale' => '', 'status' => 200, 'html' => true ],
+] );
+check( '...a list, and none for a table that holds no page', array_is_list( \Nino\Http::pages( $pageTable ) ) === true && \Nino\Http::pages( [] ) === [] && \Nino\Http::pages( [ 'POST://x' => [ 'uri' => '/x' ] ] ) === [] );
+
+// Cache's blacklist, a sitemap's exclusions and the paths of a protected area are one match
+$matchList = [ '/contact', '/blog/*' ];
+foreach( [ '/contact' => true, '/blog' => true, '/blog/post-1' => true, '/blog/2026/one' => true, '/contacts' => false, '/blogging' => false, '/home' => false ] as $matchUri => $expectMatch )
+	check( 'matchesPath: '. $matchUri. ' '. ( $expectMatch === true ? 'matches' : 'does not match' ). ' [ \'/contact\', \'/blog/*\' ]', \Nino\Http::matchesPath( $matchUri, $matchList ) === $expectMatch );
+check( 'a pattern is editable text: one that looks like a regular expression is matched literally, never evaluated', \Nino\Http::matchesPath( '/home', [ '/.*' ] ) === false && \Nino\Http::matchesPath( '/.*', [ '/.*' ] ) === true );
+check( 'a pattern that is no string or is empty matches nothing, and neither does an empty list', \Nino\Http::matchesPath( '/home', [ '', null, 7, [ '/home' ] ] ) === false && \Nino\Http::matchesPath( '/home', [] ) === false && \Nino\Http::matchesPath( '', [ '' ] ) === false );
+
+// answersHtml(): the first Content-Type decides, none is html
+check( 'a route that names no header answers html', \Nino\Http::answersHtml( [] ) === true && \Nino\Http::answersHtml( [ 'uri' => '/x' ] ) === true && \Nino\Http::answersHtml( [ 'header' => [] ] ) === true && \Nino\Http::answersHtml( [ 'header' => [ 'X-Other' => 'text/plain' ] ] ) === true );
+check( '...so does text/html, with a charset or without, in any case of letters and with space around', \Nino\Http::answersHtml( [ 'header' => [ 'Content-Type' => 'text/html' ] ] ) === true
+	&& \Nino\Http::answersHtml( [ 'header' => [ 'Content-Type' => 'Text/HTML; charset=utf-8' ] ] ) === true && \Nino\Http::answersHtml( [ 'header' => [ 'Content-Type' => ' text/html ' ] ] ) === true );
+check( '...and the header is found in any case of letters too', \Nino\Http::answersHtml( [ 'header' => [ 'content-type' => 'text/plain' ] ] ) === false && \Nino\Http::answersHtml( [ 'header' => [ 'CONTENT-TYPE' => 'text/html' ] ] ) === true );
+check( '...text/plain, application/json and the like do not', \Nino\Http::answersHtml( [ 'header' => [ 'Content-Type' => 'text/plain; charset=utf-8' ] ] ) === false && \Nino\Http::answersHtml( [ 'header' => [ 'Content-Type' => 'application/json' ] ] ) === false
+	&& \Nino\Http::answersHtml( [ 'header' => [ 'Content-Type' => 'application/xhtml+xml' ] ] ) === false );
+check( '...the first Content-Type named decides, and a value that is no string is no html', \Nino\Http::answersHtml( [ 'header' => [ 'content-type' => 'text/plain', 'Content-Type' => 'text/html' ] ] ) === false
+	&& \Nino\Http::answersHtml( [ 'header' => [ 'Content-Type' => [ 'text/html' ] ] ] ) === false && \Nino\Http::answersHtml( [ 'header' => 'text/plain' ] ) === true );
+check( 'a response answers it the same way, its header being the same map', \Nino\Http::answersHtml( $robotsRequest['/nino/http/response'] ) === false && \Nino\Http::answersHtml( $homeRequest['/nino/http/response'] ) === true );
+
+echo "\n";
+
+
+// --- Http::redirect ----------------------------------------------------------
+
+echo "Http::redirect - the status, the Location, no-store and an empty body in one call\n";
+
+$shop = $appData;
+$shop['/nino/dir'] = '/shop';
+$redirected = static fn(): array => [ '/nino/http/response' => [ 'statusCode' => 200, 'header' => [ 'X-Kept' => '1', 'Cache-Control' => 'max-age=60' ], 'body' => '<p>rendered for nothing</p>' ] ];
+
+$redirectRequest = $redirected();
+\Nino\Http::redirect( $shop, $redirectRequest, '/thanks?ok=1#top' );
+check( 'a path of the site is sent under the directory the project is served from: 303, the Location, no-store and an empty body', $redirectRequest['/nino/http/response']['statusCode'] === 303
+	&& $redirectRequest['/nino/http/response']['header']['Location'] === '/shop/thanks?ok=1#top' && $redirectRequest['/nino/http/response']['header']['Cache-Control'] === 'no-store' && $redirectRequest['/nino/http/response']['body'] === '' );
+check( '...and the headers it does not set stay as they were', $redirectRequest['/nino/http/response']['header']['X-Kept'] === '1' );
+
+$redirectRequest = $redirected();
+\Nino\Http::redirect( $appData, $redirectRequest, '/thanks' );
+$slashRoot = $appData;
+$slashRoot['/nino/dir'] = '/';
+$slashRequest = $redirected();
+\Nino\Http::redirect( $slashRoot, $slashRequest, '/thanks' );
+check( 'a project at the root sends the path as it is, whether its directory is written \'\' or \'/\'', $redirectRequest['/nino/http/response']['header']['Location'] === '/thanks' && $slashRequest['/nino/http/response']['header']['Location'] === '/thanks' );
+
+$redirectRequest = $redirected();
+\Nino\Http::redirect( $shop, $redirectRequest, 'https://example.org/elsewhere?x=1', 301 );
+$plainRequest = $redirected();
+\Nino\Http::redirect( $shop, $plainRequest, 'http://example.org/old' );
+check( 'an absolute https url is sent as it is, under the status asked for - an http one too: a redirect rule sends a visitor to another site', $redirectRequest['/nino/http/response']['statusCode'] === 301
+	&& $redirectRequest['/nino/http/response']['header']['Location'] === 'https://example.org/elsewhere?x=1' && $plainRequest['/nino/http/response']['header']['Location'] === 'http://example.org/old' );
+
+$redirectRefused = [];
+foreach( [ '//evil.example.com/x', '/\\evil.example.com/x', 'javascript:alert(1)', 'relative/path', '', 'ftp://example.org/', 'https://', 'http://', 'data:text/html,x', '/a:b', "/x\r\nSet-Cookie: a=b", '/x y', "/x\ty", 'https://exa mple.org/', 'https://user:pw@example.org/', 'mailto:me@example.org' ] as $redirectTarget ) {
+	$redirectRequest = $redirected();
+	$redirectErrors = ninoErrors( function() use ( &$shop, &$redirectRequest, $redirectTarget ) { \Nino\Http::redirect( $shop, $redirectRequest, $redirectTarget ); } );
+	if( count( $redirectErrors ) !== 1 || $redirectErrors[0][0] !== E_USER_WARNING || $redirectRequest !== $redirected() )
+		$redirectRefused[] = $redirectTarget;
+}
+check( 'anything but a path of the site or an http(s) url is a warning and changes nothing: another host written as a path, a scheme that runs, a relative path, a header split', $redirectRefused === [] );
+
+$redirectStatus = [];
+foreach( [ 301, 302, 303, 307, 308 ] as $status ) {
+	$redirectRequest = $redirected();
+	\Nino\Http::redirect( $shop, $redirectRequest, '/thanks', $status );
+	if( $redirectRequest['/nino/http/response']['statusCode'] !== $status )
+		$redirectStatus[] = $status;
+}
+check( 'the five statuses of a redirect are sent as given', $redirectStatus === [] );
+$redirectStatus = [];
+foreach( [ 200, 304, 404, 999, 0, -1 ] as $status ) {
+	$redirectRequest = $redirected();
+	$redirectErrors = ninoErrors( function() use ( &$shop, &$redirectRequest, $status ) { \Nino\Http::redirect( $shop, $redirectRequest, '/thanks', $status ); } );
+	if( count( $redirectErrors ) !== 1 || $redirectErrors[0][0] !== E_USER_WARNING || $redirectRequest['/nino/http/response']['statusCode'] !== 303 || $redirectRequest['/nino/http/response']['header']['Location'] !== '/shop/thanks' )
+		$redirectStatus[] = $status;
+}
+check( '...any other is a warning and the 303 a form post is sent on with - the redirect itself still happens', $redirectStatus === [] );
+
+// The locale switch is the kernel's own redirect: it answers 302 as before, and the
+// page the route would have rendered is not what the redirect carries
+$appData['/nino/http/routes']['GET://legal']['body'] = '<p>the page</p>';
+\Nino\Locales::setCurrentLocale( $appData, 'en_US' );
+$switchRequest = ninoVisit( $appData, '/legal?/_nino/locales/current=de_DE' );
+\Nino\Http::response( $appData, $switchRequest );
+check( 'the locale switch is a redirect of this kind: 302, the Location of the other variant, no-store, and no page in the body', $switchRequest['/nino/http/response']['statusCode'] === 302
+	&& $switchRequest['/nino/http/response']['header']['Location'] === '/rechtliches' && $switchRequest['/nino/http/response']['header']['Cache-Control'] === 'no-store' && $switchRequest['/nino/http/response']['body'] === '' );
+$appData['/nino/http/routes']['GET://legal']['body'] = '';
+\Nino\Locales::setCurrentLocale( $appData, 'en_US' );
+
+echo "\n";
+
+
+// --- Http::allowSource -------------------------------------------------------
+
+echo "Http::allowSource - widening the Content-Security-Policy of one response\n";
+
+$cspPolicy	= static fn( array $request ): string => (string) ( $request['/nino/http/response']['header']['Content-Security-Policy'] ?? '' );
+$cspWith		= static fn( mixed $policy ): array => [ '/nino/http/response' => [ 'header' => [ 'Content-Security-Policy' => $policy ] ] ];
+$cspRefuses = static function( string $policy, string $directive, string $source ) use ( $cspPolicy, $cspWith ): bool {
+	$request = $cspWith( $policy );
+	$result = null;
+	$errors = ninoErrors( function() use ( &$request, &$result, $directive, $source ) { $result = \Nino\Http::allowSource( $request, $directive, $source ); } );
+	return $result === false && count( $errors ) === 1 && $errors[0][0] === E_USER_WARNING && $cspPolicy( $request ) === $policy;
+};
+
+$cspVisit = ninoVisit( $appData, '/' );
+$cspKernel = $cspPolicy( $cspVisit );
+check( 'the policy a request starts from is the kernel\'s, with no frame-src of its own', str_contains( $cspKernel, "default-src 'self'" ) === true && str_contains( $cspKernel, 'frame-src' ) === false );
+check( 'allowSource() makes a directive the policy lacks from the one a browser would read instead, and adds the source to it', \Nino\Http::allowSource( $cspVisit, 'frame-src', 'https://player.example.com' ) === true
+	&& $cspPolicy( $cspVisit ) === $cspKernel. "; frame-src 'self' https://player.example.com" );
+check( '...appends to a directive the policy has, and leaves the others as they were', \Nino\Http::allowSource( $cspVisit, 'img-src', 'https://pictures.example.com' ) === true
+	&& $cspPolicy( $cspVisit ) === str_replace( 'img-src * data:', 'img-src * data: https://pictures.example.com', $cspKernel ). "; frame-src 'self' https://player.example.com" );
+check( '...and a source it lists already is not added again, in whatever case of letters', \Nino\Http::allowSource( $cspVisit, 'frame-src', 'HTTPS://Player.example.com' ) === false && substr_count( strtolower( $cspPolicy( $cspVisit ) ), 'https://player.example.com' ) === 1 );
+
+$cspScripts = $cspWith( $cspKernel );
+check( 'a directive built from its fallback is kept only if the source was new to it: script-src-elem after script-src changes nothing', \Nino\Http::allowSource( $cspScripts, 'script-src', 'https://cdn.example.com' ) === true
+	&& \Nino\Http::allowSource( $cspScripts, 'script-src-elem', 'https://cdn.example.com' ) === false && str_contains( $cspPolicy( $cspScripts ), 'script-src-elem' ) === false );
+check( '...and one the fallback did not name widens by a copy of the fallback\'s list', \Nino\Http::allowSource( $cspScripts, 'script-src-elem', 'https://other.example.com' ) === true
+	&& str_ends_with( $cspPolicy( $cspScripts ), "; script-src-elem 'self' https://cdn.example.com https://other.example.com" ) === true );
+
+$cspChild = $cspWith( "default-src 'self'; child-src 'self' https://kids.example.com" );
+check( 'the fallback is the nearest one the policy has: frame-src is read from child-src before default-src', \Nino\Http::allowSource( $cspChild, 'frame-src', 'https://player.example.com' ) === true
+	&& $cspPolicy( $cspChild ) === "default-src 'self'; child-src 'self' https://kids.example.com; frame-src 'self' https://kids.example.com https://player.example.com" );
+$cspTwice = $cspWith( "frame-src 'self'; frame-src https://later.example.com" );
+check( 'a directive named twice is widened where a browser reads it, at its first occurrence', \Nino\Http::allowSource( $cspTwice, 'frame-src', 'https://player.example.com' ) === true
+	&& $cspPolicy( $cspTwice ) === "frame-src 'self' https://player.example.com; frame-src https://later.example.com" );
+check( 'one that is not a fetch directive is appended to where the policy has it, and not made where it has not: an absent one restricts nothing', ( static function() use ( $cspWith, $cspPolicy ): bool {
+	$request = $cspWith( "default-src 'self'; form-action 'self'" );
+	return \Nino\Http::allowSource( $request, 'form-action', 'https://forms.example.com' ) === true && $cspPolicy( $request ) === "default-src 'self'; form-action 'self' https://forms.example.com"
+		&& \Nino\Http::allowSource( $request, 'base-uri', 'https://base.example.com' ) === false && str_contains( $cspPolicy( $request ), 'base-uri' ) === false;
+} )() );
+
+// The table of CSP level 3: the directives a browser reads the sources of a directive from, nearest first.
+// A policy that has the chain from one step on is widened from that step's list, whichever step it is
+$cspChains = [
+	'child-src'				=> [ 'default-src' ],
+	'frame-src'				=> [ 'child-src', 'default-src' ],
+	'worker-src'			=> [ 'child-src', 'script-src', 'default-src' ],
+	'script-src-elem'	=> [ 'script-src', 'default-src' ],
+	'script-src-attr'	=> [ 'script-src', 'default-src' ],
+	'style-src-elem'	=> [ 'style-src', 'default-src' ],
+	'style-src-attr'	=> [ 'style-src', 'default-src' ],
+];
+foreach( [ 'connect-src', 'font-src', 'img-src', 'manifest-src', 'media-src', 'object-src', 'prefetch-src', 'script-src', 'style-src' ] as $cspFetch )
+	$cspChains[$cspFetch] = [ 'default-src' ];
+
+$cspWrongChain = [];
+foreach( $cspChains as $cspDirective => $cspChain )
+	for( $step = 0; $step < count( $cspChain ); $step++ ) {
+
+		$cspStart = implode( '; ', array_map( static fn( string $name ): string => $name. " 'self' https://". $name. '.example.com', array_slice( $cspChain, $step ) ) );
+		$cspStepped = $cspWith( $cspStart );
+
+		if( \Nino\Http::allowSource( $cspStepped, $cspDirective, 'https://new.example.com' ) !== true
+			|| $cspPolicy( $cspStepped ) !== $cspStart. '; '. $cspDirective. " 'self' https://". $cspChain[$step]. '.example.com https://new.example.com' )
+			$cspWrongChain[] = $cspDirective. ' from '. $cspChain[$step];
+	}
+check( 'a directive the policy lacks is made from the nearest of the directives CSP level 3 reads its sources from - for every fetch directive, from whichever step of its chain the policy has', $cspWrongChain === [] );
+check( '...and the directives that are no fetch directives are not made: an absent one restricts nothing', array_filter( [ 'base-uri', 'form-action', 'frame-ancestors', 'sandbox', 'report-uri', 'report-to', 'upgrade-insecure-requests', 'require-trusted-types-for', 'trusted-types' ], static function( string $directive ) use ( $cspWith, $cspPolicy ): bool {
+	$request = $cspWith( "default-src 'self'" );
+	return \Nino\Http::allowSource( $request, $directive, 'https://new.example.com' ) !== false || $cspPolicy( $request ) !== "default-src 'self'";
+} ) === [] );
+
+$cspClosed = [ "default-src 'none'", "default-src 'self'; child-src 'none'", "default-src 'self'; frame-src 'none'", "default-src 'self'; frame-src", "default-src 'self'; frame-src 'NONE'" ];
+check( 'a directive that says \'none\', or lists nothing, is the project having decided - and so is a fallback that does', array_filter( $cspClosed, static function( string $policy ) use ( $cspWith, $cspPolicy ): bool {
+	$request = $cspWith( $policy );
+	return \Nino\Http::allowSource( $request, 'frame-src', 'https://player.example.com' ) !== false || $cspPolicy( $request ) !== $policy;
+} ) === [] );
+check( 'a policy with neither the directive nor a fallback for it restricts nothing there, and is left alone', ( static function() use ( $cspWith, $cspPolicy ): bool {
+	$request = $cspWith( "img-src 'self'" );
+	return \Nino\Http::allowSource( $request, 'frame-src', 'https://player.example.com' ) === false && $cspPolicy( $request ) === "img-src 'self'";
+} )() );
+check( 'an empty policy, one that is no string and a response without one are left as they are', ( static function() use ( $cspWith, $cspPolicy ): bool {
+	$empty = $cspWith( '' );
+	$array = $cspWith( [ "default-src 'self'" ] );
+	$none = [ '/nino/http/response' => [] ];
+	return \Nino\Http::allowSource( $empty, 'frame-src', 'https://player.example.com' ) === false && $cspPolicy( $empty ) === ''
+		&& \Nino\Http::allowSource( $array, 'frame-src', 'https://player.example.com' ) === false && $array === $cspWith( [ "default-src 'self'" ] )
+		&& \Nino\Http::allowSource( $none, 'frame-src', 'https://player.example.com' ) === false && $none === [ '/nino/http/response' => [] ];
+} )() );
+check( 'a feature may widen a policy, never open it: \'*\' alone, the unsafe keywords in quotes and a source that would end the directive are a warning and no change',
+	array_filter( [ '*', "'unsafe-inline'", "'UNSAFE-EVAL'", '', 'a b', "a\tb", 'a;b', 'a,b', "a\nb" ], static fn( string $source ): bool => $cspRefuses( $cspKernel, 'frame-src', $source ) === false ) === [] );
+check( '...and so is a directive that is no name of one', array_filter( [ 'Frame-Src', 'frame_src', 'frame-src;', '', '-x', 'frame src' ], static fn( string $directive ): bool => $cspRefuses( $cspKernel, $directive, 'https://player.example.com' ) === false ) === [] );
+check( '...while a source with a scheme only, like data:, is one a feature may add', ( static function() use ( $cspWith, $cspPolicy ): bool {
+	$request = $cspWith( "default-src 'self'; img-src 'self'" );
+	return \Nino\Http::allowSource( $request, 'img-src', 'data:' ) === true && $cspPolicy( $request ) === "default-src 'self'; img-src 'self' data:";
+} )() );
+check( '...but on a directive that runs code a scheme alone, a wildcard host and any unsafe keyword open the policy and are refused - a wildcard host on frame-src is a source like any other',
+	array_filter( [ [ 'script-src', 'https:' ], [ 'script-src-elem', 'data:' ], [ 'script-src-attr', 'blob:' ], [ 'object-src', 'https://*.example.com' ], [ 'worker-src', 'https://*' ], [ 'script-src', "'unsafe-hashes'" ], [ 'frame-src', "'Unsafe-Hashes'" ] ],
+		static fn( array $case ): bool => $cspRefuses( $cspKernel, $case[0], $case[1] ) === false ) === []
+	&& ( static function() use ( $cspWith, $cspPolicy ): bool {
+		$request = $cspWith( "default-src 'self'" );
+		return \Nino\Http::allowSource( $request, 'frame-src', 'https://*.example.com' ) === true && str_contains( $cspPolicy( $request ), 'https://*.example.com' ) === true
+			&& \Nino\Http::allowSource( $request, 'script-src', 'https://cdn.example.com' ) === true && str_contains( $cspPolicy( $request ), "script-src 'self' https://cdn.example.com" ) === true;
+	} )() );
+
+
+echo "\n";
+
+
 // --- Modules\Navigation ----------------------------------------------------
 
 echo "Modules\\Navigation: menus built from the routes\n";
@@ -872,10 +1106,10 @@ unset( $appData['/nino/html/navroutes'] );
 $appData['/nino/http/routes'] = $routesBeforeNav;
 
 // Http::output() itself exit()s, so the header-finalizing part it delegates
-// to is exercised directly via Reflection instead (same approach as
-// Mail::_hit in form-mail-smoke.php). invokeArgs() with an array of references - plain
-// invoke() can't pass $request by reference, which would silently run
-// against a copy and never show this test its own mutations
+// to is exercised directly via Reflection instead. invokeArgs() with an
+// array of references - plain invoke() can't pass $request by reference,
+// which would silently run against a copy and never show this test its own
+// mutations
 $finalizeResponse = new ReflectionMethod( '\Nino\Http', '_finalizeResponse' );
 $finalizeResponse->setAccessible( true );
 
@@ -1121,22 +1355,15 @@ check( '...both are held as markers instead', substr_count( $storedBody, '@@nino
 
 // --- blacklist ------------------------------------------------------------
 
+// What matches is Http::matchesPath(), with its cases in the Http section above;
+// here the cache keeps a page that matches out of the store, and one that does not in
 $appData['/nino/cache/blacklist'] = [ '/contact', '/blog/*' ];
-
-foreach( [ '/contact' => false, '/blog' => false, '/blog/post-1' => false, '/blog/2026/one' => false,
-           '/contacts' => true, '/blogging' => true, '/home' => true ] as $uri => $expectStored ) {
-	\Nino\Modules\Cache::_invalidate( $appData );
-	$req = cacheRequest( $uri );
-	\Nino\Modules\Cache::callbackOutput( $appData, $req );
-	check( "blacklist: $uri is ". ( $expectStored ? 'cached' : 'excluded' ), ( cacheEntryCount( $appData ) === 1 ) === $expectStored );
-}
-
-// A pattern is admin-editable text, so it must never reach a regex engine
 \Nino\Modules\Cache::_invalidate( $appData );
-$appData['/nino/cache/blacklist'] = [ '/.*' ];
-$regexish = cacheRequest( '/home' );
-\Nino\Modules\Cache::callbackOutput( $appData, $regexish );
-check( 'a regex-looking pattern is matched literally, not evaluated', cacheEntryCount( $appData ) === 1 );
+$listedRequest = cacheRequest( '/blog/post-1' );
+\Nino\Modules\Cache::callbackOutput( $appData, $listedRequest );
+$unlistedRequest = cacheRequest( '/home' );
+\Nino\Modules\Cache::callbackOutput( $appData, $unlistedRequest );
+check( 'a page on the blacklist is not stored and one that is not on it is', cacheEntryCount( $appData ) === 1 && is_file( \Nino\Filesystem::path( $appData, '/data/cache/'. sha1( '/home|de_DE' ). '.php' ) ) === true );
 $appData['/nino/cache/blacklist'] = [];
 
 // --- expiry ---------------------------------------------------------------

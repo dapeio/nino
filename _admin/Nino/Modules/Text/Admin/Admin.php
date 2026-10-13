@@ -309,7 +309,8 @@ namespace Nino\Modules\Text {
 			if( class_exists( '\\Nino\\Modules\\Routes\\Admin' ) === false )
 				return null;
 
-			$routes = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
+			$routes = \Nino\AppData::stored( $appData, '/nino/http/routes', [] );
+			$routes = is_array( $routes ) === true ? $routes : [];
 			$pages 	= [];
 
 			// No languages asked for: the names and titles are keys of the list

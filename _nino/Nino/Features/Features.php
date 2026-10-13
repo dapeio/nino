@@ -125,6 +125,11 @@ namespace Nino {
 
 		private const string SETTING_PATTERN = '/^[a-z][a-zA-Z0-9]*$/';
 
+		// A file below a feature's assets/ directory the bundles of the site may
+		// carry: a style sheet or a script, a plain relative name with no hidden
+		// first character
+		private const string ASSET_PATTERN = '/^[A-Za-z0-9_][A-Za-z0-9_.\/-]*\.(?:css|js)$/D';
+
 		private const int MAX_STRING_LENGTH = 1000;
 		private const int MAX_TEXT_LENGTH = 10000;
 		private const int MAX_LINES = 200;
@@ -458,6 +463,19 @@ namespace Nino {
 				$data[] = $file;
 			}
 
+			// The files of the feature's own assets/ directory that the site's two
+			// bundles carry (see registerAssets()). The directory is the manifest's
+			// own, so a manifest can name no file of another feature, and a file
+			// is a style sheet or a script, never a '..' away from where it is
+			$assets = [];
+			$assetsDir = '/features/'. $name. '/assets/';
+			foreach( (array) ( $raw['assets'] ?? [] ) as $file ) {
+				if( is_string( $file ) === false || str_starts_with( $file, $assetsDir ) === false
+					|| preg_match( self::ASSET_PATTERN, substr( $file, strlen( $assetsDir ) ) ) !== 1 || str_contains( $file, '..' ) === true )
+					return $fail( '"assets" must list css and js files below '. $assetsDir );
+				$assets[] = $file;
+			}
+
 			$settings = [];
 			foreach( (array) ( $raw['settings'] ?? [] ) as $settingName => $schema ) {
 
@@ -506,6 +524,7 @@ namespace Nino {
 				'php'					=> [ 'ext' => $extensions ],
 				'requires'		=> $requires,
 				'data'				=> $data,
+				'assets'			=> $assets,
 				'settings'		=> $settings,
 				'components'	=> $declared['components'],
 				'stacks'			=> $declared['stacks'],
@@ -519,8 +538,13 @@ namespace Nino {
 		 *	itself. Each name is a shortcode whose renderer is by convention
 		 *	[ '\Nino\Modules\<Directory>', 'component<Name>' ] - or 'stack<Name>' -
 		 *	with the name written in studly caps: 'newsletter-signup' is
-		 *	componentNewsletterSignup(). A renderer the class does not have is
-		 *	said out loud and skipped, the way a callback that is not callable is.
+		 *	componentNewsletterSignup(). A component whose class has no such
+		 *	method is rendered by the class's doShortcode() where it has one: the
+		 *	shortcode a feature would write by hand and the component of its
+		 *	manifest are then one method, which is handed the arguments the way
+		 *	any renderer is, made ready. A stack keeps the strict rule. A renderer
+		 *	the class does not have is said out loud and skipped, the way a
+		 *	callback that is not callable is.
 		 *
 		 *	Asked at every boot, by the Components module, and so only the
 		 *	manifests of the features listed in '/nino/modules' are read: not
@@ -533,7 +557,87 @@ namespace Nino {
 		 */
 		public static function registerComponents( array &$appData ): void {
 
-			foreach( (array) ( $appData['/nino/modules'] ?? [] ) as $class ) {
+			foreach( self::_listed( $appData ) as $manifest ) {
+
+				if( $manifest['components'] === [] && $manifest['stacks'] === [] )
+					continue;
+
+				foreach( [ 'component' => 'components', 'stack' => 'stacks' ] as $prefix => $what )
+					foreach( $manifest[$what] as $name => $schema ) {
+
+						$callback = [ $manifest['module'], $prefix. str_replace( ' ', '', ucwords( str_replace( '-', ' ', (string) $name ) ) ) ];
+
+						if( $what === 'components' && is_callable( $callback ) === false && is_callable( [ $manifest['module'], 'doShortcode' ] ) === true )
+							$callback = [ $manifest['module'], 'doShortcode' ];
+
+						if( is_callable( $callback ) === false ) {
+							trigger_error( 'Feature manifest '. $manifest['dir']. '/'. self::MANIFEST. ': the '. $prefix. ' "'. $name. '" has no renderer '. $callback[0]. '::'. $callback[1]. '()', E_USER_WARNING );
+							continue;
+						}
+
+						if( $what === 'stacks' )
+							\Nino\Modules\Components::addStack( $appData, (string) $name, $callback, $schema );
+						else
+							\Nino\Modules\Components::addComponent( $appData, (string) $name, $callback, $schema );
+					}
+			}
+		}
+
+		/**
+		 *	Put the files the active features name under 'assets' into the two
+		 *	bundles of the site: a style sheet into '/.cache/style.css', a script
+		 *	into '/.cache/script.js', each once and in the order the manifest
+		 *	lists it. The paths are virtual, '/features/<Directory>/assets/<file>',
+		 *	which \Nino\Filesystem resolves against the features directory wherever
+		 *	NINO_FEATURES_DIR put it. A feature that wants its files in another
+		 *	bundle calls \Nino\Html::addAsset() itself, in its init().
+		 *
+		 *	Asked at every boot by \Nino\init(), ahead of the init() of every module,
+		 *	and so what a feature adds to a bundle itself comes after the files
+		 *	of its manifest. Only the manifests of the features listed in
+		 *	'/nino/modules' are read, as registerComponents() reads them.
+		 *
+		 *	Not the 'assets' of a stack's schema (\Nino\Modules\Components::validate()),
+		 *	which is a note for a tool about the files a stack needs and adds nothing
+		 *	to a page.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		public static function registerAssets( array &$appData ): void {
+
+			foreach( self::_listed( $appData ) as $manifest )
+				foreach( $manifest['assets'] as $path )
+					\Nino\Html::addAsset( $appData, str_ends_with( $path, '.css' ) === true ? '/.cache/style.css' : '/.cache/script.js', $path );
+		}
+
+		/**
+		 *	The manifests of the features listed in '/nino/modules', in that
+		 *	order: the walk the two readers of a boot share, registerAssets() and
+		 *	registerComponents(). A class that is no feature's, a directory
+		 *	without a manifest and a manifest that does not validate - said in a
+		 *	warning, as manifest() does - are left out.
+		 *
+		 *	The walk is kept for the request in './nino/features/listed', beside
+		 *	the list it was made for: a manifest is read, and a bad one said, once
+		 *	per boot however many readers ask, and a list that has changed since is
+		 *	walked again.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										The manifests, as manifest() answers them
+		 */
+		private static function _listed( array &$appData ): array {
+
+			$modules = (array) ( $appData['/nino/modules'] ?? [] );
+
+			if( ( $appData['./nino/features/listed']['modules'] ?? null ) === $modules )
+				return $appData['./nino/features/listed']['manifests'];
+
+			$listed = [];
+
+			foreach( $modules as $class ) {
 
 				if( preg_match( '/^\\\\?Nino\\\\Modules\\\\([A-Z][A-Za-z0-9]*)$/D', (string) $class, $match ) !== 1 )
 					continue;
@@ -545,25 +649,13 @@ namespace Nino {
 
 				$manifest = self::manifest( $dir );
 
-				if( $manifest === null || ( $manifest['components'] === [] && $manifest['stacks'] === [] ) )
-					continue;
-
-				foreach( [ 'component' => 'components', 'stack' => 'stacks' ] as $prefix => $what )
-					foreach( $manifest[$what] as $name => $schema ) {
-
-						$callback = [ $manifest['module'], $prefix. str_replace( ' ', '', ucwords( str_replace( '-', ' ', (string) $name ) ) ) ];
-
-						if( is_callable( $callback ) === false ) {
-							trigger_error( 'Feature manifest '. $dir. '/'. self::MANIFEST. ': the '. $prefix. ' "'. $name. '" has no renderer '. $callback[0]. '::'. $callback[1]. '()', E_USER_WARNING );
-							continue;
-						}
-
-						if( $what === 'stacks' )
-							\Nino\Modules\Components::addStack( $appData, (string) $name, $callback, $schema );
-						else
-							\Nino\Modules\Components::addComponent( $appData, (string) $name, $callback, $schema );
-					}
+				if( $manifest !== null )
+					$listed[] = $manifest;
 			}
+
+			$appData['./nino/features/listed'] = [ 'modules' => $modules, 'manifests' => $listed ];
+
+			return $listed;
 		}
 
 		/**
@@ -852,9 +944,8 @@ namespace Nino {
 			// carries this request's own runtime routes (the workbench's, the
 			// active modules' self-registered endpoints), which must not be
 			// written into config.php. Same rule as the wizard's Setup step.
-			$stored 		= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-			$stored 		= is_array( $stored ) ? $stored : [];
-			$routes 		= is_array( $stored['/nino/http/routes'] ?? null ) ? $stored['/nino/http/routes'] : \Nino\AppData::DEFAULTS['/nino/http/routes'];
+			$routes 		= \Nino\AppData::stored( $appData, '/nino/http/routes', \Nino\AppData::DEFAULTS['/nino/http/routes'] );
+			$routes 		= is_array( $routes ) ? $routes : \Nino\AppData::DEFAULTS['/nino/http/routes'];
 			$routesBefore	= $routes;
 			$blacklist	= [];
 			$config			= [];

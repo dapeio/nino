@@ -49,6 +49,41 @@ namespace Nino {
 			'Cache-Control'								=> 'no-store',
 		];
 
+		/*	The directives a Content-Security-Policy falls back to where it names
+			none of its own, nearest first: the table of CSP level 3, which
+			allowSource() widens a directive by. A fetch directive has the list a
+			browser would read its sources from; one with an empty list is none -
+			it takes no fallback, and a policy that does not name it restricts
+			nothing	*/
+		private const array FALLBACKS = [
+			'default-src'			=> [],
+			'child-src'				=> [ 'default-src' ],
+			'frame-src'				=> [ 'child-src', 'default-src' ],
+			'worker-src'			=> [ 'child-src', 'script-src', 'default-src' ],
+			'script-src'			=> [ 'default-src' ],
+			'script-src-elem'	=> [ 'script-src', 'default-src' ],
+			'script-src-attr'	=> [ 'script-src', 'default-src' ],
+			'style-src'				=> [ 'default-src' ],
+			'style-src-elem'	=> [ 'style-src', 'default-src' ],
+			'style-src-attr'	=> [ 'style-src', 'default-src' ],
+			'connect-src'			=> [ 'default-src' ],
+			'font-src'				=> [ 'default-src' ],
+			'img-src'					=> [ 'default-src' ],
+			'manifest-src'		=> [ 'default-src' ],
+			'media-src'				=> [ 'default-src' ],
+			'object-src'			=> [ 'default-src' ],
+			'prefetch-src'		=> [ 'default-src' ],
+			'base-uri'				=> [],
+			'form-action'			=> [],
+			'frame-ancestors'	=> [],
+			'sandbox'					=> [],
+			'report-uri'			=> [],
+			'report-to'				=> [],
+			'upgrade-insecure-requests'	=> [],
+			'require-trusted-types-for'	=> [],
+			'trusted-types'		=> [],
+		];
+
 		public static function request( array &$appData, array &$request ): void {
 
 			$currentLocale = \Nino\Locales::getCurrentLocale( $appData );
@@ -240,6 +275,213 @@ namespace Nino {
 			$request['/nino/http/response']['body'] = $body;
 		}
 
+		/**
+		 *	Make the response a redirect: the status, the Location header and an
+		 *	empty body, in one call. A handler must not send a header itself (it
+		 *	changes the response, see Http::output()), and a redirect set by hand
+		 *	was one more way to get the directory, the status or the body wrong.
+		 *
+		 *	$to is a path of this site - it starts with a single '/', has no
+		 *	whitespace or control character, no ':' before its first '/' (which a
+		 *	browser reads as a scheme) and no backslash after the slash (which it
+		 *	reads as a second one) - and Location is the project's directory and
+		 *	that path, so that it works wherever the project is served from. Or $to
+		 *	is an absolute http or https url, which is sent as it is: a site may
+		 *	send a visitor elsewhere, that is what a redirect rule is for. Anything
+		 *	else - '//host/path', 'javascript:...', a relative path - is no
+		 *	redirect: a warning, and the response is left as it was. A target that
+		 *	comes from the request - a posted return address, a parameter of the
+		 *	query - has to be checked by the caller to be a path of this site first:
+		 *	an absolute url is sent as it is, so a redirect to whatever a visitor
+		 *	wrote there is an open one.
+		 *
+		 *	The status is 301, 302, 303, 307 or 308; any other is a warning and
+		 *	303, the answer a form post is sent on with. The response is marked
+		 *	no-store, so that a redirect that changes (a rule edited, a page moved)
+		 *	takes effect for whoever was sent by the old one.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$to						A path of the site, eg. '/thanks', or an absolute url
+		 *	@param		int				$status				301, 302, 303, 307 or 308
+		 *
+		 *	@return 	void
+		 */
+		public static function redirect( array &$appData, array &$request, string $to, int $status = 303 ): void {
+
+			if( self::_isSitePath( $to ) === true )
+				$location = rtrim( \Nino\Filesystem::getDir( $appData ), '/' ). $to;
+			else if( \Nino\Fetch::isHttpsUrl( $to ) === true || ( preg_match( '#^http://#i', $to ) === 1 && \Nino\Fetch::isHttpsUrl( 'https'. substr( $to, 4 ) ) === true ) )
+				$location = $to;
+			else {
+				trigger_error( 'Http::redirect(): "'. $to. '" is neither a path of this site nor an http(s) url - the response was left as it was', E_USER_WARNING );
+				return;
+			}
+
+			if( in_array( $status, [ 301, 302, 303, 307, 308 ], true ) === false ) {
+				trigger_error( 'Http::redirect(): '. $status. ' is no redirect status - 303 was sent', E_USER_WARNING );
+				$status = 303;
+			}
+
+			$request['/nino/http/response']['statusCode']								= $status;
+			$request['/nino/http/response']['header']['Location']				= $location;
+			$request['/nino/http/response']['header']['Cache-Control']	= 'no-store';
+			$request['/nino/http/response']['body']											= '';
+		}
+
+		/**
+		 *	@param		string		$path
+		 *
+		 *	@return 	bool										Whether it is a path of this site that is safe to put in a Location header
+		 */
+		private static function _isSitePath( string $path ): bool {
+
+			// A single slash first: '//host' is protocol-relative, and a browser
+			// reads '/\host' as the same. Whitespace or a control character has no
+			// place in a header, and a colon before the next slash reads as a
+			// scheme ('/javascript:...') rather than as a segment
+			return str_starts_with( $path, '/' ) === true && str_starts_with( $path, '//' ) === false && str_starts_with( $path, '/\\' ) === false
+				&& preg_match( '/[\s\x00-\x1f\x7f]/', $path ) !== 1 && preg_match( '#^/[^/]*:#', $path ) !== 1;
+		}
+
+		/**
+		 *	Widen one directive of the Content-Security-Policy of this response by
+		 *	one source - what a feature needs when its page loads from a place the
+		 *	policy does not name (a frame of another site, a script of a
+		 *	provider). The policy is $request['/nino/http/response']['header']
+		 *	['Content-Security-Policy']; an empty one, or one that is no string,
+		 *	is left as it is.
+		 *
+		 *	A feature may widen a policy, never open it. A source is one token
+		 *	without whitespace, ';' or ',' - the characters that would end it or
+		 *	its directive - and never '*' alone or an unsafe keyword in quotes
+		 *	('unsafe-inline', 'unsafe-eval', 'unsafe-hashes'): a warning and
+		 *	false. On a directive that runs code (script-src, script-src-elem,
+		 *	script-src-attr, object-src, worker-src) a scheme alone (https:) and
+		 *	a wildcard host (https://*.example.com) are refused the same way,
+		 *	since either admits every host. The directive is a name of lower
+		 *	case letters and hyphens.
+		 *
+		 *	Where the directive exists, the source is appended to its first
+		 *	occurrence (a browser ignores the second, so adding one would widen
+		 *	nothing), unless it is listed already, in any case of letters. Where it
+		 *	does not, it is built from the first of the directives a browser would
+		 *	have read its sources from instead (FALLBACKS: frame-src from child-src,
+		 *	then default-src), since naming 'self' by hand would narrow a policy
+		 *	whose default-src lists more; and the copy is kept only if the source
+		 *	is new to it, so that widening script-src-elem after script-src is a
+		 *	step that changes nothing. A policy that has none of the fallbacks
+		 *	restricts the directive in no way, and is left alone.
+		 *
+		 *	A directive that says 'none', or lists no source at all (which a
+		 *	browser reads the same way), is the project having decided, and so is
+		 *	a fallback that does. The directives that are no fetch directives
+		 *	(base-uri, form-action, frame-ancestors, sandbox and the like) have no
+		 *	fallback: present, the source is appended as to any directive;
+		 *	absent, nothing happens - an absent one restricts nothing, and
+		 *	creating it with one source would narrow the policy, which a widener
+		 *	never does.
+		 *
+		 *	The policy is written back joined with '; '. \Nino\Modules\Jstext adds
+		 *	its nonce by a merge of its own, which creates script-src even beside
+		 *	a default-src that says 'none'; the two rules are different ones.
+		 *
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$directive		The directive to widen, eg. 'frame-src'
+		 *	@param		string		$source				One source, eg. 'https://player.example.com' or 'data:'
+		 *
+		 *	@return 	bool											Whether the policy changed
+		 */
+		public static function allowSource( array &$request, string $directive, string $source ): bool {
+
+			if( preg_match( '/^[a-z][a-z-]*$/D', $directive ) !== 1 ) {
+				trigger_error( 'Http::allowSource(): "'. $directive. '" is no directive of a policy', E_USER_WARNING );
+				return false;
+			}
+
+			if( $source === '' || $source === '*' || preg_match( '/[\s\x00-\x1f\x7f;,]/', $source ) === 1
+				|| preg_match( "/^'unsafe-/i", $source ) === 1 ) {
+				trigger_error( 'Http::allowSource(): "'. $source. '" is no source a feature may add - a policy is widened, never opened', E_USER_WARNING );
+				return false;
+			}
+
+			// On a directive that runs code a scheme alone (https:) or a wildcard
+			// host (https://*.example.com) admits every host of the scheme or the
+			// domain: that is opening, whatever the directive said before
+			if( in_array( $directive, [ 'script-src', 'script-src-elem', 'script-src-attr', 'object-src', 'worker-src' ], true ) === true
+				&& ( preg_match( '/^[a-z][a-z0-9+.-]*:$/Di', $source ) === 1 || str_contains( $source, '*' ) === true ) ) {
+				trigger_error( 'Http::allowSource(): "'. $source. '" is no source a feature may add to '. $directive. ' - a scheme alone or a wildcard host opens the policy to every host', E_USER_WARNING );
+				return false;
+			}
+
+			$policy = $request['/nino/http/response']['header']['Content-Security-Policy'] ?? '';
+
+			if( is_string( $policy ) === false || trim( $policy ) === '' )
+				return false;
+
+			$directives	= array_values( array_filter( array_map( 'trim', explode( ';', $policy ) ), static fn( string $part ): bool => $part !== '' ) );
+			$index			= self::_directiveIndex( $directives, $directive );
+
+			if( $index === null ) {
+
+				foreach( self::FALLBACKS[$directive] ?? [] as $fallback ) {
+
+					$from = self::_directiveIndex( $directives, $fallback );
+
+					if( $from === null )
+						continue;
+
+					if( self::_closed( $directives[$from] ) === true )
+						return false;
+
+					// The fallback's own list, under this directive's name
+					$directives[]	= $directive. substr( $directives[$from], strlen( $fallback ) );
+					$index				= array_key_last( $directives );
+					break;
+				}
+
+				if( $index === null )
+					return false;
+			}
+			else if( self::_closed( $directives[$index] ) === true )
+				return false;
+
+			// A directive built from its fallback is new even when it adds nothing the
+			// fallback did not name - and then it changes nothing, so it is not written
+			if( in_array( strtolower( $source ), array_map( 'strtolower', preg_split( '/\s+/', $directives[$index] ) ?: [] ), true ) === true )
+				return false;
+
+			$directives[$index] .= ' '. $source;
+			$request['/nino/http/response']['header']['Content-Security-Policy'] = implode( '; ', $directives );
+
+			return true;
+		}
+
+		/**
+		 *	@param		array 		$directives		The parts of a policy, trimmed
+		 *	@param		string		$name					A directive
+		 *
+		 *	@return 	int|null									Where its first occurrence is
+		 */
+		private static function _directiveIndex( array $directives, string $name ): ?int {
+
+			foreach( $directives as $index => $part )
+				if( preg_match( '/^'. preg_quote( $name, '/' ). '(?:\s|$)/i', $part ) === 1 )
+					return $index;
+
+			return null;
+		}
+
+		/**
+		 *	@param		string		$part					One directive of a policy
+		 *
+		 *	@return 	bool											Whether it is closed: 'none', or a name with no source at all - which blocks everything just the same
+		 */
+		private static function _closed( string $part ): bool {
+
+			return preg_match( "/(?:^|\s)'none'(?:\s|\$)/i", $part ) === 1 || preg_match( '/^\S+$/D', $part ) === 1;
+		}
+
 		public static function requestRoute( array &$appData, string $uri, string $method ): ?array {
 
 			// Only normalized absolute request paths are routable. dirname('')
@@ -277,6 +519,139 @@ namespace Nino {
 					return $routeUri;
 
 			return null;
+		}
+
+		/**
+		 *	The pages among a table of routes, for a feature that lists or matches
+		 *	them - a sitemap, a menu of redirect targets, the pages behind a
+		 *	password. One row for every GET route that is a public address:
+		 *
+		 *	- 'path'			the address, without the directory, '/' for the root; a
+		 *								trailing '/*' is taken off
+		 *	- 'wildcard'	whether it had one - the route answers the whole subtree
+		 *	- 'uri'				the route's own 'uri' (the element it renders), else the path
+		 *	- 'locale'		the route's own 'locale', else ''
+		 *	- 'status'		its 'statusCode', 200 where it names none
+		 *	- 'html'			whether it answers html, see answersHtml()
+		 *
+		 *	Left out are the routes that are no page of the site: a method but
+		 *	GET, a path under '/_' or '/.' (the workbench, the module endpoints),
+		 *	one with whitespace, a control character or a '*' that is not its
+		 *	wildcard, and one that starts with '//' or '/\' (a browser reads that
+		 *	as the address of another host). Nothing else is filtered: a caller
+		 *	that does not want the 404 (a 'status' of 400 and above), a subtree or
+		 *	a response that is no html drops those rows itself, and each of the
+		 *	three that list pages wants another subset. The rows are in the order
+		 *	of the table.
+		 *
+		 *	Not the editor's list of pages of \Nino\Modules\Routes\Admin::pages(),
+		 *	which answers which routes are pages a person made.
+		 *
+		 *	@param		array 		$routes				A route table, eg. $appData['/nino/http/routes'], or the persisted one: AppData::stored( $appData, '/nino/http/routes', [] )
+		 *
+		 *	@return 	array										A list of rows
+		 */
+		public static function pages( array $routes ): array {
+
+			$pages = [];
+
+			foreach( $routes as $routeKey => $route ) {
+
+				if( is_string( $routeKey ) === false || str_starts_with( $routeKey, 'GET:/' ) === false || is_array( $route ) === false )
+					continue;
+
+				$path			= substr( $routeKey, strlen( 'GET:/' ) );
+
+				// '//x' and '/\x' are no path of this site: no request is routed to one, and
+				// written into a link a browser reads it as the address of another host
+				if( str_starts_with( $path, '//' ) === true || str_starts_with( $path, '/\\' ) === true )
+					continue;
+
+				$wildcard	= str_ends_with( $path, '/*' );
+
+				if( $wildcard === true ) {
+
+					$path = substr( $path, 0, -2 );
+
+					if( $path === '' )
+						$path = '/';
+				}
+
+				if( preg_match( '#^/[^\s\x00-\x1f\x7f*]*$#D', $path ) !== 1 || str_starts_with( $path, '/_' ) === true || str_starts_with( $path, '/.' ) === true )
+					continue;
+
+				$pages[] = [
+					'path'			=> $path,
+					'wildcard'	=> $wildcard,
+					'uri'				=> is_string( $route['uri'] ?? null ) === true && $route['uri'] !== '' ? $route['uri'] : $path,
+					'locale'		=> is_string( $route['locale'] ?? null ) === true ? $route['locale'] : '',
+					'status'		=> (int) ( $route['statusCode'] ?? 200 ),
+					'html'			=> self::answersHtml( $route ),
+				];
+			}
+
+			return $pages;
+		}
+
+		/**
+		 *	Whether a uri is one of the patterns of a list: the match a blacklist
+		 *	of the cache, an exclusion of a sitemap or a statistic and the paths
+		 *	of a protected area all make. A pattern is an exact uri ('/contact') or
+		 *	a subtree ('/blog/*', which covers /blog itself and everything below
+		 *	it, and not '/blogging'). Plain string work on purpose - a pattern is
+		 *	editable text, and handing editable text to preg_match() makes the
+		 *	expression itself an input. A pattern that is no string, or is empty,
+		 *	matches nothing.
+		 *
+		 *	@param		string		$uri					A request path without the directory, eg. '/blog/post-1'
+		 *	@param		array 		$patterns			Exact uris and subtrees
+		 *
+		 *	@return 	bool
+		 */
+		public static function matchesPath( string $uri, array $patterns ): bool {
+
+			foreach( $patterns as $pattern ) {
+
+				if( is_string( $pattern ) === false || $pattern === '' )
+					continue;
+
+				if( str_ends_with( $pattern, '/*' ) === false ) {
+					if( $uri === $pattern )
+						return true;
+					continue;
+				}
+
+				$prefix = substr( $pattern, 0, -2 );
+
+				if( $uri === $prefix || str_starts_with( $uri, $prefix. '/' ) === true )
+					return true;
+			}
+
+			return false;
+		}
+
+		/**
+		 *	Whether a route answers html - the one thing a visitor can be asked
+		 *	for a password in front of, or a sitemap lists. The first header the
+		 *	route names Content-Type (in any case of letters) decides: html is a
+		 *	value that starts with text/html, with a charset or not. A route that
+		 *	names none is a page, since html is what the kernel answers by
+		 *	default.
+		 *
+		 *	A response answers it the same way, its header being the same map:
+		 *	Http::answersHtml( $request['/nino/http/response'] ).
+		 *
+		 *	@param		array 		$route				A route, or a response, with an optional 'header' map
+		 *
+		 *	@return 	bool
+		 */
+		public static function answersHtml( array $route ): bool {
+
+			foreach( is_array( $route['header'] ?? null ) === true ? $route['header'] : [] as $name => $value )
+				if( is_string( $name ) === true && strtolower( $name ) === 'content-type' )
+					return is_string( $value ) === true && str_starts_with( strtolower( trim( $value ) ), 'text/html' ) === true;
+
+			return true;
 		}
 
 		public static function getRequest( array &$appData, int $offset = 0 ): array|false {
@@ -364,7 +739,7 @@ namespace Nino {
 		// Behind a reverse proxy (Cloudflare, a load balancer, ...) the peer
 		// address is the proxy's own for every single visitor, though, and
 		// then every per-ip rule in the site collapses into one bucket:
-		// Mail::_hit()'s send cap becomes a per-site cap, where five
+		// Mail's send cap becomes a per-site cap, where five
 		// contact-form submissions from anyone lock out every visitor's mail
 		// (newsletter confirmations included) for the rest of the window -
 		// silently, since a rate-limit refusal is not surfaced as an error.

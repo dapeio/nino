@@ -252,7 +252,7 @@ namespace Nino\Modules\Backups {
 			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
 				return;
 
-			$date = (string) ( \Nino\Admin\Admin::postData()['date'] ?? '' );
+			$date = \Nino\Admin\Admin::postString( \Nino\Admin\Admin::postData(), 'date' );
 
 			if( preg_match( self::ID_PATTERN, $date ) !== 1 ) {
 				\Nino\Http::fail( $request, 400, 'invalid date' );

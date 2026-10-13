@@ -14,6 +14,9 @@ return [
 	'requires'		=> [ 'helper' ],
 	// One file and one directory: a backup has to carry both shapes
 	'data'				=> [ '/data/sample.php', '/data/sample-dir' ],
+	// The files of its assets/ directory the site's bundles carry: a style sheet
+	// into the style bundle, a script into the script bundle
+	'assets'			=> [ '/features/Sample/assets/sample.css', '/features/Sample/assets/sample.js' ],
 	'settings'		=> [
 		'enabled'	=> [ 'type' => 'bool', 'label' => [ 'en_US' => 'Enabled', 'de_DE' => 'Aktiv' ], 'default' => true ],
 		'limit'		=> [ 'type' => 'int', 'label' => 'Limit', 'hint' => 'Items per page', 'min' => 1, 'max' => 50, 'unit' => 'items', 'default' => 10 ],
@@ -26,9 +29,10 @@ return [
 		'apiKey'	=> [ 'type' => 'secret', 'label' => 'API key' ],
 		'hosts'		=> [ 'type' => 'lines', 'label' => 'Hosts' ],
 	],
-	// A component and a stack, the way a feature declares them: the kernel
+	// Two components and a stack, the way a feature declares them: the kernel
 	// registers each as a shortcode whose renderer is componentGreeting() and
-	// stackRows() of the class
+	// stackRows() of the class - and componentCaption(), which the class does
+	// not have, so that the component falls back to its doShortcode()
 	'components'	=> [
 		'greeting'	=> [
 			'label'				=> [ 'en_US' => 'Greeting', 'de_DE' => 'Begrüßung' ],
@@ -42,6 +46,10 @@ return [
 			// Where the editor may put it and what it draws, the two keys the kernel's own titles carry
 			'in'					=> [ 'section', 'card' ],
 			'draws'				=> 'p .sample-greeting',
+		],
+		'caption'		=> [
+			'label'				=> [ 'en_US' => 'Caption', 'de_DE' => 'Beschriftung' ],
+			'source'			=> 'none',
 		],
 	],
 	'stacks'			=> [

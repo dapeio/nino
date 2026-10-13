@@ -433,6 +433,26 @@ namespace Nino {
 		}
 
 		/**
+		 *	Whether the CSRF guard refused this request: \Nino\Csrf sets the flag
+		 *	'./nino/csrf/blocked' beside the 403 it answers, and it stays set -
+		 *	a later callback that resets the status leaves the flag standing,
+		 *	which is what it is for. Every callback that writes or sends on a
+		 *	state-changing request asks it first. The status check beside it is
+		 *	another question: it says whether an earlier callback refused for
+		 *	any reason at all.
+		 *
+		 *	This class and not \Nino\Modules\Form, which owns the route.
+		 *
+		 *	@param		array 		$request			Current server request
+		 *
+		 *	@return 	bool
+		 */
+		public static function blocked( array $request ): bool {
+
+			return ( $request['./nino/csrf/blocked'] ?? false ) === true;
+		}
+
+		/**
 		 *	The whole endpoint: which form this is, whether the submission
 		 *	may pass, the mail pair it sends and the record it leaves.
 		 *	\Nino\Modules\Form hands POST /.form here; a listener registered
@@ -453,7 +473,7 @@ namespace Nino {
 			// guard sets a flag of its own, anything else simply left a status
 			// behind. Two checks rather than one because the flag survives a
 			// later handler resetting the status, which is what it is for
-			if( ( $request['./nino/csrf/blocked'] ?? false ) === true )
+			if( self::blocked( $request ) === true )
 				return;
 
 			if( (int) ( $request['/nino/http/response']['statusCode'] ?? 200 ) !== 200 )
@@ -497,7 +517,7 @@ namespace Nino {
 			// out and nothing was kept, and the visitor waited for a reply to
 			// a message nobody received. A 429, which the shared .nino-form
 			// script shows as the generic message, so the visitor tries later
-			if( ( $appData['./nino/mail/ratelimited'] ?? false ) === true ) {
+			if( \Nino\Mail::rateLimited( $appData ) === true ) {
 				$request['/nino/http/response']['statusCode'] = 429;
 				return;
 			}

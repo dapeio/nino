@@ -169,7 +169,7 @@ namespace Nino\Modules\Elements {
 			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
 				return;
 
-			$typeUri = (string) ( \Nino\Admin\Admin::postData()['uri'] ?? '' );
+			$typeUri = \Nino\Admin\Admin::postString( \Nino\Admin\Admin::postData(), 'uri' );
 
 			if( self::isValidTypeUri( $typeUri ) === false ) {
 				\Nino\Http::fail( $request, 400, 'invalid type uri', 'types_invalid_uri', [], 'uri' );
@@ -268,7 +268,7 @@ namespace Nino\Modules\Elements {
 					// The field that holds this picture's alt text, per language.
 					// Only kept as the name here: whether it names a field that can
 					// hold one is decided below, once the whole model is clean
-					$alt = trim( (string) ( $data['alt'] ?? '' ) );
+					$alt = trim( \Nino\Admin\Admin::postString( $data, 'alt' ) );
 					if( $alt !== '' )
 						$field['alt'] = $alt;
 				}
@@ -292,7 +292,7 @@ namespace Nino\Modules\Elements {
 						all: the dangling-reference check compared it against the
 						bare type uris on disk and refused every save, including
 						one that only changed the title.	*/
-					$field['elementType'] = trim( trim( (string) ( $data['elementType'] ?? '' ) ), '/' );
+					$field['elementType'] = trim( trim( \Nino\Admin\Admin::postString( $data, 'elementType' ) ), '/' );
 
 					// The type editor asks whether the reference is a list and
 					// where it stops as two controls; the model carries one int.
@@ -327,7 +327,7 @@ namespace Nino\Modules\Elements {
 				// "€") - for the types that render an input a unit can sit next
 				// to, see SUFFIX_TYPES
 				if( in_array( $data['type'], self::SUFFIX_TYPES, true ) === true ) {
-					$suffix = trim( (string) ( $data['suffix'] ?? '' ) );
+					$suffix = trim( \Nino\Admin\Admin::postString( $data, 'suffix' ) );
 					if( $suffix !== '' )
 						$field['suffix'] = $suffix;
 				}
@@ -447,7 +447,7 @@ namespace Nino\Modules\Elements {
 				return;
 
 			$data 	= \Nino\Admin\Admin::postData();
-			$typeUri = (string) ( $data['uri'] ?? '' );
+			$typeUri = \Nino\Admin\Admin::postString( $data, 'uri' );
 
 			if( self::isValidTypeUri( $typeUri ) === false ) {
 				\Nino\Http::fail( $request, 400, 'invalid type uri', 'types_invalid_uri', [], 'uri' );
@@ -487,7 +487,7 @@ namespace Nino\Modules\Elements {
 					return null;
 				}
 
-				$title 		= trim( (string) ( $data['title'] ?? '' ) );
+				$title 		= trim( \Nino\Admin\Admin::postString( $data, 'title' ) );
 				$oldModel = $typeData['model'] ?? [];
 				$newModel = self::cleanModel( $data['model'] );
 
@@ -856,7 +856,7 @@ namespace Nino\Modules\Elements {
 				return;
 
 			$data 		= \Nino\Admin\Admin::postData();
-			$typeUri 	= (string) ( $data['uri'] ?? '' );
+			$typeUri 	= \Nino\Admin\Admin::postString( $data, 'uri' );
 
 			if( self::isValidTypeUri( $typeUri ) === false ) {
 				\Nino\Http::fail( $request, 400, 'invalid type uri', 'types_invalid_uri', [], 'uri' );
@@ -868,7 +868,7 @@ namespace Nino\Modules\Elements {
 				return;
 			}
 
-			$title = trim( (string) ( $data['title'] ?? '' ) );
+			$title = trim( \Nino\Admin\Admin::postString( $data, 'title' ) );
 			$model = self::cleanModel( $data['model'] ?? [] );
 
 			$danglingReference = self::_unknownReferencedType( $appData, $model );
@@ -991,8 +991,8 @@ namespace Nino\Modules\Elements {
 				return;
 
 			$data 		= \Nino\Admin\Admin::postData();
-			$typeUri 	= (string) ( $data['uri'] ?? '' );
-			$confirm 	= (string) ( $data['confirm'] ?? '' );
+			$typeUri 	= \Nino\Admin\Admin::postString( $data, 'uri' );
+			$confirm 	= \Nino\Admin\Admin::postString( $data, 'confirm' );
 
 			if( in_array( $typeUri, Admin::types( $appData ), true ) === false ) {
 				\Nino\Http::fail( $request, 404, 'unknown element type' );

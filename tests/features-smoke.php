@@ -57,11 +57,11 @@ $warnings = ninoWarnings();
 
 check( 'dir() is the constant', \Nino\Features::dir() === __DIR__. '/fixtures/features' );
 check( 'a virtual /features path resolves there too, so a feature can name its own files', \Nino\Filesystem::path( $appData, '/features/Sample/feature.php' ) === __DIR__. '/fixtures/features/Sample/feature.php' );
-check( 'every readable manifest is listed, sorted by key', array_keys( $all ) === [ 'helper', 'old', 'sample' ] );
+check( 'every readable manifest is listed, sorted by key', array_keys( $all ) === [ 'helper', 'mute', 'old', 'sample', 'strict' ] );
 check( 'a directory whose manifest does not validate is skipped with a warning naming it', isset( $all['broken'] ) === false
 	&& count( array_filter( $warnings, static fn( string $w ): bool => str_contains( $w, '/Broken/feature.php' ) && str_contains( $w, 'version' ) ) ) === 1 );
 check( 'the module class is derived from the directory', $all['sample']['module'] === '\\Nino\\Modules\\Sample' && $all['helper']['module'] === '\\Nino\\Modules\\Helper' );
-check( 'the manifest is normalized: every key present', array_keys( $all['helper'] ) === [ 'key', 'dir', 'module', 'name', 'description', 'manual', 'category', 'maturity', 'version', 'nino', 'php', 'requires', 'data', 'settings', 'components', 'stacks', 'active', 'installed', 'update', 'problems' ]
+check( 'the manifest is normalized: every key present', array_keys( $all['helper'] ) === [ 'key', 'dir', 'module', 'name', 'description', 'manual', 'category', 'maturity', 'version', 'nino', 'php', 'requires', 'data', 'assets', 'settings', 'components', 'stacks', 'active', 'installed', 'update', 'problems' ]
 	&& $all['helper']['nino'] === '*' && $all['helper']['requires'] === [] && $all['helper']['settings'] === [] );
 check( 'nothing is active or recorded on a fresh project', $all['sample']['active'] === false && $all['sample']['installed'] === null && $all['sample']['update'] === false );
 check( 'a compatible feature has no problems', $all['sample']['problems'] === [] && $all['helper']['problems'] === [] );
@@ -143,6 +143,21 @@ check( 'data paths stay below /data/', manifestFails( $manifestDir, 'BadData', [
 	backup, and a restore wrote them back	*/
 check( '...and the data directory itself is not a path below itself', manifestFails( $manifestDir, 'RootData', [ 'name' => 'x', 'version' => '1.0.0', 'data' => [ '/data/' ] ], '"data"' )
 	&& manifestFails( $manifestDir, 'RootData2', [ 'name' => 'x', 'version' => '1.0.0', 'data' => [ '/data//' ] ], '"data"' ) );
+
+// The files a manifest puts into the bundles of the site are those of its own
+// assets/ directory, and style sheets or scripts: the directory is the
+// manifest's own, so that no manifest can name a file of another feature
+check( 'assets name the feature\'s own css and js files, in the order listed - a manifest that names none has none', \Nino\Features::manifest( writeManifest( $manifestDir, 'WithAssets', [ 'name' => 'x', 'version' => '1.0.0', 'assets' => [ '/features/WithAssets/assets/b.js', '/features/WithAssets/assets/css/a.css' ] ] ) )['assets'] === [ '/features/WithAssets/assets/b.js', '/features/WithAssets/assets/css/a.css' ]
+	&& \Nino\Features::manifest( $manifestDir. '/Mini' )['assets'] === [] && ninoWarnings() === [] );
+check( '...a file of another feature is refused, whatever the case of the directory', manifestFails( $manifestDir, 'OtherAssets', [ 'name' => 'x', 'version' => '1.0.0', 'assets' => [ '/features/Sample/assets/sample.css' ] ], '"assets"' )
+	&& manifestFails( $manifestDir, 'CaseAssets', [ 'name' => 'x', 'version' => '1.0.0', 'assets' => [ '/features/caseassets/assets/a.css' ] ], '"assets"' ) );
+check( '...so is a file that is neither css nor js', manifestFails( $manifestDir, 'PhpAssets', [ 'name' => 'x', 'version' => '1.0.0', 'assets' => [ '/features/PhpAssets/assets/shell.php' ] ], '"assets"' )
+	&& manifestFails( $manifestDir, 'BareAssets', [ 'name' => 'x', 'version' => '1.0.0', 'assets' => [ '/features/BareAssets/assets/style' ] ], '"assets"' ) );
+check( '...one that climbs out of the directory, or hides', manifestFails( $manifestDir, 'DotAssets', [ 'name' => 'x', 'version' => '1.0.0', 'assets' => [ '/features/DotAssets/assets/sub/../../feature.js' ] ], '"assets"' )
+	&& manifestFails( $manifestDir, 'UpAssets', [ 'name' => 'x', 'version' => '1.0.0', 'assets' => [ '/features/UpAssets/assets/../x.js' ] ], '"assets"' )
+	&& manifestFails( $manifestDir, 'HiddenAssets', [ 'name' => 'x', 'version' => '1.0.0', 'assets' => [ '/features/HiddenAssets/assets/.hidden.css' ] ], '"assets"' ) );
+check( '...and an entry that is no path at all', manifestFails( $manifestDir, 'ArrayAssets', [ 'name' => 'x', 'version' => '1.0.0', 'assets' => [ [ '/features/ArrayAssets/assets/a.css' ] ] ], '"assets"' )
+	&& manifestFails( $manifestDir, 'TextAssets', [ 'name' => 'x', 'version' => '1.0.0', 'assets' => [ 'a.css' ] ], '"assets"' ) );
 
 // The components and the stacks a manifest declares are read by the schema the
 // Components module registers them by, so a bad one is refused here, with the
@@ -334,6 +349,17 @@ check( 'a schema comes back normalized', ( static function() use ( $all ): bool 
 		&& $s['apiKey'] === [ 'type' => 'secret', 'label' => 'API key', 'hint' => '', 'required' => false, 'maxlength' => 1000 ]
 		&& $s['mode']['options']['fast'] === 'Fast' && $s['title']['required'] === true && $s['notes']['maxlength'] === 10000;
 } )() );
+
+// The Features panel puts a unit behind the value of a setting, and says it in
+// the words of the workbench: Nino.content.getText( '/_admin/common/unit/<unit>' ).
+// A unit the workbench has no word for is shown as the manifest wrote it
+foreach( [ 'en_US', 'de_DE' ] as $unitLanguage ) {
+
+	$unitFills = (array) require __DIR__. '/../_admin/text/'. $unitLanguage. '.php';
+
+	check( 'the workbench has a word in '. $unitLanguage. ' for each unit a manifest may name', array_filter( [ 'seconds', 'minutes', 'hours', 'days', 'weeks', 'months', 'items', 'uris', 'per-hour', 'percent', 'characters' ],
+		static fn( string $unit ): bool => is_string( $unitFills[ '[[/_admin/common/unit/'. $unit. ']]'] ?? null ) === false || $unitFills[ '[[/_admin/common/unit/'. $unit. ']]'] === '' ) === [] );
+}
 
 echo "\n";
 
@@ -527,7 +553,7 @@ check( 'a shortcode belongs to the feature whose class answers it, a closure inc
 // that are listed in '/nino/modules' and for no other
 echo "Features::registerComponents - the components and stacks of a manifest\n";
 
-check( 'the reference feature declares a component and a stack, a feature without the keys none', array_keys( $all['sample']['components'] ) === [ 'greeting' ] && array_keys( $all['sample']['stacks'] ) === [ 'rows' ]
+check( 'the reference feature declares two components and a stack, a feature without the keys none', array_keys( $all['sample']['components'] ) === [ 'greeting', 'caption' ] && array_keys( $all['sample']['stacks'] ) === [ 'rows' ]
 	&& $all['helper']['components'] === [] && $all['helper']['stacks'] === [] );
 
 ninoWarnings();
@@ -540,7 +566,7 @@ check( 'a feature that is not listed registers nothing, and one that declares no
 
 $declared['/nino/modules'] = [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Sample' ];
 \Nino\Features::registerComponents( $declared );
-check( 'a listed feature\'s components and stacks are registered with the schema of its manifest', array_keys( \Nino\Modules\Components::components( $declared ) ) === [ 'greeting' ] && array_keys( \Nino\Modules\Components::stacks( $declared ) ) === [ 'rows' ]
+check( 'a listed feature\'s components and stacks are registered with the schema of its manifest', array_keys( \Nino\Modules\Components::components( $declared ) ) === [ 'greeting', 'caption' ] && array_keys( \Nino\Modules\Components::stacks( $declared ) ) === [ 'rows' ]
 	&& \Nino\Modules\Components::components( $declared )['greeting'] === $all['sample']['components']['greeting'] && \Nino\Modules\Components::stacks( $declared )['rows'] === $all['sample']['stacks']['rows']
 	&& \Nino\Modules\Components::defaults( $declared, 'greeting' ) === [ 'shout' => '0', 'class' => '' ] && ninoWarnings() === [] );
 check( '...and the places and the drawing of a component arrive in the registry with it, as the Builder reads them',
@@ -556,9 +582,305 @@ check( 'the renderer is componentGreeting() of the class: the name in studly cap
 \Nino\Elements::insertElement( $declared, '/rowtype/one', [ 'title' => 'One' ], 'de_DE' );
 \Nino\Elements::insertElement( $declared, '/rowtype/two', [ 'title' => 'Two' ], 'de_DE' );
 check( 'a stack of a feature loops the elements through the kernel\'s renderStack()', \Nino\Html::renderHtml( $declared, '[rows /rowtype sort="-title"][greeting title][/rows]' ) === '<div class="sample-rows"><span><p class="sample-greeting">Two</p></span><span><p class="sample-greeting">One</p></span></div>' );
-check( '...and the shortcodes are the feature\'s: the class of the renderer is what says whose they are', \Nino\Features::shortcodes( $declared, 'sample' ) === [ 'greeting', 'rows' ] );
+check( '...and the shortcodes are the feature\'s: the class of the renderer is what says whose they are', \Nino\Features::shortcodes( $declared, 'sample' ) === [ 'caption', 'greeting', 'rows' ] );
+
+// A component whose class has no renderer of its name is rendered by the
+// class's doShortcode(), the method that is also the shortcode a feature would
+// write by hand: Sample has no componentCaption(), and [caption] answers what
+// doShortcode() does
+check( 'a component whose class has no renderer of its name is rendered by the class\'s doShortcode()', \Nino\Modules\Components::components( $declared )['caption']['source'] === 'none'
+	&& \Nino\Html::renderHtml( $declared, '[caption]' ) === \Nino\Modules\Sample::doShortcode( $declared, [] ) && \Nino\Html::renderHtml( $declared, '[caption]' ) !== '' );
+check( '...the renderer a class does name still wins over its doShortcode()', \Nino\Html::renderHtml( $declared, '[greeting /feature/sample/greeting/text]' ) === '<p class="sample-greeting">Hello &#91;there]</p>' );
+
+// ...and where the class has neither, the component is skipped with the warning
+// that names the renderer it looked for, and nothing is registered
+$declared['/nino/modules'] = [ '\\Nino\\Modules\\Mute' ];
+$mute = ninoErrors( function() use ( &$declared ) { \Nino\Features::registerComponents( $declared ); } );
+check( 'a component whose class has neither a renderer nor doShortcode() is a warning that names the renderer it looked for', count( $mute ) === 1 && $mute[0][0] === E_USER_WARNING
+	&& str_contains( $mute[0][1], '"chime"' ) === true && str_contains( $mute[0][1], 'Mute::componentChime()' ) === true );
+check( '...and the component is not registered, so that no shortcode answers for it', isset( \Nino\Modules\Components::components( $declared )['chime'] ) === false && \Nino\Features::shortcodes( $declared, 'mute' ) === [] );
+
+// A stack keeps the strict rule: the fallback to doShortcode() is a component's.
+// Strict has a doShortcode() and no stackLedger()
+$declared['/nino/modules'] = [ '\\Nino\\Modules\\Strict' ];
+$strict = ninoErrors( function() use ( &$declared ) { \Nino\Features::registerComponents( $declared ); } );
+check( 'a stack whose class has no renderer of its name is skipped with the warning, though the class has a doShortcode() - the fallback is a component\'s', count( $strict ) === 1 && $strict[0][0] === E_USER_WARNING
+	&& str_contains( $strict[0][1], '"ledger"' ) === true && str_contains( $strict[0][1], 'Strict::stackLedger()' ) === true
+	&& isset( \Nino\Modules\Components::stacks( $declared )['ledger'] ) === false && \Nino\Features::shortcodes( $declared, 'strict' ) === [] );
+$declared['/nino/modules'] = [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Sample' ];
 
 echo "\n";
+
+
+// --- The files of a manifest in the two bundles -------------------------------
+
+echo "Features::registerAssets - the files a manifest names go into the two bundles\n";
+
+$bundled = ninoSandbox( 'assets' );
+$bundled['/nino/dir'] = '';
+
+\Nino\Features::registerAssets( $bundled );
+$bundled['/nino/modules'] = [ '\\Nino\\Modules\\Helper' ];
+\Nino\Features::registerAssets( $bundled );
+check( 'a feature that is not listed, and one that names no assets, add nothing to the bundles', ( $bundled['/nino/html/assets'] ?? [] ) === [] );
+
+$bundled['/nino/modules'] = [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Sample' ];
+\Nino\Features::registerAssets( $bundled );
+\Nino\Features::registerAssets( $bundled );
+check( 'the css a listed feature names lands in the style bundle and its js in the script bundle, once each however often it is asked', $bundled['/nino/html/assets'] === [
+	'/.cache/style.css'	=> [ '/features/Sample/assets/sample.css' ],
+	'/.cache/script.js'	=> [ '/features/Sample/assets/sample.js' ],
+] );
+check( '...and each of them is a file of the feature, below the features directory', array_filter( array_merge( ...array_values( $bundled['/nino/html/assets'] ) ),
+	static fn( string $path ): bool => is_file( \Nino\Filesystem::path( $bundled, $path ) ) === false || str_starts_with( \Nino\Filesystem::path( $bundled, $path ), \Nino\Features::dir(). '/Sample/assets/' ) === false ) === [] );
+
+\Nino\Modules\Assets::doShortcode( $bundled, [ '/.cache/style.css' ] );
+\Nino\Modules\Assets::doShortcode( $bundled, [ '/.cache/script.js' ] );
+check( 'the bundles the Assets module builds carry them: the style bundle the css of the feature, the script bundle its js',
+	str_contains( (string) file_get_contents( \Nino\Filesystem::path( $bundled, '/.cache/style.css' ) ), trim( (string) file_get_contents( __DIR__. '/fixtures/features/Sample/assets/sample.css' ) ) ) === true
+	&& str_contains( (string) file_get_contents( \Nino\Filesystem::path( $bundled, '/.cache/script.js' ) ), trim( (string) file_get_contents( __DIR__. '/fixtures/features/Sample/assets/sample.js' ) ) ) === true );
+\Nino\Filesystem::removeDir( ninoSandboxDir( $bundled ) );
+
+// A boot asks for the listed features twice - the files of the bundles, then the
+// components - and a manifest that does not validate is said once, as it was when
+// only the components asked
+$asked = ninoSandbox( 'assets-asked' );
+$asked['/nino/dir'] = '';
+\Nino\Html::init( $asked );
+$asked['/nino/modules'] = [ '\\Nino\\Modules\\Broken', '\\Nino\\Modules\\Sample' ];
+$askedErrors = ninoErrors( function() use ( &$asked ) { \Nino\Features::registerAssets( $asked ); \Nino\Features::registerComponents( $asked ); } );
+check( 'a listed manifest that does not validate is said once per boot, though the bundles and the components both ask for it - and the features after it are read all the same', count( $askedErrors ) === 1 && $askedErrors[0][0] === E_USER_WARNING
+	&& str_contains( $askedErrors[0][1], '/Broken/feature.php' ) === true && ( $asked['/nino/html/assets']['/.cache/style.css'] ?? [] ) === [ '/features/Sample/assets/sample.css' ]
+	&& isset( \Nino\Modules\Components::components( $asked )['greeting'] ) === true );
+\Nino\Filesystem::removeDir( ninoSandboxDir( $asked ) );
+
+// The boot itself, in a process of its own: \Nino\init() over a project whose config.php lists the feature.
+// The files of the manifest come after the ones the kernel puts in the bundles and before whatever a module
+// adds in its init() - Sample adds one - and the components of the manifest are registered by then
+$bootDir = $sandbox. '/boot';
+mkdir( $bootDir. '/private', 0755, true );
+file_put_contents( $bootDir. '/private/config.php', '<?php return '. var_export( [
+	'/nino/modules'							=> [ '\\Nino\\Modules\\Sample' ],
+	'/nino/locales/available'		=> [ 'de_DE', 'en_US' ],
+	'/nino/locales/native'			=> 'de_DE',
+	'/nino/install/completed'		=> true,
+], true ). ';' );
+file_put_contents( $bootDir. '/boot.php', '<?php declare(strict_types=1);
+define( \'NINO_FEATURES_DIR\', '. var_export( __DIR__. '/fixtures/features', true ). ' );
+define( \'NINO_PRIVATE_DIR\', '. var_export( $bootDir. '/private', true ). ' );
+require '. var_export( dirname( __DIR__ ). '/_nino/Nino.php', true ). ';
+$appData = \\Nino\\init();
+echo json_encode( [ $appData[\'/nino/html/assets\'], \\Nino\\Html::shortcodes( $appData ) ] );' );
+$booted = json_decode( (string) shell_exec( escapeshellarg( PHP_BINARY ). ' '. escapeshellarg( $bootDir. '/boot.php' ). ' 2>/dev/null' ), true ) ?? [];
+check( 'a boot lists the files of an active feature in the two bundles - behind the kernel\'s own, ahead of what its class adds itself, once each - and has its components registered', ( $booted[0]['/.cache/style.css'] ?? [] ) === [ '/_nino/Nino.css', '/features/Sample/assets/sample.css' ]
+	&& ( $booted[0]['/.cache/script.js'] ?? [] ) === [ '/_nino/Nino.js', '/_nino/Nino.ui.js', '/features/Sample/assets/sample.js', '/features/Sample/assets/late.js' ] && array_diff( [ 'greeting', 'caption', 'sample' ], $booted[1] ?? [] ) === [] );
+
+echo "\n";
+
+// --- The toolset of a feature ------------------------------------------------
+
+echo "\\Nino\\Feature - the toolset of a feature\n";
+
+$toolset = ninoSandbox( 'toolset' );
+$toolset['/nino/dir'] = '';
+\Nino\Html::init( $toolset );
+
+/**
+ *	One call of the toolset and the errors it raised: [ answer, [ [ level, message ], ... ] ]
+ *	- a helper that refuses says so in a warning, and the checks read both
+ */
+function toolsetCall( array &$appData, callable $run ): array {
+	$answer = null;
+	$errors = ninoErrors( function() use ( &$appData, $run, &$answer ) { $answer = $run( $appData ); } );
+	return [ $answer, $errors ];
+}
+
+// template(): the markup a feature keeps in a file of its own
+$toolNotice = (string) file_get_contents( __DIR__. '/fixtures/features/Sample/templates/notice.tpl' );
+[ $toolMarkup, $toolErrors ] = toolsetCall( $toolset, static fn( array &$appData ): string => \Nino\Feature::template( $appData, '/features/Sample/templates', 'notice' ) );
+check( 'template() reads <name>.tpl from the directory it is given, through the virtual path - the final newline gone, every other byte kept', str_ends_with( $toolNotice, "\n" ) === true
+	&& $toolMarkup === substr( $toolNotice, 0, -1 ) && $toolMarkup !== '' && $toolErrors === [] );
+
+\Nino\Filesystem::putFileContent( $toolset, '/templates/multi.tpl', "<ul>\n\t<li>[[text]]</li>\n</ul>\n\n" );
+\Nino\Filesystem::putFileContent( $toolset, '/templates/empty.tpl', '' );
+// Files a name that is no slug would find: one in another directory, one in capitals, one with an underscore
+\Nino\Filesystem::putFileContent( $toolset, '/templates/deep/inner.tpl', '<p>inner</p>' );
+\Nino\Filesystem::putFileContent( $toolset, '/templates/Page.tpl', '<p>page</p>' );
+\Nino\Filesystem::putFileContent( $toolset, '/templates/a_b.tpl', '<p>a_b</p>' );
+check( '...only the newlines at the end go: those inside the markup, and its tabs, are the markup', \Nino\Feature::template( $toolset, '/templates', 'multi' ) === "<ul>\n\t<li>[[text]]</li>\n</ul>" );
+\Nino\Filesystem::putFileContent( $toolset, '/templates/edges.tpl', "\n  <p>x</p>\t \n" );
+check( '...and nothing else: a newline or an indent in front of the markup, a tab or a space in front of the last newline, are the markup too', \Nino\Feature::template( $toolset, '/templates', 'edges' ) === "\n  <p>x</p>\t " );
+
+[ $toolMarkup, $toolErrors ] = toolsetCall( $toolset, static fn( array &$appData ): string => \Nino\Feature::template( $appData, '/features/Sample/templates', 'missing' ) );
+check( 'a template that is not there is an empty string and a warning that names its path', $toolMarkup === '' && count( $toolErrors ) === 1 && $toolErrors[0][0] === E_USER_WARNING
+	&& str_contains( $toolErrors[0][1], '/features/Sample/templates/missing.tpl' ) === true );
+[ $toolMarkup, $toolErrors ] = toolsetCall( $toolset, static fn( array &$appData ): string => \Nino\Feature::template( $appData, '/templates', 'empty' ) );
+check( '...as is one that is empty', $toolMarkup === '' && count( $toolErrors ) === 1 && $toolErrors[0][0] === E_USER_WARNING && str_contains( $toolErrors[0][1], '/templates/empty.tpl' ) === true );
+
+$toolRefused = [];
+foreach( [ 'deep/inner', 'Page', 'a_b', '../x', 'multi.tpl', '', "multi\n" ] as $toolName ) {
+	[ $toolMarkup, $toolErrors ] = toolsetCall( $toolset, static fn( array &$appData ): string => \Nino\Feature::template( $appData, '/templates', $toolName ) );
+	if( $toolMarkup !== '' || count( $toolErrors ) !== 1 || $toolErrors[0][0] !== E_USER_WARNING )
+		$toolRefused[] = $toolName;
+}
+check( 'a name that is no slug - a path, a capital, an underscore, an extension, nothing, a trailing newline - is a warning and an empty string, though the file it names is there', $toolRefused === []
+	&& \Nino\Filesystem::getFileContent( $toolset, '/templates/deep/inner.tpl', '' ) === '<p>inner</p>' && \Nino\Filesystem::getFileContent( $toolset, '/templates/Page.tpl', '' ) === '<p>page</p>' );
+[ $toolMarkup, $toolErrors ] = toolsetCall( $toolset, static fn( array &$appData ): string => \Nino\Feature::template( $appData, '/features/Sample/../Helper', 'notice' ) );
+check( 'a directory that climbs out of the features is read as getFileContent() reads it: not at all', $toolMarkup === '' && $toolErrors !== [] );
+
+// classes(): the value of a class attribute, as the arguments of a shortcode give it
+check( 'classes() is nothing where there is no class argument, or a blank one', \Nino\Feature::classes( [] ) === '' && \Nino\Feature::classes( [ 'class' => '' ] ) === '' && \Nino\Feature::classes( [ 'class' => " \t " ] ) === '' );
+check( '...a space and the classes otherwise, trimmed - the space is what a template\'s attribute is written to take', \Nino\Feature::classes( [ 'class' => '  wide dark ' ] ) === ' wide dark' );
+check( '...escaped as the Components module escapes: a [ is written as &#91;, so that the next pass cannot read a fill or a shortcode in it', \Nino\Feature::classes( [ 'class' => 'a[b' ] ) === ' a&#91;b'
+	&& \Nino\Feature::classes( [ 'class' => 'x"y<z' ] ) === ' '. \Nino\Modules\Components::escape( 'x"y<z' ) && str_contains( \Nino\Feature::classes( [ 'class' => 'x"y<z' ] ), '"' ) === false );
+
+// flag(): a bare word and a named value, read through the shortcode parser
+\Nino\Html::addShortcode( $toolset, 'flagprobe', static fn( array &$appData, array $args ): string => \Nino\Feature::flag( $args, 'block' ) === true ? 'on' : 'off' );
+\Nino\Html::addShortcode( $toolset, 'flagdefault', static fn( array &$appData, array $args ): string => \Nino\Feature::flag( $args, 'block', true ) === true ? 'on' : 'off' );
+check( 'flag() takes a bare word as on', \Nino\Html::renderHtml( $toolset, '[flagprobe block]' ) === 'on' && \Nino\Html::renderHtml( $toolset, '[flagprobe wide block]' ) === 'on' && \Nino\Html::renderHtml( $toolset, '[flagprobe wide]' ) === 'off' );
+check( '...a named value by the words of a bool attribute: yes, on, true and 1 are on, no, off, false and 0 are off',
+	array_filter( \Nino\Modules\Components::ON, static fn( string $word ): bool => \Nino\Html::renderHtml( $toolset, '[flagprobe block="'. $word. '"]' ) !== 'on' ) === []
+	&& array_filter( \Nino\Modules\Components::OFF, static fn( string $word ): bool => \Nino\Html::renderHtml( $toolset, '[flagdefault block="'. $word. '"]' ) !== 'off' ) === [] );
+check( '...whatever the case of the letters, and with a space around the word', \Nino\Html::renderHtml( $toolset, '[flagdefault block="OFF"]' ) === 'off' && \Nino\Html::renderHtml( $toolset, '[flagprobe block=" Yes "]' ) === 'on' && \Nino\Html::renderHtml( $toolset, '[flagdefault block=" no "]' ) === 'off' );
+check( '...any other word, and an argument that is not there, give the default - which is off unless it is asked to be on', \Nino\Html::renderHtml( $toolset, '[flagprobe block="maybe"]' ) === 'off' && \Nino\Html::renderHtml( $toolset, '[flagdefault block="maybe"]' ) === 'on'
+	&& \Nino\Html::renderHtml( $toolset, '[flagprobe]' ) === 'off' && \Nino\Html::renderHtml( $toolset, '[flagdefault]' ) === 'on' );
+check( '...a value that is no string, too', \Nino\Feature::flag( [ 'block' => [ 'yes' ] ], 'block' ) === false && \Nino\Feature::flag( [ 'block' => [ 'no' ] ], 'block', true ) === true && \Nino\Feature::flag( [ 'block' => true ], 'block' ) === false );
+
+// origin(): the https origin of an address, or nothing a policy could be widened by
+check( 'origin() is the scheme and host of an https address, the port kept - and lower case', \Nino\Feature::origin( 'https://player.example.com/embed/7?x=1#t' ) === 'https://player.example.com'
+	&& \Nino\Feature::origin( 'https://Player.Example.COM:8443/x' ) === 'https://player.example.com:8443' );
+check( '...none for anything but https, an address with credentials, or a host that is not a plain name', array_filter( [
+	'http://player.example.com/', 'ftp://player.example.com/', '//player.example.com/', 'player.example.com', 'javascript:alert(1)', '',
+	'https://user@player.example.com/', 'https://user:pw@player.example.com/',
+	'https://127.0.0.1/', 'https://[::1]/', 'https://0x7f000001/', 'https://example.123/', 'https://*.example.com/', 'https://exa mple.com/',
+	'https://-a.example.com/', 'https://a-.example.com/', 'https://bücher.example/', 'https://a.example.com;b.example.com/', "https://player.example.com\n",
+], static fn( string $address ): bool => \Nino\Feature::origin( $address ) !== '' ) === [] );
+
+// allowSource() and allowOrigin(): widening the Content-Security-Policy of one response
+$toolPolicy = static fn( array $request ): string => (string) ( $request['/nino/http/response']['header']['Content-Security-Policy'] ?? '' );
+$toolWith 	= static fn( mixed $policy ): array => [ '/nino/http/response' => [ 'header' => [ 'Content-Security-Policy' => $policy ] ] ];
+$toolKernel = $toolPolicy( ninoVisit( $toolset, '/' ) );
+
+$toolOrigin = $toolWith( $toolKernel );
+check( 'allowOrigin() widens by the origin of an address - not by the address', \Nino\Feature::allowOrigin( $toolOrigin, 'frame-src', 'https://Player.example.com:8443/embed/7?x=1#t' ) === true
+	&& $toolPolicy( $toolOrigin ) === $toolKernel. "; frame-src 'self' https://player.example.com:8443" );
+check( '...and an address that is no origin changes nothing, and is not a warning', array_filter( [ 'http://player.example.com/', 'https://user@player.example.com/', 'https://127.0.0.1/', 'not an address', '' ], static function( string $address ) use ( $toolWith, $toolKernel, $toolPolicy ): bool {
+	$request = $toolWith( $toolKernel );
+	[ $changed, $errors ] = toolsetCall( $request, static fn( array &$request ): bool => \Nino\Feature::allowOrigin( $request, 'frame-src', $address ) );
+	return $changed !== false || $errors !== [] || $toolPolicy( $request ) !== $toolKernel;
+} ) === [] );
+
+// ...and the way a feature does it: a callback of the response, which has the request in hand
+$toolServed = $toolset;
+$toolServed['/nino/http/routes'] = [ 'GET://' => [ 'uri' => '/home', 'body' => '' ] ];
+\Nino\Callbacks::registerCallback( $toolServed, '/nino/http/response', static function( array &$appData, array &$request ): void {
+	\Nino\Feature::allowOrigin( $request, 'frame-src', 'https://player.example.com/embed/7' );
+}, 5 );
+$toolPage = ninoVisit( $toolServed, '/' );
+\Nino\Http::response( $toolServed, $toolPage );
+check( 'a callback of the response that widens the policy changes the policy the response goes out with', $toolPolicy( $toolPage ) === $toolKernel. "; frame-src 'self' https://player.example.com" && $toolPage['/nino/http/response']['statusCode'] === 200 );
+
+// count(), spent() and forget(): a counter per client, in a window
+$toolClient = '203.0.113.7';
+$toolHash = hash( 'sha256', $toolClient );
+$toolFile = '/data/tries.php';
+
+$toolAlong = [];
+foreach( [ 'spent', 'count', 'spent', 'count', 'spent', 'count' ] as $toolStep )
+	$toolAlong[] = $toolStep === 'count' ? \Nino\Feature::count( $toolset, 'tries', $toolClient, 2, 3600 ) : \Nino\Feature::spent( $toolset, 'tries', $toolClient, 2 );
+check( 'at a limit of 2 count() answers true, true, false - and spent(), which counts nothing, false, false, true in between', $toolAlong === [ false, true, false, true, true, false ] );
+
+$toolState = \Nino\Filesystem::getFileContent( $toolset, $toolFile, [] );
+check( 'every try is counted, the refused one too - and the counter holds nothing but the client, under the sha256 of its key', array_keys( $toolState ) === [ $toolHash ] && $toolState[$toolHash]['tries'] === 3 );
+check( '...a key of 64 hex characters, and the key itself is in no byte of the file', preg_match( '/^[0-9a-f]{64}$/D', (string) array_key_first( $toolState ) ) === 1 && str_contains( (string) file_get_contents( \Nino\Filesystem::path( $toolset, $toolFile ) ), $toolClient ) === false );
+check( '...whose window the first try opened, for the seconds asked', $toolState[$toolHash]['reset'] - time() > 3590 && $toolState[$toolHash]['reset'] - time() <= 3600 );
+$toolSoon = time() + 100;
+\Nino\Filesystem::putFileContent( $toolset, '/data/fixed.php', [ hash( 'sha256', 'c' ) => [ 'tries' => 1, 'reset' => $toolSoon ] ] );
+\Nino\Feature::count( $toolset, 'fixed', 'c', 5, 3600 );
+check( '...and a later try inside an open window counts without moving its end', \Nino\Filesystem::getFileContent( $toolset, '/data/fixed.php', [] )[ hash( 'sha256', 'c' ) ] === [ 'tries' => 2, 'reset' => $toolSoon ] );
+check( 'another client has a budget of its own', \Nino\Feature::count( $toolset, 'tries', '203.0.113.8', 2, 3600 ) === true && \Nino\Feature::spent( $toolset, 'tries', '203.0.113.8', 2 ) === false && \Nino\Feature::spent( $toolset, 'tries', $toolClient, 2 ) === true );
+check( 'spent() of a limit of 0 or less is false, whatever has been tried', \Nino\Feature::spent( $toolset, 'tries', $toolClient, 0 ) === false && \Nino\Feature::spent( $toolset, 'tries', $toolClient, -1 ) === false );
+
+$toolState = \Nino\Filesystem::getFileContent( $toolset, $toolFile, [] );
+$toolState[$toolHash]['reset'] = time() - 1;
+\Nino\Filesystem::putFileContent( $toolset, $toolFile, $toolState );
+check( 'a client whose window is over has spent nothing, and its next try opens a new window with a count of one', \Nino\Feature::spent( $toolset, 'tries', $toolClient, 2 ) === false && \Nino\Feature::count( $toolset, 'tries', $toolClient, 2, 3600 ) === true
+	&& \Nino\Filesystem::getFileContent( $toolset, $toolFile, [] )[$toolHash]['tries'] === 1 );
+
+\Nino\Feature::forget( $toolset, 'tries', $toolClient );
+$toolState = \Nino\Filesystem::getFileContent( $toolset, $toolFile, [] );
+check( 'forget() lets a client go: its entry leaves the file, the others stay, and its next try opens a window of its own', isset( $toolState[$toolHash] ) === false && isset( $toolState[ hash( 'sha256', '203.0.113.8' ) ] ) === true
+	&& \Nino\Feature::count( $toolset, 'tries', $toolClient, 2, 3600 ) === true && \Nino\Filesystem::getFileContent( $toolset, $toolFile, [] )[$toolHash]['tries'] === 1 );
+
+$toolPath = \Nino\Filesystem::path( $toolset, $toolFile );
+touch( $toolPath, time() - 500 );
+clearstatcache();
+$toolMtime = filemtime( $toolPath );
+\Nino\Feature::forget( $toolset, 'tries', 'nobody-counted-this' );
+clearstatcache();
+check( 'forget() of a client that has no entry writes nothing', filemtime( $toolPath ) === $toolMtime );
+\Nino\Feature::forget( $toolset, 'never-written', $toolClient );
+check( '...and makes no file of a counter that was never written', is_file( \Nino\Filesystem::path( $toolset, '/data/never-written.php' ) ) === false );
+
+\Nino\Filesystem::putFileContent( $toolset, '/data/prune.php', [
+	hash( 'sha256', 'stale' )	=> [ 'tries' => 9, 'reset' => time() - 10 ],
+	'junk'										=> 'not an entry',
+	hash( 'sha256', 'open' )	=> [ 'tries' => 1, 'reset' => time() + 600 ],
+] );
+\Nino\Feature::count( $toolset, 'prune', 'fresh', 5, 60 );
+check( 'the next write drops every entry whose window is over and whatever is no entry, and keeps those still open', array_keys( \Nino\Filesystem::getFileContent( $toolset, '/data/prune.php', [] ) ) === [ hash( 'sha256', 'open' ), hash( 'sha256', 'fresh' ) ] );
+\Nino\Filesystem::putFileContent( $toolset, '/data/prune.php', [
+	hash( 'sha256', 'stale' )	=> [ 'tries' => 9, 'reset' => time() - 10 ],
+	hash( 'sha256', 'open' )	=> [ 'tries' => 1, 'reset' => time() + 600 ],
+	hash( 'sha256', 'gone' )	=> [ 'tries' => 1, 'reset' => time() + 600 ],
+] );
+\Nino\Feature::forget( $toolset, 'prune', 'gone' );
+check( '...and so does forget(), where it writes', array_keys( \Nino\Filesystem::getFileContent( $toolset, '/data/prune.php', [] ) ) === [ hash( 'sha256', 'open' ) ] );
+
+\Nino\Filesystem::putFileContent( $toolset, '/data/corrupt.php', 'not an array' );
+check( 'a counter file that holds anything but an array counts from zero instead of taking the request down', \Nino\Feature::spent( $toolset, 'corrupt', $toolClient, 1 ) === false
+	&& \Nino\Feature::count( $toolset, 'corrupt', $toolClient, 1, 60 ) === true && \Nino\Feature::count( $toolset, 'corrupt', $toolClient, 1, 60 ) === false );
+check( 'a limit of 0 or less is no limit: always true, and nothing is written', \Nino\Feature::count( $toolset, 'unlimited', $toolClient, 0, 60 ) === true && \Nino\Feature::count( $toolset, 'unlimited', $toolClient, -3, 60 ) === true
+	&& \Nino\Feature::spent( $toolset, 'unlimited', $toolClient, 0 ) === false && is_file( \Nino\Filesystem::path( $toolset, '/data/unlimited.php' ) ) === false );
+
+// A directory where the sidecar lock goes: lockFile() cannot open it, which is what a counter on a disk that cannot be written looks like
+$toolLock = \Nino\Filesystem::path( $toolset, '/data/.locks' ). '/'. sha1( '/data/locked.php' ). '.lock';
+\Nino\Filesystem::forceDir( $toolset, '/data/.locks' );
+@mkdir( $toolLock );
+check( 'a counter whose lock cannot be taken has no budget to give: false, and nothing is written', \Nino\Feature::count( $toolset, 'locked', $toolClient, 5, 60 ) === false && is_file( \Nino\Filesystem::path( $toolset, '/data/locked.php' ) ) === false );
+@rmdir( $toolLock );
+unset( $toolset['./nino/filesystem/locks'], $toolset['./nino/filesystem/cache'] );
+check( '...and counts again once it can', \Nino\Feature::count( $toolset, 'locked', $toolClient, 5, 60 ) === true );
+
+$toolBad = [];
+foreach( [ 'Bad Name', '../x', 'a_b', 'x.php', '' ] as $toolName ) {
+	[ $toolCounted, $toolCountErrors ] = toolsetCall( $toolset, static fn( array &$appData ): bool => \Nino\Feature::count( $appData, $toolName, 'k', 5, 60 ) );
+	[ $toolSpent, $toolSpentErrors ] = toolsetCall( $toolset, static fn( array &$appData ): bool => \Nino\Feature::spent( $appData, $toolName, 'k', 5 ) );
+	[ , $toolForgetErrors ] = toolsetCall( $toolset, static function( array &$appData ) use ( $toolName ): void { \Nino\Feature::forget( $appData, $toolName, 'k' ); } );
+	if( $toolCounted !== false || $toolSpent !== false || count( $toolCountErrors ) !== 1 || count( $toolSpentErrors ) !== 1 || count( $toolForgetErrors ) !== 1 )
+		$toolBad[] = $toolName;
+}
+check( 'a name that is no slug is no counter: a warning for each of the three, nothing counted - false from count() and spent()', $toolBad === [] );
+
+// shortcode(): register one, unless the Components module owns the name
+$toolPlain = static fn( array &$appData, array $args ): string => 'by the feature';
+check( 'shortcode() registers the shortcode where the Components module owns no such name, and says so', \Nino\Feature::shortcode( $toolset, 'note', $toolPlain ) === true && \Nino\Html::renderHtml( $toolset, '[note]' ) === 'by the feature' );
+\Nino\Modules\Components::addComponent( $toolset, 'owned', static fn( array &$appData, array $args ): string => 'by the component', [ 'label' => 'Owned', 'source' => 'none' ] );
+check( '...and registers nothing where a component of that name is in the registry: it says so, and the component renders as it did', \Nino\Feature::shortcode( $toolset, 'owned', $toolPlain ) === false
+	&& \Nino\Html::renderHtml( $toolset, '[owned]' ) === 'by the component' );
+
+// slug(): a name made into a word of a url or a file
+check( 'slug() lower-cases, writes the letters ascii lacks as its table says, and turns every run of anything else into one hyphen', \Nino\Feature::slug( 'Äpfel & Öl, groß!' ) === 'aepfel-oel-gross'
+	&& \Nino\Feature::slug( 'ÄÖÜ Straße É' ) === 'aeoeue-strasse-e' && \Nino\Feature::slug( 'Crème brûlée à la Française' ) === 'creme-brulee-a-la-francaise' );
+check( '...no hyphen at either end', \Nino\Feature::slug( '  --Hello,  World--  ' ) === 'hello-world' );
+check( '...cut at the longest asked for, and never with a hyphen at the end of the cut', \Nino\Feature::slug( 'alpha beta gamma', 6 ) === 'alpha' && \Nino\Feature::slug( 'alpha beta', 10 ) === 'alpha-beta' && \Nino\Feature::slug( 'abcdef', 3 ) === 'abc'
+	&& \Nino\Feature::slug( 'abc', 0 ) === '' && strlen( \Nino\Feature::slug( str_repeat( 'wort ', 40 ) ) ) <= 60 );
+check( '...nothing for a text that holds no letter or digit', \Nino\Feature::slug( '' ) === '' && \Nino\Feature::slug( ' -- !? ' ) === '' );
+
+\Nino\Filesystem::removeDir( ninoSandboxDir( $toolset ) );
+
+echo "\n";
+
 
 // The manifest key 'data' is documented as "what a backup carries", and until
 // Backup::manifest() read it, it was not: only two hardcoded literals for the
@@ -981,8 +1303,8 @@ foreach( $panelActions as $method => $data )
 // and would come last if the panel still answered in key order
 check( 'apiList answers the directory the panel reads from, the catalogue url, whether it is writable, no cached catalogue yet, and every feature, sorted by the localized name', $status === 200 && $body['dir'] === '/tests/fixtures/features'
 	&& $body['catalogueUrl'] === \Nino\Catalogue::DEFAULT_URL && $body['writable'] === true && $body['catalogue'] === null
-	&& array_keys( $body ) === [ 'dir', 'catalogueUrl', 'writable', 'catalogue', 'features' ] && array_column( $body['features'], 'key' ) === [ 'sample', 'helper', 'old' ]
-	&& array_column( $body['features'], 'name' ) === [ 'Beispiel-Feature', 'Helper', 'Old' ] );
+	&& array_keys( $body ) === [ 'dir', 'catalogueUrl', 'writable', 'catalogue', 'features' ] && array_column( $body['features'], 'key' ) === [ 'sample', 'helper', 'mute', 'old', 'strict' ]
+	&& array_column( $body['features'], 'name' ) === [ 'Beispiel-Feature', 'Helper', 'Mute', 'Old', 'Strict' ] );
 $byKey = array_column( $body['features'], null, 'key' );
 check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'manual', 'manualSections', 'category', 'maturity', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings', 'settingsTab' ] );
 check( 'names and descriptions arrive in the session locale - de_DE, the native language, since none was chosen', $byKey['sample']['name'] === 'Beispiel-Feature' && $byKey['sample']['description'] === 'Prüft den ganzen Feature-Vertrag.'

@@ -465,6 +465,42 @@ check( 'the accounts key is still written by its own merge, not removed', $accou
 echo "\n";
 
 
+// --- AppData::stored - the persisted value of a key -----------------------------
+
+echo "AppData::stored - what config.php holds, not what this request carries\n";
+
+// A sandbox of its own: the config.php below is this section's
+$persisted = ninoSandbox( 'runtime-stored' );
+check( 'a project without a config.php has no persisted value: the default the caller passes, null where it passes none', \Nino\AppData::stored( $persisted, '/test/stored/text' ) === null && \Nino\AppData::stored( $persisted, '/test/stored/text', 'fallback' ) === 'fallback' );
+
+\Nino\Filesystem::putFileContent( $persisted, '/config.php', [
+	'/test/stored/text'		=> 'persisted',
+	'/test/stored/list'		=> [ 'a', 'b' ],
+	'/test/stored/nothing'	=> null,
+	'/test/stored/zero'		=> 0,
+	'/test/stored/empty'	=> '',
+	'/test/stored/off'		=> false,
+] );
+check( 'stored() is the value of a top-level key of config.php, of whatever type', \Nino\AppData::stored( $persisted, '/test/stored/text' ) === 'persisted' && \Nino\AppData::stored( $persisted, '/test/stored/list' ) === [ 'a', 'b' ] );
+check( '...the default for a key that is not there - the one the caller passes, and nothing from AppData::DEFAULTS, which has the routes as an empty list', \Nino\AppData::stored( $persisted, '/test/stored/absent', 'fallback' ) === 'fallback'
+	&& \Nino\AppData::stored( $persisted, '/nino/http/routes', 'mine' ) === 'mine' && \Nino\AppData::stored( $persisted, '/nino/http/routes' ) === null && array_key_exists( '/nino/http/routes', \Nino\AppData::DEFAULTS ) === true );
+check( '...a stored null is a stored null, and so are 0, \'\' and false: the default is for a key that is absent', \Nino\AppData::stored( $persisted, '/test/stored/nothing', 'fallback' ) === null
+	&& \Nino\AppData::stored( $persisted, '/test/stored/zero', 'fallback' ) === 0 && \Nino\AppData::stored( $persisted, '/test/stored/empty', 'fallback' ) === '' && \Nino\AppData::stored( $persisted, '/test/stored/off', 'fallback' ) === false );
+
+$persisted['/test/stored/text'] = 'this request alone';
+$persisted['/test/stored/live'] = 'this request alone';
+check( 'it is the persisted value, not the live one: what a request writes to its $appData alone does not reach it', $persisted['/test/stored/text'] === 'this request alone'
+	&& \Nino\AppData::stored( $persisted, '/test/stored/text' ) === 'persisted' && \Nino\AppData::stored( $persisted, '/test/stored/live', 'none yet' ) === 'none yet' );
+\Nino\AppData::writeContentData( $persisted, [ '/test/stored/live' ] );
+check( '...until it is written: then the key is there, and the others are as they were', \Nino\AppData::stored( $persisted, '/test/stored/live' ) === 'this request alone' && \Nino\AppData::stored( $persisted, '/test/stored/zero', 'fallback' ) === 0 );
+
+\Nino\Filesystem::putFileContent( $persisted, '/config.php', 'not an array' );
+check( 'a config.php that holds anything but an array has no keys', \Nino\AppData::stored( $persisted, '/test/stored/text', 'fallback' ) === 'fallback' );
+\Nino\Filesystem::removeDir( ninoSandboxDir( $persisted ) );
+
+echo "\n";
+
+
 // --- Autoloading - project root, override, kernel guard and fallback ------
 
 echo "Autoloading resolves project classes separately from the Nino kernel\n";

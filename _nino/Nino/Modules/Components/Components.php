@@ -74,6 +74,12 @@ namespace Nino\Modules {
 		// What a component takes its first argument from, see value()
 		public const array SOURCES = [ 'text', 'image', 'href', 'content', 'none' ];
 
+		// The words a bool is read from: an attribute of a component here, and a
+		// flag of a shortcode without a schema in \Nino\Feature::flag() - one
+		// table, so that the two cannot come to mean different things by "yes"
+		public const array ON = [ '1', 'true', 'yes', 'on' ];
+		public const array OFF = [ '0', 'false', 'no', 'off' ];
+
 		// What an attribute may be: the types of a feature's settings that
 		// make sense here, and three of this module's own - a text key, an
 		// image slot and an address
@@ -512,7 +518,10 @@ namespace Nino\Modules {
 		 *	every key present, or what is wrong with it. Not for a page to
 		 *	call - it is what addComponent() and addStack() refuse a schema
 		 *	by, and what a feature's manifest is read through (see
-		 *	\Nino\Features::manifest())
+		 *	\Nino\Features::manifest()). A stack's assets are the files a tool
+		 *	tells the developer about; the manifest key of the same name, which
+		 *	\Nino\Features::registerAssets() reads into the bundles, is another
+		 *	thing
 		 *
 		 *	@param		string		$name					The shortcode, a slug
 		 *	@param		mixed			$schema				label, source (not for a stack), loop, attributes, preview;
@@ -659,6 +668,9 @@ namespace Nino\Modules {
 				}
 			}
 
+			// A note for a tool about the files a stack needs: nothing adds them to a
+			// page. Not the 'assets' key of a feature's manifest, which lists files of
+			// the feature that the bundles of the site carry (\Nino\Features::registerAssets())
 			if( $stack === true && isset( $schema['assets'] ) === true ) {
 
 				if( is_array( $schema['assets'] ) === false )
@@ -903,9 +915,9 @@ namespace Nino\Modules {
 					return (string) max( $declared['min'] ?? PHP_INT_MIN, min( $declared['max'] ?? PHP_INT_MAX, (int) $raw ) );
 
 				case 'bool':
-					if( in_array( strtolower( $raw ), [ '1', 'true', 'yes', 'on' ], true ) === true )
+					if( in_array( strtolower( $raw ), self::ON, true ) === true )
 						return '1';
-					return in_array( strtolower( $raw ), [ '0', 'false', 'no', 'off' ], true ) === true ? '0' : $default;
+					return in_array( strtolower( $raw ), self::OFF, true ) === true ? '0' : $default;
 			}
 
 			return $raw;

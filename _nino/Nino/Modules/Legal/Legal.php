@@ -388,7 +388,7 @@ namespace Nino\Modules {
 
 			try {
 
-				$removed = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )[ \Nino\Elements::REMOVED ] ?? [];
+				$removed = \Nino\AppData::stored( $appData, \Nino\Elements::REMOVED, [] );
 				$removed = is_array( $removed ) === true ? $removed : [];
 				$list		 = array_values( array_map( 'strval', (array) ( $removed[$type] ?? [] ) ) );
 				$listed	 = in_array( $id, $list, true );
@@ -1027,7 +1027,7 @@ namespace Nino\Modules {
 					$findings[] = [ 'kind' => $kind, 'values' => [ $name, $problem['locale'], $problem['path'] !== '' ? $problem['path'] : '-' ], 'link' => '' ];
 				}
 
-				$stored = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
+				$stored = \Nino\AppData::stored( $appData, '/nino/http/routes', [] );
 
 				foreach( is_array( $stored ) === true ? $stored : [] as $routeKey => $route )
 					if( is_array( $route ) === true && ( $route['uri'] ?? null ) === $definition['uri'] )

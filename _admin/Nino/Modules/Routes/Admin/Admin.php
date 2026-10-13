@@ -144,7 +144,8 @@ namespace Nino\Modules\Routes {
 		 */
 		public static function count( array &$appData ): int {
 
-			$routes = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
+			$routes = \Nino\AppData::stored( $appData, '/nino/http/routes', [] );
+			$routes = is_array( $routes ) === true ? $routes : [];
 
 			return count( array_filter( $routes, fn( array $r, string $k ): bool => self::isPageRoute( $k, $r ), ARRAY_FILTER_USE_BOTH ) );
 		}
@@ -291,7 +292,7 @@ namespace Nino\Modules\Routes {
 		 */
 		public static function runtimeRoutes( array &$appData ): array {
 
-			$persisted = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
+			$persisted = \Nino\AppData::stored( $appData, '/nino/http/routes', [] );
 			$runtime 	 = [];
 
 			foreach( $appData['/nino/http/routes'] ?? [] as $routeKey => $route ) {
@@ -528,19 +529,19 @@ namespace Nino\Modules\Routes {
 			try {
 
 				$data 						= \Nino\Admin\Admin::postData();
-				$originalHttpUri 	= (string) ( $data['originalHttpUri'] ?? '' );
+				$originalHttpUri 	= \Nino\Admin\Admin::postString( $data, 'originalHttpUri' );
 
-				$uri 			= self::_normalizeUri( (string) ( $data['uri'] ?? '' ) );
-				$httpUri 	= self::_normalizeUri( (string) ( $data['httpUri'] ?? '' ) );
-				$template = (string) ( $data['template'] ?? '' );
+				$uri 			= self::_normalizeUri( \Nino\Admin\Admin::postString( $data, 'uri' ) );
+				$httpUri 	= self::_normalizeUri( \Nino\Admin\Admin::postString( $data, 'httpUri' ) );
+				$template = \Nino\Admin\Admin::postString( $data, 'template' );
 
 				if( $uri === null ) {
-					\Nino\Http::fail( $request, 400, 'invalid uri: "'. ( (string) ( $data['uri'] ?? '' ) ). '"', 'routes_invalid_uri', [ (string) ( $data['uri'] ?? '' ) ], 'uri' );
+					\Nino\Http::fail( $request, 400, 'invalid uri: "'. ( \Nino\Admin\Admin::postString( $data, 'uri' ) ). '"', 'routes_invalid_uri', [ \Nino\Admin\Admin::postString( $data, 'uri' ) ], 'uri' );
 					return;
 				}
 
 				if( $httpUri === null ) {
-					\Nino\Http::fail( $request, 400, 'invalid http uri: "'. ( (string) ( $data['httpUri'] ?? '' ) ). '"', 'routes_invalid_http_uri', [ (string) ( $data['httpUri'] ?? '' ) ], 'httpUri' );
+					\Nino\Http::fail( $request, 400, 'invalid http uri: "'. ( \Nino\Admin\Admin::postString( $data, 'httpUri' ) ). '"', 'routes_invalid_http_uri', [ \Nino\Admin\Admin::postString( $data, 'httpUri' ) ], 'httpUri' );
 					return;
 				}
 
@@ -768,7 +769,7 @@ namespace Nino\Modules\Routes {
 				return;
 
 			$data = \Nino\Admin\Admin::postData();
-			$uri 	= (string) ( $data['uri'] ?? '' );
+			$uri 	= \Nino\Admin\Admin::postString( $data, 'uri' );
 
 			if( in_array( $uri, array_column( self::runtimeRoutes( $appData ), 'uri' ), true ) === false ) {
 				\Nino\Http::fail( $request, 404, 'unknown feature route' );
@@ -882,8 +883,8 @@ namespace Nino\Modules\Routes {
 
 			try {
 
-				$httpUri 	= (string) ( \Nino\Admin\Admin::postData()['httpUri'] ?? '' );
-				$routes 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
+				$httpUri 	= \Nino\Admin\Admin::postString( \Nino\Admin\Admin::postData(), 'httpUri' );
+				$routes 	= \Nino\AppData::stored( $appData, '/nino/http/routes', [] );
 				$routeKey = self::_routeKey( $httpUri );
 
 				// Only ever a page route: this module lists nothing else, so
@@ -944,15 +945,16 @@ namespace Nino\Modules\Routes {
 			try {
 
 				$data 			= \Nino\Admin\Admin::postData();
-				$httpUri 		= (string) ( $data['httpUri'] ?? '' );
-				$direction 	= (string) ( $data['direction'] ?? '' );
+				$httpUri 		= \Nino\Admin\Admin::postString( $data, 'httpUri' );
+				$direction 	= \Nino\Admin\Admin::postString( $data, 'direction' );
 
 				if( in_array( $direction, [ 'up', 'down' ], true ) === false ) {
 					\Nino\Http::fail( $request, 400, 'direction must be "up" or "down"' );
 					return;
 				}
 
-				$routes 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
+				$routes 	= \Nino\AppData::stored( $appData, '/nino/http/routes', [] );
+				$routes 	= is_array( $routes ) === true ? $routes : [];
 				$pageKeys = array_keys( array_filter( $routes, fn( array $r, string $k ): bool => self::isPageRoute( $k, $r ), ARRAY_FILTER_USE_BOTH ) );
 
 				$index = array_search( self::_routeKey( $httpUri ), $pageKeys, true );

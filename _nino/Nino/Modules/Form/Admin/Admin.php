@@ -60,7 +60,7 @@ namespace Nino\Modules\Form {
 		// anyone reads the line
 		public static function log( string $action, array $data ): string {
 			return match( $action ) {
-				'submissions/delete'	=> 'Delete submission '. (string) ( $data['id'] ?? '' ),
+				'submissions/delete'	=> 'Delete submission '. \Nino\Admin\Admin::postString( $data, 'id' ),
 				default								=> '',
 			};
 		}

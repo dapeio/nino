@@ -86,8 +86,8 @@ namespace Nino\Modules\Users {
 				return;
 
 			$data 		= \Nino\Admin\Admin::postData();
-			$current 	= is_string( $data['current'] ?? null ) === true ? $data['current'] : '';
-			$new 			= is_string( $data['pw'] ?? null ) === true ? $data['pw'] : '';
+			$current 	= \Nino\Admin\Admin::postString( $data, 'current' );
+			$new 			= \Nino\Admin\Admin::postString( $data, 'pw' );
 
 			$status = \Nino\Admin\Recovery::change( $appData, $current, $new );
 

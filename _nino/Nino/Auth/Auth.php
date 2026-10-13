@@ -30,8 +30,9 @@ namespace Nino {
 		// Failed-attempt counters live here, not in config.php - a login
 		// storm from an unauthenticated attacker would otherwise force a
 		// config.php rewrite (routes, module wiring, every user's hash) on
-		// every single failure. Same layout Mail::_hit() already uses for
-		// its own rate limit.
+		// every single failure. The same kind of file below /data/ that
+		// \Nino\Feature::count() keeps for the counters of a feature and of
+		// Mail's send cap, with a number per key where those keep tries and a reset.
 		private const string TRIES_PATH = '/data/auth-tries.php';
 
 		// Failed attempts are counted per account *and* per client ip. The
@@ -91,7 +92,7 @@ namespace Nino {
 
 		public static function callbackLoginResponse( array &$appData, array &$request ): void {
 
-			if( ( $request['./nino/csrf/blocked'] ?? false ) === true )
+			if( \Nino\Form::blocked( $request ) === true )
 				return;
 
 			// The attempt's own result, not who is signed in afterwards.
@@ -116,7 +117,7 @@ namespace Nino {
 
 		public static function callbackLogoutResponse( array &$appData, array &$request ): void {
 
-			if( ( $request['./nino/csrf/blocked'] ?? false ) === true )
+			if( \Nino\Form::blocked( $request ) === true )
 				return;
 
 			self::logoutUser( $appData );
@@ -241,7 +242,7 @@ namespace Nino {
 
 			// Prune expired session entries opportunistically, on the one write
 			// this method was already going to make - same "clean up on write"
-			// idea as Mail::_hit(). The is_array() half is not about age: these
+			// idea as Feature::count(). The is_array() half is not about age: these
 			// entries come out of config.php, which is a file a developer edits
 			// by hand, and a scalar where the ['time','ip'] shape is expected
 			// would be a TypeError rather than a stale entry.
@@ -833,7 +834,7 @@ namespace Nino {
 				// Drop buckets whose cooldown has already elapsed - with an ip
 				// bucket per attacking client this file would otherwise only ever
 				// grow. Same "clean up on the write we're doing anyway" idea as
-				// Mail::_hit() and loginUser()'s session pruning.
+				// Feature::count() and loginUser()'s session pruning.
 				foreach( $state as $stateKey => $stateTries )
 					if( (int) $stateTries < 0 && 0 - (int) $stateTries <= $now )
 						unset( $state[$stateKey] );

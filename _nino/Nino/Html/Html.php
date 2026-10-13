@@ -171,6 +171,35 @@ namespace Nino {
 				$appData['./nino/html/fills'][$locale]['[['. trim( $fillKey, '[[]]' ). ']]'] = $fillValue;
 		}
 
+		/**
+		 *	Take one fill that addFills() added back out - the counterpart of it
+		 *	for a key, for a fill that is there for the length of one piece of
+		 *	work (a mail rendered with a link in it) and must not stay for the
+		 *	rest of the request. The key is spelled as addFills() spells it, with
+		 *	or without its brackets, and the language is checked as addFills()
+		 *	checks it: '*' is the bucket of the fills that belong to no language,
+		 *	'' the current language, and a language the site does not have is
+		 *	nothing to take anything out of. A key that is not there is not an
+		 *	error. The text files are not touched: this is the fills of the
+		 *	running request.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					The key, eg. '/newsletter/link/confirm'
+		 *	@param		string		$locale				The language the fill was added for; '*' for the bucket of the fills that belong to none, '' for the current language
+		 *
+		 *	@return 	void
+		 */
+		public static function removeFill( array &$appData, string $key, string $locale = '*' ): void {
+
+			// Check locale
+			if( $locale === '' )
+				$locale = \Nino\Locales::getCurrentLocale( $appData );
+			else if( $locale !== '*' && \Nino\Locales::verifyLocale( $appData, $locale ) === false )
+				return;
+
+			unset( $appData['./nino/html/fills'][$locale]['[['. trim( $key, '[[]]' ). ']]'] );
+		}
+
 		// The fills the kernel registers at runtime rather than reading from a
 		// text file, stated once, here: bootFills() at the start of every
 		// request, before the response round (the mail templates Modules\Form
@@ -207,16 +236,74 @@ namespace Nino {
 			return $appData['/nino/html/assets'][$library] ?? [];
 		}
 
-		public static function getFills( array &$appData ): array {
+		/**
+		 *	Every fill of a language, merged the way a page reads them: the text
+		 *	files (/text/global.php, then the language's own), the fills added
+		 *	at runtime for the language, and last those added for '*', so that a
+		 *	fill that belongs to no language wins. The language is the current
+		 *	one, or another that the code asks for - a mail in the language of the
+		 *	visitor, a title in the language of the page that is listed.
+		 *
+		 *	The language is checked as addFills() checks it: '*' is the bucket of
+		 *	the fills that belong to no language, null or '' the current language,
+		 *	and a language the site does not have has no fills - [] and no
+		 *	warning, as addFills() takes nothing for it. The locale becomes a path
+		 *	segment (/text/<locale>.php), so nothing that the site does not list
+		 *	reaches the file system.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string|null	$locale				A language of the site; null for the current one
+		 *
+		 *	@return 	array										'[[key]]' => value
+		 */
+		public static function getFills( array &$appData, ?string $locale = null ): array {
 
-			$locale = \Nino\Locales::getCurrentLocale( $appData );
+			if( $locale === null || $locale === '' )
+				$locale = \Nino\Locales::getCurrentLocale( $appData );
+			else if( $locale !== '*' && \Nino\Locales::verifyLocale( $appData, $locale ) === false )
+				return [];
+
+			// '*' is no language and has no file: /text/*.php would be a file with a star in its name, not a pattern
+			$language = $locale === '*' ? [] : \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
 
 			return array_merge(
 				\Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] ),
-				\Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] ),
+				$language,
 				( $appData['./nino/html/fills'][$locale] ?? [] ),
 				( $appData['./nino/html/fills']['*'] ?? [] )
 			);
+		}
+
+		/**
+		 *	The address of this website, or of one page of it, as a visitor from
+		 *	elsewhere needs it - a link in a mail, the canonical address of a
+		 *	page, an entry of a sitemap: 'https://' and the website's address,
+		 *	with no slash at its end, and $path as it is given.
+		 *
+		 *	The website's address is the fill '/project/website/general/url', which
+		 *	the Text panel keeps and the templates of the base unit write behind
+		 *	'https://' as well (html-header.tpl). It is the address without a
+		 *	scheme, and it carries the directory a project is served from:
+		 *	'example.com/shop' for a site at /shop. The templates put the
+		 *	project-relative path of the request behind it and never
+		 *	[[/nino/dir]], so the directory has to be in the value or every
+		 *	canonical link would miss it. This adds nothing of its own, and
+		 *	neither does the path - which is why $path starts with a slash, or
+		 *	is ''.
+		 *
+		 *	A site without an address has no absolute one: the answer is '' and
+		 *	the caller decides what a link without a host is worth.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$path					Starts with '/' or is '', eg. '/.newsletter/unsubscribe'
+		 *
+		 *	@return 	string										'https://example.com/shop/page', or '' where the website has no address
+		 */
+		public static function absoluteUrl( array &$appData, string $path = '' ): string {
+
+			$url = trim( (string) self::resolveTextfill( $appData, '/project/website/general/url' ), '/' );
+
+			return $url === '' ? '' : 'https://'. $url. $path;
 		}
 
 		private static function _renderShortcodes( array &$appData, string $html ): string {

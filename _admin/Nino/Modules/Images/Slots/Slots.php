@@ -176,14 +176,14 @@ namespace Nino\Modules\Images {
 				return;
 
 			$data = \Nino\Admin\Admin::postData();
-			$uri 	= (string) ( $data['uri'] ?? '' );
+			$uri 	= \Nino\Admin\Admin::postString( $data, 'uri' );
 
 			if( isset( $appData['/nino/html/images'][$uri] ) === false ) {
 				\Nino\Http::fail( $request, 404, 'unknown slot' );
 				return;
 			}
 
-			$label 	= trim( (string) ( $data['label'] ?? '' ) );
+			$label 	= trim( \Nino\Admin\Admin::postString( $data, 'label' ) );
 			$width 	= max( 1, (int) ( $data['width'] ?? 0 ) );
 			$height = max( 1, (int) ( $data['height'] ?? 0 ) );
 
@@ -248,8 +248,8 @@ namespace Nino\Modules\Images {
 				return;
 
 			$data 	= \Nino\Admin\Admin::postData();
-			$uri 		= (string) ( $data['uri'] ?? '' );
-			$label 	= trim( (string) ( $data['label'] ?? '' ) );
+			$uri 		= \Nino\Admin\Admin::postString( $data, 'uri' );
+			$label 	= trim( \Nino\Admin\Admin::postString( $data, 'label' ) );
 			$width 	= max( 1, (int) ( $data['width'] ?? 0 ) );
 			$height = max( 1, (int) ( $data['height'] ?? 0 ) );
 
@@ -321,7 +321,7 @@ namespace Nino\Modules\Images {
 				return;
 
 			$data = \Nino\Admin\Admin::postData();
-			$uri 	= (string) ( $data['uri'] ?? '' );
+			$uri 	= \Nino\Admin\Admin::postString( $data, 'uri' );
 
 			if( isset( $appData['/nino/html/images'][$uri] ) === false ) {
 				\Nino\Http::fail( $request, 404, 'unknown slot' );

@@ -135,10 +135,8 @@ namespace Nino {
 			// The route key is project-relative, the address a browser is sent
 			// to is not: a site served from a directory puts it in front, or
 			// the switch lands beside the site (see Http::_projectUri())
-			if( $newUri !== null ) {
-				$request['/nino/http/response']['statusCode'] 					= 302;
-				$request['/nino/http/response']['header']['Location']	= rtrim( \Nino\Filesystem::getDir( $appData ), '/' ). str_replace( $request['/nino/http/request']['method']. ':/', '', $newUri );
-			}
+			if( $newUri !== null )
+				\Nino\Http::redirect( $appData, $request, str_replace( $request['/nino/http/request']['method']. ':/', '', $newUri ), 302 );
 		}
 
 		// Apply the locale of the resolved route, if it declares one (eg.

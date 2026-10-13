@@ -663,7 +663,7 @@ namespace Nino\Install {
 			// itself is free-form) falls back to the same rule as no native
 			// posted at all: keep the current native if it's still picked,
 			// else the first picked locale
-			$native = (string) ( $data['native'] ?? '' );
+			$native = \Nino\Admin\Admin::postString( $data, 'native' );
 			if( in_array( $native, $locales, true ) === true )
 				$appData['/nino/locales/native'] = $native;
 			elseif( in_array( $appData['/nino/locales/native'] ?? '', $locales, true ) === false )
@@ -695,8 +695,8 @@ namespace Nino\Install {
 			// persist yet - the same reading the routes above take, and for the
 			// same reason: until this step has run there is no config.php, and
 			// starting from the empty runtime value would drop Nino.css itself
-			$assets = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/assets']
-				?? $appData['/nino/html/assets'] ?? \Nino\AppData::DEFAULTS['/nino/html/assets'];
+			$assets = \Nino\AppData::stored( $appData, '/nino/html/assets' );
+			$assets = is_array( $assets ) === true ? $assets : $appData['/nino/html/assets'] ?? \Nino\AppData::DEFAULTS['/nino/html/assets'];
 			$bundle = array_map( 'strval', $assets[self::BUNDLE_KEY] ?? \Nino\AppData::DEFAULTS['/nino/html/assets'][self::BUNDLE_KEY] );
 
 			foreach( self::BASE_STYLESHEETS as $stylesheet )
@@ -721,8 +721,8 @@ namespace Nino\Install {
 				config.php - and would drop, in the same move, every route that
 				only exists on disk, a developer's own hand-written ones among
 				them. Webpages::apiApply()/apiList() read it the same way.	*/
-			$routes = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']
-				?? \Nino\AppData::DEFAULTS['/nino/http/routes'] ?? [];
+			$routes = \Nino\AppData::stored( $appData, '/nino/http/routes', \Nino\AppData::DEFAULTS['/nino/http/routes'] );
+			$routes = is_array( $routes ) === true ? $routes : \Nino\AppData::DEFAULTS['/nino/http/routes'];
 			foreach( self::_libraryRouteKeys() as $routeKey )
 				unset( $routes[$routeKey] );
 
@@ -1031,7 +1031,8 @@ namespace Nino\Install {
 
 			// The persisted route array, never the live one polluted by
 			// the wizard's and the modules' own bootstrap routes
-			$routes 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] ?? [];
+			$routes 	= \Nino\AppData::stored( $appData, '/nino/http/routes', [] );
+			$routes 	= is_array( $routes ) === true ? $routes : [];
 
 			$webpages = self::pages( $appData, $routes, $locales, $navs );
 
@@ -2415,8 +2416,8 @@ namespace Nino\Install {
 		public static function apiCreate( array &$appData, array &$request ): void {
 
 			$data = \Nino\Install\Install::postData();
-			$mail = trim( (string) ( $data['mail'] ?? '' ) );
-			$pw 	= (string) ( $data['pw'] ?? '' );
+			$mail = trim( \Nino\Admin\Admin::postString( $data, 'mail' ) );
+			$pw 	= \Nino\Admin\Admin::postString( $data, 'pw' );
 
 			if( filter_var( $mail, FILTER_VALIDATE_EMAIL ) === false ) {
 				\Nino\Http::fail( $request, 400, 'invalid email address' );
@@ -2497,7 +2498,7 @@ namespace Nino\Install {
 		public static function apiComplete( array &$appData, array &$request ): void {
 
 			$data 	= \Nino\Install\Install::postData();
-			$pw 		= (string) ( $data['password'] ?? '' );
+			$pw 		= \Nino\Admin\Admin::postString( $data, 'password' );
 			$users	= \Nino\Install\Accounts::usableUsers( $appData );
 
 			if( count( $users ) === 0 ) {

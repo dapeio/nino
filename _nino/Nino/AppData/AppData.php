@@ -379,6 +379,37 @@ namespace Nino {
 			return $written !== false;
 		}
 
+		/**
+		 *	One top-level key of config.php as the file holds it: the persisted
+		 *	value, not the live one. $appData carries what the project decided
+		 *	and, mixed in with it, what this request added at runtime - the routes
+		 *	of the workbench, those a module registers in init(), the defaults
+		 *	beneath it all. A caller that is about to write a key back, or has to
+		 *	tell what the project decided from what is only there for this
+		 *	request, reads the file. The install unit of a feature is applied
+		 *	against the persisted routes for that reason (\Nino\Features::activate()
+		 *	reads them here): a route a module registered for this request alone is
+		 *	never written into config.php.
+		 *
+		 *	The default is the caller's: it is answered for a key the file does
+		 *	not hold, and not looked up in DEFAULTS, which is not always the
+		 *	value a caller means. A key the file holds as null is null - the file
+		 *	said so, and the default is for a file that said nothing. A file that
+		 *	is not there, or does not return an array, holds no key.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					The key as config.php spells it, eg. '/nino/http/routes'
+		 *	@param		mixed			$default			Answered for a key the file does not hold
+		 *
+		 *	@return 	mixed
+		 */
+		public static function stored( array &$appData, string $key, mixed $default = null ): mixed {
+
+			$stored = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+
+			return is_array( $stored ) === true && array_key_exists( $key, $stored ) === true ? $stored[$key] : $default;
+		}
+
 		// Three-way merge for '/nino/auth/user' - every Auth write persists the
 		// whole key from the copy its own request booted with, so re-reading
 		// alone isn't enough: whoever writes second would otherwise drop

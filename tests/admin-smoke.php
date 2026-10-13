@@ -131,6 +131,13 @@ check( 'a feature key is looked up in the templates of the feature first, then i
 check( '...and a module key, which no template of the module reads here, in the project\'s, in the order they are read', isset( $body['order']['/module/form/info/success'], $body['order']['/module/form/info/error'] ) === true && $body['order']['/module/form/info/success'] < $body['order']['/module/form/info/error'] );
 check( 'features says each installed feature\'s name, by its key, in the language of the workbench', $body['features'] === [ 'shop' => 'Laden' ] );
 
+// ...and a config.php that holds the routes as null has no pages, as the reader took it before AppData::stored(): the list answers all the same
+$routesStored = \Nino\AppData::stored( $appData, '/nino/http/routes' );
+\Nino\Filesystem::mutate( $appData, '/config.php', static function( array $config ): array { $config['/nino/http/routes'] = null; return $config; } );
+[ $nullStatus, $nullBody ] = ninoCall( $appData, [ \Nino\Modules\Text\Admin::class, 'apiKeys' ] );
+\Nino\Filesystem::mutate( $appData, '/config.php', static function( array $config ) use ( $routesStored ): array { $config['/nino/http/routes'] = $routesStored; return $config; } );
+check( 'a config.php that holds the routes as null has no pages, and the list of keys answers all the same', $nullStatus === 200 && ( $nullBody['pages'] ?? null ) === [] );
+
 // What the log says of a batch: every group it touches, once, in the order the batch names them
 check( 'the log names every group of a batch - a page\'s texts and its details together, a language\'s name, the project, a key somebody made up',
 	\Nino\Modules\Text\Admin::log( 'text/savebatch', [ 'items' => [
@@ -206,6 +213,33 @@ check( 'sessionLocale now returns the newly chosen locale', \Nino\Admin\Admin::s
 
 [ , $body ] = ninoCall( $appData, [ \Nino\Modules\Elements\Admin::class, 'apiTypes' ] );
 check( 'Elements::apiTypes also exposes the (now updated) session locale', ( $body['selectedLocale'] ?? null ) === 'en_US' );
+
+echo "\n";
+
+
+// --- Admin::postString --------------------------------------------------------
+
+echo "Admin::postString - one posted value as a string, and never a cast\n";
+
+$posted = [ 'text' => 'Hello', 'padded' => '  Hello  ', 'int' => 42, 'float' => 1.5, 'zero' => 0, 'empty' => '', 'array' => [ 'x' ], 'nested' => [ 'a' => [ 'b' ] ], 'yes' => true, 'no' => false, 'null' => null ];
+check( 'a string comes as it is - not trimmed, which is the caller\'s to do', \Nino\Admin\Admin::postString( $posted, 'text' ) === 'Hello' && \Nino\Admin\Admin::postString( $posted, 'padded' ) === '  Hello  ' && \Nino\Admin\Admin::postString( $posted, 'empty', 'dflt' ) === '' );
+check( '...a whole number or a decimal one as its text', \Nino\Admin\Admin::postString( $posted, 'int' ) === '42' && \Nino\Admin\Admin::postString( $posted, 'float' ) === '1.5' && \Nino\Admin\Admin::postString( $posted, 'zero' ) === '0' );
+check( '...an array gets the default - nothing is cast, so nothing the runtime treats as fatal is raised', array_filter( [ 'array', 'nested' ], static function( string $key ) use ( $posted ): bool {
+	$answer = null;
+	$errors = ninoErrors( function() use ( $posted, $key, &$answer ) { $answer = \Nino\Admin\Admin::postString( $posted, $key, 'dflt' ); } );
+	return $answer !== 'dflt' || $errors !== [];
+} ) === [] && \Nino\Admin\Admin::postString( $posted, 'array' ) === '' );
+check( '...and so do a bool, null and a key that is not there', array_filter( [ 'yes', 'no', 'null', 'absent' ], static fn( string $key ): bool => \Nino\Admin\Admin::postString( $posted, $key, 'dflt' ) !== 'dflt' && \Nino\Admin\Admin::postString( $posted, $key ) !== '' ) === [] );
+
+// A panel reads what it is posted through it: a payload that is one line of json with an array where a
+// string belongs is the panel's refusal of an empty value, where it used to be a 500
+$arrayPost = static function( string $method, array $data ) use ( &$appData ): array {
+	$status = null;
+	$errors = ninoErrors( function() use ( &$appData, $method, $data, &$status ) { [ $status ] = ninoCall( $appData, [ \Nino\Modules\Users\Admin::class, $method ], $data ); } );
+	return [ $status, $errors ];
+};
+[ $arrayStatus, $arrayErrors ] = $arrayPost( 'apiSave', [ 'username' => [ 'x' ], 'mail' => [ 'y' ], 'currentPassword' => [ 'z' ] ] );
+check( 'a panel answers a field posted as an array with its refusal, and raises nothing', $arrayStatus === 400 && $arrayErrors === [] );
 
 echo "\n";
 

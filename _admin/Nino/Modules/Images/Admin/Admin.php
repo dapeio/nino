@@ -132,7 +132,7 @@ namespace Nino\Modules\Images {
 			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
 				return;
 
-			$uri 	= (string) ( \Nino\Admin\Admin::postData()['uri'] ?? '' );
+			$uri 	= \Nino\Admin\Admin::postString( \Nino\Admin\Admin::postData(), 'uri' );
 			$slot	= \Nino\Images::getSlot( $appData, $uri );
 
 			if( $slot === false ) {
@@ -226,7 +226,7 @@ namespace Nino\Modules\Images {
 				return;
 
 			$data	= \Nino\Admin\Admin::postData();
-			$uri 	= (string) ( $data['uri'] ?? '' );
+			$uri 	= \Nino\Admin\Admin::postString( $data, 'uri' );
 
 			if( \Nino\Images::getSlot( $appData, $uri ) === false ) {
 				\Nino\Http::fail( $request, 404, 'unknown slot' );
@@ -289,7 +289,7 @@ namespace Nino\Modules\Images {
 			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
 				return;
 
-			$uri 	= (string) ( \Nino\Admin\Admin::postData()['uri'] ?? '' );
+			$uri 	= \Nino\Admin\Admin::postString( \Nino\Admin\Admin::postData(), 'uri' );
 			$slot	= \Nino\Images::getSlot( $appData, $uri );
 
 			if( $slot === false ) {

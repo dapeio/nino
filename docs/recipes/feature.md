@@ -33,6 +33,9 @@ features/Catalog/
 │   ├── en_US.php            the panel's fills, merged while the feature is active
 │   └── de_DE.php
 ├── templates/catalog.tpl    the markup the runtime class renders - php decides what is shown, a template what it looks like
+├── assets/                  the style sheets and scripts the manifest puts into the site's bundles (1.)
+│   ├── catalog.css
+│   └── catalog.js
 ├── install/                 the unit activate() applies, add-only (4.)
 │   ├── manifest.php
 │   ├── elements/privacy.php  the feature's section of the privacy policy, if it processes personal data
@@ -96,6 +99,9 @@ return [
 	'requires'		=> [],
 	// The files under data/ this feature owns - what a backup carries
 	'data'				=> [ '/data/catalog.php' ],
+	// The style sheets and scripts of its assets/ directory that the site's two
+	// bundles carry, added at every boot while the feature is active
+	'assets'			=> [ '/features/Catalog/assets/catalog.css', '/features/Catalog/assets/catalog.js' ],
 	'settings'		=> [
 		'title'		=> [ 'type' => 'string', 'label' => [ 'en_US' => 'Title', 'de_DE' => 'Titel' ], 'required' => true, 'maxlength' => 60, 'default' => 'Catalog' ],
 		'pageSize'	=> [ 'type' => 'int', 'label' => 'Items per page', 'min' => 1, 'max' => 100, 'unit' => 'items', 'default' => 12 ],
@@ -124,6 +130,13 @@ skipped with a warning naming the file and the reason, never applied halfway:
   default `*`. A pre-release kernel such as `1.0.0-beta` counts as `1.0.0`.
 - `php` => `ext` lists extension names; `requires` lists feature keys (the
   feature's own is dropped); `data` lists paths below `/data/` without `..`.
+- `assets` lists css and js files of the feature's own `assets/` directory, as
+  `/features/<Directory>/assets/<file>` with the directory the manifest's own
+  and `<file>` a plain relative name ending in `.css` or `.js`, no `..` in it.
+  `\Nino\Features::registerAssets()` adds each `.css` to the style bundle of
+  the site (`/.cache/style.css`) and each `.js` to its script bundle
+  (`/.cache/script.js`), at every boot and ahead of every `init()`. A feature
+  that wants another bundle calls `\Nino\Html::addAsset()` in its `init()`.
 - A setting name is lowerCamel (`/^[a-z][a-zA-Z0-9]*$/`); `type` is one of
   `bool`, `int`, `string`, `text`, `email`, `url`, `select`, `secret`,
   `lines`; a `default` has to validate against its own schema; a `secret`
@@ -147,6 +160,10 @@ the technical route belongs to the module, responses go through `Http`. Three
 methods are feature-specific: `adminPanels()` brings the panel (3.),
 `upgrade()` migrates data when a new version is activated (7.), and the
 settings are read through `\Nino\Features::setting()` with a default.
+What every feature needs again and again - reading the template of its markup,
+a counter per client, a slug, widening the Content-Security-Policy - is
+`\Nino\Feature`, static methods whose docblocks are their reference: write
+none of it again.
 
 ```php
 <?php

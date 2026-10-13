@@ -96,9 +96,9 @@ namespace Nino\Modules\Users {
 
 		public static function log( string $action, array $data ): string {
 			return match( $action ) {
-				'users/create' 		=> 'Create User '. trim( (string) ( $data['mail'] ?? '' ) ),
+				'users/create' 		=> 'Create User '. trim( \Nino\Admin\Admin::postString( $data, 'mail' ) ),
 				'users/delete' 		=> 'Delete User '. ( $data['username'] ?? '' ),
-				'users/save' 			=> 'Edit User '. ( trim( (string) ( $data['mail'] ?? '' ) ) !== '' ? $data['mail'] : ( $data['username'] ?? '' ) ). ( is_string( $data['role'] ?? null ) === true ? ' Role '. $data['role'] : '' ),
+				'users/save' 			=> 'Edit User '. ( trim( \Nino\Admin\Admin::postString( $data, 'mail' ) ) !== '' ? $data['mail'] : ( $data['username'] ?? '' ) ). ( is_string( $data['role'] ?? null ) === true ? ' Role '. $data['role'] : '' ),
 				'users/status' 		=> ( ( $data['active'] ?? false ) === true ? 'Activate User ' : 'Deactivate User ' ). ( $data['username'] ?? '' ),
 				'users/logoutall' => 'Logout-All '. ( $data['username'] ?? '' ),
 				'users/role' 			=> 'Set Role '. ( $data['username'] ?? '' ). ' '. ( $data['role'] ?? '' ),
@@ -367,9 +367,9 @@ namespace Nino\Modules\Users {
 				return;
 
 			$data 	= \Nino\Admin\Admin::postData();
-			$mail 	= trim( (string) ( $data['mail'] ?? '' ) );
-			$pw 		= (string) ( $data['pw'] ?? '' );
-			$role 	= (string) ( $data['role'] ?? '' );
+			$mail 	= trim( \Nino\Admin\Admin::postString( $data, 'mail' ) );
+			$pw 		= \Nino\Admin\Admin::postString( $data, 'pw' );
+			$role 	= \Nino\Admin\Admin::postString( $data, 'role' );
 
 			if( $mail === '' || filter_var( $mail, FILTER_VALIDATE_EMAIL ) === false ) {
 				\Nino\Http::fail( $request, 400, 'invalid mail', 'users_invalid_mail', [], 'mail' );
@@ -419,7 +419,7 @@ namespace Nino\Modules\Users {
 			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
 				return;
 
-			$username = (string) ( \Nino\Admin\Admin::postData()['username'] ?? '' );
+			$username = \Nino\Admin\Admin::postString( \Nino\Admin\Admin::postData(), 'username' );
 			$current 	= \Nino\Auth::getCurrentUser( $appData );
 
 			if( $current !== false && $current['mail'] === $username ) {
@@ -467,10 +467,10 @@ namespace Nino\Modules\Users {
 				return;
 
 			$data 				= \Nino\Admin\Admin::postData();
-			$username 		= (string) ( $data['username'] ?? '' );
-			$newUsername 	= trim( (string) ( $data['mail'] ?? '' ) );
-			$pw 					= (string) ( $data['pw'] ?? '' );
-			$currentPw 		= (string) ( $data['currentPassword'] ?? '' );
+			$username 		= \Nino\Admin\Admin::postString( $data, 'username' );
+			$newUsername 	= trim( \Nino\Admin\Admin::postString( $data, 'mail' ) );
+			$pw 					= \Nino\Admin\Admin::postString( $data, 'pw' );
+			$currentPw 		= \Nino\Admin\Admin::postString( $data, 'currentPassword' );
 			$postedRole 	= array_key_exists( 'role', $data ) === true ? $data['role'] : null;
 
 			[ $allowed, $isSelf ] = self::_authorize( $appData, $username );
@@ -575,7 +575,7 @@ namespace Nino\Modules\Users {
 				return;
 
 			$data 		= \Nino\Admin\Admin::postData();
-			$username = (string) ( $data['username'] ?? '' );
+			$username = \Nino\Admin\Admin::postString( $data, 'username' );
 
 			[ $allowed, $isSelf ] = self::_authorize( $appData, $username );
 
@@ -609,8 +609,8 @@ namespace Nino\Modules\Users {
 				return;
 
 			$data 		= \Nino\Admin\Admin::postData();
-			$username = (string) ( $data['username'] ?? '' );
-			$role 		= (string) ( $data['role'] ?? '' );
+			$username = \Nino\Admin\Admin::postString( $data, 'username' );
+			$role 		= \Nino\Admin\Admin::postString( $data, 'role' );
 
 			if( self::_refuseRoleChange( $appData, $request, $username, $role ) === true )
 				return;

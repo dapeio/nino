@@ -63,8 +63,9 @@ check( 'loginUser locks out after maxtries failed attempts', \Nino\Auth::loginUs
 // the maxtries'th attempt had closed it - a lockout that held for guesses
 // made one after the other and never for the ones made at once. loginUser()
 // itself never registers against a bucket it found locked, so the late
-// registration is exercised directly (invokeArgs() with a reference - see
-// the Mail::_hit section of form-mail-smoke.php for why)
+// registration is exercised directly (invokeArgs() with a reference, since a
+// plain invoke() would run against a copy of $appData and never see this
+// test's own prior writes)
 $register			= new ReflectionMethod( '\Nino\Auth', '_registerFailedAttemp' );
 $triesBefore	= \Nino\Filesystem::getFileContent( $appData, '/data/auth-tries.php', [] );
 $register->invokeArgs( null, [ &$appData, [ 'ip:127.0.0.1', 'test@example.com' ] ] );

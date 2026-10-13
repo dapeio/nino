@@ -128,7 +128,7 @@ namespace Nino\Modules\Language {
 				return;
 
 			$data 			= \Nino\Admin\Admin::postData();
-			$targetLocale = (string) ( $data['targetLocale'] ?? '' );
+			$targetLocale = \Nino\Admin\Admin::postString( $data, 'targetLocale' );
 			$translation 	= $data['translation'] ?? null;
 
 			if( \Nino\Locales::verifyLocale( $appData, $targetLocale ) === false ) {

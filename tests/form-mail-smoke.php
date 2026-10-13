@@ -22,6 +22,9 @@ $sandbox = ninoSandboxDir( $appData );
 
 $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 
+// What /data/ratelimit.php calls this client: the hash of its address, never the address
+$clientKey = hash( 'sha256', '127.0.0.1' );
+
 echo "Sandbox: $sandbox\n\n";
 
 
@@ -86,6 +89,19 @@ $_POST = array_merge( $_POST, [ 'name' => 'Attacker', 'email' => 'attacker@examp
 \Nino\Modules\Form::callbackResponse( $appData, $blockedRequest );
 check( 'a csrf-blocked request is rejected even with otherwise-valid fields', $blockedRequest['/nino/http/response']['statusCode'] === 403 );
 check( 'a csrf-blocked request does not send mail or record a submission', count( \Nino\Filesystem::getFileContent( $appData, '/data/forms.'. date( 'Y-m' ). '.php', [] ) ) === $submissionsBefore );
+check( 'Form::blocked() says it was Csrf that refused the request', \Nino\Form::blocked( $blockedRequest ) === true );
+
+// The same through requests of the site, on a copy of the sandbox so that the
+// guard \Nino\init() registers stays out of the rest of this suite
+$guardedAppData = $appData;
+\Nino\Csrf::init( $guardedAppData );
+$postVisit = ninoVisit( $guardedAppData, '/anywhere', 'POST' );
+\Nino\Http::response( $guardedAppData, $postVisit );
+$getVisit = ninoVisit( $guardedAppData, '/anywhere' );
+\Nino\Http::response( $guardedAppData, $getVisit );
+check( 'a POST without a token is refused by the guard, and Form::blocked() reads it', $postVisit['/nino/http/response']['statusCode'] === 403 && \Nino\Form::blocked( $postVisit ) === true );
+check( '...a GET is not blocked, whatever else it came to', $getVisit['/nino/http/response']['statusCode'] !== 403 && \Nino\Form::blocked( $getVisit ) === false );
+check( '...nor is a request nothing has looked at', \Nino\Form::blocked( [] ) === false );
 
 // A post that is not a flat map of strings. Casting one raised an engine
 // warning Runtime::handleError() treats as fatal - an unauthenticated 500
@@ -256,12 +272,11 @@ check( 'a submitted value is never read as a placeholder - in the [[fields]] tab
 // and the visitor knows to try again later. The cap is Mail's, 5 per hour
 $mailed = [];
 $countBefore = count( \Nino\Filesystem::getFileContent( $appData, $formsFile, [] ) );
-\Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [ '127.0.0.1' => [ 'tries' => 5, 'reset' => time() + 3600 ] ] );
+\Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [ $clientKey => [ 'tries' => 5, 'reset' => time() + 3600 ] ] );
 $cappedRequest = submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'Hi' ] );
 check( 'a submission the per-ip mail cap refuses is a 429, not ok - and neither mailed nor recorded', $cappedRequest['/nino/http/response']['statusCode'] === 429
 	&& isset( $cappedRequest['/nino/http/response']['body'] ) === false && $mailed === [] && count( \Nino\Filesystem::getFileContent( $appData, $formsFile, [] ) ) === $countBefore );
 \Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [] );
-unset( $appData['./nino/mail/ratelimited'] );
 
 // A mail that did not go out. The inquiry is recorded where a copy is kept -
 // it did happen, and it is in the panel - but the visitor is told it did not
@@ -554,42 +569,51 @@ $_POST = [];
 echo "\n";
 
 
-// --- Mail::_hit - per-ip send rate limiting --------------------------------
+// --- Mail::send - the per-ip send cap --------------------------------------
 
-echo "Mail::_hit - fixed-window rate limiting (private, exercised via Reflection)\n";
-
-$hit = new ReflectionMethod( '\Nino\Mail', '_hit' );
-$hit->setAccessible( true );
-
-// invokeArgs() with an array of references - plain invoke() can't pass
-// $appData by reference (Mail::_hit()'s first parameter), which would
-// silently work against a copy and never see this test's own prior writes
-function hitRateLimit( ReflectionMethod $hit, array &$appData, string $key ): bool {
-	return $hit->invokeArgs( null, [ &$appData, $key ] );
-}
+echo "Mail::send - the per-ip send cap: five a window, counted by Feature::count() under 'ratelimit'\n";
 
 $ratelimitPath = '/data/ratelimit.php';
-$rateKey 			= '203.0.113.1';
+
+// A transport takes the mails, so that the cap is the only thing that answers
+$capMails = [];
+\Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ) use ( &$capMails ): void {
+	$capMails[] = $mail['to'];
+	$mail['sent'] = true;
+} );
+\Nino\Filesystem::putFileContent( $appData, $ratelimitPath, [] );
 
 for( $i = 1; $i <= 5; $i++ )
-	check( "hit $i of 5 stays within budget (true)", hitRateLimit( $hit, $appData, $rateKey ) === true );
+	check( "send $i of 5 stays within budget and is not flagged as refused", \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' ) === true && \Nino\Mail::rateLimited( $appData ) === false );
 
-check( 'the 6th hit within the same window is rejected (false)', hitRateLimit( $hit, $appData, $rateKey ) === false );
-check( 'a 7th hit stays rejected too - the counter keeps growing, not stuck at the cap', hitRateLimit( $hit, $appData, $rateKey ) === false );
+check( 'the 6th send within the same window is refused, and rateLimited() says it was the cap', \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' ) === false && \Nino\Mail::rateLimited( $appData ) === true );
+check( '...before any transport was asked', count( $capMails ) === 5 );
+check( 'a 7th send stays refused - the counter keeps growing, not stuck at the cap', \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' ) === false );
 
 $rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
-check( 'the ratelimit file recorded every hit for this key, past the cap', ( $rateState[$rateKey]['tries'] ?? 0 ) === 7 );
+check( 'the file holds this client under the hash of its address, every send counted past the cap', array_keys( $rateState ) === [ $clientKey ] && ( $rateState[$clientKey]['tries'] ?? 0 ) === 7 );
+check( '...and the address itself is nowhere in it', str_contains( (string) file_get_contents( \Nino\Filesystem::path( $appData, $ratelimitPath ) ), '127.0.0.1' ) === false );
 
-check( 'a different key has its own independent budget', hitRateLimit( $hit, $appData, '203.0.113.2' ) === true );
+// Another client, and with it the next call: the flag the refusal left behind
+// belongs to that call, so a call within budget reads it as false
+$_SERVER['REMOTE_ADDR'] = '203.0.113.2';
+check( 'a different client has its own independent budget, and the call after a refusal reads as not refused', \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' ) === true && \Nino\Mail::rateLimited( $appData ) === false );
+$_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 
-// Force this key's window to already have elapsed, same as real wall-clock
-// expiry - the next hit must treat it as a fresh window, not carry the old count
-$rateState[$rateKey]['reset'] = time() - 1;
+$capBatch = [ [ 'to' => 'owner@example.org', 'subject' => 'a', 'body' => 'x', 'replyTo' => '' ] ];
+check( 'sendAll() is refused over the same budget and flags it the same way', \Nino\Mail::sendAll( $appData, $capBatch ) === false && \Nino\Mail::rateLimited( $appData ) === true );
+check( '...and an empty batch is no action: it answers true and clears the flag', \Nino\Mail::sendAll( $appData, [] ) === true && \Nino\Mail::rateLimited( $appData ) === false );
+
+// Force this client's window to already have elapsed, same as real wall-clock
+// expiry - the next send must treat it as a fresh window, not carry the old count
+$rateState[$clientKey]['reset'] = time() - 1;
 \Nino\Filesystem::putFileContent( $appData, $ratelimitPath, $rateState );
 
-check( 'a hit after the window elapsed starts a fresh budget (true)', hitRateLimit( $hit, $appData, $rateKey ) === true );
+check( 'a send after the window elapsed starts a fresh budget', \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' ) === true && \Nino\Mail::rateLimited( $appData ) === false );
 $rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
-check( 'and the stale entry was dropped rather than accumulating forever', $rateState[$rateKey]['tries'] === 1 );
+check( 'and the stale entry was dropped rather than accumulating forever', $rateState[$clientKey]['tries'] === 1 );
+
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
 
 echo "\n";
 
@@ -602,9 +626,8 @@ check( 'the callback name is a constant', \Nino\Mail::TRANSPORT === '/nino/mail/
 
 // A fresh budget for this test's client ip, whatever ran before
 $rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
-unset( $rateState['127.0.0.1'] );
+unset( $rateState[$clientKey] );
 \Nino\Filesystem::putFileContent( $appData, $ratelimitPath, $rateState );
-unset( $appData['./nino/mail/ratelimited'] );
 
 // The envelope sender is a global textfill, like the owner address it
 // falls back to - one place, the Text panel, for both
@@ -649,9 +672,8 @@ check( 'a nul byte is dropped from the body and every header value, never thrown
 // Six more mails than this block budgeted for - a fresh window, the same way
 // the block above opened one
 $rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
-unset( $rateState['127.0.0.1'] );
+unset( $rateState[$clientKey] );
 \Nino\Filesystem::putFileContent( $appData, $ratelimitPath, $rateState );
-unset( $appData['./nino/mail/ratelimited'] );
 
 ninoWarnings();
 
@@ -662,9 +684,8 @@ foreach( [ '[[/project/mail/address/owner]]', 'ask us anything', 'a@example.org,
 // Six sends, and the per-ip cap is five an hour - a fresh window between the
 // two groups, or the last of them never reaches a transport at all
 $rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
-unset( $rateState['127.0.0.1'] );
+unset( $rateState[$clientKey] );
 \Nino\Filesystem::putFileContent( $appData, $ratelimitPath, $rateState );
-unset( $appData['./nino/mail/ratelimited'] );
 
 $replyKept = [];
 foreach( [ 'reply@example.org', 'Max Mustermann <max@example.org>' ] as $isAnAddress )
@@ -694,9 +715,8 @@ check( '...and one recorded line per mail, naming the value, or nothing tells th
 \Nino\Html::addFills( $appData, [ '[[/project/company/contact/email]]' => 'hallo@example.com', '[[/project/mail/address/owner]]' => '[[/project/company/contact/email]]', '[[/project/mail/address/envelope]]' => '' ], '*' );
 
 $rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
-unset( $rateState['127.0.0.1'] );
+unset( $rateState[$clientKey] );
 \Nino\Filesystem::putFileContent( $appData, $ratelimitPath, $rateState );
-unset( $appData['./nino/mail/ratelimited'] );
 
 $chained = [];
 $chainedTransport = static function( array &$appData, array &$mail ) use ( &$chained ): void { $chained[] = $mail; $mail['sent'] = true; };
@@ -741,9 +761,8 @@ unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
 if( $transportBefore !== null )
 	$appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] = $transportBefore;
 $rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
-unset( $rateState['127.0.0.1'] );
+unset( $rateState[$clientKey] );
 \Nino\Filesystem::putFileContent( $appData, $ratelimitPath, $rateState );
-unset( $appData['./nino/mail/ratelimited'] );
 
 check( 'a plain reply address is untouched', ( $replyHeaders[4] ?? null ) === 'reply@example.org' && ( $replyKept['reply@example.org'] ?? false ) === true );
 check( '...and a display-name address keeps its name, because only the address part has to hold up',
@@ -752,9 +771,8 @@ check( '...and a display-name address keeps its name, because only the address p
 
 // ...and back to the budget the rest of this block was written against
 $rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
-unset( $rateState['127.0.0.1'] );
+unset( $rateState[$clientKey] );
 \Nino\Filesystem::putFileContent( $appData, $ratelimitPath, $rateState );
-unset( $appData['./nino/mail/ratelimited'] );
 
 // A first transport that leaves sent alone passes the mail on; the one
 // after it decides
@@ -771,18 +789,18 @@ check( 'a transport that leaves sent at null passes the mail on; sent = false is
 
 // The cap comes first: over budget, no transport is asked
 $rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
-$rateState['127.0.0.1'] = [ 'tries' => 5, 'reset' => time() + 3600 ];
+$rateState[$clientKey] = [ 'tries' => 5, 'reset' => time() + 3600 ];
 \Nino\Filesystem::putFileContent( $appData, $ratelimitPath, $rateState );
 $seen = [];
-check( 'the per-ip cap applies before any transport', \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' ) === false && $seen === [] && ( $appData['./nino/mail/ratelimited'] ?? false ) === true );
+check( 'the per-ip cap applies before any transport', \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' ) === false && $seen === [] && \Nino\Mail::rateLimited( $appData ) === true );
 
 // One action of one visitor, several envelopes: a contact form's owner
 // notification and the confirmation that answers it. Charging each mail
 // separately made a cap of five allow two submissions, and the third was
 // answered "sent" while nothing left the server
-unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ], $appData['./nino/mail/ratelimited'] );
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
 $rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
-unset( $rateState['127.0.0.1'] );
+unset( $rateState[$clientKey] );
 \Nino\Filesystem::putFileContent( $appData, $ratelimitPath, $rateState );
 
 $batched = [];
@@ -796,16 +814,16 @@ $pair = [
 	[ 'to' => 'jo@example.org',      'subject' => 'b', 'body' => 'y', 'replyTo' => 'owner@example.org' ],
 ];
 check( 'sendAll delivers every mail of one action', \Nino\Mail::sendAll( $appData, $pair ) === true && $batched === [ 'owner@example.org', 'jo@example.org' ] );
-check( 'and charges the cap once for the pair, not once per envelope', ( \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] )['127.0.0.1']['tries'] ?? 0 ) === 1 );
+check( 'and charges the cap once for the pair, not once per envelope', ( \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] )[$clientKey]['tries'] ?? 0 ) === 1 );
 
 $batched = [];
 for( $i = 0; $i < 4; $i++ )
 	\Nino\Mail::sendAll( $appData, $pair );
 check( 'so five submissions fit the window of five, and the sixth is refused whole', count( $batched ) === 8
-	&& \Nino\Mail::sendAll( $appData, $pair ) === false && count( $batched ) === 8 && ( $appData['./nino/mail/ratelimited'] ?? false ) === true );
+	&& \Nino\Mail::sendAll( $appData, $pair ) === false && count( $batched ) === 8 && \Nino\Mail::rateLimited( $appData ) === true );
 check( 'an empty batch is not an action and costs nothing', \Nino\Mail::sendAll( $appData, [] ) === true );
 
-unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ], $appData['./nino/mail/ratelimited'] );
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
 \Nino\Html::addFills( $appData, [ '[[/project/mail/address/envelope]]' => '' ], '*' );
 
 echo "\n";
@@ -823,13 +841,12 @@ echo "Mail::failure - a call that failed leaves a record, one that delivered eve
 	is waiting for	*/
 $statusPath = '/data/mail-status.php';
 $refused 		= [ 'refused@example.org' ];
-unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ], $appData['./nino/mail/ratelimited'] );
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
 \Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ) use ( &$refused ): void {
 	$mail['sent'] = in_array( $mail['to'], $refused, true ) === false;
 } );
 $freshWindow = static function() use ( &$appData, $ratelimitPath ): void {
 	\Nino\Filesystem::putFileContent( $appData, $ratelimitPath, [] );
-	unset( $appData['./nino/mail/ratelimited'] );
 };
 
 @unlink( \Nino\Filesystem::path( $appData, $statusPath ) );
@@ -857,8 +874,7 @@ check( 'a second failure keeps the first date and adds one to the count', $recor
 
 // A call that sent nothing neither raises nor clears: the cap refused it, or
 // there was nothing to send
-\Nino\Filesystem::putFileContent( $appData, $ratelimitPath, [ '127.0.0.1' => [ 'tries' => 5, 'reset' => time() + 3600 ] ] );
-unset( $appData['./nino/mail/ratelimited'] );
+\Nino\Filesystem::putFileContent( $appData, $ratelimitPath, [ $clientKey => [ 'tries' => 5, 'reset' => time() + 3600 ] ] );
 $appData['./nino/mail/results'] = [ true, true ];
 check( 'a send the cap refused answers false and leaves the record as it was', \Nino\Mail::send( $appData, 'ok@example.org', 'a', 'b', '' ) === false
 	&& ( \Nino\Mail::failure( $appData )['count'] ?? 0 ) === 2 );
@@ -915,7 +931,7 @@ check( '...and the next failure starts a clean one', ( \Nino\Mail::failure( $app
 
 // A transport that takes no mail and leaves 'sent' alone falls through to
 // mail(): not exercised here, the record rests on _deliver()'s answer alone
-unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ], $appData['./nino/mail/ratelimited'], $appData['./nino/mail/results'] );
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ], $appData['./nino/mail/results'] );
 \Nino\Filesystem::putFileContent( $appData, $statusPath, [] );
 $freshWindow();
 

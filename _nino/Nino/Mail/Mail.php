@@ -12,13 +12,15 @@ namespace Nino {
 
 	// Mail - thin wrapper around mail(): centralizes Content-Type/Reply-To
 	// headers (one place for a project-wide change) and a shared per-ip
-	// send cap (5/hour, /data/ratelimit.php) - over budget, send() and
-	// sendAll() return false and leave './nino/mail/ratelimited' behind,
-	// which is what tells a caller "we refused to send this" apart from a
-	// mail() that failed: \Nino\Form::handle() reads the flag and answers
-	// 429 without recording the submission, where a mail no transport took
-	// is recorded and answered 500 - and what each mail of the call came to
-	// is left in './nino/mail/results', in input order, for a caller that
+	// send cap (5/hour, counted by \Nino\Feature::count() in
+	// /data/ratelimit.php) - over budget, send() and sendAll() return false
+	// and rateLimited() answers true, which is what tells a caller "we
+	// refused to send this" apart from a mail() that failed:
+	// \Nino\Form::handle() asks it and answers 429 without recording the
+	// submission, where a mail no transport took is recorded and answered 500.
+	// The signal belongs to the call that was made, not to the request: both
+	// methods reset it where they reset what each mail of the call came to,
+	// './nino/mail/results', which is left in input order for a caller that
 	// has to tell the first from the rest
 	//
 	// A call that sent something also keeps one record of how it went,
@@ -53,18 +55,36 @@ namespace Nino {
 		// the mail on: to the next callback, and finally to mail()
 		public const string TRANSPORT = '/nino/mail/send';
 
-		// Send an html mail with a Reply-To header, unless the current
-		// client ip has hit the send cap for this window
+		/**
+		 *	Send an html mail with a Reply-To header, unless the current client
+		 *	ip has hit the send cap for this window. The cap is a counter of the
+		 *	toolset, \Nino\Feature::count() under the name 'ratelimit', keyed by the
+		 *	address of the client (hashed there, as every key is): a kernel class
+		 *	calls it because the counter is the same one a feature keeps its own
+		 *	by. Both signals of the call are reset on entry - what the mail came
+		 *	to in './nino/mail/results' and whether the cap refused it, see
+		 *	rateLimited() - so that nothing of an earlier call is read as this
+		 *	one's.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$to
+		 *	@param		string		$subject
+		 *	@param		string		$body
+		 *	@param		string		$replyTo
+		 *
+		 *	@return 	bool										Whether the mail was delivered
+		 */
 		public static function send( array &$appData, string $to, string $subject, string $body, string $replyTo ): bool {
 
-			$appData['./nino/mail/results'] = [];
+			$appData['./nino/mail/results']			= [];
+			$appData['./nino/mail/ratelimited']	= false;
 
-			if( self::_hit( $appData, \Nino\Http::getClientIp( $appData ) ) === false ) {
+			if( \Nino\Feature::count( $appData, 'ratelimit', \Nino\Http::getClientIp( $appData ), self::MAX_TRIES, self::WINDOW ) === false ) {
 
 				// Flagged rather than just reported through the return value, so
 				// a caller can tell "we refused to send this" apart from "mail()
 				// failed" - Form uses it to not record a submission whose mail
-				// was never attempted (see \Nino\Form::handle())
+				// was never attempted (see \Nino\Form::handle() and rateLimited())
 				$appData['./nino/mail/ratelimited'] = true;
 
 				return false;
@@ -90,11 +110,12 @@ namespace Nino {
 		 *	relay, and a relay is measured in submissions, not in envelopes.
 		 *
 		 *	What each mail came to is left in './nino/mail/results', one bool
-		 *	per mail in the order they were given - reset on every call, a cap
-		 *	refusal and an empty batch included, so a caller never reads the
-		 *	answer of an earlier one. The failure record (see failure()) is
-		 *	written once for the whole call: a failure if any mail failed,
-		 *	cleared only if every one was delivered.
+		 *	per mail in the order they were given - and whether the cap refused
+		 *	the call in './nino/mail/ratelimited', see rateLimited(). Both are
+		 *	reset on every call, a cap refusal and an empty batch included, so a
+		 *	caller never reads the answer of an earlier one. The failure record
+		 *	(see failure()) is written once for the whole call: a failure if any
+		 *	mail failed, cleared only if every one was delivered.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$mails				[ { to, subject, body, replyTo }, ... ]
@@ -103,12 +124,13 @@ namespace Nino {
 		 */
 		public static function sendAll( array &$appData, array $mails ): bool {
 
-			$appData['./nino/mail/results'] = [];
+			$appData['./nino/mail/results']			= [];
+			$appData['./nino/mail/ratelimited']	= false;
 
 			if( $mails === [] )
 				return true;
 
-			if( self::_hit( $appData, \Nino\Http::getClientIp( $appData ) ) === false ) {
+			if( \Nino\Feature::count( $appData, 'ratelimit', \Nino\Http::getClientIp( $appData ), self::MAX_TRIES, self::WINDOW ) === false ) {
 				$appData['./nino/mail/ratelimited'] = true;
 				return false;
 			}
@@ -130,6 +152,23 @@ namespace Nino {
 			self::_recordOutcome( $appData, $sent );
 
 			return $sent;
+		}
+
+		/**
+		 *	Whether the last send() or sendAll() was refused by the per-ip cap -
+		 *	which is not a mail() that failed: nothing was attempted, and a
+		 *	caller that records or reports the failure answers differently (a
+		 *	form answers 429 and keeps no submission). Per call, not sticky: each
+		 *	of the two sets it again, to false where the call was not refused, so
+		 *	a caller that sends twice reads the answer of the second.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	bool
+		 */
+		public static function rateLimited( array &$appData ): bool {
+
+			return ( $appData['./nino/mail/ratelimited'] ?? false ) === true;
 		}
 
 		/**
@@ -399,38 +438,6 @@ namespace Nino {
 			}
 
 			return ( filter_var( $sender, FILTER_VALIDATE_EMAIL ) !== false ) ? $sender : '';
-		}
-
-		// Register one send attempt for $key and report whether it's
-		// still within budget for the current window. Any key (not just
-		// the one being checked) whose window has already elapsed is
-		// dropped on write, so the state file can't grow without bound.
-		private static function _hit( array &$appData, string $key ): bool {
-
-			$path 	= '/data/ratelimit.php';
-			$now 		= time();
-			$tries	= null;
-
-			// An unlocked read-modify-write lets two parallel sends read the
-			// same counter and write back the same +1, bypassing the cap by
-			// simply firing requests concurrently - which is what a sending
-			// burst looks like anyway. No reliable counter, no send: an
-			// unreliable cap is worse than a closed one here.
-			$written = \Nino\Filesystem::mutate( $appData, $path, function( array $state ) use ( $key, $now, &$tries ): array {
-
-				foreach( $state as $stateKey => $entry )
-					if( ( $entry['reset'] ?? 0 ) <= $now )
-						unset( $state[$stateKey] );
-
-				$entry 					= $state[$key] ?? [ 'tries' => 0, 'reset' => $now + self::WINDOW ];
-				$entry['tries']	= (int) $entry['tries'] + 1;
-				$state[$key] 		= $entry;
-				$tries 					= $entry['tries'];
-
-				return $state;
-			} );
-
-			return $written === true && $tries <= self::MAX_TRIES;
 		}
 	}
 }

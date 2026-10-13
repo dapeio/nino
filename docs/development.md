@@ -442,6 +442,8 @@ The respective target names are then included as shortcodes:
 
 Only if the target name ends with `.min` is it additionally minified. The cache considers path, size, and modification time of the source files.
 
+A feature does not write that array. It names its files under `assets` in its manifest, and `\Nino\Features::registerAssets()` adds every `.css` to `/.cache/style.css` and every `.js` to `/.cache/script.js` while the feature is active - see [Assets](features.md#assets).
+
 Assets deliberately **do not** go through the full HTML+ engine. Only the two secure directory fills are replaced: `[[/nino/dir]]` and `[[/nino/public]]`. This prevents editorial textfills or shortcodes from inadvertently generating executable CSS or JavaScript code. Both are needed - `Nino.ui.js` falls back to `[[/nino/dir]]/.form` for a form that carries no action of its own, and the base unit's `theme.css` addresses its three webfonts through `[[/nino/public]]`.
 
 ### Final HTML Callbacks
@@ -465,7 +467,7 @@ This hook is suitable for clearly limited, global post-processing. Project logic
 
 ## Important Kernel APIs
 
-The kernel classes live one per file, in `_nino/Nino/<Class>/<Class>.php`, and are loaded on first use; the docblocks of each state its public tasks. Use the public methods instead of the internal implementations starting with `_`. This keeps project code decoupled from details like cache invalidation, file format, and session rotation.
+The kernel classes live one per file, in `_nino/Nino/<Class>/<Class>.php`, and are loaded on first use; the docblocks of each state its public tasks. Use the public methods instead of the internal implementations starting with `_`. This keeps project code decoupled from details like cache invalidation, file format, and session rotation. `\Nino\Feature` is the class a feature calls for what every feature needs - the template its markup lives in, the class attribute, a flag, a counter per client, a slug, the widening of the Content-Security-Policy - and its docblocks are the reference.
 
 ---
 

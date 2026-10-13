@@ -439,6 +439,14 @@ unlink( $sandbox. '/private/templates/not-a-page.tpl' );
 check( 'PageEditor actions require an authed _admin session too', $status === 401 );
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 
+// A config.php that holds the routes as null - a hand edit - is a project without routes, as the readers took it
+// before they read through AppData::stored(): the tile counts none and a move finds no page, where a TypeError is a 500
+$routesStored = \Nino\AppData::stored( $appData, '/nino/http/routes' );
+\Nino\Filesystem::mutate( $appData, '/config.php', static function( array $config ): array { $config['/nino/http/routes'] = null; return $config; } );
+[ $nullStatus ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiMove', [ 'httpUri' => '/about', 'direction' => 'up' ] );
+check( 'a config.php that holds the routes as null is a project without routes: the dashboard tile counts none and a move finds no page', \Nino\Modules\Routes\Admin::count( $appData ) === 0 && $nullStatus === 404 );
+\Nino\Filesystem::mutate( $appData, '/config.php', static function( array $config ) use ( $routesStored ): array { $config['/nino/http/routes'] = $routesStored; return $config; } );
+
 echo "\n";
 
 

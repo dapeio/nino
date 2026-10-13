@@ -484,7 +484,7 @@ namespace Nino\Admin {
 			// and say what it was, because the csrf guard answers a bare 403
 			// and a page that outlived its session reads that as "not allowed"
 			if( $request['/nino/http/response']['statusCode'] !== 200 ) {
-				if( ( $request['./nino/csrf/blocked'] ?? false ) === true )
+				if( \Nino\Form::blocked( $request ) === true )
 					self::_failBlocked( $request );
 				return;
 			}
@@ -934,6 +934,31 @@ namespace Nino\Admin {
 				return $fills;
 
 			return (array) \Nino\Filesystem::getFileContent( $appData, $dir. '/en_US.php', [] );
+		}
+
+		/**
+		 *	One posted value as a string. The payload is untrusted json, so a
+		 *	field that should hold a string may hold anything: a string is
+		 *	itself, a whole or a decimal number is its text, and an array, a
+		 *	bool, null or a key that is not there is $default. Never a cast: the
+		 *	cast of an array raises "Array to string conversion", a level the
+		 *	runtime treats as fatal - a 500 for a payload one line long. Not
+		 *	trimmed, which is the caller's to do where it wants it.
+		 *
+		 *	@param		array 		$data					The posted payload, see postData()
+		 *	@param		string		$key
+		 *	@param		string		$default			Answered for anything that is neither a string nor a number
+		 *
+		 *	@return 	string
+		 */
+		public static function postString( array $data, string $key, string $default = '' ): string {
+
+			$value = $data[$key] ?? null;
+
+			if( is_string( $value ) === true )
+				return $value;
+
+			return is_int( $value ) === true || is_float( $value ) === true ? (string) $value : $default;
 		}
 
 		/**
@@ -1927,7 +1952,7 @@ namespace Nino\Admin {
 
 			if( $action === 'recovery/login' ) {
 
-				$status = self::verify( $appData, (string) ( $data['password'] ?? '' ) );
+				$status = self::verify( $appData, Admin::postString( $data, 'password' ) );
 
 				if( $status !== 200 ) {
 					\Nino\Http::fail( $request, $status, $status === 429 ? 'too many attempts' : 'wrong password' );
@@ -1969,7 +1994,7 @@ namespace Nino\Admin {
 					return;
 
 				case 'recovery/restore':
-					$date = (string) ( $data['date'] ?? '' );
+					$date = Admin::postString( $data, 'date' );
 					// Asked first: the date check below reads a constant of the
 					// module, and a delivery without it has to be told 501 here
 					// rather than fall over that read
@@ -2035,8 +2060,8 @@ namespace Nino\Admin {
 		 */
 		private static function _reset( array &$appData, array &$request, array $data ): void {
 
-			$mail = trim( (string) ( $data['mail'] ?? '' ) );
-			$pw 	= (string) ( $data['pw'] ?? '' );
+			$mail = trim( Admin::postString( $data, 'mail' ) );
+			$pw 	= Admin::postString( $data, 'pw' );
 
 			if( self::_validateMailPw( $request, $mail, $pw ) === false )
 				return;
@@ -2081,8 +2106,8 @@ namespace Nino\Admin {
 		 */
 		private static function _create( array &$appData, array &$request, array $data ): void {
 
-			$mail = trim( (string) ( $data['mail'] ?? '' ) );
-			$pw 	= (string) ( $data['pw'] ?? '' );
+			$mail = trim( Admin::postString( $data, 'mail' ) );
+			$pw 	= Admin::postString( $data, 'pw' );
 
 			if( ( $data['confirm'] ?? false ) !== true ) {
 				\Nino\Http::fail( $request, 400, 'confirmation required' );

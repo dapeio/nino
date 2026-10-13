@@ -103,6 +103,11 @@ namespace Nino {
 		\Nino\Csrf::init( $appData );
 		\Nino\Html::init( $appData );
 		\Nino\Auth::init( $appData );
+
+		// The files the manifests of the active features name, in the two
+		// bundles of the site - ahead of the init() of any module, so that what a
+		// feature adds to a bundle itself comes after them
+		\Nino\Features::registerAssets( $appData );
 		\Nino\Modules::callModules( $appData, 'init' );
 
 		return $appData;
@@ -174,7 +179,7 @@ namespace Nino {
 	}
 
 	// The kernel classes - AppData, Auth, Callbacks, Catalogue, Csrf,
-	// Features, Fetch, Filesystem, Form, Backup, RotatingLog, Elements, Html, Http,
+	// Feature, Features, Fetch, Filesystem, Form, Backup, RotatingLog, Elements, Html, Http,
 	// Images, Locales, Text, Mail, Modules and Runtime - each live in their own file under
 	// _nino/Nino/<Class>/<Class>.php and are autoloaded on first use by
 	// the spl_autoload_register() call at the bottom of this file, from

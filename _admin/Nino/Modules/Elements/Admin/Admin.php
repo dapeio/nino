@@ -181,7 +181,7 @@ namespace Nino\Modules\Elements {
 			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
 				return;
 
-			$type = (string) ( \Nino\Admin\Admin::postData()['type'] ?? '' );
+			$type = \Nino\Admin\Admin::postString( \Nino\Admin\Admin::postData(), 'type' );
 
 			if( in_array( $type, self::types( $appData ), true ) === false ) {
 				\Nino\Http::fail( $request, 404, 'unknown type' );
@@ -190,7 +190,7 @@ namespace Nino\Modules\Elements {
 
 			$typeData = self::typeData( $appData, $type );
 			$model = $typeData['model'] ?? [];
-			$locale = (string) ( \Nino\Admin\Admin::postData()['locale'] ?? '' );
+			$locale = \Nino\Admin\Admin::postString( \Nino\Admin\Admin::postData(), 'locale' );
 
 			// The table view reads one translation at a time: global fields plus
 			// the picked locale's. Without one, fall back to the old "any locale"
@@ -243,8 +243,8 @@ namespace Nino\Modules\Elements {
 				return;
 
 			$data = \Nino\Admin\Admin::postData();
-			$type = (string) ( $data['type'] ?? '' );
-			$uri	= (string) ( $data['uri'] ?? '' );
+			$type = \Nino\Admin\Admin::postString( $data, 'type' );
+			$uri	= \Nino\Admin\Admin::postString( $data, 'uri' );
 
 			if( in_array( $type, self::types( $appData ), true ) === false || $uri === '' || str_contains( $uri, '/' ) === true ) {
 				\Nino\Http::fail( $request, 404, 'unknown type or element' );
@@ -338,10 +338,10 @@ namespace Nino\Modules\Elements {
 				return;
 
 			$data 		= \Nino\Admin\Admin::postData();
-			$type 		= (string) ( $data['type'] ?? '' );
-			$uri 			= (string) ( $data['uri'] ?? '' );
-			$locale 	= (string) ( $data['locale'] ?? '' );
-			$key 			= (string) ( $data['key'] ?? '' );
+			$type 		= \Nino\Admin\Admin::postString( $data, 'type' );
+			$uri 			= \Nino\Admin\Admin::postString( $data, 'uri' );
+			$locale 	= \Nino\Admin\Admin::postString( $data, 'locale' );
+			$key 			= \Nino\Admin\Admin::postString( $data, 'key' );
 
 			if( in_array( $type, self::types( $appData ), true ) === false || $uri === '' || str_contains( $uri, '/' ) === true || \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
 				\Nino\Http::fail( $request, 400, 'invalid type, uri or locale' );
@@ -474,10 +474,10 @@ namespace Nino\Modules\Elements {
 				return;
 
 			$data 		= \Nino\Admin\Admin::postData();
-			$type 		= (string) ( $data['type'] ?? '' );
-			$uri 			= (string) ( $data['uri'] ?? '' );
-			$locale 	= (string) ( $data['locale'] ?? '' );
-			$key 			= (string) ( $data['key'] ?? '' );
+			$type 		= \Nino\Admin\Admin::postString( $data, 'type' );
+			$uri 			= \Nino\Admin\Admin::postString( $data, 'uri' );
+			$locale 	= \Nino\Admin\Admin::postString( $data, 'locale' );
+			$key 			= \Nino\Admin\Admin::postString( $data, 'key' );
 
 			if( in_array( $type, self::types( $appData ), true ) === false || $uri === '' || str_contains( $uri, '/' ) === true || \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
 				\Nino\Http::fail( $request, 400, 'invalid type, uri or locale' );
@@ -663,9 +663,9 @@ namespace Nino\Modules\Elements {
 				return;
 
 			$data 		= \Nino\Admin\Admin::postData();
-			$type 		= (string) ( $data['type'] ?? '' );
-			$uri 			= (string) ( $data['uri'] ?? '' );
-			$locale 	= (string) ( $data['locale'] ?? '' );
+			$type 		= \Nino\Admin\Admin::postString( $data, 'type' );
+			$uri 			= \Nino\Admin\Admin::postString( $data, 'uri' );
+			$locale 	= \Nino\Admin\Admin::postString( $data, 'locale' );
 			$isNew 		= ( $data['isNew'] ?? false ) === true;
 			$fields 	= is_array( $data['fields'] ?? null ) ? $data['fields'] : [];
 
@@ -752,8 +752,8 @@ namespace Nino\Modules\Elements {
 				return;
 
 			$data = \Nino\Admin\Admin::postData();
-			$type = (string) ( $data['type'] ?? '' );
-			$uri	= (string) ( $data['uri'] ?? '' );
+			$type = \Nino\Admin\Admin::postString( $data, 'type' );
+			$uri	= \Nino\Admin\Admin::postString( $data, 'uri' );
 
 			if( in_array( $type, self::types( $appData ), true ) === false || $uri === '' || str_contains( $uri, '/' ) === true ) {
 				\Nino\Http::fail( $request, 400, 'invalid type or uri' );

@@ -226,9 +226,9 @@ namespace Nino\Modules\Text {
 				return;
 
 			$data 		= \Nino\Admin\Admin::postData();
-			$key 			= (string) ( $data['key'] ?? '' );
+			$key 			= \Nino\Admin\Admin::postString( $data, 'key' );
 			$isGlobal = ( $data['global'] ?? false ) === true;
-			$value 		= (string) ( $data['value'] ?? '' );
+			$value 		= \Nino\Admin\Admin::postString( $data, 'value' );
 			$format 	= self::_postedFormat( $data );
 
 			if( \Nino\Text::isGrammarKey( $key ) === false ) {
@@ -393,7 +393,7 @@ namespace Nino\Modules\Text {
 				return;
 
 			$data 		= \Nino\Admin\Admin::postData();
-			$key 			= (string) ( $data['key'] ?? '' );
+			$key 			= \Nino\Admin\Admin::postString( $data, 'key' );
 			$isGlobal = ( $data['global'] ?? false ) === true;
 			$blacklisted = ( $data['blacklisted'] ?? false ) === true;
 
@@ -584,8 +584,8 @@ namespace Nino\Modules\Text {
 				return;
 
 			$data 	= \Nino\Admin\Admin::postData();
-			$key 		= (string) ( $data['key'] ?? '' );
-			$newKey = (string) ( $data['newKey'] ?? '' );
+			$key 		= \Nino\Admin\Admin::postString( $data, 'key' );
+			$newKey = \Nino\Admin\Admin::postString( $data, 'newKey' );
 
 			if( \Nino\Text::isGrammarKey( $newKey ) === false ) {
 				\Nino\Http::fail( $request, 400, 'invalid new key', 'keys_invalid', [ $newKey ], 'newKey' );
@@ -679,7 +679,7 @@ namespace Nino\Modules\Text {
 				return;
 
 			$data = \Nino\Admin\Admin::postData();
-			$key 	= (string) ( $data['key'] ?? '' );
+			$key 	= \Nino\Admin\Admin::postString( $data, 'key' );
 
 			$entry = \Nino\Text::entry( $appData, $key );
 

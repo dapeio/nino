@@ -1,0 +1,3 @@
+/* The reference feature's style sheet: the manifest names it under "assets", so the site's style bundle carries it */
+.sample-greeting { font-weight: 600; }
+.sample-notice { opacity: .8; }

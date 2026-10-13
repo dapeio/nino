@@ -299,8 +299,8 @@ namespace Nino\Modules\Users {
 				return;
 
 			$data 	= \Nino\Admin\Admin::postData();
-			$id 		= (string) ( $data['id'] ?? '' );
-			$label 	= trim( (string) ( $data['label'] ?? '' ) );
+			$id 		= \Nino\Admin\Admin::postString( $data, 'id' );
+			$label 	= trim( \Nino\Admin\Admin::postString( $data, 'label' ) );
 			$perms 	= $data['perms'] ?? null;
 
 			if( preg_match( self::ID_PATTERN, $id ) !== 1 ) {
@@ -375,7 +375,7 @@ namespace Nino\Modules\Users {
 			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
 				return;
 
-			$id = (string) ( \Nino\Admin\Admin::postData()['id'] ?? '' );
+			$id = \Nino\Admin\Admin::postString( \Nino\Admin\Admin::postData(), 'id' );
 
 			if( isset( self::all( $appData )[$id] ) === false ) {
 				\Nino\Http::fail( $request, 404, 'unknown role' );

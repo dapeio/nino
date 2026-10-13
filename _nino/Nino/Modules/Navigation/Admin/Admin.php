@@ -195,8 +195,8 @@ namespace Nino\Modules\Navigation {
 			try {
 
 				$data 				= \Nino\Admin\Admin::postData();
-				$key 					= trim( (string) ( $data['key'] ?? '' ) );
-				$originalKey 	= trim( (string) ( $data['originalKey'] ?? '' ) );
+				$key 					= trim( \Nino\Admin\Admin::postString( $data, 'key' ) );
+				$originalKey 	= trim( \Nino\Admin\Admin::postString( $data, 'originalKey' ) );
 
 				if( self::isValidKey( $key ) === false ) {
 					\Nino\Http::fail( $request, 400, 'invalid navigation id: "'. $key. '"', 'navs_invalid_id', [ $key ], 'key' );
@@ -329,7 +329,7 @@ namespace Nino\Modules\Navigation {
 
 			try {
 
-				$key 			= (string) ( \Nino\Admin\Admin::postData()['key'] ?? '' );
+				$key 			= \Nino\Admin\Admin::postString( \Nino\Admin\Admin::postData(), 'key' );
 				$config 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 				$registry = self::_storedRegistry( $config );
 				$index 		= array_search( $key, $registry, true );

@@ -6,8 +6,10 @@ declare(strict_types=1);
  *	html-smoke.php			Dependency-free smoke test for \Nino\Html: resolveTextfill(), the
  *											formats of a field - sanitizeHtml() with its profiles,
  *											detectFormat(), fieldFormat(), fieldValue() - as the element
- *											shortcodes apply them, and the [json] shortcode. Runs against an
- *											isolated sandbox directory, never touches the real project data.
+ *											shortcodes apply them, the [json] shortcode, and the fills of
+ *											another language, the address of the site and a fill taken back.
+ *											Runs against an isolated sandbox directory, never touches the real
+ *											project data.
  *
  *	Usage: php tests/html-smoke.php
  */
@@ -242,6 +244,82 @@ check( 'nothing that could close the surrounding <script> survives encoding', st
 check( 'the raw-fill form this replaces really is invalid json', json_decode( \Nino\Html::renderHtml( $appData, '{ "streetAddress": "[[/test/json/multiline]]" }' ), true ) === null );
 
 echo "\n";
+
+// --- Html::getFills of a language, absoluteUrl and removeFill ----------------
+
+echo "Html::getFills, absoluteUrl and removeFill - the fills of another language, the address of the site, a fill taken back\n";
+
+// A sandbox of its own: the text files below are this section's, and no other check reads them
+$fills = ninoSandbox( 'html-fills' );
+\Nino\Filesystem::putFileContent( $fills, '/text/global.php', [ '[[/t/global]]' => 'in every language', '[[/t/both]]' => 'global text' ] );
+\Nino\Filesystem::putFileContent( $fills, '/text/de_DE.php', [ '[[/t/both]]' => 'de text', '[[/t/de]]' => 'only de' ] );
+\Nino\Filesystem::putFileContent( $fills, '/text/en_US.php', [ '[[/t/both]]' => 'en text', '[[/t/en]]' => 'only en' ] );
+// ...and a file with a star in its name, which is no language: * is no pattern, and no file of it is read
+file_put_contents( \Nino\Filesystem::path( $fills, '/text' ). '/*.php', '<?php return [ \'[[/t/starfile]]\' => \'from a file named star\' ];' );
+\Nino\Html::addFills( $fills, [ '/t/both' => 'de runtime' ], 'de_DE' );
+\Nino\Html::addFills( $fills, [ '/t/en' => 'en runtime', '/t/star' => 'en wants this' ], 'en_US' );
+\Nino\Html::addFills( $fills, [ '/t/star' => 'star' ], '*' );
+\Nino\Locales::setCurrentLocale( $fills, 'de_DE' );
+
+$fillsOfCurrent = \Nino\Html::getFills( $fills );
+check( 'getFills() is the current language\'s: the global text, the language\'s own, its runtime fills and last those of *, as it always was', $fillsOfCurrent['[[/t/global]]'] === 'in every language'
+	&& $fillsOfCurrent['[[/t/both]]'] === 'de runtime' && $fillsOfCurrent['[[/t/de]]'] === 'only de' && $fillsOfCurrent['[[/t/star]]'] === 'star' && isset( $fillsOfCurrent['[[/t/en]]'] ) === false );
+check( '...and so it is for null and for \'\'', \Nino\Html::getFills( $fills, null ) === $fillsOfCurrent && \Nino\Html::getFills( $fills, '' ) === $fillsOfCurrent && \Nino\Html::getFills( $fills, 'de_DE' ) === $fillsOfCurrent );
+$fillsOfOther = \Nino\Html::getFills( $fills, 'en_US' );
+check( 'the fills of another language of the site are its own text and its own runtime fills, merged the same way, while the visitor stays in theirs', $fillsOfOther['[[/t/global]]'] === 'in every language'
+	&& $fillsOfOther['[[/t/both]]'] === 'en text' && $fillsOfOther['[[/t/en]]'] === 'en runtime' && isset( $fillsOfOther['[[/t/de]]'] ) === false && \Nino\Locales::getCurrentLocale( $fills ) === 'de_DE' );
+check( '...and the fills that belong to no language win there too', $fillsOfOther['[[/t/star]]'] === 'star' );
+$fillsOfNone = \Nino\Html::getFills( $fills, '*' );
+check( 'asked for *, it is the global text and the fills that belong to no language - no language\'s own', $fillsOfNone['[[/t/global]]'] === 'in every language' && $fillsOfNone['[[/t/star]]'] === 'star'
+	&& isset( $fillsOfNone['[[/t/de]]'] ) === false && isset( $fillsOfNone['[[/t/en]]'] ) === false );
+check( '...and no file is read for it, not even one that has a star in its name', is_file( \Nino\Filesystem::path( $fills, '/text' ). '/*.php' ) === true && isset( $fillsOfNone['[[/t/starfile]]'] ) === false );
+check( 'a language the site does not have has no fills - none from a file of that name either', \Nino\Html::getFills( $fills, 'fr_FR' ) === [] && \Nino\Html::getFills( $fills, '../private/config' ) === [] && ninoWarnings() === [] );
+
+\Nino\Html::addFills( $fills, [ '/project/website/general/url' => 'example.com/shop/' ], '*' );
+check( 'absoluteUrl() is https:// and the address of the website, the slash at the end of the value gone, and the path as it is given', \Nino\Html::absoluteUrl( $fills, '/page' ) === 'https://example.com/shop/page'
+	&& \Nino\Html::absoluteUrl( $fills ) === 'https://example.com/shop' && \Nino\Html::absoluteUrl( $fills, '/' ) === 'https://example.com/shop/' && \Nino\Html::absoluteUrl( $fills, '/a?b=1#c' ) === 'https://example.com/shop/a?b=1#c' );
+\Nino\Html::addFills( $fills, [ '/test/host' => 'example.org', '/project/website/general/url' => '/[[/test/host]]/shop//' ], '*' );
+check( '...the fills inside the value resolved, a slash on either side of it gone', \Nino\Html::absoluteUrl( $fills, '/page' ) === 'https://example.org/shop/page' );
+\Nino\Html::addFills( $fills, [ '/project/website/general/url' => '' ], '*' );
+$fillsNoUrl = \Nino\Html::absoluteUrl( $fills, '/page' );
+\Nino\Html::addFills( $fills, [ '/project/website/general/url' => '/' ], '*' );
+$fillsSlashUrl = \Nino\Html::absoluteUrl( $fills, '/page' );
+\Nino\Html::removeFill( $fills, '/project/website/general/url' );
+check( 'a website without an address has no absolute one, whether its value is empty, a slash or not there at all', $fillsNoUrl === '' && $fillsSlashUrl === '' && \Nino\Html::absoluteUrl( $fills, '/page' ) === '' && \Nino\Html::absoluteUrl( $fills ) === '' );
+
+\Nino\Html::addFills( $fills, [ '/t/rm/star' => 'star value', '/t/rm/bracketed' => 'bracketed value' ], '*' );
+\Nino\Html::addFills( $fills, [ '/t/rm/de' => 'de value', '/t/rm/current' => 'current value' ], 'de_DE' );
+\Nino\Html::addFills( $fills, [ '/t/rm/de' => 'en value' ], 'en_US' );
+\Nino\Html::addFills( $fills, [ '/t/rm/both' => 'in every language' ], '*' );
+\Nino\Html::addFills( $fills, [ '/t/rm/both' => 'de value' ], 'de_DE' );
+check( 'the fills to take back render', \Nino\Html::renderHtml( $fills, '[[/t/rm/star]]|[[/t/rm/bracketed]]|[[/t/rm/de]]|[[/t/rm/current]]' ) === 'star value|bracketed value|de value|current value' );
+\Nino\Html::removeFill( $fills, '/t/rm/star' );
+\Nino\Html::removeFill( $fills, '[[/t/rm/bracketed]]' );
+check( 'removeFill() takes a fill added for * out of the render, spelled with its brackets or without', \Nino\Html::renderHtml( $fills, '[[/t/rm/star]]|[[/t/rm/bracketed]]' ) === '[[/t/rm/star]]|[[/t/rm/bracketed]]'
+	&& isset( \Nino\Html::getFills( $fills )['[[/t/rm/star]]'] ) === false );
+\Nino\Html::removeFill( $fills, '/t/rm/de' );
+check( '...a fill added for a language is not taken back by *, but by that language', \Nino\Html::renderHtml( $fills, '[[/t/rm/de]]' ) === 'de value' );
+\Nino\Html::removeFill( $fills, '/t/rm/de', 'de_DE' );
+check( '...and takes only that language\'s: the other one keeps its own', \Nino\Html::renderHtml( $fills, '[[/t/rm/de]]' ) === '[[/t/rm/de]]' && \Nino\Html::getFills( $fills, 'en_US' )['[[/t/rm/de]]'] === 'en value' );
+\Nino\Html::removeFill( $fills, '/t/rm/both', 'de_DE' );
+check( '...the same key under * stays when the language\'s is taken back, and the other way round', \Nino\Html::getFills( $fills, '*' )['[[/t/rm/both]]'] === 'in every language' && \Nino\Html::getFills( $fills, 'de_DE' )['[[/t/rm/both]]'] === 'in every language'
+	&& isset( $fills['./nino/html/fills']['de_DE']['[[/t/rm/both]]'] ) === false );
+\Nino\Html::addFills( $fills, [ '/t/rm/both' => 'de value' ], 'de_DE' );
+\Nino\Html::removeFill( $fills, '/t/rm/both' );
+check( '...and the one of the language stays when * is taken back', \Nino\Html::getFills( $fills, 'de_DE' )['[[/t/rm/both]]'] === 'de value' && isset( $fills['./nino/html/fills']['*']['[[/t/rm/both]]'] ) === false );
+\Nino\Html::removeFill( $fills, '/t/rm/current', '' );
+check( '...\'\' is the current language, as for addFills()', \Nino\Html::renderHtml( $fills, '[[/t/rm/current]]' ) === '[[/t/rm/current]]' );
+$fillsBefore = $fills['./nino/html/fills'];
+$fillsErrors = ninoErrors( function() use ( &$fills ) {
+	\Nino\Html::removeFill( $fills, '/t/rm/never-added' );
+	\Nino\Html::removeFill( $fills, '/t/rm/de', 'fr_FR' );
+	\Nino\Html::removeFill( $fills, '/t/rm/de', '../private/config' );
+} );
+check( 'a fill that is not there, and a language the site does not have, are nothing to take back: no error, nothing created', $fillsErrors === [] && $fills['./nino/html/fills'] === $fillsBefore );
+\Nino\Filesystem::removeDir( ninoSandboxDir( $fills ) );
+
+echo "\n";
+
 
 // --- Cleanup ------------------------------------------------------------
 

@@ -1265,6 +1265,15 @@ check( 'a component registered again replaces the one before it: its renderer, i
 \Nino\Modules\Components::init( $appData );
 check( '...and the kernel takes it back by registering its own again', $render( '[title /template/page-home/hero/title]' ) === '<h3 class="nino-section-title">Hi &#91;there]</h3>' );
 
+// The words a bool attribute is read by are the two tables of the class, which
+// \Nino\Feature::flag() reads a flag of a shortcode without a schema by as well
+\Nino\Modules\Components::addComponent( $appData, 'wordprobe', static fn( array &$appData, array $args ): string => $args['wide'], [ 'label' => 'Probe', 'source' => 'none', 'attributes' => [ 'wide' => [ 'type' => 'bool', 'default' => false ] ] ] );
+\Nino\Modules\Components::addComponent( $appData, 'worddefault', static fn( array &$appData, array $args ): string => $args['wide'], [ 'label' => 'Probe', 'source' => 'none', 'attributes' => [ 'wide' => [ 'type' => 'bool', 'default' => true ] ] ] );
+check( 'every word of ON reads as on and every word of OFF as off, whatever the case of its letters', array_filter( \Nino\Modules\Components::ON, static fn( string $word ): bool => $render( '[worddefault wide="'. $word. '"]' ) !== '1' || $render( '[wordprobe wide="'. strtoupper( $word ). '"]' ) !== '1' ) === []
+	&& array_filter( \Nino\Modules\Components::OFF, static fn( string $word ): bool => $render( '[wordprobe wide="'. $word. '"]' ) !== '0' || $render( '[worddefault wide="'. strtoupper( $word ). '"]' ) !== '0' ) === [] );
+check( '...no word is in both tables, and any other word is the default', array_intersect( \Nino\Modules\Components::ON, \Nino\Modules\Components::OFF ) === [] && $render( '[wordprobe wide="maybe"]' ) === '0' && $render( '[worddefault wide="maybe"]' ) === '1' );
+check( '...a word with a space around it is not one: what the Builder writes is read as it is written, and \Nino\Feature::flag() is the one that trims', $render( '[wordprobe wide=" yes "]' ) === '0' && $render( '[worddefault wide=" no "]' ) === '1' );
+
 // The four stacks of the kernel
 check( '[stack] draws a nested grid row, one cell to an element, in the widths of cols, with the gap as a class of the row',
 	$render( '[stack /services sort="title" cols="100 50" gap="4" id="svc"][title title tag="h4"][/stack]' ) === '<div class="nino-grid-row nino-stack nino-stack-gap-4" id="svc">'

@@ -340,7 +340,7 @@ namespace Nino\Modules {
 				&& \Nino\Http::requestRoute( $appData, $uri, $method ) !== null )
 				return false;
 
-			return self::_blacklisted( (array) ( $appData['/nino/cache/blacklist'] ?? [] ), $uri ) === false;
+			return \Nino\Http::matchesPath( $uri, (array) ( $appData['/nino/cache/blacklist'] ?? [] ) ) === false;
 		}
 
 		/**
@@ -353,40 +353,6 @@ namespace Nino\Modules {
 			foreach( self::TOOL_PREFIXES as $prefix )
 				if( $uri === $prefix || str_starts_with( $uri, $prefix. '/' ) === true )
 					return true;
-
-			return false;
-		}
-
-		/**
-		 *	Match a uri against the configured blacklist. An entry is either an
-		 *	exact uri ('/contact') or a subtree ('/blog/*', which covers /blog
-		 *	itself and everything under it). Plain string work on purpose - a
-		 *	pattern is admin-editable, and handing admin-editable text to
-		 *	preg_match() makes the expression itself an input.
-		 *
-		 *	@param		array			$patterns
-		 *	@param		string		$uri
-		 *
-		 *	@return 	bool
-		 */
-		private static function _blacklisted( array $patterns, string $uri ): bool {
-
-			foreach( $patterns as $pattern ) {
-
-				if( is_string( $pattern ) === false || $pattern === '' )
-					continue;
-
-				if( str_ends_with( $pattern, '/*' ) === false ) {
-					if( $uri === $pattern )
-						return true;
-					continue;
-				}
-
-				$prefix = substr( $pattern, 0, -2 );
-
-				if( $uri === $prefix || str_starts_with( $uri, $prefix. '/' ) === true )
-					return true;
-			}
 
 			return false;
 		}

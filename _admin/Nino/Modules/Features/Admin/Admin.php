@@ -135,8 +135,8 @@ namespace Nino\Modules\Features {
 
 		public static function log( string $action, array $data ): string {
 
-			$key 		 = is_string( $data['key'] ?? null ) === true ? $data['key'] : '';
-			$version = is_string( $data['version'] ?? null ) === true ? $data['version'] : '';
+			$key 		 = \Nino\Admin\Admin::postString( $data, 'key' );
+			$version = \Nino\Admin\Admin::postString( $data, 'version' );
 
 			return match( $action ) {
 				'features/activate' 	=> 'Activate feature "'. $key. '"',

@@ -953,6 +953,22 @@ check( '...and the three always-on modules are still there, unaffected by postin
 	&& in_array( '\\Nino\\Modules\\Form', $configAfterDecline['/nino/modules'], true ) === true
 	&& in_array( '\\Nino\\Modules\\Localepicker', $configAfterDecline['/nino/modules'], true ) === true );
 
+// A config.php that holds the routes and the bundles as null - a hand edit - is a project that has none, as the readers
+// took it before they read through AppData::stored(): the list of pages answers, and the apply goes through and writes
+// both again, the kernel's script bundle with them. A project of its own, so that the state above stays as it is
+$nulled = ninoSandbox( 'install-null' );
+$nulledDir = ninoSandboxDir( $nulled );
+$nulled['/nino/dir'] = '';
+foreach( [ '/private/templates', '/public/images', '/private/text', '/private/assets' ] as $nulledSub )
+	mkdir( $nulledDir. $nulledSub, 0777, true );
+\Nino\Filesystem::putFileContent( $nulled, '/config.php', [ '/nino/http/routes' => null, '/nino/html/assets' => null, '/nino/locales/native' => 'de_DE', '/nino/locales/available' => [ 'de_DE' ] ] );
+[ $nullListStatus ] = ninoCall( $nulled, [ \Nino\Install\Webpages::class, 'apiList' ] );
+[ $nullApplyStatus ] = ninoCall( $nulled, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE' ], 'modules' => [] ] );
+$nullConfig = \Nino\Filesystem::getFileContent( $nulled, '/config.php', [] );
+check( 'a config.php that holds the routes and the bundles as null is a project that has none: the list of pages answers and the apply writes both again, the script bundle with them', $nullListStatus === 200 && $nullApplyStatus === 200
+	&& is_array( $nullConfig['/nino/http/routes'] ?? null ) === true && isset( $nullConfig['/nino/html/assets']['/.cache/script.js'] ) === true );
+\Nino\Filesystem::removeDir( $nulledDir );
+
 echo "\n";
 
 
@@ -1059,8 +1075,10 @@ foreach( [ 'apiSave', 'apiDelete', 'apiMove' ] as $action ) {
 	$body = substr( $routesSource, strpos( $routesSource, 'public static function '. $action. '(' ) ?: 0 );
 	$body = substr( $body, 0, strpos( $body, "\n\t\t}" ) ?: strlen( $body ) );
 
+	// The read is the whole file or one key of it, AppData::stored()
+	$reads		= array_filter( [ strpos( $body, "getFileContent( \$appData, '/config.php'" ), strpos( $body, 'AppData::stored( $appData' ) ], static fn( $at ): bool => $at !== false );
 	$lockAt		= strpos( $body, "lockFile( \$appData, '/config.php' )" );
-	$readAt		= strpos( $body, "getFileContent( \$appData, '/config.php'" );
+	$readAt		= $reads === [] ? false : min( $reads );
 	$unlockAt	= strpos( $body, "unlockFile( \$appData, '/config.php' )" );
 
 	if( $lockAt === false || $readAt === false || $unlockAt === false || $lockAt > $readAt || $unlockAt < $readAt || str_contains( $body, '} finally {' ) === false )

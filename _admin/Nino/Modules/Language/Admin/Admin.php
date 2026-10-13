@@ -268,7 +268,7 @@ namespace Nino\Modules\Language {
 				return;
 
 			$data 	= \Nino\Admin\Admin::postData();
-			$locale = (string) ( $data['locale'] ?? '' );
+			$locale = \Nino\Admin\Admin::postString( $data, 'locale' );
 
 			if( preg_match( self::LOCALE_PATTERN, $locale ) !== 1 ) {
 				\Nino\Http::fail( $request, 400, 'a language id looks like de_DE' );
