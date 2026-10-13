@@ -1,6 +1,6 @@
 # Recipe: Define Element types for repeated content
 
-One of the six extension recipes of the [Nino agent guide](../../AGENTS.md). Its
+One of the five extension recipes of the [Nino agent guide](../../AGENTS.md). Its
 rules - the working method, the core runtime model, the conventions and the
 security review - apply to every step below.
 

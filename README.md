@@ -142,7 +142,7 @@ The manuals and the recipes are in English. The agent guide and the recipes are 
 * **[Developer Manual](docs/development.md):** how Nino runs - the request, routing, callbacks, rendering, modules, and security
 * **[Setup Wizard](docs/setup.md):** the six steps, what they write, and the library format
 * **[`/_admin` Workbench](docs/_admin.md):** roles and rights, recovery, and troubleshooting
-* **[Features](docs/features.md):** installable packages - the panel, the manifest, the lifecycle, and the catalogue
+* **[Developing a feature](docs/features.md):** installable packages - the manifest, the class, the toolset, the panel, the install unit, settings, updates, and the test
 * **[Deployment](docs/deployment.md):** web server, permissions, production settings, tests, and go-live
 * **[Agent guide](AGENTS.md):** the rules every change keeps, and the method a change is made by
 
@@ -153,7 +153,7 @@ The manuals and the recipes are in English. The agent guide and the recipes are 
 * **[Add a component](docs/recipes/component.md):** a shortcode with a schema, or a stack that loops elements
 * **[Add an installer module package](docs/recipes/installer-package.md):** a module the setup wizard can select
 * **[Define Element types](docs/recipes/element-types.md):** repeated structured content
-* **[Package a feature](docs/recipes/feature.md):** a module delivered as one directory with a manifest, settings, and a version
+* **[Developing a feature](docs/features.md):** a module delivered as one directory with a manifest, settings, and a version - the manual, not a recipe
 
 **Elsewhere**
 

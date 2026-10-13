@@ -300,6 +300,15 @@ namespace Nino {
 		}
 
 
+		/**
+		 *	The account that is signed in on this request: its record as getUser()
+		 *	answers it - 'mail', 'status', 'sessions', 'perms', 'role' and 'pw',
+		 *	the password hash, which belongs in no response.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array|false						The record; false for a visitor who is not signed in
+		 */
 		public static function getCurrentUser( array &$appData ): array|false {
 
 			return $appData['./nino/auth/current'] ?? false;
@@ -670,6 +679,23 @@ namespace Nino {
 			return $written === true || ( $ran === true && $changed === false );
 		}
 
+		/**
+		 *	Whether an account holds a permission. An account holds what it names
+		 *	itself and what its role names (see permissions()), and a permission
+		 *	holds whenever one above it does with a '/*':
+		 *	'/_admin/elements/manage' is held by '/_admin/elements/*', by
+		 *	'/_admin/*' and by '/*'. A visitor who is not signed in holds none.
+		 *
+		 *	Ask about the signed-in account. $username is for code that asks about
+		 *	another one; the name of an account that a request sends is never the
+		 *	one whose rights authorize the request.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$perm				A permission, eg. '/_admin/hello/manage'
+		 *	@param		string		$username			An account's mail instead of the signed-in one
+		 *
+		 *	@return 	bool
+		 */
 		public static function checkPermission( array &$appData, string $perm, string $username = '' ): bool {
 
 			// Get current user data

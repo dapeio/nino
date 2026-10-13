@@ -1,6 +1,6 @@
 # Recipe: Add a panel to the workbench
 
-One of the six extension recipes of the [Nino agent guide](../../AGENTS.md). Its
+One of the five extension recipes of the [Nino agent guide](../../AGENTS.md). Its
 rules - the working method, the core runtime model, the conventions and the
 security review - apply to every step below.
 
@@ -22,7 +22,7 @@ Two kinds of panel exist, and the class looks the same for both:
   built this way as kernel modules, `Modules\Builder`,
   `Modules\Newsletter` and `Modules\Search` as features from the
   catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features),
-  copied under `features/` (the [feature recipe](feature.md)).
+  copied under `features/` (the [feature manual](../features.md)).
 - A **workbench panel** is a module under `_admin/Nino/Modules/<Name>/`, the
   same shape as above but delivered with the tool rather than with a runtime
   feature: `Admin/Admin.php` is the panel, `<Tab>/<Tab>.php` a tab of it.
@@ -315,7 +315,7 @@ namespace Project\Catalog\Catalog {
 		}
 
 		public static function log( string $action, array $data ): string {
-			return $action === 'catalog/save' ? 'Saved catalog note "'. (string) ( $data['id'] ?? '' ). '"' : '';
+			return $action === 'catalog/save' ? 'Saved catalog note "'. \Nino\Admin\Admin::postString( $data, 'id' ). '"' : '';
 		}
 
 		public static function apiList( array &$appData, array &$request ): void {
@@ -332,9 +332,9 @@ namespace Project\Catalog\Catalog {
 				return;
 
 			$data  = \Nino\Admin\Admin::postData();
-			$id    = strtolower( trim( (string) ( $data['id'] ?? '' ) ) );
-			$title = trim( (string) ( $data['title'] ?? '' ) );
-			$body  = trim( (string) ( $data['body'] ?? '' ) );
+			$id    = strtolower( trim( \Nino\Admin\Admin::postString( $data, 'id' ) ) );
+			$title = trim( \Nino\Admin\Admin::postString( $data, 'title' ) );
+			$body  = trim( \Nino\Admin\Admin::postString( $data, 'body' ) );
 
 			if( preg_match( '/^[a-z][a-z0-9-]*$/', $id ) !== 1 ) {
 				\Nino\Http::fail( $request, 400, 'invalid note id', 'catalog_invalid_id', [], 'id' );
@@ -403,6 +403,14 @@ like the tool's own:
 return [
 	'[[/_admin/nav/catalog]]'         => 'Catalog',
 	'[[/_admin/catalog/label/count]]' => 'Catalog entries',
+	'[[/_admin/catalog/empty]]'       => 'No catalog notes yet.',
+	'[[/_admin/catalog/label/new]]'   => 'New note',
+	'[[/_admin/catalog/label/edit]]'  => 'Edit note',
+	'[[/_admin/catalog/label/back]]'  => 'Back to catalog',
+	'[[/_admin/catalog/label/id]]'    => 'ID',
+	'[[/_admin/catalog/label/title]]' => 'Title',
+	'[[/_admin/catalog/label/body]]'  => 'Body',
+	'[[/_admin/catalog/label/save]]'  => 'Save',
 	'[[/_admin/catalog/error/load]]'  => 'Could not load the catalog.',
 	'[[/_admin/catalog/error/save]]'  => 'Could not save the entry.',
 	'[[/_admin/error/catalog_invalid_id]]'    => 'The id may use lower-case letters, digits and hyphens, and starts with a letter.',
@@ -411,10 +419,11 @@ return [
 ];
 ```
 
-The first two are what the frontend skeleton below asks for when a request
-fails (see "Saying what happened"): the panel's own sentences for a failed
-load and save. The last three are the texts of the codes the backend skeleton
-above answers with.
+The tile label and the words from `empty` to `label/save` are what the
+frontend skeleton below draws; the two `error/` keys are what it asks for when
+a request fails (see "Saying what happened"): the panel's own sentences for a
+failed load and save. The last three are the texts of the codes the backend
+skeleton above answers with.
 
 A workbench panel has the identical body; it lives in
 `_admin/Nino/Modules/<Name>/Admin/Admin.php` (namespace `Nino\Modules\<Name>`,
@@ -427,7 +436,10 @@ for it in `_admin/`.
 This skeleton demonstrates the required invariants:
 
 - Every API method calls the guard itself, with the panel's permission.
-- Payload comes from `Admin::postData()`, which decodes the JSON `data` field.
+- Payload comes from `Admin::postData()`, which decodes the JSON `data` field, and
+  every value is read with `Admin::postString()`, never cast: the payload is
+  untrusted json, and the cast of an array raises "Array to string conversion",
+  which the runtime treats as fatal - a 500 for a payload one line long.
 - IDs, lengths, and required fields are validated server-side.
 - The file update is atomic.
 - The response uses `Http::ok()` or `Http::fail()`; a failure a person can
@@ -599,7 +611,7 @@ but preserve the API, DOM safety, and lifecycle shape:
 
 			if( Nino.admin.catalog._items.length === 0 ) {
 				const empty = dc.createElement('p');
-				empty.textContent = 'No catalog notes yet.';
+				empty.textContent = Nino.content.getText('/_admin/catalog/empty');
 				wrap.appendChild( empty );
 			}
 
@@ -626,7 +638,7 @@ but preserve the API, DOM safety, and lifecycle shape:
 
 			wrap.appendChild( list );
 
-			const add = Nino.adminUi.button( 'New note', function() {
+			const add = Nino.adminUi.button( Nino.content.getText('/_admin/catalog/label/new'), function() {
 				Nino.admin.catalog._renderForm( null );
 			}, { className : 'nino-admin-btn-primary' } );
 			wrap.appendChild( Nino.adminUi.listActions( [ add ] ) );
@@ -640,7 +652,7 @@ but preserve the API, DOM safety, and lifecycle shape:
 			const back = dc.createElement('a');
 			back.href = '#';
 			back.className = 'nino-admin-back-link';
-			back.textContent = 'Back to catalog';
+			back.textContent = Nino.content.getText('/_admin/catalog/label/back');
 			back.addEventListener( 'click', function( event ) {
 				event.preventDefault();
 				Nino.admin.catalog._levels.show( 'list' );
@@ -648,21 +660,22 @@ but preserve the API, DOM safety, and lifecycle shape:
 			wrap.appendChild( Nino.admin.formToolbar( back ) );
 
 			const form = dc.createElement('form');
-			const heading = Nino.adminUi.el( 'h2', '', item ? 'Edit note' : 'New note' );
+			form.id = 'catalog-edit';
+			const heading = Nino.adminUi.el( 'h2', '', Nino.content.getText( item ? '/_admin/catalog/label/edit' : '/_admin/catalog/label/new' ) );
 
-			const idField = Nino.adminUi.textField( { label : 'ID', id : 'catalog-id', value : item ? item.id : '', required : true } );
+			const idField = Nino.adminUi.textField( { label : Nino.content.getText('/_admin/catalog/label/id'), id : 'catalog-id', value : item ? item.id : '', required : true } );
 			const id = idField.querySelector('input');
 			id.name = 'id';
 			id.pattern = '[a-z][a-z0-9\\-]*';
 			id.disabled = item !== null;
 
-			const titleField = Nino.adminUi.textField( { label : 'Title', id : 'catalog-title', value : item ? item.title : '', required : true, maxLength : 160 } );
+			const titleField = Nino.adminUi.textField( { label : Nino.content.getText('/_admin/catalog/label/title'), id : 'catalog-title', value : item ? item.title : '', required : true, maxLength : 160 } );
 			const title = titleField.querySelector('input');
 			title.name = 'title';
 
 			const bodyLabel = dc.createElement('label');
 			const body = dc.createElement('textarea');
-			bodyLabel.textContent = 'Body';
+			bodyLabel.textContent = Nino.content.getText('/_admin/catalog/label/body');
 			bodyLabel.htmlFor = 'catalog-body';
 			body.id = 'catalog-body';
 			body.name = 'body';
@@ -671,7 +684,7 @@ but preserve the API, DOM safety, and lifecycle shape:
 
 			const message = Nino.adminUi.el( 'p', 'admin-form-message' );
 
-			const save = Nino.adminUi.button( 'Save', null, { type : 'submit', className : 'nino-admin-btn-primary' } );
+			const save = Nino.adminUi.button( Nino.content.getText('/_admin/catalog/label/save'), null, { type : 'submit', className : 'nino-admin-btn-primary' } );
 			const actions = Nino.adminUi.actionBar( Nino.adminUi.el( 'div' ) );
 			actions.appendChild( save );
 
@@ -689,8 +702,10 @@ but preserve the API, DOM safety, and lifecycle shape:
 			const line = Nino.adminUi.status( message );
 			line.bind( form );
 
-			form.addEventListener( 'submit', function( event ) {
-				event.preventDefault();
+			// What the submit does, and what the shell's Save does (see "Unsaved
+			// input"): it ends in done( true ) or done( false ) on every way it can
+			Nino.admin.catalog._save = function( done ) {
+
 				save.disabled = true;
 				line.saving();
 
@@ -704,6 +719,7 @@ but preserve the API, DOM safety, and lifecycle shape:
 
 					if( status !== 200 ) {
 						line.error( status, response, '/_admin/catalog/error/save' );
+						done( false );
 						return;
 					}
 
@@ -722,7 +738,13 @@ but preserve the API, DOM safety, and lifecycle shape:
 					} );
 					Nino.admin.catalog._renderList();
 					Nino.admin.catalog._levels.show( 'list' );
+					done( true );
 				} );
+			};
+
+			form.addEventListener( 'submit', function( event ) {
+				event.preventDefault();
+				Nino.admin.catalog._save( function() {} );
 			} );
 
 			wrap.appendChild( form );
@@ -767,17 +789,19 @@ interface language and mark the field:
 \Nino\Http::fail( $request, 409, 'note id already taken: "'. $id. '"', 'catalog_id_taken', [ $id ], 'id' );
 ```
 
-The third argument stays the English message for a developer or a log; the
-code is a stable slug, the params fill the `%s` placeholders of its text in
+The third argument stays the English message for a developer or a log; the code
+is stable and made of lower-case letters, digits and underscores - what
+`errorText()` looks up - the params fill the `%s` placeholders of its text in
 order, and the field is the posted key the value was refused for. A panel's own
-codes carry its slug as a prefix and live in its own `text()` directory as
-`'[[/_admin/error/catalog_id_taken]]'`, both languages; the codes every panel
-may meet - an upload that did not arrive, a value of the wrong type - are the
-shell's. `tests/admin-shell-smoke.php` finds every code in the source and fails
-on one without text in both languages. Leave a failure nobody can cause (a file
-that could not be written) without a code: the person then sees the English
-message of the server, with the status number in front, and the panel's sentence
-where there is none.
+codes carry its slug as a prefix, the hyphens of the slug written as
+underscores (`my_feature_empty` for the slug `my-feature`), and live in its own
+`text()` directory as `'[[/_admin/error/catalog_id_taken]]'`, both languages;
+the codes every panel may meet - an upload that did not arrive, a value of the
+wrong type - are the shell's. `tests/admin-shell-smoke.php` finds every code in
+the source and fails on one without text in both languages. Leave a failure
+nobody can cause (a file that could not be written) without a code: the person
+then sees the English message of the server, with the status number in front,
+and the panel's sentence where there is none.
 
 A feature whose `nino` constraint still admits kernels before this release
 detects `Nino.adminUi.api` and falls back to its own post where it is missing

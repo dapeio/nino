@@ -74,16 +74,26 @@ namespace Nino {
 		public const int MAX_SOURCE_PIXELS 		= 20 * 1000 * 1000;
 		private const string UPLOAD_DIR 				= '/images';
 
-		// Validate, turn upright, center-crop and resize raw uploaded image bytes
-		// to exactly $targetWidth x $targetHeight, then store the result at $basePath
-		// with an extension appended for the chosen output format - the
-		// caller picks $basePath deterministically (eg. "elements/<type>/<uri>"),
-		// so re-uploading the *same slot at the same configured dimensions*
-		// overwrites in place rather than accumulating orphaned files. The
-		// target size is baked into the filename (see below) - changing a
-		// slot's configured width/height in config.php orphans whatever file
-		// the old dimensions produced; the stored filename keeps pointing at
-		// it until the next re-upload writes a new one under the new name
+		/**
+		 *	Validate, turn upright, center-crop and resize raw uploaded image bytes
+		 *	to exactly $targetWidth x $targetHeight, then store the result at $basePath
+		 *	with an extension appended for the chosen output format - the
+		 *	caller picks $basePath deterministically (eg. "elements/<type>/<uri>"),
+		 *	so re-uploading the *same slot at the same configured dimensions*
+		 *	overwrites in place rather than accumulating orphaned files. The
+		 *	target size is baked into the filename (see below) - changing a
+		 *	slot's configured width/height in config.php orphans whatever file
+		 *	the old dimensions produced; the stored filename keeps pointing at
+		 *	it until the next re-upload writes a new one under the new name
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$bytes				The uploaded bytes
+		 *	@param		int			$targetWidth		The width of the result, in pixels
+		 *	@param		int			$targetHeight		The height of the result, in pixels
+		 *	@param		string		$basePath			Deterministic, without an extension
+		 *
+		 *	@return 	string|false					The stored filename below /images/, or false
+		 */
 		public static function process( array &$appData, string $bytes, int $targetWidth, int $targetHeight, string $basePath ): string|false {
 
 			return self::_render( $appData, 'crop', $bytes, $targetWidth, $targetHeight, $basePath );
@@ -632,10 +642,17 @@ namespace Nino {
 			};
 		}
 
-		// Read a previously processed image for a short-lived rollback snapshot.
-		// Element image replacement normally overwrites a deterministic filename
-		// in place; if the following metadata update is vetoed, the panel must be
-		// able to restore those old bytes rather than deleting the only copy.
+		/**
+		 *	Read a previously processed image for a short-lived rollback snapshot.
+		 *	Element image replacement normally overwrites a deterministic filename
+		 *	in place; if the following metadata update is vetoed, the panel must be
+		 *	able to restore those old bytes rather than deleting the only copy.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$filename			A filename below /images/, as process() and fit() answered it
+		 *
+		 *	@return 	string|false					The bytes; false for a filename that is empty, absolute or climbs out with '..', and for a file that is not there
+		 */
 		public static function read( array &$appData, string $filename ): string|false {
 
 			if( $filename === '' || str_contains( $filename, '..' ) === true || str_starts_with( $filename, '/' ) === true )
@@ -646,8 +663,16 @@ namespace Nino {
 			return is_string( $content ) ? $content : false;
 		}
 
-		// Counterpart to read(): restore a validated processed filename through
-		// Filesystem's atomic writer after a failed deterministic replacement.
+		/**
+		 *	Counterpart to read(): restore a validated processed filename through
+		 *	Filesystem's atomic writer after a failed deterministic replacement.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$filename			A filename below /images/, see read()
+		 *	@param		string		$bytes				What read() answered
+		 *
+		 *	@return 	bool							Whether it was written; false for a filename that is empty, absolute or climbs out
+		 */
 		public static function restore( array &$appData, string $filename, string $bytes ): bool {
 
 			if( $filename === '' || str_contains( $filename, '..' ) === true || str_starts_with( $filename, '/' ) === true )
@@ -656,6 +681,18 @@ namespace Nino {
 			return \Nino\Filesystem::putFileContent( $appData, self::UPLOAD_DIR. '/'. $filename, $bytes );
 		}
 
+		/**
+		 *	Delete a stored image by its filename below /images/, as process() and
+		 *	fit() answered it. A filename that is empty, absolute or climbs out
+		 *	with '..' is refused, and a file that is not there is nothing to
+		 *	delete - a stored value could have been edited by hand, so it is not
+		 *	trusted.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$filename			A filename below /images/
+		 *
+		 *	@return 	void
+		 */
 		public static function delete( array &$appData, string $filename ): void {
 
 			// process() and fit() only ever hand out names they built below our
@@ -674,33 +711,65 @@ namespace Nino {
 				@unlink( $path );
 		}
 
+		/**
+		 *	The address a stored image is served under: the filename below
+		 *	/images/ behind the public directory of the project (see
+		 *	\Nino\Filesystem::url()).
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$filename			A filename below /images/, as process() and fit() answered it
+		 *
+		 *	@return 	string							Eg. '/public/images/elements/news/launch.800x600.webp'
+		 */
 		public static function getUrl( array &$appData, string $filename ): string {
 			return \Nino\Filesystem::url( $appData, self::UPLOAD_DIR. '/'. $filename );
 		}
 
-		// Every developer-fixed image slot ("/nino/html/images" in config.php).
-		// The set and the values are two panes, the same split Element Types and
-		// Elements have: the Image Slots tab creates a slot, edits its label and
-		// its target size and deletes it (see \Nino\Modules\Images\Slots), and
-		// the Images panel only changes which file each one points at
+		/**
+		 *	Every developer-fixed image slot ("/nino/html/images" in config.php).
+		 *	The set and the values are two panes, the same split Element Types and
+		 *	Elements have: the Image Slots tab creates a slot, edits its label and
+		 *	its target size and deletes it (see \Nino\Modules\Images\Slots), and
+		 *	the Images panel only changes which file each one points at
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array							uri => { label, width, height, filename, alt } - what config.php holds under '/nino/html/images'
+		 */
 		public static function getSlots( array &$appData ): array {
 			return $appData['/nino/html/images'] ?? [];
 		}
 
+		/**
+		 *	One image slot by its uri.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$uri				The slot, eg. '/template/page-home/main-hero/image'
+		 *
+		 *	@return 	array|false						The slot as getSlots() holds it, false for a uri nobody defined
+		 */
 		public static function getSlot( array &$appData, string $uri ): array|false {
 			return self::getSlots( $appData )[$uri] ?? false;
 		}
 
-		// Record a new filename for an existing slot - null for no image at all -
-		// and persist it with a mutation of config.php that changes this one
-		// entry and nothing else, like setSlotAlt(): writeContentData() would
-		// replace the whole /nino/html/images key with this request's copy of
-		// it, and an upload or a removal that finishes after an alt text was
-		// saved would put the old alt texts back. True only where the record
-		// was written: an unknown slot (here or in config.php) and a config.php
-		// that could not be written are both false, and both leave $appData as
-		// it was, so that the caller can leave the file the old record still
-		// names alone
+		/**
+		 *	Record a new filename for an existing slot - null for no image at all -
+		 *	and persist it with a mutation of config.php that changes this one
+		 *	entry and nothing else, like setSlotAlt(): writeContentData() would
+		 *	replace the whole /nino/html/images key with this request's copy of
+		 *	it, and an upload or a removal that finishes after an alt text was
+		 *	saved would put the old alt texts back. True only where the record
+		 *	was written: an unknown slot (here or in config.php) and a config.php
+		 *	that could not be written are both false, and both leave $appData as
+		 *	it was, so that the caller can leave the file the old record still
+		 *	names alone
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$uri				The slot
+		 *	@param		string|null	$filename			Below /images/; null for no image at all
+		 *
+		 *	@return 	bool							Whether the record was written
+		 */
 		public static function setSlotFilename( array &$appData, string $uri, ?string $filename ): bool {
 
 			if( self::getSlot( $appData, $uri ) === false )

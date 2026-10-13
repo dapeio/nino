@@ -142,7 +142,7 @@ Die Handbücher und die Rezepte sind englisch. Der Agent-Leitfaden und die Rezep
 * **[Developer Manual](docs/development.md):** wie Nino läuft – Anfrage, Routing, Callbacks, Rendering, Module und Sicherheit
 * **[Setup Wizard](docs/setup.md):** die sechs Schritte, was sie schreiben, und das Library-Format
 * **[`/_admin` Workbench](docs/_admin.md):** Rollen und Rechte, Recovery und Fehlersuche
-* **[Features](docs/features.md):** installierbare Pakete – Panel, Manifest, Lebenszyklus und Katalog
+* **[Developing a feature](docs/features.md):** installierbare Pakete – Manifest, Klasse, Werkzeuge, Panel, Installationseinheit, Einstellungen, Updates und Test
 * **[Deployment](docs/deployment.md):** Webserver, Schreibrechte, Produktionseinstellungen, Tests und Go-live
 * **[Agent-Leitfaden](AGENTS.md):** die Regeln, die jede Änderung einhält, und das Verfahren, nach dem sie entsteht
 
@@ -153,7 +153,7 @@ Die Handbücher und die Rezepte sind englisch. Der Agent-Leitfaden und die Rezep
 * **[Add a component](docs/recipes/component.md):** ein Shortcode mit Schema oder ein Stack, der Elemente durchläuft
 * **[Add an installer module package](docs/recipes/installer-package.md):** ein Modul, das der Assistent auswählen kann
 * **[Define Element types](docs/recipes/element-types.md):** wiederkehrende strukturierte Inhalte
-* **[Package a feature](docs/recipes/feature.md):** ein Modul als ein Verzeichnis mit Manifest, Einstellungen und Version
+* **[Developing a feature](docs/features.md):** ein Modul als ein Verzeichnis mit Manifest, Einstellungen und Version – das Handbuch, kein Rezept
 
 **Anderswo**
 

@@ -519,6 +519,10 @@
 			_stayTimer : null,
 
 			/**
+			 *	Register a panel or a tab for the questions asked before unsaved
+			 *	input is lost, under its name (its uri). An entry registered under
+			 *	a name that is registered already replaces it
+			 *
 			 *	@param		{string}		name
 			 *	@param		{Object}		entry				{ isDirty, save, discard, bar }
 			 *
@@ -543,7 +547,9 @@
 			},
 
 			/**
-			 *	@param		{Array|null}	[names]
+			 *	Whether anything in scope holds unsaved input
+			 *
+			 *	@param		{Array|null}	[names]			The names to ask about, null for every entry
 			 *
 			 *	@return		{boolean}
 			 */

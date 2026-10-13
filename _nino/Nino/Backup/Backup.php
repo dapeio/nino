@@ -149,7 +149,7 @@ namespace Nino {
 
 			// What an installed feature says it owns under /data/. The manifest
 			// key is documented as what a backup carries (see docs/features.md,
-			// "Data, Backups and Restore"), and until this read it it was not:
+			// "Data and restore"), and until this read it it was not:
 			// the two entries above are hardcoded literals for the one feature
 			// that predates the catalogue, and anything else - a directory a
 			// feature owns, a file a feature nobody here knows about writes -

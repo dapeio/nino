@@ -383,9 +383,10 @@ namespace Nino\Admin {
 		 *	modules()), then every panel a runtime module contributes by
 		 *	answering adminPanels() with a class name, so a runtime module
 		 *	can add a screen but never take one over. A panel is a class
-		 *	with actions() and nav(), and optionally perm(), panes(),
-		 *	assets(), text(), summary() and log() (see Panels, and
-		 *	docs/recipes/admin-panel.md, "The panel contract").
+		 *	with actions() and nav(), and optionally perm(), panes(), template(),
+		 *	layout(), head(), icon(), tab(), tabs(), assets(), text(), summary(),
+		 *	log() and scopes() (see Panels, and docs/recipes/admin-panel.md, "The
+		 *	panel contract").
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -1157,6 +1158,9 @@ namespace Nino\Admin {
 	 *											  layout(): string          'page' (default: a column of content) or
 	 *											                            'workspace' (the whole pane, edge to
 	 *											                            edge, the rail folded away)
+	 *											  head(): bool              false opens the pane on its screen alone,
+	 *											                            without the row that names the panel (the
+	 *											                            Dashboard); true, the default, keeps it
 	 *											  tabs(): array             further panel classes shown as tabs of this
 	 *											                            panel's pane, each with its own perm(), script
 	 *											                            and hash prefix; tab(): string names the tab
@@ -1167,6 +1171,8 @@ namespace Nino\Admin {
 	 *											  text(): string            directory of its <locale>.php fills
 	 *											  summary( &$appData ): ?array   a dashboard tile { value, label }
 	 *											  log( $action, $data ): string  the activity-log line, '' for none
+	 *											  scopes( &$appData ): array  the scoped permissions the roles tab offers,
+	 *											                            [ { scope, door, label, areas } ]
 	 *
 	 *											The navigation has four groups, in this order: 'content'
 	 *											(what editors work in), 'structure' (the shape of the
@@ -1275,7 +1281,7 @@ namespace Nino\Admin {
 		 *	@param		array 		$core					The workbench's own panel classes (see Admin::modules())
 		 *	@param		string		$method				What every active module is asked for its panels - 'adminPanels'
 		 *
-		 *	@return 	array										[ uri => { class, uri, label, tab, weight, group, perm, panes, template, layout, icon, assets, text, tabs, parent, own, core, feature? } ] - feature only on a Settings tab, the key it belongs to
+		 *	@return 	array										[ uri => { class, uri, label, tab, weight, group, perm, panes, template, layout, head, icon, assets, text, tabs, parent, own, core, feature? } ] - feature only on a Settings tab, the key it belongs to
 		 */
 		public static function collect( array &$appData, array $core, string $method ): array {
 

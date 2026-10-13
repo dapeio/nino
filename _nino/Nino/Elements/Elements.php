@@ -25,6 +25,21 @@ namespace Nino {
 		// - which seed() never creates again. See Modules\Legal::callbackCommitted()
 		public const string REMOVED = '/nino/elements/removed';
 
+		/**
+		 *	One element by its uri in one language: its fields from that
+		 *	language's bucket of the type file, then the global ones ('*'), then
+		 *	the defaults the type holds for every element, with '.locale' and
+		 *	'.uri' beside them. The language is one of the site's, '*' for the
+		 *	first that holds the element, and the current one for anything else.
+		 *	An element is read once per request, until something writes.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$uri				The element, '/<type>/<slug>'
+		 *	@param		string		$locale				A locale id, '*', or '' for the current language
+		 *	@param		mixed		$return				Answered for an element that is not there
+		 *
+		 *	@return 	mixed							field => value, '.locale' and '.uri' among them; $return where there is no such element
+		 */
 		static public function getElement( array &$appData, string $uri, string $locale = '', mixed $return = false ): mixed {
 
 			// Verify locale
@@ -37,10 +52,26 @@ namespace Nino {
 			return $appData['./nino/elements/cache']['elements'][ $uri ][ $locale ] ?? $return;
 		}
 
-		// The elements of a type that match a query - and, through $options,
-		// in an order and a window: 'sort' as sortElements() reads it,
-		// 'offset' skips that many hits, 'limit' keeps at most that many
-		// (0 or less: all). Filtered first, then sorted, then cut
+		/**
+		 *	The elements of a type that match a query - and, through $options,
+		 *	in an order and a window: 'sort' as sortElements() reads it,
+		 *	'offset' skips that many hits, 'limit' keeps at most that many
+		 *	(0 or less: all). Filtered first, then sorted, then cut
+		 *
+		 *	Every key of $query has to match: a value is compared as text, '%foo%'
+		 *	means contains, '%foo' ends with, 'foo%' starts with, and a bare '%'
+		 *	anything the element has a value for. A language of '*' asks every
+		 *	language of the site.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$typeUri			The type, '/<type>'
+		 *	@param		array 		$query				field => value; [] for every element
+		 *	@param		string		$locale				A locale id, '*' for any, '' for the current language
+		 *	@param		mixed		$return				Answered for a type that is not there
+		 *	@param		array 		$options			{ sort, offset, limit }
+		 *
+		 *	@return 	mixed							A list of elements as getElement() answers them; $return where the type is not there
+		 */
 		static public function queryElements( array &$appData, string $typeUri, array $query, string $locale = '', mixed $return = false, array $options = [] ): mixed {
 
 			// Verify locale
@@ -718,7 +749,15 @@ namespace Nino {
 		}
 
 
-		// Returns an element type model
+		/**
+		 *	The model of an element type: field => its definition ('type' among
+		 *	FIELD_TYPES, and what else the type declares for it).
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$typeUri			The type, '/<type>'
+		 *
+		 *	@return 	array							[] for a type that is not there or declares none
+		 */
 		static public function getElementModel( array &$appData, string $typeUri ): array {
 			$typeData = self::getElementFile( $appData, $typeUri );
 			return ( $typeData === false || is_array( $typeData['model'] ?? null ) === false )

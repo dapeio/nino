@@ -62,6 +62,16 @@
 		ELEMENTLIST_RESULTS : 50,
 
 
+		/**
+		 *	The pinned row at the top of a drill-down level: the back link, then
+		 *	the controls that belong to the level (a locale select, a button).
+		 *	Its class is .nino-admin-contextbar
+		 *
+		 *	@param		{Element}				[backLink]			The link out of the level
+		 *	@param		{Element|Array}	[controls]			One element or a list of them
+		 *
+		 *	@return		{Element}											The row
+		 */
 		contextBar : function( backLink, controls ) {
 			const bar = dc.createElement('div');
 			bar.className = 'nino-admin-contextbar';
@@ -73,11 +83,30 @@
 			return bar;
 		},
 
+		/**
+		 *	Turn an element into the fixed bar at the bottom of a screen, where
+		 *	its Save and its status line stand: it gets the class
+		 *	.nino-admin-actionbar and nothing else is touched. The caller puts
+		 *	the buttons and the status line in
+		 *
+		 *	@param		{Element}		bar						The element that becomes the bar, usually a div
+		 *
+		 *	@return		{Element}										The same element
+		 */
 		actionBar : function( bar ) {
 			bar.classList.add('nino-admin-actionbar');
 			return bar;
 		},
 
+		/**
+		 *	The fixed bar above a list that holds the buttons for the list as
+		 *	a whole - "New", an import (.nino-admin-actionbar
+		 *	.nino-admin-list-actions)
+		 *
+		 *	@param		{Array}			buttons				The buttons, in the order they stand
+		 *
+		 *	@return		{Element}										The bar, the buttons in it
+		 */
 		listActions : function( buttons ) {
 			const bar = dc.createElement('div');
 			bar.className = 'nino-admin-actionbar nino-admin-list-actions';
@@ -1507,15 +1536,14 @@
 			},
 
 			/**
-			 *	Type-aware comparison. A plain string compare puts 10 before
-			 *	9 and sorts booleans by the words "false"/"true", so each
-			 *	type that is not text gets its own ordering.
+			 *	Whether a cell has no value: null, undefined, '' or - for a field
+			 *	that holds a list of elements - an empty list. sort() places such
+			 *	a cell with the other absent ones, last whichever way the column
+			 *	runs
 			 *
-			 *	@param		{*}				a
-			 *	@param		{*}				b
-			 *	@param		{string}	type
+			 *	@param		{*}				value
 			 *
-			 *	@return		{number}
+			 *	@return		{boolean}
 			 */
 			isEmpty : function( value ) {
 				// An element field holding an empty list is as absent as a blank
@@ -1527,7 +1555,9 @@
 			},
 
 			/**
-			 *	Order two present values of one type. Absent values are not
+			 *	Order two present values of one type. A plain string compare puts
+			 *	10 before 9 and sorts booleans by the words "false"/"true", so each
+			 *	type that is not text gets its own ordering. Absent values are not
 			 *	handled here on purpose - see sort(), which has to place them
 			 *	outside the direction flip.
 			 *
@@ -1552,6 +1582,10 @@
 			},
 
 			/**
+			 *	Order rows by one column: the present values by compare(), the
+			 *	absent ones (see isEmpty()) after them whichever way the column
+			 *	runs
+			 *
 			 *	@param		{Array}		rows
 			 *	@param		{string}	key				Column key, '' to leave the order alone
 			 *	@param		{string}	type			That column's model type
@@ -1612,6 +1646,8 @@
 			},
 
 			/**
+			 *	How many pages a number of rows make at a page size
+			 *
 			 *	@param		{number}	total
 			 *	@param		{number}	pageSize
 			 *

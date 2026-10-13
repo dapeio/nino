@@ -1,6 +1,6 @@
 # Recipe: Add an installer module package
 
-One of the six extension recipes of the [Nino agent guide](../../AGENTS.md). Its
+One of the five extension recipes of the [Nino agent guide](../../AGENTS.md). Its
 rules - the working method, the core runtime model, the conventions and the
 security review - apply to every step below.
 
@@ -26,7 +26,7 @@ manual; this recipe is the step-by-step for one unit.
 The wizard does not scan `features/`. A feature's `install/` has the same
 shape, but `\Nino\Features::activate()` applies it - add-only, through the
 same `\Nino\Features::applyUnit()` the wizard calls with overwrite on - when
-the feature is switched on in the workbench: the [feature recipe](feature.md).
+the feature is switched on in the workbench: [the feature manual](../features.md#the-install-unit).
 The catalogue's `Newsletter` and `Search` ([dapeio/nino-features](https://github.com/dapeio/nino-features)) are features and are not offered here.
 
 ## Directory shape
@@ -211,7 +211,7 @@ one. The key is read by `\Nino\Features::applyUnit()` - the wizard's and a
 feature's activation - and not by the auto-require path of a page. A path
 that leaves the unit, is absolute or is no file fails the step by name; a
 value that does not fit the model is left out and logged. See
-[Features](../features.md#the-install-unit) for a feature's use of it and
+[Developing a feature](../features.md#the-install-unit) for a feature's use of it and
 [Legal](../development.md#legal) for the types `legal` and `privacy`.
 
 `navs` creates a menu:

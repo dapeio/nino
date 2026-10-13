@@ -87,6 +87,18 @@ namespace Nino {
 			return (string) json_encode( $value, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT );
 		}
 
+		/**
+		 *	Render a piece of html+ the way a page is rendered: its fills first -
+		 *	every key between double brackets replaced by its value in the current
+		 *	language, again and again until nothing changes (at most ten passes),
+		 *	so that a value may hold fills of its own - then its shortcodes, then
+		 *	the callbacks of '/nino/html/render', which are handed the result.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$html				html+, eg. a template that was read or the markup a shortcode built
+		 *
+		 *	@return 	string							The html with every fill and shortcode resolved
+		 */
 		public static function renderHtml( array &$appData, string $html ): string {
 
 			$html = self::_renderFills( $appData, $html );
@@ -97,6 +109,16 @@ namespace Nino {
 			return $html;
 		}
 
+		/**
+		 *	The value of one fill in the current language as the fills hold it -
+		 *	the fills inside it are not resolved (resolveTextfill() does that) -
+		 *	and '' for a key with no value.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$fill				The key without brackets, eg. '/project/company/contact/email'
+		 *
+		 *	@return 	string							'' for a key with no value
+		 */
 		public static function renderTextfill( array &$appData, string $fill ): string {
 
 			$fills = self::getFills( $appData );
@@ -127,6 +149,21 @@ namespace Nino {
 			return is_string( $value ) === true ? self::_renderFills( $appData, $value ) : null;
 		}
 
+		/**
+		 *	Put a file into one of the bundles of the site, once: it is added
+		 *	behind the files the bundle holds, and a file that is in the list
+		 *	already is not added again. The [assets] shortcode of a template
+		 *	builds a bundle from its list; a feature's manifest key 'assets' does
+		 *	this at every boot for the files it names (see
+		 *	\Nino\Features::registerAssets()), and a feature that wants another
+		 *	bundle calls this in its init().
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$library			The bundle, named by the file it is written to: '/.cache/style.css' or '/.cache/script.js'
+		 *	@param		string		$assetfile			The project-relative path of the file, eg. '/features/Hello/assets/hello.css'
+		 *
+		 *	@return 	void
+		 */
 		public static function addAsset( array &$appData, string $library, string $assetfile ): void {
 
 			$appData['/nino/html/assets'][$library] = $appData['/nino/html/assets'][$library] ?? [];
@@ -135,6 +172,27 @@ namespace Nino {
 				$appData['/nino/html/assets'][$library][] = $assetfile;
 		}
 
+		/**
+		 *	Register a shortcode: [name] in html+ calls the callback with the app
+		 *	data and the arguments, and what the callback answers takes the place
+		 *	of the shortcode and is rendered once more. A named argument
+		 *	(name="value") is $args['name'], a bare word is a list entry, and what
+		 *	stands between [name] and [/name] is $args['content']. A callback that
+		 *	answers something that is no string renders nothing.
+		 *
+		 *	The callback is registered under '/nino/html/shortcode/<name>' (see
+		 *	\Nino\Callbacks::registerCallback()), so a second registration under
+		 *	the same name does not replace the first but is handed its answer as
+		 *	the arguments. A shortcode with a schema is registered through
+		 *	\Nino\Modules\Components, a feature's plain one through
+		 *	\Nino\Feature::shortcode().
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$shortcode			The name, as it is written between the brackets
+		 *	@param		mixed		$callback			( array &$appData, array &$args ): string
+		 *
+		 *	@return 	void
+		 */
 		public static function addShortcode( array &$appData, string $shortcode, mixed $callback ): void {
 
 			// Add shortcode in appData
@@ -157,6 +215,20 @@ namespace Nino {
 			return array_map( 'strval', array_keys( (array) ( $appData['./nino/html/shortcodes'] ?? [] ) ) );
 		}
 
+		/**
+		 *	Add fills for the length of this request: key => value, the key
+		 *	written with or without its brackets. They are merged over the text
+		 *	files by getFills() and belong to the language they were added for;
+		 *	those added for '*' belong to none and win over every language's. The
+		 *	text files are not touched, and a language the site does not have
+		 *	takes nothing. removeFill() takes one out again.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$fills				'/newsletter/link/confirm' => value, ...
+		 *	@param		string		$locale				The language; '' for the current one, '*' for the fills that belong to none
+		 *
+		 *	@return 	void
+		 */
 		public static function addFills( array &$appData, array $fills, string $locale = ''  ): void {
 
 			// Check locale
@@ -517,20 +589,28 @@ namespace Nino {
 			return $blocks + $breaks > 0 ? rtrim( $value, "\n" ) : $value;
 		}
 
-		// Rebuild a html value, keeping only whitelisted inline tags (strong/
-		// em/span/code/a) one level deep and a safe href scheme on links. Never
-		// trust the client's html: the editor's "no nesting" toolbar rule is
-		// enforced here too, against a client that bypasses it entirely.
-		//
-		// $format widens what is kept. 'inline' is the tags above and nothing
-		// else: a block that is unwrapped leaves one space where it ended, so
-		// '<p>One.</p><p>Two.</p>' reads 'One. Two.' rather than 'One.Two.'.
-		// 'lines' adds <br>, and a newline of the text becomes one. 'blocks'
-		// keeps paragraphs and lists: p/ul/ol at the top level, li only in a
-		// list, the inline tags and <br> inside p/li. Every other value - plain
-		// is not html, see \Nino\Text::sanitizeValue() - is read as 'inline'.
-		// What comes out of any of them is stable: sanitizing it again changes
-		// nothing
+		/**
+		 *	Rebuild a html value, keeping only whitelisted inline tags
+		 *	(strong/em/span/code/a) one level deep and a safe href scheme on
+		 *	links. Never trust the client's html: the editor's "no nesting"
+		 *	toolbar rule is enforced here too, against a client that bypasses it
+		 *	entirely.
+		 *
+		 *	$format widens what is kept. 'inline' is the tags above and nothing
+		 *	else: a block that is unwrapped leaves one space where it ended, so
+		 *	'<p>One.</p><p>Two.</p>' reads 'One. Two.' rather than 'One.Two.'.
+		 *	'lines' adds <br>, and a newline of the text becomes one. 'blocks'
+		 *	keeps paragraphs and lists: p/ul/ol at the top level, li only in a
+		 *	list, the inline tags and <br> inside p/li. Every other value - plain
+		 *	is not html, see \Nino\Text::sanitizeValue() - is read as 'inline'.
+		 *	What comes out of any of them is stable: sanitizing it again changes
+		 *	nothing
+		 *
+		 *	@param		string		$html				What the client sent
+		 *	@param		string		$format				inline, lines or blocks
+		 *
+		 *	@return 	string							The rebuilt value
+		 */
 		public static function sanitizeHtml( string $html, string $format = 'inline' ): string {
 
 			if( trim( $html ) === '' )

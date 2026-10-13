@@ -15,6 +15,19 @@ namespace Nino {
 	// module answers to one
 	class Modules {
 
+		/**
+		 *	Call one method on every module listed in '/nino/modules', in that
+		 *	order, with the app data. A class that does not have the method is
+		 *	passed over, and what the methods answer is dropped - collect() is the
+		 *	call that asks. The kernel calls 'init' once at every boot, which is
+		 *	where a module registers its behaviour; looking the method up loads
+		 *	the class.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$method				The method every module may have, eg. 'init'
+		 *
+		 *	@return 	void
+		 */
 		public static function callModules( array &$appData, string $method ): void {
 
 			// method_exists() autoloads $className itself if it isn't defined

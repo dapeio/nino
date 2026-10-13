@@ -246,18 +246,39 @@ namespace Nino {
 			$request['/nino/http/response']['header'] = array_merge( self::DEFAULT_HEADERS, $request['/nino/http/response']['header'] );
 		}
 
-		// Set a response's status code and error body in one call - the
-		// statusCode/body pair a handler otherwise sets by hand on every
-		// failure branch, with 'error' as the body key enforced rather
-		// than just remembered by convention.
-		//
-		// 'error' is the sentence for a developer or a log, in English. A
-		// client that wants to say it in the reader's language needs something
-		// that does not change with the wording, so a failure may also carry
-		// a stable $code (a slug), the values that belong in the sentence as
-		// $params (in the order the client's text uses them) and the $field the
-		// value was refused for. All three are left out of the body when
-		// empty, so a caller that gives none answers exactly what it always did
+		/**
+		 *	Set a response's status code and error body in one call - the
+		 *	statusCode/body pair a handler otherwise sets by hand on every failure
+		 *	branch, with 'error' as the body key enforced rather than just
+		 *	remembered by convention.
+		 *
+		 *	'error' is the sentence for a developer or a log, in English. A client
+		 *	that wants to say it in the reader's language needs something that
+		 *	does not change with the wording, so a failure a person can cause also
+		 *	carries a $code, the values that belong in the sentence as $params (in
+		 *	the order the client's text uses them) and the $field the value was
+		 *	refused for. All three are left out of the body when empty, so a
+		 *	caller that gives none answers exactly what it always did.
+		 *
+		 *	A code is lower-case letters, digits and underscores -
+		 *	/^[a-z][a-z0-9_]*$/, which is what Nino.adminUi.api.errorText() looks
+		 *	up, so a code with a hyphen in it is never found. A panel's code is
+		 *	its slug first, the hyphens of the slug written as underscores, then a
+		 *	word: 'hello_long' for the panel 'hello', 'my_feature_empty' for
+		 *	'my-feature'. Its sentence is the fill '/_admin/error/<code>' in both
+		 *	interface languages, with %s where a param goes; the workbench keeps
+		 *	its own codes there too ('csrf', 'session', the upload and image
+		 *	ones).
+		 *
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		int			$statusCode			The HTTP status, eg. 400
+		 *	@param		string		$error				The English sentence for a developer or a log
+		 *	@param		string		$code				The code of a failure a person can cause; '' for none
+		 *	@param		array 		$params				What belongs in the sentence, in order
+		 *	@param		string		$field				The posted key the value was refused for; '' for none
+		 *
+		 *	@return 	void
+		 */
 		public static function fail( array &$request, int $statusCode, string $error, string $code = '', array $params = [], string $field = '' ): void {
 			$body = [ 'error' => $error ];
 			if( $code !== '' )
@@ -270,7 +291,17 @@ namespace Nino {
 			$request['/nino/http/response']['body'] = $body;
 		}
 
-		// Set a response's success body - see fail()
+		/**
+		 *	Set a response's success body - the counterpart of fail(), which sets
+		 *	the status as well. The status stays what the request carries, 200
+		 *	unless something set another; a body that is no string is answered as
+		 *	json, a string as it is.
+		 *
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		mixed		$body				What the response answers, an array for json
+		 *
+		 *	@return 	void
+		 */
 		public static function ok( array &$request, mixed $body = [ 'ok' => true ] ): void {
 			$request['/nino/http/response']['body'] = $body;
 		}
@@ -482,6 +513,18 @@ namespace Nino {
 			return preg_match( "/(?:^|\s)'none'(?:\s|\$)/i", $part ) === 1 || preg_match( '/^\S+$/D', $part ) === 1;
 		}
 
+		/**
+		 *	The route that answers a request path: the one keyed for exactly that
+		 *	path and method, else the nearest wildcard route ('GET://docs/*') on a
+		 *	parent of the path, up to the root. Routes are keyed project-relative,
+		 *	'GET://about' for '/about'.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$uri				The cleaned request path without the directory the project is served from, starting with '/'
+		 *	@param		string		$method				GET, POST...
+		 *
+		 *	@return 	array|null						The route; null where none answers, and for a path that is empty or does not start with a slash
+		 */
 		public static function requestRoute( array &$appData, string $uri, string $method ): ?array {
 
 			// Only normalized absolute request paths are routable. dirname('')
@@ -654,6 +697,19 @@ namespace Nino {
 			return true;
 		}
 
+		/**
+		 *	A request this process has handled, by its place in the list
+		 *	Http::request() keeps - the newest at 0. It is the copy stored when
+		 *	the request began, with its '/nino/http/request' and the response as
+		 *	it was seeded then: what code that has no request in hand, a shortcode
+		 *	above all, can read of one. It does not see what a callback does to
+		 *	the live response afterwards.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		int			$offset				0 for the current request
+		 *
+		 *	@return 	array|false						The request, false where there is none
+		 */
 		public static function getRequest( array &$appData, int $offset = 0 ): array|false {
 			return $appData['./nino/http/requests'][$offset] ?? false;
 		}
@@ -723,40 +779,46 @@ namespace Nino {
 		// allowlist below has to stay in sync with
 		private const string FORWARDED_FOR = 'HTTP_X_FORWARDED_FOR';
 
-		// Return current client ip address.
-		//
-		// The TCP peer address (REMOTE_ADDR) is the answer, unless that peer
-		// is itself a proxy this site was configured to trust:
-		// X-Forwarded-For is an ordinary request header any client can set to
-		// an arbitrary value, so a forwarded address is worth exactly as much
-		// as the hop that wrote it. Read unconditionally it would let the
-		// login cooldown's ip bucket (see Auth::loginUser()), the activity
-		// log's ip field and the address a session is listed under all be
-		// set by the request itself. A session is not pinned to an address -
-		// its token is the key it lives under, and the ip beside it is the
-		// display value the workbench's session list shows.
-		//
-		// Behind a reverse proxy (Cloudflare, a load balancer, ...) the peer
-		// address is the proxy's own for every single visitor, though, and
-		// then every per-ip rule in the site collapses into one bucket:
-		// Mail's send cap becomes a per-site cap, where five
-		// contact-form submissions from anyone lock out every visitor's mail
-		// (newsletter confirmations included) for the rest of the window -
-		// silently, since a rate-limit refusal is not surfaced as an error.
-		// Auth's ip bucket becomes one too, and it is the larger of the two:
-		// maxtries * IP_TRIES_FACTOR wrong logins against account names that
-		// need not exist put that one address in cooldown, and every admin's
-		// correct password is refused for as long as it lasts.
-		//
-		// So the peer has to be named: '/nino/http/proxies' lists the proxies
-		// in front of this site, as exact addresses or cidr ranges. Where the
-		// peer is one of them, the client is the rightmost X-Forwarded-For
-		// hop that is not itself a listed proxy - everything left of it is
-		// whatever the client sent (a forwarding proxy appends, it does not
-		// verify) and is never read. An empty list, which is the default,
-		// keeps the plain behaviour: the header is ignored and the peer is
-		// the client. So does calling this without $appData, for the few
-		// callers that have none.
+		/**
+		 *	Return current client ip address.
+		 *
+		 *	The TCP peer address (REMOTE_ADDR) is the answer, unless that peer
+		 *	is itself a proxy this site was configured to trust:
+		 *	X-Forwarded-For is an ordinary request header any client can set to
+		 *	an arbitrary value, so a forwarded address is worth exactly as much
+		 *	as the hop that wrote it. Read unconditionally it would let the
+		 *	login cooldown's ip bucket (see Auth::loginUser()), the activity
+		 *	log's ip field and the address a session is listed under all be
+		 *	set by the request itself. A session is not pinned to an address -
+		 *	its token is the key it lives under, and the ip beside it is the
+		 *	display value the workbench's session list shows.
+		 *
+		 *	Behind a reverse proxy (Cloudflare, a load balancer, ...) the peer
+		 *	address is the proxy's own for every single visitor, though, and
+		 *	then every per-ip rule in the site collapses into one bucket:
+		 *	Mail's send cap becomes a per-site cap, where five
+		 *	contact-form submissions from anyone lock out every visitor's mail
+		 *	(newsletter confirmations included) for the rest of the window -
+		 *	silently, since a rate-limit refusal is not surfaced as an error.
+		 *	Auth's ip bucket becomes one too, and it is the larger of the two:
+		 *	maxtries * IP_TRIES_FACTOR wrong logins against account names that
+		 *	need not exist put that one address in cooldown, and every admin's
+		 *	correct password is refused for as long as it lasts.
+		 *
+		 *	So the peer has to be named: '/nino/http/proxies' lists the proxies
+		 *	in front of this site, as exact addresses or cidr ranges. Where the
+		 *	peer is one of them, the client is the rightmost X-Forwarded-For
+		 *	hop that is not itself a listed proxy - everything left of it is
+		 *	whatever the client sent (a forwarding proxy appends, it does not
+		 *	verify) and is never read. An empty list, which is the default,
+		 *	keeps the plain behaviour: the header is ignored and the peer is
+		 *	the client. So does calling this without $appData, for the few
+		 *	callers that have none.
+		 *
+		 *	@param		array 		$appData			Array with current app data; [] for the few callers that have none
+		 *
+		 *	@return 	string							The peer address (REMOTE_ADDR), or the client behind a proxy this site names under '/nino/http/proxies'
+		 */
 		public static function getClientIp( array $appData = [] ): string {
 
 			$remote 	= $_SERVER['REMOTE_ADDR'] ?? '';

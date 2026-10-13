@@ -1,313 +1,701 @@
-# Features — Manual and Contract
+# Developing a feature
 
-This manual explains what a feature is, how an operator switches one on in the workbench's **Features** panel, and what a developer has to deliver for a directory to be one: the manifest, the settings schema, the lifecycle and the tests. The kernel contract behind it is `\Nino\Features` in `_nino/Nino/Features/Features.php`; `tests/features-smoke.php` checks it against the fixtures under `tests/fixtures/features/`. To build a feature of your own step by step, follow the [feature recipe](recipes/feature.md).
+This manual is for someone who writes a feature: a directory below `features/` that
+brings a module - and a panel and an install unit, when it needs them - to a Nino
+project. The contract is `\Nino\Features` (`_nino/Nino/Features/Features.php`),
+checked by `tests/features-smoke.php` against `tests/fixtures/features/`; the
+docblock of each member is its reference. The catalogue's `Hello`
+([dapeio/nino-features](https://github.com/dapeio/nino-features)) is the complete
+example, written to be copied. The operator's side, the Features panel and the
+catalogue, is in [the workbench manual](_admin.md#features).
 
-## What a Feature Is
+## What a feature is
 
-A feature is an installable package: one directory below `features/` that brings a module - its runtime class, a workbench panel when it has one, an install unit with templates and texts, and a manifest `feature.php` that says what it is, which Nino version it was written for and which settings it offers. A feature is a directory: it is installed from the catalogue by the Features panel or dropped into `features/` by hand, and switched on in the workbench. A checkout ships no feature at all; `features/` holds nothing but its `.htaccess`. The features Nino publishes - `Newsletter` and `Search` among them - live in the catalogue repository [dapeio/nino-features](https://github.com/dapeio/nino-features), one directory each below `features/` there with its manifest - its tests where the feature carries them - and arrive in a project through the panel's **Install**, or by copying that directory into its own `features/`.
+A feature is an installable package: one directory below `features/` with the
+module's class, a workbench panel when it has one, an install unit with templates
+and texts, and a manifest `feature.php`. A checkout ships none: one is dropped in or
+installed from the signed catalogue and switched on in the workbench, and the
+project holds it with a version, settings in `config.php` and files under `data/`.
 
-A Nino project has three kinds of modules, and the difference is who owns the directory:
-
-| Kind | Where | Who switches it on |
+| Kind | Where | Switched on by |
 |---|---|---|
-| **Kernel module** | `_nino/Nino/Modules/<Name>/` - the always-on ones and the optional ones a project switches on or off (`\Nino\Modules\*`) | the setup wizard, or by hand in `/nino/modules` |
-| **Feature** | `features/<Name>/`, one directory per feature, with `feature.php` | the Features panel |
-| **Project module** | `app/<Vendor>/…` under a namespace of its own | by hand in `/nino/modules` |
+| **Kernel module** | `_nino/Nino/Modules/<Name>/`, Nino's own | the setup wizard, or `/nino/modules` by hand |
+| **Feature** | `features/<Name>/` with `feature.php`: from outside, held by the project | the Features panel |
+| **Project module** | `app/<Vendor>/...` under a namespace of its own, the project's | `/nino/modules` by hand |
 
-"Module" remains the technical term for the class listed in `/nino/modules` whose `init()` the kernel calls; "feature" is the package that delivers such a class. A kernel module belongs to Nino and is replaced wholesale with `_nino/`. A project module belongs to the project and carries its own namespace. A feature sits between the two: it comes from outside, but the project holds it - with a version number, with settings in `config.php` and with files under `data/` that belong to the project, not to the feature.
+"Module" is a class listed in `/nino/modules` whose `init()` the kernel calls;
+"feature" is the package that delivers one. The directory is the class name:
+`features/Hello/Hello.php` is `\Nino\Modules\Hello`,
+`features/Hello/Admin/Admin.php` its panel `\Nino\Modules\Hello\Admin`. It matches
+`/^[A-Z][A-Za-z0-9]*$/`, and only `feature.php` and the class file are required. The
+autoloader serves `Nino\Modules\*` from `_nino/`, `_admin/`, `features/` and `app/`
+in this order, so a feature never shadows a kernel module or a workbench screen and
+`app/` never replaces a feature ([autoload
+layout](recipes/runtime-module.md#autoload-layout)). `NINO_FEATURES_DIR`, defined
+before `_nino/Nino.php` loads (the entry points carry the line commented out),
+replaces the directory as a whole.
 
-**Why?** Before this split, Nino's optional modules lived under `app/Nino/Modules/`, beside the project's own classes, and an update had to compare them one directory at a time. Now `app/` belongs to the project alone, `_nino/` is replaceable wholesale again, and a package a project takes on has a place of its own with a contract of its own.
+`features/` is server-side source: `.htaccess` and `router.php` deny it
+([deployment](deployment.md#nginx-and-other-web-servers)), and a feature's browser
+files are read off disk and bundled, never requested. A catalogue publishes one
+directory per feature as a `.tar.gz` that its signed catalogue lists by digest, its
+`tests/` left out ([a catalogue of your own](_admin.md#a-catalogue-of-your-own)).
 
-## The `features/` Directory
+## The manifest
 
-Every feature is exactly one directory, named after the module class it brings - take the catalogue's Newsletter feature, once copied in: `features/Newsletter/Newsletter.php` is `\Nino\Modules\Newsletter`, `features/Newsletter/Admin/Admin.php` is `\Nino\Modules\Newsletter\Admin`. The directory name must be a class name segment (`Newsletter`, not `newsletter`), because it *is* the class name - a manifest cannot declare a different class, see [The Manifest](#the-manifest-featurephp).
+`feature.php` lies beside the class file and returns an array;
+`\Nino\Features::manifest()` reads and validates it. A manifest that breaks a rule
+is skipped whole, with a warning that names the file and the reason, and so is a
+second directory that claims a key an earlier one holds. The one of `Hello` is
+`features/Hello/feature.php`:
 
-The autoloader resolves `Nino\Modules\*` as a merged view over four roots, in this order: `_nino/`, `_admin/`, `features/`, `app/`. Below the features root the `Nino/Modules/` prefix is the directory itself - `features/<Name>/<Name>.php`, not `features/Nino/Modules/<Name>/`. What the order keeps each root from doing to the others is in the [autoload layout](recipes/runtime-module.md#autoload-layout) of the runtime module recipe.
+```php features/Hello/feature.php
+<?php
+// The class is not declared: features/Hello/ can only serve \Nino\Modules\Hello
+return [
+	'key'					=> 'hello',
+	'name'				=> [ 'en_US' => 'Hello World', 'de_DE' => 'Hallo Welt' ],
+	'description'	=> [ 'en_US' => 'Greets the name its panel stores.', 'de_DE' => 'Grüßt den Namen, den sein Panel speichert.' ],
+	// What the Description tab shows: all six sections, the empty ones too
+	'manual'			=> [
+		'shortcodes' => [ '[hello name="Ada" shout="yes"]' => 'Greets Ada, in capitals.' ], 'markup' => [],
+		'routes' => [ '/hello' => 'The page of the greeting.' ], 'panel' => [ 'Hello World' => 'Who the shortcode greets.' ],
+		'callbacks' => [], 'install' => [ 'templates/page-hello.tpl' => 'The page /hello renders.', 'elements/privacy.php' => 'Its section of the privacy policy.' ],
+	],
+	'category'		=> 'system',				// one of \Nino\Features::CATEGORIES
+	'maturity'		=> 'Example',				// the badge beside the name, 24 characters at most
+	'version'			=> '1.1.0',
+	'nino'				=> '^1.8',					// the kernel whose vocabulary it uses
+	'data'				=> [ '/data/hello.php' ],					// what a backup carries
+	'assets'			=> [ '/features/Hello/assets/hello.css' ],	// into the site's style bundle
+	'settings'		=> [
+		'greeting'	=> [ 'type' => 'string', 'label' => 'Greeting', 'default' => 'Hello', 'maxlength' => 24 ],
+		'longest'		=> [ 'type' => 'int', 'label' => 'Longest name', 'min' => 1, 'max' => 60, 'unit' => 'characters', 'default' => 40 ],
+	],
+	// A shortcode with a schema; the class has no componentHello(), so doShortcode() renders it
+	'components'	=> [ 'hello' => [ 'label' => 'Greeting', 'source' => 'none', 'attributes' => [
+		'name'	=> [ 'type' => 'string', 'default' => '', 'label' => 'Name' ],
+		'shout'	=> [ 'type' => 'bool', 'default' => false, 'label' => 'Capitals' ],
+	] ] ],
+];
+```
 
-`NINO_FEATURES_DIR` relocates the directory, the way `NINO_APP_DIR` does for `app/`. The constant is defined before `_nino/Nino.php` is loaded - in every entry point, that is `index.php`, `_admin/index.php` and `_admin/recovery.php`, all three of which carry the line commented out. The autoloader and `\Nino\Features::dir()` read the same constant, so a relocated directory serves the classes too. It is replaced as a whole: a project that points it elsewhere takes its features along, or loses them without a word.
-
-**Security:** Everything in `features/` is server-side source - classes, panels, mail and page templates, text files. `features/.htaccess` denies the tree the way `app/.htaccess` denies its own, and `router.php` does the same for the built-in server. A web server that does not read `.htaccess` needs the equivalent rule; see [Deployment](deployment.md#nginx-and-other-web-servers). A feature's browser-facing assets are read off disk and bundled into `public/.cache/` or `_admin/.cache/` like everyone else's - nothing in the tree is ever requested directly. For the website, the manifest lists them under `assets` and the kernel adds them to the project's two bundles, see [Assets](#assets); `\Nino\Filesystem::path()` resolves `/features/...` against the features directory, relocated or not. A panel names its workbench assets through `assets()` instead, see [The panel](recipes/feature.md#3-the-panel) in the feature recipe.
-
-## The Features Panel
-
-The panel sits in the workbench's System group and asks for `/_admin/features/manage` on every action - a developer's permission. The panels of the features it manages sit in the Features group, whatever their own `nav()` names - see [The panel](recipes/feature.md#3-the-panel) in the feature recipe. It sorts every directory below `features/` that carries a valid manifest into three tabs - **Active**, **Inactive**, **Available** - each labelled with a count, Active first and open. Beside them sit two filters: a search box over name, key, description and category, and a select that narrows to one category - built from the categories the features and offers on screen actually carry, so it never offers a heading nothing is filed under. Both narrow every tab at once and the counts narrow with them, so a search says where the match is. Tabs and filters stay at the top of the pane while the rows scroll, and within a tab the features are sorted by the localized name; the category leads the line under each name. Wherever a feature sits, it shows name and description in the interface language, the version from the manifest, and whatever stands in the way of an activation: a Nino version the feature was not written for, a PHP extension that is missing, a required feature that is not in the directory. The names come from the manifest itself, not from text fills, because the fills of a feature that is not active are not loaded.
-
-The panel's seven actions are `features/list`, `features/activate`, `features/deactivate`, `features/settings`, `features/remove`, `features/catalogue` and `features/install`; behind the first five stand `\Nino\Features::all()`, `activate()`, `deactivate()`, `saveSettings()` and `remove()`, behind the last two `\Nino\Catalogue::fetch()` and `install()`:
-
-- **Activate** switches a feature on. Required features are activated first, the feature's install unit is applied without overwriting anything your project already has, the class is listed in `/nino/modules` and the version recorded under `/nino/features`. The answer names every feature that was switched on - the one asked for first, the requirements after it by name - and the panel says so in a dialog before it reloads (*Switched on: Social media links, Lightbox.*). An Update says it too where the new version added a requirement that was off.
-- **Deactivate** removes the class from the list - and nothing else. Settings, data and copied templates stay, and switching the feature back on finds everything as it was. A feature another active feature requires cannot be deactivated. Once it is off, the panel says where the feature's shortcodes still stand: in a template, a text or an element of the project - see [Deactivating](#deactivating).
-- **Remove** deletes an inactive feature's directory, which is the one step deactivating deliberately leaves out. What the feature kept stays - its settings under `/nino/features`, its files under `data/`, whatever its unit copied into the project - so putting the same feature back finds its settings where it left them. It is refused for an active feature: the class is listed in `/nino/modules`, and a directory deleted from under the autoloader is a fatal on the next request rather than a message.
-- **Update** is offered for an active feature whose manifest names a different version than the recorded one - after its directory has been replaced with a new release. The update is the same action as activating: the unit adds what is new, and the module gets to migrate its own data before the new version is recorded.
-- **Settings** are on the screen an active feature's row steps into - together with its update, where one waits, and with **Deactivate**. That screen is two tabs: **Description**, which is the sentence the manifest describes the feature with and under it [the manual](#the-manual), and **Settings**, the form the manifest describes. A feature that declares no setting, or describes itself nowhere, has the one pane it has and no strip over it. Both panes are built, one hidden, so a setting typed into and then left to go and read what it does comes back with what was typed in it - and the one Save below both collects the whole schema whichever tab is on; pressed from the Description it brings the settings forward first. Saving stores the form under `/nino/features` in `config.php`. Every setting is validated before any is written; an error names the setting, and nothing is saved. A feature that has a panel of its own and declares settings gets them there instead: the panel is given a **Settings** tab, the same form on the same `features/list` and `features/settings` actions and the same `/_admin/features/manage` permission - so an account that holds only the feature's own permission does not see the settings, as before. The feature's screen in the Features panel then has no form and no Save of its own, and links to that tab. Nothing in the feature has to be written for it; the tab comes from `_admin/Nino/Modules/Features/Settings/`, and without it the form is back in the Features panel. The reverse holds too: an account that holds only `/_admin/features/manage` gets, for every feature panel that has settings, that panel in its rail - opened on the Settings tab alone.
-
-The **Available** tab is the catalogue: what it offers that this installation does not already have current. Above the tabs, an action bar's **Refresh catalogue** button posts `features/catalogue`, behind which stand `\Nino\Catalogue::fetch()` and `offers()` (`features/install` stands behind `install()`), and a status line names when the catalogue was last read, or that it has not been read yet. Nothing is fetched on its own: `features/list` answers whatever `\Nino\Catalogue::cached()` last left under `data/catalogue.php`, so Available fills the moment the panel opens without a request of its own; only Refresh calls `fetch()` again. Loaded, Available offers **Install** for a feature not in the directory, **Update** for one there in an older version, and greys out, with what it asks for, one no version of which fits - a feature already current does not appear here at all. Installing downloads the archive, checks it against the signed catalogue, puts the directory in place and switches the feature on; an update replaces the directory and, for an active feature, applies the update in a second request the panel makes on its own - the request that placed the files booted with the previous version's class, and the hook the new version brought can only run in a request that loads the new one - while a feature the project has switched off stays off. The offers themselves are always recomputed against the features on disk now, so an install is reflected on Available without a new fetch either. Where `features/` is not writable, the tab links the archive instead, to unpack by hand. See [The Catalogue](#the-catalogue).
-
-**Important:** A panel a feature brings appears only with the next load of the workbench after activating, and goes only then after deactivating - the rail is built once per page load from the panel registry. The panel reloads the workbench itself after each of them. It lands in the rail's own **Features** group regardless of what its own `nav()` names - see [Panels of the Workbench](development.md#panels-of-the-workbench) - and offers its permission on the roles tab of the Users panel under that same group label; the **Editor** role the wizard wrote before the activation does not receive it by itself - grant it there.
-
-## The Manifest `feature.php`
-
-The manifest lives beside the class file and returns an array. `\Nino\Features::manifest()` reads and validates it, and the rules it enforces are the list in the [feature recipe](recipes/feature.md#1-the-manifest), whose example is a complete manifest.
-
-A localized value - `name`, `description`, a `label`, a `hint`, an option of a `select` - is read through `\Nino\Features::localized( $value, $locale )`: the locale asked for, else `en_US`, else the first entry, else an empty string.
-
-The class is not declared but derived: `\Nino\Modules\<Directory>`. A `module` entry that names the same class is accepted; one that says anything else is refused. The autoloader serves that one class from `features/<Name>/` and no other, so a manifest promising something else would be wrong.
-
-The version constraint under `nino` understands enough of the composer vocabulary to write a manifest with:
-
-| Constraint | Satisfied by |
+| Key | Rule |
 |---|---|
-| `*` | every version |
-| `1.2.3` | exactly that version; `1.2` by any `1.2.x`, `1` by any `1.x.y` |
-| `>=1.2`, `<=1.2`, `>1.2`, `<1.2`, `!=1.2.3` | the comparison |
-| `^1.0` | the same major version from `1.0.0` on (`^0.13`: the same minor version from `0.13.0` on) |
-| `~1.2` | the same major version from `1.2.0` on; `~1.2.3` the same minor version from `1.2.3` on |
-| `>=1.0 <2.0`, `>=1.0, <2.0` | all parts at once |
-| `2.0 \|\| ^1.0` | one of the alternatives |
+| `key` | a slug (`/^[a-z][a-z0-9-]*$/D`), the lower-cased directory name where left out; `requires` and `/nino/features` name features by it |
+| `name`, `description`, `label`, `hint`, the label of an `options` entry | a string or a `locale => string` map, `name` required: the panel shows features that are not active, whose fills are not loaded, so the words travel in the manifest. `\Nino\Features::localized( $value, $locale )` reads one: the locale asked for, else `en_US`, else the first entry, else `''` |
+| `version`, `maturity` | `major.minor.patch`, a pre-release suffix allowed; a string or a `locale => string` map of at most 24 characters each |
+| `nino` | the constraint on the kernel, `*` where left out: the floor, the kernel whose vocabulary the feature uses. What [The toolset](#the-toolset) marks **1.8**, the key `assets` and the renderer `doShortcode()` are 1.8: a feature that uses one of them says `^1.8`, and an older kernel refuses it. The vocabulary is that of `\Nino\Features::satisfies( $constraint, $version )`: `*`, a version (`1.2.3`, `1.2`, `1`), a comparison (`>=1.2`, `!=1.2.3`), a caret (`^1.0`: the same major version from there on; `^0.13` the same minor version) or tilde (`~1.2`: the same major version from 1.2; `~1.2.3` the same minor version from 1.2.3), parts joined by a comma or a space (all must hold) and alternatives joined by `\|\|`; a pre-release kernel counts as the release it precedes |
+| `php`, `requires`, `data` | `php` => `ext`, the extensions it needs; the feature keys it cannot run without (its own is dropped; an activation activates them first); the files under `/data/` it owns, no `..` - what a backup carries |
+| `assets`, `components`, `stacks`, `settings` | the subsections below and the chapter [Settings](#settings) |
+| `module` | may name `\Nino\Modules\<Directory>` and nothing else, and the class file must exist |
 
-A pre-release kernel counts as the release it precedes: a feature written against `^1.0` runs on `1.0.0-beta`. `\Nino\Features::satisfies( $constraint, $version )` is the function behind it, with the running kernel's version as the default.
-
-A manifest that is not valid as a whole is not applied halfway: the directory is skipped with a warning naming the file and the reason - a directory name that is not a class name, a missing class file, a key that is not a slug, a version that is not `major.minor.patch`, a setting of an unknown type, a default that fails its own schema. A second directory claiming a key an earlier one holds is skipped too. `\Nino\Features::all()` reads the directory once per request and answers, per feature, with the normalized manifest plus `dir`, `module`, `active`, `installed` (the version last recorded, `null` before the first), `update` (active, and the recorded version differs from the manifest's) and `problems`.
+Keys the kernel does not read are ignored, so a decorative key is not documentation.
+`\Nino\Features::all()` answers every manifest by key, with `dir`, `module` and what
+this installation knows: `active`, `installed`, `update` and `problems`.
 
 ### Assets
 
-The style sheets and scripts a feature brings for the website are listed in the manifest under `assets`, as virtual paths below the feature's own `assets/` directory:
+Style sheets and scripts for the website are listed under `assets` as virtual paths
+below the feature's own `assets/` directory - a `.css` or a `.js` of a plain
+relative name, no `..`; an entry that breaks one refuses the manifest. While the
+feature is listed in `/nino/modules`, `\Nino\Features::registerAssets()` adds every
+`.css` to the style bundle and every `.js` to the script bundle at every boot, ahead
+of any module's `init()`, once each and in the order listed. A file for another
+bundle goes through `\Nino\Html::addAsset()`.
 
-```php
-'assets'	=> [ '/features/Catalog/assets/catalog.css', '/features/Catalog/assets/catalog.js' ],
-```
+### Components and stacks
 
-The directory in the path is the manifest's own, so that a feature cannot name a file of another; a file is a `.css` or a `.js` of a plain relative name, and no `..` is in the path. An entry that breaks one of these refuses the manifest, the way a bad `data` path does. While the feature is listed in `/nino/modules`, `\Nino\Features::registerAssets()` adds every `.css` to the project's style bundle, `/.cache/style.css`, and every `.js` to its script bundle, `/.cache/script.js` - at every boot, ahead of the `init()` of any module, once each and in the order the manifest lists them, behind what the kernel and the project put there. The `[assets]` shortcode of the page templates builds the bundle from the list, as it does for the files of the kernel. A feature that wants a file in another bundle calls `\Nino\Html::addAsset()` in its `init()`, as before; one that wants its file in no bundle leaves it out.
+A shortcode a feature brings stays a shortcode, and a builder cannot offer it. Give
+it a schema and it is a **component** the Components module knows and a tool can
+list; one that loops the elements of a type around its content is a **stack**. The
+manifest declares them as `name => schema` ([Components](development.md#components)
+has the schema), read by the same `validate()` as `addComponent()`. The renderer is
+derived like the class: `component<Name>()` or `stack<Name>()`, the name in studly
+caps (`componentNewsletterSignup()`), handed the arguments made ready - every
+attribute a string, a bool `'1'` or `'0'`, the default where the shortcode says
+nothing, and always `class` ([component recipe](recipes/component.md)). A component
+whose class has no `component<Name>()` is rendered by `doShortcode()` where it has
+one, so the shortcode by hand and the component are one method, as in `Hello`; a
+stack keeps the strict rule, and with neither renderer a component is a warning and
+left out. The Components module registers both at every boot while the feature is
+listed in `/nino/modules`, before its `init()` (activation lists a feature after
+that module). A component is registered one way, by the manifest or by
+`addComponent()` in `init()`; [`\Nino\Feature::shortcode()`](#the-toolset) keeps a
+plain registration from meeting the manifest's.
 
-The `assets` of a *stack's* schema (see [Components and Stacks](#components-and-stacks)) is another thing at another level: a note for a tool about the files the stack needs, which adds nothing to a page.
+### The manual
 
-### Components and Stacks
-
-A shortcode a feature brings stays a shortcode, and a builder cannot offer it. Give it a schema and it is a **component**: the kernel's `\Nino\Modules\Components` knows what its first argument is and which attributes it takes, and a tool can list it. A shortcode that loops the elements of one type around its content is a **stack**. Both are declared in the manifest as `name => schema`, with the schema written as [Components](development.md#components) describes it:
-
-```php
-'components'	=> [
-	'countdown'	=> [
-		'label'				=> [ 'en_US' => 'Countdown', 'de_DE' => 'Countdown' ],
-		'source'			=> 'none',
-		'attributes'	=> [
-			'to'				=> [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Moment', 'de_DE' => 'Zeitpunkt' ] ],
-			'tz'				=> [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Timezone', 'de_DE' => 'Zeitzone' ] ],
-			// the catalogue's countdown declares units, done and format the same way
-		],
-		'preview'			=> 'block',
-	],
-	'gallery'		=> [
-		'label'				=> [ 'en_US' => 'Gallery', 'de_DE' => 'Galerie' ],
-		'source'			=> 'none',
-		'attributes'	=> [
-			'album'			=> [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Album', 'de_DE' => 'Album' ] ],
-			'columns'		=> [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Columns', 'de_DE' => 'Spalten' ] ],
-		],
-		'preview'			=> 'image',
-	],
-],
-```
-
-Four optional keys say something to a tool without changing how the component renders. `draws` is what the renderer draws on the outside, the tag and the one class a theme addresses it by (`'p .countdown'`; 1 to 64 characters, a name in braces is an attribute of the schema), and `in` is where a tool offers the component, a non-empty list of the places `section` (directly in a column), `card` (in a card) and `hero` (directly in a column of the hero section); without `in` the component is offered everywhere. `holds` is one of the same places, and only with the source `content`: the content of the component is then the calls of the components of that place, which are rendered with it and which a builder edits as children - the kernel's `[card]` holds `card`. `icon` is the picture a tool shows it by, the parts of a 24 by 24 stroke icon (the [component recipe](recipes/component.md) has one to copy). A feature declares `draws` where a theme reaches its element by tag and class, `in` only where the place matters and `holds` only for a component that is a container. A manifest is read by the same `validate()` as `addComponent()`, so a wrong word in any of the keys refuses the manifest, with the name of the component.
-
-The `stacks` key takes the same shape. The kernel's own stacks - `[stack]`, `[slider]`, `[filter]` and `[list]`, registered in `Components::init()` - are the example for it, and the catalogue's features declare components only.
-
-The renderer is not declared but derived, like the class: `[ '\Nino\Modules\<Directory>', 'component<Name>' ]` for a component and `stack<Name>` for a stack, the name in studly caps - `componentCountdown()`, `componentNewsletterSignup()` for `newsletter-signup`, the kernel's own `stackSlider()` - each with the signature `( array &$appData, array $args ): string`. A component whose class has no `component<Name>()` is rendered by the class's `doShortcode()` where it has one: the shortcode a feature writes by hand and the component of its manifest are then one method, handed the arguments made ready the way any renderer is. A stack keeps the strict rule, `stack<Name>()` or nothing. The kernel registers them at every boot while the feature is listed in `/nino/modules`, before the feature's own `init()`; the shortcodes then belong to the feature, as `\Nino\Features::shortcodes()` reads it from the class of the renderer. A renderer the class has neither way is said in a warning and left out. A schema that does not validate refuses the whole manifest, with the name of the component in the message. A feature registers a component by manifest or by `\Nino\Modules\Components::addComponent()` in its `init()`, not both. The [component recipe](recipes/component.md) shows each.
-
-### The Manual
-
-The **Description** tab of a feature's screen in the Features panel, under the
-sentence the manifest describes it with. Not prose: what a developer does with it
-is *look something up* — which shortcode, which route, what the panel is called —
-and every feature answering the same questions in the same order is worth more
-than any one of them answering them well.
-
-One entry is a **handle** and one **line**. The handle is what somebody types and
-is never translated; the line is a string, or a `locale => string` map of them,
-exactly like a `name` or a `description`.
-
-```php
-'manual' => [
-	'shortcodes'	=> [ '[catalog limit="6"]' => [ 'en_US' => 'The list, at most six.', 'de_DE' => 'Die Liste, höchstens sechs.' ] ],
-	'markup'		=> [ 'data-catalog' => 'On a container the script should fill.' ],
-	'routes'		=> [ '/api/catalog' => 'The public JSON endpoint.' ],
-	'panel'			=> [ 'Catalog' => 'The products themselves.' ],
-	'callbacks'		=> [ '/nino/elements/committed' => 'Refreshes the list when an element is saved.' ],
-	'install'		=> [ 'templates/page-catalog.tpl' => 'The list page.' ],
-],
-```
-
-The sections are `\Nino\Features::MANUAL_SECTIONS`, and the panel draws every one
-of them **including the ones left empty** — "no callbacks" is an answer, and a
-reader who does not find the question has to go and read the source to learn that
-the answer was nothing. A section with entries is one list, so every handle in it
-stands in one column and every line beside it in another; keep a line to what
-fits on one.
+The `manual` key is what the **Description** tab of the feature's screen shows:
+reference, not prose, every feature answering the same questions in the same order.
+An entry is a **handle**, what somebody types and never translated, and a **line**,
+a string or a `locale => string` map. The sections are
+`\Nino\Features::MANUAL_SECTIONS`, drawn in this order and when empty ("no
+callbacks" is an answer):
 
 | Section | What belongs there |
 |---|---|
 | `shortcodes` | what a page writes between brackets, one line per form worth naming |
-| `markup` | what a template writes that is not a shortcode: an attribute, a class a script looks for, a `<script type="text/plain">`. Several features add nothing else |
+| `markup` | what a template writes that is no shortcode: an attribute, a class a script looks for, a `<script type="text/plain">` |
 | `routes` | the addresses the feature answers |
 | `panel` | the workbench screens it brings, by the name in the rail |
 | `callbacks` | what it hooks into, by the callback key |
-| `install` | what activation puts in the project — a template, an element type, the words it merges |
+| `install` | what activation puts in the project - a template, an element type, the words it merges |
 
-Three things deliberately have no section.
-
-The **description** is the manifest's own `description`, printed as the first
-line of the same tab, and the **settings** are the other tab - or the Settings tab of the feature's
-own panel - with the labels and hints the manifest declares. Writing either again is writing it differently.
-
-The **PHP a feature exposes to other code** is a question for the code and its
-docblocks. This tab is what an operator opens to find out what arrived on their site; mixing
-`Modules\Search::getElements()` into it makes both harder to scan.
-
-An entry written as a plain list item has no handle and is a line that stands on
-its own — for the case where the thing to say is a sentence rather than a
-snippet:
-
-```php
-'markup' => [ 'The feature ships no form: place the shortcode with the Builder.' ],
-```
-
-A handle is at most 120 characters, a line at most 1000, a section at most 40
-entries. Anything longer belongs in the code and its docblocks, not in the manual.
-
-The older form — a string, or a `locale => string` map of one — is still read, so
-a catalogue written before the sections existed keeps working. It is not the one
-to write.
+A plain list item has no handle; a handle is at most 120 characters, a line 1000, a
+section 40 entries. The description, the settings and the PHP a feature exposes have
+no section: the manifest says the first two, the docblocks the third. The older
+form, one string or a `locale => string` map, is still read; do not write it.
 
 ### Categories
 
-One category per feature, the coarse "what is this for" the Features panel groups by and a catalogue of forty features is browsed by. `\Nino\Features::CATEGORIES` publishes the vocabulary.
+One category per feature, the coarse "what is this for" the Features panel groups
+and filters by (`\Nino\Features::CATEGORIES`). Where a feature could sit in two,
+take the first that fits: `security` (it protects access or touches personal data),
+`marketing` (being found or measured), `communication` (messages with people),
+`content` (it brings content or makes it reachable), `ui` (it only changes how
+existing things look); what is left is `system`. Any slug passes
+(`/^[a-z][a-z0-9-]{0,23}$/`), so a feature written for a newer catalogue stays
+installable; a manifest without `category` is valid.
 
-Where a feature could sit in two of them, decide top-down and take the first that fits: does it protect access or touch personal data (`security`), is it about being found or measured (`marketing`), does it exchange messages with people (`communication`), does it bring content or make content reachable (`content`), does it only change how existing things look (`ui`)? What is left is `system`. The question is what the site owner wants, never how the feature is built: an image gallery is `content`, a lightbox over images that are already there is `ui`.
+## The class
 
-The kernel accepts any slug (`/^[a-z][a-z0-9-]{0,23}$/`), not only these six. A feature written for a catalogue newer than the kernel running it is filed under a category that kernel cannot know, and has to install regardless - so an unknown one is kept and shown as it stands, and the vocabulary is enforced where features are published rather than where they are read. A manifest without a `category` is valid; the panel simply says nothing about one.
+The class is an ordinary runtime module in `Nino\Modules`: `init()` registers
+behaviour and outputs nothing, a response goes through `\Nino\Http`, and the
+technical route belongs to the module (the [runtime module
+recipe](recipes/runtime-module.md) applies unchanged). The kernel calls these
+methods on a feature's classes:
 
-## The Settings Schema
+| Method | Called | The kernel does with the answer |
+|---|---|---|
+| `init( array &$appData ): void` | by `\Nino\Modules::callModules( $appData, 'init' )` at every boot, for each class in `/nino/modules` in its order, after the manifests' assets are registered | nothing |
+| `adminPanels( array &$appData ): array` | by `\Nino\Modules::collect()` whenever the workbench builds its registry | merges the panel classes into it ([The panel](#the-panel)) |
+| `upgrade( array &$appData, string $fromVersion ): bool` | by `\Nino\Features::activate()` ([Updates](#updates-and-the-upgrade-hook)) | `false` refuses the update, anything else goes on |
+| `component<Name>()`, `doShortcode()`, `stack<Name>()` | by the Components module when the shortcode is rendered | renders it ([Components and stacks](#components-and-stacks)) |
+| a callback of `'/nino/admin/restore'` | by the Backups panel and the recovery page, with `{ dataDir, staging }` | none ([Data and restore](#data-and-restore)) |
+| on a panel class: `log( $action, $data )`, `summary( &$appData )`, `scopes( &$appData )` | after an action that completed; by the Dashboard; by the roles tab | the line of the activity log (`''` for none); a tile `{ value, label }`; the scoped permissions |
 
-Every setting is a form control the panel can render and the kernel can validate. `\Nino\Features::SETTING_TYPES` lists the types and `\Nino\Features::validateSettings()` is where the keys and the validation of each are read; the rules a manifest has to keep are in the [feature recipe](recipes/feature.md#1-the-manifest).
+There is no install, activate, deactivate or uninstall hook: a feature lies in the
+directory, an activation applies its unit and lists its class, and nothing runs on
+the way out. The class of `Hello` is `features/Hello/Hello.php`; its markup is the
+template `templates/hello.tpl`, `<p class="nino-hello[[classes]]">[[text]]</p>`:
 
-The values live under `/nino/features` in `config.php`, per feature as `key => { version, settings }`:
+```php features/Hello/Hello.php
+<?php
+declare(strict_types=1);
 
-```php
-'/nino/features' => [
-	'catalog' => [
-		'version'  => '1.1.0',
-		'settings' => [ 'pageSize' => 24, 'public' => false ],
-	],
-],
+namespace Nino\Modules {
+
+	class Hello {
+
+		public const string STORAGE = '/data/hello.php';
+
+		public static function init( array &$appData ): void {
+
+			// false: the manifest's component owns the name and renders it through doShortcode()
+			\Nino\Feature::shortcode( $appData, 'hello', [ self::class, 'doShortcode' ] );
+
+			// A route of the feature's own, only where the address is free
+			if( isset( $appData['/nino/http/routes']['GET://hello'] ) === false )
+				$appData['/nino/http/routes']['GET://hello'] = [ 'uri' => '/hello', 'body' => '[template /templates/page-hello]' ];
+		}
+
+		public static function adminPanels( array &$appData ): array {
+			return [ \Nino\Modules\Hello\Admin::class ];
+		}
+
+		// 1.0.0 kept the name as 'who'
+		public static function upgrade( array &$appData, string $fromVersion ): bool {
+
+			if( version_compare( $fromVersion, '1.1.0', '>=' ) === true || \Nino\Filesystem::fileExists( $appData, self::STORAGE ) === false )
+				return true;
+
+			return \Nino\Filesystem::mutate( $appData, self::STORAGE, static function( mixed $state ): array {
+
+				$state = is_array( $state ) === true ? $state : [];
+				$state['name'] ??= $state['who'] ?? '';
+				unset( $state['who'] );
+
+				return $state;
+			} );
+		}
+
+		public static function doShortcode( array &$appData, array $args ): string {
+
+			$name = trim( (string) ( $args['name'] ?? '' ) );
+			$text = \Nino\Features::setting( $appData, 'hello', 'greeting', 'Hello' ). ', '. ( $name === '' ? self::name( $appData ) : $name ). '!';
+
+			return str_replace(
+				[ '[[classes]]', '[[text]]' ],
+				[ \Nino\Feature::classes( $args ), \Nino\Modules\Components::escape( \Nino\Feature::flag( $args, 'shout' ) === true ? mb_strtoupper( $text ) : $text ) ],
+				\Nino\Feature::template( $appData, '/features/Hello/templates', 'hello' )
+			);
+		}
+
+		public static function name( array &$appData ): string {
+
+			$stored = \Nino\Filesystem::getFileContent( $appData, self::STORAGE, [] );
+
+			return is_array( $stored ) === true && is_string( $stored['name'] ?? null ) === true && $stored['name'] !== '' ? $stored['name'] : 'World';
+		}
+	}
+}
 ```
 
-A feature reads its settings through the kernel, never out of the array itself:
+`init()` registers `[hello]` through `\Nino\Feature::shortcode()`, which registers
+nothing where the Components module already owns the name: here the manifest
+declared the component, the answer is `false` and `doShortcode()` is its renderer.
+The route is registered only where the address is free: a route in `config.php` is a
+page somebody made. It goes with the feature; a menu shows it once the Navigations
+panel has put it into one and it has a name (`/_nino/webpage<uri>/name`, written in
+the Routes panel under *Routes of features and modules*).
 
-```php
-$pageSize = \Nino\Features::setting( $appData, 'catalog', 'pageSize', 12 );
-$all      = \Nino\Features::settings( $appData, 'catalog' );
+## The toolset
+
+What a feature once wrote for itself, the kernel has once, and the docblock of a
+member is its reference. A method whose name starts with `_` is internal, every
+other is public; **1.8** marks what kernels before it lack, so a feature that calls
+one says `^1.8`. `\Nino\Feature` **1.8** (not `\Nino\Features`, the contract) holds
+the helpers of a feature's own code, static methods that render no markup:
+
+| Call | What it does |
+|---|---|
+| `template( $appData, $directory, $name )` | the `<name>.tpl` of a templates directory (`'/features/Hello/templates'`), ready for `str_replace()` over its `[[tokens]]`; one that is missing or empty is a warning and `''` |
+| `classes( $args )` | the `class` attribute of a component's markup, from the argument every shortcode may carry: `''`, or a space and the classes, escaped |
+| `flag( $args, $name, $default )` | a flag of a shortcode without a schema: a bare word is on, `name="no"` is read by the words a component's bool is |
+| `shortcode( $appData, $name, $callback )` | a plain shortcode, unless the Components module owns the name (the manifest declared a component or a stack): then `false` |
+| `origin( $url )`, `allowOrigin( $request, $directive, $url )` | an address as a Content-Security-Policy source - https, no credentials, no ip literal - and the call that adds it to one directive of this response |
+| `count( $appData, $name, $key, $limit, $window )`, `spent()`, `forget()` | tries per client in the window, kept in `/data/<name>.php` under a hashed key: count one and learn whether it is within budget; ask without counting; let a client go |
+| `slug( $text, $max )` | a name made into a slug, the letters ascii lacks written as `TRANSLITERATIONS` says; `Nino.slug()` is its twin |
+
+The kernel classes a feature calls, by home:
+
+| Class | Members |
+|---|---|
+| `\Nino\Features` | `setting( $appData, $key, $name, $default )`, `settings()`, `saveSettings()` ([Settings](#settings)); `get()` one feature as `all()` answers it; `localized()`, `satisfies()` |
+| `\Nino\Filesystem` | `getFileContent()`, `putFileContent()` a whole file by its virtual path; `mutate( $appData, $path, $fn, $default )` every read-modify-write: it locks, reads, calls `$fn( $state )` and writes what that answers, `null` aborts and `mutate()` answers `false` - a file whose shape may change carries a `format` key; `fileExists()`; `path()`, the real path, to `glob()` a directory; `forceDir()`, `removeDir()`; `getDir()`, `getPublicDir()`, `getPublicPath()` |
+| `\Nino\AppData` | `writeContentData( $appData, $keys )` persists the given top-level keys of `config.php`; `stored()` **1.8** reads one as the file holds it |
+| `\Nino\Http` | `fail( $request, $status, $error, $code, $params, $field )` and `ok( $request, $body )` end a handler; `redirect()`, `allowSource()` a policy directive widened by one source, `pages()`, `matchesPath()`, `answersHtml()` for a sitemap or a protected area, all **1.8**; `requestRoute()`, `getRequest()`, `getClientIp()` |
+| `\Nino\Html` | `renderHtml()` a string as a page is rendered; `renderTextfill()`, `resolveTextfill()` one fill; `addShortcode()`, `addAsset()`; `addFills()`; `getFills( $appData, $locale )` every fill of a language, the argument **1.8**; `removeFill()`, `absoluteUrl()` **1.8**; `sanitizeHtml()` |
+| `\Nino\Text` | `entries()`, `entry()`, `isGrammarKey()`, `sanitizeValue()`: the project's texts and their keys |
+| `\Nino\Form` | `forms()`, `form()`, `posted()`, `validate()`, `entries()`; `blocked()` **1.8** whether the CSRF guard refused the request |
+| `\Nino\Images` | `getUrl()`, `getSlot()`, `getSlots()`, `setSlotFilename()`, `setSlotAlt()`, `cleanAlt()`, `process()`, `fit()`, `limits()`, `reject()`, `read()`, `restore()`, `delete()` |
+| `\Nino\Mail` | `send()`; `rateLimited()` **1.8** whether the last send was refused by the cap per ip |
+| `\Nino\Locales` | `getCurrentLocale()`, `getNativeLocale()`, `getAvailableLocales()`, `verifyLocale()`, `useLocale()` for the rest of the request |
+| `\Nino\Modules\Components` | `components()`, `stacks()`, `defaults()`, `addComponent()`; `escape()` a value into html or an attribute; `renderStack()`, `cell()`, `element()` for a stack |
+| `\Nino\Admin\Admin` | `guardPerm()`; `postData()` the json of the posted `data`; `postString()` **1.8** one posted value as a string, never a cast; `cleanInt()`, `failType()`, `uploadError()`; `sessionLocale()`, `textFills()`; `\Nino\Admin\Panels::relative()` |
+| beside them | `\Nino\Callbacks::registerCallback()`; `\Nino\Elements::queryElements()`, `getElement()`, `getElementModel()`; `\Nino\Auth::getCurrentUser()`, `checkPermission()`; `\Nino\Fetch::get()`, the one way to the network; `\Nino\Modules\Jstext::publish()` fills for a public script; `\Nino\Modules::callModules()` |
+
+In the browser:
+
+| Where | Members |
+|---|---|
+| `Nino` | `slug( text, max )`, `clipboard( text )` (a promise of `true` or `false`), **1.8**; `content.getText( key )`; `dir`; `events.bindCallback( evt, cb )`: a callback bound after the event fired runs at once, every callback runs on its own and an error is thrown again from a timer, so one cannot stop the next, and the listeners are passive (**1.8**) |
+| `Nino.ui`, the site only | `reducedMotion()`, `options( el, prefix, schema )` the `data-<prefix>-<name>` attributes of an element read against a schema, `whenVisible( el, callback )`, all **1.8**. A site script never reaches `Nino.adminUi` and a panel script never `Nino.ui`; what both need is on `Nino` |
+| `Nino.adminUi` | `panel( spec )`, `levels( prefix, names )`, `hint()`, `textField()`, `el()`, `button()`, `localeSelect()` **1.8**; `api.call()`, `api.errorText()`, `showError()`, `status()`, `format()`, `text()`, `emptyState()`, `notice()`, `panelHead()`, `contextBar()`, `actionBar()`, `listActions()`, `selectField()`, `switchField()`, `numberField()`, `elementList()`, `stringList()`, `table()`, `buttonRow()`, `choiceDialog()`, `checkImage()`, `limits()` |
+| `Nino.admin`, the shell | `dirty` (`register`, `watchForm`, `snapshot`, `isDirty`, `guard`, `refresh`), `router` (`set`, `current`, `go`, `leave`), `sessionLocale`, `assetUrl()`, `publicUrl()`; a panel script reads none of it at load, `panel()` and `levels()` look it up when asked |
+| CSS | the site: the custom properties at `:root` of `_nino/Nino.css` are the tokens a feature's stylesheet uses, written without a fallback (`var( --space-2 )`: the token is there, or the kernel is older than the feature's floor); `.nino-btn` with its `--` variants and `.nino-sr-only`. The workbench: the classes of the [panel recipe](recipes/admin-panel.md#designing-an-admin-frontend), among them the four of 1.8 - `.nino-admin-btn--small`, `.nino-admin-actions`, `.nino-admin-badge[data-state]`, `.nino-admin-move`; a panel stylesheet opens with `@layer nino.system, nino.tool, nino.local;` and writes into `nino.tool`, scoped to its own root |
+
+## The panel
+
+A panel is one screen of the workbench, the class `adminPanels()` answers while the
+feature is active: it appears with the next load of the workbench after the
+activation, goes with the next one after the deactivation, and always stands in the
+rail's **Features** group whatever its `nav()` names. Its permission is offered on
+the roles tab; the **Editor** role does not receive it by itself. The class of
+`Hello` is `features/Hello/Admin/Admin.php`:
+
+```php features/Hello/Admin/Admin.php
+<?php
+declare(strict_types=1);
+
+namespace Nino\Modules\Hello {
+
+	class Admin {
+
+		public static function perm(): string {
+			return '/_admin/hello/manage';
+		}
+
+		public static function actions(): array {
+			return [ 'hello/list' => [ self::class, 'apiList' ], 'hello/save' => [ self::class, 'apiSave' ] ];
+		}
+
+		public static function nav(): array {
+			return [ 'hello', '/_admin/hello/nav', 90 ];
+		}
+
+		public static function assets(): array {
+			return [ \Nino\Admin\Panels::relative( dirname( __DIR__ ). '/assets/admin.js' ) ];
+		}
+
+		public static function text(): string {
+			return \Nino\Admin\Panels::relative( dirname( __DIR__ ). '/text' );
+		}
+
+		public static function apiList( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::perm() ) === false )
+				return;
+
+			\Nino\Http::ok( $request, [ 'name' => \Nino\Modules\Hello::name( $appData ), 'longest' => self::_longest( $appData ) ] );
+		}
+
+		public static function apiSave( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::perm() ) === false )
+				return;
+
+			$name = trim( \Nino\Admin\Admin::postString( \Nino\Admin\Admin::postData(), 'name' ) );
+
+			if( mb_strlen( $name ) > self::_longest( $appData ) )
+				\Nino\Http::fail( $request, 400, 'the name is too long', 'hello_long', [ self::_longest( $appData ) ], 'name' );
+			else if( \Nino\Filesystem::mutate( $appData, \Nino\Modules\Hello::STORAGE, static fn( mixed $state ): array => array_merge( is_array( $state ) === true ? $state : [], [ 'name' => $name ] ) ) === false )
+				\Nino\Http::fail( $request, 500, 'could not write the name' );
+			else
+				\Nino\Http::ok( $request, [ 'name' => \Nino\Modules\Hello::name( $appData ) ] );
+		}
+
+		private static function _longest( array &$appData ): int {
+			return (int) \Nino\Features::setting( $appData, 'hello', 'longest', 40 );
+		}
+	}
+}
 ```
 
-`settings()` answers every setting the schema declares - with the stored value, else the `default`, else the type's zero value (`false`, `min` or `0`, `[]`, `''`) - and only those: a stray key in `config.php` is not a setting. A stored value that no longer validates - after a schema that tightened, after a hand edit - is not handed to the feature; the default is. `setting()` answers the `$default` you pass for a setting the schema does not declare.
+- Every action guards itself with `\Nino\Admin\Admin::guardPerm()` and the panel's
+  permission, in its first lines, whatever the routing did. The uri (`hello`) names
+  the link, the pane, the action prefix and the script's namespace
+  `Nino.admin.hello`; a taken uri is dropped with a warning.
+- A failure a person can cause carries a **code**: the panel's slug with its hyphens
+  written as underscores, then a word (`hello_long`; `my_feature_empty` for
+  `my-feature`), in lower-case letters, digits and underscores. Its sentence is the
+  panel's text under `[[/_admin/error/<code>]]` in both languages, `%s` where a
+  param goes; `Http::fail()` carries the English message for a log, the code, the
+  params and the `field` refused, and `Nino.adminUi.api.errorText()` makes the
+  sentence of them. A failure nobody can cause has no code and shows the server's
+  message with the status in front. The kernel's scan for codes without a sentence
+  does not reach `features/`, so a feature's test asks, as `Hello`'s does.
+- `text()` names a directory of `<locale>.php` files, one for each interface
+  language, merged into the workbench's fills while the feature is active: the nav
+  label, the labels and errors its script reads and, for the code `hello_long`,
+  `[[/_admin/error/hello_long]]` => `The name may have up to %s characters.`
 
-An `int` setting may name a `unit`, the word its number is counted in: `'unit' => 'seconds'`. The workbench writes it in brackets behind the label of the field, in its own language - it looks the word up as the text key `[[/_admin/common/unit/<unit>]]` - and knows `seconds`, `minutes`, `hours`, `days`, `weeks`, `months`, `items`, `uris`, `per-hour`, `percent` and `characters`, in English and in German. The manifest does not check the word: one the workbench has no text for is written there as it stands, in the language the manifest wrote it in.
+The script runs on `Nino.adminUi.panel()`: it asks for `hello/list` when the pane is
+first shown, calls `render( data, panel )` with the answer and says a failed load in
+the mount (`/_admin/hello/error/load` unless `error` names another key). `dirty` is
+the entry for `Nino.admin.dirty`: the shell asks Save, Discard or Cancel before it
+throws away what the field holds, and `save( done )` ends in `done( true )` or
+`done( false )` on every way it can. The script is `features/Hello/assets/admin.js`:
 
-A form posts strings and gets the real types back: `'25'` becomes `25` for an `int`, `'false'` becomes `false` for a `bool`. `\Nino\Features::validateSettings( $schema, $posted, $current )` checks every setting before any is accepted and answers with `values` and `errors` (`name => message`); a setting the form did not send keeps its current value. `saveSettings( $appData, $key, $posted )` validates that way and then writes the `/nino/features` key once - or not at all while anything is wrong.
+```js features/Hello/assets/admin.js
+( function(wn) {
 
-## The Install Unit
+	wn.Nino.admin = wn.Nino.admin || {};
 
-`install/manifest.php` has the same shape as a kernel module's unit in the wizard - the [installer package recipe](recipes/installer-package.md) lists its keys. `\Nino\Features::applyUnit()` applies it, with overwrite on for the wizard and off for an activation. An activation reads `routes`, `templates`, `files`, `elementTypes`, `elements`, `blacklist` and `config` from it, plus `text/global.php` and `text/<locale>.php` for every available locale; `key`, `label`, `moduleClass`, `requiresModules`, `preset` and `navs` are the wizard's and are not read by an activation - the feature manifest carries them in its own form. Everything the unit copies belongs to the project from then on and is not touched by an update.
+	let input = null;
+	let line = null;
+	let saved = '';
 
-`elements` puts elements into the project, add-only: a map of an element type's URI (`'privacy'`) to a file of the unit (`'elements/privacy.php'`). `\Nino\Elements::seed()` creates the type if the project does not have it and the file brings a `model`, adds an element that does not exist and a language version an element does not have, and never replaces or deletes anything - not at an activation, not at an update, and not when the wizard applies a unit with `$overwrite`: elements are the editors' content. An element that is on the tombstone list under `/nino/elements/removed` in `config.php` is not added again; the Legal module writes it for the sections of its two types when somebody deletes one for good. The shape of the file is in the [installer package recipe](recipes/installer-package.md#files-and-element-types).
+	const save = function( done ) {
 
-This is how a feature that processes personal data brings its **section of the privacy policy**: `install/elements/privacy.php` with the type `privacy` of the Legal module, one section per feature, in every language it ships, as the [feature recipe](recipes/feature.md#4-the-install-unit) writes it. The section is the feature's own words, states only what the code does (a cookie's name and lifetime, what is stored, for how long) and names a fact of the website by a placeholder (`#/project/company/contact/email#`) instead of writing it. A feature that is switched off leaves its section in place; the Dashboard and the dialog say so, and the editor may hide it.
+		line.saving();
 
-## The Lifecycle
+		Nino.admin.hello.call( 'save', { name : input.value }, function( status, response ) {
 
-There is no install step. A feature lies in the directory, and everything after that is an action of the panel, or a call of `\Nino\Features`.
+			if( status !== 200 ) {
+				line.error( status, response, '/_admin/hello/error/save' );
+				done( false );
+				return;
+			}
 
-### Activating
+			saved = input.value = response.name;
+			line.saved();
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.refresh();
+			done( true );
+		} );
+	};
 
-`\Nino\Features::activate( $appData, $key )` answers `true`, or the reason why not. In order:
+	Nino.admin.hello = Nino.adminUi.panel( {
+		uri		: 'hello',
+		mount	: 'hello-list',
+		dirty	: { isDirty : function() { return input !== null && input.value !== saved }, save : save, discard : function() { input.value = saved } },
+		render	: function( data, panel ) {
 
-1. A feature with `problems` is refused, and the answer names all of them.
-2. The features under `requires` are activated first - a cycle is detected and stops rather than running forever. A required feature that is in the directory but not active is no obstacle; one that is missing is.
-3. If an `install/` directory lies beside the class, its unit is applied - **without overwriting anything**. A route whose key `config.php` already knows stays; a template `templates/` already has stays; a file that is there stays; a text key present in `text/<locale>.php` or `text/global.php` stays. Only what is missing is added. A `config` default of the unit is set only where the project has nothing. The unit's blacklist entries are merged into `text/blacklist.php`. A file the unit cannot copy - a target that cannot be written, a fragment it names but does not carry - refuses the activation with that file named, before anything is listed or recorded.
-4. The class is listed in `/nino/modules` and the manifest's version recorded under `/nino/features/<key>/version`; stored settings stay as they are. `/nino/modules`, `/nino/features` and - when the unit added any - `/nino/http/routes` are written as targeted keys.
+			const mount = panel.mount();
+			const field = Nino.adminUi.textField( { label : Nino.content.getText('/_admin/hello/label/name'), value : data.name, maxLength : data.longest } );
+			const bar = Nino.adminUi.actionBar( Nino.adminUi.el( 'div' ) );
 
-The unit is applied against the *persisted* routes of `config.php`, never the live ones: the live array carries this request's runtime routes - the workbench's, the ones an active module registers in `init()` - and those must not be written into `config.php`. The wizard's Setup step follows the same rule.
+			input = field.querySelector('input');
+			input.name = 'name';
+			saved = input.value;
 
-Activating an active feature again, with its version unchanged, changes nothing.
+			line = Nino.adminUi.status( Nino.adminUi.el( 'span' ) );
+			line.bind( mount );
 
-### Updating
+			bar.appendChild( line.element );
+			bar.appendChild( Nino.adminUi.button( Nino.content.getText('/_admin/hello/label/save'), function() { save( function() {} ) }, { className : 'nino-admin-btn-primary' } ) );
 
-A feature is updated by replacing its directory with the new release and activating it again in the panel - **Update** is the same action. The unit adds what is new and leaves everything the project has edited since the first activation as it is: a template you changed is not replaced by the new release's. What a feature keeps under `data/` may change its shape with the version, though, and there is a hook in the module class for that:
+			mount.innerHTML = '';
+			mount.appendChild( field );
+			mount.appendChild( bar );
+		},
+	} );
 
-```php
-public static function upgrade( array &$appData, string $fromVersion ): bool
+} )(window);
 ```
 
-`activate()` calls it when a version is recorded that differs from the manifest's and the class has the method - whether the feature is on or was switched off and its directory replaced in the meantime - with the recorded version as `$fromVersion`, after the unit has been applied and before the new version is recorded. The module migrates its own data in there. Returning `false` refuses the update, and the recorded version stays the old one. A class without `upgrade()` is updated without a migration. In a request that has already loaded the previous version's class - which `\Nino\Catalogue::install()` notes when it replaces the directory of a running feature - `activate()` refuses to apply the update and says so, because the hook it could call is the old one; the panel activates again in a request of its own.
+The script never renders a literal sentence (every word is a fill read through
+`Nino.content.getText()`), never posts by hand (`panel.call()` wraps
+`Nino.adminUi.api.call()`) and reads no member of the shell at load. The router,
+drill-down levels, tables, scoped permissions, the design rules and a panel's own
+template and icon are the [panel recipe](recipes/admin-panel.md).
 
-### Deactivating
+## The install unit
 
-`\Nino\Features::deactivate( $appData, $key )` removes the class from `/nino/modules` and writes that key - and nothing else. The settings and the recorded version under `/nino/features` stay, the files under `data/` stay, copied templates and texts stay, the unit's routes stay. Activating again therefore finds the feature as it was. The action is refused while another active feature names this one under `requires`; deactivating an inactive feature is harmless.
+`install/manifest.php` has the shape of the unit of a module in the setup wizard
+(the [installer package recipe](recipes/installer-package.md) lists its keys,
+[Library Format](setup.md#library-format) the files). An activation reads `routes`,
+`templates`, `files`, `elementTypes`, `elements`, `blacklist` and `config` from it,
+and `text/global.php` and `text/<locale>.php` for every available locale; `key`,
+`label`, `moduleClass`, `requiresModules`, `preset`, `navs` and `imageSlots` are the
+wizard's alone. The unit of `Hello`, `features/Hello/install/manifest.php`, copies
+the template of the page `/hello` and adds a section of the privacy policy:
 
-The Features panel answers a successful deactivation with the places that still contain the feature's shortcodes - the templates below `templates/`, the texts, the elements - and shows them in a dialog: a shortcode of a feature that is off is not rendered, it stays as the text it is written as. Which shortcodes are the feature's is read from what is registered: a shortcode belongs to the feature whose class, or a class below its namespace, is the callback's owner (`\Nino\Features::shortcodes()`, which asks `\Nino\Html::shortcodes()` and `\Nino\Callbacks::registered()` - both read only). It counts opening tags only, and raw brackets only: a shortcode the Text panel stored as `&#91;...&#93;` was never rendered and is not reported. The panel changes nothing, and asks nothing before it deactivates.
+```php features/Hello/install/manifest.php
+<?php return [
+	'templates'	=> [ 'page-hello.tpl' ],
+	'elements'	=> [ 'privacy' => 'elements/privacy.php' ],
+];
+```
 
-There is no uninstall, deliberately: deleting a file the project may have edited in the meantime would not be safe. What a feature leaves behind, a developer removes knowingly and by hand.
+The unit is applied **add-only**, on every activation of the feature - the first,
+each update, a re-activation: a route key `config.php` has, a template `templates/`
+has, a file that is there and a text key that exists stay as they are, and a
+`config` default is written only where the project has no value. A copy the project
+changed stays, one it deleted comes back; the wizard applies a unit with overwrite
+on through the same `\Nino\Features::applyUnit()`. So a unit never relies on being
+applied again to fix a file, and never promises an uninstall; a route the feature
+owns while it is active belongs in `init()`, a visitor page in the unit's `routes`.
+The words of a unit live in `/feature/<key>/<part>/<name>` (the feature's own
+function) and `/template/<file name without .tpl>/<part>/<name>` (a word only a
+template of the unit reads: `page-hello.tpl` reads
+`/template/page-hello/intro/title`); a unit never delivers a `/project` key ([the
+key grammar](development.md#the-key-grammar)).
 
-### Data, Backups and Restore
+A feature that processes personal data brings its own section of the privacy policy
+with the `elements` key, a map of an element type's uri to a file of the unit. The
+type `privacy` is the Legal module's; the file has no `model`, so it adds to the
+type and never creates it. `\Nino\Elements::seed()` only adds: an element that
+exists, a section the editor changed and one deleted for good stay as they are, and
+a feature that is switched off leaves its section in place - the deactivation dialog
+and the Dashboard say so, and the editor may hide it. The file of `Hello` is
+`features/Hello/install/elements/privacy.php`:
 
-What a feature writes under `data/` belongs to the project: the workbench's daily backup carries it, and `data` in the manifest documents which files those are. A feature that needs a restore to merge rather than overwrite registers the callback `'/nino/admin/restore'` in `init()` - the way a module always has. The Backups panel and the recovery page call it with `{ dataDir, staging }`, the live `data/` directory and the extracted backup, and the feature rewrites the files that are its own in the extracted copy before it is copied over the live one. `Newsletter::callbackRestore()` in the catalogue's Newsletter feature is the reference: an address someone removed stays removed however old the restored backup is. The callback runs only while the feature is active.
+```php features/Hello/install/elements/privacy.php
+<?php return [
+	'*' => [ 'hello' => [ 'order' => 860 ] ],
+	'en_US' => [ 'hello' => [
+		'title' => 'Hello World',
+		'text'  => '<p>The Hello World feature stores one name, the one its panel saves. Nothing about a visitor is stored. Questions: #/project/company/contact/email#</p>',
+	] ],
+];
+```
 
-### The Wizard and the Units
+Write the section in your own words, one entry for each language the feature ships,
+stating only what the code does; a placeholder names a fact of the website. It is a
+starting point and no legal advice, and the feature's manual says so. `order` is the
+position, a hundred apart so a section fits between two: the module's own sections
+stand in 100-399, cookies and consent in 400-499, contact, forms and mail in
+500-599, statistics in 600-699, embedded content in 700-799, other features in
+800-899, the closing section at 900.
 
-The setup wizard's second step offers no features. It knows the kernel modules that ship a unit - navigation, language selection, contact form - a project's own modules under `app/`, and the units in an `_admin/install/library/modules/` that a checkout adds for itself (scanned when it exists, none is shipped); a feature is switched on in the Features panel after setup. Both apply their units through the same method, `\Nino\Features::applyUnit()`: the wizard with overwrite on, because a unit applied again is meant to replace what it copied before there; an activation with it off. That is why the application lives in the kernel and not in the wizard - `_admin/install/` may be deleted after setup, and a feature still has to activate afterwards.
+## Settings
 
-## The Catalogue
+A setting is a form control the Features panel renders and the kernel validates. The
+manifest declares each by name (`/^[a-z][a-zA-Z0-9]*$/`) with a schema:
 
-A feature that is not copied in by hand comes from a catalogue: a `catalogue.json` published over https beside the archives it lists, and beside it a detached signature `catalogue.json.sig`. Nino's own is `https://catalogue.getnino.dev/catalogue.json`, built and signed by the catalogue repository [dapeio/nino-features](https://github.com/dapeio/nino-features) from the same directories a hand copy comes from. The kernel side is `\Nino\Catalogue` in `_nino/Nino/Catalogue/Catalogue.php` and the kernel's one http client, `\Nino\Fetch`; `tests/catalogue-smoke.php` checks both without a network.
+| Key | For | Rule |
+|---|---|---|
+| `type` | all | one of `\Nino\Features::SETTING_TYPES`: `bool`, `int`, `string`, `text`, `email`, `url`, `select`, `secret`, `lines` |
+| `label`, `hint`, `required` | all | a string or a `locale => string` map (the label is the name where left out); `true` refuses an empty value |
+| `default` | all but `secret` | has to pass its own schema; without one the type's zero value answers (`false`, `min` or `0`, `[]`, `''`) |
+| `min`, `max`, `unit` | `int` | ints, `min` not above `max`; the word the number is counted in, written in brackets behind the label: `seconds`, `minutes`, `hours`, `days`, `weeks`, `months`, `items`, `uris`, `per-hour`, `percent` and `characters` have a word in both languages (`[[/_admin/common/unit/<unit>]]`), any other is written as it stands |
+| `maxlength`, `pattern` | `string`, `text`, `secret`, `email`, `url` | `maxlength` 1 to 1000 (`text`: 10000), the ceiling where left out; `pattern`, for `string` only, a valid regular expression |
+| `options` | `select` | a non-empty map `value => label` |
 
-### What the Catalogue Says
+A feature reads its settings through the kernel, never out of the array:
+`\Nino\Features::setting( $appData, 'hello', 'longest', 40 )` answers one,
+`settings( $appData, 'hello' )` all - the stored value, else the default, else the
+type's zero value, and only for names the schema declares: a stray key in
+`config.php` is no setting, a stored value that no longer validates is not handed
+over, and `setting()` answers your `$default` for a name the schema lacks. The
+values live under `/nino/features` in `config.php`, per feature as
+`key => { version, settings }`:
 
-Format 1 is one JSON document: `format` (`1`), `generated` (when), and `features`, a list of entries - one per published version:
+```php
+'/nino/features' => [ 'hello' => [ 'version' => '1.1.0', 'settings' => [ 'greeting' => 'Hi', 'longest' => 24 ] ] ],
+```
 
-| Field | Meaning |
-| --- | --- |
-| `key`, `name`, `description`, `version`, `nino`, `php.ext`, `requires` | what the feature's manifest says, see [The Manifest](#the-manifest-featurephp) |
-| `category`, `maturity` | optional, the same two the manifest has. A reader dropping one it cannot use - a `maturity` too long or of the wrong type - does so without refusing the catalogue; catalogues published before `maturity` existed carry none, and so does a cached one |
-| `directory` | the directory the archive holds - `Newsletter`, the feature's class name segment |
-| `archive` | the https url of the `.tar.gz` |
-| `sha256`, `size` | the digest and the byte length of exactly that file |
-| `released` | the date |
+The form is on the feature's screen in the Features panel; a feature that also has a
+panel gets a **Settings** tab in it, on the same actions and the permission
+`/_admin/features/manage`, without a line of code. A form posts strings and gets the
+real types back. `saveSettings( $appData, $key, $posted )` validates every setting
+before any is written and answers `name => message` for each one it rejected, `[]`
+when it saved; a setting the form did not send keeps its value, a `secret` posted as
+`''` keeps the stored one and as `null` clears it.
 
-An archive is a `.tar.gz` holding exactly that one directory - what lands below `features/`, nothing beside it; a feature's `tests/` are not published. A catalogue that is wrong anywhere is refused as a whole: `\Nino\Catalogue::parse()` names the entry and the field.
+## Updates and the upgrade hook
 
-### Trust
+A feature is updated by replacing its directory with the new release and activating
+it again; the Features panel offers **Update** for an active feature whose manifest
+version differs from the recorded one. The unit adds what is new and leaves what the
+project has; then, if the class has it,
+`upgrade( array &$appData, string $fromVersion ): bool` runs - when a version is
+recorded that differs from the manifest's, whether the feature is on or was switched
+off and its directory replaced in the meantime - with the recorded version, after
+the unit and before the new version is recorded. `false` refuses the update and the
+record stays; any other answer lets it go on, and a class without the method is
+updated without a migration. A request that already loaded the previous version's
+class refuses the activation; the panel activates again in a request of its own.
 
-The signature is the trust. It is an ECDSA signature (curve P-256) over SHA-256 of the document's exact bytes, DER-encoded and base64 - what `openssl dgst -sha256 -sign key.pem catalogue.json | base64` writes. The public half of Nino's key ships with the kernel as `\Nino\Catalogue::PUBLIC_KEY`; `/nino/catalogue/key` in `config.php` replaces it with another key, PEM, for a catalogue of your own, and `/nino/catalogue/url` names that catalogue. An empty key verifies nothing, so a kernel that shipped none would accept no catalogue at all; the constant holds Nino's key, and `/nino/catalogue/key` left empty falls back to it. `/nino/catalogue/url` set to `''` switches the catalogue off: the Available tab says so and offers no Refresh button, and Nino makes no request.
+`\Nino\Features::activate( $appData, $key )` answers `true`, or why not: a feature
+with `problems` (all named), a requirement that failed, a unit file it cannot copy;
+a cycle of requirements ends where it began. The unit is applied to the routes
+`config.php` holds, not this request's own, so a route `init()` registers is not
+written; activating again at the same version changes only what the unit adds back.
+`deactivate( $appData, $key )` is refused while an active feature requires the one,
+and changes nothing for a feature that is off.
 
-Nothing is believed before the signature holds: the document is fetched, its signature is fetched, and only a document the key signed is parsed. An installation fetches the catalogue again rather than trusting what the panel showed, downloads the archive with the byte cap the entry names, and refuses an archive whose size or SHA-256 differs from the entry. The archive is unpacked below `data/.features/` - never in `features/` itself - after every entry was looked at: one directory named as the entry says, plain files and directories only, no path outside it, bounded in count and size; what came out is read as a feature and has to be the key and the version the catalogue promised, and to fit this kernel as the entry did. Only then is the directory moved into `features/`, replacing what was there; a move that fails half way puts the old directory back. The staging directory is removed either way.
+- Migrate only what the feature owns: its `data/` files and its own config keys,
+  through `\Nino\Filesystem::mutate()` as `Hello`'s hook does, returning its result:
+  a callback that aborts answers `false`, which refuses. The activation writes its
+  own keys as differences against `config.php` as it stands, so a hook that migrates
+  `config.php` with `mutate()` is not undone.
+- Be idempotent for the versions it handles: a refused update is asked again at the
+  next activation. Bump `version` with every release a project should tell apart:
+  the hook runs on any difference, a lower manifest version too.
 
-### The Cache
+### Data and restore
 
-A successful fetch is kept under `data/catalogue.php` - `\Nino\Catalogue::cached()` reads it back without ever making a request, and the panel's Available tab fills from it the moment it opens. The file holds when it was fetched, the url it was fetched under, and the parsed document; a url that no longer matches the one configured now - including the catalogue having been switched off since - makes `cached()` answer null again, the same as a file that does not hold what a fetch writes. Only the panel's own Refresh action calls `fetch()` a second time, and a successful one overwrites the cache whole; the offers computed from a cached document are always matched against the features actually on disk, so an install or activation since the last fetch shows up on Available without a new one.
+What a feature writes under `data/` belongs to the project: the daily backup carries
+the files `data` in the manifest names. A feature whose restore has to merge rather
+than overwrite - a removal that must survive an older backup, a counter that must
+not go backwards - registers a callback of `'/nino/admin/restore'` in `init()`
+(`\Nino\Callbacks::registerCallback()`). The Backups panel and the recovery page
+call it, while the feature is active, with `{ dataDir, staging }`, the live `data/`
+directory and the extracted backup; it rewrites its own files in the staged copy
+before that is copied over the live one.
+[`Newsletter::callbackRestore()`](https://github.com/dapeio/nino-features/blob/main/features/Newsletter/Newsletter.php)
+of the catalogue is the reference.
 
-### What Install Does
+## The feature's own test
 
-`\Nino\Catalogue::install()` places files and activates nothing - that is the kernel's half, and it is unchanged. The panel's `features/install` is the other half: it follows the install with an activation, with everything [Activating](#activating) says.
+A feature's test travels with it, `features/<Name>/tests/<key>-smoke.php`, and runs
+against a real checkout with a throwaway project in it, not against mocks: only Nino
+can say whether the feature kept its contract. It finds the checkout three levels
+up, or the one `NINO_ROOT` names, which is how the same test runs against another
+Nino from outside the checkout. The bootstrap is three lines - `NINO_FEATURES_DIR`
+has to exist before the harness loads the kernel, and the guard keeps one defined
+before the test was included - and `tests/harness.php` gives nine helpers:
 
-It does that in two of the three cases, and the third is the point of telling them apart. A feature that was **already active** is activated again, which is how an update is applied - the unit adds what is new and the module gets to migrate its data, see [Updating](#updating). A feature the project **did not have at all** is switched on: pressing Install is a project saying it wants the feature, and leaving it in the Inactive tab made one intention take two presses. A feature that is **there and switched off** stays off - somebody switched it off, and a newer version of it is not them changing their mind. Its Activate stays where it was.
+| Helper | What it does |
+|---|---|
+| `check( $label, $condition )` | one assertion, one line of output |
+| `ninoSandbox( $name )`, `ninoSandboxDir( $appData )` | a fresh, isolated project directory - `$appData` with every path in it, the locales `de_DE` and `en_US`, no modules, the test switches on what it tests - and its path |
+| `ninoWarnings()`, `ninoErrors( $run )` | the warnings raised since the last call, cleared as they are read - assert on the one you expect; every error one call raises, the level with it |
+| `ninoCall( $appData, $target, $data, $action )` | one workbench request as a panel method sees it: `$_POST['data']` is the json of `$data`; answers `[ status, body, request ]` |
+| `ninoUser( $appData, $mail, $perms )` | an account that exists and is signed in, full access unless `$perms` says otherwise |
+| `ninoVisit( $appData, $uri, $method, $server )` | one request of the site through `Http::request()`: the request built, the response seeded with the default headers, the callbacks of `/nino/http/request` run - no route resolved, nothing rendered |
+| `ninoDone( $appData )` | the summary with the seconds, the sandbox removed, the exit status |
 
-The answer says which happened: `pending` for the first (the update is applied by activating again, in a request of its own), `activated` for the second, both false for the third. `switchedOn` lists what was switched on - the feature and the requirements that came with it, by key and name - and is empty unless the feature was switched on here. Where the files are placed but the activation fails - a manifest that requires something the directory does not have, which only an activation can know - the panel answers a 400 that says exactly that, because a feature sitting in the list for no stated reason is worse than either half alone.
+The test of `Hello` is `features/Hello/tests/hello-smoke.php`:
 
-What it does resolve is requirements. `install()` works out the whole set first - what the feature `requires`, what those require, and only what the project does not already carry - checks every entry against this kernel, and then places them deepest first, so the feature that was asked for arrives last and can be switched on straight away. A requirement already on disk is left exactly as it is, whatever version it has: an install is not the moment to update something a project chose to keep. A requirement the catalogue cannot serve refuses the whole install, naming it, with nothing placed - half an installation is worse than none. The panel names what came along in its answer, because pressing Install on one feature and getting three is not something to work out from the Inactive tab afterwards. It says so in a dialog: an offer that is installed is not an offer any more, so the row it was pressed on is gone by the time anybody could read a line written on it.
+```php features/Hello/tests/hello-smoke.php
+<?php
+declare(strict_types=1);
 
-### Requirements and Privacy
+// The Hello feature's contract test. Runs against the checkout three levels up,
+// or the one NINO_ROOT names
+$root = getenv( 'NINO_ROOT' ) ?: dirname( __DIR__, 3 );
+defined( 'NINO_FEATURES_DIR' ) === true || define( 'NINO_FEATURES_DIR', dirname( __DIR__, 2 ) );
+require $root. '/tests/harness.php';
 
-An installation needs the `curl` extension or `allow_url_fopen`, the `openssl` extension, `phar` for the archive, and a writable `features/` directory - where it is not writable, the panel links the archive, to unpack by hand as before. Every request goes over https to the catalogue's host and nowhere else: no redirect is followed, no other scheme fetched, the certificate is verified, the user agent says `Nino` and nothing more - not the version, not the site. Nino makes these requests when someone presses **Refresh catalogue** or **Install** and at no other time; there is no check for updates in the background, no telemetry, nothing sent. The manual way stays: a directory copied into `features/` is a feature like any other.
+$appData = ninoSandbox( 'hello' );
+$appData['/nino/modules'] = [ '\\Nino\\Modules\\Components' ];
+\Nino\AppData::writeContentData( $appData, [ '/nino/modules', '/nino/locales/available', '/nino/locales/native' ] );
 
-## Outlook
+check( 'the manifest validates without a warning', is_array( \Nino\Features::manifest( dirname( __DIR__ ) ) ) && ninoWarnings() === [] );
+check( 'activation lists the class, records the version and applies the unit', \Nino\Features::activate( $appData, 'hello' ) === true
+	&& \Nino\Features::get( $appData, 'hello' )['installed'] === '1.1.0' && is_file( \Nino\Filesystem::path( $appData, '/templates/page-hello.tpl' ) ) === true );
 
-The features Nino publishes come from the catalogue repository [dapeio/nino-features](https://github.com/dapeio/nino-features): one directory per feature below `features/` there, each with its manifest and, where the feature carries them, its tests - copied into a project's `features/` by hand, or installed from the signed catalogue the repository publishes at getnino.dev, see [The Catalogue](#the-catalogue). And a catalogue of your own is a matter of a url and a key - the format is small enough to publish from a directory of features with the repository's `bin/build.php`.
+\Nino\Html::init( $appData );
+\Nino\Modules::callModules( $appData, 'init' );
+check( 'the component is registered from the manifest and renders through the template', isset( \Nino\Modules\Components::components( $appData )['hello'] ) === true
+	&& \Nino\Html::renderHtml( $appData, '[hello name="Ada" shout="yes" class="wide"]' ) === '<p class="nino-hello wide">HELLO, ADA!</p>' );
+
+ninoUser( $appData, 'dev@example.com' );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [ 'name' => 'Grace' ], 'hello/save' );
+check( 'hello/save stores the name and hello/list answers it', $status === 200 && $body['name'] === 'Grace'
+	&& ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'hello/list' )[1] === [ 'name' => 'Grace', 'longest' => 40 ] );
+
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [ 'name' => str_repeat( 'x', 41 ) ], 'hello/save' );
+check( 'a name too long is refused with the code, its limit and the field', $status === 400 && $body['code'] === 'hello_long' && $body['params'] === [ 40 ] && $body['field'] === 'name' );
+foreach( [ 'en_US', 'de_DE' ] as $locale )
+	check( "...and the code has its sentence in $locale", str_contains( \Nino\Admin\Admin::textFills( $appData, '/features/Hello/text', $locale )['[[/_admin/error/'. $body['code']. ']]'] ?? '', '%s' ) );
+
+// The project as 1.0.0 left it; all() keeps its answer for the request, so it is dropped to be asked again
+\Nino\Filesystem::putFileContent( $appData, '/data/hello.php', [ 'who' => 'Ada' ] );
+$appData['/nino/features']['hello']['version'] = '1.0.0';
+\Nino\AppData::writeContentData( $appData, [ '/nino/features' ] );
+unset( $appData['./nino/features/all'] );
+check( 'a recorded version behind the manifest runs the upgrade hook, which moves who to name', \Nino\Features::activate( $appData, 'hello' ) === true
+	&& \Nino\Filesystem::getFileContent( $appData, '/data/hello.php', [] ) === [ 'name' => 'Ada' ] );
+check( 'deactivation takes the panel away and keeps the data', \Nino\Features::deactivate( $appData, 'hello' ) === true
+	&& isset( \Nino\Admin\Admin::panels( $appData )['hello'] ) === false && \Nino\Modules\Hello::name( $appData ) === 'Ada' );
+
+ninoDone( $appData );
+```
+
+Test what a caller can see, as `Hello`'s test does: the manifest, the activation and
+its unit, the shortcode and the endpoints, a refusal with its code and its
+sentences, the panel there while the feature is active and gone after, the upgrade
+hook, the data that deactivation keeps. `php features/Hello/tests/hello-smoke.php`
+runs it (`NINO_ROOT=...` before it for another Nino), `php tests/features-smoke.php`
+is the kernel's contract test beside it. `ninoErrors()`, `ninoCall()`, `ninoUser()`
+and `ninoVisit()` are 1.8: a test that uses them needs a floor of `^1.8`.
+
+CI runs the contract test and then every feature's own test (a loop over
+`features/*/tests/*-smoke.php`, guarded because a checkout ships no feature). The
+catalogue's `bin/check.sh` does the same against a checkout of Nino: its
+`bin/applicable.php` names the features whose `nino` constraint the checkout
+satisfies, so the floor decides on which kernels a test runs.
+
+A feature's script is tested over the same stand-ins: `tests/<key>-js-smoke.js`
+takes `check()`, `done()`, `load()`, `element()` and `documentOf()` from the
+checkout's `tests/harness.js` (1.8; `NINO_ROOT` or three levels up) and `load()`s
+`_admin/assets/Nino.admin.js` and the feature's own script over a stand-in for
+`Nino` that keeps the requests. `load()` reads from the root of the checkout, so a
+feature outside it names its script as `path.relative( root, ... )`. The catalogue's
+JavaScript tests carry a stand-in of their own and run with any Nino.
+
+## What a feature does not do
+
+- It does not install or uninstall itself: deactivation only removes the class from
+  `/nino/modules`; copied files, texts, routes, settings and data stay.
+- It does not overwrite: neither activation nor an update replaces a file, a route
+  key or a text key the project has.
+- It does not reach the network on a page request, and never but through
+  `\Nino\Fetch`; Nino itself makes no outbound request unless someone presses
+  **Refresh catalogue** or **Install** ([the workbench manual](_admin.md#features)).
+- It does not write output (no `echo`, `header()`, `http_response_code()` or `exit`;
+  the response is `Http::ok()`, `fail()` or `redirect()`) and does not build markup
+  in PHP: a template, read by `\Nino\Feature::template()`, holds it (an icon and a
+  one-line fragment declared once as a property are the exceptions).
+- It does not depend on anything outside the public API of `\Nino\*` and its own
+  directory: no `_`-method, no class of `app/`, no copy of kernel code; a feature
+  that needs what the kernel lacks is blocked, not patched.
+- It does not read-modify-write a file with two calls (`Filesystem::mutate()`),
+  widen the Content-Security-Policy to `*` or an unsafe keyword
+  (`Feature::allowOrigin()` adds one origin) or register what its manifest declares twice.

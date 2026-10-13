@@ -23,6 +23,25 @@ namespace Nino {
 			$appData['./nino/filesystem/path'] = $appData['./nino/uid'];
 		}
 
+		/**
+		 *	The content of a file, by its virtual project path: a .php file is
+		 *	included and answers what it returns, a .json file is decoded, any
+		 *	other file is its text. A file is read again only when its
+		 *	modification time or its size differs from the last read of this
+		 *	request. No lock is taken - a write replaces the file whole (see
+		 *	putFileContent()), so a reader sees all of the old one or all of the
+		 *	new one; a read that is followed by a write of the same file belongs
+		 *	in mutate().
+		 *
+		 *	$default is what a file that is not there, a path with '..' or a NUL
+		 *	byte in it, and a .json that does not decode answer.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$filename			A virtual path, eg. '/data/hello.php', '/text/en_US.php', '/features/Hello/templates/hello.tpl' (see path())
+		 *	@param		mixed		$default			Answered where there is no content to give
+		 *
+		 *	@return 	mixed							The content, or $default
+		 */
 		public static function getFileContent( array &$appData, string $filename, mixed $default = false ): mixed {
 
 			// Every call site is expected to already validate $filename against
@@ -83,6 +102,27 @@ namespace Nino {
 			return $content;
 		}
 
+		/**
+		 *	Write a file by its virtual project path: the whole file, atomically
+		 *	(a temporary file next to it is renamed over it, so a reader never
+		 *	sees half of one). A .php file is written as <?php return ...; from
+		 *	the value, a .json file as json, any other as the string; the
+		 *	directory is made where it is missing, and the file keeps its mode.
+		 *	The file is locked while it is written, unless the caller holds the
+		 *	lock already ($nolock - lockFile() and mutate() do), and the lock is
+		 *	released when this returns.
+		 *
+		 *	It writes what it is given over whatever the file holds now. A change
+		 *	that depends on what is in the file is a read-modify-write and belongs
+		 *	in mutate().
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$filename			A virtual path, see getFileContent()
+		 *	@param		mixed		$content			The value to write
+		 *	@param		bool		$nolock				The caller holds the lock of this file already
+		 *
+		 *	@return 	bool							Whether it was written; false for an unusable path, a lock that could not be taken, a value json cannot encode and a failed write - the file is then as it was
+		 */
 		public static function putFileContent( array &$appData, string $filename, mixed $content, bool $nolock = false ): bool {
 
 			// See getFileContent() - same defense-in-depth rejection, on the
@@ -277,15 +317,24 @@ namespace Nino {
 			return true;
 		}
 
-		// Lock -> invalidate -> read -> write, in that order, around a
-		// callback that computes the new state - the shape every
-		// read-modify-write cycle on a file needs, written once. Reading
-		// before locking leaves a window for exactly the concurrent write
-		// the lock exists to exclude. $fn is fn(mixed $state, array
-		// &$appData): mixed, returning either the new state to write or
-		// null to abort - which still releases the lock, so a caller with
-		// an early exit doesn't need its own unlockFile() call. A callback
-		// that throws releases it too, and the throwable carries on.
+		/**
+		 *	Lock -> invalidate -> read -> write, in that order, around a
+		 *	callback that computes the new state - the shape every
+		 *	read-modify-write cycle on a file needs, written once. Reading
+		 *	before locking leaves a window for exactly the concurrent write
+		 *	the lock exists to exclude. $fn is fn(mixed $state, array
+		 *	&$appData): mixed, returning either the new state to write or
+		 *	null to abort - which still releases the lock, so a caller with
+		 *	an early exit doesn't need its own unlockFile() call. A callback
+		 *	that throws releases it too, and the throwable carries on.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$path				A virtual path, see getFileContent()
+		 *	@param		callable	$fn					function( mixed $state, array &$appData ): mixed
+		 *	@param		mixed		$default			The state of a file that is not there
+		 *
+		 *	@return 	bool							Whether the new state was written; false when the lock could not be taken, when $fn answered null (nothing is written) and when the write failed
+		 */
 		public static function mutate( array &$appData, string $path, callable $fn, mixed $default = [] ): bool {
 
 			if( self::lockFile( $appData, $path ) === false )
@@ -320,6 +369,16 @@ namespace Nino {
 			return self::putFileContent( $appData, $path, $new, true );
 		}
 
+		/**
+		 *	Whether a regular file is there, by its virtual project path. A
+		 *	directory, a path that is not there and a path with '..' or a NUL byte
+		 *	in it are not.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$filename			A virtual path, see getFileContent()
+		 *
+		 *	@return 	bool
+		 */
 		public static function fileExists( array &$appData, string $filename ): bool {
 
 			// Force file array cache
@@ -487,6 +546,18 @@ namespace Nino {
 			return self::_resolvePath( $appData, $filename );
 		}
 
+		/**
+		 *	Make a directory by its virtual project path, with the directories
+		 *	above it, where it is not there yet (mode 0755). Quiet about the rest:
+		 *	a directory that exists is nothing to do, a path with '..' or a NUL
+		 *	byte in it is a warning, and a directory that could not be made shows
+		 *	at the write that needed it.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$dirpath			A virtual path, eg. '/data/hello'
+		 *
+		 *	@return 	void
+		 */
 		public static function forceDir( array &$appData, string $dirpath ): void {
 
 			// See path()
@@ -522,10 +593,16 @@ namespace Nino {
 
 		}
 
-		// The project's *public content* root - images, fonts, the favicon
-		// set and the generated bundles (see PUBLIC_DIRS). Inside the
-		// webroot, one level down from it, so the project root keeps only
-		// the code that runs the site
+		/**
+		 *	The project's *public content* root - images, fonts, the favicon
+		 *	set and the generated bundles (see PUBLIC_DIRS). Inside the
+		 *	webroot, one level down from it, so the project root keeps only
+		 *	the code that runs the site
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string							Absolute path
+		 */
 		public static function getPublicPath( array &$appData ): string {
 
 			return $appData['./nino/filesystem/publicpath'];
@@ -604,6 +681,17 @@ namespace Nino {
 
 		}
 
+		/**
+		 *	The directory the project is served from, as an address carries it: ''
+		 *	at the domain root, '/shop' for a site at example.com/shop/. It is the
+		 *	fill '/nino/dir', and the prefix of every address a page builds;
+		 *	config.php names it, and where it does not the entry script's address
+		 *	does (see deriveDir()).
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string							Eg. '', '/shop'
+		 */
 		public static function getDir( array &$appData ): string {
 
 			return $appData['/nino/dir'];
@@ -690,6 +778,17 @@ namespace Nino {
 		}
 
 
+		/**
+		 *	Delete a file, or a directory with everything in it. Quiet about what
+		 *	is not there, and a link to a directory is neither followed nor
+		 *	removed. It takes an absolute path and checks nothing of what it
+		 *	deletes: the caller has proven the path is its own (see
+		 *	\Nino\Features::remove()).
+		 *
+		 *	@param		string		$target				An absolute path
+		 *
+		 *	@return 	void
+		 */
 		public static function removeDir( string $target ): void {
 
 			if( is_file( $target ) ) {

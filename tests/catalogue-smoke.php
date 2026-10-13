@@ -702,7 +702,7 @@ $result = tryInstall( $appData, $remote, $features, $privateKey, entry( 'helper'
 // isLink(), which PharData answers false to for every entry a tar can
 // hold - so the guard never fired, the link came out as a 0-byte plain
 // file, and the look after the extraction found no link to object to
-// either. Inert, but not what docs/features.md promises ("plain files and
+// either. Inert, but not what docs/_admin.md promises ("plain files and
 // directories only"), and the archive got as far as being unpacked
 check( 'an archive with a symlink is refused, before anything is unpacked', $result === 'the archive holds "Helper/link.php", which is neither a file nor a directory' );
 check( 'nothing of it reaches features/, and the staging directory is gone', file_exists( NINO_FEATURES_DIR. '/Helper/link.php' ) === false && stagingClean( $staging ) === true );

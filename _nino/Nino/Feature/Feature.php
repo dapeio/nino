@@ -192,7 +192,7 @@ namespace Nino {
 
 			$parts = parse_url( $url );
 
-			if( is_array( $parts ) === false || ( $parts['scheme'] ?? '' ) !== 'https' || isset( $parts['user'] ) === true || isset( $parts['pass'] ) === true )
+			if( is_array( $parts ) === false || strtolower( (string) ( $parts['scheme'] ?? '' ) ) !== 'https' || isset( $parts['user'] ) === true || isset( $parts['pass'] ) === true )
 				return '';
 
 			$host = strtolower( (string) ( $parts['host'] ?? '' ) );
@@ -419,11 +419,12 @@ namespace Nino {
 
 		/**
 		 *	Register a shortcode unless the Components module owns the name:
-		 *	\Nino\Modules\Components::components() has an entry for it when the
-		 *	manifest of a feature registered it as a component, and the registry
-		 *	is the whole answer to "is the module on and does it know it". What
-		 *	the module owns it renders itself - registering a callback beside it
-		 *	would chain a second renderer onto the first.
+		 *	\Nino\Modules\Components::components() or stacks() has an entry for it
+		 *	when the manifest of a feature registered it as a component or as a
+		 *	stack, and the two registries are the whole answer to "is the module
+		 *	on and does it know it". What the module owns it renders itself -
+		 *	registering a callback beside it would chain a second renderer onto
+		 *	the first.
 		 *
 		 *	The answer says which it was, so a feature that has something to do
 		 *	where the component owns the name asks for it - a feature that
@@ -442,7 +443,7 @@ namespace Nino {
 		 */
 		public static function shortcode( array &$appData, string $name, callable $callback ): bool {
 
-			if( isset( \Nino\Modules\Components::components( $appData )[$name] ) === true )
+			if( isset( \Nino\Modules\Components::components( $appData )[$name] ) === true || isset( \Nino\Modules\Components::stacks( $appData )[$name] ) === true )
 				return false;
 
 			\Nino\Html::addShortcode( $appData, $name, $callback );

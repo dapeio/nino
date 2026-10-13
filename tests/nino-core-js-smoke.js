@@ -170,6 +170,16 @@ let lateEvent = null;
 starting.Nino.events.bindCallback( 'ready', function( event ) { lateEvent = event } );
 check( 'a callback bound after the page was ready is called at once', lateEvent !== null );
 
+let lateReturned = false;
+let lateThrew = null;
+try {
+	starting.Nino.events.bindCallback( 'ready', function() { throw new Error( 'a late ready callback of somebody elses' ) } );
+	lateReturned = true;
+} catch( error ) { lateThrew = error.message }
+const lateErrors = thrownAgain( starting );
+check( '...one that throws is thrown again from a timer with no delay, like a queued one, and the binding call returns', lateReturned === true && lateThrew === null
+	&& lateErrors.messages.join() === 'a late ready callback of somebody elses' && lateErrors.delays.join() === '0' );
+
 // A page that has started: its own ready callback ran and the frames that asked for are done
 const ticking = page();
 ticking.runTimers();

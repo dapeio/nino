@@ -11,9 +11,14 @@ declare(strict_types=1);
  *								(features/<Name>/tests/<key>-smoke.php) and finds the
  *								checkout it runs against three levels up - or wherever
  *								NINO_ROOT points, which is how the same test runs against
- *								another Nino version from outside the checkout:
+ *								another Nino version from outside the checkout. The
+ *								features directory is the one the feature lives in, named
+ *								before the kernel loads (the autoloader and
+ *								\Nino\Features::dir() read the same constant), and kept if
+ *								the test was included by something that named it already:
  *
  *									$root = getenv( 'NINO_ROOT' ) ?: dirname( __DIR__, 3 );
+ *									defined( 'NINO_FEATURES_DIR' ) === true || define( 'NINO_FEATURES_DIR', dirname( __DIR__, 2 ) );
  *									require $root. '/tests/harness.php';
  *
  *								check()				One assertion, one line of output
@@ -95,9 +100,13 @@ function ninoSandbox( string $name ): array {
 }
 
 /**
+ *	The directory a sandbox lives in, with the private/ and public/ halves of
+ *	its project below it - to put a file there for the code under test, or to
+ *	look at what that code wrote
+ *
  *	@param		array 		&$appData			(reference) A sandbox's app data
  *
- *	@return 	string									Its directory
+ *	@return 	string									Its directory; '' for app data that is no sandbox's
  */
 function ninoSandboxDir( array &$appData ): string {
 
@@ -211,9 +220,11 @@ function ninoUser( array &$appData, string $mail, array $perms = [ '/*' ], strin
 }
 
 /**
- *	One request of the site, the way a web server hands it over: the server
- *	array run through Http::request(), the response and the headers it
- *	composes included
+ *	One request of the site, the way a web server hands it over, as far as
+ *	its first stage: the server array run through Http::request(), which
+ *	builds the request, seeds the response with the default headers and runs
+ *	the callbacks of '/nino/http/request'. No route is resolved and nothing is
+ *	rendered - Http::response() and the output are not run
  *
  *	@param		array 		&$appData			(reference) A sandbox's app data
  *	@param		string		$uri					eg. '/legal?x=1'

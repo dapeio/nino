@@ -110,20 +110,21 @@ namespace Nino {
 			reads the same three fields out of a published catalogue entry, and
 			kept its own copies of all three. Two spellings of "what a feature
 			key is" is one spelling too many - the catalogue is the publishing
-			side of exactly these manifests	*/
-		public const string KEY_PATTERN = '/^[a-z][a-z0-9-]*$/';
-		public const string CATEGORY_PATTERN = '/^[a-z][a-z0-9-]{0,23}$/';
-		public const string VERSION_PATTERN = '/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/';
+			side of exactly these manifests. The key pattern has the D modifier:
+			without it a key with a line break at its end is a slug	*/
+		public const string KEY_PATTERN = '/^[a-z][a-z0-9-]*$/D';
+		public const string CATEGORY_PATTERN = '/^[a-z][a-z0-9-]{0,23}$/D';
+		public const string VERSION_PATTERN = '/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/D';
 
 		/*	What a feature's directory and a PHP extension name look like, for
 			the same reason: the directory is the class name segment
 			(\Nino\Modules\<Directory>), so a catalogue entry that names one has
 			to pass the rule manifest() applies to the directory it lands in,
 			and "php" => "ext" is read by both	*/
-		public const string DIRECTORY_PATTERN = '/^[A-Z][A-Za-z0-9]*$/';
-		public const string EXTENSION_PATTERN = '/^[a-z][a-z0-9_]*$/i';
+		public const string DIRECTORY_PATTERN = '/^[A-Z][A-Za-z0-9]*$/D';
+		public const string EXTENSION_PATTERN = '/^[a-z][a-z0-9_]*$/iD';
 
-		private const string SETTING_PATTERN = '/^[a-z][a-zA-Z0-9]*$/';
+		private const string SETTING_PATTERN = '/^[a-z][a-zA-Z0-9]*$/D';
 
 		// A file below a feature's assets/ directory the bundles of the site may
 		// carry: a style sheet or a script, a plain relative name with no hidden

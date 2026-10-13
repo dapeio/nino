@@ -2,7 +2,7 @@
 
 This file is the operational specification for AI agents that modify Nino.
 Follow it before copying patterns from memory or from another framework. The
-six extension recipes of section 7 are part of it.
+five extension recipes and the feature manual of section 7 are part of it.
 
 Nino is a filesystem-based PHP website framework. It has no database, Composer
 dependency, JavaScript build step, component framework, or plugin manager.
@@ -85,7 +85,7 @@ Do not use “page”, “template”, “module”, and “admin module” inte
 | Add behavior to public requests or a new shortcode | Runtime module, see the [runtime module recipe](docs/recipes/runtime-module.md) |
 | Add a shortcode that a tool can offer - a source for its value and typed attributes with defaults - or one that loops the elements of a type around its content | Component or stack - `\Nino\Modules\Components::addComponent()` and `addStack()` from a module's `init()`, or the `components` and `stacks` keys of a feature manifest, see the [component recipe](docs/recipes/component.md) |
 | Make a kernel or project module selectable and copyable during the setup wizard | Installer module package, see the [installer package recipe](docs/recipes/installer-package.md) |
-| Package an installable feature - a module with a manifest, settings and a version, switched on in the workbench after setup | Feature - `features/<Name>/` with `feature.php`, see the [feature recipe](docs/recipes/feature.md) |
+| Package an installable feature - a module with a manifest, settings and a version, switched on in the workbench after setup | Feature - `features/<Name>/` with `feature.php`, see the [feature manual](docs/features.md) |
 | Compose a page template out of sections, columns and components in the workbench | The Builder - the feature `features/Builder` of the catalogue, panel Builder in the Features group, not here |
 | Add a complete starting page to the installation library | Page library unit |
 | Add reusable HTML+ included by other templates | Reusable `.tpl` template |
@@ -110,7 +110,7 @@ group, always, since the group a `nav()` names is read for the kernel's own and
 | `_admin/` | The workbench: the shell (`Admin.php`, `recovery.php`, `assets/style.css`, `assets/Nino.admin.js`, which the workbench and the setup wizard load), its screens as modules in `_admin/Nino/Modules/<Name>/`, and the setup wizard with its library in `_admin/install/`, deletable after setup |
 | `app/` | The project's own PHP classes and runtime modules, under namespaces of their own |
 | `features/` | Installed features, one directory each with a `feature.php` manifest; the `nino` constraint it names is the kernel whose vocabulary the feature uses. A checkout ships none: they come from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) |
-| `docs/` | The manuals, and the six extension recipes in `docs/recipes/` |
+| `docs/` | The manuals - among them [`docs/features.md`](docs/features.md), the one manual of a feature - and the five extension recipes in `docs/recipes/` |
 | `tests/` | Standalone contract tests, one suite per module or panel (`*-smoke.php`, `*-js-smoke.js`), `harness.php` (`check()`, `ninoSandbox()`, `ninoSandboxDir()`, `ninoWarnings()`, `ninoErrors()`, `ninoCall()`, `ninoUser()`, `ninoVisit()`, `ninoDone()`), its JS counterpart `harness.js` for the forty-three JS suites, and `fixtures/` |
 | `history/` | The frozen `CHANGELOG.md` up to 1.7.0; from there the history is the git log and the tags |
 | `private/`, `public/` | One installation's own state, written by the wizard and tracked by nobody. `private/` is never served: `config.php`, `templates/`, `text/`, `elements/`, `assets/`, `data/`, `.auth/`, `.logs/`, `.backups/`. `public/` is what a browser loads directly: `images/`, `fonts/`, `favicon/` and the generated `.cache/` |
@@ -380,11 +380,12 @@ or the recovery page.
   suitable alt text on every content image.
 - Do not assume JavaScript is available for essential content.
 
-## 7. Recipes
+## 7. Recipes and the feature manual
 
-The six extension recipes linked from the table in section 3 are part of this
-specification: every rule above applies inside them, and a change to a contract
-they describe updates the recipe in the same commit.
+The five extension recipes linked from the table in section 3 and the feature
+manual [`docs/features.md`](docs/features.md) are part of this specification:
+every rule above applies inside them, and a change to a contract they describe
+updates the recipe or the manual in the same commit.
 
 ## 8. Security review required for every extension
 
@@ -457,7 +458,7 @@ convenience: repeat it on the server.
 - A translation import is merge-only and validated against schema and path;
   unknown keys and the technical, global and image fields stay untouched.
 - A feature that processes personal data MUST bring its section of the privacy
-  policy, as the [feature recipe](docs/recipes/feature.md#4-the-install-unit) writes it.
+  policy, as the [feature manual](docs/features.md#the-install-unit) writes it.
 
 ### 8.4 Failure behavior
 

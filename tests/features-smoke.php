@@ -114,6 +114,9 @@ check( 'a manifest that is not an array is refused', ( static function() use ( $
 	return $r === null && str_contains( ninoWarnings()[0] ?? '', 'must return an array' );
 } )() );
 check( 'a key that is not a slug is refused', manifestFails( $manifestDir, 'BadKey', [ 'key' => 'Bad Key', 'name' => 'x', 'version' => '1.0.0' ], '"key"' ) );
+check( 'a key with a line break at its end is no slug: the warning names the file and "key"', manifestFails( $manifestDir, 'NewlineKey', [ 'key' => "helper\n", 'name' => 'x', 'version' => '1.0.0' ], 'NewlineKey/feature.php: "key"' ) );
+check( '...and neither is a version or a category with one', manifestFails( $manifestDir, 'NewlineVersion', [ 'name' => 'x', 'version' => "1.0.0\n" ], 'NewlineVersion/feature.php: "version"' )
+	&& manifestFails( $manifestDir, 'NewlineCategory', [ 'name' => 'x', 'version' => '1.0.0', 'category' => "content\n" ], 'NewlineCategory/feature.php: "category"' ) );
 check( 'a name is required', manifestFails( $manifestDir, 'NoName', [ 'version' => '1.0.0' ], '"name"' ) );
 check( 'a version is major.minor.patch', manifestFails( $manifestDir, 'BadVersion', [ 'name' => 'x', 'version' => '1.0' ], '"version"' ) );
 check( 'a pre-release suffix is a version too', \Nino\Features::manifest( writeManifest( $manifestDir, 'Pre', [ 'name' => 'x', 'version' => '1.0.0-beta.2' ] ) )['version'] === '1.0.0-beta.2' );
@@ -747,8 +750,8 @@ check( '...any other word, and an argument that is not there, give the default -
 check( '...a value that is no string, too', \Nino\Feature::flag( [ 'block' => [ 'yes' ] ], 'block' ) === false && \Nino\Feature::flag( [ 'block' => [ 'no' ] ], 'block', true ) === true && \Nino\Feature::flag( [ 'block' => true ], 'block' ) === false );
 
 // origin(): the https origin of an address, or nothing a policy could be widened by
-check( 'origin() is the scheme and host of an https address, the port kept - and lower case', \Nino\Feature::origin( 'https://player.example.com/embed/7?x=1#t' ) === 'https://player.example.com'
-	&& \Nino\Feature::origin( 'https://Player.Example.COM:8443/x' ) === 'https://player.example.com:8443' );
+check( 'origin() is the scheme and host of an https address, the port kept - and lower case, the scheme read in any case', \Nino\Feature::origin( 'https://player.example.com/embed/7?x=1#t' ) === 'https://player.example.com'
+	&& \Nino\Feature::origin( 'https://Player.Example.COM:8443/x' ) === 'https://player.example.com:8443' && \Nino\Feature::origin( 'HTTPS://CDN.Example.com/fonts.css' ) === 'https://cdn.example.com' );
 check( '...none for anything but https, an address with credentials, or a host that is not a plain name', array_filter( [
 	'http://player.example.com/', 'ftp://player.example.com/', '//player.example.com/', 'player.example.com', 'javascript:alert(1)', '',
 	'https://user@player.example.com/', 'https://user:pw@player.example.com/',
@@ -868,6 +871,11 @@ check( 'shortcode() registers the shortcode where the Components module owns no 
 \Nino\Modules\Components::addComponent( $toolset, 'owned', static fn( array &$appData, array $args ): string => 'by the component', [ 'label' => 'Owned', 'source' => 'none' ] );
 check( '...and registers nothing where a component of that name is in the registry: it says so, and the component renders as it did', \Nino\Feature::shortcode( $toolset, 'owned', $toolPlain ) === false
 	&& \Nino\Html::renderHtml( $toolset, '[owned]' ) === 'by the component' );
+$toolset['/nino/modules'] = [ '\\Nino\\Modules\\Sample' ];
+\Nino\Features::registerComponents( $toolset );
+$toolRows = \Nino\Callbacks::registered( $toolset, '/nino/html/shortcode/rows' );
+check( '...and where the manifest of a feature declared the name under stacks: false as well, and the one callback of the stack is still the module\'s', isset( \Nino\Modules\Components::stacks( $toolset )['rows'] ) === true
+	&& count( $toolRows ) === 1 && \Nino\Feature::shortcode( $toolset, 'rows', $toolPlain ) === false && \Nino\Callbacks::registered( $toolset, '/nino/html/shortcode/rows' ) === $toolRows );
 
 // slug(): a name made into a word of a url or a file
 check( 'slug() lower-cases, writes the letters ascii lacks as its table says, and turns every run of anything else into one hyphen', \Nino\Feature::slug( 'Äpfel & Öl, groß!' ) === 'aepfel-oel-gross'

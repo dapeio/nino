@@ -159,18 +159,53 @@ namespace Nino {
 			$request['/nino/http/response']['locale'] = \Nino\Locales::setCurrentLocale( $appData, $locale );
 		}
 
+		/**
+		 *	The language this request is rendered in: the project's native one
+		 *	unless the visitor picked another of the available ones (kept in their
+		 *	session) or the route names its own. setCurrentLocale() and
+		 *	useLocale() switch it.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string							A locale id, eg. 'de_DE'
+		 */
 		public static function getCurrentLocale( array &$appData ): string {
 			return $appData['./nino/locales/current'];
 		}
 
+		/**
+		 *	The project's own language, '/nino/locales/native' in config.php -
+		 *	what a visitor who picked none is served.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string							A locale id, eg. 'de_DE'
+		 */
 		public static function getNativeLocale( array &$appData ): string {
 			return $appData['/nino/locales/native'];
 		}
 
+		/**
+		 *	The languages the site has, '/nino/locales/available' in config.php,
+		 *	in the order it lists them.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array							Locale ids, eg. [ 'de_DE', 'en_US' ]
+		 */
 		public static function getAvailableLocales( array &$appData ): array {
 			return $appData['/nino/locales/available'];
 		}
 
+		/**
+		 *	Whether a language is one of the site's - the check before a locale id
+		 *	from a request becomes a path segment (/text/<locale>.php) or a key.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$locale				A locale id
+		 *
+		 *	@return 	bool							Whether it is among getAvailableLocales()
+		 */
 		public static function verifyLocale( array &$appData, string $locale ): bool {
 
 			return in_array( $locale, \Nino\Locales::getAvailableLocales( $appData ) );

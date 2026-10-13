@@ -76,7 +76,10 @@ namespace Nino\Modules {
 
 		// The words a bool is read from: an attribute of a component here, and a
 		// flag of a shortcode without a schema in \Nino\Feature::flag() - one
-		// table, so that the two cannot come to mean different things by "yes"
+		// table, so that the two cannot come to mean different things by "yes".
+		// The script that reads a flag off a data attribute, Nino.ui.options(),
+		// carries a copy of the two lists (ON and OFF in Nino.ui.js): the three
+		// must stay equal
 		public const array ON = [ '1', 'true', 'yes', 'on' ];
 		public const array OFF = [ '0', 'false', 'no', 'off' ];
 

@@ -14,6 +14,23 @@ namespace Nino {
 	// code fires that key deliberately
 	class Callbacks {
 
+		/**
+		 *	Register a callable under a hook name. doCallbacks() calls it whenever
+		 *	that hook fires, in the order of the priority and then of the
+		 *	registration. The callable is handed the app data and the hook's
+		 *	argument by reference, and what it answers - unless that is null -
+		 *	takes the place of the argument for the callbacks after it.
+		 *
+		 *	What is not callable is said in a warning and not registered. A
+		 *	priority is 0 to 9, lower first; any other number is 5, the middle.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$name				The hook, eg. '/nino/http/response/GET://about' or '/nino/admin/restore'
+		 *	@param		mixed		$callback			A callable: [ Class::class, 'method' ], a function name, a closure
+		 *	@param		int			$prio				0 to 9
+		 *
+		 *	@return 	void
+		 */
 		public static function registerCallback( array &$appData, string $name, mixed $callback, int $prio = 5 ): void {
 
 			/*	Said out loud rather than dropped in silence. A hook is a string

@@ -1,6 +1,6 @@
 # Recipe: Add a runtime module
 
-One of the six extension recipes of the [Nino agent guide](../../AGENTS.md). Its
+One of the five extension recipes of the [Nino agent guide](../../AGENTS.md). Its
 rules - the working method, the core runtime model, the conventions and the
 security review - apply to every step below.
 
@@ -356,7 +356,7 @@ tools and the installer:
   to copy - `Maintenance`, which is a switch and a template - has no unit:
   the wizard's Setup step lists it in `/nino/modules` on every run. A feature carries the same unit and
   `\Nino\Features::activate()` applies it, add-only, when the feature is
-  switched on in the workbench - the [feature recipe](feature.md).
+  switched on in the workbench - the [feature manual](../features.md#the-install-unit).
 - `'/nino/admin/restore'` (args `dataDir`, `staging`) is the callback a module
   registers in `init()` when it keeps its own files under `data/` that a
   backup carries: the Backups panel (and the recovery page) call it with the

@@ -81,10 +81,11 @@ namespace Nino {
 			'/nino/session/force-secure-cookie'	=> false,
 			'/nino/locales/native'		=> 'en_US',
 			'/nino/locales/available'	=> [ 'en_US' ],
-			// Read by nothing in the kernel: text lives in /text (see
-			// Filesystem::PRIVATE_DIRS), whatever this says. Kept for the
-			// catalogue features that still read it without a fallback - an
-			// undefined key is fatal - until 2.0
+			// Read by nothing in the kernel and by no feature of the catalogue:
+			// text lives in /text (see Filesystem::PRIVATE_DIRS), whatever this
+			// says, and a test need not set it. Kept for a feature written
+			// against an older kernel that still reads it without a fallback -
+			// an undefined key is fatal - until 2.0
 			'/nino/locales/textfiles'	=> '/text',
 			'/nino/auth/maxtries'		=> 5,
 			'/nino/auth/cooldown'		=> 3600,
@@ -313,25 +314,34 @@ namespace Nino {
 			return $base;
 		}
 
-		// Persists only the given top-level keys into config.php, not the
-		// whole in-memory appData - which is loaded once at boot, so a full
-		// re-serialize would silently discard whatever a concurrent request
-		// (a second admin session, Auth's failed-attempt tracking) wrote in
-		// the meantime. mutate() re-reads fresh under the lock for the same
-		// reason; this just merges the given keys into that copy.
-		//
-		// A failed lock here means a deployment problem (no /data/.locks, no
-		// free handles), not contention - unlike every other mutate() caller,
-		// this trigger_error()s instead of failing silently, since a dropped
-		// config.php write can mean a route, permission, or login never
-		// actually saved.
-		//
-		// Returns whether the write happened - under Nino's own error handler the
-		// E_USER_ERROR above already ended the request, so the false only ever
-		// reaches a caller running with a handler that continues (the tests).
-		//
-		// A named key the given appData does not carry is taken out of
-		// config.php rather than written into it - see the loop below.
+		/**
+		 *	Persists only the given top-level keys into config.php, not the
+		 *	whole in-memory appData - which is loaded once at boot, so a full
+		 *	re-serialize would silently discard whatever a concurrent request
+		 *	(a second admin session, Auth's failed-attempt tracking) wrote in
+		 *	the meantime. mutate() re-reads fresh under the lock for the same
+		 *	reason; this just merges the given keys into that copy.
+		 *
+		 *	A failed lock here means a deployment problem (no /data/.locks, no
+		 *	free handles), not contention - unlike every other mutate() caller,
+		 *	this trigger_error()s instead of failing silently, since a dropped
+		 *	config.php write can mean a route, permission, or login never
+		 *	actually saved.
+		 *
+		 *	Returns whether the write happened - under Nino's own error handler the
+		 *	E_USER_ERROR of a lock that cannot be taken already ended the request,
+		 *	so the false only ever reaches a caller running with a handler that
+		 *	continues (the tests).
+		 *
+		 *	A named key the given appData does not carry is taken out of
+		 *	config.php rather than written into it, so that the framework default
+		 *	stands again.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$keys				The top-level keys of config.php to persist, spelled as it spells them: '/nino/modules', '/project/catalog'
+		 *
+		 *	@return 	bool							Whether config.php was written
+		 */
 		public static function writeContentData( array &$appData, array $keys ): bool {
 
 			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === false ) {

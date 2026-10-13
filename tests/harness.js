@@ -86,6 +86,10 @@ function done() {
 // --- the files -------------------------------------------------------------
 
 /**
+ *	The text of a file of the checkout, by its path from the checkout root:
+ *	the directory above tests/, where this file is, wherever the suite is
+ *	run from. A file that is not there throws
+ *
  *	@param		{string}	relative		A path from the checkout root, eg. '_admin/assets/Nino.admin.js'
  *
  *	@return		{string}							Its text
@@ -223,6 +227,9 @@ function matches( el, selector ) {
 }
 
 /**
+ *	Every descendant of an element stand-in that a predicate accepts: the
+ *	tree walked through children, depth first. The root itself is not asked
+ *
  *	@param		{Object}		root
  *	@param		{Function}	predicate		Called with each descendant; true keeps it
  *

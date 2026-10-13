@@ -52,19 +52,26 @@ namespace Nino {
 		// created by hand
 		private const string KEY_GRAMMAR = '#^/(?:template|project|feature|module)(?:/[a-z0-9]+(?:-[a-z0-9]+)*){3}$#D';
 
-		// Every known key across global.php + every locale file, with its
-		// current value(s), whether it's global or per-locale, its format
-		// (the one set in meta(), else the widest the values hold - 'html' is
-		// whether that is more than plain text), a maxlength (the one set,
-		// else derived from its longest current value), and whether it's
-		// blacklisted (see blacklist()). 'formatSet' and 'maxlengthSet' say
-		// whether the two come from meta() or from the values. A limit that is
-		// set is never shorter than the longest text the key holds - a longer
-		// one written later (an import, the wizard, a feature) is not cut by
-		// the editor at its first keystroke.
-		// $includeBlacklisted controls whether a blacklisted key is skipped
-		// entirely or just flagged - the Text panel hides them, Text Keys
-		// editor needs to see them to be able to un-blacklist one.
+		/**
+		 *	Every known key across global.php + every locale file, with its
+		 *	current value(s), whether it's global or per-locale, its format
+		 *	(the one set in meta(), else the widest the values hold - 'html' is
+		 *	whether that is more than plain text), a maxlength (the one set,
+		 *	else derived from its longest current value), and whether it's
+		 *	blacklisted (see blacklist()). 'formatSet' and 'maxlengthSet' say
+		 *	whether the two come from meta() or from the values. A limit that is
+		 *	set is never shorter than the longest text the key holds - a longer
+		 *	one written later (an import, the wizard, a feature) is not cut by
+		 *	the editor at its first keystroke.
+		 *	$includeBlacklisted controls whether a blacklisted key is skipped
+		 *	entirely or just flagged - the Text panel hides them, Text Keys
+		 *	editor needs to see them to be able to un-blacklist one.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		bool		$includeBlacklisted	Whether a blacklisted key is in the list (flagged) or left out
+		 *
+		 *	@return 	array							One entry per key, sorted by key: { key, global, blacklisted, html, format, formatSet, maxlength, maxlengthSet, values } - values is locale => text, null for a language without one, or '*' => text for a global key
+		 */
 		public static function entries( array &$appData, bool $includeBlacklisted = true ): array {
 
 			$global 	= \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
@@ -147,6 +154,15 @@ namespace Nino {
 			return $entries;
 		}
 
+		/**
+		 *	One entry of entries() by its key.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key				The key without brackets, eg. '/template/page-home/hero/title'
+		 *	@param		bool		$includeBlacklisted	Whether a blacklisted key may be found
+		 *
+		 *	@return 	array|null						The entry, null for a key nobody holds
+		 */
 		public static function entry( array &$appData, string $key, bool $includeBlacklisted = true ): array|null {
 
 			foreach( self::entries( $appData, $includeBlacklisted ) as $entry )
@@ -258,9 +274,15 @@ namespace Nino {
 			return $written === true || $unchanged === true;
 		}
 
-		// Whether a key has the form of a text key a person may create or
-		// rename (see KEY_GRAMMAR). Not a statement about the keys already
-		// there: a project may hold older ones, and they stay as they are
+		/**
+		 *	Whether a key has the form of a text key a person may create or
+		 *	rename (see KEY_GRAMMAR). Not a statement about the keys already
+		 *	there: a project may hold older ones, and they stay as they are
+		 *
+		 *	@param		string		$key				A text key without brackets
+		 *
+		 *	@return 	bool
+		 */
 		public static function isGrammarKey( string $key ): bool {
 			return preg_match( self::KEY_GRAMMAR, $key ) === 1;
 		}
@@ -377,17 +399,24 @@ namespace Nino {
 			return $results;
 		}
 
-		// The one value-normalization path shared by regular batch saves and
-		// _admin's JSON translation import. Keeping it here prevents import
-		// from bypassing the hard length limit and HTML whitelist that the form
-		// itself enforces.
-		//
-		// $format is one of \Nino\Html::FORMATS; true is 'inline' and false is
-		// 'plain', which is what the parameter was before there were more. A
-		// name that is none of them is read as 'plain': the narrowest answer.
-		// 'lines' and 'blocks' read a newline of the value as a break or a
-		// paragraph - a form posts the text of a textarea, and a value may
-		// move from plain to either with one
+		/**
+		 *	The one value-normalization path shared by regular batch saves and
+		 *	_admin's JSON translation import. Keeping it here prevents import
+		 *	from bypassing the hard length limit and HTML whitelist that the form
+		 *	itself enforces.
+		 *
+		 *	$format is one of \Nino\Html::FORMATS; true is 'inline' and false is
+		 *	'plain', which is what the parameter was before there were more. A
+		 *	name that is none of them is read as 'plain': the narrowest answer.
+		 *	'lines' and 'blocks' read a newline of the value as a break or a
+		 *	paragraph - a form posts the text of a textarea, and a value may
+		 *	move from plain to either with one
+		 *
+		 *	@param		string		$value				What was typed, imported or sent
+		 *	@param		bool|string	$format				plain, inline, lines or blocks; true is 'inline', false 'plain'
+		 *
+		 *	@return 	string							The value as it may be stored: cut at the hard byte limit, its markup reduced to what the format keeps, every bracket but those of a fill written as an entity
+		 */
 		public static function sanitizeValue( string $value, bool|string $format ): string {
 
 			if( is_bool( $format ) === true )

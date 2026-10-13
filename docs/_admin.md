@@ -81,6 +81,51 @@ For operation:
 
 If the accounts themselves are what is broken – the last developer password forgotten, a bad restore – the [recovery page](#recovery) is the way back in.
 
+## Features
+
+**Features**, a panel of the System group, switches the packages of `features/` on and off, sets them up and installs them from a catalogue; how one is written is the [feature manual](features.md). The setup wizard offers none: a feature is switched on here, after setup.
+
+### The panel
+
+The panel asks for `/_admin/features/manage` on every action, a developer's permission. It sorts every directory below `features/` that carries a valid manifest into three tabs - **Active**, **Inactive** and **Available** - each with a count, Active first, and a search box (name, key, description, category) and a category select narrow all three at once. A row shows name and description in the interface language - they come from the manifest, because the texts of a feature that is off are not loaded - the version, the category, and whatever stands in the way of an activation: a Nino version the feature was not written for, a PHP extension that is missing, a required feature that is not in the directory.
+
+The seven actions behind it are `features/list`, `features/activate`, `features/deactivate`, `features/settings`, `features/remove`, `features/catalogue` and `features/install`; behind the first five stand `\Nino\Features::all()`, `activate()`, `deactivate()`, `saveSettings()` and `remove()`, behind the last two `\Nino\Catalogue::fetch()` and `install()`:
+
+- **Activate** switches a feature on: the features it requires first, then its install unit, applied without overwriting anything your project has, the class listed in `/nino/modules` and the version recorded under `/nino/features`. A dialog names everything that was switched on - the feature asked for first, the requirements after it - before the workbench reloads; an update says the same where the new version added a requirement that was off.
+- **Update** is offered for an active feature whose manifest names another version than the recorded one, after its directory was replaced with a new release. It is the same action: the unit adds what is new and the feature migrates its own data.
+- **Deactivate** removes the class from the list and nothing else - settings, data and copied templates stay, and activating again finds everything as it was. It is refused while another active feature requires this one. A dialog then lists the places that still contain the feature's shortcodes (templates, texts, elements), because a shortcode of a feature that is off stays the text it is written as; which shortcodes are the feature's is read from what is registered (`\Nino\Features::shortcodes()`), opening tags in raw brackets only - one the Text panel stored as `&#91;...&#93;` was never rendered and is not reported; the panel changes nothing and asks nothing before. The dialog also names the sections of the privacy policy that still describe the feature - the Dashboard keeps saying so while the feature stays installed - and an editor hides them under **Elements › Privacy policy** if they no longer apply. There is no uninstall, deliberately: deleting a file the project may have edited in the meantime would not be safe, and what a feature leaves behind, a developer removes knowingly and by hand.
+- **Remove** deletes the directory of an inactive feature, the one step deactivating leaves out. What the feature kept stays, so putting it back finds its settings; an active feature is refused, since a directory deleted from under the autoloader is a fatal on the next request.
+- **Settings** are on the screen an active feature's row opens, in two tabs: **Description**, the sentence the manifest describes the feature with and under it its manual, and **Settings**, the form the manifest describes. Both tabs are built at once, so what was typed into a setting survives a look at the Description, and the one Save collects the whole form whichever tab is on; every setting is validated before any is written, an error names the setting, and the values are stored under `/nino/features` in `config.php`. A feature that declares no setting has the one tab it has and no strip over it. A feature that has a panel of its own and settings gets them there instead, as a **Settings** tab of that panel on the same actions and the same permission, and its screen here links to that tab - an account that holds only the feature's own permission does not see them, and an account that holds only `/_admin/features/manage` gets that panel in its rail, opened on the Settings tab alone.
+
+A panel a feature brings appears with the next load of the workbench after the activation and goes with the next one after the deactivation; the panel reloads the workbench itself. It lands in the rail's **Features** group whatever its own `nav()` names and offers its permission on the roles tab of the Users panel under that group's label - the **Editor** role the wizard wrote does not receive it by itself, grant it there.
+
+### The catalogue
+
+A feature that is not copied in by hand comes from a catalogue: a `catalogue.json` published over https beside the archives it lists, and a detached signature `catalogue.json.sig`. Nino's own is `https://catalogue.getnino.dev/catalogue.json`, built and signed by [dapeio/nino-features](https://github.com/dapeio/nino-features); the kernel side is `\Nino\Catalogue` and the one http client `\Nino\Fetch`, both checked without a network by `tests/catalogue-smoke.php`.
+
+The **Available** tab shows what the catalogue offers that this installation does not already have current. Only **Refresh catalogue** fetches: the tab fills from the cache, `data/catalogue.php` (when it was fetched, under which url, the parsed document - ignored when another url is configured now), a status line says when it was last read, and the offers are matched against the features on disk every time. Loaded, it offers **Install** for a feature that is not in the directory, **Update** for one there in an older version, and greys out, with what it asks for, one no version of which fits.
+
+Install downloads the archive, checks it against the signed catalogue and puts the directory in place; then it switches the feature on in two of three cases. A feature the project did not have is switched on - pressing Install says the project wants it. An active one is activated again, which applies the update in a second request the panel makes on its own, since the first booted with the previous version's class. One that is there and switched off stays off: a newer version of it is not somebody changing their mind. Requirements come along: the whole set is worked out first, checked against this kernel and placed deepest first, so the feature asked for arrives last; one already on disk stays as it is, whatever its version, and one the catalogue cannot serve refuses the install with nothing placed. A dialog names what came along; where the files are placed but the activation fails, the panel says exactly that. Where `features/` is not writable, the tab links the archive instead, to unpack by hand.
+
+The signature is the trust: ECDSA (P-256) over SHA-256 of the exact bytes of the document, DER and base64 (`openssl dgst -sha256 -sign key.pem catalogue.json | base64`), checked against `\Nino\Catalogue::PUBLIC_KEY`, or against the PEM in `/nino/catalogue/key` for a catalogue of your own, found at `/nino/catalogue/url`; an empty key falls back to Nino's, and a url of `''` switches the catalogue off - the tab says so, there is no Refresh button and no request. An installation fetches the catalogue again rather than trusting what the panel showed, downloads the archive within the byte cap of its entry, refuses one whose size or SHA-256 differs, unpacks it below `data/.features/` after looking at every entry (one directory, plain files and directories only, nothing outside it, bounded in count and size), requires the key and version the catalogue promised, and only then moves the directory in, putting the old one back if the move fails.
+
+It needs the `curl` extension or `allow_url_fopen`, `openssl`, `phar` and a writable `features/`. Every request goes over https to the catalogue's host and nowhere else - no redirect followed, the certificate verified, the user agent `Nino` and nothing more - and only when someone presses **Refresh catalogue** or **Install**: no check in the background, no telemetry, nothing sent. A directory copied into `features/` is a feature like any other.
+
+#### A catalogue of your own
+
+A catalogue is an address, a key and a directory of features; `bin/build.php` of the [catalogue repository](https://github.com/dapeio/nino-features) publishes the `catalogue.json`, its signature and one `.tar.gz` per feature from such a directory. The document (format 1) holds `format` (`1`), `generated` and `features`, one entry per published version; a catalogue that is wrong anywhere is refused as a whole, `\Nino\Catalogue::parse()` naming the entry and the field.
+
+| Field | Meaning |
+| --- | --- |
+| `key`, `name`, `description`, `version`, `nino`, `php.ext`, `requires` | what the feature's manifest says, see [the manifest](features.md#the-manifest) |
+| `category`, `maturity` | optional, the same two the manifest has; a reader drops one it cannot use without refusing the catalogue |
+| `directory` | the directory the archive holds - `Newsletter`, the feature's class name segment |
+| `archive` | the https url of the `.tar.gz` |
+| `sha256`, `size` | the digest and the byte length of exactly that file |
+| `released` | the date |
+
+An archive is a `.tar.gz` of exactly that one directory - what lands below `features/`, nothing beside it; a feature's `tests/` are not published.
+
 ## Maintenance
 
 **Maintenance**, a panel of the System group, is one switch: while it is on, every visitor who is not signed in to the workbench gets a 503 answer instead of the site - the page itself and a module endpoint such as the contact form's `/.form` alike - and a signed-in account sees the site as it is, with a banner. `/_admin` and its login keep working throughout, so switching it off never depends on the switch itself.

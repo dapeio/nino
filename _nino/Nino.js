@@ -197,6 +197,12 @@
 			 *	Register a callback for a lifecycle event ('ready'/'resize'/'scroll').
 			 *	If the event already fired once, the callback is invoked immediately.
 			 *
+			 *	Every callback runs on its own, a queued one when its event fires and
+			 *	a late one inside this call: one that throws is reported by the
+			 *	browser like any error nobody caught - it is thrown again from a
+			 *	timer - and stops neither the callbacks after it nor the code that
+			 *	bound it.
+			 *
 			 *	@param		{string}		evt						Event name ('ready', 'resize' or 'scroll')
 			 *	@param		{Function}	cb						Callback to register
 			 *
@@ -210,7 +216,7 @@
 				Nino.events._events[evt].push( cb );
 
 				if( Nino.events._calls[evt] !== false )
-					cb.call( cb, Nino.events._calls[evt] );
+					isolate( () => { cb.call( cb, Nino.events._calls[evt] ) } );
 			},
 
 			/**
