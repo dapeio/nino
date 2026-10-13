@@ -204,7 +204,7 @@ namespace Nino\Modules {
 			return [ \Nino\Modules\Hello\Admin::class ];
 		}
 
-		// 1.0.0 kept the name as 'who'
+		// 1.0.0 stored the name alone; from 1.1.0 the file carries a format key
 		public static function upgrade( array &$appData, string $fromVersion ): bool {
 
 			if( version_compare( $fromVersion, '1.1.0', '>=' ) === true || \Nino\Filesystem::fileExists( $appData, self::STORAGE ) === false )
@@ -213,10 +213,8 @@ namespace Nino\Modules {
 			return \Nino\Filesystem::mutate( $appData, self::STORAGE, static function( mixed $state ): array {
 
 				$state = is_array( $state ) === true ? $state : [];
-				$state['name'] ??= $state['who'] ?? '';
-				unset( $state['who'] );
 
-				return $state;
+				return [ 'format' => 1, 'name' => (string) ( $state['name'] ?? '' ) ];
 			} );
 		}
 
@@ -350,7 +348,7 @@ namespace Nino\Modules\Hello {
 
 			if( mb_strlen( $name ) > self::_longest( $appData ) )
 				\Nino\Http::fail( $request, 400, 'the name is too long', 'hello_long', [ self::_longest( $appData ) ], 'name' );
-			else if( \Nino\Filesystem::mutate( $appData, \Nino\Modules\Hello::STORAGE, static fn( mixed $state ): array => array_merge( is_array( $state ) === true ? $state : [], [ 'name' => $name ] ) ) === false )
+			else if( \Nino\Filesystem::mutate( $appData, \Nino\Modules\Hello::STORAGE, static fn( mixed $state ): array => array_merge( [ 'format' => 1 ], is_array( $state ) === true ? $state : [], [ 'name' => $name ] ) ) === false )
 				\Nino\Http::fail( $request, 500, 'could not write the name' );
 			else
 				\Nino\Http::ok( $request, [ 'name' => \Nino\Modules\Hello::name( $appData ) ] );
@@ -646,12 +644,12 @@ foreach( [ 'en_US', 'de_DE' ] as $locale )
 	check( "...and the code has its sentence in $locale", str_contains( \Nino\Admin\Admin::textFills( $appData, '/features/Hello/text', $locale )['[[/_admin/error/'. $body['code']. ']]'] ?? '', '%s' ) );
 
 // The project as 1.0.0 left it; all() keeps its answer for the request, so it is dropped to be asked again
-\Nino\Filesystem::putFileContent( $appData, '/data/hello.php', [ 'who' => 'Ada' ] );
+\Nino\Filesystem::putFileContent( $appData, '/data/hello.php', [ 'name' => 'Ada' ] );
 $appData['/nino/features']['hello']['version'] = '1.0.0';
 \Nino\AppData::writeContentData( $appData, [ '/nino/features' ] );
 unset( $appData['./nino/features/all'] );
-check( 'a recorded version behind the manifest runs the upgrade hook, which moves who to name', \Nino\Features::activate( $appData, 'hello' ) === true
-	&& \Nino\Filesystem::getFileContent( $appData, '/data/hello.php', [] ) === [ 'name' => 'Ada' ] );
+check( 'a recorded version behind the manifest runs the upgrade hook, which adds the format key', \Nino\Features::activate( $appData, 'hello' ) === true
+	&& \Nino\Filesystem::getFileContent( $appData, '/data/hello.php', [] ) === [ 'format' => 1, 'name' => 'Ada' ] );
 check( 'deactivation takes the panel away and keeps the data', \Nino\Features::deactivate( $appData, 'hello' ) === true
 	&& isset( \Nino\Admin\Admin::panels( $appData )['hello'] ) === false && \Nino\Modules\Hello::name( $appData ) === 'Ada' );
 
