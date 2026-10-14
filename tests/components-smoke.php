@@ -890,7 +890,7 @@ check( '...and every title has a tag of its own - the tags it may be drawn as, a
 		|| \Nino\Modules\Components::components( $appData )[$name]['attributes']['tag']['type'] !== 'select'
 		|| \Nino\Modules\Components::components( $appData )[$name]['attributes']['tag']['options'] !== $tags[1]
 		|| \Nino\Modules\Components::components( $appData )[$name]['attributes']['tag']['default'] !== $tags[0]
-		|| \Nino\Modules\Components::components( $appData )[$name]['attributes']['tag']['label'] !== [ 'en_US' => 'Tag', 'de_DE' => 'Tag' ], ARRAY_FILTER_USE_BOTH ) === []
+		|| \Nino\Modules\Components::components( $appData )[$name]['attributes']['tag']['label'] !== [ 'en_US' => 'HTML tag', 'de_DE' => 'HTML-Tag' ], ARRAY_FILTER_USE_BOTH ) === []
 	&& array_filter( array_keys( $kernelPlaces ), static fn( string $name ): bool => \Nino\Modules\Components::components( $appData )[$name]['label'] === \Nino\Modules\Components::components( $appData )['title']['label']
 		|| \Nino\Modules\Components::components( $appData )[$name]['preview'] !== 'title' || \Nino\Modules\Components::components( $appData )[$name]['source'] !== 'text' ) === [ 'title' ] );
 // The icons of the twelve: each component of the kernel is shown by the parts of a 24 by 24 icon of Lucide, which the registry hands to a tool
@@ -941,8 +941,8 @@ check( 'the card is declared as the registry says: a label in both languages, th
 	$cardSchema['label'] === [ 'en_US' => 'Card', 'de_DE' => 'Karte' ] && $cardSchema['source'] === 'content' && $cardSchema['loop'] === true && $cardSchema['preview'] === 'block'
 	&& $cardSchema['in'] === [ 'section', 'hero' ] && $cardSchema['draws'] === 'article .nino-card' && $cardSchema['holds'] === 'card'
 	&& array_keys( $cardSchema ) === [ 'label', 'source', 'loop', 'preview', 'icon', 'attributes', 'in', 'draws', 'holds' ] );
-check( '...its attributes are nine, in the order the Builder writes them: the ground, the padding, whether it fills, where its content stands, how it is aligned, the picture, its focus, the dim and the border',
-	array_keys( $cardSchema['attributes'] ) === [ 'ground', 'padding', 'fill', 'vertical', 'align', 'background', 'focus', 'dim', 'borderless' ] );
+check( '...its attributes are nine, in the order the form shows them: whether it fills, the padding, where its content stands, how it is aligned, the ground, the border, the picture, its focus and the dim',
+	array_keys( $cardSchema['attributes'] ) === [ 'fill', 'padding', 'vertical', 'align', 'ground', 'borderless', 'background', 'focus', 'dim' ] );
 $cardTypes = [ 'ground' => 'select', 'padding' => 'select', 'fill' => 'bool', 'vertical' => 'select', 'align' => 'select', 'background' => 'image', 'focus' => 'select', 'dim' => 'bool', 'borderless' => 'bool' ];
 $cardOptions = [
 	'ground'		=> [ '', 'counter', 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt' ],
@@ -959,26 +959,26 @@ foreach( $cardSchema['attributes'] as $cardName => $cardAttribute ) {
 		$cardWrong[] = $cardName. ' has other options';
 	if( $cardAttribute['default'] !== ( $cardAttribute['type'] === 'bool' ? false : '' ) )
 		$cardWrong[] = $cardName. ' has another default';
+	// A label in both languages always, a hint in both where the attribute has one - a select whose label says it all has none, and the registry hands that on as an empty hint
 	foreach( [ 'label', 'hint' ] as $cardWords )
-		if( is_array( $cardAttribute[$cardWords] ) === false || array_keys( $cardAttribute[$cardWords] ) !== [ 'en_US', 'de_DE' ] || in_array( '', $cardAttribute[$cardWords], true ) === true )
+		if( ( $cardWords === 'label' || ( $cardAttribute['hint'] ?? '' ) !== '' ) && ( is_array( $cardAttribute[$cardWords] ) === false || array_keys( $cardAttribute[$cardWords] ) !== [ 'en_US', 'de_DE' ] || in_array( '', $cardAttribute[$cardWords], true ) === true ) )
 			$cardWrong[] = $cardName. ' has no '. $cardWords. ' in both languages';
 }
-check( '...each with its type, its options and its default - the padding a step of the space scale or none, a bool off - and a label and a hint in both languages'. ( $cardWrong === [] ? '' : ' - '. implode( ', ', $cardWrong ) ), $cardWrong === [] );
+check( '...each with its type, its options and its default - the padding a step of the space scale or none, a bool off - and a label in both languages, and a hint in both where it has one'. ( $cardWrong === [] ? '' : ' - '. implode( ', ', $cardWrong ) ), $cardWrong === [] );
 check( '...the focus is the focus of [image], word for word, and the other labels are the ones of the owner\'s decision',
 	$cardSchema['attributes']['focus']['label'] === \Nino\Modules\Components::components( $appData )['image']['attributes']['focus']['label']
 	&& $cardSchema['attributes']['focus']['hint'] === \Nino\Modules\Components::components( $appData )['image']['attributes']['focus']['hint']
-	&& $cardSchema['attributes']['ground']['label'] === [ 'en_US' => 'Ground', 'de_DE' => 'Fläche' ] && $cardSchema['attributes']['padding']['label'] === [ 'en_US' => 'Padding', 'de_DE' => 'Innenabstand' ]
-	&& $cardSchema['attributes']['fill']['label'] === [ 'en_US' => 'Full height', 'de_DE' => 'Volle Höhe' ] && $cardSchema['attributes']['vertical']['label'] === [ 'en_US' => 'Vertical', 'de_DE' => 'Vertikal' ]
-	&& $cardSchema['attributes']['align']['label'] === [ 'en_US' => 'Horizontal', 'de_DE' => 'Horizontal' ] && $cardSchema['attributes']['background']['label'] === [ 'en_US' => 'Picture', 'de_DE' => 'Bild' ]
+	&& $cardSchema['attributes']['ground']['label'] === [ 'en_US' => 'Background colour', 'de_DE' => 'Hintergrund-Farbe' ] && $cardSchema['attributes']['padding']['label'] === [ 'en_US' => 'Padding', 'de_DE' => 'Padding' ]
+	&& $cardSchema['attributes']['fill']['label'] === [ 'en_US' => 'Full height', 'de_DE' => 'Volle Höhe' ] && $cardSchema['attributes']['vertical']['label'] === [ 'en_US' => 'Vertical element alignment', 'de_DE' => 'Vertikale Element-Ausrichtung' ]
+	&& $cardSchema['attributes']['align']['label'] === [ 'en_US' => 'Horizontal text alignment', 'de_DE' => 'Horizontale Text-Ausrichtung' ] && $cardSchema['attributes']['background']['label'] === [ 'en_US' => 'Background picture', 'de_DE' => 'Hintergrund-Bild' ]
 	&& $cardSchema['attributes']['dim']['label'] === [ 'en_US' => 'Dim the picture', 'de_DE' => 'Bild abdunkeln' ] && $cardSchema['attributes']['borderless']['label'] === [ 'en_US' => 'Without border', 'de_DE' => 'Ohne Rahmen' ] );
 check( '...the card is the one component of the kernel that holds components, and no stack does',
 	array_keys( array_filter( \Nino\Modules\Components::components( $appData ), static fn( array $schema ): bool => array_key_exists( 'holds', $schema ) === true ) ) === [ 'card' ]
 	&& array_filter( \Nino\Modules\Components::stacks( $appData ), static fn( array $stack ): bool => array_key_exists( 'holds', $stack ) === true ) === []
-	&& \Nino\Modules\Components::defaults( $appData, 'card' ) === [ 'ground' => '', 'padding' => '', 'fill' => '0', 'vertical' => '', 'align' => '', 'background' => '', 'focus' => '', 'dim' => '0', 'borderless' => '0', 'class' => '' ] );
-// The variants are factors of the role now (Nino.css), and the hint of the style says so - the one hint all seven share
-$styleHint = [ 'en_US' => 'Quieter or louder than the role: the size times the quiet or the loud factor.', 'de_DE' => 'Leiser oder lauter als die Rolle: die Größe mal dem Quiet- oder dem Loud-Faktor.' ];
-check( '...and the style of the six titles and of the text says what its variants are in both languages: quieter or louder than the role, the size times the quiet or the loud factor',
-	array_filter( [ 'title', 'card-title', 'hero-title', 'subtitle', 'card-subtitle', 'hero-subtitle', 'text' ], static fn( string $name ): bool => ( \Nino\Modules\Components::components( $appData )[$name]['attributes']['style']['hint'] ?? null ) !== $styleHint ) === [] );
+	&& \Nino\Modules\Components::defaults( $appData, 'card' ) === [ 'fill' => '0', 'padding' => '', 'vertical' => '', 'align' => '', 'ground' => '', 'borderless' => '0', 'background' => '', 'focus' => '', 'dim' => '0', 'class' => '' ] );
+// The variants are factors of the role (Nino.css), and the label of the style says it all: none of the seven carries a hint
+check( '...and the style of the six titles and of the text has no hint under its name, in neither language',
+	array_filter( [ 'title', 'card-title', 'hero-title', 'subtitle', 'card-subtitle', 'hero-subtitle', 'text' ], static fn( string $name ): bool => ( \Nino\Modules\Components::components( $appData )[$name]['attributes']['style']['hint'] ?? '' ) !== '' ) === [] );
 check( 'a clean schema validates again as it is - what a manifest hands over after Features::manifest() has read it', \Nino\Modules\Components::validate( 'title', \Nino\Modules\Components::components( $appData )['title'] ) === \Nino\Modules\Components::components( $appData )['title']
 	&& \Nino\Modules\Components::validate( 'filter', \Nino\Modules\Components::stacks( $appData )['filter'], true ) === \Nino\Modules\Components::stacks( $appData )['filter'] );
 check( '...icon and all: each of the twelve, and a component registered with an icon of its own, validates again as it is, the parts and the maps of the icon in the order they were in',

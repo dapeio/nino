@@ -253,8 +253,7 @@ namespace Nino\Modules {
 				[ 'hero-title', 'Title (Hero)', 'Titel (Hero)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'h2', 'h3' ], 'h2' ), 'style' => self::_style() ], [ 'hero' ], '{tag} .nino-hero-title', null ],
 				[ 'hero-subtitle', 'Subtitle (Hero)', 'Untertitel (Hero)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'p', 'h3', 'h4' ], 'p' ), 'style' => self::_style() ], [ 'hero' ], '{tag} .nino-hero-subtitle', null ],
 				[ 'text', 'Text', 'Text', 'text', 'text', [
-					'format' => [ 'type' => 'select', 'options' => [ 'inline', 'lines', 'blocks' ], 'default' => 'blocks', 'label' => [ 'en_US' => 'Format', 'de_DE' => 'Format' ],
-						'hint' => [ 'en_US' => 'What the text may hold: inline tags, line breaks, or paragraphs and lists.', 'de_DE' => 'Was der Text enthalten darf: Auszeichnungen, Zeilenumbrüche oder Absätze und Listen.' ] ],
+					'format' => [ 'type' => 'select', 'options' => [ 'inline', 'lines', 'blocks' ], 'default' => 'blocks', 'label' => [ 'en_US' => 'Format', 'de_DE' => 'Format' ] ],
 					'style' => self::_style(),
 				], null, null, null ],
 				// The card is the one component that holds components: what stands between
@@ -263,26 +262,20 @@ namespace Nino\Modules {
 				// tool. It stands once in a column and, in the content of a stack, once
 				// per element
 				[ 'card', 'Card', 'Karte', 'block', 'content', [
-					'ground' => [ 'type' => 'select', 'options' => [ '', 'counter', 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt' ], 'default' => '', 'label' => [ 'en_US' => 'Ground', 'de_DE' => 'Fläche' ],
-						'hint' => [ 'en_US' => 'The surface the card paints: none, the counter of the ground it sits on, or one of the six.', 'de_DE' => 'Die Fläche, die die Karte malt: keine, die Gegenfläche der Fläche, auf der sie steht, oder eine der sechs.' ] ],
-					'padding' => [ 'type' => 'select', 'options' => [ '', '0', '1', '2', '3', '4', '5', '6' ], 'default' => '', 'label' => [ 'en_US' => 'Padding', 'de_DE' => 'Innenabstand' ],
-						'hint' => [ 'en_US' => 'The room between the edge of the card and its content, as a step of the space scale; empty is what the ground gives.', 'de_DE' => 'Der Raum zwischen dem Rand der Karte und ihrem Inhalt, als Stufe der Abstandsskala; leer ist, was die Fläche vorgibt.' ] ],
 					'fill' => [ 'type' => 'bool', 'default' => false, 'label' => [ 'en_US' => 'Full height', 'de_DE' => 'Volle Höhe' ],
-						'hint' => [ 'en_US' => 'The card takes the whole height of its column or cell, so the cards of one row end on one line.', 'de_DE' => 'Die Karte nimmt die ganze Höhe ihrer Spalte oder Zelle, so dass die Karten einer Zeile auf einer Linie enden.' ] ],
-					'vertical' => [ 'type' => 'select', 'options' => [ '', 'middle', 'bottom', 'last-bottom' ], 'default' => '', 'label' => [ 'en_US' => 'Vertical', 'de_DE' => 'Vertikal' ],
-						'hint' => [ 'en_US' => 'Where the content stands in a card taller than it: at the top, in the middle, at the bottom, or spread so that the last element stands at the bottom.', 'de_DE' => 'Wo der Inhalt in einer Karte steht, die höher ist als er: oben, in der Mitte, unten oder so verteilt, dass das letzte Element unten steht.' ] ],
-					'align' => [ 'type' => 'select', 'options' => [ '', 'left', 'center', 'right' ], 'default' => '', 'label' => [ 'en_US' => 'Horizontal', 'de_DE' => 'Horizontal' ],
-						'hint' => [ 'en_US' => 'How the text and the buttons are aligned.', 'de_DE' => 'Wie Text und Knöpfe ausgerichtet sind.' ] ],
-					'background' => [ 'type' => 'image', 'default' => '', 'label' => [ 'en_US' => 'Picture', 'de_DE' => 'Bild' ],
+						'hint' => [ 'en_US' => 'The card takes the whole height.', 'de_DE' => 'Die Karte nimmt die ganze Höhe ein.' ] ],
+					'padding' => [ 'type' => 'select', 'options' => [ '', '0', '1', '2', '3', '4', '5', '6' ], 'default' => '', 'label' => [ 'en_US' => 'Padding', 'de_DE' => 'Padding' ] ],
+					'vertical' => [ 'type' => 'select', 'options' => [ '', 'middle', 'bottom', 'last-bottom' ], 'default' => '', 'label' => [ 'en_US' => 'Vertical element alignment', 'de_DE' => 'Vertikale Element-Ausrichtung' ] ],
+					'align' => [ 'type' => 'select', 'options' => [ '', 'left', 'center', 'right' ], 'default' => '', 'label' => [ 'en_US' => 'Horizontal text alignment', 'de_DE' => 'Horizontale Text-Ausrichtung' ] ],
+					'ground' => [ 'type' => 'select', 'options' => [ '', 'counter', 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt' ], 'default' => '', 'label' => [ 'en_US' => 'Background colour', 'de_DE' => 'Hintergrund-Farbe' ] ],
+					'borderless' => [ 'type' => 'bool', 'default' => false, 'label' => [ 'en_US' => 'Without border', 'de_DE' => 'Ohne Rahmen' ] ],
+					'background' => [ 'type' => 'image', 'default' => '', 'label' => [ 'en_US' => 'Background picture', 'de_DE' => 'Hintergrund-Bild' ],
 						'hint' => [ 'en_US' => 'A slot, or in a stack an image field of the element, laid behind the content.', 'de_DE' => 'Ein Slot oder in einem Stapel ein Bildfeld des Elements, hinter den Inhalt gelegt.' ] ],
 					'focus' => [ 'type' => 'select', 'options' => [ '', '1', '2', '3', '4', '5', '6', '7', '8', '9' ], 'default' => '', 'label' => [ 'en_US' => 'Focus', 'de_DE' => 'Fokus' ],
 						'hint' => [ 'en_US' => 'Which part of the picture survives a crop, as one of nine positions.', 'de_DE' => 'Welcher Teil des Bildes beim Zuschneiden bleibt, als eine von neun Positionen.' ] ],
-					'dim' => [ 'type' => 'bool', 'default' => false, 'label' => [ 'en_US' => 'Dim the picture', 'de_DE' => 'Bild abdunkeln' ],
-						'hint' => [ 'en_US' => 'A scrim over the picture, and the card writes in the ink of the dark ground.', 'de_DE' => 'Ein Schleier über dem Bild, und die Karte schreibt in der Tinte der dunklen Fläche.' ] ],
-					'borderless' => [ 'type' => 'bool', 'default' => false, 'label' => [ 'en_US' => 'Without border', 'de_DE' => 'Ohne Rahmen' ],
-						'hint' => [ 'en_US' => 'No line and no shadow; a ground keeps its fill.', 'de_DE' => 'Keine Linie und kein Schatten; eine Fläche behält ihre Füllung.' ] ],
+					'dim' => [ 'type' => 'bool', 'default' => false, 'label' => [ 'en_US' => 'Dim the picture', 'de_DE' => 'Bild abdunkeln' ] ],
 				], [ 'section', 'hero' ], 'article .nino-card', 'card' ],
-				[ 'button', 'Button', 'Knopf', 'button', 'text', [
+				[ 'button', 'Button', 'Button', 'button', 'text', [
 					'href' => [ 'type' => 'href', 'default' => '', 'label' => [ 'en_US' => 'Link', 'de_DE' => 'Ziel' ],
 						'hint' => [ 'en_US' => 'A text key, an address, or in a stack a field of the element.', 'de_DE' => 'Ein Textschlüssel, eine Adresse oder in einem Stapel ein Feld des Elements.' ] ],
 					'style' => [ 'type' => 'select', 'options' => [ '', 'primary', 'outline', 'light', 'dark', 'brand-alt' ], 'default' => '', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ] ],
@@ -327,8 +320,8 @@ namespace Nino\Modules {
 				] ],
 				[ 'filter', 'Filter', 'Filter', 'cells', true, [
 					'by' => [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Filter by', 'de_DE' => 'Filtern nach' ],
-						'hint' => [ 'en_US' => 'The field whose values become the buttons.', 'de_DE' => 'Das Feld, dessen Werte zu den Knöpfen werden.' ] ],
-					'all' => [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Label of the first button', 'de_DE' => 'Beschriftung des ersten Knopfs' ],
+						'hint' => [ 'en_US' => 'The field whose values become the buttons.', 'de_DE' => 'Das Feld, dessen Werte zu den Buttons werden.' ] ],
+					'all' => [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Label of the first button', 'de_DE' => 'Beschriftung des ersten Buttons' ],
 						'hint' => [ 'en_US' => 'Empty takes the text /template/common/filter/all, or the word of the page\'s language.', 'de_DE' => 'Leer nimmt den Text /template/common/filter/all oder das Wort der Seitensprache.' ] ],
 				] ],
 				[ 'list', 'List', 'Liste', 'block', false, [
@@ -353,8 +346,7 @@ namespace Nino\Modules {
 		 *	@return 	array										The attribute's schema
 		 */
 		private static function _style(): array {
-			return [ 'type' => 'select', 'options' => [ '', 'loud', 'quiet' ], 'default' => '', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ],
-				'hint' => [ 'en_US' => 'Quieter or louder than the role: the size times the quiet or the loud factor.', 'de_DE' => 'Leiser oder lauter als die Rolle: die Größe mal dem Quiet- oder dem Loud-Faktor.' ] ];
+			return [ 'type' => 'select', 'options' => [ '', 'loud', 'quiet' ], 'default' => '', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ] ];
 		}
 
 		/**
@@ -368,7 +360,7 @@ namespace Nino\Modules {
 		 *	@return 	array										The attribute's schema
 		 */
 		private static function _tag( array $options, string $default ): array {
-			return [ 'type' => 'select', 'options' => $options, 'default' => $default, 'label' => [ 'en_US' => 'Tag', 'de_DE' => 'Tag' ] ];
+			return [ 'type' => 'select', 'options' => $options, 'default' => $default, 'label' => [ 'en_US' => 'HTML tag', 'de_DE' => 'HTML-Tag' ] ];
 		}
 
 		/**

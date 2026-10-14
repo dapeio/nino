@@ -967,10 +967,14 @@ body.nino-scroll-down .nino-scroll-header {
 	box-sizing: border-box;
 	width: 100%;
 }
-.nino-section--fullwidth {
+.nino-section--fullwidth, .nino-section--fullwidth > .nino-grid-row {
 	padding-left: 0;
 	padding-right: 0;
 	margin: 0;
+}
+/* ...and the row goes to the edges on a screen wider than the grid as well: without this it would stand at the left, its maximum wide */
+.nino-section--fullwidth > .nino-grid-row {
+	max-width: none;
 }
 /*	Grounds. A section, a column and a card paint a ground with the same
 	words - alt, tint, dark, black, primary and brand-alt, written
