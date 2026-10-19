@@ -5,6 +5,8 @@
 	'[[/project/company/general/description]]' => 'Kurze Beschreibung Deines Unternehmens.',
 
 	'[[/template/frame-header/navigation/label]]' => 'Hauptnavigation',
+	'[[/template/frame-header/button/label]]' => 'Jetzt kontaktieren',
+	'[[/template/frame-header/button/link]]' => '#',
 	'[[/template/common/navigation/footer]]' => 'Navigation',
 	'[[/template/frame-footer/label/address]]' => 'Adresse',
 	'[[/template/common/label/phone]]' => 'Telefon',

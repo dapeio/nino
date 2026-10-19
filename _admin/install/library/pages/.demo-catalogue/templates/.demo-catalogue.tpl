@@ -1268,6 +1268,23 @@
 	</div>
 </section>
 
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-cover-padded" data-demo-preset="static-content" data-demo-layout="default">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
+			<span class="nino-badge nino-badge--primary">content-section</span> <span class="nino-badge nino-badge--pill">Layout: default</span> <span class="nino-badge nino-badge--pill">Height: 75</span> <span class="nino-badge nino-badge--pill">.nino-cover--padded</span>
+		</div>
+	</div>
+</section>
+<section id="cover-padded" class="nino-section nino-section--dark nino-cover nino-cover--dim nino-cover--padded nino-img-focus--5 nino-mt-0 nino-mb-0" data-cover-height="75" aria-labelledby="cover-padded-title">
+	<img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="">
+	<div class="nino-cover-content">
+		<div class="nino-grid-row">
+			<div class="nino-grid-100 nino-mb-3 nino-text-center"><h2 class="nino-section-title" id="cover-padded-title">padded cover</h2></div>
+			<div class="nino-grid-100"><div class="nino-section-text">The picture stands inside the padding of the section, in the corners of a card, with the colour of the section round it.</div></div>
+		</div>
+	</div>
+</section>
+
 
 <section class="nino-section nino-section--primary nino-pt-4 nino-pb-4 nino-mt-0 nino-mb-0" id="gruppe-ebenen">
 	<div class="nino-grid-row nino-grid-row--wide">
@@ -1743,9 +1760,9 @@
 			<h3 class="nino-section-title nino-text-left" id="karten-title">Cards</h3>
 			<p class="nino-section-subtitle nino-text-left">The component behind every card preset: image, title, subtitle, text and price — in four variants.</p>
 		</div>
-		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-card</span> <span class="nino-badge nino-badge--pill">.nino-card--alt</span> <span class="nino-badge nino-badge--pill">.nino-card--tint</span> <span class="nino-badge nino-badge--pill">.nino-card--dark</span> <span class="nino-badge nino-badge--pill">.nino-card--black</span> <span class="nino-badge nino-badge--pill">.nino-card--primary</span> <span class="nino-badge nino-badge--pill">.nino-card--brand-alt</span> <span class="nino-badge nino-badge--pill">.nino-card--counter</span> <span class="nino-badge nino-badge--pill">.nino-card--borderless</span> <span class="nino-badge nino-badge--pill">.nino-card--wide</span> <span class="nino-badge nino-badge--pill">.nino-card--grid</span> <span class="nino-badge nino-badge--pill">.nino-card--fullwidth</span> <span class="nino-badge nino-badge--pill">.nino-card-content</span> <span class="nino-badge nino-badge--pill">.nino-card-title</span> <span class="nino-badge nino-badge--pill">.nino-card-subtitle</span> <span class="nino-badge nino-badge--pill">.nino-card-descr</span> <span class="nino-badge nino-badge--pill">.nino-card-price</span> <span class="nino-badge nino-badge--pill">.nino-card-img</span> <span class="nino-badge nino-badge--pill">.nino-card-img--dim</span> <span class="nino-badge nino-badge--pill">.nino-card-img--maxheight</span> <span class="nino-badge nino-badge--pill">.nino-card-cols-s|m|l|xl</span></div>
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-card</span> <span class="nino-badge nino-badge--pill">.nino-card--alt</span> <span class="nino-badge nino-badge--pill">.nino-card--tint</span> <span class="nino-badge nino-badge--pill">.nino-card--dark</span> <span class="nino-badge nino-badge--pill">.nino-card--black</span> <span class="nino-badge nino-badge--pill">.nino-card--primary</span> <span class="nino-badge nino-badge--pill">.nino-card--brand-alt</span> <span class="nino-badge nino-badge--pill">.nino-card--counter</span> <span class="nino-badge nino-badge--pill">.nino-card--borderless</span> <span class="nino-badge nino-badge--pill">.nino-card--wide</span> <span class="nino-badge nino-badge--pill">.nino-card--grid</span> <span class="nino-badge nino-badge--pill">.nino-card--fullwidth</span> <span class="nino-badge nino-badge--pill">.nino-card-content</span> <span class="nino-badge nino-badge--pill">.nino-card-title</span> <span class="nino-badge nino-badge--pill">.nino-card-subtitle</span> <span class="nino-badge nino-badge--pill">.nino-card-descr</span> <span class="nino-badge nino-badge--pill">.nino-card-price</span> <span class="nino-badge nino-badge--pill">.nino-card-img</span> <span class="nino-badge nino-badge--pill">.nino-card-img--dim</span> <span class="nino-badge nino-badge--pill">.nino-card-img--maxheight</span> <span class="nino-badge nino-badge--pill">.nino-card-img--inline</span> <span class="nino-badge nino-badge--pill">.nino-card-cols-s|m|l|xl</span></div>
 		<div class="nino-grid-100 nino-grid-m-33 nino-p-1"><article class="nino-card nino-card--counter"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="" loading="lazy" class="nino-card-img nino-card-img--maxheight"><div class="nino-card-content"><h4 class="nino-card-title">card--counter</h4><p class="nino-card-subtitle">.nino-card-subtitle</p><div class="nino-card-descr">Card on the counter ground</div><div class="nino-card-price">89 €</div></div></article></div>
-		<div class="nino-grid-100 nino-grid-m-33 nino-p-1"><article class="nino-card nino-card--borderless"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="" loading="lazy" class="nino-card-img nino-card-img--maxheight"><div class="nino-card-content"><h4 class="nino-card-title">card--borderless</h4><p class="nino-card-subtitle">.nino-card-subtitle</p><div class="nino-card-descr">without border or surface</div><div class="nino-card-price">89 €</div></div></article></div>
+		<div class="nino-grid-100 nino-grid-m-33 nino-p-1"><article class="nino-card nino-card--borderless"><img src="[[/nino/public]]/images/.demo/demo-03.svg" alt="" loading="lazy" width="240" height="160" class="nino-card-img nino-card-img--inline"><div class="nino-card-content"><h4 class="nino-card-title">card--borderless</h4><p class="nino-card-subtitle">.nino-card-subtitle</p><div class="nino-card-descr">without border or surface, the picture at its own size (.nino-card-img--inline)</div><div class="nino-card-price">89 €</div></div></article></div>
 		<div class="nino-grid-100 nino-grid-m-33 nino-p-1"><article class="nino-card nino-card--counter nino-card--grid"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="" loading="lazy" class="nino-card-img nino-card-img--maxheight"><div class="nino-card-content"><h4 class="nino-card-title">card--grid</h4><p class="nino-card-subtitle">.nino-card-subtitle</p><div class="nino-card-descr">equal-height grid card</div><div class="nino-card-price">89 €</div></div></article></div>
 		<div class="nino-grid-100">
 			<div class="nino-grid-100 nino-mb-2"><article class="nino-card nino-card--counter nino-card--wide nino-card-cols-m"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy" class="nino-card-img nino-card-img--dim"><div class="nino-card-content"><h4 class="nino-card-title nino-card-title--loud">.nino-card-cols-m</h4><div class="nino-card-descr nino-card-descr--quiet">Image and text side by side from the m breakpoint. The variant exists for every level: -s, -m, -l and -xl.</div><a href="#karten" class="nino-btn nino-btn--outline nino-btn--small">More</a></div></article></div>
@@ -1902,9 +1919,9 @@
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-mb-2">
 			<h3 class="nino-section-title nino-text-left" id="bilder-title">Images</h3>
-			<p class="nino-section-subtitle nino-text-left">An image fills its box while preserving its important crop — nine focal points, like a numeric keypad.</p>
+			<p class="nino-section-subtitle nino-text-left">An image fills its box while preserving its important crop — nine focal points, like a numeric keypad. A frame cuts it to a shape and may round its corners.</p>
 		</div>
-		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-img-cover</span> <span class="nino-badge nino-badge--pill">.nino-img-focus--1 … --9</span> <span class="nino-badge nino-badge--pill">.nino-img-background</span> <span class="nino-badge nino-badge--pill">.nino-img-background--dim</span> <span class="nino-badge nino-badge--pill">.nino-img-background-content</span></div>
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-img-cover</span> <span class="nino-badge nino-badge--pill">.nino-img-focus--1 … --9</span> <span class="nino-badge nino-badge--pill">.nino-img-background</span> <span class="nino-badge nino-badge--pill">.nino-img-background--dim</span> <span class="nino-badge nino-badge--pill">.nino-img-background-content</span> <span class="nino-badge nino-badge--pill">.nino-image--rounded</span></div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-pr-2 nino-mb-3">
 			<div class="nino-grid-row">
 				<div class="nino-grid-33 nino-grid-m-33 nino-p-1"><div class="nino-img-cover nino-img-focus--1"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy"></div><p class="nino-section-text--quiet nino-text-center">--1</p></div>
@@ -1927,6 +1944,8 @@
 				</div>
 			</div>
 		</div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-p-1"><div class="nino-image nino-image--rounded"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="" loading="lazy" width="1200" height="800"></div><p class="nino-section-text--quiet nino-text-center">.nino-image--rounded</p></div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-p-1"><div class="nino-image nino-image--4-3 nino-img-focus--3 nino-image--rounded"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy" width="1200" height="800"></div><p class="nino-section-text--quiet nino-text-center">.nino-image--rounded, cut to 4:3 with the focus on the right</p></div>
 	</div>
 </section>
 
@@ -2386,9 +2405,9 @@
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-mb-2">
 			<h3 class="nino-section-title nino-text-left" id="bewegungsvarianten-title">Motion, all variants</h3>
-			<p class="nino-section-subtitle nino-text-left">Six effects in three strengths each, shown here with --repeat so they run again every time they scroll into view.</p>
+			<p class="nino-section-subtitle nino-text-left">Eight effects in three strengths each, shown here with --repeat so they run again every time they scroll into view.</p>
 		</div>
-		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-vpa--zoom-soft|medium|hard</span> <span class="nino-badge nino-badge--pill">.nino-vpa--zoom-out-soft|medium|hard</span> <span class="nino-badge nino-badge--pill">.nino-vpa--slide-left-soft|medium|hard</span> <span class="nino-badge nino-badge--pill">.nino-vpa--slide-right-soft|medium|hard</span> <span class="nino-badge nino-badge--pill">.nino-vpa--blur-soft|medium|hard</span> <span class="nino-badge nino-badge--pill">.nino-vpa--flip-soft|medium|hard</span></div>
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-vpa--zoom-soft|medium|hard</span> <span class="nino-badge nino-badge--pill">.nino-vpa--zoom-out-soft|medium|hard</span> <span class="nino-badge nino-badge--pill">.nino-vpa--slide-left-soft|medium|hard</span> <span class="nino-badge nino-badge--pill">.nino-vpa--slide-right-soft|medium|hard</span> <span class="nino-badge nino-badge--pill">.nino-vpa--slide-up-soft|medium|hard</span> <span class="nino-badge nino-badge--pill">.nino-vpa--slide-down-soft|medium|hard</span> <span class="nino-badge nino-badge--pill">.nino-vpa--blur-soft|medium|hard</span> <span class="nino-badge nino-badge--pill">.nino-vpa--flip-soft|medium|hard</span></div>
 		<div class="nino-grid-100 nino-grid-m-33 nino-p-1 nino-vpa nino-vpa--repeat nino-vpa--zoom-soft"><p class="nino-alert nino-alert--info nino-text-center"><small>--zoom-soft</small></p></div>
 		<div class="nino-grid-100 nino-grid-m-33 nino-p-1 nino-vpa nino-vpa--repeat nino-vpa--zoom-medium"><p class="nino-alert nino-alert--info nino-text-center"><small>--zoom-medium</small></p></div>
 		<div class="nino-grid-100 nino-grid-m-33 nino-p-1 nino-vpa nino-vpa--repeat nino-vpa--zoom-hard"><p class="nino-alert nino-alert--info nino-text-center"><small>--zoom-hard</small></p></div>
@@ -2401,6 +2420,12 @@
 		<div class="nino-grid-100 nino-grid-m-33 nino-p-1 nino-vpa nino-vpa--repeat nino-vpa--slide-right-soft"><p class="nino-alert nino-alert--info nino-text-center"><small>--slide-right-soft</small></p></div>
 		<div class="nino-grid-100 nino-grid-m-33 nino-p-1 nino-vpa nino-vpa--repeat nino-vpa--slide-right-medium"><p class="nino-alert nino-alert--info nino-text-center"><small>--slide-right-medium</small></p></div>
 		<div class="nino-grid-100 nino-grid-m-33 nino-p-1 nino-vpa nino-vpa--repeat nino-vpa--slide-right-hard"><p class="nino-alert nino-alert--info nino-text-center"><small>--slide-right-hard</small></p></div>
+		<div class="nino-grid-100 nino-grid-m-33 nino-p-1 nino-vpa nino-vpa--repeat nino-vpa--slide-up-soft"><p class="nino-alert nino-alert--info nino-text-center"><small>--slide-up-soft</small></p></div>
+		<div class="nino-grid-100 nino-grid-m-33 nino-p-1 nino-vpa nino-vpa--repeat nino-vpa--slide-up-medium"><p class="nino-alert nino-alert--info nino-text-center"><small>--slide-up-medium</small></p></div>
+		<div class="nino-grid-100 nino-grid-m-33 nino-p-1 nino-vpa nino-vpa--repeat nino-vpa--slide-up-hard"><p class="nino-alert nino-alert--info nino-text-center"><small>--slide-up-hard</small></p></div>
+		<div class="nino-grid-100 nino-grid-m-33 nino-p-1 nino-vpa nino-vpa--repeat nino-vpa--slide-down-soft"><p class="nino-alert nino-alert--info nino-text-center"><small>--slide-down-soft</small></p></div>
+		<div class="nino-grid-100 nino-grid-m-33 nino-p-1 nino-vpa nino-vpa--repeat nino-vpa--slide-down-medium"><p class="nino-alert nino-alert--info nino-text-center"><small>--slide-down-medium</small></p></div>
+		<div class="nino-grid-100 nino-grid-m-33 nino-p-1 nino-vpa nino-vpa--repeat nino-vpa--slide-down-hard"><p class="nino-alert nino-alert--info nino-text-center"><small>--slide-down-hard</small></p></div>
 		<div class="nino-grid-100 nino-grid-m-33 nino-p-1 nino-vpa nino-vpa--repeat nino-vpa--blur-soft"><p class="nino-alert nino-alert--info nino-text-center"><small>--blur-soft</small></p></div>
 		<div class="nino-grid-100 nino-grid-m-33 nino-p-1 nino-vpa nino-vpa--repeat nino-vpa--blur-medium"><p class="nino-alert nino-alert--info nino-text-center"><small>--blur-medium</small></p></div>
 		<div class="nino-grid-100 nino-grid-m-33 nino-p-1 nino-vpa nino-vpa--repeat nino-vpa--blur-hard"><p class="nino-alert nino-alert--info nino-text-center"><small>--blur-hard</small></p></div>

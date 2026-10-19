@@ -5,6 +5,8 @@
 	'[[/project/company/general/description]]' => 'A short description of your company.',
 	
 	'[[/template/frame-header/navigation/label]]' => 'Main navigation',
+	'[[/template/frame-header/button/label]]' => 'Contact us',
+	'[[/template/frame-header/button/link]]' => '#',
 	'[[/template/common/navigation/footer]]' => 'Navigation',
 	'[[/template/frame-footer/contact/title]]' => 'Here we are',
 

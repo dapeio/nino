@@ -15,14 +15,14 @@ the base install unit copies into every new project.
 | --- | --- |
 | `_admin/templates/page-*.tpl`, `_admin/install/templates/page-*.tpl` | the Nino mark (`box`), the workbench's toggles, the wizard's step and progress icons |
 | `_admin/Nino/Modules/*/Admin/Admin.php`, `_nino/Nino/Modules/*/Admin/Admin.php` | one per panel, the one its entry in the workbench menu shows |
-| `_nino/Nino/Modules/Components/Components.php` | the geometry of the twelve components' icons, as a tool shows them |
+| `_nino/Nino/Modules/Components/Components.php` | the geometry of the fourteen components' icons, as a tool shows them |
 
 Most of them keep Lucide's own class names - `lucide lucide-<name>` - in
 their markup, which is how to find them.
 
 ## Lucide
 
-The twelve components' icons are eight icons of Lucide 0.577.0 - heading, type,
+The fourteen components' icons are eight icons of Lucide 0.577.0 - heading, type,
 text-align-start, panel-top, mouse-pointer-click, image, code and
 separator-horizontal - transcribed as the parts inside the `<svg>` of each file
 and kept as data that a tool draws, not as markup. Of these, `code` and `type`

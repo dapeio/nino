@@ -41,8 +41,8 @@ namespace Nino\Modules {
 				'subtitle'		=> '<[[tag]] class="nino-section-subtitle[[style]][[class]]">[[value]]</[[tag]]>',
 				'card-subtitle'	=> '<[[tag]] class="nino-card-subtitle[[style]][[class]]">[[value]]</[[tag]]>',
 				'hero-subtitle'	=> '<[[tag]] class="nino-hero-subtitle[[style]][[class]]">[[value]]</[[tag]]>',
-				'text'				=> '<div class="nino-section-text[[richtext]][[style]][[class]]">[[value]]</div>',
-				'img'					=> '<img src="[[src]]" width="[[width]]" height="[[height]]" alt="[[alt]]">',
+				'text'				=> '<div class="[[base]][[richtext]][[style]][[class]]">[[value]]</div>',
+				'img'					=> '<img src="[[src]]" width="[[width]]" height="[[height]]" alt="[[alt]]"[[class]]>',
 				'image'				=> '<div class="nino-image[[ratio]][[focus]][[class]]">[[img]]</div>',
 				'button'			=> '<a class="nino-btn[[style]][[size]][[class]]"[[href]][[target]]>[[value]]</a>',
 				'spacer'			=> '<div class="nino-mt-[[size]][[class]]"></div>',
@@ -206,12 +206,15 @@ namespace Nino\Modules {
 		];
 
 		// Which of them each component carries: the three titles are one heading,
-		// the three subtitles one line of type
+		// the three subtitles one line of type, the two texts the lines of a text
+		// and the two images one picture
 		private const array ICONS = [
 			'title'			=> 'heading',
 			'subtitle'		=> 'type',
 			'card-title'	=> 'heading',
 			'card-subtitle'	=> 'type',
+			'card-text'		=> 'text-align-start',
+			'card-image'	=> 'image',
 			'hero-title'	=> 'heading',
 			'hero-subtitle'	=> 'type',
 			'text'			=> 'text-align-start',
@@ -230,10 +233,11 @@ namespace Nino\Modules {
 		 *	The components are registered in the order a column offers them, because
 		 *	the registry's order is the one a tool shows: components() answers it as
 		 *	it stands, and a tool that lists what can be added to a column knows no
-		 *	component by name. So the title and the subtitle of a section, of a card
-		 *	and of a hero come first, in pairs, then the text, the card, the button,
-		 *	the image, the html and the spacer - and for any one place ('in') that
-		 *	is the order its column has. The components of a feature follow these.
+		 *	component by name. So the title, the subtitle and the text of a section
+		 *	come first, then the title, the subtitle, the text and the image of a
+		 *	card, then the title and the subtitle of a hero, and then the card, the
+		 *	button, the image, the html and the spacer - and for any one place ('in')
+		 *	that is the order its column has. The components of a feature follow these.
 		 *
 		 *	Each of the kernel's components carries an icon, so that the registry that
 		 *	lists them hands a tool the picture to show each by: ICONS names the shape
@@ -248,14 +252,26 @@ namespace Nino\Modules {
 			$components = [
 				[ 'title', 'Title (Section)', 'Titel (Sektion)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'h3', 'h4' ], 'h3' ), 'style' => self::_style() ], [ 'hero', 'section' ], '{tag} .nino-section-title', null ],
 				[ 'subtitle', 'Subtitle (Section)', 'Untertitel (Sektion)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'p', 'h4', 'h5' ], 'div' ), 'style' => self::_style() ], [ 'hero', 'section' ], '{tag} .nino-section-subtitle', null ],
-				[ 'card-title', 'Title (Card)', 'Titel (Karte)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'h3', 'h4' ], 'h4' ), 'style' => self::_style() ], [ 'card' ], '{tag} .nino-card-title', null ],
-				[ 'card-subtitle', 'Subtitle (Card)', 'Untertitel (Karte)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'p', 'h5', 'h6' ], 'p' ), 'style' => self::_style() ], [ 'card' ], '{tag} .nino-card-subtitle', null ],
-				[ 'hero-title', 'Title (Hero)', 'Titel (Hero)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'h2', 'h3' ], 'h2' ), 'style' => self::_style() ], [ 'hero' ], '{tag} .nino-hero-title', null ],
-				[ 'hero-subtitle', 'Subtitle (Hero)', 'Untertitel (Hero)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'p', 'h3', 'h4' ], 'p' ), 'style' => self::_style() ], [ 'hero' ], '{tag} .nino-hero-subtitle', null ],
 				[ 'text', 'Text', 'Text', 'text', 'text', [
 					'format' => [ 'type' => 'select', 'options' => [ 'inline', 'lines', 'blocks' ], 'default' => 'blocks', 'label' => [ 'en_US' => 'Format', 'de_DE' => 'Format' ] ],
 					'style' => self::_style(),
 				], null, null, null ],
+				[ 'card-title', 'Title (Card)', 'Titel (Karte)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'h3', 'h4' ], 'h4' ), 'style' => self::_style() ], [ 'card' ], '{tag} .nino-card-title', null ],
+				[ 'card-subtitle', 'Subtitle (Card)', 'Untertitel (Karte)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'p', 'h5', 'h6' ], 'p' ), 'style' => self::_style() ], [ 'card' ], '{tag} .nino-card-subtitle', null ],
+				[ 'card-text', 'Text (Card)', 'Text (Karte)', 'text', 'text', [
+					'format' => [ 'type' => 'select', 'options' => [ 'inline', 'lines', 'blocks' ], 'default' => 'blocks', 'label' => [ 'en_US' => 'Format', 'de_DE' => 'Format' ] ],
+					'style' => self::_style(),
+				], [ 'card' ], 'div .nino-card-descr', null ],
+				[ 'card-image', 'Image (Card)', 'Bild (Karte)', 'image', 'image', [
+					'style' => [ 'type' => 'select', 'options' => [ '', 'nino-card-img--inline' ], 'default' => '', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ] ],
+					'alt' => [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Alternative text', 'de_DE' => 'Alternativtext' ],
+						'hint' => [ 'en_US' => 'Used where the slot has no text of its own. Empty marks the picture as decoration.', 'de_DE' => 'Gilt, wo der Slot keinen eigenen Text hat. Leer kennzeichnet das Bild als Dekoration.' ] ],
+					'focus' => [ 'type' => 'select', 'options' => [ '', '1', '2', '3', '4', '5', '6', '7', '8', '9' ], 'default' => '', 'label' => [ 'en_US' => 'Focus', 'de_DE' => 'Fokus' ],
+						'hint' => [ 'en_US' => 'Which part of the picture survives a crop, as one of nine positions.', 'de_DE' => 'Welcher Teil des Bildes beim Zuschneiden bleibt, als eine von neun Positionen.' ] ],
+					'ratio' => [ 'type' => 'select', 'options' => [ '', '1-1', '4-3', '3-2', '16-9', '21-9' ], 'default' => '', 'label' => [ 'en_US' => 'Ratio', 'de_DE' => 'Seitenverhältnis' ] ],
+				], [ 'card' ], 'img .nino-card-img', null ],
+				[ 'hero-title', 'Title (Hero)', 'Titel (Hero)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'h2', 'h3' ], 'h2' ), 'style' => self::_style() ], [ 'hero', 'section' ], '{tag} .nino-hero-title', null ],
+				[ 'hero-subtitle', 'Subtitle (Hero)', 'Untertitel (Hero)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'p', 'h3', 'h4' ], 'p' ), 'style' => self::_style() ], [ 'hero', 'section' ], '{tag} .nino-hero-subtitle', null ],
 				// The card is the one component that holds components: what stands between
 				// its tags is the calls of the components of a card, which are rendered
 				// when its output is (see componentCard()), and 'holds' says so to a
@@ -283,6 +299,7 @@ namespace Nino\Modules {
 					'target' => [ 'type' => 'select', 'options' => [ '', '_blank' ], 'default' => '', 'label' => [ 'en_US' => 'Opens in', 'de_DE' => 'Öffnet in' ] ],
 				], null, 'a .nino-btn', null ],
 				[ 'image', 'Image', 'Bild', 'image', 'image', [
+					'style' => [ 'type' => 'select', 'options' => [ '', 'nino-image--rounded' ], 'default' => '', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ] ],
 					'alt' => [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Alternative text', 'de_DE' => 'Alternativtext' ],
 						'hint' => [ 'en_US' => 'Used where the slot has no text of its own. Empty marks the picture as decoration.', 'de_DE' => 'Gilt, wo der Slot keinen eigenen Text hat. Leer kennzeichnet das Bild als Dekoration.' ] ],
 					'focus' => [ 'type' => 'select', 'options' => [ '', '1', '2', '3', '4', '5', '6', '7', '8', '9' ], 'default' => '', 'label' => [ 'en_US' => 'Focus', 'de_DE' => 'Fokus' ],
@@ -1019,7 +1036,7 @@ namespace Nino\Modules {
 				return '';
 
 			if( $fixed !== null && $kind !== 'image' && $kind !== 'content' )
-				return $kind === 'href' ? self::_href( $fixed ) : self::_text( $fixed, $format );
+				return $kind === 'href' ? self::_href( $fixed ) : self::_formatText( $fixed, $format );
 
 			if( $source === '' )
 				return null;
@@ -1051,7 +1068,7 @@ namespace Nino\Modules {
 				if( $kind === 'href' )
 					return self::_href( $fill ?? $source );
 
-				return $fill === null ? null : self::_text( $fill, $format );
+				return $fill === null ? null : self::_formatText( $fill, $format );
 			}
 
 			if( $context !== null ) {
@@ -1090,7 +1107,7 @@ namespace Nino\Modules {
 		 *
 		 *	@return 	string
 		 */
-		private static function _text( string $text, string $format ): string {
+		private static function _formatText( string $text, string $format ): string {
 
 			if( in_array( $format, [ 'inline', 'lines', 'blocks' ], true ) === false )
 				return self::escape( $text );
@@ -1349,6 +1366,25 @@ namespace Nino\Modules {
 		}
 
 		/**
+		 *	The part of [text] and [card-text] they share: the fragment of the text,
+		 *	filled with the class the text draws, the wrapper's mark as rich text
+		 *	where it holds paragraphs and lists, its style as a modifier of that
+		 *	class, its own class and its value
+		 *
+		 *	@param		string		$base					The class the text draws: nino-section-text or nino-card-descr
+		 *	@param		array			$args					The arguments made ready by dispatch()
+		 *
+		 *	@return 	string
+		 */
+		private static function _text( string $base, array $args ): string {
+			return str_replace(
+				[ '[[base]]', '[[richtext]]', '[[style]]', '[[class]]', '[[value]]' ],
+				[ $base, $args['format'] === 'blocks' ? ' nino-richtext' : '', self::_modifier( $base. '--', $args['style'] ), self::_modifier( '', $args['class'] ), $args['value'] ],
+				self::$html['text']
+			);
+		}
+
+		/**
 		 *	Replace [title]: the heading of a section
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
@@ -1433,11 +1469,22 @@ namespace Nino\Modules {
 		 *	@return 	string
 		 */
 		public static function componentText( array &$appData, array $args ): string {
-			return str_replace(
-				[ '[[richtext]]', '[[style]]', '[[class]]', '[[value]]' ],
-				[ $args['format'] === 'blocks' ? ' nino-richtext' : '', self::_modifier( 'nino-section-text--', $args['style'] ), self::_modifier( '', $args['class'] ), $args['value'] ],
-				self::$html['text']
-			);
+			return self::_text( 'nino-section-text', $args );
+		}
+
+		/**
+		 *	Replace [card-text]: the text of a card, as [text] has it - the rich text
+		 *	of a key or of a field, in the format the attribute names, and the
+		 *	wrapper marked as rich text where it holds paragraphs and lists - in the
+		 *	class of the text of a card, nino-card-descr
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$args					The arguments made ready by dispatch()
+		 *
+		 *	@return 	string
+		 */
+		public static function componentCardText( array &$appData, array $args ): string {
+			return self::_text( 'nino-card-descr', $args );
 		}
 
 		/**
@@ -1520,8 +1567,10 @@ namespace Nino\Modules {
 		 *	alt text an editor wrote must not be able to open a fill or a
 		 *	shortcode there.
 		 *
-		 *	A focus, a ratio or a class of its own puts the <img> in a frame,
-		 *	<div class="nino-image ...">, which crops it as Nino.css has it.
+		 *	A focus, a ratio, a style or a class of its own puts the <img> in a frame,
+		 *	<div class="nino-image ...">, which crops it as Nino.css has it. The style
+		 *	(nino-image--rounded) and the class are the frame's, never the <img>'s:
+		 *	the frame, cut at its corners, is what rounds the picture.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments made ready by dispatch()
@@ -1529,6 +1578,52 @@ namespace Nino\Modules {
 		 *	@return 	string
 		 */
 		public static function componentImage( array &$appData, array $args ): string {
+			return self::_image( $appData, 'nino-image', $args );
+		}
+
+		/**
+		 *	Replace [card-image]: the picture of a card, found and written as
+		 *	[image] finds and writes its own - the slot or the image field, the
+		 *	alt text, the content form - as the <img> of .nino-card-img. A focus
+		 *	or a ratio puts it in the frame of [image], which then carries
+		 *	.nino-card-img: the rules of the picture of a card (the width, the
+		 *	room below it, the corners, the --inline style) work on the frame as
+		 *	on the <img>, and the frame crops. The style and the class of its own
+		 *	go where .nino-card-img goes: on the <img> where there is no frame,
+		 *	on the frame where there is one
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$args					The arguments made ready by dispatch()
+		 *
+		 *	@return 	string
+		 */
+		public static function componentCardImage( array &$appData, array $args ): string {
+			return self::_image( $appData, 'nino-card-img', $args );
+		}
+
+		/**
+		 *	The part of [image] and [card-image] they share: the picture a
+		 *	reference names as an <img> - or as what the content between the tags
+		 *	makes of it, the same for both - and the frame around it where there
+		 *	is one.
+		 *
+		 *	The picture of [image] is its frame, nino-image, which the fragment
+		 *	names. A focus, a ratio, a style or a class of its own call for it, and
+		 *	the style and the class are the frame's, in that order behind the ratio
+		 *	and the focus; with none of them the picture is the bare <img>, which
+		 *	has no class attribute. The picture of a card is the box nino-card-img
+		 *	names, and its style and its class of its own are the classes of that
+		 *	box: the <img>, which then has all three as its class attribute, or the
+		 *	frame where a focus or a ratio call for one, which then has them in the
+		 *	place of its class and holds an <img> with none
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$base					The class of the picture: nino-image or nino-card-img
+		 *	@param		array			$args					The arguments made ready by dispatch()
+		 *
+		 *	@return 	string
+		 */
+		private static function _image( array &$appData, string $base, array $args ): string {
 
 			// The value is the reference made safe to write; the lookup takes the
 			// reference itself
@@ -1541,18 +1636,26 @@ namespace Nino\Modules {
 
 			$content = trim( $args['content'] ) !== '' ? $args['content'] : null;
 
+			// What the picture carries - the class of a card, then its style and its class of
+			// its own - is the frame's in [image], which is only there for a focus, a ratio or
+			// a class to carry, and the <img>'s in a card, which is framed for a focus or a
+			// ratio alone
+			$card	= $base === 'nino-card-img';
+			$class	= implode( ' ', array_filter( [ $card === true ? $base : '', $args['style'] ?? '', $args['class'] ], static fn( string $word ): bool => $word !== '' ) );
+			$framed	= $args['focus'] !== '' || $args['ratio'] !== '' || ( $card === false && $class !== '' );
+
 			$img = str_replace(
 				[ '[[src]]', '[[width]]', '[[height]]', '[[alt]]' ],
 				[ self::escape( $picture['url'] ), (string) $picture['width'], (string) $picture['height'], self::escape( $alt ) ],
-				$content ?? self::$html['img']
+				$content ?? str_replace( '[[class]]', $card === true && $framed === false ? self::_attribute( 'class', $class ) : '', self::$html['img'] )
 			);
 
-			if( $content !== null || ( $args['focus'] === '' && $args['ratio'] === '' && $args['class'] === '' ) )
+			if( $content !== null || $framed === false )
 				return $img;
 
 			return str_replace(
 				[ '[[ratio]]', '[[focus]]', '[[class]]', '[[img]]' ],
-				[ self::_modifier( 'nino-image--', $args['ratio'] ), self::_modifier( 'nino-img-focus--', $args['focus'] ), self::_modifier( '', $args['class'] ), $img ],
+				[ self::_modifier( 'nino-image--', $args['ratio'] ), self::_modifier( 'nino-img-focus--', $args['focus'] ), self::_modifier( '', $class ), $img ],
 				self::$html['image']
 			);
 		}
@@ -1662,8 +1765,8 @@ namespace Nino\Modules {
 			if( $picture !== null ) {
 
 				$img = str_replace(
-					[ '[[src]]', '[[width]]', '[[height]]', '[[alt]]' ],
-					[ self::escape( $picture['url'] ), (string) $picture['width'], (string) $picture['height'], '' ],
+					[ '[[src]]', '[[width]]', '[[height]]', '[[alt]]', '[[class]]' ],
+					[ self::escape( $picture['url'] ), (string) $picture['width'], (string) $picture['height'], '', '' ],
 					self::$html['img']
 				);
 

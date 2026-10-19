@@ -236,11 +236,13 @@
 		transform), the button role by .nino-btn and the code role by
 		.nino-code.
 
-		Each default is what the rules had before there were roles, so a page
-		that sets none looks as it did: titles and buttons are bold, the rest
-		normal, nothing is transformed, a title is the --text-4 step of the
-		scale below and a subtitle the --text-2, a button is as large as
-		--fontsize-btn says and the code block is .875rem.
+		Each default is the look of the framework: titles and buttons are bold,
+		the rest normal, nothing is transformed, a title is the --text-5 step of
+		the scale below and a subtitle the --text-3, a button is as large as
+		--fontsize-btn says and the code block is .875rem. The title, the
+		subtitle and the button are larger than the rules were before there
+		were roles - they stood on --text-4, --text-2 and 1rem - and a design
+		layer that wants those sizes says so.
 
 		The text size is the root of that scale, and the page reads it on body.
 		A size in rem there takes away the smaller size the browser gives a
@@ -248,10 +250,10 @@
 		it again for those four.	*/
 	--font-title-weight: bold;
 	--font-title-transform: none;
-	--font-title-size: var(--text-4);
+	--font-title-size: var(--text-5);
 	--font-subtitle-weight: normal;
 	--font-subtitle-transform: none;
-	--font-subtitle-size: var(--text-2);
+	--font-subtitle-size: var(--text-3);
 	--font-text-weight: normal;
 	--font-text-transform: none;
 	--font-text-size: 1rem;
@@ -274,7 +276,7 @@
 	--line-height: 1.5;
 	--fontsize-small: .75em;
 	--fontsize-big: 1.25em;
-	--fontsize-btn: 1rem;
+	--fontsize-btn: 1.1rem;
 
 	/*	The scale is relative to the text size, with the factors its rem values
 		were. --text-4 to --text-6 have factors of their own from 768px (see
@@ -287,11 +289,12 @@
 	--text-6: calc(var(--font-text-size) * 2.5);
 
 	/*	What a design layer scales without choosing a size. The hero takes the
-		size of the title and of the subtitle role times a number of its own,
-		and so does a card title - the size of the title role times 5 / 6,
-		because it stood on --text-3 where the other titles stand on --text-4.
-		Each is another number from 768px, where the scale above steps up (see
-		below). A section title, a section subtitle and a card subtitle have a
+		size of the title and of the subtitle role times a number of its own -
+		1.4 and 1.2 below 768px, 1.45 and 10 / 9 from there - and so does a card
+		title: the size of the title role times 5 / 6, because it stood on
+		--text-3 where the title role stood on --text-4, and keeps that ratio to
+		it. Each is another number from 768px, where the scale above steps up
+		(see below). A section title, a section subtitle and a card subtitle have a
 		number of their own too, 1 at every width, and a section title has a
 		rule under it, none until a design layer gives it a thickness:
 			--section-title-scale     times the title role: a section title
@@ -302,7 +305,7 @@
 		the size of the class they vary - the role times its number, where the
 		class has one - times --scale-quiet or --scale-loud: a title that is
 		made larger has a quiet and a loud variant that follow it.	*/
-	--hero-title-scale: 1.2;
+	--hero-title-scale: 1.4;
 	--hero-text-scale: 1.2;
 	--card-title-scale: calc(5 / 6);
 	--section-title-scale: 1;
@@ -318,6 +321,35 @@
 	--space-4: 3rem;
 	--space-5: 5rem;
 	--space-6: 8rem;
+
+	/*	How much air a layout has, from one number. --whitespace-scale is 1, and
+		1 is the layout of every page that never heard of it, to the pixel: .75
+		takes a quarter of the air away, 2 doubles it. Three strengths come of
+		it, each exactly 1 where the number is 1:
+			--whitespace-scale  the areas, whole: the padding of a section, the
+			                    margin and the padding of a card and of what is in
+			                    it, the gap between the columns of a row of cards
+			--whitespace-gap    the room between pieces: the gap of a stack, of its
+			                    cells and of a column that is a stack - the number
+			                    moved .8 of the way
+			--whitespace-text   the room under text: a title, a subtitle, a text,
+			                    the paragraphs and lists of a rich text, a legal
+			                    section and the picture of a card - the number
+			                    moved .6 of the way
+		The two derived ones are damped on purpose: at 2 a paragraph gap of 1rem
+		that becomes 2rem reads as holes in the text, while 10rem of section
+		padding instead of 5rem is exactly the air a loud design wants. What the
+		number never touches: the --space-* scale itself, the width of the page
+		(--grid-gutter and the padding of a row are the width ladder's of the
+		Design feature), line heights, buttons and controls, the rule under a
+		section title and the utility classes (nino-p-<n>, nino-mt-<n> ...), which
+		say what they say. A template or a page may set --whitespace-scale on a
+		section or on a card to tune that subtree: the two derived strengths are
+		said again for both, below, because a property that is worked out from
+		another is worked out where it is declared.	*/
+	--whitespace-scale: 1;
+	--whitespace-gap: calc( 1 + ( var(--whitespace-scale) - 1 ) * .8 );
+	--whitespace-text: calc( 1 + ( var(--whitespace-scale) - 1 ) * .6 );
 
 	--card-img-max-width: 12vw;
 	--card-img-max-height: 20vh;
@@ -343,11 +375,20 @@
     --text-4: calc(var(--font-text-size) * 1.6);
     --text-5: calc(var(--font-text-size) * 2);
     --text-6: calc(var(--font-text-size) * 3);
-		--hero-title-scale: 1.25;
+		--hero-title-scale: 1.45;
 		--hero-text-scale: calc(10 / 9);
 		--card-title-scale: calc(25 / 32);
 		--grid-gutter: var(--space-3);
   }
+}
+
+/*	A section or a card that sets --whitespace-scale of its own: what stands in
+	it takes its number, not the page's. A custom property that is worked out
+	from another is worked out where it is declared and inherited as the value
+	it came to, so the two strengths of :root would stay the page's	*/
+.nino-section, .nino-card {
+	--whitespace-gap: calc( 1 + ( var(--whitespace-scale) - 1 ) * .8 );
+	--whitespace-text: calc( 1 + ( var(--whitespace-scale) - 1 ) * .6 );
 }
 
 
@@ -651,13 +692,14 @@ h1, h2, h3, h4, h5, h6 {
 	which would change what a page that never heard of it looks like: grid
 	items do not collapse their margins, and a link beside a word is two of
 	them. --nino-stack-gap is what the classes set and what a nested stack
-	reads, with the space the theme calls 2 where nobody chose	*/
+	reads, with the space the theme calls 2 where nobody chose; the gap the
+	column draws is that times --whitespace-gap	*/
 .nino-grid-row > .nino-stack-start,
 .nino-grid-row > .nino-stack-center,
 .nino-grid-row > .nino-stack-end,
 .nino-grid-row > [class*="nino-stack-gap-"]:not(.nino-stack) {
 	display: grid;
-	gap: var(--nino-stack-gap, var(--space-2));
+	gap: calc(var(--nino-stack-gap, var(--space-2)) * var(--whitespace-gap));
 	align-content: start;
 }
 .nino-grid-row > .nino-stack-center { align-content: center; }
@@ -675,19 +717,23 @@ h1, h2, h3, h4, h5, h6 {
 	neighbours are one gap apart and the stack's edges are the column's.
 	The row's width is stated, not left to "auto": it also stands in a flex
 	container (.nino-filter), where auto would shrink it to its content.
-	Inside, the pieces of a cell are one below the other, a space apart	*/
+	Inside, the pieces of a cell are one below the other, a space apart. The
+	gap is the one the classes set times --whitespace-gap, said once as
+	--nino-stack-gap-scaled, so that the padding of the cells and the reach of
+	the row cannot part	*/
 .nino-stack {
 	--nino-stack-gap: var(--space-2);
-	width: calc(100% + var(--nino-stack-gap));
+	--nino-stack-gap-scaled: calc(var(--nino-stack-gap) * var(--whitespace-gap));
+	width: calc(100% + var(--nino-stack-gap-scaled));
 	max-width: none;
-	margin: calc(var(--nino-stack-gap) / -2);
+	margin: calc(var(--nino-stack-gap-scaled) / -2);
 	padding: 0;
 }
 .nino-stack > * {
 	display: grid;
 	align-content: start;
-	gap: var(--space-1);
-	padding: calc(var(--nino-stack-gap) / 2);
+	gap: calc(var(--space-1) * var(--whitespace-gap));
+	padding: calc(var(--nino-stack-gap-scaled) / 2);
 }
 /*	A card in a cell takes no margin of its own: the half gap of its cell is the
 	room between neighbours, and the stack's edges are the column's. A card's own
@@ -898,7 +944,7 @@ body.nino-scroll-down .nino-scroll-header {
 	font-size: calc( var(--font-title-size) * var(--hero-title-scale) );
 	text-transform: var(--font-title-transform);
 	color: var(--color-title);
-	margin-bottom: var(--space-3);
+	margin-bottom: calc(var(--space-3) * var(--whitespace-text));
 	line-height: calc( var(--font-title-size) * var(--hero-title-scale) *1.3 / 1.2 );
 }
 .nino-hero-subtitle {
@@ -909,7 +955,7 @@ body.nino-scroll-down .nino-scroll-header {
 	color: var(--color-subtitle);
 	opacity: .8;
 	line-height: calc( var(--font-subtitle-size) * var(--hero-text-scale) *1.3 / 1.2 );
-	margin-bottom: var(--space-3);
+	margin-bottom: calc(var(--space-3) * var(--whitespace-text));
 }
 /*	The variants are the size the hero has, times --scale-quiet or
 	--scale-loud, and the leading keeps its ratio to the size: 1.3 / 1.2 for a
@@ -961,7 +1007,7 @@ body.nino-scroll-down .nino-scroll-header {
 .nino-section {
 	--color-ground: var(--color-section-default-bg);
 	--color-ink: var(--color-section-default-text);
-	padding: var(--space-4) 0;
+	padding: calc(var(--space-4) * var(--whitespace-scale)) 0;
 	background-color: var(--color-section-default-bg);
 	color: var(--color-section-default-text);
 	box-sizing: border-box;
@@ -1317,7 +1363,7 @@ body.nino-scroll-down .nino-scroll-header {
 	text-transform: var(--font-title-transform);
 	color: var(--color-title);
 	line-height: calc( var(--font-title-size) * var(--section-title-scale) *1.3 );
-	margin: var(--space-1) 0;
+	margin: calc(var(--space-1) * var(--whitespace-text)) 0;
 	border-bottom: var(--section-line) solid var(--color-border);
 	padding-bottom: calc( var(--section-line) * 6 );
 }
@@ -1330,13 +1376,13 @@ body.nino-scroll-down .nino-scroll-header {
 	color: var(--color-subtitle);
 	line-height: calc( var(--font-subtitle-size) * var(--section-subtitle-scale) *1.3 );
 	opacity: .8;
-	margin-bottom: var(--space-2);
+	margin-bottom: calc(var(--space-2) * var(--whitespace-text));
 }
 /*	Body copy inside a section - the third member of title/subtitle/text */
 .nino-section-text {
 	font-size: var(--text-1);
 	line-height: var(--line-height);
-	margin-bottom: var(--space-2);
+	margin-bottom: calc(var(--space-2) * var(--whitespace-text));
 }
 
 /*	The wrapper of a field or a key that keeps paragraphs and lists - an element
@@ -1349,7 +1395,7 @@ body.nino-scroll-down .nino-scroll-header {
 .nino-richtext p,
 .nino-richtext ul,
 .nino-richtext ol {
-	margin-bottom: var(--space-2);
+	margin-bottom: calc(var(--space-2) * var(--whitespace-text));
 }
 .nino-richtext > :last-child {
 	margin-bottom: 0;
@@ -1369,10 +1415,10 @@ body.nino-scroll-down .nino-scroll-header {
  *	over a .nino-richtext, and a gap before the next section - the reset has
  *	taken the heading's own margins away */
 .nino-legal-section > h3 {
-	margin-bottom: var(--space-1);
+	margin-bottom: calc(var(--space-1) * var(--whitespace-text));
 }
 .nino-legal-section + .nino-legal-section {
-	margin-top: var(--space-3);
+	margin-top: calc(var(--space-3) * var(--whitespace-text));
 }
 
 /*	--quiet and --loud are the size of the class they vary, smaller and larger,
@@ -1434,14 +1480,14 @@ body.nino-scroll-down .nino-scroll-header {
 		768px on it	*/
 	.nino-hero-title { font-size: calc( var(--font-title-size) * var(--hero-title-scale) ); line-height: calc( var(--font-title-size) * var(--hero-title-scale) *1.2 );}
 	.nino-hero-subtitle { font-size: calc( var(--font-subtitle-size) * var(--hero-text-scale) ); line-height: calc( var(--font-subtitle-size) * var(--hero-text-scale) *1.2 );}
-	.nino-section { padding: var(--space-5) var(--space-3); }
+	.nino-section { padding: calc(var(--space-5) * var(--whitespace-scale)) calc(var(--space-3) * var(--whitespace-scale)); }
 	.nino-section--fullwidth { padding-left: 0; padding-right: 0; }
 	.nino-section--fullheight { padding-top: 0; padding-bottom: 0; }
 }
 
 .nino-card {
-	margin: 0 0 var(--space-1);
-	padding: 0 0 var(--space-1);
+	margin: 0 0 calc(var(--space-1) * var(--whitespace-scale));
+	padding: 0 0 calc(var(--space-1) * var(--whitespace-scale));
 	box-sizing: border-box;
 	border-radius: var(--radius-small);
 	box-shadow: var(--shadow-card);
@@ -1461,7 +1507,7 @@ body.nino-scroll-down .nino-scroll-header {
 	stand out of its section says so with counter	*/
 .nino-card--alt, .nino-card--tint, .nino-card--dark, .nino-card--black, .nino-card--primary, .nino-card--brand-alt, .nino-card--counter, .nino-card--dim {
 	border: 1px solid var(--color-border);
-	padding: var(--space-1);
+	padding: calc(var(--space-1) * var(--whitespace-scale));
 }
 .nino-card--borderless { border: 0; background: transparent; box-shadow: none; }
 /*	After the borderless card: a card that names a ground is painted with it also
@@ -1509,8 +1555,8 @@ body.nino-scroll-down .nino-scroll-header {
 }
 
 .nino-card-content {
-	padding: var(--space-1) var(--space-2);
-	padding-top: var(--space-1);
+	padding: calc(var(--space-1) * var(--whitespace-scale)) calc(var(--space-2) * var(--whitespace-scale));
+	padding-top: calc(var(--space-1) * var(--whitespace-scale));
 	box-sizing: border-box;
 }
 
@@ -1519,7 +1565,7 @@ body.nino-scroll-down .nino-scroll-header {
 	text-transform: var(--font-title-transform);
 	color: var(--color-title);
 	font-size: calc( var(--font-title-size) * var(--card-title-scale) );
-	margin-bottom: var(--space-2);
+	margin-bottom: calc(var(--space-2) * var(--whitespace-text));
 }
 
 .nino-card-subtitle {
@@ -1527,22 +1573,35 @@ body.nino-scroll-down .nino-scroll-header {
 	font-size: calc( var(--font-subtitle-size) * var(--card-subtitle-scale) );
 	font-weight: var(--font-subtitle-weight);
 	text-transform: var(--font-subtitle-transform);
-	margin-bottom: var(--space-2);
+	margin-bottom: calc(var(--space-2) * var(--whitespace-text));
 }
 
 .nino-card-descr {
 	font-size: var(--text-1);
 	line-height: var(--line-height);
-	margin-bottom: var(--space-2);
+	margin-bottom: calc(var(--space-2) * var(--whitespace-text));
 }
 
+/*	The picture of a card is as wide as the card and never wider: it is the
+	<img> [card-image] writes, or the frame it puts round it for a focus or a
+	ratio, which carries the class as well and is cropped by it. --inline is the
+	other way round - the picture at its own size, capped by the width of the
+	card, and it follows the text alignment of the card. It sits on the bottom of
+	its line, so the room below it is its margin and not the margin and the
+	descender of the line	*/
 .nino-card-img {
 	height: auto;
 	width: 100%;
+	max-width: 100%;
 	object-fit: cover;
 	align-self: stretch;
-	margin-bottom: var(--space-1);
+	margin-bottom: calc(var(--space-1) * var(--whitespace-text));
 	border-radius: calc( var(--radius-small) *.7);
+}
+.nino-card-img--inline {
+	display: inline-block;
+	width: auto;
+	vertical-align: bottom;
 }
 
 
@@ -1560,7 +1619,7 @@ body.nino-scroll-down .nino-scroll-header {
 	border-radius:var(--radius-small) var(--radius-small) 0 0;
 }
 .nino-section--fullheight .nino-card-content {
-	padding: var(--space-4) var(--space-2) var(--space-3);
+	padding: calc(var(--space-4) * var(--whitespace-scale)) calc(var(--space-2) * var(--whitespace-scale)) calc(var(--space-3) * var(--whitespace-scale));
 }
 /* Price display for a .nino-card that presents a product or a service - distinct
    from .nino-pricing-price (used inside .nino-pricing-item, see 05 Helper), for
@@ -1579,7 +1638,7 @@ body.nino-scroll-down .nino-scroll-header {
 	display: flex;
 	flex-direction: row;
 	justify-content: center;
-	column-gap: var(--space-2);
+	column-gap: calc(var(--space-2) * var(--whitespace-scale));
 }
 .nino-card-cols > .nino-card-img {
 	max-height: none;
@@ -1587,29 +1646,29 @@ body.nino-scroll-down .nino-scroll-header {
 }
 
 @media (min-width: 640px) {
-	.nino-card-cols-s { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
+	.nino-card-cols-s { display: flex; flex-direction: row; justify-content: center; column-gap: calc(var(--space-2) * var(--whitespace-scale)); }
 	.nino-card-cols-s > .nino-card-img { max-height: none; max-width: var(--card-img-max-width); }
 }
 @media (min-width: 768px) {
-	.nino-card { margin: var(--space-1); padding: var(--space-1); }
+	.nino-card { margin: calc(var(--space-1) * var(--whitespace-scale)); padding: calc(var(--space-1) * var(--whitespace-scale)); }
 	/* nino-card adds horizontal margins from here on. Account for those
 	   gutters when the card itself is also the grid column */
-	.nino-card--grid.nino-grid-m-25 { width: calc(25% - var(--space-1) - var(--space-1)); }
-	.nino-card--grid.nino-grid-m-33 { width: calc((100% / 3) - var(--space-1) - var(--space-1)); }
-	.nino-card--grid.nino-grid-m-50 { width: calc(50% - var(--space-1) - var(--space-1)); }
-	.nino-card-cols-m { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
+	.nino-card--grid.nino-grid-m-25 { width: calc(25% - var(--space-1) * var(--whitespace-scale) - var(--space-1) * var(--whitespace-scale)); }
+	.nino-card--grid.nino-grid-m-33 { width: calc((100% / 3) - var(--space-1) * var(--whitespace-scale) - var(--space-1) * var(--whitespace-scale)); }
+	.nino-card--grid.nino-grid-m-50 { width: calc(50% - var(--space-1) * var(--whitespace-scale) - var(--space-1) * var(--whitespace-scale)); }
+	.nino-card-cols-m { display: flex; flex-direction: row; justify-content: center; column-gap: calc(var(--space-2) * var(--whitespace-scale)); }
 	.nino-card-cols-m > .nino-card-img { max-height: none; max-width: var(--card-img-max-width); }
 }
 @media (min-width: 1024px) {
-	.nino-card-cols-l { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
+	.nino-card-cols-l { display: flex; flex-direction: row; justify-content: center; column-gap: calc(var(--space-2) * var(--whitespace-scale)); }
 	.nino-card-cols-l > .nino-card-img { max-height: none; max-width: var(--card-img-max-width); }
 }
 @media (min-width: 1280px) {
-	.nino-card { padding: var(--space-2); }
-	.nino-card--wide { padding: var(--space-1); }
+	.nino-card { padding: calc(var(--space-2) * var(--whitespace-scale)); }
+	.nino-card--wide { padding: calc(var(--space-1) * var(--whitespace-scale)); }
 	.nino-card--fullwidth { padding:0; }
-	.nino-card--fullwidth .nino-card-content { padding: var(--space-1) var(--space-2); }
-	.nino-card-cols-xl { display: flex; flex-direction: row; justify-content: center; column-gap: var(--space-2); }
+	.nino-card--fullwidth .nino-card-content { padding: calc(var(--space-1) * var(--whitespace-scale)) calc(var(--space-2) * var(--whitespace-scale)); }
+	.nino-card-cols-xl { display: flex; flex-direction: row; justify-content: center; column-gap: calc(var(--space-2) * var(--whitespace-scale)); }
 	.nino-card-cols-xl > .nino-card-img { max-height: none; max-width: var(--card-img-max-width); }
 }
 
@@ -1905,6 +1964,13 @@ textarea:disabled {
 .nino-image {
 	position: relative;
 	overflow: hidden;
+}
+/* The frame with rounded corners - [image style="nino-image--rounded"] puts
+   the style on the frame, never on the picture: the frame has the overflow,
+   so its corners are the picture's. A design layer with corners of its own
+   says this class again with them */
+.nino-image--rounded {
+	border-radius: var(--radius-large);
 }
 .nino-image > img {
 	display: block;
@@ -3111,6 +3177,19 @@ header .nino-headernav-logo:empty {
 	position: relative;
 	z-index: 101;
 }
+/*	A section with a picture behind it that is taller than what it holds - a
+	height of its own, a hero that is a screen high - keeps its row in the
+	middle of it, as a cover does, and not at its top where the flow puts it.
+	The row is the one item that is in the flow, so the section lays it out;
+	nino-cover-top and nino-cover-bottom keep it at the top or at the bottom
+	as they do for a cover, which has its row laid out by the rules above	*/
+.nino-section:not(.nino-cover, .nino-parallex):has(> .nino-section-bg) {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+}
+.nino-section:not(.nino-cover, .nino-parallex):has(> .nino-section-bg).nino-cover-top { justify-content: flex-start; }
+.nino-section:not(.nino-cover, .nino-parallex):has(> .nino-section-bg).nino-cover-bottom { justify-content: flex-end; }
 .nino-parallex > .nino-grid-row,
 .nino-cover > .nino-grid-row {
 	position: absolute;
@@ -3137,6 +3216,63 @@ header .nino-headernav-logo:empty {
 @media (prefers-reduced-motion: reduce), (pointer: coarse) {
 	.nino-parallex > .nino-section-bg > img { top: 0 !important; height: 100%; transform: none !important; will-change: auto; animation: none; }
 }
+
+/*	A padded cover: the picture stands inside the padding of the section instead
+	of out to its edges, with the colour of the section round it. The padding is
+	the section's own - the same distances, said here once as --cover-padding-y
+	and --cover-padding-x, since the picture, the scrim of a dimmed cover and the
+	content are laid out by them (a spacing class moves the section's padding and
+	not these two; set them to move both). The picture has the corners of a card,
+	--radius-small, which a design layer says again with its own. The content
+	stands over it as it does in any cover - in the middle, or at its top or its
+	bottom edge - and the picture of a parallax is in a .nino-section-bg, which
+	clips it where the padding begins: an image placed straight in a parallax is
+	not clipped by anything and stays as wide as the section	*/
+.nino-cover--padded {
+	--cover-padding-y: calc(var(--space-4) * var(--whitespace-scale));
+	--cover-padding-x: 0px;
+	padding: var(--cover-padding-y) var(--cover-padding-x);
+}
+.nino-cover--padded > .nino-section-bg,
+.nino-cover--padded.nino-cover--dim::before,
+.nino-cover--padded.nino-parallex--dim::before {
+	inset: var(--cover-padding-y) var(--cover-padding-x);
+	border-radius: var(--radius-small);
+}
+.nino-cover--padded:not(.nino-parallex) > img {
+	top: var(--cover-padding-y);
+	left: var(--cover-padding-x);
+	right: auto;
+	bottom: auto;
+	width: calc(100% - 2 * var(--cover-padding-x));
+	height: calc(100% - 2 * var(--cover-padding-y));
+	border-radius: var(--radius-small);
+}
+.nino-cover--padded > .nino-grid-row,
+.nino-cover--padded > .nino-cover-content {
+	left: var(--cover-padding-x);
+	right: var(--cover-padding-x);
+}
+/*	The row of a section the Builder wrote is a child of the section and says
+	width: 100% as every row does - with an offset on each side that is the
+	width of the section from the left offset on, and the row hangs over the
+	right one by it. Auto lets the two offsets make its width, and its auto
+	margins still centre it where a maximum width holds it back	*/
+.nino-cover--padded > .nino-grid-row {
+	width: auto;
+}
+.nino-cover--padded.nino-cover-top > .nino-grid-row,
+.nino-cover--padded.nino-cover-top > .nino-cover-content { top: var(--cover-padding-y); }
+.nino-cover--padded.nino-cover-bottom > .nino-grid-row,
+.nino-cover--padded.nino-cover-bottom > .nino-cover-content { bottom: var(--cover-padding-y); }
+@media (min-width: 768px) {
+	.nino-cover--padded {
+		--cover-padding-y: calc(var(--space-5) * var(--whitespace-scale));
+		--cover-padding-x: calc(var(--space-3) * var(--whitespace-scale));
+	}
+	.nino-cover--padded.nino-section--fullheight { --cover-padding-y: 0px; }
+}
+.nino-cover--padded.nino-section--fullwidth { --cover-padding-x: 0px; }
 
 /*	The picture behind a column, in a block of its own that the content of the
 	column follows: what .nino-section-bg is to a section, for a column. It
@@ -3293,8 +3429,9 @@ header .nino-headernav-logo:empty {
 }
 
 /* Viewport animations (vpa) - default is a subtle fade+rise. --zoom/--zoom-
-   out/--slide-left/--slide-right/--blur/--flip are drop-in alternatives,
-   each split into a -soft/-medium/-hard intensity (e.g. nino-vpa--zoom-soft).
+   out/--slide-left/--slide-right/--slide-up/--slide-down/--blur/--flip are
+   drop-in alternatives, each split into a -soft/-medium/-hard intensity (e.g.
+   nino-vpa--zoom-soft).
    --speed-slow/-medium/-fast controls the transition duration, independent
    of which variant is used. Everything is implemented as custom properties
    (--vpa-t-* /--vpa-f-* /--vpa-origin/--vpa-duration) rather than fixed
@@ -3311,7 +3448,7 @@ header .nino-headernav-logo:empty {
 	--vpa-f-hidden: none;
 	--vpa-f-visible: none;
 	--vpa-origin: center;
-	--vpa-duration: .5s;
+	--vpa-duration: 1s;
 }
 .nino-vpa {
 	transform-origin: var(--vpa-origin);
@@ -3333,9 +3470,11 @@ header .nino-headernav-logo:empty {
 }
 
 /* --speed-*: duration only, combine with any variant below (or the plain
-   default) - --speed-slow is deliberately slow, not just "a bit slower" */
-.nino-vpa--speed-fast { --vpa-duration: .25s; }
-.nino-vpa--speed-medium { --vpa-duration: .5s; }
+   default). The plain default lasts a second, which --speed-medium says
+   again; --speed-fast is under half of it and --speed-slow twice it -
+   deliberately slow, not just "a bit slower" */
+.nino-vpa--speed-fast { --vpa-duration: .45s; }
+.nino-vpa--speed-medium { --vpa-duration: 1s; }
 .nino-vpa--speed-slow { --vpa-duration: 2s; }
 
 /* --zoom-*: scales up into place, a snappier "pop" than the plain
@@ -3359,6 +3498,19 @@ header .nino-headernav-logo:empty {
 .nino-vpa--slide-right-soft { --vpa-t-hidden: translateX(-1.5rem); --vpa-t-visible: translateX(0); }
 .nino-vpa--slide-right-medium { --vpa-t-hidden: translateX(-3rem); --vpa-t-visible: translateX(0); }
 .nino-vpa--slide-right-hard { --vpa-t-hidden: translateX(-6rem); --vpa-t-visible: translateX(0); }
+
+/* --slide-up-* /--slide-down-*: the same travel on the other axis, and named
+   the same way - for the motion the visitor sees, as slide-left slides left:
+   slide-up starts below its place and slides up into it, slide-down starts
+   above it and slides down. The default rise is a short slide-up already, so
+   slide-up is the one to choose when it should be longer, and slide-down is
+   the one the default has no counterpart of */
+.nino-vpa--slide-up-soft { --vpa-t-hidden: translateY(1.5rem); --vpa-t-visible: translateY(0); }
+.nino-vpa--slide-up-medium { --vpa-t-hidden: translateY(3rem); --vpa-t-visible: translateY(0); }
+.nino-vpa--slide-up-hard { --vpa-t-hidden: translateY(6rem); --vpa-t-visible: translateY(0); }
+.nino-vpa--slide-down-soft { --vpa-t-hidden: translateY(-1.5rem); --vpa-t-visible: translateY(0); }
+.nino-vpa--slide-down-medium { --vpa-t-hidden: translateY(-3rem); --vpa-t-visible: translateY(0); }
+.nino-vpa--slide-down-hard { --vpa-t-hidden: translateY(-6rem); --vpa-t-visible: translateY(0); }
 
 /* --blur-*: soft-focus-in, on top of whatever transform is already in
    effect (the default rise, or a --zoom-* /--slide-* /--flip-* combined on

@@ -618,9 +618,13 @@ check( 'a decorative picture is written with an empty alt and keeps it', str_con
 $shippedImg = \Nino\Modules\Components::$html['img'];
 \Nino\Modules\Components::$html['img'] = '<img loading="lazy" src="[[src]]" alt="[[alt]]" data-size="[[width]]x[[height]]">';
 $replacedImg = \Nino\Html::renderHtml( $appData, '[image hero]' );
+$replacedCardImg = \Nino\Html::renderHtml( $appData, '[card-image hero]' );
 \Nino\Modules\Components::$html['img'] = $shippedImg;
 check( 'the <img> fragment is the property, so replacing it replaces what the shortcode renders', $replacedImg === '<img loading="lazy" src="/public/images/hero.1600x600.jpg" alt="" data-size="1600x600">' );
-check( '...and putting the shipped one back renders the shipped markup again', str_starts_with( \Nino\Html::renderHtml( $appData, '[image hero]' ), '<img src="/public/images/hero.1600x600.jpg"' ) === true );
+check( '...and [card-image] renders through it as well: a fragment with no place for a class loses the class of the card\'s picture, not the picture', $replacedCardImg === $replacedImg );
+check( '...and putting the shipped one back renders the shipped markup again', str_starts_with( \Nino\Html::renderHtml( $appData, '[image hero]' ), '<img src="/public/images/hero.1600x600.jpg"' ) === true
+	&& \Nino\Html::renderHtml( $appData, '[image hero alt=""]' ) === '<img src="/public/images/hero.1600x600.jpg" width="1600" height="600" alt="">'
+	&& \Nino\Html::renderHtml( $appData, '[card-image hero]' ) === '<img src="/public/images/hero.1600x600.jpg" width="1600" height="600" alt="" class="nino-card-img">' );
 
 unset( $appData['./nino/html/shortcodes']['argprobe'], $appData['./nino/callbacks']['/nino/html/shortcode/argprobe'] );
 

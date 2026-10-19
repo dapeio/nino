@@ -6,8 +6,9 @@
  *
  *									Everything below this comment is what the catalogue's
  *									Design feature compiles at its defaults: the twelve
- *									numbered sections, every part on the first set of its
- *									tab, every knob in the middle. It is regenerated from
+ *									numbered sections, every part on the set the first
+ *									shipped theme names - Nino, the default construction
+ *									of each tab -, every knob in the middle. It is regenerated from
  *									that compiler with each kernel release, so that the look
  *									a project starts from and the look Design compiles have
  *									one source. Nino.css carries the defaults; this file is
@@ -629,25 +630,30 @@
 @media (min-width: 768px) { :root { --nino-base-size: 112.5%; } }
 
 /* ==== 6. the page ==== */
-/* a row of the width Nino.css gives it, and the animation Nino.css has */
+/* a row of the width Nino.css gives it, the air it has, and the animation Nino.css has */
 
-/* ==== 7. header: v1 ==== */
-/*	Nino Design - header v1
- *
- *	@name				Plain bar
+/* ==== 7. header: classic-default ==== */
+/*	@name				Classic, default
  *	@description	A bar on the page ground with a rule under it, five rem tall. The one a fresh Nino installs.
+ *	@description-de	Eine Leiste auf dem Grund der Seite mit einer Linie darunter, fünf rem hoch. Die, die ein frisches Nino mitbringt.
  *
  *	The name and the description are what the Design panel lists this
  *	variant as. Every library file carries them; a file without a @name
  *	is offered under its own file name instead.
  */
 
+/*	The height of the bar, once: the bar is that tall, and main, which the fixed
+	header would cover, starts below it	*/
+:root {
+	--header-height: 5rem;
+}
+
 .nino-frame-header {
 	border-bottom: 1px solid var(--color-border);
 }
 
 .nino-frame-header .nino-scroll-header {
-	min-height: 5rem;
+	min-height: var(--header-height);
 	opacity: 1;
 	background-color: var(--color-background);
 	display:flex;
@@ -676,7 +682,7 @@ body.nino-scroll-atf .nino-frame-header .nino-scroll-header {
 
 
 body main {
-	padding-top: clamp(5rem, var(--space-6), 8rem);
+	padding-top: var(--header-height);
 }
 
 body main:has(> .nino-cover:first-child),
@@ -689,8 +695,8 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 @media (min-width: 768px) {
 	.nino-frame-header .nino-nav-content li a {
 		position: relative;
-		padding: .5rem 0;
-		font-size: .9rem;
+		padding: var(--space-1);
+		font-size: var(--fontsize-btn);
 		letter-spacing: .04em;
 	}
 
@@ -722,11 +728,10 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 }
 
 
-/* ==== 8. footer: v1 ==== */
-/*	Nino Design - footer v1
- *
- *	@name				One legal row
+/* ==== 8. footer: one-legal-row ==== */
+/*	@name				One legal row
  *	@description	Copyright, the footer navigation and the legal links on a single row. The smallest footer there is.
+ *	@description-de	Copyright, die Footer-Navigation und die rechtlichen Links in einer einzigen Zeile. Der kleinste Footer, den es gibt.
  *
  *	The name and the description are what the Design panel lists this
  *	variant as. Every library file carries them; a file without a @name
@@ -747,11 +752,10 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 }
 
 
-/* ==== 9. content: v1 (hero-title default, hero-text default, quiet default, loud default, section-title default, section-subtitle default, section-space default, section-line default, card-title default, card-subtitle default, card-space default, corners default, border default, shadow default) ==== */
-/*	Nino Design - content v1
- *
- *	@name			Nino
- *	@description	The framework as it is, with its own values on every knob. The hero, the sections and the cards of the page.
+/* ==== 9. content: regular (hero-title default, hero-text default, quiet default, loud default, section-title default, section-subtitle default, section-space default, section-line default, card-title default, card-subtitle default, card-space default, corners default, border default, shadow default) ==== */
+/*	@name			Regular
+ *	@description	The framework as it is: the middle of every ladder. Hero, sections and cards as Nino.css draws them.
+ *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Hero, Sektionen und Karten, wie Nino.css sie zeichnet.
  *
  *	@knob	hero-title			Size of the title of a hero
  *	@knob	hero-text			Size of the text of a hero
@@ -768,7 +772,7 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
  *	@knob	border				Line round a card that has a ground
  *	@knob	shadow				Shadow of a card
  *
- *	v1 is the starting point, not a design. Every value it declares is the
+ *	Regular is the starting point, not a design. Every value it declares is the
  *	framework's own, so a page under it looks as it does under Nino.css alone -
  *	and every one of them is a ladder of five, so each knob has something to
  *	reach. The middle of a ladder is Nino.css, the others are two steps to
@@ -792,20 +796,20 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
  *	(var(--content-section-space)). The knobs of Nino.css itself - the factors
  *	of the hero, of a section's and a card's title and subtitle and of the
  *	variants, the rule under a section title, the shadow of a card - need no
- *	rule: the set only points them at the ladder. Copy this file to v2.css and
- *	start there.
+ *	rule: the set only points them at the ladder. Copy this file under a name of
+ *	your own and start there.
  */
 
 :root {
 	/*	The factors Nino.css multiplies the size of the title role and of the
-		subtitle role by, in a hero: 1.2 and 1.2, from 768px 1.25 and 10 / 9.
+		subtitle role by, in a hero: 1.4 and 1.2, from 768px 1.45 and 10 / 9.
 		A step is the ratio 1.25 to either side of the middle, twice: times .64,
 		.8, 1, 1.25 and 1.5625	*/
-	--content-hero-title--least: 		.768;
-	--content-hero-title--less: 		.96;
-	--content-hero-title--default: 	1.2;
-	--content-hero-title--more: 		1.5;
-	--content-hero-title--most: 		1.875;
+	--content-hero-title--least: 		.896;
+	--content-hero-title--less: 		1.12;
+	--content-hero-title--default: 	1.4;
+	--content-hero-title--more: 		1.75;
+	--content-hero-title--most: 		2.1875;
 
 	--content-hero-text--least: 		.768;
 	--content-hero-text--less: 			.96;
@@ -915,11 +919,11 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 
 @media (min-width: 768px) {
 	:root {
-		--content-hero-title--least: 		.8;
-		--content-hero-title--less: 		1;
-		--content-hero-title--default: 	1.25;
-		--content-hero-title--more: 		1.5625;
-		--content-hero-title--most: 		1.953;
+		--content-hero-title--least: 		.928;
+		--content-hero-title--less: 		1.16;
+		--content-hero-title--default: 	1.45;
+		--content-hero-title--more: 		1.8125;
+		--content-hero-title--most: 		2.2656;
 
 		--content-hero-text--least: 		calc(.64 * 10 / 9);
 		--content-hero-text--less: 			calc(.8 * 10 / 9);
@@ -959,28 +963,38 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 	classes of Nino.css (nino-pt-3, nino-p-2 ...) come last in its stylesheet so
 	that they win, and a rule of a design layer that came after them would
 	beat them - so a section that names a padding is left alone. One with the
-	fullheight class keeps the padding Nino.css gives it from 768px, none	*/
+	fullheight class keeps the padding Nino.css gives it from 768px, none.
+	What a set spaces it spaces times the whitespace of the page, as Nino.css
+	does - --whitespace-scale for an area, --whitespace-text for the room under
+	a text, and 1 where the framework says none - since a rule that came after
+	Nino.css and said the space without the factor would stop the position of
+	the Global tab at the set	*/
 .nino-section:where(:not(.nino-section--fullheight, [class*="nino-pt-"], [class*="nino-p-"])) {
-	padding-top: var(--content-section-space);
+	padding-top: calc( var(--content-section-space) * var(--whitespace-scale, 1) );
 }
 .nino-section:where(:not(.nino-section--fullheight, [class*="nino-pb-"], [class*="nino-p-"])) {
-	padding-bottom: var(--content-section-space);
+	padding-bottom: calc( var(--content-section-space) * var(--whitespace-scale, 1) );
 }
 
 .nino-card-content:where(:not([class*="nino-pt-"], [class*="nino-pb-"], [class*="nino-p-"])) {
-	padding: calc( var(--content-card-space) / 2 ) var(--content-card-space);
+	padding: calc( var(--content-card-space) / 2 * var(--whitespace-scale, 1) ) calc( var(--content-card-space) * var(--whitespace-scale, 1) );
 }
 .nino-card-title:where(:not([class*="nino-mb-"], [class*="nino-m-"])),
 .nino-card-subtitle:where(:not([class*="nino-mb-"], [class*="nino-m-"])),
 .nino-card-descr:where(:not([class*="nino-mb-"], [class*="nino-m-"])) {
-	margin-bottom: var(--content-card-space);
+	margin-bottom: calc( var(--content-card-space) * var(--whitespace-text, 1) );
 }
 .nino-card-img:where(:not([class*="nino-mb-"], [class*="nino-m-"])) {
-	margin-bottom: calc( var(--content-card-space) / 2 );
+	margin-bottom: calc( var(--content-card-space) / 2 * var(--whitespace-text, 1) );
 }
 
-/*	A card, its picture inside it, and a column that paints a ground - rounded
-	as a card is, twice	*/
+/*	A card, its picture inside it, a column that paints a ground or holds a picture
+	and the picture of a padded cover - rounded as the corners knob says, the
+	pictures and the grounds at .7 of a card's corner. The padded cover says the
+	selectors of Nino.css again, with the same weight, since a rule of the design
+	layer that came after them has to win against each of them: the picture, the
+	box of a parallax and the scrim of a dimmed cover, which has the inset of the
+	picture and so its corners	*/
 .nino-card {
 	border-radius: var(--content-corners);
 }
@@ -990,27 +1004,32 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 .nino-card--fullwidth .nino-card-img {
 	border-radius: var(--content-corners) var(--content-corners) 0 0;
 }
-.nino-grid--alt, .nino-grid--tint, .nino-grid--dark, .nino-grid--black, .nino-grid--primary, .nino-grid--brand-alt, .nino-grid--counter, .nino-grid--dim {
+.nino-grid-bg, .nino-grid--alt, .nino-grid--tint, .nino-grid--dark, .nino-grid--black, .nino-grid--primary, .nino-grid--brand-alt, .nino-grid--counter, .nino-grid--dim,
+.nino-cover--padded > .nino-section-bg, .nino-cover--padded:not(.nino-parallex) > img, .nino-cover--padded.nino-cover--dim::before, .nino-cover--padded.nino-parallex--dim::before {
+	border-radius: calc( var(--content-corners) * .7 );
+}
+/*	A picture that asks to be rounded (nino-image--rounded) takes the corners of a
+	card twice, where Nino.css gives it --radius-large: the corners knob rounds it
+	further	*/
+.nino-image--rounded {
 	border-radius: calc( var(--content-corners) * 2 );
 }
-
 .nino-card--alt, .nino-card--tint, .nino-card--dark, .nino-card--black, .nino-card--primary, .nino-card--brand-alt, .nino-card--counter, .nino-card--dim {
 	border-width: var(--content-border);
 }
 
 
-/* ==== 10. buttons: v1 (size default, spread default, space default, corners default) ==== */
-/*	Nino Design - buttons v1
- *
- *	@name			Nino
- *	@description	The framework as it is, with its own values on every knob. Every .nino-btn variant, and the link that looks like one.
+/* ==== 10. buttons: regular (size default, spread default, space default, corners default) ==== */
+/*	@name			Regular
+ *	@description	The framework as it is: the middle of every ladder. Every .nino-btn variant and the link that looks like one.
+ *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Jede .nino-btn-Variante und der Link, der wie eine aussieht.
  *
  *	@knob	size		Size of a button
  *	@knob	spread		How far a small and a big button stand from it
  *	@knob	space		Space around the label
  *	@knob	corners		Corner radius
  *
- *	v1 is the starting point, not a design. Every value it declares is the
+ *	Regular is the starting point, not a design. Every value it declares is the
  *	framework's own, so a button under it looks as it does under Nino.css
  *	alone, and every one of them is a ladder of five, so each knob has
  *	something to reach: the middle of a ladder is Nino.css, the others are
@@ -1028,7 +1047,7 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
  *	The size is what the padding, the type and the radius of a button are
  *	multiplied by. The variants are that size times a number, in Nino.css as
  *	here: a small button is the size times 1 less the spread, a big one the
- *	size times 1 plus it. Copy this file to v2.css and start there.
+ *	size times 1 plus it. Copy this file under a name of your own and start there.
  */
 
 :root {
@@ -1088,11 +1107,10 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 }
 
 
-/* ==== 11. components: v1 (scale default, space default, corners default, border default, zebra default, labels default) ==== */
-/*	Nino Design - components v1
- *
- *	@name			Nino
- *	@description	The framework as it is, with its own values on every knob. Fields, labels, tables, lists, alerts, badges and the building blocks.
+/* ==== 11. components: regular (scale default, space default, corners default, border default, zebra default, labels default) ==== */
+/*	@name			Regular
+ *	@description	The framework as it is: the middle of every ladder. Fields, labels, tables, lists, alerts, badges and the building blocks.
+ *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Felder, Beschriftungen, Tabellen, Listen, Alerts, Badges und die Bausteine.
  *
  *	@knob	scale		Type size of the fields and the tables
  *	@knob	space		Space inside a field, a cell, a block and between them
@@ -1101,7 +1119,7 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
  *	@knob	zebra		Stripes of a table that asks for them
  *	@knob	labels		Where the label of a field stands
  *
- *	v1 is the starting point, not a design. Every value it declares is the
+ *	Regular is the starting point, not a design. Every value it declares is the
  *	framework's own, so a form, a table or a block under it looks as it does
  *	under Nino.css alone - and every one of them is a ladder, so each knob has
  *	something to reach: the five values of a scale, the middle of them Nino.css
@@ -1128,7 +1146,7 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
  *	The spacing classes of Nino.css (nino-p-2, nino-mb-3 ...) come last in its
  *	stylesheet so that they win. A rule of a design layer would beat them, so
  *	a box that names a padding or a margin of its own is left alone.
- *	Copy this file to v2.css and start there.
+ *	Copy this file under a name of your own and start there.
  */
 
 :root {

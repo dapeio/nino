@@ -469,8 +469,9 @@ check( 'the two pages of the Legal module read the details of their page and car
 	&& array_values( $units['module:legal']['templates'] ) === [ 'page-legal-imprint.tpl', 'page-legal-privacy.tpl' ] && isset( $units['page:legal'] ) === false );
 
 // The frames carry the keys of their own category, delivered by the base unit that delivers the frames
-check( 'the frames are frame-header.tpl and frame-footer.tpl, and their words are delivered with them', in_array( 'frame-header.tpl', $units['base']['templates'], true ) === true && in_array( 'frame-footer.tpl', $units['base']['templates'], true ) === true
-	&& isset( $provided['base']['/template/frame-header/navigation/label'], $provided['base']['/template/frame-footer/contact/title'], $provided['base']['/template/frame-footer/label/address'] ) === true );
+check( 'the frames are frame-header.tpl and frame-footer.tpl, and their words are delivered with them - the label and the link of a header\'s button too, which a header of the library reads where the delivered one reads none', in_array( 'frame-header.tpl', $units['base']['templates'], true ) === true && in_array( 'frame-footer.tpl', $units['base']['templates'], true ) === true
+	&& isset( $provided['base']['/template/frame-header/navigation/label'], $provided['base']['/template/frame-footer/contact/title'], $provided['base']['/template/frame-footer/label/address'] ) === true
+	&& isset( $provided['base']['/template/frame-header/button/label'], $provided['base']['/template/frame-header/button/link'] ) === true );
 echo "\n";
 
 

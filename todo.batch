@@ -1,0 +1,45 @@
+Builder/Kernel selbst geändert (bitte alles prüfen!)
+- v* Dateibezeichnung entfernt. Vorlagen dürfen ihren Namen tragen.
+- Deutsche Namen für Vorlagen entfernt. Der Name ist keine Bezeichnung sondern ein Name (Beschreibung darf mehrsprachig sein)
+- Neue Buttonvorlage "Big"
+- Erste Kommentarzeile der library-style.css entfernt
+- Schriftgrößen in Nino geändert
+- _setLabel nimmt nur name/set
+- vpa "slide-top", "slide-bottom" hinzugefügt (fehlt vermutlich noch an anderen stellen?)
+- library-Elemente umbenannt
+- nino-card-img als neue Komponente ergänzt
+- neue Eigenschaft "Style" für nino-card-img
+- nino-card-img--fullwidth in Nino.css ergänzt
+- neue Eigenschaft "Style" für nino-image
+- nino-image--rounded ergänzt
+
+Allgemein TODO:
+- wir brauchen noch eine Button-Variante, die 100% Breite hat --fullwidth
+- Der Scroll-Down-To-... Anchor für klassische ATF-Background-Heros sollte als Basiskomponente verfügbar sein
+- Eventuell sollten wir ein Lucide Icon Feature bereitstellen (evt. dann für Builder abhängig machen)
+- Eventuell benötigt nav eine Untermenü-Funktionalität
+- Admin/Elemente - Bei "Neues Element" neben "Speichern" ein "Speichern und neu einfügen"
+- Sections müssen eventuell -trotz cover- mit einem Rand angeboten werden können (z.B. --padded)
+
+Allgemeine Bugs:
+- Nach Ändern von Texten/Elementen/Builder müssen alle Feature-Tabs neu geladen werden
+
+Builder TODOs:
+- Das "+ Komponenten" kann eventuell schon die Settings-Lightbox öffnen. Dort werden dann zuerst alle Komponenten als Buttons angeboten (ca.100x30px), nach Kategorie sortiert (Section > Title, Subtitle, Text | Card > Title, Subtitle, Text, Image,... etc), jede Kategorie in einer Zeile. "Features" evt. als Eigene. Es werden immer (!) alle angezeigt - die "in" nicht-Verfügbaren werden aber ausgegraut. Beim Einfügen bleibt man gleich in der Lightbox und kommt in die Settings. Das sollte sich noch intuitiver anfühlen.
+- (fast) jede Komponente könnte ein "Link"-Tab kriegen - das ein <a> um das Element anbietet
+- Ein Global-Steuerelement für den neuen Nino.css-Wert --whitespace-scale
+- Ein Loop sollte eventuell auch für eine Section eingestellt werden können
+- Komponenten benötigen mehr Input-Varianten (Checkbox,Toggle,Tabs,..)
+- Komponenten sollten eventuell Ausrichtungs-Icons (vert/hor) als Input-Art auswählen dürfen
+- Der Hintergrund auf eine Section sollte als "Hintergrund innen" als Toggle Option (nach "Bild abdunkeln") nicht auf die Section sondern die Row legbar sein.
+- Prüfen, ob .nino-card-content notwendig ist
+- "Style" bei nino-card-img und nino-image ist aktuell noch eine "dirty"-Lösung. Evt. benötigen Komponenten einen Tab "Varianten" in der Style-Varianten angeboten werden können.
+- Themes müssen Fonts vorlegen/installieren können
+- Eventuell sollten Header/Footer auch Knobs bereitstellen können (z.B. Header>padding nav Buttons, etc.). Die Technik ist da und würde den Footer/Header Katalog effektiver gestalten
+- Wir sollten über Builder Presets nachdenken - Vorlagen von gängigen Kombinationen
+
+Builder Bugs
+- Nach Anlegen einer Builder-Designs muss das "Routen"-Tabs neu geladen werden (sonst fehlt das neu angelegte Template)
+- Die Footer-Setting und Global scrollt den Preview nicht nach unten
+- Bild getönt muss unabhängig von Parallex verfügbar sein
+- Click in ein Element im Builder-Preview darf nicht automatisch scrollen
