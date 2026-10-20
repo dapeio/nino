@@ -384,10 +384,6 @@ namespace Nino {
 			if( $html === '' || strpos( $html, '[' ) === false || empty( $appData['./nino/html/shortcodes'] ) === true )
 				return $html;
 
-			// Run shortcodes
-			if( $appData['./nino/html/cache'] === false )
-				$appData['./nino/html/cache'] = implode( '|', array_keys( ( $appData['./nino/html/shortcodes'] ?? [] ) ) );
-
 			// A closure capturing $appData by reference, not the previous
 			// static-property-as-callback-target approach: preg_replace_callback()
 			// only accepts a callable, but binding $appData to a class property
@@ -400,9 +396,29 @@ namespace Nino {
 			$callback = function( array $pregArgs ) use ( &$appData ): string {
 				return self::_doShortcode( $appData, $pregArgs );
 			};
-			$html = preg_replace_callback( '/\[('. $appData['./nino/html/cache'] . ')(?: ([^\]]*))?\](?:([^\[]*+(?:\[(?!\/\1\])[^\[]*+)*+)(?:\[\/(?:\1)\]))?/', $callback, $html );
+			$html = preg_replace_callback( self::_shortcodePattern( $appData ), $callback, $html );
 
 			return $html;
+		}
+
+		/**
+		 *	What finds a shortcode in html+: [name], [name arguments], and where
+		 *	a [/name] follows, what stands between the two tags - the groups
+		 *	being the name, the arguments and the content. The names are the
+		 *	shortcodes registered, joined once and again after a registration
+		 *	(see addShortcode()). The one pattern of the rendering and of
+		 *	shortcodeCalls()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string
+		 */
+		private static function _shortcodePattern( array &$appData ): string {
+
+			if( $appData['./nino/html/cache'] === false )
+				$appData['./nino/html/cache'] = implode( '|', array_keys( ( $appData['./nino/html/shortcodes'] ?? [] ) ) );
+
+			return '/\[('. $appData['./nino/html/cache'] . ')(?: ([^\]]*))?\](?:([^\[]*+(?:\[(?!\/\1\])[^\[]*+)*+)(?:\[\/(?:\1)\]))?/';
 		}
 
 		private static function _renderFills( array &$appData, string $html ): string {
@@ -458,35 +474,7 @@ namespace Nino {
 			if( isset( $appData['./nino/html/shortcodes'][$shortcode] ) === false )
 				return '';
 
-			// Split shortcode arguments
-			$args = [];
-			if( isset( $pregArgs[2] ) === true && $pregArgs[2] !== '' ) {
-				// The assignment is a group of its own, so "was there a value?"
-				// is answerable: judged by the value alone, alt="" read as no
-				// value at all and arrived as the positional argument 'alt' -
-				// which is how a decorative picture is written, and how
-				// AGENTS.md writes one. A value that happens to equal its own
-				// name (name="name") went the same way
-				preg_match_all( '/\ ([^\ \=]*)(\=[\"]([^\"]*)[\"])?/i', ' '.$pregArgs[2].' ', $attr );
-
-				foreach( $attr[1] AS $id => $key ) {
-
-					if( $attr[2][$id] !== '' ) {
-						$args[$key] = str_replace( '\'', '"', $attr[3][$id] );
-						continue;
-					}
-
-					$args[] = $key;
-				}
-
-				// The trailing space this was given adds one empty positional
-				// match at the end, which is not an argument
-				array_pop( $args );
-			}
-
-			// Modify arguments
-			if( strlen( $content ) > 0 )
-				$args['content'] = $content;
+			$args = self::_shortcodeArguments( $pregArgs[2] ?? '', $content );
 
 			$value = \Nino\Callbacks::doCallbacks( $appData, '/nino/html/shortcode/'. $shortcode, $args );
 
@@ -511,6 +499,89 @@ namespace Nino {
 			$appData['./nino/html/depth'] = $depth;
 
 			return $value;
+		}
+
+		/**
+		 *	The arguments of one shortcode call as the callback gets them: a
+		 *	named one under its name, a bare word as an entry of the list, and
+		 *	the content between the tags - where there is any - as 'content'
+		 *
+		 *	@param		string		$raw					What follows the name inside the tag, '' where nothing does
+		 *	@param		string		$content			What stands between [name] and [/name], '' where nothing does
+		 *
+		 *	@return 	array
+		 */
+		private static function _shortcodeArguments( string $raw, string $content ): array {
+
+			$args = [];
+
+			if( $raw !== '' ) {
+				// The assignment is a group of its own, so "was there a value?"
+				// is answerable: judged by the value alone, alt="" read as no
+				// value at all and arrived as the positional argument 'alt' -
+				// which is how a decorative picture is written, and how
+				// AGENTS.md writes one. A value that happens to equal its own
+				// name (name="name") went the same way
+				preg_match_all( '/\ ([^\ \=]*)(\=[\"]([^\"]*)[\"])?/i', ' '.$raw.' ', $attr );
+
+				foreach( $attr[1] AS $id => $key ) {
+
+					if( $attr[2][$id] !== '' ) {
+						$args[$key] = str_replace( '\'', '"', $attr[3][$id] );
+						continue;
+					}
+
+					$args[] = $key;
+				}
+
+				// The trailing space this was given adds one empty positional
+				// match at the end, which is not an argument
+				array_pop( $args );
+			}
+
+			// Modify arguments
+			if( strlen( $content ) > 0 )
+				$args['content'] = $content;
+
+			return $args;
+		}
+
+		/**
+		 *	The calls of the registered shortcodes a piece of html+ makes, found
+		 *	and read as the rendering does and run by nobody: the pattern of
+		 *	_renderShortcodes() and the arguments as _doShortcode() hands them
+		 *	to the callback, so that what a scan of a template sees is what the
+		 *	page will run. What stands between the tags of a call is read for
+		 *	calls as well - its output is rendered again, so they will run - and
+		 *	they follow the call that holds them. A name nobody registered is no
+		 *	call, as it is none to the rendering. What a fill would put into a
+		 *	call is not known here: a scan reads the source as it stands
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$html					html+, eg. a template
+		 *
+		 *	@return 	array										[ [ 'name' => 'card-text', 'args' => [ '/template/page-home/cards/one-text', 'format' => 'inline' ] ], ... ], in the order the calls stand
+		 */
+		public static function shortcodeCalls( array &$appData, string $html ): array {
+
+			if( $html === '' || strpos( $html, '[' ) === false || empty( $appData['./nino/html/shortcodes'] ) === true )
+				return [];
+
+			$calls = [];
+
+			if( preg_match_all( self::_shortcodePattern( $appData ), $html, $matches, PREG_SET_ORDER ) === false )
+				return $calls;
+
+			foreach( $matches as $match ) {
+
+				$content = $match[3] ?? '';
+				$calls[] = [ 'name' => $match[1], 'args' => self::_shortcodeArguments( $match[2] ?? '', $content ) ];
+
+				foreach( self::shortcodeCalls( $appData, $content ) as $inner )
+					$calls[] = $inner;
+			}
+
+			return $calls;
 		}
 
 		// Whether a value currently contains one of the allowed inline tags -

@@ -1270,8 +1270,10 @@ foreach( $source as $file ) {
 	}
 }
 // The ones Admin builds from the type of a field, from a failed upload and from
-// the images the kernel refuses - named by variable at the call
-foreach( [ 'int_range', 'bool', 'lines', 'lines_ip', 'invalid_value', 'upload_too_large', 'upload_partial', 'upload_missing', 'upload_server', 'image_too_large', 'image_type', 'image_too_many_pixels', 'image_unreadable', 'post_too_large', 'csrf', 'session', 'already_top', 'already_bottom' ] as $code )
+// the images the kernel refuses - named by variable at the call - and the one
+// a restore carries in its answer, where nothing failed and so no Http::fail()
+// names it: the notice of a backup that comes from another version of Nino
+foreach( [ 'int_range', 'bool', 'lines', 'lines_ip', 'invalid_value', 'upload_too_large', 'upload_partial', 'upload_missing', 'upload_server', 'image_too_large', 'image_type', 'image_too_many_pixels', 'image_unreadable', 'post_too_large', 'csrf', 'session', 'already_top', 'already_bottom', 'backups_restored_other_version' ] as $code )
 	$codes[$code] = true;
 
 $wordFiles = [];

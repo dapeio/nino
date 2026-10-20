@@ -375,8 +375,10 @@ namespace Nino\Modules\Images {
 		}
 
 		/**
-		 *	Where every image slot is used: the templates that show it with
-		 *	[image <uri>] (or [image uri="<uri>"]) and the pages that end up
+		 *	Where every image slot is used: the templates that show it as the
+		 *	source of a component - [image <uri>], [image uri="<uri>"],
+		 *	[card-image <uri>], as \Nino\Modules\Components::sources() reads
+		 *	them - and the pages that end up
 		 *	rendering it. A page is a GET route as the project serves it,
 		 *	feature routes included, whose body shows the slot itself or
 		 *	through the [template /templates/<name>] includes that body pulls
@@ -414,7 +416,7 @@ namespace Nino\Modules\Images {
 
 			$found = [];
 			foreach( $sources as $name => $content )
-				foreach( array_keys( self::_scanSource( $content, $locales )['images'] ) as $uri )
+				foreach( array_keys( self::_scanSource( $appData, $content, $locales )['images'] ) as $uri )
 					$found[$uri]['templates'][] = $name;
 
 			$text = [];
@@ -435,7 +437,7 @@ namespace Nino\Modules\Images {
 				$httpUri = substr( (string) $routeKey, strlen( 'GET:/' ) );
 				$images = [];
 				$visited = [];
-				self::_scanPage( (string) ( $route['body'] ?? '' ), $locales, $sources, $visited, $images, 0 );
+				self::_scanPage( $appData, (string) ( $route['body'] ?? '' ), $locales, $sources, $visited, $images, 0 );
 
 				foreach( array_keys( $images ) as $uri )
 					$found[$uri]['pages'][] = [ 'httpUri' => $httpUri, 'name' => $names( $appData, (string) ( $route['uri'] ?? $httpUri ), $httpUri ) ];
@@ -455,6 +457,7 @@ namespace Nino\Modules\Images {
 		 *	The slots a page shows: those of its own source and of every
 		 *	template it includes, however deep
 		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$source				A route body or a template
 		 *	@param		array			$locales			Available locales
 		 *	@param		array			$sources			Every template, name => content
@@ -464,9 +467,9 @@ namespace Nino\Modules\Images {
 		 *
 		 *	@return 	void
 		 */
-		private static function _scanPage( string $source, array $locales, array $sources, array &$visited, array &$images, int $depth ): void {
+		private static function _scanPage( array &$appData, string $source, array $locales, array $sources, array &$visited, array &$images, int $depth ): void {
 
-			$scan = self::_scanSource( $source, $locales );
+			$scan = self::_scanSource( $appData, $source, $locales );
 
 			foreach( $scan['images'] as $uri => $true )
 				$images[$uri] = true;
@@ -480,21 +483,23 @@ namespace Nino\Modules\Images {
 					continue;
 
 				$visited[$name] = true;
-				self::_scanPage( $sources[$name], $locales, $sources, $visited, $images, $depth + 1 );
+				self::_scanPage( $appData, $sources[$name], $locales, $sources, $visited, $images, $depth + 1 );
 			}
 		}
 
 		/**
-		 *	The [image] slots and the [template /templates/<name>] includes one
-		 *	source names, read once for each language where the source is
-		 *	about the language ([[/nino/http/response/locale]])
+		 *	The image slots the components of one source name and the
+		 *	[template /templates/<name>] includes it has, read once for each
+		 *	language where the source is about the language
+		 *	([[/nino/http/response/locale]])
 		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$source
 		 *	@param		array			$locales			Available locales
 		 *
 		 *	@return 	array										[ 'images' => [ uri => true ], 'includes' => [ template name => true ] ]
 		 */
-		private static function _scanSource( string $source, array $locales ): array {
+		private static function _scanSource( array &$appData, string $source, array $locales ): array {
 
 			$fill			= '[[/nino/http/response/locale]]';
 			$variants	= str_contains( $source, $fill ) === true
@@ -506,28 +511,11 @@ namespace Nino\Modules\Images {
 
 			foreach( $variants as $variant ) {
 
-				if( preg_match_all( '/\[image(?: ([^\]]*))?\]/', $variant, $matches ) > 0 )
-					foreach( $matches[1] as $arguments ) {
-
-						// Split the way Html::_doShortcode() does, and read the
-						// slot the way Modules\Images does: the first bare
-						// argument, or uri="..."
-						preg_match_all( '/\ ([^\ \=]*)(\=[\"]([^\"]*)[\"])?/i', ' '. $arguments. ' ', $attr );
-						$args = [];
-						foreach( $attr[1] as $id => $key )
-							if( $attr[2][$id] !== '' )
-								$args[$key] = $attr[3][$id];
-							else
-								$args[] = $key;
-
-						// The trailing space given to the pattern adds one empty
-						// bare argument at the end, which is not an argument
-						array_pop( $args );
-
-						$uri = (string) ( $args[0] ?? ( $args['uri'] ?? '' ) );
-						if( $uri !== '' )
-							$images[$uri] = true;
-					}
+				// A slot is the source of [image] and [card-image], bare or as
+				// uri="...": found as the rendering finds them
+				foreach( \Nino\Modules\Components::sources( $appData, $variant ) as $component )
+					if( $component['kind'] === 'image' )
+						$images[ $component['source'] ] = true;
 
 				// A flat directory: the names a template file can have
 				if( preg_match_all( '#\[template /templates/([A-Za-z0-9._-]+)[\] ]#', $variant, $matches ) > 0 )
@@ -551,7 +539,13 @@ namespace Nino\Modules\Images {
 		 *	leave empty - same "dev only ever creates the empty slot, a real
 		 *	upload is the Images panel's job" rule the class docblock already states.
 		 *	An <img> outside /images/ (external url, data: uri, favicon,
-		 *	logo) is skipped entirely, none of those fit this slot system
+		 *	logo) is skipped entirely, none of those fit this slot system.
+		 *	A slot a template names as the source of a component is the other
+		 *	way it asks for a picture - [card-image /template/page-x/cards/one-picture],
+		 *	as the Builder writes a page (see \Nino\Modules\Components::sources()) -
+		 *	and where no slot is defined for it, it is a row too, after the
+		 *	files': its uri is the src and the uri proposed, with no file and no
+		 *	size to go with it
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -567,8 +561,9 @@ namespace Nino\Modules\Images {
 		}
 
 		/**
-		 *	How many <img> tags apiScan() above would currently report as
-		 *	missing a slot - the Dashboard tile, see summary()
+		 *	How many rows apiScan() above would currently report - pictures
+		 *	missing a slot and slots missing a definition - the Dashboard
+		 *	tile, see summary()
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -580,12 +575,13 @@ namespace Nino\Modules\Images {
 
 		/**
 		 *	Scan every public-site template for <img src="/images/..."> tags
-		 *	not backed by any image slot - the actual work behind
+		 *	not backed by any image slot, and for slots named as the source of a
+		 *	component that are not defined - the actual work behind
 		 *	apiScan()/missingCount() above
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	array										[ [ 'filename', 'src', 'suggestedUri', 'width', 'height', 'files' ], ... ]
+		 *	@return 	array										[ [ 'filename', 'src', 'suggestedUri', 'width', 'height', 'files' ], ... ] - a slot that is named and not defined has '' as its filename and 0 for both sizes
 		 */
 		private static function _scanMissing( array &$appData ): array {
 
@@ -599,11 +595,19 @@ namespace Nino\Modules\Images {
 			$templates 	= \Nino\Filesystem::path( $appData, '/templates' );
 			$images 		= \Nino\Filesystem::path( $appData, '/images' );
 			$found 			= [];
+			$named 			= [];
 
 			foreach( glob( $templates. '/*.tpl' ) ?: [] as $file ) {
 
 				$content = is_file( $file ) === true ? file_get_contents( $file ) : false;
-				if( $content === false || preg_match_all( '/<img\b[^>]*\bsrc="([^"]+)"[^>]*>/i', $content, $matches, PREG_SET_ORDER ) === false )
+				if( $content === false )
+					continue;
+
+				foreach( \Nino\Modules\Components::sources( $appData, $content ) as $component )
+					if( $component['kind'] === 'image' && isset( $appData['/nino/html/images'][ $component['source'] ] ) === false )
+						$named[ $component['source'] ][] = basename( $file );
+
+				if( preg_match_all( '/<img\b[^>]*\bsrc="([^"]+)"[^>]*>/i', $content, $matches, PREG_SET_ORDER ) === false )
 					continue;
 
 				foreach( $matches as $match ) {
@@ -654,8 +658,14 @@ namespace Nino\Modules\Images {
 			unset( $entry );
 
 			ksort( $found );
+			ksort( $named );
 
-			return array_map( fn( $filename, $entry ) => array_merge( [ 'filename' => $filename ], $entry ), array_keys( $found ), array_values( $found ) );
+			$rows = array_map( fn( $filename, $entry ) => array_merge( [ 'filename' => $filename ], $entry ), array_keys( $found ), array_values( $found ) );
+
+			foreach( $named as $uri => $files )
+				$rows[] = [ 'filename' => '', 'src' => (string) $uri, 'suggestedUri' => (string) $uri, 'width' => 0, 'height' => 0, 'files' => array_values( array_unique( $files ) ) ];
+
+			return $rows;
 		}
 	}
 }

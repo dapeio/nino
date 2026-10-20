@@ -338,6 +338,155 @@ check( '...403 without the backups permission', $status === 403 && $timedFiles()
 \Nino\Auth::deleteUser( $appData, 'usersmanageonly@example.com' );
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 
+/*	What an archive holds besides the texts and the elements: the pages and
+	the look the Builder and Design write - templates/*.tpl and assets/ - and a
+	note of the state it comes from, nino.php. Read back from the outside, as
+	somebody with the key reads one: the stub spelled out here and not taken
+	from the class that writes it, the payload decrypted with the key the
+	project keeps, the tar.gz opened with PharData. Names are the suite's own;
+	no file of the product is pinned	*/
+$stubPrefix	= "<?php http_response_code(403); exit; return '";
+$stubSuffix	= "';\n";
+$archiveKey	= base64_decode( substr( (string) file_get_contents( $sandbox. '/private/.auth/backup-key.php' ), strlen( $stubPrefix ), -strlen( $stubSuffix ) ), true );
+
+$readArchive = static function( string $id ) use ( $nowDir, $stubPrefix, $stubSuffix, $archiveKey ): array {
+
+	$payload	= base64_decode( substr( (string) file_get_contents( $nowDir. '/'. $id. '.php' ), strlen( $stubPrefix ), -strlen( $stubSuffix ) ), true );
+	$gz				= openssl_decrypt( substr( (string) $payload, 28 ), 'aes-256-gcm', (string) $archiveKey, OPENSSL_RAW_DATA, substr( (string) $payload, 0, 12 ), substr( (string) $payload, 12, 16 ) );
+	$tmp			= sys_get_temp_dir(). '/ninotest-archive-'. bin2hex( random_bytes( 6 ) ). '.tar.gz';
+	$entries	= [];
+
+	file_put_contents( $tmp, (string) $gz );
+	foreach( new RecursiveIteratorIterator( new PharData( $tmp ) ) as $file )
+		$entries[ substr( $file->getPathname(), strlen( 'phar://'. $tmp. '/' ) ) ] = $file->getContent();
+	unlink( $tmp );
+
+	return $entries;
+};
+
+$writeArchive = static function( string $id, array $entries ) use ( $nowDir, $stubPrefix, $stubSuffix, $archiveKey ): void {
+
+	$base	= sys_get_temp_dir(). '/ninotest-pack-'. bin2hex( random_bytes( 6 ) );
+	$tar	= new PharData( $base. '.tar' );
+	foreach( $entries as $name => $bytes )
+		$tar->addFromString( $name, $bytes );
+	$tar->compress( Phar::GZ );
+	unset( $tar );
+
+	$iv			= random_bytes( 12 );
+	$tag		= '';
+	$cipher	= openssl_encrypt( (string) file_get_contents( $base. '.tar.gz' ), 'aes-256-gcm', (string) $archiveKey, OPENSSL_RAW_DATA, $iv, $tag );
+	file_put_contents( $nowDir. '/'. $id. '.php', $stubPrefix. base64_encode( $iv. $tag. (string) $cipher ). $stubSuffix );
+	unlink( $base. '.tar' );
+	unlink( $base. '.tar.gz' );
+};
+
+$pagesDir		= $sandbox. '/private/templates';
+$assetsDir	= $sandbox. '/private/assets';
+$snapshotsBefore = glob( $nowDir. '/pre-restore-*.php' ) ?: [];
+
+\Nino\Filesystem::putFileContent( $appData, '/templates/page-probe.tpl', 'probe page, as archived' );
+\Nino\Filesystem::putFileContent( $appData, '/assets/probe.css', '.probe { color: #123456; }' );
+\Nino\Filesystem::putFileContent( $appData, '/assets/nested/deep.css', '.deep { color: #654321; }' );
+// What is not a template: a directory with the name of one, a file with another
+// extension and a link, which is not followed out of the directory
+mkdir( $pagesDir. '/folder.tpl' );
+file_put_contents( $pagesDir. '/notes.txt', 'not a template' );
+$linked = @symlink( 'page-probe.tpl', $pagesDir. '/link.tpl' );
+
+// Two features, one on: only the one that is on is in the note
+$appData['./nino/features/all'] = [
+	'stamped'	=> [ 'key' => 'stamped', 'dir' => '', 'data' => [], 'active' => true, 'problems' => [], 'version' => '2.3.4', 'installed' => '2.3.4', 'module' => '' ],
+	'resting'	=> [ 'key' => 'resting', 'dir' => '', 'data' => [], 'active' => false, 'problems' => [], 'version' => '1.0.0', 'installed' => null, 'module' => '' ],
+];
+
+$pagesId		= \Nino\Modules\Backups::now( $appData );
+$entries		= is_string( $pagesId ) === true ? $readArchive( $pagesId ) : [];
+$stampFile	= $sandbox. '/stamp-probe.php';
+file_put_contents( $stampFile, $entries['nino.php'] ?? '' );
+$stamped		= include $stampFile;
+unlink( $stampFile );
+unset( $appData['./nino/features/all'] );
+
+check( 'an archive carries the templates of the project, each as templates/<name>', ( $entries['templates/page-probe.tpl'] ?? null ) === 'probe page, as archived' );
+check( '...and every file below assets/, nested ones at their relative path', ( $entries['assets/probe.css'] ?? null ) === '.probe { color: #123456; }' && ( $entries['assets/nested/deep.css'] ?? null ) === '.deep { color: #654321; }' );
+check( '...but not a directory that is called x.tpl, a file that is no .tpl or a link'. ( $linked === true ? '' : ' (no link could be made here)' ),
+	isset( $entries['templates/folder.tpl'] ) === false && isset( $entries['templates/notes.txt'] ) === false && isset( $entries['templates/link.tpl'] ) === false );
+check( 'the archive names the state it comes from: nino.php holds the version that runs and the features that are on, by their key', $stamped === [ 'nino' => \Nino\VERSION, 'features' => [ 'stamped' => '2.3.4' ] ] );
+check( '...and no file of the manifest is called that, since the note is no file of the project', in_array( 'nino.php', \Nino\Backup::manifest( $appData ), true ) === false && is_string( $pagesId ) === true );
+
+// Changed after the archive, and one more written after it: the archive's own
+// come back as they were, the one it has not stays
+\Nino\Filesystem::putFileContent( $appData, '/templates/page-probe.tpl', 'probe page, changed after the archive' );
+\Nino\Filesystem::putFileContent( $appData, '/assets/probe.css', '.probe { color: #abcdef; }' );
+\Nino\Filesystem::putFileContent( $appData, '/assets/nested/deep.css', '.deep { color: #fedcba; }' );
+\Nino\Filesystem::putFileContent( $appData, '/templates/page-late.tpl', 'probe page, written after the archive' );
+\Nino\Filesystem::putFileContent( $appData, '/assets/late.css', '.late { color: #111111; }' );
+
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $pagesId ] );
+$pageSnapshots = array_values( array_diff( glob( $nowDir. '/pre-restore-*.php' ) ?: [], $snapshotsBefore ) );
+check( 'a restore brings the templates and the assets back as they were archived, nested ones too', $status === 200 && ( $body['ok'] ?? false ) === true
+	&& file_get_contents( $pagesDir. '/page-probe.tpl' ) === 'probe page, as archived' && file_get_contents( $assetsDir. '/probe.css' ) === '.probe { color: #123456; }'
+	&& file_get_contents( $assetsDir. '/nested/deep.css' ) === '.deep { color: #654321; }' );
+check( '...and leaves a template and an asset that were written after the archive, as the texts and the elements are treated', file_get_contents( $pagesDir. '/page-late.tpl' ) === 'probe page, written after the archive'
+	&& file_get_contents( $assetsDir. '/late.css' ) === '.late { color: #111111; }' );
+check( '...and the note of where the archive comes from is none of the files it puts back: nothing named nino.php is left in the project\'s root', is_file( $sandbox. '/nino.php' ) === false );
+check( '...an archive of the version that runs carries no notice, in the answer or in the activity log', isset( $body['notice'] ) === false
+	&& str_contains( implode( "\n", \Nino\Modules\Logs\Admin::recentLines( $appData, 20 ) ), 'comes from Nino' ) === false );
+
+// The safety snapshot a restore makes holds what an archive holds: the state it
+// replaced, templates and assets with it, and the note
+$snapshot = count( $pageSnapshots ) === 1 ? $readArchive( basename( $pageSnapshots[0], '.php' ) ) : [];
+check( 'the safety snapshot before the restore carries the templates and the assets of the state it replaces, and the note', ( $snapshot['templates/page-probe.tpl'] ?? null ) === 'probe page, changed after the archive'
+	&& ( $snapshot['assets/probe.css'] ?? null ) === '.probe { color: #abcdef; }' && ( $snapshot['templates/page-late.tpl'] ?? null ) === 'probe page, written after the archive'
+	&& is_string( $snapshot['nino.php'] ?? null ) === true && str_contains( $snapshot['nino.php'], \Nino\VERSION ) === true );
+
+// The same archive with its note rewritten to another version, one with the same
+// version and one made before there was a note
+$otherId		= date( 'Y-m-d' ). '-000001';
+$sameId			= date( 'Y-m-d' ). '-000002';
+$noNoteId		= date( 'Y-m-d' ). '-000003';
+$writeArchive( $otherId, array_merge( $entries, [ 'nino.php' => '<?php return '. var_export( [ 'nino' => '0.9.1', 'features' => [] ], true ). ';' ] ) );
+$writeArchive( $sameId, array_merge( $entries, [ 'nino.php' => '<?php return '. var_export( [ 'nino' => \Nino\VERSION, 'features' => [ 'other' => '9.9.9' ] ], true ). ';' ] ) );
+$writeArchive( $noNoteId, array_diff_key( $entries, [ 'nino.php' => true ] ) );
+
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $otherId ] );
+check( 'a restore of an archive from another version of Nino answers with a notice: the code, and the version it comes from and the one that runs', $status === 200 && ( $body['ok'] ?? false ) === true
+	&& ( $body['notice'] ?? null ) === [ 'code' => 'backups_restored_other_version', 'params' => [ '0.9.1', \Nino\VERSION ] ] );
+check( '...restores it all the same, nothing is planted in the root for the note, and the activity log says it in a line of its own',
+	file_get_contents( $pagesDir. '/page-probe.tpl' ) === 'probe page, as archived' && is_file( $sandbox. '/nino.php' ) === false
+	&& str_contains( implode( "\n", \Nino\Modules\Logs\Admin::recentLines( $appData, 20 ) ), 'Backup '. $otherId. ' comes from Nino 0.9.1, this is '. \Nino\VERSION. ' (backups_restored_other_version)' ) === true );
+
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $sameId ] );
+check( 'an archive whose note names the version that runs has no notice, whatever its features were', $status === 200 && ( $body['ok'] ?? false ) === true && isset( $body['notice'] ) === false );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $noNoteId ] );
+check( '...and an archive with no note at all restores as it always did, with nothing to say', $status === 200 && ( $body['ok'] ?? false ) === true && isset( $body['notice'] ) === false && is_file( $sandbox. '/nino.php' ) === false );
+
+// The recovery page restores through the same function and answers the same way
+\Nino\Runtime::setSessionValue( $appData, \Nino\Admin\Recovery::SESSION_KEY, true );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Recovery::class, 'handlePost' ], [ 'date' => $otherId ], 'recovery/restore' );
+check( 'the recovery page carries the notice in its answer too', $status === 200 && ( $body['restoredDate'] ?? null ) === $otherId
+	&& ( $body['notice'] ?? null ) === [ 'code' => 'backups_restored_other_version', 'params' => [ '0.9.1', \Nino\VERSION ] ] );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Recovery::class, 'handlePost' ], [ 'date' => $sameId ], 'recovery/restore' );
+check( '...and none for an archive of the version that runs', $status === 200 && ( $body['restoredDate'] ?? null ) === $sameId && isset( $body['notice'] ) === false );
+\Nino\Runtime::unsetSessionValue( $appData, \Nino\Admin\Recovery::SESSION_KEY );
+
+// What this block wrote is taken away again: the archives, the snapshots its
+// restores made, the files and the directories
+foreach( [ $pagesId, $otherId, $sameId, $noNoteId ] as $name )
+	unlink( $nowDir. '/'. $name. '.php' );
+foreach( array_diff( glob( $nowDir. '/pre-restore-*.php' ) ?: [], $snapshotsBefore ) as $name )
+	unlink( $name );
+foreach( [ $pagesDir. '/page-probe.tpl', $pagesDir. '/page-late.tpl', $pagesDir. '/notes.txt', $assetsDir. '/probe.css', $assetsDir. '/late.css', $assetsDir. '/nested/deep.css' ] as $name )
+	unlink( $name );
+if( $linked === true )
+	unlink( $pagesDir. '/link.tpl' );
+rmdir( $pagesDir. '/folder.tpl' );
+rmdir( $assetsDir. '/nested' );
+foreach( [ $pagesDir, $assetsDir ] as $name )
+	if( ( scandir( $name ) ?: [] ) === [ '.', '..' ] )
+		rmdir( $name );
+
 // The restores below count the archives; theirs are the ones to count
 foreach( $timedFiles() as $name )
 	unlink( $nowDir. '/'. $name );

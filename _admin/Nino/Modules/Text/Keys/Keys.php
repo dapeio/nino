@@ -925,12 +925,15 @@ namespace Nino\Modules\Text {
 		/**
 		 *	Read the templates once and answer both lists the scan has.
 		 *
-		 *	A key counts when a template reads it as a textfill and no text file, runtime
-		 *	fill or blacklist line knows it. Only the innermost [[...]] of a
-		 *	nested fill is seen, as a static scan can see no more, and only the
-		 *	ones with a leading slash: [[name]] in mail-user.tpl and [[.rel]] in
-		 *	Posts' page-post.tpl are placeholders the code of the template's own
-		 *	shortcode fills in, not keys, and are no gap in any text file.
+		 *	A key counts when a template reads it as a textfill or as the source
+		 *	of a component - [card-text /template/page-x/cards/one-text], the way
+		 *	the Builder writes a page, see \Nino\Modules\Components::sources() -
+		 *	and no text file, runtime fill or blacklist line knows it. Only the
+		 *	innermost [[...]] of a nested fill is seen, as a static scan can see
+		 *	no more, and only the ones with a leading slash: [[name]] in
+		 *	mail-user.tpl and [[.rel]] in Posts' page-post.tpl are placeholders
+		 *	the code of the template's own shortcode fills in, not keys, and are
+		 *	no gap in any text file.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		bool			$alsoUsed			Whether to work out 'alsoUsed' too, which the Dashboard count has no use for
@@ -976,7 +979,14 @@ namespace Nino\Modules\Text {
 
 				$category = \Nino\Modules\Template::category( basename( $file ) );
 
-				foreach( array_unique( $matches[1] ) as $key ) {
+				// What the template names as the text of a component reads as a
+				// fill does: the key it asks for, to be known or to be missing
+				$read = $matches[1];
+				foreach( \Nino\Modules\Components::sources( $appData, $content ) as $component )
+					if( $component['kind'] === 'text' )
+						$read[] = $component['source'];
+
+				foreach( array_unique( $read ) as $key ) {
 
 					// Not a key at all: a placeholder the template's own shortcode fills
 					if( str_starts_with( $key, '/' ) === false )

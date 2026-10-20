@@ -321,6 +321,49 @@ check( 'a fill that is not there, and a language the site does not have, are not
 echo "\n";
 
 
+// --- Html::shortcodeCalls ---------------------------------------------------
+
+echo "Html::shortcodeCalls - the calls a piece of html+ makes, found and read as the rendering does\n";
+
+$calls = ninoSandbox( 'html-calls' );
+$seen = [];
+\Nino\Html::addShortcode( $calls, 'probe', static function( array &$appData, array $args ) use ( &$seen ): string {
+	$seen[] = $args;
+	return '';
+} );
+\Nino\Html::addShortcode( $calls, 'wrap', static function( array &$appData, array $args ): string {
+	return (string) ( $args['content'] ?? '' );
+} );
+
+$callsSource = '[probe /a/b name="x y" flag] text [wrap size="2"]inner [probe /c/d][/wrap] [unknown /e] [probe] [probe empty="" /f/g] [probe alt=""]';
+$found = \Nino\Html::shortcodeCalls( $calls, $callsSource );
+check( 'the calls are listed in the order they stand, each with its name and its arguments: a bare word a list entry, a named one under its name, the content between the tags as content',
+	$found === [
+		[ 'name' => 'probe', 'args' => [ '/a/b', 'name' => 'x y', 'flag' ] ],
+		[ 'name' => 'wrap', 'args' => [ 'size' => '2', 'content' => 'inner [probe /c/d]' ] ],
+		[ 'name' => 'probe', 'args' => [ '/c/d' ] ],
+		[ 'name' => 'probe', 'args' => [] ],
+		[ 'name' => 'probe', 'args' => [ 'empty' => '', '/f/g' ] ],
+		[ 'name' => 'probe', 'args' => [ 'alt' => '' ] ],
+	] );
+check( '...the calls in the content of one follow it, and a name nobody registered is no call', array_column( $found, 'name' ) === [ 'probe', 'wrap', 'probe', 'probe', 'probe', 'probe' ] );
+
+// What the rendering hands to the callbacks is what this reads: the same pattern, the same arguments
+\Nino\Html::renderHtml( $calls, $callsSource );
+check( 'the arguments are the ones the callback of a shortcode gets when the page is rendered', $seen === array_values( array_map( static fn( array $call ): array => $call['args'], array_filter( $found, static fn( array $call ): bool => $call['name'] === 'probe' ) ) ) && count( $seen ) === 5 );
+
+check( '...nothing for a text with no bracket, an empty text and a bracket that opens no call', \Nino\Html::shortcodeCalls( $calls, '' ) === [] && \Nino\Html::shortcodeCalls( $calls, 'plain text' ) === []
+	&& \Nino\Html::shortcodeCalls( $calls, '[ probe ] [probes] [/probe]' ) === [] );
+
+\Nino\Html::addShortcode( $calls, 'late', static fn( array &$appData, array $args ): string => '' );
+check( 'a shortcode registered after the first read is found by the next one', array_column( \Nino\Html::shortcodeCalls( $calls, '[late x]' ), 'name' ) === [ 'late' ] );
+check( '...and a name the app data at hand did not register is no call there, whatever another one has', \Nino\Html::shortcodeCalls( $appData, '[probe /a/b]' ) === [] );
+
+\Nino\Filesystem::removeDir( ninoSandboxDir( $calls ) );
+
+echo "\n";
+
+
 // --- Cleanup ------------------------------------------------------------
 
 ninoDone( $appData );

@@ -595,6 +595,59 @@ namespace Nino\Modules {
 		}
 
 		/**
+		 *	The text keys and the image slots a piece of html+ names as the
+		 *	source of a component - what the scans of the templates need, since
+		 *	a page the Builder writes names its texts and its pictures like this
+		 *	and in no fill. The calls of the components whose schema says 'text'
+		 *	or 'image' are found as the rendering finds them (see
+		 *	\Nino\Html::shortcodeCalls()), those in a card or a stack among
+		 *	them, and what is kept of each is its first argument where that
+		 *	begins with a slash: it is what dispatch() hands to value() as a key
+		 *	or as a slot. A name without one is a field of the element in a
+		 *	stack and nobody's key or slot, and the source of a stack is a type,
+		 *	which is neither
+		 *
+		 *	Read as dispatch() reads it: the slot of an image may be written
+		 *	uri="..." as well as bare, and a text with a fixed text="..." has no
+		 *	key to look up. A source with a [ in it holds a fill that is put in
+		 *	when the page is rendered, which is no name a scan can give: it is
+		 *	left out
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$content			html+, eg. a template
+		 *
+		 *	@return 	array										[ [ 'name' => 'card-text', 'kind' => 'text', 'source' => '/template/page-home/cards/one-text' ], ... ], in the order the calls stand, one entry per call
+		 */
+		public static function sources( array &$appData, string $content ): array {
+
+			$components = self::components( $appData );
+			$sources = [];
+
+			foreach( \Nino\Html::shortcodeCalls( $appData, $content ) as $call ) {
+
+				$kind = (string) ( $components[ $call['name'] ]['source'] ?? '' );
+
+				if( $kind !== 'text' && $kind !== 'image' )
+					continue;
+
+				if( $kind === 'text' && is_string( $call['args']['text'] ?? null ) === true )
+					continue;
+
+				$source = (string) ( $call['args'][0] ?? '' );
+
+				if( $kind === 'image' && $source === '' )
+					$source = (string) ( $call['args']['uri'] ?? '' );
+
+				if( $source === '' || $source[0] !== '/' || str_contains( $source, '[' ) === true )
+					continue;
+
+				$sources[] = [ 'name' => $call['name'], 'kind' => $kind, 'source' => $source ];
+			}
+
+			return $sources;
+		}
+
+		/**
 		 *	Check a schema and make it complete: the answer is the schema with
 		 *	every key present, or what is wrong with it. Not for a page to
 		 *	call - it is what addComponent() and addStack() refuse a schema

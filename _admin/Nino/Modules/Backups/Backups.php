@@ -318,11 +318,13 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	Tar+gzip every file the admin panel can write to at runtime,
-		 *	encrypt it, and write it out behind the .php exit-stub. Built via
-		 *	PharData rather than shelling out to `tar`/`gzip` - pure PHP, and
-		 *	unlike the executable Phar class, PharData isn't restricted by
-		 *	the phar.readonly ini setting many hosts enable by default.
+		 *	Tar+gzip every file the admin panel can write to at runtime and,
+		 *	after them, the note of the state they come from (see
+		 *	\Nino\Backup::stamp()), encrypt it, and write it out behind the .php
+		 *	exit-stub. Built via PharData rather than shelling out to
+		 *	`tar`/`gzip` - pure PHP, and unlike the executable Phar class,
+		 *	PharData isn't restricted by the phar.readonly ini setting many
+		 *	hosts enable by default.
 		 *
 		 *	Reads each file's bytes itself and hands them to addFromString()
 		 *	rather than pointing addFile() at the path - addFile() alone
@@ -358,6 +360,7 @@ namespace Nino\Modules {
 						throw new \RuntimeException( 'backup source could not be read: '. $archiveName );
 					$phar->addFromString( $archiveName, $bytes );
 				}
+				$phar->addFromString( 'nino.php', \Nino\Backup::stamp( $appData ) );
 				$phar->compress( \Phar::GZ );
 				unset( $phar );
 

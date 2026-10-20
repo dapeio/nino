@@ -9,4 +9,5 @@ return [
 	'[[/_admin/backups/msg/restored]]'	=> 'The backup from %s has been restored.',
 	'[[/_admin/backups/label/now]]'			=> 'Back up now',
 	'[[/_admin/backups/msg/created]]'		=> 'Backup created: %s',
+	'[[/_admin/error/backups_restored_other_version]]'	=> 'The backup comes from Nino %s; this is %s.',
 ];

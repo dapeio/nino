@@ -240,7 +240,14 @@ namespace Nino\Modules\Backups {
 		/**
 		 *	Restore one chosen backup date: snapshot the *current* state
 		 *	first (see _safetySnapshot()), so a wrong choice is itself
-		 *	undoable, then overwrite every file the backup contains
+		 *	undoable, then overwrite every file the backup contains.
+		 *
+		 *	A backup that comes from another version of Nino restores all the
+		 *	same, and the answer says so: 'notice' - a code and its params, as
+		 *	a failure names itself (see \Nino\Http::fail()) - which the panel
+		 *	words in the interface language. The activity log says it in a line
+		 *	of its own, written here: log() is handed the posted body alone and
+		 *	could not know
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -259,14 +266,20 @@ namespace Nino\Modules\Backups {
 				return;
 			}
 
-			$result = self::restore( $appData, $date );
+			$notice = null;
+			$result = self::restore( $appData, $date, $notice );
 
 			if( $result !== true ) {
 				\Nino\Http::fail( $request, $result[0], $result[1] );
 				return;
 			}
 
-			\Nino\Http::ok( $request, [ 'ok' => true, 'restoredDate' => $date ] );
+			$actor = \Nino\Auth::getCurrentUser( $appData );
+
+			if( $notice !== null && $actor !== false )
+				\Nino\Admin\Admin::record( $appData, $actor['mail'], 'Backup '. $date. ' comes from Nino '. $notice['params'][0]. ', this is '. $notice['params'][1]. ' ('. $notice['code']. ')' );
+
+			\Nino\Http::ok( $request, [ 'ok' => true, 'restoredDate' => $date ] + ( $notice !== null ? [ 'notice' => $notice ] : [] ) );
 		}
 
 		/**
@@ -276,10 +289,11 @@ namespace Nino\Modules\Backups {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$date					"Y-m-d", "Y-m-d-His" or "pre-restore-Y-m-d-His" (see ID_PATTERN)
+		 *	@param		array|null	&$notice			(reference) Set where the archive comes from another version of Nino than the one that runs: [ 'code' => 'backups_restored_other_version', 'params' => [ from, to ] ]; left as it was otherwise
 		 *
 		 *	@return 	true|array								True, or [ http status, message ]
 		 */
-		public static function restore( array &$appData, string $date ): true|array {
+		public static function restore( array &$appData, string $date, ?array &$notice = null ): true|array {
 
 			$dir = self::_backupDir( $appData );
 			$key = self::_key( $appData );
@@ -327,7 +341,7 @@ namespace Nino\Modules\Backups {
 			$staging	= sys_get_temp_dir(). '/ninorestore-'. bin2hex( random_bytes( 8 ) );
 
 			try {
-				return self::_restoreFrom( $appData, $gz, $tmpGz, $staging );
+				return self::_restoreFrom( $appData, $gz, $tmpGz, $staging, $notice );
 			}
 			finally {
 				@unlink( $tmpBase );
@@ -346,10 +360,11 @@ namespace Nino\Modules\Backups {
 		 *	@param		string		$gz						The decrypted .tar.gz bytes
 		 *	@param		string		$tmpGz				Where to write them for PharData
 		 *	@param		string		$staging			Where to unpack them, not existing yet
+		 *	@param		array|null	&$notice			(reference) See restore()
 		 *
 		 *	@return 	true|array							true, or [ http status, message ]
 		 */
-		private static function _restoreFrom( array &$appData, string $gz, string $tmpGz, string $staging ): true|array {
+		private static function _restoreFrom( array &$appData, string $gz, string $tmpGz, string $staging, ?array &$notice = null ): true|array {
 
 			if( @file_put_contents( $tmpGz, $gz ) !== strlen( $gz ) )
 				return [ 500, 'the backup could not be written for unpacking' ];
@@ -365,6 +380,22 @@ namespace Nino\Modules\Backups {
 			}
 			catch( \Throwable $e ) {
 				return [ 500, 'the backup could not be unpacked: '. $e->getMessage() ];
+			}
+
+			// The note of where the archive comes from (see \Nino\Backup::stamp())
+			// is no file of the project: it is read from the staged copy and taken
+			// out of it, since the copy below puts every top-level entry somewhere
+			// and this one would land beside index.php. An archive made before
+			// there was a note has none, and there is nothing to say then
+			$stagedStamp = $staging. '/nino.php';
+
+			if( is_file( $stagedStamp ) === true ) {
+
+				$stamp = include $stagedStamp;
+				unlink( $stagedStamp );
+
+				if( is_array( $stamp ) === true && is_string( $stamp['nino'] ?? null ) === true && $stamp['nino'] !== \Nino\VERSION )
+					$notice = [ 'code' => 'backups_restored_other_version', 'params' => [ $stamp['nino'], \Nino\VERSION ] ];
 			}
 
 			$configPath = \Nino\Filesystem::getConfigPath( $appData );
@@ -412,12 +443,16 @@ namespace Nino\Modules\Backups {
 			$restoreArgs = [ 'dataDir' => \Nino\Filesystem::path( $appData, '/data' ), 'staging' => $staging ];
 			\Nino\Callbacks::doCallbacks( $appData, '/nino/admin/restore', $restoreArgs );
 
-			// The archive's own layout is flat - text/, elements/, images/,
-			// data/ - but those no longer share one destination on disk:
-			// everything but images is private and resolves against the
-			// private root (see \Nino\Filesystem::PRIVATE_DIRS). Copied one
-			// top-level entry at a time rather than as a single tree, so each
-			// lands wherever this project actually keeps it
+			// The archive's own layout is flat - text/, elements/, templates/,
+			// assets/, images/, data/ - but those no longer share one
+			// destination on disk: everything but images is private and
+			// resolves against the private root (see
+			// \Nino\Filesystem::PRIVATE_DIRS). Copied one top-level entry at a
+			// time rather than as a single tree, so each lands wherever this
+			// project actually keeps it. What a directory of the archive holds
+			// replaces the file of the same name on disk, and a file on disk
+			// that the archive has not is left alone - for the templates and the
+			// assets as for the texts and the elements
 			foreach( glob( $staging. '/*' ) ?: [] as $entry ) {
 
 				$target = \Nino\Filesystem::path( $appData, '/'. basename( $entry ) );
@@ -446,10 +481,12 @@ namespace Nino\Modules\Backups {
 		 *	Archive the *current* on-disk state before overwriting it, same
 		 *	tar+gzip+encrypt shape as \Nino\Modules\Backups::_create() (duplicated, not
 		 *	called into - see this class' own docblock; the file manifest
-		 *	itself is shared via \Nino\Backup::manifest(), which carries
-		 *	no such coupling). Named distinctly from a dated backup so it's
-		 *	never mistaken for one and never collides with/gets pruned by
-		 *	Backup's own retention sweep
+		 *	and the note of the state it comes from are shared via
+		 *	\Nino\Backup::manifest() and ::stamp(), which carry no such
+		 *	coupling), so it holds what an archive holds: the templates and the
+		 *	assets with the rest, and the stamp. Named distinctly from a dated
+		 *	backup so it's never mistaken for one and never collides with/gets
+		 *	pruned by Backup's own retention sweep
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$dir					Absolute path to the backup directory
@@ -484,6 +521,7 @@ namespace Nino\Modules\Backups {
 					$phar->addFromString( $archiveName, $bytes );
 				}
 
+				$phar->addFromString( 'nino.php', \Nino\Backup::stamp( $appData ) );
 				$phar->compress( \Phar::GZ );
 				unset( $phar );
 

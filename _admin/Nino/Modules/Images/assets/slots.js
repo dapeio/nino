@@ -398,7 +398,8 @@
 
 		/**
 		 *	Open the "hardcoded <img> tags found in templates, not backed by
-		 *	any slot" scan results form - see Slots::apiScan()
+		 *	any slot - and slots a template names that nobody has made" scan
+		 *	results form - see Slots::apiScan()
 		 *
 		 *	@return		void
 		 */
@@ -439,9 +440,11 @@
 
 		/**
 		 *	Render the scan results: one row per <img src="/images/..."> not
-		 *	backed by a slot - editable uri/label/width/height (pre-filled
-		 *	from the tag's own attributes, or the actual file's real pixel
-		 *	size if the tag had none) + an "Ignore" toggle. Submitting
+		 *	backed by a slot, and one per slot a component names that is not
+		 *	defined (its uri is the src, and no size is known) - editable
+		 *	uri/label/width/height (pre-filled from the tag's own attributes,
+		 *	or the actual file's real pixel size if the tag had none) + an
+		 *	"Ignore" toggle. Submitting
 		 *	creates every non-ignored row's slot via the existing
 		 *	slots/create action - filename stays empty, same "this tab only
 		 *	ever creates the empty slot, a real upload is the Images panel's job" rule

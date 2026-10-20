@@ -53,18 +53,24 @@ namespace Nino {
 
 		// Absolute path -> archive name, for every file the admin panel
 		// writes to at runtime: config.php, the text files, every element
-		// type/image, and the /data/ content a project actually accumulates
-		// (newsletter subscribers, form submissions, the php error log
-		// logs.<month>.php, and what an installed feature's manifest declares
-		// it owns below /data/). Deliberately not developer code (_nino/,
-		// templates, _admin/ itself, ...) - that's already versioned in git
-		// and would just bloat every backup. Also deliberately not
+		// type/image, the pages and the look - the templates/*.tpl the Builder
+		// writes (page-*.tpl) and Design writes (frame-header.tpl and
+		// frame-footer.tpl), the assets/ Design writes its theme.css into -
+		// and the /data/ content a project actually accumulates (newsletter
+		// subscribers, form submissions, the php error log logs.<month>.php,
+		// and what an installed feature's manifest declares it owns below
+		// /data/). A template is editorial content once the Builder exists, so
+		// every one of them is in: a developer's own, which git versions as
+		// well, is not hurt by being in an archive - a restore brings it back
+		// as it was archived. Deliberately not developer code (_nino/,
+		// _admin/ itself, ...) - that's already versioned in git and would
+		// just bloat every backup. Also deliberately not
 		// auth-tries.php, ratelimit.php or mail-status.php - transient
 		// throttling counters and the last failed mail, not data a restore
 		// should bring back. The workbench's
 		// activity log is not in an archive either: it is written to
 		// private/.logs/<day>.php (see \Nino\Modules\Logs\Admin),
-		// which is none of the four directories this walks.
+		// which is none of the directories this walks.
 		//
 		// Shared by \Nino\Modules\Backups::_create() and
 		// \Nino\Modules\Backups\Admin::_safetySnapshot(), which both need the
@@ -81,11 +87,13 @@ namespace Nino {
 
 			// Every path here is resolved rather than concatenated onto one
 			// root: config.php may sit outside the webroot on its own
-			// (NINO_CONFIG_DIR), text/elements/data are private and images
-			// are public, so the two halves need not live under the same
-			// directory - see Filesystem::path() and PRIVATE_DIRS
+			// (NINO_CONFIG_DIR), text/elements/templates/assets/data are
+			// private and images are public, so the two halves need not live
+			// under the same directory - see Filesystem::path() and PRIVATE_DIRS
 			$text 			= \Nino\Filesystem::path( $appData, '/text' );
 			$elements 	= \Nino\Filesystem::path( $appData, '/elements' );
+			$templates 	= \Nino\Filesystem::path( $appData, '/templates' );
+			$assets 		= \Nino\Filesystem::path( $appData, '/assets' );
 			$images 		= \Nino\Filesystem::path( $appData, '/images' );
 			$data 			= \Nino\Filesystem::path( $appData, '/data' );
 			$configPath	= \Nino\Filesystem::getConfigPath( $appData );
@@ -105,12 +113,27 @@ namespace Nino {
 			foreach( glob( $elements. '/*.php' ) ?: [] as $file )
 				$files[$file] = 'elements/'. basename( $file );
 
-			// Element images are deliberately nested (images/elements/type/...).
-			// Walk the complete tree and preserve each relative archive path;
-			// never follow symlinks out of the public image directory.
-			if( is_dir( $images ) === true ) {
+			// Every *.tpl directly in templates/ - the pages of the Builder
+			// and the frames of Design among them, and which of the others a
+			// person wrote is not something a file says. Files only: a
+			// directory that is called x.tpl is no template, and a link is not
+			// followed out of the private directory
+			foreach( glob( $templates. '/*.tpl' ) ?: [] as $file )
+				if( is_file( $file ) === true && is_link( $file ) === false )
+					$files[$file] = 'templates/'. basename( $file );
+
+			// Element images are deliberately nested (images/elements/type/...)
+			// and so are the stylesheet sources of assets/. Walk the complete
+			// tree of each and preserve each relative archive path; never
+			// follow symlinks out of the public image directory or the
+			// private asset one.
+			foreach( [ 'images' => $images, 'assets' => $assets ] as $archive => $root ) {
+
+				if( is_dir( $root ) === false )
+					continue;
+
 				$iterator = new \RecursiveIteratorIterator(
-					new \RecursiveDirectoryIterator( $images, \FilesystemIterator::SKIP_DOTS ),
+					new \RecursiveDirectoryIterator( $root, \FilesystemIterator::SKIP_DOTS ),
 					\RecursiveIteratorIterator::LEAVES_ONLY,
 					\RecursiveIteratorIterator::CATCH_GET_CHILD
 				);
@@ -120,8 +143,8 @@ namespace Nino {
 					if( $file->isFile() === false || is_link( $path ) === true )
 						continue;
 
-					$relative = substr( $path, strlen( rtrim( $images, DIRECTORY_SEPARATOR ) ) + 1 );
-					$files[$path] = 'images/'. str_replace( DIRECTORY_SEPARATOR, '/', $relative );
+					$relative = substr( $path, strlen( rtrim( $root, DIRECTORY_SEPARATOR ) ) + 1 );
+					$files[$path] = $archive. '/'. str_replace( DIRECTORY_SEPARATOR, '/', $relative );
 				}
 			}
 
@@ -215,6 +238,35 @@ namespace Nino {
 			}
 
 			return $files;
+		}
+
+		/**
+		 *	The state an archive comes from, as the file the archive carries it
+		 *	in: nino.php, written the way Filesystem writes its data files. It
+		 *	holds the version of Nino that made the archive and the version of
+		 *	every feature the project had switched on then, by the feature's
+		 *	key. Not a file of the project, so it is not in manifest():
+		 *	\Nino\Modules\Backups::_create() and
+		 *	\Nino\Modules\Backups\Admin::_safetySnapshot() add it after the
+		 *	files the manifest names, and a restore reads it back from the
+		 *	staged copy and says so where the version is not the one that runs
+		 *	(see \Nino\Modules\Backups\Admin::_restoreFrom()). Kept here beside
+		 *	the manifest for the same reason: the panel that restores an
+		 *	archive has to work where no other class is loadable
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string									The php source of the file: an array with 'nino' (the version) and 'features' (key => version)
+		 */
+		public static function stamp( array &$appData ): string {
+
+			$features = [];
+
+			foreach( \Nino\Features::all( $appData ) as $key => $feature )
+				if( $feature['active'] === true )
+					$features[(string) $key] = (string) $feature['version'];
+
+			return '<?php return '. var_export( [ 'nino' => \Nino\VERSION, 'features' => $features ], true ). ';';
 		}
 
 	}

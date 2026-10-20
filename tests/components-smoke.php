@@ -984,6 +984,63 @@ check( '...a stack has those of the loop, of its grid where it has one, and its 
 	&& \Nino\Modules\Components::defaults( $appData, 'filter', true )['autoheight'] === '0' );
 check( '...and nothing for a name that is not registered', \Nino\Modules\Components::defaults( $appData, 'nope' ) === [] && \Nino\Modules\Components::defaults( $appData, 'title', true ) === [] );
 
+/*	sources(): the keys and the slots a template names as the source of a
+	component, which is what the scans of the templates read. Found as the
+	rendering finds the calls - the ones in a card or a stack included - and
+	kept where the component takes a text or an image and the first argument
+	begins with a slash: a field of the element, a text="..." that has no key to
+	look up, a source with a fill in it, a component of another kind, a
+	shortcode that is none and one nobody registered are not	*/
+$sourcesTemplate = implode( "\n", [
+	'[title /template/page-x/intro/title]',
+	'[card padding="3"]',
+	'	[card-image /template/page-x/cards/one-picture style="inline"]',
+	'	[card-text /template/page-x/cards/one-text format="inline"]',
+	'	[button /template/page-x/cards/one-button href="/more"]',
+	'[/card]',
+	'[image uri="/template/page-x/viauri/picture" alt=""]',
+	'[image /template/page-x/bare/picture]',
+	'[stack /deltas sort="title"]',
+	'	[card-title title]',
+	'	[image image focus="5"]',
+	'	[card-text /template/page-x/stack/one-text]',
+	'[/stack]',
+	'[button /template/page-x/fixed/label text="Fixed words" href="/more"]',
+	'[title /template/[[/nino/http/response/locale]]/dynamic/title]',
+	'[spacer size="3"]',
+	'[html]<b>/template/page-x/html/not-a-source</b>[/html]',
+	'[template /templates/page-y]',
+	'[unregistered /template/page-x/unregistered/source]',
+] );
+check( 'sources() lists the keys and the slots a template names as the source of a component, in the order the calls stand, the ones inside a card or a stack among them',
+	\Nino\Modules\Components::sources( $appData, $sourcesTemplate ) === [
+		[ 'name' => 'title', 'kind' => 'text', 'source' => '/template/page-x/intro/title' ],
+		[ 'name' => 'card-image', 'kind' => 'image', 'source' => '/template/page-x/cards/one-picture' ],
+		[ 'name' => 'card-text', 'kind' => 'text', 'source' => '/template/page-x/cards/one-text' ],
+		[ 'name' => 'button', 'kind' => 'text', 'source' => '/template/page-x/cards/one-button' ],
+		[ 'name' => 'image', 'kind' => 'image', 'source' => '/template/page-x/viauri/picture' ],
+		[ 'name' => 'image', 'kind' => 'image', 'source' => '/template/page-x/bare/picture' ],
+		[ 'name' => 'card-text', 'kind' => 'text', 'source' => '/template/page-x/stack/one-text' ],
+	] );
+check( '...and nothing else of it: not the field of an element, not the type a stack loops, not a label that has a fixed text, not a source with a fill in it, not a component of another kind and not a shortcode nobody registered',
+	array_intersect( array_column( \Nino\Modules\Components::sources( $appData, $sourcesTemplate ), 'source' ), [ 'title', 'image', 'summary', '/deltas', '/template/page-x/fixed/label', '/template/[[/nino/http/response/locale]]/dynamic/title',
+		'/template/page-x/html/not-a-source', '/templates/page-y', '/template/page-x/unregistered/source' ] ) === [] );
+check( '...nothing for a text without a shortcode in it, and nothing where no call has a source', \Nino\Modules\Components::sources( $appData, '' ) === [] && \Nino\Modules\Components::sources( $appData, 'a [ lone bracket and [[/a/fill]]' ) === []
+	&& \Nino\Modules\Components::sources( $appData, '[card padding="3"][/card][spacer size="1"][card-text summary]' ) === [] );
+
+// What the rule is made of is the registry's: the kind a schema says. A component a feature registers is read the same, and the kernel's own registry knows nothing of it
+$sourcesApp = $appData;
+$sourceNoop = static fn( array &$appData, array $args ): string => '';
+\Nino\Modules\Components::addComponent( $sourcesApp, 'wordsof', $sourceNoop, [ 'label' => 'Words', 'source' => 'text' ] );
+\Nino\Modules\Components::addComponent( $sourcesApp, 'pictureof', $sourceNoop, [ 'label' => 'Picture', 'source' => 'image' ] );
+\Nino\Modules\Components::addComponent( $sourcesApp, 'linkof', $sourceNoop, [ 'label' => 'Link', 'source' => 'href' ] );
+$sourcesOwn = '[wordsof /feature/probe/words/one][pictureof /feature/probe/pictures/one][pictureof uri="/feature/probe/pictures/two"][linkof /feature/probe/links/one]';
+check( 'the components of a feature are read by the kind their schema says: a text and an image count, an address does not', \Nino\Modules\Components::sources( $sourcesApp, $sourcesOwn ) === [
+		[ 'name' => 'wordsof', 'kind' => 'text', 'source' => '/feature/probe/words/one' ],
+		[ 'name' => 'pictureof', 'kind' => 'image', 'source' => '/feature/probe/pictures/one' ],
+		[ 'name' => 'pictureof', 'kind' => 'image', 'source' => '/feature/probe/pictures/two' ],
+	] && \Nino\Modules\Components::sources( $appData, $sourcesOwn ) === [] );
+
 // The schema is checked where the component is registered
 // php 8.4 adds a deprecation of its own to every E_USER_ERROR: not what is asked about here
 $errorsOf = static fn( callable $run ): array => array_values( array_filter( ninoErrors( $run ), static fn( array $error ): bool => $error[0] !== E_DEPRECATED ) );

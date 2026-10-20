@@ -2019,12 +2019,15 @@ namespace Nino\Admin {
 						\Nino\Http::fail( $request, 400, 'invalid date' );
 						return;
 					}
-					$result = \Nino\Modules\Backups\Admin::restore( $appData, $date );
+					$notice = null;
+					$result = \Nino\Modules\Backups\Admin::restore( $appData, $date, $notice );
 					if( $result !== true ) {
 						\Nino\Http::fail( $request, $result[0], $result[1] );
 						return;
 					}
-					\Nino\Http::ok( $request, [ 'restoredDate' => $date ] );
+					// A backup of another version of Nino comes with the notice the
+					// panel's answer has (see \Nino\Modules\Backups\Admin::apiRestore())
+					\Nino\Http::ok( $request, [ 'restoredDate' => $date ] + ( $notice !== null ? [ 'notice' => $notice ] : [] ) );
 					return;
 
 				case 'recovery/reset':

@@ -137,6 +137,19 @@ check( '...and the list is still there after the second refusal too', dateRows()
 fire( restoreButton('2024-05-03'), 'click' );
 answer( 200, { ok : true } );
 check( 'a restore that succeeded says so and reloads the page', alerts.length === 1 && reloaded === 1 );
+check( '...with the sentence of the restore alone where the backup has nothing to add', alerts[0] === 'The backup from 2024-05-03 has been restored.' );
+
+// A backup of another version of Nino restores all the same. Its notice - a
+// code and its params, worded the way a failure's is - is said with the restore
+// in the one message the page shows before it reloads: a line in the panel would
+// be gone with the reload
+alerts.length = 0;
+reloaded = 0;
+fire( restoreButton('2024-05-03'), 'click' );
+answer( 200, { ok : true, restoredDate : '2024-05-03', notice : { code : 'backups_restored_other_version', params : [ '1.8.0', '1.9.0' ] } } );
+check( 'a restore of a backup from another version says where it comes from, in the message of the restore, and reloads', alerts.length === 1 && reloaded === 1
+	&& alerts[0] === 'The backup from 2024-05-03 has been restored.\n\nThe backup comes from Nino 1.8.0; this is 1.9.0.' );
+check( '...from the words of the Backups module, which has them for the code', text('/_admin/error/backups_restored_other_version') === 'The backup comes from Nino %s; this is %s.' );
 
 /*	"Back up now": one more archive on request. It is on the list screen
 	whatever the list holds, off while it runs, and says what it made once

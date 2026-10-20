@@ -91,6 +91,21 @@ check( 'the page asks for the backups and the accounts when the gate is open', s
 answer( 'recovery/list', 200, { dates : [ '2026-10-02' ], users : [ 'a@example.com', 'b@example.com' ] } );
 check( 'the select is filled from the list the server sent', options().join(',') === 'a@example.com,b@example.com' && page['recovery-reset-submit'].disabled === false );
 
+// Restore: after the question, and the page says what the server said - and, for a
+// backup of another version of Nino, where it comes from, in the page's own English
+const restoreButton = page['recovery-dates'].children[0].children[1];
+fire( restoreButton, 'click' );
+check( 'a restore is asked about, and sends the date of its row', confirms.length === 1 && sent('recovery/restore').length === 1 && sent('recovery/restore')[0].payload.date === '2026-10-02' );
+answer( 'recovery/restore', 200, { restoredDate : '2026-10-02' } );
+check( '...and says it was restored, with nothing more where the backup has nothing to add', page['recovery-restore-msg'].textContent === 'Restored 2026-10-02.' );
+fire( restoreButton, 'click' );
+answer( 'recovery/restore', 200, { restoredDate : '2026-10-02', notice : { code : 'backups_restored_other_version', params : [ '1.8.0', '1.9.0' ] } } );
+check( '...and with the notice of a backup from another version: where it comes from and what runs here', page['recovery-restore-msg'].textContent === 'Restored 2026-10-02. The backup comes from Nino 1.8.0; this is 1.9.0.' );
+fire( restoreButton, 'click' );
+answer( 'recovery/restore', 500, { error : 'decryption failed' } );
+check( 'a refused restore shows the status and the reason', page['recovery-restore-msg'].textContent === '(500) decryption failed' );
+confirms.length = 0;
+
 // Set a password: the account is the one that is selected
 page['recovery-reset-mail'].value = 'b@example.com';
 page['recovery-reset-pw'].value = 'a new password';

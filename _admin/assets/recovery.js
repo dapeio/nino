@@ -30,6 +30,20 @@
 			return '('+ status+ ') '+ ( ( response && response.error ) ? response.error : fallback );
 		},
 		/**
+		 *	What a restore says besides that it happened, for the backup of
+		 *	another version of Nino: where it comes from and what runs here.
+		 *	In English, like the rest of this page - it has no words to look
+		 *	a code up in
+		 *
+		 *	@param		{*}					response			The answer of recovery/restore
+		 *
+		 *	@return		{string}									'' or ' The backup comes from Nino 1.8.0; this is 1.9.0.'
+		 */
+		_notice : function( response ) {
+			const params = response && response.notice && Array.isArray( response.notice.params ) ? response.notice.params : [];
+			return params.length === 2 ? ' The backup comes from Nino '+ params[0]+ '; this is '+ params[1]+ '.' : '';
+		},
+		/**
 		 *	The secret form - a reload after success shows the tools, since
 		 *	the [csrf] field has been rotated on the server
 		 *
@@ -153,7 +167,7 @@
 							return;
 						restoreMsg.textContent = 'Restoring …';
 						Nino.recovery._apiCall( 'restore', { date : date }, function( status, response ) {
-							restoreMsg.textContent = status === 200 ? 'Restored '+ response.restoredDate+ '.' : Nino.recovery._error( status, response, 'Restore failed.' );
+							restoreMsg.textContent = status === 200 ? 'Restored '+ response.restoredDate+ '.'+ Nino.recovery._notice( response ) : Nino.recovery._error( status, response, 'Restore failed.' );
 						} );
 					} );
 					li.appendChild( btn );

@@ -248,7 +248,16 @@
 					if( status !== 200 || response === null || response.ok !== true )
 						return Nino.admin.backups._showRestoreError( status, response );
 
-					wn.alert( Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/restored'), date ) );
+					let said = Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/restored'), date );
+
+					// A backup of another version of Nino restores all the same, and
+					// its notice - a code and its params, worded as a failure's is - is
+					// said with the restore in the one message the page shows before it
+					// reloads: a line in the panel would be gone with the reload
+					if( typeof response.notice === 'object' && response.notice !== null )
+						said += '\n\n'+ Nino.adminUi.api.errorText( status, response.notice );
+
+					wn.alert( said );
 					wn.location.reload();
 				} );
 			};
