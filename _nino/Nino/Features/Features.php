@@ -495,8 +495,10 @@ namespace Nino {
 			// that the manifest is refused here and not when a request is
 			// rendered - and a component's schema as it is registered, which is
 			// the feature's own: "by", the registry's word for who registered it,
-			// is the key of the feature whatever the schema says. The callbacks
-			// are not declared but derived (see registerComponents())
+			// is the key of the feature whatever the schema says, which is why the
+			// reader is handed the key, and a tool offers it under the feature, so
+			// that a schema naming a "group" is refused. The callbacks are not
+			// declared but derived (see registerComponents())
 			$declared = [ 'components' => [], 'stacks' => [] ];
 			foreach( $declared as $what => $none ) {
 
@@ -505,12 +507,9 @@ namespace Nino {
 
 				foreach( (array) ( $raw[$what] ?? [] ) as $name => $schema ) {
 
-					$clean = \Nino\Modules\Components::validate( (string) $name, $schema, $what === 'stacks' );
+					$clean = \Nino\Modules\Components::validate( (string) $name, $schema, $what === 'stacks', $key );
 					if( is_string( $clean ) === true )
 						return $fail( $clean );
-
-					if( $what === 'components' )
-						$clean['by'] = $key;
 
 					$declared[$what][(string) $name] = $clean;
 				}
@@ -553,7 +552,8 @@ namespace Nino {
 		 *	callback that is not callable is. A component is registered as the
 		 *	feature's own - its schema says 'by' the key of the manifest (see
 		 *	manifest()) - which is how a tool that lists the registry tells it
-		 *	from the kernel's.
+		 *	from the kernel's, and why it has no 'group': a tool offers it under
+		 *	the feature.
 		 *
 		 *	Asked at every boot, by the Components module, and so only the
 		 *	manifests of the features listed in '/nino/modules' are read: not

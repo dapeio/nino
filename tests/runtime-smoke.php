@@ -830,7 +830,7 @@ check( '...including a list, which is replaced rather than appended to', ( $part
 // Images stood, so that the project's module boots after it and its markup wins
 class KernelSmokeTitleOverride {
 	public static function init( array &$appData ): void {
-		\Nino\Modules\Components::addComponent( $appData, 'title', static fn( array &$appData, array $args ): string => '<b class="mine">'. $args['value']. '</b>', [ 'label' => 'Title', 'source' => 'text' ] );
+		\Nino\Modules\Components::addComponent( $appData, 'title', static fn( array &$appData, array $args ): string => '<b class="mine">'. $args['value']. '</b>', [ 'label' => 'Title', 'source' => 'text', 'group' => 'section' ] );
 	}
 }
 $migrations = [

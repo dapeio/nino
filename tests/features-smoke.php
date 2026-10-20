@@ -575,6 +575,12 @@ check( 'a listed feature\'s components and stacks are registered with the schema
 check( '...every component of it the feature\'s own: "by", the registry\'s word for who registered it, is the key of the feature in the manifest as it is read and in the registry - whatever the manifest says: the caption of the reference feature claims to be the kernel\'s - and a manifest whose "by" is no slug is refused',
 	array_column( \Nino\Modules\Components::components( $declared ), 'by' ) === [ 'sample', 'sample' ] && array_column( $all['sample']['components'], 'by' ) === [ 'sample', 'sample' ] && ( ( include __DIR__. '/fixtures/features/Sample/feature.php' )['components']['caption']['by'] ?? null ) === 'nino'
 	&& manifestFails( $manifestDir, 'ClaimsBadly', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'by' => 'Not A Slug' ] ] ], 'component "probe": "by" is a slug' ) );
+check( '...a tool offers a feature\'s components under the feature and not under a group: the manifest as it is read and the registry have none for them, and a manifest that names one - a word of the four, a fifth, or one that claims to be the kernel\'s - is refused with the sentence for it',
+	array_filter( $all['sample']['components'], static fn( array $schema ): bool => array_key_exists( 'group', $schema ) === true ) === []
+	&& array_filter( \Nino\Modules\Components::components( $declared ), static fn( array $schema ): bool => array_key_exists( 'group', $schema ) === true ) === []
+	&& manifestFails( $manifestDir, 'NamesAGroup', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'group' => 'section' ] ] ], 'component "probe": a feature\'s components are offered under the feature, not under a group' )
+	&& manifestFails( $manifestDir, 'NamesAFifthGroup', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'group' => 'footer' ] ] ], 'component "probe": a feature\'s components are offered under the feature, not under a group' )
+	&& manifestFails( $manifestDir, 'NamesAGroupAsNino', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'by' => 'nino', 'group' => 'global' ] ] ], 'component "probe": a feature\'s components are offered under the feature, not under a group' ) );
 check( '...and the places and the drawing of a component arrive in the registry with it, as the Builder reads them',
 	\Nino\Modules\Components::components( $declared )['greeting']['in'] === [ 'section', 'card' ] && \Nino\Modules\Components::components( $declared )['greeting']['draws'] === 'p .sample-greeting'
 	&& $all['sample']['components']['greeting']['in'] === [ 'section', 'card' ] && $all['sample']['components']['greeting']['draws'] === 'p .sample-greeting' );
@@ -871,7 +877,7 @@ check( 'a name that is no slug is no counter: a warning for each of the three, n
 // shortcode(): register one, unless the Components module owns the name
 $toolPlain = static fn( array &$appData, array $args ): string => 'by the feature';
 check( 'shortcode() registers the shortcode where the Components module owns no such name, and says so', \Nino\Feature::shortcode( $toolset, 'note', $toolPlain ) === true && \Nino\Html::renderHtml( $toolset, '[note]' ) === 'by the feature' );
-\Nino\Modules\Components::addComponent( $toolset, 'owned', static fn( array &$appData, array $args ): string => 'by the component', [ 'label' => 'Owned', 'source' => 'none' ] );
+\Nino\Modules\Components::addComponent( $toolset, 'owned', static fn( array &$appData, array $args ): string => 'by the component', [ 'label' => 'Owned', 'source' => 'none', 'group' => 'global' ] );
 check( '...and registers nothing where a component of that name is in the registry: it says so, and the component renders as it did', \Nino\Feature::shortcode( $toolset, 'owned', $toolPlain ) === false
 	&& \Nino\Html::renderHtml( $toolset, '[owned]' ) === 'by the component' );
 $toolset['/nino/modules'] = [ '\\Nino\\Modules\\Sample' ];

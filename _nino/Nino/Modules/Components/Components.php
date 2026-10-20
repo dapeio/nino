@@ -125,6 +125,14 @@ namespace Nino\Modules {
 		// hero
 		public const array PLACES = [ 'section', 'card', 'hero' ];
 
+		// The group a tool offers a component under, the one word of its schema's
+		// 'group' - see validate(): the components of a section, of the hero and
+		// of a card, and those that stand anywhere, in the order a tool lists
+		// them. A place says where a component may stand and a group where it is
+		// offered: the title of a hero may stand in a section as well, and is
+		// offered with the hero
+		public const array GROUPS = [ 'section', 'hero', 'card', 'global' ];
+
 		// What an icon is made of - see validate(): the tags a part may be, each
 		// with the attributes it takes (a part holds all of them and none other;
 		// the radii of a rect may be left out, ICON_OPTIONAL); how a value is
@@ -284,8 +292,9 @@ namespace Nino\Modules {
 		 *	Each of the kernel's components carries an icon, so that the registry that
 		 *	lists them hands a tool the picture to show each by: ICONS names the shape
 		 *	it takes and SHAPES holds the parts of it. A stack has none. Ten of them
-		 *	can be a link ('link', see _linked()); each is the kernel's ('by'), as a
-		 *	feature's are its own.
+		 *	can be a link ('link', see _linked()); each is the kernel's ('by') and is
+		 *	offered under one of the four groups ('group', see GROUPS), as a
+		 *	feature's are its own and are offered under the feature.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -294,20 +303,20 @@ namespace Nino\Modules {
 		public static function init( array &$appData ): void {
 
 			$components = [
-				[ 'title', 'Title (Section)', 'Titel (Sektion)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'h2', 'h3', 'h4' ], 'h3' ), 'style' => self::_style(), 'color' => self::_color() ], [ 'hero', 'section' ], '{tag} .nino-section-title', null, true ],
-				[ 'subtitle', 'Subtitle (Section)', 'Untertitel (Sektion)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'p', 'h4', 'h5' ], 'div' ), 'style' => self::_style(), 'color' => self::_color() ], [ 'hero', 'section' ], '{tag} .nino-section-subtitle', null, true ],
+				[ 'title', 'Title (Section)', 'Titel (Sektion)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'h2', 'h3', 'h4' ], 'h3' ), 'style' => self::_style(), 'color' => self::_color() ], [ 'hero', 'section' ], '{tag} .nino-section-title', null, true, 'section' ],
+				[ 'subtitle', 'Subtitle (Section)', 'Untertitel (Sektion)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'p', 'h4', 'h5' ], 'div' ), 'style' => self::_style(), 'color' => self::_color() ], [ 'hero', 'section' ], '{tag} .nino-section-subtitle', null, true, 'section' ],
 				[ 'text', 'Text', 'Text', 'text', 'text', [
 					'format' => [ 'type' => 'select', 'options' => [ 'inline', 'lines', 'blocks' ], 'default' => 'blocks', 'input' => 'segment', 'label' => [ 'en_US' => 'Format', 'de_DE' => 'Format' ] ],
 					'style' => self::_style(),
 					'color' => self::_color(),
-				], null, null, null, true ],
-				[ 'card-title', 'Title (Card)', 'Titel (Karte)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'h3', 'h4' ], 'h4' ), 'style' => self::_style(), 'color' => self::_color() ], [ 'card' ], '{tag} .nino-card-title', null, true ],
-				[ 'card-subtitle', 'Subtitle (Card)', 'Untertitel (Karte)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'p', 'h5', 'h6' ], 'p' ), 'style' => self::_style(), 'color' => self::_color() ], [ 'card' ], '{tag} .nino-card-subtitle', null, true ],
+				], null, null, null, true, 'global' ],
+				[ 'card-title', 'Title (Card)', 'Titel (Karte)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'h3', 'h4' ], 'h4' ), 'style' => self::_style(), 'color' => self::_color() ], [ 'card' ], '{tag} .nino-card-title', null, true, 'card' ],
+				[ 'card-subtitle', 'Subtitle (Card)', 'Untertitel (Karte)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'p', 'h5', 'h6' ], 'p' ), 'style' => self::_style(), 'color' => self::_color() ], [ 'card' ], '{tag} .nino-card-subtitle', null, true, 'card' ],
 				[ 'card-text', 'Text (Card)', 'Text (Karte)', 'text', 'text', [
 					'format' => [ 'type' => 'select', 'options' => [ 'inline', 'lines', 'blocks' ], 'default' => 'blocks', 'input' => 'segment', 'label' => [ 'en_US' => 'Format', 'de_DE' => 'Format' ] ],
 					'style' => self::_style(),
 					'color' => self::_color(),
-				], [ 'card' ], 'div .nino-card-descr', null, true ],
+				], [ 'card' ], 'div .nino-card-descr', null, true, 'card' ],
 				[ 'card-image', 'Image (Card)', 'Bild (Karte)', 'image', 'image', [
 					'style' => [ 'type' => 'variant', 'options' => [ '', 'inline' ], 'prefix' => 'nino-card-img--', 'default' => '', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ] ],
 					'alt' => [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Alternative text', 'de_DE' => 'Alternativtext' ],
@@ -315,9 +324,9 @@ namespace Nino\Modules {
 					'focus' => [ 'type' => 'select', 'options' => [ '', '1', '2', '3', '4', '5', '6', '7', '8', '9' ], 'default' => '', 'label' => [ 'en_US' => 'Focus', 'de_DE' => 'Fokus' ],
 						'hint' => [ 'en_US' => 'Which part of the picture survives a crop, as one of nine positions.', 'de_DE' => 'Welcher Teil des Bildes beim Zuschneiden bleibt, als eine von neun Positionen.' ] ],
 					'ratio' => [ 'type' => 'select', 'options' => [ '', '1-1', '4-3', '3-2', '16-9', '21-9' ], 'default' => '', 'label' => [ 'en_US' => 'Ratio', 'de_DE' => 'Seitenverhältnis' ] ],
-				], [ 'card' ], 'img .nino-card-img', null, true ],
-				[ 'hero-title', 'Title (Hero)', 'Titel (Hero)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'h2', 'h3' ], 'h2' ), 'style' => self::_style(), 'color' => self::_color() ], [ 'hero', 'section' ], '{tag} .nino-hero-title', null, true ],
-				[ 'hero-subtitle', 'Subtitle (Hero)', 'Untertitel (Hero)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'p', 'h3', 'h4' ], 'p' ), 'style' => self::_style(), 'color' => self::_color() ], [ 'hero', 'section' ], '{tag} .nino-hero-subtitle', null, true ],
+				], [ 'card' ], 'img .nino-card-img', null, true, 'card' ],
+				[ 'hero-title', 'Title (Hero)', 'Titel (Hero)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'h2', 'h3' ], 'h2' ), 'style' => self::_style(), 'color' => self::_color() ], [ 'hero', 'section' ], '{tag} .nino-hero-title', null, true, 'hero' ],
+				[ 'hero-subtitle', 'Subtitle (Hero)', 'Untertitel (Hero)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'p', 'h3', 'h4' ], 'p' ), 'style' => self::_style(), 'color' => self::_color() ], [ 'hero', 'section' ], '{tag} .nino-hero-subtitle', null, true, 'hero' ],
 				// The card is the one component that holds components: what stands between
 				// its tags is the calls of the components of a card, which are rendered
 				// when its output is (see componentCard()), and 'holds' says so to a
@@ -336,14 +345,14 @@ namespace Nino\Modules {
 					'focus' => [ 'type' => 'select', 'options' => [ '', '1', '2', '3', '4', '5', '6', '7', '8', '9' ], 'default' => '', 'label' => [ 'en_US' => 'Focus', 'de_DE' => 'Fokus' ],
 						'hint' => [ 'en_US' => 'Which part of the picture survives a crop, as one of nine positions.', 'de_DE' => 'Welcher Teil des Bildes beim Zuschneiden bleibt, als eine von neun Positionen.' ] ],
 					'dim' => [ 'type' => 'bool', 'default' => false, 'label' => [ 'en_US' => 'Dim the picture', 'de_DE' => 'Bild abdunkeln' ] ],
-				], [ 'section', 'hero' ], 'article .nino-card', 'card', false ],
+				], [ 'section', 'hero' ], 'article .nino-card', 'card', false, 'card' ],
 				[ 'button', 'Button', 'Button', 'button', 'text', [
 					'href' => self::LINK['href'],
 					'style' => [ 'type' => 'select', 'options' => [ '', 'primary', 'outline', 'light', 'dark', 'brand-alt' ], 'default' => '', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ] ],
 					'size' => [ 'type' => 'select', 'options' => [ '', 'small', 'big' ], 'default' => '', 'input' => 'segment', 'label' => [ 'en_US' => 'Size', 'de_DE' => 'Größe' ] ],
 					'width' => [ 'type' => 'select', 'options' => [ '', 'full' ], 'default' => '', 'input' => 'segment', 'label' => [ 'en_US' => 'Width', 'de_DE' => 'Breite' ] ],
 					'target' => self::LINK['target'],
-				], null, 'a .nino-btn', null, false ],
+				], null, 'a .nino-btn', null, false, 'global' ],
 				[ 'image', 'Image', 'Bild', 'image', 'image', [
 					'style' => [ 'type' => 'variant', 'options' => [ '', 'rounded' ], 'prefix' => 'nino-image--', 'default' => '', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ] ],
 					'alt' => [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Alternative text', 'de_DE' => 'Alternativtext' ],
@@ -351,25 +360,26 @@ namespace Nino\Modules {
 					'focus' => [ 'type' => 'select', 'options' => [ '', '1', '2', '3', '4', '5', '6', '7', '8', '9' ], 'default' => '', 'label' => [ 'en_US' => 'Focus', 'de_DE' => 'Fokus' ],
 						'hint' => [ 'en_US' => 'Which part of the picture survives a crop, as one of nine positions.', 'de_DE' => 'Welcher Teil des Bildes beim Zuschneiden bleibt, als eine von neun Positionen.' ] ],
 					'ratio' => [ 'type' => 'select', 'options' => [ '', '1-1', '4-3', '3-2', '16-9', '21-9' ], 'default' => '', 'label' => [ 'en_US' => 'Ratio', 'de_DE' => 'Seitenverhältnis' ] ],
-				], null, null, null, true ],
-				[ 'html', 'HTML', 'HTML', 'block', 'content', [], null, null, null, false ],
+				], null, null, null, true, 'global' ],
+				[ 'html', 'HTML', 'HTML', 'block', 'content', [], null, null, null, false, 'global' ],
 				[ 'spacer', 'Spacer', 'Abstand', 'block', 'none', [
 					'size' => [ 'type' => 'select', 'options' => [ '1', '2', '3', '4', '5', '6' ], 'default' => '2', 'label' => [ 'en_US' => 'Size', 'de_DE' => 'Größe' ] ],
-				], null, null, null, false ],
+				], null, null, null, false, 'global' ],
 				// The arrow at the foot of a hero, a link to the next section - or to the one
 				// whose id it is given - which Nino.ui.js has scroll there
 				[ 'scroll-hint', 'Scroll hint', 'Scroll-Hinweis', 'block', 'none', [
 					'to' => [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Target', 'de_DE' => 'Ziel' ],
 						'hint' => [ 'en_US' => 'The id of the section to scroll to. Empty scrolls to the next section.', 'de_DE' => 'Die Id der Sektion, zu der gescrollt wird. Leer scrollt zur nächsten Sektion.' ] ],
-				], [ 'hero', 'section' ], 'a .nino-hero-arrowdown', null, false ],
+				], [ 'hero', 'section' ], 'a .nino-hero-arrowdown', null, false, 'hero' ],
 			];
 
 			// Each class is a component of its own, and the schema says where a tool
-			// offers it ('in'), what it draws ('draws') and what it holds ('holds', the
-			// card's): the renderer reads no context, so a title in a card is the one
-			// that draws the title of a card. Its icon is the shape ICONS names, as the
-			// parts SHAPES holds, and 'link' whether a link may wrap what it draws
-			foreach( $components as [ $name, $en, $de, $preview, $source, $attributes, $in, $draws, $holds, $link ] )
+			// offers it ('in') and under which group ('group'), what it draws ('draws')
+			// and what it holds ('holds', the card's): the renderer reads no context, so
+			// a title in a card is the one that draws the title of a card. Its icon is
+			// the shape ICONS names, as the parts SHAPES holds, and 'link' whether a link
+			// may wrap what it draws
+			foreach( $components as [ $name, $en, $de, $preview, $source, $attributes, $in, $draws, $holds, $link, $group ] )
 				self::addComponent( $appData, $name, [ self::class, 'component'. str_replace( ' ', '', ucwords( str_replace( '-', ' ', $name ) ) ) ], [
 					'label'				=> [ 'en_US' => $en, 'de_DE' => $de ],
 					'source'			=> $source,
@@ -378,6 +388,7 @@ namespace Nino\Modules {
 					'preview'			=> $preview,
 					'icon'				=> self::SHAPES[ self::ICONS[$name] ],
 					'link'				=> $link,
+					'group'				=> $group,
 				] + ( $in !== null ? [ 'in' => $in ] : [] ) + ( $draws !== null ? [ 'draws' => $draws ] : [] ) + ( $holds !== null ? [ 'holds' => $holds ] : [] ) );
 
 			$stacks = [
@@ -657,15 +668,22 @@ namespace Nino\Modules {
 		 *	\Nino\Features::registerAssets() reads into the bundles, is another
 		 *	thing
 		 *
+		 *	Who registered a component ('by') is also how a tool offers it: one that
+		 *	is the kernel's own or a project module's - 'nino', which is what a schema
+		 *	that says nothing reads as - is offered in a group and declares which,
+		 *	one of GROUPS, and one that is a feature's is offered under the feature
+		 *	and declares none: a schema that names a group for it is refused.
+		 *
 		 *	@param		string		$name					The shortcode, a slug
 		 *	@param		mixed			$schema				label, source (not for a stack), loop, attributes, preview;
-		 *																	icon, in, draws, holds, link and by for a component, grid and assets for a stack.
+		 *																	icon, in, draws, holds, link, by and group for a component, grid and assets for a stack.
 		 *																	See docs/development.md, "Components"
 		 *	@param		bool			$stack				Read it as a stack's
+		 *	@param		string|null	$feature			The key of the feature whose manifest the schema is read from, null for a module's: its components are the feature's own, whatever 'by' they say
 		 *
 		 *	@return 	array|string						The clean schema, or what is wrong with it
 		 */
-		public static function validate( string $name, mixed $schema, bool $stack = false ): array|string {
+		public static function validate( string $name, mixed $schema, bool $stack = false, ?string $feature = null ): array|string {
 
 			$what = ( $stack === true ? 'stack' : 'component' ). ' "'. $name. '"';
 
@@ -818,14 +836,30 @@ namespace Nino\Modules {
 
 				// Who registered it, for a tool that groups what it offers: the kernel's
 				// own components and everything a module of the project registers are
-				// 'nino' where the schema says nothing, and a feature's manifest has the
-				// feature's key put here whatever it says (see \Nino\Features::manifest())
+				// 'nino' where the schema says nothing, and the components of a feature's
+				// manifest are the feature's own whatever the schema says - the manifest
+				// is read for the key it hands over (see \Nino\Features::manifest()), and
+				// what the schema says itself is read all the same and refused if it is no slug
 				$by = $schema['by'] ?? 'nino';
 
 				if( is_string( $by ) === false || preg_match( '/^[a-z][a-z0-9-]*$/D', $by ) !== 1 )
 					return $what. ': "by" is a slug of lower case letters, digits and hyphens';
 
-				$clean['by'] = $by;
+				$clean['by'] = $feature ?? $by;
+
+				// The group a tool offers it under follows from who registered it: what
+				// the kernel and the modules of a project register is offered in one of
+				// the groups and says which, what a feature registers is offered under
+				// the feature - a schema that names a group for it is refused
+				if( $clean['by'] === 'nino' ) {
+
+					if( is_string( $schema['group'] ?? null ) === false || in_array( $schema['group'], self::GROUPS, true ) === false )
+						return $what. ': "group" must be one of '. implode( ', ', self::GROUPS );
+
+					$clean['group'] = $schema['group'];
+				}
+				else if( isset( $schema['group'] ) === true )
+					return $what. ': a feature\'s components are offered under the feature, not under a group';
 			}
 
 			// A note for a tool about the files a stack needs: nothing adds them to a

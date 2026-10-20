@@ -53,6 +53,7 @@ class Countdown {
 				             'label' => [ 'en_US' => 'Size', 'de_DE' => 'Größe' ] ],
 			],
 			'preview'    => 'block',
+			'group'      => 'global',
 		] );
 	}
 
@@ -97,7 +98,8 @@ The rules the module keeps for you, and the ones it leaves to the renderer:
   module's `init()` takes it back where it is called again.
 - A schema that cannot be worked with is an `E_USER_ERROR` at registration - a
   name that is no slug, an unknown `source` or type, a `select` without options
-  or with a default outside them, an attribute without a default.
+  or with a default outside them, an attribute without a default, a `group`
+  that is missing or none of the four.
 - `draws`, `in` and `holds` are optional and change nothing about the
   rendering: the tag and the class the renderer draws (`'p .project-countdown'`,
   with a name in braces for an attribute of the schema), where a tool offers the
@@ -108,6 +110,12 @@ The rules the module keeps for you, and the ones it leaves to the renderer:
   is another component. A container does not render its content itself: the
   engine renders the output of a shortcode again, so what it returns inside its
   own markup is rendered when it is - with a stack's element still the context.
+- `group` is the word a tool offers a component under: `section`, `hero`,
+  `card` or `global`, the last for what stands anywhere, as the countdown does.
+  A component a module registers has to declare one. It says nothing about where
+  the component may stand, which `in` does: the title of a hero may stand in a
+  section as well and is offered with the hero. A feature's component declares
+  none (section 3): a tool offers it under the feature.
 - `icon` is optional as well, and as little a matter of rendering: the picture a
   tool shows the component by, where a tool without it shows one of its own. It
   is geometry and not markup - a list of 1 to 12 parts, each a tag (`path`,
@@ -209,11 +217,12 @@ namespace Nino\Modules {
 name in studly caps behind `component`, or `stack` for a stack
 (`stackSlider()`, `componentNewsletterSignup()` for `newsletter-signup`). A
 manifest whose schema does not validate is refused as a whole, naming the
-component, and a renderer the class lacks is a warning and skipped. The kernel
-registers the feature's components at boot while it is listed in
-`/nino/modules`; the shortcode is the feature's, and the Features panel lists
-it so. Register a component by manifest or in `init()`, not both - a second
-callback beside the first is not a replacement.
+component - so is one that names a `group`, as a tool offers a feature's
+component under the feature - and a renderer the class lacks is a warning and
+skipped. The kernel registers the feature's components at boot while it is
+listed in `/nino/modules`; the shortcode is the feature's, and the Features
+panel lists it so. Register a component by manifest or in `init()`, not both - a
+second callback beside the first is not a replacement.
 
 ## 4. Test it
 
@@ -240,7 +249,7 @@ own test, then the syntax checks and the static analysis of the
 
 ## Definition of done
 
-- [ ] The schema validates: every attribute has a default, every select an option list that holds it.
+- [ ] The schema validates: every attribute has a default, every select an option list that holds it, and a component of a project has its group, a feature's none.
 - [ ] The renderer has the signature `( array &$appData, array $args ): string` and returns nothing it did not escape or make itself.
 - [ ] Nothing in `$args['value']` is escaped a second time, and nothing outside it is written unescaped. For `image` the value is an escaped reference, to look the picture up by `$args['source']`, never a filename to write; for `content` it is the template's own markup.
 - [ ] A source that resolves to nothing renders nothing; a hand-written shortcode with a wrong attribute still renders.

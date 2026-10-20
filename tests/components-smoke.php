@@ -949,6 +949,10 @@ check( '...and a tool is answered in that order: the registry as json is an obje
 	str_starts_with( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), '{"title":{' ) === true
 	&& array_keys( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), true ) ) === $kernelAll );
 check( '...and its stacks', array_keys( \Nino\Modules\Components::stacks( $appData ) ) === $kernelStacks );
+check( 'every component of the kernel says which group a tool offers it under, one word of GROUPS - the registry hands it over beside where the component stands and who registered it, in the json a tool reads as well - and no stack says one',
+	array_filter( \Nino\Modules\Components::components( $appData ), static fn( array $schema ): bool => in_array( $schema['group'] ?? null, \Nino\Modules\Components::GROUPS, true ) === false ) === []
+	&& array_column( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), true ), 'group' ) === array_column( \Nino\Modules\Components::components( $appData ), 'group' )
+	&& array_filter( \Nino\Modules\Components::stacks( $appData ), static fn( array $stack ): bool => array_key_exists( 'group', $stack ) === true ) === [] );
 check( 'a registered schema is complete and carries its label in both languages', \Nino\Modules\Components::components( $appData )['title']['label'] === [ 'en_US' => 'Title (Section)', 'de_DE' => 'Titel (Sektion)' ]
 	&& \Nino\Modules\Components::components( $appData )['title']['source'] === 'text'
 	&& \Nino\Modules\Components::components( $appData )['title']['preview'] === 'title'
@@ -1031,9 +1035,9 @@ check( '...nothing for a text without a shortcode in it, and nothing where no ca
 // What the rule is made of is the registry's: the kind a schema says. A component a feature registers is read the same, and the kernel's own registry knows nothing of it
 $sourcesApp = $appData;
 $sourceNoop = static fn( array &$appData, array $args ): string => '';
-\Nino\Modules\Components::addComponent( $sourcesApp, 'wordsof', $sourceNoop, [ 'label' => 'Words', 'source' => 'text' ] );
-\Nino\Modules\Components::addComponent( $sourcesApp, 'pictureof', $sourceNoop, [ 'label' => 'Picture', 'source' => 'image' ] );
-\Nino\Modules\Components::addComponent( $sourcesApp, 'linkof', $sourceNoop, [ 'label' => 'Link', 'source' => 'href' ] );
+\Nino\Modules\Components::addComponent( $sourcesApp, 'wordsof', $sourceNoop, [ 'label' => 'Words', 'source' => 'text', 'by' => 'probe' ] );
+\Nino\Modules\Components::addComponent( $sourcesApp, 'pictureof', $sourceNoop, [ 'label' => 'Picture', 'source' => 'image', 'by' => 'probe' ] );
+\Nino\Modules\Components::addComponent( $sourcesApp, 'linkof', $sourceNoop, [ 'label' => 'Link', 'source' => 'href', 'by' => 'probe' ] );
 $sourcesOwn = '[wordsof /feature/probe/words/one][pictureof /feature/probe/pictures/one][pictureof uri="/feature/probe/pictures/two"][linkof /feature/probe/links/one]';
 check( 'the components of a feature are read by the kind their schema says: a text and an image count, an address does not', \Nino\Modules\Components::sources( $sourcesApp, $sourcesOwn ) === [
 		[ 'name' => 'wordsof', 'kind' => 'text', 'source' => '/feature/probe/words/one' ],
@@ -1133,6 +1137,11 @@ $badSchemas = [
 	'a link of a component that has a target of its own'	=> [ 'targetlink', [ 'label' => 'x', 'source' => 'text', 'link' => true, 'attributes' => [ 'target' => [ 'type' => 'string', 'default' => '' ] ] ], 'and the schema declares "target" itself' ],
 	'a registrar that is no slug'								=> [ 'badby', [ 'label' => 'x', 'source' => 'text', 'by' => 'Not A Slug' ], '"by" is a slug' ],
 	'a registrar that is no string'							=> [ 'intby', [ 'label' => 'x', 'source' => 'text', 'by' => 5 ], '"by" is a slug' ],
+	'a component of the kernel or of a project that names no group'	=> [ 'nogroup', [ 'label' => 'x', 'source' => 'text' ], '"group" must be one of section, hero, card, global' ],
+	'a group that is none of the four'					=> [ 'fifthgroup', [ 'label' => 'x', 'source' => 'text', 'group' => 'footer' ], '"group" must be one of section, hero, card, global' ],
+	'a group that is a list'										=> [ 'listgroup', [ 'label' => 'x', 'source' => 'text', 'group' => [ 'section' ] ], '"group" must be one of section, hero, card, global' ],
+	'a component that says nino itself and names no group'	=> [ 'ninogroup', [ 'label' => 'x', 'source' => 'text', 'by' => 'nino' ], '"group" must be one of section, hero, card, global' ],
+	'a group named by the component of a feature'	=> [ 'ownedgroup', [ 'label' => 'x', 'source' => 'text', 'by' => 'hello', 'group' => 'section' ], 'a feature\'s components are offered under the feature, not under a group' ],
 ];
 foreach( $badSchemas as $what => [ $name, $schema, $why ] ) {
 	$schemaErrors = $errorsOf( function() use ( &$appData, $noop, $name, $schema ) { \Nino\Modules\Components::addComponent( $appData, $name, $noop, $schema ); } );
@@ -1150,7 +1159,7 @@ check( 'the registry was left alone by every refusal', array_keys( \Nino\Modules
 check( 'a schema that validates is returned complete, a stack with its assets', \Nino\Modules\Components::validate( 'rows', [ 'label' => 'Rows', 'grid' => true, 'assets' => [ 'css' => [ '/features/Rows/assets/rows.css' ] ] ], true ) === [
 	'label' => 'Rows', 'grid' => true, 'preview' => 'cells', 'attributes' => [], 'assets' => [ 'css' => [ '/features/Rows/assets/rows.css' ] ],
 ] );
-$placed = [ 'label' => 'x', 'source' => 'text', 'attributes' => [ 'tag' => [ 'type' => 'select', 'options' => [ 'div', 'h3' ], 'default' => 'h3' ] ] ];
+$placed = [ 'label' => 'x', 'source' => 'text', 'group' => 'global', 'attributes' => [ 'tag' => [ 'type' => 'select', 'options' => [ 'div', 'h3' ], 'default' => 'h3' ] ] ];
 check( 'validate() takes the places a component stands in and what it draws, and carries them in the clean schema; a schema that says neither has neither',
 	( \Nino\Modules\Components::validate( 'probe', $placed + [ 'in' => [ 'section', 'card', 'hero' ], 'draws' => '{tag} .nino-probe' ] )['in'] ?? null ) === [ 'section', 'card', 'hero' ]
 	&& ( \Nino\Modules\Components::validate( 'probe', $placed + [ 'in' => [ 'card' ], 'draws' => '{tag} .nino-probe' ] )['draws'] ?? null ) === '{tag} .nino-probe'
@@ -1167,7 +1176,7 @@ check( '...a stack is not a place a component stands in, and holds nothing: its 
 	&& array_key_exists( 'draws', \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'in' => [ 'card' ], 'draws' => 'p .x', 'holds' => 'card' ], true ) ) === false
 	&& array_key_exists( 'holds', \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'in' => [ 'card' ], 'draws' => 'p .x', 'holds' => 'card' ], true ) ) === false );
 // What a component holds: one of the places, which is what its content is the calls of - and only where its source is its content
-$holding = [ 'label' => 'x', 'source' => 'content', 'attributes' => [ 'tag' => [ 'type' => 'select', 'options' => [ 'div', 'h3' ], 'default' => 'h3' ] ] ];
+$holding = [ 'label' => 'x', 'source' => 'content', 'group' => 'global', 'attributes' => [ 'tag' => [ 'type' => 'select', 'options' => [ 'div', 'h3' ], 'default' => 'h3' ] ] ];
 $holdsAnswer = static function( array $schema ): string {
 	$answer = \Nino\Modules\Components::validate( 'box', $schema );
 	return is_string( $answer ) === true ? $answer : '';
@@ -1216,7 +1225,7 @@ check( '...a stack has no icon: the key is dropped from its clean schema, a good
 	} )() );
 // A component registered with an icon hands it on: to a tool that asks the registry for it, and to one that reads the json of the registry
 $pictured = [ [ 'circle', [ 'cx' => '12', 'cy' => '12', 'r' => '4' ] ], [ 'path', [ 'd' => 'M4 12h16' ] ], [ 'rect', [ 'rx' => '2', 'x' => '3', 'y' => '3', 'width' => '18', 'height' => '18' ] ] ];
-\Nino\Modules\Components::addComponent( $appData, 'pictured', $noop, [ 'label' => 'Pictured', 'source' => 'none', 'icon' => $pictured ] );
+\Nino\Modules\Components::addComponent( $appData, 'pictured', $noop, [ 'label' => 'Pictured', 'source' => 'none', 'group' => 'global', 'icon' => $pictured ] );
 check( 'a component registered with an icon carries it in the registry as it was given',
 	( \Nino\Modules\Components::components( $appData )['pictured']['icon'] ?? null ) === $pictured
 	&& array_key_exists( 'icon', \Nino\Modules\Components::components( $appData )['pictured'] ) === true );
@@ -1314,7 +1323,7 @@ $cardSchema = \Nino\Modules\Components::components( $appData )['card'];
 check( 'the card is declared as the registry says: a label in both languages, the source content, the picture of a block, its icon, offered in a section and a hero, drawing the <article> with its class, and holding the components of a card',
 	$cardSchema['label'] === [ 'en_US' => 'Card', 'de_DE' => 'Karte' ] && $cardSchema['source'] === 'content' && $cardSchema['loop'] === true && $cardSchema['preview'] === 'block'
 	&& $cardSchema['in'] === [ 'section', 'hero' ] && $cardSchema['draws'] === 'article .nino-card' && $cardSchema['holds'] === 'card'
-	&& array_keys( $cardSchema ) === [ 'label', 'source', 'loop', 'preview', 'icon', 'attributes', 'in', 'draws', 'holds', 'link', 'by' ] );
+	&& array_keys( $cardSchema ) === [ 'label', 'source', 'loop', 'preview', 'icon', 'attributes', 'in', 'draws', 'holds', 'link', 'by', 'group' ] );
 check( '...its attributes are nine, in the order the form shows them: whether it fills, the padding, where its content stands, how it is aligned, the ground, the border, the picture, its focus and the dim',
 	array_keys( $cardSchema['attributes'] ) === [ 'fill', 'padding', 'vertical', 'align', 'ground', 'borderless', 'background', 'focus', 'dim' ] );
 $cardTypes = [ 'ground' => 'select', 'padding' => 'select', 'fill' => 'bool', 'vertical' => 'select', 'align' => 'select', 'background' => 'image', 'focus' => 'select', 'dim' => 'bool', 'borderless' => 'bool' ];
@@ -1354,7 +1363,7 @@ check( '...the card is the one component of the kernel that holds components, an
 check( '...and the style of the six titles and of the two texts has no hint under its name, in neither language',
 	array_filter( [ 'title', 'card-title', 'hero-title', 'subtitle', 'card-subtitle', 'hero-subtitle', 'text', 'card-text' ], static fn( string $name ): bool => ( \Nino\Modules\Components::components( $appData )[$name]['attributes']['style']['hint'] ?? '' ) !== '' ) === [] );
 // A variant: a select whose words are the modifiers of a class - the style of the text and of the pictures, the colour of a text
-$lookOf = static fn( array $declared ): array|string => \Nino\Modules\Components::validate( 'probe', [ 'label' => 'x', 'source' => 'text', 'attributes' => [ 'look' => $declared ] ] );
+$lookOf = static fn( array $declared ): array|string => \Nino\Modules\Components::validate( 'probe', [ 'label' => 'x', 'source' => 'text', 'group' => 'global', 'attributes' => [ 'look' => $declared ] ] );
 $lookGood = [ 'type' => 'variant', 'options' => [ '', 'big', 'extra-big' ], 'default' => 'big' ];
 check( 'validate() takes a variant - the options of a select, the default among them, and the empty word one of them or not - and its clean schema is a select\'s with the prefix, where it has one, between the options and the default',
 	( $lookOf( $lookGood )['attributes']['look'] ?? null ) === [ 'type' => 'variant', 'label' => 'look', 'hint' => '', 'options' => [ '', 'big', 'extra-big' ], 'default' => 'big' ]
@@ -1362,7 +1371,7 @@ check( 'validate() takes a variant - the options of a select, the default among 
 	&& is_array( $lookOf( [ 'options' => [ '' ], 'default' => '' ] + $lookGood ) ) === true && is_array( $lookOf( [ 'options' => [ '', '1', '2x' ], 'default' => '1' ] + $lookGood ) ) === true );
 check( '...a variant outside its options is the default, as a select is, and the default is what defaults() hands out',
 	( static function() use ( &$appData ): bool {
-		\Nino\Modules\Components::addComponent( $appData, 'lookprobe', static fn( array &$appData, array $args ): string => $args['look'], [ 'label' => 'x', 'source' => 'none', 'attributes' => [ 'look' => [ 'type' => 'variant', 'options' => [ 'a', 'b' ], 'default' => 'b' ] ] ] );
+		\Nino\Modules\Components::addComponent( $appData, 'lookprobe', static fn( array &$appData, array $args ): string => $args['look'], [ 'label' => 'x', 'source' => 'none', 'group' => 'global', 'attributes' => [ 'look' => [ 'type' => 'variant', 'options' => [ 'a', 'b' ], 'default' => 'b' ] ] ] );
 		return \Nino\Html::renderHtml( $appData, '[lookprobe look="a"][lookprobe look="c"][lookprobe]' ) === 'abb' && \Nino\Modules\Components::defaults( $appData, 'lookprobe' ) === [ 'look' => 'b', 'class' => '' ];
 	} )() );
 
@@ -1383,7 +1392,7 @@ $linkable = [ 'label' => 'x', 'source' => 'text', 'attributes' => [ 'tag' => [ '
 check( 'validate() takes whether a component can be a link and who registered it - false and nino where the schema says nothing - and the clean schema has the two last, after holds; a stack has neither, whatever it says',
 	array_keys( \Nino\Modules\Components::validate( 'probe', $linkable + [ 'in' => [ 'card' ], 'draws' => '{tag} .x', 'link' => true, 'by' => 'hello' ] ) ) === [ 'label', 'source', 'loop', 'preview', 'attributes', 'in', 'draws', 'link', 'by' ]
 	&& ( \Nino\Modules\Components::validate( 'probe', $linkable + [ 'link' => true, 'by' => 'hello' ] )['link'] ?? null ) === true && ( \Nino\Modules\Components::validate( 'probe', $linkable + [ 'link' => true, 'by' => 'hello' ] )['by'] ?? null ) === 'hello'
-	&& ( \Nino\Modules\Components::validate( 'probe', $linkable )['link'] ?? null ) === false && ( \Nino\Modules\Components::validate( 'probe', $linkable )['by'] ?? null ) === 'nino'
+	&& ( \Nino\Modules\Components::validate( 'probe', $linkable + [ 'group' => 'global' ] )['link'] ?? null ) === false && ( \Nino\Modules\Components::validate( 'probe', $linkable + [ 'group' => 'global' ] )['by'] ?? null ) === 'nino'
 	&& array_diff_key( (array) \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'link' => true, 'by' => 'hello' ], true ), [ 'label' => 1, 'grid' => 1, 'preview' => 1, 'attributes' => 1 ] ) === []
 	&& \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'link' => 'yes', 'by' => 'Not A Slug' ], true ) === \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x' ], true ) );
 $linkAttributes = (array) ( new ReflectionClassConstant( '\Nino\Modules\Components', 'LINK' ) )->getValue();
@@ -1392,6 +1401,36 @@ check( 'a component that says link has the address and the window of a link afte
 	array_keys( \Nino\Modules\Components::defaults( $appData, 'linkprobe' ) ) === [ 'tag', 'href', 'target', 'class' ] && \Nino\Modules\Components::defaults( $appData, 'linkprobe' ) === [ 'tag' => 'h3', 'href' => '', 'target' => '', 'class' => '' ]
 	&& array_keys( \Nino\Modules\Components::components( $appData )['linkprobe']['attributes'] ) === [ 'tag' ] && \Nino\Modules\Components::components( $appData )['linkprobe']['by'] === 'hello'
 	&& array_keys( $linkAttributes ) === [ 'href', 'target' ] && $linkAttributes['href']['type'] === 'href' && $linkAttributes['target']['options'] === [ '', '_blank' ] );
+
+// The group a tool offers a component under follows from who registered it: one of the four words from the kernel's own and from a project's, none from a feature's
+$ungrouped = array_diff_key( $placed, [ 'group' => 1 ] );
+$groupSentence = 'component "probe": "group" must be one of section, hero, card, global';
+$featureSentence = 'component "probe": a feature\'s components are offered under the feature, not under a group';
+check( 'validate() takes the group a component is offered under, one of the four words, and the clean schema carries it as its last key, after who registered it; a stack has none, whatever it says',
+	array_filter( \Nino\Modules\Components::GROUPS, static fn( string $group ): bool => ( \Nino\Modules\Components::validate( 'probe', $ungrouped + [ 'group' => $group ] )['group'] ?? null ) !== $group ) === []
+	&& array_keys( \Nino\Modules\Components::validate( 'probe', $placed ) ) === [ 'label', 'source', 'loop', 'preview', 'attributes', 'link', 'by', 'group' ]
+	&& array_key_exists( 'group', (array) \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'group' => 'section' ], true ) ) === false
+	&& \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'group' => 'footer' ], true ) === \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x' ], true ) );
+check( '...and gives the sentence for a component of the kernel or of a project that names none, says nino and none, or names a word that is none of the four: a fifth word, one in capitals, one with a space, an empty word, a number, a list',
+	array_filter( [ [], [ 'by' => 'nino' ], [ 'group' => 'footer' ], [ 'group' => 'Section' ], [ 'group' => ' section' ], [ 'group' => '' ], [ 'group' => null ], [ 'group' => 5 ], [ 'group' => true ], [ 'group' => [ 'section' ] ] ],
+		static fn( array $wrong ): bool => \Nino\Modules\Components::validate( 'probe', $ungrouped + $wrong ) !== $groupSentence ) === [] );
+check( '...a feature\'s components are offered under the feature: one that is registered by another than nino has no group in its clean schema, and a schema that names one - a word of the four or not - is refused with the sentence for it',
+	array_key_exists( 'group', (array) \Nino\Modules\Components::validate( 'probe', $ungrouped + [ 'by' => 'hello' ] ) ) === false && is_array( \Nino\Modules\Components::validate( 'probe', $ungrouped + [ 'by' => 'hello' ] ) ) === true
+	&& array_filter( [ 'section', 'hero', 'card', 'global', 'footer', '', 5, [ 'section' ] ], static fn( mixed $group ): bool => \Nino\Modules\Components::validate( 'probe', $ungrouped + [ 'by' => 'hello', 'group' => $group ] ) !== $featureSentence ) === [] );
+check( '...and the manifest of a feature is read for the feature: handed its key, validate() makes the component the feature\'s own whatever by the schema says and offers it under no group - a schema that names one is refused - while the by the schema says is read all the same, and a stack is read as before',
+	( \Nino\Modules\Components::validate( 'probe', $ungrouped, false, 'hello' )['by'] ?? null ) === 'hello' && array_key_exists( 'group', (array) \Nino\Modules\Components::validate( 'probe', $ungrouped, false, 'hello' ) ) === false
+	&& ( \Nino\Modules\Components::validate( 'probe', $ungrouped + [ 'by' => 'nino' ], false, 'hello' )['by'] ?? null ) === 'hello'
+	&& \Nino\Modules\Components::validate( 'probe', $placed, false, 'hello' ) === $featureSentence
+	&& str_contains( (string) \Nino\Modules\Components::validate( 'probe', $ungrouped + [ 'by' => 'Not A Slug' ], false, 'hello' ), '"by" is a slug' ) === true
+	&& \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'group' => 'section' ], true, 'hello' ) === \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x' ], true ) );
+$groupApp = $appData;
+\Nino\Modules\Components::addComponent( $groupApp, 'grouped', $noop, $ungrouped + [ 'group' => 'hero' ] );
+\Nino\Modules\Components::addComponent( $groupApp, 'featured', $noop, $ungrouped + [ 'by' => 'hello' ] );
+check( '...the registry has the group a component said and none for a feature\'s, as the registry and as the json a tool reads, where the two are told apart by who registered them',
+	( \Nino\Modules\Components::components( $groupApp )['grouped']['group'] ?? null ) === 'hero' && array_key_exists( 'group', \Nino\Modules\Components::components( $groupApp )['featured'] ) === false
+	&& ( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $groupApp ) ), true ) )['grouped']['group'] === 'hero'
+	&& array_key_exists( 'group', (array) ( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $groupApp ) ), true ) )['featured'] ) === false
+	&& \Nino\Modules\Components::components( $groupApp )['grouped']['by'] === 'nino' && \Nino\Modules\Components::components( $groupApp )['featured']['by'] === 'hello' );
 
 // What the kernel says with them: ten components can be a link, every one is the kernel's, and four attributes say how they are drawn
 $kernelLinked = [ 'title', 'subtitle', 'text', 'card-title', 'card-subtitle', 'card-text', 'card-image', 'hero-title', 'hero-subtitle', 'image' ];
@@ -1517,11 +1556,11 @@ check( '[title] and a [button] label of a stored value show the characters', $re
 \Nino\Modules\Components::addComponent( $appData, 'probe', static function( array &$appData, array $args ): string {
 	$element = \Nino\Modules\Components::element( $appData );
 	return $element === null ? 'outside' : 'inside:'. $element['uri']. '#'. $element['id']. '#'. $element['element']['.uri']. '#'. ( $element['model']['title']['type'] ?? '-' );
-}, [ 'label' => 'Probe', 'source' => 'none' ] );
+}, [ 'label' => 'Probe', 'source' => 'none', 'group' => 'global' ] );
 \Nino\Modules\Components::addComponent( $appData, 'values', static function( array &$appData, array $args ): string {
 	$value = \Nino\Modules\Components::value( $appData, $args['of'], $args['kind'] );
 	return '<i>'. ( $value === null ? 'NULL' : $value ). '</i>';
-}, [ 'label' => 'Values', 'source' => 'none', 'attributes' => [
+}, [ 'label' => 'Values', 'source' => 'none', 'group' => 'global', 'attributes' => [
 	'of'		=> [ 'type' => 'string', 'default' => '' ],
 	'kind'	=> [ 'type' => 'select', 'options' => [ 'text', 'image', 'href' ], 'default' => 'text' ],
 ] ] );
@@ -1831,7 +1870,7 @@ check( '...the others take no link: the card holds buttons, the button has an ad
 check( '...and a component of a project that says link is wrapped the same way, a component that does not is not',
 	$render( '[linkprobe /template/page-home/hero/title href="#x" target="_blank"]' ) === '<a href="#x" target="_blank" rel="noopener"><i>Hi &#91;there]</i></a>' && $render( '[linkprobe /template/page-home/hero/title]' ) === '<i>Hi &#91;there]</i>'
 	&& ( static function() use ( &$appData, $render ): bool {
-		\Nino\Modules\Components::addComponent( $appData, 'plainprobe', static fn( array &$appData, array $args ): string => '<i>'. $args['value']. '</i>', [ 'label' => 'x', 'source' => 'text' ] );
+		\Nino\Modules\Components::addComponent( $appData, 'plainprobe', static fn( array &$appData, array $args ): string => '<i>'. $args['value']. '</i>', [ 'label' => 'x', 'source' => 'text', 'group' => 'global' ] );
 		return $render( '[plainprobe /template/page-home/hero/title href="#x"]' ) === '<i>Hi &#91;there]</i>';
 	} )() );
 
@@ -1883,7 +1922,7 @@ check( '...an id is a slug that starts with a letter, the whole of it: one with 
 // A project's own component replaces the one of the kernel, and nothing else answers for it
 \Nino\Modules\Components::addComponent( $appData, 'title', static function( array &$appData, array $args ): string {
 	return '<'. $args['tag']. ' class="mine">'. $args['value']. '</'. $args['tag']. '>';
-}, [ 'label' => 'Title', 'source' => 'text', 'attributes' => [ 'tag' => [ 'type' => 'select', 'options' => [ 'h1', 'h2', 'h3' ], 'default' => 'h3', 'label' => 'Tag' ] ] ] );
+}, [ 'label' => 'Title', 'source' => 'text', 'group' => 'section', 'attributes' => [ 'tag' => [ 'type' => 'select', 'options' => [ 'h1', 'h2', 'h3' ], 'default' => 'h3', 'label' => 'Tag' ] ] ] );
 check( 'a component registered again replaces the one before it: its renderer, its defaults, its options', $render( '[title /template/page-home/hero/title]' ) === '<h3 class="mine">Hi &#91;there]</h3>'
 	&& $render( '[title /template/page-home/hero/title tag="h4"]' ) === '<h3 class="mine">Hi &#91;there]</h3>'
 	&& \Nino\Modules\Components::defaults( $appData, 'title' ) === [ 'tag' => 'h3', 'class' => '' ] && count( \Nino\Callbacks::registered( $appData, '/nino/html/shortcode/title' ) ) === 1 );
@@ -1892,8 +1931,8 @@ check( '...and the kernel takes it back by registering its own again', $render( 
 
 // The words a bool attribute is read by are the two tables of the class, which
 // \Nino\Feature::flag() reads a flag of a shortcode without a schema by as well
-\Nino\Modules\Components::addComponent( $appData, 'wordprobe', static fn( array &$appData, array $args ): string => $args['wide'], [ 'label' => 'Probe', 'source' => 'none', 'attributes' => [ 'wide' => [ 'type' => 'bool', 'default' => false ] ] ] );
-\Nino\Modules\Components::addComponent( $appData, 'worddefault', static fn( array &$appData, array $args ): string => $args['wide'], [ 'label' => 'Probe', 'source' => 'none', 'attributes' => [ 'wide' => [ 'type' => 'bool', 'default' => true ] ] ] );
+\Nino\Modules\Components::addComponent( $appData, 'wordprobe', static fn( array &$appData, array $args ): string => $args['wide'], [ 'label' => 'Probe', 'source' => 'none', 'group' => 'global', 'attributes' => [ 'wide' => [ 'type' => 'bool', 'default' => false ] ] ] );
+\Nino\Modules\Components::addComponent( $appData, 'worddefault', static fn( array &$appData, array $args ): string => $args['wide'], [ 'label' => 'Probe', 'source' => 'none', 'group' => 'global', 'attributes' => [ 'wide' => [ 'type' => 'bool', 'default' => true ] ] ] );
 check( 'every word of ON reads as on and every word of OFF as off, whatever the case of its letters', array_filter( \Nino\Modules\Components::ON, static fn( string $word ): bool => $render( '[worddefault wide="'. $word. '"]' ) !== '1' || $render( '[wordprobe wide="'. strtoupper( $word ). '"]' ) !== '1' ) === []
 	&& array_filter( \Nino\Modules\Components::OFF, static fn( string $word ): bool => $render( '[wordprobe wide="'. $word. '"]' ) !== '0' || $render( '[worddefault wide="'. strtoupper( $word ). '"]' ) !== '0' ) === [] );
 check( '...no word is in both tables, and any other word is the default', array_intersect( \Nino\Modules\Components::ON, \Nino\Modules\Components::OFF ) === [] && $render( '[wordprobe wide="maybe"]' ) === '0' && $render( '[worddefault wide="maybe"]' ) === '1' );
