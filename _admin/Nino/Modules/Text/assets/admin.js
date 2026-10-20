@@ -269,25 +269,52 @@
 
 		/**
 		 *	Drill-down navigation: list -> row form. The main
-		 *	System/Text/Elements bar stays visible throughout.
+		 *	System/Text/Elements bar stays visible throughout. The focus stays
+		 *	where it is, unless it stood in the level that is hidden now (see
+		 *	Nino.adminUi.showLevel()): the level is shown again as it stands, by the
+		 *	address. Back goes to the row, and what a person opens takes the
+		 *	focus in
+		 *
+		 *	@param		{string|null}	[group]		Back: the row that was open, to give the focus to; null where there is none to name
 		 *
 		 *	@return		void
 		 */
-		_showList : function() {
-			dc.getElementById('text-list').classList.remove('admin-hidden');
-			dc.getElementById('text-form').classList.add('admin-hidden');
+		_showList : function( group ) {
 			Nino.admin.router.set( 'text', [] );
 
 			// What was edited in the form, or the language it was in, is not
-			// what the list showed when it was last drawn
+			// what the list showed when it was last drawn - and drawn before the
+			// focus goes back, so that the row it goes to is there
 			if( Nino.admin.text._model !== null )
 				Nino.admin.text._renderCategoryList();
+
+			if( group === undefined )
+				Nino.adminUi.showLevel( 'text-list', { focus : false } );
+			else
+				Nino.adminUi.backTo( 'text-list', group === null ? null : Nino.admin.text._rowOf( group ) );
 		},
 
-		_showForm : function() {
-			dc.getElementById('text-list').classList.add('admin-hidden');
-			dc.getElementById('text-form').classList.remove('admin-hidden');
+		/**
+		 *	@param		{boolean}	[opened]	The person opened it: the focus goes into the form
+		 *
+		 *	@return		void
+		 */
+		_showForm : function( opened ) {
 			Nino.admin.router.set( 'text', Nino.admin.textKeys.hashParts( Nino.admin.text._currentGroup, Nino.admin.text._focusKey ) );
+			Nino.adminUi.showLevel( 'text-form', opened === true ? {} : { focus : false } );
+		},
+
+		/**
+		 *	The button of a row as the list is drawn now: the list is drawn again
+		 *	whenever it is shown, and the button that was pressed is gone with the
+		 *	old drawing
+		 *
+		 *	@param		{string}	group			The row's id
+		 *
+		 *	@return		{Element|null}
+		 */
+		_rowOf : function( group ) {
+			return Array.from( dc.getElementById('text-list').querySelectorAll('button') ).find( function( button ) { return button.dataset.group === group } ) ?? null;
 		},
 
 		/**
@@ -469,7 +496,7 @@
 				btn.appendChild( chev );
 				btn.addEventListener( 'click', function() {
 					Nino.admin.router.go( 'text', Nino.admin.textKeys.hashParts( id ) );
-					Nino.admin.text._openGroup( id );
+					Nino.admin.text._openGroup( id, null, true );
 				} );
 
 				list.appendChild( btn );
@@ -542,7 +569,7 @@
 		_renderHit : function( hit, locale ) {
 			return Nino.admin.textKeys.hitElement( hit, locale, function() {
 				Nino.admin.router.go( 'text', Nino.admin.textKeys.hashParts( hit.item.row.id, hit.item.field.entry.key ) );
-				Nino.admin.text._openGroup( hit.item.row.id, hit.item.field.entry.key );
+				Nino.admin.text._openGroup( hit.item.row.id, hit.item.field.entry.key, true );
 			}, Nino.admin.text._setLocale );
 		},
 
@@ -552,10 +579,11 @@
 		 *
 		 *	@param		{string}		group					The row's id
 		 *	@param		{string|null}	[key]
+		 *	@param		{boolean}			[opened]			The person opened it - a row, or a hit: the focus goes into the form, to the field of the key where there is one. Otherwise it is shown as it stands, by the address
 		 *
 		 *	@return		void
 		 */
-		_openGroup : function( group, key ) {
+		_openGroup : function( group, key, opened ) {
 
 			Nino.admin.text._destroyHtmlEditors();
 
@@ -568,7 +596,7 @@
 			Nino.admin.text._fieldEls 			= {};
 
 			Nino.admin.text._renderGroupForm();
-			Nino.admin.text._showForm();
+			Nino.admin.text._showForm( opened === true );
 
 			if( Nino.admin.text._focusKey !== null )
 				Nino.admin.text._focusField( Nino.admin.text._focusKey );
@@ -1020,7 +1048,7 @@
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/text/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'text', [] ); Nino.admin.text._destroyHtmlEditors(); Nino.admin.text._showList() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'text', [] ); Nino.admin.text._destroyHtmlEditors(); Nino.admin.text._showList( Nino.admin.text._currentGroup ) } );
 			const toolbar = Nino.admin.formToolbar( backLink );
 			wrap.appendChild( toolbar );
 

@@ -398,6 +398,36 @@ dirtyAnswer = false;
 fire( narrowedForm, 'input' );
 check( '...back as well, when what was typed is undone', narrowed.state === 'idle' );
 
+// --- the sentence at a field
+
+const fields = element('form');
+const nameLabel = element('label');
+const nameInput = element('input');
+nameLabel.appendChild( nameInput );
+fields.appendChild( nameLabel );
+// Whatever the caller says: the helper owns no strings, and this one is no sentence of the workbench
+const said = 'SENTENCE';
+const sentence = ui.fieldError( nameLabel, nameInput, 'name-error', said );
+check( 'a sentence at a field is a paragraph of the field error type, after the label and not in it', sentence.tagName === 'P' && sentence.id === 'name-error' && sentence.className === 'nino-admin-field-error' && sentence.textContent === said
+	&& fields.children.indexOf( sentence ) === fields.children.indexOf( nameLabel ) + 1 && nameLabel.children.indexOf( sentence ) === -1 );
+check( '...the control is marked invalid and points at the sentence, which is not an alert', nameInput.attributes['aria-invalid'] === 'true' && nameInput.attributes['aria-describedby'] === 'name-error' && sentence.attributes.role === undefined );
+
+const block = element('div');
+const notes = element('textarea');
+block.appendChild( notes );
+const last = ui.fieldError( block, notes, 'notes-error', 'x' );
+check( 'a block that is no label gets the sentence at its end', block.children[block.children.length - 1] === last && notes.attributes['aria-describedby'] === 'notes-error' );
+
+const editor = element('div');
+ui.fieldError( editor, null, 'body-error', 'x' );
+check( 'no control marks nothing - an editor marks itself', editor.attributes['aria-invalid'] === undefined && editor.attributes['aria-describedby'] === undefined && editor.children.length === 1 );
+
+fields.appendChild( block );
+ui.clearFieldErrors( fields );
+check( 'clearing a form takes every sentence and every mark off again', fields.children.indexOf( sentence ) === -1 && block.children.indexOf( last ) === -1
+	&& nameInput.attributes['aria-invalid'] === undefined && nameInput.attributes['aria-describedby'] === undefined && notes.attributes['aria-invalid'] === undefined && notes.attributes['aria-describedby'] === undefined );
+check( '...and nothing else: the labels and the controls stay', fields.children.indexOf( nameLabel ) !== -1 && nameLabel.children[0] === nameInput && block.children[0] === notes );
+
 // --- the limits
 
 check( 'limits() reads what the shell wrote onto its wrapper', JSON.stringify( ui.limits() ) === '{"bytes":2097152,"pixels":20000000}' );

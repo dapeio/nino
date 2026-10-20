@@ -69,6 +69,9 @@
 		// renames) or 'scan' - and the rows of the scan form, for isDirty()
 		_view						: null,
 		_scanRows				: [],
+		// The button that opened the form of a key's own or the scan: Back
+		// returns the focus to it (a row's own link is found again, see _backTarget())
+		_opener					: null,
 		// The key the form of 'new' renames, null while it creates one; whether
 		// the namespaces that normally belong to a template, a feature or a module
 		// are unlocked; what the form held when it was drawn, for isDirty()
@@ -262,16 +265,48 @@
 			Nino.adminUi.showError( container, status, response, '/_admin/common/error/load' );
 		},
 
-		_showList : function() {
-			dc.getElementById('keys-list').classList.remove('admin-hidden');
-			dc.getElementById('keys-form').classList.add('admin-hidden');
+		/**
+		 *	The list or the form again as they stand: the focus stays where it is,
+		 *	unless it stood in the level that is hidden now (see
+		 *	Nino.adminUi.showLevel()). Back goes to the control that opened the
+		 *	form, and what a person opens takes the focus in
+		 *
+		 *	@param		{Element|null}	[opener]	Back: the control to give the focus to; null where there is none to name
+		 *
+		 *	@return		void
+		 */
+		_showList : function( opener ) {
 			Nino.admin.router.set( 'keys', [] );
+
+			if( opener === undefined )
+				Nino.adminUi.showLevel( 'keys-list', { focus : false } );
+			else
+				Nino.adminUi.backTo( 'keys-list', opener );
 		},
 
-		_showForm : function() {
-			dc.getElementById('keys-list').classList.add('admin-hidden');
-			dc.getElementById('keys-form').classList.remove('admin-hidden');
+		/**
+		 *	@param		{boolean}	[opened]	The person opened it: the focus goes into the form
+		 *
+		 *	@return		void
+		 */
+		_showForm : function( opened ) {
 			Nino.admin.router.set( 'keys', Nino.admin.keys._view === 'group' ? Nino.admin.textKeys.hashParts( Nino.admin.keys._currentGroup, Nino.admin.keys._focusKey ) : [] );
+			Nino.adminUi.showLevel( 'keys-form', opened === true ? {} : { focus : false } );
+		},
+
+		/**
+		 *	The control Back returns the focus to from the form that is open: the
+		 *	row of the group as the list is drawn now, or the button that opened a
+		 *	form of a key's own or the scan
+		 *
+		 *	@return		{Element|null}
+		 */
+		_backTarget : function() {
+
+			if( Nino.admin.keys._view !== 'group' )
+				return Nino.admin.keys._opener;
+
+			return Array.from( dc.getElementById('keys-list').querySelectorAll('a') ).find( function( link ) { return link.dataset.group === Nino.admin.keys._currentGroup } ) ?? null;
 		},
 
 		/**
@@ -317,7 +352,7 @@
 		_renderHit : function( hit, locale ) {
 			return Nino.admin.textKeys.hitElement( hit, locale, function() {
 				Nino.admin.router.go( 'keys', Nino.admin.textKeys.hashParts( hit.item.row.id, hit.item.field.entry.key ) );
-				Nino.admin.keys._openGroup( hit.item.row.id, hit.item.field.entry.key );
+				Nino.admin.keys._openGroup( hit.item.row.id, hit.item.field.entry.key, true );
 			}, Nino.admin.keys._setLocale );
 		},
 
@@ -449,19 +484,19 @@
 			scanBtn.type = 'button';
 			scanBtn.className = 'nino-admin-btn-secondary';
 			scanBtn.textContent = Nino.content.getText('/_admin/keys/label/scan');
-			scanBtn.addEventListener( 'click', function() { Nino.admin.keys._openScanForm() } );
+			scanBtn.addEventListener( 'click', function() { Nino.admin.keys._openScanForm( scanBtn ) } );
 
 			const addBtn = dc.createElement('button');
 			addBtn.type = 'button';
 			addBtn.className = 'nino-admin-btn-primary';
 			addBtn.textContent = Nino.content.getText('/_admin/keys/label/new');
-			addBtn.addEventListener( 'click', function() { Nino.admin.keys._openNewKeyForm() } );
+			addBtn.addEventListener( 'click', function() { Nino.admin.keys._openNewKeyForm( null, addBtn ) } );
 			wrap.appendChild( Nino.adminUi.listActions( [ scanBtn, addBtn ] ) );
 		},
 
 		/**
 		 *	The rows, in the blocks and groups textkeys.js made of them: each a
-		 *	link that opens the row's form
+		 *	link that opens the row's form, and has its address
 		 *
 		 *	@param		{Element}	body
 		 *
@@ -501,9 +536,10 @@
 
 						const row = model.rows[id];
 
+						// A row opens a form and writes its address: a link, with that address
 						const li = dc.createElement('li');
 						const link = dc.createElement('a');
-						link.href = '#';
+						link.href = Nino.admin.router.href( 'keys', Nino.admin.textKeys.hashParts( id ) );
 						link.dataset.group = id;
 
 						const copy = dc.createElement('span');
@@ -520,7 +556,7 @@
 						link.addEventListener( 'click', function( ev ) {
 							ev.preventDefault();
 							Nino.admin.router.go( 'keys', Nino.admin.textKeys.hashParts( id ) );
-							Nino.admin.keys._openGroup( id );
+							Nino.admin.keys._openGroup( id, null, true );
 						} );
 						li.appendChild( link );
 						ul.appendChild( li );
@@ -539,10 +575,11 @@
 		 *
 		 *	@param		{string}		group					The row's id
 		 *	@param		{string|null}	[key]
+		 *	@param		{boolean}			[opened]			The person opened it - a row, or a hit: the focus goes into the form, to the field of the key where there is one. Otherwise it is shown as it stands, by the address
 		 *
 		 *	@return		void
 		 */
-		_openGroup : function( group, key ) {
+		_openGroup : function( group, key, opened ) {
 
 			Nino.admin.keys._destroyHtmlEditors();
 
@@ -556,7 +593,7 @@
 			Nino.admin.keys._fieldEls 			= {};
 
 			Nino.admin.keys._renderGroupForm();
-			Nino.admin.keys._showForm();
+			Nino.admin.keys._showForm( opened === true );
 
 			if( Nino.admin.keys._focusKey !== null )
 				Nino.admin.keys._focusField( Nino.admin.keys._focusKey );
@@ -630,7 +667,7 @@
 				renameBtn.type = 'button';
 				renameBtn.className = 'admin-text-key-btn';
 				renameBtn.textContent = Nino.content.getText('/_admin/common/label/rename');
-				renameBtn.addEventListener( 'click', function() { Nino.admin.keys._openNewKeyForm( entry.key ) } );
+				renameBtn.addEventListener( 'click', function() { Nino.admin.keys._openNewKeyForm( entry.key, renameBtn ) } );
 				header.appendChild( renameBtn );
 			}
 
@@ -1182,7 +1219,7 @@
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/common/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'keys', [] ); Nino.admin.keys._destroyHtmlEditors(); Nino.admin.keys._showList() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'keys', [] ); Nino.admin.keys._destroyHtmlEditors(); Nino.admin.keys._showList( Nino.admin.keys._backTarget() ) } );
 
 			// A row can carry hundreds of keys - the back link and the
 			// locale switch ride along in one pinned row instead of scrolling
@@ -1398,17 +1435,19 @@
 		 *	with the key's segments. Leaving the row that held the key asks about
 		 *	unsaved input first
 		 *
-		 *	@param		{string}	[fromKey]			The key to rename
+		 *	@param		{string|null}	[fromKey]			The key to rename
+		 *	@param		{Element}			[opener]			The button that was pressed: Back returns the focus to it
 		 *
 		 *	@return		void
 		 */
-		_openNewKeyForm : function( fromKey ) {
+		_openNewKeyForm : function( fromKey, opener ) {
 
 			const open = function() {
 				Nino.admin.keys._renameFrom = typeof fromKey === 'string' ? fromKey : null;
+				Nino.admin.keys._opener = opener ?? null;
 				Nino.admin.keys._view = 'new';
 				Nino.admin.keys._renderNewKeyForm();
-				Nino.admin.keys._showForm();
+				Nino.admin.keys._showForm( true );
 			};
 
 			if( typeof fromKey === 'string' )
@@ -1508,7 +1547,7 @@
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/common/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); keys._showList() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); keys._showList( keys._backTarget() ) } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const title = dc.createElement('div');
@@ -1800,9 +1839,10 @@
 		 *
 		 *	@return		void
 		 */
-		_openScanForm : function() {
+		_openScanForm : function( opener ) {
 
 			Nino.admin.keys._view = 'scan';
+			Nino.admin.keys._opener = opener ?? null;
 			Nino.admin.keys._scanRows = [];
 
 			const wrap = dc.getElementById('keys-form');
@@ -1812,7 +1852,7 @@
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/common/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.keys._showList() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.keys._showList( Nino.admin.keys._backTarget() ) } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const title = dc.createElement('div');
@@ -1825,7 +1865,7 @@
 			msg.textContent = Nino.content.getText('/_admin/common/msg/scanning');
 			wrap.appendChild( msg );
 
-			Nino.admin.keys._showForm();
+			Nino.admin.keys._showForm( true );
 
 			Nino.admin.keys._apiCall( 'scan', {}, function( status, response ) {
 				if( status !== 200 || response === null ) {
@@ -1864,14 +1904,21 @@
 		_renderScanForm : function( missing, alsoUsed ) {
 
 			const wrap = dc.getElementById('keys-form');
+
+			// The form that stood while the scan ran had the focus, on its back link:
+			// the one that replaces it takes it over
+			const held = ( dc.activeElement ?? null ) !== null && dc.activeElement.closest('#keys-form') !== null;
 			wrap.innerHTML = '';
 
 			const backLink = dc.createElement('a');
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/common/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.keys._showList() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.keys._showList( Nino.admin.keys._backTarget() ) } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
+
+			if( held === true )
+				backLink.focus();
 
 			const title = dc.createElement('div');
 			title.className = 'main-title';

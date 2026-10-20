@@ -142,6 +142,21 @@
 			},
 
 			/**
+			 *	The address a level has, for a link that opens it: the same hash
+			 *	go() and set() write. A row that opens an account or a list of texts
+			 *	is a link with this for its href, so that the address can be copied
+			 *	and opened in a tab of its own, and says where it goes
+			 *
+			 *	@param		{string}	panel
+			 *	@param		{Array}		[parts]
+			 *
+			 *	@return		{string}
+			 */
+			href : function( panel, parts ) {
+				return Nino.admin.router._hash( panel, parts );
+			},
+
+			/**
 			 *	Write #panel/part/part/... into the address: replacing the entry
 			 *	the browser is on - or adding one, when the shell flagged the
 			 *	switch in progress as the person's own move (the one-shot _push)
@@ -1408,8 +1423,18 @@
 				const menu 		= dc.getElementById('admin-nav-ui-menu');
 				if( menu === null || toggle === null )
 					return;
+
+				// The focus goes back to the button that opened the menu when it was in
+				// the menu: a hidden element keeps no focus, and the Tab key would start
+				// again at the top of the page. Not when it is elsewhere - a click on
+				// another control closed the menu and took the focus there
+				const held = menu.contains( dc.activeElement );
+
 				menu.classList.add('admin-hidden');
 				toggle.setAttribute( 'aria-expanded', 'false' );
+
+				if( held === true )
+					toggle.focus();
 			},
 		},
 
@@ -1968,6 +1993,29 @@
 			}
 
 			/**
+			 *	Put the focus on the name of the panel a person has just opened from
+			 *	the rail. The pane is new to them, and the Tab key would otherwise
+			 *	carry on from the link they pressed - through the rest of the rail -
+			 *	to the first control of a page they have not read yet. The name is the
+			 *	h2 of the pane's head: it takes the focus and is no stop of the Tab key
+			 *
+			 *	@param		{string}	panel					Panel name
+			 *
+			 *	@return		void
+			 */
+			function focusTitle( panel ) {
+
+				const pane		= panels[panel] === undefined ? null : panels[panel][1];
+				const title		= pane === null ? null : pane.querySelector(':scope > .admin-panel-head > .admin-panel-title');
+
+				if( title === null )
+					return;
+
+				title.setAttribute( 'tabindex', '-1' );
+				title.focus();
+			}
+
+			/**
 			 *	What selectTab() does, without the history entry
 			 *
 			 *	@param		{string}	panel
@@ -2076,6 +2124,24 @@
 						return;
 					ev.preventDefault();
 					selectTab( panel, undefined, true );
+					focusTitle( panel );
+				} );
+			} );
+			// The skip link is a real one, and the address belongs to the router: an
+			// anchor jump would write #admin-content-wrap into it and be answered as a
+			// panel. The jump is made here, onto the pane, and writes nothing. The pane
+			// can take the focus for the jump only: one that always could would take it
+			// from a click on any text in it, and the Tab key would start again at its
+			// first control instead of after the text that was clicked
+			const content = dc.getElementById('admin-content-wrap');
+			dc.querySelectorAll('.nino-admin-skip').forEach( function( skip ) {
+				skip.addEventListener( 'click', function( ev ) {
+					ev.preventDefault();
+					if( content === null )
+						return;
+					content.setAttribute( 'tabindex', '-1' );
+					content.addEventListener( 'blur', function() { content.removeAttribute('tabindex') }, { once : true } );
+					content.focus();
 				} );
 			} );
 			// The strip stands in the pane's head, beside the panel's name

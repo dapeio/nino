@@ -202,6 +202,135 @@ check( 'no shared rule takes a focus ring off without putting one back'+ ( unrin
 check( 'a clickable table row draws its own ring, inside the row the scroller would clip',
 	/:where\(\.nino-admin\) \.nino-admin-table tbody tr:focus-visible \{[^}]*outline: 2px solid var\(--editor-blue\);[^}]*outline-offset: -2px;/s.test( sharedCss ) );
 
+/*	The accessibility pass on the workbench's stylesheet: what a keyboard sees,
+	what an ink reads against, and what a screen reader is given. Read from the
+	tokens and the rules themselves, so that a colour changed later is measured
+	and not remembered	*/
+{
+	const tokensOf = function( block ) {
+		const out = {};
+		block.replace( /(--[\w-]+):\s*([^;]+);/g, function( all, name, value ) { out[name] = value.trim(); return all } );
+		return out;
+	};
+	const light = tokensOf( css.match( /:root \{([^}]*)\}/ )[1] );
+	const dark = Object.assign( {}, light, tokensOf( css.match( /:root\[data-theme="dark"\] \{([^}]*)\}/ )[1] ) );
+	const resolve = function( tokens, value ) {
+		const reference = /^var\((--[\w-]+)\)$/.exec( value );
+		return reference === null ? value : resolve( tokens, tokens[reference[1]] );
+	};
+	// The red, green and blue of a colour written as hex or as rgb()
+	const channels = function( value ) {
+		const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec( value );
+		if( hex !== null ) {
+			const full = hex[1].length === 3 ? hex[1].replace( /./g, function( c ) { return c+ c } ) : hex[1];
+			return [ 0, 2, 4 ].map( function( at ) { return parseInt( full.slice( at, at+ 2 ), 16 ) } );
+		}
+		return value.match( /rgba?\(([^)]*)\)/ )[1].split(',').map( Number ).slice( 0, 3 );
+	};
+	const luminance = function( value ) {
+		const c = channels( value ).map( function( n ) { const s = n/ 255; return s <= .03928 ? s/ 12.92 : Math.pow( ( s+ .055 )/ 1.055, 2.4 ) } );
+		return .2126* c[0]+ .7152* c[1]+ .0722* c[2];
+	};
+	const ratio = function( ink, ground ) {
+		const a = luminance( ink ), b = luminance( ground );
+		return ( Math.max( a, b )+ .05 )/ ( Math.min( a, b )+ .05 );
+	};
+	const read = function( tokens, name ) { return resolve( tokens, tokens[name] ) };
+	// A tint written as rgba(): the colour it makes over the ground it stands on
+	const soft = function( tokens, name, ground ) {
+		const parts = read( tokens, name ).match( /rgba\(([^)]*)\)/ )[1].split(',').map( Number );
+		return 'rgb('+ [ 0, 1, 2 ].map( function( at ) { return Math.round( parts[at]* parts[3]+ channels( ground )[at]* ( 1- parts[3] ) ) } ).join(',')+ ')';
+	};
+
+	[ [ 'light', light ], [ 'dark', dark ] ].forEach( function( scheme ) {
+		const tokens = scheme[1], name = scheme[0];
+		const page = read( tokens, '--editor-bg' ), card = read( tokens, '--editor-bg-elevated' );
+		const worst = function( ink, grounds ) { return Math.min.apply( null, grounds.map( function( ground ) { return ratio( read( tokens, ink ), ground ) } ) ) };
+
+		check( name+ ': the muted ink reads on the page and on a card - and so does a placeholder, which is the same ink', worst( '--editor-text-secondary', [ page, card ] ) >= 4.5 );
+		check( name+ ': the ink of an error reads on the page, on a card and on the tint of a destructive button', worst( '--editor-red-ink', [ page, card, soft( tokens, '--editor-red-soft', card ) ] ) >= 4.5 );
+		check( name+ ': the inks of "saved" and "unsaved" read on a card', worst( '--editor-green', [ card ] ) >= 4.5 && worst( '--editor-orange-ink', [ card ] ) >= 4.5 );
+		check( name+ ': the pill of the translations screen reads on its own tint, in the darker step of the blue', worst( '--editor-blue-hover', [ soft( tokens, '--editor-blue-soft', card ) ] ) >= 4.5
+			&& /\.admin-translations-intro > span \{[^}]*background: var\(--editor-blue-soft\);[^}]*color: var\(--editor-blue-hover\);/s.test( adminAsset( 'Language', 'admin.css' ) ) );
+		check( name+ ': the active ink reads on the blue of a primary action and of its hover, and on the red of a destructive one', [ '--editor-blue', '--editor-blue-hover', '--editor-red' ].every( function( ground ) { return ratio( read( tokens, '--nino-admin-active-text' ), read( tokens, ground ) ) >= 4.5 } ) );
+	} );
+	check( 'the surfaces keep their colours: the red and the orange of a border or a tint are not the inks', light['--editor-red'] === '#dc2626' && light['--editor-orange'] === '#d97706' && light['--editor-red-ink'] !== light['--editor-red'] && light['--editor-orange-ink'] !== light['--editor-orange'] );
+	check( '...and in the dark scheme the ink is the colour itself', dark['--editor-red-ink'] === 'var(--editor-red)' && dark['--editor-orange-ink'] === 'var(--editor-orange)' );
+
+	// No rule writes white on a blue or a red ground: it is the ink of the scheme, which is dark on the light blue
+	const whiteOnFill = [];
+	sharedCss.replace( /([^{}]+)\{([^}]*)\}/g, function( rule, selector, body ) {
+		if( /background:\s*var\(--editor-(blue|blue-hover|red)\)/.test( body ) === true && /(^|[;\s])color:\s*(#fff\b|#ffffff|white)/.test( body ) === true && /brand/.test( selector ) === false )
+			whiteOnFill.push( selector.trim().split('\n').pop().trim() );
+		return rule;
+	} );
+	check( 'no rule of the design system writes white on the blue or the red of a ground'+ ( whiteOnFill.length ? ' - '+ whiteOnFill.join(' | ') : '' ), whiteOnFill.length === 0 );
+	// The red and the orange are surfaces - a border, a tint, the fill of a destructive button - and a word has the ink
+	const surfaceAsInk = [];
+	[ [ 'style.css', css ], [ 'install/style.css', fs.readFileSync( path.join( __dirname, '../_admin/install/assets/style.css' ), 'utf8' ) ] ]
+		.concat( ADMIN_MODULES.filter( m => fs.existsSync( path.join( __dirname, '../_admin/Nino/Modules/', m, 'assets/admin.css' ) ) ).map( m => [ m+ '/admin.css', adminAsset( m, 'admin.css' ) ] ) )
+		.forEach( function( sheet ) {
+			sheet[1].replace( /(^|[;{\s])color:\s*var\(--editor-(red|orange)\)/g, function( all ) { surfaceAsInk.push( sheet[0] ); return all } );
+		} );
+	check( 'no rule writes the red or the orange of a surface as the colour of a word - the ink has its own token'+ ( surfaceAsInk.length ? ' - '+ surfaceAsInk.join(', ') : '' ), surfaceAsInk.length === 0 );
+	check( 'a submit button without the primary class is not tinted on hover: the primary rule has it, and the tint would take the surface from its white ink', /button:hover:not\(:disabled\)[^{]*:not\(\.nino-admin-btn-primary\)[^{]*:not\(\[type="submit"\]\) \{/.test( sharedCss ) );
+	// The tint weighs more than the destructive hover (every :not() counts): left to it, the red the hover fills the button with is never painted, and its word lies on the blue tint
+	const tintRule = /:where\(\.nino-admin\) (button:hover:not\(:disabled\)[^{]*) \{/.exec( sharedCss );
+	check( 'a destructive button is not tinted on hover either: its own hover is the red it is filled with, which the active ink reads on'+ ( tintRule === null ? ' - the tint rule is not found' : '' ),
+		tintRule !== null && tintRule[1].includes(':not(.nino-admin-btn-danger)') === true && /\.nino-admin-btn-danger:hover:not\(:disabled\) \{[^}]*background: var\(--editor-red\);[^}]*color: var\(--nino-admin-active-text\);/s.test( sharedCss ) );
+	check( 'the placeholder is the muted ink at full opacity', /:where\(\.nino-admin\) ::placeholder \{[^}]*color: var\(--editor-text-secondary\);[^}]*opacity: 1;/s.test( sharedCss ) );
+
+	check( 'a heading that is given the focus rings in the blue like a control, and not in the two lines the browser draws', /:is\(h1, h2, h3, h4, h5, h6, \[role="heading"\]\)\[tabindex="-1"\]:focus-visible \{[^}]*outline: 2px solid var\(--editor-blue\);[^}]*outline-offset: 2px;/s.test( sharedCss ) );
+
+	// The room of the bars: the root scroller of a phone and the pane of a desktop
+	check( 'the scroller keeps the room of the bars clear: the action bar below, the context bar above - on the page and on the pane',
+		/\nhtml \{[^}]*scroll-padding-block-start: calc\(var\(--nino-admin-contextbar-height\) \+ \.5rem\);[^}]*scroll-padding-block-end: calc\(var\(--nino-admin-actionbar-height\) \+ \.5rem\);/s.test( sharedCss )
+		&& /\.nino-admin-pane \{[^}]*scroll-padding-block-start: calc\(var\(--nino-admin-contextbar-height\) \+ \.5rem\);[^}]*scroll-padding-block-end: calc\(var\(--nino-admin-actionbar-height\) \+ \.5rem\);/s.test( sharedCss )
+		&& /\.nino-admin-contextbar \{[^}]*min-height: var\(--nino-admin-contextbar-height\);/s.test( sharedCss ) );
+
+	// What a keyboard sees
+	check( 'the chosen tab of a segmented strip rings in the active ink, inside the blue - not in the blue it is filled with - and a --bar tab keeps the blue ring',
+		/\.nino-admin-tabs:not\(\.nino-admin-tabs--bar\) \.nino-admin-tab\.is-active:focus-visible \{[^}]*outline-color: var\(--nino-admin-active-text\);[^}]*outline-offset: -4px;/s.test( sharedCss ) );
+	check( 'a yes/no segment rings round the segment, in the active ink once it is chosen: the radio inside it is invisible',
+		/\.nino-admin-field-radio:has\(input\[type="radio"\]:focus-visible\) \{[^}]*outline: 2px solid var\(--editor-blue\);[^}]*outline-offset: -2px;/s.test( sharedCss )
+		&& /\.nino-admin-field-radio:has\(input\[type="radio"\]:checked:focus-visible\) \{[^}]*outline-color: var\(--nino-admin-active-text\);/s.test( sharedCss ) );
+	check( 'a row of a list of buttons rings inside the row, as a row of links does: the list clips what is outside it',
+		/\.nino-admin-list-buttons > button:focus-visible \{[^}]*outline: none;[^}]*box-shadow: inset 0 0 0 2px var\(--editor-blue\);/s.test( sharedCss ) );
+	check( 'the focus of a field is the border it has - a file, a colour, a checkbox and a radio have none, and get the ring of a button',
+		/:is\(input:where\(:not\(\[type="file"\], \[type="color"\], \[type="checkbox"\], \[type="radio"\]\)\), textarea, select, \[contenteditable\]\):focus \{[^}]*outline: none;/s.test( sharedCss )
+		&& /:is\(input, textarea, select, button, a\):focus-visible \{[^}]*outline: 2px solid var\(--editor-blue\);/s.test( sharedCss ) );
+	check( 'the language picker of the bar and of the login page rings in the blue, in the layer that outranks the field rule',
+		/@layer nino\.local \{[\s\S]*#admin-page-wrap #admin-localepicker:focus-visible,\s*#form-login #admin-localepicker:focus-visible \{[^}]*outline: 2px solid var\(--editor-blue\);/.test( css ) );
+	check( 'what the skip link jumps to rings inside the pane, and the link itself waits above the screen until it has the focus',
+		/\.nino-admin-pane:focus-visible \{[^}]*outline: 2px solid var\(--editor-blue\);[^}]*outline-offset: -2px;/s.test( sharedCss )
+		&& /\.nino-admin-skip \{[^}]*position: fixed;[^}]*transform: translateY\(-200%\);/s.test( sharedCss ) && /\.nino-admin-skip:focus \{[^}]*transform: none;/s.test( sharedCss ) );
+
+	// A button that is a row of a list looks like the link it replaces
+	check( 'a row of a list that is a button is the width of the list, reads from the left and has none of the button\'s own surface, weight and ring',
+		/\.nino-admin-list li > button\.nino-admin-list-link \{[^}]*width: 100%;[^}]*border: 0;[^}]*background: transparent;[^}]*box-shadow: none;[^}]*font-weight: inherit;[^}]*text-align: left;/s.test( sharedCss ) );
+	check( '...and takes the hover, the inside ring and the chevron of the link rows',
+		/\.nino-admin-list li > :is\(a, button\.nino-admin-list-link\):hover \{/.test( sharedCss ) && /\.nino-admin-list li > :is\(a, button\.nino-admin-list-link\):focus-visible \{[^}]*outline: none;[^}]*box-shadow: inset 0 0 0 2px var\(--editor-blue\);/s.test( sharedCss )
+		&& /\.nino-admin-list li > :is\(a, button\.nino-admin-list-link\)::after \{[^}]*content: "›";/s.test( sharedCss ) );
+
+	// What a screen reader is given, and what a phone is given
+	const foldedHidden = /\.nino-admin-shell--folded :is\(([^)]*)\) \{[^}]*display: none;/.exec( sharedCss );
+	check( 'a folded rail does not take the label of its links out of the accessibility tree: it is hidden the way .nino-admin-sr-only hides, and display: none is for the rest',
+		foldedHidden !== null && foldedHidden[1].includes('nino-admin-nav-label') === false && /\.nino-admin-shell--folded \.nino-admin-nav-label \{[^}]*clip-path: inset\(50%\);/s.test( sharedCss ) );
+	check( 'the strip of tabs in a pane\'s head scrolls on its own, and the toolbar of a rich text field wraps - at 390 px neither lets the page scroll sideways',
+		/> \.admin-panel-head > \.admin-panel-tabs \{[^}]*overflow-x: auto;/s.test( workbenchCss ) && /\.nino-admin-richtext-toolbar \{[^}]*flex-wrap: wrap;/s.test( sharedCss ) );
+}
+
+// The shell's two pages: the first stop, the landmark it points at, a disclosure that promises no menu, and a form inside a main
+{
+	const indexTemplate = fs.readFileSync( path.join( __dirname, '../_admin/templates/page-index.tpl' ), 'utf8' );
+	const loginTemplate = fs.readFileSync( path.join( __dirname, '../_admin/templates/page-login.tpl' ), 'utf8' );
+	check( 'the workbench opens with a link past the rail, the first element of the shell, to the main landmark - which is no target of the focus until the link is followed: one that was would take it from a click on any text in the pane',
+		/<div id="admin-page-wrap"[^>]*>\s*<a class="nino-admin-skip" href="#admin-content-wrap">\[\[\/_admin\/label\/skip\]\]<\/a>\s*<aside/.test( indexTemplate ) && /<main id="admin-content-wrap"(?![^>]*tabindex)[^>]*>/.test( indexTemplate ) );
+	check( 'the settings menu is a disclosure - aria-expanded on its button - and promises no menu widget',
+		/id="admin-nav-ui-toggle"[^>]*aria-expanded="false"/.test( indexTemplate ) && indexTemplate.includes('aria-haspopup') === false );
+	check( 'the login form is the content of a main landmark', /<main>\s*<form id="form-login"[\s\S]*<\/form>\s*<\/main>/.test( loginTemplate ) );
+}
+
 /*	Two tab strips, one class each: the segmented one (equal boxes, the open
 	tab filled) and --bar (natural widths, an underline). A :not() weighs as
 	much as the class it names, so a segmented rule that excludes only the
@@ -743,9 +872,12 @@ check( '...and it is hidden only above the phone width, and only in a bar that h
 	/@media \(min-width: 38\.001rem\) \{\s*\.nino-admin \.nino-admin-actionbar:has\(> \.nino-admin-status\) > \.nino-admin-actionbar-dirty \{\s*display: none;/.test( stylesheetSource ) === true );
 
 const askTexts = [ '/_admin/common/confirm/unsaved', '/_admin/common/label/discard', '/_admin/common/label/cancel' ];
-const elementTexts = [ '/_admin/elements/error/json', '/_admin/elements/error/field-required', '/_admin/elements/label/locale-open', '/_admin/elements/error/required' ];
+const elementTexts = [ '/_admin/elements/error/json', '/_admin/elements/label/locale-open', '/_admin/elements/error/required' ];
 check( 'the words of the question are fills in both interface languages',
 	[ 'en_US', 'de_DE' ].every( l => askTexts.every( k => workbenchText( l ).includes( "'[["+ k+ "]]'" ) ) && elementTexts.every( k => adminModuleText( 'Elements', l ).includes( "'[["+ k+ "]]'" ) ) ) );
+// Elements and Routes say an empty required field with one sentence, which is the shell's
+check( 'the sentence at an empty required field is a fill of the shell in both interface languages',
+	[ 'en_US', 'de_DE' ].every( l => workbenchText( l ).includes( "'[[/_admin/common/error/required]]'" ) ) );
 check( '...and the JSON refusal contains no bracket characters (a fill is parsed as a fill key)',
 	[ 'en_US', 'de_DE' ].every( l => { const m = adminModuleText( 'Elements', l ).match( /\[\[\/_admin\/elements\/error\/json\]\]'\s*=>\s*'([^']*)'/ ); return m !== null && /[\[\]]/.test( m[1] ) === false } ) );
 

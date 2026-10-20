@@ -24,7 +24,7 @@
 const fs 	= require('fs');
 const path 	= require('path');
 const vm 		= require('vm');
-const { check, done, load, element, findAll, fire } = require( './harness.js' );
+const { check, done, fills, load, element, findAll, fire } = require( './harness.js' );
 
 const sandbox = {
 	console : console,
@@ -333,7 +333,7 @@ check( '...and a field added in the form has none', elementTypes._fields.find( f
 	check( 'the form offers it for a saved type only, above the danger zone', /_isNew === false \) \{\s*form\.appendChild\( Nino\.admin\.types\._renderDuplicate\(\) \);\s*form\.appendChild\( Nino\.admin\.types\._renderDangerZone\(\) \);/.test( duplicateSource ) );
 	check( 'what is typed into it is no edit of the type', duplicateSource.includes( "uriInput.dataset.dirty = 'ignore'" ) && duplicateSource.includes( "titleInput.dataset.dirty = 'ignore'" ) );
 	const open = duplicateSource.slice( duplicateSource.indexOf( 'const open = Nino.admin.types._openUri' ) );
-	check( 'the copy is opened by the list that loads after it', open.startsWith( 'const open = Nino.admin.types._openUri;' ) && /_openForm\( open \)/.test( open.slice( 0, 300 ) ) );
+	check( 'the copy is opened by the list that loads after it, as the person\'s own move', open.startsWith( 'const open = Nino.admin.types._openUri;' ) && /_openForm\( open, null \)/.test( open.slice( 0, 300 ) ) );
 }
 
 delete sandbox.Nino.content;
@@ -587,6 +587,83 @@ check( 'the danger zone is not rendered while creating a new type',
 	box.Nino.admin.elements = { invalidate : () => dropped.push( true ) };
 	box.Nino.admin.types._invalidateElements();
 	check( '...and where there is one it is told as before, and the stamp is raised once more', told.join() === 'elements,elements' && dropped.length === 1 );
+}
+
+// A row opens a type and writes no address, so it is a button and not a link to nowhere. What is opened takes the
+// focus into the form, Back gives it to the row, and a save - which draws the list anew - leaves it the name of the panel
+{
+	const words = Object.assign( {}, fills('_admin/text/en_US.php'), fills('_admin/Nino/Modules/Elements/text/en_US.php') );
+	const pane = element('div');
+	pane.dataset.panel = 'types';
+	const head = element('div');
+	head.className = 'admin-panel-head';
+	const paneTitle = element('h2');
+	paneTitle.className = 'admin-panel-title';
+	head.appendChild( paneTitle );
+	pane.appendChild( head );
+	const list = element('div');
+	list.id = 'types-list';
+	pane.appendChild( list );
+	const form = element('div');
+	form.id = 'types-form';
+	form.classList.add('admin-hidden');
+	pane.appendChild( form );
+
+	const sent = [];
+	const page = {
+		admin : { formToolbar : function( back ) { const bar = element('div'); bar.appendChild( back ); return bar }, touch : function() {}, stamp : function() { return 0 } },
+		events : { bindCallback : function() {} },
+		http : { sendRequest : function( uri, method, callback, data ) { sent.push( { action : data.action, callback : callback } ) } },
+		content : { getText : function( key ) { return words[key] ?? '' } },
+	};
+	const box = {
+		console : console,
+		document : {
+			createElement : element,
+			createTextNode : function( value ) { return Object.assign( element('#text'), { textContent : String( value ) } ) },
+			getElementById : function( id ) { return findAll( pane, function( el ) { return el.id === id } )[0] ?? null },
+			querySelectorAll : function( selector ) { return pane.querySelectorAll( selector ) },
+			documentElement : null,
+			body : null,
+			get activeElement() { return findAll( pane, function( el ) { return el.focused === true } )[0] ?? null },
+		},
+		Nino : page,
+	};
+	box.window = { Nino : page, confirm : function() { return true }, location : { hash : '' } };
+	const context = vm.createContext( box );
+	load( '_admin/assets/Nino.admin.js', context );
+	load( '_admin/Nino/Modules/Elements/assets/types.js', context, 'elementtypes.js' );
+
+	const drawn = page.admin.types;
+	drawn._types = [ { uri : 'people', title : 'People', fieldCount : 2 }, { uri : 'places', title : 'Places', fieldCount : 1 } ];
+	drawn._fieldTypes = [ 'string', 'integer' ];
+	drawn._renderList();
+	drawn._showList();
+
+	const rowOf = function( title ) { return findAll( list, function( el ) { return el.className === 'nino-admin-list-link' } ).find( function( row ) { return row.children[0].children[0].textContent === title } ) };
+	const focusedNow = function() { return findAll( pane, function( el ) { return el.focused === true } )[0] ?? null };
+	const backLinkOf = function() { return findAll( form, function( el ) { return el.className === 'nino-admin-back-link' } )[0] };
+
+	check( 'a type is a row that opens its form: a button, because no address is written', rowOf('People').tagName === 'BUTTON' && rowOf('People').type === 'button' && rowOf('People').href === '' && rowOf('Places') !== undefined );
+
+	fire( rowOf('People'), 'click' );
+	sent[sent.length - 1].callback( { status : 200, responseJSON : { uri : 'people', title : 'People', model : { name : { type : 'string' } }, next : '00001', autoincrement : false } } );
+	check( 'opening a type shows its form once it has answered, and moves the focus into it', form.classList.contains('admin-hidden') === false && list.classList.contains('admin-hidden') === true && backLinkOf() !== undefined && focusedNow() === backLinkOf() );
+
+	fire( backLinkOf(), 'click' );
+	check( 'Back shows the list and puts the focus on the row that was opened', list.classList.contains('admin-hidden') === false && form.classList.contains('admin-hidden') === true && focusedNow() === rowOf('People') );
+
+	const addButton = findAll( list, function( el ) { return el.className === 'nino-admin-btn-primary' } )[0];
+	fire( addButton, 'click' );
+	check( 'a new type opens at once, with the focus in its form', form.classList.contains('admin-hidden') === false && focusedNow() === backLinkOf() );
+	fire( backLinkOf(), 'click' );
+	check( '...and Back returns to the New type button', focusedNow() === addButton );
+
+	fire( rowOf('Places'), 'click' );
+	sent[sent.length - 1].callback( { status : 200, responseJSON : { uri : 'places', title : 'Places', model : { name : { type : 'string' } }, next : '00001', autoincrement : false } } );
+	findAll( form, function( el ) { return el.tagName === 'BUTTON' } )[0].focus();
+	drawn._showList();
+	check( 'a form that is closed without Back leaves the focus nothing to stand on: it goes to the name of the panel', list.classList.contains('admin-hidden') === false && focusedNow() === paneTitle );
 }
 
 done();

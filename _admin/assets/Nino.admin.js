@@ -84,6 +84,104 @@
 		},
 
 		/**
+		 *	Show one level of a drill-down and move the focus into it. The levels
+		 *	of a pane are elements whose ids start alike (<prefix>-list,
+		 *	<prefix>-form - see levels()), and the pane shows one at a time: the
+		 *	level asked for loses the shell's admin-hidden class and its siblings,
+		 *	the other children of its parent with an id that begins the same, gain
+		 *	it. What every panel left out was the focus. The control that opened a
+		 *	level is hidden with the level it stood in, the focus falls to the
+		 *	body, and the next Tab starts again at the top of the page
+		 *
+		 *	The focus goes to options.focus where that is an element; else to the
+		 *	first heading of the level, and where the level has none to its back
+		 *	link, and where it has none either to the name of the panel. A target
+		 *	that is no control gets tabindex="-1" - it can take the focus and is no
+		 *	stop of the Tab key.
+		 *
+		 *	false is for a level that is shown again, or drawn when its answer
+		 *	arrives - not one the person opened: the focus stays where it is.
+		 *	Unless it stood in a level that is hidden now. Nothing keeps it
+		 *	there, and it goes to the name of the panel, where the person started.
+		 *	Owns no strings
+		 *
+		 *	@param		{Element|string}	level				The level, or its id
+		 *	@param		{Object}					[options]		{ focus } - an element to focus instead of the heading, or false to keep the focus where it is
+		 *
+		 *	@return		{Element|null}									The element that took the focus, null where it stayed
+		 */
+		showLevel : function( level, options ) {
+
+			options = options || {};
+
+			if( typeof level === 'string' )
+				level = dc.getElementById( level );
+
+			if( level === null || level === undefined )
+				return null;
+
+			const others	= [];
+			const stem		= level.id.lastIndexOf('-') > 0 ? level.id.slice( 0, level.id.lastIndexOf('-')+ 1 ) : '';
+
+			if( stem !== '' && level.parentNode !== null && level.parentNode !== undefined )
+				Array.from( level.parentNode.children ).forEach( function( other ) {
+					if( other !== level && other.id.indexOf( stem ) === 0 )
+						others.push( other );
+				} );
+
+			// Asked before the siblings are hidden: a browser takes the focus
+			// from a hidden element a moment later, and by then nothing says where it was
+			const held	= dc.activeElement ?? null;
+			const lost	= held !== null && others.some( function( other ) {
+				for( let node = held; node !== null && node !== undefined; node = node.parentNode )
+					if( node === other )
+						return true;
+				return false;
+			} );
+
+			others.forEach( function( other ) { other.classList.add('admin-hidden') } );
+			level.classList.remove('admin-hidden');
+
+			if( options.focus === false && lost === false )
+				return null;
+
+			const pane		= level.closest('[data-panel]');
+			const title		= pane === null ? null : pane.querySelector('.admin-panel-title');
+			let target		= typeof options.focus === 'object' ? options.focus : null;
+
+			if( target === null && options.focus === false )
+				target = title;
+			else if( target === null )
+				target = level.querySelector('h1, h2, h3, h4, h5, h6, [role="heading"]') ?? level.querySelector('.nino-admin-back-link') ?? title;
+
+			if( target === null || typeof target.focus !== 'function' )
+				return null;
+
+			if( target.hasAttribute('tabindex') === false && /^(A|BUTTON|INPUT|SELECT|TEXTAREA|SUMMARY)$/.test( target.tagName ) === false )
+				target.setAttribute( 'tabindex', '-1' );
+
+			target.focus();
+
+			return target;
+		},
+
+		/**
+		 *	Back to the level a drill-down came from, and the focus to the control
+		 *	that opened the one that is left - the row or the button - where that
+		 *	is still in the page; else to what showLevel() picks. A list that is
+		 *	drawn again while the form is open has a new row for it, which is the
+		 *	one to pass
+		 *
+		 *	@param		{Element|string}	level				The level to go back to, or its id
+		 *	@param		{Element}					[opener]		The control that opened the level that is left
+		 *
+		 *	@return		{Element|null}									The element that took the focus
+		 */
+		backTo : function( level, opener ) {
+			return Nino.adminUi.showLevel( level, { focus : opener !== null && opener !== undefined && opener.isConnected === true ? opener : true } );
+		},
+
+		/**
 		 *	Turn an element into the fixed bar at the bottom of a screen, where
 		 *	its Save and its status line stand: it gets the class
 		 *	.nino-admin-actionbar and nothing else is touched. The caller puts
@@ -244,6 +342,61 @@
 			hint.className = kind === 'error' ? 'nino-admin-hint nino-admin-error' : 'nino-admin-hint';
 			hint.textContent = text;
 			return hint;
+		},
+
+		/**
+		 *	Say at a field what is wrong with it: a paragraph in the field error
+		 *	type after the field, the control marked aria-invalid and pointed at
+		 *	the paragraph with aria-describedby - so the sentence is read where
+		 *	the person stands and not only seen. It goes after a label, not into
+		 *	it: inside, it would be part of the control's name as well. The
+		 *	sentences are not alerts - a form with six empty fields would announce
+		 *	six at once - the form's status line says the one summary
+		 *	(status().fail()) and the focus goes to the first field, which reads
+		 *	its own. Owns no strings
+		 *
+		 *	@param		{Element}				wrapper			What the field stands in - its label, or the block around the control
+		 *	@param		{Element|null}	control			The control that is invalid; null where the caller marks it itself (an editor)
+		 *	@param		{string}				id					The paragraph's id, which is what the control's aria-describedby names
+		 *	@param		{string}				text				The sentence
+		 *
+		 *	@return		{Element}											The paragraph
+		 */
+		fieldError : function( wrapper, control, id, text ) {
+
+			const error = dc.createElement('p');
+			error.id = id;
+			error.className = 'nino-admin-field-error';
+			error.textContent = text;
+
+			if( wrapper.tagName.toLowerCase() === 'label' )
+				wrapper.after( error );
+			else
+				wrapper.appendChild( error );
+
+			if( control !== null ) {
+				control.setAttribute( 'aria-invalid', 'true' );
+				control.setAttribute( 'aria-describedby', id );
+			}
+
+			return error;
+		},
+
+		/**
+		 *	Take what fieldError() put on a form off again: the sentences go, and
+		 *	so do aria-invalid and the aria-describedby that goes with it
+		 *
+		 *	@param		{Element}		root				The form, or whatever holds its fields
+		 *
+		 *	@return		void
+		 */
+		clearFieldErrors : function( root ) {
+
+			root.querySelectorAll('.nino-admin-field-error').forEach( function( el ) { el.remove() } );
+			root.querySelectorAll('[aria-invalid]').forEach( function( el ) {
+				el.removeAttribute('aria-invalid');
+				el.removeAttribute('aria-describedby');
+			} );
 		},
 
 		// Whether choiceDialog() has a question open - one at a time: a second
@@ -1075,12 +1228,14 @@
 		 *	the design system (.nino-admin-locale-select) and sits in the pinned
 		 *	context bar. What a change does is the caller's - the Elements and
 		 *	Text panels also tell the session (Nino.admin.sessionLocale), the Keys
-		 *	tab does not. Owns no strings: the name of the select is the caller's
+		 *	tab does not. The select is named: the caller's label, or the shared
+		 *	word for a translation where it has none - a combobox of bare codes
+		 *	is announced as nothing else
 		 *
 		 *	@param		{Object}		options					{ locales, current, label, id, onChange }
 		 *														- locales    the codes, which are also what the options say
 		 *														- current    the code that is picked
-		 *														- label      the select's aria-label
+		 *														- label      the select's aria-label, /_admin/common/label/locale by default
 		 *														- onChange   called with the picked code on every change
 		 *
 		 *	@return		{Element}										The select
@@ -1094,8 +1249,7 @@
 
 			select.className = 'nino-admin-locale-select nino-admin-contextbar-select';
 
-			if( options.label )
-				select.setAttribute( 'aria-label', options.label );
+			select.setAttribute( 'aria-label', options.label || Nino.adminUi.text('/_admin/common/label/locale') );
 
 			( options.locales || [] ).forEach( function( locale ) {
 				const option = dc.createElement('option');
@@ -1745,7 +1899,11 @@
 		 *
 		 *	@param		{Object}		options
 		 *	@param		{Element}		options.mount					Container; emptied and taken over
-		 *	@param		{Array}			options.columns				[ { key, label, type, render }, ... ]
+		 *	@param		{Array}			options.columns				[ { key, label, type, render, sortable }, ... ]
+		 *																					A column is sorted by the button its label is;
+		 *																					`sortable` is true for a column that has a label
+		 *																					and false for one that has none - the column of
+		 *																					a row's own buttons - unless the caller says.
 		 *																					`render(value, row)` may return an Element to
 		 *																					put in the cell instead of text - what a column
 		 *																					holding a mailto link or a per-row action needs.
@@ -1760,8 +1918,12 @@
 		 *																					-/perpage
 		 *	@param		{number}		[options.pageSize]		Initial rows per page (default 50)
 		 *	@param		{Array}			[options.pageSizes]		Offered sizes (default [50,100,150])
-		 *	@param		{Function}	[options.onRowClick]	Called with the row object
-		 *	@param		{string}		[options.rowKey]			Row property used as the row's identity
+		 *	@param		{Function}	[options.onRowClick]	Called with the row object, on a click of the row and on Enter or Space
+		 *																					with the row focused. The row is a stop of the Tab
+		 *																					key only where no control stands in it: a row with
+		 *																					buttons or links of its own is reached through them
+		 *	@param		{string}		[options.rowKey]			Row property used as the row's identity - also written on the row as data-row, where a
+		 *																					caller finds it again after the table was drawn anew
 		 *
 		 *	@return		{Object}													{ setRows, destroy }
 		 */
@@ -1828,6 +1990,14 @@
 				th.dataset.key = column.key;
 				if( column.type === 'integer' || column.type === 'double' )
 					th.classList.add('nino-admin-table-num');
+
+				// A sort button with no word on it is announced as nothing and
+				// offers an order nobody can name: a column without a label has none
+				if( column.sortable === undefined ? String( column.label ?? '' ) === '' : column.sortable !== true ) {
+					th.textContent = column.label ?? '';
+					headRow.appendChild( th );
+					return;
+				}
 
 				const btn = dc.createElement('button');
 				btn.type = 'button';
@@ -1915,6 +2085,10 @@
 
 				headRow.querySelectorAll('th').forEach( function( th ) {
 
+					// "none" tells the reader a column can be sorted: not one that cannot
+					if( th.querySelector('button') === null )
+						return;
+
 					const sorted = th.dataset.key === sortKey;
 
 					th.classList.toggle( 'is-sorted', sorted );
@@ -1933,12 +2107,14 @@
 				view.rows.forEach( function( row ) {
 
 					const tr = dc.createElement('tr');
+					if( row[rowKey] !== undefined && row[rowKey] !== null )
+						tr.dataset.row = String( row[rowKey] );
 					if( typeof options.onRowClick === 'function' ) {
-						tr.tabIndex = 0;
 						tr.classList.add('is-clickable');
 						tr.addEventListener( 'click', function() { options.onRowClick( row ) } );
 						tr.addEventListener( 'keydown', function( ev ) {
-							if( ev.key === 'Enter' || ev.key === ' ' ) { ev.preventDefault(); options.onRowClick( row ) }
+							// A key pressed on a button in the row is the button's, not the row's
+							if( ev.target === tr && ( ev.key === 'Enter' || ev.key === ' ' ) ) { ev.preventDefault(); options.onRowClick( row ) }
 						} );
 					}
 
@@ -1968,6 +2144,12 @@
 							td.classList.add('is-empty');
 						tr.appendChild( td );
 					} );
+
+					// Its own stop of the Tab key only where nothing inside it is one: a
+					// row that holds its buttons or links is reached through them, and
+					// would be a second stop for the same thing
+					if( typeof options.onRowClick === 'function' && tr.querySelector('a, button, input, select, textarea') === null )
+						tr.tabIndex = 0;
 
 					tbody.appendChild( tr );
 				} );

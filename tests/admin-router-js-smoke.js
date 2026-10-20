@@ -70,6 +70,7 @@ console.log( 'Router' );
 
 	router.go( 'images', [ 'a b', 'c/d' ] );
 	check( 'the parts are encoded', box.location.hash === '#images/a%20b/c%2Fd' );
+	check( 'href() is that address, for a link that opens the level: what go() writes', router.href( 'images', [ 'a b', 'c/d' ] ) === box.location.hash && router.href( 'users', [ 'ada@example.com' ] ) === '#users/ada%40example.com' && router.href( 'users' ) === '#users' );
 
 	// Every entry the router writes is numbered, in the order of the history
 	const numbers = () => box.history.states.map( state => state === null ? null : state.nino ).join();

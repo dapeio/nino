@@ -401,6 +401,7 @@ function countTypesRequests() {
 	const el = () => ( { classList : classes(), dataset : {}, style : {}, innerHTML : '', textContent : '',
 		appendChild(){}, addEventListener(){}, setAttribute(){}, removeAttribute(){}, querySelectorAll : () => [] } );
 	const nodes = { 'elements-types' : el(), 'elements-list' : el(), 'elements-form' : el() };
+	Object.keys( nodes ).forEach( id => { nodes[id].id = id } );
 	const asked = [];
 
 	const box = {
@@ -749,7 +750,7 @@ if( typeof elements._renderNav === 'function' ) {
 
 	const opened = [];
 	const stepped = [];
-	sandbox.Nino.admin.router = { set(){}, go : ( panel, parts ) => stepped.push( panel+ '/'+ parts.join('/') ) };
+	sandbox.Nino.admin.router = { set(){}, go : ( panel, parts ) => stepped.push( panel+ '/'+ parts.join('/') ), href : ( panel, parts ) => '#'+ [ panel ].concat( parts ).map( encodeURIComponent ).join('/') };
 	elements._openForm = function( uri ) { opened.push( uri ) };
 	const nav = elements._renderNav();
 	const buttons = dom.find( nav, n => n.tagName === 'button' );
@@ -1013,6 +1014,9 @@ check( '...a save marks it saving, saved and - with the server\'s words and fiel
  */
 function fakeDom() {
 
+	// The element that has the focus: a page has one, and loses it with the element
+	let held = null;
+
 	const matchOne = ( node, selector ) => {
 		selector = selector.trim();
 		if( selector.endsWith(':checked') === true ) {
@@ -1033,7 +1037,8 @@ function fakeDom() {
 			if( part[0] === '[' ) {
 				const m = /\[([\w-]+)(?:="([^"]*)")?\]/.exec( part );
 				const value = node.attr( m[1] );
-				return m[2] === undefined ? value !== null && value !== undefined : String( value ) === m[2];
+				// A flag the node holds as a property - hidden, disabled - is an attribute while it is true
+				return m[2] === undefined ? value !== null && value !== undefined && value !== false : String( value ) === m[2];
 			}
 			return node.tagName === part;
 		} );
@@ -1051,10 +1056,12 @@ function fakeDom() {
 				contains : k => classes.has( k ), toggle : ( k, on ) => { if( on === undefined ? ! classes.has( k ) : on ) classes.add( k ); else classes.delete( k ); return classes.has( k ) },
 			},
 			get className() { return [ ...classes ].join(' ') }, set className( v ) { classes = new Set( String( v ).split( /\s+/ ).filter( Boolean ) ) },
+			get contentEditable() { return this.attrs.contenteditable ?? 'inherit' }, set contentEditable( v ) { this.attrs.contenteditable = String( v ) },
 			get firstChild() { return this.children[0] ?? null },
 			get innerHTML() { return '' }, set innerHTML( v ) { this.children.forEach( c => c.parentNode = null ); this.children = [] },
 			attr( name ) { return name in this.attrs ? this.attrs[name] : ( name === 'type' ? ( this.type || null ) : ( this[name] === undefined || this[name] === '' ? ( name.startsWith('data-') ? this.dataset[name.slice(5)] ?? null : null ) : this[name] ) ) },
-			setAttribute( k, v ) { this.attrs[k] = String( v ) }, getAttribute( k ) { return this.attrs[k] ?? null }, removeAttribute( k ) { delete this.attrs[k] },
+			setAttribute( k, v ) { this.attrs[k] = String( v ) }, getAttribute( k ) { return this.attrs[k] ?? null }, hasAttribute( k ) { return k in this.attrs }, removeAttribute( k ) { delete this.attrs[k] },
+			get isConnected() { for( let n = this; n; n = n.parentNode ) if( n === root ) return true; return false },
 			appendChild( c ) { if( c.parentNode ) c.remove(); c.parentNode = this; this.children.push( c ); return c },
 			insertBefore( c, ref ) { c.parentNode = this; this.children.splice( ref ? this.children.indexOf( ref ) : this.children.length, 0, c ); return c },
 			remove() { if( this.parentNode ) this.parentNode.children.splice( this.parentNode.children.indexOf( this ), 1 ); this.parentNode = null },
@@ -1063,7 +1070,7 @@ function fakeDom() {
 			addEventListener( type, fn ) { ( this.listeners[type] = this.listeners[type] ?? [] ).push( fn ) },
 			fire( type, ev = {} ) { ( this.listeners[type] ?? [] ).forEach( fn => fn( Object.assign( { target : this, preventDefault(){} }, ev ) ) ) },
 			click() { this.fire('click') },
-			focus() { this.focused = true; doc.activeElement = this },
+			focus() { if( held !== null && held !== this ) held.focused = false; held = this; this.focused = true },
 			querySelectorAll( selector ) { return walk( this ).filter( n => matches( n, selector ) ) },
 			querySelector( selector ) { return this.querySelectorAll( selector )[0] ?? null },
 			closest( selector ) { for( let n = this; n; n = n.parentNode ) if( matches( n, selector ) ) return n; return null },
@@ -1073,7 +1080,8 @@ function fakeDom() {
 
 	const root = make('body');
 	const doc = {
-		documentElement : make('html'), body : root, activeElement : null,
+		documentElement : make('html'), body : root,
+		get activeElement() { return held !== null && held.isConnected === true ? held : null },
 		createElement : make,
 		createTextNode : text => Object.assign( make('#text'), { textContent : String( text ) } ),
 		getElementById : id => walk( root ).find( n => n.id === id ) ?? null,
@@ -1088,11 +1096,11 @@ function fakeDom() {
 
 {
 	const d = fakeDom();
-	Object.assign( sandbox.document, d.doc );
+	Object.defineProperties( sandbox.document, Object.getOwnPropertyDescriptors( d.doc ) );
 	sandbox.CSS = { escape : value => String( value ) };
 
 	const texts = {
-		'/_admin/elements/error/required' : 'REQ', '/_admin/elements/error/field-required' : 'FIELD', '/_admin/elements/error/json' : 'JSON',
+		'/_admin/elements/error/required' : 'REQ', '/_admin/common/error/required' : 'FIELD', '/_admin/elements/error/json' : 'JSON',
 		'/_admin/elements/error/uri' : 'URI', '/_admin/elements/error/save' : 'SAVEFAIL', '/_admin/elements/label/locale-open' : '%s - %d open',
 		'/_admin/elements/label/uri' : 'Uri', '/_admin/elements/msg/duplicated' : 'COPY',
 		'/_admin/common/msg/dirty' : 'Unsaved changes', '/_admin/common/msg/savedat' : 'Saved at %s.', '/_admin/common/msg/saving' : 'Saving',
@@ -1147,12 +1155,18 @@ function fakeDom() {
 	const removeOf = el => el.querySelectorAll('button').filter( b => b.className === 'nino-admin-btn-danger' )[0];
 	check( 'the remove button is drawn with the image field, shown while there is an image and hidden while there is none', removeOf( withImage ).hidden === false && removeOf( withoutImage ).hidden === true
 		&& removeOf( withImage ).textContent === 'Remove image' );
+	check( 'the preview of an image field has an alt of its own that is empty: the label of the field names it, and a file name would be read as well', withImage.querySelector('.nino-admin-field-image-preview').alt === '' );
 	elements._isNew = true;
 	check( 'a new element, which has no image to remove, has no button', removeOf( elements._renderField( 'photo', elements._currentModel.photo, '' ) ) === undefined );
 	elements._isNew = false;
 	elements._currentModel = {};
 	check( 'an image and a yes/no choice are never marked: one is uploaded on its own, the other cannot be empty',
 		stars( draw( { type : 'image', required : true } ) ).length === 0 && stars( draw( { type : 'boolean', required : true } ) ).length === 0 );
+
+	const choice = draw( { type : 'boolean' }, true );
+	check( 'a yes/no choice is a radio group named by its visible name - not a label around two controls, which would name the first of them "Name Yes"',
+		choice.tagName === 'div' && choice.getAttribute('role') === 'radiogroup' && choice.firstChild.tagName === 'span' && choice.getAttribute('aria-labelledby') === choice.firstChild.id && choice.firstChild.id !== ''
+		&& choice.querySelectorAll('input').length === 2 && choice.querySelectorAll('label').length === 2 && choice.querySelectorAll('label').every( option => option.parentNode.className === 'nino-admin-field-radios' ) );
 
 	const list = draw( { type : 'element', elementType : 'tag', multiple : 0, required : true }, [] );
 	check( 'a list of references gets the asterisk on its name only - nothing in it could carry aria-required',
@@ -1244,6 +1258,7 @@ function fakeDom() {
 	check( '...next to the label, not inside it: the sentence describes the control and is not part of its name',
 		uriInput.parentNode.querySelector('#elements-error-uri') === null && field('slug').closest('label').querySelector('.nino-admin-field-error') === null );
 	check( 'every other field on screen is marked the same way', [ 'slug', 'name', 'body' ].every( key => field( key ).getAttribute('aria-invalid') === 'true' && field( key ).getAttribute('aria-describedby') === 'elements-error-field-'+ key ) );
+	check( '...an empty required field is described by the sentence of the shell, the one a form of another panel says as well', d.doc.getElementById('elements-error-field-slug').textContent === 'FIELD' );
 	check( 'a required list of texts with no row has no input to mark: the sentence is under the list and its add button is the control',
 	( function() {
 		const add = d.doc.getElementById('elements-form').querySelector('.nino-admin-stringlist-add');
@@ -1619,6 +1634,12 @@ check( 'the sentences are not alerts - the status line says it once, in its own 
 		elements._renderForm();
 		check( '...a form of an element that is saved has none: there is nothing to add another to', again() === null );
 
+		// The bar lays Delete on its far side and the status line beside it (order in the stylesheet): the markup has them there
+		const kinds = () => d.doc.getElementById('elements-form-actions').children.map( c => c.classList.contains('nino-admin-btn-danger') ? 'delete' : ( c.id === 'elements-form-msg' ? 'status' : ( c.type === 'submit' ? 'save' : 'other' ) ) ).join();
+		check( 'the bar of a saved element holds its actions in the order it lays them out - Delete, the status line, Save, Duplicate - so that the Tab key follows the eye', kinds() === 'delete,status,save,other' );
+		blank();
+		check( '...that of a new element has nothing to delete: the status line, Save, Save and add another', kinds() === 'status,save,other' );
+
 		// a refused save stays where it is
 		blank();
 		sent.length = 0;
@@ -1643,6 +1664,72 @@ check( 'the sentences are not alerts - the status line says it once, in its own 
 		check( '...the status line of that form says what was saved, and holds nothing unsaved', elements._status.state === 'saved' && d.doc.getElementById('elements-form-msg').textContent.indexOf( 'Saved at' ) === 0 && elements.isDirty() === false );
 		check( '...and the other panels were told that elements were written, once', touched.join() === 'elements' );
 		check( '...it is shown the way a new element is, as the level of the pane', d.doc.getElementById('elements-form').classList.contains('admin-hidden') === false );
+		check( '...and the focus is in its first field, where the next element is typed, and not on the way back', d.doc.activeElement === d.doc.getElementById('elements-form-uri') && d.doc.activeElement.closest('.nino-admin-back-link') === null );
+
+		// a locked field takes no focus: the first one that can be typed into does
+		blank();
+		d.doc.getElementById('elements-form-uri').disabled = true;
+		elements._focusFirstField();
+		check( 'a blank form whose first field is locked puts the focus on the first one that is not', d.doc.activeElement === field('slug') && d.doc.activeElement.disabled !== true );
+
+		// a type with nothing to type into but its way back
+		elements._globalKeys = [];
+		elements._localeKeys = [];
+		elements._numbered = { post : true };
+		blank();
+		elements._focusFirstField();
+		check( 'a blank form with no field to type into puts the focus on its way back instead of leaving it nowhere', d.doc.activeElement === d.doc.getElementById('elements-form').querySelector('.nino-admin-back-link') && d.doc.activeElement !== null );
+
+		// A rich text is a field to type into, and its text box is the control: the editor keeps an
+		// input of its own in a bar that is hidden until a link is made, and a call on that moves nothing
+		{
+			const plainEditor = sandbox.Nino.admin.htmlEditor;
+			const kept = [ elements._currentModel, elements._globalKeys, elements._localeKeys, elements._numbered ];
+			let editor = null;
+			// In the order of the editor's own: the text box, then the bar of its link input, hidden
+			sandbox.Nino.admin.htmlEditor = { create : mount => {
+				const content = d.make('div');
+				content.contentEditable = 'true';
+				const bar = d.make('div');
+				bar.hidden = true;
+				const link = d.make('input');
+				link.type = 'text';
+				bar.appendChild( link );
+				mount.appendChild( content );
+				mount.appendChild( bar );
+				editor = { getValue : () => '', setValue(){}, destroy(){}, focus(){}, mark(){}, content : content, link : link };
+				return editor;
+			} };
+			elements._currentModel = { body : { type : 'string', locale : true, html : true }, name : { type : 'string', locale : true } };
+			elements._globalKeys = [];
+			elements._localeKeys = [ 'body', 'name' ];
+			elements._numbered = { post : '00002' };
+
+			blank();
+			sent.length = 0;
+			again().click();
+			sent[0].callback( 200, { element : { '.uri' : '/post/00002' }, nextUri : '00003' } );
+			check( 'a numbered type whose first field is a rich text opens its next blank form with the focus in the text box of the editor, where the next element is typed',
+				elements._isNew === true && editor !== null && d.doc.activeElement === editor.content );
+			check( '...not nowhere, not on the input of the hidden link bar and not past the editor on the field after it',
+				d.doc.activeElement !== null && d.doc.activeElement.closest('[hidden]') === null && editor.link.focused !== true && field('name').focused !== true );
+
+			// a control in a part that is hidden takes no focus: the first one that can does
+			editor.content.parentNode.hidden = true;
+			elements._focusFirstField();
+			check( 'with the editor in a part that is hidden the focus goes to the field after it', d.doc.activeElement === field('name') );
+
+			// a rich text this account may not write is locked, and a locked text box takes no focus either
+			elements._rights = { post : { update : { body : false } } };
+			blank();
+			elements._focusFirstField();
+			check( 'a rich text that is locked is passed over: the field after it has the focus', d.doc.activeElement === field('name') );
+			elements._rights = {};
+
+			sandbox.Nino.admin.htmlEditor = plainEditor;
+			[ elements._currentModel, elements._globalKeys, elements._localeKeys, elements._numbered ] = kept;
+		}
+		elements._numbered = {};
 	}
 
 	// ---- a delete: the other panels hear of it once the server says the element is gone
@@ -1684,6 +1771,142 @@ check( 'the sentences are not alerts - the status line says it once, in its own 
 	vm.runInContext( source, vm.createContext( box ), { filename : 'elements.js' } );
 	check( 'the Elements form registers with the shell under its name, with the three words the shell asks it',
 		registered.length === 1 && registered[0][0] === 'elements' && [ 'isDirty', 'save', 'discard' ].every( k => typeof registered[0][1][k] === 'function' ) );
+}
+
+// --- the focus of the drill-down: types, list, form ---------------------------------
+//
+// A level a person opens takes the focus in, and Back gives it to the control that
+// opened the level that was left - the button of the type, the row of the element,
+// the button that adds one - found again where the picker or the list was drawn anew
+// in between, which a request does after every save. A row of a plain list is a link
+// with the address it writes, a row of the table a stop of the Tab key of its own
+
+{
+	const f = fakeDom();
+	Object.defineProperties( sandbox.document, Object.getOwnPropertyDescriptors( f.doc ) );
+	sandbox.CSS = { escape : value => String( value ) };
+	sandbox.Nino.content = { getText : key => key };
+	sandbox.Nino.admin.formToolbar = backLink => { const bar = f.make('div'); bar.className = 'nino-admin-contextbar'; bar.appendChild( backLink ); return bar };
+	sandbox.Nino.admin.sessionLocale = { current : 'en_US', set(){}, init(){} };
+	sandbox.Nino.admin.htmlEditor = { create : () => ( { getValue : () => '', setValue(){}, destroy(){} } ) };
+	// The bar under a list, as the design system makes it: the buttons in a bar of the list's kind
+	sandbox.Nino.adminUi.listActions = buttons => { const bar = f.make('div'); bar.className = 'nino-admin-actionbar nino-admin-list-actions'; buttons.forEach( button => bar.appendChild( button ) ); return bar };
+	const routed = [];
+	sandbox.Nino.admin.router = { set(){}, go : ( panel, parts ) => routed.push( panel+ '/'+ parts.join('/') ), current : () => ( { panel : '', parts : [] } ), leave : ( names, leaving, proceed ) => proceed(),
+		href : ( panel, parts ) => '#'+ [ panel ].concat( parts ).map( encodeURIComponent ).join('/') };
+
+	// The pane the shell draws: the name of the panel in its head, and the three levels beside it
+	const pane = f.make('div');
+	pane.dataset.panel = 'elements';
+	const head = f.make('div');
+	head.className = 'admin-panel-head';
+	const paneTitle = f.make('h2');
+	paneTitle.className = 'admin-panel-title';
+	head.appendChild( paneTitle );
+	pane.appendChild( head );
+	f.root.appendChild( pane );
+	const level = {};
+	[ 'types', 'list', 'form' ].forEach( name => {
+		level[name] = f.make('div');
+		level[name].id = 'elements-'+ name;
+		if( name !== 'types' )
+			level[name].classList.add('admin-hidden');
+		pane.appendChild( level[name] );
+	} );
+
+	const asked = [];
+	elements._apiCall = ( endpoint, payload, callback ) => asked.push( { endpoint : endpoint, payload : payload, callback : callback } );
+	const answer = ( endpoint, status, body ) => asked.splice( asked.findIndex( request => request.endpoint === endpoint ), 1 )[0].callback( status, body );
+
+	const model = { slug : { type : 'string' }, title : { type : 'string' } };
+	const types = [ { type : 'post', title : 'Posts', descr : '(2)', model : model }, { type : 'page', title : 'Pages', descr : '(0)', model : model } ];
+	const plain = { elements : [ { uri : 'one', label : 'One' }, { uri : 'two', label : 'Two' } ], columns : [] };
+	const tabled = { elements : [ { uri : 'one', label : 'One', values : { title : 'One' } }, { uri : 'two', label : 'Two', values : { title : 'Two' } } ], columns : [ 'title' ] };
+	const element = { global : { slug : 'x', title : 'X' }, locales : {}, raw : {} };
+
+	const focus = () => f.doc.activeElement;
+	const inside = node => focus() !== null && focus().closest( '#'+ node.id ) === node;
+	const typeButton = type => level.types.querySelectorAll('button').find( b => b.dataset.type === type );
+	const rowOf = uri => level.list.querySelectorAll('tr, a').find( row => row.dataset.row === uri );
+	const backOf = node => node.querySelector('.nino-admin-back-link');
+
+	elements._ready = true;
+	elements._loading = false;
+	elements._saving = false;
+	elements._rights = {};
+	elements._locales = [];
+	elements._currentType = null;
+	elements._renderTypes( types );
+	elements._showTypes();
+	check( 'the picker is shown as it stands, and the focus is nowhere in particular: it was nowhere', level.types.classList.contains('admin-hidden') === false && focus() === null );
+
+	// a type is picked: the list arrives, and the focus goes in
+	const picked = typeButton('post');
+	picked.click();
+	check( 'a type that is picked goes by its address', routed.at(-1) === 'elements/post' );
+	answer( 'list', 200, plain );
+	check( 'its list takes the focus when it arrives', level.list.classList.contains('admin-hidden') === false && level.types.classList.contains('admin-hidden') === true && inside( level.list ) );
+
+	// an element of a plain list: a link with its address, and the focus goes into the form
+	const link = rowOf('one');
+	check( 'an entry of the plain list is a link with the address it writes - not a link to nowhere', link.tagName === 'a' && link.href === '#elements/post/one' );
+	link.click();
+	answer( 'get', 200, element );
+	check( 'the form of the element takes the focus when it arrives', level.form.classList.contains('admin-hidden') === false && inside( level.form ) );
+
+	// the list is drawn anew while the form is open: a save does it
+	elements._renderList( plain.elements, [] );
+	check( '...a list drawn anew behind the form leaves the focus where it is', inside( level.form ) );
+	backOf( level.form ).click();
+	check( 'Back shows the list and gives the focus to the row of the element - the one the list has now, not the one that was pressed', level.list.classList.contains('admin-hidden') === false
+		&& focus() === rowOf('one') && focus() !== link );
+
+	// the list drawn anew while the person is on it, as the language does it: the row keeps the focus
+	elements._renderList( plain.elements, [] );
+	check( 'a list drawn anew with the focus on a row gives it to the row of the same element', focus() === rowOf('one') && focus() !== link );
+	rowOf('two').focus();
+	elements._renderList( plain.elements, [] );
+	check( '...whichever row it was on', focus() === rowOf('two') );
+
+	// the table: a row is a stop of the Tab key of its own, and Enter on it opens
+	elements._renderList( tabled.elements, tabled.columns );
+	const tr = rowOf('two');
+	check( 'a row of the table has its element for an identity, and is a stop of the Tab key', tr.tagName === 'tr' && tr.tabIndex === 0 && level.list.querySelectorAll('tr').filter( row => row.dataset.row !== undefined ).length === 2 );
+	tr.focus();
+	tr.fire( 'keydown', { key : 'Enter' } );
+	answer( 'get', 200, element );
+	check( 'Enter on a row opens the form, with the focus in it', inside( level.form ) );
+	backOf( level.form ).click();
+	check( '...and Back puts the focus on that row', focus() === rowOf('two') && focus().tagName === 'tr' );
+
+	// a blank form: the button that adds one is where Back returns to
+	const add = level.list.querySelector('.nino-admin-btn-primary');
+	add.click();
+	check( 'a new element opens its form with the focus in it', inside( level.form ) && elements._isNew === true );
+	backOf( level.form ).click();
+	check( '...and Back returns it to the button that adds one', focus() === add );
+
+	// back to the picker: the button of the type, which is drawn anew behind it
+	backOf( level.list ).click();
+	check( 'Back to the types shows the picker and gives the focus to the button of the type that was open', level.types.classList.contains('admin-hidden') === false && focus() === typeButton('post') );
+	const before = typeButton('post');
+	check( '...the picker is read again then', asked.some( request => request.endpoint === 'types' ) );
+	answer( 'types', 200, { types : types } );
+	check( '...and drawn anew, the button of the same type has the focus, not the body', typeButton('post') !== before && focus() === typeButton('post') );
+	typeButton('page').focus();
+	elements._renderTypes( types );
+	check( 'a picker drawn anew gives the focus to the button of the type it was on, whichever', focus() === typeButton('page') );
+
+	// shown again as it stands - by the address, a step through the history: the focus stays, unless it stood in the level that goes
+	typeButton('page').focus();
+	elements._showTypes();
+	check( 'the picker shown again leaves the focus where it is', focus() === typeButton('page') );
+	elements._currentType = 'post';
+	elements._renderList( plain.elements, [] );
+	elements._showList();
+	rowOf('one').focus();
+	elements._showTypes();
+	check( 'the list gone with the focus on its row: the focus goes to the name of the panel, where the person started', focus() === paneTitle );
 }
 
 // --- the name of a field: a fill, a word, the key -----------------------------------

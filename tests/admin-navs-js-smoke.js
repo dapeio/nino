@@ -36,11 +36,22 @@ function text( key ) {
  */
 function build( shell ) {
 
+	// The pane the shell draws: the name of the panel in its head, and the two levels beside it
+	const pane = element('div');
+	pane.dataset.panel = 'navs';
+	const head = element('div');
+	head.className = 'admin-panel-head';
+	const paneTitle = element('h2');
+	paneTitle.className = 'admin-panel-title';
+	head.appendChild( paneTitle );
+	pane.appendChild( head );
 	const list = element('div');
 	list.id = 'navs-list';
+	pane.appendChild( list );
 	const form = element('div');
 	form.id = 'navs-form';
 	form.classList.add('admin-hidden');
+	pane.appendChild( form );
 
 	const requests = [];
 	const confirms = [];
@@ -71,6 +82,7 @@ function build( shell ) {
 			},
 			documentElement : null,
 			body : null,
+			get activeElement() { return findAll( pane, function( el ) { return el.focused === true } )[0] ?? null },
 		},
 		Nino : Nino,
 	};
@@ -84,6 +96,7 @@ function build( shell ) {
 		panel : Nino.admin.navs,
 		list : list,
 		form : form,
+		title : paneTitle,
 		requests : requests,
 		confirms : confirms,
 		touched : touched,
@@ -135,7 +148,9 @@ console.log('Admin Navigations');
 	t.panel.init();
 	check( 'the panel asks for the menus', t.requests.length === 1 && t.requests[0].action === 'navs/list' );
 	t.answer( 200, payload( [ '/', '/about' ] ) );
-	check( 'a menu is a row with the number of its entries', findAll( t.list, function( el ) { return el.tagName === 'A' } ).map( function( a ) { return a.textContent } ).join() === 'main (2),footer (0)' );
+	const rows = findAll( t.list, function( el ) { return el.className === 'nino-admin-list-link' } );
+	check( 'a menu is a row with the number of its entries', rows.map( function( row ) { return row.textContent } ).join() === 'main (2),footer (0)' );
+	check( '...a button, because opening it writes no address - not a link to nowhere', rows.every( function( row ) { return row.tagName === 'BUTTON' && row.type === 'button' && row.href === '' } ) );
 
 	// The panel is there only while the Navigation module is, so the list has
 	// nothing to say about the module - whatever else an answer carries
@@ -272,6 +287,41 @@ console.log('Admin Navigations');
 }
 
 
+// --- the focus -------------------------------------------------------------
+
+/*	It falls to the body when a level is hidden with the control that was
+	pressed in it. A menu that is opened takes the focus into itself, and Back
+	gives it to the row that opened it	*/
+{
+	const t = build( null );
+	t.panel.init();
+	t.answer( 200, payload( [ '/', '/about' ] ) );
+	const rows = findAll( t.list, function( el ) { return el.className === 'nino-admin-list-link' } );
+
+	fire( rows[1], 'click' );
+	const back = findAll( t.form, function( el ) { return el.className === 'nino-admin-back-link' } )[0];
+	check( 'opening a menu shows its form and moves the focus into it', t.form.classList.contains('admin-hidden') === false && t.list.classList.contains('admin-hidden') === true && back.focused === true );
+
+	fire( back, 'click' );
+	check( 'Back shows the list and puts the focus on the row that was opened', t.form.classList.contains('admin-hidden') === true && rows[1].focused === true && t.panel._currentKey === null );
+
+	const add = findAll( t.list, function( el ) { return el.className === 'nino-admin-btn-primary' } )[0];
+	fire( add, 'click' );
+	check( 'a new menu opens the same way', findAll( t.form, function( el ) { return el.focused === true } ).length === 1 );
+	fire( findAll( t.form, function( el ) { return el.className === 'nino-admin-back-link' } )[0], 'click' );
+	check( '...and Back returns to the New navigation button', add.focused === true );
+}
+
+{
+	const t = opened( null );
+	t.field('navs-form-key').focus();
+	t.box.confirmAnswer = true;
+	t.panel._delete();
+	t.answer( 200, { navs : [ { key : 'footer', entries : [] } ], routes : ROUTES } );
+	check( 'a menu that was deleted leaves the focus no control to stand on: it goes to the name of the panel', t.form.classList.contains('admin-hidden') === true && t.title.focused === true );
+}
+
+
 // --- showing the panel again -----------------------------------------------
 
 {
@@ -292,7 +342,7 @@ console.log('Admin Navigations');
 	t.answer( 200, { navs : [ { key : 'main', entries : [ ROUTES[0], ROUTES[1], ROUTES[2] ] }, { key : 'footer', entries : [] } ], routes : ROUTES.concat( [ { httpUri : '/shop', uri : '/shop', label : 'Shop', named : true, runtime : true } ] ) } );
 	check( 'a copy with changes is read over nothing: entries and typed id stay', t.requests.length === again + 1 && t.entries().join() === '' && t.field('navs-form-key').value === 'typed' && t.panel._isDirty() === true );
 	check( '...while the routes it can still pick from are the new ones', t.field('navs-form-add').children.some( function( option ) { return option.value === '/shop' } ) && t.field('navs-form-add').children.some( function( option ) { return option.value === '/news' } ) === false );
-	check( '...and the list of menus has the saved state', findAll( t.list, function( el ) { return el.tagName === 'A' } ).map( function( a ) { return a.textContent } )[0] === 'main (3)' );
+	check( '...and the list of menus has the saved state', findAll( t.list, function( el ) { return el.className === 'nino-admin-list-link' } ).map( function( row ) { return row.textContent } )[0] === 'main (3)' );
 
 	// A read that fails changes nothing
 	t.panel.showCurrent();

@@ -48,6 +48,9 @@
 		// The type to open once the list has loaded - the copy a duplication
 		// just made (see _duplicate())
 		_openUri 				: null,
+		// The row or the button that opened the form that is open: Back returns
+		// the focus to it (see Nino.adminUi.backTo())
+		_opener 				: null,
 		// What the last save of a rename left that it cannot move, shown once
 		// above the type list - the form it happened in is gone by then
 		_notice 				: '',
@@ -77,7 +80,7 @@
 				Nino.admin.types._openUri = null;
 
 				if( open !== null )
-					Nino.admin.types._openForm( open );
+					Nino.admin.types._openForm( open, null );
 			} );
 		},
 
@@ -124,14 +127,25 @@
 			Nino.adminUi.showError( container, status, response, '/_admin/common/error/load' );
 		},
 
+		/**
+		 *	Show the list or the form again as they stand: the focus stays where
+		 *	it is, unless it stood in the level that is hidden now (see
+		 *	Nino.adminUi.showLevel()). Back goes through the back link, and what
+		 *	a person opens takes the focus in
+		 *
+		 *	@return		void
+		 */
 		_showList : function() {
-			dc.getElementById('types-list').classList.remove('admin-hidden');
-			dc.getElementById('types-form').classList.add('admin-hidden');
+			Nino.adminUi.showLevel( 'types-list', { focus : false } );
 		},
 
-		_showForm : function() {
-			dc.getElementById('types-list').classList.add('admin-hidden');
-			dc.getElementById('types-form').classList.remove('admin-hidden');
+		/**
+		 *	@param		{boolean}	[opened]	The person opened it: the focus goes into the form
+		 *
+		 *	@return		void
+		 */
+		_showForm : function( opened ) {
+			Nino.adminUi.showLevel( 'types-form', opened === true ? {} : { focus : false } );
 		},
 
 		/**
@@ -160,8 +174,11 @@
 			ul.className = 'nino-admin-list';
 			Nino.admin.types._types.forEach( function( type ) {
 				const li 		= dc.createElement('li');
-				const link	= dc.createElement('a');
-				link.href = '#';
+
+				// It opens a form and no address is written: a button, not a link to nowhere
+				const edit	= dc.createElement('button');
+				edit.type = 'button';
+				edit.className = 'nino-admin-list-link';
 
 				const copy = dc.createElement('span');
 				copy.className = 'nino-admin-list-copy';
@@ -171,10 +188,10 @@
 				descr.textContent = '/'+ type.uri+ ' · '+ Nino.adminUi.format( Nino.content.getText( type.fieldCount === 1 ? '/_admin/types/label/field' : '/_admin/types/label/fields' ), type.fieldCount );
 				copy.appendChild( title );
 				copy.appendChild( descr );
-				link.appendChild( copy );
+				edit.appendChild( copy );
 
-				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.types._openForm( type.uri ) } );
-				li.appendChild( link );
+				edit.addEventListener( 'click', function() { Nino.admin.types._openForm( type.uri, edit ) } );
+				li.appendChild( edit );
 				ul.appendChild( li );
 			} );
 			if( Nino.admin.types._types.length > 0 )
@@ -184,18 +201,22 @@
 			addBtn.type = 'button';
 			addBtn.className = 'nino-admin-btn-primary';
 			addBtn.textContent = Nino.content.getText('/_admin/types/label/new');
-			addBtn.addEventListener( 'click', function() { Nino.admin.types._openForm( null ) } );
+			addBtn.addEventListener( 'click', function() { Nino.admin.types._openForm( null, addBtn ) } );
 			wrap.appendChild( Nino.adminUi.listActions( [ addBtn ] ) );
 		},
 
 		/**
 		 *	Open the editor for an existing type, or a blank one for a new type
 		 *
-		 *	@param		{string|null}	uri			Type uri, or null to create a new one
+		 *	@param		{string|null}		uri				Type uri, or null to create a new one
+		 *	@param		{Element|null}	[opener]	The row or the button that was pressed - the focus goes into the form, and Back returns it there; null for the copy a duplication just made, which has none. Left out, the form is shown as it stands
 		 *
 		 *	@return		void
 		 */
-		_openForm : function( uri ) {
+		_openForm : function( uri, opener ) {
+
+			const opened = opener !== undefined;
+			Nino.admin.types._opener = opener ?? null;
 
 			if( uri === null ) {
 				Nino.admin.types._isNew 			= true;
@@ -204,7 +225,7 @@
 				Nino.admin.types._elementCount = 0;
 				Nino.admin.types._referencedBy = [];
 				Nino.admin.types._renderForm( '', false, '00001' );
-				Nino.admin.types._showForm();
+				Nino.admin.types._showForm( opened );
 				return;
 			}
 
@@ -218,7 +239,7 @@
 				// door, which its own suite enforces
 				if( status !== 200 || response === null ) {
 					Nino.admin.types._showError( dc.getElementById('types-form'), status, response );
-					Nino.admin.types._showForm();
+					Nino.admin.types._showForm( opened );
 					return;
 				}
 
@@ -232,7 +253,7 @@
 				Nino.admin.types._elementCount = response.elements ?? 0;
 				Nino.admin.types._referencedBy = response.referencedBy ?? [];
 				Nino.admin.types._renderForm( response.title, response.autoincrement === true, response.next );
-				Nino.admin.types._showForm();
+				Nino.admin.types._showForm( opened );
 			} );
 		},
 
@@ -761,7 +782,7 @@
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/common/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.types._showList() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.adminUi.backTo( 'types-list', Nino.admin.types._opener ) } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const form = dc.createElement('form');

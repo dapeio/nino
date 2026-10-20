@@ -4,7 +4,9 @@
  *													lifecycle every panel script wrote for itself: when the
  *													panel asks for its screen, what it does with the
  *													answer and with a failure, what a second showing
- *													does, and the level it shows. Nino.admin.js is loaded
+ *													does, and the level it shows - and showLevel() and
+ *													backTo(), which move the focus into a level and back
+ *													to the control that opened it. Nino.admin.js is loaded
  *													the way the panel suites load it, with the shell's
  *													dirty registry and router as stand-ins - and in a
  *													page that has no Nino.admin at all, which is what the
@@ -16,7 +18,7 @@
 'use strict';
 
 const vm = require('vm');
-const { check, done, load, documentOf, element } = require( './harness.js' );
+const { check, done, load, documentOf, element, findAll } = require( './harness.js' );
 
 
 // --- the page --------------------------------------------------------------
@@ -49,7 +51,11 @@ function world( shell ) {
 	if( shell !== undefined )
 		Nino.admin = shell;
 
-	const sandbox = { console : console, document : documentOf( page ), Nino : Nino };
+	// The element that has the focus: documentOf() has none, a page does
+	const doc = documentOf( page );
+	Object.defineProperty( doc, 'activeElement', { get : function() { return findAll( page, function( el ) { return el.focused === true } )[0] ?? null } } );
+
+	const sandbox = { console : console, document : doc, Nino : Nino };
 	sandbox.window = { Nino : Nino };
 	load( '_admin/assets/Nino.admin.js', vm.createContext( sandbox ) );
 
@@ -510,6 +516,116 @@ function levelsPage( shell ) {
 	let bareThrew = null;
 	try { without.show( 'list', [] ) } catch( error ) { bareThrew = error }
 	check( '...and so is a page that has no shell at all', bareThrew === null && bare.form.classList.contains('admin-hidden') === true );
+}
+
+
+// --- showLevel and backTo --------------------------------------------------
+
+console.log( '\nNino.adminUi.showLevel - a level is shown and the focus goes into it\n' );
+
+/**
+ *	A pane of two levels as the shell draws one: the head with the name of the panel, the list with a row to open,
+ *	the form with a context bar, a back link and a heading of its own
+ *
+ *	@param		{boolean}		[titled]		Whether the form has a heading (default true)
+ *
+ *	@return		{Object}
+ */
+function drill( titled ) {
+	const w = world( {} );
+	w.page.removeChild( w.mount );
+
+	const pane = element('div');
+	pane.dataset.panel = 'catalog';
+	const head = element('div'); head.className = 'admin-panel-head';
+	const name = element('h2'); name.className = 'admin-panel-title';
+	head.appendChild( name );
+	pane.appendChild( head );
+
+	const list = element('div'); list.id = 'catalog-list';
+	const row = element('button'); row.type = 'button';
+	list.appendChild( row );
+	const form = element('div'); form.id = 'catalog-form'; form.className = 'admin-hidden';
+	const back = element('a'); back.className = 'nino-admin-back-link';
+	form.appendChild( back );
+	const title = element('h2');
+	if( titled !== false )
+		form.appendChild( title );
+	const field = element('input');
+	form.appendChild( field );
+
+	pane.appendChild( list );
+	pane.appendChild( form );
+	w.page.appendChild( pane );
+
+	return Object.assign( w, { pane : pane, name : name, list : list, row : row, form : form, back : back, title : title, field : field } );
+}
+
+{
+	const d = drill();
+	d.row.focus();
+	const reached = d.Nino.adminUi.showLevel( 'catalog-form' );
+	check( 'a level is shown by its id, and the others of its pane are hidden', d.form.classList.contains('admin-hidden') === false && d.list.classList.contains('admin-hidden') === true );
+	check( '...the focus goes onto its first heading, which can take it without being a stop of the Tab key', reached === d.title && d.title.focused === true && d.title.attributes.tabindex === '-1' );
+	check( '...and not onto the head of the pane or the next control', d.name.focused !== true && d.field.focused !== true && d.page.querySelector('[data-panel]') === d.pane );
+	check( 'the head of the pane is not a level and stays', d.pane.children[0].classList.contains('admin-hidden') === false );
+
+	d.Nino.adminUi.showLevel( d.list );
+	check( 'a level is shown by the element as well', d.list.classList.contains('admin-hidden') === false && d.form.classList.contains('admin-hidden') === true );
+	check( '...a list with no heading of its own takes the focus to the name of the panel', d.name.focused === true && d.name.attributes.tabindex === '-1' );
+
+	const elsewhere = d.Nino.adminUi.showLevel( 'catalog-form', { focus : d.field } );
+	check( 'an element named in the options takes the focus instead of the heading', elsewhere === d.field && d.field.focused === true && d.title.focused !== true );
+	check( '...a control is not given a tabindex', d.field.attributes.tabindex === undefined );
+
+	check( 'an id the page does not have is no level: nothing is shown, nothing throws', d.Nino.adminUi.showLevel( 'catalog-nope' ) === null && d.form.classList.contains('admin-hidden') === false );
+}
+
+{
+	const d = drill( false );
+	const reached = d.Nino.adminUi.showLevel( 'catalog-form' );
+	check( 'a level with no heading takes the focus onto its back link', reached === d.back && d.back.focused === true );
+	check( '...which is a link and so gets no tabindex', d.back.attributes.tabindex === undefined );
+}
+
+{
+	const d = drill();
+	d.name.focus();
+	const stayed = d.Nino.adminUi.showLevel( 'catalog-form', { focus : false } );
+	check( 'false keeps the focus where it is - a level shown again, not one the person opened', stayed === null && d.name.focused === true && d.title.focused !== true );
+	check( '...and the level is shown all the same', d.form.classList.contains('admin-hidden') === false && d.list.classList.contains('admin-hidden') === true );
+
+	d.Nino.adminUi.showLevel( 'catalog-list', { focus : false } );
+	d.row.focus();
+	d.Nino.adminUi.showLevel( 'catalog-form', { focus : false } );
+	check( '...unless it stood in a level that is hidden now: nothing keeps it there, and it goes to the name of the panel', d.name.focused === true && d.row.focused !== true && d.title.focused !== true );
+}
+
+console.log( '\nNino.adminUi.backTo - back to the control that opened the level\n' );
+
+{
+	const d = drill();
+	d.row.focus();
+	d.Nino.adminUi.showLevel( 'catalog-form' );
+	const back = d.Nino.adminUi.backTo( 'catalog-list', d.row );
+	check( 'back shows the level it was asked for and hides the other', d.list.classList.contains('admin-hidden') === false && d.form.classList.contains('admin-hidden') === true );
+	check( '...and the focus goes to the control that opened the level that is left', back === d.row && d.row.focused === true );
+
+	d.Nino.adminUi.showLevel( 'catalog-form' );
+	d.list.removeChild( d.row );
+	d.list.appendChild( element('button') );
+	const fallback = d.Nino.adminUi.backTo( 'catalog-list', d.row );
+	check( 'an opener the page no longer has is not focused: the focus goes where showLevel() sends it', fallback === d.name && d.name.focused === true && d.row.focused !== true );
+
+	const second = element('button');
+	d.list.appendChild( second );
+	d.Nino.adminUi.showLevel( 'catalog-form' );
+	d.list.innerHTML = '';
+	d.list.appendChild( element('button') );
+	check( '...whether it was removed or its list was emptied and drawn again', d.Nino.adminUi.backTo( 'catalog-list', second ) === d.name && second.focused !== true );
+
+	d.Nino.adminUi.showLevel( 'catalog-form' );
+	check( 'back without an opener is the level\'s own heading as well', d.Nino.adminUi.backTo( 'catalog-list' ) === d.name && d.Nino.adminUi.backTo( 'catalog-list', null ) === d.name );
 }
 
 done();

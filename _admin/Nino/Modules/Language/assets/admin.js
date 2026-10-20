@@ -44,6 +44,10 @@
 		// isDirty(): adding a language writes its file at once and adds a row
 		// to the list, which is not an edit of what Save stores
 		_saved 		: { active : [], native : '' },
+		// The adder's line under the list - the warning about a language without
+		// a file, what adding one made of the code, and why it did not (see
+		// Nino.adminUi.status()). Drawn again with the form
+		_line 		: null,
 
 		/**
 		 *	Load the schema, the inventory and the native language, and
@@ -283,6 +287,7 @@
 			adder.className = 'nino-admin-field';
 
 			const adderLabel = dc.createElement('span');
+			adderLabel.id = 'language-locale-new-name';
 			adderLabel.textContent = Nino.content.getText('/_admin/language/label/add');
 			adder.appendChild( adderLabel );
 
@@ -303,6 +308,8 @@
 			adderInput.placeholder = 'fr_FR';
 			adderInput.autocomplete = 'off';
 			adderInput.spellcheck = false;
+			// Named by the words above it, not by the example in it
+			adderInput.setAttribute( 'aria-labelledby', adderLabel.id );
 			adderRow.appendChild( adderInput );
 
 			const adderBtn = dc.createElement('button');
@@ -320,12 +327,21 @@
 				Nino.admin.language._addLocale();
 			} );
 
+			// What was refused is let go of as the code is typed again
+			adderInput.addEventListener( 'input', function() {
+				if( adderInput.getAttribute('aria-invalid') !== 'true' )
+					return;
+				Nino.adminUi.clearFieldErrors( adder );
+				Nino.admin.language._refreshLocaleWarning();
+			} );
+
 			adder.appendChild( adderRow );
 
 			const adderMsg = dc.createElement('p');
 			adderMsg.id = 'language-locale-msg';
 			adderMsg.className = 'nino-admin-hint';
 			adder.appendChild( adderMsg );
+			Nino.admin.language._line = Nino.adminUi.status( adderMsg );
 
 			wrap.appendChild( adder );
 
@@ -393,8 +409,8 @@
 		 */
 		_refreshLocaleWarning : function() {
 
-			const msg = dc.getElementById('language-locale-msg');
-			if( msg === null )
+			const line = Nino.admin.language._line;
+			if( line === null )
 				return;
 
 			const missing = Nino.admin.language._locales
@@ -402,29 +418,36 @@
 				.map( function( locale ) { return locale.code } );
 
 			if( missing.length === 0 ) {
-				msg.className = 'nino-admin-hint';
-				msg.textContent = '';
+				line.idle( '' );
 				return;
 			}
 
-			msg.className = 'nino-admin-error';
-			msg.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/language/error/missing'), missing.join( ', ' ) );
+			line.fail( Nino.adminUi.format( Nino.content.getText('/_admin/language/error/missing'), missing.join( ', ' ) ) );
 		},
 
 		/**
-		 *	Add a locale typed into the adder field
+		 *	Add a locale typed into the adder field. A code that is no code is
+		 *	said where the person is: the field is marked and described by the
+		 *	sentence under it, which says what a code looks like, the line below
+		 *	announces that the value is not valid, and the focus goes back to
+		 *	the field
 		 *
 		 *	@return		void
 		 */
 		_addLocale : function() {
 
 			const input = dc.getElementById('language-locale-new');
-			const msg 	= dc.getElementById('language-locale-msg');
+			const adder = input.closest('.nino-admin-field');
+			const line 	= Nino.admin.language._line;
 			const code 	= input.value.trim();
 
+			Nino.adminUi.clearFieldErrors( adder );
+
 			if( /^[a-z]{2}_[A-Z]{2}$/.test( code ) === false ) {
-				msg.className = 'nino-admin-error';
-				msg.textContent = Nino.content.getText('/_admin/language/error/id');
+				line.fail( Nino.content.getText('/_admin/error/invalid_value') );
+				// Right under the row of the field, above the line
+				input.parentNode.after( Nino.adminUi.fieldError( adder, input, 'language-locale-error', Nino.content.getText('/_admin/language/error/id') ) );
+				input.focus();
 				return;
 			}
 
@@ -440,8 +463,7 @@
 				return;
 			}
 
-			msg.className = 'nino-admin-hint';
-			msg.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/language/msg/creating'), code );
+			line.idle( Nino.adminUi.format( Nino.content.getText('/_admin/language/msg/creating'), code ) );
 
 			// The file comes first, then the row: a language whose text file
 			// exists is a language that renders, and the row can then report
@@ -449,8 +471,7 @@
 			Nino.admin.language._apiCall( 'addlocale', { locale : code }, function( status, response ) {
 
 				if( status !== 200 || response === null ) {
-					msg.className = 'nino-admin-error';
-					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/language/error/create' );
+					line.error( status, response, '/_admin/language/error/create' );
 					return;
 				}
 
@@ -478,11 +499,9 @@
 
 				// _renderLocaleRows() has just cleared this line via
 				// _refreshLocaleWarning(), so the outcome goes in afterwards
-				const after = dc.getElementById('language-locale-msg');
-				after.className = 'nino-admin-hint';
-				after.textContent = response.created === true
+				line.idle( response.created === true
 					? Nino.adminUi.format( Nino.content.getText('/_admin/language/msg/created'), code, response.keys, response.from, code )
-					: Nino.adminUi.format( Nino.content.getText('/_admin/language/msg/existed'), code, response.keys );
+					: Nino.adminUi.format( Nino.content.getText('/_admin/language/msg/existed'), code, response.keys ) );
 			} );
 		},
 

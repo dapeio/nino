@@ -28,6 +28,9 @@
 
 		_users				: [],
 		_currentUser	: null,
+		// The button that opened the new-account form that is open: Back returns
+		// the focus to it (an account's own row is found again, see _rowOf())
+		_opener				: null,
 		// The edit form's status line - see Nino.adminUi.status(). Drawn again
 		// with its form, so always read from here rather than kept in a local
 		_status				: null,
@@ -180,20 +183,55 @@
 
 		/**
 		 *	Drill-down navigation: list -> form. The rail stays visible
-		 *	throughout.
+		 *	throughout. The focus stays where it is, unless it stood in the level
+		 *	that is hidden now (see Nino.adminUi.showLevel()): the level is shown
+		 *	again as it stands, by the address or after a delete. Back goes to the
+		 *	row, and what a person opens takes the focus in
+		 *
+		 *	@param		{Element|null}	[opener]	Back: the control that opened the form that is left; null where there is none to name
 		 *
 		 *	@return		void
 		 */
-		_showList : function() {
-			dc.getElementById('users-list').classList.remove('admin-hidden');
-			dc.getElementById('users-form').classList.add('admin-hidden');
+		_showList : function( opener ) {
 			Nino.admin.router.set( 'users', [] );
+
+			if( opener === undefined )
+				Nino.adminUi.showLevel( 'users-list', { focus : false } );
+			else
+				Nino.adminUi.backTo( 'users-list', opener );
 		},
 
-		_showForm : function() {
-			dc.getElementById('users-list').classList.add('admin-hidden');
-			dc.getElementById('users-form').classList.remove('admin-hidden');
+		/**
+		 *	@param		{boolean}	[opened]	The person opened it: the focus goes into the form
+		 *
+		 *	@return		void
+		 */
+		_showForm : function( opened ) {
 			Nino.admin.router.set( 'users', [ Nino.admin.users._currentUser === null ? 'new' : Nino.admin.users._currentUser.mail ] );
+			Nino.adminUi.showLevel( 'users-form', opened === true ? {} : { focus : false } );
+		},
+
+		/**
+		 *	The row of an account as the list is drawn now: the list is drawn
+		 *	again behind an open form after a save, and the row that was pressed
+		 *	is gone with the old drawing
+		 *
+		 *	@param		{string}	mail
+		 *
+		 *	@return		{Element|null}
+		 */
+		_rowOf : function( mail ) {
+			return Array.from( dc.getElementById('users-list').querySelectorAll('a') ).find( function( link ) { return link.dataset.mail === mail } ) ?? null;
+		},
+
+		/**
+		 *	The control Back returns the focus to from the form that is open: the
+		 *	row of the account, or the button that opened the new-account form
+		 *
+		 *	@return		{Element|null}
+		 */
+		_backTarget : function() {
+			return Nino.admin.users._currentUser === null ? Nino.admin.users._opener : Nino.admin.users._rowOf( Nino.admin.users._currentUser.mail );
 		},
 
 		/**
@@ -296,8 +334,11 @@
 			ul.className = 'nino-admin-list';
 			users.forEach( function( user ) {
 				const li 		= dc.createElement('li');
+
+				// A row opens an account and writes its address: a link, with that address
 				const link	= dc.createElement('a');
-				link.href = '#';
+				link.href = Nino.admin.router.href( 'users', [ user.mail ] );
+				link.dataset.mail = user.mail;
 
 				const copy = dc.createElement('span');
 				copy.className = 'nino-admin-list-copy';
@@ -309,7 +350,7 @@
 				copy.appendChild( role );
 				link.appendChild( copy );
 
-				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'users', [ user.mail ] ); Nino.admin.users._openUser( user.mail ) } );
+				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'users', [ user.mail ] ); Nino.admin.users._openUser( user.mail, true ) } );
 				li.appendChild( link );
 				ul.appendChild( li );
 			} );
@@ -319,26 +360,30 @@
 				add.type = 'button';
 				add.className = 'nino-admin-btn-primary';
 				add.textContent = Nino.content.getText('/_admin/users/label/new');
-				add.addEventListener( 'click', function() { Nino.admin.router.go( 'users', [ 'new' ] ); Nino.admin.users._renderCreateForm() } );
+				add.addEventListener( 'click', function() { Nino.admin.router.go( 'users', [ 'new' ] ); Nino.admin.users._renderCreateForm( add ) } );
 				wrap.appendChild( Nino.adminUi.listActions( [ add ] ) );
 			}
 		},
 
 		/**
 		 *	The "new user" form: mail, password and the role the account
-		 *	starts with - what a role grants is the roles tab, not this form
+		 *	starts with - what a role grants is the roles tab, not this form.
+		 *	The focus goes to the first field
+		 *
+		 *	@param		{Element}		[opener]	The button that was pressed: Back returns the focus to it
 		 *
 		 *	@return		void
 		 */
-		_renderCreateForm : function() {
+		_renderCreateForm : function( opener ) {
 			const wrap = dc.getElementById('users-form');
 			wrap.innerHTML = '';
 			Nino.admin.users._currentUser = null;
+			Nino.admin.users._opener = opener ?? null;
 			const backLink = dc.createElement('a');
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/users/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'users', [] ); Nino.admin.users._showList() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'users', [] ); Nino.admin.users._showList( Nino.admin.users._backTarget() ) } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 			const form = dc.createElement('form');
 			form.id = 'users-create-form';
@@ -423,7 +468,7 @@
 						}
 						Nino.admin.users._users = listResponse.users;
 						Nino.admin.users._renderList( listResponse.users );
-						Nino.admin.users._openUser( response.mail );
+						Nino.admin.users._openUser( response.mail, true );
 						report( true );
 					} );
 				} );
@@ -434,10 +479,8 @@
 				Nino.admin.users._create();
 			} );
 			wrap.appendChild( form );
-			dc.getElementById('users-list').classList.add('admin-hidden');
-			wrap.classList.remove('admin-hidden');
 			Nino.admin.router.set( 'users', [ 'new' ] );
-			mailInput.focus();
+			Nino.adminUi.showLevel( 'users-form', { focus : mailInput } );
 
 			// What the form holds now is what is saved
 			if( typeof Nino.admin.dirty === 'object' )
@@ -447,11 +490,12 @@
 		/**
 		 *	Open one user's edit form
 		 *
-		 *	@param		{string}	mail
+		 *	@param		{string}		mail
+		 *	@param		{boolean}		[opened]	The person opened it - a row, or the create form that was just saved: the focus goes into the form. Otherwise it is shown as it stands, by the address or after a step through the history
 		 *
 		 *	@return		void
 		 */
-		_openUser : function( mail ) {
+		_openUser : function( mail, opened ) {
 
 			const user = Nino.admin.users._users.find( function( u ) { return u.mail === mail } );
 			if( user === undefined )
@@ -459,7 +503,7 @@
 
 			Nino.admin.users._currentUser = user;
 			Nino.admin.users._renderForm();
-			Nino.admin.users._showForm();
+			Nino.admin.users._showForm( opened === true );
 		},
 
 		/**
@@ -483,7 +527,7 @@
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/users/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'users', [] ); Nino.admin.users._showList() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'users', [] ); Nino.admin.users._showList( Nino.admin.users._backTarget() ) } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const form = dc.createElement('form');

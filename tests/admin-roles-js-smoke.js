@@ -304,4 +304,88 @@ parts.fullCheck.checked = true;
 fire( parts.fullCheck, 'change' );
 check( '...and with full access it says so', summary( parts ).join('|') === text('/_admin/roles/summary/full') );
 
+
+console.log('\nAdmin Roles - the drill-down');
+
+/*	A row opens a role and writes its address, so it is a link with that address.
+	What is opened takes the focus into the form, Back gives it to the row - found
+	again where the list was drawn anew behind the form - and a delete leaves it
+	nowhere to stand	*/
+{
+	// The pane the shell draws: the name of the panel in its head, and the two levels beside it
+	const pane = element('div');
+	pane.dataset.panel = 'roles';
+	const head = element('div');
+	head.className = 'admin-panel-head';
+	const paneTitle = element('h2');
+	paneTitle.className = 'admin-panel-title';
+	head.appendChild( paneTitle );
+	pane.appendChild( head );
+	const list = element('div');
+	list.id = 'roles-list';
+	pane.appendChild( list );
+	const form = element('div');
+	form.id = 'roles-form';
+	form.classList.add('admin-hidden');
+	pane.appendChild( form );
+
+	const sent = [];
+	const shell = {
+		router : { current : function() { return { panel : 'roles', parts : [] } }, go : function() {}, set : function() {}, leave : function() {},
+			href : function( name, at ) { return '#'+ [ name ].concat( at || [] ).map( encodeURIComponent ).join('/') } },
+		formToolbar : function( back ) { const bar = element('div'); bar.appendChild( back ); return bar },
+	};
+	const page = { admin : shell, events : { bindCallback : function() {} }, http : { sendRequest : function( uri, method, callback, data ) { sent.push( { action : data.action, callback : callback } ) } }, content : { getText : text } };
+	const box = {
+		console : console,
+		document : {
+			createElement : element,
+			createTextNode : function( value ) { return { tagName : '#TEXT', textContent : value, attributes : {}, dataset : {}, children : [] } },
+			getElementById : function( id ) { return findAll( pane, function( el ) { return el.id === id } )[0] ?? null },
+			documentElement : null,
+			body : null,
+			get activeElement() { return findAll( pane, function( el ) { return el.focused === true } )[0] ?? null },
+		},
+		Nino : page,
+	};
+	box.window = { Nino : page, confirm : function() { return true } };
+	const drillContext = vm.createContext( box );
+	load( '_admin/assets/Nino.admin.js', drillContext );
+	page.adminUi.elementList = function() { return element('div') };
+	load( '_admin/Nino/Modules/Users/assets/roles.js', drillContext );
+
+	const drilled = page.admin.roles;
+	drilled._roles = [ { id : 'editor', label : 'Editor', users : 1, perms : [ '/_admin/elements/manage' ] }, { id : 'author', label : 'Author', users : 0, perms : [] } ];
+	drilled._scopes = SCOPES;
+	drilled._permOptions = OPTIONS;
+	drilled._groups = [ 'content', 'other' ];
+	drilled._renderList();
+	drilled._showList();
+
+	const linkOf = function( id ) { return findAll( list, function( el ) { return el.tagName === 'A' } ).find( function( a ) { return a.dataset.role === id } ) };
+	const focusedNow = function() { return findAll( pane, function( el ) { return el.focused === true } )[0] ?? null };
+	const backLinkOf = function() { return findAll( form, function( el ) { return el.className === 'nino-admin-back-link' } )[0] };
+
+	check( 'a row is a link with the address of the role it opens', linkOf('editor').href === '#roles/editor' && linkOf('author').href === '#roles/author' );
+
+	fire( linkOf('editor'), 'click' );
+	check( 'opening a role shows its form and moves the focus into it', form.classList.contains('admin-hidden') === false && list.classList.contains('admin-hidden') === true && backLinkOf() !== undefined && focusedNow() === backLinkOf() );
+
+	drilled._renderList();
+	fire( backLinkOf(), 'click' );
+	check( 'Back shows the list and puts the focus on the row of the role - the one drawn now, not the one that was pressed', list.classList.contains('admin-hidden') === false && form.classList.contains('admin-hidden') === true && focusedNow() === linkOf('editor') );
+
+	const addButton = findAll( list, function( el ) { return el.className === 'nino-admin-btn-primary' } )[0];
+	fire( addButton, 'click' );
+	check( 'a new role opens the same way', form.classList.contains('admin-hidden') === false && focusedNow() === backLinkOf() );
+	fire( backLinkOf(), 'click' );
+	check( '...and Back returns to the New role button', focusedNow() === addButton && list.classList.contains('admin-hidden') === false );
+
+	fire( linkOf('author'), 'click' );
+	findAll( form, function( el ) { return el.id === 'roles-form-name' } )[0].focus();
+	drilled._delete();
+	sent[sent.length - 1].callback( { status : 200, responseJSON : {} } );
+	check( 'a deleted role leaves the focus nothing to stand on in the form: it goes to the name of the panel', list.classList.contains('admin-hidden') === false && focusedNow() === paneTitle );
+}
+
 done();

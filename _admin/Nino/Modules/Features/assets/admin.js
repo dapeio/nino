@@ -205,9 +205,10 @@
 
 		/**
 		 *	The whole panel, from state: the head that holds the tab strip and
-		 *	the filter, the action bar (only while the catalogue is switched
-		 *	on) and the current tab's content, and the open feature's screen
-		 *	unless it is left as it is
+		 *	the filter, the current tab's content and the action bar (only while
+		 *	the catalogue is switched on), which stands last in the markup as it
+		 *	does on the screen, and the open feature's screen unless it is left
+		 *	as it is
 		 *
 		 *	@param		{boolean}		[keepDetail]	True to leave the open feature's screen alone
 		 *
@@ -220,10 +221,10 @@
 
 			wrap.appendChild( Nino.admin.features._renderHead() );
 
+			Nino.admin.features._renderTabContent( wrap );
+
 			if( Nino.admin.features._catalogueUrl !== '' )
 				wrap.appendChild( Nino.admin.features._renderActionBar() );
-
-			Nino.admin.features._renderTabContent( wrap );
 
 			if( keepDetail !== true )
 				Nino.admin.features._renderDetail();
@@ -521,7 +522,7 @@
 		},
 
 		/**
-		 *	The action bar above the tabs: Refresh catalogue - absent while
+		 *	The action bar under the tabs: Refresh catalogue - absent while
 		 *	the catalogue is switched off, the caller already checked that -
 		 *	and a status line saying when the cache is from, or that it is
 		 *	not loaded yet, or what the last refresh answered
@@ -1523,9 +1524,11 @@
 		 *	on. Else the list, which is where a feature that was switched off
 		 *	somewhere else ends up rather than on a screen about nothing
 		 *
+		 *	@param		{boolean}		[opened]		The person opened the screen: the focus goes into it (see Nino.adminUi.showLevel()). Else the level is only shown, and the focus stays where it is
+		 *
 		 *	@return		void
 		 */
-		_renderDetail : function() {
+		_renderDetail : function( opened ) {
 
 			const list	= dc.getElementById('features-list');
 			const wrap	= dc.getElementById('features-detail');
@@ -1539,8 +1542,7 @@
 
 			if( feature === undefined ) {
 				Nino.admin.features._openFeature = '';
-				list.classList.remove('admin-hidden');
-				wrap.classList.add('admin-hidden');
+				Nino.adminUi.showLevel( list, { focus : false } );
 				return;
 			}
 
@@ -1548,7 +1550,7 @@
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/common/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.features._showList() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.features._showList( true ) } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			// One form, whether or not it has anything to fill in: the bar at the
@@ -1702,8 +1704,7 @@
 
 			wrap.appendChild( form );
 
-			list.classList.add('admin-hidden');
-			wrap.classList.remove('admin-hidden');
+			Nino.adminUi.showLevel( wrap, opened === true ? {} : { focus : false } );
 
 			// What the settings hold now is what is saved
 			Nino.admin.features._detailParts = { feature : feature, form : form, save : save, msg : msg };
@@ -1792,18 +1793,39 @@
 			// A different feature is a different screen: the tab the last one was
 			// left on says nothing about this one, so it opens on what it is
 			Nino.admin.features._detailTab = 'about';
-			Nino.admin.features._renderDetail();
+			Nino.admin.features._renderDetail( true );
 		},
 
 		/**
 		 *	Leave a feature's screen for the list it was opened from - the tab
 		 *	it stands on is the one it was left on
 		 *
+		 *	@param		{boolean}		[back]			The person went Back: the focus goes to the row of the feature that was open. Else the list is only shown
+		 *
 		 *	@return		void
 		 */
-		_showList : function() {
+		_showList : function( back ) {
+
+			const key = Nino.admin.features._openFeature;
+
 			Nino.admin.features._openFeature = '';
 			Nino.admin.features._renderDetail();
+
+			if( back === true )
+				Nino.adminUi.backTo( 'features-list', Nino.admin.features._rowOf( key ) );
+		},
+
+		/**
+		 *	The row of a feature as the list is drawn now - the list is drawn
+		 *	again with every change of the filter and the tab, and the row that
+		 *	was pressed is gone with the old drawing
+		 *
+		 *	@param		{string}		key
+		 *
+		 *	@return		{Element|null}
+		 */
+		_rowOf : function( key ) {
+			return Array.from( dc.getElementById('features-list').querySelectorAll('button') ).find( function( button ) { return button.dataset.feature === key } ) ?? null;
 		},
 
 		/**

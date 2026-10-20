@@ -100,7 +100,7 @@
 }
 .install-check-status--fail {
 	background: var(--editor-red-soft);
-	color: var(--editor-red);
+	color: var(--editor-red-ink);
 }
 
 /* ----------------------------------------------------------- Routes step */
@@ -343,7 +343,7 @@
 /* The wizard's own step message is the one place a bottom-bar status is an
    error rather than a progress note */
 #install-page-wrap .nino-admin-actionbar #install-actions-msg {
-	color: var(--editor-red);
+	color: var(--editor-red-ink);
 }
 
 /* Screen-level chrome that only one step wants */

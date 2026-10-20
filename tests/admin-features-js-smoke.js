@@ -126,9 +126,15 @@ const Nino = {
 	} },
 	content : { getText : text },
 };
+/** The element that has the focus in the pane, as the page would say */
+function focused() {
+	return findAll( pane, function( el ) { return el.focused === true } )[0] ?? null;
+}
+
 const sandbox = {
 	console : console,
 	document : {
+		get activeElement() { return focused() },
 		createElement : element,
 		createTextNode : textNode,
 		getElementById : function( id ) {
@@ -317,6 +323,9 @@ check( 'there is no intro line and no eyebrow badge - just the head, the action 
 // --- the head: the tab strip beside the panel's name, the filter in the module's own row
 
 const head 	 = mount.children[0];
+// The panel is the head, the content of the tab and - while the catalogue is on - the bar, in the order of the screen: the Tab key follows the markup
+const tabContent = function() { return mount.children[1] };
+const catalogueBar = function() { return mount.children[2] };
 const strip	 = paneHead.children[1];
 const filter = head.children[0];
 check( 'the strip stands in the pane\'s head beside the name, and the module\'s own row holds the filter and the category - neither inside the tablist', paneHead.children.length === 3
@@ -355,15 +364,17 @@ check( 'a maturity is text, whatever it contains, and goes into the element it w
 
 // --- the action bar
 
-check( 'the action bar carries the shared classes and one button plus a status line', hasClass( mount.children[1], 'nino-admin-actionbar' ) && hasClass( mount.children[1], 'nino-admin-list-actions' )
-	&& byTag( mount.children[1], 'button' ).length === 1 && byTag( mount.children[1], 'button' )[0].textContent === text('/_admin/features/label/catalogue-refresh') && hasClass( byTag( mount.children[1], 'button' )[0], 'nino-admin-btn-secondary' ) );
-const status = byTag( mount.children[1], 'p' )[0];
+check( 'the bar stands after the list in the markup, where it stands on the screen - the Tab key follows the markup, and it used to come before every row', mount.children.length === 3
+	&& catalogueBar() === mount.children[mount.children.length - 1] && hasClass( catalogueBar(), 'nino-admin-actionbar' ) && hasClass( tabContent(), 'nino-admin-actionbar' ) === false );
+check( 'the action bar carries the shared classes and one button plus a status line', hasClass( catalogueBar(), 'nino-admin-actionbar' ) && hasClass( catalogueBar(), 'nino-admin-list-actions' )
+	&& byTag( catalogueBar(), 'button' ).length === 1 && byTag( catalogueBar(), 'button' )[0].textContent === text('/_admin/features/label/catalogue-refresh') && hasClass( byTag( catalogueBar(), 'button' )[0], 'nino-admin-btn-secondary' ) );
+const status = byTag( catalogueBar(), 'p' )[0];
 check( 'without a cache yet the status says so, not an error', status.textContent === text('/_admin/features/label/catalogue-unloaded') && hasClass( status, 'nino-admin-error' ) === false && status.attributes['aria-live'] === 'polite' );
 
 // --- the Available tab before anything was ever fetched
 
 fire( tabs[2], 'click' );
-check( 'the Available tab explains there is nothing cached yet', findAll( mount.children[2], function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/available-unloaded') );
+check( 'the Available tab explains there is nothing cached yet', findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/available-unloaded') );
 
 // --- Inactive and Active
 
@@ -373,7 +384,7 @@ check( 'an inactive row carries the badge after its name too, in the shared copy
 check( '...and in the element that holds the name - the <strong> of the shared copy, which is a grid - not beside it',
 	badgeParents( row( mount, 'fresh' ) ).length === 1 && badgeParents( row( mount, 'fresh' ) )[0].tagName === 'STRONG' && badgeParents( row( mount, 'fresh' ) )[0].textContent === 'Fresh' );
 check( 'Inactive is the grouped list, one row per feature that is off, in the backend\'s order', rowKeys( mount, 'feature' ) === 'old,fresh'
-	&& hasClass( byTag( mount.children[2], 'ul' )[0], 'nino-admin-list' ) && row( mount, 'old' ).tagName === 'LI' );
+	&& hasClass( byTag( tabContent(), 'ul' )[0], 'nino-admin-list' ) && row( mount, 'old' ).tagName === 'LI' );
 check( 'a row is the shared name-over-line copy, and carries no status badge', hasClass( row( mount, 'fresh' ).children[0], 'nino-admin-list-copy' )
 	&& row( mount, 'fresh' ).children[0].children[0].tagName === 'STRONG' && row( mount, 'fresh' ).children[0].children[0].textContent === 'Fresh' );
 check( 'the line under the name says which version this is and what the feature does', meta( row( mount, 'fresh' ) ) === text('/_admin/features/label/version').replace( '%s', '0.1.0' )+ ' · Not switched on yet.' );
@@ -439,7 +450,7 @@ check( 'switching tabs keeps the filter, and it reads the key as well as the nam
 filterNow().value = 'zzz';
 fire( filterNow(), 'input' );
 check( 'a filter that matches nothing says so - not the tab\'s own empty state, which would explain a features directory nobody asked about',
-	findAll( mount.children[2], function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/nomatch') );
+	findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/nomatch') );
 
 filterNow().value = '';
 fire( filterNow(), 'input' );
@@ -475,7 +486,7 @@ check( 'the pick survives the redraw it triggers', categoryNow().value === 'cont
 filterNow().value = 'plain';
 fire( filterNow(), 'input' );
 check( 'the two narrow together rather than one replacing the other - Plain is not filed under Content',
-	findAll( mount.children[2], function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/nomatch') );
+	findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/nomatch') );
 
 filterNow().value = '';
 fire( filterNow(), 'input' );
@@ -512,6 +523,7 @@ const asked = requests.length;
 fire( sample, 'click' );
 check( 'stepping into it asks the backend for nothing - features/list already carried the schema', requests.length === asked );
 check( 'the list is stepped out of and the feature\'s pane shown, the way every drill-down level is', mount.classList.contains('admin-hidden') === true && screen.classList.contains('admin-hidden') === false );
+check( 'the screen takes the focus when it is opened: on the name of the feature, which the list it came from loses with the row that was pressed', focused() === byTag( screen, 'h2' )[0] && focused().attributes.tabindex === '-1' );
 check( 'the screen names the feature, and the line under it is identity alone - what it does is a sentence, and a sentence is not appended to a line that gets scanned', byTag( screen, 'h2' )[0].textContent === 'Beispiel-Feature'
 	&& byTag( screen, 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/category/content')+ ' · '+ text('/_admin/features/label/version').replace( '%s', '1.2.0' ) } )
 	&& byTag( screen, 'p' ).some( function( el ) { return el.textContent === text('/_admin/features/label/requires').replace( '%s', 'helper' ) } ) );
@@ -695,6 +707,7 @@ check( 'an active feature that declares no setting gets the same screen, without
 	&& byTag( plainBar, 'button' ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/features/label/deactivate')+ '|'+ text('/_admin/features/label/update').replace( '%s', '1.0.0' )
 	&& byTag( plainBar, 'button' ).every( function( el ) { return el.type === 'button' } ) );
 fire( byTag( screen.children[0], 'a' )[0], 'click' );
+check( 'Back shows the list and puts the focus on the row of the feature that was open', mount.classList.contains('admin-hidden') === false && screen.classList.contains('admin-hidden') === true && focused() === row( mount, 'plain' ) && focused() !== null );
 
 /*	A feature that has a panel of its own edits its settings in a tab of that
 	panel (see settings.js): its screen here draws no form and no Save for
@@ -795,7 +808,7 @@ fire( tabs[2], 'click' );
 
 const availableTabs = byTag( paneHead.children[1], 'button' );
 check( 'Available\'s count is the offers that are not already current: ancient, extra, helper, needy - not sample', availableTabs[2].textContent === text('/_admin/features/tab/available')+ ' (4)' );
-check( 'the status line reads the cache\'s own stamp', byTag( mount.children[1], 'p' )[0].textContent === text('/_admin/features/label/catalogue-status').replace( '%s', CACHE.fetched ) );
+check( 'the status line reads the cache\'s own stamp', byTag( catalogueBar(), 'p' )[0].textContent === text('/_admin/features/label/catalogue-status').replace( '%s', CACHE.fetched ) );
 check( 'and the category now offers what the catalogue brought as well - it is built from what is on screen, installed or not',
 	byTag( mount.children[0].children[1], 'option' ).map( function( o ) { return o.value } ).join('|') === '|content|ui|marketing|security|system|' );
 
@@ -917,7 +930,7 @@ check( '...and updating a feature that is running activates it again in a reques
 // that answer: an update ends in a reload, so there is no list read to answer
 panel.init();
 answer( 200, listAnswer( CATALOGUE_URL, false, Object.assign( {}, CACHE, { offers : installedOffers } ) ) );
-check( 'without a writable directory the tab says so, naming it, and every remaining offer links its archive instead of a button', byTag( mount.children[2], 'p' ).some( function( el ) { return hasClass( el, 'nino-admin-error' ) && el.textContent === text('/_admin/features/hint/catalogue-readonly').replace( '%s', '/features' ) } )
+check( 'without a writable directory the tab says so, naming it, and every remaining offer links its archive instead of a button', byTag( tabContent(), 'p' ).some( function( el ) { return hasClass( el, 'nino-admin-error' ) && el.textContent === text('/_admin/features/hint/catalogue-readonly').replace( '%s', '/features' ) } )
 	&& byTag( offer( mount, 'ancient' ), 'button' ).length === 0 && byTag( offer( mount, 'needy' ), 'button' ).length === 0
 	&& byTag( offer( mount, 'helper' ), 'a' ).length === 1 && byTag( offer( mount, 'helper' ), 'a' )[0].href === CACHE.offers[2].archive && byTag( offer( mount, 'helper' ), 'a' )[0].textContent === text('/_admin/features/label/archive') );
 
@@ -925,12 +938,12 @@ check( 'without a writable directory the tab says so, naming it, and every remai
 
 panel.init();
 answer( 200, listAnswer( CATALOGUE_URL, true, Object.assign( {}, CACHE, { offers : [] } ) ) );
-check( 'a cached catalogue listing no features at all is the shared empty state, naming none of the module\'s regular hints', findAll( mount.children[2], function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/catalogue-empty') );
+check( 'a cached catalogue listing no features at all is the shared empty state, naming none of the module\'s regular hints', findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/catalogue-empty') );
 
 panel.init();
 const allCurrent = OFFERS.map( function( o ) { return Object.assign( {}, o, { state : 'current' } ) } );
 answer( 200, listAnswer( CATALOGUE_URL, true, Object.assign( {}, CACHE, { offers : allCurrent } ) ) );
-check( 'a cache whose offers are all already current says everything is up to date, count 0', findAll( mount.children[2], function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/available-empty')
+check( 'a cache whose offers are all already current says everything is up to date, count 0', findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/available-empty')
 	&& byTag( paneHead.children[1], 'button' )[2].textContent === text('/_admin/features/tab/available')+ ' (0)' );
 
 panel.showCurrent();
@@ -943,27 +956,27 @@ check( 'and a fetch was never made on its own throughout all of this', requests.
 
 panel.showCurrent();
 answer( 200, listAnswer( CATALOGUE_URL, true, null ) );
-const refreshBtn = byTag( mount.children[1], 'button' )[0];
+const refreshBtn = byTag( catalogueBar(), 'button' )[0];
 const requestsBeforeRefresh = requests.length;
 
 fire( refreshBtn, 'click' );
 // The click rebuilt the whole action bar - re-query rather than trust the
 // button reference from before the click, which the rebuild detached
 check( 'Refresh catalogue posts features/catalogue with nothing, holds the button and says it is loading', requests.length === requestsBeforeRefresh + 1 && requests[requests.length - 1].action === 'features/catalogue' && Object.keys( requests[requests.length - 1].payload ).length === 0
-	&& byTag( mount.children[1], 'button' )[0].disabled === true && byTag( mount.children[1], 'p' )[0].textContent === text('/_admin/features/msg/catalogue-loading') );
+	&& byTag( catalogueBar(), 'button' )[0].disabled === true && byTag( catalogueBar(), 'p' )[0].textContent === text('/_admin/features/msg/catalogue-loading') );
 answer( 400, { error : 'Der Katalog konnte nicht geladen werden: the catalogue signature does not verify' } );
-check( 'a refusal shows the backend\'s message as an error and frees the button, the Available tab unchanged (still unloaded)', byTag( mount.children[1], 'button' )[0].disabled === false && hasClass( byTag( mount.children[1], 'p' )[0], 'nino-admin-error' )
-	&& byTag( mount.children[1], 'p' )[0].textContent === '(400) Der Katalog konnte nicht geladen werden: the catalogue signature does not verify'
-	&& findAll( mount.children[2], function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/available-unloaded') );
+check( 'a refusal shows the backend\'s message as an error and frees the button, the Available tab unchanged (still unloaded)', byTag( catalogueBar(), 'button' )[0].disabled === false && hasClass( byTag( catalogueBar(), 'p' )[0], 'nino-admin-error' )
+	&& byTag( catalogueBar(), 'p' )[0].textContent === '(400) Der Katalog konnte nicht geladen werden: the catalogue signature does not verify'
+	&& findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/available-unloaded') );
 
-fire( byTag( mount.children[1], 'button' )[0], 'click' );
+fire( byTag( catalogueBar(), 'button' )[0], 'click' );
 answer( 500, null );
-check( 'a failed refresh falls back to its own error line', byTag( mount.children[1], 'p' )[0].textContent === '(500) '+ text('/_admin/features/error/catalogue') );
+check( 'a failed refresh falls back to its own error line', byTag( catalogueBar(), 'p' )[0].textContent === '(500) '+ text('/_admin/features/error/catalogue') );
 
-fire( byTag( mount.children[1], 'button' )[0], 'click' );
+fire( byTag( catalogueBar(), 'button' )[0], 'click' );
 answer( 200, catalogueAnswer( true, OFFERS, '2026-09-08 09:00' ) );
-check( 'a successful refresh clears the error, frees the button and the status now names when it was fetched', hasClass( byTag( mount.children[1], 'p' )[0], 'nino-admin-error' ) === false && byTag( mount.children[1], 'button' )[0].disabled === false
-	&& byTag( mount.children[1], 'p' )[0].textContent === text('/_admin/features/label/catalogue-status').replace( '%s', '2026-09-08 09:00' ) );
+check( 'a successful refresh clears the error, frees the button and the status now names when it was fetched', hasClass( byTag( catalogueBar(), 'p' )[0], 'nino-admin-error' ) === false && byTag( catalogueBar(), 'button' )[0].disabled === false
+	&& byTag( catalogueBar(), 'p' )[0].textContent === text('/_admin/features/label/catalogue-status').replace( '%s', '2026-09-08 09:00' ) );
 check( 'the Available tab now shows the refreshed offers, count 4', byTag( paneHead.children[1], 'button' )[2].textContent === text('/_admin/features/tab/available')+ ' (4)'
 	&& rowKeys( mount, 'offer' ) === 'ancient,extra,helper,needy' );
 check( 'switching tabs and back leaves the refreshed cache in place - the tab bar rebuild does not lose state', ( fire( byTag( paneHead.children[1], 'button' )[0], 'click' ), fire( byTag( paneHead.children[1], 'button' )[2], 'click' ), rowKeys( mount, 'offer' ).split(',').filter( Boolean ).length === 4 ) );
@@ -980,7 +993,7 @@ check( '...and every redraw put one strip into the head, in the place after the 
 
 	// Nothing typed: the screen is drawn again, as it always was
 	Nino.admin.dirty = { isDirty : function() { return false }, snapshot : function() {} };
-	fire( byTag( mount.children[1], 'button' )[0], 'click' );
+	fire( byTag( catalogueBar(), 'button' )[0], 'click' );
 	answer( 200, catalogueAnswer( true, OFFERS, '2026-09-09 10:00' ) );
 	check( 'a refresh draws the open feature\'s screen again while nothing is typed into it', detailDrawn.length === 2 );
 
@@ -988,21 +1001,21 @@ check( '...and every redraw put one strip into the head, in the place after the 
 	detailDrawn.length = 0;
 	const asked = [];
 	Nino.admin.dirty = { isDirty : function( names ) { asked.push( names ); return true }, snapshot : function() {} };
-	fire( byTag( mount.children[1], 'button' )[0], 'click' );
+	fire( byTag( catalogueBar(), 'button' )[0], 'click' );
 	check( 'a refresh over typed settings leaves the screen alone from the click on, and asks the shell about the feature panel', detailDrawn.length === 0 && asked.length >= 1 && asked.every( function( names ) { return JSON.stringify( names ) === '["features"]' } )
-		&& byTag( mount.children[1], 'p' )[0].textContent === text('/_admin/features/msg/catalogue-loading') );
+		&& byTag( catalogueBar(), 'p' )[0].textContent === text('/_admin/features/msg/catalogue-loading') );
 	answer( 200, catalogueAnswer( true, OFFERS, '2026-09-10 11:00' ) );
 	check( '...and so does the answer, which still updates the status line and the offers', detailDrawn.length === 0
-		&& byTag( mount.children[1], 'p' )[0].textContent === text('/_admin/features/label/catalogue-status').replace( '%s', '2026-09-10 11:00' ) );
+		&& byTag( catalogueBar(), 'p' )[0].textContent === text('/_admin/features/label/catalogue-status').replace( '%s', '2026-09-10 11:00' ) );
 
 	// A refusal is the same case
-	fire( byTag( mount.children[1], 'button' )[0], 'click' );
+	fire( byTag( catalogueBar(), 'button' )[0], 'click' );
 	answer( 500, null );
-	check( '...and a refusal as well', detailDrawn.length === 0 && byTag( mount.children[1], 'p' )[0].textContent === '(500) '+ text('/_admin/features/error/catalogue') );
+	check( '...and a refusal as well', detailDrawn.length === 0 && byTag( catalogueBar(), 'p' )[0].textContent === '(500) '+ text('/_admin/features/error/catalogue') );
 
 	// Typed into while the answer was on its way
 	Nino.admin.dirty = { isDirty : function() { return false }, snapshot : function() {} };
-	fire( byTag( mount.children[1], 'button' )[0], 'click' );
+	fire( byTag( catalogueBar(), 'button' )[0], 'click' );
 	detailDrawn.length = 0;
 	Nino.admin.dirty = { isDirty : function() { return true }, snapshot : function() {} };
 	answer( 200, catalogueAnswer( true, OFFERS, '2026-09-11 12:00' ) );
@@ -1032,9 +1045,9 @@ answer( 200, { dir : '/features', catalogueUrl : CATALOGUE_URL, writable : true,
 check( 'init reloads, and Inactive\'s empty state names the directory - Active empty too, both counted 0', requests[requests.length - 1].action === 'features/list'
 	&& byTag( paneHead.children[1], 'button' )[0].textContent === text('/_admin/features/tab/active')+ ' (0)' && byTag( paneHead.children[1], 'button' )[1].textContent === text('/_admin/features/tab/inactive')+ ' (0)' );
 fire( byTag( paneHead.children[1], 'button' )[1], 'click' );
-check( 'Inactive, empty, names the features directory', findAll( mount.children[2], function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/empty').replace( '%s', '/features' ) );
+check( 'Inactive, empty, names the features directory', findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/empty').replace( '%s', '/features' ) );
 fire( byTag( paneHead.children[1], 'button' )[0], 'click' );
-check( 'Active, empty, says no feature is on', findAll( mount.children[2], function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/active-empty') );
+check( 'Active, empty, says no feature is on', findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/active-empty') );
 check( 'and with nothing to narrow the category is not drawn at all - a select with one option is a control that cannot be used',
 	mount.children[0].children.length === 1 && byTag( mount.children[0], 'select' ).length === 0 );
 

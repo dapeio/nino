@@ -308,7 +308,7 @@
 				return;
 
 			Nino.admin.router.go( 'elements', [ Nino.admin.elements._currentType, uri === null ? 'new' : uri ] );
-			Nino.admin.elements._openForm( uri );
+			Nino.admin.elements._openForm( uri, undefined, true );
 		},
 
 		/**
@@ -439,15 +439,24 @@
 		 *	Drill-down navigation: types -> list -> form, each level hiding its
 		 *	parent (the shell's rail and the pane's tab strip stay visible
 		 *	throughout, so only the local "‹ Back" links in the list/form need
-		 *	to move back up one level, not the whole page)
+		 *	to move back up one level, not the whole page). The focus stays where
+		 *	it is, unless it stood in the level that is hidden now (see
+		 *	Nino.adminUi.showLevel()): a level is shown again as it stands by the
+		 *	address, or after a request. Back goes to the control that opened the
+		 *	level that is left, and what a person opens takes the focus in
+		 *
+		 *	@param		{Element|null}	[opener]	Back: the control to give the focus to; null where there is none to name
 		 *
 		 *	@return		void
 		 */
-		_showTypes : function() {
-			dc.getElementById('elements-types').classList.remove('admin-hidden');
-			dc.getElementById('elements-list').classList.add('admin-hidden');
-			dc.getElementById('elements-form').classList.add('admin-hidden');
+		_showTypes : function( opener ) {
 			Nino.admin.router.set( 'elements', [] );
+
+			if( opener === undefined )
+				Nino.adminUi.showLevel( 'elements-types', { focus : false } );
+			else
+				Nino.adminUi.backTo( 'elements-types', opener );
+
 			Nino.admin.elements._refreshTypes();
 		},
 
@@ -479,18 +488,68 @@
 			} );
 		},
 
-		_showList : function() {
-			dc.getElementById('elements-types').classList.add('admin-hidden');
-			dc.getElementById('elements-list').classList.remove('admin-hidden');
-			dc.getElementById('elements-form').classList.add('admin-hidden');
+		/**
+		 *	@param		{Element|null}	[opener]	A person's move: the control to give the focus to (Back), or null for the level itself (a type that was picked). Left out, the list is only shown
+		 *
+		 *	@return		void
+		 */
+		_showList : function( opener ) {
 			Nino.admin.router.set( 'elements', [ Nino.admin.elements._currentType ] );
+
+			if( opener === undefined )
+				Nino.adminUi.showLevel( 'elements-list', { focus : false } );
+			else
+				Nino.adminUi.backTo( 'elements-list', opener );
 		},
 
-		_showFormView : function() {
-			dc.getElementById('elements-types').classList.add('admin-hidden');
-			dc.getElementById('elements-list').classList.add('admin-hidden');
-			dc.getElementById('elements-form').classList.remove('admin-hidden');
+		/**
+		 *	@param		{boolean}	[opened]	The person opened it: the focus goes into the form
+		 *
+		 *	@return		void
+		 */
+		_showFormView : function( opened ) {
 			Nino.admin.router.set( 'elements', [ Nino.admin.elements._currentType, Nino.admin.elements._isNew ? 'new' : Nino.admin.elements._currentUri ] );
+			Nino.adminUi.showLevel( 'elements-form', opened === true ? {} : { focus : false } );
+		},
+
+		/**
+		 *	The button of a type as the picker is drawn now: the picker is drawn
+		 *	again whenever it is shown, and the button that was pressed is gone
+		 *	with the old drawing
+		 *
+		 *	@param		{string}	type
+		 *
+		 *	@return		{Element|null}
+		 */
+		_typeButton : function( type ) {
+			return Array.from( dc.getElementById('elements-types').querySelectorAll('button') ).find( function( button ) { return button.dataset.type === type } ) ?? null;
+		},
+
+		/**
+		 *	The row of an element as the list is drawn now - a row of the table, an
+		 *	entry of the plain list: the list is drawn again after a save, and the
+		 *	row that was pressed is gone with the old drawing
+		 *
+		 *	@param		{string|null}	uri
+		 *
+		 *	@return		{Element|null}
+		 */
+		_rowOf : function( uri ) {
+			return Array.from( dc.getElementById('elements-list').querySelectorAll('tr, a') ).find( function( row ) { return row.dataset.row === uri } ) ?? null;
+		},
+
+		/**
+		 *	The control Back returns the focus to from the form that is open: the
+		 *	row of its element, and for a blank form the button that adds one
+		 *
+		 *	@return		{Element|null}
+		 */
+		_backTarget : function() {
+
+			if( Nino.admin.elements._isNew === false && Nino.admin.elements._currentUri !== null )
+				return Nino.admin.elements._rowOf( Nino.admin.elements._currentUri );
+
+			return dc.getElementById('elements-list').querySelector('.nino-admin-btn-primary');
 		},
 
 		/**
@@ -516,6 +575,11 @@
 
 
 			const wrap = dc.getElementById('elements-types');
+
+			// The picker is drawn again whenever it is shown, and the button that has
+			// the focus is gone with the old drawing: the one for the same type takes it over
+			const held = ( dc.activeElement ?? null ) !== null && dc.activeElement.closest('#elements-types') !== null ? ( dc.activeElement.dataset.type ?? null ) : null;
+			let kept = null;
 			wrap.innerHTML = '';
 
 			if( types.length === 0 ) {
@@ -551,10 +615,16 @@
 
 				btn.appendChild( titleWrap );
 				btn.appendChild( chev );
-				btn.addEventListener( 'click', function() { Nino.admin.router.go( 'elements', [ entry.type ] ); Nino.admin.elements._selectType( entry.type, entry.model, entry.title ) } );
+				btn.addEventListener( 'click', function() { Nino.admin.router.go( 'elements', [ entry.type ] ); Nino.admin.elements._selectType( entry.type, entry.model, entry.title, true ) } );
 
 				wrap.appendChild( btn );
+
+				if( entry.type === held )
+					kept = btn;
 			} );
+
+			if( kept !== null )
+				kept.focus();
 		},
 
 		/**
@@ -663,10 +733,11 @@
 		 *	@param		{string}	type					Type name
 		 *	@param		{Object}	model					Type model
 		 *	@param		{string}	title					Type display title
+		 *	@param		{boolean}	[opened]			The person opened it - a type picked, or an element deleted: the focus goes into the list when it arrives. Otherwise it is shown as it stands, by the address
 		 *
 		 *	@return		void
 		 */
-		_selectType : function( type, model, title ) {
+		_selectType : function( type, model, title, opened ) {
 
 			if( Nino.admin.elements._saving === true )
 				return;
@@ -697,7 +768,7 @@
 					return;
 				}
 				Nino.admin.elements._renderList( response.elements, response.columns ?? [] );
-				Nino.admin.elements._showList();
+				Nino.admin.elements._showList( opened === true ? null : undefined );
 
 				const pendingUri = Nino.admin.elements._pendingUri;
 				Nino.admin.elements._pendingUri = undefined;
@@ -747,13 +818,18 @@
 				nav.replaceWith( Nino.admin.elements._renderNav() );
 
 			const wrap = dc.getElementById('elements-list');
+
+			// The list is drawn again after a save and when the language moved on, and the
+			// row that has the focus is gone with the old drawing: the row of the same
+			// element - or the back link - takes it over
+			const held = ( dc.activeElement ?? null ) !== null && dc.activeElement.closest('#elements-list') !== null ? dc.activeElement : null;
 			wrap.innerHTML = '';
 
 			const backLink = dc.createElement('a');
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/elements/label/backtypes');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'elements', [] ); Nino.admin.elements._showTypes() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'elements', [] ); Nino.admin.elements._showTypes( Nino.admin.elements._typeButton( Nino.admin.elements._currentType ) ) } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const title = dc.createElement('div');
@@ -805,7 +881,9 @@
 				elements.forEach( function( element ) {
 					const li 		= dc.createElement('li');
 					const link	= dc.createElement('a');
-					link.href = '#';
+					// An element opens a form and writes its address: a link, with that address
+					link.href = Nino.admin.router.href( 'elements', [ Nino.admin.elements._currentType, element.uri ] );
+					link.dataset.row = element.uri;
 					link.textContent = element.label;
 					link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.elements._visit( element.uri ) } );
 					li.appendChild( link );
@@ -813,6 +891,9 @@
 				} );
 				wrap.appendChild( ul );
 			}
+
+			if( held !== null )
+				( Nino.admin.elements._rowOf( held.dataset.row ?? null ) ?? backLink ).focus();
 
 			// "New element" as an action below the list, not above it - and
 			// only for an account that may actually add one
@@ -831,11 +912,12 @@
 		 *	Open the edit form for an existing element, or a blank one for a new element
 		 *
 		 *	@param		{string|null}	uri			Element uri, or null to create a new one
-		 *	@param		{Function}		[then]	Called once the form is on screen: the blank one a save asked for says what it saved (see _saveAndAdd())
+		 *	@param		{Function}		[then]	Called once the form is on screen: the blank one a save asked for says what it saved and has the focus in its first field (see _saveAndAdd())
+		 *	@param		{boolean}			[opened]	The person opened it - from the list, the form's steps: the focus goes into the form when it arrives. Otherwise it is shown as it stands, by the address
 		 *
 		 *	@return		void
 		 */
-		_openForm : function( uri, then ) {
+		_openForm : function( uri, then, opened ) {
 
 			if( Nino.admin.elements._saving === true )
 				return;
@@ -857,7 +939,7 @@
 					if( requestId !== Nino.admin.elements._formRequest || type !== Nino.admin.elements._currentType )
 						return;
 					Nino.admin.elements._renderForm();
-					Nino.admin.elements._showFormView();
+					Nino.admin.elements._showFormView( opened === true );
 					if( typeof then === 'function' )
 						then();
 				} );
@@ -892,7 +974,7 @@
 					if( requestId !== Nino.admin.elements._formRequest || type !== Nino.admin.elements._currentType )
 						return;
 					Nino.admin.elements._renderForm();
-					Nino.admin.elements._showFormView();
+					Nino.admin.elements._showFormView( opened === true );
 					if( typeof then === 'function' )
 						then();
 				} );
@@ -997,8 +1079,10 @@
 			const marked = Nino.admin.elements._isMarkedRequired( key, field );
 			// A contenteditable inside <label> is invalid interactive markup and
 			// can make drag-selection fail in Safari. Rich text gets a semantic
-			// group; ordinary controls retain their native label wrapper.
-			const label = dc.createElement( isHtml ? 'div' : 'label' );
+			// group; ordinary controls retain their native label wrapper. So does
+			// no field of two controls: a label names the one it holds, and the
+			// Yes and No of a boolean are a group, named as a whole
+			const label = dc.createElement( isHtml || field.type === 'boolean' ? 'div' : 'label' );
 			label.className = 'nino-admin-field';
 			if( isHtml ) {
 				label.setAttribute( 'role', 'group' );
@@ -1029,7 +1113,10 @@
 			// first ("Yes") one regardless of which is actually selected
 			if( field.type === 'boolean' ) {
 				const span = dc.createElement('span');
+				span.id = 'elements-name-'+ key;
 				span.textContent = displayName;
+				label.setAttribute( 'role', 'radiogroup' );
+				label.setAttribute( 'aria-labelledby', span.id );
 				label.appendChild( span );
 
 				const group = dc.createElement('div');
@@ -1220,6 +1307,9 @@
 
 				const preview = dc.createElement('img');
 				preview.className = 'nino-admin-field-image-preview';
+				// Empty: the picture is inside the field's label, which names it, and a
+				// description would become part of the name of the file input as well
+				preview.alt = '';
 				preview.hidden = ! value;
 				// Every uploaded image lives under /images (Nino\Images::UPLOAD_DIR),
 				// and the stored value is the filename relative to it - the same
@@ -1792,11 +1882,7 @@
 				Nino.admin.elements._switchLocale( problems[0].locale );
 			}
 
-			form.querySelectorAll('.nino-admin-field-error').forEach( function( el ) { el.remove() } );
-			form.querySelectorAll('[aria-invalid]').forEach( function( el ) {
-				el.removeAttribute('aria-invalid');
-				el.removeAttribute('aria-describedby');
-			} );
+			Nino.adminUi.clearFieldErrors( form );
 			Object.keys( Nino.admin.elements._htmlEditors ).forEach( function( key ) {
 				if( typeof Nino.admin.elements._htmlEditors[key].mark === 'function' )
 					Nino.admin.elements._htmlEditors[key].mark( { invalid : false, describedBy : '' } );
@@ -1813,24 +1899,13 @@
 				if( target === null )
 					return;
 
+				// The sentence is the control's description and goes after its label, not
+				// in it (see Nino.adminUi.fieldError()); an editor marks itself
 				const id = ( problem.key === '.uri' ? 'elements-error-uri' : 'elements-error-field-'+ problem.key );
-				const error = dc.createElement('p');
-				error.id = id;
-				error.className = 'nino-admin-field-error';
-				error.textContent = Nino.content.getText( problem.key === '.uri' ? '/_admin/elements/error/uri' : ( problem.kind === 'json' ? '/_admin/elements/error/json' : '/_admin/elements/error/field-required' ) );
-				// After a label, not in it: the sentence is the control's description,
-				// and inside the label it would be part of its name as well
-				if( target.wrapper.tagName.toLowerCase() === 'label' )
-					target.wrapper.after( error );
-				else
-					target.wrapper.appendChild( error );
+				Nino.adminUi.fieldError( target.wrapper, target.handle === null ? target.control : null, id, Nino.content.getText( problem.key === '.uri' ? '/_admin/elements/error/uri' : ( problem.kind === 'json' ? '/_admin/elements/error/json' : '/_admin/common/error/required' ) ) );
 
 				if( target.handle !== null )
 					target.handle.mark( { invalid : true, describedBy : id } );
-				else {
-					target.control.setAttribute( 'aria-invalid', 'true' );
-					target.control.setAttribute( 'aria-describedby', id );
-				}
 
 				if( first === null )
 					first = target;
@@ -2425,7 +2500,7 @@
 					return;
 				Nino.admin.elements._destroyHtmlEditors();
 				Nino.admin.router.go( 'elements', [ Nino.admin.elements._currentType ] );
-				Nino.admin.elements._showList();
+				Nino.admin.elements._showList( Nino.admin.elements._backTarget() );
 				// The form's locale switch moves the workbench's content locale;
 				// the list's cells show one translation, so they follow
 				if( Nino.admin.elements._listLocale !== ( Nino.admin.sessionLocale.current ?? '' ) )
@@ -2573,10 +2648,26 @@
 			if( raw !== null )
 				form.appendChild( raw );
 
-			// Actions
+			// Actions, in the order the bar lays them out (see .nino-admin-actionbar):
+			// the destructive one on its far side, the line that says how it went
+			// beside it, then those that confirm. The Tab key follows the markup, so
+			// the markup follows the eye
 			const actions = dc.createElement('div');
 			actions.id = 'elements-form-actions';
 			actions.className = 'nino-admin-actionbar';
+
+			if( Nino.admin.elements._isNew === false && Nino.admin.elements._mayDelete() === true ) {
+				const delBtn = dc.createElement('button');
+				delBtn.type = 'button';
+				delBtn.classList.add('nino-admin-btn-danger');
+				delBtn.textContent = Nino.content.getText('/_admin/elements/label/delete');
+				delBtn.addEventListener( 'click', function() { Nino.admin.elements._delete() } );
+				actions.appendChild( delBtn );
+			}
+
+			const msg = dc.createElement('p');
+			msg.id = 'elements-form-msg';
+			actions.appendChild( msg );
 
 			const saveBtn = dc.createElement('button');
 			saveBtn.type = 'submit';
@@ -2607,19 +2698,6 @@
 				dupBtn.addEventListener( 'click', function() { Nino.admin.elements._duplicate() } );
 				actions.appendChild( dupBtn );
 			}
-
-			if( Nino.admin.elements._isNew === false && Nino.admin.elements._mayDelete() === true ) {
-				const delBtn = dc.createElement('button');
-				delBtn.type = 'button';
-				delBtn.classList.add('nino-admin-btn-danger');
-				delBtn.textContent = Nino.content.getText('/_admin/elements/label/delete');
-				delBtn.addEventListener( 'click', function() { Nino.admin.elements._delete() } );
-				actions.appendChild( delBtn );
-			}
-
-			const msg = dc.createElement('p');
-			msg.id = 'elements-form-msg';
-			actions.appendChild( msg );
 
 			form.appendChild( actions );
 
@@ -2853,7 +2931,8 @@
 		 *	Save the form of a new element exactly as Save does and, when
 		 *	everything was written, open a blank form of the same type instead of
 		 *	staying on the one that was saved: entering several elements in a
-		 *	row. The blank form says what was saved in its status line. A save
+		 *	row. The blank form says what was saved in its status line and has the
+		 *	focus in its first field, where the next element is typed. A save
 		 *	that was refused or failed stays where it is, with its errors
 		 *
 		 *	@return		void
@@ -2861,8 +2940,34 @@
 		_saveAndAdd : function() {
 			Nino.admin.elements._save( function( ok ) {
 				if( ok === true )
-					Nino.admin.elements._openForm( null, function() { Nino.admin.elements._status.saved() } );
+					// Not opened for a person to walk into, whose form starts at its way
+					// out: the focus makes one move, from where the save left it to the field
+					Nino.admin.elements._openForm( null, function() {
+						Nino.admin.elements._status.saved();
+						Nino.admin.elements._focusFirstField();
+					} );
 			} );
+		},
+
+		/**
+		 *	Put the focus on the first field of the form that is open - the uri of
+		 *	a new element that is typed, else the first control of its fields that
+		 *	can be typed into - and on its way back where it has none. A locked
+		 *	control takes no focus, nor does one in a part that is hidden. The
+		 *	control of a rich text is its text box: the input of its editor is the
+		 *	link bar's, hidden until a link is made, and a call on that moves
+		 *	nothing
+		 *
+		 *	@return		void
+		 */
+		_focusFirstField : function() {
+
+			const form = dc.getElementById('elements-edit-form');
+			const controls = form === null ? [] : Array.from( form.querySelectorAll('input:not([type="hidden"]), textarea, select, [contenteditable="true"]') );
+			const target = controls.find( function( control ) { return control.disabled !== true && control.closest('[hidden]') === null } ) ?? dc.getElementById('elements-form').querySelector('.nino-admin-back-link');
+
+			if( target !== null )
+				target.focus();
 		},
 
 		/**
@@ -3098,7 +3203,7 @@
 				}
 				Nino.admin.touch( 'elements' );
 				Nino.admin.elements._saving = false;
-				Nino.admin.elements._selectType( type, model, title );
+				Nino.admin.elements._selectType( type, model, title, true );
 			} );
 		},
 	};

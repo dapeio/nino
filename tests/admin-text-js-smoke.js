@@ -533,6 +533,9 @@ function fakeDom() {
 	const matches = ( node, selector ) => selector.split(',').some( one => matchPath( node, one ) );
 	const walk = ( node, out = [] ) => { node.children.forEach( child => { out.push( child ); walk( child, out ) } ); return out };
 
+	// The element that has the focus: a page has one, and loses it with the element
+	let held = null;
+
 	const make = tag => {
 		let classes = new Set();
 		const node = {
@@ -545,7 +548,8 @@ function fakeDom() {
 			get className() { return [ ...classes ].join(' ') }, set className( v ) { classes = new Set( String( v ).split( /\s+/ ).filter( Boolean ) ) },
 			get textContent() { return this._text + this.children.map( c => c.textContent ).join('') }, set textContent( v ) { this.children = []; this._text = String( v ) },
 			get innerHTML() { return '' }, set innerHTML( v ) { this.children.forEach( c => c.parentNode = null ); this.children = []; this._text = '' },
-			setAttribute( k, v ) { this.attrs[k] = String( v ) }, getAttribute( k ) { return this.attrs[k] ?? null }, removeAttribute( k ) { delete this.attrs[k] },
+			setAttribute( k, v ) { this.attrs[k] = String( v ) }, getAttribute( k ) { return this.attrs[k] ?? null }, hasAttribute( k ) { return k in this.attrs }, removeAttribute( k ) { delete this.attrs[k] },
+			get isConnected() { for( let n = this; n; n = n.parentNode ) if( n === root ) return true; return false },
 			appendChild( c ) { if( c.parentNode ) c.remove(); c.parentNode = this; this.children.push( c ); return c },
 			removeChild( c ) { c.remove(); return c },
 			remove() { if( this.parentNode ) this.parentNode.children.splice( this.parentNode.children.indexOf( this ), 1 ); this.parentNode = null },
@@ -553,7 +557,7 @@ function fakeDom() {
 			addEventListener( type, fn ) { ( this.listeners[type] = this.listeners[type] ?? [] ).push( fn ) },
 			fire( type, ev = {} ) { ( this.listeners[type] ?? [] ).forEach( fn => fn( Object.assign( { target : this, preventDefault(){} }, ev ) ) ) },
 			click() { this.fire('click') },
-			focus() { this.focused = true },
+			focus() { if( held !== null && held !== this ) held.focused = false; held = this; this.focused = true },
 			scrollIntoView() { this.scrolled = true },
 			querySelectorAll( selector ) { return walk( this ).filter( n => matches( n, selector ) ) },
 			querySelector( selector ) { return this.querySelectorAll( selector )[0] ?? null },
@@ -574,6 +578,7 @@ function fakeDom() {
 		createTextNode : text => Object.assign( make('#text'), { _text : String( text ) } ),
 		getElementById : id => walk( root ).find( n => n.id === id ) ?? null,
 		querySelector : selector => root.querySelector( selector ), querySelectorAll : selector => root.querySelectorAll( selector ),
+		get activeElement() { return held !== null && held.isConnected === true ? held : null },
 		addEventListener(){}, removeEventListener(){},
 	};
 
@@ -598,7 +603,7 @@ function world( locale, hash, session ) {
 		admin : {
 			touch : topic => { touched.push( topic ); stamps[topic] = ( stamps[topic] ?? 0 ) + 1 },
 			stamp : topic => stamps[topic] ?? 0,
-			router : { set : ( p, parts ) => calls.push( 'set '+ [ p ].concat( parts ).join('/') ), go : ( p, parts ) => calls.push( 'go '+ [ p ].concat( parts ).join('/') ), current : () => hash ?? { panel : '', parts : [] }, leave : ( n, l, proceed ) => proceed() },
+			router : { set : ( p, parts ) => calls.push( 'set '+ [ p ].concat( parts ).join('/') ), go : ( p, parts ) => calls.push( 'go '+ [ p ].concat( parts ).join('/') ), current : () => hash ?? { panel : '', parts : [] }, leave : ( n, l, proceed ) => proceed(), href : ( p, parts ) => '#'+ [ p ].concat( parts ).map( encodeURIComponent ).join('/') },
 			sessionLocale : { current : session === undefined ? locale : session, init : code => { if( box.Nino.admin.sessionLocale.current === null ) box.Nino.admin.sessionLocale.current = code }, set : code => { calls.push( 'locale '+ code ); box.Nino.admin.sessionLocale.current = code } },
 			formToolbar : back => { const bar = dom.make('div'); bar.className = 'nino-admin-contextbar'; bar.appendChild( back ); return bar },
 			htmlEditor : { create : ( mount, value ) => { mount.setAttribute( 'data-editor', 'yes' ); let held = String( value ?? '' ); return { getValue : () => held, setValue : v => { held = v }, destroy(){} } } },
@@ -611,8 +616,23 @@ function world( locale, hash, session ) {
 
 	const mount = ( ...ids ) => ids.map( id => { const el = dom.make('div'); el.id = id; dom.root.appendChild( el ); return el } );
 
-	return { dom, box, calls, words, touched, stamps, Nino : box.Nino, T : box.Nino.admin.textKeys, U : box.Nino.adminUi, mount };
+	// What the shell draws round the levels of a panel: its name in the head, and the levels beside it
+	const pane = ( panel, ...ids ) => {
+		const el = dom.make('div'), head = dom.make('div'), title = dom.make('h2');
+		el.dataset.panel = panel;
+		head.className = 'admin-panel-head';
+		title.className = 'admin-panel-title';
+		head.appendChild( title );
+		el.appendChild( head );
+		dom.root.appendChild( el );
+		return { title : title, levels : ids.map( id => { const level = dom.make('div'); level.id = id; el.appendChild( level ); return level } ) };
+	};
+
+	return { dom, box, calls, words, touched, stamps, Nino : box.Nino, T : box.Nino.admin.textKeys, U : box.Nino.adminUi, mount, pane };
 }
+
+// Whether the focus is in a level, as a person who looks at the page would say
+const focusIn = ( w, level ) => w.dom.doc.activeElement !== null && w.dom.doc.activeElement.closest( '#'+ level.id ) === level;
 
 // --- the names of a key ---------------------------------------------------------
 
@@ -842,7 +862,7 @@ const textResponse = ( extra ) => Object.assign( { keys : homeKeys.filter( e => 
 
 function openedText( response, hash, locale ) {
 	const w = world( locale ?? 'de_DE', hash );
-	const [ list, form ] = w.mount( 'text-list', 'text-form' );
+	const { title, levels : [ list, form ] } = w.pane( 'text', 'text-list', 'text-form' );
 	form.classList.add('admin-hidden');
 	const sent = [];
 	const text = w.Nino.admin.text;
@@ -855,7 +875,7 @@ function openedText( response, hash, locale ) {
 		callback( 200, { results : results } );
 	};
 	text.init();
-	return Object.assign( w, { list, form, sent, text } );
+	return Object.assign( w, { list, form, title, sent, text } );
 }
 
 {
@@ -1074,6 +1094,35 @@ function openedText( response, hash, locale ) {
 }
 
 {
+	// the focus of a drill-down: into the form that a row or a hit opens, back to the row, and left where it stands when a level is only shown again
+	const t = openedText( textResponse() );
+	const row = group => t.list.querySelectorAll('.admin-type-btn').find( r => r.dataset.group === group );
+	const pressed = row('template/page-services');
+
+	pressed.click();
+	check( 'a row that is opened takes the focus into its form', t.form.classList.contains('admin-hidden') === false && focusIn( t, t.form ) );
+	t.form.querySelector('.nino-admin-back-link').click();
+	check( 'Back shows the list and gives the focus to the row that was open - the one the list has now, drawn again, not the one that was pressed', t.list.classList.contains('admin-hidden') === false
+		&& t.dom.doc.activeElement !== pressed && t.dom.doc.activeElement === row('template/page-services') );
+
+	// a hit opens the row at its key: the focus goes in with it
+	const box = t.list.querySelector('#text-search');
+	box.value = 'beraten';
+	box.fire('input');
+	t.list.querySelector('.admin-text-hit-open').click();
+	check( 'a hit takes the focus into the form as well', focusIn( t, t.form ) );
+
+	// the level shown again, by the address or by a step through the history: the focus is the person's
+	t.text._showList();
+	check( 'the list shown again with the focus in the form that goes gives it to the name of the panel - it would fall to the body', focusIn( t, t.list ) === false && t.dom.doc.activeElement === t.title );
+	box.focus();
+	t.text._showList();
+	check( '...and leaves it where it stands, in the search box, when it stood in the level that stays', t.dom.doc.activeElement === box );
+	t.text._openGroup( 'template/page-services' );
+	check( 'a form shown by the address takes the focus only from the level that goes: it was in the search box, and is on the name of the panel now', t.form.classList.contains('admin-hidden') === false && t.dom.doc.activeElement === t.title );
+}
+
+{
 	// more hits than a page: fifty, then "Weitere anzeigen", fifty at a time
 	const many = Array.from( { length : 120 }, ( v, i ) => textEntry( '/project/many/item/n'+ String( i ).padStart( 3, '0' ), { de_DE : 'Treffer '+ i, en_US : '' } ) );
 	const t = openedText( textResponse( { keys : many, pages : [], order : {} } ) );
@@ -1114,7 +1163,7 @@ const lastWrite = k => k.sent.filter( c => c.endpoint !== 'list' ).at(-1);
 
 function openedKeys( response, hash ) {
 	const w = world( 'de_DE', hash, null );
-	const [ list, form ] = w.mount( 'keys-list', 'keys-form' );
+	const { title, levels : [ list, form ] } = w.pane( 'keys', 'keys-list', 'keys-form' );
 	form.classList.add('admin-hidden');
 	const sent = [];
 	const keys = w.Nino.admin.keys;
@@ -1123,7 +1172,7 @@ function openedKeys( response, hash ) {
 		callback( 200, endpoint === 'list' ? response : { ok : true } );
 	};
 	keys.init();
-	return Object.assign( w, { list, form, sent, keys } );
+	return Object.assign( w, { list, form, title, sent, keys } );
 }
 
 {
@@ -1131,7 +1180,9 @@ function openedKeys( response, hash ) {
 
 	check( 'the Keys tab has the rows of the Text panel - with the hidden keys and the words of the workbench, which it exists to show - as a list of links', k.list.querySelectorAll('ul.nino-admin-list').length > 0
 		&& k.list.querySelectorAll('ul.nino-admin-list a').some( a => a.dataset.group === '_admin' ) && k.list.querySelectorAll('ul.nino-admin-list a').some( a => a.dataset.group === 'project/mail' )
-		&& k.list.querySelectorAll('a').every( a => a.href === '#' ) && k.list.querySelector('#keys-list-body').tagName === 'section' );
+		&& k.list.querySelector('#keys-list-body').tagName === 'section' );
+	check( '...each a link with the address of its row, because opening it writes that address - none to nowhere', k.list.querySelectorAll('ul.nino-admin-list a').every( a => a.href.indexOf('#keys/') === 0 )
+		&& k.list.querySelectorAll('a').find( a => a.dataset.group === 'project/mail' ).href === '#keys/project/mail' && k.list.querySelectorAll('a').find( a => a.dataset.group === '_admin' ).href === '#keys/_admin' );
 	check( '...the page rows are blocks, as there is no route list here, and have their names from the vocabulary', k.list.querySelectorAll('h2').map( h => h.textContent ).join() === 'Allgemein'
 		&& k.list.querySelectorAll('a').find( a => a.dataset.group === 'template/frame-header' ).querySelector('strong').textContent === 'Kopfrahmen' );
 	check( 'the session language is the one the tab opens in - the previews are English where the session is', k.keys._locale() === 'en_US' && k.list.querySelectorAll('a').find( a => a.dataset.group === 'project/company' ).querySelector('small').textContent.includes( 'We build things' ) );
@@ -1409,6 +1460,47 @@ function openedKeys( response, hash ) {
 	k.keys._showList();
 	k.keys.init();
 	check( '...and a reload after a change - which the hash still names - goes back to the list, as it always did', k.list.classList.contains('admin-hidden') === false );
+}
+
+{
+	// the focus of a drill-down in the Keys tab: into the form of a row, the new key or the scan, and back to the control that opened it
+	const k = openedKeys( keysResponse() );
+	const link = group => k.list.querySelectorAll('a').find( a => a.dataset.group === group );
+	const back = () => k.form.querySelector('.nino-admin-back-link');
+
+	link('project/company').click();
+	check( 'a row that is opened takes the focus into its form', k.form.classList.contains('admin-hidden') === false && focusIn( k, k.form ) );
+	back().click();
+	check( 'Back shows the list and gives the focus to the link of that row', k.list.classList.contains('admin-hidden') === false && k.dom.doc.activeElement === link('project/company') );
+
+	const add = k.list.querySelector('.nino-admin-btn-primary');
+	add.click();
+	check( 'the form for a new key takes the focus', k.keys._view === 'new' && focusIn( k, k.form ) );
+	back().click();
+	check( '...and Back returns it to the button that opened it', k.list.classList.contains('admin-hidden') === false && k.dom.doc.activeElement === add );
+
+	let scanned = null;
+	k.keys._apiCall = ( endpoint, payload, callback ) => { if( endpoint === 'scan' ) scanned = () => callback( 200, { missing : [ { key : '/project/shop/list/title', files : [ 'page-shop.tpl' ], kind : 'create' } ], alsoUsed : [] } ) };
+	const scan = k.list.querySelector('.nino-admin-btn-secondary');
+	scan.click();
+	check( 'the scan takes the focus into its form while it runs', k.keys._view === 'scan' && focusIn( k, k.form ) );
+	const waiting = back();
+	scanned();
+	check( '...and the form that its answer draws over the one that waited has it, on its own back link - not the body', back() !== waiting && k.dom.doc.activeElement === back() );
+	back().click();
+	check( 'Back returns it to the Scan button', k.dom.doc.activeElement === scan );
+
+	// a key is renamed from the form of its row: the form that held the button is drawn over, and Back then has the heading of the list to go to
+	link('template/page-services').click();
+	k.form.querySelector('[data-key="/template/page-services/item-1/title"]').querySelectorAll('button').find( b => b.textContent === 'Umbenennen' ).click();
+	check( 'a rename takes the focus into its form', k.keys._view === 'new' && focusIn( k, k.form ) );
+	back().click();
+	check( '...and Back, with the button that was pressed gone, still lands in the list - on a stop of its own and not on the body', k.list.classList.contains('admin-hidden') === false && focusIn( k, k.list ) );
+
+	// the list shown again: the focus stays, unless it stood in the form that goes
+	link('project/company').click();
+	k.keys._showList();
+	check( 'the list shown again with the focus in the form that goes gives it to the name of the panel', k.dom.doc.activeElement === k.title );
 }
 
 {

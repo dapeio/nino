@@ -179,6 +179,17 @@ answer( 400, { error : 'an alt text is at most 250 characters' } );
 check( 'a refused one is an error', altStatus.className === 'nino-admin-field-image-msg is-error' );
 check( '...and writes nothing to tell', touched.join() === 'slots' );
 
+// The picture itself is named: by the first alt text the slot has, or by nothing - the name of the slot stands over it
+check( 'the preview of a slot carries the alt text the slot has in the first language that has one', previewOf( alt ).alt === 'Ein Haus' && previewOf( panel._renderSlotField( slot( { alt : { en_US : 'A house' } } ) ) ).alt === 'A house' );
+check( '...and an empty one where it has none, so that it is not read as a file name', previewOf( panel._renderSlotField( slot( { alt : {} } ) ) ).alt === '' && previewOf( panel._renderSlotField( slot( { alt : undefined } ) ) ).alt === '' );
+
+requests.length = 0;
+const fresh = panel._renderSlotField( slot( { alt : {} } ) );
+findAll( fresh, function( el ) { return el.type === 'text' } )[0].value = 'Das Haus';
+fire( findAll( byClass( fresh, 'images-slot-alt' )[0], function( el ) { return el.tagName === 'BUTTON' } )[0], 'click' );
+answer( 200, { alt : { de_DE : 'Das Haus' } } );
+check( '...and follows what was saved', previewOf( fresh ).alt === 'Das Haus' );
+
 // --- alt texts typed and not saved -------------------------------------------
 
 // A shell that has the registry: what Nino.admin.dirty does that the panel relies on - the
@@ -197,8 +208,21 @@ const registry = {
 		asks.push( { names : names, proceed : proceed, onCancel : onCancel } );
 	},
 };
-const shellForm = element('div');
+// The pane the shell draws: the name of the panel in its head, and the two levels beside it
+const shellPane = element('div');
+shellPane.dataset.panel = 'images';
+const shellHead = element('div');
+shellHead.className = 'admin-panel-head';
+const shellTitle = element('h2');
+shellTitle.className = 'admin-panel-title';
+shellHead.appendChild( shellTitle );
+shellPane.appendChild( shellHead );
 const shellList = element('div');
+shellList.id = 'images-list';
+shellPane.appendChild( shellList );
+const shellForm = element('div');
+shellForm.id = 'images-form';
+shellPane.appendChild( shellForm );
 // The shell's router as far as the panel uses it: what it was asked to write, the hash a step
 // through the history left, and leave() as the shell does it (ask first where a form is left)
 const routed = [];
@@ -221,7 +245,8 @@ const shellNino = {
 };
 const shellSandbox = {
 	console : console,
-	document : { createElement : element, getElementById : function( id ) { return { 'images-form' : shellForm, 'images-list' : shellList }[id] ?? null }, documentElement : null, body : null },
+	document : { createElement : element, getElementById : function( id ) { return { 'images-form' : shellForm, 'images-list' : shellList }[id] ?? null }, documentElement : null, body : null,
+		get activeElement() { return findAll( shellPane, function( el ) { return el.focused === true } )[0] ?? null } },
 	Nino : shellNino,
 };
 shellSandbox.window = { Nino : shellNino, location : { hash : '' }, confirm : function() { return true } };
@@ -346,6 +371,34 @@ const backLinks = findAll( shellForm, function( el ) { return el.className === '
 routed.length = 0;
 fire( backLinks[0], 'click' );
 check( 'the back link is a step Back returns to as well', routed.join() === 'go images,set images' && shellForm.classList.contains('admin-hidden') === true );
+
+// --- the focus -------------------------------------------------------------------
+
+/*	A category is opened by its button, which is hidden with the list it stands in:
+	the focus goes into the form, Back gives it back to the button - found again where
+	the list was drawn anew - and a form that the address closes leaves it the name of the panel	*/
+shellRequests.length = 0;
+shellPanel._ready = true;
+shellPanel._groups = { 'page-home' : [ slot() ] };
+shellPanel._renderCategoryList();
+shellPanel._showList();
+
+const groupButton = function() { return findAll( shellList, function( el ) { return el.tagName === 'BUTTON' } ).find( function( b ) { return b.dataset.group === 'page-home' } ) };
+const shellFocused = function() { return findAll( shellPane, function( el ) { return el.focused === true } )[0] ?? null };
+const shellBack = function() { return findAll( shellForm, function( el ) { return el.className === 'nino-admin-back-link' } )[0] };
+
+fire( groupButton(), 'click' );
+check( 'opening a category shows its form and moves the focus into it', shellForm.classList.contains('admin-hidden') === false && shellList.classList.contains('admin-hidden') === true && shellFocused() === shellBack() && shellBack() !== undefined );
+
+shellPanel._renderCategoryList();
+fire( shellBack(), 'click' );
+check( 'Back shows the list and puts the focus on the button of the category - the one drawn now', shellList.classList.contains('admin-hidden') === false && shellForm.classList.contains('admin-hidden') === true && shellFocused() === groupButton() );
+
+fire( groupButton(), 'click' );
+routedHash = { panel : 'images', parts : [] };
+shellPanel.showCurrent();
+check( 'a form the address closes - a step back through the history - leaves the focus the name of the panel', shellList.classList.contains('admin-hidden') === false && shellFocused() === shellTitle );
+routed.length = 0;
 
 // --- a category of the grammar: its name has a slash, the address has its segments -------
 
@@ -506,5 +559,92 @@ slotsPanel._saveScanResults( [
 slotsAnswer( 200, {} );
 slotsAnswer( 409, { error : 'taken' } );
 check( 'the slots a scan creates are told one by one, the one that was refused not', slotsTouched.join() === 'slots' && slotsSent[slotsSent.length - 1].endpoint === 'create' );
+
+
+// --- the Slots tab opens a slot and goes back to it ------------------------------------------
+
+/*	A row opens a form and writes no address, so it is a button and not a link to nowhere.
+	What is opened takes the focus into the form, Back gives it to the row or the button
+	that opened it, and a form closed by a save leaves it the name of the panel	*/
+{
+	const pane = element('div');
+	pane.dataset.panel = 'slots';
+	const head = element('div');
+	head.className = 'admin-panel-head';
+	const paneTitle = element('h2');
+	paneTitle.className = 'admin-panel-title';
+	head.appendChild( paneTitle );
+	pane.appendChild( head );
+	const list = element('div');
+	list.id = 'slots-list';
+	pane.appendChild( list );
+	const form = element('div');
+	form.id = 'slots-form';
+	form.classList.add('admin-hidden');
+	pane.appendChild( form );
+
+	const page = {
+		admin : { formToolbar : function( back ) { const bar = element('div'); bar.appendChild( back ); return bar }, touch : function() {}, stamp : function() { return 0 } },
+		events : { bindCallback : function() {} },
+		http : { sendRequest : function() {} },
+		content : { getText : text },
+	};
+	const box = {
+		console : console,
+		document : {
+			createElement : element,
+			createTextNode : function( value ) { return Object.assign( element('#text'), { textContent : String( value ) } ) },
+			getElementById : function( id ) { return findAll( pane, function( el ) { return el.id === id } )[0] ?? null },
+			documentElement : null,
+			body : null,
+			get activeElement() { return findAll( pane, function( el ) { return el.focused === true } )[0] ?? null },
+		},
+		Nino : page,
+	};
+	box.window = { Nino : page, confirm : () => true, alert : () => {} };
+	const context = vm.createContext( box );
+	load( '_admin/assets/Nino.admin.js', context );
+	load( '_admin/Nino/Modules/Images/assets/slots.js', context );
+
+	const drawn = page.admin.slots;
+	let scanned = null;
+	drawn._apiCall = function( endpoint, payload, callback ) { if( endpoint === 'scan' ) scanned = callback };
+	drawn._snapshot = function() {};
+	drawn._slots = [ slot(), slot( { uri : '/page-home/logo', label : 'Logo', hasImage : false } ) ];
+	drawn._renderList();
+	drawn._showList();
+
+	const rows = findAll( list, function( el ) { return el.className === 'nino-admin-list-link' } );
+	const focusedNow = function() { return findAll( pane, function( el ) { return el.focused === true } )[0] ?? null };
+	const backLinkOf = function() { return findAll( form, function( el ) { return el.className === 'nino-admin-back-link' } )[0] };
+
+	check( 'a slot is a row that opens its form: a button, because no address is written', rows.length === 2 && rows.every( function( row ) { return row.tagName === 'BUTTON' && row.type === 'button' && row.href === '' } ) );
+
+	fire( rows[0], 'click' );
+	check( 'opening a slot shows its form and moves the focus into it', form.classList.contains('admin-hidden') === false && list.classList.contains('admin-hidden') === true && backLinkOf() !== undefined && focusedNow() === backLinkOf() );
+	fire( backLinkOf(), 'click' );
+	check( 'Back shows the list and puts the focus on the row that was opened', list.classList.contains('admin-hidden') === false && form.classList.contains('admin-hidden') === true && focusedNow() === rows[0] );
+
+	const buttons = findAll( list, function( el ) { return el.tagName === 'BUTTON' && el.className !== 'nino-admin-list-link' } );
+	const scan = buttons.find( function( b ) { return b.className === 'nino-admin-btn-secondary' } );
+	const add = buttons.find( function( b ) { return b.className === 'nino-admin-btn-primary' } );
+	fire( add, 'click' );
+	check( 'a new slot opens the same way', form.classList.contains('admin-hidden') === false && focusedNow() === backLinkOf() );
+	fire( backLinkOf(), 'click' );
+	check( '...and Back returns to the New slot button', focusedNow() === add );
+
+	fire( scan, 'click' );
+	check( 'the scan opens in the form level, with the focus in it', form.classList.contains('admin-hidden') === false && focusedNow() === backLinkOf() );
+	const waiting = backLinkOf();
+	scanned( 200, { missing : [] } );
+	check( '...and the form its answer draws over the one that waited has the focus on its own back link - not the body', backLinkOf() !== waiting && focusedNow() === backLinkOf() );
+	fire( backLinkOf(), 'click' );
+	check( '...and Back returns to the Scan button', focusedNow() === scan );
+
+	fire( rows[1], 'click' );
+	findAll( form, function( el ) { return el.tagName === 'BUTTON' } )[0].focus();
+	drawn._showList();
+	check( 'a form that is closed without Back leaves the focus nothing to stand on: it goes to the name of the panel', list.classList.contains('admin-hidden') === false && focusedNow() === paneTitle );
+}
 
 done();

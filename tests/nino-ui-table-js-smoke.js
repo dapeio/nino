@@ -203,4 +203,61 @@ check( '...and says it again the other way round on a second press', headers[1].
 fire( sortButtons[0], 'click' );
 check( '...and the column that lost the sort goes back to none', headers[1].getAttribute('aria-sort') === 'none' && headers[0].getAttribute('aria-sort') === 'ascending' );
 
+
+/*	A column with no label is a column of a row's own buttons: its sort button
+	would be announced as nothing and offer an order nobody can name. A row is a
+	stop of the Tab key on its own only where it holds no control - the one that
+	stands in it is the stop, and a row that was one as well made two for the
+	same thing	*/
+ctx.document.createElement = function( tag ) {
+	const el = element( tag );
+	// A row is no stop of the Tab key in a browser until it is given a tabindex
+	if( tag === 'tr' )
+		el.tabIndex = -1;
+	return el;
+};
+
+const opened = [];
+const actions = element('div');
+ctx.Nino.adminUi.table( {
+	mount 	: actions,
+	columns	: [
+		{ key : 'uri', label : 'Uri', type : 'string' },
+		{ key : 'actions', label : '', type : 'string', render : function( value, row ) {
+			if( row.uri === '/plain' )
+				return 'text';
+			// A node, as the table takes one into a cell as it is: it asks whether the
+			// cell is an Object of its own context, which a stand-in made here is not
+			const open = element('button');
+			Object.setPrototypeOf( open, vm.runInContext( 'Object.prototype', ctx ) );
+			open.nodeType = 1;
+			open.textContent = 'Open';
+			return open;
+		} },
+		{ key : 'forced', label : '', sortable : true, type : 'string' },
+		{ key : 'quiet', label : 'Quiet', sortable : false, type : 'string' },
+	],
+	rows 		: [ { uri : '/button' }, { uri : '/plain' } ],
+	labels 	: { search : 'Search', empty : '', noMatch : '' },
+	onRowClick : function( row ) { opened.push( row.uri ) },
+} );
+
+const actionHeads = descendants( actions ).filter( el => el.tagName === 'TH' );
+const actionSorts = descendants( actions ).filter( el => el.className === 'nino-admin-table-sort' );
+check( 'a column with a label is sorted by its button, and so is one that says it may be sorted', actionHeads[0].querySelector('button') !== null && actionHeads[2].querySelector('button') !== null && actionSorts.length === 2 );
+check( '...a column without a label has no sort button, nor has one that says it may not', actionHeads[1].querySelector('button') === null && actionHeads[3].querySelector('button') === null );
+check( '...and it claims no sort order either: aria-sort says "none" only of a column that can be sorted', actionHeads[0].getAttribute('aria-sort') === 'none' && actionHeads[1].getAttribute('aria-sort') === null && actionHeads[3].getAttribute('aria-sort') === null );
+
+const bodyRows = descendants( actions ).filter( el => el.tagName === 'TR' && el.classList.contains('is-clickable') );
+check( 'a row that holds a button of its own is not a stop of the Tab key: the button is', bodyRows.length === 2 && bodyRows[0].tabIndex === -1 );
+check( '...a row that holds none is, so that it can be opened from the keyboard', bodyRows[1].tabIndex === 0 );
+check( 'a row carries the identity of its record - the row key - for the caller that finds it again after the table was drawn anew', bodyRows.map( row => row.dataset.row ).join() === '/button,/plain' );
+
+fire( bodyRows[1], 'keydown', { key : 'Enter' } );
+check( 'Enter on the row itself opens it', opened.join() === '/plain' );
+fire( bodyRows[0], 'keydown', { key : 'Enter', target : descendants( bodyRows[0] ).filter( el => el.tagName === 'BUTTON' )[0] } );
+check( '...Enter on a button inside the row is the button\'s and does not open the row as well', opened.join() === '/plain' );
+fire( bodyRows[0], 'click' );
+check( 'a click on a row opens it as before', opened.join() === '/plain,/button' );
+
 done();

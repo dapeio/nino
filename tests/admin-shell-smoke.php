@@ -186,7 +186,8 @@ check( 'a panel reusing a core uri is dropped, the core panel keeps it', $regist
 	&& str_contains( \Nino\Admin\Panels::navHtml( $registry ), 'Twin' ) === false );
 
 $navHtml = \Nino\Admin\Panels::navHtml( $registry );
-check( 'nav() is rendered - every panel has its link, the module\'s included, an icon or its initial beside the label', str_contains( $navHtml, 'id="admin-nav-dummy" data-panel="dummy" data-layout="page"><span class="nino-admin-nav-icon" aria-hidden="true"><b>D</b></span><span class="nino-admin-nav-label">Dummy</span></a>' ) === true && str_contains( $navHtml, 'id="admin-nav-navs" data-panel="navs" data-layout="page">' ) === true && str_contains( $navHtml, '<span class="nino-admin-nav-label">[[/_admin/nav/navs]]</span></a>' ) === true );
+check( 'nav() is rendered - every panel has its link, the module\'s included, an icon or its initial beside the label', str_contains( $navHtml, 'id="admin-nav-dummy" data-panel="dummy" data-layout="page" title="Dummy"><span class="nino-admin-nav-icon" aria-hidden="true"><b>D</b></span><span class="nino-admin-nav-label">Dummy</span></a>' ) === true && str_contains( $navHtml, 'id="admin-nav-navs" data-panel="navs" data-layout="page" title="[[/_admin/nav/navs]]">' ) === true && str_contains( $navHtml, '<span class="nino-admin-nav-label">[[/_admin/nav/navs]]</span></a>' ) === true );
+check( 'every link carries its label as its title as well: folded to icons, the rail is a column of links that a mouse can still name', preg_match_all( '/ title="([^"]+)"><span class="nino-admin-nav-icon"[^>]*>.*?<\/span><span class="nino-admin-nav-label">\1<\/span><\/a>/s', $navHtml ) === substr_count( $navHtml, 'data-panel=' ) );
 check( 'every label is a fill - structure and system panels the same as the content ones, so the rail speaks one language', str_contains( $navHtml, '>[[/_admin/nav/routes]]</span></a>' ) === true && str_contains( $navHtml, '>[[/_admin/nav/backups]]</span></a>' ) === true && str_contains( $navHtml, '>[[/_admin/nav/text]]</span></a>' ) === true && str_contains( $navHtml, '>[[/_admin/nav/user]]</span></a>' ) === true );
 check( 'the three groups actually on screen get their headings, in the GROUPS order - features carries no heading while nothing sits in it', preg_match( '/nav-group" data-group="content".*data-group="structure".*data-group="system"/s', $navHtml ) === 1
 	&& str_contains( $navHtml, 'data-group="features"' ) === false );
@@ -674,7 +675,7 @@ check( 'the shell\'s registry is bundled before every panel script that register
 foreach( [ 'en_US', 'de_DE' ] as $locale ) {
 	$elementFills = (array) include dirname( __DIR__ ). '/_admin/Nino/Modules/Elements/text/'. $locale. '.php';
 	check( $locale. ': the Elements form words its refusals in fills, the JSON one without bracket characters',
-		isset( $elementFills['[[/_admin/elements/error/json]]'], $elementFills['[[/_admin/elements/error/field-required]]'], $elementFills['[[/_admin/elements/label/locale-open]]'] ) === true
+		isset( $elementFills['[[/_admin/elements/error/json]]'], $elementFills['[[/_admin/elements/label/locale-open]]'] ) === true
 		&& preg_match( '/[\[\]]/', $elementFills['[[/_admin/elements/error/json]]'] ) === 0
 		&& str_contains( $elementFills['[[/_admin/elements/label/locale-open]]'], '%s' ) === true && str_contains( $elementFills['[[/_admin/elements/label/locale-open]]'], '%d' ) === true );
 }

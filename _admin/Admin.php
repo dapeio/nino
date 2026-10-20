@@ -1241,7 +1241,7 @@ namespace Nino\Admin {
 		public static
 			$html = [
 				'nav-group'		=> '<button type="button" class="nino-admin-nav-group" data-group="[[group]]" aria-expanded="true">[[label]]</button>',
-				'nav-link'		=> '<a href="#[[uri]]" id="admin-nav-[[uri]]" data-panel="[[uri]]" data-layout="[[layout]]"><span class="nino-admin-nav-icon" aria-hidden="true">[[icon]]</span><span class="nino-admin-nav-label">[[label]]</span></a>',
+				'nav-link'		=> '<a href="#[[uri]]" id="admin-nav-[[uri]]" data-panel="[[uri]]" data-layout="[[layout]]" title="[[label]]"><span class="nino-admin-nav-icon" aria-hidden="true">[[icon]]</span><span class="nino-admin-nav-label">[[label]]</span></a>',
 				// The letter that stands in for a panel with no icon of its own
 				'nav-initial'	=> '<b>[[initial]]</b>',
 				'pane'				=> '<div id="admin-content-[[uri]]" data-panel="[[uri]]" data-layout="[[layout]]" hidden>[[head]][[content]]</div>',

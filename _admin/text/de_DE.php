@@ -26,6 +26,7 @@ return [
 
 	'[[/_admin/label/rail]]'			=> 'Navigation der Workbench',
 	'[[/_admin/label/nav]]'			=> 'Bereiche der Workbench',
+	'[[/_admin/label/skip]]'		=> 'Zum Inhalt springen',
 	'[[/_admin/label/language]]'	=> 'Sprache der Oberfläche',
 	'[[/_admin/label/title]]'		=> 'Nino Workbench',
 	'[[/_admin/nav/group/content]]'		=> 'Inhalt',
@@ -76,6 +77,7 @@ return [
 	'[[/_admin/common/error/load]]'			=> 'Laden fehlgeschlagen.',
 	'[[/_admin/common/error/save]]'			=> 'Speichern fehlgeschlagen.',
 	'[[/_admin/common/error/delete]]'		=> 'Löschen fehlgeschlagen.',
+	'[[/_admin/common/error/required]]'	=> 'Dieses Pflichtfeld ist leer.',
 	'[[/_admin/common/error/rename]]'		=> 'Umbenennen fehlgeschlagen.',
 	'[[/_admin/common/error/scan]]'			=> 'Durchsuchen fehlgeschlagen.',
 	'[[/_admin/common/error/request]]'	=> 'Anfrage fehlgeschlagen.',

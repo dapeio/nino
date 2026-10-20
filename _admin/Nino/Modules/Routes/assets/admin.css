@@ -33,7 +33,7 @@
 	justify-content: space-between;
 }
 
-#routes-list .admin-page-row > a:not(.admin-page-open) {
+#routes-list .admin-page-row > :is(a, button):not(.admin-page-open) {
 	flex: 1 1 auto;
 	min-width: 0;
 }
@@ -82,6 +82,13 @@
 	grid-column: 2 / -1;
 }
 
+/* What is wrong with the name or the title of a language: one sentence for
+   the row, under its fields, in the columns they stand in */
+#admin-page-wrap .admin-page-locale-row > .nino-admin-field-error {
+	grid-column: 2 / -1;
+	margin: 0;
+}
+
 @media (max-width: 38rem) {
 
 	#admin-page-wrap .admin-page-locale-row {
@@ -89,7 +96,8 @@
 	}
 
 	#admin-page-wrap .admin-page-locale-label,
-	#admin-page-wrap .admin-page-locale-row textarea {
+	#admin-page-wrap .admin-page-locale-row textarea,
+	#admin-page-wrap .admin-page-locale-row > .nino-admin-field-error {
 		grid-column: 1;
 	}
 

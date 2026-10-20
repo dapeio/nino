@@ -150,6 +150,10 @@ Do this in a protected local environment only – a password on a command line m
 
 The **Recovery password** tab of the Users panel changes the recovery password: the current one, the new one - at least eight characters - and the new one again. A wrong current password counts against the same five attempts `recovery.php` has. The tab cannot set a first password: where `private/.auth/pw.php` is missing, the one-liner above writes it. The tab needs `/_admin/recoverypw/manage`, a permission of its own that the Developer role holds through full access and the Editor role does not - whoever holds it can lock `recovery.php`, and with the recovery password restore a backup over the whole project.
 
+## With the Keyboard
+
+The first Tab stop of the workbench is a link that skips the rail and lands on the pane. A panel opened from the rail starts at its name; a row that opens a form takes the focus into it, and *Back* returns the focus to the row that was opened. The action bar at the foot of the screen never covers the field that has the focus. The settings menu of the rail - the theme, the language of the interface - closes with Escape and gives the focus back to its button.
+
 ## Recommended Workflow
 
 1. Build the structure under **Element Types** (a tab of Elements), **Text Keys** (Text), **Image Slots** (Images), **Routes** and **Navigations**.

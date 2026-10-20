@@ -33,10 +33,21 @@ function text( key ) {
 
 // --- the sandbox -----------------------------------------------------------
 
+// The pane the shell draws: the name of the panel in its head, and the two levels beside it
+const pane = element('div');
+pane.dataset.panel = 'users';
+const head = element('div');
+head.className = 'admin-panel-head';
+const paneTitle = element('h2');
+paneTitle.className = 'admin-panel-title';
+head.appendChild( paneTitle );
+pane.appendChild( head );
 const list = element('div');
 list.id = 'users-list';
+pane.appendChild( list );
 const form = element('div');
 form.id = 'users-form';
+pane.appendChild( form );
 
 function everything() {
 	return [ list, form ].concat( findAll( list, function() { return true } ), findAll( form, function() { return true } ) );
@@ -48,7 +59,8 @@ let confirmAnswer = true;
 
 const Nino = {
 	admin : {
-		router : { current : function() { return { panel : 'users', parts : [] } }, go : function() {}, set : function() {}, leave : function() {} },
+		router : { current : function() { return { panel : 'users', parts : [] } }, go : function() {}, set : function() {}, leave : function() {},
+			href : function( name, parts ) { return '#'+ [ name ].concat( parts || [] ).map( encodeURIComponent ).join('/') } },
 		formToolbar : function( back ) { const bar = element('div'); bar.appendChild( back ); return bar },
 	},
 	events : { bindCallback : function() {} },
@@ -65,6 +77,7 @@ const sandbox = {
 		getElementById : function( id ) { return everything().find( function( el ) { return el.id === id } ) ?? null },
 		documentElement : null,
 		body : null,
+		get activeElement() { return findAll( pane, function( el ) { return el.focused === true } )[0] ?? null },
 	},
 	Nino : Nino,
 };
@@ -195,6 +208,41 @@ check( '...and takes the marker away again', toggle.textContent === 'Deactivate 
 panel._openUser( 'me@example.com' );
 check( 'there is no Deactivate button on your own account', byId('users-form-status-toggle') === null );
 check( '...and no role select either: the role is text', byId('users-form-role-select') === null );
+
+// --- the focus -----------------------------------------------------------------
+
+/*	A row opens an account and writes its address, so it is a link with that
+	address - not a link to nowhere. What is opened takes the focus into the form,
+	Back gives it to the row, which is found again where the list was drawn anew
+	behind the form (a save does that), and a delete leaves it nowhere to stand	*/
+const linkOf = function( mail ) { return findAll( list, function( el ) { return el.tagName === 'A' } ).find( function( a ) { return a.dataset.mail === mail } ) };
+const focusedNow = function() { return findAll( pane, function( el ) { return el.focused === true } )[0] ?? null };
+const backLinkOf = function() { return findAll( form, function( el ) { return el.className === 'nino-admin-back-link' } )[0] };
+
+panel._showList();
+panel._renderList( panel._users );
+check( 'a row is a link with the address of the account it opens', linkOf('c@example.com').href === '#users/c%40example.com' && linkOf('me@example.com').href === '#users/me%40example.com' );
+
+fire( linkOf('c@example.com'), 'click' );
+check( 'opening an account shows its form and moves the focus into it', form.classList.contains('admin-hidden') === false && list.classList.contains('admin-hidden') === true && focusedNow() === backLinkOf() && backLinkOf() !== undefined );
+
+panel._renderList( panel._users );
+fire( backLinkOf(), 'click' );
+check( 'Back shows the list and puts the focus on the row of the account - the one drawn now, not the one that was pressed', list.classList.contains('admin-hidden') === false && form.classList.contains('admin-hidden') === true
+	&& focusedNow() === linkOf('c@example.com') );
+
+const addButton = findAll( list, function( el ) { return el.className === 'nino-admin-btn-primary' } )[0];
+fire( addButton, 'click' );
+check( 'a new account takes the focus into its first field', focusedNow() === byId('users-create-mail') );
+fire( backLinkOf(), 'click' );
+check( '...and Back returns to the New user button', focusedNow() === addButton && list.classList.contains('admin-hidden') === false );
+
+fire( linkOf('c@example.com'), 'click' );
+byId('users-form-mail').focus();
+confirmAnswer = true;
+panel._delete();
+answer( 200, {} );
+check( 'a deleted account leaves the focus nothing to stand on in the form: it goes to the name of the panel', list.classList.contains('admin-hidden') === false && focusedNow() === paneTitle );
 
 // --- where the shell's "unsaved" marker goes -----------------------------------
 

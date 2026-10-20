@@ -71,11 +71,21 @@
 	--editor-blue: #2563eb;
 	--editor-blue-hover: #1d4ed8;
 	--editor-blue-soft: rgba(37,99,235,.1);
+	/* Red and orange are a surface and an ink at once - a border, a tint, the
+	   fill of a destructive button - and as the colour of a word on the light
+	   page they fell under 4.5:1. The word has a token of its own, one step
+	   darker, and the surface keeps its colour; in the dark scheme the two are
+	   one. Green and the muted grey are inks above all (a hover border of the
+	   wizard, a state word of the catalogue and the thumb of a scrollbar mix
+	   them, where the darker step changes nothing anyone can see), and are
+	   darkened where they stand */
 	--editor-red: #dc2626;
+	--editor-red-ink: #c81e1e;
 	--editor-red-soft: rgba(220,38,38,.1);
-	--editor-green: #16a34a;
+	--editor-green: #15803d;
 	--editor-green-soft: rgba(22,163,74,.1);
 	--editor-orange: #d97706;
+	--editor-orange-ink: #b45309;
 	/* A shade further from white than it was (#f5f7fb): the cards, the rail
 	   and the bars are white, and on a page this close to white they had
 	   almost no edge - the border between them measured 1.3:1 */
@@ -83,7 +93,7 @@
 	--editor-bg-elevated: #fff;
 	--editor-bg-grouped: #fff;
 	--editor-text: #172033;
-	--editor-text-secondary: #687386;
+	--editor-text-secondary: #5b6576;
 	--editor-separator: rgba(15,23,42,.11);
 	--editor-border: rgba(15,23,42,.19);
 	--editor-bar-bg: rgba(255,255,255,.9);
@@ -98,13 +108,14 @@
 	--nino-admin-sidebar-width: 15rem;
 	--nino-admin-rail-folded-width: 3.75rem;
 	--nino-admin-actionbar-height: 4.25rem;
+	--nino-admin-contextbar-height: 52px;
 	--nino-admin-content-inline: clamp(1.25rem, 3vw, 3rem);
 	--nino-admin-control-height: 38px;
 	--nino-admin-row-height: 46px;
 	/* The chevron and its reserved space stay together. A single SVG stroke
 	   avoids the sub-pixel seam two touching gradient triangles can expose. */
 	--nino-admin-select-indicator: 1.6rem;
-	--nino-admin-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='m1 1 5 5 5-5' stroke='%23687386' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+	--nino-admin-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='m1 1 5 5 5-5' stroke='%235b6576' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 	--nino-admin-rail: var(--editor-sidebar-bg);
 	--nino-admin-rail-hover: var(--editor-blue-soft);
 	--nino-admin-rail-text: var(--editor-text);
@@ -121,10 +132,12 @@
 		--editor-blue-hover: #93c5fd;
 		--editor-blue-soft: rgba(96,165,250,.14);
 		--editor-red: #f87171;
+		--editor-red-ink: var(--editor-red);
 		--editor-red-soft: rgba(248,113,113,.14);
 		--editor-green: #4ade80;
 		--editor-green-soft: rgba(74,222,128,.14);
 		--editor-orange: #fbbf24;
+		--editor-orange-ink: var(--editor-orange);
 		--editor-bg: #0b0f17;
 		--editor-bg-elevated: #151b26;
 		--editor-bg-grouped: #151b26;
@@ -149,10 +162,12 @@
 	--editor-blue-hover: #93c5fd;
 	--editor-blue-soft: rgba(96,165,250,.14);
 	--editor-red: #f87171;
+	--editor-red-ink: var(--editor-red);
 	--editor-red-soft: rgba(248,113,113,.14);
 	--editor-green: #4ade80;
 	--editor-green-soft: rgba(74,222,128,.14);
 	--editor-orange: #fbbf24;
+	--editor-orange-ink: var(--editor-orange);
 	--editor-bg: #0b0f17;
 	--editor-bg-elevated: #151b26;
 	--editor-bg-grouped: #151b26;
@@ -179,6 +194,13 @@
 html {
 	-webkit-text-size-adjust: 100%;
 	font-size:15px;
+	/* The bars lie over the edge of the scroller - the action bar fixed to the
+	   foot, the context bar pinned to the head - and a field that the Tab key
+	   brings into view is scrolled up to that edge and no further. The scroller
+	   keeps their room clear: the page on a phone, the pane (below) from a
+	   desktop's width on */
+	scroll-padding-block-start: calc(var(--nino-admin-contextbar-height) + .5rem);
+	scroll-padding-block-end: calc(var(--nino-admin-actionbar-height) + .5rem);
 }
 
 body {
@@ -289,7 +311,7 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-rail-danger {
-	color: var(--editor-red);
+	color: var(--editor-red-ink);
 }
 
 /* An action that belongs in a line of text: the rail's "Log out", the
@@ -412,6 +434,38 @@ a {
 	min-width: 0;
 	margin: 0 auto;
 	padding: 1rem var(--nino-admin-content-inline) calc(var(--nino-admin-actionbar-height) + 1.5rem);
+	scroll-padding-block-start: calc(var(--nino-admin-contextbar-height) + .5rem);
+	scroll-padding-block-end: calc(var(--nino-admin-actionbar-height) + .5rem);
+}
+
+/* What the skip link jumps to takes the focus, and the keyboard sees where the
+   Tab key will start from. The ring is drawn inside the pane, which is the
+   scroller from a desktop's width on and would clip one outside it */
+:where(.nino-admin) .nino-admin-pane:focus-visible {
+	outline: 2px solid var(--editor-blue);
+	outline-offset: -2px;
+}
+
+/* The first stop of the page, a way past the rail to the pane. It waits above
+   the screen until the keyboard reaches it, and is then as plain as a primary
+   action: the active ink on the blue, the same pair in both schemes */
+:where(.nino-admin) .nino-admin-skip {
+	position: fixed;
+	top: .5rem;
+	left: .5rem;
+	z-index: 100;
+	padding: .55rem .9rem;
+	border-radius: var(--editor-radius-sm);
+	background: var(--editor-blue);
+	box-shadow: var(--editor-shadow);
+	color: var(--nino-admin-active-text);
+	font-size: .84rem;
+	font-weight: 650;
+	transform: translateY(-200%);
+}
+
+:where(.nino-admin) .nino-admin-skip:focus {
+	transform: none;
 }
 
 :where(.nino-admin) * {
@@ -525,11 +579,16 @@ a {
 	transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, opacity .12s ease;
 }
 
-/* Not the link-shaped one, and not a rail group heading: they have no surface
-   to tint of their own kind (the heading takes the rail's hover), and this
-   rule weighs more than theirs (three classes and an element against three
-   classes), so naming the exception here is the only place it can be made */
-:where(.nino-admin) button:hover:not(:disabled):not(.is-active):not(.nino-admin-linkbutton):not(.nino-admin-btn-primary):not(.nino-admin-nav-group) {
+/* Not the link-shaped one, not a rail group heading, not a destructive button
+   and not a submit button: they have no surface to tint of their own kind (the
+   heading takes the rail's hover, a submit button the primary one's, a
+   destructive button the red its hover fills it with), and this rule weighs
+   more than theirs (every :not() counts as a class), so naming the exception
+   here is the only place it can be made. Tinted, a submit button without the
+   primary class went white under its white word, and the word of a
+   destructive button was set for the red and read on the blue tint, which is
+   no ground for it */
+:where(.nino-admin) button:hover:not(:disabled):not(.is-active):not(.nino-admin-linkbutton):not(.nino-admin-btn-primary):not(.nino-admin-btn-danger):not(.nino-admin-nav-group):not([type="submit"]) {
 	background: var(--editor-blue-soft);
 }
 :where(.nino-admin) button:active {
@@ -549,12 +608,12 @@ a {
 	border-color: transparent;
 	background: var(--editor-blue);
 	box-shadow: none;
-	color: #fff;
+	color: var(--nino-admin-active-text);
 }
 
 :where(.nino-admin) :is(button[type="submit"], .nino-admin-btn-primary):hover:not(:disabled) {
 	background: var(--editor-blue-hover);
-	color: #fff;
+	color: var(--nino-admin-active-text);
 }
 
 :where(.nino-admin) .nino-admin-btn-secondary {
@@ -573,13 +632,13 @@ a {
 	border-color: color-mix(in srgb, var(--editor-red) 38%, transparent);
 	background: var(--editor-red-soft);
 	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--editor-red) 38%, transparent);
-	color: var(--editor-red);
+	color: var(--editor-red-ink);
 	opacity: 1;
 }
 
 :where(.nino-admin) .nino-admin-btn-danger:hover:not(:disabled) {
 	background: var(--editor-red);
-	color: #fff;
+	color: var(--nino-admin-active-text);
 }
 
 /* A button small enough for a row: the actions of one entry of a list, a
@@ -633,11 +692,11 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-badge[data-state="warn"] {
-	color: var(--editor-orange);
+	color: var(--editor-orange-ink);
 }
 
 :where(.nino-admin) .nino-admin-badge[data-state="error"] {
-	color: var(--editor-red);
+	color: var(--editor-red-ink);
 }
 
 :where(.nino-admin) .nino-admin-badge[data-state="muted"] {
@@ -742,7 +801,18 @@ a {
 	resize: vertical;
 }
 
-:where(.nino-admin) :is(input, textarea, select, [contenteditable]):focus {
+/* What the browser paints for a placeholder is #757575, and lighter still: the
+   muted ink of the workbench, as it is, in both schemes */
+:where(.nino-admin) ::placeholder {
+	color: var(--editor-text-secondary);
+	opacity: 1;
+}
+
+/* A field with a border of its own takes its focus in that border. A file, a
+   colour, a checkbox and a radio have none to take it in - the pale halo was
+   all they showed - and get the ring below, as a button does. The exclusion is
+   in a :where(), so the rule weighs what it did */
+:where(.nino-admin) :is(input:where(:not([type="file"], [type="color"], [type="checkbox"], [type="radio"])), textarea, select, [contenteditable]):focus {
 	outline: none;
 	border-color: var(--editor-blue);
 	box-shadow: var(--editor-focus);
@@ -753,8 +823,17 @@ a {
 	outline-offset: 2px;
 }
 
+/* A heading that is given the focus - the name of a panel, the first heading of
+   a level that was just opened (see Nino.adminUi.showLevel()) - is shown where it
+   stands the way a control is. Left to the browser its ring is two near-black and
+   near-white lines, and the one it draws inside is dark on the dark scheme */
+:where(.nino-admin) :is(h1, h2, h3, h4, h5, h6, [role="heading"])[tabindex="-1"]:focus-visible {
+	outline: 2px solid var(--editor-blue);
+	outline-offset: 2px;
+}
+
 :where(.nino-admin) .nino-admin-error {
-	color: var(--editor-red);
+	color: var(--editor-red-ink);
 }
 
 /* Whether what is on screen is saved - written by Nino.adminUi.status(),
@@ -789,7 +868,7 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-status[data-state="dirty"] {
-	color: var(--editor-orange);
+	color: var(--editor-orange-ink);
 }
 
 :where(.nino-admin) .nino-admin-status[data-state="dirty"]::before {
@@ -798,7 +877,7 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-status[data-state="error"] {
-	color: var(--editor-red);
+	color: var(--editor-red-ink);
 }
 
 :where(.nino-admin) .nino-admin-status[data-state="error"]::before {
@@ -924,7 +1003,7 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-char-counter.is-limit {
-	color: var(--editor-red);
+	color: var(--editor-red-ink);
 	font-weight: 650;
 }
 
@@ -938,7 +1017,7 @@ a {
 /* A hint that states a condition worth acting on - an image slot no page uses.
    The sentence says so itself; the colour only supports it. */
 :where(.nino-admin) .nino-admin-field-hint.is-warning {
-	color: var(--editor-orange);
+	color: var(--editor-orange-ink);
 	font-weight: 650;
 }
 
@@ -947,7 +1026,7 @@ a {
    control, so the star is not read out as "star". */
 :where(.nino-admin) .nino-admin-required {
 	margin-left: .2rem;
-	color: var(--editor-red);
+	color: var(--editor-red-ink);
 	font-weight: 650;
 }
 
@@ -958,7 +1037,7 @@ a {
    announces the refusal once. */
 :where(.nino-admin) .nino-admin-field-error {
 	margin: .3rem 0 .72rem;
-	color: var(--editor-red);
+	color: var(--editor-red-ink);
 	font-size: .74rem;
 	line-height: 1.45;
 }
@@ -1040,7 +1119,21 @@ a {
 
 :where(.nino-admin) .nino-admin-field-radio:has(input[type="radio"]:checked) {
 	background: var(--editor-blue);
-	color: #fff;
+	color: var(--nino-admin-active-text);
+}
+
+/* The radio itself is invisible, and the segment around it is the control: the
+   ring is the segment's, inside it (the row scrolls, and clips what is outside).
+   The chosen segment is filled with the blue the ring is drawn in, so its ring
+   is the ink of an active tab, a little further in */
+:where(.nino-admin) .nino-admin-field-radio:has(input[type="radio"]:focus-visible) {
+	outline: 2px solid var(--editor-blue);
+	outline-offset: -2px;
+}
+
+:where(.nino-admin) .nino-admin-field-radio:has(input[type="radio"]:checked:focus-visible) {
+	outline-color: var(--nino-admin-active-text);
+	outline-offset: -4px;
 }
 
 :where(.nino-admin) .nino-admin-field-radio input[type="radio"] {
@@ -1088,14 +1181,14 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-field-image-msg.is-error {
-	color: var(--editor-red);
+	color: var(--editor-red-ink);
 	font-weight: 650;
 }
 
 /* A warning is not an error: the picture was saved. The text says what is
    wrong in words, the colour only supports it. */
 :where(.nino-admin) .nino-admin-field-image-msg.is-warning {
-	color: var(--editor-orange);
+	color: var(--editor-orange-ink);
 	font-weight: 650;
 }
 
@@ -1171,7 +1264,7 @@ a {
 
 :where(.nino-admin) .nino-admin-elementlist-remove:not(:disabled):hover {
 	border-color: var(--editor-red);
-	color: var(--editor-red);
+	color: var(--editor-red-ink);
 }
 
 /* Nothing chosen yet, no search hits, or the cap reached - the same quiet
@@ -1192,7 +1285,7 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-elementlist-count.is-limit {
-	color: var(--editor-orange);
+	color: var(--editor-orange-ink);
 	font-weight: 650;
 }
 
@@ -1249,7 +1342,7 @@ a {
 
 :where(.nino-admin) .nino-admin-stringlist-remove:not(:disabled):hover {
 	border-color: var(--editor-red);
-	color: var(--editor-red);
+	color: var(--editor-red-ink);
 }
 
 :where(.nino-admin) .nino-admin-stringlist-empty {
@@ -1472,6 +1565,15 @@ a {
 	outline-offset: -2px;
 }
 
+/* The chosen tab of a segmented strip is filled with the blue the ring is
+   drawn in: blue on blue shows nothing of the keyboard's focus, so its ring is
+   the ink of an active tab, inside the blue. A --bar tab has no fill and keeps
+   the blue one */
+:where(.nino-admin) .nino-admin-tabs:not(.nino-admin-tabs--bar) .nino-admin-tab.is-active:focus-visible {
+	outline-color: var(--nino-admin-active-text);
+	outline-offset: -4px;
+}
+
 /* --bar: a row of natural-width tabs above a pane, the way a panel with
    several screens switches between them (see Panels::panesHtml()) - a
    labelled underline on one rule, not a row of filled buttons splitting the
@@ -1552,6 +1654,7 @@ a {
 
 :where(.nino-admin) .nino-admin-richtext-toolbar {
 	display: flex;
+	flex-wrap: wrap;
 	gap: .2rem;
 	margin-bottom: .32rem;
 	padding: .22rem;
@@ -1710,16 +1813,38 @@ a {
 	font-size: .84rem;
 }
 
-:where(.nino-admin) .nino-admin-list li > a:hover {
+/* A row that opens a form and writes no address is a button with the look of the
+   link beside it (.nino-admin-list-link): the button's own surface, weight and
+   height give way, the row is the width of the list and reads from the left */
+:where(.nino-admin) .nino-admin-list li > button.nino-admin-list-link {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: .75rem;
+	width: 100%;
+	min-height: var(--nino-admin-row-height);
+	padding: .58rem .78rem;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--editor-text);
+	font-size: .84rem;
+	font-weight: inherit;
+	line-height: inherit;
+	text-align: left;
+}
+
+:where(.nino-admin) .nino-admin-list li > :is(a, button.nino-admin-list-link):hover {
 	background: var(--editor-blue-soft);
 }
 
-:where(.nino-admin) .nino-admin-list li > a:focus-visible {
+:where(.nino-admin) .nino-admin-list li > :is(a, button.nino-admin-list-link):focus-visible {
 	outline: none;
 	box-shadow: inset 0 0 0 2px var(--editor-blue);
 }
 
-:where(.nino-admin) .nino-admin-list li > a::after {
+:where(.nino-admin) .nino-admin-list li > :is(a, button.nino-admin-list-link)::after {
 	content: "›";
 	margin-left: auto;
 	color: var(--editor-text-secondary);
@@ -1798,6 +1923,13 @@ a {
 	background: var(--editor-blue-soft);
 	box-shadow: none;
 	transform: none;
+}
+
+/* The ring of a row is drawn inside it, as on the rows of a list of links: the
+   list clips what lies outside it, and an outline with an offset was cut off */
+:where(.nino-admin) .nino-admin-list-buttons > button:focus-visible {
+	outline: none;
+	box-shadow: inset 0 0 0 2px var(--editor-blue);
 }
 
 /* ------------------------------------------------------------ Data table */
@@ -2123,7 +2255,7 @@ a {
 	align-items: center;
 	justify-content: space-between;
 	gap: .65rem;
-	min-height: 52px;
+	min-height: var(--nino-admin-contextbar-height);
 	margin: -1rem calc(var(--nino-admin-content-inline) * -1) 1rem;
 	padding: .48rem var(--nino-admin-content-inline);
 	border-bottom: 1px solid var(--editor-separator);
@@ -2198,11 +2330,11 @@ a {
 }
 
 .nino-admin .nino-admin-actionbar > .nino-admin-status[data-state="dirty"] {
-	color: var(--editor-orange);
+	color: var(--editor-orange-ink);
 }
 
 .nino-admin .nino-admin-actionbar > .nino-admin-status[data-state="error"] {
-	color: var(--editor-red);
+	color: var(--editor-red-ink);
 }
 
 /* The mark a form's bar carries while it holds input nobody has saved -
@@ -2215,7 +2347,7 @@ a {
 	order: -1;
 	flex: 1 1 auto;
 	min-width: 0;
-	color: var(--editor-orange);
+	color: var(--editor-orange-ink);
 	font-size: .78rem;
 	text-align: right;
 }
@@ -2355,7 +2487,7 @@ a {
 	}
 
 	.nino-admin .nino-admin-rail-danger {
-		color: var(--editor-red);
+		color: var(--editor-red-ink);
 	}
 
 	.nino-admin .nino-admin-nav {
@@ -2542,8 +2674,23 @@ a {
 		padding-left: .5rem;
 	}
 
-	.nino-admin-shell--folded :is(.nino-admin-brand-copy, .nino-admin-rail-user, .nino-admin-nav-label, .nino-admin-nav-group) {
+	.nino-admin-shell--folded :is(.nino-admin-brand-copy, .nino-admin-rail-user, .nino-admin-nav-group) {
 		display: none;
+	}
+
+	/* The label of a link is its name: out of the way on a column of icons, and
+	   not out of the accessibility tree, which display: none is as well (see
+	   .nino-admin-sr-only). The title on the link says it to a mouse */
+	.nino-admin-shell--folded .nino-admin-nav-label {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		margin: -1px;
+		padding: 0;
+		overflow: hidden;
+		clip-path: inset(50%);
+		border: 0;
+		white-space: nowrap;
 	}
 
 	.nino-admin-shell--folded .nino-admin-rail-toggle {
@@ -2764,6 +2911,7 @@ a {
 	min-width: 0;
 	margin: 0;
 	padding: 0;
+	overflow-x: auto;
 	border-bottom: 0;
 	align-self: flex-end;
 }
@@ -2945,7 +3093,7 @@ body.theme-dark #admin-theme-toggle .admin-theme-toggle-dark {
 	color: var(--editor-blue);
 }
 #form-message.error {
-	color: var(--editor-red);
+	color: var(--editor-red-ink);
 }
 /*	Login is the one screen that marks the offending field itself: there is no
  *	per-field error text to read, only "that pair was wrong" */
@@ -3028,6 +3176,13 @@ body.theme-dark #admin-theme-toggle .admin-theme-toggle-dark {
 	background-position: calc(100% - 4px) 50%, 100% 50%;
 	background-size: 5px 5px;
 	background-repeat: no-repeat;
+}
+
+/* Flat as it is, its border and halo showed nothing of the keyboard's focus */
+#admin-page-wrap #admin-localepicker:focus-visible,
+#form-login #admin-localepicker:focus-visible {
+	outline: 2px solid var(--editor-blue);
+	outline-offset: 2px;
 }
 
 }

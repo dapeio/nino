@@ -14,11 +14,14 @@
 'use strict';
 
 const vm = require('vm');
-const { check, done, load, documentOf, element, findAll, fire } = require( './harness.js' );
+const { check, done, fills, load, documentOf, element, findAll, fire } = require( './harness.js' );
 
 const page = element('div');
 
-const sandbox = { console : console, document : documentOf( page ), Nino : { content : { getText : function() { return '' } } } };
+// The shell's own words, as a page has them: a select with no name of its caller's reads the shared one
+const words = fills('_admin/text/en_US.php');
+
+const sandbox = { console : console, document : documentOf( page ), Nino : { content : { getText : function( key ) { return key === '/_admin/common/label/locale' ? words[key] : '' } } } };
 sandbox.window = { Nino : sandbox.Nino };
 load( '_admin/assets/Nino.admin.js', vm.createContext( sandbox ) );
 
@@ -132,6 +135,8 @@ fire( locales, 'change' );
 check( 'a change calls onChange with the code picked', picked.join() === 'fr_FR' );
 
 const unnamed = ui.localeSelect( { locales : [ 'de_DE', 'en_US' ], current : 'de_DE' } );
-check( 'without a label it has no aria-label, without an id none, and a change without a handler is nothing', unnamed.id === '' && 'aria-label' in unnamed.attributes === false && unnamed.value === 'de_DE' && fire( unnamed, 'change' ) === undefined );
+check( 'without an id it has none, and a change without a handler is nothing', unnamed.id === '' && unnamed.value === 'de_DE' && fire( unnamed, 'change' ) === undefined );
+check( 'without a label it is still named: the shared word for a translation, not an empty combobox', words['/_admin/common/label/locale'] !== undefined && words['/_admin/common/label/locale'] !== '' && unnamed.attributes['aria-label'] === words['/_admin/common/label/locale'] );
+check( '...and a label of the caller\'s wins', ui.localeSelect( { locales : [ 'de_DE' ], current : 'de_DE', label : 'Sprache' } ).attributes['aria-label'] === 'Sprache' );
 
 done();

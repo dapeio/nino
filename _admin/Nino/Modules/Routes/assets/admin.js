@@ -41,6 +41,11 @@
 		_currentRuntime : null,
 		_isNew 					: false,
 		_ready 					: false,
+		// The row or the button that opened the form that is open: Back returns
+		// the focus to it (see Nino.adminUi.backTo())
+		_opener 				: null,
+		// The status line of the form that is open (see Nino.adminUi.status())
+		_line 					: null,
 		// The stamp of the templates (see Nino.admin.touch()) the list was asked
 		// for: the form offers the templates the answer held, and one written
 		// since is not among them
@@ -127,22 +132,29 @@
 			Nino.adminUi.showError( container, status, response, '/_admin/common/error/load' );
 		},
 
+		/**
+		 *	Show the list or the form again as they stand: the focus stays where
+		 *	it is, unless it stood in the level that is hidden now (see
+		 *	Nino.adminUi.showLevel()). What a person opens goes through
+		 *	_openForm(), and Back through the back link
+		 *
+		 *	@return		void
+		 */
 		_showList : function() {
-			dc.getElementById('routes-list').classList.remove('admin-hidden');
-			dc.getElementById('routes-form').classList.add('admin-hidden');
+			Nino.adminUi.showLevel( 'routes-list', { focus : false } );
 		},
 
 		_showForm : function() {
-			dc.getElementById('routes-list').classList.add('admin-hidden');
-			dc.getElementById('routes-form').classList.remove('admin-hidden');
+			Nino.adminUi.showLevel( 'routes-form', { focus : false } );
 		},
 
 		/**
 		 *	Render the page list, plus a "New page" action below it. A row is
-		 *	the page's name over its path, and a link that opens the page
-		 *	itself; its ↑/↓ buttons reorder the persisted list and the routes
-		 *	with it - equal menu priorities follow route order, so this is what
-		 *	orders the menus (see Admin.php's apiMove())
+		 *	the page's name over its path, a button that opens its form and a
+		 *	link that opens the page itself; its ↑/↓ buttons reorder the
+		 *	persisted list and the routes with it - equal menu priorities
+		 *	follow route order, so this is what orders the menus (see
+		 *	Admin.php's apiMove())
 		 *
 		 *	@return		void
 		 */
@@ -162,9 +174,11 @@
 				li.className = 'admin-page-row';
 
 				// Names are editor content: textContent, never markup. The template
-				// and the Element URI are in the form, not on the row
-				const link = dc.createElement('a');
-				link.href = '#';
+				// and the Element URI are in the form, not on the row. It opens a
+				// form and no address is written: a button, not a link to nowhere
+				const edit = dc.createElement('button');
+				edit.type = 'button';
+				edit.className = 'nino-admin-list-link';
 				const copy = dc.createElement('span');
 				copy.className = 'nino-admin-list-copy';
 				const name = dc.createElement('strong');
@@ -173,9 +187,9 @@
 				const path = dc.createElement('small');
 				path.textContent = entry.httpUri;
 				copy.appendChild( path );
-				link.appendChild( copy );
-				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.routes._openForm( entry ) } );
-				li.appendChild( link );
+				edit.appendChild( copy );
+				edit.addEventListener( 'click', function() { Nino.admin.routes._openForm( entry, edit ) } );
+				li.appendChild( edit );
 
 				// The page itself, in a tab of its own. Only for a path that is a
 				// path below this site: a '//host' would be read as another origin
@@ -232,7 +246,7 @@
 			addBtn.type = 'button';
 			addBtn.className = 'nino-admin-btn-primary';
 			addBtn.textContent = Nino.content.getText('/_admin/routes/label/new');
-			addBtn.addEventListener( 'click', function() { Nino.admin.routes._openForm( null ) } );
+			addBtn.addEventListener( 'click', function() { Nino.admin.routes._openForm( null, addBtn ) } );
 			wrap.appendChild( Nino.adminUi.listActions( [ addBtn ] ) );
 		},
 
@@ -269,8 +283,9 @@
 				const li = dc.createElement('li');
 				li.className = 'admin-page-row';
 
-				const link = dc.createElement('a');
-				link.href = '#';
+				const edit = dc.createElement('button');
+				edit.type = 'button';
+				edit.className = 'nino-admin-list-link';
 				const copy = dc.createElement('span');
 				copy.className = 'nino-admin-list-copy';
 				const name = dc.createElement('strong');
@@ -279,9 +294,9 @@
 				const path = dc.createElement('small');
 				path.textContent = Nino.admin.routes._paths( entry );
 				copy.appendChild( path );
-				link.appendChild( copy );
-				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.routes._openRuntimeForm( entry ) } );
-				li.appendChild( link );
+				edit.appendChild( copy );
+				edit.addEventListener( 'click', function() { Nino.admin.routes._openRuntimeForm( entry, edit ) } );
+				li.appendChild( edit );
 
 				ul.appendChild( li );
 			} );
@@ -405,18 +420,20 @@
 		 *	page - nothing is suggested but the template, and that only when
 		 *	the project has a blank page (see Admin.php's apiList())
 		 *
-		 *	@param		{Object|null}	entry		One entry from _pages, or null to create new
+		 *	@param		{Object|null}	entry			One entry from _pages, or null to create new
+		 *	@param		{Element}			[opener]	The row or the button that was pressed: Back returns the focus to it
 		 *
 		 *	@return		void
 		 */
-		_openForm : function( entry ) {
+		_openForm : function( entry, opener ) {
 
 			Nino.admin.routes._isNew 					= entry === null;
 			Nino.admin.routes._currentHttpUri = entry ? entry.httpUri : null;
 			Nino.admin.routes._currentRuntime = null;
+			Nino.admin.routes._opener 				= opener ?? null;
 
 			Nino.admin.routes._renderForm( entry || { uri : '', httpUri : '', template : Nino.admin.routes._defaultTemplate } );
-			Nino.admin.routes._showForm();
+			Nino.adminUi.showLevel( 'routes-form' );
 		},
 
 		/**
@@ -424,18 +441,20 @@
 		 *	feature decides and this panel only shows, and its name, title and
 		 *	description in every language
 		 *
-		 *	@param		{Object}	entry		One entry from _runtime
+		 *	@param		{Object}		entry			One entry from _runtime
+		 *	@param		{Element}		[opener]	The row that was pressed: Back returns the focus to it
 		 *
 		 *	@return		void
 		 */
-		_openRuntimeForm : function( entry ) {
+		_openRuntimeForm : function( entry, opener ) {
 
 			Nino.admin.routes._isNew 					= false;
 			Nino.admin.routes._currentHttpUri = null;
 			Nino.admin.routes._currentRuntime = entry;
+			Nino.admin.routes._opener 				= opener ?? null;
 
 			Nino.admin.routes._renderRuntimeForm( entry );
-			Nino.admin.routes._showForm();
+			Nino.adminUi.showLevel( 'routes-form' );
 		},
 
 		/**
@@ -457,7 +476,7 @@
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/common/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.routes._showList() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.adminUi.backTo( 'routes-list', Nino.admin.routes._opener ) } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const form = dc.createElement('form');
@@ -518,6 +537,9 @@
 			const msg = dc.createElement('p');
 			msg.id = 'routes-form-msg';
 			actions.appendChild( msg );
+			Nino.admin.routes._line = Nino.adminUi.status( msg );
+			// A bar with a status line shows no other mark of unsaved input: the line follows the form
+			Nino.admin.routes._line.bind( form );
 
 			form.appendChild( actions );
 
@@ -551,7 +573,7 @@
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/common/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.routes._showList() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.adminUi.backTo( 'routes-list', Nino.admin.routes._opener ) } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const form = dc.createElement('form');
@@ -734,6 +756,9 @@
 			const msg = dc.createElement('p');
 			msg.id = 'routes-form-msg';
 			actions.appendChild( msg );
+			Nino.admin.routes._line = Nino.adminUi.status( msg );
+			// A bar with a status line shows no other mark of unsaved input: the line follows the form
+			Nino.admin.routes._line.bind( form );
 
 			form.appendChild( actions );
 
@@ -823,7 +848,7 @@
 					done( ok );
 			};
 
-			const msg = dc.getElementById('routes-form-msg');
+			const line = Nino.admin.routes._line;
 
 			const text = {};
 			dc.querySelectorAll('#routes-form-locales [data-locale]').forEach( function( row ) {
@@ -838,12 +863,11 @@
 				form is not validated by the browser (see _renderForm()), and
 				a name or a title nobody wrote would render as the raw
 				[[/_nino/webpage.../name]] on the page and in the menu. Every
-				attempt starts without the marks of the one before; the first
-				field that fails takes the focus, and the message is the
-				workbench's own	*/
-			dc.querySelectorAll('#routes-form [aria-invalid]').forEach( function( field ) {
-				field.removeAttribute('aria-invalid');
-			} );
+				attempt starts without the marks of the one before; a field
+				that fails is marked and says why where it stands, the first
+				one takes the focus, and the one summary is the status line's,
+				in the workbench's own words	*/
+			Nino.adminUi.clearFieldErrors( dc.getElementById('routes-form') );
 
 			const missing = [];
 			const need = function( field ) {
@@ -863,17 +887,17 @@
 			} );
 
 			if( missing.length > 0 ) {
-				missing.forEach( function( field ) { field.setAttribute( 'aria-invalid', 'true' ) } );
+				missing.forEach( Nino.admin.routes._markMissing );
 				missing[0].focus();
-				msg.textContent = Nino.content.getText('/_admin/routes/error/required');
+				line.fail( Nino.content.getText('/_admin/routes/error/required') );
 				report( false );
 				return;
 			}
 
-			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');
+			line.saving();
 
 			if( Nino.admin.routes._currentRuntime !== null )
-				return Nino.admin.routes._saveRuntime( text, msg, report );
+				return Nino.admin.routes._saveRuntime( text, report );
 
 			const navs = [];
 			dc.querySelectorAll('#routes-form [data-nav]').forEach( function( input ) {
@@ -891,12 +915,12 @@
 				text 						: text,
 			}, function( status, response ) {
 				if( status !== 200 || response === null ) {
-					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
+					line.error( status, response, '/_admin/common/error/save' );
 					report( false );
 					return;
 				}
 				Nino.admin.touch( 'routes' );
-				msg.textContent = Nino.content.getText('/_admin/common/msg/saved');
+				line.saved();
 				if( typeof Nino.admin.dirty === 'object' )
 					Nino.admin.dirty.snapshot( 'routes' );
 				Nino.admin.routes.init();
@@ -905,25 +929,51 @@
 		},
 
 		/**
+		 *	Say at a field that it is empty and must not be: aria-invalid, and a
+		 *	sentence under it that the field points at. The name and the title
+		 *	of a language stand side by side in one row and are told with one
+		 *	sentence, the row's, which both point at; the other fields have
+		 *	their label to follow
+		 *
+		 *	@param		{Element}		field					The input or the select that is missing
+		 *
+		 *	@return		void
+		 */
+		_markMissing : function( field ) {
+
+			const row = field.closest('.admin-page-locale-row');
+			const id = 'routes-error-'+ ( row === null ? field.id.replace( /^routes-form-/, '' ) : row.dataset.locale );
+			const sentence = dc.getElementById( id );
+
+			if( sentence === null )
+				Nino.adminUi.fieldError( row ?? field.closest('label'), field, id, Nino.content.getText('/_admin/common/error/required') );
+			else {
+				field.setAttribute( 'aria-invalid', 'true' );
+				field.setAttribute( 'aria-describedby', id );
+			}
+		},
+
+		/**
 		 *	Save the texts of the feature page currently open - routes/savetexts
 		 *	writes the three /_nino/webpage keys per language and nothing else
 		 *
 		 *	@param		{Object}		text					Locale => { name, title, description }
-		 *	@param		{Element}		msg						The line the result is reported into
 		 *	@param		{Function}	report				Called once with true when the texts were written, false otherwise
 		 *
 		 *	@return		void
 		 */
-		_saveRuntime : function( text, msg, report ) {
+		_saveRuntime : function( text, report ) {
+
+			const line = Nino.admin.routes._line;
 
 			Nino.admin.routes._apiCall( 'savetexts', { uri : Nino.admin.routes._currentRuntime.uri, text : text }, function( status, response ) {
 				if( status !== 200 || response === null ) {
-					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' );
+					line.error( status, response, '/_admin/common/error/save' );
 					report( false );
 					return;
 				}
 				Nino.admin.touch( 'routes' );
-				msg.textContent = Nino.content.getText('/_admin/common/msg/saved');
+				line.saved();
 				if( typeof Nino.admin.dirty === 'object' )
 					Nino.admin.dirty.snapshot( 'routes' );
 				Nino.admin.routes.init();
@@ -1005,12 +1055,12 @@
 			if( wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/routes/confirm/delete-left'), Nino.admin.routes._currentHttpUri, Nino.admin.routes._staysLine() ) ) === false )
 				return;
 
-			const msg = dc.getElementById('routes-form-msg');
-			msg.textContent = Nino.content.getText('/_admin/common/msg/deleting');
+			const line = Nino.admin.routes._line;
+			line.idle( Nino.content.getText('/_admin/common/msg/deleting') );
 
 			Nino.admin.routes._apiCall( 'delete', { httpUri : Nino.admin.routes._currentHttpUri }, function( status, response ) {
 				if( status !== 200 || response === null ) {
-					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/delete' );
+					line.error( status, response, '/_admin/common/error/delete' );
 					return;
 				}
 				Nino.admin.touch( 'routes' );

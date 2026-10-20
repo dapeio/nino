@@ -97,6 +97,9 @@ check( 'a csv export carries every row\'s columns, not the first row\'s',
 
 	A second context rather than more of the one above: onReady() wants a dom,
 	and the router checks up there want one that answers nothing	*/
+// The element that has the focus: a page has one
+let focusedNode = null;
+
 function node( id, attributes ) {
 	const classes = new Set();
 	const el = {
@@ -121,7 +124,8 @@ function node( id, attributes ) {
 		removeAttribute : function( name ) { delete el.attributes[name] },
 		getAttribute : function( name ) { return el.attributes[name] ?? null },
 		addEventListener : function( name, fn ) { el.listeners[name] = fn },
-		focus : function() { el.focused = true },
+		focus : function() { if( focusedNode !== null ) focusedNode.focused = false; focusedNode = el; el.focused = true },
+		contains : function( other ) { for( let at = other; at !== null && at !== undefined; at = at.parent ) if( at === el ) return true; return false },
 		closest : function() { return el.parent === null ? null : ( el.parent.dataset.panel !== undefined ? el.parent : el.parent.closest() ) },
 		// A child by one class, the way the head's parts are reached
 		querySelector : function( selector ) {
@@ -129,6 +133,10 @@ function node( id, attributes ) {
 			if( selector === ':scope > .admin-panel-tabs > button[data-tab]' )
 				return el.children.filter( function( c ) { return c.classList.contains('admin-panel-tabs') } )
 					.flatMap( function( c ) { return c.children } ).find( function( b ) { return b.dataset.tab !== undefined } ) || null;
+			// The name of a panel: the title in the head of the pane
+			if( selector === ':scope > .admin-panel-head > .admin-panel-title' )
+				return el.children.filter( function( c ) { return c.classList.contains('admin-panel-head') } )
+					.flatMap( function( h ) { return h.children } ).find( function( c ) { return c.classList.contains('admin-panel-title') } ) || null;
 			return el.children.find( function( c ) { return c.classList.contains( selector.replace( ':scope > .', '' ) ) } ) || null;
 		},
 		querySelectorAll : function( selector ) {
@@ -222,8 +230,25 @@ head.parent = usersPane;
 
 const dashboardPane = node( 'admin-content-dashboard', { panel : 'dashboard', layout : 'page' } );
 const pageWrap = node( 'admin-page-wrap', {} );
+// The first stop of the page, and the pane it jumps to
+const skipLink = node( '', {} );
+const contentWrap = node( 'admin-content-wrap', {} );
+// The settings menu: the button that opens it, and what it holds
+const settingsWrap = node( 'admin-nav-ui', {} );
+const settingsToggle = node( 'admin-nav-ui-toggle', {} );
+const settingsMenu = node( 'admin-nav-ui-menu', {} );
+const themeToggle = node( 'admin-theme-toggle', {} );
+settingsMenu.children = [ themeToggle ];
+themeToggle.parent = settingsMenu;
+settingsWrap.children = [ settingsToggle, settingsMenu ];
+settingsToggle.parent = settingsWrap;
+settingsMenu.parent = settingsWrap;
 const shellNodes = {
 	'admin-page-wrap' : pageWrap,
+	'admin-content-wrap' : contentWrap,
+	'admin-nav-ui' : settingsWrap,
+	'admin-nav-ui-toggle' : settingsToggle,
+	'admin-nav-ui-menu' : settingsMenu,
 	'admin-nav-wrap' : railNav,
 	'admin-user-logout' : node( 'admin-user-logout', {} ),
 	'admin-content-dashboard' : dashboardPane,
@@ -267,10 +292,13 @@ const shell = {
 	clearTimeout : function() {},
 	document : {
 		documentElement : null, body : null,
+		get activeElement() { return focusedNode },
 		getElementById : function( id ) { return shellNodes[id] ?? null },
 		createElement : function( tag ) { return fakeElement( tag ) },
 		addEventListener : function() {},
 		querySelectorAll : function( selector ) {
+			if( selector === '.nino-admin-skip' )
+				return [ skipLink ];
 			if( selector === '#admin-nav-wrap a[data-panel]' )
 				return [ railLinks.dashboard, railLinks.users ];
 			if( selector === '#admin-content-wrap > [data-panel]' )
@@ -316,6 +344,7 @@ check( 'the rail says which panel is open rather than only painting it', railLin
 check( '...and no other link claims to be the current page', railLinks.dashboard.getAttribute('aria-current') === null );
 railLinks.dashboard.listeners.click( { preventDefault : function() {} } );
 check( 'the mark moves with the panel', railLinks.dashboard.getAttribute('aria-current') === 'page' && railLinks.users.getAttribute('aria-current') === null );
+check( 'a panel without a head to name it leaves the focus where the click put it', title.focused === false );
 
 /*	And the address moves with it. A panel that keeps drill-down state writes
 	the hash itself; the others never wrote it, so the bar kept naming the
@@ -325,6 +354,32 @@ check( 'the mark moves with the panel', railLinks.dashboard.getAttribute('aria-c
 check( 'a panel opened from the rail writes its name into the address', shell.location.hash === '#dashboard' );
 railLinks.users.listeners.click( { preventDefault : function() {} } );
 check( '...and a pane with tabs writes the tab that is open', shell.location.hash === '#roles' );
+check( 'a panel opened from the rail starts at its name: the title has the focus, and is no stop of the Tab key', title.focused === true && title.getAttribute('tabindex') === '-1' );
+
+/*	The skip link jumps to the pane and writes no address - an anchor jump
+	would be answered by the router as a panel of that name	*/
+const hashBefore = shell.location.hash;
+let skipped = 0;
+check( 'the pane is no target of the focus until the link is followed', contentWrap.getAttribute('tabindex') === null );
+skipLink.listeners.click( { preventDefault : function() { skipped++ } } );
+check( 'the skip link puts the focus on the pane and leaves the address alone', skipped === 1 && contentWrap.focused === true && shell.location.hash === hashBefore );
+check( '...which can take it for the jump: the pane is made a target of the focus, and not a stop of the Tab key', contentWrap.getAttribute('tabindex') === '-1' );
+contentWrap.listeners.blur();
+check( '...and is none again as the focus leaves it, so that a click on a text in the pane starts the Tab key after the text', contentWrap.getAttribute('tabindex') === null );
+
+/*	The settings menu is a disclosure. Closing it with the Escape key takes the
+	focus out of the page when it was in the menu: a hidden element keeps no
+	focus. It goes back to the button that opened it. A click on another control
+	closes the menu too, and the focus is on that control by then	*/
+settingsToggle.setAttribute( 'aria-expanded', 'true' );
+themeToggle.focus();
+shell.Nino.admin.navUi.close();
+check( 'the menu closed with the focus in it gives the focus to the button that opened it', settingsMenu.classList.contains('admin-hidden') === true && settingsToggle.getAttribute('aria-expanded') === 'false' && settingsToggle.focused === true );
+settingsMenu.classList.remove('admin-hidden');
+railLinks.users.focus();
+shell.Nino.admin.navUi.close();
+check( '...and not when it was elsewhere: it stays on the control the person went to', settingsMenu.classList.contains('admin-hidden') === true && railLinks.users.focused === true && settingsToggle.focused === false );
+title.focus();
 
 check( 'a pane strip starts with exactly one tab selected and one tab stop', rolesTab.getAttribute('aria-selected') === 'true'
 	&& lockoutTab.getAttribute('aria-selected') === 'false' && rolesTab.tabIndex === 0 && lockoutTab.tabIndex === -1 );

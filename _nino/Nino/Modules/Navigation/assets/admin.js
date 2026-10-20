@@ -47,6 +47,10 @@
 		_savedKey 	: '',
 		_entriesHost : null,
 
+		// The row or the button that opened the menu that is open: Back returns
+		// the focus to it (see Nino.adminUi.backTo())
+		_opener 		: null,
+
 		/**
 		 *	Load the menus and render the list
 		 *
@@ -171,17 +175,33 @@
 			Nino.adminUi.showError( container, status, response, '/_admin/common/error/load' );
 		},
 
+		/**
+		 *	Show the list or the menu again as they stand: the focus stays where
+		 *	it is, unless it stood in the level that is hidden now (see
+		 *	Nino.adminUi.showLevel()). What a person opens goes through
+		 *	_openForm(), and Back through _back()
+		 *
+		 *	@return		void
+		 */
 		_showList : function() {
-			Nino.admin.navs._currentKey = null;
-			Nino.admin.navs._dirty 			= false;
-			Nino.admin.navs._entries 		= [];
-			dc.getElementById('navs-list').classList.remove('admin-hidden');
-			dc.getElementById('navs-form').classList.add('admin-hidden');
+			Nino.admin.navs._leave();
+			Nino.adminUi.showLevel( 'navs-list', { focus : false } );
 		},
 
 		_showForm : function() {
-			dc.getElementById('navs-list').classList.add('admin-hidden');
-			dc.getElementById('navs-form').classList.remove('admin-hidden');
+			Nino.adminUi.showLevel( 'navs-form', { focus : false } );
+		},
+
+		/**
+		 *	Let go of the menu that was open: its key, its working copy and the
+		 *	changes in it
+		 *
+		 *	@return		void
+		 */
+		_leave : function() {
+			Nino.admin.navs._currentKey = null;
+			Nino.admin.navs._dirty 			= false;
+			Nino.admin.navs._entries 		= [];
 		},
 
 		/**
@@ -204,11 +224,13 @@
 
 				const li = dc.createElement('li');
 
-				const link = dc.createElement('a');
-				link.href = '#';
-				link.textContent = nav.key+ ' ('+ nav.entries.length+ ')';
-				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.navs._openForm( nav ) } );
-				li.appendChild( link );
+				// It opens a form and no address is written: a button, not a link to nowhere
+				const edit = dc.createElement('button');
+				edit.type = 'button';
+				edit.className = 'nino-admin-list-link';
+				edit.textContent = nav.key+ ' ('+ nav.entries.length+ ')';
+				edit.addEventListener( 'click', function() { Nino.admin.navs._openForm( nav, edit ) } );
+				li.appendChild( edit );
 
 				ul.appendChild( li );
 			} );
@@ -218,24 +240,26 @@
 			addBtn.type = 'button';
 			addBtn.className = 'nino-admin-btn-primary';
 			addBtn.textContent = Nino.content.getText('/_admin/navs/label/new');
-			addBtn.addEventListener( 'click', function() { Nino.admin.navs._openForm( null ) } );
+			addBtn.addEventListener( 'click', function() { Nino.admin.navs._openForm( null, addBtn ) } );
 			wrap.appendChild( Nino.adminUi.listActions( [ addBtn ] ) );
 		},
 
 		/**
 		 *	Open one menu, or a blank one to create
 		 *
-		 *	@param		{Object|null}	nav		One entry from _navs, or null to create new
+		 *	@param		{Object|null}	nav				One entry from _navs, or null to create new
+		 *	@param		{Element}			[opener]	The row or the button that was pressed: Back returns the focus to it
 		 *
 		 *	@return		void
 		 */
-		_openForm : function( nav ) {
+		_openForm : function( nav, opener ) {
 
 			Nino.admin.navs._isNew 			= nav === null;
 			Nino.admin.navs._currentKey = nav ? nav.key : null;
+			Nino.admin.navs._opener 		= opener ?? null;
 
 			Nino.admin.navs._renderForm( nav || { key : Nino.admin.navs._freeKey(), entries : [] } );
-			Nino.admin.navs._showForm();
+			Nino.adminUi.showLevel( 'navs-form' );
 		},
 
 		/**
@@ -615,7 +639,8 @@
 			if( typeof Nino.admin.dirty !== 'object' && Nino.admin.navs._isDirty() === true && wn.confirm( Nino.content.getText('/_admin/navs/confirm/discard') ) === false )
 				return;
 
-			Nino.admin.navs._showList();
+			Nino.admin.navs._leave();
+			Nino.adminUi.backTo( 'navs-list', Nino.admin.navs._opener );
 		},
 
 		/**

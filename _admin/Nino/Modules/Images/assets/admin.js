@@ -242,20 +242,46 @@
 
 		/**
 		 *	Drill-down navigation: list -> form. The main Elements/Text/Images/
-		 *	Users bar stays visible throughout.
+		 *	Users bar stays visible throughout. The focus stays where it is,
+		 *	unless it stood in the level that is hidden now (see
+		 *	Nino.adminUi.showLevel()): the level is shown again as it stands, by
+		 *	the address. Back goes to the category, and what a person opens takes
+		 *	the focus in
+		 *
+		 *	@param		{Element|null}	[opener]	Back: the control that opened the form that is left; null where there is none to name
 		 *
 		 *	@return		void
 		 */
-		_showList : function() {
-			dc.getElementById('images-list').classList.remove('admin-hidden');
-			dc.getElementById('images-form').classList.add('admin-hidden');
+		_showList : function( opener ) {
 			Nino.admin.router.set( 'images', [] );
+
+			if( opener === undefined )
+				Nino.adminUi.showLevel( 'images-list', { focus : false } );
+			else
+				Nino.adminUi.backTo( 'images-list', opener );
 		},
 
-		_showForm : function() {
-			dc.getElementById('images-list').classList.add('admin-hidden');
-			dc.getElementById('images-form').classList.remove('admin-hidden');
+		/**
+		 *	@param		{boolean}	[opened]	The person opened it: the focus goes into the form
+		 *
+		 *	@return		void
+		 */
+		_showForm : function( opened ) {
 			Nino.admin.router.set( 'images', Nino.admin.images._groupParts( Nino.admin.images._currentGroup ) );
+			Nino.adminUi.showLevel( 'images-form', opened === true ? {} : { focus : false } );
+		},
+
+		/**
+		 *	The button of a category as the list is drawn now: the list is drawn
+		 *	again where the slots are read anew, and the button that was pressed is
+		 *	gone with the old drawing
+		 *
+		 *	@param		{string}	group
+		 *
+		 *	@return		{Element|null}
+		 */
+		_rowOf : function( group ) {
+			return Array.from( dc.getElementById('images-list').querySelectorAll('button') ).find( function( button ) { return button.dataset.group === group } ) ?? null;
 		},
 
 		/**
@@ -326,7 +352,7 @@
 
 				btn.appendChild( titleWrap );
 				btn.appendChild( chev );
-				btn.addEventListener( 'click', function() { Nino.admin.images._openGroup( group ) } );
+				btn.addEventListener( 'click', function() { Nino.admin.images._openGroup( group, true ) } );
 
 				wrap.appendChild( btn );
 			} );
@@ -338,17 +364,18 @@
 		 *	where it has the registry (see Nino.admin.dirty). A shell without
 		 *	it (an older one, a test) goes straight on
 		 *
-		 *	@param		{string}	group
+		 *	@param		{string}		group
+		 *	@param		{boolean}		[opened]	The person pressed its button: the focus goes into the form. Otherwise it is shown as it stands, by the address
 		 *
 		 *	@return		void
 		 */
-		_openGroup : function( group ) {
+		_openGroup : function( group, opened ) {
 
 			const open = function() {
 				Nino.admin.images._currentGroup = group;
 				Nino.admin.images._renderGroupForm();
 				Nino.admin.router.go( 'images', Nino.admin.images._groupParts( group ) );
-				Nino.admin.images._showForm();
+				Nino.admin.images._showForm( opened === true );
 			};
 
 			if( typeof Nino.admin.dirty !== 'object' ) {
@@ -384,7 +411,7 @@
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/images/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'images', [] ); Nino.admin.images._showList() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'images', [] ); Nino.admin.images._showList( Nino.admin.images._rowOf( Nino.admin.images._currentGroup ) ) } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const title = dc.createElement('div');
@@ -438,6 +465,7 @@
 
 			const preview = dc.createElement('img');
 			preview.className = 'nino-admin-field-image-preview';
+			preview.alt = Nino.admin.images._previewAlt( slot );
 			preview.hidden = ! slot.url;
 			if( slot.url )
 				preview.src = slot.url;
@@ -475,8 +503,25 @@
 			imageWrap.appendChild( msg );
 
 			fieldset.appendChild( imageWrap );
-			fieldset.appendChild( Nino.admin.images._renderAlt( slot ) );
+			fieldset.appendChild( Nino.admin.images._renderAlt( slot, preview ) );
 			return fieldset;
+		},
+
+		/**
+		 *	What the preview of a slot says to a screen reader: the alt text the
+		 *	slot has in the first language that has one - the words its page
+		 *	carries - or nothing at all, the name of the slot stands over it and a
+		 *	picture that repeated that would be read twice
+		 *
+		 *	@param		{Object}	slot
+		 *
+		 *	@return		{string}
+		 */
+		_previewAlt : function( slot ) {
+
+			const locale = Nino.admin.images._locales.find( function( code ) { return ( slot.alt && slot.alt[code] ) ? true : false } );
+
+			return locale === undefined ? '' : slot.alt[locale];
 		},
 
 		/**
@@ -516,10 +561,11 @@
 		 *	its own request. Empty means decorative, which the hint says
 		 *
 		 *	@param		{Object}	slot
+		 *	@param		{Element}	preview					The slot's <img>, whose alt follows what is saved here
 		 *
 		 *	@return		{Element}								<div>
 		 */
-		_renderAlt : function( slot ) {
+		_renderAlt : function( slot, preview ) {
 
 			const wrap = dc.createElement('div');
 			wrap.className = 'images-slot-alt';
@@ -559,7 +605,7 @@
 			saveBtn.className = 'nino-admin-btn-secondary';
 			saveBtn.textContent = Nino.content.getText('/_admin/images/label/alt-save');
 
-			const editor = { slot : slot, inputs : inputs, msg : msg, saveBtn : saveBtn, saving : false };
+			const editor = { slot : slot, preview : preview, inputs : inputs, msg : msg, saveBtn : saveBtn, saving : false };
 			Nino.admin.images._altEditors.push( editor );
 
 			saveBtn.addEventListener( 'click', function() { Nino.admin.images._saveAlt( editor ) } );
@@ -622,6 +668,7 @@
 				Nino.admin.touch( 'slots' );
 
 				editor.slot.alt = response.alt || {};
+				editor.preview.alt = Nino.admin.images._previewAlt( editor.slot );
 				Object.keys( editor.inputs ).forEach( function( locale ) {
 					if( editor.inputs[locale].value === sent[locale] )
 						editor.inputs[locale].value = editor.slot.alt[locale] || '';

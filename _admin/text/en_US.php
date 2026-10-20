@@ -25,6 +25,7 @@ return [
 
 	'[[/_admin/label/rail]]'			=> 'Workbench navigation',
 	'[[/_admin/label/nav]]'			=> 'Workbench sections',
+	'[[/_admin/label/skip]]'		=> 'Skip to content',
 	'[[/_admin/label/language]]'	=> 'Interface language',
 	'[[/_admin/label/title]]'		=> 'Nino workbench',
 	'[[/_admin/nav/group/content]]'		=> 'Content',
@@ -75,6 +76,7 @@ return [
 	'[[/_admin/common/error/load]]'			=> 'Failed to load.',
 	'[[/_admin/common/error/save]]'			=> 'Failed to save.',
 	'[[/_admin/common/error/delete]]'		=> 'Failed to delete.',
+	'[[/_admin/common/error/required]]'	=> 'This required field is empty.',
 	'[[/_admin/common/error/rename]]'		=> 'Failed to rename.',
 	'[[/_admin/common/error/scan]]'			=> 'Scan failed.',
 	'[[/_admin/common/error/request]]'	=> 'Request failed.',

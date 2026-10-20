@@ -21,7 +21,7 @@
  *									fills( relative )					The [[/key]] => 'value' lines of a text file
  *									load( relative, context, filename )	A script of the checkout, run in a context
  *									classList( el, initial )			A class list over a Set, one with className
- *									element( tag )						An element stand-in: tree, listeners, matcher
+ *									element( tag )						An element stand-in: tree, listeners, matcher, isConnected
  *									findAll( root, predicate )			Every descendant the predicate accepts
  *									fire( el, name, event )				Calls the listeners of an event
  *									matches( el, selector )				Whether an element answers a selector
@@ -352,17 +352,19 @@ function element( tag ) {
 		// The options the last listener of each event was added with
 		listenerOptions : {},
 		parentNode : null,
-		appendChild : function( child ) { child.parentNode = el; el.children.push( child ); return child },
+		appendChild : function( child ) { child.parentNode = el; child.removed = false; el.children.push( child ); return child },
 		removeChild : function( child ) {
 			const at = el.children.indexOf( child );
 			if( at !== -1 )
 				el.children.splice( at, 1 );
 			child.parentNode = null;
+			child.removed = true;
 			return child;
 		},
 		insertBefore : function( child, reference ) {
 			const at = reference ? el.children.indexOf( reference ) : -1;
 			child.parentNode = el;
+			child.removed = false;
 			if( at === -1 )
 				el.children.push( child );
 			else
@@ -372,14 +374,21 @@ function element( tag ) {
 		insertAdjacentElement : function( where, child ) {
 			if( where !== 'afterend' )
 				throw new Error( 'only afterend is stood in for' );
+			// A node is in one place: put somewhere else, it leaves the one it was in
+			if( child.parentNode !== null )
+				child.parentNode.removeChild( child );
 			child.parentNode = el.parentNode;
+			child.removed = false;
 			el.parentNode.children.splice( el.parentNode.children.indexOf( el ) + 1, 0, child );
 			return child;
 		},
+		after : function( node ) { el.insertAdjacentElement( 'afterend', node ) },
 		replaceWith : function( other ) {
 			el.parentNode.children[ el.parentNode.children.indexOf( el ) ] = other;
 			other.parentNode = el.parentNode;
+			other.removed = false;
 			el.parentNode = null;
+			el.removed = true;
 		},
 		remove : function() { if( el.parentNode !== null ) el.parentNode.removeChild( el ) },
 		setAttribute : function( name, value ) {
@@ -469,6 +478,19 @@ function element( tag ) {
 			}
 			el.children.forEach( function( option ) { option.selected = option.value === String( next ) } );
 			unmatched = el.children.some( function( option ) { return option.selected === true } ) ? null : el.children.slice();
+		},
+	} );
+
+	// In the page unless it, or an element above it, was taken out of its parent -
+	// removed, replaced, or emptied away by an innerHTML assignment. One that was
+	// never put anywhere is as much a root as a mount is: there is no document
+	// node to ask
+	Object.defineProperty( el, 'isConnected', {
+		get : function() {
+			for( let node = el; node !== null; node = node.parentNode )
+				if( node.removed === true || ( node.parentNode !== null && node.parentNode.children.indexOf( node ) === -1 ) )
+					return false;
+			return true;
 		},
 	} );
 

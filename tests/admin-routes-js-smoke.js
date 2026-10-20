@@ -20,12 +20,13 @@ const vm 		= require('vm');
 const { check, done, fills, load, element, findAll, fire } = require( './harness.js' );
 
 // Every focus() the panel asks for, in order: a check counts them, which the
-// element's own focused flag cannot
+// element's own focused flag cannot - and the one that has it now, which is what a page answers to activeElement
 const focused = [];
+let active = null;
 
 function control( tag ) {
 	const el = element( tag );
-	el.focus = function() { focused.push( el ) };
+	el.focus = function() { focused.push( el ); active = el };
 	return el;
 }
 
@@ -61,6 +62,14 @@ function messageText() {
 	return line === undefined ? null : line.textContent;
 }
 
+/** Whether an element is the root or stands somewhere below it */
+function inside( root, el ) {
+	for( let node = el; node !== null; node = node.parentNode )
+		if( node === root )
+			return true;
+	return false;
+}
+
 function messageClass() {
 	const line = findAll( mount, function( el ) { return el.id === 'routes-list-msg' } )[0];
 	return line === undefined ? null : line.className;
@@ -79,10 +88,21 @@ function text( key ) {
 
 // --- the sandbox -----------------------------------------------------------
 
+// The pane the shell draws: the name of the panel in its head, and the two levels beside it
+const pane = element('div');
+pane.dataset.panel = 'routes';
+const head = element('div');
+head.className = 'admin-panel-head';
+const paneTitle = control('h2');
+paneTitle.className = 'admin-panel-title';
+head.appendChild( paneTitle );
+pane.appendChild( head );
 const mount = element('div');
 mount.id = 'routes-list';
+pane.appendChild( mount );
 const form = element('div');
 form.id = 'routes-form';
+pane.appendChild( form );
 
 const requests = [];
 
@@ -128,6 +148,7 @@ const sandbox = {
 		},
 		documentElement : null,
 		body : null,
+		get activeElement() { return active },
 	},
 	Nino : Nino,
 };
@@ -218,6 +239,9 @@ answer( 200, listing( [ '/', '/about', '//evil.example', 'relative' ], { templat
 check( 'a row names the page in the language the workbench is on, and shows its path under it', rows().map( rowName ).slice( 0, 2 ).join() === 'Start,Über uns' && rowLabels().slice( 0, 2 ).join() === '/,/about' );
 check( '...and a page nobody named in any language is called by its path', rowName( rows()[2] ) === '//evil.example' );
 
+const opening = rows().map( function( li ) { return li.children[0] } );
+check( 'a row opens a form and writes no address, so it is a button and not a link to nowhere', opening.length === 4 && opening.every( function( el ) { return el.tagName === 'BUTTON' && el.type === 'button' && el.className === 'nino-admin-list-link' && el.href === '' } ) );
+
 const withOpen = openLink( '/about' );
 check( 'the link to the page is a real link, in a tab of its own, under the project directory', withOpen !== null && withOpen.href === '/site/about' && withOpen.target === '_blank' && withOpen.rel === 'noopener'
 	&& withOpen.attributes['aria-label'] === text('/_admin/routes/label/open') && withOpen.textContent === '↗' );
@@ -274,6 +298,12 @@ check( 'without a blank page the template select asks for a choice: a disabled, 
 check( '...and it is not the first template on offer in disguise', chooser.children.length === panel._templates.length + 1 );
 panel._defaultTemplate = 'page-blank';
 
+// The bar of the form has a status line, and a bar that has one shows no other mark of unsaved input
+fire( listActionButton(), 'click' );
+check( 'a form that was just opened is not marked as unsaved', field('routes-form-msg').dataset.state !== 'dirty' );
+fire( findAll( form, function( el ) { return el.tagName === 'FORM' } )[0], 'input', { target : field('routes-form-uri') } );
+check( '...an edit turns the line of the bar to unsaved, which is where the screen says it', field('routes-form-msg').dataset.state === 'dirty' );
+
 // Required fields: nothing is sent, the fields are marked, the first takes the focus
 fire( listActionButton(), 'click' );
 const before = requests.length;
@@ -285,6 +315,22 @@ check( '...marks every field that is missing: both uris and every name and title
 	&& localeInput( 'de_DE', 'description' ).attributes['aria-invalid'] === undefined && field('routes-form-template').attributes['aria-invalid'] === undefined );
 check( '...puts the focus on the first of them', focused.length === 1 && focused[0] === field('routes-form-uri') );
 check( '...and says it in the workbench\'s language, in the line of the form', field('routes-form-msg').textContent === text('/_admin/routes/error/required') && text('/_admin/routes/error/required') !== '' );
+check( '...which is an alert of the status line, not a paragraph nobody hears', field('routes-form-msg').dataset.state === 'error' && field('routes-form-msg').attributes.role === 'alert' );
+
+function sentences() {
+	return findAll( form, function( el ) { return el.className === 'nino-admin-field-error' } );
+}
+const empty = sentences();
+check( 'each missing field points at a sentence of its own under its label, which says what is wrong', [ 'routes-form-uri', 'routes-form-http-uri' ].every( function( id ) {
+	const sentence = empty.find( function( el ) { return el.id === field( id ).attributes['aria-describedby'] } );
+	const label = field( id ).parentNode;
+	return sentence !== undefined && sentence.textContent === text('/_admin/common/error/required') && label.parentNode.children.indexOf( sentence ) === label.parentNode.children.indexOf( label ) + 1;
+} ) && text('/_admin/common/error/required') !== '' );
+check( '...the name and the title of a language stand in one row and point at one sentence', [ 'de_DE', 'en_US' ].every( function( locale ) {
+	const id = localeInput( locale, 'name' ).attributes['aria-describedby'];
+	return id === localeInput( locale, 'title' ).attributes['aria-describedby'] && empty.filter( function( el ) { return el.id === id } ).length === 1;
+} ) && empty.length === 4 );
+check( '...and a field that is not missing points at nothing', localeInput( 'de_DE', 'description' ).attributes['aria-describedby'] === undefined && field('routes-form-template').attributes['aria-describedby'] === undefined );
 
 field('routes-form-uri').value = '/new';
 field('routes-form-http-uri').value = '/new';
@@ -298,6 +344,8 @@ check( 'only what is still missing stays marked, and a blank one counts as missi
 	&& field('routes-form-uri').attributes['aria-invalid'] === undefined && localeInput( 'de_DE', 'name' ).attributes['aria-invalid'] === undefined
 	&& localeInput( 'en_US', 'name' ).attributes['aria-invalid'] === 'true' && localeInput( 'en_US', 'title' ).attributes['aria-invalid'] === undefined );
 check( '...with the focus on it', focused.length === 1 && focused[0] === localeInput( 'en_US', 'name' ) );
+check( '...and the sentences of what was fixed are gone with their marks', sentences().length === 1 && sentences()[0].id === localeInput( 'en_US', 'name' ).attributes['aria-describedby']
+	&& field('routes-form-uri').attributes['aria-describedby'] === undefined && localeInput( 'de_DE', 'title' ).attributes['aria-describedby'] === undefined );
 
 // The template placeholder counts as missing too
 panel._defaultTemplate = '';
@@ -314,6 +362,7 @@ fire( listActionButton(), 'click' );
 field('routes-form-uri').value = '/new';
 field('routes-form-http-uri').value = '/new';
 [ 'de_DE', 'en_US' ].forEach( function( locale ) { localeInput( locale, 'name' ).value = 'N'; localeInput( locale, 'title' ).value = 'T' } );
+field('routes-form-http-uri').focus();
 save();
 check( 'a complete form is sent, an empty description with it', requests.length === before + 1 && requests[before].action === 'routes/save'
 	&& requests[before].payload.template === 'page-blank' && requests[before].payload.text.en_US.description === '' && requests[before].payload.originalHttpUri === '' );
@@ -321,12 +370,31 @@ touched.length = 0;
 answer( 200, {} );
 check( 'a save that went through tells the other panels that routes were written', touched.join() === 'routes' );
 answer( 200, listing( [ '/', '/about', '/contact' ], { templates : [ 'page-about', 'page-blank', 'page-contact' ] } ) );
+check( 'a save returns to the list, and the focus that stood in the form goes to the name of the panel', mount.classList.contains('admin-hidden') === false && form.classList.contains('admin-hidden') === true && active === paneTitle );
 
-/*	The delete question names what stays: the texts and the template, and for
-	the template whether other routes use it.	*/
+/*	The focus goes into a form that is opened, and back to the row that opened
+	it. It used to fall to the body both ways: the control that was pressed is
+	hidden with the level it stood in	*/
 function openRoute( httpUri ) {
 	rows().find( function( li ) { return rowPath( li ) === httpUri } ).children[0].listeners.click[0]( { preventDefault : function() {} } );
 }
+function backLink() {
+	return findAll( form, function( el ) { return el.className === 'nino-admin-back-link' } )[0];
+}
+
+openRoute( '/about' );
+check( 'opening a form moves the focus into it', form.classList.contains('admin-hidden') === false && mount.classList.contains('admin-hidden') === true && inside( form, active ) && active.tagName === 'A' );
+fire( backLink(), 'click' );
+check( 'Back shows the list and puts the focus on the row that was opened', mount.classList.contains('admin-hidden') === false && form.classList.contains('admin-hidden') === true
+	&& active === rows().find( function( li ) { return rowPath( li ) === '/about' } ).children[0] );
+
+fire( listActionButton(), 'click' );
+check( 'a new route opens the same way', inside( form, active ) );
+fire( backLink(), 'click' );
+check( '...and Back returns to the New route button', active === listActionButton() );
+
+/*	The delete question names what stays: the texts and the template, and for
+	the template whether other routes use it.	*/
 function deleteButton() {
 	return findAll( form, function( el ) { return el.className === 'nino-admin-btn-danger' } )[0];
 }
@@ -420,6 +488,8 @@ check( 'a feature route opens a form of the path, which is read only', field('ro
 	&& field('routes-form-uri') === undefined && field('routes-form-template') === undefined );
 check( '...with a name, a title and a description per language', [ 'de_DE', 'en_US' ].every( function( locale ) { return [ 'name', 'title', 'description' ].every( function( name ) { return localeInput( locale, name ) !== undefined } ) } ) );
 check( '...and no menu, no status code and no delete', findAll( form, function( el ) { return el.dataset.nav !== undefined || el.id === 'routes-form-status' || el.className === 'nino-admin-btn-danger' } ).length === 0 );
+fire( findAll( form, function( el ) { return el.tagName === 'FORM' } )[0], 'input', { target : localeInput( 'de_DE', 'name' ) } );
+check( '...whose line follows an edit too: unsaved', field('routes-form-msg').dataset.state === 'dirty' );
 
 const beforeRuntime = requests.length;
 save();
@@ -524,11 +594,15 @@ answer( 200, listing( [ '/', '/contact' ], { templates : [ 'page-contact', 'page
 			events : { bindCallback : function() {} },
 			http : { sendRequest : ( uri, method, callback, data ) => sent.push( { action : data.action, callback : callback } ) },
 			content : { getText : key => key },
-			adminUi : { api : { errorText : status => 'error '+ status, call : ( endpoint, payload, callback ) => sent.push( { action : endpoint, callback : callback } ) } },
+			adminUi : { clearFieldErrors : () => {}, api : { errorText : status => 'error '+ status, call : ( endpoint, payload, callback ) => sent.push( { action : endpoint, callback : callback } ) } },
 		},
 	};
 	box.window = box;
 	load( '_admin/Nino/Modules/Routes/assets/admin.js', vm.createContext( box ) );
+
+	// The status line of the form that is open, which the form draws: here it writes down what it is told
+	const said = [];
+	box.Nino.admin.routes._line = { saving : () => said.push( 'saving' ), saved : () => said.push( 'saved' ), fail : () => said.push( 'fail' ), error : status => said.push( 'error '+ status ) };
 
 	check( 'the page form registers with the shell under the panel\'s name', watched.length === 1 && watched[0].name === 'routes' && watched[0].getter() === node('routes-form') );
 
@@ -536,10 +610,11 @@ answer( 200, listing( [ '/', '/contact' ], { templates : [ 'page-contact', 'page
 	box.Nino.admin.routes._save( ok => outcomes.push( ok ) );
 	sent[sent.length - 1].callback( 500, null );
 	check( 'a save that fails reports false and takes nothing for stored', outcomes.join() === 'false' && calls.length === 0 );
+	check( '...and says in the status line that it is saving and then why it failed', said.join() === 'saving,error 500' );
 
 	box.Nino.admin.routes._save( ok => outcomes.push( ok ) );
 	sent[sent.length - 1].callback( 200, {} );
-	check( 'a save that goes through says what it wrote, takes the form as it stands for the stored one, and reports true', outcomes.join() === 'false,true' && calls.join() === 'touch routes,snapshot routes' );
+	check( 'a save that goes through says what it wrote, takes the form as it stands for the stored one, and reports true', outcomes.join() === 'false,true' && calls.join() === 'touch routes,snapshot routes' && said.slice( 2 ).join() === 'saving,saved' );
 	check( '...the shell\'s Save runs the same save', typeof watched[0].save === 'function' );
 }
 

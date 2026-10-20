@@ -27,6 +27,9 @@
 		// what the shell's Save tells the two forms apart by
 		_scanRows : null,
 		_ready 		: false,
+		// The row or the button that opened the form that is open: Back returns
+		// the focus to it (see Nino.adminUi.backTo())
+		_opener 	: null,
 
 		/**
 		 *	Load every image slot and render the list
@@ -101,14 +104,25 @@
 			Nino.adminUi.showError( container, status, response, '/_admin/common/error/load' );
 		},
 
+		/**
+		 *	Show the list or the form again as they stand: the focus stays where
+		 *	it is, unless it stood in the level that is hidden now (see
+		 *	Nino.adminUi.showLevel()). Back goes through the back link, and what
+		 *	a person opens takes the focus in
+		 *
+		 *	@return		void
+		 */
 		_showList : function() {
-			dc.getElementById('slots-list').classList.remove('admin-hidden');
-			dc.getElementById('slots-form').classList.add('admin-hidden');
+			Nino.adminUi.showLevel( 'slots-list', { focus : false } );
 		},
 
-		_showForm : function() {
-			dc.getElementById('slots-list').classList.add('admin-hidden');
-			dc.getElementById('slots-form').classList.remove('admin-hidden');
+		/**
+		 *	@param		{boolean}	[opened]	The person opened it: the focus goes into the form
+		 *
+		 *	@return		void
+		 */
+		_showForm : function( opened ) {
+			Nino.adminUi.showLevel( 'slots-form', opened === true ? {} : { focus : false } );
 		},
 
 		/**
@@ -128,11 +142,14 @@
 			ul.className = 'nino-admin-list';
 			Nino.admin.slots._slots.forEach( function( slot ) {
 				const li 		= dc.createElement('li');
-				const link	= dc.createElement('a');
-				link.href = '#';
-				link.textContent = slot.label+ ' ('+ slot.uri+ ', '+ slot.width+ '×'+ slot.height+ ( slot.hasImage ? '' : ', '+ Nino.content.getText('/_admin/slots/label/noimage') )+ Nino.admin.slots._usageLabel( slot )+ ')';
-				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.slots._openForm( slot ) } );
-				li.appendChild( link );
+
+				// It opens a form and no address is written: a button, not a link to nowhere
+				const edit	= dc.createElement('button');
+				edit.type = 'button';
+				edit.className = 'nino-admin-list-link';
+				edit.textContent = slot.label+ ' ('+ slot.uri+ ', '+ slot.width+ '×'+ slot.height+ ( slot.hasImage ? '' : ', '+ Nino.content.getText('/_admin/slots/label/noimage') )+ Nino.admin.slots._usageLabel( slot )+ ')';
+				edit.addEventListener( 'click', function() { Nino.admin.slots._openForm( slot, edit ) } );
+				li.appendChild( edit );
 				ul.appendChild( li );
 			} );
 			if( Nino.admin.slots._slots.length > 0 )
@@ -142,13 +159,13 @@
 			addBtn.type = 'button';
 			addBtn.className = 'nino-admin-btn-primary';
 			addBtn.textContent = Nino.content.getText('/_admin/slots/label/new');
-			addBtn.addEventListener( 'click', function() { Nino.admin.slots._openForm( null ) } );
+			addBtn.addEventListener( 'click', function() { Nino.admin.slots._openForm( null, addBtn ) } );
 
 			const scanBtn = dc.createElement('button');
 			scanBtn.type = 'button';
 			scanBtn.className = 'nino-admin-btn-secondary';
 			scanBtn.textContent = Nino.content.getText('/_admin/slots/label/scan');
-			scanBtn.addEventListener( 'click', function() { Nino.admin.slots._openScanForm() } );
+			scanBtn.addEventListener( 'click', function() { Nino.admin.slots._openScanForm( scanBtn ) } );
 			wrap.appendChild( Nino.adminUi.listActions( [ scanBtn, addBtn ] ) );
 		},
 
@@ -179,16 +196,18 @@
 		/**
 		 *	Open the editor for an existing slot, or a blank one for a new slot
 		 *
-		 *	@param		{Object|null}	slot		{ uri, label, width, height, hasImage }, or null to create new
+		 *	@param		{Object|null}	slot			{ uri, label, width, height, hasImage }, or null to create new
+		 *	@param		{Element}			[opener]	The row or the button that was pressed: Back returns the focus to it
 		 *
 		 *	@return		void
 		 */
-		_openForm : function( slot ) {
+		_openForm : function( slot, opener ) {
 
 			Nino.admin.slots._isNew 			= slot === null;
 			Nino.admin.slots._currentUri = slot ? slot.uri : null;
+			Nino.admin.slots._opener 		= opener ?? null;
 			Nino.admin.slots._renderForm( slot ?? {} );
-			Nino.admin.slots._showForm();
+			Nino.admin.slots._showForm( true );
 		},
 
 		/**
@@ -208,7 +227,7 @@
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/common/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.slots._showList() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.adminUi.backTo( 'slots-list', Nino.admin.slots._opener ) } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const form = dc.createElement('form');
@@ -401,9 +420,13 @@
 		 *	any slot - and slots a template names that nobody has made" scan
 		 *	results form - see Slots::apiScan()
 		 *
+		 *	@param		{Element}		[opener]	The button that was pressed: Back returns the focus to it
+		 *
 		 *	@return		void
 		 */
-		_openScanForm : function() {
+		_openScanForm : function( opener ) {
+
+			Nino.admin.slots._opener = opener ?? null;
 
 			const wrap = dc.getElementById('slots-form');
 			wrap.innerHTML = '';
@@ -412,7 +435,7 @@
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/common/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.slots._showList() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.adminUi.backTo( 'slots-list', Nino.admin.slots._opener ) } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const title = dc.createElement('div');
@@ -427,7 +450,7 @@
 
 			Nino.admin.slots._scanRows = null;
 			Nino.admin.slots._snapshot();
-			Nino.admin.slots._showForm();
+			Nino.admin.slots._showForm( true );
 
 			Nino.admin.slots._apiCall( 'scan', {}, function( status, response ) {
 				if( status !== 200 || response === null ) {
@@ -457,14 +480,21 @@
 		_renderScanForm : function( missing ) {
 
 			const wrap = dc.getElementById('slots-form');
+
+			// The form that stood while the scan ran had the focus, on its back link:
+			// the one that replaces it takes it over
+			const held = ( dc.activeElement ?? null ) !== null && dc.activeElement.closest('#slots-form') !== null;
 			wrap.innerHTML = '';
 
 			const backLink = dc.createElement('a');
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/common/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.slots._showList() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.adminUi.backTo( 'slots-list', Nino.admin.slots._opener ) } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
+
+			if( held === true )
+				backLink.focus();
 
 			const title = dc.createElement('div');
 			title.className = 'main-title';

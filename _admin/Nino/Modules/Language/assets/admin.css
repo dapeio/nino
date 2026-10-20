@@ -46,13 +46,14 @@
 	margin-bottom: .9rem;
 }
 
+/* The pill's blue on its own tint is 3.97:1 - the darker step of the blue reads on it */
 #admin-page-wrap .admin-translations-intro > span {
 	display: inline-flex;
 	margin-bottom: .55rem;
 	padding: .25rem .55rem;
 	border-radius: 999px;
 	background: var(--editor-blue-soft);
-	color: var(--editor-blue);
+	color: var(--editor-blue-hover);
 	font-size: .68rem;
 	font-weight: 750;
 	letter-spacing: .065em;
@@ -92,7 +93,7 @@
 	height: 1.85rem;
 	border-radius: var(--editor-radius-sm);
 	background: var(--editor-blue);
-	color: #fff;
+	color: var(--nino-admin-active-text);
 	font-size: .78rem;
 	font-weight: 800;
 }

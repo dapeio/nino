@@ -1,6 +1,7 @@
 [template /_admin/templates/html-header]
 		[csrf]
 		<div id="admin-page-wrap" class="nino-admin nino-admin-shell nino-admin-shell--rail" data-dir="[[/nino/dir]]" data-public="[[/nino/public]]" data-upload-bytes="[[/_admin/upload/bytes]]" data-upload-pixels="[[/_admin/upload/pixels]]">
+			<a class="nino-admin-skip" href="#admin-content-wrap">[[/_admin/label/skip]]</a>
 			<aside id="admin-bar-wrap" class="nino-admin-rail" aria-label="[[/_admin/label/rail]]">
 				<!-- Brand and account sit on one row on a phone and stack in the
 				     sidebar on a desktop. The fold button only exists on the
@@ -17,7 +18,7 @@
 						<span id="admin-user-email">[[/nino/auth/user]]</span>
 						<button type="button" id="admin-user-logout" class="nino-admin-linkbutton nino-admin-rail-danger">[[/_admin/user/logout]]</button>
 						<div id="admin-nav-ui">
-							<button type="button" id="admin-nav-ui-toggle" aria-haspopup="true" aria-expanded="false" aria-label="[[/_admin/user/settings]]"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings-icon lucide-settings"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg></button>
+							<button type="button" id="admin-nav-ui-toggle" aria-expanded="false" aria-label="[[/_admin/user/settings]]"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings-icon lucide-settings"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg></button>
 							<div id="admin-nav-ui-menu" class="admin-hidden">
 								<button type="button" id="admin-theme-toggle" aria-label="[[/_admin/user/theme]]">
 									<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="admin-theme-toggle-system lucide lucide-sun-moon-icon lucide-sun-moon"><path d="M12 2v2"/><path d="M14.837 16.385a6 6 0 1 1-7.223-7.222c.624-.147.97.66.715 1.248a4 4 0 0 0 5.26 5.259c.589-.255 1.396.09 1.248.715"/><path d="M16 12a4 4 0 0 0-4-4"/><path d="m19 5-1.256 1.256"/><path d="M20 12h2"/></svg>

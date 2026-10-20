@@ -193,7 +193,7 @@
 }
 
 #admin-page-wrap .admin-type-danger > legend {
-	color: var(--editor-red);
+	color: var(--editor-red-ink);
 }
 
 #admin-page-wrap .admin-type-danger-row {

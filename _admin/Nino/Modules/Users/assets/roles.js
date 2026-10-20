@@ -36,6 +36,9 @@
 		_scopes				: [],
 		// The role on the form, null while a new one is being made
 		_current			: null,
+		// The button that opened the new-role form that is open: Back returns the
+		// focus to it (a role's own row is found again, see _rowOf())
+		_opener				: null,
 		// The controls the form's save reads, as _renderForm() made them
 		_parts				: null,
 		_loading			: false,
@@ -178,20 +181,56 @@
 		},
 
 		/**
-		 *	Drill-down navigation: list -> form
+		 *	Drill-down navigation: list -> form. The focus stays where it is,
+		 *	unless it stood in the level that is hidden now (see
+		 *	Nino.adminUi.showLevel()): the level is shown again as it stands, by
+		 *	the address or after a delete. Back goes to the row, and what a person
+		 *	opens takes the focus in
+		 *
+		 *	@param		{Element|null}	[opener]	Back: the control that opened the form that is left; null where there is none to name
 		 *
 		 *	@return		void
 		 */
-		_showList : function() {
-			dc.getElementById('roles-list').classList.remove('admin-hidden');
-			dc.getElementById('roles-form').classList.add('admin-hidden');
+		_showList : function( opener ) {
 			Nino.admin.router.set( 'roles', [] );
+
+			if( opener === undefined )
+				Nino.adminUi.showLevel( 'roles-list', { focus : false } );
+			else
+				Nino.adminUi.backTo( 'roles-list', opener );
 		},
 
-		_showForm : function() {
-			dc.getElementById('roles-list').classList.add('admin-hidden');
-			dc.getElementById('roles-form').classList.remove('admin-hidden');
+		/**
+		 *	@param		{boolean}	[opened]	The person opened it: the focus goes into the form
+		 *
+		 *	@return		void
+		 */
+		_showForm : function( opened ) {
 			Nino.admin.router.set( 'roles', [ Nino.admin.roles._current === null ? 'new' : Nino.admin.roles._current.id ] );
+			Nino.adminUi.showLevel( 'roles-form', opened === true ? {} : { focus : false } );
+		},
+
+		/**
+		 *	The row of a role as the list is drawn now: the list is drawn again
+		 *	behind an open form after a save, and the row that was pressed is gone
+		 *	with the old drawing
+		 *
+		 *	@param		{string}	id
+		 *
+		 *	@return		{Element|null}
+		 */
+		_rowOf : function( id ) {
+			return Array.from( dc.getElementById('roles-list').querySelectorAll('a') ).find( function( link ) { return link.dataset.role === id } ) ?? null;
+		},
+
+		/**
+		 *	The control Back returns the focus to from the form that is open: the
+		 *	row of the role, or the button that opened the new-role form
+		 *
+		 *	@return		{Element|null}
+		 */
+		_backTarget : function() {
+			return Nino.admin.roles._current === null ? Nino.admin.roles._opener : Nino.admin.roles._rowOf( Nino.admin.roles._current.id );
 		},
 
 		/**
@@ -212,8 +251,11 @@
 			ul.className = 'nino-admin-list';
 			Nino.admin.roles._roles.forEach( function( role ) {
 				const li 		= dc.createElement('li');
+
+				// A row opens a role and writes its address: a link, with that address
 				const link	= dc.createElement('a');
-				link.href = '#';
+				link.href = Nino.admin.router.href( 'roles', [ role.id ] );
+				link.dataset.role = role.id;
 
 				const copy = dc.createElement('span');
 				copy.className = 'nino-admin-list-copy';
@@ -226,7 +268,7 @@
 				copy.appendChild( descr );
 				link.appendChild( copy );
 
-				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'roles', [ role.id ] ); Nino.admin.roles._openRole( role.id ) } );
+				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'roles', [ role.id ] ); Nino.admin.roles._openRole( role.id, true ) } );
 				li.appendChild( link );
 				ul.appendChild( li );
 			} );
@@ -237,7 +279,7 @@
 			add.type = 'button';
 			add.className = 'nino-admin-btn-primary';
 			add.textContent = Nino.content.getText('/_admin/roles/label/new');
-			add.addEventListener( 'click', function() { Nino.admin.router.go( 'roles', [ 'new' ] ); Nino.admin.roles._openRole( null ) } );
+			add.addEventListener( 'click', function() { Nino.admin.router.go( 'roles', [ 'new' ] ); Nino.admin.roles._opener = add; Nino.admin.roles._openRole( null, true ) } );
 			wrap.appendChild( Nino.adminUi.listActions( [ add ] ) );
 		},
 
@@ -245,14 +287,15 @@
 		 *	Open one role's form, or an empty one
 		 *
 		 *	@param		{string|null}	id
+		 *	@param		{boolean}			[opened]	The person opened it - a row, the New button, or the role that was just saved: the focus goes into the form. Otherwise it is shown as it stands, by the address or after a step through the history
 		 *
 		 *	@return		void
 		 */
-		_openRole : function( id ) {
+		_openRole : function( id, opened ) {
 
 			Nino.admin.roles._current = id === null ? null : ( Nino.admin.roles._roles.find( function( r ) { return r.id === id } ) ?? null );
 			Nino.admin.roles._renderForm();
-			Nino.admin.roles._showForm();
+			Nino.admin.roles._showForm( opened === true );
 		},
 
 		/**
@@ -271,7 +314,7 @@
 			backLink.href = '#';
 			backLink.className = 'nino-admin-back-link';
 			backLink.textContent = Nino.content.getText('/_admin/roles/label/back');
-			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'roles', [] ); Nino.admin.roles._showList() } );
+			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'roles', [] ); Nino.admin.roles._showList( Nino.admin.roles._backTarget() ) } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
 			const form = dc.createElement('form');
@@ -1012,7 +1055,7 @@
 					Nino.admin.roles._groups = listResponse.groups;
 					Nino.admin.roles._scopes = listResponse.scopes || [];
 					Nino.admin.roles._renderList();
-					Nino.admin.roles._openRole( response.id );
+					Nino.admin.roles._openRole( response.id, true );
 					dc.getElementById('roles-form-msg').textContent = Nino.content.getText('/_admin/roles/msg/saved');
 					report( true );
 				} );

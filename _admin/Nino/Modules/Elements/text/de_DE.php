@@ -46,7 +46,6 @@ return [
 	'[[/_admin/elements/error/save]]'			=> 'Speichern fehlgeschlagen.',
 	'[[/_admin/elements/error/load]]'			=> 'Laden fehlgeschlagen.',
 	'[[/_admin/elements/error/required]]'	=> 'Bitte fülle die markierten Pflichtfelder aus.',
-	'[[/_admin/elements/error/field-required]]'	=> 'Dieses Pflichtfeld ist leer.',
 	'[[/_admin/elements/error/json]]'	=> 'Kein gültiges JSON – erwartet wird eine Liste oder ein Objekt.',
 	'[[/_admin/elements/label/locale-open]]'	=> '%s – %d offen',
 	'[[/_admin/elements/confirm/delete]]'	=> 'Dieses Element wirklich löschen?',

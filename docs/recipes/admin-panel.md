@@ -552,11 +552,33 @@ dirty registry is looked up when it is needed, so the same panel runs on a page
 that has none, as the setup wizard is.
 
 The levels of the pane - `catalog-list`, `catalog-form` - are shown one at a
-time. `Nino.adminUi.levels( 'catalog', [ 'list', 'form' ] ).show( 'form' )` shows
-the one and hides the others with the shell's `admin-hidden` class (an id the
-page does not have is skipped), and `show( 'form', [ id ] )` writes the level
-into the address through the router as well. What goes with a level - a redraw,
-a refresh, a dropped working copy - stays with the panel. The url hash is the
+time, and the focus goes with them. `Nino.adminUi.showLevel( 'catalog-form' )`
+shows the level and hides its siblings - the other children of its parent whose
+ids begin alike - with the shell's `admin-hidden` class, and puts the focus into
+it: onto the element `{ focus : element }` names, else the first heading of the
+level, else its back link, else the name of the panel. A level the person did
+not just open - one the address names, one drawn when its answer arrives - is
+shown with `{ focus : false }`: the focus stays where it is, unless it stood in
+a level that is hidden now, and then it goes to the name of the panel, where
+the person started. `Nino.adminUi.backTo( 'catalog-list', opener )` shows the
+level a drill-down came from and gives the focus to `opener`, the row or the
+button that opened the level that is left, where that is still in the page. A
+list that is drawn again in the meantime has a new row for it, which the panel
+finds again - by a `data-*` of the row - and passes; so does a picker or a list
+that is drawn again behind a focus that stood in it, which hands the focus to
+the control of the same record. Without the two a drill-down hides the element
+that has the focus, the focus falls to the `body`, and the next Tab key starts
+again at the top of the page.
+
+A row of a list that opens a level and writes no address is a `button` of the
+class `nino-admin-list-link` in its `li` - the look of the link rows is done in
+the stylesheet. A row that does write one - the form of a user, of a text key -
+is a link whose `href` is `Nino.admin.router.href( panel, parts )`, with the click
+handler going through the router as before. An `href="#"` that only stands for
+a button is neither. `Nino.adminUi.levels( 'catalog', [ 'list', 'form' ] ).show( 'form' )`
+only shows and hides, and `show( 'form', [ id ] )` writes the level into the
+address through the router as well. What goes with a level - a redraw, a
+refresh, a dropped working copy - stays with the panel. The url hash is the
 panel's to deep-link into: `Nino.admin.router.set( 'catalog', [ id ] )` while
 the panel is on screen, `Nino.admin.router.current()` to read it back on load.
 
@@ -594,7 +616,8 @@ but preserve the API, DOM safety, and lifecycle shape:
 		render	: function( data ) {
 			Nino.admin.catalog._items = data.notes || [];
 			Nino.admin.catalog._renderList();
-			Nino.admin.catalog._levels.show( 'list' );
+			// Drawn when its answer arrives, not opened by the person: the focus stays
+			Nino.adminUi.showLevel( 'catalog-list', { focus : false } );
 		},
 	} );
 
@@ -602,8 +625,11 @@ but preserve the API, DOM safety, and lifecycle shape:
 
 		_items : [],
 
-		// The two levels of the pane: catalog-list and catalog-form
-		_levels : Nino.adminUi.levels( 'catalog', [ 'list', 'form' ] ),
+		// The row of a note as the list is drawn now - the list is drawn again
+		// after a save, and the row that was pressed is gone with the old drawing
+		_rowOf : function( id ) {
+			return Array.from( dc.getElementById('catalog-list').querySelectorAll('button') ).find( function( row ) { return row.dataset.id === id } ) ?? null;
+		},
 
 		_renderList : function() {
 
@@ -625,34 +651,37 @@ but preserve the API, DOM safety, and lifecycle shape:
 
 			Nino.admin.catalog._items.forEach( function( item ) {
 				const li = dc.createElement('li');
-				const link = dc.createElement('a');
+				// Opening a note writes no address: a button, which looks like a link row
+				const row = dc.createElement('button');
 				const title = dc.createElement('strong');
 				const meta = dc.createElement('small');
 
-				link.href = '#';
+				row.type = 'button';
+				row.className = 'nino-admin-list-link';
+				row.dataset.id = item.id;
 				title.textContent = item.title;
 				meta.textContent = item.id;
 
-				link.appendChild( title );
-				link.appendChild( meta );
-				link.addEventListener( 'click', function( event ) {
-					event.preventDefault();
+				row.appendChild( title );
+				row.appendChild( meta );
+				row.addEventListener( 'click', function() {
 					Nino.admin.catalog._renderForm( item );
 				} );
 
-				li.appendChild( link );
+				li.appendChild( row );
 				list.appendChild( li );
 			} );
 
 			wrap.appendChild( list );
 
 			const add = Nino.adminUi.button( Nino.content.getText('/_admin/catalog/label/new'), function() {
-				Nino.admin.catalog._renderForm( null );
+				Nino.admin.catalog._renderForm( null, add );
 			}, { className : 'nino-admin-btn-primary' } );
 			wrap.appendChild( Nino.adminUi.listActions( [ add ] ) );
 		},
 
-		_renderForm : function( item ) {
+		// opener: the button that opened the blank form, which Back returns to
+		_renderForm : function( item, opener ) {
 
 			const wrap = dc.getElementById('catalog-form');
 			wrap.innerHTML = '';
@@ -663,7 +692,9 @@ but preserve the API, DOM safety, and lifecycle shape:
 			back.textContent = Nino.content.getText('/_admin/catalog/label/back');
 			back.addEventListener( 'click', function( event ) {
 				event.preventDefault();
-				Nino.admin.catalog._levels.show( 'list' );
+				// To the row that was opened, as the list is drawn now - for a blank
+				// form to the button that opened it
+				Nino.adminUi.backTo( 'catalog-list', item === null ? opener : Nino.admin.catalog._rowOf( item.id ) );
 			} );
 			wrap.appendChild( Nino.admin.formToolbar( back ) );
 
@@ -745,7 +776,7 @@ but preserve the API, DOM safety, and lifecycle shape:
 						return a.id.localeCompare( b.id );
 					} );
 					Nino.admin.catalog._renderList();
-					Nino.admin.catalog._levels.show( 'list' );
+					Nino.adminUi.backTo( 'catalog-list', Nino.admin.catalog._rowOf( response.note.id ) );
 					done( true );
 				} );
 			};
@@ -756,8 +787,9 @@ but preserve the API, DOM safety, and lifecycle shape:
 			} );
 
 			wrap.appendChild( form );
-			Nino.admin.catalog._levels.show( 'form' );
-			title.focus();
+			// Opened by the person: the focus goes in, to the first field that takes it -
+			// the id of a new note, else the title (the id of a note is fixed)
+			Nino.adminUi.showLevel( 'catalog-form', { focus : item === null ? id : title } );
 		},
 	} );
 
@@ -967,7 +999,13 @@ A required field is marked the same way everywhere: the asterisk
 control, and after a refused save the sentence under it
 (`.nino-admin-field-error`, linked with `aria-describedby`) with the focus on
 the first one. The sentences are not alerts; the form's status line announces
-the refusal once.
+the refusal once. `Nino.adminUi.fieldError( wrapper, control, id, text )` draws
+a sentence - after a `label`, else at the end of the block that holds the field
+- and marks the control `aria-invalid` and `aria-describedby`;
+`Nino.adminUi.clearFieldErrors( root )` takes them off again. What a panel
+refuses before it sends anything goes into the line with `status.fail( text )`
+- an alert - and the sentences into the fields, in that order: the line says
+that something is wrong, the fields say what.
 
 ## Designing an admin frontend
 
@@ -1040,7 +1078,8 @@ Reach for an existing class first; only invent one when no role fits.
 | A short word as a pill beside a name - a state, a kind, a count | `.nino-admin-badge`; `data-state="ok"`, `"warn"`, `"error"` or `"muted"` colours it like the status line's saved, unsaved, failed and quiet text, and the word says it too |
 | Up, down and remove at the end of a row of an ordered list | `.nino-admin-move` around the square buttons (inside a `.nino-admin-list` row it keeps off the row's edge) |
 | Raised panel | `.nino-admin-card` (a `fieldset` is one already) |
-| Clickable drill-down list | `.nino-admin-list` (+ `.nino-admin-list-copy` per row) |
+| Clickable drill-down list | `.nino-admin-list` (+ `.nino-admin-list-copy` per row); a row that writes no address is a `button.nino-admin-list-link`, one that writes an address a link with the `href` of `Nino.admin.router.href()` |
+| The first stop of a page, a way past the rail to the pane | `.nino-admin-skip`, a link to the id of the pane; it waits above the screen until it has the focus. The shell's script makes the pane a target of the focus (`tabindex="-1"`) for the jump and takes that off as the focus leaves it - one that always had it would take the focus from a click on any text in it |
 | Many rows of the same record, with search/sort/paging | `Nino.adminUi.table()` — see below |
 | List of rows that are read, not opened | `.nino-admin-list-dense` |
 | List whose rows are `button`s | `.nino-admin-list-buttons` |
@@ -1107,7 +1146,13 @@ stops being the right tool — past that, use SQLite or MySQL.
 
 A column may carry `render(value, row)` returning an Element, for a cell that
 holds a link or a per-row action; sorting and searching still use the plain
-value, so behaviour never depends on how a cell is drawn.
+value, so behaviour never depends on how a cell is drawn. A column is sorted
+by the button its label is: one with no label - the column of a row's own
+buttons - has no sort button, nor has one that says `sortable: false`. With an
+`onRowClick` a row opens on a click and on Enter or Space; it is a stop of the
+Tab key of its own only where no control stands in it - a row that holds
+buttons or links is reached through them - and it carries the row key as
+`data-row`, which is how a panel finds it again after the table was drawn anew.
 
 The pure half (`Nino.adminUi.tableModel`) is filtering, sorting, paging and cell
 formatting as plain functions — extend and test there, not in the renderer.

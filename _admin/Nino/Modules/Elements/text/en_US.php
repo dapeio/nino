@@ -46,7 +46,6 @@ return [
 	'[[/_admin/elements/error/save]]'			=> 'Save failed.',
 	'[[/_admin/elements/error/load]]'			=> 'Failed to load.',
 	'[[/_admin/elements/error/required]]'	=> 'Please fill in the marked required fields.',
-	'[[/_admin/elements/error/field-required]]'	=> 'This required field is empty.',
 	'[[/_admin/elements/error/json]]'	=> 'Not valid JSON – a list or an object is expected.',
 	'[[/_admin/elements/label/locale-open]]'	=> '%s – %d open',
 	'[[/_admin/elements/confirm/delete]]'	=> 'Really delete this element?',
