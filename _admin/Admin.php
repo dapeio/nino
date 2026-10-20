@@ -1953,7 +1953,10 @@ namespace Nino\Admin {
 			if( $request['/nino/http/response']['statusCode'] !== 200 )
 				return;
 
-			$action = (string) ( $_POST['action'] ?? '' );
+			// A non-string action is no action, as in Admin::handlePost(): cast,
+			// 'action[]=x' is an "Array to string conversion" - fatal here, ie. a
+			// 500 for anybody who has fetched this page and its token
+			$action = is_string( $_POST['action'] ?? null ) === true ? $_POST['action'] : '';
 			$data 	= Admin::postData();
 
 			if( $action === 'recovery/login' ) {

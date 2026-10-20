@@ -4,10 +4,12 @@ declare(strict_types=1);
 /**
  *	Nino								A compact filesystembased php framework
  *	http-smoke.php			Dependency-free smoke test for \Nino\Http: the headers a response is
- *											composed with, the csp and the locale redirects, the shipped
- *											.htaccess and router.php, Modules\Navigation, and Modules\Cache -
- *											the full-page cache for an anonymous GET. Runs against an isolated
- *											sandbox directory, never touches the real project data.
+ *											composed with, the csp and the locale redirects, the query a request
+ *											is read with, the shipped .htaccess files and router.php - which is
+ *											run - and the nginx recipe of docs/deployment.md, Modules\Navigation,
+ *											and Modules\Cache - the full-page cache for an anonymous GET. Runs
+ *											against an isolated sandbox directory, never touches the real
+ *											project data.
  *
  *	Usage: php tests/http-smoke.php
  */
@@ -165,6 +167,16 @@ check( 'the response header is seeded with the default csp', str_contains( $seed
 	same answer has to come from here or it would depend on whether the
 	page happened to render a form	*/
 check( 'the response header carries an explicit no-store', ( $homeRequest['/nino/http/response']['header']['Cache-Control'] ?? '' ) === 'no-store' );
+
+/*	What a visit to another site tells that site, and what a page may ask a
+	visitor's device for. A current browser sends the origin alone across
+	origins by itself, an older one the whole address - query string and all,
+	and an address may carry a one-time token - so the policy is named rather
+	than left to the browser's default. Nothing a page of Nino does needs the
+	camera, the microphone or the location, so they are taken away from the
+	page and from every frame in it	*/
+check( 'the response header names a referrer policy: the origin alone leaves for another site', ( $homeRequest['/nino/http/response']['header']['Referrer-Policy'] ?? '' ) === 'strict-origin-when-cross-origin' );
+check( '...and a permissions policy that takes the camera, the microphone and the location away', ( $homeRequest['/nino/http/response']['header']['Permissions-Policy'] ?? '' ) === 'camera=(), microphone=(), geolocation=()' );
 
 // img-src '*' covers network schemes only, so a data: uri needs spelling out.
 /*	Every custom property Nino.css reads without a fallback is one it declares
@@ -656,6 +668,56 @@ check( 'the locale switch is one method taking the query key, so a project can a
 $queryParser = new ReflectionMethod( '\Nino\Http', '_getRequestQueryVarsPart' );
 $queryParser->setAccessible( true );
 check( 'a URL parse failure produces an empty query array', $queryParser->invoke( null, 'http://[' ) === [] );
+
+/*	The query is read with parse_str(), which has two limits of its own: max_input_vars
+	pairs, and keys nested no deeper than max_input_nesting_level. Past either it drops
+	what is over and raises an E_WARNING - the second only where display_errors is off,
+	which is where a site is live - and an engine warning is fatal here (see
+	Runtime::NON_FATAL_LEVELS). One request was therefore a 500 on every address: a
+	query of 1,001 variables, or a key with 65 brackets. Measured with php -S against
+	this kernel: 1,000 variables answered 200, 1,001 answered 500. The same two cuts
+	are made before php is asked, so what it reads is what it would have kept and
+	there is nothing left to warn about. The harness records a warning and carries
+	on where a request would have died, so what is read back here is the warnings	*/
+$varLimit = (int) ini_get( 'max_input_vars' );
+$varQuery = static fn( int $count ): string => implode( '&', array_map( static fn( int $i ): string => 'v'. $i. '=1', range( 1, $count ) ) );
+
+ninoWarnings();
+$manyRequest = ninoVisit( $appData, '/?'. $varQuery( $varLimit + 100 ) );
+\Nino\Http::response( $appData, $manyRequest );
+$manyQuery = $manyRequest['/nino/http/request']['query'];
+check( 'a query of more variables than max_input_vars is answered, with nothing raised', ninoWarnings() === [] && $manyRequest['/nino/http/response']['statusCode'] === 200 );
+check( '...the first of them are read and the rest are dropped', count( $manyQuery ) === $varLimit && ( $manyQuery['v'. $varLimit] ?? null ) === '1' && isset( $manyQuery['v'. ( $varLimit + 1 )] ) === false );
+
+ninoWarnings();
+$limitQuery = ninoVisit( $appData, '/?'. $varQuery( $varLimit ) )['/nino/http/request']['query'];
+check( '...and a query of exactly that many is read whole', count( $limitQuery ) === $varLimit && ninoWarnings() === [] );
+
+// The cut leaves an ordinary query exactly as parse_str() reads it: arrays,
+// empty values, an encoded key, a plus, a repeated key and an empty pair
+$ordinaryQuery = 'a=1&b[]=2&b[]=3&c=&d%5Be%5D=f+g&a=4&&h';
+parse_str( $ordinaryQuery, $ordinaryRead );
+check( 'a query within the limits is read as it always was', ninoVisit( $appData, '/?'. $ordinaryQuery )['/nino/http/request']['query'] === $ordinaryRead && count( $ordinaryRead ) === 5 );
+
+$depthLimit = (int) ini_get( 'max_input_nesting_level' );
+$nestedKey = static fn( int $depth ): string => 'n'. str_repeat( '[k]', $depth );
+// php names a key nested too deep only where nothing is displayed - the
+// setting a live site has, and the one the harness's php may not
+$displayErrors = ini_set( 'display_errors', '0' );
+
+ninoWarnings();
+$deepRequest = ninoVisit( $appData, '/?before=1&'. $nestedKey( $depthLimit + 1 ). '=1&after=2' );
+\Nino\Http::response( $appData, $deepRequest );
+$deepWarnings = ninoWarnings();
+check( 'a key nested deeper than max_input_nesting_level is answered, with nothing raised', $deepWarnings === [] && $deepRequest['/nino/http/response']['statusCode'] === 200 );
+check( '...it is dropped, as php drops it, and the rest of the query is read', $deepRequest['/nino/http/request']['query'] === [ 'before' => '1', 'after' => '2' ] );
+
+ninoWarnings();
+parse_str( $nestedKey( $depthLimit ). '=1', $deepestRead );
+$deepestQuery = ninoVisit( $appData, '/?'. $nestedKey( $depthLimit ). '=1' )['/nino/http/request']['query'];
+check( '...and one nested exactly that deep is read', $deepestQuery === $deepestRead && isset( $deepestQuery['n'] ) === true && ninoWarnings() === [] );
+ini_set( 'display_errors', (string) $displayErrors );
+
 check( 'requestRoute rejects an empty URI without entering its parent walk', \Nino\Http::requestRoute( $appData, '', 'GET' ) === null );
 check( 'requestRoute rejects a relative URI without entering its parent walk', \Nino\Http::requestRoute( $appData, 'relative/path', 'GET' ) === null );
 
@@ -1161,6 +1223,11 @@ $finalizeResponse->invokeArgs( null, [ &$htmlRequest ] );
 check( 'a string body passes through unencoded and untyped', $htmlRequest['/nino/http/response']['body'] === '<html>page</html>'
 	&& isset( $htmlRequest['/nino/http/response']['header']['Content-Type'] ) === false );
 
+// What a browser is sent is what is left after this stage: a response that
+// names no header of its own has the defaults put back
+check( 'a response that names no header of its own is sent with both policies', ( $htmlRequest['/nino/http/response']['header']['Referrer-Policy'] ?? '' ) === 'strict-origin-when-cross-origin'
+	&& ( $htmlRequest['/nino/http/response']['header']['Permissions-Policy'] ?? '' ) === 'camera=(), microphone=(), geolocation=()' );
+
 /*	The request header allowlist names request headers. Location, the
 	Content-Security-Policy and the other security headers are what Nino
 	sends, never what it reads - one a client sends is dropped like any other
@@ -1244,6 +1311,150 @@ foreach( \Nino\Filesystem::PRIVATE_DIRS as $private )
 	check( "a checkout ships no $private in the public root", file_exists( __DIR__. '/..'. $private ) === false );
 
 check( 'and no config.php either - the wizard writes the first one', is_file( __DIR__. '/../private/config.php' ) === false );
+
+echo "\n";
+
+
+// --- What no page loads is not delivered ---------------------------------
+
+echo "router.php, .htaccess and the nginx recipe - the tool folders, docs/, history/ and the root metadata\n";
+
+/*	The tool folders are public in part only. A page names the scripts and
+	stylesheets of the workbench and of the wizard, the workbench's icons and the
+	kernel's Nino.js by their urls, and nothing else of _nino/ or _admin/: every
+	other script and stylesheet is read off disk and bundled into a .cache/ (see
+	Admin::init()). Of the tool folders only the wizard's library was refused,
+	though. A template - the workbench's login, a mail body, the maintenance page -,
+	a text file and a manual were delivered as they stand to whoever asked, with the
+	checkout's history and metadata beside them; a .php file runs and shows nothing,
+	which is all that kept the classes from being as open. Each tree is denied the
+	way app/ and features/ are: a .htaccess of its own for Apache, a rule of
+	router.php for php's development server, a location of the nginx recipe for the
+	rest.
+
+	router.php is php, so it is run: a copy of it, in a directory that holds one
+	empty file for every address asked - which is all it looks at -, answers for
+	every file of the real trees. What no page loads is refused, what a page loads
+	is handed back to the server, and the entry points reach their scripts. A
+	second copy, in a directory that has no docs/ and no history/, answers for a
+	project that has deleted them to have pages of its own at those addresses	*/
+$checkout			= dirname( __DIR__ );
+$hiddenTrees	= [ '_nino/Nino', '_admin/templates', '_admin/text', '_admin/Nino', '_admin/install', 'docs', 'history' ];
+
+// Every file of those trees, under the address a browser would ask for it - but
+// for the wizard's assets, which the page of the wizard names - and the
+// checkout's metadata at its root
+$hidden = [];
+foreach( $hiddenTrees as $tree )
+	foreach( new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $checkout. '/'. $tree, FilesystemIterator::SKIP_DOTS ) ) as $file )
+		if( str_starts_with( $file->getPathname(), $checkout. '/_admin/install/assets/' ) === false )
+			$hidden[] = substr( $file->getPathname(), strlen( $checkout ) );
+foreach( array_merge( glob( $checkout. '/*.md' ) ?: [], glob( $checkout. '/*.neon' ) ?: [], glob( $checkout. '/*.mjs' ) ?: [] ) as $file )
+	$hidden[] = '/'. basename( $file );
+
+// What the pages of the workbench, the wizard and the recovery page name: the
+// files they link and the bundles they ask the [assets] shortcode for
+$served = [ '/_nino/Nino.css', '/_nino/Nino.js', '/_nino/Nino.ui.js' ];
+foreach( array_merge( glob( $checkout. '/_admin/templates/*.tpl' ) ?: [], glob( $checkout. '/_admin/install/templates/*.tpl' ) ?: [] ) as $template ) {
+	$source = (string) file_get_contents( $template );
+	preg_match_all( '~(?:src|href)="\[\[/nino/dir\]\](/[^"]*[^/"])"~', $source, $linked );
+	preg_match_all( '~\[assets (/[^\]\s]+)\]~', $source, $bundled );
+	$served = array_merge( $served, $linked[1], $bundled[1] );
+}
+$served = array_values( array_unique( $served ) );
+
+$routerRoot = $sandbox. '/router-root';
+mkdir( $routerRoot. '/_admin', 0777, true );
+copy( $checkout. '/router.php', $routerRoot. '/router.php' );
+file_put_contents( $routerRoot. '/index.php', '<?php echo "front controller";' );
+file_put_contents( $routerRoot. '/_admin/index.php', '<?php echo "workbench";' );
+foreach( array_merge( $hidden, $served, [ '/_admin/recovery.php' ] ) as $url ) {
+	is_dir( dirname( $routerRoot. $url ) ) === true || mkdir( dirname( $routerRoot. $url ), 0777, true );
+	touch( $routerRoot. $url );
+}
+
+// The same router in a directory that has neither docs/ nor history/
+$bareRoot = $sandbox. '/router-bare';
+mkdir( $bareRoot );
+copy( $checkout. '/router.php', $bareRoot. '/router.php' );
+file_put_contents( $bareRoot. '/index.php', '<?php echo "front controller";' );
+
+// More addresses than the files of those lists: the entry points, the root
+// address that only looks like metadata, spellings of an address that the router
+// has to read as the server does - a percent-encoded letter, and a doubled slash,
+// which Apache, nginx and php -S all take for one - and the addresses below the
+// two directories a project may delete
+$asked = array_merge( $hidden, $served, [ '/', '/_admin', '/_admin/', '/_admin/recovery.php', '/gibt-es-nicht.md', '/_admin/%74emplates/page-login.tpl', '/_admin//templates/page-login.tpl', '/_nino//Nino/Http/Http.php', '/_admin//install/library/base/manifest.php', '/_admin//assets/style.css', '/docs', '/docs/intro', '/history' ] );
+$askedBare = [ '/docs', '/docs/intro', '/history', '/history/1990' ];
+$routerDriver = $sandbox. '/router-driver.php';
+file_put_contents( $routerDriver, '<?php
+declare(strict_types=1);
+// The router is a script of its own for php -S: in a function, its variables are not this one\'s
+function route( string $root, string $uri ): array {
+	chdir( $root );
+	$_SERVER["REQUEST_URI"] = $uri;
+	http_response_code( 200 );
+	ob_start();
+	$handled = require $root. "/router.php";
+	return [ $handled, http_response_code(), ob_get_clean() ];
+}
+$answers = [];
+ob_start();
+foreach( '. var_export( [ $routerRoot => $asked, $bareRoot => $askedBare ], true ). ' as $root => $uris )
+	foreach( $uris as $uri )
+		$answers[$root][$uri] = route( $root, $uri );
+ob_end_clean();
+echo json_encode( $answers );
+' );
+$answers = json_decode( (string) shell_exec( escapeshellarg( PHP_BINARY ). ' '. escapeshellarg( $routerDriver ). ' 2>&1' ), true ) ?? [];
+
+// What the router did with an address: handed the file back to the server,
+// refused it, or ran a script - the one that printed what it says it is
+$routed = static function( string $uri, ?string $root = null ) use ( $answers, $routerRoot ): string {
+	[ $handled, $status, $output ] = $answers[$root ?? $routerRoot][$uri] ?? [ null, 0, '' ];
+	return $handled === false ? 'file' : ( $status === 404 ? 'refused' : (string) $output );
+};
+
+$leaking = array_values( array_filter( $hidden, static fn( string $uri ): bool => $routed( $uri ) !== 'refused' ) );
+check( 'router.php refuses every file of the trees no page loads'. ( $leaking === [] ? '' : ' - '. implode( ', ', array_slice( $leaking, 0, 4 ) ) ), $leaking === [] && $hidden !== [] );
+check( '...in each of them, and the checkout\'s metadata at the root', array_filter( $hiddenTrees, static fn( string $tree ): bool => array_filter( $hidden, static fn( string $uri ): bool => str_starts_with( $uri, '/'. $tree. '/' ) ) === [] ) === []
+	&& in_array( '/README.md', $hidden, true ) === true && in_array( '/phpstan.neon', $hidden, true ) === true && in_array( '/eslint.config.mjs', $hidden, true ) === true );
+check( '...also under a spelling the browser may send, since the address is decoded before it is judged', $routed( '/_admin/%74emplates/page-login.tpl' ) === 'refused' );
+check( '...and with a doubled slash, which the server that serves the file, Apache and nginx all read as one', $routed( '/_admin//templates/page-login.tpl' ) === 'refused'
+	&& $routed( '/_nino//Nino/Http/Http.php' ) === 'refused' && $routed( '/_admin//install/library/base/manifest.php' ) === 'refused' );
+check( 'docs/ and history/ are refused for as long as the directories are there, whatever is asked below them', $routed( '/docs' ) === 'refused' && $routed( '/docs/intro' ) === 'refused' && $routed( '/history' ) === 'refused' );
+check( '...and where a project has deleted them to have pages of its own, those addresses are routes again', array_filter( $askedBare, static fn( string $uri ): bool => $routed( $uri, $bareRoot ) !== 'front controller' ) === [] );
+
+$unserved = array_values( array_filter( $served, static fn( string $uri ): bool => $routed( $uri ) !== 'file' ) );
+check( 'every file a page of the workbench, the wizard and the recovery page names is still handed to the server'. ( $unserved === [] ? '' : ' - '. implode( ', ', array_slice( $unserved, 0, 4 ) ) ), $unserved === []
+	&& in_array( '/_admin/install/assets/script.js', $served, true ) === true && in_array( '/_admin/.cache/script.js', $served, true ) === true && in_array( '/_admin/assets/recovery.js', $served, true ) === true );
+check( '...and the entry points still reach their scripts', $routed( '/' ) === 'front controller' && $routed( '/_admin' ) === 'workbench' && $routed( '/_admin/' ) === 'workbench' && $routed( '/_admin/recovery.php' ) === 'file' );
+check( '...and a file a page loads is still handed to the server with a doubled slash in its address', $routed( '/_admin//assets/style.css' ) === 'file' );
+
+// The root metadata is refused where it is a file. An address that only looks
+// like one is a route, as a dot uri that is no file is (see above)
+check( 'a root address that ends in .md and is no file is a route like any other', $routed( '/gibt-es-nicht.md' ) === 'front controller' );
+
+// Apache and nginx each have their own copy of the same list
+$unguarded = [];
+foreach( $hiddenTrees as $tree )
+	if( str_contains( (string) @file_get_contents( $checkout. '/'. $tree. '/.htaccess' ), 'Require all denied' ) === false )
+		$unguarded[] = $tree;
+check( 'Apache denies every one of the trees from a .htaccess of its own'. ( $unguarded === [] ? '' : ' - missing: '. implode( ', ', $unguarded ) ), $unguarded === [] );
+check( '...but for the wizard\'s assets, which that file hands back to the page that loads them', str_contains( (string) @file_get_contents( $checkout. '/_admin/install/assets/.htaccess' ), 'Require all granted' ) === true );
+
+$metadataRule = strpos( $htaccess, 'RewriteRule ^[^/]+\.(md|neon|mjs)$ - [F]' );
+check( '...and the root .htaccess refuses the metadata at the root where it is a file', $metadataRule !== false
+	&& str_ends_with( rtrim( substr( $htaccess, 0, $metadataRule ) ), 'RewriteCond %{REQUEST_FILENAME} -f' ) === true );
+
+$recipe		= (string) file_get_contents( $checkout. '/docs/deployment.md' );
+$unlisted	= [];
+foreach( array_merge( [ 'private', 'app', 'features', 'tests', '_admin/install/library' ], $hiddenTrees ) as $tree )
+	if( preg_match( '#location \^~ /'. preg_quote( $tree, '#' ). '/\s+\{ deny all; return 404; \}#', $recipe ) !== 1 )
+		$unlisted[] = $tree;
+check( 'the nginx recipe denies each of them, and the ones above, with a location of its own'. ( $unlisted === [] ? '' : ' - missing: '. implode( ', ', $unlisted ) ), $unlisted === [] );
+check( '...hands the wizard\'s assets back and refuses the metadata at the root where it is a file', preg_match( '#location \^~ /_admin/install/assets/\s+\{ try_files \$uri =404; \}#', $recipe ) === 1
+	&& str_contains( $recipe, 'location ~ ^/[^/]+\.(?:md|neon|mjs)$ {'. "\n\tif ( -e \$request_filename ) { return 404; }" ) === true );
 
 echo "\n";
 

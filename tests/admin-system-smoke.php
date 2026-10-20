@@ -5,12 +5,13 @@ declare(strict_types=1);
  *	Nino								A compact filesystembased php framework
  *	admin-system-smoke.php	Dependency-free smoke test for the system panels of the workbench
  *											(_admin/Admin.php): the recovery page - its secret, the account gate, a
- *											restore without the Backups module, the accounts it can make -, Backups
- *											and Restore, Config and the Lockout tab, Language, the Recovery password,
- *											Maintenance, Users and Roles. The Restore checks count the temporary
- *											files a restore leaves in the system's temp directory, so run this suite
- *											alone: any other that makes a backup writes there as well. Runs against
- *											an isolated sandbox directory, never touches the real project data.
+ *											restore without the Backups module, the accounts it can make, an action
+ *											that is no string -, Backups and Restore, Config and the Lockout tab,
+ *											Language, the Recovery password, Maintenance, Users and Roles. The
+ *											Restore checks count the temporary files a restore leaves in the
+ *											system's temp directory, so run this suite alone: any other that makes
+ *											a backup writes there as well. Runs against an isolated sandbox
+ *											directory, never touches the real project data.
  *
  *	Usage: php tests/admin-system-smoke.php
  */
@@ -1166,6 +1167,24 @@ $accountsAfter = array_keys( $appData['/nino/auth/user'] );
 check( 'with the session flag unset, reset is 401', $status === 401 && password_verify( 'a second password', $appData['/nino/auth/user']['resetme@example.com']['pw'] ) === true );
 [ $status ] = $recoveryCall( 'recovery/create', [ 'mail' => 'unlocked@example.com', 'pw' => 'yet another password', 'confirm' => true ], false );
 check( '...and so is create', $status === 401 && array_keys( $appData['/nino/auth/user'] ) === $accountsAfter );
+
+/*	Nothing says a request carries strings, and this is the door that is open when
+	nothing else is: its action was cast to a string, and 'action[]=x' is an "Array to
+	string conversion" - a level the runtime treats as fatal, so a 500 for anybody who
+	has fetched the page and its token. The workbench and the wizard read the action as
+	a string or as none, and so does this page now: a posted array is no action. The
+	harness records the warning and carries on where a request would have died, so the
+	warnings are what is read back	*/
+ninoWarnings();
+$_POST['action'] = [ 'recovery/list' ];
+\Nino\Runtime::setSessionValue( $appData, \Nino\Admin\Recovery::SESSION_KEY, true );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Recovery::class, 'handlePost' ] );
+check( 'an array-shaped action is an unknown action to a recovery session that is open, not a 500', $status === 404 && ( $body['error'] ?? '' ) === 'unknown action' );
+\Nino\Runtime::unsetSessionValue( $appData, \Nino\Admin\Recovery::SESSION_KEY );
+[ $status ] = ninoCall( $appData, [ \Nino\Admin\Recovery::class, 'handlePost' ] );
+check( '...and to one that has not passed the secret, which is turned away like any other action', $status === 401 );
+unset( $_POST['action'] );
+check( '...with no "Array to string conversion" raised on the way', array_filter( ninoWarnings(), static fn( string $message ): bool => str_contains( $message, 'Array to string conversion' ) ) === [] );
 
 \Nino\Runtime::unsetSessionValue( $appData, \Nino\Admin\Recovery::SESSION_KEY );
 \Nino\Auth::deleteUser( $appData, 'resetme@example.com' );

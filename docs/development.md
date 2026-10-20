@@ -126,7 +126,7 @@ Html::addFills( $appData, [ /* values that depend on the request */ ], '*' );
 Html::response( $appData, $request );
 ```
 
-`Http::request()` does not read directly into arbitrary project variables but normalizes method, URI, query, header, body, basic auth data, and client IP under `/nino/http/request`. Simultaneously, a response is created with an empty body, status `200`, and the preset security headers.
+`Http::request()` does not read directly into arbitrary project variables but normalizes method, URI, query, header, body, basic auth data, and client IP under `/nino/http/request`. The query is read as PHP reads one, within PHP's own limits: the first `max_input_vars` pairs, and no key nested deeper than `max_input_nesting_level`. A query with more is cut to that, not refused - PHP's warning for it is fatal here, and one request with a long enough query would otherwise be a `500` on every address. Simultaneously, a response is created with an empty body, status `200`, and the preset security headers.
 
 The runtime textfills are added in two passes, and the split matters. `/nino/dir`, `/nino/public`, and `/nino/date/year` answer to `$appData` alone, so they are registered **before** `Http::response()`: a response callback that renders a template is a real caller — `Modules\Form` and `Modules\Newsletter` build their HTML mails in exactly that window, and a fill registered after it would reach them as the literal `[[/nino/public]]`.
 
@@ -755,6 +755,8 @@ Each response starts with central security headers, including:
 - `Content-Security-Policy`,
 - `X-Frame-Options: SAMEORIGIN`,
 - `X-Content-Type-Options: nosniff`,
+- `Referrer-Policy: strict-origin-when-cross-origin`,
+- `Permissions-Policy: camera=(), microphone=(), geolocation=()`,
 - `Cache-Control: no-store`.
 
 The last one is Nino's own answer to whether a response may be stored. PHP used to give it, as a side effect of the session that was started on every request; now that a request without session state starts none, the header is declared in `\Nino\Http` instead - a project that wants its public pages cached by browsers and proxies changes that one value, and accepts that a visitor sees a page one render behind an edit for as long as it says.

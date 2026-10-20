@@ -1,0 +1,6 @@
+# The manuals are for whoever works on the project, read on GitHub or in an
+# editor: markdown, which no page of the site links or loads. Nothing in here
+# is ever requested by a browser.
+Require all denied
+
+Options -Indexes

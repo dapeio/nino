@@ -1,0 +1,6 @@
+# The workbench's page templates - the shell, the login, the recovery page -
+# are read by php and rendered. Nothing in here is ever requested by a
+# browser, and a template is no php: it would be delivered as it stands.
+Require all denied
+
+Options -Indexes

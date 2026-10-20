@@ -1,0 +1,6 @@
+# The workbench's own words, one file per language. They are read by php (see
+# \Nino\Admin\Admin::textFills()) and published to the page that needs them.
+# Nothing in here is ever requested by a browser.
+Require all denied
+
+Options -Indexes

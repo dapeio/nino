@@ -1,0 +1,4 @@
+# The scripts and the stylesheet of the setup wizard's page, which names each
+# of them (see ../templates/page-wizard.tpl): the one part of _admin/install/
+# a browser loads. The rest of it is denied by the .htaccess above.
+Require all granted

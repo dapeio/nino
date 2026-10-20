@@ -1,0 +1,8 @@
+# The workbench's screens - one directory per panel, with its classes, its
+# scripts, its stylesheet and its words. Nothing in here is ever requested by a
+# browser: the scripts and stylesheets of every panel are read off disk and
+# bundled into _admin/.cache/ (see \Nino\Admin\Admin::init()), and the page
+# loads the bundle.
+Require all denied
+
+Options -Indexes

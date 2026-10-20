@@ -33,6 +33,7 @@ The included `.htaccess` sets these baseline rules, provided the server allows `
 
 - Requests that resolve to neither a file nor a directory are forwarded to `index.php`, and `DirectoryIndex index.php` is what answers `/` and `/_admin/`. Without the first, every address but the homepage is the server's own 404; without the second, `/` finds no index file on a host whose PHP configuration does not add one to Apache's list, falls through to the directory listing, and is refused by the rule below. `DirectoryIndex` needs `AllowOverride Indexes`, one class more than the rest of the file - a server that grants the others but not that one answers every request with a 500, so remove that line there and set the directive in the vhost.
 - Files with a leading dot are not delivered directly.
+- What no page loads is not delivered either: the kernel's classes with their templates and texts (`_nino/Nino/`), the workbench's templates, texts and panels (`_admin/templates/`, `_admin/text/`, `_admin/Nino/`), the setup wizard but for its `assets/` (`_admin/install/`), and the checkout's `docs/` and `history/` each carry a `.htaccess` that denies them, as `app/`, `features/` and `tests/` do; the checkout's `*.md`, `*.neon` and `*.mjs` at the root are refused by a rule of the root file, where they are files. What stays delivered of the tool folders is their public part: `_nino/Nino.css`, `Nino.js` and `Nino.ui.js`, `_admin/assets/`, `_admin/.cache/` and `_admin/install/assets/`.
 - Directories without an index file do not show a file list.
 - The HTTP `Authorization` header reaches PHP so that the `/_admin` login can read its Basic credentials. Apache normally hides this header from CGI/FastCGI scripts. Two rules cover that, and the file ships both: `CGIPassAuth On`, and - for where that is not enough - a `RewriteRule` that copies the header into an environment variable. The directive needs Apache 2.4.13 or newer; an older one answers every request with a 500 because it does not know it, so remove that one line there and rely on the rewrite.
 - `SetEnv NINO_HTACCESS 1`. A `1` in `$_SERVER` proves the file is applied. Its absence proves nothing: some FastCGI setups and PHP wrappers never pass `SetEnv` through to the script, and leave the variable empty while every rule above is in force. The probe below settles that direction from outside.
@@ -139,6 +140,9 @@ Transfer the same behavior explicitly to the server configuration:
 - **deny `private/` entirely** — it is never requested by a browser, only read by PHP;
 - **deny `app/`, `features/` and `tests/` entirely** — the project's own classes and the installed features are server-side source, never requested by a browser, and the suites are run from a shell; each ships its own `.htaccess` for Apache;
 - **deny `_admin/install/library/` entirely** — it is what the wizard copies a project out of, server-side source with nothing public in it; the same goes for the install units and libraries a feature brings below `features/`;
+- **deny the parts of the tool folders that no page loads** — the kernel's classes with their templates and texts (`_nino/Nino/`) and the workbench's templates, texts and panels (`_admin/templates/`, `_admin/text/`, `_admin/Nino/`) are read by PHP and rendered, never requested by a browser, and a template is no PHP: delivered as it stands it is markup meant to be filled. The setup wizard (`_admin/install/`) is denied but for its `assets/`, which its page loads. What stays delivered of the tool folders is their public part: `_nino/Nino.css`, `Nino.js` and `Nino.ui.js`, `_admin/assets/`, `_admin/.cache/` and `_admin/install/assets/`. Each denied tree ships its own `.htaccess` for Apache;
+- **deny `docs/` and `history/` entirely** — the checkout's manuals and its frozen changelog, nothing a page loads. A project with a page of its own at `/docs` or `/history` deletes the directory and, on nginx, its location;
+- **deny the checkout's metadata at the root** — `README.md`, `AGENTS.md`, `SECURITY.md`, `THIRD-PARTY-NOTICES.md`, `phpstan.neon`, `eslint.config.mjs` and every other `*.md`, `*.neon` and `*.mjs` there, where it exists as a file, like the dotfiles - an address of that shape that is no file is a route. `LICENSE` stays delivered;
 - disable directory listing;
 - forward the HTTP `Authorization` header to PHP. With nginx/PHP-FPM this normally requires `fastcgi_param HTTP_AUTHORIZATION $http_authorization;` in the PHP location;
 - do not deliver PHP source and data files as text;
@@ -158,7 +162,17 @@ location ^~ /private/                { deny all; return 404; }
 location ^~ /app/                    { deny all; return 404; }
 location ^~ /features/               { deny all; return 404; }
 location ^~ /tests/                  { deny all; return 404; }
+location ^~ /docs/                   { deny all; return 404; }
+location ^~ /history/                { deny all; return 404; }
+location ^~ /_nino/Nino/             { deny all; return 404; }
+location ^~ /_admin/templates/       { deny all; return 404; }
+location ^~ /_admin/text/            { deny all; return 404; }
+location ^~ /_admin/Nino/            { deny all; return 404; }
+location ^~ /_admin/install/         { deny all; return 404; }
 location ^~ /_admin/install/library/ { deny all; return 404; }
+
+# ...but for what the wizard's page loads: the longer prefix wins
+location ^~ /_admin/install/assets/  { try_files $uri =404; }
 
 # Dotfiles and dot directories, with .cache/ (the generated bundles), .demo/
 # (the demo images) and .well-known/ as the exceptions. Only for paths that
@@ -166,6 +180,14 @@ location ^~ /_admin/install/library/ { deny all; return 404; }
 # have to keep falling through - the same line router.php draws.
 location ~ /\.(?!cache/|demo/|well-known/) {
 	if ( -e $request_filename ) { return 403; }
+	try_files $uri $uri/ /index.php$is_args$args;
+}
+
+# The checkout's metadata at the root - README.md, AGENTS.md, phpstan.neon,
+# eslint.config.mjs and the like - again only for paths that resolve on disk: an address of that
+# shape that is no file is a route.
+location ~ ^/[^/]+\.(?:md|neon|mjs)$ {
+	if ( -e $request_filename ) { return 404; }
 	try_files $uri $uri/ /index.php$is_args$args;
 }
 
@@ -313,11 +335,12 @@ A successful call to the homepage does not yet prove that sensitive files are pr
 - dotfiles and dot directories;
 - `config.php` and PHP data files;
 - hidden log and backup directories;
-- internal files from `_admin/`, `app/`, `features/` and `tests/` that are not intended as public assets - the panel templates and a feature's install unit among them;
-- any file below `_admin/install/library/`;
+- internal files from `_nino/Nino/`, `_admin/templates/`, `_admin/text/`, `_admin/Nino/`, `app/`, `features/` and `tests/` that are not intended as public assets - a template such as `/_admin/templates/page-login.tpl`, a module's mail body and a feature's install unit among them;
+- any file below `_admin/install/` but its `assets/`, and below `_admin/install/library/`;
+- `docs/`, `history/` and the metadata at the root, `/README.md` and `/phpstan.neon` among it;
 - `_admin/install/`, after it has been removed.
 
-The expected response may be `403` or `404` depending on the server. The decisive factor is that neither content nor directory list is delivered.
+The expected response may be `403` or `404` depending on the server. The decisive factor is that neither content nor directory list is delivered. The other direction is as much a part of the test: `/_nino/Nino.js`, `/_admin/assets/style.css` and, until the wizard is removed, `/_admin/install/assets/script.js` still answer `200`.
 
 ## Updates and Rollback
 
@@ -348,6 +371,7 @@ Security fixes appear on `main`; there is currently no separate LTS line. Theref
 - [ ] Dotfiles, dot directories, and PHP data files are not directly accessible.
 - [ ] On Apache: the `.htaccess` is actually applied — `$_SERVER['NINO_HTACCESS']` is `1`, or, on a host that drops `SetEnv`, an address that does not exist answers with Nino's own 404 rather than the server's. Everything below that relies on `.htaccess` is worth nothing if it is not.
 - [ ] `app/`, `features/` and `tests/` are not served — each carries its own `.htaccess`; `/tests/http-smoke.php` must answer `403` or `404`, never a list of checks; verify with a request for a file of an installed feature, e.g. `/features/Newsletter/install/templates/mail-header.tpl` once the catalogue's Newsletter feature is in place - a checkout ships no feature, so there has to be one to ask for.
+- [ ] The kernel's classes, templates and texts (`_nino/Nino/`), the workbench's templates, texts and panels (`_admin/templates/`, `_admin/text/`, `_admin/Nino/`), `docs/`, `history/` and the metadata at the root are not served — each tree carries its own `.htaccess`, and the root file refuses `*.md`, `*.neon` and `*.mjs`. `/_admin/templates/page-login.tpl`, `/_nino/Nino/Http/Http.php`, `/docs/deployment.md` and `/README.md` must each answer `403` or `404`, while `/_nino/Nino.js` and `/_admin/assets/style.css` still answer `200`.
 - [ ] `private/` is not served — its own `.htaccess` denies it, and each PHP file inside carries a 403 stub; verify both apply on your webserver, or move the directory out of the webroot with `NINO_PRIVATE_DIR`. The templates and the asset sources are not PHP and have only the server rule.
 - [ ] Directory listing is disabled.
 - [ ] The setup wizard was able to create the project directories from the writable project root itself — a checkout ships neither `private/` nor `public/`, so the first step of the wizard is where that is confirmed.

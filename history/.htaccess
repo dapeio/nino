@@ -1,0 +1,5 @@
+# The frozen changelog of the releases up to 1.7.0 - from there the history is
+# the git log. Nothing in here is ever requested by a browser.
+Require all denied
+
+Options -Indexes

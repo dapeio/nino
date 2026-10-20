@@ -1,0 +1,11 @@
+# The kernel is server-side source: its classes, the modules Nino ships and
+# what each of them brings - templates (the mail bodies, the maintenance
+# page), texts, install unit, panel scripts. Nothing in here is ever requested
+# by a browser. What is public of _nino/ - Nino.css, Nino.js and Nino.ui.js -
+# lies beside this directory, and a module's stylesheets and scripts are read
+# off disk and bundled into public/.cache/ or _admin/.cache/ like everything
+# else (see \Nino\Modules\Assets). A .php file would run and show nothing; a
+# template or a text file is no php and would be delivered as it stands.
+Require all denied
+
+Options -Indexes

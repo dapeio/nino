@@ -1,0 +1,8 @@
+# The setup wizard is server-side source but for its assets/: its class, the
+# templates it renders and library/, which has a .htaccess of its own. What the
+# wizard's page loads - the scripts and the stylesheet in assets/ - is handed
+# back by the .htaccess of that directory. The wizard may be removed once the
+# project is set up (_admin/install/), and with it these rules.
+Require all denied
+
+Options -Indexes

@@ -35,6 +35,17 @@ namespace Nino {
 			'Content-Security-Policy' 		=> 'default-src \'self\'; img-src * data:; style-src \'self\' \'unsafe-inline\'; frame-ancestors \'self\'; base-uri \'self\'; form-action \'self\'',
 			'X-Frame-Options' 						=> 'SAMEORIGIN',
 			'X-Content-Type-Options'			=> 'nosniff',
+			// What a visit to another site tells that site: the origin alone
+			// where a link leaves for another origin, the whole address - query
+			// string included - only within this one. A current browser does
+			// that by itself; this says it for an older one, which sends the
+			// whole address to every other https site, and an address can
+			// carry a one-time token in its query
+			'Referrer-Policy'							=> 'strict-origin-when-cross-origin',
+			// Nothing a page of Nino asks a visitor's device for - the camera,
+			// the microphone, the location - so no page may, nor a frame in it:
+			// a feature switched off in the top document is off in every frame
+			'Permissions-Policy'					=> 'camera=(), microphone=(), geolocation=()',
 			// Nino's own answer to whether a response may be stored,
 			// rather than php's: the session used to be started on
 			// every request, and its cache limiter put four no-store
@@ -515,7 +526,7 @@ namespace Nino {
 
 		/**
 		 *	The route that answers a request path: the one keyed for exactly that
-		 *	path and method, else the nearest wildcard route ('GET://docs/*') on a
+		 *	path and method, else the nearest wildcard route ('GET://blog/*') on a
 		 *	parent of the path, up to the root. Routes are keyed project-relative,
 		 *	'GET://about' for '/about'.
 		 *
@@ -1067,7 +1078,29 @@ namespace Nino {
 			$parsedUrl = @parse_url( $rawRequest, PHP_URL_QUERY );
 			if( is_string( $parsedUrl ) === false || $parsedUrl === '' )
 				return $queryVars;
-			parse_str( $parsedUrl, $queryVars );
+
+			/*	parse_str() reads max_input_vars pairs and no key nested deeper than
+				max_input_nesting_level, and raises an E_WARNING for what it drops -
+				the second only where display_errors is off, which is where a site is
+				live. An engine warning is fatal here (see Runtime::NON_FATAL_LEVELS),
+				so one query of 1,001 variables, or of a key with 65 brackets, was a
+				500 on every address. The same two cuts are made before php is asked:
+				the first pairs are kept, the keys that are too deep are left out, and
+				what it reads is what it would have kept, but for three edges that no
+				query worth sending reaches: an empty pair counts here as one of the
+				pairs and php skips it, a [ counts as a level wherever it stands in a
+				key where php counts the [..] groups behind the name, and php drops
+				the whole variable of a key that is too deep where this leaves out the
+				key alone. A pair ends at any byte of arg_separator.input, as it does
+				for php - the & of the default, and whatever a host has set there	*/
+			$limit			= (int) ( ini_get( 'max_input_vars' ) ?: 1000 );
+			$depth			= (int) ( ini_get( 'max_input_nesting_level' ) ?: 64 );
+			$separators	= (string) ( ini_get( 'arg_separator.input' ) ?: '&' );
+			$pairs			= [];
+			foreach( array_slice( preg_split( '/['. preg_quote( $separators, '/' ). ']/', $parsedUrl, $limit + 1 ) ?: [], 0, $limit ) as $pair )
+				if( substr_count( urldecode( explode( '=', $pair, 2 )[0] ), '[' ) <= $depth )
+					$pairs[] = $pair;
+			parse_str( implode( $separators[0], $pairs ), $queryVars );
 
 			return $queryVars;
 		}

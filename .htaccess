@@ -104,11 +104,30 @@ SetEnv NINO_HTACCESS 1
 # have only the two server rules.
 #
 # Its mirror, public/, is the opposite: everything in there is meant to be
-# served, and nothing else in this project root is - index.php and the tool
-# folders aside, a request that resolves to a real file outside public/ is
-# almost always a mistake. _admin/install/library/.htaccess denies its whole
-# tree for the same reason: it is what the wizard copies from, not a second
-# public asset tree.
+# served, and nothing else in this project root is - index.php and what a page
+# loads of the tool folders aside, a request that resolves to a real file
+# outside public/ is almost always a mistake. _admin/install/library/.htaccess
+# denies its whole tree for the same reason: it is what the wizard copies from,
+# not a second public asset tree. So do the parts of the tool folders that no
+# page loads - the kernel's classes with their templates and texts
+# (_nino/Nino/), the workbench's templates, texts and panels
+# (_admin/templates/, _admin/text/, _admin/Nino/) and the wizard but for its
+# assets/ - and the checkout's docs/ and history/, each from a .htaccess of its
+# own, as app/, features/ and tests/ do. What stays served of the tool folders
+# is their public part: _nino/Nino.css, Nino.js and Nino.ui.js, _admin/assets/,
+# _admin/.cache/, _admin/install/assets/.
+
+# The checkout's own metadata at its root - README.md, AGENTS.md, SECURITY.md,
+# THIRD-PARTY-NOTICES.md, phpstan.neon, eslint.config.mjs - is nobody's page. This file is the one
+# that covers the root, so the rule is written here. LICENSE stays served: a
+# licence is for whoever holds a copy to read. Conditioned on the request
+# resolving to a file, as the dot rule above is - an address of that shape that
+# is no file is a route, and has to keep falling through to index.php.
+<IfModule mod_rewrite.c>
+	RewriteEngine On
+	RewriteCond %{REQUEST_FILENAME} -f
+	RewriteRule ^[^/]+\.(md|neon|mjs)$ - [F]
+</IfModule>
 
 # Don't let a directory with no index.php list its contents - a plain
 # defence-in-depth default now that nothing relies on an unguessable
