@@ -92,5 +92,6 @@ return [
 	'[[/_admin/keys/label/rename-title]]'	=> 'Textschlüssel umbenennen',
 	'[[/_admin/keys/hint/unlock]]'	=> 'Ein Schlüssel eines Templates, eines Features oder eines Moduls gehört zu diesem, und dessen Install-Einheit liefert ihn. Entsperre diese Namensräume nur für einen Schlüssel, den diese Einheit nicht mitbringt.',
 	'[[/_admin/keys/hint/segment]]'	=> 'Kleine Wörter aus den Buchstaben a bis z und Ziffern, durch Bindestriche verbunden.',
+	'[[/_admin/keys/hint/not-a-word]]'	=> 'Kein Wort des Vokabulars: „%s“ wird als „%s“ angezeigt',
 	'[[/_admin/keys/error/segment]]'	=> 'Das ist kein Wort eines Schlüssels: nur kleine Buchstaben a bis z, Ziffern und einzelne Bindestriche dazwischen.',
 ];

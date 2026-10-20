@@ -515,14 +515,29 @@
 			/*
 			 *	nino-hero-arrowdown - scrolls to whichever element its own
 			 *	data-arrow-target (a css selector, eg. "#next-section") points
-			 *	at. The icon itself is a background-image (see Nino.css), so
-			 *	using it never needs more than the one data attribute.
+			 *	at, or - with data-arrow-next, on the link [scroll-hint] writes,
+			 *	whose address is a # - to what follows the section the arrow is
+			 *	in. A link with the id of a section for an address needs no script:
+			 *	the anchor scrolls there itself, as a hash link does. The icon
+			 *	itself is a mask over the arrow's color (see Nino.css), so using
+			 *	it never needs more than the one attribute.
 			 */
 			for( let i=0, l=e.arrowDown.length; i<l; i++ )
-				e.arrowDown[i].addEventListener( 'click', function() {
-					if( ! this.dataset.arrowTarget )
-						return;
-					const target = dc.querySelector( this.dataset.arrowTarget );
+				e.arrowDown[i].addEventListener( 'click', function( event ) {
+
+					let target = null;
+
+					if( this.dataset.arrowTarget )
+						target = dc.querySelector( this.dataset.arrowTarget );
+					else if( this.hasAttribute( 'data-arrow-next' ) === true ) {
+
+						// A # is the top of the page: the link stays where it is where there is no next section
+						event.preventDefault();
+
+						const section = this.closest( 'section' );
+						target = section === null ? null : section.nextElementSibling;
+					}
+
 					if( target !== null )
 						target.scrollIntoView({ behavior: ui._scrollBehavior() });
 				} );

@@ -496,10 +496,12 @@ at reading width, like every other panel.
 ## Frontend skeleton
 
 The shell shows the pane whose `data-panel` matches the selected link and
-calls `Nino.admin.<uri>.showCurrent()` when a tab is selected, if such a
-function exists - which is also where a panel loads its data the first time,
-so a panel nobody opens costs no request. Inside the pane the panel owns its
-mount points (`panes()`).
+calls `Nino.admin.<uri>.showCurrent()` every time a tab is selected, if such a
+function exists. That is where a panel that does not start with the page loads
+its data the first time - `Nino.adminUi.panel()` starts lazily unless it is told
+`boot: 'ready'` - so a panel nobody opens costs no request; a panel that binds
+its `init()` to the ready event loads with the page, and its `showCurrent()`
+shows it again. Inside the pane the panel owns its mount points (`panes()`).
 
 That lifecycle is `Nino.adminUi.panel( spec )`, written once. The script
 publishes what it answers - `Nino.admin.catalog = Nino.adminUi.panel( { ... } )` -
@@ -518,6 +520,12 @@ and the shell calls `showCurrent()` on it. The spec:
   not loaded and afterwards draws the last answer again, from `panel.data` and
   without a request - and not at all while the dirty registry says the panel
   holds input nobody has saved.
+- `stamps` is a list of kinds of data (the next section) the panel shows and
+  another panel writes: the stamp of each is kept as it was when the screen was
+  asked for, and with `show: 'keep'` a showing asks again instead of drawing the
+  last answer when one of them moved - not while the panel holds input nobody
+  has saved, which is asked again at the next showing. `'once'` and `'always'`
+  have their own rule for a second showing, and `stamps` changes neither.
 - `boot` is `'lazy'` (the default: the first showing starts the panel) or
   `'ready'`, which starts it at the ready event too. A request that is out is
   asked for once, so a `'ready'` panel that the shell shows first - as it does on
@@ -767,6 +775,45 @@ the `aria-label` of a glyph; `el( tag, className, text )` an element with a clas
 and a text; and `localeSelect( options )` the switch of the translation a form
 shows, for the context bar - what a change does is the panel's. Their docblocks in
 `_admin/assets/Nino.admin.js` are the reference.
+
+## What one panel tells another
+
+A panel that writes data another panel shows says so, and the other panel finds
+out when it is shown again - with no event and without the page being loaded
+anew. `Nino.admin.touch( topic )` raises the counter of a kind of data after a
+write has succeeded, and `Nino.admin.stamp( topic )` reads it. The kinds are
+`templates` (the files of `templates/`), `texts` (the keys of the text files),
+`elements`, `slots` (the image slots), `routes` and `navigations`; a name that is
+none of them is ignored by `touch()` and reads `0`. The kernel's panels touch
+what they write - Text and Keys the texts, and the templates where a key of a
+template is created, Elements and Element Types the elements, Images and Slots
+the slots, Routes the routes, Navigations the navigations - and a feature's panel
+that writes one of these kinds does the same: the Builder creates templates, and
+touches `templates`.
+
+A panel that shows data it does not write remembers the stamp of it as it was
+when the request went out, and compares at its next `showCurrent()`: where the
+stamp moved, it asks again, and not while it holds input nobody has saved, which
+is asked again at the next showing. Routes does so for `templates`, so that its
+form offers a page template the Builder has just created; Text and Images read
+`templates` the same way. A panel on `Nino.adminUi.panel()` says it in its spec,
+`show: 'keep'` with `stamps: [ 'templates' ]`. The counters live as long as the
+page does: a page that is loaded anew asks the server for everything.
+
+```js
+// A catalogue of the page templates, drawn from what the server holds: when the
+// Builder (or any panel) touched the templates since, showing the panel asks again
+Nino.admin.catalog = Nino.adminUi.panel( {
+	uri			: 'catalog',
+	mount		: 'catalog-list',
+	show		: 'keep',
+	stamps	: [ 'templates' ],
+	render	: function( data ) { /* draw data.notes */ },
+} );
+
+// ...and the write of the panel that creates one
+Nino.admin.touch( 'templates' );
+```
 
 ## Saying what happened
 

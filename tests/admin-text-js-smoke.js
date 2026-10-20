@@ -56,8 +56,10 @@ const keysSandbox = {
 	document : { documentElement : null, body : null, getElementById : function() { return { textContent : '' } } },
 };
 keysSandbox.window = keysSandbox;
+// What the tab told the shell it had written - Nino.admin.touch( topic ), see script.js
+keysSandbox.touched = [];
 keysSandbox.Nino = {
-	admin : {},
+	admin : { touch : function( topic ) { keysSandbox.touched.push( topic ) } },
 	content : { getText : function( key ) { return key } },
 	events : { bindCallback : function() {} },
 };
@@ -317,6 +319,7 @@ check( 'the confirmation comes once, after the last translation, with the form g
 	&& pendingControls.every( function( c ) { return c.disabled === false } ) && keysSandbox.listDrawn === 1 );
 check( '...what the server answered is what the model holds now', keys._groups.g[1].values.de_DE === 'Text!.' && keys._groups.g[1].values.en_US === 'Body!.' && keys._localeValues.de_DE['/g/body'] === 'Text!.' );
 check( '...and the controls count as saved', keys.isDirty() === false );
+check( 'every request the server answered told the shell that texts were written - the Builder reads them - one for each of the two translations', keysSandbox.touched.join() === 'texts,texts' );
 
 // a request that fails
 requests.length = 0;
@@ -328,6 +331,7 @@ requests[0].callback( 500, null );
 check( 'a failed request stops the loop: nothing further is sent, every translation stays edited, the message names the language',
 	requests.length === 1 && ended.join() === 'false' && JSON.stringify( keys._dirtyLocales ) === '["de_DE","en_US"]' && keys._saving === false
 	&& msg.textContent.indexOf('(de_DE)') !== -1 && pendingControls.every( function( c ) { return c.disabled === false } ) );
+check( '...and a request that failed wrote nothing, so the shell hears nothing', keysSandbox.touched.length === 2 );
 
 // a key the server did not accept
 requests.length = 0;
@@ -338,6 +342,7 @@ answers( requests[1], '/g/body' );
 check( 'a key the server refused stops the loop after the translations that went through; the rest stays edited and the message says key (language)',
 	ended.join() === 'false' && JSON.stringify( keys._dirtyLocales ) === '["en_US"]' && msg.textContent.indexOf('/g/body (en_US)') !== -1 );
 check( '...and the global keys went out once', requests[0].payload.items.some( function( i ) { return i.locale === '*' } ) && requests[1].payload.items.every( function( i ) { return i.locale !== '*' } ) );
+check( 'a request with a key refused in it wrote the others: the shell hears of both requests', keysSandbox.touched.length === 4 );
 
 // a result the answer does not contain counts as refused as well
 requests.length = 0;
@@ -392,6 +397,8 @@ keys._view = 'group';
 
 // the exits that reload the tab ask first - and so does the one that leaves the row for the form that renames
 const asked = [];
+// What a call told the shell it had written
+const touchedBy = call => { const before = keysSandbox.touched.length; call(); return keysSandbox.touched.slice( before ).join() };
 keysSandbox.Nino.admin.dirty = { guard : function( names, proceed, onCancel ) { asked.push( { names : names, proceed : proceed, onCancel : onCancel } ) }, refresh : function() {}, register : function() {} };
 requests.length = 0;
 let undone = 0;
@@ -403,10 +410,14 @@ keys._deleteKey( '/g/title' );
 check( 'a schema change, the form that renames and a delete ask about the open row before anything happens', asked.length === 3 && requests.length === 0 && opened === 0 && asked.every( function( a ) { return JSON.stringify( a.names ) === '["keys"]' } ) );
 asked[0].onCancel();
 check( '...a Cancel on a schema checkbox puts the box back', undone === 1 && requests.length === 0 );
+const written = keysSandbox.touched.length;
 asked[0].proceed();
 asked[1].proceed();
 asked[2].proceed();
 check( '...an answer lets each request go, and opens the form with the key to rename', requests.map( function( r ) { return r.endpoint } ).join() === 'save,delete' && opened === 1 && keys._renameFrom === '/g/title' && keys._view === 'new' );
+const kept = requests.slice();
+check( '...a schema change and a delete are writes of texts once the server says they are done - and not before', keysSandbox.touched.length === written
+	&& touchedBy( () => kept[0].callback( 200, { ok : true } ) ) === 'texts' && touchedBy( () => kept[1].callback( 200, { ok : true } ) ) === 'texts' );
 delete keysSandbox.Nino.admin.dirty;
 opened = 0;
 keys._openNewKeyForm( '/g/title' );
@@ -449,11 +460,9 @@ keysSandbox.window.confirm = function( question ) { confirms.push( question ); r
 keys._saveSettings( { key : '/g/body', format : 'lines' }, false, false, 'lines', '' );
 check( 'the format a key already has is no change to ask about', confirms.length === 2 && requests.length === 4 );
 
-requests[0].callback( 200, { ok : true } );
-check( 'a success comes back to the category it was made in', keys._reopen === 'g' );
+check( 'a success comes back to the category it was made in - and is a write of texts', touchedBy( () => requests[0].callback( 200, { ok : true } ) ) === 'texts' && keys._reopen === 'g' );
 keys._reopen = null;
-requests[1].callback( 400, { error : 'x', code : 'keys_limit' } );
-check( 'a refusal says so and reloads nothing', keys._reopen === null );
+check( 'a refusal says so, reloads nothing and wrote nothing', touchedBy( () => requests[1].callback( 400, { error : 'x', code : 'keys_limit' } ) ) === '' && keys._reopen === null );
 
 keysSandbox.Nino.content.getText = plainWords;
 check( 'the controls are drawn from the entry: a format select with "auto" first, a limit input, an Apply button',
@@ -581,10 +590,14 @@ function world( locale, hash, session ) {
 	box.window = box;
 	box.Event = function( type ) { this.type = type };
 	const calls = [];
+	// The counters of the shell (script.js): what the panels told it they wrote, and what they read
+	const stamps = { templates : 0, texts : 0 }, touched = [];
 	box.Nino = {
 		editor : {}, events : { bindCallback(){} },
 		content : { getText : key => words[key] ?? '' },
 		admin : {
+			touch : topic => { touched.push( topic ); stamps[topic] = ( stamps[topic] ?? 0 ) + 1 },
+			stamp : topic => stamps[topic] ?? 0,
 			router : { set : ( p, parts ) => calls.push( 'set '+ [ p ].concat( parts ).join('/') ), go : ( p, parts ) => calls.push( 'go '+ [ p ].concat( parts ).join('/') ), current : () => hash ?? { panel : '', parts : [] }, leave : ( n, l, proceed ) => proceed() },
 			sessionLocale : { current : session === undefined ? locale : session, init : code => { if( box.Nino.admin.sessionLocale.current === null ) box.Nino.admin.sessionLocale.current = code }, set : code => { calls.push( 'locale '+ code ); box.Nino.admin.sessionLocale.current = code } },
 			formToolbar : back => { const bar = dom.make('div'); bar.className = 'nino-admin-contextbar'; bar.appendChild( back ); return bar },
@@ -598,7 +611,7 @@ function world( locale, hash, session ) {
 
 	const mount = ( ...ids ) => ids.map( id => { const el = dom.make('div'); el.id = id; dom.root.appendChild( el ); return el } );
 
-	return { dom, box, calls, words, Nino : box.Nino, T : box.Nino.admin.textKeys, U : box.Nino.adminUi, mount };
+	return { dom, box, calls, words, touched, stamps, Nino : box.Nino, T : box.Nino.admin.textKeys, U : box.Nino.adminUi, mount };
 }
 
 // --- the names of a key ---------------------------------------------------------
@@ -628,6 +641,10 @@ function world( locale, hash, session ) {
 	check( '...a word that is not in the vocabulary, humanized', label( de, 'tagline' ) === 'Tagline' && label( de, 'get-in-touch' ) === 'Get in touch' && label( en, 'tagline' ) === 'Tagline' );
 	check( 'a group has a word of its own', label( de, 'frame-header' ) === 'Kopfrahmen' && label( de, 'mail-user' ) === 'Mail an den Besucher' && label( de, 'common' ) === 'Allgemeine Wörter' && label( de, 'company' ) === 'Unternehmen' && label( de, 'mail' ) === 'E-Mail-Versand' );
 	check( 'humanize: capital first letter, hyphens and underscores as spaces', de.U.humanize( 'price_default' ) === 'Price default' && de.U.humanize( 'get-in-touch' ) === 'Get in touch' );
+
+	// isWord: the rule admin-text-smoke holds the shipped keys to, as a function of the workbench - a word, <word>-<number>, or two words with a hyphen between them
+	check( 'isWord: a word of the vocabulary, <word>-<number>, <word>-<word> - in either language', [ 'intro', 'section', 'section-2', 'item-3', 'accept-all', 'unit-day', 'button-label', 'category-necessary' ].every( slug => de.U.isWord( slug ) === true && en.U.isWord( slug ) === true ) );
+	check( '...and nothing else: a word nobody made, a number after it, a made-up word beside a real one on either side, three words, a number alone, nothing', [ 'cta', 'cta-2', 'cta-button', 'button-cta', 'accept-all-now', 'item-3-x', '2', '', null, undefined ].every( slug => de.U.isWord( slug ) === false && en.U.isWord( slug ) === false ) );
 }
 
 // --- the rows, the sections and their order ------------------------------------------
@@ -940,6 +957,52 @@ function openedText( response, hash, locale ) {
 		&& batch.payload.items.some( i => i.key === '/template/page-services/intro/title' && i.value === 'Leistungen neu' && i.locale === 'de_DE' )
 		&& batch.payload.items.some( i => i.key === '/_nino/webpage/services/title' && i.value === 'Neuer Seitentitel' && i.locale === 'de_DE' ) );
 	check( '...and says it is saved', t.form.querySelector('#text-form-msg').textContent === 'Gespeichert.' && t.text._dirtyLocales.length === 0 );
+	check( 'a save is a write of texts: the shell is told so, once - and of no template, which this panel does not write', t.touched.join() === 'texts' );
+}
+
+{
+	// A template written since the keys were read is a row the list did not have - the Builder makes the keys of its sections, and so does a key of a template that the
+	// Keys tab adds: the panel reads the keys again where it is shown, and not before
+	const response = textResponse();
+	const t = openedText( response );
+	const asked = () => t.sent.filter( c => c.endpoint === 'keys' ).length;
+	const fresh = '/template/frame-footer/navigation/label';
+	const rowOf = key => t.text._model.rowOf[key];
+	const listed = group => t.list.querySelectorAll('.admin-type-btn').some( r => r.dataset.group === group );
+
+	check( 'the panel asks for the keys once when it opens, and keeps the stamp of the templates it asked at', asked() === 1 && t.text._stamp === 0 && rowOf( fresh ) === undefined && listed( 'template/frame-footer' ) === false );
+	t.text.showCurrent();
+	check( 'shown again with nothing written since, it asks for nothing', asked() === 1 );
+	t.Nino.admin.touch( 'texts' );
+	t.text.showCurrent();
+	check( '...nor does a write of texts make it ask: the texts it writes itself it has in hand', asked() === 1 );
+
+	response.keys = response.keys.concat( [ textEntry( fresh, { de_DE : 'Fußnavigation', en_US : 'Footer navigation' } ) ] );
+	t.Nino.admin.touch( 'templates' );
+	t.text.showCurrent();
+	check( 'a template written since: shown again, it asks again - and the rows have what the template made', asked() === 2 && t.text._stamp === 1 && rowOf( fresh ) === 'template/frame-footer' && listed( 'template/frame-footer' ) );
+	t.text.showCurrent();
+	check( '...once: what it holds now is the stamp it asked at', asked() === 2 );
+
+	// a row is open: the list is not drawn over it
+	t.list.querySelectorAll('.admin-type-btn').find( r => r.dataset.group === 'template/page-services' ).click();
+	t.Nino.admin.touch( 'templates' );
+	t.text.showCurrent();
+	check( 'a row that is open is not drawn over: shown again, the panel asks for nothing and the form stays', asked() === 2 && t.text._currentGroup === 'template/page-services' && t.form.classList.contains('admin-hidden') === false );
+	t.text._showList();
+	t.text.showCurrent();
+	check( '...the showing that finds the list is the one that asks, and the stamp is the one of that time', asked() === 3 && t.text._stamp === 2 );
+
+	// a template written while the answer is on its way is not in it
+	let held = null;
+	t.text._apiCall = ( endpoint, payload, callback ) => { t.sent.push( { endpoint : endpoint, payload : payload } ); held = () => callback( 200, response ) };
+	t.Nino.admin.touch( 'templates' );
+	t.text.showCurrent();
+	t.Nino.admin.touch( 'templates' );
+	held();
+	check( 'a template written while the answer is on its way is not in it: the panel keeps the stamp from before the request', asked() === 4 && t.text._stamp === 3 && t.stamps.templates === 4 );
+	t.text.showCurrent();
+	check( '...so the next showing asks again', asked() === 5 );
 }
 
 {
@@ -1151,7 +1214,7 @@ function openedKeys( response, hash ) {
 	check( '...so is one with a dot', name.getAttribute('aria-invalid') === 'true' && submit().disabled === true );
 	name.value = 'heading-2';
 	name.fire('input');
-	check( 'a word of a key is not marked, and the button is on once the key is another', name.getAttribute('aria-invalid') === 'false' && control('keys-form-name-error').hidden === true && name.getAttribute('aria-describedby') === null && submit().disabled === false
+	check( 'a word of a key is not marked, and the button is on once the key is another', name.getAttribute('aria-invalid') === 'false' && control('keys-form-name-error').hidden === true && name.getAttribute('aria-describedby') !== 'keys-form-name-error' && submit().disabled === false
 		&& control('keys-form-preview').textContent === '/template/page-services/item-1/heading-2' );
 	const part = control('keys-form-part');
 	part.value = '';
@@ -1162,6 +1225,7 @@ function openedKeys( response, hash ) {
 	check( 'dirty once a segment is changed', k.keys.isDirty() === true );
 	k.keys._saveNewKey();
 	check( 'submitting renames the key to the one the segments make', lastWrite( k ).endpoint === 'rename' && JSON.stringify( lastWrite( k ).payload ) === '{"key":"/template/page-services/item-1/title","newKey":"/template/page-services/item-1/heading-2"}' );
+	check( '...a write of texts, and of templates too where the key is one a template reads: the Text panel has a row for it', k.touched.join() === 'texts,templates' );
 }
 
 {
@@ -1211,6 +1275,117 @@ function openedKeys( response, hash ) {
 	control('keys-form-new-global').checked = true;
 	k.keys._saveNewKey();
 	check( 'submitting creates the key the segments make, with its value and whether it is global', lastWrite( k ).endpoint === 'create' && JSON.stringify( lastWrite( k ).payload ) === '{"key":"/project/catalog/list/title","global":true,"value":"Katalog"}' );
+	check( '...a write of texts, and nothing a template is told of: the key is the project\'s', k.touched.join() === 'texts' );
+}
+
+{
+	// a key of a template is one the Text panel has no row for yet: it is told of the templates as well
+	const k = openedKeys( keysResponse() );
+	k.keys._openNewKeyForm();
+	const control = id => k.form.querySelector( '#'+ id );
+	k.form.querySelectorAll('button').find( b => b.textContent === 'Entsperren' ).click();
+	control('keys-form-namespace').value = 'template';
+	control('keys-form-namespace').fire('change');
+	[ [ 'keys-form-part', 'label' ], [ 'keys-form-name', 'fax' ] ].forEach( ( [ id, value ] ) => { control( id ).value = value; control( id ).fire('input') } );
+	k.keys._saveNewKey();
+	check( 'creating a key of a template is a write of texts and of templates, in that order', lastWrite( k ).endpoint === 'create' && lastWrite( k ).payload.key === '/template/common/label/fax' && k.touched.join() === 'texts,templates' );
+	k.keys._apiCall = ( endpoint, payload, callback ) => callback( 500, { error : 'refused' } );
+	k.keys._openNewKeyForm();
+	k.form.querySelectorAll('button').find( b => b.textContent === 'Entsperren' ).click();
+	control('keys-form-namespace').value = 'template';
+	control('keys-form-namespace').fire('change');
+	[ [ 'keys-form-part', 'label' ], [ 'keys-form-name', 'fax' ] ].forEach( ( [ id, value ] ) => { control( id ).value = value; control( id ).fire('input') } );
+	k.keys._saveNewKey();
+	check( '...and a key the server refused is no write: the shell hears nothing more', k.touched.join() === 'texts,templates' );
+}
+
+{
+	// the scan: what it creates is a write of texts - and of templates where one of the keys it was asked to create is a template's
+	const k = openedKeys( keysResponse() );
+	k.mount( 'keys-scan-msg' );
+	let answer = null;
+	k.keys._apiCall = ( endpoint, payload, callback ) => { k.sent.push( { endpoint : endpoint, payload : payload } ); callback( 200, endpoint === 'scanapply' ? answer : keysResponse() ) };
+	const row = ( key, value, ignore ) => ( { key : key, valueInput : { value : value }, ignoreCheck : { checked : ignore } } );
+	const scan = ( rows, response ) => { const before = k.touched.length; answer = response; k.keys._saveScanResults( rows ); return k.touched.slice( before ).join() };
+
+	check( 'a scan that created keys of the project is a write of texts', scan( [ row( '/project/shop/list/title', 'Shop', false ) ], { created : 1, ignored : 0, skipped : 0 } ) === 'texts' );
+	check( '...of templates as well where a key of a template was among the ones it was asked to create', scan( [ row( '/project/shop/list/title', 'Shop', false ), row( '/template/common/label/fax', 'Fax', false ) ], { created : 2, ignored : 0, skipped : 0 } ) === 'texts,templates' );
+	check( '...not where the key of the template was only ignored, or left empty and nothing came of it', scan( [ row( '/template/common/label/fax', '', true ) ], { created : 0, ignored : 1, skipped : 0 } ) === 'texts'
+		&& scan( [ row( '/template/common/label/fax', '', false ) ], { created : 0, ignored : 0, skipped : 1 } ) === 'texts' );
+	check( '...nor where it was ignored while a key of the project was created beside it', scan( [ row( '/project/shop/list/title', 'Shop', false ), row( '/template/common/label/fax', '', true ) ], { created : 1, ignored : 1, skipped : 0 } ) === 'texts' );
+	k.keys._apiCall = ( endpoint, payload, callback ) => callback( 500, null );
+	check( 'a scan the server refused wrote nothing', ( () => { const before = k.touched.length; k.keys._saveScanResults( [ row( '/template/common/label/fax', 'Fax', false ) ] ); return k.touched.length === before } )() );
+}
+
+{
+	// a segment that is no word of the vocabulary is said so, under its field - and the key saves all the same
+	const k = openedKeys( keysResponse() );
+	k.keys._openNewKeyForm();
+	const control = id => k.form.querySelector( '#'+ id );
+	const hint = id => control( id+ '-hint' );
+	const ids = [ 'keys-form-category', 'keys-form-part', 'keys-form-name' ];
+	const type = ( id, value ) => { control( id ).value = value; control( id ).fire('input') };
+	const submit = () => k.form.querySelector('button[type="submit"]');
+	const said = ( slug, shown ) => k.U.format( k.words['/_admin/keys/hint/not-a-word'], slug, shown );
+
+	check( 'a form nobody typed into has the line under each of the three segments - a paragraph of its own, hidden and empty, after the error and not a part of it', ids.every( id => hint( id ) !== null && hint( id ).tagName === 'p' && hint( id ).hidden === true && hint( id ).textContent === ''
+		&& hint( id ).classList.contains('nino-admin-field-hint') && hint( id ).classList.contains('is-warning') && hint( id ) !== control( id+ '-error' ) && hint( id ).parentNode === control( id+ '-error' ).parentNode
+		&& hint( id ).parentNode.children.indexOf( hint( id ) ) === hint( id ).parentNode.children.indexOf( control( id+ '-error' ) ) + 1 ) );
+	type( 'keys-form-category', 'company' );
+	type( 'keys-form-part', 'general' );
+	type( 'keys-form-name', 'title' );
+	check( 'segments that are words of the vocabulary have no hint - and nothing that describes them', ids.every( id => hint( id ).hidden === true && hint( id ).textContent === '' && control( id ).getAttribute('aria-describedby') === null ) && submit().disabled === false );
+
+	type( 'keys-form-name', 'cta' );
+	check( 'a segment that is no word gets the hint under its own field: what it is and how the panel will show it - and nothing else is marked', hint( 'keys-form-name' ).hidden === false && hint( 'keys-form-name' ).textContent === said( 'cta', 'Cta' )
+		&& hint( 'keys-form-name' ).textContent.includes( '„cta“' ) && hint( 'keys-form-name' ).textContent.includes( '„Cta“' ) && hint( 'keys-form-part' ).hidden === true && hint( 'keys-form-category' ).hidden === true );
+	check( '...nothing is refused: the key can be made, the field is not wrong and the error stays hidden - and the hint is what describes the field, so that a screen reader says it with the field', submit().disabled === false && control('keys-form-name').getAttribute('aria-invalid') === 'false'
+		&& control('keys-form-name-error').hidden === true && control('keys-form-name').getAttribute('aria-describedby') === hint( 'keys-form-name' ).id && hint( 'keys-form-name' ).id === 'keys-form-name-hint'
+		&& control('keys-form-part').getAttribute('aria-describedby') === null && control('keys-form-category').getAttribute('aria-describedby') === null );
+	type( 'keys-form-category', 'catalog' );
+	check( 'the category and the part are checked the same way, each under its own field', hint( 'keys-form-category' ).hidden === false && hint( 'keys-form-category' ).textContent === said( 'catalog', 'Catalog' ) && hint( 'keys-form-part' ).hidden === true );
+	type( 'keys-form-part', 'hero-cta' );
+	check( '...a compound of a word and one that is none is none: it is shown as the words that are there and the rest as it is written', hint( 'keys-form-part' ).hidden === false && hint( 'keys-form-part' ).textContent === said( 'hero-cta', k.U.slugLabel( 'hero-cta' ) ) );
+
+	// the rule of admin-text-smoke: a word, <word>-<number>, <word>-<word>
+	[ 'button', 'section', 'section-2', 'item-12', 'button-label', 'unit-day', 'accept-all' ].forEach( slug => {
+		type( 'keys-form-name', slug );
+		check( 'a covered slug has no hint: '+ slug, hint( 'keys-form-name' ).hidden === true && hint( 'keys-form-name' ).textContent === '' );
+	} );
+	[ 'cta-2', 'cta-button', 'button-cta', 'section-x' ].forEach( slug => {
+		type( 'keys-form-name', slug );
+		check( 'an uncovered slug has one: '+ slug, hint( 'keys-form-name' ).hidden === false && hint( 'keys-form-name' ).textContent === said( slug, k.U.slugLabel( slug ) ) );
+	} );
+
+	// what is wrong has its own line, and the hint stands aside for it
+	type( 'keys-form-name', 'Cta' );
+	check( 'a slug that is wrong has the error, and no hint beside it', control('keys-form-name-error').hidden === false && hint( 'keys-form-name' ).hidden === true && hint( 'keys-form-name' ).textContent === ''
+		&& control('keys-form-name').getAttribute('aria-describedby') === 'keys-form-name-error' );
+	type( 'keys-form-name', 'cta' );
+	check( '...and the hint is there again once it is right, and describes the field again instead of the error', control('keys-form-name-error').hidden === true && hint( 'keys-form-name' ).hidden === false && control('keys-form-name').getAttribute('aria-describedby') === 'keys-form-name-hint' );
+	type( 'keys-form-name', '' );
+	check( 'an empty field has none, and nothing describes it', hint( 'keys-form-name' ).hidden === true && hint( 'keys-form-name' ).textContent === '' && control('keys-form-name').getAttribute('aria-describedby') === null );
+
+	// the key saves as it is, with the hint on screen
+	type( 'keys-form-category', 'company' );
+	type( 'keys-form-part', 'general' );
+	type( 'keys-form-name', 'cta' );
+	k.keys._saveNewKey();
+	check( 'a key with a segment that is no word is written as typed', lastWrite( k ).endpoint === 'create' && lastWrite( k ).payload.key === '/project/company/general/cta' );
+}
+
+{
+	// the form that renames says it too: the category of a key is the template, which is a word of the vocabulary or is not
+	const k = openedKeys( keysResponse() );
+	k.keys._openGroup( 'template/page-services' );
+	k.form.querySelector('[data-key="/template/page-services/item-1/title"]').querySelectorAll('button').find( b => b.textContent === 'Umbenennen' ).click();
+	const hint = id => k.form.querySelector( '#'+ id+ '-hint' );
+	check( 'the form that renames has the line as well: the category is the template of the key, which is a word or is not - "page-services" is not', hint( 'keys-form-category' ).hidden === false
+		&& hint( 'keys-form-category' ).textContent === k.U.format( k.words['/_admin/keys/hint/not-a-word'], 'page-services', k.U.slugLabel( 'page-services' ) ) && hint( 'keys-form-part' ).hidden === true && hint( 'keys-form-name' ).hidden === true );
+	const category = k.form.querySelector('#keys-form-category');
+	category.value = 'common';
+	category.fire('change');
+	check( '...and follows the choice of the template', hint( 'keys-form-category' ).hidden === true );
 }
 
 {

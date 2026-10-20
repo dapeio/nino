@@ -1218,11 +1218,15 @@
 		 *	showed up over there after a full page reload. Called through its
 		 *	own public entry point rather than by touching its state, and
 		 *	guarded so this module still works on its own if admin.js is
-		 *	not deployed alongside it
+		 *	not deployed alongside it. Every panel that shows elements is told
+		 *	as well, by the stamp of the elements (see Nino.admin.touch()):
+		 *	a type written is the elements of it written
 		 *
 		 *	@return		void
 		 */
 		_invalidateElements : function() {
+
+			Nino.admin.touch( 'elements' );
 
 			if( wn.Nino.admin.elements === undefined )
 				return;

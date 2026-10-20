@@ -117,6 +117,23 @@ The rules the module keeps for you, and the ones it leaves to the renderer:
   A 24 by 24 stroke icon of Lucide is the shape the workbench draws, so an icon
   of that kind sits among the kernel's own; the tool builds the elements from
   the parts.
+- A `variant` is a `select` whose words are the modifiers of a class:
+  `[ 'type' => 'variant', 'options' => [ '', 'big' ], 'default' => '', 'prefix' => 'project-countdown--' ]`
+  is a style that is none or `project-countdown--big`. The options are words,
+  never class names, and a tool draws them as a row of buttons; writing the
+  class is the renderer's business, and a renderer that wants the prefix of the
+  schema reads it from the registry. `input`
+  on a `select`, a `variant` or a `bool` is a hint for the tool on how to draw
+  the attribute (`segment` or `icons` for words, `checkbox` for a flag) and
+  changes nothing about the rendering.
+- `link => true` makes a component a link where it is given one: it has an
+  `href` and a `target` without declaring them, and what the renderer made is
+  wrapped in the `<a>` they say - nothing the renderer has to know. The `<a>` is
+  then the outer element: a stylesheet rule that names the component as a direct
+  child (`>`) does not match it while it is linked, and a text that holds a link
+  of its own would be a link inside a link. `by` is the slug of who registered a
+  component: a feature's manifest has it set to the feature's key, and a module
+  of a project that says nothing is `nino`.
 
 ## 2. A stack from the project
 

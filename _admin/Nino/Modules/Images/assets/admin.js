@@ -43,6 +43,10 @@
 		_currentGroup	: null,
 		_loading			: false,
 		_ready				: false,
+		// The stamp of the templates (see Nino.admin.touch()) the slots were asked
+		// for: each slot says which pages use it, and that is what a template
+		// written since is not in
+		_stamp				: 0,
 
 		/**
 		 *	Load every image slot, group them and render the category list
@@ -55,6 +59,10 @@
 				return;
 
 			Nino.admin.images._loading = true;
+
+			// A template written while the answer is on its way is not in it: the
+			// stamp is the one from before the request went out
+			const stamp = Nino.admin.stamp( 'templates' );
 
 			Nino.admin.images._apiCall( 'list', {}, function( status, response ) {
 				Nino.admin.images._loading = false;
@@ -69,6 +77,7 @@
 				Nino.admin.images._groups = Nino.admin.images._groupSlots( response.slots );
 				Nino.admin.images._renderCategoryList();
 				Nino.admin.images._ready = true;
+				Nino.admin.images._stamp = stamp;
 
 				const named = Nino.admin.images._groupOf( hash.parts );
 
@@ -89,13 +98,24 @@
 		 *	browser's history changes the address and nothing else, so the level
 		 *	it names is shown - and leaving a form that holds unsaved input asks
 		 *	first, as its back link does. A hash that names another panel (a
-		 *	click on the rail) leaves the level in memory as it is
+		 *	click on the rail) leaves the level in memory as it is.
+		 *
+		 *	The slots are read again where a template was written since they were
+		 *	read (the Builder creates them, with the image slots they use), so
+		 *	that the list has them. Not while a category is open: the list would
+		 *	be drawn over it, and the showing that finds none open reads them
 		 *
 		 *	@return		void
 		 */
 		showCurrent : function() {
 
 			if( Nino.admin.images._ready === false ) {
+				Nino.admin.images.init();
+				return;
+			}
+
+			if( dc.getElementById('images-form').classList.contains('admin-hidden') === true && Nino.admin.stamp( 'templates' ) !== Nino.admin.images._stamp ) {
+				Nino.admin.images._ready = false;
 				Nino.admin.images.init();
 				return;
 			}
@@ -599,6 +619,8 @@
 					return;
 				}
 
+				Nino.admin.touch( 'slots' );
+
 				editor.slot.alt = response.alt || {};
 				Object.keys( editor.inputs ).forEach( function( locale ) {
 					if( editor.inputs[locale].value === sent[locale] )
@@ -735,6 +757,8 @@
 					return;
 				}
 
+				Nino.admin.touch( 'slots' );
+
 				slot.url = null;
 				preview.hidden = true;
 				removeBtn.hidden = true;
@@ -783,6 +807,8 @@
 						msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/images/error/save' );
 						return;
 					}
+
+					Nino.admin.touch( 'slots' );
 
 					slot.url = response.url;
 

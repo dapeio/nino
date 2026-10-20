@@ -41,6 +41,10 @@
 		_currentRuntime : null,
 		_isNew 					: false,
 		_ready 					: false,
+		// The stamp of the templates (see Nino.admin.touch()) the list was asked
+		// for: the form offers the templates the answer held, and one written
+		// since is not among them
+		_stamp 					: 0,
 
 		/**
 		 *	Load the persisted page list and render it
@@ -51,6 +55,10 @@
 
 			if( dc.getElementById('routes-list') === null )
 				return;
+
+			// A template written while the answer is on its way is not in it: the
+			// stamp is the one from before the request went out
+			const stamp = Nino.admin.stamp( 'templates' );
 
 			Nino.admin.routes._apiCall( 'list', {}, function( status, response ) {
 				if( status !== 200 || response === null )
@@ -66,11 +74,16 @@
 				Nino.admin.routes._renderList();
 				Nino.admin.routes._showList();
 				Nino.admin.routes._ready = true;
+				Nino.admin.routes._stamp = stamp;
 			} );
 		},
 
 		/**
-		 *	Re-show whichever level (list or form) is currently on
+		 *	Re-show whichever level (list or form) is currently on - and read
+		 *	the list again first where a page template was written since it was
+		 *	read (the Builder creates them), so that the form's select offers it.
+		 *	Not while a form is open: the list would be drawn over it, and the
+		 *	showing that finds none open reads it
 		 *
 		 *	@return		void
 		 */
@@ -81,6 +94,9 @@
 
 			if( dc.getElementById('routes-form').classList.contains('admin-hidden') === false )
 				return Nino.admin.routes._showForm();
+
+			if( Nino.admin.stamp( 'templates' ) !== Nino.admin.routes._stamp )
+				return Nino.admin.routes.init();
 
 			Nino.admin.routes._showList();
 		},
@@ -355,6 +371,8 @@
 					} );
 					return;
 				}
+
+				Nino.admin.touch( 'routes' );
 
 				Nino.admin.routes._pages = response.pages;
 				Nino.admin.routes._renderList();
@@ -877,6 +895,7 @@
 					report( false );
 					return;
 				}
+				Nino.admin.touch( 'routes' );
 				msg.textContent = Nino.content.getText('/_admin/common/msg/saved');
 				if( typeof Nino.admin.dirty === 'object' )
 					Nino.admin.dirty.snapshot( 'routes' );
@@ -903,6 +922,7 @@
 					report( false );
 					return;
 				}
+				Nino.admin.touch( 'routes' );
 				msg.textContent = Nino.content.getText('/_admin/common/msg/saved');
 				if( typeof Nino.admin.dirty === 'object' )
 					Nino.admin.dirty.snapshot( 'routes' );
@@ -993,6 +1013,7 @@
 					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/delete' );
 					return;
 				}
+				Nino.admin.touch( 'routes' );
 				Nino.admin.routes.init();
 			} );
 		},

@@ -32,6 +32,7 @@ return [
 	'[[/_admin/elements/label/reference-add]]'		=> 'Add',
 	'[[/_admin/elements/label/reference-full]]'	=> 'Maximum number reached.',
 	'[[/_admin/elements/label/save]]'			=> 'Save',
+	'[[/_admin/elements/label/save-again]]'	=> 'Save and add another',
 	'[[/_admin/elements/label/delete]]'		=> 'Delete',
 	'[[/_admin/elements/label/duplicate]]'	=> 'Duplicate',
 	'[[/_admin/elements/msg/duplicated]]'	=> 'A copy of the values, not yet an element - give it a uri and save.',

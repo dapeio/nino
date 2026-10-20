@@ -493,8 +493,10 @@ namespace Nino {
 			// The components and the stacks a feature declares: name => schema,
 			// each read the way \Nino\Modules\Components registers a schema, so
 			// that the manifest is refused here and not when a request is
-			// rendered. The callbacks are not declared but derived (see
-			// registerComponents())
+			// rendered - and a component's schema as it is registered, which is
+			// the feature's own: "by", the registry's word for who registered it,
+			// is the key of the feature whatever the schema says. The callbacks
+			// are not declared but derived (see registerComponents())
 			$declared = [ 'components' => [], 'stacks' => [] ];
 			foreach( $declared as $what => $none ) {
 
@@ -506,6 +508,9 @@ namespace Nino {
 					$clean = \Nino\Modules\Components::validate( (string) $name, $schema, $what === 'stacks' );
 					if( is_string( $clean ) === true )
 						return $fail( $clean );
+
+					if( $what === 'components' )
+						$clean['by'] = $key;
 
 					$declared[$what][(string) $name] = $clean;
 				}
@@ -545,7 +550,10 @@ namespace Nino {
 		 *	manifest are then one method, which is handed the arguments the way
 		 *	any renderer is, made ready. A stack keeps the strict rule. A renderer
 		 *	the class does not have is said out loud and skipped, the way a
-		 *	callback that is not callable is.
+		 *	callback that is not callable is. A component is registered as the
+		 *	feature's own - its schema says 'by' the key of the manifest (see
+		 *	manifest()) - which is how a tool that lists the registry tells it
+		 *	from the kernel's.
 		 *
 		 *	Asked at every boot, by the Components module, and so only the
 		 *	manifests of the features listed in '/nino/modules' are read: not

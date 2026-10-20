@@ -27,11 +27,11 @@
  *			and a size (--font-<role>-weight, -transform and -size). What
  *			reads which is said beside the defaults in :root.
  *
- *			A section, a column and a card paint a ground with the same words
- *			(alt, tint, dark, black, primary, brand-alt, and counter on a
- *			column and a card): --color-ground and --color-ink name the one a
- *			thing sits on, and the roles solved against it follow. That is said
- *			beside the defaults in :root and under Grounds in chapter 04.
+ *			A section, a row, a column and a card paint a ground with the same
+ *			words (alt, tint, dark, black, primary, brand-alt, and counter on a
+ *			row, a column and a card): --color-ground and --color-ink name the
+ *			one a thing sits on, and the roles solved against it follow. That is
+ *			said beside the defaults in :root and under Grounds in chapter 04.
  *
  *			--base-size and --text-4/-5/-6 step up at the 768px breakpoint (see
  *			the @media block right below :root) - mobile-first fluid type, not
@@ -176,18 +176,20 @@
 	--color-border-primary: var(--color-border);
 	--color-border-brand-alt: var(--color-border);
 
-	/*	What a column and a card become on the counter ground, in three
+	/*	What a row, a column and a card become on the counter ground, in three
 		families of properties, one for each part of a ground (bg, text, title,
 		accent, focus, border). The framework alone sets them; a theme never
 		writes one:
-			--counter-grid-*        what a .nino-grid--counter becomes
+			--counter-grid-*        what a .nino-grid--counter and a
+			                        .nino-grid-row--counter become
 			--counter-grid-next-*   what a .nino-card--counter in a
 			                        .nino-grid--counter becomes
 			--counter-card-*        what a .nino-card--counter becomes
-		These are the page's, whose ground is default: a column stands out of it
-		as alt and a card in that column as default again, a card straight on the
-		page as alt. A section answers for its own ground, a column with a ground
-		for the cards in it - Grounds in chapter 04 has the rules and the pairs.	*/
+		These are the page's, whose ground is default: a row or a column stands
+		out of it as alt and a card in that column as default again, a card
+		straight on the page as alt. A section and a row with a ground answer
+		for their own ground, a column with a ground for the cards in it -
+		Grounds in chapter 04 has the rules and the pairs.	*/
 	--counter-grid-bg: var(--color-section-alt-bg);
 	--counter-grid-text: var(--color-section-alt-text);
 	--counter-grid-title: var(--color-section-alt-text);
@@ -385,11 +387,24 @@
 /*	A section or a card that sets --whitespace-scale of its own: what stands in
 	it takes its number, not the page's. A custom property that is worked out
 	from another is worked out where it is declared and inherited as the value
-	it came to, so the two strengths of :root would stay the page's	*/
-.nino-section, .nino-card {
+	it came to, so the two strengths of :root would stay the page's - and the
+	same goes for any element a whitespace class is written on (below)	*/
+.nino-section, .nino-card,
+.nino-whitespace--least, .nino-whitespace--less, .nino-whitespace--more, .nino-whitespace--most {
 	--whitespace-gap: calc( 1 + ( var(--whitespace-scale) - 1 ) * .8 );
 	--whitespace-text: calc( 1 + ( var(--whitespace-scale) - 1 ) * .6 );
 }
+/*	The four positions of the whitespace around the middle, as classes: the
+	number of the page is the middle one, and these are the two steps below and
+	above it - the four outer values of the ladder the Design feature gives its
+	whitespace position (Setup::WHITESPACE), which these mirror. On a section or
+	a card, or on any element whose content is to have more or less air than the
+	page: it sets the number and everything that reads it, the strengths above
+	included, follows	*/
+.nino-whitespace--least { --whitespace-scale: .75; }
+.nino-whitespace--less { --whitespace-scale: .9; }
+.nino-whitespace--more { --whitespace-scale: 1.5; }
+.nino-whitespace--most { --whitespace-scale: 2; }
 
 
 /****************************************************************************************************
@@ -925,9 +940,11 @@ body.nino-scroll-down .nino-scroll-header {
  *
  *
  *			.nino-hero(--fullscreen), .nino-hero(-title, -subtitle, -arrowdown)
- *			.nino-section(--alt, --tint, --dark, --black, --primary, --brand-alt, --fullwidth, --border-1/2/3), .nino-section(-title, -subtitle)
+ *			.nino-section(--alt, --tint, --dark, --black, --primary, --brand-alt, --dim, --fullwidth, --border-1/2/3), .nino-section(-title, -subtitle)
+ *			.nino-grid-row(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim), .nino-grid-row-bg
  *			.nino-grid(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim)
  *			.nino-card(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim, --fill, --middle, --bottom, --last-bottom, --fullwidth), .nino-card(-content, -title, -subtitle, -descr, -img, -price, -bg)
+ *			.nino-ink(--muted, --accent)
  *
  *
  ****************************************************************************************************/
@@ -964,12 +981,18 @@ body.nino-scroll-down .nino-scroll-header {
 .nino-hero-title--loud { font-size: calc( var(--font-title-size) * var(--hero-title-scale) * var(--scale-loud) ); line-height: calc( var(--font-title-size) * var(--hero-title-scale) * var(--scale-loud) ); }
 .nino-hero-subtitle--quiet { font-size: calc( var(--font-subtitle-size) * var(--hero-text-scale) * var(--scale-quiet) ); line-height: calc( var(--font-subtitle-size) * var(--hero-text-scale) * var(--scale-quiet) *1.4 / 1.2 ); opacity: .7; }
 .nino-hero-subtitle--loud { font-size: calc( var(--font-subtitle-size) * var(--hero-text-scale) * var(--scale-loud) ); line-height: calc( var(--font-subtitle-size) * var(--hero-text-scale) * var(--scale-loud) *1.3 / 1.2 ); opacity: 1; }
-/*	Self-contained: the chevron is a background SVG (currentColor, so it
- *	always matches the hero's own text color - dark hero, light hero,
- *	whatever), so using it is just <button class="nino-hero-arrowdown"
- *	data-arrow-target="#some-id">label</button> - no icon markup, no extra
- *	CSS file. Click behavior (smooth-scroll to data-arrow-target) is wired
- *	in Nino.ui.js */
+/*	Self-contained: the chevron is a mask over currentColor, so it always
+ *	matches the text color around it - dark hero, light hero, whatever - and
+ *	using it is just <a class="nino-hero-arrowdown" href="#some-id"
+ *	aria-label="...">, which [scroll-hint] writes, or the button of old,
+ *	<button class="nino-hero-arrowdown" data-arrow-target="#some-id">label</button>
+ *	- no icon markup, no extra CSS file. The mask is on the ::before and never
+ *	on the arrow: a mask clips everything its element paints, and the focus
+ *	ring is painted outside the box, so an arrow that wore the mask itself
+ *	would show a keyboard user no ring at all. A link with data-arrow-next and
+ *	a # for an address goes to the section after the one it is in. Click
+ *	behavior (smooth-scroll to data-arrow-target, or to the next section) is
+ *	wired in Nino.ui.js */
 .nino-hero-arrowdown {
 	position: absolute;
 	bottom: var(--space-2);
@@ -981,13 +1004,23 @@ body.nino-scroll-down .nino-scroll-header {
 	padding: 0;
 	border: none;
 	background-color: transparent;
-	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 330 330'%3E%3Cpath fill='%23fff' d='M325.607 79.393c-5.857-5.857-15.355-5.858-21.213.001L165.004 218.787 25.607 79.393c-5.857-5.857-15.355-5.858-21.213.001-5.858 5.858-5.858 15.355 0 21.213l150.004 150c2.813 2.813 6.628 4.393 10.606 4.393s7.794-1.581 10.606-4.394l149.996-150c5.859-5.857 5.859-15.355.001-21.213z'/%3E%3C/svg%3E");
-	background-repeat: no-repeat;
-	background-position: center;
-	background-size: contain;
 	color: inherit;
 	cursor: pointer;
 	animation: nino-hero-arrowdown-bounce 1.8s ease-in-out infinite;
+}
+.nino-hero-arrowdown::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background-color: currentColor;
+	-webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 330 330'%3E%3Cpath fill='%23fff' d='M325.607 79.393c-5.857-5.857-15.355-5.858-21.213.001L165.004 218.787 25.607 79.393c-5.857-5.857-15.355-5.858-21.213.001-5.858 5.858-5.858 15.355 0 21.213l150.004 150c2.813 2.813 6.628 4.393 10.606 4.393s7.794-1.581 10.606-4.394l149.996-150c5.859-5.857 5.859-15.355.001-21.213z'/%3E%3C/svg%3E");
+	mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 330 330'%3E%3Cpath fill='%23fff' d='M325.607 79.393c-5.857-5.857-15.355-5.858-21.213.001L165.004 218.787 25.607 79.393c-5.857-5.857-15.355-5.858-21.213.001-5.858 5.858-5.858 15.355 0 21.213l150.004 150c2.813 2.813 6.628 4.393 10.606 4.393s7.794-1.581 10.606-4.394l149.996-150c5.859-5.857 5.859-15.355.001-21.213z'/%3E%3C/svg%3E");
+	-webkit-mask-repeat: no-repeat;
+	mask-repeat: no-repeat;
+	-webkit-mask-position: center;
+	mask-position: center;
+	-webkit-mask-size: contain;
+	mask-size: contain;
 }
 @keyframes nino-hero-arrowdown-bounce {
 	0%, 100% { transform: translateX(-50%) translateY(0); }
@@ -1022,10 +1055,11 @@ body.nino-scroll-down .nino-scroll-header {
 .nino-section--fullwidth > .nino-grid-row {
 	max-width: none;
 }
-/*	Grounds. A section, a column and a card paint a ground with the same
-	words - alt, tint, dark, black, primary and brand-alt, written
-	.nino-section--<x>, .nino-grid--<x> and .nino-card--<x> - and a column
-	and a card may also ask for the counter ground, below. A ground is a
+/*	Grounds. A section, a row, a column and a card paint a ground with the
+	same words - alt, tint, dark, black, primary and brand-alt, written
+	.nino-section--<x>, .nino-grid-row--<x>, .nino-grid--<x> and
+	.nino-card--<x> - and a row, a column and a card may also ask for the
+	counter ground, below. A ground is a
 	surface, the ink solved for it and the roles solved against the pair: it
 	paints itself with the first two and hands all of them to what stands in
 	it, so that a title, a link, a button or a ring never has to know which
@@ -1041,7 +1075,7 @@ body.nino-scroll-down .nino-scroll-header {
 	and the arrow of a hero take the ink the ground paints. No rule of a
 	section stands above them, because it would reach past a column or a card
 	of another ground in between and write the ink of the section on it.	*/
-.nino-section--dark, .nino-grid--dark, .nino-card--dark {
+.nino-section--dark, .nino-grid--dark, .nino-card--dark, .nino-grid-row--dark {
 	--color-ground: var(--color-section-dark-bg);
 	--color-ink: var(--color-section-dark-text);
 	--color-title: var(--color-section-dark-text);
@@ -1052,7 +1086,7 @@ body.nino-scroll-down .nino-scroll-header {
 	background-color: var(--color-ground);
 	color: var(--color-ink);
 }
-.nino-section--black, .nino-grid--black, .nino-card--black {
+.nino-section--black, .nino-grid--black, .nino-card--black, .nino-grid-row--black {
 	--color-ground: var(--color-section-black-bg);
 	--color-ink: var(--color-section-black-text);
 	--color-title: var(--color-section-black-text);
@@ -1067,7 +1101,7 @@ body.nino-scroll-down .nino-scroll-header {
 	the ink solved for it, and that ink is also what a title, a link and a
 	ring on them are: an accent solved against a page would not clear the
 	target on a brand surface	*/
-.nino-section--primary, .nino-grid--primary, .nino-card--primary {
+.nino-section--primary, .nino-grid--primary, .nino-card--primary, .nino-grid-row--primary {
 	--color-ground: var(--color-primary);
 	--color-ink: var(--color-primary-text);
 	--color-title: var(--color-primary-text);
@@ -1078,7 +1112,7 @@ body.nino-scroll-down .nino-scroll-header {
 	background-color: var(--color-ground);
 	color: var(--color-ink);
 }
-.nino-section--alt, .nino-grid--alt, .nino-card--alt {
+.nino-section--alt, .nino-grid--alt, .nino-card--alt, .nino-grid-row--alt {
 	--color-ground: var(--color-section-alt-bg);
 	--color-ink: var(--color-section-alt-text);
 	--color-title: var(--color-section-alt-text);
@@ -1089,7 +1123,7 @@ body.nino-scroll-down .nino-scroll-header {
 	background-color: var(--color-ground);
 	color: var(--color-ink);
 }
-.nino-section--tint, .nino-grid--tint, .nino-card--tint {
+.nino-section--tint, .nino-grid--tint, .nino-card--tint, .nino-grid-row--tint {
 	--color-ground: var(--color-section-tint-bg);
 	--color-ink: var(--color-section-tint-text);
 	--color-title: var(--color-section-tint-text);
@@ -1100,7 +1134,7 @@ body.nino-scroll-down .nino-scroll-header {
 	background-color: var(--color-ground);
 	color: var(--color-ink);
 }
-.nino-section--brand-alt, .nino-grid--brand-alt, .nino-card--brand-alt {
+.nino-section--brand-alt, .nino-grid--brand-alt, .nino-card--brand-alt, .nino-grid-row--brand-alt {
 	--color-ground: var(--color-brand-alt);
 	--color-ink: var(--color-brand-alt-text);
 	--color-title: var(--color-brand-alt-text);
@@ -1118,18 +1152,21 @@ body.nino-scroll-down .nino-scroll-header {
 	and primary for brand-alt - and default for tint, which is a wash of the
 	page: a card of the alt surface on it reads worse than the page's own,
 	and default is what an alt card on a tint section has always become. A
-	column and a card ask for it by name, .nino-grid--counter and
-	.nino-card--counter, and nothing is told which ground they sit on: the
-	answer travels in the three families of :root, one property for each part
-	of a ground. A section sets them to the counter of its own ground (grid,
-	card) and to the counter of that (grid-next); a column with a ground sets
-	the card family; and a counter column sets its own ground from grid and
-	the card family from grid-next - a var() that resolves against what the
-	section left for it, so it needs no condition. Section alt > column
-	counter > card counter is default and then alt; every nesting of the three
-	levels is the same two steps, with no selector that names one ground
-	above another.	*/
-.nino-section--dark {
+	row, a column and a card ask for it by name, .nino-grid-row--counter,
+	.nino-grid--counter and .nino-card--counter, and nothing is told which
+	ground they sit on: the answer travels in the three families of :root,
+	one property for each part of a ground. A section sets them to the
+	counter of its own ground (grid, card) and to the counter of that
+	(grid-next), and a row with a ground does the same for what stands in
+	it; a column with a ground sets the card family; and a counter row or
+	column sets its own ground from grid and the card family from grid-next
+	- a var() that resolves against what the section left for it, so it
+	needs no condition. Section alt > column counter > card counter is
+	default and then alt; every nesting of the levels is the same two steps,
+	with no selector that names one ground above another. The families hold
+	two steps, so a counter column in a counter row is the ground of the row
+	and only its cards step again.	*/
+.nino-section--dark, .nino-grid-row--dark {
 	--counter-grid-bg: var(--color-section-black-bg);
 	--counter-grid-text: var(--color-section-black-text);
 	--counter-grid-title: var(--color-section-black-text);
@@ -1149,7 +1186,7 @@ body.nino-scroll-down .nino-scroll-header {
 	--counter-card-focus: var(--color-focus-black);
 	--counter-card-border: var(--color-border-black);
 }
-.nino-section--black {
+.nino-section--black, .nino-grid-row--black {
 	--counter-grid-bg: var(--color-section-dark-bg);
 	--counter-grid-text: var(--color-section-dark-text);
 	--counter-grid-title: var(--color-section-dark-text);
@@ -1169,7 +1206,7 @@ body.nino-scroll-down .nino-scroll-header {
 	--counter-card-focus: var(--color-focus-dark);
 	--counter-card-border: var(--color-border-dark);
 }
-.nino-section--primary {
+.nino-section--primary, .nino-grid-row--primary {
 	--counter-grid-bg: var(--color-brand-alt);
 	--counter-grid-text: var(--color-brand-alt-text);
 	--counter-grid-title: var(--color-brand-alt-text);
@@ -1189,7 +1226,7 @@ body.nino-scroll-down .nino-scroll-header {
 	--counter-card-focus: var(--color-brand-alt-text);
 	--counter-card-border: var(--color-border-brand-alt);
 }
-.nino-section--alt {
+.nino-section--alt, .nino-grid-row--alt {
 	--counter-grid-bg: var(--color-section-default-bg);
 	--counter-grid-text: var(--color-section-default-text);
 	--counter-grid-title: var(--color-title-default);
@@ -1209,7 +1246,7 @@ body.nino-scroll-down .nino-scroll-header {
 	--counter-card-focus: var(--color-focus-default);
 	--counter-card-border: var(--color-border-default);
 }
-.nino-section--tint {
+.nino-section--tint, .nino-grid-row--tint {
 	--counter-grid-bg: var(--color-section-default-bg);
 	--counter-grid-text: var(--color-section-default-text);
 	--counter-grid-title: var(--color-title-default);
@@ -1229,7 +1266,7 @@ body.nino-scroll-down .nino-scroll-header {
 	--counter-card-focus: var(--color-focus-default);
 	--counter-card-border: var(--color-border-default);
 }
-.nino-section--brand-alt {
+.nino-section--brand-alt, .nino-grid-row--brand-alt {
 	--counter-grid-bg: var(--color-primary);
 	--counter-grid-text: var(--color-primary-text);
 	--counter-grid-title: var(--color-primary-text);
@@ -1304,7 +1341,7 @@ body.nino-scroll-down .nino-scroll-header {
 	--counter-card-focus: var(--color-primary-text);
 	--counter-card-border: var(--color-border-primary);
 }
-.nino-grid--counter {
+.nino-grid--counter, .nino-grid-row--counter {
 	--color-ground: var(--counter-grid-bg);
 	--color-ink: var(--counter-grid-text);
 	--color-title: var(--counter-grid-title);
@@ -1347,6 +1384,21 @@ body.nino-scroll-down .nino-scroll-header {
 	--counter-card-border: var(--color-border-black);
 	background-color: var(--color-ground);
 	color: var(--color-ink);
+}
+
+/*	A row that paints a ground - what a section has inside, the colour round
+	the columns and not round the section - is the grounds above for a row, and
+	is built as a column that paints one is: it keeps its content off the colour
+	and is rounded as a card is. The room above and below is the section's own
+	step times the whitespace, the gutter at the sides what a row has and the
+	width ladder's to move, and the row keeps its maximum width. A row with a
+	picture behind it (the block of its own, below) is the same box, and a
+	dimmed one is the dark of its scrim: it is in the list of the inks of a
+	dimmed cover, which comes after the grounds	*/
+.nino-grid-row--alt, .nino-grid-row--tint, .nino-grid-row--dark, .nino-grid-row--black, .nino-grid-row--primary, .nino-grid-row--brand-alt, .nino-grid-row--counter, .nino-grid-row--dim,
+.nino-grid-row:has(> .nino-grid-row-bg) {
+	padding: calc(var(--space-3) * var(--whitespace-scale)) var(--grid-gutter);
+	border-radius: var(--radius-small);
 }
 
 /*	A section title and a section subtitle take the size of their role times a
@@ -1447,8 +1499,9 @@ body.nino-scroll-down .nino-scroll-header {
 	and the arrow of a hero take the colours of the scrim without a rule of the
 	cover's own. Body copy, icons and anything else placed in a cover take
 	their colour from the page, and on a dimmed photograph the page's ink is
-	dark ink on a dark ground	*/
-.nino-cover--dim {
+	dark ink on a dark ground. A plain section with a picture behind it and a
+	row with one are dimmed the same way, and have the same ink	*/
+.nino-cover--dim, .nino-section--dim, .nino-grid-row--dim {
 	color: var(--color-section-black-text);
 	--color-ground: var(--color-section-black-bg);
 	--color-ink: var(--color-section-black-text);
@@ -1611,6 +1664,17 @@ body.nino-scroll-down .nino-scroll-header {
 .nino-card-subtitle--loud { font-size: calc( var(--font-subtitle-size) * var(--card-subtitle-scale) * var(--scale-loud) ); }
 .nino-card-descr--quiet { font-size: calc( var(--font-text-size) * var(--scale-quiet) ); opacity: .8; }
 .nino-card-descr--loud { font-size: calc( var(--font-text-size) * var(--scale-loud) ); line-height: calc( var(--font-text-size) * var(--scale-loud) *1.4 ); }
+
+/*	The colour of a title, a subtitle or a text: one of the inks the ground it
+	stands on resolves - --color-subtitle, the quiet one, and --color-accent,
+	the brand as ink on that ground - and so a role and never a colour. There is
+	no light and no dark and no status colour among them: a ground says what is
+	light on it, and the word that is white on a dark section is dark on the
+	next. After every rule of a title, a subtitle and a text, which set the
+	colour of their own at the specificity of one class, so that these are the
+	ones that win	*/
+.nino-ink--muted { color: var(--color-subtitle); }
+.nino-ink--accent { color: var(--color-accent); }
 
 .nino-card-img--maxheight {
 	max-height: var(--card-img-max-height);
@@ -1834,6 +1898,17 @@ body.nino-scroll-down .nino-scroll-header {
 	font-size: calc( var(--font-button-size) * 1.3);
 	border-radius: calc( var(--radius) * 1.3 );
 }
+/*	As wide as the box it stands in. The column of a stack and a flex card
+	place a button at the start (above and below), where an item is as wide as
+	its label - the width is stated here, so that the placement has nothing to
+	shrink, and the label stands in the middle of it	*/
+.nino-btn--fullwidth {
+	display: block;
+	width: 100%;
+	text-align: center;
+	justify-self: stretch;
+	align-self: stretch;
+}
 
 /*	One visible focus ring for everything that can take focus, rather than a
 	handful of components that each remembered to draw one and everything else
@@ -1965,10 +2040,10 @@ textarea:disabled {
 	position: relative;
 	overflow: hidden;
 }
-/* The frame with rounded corners - [image style="nino-image--rounded"] puts
-   the style on the frame, never on the picture: the frame has the overflow,
-   so its corners are the picture's. A design layer with corners of its own
-   says this class again with them */
+/* The frame with rounded corners - [image style="rounded"] puts this class
+   on the frame, never on the picture: the frame has the overflow, so its
+   corners are the picture's. A design layer with corners of its own says
+   this class again with them */
 .nino-image--rounded {
 	border-radius: var(--radius-large);
 }
@@ -3177,6 +3252,16 @@ header .nino-headernav-logo:empty {
 	position: relative;
 	z-index: 101;
 }
+/*	The scrim of a plain section with a picture behind it, which has no cover
+	to draw one with: the block of the picture draws it over the picture, at
+	the size of the block, as the block of a column does. The row stands above
+	it, and the ink of the section is the dimmed cover's (see .nino-cover--dim)	*/
+.nino-section--dim > .nino-section-bg::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background-color: var(--color-background-dim);
+}
 /*	A section with a picture behind it that is taller than what it holds - a
 	height of its own, a hero that is a screen high - keeps its row in the
 	middle of it, as a cover does, and not at its top where the flow puts it.
@@ -3326,6 +3411,38 @@ header .nino-headernav-logo:empty {
 	object-fit: cover;
 }
 .nino-card--dim > .nino-card-bg::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background-color: var(--color-background-dim);
+}
+
+/*	The picture behind a row, in a block of its own that the columns of the row
+	follow: what .nino-grid-bg is to a column, for a row - it lies over the whole
+	row, is cut at its corners, and the picture covers it. The row with a picture
+	is the box it is placed in and a stacking context of its own, so that the
+	picture goes behind the columns without leaving the row, and it is cut at its
+	own edge as well. --dim darkens the picture with the scrim of a dimmed cover,
+	and the row writes in the ink of that (see .nino-cover--dim)	*/
+.nino-grid-row-bg {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	border-radius: inherit;
+	z-index: -1;
+}
+.nino-grid-row-bg > img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+.nino-grid-row:has(> .nino-grid-row-bg) {
+	position: relative;
+	isolation: isolate;
+	overflow: hidden;
+}
+.nino-grid-row--dim > .nino-grid-row-bg::after {
 	content: '';
 	position: absolute;
 	inset: 0;

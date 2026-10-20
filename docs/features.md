@@ -122,7 +122,11 @@ left out. The Components module registers both at every boot while the feature i
 listed in `/nino/modules`, before its `init()` (activation lists a feature after
 that module). A component is registered one way, by the manifest or by
 `addComponent()` in `init()`; [`\Nino\Feature::shortcode()`](#the-toolset) keeps a
-plain registration from meeting the manifest's.
+plain registration from meeting the manifest's. A component of a manifest is
+registered as the feature's own: the registry says so in `by`, the feature's key,
+whatever the schema says - the manifest as it is read says so too, so that what
+is registered is what the manifest declares - and a tool such as the Builder
+groups what it offers by it.
 
 ### The manual
 

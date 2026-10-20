@@ -42,6 +42,25 @@ check( 'a pane the shell rendered is a panel the router knows', editor.router.ex
 check( 'a tab of a pane is a panel of its own to the router', editor.router.exists('roles') === true );
 check( 'a name without a pane, or one that is not a slug, is no panel', editor.router.exists('nope') === false && editor.router.exists('Roles') === false && editor.router.exists( 42 ) === false );
 
+/*	What one panel tells another: a counter for each kind of data the panels
+	write, raised by whoever wrote it and read by the panels that show it - no
+	event, no list of listeners (see Nino.admin.touch())	*/
+const kinds = [ 'templates', 'texts', 'elements', 'slots', 'routes', 'navigations' ];
+check( 'every kind of data starts with nothing written, in a page that has just been loaded', kinds.every( function( kind ) { return editor.stamp( kind ) === 0 } ) );
+editor.touch( 'templates' );
+editor.touch( 'templates' );
+editor.touch( 'routes' );
+check( 'a touch raises the stamp of its kind by one, and of no other', editor.stamp( 'templates' ) === 2 && editor.stamp( 'routes' ) === 1
+	&& [ 'texts', 'elements', 'slots', 'navigations' ].every( function( kind ) { return editor.stamp( kind ) === 0 } ) );
+editor.touch( 'nope' );
+editor.touch( 'toString' );
+editor.touch( '__proto__' );
+editor.touch( undefined );
+check( 'a kind that is none of them is ignored by touch() and reads 0 - whatever its name, an inherited property of an object included',
+	editor.stamp( 'nope' ) === 0 && editor.stamp( 'toString' ) === 0 && editor.stamp( '__proto__' ) === 0 && editor.stamp( undefined ) === 0
+	&& Object.keys( editor._stamps ).sort().join() === kinds.slice().sort().join() && editor.stamp( 'templates' ) === 2 );
+check( 'the stamps are numbers a panel compares by being unequal: a second touch is a different stamp from the first', ( function() { const before = editor.stamp( 'slots' ); editor.touch( 'slots' ); return typeof before === 'number' && editor.stamp( 'slots' ) !== before } )() );
+
 editor.decodeEntities = function( value ) { return value };
 check( 'a leading equals sign is exported as explicit text', editor.csvCell('=2+2') === "'=2+2" );
 check( 'a formula marker hidden behind whitespace is neutralized too', editor.csvCell(' \t+SUM(A1:A2)') === "' \t+SUM(A1:A2)" );

@@ -37,6 +37,52 @@ const withPicture = parallex( picture, 120 );
 // a wrapper this does not look into
 const withoutPicture = parallex( null, 200 );
 
+/**
+ *	Something an arrow can scroll to: it records how it was scrolled to
+ *
+ *	@return		{Object}
+ */
+function scrollTarget() {
+	return { scrolled : [], scrollIntoView : function( options ) { this.scrolled.push( options.behavior ) } };
+}
+
+/**
+ *	The arrow of a hero: it takes a click listener, answers the two questions
+ *	the script asks it - its data attributes and its section - and clicks, with
+ *	an event that remembers whether it was told not to follow its link
+ *
+ *	@param		{Object}			attributes		{ target: the selector of data-arrow-target, next: whether it has data-arrow-next }
+ *	@param		{Object|null}	section				The section the arrow is in, none for an arrow that is in no section
+ *
+ *	@return		{Object}
+ */
+function arrow( attributes, section ) {
+
+	const node = {
+		dataset : attributes.target === undefined ? {} : { arrowTarget : attributes.target },
+		listeners : [],
+		addEventListener : function( name, listener ) { if( name === 'click' ) node.listeners.push( listener ) },
+		hasAttribute : function( name ) { return name === 'data-arrow-next' && attributes.next === true },
+		closest : function( selector ) { return selector === 'section' ? section : null },
+		click : function() {
+			const event = { prevented : false, preventDefault : function() { event.prevented = true } };
+			node.listeners.forEach( function( listener ) { listener.call( node, event ) } );
+			return event;
+		},
+	};
+
+	return node;
+}
+
+const nextSection = scrollTarget();
+const targeted = scrollTarget();
+const heroSection = { nextElementSibling : nextSection };
+const lastSection = { nextElementSibling : null };
+const arrows = {
+	next : arrow( { next : true }, heroSection ), targeted : arrow( { target : '#targeted' }, heroSection ), both : arrow( { target : '#targeted', next : true }, heroSection ),
+	last : arrow( { next : true }, lastSection ), nowhere : arrow( { next : true }, null ), plain : arrow( {}, heroSection ),
+};
+
 const frames = [];
 
 const documentElement = { clientHeight : 800, clientWidth : 1440, scrollLeft : 0, scrollTop : 0, style : {} };
@@ -55,8 +101,12 @@ const document = {
 	body : body,
 	documentElement : documentElement,
 	getElementById : function() { return null },
-	querySelector : function() { return null },
-	querySelectorAll : function( selector ) { return selector === '.nino-parallex' ? [ withPicture, withoutPicture ] : [] },
+	querySelector : function( selector ) { return selector === '#targeted' ? targeted : null },
+	querySelectorAll : function( selector ) {
+		if( selector === '.nino-hero-arrowdown' )
+			return Object.values( arrows );
+		return selector === '.nino-parallex' ? [ withPicture, withoutPicture ] : [];
+	},
 	createElement : function() { return { classList : classList(), style : {}, setAttribute : function() {}, appendChild : function() {} } },
 };
 
@@ -143,6 +193,29 @@ reducedMotion = false;
 
 const uiSource = fs.readFileSync( path.join( __dirname, '../_nino/Nino.ui.js' ), 'utf8' );
 check( 'no scroll in the file hardcodes the ride', /behavior:\s*'smooth'/.test( uiSource.replace( /^\s*\*.*$/gm, '' ) ) === false );
+
+
+// --- The arrow of a hero -------------------------------------------------
+
+/*	The link [scroll-hint] writes has a # for an address and says data-arrow-next:
+	the script takes it to what follows the section it is in - a # that followed
+	itself would take the page to its top - and the hand-written arrow, a button
+	with data-arrow-target, goes where it always went	*/
+const nextClick = arrows.next.click();
+check( 'the arrow marked data-arrow-next scrolls to what follows its section, as the visitor travels, and its # is not followed', nextSection.scrolled.join() === 'smooth' && nextClick.prevented === true );
+reducedMotion = true;
+arrows.next.click();
+reducedMotion = false;
+check( '...and a visitor who asked for less motion is put there', nextSection.scrolled.join() === 'smooth,auto' );
+const targetClick = arrows.targeted.click();
+check( 'the arrow with a data-arrow-target scrolls to its target, as it did, and has nothing to prevent', targeted.scrolled.join() === 'smooth' && targetClick.prevented === false && nextSection.scrolled.length === 2 );
+arrows.both.click();
+check( '...and where it says both, the target it names wins', targeted.scrolled.length === 2 && nextSection.scrolled.length === 2 );
+const lastClick = arrows.last.click();
+const nowhereClick = arrows.nowhere.click();
+check( 'an arrow with no section after its own, or in none, scrolls nowhere - and its # still does not take the page to the top', nextSection.scrolled.length === 2 && targeted.scrolled.length === 2 && lastClick.prevented === true && nowhereClick.prevented === true );
+const plainClick = arrows.plain.click();
+check( 'an arrow with neither attribute is a link like any other: the script does nothing for it', plainClick.prevented === false && nextSection.scrolled.length === 2 && targeted.scrolled.length === 2 );
 
 /*	How an ordinary anchor travels is the stylesheet's to say: Nino.css sets
 	html's scroll-behavior and takes it back for a visitor who asked for less

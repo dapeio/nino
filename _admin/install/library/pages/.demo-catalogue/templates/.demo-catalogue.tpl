@@ -41,7 +41,7 @@
 				<a href="#gruppe-statisch" class="nino-btn nino-btn--outline nino-btn--small">Static blocks</a>
 				<a href="#gruppe-struktur" class="nino-btn nino-btn--outline nino-btn--small">Structure</a>
 				<a href="#gruppe-frame" class="nino-btn nino-btn--outline nino-btn--small">Frame</a>
-				<a href="#gruppe-ebenen" class="nino-btn nino-btn--outline nino-btn--small">Grounds on three levels</a>
+				<a href="#gruppe-ebenen" class="nino-btn nino-btn--outline nino-btn--small">Grounds on four levels</a>
 			</p>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-50">
@@ -49,6 +49,7 @@
 			<p class="nino-badge-cloud nino-badge-cloud--left">
 				<a href="#raster" class="nino-btn nino-btn--outline nino-btn--small">Grid</a>
 				<a href="#typografie" class="nino-btn nino-btn--outline nino-btn--small">Typography</a>
+				<a href="#textfarben" class="nino-btn nino-btn--outline nino-btn--small">Text colours</a>
 				<a href="#abstaende" class="nino-btn nino-btn--outline nino-btn--small">Spacing</a>
 				<a href="#ausrichtung" class="nino-btn nino-btn--outline nino-btn--small">Alignment</a>
 				<a href="#sichtbarkeit" class="nino-btn nino-btn--outline nino-btn--small">Visibility</a>
@@ -1220,6 +1221,58 @@
 	</div>
 </section>
 
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-luft-least" data-demo-preset="static-content" data-demo-layout="default">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
+			<span class="nino-badge nino-badge--primary">content-section</span> <span class="nino-badge nino-badge--pill">Layout: default</span> <span class="nino-badge nino-badge--pill">Whitespace: least</span> <span class="nino-badge nino-badge--pill">.nino-whitespace--least</span>
+		</div>
+	</div>
+</section>
+<section id="luft-least" class="nino-section nino-whitespace--least nino-mt-0 nino-mb-0" aria-labelledby="luft-least-title">
+	<div class="nino-grid-row">
+		<div class="nino-grid-100 nino-text-center"><h2 class="nino-section-title" id="luft-least-title">whitespace: least</h2><p class="nino-section-subtitle">Three quarters of the air the page has.</p><div class="nino-section-text">The padding of the section and the room under its title, its subtitle and its text move together: one class, on the section.</div></div>
+	</div>
+</section>
+
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-luft-less" data-demo-preset="static-content" data-demo-layout="default">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
+			<span class="nino-badge nino-badge--primary">content-section</span> <span class="nino-badge nino-badge--pill">Layout: default</span> <span class="nino-badge nino-badge--pill">Whitespace: less</span> <span class="nino-badge nino-badge--pill">.nino-whitespace--less</span>
+		</div>
+	</div>
+</section>
+<section id="luft-less" class="nino-section nino-section--alt nino-whitespace--less nino-mt-0 nino-mb-0" aria-labelledby="luft-less-title">
+	<div class="nino-grid-row">
+		<div class="nino-grid-100 nino-text-center"><h2 class="nino-section-title" id="luft-less-title">whitespace: less</h2><p class="nino-section-subtitle">Nine tenths of the air the page has.</p><div class="nino-section-text">The padding of the section and the room under its title, its subtitle and its text move together: one class, on the section.</div></div>
+	</div>
+</section>
+
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-luft-more" data-demo-preset="static-content" data-demo-layout="default">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
+			<span class="nino-badge nino-badge--primary">content-section</span> <span class="nino-badge nino-badge--pill">Layout: default</span> <span class="nino-badge nino-badge--pill">Whitespace: more</span> <span class="nino-badge nino-badge--pill">.nino-whitespace--more</span>
+		</div>
+	</div>
+</section>
+<section id="luft-more" class="nino-section nino-whitespace--more nino-mt-0 nino-mb-0" aria-labelledby="luft-more-title">
+	<div class="nino-grid-row">
+		<div class="nino-grid-100 nino-text-center"><h2 class="nino-section-title" id="luft-more-title">whitespace: more</h2><p class="nino-section-subtitle">One and a half times the air the page has.</p><div class="nino-section-text">The padding of the section and the room under its title, its subtitle and its text move together: one class, on the section.</div></div>
+	</div>
+</section>
+
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-luft-most" data-demo-preset="static-content" data-demo-layout="default">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
+			<span class="nino-badge nino-badge--primary">content-section</span> <span class="nino-badge nino-badge--pill">Layout: default</span> <span class="nino-badge nino-badge--pill">Whitespace: most</span> <span class="nino-badge nino-badge--pill">.nino-whitespace--most</span>
+		</div>
+	</div>
+</section>
+<section id="luft-most" class="nino-section nino-section--alt nino-whitespace--most nino-mt-0 nino-mb-0" aria-labelledby="luft-most-title">
+	<div class="nino-grid-row">
+		<div class="nino-grid-100 nino-text-center"><h2 class="nino-section-title" id="luft-most-title">whitespace: most</h2><p class="nino-section-subtitle">Twice the air the page has.</p><div class="nino-section-text">The padding of the section and the room under its title, its subtitle and its text move together: one class, on the section.</div></div>
+	</div>
+</section>
+
 <section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-hoehe-50" data-demo-preset="static-content" data-demo-layout="default">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
@@ -1285,12 +1338,27 @@
 	</div>
 </section>
 
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-frame-plain-dim" data-demo-preset="static-content" data-demo-layout="default">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
+			<span class="nino-badge nino-badge--primary">content-section</span> <span class="nino-badge nino-badge--pill">Layout: default</span> <span class="nino-badge nino-badge--pill">Picture: dimmed</span> <span class="nino-badge nino-badge--pill">.nino-section--dim</span> <span class="nino-badge nino-badge--pill">.nino-section-bg</span>
+		</div>
+	</div>
+</section>
+<section id="plain-dim" class="nino-section nino-section--dim nino-mt-0 nino-mb-0" aria-labelledby="plain-dim-title">
+	<div class="nino-section-bg"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="" loading="lazy"></div>
+	<div class="nino-grid-row">
+		<div class="nino-grid-100 nino-mb-3 nino-text-center"><h2 class="nino-section-title" id="plain-dim-title">a plain section with a picture</h2></div>
+		<div class="nino-grid-100"><div class="nino-section-text">No cover and no parallax: the picture lies behind the content, a scrim darkens it, and the section writes in the ink of the dark ground.</div></div>
+	</div>
+</section>
+
 
 <section class="nino-section nino-section--primary nino-pt-4 nino-pb-4 nino-mt-0 nino-mb-0" id="gruppe-ebenen">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100">
-			<h2 class="nino-section-title nino-text-left">Grounds on three levels</h2>
-			<p class="nino-section-subtitle nino-text-left">A section, a column and a card paint the same grounds, and the counter ground sets a column or a card off from the one it sits on.</p>
+			<h2 class="nino-section-title nino-text-left">Grounds on four levels</h2>
+			<p class="nino-section-subtitle nino-text-left">A section, a row, a column and a card paint the same grounds, and the counter ground sets a row, a column or a card off from the one it sits on.</p>
 		</div>
 	</div>
 </section>
@@ -1321,6 +1389,56 @@
 				<p>Change the section to alt and both become the page ground.</p>
 			</article>
 		</div>
+	</div>
+</section>
+
+<!--	A row paints a ground too: the colour round its columns, inside the section, with the
+			gutter kept inside it and the corners of a card. The seven are the grounds of a section,
+			and the counter row is the one that sets itself off from the ground it stands on. The
+			dark one has a picture behind its columns, in a block of its own that is cut at the
+			corners of the row, and --dim darkens it and writes in the ink of the dark ground.	-->
+<section class="nino-section nino-pt-3 nino-pb-3 nino-mt-0 nino-mb-0" id="v-levels-row">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-2">
+			<span class="nino-badge nino-badge--pill">.nino-grid-row--alt</span>
+			<span class="nino-badge nino-badge--pill">.nino-grid-row--tint</span>
+			<span class="nino-badge nino-badge--pill">.nino-grid-row--dark</span>
+			<span class="nino-badge nino-badge--pill">.nino-grid-row--black</span>
+			<span class="nino-badge nino-badge--pill">.nino-grid-row--primary</span>
+			<span class="nino-badge nino-badge--pill">.nino-grid-row--brand-alt</span>
+			<span class="nino-badge nino-badge--pill">.nino-grid-row--counter</span>
+			<span class="nino-badge nino-badge--pill">.nino-grid-row-bg</span>
+			<span class="nino-badge nino-badge--pill">.nino-grid-row--dim</span>
+		</div>
+	</div>
+	<div class="nino-grid-row nino-grid-row--wide nino-grid-row--alt nino-mb-1">
+		<div class="nino-grid-100 nino-grid-m-33"><h3 class="nino-section-title nino-text-left">alt</h3></div>
+		<div class="nino-grid-100 nino-grid-m-66"><p>The colour is the row's, and the section round it is the page's.</p></div>
+	</div>
+	<div class="nino-grid-row nino-grid-row--wide nino-grid-row--tint nino-mb-1">
+		<div class="nino-grid-100 nino-grid-m-33"><h3 class="nino-section-title nino-text-left">tint</h3></div>
+		<div class="nino-grid-100 nino-grid-m-66"><p>A wash of the brand, quiet enough to read a whole row on.</p></div>
+	</div>
+	<div class="nino-grid-row nino-grid-row--wide nino-grid-row--dark nino-grid-row--dim nino-mb-1">
+		<div class="nino-grid-row-bg"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy"></div>
+		<div class="nino-grid-100 nino-grid-m-33"><h3 class="nino-section-title nino-text-left">dark, with a picture</h3></div>
+		<div class="nino-grid-100 nino-grid-m-66"><p>The picture lies behind the columns and is cut at the corners of the row, a scrim darkens it, and the text is white.</p></div>
+	</div>
+	<div class="nino-grid-row nino-grid-row--wide nino-grid-row--black nino-mb-1">
+		<div class="nino-grid-100 nino-grid-m-33"><h3 class="nino-section-title nino-text-left">black</h3></div>
+		<div class="nino-grid-100 nino-grid-m-66"><p>The deepest surface.</p></div>
+	</div>
+	<div class="nino-grid-row nino-grid-row--wide nino-grid-row--primary nino-mb-1">
+		<div class="nino-grid-100 nino-grid-m-33"><h3 class="nino-section-title nino-text-left">primary</h3></div>
+		<div class="nino-grid-100 nino-grid-m-66"><p>The brand as a surface, with the ink solved for it.</p></div>
+	</div>
+	<div class="nino-grid-row nino-grid-row--wide nino-grid-row--brand-alt nino-mb-1">
+		<div class="nino-grid-100 nino-grid-m-33"><h3 class="nino-section-title nino-text-left">brand-alt</h3></div>
+		<div class="nino-grid-100 nino-grid-m-66"><p>The second brand colour.</p></div>
+	</div>
+	<div class="nino-grid-row nino-grid-row--wide nino-grid-row--counter">
+		<div class="nino-grid-100 nino-grid-m-33"><h3 class="nino-section-title nino-text-left">counter</h3></div>
+		<div class="nino-grid-100 nino-grid-m-66"><p>One step off the ground the section has, and it follows it when the section changes colour.</p></div>
 	</div>
 </section>
 
@@ -1620,6 +1738,34 @@
 	</div>
 </section>
 
+<section class="nino-section nino-mt-0 nino-mb-0" id="textfarben" aria-labelledby="textfarben-title">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100 nino-mb-2">
+			<h3 class="nino-section-title nino-text-left" id="textfarben-title">Text colours</h3>
+			<p class="nino-section-subtitle nino-text-left">A title, a subtitle or a text takes one of two inks of the ground it stands on: a role, and never a colour.</p>
+		</div>
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-ink--muted</span> <span class="nino-badge nino-badge--pill">.nino-ink--accent</span> <span class="nino-badge nino-badge--pill">.nino-grid--dark</span></div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-pr-2 nino-mb-3">
+			<p class="nino-section-title nino-text-left">no ink class</p>
+			<div class="nino-section-text nino-text-left">The title and the text as the ground has them.</div>
+			<p class="nino-section-title nino-ink--muted nino-text-left">.nino-ink--muted</p>
+			<div class="nino-section-text nino-ink--muted nino-text-left">The quiet ink of this ground, the colour of its subtitle.</div>
+			<p class="nino-section-title nino-ink--accent nino-text-left">.nino-ink--accent</p>
+			<div class="nino-section-text nino-ink--accent nino-text-left">The brand as ink on this ground.</div>
+		</div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-mb-3">
+			<div class="nino-grid-100 nino-grid--dark">
+				<p class="nino-section-title nino-text-left">no ink class</p>
+				<div class="nino-section-text nino-text-left">On a dark ground the same roles resolve to what reads on it.</div>
+				<p class="nino-section-title nino-ink--muted nino-text-left">.nino-ink--muted</p>
+				<div class="nino-section-text nino-ink--muted nino-text-left">The quiet ink of this ground: here the subtitle role is the ink itself, so it reads as the text does.</div>
+				<p class="nino-section-title nino-ink--accent nino-text-left">.nino-ink--accent</p>
+				<div class="nino-section-text nino-ink--accent nino-text-left">The brand as it reads on dark.</div>
+			</div>
+		</div>
+	</div>
+</section>
+
 <section class="nino-section nino-mt-0 nino-mb-0" id="abstaende" aria-labelledby="abstaende-title">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-mb-2">
@@ -1707,7 +1853,7 @@
 			<h3 class="nino-section-title nino-text-left" id="buttons-title">Buttons</h3>
 			<p class="nino-section-subtitle nino-text-left">Four roles, two sizes. The outline button border colour comes from the accent colour of the surface it sits on.</p>
 		</div>
-		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-btn</span> <span class="nino-badge nino-badge--pill">.nino-btn--primary</span> <span class="nino-badge nino-badge--pill">.nino-btn--outline</span> <span class="nino-badge nino-badge--pill">.nino-btn--light</span> <span class="nino-badge nino-badge--pill">.nino-btn--dark</span> <span class="nino-badge nino-badge--pill">.nino-btn--small</span> <span class="nino-badge nino-badge--pill">.nino-btn--big</span></div>
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-btn</span> <span class="nino-badge nino-badge--pill">.nino-btn--primary</span> <span class="nino-badge nino-badge--pill">.nino-btn--outline</span> <span class="nino-badge nino-badge--pill">.nino-btn--light</span> <span class="nino-badge nino-badge--pill">.nino-btn--dark</span> <span class="nino-badge nino-badge--pill">.nino-btn--small</span> <span class="nino-badge nino-badge--pill">.nino-btn--big</span> <span class="nino-badge nino-badge--pill">.nino-btn--fullwidth</span></div>
 		<div class="nino-grid-100">
 			<a href="#buttons" class="nino-btn nino-btn--primary">primary</a>
 			<a href="#buttons" class="nino-btn nino-btn--outline">outline</a>
@@ -1716,6 +1862,13 @@
 			<a href="#buttons" class="nino-btn nino-btn--primary nino-btn--big">big</a>
 			<a href="#buttons" class="nino-btn nino-btn--primary nino-btn--small">small</a>
 			<button type="button" class="nino-btn nino-btn--outline nino-btn--small">als &lt;button&gt;</button>
+		</div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-pr-2 nino-mt-3 nino-stack-start nino-stack-gap-1">
+			<a href="#buttons" class="nino-btn nino-btn--primary nino-btn--fullwidth">fullwidth</a>
+			<a href="#buttons" class="nino-btn nino-btn--outline nino-btn--fullwidth">fullwidth, outline</a>
+		</div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-mt-3">
+			<article class="nino-card nino-card--counter nino-card--fill nino-card--bottom"><h4 class="nino-card-title">A card</h4><div class="nino-section-text">The button is as wide as the box it stands in, and its label in the middle of it.</div><a href="#buttons" class="nino-btn nino-btn--primary nino-btn--fullwidth">fullwidth</a></article>
 		</div>
 	</div>
 </section>
@@ -2479,6 +2632,29 @@
 			</div>
 		</div>
 	</div>
+</section>
+
+<!-- The arrow of a hero in the form [scroll-hint] writes: a link, not a button. It is drawn in
+     the ink of the ground it stands on - dark on a light section, light on a dark one - and
+     with no target it scrolls to the section that follows. -->
+<section class="nino-hero nino-section nino-section--alt nino-pt-4 nino-pb-6 nino-mt-0 nino-mb-0" id="hero-hint-light" aria-labelledby="hero-hint-light-title">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100 nino-text-center">
+			<h3 class="nino-section-title" id="hero-hint-light-title">Scroll hint on a light section</h3>
+			<p class="nino-section-subtitle">A link with an arrow in the colour of the section's ink.</p>
+			<p class="nino-badge-cloud"><span class="nino-badge nino-badge--pill">.nino-hero-arrowdown</span> <span class="nino-badge nino-badge--pill">&#91;scroll-hint&#93;</span></p>
+		</div>
+	</div>
+	<a class="nino-hero-arrowdown" href="#" data-arrow-next aria-label="[[/template/common/slider/next]]"></a>
+</section>
+<section class="nino-hero nino-section nino-section--dark nino-pt-4 nino-pb-6 nino-mt-0 nino-mb-0" id="hero-hint-dark" aria-labelledby="hero-hint-dark-title">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100 nino-text-center">
+			<h3 class="nino-section-title" id="hero-hint-dark-title">Scroll hint on a dark section</h3>
+			<p class="nino-section-subtitle">The same arrow, light on the dark ground, goes to the section after this one.</p>
+		</div>
+	</div>
+	<a class="nino-hero-arrowdown" href="#" data-arrow-next aria-label="[[/template/common/slider/next]]"></a>
 </section>
 
 <!-- Ein Hero füllt den ersten Bildschirm und bringt den Pfeil mit, der zum

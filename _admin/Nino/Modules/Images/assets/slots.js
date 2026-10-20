@@ -336,6 +336,7 @@
 					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/delete' );
 					return;
 				}
+				Nino.admin.touch( 'slots' );
 				Nino.admin.slots.init();
 			} );
 		},
@@ -372,6 +373,7 @@
 						report( false );
 						return;
 					}
+					Nino.admin.touch( 'slots' );
 					msg.textContent = Nino.content.getText('/_admin/common/msg/saved');
 					Nino.admin.slots._snapshot();
 					Nino.admin.slots.init();
@@ -386,6 +388,7 @@
 					report( false );
 					return;
 				}
+				Nino.admin.touch( 'slots' );
 				msg.textContent = Nino.content.getText('/_admin/common/msg/saved');
 				Nino.admin.slots._snapshot();
 				Nino.admin.slots.init();
@@ -606,8 +609,10 @@
 					width 	: row.widthInput.value,
 					height 	: row.heightInput.value,
 				}, function( status ) {
-					if( status === 200 )
+					if( status === 200 ) {
+						Nino.admin.touch( 'slots' );
 						created++;
+					}
 					else
 						failed.push( row.uriInput.value );
 					next( i + 1 );

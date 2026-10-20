@@ -39,6 +39,13 @@ vm.runInContext(
 );
 
 const elements = sandbox.Nino.admin.elements;
+// The form a person opens, as the script has it: later checks stand it in for what they drive
+const originalOpenForm = elements._openForm;
+
+// The shell's counters (see Nino.admin.touch()): what the panel says it wrote
+const touched = [];
+sandbox.Nino.admin.touch = function( topic ) { touched.push( topic ) };
+sandbox.Nino.admin.stamp = function() { return 0 };
 
 // Regression: an image field's preview used to be built as "/uploads/<stored
 // filename>", a directory no deployment has - every upload is stored under
@@ -908,9 +915,11 @@ if( typeof elements._renderNav === 'function' ) {
 
 	elements._uploadImage( 'photo', { size : 1000 }, hidden, preview, msg, fileInput, removeBtn );
 	check( 'a file within it goes to the server as before, with the file as the extra field', sent.length === 1 && sent[0].endpoint === 'uploadimage' && sent[0].extra.file.size === 1000 && msg.textContent === 'Saving' );
+	check( 'nothing was written yet, so nothing is told to the other panels', touched.length === 0 );
 	sent[0].callback( 200, { filename : 'a.jpg', url : '/images/a.jpg' } );
 	check( '...and the answer lands in the field and the preview', hidden.value === 'a.jpg' && preview.src === '/images/a.jpg' && msg.textContent === 'Saved.' );
 	check( '...and the Remove button is there from then on', removeBtn.hidden === false );
+	check( 'an image that was written tells the other panels that elements were', touched.join() === 'elements' );
 
 	// A picture below the field's target size is saved and said to be scaled up: in words, with its size, and in the warning's colour
 	elements._uploadImage( 'photo', { size : 1000 }, hidden, preview, msg, fileInput, removeBtn );
@@ -930,9 +939,12 @@ if( typeof elements._renderNav === 'function' ) {
 		&& JSON.stringify( sent[sent.length - 1].payload ) === JSON.stringify( { type : 'services', uri : 'one', locale : 'de_DE', key : 'photo' } ) );
 	sent[sent.length - 1].callback( 500, null );
 	check( 'a failed removal is an error and leaves the field as it was', msg.className === 'nino-admin-field-image-msg is-error' && hidden.value === 'b.jpg' && removeBtn.hidden === false && removeBtn.disabled === false );
+	const toldBefore = touched.length;
+	check( '...and told nobody that anything was written', touched.length === toldBefore && toldBefore === 2 );
 	elements._removeImage( 'photo', 'Photo', hidden, preview, msg, removeBtn );
 	sent[sent.length - 1].callback( 200, { filename : null } );
 	check( 'a removal empties the field, hides the preview and the button and says so', hidden.value === '' && preview.hidden === true && removeBtn.hidden === true && msg.textContent === 'Removed.' );
+	check( '...and tells the other panels that elements were written', touched.length === toldBefore + 1 && touched[touched.length - 1] === 'elements' );
 
 	elements._uploadImage( 'photo', { size : 1000 }, hidden, preview, msg, fileInput, removeBtn );
 	sent[1].callback( 413, { error : 'the file is larger than the server accepts', code : 'upload_too_large', params : [ 2 ] } );
@@ -1431,9 +1443,11 @@ check( 'the sentences are not alerts - the status line says it once, in its own 
 	check( 'a request that fails reports false and gives the form back', sent.length === 1 && ( sent[0].callback( 500, null ), reports.join() === 'false,false,false' ) && elements._saving === false );
 	check( '...what was typed is still unsaved', elements.isDirty() === true );
 
+	touched.length = 0;
 	elements._save( report );
 	sent[1].callback( 200, { element : { '.uri' : '/post/one', slug : 'new slug', tags : [ 'x' ], pic : 'a.jpg', name : 'Name', body : 'Body', ltags : [], rich : '' } } );
 	check( 'a save that goes through reports true', reports.join() === 'false,false,false,true' );
+	check( '...and tells the other panels that elements were written', touched.join() === 'elements' );
 	check( '...the form counts as saved, the line says when, and the model is what the server answered',
 		elements.isDirty() === false && elements._status.state === 'saved' && elements._globalValues.slug === 'new slug' );
 	elements.discard();
@@ -1554,6 +1568,109 @@ check( 'the sentences are not alerts - the status line says it once, in its own 
 			elements._isNew === false && elements._saving === false && elements.isDirty() === false && richValue() === richLink && elements._status.state === 'saved' );
 
 		sandbox.Nino.admin.htmlEditor = plainEditor;
+	}
+
+	// ---- save and add another: the same save, and a blank form of the type after it
+	{
+		texts['/_admin/elements/label/save-again'] = 'AGAIN';
+		for( const id of [ 'elements-types', 'elements-list' ] )
+			if( d.doc.getElementById( id ) === null ) {
+				const level = d.make('div');
+				level.id = id;
+				d.root.appendChild( level );
+			}
+		elements._openForm = originalOpenForm;
+		elements._currentType = 'post';
+		elements._currentTypeTitle = 'Posts';
+		elements._currentModel = { slug : { type : 'string', required : true }, name : { type : 'string', locale : true } };
+		elements._globalKeys = [ 'slug' ];
+		elements._localeKeys = [ 'name' ];
+		elements._locales = [ 'de_DE', 'en_US' ];
+		elements._selectedLocale = 'en_US';
+		elements._rights = {};
+		elements._referenceOptions = {};
+		elements._numbered = {};
+		elements._raw = {};
+		const blank = () => {
+			elements._isNew = true;
+			elements._currentUri = null;
+			elements._globalValues = {};
+			elements._localeValues = {};
+			elements._dirtyLocales = [];
+			elements._resetEdits();
+			elements._renderForm();
+		};
+		const bar = () => d.doc.getElementById('elements-form-actions').querySelectorAll('button');
+		const again = () => d.doc.getElementById('elements-form-save-again');
+		const fillIn = () => {
+			d.doc.getElementById('elements-form-uri').value = 'newone';
+			field('slug').value = 'fresh';
+			d.doc.getElementById('elements-edit-form').fire('input');
+		};
+
+		blank();
+		check( 'the form of a new element has a second button after Save: the words of "save and add another", secondary, and no submit of its own',
+			again() !== null && bar().length === 2 && bar()[0].type === 'submit' && bar()[1] === again() && again().type === 'button' && again().className === 'nino-admin-btn-secondary' && again().textContent === 'AGAIN' );
+
+		elements._isNew = false;
+		elements._currentUri = 'one';
+		elements._globalValues = { slug : 'hello' };
+		elements._localeValues = { en_US : { name : 'Name' } };
+		elements._renderForm();
+		check( '...a form of an element that is saved has none: there is nothing to add another to', again() === null );
+
+		// a refused save stays where it is
+		blank();
+		sent.length = 0;
+		touched.length = 0;
+		again().click();
+		check( 'the second button saves as the first does: a form that is refused sends nothing and stays, with its problems marked', sent.length === 0 && elements._isNew === true && field('slug').getAttribute('aria-invalid') === 'true' && touched.length === 0 );
+
+		// a request that fails stays where it is
+		fillIn();
+		again().click();
+		check( 'a complete form is sent as the first button sends it - a new element, this uri, these fields', sent.length === 1 && sent[0].endpoint === 'save' && sent[0].payload.isNew === true && sent[0].payload.uri === 'newone' && sent[0].payload.fields.slug === 'fresh' );
+		check( '...with both buttons disabled while it is on its way, like everything else in the form', again().disabled === true && bar()[0].disabled === true );
+		sent[0].callback( 500, null );
+		check( 'a request that fails leaves the form as it was, saying so, the second button given back', elements._isNew === true && d.doc.getElementById('elements-form-uri').value === 'newone' && again().disabled === false && elements._status.state === 'error' && touched.length === 0 );
+
+		// the answer: the blank form of the same type
+		again().click();
+		check( 'the second try sends the same request', sent.length === 2 && sent[1].payload.uri === 'newone' );
+		sent[1].callback( 200, { element : { '.uri' : '/post/newone', slug : 'fresh', name : 'Name' } } );
+		check( 'saved, a blank form of the same type opens: a new element with no uri and nothing in it', elements._isNew === true && elements._currentUri === null && elements._currentType === 'post'
+			&& d.doc.getElementById('elements-form-uri').value === '' && d.doc.getElementById('elements-form-uri').disabled !== true && field('slug').value === '' && again() !== null );
+		check( '...the status line of that form says what was saved, and holds nothing unsaved', elements._status.state === 'saved' && d.doc.getElementById('elements-form-msg').textContent.indexOf( 'Saved at' ) === 0 && elements.isDirty() === false );
+		check( '...and the other panels were told that elements were written, once', touched.join() === 'elements' );
+		check( '...it is shown the way a new element is, as the level of the pane', d.doc.getElementById('elements-form').classList.contains('admin-hidden') === false );
+	}
+
+	// ---- a delete: the other panels hear of it once the server says the element is gone
+	{
+		let selected = null;
+		const originalSelect = elements._selectType;
+		elements._selectType = ( type, model, title ) => { selected = [ type, model, title ] };
+		elements._isNew = false;
+		elements._currentUri = 'one';
+		elements._currentType = 'post';
+		sent.length = 0;
+		touched.length = 0;
+
+		sandbox.window.confirm = () => false;
+		elements._delete();
+		check( 'a delete that is not confirmed sends nothing and writes nothing', sent.length === 0 && touched.length === 0 );
+
+		sandbox.window.confirm = () => true;
+		elements._delete();
+		check( 'a confirmed one asks the server to delete the element, and has written nothing yet', sent.length === 1 && sent[0].endpoint === 'delete' && sent[0].payload.uri === 'one' && touched.length === 0 );
+		sent[0].callback( 500, null );
+		check( '...one the server refused wrote nothing, gives the form back and stays where it is', touched.length === 0 && elements._saving === false && selected === null );
+
+		elements._delete();
+		sent[1].callback( 200, { ok : true } );
+		check( '...one that went through tells the other panels that elements were written, and goes back to the list of the type', touched.join() === 'elements' && selected !== null && selected[0] === 'post' );
+
+		elements._selectType = originalSelect;
 	}
 }
 

@@ -50,6 +50,9 @@ return [
 		'caption'		=> [
 			'label'				=> [ 'en_US' => 'Caption', 'de_DE' => 'Beschriftung' ],
 			'source'			=> 'none',
+			// Who registered it is the feature's key whatever the manifest says: a
+			// feature that claims to be the kernel's is registered as its own
+			'by'					=> 'nino',
 		],
 	],
 	'stacks'			=> [

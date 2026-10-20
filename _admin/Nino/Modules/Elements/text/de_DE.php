@@ -32,6 +32,7 @@ return [
 	'[[/_admin/elements/label/reference-add]]'		=> 'Hinzufügen',
 	'[[/_admin/elements/label/reference-full]]'	=> 'Maximale Anzahl erreicht.',
 	'[[/_admin/elements/label/save]]'			=> 'Speichern',
+	'[[/_admin/elements/label/save-again]]'	=> 'Speichern und neu einfügen',
 	'[[/_admin/elements/label/delete]]'		=> 'Löschen',
 	'[[/_admin/elements/label/duplicate]]'	=> 'Duplizieren',
 	'[[/_admin/elements/msg/duplicated]]'	=> 'Eine Kopie der Werte, noch kein Element – vergib eine Uri und speichere.',

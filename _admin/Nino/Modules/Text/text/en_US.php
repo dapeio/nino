@@ -92,5 +92,6 @@ return [
 	'[[/_admin/keys/label/rename-title]]'	=> 'Rename text key',
 	'[[/_admin/keys/hint/unlock]]'	=> 'A key of a template, a feature or a module belongs to it, and its install unit delivers it. Unlock these namespaces only for a key that unit does not bring.',
 	'[[/_admin/keys/hint/segment]]'	=> 'Lower-case words of the letters a to z and digits, joined by hyphens.',
+	'[[/_admin/keys/hint/not-a-word]]'	=> 'Not a word of the vocabulary: “%s” is shown as “%s”',
 	'[[/_admin/keys/error/segment]]'	=> 'This is not a word of a key: only lower-case letters a to z, digits and single hyphens between them.',
 ];

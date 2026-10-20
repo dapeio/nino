@@ -37,14 +37,17 @@
 		 *	by selecting the panel or tab the hash names and the panel by
 		 *	following the rest (see showCurrent() of the drill-down panels).
 		 *
-		 *	Every panel's init() runs unconditionally on page load and each
-		 *	ends by calling its own "show my current state" function - which is
-		 *	also what set() is called from. Without a guard, whichever panel's
-		 *	background load finishes last would stomp the hash with its own
-		 *	default state, regardless of which panel the hash actually pointed
-		 *	at. set() only writes when `panel` is the one currently on screen;
-		 *	onReady() below resolves that race by selecting the hash's target
-		 *	tab synchronously, before any panel's async data can arrive.
+		 *	A panel's init() runs at page load where the panel binds it to the
+		 *	ready event (most of the kernel's do), and at the panel's first
+		 *	showing where it does not (Nino.adminUi.panel() with boot 'lazy'):
+		 *	either way a load ends by showing the panel's own current state -
+		 *	which is also what set() is called from. Without a guard,
+		 *	whichever panel's background load finishes last would stomp the
+		 *	hash with its own default state, regardless of which panel the hash
+		 *	actually pointed at. set() only writes when `panel` is the one
+		 *	currently on screen; onReady() below resolves that race by
+		 *	selecting the hash's target tab synchronously, before any panel's
+		 *	async data can arrive.
 		 */
 		router : {
 
@@ -418,6 +421,46 @@
 				if( Nino.admin.router.current().panel !== name )
 					Nino.admin.router.set( name, [] );
 			},
+		},
+
+		// The counters behind touch() and stamp(): one for each kind of data the
+		// panels write, none of them ever lower than it was
+		_stamps : { templates : 0, texts : 0, elements : 0, slots : 0, routes : 0, navigations : 0 },
+
+		/**
+		 *	Say that data of a kind was written. A panel that writes something
+		 *	another panel shows calls this after the write has succeeded - a
+		 *	page-*.tpl the Builder created is the templates, a key is texts, an
+		 *	element or a type is elements, an image slot is slots, a page is
+		 *	routes and a menu is navigations - and the other panel finds out
+		 *	when it is shown again, by comparing the stamp it was loaded with to
+		 *	the one the kind has by then (see stamp(), and the stamps option of
+		 *	Nino.adminUi.panel()). A counter and a comparison: nothing is
+		 *	listening, nothing is told, and a panel nobody opens costs nothing.
+		 *	A kind that is not in the list is nobody's, and is ignored
+		 *
+		 *	@param		{string}	topic					templates, texts, elements, slots, routes or navigations
+		 *
+		 *	@return		void
+		 */
+		touch : function( topic ) {
+			if( Object.prototype.hasOwnProperty.call( Nino.admin._stamps, topic ) === true )
+				Nino.admin._stamps[topic]++;
+		},
+
+		/**
+		 *	How often data of a kind was written since the page was loaded: what
+		 *	a panel remembers when it reads that data, to know at its next
+		 *	showing whether it is still what the server holds. It says nothing
+		 *	else - not who wrote, not what - and compares by being unequal.
+		 *	A kind that is not in the list reads 0
+		 *
+		 *	@param		{string}	topic					The same names touch() has
+		 *
+		 *	@return		{number}
+		 */
+		stamp : function( topic ) {
+			return Object.prototype.hasOwnProperty.call( Nino.admin._stamps, topic ) === true ? Nino.admin._stamps[topic] : 0;
 		},
 
 		/**

@@ -89,10 +89,17 @@ const requests = [];
 const confirms = [];
 let confirmAnswer = false;
 
+// The shell's counters (see Nino.admin.touch()): what the panel says it wrote,
+// and the stamp of the templates it reads back
+const touched = [];
+const stamps = { templates : 0 };
+
 const Nino = {
 	admin : {
 		assetUrl : function( path ) { return '/site'+ path },
 		formToolbar : function( backLink ) { const bar = element('div'); bar.appendChild( backLink ); return bar },
+		touch : function( topic ) { touched.push( topic ) },
+		stamp : function( topic ) { return stamps[topic] ?? 0 },
 	},
 	events : { bindCallback : function() {} },
 	http : { sendRequest : function( uri, method, callback, data ) {
@@ -172,6 +179,7 @@ check( 'the move is sent for the row whose arrow was pressed', requests.length =
 answer( 200, { pages : listing( [ '/', '/contact', '/about' ] ).pages } );
 check( 'an accepted move redraws the list in the order the server answers with', rowLabels().join(',') === '/,/contact,/about' );
 check( '...and says nothing, because nothing went wrong', messageText() === '' );
+check( '...and tells the other panels that routes were written', touched.join() === 'routes' );
 
 /*	A move the server refuses. It used to end in a bare return: the row did
 	not move, nothing appeared anywhere, and the arrow read as a button that
@@ -182,6 +190,7 @@ fire( moveButton( '/about', 'up' ), 'click' );
 answer( 409, { error : 'route was removed in the meantime' } );
 
 check( 'a refused move reads the list back from the server', requests.length === 4 && requests[3].action === 'routes/list' );
+check( '...and says nothing of routes written: nothing was', touched.join() === 'routes' );
 answer( 200, listing( [ '/', '/contact' ] ) );
 
 check( '...so what is on screen afterwards is what is on disk', rowLabels().join(',') === '/,/contact' );
@@ -308,7 +317,9 @@ field('routes-form-http-uri').value = '/new';
 save();
 check( 'a complete form is sent, an empty description with it', requests.length === before + 1 && requests[before].action === 'routes/save'
 	&& requests[before].payload.template === 'page-blank' && requests[before].payload.text.en_US.description === '' && requests[before].payload.originalHttpUri === '' );
+touched.length = 0;
 answer( 200, {} );
+check( 'a save that went through tells the other panels that routes were written', touched.join() === 'routes' );
 answer( 200, listing( [ '/', '/about', '/contact' ], { templates : [ 'page-about', 'page-blank', 'page-contact' ] } ) );
 
 /*	The delete question names what stays: the texts and the template, and for
@@ -361,7 +372,9 @@ confirms.length = 0;
 fire( deleteButton(), 'click' );
 check( 'a confirmed question deletes the route', requests[requests.length - 1].action === 'routes/delete' && requests[requests.length - 1].payload.httpUri === '/about' );
 confirmAnswer = false;
+touched.length = 0;
 answer( 200, {} );
+check( '...and a delete that went through tells the other panels that routes were written', touched.join() === 'routes' );
 answer( 200, listing( [ '/', '/contact' ] ) );
 
 // A route that picks its template at runtime has no template to choose: the
@@ -418,7 +431,9 @@ save();
 check( 'a complete form is sent as routes/savetexts for the Element-URI, and only that', requests.length === beforeRuntime + 1 && requests[beforeRuntime].action === 'routes/savetexts'
 	&& requests[beforeRuntime].payload.uri === '/.newsletter' && Object.keys( requests[beforeRuntime].payload ).sort().join() === 'text,uri'
 	&& requests[beforeRuntime].payload.text.de_DE.description === 'Alle drei Monate.' && requests[beforeRuntime].payload.text.en_US.title === 'Abonnieren' );
+touched.length = 0;
 answer( 200, { runtime : [] } );
+check( 'the texts of a feature route are written like a page: the other panels are told', touched.join() === 'routes' );
 answer( 200, listing( [ '/', '/contact' ], { templates : [ 'page-contact' ] } ) );
 check( 'once saved the list is read again', requests[requests.length - 1].action === 'routes/list' );
 
@@ -449,6 +464,49 @@ check( 'a page without a list of paths - an older server\'s answer - shows its o
 panel._runtime = [];
 panel._renderList();
 
+/*	A page template written since the list was read - the Builder creates them -
+	is one the form's select has to offer. The panel remembers the stamp of the
+	templates it asked for and, when it is shown again, reads the list again if
+	that moved: not while a form is open, which would be drawn over, and then at
+	the showing that finds none	*/
+panel.init();
+answer( 200, listing( [ '/', '/contact' ], { templates : [ 'page-contact' ] } ) );
+const idle = requests.length;
+panel.showCurrent();
+check( 'shown again with no template written since, the panel asks for nothing', requests.length === idle && panel._stamp === 0 );
+
+stamps.templates++;
+fire( listActionButton(), 'click' );
+panel.showCurrent();
+check( 'a template written while a form is open is not read now: the form is not drawn over', requests.length === idle && form.classList.contains('admin-hidden') === false );
+
+fire( findAll( form, function( el ) { return el.className === 'nino-admin-back-link' } )[0], 'click' );
+check( '...going back to the list is no showing of the panel, and asks for nothing either', requests.length === idle );
+panel.showCurrent();
+check( '...the showing that finds no form open reads the list again', requests.length === idle + 1 && requests[idle].action === 'routes/list' );
+check( '...and until the answer is there it is what the panel remembers that is old, not the stamp: a second showing does not take the first for done', ( function() { panel.showCurrent(); return requests.length === idle + 2 } )() );
+
+answer( 200, listing( [ '/', '/contact' ], { templates : [ 'page-contact', 'page-new' ] } ) );
+check( '...the template that was written is on offer in the form of a new page', ( function() {
+	fire( listActionButton(), 'click' );
+	return field('routes-form-template').children.map( function( option ) { return option.value } ).indexOf('page-new') !== -1;
+} )() );
+const settled = requests.length;
+panel._showList();
+panel.showCurrent();
+check( '...and with nothing written after that, the next showing asks for nothing', requests.length === settled && panel._stamp === 1 );
+
+// A template written while the request is out is not in its answer
+stamps.templates++;
+panel.showCurrent();
+const outRequests = requests.length;
+stamps.templates++;
+answer( 200, listing( [ '/', '/contact' ], { templates : [ 'page-contact', 'page-new', 'page-newer' ] } ) );
+check( 'the stamp is the one from before the request went out', panel._stamp === 2 );
+panel.showCurrent();
+check( '...so a template written while it was out is asked for at the next showing', requests.length === outRequests + 1 );
+answer( 200, listing( [ '/', '/contact' ], { templates : [ 'page-contact', 'page-new', 'page-newer' ] } ) );
+
 /*	The open page's form is watched by the shell (Nino.admin.dirty), which asks
 	before anything throws what was typed into it away. A second context, with
 	a registry that records what it is told, since the one above has none	*/
@@ -462,7 +520,7 @@ panel._renderList();
 		console : console,
 		document : { getElementById : node, querySelectorAll : () => [], documentElement : null, body : null },
 		Nino : {
-			admin : { dirty : { watchForm : ( name, getter, save ) => watched.push( { name : name, getter : getter, save : save } ), snapshot : name => calls.push( 'snapshot '+ name ) } },
+			admin : { dirty : { watchForm : ( name, getter, save ) => watched.push( { name : name, getter : getter, save : save } ), snapshot : name => calls.push( 'snapshot '+ name ) }, touch : topic => calls.push( 'touch '+ topic ), stamp : () => 0 },
 			events : { bindCallback : function() {} },
 			http : { sendRequest : ( uri, method, callback, data ) => sent.push( { action : data.action, callback : callback } ) },
 			content : { getText : key => key },
@@ -481,7 +539,7 @@ panel._renderList();
 
 	box.Nino.admin.routes._save( ok => outcomes.push( ok ) );
 	sent[sent.length - 1].callback( 200, {} );
-	check( 'a save that goes through takes the form as it stands for the stored one, and reports true', outcomes.join() === 'false,true' && calls.join() === 'snapshot routes' );
+	check( 'a save that goes through says what it wrote, takes the form as it stands for the stored one, and reports true', outcomes.join() === 'false,true' && calls.join() === 'touch routes,snapshot routes' );
 	check( '...the shell\'s Save runs the same save', typeof watched[0].save === 'function' );
 }
 

@@ -58,6 +58,9 @@
 		_loading				: false,
 		_saving					: false,
 		_ready					: false,
+		// The stamp of the templates (see Nino.admin.touch()) the keys were asked
+		// for: the rows of the templates are made from what the answer held
+		_stamp					: 0,
 
 		/**
 		 *	Load every editable key, sort them into rows and render the list - or,
@@ -71,6 +74,10 @@
 				return;
 
 			Nino.admin.text._loading = true;
+
+			// A template written while the answer is on its way is not in it: the
+			// stamp is the one from before the request went out
+			const stamp = Nino.admin.stamp( 'templates' );
 
 			Nino.admin.text._apiCall( 'keys', {}, function( status, response ) {
 				Nino.admin.text._loading = false;
@@ -87,6 +94,7 @@
 				Nino.admin.text._buildModel();
 				Nino.admin.text._renderList();
 				Nino.admin.text._ready 	= true;
+				Nino.admin.text._stamp 	= stamp;
 
 				const target = hash.panel === 'text' && hash.parts.length > 0 ? Nino.admin.text._resolve( hash.parts ) : null;
 
@@ -147,13 +155,25 @@
 		 *	browser's history changes the address and nothing else, so the level
 		 *	it names is shown - and leaving a form that holds unsaved input asks
 		 *	first, as its back link does. A hash that names another panel (a
-		 *	click on the rail) leaves the level in memory as it is
+		 *	click on the rail) leaves the level in memory as it is.
+		 *
+		 *	The keys are read again where a template was written since they were
+		 *	read (the Builder creates them, and so does a key of a template that
+		 *	the Keys tab adds), so that the rows have it. Not while a row is
+		 *	open: the list would be drawn over it, and the showing that finds
+		 *	none open reads them
 		 *
 		 *	@return		void
 		 */
 		showCurrent : function() {
 
 			if( Nino.admin.text._ready === false ) {
+				Nino.admin.text.init();
+				return;
+			}
+
+			if( dc.getElementById('text-form').classList.contains('admin-hidden') === true && Nino.admin.stamp( 'templates' ) !== Nino.admin.text._stamp ) {
+				Nino.admin.text._ready = false;
 				Nino.admin.text.init();
 				return;
 			}
@@ -1172,6 +1192,9 @@
 						report( false );
 						return;
 					}
+
+					// Written, whichever of the items a later check turns down
+					Nino.admin.touch( 'texts' );
 
 					const results = response.results ?? {};
 					const failed 	= [];

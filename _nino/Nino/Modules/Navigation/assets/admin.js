@@ -659,6 +659,8 @@
 					return;
 				}
 
+				Nino.admin.touch( 'navigations' );
+
 				// Stay on the menu that was just created/renamed, under
 				// whichever key it now has
 				Nino.admin.navs._isNew 			= false;
@@ -692,6 +694,7 @@
 					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/delete' );
 					return;
 				}
+				Nino.admin.touch( 'navigations' );
 				Nino.admin.navs._showList();
 				Nino.admin.navs._apply( response );
 			} );

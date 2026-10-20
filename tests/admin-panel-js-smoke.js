@@ -249,6 +249,132 @@ console.log( '\nNino.adminUi.panel - starting at the ready event\n' );
 }
 
 
+console.log( '\nNino.adminUi.panel - what another panel wrote since the screen was asked for\n' );
+
+{
+	// The shell's counters as stand-ins: stamp() reads what the test has set
+	const counters = { templates : 0, texts : 0 };
+	let unsaved = false;
+	const shell = function() {
+		return { stamp : function( topic ) { return counters[topic] ?? 0 }, dirty : { register : function() {}, isDirty : function() { return unsaved } } };
+	};
+
+	const w = world( shell() );
+	const c = catalog( w, { show : 'keep', stamps : [ 'templates' ] } );
+
+	c.panel.showCurrent();
+	reply( w, 200, { round : 1 } );
+	c.panel.showCurrent();
+	check( 'stamps with keep: a showing with nothing written since draws the last answer again, as keep does', w.requests.length === 1 && c.drawn.length === 2 );
+
+	counters.texts++;
+	c.panel.showCurrent();
+	check( '...a kind the spec does not name moving changes nothing', w.requests.length === 1 && c.drawn.length === 3 );
+
+	counters.templates++;
+	unsaved = true;
+	c.panel.showCurrent();
+	check( '...a kind it names that moved asks again instead - not while the dirty registry says the panel holds input nobody has saved', w.requests.length === 1 && c.drawn.length === 3 );
+
+	unsaved = false;
+	c.panel.showCurrent();
+	check( '...which is asked at the next showing that finds none: the list of the panel again, and nothing drawn before the answer', w.requests.length === 2 && w.requests[1].action === 'catalog/list' && c.drawn.length === 3 && c.panel.loading === true );
+
+	reply( w, 200, { round : 2 } );
+	check( '...the new answer is the panel\'s data and is drawn', c.panel.data.round === 2 && c.drawn.length === 4 && c.panel.ready === true );
+
+	c.panel.showCurrent();
+	check( '...and with nothing written after it, the showing that follows draws it and asks nothing', w.requests.length === 2 && c.drawn.length === 5 );
+}
+
+{
+	// The stamp is the one from before the request went out: a write that lands while it is out is not in what it answers
+	const counters = { templates : 0 };
+	const w = world( { stamp : function( topic ) { return counters[topic] ?? 0 } } );
+	const c = catalog( w, { show : 'keep', stamps : [ 'templates' ] } );
+
+	c.panel.showCurrent();
+	counters.templates++;
+	reply( w, 200, { round : 1 } );
+	c.panel.showCurrent();
+	check( 'a write that landed while the request was out is not in its answer: the next showing asks again', w.requests.length === 2 && c.drawn.length === 1 );
+
+	// A request that is out is asked for once, though the stamp moved
+	c.panel.showCurrent();
+	check( '...once, however often the panel is shown while that request is out', w.requests.length === 2 );
+}
+
+{
+	// Any of the kinds it names
+	const counters = { templates : 0, texts : 0, slots : 0 };
+	const w = world( { stamp : function( topic ) { return counters[topic] ?? 0 } } );
+	const c = catalog( w, { show : 'keep', stamps : [ 'templates', 'texts' ] } );
+
+	c.panel.showCurrent();
+	reply( w, 200, { round : 1 } );
+	counters.slots++;
+	c.panel.showCurrent();
+	counters.texts++;
+	c.panel.showCurrent();
+	check( 'a panel that names several kinds asks again when any one of them moved, and for no other', w.requests.length === 2 );
+	reply( w, 200, { round : 2 } );
+	c.panel.showCurrent();
+	check( '...and then asks nothing until one moves again', w.requests.length === 2 );
+}
+
+{
+	// once and always keep their own rule for a second showing
+	const counters = { templates : 0 };
+	const shell = { stamp : function( topic ) { return counters[topic] ?? 0 } };
+
+	const once = world( shell );
+	const o = catalog( once, { stamps : [ 'templates' ] } );
+	o.panel.showCurrent();
+	reply( once, 200, { round : 1 } );
+	counters.templates++;
+	o.panel.showCurrent();
+	check( 'once: the stamps change nothing - a second showing does nothing, as it says', once.requests.length === 1 && o.drawn.length === 1 );
+
+	const always = world( shell );
+	const a = catalog( always, { show : 'always', stamps : [ 'templates' ] } );
+	for( let i = 0; i < 2; i++ ) {
+		a.panel.showCurrent();
+		reply( always, 200, { round : i } );
+	}
+	check( 'always: every showing asks, with or without a stamp that moved', always.requests.length === 2 );
+}
+
+{
+	// A load that failed is not remembered: the panel is not loaded, and a showing asks again whatever the counters say
+	const w = world( { stamp : function() { return 0 } } );
+	const c = catalog( w, { show : 'keep', stamps : [ 'templates' ] } );
+	c.panel.showCurrent();
+	reply( w, 500, null );
+	c.panel.showCurrent();
+	check( 'a load that failed leaves the panel not loaded, and showing it asks again', c.panel.ready === false && w.requests.length === 2 );
+}
+
+{
+	// A shell without counters, and a page without a shell: nothing ever moves
+	const bare = world( {} );
+	const b = catalog( bare, { show : 'keep', stamps : [ 'templates' ] } );
+	b.panel.showCurrent();
+	reply( bare, 200, { round : 1 } );
+	b.panel.showCurrent();
+
+	const none = world();
+	const n = catalog( none, { show : 'keep', stamps : [ 'templates' ] } );
+	let threw = null;
+	try {
+		n.panel.showCurrent();
+		reply( none, 200, { round : 1 } );
+		n.panel.showCurrent();
+	}
+	catch( error ) { threw = error }
+	check( 'where the shell has no stamp(), or there is no shell, nothing moves: the last answer is drawn again, asked for once', bare.requests.length === 1 && none.requests.length === 1 && threw === null && b.drawn.length === 2 && n.drawn.length === 2 );
+}
+
+
 console.log( '\nNino.adminUi.panel - a failed load\n' );
 
 {

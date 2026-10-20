@@ -796,6 +796,7 @@
 						wn.alert( Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' ) );
 						return;
 					}
+					Nino.admin.touch( 'texts' );
 					Nino.admin.keys._reopen = group;
 					Nino.admin.keys.init();
 				} );
@@ -826,6 +827,7 @@
 						wn.alert( Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' ) );
 						return;
 					}
+					Nino.admin.touch( 'texts' );
 					Nino.admin.keys.init();
 				} );
 			}, undo );
@@ -869,6 +871,7 @@
 						wn.alert( Nino.adminUi.api.errorText( status, response, '/_admin/common/error/delete' ) );
 						return;
 					}
+					Nino.admin.touch( 'texts' );
 					Nino.admin.keys.init();
 				} );
 			} );
@@ -1339,6 +1342,9 @@
 					if( status !== 200 || response === null )
 						return stop( Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' )+ ' ('+ locale+ ')' );
 
+					// Written, whichever of the items a later check turns down
+					Nino.admin.touch( 'texts' );
+
 					const results = response.results ?? {};
 					const failed 	= [];
 
@@ -1453,6 +1459,28 @@
 		},
 
 		/**
+		 *	The line under a segment's field that says the segment is no word of
+		 *	the vocabulary and how the panel will show it. A warning and no
+		 *	refusal: a developer's own key saves as it is, and the line is only
+		 *	what it will read like - 'cta' as "Cta" - until the vocabulary has
+		 *	the word. Empty and hidden until refresh() has something to say; it
+		 *	is a paragraph of its own, next to the error and not instead of it,
+		 *	and describes the field while it shows
+		 *
+		 *	@param		{string}	id							The id of the segment's control
+		 *
+		 *	@return		{Element}
+		 */
+		_unknownHint : function( id ) {
+
+			const hint = dc.createElement('p');
+			hint.className = 'nino-admin-field-hint is-warning';
+			hint.id = id+ '-hint';
+			hint.hidden = true;
+			return hint;
+		},
+
+		/**
 		 *	Render the form that creates a key or renames one: a field for each
 		 *	segment, checked as it is typed; under them the key they make and the
 		 *	name it will be read by. The namespace is a choice that offers /project
@@ -1552,6 +1580,7 @@
 			categoryError.textContent = Nino.content.getText('/_admin/keys/error/segment');
 			categoryError.hidden = true;
 			form.appendChild( categoryError );
+			form.appendChild( keys._unknownHint( 'keys-form-category' ) );
 
 			let category = null;
 
@@ -1616,6 +1645,7 @@
 				error.textContent = Nino.content.getText('/_admin/keys/error/segment');
 				error.hidden = true;
 				form.appendChild( error );
+				form.appendChild( keys._unknownHint( id ) );
 			};
 
 			segment( 'keys-form-part', '/_admin/keys/label/part', initial.part );
@@ -1683,17 +1713,26 @@
 
 					const control = dc.getElementById( pair[0] );
 					const error = dc.getElementById( pair[0]+ '-error' );
+					const unknown = dc.getElementById( pair[0]+ '-hint' );
 					const wrong = pair[1] !== '' && keys.SEGMENT.test( pair[1] ) === false;
 
 					valid = valid && pair[1] !== '' && wrong === false;
 					control.setAttribute( 'aria-invalid', wrong ? 'true' : 'false' );
+					error.hidden = wrong === false;
 
+					// A slug of a key that is no word still saves: it is said what it will
+					// read like. Not while it is wrong, which has its own line
+					const unlisted = pair[1] !== '' && wrong === false && Nino.adminUi.isWord( pair[1] ) === false;
+					unknown.textContent = unlisted ? Nino.adminUi.format( Nino.content.getText('/_admin/keys/hint/not-a-word'), pair[1], Nino.adminUi.slugLabel( pair[1] ) ) : '';
+					unknown.hidden = unlisted === false;
+
+					// What a screen reader says with the field: the error while it is wrong, else the line about the word
 					if( wrong )
 						control.setAttribute( 'aria-describedby', error.id );
+					else if( unlisted )
+						control.setAttribute( 'aria-describedby', unknown.id );
 					else
 						control.removeAttribute( 'aria-describedby' );
-
-					error.hidden = wrong === false;
 				} );
 
 				composedKey.textContent = keys._composeKey( segments );
@@ -1739,6 +1778,10 @@
 					report( false );
 					return;
 				}
+				Nino.admin.touch( 'texts' );
+				// A key of a template is one the rows of that template did not have
+				if( key.indexOf('/template/') === 0 )
+					Nino.admin.touch( 'templates' );
 				keys.init();
 				report( true );
 			};
@@ -2014,6 +2057,12 @@
 					report( false );
 					return;
 				}
+
+				Nino.admin.touch( 'texts' );
+				// What the scan creates are the keys the templates read: a template
+				// with one is a row the Text panel did not have
+				if( response.created > 0 && payload.some( function( row ) { return row.ignore === false && row.key.indexOf('/template/') === 0 } ) === true )
+					Nino.admin.touch( 'templates' );
 
 				Nino.admin.keys._scanSummary = Nino.content.getText('/_admin/keys/scan/result')
 					.replace( '%c', String( response.created ) )

@@ -831,10 +831,11 @@
 		 *	Open the edit form for an existing element, or a blank one for a new element
 		 *
 		 *	@param		{string|null}	uri			Element uri, or null to create a new one
+		 *	@param		{Function}		[then]	Called once the form is on screen: the blank one a save asked for says what it saved (see _saveAndAdd())
 		 *
 		 *	@return		void
 		 */
-		_openForm : function( uri ) {
+		_openForm : function( uri, then ) {
 
 			if( Nino.admin.elements._saving === true )
 				return;
@@ -857,6 +858,8 @@
 						return;
 					Nino.admin.elements._renderForm();
 					Nino.admin.elements._showFormView();
+					if( typeof then === 'function' )
+						then();
 				} );
 				return;
 			}
@@ -890,6 +893,8 @@
 						return;
 					Nino.admin.elements._renderForm();
 					Nino.admin.elements._showFormView();
+					if( typeof then === 'function' )
+						then();
 				} );
 			} );
 		},
@@ -2578,6 +2583,19 @@
 			saveBtn.textContent = Nino.content.getText('/_admin/elements/label/save');
 			actions.appendChild( saveBtn );
 
+			// Entering several elements of a type in a row: the same save, and a
+			// blank form after it where the list would be. An element that is
+			// saved has nothing to add another to
+			if( Nino.admin.elements._isNew === true ) {
+				const againBtn = dc.createElement('button');
+				againBtn.type = 'button';
+				againBtn.id = 'elements-form-save-again';
+				againBtn.className = 'nino-admin-btn-secondary';
+				againBtn.textContent = Nino.content.getText('/_admin/elements/label/save-again');
+				againBtn.addEventListener( 'click', function() { Nino.admin.elements._saveAndAdd() } );
+				actions.appendChild( againBtn );
+			}
+
 			// Duplicating ends in a new element, so it is offered exactly where
 			// adding one is - and only on a saved element, which is the only
 			// thing there is to copy
@@ -2758,6 +2776,10 @@
 						return;
 					}
 
+					// Written, whatever a later locale does: what the panels that show
+					// elements hold is no longer what the server has
+					Nino.admin.touch( 'elements' );
+
 					if( wasNew === true && position === 0 ) {
 						Nino.admin.elements._isNew = false;
 						// A numbered type only knows its uri now. Every element the
@@ -2828,6 +2850,22 @@
 		},
 
 		/**
+		 *	Save the form of a new element exactly as Save does and, when
+		 *	everything was written, open a blank form of the same type instead of
+		 *	staying on the one that was saved: entering several elements in a
+		 *	row. The blank form says what was saved in its status line. A save
+		 *	that was refused or failed stays where it is, with its errors
+		 *
+		 *	@return		void
+		 */
+		_saveAndAdd : function() {
+			Nino.admin.elements._save( function( ok ) {
+				if( ok === true )
+					Nino.admin.elements._openForm( null, function() { Nino.admin.elements._status.saved() } );
+			} );
+		},
+
+		/**
 		 *	Upload a new image for one "image" field, immediately - the server
 		 *	commits it straight to the element record and deletes the previous
 		 *	file, so there's nothing left to do here beyond reflecting the result
@@ -2880,6 +2918,8 @@
 						msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/elements/error/save' );
 						return;
 					}
+
+					Nino.admin.touch( 'elements' );
 
 					hiddenInput.value = response.filename;
 					preview.src = response.url;
@@ -2939,6 +2979,8 @@
 					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/elements/error/image-remove' );
 					return;
 				}
+
+				Nino.admin.touch( 'elements' );
 
 				hiddenInput.value = '';
 				preview.hidden = true;
@@ -3054,6 +3096,7 @@
 					Nino.admin.elements._status.error( status, response, '/_admin/elements/error/save' );
 					return;
 				}
+				Nino.admin.touch( 'elements' );
 				Nino.admin.elements._saving = false;
 				Nino.admin.elements._selectType( type, model, title );
 			} );

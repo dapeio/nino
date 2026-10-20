@@ -44,10 +44,13 @@ function build( shell ) {
 
 	const requests = [];
 	const confirms = [];
+	// What the panel said it wrote (see Nino.admin.touch() of the shell)
+	const touched = [];
 	const box = { confirmAnswer : false };
 
 	const Nino = {
-		admin : { formToolbar : function( backLink ) { const bar = element('div'); bar.appendChild( backLink ); return bar } },
+		admin : { formToolbar : function( backLink ) { const bar = element('div'); bar.appendChild( backLink ); return bar },
+			touch : function( topic ) { touched.push( topic ) }, stamp : function() { return 0 } },
 		events : { bindCallback : function() {} },
 		http : { sendRequest : function( uri, method, callback, data ) {
 			requests.push( { action : data.action, payload : JSON.parse( data.data ), callback : callback } );
@@ -83,6 +86,7 @@ function build( shell ) {
 		form : form,
 		requests : requests,
 		confirms : confirms,
+		touched : touched,
 		box : box,
 		/** Answer the last request the panel made, the way Nino.http.sendRequest() calls back */
 		answer : function( status, body ) { requests[requests.length - 1].callback( { status : status, responseJSON : body } ) },
@@ -180,6 +184,7 @@ console.log('Admin Navigations');
 	t.answer( 200, { navs : [ { key : 'primary', entries : [ ROUTES[1], ROUTES[2] ] }, { key : 'footer', entries : [] } ], routes : ROUTES } );
 	check( 'the answer is drawn: the copy is the saved menu now', t.entries().join() === 'About (/about),Contact (/contact)' && t.panel._isDirty() === false && t.panel._currentKey === 'primary' );
 	check( '...and says it was saved', t.field('navs-form-msg').textContent === text('/_admin/common/msg/saved') );
+	check( '...and tells the other panels that navigations were written', t.touched.join() === 'navigations' );
 }
 
 
@@ -192,6 +197,29 @@ console.log('Admin Navigations');
 	t.answer( 404, { error : 'unknown route: "/about"', code : 'navs_unknown_route', params : [ '/about' ] } );
 	check( 'a refused save keeps the copy as it is and says why', t.entries().join() === 'About (/about),Start (/)' && t.panel._isDirty() === true
 		&& t.field('navs-form-msg').textContent.includes('/about') );
+	check( '...and wrote nothing the other panels need to know of', t.touched.length === 0 );
+}
+
+
+// --- a menu deleted -------------------------------------------------------
+
+{
+	const t = opened( null );
+	const sent = t.requests.length;
+
+	t.box.confirmAnswer = false;
+	t.panel._delete();
+	check( 'a delete that is not confirmed sends nothing and tells nobody anything', t.requests.length === sent && t.touched.length === 0 );
+
+	t.box.confirmAnswer = true;
+	t.panel._delete();
+	check( 'a confirmed one asks the server to delete the menu that is open', t.requests[t.requests.length - 1].action === 'navs/delete' && t.requests[t.requests.length - 1].payload.key === 'main' );
+	t.answer( 403, { error : 'no permission' } );
+	check( 'a refused delete says so, and nothing was written', t.field('navs-form-msg').textContent.includes('no permission') && t.touched.length === 0 );
+
+	t.panel._delete();
+	t.answer( 200, { navs : [ { key : 'footer', entries : [] } ], routes : ROUTES } );
+	check( 'one that went through tells the other panels that navigations were written, and the list shows the menus that are left', t.touched.join() === 'navigations' && t.form.classList.contains('admin-hidden') === true );
 }
 
 

@@ -570,4 +570,23 @@ check( 'the danger zone is not rendered while creating a new type',
 	delete sandbox.Nino.admin.dirty;
 }
 
+// Every write of a type ends in _invalidateElements(): the real one, not the stand-in above. It says that elements
+// were written - to every panel that shows them, whether or not the Elements module is deployed next door - and drops
+// what that module holds where there is one
+{
+	const box = { console : console, document : { documentElement : null, body : null } };
+	box.window = box;
+	const told = [];
+	const dropped = [];
+	box.Nino = { admin : { touch : topic => told.push( topic ) }, events : { bindCallback : function() {} } };
+	load( '_admin/Nino/Modules/Elements/assets/types.js', vm.createContext( box ), 'elementtypes.js' );
+
+	box.Nino.admin.types._invalidateElements();
+	check( 'a type that was written tells the other panels that elements were, with no Elements module next door to drop', told.join() === 'elements' && dropped.length === 0 );
+
+	box.Nino.admin.elements = { invalidate : () => dropped.push( true ) };
+	box.Nino.admin.types._invalidateElements();
+	check( '...and where there is one it is told as before, and the stamp is raised once more', told.join() === 'elements,elements' && dropped.length === 1 );
+}
+
 done();

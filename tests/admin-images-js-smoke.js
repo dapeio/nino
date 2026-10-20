@@ -37,8 +37,11 @@ const requests = [];
 const asked = [];
 let answerConfirm = true;
 
+// The shell's counters (see Nino.admin.touch()): what the panels say they wrote
+const touched = [];
+
 const Nino = {
-	admin : {},
+	admin : { touch : function( topic ) { touched.push( topic ) }, stamp : function() { return 0 } },
 	events : { bindCallback : function() {} },
 	http : { sendRequest : function( uri, method, callback, data ) {
 		requests.push( { action : data.action, payload : JSON.parse( data.data ), callback : callback } );
@@ -107,10 +110,12 @@ fire( removeButton( withImage ), 'click' );
 check( 'a confirmed one sends the removal for the slot', requests.length === 1 && requests[0].action === 'images/remove' && requests[0].payload.uri === '/page-home/hero' );
 answer( 500, { error : 'could not save the slot' } );
 check( 'a failure is an error beside the picture, which stays', messageOf( withImage ).className === 'nino-admin-field-image-msg is-error' && previewOf( withImage ).hidden === false && removeButton( withImage ).hidden === false );
+check( '...and nothing was written, so nothing is said of it to the other panels', touched.length === 0 );
 
 fire( removeButton( withImage ), 'click' );
 answer( 200, { filename : null } );
 check( 'a successful removal hides the preview and the button and says so', previewOf( withImage ).hidden === true && removeButton( withImage ).hidden === true && messageOf( withImage ).textContent === 'Image removed.' );
+check( '...and tells the other panels that slots were written', touched.join() === 'slots' );
 
 
 // --- the warning for a picture below the target size -----------------------
@@ -125,6 +130,7 @@ answer( 200, { filename : 'a.jpg', url : '/public/images/a.jpg', belowTarget : t
 check( 'a picture below the target is saved, and said to be in the warning style with its own size', messageOf( upload ).className === 'nino-admin-field-image-msg is-warning'
 	&& messageOf( upload ).textContent.indexOf( '300 × 150 px' ) !== -1 && messageOf( upload ).textContent.indexOf( 'smaller than the target size' ) !== -1 );
 check( '...and Remove is there from then on', removeButton( upload ).hidden === false && previewOf( upload ).hidden === false );
+check( 'an upload that went through tells the other panels that slots were written', touched.join() === 'slots,slots' );
 
 fire( fileInput, 'change' );
 answer( 200, { filename : 'b.jpg', url : '/public/images/b.jpg', belowTarget : false, source : { width : 3000, height : 2000 } } );
@@ -162,13 +168,16 @@ altInputs[1].value = 'A house';
 fire( altSave, 'click' );
 check( 'saving posts the slot and every language\'s text, so an emptied input removes its entry', requests.length === 1 && requests[0].action === 'images/alt'
 	&& JSON.stringify( requests[0].payload ) === JSON.stringify( { uri : '/page-home/hero', alt : { de_DE : 'Ein Haus', en_US : 'A house' } } ) );
+touched.length = 0;
 answer( 200, { alt : { de_DE : 'Ein Haus', en_US : 'A house' } } );
 // The second such line of the slot: the first is the picture's own
 const altStatus = byClass( alt, 'nino-admin-field-image-msg' )[1];
 check( 'a saved alt text says so in a polite live region', altStatus.textContent === 'Alt texts saved.' && altStatus.getAttribute('aria-live') === 'polite' );
+check( '...and tells the other panels that slots were written', touched.join() === 'slots' );
 fire( altSave, 'click' );
 answer( 400, { error : 'an alt text is at most 250 characters' } );
 check( 'a refused one is an error', altStatus.className === 'nino-admin-field-image-msg is-error' );
+check( '...and writes nothing to tell', touched.join() === 'slots' );
 
 // --- alt texts typed and not saved -------------------------------------------
 
@@ -201,8 +210,11 @@ const routerStub = {
 	current : function() { return routedHash },
 	leave : function( names, leaving, proceed, resync ) { if( leaving === true ) return registry.guard( names, proceed, resync ); proceed() },
 };
+const shellTouched = [];
+const shellStamps = { templates : 0 };
 const shellNino = {
-	admin : { dirty : registry, formToolbar : function( back ) { const bar = element('div'); bar.appendChild( back ); return bar }, router : routerStub },
+	admin : { dirty : registry, formToolbar : function( back ) { const bar = element('div'); bar.appendChild( back ); return bar }, router : routerStub,
+		touch : function( topic ) { shellTouched.push( topic ) }, stamp : function( topic ) { return shellStamps[topic] ?? 0 } },
 	events : { bindCallback : function() {} },
 	http : { sendRequest : function( uri, method, callback, data ) { shellRequests.push( { action : data.action, payload : JSON.parse( data.data ), callback : callback } ) } },
 	content : { getText : text },
@@ -385,6 +397,49 @@ check( 'a reload on #images/template/page-home opens the category', shellPanel._
 
 shellPanel._ready = false;
 
+// --- a template written since the slots were read -----------------------------------------
+// Each slot says which pages use it, so a template the Builder creates after the list was read
+// is not in it: the panel remembers the stamp of the templates it asked with and reads again
+// at the next showing - not while a category is open, and not while the request is out
+
+shellPanel._groupSlots = Nino.admin.images._groupSlots;
+shellForm.classList.add('admin-hidden');
+shellList.classList.remove('admin-hidden');
+routedHash = { panel : 'images', parts : [] };
+shellRequests.length = 0;
+shellPanel._apiCall = function( endpoint, payload, callback ) { shellRequests.push( { action : endpoint, payload : payload, callback : function( reply ) { callback( reply.status, reply.responseJSON ) } } ) };
+shellPanel.init();
+shellAnswer( 200, { slots : [ slot( { uri : '/template/page-home/hero/image' } ) ], locales : [ 'de_DE', 'en_US' ] } );
+check( 'the panel asked with the stamp the templates had', shellPanel._ready === true && shellPanel._stamp === 0 );
+
+shellPanel.showCurrent();
+check( 'shown again with no template written since, it asks for nothing', shellRequests.length === 1 );
+
+shellStamps.templates++;
+shellForm.classList.remove('admin-hidden');
+shellList.classList.add('admin-hidden');
+shellPanel._currentGroup = 'template/page-home';
+routedHash = { panel : 'images', parts : [ 'template', 'page-home' ] };
+shellPanel.showCurrent();
+check( 'a template written while a category is open is not read now: the form is not drawn over', shellRequests.length === 1 && shellForm.classList.contains('admin-hidden') === false );
+
+shellForm.classList.add('admin-hidden');
+shellList.classList.remove('admin-hidden');
+routedHash = { panel : 'images', parts : [] };
+shellPanel.showCurrent();
+check( '...the showing that finds none open reads the slots again', shellRequests.length === 2 && shellRequests[1].action === 'list' && shellPanel._ready === false );
+
+shellStamps.templates++;
+shellPanel.showCurrent();
+check( '...once, whatever is written while the request is out', shellRequests.length === 2 );
+shellAnswer( 200, { slots : [ slot( { uri : '/template/page-home/hero/image' } ), slot( { uri : '/template/page-new/hero/image' } ) ], locales : [ 'de_DE', 'en_US' ] } );
+check( '...and the stamp is the one from before it went out, so what was written meanwhile is read at the next showing', shellPanel._ready === true && shellPanel._stamp === 1 && Object.keys( shellPanel._groups ).join() === 'template/page-home,template/page-new' );
+shellPanel.showCurrent();
+check( '...which asks again', shellRequests.length === 3 );
+shellAnswer( 200, { slots : [ slot( { uri : '/template/page-home/hero/image' } ) ], locales : [ 'de_DE', 'en_US' ] } );
+shellPanel.showCurrent();
+check( 'and with nothing written after the last answer, the next showing asks for nothing', shellRequests.length === 3 && shellPanel._stamp === 2 );
+
 // Whatever the server or an editor wrote reaches the page as text: the only innerHTML here empties a container
 check( 'nothing the panel is told is written as markup - innerHTML is only ever emptied', ( source('_admin/Nino/Modules/Images/assets/admin.js').match( /innerHTML[^\n]*/g ) || [] ).every( function( use ) { return /^innerHTML = '';$/.test( use ) } ) );
 
@@ -396,5 +451,60 @@ check( 'a slot some page shows adds nothing to its row', slots._usageLabel( { us
 check( 'a slot no page shows says it is not included anywhere', slots._usageLabel( { usage : { templates : [], pages : [] } } ) === ', not included anywhere' );
 check( '...and names the templates that mention it, if any', slots._usageLabel( { usage : { templates : [ 'page-a', 'page-b' ], pages : [] } } ) === ', not included anywhere, Templates: page-a, page-b' );
 check( 'a slot without usage data reads as unused rather than throwing', slots._usageLabel( {} ) === ', not included anywhere' );
+
+
+// --- the Slots tab says what it wrote ---------------------------------------------------------
+
+const slotsNodes = {};
+const slotsNode = id => slotsNodes[id] = slotsNodes[id] ?? { id : id, value : '', textContent : '', classList : { contains : () => false, add : () => {}, remove : () => {} } };
+const slotsTouched = [];
+const slotsNino = {
+	admin : { touch : topic => slotsTouched.push( topic ), stamp : () => 0 },
+	events : { bindCallback : function() {} },
+	http : { sendRequest : function() {} },
+	content : { getText : text },
+};
+const slotsSandbox = { console : console, document : { createElement : element, getElementById : slotsNode, documentElement : null, body : null }, Nino : slotsNino };
+slotsSandbox.window = { Nino : slotsNino, confirm : () => true, alert : () => {} };
+const slotsContext = vm.createContext( slotsSandbox );
+load( '_admin/assets/Nino.admin.js', slotsContext );
+load( '_admin/Nino/Modules/Images/assets/slots.js', slotsContext );
+const slotsPanel = slotsNino.admin.slots;
+const slotsSent = [];
+slotsPanel._apiCall = function( endpoint, payload, callback ) { slotsSent.push( { endpoint : endpoint, callback : callback } ) };
+slotsPanel._snapshot = function() {};
+slotsPanel.init = function() {};
+const slotsAnswer = function( status, body ) { slotsSent[slotsSent.length - 1].callback( status, body ) };
+
+slotsPanel._isNew = true;
+slotsNode('slots-form-uri').value = '/page-new/hero';
+slotsPanel._save();
+slotsAnswer( 500, { error : 'no' } );
+check( 'a slot that could not be created tells nobody that slots were written', slotsSent[0].endpoint === 'create' && slotsTouched.length === 0 );
+slotsPanel._save();
+slotsAnswer( 200, {} );
+check( 'a slot that was created does', slotsTouched.join() === 'slots' );
+
+slotsPanel._isNew = false;
+slotsPanel._currentUri = '/page-new/hero';
+slotsPanel._save();
+slotsAnswer( 200, {} );
+check( 'a slot that was saved does too', slotsSent[slotsSent.length - 1].endpoint === 'save' && slotsTouched.join() === 'slots,slots' );
+
+slotsPanel._delete();
+slotsAnswer( 403, null );
+check( 'a delete that was refused does not', slotsSent[slotsSent.length - 1].endpoint === 'delete' && slotsTouched.length === 2 );
+slotsPanel._delete();
+slotsAnswer( 200, {} );
+check( 'one that went through does', slotsTouched.join() === 'slots,slots,slots' );
+
+slotsTouched.length = 0;
+slotsPanel._saveScanResults( [
+	{ ignoreCheck : { checked : false }, uriInput : { value : '/a' }, labelInput : { value : 'A' }, widthInput : { value : '100' }, heightInput : { value : '100' } },
+	{ ignoreCheck : { checked : false }, uriInput : { value : '/b' }, labelInput : { value : 'B' }, widthInput : { value : '100' }, heightInput : { value : '100' } },
+] );
+slotsAnswer( 200, {} );
+slotsAnswer( 409, { error : 'taken' } );
+check( 'the slots a scan creates are told one by one, the one that was refused not', slotsTouched.join() === 'slots' && slotsSent[slotsSent.length - 1].endpoint === 'create' );
 
 done();

@@ -248,6 +248,7 @@ return [
 	'[[/_admin/common/word/return]]'	=> 'Rücksprung',
 	'[[/_admin/common/word/save]]'	=> 'Speichern',
 	'[[/_admin/common/word/second]]'	=> 'Sekunde',
+	'[[/_admin/common/word/section]]'	=> 'Sektion',
 	'[[/_admin/common/word/side]]'	=> 'Ansicht',
 	'[[/_admin/common/word/slide]]'	=> 'Folie',
 	'[[/_admin/common/word/slider]]'	=> 'Slider',

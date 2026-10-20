@@ -246,6 +246,7 @@ return [
 	'[[/_admin/common/word/return]]'	=> 'Return address',
 	'[[/_admin/common/word/save]]'	=> 'Save',
 	'[[/_admin/common/word/second]]'	=> 'Second',
+	'[[/_admin/common/word/section]]'	=> 'Section',
 	'[[/_admin/common/word/side]]'	=> 'Side',
 	'[[/_admin/common/word/slide]]'	=> 'Slide',
 	'[[/_admin/common/word/slider]]'	=> 'Slider',

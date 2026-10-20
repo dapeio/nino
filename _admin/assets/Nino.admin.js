@@ -468,6 +468,39 @@
 		},
 
 		/**
+		 *	Whether a slug is covered by the vocabulary: the words the interface
+		 *	names a part of a key with, /_admin/common/word/<slug>. It is one,
+		 *	or <word>-<number> (a list's entry: 'item-3'), or <word>-<word> -
+		 *	the slug falls apart at a hyphen into two words, as 'unit-day' does.
+		 *	That is the rule of every key the kernel ships (admin-text-smoke
+		 *	holds them to it), and what slugLabel() gives a slug that is none of
+		 *	it is only a guess at how to read it: 'cta' is shown as "Cta"
+		 *
+		 *	@param		{string}	slug
+		 *
+		 *	@return		{boolean}
+		 */
+		isWord : function( slug ) {
+
+			slug = String( slug ?? '' );
+
+			const word = function( candidate ) { return Nino.content.getText( '/_admin/common/word/'+ candidate ) !== '' };
+
+			if( word( slug ) === true )
+				return true;
+
+			const numbered = /^(.+)-\d+$/.exec( slug );
+			if( numbered !== null )
+				return Nino.adminUi.isWord( numbered[1] );
+
+			for( let dash = slug.indexOf('-'); dash !== -1; dash = slug.indexOf( '-', dash + 1 ) )
+				if( dash > 0 && word( slug.slice( 0, dash ) ) === true && word( slug.slice( dash + 1 ) ) === true )
+					return true;
+
+			return false;
+		},
+
+		/**
 		 *	Show a frame at a layout width it does not have room for, scaled to
 		 *	the room it does have.
 		 *
@@ -2419,6 +2452,17 @@
 		 *	             loaded and afterwards draws the last answer again - unless
 		 *	             the dirty registry says the panel holds input nobody has
 		 *	             saved, which it leaves alone
+		 *	  - stamps   the kinds of data the panel shows and another panel
+		 *	             writes, a list of the names touch() of the shell has
+		 *	             (templates, texts, elements, slots, routes, navigations):
+		 *	             the stamp of each is kept as it was when the request for
+		 *	             the screen went out, and a showCurrent() with show 'keep'
+		 *	             asks again, instead of drawing the last answer, when one
+		 *	             of them has moved since - not while the dirty registry
+		 *	             says the panel holds input nobody has saved, which is
+		 *	             left alone and answered at the next showing. Nothing
+		 *	             moves on a page that has no shell, and 'once' and
+		 *	             'always' have their own rule for a second showing
 		 *	  - boot     'lazy' (the default): the first showCurrent() starts the
 		 *	             panel; 'ready': the ready event does, and a showCurrent()
 		 *	             that comes first starts it too, once
@@ -2454,18 +2498,29 @@
 		 *	panel needs it and not at load: without it the panel works the same,
 		 *	and 'keep' counts it as clean. Owns no strings
 		 *
-		 *	@param		{Object}		spec						{ uri, mount, render, action, payload, show, boot, dirty, error, onError }
+		 *	@param		{Object}		spec						{ uri, mount, render, action, payload, show, stamps, boot, dirty, error, onError }
 		 *
 		 *	@return		{Object}										The panel
 		 */
 		panel : function( spec ) {
 
 			const fallback	= spec.error ?? '/_admin/'+ spec.uri+ '/error/load';
+			const topics		= Array.isArray( spec.stamps ) === true ? spec.stamps : [];
 			let registered	= false;
+			// The stamps of the topics as they were when the screen was asked for
+			let seen				= [];
 
 			const dirty = function() {
 				const registry = shell().dirty;
 				return typeof registry === 'object' && registry !== null && registry.isDirty( [ spec.uri ] ) === true;
+			};
+
+			// The stamps now, in the order the spec names the topics: a page that
+			// has no shell - the wizard, a test - has no counters, and nothing on
+			// it ever moves
+			const stamped = function() {
+				const registry = shell();
+				return topics.map( function( topic ) { return typeof registry.stamp === 'function' ? registry.stamp( topic ) : 0 } );
 			};
 
 			const panel = {
@@ -2501,6 +2556,10 @@
 
 					panel.loading = true;
 
+					// A write that lands while the request is out is one this answer
+					// may not hold: the stamps are the ones from before it went out
+					const asked = stamped();
+
 					if( registered === false && typeof spec.dirty === 'object' && spec.dirty !== null && typeof shell().dirty === 'object' && shell().dirty !== null ) {
 						shell().dirty.register( spec.uri, spec.dirty );
 						registered = true;
@@ -2513,6 +2572,7 @@
 						if( status === 200 ) {
 							panel.data = response;
 							panel.ready = true;
+							seen = asked;
 							spec.render( panel.data, panel );
 							if( typeof then === 'function' )
 								then();
@@ -2537,8 +2597,17 @@
 						return;
 					}
 
-					if( spec.show === 'keep' && dirty() === false )
-						spec.render( panel.data, panel );
+					if( spec.show !== 'keep' || dirty() === true )
+						return;
+
+					// What another panel wrote since the answer was asked for is not in
+					// it: ask again, and the render of that answer is the redraw
+					if( stamped().some( function( stamp, at ) { return stamp !== seen[at] } ) === true ) {
+						panel.init();
+						return;
+					}
+
+					spec.render( panel.data, panel );
 				},
 			};
 

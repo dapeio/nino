@@ -168,7 +168,7 @@ The **Recovery password** tab of the Users panel changes the recovery password: 
 | A panel or a tab is missing | The account lacks its permission, or its module is not active. |
 | Saving fails | The message says why where Nino has a sentence for it (a value out of range, an address already in use, a file over PHP's upload limit). Otherwise: write permissions of the affected file or directory. |
 | A login dialog appears over a form | The session ended; log in again and the request is sent on. *Another account is logged in in another tab* means exactly that: reload the page. |
-| Template missing in **Routes** | Only existing `templates/page-*.tpl` files are offered. |
+| Template missing in **Routes** | Only existing `templates/page-*.tpl` files are offered. One a panel of the workbench has written (the Builder creates them) is offered the next time Routes is shown, with no reload; one put on the disk by hand is offered after a reload of the page. |
 | Texts or images missing in a scan | Dynamic keys and images are not statically recognizable. |
 | Backup list is empty | Backups are switched off, or no authenticated request has happened today. **Back up now** writes the first archive at once. |
 | Website broken after **Config** | Restore the last Git state or backup. |
