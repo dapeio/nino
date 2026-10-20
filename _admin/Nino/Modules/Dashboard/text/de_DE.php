@@ -27,4 +27,11 @@ return [
 	'[[/_admin/dashboard/notice/legal-undescribed]]'	=> 'Das Feature „%s“ ist aktiv, aber die Datenschutzerklärung hat keinen sichtbaren Abschnitt dazu. Blende ihn unter Elements › Datenschutzerklärung wieder ein oder beschreibe es dort selbst.',
 	'[[/_admin/dashboard/notice/legal-more]]'	=> '… und %s weitere Hinweise zu den Rechtstexten.',
 	'[[/_admin/dashboard/notice/open]]'	=> 'Öffnen',
+
+	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
+	'[[/_admin/dashboard/manual/intro]]'	=> 'Der Überblick über Deine Website: was Deine Aufmerksamkeit braucht und ein paar Zahlen auf einen Blick.',
+	'[[/_admin/dashboard/manual/notice]]'	=> 'Was Aufmerksamkeit braucht, steht oben: Texte ohne Übersetzung, Mails, die nicht ankommen, Rechtstexte, die noch fehlen. Jeder Hinweis sagt, wo Du ihn erledigst, und führt Dich dorthin.',
+	'[[/_admin/dashboard/manual/tile]]'	=> 'Eine Kachel zeigt eine Zahl: Elementtypen, fehlende Textschlüssel, Anfragen, aktive Features, das letzte Backup. Ein Klick öffnet den Bereich dahinter.',
+	'[[/_admin/dashboard/manual/element]]'	=> '„Elemente nach Typ“ zählt die Einträge jeder Liste.',
+	'[[/_admin/dashboard/manual/activity]]'	=> '„Letzte Aktivität“ zeigt die letzten Anmeldungen und Änderungen. „Alle anzeigen“ öffnet das Log.',
 ];

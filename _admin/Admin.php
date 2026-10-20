@@ -140,7 +140,9 @@ namespace Nino\Admin {
 			// admin/locale action Elements/Text's live content-locale
 			// switch uses, this needs no guard() at all: GET /_admin is
 			// already reachable without a session, so there's nothing to
-			// loosen. Persists to the same ./admin/locale session key.
+			// loosen. Persists to ./admin/locale, the interface language -
+			// the working language the panels' selects name is another
+			// session value (see contentLocale()), and this never writes it
 			// is_string(), not a cast: '?locale[]=x' is a query anybody can
 			// send, and casting the array it parses to raises "Array to
 			// string conversion" - a level the runtime treats as fatal, ie.
@@ -150,12 +152,13 @@ namespace Nino\Admin {
 			if( $queryLocale !== '' && \Nino\Locales::verifyLocale( $appData, $queryLocale ) === true )
 				\Nino\Runtime::setSessionValue( $appData, './admin/locale', $queryLocale );
 
-			// Sync the shared "current locale" to the admin's own remembered
-			// locale (session locale) before loading the tool's own text fills -
-			// reuses the exact mechanism Elements/Text's locale switch already
-			// persists (POST admin/locale), so switching it also switches
-			// which language the admin UI chrome itself renders in
-			\Nino\Locales::setCurrentLocale( $appData, self::sessionLocale( $appData ) );
+			// The workbench renders in its own interface language (the session
+			// locale) for the rest of this request, and leaves it at that:
+			// useLocale() does not persist, and ./nino/locales/current is the
+			// visitor's own choice, the public site's - the one a picker on
+			// the site made - which the workbench never writes. Before
+			// loading the tool's own text fills, which are read per locale
+			\Nino\Locales::useLocale( $appData, self::sessionLocale( $appData ) );
 
 			$currentLocale = \Nino\Locales::getCurrentLocale( $appData );
 			\Nino\Html::addFills( $appData, self::textFills( $appData, '/_admin/text', $currentLocale ), $currentLocale );
@@ -413,7 +416,7 @@ namespace Nino\Admin {
 		 */
 		public static function actions( array &$appData ): array {
 
-			$actions = [ 'admin/locale' => [ Admin::class, 'apiSetLocale' ] ];
+			$actions = [ 'admin/locale' => [ Admin::class, 'apiSetLocale' ], 'admin/manual' => [ Admin::class, 'apiManual' ] ];
 			$panels	 = self::allPanels( $appData );
 			$core		 = array_filter( $panels, static fn( array $panel ): bool => $panel['core'] === true );
 
@@ -800,12 +803,13 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	The admin's remembered locale for this session (Elements/Text's
-		 *	locale switch), so opening the next form - in this or another
-		 *	panel - starts on it instead of always resetting to whichever
-		 *	locale happens to come first. Falls back to the site's native
-		 *	locale if nothing has been chosen yet, or the stored one is no
-		 *	longer available (eg. removed from config since).
+		 *	The language the workbench speaks in this session - the interface
+		 *	language, which the rail's picker and the login page's choose
+		 *	(?locale=xx) and nothing else does. What the text fills and the
+		 *	chrome are rendered in, and what a panel names a page or a feature
+		 *	in. Falls back to the site's native locale if nothing has been
+		 *	chosen yet, or the stored one is no longer available (eg. removed
+		 *	from config since). The language a panel edits is contentLocale().
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -814,6 +818,32 @@ namespace Nino\Admin {
 		public static function sessionLocale( array &$appData ): string {
 
 			$locale = \Nino\Runtime::getSessionValue( $appData, './admin/locale', '' );
+
+			if( $locale === '' || \Nino\Locales::verifyLocale( $appData, $locale ) === false )
+				return \Nino\Locales::getNativeLocale( $appData );
+
+			return $locale;
+		}
+
+		/**
+		 *	The working language of this session: the translation Elements and
+		 *	Text (the Keys tab too) open on, and the one Routes names its pages in
+		 *	where they have a name in it (the select above those screens, POST
+		 *	admin/locale), so opening the next form - in this or another panel -
+		 *	starts on it instead of always resetting to whichever locale happens
+		 *	to come first. Its own session value, apart from
+		 *	the interface language (sessionLocale()) and from the visitor's
+		 *	locale, which the workbench never writes. Falls back to the site's
+		 *	native locale if nothing has been chosen yet, or the stored one is
+		 *	no longer available.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string
+		 */
+		public static function contentLocale( array &$appData ): string {
+
+			$locale = \Nino\Runtime::getSessionValue( $appData, './admin/content-locale', '' );
 
 			if( $locale === '' || \Nino\Locales::verifyLocale( $appData, $locale ) === false )
 				return \Nino\Locales::getNativeLocale( $appData );
@@ -876,7 +906,9 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	Remember the admin's currently selected locale for this session
+		 *	Remember the working language a panel's select names for this
+		 *	session (see contentLocale()). The interface language is not
+		 *	touched, and neither is the visitor's locale
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -897,7 +929,105 @@ namespace Nino\Admin {
 				return;
 			}
 
-			\Nino\Runtime::setSessionValue( $appData, './admin/locale', $locale );
+			\Nino\Runtime::setSessionValue( $appData, './admin/content-locale', $locale );
+		}
+
+		/**
+		 *	One pane's manual, for the "?" in its head to show in a dialog (see
+		 *	manual()). Any account that may see the pane may read it: a manual is
+		 *	what the pane is for, and the pane is already there. That is why it is
+		 *	guard() and the registry of the panes the account sees, and not
+		 *	guardPerm() with one permission: the action is the shell's and answers
+		 *	for every pane, and an account that holds only one tab of a pane has the
+		 *	pane. Asked for when the "?" is pressed and not sent with the page - a
+		 *	feature's manual is as long as its author made it
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiManual( array &$appData, array &$request ): void {
+
+			if( self::guard( $appData, $request ) === false )
+				return;
+
+			$uri		= self::postData()['panel'] ?? '';
+			$panel	= is_string( $uri ) === true ? ( self::visiblePanels( $appData )[$uri] ?? null ) : null;
+
+			if( $panel === null || Panels::hasManual( $panel ) === false ) {
+				\Nino\Http::fail( $request, 404, 'no manual', 'no_manual' );
+				return;
+			}
+
+			\Nino\Http::ok( $request, self::manual( $appData, $panel ) );
+		}
+
+		/**
+		 *	A pane's manual in the interface language, in the one shape the "?"
+		 *	draws (Nino.adminUi.manual()) whoever wrote it:
+		 *
+		 *	  - title      the panel's name as its nav() gave it - a fill key or text
+		 *	  - sections   [ { heading, entries : [ { handle, text } ] } ]
+		 *	  - text       the running text of a feature whose manifest has the
+		 *	               older form, which has no sections; '' otherwise
+		 *	  - none       what a section without entries says; '' for none
+		 *	  - words      the handles are words of the vocabulary, for the person
+		 *	               to read in the interface language, and not code
+		 *
+		 *	A panel with a manual() of its own has one section, with no heading:
+		 *	an entry per handle, the line the fill /_admin/<uri>/manual/<handle>
+		 *	says, and the handle 'intro' - what the panel is for - has no handle
+		 *	to show, which is how a line about the whole section is told (see
+		 *	Features::manualSections()). A feature's panel shows the manual of
+		 *	the manifest as the Features panel does: the sections
+		 *	\Nino\Features::MANUAL_SECTIONS names, each under the heading that
+		 *	panel's fills give it, every one of them though it is empty
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$panel				A registry entry with a manual (see Panels::hasManual())
+		 *
+		 *	@return 	array
+		 */
+		public static function manual( array &$appData, array $panel ): array {
+
+			$answer = [ 'title' => $panel['label'], 'sections' => [], 'text' => '', 'none' => '', 'words' => false ];
+
+			if( $panel['manual'] !== [] ) {
+
+				$entries = [];
+
+				foreach( $panel['manual'] as $handle )
+					$entries[] = [
+						'handle'	=> $handle === 'intro' ? '' : $handle,
+						'text'		=> \Nino\Html::renderTextfill( $appData, '/_admin/'. $panel['uri']. '/manual/'. $handle ),
+					];
+
+				$answer['sections']	= [ [ 'heading' => '', 'entries' => $entries ] ];
+				$answer['words']		= true;
+
+				return $answer;
+			}
+
+			$feature = \Nino\Features::get( $appData, $panel['manualFeature'] );
+
+			if( $feature === null )
+				return $answer;
+
+			$locale		= self::sessionLocale( $appData );
+			$sections	= \Nino\Features::manualSections( $feature['manual'] ?? '', $locale );
+
+			if( $sections === null ) {
+				$answer['text'] = \Nino\Features::localized( $feature['manual'] ?? '', $locale );
+				return $answer;
+			}
+
+			foreach( $sections as $name => $entries )
+				$answer['sections'][] = [ 'heading' => \Nino\Html::renderTextfill( $appData, '/_admin/features/manual/'. $name ), 'entries' => $entries ];
+
+			$answer['none'] = \Nino\Html::renderTextfill( $appData, '/_admin/features/manual/none' );
+
+			return $answer;
 		}
 
 		/**
@@ -917,7 +1047,7 @@ namespace Nino\Admin {
 		/**
 		 *	The words of one text directory in the interface language - or in
 		 *	English when there are none in that language. The interface
-		 *	language follows the site's (see sessionLocale()), and the
+		 *	language is one of the site's (see sessionLocale()), and the
 		 *	workbench speaks two; a site in a third would otherwise render
 		 *	every label of every panel as its own fill key
 		 *
@@ -1161,6 +1291,14 @@ namespace Nino\Admin {
 	 *											  head(): bool              false opens the pane on its screen alone,
 	 *											                            without the row that names the panel (the
 	 *											                            Dashboard); true, the default, keeps it
+	 *											  manual(): array           the handles of the panel's manual, in the
+	 *											                            order its "?" shows them: one for what the
+	 *											                            panel is for ('intro') and one for each
+	 *											                            thing a person does in it. The line of a
+	 *											                            handle is the fill /_admin/<uri>/manual/<handle>
+	 *											                            of the panel's own text/ files. A feature's
+	 *											                            panel with none shows the manual of the
+	 *											                            feature's manifest
 	 *											  tabs(): array             further panel classes shown as tabs of this
 	 *											                            panel's pane, each with its own perm(), script
 	 *											                            and hash prefix; tab(): string names the tab
@@ -1233,11 +1371,13 @@ namespace Nino\Admin {
 
 			Every pane but one opens with its head: one row across the
 			workbench, the panel's name as the h2 of the screen, the tab strip
-			beside it where the registry has tabs, and a slot at its end for
-			the buttons a panel keeps over its screen (see panesHtml() and
+			beside it where the registry has tabs, a slot for the buttons a
+			panel keeps over its screen (see panesHtml() and
 			Nino.adminUi.panelHead(), through which a panel's script puts a
-			strip or a button of its own there). A panel answering head()
-			false - the Dashboard - opens on its screen alone	*/
+			strip or a button of its own there) and, last, the "?" of the
+			panel's manual where it has one. A panel answering head() false -
+			the Dashboard - opens on its screen alone, with the "?" in a row
+			of its own	*/
 		public static
 			$html = [
 				'nav-group'		=> '<button type="button" class="nino-admin-nav-group" data-group="[[group]]" aria-expanded="true">[[label]]</button>',
@@ -1245,8 +1385,14 @@ namespace Nino\Admin {
 				// The letter that stands in for a panel with no icon of its own
 				'nav-initial'	=> '<b>[[initial]]</b>',
 				'pane'				=> '<div id="admin-content-[[uri]]" data-panel="[[uri]]" data-layout="[[layout]]" hidden>[[head]][[content]]</div>',
-				'head'				=> '<div class="admin-panel-head">[[title]][[tabs]]<div class="admin-panel-actions"></div></div>',
+				'head'				=> '<div class="admin-panel-head">[[title]][[tabs]]<div class="admin-panel-actions"></div>[[manual]]</div>',
 				'head-title'	=> '<h2 class="admin-panel-title">[[label]]</h2>',
+				// The "?" at the end of the head, which opens the panel's manual
+				// (see Nino.admin.manual in script.js): drawn for a panel that
+				// has one, and in a row of its own where there is no head to
+				// put it in - the Dashboard
+				'head-manual'	=> '<button type="button" class="admin-panel-manual" data-manual="[[uri]]" aria-haspopup="dialog" aria-label="[[/_admin/common/label/manual]]" title="[[/_admin/common/label/manual]]">?</button>',
+				'head-bare'		=> '<div class="admin-panel-manualrow">[[manual]]</div>',
 				'tab-bar'			=> '<div class="nino-admin-tabs nino-admin-tabs--bar nino-admin-tabs--panel admin-panel-tabs" role="tablist">[[content]]</div>',
 				'tab-button'	=> '<button type="button" role="tab" id="admin-tabbutton-[[uri]]" class="nino-admin-tab" data-tab="[[uri]]" aria-controls="admin-tab-[[uri]]" aria-selected="false">[[label]]</button>',
 				'tab-pane'		=> '<div id="admin-tab-[[uri]]" role="tabpanel" aria-labelledby="admin-tabbutton-[[uri]]" data-tab="[[uri]]" hidden>[[content]]</div>',
@@ -1281,7 +1427,7 @@ namespace Nino\Admin {
 		 *	@param		array 		$core					The workbench's own panel classes (see Admin::modules())
 		 *	@param		string		$method				What every active module is asked for its panels - 'adminPanels'
 		 *
-		 *	@return 	array										[ uri => { class, uri, label, tab, weight, group, perm, panes, template, layout, head, icon, assets, text, tabs, parent, own, core, feature? } ] - feature only on a Settings tab, the key it belongs to
+		 *	@return 	array										[ uri => { class, uri, label, tab, weight, group, perm, panes, template, layout, head, icon, assets, text, manual, manualFeature, tabs, parent, own, core, feature? } ] - feature only on a Settings tab, the key it belongs to
 		 */
 		public static function collect( array &$appData, array $core, string $method ): array {
 
@@ -1350,6 +1496,8 @@ namespace Nino\Admin {
 			if( class_exists( '\\Nino\\Modules\\Features\\Settings' ) === true )
 				self::_attachSettings( $appData, $panels, $taken );
 
+			self::_attachManuals( $appData, $panels );
+
 			// Group first, weight within the group - stable, so two panels
 			// of equal weight keep their registration order
 			$order = array_flip( self::GROUPS );
@@ -1399,13 +1547,7 @@ namespace Nino\Admin {
 
 				foreach( $featurePanels as $uri => $panel ) {
 
-					try {
-						$file = ( new \ReflectionClass( $panel['class'] ) )->getFileName();
-					} catch( \ReflectionException ) {
-						continue;
-					}
-
-					$file = is_string( $file ) === true ? realpath( $file ) : false;
+					$file = self::_classFile( $panel['class'] );
 
 					// The feature's first panel, by the same test that tells a
 					// feature's panel apart (see _isFeaturePanel())
@@ -1434,6 +1576,8 @@ namespace Nino\Admin {
 						'icon'		=> '',
 						'assets'	=> [],
 						'text'		=> \Nino\Modules\Features\Settings::text(),
+						'manual'	=> [],
+						'manualFeature'	=> '',
 						'tabs'		=> [],
 						'parent'	=> $uri,
 						'own'			=> true,
@@ -1447,6 +1591,81 @@ namespace Nino\Admin {
 					break;
 				}
 			}
+		}
+
+		/**
+		 *	Give a panel a feature brought the manual of its feature, where it
+		 *	has none of its own: the one the feature's manifest carries, which
+		 *	the Features panel shows to the people who develop with the feature
+		 *	and the panel's "?" shows to the people who work with it. Which
+		 *	feature a panel belongs to is told the way a feature's panel is told
+		 *	apart (see _isFeaturePanel()) - its class file lies below the
+		 *	feature's directory - and a feature whose manifest says nothing
+		 *	about its use gives its panel no "?"
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$panels			(reference) The registry under construction, uri => entry
+		 *
+		 *	@return 	void
+		 */
+		private static function _attachManuals( array &$appData, array &$panels ): void {
+
+			// Reading the features reads every manifest below features/, which a
+			// registry without a feature's panel has no reason to do
+			$featurePanels = array_filter( $panels, static fn( array $panel ): bool => $panel['manual'] === [] && self::_isFeaturePanel( $panel['class'] ) === true );
+
+			if( $featurePanels === [] )
+				return;
+
+			foreach( \Nino\Features::all( $appData ) as $feature ) {
+
+				if( $feature['active'] !== true || \Nino\Features::hasManual( $feature['manual'] ?? '' ) === false )
+					continue;
+
+				$dir = realpath( $feature['dir'] );
+
+				if( $dir === false )
+					continue;
+
+				foreach( $featurePanels as $uri => $panel ) {
+
+					$file = self::_classFile( $panel['class'] );
+
+					if( $file !== false && str_starts_with( $file, $dir. DIRECTORY_SEPARATOR ) === true )
+						$panels[$uri]['manualFeature'] = $feature['key'];
+				}
+			}
+		}
+
+		/**
+		 *	The file a panel class was loaded from, as realpath() has it
+		 *
+		 *	@param		string		$class				A validated panel class name
+		 *
+		 *	@return 	string|false								false for a class that is not there, or not in a file
+		 */
+		private static function _classFile( string $class ): string|false {
+
+			try {
+				$file = ( new \ReflectionClass( $class ) )->getFileName();
+			} catch( \ReflectionException ) {
+				return false;
+			}
+
+			return is_string( $file ) === true ? realpath( $file ) : false;
+		}
+
+		/**
+		 *	Whether a pane has a manual to open: handles of its own, or the
+		 *	manual of its feature (see _attachManuals())
+		 *
+		 *	@param		array 		$panel				A registry entry
+		 *
+		 *	@return 	bool
+		 */
+		public static function hasManual( array $panel ): bool {
+
+			return $panel['manual'] !== [] || $panel['manualFeature'] !== '';
 		}
 
 		/**
@@ -1536,6 +1755,23 @@ namespace Nino\Admin {
 			// that is its own overview, the Dashboard, is the one that does
 			$head = method_exists( $class, 'head' ) === true ? (bool) $class::head() : true;
 
+			// The handles of the panel's manual, in the order its "?" shows them
+			// (see Admin::manual()): slugs, each once. One that is none is named
+			// rather than dropped in silence, like an asset path that is not
+			// one - a manual with an entry missing is the hardest kind of
+			// nothing to chase
+			$manual = [];
+			if( method_exists( $class, 'manual' ) === true )
+				foreach( (array) $class::manual() as $handle ) {
+
+					if( is_string( $handle ) === false || preg_match( '/^[a-z][a-z0-9-]*$/', $handle ) !== 1 || in_array( $handle, $manual, true ) === true ) {
+						trigger_error( 'Panel '. $class. ' names a manual entry that is no handle, or names it twice: \''. ( is_string( $handle ) === true ? $handle : gettype( $handle ) ). '\'', E_USER_WARNING );
+						continue;
+					}
+
+					$manual[] = $handle;
+				}
+
 			// An icon is markup a panel class ships - trusted code, but
 			// held to one shape: an inline svg and nothing that runs
 			$icon = method_exists( $class, 'icon' ) === true ? trim( (string) $class::icon() ) : '';
@@ -1583,6 +1819,11 @@ namespace Nino\Admin {
 				'icon'		=> $icon,
 				'assets'	=> $assets,
 				'text'		=> method_exists( $class, 'text' ) === true ? (string) $class::text() : '',
+				'manual'	=> $manual,
+				// The feature whose manifest manual the panel shows where it has
+				// none of its own - set once the features are known (see
+				// _attachManuals())
+				'manualFeature'	=> '',
 				'tabs'		=> [],
 				'parent'	=> '',
 				// Whether the panel's own screen is on offer - false once
@@ -1779,12 +2020,17 @@ namespace Nino\Admin {
 						);
 				}
 
-				// The head: the name, the strip beside it, the actions slot.
-				// A panel without a name of its own still gets the row when
-				// there is a strip to hold - the shell script looks for a
-				// strip in the head and nowhere else
+				// The head: the name, the strip beside it, the actions slot and
+				// the "?" of the panel's manual at its end. A panel without a
+				// name of its own still gets the row when there is a strip to
+				// hold - the shell script looks for a strip in the head and
+				// nowhere else - and one with a manual and nothing else to put
+				// in a head, the Dashboard, a row for the "?" alone
 				$title	= $panel['head'] === true ? str_replace( '[[label]]', self::label( $panel['label'] ), self::$html['head-title'] ) : '';
-				$head		= $title === '' && $strip === '' ? '' : str_replace( [ '[[title]]', '[[tabs]]' ], [ $title, $strip ], self::$html['head'] );
+				$manual	= self::hasManual( $panel ) === true ? str_replace( '[[uri]]', $panel['uri'], self::$html['head-manual'] ) : '';
+				$head		= $title === '' && $strip === ''
+					? ( $manual === '' ? '' : str_replace( '[[manual]]', $manual, self::$html['head-bare'] ) )
+					: str_replace( [ '[[title]]', '[[tabs]]', '[[manual]]' ], [ $title, $strip, $manual ], self::$html['head'] );
 
 				$html .= str_replace(
 					[ '[[uri]]', '[[layout]]', '[[head]]', '[[content]]' ],

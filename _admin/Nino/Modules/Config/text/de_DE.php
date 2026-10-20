@@ -28,4 +28,11 @@ return [
 	'[[/_admin/config/hint/cachettl]]'	=> 'Wie lange eine gespeicherte Seite ausgeliefert wird, bevor sie neu gerendert wird. Änderungen warten nicht darauf – sie leeren den Cache sofort.',
 	'[[/_admin/config/label/cacheblacklist]]'	=> 'Nie cachen',
 	'[[/_admin/config/hint/cacheblacklist]]'	=> 'Eine Uri je Zeile. Ein abschließendes /* deckt einen ganzen Teilbaum ab: /blog/* trifft /blog und alles darunter. Für alles, was je Besuch gerendert werden muss.',
+
+	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
+	'[[/_admin/config/manual/intro]]'	=> 'Einstellungen, die für das ganze Projekt gelten und sich selten ändern – meist für Entwickler.',
+	'[[/_admin/config/manual/error]]'	=> '„Fehler und Diagnose“ bestimmt, ob PHP-Fehler in ein Log geschrieben oder auf der Website gezeigt werden, wie das Sitzungs-Cookie ausgestellt wird und welche Proxys vor der Website stehen. Eine Live-Website zeigt nie Fehler.',
+	'[[/_admin/config/manual/backup]]'	=> '„Tägliche verschlüsselte Sicherung“ schaltet die automatische Sicherung ein oder aus. Zurückgespielt werden die Backups unter Backups.',
+	'[[/_admin/config/manual/log]]'	=> '„Aktivitätsprotokoll führen“ schaltet das Log ein oder aus: eine Zeile je Anmeldung und je Änderung, vierzehn Tage aufgehoben.',
+	'[[/_admin/config/manual/cache]]'	=> '„Gerenderte Seiten cachen“ liefert gespeicherte Kopien von Seiten aus, statt sie neu zu erzeugen. Schalte es ein, wenn die Website fertig ist, nicht beim Bauen. Jedes Speichern in der Workbench leert den ganzen Cache.',
 ];

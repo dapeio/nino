@@ -30,7 +30,7 @@
 		 */
 		init : function() {
 
-			if( dc.getElementById('admin-content-dashboard') === null )
+			if( dc.getElementById('dashboard-list') === null )
 				return;
 
 			Nino.admin.dashboard._apiCall( 'summary', {}, function( status, response ) {
@@ -73,7 +73,7 @@
 		 *	@return		void
 		 */
 		_showError : function( status, response ) {
-			Nino.adminUi.showError( dc.getElementById('admin-content-dashboard'), status, response, '/_admin/dashboard/error/load' );
+			Nino.adminUi.showError( dc.getElementById('dashboard-list'), status, response, '/_admin/dashboard/error/load' );
 		},
 
 		/**
@@ -86,7 +86,7 @@
 		 */
 		_render : function( data ) {
 
-			const wrap = dc.getElementById('admin-content-dashboard');
+			const wrap = dc.getElementById('dashboard-list');
 			wrap.innerHTML = '';
 
 			// What needs attention comes first (see the panel's apiSummary()):

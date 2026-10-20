@@ -102,4 +102,10 @@ return [
 	'[[/_admin/features/error/catalogue-reason]]'	=> 'The catalogue could not be loaded: %s',
 	'[[/_admin/features/error/catalogue-off]]'	=> 'The catalogue is switched off: /nino/catalogue/url in config.php is empty.',
 	'[[/_admin/features/error/activate-after-install]]'	=> 'The feature is in place, but it could not be switched on: %s',
+
+	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
+	'[[/_admin/features/manual/intro]]'	=> 'Features are add-ons – tools and functions that come as a directory and are switched on here. This panel lists, installs and switches them.',
+	'[[/_admin/features/manual/available]]'	=> 'Available lists what the catalogue offers. Refresh catalogue loads it, Install copies a feature into the project.',
+	'[[/_admin/features/manual/inactive]]'	=> 'Inactive lists the features that are installed and switched off. Activate switches one on, Remove deletes it from the project.',
+	'[[/_admin/features/manual/active]]'	=> 'Active lists the features that are on. A click opens one: its description and manual, written for developers, its settings, an update where there is one, and Deactivate.',
 ];

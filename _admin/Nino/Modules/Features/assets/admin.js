@@ -1364,33 +1364,23 @@
 		 *	The manual: what a feature's manifest says about using it - either
 		 *	as the sections every manifest answers, or, for a catalogue written
 		 *	before those existed, as paragraphs with `backticked` spans as code.
-		 *	null where the feature carries none
+		 *	null where the feature carries none. Drawn by the design system
+		 *	(Nino.adminUi.manual()), which is also what the "?" of every panel
+		 *	draws a manual with
 		 *
 		 *	No box of its own and no cap on its height: the tab it is drawn
 		 *	under is what gets it out of the way, so it is as long as it is
 		 *
 		 *	@param		{object}	feature			As the panel loaded it
 		 *
-		 *	@return		{?Element}						<div class="features-manual-body">
+		 *	@return		{?Element}						<div class="nino-admin-manual">
 		 */
 		_renderManual : function( feature ) {
 
 			const manual = feature.manual;
-			const prose  = typeof manual === 'string' ? manual.trim() : '';
-			const sections = ( manual !== null && typeof manual === 'object' ) ? manual : null;
 
-			if( sections === null && prose === '' )
-				return null;
-
-			const body = dc.createElement('div');
-			body.className = 'features-manual-body';
-
-			if( sections === null ) {
-				// The older prose form. Still drawn, so a catalogue written
-				// before the sections existed reads as it always did
-				Nino.admin.features._manualProse( body, prose );
-				return body;
-			}
+			if( manual === null || typeof manual !== 'object' )
+				return Nino.adminUi.manual( typeof manual === 'string' ? manual : '' );
 
 			/*	One shape for every feature, in one order, so the thing a
 				developer does with this - look something up - is a glance rather
@@ -1401,119 +1391,11 @@
 
 				What is *not* in here: the settings. They are the other tab, with
 				their own labels and their own hints, and the same words twice is
-				the second place they drift from	*/
-			( feature.manualSections || [] ).forEach( function( name ) {
-				Nino.admin.features._manualSection( body, name, sections[name] || [] );
-			} );
-
-			return body;
-		},
-
-		/**
-		 *	One section: its heading, then a line per entry - the handle as
-		 *	code, what it does beside it. An empty one says so rather than
-		 *	being left out
-		 *
-		 *	@param		{Element}	body
-		 *	@param		{string}	name				A section of \Nino\Features::MANUAL_SECTIONS
-		 *	@param		{Array}		entries			{ handle, text }, handle optional
-		 *
-		 *	@return		void
-		 */
-		_manualSection : function( body, name, entries ) {
-
-			const heading = dc.createElement('h6');
-			heading.textContent = Nino.content.getText('/_admin/features/manual/'+ name);
-			body.appendChild( heading );
-
-			if( entries.length === 0 ) {
-				const none = dc.createElement('p');
-				none.className = 'features-manual-none';
-				none.textContent = Nino.content.getText('/_admin/features/manual/none');
-				body.appendChild( none );
-				return;
-			}
-
-			/*	A handle and what it does is a description list, and one list for
-				the whole section is what puts every handle of it in one column and
-				every line in another. One grid per entry - which is what a row of
-				<p> is - aligns each entry with itself and with nothing else, which
-				is not a column and is no faster to read than prose	*/
-			const list = dc.createElement('dl');
-			list.className = 'features-manual-section';
-
-			entries.forEach( function( entry ) {
-
-				// Everything here came out of a manifest, so everything goes in
-				// as text - the handle is an element rather than a string of
-				// html, and there is no markup to get wrong
-				const term = dc.createElement('dt');
-
-				if( entry.handle ) {
-					const code = dc.createElement('code');
-					code.textContent = entry.handle;
-					term.appendChild( code );
-				}
-
-				// A line with no handle of its own - one that says something about
-				// the whole section - keeps the column the other lines are in
-				const said = dc.createElement('dd');
-				said.textContent = entry.text || '';
-
-				list.appendChild( term );
-				list.appendChild( said );
-			} );
-
-			body.appendChild( list );
-		},
-
-		/**
-		 *	The older prose manual: paragraphs, with `backticked` spans as code
-		 *
-		 *	@param		{Element}	body
-		 *	@param		{string}	text
-		 *
-		 *	@return		void
-		 */
-		_manualProse : function( body, text ) {
-
-			// A blank line starts a paragraph; a single one is where the manifest
-			// wrapped its own line and means nothing here
-			text.split( /\n[ \t]*\n/ ).forEach( function( block ) {
-
-				const flowed = block.trim().replace( /\s*\n\s*/g, ' ' );
-
-				if( flowed === '' )
-					return;
-
-				const paragraph = dc.createElement('p');
-				const pieces = flowed.split( '`' );
-
-				// Text out of a manifest, so every piece of it goes in as text: the
-				// backtick is the only markup there is, and it makes an element
-				// rather than a string of html. An unclosed one is prose, not
-				// markup - shown as it was written instead of turning the rest of
-				// the paragraph into code
-				if( pieces.length % 2 === 0 )
-					paragraph.textContent = flowed;
-				else
-					pieces.forEach( function( piece, index ) {
-
-						if( piece === '' )
-							return;
-
-						if( index % 2 === 0 ) {
-							paragraph.appendChild( dc.createTextNode( piece ) );
-							return;
-						}
-
-						const code = dc.createElement('code');
-						code.textContent = piece;
-						paragraph.appendChild( code );
-					} );
-
-				body.appendChild( paragraph );
-			} );
+				the second place they drift from. The headings are the sixth
+				level: the screen's own order of them, which is not the dialog's	*/
+			return Nino.adminUi.manual( ( feature.manualSections || [] ).map( function( name ) {
+				return { heading : Nino.content.getText('/_admin/features/manual/'+ name), entries : manual[name] || [] };
+			} ), { none : Nino.content.getText('/_admin/features/manual/none'), level : 6 } );
 		},
 
 		/**

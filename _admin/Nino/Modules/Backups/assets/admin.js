@@ -255,10 +255,21 @@
 					// said with the restore in the one message the page shows before it
 					// reloads: a line in the panel would be gone with the reload
 					if( typeof response.notice === 'object' && response.notice !== null )
-						said += '\n\n'+ Nino.adminUi.api.errorText( status, response.notice );
+						said += ' '+ Nino.adminUi.api.errorText( status, response.notice );
 
-					wn.alert( said );
-					wn.location.reload();
+					// The restore ended the session - the sessions are part of what was
+					// restored, and the one that ran it is ended either way (see
+					// apiRestore()) - so the reload lands on the login page. The message
+					// is read in a dialog before that, and the dialog's one choice is the
+					// way there - a reload of its own accord would be the page changing
+					// under the person's eyes
+					if( Nino.adminUi.choiceDialog( {
+						title		: Nino.content.getText('/_admin/nav/backups'),
+						message	: said,
+						choices	: [ { value : 'login', label : Nino.content.getText('/_admin/backups/label/login'), kind : 'primary' } ],
+						onChoose : function() { wn.location.reload() },
+					} ) === false )
+						wn.location.reload();
 				} );
 			};
 

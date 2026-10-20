@@ -930,6 +930,174 @@ a {
 	gap: .5rem;
 }
 
+/* A manual in a dialog (Nino.adminUi.manualDialog()): wider than a question,
+   and what stands between its title and its button scrolls, so that neither
+   leaves the screen however long the manual is. */
+:where(.nino-admin) .nino-admin-dialog--manual {
+	width: min(40rem, calc(100vw - 2rem));
+	max-height: calc(100vh - 2rem);
+	max-height: calc(100dvh - 2rem);
+	overflow: hidden;
+}
+
+:where(.nino-admin) .nino-admin-dialog--manual[open] {
+	display: flex;
+	flex-direction: column;
+}
+
+:where(.nino-admin) .nino-admin-dialog--manual .nino-admin-dialog-body {
+	flex: 1 1 auto;
+	grid-template-rows: auto minmax(0, 1fr) auto;
+	min-height: 0;
+}
+
+:where(.nino-admin) .nino-admin-dialog-content {
+	min-height: 0;
+	overflow-y: auto;
+}
+
+/* What scrolls is a stop of the keyboard where the browser makes it one - a
+   manual longer than the dialog, opened from the keyboard, is where the focus
+   starts - and it is shown with the ring every other stop has, not the two
+   near-black and near-white lines the browser draws. */
+:where(.nino-admin) .nino-admin-dialog-content:focus-visible {
+	outline: 2px solid var(--editor-blue);
+	outline-offset: 4px;
+}
+
+/* A manual (Nino.adminUi.manual()): what a screen is for and how it is used,
+   as sections of a handle and what it does, or as running text. No box of its
+   own and no cap on its height - the dialog that holds it scrolls it, and the
+   Features panel puts it under a tab, so it is as long as it is instead of
+   scrolling inside a frame that showed three of its seven headings. */
+:where(.nino-admin) .nino-admin-manual {
+	font-size: .85rem;
+	line-height: 1.55;
+}
+
+:where(.nino-admin) .nino-admin-manual p {
+	margin: 0 0 .6rem;
+}
+
+:where(.nino-admin) .nino-admin-manual p:last-child {
+	margin-bottom: 0;
+}
+
+:where(.nino-admin) .nino-admin-manual code {
+	padding: .08em .3em;
+	border-radius: 4px;
+	background: var(--editor-bg);
+	font-family: var(--nino-admin-mono);
+	font-size: .92em;
+}
+
+/* A heading per section, small and quiet: every feature answering the same
+   questions in the same order is what makes a sectioned manual a thing to
+   glance at rather than a thing to read, and the look has to hold that up -
+   the headings small, the handles aligned, the lines tight. */
+:where(.nino-admin) .nino-admin-manual-heading {
+	margin: .9rem 0 .3rem;
+	color: var(--editor-text-secondary);
+	font-size: .72rem;
+	font-weight: 600;
+	letter-spacing: .02em;
+	text-transform: uppercase;
+}
+
+:where(.nino-admin) .nino-admin-manual-heading:first-child {
+	margin-top: 0;
+}
+
+/* Handle and line as two columns rather than a run of inline text: a column
+   of handles is a column to run the eye down, which is the whole reason the
+   sections exist. One grid for the whole section, not one per entry - a grid
+   per entry sizes its first column to its own handle, and a column that
+   starts somewhere else on every line is not a column. */
+:where(.nino-admin) .nino-admin-manual-section {
+	display: grid;
+	grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+	gap: .2rem .7rem;
+	align-items: baseline;
+	margin: 0;
+}
+
+:where(.nino-admin) .nino-admin-manual-section > :is(dt, dd) {
+	min-width: 0;
+	margin: 0;
+}
+
+/* A section with nothing in it says so, and says it quietly */
+:where(.nino-admin) .nino-admin-manual .nino-admin-manual-none {
+	display: block;
+	color: var(--editor-text-secondary);
+	font-style: italic;
+}
+
+/* The manual of a panel names its entries in words, not as code, and the
+   words stand over what they say: there are few of them and the lines are
+   sentences, which a column of terms does not make easier to read. A line
+   with no word of its own - what the panel is for - opens the list. */
+:where(.nino-admin) .nino-admin-manual-section--terms {
+	grid-template-columns: minmax(0, 1fr);
+	gap: 0;
+}
+
+:where(.nino-admin) .nino-admin-manual-section--terms > dt {
+	margin-top: .7rem;
+	color: var(--editor-text);
+	font-weight: 650;
+}
+
+:where(.nino-admin) .nino-admin-manual-section--terms > dt:empty {
+	display: none;
+}
+
+:where(.nino-admin) .nino-admin-manual-section--terms > dt:first-child {
+	margin-top: 0;
+}
+
+/* One column where there is no room for two: below this width the alignment
+   buys nothing and costs the line. A handle then sits on the line above what
+   it does, and an entry that has none - a line about the whole section - is
+   that line alone rather than a blank row above it. */
+@media (max-width: 700px) {
+	:where(.nino-admin) .nino-admin-manual-section {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 0;
+	}
+
+	:where(.nino-admin) .nino-admin-manual-section > dt:empty {
+		display: none;
+	}
+
+	:where(.nino-admin) .nino-admin-manual-section > dd {
+		margin-bottom: .5rem;
+	}
+}
+
+/* The same in a dialog at any width of the screen, which is never wider than
+   40rem and has no room for a column of handles beside their lines: a handle
+   as long as a line of markup took the whole width of its column and left the
+   line beside it a few letters wide. The words of a panel's manual
+   (--terms) already stand over theirs. A handle or a line with no place to
+   break breaks anywhere, rather than past the dialog. */
+:where(.nino-admin) .nino-admin-dialog--manual .nino-admin-manual-section > :is(dt, dd) {
+	overflow-wrap: anywhere;
+}
+
+:where(.nino-admin) .nino-admin-dialog--manual .nino-admin-manual-section:not(.nino-admin-manual-section--terms) {
+	grid-template-columns: minmax(0, 1fr);
+	gap: 0;
+}
+
+:where(.nino-admin) .nino-admin-dialog--manual .nino-admin-manual-section:not(.nino-admin-manual-section--terms) > dt:empty {
+	display: none;
+}
+
+:where(.nino-admin) .nino-admin-dialog--manual .nino-admin-manual-section:not(.nino-admin-manual-section--terms) > dd {
+	margin-bottom: .5rem;
+}
+
 /* --------------------------------------------------------- Cards and forms */
 
 /* The one raised surface in the system. A fieldset is one by definition;
@@ -2925,6 +3093,39 @@ a {
 }
 #admin-content-wrap > [data-panel] > .admin-panel-head > .admin-panel-actions:empty {
 	display: none;
+}
+/*	The "?" at the end of the head: the panel's manual, in a dialog (see
+ *	Nino.admin.manual in script.js). Round and as quiet as the row it stands
+ *	in - it is there to be found, not to be looked at. After the actions, which
+ *	a panel appends to their own slot, so that it stays the last thing of the
+ *	row whatever a panel puts before it */
+#admin-content-wrap > [data-panel] > .admin-panel-head > .admin-panel-manual,
+#admin-content-wrap > [data-panel] > .admin-panel-manualrow > .admin-panel-manual {
+	flex: 0 0 auto;
+	width: 2rem;
+	min-width: 2rem;
+	height: 2rem;
+	min-height: 2rem;
+	margin: 0 0 .35rem auto;
+	padding: 0;
+	border-radius: 50%;
+	color: var(--editor-text-secondary);
+	font-size: .95rem;
+	line-height: 1;
+}
+#admin-content-wrap > [data-panel] > .admin-panel-head > .admin-panel-actions:not(:empty) + .admin-panel-manual {
+	margin-left: -1rem;
+}
+/*	A pane without a name to put in a head - the Dashboard - has the "?" alone,
+ *	in a row of its own that is no head (Nino.adminUi.panelHead() answers null
+ *	for it) and no bar: nothing to bleed through the pane's padding, no line
+ *	under it */
+#admin-content-wrap > [data-panel] > .admin-panel-manualrow {
+	display: flex;
+	margin: 0 0 .5rem;
+}
+#admin-content-wrap > [data-panel] > .admin-panel-manualrow > .admin-panel-manual {
+	margin-bottom: 0;
 }
 /*	A workspace pane (see layout() in the panel contract, and the rule in the
  *	design system above) has no padding for the head to bleed through: the

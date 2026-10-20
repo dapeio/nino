@@ -114,6 +114,11 @@ namespace Nino\Modules\Routes {
 			return [ 'routes', '/_admin/nav/routes', 20, 'structure' ];
 		}
 
+		// The entries of the manual its "?" opens, in the order they are shown (see \Nino\Admin\Admin::manual())
+		public static function manual(): array {
+			return [ 'intro', 'address', 'template', 'name', 'navigation', 'open', 'delete', 'feature' ];
+		}
+
 		public static function icon(): string {
 			return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-route-icon lucide-route"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg>';
 		}
@@ -191,7 +196,7 @@ namespace Nino\Modules\Routes {
 				'templates' 		=> $templates,
 				'defaultTemplate' => in_array( self::DEFAULT_TEMPLATE, $templates, true ) === true ? self::DEFAULT_TEMPLATE : '',
 				'locales' 			=> $locales,
-				'selectedLocale' => \Nino\Admin\Admin::sessionLocale( $appData ),
+				'selectedLocale' => \Nino\Admin\Admin::contentLocale( $appData ),
 				'navs' 					=> $navs,
 			] );
 		}
@@ -414,7 +419,7 @@ namespace Nino\Modules\Routes {
 		 */
 		private static function _templates( array &$appData ): array {
 
-			$files = glob( \Nino\Filesystem::path( $appData, '/templates' ). '/page-*.tpl' ) ?: [];
+			$files = array_filter( glob( \Nino\Filesystem::path( $appData, '/templates' ). '/page-*.tpl' ) ?: [], 'is_file' );
 			$names = array_map( fn( string $file ): string => basename( $file, '.tpl' ), $files );
 
 			sort( $names );

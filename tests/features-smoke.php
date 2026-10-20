@@ -301,6 +301,15 @@ check( 'a handle nobody could type is refused', manifestFails( $manifestDir, 'Lo
 check( 'the older prose form is still a manual', \Nino\Features::manualSections( 'Put `[told]` where it goes.', 'en_US' ) === null
 	&& \Nino\Features::manualSections( [ 'en_US' => 'Use it.' ], 'en_US' ) === null );
 
+// Whether a manual says anything at all - what decides if the panel of a feature gets a "?"
+check( 'a text with a word in it is something to read, in either form: one string, or a map of them', \Nino\Features::hasManual( 'Put `[told]` where it goes.' ) === true
+	&& \Nino\Features::hasManual( [ 'en_US' => 'Use it.', 'de_DE' => '' ] ) === true );
+check( 'a sectioned manual with an entry in one section is too, however empty the other five are', \Nino\Features::hasManual( [ 'shortcodes' => [], 'routes' => [ '/x' => 'Serves it.' ] ] ) === true
+	&& \Nino\Features::hasManual( [ 'markup' => [ 'A line that stands on its own.' ] ] ) === true );
+check( 'nothing is not: no text, blanks, no section with an entry - a feature saying it adds nothing - and no manual at all', \Nino\Features::hasManual( '' ) === false && \Nino\Features::hasManual( " \n " ) === false
+	&& \Nino\Features::hasManual( [ 'en_US' => ' ' ] ) === false && \Nino\Features::hasManual( [ 'shortcodes' => [], 'markup' => [] ] ) === false
+	&& \Nino\Features::hasManual( [] ) === false && \Nino\Features::hasManual( null ) === false && \Nino\Features::hasManual( 5 ) === false );
+
 /*	Every shipped feature carries the sectioned shape. A schema half a
 	catalogue follows is not a schema, and this is the check that keeps it
 	from becoming one	*/
@@ -1436,6 +1445,43 @@ check( 'an account holding both gets a strip with both tabs', array_keys( \Nino\
 	&& str_contains( $html, 'id="admin-tabbutton-sample"' ) === true && str_contains( $html, 'id="admin-tabbutton-sample-settings"' ) === true
 	&& strpos( $html, 'id="admin-tabbutton-sample"' ) < strpos( $html, 'id="admin-tabbutton-sample-settings"' ) );
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+/*	The panel of a feature shows the feature's manual behind its "?": the one its manifest carries, which the
+	Features panel draws for the people who develop with the feature. A feature that says nothing about its use
+	has no "?" - there would be nothing behind it	*/
+$manualAsked = static function( array $appData, mixed $manual, string $locale = '' ): array {
+	unset( $appData['./_admin/panels'] );
+	$appData['./nino/features/all']['sample']['manual'] = $manual;
+	\Nino\Html::addFills( $appData, include __DIR__. '/../_admin/Nino/Modules/Features/text/en_US.php', '*' );
+	foreach( $locale === '' ? [] : [ $locale ] as $chosen )
+		\Nino\Runtime::setSessionValue( $appData, './admin/locale', $chosen );
+	$entry	= \Nino\Admin\Admin::panels( $appData )['sample'];
+	$asked	= [ $entry, \Nino\Admin\Admin::panesHtml( $appData ), ninoCall( $appData, [ \Nino\Admin\Admin::class, 'apiManual' ], [ 'panel' => 'sample' ] ) ];
+	\Nino\Runtime::unsetSessionValue( $appData, './admin/locale' );
+	return $asked;
+};
+[ $entry, $html, [ $status, $body ] ] = $manualAsked( $appData, [ 'shortcodes' => [ '[sample]' => 'Draws it.' ], 'markup' => [ 'A line on its own.' ] ] );
+check( 'a feature with a manual lends it to its panel, which gets the "?" at the end of its head', $entry['manualFeature'] === 'sample' && $entry['manual'] === []
+	&& str_contains( $html, '<div class="admin-panel-actions"></div><button type="button" class="admin-panel-manual" data-manual="sample"' ) === true );
+$featureWords = include __DIR__. '/../_admin/Nino/Modules/Features/text/en_US.php';
+check( '...and asking for it answers the sections the Features panel draws, in its order, each under the heading that panel gives it - the empty ones too, saying so', $status === 200
+	&& array_column( $body['sections'], 'heading' ) === array_map( static fn( string $section ): string => $featureWords['[[/_admin/features/manual/'. $section. ']]'], \Nino\Features::MANUAL_SECTIONS )
+	&& $body['sections'][0]['entries'] === [ [ 'handle' => '[sample]', 'text' => 'Draws it.' ] ]
+	&& $body['sections'][1]['entries'] === [ [ 'handle' => '', 'text' => 'A line on its own.' ] ] && $body['sections'][2]['entries'] === [] );
+check( '...with the sentence an empty section says, the handles as code and not as words, and no running text', $body['none'] === $featureWords['[[/_admin/features/manual/none]]'] && $body['none'] !== ''
+	&& $body['words'] === false && $body['text'] === '' && $body['title'] === $entry['label'] );
+[ $entry, $html, [ $status, $body ] ] = $manualAsked( $appData, 'Put `[sample]` where it goes.' );
+check( 'a manual written before the sections existed is running text, asked for as it is, and gets its "?" too', $entry['manualFeature'] === 'sample' && $status === 200 && $body['sections'] === [] && $body['text'] === 'Put `[sample]` where it goes.'
+	&& str_contains( $html, 'data-manual="sample"' ) === true );
+$perLanguage = [ 'en_US' => 'Use it.', 'de_DE' => 'So geht es.' ];
+$spoken = [];
+foreach( array_keys( $perLanguage ) as $language )
+	$spoken[$language] = $manualAsked( $appData, $perLanguage, $language )[2][1]['text'] ?? null;
+check( 'one in a map of languages is the one of the interface language', $spoken === $perLanguage );
+foreach( [ 'no manual' => '', 'a manual with nothing in it' => [ 'shortcodes' => [], 'routes' => [] ] ] as $label => $empty ) {
+	[ $entry, $html, [ $status ] ] = $manualAsked( $appData, $empty );
+	check( 'a feature with '. $label. ' gives its panel no "?", and asking for one is refused', $entry['manualFeature'] === '' && str_contains( $html, 'data-manual="sample"' ) === false && $status === 404 );
+}
 
 // Activation through the action
 [ $status, $body ] = callFeatures( $appData, 'apiActivate', [ 'key' => 'old' ] );

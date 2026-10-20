@@ -519,23 +519,109 @@
 		},
 
 		/**
+		 *	The "?" at the end of a pane's head (see Panels::panesHtml()): the
+		 *	panel's manual, in a dialog. The button names its pane in
+		 *	data-manual, and one listener on the content wrapper answers every
+		 *	one of them - the panes the server rendered and the row a pane
+		 *	keeps its "?" in alike, whatever a panel's script draws or empties
+		 *	beside it. What the manual says is asked for when the button is
+		 *	pressed (POST admin/manual): it is the panel's own words or a
+		 *	feature's manifest, and nothing needs them before somebody asks.
+		 *	Nino.adminUi.manual() draws the answer and Nino.adminUi.manualDialog()
+		 *	holds it, which takes the focus into the dialog and gives it back to
+		 *	the button when it is closed. A manual that cannot be had is told in
+		 *	the same dialog
+		 */
+		manual : {
+
+			// The request is out: a button pressed twice is one question
+			_asking : false,
+
+			/**
+			 *	Wire the page: one listener for every "?"
+			 *
+			 *	@return		void
+			 */
+			init : function() {
+
+				const wrap = dc.getElementById('admin-content-wrap');
+
+				if( wrap === null || wrap === undefined )
+					return;
+
+				wrap.addEventListener( 'click', function( ev ) {
+
+					const button = ev.target && typeof ev.target.closest === 'function' ? ev.target.closest('[data-manual]') : null;
+
+					if( button !== null && button !== undefined )
+						Nino.admin.manual.open( button.dataset.manual, button );
+				} );
+			},
+
+			/**
+			 *	Ask for a pane's manual and show it
+			 *
+			 *	@param		{string}		panel					The pane's name
+			 *	@param		{Element}		[opener]			The button that asked, which gets the focus back
+			 *
+			 *	@return		void
+			 */
+			open : function( panel, opener ) {
+
+				if( Nino.admin.manual._asking === true )
+					return;
+
+				Nino.admin.manual._asking = true;
+
+				Nino.adminUi.api.call( 'admin/manual', { panel : panel }, function( status, response ) {
+
+					Nino.admin.manual._asking = false;
+
+					const answered = status === 200 && response !== null && typeof response === 'object';
+					const prose		 = answered === true && typeof response.text === 'string' ? response.text : '';
+					const content	 = answered === false ? null : Nino.adminUi.manual( prose !== '' ? prose : response.sections, {
+						none	: response.none,
+						named	: response.words === true ? Nino.adminUi.slugLabel : undefined,
+					} );
+
+					// Where there is no manual to draw - the request failed (a feature
+					// that dropped its manual since the page was drawn is refused with a
+					// code that has its words), or the answer holds nothing - the dialog
+					// says so in a line
+					const line = dc.createElement('p');
+					line.className = 'nino-admin-error';
+					line.textContent = answered === true ? Nino.content.getText('/_admin/common/notice/manual') : Nino.adminUi.api.errorText( status, response, '/_admin/common/error/manual' );
+
+					Nino.adminUi.manualDialog(
+						answered === true ? Nino.adminUi.text( response.title ) : Nino.content.getText('/_admin/common/label/manual'),
+						content ?? line,
+						opener
+					);
+				} );
+			},
+		},
+
+		/**
 		 *	Unsaved input, and the questions asked before it is lost. A panel
 		 *	that keeps a form registers itself here and says when that form
 		 *	holds something nobody has saved; the shell asks Save, Discard or
 		 *	Cancel before anything it does would throw that away - leaving by
-		 *	logout, the interface language, a back link - and the browser asks
-		 *	before the page itself goes (beforeunload). A panel that does not
-		 *	register is simply not asked about: the registration is opt-in,
-		 *	and a panel guards its own exits (a link to another record, a
-		 *	reload) with guard().
+		 *	logout, the interface language, a back link, a move through the
+		 *	rail - and the browser asks before the page itself goes
+		 *	(beforeunload). A panel that does not register is simply not asked
+		 *	about: the registration is opt-in, and a panel guards its own exits
+		 *	(a link to another record, a reload) with guard().
 		 *
 		 *	A name is the panel's or the tab's uri, the id of its pane without
 		 *	the admin-content- or admin-tab- in front. An entry is
 		 *	{ isDirty(), save( done ), discard(), bar() }: save() reports with
 		 *	done( true ) or done( false ) on every way it can end, discard()
-		 *	forgets the input (the form is about to be left or drawn again),
-		 *	bar() answers the action bar that carries the marker, if the
-		 *	first one in the pane is not it.
+		 *	forgets the input (the form is about to be left or drawn again; the
+		 *	fields of a watched form are put back, see watchForm()), bar()
+		 *	answers the action bar that carries the marker, if the first one in
+		 *	the pane is not it. The rail leaves a pane standing in memory, so a
+		 *	Discard there is followed by the back link of the form: the shell
+		 *	presses it (see _close()).
 		 *
 		 *	Every listener is installed by init(), from onReady(): a shell
 		 *	script loaded without a dom (a test's first context) has none.
@@ -629,7 +715,7 @@
 			 *	question and the Save, and the error goes on up
 			 *
 			 *	@param		{Array|null}	names				The entries the exit would lose, null for all
-			 *	@param		{Function}		proceed
+			 *	@param		{Function}		proceed			Called with the answer - 'save' or 'discard' - where a question was asked, with nothing where there was none
 			 *	@param		{Function}		[onCancel]
 			 *	@param		{boolean}			[leaves]		proceed() leaves the page at once, so the browser has nothing to ask
 			 *
@@ -659,12 +745,12 @@
 				}
 
 				// Every way on ends here: the question is over, the markers follow
-				const go = function() {
+				const go = function( answered ) {
 					Nino.admin.dirty._asking = nested;
 					if( nested === false )
 						Nino.admin.dirty._leaving = leaves === true;
 					Nino.admin.dirty.refresh();
-					proceed();
+					proceed( answered );
 					// An exit that does not happen (another script's own question keeps
 					// the page, the language change is refused) must not leave the
 					// browser's protection off
@@ -694,7 +780,7 @@
 								if( typeof Nino.admin.dirty._entries[name].discard === 'function' )
 									Nino.admin.dirty._entries[name].discard();
 							} );
-							go();
+							go('discard');
 							return;
 						}
 
@@ -721,7 +807,7 @@
 
 							if( at >= open.length ) {
 								stop();
-								go();
+								go('save');
 								return;
 							}
 
@@ -911,25 +997,33 @@
 			},
 
 			/**
+			 *	The fields of a form that hold what a person typed: not a file
+			 *	input (its file is saved by its own upload), a search box (it
+			 *	filters, it stores nothing), a password the browser may fill in by
+			 *	itself and a field that says data-dirty="ignore" (a confirmation
+			 *	typed to unlock a button is not an edit)
+			 *
+			 *	@param		{Element}		form
+			 *
+			 *	@return		{Array<Element>}
+			 */
+			_fieldsOf : function( form ) {
+				return Array.from( form.querySelectorAll('input, textarea, select') ).filter( function( el ) {
+					return el.type !== 'file' && el.type !== 'search' && el.autocomplete !== 'current-password' && ( el.dataset === undefined || el.dataset.dirty !== 'ignore' );
+				} );
+			},
+
+			/**
 			 *	What a form holds, as one string to compare with later: the
-			 *	value of every field in it - a checkbox or a radio by its state -
-			 *	and the content of every rich-text field. Not what a person did
-			 *	not type: a file input (its file is saved by its own upload), a
-			 *	search box (it filters, it stores nothing), a password the
-			 *	browser may fill in by itself and a field that says data-dirty="ignore"
-			 *	(a confirmation typed to unlock a button is not an edit)
+			 *	value of every field in it (see _fieldsOf()) - a checkbox or a
+			 *	radio by its state - and the content of every rich-text field
 			 *
 			 *	@param		{Element}		form
 			 *
 			 *	@return		{string}
 			 */
 			_serialize : function( form ) {
-
-				const fields = Array.from( form.querySelectorAll('input, textarea, select') ).filter( function( el ) {
-					return el.type !== 'file' && el.type !== 'search' && el.autocomplete !== 'current-password' && ( el.dataset === undefined || el.dataset.dirty !== 'ignore' );
-				} );
-
-				return JSON.stringify( fields.map( function( el ) {
+				return JSON.stringify( Nino.admin.dirty._fieldsOf( form ).map( function( el ) {
 					return el.type === 'checkbox' || el.type === 'radio' ? el.checked : el.value;
 				} ).concat( Array.from( form.querySelectorAll('[contenteditable]') ).map( function( el ) { return el.innerHTML } ) ) );
 			},
@@ -983,13 +1077,102 @@
 			},
 
 			/**
+			 *	Put a watched form back to what snapshot() saw: every field gets
+			 *	the value it held then, the rich-text fields their content. A field
+			 *	that changes tells its own listeners the way a person typing it back
+			 *	would (an input and a change event that bubble), so that what hangs
+			 *	on it - the reading aid of a number, the status line - follows. A
+			 *	form that has other fields than the ones the baseline was taken of
+			 *	(rows added or removed since) cannot be matched field by field and is
+			 *	left as it is: whoever leaves such a form draws it again
+			 *
+			 *	@param		{string}		name
+			 *
+			 *	@return		{boolean}										Whether the fields were put back
+			 */
+			_restore : function( name ) {
+
+				const form = typeof Nino.admin.dirty._forms[name] === 'function' ? Nino.admin.dirty._forms[name]() : null;
+				const held = Nino.admin.dirty._baseline[name];
+
+				if( form === null || form === undefined || held === undefined )
+					return false;
+
+				const values = JSON.parse( held );
+				const fields = Nino.admin.dirty._fieldsOf( form );
+				const editable = Array.from( form.querySelectorAll('[contenteditable]') );
+
+				if( values.length !== fields.length + editable.length )
+					return false;
+
+				fields.forEach( function( el, at ) {
+
+					const checkable = el.type === 'checkbox' || el.type === 'radio';
+
+					if( ( checkable === true ? el.checked : el.value ) === values[at] )
+						return;
+
+					if( checkable === true )
+						el.checked = values[at];
+					else
+						el.value = values[at];
+
+					[ 'input', 'change' ].forEach( function( type ) {
+						if( typeof el.dispatchEvent === 'function' && typeof wn.Event === 'function' )
+							el.dispatchEvent( new wn.Event( type, { bubbles : true } ) );
+					} );
+				} );
+
+				editable.forEach( function( el, at ) { el.innerHTML = values[fields.length + at] } );
+
+				return true;
+			},
+
+			/**
+			 *	Leave the form of an entry the way its back link leaves it: the back
+			 *	link of the level that is on screen in the pane of the name (the
+			 *	nearest tab, else the panel - see _owner()) is pressed, and the
+			 *	panel's own handler does what it does there, which is what makes the
+			 *	form be drawn again at its next opening. The question the shell asks
+			 *	before a back link of a form with unsaved input is not asked: the
+			 *	input was given up already
+			 *
+			 *	@param		{string}		name
+			 *
+			 *	@return		{boolean}										Whether there was a back link to press
+			 */
+			_close : function( name ) {
+
+				const pane = dc.getElementById( 'admin-tab-'+ name ) ?? dc.getElementById( 'admin-content-'+ name );
+				const link = pane === null || pane === undefined ? undefined : Array.from( pane.querySelectorAll('a.nino-admin-back-link') ).find( function( el ) {
+					return Nino.admin.dirty._owner( el ) === name && Nino.admin.dirty._shown( el ) === true;
+				} );
+
+				if( link === undefined )
+					return false;
+
+				Nino.admin.dirty._bypass = link;
+				try {
+					link.click();
+				}
+				finally {
+					Nino.admin.dirty._bypass = null;
+				}
+
+				return true;
+			},
+
+			/**
 			 *	Register a panel whose form is plain fields: it is dirty when the
 			 *	form it answers now differs from what snapshot() saw, and clean
 			 *	while that form is not on screen - drawn but under a drill-down
 			 *	level that is hidden (admin-hidden), or not drawn - or holds no
 			 *	fields (an error message took its place). Compared when
-			 *	asked, not on every key. Its discard() takes the form as it stands
-			 *	for saved: the form is about to be left or drawn again
+			 *	asked, not on every key. Its discard() puts the fields back to what
+			 *	snapshot() saw (see _restore()) and takes the form as it stands for
+			 *	saved, so that what is typed is gone from the controls whatever the
+			 *	exit does next; a form that has other fields now than it had then
+			 *	is only taken for saved, and its exit leaves or draws it again
 			 *
 			 *	@param		{string}		name
 			 *	@param		{Function}	formGetter			Answers the form drawn last, or null
@@ -1010,7 +1193,10 @@
 						return form !== null && form !== undefined && Nino.admin.dirty._baseline[name] !== undefined && Nino.admin.dirty._hasFields( form ) === true && Nino.admin.dirty._shown( form ) === true && Nino.admin.dirty._serialize( form ) !== Nino.admin.dirty._baseline[name];
 					},
 					save		: save,
-					discard : function() { Nino.admin.dirty.snapshot( name ) },
+					discard : function() {
+						Nino.admin.dirty._restore( name );
+						Nino.admin.dirty.snapshot( name );
+					},
 				} );
 			},
 
@@ -1890,6 +2076,7 @@
 			Nino.admin.navUi.init();
 			Nino.admin.rail.init();
 			Nino.admin.sessionDialog.init();
+			Nino.admin.manual.init();
 
 			// The picker's <option> values are already real ?locale=xx
 			// targets (see Admin::_localePickerHtml()) - navigating there
@@ -1945,6 +2132,10 @@
 
 			const links = Object.keys( panels ).map( function( panel ) { return panels[panel][0] } );
 
+			// What is on screen now: the panel, and the tab of it that is open (the
+			// panel's own name where it has none). The rail's moves leave this
+			const screen = { panel : null, name : null };
+
 			/**
 			 *	Hand a panel, or one of its tabs, the screen: its state class
 			 *	first (router.set() ignores writes from a panel that isn't on
@@ -1970,26 +2161,81 @@
 			 *	its own drill-down state, switching never resets it, so jumping
 			 *	back and forth is always exactly where you left it. A pane with
 			 *	tabs opens on the requested one, else the one last open, else
-			 *	its first
+			 *	its first.
+			 *
+			 *	A move to another panel leaves the one on screen, and what that
+			 *	holds unsaved - in the panel or in a tab of it - is asked about first,
+			 *	with the question the back link of a form asks: Save, Discard or
+			 *	Cancel (see Nino.admin.dirty.guard()). Cancel keeps the panel and
+			 *	puts the rail back as it was - the select of the phone, and the
+			 *	address where the move came from a step through the history or an
+			 *	address typed, written over by the screen's own where the panel
+			 *	writes none of its own. Discard lets the entries forget, and then
+			 *	leaves the forms they held the way their back links do (see
+			 *	Nino.admin.dirty._close()): the pane stays in memory, and would come
+			 *	back with the discarded input in it. A move inside the pane, from one
+			 *	of its tabs to another, leaves nothing
 			 *
 			 *	@param		{string}	panel					Panel name
 			 *	@param		{string}	[tab]					One of its tabs
 			 *	@param		{boolean}	[push]				The person's own move - a click on the rail, a tab or the phone's select - so it adds a history entry for Back to return to. Left out, the address only follows (the hash on load, a step through the history, the arrow keys of a tab strip)
+			 *	@param		{Function}	[then]			Called once the panel is on screen - at once, or after the question was answered
 			 *
 			 *	@return		void
 			 */
-			function selectTab( panel, tab, push ) {
+			function selectTab( panel, tab, push, then ) {
 
-				// Consumed by the first write to the address, wherever it comes from:
-				// a panel's own showCurrent() or settle() below
-				Nino.admin.router._push = push === true;
+				const move = function() {
 
-				try {
-					openTab( panel, tab );
+					// Consumed by the first write to the address, wherever it comes from:
+					// a panel's own showCurrent() or settle() below
+					Nino.admin.router._push = push === true;
+
+					try {
+						openTab( panel, tab );
+					}
+					finally {
+						Nino.admin.router._push = false;
+					}
+
+					if( typeof then === 'function' )
+						then();
+				};
+
+				// A form that failed to save is brought on screen as it stands (see
+				// dirty.init() below), and a move inside the pane leaves nothing
+				if( panels[panel] === undefined || screen.panel === null || panel === screen.panel || Nino.admin.router._keep === true ) {
+					move();
+					return;
 				}
-				finally {
-					Nino.admin.router._push = false;
-				}
+
+				// The step through the history that brought the move, if one did
+				const step = Nino.admin.router._step;
+				// A pane with a screen of its own draws it as its first tab, named like the
+				// panel (see Panels::panesHtml()): the panel is in the list once, or its entry
+				// would be saved twice and its back link pressed twice
+				const names = [ screen.panel ].concat( Object.keys( tabOwner ).filter( function( name ) { return tabOwner[name] === screen.panel && name !== screen.panel } ) );
+				const held = Nino.admin.dirty.dirtyNames( names );
+
+				Nino.admin.dirty.guard( names, function( answered ) {
+
+					move();
+
+					// Left behind, the forms would come back as they were. The panel is hidden
+					// by now, so nothing here takes the focus from where the move put it
+					if( answered === 'discard' )
+						held.forEach( Nino.admin.dirty._close );
+				}, function() {
+
+					Nino.admin.navGroups.show( screen.panel );
+
+					// A step the history can take back is taken back; an address that was typed
+					// is written over by the screen's own, or by the panel's where it has one
+					if( Nino.admin.router._undo( step ) === false && Nino.admin.router.current().panel !== screen.name ) {
+						show( screen.name );
+						Nino.admin.router.settle( screen.name );
+					}
+				} );
 			}
 
 			/**
@@ -2059,7 +2305,10 @@
 				const pane 			= target[1];
 				const tabPanes	= pane === null ? [] : Array.from( pane.querySelectorAll(':scope > div[data-tab]') );
 
+				screen.panel = panel;
+
 				if( tabPanes.length === 0 ) {
+					screen.name = panel;
 					show( panel );
 					Nino.admin.router.settle( panel );
 					return;
@@ -2079,6 +2328,7 @@
 					btn.tabIndex = active ? 0 : -1;
 				} );
 
+				screen.name = current;
 				show( current );
 				Nino.admin.router.settle( current );
 			}
@@ -2123,8 +2373,7 @@
 					if( ev.defaultPrevented === true || ( ev.button || 0 ) !== 0 || ev.metaKey === true || ev.ctrlKey === true || ev.shiftKey === true || ev.altKey === true )
 						return;
 					ev.preventDefault();
-					selectTab( panel, undefined, true );
-					focusTitle( panel );
+					selectTab( panel, undefined, true, function() { focusTitle( panel ) } );
 				} );
 			} );
 			// The skip link is a real one, and the address belongs to the router: an

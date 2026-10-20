@@ -570,7 +570,7 @@ check( '...without rebuilding either of them - the controls are the same element
 fire( detailTabs[0], 'click' );
 check( 'and back again', aboutPane.hidden === false && settingsPane.hidden === true );
 
-const manualBody = findAll( aboutPane, function( el ) { return hasClass( el, 'features-manual-body' ) } )[0];
+const manualBody = findAll( aboutPane, function( el ) { return hasClass( el, 'nino-admin-manual' ) } )[0];
 const manualP		 = byTag( manualBody, 'p' );
 
 check( 'the manual out of the manifest is under the description, in that pane, in no box of its own', manualBody !== undefined
@@ -621,7 +621,7 @@ check( 'an entry with no handle keeps the column the other lines are in, its ter
 /*	Four sections with nothing in them, each saying so. "No callbacks" is an
 	answer, and a reader who does not find the question has to go and read the
 	source to learn that the answer was nothing	*/
-const none = byTag( cardedBody, 'p' ).filter( function( el ) { return hasClass( el, 'features-manual-none' ) } );
+const none = byTag( cardedBody, 'p' ).filter( function( el ) { return hasClass( el, 'nino-admin-manual-none' ) } );
 
 check( 'an empty section says there is nothing rather than being left out, with no list at all', none.length === 4
 	&& none.every( function( el ) { return el.textContent === text('/_admin/features/manual/none') } ) );
@@ -699,7 +699,7 @@ check( 'a feature that is no longer switched on drops its screen and comes back 
 // Deactivate is, and where an update waiting for it is applied
 fire( row( mount, 'plain' ), 'click' );
 const plainBar = byTag( screen, 'form' )[0].children[ byTag( screen, 'form' )[0].children.length - 1 ];
-check( 'a feature whose manifest carries no manual gets no manual, only the sentence it describes itself with', findAll( screen, function( el ) { return hasClass( el, 'features-manual-body' ) } ).length === 0
+check( 'a feature whose manifest carries no manual gets no manual, only the sentence it describes itself with', findAll( screen, function( el ) { return hasClass( el, 'nino-admin-manual' ) } ).length === 0
 	&& byTag( findAll( screen, function( el ) { return hasClass( el, 'features-about' ) } )[0], 'p' ).map( function( el ) { return el.textContent } ).join('|') === 'Nothing to set.' );
 check( '...and with one pane there is no strip over it, and nothing hidden behind a tab that is not there', findAll( screen, function( el ) { return hasClass( el, 'features-detail-tabs' ) } ).length === 0
 	&& findAll( screen, function( el ) { return hasClass( el, 'features-detail-pane' ) } ).every( function( el ) { return el.hidden === false } ) );

@@ -448,6 +448,20 @@ check( 'the old key is gone from a fresh read, and the new one is there', array_
 check( 'the log names the rename', \Nino\Modules\Elements\Types::log( 'types/save', [ 'uri' => 'renamer', 'renames' => [ 'title' => 'headline', 'tags' => 'labels' ] ] ) === 'Edit Element Type /renamer (renamed title to headline, tags to labels)'
 	&& \Nino\Modules\Elements\Types::log( 'types/save', [ 'uri' => 'renamer' ] ) === 'Edit Element Type /renamer' );
 
+// A directory that is called x.tpl among the templates is no template: the rename looks for the old name in the real ones
+$templatesPath = \Nino\Filesystem::path( $appData, '/templates' );
+is_dir( $templatesPath ) === true || mkdir( $templatesPath, 0777, true );
+file_put_contents( $templatesPath. '/uses-title.tpl', '<h1>[[title]]</h1>' );
+mkdir( $templatesPath. '/dir-title.tpl' );
+$seedRenamer();
+ninoWarnings();
+[ $status, $body ] = $saveRenamer( $renamed, [ 'title' => 'headline' ] );
+$dirWarnings = ninoWarnings();
+rmdir( $templatesPath. '/dir-title.tpl' );
+unlink( $templatesPath. '/uses-title.tpl' );
+check( 'a directory called x.tpl among the templates is no 500 for a rename, raises no warning, and the templates that are files are still searched',
+	$status === 200 && $dirWarnings === [] && array_column( $body['references'] ?? [], 'name' ) === [ 'uses-title.tpl' ] );
+
 // Renamed in the same save as its shape: the old model is read as it is now called
 $seedRenamer();
 [ $status ] = $saveRenamer( [ 'headline' => [ 'type' => 'string' ] ] + array_diff_key( $renamerModel(), [ 'title' => 1 ] ), [ 'title' => 'headline' ] );

@@ -86,6 +86,11 @@ namespace Nino\Modules\Navigation {
 			return [ 'navs', '/_admin/nav/navs', 25, 'structure' ];
 		}
 
+		// The entries of the manual its "?" opens, in the order they are shown (see \Nino\Admin\Admin::manual())
+		public static function manual(): array {
+			return [ 'intro', 'navigation', 'item', 'name', 'save', 'delete' ];
+		}
+
 		public static function icon(): string {
 			return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-menu-icon lucide-menu"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/></svg>';
 		}

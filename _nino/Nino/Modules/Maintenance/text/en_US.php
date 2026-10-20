@@ -14,4 +14,10 @@ return [
 	'[[/_admin/dashboard/label/maintenance]]'	=> 'Maintenance on',
 	'[[/_admin/maintenance/banner/text]]'	=> 'Maintenance is on – visitors see the maintenance page.',
 	'[[/_admin/maintenance/banner/link]]'	=> 'Go to Maintenance',
+
+	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
+	'[[/_admin/maintenance/manual/intro]]'	=> 'Switches the whole website to a maintenance page while you work on it.',
+	'[[/_admin/maintenance/manual/maintenance]]'	=> 'While “Show the maintenance page” is on, every visitor gets a 503 answer instead of the site – the imprint, the privacy policy and the login stay reachable – and a notice in the workbench reminds you.',
+	'[[/_admin/maintenance/manual/retry]]'	=> '“Ask visitors to retry after” is sent as the Retry-After header: a well-behaved browser or search engine waits that long before it tries again.',
+	'[[/_admin/maintenance/manual/account]]'	=> 'A signed-in account still sees the site as it is. To check what a visitor sees, open it in another browser or log out.',
 ];

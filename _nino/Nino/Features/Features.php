@@ -1764,6 +1764,34 @@ namespace Nino {
 		}
 
 		/**
+		 *	Whether a manifest's manual says anything about using the feature: a
+		 *	text with a word in it, in any language, or a sectioned manual with an
+		 *	entry in one of its sections. A sectioned one whose sections are all
+		 *	empty is a feature saying it adds nothing, which its own screen in the
+		 *	Features panel shows - every section, "none" under each - and which a
+		 *	panel's "?" has nothing to open for.
+		 *
+		 *	@param		mixed			$manual				A manifest's 'manual'
+		 *
+		 *	@return 	bool
+		 */
+		public static function hasManual( mixed $manual ): bool {
+
+			if( is_string( $manual ) === true )
+				return trim( $manual ) !== '';
+
+			if( is_array( $manual ) === false )
+				return false;
+
+			// A sectioned manual holds lists, the older form holds texts
+			foreach( $manual as $value )
+				if( ( is_array( $value ) === true && $value !== [] ) || ( is_string( $value ) === true && trim( $value ) !== '' ) )
+					return true;
+
+			return false;
+		}
+
+		/**
 		 *	Which of the two shapes a manual is written in.
 		 *
 		 *	A sectioned manual is section => handle => line, so its values are

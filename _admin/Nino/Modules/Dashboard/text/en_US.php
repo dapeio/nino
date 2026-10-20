@@ -27,4 +27,11 @@ return [
 	'[[/_admin/dashboard/notice/legal-undescribed]]'	=> 'The feature “%s” is active, but the privacy policy has no section about it that can be seen. Show it again under Elements › Privacy policy or describe the feature there yourself.',
 	'[[/_admin/dashboard/notice/legal-more]]'	=> '… and %s more notices about the legal texts.',
 	'[[/_admin/dashboard/notice/open]]'	=> 'Open',
+
+	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
+	'[[/_admin/dashboard/manual/intro]]'	=> 'The overview of your website: what needs your attention, and a few numbers at a glance.',
+	'[[/_admin/dashboard/manual/notice]]'	=> 'What needs attention comes first – texts without a translation, mail that fails, legal texts to complete. Each notice says where to deal with it and leads you there.',
+	'[[/_admin/dashboard/manual/tile]]'	=> 'A tile shows one number – element types, missing texts, submissions, active features, the latest backup. A click opens the panel behind it.',
+	'[[/_admin/dashboard/manual/element]]'	=> '“Elements by type” counts the entries of every list.',
+	'[[/_admin/dashboard/manual/activity]]'	=> '“Recent activity” lists the latest logins and changes. Show all opens the Log.',
 ];

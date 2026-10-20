@@ -45,4 +45,11 @@ return [
 	'[[/_admin/translations/msg/importing]]'	=> 'Wird importiert …',
 	'[[/_admin/translations/error/import]]'	=> 'Import fehlgeschlagen.',
 	'[[/_admin/translations/msg/imported]]'	=> '%d Werte nach %s importiert, %n übersprungen.',
+
+	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
+	'[[/_admin/language/manual/intro]]'	=> 'Welche Sprachen Deine Website spricht und welche ein Besucher bekommt, bevor er wählt.',
+	'[[/_admin/language/manual/language]]'	=> 'Hake jede Sprache an, die die Website ausliefert. Eine Sprache ohne eigene Textdatei kann ihre Texte nicht zeigen – lege sie zuerst mit „Eine Sprache hinzufügen“ an.',
+	'[[/_admin/language/manual/native]]'	=> 'Die native Sprache ist der Ersatz für einen Besucher, der noch nicht gewählt hat, und die Sprache, in der Dir die Mail eines Kontaktformulars geschickt wird.',
+	'[[/_admin/language/manual/add]]'	=> '„Eine Sprache hinzufügen“ legt die Textdatei mit allen Schlüsseln der nativen Sprache an, alle leer. Übersetze sie unter Texte, hake die Sprache dann hier an und speichere.',
+	'[[/_admin/language/manual/translation]]'	=> 'Der Reiter Übersetzungen exportiert alle Texte und Elementwerte der nativen Sprache als JSON für einen Übersetzer und importiert das übersetzte Dokument in eine Sprache. Ein Import überschreibt passende Werte und löscht nie etwas.',
 ];

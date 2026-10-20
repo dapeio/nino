@@ -55,6 +55,11 @@ namespace Nino\Modules\Text {
 			return [ 'text', '/_admin/nav/text', 30, 'content' ];
 		}
 
+		// The entries of the manual its "?" opens, in the order they are shown (see \Nino\Admin\Admin::manual())
+		public static function manual(): array {
+			return [ 'intro', 'search', 'key', 'language', 'save', 'scan' ];
+		}
+
 		public static function icon(): string {
 			return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-text-initial-icon lucide-text-initial"><path d="M15 5h6"/><path d="M15 12h6"/><path d="M3 19h18"/><path d="m3 12 3.553-7.724a.5.5 0 0 1 .894 0L11 12"/><path d="M3.92 10h6.16"/></svg>';
 		}
@@ -180,7 +185,7 @@ namespace Nino\Modules\Text {
 			\Nino\Http::ok( $request, [
 				'keys' 					=> $keys,
 				'locales' 			=> \Nino\Locales::getAvailableLocales( $appData ),
-				'selectedLocale' => \Nino\Admin\Admin::sessionLocale( $appData ),
+				'selectedLocale' => \Nino\Admin\Admin::contentLocale( $appData ),
 				'order' 				=> self::_order( $appData, array_column( $keys, 'key' ) ),
 				'pages' 				=> self::_pages( $appData ),
 				'templates' 		=> self::_templates( $appData ),
@@ -211,7 +216,7 @@ namespace Nino\Modules\Text {
 		private static function _order( array &$appData, array $keys ): array {
 
 			$root 		= \Nino\Filesystem::path( $appData, '/templates' );
-			$project 	= glob( $root. '/*.tpl' ) ?: [];
+			$project 	= array_filter( glob( $root. '/*.tpl' ) ?: [], 'is_file' );
 			$features = \Nino\Features::all( $appData );
 			$modules 	= [];
 			$read 		= [];
@@ -261,7 +266,7 @@ namespace Nino\Modules\Text {
 			$files = [];
 
 			foreach( [ '/templates', '/install/templates' ] as $sub ) {
-				$found = glob( $dir. $sub. '/*.tpl' ) ?: [];
+				$found = array_filter( glob( $dir. $sub. '/*.tpl' ) ?: [], 'is_file' );
 				sort( $found );
 				$files = array_merge( $files, $found );
 			}
@@ -364,7 +369,7 @@ namespace Nino\Modules\Text {
 
 			$templates = [];
 
-			foreach( glob( \Nino\Filesystem::path( $appData, '/templates' ). '/*.tpl' ) ?: [] as $file ) {
+			foreach( array_filter( glob( \Nino\Filesystem::path( $appData, '/templates' ). '/*.tpl' ) ?: [], 'is_file' ) as $file ) {
 
 				$category = \Nino\Modules\Template::category( basename( $file ) );
 

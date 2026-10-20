@@ -28,4 +28,11 @@ return [
 	'[[/_admin/config/hint/cachettl]]'	=> 'How long a stored page is served before it is rendered again. Edits do not wait for this – they drop the cache immediately.',
 	'[[/_admin/config/label/cacheblacklist]]'	=> 'Never cache these',
 	'[[/_admin/config/hint/cacheblacklist]]'	=> 'One uri per line. A trailing /* covers a whole subtree: /blog/* matches /blog and everything below it. Use it for anything that has to be rendered per visit.',
+
+	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
+	'[[/_admin/config/manual/intro]]'	=> 'Settings that apply to the whole project and rarely change – mostly for developers.',
+	'[[/_admin/config/manual/error]]'	=> '“Errors and diagnostics” decides whether PHP errors are written to a log or shown on the site, how the session cookie is issued and which proxies stand in front of the site. A live site never shows errors.',
+	'[[/_admin/config/manual/backup]]'	=> 'Daily encrypted backup switches the automatic backup on or off. The backups are restored under Backups.',
+	'[[/_admin/config/manual/log]]'	=> 'Record an audit trail switches the Log on or off: one line per login and per change, kept for fourteen days.',
+	'[[/_admin/config/manual/cache]]'	=> 'Cache rendered pages serves stored copies of pages instead of rendering them again. Switch it on when the site is finished, not while you build it. Every save in the workbench empties the whole cache.',
 ];

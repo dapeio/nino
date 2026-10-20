@@ -417,9 +417,17 @@
 		 *	one where there is none), Cancel the 'secondary' one: nothing is
 		 *	thrown away by agreeing to the question as it is worded
 		 *
+		 *	The same dialog holds a text that is read rather than answered, a
+		 *	manual (see manualDialog()): `content` is drawn in place of the
+		 *	message, and the dialog keeps its title and its answers in view while
+		 *	what is between them scrolls
+		 *
 		 *	@param		{Object}		options
 		 *	@param		{string}		[options.title]
-		 *	@param		{string}		options.message
+		 *	@param		{string}		options.message				The question - what a browser without <dialog> is asked, with a `content`
+		 *	@param		{Element}		[options.content]			Drawn in place of the message
+		 *	@param		{string}		[options.className]		Added to the dialog's own class
+		 *	@param		{Element}		[options.opener]			What gets the focus back when the dialog closes, where it is not what had it when the dialog opened: a button that was clicked has the focus in Chromium and Firefox and not in Safari
 		 *	@param		{Array}			options.choices				[ { value, label, kind } ], kind 'primary', 'danger' or 'secondary'
 		 *	@param		{Function}	options.onChoose			Called once with the chosen value
 		 *
@@ -442,11 +450,16 @@
 
 			Nino.adminUi._choiceOpen = true;
 
-			const opener = dc.activeElement;
+			const opener = options.opener ?? dc.activeElement;
+			const hasContent = options.content !== undefined && options.content !== null;
 			let chosen = null;
 
-			dialog.className = 'nino-admin-dialog';
-			dialog.setAttribute( 'aria-describedby', 'nino-admin-choice-text' );
+			dialog.className = 'nino-admin-dialog'+ ( typeof options.className === 'string' && options.className !== '' ? ' '+ options.className : '' );
+
+			// A message is what the dialog is about and is read out with it; a
+			// manual is as long as it is and is read when it is looked at
+			if( hasContent === false )
+				dialog.setAttribute( 'aria-describedby', 'nino-admin-choice-text' );
 
 			const body = dc.createElement('div');
 			body.className = 'nino-admin-dialog-body';
@@ -460,10 +473,18 @@
 				dialog.setAttribute( 'aria-labelledby', 'nino-admin-choice-title' );
 			}
 
-			const text = dc.createElement('p');
-			text.id = 'nino-admin-choice-text';
-			text.textContent = options.message;
-			body.appendChild( text );
+			if( hasContent === true ) {
+				const scroll = dc.createElement('div');
+				scroll.className = 'nino-admin-dialog-content';
+				scroll.appendChild( options.content );
+				body.appendChild( scroll );
+			}
+			else {
+				const text = dc.createElement('p');
+				text.id = 'nino-admin-choice-text';
+				text.textContent = options.message;
+				body.appendChild( text );
+			}
 
 			const actions = dc.createElement('div');
 			actions.className = 'nino-admin-dialog-actions';
@@ -498,6 +519,198 @@
 			dialog.showModal();
 
 			return true;
+		},
+
+		/**
+		 *	A manual, drawn: what a screen is for and how it is used, as sections
+		 *	of "a handle and what it does" or as running text. The one drawing
+		 *	the "?" of every panel opens in a dialog (see manualDialog()), and the
+		 *	one the Features panel draws a feature's manual with on its own
+		 *	screen.
+		 *
+		 *	A section is { heading, entries }, an entry { handle, text }. A
+		 *	handle is what a developer types and is set as code; a manual written
+		 *	for the people who edit with a panel names it in words instead
+		 *	(options.named). An entry with no handle says something about the
+		 *	whole section and keeps the column the others stand in. A section
+		 *	with no entries says so rather than being left out - "no callbacks"
+		 *	is an answer, and a reader who does not find the question has to go
+		 *	and read the source to learn that the answer was nothing - unless the
+		 *	caller has no sentence for it.
+		 *
+		 *	Everything is set as text: a manual comes out of a manifest or a text
+		 *	file, so there is no markup in it to get wrong. The running text,
+		 *	which is the form a manifest written before the sections existed has,
+		 *	has one mark: a `backticked` span is code, and an unclosed backtick
+		 *	is text - shown as it was written instead of turning the rest of the
+		 *	paragraph into code.
+		 *
+		 *	No box of its own and no cap on its height: what holds it decides how
+		 *	it gets out of the way. Owns no strings
+		 *
+		 *	@param		{Array|string}	content					[ { heading, entries } ], or the running text - a blank line starts a paragraph, a single one is where the text wrapped its own line
+		 *	@param		{Object}				[options]
+		 *	@param		{string}				[options.none]			What a section with no entries says; such a section is left out where there is none
+		 *	@param		{Function}			[options.named]			named( handle ) answers the words a handle is shown as, instead of code
+		 *	@param		{number}				[options.level]			The heading level of the sections, 3 where it is not given - one under the dialog's own
+		 *
+		 *	@return		{Element|null}									<div class="nino-admin-manual">; null where there is nothing to show
+		 */
+		manual : function( content, options ) {
+
+			options = options ?? {};
+
+			const body = dc.createElement('div');
+			body.className = 'nino-admin-manual';
+
+			if( typeof content === 'string' )
+				Nino.adminUi._manualProse( body, content.trim() );
+			else if( Array.isArray( content ) === true )
+				content.forEach( function( section ) { Nino.adminUi._manualSection( body, section, options ) } );
+
+			return body.children.length === 0 ? null : body;
+		},
+
+		/**
+		 *	One section of manual(): its heading, then a line per entry - the
+		 *	handle beside what it does. One description list for the whole
+		 *	section is what puts every handle of it in one column and every line
+		 *	in another: one grid per entry - which is what a row of <p> is -
+		 *	aligns each entry with itself and with nothing else, which is not a
+		 *	column and is no faster to read than prose
+		 *
+		 *	@param		{Element}	body
+		 *	@param		{Object}	section				{ heading, entries }
+		 *	@param		{Object}	options				See manual()
+		 *
+		 *	@return		void
+		 */
+		_manualSection : function( body, section, options ) {
+
+			const entries = Array.isArray( section.entries ) === true ? section.entries : [];
+			const none		= typeof options.none === 'string' ? options.none : '';
+
+			if( entries.length === 0 && none === '' )
+				return;
+
+			if( typeof section.heading === 'string' && section.heading !== '' ) {
+				const level = Math.min( 6, Math.max( 2, Math.floor( Number( options.level ) ) || 3 ) );
+				const heading = dc.createElement( 'h'+ level );
+				heading.className = 'nino-admin-manual-heading';
+				heading.textContent = section.heading;
+				body.appendChild( heading );
+			}
+
+			if( entries.length === 0 ) {
+				const empty = dc.createElement('p');
+				empty.className = 'nino-admin-manual-none';
+				empty.textContent = none;
+				body.appendChild( empty );
+				return;
+			}
+
+			const named = typeof options.named === 'function' ? options.named : null;
+			const list	= dc.createElement('dl');
+			list.className = 'nino-admin-manual-section'+ ( named === null ? '' : ' nino-admin-manual-section--terms' );
+
+			entries.forEach( function( entry ) {
+
+				const term = dc.createElement('dt');
+
+				if( entry.handle ) {
+					if( named !== null )
+						term.textContent = named( String( entry.handle ) );
+					else {
+						const code = dc.createElement('code');
+						code.textContent = entry.handle;
+						term.appendChild( code );
+					}
+				}
+
+				// A line with no handle of its own - one that says something about
+				// the whole section - keeps the column the other lines are in
+				const said = dc.createElement('dd');
+				said.textContent = entry.text || '';
+
+				list.appendChild( term );
+				list.appendChild( said );
+			} );
+
+			body.appendChild( list );
+		},
+
+		/**
+		 *	The running text of manual(): paragraphs, with `backticked` spans as
+		 *	code
+		 *
+		 *	@param		{Element}	body
+		 *	@param		{string}	text
+		 *
+		 *	@return		void
+		 */
+		_manualProse : function( body, text ) {
+
+			// A blank line starts a paragraph; a single one is where the text
+			// wrapped its own line and means nothing here
+			text.split( /\n[ \t]*\n/ ).forEach( function( block ) {
+
+				const flowed = block.trim().replace( /\s*\n\s*/g, ' ' );
+
+				if( flowed === '' )
+					return;
+
+				const paragraph = dc.createElement('p');
+				const pieces = flowed.split( '`' );
+
+				// The backtick is the only markup there is, and it makes an
+				// element rather than a string of html. An unclosed one is prose,
+				// not markup
+				if( pieces.length % 2 === 0 )
+					paragraph.textContent = flowed;
+				else
+					pieces.forEach( function( piece, index ) {
+
+						if( piece === '' )
+							return;
+
+						if( index % 2 === 0 ) {
+							paragraph.appendChild( dc.createTextNode( piece ) );
+							return;
+						}
+
+						const code = dc.createElement('code');
+						code.textContent = piece;
+						paragraph.appendChild( code );
+					} );
+
+				body.appendChild( paragraph );
+			} );
+		},
+
+		/**
+		 *	A manual in a dialog: the panel's name over it, a button to close it
+		 *	under it, and what is between them scrolls. The dialog is
+		 *	choiceDialog()'s - it opens, closes on Escape, and gives the focus
+		 *	back the way every question of the workbench does, with one answer
+		 *	and no question. The focus goes into the dialog on opening
+		 *
+		 *	@param		{string}		title					What the manual is of - the panel's name
+		 *	@param		{Element}		content				What manual() answered
+		 *	@param		{Element}		[opener]			The button that asked, which gets the focus back
+		 *
+		 *	@return		{boolean}									false when a question is already open
+		 */
+		manualDialog : function( title, content, opener ) {
+
+			return Nino.adminUi.choiceDialog( {
+				title			: title,
+				message		: content.textContent,
+				content		: content,
+				className	: 'nino-admin-dialog--manual',
+				opener		: opener,
+				choices		: [ { value : 'close', label : Nino.content.getText('/_admin/common/label/close'), kind : 'secondary' } ],
+				onChoose	: function() {},
+			} );
 		},
 
 		/**

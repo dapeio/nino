@@ -16,4 +16,11 @@ return [
 	'[[/_admin/submissions/label/export]]'	=> 'Als CSV exportieren',
 	'[[/_admin/submissions/label/more]]'		=> 'Mehr anzeigen',
 	'[[/_admin/submissions/label/less]]'		=> 'Weniger anzeigen',
+
+	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
+	'[[/_admin/submissions/manual/intro]]'	=> 'Die Nachrichten, die Besucher über die Formulare Deiner Website geschickt haben, die neuesten zuerst.',
+	'[[/_admin/submissions/manual/form]]'	=> 'Die Auswahl „Formular“ beschränkt die Liste auf ein Formular.',
+	'[[/_admin/submissions/manual/search]]'	=> 'Die Suche durchsucht jeden Wert jeder Anfrage und auch die Namen der Felder.',
+	'[[/_admin/submissions/manual/export]]'	=> '„Als CSV exportieren“ lädt herunter, was auf dem Bildschirm steht: Ist ein Formular gewählt, sind es dessen Anfragen. Eine Tabellenkalkulation öffnet die Datei.',
+	'[[/_admin/submissions/manual/delete]]'	=> '„Löschen“ entfernt eine Anfrage von diesem Server. Die Mail, die sie ausgelöst hat, bleibt davon unberührt.',
 ];

@@ -94,4 +94,12 @@ return [
 	'[[/_admin/keys/hint/segment]]'	=> 'Lower-case words of the letters a to z and digits, joined by hyphens.',
 	'[[/_admin/keys/hint/not-a-word]]'	=> 'Not a word of the vocabulary: “%s” is shown as “%s”',
 	'[[/_admin/keys/error/segment]]'	=> 'This is not a word of a key: only lower-case letters a to z, digits and single hyphens between them.',
+
+	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
+	'[[/_admin/text/manual/intro]]'	=> 'Every text of your website in every language, in one place: headings, paragraphs, the name of your company, the words on buttons.',
+	'[[/_admin/text/manual/search]]'	=> 'Type a word of the text, its name or its key. A click on a hit opens all texts of that page, with the one you looked for marked.',
+	'[[/_admin/text/manual/key]]'	=> 'A key is the fixed address of a text. It stands in grey under each field, and templates ask for a text by its key.',
+	'[[/_admin/text/manual/language]]'	=> 'The select at the top is the language you write in. What you typed in one language stays while you switch, and one Save stores them all. It changes nothing else: not the language of the workbench, not the one your website shows.',
+	'[[/_admin/text/manual/save]]'	=> 'Save stores every text you changed, in all languages at once. Unsaved changes are marked at the bottom.',
+	'[[/_admin/text/manual/scan]]'	=> 'The Text Keys tab is for developers: it creates, renames and deletes keys and sets their format. Its scan lists the keys that templates ask for and nobody has written yet.',
 ];

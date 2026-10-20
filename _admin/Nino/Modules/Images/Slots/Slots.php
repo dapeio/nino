@@ -101,6 +101,31 @@ namespace Nino\Modules\Images {
 		}
 
 		/**
+		 *	Refuse a slot that has no size, at the field that has none. A slot is
+		 *	the exact canvas an upload is cut to (\Nino\Images::process()), so a
+		 *	size is not a detail to default: a slot made with a width or a height
+		 *	left blank, and then raised to 1 here, was a picture of one pixel
+		 *	that every later upload was cut to, and the scan proposes exactly
+		 *	such slots - the ones a component names and nobody made have no size
+		 *	to propose. The width is named first where both are missing
+		 *
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		int				$width
+		 *	@param		int				$height
+		 *
+		 *	@return 	bool										Whether the request was refused
+		 */
+		private static function failSize( array &$request, int $width, int $height ): bool {
+
+			if( $width >= 1 && $height >= 1 )
+				return false;
+
+			\Nino\Http::fail( $request, 400, 'a slot needs a width and a height of at least 1 pixel', 'invalid_value', [], $width < 1 ? 'width' : 'height' );
+
+			return true;
+		}
+
+		/**
 		 *	Whether a slot of this size is one an upload could ever fill.
 		 *
 		 *	A slot's width and height are the exact canvas \Nino\Images::process()
@@ -184,13 +209,16 @@ namespace Nino\Modules\Images {
 			}
 
 			$label 	= trim( \Nino\Admin\Admin::postString( $data, 'label' ) );
-			$width 	= max( 1, (int) ( $data['width'] ?? 0 ) );
-			$height = max( 1, (int) ( $data['height'] ?? 0 ) );
+			$width 	= (int) ( $data['width'] ?? 0 );
+			$height = (int) ( $data['height'] ?? 0 );
 
 			if( $label === '' ) {
 				\Nino\Http::fail( $request, 400, 'label is required' );
 				return;
 			}
+
+			if( self::failSize( $request, $width, $height ) === true )
+				return;
 
 			if( self::fitsUploadLimit( $width, $height ) === false ) {
 				\Nino\Http::fail( $request, 400, 'target size is larger than an upload can produce' );
@@ -250,13 +278,16 @@ namespace Nino\Modules\Images {
 			$data 	= \Nino\Admin\Admin::postData();
 			$uri 		= \Nino\Admin\Admin::postString( $data, 'uri' );
 			$label 	= trim( \Nino\Admin\Admin::postString( $data, 'label' ) );
-			$width 	= max( 1, (int) ( $data['width'] ?? 0 ) );
-			$height = max( 1, (int) ( $data['height'] ?? 0 ) );
+			$width 	= (int) ( $data['width'] ?? 0 );
+			$height = (int) ( $data['height'] ?? 0 );
 
 			if( self::isValidUri( $uri ) === false || $label === '' ) {
 				\Nino\Http::fail( $request, 400, 'invalid uri or missing label' );
 				return;
 			}
+
+			if( self::failSize( $request, $width, $height ) === true )
+				return;
 
 			if( self::fitsUploadLimit( $width, $height ) === false ) {
 				\Nino\Http::fail( $request, 400, 'target size is larger than an upload can produce' );
@@ -377,9 +408,10 @@ namespace Nino\Modules\Images {
 		/**
 		 *	Where every image slot is used: the templates that show it as the
 		 *	source of a component - [image <uri>], [image uri="<uri>"],
-		 *	[card-image <uri>], as \Nino\Modules\Components::sources() reads
-		 *	them - and the pages that end up
-		 *	rendering it. A page is a GET route as the project serves it,
+		 *	[card-image <uri>] - or as the value of an attribute of the type
+		 *	image, the background of a card, as
+		 *	\Nino\Modules\Components::sources() reads them - and the pages that
+		 *	end up rendering it. A page is a GET route as the project serves it,
 		 *	feature routes included, whose body shows the slot itself or
 		 *	through the [template /templates/<name>] includes that body pulls
 		 *	in, however deep (a visited set and a depth cap keep a template
@@ -512,7 +544,8 @@ namespace Nino\Modules\Images {
 			foreach( $variants as $variant ) {
 
 				// A slot is the source of [image] and [card-image], bare or as
-				// uri="...": found as the rendering finds them
+				// uri="...", and the value of an attribute of the type image (the
+				// background of a card): found as the rendering finds them
 				foreach( \Nino\Modules\Components::sources( $appData, $variant ) as $component )
 					if( $component['kind'] === 'image' )
 						$images[ $component['source'] ] = true;
@@ -542,6 +575,7 @@ namespace Nino\Modules\Images {
 		 *	logo) is skipped entirely, none of those fit this slot system.
 		 *	A slot a template names as the source of a component is the other
 		 *	way it asks for a picture - [card-image /template/page-x/cards/one-picture],
+		 *	or the background of a card, [card background="/template/page-x/cards/one-background"],
 		 *	as the Builder writes a page (see \Nino\Modules\Components::sources()) -
 		 *	and where no slot is defined for it, it is a row too, after the
 		 *	files': its uri is the src and the uri proposed, with no file and no

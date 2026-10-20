@@ -301,9 +301,16 @@ check( 'a clickable table row draws its own ring, inside the row the scroller wo
 		&& /:is\(input, textarea, select, button, a\):focus-visible \{[^}]*outline: 2px solid var\(--editor-blue\);/s.test( sharedCss ) );
 	check( 'the language picker of the bar and of the login page rings in the blue, in the layer that outranks the field rule',
 		/@layer nino\.local \{[\s\S]*#admin-page-wrap #admin-localepicker:focus-visible,\s*#form-login #admin-localepicker:focus-visible \{[^}]*outline: 2px solid var\(--editor-blue\);/.test( css ) );
+	check( 'what scrolls in a dialog - a manual longer than the screen - rings in the blue like a control when the keyboard stops on it, and not in the two lines the browser draws',
+		/\.nino-admin-dialog-content:focus-visible \{[^}]*outline: 2px solid var\(--editor-blue\);[^}]*outline-offset: 4px;/s.test( sharedCss ) );
 	check( 'what the skip link jumps to rings inside the pane, and the link itself waits above the screen until it has the focus',
 		/\.nino-admin-pane:focus-visible \{[^}]*outline: 2px solid var\(--editor-blue\);[^}]*outline-offset: -2px;/s.test( sharedCss )
 		&& /\.nino-admin-skip \{[^}]*position: fixed;[^}]*transform: translateY\(-200%\);/s.test( sharedCss ) && /\.nino-admin-skip:focus \{[^}]*transform: none;/s.test( sharedCss ) );
+
+	// A manual in a dialog is as wide as the dialog, not as the screen
+	check( 'the handles of a manual in a dialog stand over their lines at any width of the screen - a handle as long as a line of markup took the column and left the line beside it a few letters wide - and one with no place to break breaks anywhere',
+		/\.nino-admin-dialog--manual \.nino-admin-manual-section:not\(\.nino-admin-manual-section--terms\) \{[^}]*grid-template-columns: minmax\(0, 1fr\);[^}]*gap: 0;/s.test( sharedCss )
+		&& /\.nino-admin-dialog--manual \.nino-admin-manual-section > :is\(dt, dd\) \{[^}]*overflow-wrap: anywhere;/s.test( sharedCss ) );
 
 	// A button that is a row of a list looks like the link it replaces
 	check( 'a row of a list that is a button is the width of the list, reads from the left and has none of the button\'s own surface, weight and ring',

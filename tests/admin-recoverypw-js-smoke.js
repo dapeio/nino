@@ -36,12 +36,16 @@ mount.id = 'recoverypw-form';
 
 const requests = [];
 
-// A stand-in for the shell's registry (Nino.admin.dirty): what the tab registers and when it takes a snapshot
+// A stand-in for the shell's registry (Nino.admin.dirty): what the tab registers and when it takes a snapshot, and
+// what it answers when asked whether the form holds input (unsaved is the registry's word, set by the check)
 const dirty = {
 	forms : {},
 	snapshots : [],
+	unsaved : false,
+	asked : [],
 	watchForm : function( name, getter, save ) { dirty.forms[name] = { getter : getter, save : save } },
 	snapshot : function( name ) { dirty.snapshots.push( name ) },
+	isDirty : function( names ) { dirty.asked.push( names.join() ); return dirty.unsaved },
 };
 
 const Nino = {
@@ -102,6 +106,19 @@ check( 'the status line is the action bar\'s own', field('msg') !== null && fiel
 check( 'the form is registered with the shell\'s dirty registry, and drawn means saved', dirty.forms.recoverypw !== undefined && dirty.forms.recoverypw.getter() === mount && dirty.snapshots.join() === 'recoverypw' );
 check( 'the inputs carry the field names the server\'s refusals use', field('current').dataset.field === 'current' && field('new').dataset.field === 'pw' );
 check( 'the tab shows again without being rebuilt', ( function() { const before = field('current'); tab.showCurrent(); return field('current') === before && requests.length === 0 } )() );
+
+// The line follows the registry's word and not the keystrokes: it says "unsaved" while the form holds input, and says
+// nothing once the registry does not - after a Discard has put the fields back no line about unsaved input is left
+{
+	const form = findAll( mount, function( el ) { return el.tagName === 'FORM' } )[0];
+	dirty.unsaved = true;
+	fire( form, 'input', { target : field('new') } );
+	const typed = message();
+	dirty.unsaved = false;
+	fire( form, 'input', { target : field('new') } );
+	check( 'while the registry says the form holds input the line says so, asking it about this tab', typed === text('/_admin/common/msg/dirty') && text('/_admin/common/msg/dirty') !== '' && dirty.asked.every( function( names ) { return names === 'recoverypw' } ) && dirty.asked.length === 2 );
+	check( '...and once the registry says it does not - the fields were put back - the line is clear again', message() === '' && field('msg').dataset.state === 'idle' );
+}
 
 // A repeat that differs: nothing is sent, and the fields stay as they are
 type( 'old secret', 'brand new secret', 'brand new secrat' );

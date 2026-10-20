@@ -61,6 +61,18 @@ check( 'the slot starts with no filename', array_key_exists( 'filename', $appDat
 [ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiCreate', [ 'uri' => 'not valid', 'label' => 'x', 'width' => '10', 'height' => '10' ] );
 check( 'apiCreate rejects an invalid uri', $status === 400 );
 
+/*	A slot is made with a size: it is the canvas every upload is cut to. A width or a height
+	under 1 was raised to 1 and made a slot of one pixel - the scan proposes slots with no size
+	to propose - and is refused now, at the field that has none	*/
+$noSizes = [ 'a width of 0' => [ [ 'width' => '0', 'height' => '100' ], 'width' ], 'a height of 0' => [ [ 'width' => '100', 'height' => '0' ], 'height' ],
+	'both blank' => [ [ 'width' => '', 'height' => '' ], 'width' ], 'a negative width' => [ [ 'width' => '-5', 'height' => '10' ], 'width' ],
+	'a height that is no number' => [ [ 'width' => '100', 'height' => 'tall' ], 'height' ], 'no size at all' => [ [], 'width' ] ];
+foreach( $noSizes as $noSize => [ $size, $field ] ) {
+	[ $status, $body ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiCreate', [ 'uri' => '/home/nosize', 'label' => 'No size' ] + $size );
+	check( 'apiCreate refuses '. $noSize. ' with 400 and the code invalid_value on the field '. $field. ', and makes nothing',
+		$status === 400 && ( $body['code'] ?? '' ) === 'invalid_value' && ( $body['field'] ?? '' ) === $field && isset( $appData['/nino/html/images']['/home/nosize'] ) === false );
+}
+
 [ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiCreate', [ 'uri' => '/home/hero', 'label' => 'x', 'width' => '10', 'height' => '10' ] );
 check( 'apiCreate rejects a uri that already exists', $status === 409 );
 
@@ -90,6 +102,12 @@ callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiDelete', [ 'uri' => '/
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiList' );
 check( 'apiList succeeds', $status === 200 );
 check( 'apiList finds the new slot', in_array( '/home/hero', array_column( $body['slots'], 'uri' ), true ) === true );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiSave', [ 'uri' => '/home/hero', 'label' => 'Hero neu', 'width' => '0', 'height' => '400' ] );
+check( 'apiSave refuses a width under 1 as it refuses it on a new slot, at the field, and leaves the size the slot had',
+	$status === 400 && ( $body['code'] ?? '' ) === 'invalid_value' && ( $body['field'] ?? '' ) === 'width' && ( $appData['/nino/html/images']['/home/hero']['width'] ?? 0 ) === 1200 && ( $appData['/nino/html/images']['/home/hero']['height'] ?? 0 ) === 600 );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiSave', [ 'uri' => '/home/hero', 'label' => 'Hero neu', 'width' => '800' ] );
+check( '...and a height that is missing, at its field', $status === 400 && ( $body['field'] ?? '' ) === 'height' && ( $appData['/nino/html/images']['/home/hero']['height'] ?? 0 ) === 600 );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiSave', [ 'uri' => '/home/hero', 'label' => 'Hero neu', 'width' => '800', 'height' => '400' ] );
 check( 'apiSave edits an existing slot', $status === 200 );
@@ -245,7 +263,14 @@ callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/pro
 $appData['./nino/features/all'] = [ 'sample' => [ 'key' => 'sample', 'dir' => $sandbox. '/sample-feature', 'name' => 'Sample' ], 'shop' => [ 'key' => 'shop', 'dir' => $sandbox. '/shop-feature', 'name' => 'Shop' ] ];
 [ , $listBody ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiList' );
 unset( $appData['./nino/features/all'] );
-check( 'apiList names the language of the session, which the tab opens in', ( $listBody['selectedLocale'] ?? '' ) === \Nino\Admin\Admin::sessionLocale( $appData ) );
+check( 'apiList names the working language of the session, which the tab opens in', ( $listBody['selectedLocale'] ?? '' ) === \Nino\Admin\Admin::contentLocale( $appData ) );
+\Nino\Runtime::setSessionValue( $appData, './admin/content-locale', 'en_US' );
+\Nino\Runtime::setSessionValue( $appData, './admin/locale', 'de_DE' );
+[ , $workingBody ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiList' );
+[ , $textBody ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiKeys' );
+\Nino\Runtime::unsetSessionValue( $appData, './admin/content-locale' );
+\Nino\Runtime::unsetSessionValue( $appData, './admin/locale' );
+check( '...and both tabs open on the one a select chose, whatever language the workbench speaks', ( $workingBody['selectedLocale'] ?? '' ) === 'en_US' && ( $textBody['selectedLocale'] ?? '' ) === 'en_US' );
 check( 'apiList offers /template the templates directly in templates/ whose name is a category, and "common" first',
 	array_slice( $listBody['categories']['template'] ?? [], 0, 1 ) === [ 'common' ] && array_intersect( [ 'frame-header', 'page-extra' ], $listBody['categories']['template'] ?? [] ) === [ 'frame-header', 'page-extra' ] );
 check( '...none whose name is no word of a key', in_array( 'page-Foo', $listBody['categories']['template'] ?? [], true ) === false && in_array( 'page-legal.de_DE', $listBody['categories']['template'] ?? [], true ) === false );
@@ -644,6 +669,60 @@ foreach( array_keys( $shippedKeys ) as $shippedKey ) {
 }
 check( 'every part, name and group of the '. $counted. ' keys the kernel ships is a word of the vocabulary or falls apart into words'. ( $uncovered === [] ? '' : ' - '. implode( '; ', array_slice( array_keys( $uncovered ), 0, 8 ) ) ), $uncovered === [] && $counted > 50 );
 
+// --- The manuals the "?" of every panel opens -------------------------------------------
+
+echo "Panel manuals - /_admin/<panel>/manual/<handle>, a line of each in both languages\n";
+
+// Every panel the tool ships: the directories _admin/Nino/Modules/<Name>/Admin/ and the runtime modules' _nino/Nino/Modules/<Name>/Admin/
+$manualPanels = [];
+foreach( array_merge( glob( dirname( __DIR__ ). '/_admin/Nino/Modules/*/Admin/Admin.php' ) ?: [], glob( dirname( __DIR__ ). '/_nino/Nino/Modules/*/Admin/Admin.php' ) ?: [] ) as $panelFile )
+	$manualPanels[] = '\\Nino\\Modules\\'. basename( dirname( $panelFile, 2 ) ). '\\Admin';
+
+$manualProblems = [];
+$manualLines		= 0;
+foreach( $manualPanels as $manualPanel ) {
+
+	$manualUri		= $manualPanel::nav()[0];
+	$handles			= method_exists( $manualPanel, 'manual' ) === true ? $manualPanel::manual() : [];
+	$manualFills	= [];
+	foreach( [ 'en_US', 'de_DE' ] as $manualLocale )
+		$manualFills[$manualLocale] = include dirname( __DIR__ ). $manualPanel::text(). '/'. $manualLocale. '.php';
+
+	if( $handles === [] )
+		$manualProblems[] = $manualUri. ' has no manual';
+	else if( $handles[0] !== 'intro' || count( $handles ) > 8 )
+		$manualProblems[] = $manualUri. ' does not open with what it is for, or holds more than eight entries';
+
+	// What the panel says about itself first, then a line for each thing done in it - a word each, and in both languages
+	foreach( $handles as $handle ) {
+		$manualKey = '[[/_admin/'. $manualUri. '/manual/'. $handle. ']]';
+		foreach( [ 'manual', $handle ] as $segment )
+			if( $slugCovered( $segment ) === false )
+				$manualProblems[] = $manualUri. ': '. $segment. ' is no word of the vocabulary';
+		foreach( $manualFills as $manualLocale => $fills ) {
+			$line = $fills[$manualKey] ?? '';
+			$manualLines++;
+			if( is_string( $line ) === false || trim( $line ) === '' )
+				$manualProblems[] = $manualUri. '/'. $handle. ' has no line in '. $manualLocale;
+			else if( preg_match( '/[<>&]|\\[\\[/', $line ) === 1 || strlen( $line ) > 400 )
+				$manualProblems[] = $manualUri. '/'. $handle. ' in '. $manualLocale. ' holds markup, or is more than a line or two';
+		}
+		if( ( $manualFills['en_US'][$manualKey] ?? '' ) === ( $manualFills['de_DE'][$manualKey] ?? '' ) )
+			$manualProblems[] = $manualUri. '/'. $handle. ' is the same in both languages';
+	}
+
+	// Nothing is written that no entry shows - the headings the Features panel gives the sections of a feature's manual are the one other thing under /manual/
+	$kept = array_merge( array_map( static fn( string $handle ): string => '[[/_admin/'. $manualUri. '/manual/'. $handle. ']]', $handles ), $manualUri === 'features' ? array_map( static fn( string $section ): string => '[[/_admin/features/manual/'. $section. ']]', array_merge( \Nino\Features::MANUAL_SECTIONS, [ 'none' ] ) ) : [] );
+	foreach( $manualFills as $manualLocale => $fills )
+		foreach( array_keys( $fills ) as $manualKey )
+			if( str_starts_with( $manualKey, '[[/_admin/'. $manualUri. '/manual/' ) === true && in_array( $manualKey, $kept, true ) === false )
+				$manualProblems[] = $manualKey. ' in '. $manualLocale. ' is no entry of the manual';
+}
+check( 'every panel of the tool names its manual, opens it with what the panel is for, holds at most eight entries, and every entry has a line of a line or two in both languages - a word of the vocabulary for the entry and for "manual", no markup, nothing copied from one language into the other, nothing written that no entry shows'
+	. ( $manualProblems === [] ? '' : ' - '. implode( '; ', array_slice( $manualProblems, 0, 6 ) ) ), $manualProblems === [] && count( $manualPanels ) >= 14 && $manualLines >= 2 * 14 );
+
+echo "\n";
+
 // --- Text::apiScan / Images::apiScan: template scanners ---------------------
 
 // Both scans and the lists of where a slot is used read what a template names as
@@ -697,7 +776,39 @@ check( '...nor for the Images panel\'s scan of them', $status === 200 && $dirWar
 [ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiList' );
 $dirWarnings = ninoWarnings();
 check( '...nor for the list of the slots and where they are used', $status === 200 && $dirWarnings === [] );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiKeys' );
+$dirWarnings = ninoWarnings();
+check( '...nor for the Text panel, which reads the templates for the order of its keys and the names of its pages - and offers the directory as no page', $status === 200 && $dirWarnings === [] && isset( $body['templates']['scan-dir'] ) === false );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiList' );
+$dirWarnings = ninoWarnings();
+check( '...nor for the Keys tab, which offers no category named after it', $status === 200 && $dirWarnings === [] && in_array( 'scan-dir', $body['categories']['template'] ?? [], true ) === false );
 rmdir( $sandbox. '/private/templates/scan-dir.tpl' );
+
+// What a module or a feature brings itself is read the same way: its templates/ and its install/templates/, without a directory that is named like one.
+// The Text panel orders the keys of a /feature row by where those templates first read them
+$ownDir = $sandbox. '/own-feature';
+mkdir( $ownDir. '/templates/dir.tpl', 0777, true );
+mkdir( $ownDir. '/install/templates', 0777, true );
+file_put_contents( $ownDir. '/templates/b.tpl', '[[/feature/own/page/lead]]' );
+file_put_contents( $ownDir. '/install/templates/a.tpl', '[[/feature/own/page/body]]' );
+$enBefore = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
+\Nino\Filesystem::putFileContent( $appData, '/text/en_US.php', $enBefore + [ '[[/feature/own/page/lead]]' => 'Lead', '[[/feature/own/page/body]]' => 'Body' ] );
+$appData['./nino/features/all'] = [ 'own' => [ 'key' => 'own', 'dir' => $ownDir, 'name' => 'Own' ] ];
+ninoWarnings();
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiKeys' );
+$dirWarnings = ninoWarnings();
+unset( $appData['./nino/features/all'] );
+\Nino\Filesystem::putFileContent( $appData, '/text/en_US.php', $enBefore );
+check( '...nor for the templates a feature brings itself: the key its templates/ reads is first, the one its install/templates/ reads comes after it, and the directory is neither', $status === 200 && $dirWarnings === []
+	&& ( $body['order']['/feature/own/page/lead'] ?? -1 ) >= 0 && ( $body['order']['/feature/own/page/lead'] ?? -1 ) < 10000000
+	&& ( $body['order']['/feature/own/page/body'] ?? -1 ) >= 10000000 && ( $body['order']['/feature/own/page/body'] ?? -1 ) < 20000000 );
+unlink( $ownDir. '/templates/b.tpl' );
+unlink( $ownDir. '/install/templates/a.tpl' );
+rmdir( $ownDir. '/templates/dir.tpl' );
+rmdir( $ownDir. '/templates' );
+rmdir( $ownDir. '/install/templates' );
+rmdir( $ownDir. '/install' );
+rmdir( $ownDir );
 
 unlink( $sandbox. '/private/templates/scan-fixture.tpl' );
 unlink( $sandbox. '/private/templates/scan-fixture-2.tpl' );
@@ -1051,6 +1162,37 @@ check( '...and the list says so with its usage, not as a slot no template mentio
 
 callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiDelete', [ 'uri' => '/template/page-delta/cards/one-picture' ] );
 unlink( $sandbox. '/private/templates/page-delta.tpl' );
+$appData['/nino/http/routes'] = $namedRoutesBefore;
+
+// A slot an attribute names is as much a picture of the page: the background of a card. Not the image field of the
+// element in a stack, which is no slot
+\Nino\Filesystem::putFileContent( $appData, '/templates/page-echo.tpl', implode( "\n", [
+	'[card background="/template/page-echo/cards/one-background" dim="1"]',
+	'	[card-text /template/page-echo/cards/one-text]',
+	'[/card]',
+	'[stack /deltas]',
+	'	[card background="image"]',
+	'		[card-title title]',
+	'	[/card]',
+	'[/stack]',
+] ) );
+$appData['/nino/http/routes']['GET://echo'] = [ 'uri' => '/echo', 'body' => '[template /templates/page-echo]' ];
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiScan' );
+$backgroundRows = array_column( $body['missing'], null, 'src' );
+check( 'a slot a card names as its background and nobody has made is a row of the scan, as one a component names as its source is - and the image field of the element in a stack is none',
+	$status === 200 && array_keys( $backgroundRows ) === [ '/template/page-echo/cards/one-background' ] && ( $backgroundRows['/template/page-echo/cards/one-background']['files'] ?? null ) === [ 'page-echo.tpl' ] );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiCreate', [ 'uri' => '/template/page-echo/cards/one-background', 'label' => 'One background', 'width' => '30', 'height' => '20' ] );
+[ , $body ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiScan' );
+$backgroundUsage = \Nino\Modules\Images\Slots::usage( $appData );
+check( 'once the slot exists the scan lists nothing of it, and the usage names the page of the background picture - it is not "included nowhere"',
+	$status === 200 && $body['missing'] === [] && ( $backgroundUsage['/template/page-echo/cards/one-background'] ?? null ) === [ 'templates' => [ 'page-echo' ], 'pages' => [ [ 'httpUri' => '/echo', 'name' => '/echo' ] ] ] );
+[ , $body ] = callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiList' );
+check( '...and so does the list', ( array_column( $body['slots'], null, 'uri' )['/template/page-echo/cards/one-background']['usage']['pages'] ?? [] ) !== [] );
+
+callDev( $appData, \Nino\Modules\Images\Slots::class, 'apiDelete', [ 'uri' => '/template/page-echo/cards/one-background' ] );
+unlink( $sandbox. '/private/templates/page-echo.tpl' );
 $appData['/nino/http/routes'] = $namedRoutesBefore;
 
 echo "\n";

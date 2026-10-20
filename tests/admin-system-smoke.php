@@ -163,7 +163,7 @@ check( 'a tab the account lacks the permission for is left off its pane', \Nino\
 ninoUser( $appData, 'typesonly@example.com', [ '/_admin/types/manage' ] );
 $typesOnly = \Nino\Admin\Admin::visiblePanels( $appData );
 check( 'an account holding only a tab\'s permission gets the pane without the panel\'s own screen', isset( $typesOnly['elements'] ) === true && $typesOnly['elements']['own'] === false && array_keys( $typesOnly['elements']['tabs'] ) === [ 'types' ] );
-check( '...rendered as the tab pane alone under the panel\'s own head - one tab is no strip, but the name stays', str_contains( \Nino\Admin\Admin::panesHtml( $appData ), '<div id="admin-content-elements" data-panel="elements" data-layout="page" hidden><div class="admin-panel-head"><h2 class="admin-panel-title">[[/_admin/nav/elements]]</h2><div class="admin-panel-actions"></div></div><div id="admin-tab-types" data-tab="types" hidden><div id="types-list"></div><div id="types-form"></div></div></div>' ) === true );
+check( '...rendered as the tab pane alone under the panel\'s own head - one tab is no strip, but the name stays', str_contains( \Nino\Admin\Admin::panesHtml( $appData ), '<div id="admin-content-elements" data-panel="elements" data-layout="page" hidden><div class="admin-panel-head"><h2 class="admin-panel-title">[[/_admin/nav/elements]]</h2><div class="admin-panel-actions"></div><button type="button" class="admin-panel-manual" data-manual="elements" aria-haspopup="dialog" aria-label="[[/_admin/common/label/manual]]" title="[[/_admin/common/label/manual]]">?</button></div><div id="admin-tab-types" data-tab="types" hidden><div id="types-list"></div><div id="types-form"></div></div></div>' ) === true );
 \Nino\Auth::deleteUser( $appData, 'typesonly@example.com' );
 
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
@@ -450,6 +450,9 @@ $writeArchive( $otherId, array_merge( $entries, [ 'nino.php' => '<?php return '.
 $writeArchive( $sameId, array_merge( $entries, [ 'nino.php' => '<?php return '. var_export( [ 'nino' => \Nino\VERSION, 'features' => [ 'other' => '9.9.9' ] ], true ). ';' ] ) );
 $writeArchive( $noNoteId, array_diff_key( $entries, [ 'nino.php' => true ] ) );
 
+// A restore ends the session of the account that ran it (see apiRestore()):
+// signed in again before each one that follows another
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 [ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $otherId ] );
 check( 'a restore of an archive from another version of Nino answers with a notice: the code, and the version it comes from and the one that runs', $status === 200 && ( $body['ok'] ?? false ) === true
 	&& ( $body['notice'] ?? null ) === [ 'code' => 'backups_restored_other_version', 'params' => [ '0.9.1', \Nino\VERSION ] ] );
@@ -457,8 +460,10 @@ check( '...restores it all the same, nothing is planted in the root for the note
 	file_get_contents( $pagesDir. '/page-probe.tpl' ) === 'probe page, as archived' && is_file( $sandbox. '/nino.php' ) === false
 	&& str_contains( implode( "\n", \Nino\Modules\Logs\Admin::recentLines( $appData, 20 ) ), 'Backup '. $otherId. ' comes from Nino 0.9.1, this is '. \Nino\VERSION. ' (backups_restored_other_version)' ) === true );
 
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 [ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $sameId ] );
 check( 'an archive whose note names the version that runs has no notice, whatever its features were', $status === 200 && ( $body['ok'] ?? false ) === true && isset( $body['notice'] ) === false );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 [ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $noNoteId ] );
 check( '...and an archive with no note at all restores as it always did, with nothing to say', $status === 200 && ( $body['ok'] ?? false ) === true && isset( $body['notice'] ) === false && is_file( $sandbox. '/nino.php' ) === false );
 
@@ -493,6 +498,11 @@ foreach( $timedFiles() as $name )
 foreach( [ $keptDaily, $oldSnap ] as $name )
 	unlink( $nowDir. '/'. $name. '.php' );
 
+// In again after the last restore - before the corruption below, since the login
+// writes the account record and the file the restore is to put back must stay the
+// wiped one
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
 // Simulate config.php DATA corruption (not a syntax error) - eg. a wrecked user record -
 // the scenario Restore exists for. A genuine syntax error is out of scope (see Admin.php docblock).
 $beforeCorruption = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
@@ -508,8 +518,12 @@ check( 'the simulated corruption actually wiped the user record', \Nino\Filesyst
 $tempFiles	= static fn(): int => count( glob( sys_get_temp_dir(). '/ninorestore*' ) ?: [] ) + count( glob( sys_get_temp_dir(). '/ninosnapshot*' ) ?: [] );
 $tempBefore	= $tempFiles();
 
+$csrfBefore = \Nino\Csrf::getToken( $appData );
 [ , $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $dates[0] ] );
 check( 'apiRestore reports success', ( $body['ok'] ?? false ) === true );
+check( '...and ends the session of the account that ran it: no account on the request, no session values, a new csrf token, and the next action is 401 until the login', \Nino\Auth::getCurrentUser( $appData ) === false
+	&& \Nino\Runtime::getSessionValue( $appData, './nino/auth/current' ) === null && \Nino\Runtime::getSessionValue( $appData, './nino/auth/token' ) === null
+	&& \Nino\Csrf::getToken( $appData ) !== $csrfBefore && ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiList' ] )[0] === 401 );
 
 $afterRestore = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 check( 'the wrecked user record is back after restore', isset( $afterRestore['/nino/auth/user']['admin@example.com'] ) === true );
@@ -527,6 +541,7 @@ $snapshotId = basename( ( glob( $backupDir. '/pre-restore-*.php' ) ?: [] )[0], '
 check( 'the snapshot is offered, after the dated backups rather than among them', in_array( $snapshotId, \Nino\Modules\Backups\Admin::dates( $appData ), true ) === true
 	&& array_key_last( \Nino\Modules\Backups\Admin::dates( $appData ) ) === array_search( $snapshotId, \Nino\Modules\Backups\Admin::dates( $appData ), true ) );
 
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 [ , $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $snapshotId ] );
 check( 'restoring it undoes the restore', ( $body['ok'] ?? false ) === true
 	&& isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/auth/user']['admin@example.com'] ) === false );
@@ -536,6 +551,7 @@ check( 'restoring it undoes the restore', ( $body['ok'] ?? false ) === true
 for( $i = 0; $i < 4; $i++ ) {
 	touch( $backupDir. '/pre-restore-2020-01-0'. $i. '-120000.php' );
 }
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $snapshotId ] );
 check( 'a restore keeps the newest three snapshots and drops the rest', count( glob( $backupDir. '/pre-restore-*.php' ) ?: [] ) === 3 );
 
@@ -553,6 +569,7 @@ $garbageIv = random_bytes( 12 ); $garbageTag = '';
 $garbage	 = openssl_encrypt( 'this is not a tar.gz', 'aes-256-gcm', (string) $backupKey, OPENSSL_RAW_DATA, $garbageIv, $garbageTag );
 file_put_contents( $backupDir. '/2020-01-01.php', "<?php http_response_code(403); exit; return '". base64_encode( $garbageIv. $garbageTag. $garbage ). "';\n" );
 
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 $garbageRequest = [];
 $garbageOutcome = ( static function() use ( &$appData, &$garbageRequest ): string {
 	try {
@@ -663,6 +680,7 @@ check( 'the restored config.php is a readable array', is_array( ( static functio
 	return include \Nino\Filesystem::getConfigPath( $appData ). '/config.php';
 } )() ) === true );
 
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 [ $status ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => '2020-01-01' ] );
 check( 'restoring a date with no matching backup 404s', $status === 404 );
 
@@ -681,10 +699,14 @@ $afternoonId = \Nino\Modules\Backups::now( $appData );
 check( 'restoring an archive made on request gives the state of that moment', ( $body['ok'] ?? false ) === true
 	&& ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )[$stateKey] ?? null ) === 'afternoon' );
 
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 [ , $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => date( 'Y-m-d' ) ] );
 check( '...and the daily archive of today still gives the state before it', ( $body['ok'] ?? false ) === true
 	&& array_key_exists( $stateKey, \Nino\Filesystem::getFileContent( $appData, '/config.php', [] ) ) === false );
 unlink( $backupDir. '/'. $afternoonId. '.php' );
+
+// The last restore of this block signed the account out, and what follows acts as it
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 
 echo "\n";
 

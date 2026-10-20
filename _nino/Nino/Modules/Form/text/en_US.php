@@ -16,4 +16,11 @@ return [
 	'[[/_admin/submissions/label/export]]'	=> 'Export as CSV',
 	'[[/_admin/submissions/label/more]]'		=> 'Show more',
 	'[[/_admin/submissions/label/less]]'		=> 'Show less',
+
+	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
+	'[[/_admin/submissions/manual/intro]]'	=> 'The messages that visitors sent through the forms of your website, the newest first.',
+	'[[/_admin/submissions/manual/form]]'	=> 'The Form select narrows the list to one form.',
+	'[[/_admin/submissions/manual/search]]'	=> 'The search looks through every value of every submission, and through the names of the fields too.',
+	'[[/_admin/submissions/manual/export]]'	=> 'Export as CSV downloads what is on screen: with a form selected, the submissions of that form. A spreadsheet opens the file.',
+	'[[/_admin/submissions/manual/delete]]'	=> 'Delete removes a submission from this server. The mail it sent is not affected.',
 ];

@@ -36,6 +36,15 @@ return [
 	'[[/_admin/slots/label/scan-create]]'	=> 'Die nicht ignorierten Bildplätze anlegen',
 	'[[/_admin/slots/scan/none]]'				=> 'Keine fehlenden Bildplätze. Jedes lokal referenzierte Bild der Templates hat bereits einen Platz.',
 	'[[/_admin/slots/scan/created-failed]]'	=> '%d angelegt. Fehlgeschlagen: %s',
+	'[[/_admin/slots/error/size]]'			=> 'Ein Bildplatz braucht eine Größe: Trag Breite und Höhe in Pixeln ein.',
 	'[[/_admin/slots/confirm/delete]]'	=> 'Bildplatz „%s“ wirklich löschen? Ein hochgeladenes Bild geht mit ihm verloren.',
 	'[[/_admin/dashboard/label/slots]]'	=> 'Fehlende Bildplätze',
+
+	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
+	'[[/_admin/images/manual/intro]]'	=> 'Jedes Bild Deiner Website hat einen festen Platz, einen Bildplatz, mit festen Maßen. Ein hochgeladenes Bild wird darauf zugeschnitten.',
+	'[[/_admin/images/manual/slot]]'	=> 'Öffne einen Bildplatz, um seine Soll-Maße zu sehen und wo die Website ihn verwendet. Ein Bildplatz, den keine Seite verwendet, zeigt auf der Website nichts.',
+	'[[/_admin/images/manual/upload]]'	=> 'Wähle eine Datei, sie wird sofort gespeichert; die Grenzen stehen neben dem Feld. Ein Bild, das kleiner ist als die Soll-Maße, wird vergrößert und kann unscharf wirken.',
+	'[[/_admin/images/manual/alt]]'	=> 'Beschreibe in einem Satz, was das Bild zeigt, einmal für jede Sprache, und klicke auf „Alt-Texte speichern“. Bleibt das Feld leer, gilt das Bild als Dekoration.',
+	'[[/_admin/images/manual/remove]]'	=> '„Bild entfernen“ löscht das Bild, nach einer Rückfrage. Bis Du ein neues hochlädst, bleibt der Platz auf der Website leer.',
+	'[[/_admin/images/manual/scan]]'	=> 'Der Reiter Bildplätze legt Bildplätze an und löscht sie – ein Bildplatz braucht Breite und Höhe. Sein Suchlauf nennt die Bilder, die Templates verwenden und für die es noch keinen Bildplatz gibt.',
 ];

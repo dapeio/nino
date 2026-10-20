@@ -64,6 +64,7 @@ mount.id = 'backups-list';
 
 const requests = [];
 const alerts = [];
+const dialogs = [];
 let reloaded = 0;
 let confirmAnswer = true;
 
@@ -79,6 +80,18 @@ const sandbox = {
 	console : console,
 	document : documentOf( mount ),
 	Nino : Nino,
+};
+// The workbench root a dialog is put in, and a dialog that opens modally and closes the way the browser's does
+sandbox.document.body = element('body');
+sandbox.document.createElement = function( tag ) {
+	const created = element( tag );
+	if( tag === 'dialog' ) {
+		created.open = false;
+		created.showModal = function() { created.open = true };
+		created.close = function() { created.open = false; fire( created, 'close' ) };
+		dialogs.push( created );
+	}
+	return created;
 };
 sandbox.window = {
 	Nino : Nino,
@@ -132,12 +145,24 @@ check( 'an answer with no reason still says what happened', messageText() === '(
 	&& text('/_admin/common/error/request') !== '' );
 check( '...and the list is still there after the second refusal too', dateRows().length === 3 );
 
-// A restore that worked: the page reloads, because everything the workbench
-// has in memory is about the state that was just replaced
+// What the person is asked before it, and what is said after: the restore ends the session
+
+const dialogText = function( dialog ) { return findAll( dialog, function( el ) { return el.id === 'nino-admin-choice-text' } )[0].textContent };
+const dialogButtons = function( dialog ) { return findAll( dialog, function( el ) { return el.tagName === 'BUTTON' } ) };
+
+// A restore that worked: everything the workbench has in memory is about the state that was
+// just replaced, and the sessions with it - the reload lands on the login page. What it says
+// is read in a dialog first, and the reload is the dialog's one choice, not a timer
 fire( restoreButton('2024-05-03'), 'click' );
 answer( 200, { ok : true } );
-check( 'a restore that succeeded says so and reloads the page', alerts.length === 1 && reloaded === 1 );
-check( '...with the sentence of the restore alone where the backup has nothing to add', alerts[0] === 'The backup from 2024-05-03 has been restored.' );
+check( 'a restore that succeeded opens a dialog with the date in its message - and neither an alert nor a reload', dialogs.length === 1 && dialogs[0].open === true && alerts.length === 0 && reloaded === 0
+	&& dialogText( dialogs[0] ) === text('/_admin/backups/msg/restored').replace( '%s', '2024-05-03' ) );
+const loginLabelDe = fills('_admin/Nino/Modules/Backups/text/de_DE.php')['/_admin/backups/label/login'];
+check( '...whose one choice is the way to the login: the label the module has for it, in both languages', dialogButtons( dialogs[0] ).length === 1 && dialogButtons( dialogs[0] )[0].textContent === text('/_admin/backups/label/login')
+	&& text('/_admin/backups/label/login') !== '' && typeof loginLabelDe === 'string' && loginLabelDe !== '' && loginLabelDe !== text('/_admin/backups/label/login') );
+check( '...and the page stays as it is until it is chosen', reloaded === 0 && dialogs[0].open === true );
+fire( dialogButtons( dialogs[0] )[0], 'click' );
+check( 'the choice reloads the page, once, and closes the dialog', reloaded === 1 && dialogs[0].open === false );
 
 // A backup of another version of Nino restores all the same. Its notice - a
 // code and its params, worded the way a failure's is - is said with the restore
@@ -147,8 +172,10 @@ alerts.length = 0;
 reloaded = 0;
 fire( restoreButton('2024-05-03'), 'click' );
 answer( 200, { ok : true, restoredDate : '2024-05-03', notice : { code : 'backups_restored_other_version', params : [ '1.8.0', '1.9.0' ] } } );
-check( 'a restore of a backup from another version says where it comes from, in the message of the restore, and reloads', alerts.length === 1 && reloaded === 1
-	&& alerts[0] === 'The backup from 2024-05-03 has been restored.\n\nThe backup comes from Nino 1.8.0; this is 1.9.0.' );
+check( 'a restore of a backup from another version says where it comes from, in the message of the restore, and reloads only on the choice', dialogs.length === 2 && reloaded === 0 && alerts.length === 0
+	&& dialogText( dialogs[1] ) === text('/_admin/backups/msg/restored').replace( '%s', '2024-05-03' ) + ' '+ text('/_admin/error/backups_restored_other_version').replace( '%s', '1.8.0' ).replace( '%s', '1.9.0' ) );
+fire( dialogButtons( dialogs[1] )[0], 'click' );
+check( '...and then does', reloaded === 1 );
 check( '...from the words of the Backups module, which has them for the code', text('/_admin/error/backups_restored_other_version') === 'The backup comes from Nino %s; this is %s.' );
 
 /*	"Back up now": one more archive on request. It is on the list screen
@@ -226,7 +253,9 @@ check( 'a confirmed restore asks about unsaved input anywhere in the workbench b
 asked[0].proceed();
 check( '...and is sent once the question is answered', requests.length === 2 && requests[1].action === 'backups/restore' );
 answer( 200, { ok : true } );
-check( '...and reloads only then', reloaded === 1 );
+check( '...and reloads only on the choice of the dialog it ends in', dialogs.length === 3 && reloaded === 0 );
+fire( dialogButtons( dialogs[2] )[0], 'click' );
+check( '...which is the one that reloads', reloaded === 1 );
 delete Nino.admin.dirty;
 
 done();

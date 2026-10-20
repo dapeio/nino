@@ -47,7 +47,7 @@ function text( key ) {
 const mount = element('div');
 mount.id = 'admin-dashboard-content';
 const wrap = element('div');
-wrap.id = 'admin-content-dashboard';
+wrap.id = 'dashboard-list';
 mount.appendChild( wrap );
 
 const requests = [];

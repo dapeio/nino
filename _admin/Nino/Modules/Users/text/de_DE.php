@@ -123,4 +123,13 @@ return [
 	'[[/_admin/recoverypw/label/repeat]]'	=> 'Neues Passwort wiederholen',
 	'[[/_admin/recoverypw/msg/saved]]'	=> 'Das Recovery-Passwort wurde geändert.',
 	'[[/_admin/recoverypw/error/mismatch]]'	=> 'Die beiden neuen Passwörter stimmen nicht überein.',
+
+	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
+	'[[/_admin/users/manual/intro]]'	=> 'Wer sich in der Workbench anmelden darf und was jedes Konto dort tun darf.',
+	'[[/_admin/users/manual/account]]'	=> 'Ein neuer Nutzer braucht eine E-Mail-Adresse, ein Passwort mit mindestens acht Zeichen und eine Rolle. Die Liste zeigt, wann sich jedes Konto zuletzt angemeldet hat und welche gesperrt oder deaktiviert sind.',
+	'[[/_admin/users/manual/role]]'	=> 'Eine Rolle ist ein Bündel von Rechten: welche Bereiche ein Konto sieht und was es dort ändern darf. Im Reiter Nutzerrollen legst Du Rollen an und bearbeitest sie, „Vollzugriff“ öffnet alles.',
+	'[[/_admin/users/manual/password]]'	=> 'Lass „Neues Passwort“ leer, um das alte zu behalten. Im eigenen Konto fragt das Speichern nach dem aktuellen Passwort.',
+	'[[/_admin/users/manual/deactivate]]'	=> '„Konto deaktivieren“ sperrt die Anmeldung und behält das Konto – nicht Dein eigenes. „Überall abmelden“ beendet jede Sitzung des Kontos.',
+	'[[/_admin/users/manual/lockout]]'	=> 'Im Reiter Anmeldeschutz stellst Du ein, nach wie vielen Fehlversuchen ein Konto gesperrt wird und wie lange. Gesperrte Konten stehen dort; „Sperre aufheben“ öffnet eines wieder.',
+	'[[/_admin/users/manual/recovery]]'	=> 'Das Recovery-Passwort verlangt recovery.php, das ein Backup zurückspielt oder ein Konto einrichtet, wenn sich niemand mehr anmelden kann. Es ist kein Passwort zum Anmelden.',
 ];

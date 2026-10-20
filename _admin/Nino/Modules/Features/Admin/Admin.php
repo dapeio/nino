@@ -89,6 +89,13 @@ namespace Nino\Modules\Features {
 			return [ 'features', '/_admin/nav/features', 15, 'system' ];
 		}
 
+		// The entries of the manual its "?" opens, in the order they are shown (see \Nino\Admin\Admin::manual()).
+		// Their lines are /_admin/features/manual/<handle>, where the headings of a feature's manual stand too
+		// (\Nino\Features::MANUAL_SECTIONS and 'none'): a handle is never named like one of them
+		public static function manual(): array {
+			return [ 'intro', 'available', 'inactive', 'active' ];
+		}
+
 		public static function icon(): string {
 			return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-blocks-icon lucide-blocks"><path d="M10 22V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v11a3 3 0 0 0 3 3h15a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H10"/><rect x="14" y="2" width="8" height="8" rx="1"/></svg>';
 		}

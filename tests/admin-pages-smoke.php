@@ -64,7 +64,23 @@ check( 'starts with an empty page list', $body['pages'] === [] );
 check( 'lists only templates/page-*.tpl files, sorted, extension stripped', $body['templates'] === [ 'page-about', 'page-contact' ] );
 check( 'no navigations are offered - Navigation was never picked', $body['navs'] === [] );
 check( 'a project with only finished pages is proposed no template - the form asks for a choice', $body['defaultTemplate'] === '' );
-check( 'the list names the locale the workbench is on', $body['selectedLocale'] === \Nino\Admin\Admin::sessionLocale( $appData ) && in_array( $body['selectedLocale'], $body['locales'], true ) );
+check( 'the list names the working language, which is one of the site\'s', $body['selectedLocale'] === \Nino\Admin\Admin::contentLocale( $appData ) && in_array( $body['selectedLocale'], $body['locales'], true ) );
+
+// The working language is a value of its own: the interface speaks another and the list opens on the one a select chose
+\Nino\Runtime::setSessionValue( $appData, './admin/locale', 'en_US' );
+\Nino\Runtime::setSessionValue( $appData, './admin/content-locale', 'fr_FR' );
+[ , $localeBody ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiList' );
+\Nino\Runtime::unsetSessionValue( $appData, './admin/locale' );
+\Nino\Runtime::unsetSessionValue( $appData, './admin/content-locale' );
+check( 'the list opens on the working language when the workbench speaks another', $localeBody['selectedLocale'] === 'fr_FR' );
+
+// A directory that is called page-x.tpl is no template: the select the form offers leaves it out, and nothing is read from it
+mkdir( $sandbox. '/private/templates/page-dir.tpl' );
+ninoWarnings();
+[ $status, $dirBody ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiList' );
+$dirWarnings = ninoWarnings();
+rmdir( $sandbox. '/private/templates/page-dir.tpl' );
+check( 'a directory called page-x.tpl among the templates is not offered as one, and the list answers without a warning', $status === 200 && $dirWarnings === [] && $dirBody['templates'] === [ 'page-about', 'page-contact' ] );
 
 // The proposal is the blank page and nothing else - not the template that sorts
 // first, which is the 404 here, and not any other finished page

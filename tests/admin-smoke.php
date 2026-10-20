@@ -197,22 +197,25 @@ foreach( [ 'de_DE' => [ '[[/gap/empty]]', '[[/gap/blank]]', '[[/gap/hidden]]', '
 echo "\n";
 
 
-// --- Admin::sessionLocale / apiSetLocale --------------------------------------
+// --- Admin::sessionLocale / contentLocale / apiSetLocale ------------------------
 
-echo "Admin::sessionLocale / apiSetLocale\n";
+echo "Admin::sessionLocale / contentLocale / apiSetLocale\n";
 
-check( 'sessionLocale defaults to the native locale before anything is chosen', \Nino\Admin\Admin::sessionLocale( $appData ) === 'de_DE' );
+check( 'the interface language and the working language default to the native locale before anything is chosen', \Nino\Admin\Admin::sessionLocale( $appData ) === 'de_DE' && \Nino\Admin\Admin::contentLocale( $appData ) === 'de_DE' );
 
 [ $status ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'apiSetLocale' ], [ 'locale' => 'not-a-locale' ] );
 check( 'apiSetLocale rejects a locale that is not available', $status === 400 );
-check( 'sessionLocale is unaffected by the rejected attempt', \Nino\Admin\Admin::sessionLocale( $appData ) === 'de_DE' );
+check( 'the working language is unaffected by the rejected attempt', \Nino\Admin\Admin::contentLocale( $appData ) === 'de_DE' );
 
 [ $status ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'apiSetLocale' ], [ 'locale' => 'en_US' ] );
 check( 'apiSetLocale accepts an available locale', $status === 200 );
-check( 'sessionLocale now returns the newly chosen locale', \Nino\Admin\Admin::sessionLocale( $appData ) === 'en_US' );
+check( 'contentLocale now returns the newly chosen locale', \Nino\Admin\Admin::contentLocale( $appData ) === 'en_US' );
+check( '...and nothing else moved: the select edits a translation, it does not switch the workbench to it, and the visitor\'s own locale is never written',
+	\Nino\Admin\Admin::sessionLocale( $appData ) === 'de_DE' && \Nino\Runtime::getSessionValue( $appData, './admin/locale', 'unwritten' ) === 'unwritten'
+	&& \Nino\Runtime::getSessionValue( $appData, './nino/locales/current', 'unwritten' ) === 'unwritten' );
 
 [ , $body ] = ninoCall( $appData, [ \Nino\Modules\Elements\Admin::class, 'apiTypes' ] );
-check( 'Elements::apiTypes also exposes the (now updated) session locale', ( $body['selectedLocale'] ?? null ) === 'en_US' );
+check( 'Elements::apiTypes also exposes the (now updated) working language, while the workbench speaks the other', ( $body['selectedLocale'] ?? null ) === 'en_US' && \Nino\Admin\Admin::sessionLocale( $appData ) === 'de_DE' );
 
 echo "\n";
 
@@ -483,7 +486,7 @@ echo "\n";
 
 echo "Admin::panesHtml - the Elements pane holds its head, its tabs and the mounts of its script\n";
 
-check( 'a pane with tabs holds its head - the name, the strip beside it - and one tab pane per tab, its own screen first', str_contains( \Nino\Admin\Admin::panesHtml( $appData ), '<div id="admin-content-elements" data-panel="elements" data-layout="page" hidden><div class="admin-panel-head"><h2 class="admin-panel-title">[[/_admin/nav/elements]]</h2><div class="nino-admin-tabs nino-admin-tabs--bar nino-admin-tabs--panel admin-panel-tabs" role="tablist"><button type="button" role="tab" id="admin-tabbutton-elements" class="nino-admin-tab" data-tab="elements" aria-controls="admin-tab-elements" aria-selected="false">[[/_admin/nav/elements]]</button><button type="button" role="tab" id="admin-tabbutton-types" class="nino-admin-tab" data-tab="types" aria-controls="admin-tab-types" aria-selected="false">[[/_admin/nav/types]]</button></div><div class="admin-panel-actions"></div></div><div id="admin-tab-elements" role="tabpanel" aria-labelledby="admin-tabbutton-elements" data-tab="elements" hidden><div id="elements-types"></div><div id="elements-list"></div><div id="elements-form"></div></div><div id="admin-tab-types" role="tabpanel" aria-labelledby="admin-tabbutton-types" data-tab="types" hidden><div id="types-list"></div><div id="types-form"></div></div></div>' ) === true );
+check( 'a pane with tabs holds its head - the name, the strip beside it - and one tab pane per tab, its own screen first', str_contains( \Nino\Admin\Admin::panesHtml( $appData ), '<div id="admin-content-elements" data-panel="elements" data-layout="page" hidden><div class="admin-panel-head"><h2 class="admin-panel-title">[[/_admin/nav/elements]]</h2><div class="nino-admin-tabs nino-admin-tabs--bar nino-admin-tabs--panel admin-panel-tabs" role="tablist"><button type="button" role="tab" id="admin-tabbutton-elements" class="nino-admin-tab" data-tab="elements" aria-controls="admin-tab-elements" aria-selected="false">[[/_admin/nav/elements]]</button><button type="button" role="tab" id="admin-tabbutton-types" class="nino-admin-tab" data-tab="types" aria-controls="admin-tab-types" aria-selected="false">[[/_admin/nav/types]]</button></div><div class="admin-panel-actions"></div><button type="button" class="admin-panel-manual" data-manual="elements" aria-haspopup="dialog" aria-label="[[/_admin/common/label/manual]]" title="[[/_admin/common/label/manual]]">?</button></div><div id="admin-tab-elements" role="tabpanel" aria-labelledby="admin-tabbutton-elements" data-tab="elements" hidden><div id="elements-types"></div><div id="elements-list"></div><div id="elements-form"></div></div><div id="admin-tab-types" role="tabpanel" aria-labelledby="admin-tabbutton-types" data-tab="types" hidden><div id="types-list"></div><div id="types-form"></div></div></div>' ) === true );
 
 echo "\n";
 

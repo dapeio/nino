@@ -94,4 +94,12 @@ return [
 	'[[/_admin/keys/hint/segment]]'	=> 'Kleine Wörter aus den Buchstaben a bis z und Ziffern, durch Bindestriche verbunden.',
 	'[[/_admin/keys/hint/not-a-word]]'	=> 'Kein Wort des Vokabulars: „%s“ wird als „%s“ angezeigt',
 	'[[/_admin/keys/error/segment]]'	=> 'Das ist kein Wort eines Schlüssels: nur kleine Buchstaben a bis z, Ziffern und einzelne Bindestriche dazwischen.',
+
+	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
+	'[[/_admin/text/manual/intro]]'	=> 'Alle Texte Deiner Website in allen Sprachen an einem Ort: Überschriften, Absätze, der Name Deiner Firma, die Wörter auf Knöpfen.',
+	'[[/_admin/text/manual/search]]'	=> 'Gib ein Wort aus dem Text, seinen Namen oder seinen Schlüssel ein. Ein Klick auf einen Treffer öffnet alle Texte dieser Seite, der gesuchte ist markiert.',
+	'[[/_admin/text/manual/key]]'	=> 'Ein Schlüssel ist die feste Adresse eines Textes. Er steht grau unter jedem Feld, und Templates fragen einen Text über seinen Schlüssel ab.',
+	'[[/_admin/text/manual/language]]'	=> 'Die Auswahl oben ist die Sprache, in der Du schreibst. Was Du in einer Sprache getippt hast, bleibt beim Wechsel erhalten, und ein Speichern sichert alle. Sonst ändert sie nichts: weder die Sprache der Workbench noch die, die Deine Website zeigt.',
+	'[[/_admin/text/manual/save]]'	=> '„Speichern“ sichert jeden geänderten Text, in allen Sprachen auf einmal. Ungespeicherte Änderungen sind unten markiert.',
+	'[[/_admin/text/manual/scan]]'	=> 'Der Reiter Textschlüssel ist für Entwickler: Er legt Schlüssel an, benennt sie um, löscht sie und stellt ihr Format ein. Sein Suchlauf nennt die Schlüssel, nach denen Templates fragen und die noch niemand geschrieben hat.',
 ];

@@ -64,6 +64,11 @@ namespace Nino\Modules\Backups {
 			return [ 'backups', '/_admin/nav/backups', 10, 'system' ];
 		}
 
+		// The entries of the manual its "?" opens, in the order they are shown (see \Nino\Admin\Admin::manual())
+		public static function manual(): array {
+			return [ 'intro', 'backup', 'restore' ];
+		}
+
 		public static function icon(): string {
 			return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-hard-drive-icon lucide-hard-drive"><path d="M10 16h.01"/><path d="M2.212 11.577a2 2 0 0 0-.212.896V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5.527a2 2 0 0 0-.212-.896L18.55 5.11A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><path d="M21.946 12.013H2.054"/><path d="M6 16h.01"/></svg>';
 		}
@@ -247,7 +252,15 @@ namespace Nino\Modules\Backups {
 		 *	a failure names itself (see \Nino\Http::fail()) - which the panel
 		 *	words in the interface language. The activity log says it in a line
 		 *	of its own, written here: log() is handed the posted body alone and
-		 *	could not know
+		 *	could not know.
+		 *
+		 *	The session of the account that ran it ends here. The accounts and
+		 *	their sessions are part of config.php, so an archive older than the
+		 *	login would have ended it on the next request anyway and a younger
+		 *	one would not - the panel says before it asks that the restore logs
+		 *	out, and that is true either way. Not Auth::logoutUser(), which
+		 *	writes this request's copy of the account record - the one from
+		 *	before the restore - over the one the archive just put back
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -278,6 +291,14 @@ namespace Nino\Modules\Backups {
 
 			if( $notice !== null && $actor !== false )
 				\Nino\Admin\Admin::record( $appData, $actor['mail'], 'Backup '. $date. ' comes from Nino '. $notice['params'][0]. ', this is '. $notice['params'][1]. ' ('. $notice['code']. ')' );
+
+			// The session ends with the restore (see above): the values of the
+			// session go, the csrf token is a new one as at any change of the
+			// session's identity, and the request carries no account any more
+			\Nino\Runtime::unsetSessionValue( $appData, './nino/auth/current' );
+			\Nino\Runtime::unsetSessionValue( $appData, './nino/auth/token' );
+			\Nino\Csrf::rotateToken( $appData );
+			unset( $appData['./nino/auth/current'] );
 
 			\Nino\Http::ok( $request, [ 'ok' => true, 'restoredDate' => $date ] + ( $notice !== null ? [ 'notice' => $notice ] : [] ) );
 		}

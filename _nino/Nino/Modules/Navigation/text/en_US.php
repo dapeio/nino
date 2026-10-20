@@ -29,4 +29,12 @@ return [
 	'[[/_admin/error/navs_invalid_entries]]'	=> 'The navigation can only be saved with a list of routes.',
 	'[[/_admin/error/navs_duplicate_entry]]'	=> '“%s” is in the list twice.',
 	'[[/_admin/error/navs_unknown_route]]'	=> 'The route “%s” does not exist (any more).',
+
+	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
+	'[[/_admin/navs/manual/intro]]'	=> 'A navigation is a menu, such as main or footer, made of routes. A template shows it with the navigation shortcode.',
+	'[[/_admin/navs/manual/navigation]]'	=> 'New navigation asks for an id: the name a template asks for. Renaming an id updates the routes in it, not the templates that show it.',
+	'[[/_admin/navs/manual/item]]'	=> 'An entry is a route. Add to navigation puts it at the end, the arrows move it, and Remove takes it out of this menu – the route itself stays.',
+	'[[/_admin/navs/manual/name]]'	=> 'A route stands in the menu under the name it has there. A route with no name yet stays out of the menu until it gets one.',
+	'[[/_admin/navs/manual/save]]'	=> 'Save writes the running order. Leaving with unsaved changes asks first.',
+	'[[/_admin/navs/manual/delete]]'	=> 'Delete navigation removes the menu and nothing else: its routes stay, only their membership goes.',
 ];

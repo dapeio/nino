@@ -29,4 +29,12 @@ return [
 	'[[/_admin/error/navs_invalid_entries]]'	=> 'Die Navigation lässt sich nur mit einer Liste von Routen speichern.',
 	'[[/_admin/error/navs_duplicate_entry]]'	=> '„%s“ steht zweimal in der Liste.',
 	'[[/_admin/error/navs_unknown_route]]'	=> 'Die Route „%s“ gibt es (nicht mehr).',
+
+	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
+	'[[/_admin/navs/manual/intro]]'	=> 'Eine Navigation ist ein Menü, etwa main oder footer, das aus Routen besteht. Ein Template zeigt sie mit dem Navigations-Shortcode.',
+	'[[/_admin/navs/manual/navigation]]'	=> '„Neue Navigation“ fragt nach einer ID: dem Namen, nach dem ein Template fragt. Beim Umbenennen ziehen die Routen darin mit, die Templates, die sie zeigen, nicht.',
+	'[[/_admin/navs/manual/item]]'	=> 'Ein Eintrag ist eine Route. „Zur Navigation hinzufügen“ setzt sie ans Ende, die Pfeile verschieben sie, und „Entfernen“ nimmt sie aus diesem Menü – die Route selbst bleibt.',
+	'[[/_admin/navs/manual/name]]'	=> 'Eine Route steht unter dem Namen im Menü, den sie dort hat. Eine Route ohne Namen bleibt draußen, bis sie einen bekommt.',
+	'[[/_admin/navs/manual/save]]'	=> '„Speichern“ schreibt die Reihenfolge. Wer mit ungespeicherten Änderungen geht, wird vorher gefragt.',
+	'[[/_admin/navs/manual/delete]]'	=> '„Navigation löschen“ entfernt nur das Menü: Die Routen bleiben, nur ihre Zugehörigkeit geht.',
 ];

@@ -49,6 +49,11 @@ namespace Nino\Modules\Maintenance {
 			return [ 'maintenance', '/_admin/nav/maintenance', 18, 'system' ];
 		}
 
+		// The entries of the manual its "?" opens, in the order they are shown (see \Nino\Admin\Admin::manual())
+		public static function manual(): array {
+			return [ 'intro', 'maintenance', 'retry', 'account' ];
+		}
+
 		public static function perm(): string {
 			return self::MANAGE_PERM;
 		}

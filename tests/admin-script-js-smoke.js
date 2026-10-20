@@ -11,7 +11,7 @@
 const fs 	= require('fs');
 const path 	= require('path');
 const vm 		= require('vm');
-const { check, done, load } = require( './harness.js' );
+const { check, done, load, element, findAll } = require( './harness.js' );
 
 const sandbox = {
 	console : console,
@@ -288,6 +288,7 @@ const shell = {
 		removeItem : function( key ) { delete storage[key] },
 	},
 	addEventListener : function( type, fn ) { windowListeners[type] = fn },
+	removeEventListener : function( type, fn ) { if( windowListeners[type] === fn ) delete windowListeners[type] },
 	setTimeout : function( fn, ms ) { browser.timers.push( { fn : fn, ms : ms } ); return browser.timers.length },
 	clearTimeout : function() {},
 	document : {
@@ -464,7 +465,6 @@ check( 'a change of the select opens that panel as a person\'s own move: one ent
 	const questions = [];
 	let level = '';
 	let saving = false;
-	shell.Nino.admin.dirty.guard = function( names, proceed, cancel ) { questions.push( { names : names, proceed : proceed, cancel : cancel } ) };
 	// A drill-down panel as the real ones are: it follows the address, asks before it leaves a form
 	shell.Nino.admin.dashboard = { showCurrent : function() {
 		const hash = router.current();
@@ -482,7 +482,9 @@ check( 'a change of the select opens that panel as a person\'s own move: one ent
 		router.leave( [ 'dashboard' ], level !== '', function() { level = wanted; own() }, own );
 	} };
 
+	// The move to it is the rail's, and nothing is unsaved: it goes at once. Every question from here on is recorded and answered by hand
 	railLinks.dashboard.listeners.click( { preventDefault : function() {} } );
+	shell.Nino.admin.dirty.guard = function( names, proceed, cancel ) { questions.push( { names : names, proceed : proceed, cancel : cancel } ) };
 	level = 'form';
 	router.go( 'dashboard', [ 'form' ] );
 	router.set( 'dashboard', [ 'form' ] );
@@ -567,6 +569,354 @@ check( 'a change of the select opens that panel as a person\'s own move: one ent
 	shell.Nino.admin.dashboard = savedDashboard;
 }
 
+/*	The rail asks as the back link does. A move to another panel leaves the one on screen, and what
+	that holds unsaved - in the panel or in a tab of it - is asked about first, in the shell's own
+	question: Save, Discard or Cancel. The registry is the real one, the dialog is recorded and
+	answered by hand	*/
+{
+	const registry = shell.Nino.admin.dirty;
+	const realChoice = shell.Nino.adminUi.choiceDialog;
+	const realContent = shell.Nino.content;
+	const asked = [];
+	const happened = [];
+	const unsaved = { users : false, roles : false };
+	let saves = true;
+	shell.Nino.content = { getText : function( key ) { return key } };
+	shell.Nino.adminUi.choiceDialog = function( options ) { asked.push( options ); return true };
+	[ 'users', 'roles' ].forEach( function( name ) {
+		registry.register( name, { isDirty : function() { return unsaved[name] }, save : function( done ) { happened.push( 'save '+ name ); unsaved[name] = saves === false; done( saves ) }, discard : function() { happened.push( 'discard '+ name ); unsaved[name] = false } } );
+	} );
+
+	const click = function( link ) { link.listeners.click( { preventDefault : function() {} } ) };
+	const current = function() { return railLinks.dashboard.getAttribute('aria-current') === 'page' ? 'dashboard' : ( railLinks.users.getAttribute('aria-current') === 'page' ? 'users' : '' ) };
+
+	click( railLinks.users );
+	click( railLinks.dashboard );
+	check( 'a move through the rail with nothing unsaved goes at once, and asks nothing', current() === 'dashboard' && asked.length === 0 );
+	click( railLinks.users );
+
+	unsaved.users = true;
+	click( railLinks.dashboard );
+	check( 'a move through the rail with unsaved input asks - the question the back link asks, with the same three answers, about the panel on screen and the tabs of it', asked.length === 1
+		&& asked[0].title === '/_admin/common/msg/dirty' && asked[0].message === '/_admin/common/confirm/unsaved' && asked[0].choices.map( function( choice ) { return choice.value } ).join() === 'save,discard,cancel' );
+	check( '...and it has not moved: the panel stays, the link stays the current one, the form has its input', current() === 'users' && unsaved.users === true && happened.length === 0 );
+	asked[0].onChoose('cancel');
+	check( 'Cancel keeps the panel and the rail as it was', current() === 'users' && navSelect.value === 'users' && unsaved.users === true && happened.length === 0 && shell.location.hash === '#roles' );
+
+	click( railLinks.dashboard );
+	asked[1].onChoose('discard');
+	check( 'Discard lets the entries forget what was typed and goes on to the panel asked for', happened.join() === 'discard users' && unsaved.users === false && current() === 'dashboard' );
+
+	click( railLinks.users );
+	unsaved.users = true;
+	happened.length = 0;
+	click( railLinks.dashboard );
+	asked[2].onChoose('save');
+	check( 'Save saves, then goes on', happened.join() === 'save users' && unsaved.users === false && current() === 'dashboard' );
+
+	click( railLinks.users );
+	unsaved.users = true;
+	saves = false;
+	happened.length = 0;
+	click( railLinks.dashboard );
+	asked[3].onChoose('save');
+	check( 'a Save that failed does not go on: the panel is where the failure is, with its input', happened.join() === 'save users' && current() === 'users' && unsaved.users === true );
+	saves = true;
+	unsaved.users = false;
+
+	// A tab of the pane counts as the pane
+	unsaved.roles = true;
+	click( railLinks.dashboard );
+	check( 'input in a tab of the panel on screen is asked about too', asked.length === 5 && current() === 'users' );
+	asked[4].onChoose('discard');
+	check( '...and discarded with it', happened.join() === 'save users,discard roles' && current() === 'dashboard' && unsaved.roles === false );
+	click( railLinks.users );
+
+	// The phone's select is the rail as a control, which has to be put back
+	unsaved.users = true;
+	navSelect.value = 'dashboard';
+	navSelect.listeners.change();
+	check( 'the select of the phone asks the same question', asked.length === 6 && current() === 'users' );
+	asked[5].onChoose('cancel');
+	check( '...and on Cancel the select shows the panel on screen again, not the one that was asked for', navSelect.value === 'users' && current() === 'users' );
+	navSelect.value = 'dashboard';
+	navSelect.listeners.change();
+	asked[6].onChoose('discard');
+	check( '...and on an answer it goes on', current() === 'dashboard' && navSelect.value === 'dashboard' );
+	click( railLinks.users );
+
+	// A move inside the pane leaves nothing: from one tab to another
+	unsaved.users = true;
+	const before = asked.length;
+	lockoutTab.listeners.click();
+	rolesTab.listeners.click();
+	check( 'a tab of the same pane is no exit: nothing is asked, nothing is lost', asked.length === before && current() === 'users' && unsaved.users === true );
+
+	// A step through the browser's history to another panel is an exit as well; Cancel takes it back
+	unsaved.users = false;
+	click( railLinks.dashboard );
+	click( railLinks.users );
+	unsaved.users = true;
+	const entriesBefore = browser.entries.slice();
+	const hashBefore = shell.location.hash;
+	browser.step( -1 );
+	check( 'Back to the panel before asks too', asked.length === before + 1 && current() === 'users' );
+	asked[before].onChoose('cancel');
+	check( 'Cancel takes the step back with the history, and the address is the screen\'s again', browser.traversals.join() === '1' );
+	browser.arrive();
+	check( '...the entries are as they were', shell.location.hash === hashBefore && browser.entries.join() === entriesBefore.join() && current() === 'users' );
+
+	// An address that was typed is a hashchange with no step of ours behind it, and there is nothing to take back with the history.
+	// The pane on screen writes no address of its own (it has no script here): what the bar shows after Cancel is written by the shell,
+	// or a reload and Back would act on the panel that was refused
+	shell.location.hash = '#dashboard';
+	windowListeners.hashchange();
+	check( 'an address typed for another panel asks too, and has not moved the panel', asked.length === before + 2 && current() === 'users' && browser.traversals.length === 0 );
+	asked[before + 1].onChoose('cancel');
+	check( 'Cancel on it writes the panel on screen back into the address, where the panel writes none of its own', shell.location.hash === '#roles' && browser.entries[browser.at] === '#roles' );
+	check( '...with the rail and the select on it, and the history left alone', current() === 'users' && navSelect.value === 'users' && browser.traversals.length === 0 && unsaved.users === true );
+
+	unsaved.users = false;
+	registry._entries.users.isDirty = function() { return false };
+	registry._entries.roles.isDirty = function() { return false };
+	shell.Nino.adminUi.choiceDialog = realChoice;
+	shell.Nino.content = realContent;
+}
+
+/*	Discard on a move through the rail leaves the form. The rail leaves a pane standing in memory, and the form would come back with the
+	input in it, counted as saved. A watched form has its fields put back, and a form that has a back link is left through it, the way
+	the back link of the person leaves it - once the panel is left, and not on Cancel or Save. Real entries over stand-in forms; the
+	dialog is recorded and answered by hand	*/
+{
+	const registry = shell.Nino.admin.dirty;
+	const realChoice = shell.Nino.adminUi.choiceDialog;
+	const realContent = shell.Nino.content;
+	const realQuery = usersPane.querySelectorAll;
+	const realRolesQuery = rolesPane.querySelectorAll;
+	const asked = [];
+	const presses = [];
+	const saved = [];
+	shell.Nino.content = { getText : function( key ) { return key } };
+	shell.Nino.adminUi.choiceDialog = function( options ) { asked.push( options ); return true };
+	shell.Event = function( type, init ) { this.type = type; this.bubbles = init !== undefined && init.bubbles === true };
+
+	const click = function( link ) { link.listeners.click( { preventDefault : function() {} } ) };
+	const current = function() { return railLinks.dashboard.getAttribute('aria-current') === 'page' ? 'dashboard' : ( railLinks.users.getAttribute('aria-current') === 'page' ? 'users' : '' ) };
+	const backLink = function( parent ) {
+		const link = element('a');
+		link.className = 'nino-admin-back-link';
+		link.parentNode = parent;
+		link.click = function() { presses.push( ( parent === usersPane ? 'users' : ( parent === rolesPane ? 'roles' : 'hidden' ) )+ ' at '+ current()+ ( registry._bypass === link ? ' past the question' : '' ) ) };
+		return link;
+	};
+
+	// The pane of the users: a form of plain fields with its back link, and the tab of it with a form of its own
+	const input = element('input');
+	input.type = 'text';
+	input.value = 'stored';
+	const box = element('input');
+	box.type = 'checkbox';
+	const form = element('div');
+	form.appendChild( input );
+	form.appendChild( box );
+	const tabInput = element('input');
+	tabInput.type = 'text';
+	tabInput.value = 'role';
+	const tabForm = element('div');
+	tabForm.appendChild( tabInput );
+
+	registry.watchForm( 'users', function() { return form }, function( done ) { saved.push( input.value ); registry.snapshot('users'); done( true ) } );
+	registry.watchForm( 'roles', function() { return tabForm }, function( done ) { saved.push( tabInput.value ); registry.snapshot('roles'); done( true ) } );
+	registry.snapshot('users');
+	registry.snapshot('roles');
+
+	const own = backLink( usersPane );
+	const hidden = node( '', {} );
+	hidden.classList.add('admin-hidden');
+	hidden.parent = usersPane;
+	const inHidden = backLink( hidden );
+	const inTab = backLink( rolesPane );
+	let links = [ inHidden, inTab, own ];
+	usersPane.querySelectorAll = function( selector ) { return selector === 'a.nino-admin-back-link' ? links : realQuery.call( usersPane, selector ) };
+	rolesPane.querySelectorAll = function( selector ) { return selector === 'a.nino-admin-back-link' ? [ inTab ] : [] };
+
+	click( railLinks.users );
+	input.value = 'typed';
+	box.checked = true;
+	click( railLinks.dashboard );
+	check( 'a move through the rail with a watched form holding input asks, and has put nothing back and pressed nothing', asked.length === 1 && input.value === 'typed' && presses.length === 0 && current() === 'users' );
+	asked[0].onChoose('discard');
+	check( 'Discard puts the fields of the form back to what it held when it was drawn or saved, and it is clean', input.value === 'stored' && box.checked === false && registry.isDirty( [ 'users' ] ) === false );
+	check( '...and presses the back link of the level that is on screen in the pane, once, after the panel was left and past the question the shell asks of a back link: not the link of a hidden level, not the link of a tab', current() === 'dashboard' && presses.join() === 'users at dashboard past the question' && registry._bypass === null );
+	registry._entries.users.save( function() {} );
+	check( '...and a Save from there sends what is stored, not what was discarded', saved.join() === 'stored' );
+	saved.length = 0;
+
+	presses.length = 0;
+	click( railLinks.users );
+	input.value = 'typed';
+	click( railLinks.dashboard );
+	asked[1].onChoose('cancel');
+	check( 'Cancel presses nothing and puts nothing back', presses.length === 0 && input.value === 'typed' && current() === 'users' && registry.isDirty( [ 'users' ] ) === true );
+	click( railLinks.dashboard );
+	asked[2].onChoose('save');
+	check( 'Save goes on with the form as it was saved: no link is pressed, nothing is put back', saved.join() === 'typed' && presses.length === 0 && input.value === 'typed' && current() === 'dashboard' );
+
+	// The form that is the whole screen of its panel has no back link: the fields are put back, and that is all there is
+	links = [ inHidden, inTab ];
+	click( railLinks.users );
+	input.value = 'typed again';
+	click( railLinks.dashboard );
+	asked[3].onChoose('discard');
+	check( 'a pane with no back link on screen is left with its fields put back, to what the last save stored', presses.length === 0 && input.value === 'typed' && registry.isDirty( [ 'users' ] ) === false && current() === 'dashboard' );
+
+	// Input in a tab of the pane is the tab's: its own link is pressed
+	links = [ own ];
+	click( railLinks.users );
+	tabInput.value = 'role typed';
+	click( railLinks.dashboard );
+	check( 'input in a tab of the pane is asked about', asked.length === 5 && current() === 'users' );
+	asked[4].onChoose('discard');
+	check( '...and discarded in the tab: the back link of the tab is pressed, the one of the pane is not', tabInput.value === 'role' && presses.join() === 'roles at dashboard past the question' && current() === 'dashboard' );
+
+	delete registry._entries.users;
+	delete registry._forms.users;
+	delete registry._baseline.users;
+	delete registry._entries.roles;
+	delete registry._forms.roles;
+	delete registry._baseline.roles;
+	registry.refresh();
+	usersPane.querySelectorAll = realQuery;
+	rolesPane.querySelectorAll = realRolesQuery;
+	delete shell.Event;
+	shell.Nino.adminUi.choiceDialog = realChoice;
+	shell.Nino.content = realContent;
+}
+
+/*	A pane with a screen of its own and tabs besides - Elements, Text, Users, Language - draws that screen as the first of its tabs, named
+	like the panel (see Panels::panesHtml()), so the name of the panel is also the name of a tab of its pane. The rail asks about the panel
+	and its tabs, and the panel is one of them once: its entry is saved once - a second call, with nothing left to save, would report
+	failure as the Design panel's does, and the move would be refused - and its back link is pressed once. A shell of its own with such a
+	pane, the real registry, the dialog recorded and answered by hand	*/
+{
+	const homeLink = navLink( 'dashboard', 'Dashboard' );
+	const sitesLink = navLink( 'sites', 'Sites' );
+	const wrap = node( 'admin-nav-wrap', {} );
+	wrap.children = [ homeLink, sitesLink ];
+	wrap.setAttribute( 'aria-label', 'Navigation' );
+
+	// The pane as Panels::panesHtml() draws it: the head with the strip, then the screen of the panel, then its tab
+	const screenButton = node( 'admin-tabbutton-sites', { tab : 'sites' } );
+	const archiveButton = node( 'admin-tabbutton-archive', { tab : 'archive' } );
+	const tabStrip = node( '', {} );
+	tabStrip.isStrip = true;
+	tabStrip.classList.add('admin-panel-tabs');
+	tabStrip.children = [ screenButton, archiveButton ];
+	screenButton.parent = tabStrip;
+	archiveButton.parent = tabStrip;
+	const paneHead = node( '', {} );
+	paneHead.classList.add('admin-panel-head');
+	paneHead.children = [ tabStrip ];
+	tabStrip.parent = paneHead;
+	const screenPane = node( 'admin-tab-sites', { tab : 'sites' } );
+	const archivePane = node( 'admin-tab-archive', { tab : 'archive' } );
+	const sitesPane = node( 'admin-content-sites', { panel : 'sites', layout : 'page' } );
+	sitesPane.children = [ paneHead, screenPane, archivePane ];
+	[ paneHead, screenPane, archivePane ].forEach( function( child ) { child.parent = sitesPane } );
+	const homePane = node( 'admin-content-dashboard', { panel : 'dashboard', layout : 'page' } );
+	const nodes = { 'admin-page-wrap' : node( 'admin-page-wrap', {} ), 'admin-nav-wrap' : wrap, 'admin-user-logout' : node( 'admin-user-logout', {} ), 'admin-content-dashboard' : homePane, 'admin-content-sites' : sitesPane, 'admin-tab-sites' : screenPane, 'admin-tab-archive' : archivePane };
+
+	const own = {
+		console : console,
+		location : { hash : '#sites', href : '' },
+		history : { replaceState : function() {}, pushState : function() {}, state : null, go : function() {} },
+		localStorage : { getItem : function() { return null }, setItem : function() {}, removeItem : function() {} },
+		addEventListener : function() {},
+		setTimeout : function() {},
+		clearTimeout : function() {},
+		document : {
+			documentElement : null, body : null,
+			getElementById : function( id ) { return nodes[id] ?? null },
+			createElement : function( tag ) { return fakeElement( tag ) },
+			addEventListener : function() {},
+			querySelectorAll : function( selector ) {
+				if( selector === '#admin-nav-wrap a[data-panel]' )
+					return [ homeLink, sitesLink ];
+				if( selector === '#admin-content-wrap > [data-panel]' )
+					return [ homePane, sitesPane ];
+				if( selector === '#admin-content-wrap > [data-panel] > .admin-panel-head > .admin-panel-tabs' )
+					return [ tabStrip ];
+				return [];
+			},
+		},
+	};
+	own.window = own;
+	own.Nino = { events : { bindCallback : function() {} } };
+	const ownContext = vm.createContext( own );
+	load( '_admin/assets/Nino.admin.js', ownContext );
+	load( '_admin/assets/script.js', ownContext );
+	own.Nino.admin.onReady();
+
+	const registry = own.Nino.admin.dirty;
+	const asked = [];
+	const happened = [];
+	const presses = [];
+	const unsaved = { sites : false, archive : false };
+	let sitesSaves = 0;
+	own.Nino.content = { getText : function( key ) { return key } };
+	own.Nino.adminUi.choiceDialog = function( options ) { asked.push( options ); return true };
+	registry.register( 'sites', { isDirty : function() { return unsaved.sites }, save : function( done ) { sitesSaves++; happened.push( 'save sites' ); unsaved.sites = false; done( sitesSaves === 1 ) }, discard : function() { happened.push( 'discard sites' ); unsaved.sites = false } } );
+	registry.register( 'archive', { isDirty : function() { return unsaved.archive }, save : function( done ) { happened.push( 'save archive' ); unsaved.archive = false; done( true ) }, discard : function() { happened.push( 'discard archive' ); unsaved.archive = false } } );
+
+	const click = function( link ) { link.listeners.click( { preventDefault : function() {} } ) };
+	const current = function() { return homeLink.getAttribute('aria-current') === 'page' ? 'dashboard' : ( sitesLink.getAttribute('aria-current') === 'page' ? 'sites' : '' ) };
+	const backLink = function( parent, name ) {
+		const link = element('a');
+		link.className = 'nino-admin-back-link';
+		link.parentNode = parent;
+		link.click = function() { presses.push( name+ ' at '+ current() ) };
+		return link;
+	};
+	const sitesBack = backLink( screenPane, 'sites' );
+	const archiveBack = backLink( archivePane, 'archive' );
+	screenPane.querySelectorAll = function( selector ) { return selector === 'a.nino-admin-back-link' ? [ sitesBack ] : [] };
+	archivePane.querySelectorAll = function( selector ) { return selector === 'a.nino-admin-back-link' ? [ archiveBack ] : [] };
+	const leave = function() {
+		happened.length = 0;
+		presses.length = 0;
+		click( sitesLink );
+	};
+
+	check( 'the pane is on screen, and the panel is the one the rail marks', current() === 'sites' );
+	unsaved.sites = true;
+	click( homeLink );
+	check( 'a move through the rail from a pane whose first tab is named like the panel asks, and has not moved', asked.length === 1 && current() === 'sites' && happened.length === 0 );
+	asked[0].onChoose('save');
+	check( 'Save calls the entry of the panel once, and goes on', happened.join() === 'save sites' && sitesSaves === 1 && current() === 'dashboard' );
+
+	leave();
+	unsaved.sites = true;
+	click( homeLink );
+	asked[1].onChoose('discard');
+	check( 'Discard lets the entry forget once and presses its back link once, after the panel was left', happened.join() === 'discard sites' && presses.join() === 'sites at dashboard' && current() === 'dashboard' );
+
+	// The panel and a tab of it are two entries, each asked about and left once
+	leave();
+	unsaved.sites = true;
+	unsaved.archive = true;
+	click( homeLink );
+	asked[2].onChoose('discard');
+	check( 'the panel and a tab of it, both holding input, are discarded once each and left through a link each', happened.join() === 'discard sites,discard archive' && presses.join() === 'sites at dashboard,archive at dashboard' && current() === 'dashboard' );
+
+	leave();
+	sitesSaves = 0;
+	unsaved.sites = true;
+	unsaved.archive = true;
+	click( homeLink );
+	asked[3].onChoose('save');
+	check( '...and saved once each, in the order of the pane, before the move', happened.join() === 'save sites,save archive' && sitesSaves === 1 && presses.length === 0 && current() === 'dashboard' );
+}
+
 // A folded rail: the headings are dividers, nothing is hidden, nobody tabs to them
 railHeadings.system.listeners.click();
 check( 'the heading folds the group again', railLinks.users.classList.contains('nino-admin-nav-collapsed') === true );
@@ -599,6 +949,17 @@ const ui = shell.Nino.adminUi;
 check( 'there is no head to reach from outside a pane', ui.panelHead( node( 'loose', {} ) ) === null && ui.panelHead( null ) === null );
 const reached = ui.panelHead( rolesTab );
 check( 'from inside a pane the head is the row over it, with the name and the actions slot', reached !== null && reached.element === head && reached.title === title && reached.actions === actions );
+{
+	// The Dashboard keeps its "?" in a row of its own: that is no head, and a script asking for the head of its pane is told there is none
+	const row = node( '', {} );
+	row.classList.add('admin-panel-manualrow');
+	const screenMount = node( 'dashboard-list', {} );
+	dashboardPane.children = [ row, screenMount ];
+	row.parent = dashboardPane;
+	screenMount.parent = dashboardPane;
+	check( 'the row a pane keeps its "?" in when it has no head is no head: panelHead() answers null for it, as it did before the "?" was there', ui.panelHead( screenMount ) === null );
+	dashboardPane.children = [];
+}
 
 /*	A pane whose head holds the registry's strip - the Settings tab a feature's
 	panel gets is a button of it - and a screen inside one of its tabs that
@@ -1116,8 +1477,11 @@ ev = clickEvent( { closest : function() { return null } } );
 listenerFor( 'click', true ).fn( ev );
 check( 'a click that is not on a back link is none of its business', ev.prevented === 0 );
 
-// a form that is only plain fields
-const field = function( type, value, extra ) { return Object.assign( { type : type, value : String( value ), checked : false, autocomplete : '', dataset : {} }, extra || {} ) };
+// a form that is only plain fields. A field keeps the events it was told of, the way a listener on it would hear them
+dirtyCtx.Event = function( type, init ) { this.type = type; this.bubbles = init !== undefined && init.bubbles === true };
+const field = function( type, value, extra ) {
+	return Object.assign( { type : type, value : String( value ), checked : false, autocomplete : '', dataset : {}, events : [], dispatchEvent : function( event ) { this.events.push( event.type+ ( event.bubbles === true ? '+bubbles' : '' ) ) } }, extra || {} );
+};
 const plain = {
 	text		: field( 'text', 'a' ),
 	check		: field( 'checkbox', 'on' ),
@@ -1157,8 +1521,31 @@ plain.text.value = 'c';
 form.classList.add('admin-hidden');
 check( 'a form that is not on screen holds nothing the person could lose track of', dirty.isDirty( [ 'routes' ] ) === false );
 form.classList.remove('admin-hidden');
+plain.check.checked = true;
+editable.innerHTML = '<b>y</b>';
+Object.values( plain ).forEach( function( el ) { el.events.length = 0 } );
 dirty._entries.routes.discard();
-check( 'discarding takes the form as it stands for the saved one', dirty.isDirty( [ 'routes' ] ) === false );
+check( 'discarding puts the fields back to what the form held when it was drawn - a text, a checkbox, the content of a rich-text field', plain.text.value === 'a' && plain.check.checked === false && editable.innerHTML === '<b>x</b>' );
+check( '...and the form is clean', dirty.isDirty( [ 'routes' ] ) === false );
+check( '...a field that was put back tells what hangs on it - a reading aid, a status line - the way typing it back would: an input and a change that bubble', plain.text.events.join() === 'input+bubbles,change+bubbles' && plain.check.events.join() === 'input+bubbles,change+bubbles' );
+check( '...and one that was not touched is not told of anything', plain.file.events.length === 0 && plain.search.events.length === 0 && plain.secret.events.length === 0 );
+check( '...a field that is no input stays as it is: a file, a search box, the password a browser filled in, the confirmation that says it is no edit', plain.file.value === 'C:\\fakepath\\a.jpg' && plain.search.value === 'filter'
+	&& plain.secret.value === 'filled in by a password manager' && plain.typed.value === 'DELETE' );
+dirty._entries.routes.discard();
+check( '...and discarding a form that holds nothing new changes and tells nothing', plain.text.events.length === 2 && plain.text.value === 'a' && dirty.isDirty( [ 'routes' ] ) === false );
+
+// A form that has other fields than it was drawn with - a row added since - cannot be put back field by field: it is taken for saved as it stands, the way a discard always did, and its exit draws it again
+{
+	plain.added = field( 'text', 'a new row' );
+	plain.text.value = 'z';
+	plain.added.value = 'typed into the row';
+	check( 'a row added to a form is input', dirty.isDirty( [ 'routes' ] ) === true );
+	dirty._entries.routes.discard();
+	check( 'a form that has other fields than it was drawn with is not put back: its fields are as they were typed, and it counts as saved', plain.text.value === 'z' && plain.added.value === 'typed into the row' && dirty.isDirty( [ 'routes' ] ) === false );
+	delete plain.added;
+	plain.text.value = 'a';
+	dirty.snapshot('routes');
+}
 
 // a form whose own action bar is not the first one in it: the watcher is told which carries the marker
 {
@@ -1346,9 +1733,101 @@ fallback.confirmAnswer = false;
 fallback.ctx.Nino.adminUi.choiceDialog( { message : 'Sure?', choices : choices, onChoose : function( value ) { fallbackChosen.push( value ) } } );
 check( 'a browser without showModal asks with confirm(): OK is the primary choice (never the one that throws input away), Cancel the secondary one', fallback.confirms.join() === 'Sure?,Sure?' && fallbackChosen.join() === 'save,cancel' );
 
+/*	The "?" of a pane: one listener on the content wrapper answers every one of them, asks the server for the manual of
+	the pane the button names, and hands the answer to the design system - the shell draws nothing of its own. A shell of
+	its own, since the one above has one click listener on its wrapper to give to the registry of unsaved input, and a
+	page has as many as it likes	*/
+function manualWorld() {
+	const wrap = node( 'admin-content-wrap', {} );
+	const texts = {
+		'/_admin/nav/elements' : 'Elements', '/_admin/common/label/manual' : 'Manual', '/_admin/common/notice/manual' : 'This panel has no manual.',
+		'/_admin/common/error/manual' : 'The manual could not be loaded.', '/_admin/common/error/offline' : 'No connection.', '/_admin/error/no_manual' : 'This panel has no manual (code).',
+		'/_admin/common/word/page' : 'Page', '/_admin/common/word/intro' : 'Introduction',
+	};
+	const win = {
+		console : console,
+		location : { hash : '' },
+		history : { replaceState : function() {} },
+		document : {
+			documentElement : null, body : null,
+			getElementById : function( id ) { return id === 'admin-content-wrap' ? wrap : null },
+			createElement : element,
+			createTextNode : function( text ) { return Object.assign( element('#text'), { textContent : String( text ) } ) },
+			addEventListener : function() {},
+			querySelectorAll : function() { return [] },
+		},
+	};
+	win.window = win;
+	win.Nino = { events : { bindCallback : function() {} }, content : { getText : function( key ) { return texts[key] ?? '' } } };
+	const ctx = vm.createContext( win );
+	load( '_admin/assets/Nino.admin.js', ctx );
+	load( '_admin/assets/script.js', ctx );
+
+	const asked = [];
+	const shown = [];
+	win.Nino.adminUi.api.call = function( action, payload, callback ) { asked.push( { action : action, payload : payload, callback : callback } ) };
+	win.Nino.adminUi.manualDialog = function( title, content, opener ) { shown.push( { title : title, content : content, opener : opener } ); return true };
+
+	return { Nino : win.Nino, wrap : wrap, asked : asked, shown : shown };
+}
+
+{
+	const m = manualWorld();
+	m.Nino.admin.manual.init();
+	const questionMark = node( '', { manual : 'elements' } );
+	const press = function( target ) { m.wrap.listeners.click( { target : { closest : function( selector ) { return selector === '[data-manual]' ? target : null } } } ) };
+	const tags = function( root, tag ) { return findAll( root, function( el ) { return el.tagName === tag.toUpperCase() } ) };
+
+	check( 'the shell listens once, on the content wrapper, for every "?" of every pane', typeof m.wrap.listeners.click === 'function' );
+	press( null );
+	check( 'a click on anything else is nothing', m.asked.length === 0 && m.shown.length === 0 );
+
+	press( questionMark );
+	check( 'a "?" asks for the manual of the pane its button names, and opens nothing before the answer is here', m.asked.length === 1 && m.asked[0].action === 'admin/manual' && m.asked[0].payload.panel === 'elements' && m.shown.length === 0 );
+	press( questionMark );
+	check( 'pressed again while the answer is out, it is the same question', m.asked.length === 1 );
+
+	m.asked[0].callback( 200, { title : '/_admin/nav/elements', sections : [ { heading : '', entries : [ { handle : '', text : 'What it is for.' }, { handle : 'page', text : 'A page.' } ] } ], text : '', none : '', words : true } );
+	check( 'the answer is shown in the dialog under the name of the panel in the interface language, with the button that asked to get the focus back', m.shown.length === 1 && m.shown[0].title === 'Elements' && m.shown[0].opener === questionMark );
+	check( '...drawn by the design system: a panel\'s entries are named by the words of the vocabulary and are no code, the line about the whole panel has no name', m.shown[0].content.className === 'nino-admin-manual'
+		&& tags( m.shown[0].content, 'code' ).length === 0 && tags( m.shown[0].content, 'dt' ).map( el => el.textContent ).join('|') === '|Page' && tags( m.shown[0].content, 'dd' ).map( el => el.textContent ).join('|') === 'What it is for.|A page.' );
+
+	press( questionMark );
+	check( 'once it is answered the "?" asks again - the pane may have changed under the person', m.asked.length === 2 );
+	m.asked[1].callback( 200, { title : 'Sample', sections : [ { heading : 'Shortcodes', entries : [ { handle : '[card]', text : 'Draws the card.' } ] }, { heading : 'Routes', entries : [] } ], text : '', none : 'Nothing.', words : false } );
+	check( 'a feature\'s manual is the same call: its sections under their headings, the handles as code, an empty section saying so, a title that is no key shown as it is', m.shown[1].title === 'Sample'
+		&& tags( m.shown[1].content, 'h3' ).map( el => el.textContent ).join('|') === 'Shortcodes|Routes' && tags( tags( m.shown[1].content, 'dt' )[0], 'code' )[0].textContent === '[card]'
+		&& tags( m.shown[1].content, 'p' ).map( el => el.textContent ).join('|') === 'Nothing.' );
+
+	press( questionMark );
+	m.asked[2].callback( 200, { title : 'Sample', sections : [], text : 'Put `[card]` where it goes.', none : '', words : false } );
+	check( 'a manual written as running text is drawn as that', tags( m.shown[2].content, 'p' ).length === 1 && tags( m.shown[2].content, 'code' )[0].textContent === '[card]' );
+
+	press( questionMark );
+	m.asked[3].callback( 200, { title : 'Sample', sections : [], text : '', none : '', words : false } );
+	check( 'an answer with nothing in it says so in the dialog instead of opening an empty one', m.shown[3].title === 'Sample' && m.shown[3].content.textContent === 'This panel has no manual.' && m.shown[3].content.className === 'nino-admin-error' );
+
+	press( questionMark );
+	m.asked[4].callback( 404, { error : 'no manual' } );
+	check( 'a request that failed is told in the same dialog, under the name of the manual, in the words the failure has', m.shown[4].title === 'Manual' && m.shown[4].opener === questionMark
+		&& m.shown[4].content.textContent === '(404) no manual' && m.shown[4].content.className === 'nino-admin-error' );
+	press( questionMark );
+	m.asked[5].callback( 500, { code : 'offline' } );
+	check( '...and one that never got an answer as that', m.shown[5].content.textContent === 'No connection.' );
+	press( questionMark );
+	m.asked[6].callback( 500, null );
+	check( '...and one with no body at all is a failure too, with the sentence the shell has for it', m.shown[6].content.textContent === '(500) The manual could not be loaded.' );
+	press( questionMark );
+	m.asked[7].callback( 404, { error : 'no manual', code : 'no_manual' } );
+	check( 'a pane that lost its manual since the page was drawn is refused with a code, and the dialog tells it in the words of the code - without the status number or the English of the log', m.shown[7].title === 'Manual' && m.shown[7].content.textContent === 'This panel has no manual (code).' && m.shown[7].content.className === 'nino-admin-error' );
+	press( questionMark );
+	check( 'after every one of them the "?" can ask again', m.asked.length === 9 );
+}
+
 // the wiring in the shell's source
 const shellSource = fs.readFileSync( path.join( __dirname, '../_admin/assets/script.js' ), 'utf8' );
 check( 'the shell wires the registry up from onReady()', /Nino\.admin\.dirty\.init\(\s*function\( name \)/.test( shellSource ) === true );
+check( 'the shell wires the "?" of the panes up from onReady() too', /Nino\.admin\.onReady = |onReady : function\(\) \{[\s\S]*?Nino\.admin\.manual\.init\(\);/.test( shellSource ) === true );
 
 // the stylesheet's two rules that depend on what the script puts into the nav and the bar
 const shellCss = fs.readFileSync( path.join( __dirname, '../_admin/assets/style.css' ), 'utf8' );

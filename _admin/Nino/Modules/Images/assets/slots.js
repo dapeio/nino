@@ -34,9 +34,11 @@
 		/**
 		 *	Load every image slot and render the list
 		 *
+		 *	@param		{boolean}	[stay]		The form stays on screen: the list is drawn again under it, for Back to return to, and not shown
+		 *
 		 *	@return		void
 		 */
-		init : function() {
+		init : function( stay ) {
 
 			if( dc.getElementById('slots-list') === null )
 				return;
@@ -47,7 +49,8 @@
 
 				Nino.admin.slots._slots = response.slots;
 				Nino.admin.slots._renderList();
-				Nino.admin.slots._showList();
+				if( stay !== true )
+					Nino.admin.slots._showList();
 				Nino.admin.slots._ready = true;
 
 				// The Images panel of this same module lists the slots there
@@ -471,7 +474,10 @@
 		 *	creates every non-ignored row's slot via the existing
 		 *	slots/create action - filename stays empty, same "this tab only
 		 *	ever creates the empty slot, a real upload is the Images panel's job" rule
-		 *	the manual "New image slot" form already follows
+		 *	the manual "New image slot" form already follows. A slot is made with
+		 *	a size, so a row that comes without one marks its width and its height
+		 *	as required and is refused at them when it is submitted (see
+		 *	_saveScanResults())
 		 *
 		 *	@param		{Array}		missing				[ { filename, src, suggestedUri, width, height, files[] }, ... ]
 		 *
@@ -509,6 +515,10 @@
 
 			const form = dc.createElement('form');
 			const rows = [];
+
+			// _saveScanResults() says what is missing, at the field, and the shell's Save
+			// goes there too: the browser's own bubble would be a second voice
+			form.noValidate = true;
 
 			missing.forEach( function( item ) {
 
@@ -567,7 +577,9 @@
 
 				form.appendChild( field );
 
-				rows.push( { uriInput : uriInput, labelInput : labelInput, widthInput : widthInput, heightInput : heightInput, ignoreCheck : ignoreCheck } );
+				const row = { field : field, uriInput : uriInput, labelInput : labelInput, widthInput : widthInput, heightInput : heightInput, ignoreCheck : ignoreCheck };
+				Nino.admin.slots._markSize( row, [ widthSpan, heightSpan ], Nino.admin.slots._sized( row ) === false, rows.length );
+				rows.push( row );
 			} );
 
 			const actions = dc.createElement('div');
@@ -594,9 +606,105 @@
 		},
 
 		/**
+		 *	Whether a field holds a size a slot can be made with: a whole number
+		 *	of at least 1
+		 *
+		 *	@param		{Element}		input
+		 *
+		 *	@return		{boolean}
+		 */
+		_hasSize : function( input ) {
+			return /^\s*\d+\s*$/.test( input.value ) === true && parseInt( input.value, 10 ) >= 1;
+		},
+
+		/**
+		 *	Whether the row has a size a slot can be made with: a width and a height
+		 *
+		 *	@param		{Object}		row				A row of the scan form
+		 *
+		 *	@return		{boolean}
+		 */
+		_sized : function( row ) {
+			return Nino.admin.slots._hasSize( row.widthInput ) === true && Nino.admin.slots._hasSize( row.heightInput ) === true;
+		},
+
+		/**
+		 *	Mark the size of a row as required while it needs one: the star after
+		 *	the names of the two fields and aria-required on them, both off again
+		 *	while the row is ignored (a slot nobody makes needs no size). Then
+		 *	give the row what says it at its field: say( text ) puts the sentence
+		 *	after the row, marks the fields and links them to it, and it goes with
+		 *	the next thing typed into either field that makes the size whole
+		 *
+		 *	@param		{Object}		row				A row of the scan form, which gets say()
+		 *	@param		{Array}			names			The two spans that name the fields, width first
+		 *	@param		{boolean}		needed		The row came without a size
+		 *	@param		{number}		index			The row's place, which its sentence is named by
+		 *
+		 *	@return		void
+		 */
+		_markSize : function( row, names, needed, index ) {
+
+			const fields = [ row.widthInput, row.heightInput ];
+			const stars = needed === false ? [] : names.map( function( name ) {
+				const star = dc.createElement('span');
+				star.className = 'nino-admin-required';
+				star.setAttribute( 'aria-hidden', 'true' );
+				star.textContent = '*';
+				name.appendChild( star );
+				return star;
+			} );
+			let sentence = null;
+
+			const follow = function() {
+				const required = needed === true && row.ignoreCheck.checked === false;
+				fields.forEach( function( input ) {
+					input.required = required;
+					if( required === true )
+						input.setAttribute( 'aria-required', 'true' );
+					else
+						input.removeAttribute('aria-required');
+				} );
+				stars.forEach( function( star ) { star.hidden = required === false } );
+			};
+
+			const forget = function() {
+				if( sentence === null )
+					return;
+				sentence.remove();
+				sentence = null;
+				fields.forEach( function( input ) {
+					input.removeAttribute('aria-invalid');
+					input.removeAttribute('aria-describedby');
+				} );
+			};
+
+			row.say = function( text ) {
+				forget();
+				sentence = Nino.adminUi.fieldError( row.field, row.widthInput, 'slots-scan-size-'+ index, text );
+				row.heightInput.setAttribute( 'aria-invalid', 'true' );
+				row.heightInput.setAttribute( 'aria-describedby', sentence.id );
+			};
+
+			row.ignoreCheck.addEventListener( 'change', follow );
+			fields.forEach( function( input ) {
+				input.addEventListener( 'input', function() {
+					if( Nino.admin.slots._sized( row ) === true )
+						forget();
+				} );
+			} );
+			follow();
+		},
+
+		/**
 		 *	Create every non-ignored row's slot (see _renderScanForm()), one
 		 *	slots/create call at a time, so a per-row failure (eg. a
-		 *	duplicate uri) is reported without swallowing the rest
+		 *	duplicate uri) is reported without swallowing the rest.
+		 *
+		 *	A slot is made with a size, so a row that has none is not sent: it is
+		 *	refused at its width and its height, where the person can type one,
+		 *	and the rows that have a size are made. The form stays for the ones
+		 *	that were refused, without the ones that were made
 		 *
 		 *	@param		{Array}		rows
 		 *	@param		{Function}	[done]			Called once with true when every row was created, false otherwise
@@ -611,15 +719,38 @@
 			};
 
 			const msg 		= dc.getElementById('slots-scan-msg');
-			const pending = rows.filter( function( row ) { return row.ignoreCheck.checked === false } );
+			const ready 	= rows.filter( function( row ) { return row.ignoreCheck.checked === false } );
 
-			if( pending.length === 0 ) {
+			if( ready.length === 0 ) {
 				Nino.admin.slots._showList();
 				report( true );
 				return;
 			}
 
+			const pending 	= ready.filter( function( row ) { return Nino.admin.slots._sized( row ) === true } );
+			const unsized 	= ready.filter( function( row ) { return pending.indexOf( row ) === -1 } );
+
+			// The line says that something is wrong, the sentences at the fields say what
+			const refuse = function() {
+				unsized.forEach( function( row ) { row.say( Nino.content.getText('/_admin/slots/error/size') ) } );
+				Nino.adminUi.status( msg ).fail( Nino.content.getText('/_admin/error/invalid_value') );
+			};
+
+			if( unsized.length > 0 ) {
+				refuse();
+				// The first field that is refused takes the focus, and its sentence is read there
+				const first = Nino.admin.slots._hasSize( unsized[0].widthInput ) === false ? unsized[0].widthInput : unsized[0].heightInput;
+				if( typeof first.focus === 'function' )
+					first.focus();
+			}
+
+			if( pending.length === 0 ) {
+				report( false );
+				return;
+			}
+
 			let created = 0;
+			const made = [];
 			const failed = [];
 
 			function next( i ) {
@@ -627,6 +758,22 @@
 				if( i >= pending.length ) {
 					if( failed.length > 0 )
 						wn.alert( Nino.adminUi.format( Nino.content.getText('/_admin/slots/scan/created-failed'), created, failed.join(', ') ) );
+
+					// The rows that were refused - for a missing size, or by the server - are
+					// still on screen, and they are all that is there: the slots that were
+					// made are gone from the form, and the list under it is drawn again for Back
+					if( unsized.length > 0 ) {
+						made.forEach( function( row ) {
+							rows.splice( rows.indexOf( row ), 1 );
+							row.field.remove();
+						} );
+						Nino.admin.slots._snapshot();
+						Nino.admin.slots.init( true );
+						Nino.adminUi.status( msg ).fail( Nino.content.getText('/_admin/error/invalid_value') );
+						report( false );
+						return;
+					}
+
 					Nino.admin.slots._snapshot();
 					Nino.admin.slots.init();
 					report( failed.length === 0 );
@@ -634,7 +781,10 @@
 				}
 
 				const row = pending[i];
-				msg.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/common/msg/creating'), row.uriInput.value, i + 1, pending.length );
+
+				// The line that says the rows without a size were refused stays what it is
+				if( unsized.length === 0 )
+					msg.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/common/msg/creating'), row.uriInput.value, i + 1, pending.length );
 
 				Nino.admin.slots._apiCall( 'create', {
 					uri 		: row.uriInput.value,
@@ -645,6 +795,7 @@
 					if( status === 200 ) {
 						Nino.admin.touch( 'slots' );
 						created++;
+						made.push( row );
 					}
 					else
 						failed.push( row.uriInput.value );

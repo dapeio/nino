@@ -50,4 +50,14 @@ return [
 	'[[/_admin/error/routes_unknown_template]]'	=> 'The template “%s” does not exist.',
 	'[[/_admin/error/routes_missing_name]]'	=> 'The name for “%s” is missing.',
 	'[[/_admin/error/routes_missing_title]]'	=> 'The title for “%s” is missing.',
+
+	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
+	'[[/_admin/routes/manual/intro]]'	=> 'A route gives a template an address. Template and route together are a page: the template is the plan, the route makes it reachable.',
+	'[[/_admin/routes/manual/address]]'	=> 'The Http URI is the address in the browser, for example /about. The Element URI is a stable name the texts of the page are filed under; it need not be the real path.',
+	'[[/_admin/routes/manual/template]]'	=> 'The template is the plan the route shows. The list offers every page template there is.',
+	'[[/_admin/routes/manual/name]]'	=> 'Under Content, every language has a name for the menu, an HTML title for the browser tab and, if you like, a description for search engines. Name and title are required in every language.',
+	'[[/_admin/routes/manual/navigation]]'	=> 'A box for each navigation – Show in the “main” navigation – puts the page in that menu. The arrows next to a route move it in the menus, too.',
+	'[[/_admin/routes/manual/open]]'	=> 'The arrow in a row opens the page in a new tab.',
+	'[[/_admin/routes/manual/delete]]'	=> 'Delete route removes the address only. The template and the texts stay, and the question names what stays.',
+	'[[/_admin/routes/manual/feature]]'	=> 'Pages that a feature or a module serves by itself – the blog, the newsletter page, the imprint – are listed below. They are shown there, not changed.',
 ];

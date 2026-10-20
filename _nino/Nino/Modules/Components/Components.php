@@ -624,35 +624,50 @@ namespace Nino\Modules {
 		 *	when the page is rendered, which is no name a scan can give: it is
 		 *	left out
 		 *
+		 *	The first argument is not the only way a call names a slot: an
+		 *	attribute of the type 'image' does - the background of a card -
+		 *	whatever the component's own source is. Each of them is one more
+		 *	entry of the call, after the first argument's, with its attribute
+		 *	named, and the same rule keeps it: a value that begins with a slash
+		 *	and holds no [. One that does not is the image field of the element
+		 *	in a stack, which is nobody's slot
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$content			html+, eg. a template
 		 *
-		 *	@return 	array										[ [ 'name' => 'card-text', 'kind' => 'text', 'source' => '/template/page-home/cards/one-text' ], ... ], in the order the calls stand, one entry per call
+		 *	@return 	array										[ [ 'name' => 'card-text', 'kind' => 'text', 'source' => '/template/page-home/cards/one-text' ], ... ], in the order the calls stand, one entry per call and one more for each image attribute of it, that with the 'attribute' as well: [ 'name' => 'card', 'kind' => 'image', 'source' => '/template/page-home/cards/one-background', 'attribute' => 'background' ]
 		 */
 		public static function sources( array &$appData, string $content ): array {
 
 			$components = self::components( $appData );
 			$sources = [];
 
+			// A key or a slot begins with a slash; what has a [ in it is a fill the
+			// rendering puts in
+			$named = static fn( string $source ): bool => $source !== '' && $source[0] === '/' && str_contains( $source, '[' ) === false;
+
 			foreach( \Nino\Html::shortcodeCalls( $appData, $content ) as $call ) {
 
 				$kind = (string) ( $components[ $call['name'] ]['source'] ?? '' );
 
-				if( $kind !== 'text' && $kind !== 'image' )
-					continue;
+				if( ( $kind === 'text' && is_string( $call['args']['text'] ?? null ) === false ) || $kind === 'image' ) {
 
-				if( $kind === 'text' && is_string( $call['args']['text'] ?? null ) === true )
-					continue;
+					$source = (string) ( $call['args'][0] ?? '' );
 
-				$source = (string) ( $call['args'][0] ?? '' );
+					if( $kind === 'image' && $source === '' )
+						$source = (string) ( $call['args']['uri'] ?? '' );
 
-				if( $kind === 'image' && $source === '' )
-					$source = (string) ( $call['args']['uri'] ?? '' );
+					if( $named( $source ) === true )
+						$sources[] = [ 'name' => $call['name'], 'kind' => $kind, 'source' => $source ];
+				}
 
-				if( $source === '' || $source[0] !== '/' || str_contains( $source, '[' ) === true )
-					continue;
+				foreach( (array) ( $components[ $call['name'] ]['attributes'] ?? [] ) as $attribute => $declared ) {
 
-				$sources[] = [ 'name' => $call['name'], 'kind' => $kind, 'source' => $source ];
+					$source = $call['args'][$attribute] ?? null;
+
+					if( ( $declared['type'] ?? '' ) === 'image' && is_string( $source ) === true && $named( $source ) === true )
+						$sources[] = [ 'name' => $call['name'], 'kind' => 'image', 'source' => $source, 'attribute' => (string) $attribute ];
+				}
 			}
 
 			return $sources;

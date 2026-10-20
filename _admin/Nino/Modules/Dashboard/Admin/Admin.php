@@ -35,19 +35,21 @@ namespace Nino\Modules\Dashboard {
 			return [ 'dashboard', '/_admin/nav/dashboard', 0, 'content' ];
 		}
 
-		public static function icon(): string {
-			return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chart-column-icon lucide-chart-column"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>';
+		// The entries of the manual its "?" opens, in the order they are shown (see \Nino\Admin\Admin::manual())
+		public static function manual(): array {
+			return [ 'intro', 'notice', 'tile', 'element', 'activity' ];
 		}
 
-		// Renders straight into its pane, no mount points of its own
-		public static function panes(): array {
-			return [];
+		public static function icon(): string {
+			return '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chart-column-icon lucide-chart-column"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>';
 		}
 
 		// The one pane without the head that names it (see
 		// \Nino\Admin\Panels::panesHtml()): the overview is the tiles, and
 		// a row saying "Dashboard" over them would be a title over a screen
-		// that has no single subject
+		// that has no single subject. It has the "?" of its manual in a row
+		// above the screen - which is why the screen is drawn into a mount
+		// of its own and not into the pane, whose first child that row is
 		public static function head(): bool {
 			return false;
 		}

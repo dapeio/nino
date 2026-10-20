@@ -45,4 +45,11 @@ return [
 	'[[/_admin/translations/msg/importing]]'	=> 'Importing …',
 	'[[/_admin/translations/error/import]]'	=> 'Import failed.',
 	'[[/_admin/translations/msg/imported]]'	=> '%d values imported into %s, %n skipped.',
+
+	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
+	'[[/_admin/language/manual/intro]]'	=> 'Which languages your website speaks, and which one a visitor gets before choosing.',
+	'[[/_admin/language/manual/language]]'	=> 'Tick every language the website serves. A language without a text file of its own cannot show its texts – create it first with Add a language.',
+	'[[/_admin/language/manual/native]]'	=> 'The native language is the fallback for a visitor who has not chosen yet, and the language the mail of a contact form is sent to you in.',
+	'[[/_admin/language/manual/add]]'	=> 'Add a language creates its text file with every key of the native language, all empty. Translate them under Text, then tick the language here and save.',
+	'[[/_admin/language/manual/translation]]'	=> 'The Translations tab exports every text and element value of the native language as JSON for a translator, and imports the translated document into a language. An import overwrites matching values and never deletes anything.',
 ];

@@ -152,7 +152,7 @@ namespace Nino\Modules\Text {
 			\Nino\Http::ok( $request, [
 				'keys' 		=> $keys,
 				'locales' => \Nino\Locales::getAvailableLocales( $appData ),
-				'selectedLocale' => \Nino\Admin\Admin::sessionLocale( $appData ),
+				'selectedLocale' => \Nino\Admin\Admin::contentLocale( $appData ),
 				'categories' => self::_categories( $appData, $keys ),
 			] );
 		}
@@ -168,7 +168,7 @@ namespace Nino\Modules\Text {
 		private static function _categories( array &$appData, array $keys ): array {
 
 			$template = [];
-			foreach( glob( \Nino\Filesystem::path( $appData, '/templates' ). '/*.tpl' ) ?: [] as $file ) {
+			foreach( array_filter( glob( \Nino\Filesystem::path( $appData, '/templates' ). '/*.tpl' ) ?: [], 'is_file' ) as $file ) {
 				$category = \Nino\Modules\Template::category( basename( $file ) );
 				if( $category !== null && $category !== 'common' )
 					$template[] = $category;

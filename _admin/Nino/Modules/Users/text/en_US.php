@@ -123,4 +123,13 @@ return [
 	'[[/_admin/recoverypw/label/repeat]]'	=> 'Repeat the new password',
 	'[[/_admin/recoverypw/msg/saved]]'	=> 'The recovery password has been changed.',
 	'[[/_admin/recoverypw/error/mismatch]]'	=> 'The two new passwords are not the same.',
+
+	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
+	'[[/_admin/users/manual/intro]]'	=> 'Who may log in to the workbench, and what each account may do there.',
+	'[[/_admin/users/manual/account]]'	=> 'New user needs an email address, a password of at least eight characters and a role. The list shows when each account last logged in, and which are locked or deactivated.',
+	'[[/_admin/users/manual/role]]'	=> 'A role is a set of permissions: which panels an account sees and what it may change in them. The User roles tab creates and edits roles; Full access opens everything.',
+	'[[/_admin/users/manual/password]]'	=> 'Leave New password empty to keep the old one. In your own account, saving asks for your current password.',
+	'[[/_admin/users/manual/deactivate]]'	=> 'Deactivate account blocks the login and keeps the account – not your own. Log out everywhere ends every session of the account.',
+	'[[/_admin/users/manual/lockout]]'	=> 'The Login protection tab sets how many failed logins lock an account, and for how long. Locked accounts are listed there; Lift lock opens one again.',
+	'[[/_admin/users/manual/recovery]]'	=> 'The recovery password is asked for by recovery.php, which restores a backup or sets up an account when nobody can log in any more. It is not a password for logging in.',
 ];

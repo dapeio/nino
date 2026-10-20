@@ -151,6 +151,8 @@ callbacks" is an answer):
 | `callbacks` | what it hooks into, by the callback key |
 | `install` | what activation puts in the project - a template, an element type, the words it merges |
 
+The same manual is what the `?` at the end of the head of the feature's own panel opens, in a dialog, for the people who work with the panel - nothing to write for it, and a feature whose manual says nothing has no `?`. It is drawn by `Nino.adminUi.manual()`, the one the Features panel draws it with.
+
 A plain list item has no handle; a handle is at most 120 characters, a line 1000, a
 section 40 entries. The description, the settings and the PHP a feature exposes have
 no section: the manifest says the first two, the docblocks the third. The older
@@ -290,7 +292,7 @@ The kernel classes a feature calls, by home:
 | `\Nino\Mail` | `send()`; `rateLimited()` **1.8** whether the last send was refused by the cap per ip |
 | `\Nino\Locales` | `getCurrentLocale()`, `getNativeLocale()`, `getAvailableLocales()`, `verifyLocale()`, `useLocale()` for the rest of the request |
 | `\Nino\Modules\Components` | `components()`, `stacks()`, `defaults()`, `addComponent()`; `escape()` a value into html or an attribute; `renderStack()`, `cell()`, `element()` for a stack |
-| `\Nino\Admin\Admin` | `guardPerm()`; `postData()` the json of the posted `data`; `postString()` **1.8** one posted value as a string, never a cast; `cleanInt()`, `failType()`, `uploadError()`; `sessionLocale()`, `textFills()`; `\Nino\Admin\Panels::relative()` |
+| `\Nino\Admin\Admin` | `guardPerm()`; `postData()` the json of the posted `data`; `postString()` **1.8** one posted value as a string, never a cast; `cleanInt()`, `failType()`, `uploadError()`; `sessionLocale()` the language the workbench speaks, `contentLocale()` **1.8** the language a panel edits in - its own value of the session, which the select above a panel's screen sets and nothing else does; `textFills()`; `\Nino\Admin\Panels::relative()` |
 | beside them | `\Nino\Callbacks::registerCallback()`; `\Nino\Elements::queryElements()`, `getElement()`, `getElementModel()`; `\Nino\Auth::getCurrentUser()`, `checkPermission()`; `\Nino\Fetch::get()`, the one way to the network; `\Nino\Modules\Jstext::publish()` fills for a public script; `\Nino\Modules::callModules()` |
 
 In the browser:
@@ -299,7 +301,7 @@ In the browser:
 |---|---|
 | `Nino` | `slug( text, max )`, `clipboard( text )` (a promise of `true` or `false`), **1.8**; `content.getText( key )`; `dir`; `events.bindCallback( evt, cb )`: a callback bound after the event fired runs at once, every callback runs on its own and an error is thrown again from a timer, so one cannot stop the next, and the listeners are passive (**1.8**) |
 | `Nino.ui`, the site only | `reducedMotion()`, `options( el, prefix, schema )` the `data-<prefix>-<name>` attributes of an element read against a schema, `whenVisible( el, callback )`, all **1.8**. A site script never reaches `Nino.adminUi` and a panel script never `Nino.ui`; what both need is on `Nino` |
-| `Nino.adminUi` | `panel( spec )`, `levels( prefix, names )`, `hint()`, `textField()`, `el()`, `button()`, `localeSelect()` **1.8**; `api.call()`, `api.errorText()`, `showError()`, `status()`, `format()`, `text()`, `emptyState()`, `notice()`, `panelHead()`, `contextBar()`, `actionBar()`, `listActions()`, `selectField()`, `switchField()`, `numberField()`, `elementList()`, `stringList()`, `table()`, `buttonRow()`, `choiceDialog()`, `checkImage()`, `limits()` |
+| `Nino.adminUi` | `panel( spec )`, `levels( prefix, names )`, `hint()`, `textField()`, `el()`, `button()`, `localeSelect()`, `manual( content, options )` and `manualDialog( title, content, opener )` **1.8**; `api.call()`, `api.errorText()`, `showError()`, `status()`, `format()`, `text()`, `emptyState()`, `notice()`, `panelHead()`, `contextBar()`, `actionBar()`, `listActions()`, `selectField()`, `switchField()`, `numberField()`, `elementList()`, `stringList()`, `table()`, `buttonRow()`, `choiceDialog()`, `checkImage()`, `limits()` |
 | `Nino.admin`, the shell | `dirty` (`register`, `watchForm`, `snapshot`, `isDirty`, `guard`, `refresh`), `router` (`set`, `current`, `go`, `leave`), `sessionLocale`, `assetUrl()`, `publicUrl()`; a panel script reads none of it at load, `panel()` and `levels()` look it up when asked |
 | CSS | the site: the custom properties at `:root` of `_nino/Nino.css` are the tokens a feature's stylesheet uses, written without a fallback (`var( --space-2 )`: the token is there, or the kernel is older than the feature's floor); `.nino-btn` with its `--` variants and `.nino-sr-only`. The workbench: the classes of the [panel recipe](recipes/admin-panel.md#designing-an-admin-frontend), among them the four of 1.8 - `.nino-admin-btn--small`, `.nino-admin-actions`, `.nino-admin-badge[data-state]`, `.nino-admin-move`; a panel stylesheet opens with `@layer nino.system, nino.tool, nino.local;` and writes into `nino.tool`, scoped to its own root |
 

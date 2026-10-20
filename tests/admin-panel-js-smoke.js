@@ -46,7 +46,7 @@ function world( shell ) {
 		http : { sendRequest : function( uri, method, callback, data ) {
 			requests.push( { uri : uri, action : data.action, payload : JSON.parse( data.data ), callback : callback } );
 		} },
-		content : { getText : function( key ) { return { '/_admin/catalog/error/load' : 'The list could not be loaded.', '/_admin/catalog/error/other' : 'Something else failed.' }[key] || '' } },
+		content : { getText : function( key ) { return { '/_admin/catalog/error/load' : 'The list could not be loaded.', '/_admin/catalog/error/other' : 'Something else failed.', '/_admin/common/label/close' : 'Close' }[key] || '' } },
 	};
 	if( shell !== undefined )
 		Nino.admin = shell;
@@ -65,6 +65,8 @@ function world( shell ) {
 		mount : mount,
 		requests : requests,
 		ready : ready,
+		doc : doc,
+		window : sandbox.window,
 	};
 }
 
@@ -626,6 +628,166 @@ console.log( '\nNino.adminUi.backTo - back to the control that opened the level\
 
 	d.Nino.adminUi.showLevel( 'catalog-form' );
 	check( 'back without an opener is the level\'s own heading as well', d.Nino.adminUi.backTo( 'catalog-list' ) === d.name && d.Nino.adminUi.backTo( 'catalog-list', null ) === d.name );
+}
+
+// --- manual and manualDialog -----------------------------------------------
+
+console.log( '\nNino.adminUi.manual - sections of a handle and what it does, or running text\n' );
+
+/** What a person reads of an element: the text of it and of everything in it, as a browser's textContent has it */
+function textOf( el ) {
+	return el.children.length === 0 ? el.textContent : el.children.map( textOf ).join('');
+}
+
+{
+	const ui = world().Nino.adminUi;
+	const tags = function( root, tag ) { return findAll( root, function( el ) { return el.tagName === tag.toUpperCase() } ) };
+
+	const body = ui.manual( [
+		{ heading : 'Shortcodes', entries : [ { handle : '[card]', text : 'Draws the card.' }, { handle : '', text : 'A line about the whole section.' } ] },
+		{ heading : 'Routes', entries : [] },
+	], { none : 'Nothing here.' } );
+
+	check( 'a manual is one box with the design system\'s class and nothing else about it', body.tagName === 'DIV' && body.className === 'nino-admin-manual' );
+	check( 'a section is its heading - the third level, one under a dialog\'s own - and one description list for all of its entries', tags( body, 'h3' ).map( el => el.textContent ).join('|') === 'Shortcodes|Routes'
+		&& tags( body, 'h3' ).every( el => el.className === 'nino-admin-manual-heading' ) && tags( body, 'dl' ).length === 1 && tags( body, 'dl' )[0].className === 'nino-admin-manual-section'
+		&& tags( body, 'dt' ).length === 2 && tags( body, 'dd' ).length === 2 );
+	check( 'a handle is code and what it does stands beside it', tags( tags( body, 'dt' )[0], 'code' )[0].textContent === '[card]' && tags( body, 'dd' )[0].textContent === 'Draws the card.' );
+	check( 'a line with no handle keeps its place in the column: an empty term, the line beside it', tags( body, 'dt' )[1].children.length === 0 && tags( body, 'dd' )[1].textContent === 'A line about the whole section.' );
+	check( 'a section with no entries says so, quietly, and has no list', tags( body, 'p' ).length === 1 && tags( body, 'p' )[0].className === 'nino-admin-manual-none' && tags( body, 'p' )[0].textContent === 'Nothing here.' );
+
+	const noSentence = ui.manual( [ { heading : 'Routes', entries : [] }, { heading : 'Markup', entries : [ { handle : '', text : 'One.' } ] } ] );
+	check( 'where the caller has no sentence for an empty section the section is left out - its heading with it', tags( noSentence, 'h3' ).map( el => el.textContent ).join('|') === 'Markup' && tags( noSentence, 'p' ).length === 0 );
+	check( 'the level of the headings is the caller\'s, between the second and the sixth', tags( ui.manual( [ { heading : 'A', entries : [ { handle : 'x', text : 'y' } ] } ], { level : 6 } ), 'h6' ).length === 1
+		&& tags( ui.manual( [ { heading : 'A', entries : [ { handle : 'x', text : 'y' } ] } ], { level : 99 } ), 'h6' ).length === 1 && tags( ui.manual( [ { heading : 'A', entries : [ { handle : 'x', text : 'y' } ] } ], { level : 1 } ), 'h2' ).length === 1 );
+	check( 'a section with no heading is a list alone', tags( ui.manual( [ { entries : [ { handle : 'x', text : 'y' } ] } ] ), 'h3' ).length === 0 );
+
+	const named = ui.manual( [ { entries : [ { handle : '', text : 'What it is for.' }, { handle : 'page', text : 'What you do with a page.' } ] } ], { named : handle => 'Word of ' + handle } );
+	check( 'a manual written for the people who edit names a handle in words instead of as code, and says so in the list\'s class', tags( named, 'code' ).length === 0 && tags( named, 'dt' )[1].textContent === 'Word of page'
+		&& tags( named, 'dl' )[0].className === 'nino-admin-manual-section nino-admin-manual-section--terms' && tags( named, 'dt' )[0].textContent === '' );
+	check( '...and a handle it names is a plain word: the entry with none is not named at all', tags( named, 'dt' )[0].children.length === 0 );
+
+	const prose = ui.manual( "Put `[told]` where it goes.\nEvery line is typed in turn.\n\nNo more than that - <b>no</b> markup.\n\nA lone ` stays text.\n \n  \n" );
+	check( 'running text is a paragraph at a blank line, a single line break being where the text wrapped its own line', tags( prose, 'p' ).length === 3
+		&& textOf( tags( prose, 'p' )[0] ) === 'Put [told] where it goes. Every line is typed in turn.' );
+	check( '...a `backticked` span is code, anything else is text - markup included', tags( tags( prose, 'p' )[0], 'code' ).map( el => el.textContent ).join('|') === '[told]'
+		&& textOf( tags( prose, 'p' )[1] ) === 'No more than that - <b>no</b> markup.' && tags( tags( prose, 'p' )[1], 'b' ).length === 0 );
+	check( '...and a backtick that is never closed is a character, not the rest of the paragraph turned into code', textOf( tags( prose, 'p' )[2] ) === 'A lone ` stays text.' && tags( tags( prose, 'p' )[2], 'code' ).length === 0 );
+
+	check( 'nothing to show is null, whatever it is that is nothing', ui.manual( [] ) === null && ui.manual( '' ) === null && ui.manual( ' \n \n ' ) === null && ui.manual( undefined ) === null && ui.manual( null ) === null && ui.manual( 7 ) === null
+		&& ui.manual( [ { heading : 'Routes', entries : [] } ] ) === null && ui.manual( [ { heading : 'Routes' } ] ) === null );
+}
+
+console.log( '\nNino.adminUi.manualDialog - a manual in the dialog of the workbench\n' );
+
+/**
+ *	A world whose page has the workbench's wrapper and whose dialogs do what a browser's do: showModal() opens one and
+ *	puts the focus on the first control in it, close() closes it and says so
+ *
+ *	@param		{boolean}		[modal]			Whether <dialog> has showModal() at all (default true)
+ *
+ *	@return		{Object}
+ */
+function dialogs( modal ) {
+	const w = world();
+	const wrap = element('div');
+	wrap.id = 'admin-page-wrap';
+	w.page.appendChild( wrap );
+	w.asked = [];
+	w.window.confirm = function( message ) { w.asked.push( message ); return true };
+	w.opened = [];
+	w.doc.createElement = function( tag ) {
+		const el = element( tag );
+		if( tag === 'dialog' && modal !== false ) {
+			el.open = false;
+			el.showModal = function() { el.open = true; w.opened.push( el ); findAll( el, function( node ) { return node.tagName === 'BUTTON' } )[0].focus() };
+			el.close = function() { el.open = false; fireClose( el ) };
+		}
+		return el;
+	};
+	return Object.assign( w, { wrap : wrap } );
+}
+
+function fireClose( el ) {
+	( el.listeners.close || [] ).forEach( fn => fn() );
+}
+
+{
+	const d = dialogs();
+	const ui = d.Nino.adminUi;
+	const help = element('button');
+	d.page.appendChild( help );
+	help.focus();
+
+	const content = ui.manual( [ { entries : [ { handle : 'x', text : 'y' } ] } ] );
+	check( 'opening it answers true', ui.manualDialog( 'Elements', content, help ) === true );
+
+	const dialog = d.opened[0];
+	const tags = function( root, tag ) { return findAll( root, function( el ) { return el.tagName === tag.toUpperCase() } ) };
+	check( 'it is a native dialog in the workbench\'s root, opened as a modal, wider than a question', dialog.parentNode === d.wrap && dialog.open === true && dialog.className === 'nino-admin-dialog nino-admin-dialog--manual' );
+	check( 'the panel\'s name is its heading, and names the dialog', tags( dialog, 'h2' )[0].textContent === 'Elements' && tags( dialog, 'h2' )[0].className === 'nino-admin-dialog-title'
+		&& dialog.attributes['aria-labelledby'] === tags( dialog, 'h2' )[0].id && tags( dialog, 'h2' )[0].id !== '' );
+	check( 'the manual stands between it and the button, in a box of its own that scrolls', findAll( dialog, el => el.className === 'nino-admin-dialog-content' )[0].children[0] === content
+		&& findAll( dialog, el => el.className === 'nino-admin-dialog-body' )[0].children.map( el => el.className ).join('|') === 'nino-admin-dialog-title|nino-admin-dialog-content|nino-admin-dialog-actions' );
+	check( 'a manual is read when it is looked at: the dialog has no description to be read out with it', dialog.attributes['aria-describedby'] === undefined );
+	const close = tags( dialog, 'button' );
+	check( 'one button closes it, and it is the first control in the dialog - which is where the focus goes when it opens', close.length === 1 && close[0].textContent === 'Close' && close[0].focused === true );
+
+	check( 'asked while it is open, a second manual is refused', ui.manualDialog( 'Text', content, help ) === false && d.opened.length === 1 );
+
+	help.blur();
+	close[0].click();
+	check( 'the button closes it and takes it out of the page, and the focus goes back to the "?" that asked', dialog.open === false && dialog.parentNode === null && help.focused === true );
+	check( '...and a new one can be opened after it', ui.manualDialog( 'Text', content, help ) === true && d.opened.length === 2 );
+
+	// Escape closes a modal dialog by itself, and says so as every way of closing does
+	help.blur();
+	d.opened[1].close();
+	check( 'Escape - the browser closing it - gives the focus back as well', help.focused === true && d.opened[1].parentNode === null );
+}
+
+{
+	// The button that was pressed has the focus in Chromium and in Firefox, and does not in Safari: the one that asked is given
+	const d = dialogs();
+	const ui = d.Nino.adminUi;
+	const help = element('button');
+	d.page.appendChild( help );
+	check( 'nothing has the focus when the dialog opens, as after a click in Safari', d.doc.activeElement === null && ui.manualDialog( 'Elements', ui.manual( 'A line.' ), help ) === true );
+	d.opened[0].close();
+	check( '...and the "?" that was named gets it back all the same', help.focused === true );
+
+	// Without an opener it is what had the focus when the question was asked
+	const field = element('input');
+	d.page.appendChild( field );
+	field.focus();
+	ui.manualDialog( 'Elements', ui.manual( 'A line.' ) );
+	d.opened[1].close();
+	check( 'a dialog that is not told who asked gives the focus back to what had it', field.focused === true );
+}
+
+{
+	// A question keeps its message and its description, and the options the manual added are optional
+	const d = dialogs();
+	const ui = d.Nino.adminUi;
+	const answers = [];
+	ui.choiceDialog( { title : 'Unsaved', message : 'Save first?', choices : [ { value : 'save', label : 'Save', kind : 'primary' }, { value : 'cancel', label : 'Cancel', kind : 'secondary' } ], onChoose : v => answers.push( v ) } );
+	const question = d.opened[0];
+	check( 'a question is as it was: its message in a paragraph, described by it, no scrolling box, the class the design system gives it', question.className === 'nino-admin-dialog' && question.attributes['aria-describedby'] === 'nino-admin-choice-text'
+		&& findAll( question, el => el.id === 'nino-admin-choice-text' )[0].textContent === 'Save first?' && findAll( question, el => el.className === 'nino-admin-dialog-content' ).length === 0 );
+	question.close();
+	check( '...and Escape is the answer that does nothing', answers.join() === 'cancel' );
+}
+
+{
+	// A browser without showModal() asks with confirm(): nothing to show a dialog in, and the manual is its words
+	const d = dialogs( false );
+	const ui = d.Nino.adminUi;
+	// What a browser's textContent makes of the manual: the stand-in does not add its children up
+	const words = element('div');
+	words.textContent = 'A line of words.';
+	check( 'a browser that cannot open a dialog is shown the manual as text in a confirm, and the call still answers true', ui.manualDialog( 'Elements', words ) === true
+		&& d.asked.join() === 'A line of words.' && findAll( d.wrap, el => el.tagName === 'DIALOG' ).length === 0 );
+	check( '...without leaving the page believing a question is open', ui.manualDialog( 'Elements', words ) === true && d.asked.length === 2 );
 }
 
 done();

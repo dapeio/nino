@@ -52,6 +52,18 @@
 		},
 
 		/**
+		 *	Whether the form holds input nobody has saved - the shell says (see
+		 *	Nino.admin.dirty), and so the line says "unsaved" while it does and
+		 *	not after a Discard has put the fields back. A shell without the
+		 *	registry cannot tell, and what was typed is then taken as unsaved
+		 *
+		 *	@return		{boolean}
+		 */
+		_holdsInput : function() {
+			return typeof Nino.admin.dirty !== 'object' || Nino.admin.dirty.isDirty( [ 'recoverypw' ] ) === true;
+		},
+
+		/**
 		 *	Call a recoverypw/* admin action
 		 *
 		 *	@param		{string}		endpoint			Action name (eg. "save", becomes "recoverypw/save")
@@ -140,7 +152,7 @@
 
 			// Saved or not, and - for a refused field - which one
 			Nino.admin.recoverypw._status = Nino.adminUi.status( msg, { saved : Nino.content.getText('/_admin/recoverypw/msg/saved') } );
-			Nino.admin.recoverypw._status.bind( form );
+			Nino.admin.recoverypw._status.bind( form, Nino.admin.recoverypw._holdsInput );
 
 			wrap.appendChild( form );
 

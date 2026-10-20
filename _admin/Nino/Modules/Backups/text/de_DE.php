@@ -5,9 +5,15 @@
 return [
 	'[[/_admin/nav/backups]]'						=> 'Backups',
 	'[[/_admin/backups/empty]]'					=> 'Noch kein Backup vorhanden.',
-	'[[/_admin/backups/confirm/restore]]'	=> 'Das Backup vom %s wiederherstellen? Der aktuelle Stand wird zuvor automatisch gesichert.',
+	'[[/_admin/backups/confirm/restore]]'	=> 'Das Backup vom %s wiederherstellen? Der aktuelle Stand wird zuvor automatisch gesichert. Danach wirst Du abgemeldet und landest auf der Anmeldeseite.',
+	'[[/_admin/backups/label/login]]'	=> 'Zur Anmeldung',
 	'[[/_admin/backups/msg/restored]]'	=> 'Das Backup vom %s wurde wiederhergestellt.',
 	'[[/_admin/backups/label/now]]'			=> 'Jetzt sichern',
 	'[[/_admin/backups/msg/created]]'		=> 'Backup erstellt: %s',
 	'[[/_admin/error/backups_restored_other_version]]'	=> 'Das Backup stammt aus Nino %s, hier läuft %s.',
+
+	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
+	'[[/_admin/backups/manual/intro]]'	=> 'Ein Backup ist eine Kopie der Inhalte Deiner Website, wie sie an einem Tag waren. Nino legt jeden Tag von selbst eines an und hebt vierzehn Tage auf; unter Konfiguration lässt sich das abschalten.',
+	'[[/_admin/backups/manual/backup]]'	=> '„Jetzt sichern“ legt sofort eine Kopie an. Die Liste zeigt die Tage, für die es ein Backup gibt.',
+	'[[/_admin/backups/manual/restore]]'	=> 'Wähle einen Tag, um ihn wiederherzustellen; Nino fragt vorher nach. Der aktuelle Stand wird zuvor gesichert, so lässt sich eine Wiederherstellung zurücknehmen. Sie beendet Deine Sitzung: Danach bist Du abgemeldet und meldest Dich neu an.',
 ];

@@ -52,6 +52,7 @@ request:
 | `template()` | no | instead of mount points: a `.tpl` rendered whole into the pane through the `[template]` shortcode - project-relative, no extension, no `..` |
 | `layout()` | no | `'page'` (default: a column of content at reading width) or `'workspace'` (the whole pane, the rail folded to its icons) |
 | `head()` | no | `false` opens the pane on its screen alone, without the head that names the panel (the Dashboard); every other panel gets one, see below |
+| `manual()` | no | the handles of the panel's manual, in the order its `?` shows them: `'intro'` first, what the panel is for, then one for each thing a person does in it. A handle is a slug and a word of the Text panel's vocabulary; its line is the fill `/_admin/<uri>/manual/<handle>` of the panel's `text()` files, in every language. A feature's panel without one shows the manual of its manifest, and one with neither has no `?` - see [The manual](#the-manual) |
 | `icon()` | no | an inline `<svg>` for the rail; without one the folded rail shows the label's initial. Held to that one shape: nothing that runs |
 | `tabs()` | no | further panel classes shown as tabs of this panel's pane, see below |
 | `tab()` | no | what the tab strip calls this panel's own screen, when its nav label will not do (Language: `'Languages'`) |
@@ -137,7 +138,7 @@ The head: every pane but the Dashboard's opens with one row, rendered from
 `Panels::$html` like the rest of the shell - the panel's label as the `<h2>`
 of the screen (`.admin-panel-title`, the same label the rail shows, through
 the same escape), the tab strip beside it where the registry has tabs, and
-an empty `.admin-panel-actions` slot at its end. It is the workbench's bar
+an empty `.admin-panel-actions` slot at its end, and after it the `?` of the panel's manual where it has one (`.admin-panel-manual`, see [The manual](#the-manual)). It is the workbench's bar
 surface, edge to edge, so the screens read as one tool: the name says where
 you are, the strip what else is here. A panel does not draw a title of its
 own, then. A panel whose tabs are its own rather than the registry's - the
@@ -153,6 +154,26 @@ buttons over its screen appends them to `.actions`. `panelHead()` answers
 `null` where there is no head, so a script rendered somewhere other than its
 pane keeps its strip where it drew it. `head()` returning `false` drops the
 row; the Dashboard does that, because its screen has no single subject.
+
+### The manual
+
+A pane with a manual ends its head with a `?` button (`Panels::$html['head-manual']`, a fragment like the rest of the head), and where there is no head - the Dashboard - draws it in a row of its own (`head-bare`, `.admin-panel-manualrow`: not a head, so `panelHead()` answers `null` for that pane as before), which is why that panel draws its screen into a mount of its own, `dashboard-list`, and not into the pane. The button names its pane in `data-manual`; one listener of the shell (`Nino.admin.manual`) answers every one of them, asks `admin/manual` for the manual and shows it with `Nino.adminUi.manual()` in `Nino.adminUi.manualDialog()` - a panel script does nothing for it. Which panes have one is in the registry (`manual`, the handles, and `manualFeature`, the key of the feature whose manifest manual a feature's panel shows); `Panels::hasManual()` says it, and `admin/manual` answers only for a pane the account may see.
+
+A panel writes its manual as text, one fill a handle, and names the handles in `manual()`:
+
+```php
+public static function manual(): array {
+	return [ 'intro', 'type', 'element', 'delete' ];
+}
+```
+
+```php
+'[[/_admin/catalog/manual/intro]]'	=> 'The products of the shop, one list for every kind of product.',
+'[[/_admin/catalog/manual/type]]'	=> 'Open a type to see its products. ...',
+```
+
+Short is the rule: the first entry says what the panel is for, one entry follows for each thing a person does there, at most eight in all, each a sentence or two; German addresses the person as *Du*, capitalised, and English is plain. Every segment after the panel's own name is a word of the vocabulary the Text panel names keys with (`/_admin/common/word/<slug>`, one word to a slug), the handle among them, and a word that is missing is added there once, in both languages - the manual shows the handle by that word in the interface language, so `type` reads "Typ" over its line. The handle `intro` has no word shown: it is the line about the whole panel. Nothing in a line is markup - it is set as text - so no `<`, `>` or `&`. `tests/admin-text-smoke.php` holds every panel of the tool to this.
+
 
 A dispatched action announces itself on `/nino/admin/action`
 (`{ action, panel, status, user, data }`) once it has answered - the one place a
@@ -931,8 +952,9 @@ and its `assets/admin.js`.
 
 A form that holds something nobody has saved tells the shell, and the shell
 asks **Save**, **Discard** or **Cancel** before anything throws it away: the
-back link of the form, a log out, the interface language, and every exit the
-panel guards itself. The registry is `Nino.admin.dirty`, defined by the shell
+back link of the form, a move through the rail - its links and the select that
+stands in for it on a phone, but not a move from one tab of a pane to another - a log out, the
+interface language, and every exit the panel guards itself. The registry is `Nino.admin.dirty`, defined by the shell
 script before any panel file loads; a panel registers when its own file loads,
 behind a feature check, because panel scripts also run in tests and on shells
 that have no registry:
@@ -972,21 +994,44 @@ Four rules follow:
   `Nino.admin.dirty.guard( [ 'catalog' ], proceed, onCancel )` - `null` for a
   reload of the whole page (feature activation, a backup restore, a log out).
   `onCancel` undoes the control that started the exit (a checkbox, a select).
-  Nothing is sent before `proceed`.
+  Nothing is sent before `proceed`, which hears the answer - `'save'` or
+  `'discard'` - where a question was asked, and nothing where there was none.
 - A form that is rebuilt from the server whenever its panel is shown must not be
   rebuilt over unsaved input (`showCurrent()` checks `isDirty()` first). A load
   error written into the watched container leaves no fields: the shell takes
   that for clean, and a panel that tracks its own drawn state resets it there.
-- `discard()` takes the form as it stands for saved (it re-baselines) *before*
-  the exit runs. When the exit's request then fails without redrawing the form,
-  the discarded text stays in the controls and counts as saved. That is a
-  known limitation, not a rule the exits keep: an exit that wants to avoid it
-  redraws or reloads the form itself when its request fails (the Keys schema,
-  rename and delete exits and the feature,
-  backup and logout-all exits do not).
+- `discard()` forgets the input *before* the exit runs. The fields of a form
+  `watchForm()` watches are put back to what `snapshot()` saw - the controls
+  that hang on them are told, as if the person typed the old values back - and
+  the form counts as saved; a form that has other fields than it was drawn with
+  (rows added since) cannot be put back field by field and is only taken for
+  saved. What a `register()` entry forgets is its model, and its controls
+  are the exit's to draw again: when that exit's request then fails without
+  redrawing the form, the discarded text stays in the controls and counts as
+  saved. That is a known limitation, not a rule the exits keep: an exit that
+  wants to avoid it redraws or reloads the form itself when its request fails
+  (the Keys schema, rename and delete exits and the feature, backup and
+  logout-all exits do not).
+
+The rail asks with the same `guard()` as the back link: **Cancel** puts the rail back
+(the open link, the select, the address - written by the shell where the panel writes
+none of its own) and **Discard** calls the `discard()` of every entry, goes on to the
+panel asked for and then presses the back link of the form, the one on screen in the
+pane of the entry (the nearest tab, else the panel). The rail leaves a pane standing in
+memory, and without that the form would come back with the discarded input in it: the
+panel's own handler for its back link leaves the form, and it is drawn again from what is
+stored when it is opened next. A form that is the whole screen of its panel has no back
+link; its `discard()` has put the fields back. So a panel registered under its uri, or
+the uris of its tabs, with a back link in the form it draws, has nothing more to do for
+the rail.
 
 The question is `Nino.adminUi.choiceDialog( { title, message, choices, onChoose } )`
-in the design system: it owns no words and names no `Nino.admin` member. A form
+in the design system: it owns no words and names no `Nino.admin` member. A text that
+is read rather than answered - a manual - is `content`, an element drawn in place of the
+message, with `className` for the dialog and `opener` for what gets the focus back where
+that is not what had it (a button that was clicked has it in Chromium and Firefox, not
+in Safari); `Nino.adminUi.manualDialog( title, content, opener )` is that, with one
+button to close it. A form
 that has a status line (`Nino.adminUi.status()`) shows the unsaved state there;
 every form gets the word *Unsaved changes* in its action bar from
 `Nino.admin.dirty.refresh()`, which a panel calls at the end of its own save -
@@ -1068,6 +1113,7 @@ Reach for an existing class first; only invent one when no role fits.
 | Sticky top row (back link, locale switch) | `.nino-admin-contextbar` via `Nino.adminUi.contextBar()`; the switch is `Nino.adminUi.localeSelect()` (`.nino-admin-locale-select`) |
 | Back link inside that row | `.nino-admin-back-link` |
 | Fixed bottom actions | `.nino-admin-actionbar` via `Nino.adminUi.actionBar()` |
+| The manual of a screen - sections of a handle and what it does, or running text - in a dialog or on the screen | `.nino-admin-manual` via `Nino.adminUi.manual( content, options )`: `[ { heading, entries : [ { handle, text } ] } ]` or a text, `options.named` to name a handle in words instead of code, `options.none` for the sentence of an empty section, `options.level` for the headings; `Nino.adminUi.manualDialog()` shows it in `.nino-admin-dialog--manual` |
 | Fixed actions above a list | `.nino-admin-list-actions` via `Nino.adminUi.listActions()` |
 | Status text in a bottom bar - saving, saved at hh:mm, unsaved changes, why it failed | `.nino-admin-status` via `Nino.adminUi.status()` (in the bar it replaces `.nino-admin-actionbar-status`) |
 | Mark after the name of a required field, and the sentence under a refused one | `.nino-admin-required` (drawn `aria-hidden`; the control gets `aria-required`), `.nino-admin-field-error` (linked with `aria-describedby`, never `role="alert"`) |

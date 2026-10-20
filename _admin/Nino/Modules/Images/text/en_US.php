@@ -36,6 +36,15 @@ return [
 	'[[/_admin/slots/label/scan-create]]'	=> 'Create the non-ignored slots',
 	'[[/_admin/slots/scan/none]]'				=> 'No missing slots found. Every local image the templates reference is already backed by a slot.',
 	'[[/_admin/slots/scan/created-failed]]'	=> '%d created. Failed: %s',
+	'[[/_admin/slots/error/size]]'			=> 'A slot needs a size: enter its width and its height in pixels.',
 	'[[/_admin/slots/confirm/delete]]'	=> 'Really delete image slot “%s”? Any uploaded image is lost with it.',
 	'[[/_admin/dashboard/label/slots]]'	=> 'Missing image slots',
+
+	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
+	'[[/_admin/images/manual/intro]]'	=> 'Every picture of your website has a fixed place, a slot, with fixed measures. A picture you upload is cut to them.',
+	'[[/_admin/images/manual/slot]]'	=> 'Open a slot to see its target size and where the website uses it. A slot that no page uses shows nothing on the website.',
+	'[[/_admin/images/manual/upload]]'	=> 'Choose a file and it is stored at once; the limits stand beside the field. A picture smaller than the target size is scaled up and may look blurry.',
+	'[[/_admin/images/manual/alt]]'	=> 'Describe in a sentence what the picture shows, once for every language, then press Save alt texts. Left empty, the picture counts as decoration.',
+	'[[/_admin/images/manual/remove]]'	=> 'Remove image deletes the picture, after a question. Until you upload another, the place stays empty on the website.',
+	'[[/_admin/images/manual/scan]]'	=> 'The Image Slots tab creates and deletes slots – a slot needs a width and a height. Its scan lists the pictures that templates use and that have no slot yet.',
 ];

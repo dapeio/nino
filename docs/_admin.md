@@ -81,6 +81,18 @@ For operation:
 
 If the accounts themselves are what is broken – the last developer password forgotten, a bad restore – the [recovery page](#recovery) is the way back in.
 
+## Two Languages
+
+The workbench has two languages, and nothing ties them together. The **interface language** is the one the screens, the rail and the messages are written in: the picker in the rail's settings menu sets it, so does the login page's, so does `?locale=xx` on the address, and it is kept for the session. The **working language** is the one a panel edits in: the select above the screens of Elements and Text (and of the Keys tab) names it, Routes names its pages in it where they have a name in it, and it is a value of the session of its own. Changing it changes what the panels open on and nothing else - the workbench goes on speaking the interface language after a reload, and the website in the same browser keeps the language its own visitor picker chose, since the workbench never writes that one. The Design preview draws the site in the interface language, the language the request is in.
+
+## Unsaved Input
+
+A form that holds input nobody has saved asks before it is left, and every way out asks the same question - **Save**, **Discard** or **Cancel**: the back link of the form, a move through the rail (its links, and the select that stands in for it on a phone), the interface language, a log out. **Cancel** stays where you are and puts the rail back as it was - the open link, the select and the address - and **Discard** forgets the input and leaves the form: one with a Back link is left the way that link leaves it, and is drawn again from what is stored when it is opened next; one that is the whole screen of its panel shows what is stored again. What was left behind is a clean form and not one with input nobody will find again. A move from one tab of a pane to another leaves nothing and asks nothing. The one exit that is not the workbench's is a reload or a closed tab: the browser asks that itself.
+
+## The Manual: the ?
+
+Every pane ends its head with a **?**, a button that opens the manual of the panel in a dialog: what the panel is for in a sentence, then one entry for each thing done in it. The manual of a panel of the workbench is written for the people who work with it, in both languages; the manual of a feature's panel is the one its manifest carries, which the Features panel shows to the people who develop with the feature (a feature that says nothing about its use has no **?**). The Dashboard, which has no head to put it in, has the **?** in a row of its own. Escape or the button at the foot closes the dialog and the focus goes back to the **?**. How a panel brings one is in the [panel recipe](recipes/admin-panel.md#the-manual).
+
 ## Features
 
 **Features**, a panel of the System group, switches the packages of `features/` on and off, sets them up and installs them from a catalogue; how one is written is the [feature manual](features.md). The setup wizard offers none: a feature is switched on here, after setup.
@@ -173,7 +185,7 @@ The first Tab stop of the workbench is a link that skips the rail and lands on t
 | Saving fails | The message says why where Nino has a sentence for it (a value out of range, an address already in use, a file over PHP's upload limit). Otherwise: write permissions of the affected file or directory. |
 | A login dialog appears over a form | The session ended; log in again and the request is sent on. *Another account is logged in in another tab* means exactly that: reload the page. |
 | Template missing in **Routes** | Only existing `templates/page-*.tpl` files are offered. One a panel of the workbench has written (the Builder creates them) is offered the next time Routes is shown, with no reload; one put on the disk by hand is offered after a reload of the page. |
-| Texts or images missing in a scan | Dynamic keys and images are not statically recognizable. |
+| Texts or images missing in a scan | Dynamic keys and images are not statically recognizable. A picture a card has as its background is found as the slot it names, like any other. A slot the scan proposes for a component that names no size has to be given its width and its height before it is made: a slot is never created one pixel wide. |
 | Backup list is empty | Backups are switched off, or no authenticated request has happened today. **Back up now** writes the first archive at once. |
 | Website broken after **Config** | Restore the last Git state or backup. |
 | No developer password works any more | `/_admin/recovery.php` with the recovery password. |

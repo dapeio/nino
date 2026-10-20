@@ -751,7 +751,7 @@ namespace Nino\Modules\Elements {
 				return $references;
 
 			$fills 		= \Nino\Html::getFills( $appData );
-			$templates = glob( \Nino\Filesystem::path( $appData, '/templates' ). '/*.tpl' ) ?: [];
+			$templates = array_filter( glob( \Nino\Filesystem::path( $appData, '/templates' ). '/*.tpl' ) ?: [], 'is_file' );
 
 			foreach( array_keys( $renames ) as $old ) {
 

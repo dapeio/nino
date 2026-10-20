@@ -647,4 +647,146 @@ check( 'the slots a scan creates are told one by one, the one that was refused n
 	check( 'a form that is closed without Back leaves the focus nothing to stand on: it goes to the name of the panel', list.classList.contains('admin-hidden') === false && focusedNow() === paneTitle );
 }
 
+
+// --- the scan form asks for a size ----------------------------------------------------------
+
+/*	A slot is made with a size: it is the canvas every upload is cut to. The rows of the scan that
+	come without one - a slot a component names and nobody made has none to propose - mark their
+	two fields as required and are refused at them when they are submitted, and the rows that have
+	a size are made all the same	*/
+{
+	const pane = element('div');
+	pane.dataset.panel = 'slots';
+	const list = element('div');
+	list.id = 'slots-list';
+	pane.appendChild( list );
+	const form = element('div');
+	form.id = 'slots-form';
+	pane.appendChild( form );
+
+	const written = [];
+	const alerts = [];
+	const page = {
+		admin : { formToolbar : function( back ) { const bar = element('div'); bar.appendChild( back ); return bar }, touch : function( topic ) { written.push( topic ) }, stamp : function() { return 0 } },
+		events : { bindCallback : function() {} },
+		http : { sendRequest : function() {} },
+		content : { getText : text },
+	};
+	const box = {
+		console : console,
+		document : {
+			createElement : element,
+			createTextNode : function( value ) { return Object.assign( element('#text'), { textContent : String( value ) } ) },
+			getElementById : function( id ) { return findAll( pane, function( el ) { return el.id === id } )[0] ?? null },
+			documentElement : null,
+			body : null,
+			get activeElement() { return findAll( pane, function( el ) { return el.focused === true } )[0] ?? null },
+		},
+		Nino : page,
+	};
+	box.window = { Nino : page, confirm : () => true, alert : function( message ) { alerts.push( message ) } };
+	const context = vm.createContext( box );
+	load( '_admin/assets/Nino.admin.js', context );
+	load( '_admin/Nino/Modules/Images/assets/slots.js', context );
+
+	const drawn = page.admin.slots;
+	const sent = [];
+	const refreshed = [];
+	drawn._apiCall = function( endpoint, payload, callback ) { sent.push( { endpoint : endpoint, payload : payload, callback : callback } ) };
+	drawn._snapshot = function() {};
+	drawn.init = function( stay ) { refreshed.push( stay === true ) };
+
+	const rowsOnScreen = function() { return findAll( form, function( el ) { return el.className === 'nino-admin-field' } ) };
+	const numbers = function( row ) { return findAll( row, function( el ) { return el.type === 'number' } ) };
+	const sentencesOf = function( row ) { return findAll( row, function( el ) { return el.className === 'nino-admin-field-error' } ) };
+	const starsOf = function( row ) { return findAll( row, function( el ) { return el.className === 'nino-admin-required' } ) };
+	const scanMessage = function() { return findAll( form, function( el ) { return el.id === 'slots-scan-msg' } )[0] };
+	const focusedNow = function() { return findAll( pane, function( el ) { return el.focused === true } )[0] ?? null };
+
+	drawn._renderScanForm( [
+		{ filename : 'a.png', src : '/images/a.png', suggestedUri : '/a', width : 100, height : 50, files : [ 'page-a.tpl' ] },
+		{ filename : '', src : '/template/page-x/cards/one-background', suggestedUri : '/template/page-x/cards/one-background', width : 0, height : 0, files : [ 'page-x.tpl' ] },
+		{ filename : 'c.png', src : '/images/c.png', suggestedUri : '/c', width : 80, height : 0, files : [ 'page-c.tpl' ] },
+	] );
+	let rows = rowsOnScreen();
+	check( 'a row that comes with a size asks for none: no star, nothing required', rows.length === 3 && starsOf( rows[0] ).length === 0 && numbers( rows[0] ).every( function( input ) { return input.required !== true && input.getAttribute('aria-required') === null } ) );
+	check( 'a row without one marks its width and its height as required - the star after each name, aria-required on each field', starsOf( rows[1] ).length === 2 && starsOf( rows[1] ).every( function( star ) { return star.getAttribute('aria-hidden') === 'true' } )
+		&& numbers( rows[1] ).length === 2 && numbers( rows[1] ).every( function( input ) { return input.required === true && input.getAttribute('aria-required') === 'true' } ) );
+	check( '...and so does a row that knows its width and not its height: it has no size to make a slot with', starsOf( rows[2] ).length === 2 && numbers( rows[2] ).every( function( input ) { return input.required === true } ) );
+	check( 'the form leaves the checking to the script: the browser\'s own bubble would be a second voice, and would stop the submit before the sentence at the field is said', findAll( form, function( el ) { return el.tagName === 'FORM' } )[0].noValidate === true );
+	const ignoreOf = function( row ) { return findAll( row, function( el ) { return el.type === 'checkbox' } )[0] };
+	ignoreOf( rows[1] ).checked = true;
+	fire( ignoreOf( rows[1] ), 'change' );
+	check( 'a row that is ignored asks for nothing: a slot nobody makes needs no size', numbers( rows[1] ).every( function( input ) { return input.required !== true && input.getAttribute('aria-required') === null } ) && starsOf( rows[1] ).every( function( star ) { return star.hidden === true } ) );
+	ignoreOf( rows[1] ).checked = false;
+	fire( ignoreOf( rows[1] ), 'change' );
+	check( '...and asks again when it is not', numbers( rows[1] ).every( function( input ) { return input.required === true } ) );
+
+	let outcome = null;
+	drawn._saveScanResults( drawn._scanRows, function( ok ) { outcome = ok } );
+	check( 'a submit makes the row that has a size and sends none of those without', sent.length === 1 && sent[0].endpoint === 'create' && sent[0].payload.uri === '/a' && sent[0].payload.width === '100' );
+	check( 'each row without a size is refused at its fields: one sentence in the row, both fields marked invalid and described by it', [ rows[1], rows[2] ].every( function( row ) {
+		const sentence = sentencesOf( row );
+		return sentence.length === 1 && sentence[0].textContent === text('/_admin/slots/error/size') && numbers( row ).every( function( input ) { return input.getAttribute('aria-invalid') === 'true' && input.getAttribute('aria-describedby') === sentence[0].id } );
+	} ) );
+	check( '...the row that has a size is not', sentencesOf( rows[0] ).length === 0 && numbers( rows[0] ).every( function( input ) { return input.getAttribute('aria-invalid') === null } ) );
+	check( '...the line says that something is wrong, as an alert, and the focus is on the first field refused', scanMessage().getAttribute('role') === 'alert' && scanMessage().textContent === text('/_admin/error/invalid_value') && focusedNow() === numbers( rows[1] )[0] );
+	check( 'the sentence is words and is a key both languages have', text('/_admin/slots/error/size') !== '' && fills('_admin/Nino/Modules/Images/text/de_DE.php')['/_admin/slots/error/size'] !== undefined );
+
+	sent[0].callback( 200, {} );
+	rows = rowsOnScreen();
+	check( 'the slot that was made is gone from the form, and the ones that were refused stay with their sentences; the list under the form is drawn again and not shown',
+		outcome === false && rows.length === 2 && written.join() === 'slots' && refreshed.join() === 'true' && rows.every( function( row ) { return sentencesOf( row ).length === 1 } ) && drawn._scanRows.length === 2 );
+	check( '...the form is not the one the shell sees as done: it reported false, and the line is the refusal again and not the progress of the run', scanMessage().getAttribute('role') === 'alert' && scanMessage().textContent === text('/_admin/error/invalid_value') );
+
+	// What is typed into the fields that makes a size whole takes the sentence away
+	const [ widthOfFirst, heightOfFirst ] = numbers( rows[0] );
+	widthOfFirst.value = '20';
+	fire( widthOfFirst, 'input' );
+	check( 'a width alone is not a size: the sentence stays', sentencesOf( rows[0] ).length === 1 );
+	heightOfFirst.value = '10';
+	fire( heightOfFirst, 'input' );
+	check( '...the height that makes it whole takes the sentence and the marks away - and only in that row', sentencesOf( rows[0] ).length === 0 && numbers( rows[0] ).every( function( input ) { return input.getAttribute('aria-invalid') === null && input.getAttribute('aria-describedby') === null } ) && sentencesOf( rows[1] ).length === 1 );
+
+	sent.length = 0;
+	outcome = null;
+	numbers( rows[1] )[1].value = '40';
+	fire( numbers( rows[1] )[1], 'input' );
+	drawn._saveScanResults( drawn._scanRows, function( ok ) { outcome = ok } );
+	check( 'once every row has a size nothing is refused, and the rows are made one request at a time', sentencesOf( rows[0] ).length === 0 && sentencesOf( rows[1] ).length === 0 && sent.length === 1 );
+	sent[0].callback( 200, {} );
+	check( '...the next after the answer to the one before', sent.length === 2 && outcome === null );
+	sent[1].callback( 200, {} );
+	check( '...and when none was refused the list is shown, as ever, and the save is done', outcome === true && refreshed.join() === 'true,false' );
+
+	// A row the server refused stays as well: only the slot that was made leaves the form
+	drawn._renderScanForm( [
+		{ filename : 'd.png', src : '/images/d.png', suggestedUri : '/d', width : 10, height : 10, files : [ 'page-d.tpl' ] },
+		{ filename : 'e.png', src : '/images/e.png', suggestedUri : '/e', width : 20, height : 20, files : [ 'page-e.tpl' ] },
+		{ filename : '', src : '/template/page-z/a', suggestedUri : '/template/page-z/a', width : 0, height : 0, files : [ 'page-z.tpl' ] },
+	] );
+	sent.length = 0;
+	outcome = null;
+	alerts.length = 0;
+	drawn._saveScanResults( drawn._scanRows, function( ok ) { outcome = ok } );
+	sent[0].callback( 200, {} );
+	sent[1].callback( 409, { error : 'exists' } );
+	rows = rowsOnScreen();
+	check( 'a row the server refused stays in the form with the one that has no size, and the slot that was made is gone from it', outcome === false && rows.length === 2 && drawn._scanRows.length === 2
+		&& rows.map( function( row ) { return findAll( row, function( el ) { return el.type === 'text' } )[0].value } ).join() === '/e,/template/page-z/a' && alerts.length === 1 );
+
+	// Nothing to send: every row came without a size
+	drawn._renderScanForm( [
+		{ filename : '', src : '/template/page-y/a', suggestedUri : '/template/page-y/a', width : 0, height : 0, files : [ 'page-y.tpl' ] },
+		{ filename : '', src : '/template/page-y/b', suggestedUri : '/template/page-y/b', width : 0, height : 0, files : [ 'page-y.tpl' ] },
+	] );
+	sent.length = 0;
+	outcome = null;
+	drawn._saveScanResults( drawn._scanRows, function( ok ) { outcome = ok } );
+	check( 'rows that all lack a size send nothing, are all refused at their fields, and report that the save did not happen', sent.length === 0 && outcome === false && rowsOnScreen().every( function( row ) { return sentencesOf( row ).length === 1 } ) );
+
+	// The server refuses it too, with the code of the field it names
+	check( 'the server\'s refusal has the words: the code a width or a height under 1 is refused with is one the workbench says', text('/_admin/error/invalid_value') !== '' );
+}
+
 done();

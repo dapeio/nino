@@ -1032,18 +1032,49 @@ check( '...and nothing else of it: not the field of an element, not the type a s
 check( '...nothing for a text without a shortcode in it, and nothing where no call has a source', \Nino\Modules\Components::sources( $appData, '' ) === [] && \Nino\Modules\Components::sources( $appData, 'a [ lone bracket and [[/a/fill]]' ) === []
 	&& \Nino\Modules\Components::sources( $appData, '[card padding="3"][/card][spacer size="1"][card-text summary]' ) === [] );
 
+/*	A slot is also named by an attribute of the type image - the background of a
+	card - whatever the component's own source is. It is one more entry of its
+	call, after the first argument's, and the attribute is named. The same rule
+	keeps it: it begins with a slash and holds no [ - so the image field of the
+	element in a stack is none, nor is an empty one	*/
+$backgroundTemplate = implode( "\n", [
+	'[card background="/template/page-x/cards/one-background" dim="1"]',
+	'	[card-text /template/page-x/cards/one-text]',
+	'[/card]',
+	'[stack /deltas]',
+	'	[card background="image"]',
+	'		[card-title title]',
+	'	[/card]',
+	'[/stack]',
+	'[card background="/template/[[/nino/http/response/locale]]/dynamic/background"][/card]',
+	'[card background=""][/card]',
+	'[card padding="3"][/card]',
+] );
+check( 'sources() lists the slot an attribute of the type image names: the background of a card, with the attribute, before the calls inside it',
+	\Nino\Modules\Components::sources( $appData, $backgroundTemplate ) === [
+		[ 'name' => 'card', 'kind' => 'image', 'source' => '/template/page-x/cards/one-background', 'attribute' => 'background' ],
+		[ 'name' => 'card-text', 'kind' => 'text', 'source' => '/template/page-x/cards/one-text' ],
+	] );
+check( '...and not the image field of the element in a stack, a background with a fill in it, an empty one or a card with none',
+	array_intersect( array_column( \Nino\Modules\Components::sources( $appData, $backgroundTemplate ), 'source' ), [ 'image', 'title', '', '/template/[[/nino/http/response/locale]]/dynamic/background' ] ) === [] );
+
 // What the rule is made of is the registry's: the kind a schema says. A component a feature registers is read the same, and the kernel's own registry knows nothing of it
 $sourcesApp = $appData;
 $sourceNoop = static fn( array &$appData, array $args ): string => '';
 \Nino\Modules\Components::addComponent( $sourcesApp, 'wordsof', $sourceNoop, [ 'label' => 'Words', 'source' => 'text', 'by' => 'probe' ] );
 \Nino\Modules\Components::addComponent( $sourcesApp, 'pictureof', $sourceNoop, [ 'label' => 'Picture', 'source' => 'image', 'by' => 'probe' ] );
 \Nino\Modules\Components::addComponent( $sourcesApp, 'linkof', $sourceNoop, [ 'label' => 'Link', 'source' => 'href', 'by' => 'probe' ] );
+\Nino\Modules\Components::addComponent( $sourcesApp, 'bannerof', $sourceNoop, [ 'label' => 'Banner', 'source' => 'href', 'by' => 'probe', 'attributes' => [ 'picture' => [ 'type' => 'image', 'default' => '' ], 'caption' => [ 'type' => 'key', 'default' => '' ] ] ] );
 $sourcesOwn = '[wordsof /feature/probe/words/one][pictureof /feature/probe/pictures/one][pictureof uri="/feature/probe/pictures/two"][linkof /feature/probe/links/one]';
 check( 'the components of a feature are read by the kind their schema says: a text and an image count, an address does not', \Nino\Modules\Components::sources( $sourcesApp, $sourcesOwn ) === [
 		[ 'name' => 'wordsof', 'kind' => 'text', 'source' => '/feature/probe/words/one' ],
 		[ 'name' => 'pictureof', 'kind' => 'image', 'source' => '/feature/probe/pictures/one' ],
 		[ 'name' => 'pictureof', 'kind' => 'image', 'source' => '/feature/probe/pictures/two' ],
 	] && \Nino\Modules\Components::sources( $appData, $sourcesOwn ) === [] );
+$sourcesBanner = '[bannerof /feature/probe/links/two picture="/feature/probe/pictures/three" caption="/feature/probe/words/two"]';
+check( '...and its image attributes by their type, whatever its own source is: the slot of a picture counts, the key of a caption does not',
+	\Nino\Modules\Components::sources( $sourcesApp, $sourcesBanner ) === [ [ 'name' => 'bannerof', 'kind' => 'image', 'source' => '/feature/probe/pictures/three', 'attribute' => 'picture' ] ]
+	&& \Nino\Modules\Components::sources( $appData, $sourcesBanner ) === [] );
 
 // The schema is checked where the component is registered
 // php 8.4 adds a deprecation of its own to every E_USER_ERROR: not what is asked about here

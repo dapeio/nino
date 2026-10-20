@@ -113,4 +113,14 @@ return [
 	'[[/_admin/elements/scope/insert]]'	=> 'Add',
 	'[[/_admin/elements/scope/update]]'	=> 'Change fields',
 	'[[/_admin/elements/scope/delete]]'	=> 'Delete',
+
+	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
+	'[[/_admin/elements/manual/intro]]'	=> 'Elements are the lists your website is made of – the imprint, posts, products. Every list has a type, and every entry of it is an element.',
+	'[[/_admin/elements/manual/type]]'	=> 'Open a type to see its elements. The type decides which fields an element has; developers define types in the Element Types tab.',
+	'[[/_admin/elements/manual/element]]'	=> 'New element opens an empty form, a click on a row opens an existing one. Previous element and Next element step through the list, Back to overview returns to the types.',
+	'[[/_admin/elements/manual/language]]'	=> 'The select above the fields is the language you write in. What you typed in one language stays while you switch, and one Save stores them all. It changes nothing else: not the language of the workbench, not the one your website shows.',
+	'[[/_admin/elements/manual/uri]]'	=> 'The uri names the element and can be used only once: lowercase letters, digits, hyphens and underscores. A type that numbers its elements assigns it for you.',
+	'[[/_admin/elements/manual/save]]'	=> 'Save stores the element in every language. Save and add another stores it and opens an empty form for the next one.',
+	'[[/_admin/elements/manual/duplicate]]'	=> 'Duplicate puts a copy of the values into a new form. It is no element until you give it a uri and save.',
+	'[[/_admin/elements/manual/delete]]'	=> 'Delete removes the element, its pictures and every language of it, after a question. There is no undo – the way back is a backup.',
 ];

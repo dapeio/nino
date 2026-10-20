@@ -113,4 +113,14 @@ return [
 	'[[/_admin/elements/scope/insert]]'	=> 'Anlegen',
 	'[[/_admin/elements/scope/update]]'	=> 'Felder ändern',
 	'[[/_admin/elements/scope/delete]]'	=> 'Löschen',
+
+	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
+	'[[/_admin/elements/manual/intro]]'	=> 'Elemente sind die Listen, aus denen Deine Website besteht: das Impressum, Beiträge, Produkte. Jede Liste hat einen Typ, und jeder Eintrag darin ist ein Element.',
+	'[[/_admin/elements/manual/type]]'	=> 'Öffne einen Typ, um seine Elemente zu sehen. Der Typ bestimmt, welche Felder ein Element hat; Typen legen Entwickler im Reiter Elementtypen an.',
+	'[[/_admin/elements/manual/element]]'	=> '„Neues Element“ öffnet ein leeres Formular, ein Klick auf eine Zeile ein vorhandenes. Mit „Vorheriges Element“ und „Nächstes Element“ gehst Du die Liste durch, „Zurück zur Übersicht“ führt zu den Typen.',
+	'[[/_admin/elements/manual/language]]'	=> 'Die Auswahl über den Feldern ist die Sprache, in der Du schreibst. Was Du in einer Sprache getippt hast, bleibt beim Wechsel erhalten, und ein Speichern sichert alle. Sonst ändert sie nichts: weder die Sprache der Workbench noch die, die Deine Website zeigt.',
+	'[[/_admin/elements/manual/uri]]'	=> 'Die URI benennt das Element und kann nur einmal vergeben werden: Kleinbuchstaben, Ziffern, Bindestriche und Unterstriche. Ein Typ, der seine Elemente nummeriert, vergibt sie selbst.',
+	'[[/_admin/elements/manual/save]]'	=> '„Speichern“ sichert das Element in allen Sprachen. „Speichern und neu einfügen“ sichert es und öffnet ein leeres Formular für das nächste.',
+	'[[/_admin/elements/manual/duplicate]]'	=> '„Duplizieren“ legt eine Kopie der Werte in ein neues Formular. Ein Element ist es erst, wenn Du ihm eine URI gibst und speicherst.',
+	'[[/_admin/elements/manual/delete]]'	=> '„Löschen“ entfernt das Element mit seinen Bildern und allen Sprachen, nach einer Rückfrage. Es gibt kein Rückgängig – der Weg zurück ist ein Backup.',
 ];

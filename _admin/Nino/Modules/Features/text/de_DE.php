@@ -102,4 +102,10 @@ return [
 	'[[/_admin/features/error/catalogue-reason]]'	=> 'Der Katalog konnte nicht geladen werden: %s',
 	'[[/_admin/features/error/catalogue-off]]'	=> 'Der Katalog ist ausgeschaltet: /nino/catalogue/url in der config.php ist leer.',
 	'[[/_admin/features/error/activate-after-install]]'	=> 'Das Feature ist an Ort und Stelle, konnte aber nicht eingeschaltet werden: %s',
+
+	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
+	'[[/_admin/features/manual/intro]]'	=> 'Features sind Zusatzpakete: Werkzeuge und Funktionen, die als Verzeichnis kommen und hier eingeschaltet werden. Dieser Bereich listet sie auf, installiert sie und schaltet sie ein und aus.',
+	'[[/_admin/features/manual/available]]'	=> '„Verfügbar“ zeigt, was der Katalog anbietet. „Katalog aktualisieren“ lädt ihn, „Installieren“ kopiert ein Feature ins Projekt.',
+	'[[/_admin/features/manual/inactive]]'	=> '„Inaktiv“ zeigt die Features, die installiert und ausgeschaltet sind. „Aktivieren“ schaltet eines ein, „Entfernen“ löscht es aus dem Projekt.',
+	'[[/_admin/features/manual/active]]'	=> '„Aktiv“ zeigt die eingeschalteten Features. Ein Klick öffnet eines: seine Beschreibung und sein Handbuch für Entwickler, seine Einstellungen, ein Update, wenn es eines gibt, und „Deaktivieren“.',
 ];

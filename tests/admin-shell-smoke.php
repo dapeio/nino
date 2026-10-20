@@ -151,6 +151,20 @@ class AdminSmokeIconModule {
 	public static function adminPanels( array &$appData ): array { return [ 'AdminSmokeIconPanel' ]; }
 }
 
+/** A panel with a manual: its handles, two of them badly written - a handle named twice and one that is no slug - and the permission that keeps it from somebody */
+class AdminSmokeManualPanel {
+	public const string PERM = '/_admin/manualpanel/manage';
+	public static function actions(): array { return [ 'manualpanel/list' => [ self::class, 'apiList' ] ]; }
+	public static function nav(): array { return [ 'manualpanel', 'Manual panel', 63 ]; }
+	public static function perm(): string { return self::PERM; }
+	public static function manual(): array { return [ 'intro', 'page', 'page', 'Not A Handle', 7, 'item-2' ]; }
+	public static function apiList( array &$appData, array &$request ): void { \Nino\Http::ok( $request ); }
+}
+
+class AdminSmokeManualModule {
+	public static function adminPanels( array &$appData ): array { return [ 'AdminSmokeManualPanel' ]; }
+}
+
 /** A panel a project brings: every optional method answered, a few of them badly - which is what the registry has to cope with */
 class AdminSmokeProjectPanel {
 	public const string PERM = '/_admin/project/manage';
@@ -211,6 +225,51 @@ foreach( $railGroups as $railUri => $railGroup )
 check( 'every link stands under the heading of its own group, which is how the script knows what a heading folds', $railOk === true && count( $railGroups ) === count( $registry ) );
 check( 'GROUPS lists all four, features between structure and system', \Nino\Admin\Panels::GROUPS === [ 'content', 'structure', 'features', 'system' ] );
 
+/*	The manual: a panel names the handles of its entries, the "?" in its head opens them, and the shell's one
+	action answers them in the one shape the design system draws - whoever wrote them	*/
+check( 'every panel of the tool names the entries of its manual - in this registry only the dummy module\'s panel has none', array_filter( $registry, static fn( array $panel ): bool => $panel['manual'] === [] ) === [ 'dummy' => $registry['dummy'] ]
+	&& $registry['elements']['manual'][0] === 'intro' && $registry['navs']['manual'][0] === 'intro' );
+$withManualPanel = $withModule;
+$withManualPanel['/nino/modules'] = [ 'AdminSmokeManualModule' ];
+ninoWarnings();
+$manualRegistry = \Nino\Admin\Admin::panels( $withManualPanel );
+$manualWarnings = ninoWarnings();
+check( 'a handle is a slug and is named once: the three that are not are left out, each with a warning naming the panel', $manualRegistry['manualpanel']['manual'] === [ 'intro', 'page', 'item-2' ]
+	&& count( array_filter( $manualWarnings, static fn( string $m ): bool => str_contains( $m, 'AdminSmokeManualPanel' ) && str_contains( $m, 'manual entry' ) ) ) === 3 );
+check( 'the registry says whether a pane has a manual - its own handles, or the manual of its feature - and a panel without either has none', \Nino\Admin\Panels::hasManual( $manualRegistry['manualpanel'] ) === true
+	&& \Nino\Admin\Panels::hasManual( $registry['dummy'] ) === false && $registry['dummy']['manualFeature'] === '' && \Nino\Admin\Panels::hasManual( [ 'manual' => [], 'manualFeature' => 'sample' ] ) === true );
+check( 'one action asks for it, claimed by the shell before any panel', ( \Nino\Admin\Admin::actions( $withManualPanel )['admin/manual'] ?? [] ) === [ \Nino\Admin\Admin::class, 'apiManual' ] );
+
+\Nino\Html::addFills( $withManualPanel, [
+	'[[/_admin/manualpanel/manual/intro]]'	=> 'What it is for.',
+	'[[/_admin/manualpanel/manual/page]]'		=> 'What a person does with a page.',
+	'[[/_admin/manualpanel/manual/item-2]]'	=> 'Item two.',
+], '*' );
+[ $status, $body ] = callDev( $withManualPanel, \Nino\Admin\Admin::class, 'apiManual', [ 'panel' => 'manualpanel' ] );
+check( 'a panel\'s manual is one section with no heading, an entry per handle in the order it names them, the line of each from its fill', $status === 200
+	&& $body['sections'] === [ [ 'heading' => '', 'entries' => [
+		[ 'handle' => '', 'text' => 'What it is for.' ],
+		[ 'handle' => 'page', 'text' => 'What a person does with a page.' ],
+		[ 'handle' => 'item-2', 'text' => 'Item two.' ],
+	] ] ] && $body['title'] === 'Manual panel' && $body['words'] === true && $body['text'] === '' && $body['none'] === '' );
+check( '...the handle "intro" has no handle to show - it says what the whole panel is for, which is how a line about a whole section is told', $body['sections'][0]['entries'][0]['handle'] === '' && $body['sections'][0]['entries'][1]['handle'] === 'page' );
+
+[ $status, $body ] = callDev( $withManualPanel, \Nino\Admin\Admin::class, 'apiManual', [ 'panel' => 'nope' ] );
+check( 'a pane the registry does not know has no manual to ask for, and the refusal has a code the workbench says in both languages', $status === 404 && $body === [ 'error' => 'no manual', 'code' => 'no_manual' ] );
+$withoutManual = $withModule;
+[ $status ] = callDev( $withoutManual, \Nino\Admin\Admin::class, 'apiManual', [ 'panel' => 'dummy' ] );
+check( '...nor one that has none', $status === 404 );
+check( '...and a panel name that is no string is no panel', callDev( $withManualPanel, \Nino\Admin\Admin::class, 'apiManual', [ 'panel' => [ 'manualpanel' ] ] )[0] === 404
+	&& callDev( $withManualPanel, \Nino\Admin\Admin::class, 'apiManual', [] )[0] === 404 );
+
+$ownManualPanel = $withManualPanel;
+ninoUser( $ownManualPanel, 'narrow@example.com', [ '/_admin/elements/manage' ] );
+check( 'whoever may not see the pane cannot read its manual either - the registry the "?" was drawn from is the one asked', callDev( $ownManualPanel, \Nino\Admin\Admin::class, 'apiManual', [ 'panel' => 'manualpanel' ] )[0] === 404
+	&& str_contains( \Nino\Admin\Admin::panesHtml( $ownManualPanel ), 'data-manual="manualpanel"' ) === false );
+\Nino\Auth::logoutUser( $ownManualPanel );
+[ $status, $body ] = callDev( $ownManualPanel, \Nino\Admin\Admin::class, 'apiManual', [ 'panel' => 'manualpanel' ] );
+check( '...and nobody logged in gets the answer every action gives, a session that is gone', $status === 401 && ( $body['code'] ?? '' ) === 'session' );
+
 /*	The registry is built once per request and reused. Building it is a glob
 	over the module directories, a ReflectionClass per panel class to tell a
 	feature's from the tool's own, and a nav()/actions() call each - and a
@@ -251,26 +310,31 @@ check( 'a panel naming the features group from outside features/ is refused and 
 		&& count( array_filter( $warnings, static fn( string $m ): bool => str_contains( $m, 'AdminSmokeFeatureNamerPanel' ) && str_contains( $m, 'features' ) ) ) === 1;
 } )() );
 
+// The "?" that ends the head of a pane with a manual (see Panels::$html['head-manual'])
+$manualButton = static fn( string $uri ): string => '<button type="button" class="admin-panel-manual" data-manual="'. $uri. '" aria-haspopup="dialog" aria-label="[[/_admin/common/label/manual]]" title="[[/_admin/common/label/manual]]">?</button>';
+
 /*	The head is the default and the Dashboard the exception, not the other
 	way round: a panel that says nothing opens with the row that names it,
 	one that answers head() false opens on its screen alone - and the
-	registry carries the answer, so the rail and the panes read one value	*/
-check( 'a panel answering head() false opens on its screen alone; one that says nothing gets the head, the Dashboard is the one shipped panel without', ( static function() use ( $withModule ): bool {
+	registry carries the answer, so the rail and the panes read one value.
+	The Dashboard has a manual, and a "?" has to stand somewhere: in a row of
+	its own, which is no head - it has no name, no strip and no actions	*/
+check( 'a panel answering head() false opens on its screen alone; one that says nothing gets the head; the Dashboard, which has a manual, gets the "?" in a row of its own and nothing else', ( static function() use ( $withModule, $manualButton ): bool {
 	$withHeadless = $withModule;
 	$withHeadless['/nino/modules'] = array_merge( $withHeadless['/nino/modules'], [ 'AdminSmokeHeadlessModule' ] );
 	$registry = \Nino\Admin\Admin::panels( $withHeadless );
 	$html = \Nino\Admin\Panels::panesHtml( $registry );
 	return ( $registry['headless']['head'] ?? null ) === false && ( $registry['dummy']['head'] ?? null ) === true && ( $registry['dashboard']['head'] ?? null ) === false
 		&& str_contains( $html, '<div id="admin-content-headless" data-panel="headless" data-layout="page" hidden><div id="headless-list"></div></div>' ) === true
-		&& str_contains( $html, 'admin-content-headless' ) === true && substr_count( $html, 'admin-panel-head' ) === count( $registry ) - 2
-		&& str_contains( $html, '<div id="admin-content-dashboard" data-panel="dashboard" data-layout="page" hidden></div>' ) === true
+		&& substr_count( $html, '<div class="admin-panel-head' ) === count( $registry ) - 2
+		&& str_contains( $html, '<div id="admin-content-dashboard" data-panel="dashboard" data-layout="page" hidden><div class="admin-panel-manualrow">'. $manualButton( 'dashboard' ). '</div><div id="dashboard-list"></div></div>' ) === true
 		&& substr_count( $html, '<h2 class="admin-panel-title">' ) === substr_count( $html, '<div class="admin-panel-head">' );
 } )() );
 
 $panesHtml = \Nino\Admin\Panels::panesHtml( $registry );
-check( 'every pane carries the mount points its script renders into, under the head that names the panel', str_contains( $panesHtml, '<div id="admin-content-navs" data-panel="navs" data-layout="page" hidden><div class="admin-panel-head"><h2 class="admin-panel-title">[[/_admin/nav/navs]]</h2><div class="admin-panel-actions"></div></div><div id="navs-list"></div><div id="navs-form"></div></div>' ) === true );
+check( 'every pane carries the mount points its script renders into, under the head that names the panel and ends with the "?" of its manual', str_contains( $panesHtml, '<div id="admin-content-navs" data-panel="navs" data-layout="page" hidden><div class="admin-panel-head"><h2 class="admin-panel-title">[[/_admin/nav/navs]]</h2><div class="admin-panel-actions"></div>'. $manualButton( 'navs' ). '</div><div id="navs-list"></div><div id="navs-form"></div></div>' ) === true );
 check( 'a panel without panes() gets the conventional <uri>-list mount', str_contains( $panesHtml, '<div id="admin-content-dummy" data-panel="dummy" data-layout="page" hidden><div class="admin-panel-head"><h2 class="admin-panel-title">Dummy</h2><div class="admin-panel-actions"></div></div><div id="dummy-list"></div></div>' ) === true );
-check( 'a pane with tabs carries the shared tab bar in its head, beside the name, its own screen first, and a tab pane per tab', str_contains( $panesHtml, '<div id="admin-content-language" data-panel="language" data-layout="page" hidden><div class="admin-panel-head"><h2 class="admin-panel-title">[[/_admin/nav/language]]</h2><div class="nino-admin-tabs nino-admin-tabs--bar nino-admin-tabs--panel admin-panel-tabs" role="tablist"><button type="button" role="tab" id="admin-tabbutton-language" class="nino-admin-tab" data-tab="language" aria-controls="admin-tab-language" aria-selected="false">[[/_admin/nav/languages]]</button><button type="button" role="tab" id="admin-tabbutton-translations" class="nino-admin-tab" data-tab="translations" aria-controls="admin-tab-translations" aria-selected="false">[[/_admin/nav/translations]]</button></div><div class="admin-panel-actions"></div></div><div id="admin-tab-language" role="tabpanel" aria-labelledby="admin-tabbutton-language" data-tab="language" hidden><div id="language-form"></div></div><div id="admin-tab-translations" role="tabpanel" aria-labelledby="admin-tabbutton-translations" data-tab="translations" hidden><div id="translations-content"></div></div></div>' ) === true );
+check( 'a pane with tabs carries the shared tab bar in its head, beside the name, its own screen first, and a tab pane per tab', str_contains( $panesHtml, '<div id="admin-content-language" data-panel="language" data-layout="page" hidden><div class="admin-panel-head"><h2 class="admin-panel-title">[[/_admin/nav/language]]</h2><div class="nino-admin-tabs nino-admin-tabs--bar nino-admin-tabs--panel admin-panel-tabs" role="tablist"><button type="button" role="tab" id="admin-tabbutton-language" class="nino-admin-tab" data-tab="language" aria-controls="admin-tab-language" aria-selected="false">[[/_admin/nav/languages]]</button><button type="button" role="tab" id="admin-tabbutton-translations" class="nino-admin-tab" data-tab="translations" aria-controls="admin-tab-translations" aria-selected="false">[[/_admin/nav/translations]]</button></div><div class="admin-panel-actions"></div>'. $manualButton( 'language' ). '</div><div id="admin-tab-language" role="tabpanel" aria-labelledby="admin-tabbutton-language" data-tab="language" hidden><div id="language-form"></div></div><div id="admin-tab-translations" role="tabpanel" aria-labelledby="admin-tabbutton-translations" data-tab="translations" hidden><div id="translations-content"></div></div></div>' ) === true );
 
 
 /*	Every piece of that markup is an entry of Panels::$html, not a string the
@@ -777,6 +841,21 @@ $conversions = static fn( array $warnings ): array => array_filter( $warnings, s
 check( 'an array-shaped ?locale is ignored rather than cast', \Nino\Locales::getCurrentLocale( $arrayLocale ) === 'en_US'
 	&& \Nino\Runtime::getSessionValue( $arrayLocale, './admin/locale', '' ) === '' && $conversions( $localeWarnings ) === [] );
 check( 'none of the three raised an "Array to string conversion" on the way', $conversions( array_merge( $postWarnings, $localeWarnings ) ) === [] );
+
+// The language the workbench speaks and the one a panel edits in are two values, and neither is the visitor's own: ?locale= sets
+// the interface language and nothing else, and the request renders in it without writing it into the visitor's session
+$apart = $appData;
+foreach( [ './admin/locale', './admin/content-locale', './nino/locales/current' ] as $sessionKey )
+	\Nino\Runtime::unsetSessionValue( $apart, $sessionKey );
+$_GET['locale'] = 'en_US';
+\Nino\Admin\Admin::init( $apart );
+unset( $_GET['locale'] );
+check( '?locale= sets the interface language, which the workbench renders in for the request',
+	\Nino\Runtime::getSessionValue( $apart, './admin/locale', '' ) === 'en_US' && \Nino\Admin\Admin::sessionLocale( $apart ) === 'en_US' && \Nino\Locales::getCurrentLocale( $apart ) === 'en_US' );
+check( '...and nothing else: the working language is still the native one, and the visitor\'s own locale was never written',
+	\Nino\Admin\Admin::contentLocale( $apart ) === $apart['/nino/locales/native'] && \Nino\Runtime::getSessionValue( $apart, './admin/content-locale', 'unwritten' ) === 'unwritten'
+	&& \Nino\Runtime::getSessionValue( $apart, './nino/locales/current', 'unwritten' ) === 'unwritten' );
+\Nino\Runtime::unsetSessionValue( $apart, './admin/locale' );
 
 echo "\n";
 
