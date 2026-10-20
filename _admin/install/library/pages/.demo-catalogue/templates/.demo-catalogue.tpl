@@ -2398,7 +2398,7 @@
 		<div class="nino-grid-100 nino-grid-m-33 nino-p-1"><p class="nino-alert nino-autoheight" data-autoheight-group="katalog">A longer text that spans two lines and determines the group height.</p></div>
 		<div class="nino-grid-100 nino-grid-m-33 nino-p-1"><p class="nino-alert nino-autoheight" data-autoheight-group="katalog">Short too.</p></div>
 		<div class="nino-grid-100">
-			<p class="nino-section-text"><span class="nino-fx nino-fx-vertical-bounce">.nino-fx-vertical-bounce</span> — the continuous motion used by the arrow below a hero.</p>
+			<p class="nino-section-text"><span class="nino-fx nino-fx-vertical-bounce">.nino-fx-vertical-bounce</span> — a motion that runs once and stops, like the arrow below a hero, which runs twice.</p>
 		</div>
 	</div>
 </section>
@@ -2645,7 +2645,7 @@
 			<p class="nino-badge-cloud"><span class="nino-badge nino-badge--pill">.nino-hero-arrowdown</span> <span class="nino-badge nino-badge--pill">&#91;scroll-hint&#93;</span></p>
 		</div>
 	</div>
-	<a class="nino-hero-arrowdown" href="#" data-arrow-next aria-label="[[/template/common/slider/next]]"></a>
+	<a class="nino-hero-arrowdown" href="#" data-arrow-next aria-label="[[/template/common/navigation/next-section]]"></a>
 </section>
 <section class="nino-hero nino-section nino-section--dark nino-pt-4 nino-pb-6 nino-mt-0 nino-mb-0" id="hero-hint-dark" aria-labelledby="hero-hint-dark-title">
 	<div class="nino-grid-row nino-grid-row--wide">
@@ -2654,7 +2654,7 @@
 			<p class="nino-section-subtitle">The same arrow, light on the dark ground, goes to the section after this one.</p>
 		</div>
 	</div>
-	<a class="nino-hero-arrowdown" href="#" data-arrow-next aria-label="[[/template/common/slider/next]]"></a>
+	<a class="nino-hero-arrowdown" href="#" data-arrow-next aria-label="[[/template/common/navigation/next-section]]"></a>
 </section>
 
 <!-- Ein Hero füllt den ersten Bildschirm und bringt den Pfeil mit, der zum

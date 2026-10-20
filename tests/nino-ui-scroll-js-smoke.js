@@ -244,7 +244,7 @@ const publicCss = fs.readFileSync( path.join( __dirname, '../_nino/Nino.css' ), 
 const reduceBlock = ( publicCss.match( /@media \(prefers-reduced-motion: reduce\) \{(.*?)\n\}/s ) || [ '', '' ] )[1];
 check( 'the stylesheet clamps every transition and animation, not a named few',
 	/\*,\s*\*::before,\s*\*::after \{[^}]*animation-duration: \.01ms !important;[^}]*transition-duration: \.01ms !important;/s.test( reduceBlock ) );
-check( '...and the three that run forever are still stopped outright, after the clamp',
+check( '...and the three that move on their own are still stopped outright, after the clamp',
 	reduceBlock.indexOf('animation: none !important;') > reduceBlock.indexOf('transition-duration: .01ms !important;')
 	&& reduceBlock.includes('.nino-hero-arrowdown') && reduceBlock.includes('.nino-fx-vertical-bounce') );
 

@@ -206,7 +206,7 @@ check( '--shadow-card is none until a design layer says otherwise, and the two c
 	&& str_contains( $hookRules( '.nino-pricing-item' ), 'box-shadow: var(--shadow-card)' ) === true );
 check( '...a borderless card is without a surface, and a shadow is part of one: it keeps none', str_contains( $hookRules( '.nino-card--borderless' ), 'box-shadow: none' ) === true );
 
-// What the card shadow leaves alone: no rule but these two writes a box-shadow of its own
+// What the card shadow leaves alone: no rule but these writes a box-shadow of its own
 $hookShadows = [];
 preg_match_all( '/([^{}]+)\{([^{}]*)\}/', $hookCss, $hookBlocks, PREG_SET_ORDER );
 foreach( $hookBlocks as [ , $hookBlockSelector, $hookBlockBody ] )
@@ -214,8 +214,8 @@ foreach( $hookBlocks as [ , $hookBlockSelector, $hookBlockBody ] )
 		foreach( $hookBlockShadows[1] as $hookBlockShadow )
 			if( in_array( $hookBlockShadow, [ 'var(--shadow-card)', 'none' ], true ) === false )
 				$hookShadows[] = trim( (string) preg_replace( '/\s+/', ' ', $hookBlockSelector ) );
-check( 'the only box-shadows Nino.css writes itself are those of the middle card of .nino-pricing-row--feature-middle and of the toast'. ( $hookShadows === [] ? ' - none found' : ' - found: '. implode( ', ', $hookShadows ) ),
-	$hookShadows === [ '.nino-pricing-row--feature-middle > .nino-pricing-item:nth-child(2)', '.nino-toast' ] );
+check( 'the only box-shadows Nino.css writes itself are those of the middle card of .nino-pricing-row--feature-middle and of the toast - and the second line of two focus rings, the one of a button on a cover or a hero and the one of the dot of a slider'. ( $hookShadows === [] ? ' - none found' : ' - found: '. implode( ', ', $hookShadows ) ),
+	$hookShadows === [ ':is(.nino-cover, .nino-parallex, .nino-hero) .nino-btn:focus-visible', '.nino-pricing-row--feature-middle > .nino-pricing-item:nth-child(2)', '.nino-slider-point:focus-visible', '.nino-toast' ] );
 
 echo "\n";
 
@@ -625,7 +625,7 @@ $groundPage = [ 'bg' => 'var(--color-background)', 'text' => 'var(--color-text)'
 $groundRestores = [
 	'.nino-alert'																=> $groundPage,
 	'.nino-modal'																=> $groundPage,
-	'.nino-nav-burger input:checked ~ .nino-nav-content'	=> $groundPage,
+	'.nino-nav-burger > button[aria-expanded="true"] ~ .nino-nav-content'	=> $groundPage,
 	'.nino-localepicker-wrap input:checked + div'				=> $groundPage,
 	'.nino-cover--dim'													=> $groundSource['black'],
 	'.nino-section--dim'												=> $groundSource['black'],
@@ -859,6 +859,60 @@ check( 'the chevron of the arrow of a hero is a mask over currentColor on a ::be
 	&& $hookValue( $chevronBody, 'mask-repeat' ) === 'no-repeat' && $hookValue( $chevronBody, '-webkit-mask-repeat' ) === 'no-repeat' );
 check( '...and the arrow itself wears no mask and paints no ground of its own: a mask clips the focus ring with the rest of what its element paints (measured: a keyboard focus changed no pixel of an arrow that carried the mask), so the arrow is the box and the ring of the page is drawn around it',
 	preg_match( '/(?<!\w)(?:-webkit-)?mask(?:-[a-z-]+)?\s*:/', $arrowBody ) !== 1 && $hookValue( $arrowBody, 'background-color' ) === 'transparent' && $hookValue( $arrowBody, 'outline' ) === null );
+
+/*	What the arrow does on its own is bounded: SC 2.2.2 allows five seconds of motion nobody asked for, and a bounce that never ended moved for as long as the page was open.
+	Two runs of 1.8s are 3.6s; the bounce effect runs once. Neither takes the ring away - the arrow is a control, and its rule says nothing about the outline	*/
+$arrowRun = preg_match( '/^nino-hero-arrowdown-bounce\s+([\d.]+)s\s+[a-z-]+\s+(\d+)$/', (string) $hookValue( $arrowBody, 'animation' ), $arrowFound ) === 1 ? (float) $arrowFound[1] * (int) $arrowFound[2] : -1.0;
+check( 'the arrow of a hero stops moving after a few runs, five seconds in all at the most (SC 2.2.2), and so does the bounce effect, which runs once - nothing in the rule of the arrow takes its outline away',
+	$arrowRun > 0 && $arrowRun <= 5 && preg_match( '/\binfinite\b/', $arrowBody ) !== 1 && preg_match( '/\binfinite\b/', $groundOf( '.nino-fx-vertical-bounce' ) ) !== 1
+	&& preg_match( '/(?<![\w-])outline\s*:\s*(?:none|0)/', $arrowBody. ' '. $chevronBody ) !== 1 );
+
+/*	The accessibility pass, as the stylesheet says it. An opacity moves a colour that a design layer has solved: the muted role is 4.5:1 against its ground, and at .8 of it the words
+	read at 3.1:1, where a quieter variant is smaller and no more transparent	*/
+$a11yFaded = array_filter( [ '.nino-section-subtitle', '.nino-section-subtitle--quiet', '.nino-section-text--quiet' ], static fn( string $class ): bool => preg_match( '/(?<![\w-])opacity\s*:/', $groundOf( $class ) ) === 1 );
+check( 'a subtitle of a section and the quiet variants of a subtitle and a text are no more transparent than their colour is: an opacity put the muted role, solved to 4.5:1, at 3.1:1 - quieter is smaller'. ( $a11yFaded === [] ? '' : ' - faded: '. implode( ', ', $a11yFaded ) ),
+	$a11yFaded === [] && $groundSets( $groundOf( '.nino-section-subtitle' ), 'color', 'var(--color-subtitle)' ) === true
+	&& str_contains( $groundOf( '.nino-section-subtitle--quiet' ), 'var(--scale-quiet)' ) === true && str_contains( $groundOf( '.nino-section-text--quiet' ), 'var(--scale-quiet)' ) === true );
+
+// The pointer dims the two brand buttons and the focus does not - an opacity takes the ring of the focus with the rest of the element
+$a11yDims = [];
+foreach( $groundBlocks as [ , $a11ySelectors, $a11yBody ] )
+	if( preg_match( '/\.nino-btn--(?:primary|brand-alt)(?![\w-])/', (string) $a11ySelectors ) === 1 && preg_match( '/(?<![\w-])opacity\s*:\s*(?!1\s*;)/', (string) $a11yBody ) === 1 )
+		$a11yDims[] = trim( (string) preg_replace( '/\s+/', ' ', (string) $a11ySelectors ) );
+check( 'the two brand buttons are dimmed by the pointer and by nothing else: the one rule each has an opacity in says :hover and never :focus, and keeps the dimming off a button the keyboard has focused, so that the ring is never dimmed - in :where(), which leaves the rule as specific as it was for a design layer that takes the dimming back',
+	count( $a11yDims ) === 2 && array_filter( $a11yDims, static fn( string $selector ): bool => str_contains( $selector, ':hover' ) === false || preg_match( '/:focus(?!-visible)/', $selector ) === 1
+		|| str_contains( $selector, ':where(:not(:focus-visible))' ) === false ) === [] );
+check( '...the ring is the one outline of everything that can take the focus, and on a picture it has a second line - the ink of the surface, the colour its words are read in on that picture - for the button of a cover, a parallax and a hero',
+	$groundSets( $groundOf( ':where(a, area, button, input, label[tabindex], select, summary, textarea, [contenteditable], [tabindex]):focus-visible' ), 'outline', '2px solid var(--color-focus)' ) === true
+	&& $groundSets( $groundOf( ':is(.nino-cover, .nino-parallex, .nino-hero) .nino-btn:focus-visible' ), 'box-shadow', '0 0 0 2px var(--color-ink)' ) === true );
+
+// What a field shows before anything is written in it is the muted role of the ground it stands on, at the strength it was solved for, on a field that has that ground and its ink
+$a11yField = array_filter( [ '.nino-form-input', '.nino-form-textarea', '.nino-form-select' ], static fn( string $selector ): bool => $groundSets( $groundOf( $selector ), 'background-color', 'var(--color-ground)' ) === false || $groundSets( $groundOf( $selector ), 'color', 'var(--color-ink)' ) === false );
+$a11yHint = array_filter( [ '.nino-form-input::placeholder', '.nino-form-textarea::placeholder' ], static fn( string $selector ): bool => $groundSets( $groundOf( $selector ), 'color', 'var(--color-subtitle)' ) === false || $groundSets( $groundOf( $selector ), 'opacity', '1' ) === false );
+check( 'the placeholder of a field is the muted role at full strength, and the field is painted in the ground it stands on and written in its ink: the browser\'s own grey was 2.4:1 on the dark field of a dark page, and the role is measured against a ground'
+	. ( $a11yField === [] ? '' : ' - not so: '. implode( ', ', $a11yField ) ). ( $a11yHint === [] ? '' : ' - not so: '. implode( ', ', $a11yHint ) ), $a11yField === [] && $a11yHint === [] );
+check( 'a badge is written in the ink of its ground, painted in that ground and edged with its border: the pair a ground promises, whichever it is - the border role is solved to 3:1 and is no surface for text, which black ink on it was on a black section',
+	$groundSets( $groundOf( '.nino-badge' ), 'background-color', 'var(--color-ground)' ) === true && $groundSets( $groundOf( '.nino-badge' ), 'color', 'var(--color-ink)' ) === true
+	&& $groundSets( $groundOf( '.nino-badge' ), 'border', '1px solid var(--color-border)' ) === true && preg_match( '/(?<![\w-])opacity\s*:/', $groundOf( '.nino-badge' ) ) !== 1 );
+
+// The dot of a slider is a target of 24px round a dot of 12 (SC 2.5.8) with room for its neighbours, and the fade of an inactive slide stays off the button in it, where it took the ring along
+$dotSize = (int) $hookValue( $groundOf( '.nino-slider-points li' ), 'width' );
+$dotInset = preg_match( '/^-(\d+)px$/', (string) $hookValue( $groundOf( '.nino-slider-point' ), 'inset' ), $dotFound ) === 1 ? (int) $dotFound[1] : 0;
+$dotMargin = preg_match( '/^0 (\d+)px$/', (string) $hookValue( $groundOf( '.nino-slider-points li' ), 'margin' ), $dotFound ) === 1 ? (int) $dotFound[1] : 0;
+check( 'the dot of a slider is a target of 24px round a dot of 12px, its neighbours leave it the room, and the ring of its button is drawn with a line of ink inside it and in full strength: the opacity of an inactive slide does not reach it',
+	$dotSize === 12 && $dotSize + 2 * $dotInset >= 24 && $dotSize + 2 * $dotMargin >= $dotSize + 2 * $dotInset && $groundSets( $groundOf( '.nino-slider-points li' ), 'opacity', '1' ) === true
+	&& $groundSets( $groundOf( '.nino-slider-point:focus-visible' ), 'box-shadow', 'inset 0 0 0 2px var(--color-ink)' ) === true );
+check( 'the close button of a dialog is a target of 24px each way at least (SC 2.5.8), where it was as wide as the cross it draws',
+	preg_match( '/^(\d+)px$/', (string) $hookValue( $groundOf( '.nino-modal-close' ), 'min-width' ), $dotFound ) === 1 && (int) $dotFound[1] >= 24
+	&& preg_match( '/^(\d+)px$/', (string) $hookValue( $groundOf( '.nino-modal-close' ), 'min-height' ), $dotFound ) === 1 && (int) $dotFound[1] >= 24 );
+
+// What is written for the keyboard shows itself when it has the focus: a link that hides in the way of .nino-sr-only takes back what hides it, above the fixed header, and the target of the skip link has no ring round the whole of the main part
+$skipShown = array_filter( [ [ 'width', 'auto' ], [ 'height', 'auto' ], [ 'clip', 'auto' ], [ 'overflow', 'visible' ], [ 'margin', '0' ], [ 'position', 'fixed' ] ], static fn( array $property ): bool => $groundSets( $groundOf( 'a.nino-sr-only:focus' ), $property[0], $property[1] ) === false );
+check( 'a link that is hidden as .nino-sr-only hides it shows itself when it has the focus - its size, its clip, its overflow and its margin taken back, fixed in the corner above the header - and the target of a skip link has no ring round the whole of the main part'. ( $skipShown === [] ? '' : ' - still hidden: '. implode( ', ', array_column( $skipShown, 0 ) ) ),
+	$skipShown === [] && (int) $hookValue( $groundOf( 'a.nino-sr-only:focus' ), 'z-index' ) > (int) $hookValue( $groundOf( 'header' ), 'z-index' ) && (int) $hookValue( $groundOf( 'header' ), 'z-index' ) > 0
+	&& $groundSets( $groundOf( 'main[tabindex="-1"]:focus-visible' ), 'outline', 'none' ) === true );
+check( 'the name of the site written out in the link of the logo is hidden when the link holds a picture, and is the name of the site that a screen reader is spared',
+	$groundSets( $groundOf( '.nino-logo:has(img) > span[aria-hidden="true"]' ), 'display', 'none' ) === true );
 
 // The animation
 $vpaSeconds = static fn( string $selector ): float => (float) $hookValue( $groundOf( $selector ), '--vpa-duration' );
@@ -1117,7 +1171,7 @@ $kernelPlaces = [ 'title' => [ 'hero', 'section' ], 'card-title' => [ 'card' ], 
 $kernelDraws = [ 'title' => '{tag} .nino-section-title', 'card-title' => '{tag} .nino-card-title', 'hero-title' => '{tag} .nino-hero-title',
 	'subtitle' => '{tag} .nino-section-subtitle', 'card-subtitle' => '{tag} .nino-card-subtitle', 'hero-subtitle' => '{tag} .nino-hero-subtitle', 'button' => 'a .nino-btn' ];
 // The tags each of the six may be drawn as, with the one it is where the shortcode names none first: a title in a hero is an h2, a section's an h3, a card's an h4
-$sixTags = [ 'title' => [ 'h3', [ 'div', 'h3', 'h4' ] ], 'subtitle' => [ 'div', [ 'div', 'p', 'h4', 'h5' ] ], 'card-title' => [ 'h4', [ 'div', 'h3', 'h4' ] ], 'card-subtitle' => [ 'p', [ 'div', 'p', 'h5', 'h6' ] ],
+$sixTags = [ 'title' => [ 'h3', [ 'div', 'h2', 'h3', 'h4' ] ], 'subtitle' => [ 'div', [ 'div', 'p', 'h4', 'h5' ] ], 'card-title' => [ 'h4', [ 'div', 'h3', 'h4' ] ], 'card-subtitle' => [ 'p', [ 'div', 'p', 'h5', 'h6' ] ],
 	'hero-title' => [ 'h2', [ 'div', 'h2', 'h3' ] ], 'hero-subtitle' => [ 'p', [ 'div', 'p', 'h3', 'h4' ] ] ];
 check( 'the registry says where each of the six titles is offered, and what it draws - the class is the one the component is named for',
 	array_filter( $kernelPlaces, static fn( array $places, string $name ): bool => ( \Nino\Modules\Components::components( $appData )[$name]['in'] ?? null ) !== $places, ARRAY_FILTER_USE_BOTH ) === []
@@ -1490,6 +1544,9 @@ foreach( $sixTags as $tagName => [ $tagDefault, $tagOptions ] )
 		if( in_array( $tagUnknown, $tagOptions, true ) === false && $render( '['. $tagName. ' /template/page-home/hero/title tag="'. $tagUnknown. '"]' ) !== '<'. $tagDefault. ' class="'. $sixClasses[$tagName]. '">Hi &#91;there]</'. $tagDefault. '>' )
 			$tagWrong[] = $tagName. ' tag="'. $tagUnknown. '"';
 check( 'a tag a title does not offer is the default one, for each of the six - another heading level, the wrong case, another element, markup, a tag with an attribute behind it, none - so that nothing but the options of the select reaches the markup'. ( $tagWrong === [] ? '' : ' - '. implode( ', ', $tagWrong ) ), $tagWrong === [] );
+check( 'the title of a section may be an h2 as well as an h3 - the h3 it is where the call names no tag - which is what a page needs under the h1 of its header',
+	$render( '[title /template/page-home/hero/title tag="h2"]' ) === '<h2 class="nino-section-title">Hi &#91;there]</h2>' && $render( '[title /template/page-home/hero/title]' ) === '<h3 class="nino-section-title">Hi &#91;there]</h3>'
+	&& in_array( 'h2', \Nino\Modules\Components::components( $appData )['title']['attributes']['tag']['options'], true ) === true );
 check( '[text] keeps the paragraphs and lists of its key and marks the wrapper as rich text', $render( '[text /template/page-home/services/text]' ) === '<div class="nino-section-text nino-richtext"><p>One</p><ul><li>a</li></ul></div>' );
 check( '[text format="inline"] sanitizes to that format', $render( '[text /template/page-home/services/text format="inline" style="quiet"]' ) === '<div class="nino-section-text nino-section-text--quiet">One a</div>' );
 check( '[text] keeps the classes it always had, in the order it always had them: the class, the mark as rich text, the style, its own',
@@ -1513,6 +1570,11 @@ check( '[html] is its content as rich text, and nothing without content', $rende
 check( '[button] is a link drawn as one: label from a key, address from a key, a style', $render( '[button /_nino/webpage/contact/name href="/_nino/webpage/contact/uri" style="primary"]' ) === '<a class="nino-btn nino-btn--primary" href="/contact">Contact us</a>' );
 check( '[button] takes a fixed label, a size, a target - and a target that is another window says it is no concern of the opener', $render( '[button text="Go" href="https://example.com" size="big" target="_blank"]' ) === '<a class="nino-btn nino-btn--big" href="https://example.com" target="_blank" rel="noopener">Go</a>' );
 check( '[button] with a fixed label reads its first argument as the address', $render( '[button /_nino/webpage/contact/uri text="Mehr"]' ) === '<a class="nino-btn" href="/contact">Mehr</a>' );
+check( '[button] with no address is no link: the same classes on a <span>, since an <a> without an href is no stop of the Tab key and has nothing to press - a target means nothing without one, and a button with an address is the link it was',
+	$render( '[button text="Go"]' ) === '<span class="nino-btn">Go</span>'
+	&& $render( '[button text="Go" style="primary" size="small" class="x" target="_blank"]' ) === '<span class="nino-btn nino-btn--primary nino-btn--small x">Go</span>'
+	&& $render( '[button /template/page-home/stored/title]' ) === '<span class="nino-btn">Let&#039;s talk about &quot;us&quot; &#91;today]</span>'
+	&& $render( '[button text="Go" href="#x"]' ) === '<a class="nino-btn" href="#x">Go</a>' && str_contains( $render( '[button text="Go"]' ), '<a' ) === false );
 check( '[button] with a scheme that is no safe one is a link to nowhere, and its fixed label is escaped', $render( '[button text="<i>[x" href="javascript:alert(1)"]' ) === '<a class="nino-btn" href="#">&lt;i&gt;&#91;x</a>' );
 
 // The card: the <article> of a component that holds components. What stands between its tags is the template's own markup, rendered with the output
@@ -1718,20 +1780,24 @@ check( '...and a component of a project that says link is wrapped the same way, 
 
 // The width of a button: full is the class nino-btn--fullwidth, after the size
 check( '[button width="full"] is the class nino-btn--fullwidth after the style and the size and before its own class; none is no class, and a word outside the options is none',
-	$render( '[button text="Go" width="full"]' ) === '<a class="nino-btn nino-btn--fullwidth">Go</a>'
+	$render( '[button text="Go" width="full"]' ) === '<span class="nino-btn nino-btn--fullwidth">Go</span>'
 	&& $render( '[button text="Go" style="primary" size="big" width="full" class="x" href="#y"]' ) === '<a class="nino-btn nino-btn--primary nino-btn--big nino-btn--fullwidth x" href="#y">Go</a>'
 	&& $render( '[button text="Go" width=""]' ) === $render( '[button text="Go"]' ) && $render( '[button text="Go" width="fullwidth"]' ) === $render( '[button text="Go"]' ) && $render( '[button text="Go" width="weird"]' ) === $render( '[button text="Go"]' ) );
 
-// The scroll hint: a real link, the arrow at the foot of a hero
-\Nino\Html::addFills( $appData, [ '/template/common/slider/next' => 'Weiter' ], '*' );
-$nextWords = array_map( static fn( string $locale ): string => (string) ( ( include __DIR__. '/../_admin/install/library/base/text/'. $locale. '.php' )['[[/template/common/slider/next]]'] ?? '' ), [ 'de_DE', 'en_US' ] );
-check( '[scroll-hint] is an <a> of nino-hero-arrowdown named for a screen reader by the text of the next control of a slider, which the base unit ships in both languages: a # marked data-arrow-next for the script to scroll to the next section, or the id of the section it is told to go to',
-	$render( '[scroll-hint]' ) === '<a class="nino-hero-arrowdown" href="#" data-arrow-next aria-label="Weiter"></a>'
-	&& $render( '[scroll-hint to="news-2" class="x y"]' ) === '<a class="nino-hero-arrowdown x y" href="#news-2" aria-label="Weiter"></a>'
-	&& in_array( '', $nextWords, true ) === false && $nextWords[0] !== $nextWords[1] );
+// The scroll hint: a real link, the arrow at the foot of a hero, named by a text of its own - the next section, which is not the next slide of a slider
+\Nino\Html::addFills( $appData, [ '/template/common/slider/next' => 'Vor', '/template/common/navigation/next-section' => 'Zum Abschnitt' ], '*' );
+$baseWords = static fn( string $key ): array => array_map( static fn( string $locale ): string => (string) ( ( include __DIR__. '/../_admin/install/library/base/text/'. $locale. '.php' )['[[/template/common/'. $key. ']]'] ?? '' ), [ 'de_DE', 'en_US' ] );
+$nextWords = $baseWords( 'navigation/next-section' );
+$slideWords = $baseWords( 'slider/next' );
+check( '[scroll-hint] is an <a> of nino-hero-arrowdown named for a screen reader by a text of its own, not the word of the next control of a slider, which the base unit ships in both languages: a # marked data-arrow-next for the script to scroll to the next section, or the id of the section it is told to go to',
+	$render( '[scroll-hint]' ) === '<a class="nino-hero-arrowdown" href="#" data-arrow-next aria-label="Zum Abschnitt"></a>'
+	&& $render( '[scroll-hint to="news-2" class="x y"]' ) === '<a class="nino-hero-arrowdown x y" href="#news-2" aria-label="Zum Abschnitt"></a>'
+	&& in_array( '', $nextWords, true ) === false && $nextWords[0] !== $nextWords[1] && $nextWords[0] !== $slideWords[0] && $nextWords[1] !== $slideWords[1] );
 check( '...a target that is no id is none - it never reaches the address - and the arrow is a link and no button',
-	$render( '[scroll-hint to="9 bad&quot; onclick=&quot;x"]' ) === $render( '[scroll-hint]' ) && $render( '[scroll-hint to="a-b_c"]' ) === '<a class="nino-hero-arrowdown" href="#a-b_c" aria-label="Weiter"></a>'
-	&& $render( '[scroll-hint class="a&quot;b"]' ) === '<a class="nino-hero-arrowdown a&amp;quot;b" href="#" data-arrow-next aria-label="Weiter"></a>' && str_contains( $render( '[scroll-hint]' ), '<button' ) === false );
+	$render( '[scroll-hint to="9 bad&quot; onclick=&quot;x"]' ) === $render( '[scroll-hint]' ) && $render( '[scroll-hint to="a-b_c"]' ) === '<a class="nino-hero-arrowdown" href="#a-b_c" aria-label="Zum Abschnitt"></a>'
+	&& $render( '[scroll-hint class="a&quot;b"]' ) === '<a class="nino-hero-arrowdown a&amp;quot;b" href="#" data-arrow-next aria-label="Zum Abschnitt"></a>' && str_contains( $render( '[scroll-hint]' ), '<button' ) === false );
+check( 'the base unit says the name of the menu button and the words of the skip link in both languages, each in the words of its own: what a screen reader is told is a text of the page and never a key',
+	array_filter( [ 'navigation/menu', 'navigation/skip' ], static fn( string $key ): bool => in_array( '', $baseWords( $key ), true ) === true || $baseWords( $key )[0] === $baseWords( $key )[1] ) === [] );
 
 // The sections: a stack whose cell is a whole section
 \Nino\Elements::insertElementType( $appData, '/posts', [ 'title' => [ 'type' => 'string', 'locale' => true ] ] );

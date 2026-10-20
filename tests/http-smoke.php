@@ -647,10 +647,27 @@ check( 'the localepicker also ignores an array-shaped locale query', \Nino\Local
 // A language is named by the fill after its code, /_nino/locale/<code>/name, which the
 // module's install unit delivers for the two languages the wizard offers and the
 // Language panel for one it adds
-\Nino\Html::addFills( $appData, [ '[[/_nino/locale/de_DE/name]]' => 'Deutsch', '[[/_nino/locale/en_US/name]]' => 'English (US)' ], '*' );
+\Nino\Html::addFills( $appData, [ '[[/_nino/locale/de_DE/name]]' => 'Deutsch', '[[/_nino/locale/en_US/name]]' => 'English (US)', '[[/module/localepicker/menu/title]]' => 'Choose your language' ], '*' );
 $pickerHtml = \Nino\Html::renderHtml( $appData, \Nino\Modules\Localepicker::doShortcode( $appData, [] ) );
-check( 'the localepicker names each language from /_nino/locale/<code>/name', str_contains( $pickerHtml, '>Deutsch</a>' ) === true && str_contains( $pickerHtml, '>English (US)</a>' ) === true
-	&& str_contains( $pickerHtml, '/_nino/locale/' ) === false );
+check( 'the localepicker names each language from /_nino/locale/<code>/name: the other one in a link, the current one - first in the list - in a span of its own',
+	str_contains( $pickerHtml, '>Deutsch</a>' ) === true && str_contains( $pickerHtml, '>English (US)</span>' ) === true && str_contains( $pickerHtml, '/_nino/locale/' ) === false
+	&& strpos( $pickerHtml, '>English (US)<' ) < strpos( $pickerHtml, '>Deutsch<' ) );
+
+/*	The fold-out of the picker is presentation: underneath it is a list of links a keyboard and a screen reader read as one. A language that is not the current one is a link to
+	the switch, with the language it is written in and the name it has in that language - lang and hreflang, so that a screen reader says it in its own voice - and the
+	current one is no link at all but says that it is the current one. The list has a name, and so has the checkbox that unfolds it; the name is no heading, since the picker
+	has no place in the outline of a page	*/
+check( '...a language that is not the current one is a link with its lang and hreflang, and the current one a span that says so, in its own language - and it is no link to itself',
+	preg_match( '#<a href="\?/_nino/localepicker/current=de_DE" lang="de-DE" hreflang="de-DE">Deutsch</a>#', $pickerHtml ) === 1
+	&& preg_match( '#<span aria-current="true" lang="en-US">English \(US\)</span>#', $pickerHtml ) === 1 && str_contains( $pickerHtml, 'current=en_US' ) === false );
+check( '...the list is named by the title the overlay shows, and so is the checkbox that unfolds it - and the title is no heading',
+	preg_match( '#<ul aria-label="Choose your language">#', $pickerHtml ) === 1 && preg_match( '#<input type="checkbox" aria-label="Choose your language">#', $pickerHtml ) === 1
+	&& preg_match( '#<h[1-6][ >]#', $pickerHtml ) !== 1 );
+\Nino\Locales::setCurrentLocale( $appData, 'de_DE' );
+$pickerDe = \Nino\Html::renderHtml( $appData, \Nino\Modules\Localepicker::doShortcode( $appData, [] ) );
+\Nino\Locales::setCurrentLocale( $appData, 'en_US' );
+check( '...and which one is the current one is the page\'s: in German it is Deutsch that is the span and English that is the link',
+	preg_match( '#<span aria-current="true" lang="de-DE">Deutsch</span>#', $pickerDe ) === 1 && preg_match( '#<a href="\?/_nino/localepicker/current=en_US" lang="en-US" hreflang="en-US">English \(US\)</a>#', $pickerDe ) === 1 );
 
 /*	The two switches are one method under two keys now. Modules\Localepicker's
 	callback used to be a verbatim copy of the kernel's - every line and every
@@ -1049,6 +1066,24 @@ check( 'a hand-written line is appended after the generated ones', substr_count(
 
 $navManual = \Nino\Modules\Navigation::doShortcode( $appData, [ 'content' => "/a:A\n/b:B" ] );
 check( 'a menu written entirely by hand still works, with no nav argument at all', substr_count( $navManual, '<li>' ) === 2 );
+/*	The entry of the page that is shown says so to what reads the markup and not only to what reads the class. The burger is a button that names the list it opens and
+	says whether it is open; the list is beside it, and not inside the button the way the whole of it was inside one label	*/
+check( 'the entry of the page that is shown carries aria-current="page" beside its class, and no other entry says either',
+	preg_match_all( '#<a [^>]*class="nino-is-active"[^>]*>#', $navHtml, $activeLinks ) === 1 && str_contains( $activeLinks[0][0], 'aria-current="page"' ) === true
+	&& substr_count( $navHtml, 'aria-current="page"' ) === 1 && substr_count( $navHtml, 'nino-is-active' ) === 1 );
+\Nino\Html::addFills( $appData, [ '[[/template/common/navigation/menu]]' => 'Menu' ], '*' );
+$burgerHtml = \Nino\Html::renderHtml( $appData, \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main', 'burger', 'id' => 'primary' ] ) );
+check( 'the burger is a button that names the list it opens and says it is closed - hidden, for the script to show, with an icon that is no name and a name of its own - and the list stands beside the button, not inside it',
+	preg_match( '#<button type="button" class="nino-nav-toggle" aria-expanded="false" aria-controls="primary-list" hidden>(.*?)</button>#s', $burgerHtml, $burgerButton ) === 1
+	&& str_contains( $burgerButton[1], '<svg' ) === true && str_contains( $burgerButton[1], 'aria-hidden="true"' ) === true && str_contains( $burgerButton[1], '>Menu</span>' ) === true
+	&& str_contains( $burgerButton[1], '<li>' ) === false && preg_match( '#</button>.*<div class="nino-nav-content" id="primary-list">.*<li>#s', $burgerHtml ) === 1
+	&& str_contains( $burgerHtml, '<label' ) === false && str_contains( $burgerHtml, 'type="checkbox"' ) === false );
+$burgerA = \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main', 'burger' ] );
+$burgerB = \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main', 'burger' ] );
+check( '...a burger with no id of its own names its list after its place on the page, so that two of them name two lists - and what a button controls is the id of the list beside it',
+	preg_match( '#aria-controls="([^"]+)"#', $burgerA, $listA ) === 1 && preg_match( '#aria-controls="([^"]+)"#', $burgerB, $listB ) === 1 && $listA[1] !== $listB[1]
+	&& str_contains( $burgerA, 'id="'. $listA[1]. '"' ) === true && str_contains( $burgerB, 'id="'. $listB[1]. '"' ) === true );
+check( '...and the menu that is not a burger has no button and nothing to name: it is the list it is', str_contains( $navHtml, '<button' ) === false && str_contains( $navHtml, 'aria-controls' ) === false );
 check( 'an empty shortcode renders nothing', \Nino\Modules\Navigation::doShortcode( $appData, [] ) === '' );
 check( 'an unknown menu key renders nothing', \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'nope' ] ) === '' );
 

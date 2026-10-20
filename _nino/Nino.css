@@ -818,6 +818,14 @@ header .nino-grid-100 {
 	width: 100%;
 	height: auto;
 }
+/*	The name of the site, written out in the link of the logo for the day there
+	is no logo: a link with nothing in it to see is a stop of the Tab key that
+	nobody can find. It is the copy of the name that a screen reader is spared -
+	the heading beside it says it already - and with a picture in the link the
+	picture is the name, and the copy stays out of the way	*/
+.nino-logo:has(img) > span[aria-hidden="true"] {
+	display: none;
+}
 footer {
 	width: 100%;
 	box-sizing: border-box;
@@ -830,7 +838,7 @@ footer {
 	fall back on. The header frames already pad their own nav links; this is
 	the same padding for the bands that do not.	*/
 footer .nino-nav-content li a,
-footer .nino-localepicker-wrap li a {
+footer .nino-localepicker-wrap li :is(a, span) {
 	display: inline-block;
 	padding-top: var(--space-1);
 	padding-bottom: var(--space-1);
@@ -888,6 +896,12 @@ main {
 	   container, so position:sticky inside it keeps working */
 	overflow-x: clip;
 }
+/*	The target of the skip link. It can be focused so that the focus can be put
+	there - tabindex="-1", no stop of the Tab key - and a ring round the whole of
+	the main part of a page says nothing: the next stop of the Tab key is in it	*/
+main[tabindex="-1"]:focus-visible {
+	outline: none;
+}
 /* The Builder writes a div.nino-wrap around a page's sections, which puts the
    hero one level down - the second selector of each pair is that form */
 main:has(> .nino-cover.nino-hero:first-child),
@@ -910,7 +924,8 @@ body.nino-scroll-atf .nino-scroll-header {
 	opacity: 1;
 	background-color:transparent;
 }
-.nino-scroll-header:hover {
+.nino-scroll-header:hover,
+.nino-scroll-header:has(:focus-visible) {
 	opacity: 1;
 }
 /* Collapsed means gone. A header preset gives its bar a height with
@@ -922,8 +937,18 @@ body.nino-scroll-atf .nino-scroll-header {
    five presets, five bars that stayed on screen.
 
    A preset that is not a bar opts out where it says so - the sidebar rail
-   sets max-height: none for itself above its own breakpoint. */
-body.nino-scroll-down .nino-scroll-header {
+   sets max-height: none for itself above its own breakpoint.
+
+   Not while the focus is in it: a bar folded to nothing with a link focused
+   in it is a focus nobody can see, and Shift+Tab out of the page's content
+   lands there - :has(:focus-visible), not :focus-within, so that a header link
+   clicked with the pointer (an anchor of a one-page menu) does not keep the bar
+   open while the page scrolls. :not() rather than a second rule with the open
+   values, since the bar's height, padding and rule are the preset's and
+   nothing here knows them - taking the collapse back is all it takes. In
+   :where(), so that the rule is as specific as it was, and the opt-out of a
+   preset or of a project - the rail's - still wins over it as it did. */
+body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	max-height: 0;
 	min-height: 0;
 	padding-top: 0;
@@ -1006,8 +1031,10 @@ body.nino-scroll-down .nino-scroll-header {
 	background-color: transparent;
 	color: inherit;
 	cursor: pointer;
-	animation: nino-hero-arrowdown-bounce 1.8s ease-in-out infinite;
+	animation: nino-hero-arrowdown-bounce 1.8s ease-in-out 2;
 }
+/*	Two runs of 1.8s are 3.6s - an arrow that bounced for good moved on its own
+	for as long as the page was open, where SC 2.2.2 allows five seconds	*/
 .nino-hero-arrowdown::before {
 	content: "";
 	position: absolute;
@@ -1407,7 +1434,12 @@ body.nino-scroll-down .nino-scroll-header {
 	title runs a rule of --section-line, with six times that much air between:
 	none, and no air, until a design layer gives it a thickness. The --quiet and
 	--loud variants draw it too, since a page may use one without the class it
-	varies	*/
+	varies.
+
+	The subtitle is the colour of its role and no fainter: the role is solved
+	to 4.5:1 against its ground, and the opacity it had - .8, and .7 on the
+	quiet one, as .8 is on the quiet text - put the words at 3.1:1 and under.
+	Quieter is smaller, and a design layer decides what is fainter	*/
 .nino-section-title {
 	font-family: var(--fontfamily-title);
 	text-align: center;
@@ -1427,7 +1459,6 @@ body.nino-scroll-down .nino-scroll-header {
 	text-transform: var(--font-subtitle-transform);
 	color: var(--color-subtitle);
 	line-height: calc( var(--font-subtitle-size) * var(--section-subtitle-scale) *1.3 );
-	opacity: .8;
 	margin-bottom: calc(var(--space-2) * var(--whitespace-text));
 }
 /*	Body copy inside a section - the third member of title/subtitle/text */
@@ -1488,9 +1519,9 @@ body.nino-scroll-down .nino-scroll-header {
  *	(--section-line), the air under it included. */
 .nino-section-title--quiet { font-size: calc( var(--font-title-size) * var(--section-title-scale) * var(--scale-quiet) ); line-height: calc( var(--font-title-size) * var(--section-title-scale) * var(--scale-quiet) *1.3 ); opacity: .8; border-bottom: var(--section-line) solid var(--color-border); padding-bottom: calc( var(--section-line) * 6 ); }
 .nino-section-title--loud { font-size: calc( var(--font-title-size) * var(--section-title-scale) * var(--scale-loud) ); line-height: calc( var(--font-title-size) * var(--section-title-scale) * var(--scale-loud) *1.2 ); border-bottom: var(--section-line) solid var(--color-border); padding-bottom: calc( var(--section-line) * 6 ); }
-.nino-section-subtitle--quiet { font-size: calc( var(--font-subtitle-size) * var(--section-subtitle-scale) * var(--scale-quiet) ); line-height: calc( var(--font-subtitle-size) * var(--section-subtitle-scale) * var(--scale-quiet) *1.4 ); opacity: .7; }
+.nino-section-subtitle--quiet { font-size: calc( var(--font-subtitle-size) * var(--section-subtitle-scale) * var(--scale-quiet) ); line-height: calc( var(--font-subtitle-size) * var(--section-subtitle-scale) * var(--scale-quiet) *1.4 ); }
 .nino-section-subtitle--loud { font-size: calc( var(--font-subtitle-size) * var(--section-subtitle-scale) * var(--scale-loud) ); line-height: calc( var(--font-subtitle-size) * var(--section-subtitle-scale) * var(--scale-loud) *1.3 ); opacity: 1; }
-.nino-section-text--quiet { font-size: calc( var(--font-text-size) * var(--scale-quiet) ); opacity: .8; }
+.nino-section-text--quiet { font-size: calc( var(--font-text-size) * var(--scale-quiet) ); }
 .nino-section-text--loud { font-size: calc( var(--font-text-size) * var(--scale-loud) ); line-height: calc( var(--font-text-size) * var(--scale-loud) *1.4 ); max-width: 52rem; }
 .nino-text-center > .nino-section-text--loud { margin-right: auto; margin-left: auto; }
 /*	The scrim is a dark ground like any other, so the roles follow it - the
@@ -1851,13 +1882,20 @@ body.nino-scroll-down .nino-scroll-header {
 	background-color: var(--color-section-black-bg);
 	color: var(--color-section-black-text);
 }
+/*	The pointer dims the two brand buttons and the focus does not. Opacity takes
+	the whole element with it, and the ring of the focus with the rest: at .85
+	on white the ring was 2.5:1 where it is solved to 3:1, and 1.6:1 on a hero.
+	:where() keeps the specificity of a design layer's own :hover rule, which
+	may take the dimming back, and :not(:focus-visible) says that a ring is
+	never dimmed - not even when the pointer rests on the button the keyboard
+	has focused	*/
 .nino-btn--primary {
 	background-color: var(--color-primary);
 	color: var(--color-primary-text);
 	border: 1px solid var(--color-primary);
 	transition: opacity .3s;
 }
-.nino-btn--primary:hover, .nino-btn--primary:focus {
+.nino-btn--primary:hover:where(:not(:focus-visible)) {
 	background-color: var(--color-primary);
 	opacity: .85;
 }
@@ -1867,7 +1905,7 @@ body.nino-scroll-down .nino-scroll-header {
 	border: 1px solid var(--color-brand-alt);
 	transition: opacity .3s;
 }
-.nino-btn--brand-alt:hover, .nino-btn--brand-alt:focus {
+.nino-btn--brand-alt:hover:where(:not(:focus-visible)) {
 	background-color: var(--color-brand-alt);
 	opacity: .85;
 }
@@ -1927,6 +1965,15 @@ body.nino-scroll-down .nino-scroll-header {
 	outline-offset: 2px;
 }
 
+/*	On a picture the ring gets a second line. --color-focus is solved against a
+	ground, and the ground of a cover or a hero is a photograph under a scrim,
+	where one colour was 1.6:1. The ink of the surface - the colour its words
+	are read in, on that same picture - goes between the button and the ring,
+	and one of the two lines shows on any photo	*/
+:is(.nino-cover, .nino-parallex, .nino-hero) .nino-btn:focus-visible {
+	box-shadow: 0 0 0 2px var(--color-ink);
+}
+
 /*	The state that must not look actionable. Colour alone would not say it -
 	the cursor and the removed hover response are the other half, since a
 	low-contrast label reads as "hard to see" rather than "not offered". */
@@ -1956,12 +2003,24 @@ textarea:disabled {
 	border-radius: var(--radius-small);
 	font-size: 1rem;
 	box-sizing: border-box;
+	background-color: var(--color-ground);
+	color: var(--color-ink);
 	transition: border-color .2s ease;
 	margin-bottom: var(--space-1);
 }
 .nino-form-input:focus, .nino-form-textarea:focus, .nino-form-select:focus {
 	outline: 2px solid var(--color-focus);
 	border-color: transparent;
+}
+/*	What a field shows before anything is written in it is the muted role of the
+	ground it stands on, at the strength the role was solved for: the browser's
+	own is a fixed grey - 2.4:1 on the dark field of a dark page - and some
+	browsers fade it on top. The field takes the ground and the ink of what it
+	stands on for the same reason: the role is measured against that ground,
+	which a field in the browser's own colours could not promise	*/
+.nino-form-input::placeholder, .nino-form-textarea::placeholder {
+	color: var(--color-subtitle);
+	opacity: 1;
 }
 /* One-line form - an email field and its button on the same row */
 .nino-form--inline { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: flex-start; justify-content: center; }
@@ -2087,8 +2146,11 @@ textarea:disabled {
 
 
 /* Animations */
+/*	Once: its two bounces are 2.8s of the seven, and a bounce that never ends
+	moves on its own for as long as the page is open (SC 2.2.2). A project that
+	wants it to go on says animation-iteration-count: infinite	*/
 .nino-fx-vertical-bounce {
-	animation: nino-fx-vertical-bounce 7s cubic-bezier(1, -0.66, 0.31, 1.68) infinite;
+	animation: nino-fx-vertical-bounce 7s cubic-bezier(1, -0.66, 0.31, 1.68) 1;
 }
 @keyframes nino-fx-vertical-bounce {
 	0%   { transform: translateY(0); }
@@ -2106,22 +2168,25 @@ textarea:disabled {
 	font-size: var(--fontsize-small);
 	font-weight: bold;
 	line-height: 1.4;
-	background-color: var(--color-border);
-	color: var(--color-text);
+	background-color: var(--color-ground);
+	color: var(--color-ink);
+	border: 1px solid var(--color-border);
 }
 .nino-badge--pill { border-radius: 999px; }
-.nino-badge--primary { background-color: var(--color-primary); color: var(--color-primary-text); }
+.nino-badge--primary { background-color: var(--color-primary); color: var(--color-primary-text); border-color: var(--color-primary); }
 /*	A badge that reports a status paints the surface of the status and says so,
 	as the alert and the toast of a status do	*/
 .nino-badge--success {
 	background-color: var(--color-success);
 	color: var(--color-success-text);
+	border-color: var(--color-success);
 	--color-ground: var(--color-success);
 	--color-ink: var(--color-success-text);
 }
 .nino-badge--error {
 	background-color: var(--color-error);
 	color: var(--color-error-text);
+	border-color: var(--color-error);
 	--color-ground: var(--color-error);
 	--color-ink: var(--color-error-text);
 }
@@ -2858,40 +2923,39 @@ body.nino-scroll-btf .nino-back-to-top {
 .nino-nav-burger {
 	position: relative;
 }
-.nino-nav-burger label {
-	cursor: pointer;
+/*	The button that opens the list is a real one: the Tab key reaches it, Enter
+	and Space press it, and it says what it is and whether the list is open
+	(aria-expanded, which Nino.ui.js keeps). It stands above the overlay, its
+	ring included - the ring is the one every control has, and the overlay
+	paints over whatever is below it. The markup carries it hidden: it is the
+	script that shows it, and without the script there is nothing to open the
+	list with, so the list stays open (see further down)	*/
+.nino-nav-burger > button {
+	position: relative;
+	z-index: 101;
 	display: flex;
 	align-items: center;
-}
-.nino-nav-burger input[type="checkbox"] {
-	/* Not display:none: a control that is not rendered is not focusable
-	   either, so the menu could be opened with a pointer and by nothing else -
-	   the whole navigation was out of reach for a keyboard, and for anything
-	   driving one. Out of sight, still there */
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	margin: 0;
+	margin: 0 0 0 auto;
 	padding: 0;
-	opacity: 0;
-	pointer-events: none;
+	border: 0;
+	background: none;
+	color: inherit;
+	cursor: pointer;
 }
-/* ...and the icon says when the control behind it has the focus, since the
-   control itself has nothing left to show it with. The checkbox sits inside
-   the label, ahead of the icon (see Modules\Navigation's nav-burger markup) */
-.nino-nav-burger input[type="checkbox"]:focus-visible ~ svg {
-	outline: 2px solid var(--color-accent);
-	outline-offset: 2px;
+.nino-nav-burger > button[hidden] {
+	display: none;
 }
 .nino-nav-burger svg {
 	width: 32px;
 	height: 32px;
-	margin-left: auto;
-	position: relative;
-	z-index: 101;
 	transition: transform .3s;
-	fill: var(--color-section-black-text);
+	fill: var(--color-title);
 }
+/*	Folded away the list is invisible, and not only squeezed to no height: a
+	link that nobody can see is still a stop of the Tab key, and the focus
+	ended up in a box of the height 0. It is hidden when the fold has finished
+	and visible at once when it opens, which is why the visibility has a delay
+	on its way out and none on its way in	*/
 .nino-nav-burger .nino-nav-content {
 	position: fixed;
 	top: 0;
@@ -2900,8 +2964,9 @@ body.nino-scroll-btf .nino-back-to-top {
 	bottom: 0;
 	max-height: 0;
 	overflow: hidden;
+	visibility: hidden;
 	background-color: var(--color-background);
-	transition: max-height .4s;
+	transition: max-height .4s, visibility 0s .4s;
 	z-index: 100;
 }
 .nino-nav-content ul {
@@ -2918,21 +2983,23 @@ body.nino-scroll-btf .nino-back-to-top {
 	drawing its bar on the deepest surface otherwise handed its own white ink
 	down into this one. Closed, the same element is the inline nav on a wide
 	screen and has to keep inheriting the bar's	*/
-.nino-nav-burger input:checked ~ .nino-nav-content {
+.nino-nav-burger > button[aria-expanded="true"] ~ .nino-nav-content {
 	max-height: 100vh;
+	visibility: visible;
+	transition: max-height .4s;
 	color: var(--color-text);
 	--color-ground: var(--color-background);
 	--color-ink: var(--color-text);
 	--color-title: var(--color-title-default);
 	--color-accent: var(--color-accent-default);
 }
-.nino-nav-burger input:checked ~ .nino-nav-content > div {
+.nino-nav-burger > button[aria-expanded="true"] ~ .nino-nav-content > div {
 	display:block;
 }
-.nino-nav-burger input:checked ~ svg {
+.nino-nav-burger > button[aria-expanded="true"] svg {
 	transform: rotate(90deg);
 }
-.nino-nav-burger input:checked ~ .nino-nav-bg {
+.nino-nav-burger > button[aria-expanded="true"] ~ .nino-nav-bg {
 	position: fixed;
 	inset: 0;
 	z-index: 99;
@@ -2942,10 +3009,10 @@ body.nino-scroll-btf .nino-back-to-top {
    of what color the theme gives the header itself (often dark/semi-
    transparent) - so its links need the page's normal text color, not
    whatever a theme sets for header links */
-.nino-nav-burger input:checked ~ .nino-nav-content li a {
+.nino-nav-burger > button[aria-expanded="true"] ~ .nino-nav-content li a {
 	color: var(--color-text);
 }
-.nino-nav-burger input:checked ~ .nino-nav-content li a.nino-is-active {
+.nino-nav-burger > button[aria-expanded="true"] ~ .nino-nav-content li a.nino-is-active {
 	color: var(--color-accent);
 }
 
@@ -2975,13 +3042,24 @@ header .nino-headernav-logo:empty {
 	display:none;
 }
 
+/*	Without the script the button stays hidden, and a list that is folded away
+	has nothing to unfold it: it is the list it is from 768px on, in the bar
+	and not an overlay	*/
+.nino-nav-burger > button[hidden] ~ .nino-nav-content {
+	position: static;
+	max-height: none;
+	visibility: visible;
+	background-color: transparent;
+}
+
 @media (min-width: 768px) {
-	.nino-nav-burger svg {
+	.nino-nav-burger > button {
 		display: none;
 	}
 	.nino-nav-burger .nino-nav-content {
 		position: static;
 		max-height: none;
+		visibility: visible;
 		background-color: transparent;
 	}
 	.nino-nav-content ul {
@@ -3013,6 +3091,7 @@ header .nino-headernav-logo:empty {
 
 .nino-localepicker-wrap {
 	display:inline-block;
+	position:relative;
 	text-align:center;
 }
 .nino-localepicker-wrap div {
@@ -3027,15 +3106,47 @@ header .nino-headernav-logo:empty {
 	top:3px;
 }
 .nino-localepicker-wrap input {
-	display:none;
+	/* Not display:none: a control that is not rendered cannot be focused, and
+	   the list behind it was out of reach of a keyboard - every language
+	   but the one the page is in. Out of sight, still there.
+
+	   Its box is the control's and the ring's - the wrap, and the 4px of
+	   offset and outline round it, see below - and not one pixel at the top
+	   of it. What the browser brings into view when the Tab key arrives is
+	   the box of the element that has the focus: one pixel was in view as
+	   soon as the row it stands in was at the edge of the screen, nothing
+	   scrolled, and the globe, the name and the ring stayed below it */
+	position:absolute;
+	top:-4px;
+	left:-4px;
+	width:calc(100% + 8px);
+	height:calc(100% + 8px);
+	margin:0;
+	padding:0;
+	opacity:0;
+	pointer-events:none;
+}
+/* ...and the globe and the name beside it say when the control has the
+   focus, since the control itself has nothing left to show it with */
+.nino-localepicker-wrap:has(input:focus-visible) {
+	outline:2px solid var(--color-focus);
+	outline-offset:2px;
 }
 /*	The picker is mounted in a footer band by some frames and in the header by
 	others, so it takes the ink of wherever it is rather than the footer's	*/
-.nino-localepicker-wrap h6,
+.nino-localepicker-wrap p,
 .nino-localepicker-wrap li {
 	display:none;
 	color:inherit;
 	cursor:pointer;
+}
+/*	The title of the open list is no heading - the picker has no place in the
+	outline of a page - and keeps the face of the h6 it was: the size an h6 has
+	of its own and the weight and the transform of the title role	*/
+.nino-localepicker-wrap p {
+	font-size:.67em;
+	font-weight:var(--font-title-weight);
+	text-transform:var(--font-title-transform);
 }
 
 .nino-localepicker-wrap ul {
@@ -3055,6 +3166,7 @@ header .nino-headernav-logo:empty {
 
 .nino-localepicker-wrap input:checked + div {
 	display:block;
+	color:var(--color-text);
 	--color-ground: var(--color-background);
 	--color-ink: var(--color-text);
 	--color-title: var(--color-title-default);
@@ -3070,7 +3182,7 @@ header .nino-headernav-logo:empty {
 	border:1px solid var(--color-border);
 	transition:all .5s;
 }
-.nino-localepicker-wrap input:checked ~ div h6 {
+.nino-localepicker-wrap input:checked ~ div p {
 	display:block;
 	text-align:center;
 	padding:.5rem;
@@ -3079,7 +3191,7 @@ header .nino-headernav-logo:empty {
 	display:block;
 	border-top:1px solid var(--color-border);
 }
-.nino-localepicker-wrap input:checked + div li a {
+.nino-localepicker-wrap input:checked + div li :is(a, span) {
 	color:var(--color-text);
 	font-size:1.2rem;
 	padding:1rem 0;
@@ -3091,8 +3203,7 @@ header .nino-headernav-logo:empty {
 .nino-localepicker-wrap input:checked + div li a:hover {
 	color:var(--color-accent);
 }
-.nino-localepicker-wrap input:checked + div li.nino-is-active a:hover {
-	color:var(--color-text);
+.nino-localepicker-wrap input:checked + div li.nino-is-active span {
 	cursor:default;
 }
 .nino-localepicker-wrap input:checked + div li.nino-is-active {
@@ -3519,30 +3630,44 @@ header .nino-headernav-logo:empty {
 	padding: 0;
 	transition: none;
 }
+/*	The dot is the <li> and stays 12px. It is no slide: the fade an inactive
+	slide has (.nino-slider li above) took the ring of the button in it along - 1.8:1
+	on the dots that were not the current one - and the dot itself with it,
+	which is the border role at full strength now, solved to 3:1 against its
+	ground. The margin leaves 24px from the middle of a dot to the next, which
+	is the hit area of a dot	*/
 .nino-slider-points li {
+	position: relative;
 	width: 12px;
 	height: 12px;
 	border-radius: 50%;
 	background-color: var(--color-border);
-	margin: 0 4px;
+	margin: 0 6px;
+	opacity: 1;
 	cursor: pointer;
 	transition: background-color .2s;
 }
 .nino-slider-points li.nino-is-active {
 	background-color: var(--color-secondary);
 }
-/* The dot is the <li> the rules above paint; the button inside it is what a
-   visitor presses, and it covers the dot exactly */
+/*	The button inside the dot is what a visitor presses, and it is 24px round
+	the 12px dot - the size of a target, WCAG 2.2 SC 2.5.8 - with the dot in its
+	middle. Its ring is the one every control has, tight to the button, with a
+	line of the ink inside it, and so there are two lines to see it by	*/
 .nino-slider-point {
+	position: absolute;
+	inset: -6px;
 	display: block;
-	width: 100%;
-	height: 100%;
 	padding: 0;
 	appearance: none;
 	background: none;
 	border: 0;
 	border-radius: 50%;
 	cursor: pointer;
+}
+.nino-slider-point:focus-visible {
+	outline-offset: 0;
+	box-shadow: inset 0 0 0 2px var(--color-ink);
 }
 
 /* Viewport animations (vpa) - default is a subtle fade+rise. --zoom/--zoom-
@@ -3809,10 +3934,17 @@ header .nino-headernav-logo:empty {
 .nino-modal--video {
 	width: min(90vw, 900px);
 }
+/*	The cross was as wide as its glyph, 15px, and the box it is drawn in is no
+	less than a target is now: 24px each way, WCAG 2.2 SC 2.5.8	*/
 .nino-modal-close {
 	position: absolute;
 	top: var(--space-1);
 	right: var(--space-1);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 24px;
+	min-height: 24px;
 	border: none;
 	background: none;
 	font-size: 1.5rem;
@@ -4006,6 +4138,27 @@ header .nino-headernav-logo:empty {
 	white-space: nowrap;
 	border: 0;
 }
+/*	...until it has the focus: a link that is written for a keyboard - the skip
+	link, the first stop of every page - shows itself where the Tab key put it
+	and is gone when the focus has left. Fixed, so that it is in the corner of
+	the screen wherever the page has been scrolled to, and above the header,
+	which is fixed as well	*/
+a.nino-sr-only:focus {
+	position: fixed;
+	top: var(--space-1);
+	left: var(--space-1);
+	z-index: 1000;
+	width: auto;
+	height: auto;
+	padding: var(--space-1) var(--space-2);
+	margin: 0;
+	overflow: visible;
+	clip: auto;
+	white-space: normal;
+	background-color: var(--color-ground);
+	color: var(--color-ink);
+	border-radius: var(--radius);
+}
 
 /* A visitor who asked their system for less motion. The parallax has said
    this since it was written (see .nino-parallex above); this is the rest of
@@ -4023,7 +4176,7 @@ header .nino-headernav-logo:empty {
 
    A duration of .01ms, not `animation: none`: a state change still happens,
    it simply arrives instead of travelling - which is what keeps the ones a
-   visitor asked for by pressing something. The three that run forever without
+   visitor asked for by pressing something. The three that move without
    anybody doing anything are the exception and are still stopped outright,
    after the clamp and with !important, or the clamp would restart them at one
    hundredth of a millisecond each. */
@@ -4042,7 +4195,8 @@ header .nino-headernav-logo:empty {
 		scroll-behavior: auto !important;
 	}
 
-	/* The three that run forever without anybody doing anything */
+	/* The three that move without anybody doing anything: the arrow and the
+	   bounce for a few runs, the preloader for as long as it is there */
 	.nino-hero-arrowdown,
 	.nino-fx-vertical-bounce,
 	.nino-preloader::after {

@@ -172,6 +172,119 @@
 		},
 
 		/**
+		 *	Open or close the menu of a burger (Modules\Navigation). The button
+		 *	says which in aria-expanded and the wrapper in nino-is-open, and while
+		 *	the menu is open everything outside it is inert: it covers the page, and
+		 *	a focus that can leave it for what is behind it is a focus nobody can
+		 *	see. That is every element beside the wrapper and beside each of its
+		 *	ancestors up to the body - the logo and the skip link in front of the
+		 *	button as well as the main part and the footer behind the list. What was
+		 *	inert before stays inert when the menu closes
+		 *
+		 *	@param		{Element}		wrap					The .nino-nav-burger
+		 *	@param		{boolean}		open					Whether the menu is to be open
+		 *	@param		{boolean}		[focus]				Whether the button takes the focus, as it does when Escape closes the menu
+		 *
+		 *	@return		void
+		 */
+		_navToggle : function( wrap, open, focus ) {
+
+			const toggle = wrap.querySelector( '.nino-nav-toggle' );
+
+			if( toggle === null )
+				return;
+
+			toggle.setAttribute( 'aria-expanded', open === true ? 'true' : 'false' );
+			wrap.classList.toggle( 'nino-is-open', open === true );
+
+			if( open === true && ( wrap.inerted ?? [] ).length === 0 ) {
+
+				wrap.inerted = [];
+
+				for( let node = wrap; node !== bd && node.parentNode !== null; node = node.parentNode )
+					for( const beside of Array.from( node.parentNode.children ) )
+						// What draws nothing has nothing to focus, and what is inert is not ours to take back
+						if( beside !== node && [ 'SCRIPT', 'STYLE', 'LINK', 'TEMPLATE', 'NOSCRIPT' ].indexOf( beside.tagName ) === -1 && beside.hasAttribute( 'inert' ) === false ) {
+							beside.setAttribute( 'inert', '' );
+							wrap.inerted.push( beside );
+						}
+			}
+
+			if( open !== true ) {
+				for( const beside of wrap.inerted ?? [] )
+					beside.removeAttribute( 'inert' );
+				wrap.inerted = [];
+			}
+
+			if( focus === true )
+				toggle.focus();
+		},
+
+		/**
+		 *	Close what is folded open on the page, as the Escape key does: every
+		 *	burger menu, and every language picker. The focus goes back to the
+		 *	control that opened the one it was in - the button of the menu, the
+		 *	checkbox of the picker - and stays where it is when it was in neither
+		 *
+		 *	@return		{boolean}									Whether something was open
+		 */
+		_foldClose : function() {
+
+			let closed = false;
+
+			for( const wrap of Array.from( dc.querySelectorAll( '.nino-nav-burger' ) ) )
+				if( wrap.querySelector( '.nino-nav-toggle' )?.getAttribute( 'aria-expanded' ) === 'true' ) {
+					Nino.ui._navToggle( wrap, false, true );
+					closed = true;
+				}
+
+			for( const box of Array.from( dc.querySelectorAll( '.nino-localepicker-wrap input' ) ) )
+				if( box.checked === true ) {
+					box.checked = false;
+
+					if( dc.activeElement?.closest?.( '.nino-localepicker-wrap' ) === box.closest( '.nino-localepicker-wrap' ) )
+						box.focus();
+
+					closed = true;
+				}
+
+			return closed;
+		},
+
+		/**
+		 *	Give a dialog the name it has none of: its heading where it has one, else
+		 *	the alt text of the picture in it - a lightbox - else the title of the
+		 *	frame in it - a video. A dialog that carries a name of its own keeps it,
+		 *	and one with nothing to be named by stays as it is
+		 *
+		 *	@param		{Element}		dialog				A .nino-modal
+		 *	@param		{number}		index					Its place on the page, for the id of a heading that has none
+		 *
+		 *	@return		void
+		 */
+		_dialogName : function( dialog, index ) {
+
+			if( dialog.hasAttribute( 'aria-label' ) === true || dialog.hasAttribute( 'aria-labelledby' ) === true )
+				return;
+
+			const heading = dialog.querySelector( 'h1, h2, h3, h4, h5, h6' );
+
+			if( heading !== null ) {
+
+				if( heading.id === '' )
+					heading.id = ( dialog.id || 'nino-modal-'+ index )+ '-title';
+
+				dialog.setAttribute( 'aria-labelledby', heading.id );
+				return;
+			}
+
+			const name = ( dialog.querySelector( 'img' )?.getAttribute( 'alt' ) || dialog.querySelector( 'iframe' )?.getAttribute( 'title' ) || '' ).trim();
+
+			if( name !== '' )
+				dialog.setAttribute( 'aria-label', name );
+		},
+
+		/**
 		 *	Initialize all ui behaviors (cover, parallax, vpa, autoheight,
 		 *	scroll header, slider, form) for the elements found on the
 		 *	current page
@@ -193,8 +306,10 @@
 					// .nino-newsletter-form is driven as well, and one comma selector
 					// lists a form carrying both classes once
 					form			: dc.querySelectorAll( '.nino-form, .nino-newsletter-form' ),
+					localepicker	: dc.querySelectorAll( '.nino-localepicker-wrap' ),
 					modal			: dc.querySelectorAll( '.nino-modal' ),
 					modalTrigger	: dc.querySelectorAll( '.nino-modal-trigger' ),
+					navBurger	: dc.querySelectorAll( '.nino-nav-burger' ),
 					parallex	: dc.querySelectorAll( '.nino-parallex' ),
 					preloader	: dc.querySelectorAll( '.nino-preloader' ),
 					slider		: dc.querySelectorAll( '.nino-slider' ),
@@ -203,6 +318,59 @@
 					toastTrigger	: dc.querySelectorAll( '.nino-toast-trigger' ),
 					vpa				: dc.querySelectorAll( '.nino-vpa' ),
 				};
+
+			/*
+			 *	nino-nav-burger - the button that folds the menu in and out below
+			 *	768px (Modules\Navigation). The markup carries it hidden, so that a
+			 *	page without this script keeps its list open: here it is shown, and
+			 *	pressed it opens the menu. A click on a link in the open menu, or on
+			 *	the bare overlay, closes it, as it did when the whole of it was one
+			 *	label; so does the viewport becoming wide, where the button is gone
+			 *	and the list is the bar - nothing would be left to close it with.
+			 *	First in this function, ahead of everything that may throw: the
+			 *	navigation is the way into the site
+			 */
+			if( e.navBurger.length > 0 ) {
+
+				for( let i=0, l=e.navBurger.length; i<l; i++ ) {
+
+					const
+						wrap		= e.navBurger[i],
+						toggle	= wrap.querySelector( '.nino-nav-toggle' );
+
+					if( toggle === null )
+						continue;
+
+					toggle.hidden = false;
+					toggle.addEventListener( 'click', function() { ui._navToggle( wrap, toggle.getAttribute( 'aria-expanded' ) !== 'true', false ) } );
+					wrap.addEventListener( 'click', function( ev ) {
+						if( toggle.getAttribute( 'aria-expanded' ) === 'true' && ev.target.closest( '.nino-nav-toggle' ) === null )
+							ui._navToggle( wrap, false, false );
+					} );
+				}
+
+				wn.addEventListener( 'resize', function() {
+					for( let i=0, l=e.navBurger.length; i<l; i++ ) {
+
+						const toggle = e.navBurger[i].querySelector( '.nino-nav-toggle' );
+
+						if( toggle !== null && toggle.getAttribute( 'aria-expanded' ) === 'true' && wn.getComputedStyle( toggle ).display === 'none' )
+							ui._navToggle( e.navBurger[i], false, false );
+					}
+				} );
+			}
+
+			/*
+			 *	Escape closes what is folded open - the menu of a burger, the list
+			 *	of a language picker - and hands the focus back to its control.
+			 *	The picker is a checkbox the stylesheet draws as a list, and the
+			 *	checkbox has no key of its own for it
+			 */
+			if( e.navBurger.length > 0 || e.localepicker.length > 0 )
+				dc.addEventListener( 'keydown', function( ev ) {
+					if( ev.key === 'Escape' && ev.defaultPrevented !== true )
+						ui._foldClose();
+				} );
 
 			/**
 			 *	Scroll to the element referenced by the current url hash. How
@@ -1249,13 +1417,19 @@
 					} );
 			}
 			if( e.modal.length > 0 ) {
-				for( let i=0, l=e.modal.length; i<l; i++ )
+				for( let i=0, l=e.modal.length; i<l; i++ ) {
+
+					// A dialog is announced by its name, and the markup of a page has
+					// seldom written one
+					ui._dialogName( e.modal[i], i );
+
 					e.modal[i].addEventListener( 'click', function( ev ) {
 						// A click on the <dialog> element itself (not its content) means
 						// either the ::backdrop or the .nino-modal-close button was hit
 						if( ev.target === this || ev.target.closest('.nino-modal-close') !== null )
 							this.close();
 					} );
+				}
 			}
 
 

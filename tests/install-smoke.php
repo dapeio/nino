@@ -457,13 +457,18 @@ echo "\n";
 // scrolled under them
 $collapsed = '';
 
-if( preg_match( '/body\.nino-scroll-down\s+\.nino-scroll-header\s*\{([^}]*)\}/', (string) file_get_contents( __DIR__. '/../_nino/Nino.css' ), $match ) === 1 )
+// ...not while the focus is in it: a bar folded to nothing with a link focused in it is a focus nobody can see. The condition is in :where(), so that the rule is as
+// specific as it was and the opt-out of a preset - the side rail's - still wins over it
+if( preg_match( '/body\.nino-scroll-down\s+\.nino-scroll-header:where\(:not\(:has\(:focus-visible\)\)\)\s*\{([^}]*)\}/', (string) file_get_contents( __DIR__. '/../_nino/Nino.css' ), $match ) === 1 )
 	$collapsed = $match[1];
 
 check( 'the collapsed header takes back every way a frame can give its bar a height', $collapsed !== ''
 	&& preg_match( '/max-height:\s*0/', $collapsed ) === 1 && preg_match( '/min-height:\s*0/', $collapsed ) === 1
 	&& preg_match( '/padding-top:\s*0/', $collapsed ) === 1 && preg_match( '/padding-bottom:\s*0/', $collapsed ) === 1
 	&& preg_match( '/border-top-width:\s*0/', $collapsed ) === 1 && preg_match( '/border-bottom-width:\s*0/', $collapsed ) === 1 );
+check( '...and only while the focus is not in it: no rule folds the bar up without that condition, and the bar is as drawn as it is under the pointer while the focus is in it',
+	preg_match( '/body\.nino-scroll-down\s+\.nino-scroll-header\s*\{/', (string) file_get_contents( __DIR__. '/../_nino/Nino.css' ) ) !== 1
+	&& preg_match( '/\.nino-scroll-header:hover,\s*\.nino-scroll-header:has\(:focus-visible\)\s*\{[^}]*opacity:\s*1/', (string) file_get_contents( __DIR__. '/../_nino/Nino.css' ) ) === 1 );
 
 // One step's message is shown by the same pane class the panes themselves are
 // shown by - so a class the shell never sets means that step's messages are
@@ -483,23 +488,63 @@ $orphans			= array_values( array_diff( $msgClasses, $stepClasses ) );
 check( 'the wizard has a pane class per step', count( $stepClasses ) === 6 && in_array( 'show-accounts', $stepClasses, true ) === true );
 check( 'every step message is shown by a class the shell actually sets'. ( $orphans === [] ? '' : ' - orphaned: '. implode( ', ', $orphans ) ), $orphans === [] );
 
-// The burger menu is a checkbox behind a label, and the checkbox used to be
-// display:none - which is not rendered, and what is not rendered cannot be
-// focused: the whole navigation of every narrow viewport could be opened with
-// a pointer and by nothing else. Hidden, not removed, and the icon carries
-// the focus ring the control has nothing left to show one with
-$ninoCss = (string) file_get_contents( __DIR__. '/../_nino/Nino.css' );
-$burger  = '';
+// The burger menu is a button, and the list it opens is one that nothing reaches while it is folded away. A checkbox behind a label was reached by the Tab key and
+// read every link of the menu out as its name; a list squeezed to no height kept its links in the order of the Tab key, where nobody could see them, and a
+// checkbox that is display:none is not rendered, and what is not rendered cannot be focused. So the folded list is hidden by visibility - which takes it out of that
+// order - and is shown at once when it opens, and the button is a control like every other, with the ring every control has
+$ninoCss  = (string) file_get_contents( __DIR__. '/../_nino/Nino.css' );
 
-// Without the comments: this file explains itself, and one of the sentences
-// in that block is about the display:none it no longer has
-if( preg_match( '/\.nino-nav-burger input\[type="checkbox"\]\s*\{([^}]*)\}/', $ninoCss, $match ) === 1 )
-	$burger = (string) preg_replace( '#/\*.*?\*/#s', '', $match[1] );
+// Without the comments, and with the rules of a media query kept apart from the ones that stand alone: this file explains itself, and what a viewport says is
+// not what the page says before it is asked
+$ninoBare   = (string) preg_replace( '#/\*.*?\*/#s', '', $ninoCss );
+$ninoMedia  = [];
+$ninoAlone  = (string) preg_replace_callback( '/@media[^{]*\{((?:[^{}]*\{[^{}]*\})*)\s*\}/', static function( array $found ) use ( &$ninoMedia ): string { $ninoMedia[] = $found[0]; return ''; }, $ninoBare );
+$ninoBody   = static function( string $css, string $selector ): string {
+	// A selector may stand in a list, after a comma
+	preg_match_all( '/(?:^|[{},])\s*'. preg_quote( $selector, '/' ). '\s*\{([^{}]*)\}/', $css, $found );
+	return implode( ' ', $found[1] );
+};
+$ninoWide   = implode( "\n", array_filter( $ninoMedia, static fn( string $block ): bool => str_contains( $block, '.nino-nav-burger' ) === true ) );
+$burgerOpen = '.nino-nav-burger > button[aria-expanded="true"] ~ .nino-nav-content';
 
-check( 'the burger control is hidden without being taken out of the tab order', $burger !== ''
-	&& preg_match( '/display:\s*none/', $burger ) !== 1
-	&& preg_match( '/opacity:\s*0/', $burger ) === 1 );
-check( '...and something shows when it has the focus', str_contains( $ninoCss, '.nino-nav-burger input[type="checkbox"]:focus-visible' ) === true );
+check( 'the folded list of the burger menu is hidden and not only squeezed - visibility, which takes its links out of the order of the Tab key - and it is shown at once when the menu opens',
+	preg_match( '/visibility:\s*hidden/', $ninoBody( $ninoAlone, '.nino-nav-burger .nino-nav-content' ) ) === 1 && preg_match( '/max-height:\s*0/', $ninoBody( $ninoAlone, '.nino-nav-burger .nino-nav-content' ) ) === 1
+	&& preg_match( '/visibility:\s*visible/', $ninoBody( $ninoAlone, $burgerOpen ) ) === 1 && preg_match( '/max-height:\s*100vh/', $ninoBody( $ninoAlone, $burgerOpen ) ) === 1 );
+check( '...the button the markup carries hidden is shown by the script, and a page without the script keeps its list open: the list is the bar it is from 768px on, in the flow and visible',
+	preg_match( '/display:\s*none/', $ninoBody( $ninoAlone, '.nino-nav-burger > button[hidden]' ) ) === 1
+	&& preg_match( '/position:\s*static/', $ninoBody( $ninoAlone, '.nino-nav-burger > button[hidden] ~ .nino-nav-content' ) ) === 1
+	&& preg_match( '/visibility:\s*visible/', $ninoBody( $ninoAlone, '.nino-nav-burger > button[hidden] ~ .nino-nav-content' ) ) === 1
+	&& preg_match( '/max-height:\s*none/', $ninoBody( $ninoAlone, '.nino-nav-burger > button[hidden] ~ .nino-nav-content' ) ) === 1 );
+check( '...from 768px the button is gone whatever it says and the list is the bar, visible: nothing there is folded',
+	preg_match( '/display:\s*none/', $ninoBody( $ninoWide, '.nino-nav-burger > button' ) ) === 1 && preg_match( '/visibility:\s*visible/', $ninoBody( $ninoWide, '.nino-nav-burger .nino-nav-content' ) ) === 1
+	&& preg_match( '/position:\s*static/', $ninoBody( $ninoWide, '.nino-nav-burger .nino-nav-content' ) ) === 1 && preg_match( '/max-height:\s*none/', $ninoBody( $ninoWide, '.nino-nav-burger .nino-nav-content' ) ) === 1 );
+// The layers of the open menu - the list that is the overlay, and the ground behind it - are rules of their own and each has a z-index. A rule that has none reads as 0, which every
+// button is above without trying: the check fails for it, so that the button is held above two layers that are there
+$burgerLayer  = static function( string $selector ) use ( $ninoBody, $ninoAlone ): int {
+	return preg_match( '/z-index:\s*(\d+)/', $ninoBody( $ninoAlone, $selector ), $found ) === 1 ? (int) $found[1] : 0;
+};
+$burgerLayers = [ $burgerLayer( '.nino-nav-burger .nino-nav-content' ), $burgerLayer( '.nino-nav-burger > button[aria-expanded="true"] ~ .nino-nav-bg' ) ];
+check( '...and the button has the ring every control has: no rule of the menu takes the outline from it, and it stands above the overlay that paints over whatever is below it and the ground behind that, both of which are layers',
+	preg_match( '/outline:\s*(?:none|0)/', $ninoBody( $ninoAlone, '.nino-nav-burger > button' ) ) !== 1
+	&& min( $burgerLayers ) > 0 && $burgerLayer( '.nino-nav-burger > button' ) > max( $burgerLayers ) );
+
+// The language picker is the same kind of control: a checkbox the overlay hangs on, and it is hidden the way the burger's control was and never taken out of the order of
+// the Tab key - the ring is on the globe and the name beside it, which is what the checkbox cannot show it with - and the list of links under it is not rendered while it is closed
+$pickerBox  = $ninoBody( $ninoAlone, '.nino-localepicker-wrap input' );
+$pickerRing = $ninoBody( $ninoAlone, '.nino-localepicker-wrap:has(input:focus-visible)' );
+check( 'the checkbox of the language picker is hidden without being taken out of the tab order, and something shows when it has the focus - the globe and its name',
+	$pickerBox !== '' && preg_match( '/display:\s*none/', $pickerBox ) !== 1 && preg_match( '/opacity:\s*0/', $pickerBox ) === 1 && preg_match( '/position:\s*absolute/', $pickerBox ) === 1
+	&& preg_match( '/outline:\s*2px solid var\(--color-focus\)/', $pickerRing ) === 1 );
+// The browser brings the box of the element that has the focus into view, and no more. The checkbox was one pixel at the top of the control: as soon as the footer link before it had
+// put that row at the edge of the screen the pixel was in view, nothing scrolled, and the globe, the name and the ring stayed where nobody could see them. Its box is the control's and
+// the ring's: the wrap, which it stands in, and as far out of it as the ring reaches - the outline and its offset, which are read from the rule of the ring
+$ringReach = preg_match( '/outline:\s*(\d+)px/', $pickerRing, $ringWidth ) === 1 && preg_match( '/outline-offset:\s*(\d+)px/', $pickerRing, $ringOffset ) === 1 ? (int) $ringWidth[1] + (int) $ringOffset[1] : 0;
+check( '...and it is as big as the control and its ring, the wrap it stands in and the outline and offset round it, so that focusing it brings all of that into view and not the one pixel it was',
+	$ringReach > 0 && preg_match( '/position:\s*relative/', $ninoBody( $ninoAlone, '.nino-localepicker-wrap' ) ) === 1
+	&& preg_match( '/(?<![a-z-])top:\s*-'. $ringReach. 'px/', $pickerBox ) === 1 && preg_match( '/(?<![a-z-])left:\s*-'. $ringReach. 'px/', $pickerBox ) === 1
+	&& preg_match( '/(?<![a-z-])width:\s*calc\(\s*100%\s*\+\s*'. ( 2 * $ringReach ). 'px\s*\)/', $pickerBox ) === 1 && preg_match( '/(?<![a-z-])height:\s*calc\(\s*100%\s*\+\s*'. ( 2 * $ringReach ). 'px\s*\)/', $pickerBox ) === 1 );
+check( '...and the links of a closed picker are not rendered, so that no Tab key stops at them, and those of an open one are',
+	preg_match( '/display:\s*none/', $ninoBody( $ninoAlone, '.nino-localepicker-wrap li' ) ) === 1 && preg_match( '/display:\s*block/', $ninoBody( $ninoAlone, '.nino-localepicker-wrap input:checked ~ div li' ) ) === 1 );
 
 // A visitor who asked their system for less motion. The parallax has said so
 // since it was written; everything else that moves on its own had not
@@ -544,6 +589,19 @@ if( preg_match( '/class="([^"]*nino-scroll-header[^"]*)"/', $frameMarkup, $match
 	}
 
 check( 'the header markup carries the class that rule acts on', preg_match( '/class="[^"]*nino-scroll-header/', $frameMarkup ) === 1 );
+
+// The first stop of every page is a link to its main part: a keyboard that has gone through the header on every page should not have to again. The link is hidden
+// until it has the focus (.nino-sr-only, which Nino.css shows then) and its target can be focused without being a stop of the Tab key
+$documentHead = (string) file_get_contents( __DIR__. '/../_admin/install/library/base/templates/html-header.tpl' );
+check( 'the first element of the body of a page is a skip link to the main part, which the page names by an id and can focus: tabindex="-1", a target and no stop of the Tab key',
+	preg_match( '/<body>\s*<a class="nino-sr-only" href="#nino-main">\[\[\/template\/common\/navigation\/skip\]\]<\/a>/', $documentHead ) === 1
+	&& substr_count( $documentHead, 'id="nino-main"' ) === 1 && preg_match( '/<main id="nino-main" tabindex="-1">/', $documentHead ) === 1 );
+check( '...and the link of the logo writes the name of the site out, for the day no logo is uploaded: a copy that a screen reader is spared, since the heading beside it says it',
+	preg_match( '/<a [^>]*class="nino-logo">\s*\[image \/logo alt=""\]\s*<span aria-hidden="true">\[\[\/project\/company\/general\/name\]\]<\/span>\s*<h1 class="nino-sr-only"/', $frameMarkup ) === 1 );
+$contactPage = (string) file_get_contents( __DIR__. '/../_admin/install/library/pages/contact/templates/page-contact.tpl' );
+check( 'the contact form says what its two fields are - autocomplete name and email - and leaves the saying of what is missing to the form\'s own words: the script checks the fields, in the language of the page, and the browser\'s bubble would be in its own',
+	preg_match( '/<input type="text" id="contact-form-name"[^>]* autocomplete="name"/', $contactPage ) === 1 && preg_match( '/<input type="email" id="contact-form-email"[^>]* autocomplete="email"/', $contactPage ) === 1
+	&& preg_match( '/<form class="nino-form"[^>]* novalidate>/', $contactPage ) === 1 );
 check( 'and the delivered frame gives its bar no height the collapsed state cannot take back'. ( $fixedHeight === [] ? '' : ' - '. implode( ', ', array_unique( $fixedHeight ) ) ), $fixedHeight === [] );
 
 // The Builder writes a div.nino-wrap around a page's sections, and its hero

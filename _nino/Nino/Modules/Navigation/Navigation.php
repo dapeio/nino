@@ -26,11 +26,15 @@ namespace Nino\Modules {
 		public static
 			$html = [
 				'li'					=> '<li><a href="[[uri]]"[[attributes]]>[[title]]</a></li>',
-				'nav-burger'	=> '<div class="nino-nav-wrap nino-nav-fullscreen nino-nav-burger [[class]]" id="[[id]]"><label><input type="checkbox"><div class="nino-nav-bg"></div><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><rect y="3" width="24" height="3"/><rect y="10" width="24" height="3"/><rect y="17" width="24" height="3"/></svg><div class="nino-nav-content">[[content]]</div></label></div>',
+				'nav-burger'	=> '<div class="nino-nav-wrap nino-nav-fullscreen nino-nav-burger [[class]]" id="[[id]]"><button type="button" class="nino-nav-toggle" aria-expanded="false" aria-controls="[[list]]" hidden><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" aria-hidden="true"><rect y="3" width="24" height="3"/><rect y="10" width="24" height="3"/><rect y="17" width="24" height="3"/></svg><span class="nino-sr-only">[[/template/common/navigation/menu]]</span></button><div class="nino-nav-bg"></div><div class="nino-nav-content" id="[[list]]">[[content]]</div></div>',
 				'nav-regular'	=> '<div class="nino-nav-wrap nino-nav-fullscreen nino-nav-regular [[class]]" id="[[id]]"><div class="nino-nav-content">[[content]]</div></div>',
 				'ul'					=> '<ul>[[content]]</ul>',
 				'div'					=> '<div>[[content]]</div>',
 			];
+
+		// How many burgers without an id this request has drawn: the id of the
+		// list its button names is made from it
+		private const string COUNTER = './nino/navigation/count';
 
 		/**
 		 *	The /_admin screen this module brings along - collected by
@@ -64,6 +68,13 @@ namespace Nino\Modules {
 		 *	stands between the tags is appended after it, unchanged - a
 		 *	hand-written menu keeps working exactly as before, and a generated
 		 *	one can still be extended by hand (an external link, a separator).
+		 *
+		 *	The argument burger folds the list away below 768px, behind a button: it
+		 *	names the list it opens (aria-controls) and says whether it is open
+		 *	(aria-expanded). Nino.ui.js shows the button - the markup carries it
+		 *	hidden, so that without the script the list stays open, as it is from
+		 *	768px on - and closes the list with Escape. The entry of the page that is
+		 *	shown is marked aria-current="page" beside its class.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					Shortcode arguments
@@ -146,7 +157,7 @@ namespace Nino\Modules {
 					$element[0]	= str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ], $element[0] );
 				}
 
-				$attributes	.= ( $uri === $element[0] ) ? ' class="nino-is-active"' : '';
+				$attributes	.= ( $uri === $element[0] ) ? ' class="nino-is-active" aria-current="page"' : '';
 				$href				= ( str_starts_with( $element[0], '/' ) === true && str_starts_with( $element[0], '//' ) === false ) ? $dir. $element[0] : $element[0];
 				$lis				.= str_replace( [ '[[uri]]', '[[attributes]]', '[[title]]' ], [ $href, $attributes, $title ], self::$html['li'] );
 			}
@@ -154,7 +165,15 @@ namespace Nino\Modules {
 
 
 			$template = ( in_array( 'burger', $args ) === true ) ? 'burger' : 'regular';
-			$result = str_replace( [ '[[content]]', '[[id]]', '[[class]]' ], [ $html, $id, $class ], self::$html['nav-'. $template] );
+			$list			= '';
+
+			if( $template === 'burger' ) {
+				$appData[self::COUNTER] = (int) ( $appData[self::COUNTER] ?? 0 ) + 1;
+				$list = ( $id !== '' ? $id : 'nino-nav-'. $appData[self::COUNTER] ). '-list';
+			}
+
+			// What is filled in comes last, so that a bracket in it is never read again
+			$result = str_replace( [ '[[id]]', '[[class]]', '[[list]]', '[[content]]' ], [ $id, $class, $list, $html ], self::$html['nav-'. $template] );
 
 			if( $callback !== '' )
 				\Nino\Callbacks::doCallbacks( $appData, $callback, $result );

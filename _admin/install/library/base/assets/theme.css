@@ -676,7 +676,7 @@ body.nino-scroll-atf .nino-frame-header .nino-scroll-header {
 	margin-left: auto;
 }
 
-.nino-frame-header .nino-nav-burger > label > svg {
+.nino-frame-header .nino-nav-burger > button > svg {
 	fill: var(--color-title);
 }
 

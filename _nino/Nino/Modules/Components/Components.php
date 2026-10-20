@@ -45,8 +45,9 @@ namespace Nino\Modules {
 				'img'					=> '<img src="[[src]]" width="[[width]]" height="[[height]]" alt="[[alt]]"[[class]]>',
 				'image'				=> '<div class="nino-image[[ratio]][[focus]][[class]]">[[img]]</div>',
 				'button'			=> '<a class="nino-btn[[style]][[size]][[width]][[class]]"[[href]][[target]]>[[value]]</a>',
+				'button-span'	=> '<span class="nino-btn[[style]][[size]][[width]][[class]]">[[value]]</span>',
 				'link'				=> '<a[[href]][[target]]>[[inner]]</a>',
-				'scroll-hint'	=> '<a class="nino-hero-arrowdown[[class]]" href="#[[to]]"[[next]] aria-label="[[/template/common/slider/next]]"></a>',
+				'scroll-hint'	=> '<a class="nino-hero-arrowdown[[class]]" href="#[[to]]"[[next]] aria-label="[[/template/common/navigation/next-section]]"></a>',
 				'spacer'			=> '<div class="nino-mt-[[size]][[class]]"></div>',
 				'card'				=> '<article class="nino-card[[ground]][[dim]][[borderless]][[fill]][[vertical]][[align]][[padding]][[class]]">[[background]][[inner]]</article>',
 				'card-bg'			=> '<div class="nino-card-bg[[focus]]">[[img]]</div>',
@@ -293,7 +294,7 @@ namespace Nino\Modules {
 		public static function init( array &$appData ): void {
 
 			$components = [
-				[ 'title', 'Title (Section)', 'Titel (Sektion)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'h3', 'h4' ], 'h3' ), 'style' => self::_style(), 'color' => self::_color() ], [ 'hero', 'section' ], '{tag} .nino-section-title', null, true ],
+				[ 'title', 'Title (Section)', 'Titel (Sektion)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'h2', 'h3', 'h4' ], 'h3' ), 'style' => self::_style(), 'color' => self::_color() ], [ 'hero', 'section' ], '{tag} .nino-section-title', null, true ],
 				[ 'subtitle', 'Subtitle (Section)', 'Untertitel (Sektion)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'p', 'h4', 'h5' ], 'div' ), 'style' => self::_style(), 'color' => self::_color() ], [ 'hero', 'section' ], '{tag} .nino-section-subtitle', null, true ],
 				[ 'text', 'Text', 'Text', 'text', 'text', [
 					'format' => [ 'type' => 'select', 'options' => [ 'inline', 'lines', 'blocks' ], 'default' => 'blocks', 'input' => 'segment', 'label' => [ 'en_US' => 'Format', 'de_DE' => 'Format' ] ],
@@ -1899,7 +1900,11 @@ namespace Nino\Modules {
 		 *	attribute, and where that is not given and the label is a fixed
 		 *	one, the first argument is: [button .uri text="More"] is a button
 		 *	"More" to the uri of the element. The width full is the class
-		 *	nino-btn--fullwidth: a button as wide as the box it stands in
+		 *	nino-btn--fullwidth: a button as wide as the box it stands in. Where it
+		 *	has no address at all it is a <span class="nino-btn">, the same classes
+		 *	and no link: an <a> without an href looks like a button and is not a stop
+		 *	of the Tab key, and neither a keyboard nor a screen reader has anything to
+		 *	press
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments made ready by dispatch()
@@ -1922,7 +1927,7 @@ namespace Nino\Modules {
 					$args['target'] === '_blank' ? ' target="_blank" rel="noopener"' : '',
 					$args['value'],
 				],
-				self::$html['button']
+				self::$html[$href !== null && $href !== '' ? 'button' : 'button-span']
 			);
 		}
 
@@ -1960,8 +1965,8 @@ namespace Nino\Modules {
 		 *	the link is then a '#', which Nino.ui.js answers on the attribute
 		 *	data-arrow-next by scrolling to what follows the section the arrow is
 		 *	in. The chevron is Nino.css's, and what the arrow is called for a
-		 *	screen reader is the text of the slider's next control, in the
-		 *	language of the page
+		 *	screen reader is a text of its own, /template/common/navigation/next-section,
+		 *	in the language of the page
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments made ready by dispatch()

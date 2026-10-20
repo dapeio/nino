@@ -8,6 +8,9 @@
 	'[[/template/frame-header/button/label]]' => 'Contact us',
 	'[[/template/frame-header/button/link]]' => '#',
 	'[[/template/common/navigation/footer]]' => 'Navigation',
+	'[[/template/common/navigation/menu]]' => 'Menu',
+	'[[/template/common/navigation/skip]]' => 'Skip to content',
+	'[[/template/common/navigation/next-section]]' => 'Next section',
 	'[[/template/frame-footer/contact/title]]' => 'Here we are',
 
 	'[[/template/frame-footer/label/address]]' => 'Address',

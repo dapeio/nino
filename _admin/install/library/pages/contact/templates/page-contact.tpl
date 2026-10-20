@@ -19,13 +19,13 @@
 			</ul>
 		</div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-p-2">
-			<form class="nino-form" action="[[/nino/dir]]/.form" method="post">
+			<form class="nino-form" action="[[/nino/dir]]/.form" method="post" novalidate>
 				[csrf]
 				<label for="contact-form-name">[[/template/common/form/name]] *</label>
-				<input type="text" id="contact-form-name" name="name" class="nino-form-input" required>
+				<input type="text" id="contact-form-name" name="name" class="nino-form-input" autocomplete="name" required>
 		
 				<label for="contact-form-email">[[/template/common/form/email]] *</label>
-				<input type="email" id="contact-form-email" name="email" class="nino-form-input" required>
+				<input type="email" id="contact-form-email" name="email" class="nino-form-input" autocomplete="email" required>
 		
 				<label for="contact-form-message">[[/template/common/form/message]] *</label>
 				<textarea id="contact-form-message" name="message" class="nino-form-textarea" required></textarea>

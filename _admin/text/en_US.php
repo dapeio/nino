@@ -248,6 +248,7 @@ return [
 	'[[/_admin/common/word/second]]'	=> 'Second',
 	'[[/_admin/common/word/section]]'	=> 'Section',
 	'[[/_admin/common/word/side]]'	=> 'Side',
+	'[[/_admin/common/word/skip]]'	=> 'Skip link',
 	'[[/_admin/common/word/slide]]'	=> 'Slide',
 	'[[/_admin/common/word/slider]]'	=> 'Slider',
 	'[[/_admin/common/word/small]]'	=> 'Small',
