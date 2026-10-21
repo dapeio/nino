@@ -41,7 +41,10 @@
 		// are unlocked on purpose
 		NAMESPACES			: [ 'project', 'template', 'feature', 'module' ],
 
+		// The languages that have a text file, and which of them the website does
+		// not serve yet - the select says so
 		_locales				: [],
+		_inactive				: [],
 		// What the server sent (see \Nino\Modules\Text\Keys::apiList()) and the
 		// rows textkeys.js made of it: _groups is row id -> its keys. _categories
 		// is what the key form offers to choose from
@@ -108,7 +111,8 @@
 				// Before the first _show*() below, which writes the address
 				const hash = Nino.admin.keys._ready === false ? Nino.admin.router.current() : { panel : '', parts : [] };
 
-				Nino.admin.keys._locales = response.locales;
+				Nino.admin.keys._locales = response.locales.map( function( entry ) { return entry.locale } );
+				Nino.admin.keys._inactive = response.locales.filter( function( entry ) { return entry.active === false } ).map( function( entry ) { return entry.locale } );
 				Nino.admin.keys._categories = response.categories ?? {};
 
 				if( typeof Nino.admin.sessionLocale === 'object' )
@@ -1264,6 +1268,7 @@
 				toolbar.appendChild( Nino.adminUi.localeSelect( {
 					id : 'keys-form-locale-select',
 					locales : Nino.admin.keys._locales,
+					inactive : Nino.admin.keys._inactive,
 					current : Nino.admin.keys._selectedLocale,
 					onChange : function( locale ) {
 						Nino.admin.keys._storeVisibleLocaleFields();

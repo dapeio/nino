@@ -4,8 +4,9 @@ declare(strict_types=1);
 /**
  *	Nino								A compact filesystembased php framework
  *	components-smoke.php	Dependency-free smoke test for \Nino\Modules\Components - the
- *											registry, the schemas, the six titles, the card, the stacks, cell()
- *											and escape() - and for what Nino.css hands a design layer: the hero,
+ *											registry, the schemas, the six titles, the card, the stacks, cell(),
+ *											escape() and the lang attribute of a text that is another language's
+ *											- and for what Nino.css hands a design layer: the hero,
  *											the font roles, the scale, the hooks and the grounds on three
  *											levels. Runs against an isolated sandbox directory, never touches
  *											the real project data.
@@ -2137,6 +2138,60 @@ check( 'cell() draws a div, always: the classes and the attributes it is given a
 	&& \Nino\Modules\Components::cell( [ 'class' => 'a' ], 'in', 'b', ' id="c"' ) === '<div class="a b" id="c">in</div>'
 	&& \Nino\Modules\Components::cell( [ 'class' => 'a', 'card' => 'card' ], 'in', 'b', ' id="c"' ) === '<div class="a b" id="c">in</div>'
 	&& \Nino\Modules\Components::cell( [ 'card' => 'brand-alt' ], 'in' ) === '<div>in</div>' );
+
+// --- What a block says of the language of its text ----------------------------------
+
+echo "Modules\\Components - a text that is the words of another language says so with a lang attribute\n";
+
+// English is what the page is in; the native language is German, and French is a file only. A key has a text in a language, none, or only a fill of the code
+$tag = ninoSandbox( 'components-lang' );
+$tag['/nino/dir'] = '';
+\Nino\Modules\Components::init( $tag );
+\Nino\Filesystem::putFileContent( $tag, '/text/de_DE.php', [ '[[/template/page-lang/probe/own]]' => 'Eigen', '[[/template/page-lang/probe/other]]' => 'Fremd', '[[/template/page-lang/probe/runtime]]' => 'Laufzeit' ] );
+\Nino\Filesystem::putFileContent( $tag, '/text/en_US.php', [ '[[/template/page-lang/probe/own]]' => 'Own', '[[/template/page-lang/probe/other]]' => '', '[[/template/page-lang/probe/runtime]]' => ' ', '[[/template/page-lang/probe/none]]' => '' ] );
+\Nino\Filesystem::putFileContent( $tag, '/text/fr_FR.php', [ '[[/template/page-lang/probe/french]]' => 'Francais' ] );
+\Nino\Html::addFills( $tag, [ '/template/page-lang/probe/runtime' => 'Runtime' ], 'en_US' );
+$tag['./nino/locales/current'] = 'en_US';
+$tagRender = static function( string $html ) use ( &$tag ): string {
+	return \Nino\Html::renderHtml( $tag, $html );
+};
+// The attribute stands in the opening tag of the outer element, once
+$tagOuter = static function( string $html, string $lang ): bool {
+	return preg_match( '/^<[a-z0-9]+\s[^>]*\slang="'. preg_quote( $lang, '/' ). '"[^>]*>/', $html ) === 1 && substr_count( $html, ' lang=' ) === 1;
+};
+
+$tagTexts = array_keys( array_filter( \Nino\Modules\Components::components( $tag ), static fn( array $schema ): bool => $schema['source'] === 'text' ) );
+$tagWrong = [];
+foreach( $tagTexts as $tagName ) {
+	$tagFallback = $tagRender( '['. $tagName. ' /template/page-lang/probe/other]' );
+	if( $tagOuter( $tagFallback, 'de-DE' ) === false )
+		$tagWrong[] = $tagName. ' says nothing of the native text: '. $tagFallback;
+	if( $tagOuter( $tagRender( '['. $tagName. ' /template/page-lang/probe/french]' ), 'fr-FR' ) === false )
+		$tagWrong[] = $tagName. ' does not name the language of a file that is only a file';
+	foreach( [ 'own' => '[%s /template/page-lang/probe/own]', 'runtime' => '[%s /template/page-lang/probe/runtime]', 'fixed' => '[%s /template/page-lang/probe/other text="Fixed"]', 'none' => '[%s /template/page-lang/probe/none]' ] as $tagCase => $tagCall )
+		if( str_contains( $tagRender( sprintf( $tagCall, $tagName ) ), ' lang=' ) === true )
+			$tagWrong[] = $tagName. ' has a lang attribute for '. $tagCase;
+}
+check( 'every component of the registry whose text is a key writes a lang attribute on its outer element - once - where the page shows the text of another language, naming it'. ( $tagWrong === [] ? '' : ' - '. implode( ' | ', $tagWrong ) ), $tagTexts !== [] && $tagWrong === [] );
+check( '...and none for a text of the page\'s own language, one a fill of the code gives, a text the call fixes, or none at all - which draws nothing', $tagWrong === [] && $tagRender( '[title /template/page-lang/probe/none]' ) === '' );
+
+check( '[button] says it on the link and on the span it is without an address, and a card that holds one is not a text and says nothing itself',
+	$tagOuter( $tagRender( '[button /template/page-lang/probe/other href="/x"]' ), 'de-DE' ) === true && str_starts_with( $tagRender( '[button /template/page-lang/probe/other href="/x"]' ), '<a ' ) === true
+	&& $tagOuter( $tagRender( '[button /template/page-lang/probe/other]' ), 'de-DE' ) === true && str_starts_with( $tagRender( '[button /template/page-lang/probe/other]' ), '<span ' ) === true
+	&& str_contains( $tagRender( '[card][card-title /template/page-lang/probe/other][/card]' ), ' lang="de-DE"' ) === true && preg_match( '/^<[a-z]+\s[^>]*\slang=/', $tagRender( '[card][card-title /template/page-lang/probe/other][/card]' ) ) === 0 );
+check( 'a component that has no text of its own to say - a picture, a spacer, the html, the arrow of a hero - writes none',
+	array_filter( array_keys( array_filter( \Nino\Modules\Components::components( $tag ), static fn( array $schema ): bool => $schema['source'] !== 'text' ) ),
+		static fn( string $name ): bool => str_contains( $tagRender( '['. $name. ' /template/page-lang/probe/other]' ), ' lang=' ) === true ) === [] );
+check( 'the language is the one the text was taken from, and it is the page\'s when the page is in the native language', ( static function() use ( &$tag, $tagRender ): bool {
+	$tag['./nino/locales/current'] = 'de_DE';
+	$native = str_contains( $tagRender( '[title /template/page-lang/probe/other]' ), ' lang=' ) === false;
+	$tag['./nino/locales/current'] = 'en_US';
+	return $native;
+} )() === true && \Nino\Html::fillOrigin( $tag, '/template/page-lang/probe/other' ) === 'de_DE' && \Nino\Html::fillOrigin( $tag, '/template/page-lang/probe/french' ) === 'fr_FR' );
+
+\Nino\Filesystem::removeDir( ninoSandboxDir( $tag ) );
+
+echo "\n";
 
 // --- Cleanup ------------------------------------------------------------
 

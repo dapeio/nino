@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="[[/project/website/html/lang]]">
+<html lang="[[/nino/html/lang]]">
 		<head>
 			<meta charset="[[/project/website/html/charset]]">
 

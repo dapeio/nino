@@ -857,6 +857,23 @@ check( '...and nothing else: the working language is still the native one, and t
 	&& \Nino\Runtime::getSessionValue( $apart, './nino/locales/current', 'unwritten' ) === 'unwritten' );
 \Nino\Runtime::unsetSessionValue( $apart, './admin/locale' );
 
+// The shell says the language its words are in - the interface language where the workbench has words of it, English where it has none - and not the
+// tag the website writes into its pages, which belongs to the website
+$shellHead = (string) file_get_contents( dirname( __DIR__ ). '/_admin/templates/html-header.tpl' );
+$shellTag = static function( array $shellApp, string $interface ) use ( $shellHead ): string {
+	\Nino\Runtime::setSessionValue( $shellApp, './admin/locale', $interface );
+	\Nino\Admin\Admin::init( $shellApp );
+	\Nino\Html::addFills( $shellApp, [ '[[/project/website/html/lang]]' => 'xx' ], '*' );
+	return preg_match( '/<html lang="([^"]*)"/', \Nino\Html::renderHtml( $shellApp, $shellHead ), $found ) === 1 ? $found[1] : '';
+};
+$shellApp = $appData;
+$shellApp['/nino/locales/available'] = [ 'de_DE', 'en_US', 'xx_XX' ];
+$shellApp['./nino/filesystem/path'] = dirname( __DIR__ );
+check( 'the shell is drawn in the tag of the interface language, whatever tag the website has', $shellTag( $shellApp, 'de_DE' ) === 'de-DE' && $shellTag( $shellApp, 'en_US' ) === 'en-US' );
+check( '...and in English where the workbench has no words of the language: the words it shows are English ones', $shellTag( $shellApp, 'xx_XX' ) === 'en-US'
+	&& \Nino\Admin\Admin::textLocale( $shellApp, '/_admin/text', 'xx_XX' ) === 'en_US' && \Nino\Admin\Admin::textLocale( $shellApp, '/_admin/text', 'de_DE' ) === 'de_DE' );
+\Nino\Runtime::unsetSessionValue( $apart, './admin/locale' );
+
 echo "\n";
 
 

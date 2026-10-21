@@ -51,10 +51,9 @@ namespace Nino\Modules\Language {
 
 		private const string INTRO = '/_admin/language/intro';
 
-		// A locale id is exactly language_TERRITORY. Narrow on purpose: the
-		// value becomes a filename (text/<locale>.php), so anything looser is a
-		// path question, and every locale Nino itself ships uses this shape
-		public const string LOCALE_PATTERN = '/^[a-z]{2}_[A-Z]{2}$/';
+		// A locale id is exactly language_TERRITORY - the kernel's pattern, which
+		// is also what lists the languages that have a text file
+		public const string LOCALE_PATTERN = \Nino\Locales::PATTERN;
 
 		// Display names for the locales that actually turn up in practice. A
 		// code with no entry renders as itself - this is a convenience for
@@ -169,11 +168,13 @@ namespace Nino\Modules\Language {
 		 *	The union of two sources, not just the configured list: a
 		 *	text/<locale>.php whose locale is not (or no longer) configured is
 		 *	worth showing, because it is a language that has been translated and
-		 *	is simply switched off. The other direction is the one that breaks a
-		 *	site - a configured locale with no text file of its own renders every
-		 *	per-locale fill as a raw [[key]], the exact case \Nino\Locales::init()
-		 *	guards the native locale against - so 'hasText' is reported per entry
-		 *	and the frontend says so before the language is ever saved.
+		 *	is simply switched off. The other direction is the one that leaves a
+		 *	language with nothing of its own - a configured locale with no text
+		 *	file shows the texts of the native language through the fill chain
+		 *	(see \Nino\Html::getFills()) and is in neither the Text panel's nor
+		 *	the Translations tab's select, which list the languages that have a
+		 *	file - so 'hasText' is reported per entry and the frontend says so
+		 *	before the language is ever saved.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$stored				config.php as read from disk
@@ -225,18 +226,25 @@ namespace Nino\Modules\Language {
 		 *	Create a new language's text file as a translation skeleton: every
 		 *	key the native locale has, in its order, with empty values.
 		 *
-		 *	Without this, adding a language left the project in the one state
-		 *	\Nino\Locales::init() warns about - a configured locale with no
-		 *	text/<locale>.php renders every per-locale fill as a raw [[key]] -
-		 *	and the only ways out were copying a file by hand or importing a
-		 *	translation. \Nino\Text::saveBatch() cannot bootstrap one either:
-		 *	it validates against the keys that already exist, so there is
-		 *	nothing to save into an empty locale.
+		 *	Without this, adding a language left the project with a configured
+		 *	locale that has no text/<locale>.php: its pages show the texts of the
+		 *	native language through the fill chain, and it is in neither the Text
+		 *	panel's nor the Translations tab's select, which list the languages
+		 *	that have a file - so the only way out was copying one by hand.
+		 *	\Nino\Text::saveBatch() cannot bootstrap one either: it validates
+		 *	against the keys that already exist, so there is nothing to save into
+		 *	an empty locale.
 		 *
 		 *	Empty values, not the native language's own: an untranslated key
 		 *	has to be visibly untranslated. The Text panel lists a key with an
 		 *	empty value as work to do, while a copied German sentence sitting
 		 *	in the French file reads as finished and is what actually ships.
+		 *	A page shows the text of the native language for an empty one, and
+		 *	says it is that language's (see \Nino\Html::getFills()). The one key
+		 *	the skeleton fills in itself is the tag of the page,
+		 *	/project/website/html/lang: the language subtag of the new language,
+		 *	fr for fr_FR, since a text of another language is the one thing that
+		 *	tag must never be.
 		 *
 		 *	The language itself is not activated here. That is the form's
 		 *	Save, together with the native language it has to agree with - so
@@ -326,6 +334,9 @@ namespace Nino\Modules\Language {
 			// native one's key order - which is what makes the two readable
 			// side by side, in the Text panel and in a diff alike
 			$skeleton = array_fill_keys( array_keys( $nativeContent ), '' );
+
+			if( array_key_exists( '[[/project/website/html/lang]]', $skeleton ) === true )
+				$skeleton['[[/project/website/html/lang]]'] = substr( $locale, 0, 2 );
 
 			// Before the file, so a failure leaves nothing behind that makes
 			// the next attempt answer "exists" without a name

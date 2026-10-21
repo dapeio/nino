@@ -53,8 +53,10 @@ namespace Nino {
 		private const string KEY_GRAMMAR = '#^/(?:template|project|feature|module)(?:/[a-z0-9]+(?:-[a-z0-9]+)*){3}$#D';
 
 		/**
-		 *	Every known key across global.php + every locale file, with its
-		 *	current value(s), whether it's global or per-locale, its format
+		 *	Every known key across global.php + every locale file - the files of
+		 *	all the languages that have one (\Nino\Locales::getTextLocales()), so
+		 *	a language that is translated before it is switched on is among them -
+		 *	with its current value(s), whether it's global or per-locale, its format
 		 *	(the one set in meta(), else the widest the values hold - 'html' is
 		 *	whether that is more than plain text), a maxlength (the one set,
 		 *	else derived from its longest current value), and whether it's
@@ -75,7 +77,7 @@ namespace Nino {
 		public static function entries( array &$appData, bool $includeBlacklisted = true ): array {
 
 			$global 	= \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
-			$locales 	= \Nino\Locales::getAvailableLocales( $appData );
+			$locales 	= \Nino\Locales::getTextLocales( $appData );
 
 			$localeData = [];
 			foreach( $locales as $locale )
@@ -340,8 +342,11 @@ namespace Nino {
 		// A per-item failure (unknown/blacklisted key, invalid locale)
 		// doesn't fail the whole call - it's reported per key in the
 		// returned results so the other, valid items still get saved.
-		// $includeBlacklisted has the same meaning as entries()'s own
-		// parameter: whether a blacklisted key is a valid save target.
+		// A locale is valid when it has a text file, one of a language the
+		// site does not serve yet included: it is translated before it is
+		// switched on. $includeBlacklisted has the same meaning as
+		// entries()'s own parameter: whether a blacklisted key is a valid
+		// save target.
 		public static function saveBatch( array &$appData, array $items, bool $includeBlacklisted ): array {
 
 			$results 		= [];
@@ -367,7 +372,7 @@ namespace Nino {
 					continue;
 				}
 
-				if( $entry['global'] === false && \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
+				if( $entry['global'] === false && in_array( $locale, \Nino\Locales::getTextLocales( $appData ), true ) === false ) {
 					$results[$key] = [ 'ok' => false, 'error' => 'invalid locale' ];
 					continue;
 				}

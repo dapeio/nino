@@ -29,9 +29,11 @@ namespace Nino {
 		 *	One element by its uri in one language: its fields from that
 		 *	language's bucket of the type file, then the global ones ('*'), then
 		 *	the defaults the type holds for every element, with '.locale' and
-		 *	'.uri' beside them. The language is one of the site's, '*' for the
-		 *	first that holds the element, and the current one for anything else.
-		 *	An element is read once per request, until something writes.
+		 *	'.uri' beside them. The language is one of the site's or another
+		 *	that has a text file (\Nino\Locales::getTextLocales(): a language is
+		 *	translated before it is switched on), '*' for the first that holds
+		 *	the element, and the current one for anything else. An element is
+		 *	read once per request, until something writes.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$uri				The element, '/<type>/<slug>'
@@ -43,13 +45,75 @@ namespace Nino {
 		static public function getElement( array &$appData, string $uri, string $locale = '', mixed $return = false ): mixed {
 
 			// Verify locale
-			if( $locale !== '*' && ( $locale === '' || \Nino\Locales::verifyLocale( $appData, $locale ) === false ) )
-				$locale = \Nino\Locales::getCurrentLocale( $appData );
+			$locale = self::_locale( $appData, $locale );
 
 			// Add element type / element to cache
 			self::_cacheElement( $appData, $uri, $locale );
 
 			return $appData['./nino/elements/cache']['elements'][ $uri ][ $locale ] ?? $return;
+		}
+
+		/**
+		 *	One element by its uri in one language, with what the language has no
+		 *	text for taken from another: each field the model writes per language
+		 *	('locale' => true) that the element has no value for in $locale - none
+		 *	at all, an empty one, a text of whitespace or an empty list - takes the
+		 *	value of the first language that has one: the native one - where the
+		 *	site serves it - then the other languages of the site in the order it
+		 *	lists them, then the others the type file holds a bucket of. What the
+		 *	element has in $locale itself wins, and a global field has no languages
+		 *	to take from.
+		 *
+		 *	The answer is getElement()'s and '.lang' beside it: the tag
+		 *	(\Nino\Locales::languageTag()) of the language that gave the first field
+		 *	taken, '' where none was needed. A block that shows the element writes
+		 *	it as a lang attribute, so a text in another language says so.
+		 *
+		 *	An element that has nothing in $locale but exists in another language
+		 *	is answered all the same, every one of its fields from there; false is
+		 *	for an element no language has. '*' is no language: it is getElement()'s
+		 *	answer for the first that holds the element, with an empty '.lang'.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$uri				The element, '/<type>/<slug>'
+		 *	@param		string		$locale				A locale id, '*', or '' for the current language
+		 *
+		 *	@return 	array|false						The element and '.lang'; false where no language has it
+		 */
+		static public function getElementWithFallback( array &$appData, string $uri, string $locale ): array|false {
+
+			$locale = self::_locale( $appData, $locale );
+
+			if( $locale === '*' ) {
+				$element = self::getElement( $appData, $uri, '*' );
+				return is_array( $element ) === true ? $element + [ '.lang' => '' ] : false;
+			}
+
+			$version	= self::_version( $appData, $uri, $locale );
+			$element	= $version === false ? [] : $version;
+			$found		= $version !== false;
+			$lang			= '';
+
+			$fields = [];
+			foreach( self::getElementModel( $appData, self::getElementTypeFromUri( $uri ) ) as $key => $field )
+				if( ( $field['locale'] ?? false ) === true && self::_blank( $element[$key] ?? null ) === true )
+					$fields[] = $key;
+
+			if( $fields !== [] || $found === false ) {
+
+				$others = self::_otherVersions( $appData, $uri, $locale );
+				$found	= $found === true || $others !== [];
+
+				foreach( $fields as $key )
+					foreach( $others as $other => $otherVersion )
+						if( self::_blank( $otherVersion[$key] ?? null ) === false ) {
+							$element[$key]	= $otherVersion[$key];
+							$lang						= $lang !== '' ? $lang : \Nino\Locales::languageTag( (string) $other );
+							break;
+						}
+			}
+
+			return $found === true ? $element + [ '.locale' => $locale, '.uri' => $uri, '.lang' => $lang ] : false;
 		}
 
 		/**
@@ -75,8 +139,7 @@ namespace Nino {
 		static public function queryElements( array &$appData, string $typeUri, array $query, string $locale = '', mixed $return = false, array $options = [] ): mixed {
 
 			// Verify locale
-			if( $locale !== '*' && ( $locale === '' || \Nino\Locales::verifyLocale( $appData, $locale ) === false ) )
-				$locale = \Nino\Locales::getCurrentLocale( $appData );
+			$locale = self::_locale( $appData, $locale );
 
 			// Get element type data from file
 			// Normalised once, here: getElementFile() trims its own copy, so a
@@ -320,8 +383,7 @@ namespace Nino {
 		static public function deleteElement( array &$appData, string $uri, string $locale = '' ): mixed {
 
 			// Verify locale
-			if( $locale !== '*' && ( $locale === '' || \Nino\Locales::verifyLocale( $appData, $locale ) === false ) )
-				$locale = \Nino\Locales::getCurrentLocale( $appData );
+			$locale = self::_locale( $appData, $locale );
 
 			// Flush, reload and lock element file
 			$elementUri 	= self::getElementUriFromUri( $uri );
@@ -962,8 +1024,7 @@ namespace Nino {
 		static private function _writeElementData( array &$appData, string $uri, array $data, string $locale, bool $update = false ): mixed {
 
 			// Verify locale
-			if( $locale !== '*' && ( $locale === '' || \Nino\Locales::verifyLocale( $appData, $locale ) === false ) )
-				$locale = \Nino\Locales::getCurrentLocale( $appData );
+			$locale = self::_locale( $appData, $locale );
 
 			// Flush, reload and lock element file
 			$typeUri			= self::getElementTypeFromUri( $uri );
@@ -1035,7 +1096,7 @@ namespace Nino {
 				if(
 					$newTypeUri !== $typeUri
 					|| $newElementUri === ''
-					|| ( $data['.locale'] !== '*' && \Nino\Locales::verifyLocale( $appData, $data['.locale'] ) === false )
+					|| ( $data['.locale'] !== '*' && self::_known( $appData, $data['.locale'] ) === false )
 				) {
 					trigger_error( 'Callback returned an invalid element URI or locale for \''. $uri. '\'.' );
 					$outcome = 'error';
@@ -1260,6 +1321,107 @@ namespace Nino {
 			\Nino\Callbacks::doCallbacks( $appData, '/nino/elements/committed', $change );
 
 			return \Nino\Elements::getElement( $appData, $resultData['.uri'], $resultData['.locale'] );
+		}
+
+		/**
+		 *	The language an element is read, queried, written or deleted in: '*',
+		 *	a language the site has or one that has a text file (_known()), and the
+		 *	current language for anything else - a name that is none is never a
+		 *	bucket of a type file
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$locale				As the caller gave it
+		 *
+		 *	@return 	string
+		 */
+		static private function _locale( array &$appData, string $locale ): string {
+
+			if( $locale === '*' || ( $locale !== '' && self::_known( $appData, $locale ) === true ) )
+				return $locale;
+
+			return \Nino\Locales::getCurrentLocale( $appData );
+		}
+
+		/**
+		 *	Whether a language is one an element has a version in: one of the
+		 *	site's or one that has a text file, which the Language panel's
+		 *	Translations import writes into before the language is switched on
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$locale
+		 *
+		 *	@return 	bool
+		 */
+		static private function _known( array &$appData, string $locale ): bool {
+
+			return \Nino\Locales::verifyLocale( $appData, $locale ) === true || in_array( $locale, \Nino\Locales::getTextLocales( $appData ), true ) === true;
+		}
+
+		/**
+		 *	One element as one language's bucket of the type file holds it - the
+		 *	language of the type file, whether the site has it or not, which is the
+		 *	difference to getElement()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$uri
+		 *	@param		string		$locale				A bucket of the type file
+		 *
+		 *	@return 	array|false						The element of getElement(); false where the type file has nothing of it there or in '*'
+		 */
+		static private function _version( array &$appData, string $uri, string $locale ): array|false {
+
+			self::_cacheElement( $appData, $uri, $locale );
+
+			return $appData['./nino/elements/cache']['elements'][$uri][$locale] ?? false;
+		}
+
+		/**
+		 *	The versions of an element in the languages getElementWithFallback()
+		 *	takes from, in the order it takes: the native one, the languages of the
+		 *	site, the other buckets of the type file. The language asked for and a
+		 *	language the element has nothing in are not among them
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$uri
+		 *	@param		string		$locale				The language asked for
+		 *
+		 *	@return 	array								locale => the element as getElement() answers it
+		 */
+		static private function _otherVersions( array &$appData, string $uri, string $locale ): array {
+
+			$native		= \Nino\Locales::getNativeLocale( $appData );
+			$chain		= array_merge( \Nino\Locales::verifyLocale( $appData, $native ) === true ? [ $native ] : [], \Nino\Locales::getAvailableLocales( $appData ) );
+			$typeData	= self::getElementFile( $appData, self::getElementTypeFromUri( $uri ) );
+
+			foreach( $typeData === false ? [] : array_keys( $typeData ) as $bucket )
+				if( is_string( $bucket ) === true && preg_match( \Nino\Locales::PATTERN, $bucket ) === 1 && is_array( $typeData[$bucket] ) === true )
+					$chain[] = $bucket;
+
+			$versions = [];
+
+			foreach( array_diff( array_unique( $chain ), [ $locale ] ) as $other ) {
+
+				$version = self::_version( $appData, $uri, $other );
+
+				if( $version !== false )
+					$versions[$other] = $version;
+			}
+
+			return $versions;
+		}
+
+		/**
+		 *	Whether a field value has nothing to say: there is none, or it is an
+		 *	empty list, an empty text or one of whitespace. A number and a flag are
+		 *	values of something, 0 and false included
+		 *
+		 *	@param		mixed			$value
+		 *
+		 *	@return 	bool
+		 */
+		static private function _blank( mixed $value ): bool {
+
+			return $value === null || $value === [] || ( is_string( $value ) === true && trim( $value ) === '' );
 		}
 
 		// Load an element into app cache. Resolves '*' to the actual locale

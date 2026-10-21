@@ -196,7 +196,7 @@ namespace Nino\Modules\Routes {
 				'templates' 		=> $templates,
 				'defaultTemplate' => in_array( self::DEFAULT_TEMPLATE, $templates, true ) === true ? self::DEFAULT_TEMPLATE : '',
 				'locales' 			=> $locales,
-				'selectedLocale' => \Nino\Admin\Admin::contentLocale( $appData ),
+				'selectedLocale' => \Nino\Admin\Admin::contentLocale( $appData, true ),
 				'navs' 					=> $navs,
 			] );
 		}

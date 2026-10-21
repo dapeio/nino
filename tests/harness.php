@@ -94,6 +94,7 @@ function ninoSandbox( string $name ): array {
 	$appData['/nino/locales/native']					= 'de_DE';
 	$appData['/nino/locales/available']				= [ 'de_DE', 'en_US' ];
 	$appData['/nino/modules']									= [];
+	$appData['/nino/install/texts']					= \Nino\VERSION;
 	$appData['./nino/test/sandbox']						= $sandbox;
 
 	return $appData;

@@ -325,8 +325,16 @@ Textfills are placeholders with double square brackets:
 Nino combines:
 
 1. global values from `/text/global.php`,
-2. values of the current locale from `/text/<locale>.php`,
+2. values of the current locale from `/text/<locale>.php` - and, for every key the language has no text for, the text of another language (below),
 3. runtime values added with `Html::addFills()`.
+
+**A language that has no text.** A key whose value in the current language is missing or empty - empty is `trim( $value ) === ''`, so a text of whitespace is empty too - takes the value of the first language of a chain that has a non-empty one: the native locale (where the site serves it), then the other available locales in the order `config.php` lists them, then the other languages that have a text file (`\Nino\Locales::getTextLocales()`: a file on disk of a language that is switched off, so that a site whose only language has no texts of a feature yet still shows the ones another file has). The language's own non-empty text always wins, `global.php` is as it was, the runtime values win over everything - a fill added with `Html::addFills()` for the language or for `'*'` is never replaced by another language's text - and `'*'` has no chain. One key never falls back, `/project/website/html/lang`: a French page with the German tag is worse than none.
+
+`\Nino\Html::fillOrigin( $appData, $key )` answers which language a key's text was taken from - `'de_DE'` - and `null` where it is the current language's own, where a runtime value stands for it and where no language has one. It is what a block that shows a text reads to say in which language it is: the components write a `lang` attribute (below). The file layer - global, the chain, the language's own file - is made once per request and language and kept in `./nino/html/filecache`; a write under `/text/` through `\Nino\Filesystem` drops it, and with it the list `getTextLocales()` keeps in `./nino/locales/text`, so a text saved in a request is the next fill of that request. A write that goes to disk behind the filesystem - the restore of a backup - drops both itself.
+
+`\Nino\Locales` has three helpers for this: `getTextLocales( $appData )`, every language that has a file `/text/<locale>.php` - the available ones first, in `config.php`'s order, then the others by their code; `getVisitorLocale( $appData )`, the language the site shows the visitor of this browser (the one they picked where it is available, else the project's default), which in a workbench request is not `getCurrentLocale()` - that one is the interface language there; and `languageTag( $locale )`, the BCP 47 tag of a locale id, `de_DE` is `de-DE`, the value of a `lang` attribute.
+
+**The tag of a page.** `[[/nino/html/lang]]` is a runtime fill worked out for the language a page is rendered in: the value of `/project/website/html/lang` where the language has one of its own, else the language's tag. The templates the kernel ships - the base unit's `html-header.tpl`, the Form module's `mail-header.tpl` - write it into `<html lang>`; a project's own templates keep the key they have, which a language added in the Language panel presets with its language subtag (`fr` for `fr_FR`). The workbench's shell has a tag of its own, `[[/_admin/lang]]`: the language its words are in, which is English where the workbench has no words of the interface language.
 
 Fills can contain other fills. Nino therefore repeats the replacement until the entire string no longer changes, but at most ten passes. This allows controlled nesting without a cyclic fill blocking the runtime indefinitely.
 
@@ -408,12 +416,14 @@ The shortcodes `[element]` and `[elements]` load structured content. Within thei
 
 ```html
 [elements /services sort="-date" limit="6" query="featured=1"]
-    <article id="service-[[.id]]">
+    <article id="service-[[.id]]"[[.lang]]>
         <h2>[[title]]</h2>
         <p>[[description]]</p>
     </article>
 [/elements]
 ```
+
+Where the language of the page has no text of an element - the element has no version in that language, or a field of it is empty - the block shows the text of another language instead: `\Nino\Elements::getElementWithFallback( $appData, $uri, $locale )` answers the element with each field of the model that is per language (`'locale' => true`) and missing or empty in `$locale` taken from the native language, then the other available languages in their order, then the others the type file holds a bucket of, and `'.lang'` beside it - the tag of the language that gave the first field taken, `''` where the language had it all; `false` where no language has the element. `[elements]` draws every element through it, and `[[.lang]]` is that tag as an attribute with its space in front - ` lang="de-DE"` - or nothing: put it on the element that shows the text, so that a screen reader reads a German text with a German voice on an English page. The query lists the elements it lists - an element that exists in German only is listed on the English page, and shown - and a field of the model that no language has a value for is replaced by nothing, so that the block never shows `[[summary]]` or the `[]` the shortcode pass made of it. A sort is the order of what is drawn. `[element]` and the stacks of the Components module read the language they are asked for, as before.
 
 `query` filters - `key=value`, several joined with `&`, `%` as a wildcard at either end. `sort` orders by a field: `sort="title"` ascending, `sort="-date"` descending, `sort="category,-date"` by the first and, where that is equal, the second; two numbers compare as numbers, everything else naturally and without regard to case ("Item 9" before "Item 10"), and an element without the field comes last in either direction. `offset` and `limit` cut a window out of the sorted list. A `callback` runs between: it sees the sorted list and may drop or reorder, and `offset` and `limit` apply to what it let through - a page is a page of that. In PHP the same is `\Nino\Elements::queryElements( $appData, $typeUri, $query, $locale, $return, $options )` with `sort`, `offset` and `limit` under `$options`, and `\Nino\Elements::sortElements( $elements, $sort )` orders a list you already hold.
 
@@ -495,6 +505,8 @@ Modules are activated in `/nino/modules`. The order of the array is relevant if 
 	'group'      => 'section',       // required here, the group a tool offers it under: section | hero | card | global
 ] );
 ```
+
+A component whose source is a text key - the title, the subtitle and the text of a section, a card and a hero, the button - writes ` lang="<tag>"` on its outer element where the language of the page has no text for the key and the text it shows is another language's (`\Nino\Html::fillOrigin()`), and nothing where the text is the page's own, where the call fixes it with `text="..."` and where the value is a field of an element. The templates of the registry (`Components::$html`) have a `[[lang]]` slot for it where the attributes stand, filled the way `[[class]]` is; a renderer of a feature that draws a text of a key puts `\Nino\Locales::languageTag( $origin )` on its element the same way.
 
 `addComponent()` and `addStack()` register one: they call `\Nino\Html::addShortcode()` with a wrapper around the callback, and **replace** a component or a shortcode of the same name, which is how a project changes the markup of one. The rest of the API - `components()` and `stacks()`, `defaults()`, `sources()`, `value()`, `element()`, `renderStack()`, `cell()` and `escape()` - is documented where it stands, in `Components.php`. `sources()` is what a tool reads a template with: the keys and the slots it names as the source of a component, found as the rendering finds the calls - and the slots it names in an attribute of the type `image`, a card's `background` among them, as an entry that says which attribute it was. The Text Keys scan reads them besides the fills, the Image Slots scan besides the `<img>` tags, and both lists of where a key or a slot is used read them, since a page the Builder writes names its texts and pictures in no other way.
 
@@ -599,7 +611,7 @@ The endpoint's own answers follow the same rule. A submission the per-ip mail ca
 
 | Part | What it does |
 | --- | --- |
-| `[legal]`, `[privacy]` | draw the sections of one type in the visitor's language, ordered by `order`, without the ones set to `hidden`; a section that has neither a title nor a text in this language is drawn in the native language (or the first that has one) and carries `lang=""` |
+| `[legal]`, `[privacy]` | draw the sections of one type in the visitor's language, ordered by `order`, without the ones set to `hidden`; a section that has neither a title nor a text in this language is drawn in the native language (or the first that has one - the other languages of the site in their order, then a language that only has a text file) and carries `lang=""` |
 | `\Nino\Modules\Legal::render( $appData, $type )` | what the two shortcodes call; title and text are made safe by the field's own model (`\Nino\Html::fieldValue()`) first |
 | `\Nino\Modules\Legal::placeholders( $appData, $html )` | replaces `#/project/company/contact/email#` with what that text key says in the current language |
 | `\Nino\Modules\Legal::url( $appData, $page, $locale = '' )` | the address of `imprint` or `privacy`, with the directory prefix, per language, falling back to the native one |

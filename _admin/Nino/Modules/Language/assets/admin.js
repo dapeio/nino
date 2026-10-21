@@ -250,9 +250,10 @@
 		 *
 		 *	Showing both sides is the point. A translated language that is
 		 *	simply switched off should be one checkbox away from being back on,
-		 *	and a language switched on without a text file of its own renders
-		 *	every per-locale fill as a raw [[key]] - so that row says so, before
-		 *	the language is ever saved rather than after the frontend breaks.
+		 *	and a language switched on without a text file of its own shows the
+		 *	texts of the native language and is offered for translation neither
+		 *	under Text nor under Translations - so that row says so, before the
+		 *	language is ever saved.
 		 *
 		 *	@param		{Object}	field
 		 *
@@ -385,8 +386,8 @@
 				label.appendChild( name );
 
 				// What exists on disk for it, which is what decides whether
-				// switching it on produces a working language or a page full of
-				// unresolved fills
+				// switching it on produces a language with texts of its own or
+				// one that shows the native language's until it has a file
 				const state = dc.createElement('small');
 				state.className = 'nino-admin-checklist-state';
 				state.textContent = locale.hasText === true
@@ -483,11 +484,12 @@
 				entry.keys 		= response.keys;
 
 				// Deliberately left unticked. The file that was just written is a
-				// skeleton of empty keys, so ticking it here would put a blank
-				// language one Save away from being served - which is the exact
-				// failure this whole panel exists to warn about. Translate it
-				// first, then tick it. An already-translated language that was
-				// merely switched off takes the branch above and is ticked there.
+				// skeleton of empty keys, so ticking it here would put a language
+				// with nothing of its own one Save away from being served - its
+				// pages would show the native language's texts, all of them.
+				// Translate it first, then tick it. An already-translated language
+				// that was merely switched off takes the branch above and is
+				// ticked there.
 				if( existing === undefined ) {
 					Nino.admin.language._locales.push( entry );
 					Nino.admin.language._locales.sort( function( a, b ) { return a.code < b.code ? -1 : 1 } );
@@ -498,10 +500,15 @@
 				Nino.admin.language._refreshNative();
 
 				// _renderLocaleRows() has just cleared this line via
-				// _refreshLocaleWarning(), so the outcome goes in afterwards
-				line.idle( response.created === true
-					? Nino.adminUi.format( Nino.content.getText('/_admin/language/msg/created'), code, response.keys, response.from, code )
-					: Nino.adminUi.format( Nino.content.getText('/_admin/language/msg/existed'), code, response.keys ) );
+				// _refreshLocaleWarning(), so the outcome goes in afterwards. A
+				// language that is ticked already - the warning above led here -
+				// is not left off: its pages show the native language's texts
+				if( response.created !== true )
+					line.idle( Nino.adminUi.format( Nino.content.getText('/_admin/language/msg/existed'), code, response.keys ) );
+				else if( entry.active === true )
+					line.idle( Nino.adminUi.format( Nino.content.getText('/_admin/language/msg/served'), code, response.keys, response.from, code ) );
+				else
+					line.idle( Nino.adminUi.format( Nino.content.getText('/_admin/language/msg/created'), code, response.keys, response.from, code ) );
 			} );
 		},
 

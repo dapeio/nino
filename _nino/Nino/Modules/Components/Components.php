@@ -35,17 +35,17 @@ namespace Nino\Modules {
 			for a token of its own	*/
 		public static
 			$html = [
-				'title'				=> '<[[tag]] class="nino-section-title[[style]][[color]][[class]]">[[value]]</[[tag]]>',
-				'card-title'	=> '<[[tag]] class="nino-card-title[[style]][[color]][[class]]">[[value]]</[[tag]]>',
-				'hero-title'	=> '<[[tag]] class="nino-hero-title[[style]][[color]][[class]]">[[value]]</[[tag]]>',
-				'subtitle'		=> '<[[tag]] class="nino-section-subtitle[[style]][[color]][[class]]">[[value]]</[[tag]]>',
-				'card-subtitle'	=> '<[[tag]] class="nino-card-subtitle[[style]][[color]][[class]]">[[value]]</[[tag]]>',
-				'hero-subtitle'	=> '<[[tag]] class="nino-hero-subtitle[[style]][[color]][[class]]">[[value]]</[[tag]]>',
-				'text'				=> '<div class="[[base]][[richtext]][[style]][[color]][[class]]">[[value]]</div>',
+				'title'				=> '<[[tag]] class="nino-section-title[[style]][[color]][[class]]"[[lang]]>[[value]]</[[tag]]>',
+				'card-title'	=> '<[[tag]] class="nino-card-title[[style]][[color]][[class]]"[[lang]]>[[value]]</[[tag]]>',
+				'hero-title'	=> '<[[tag]] class="nino-hero-title[[style]][[color]][[class]]"[[lang]]>[[value]]</[[tag]]>',
+				'subtitle'		=> '<[[tag]] class="nino-section-subtitle[[style]][[color]][[class]]"[[lang]]>[[value]]</[[tag]]>',
+				'card-subtitle'	=> '<[[tag]] class="nino-card-subtitle[[style]][[color]][[class]]"[[lang]]>[[value]]</[[tag]]>',
+				'hero-subtitle'	=> '<[[tag]] class="nino-hero-subtitle[[style]][[color]][[class]]"[[lang]]>[[value]]</[[tag]]>',
+				'text'				=> '<div class="[[base]][[richtext]][[style]][[color]][[class]]"[[lang]]>[[value]]</div>',
 				'img'					=> '<img src="[[src]]" width="[[width]]" height="[[height]]" alt="[[alt]]"[[class]]>',
 				'image'				=> '<div class="nino-image[[ratio]][[focus]][[class]]">[[img]]</div>',
-				'button'			=> '<a class="nino-btn[[style]][[size]][[width]][[class]]"[[href]][[target]]>[[value]]</a>',
-				'button-span'	=> '<span class="nino-btn[[style]][[size]][[width]][[class]]">[[value]]</span>',
+				'button'			=> '<a class="nino-btn[[style]][[size]][[width]][[class]]"[[href]][[target]][[lang]]>[[value]]</a>',
+				'button-span'	=> '<span class="nino-btn[[style]][[size]][[width]][[class]]"[[lang]]>[[value]]</span>',
 				'link'				=> '<a[[href]][[target]]>[[inner]]</a>',
 				'scroll-hint'	=> '<a class="nino-hero-arrowdown[[class]]" href="#[[to]]"[[next]] aria-label="[[/template/common/navigation/next-section]]"></a>',
 				'spacer'			=> '<div class="nino-mt-[[size]][[class]]"></div>',
@@ -1656,6 +1656,32 @@ namespace Nino\Modules {
 		}
 
 		/**
+		 *	The lang attribute of a component whose text is the value of a text key
+		 *	the language of the page has no text for, which the page then shows in
+		 *	another language (see \Nino\Html::fillOrigin()): that language's tag with a
+		 *	space in front - and nothing for a text of the page's own language, for
+		 *	one the call fixes with text="..." and for a field of an element, which
+		 *	has no key. A screen reader reads the text in the voice of the language
+		 *	it is in
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$args					The arguments made ready by dispatch()
+		 *
+		 *	@return 	string
+		 */
+		private static function _lang( array &$appData, array $args ): string {
+
+			$source = (string) ( $args['source'] ?? '' );
+
+			if( isset( $args['text'] ) === true || $source === '' || $source[0] !== '/' )
+				return '';
+
+			$origin = \Nino\Html::fillOrigin( $appData, $source );
+
+			return $origin === null ? '' : self::_attribute( 'lang', \Nino\Locales::languageTag( $origin ) );
+		}
+
+		/**
 		 *	The part of the six titles they share: the fragment of the one that
 		 *	is rendered, filled with its tag, its style and its colour as variants
 		 *	of the class it is named for and of the ink, its own class and its value
@@ -1673,12 +1699,13 @@ namespace Nino\Modules {
 
 			// The tag is written as it is: it is one of the select's options, which dispatch() reduced it to
 			return str_replace(
-				[ '[[tag]]', '[[style]]', '[[color]]', '[[class]]', '[[value]]' ],
+				[ '[[tag]]', '[[style]]', '[[color]]', '[[class]]', '[[lang]]', '[[value]]' ],
 				[
 					$args['tag'],
 					self::_variant( $base, (array) ( $declared['style'] ?? [] ), $args['style'] ),
 					self::_variant( $base, (array) ( $declared['color'] ?? [] ), $args['color'] ?? '' ),
 					self::_modifier( '', $args['class'] ),
+					self::_lang( $appData, $args ),
 					$args['value'],
 				],
 				self::$html[$component]
@@ -1703,13 +1730,14 @@ namespace Nino\Modules {
 			$declared = self::_declared( $appData, $component );
 
 			return str_replace(
-				[ '[[base]]', '[[richtext]]', '[[style]]', '[[color]]', '[[class]]', '[[value]]' ],
+				[ '[[base]]', '[[richtext]]', '[[style]]', '[[color]]', '[[class]]', '[[lang]]', '[[value]]' ],
 				[
 					$base,
 					$args['format'] === 'blocks' ? ' nino-richtext' : '',
 					self::_variant( $base, (array) ( $declared['style'] ?? [] ), $args['style'] ),
 					self::_variant( $base, (array) ( $declared['color'] ?? [] ), $args['color'] ?? '' ),
 					self::_modifier( '', $args['class'] ),
+					self::_lang( $appData, $args ),
 					$args['value'],
 				],
 				self::$html['text']
@@ -2019,7 +2047,7 @@ namespace Nino\Modules {
 			$href		= $target !== '' ? self::value( $appData, $target, 'href' ) : null;
 
 			return str_replace(
-				[ '[[style]]', '[[size]]', '[[width]]', '[[class]]', '[[href]]', '[[target]]', '[[value]]' ],
+				[ '[[style]]', '[[size]]', '[[width]]', '[[class]]', '[[href]]', '[[target]]', '[[lang]]', '[[value]]' ],
 				[
 					self::_modifier( 'nino-btn--', $args['style'] ),
 					self::_modifier( 'nino-btn--', $args['size'] ),
@@ -2027,6 +2055,7 @@ namespace Nino\Modules {
 					self::_modifier( '', $args['class'] ),
 					$href !== null && $href !== '' ? ' href="'. $href. '"' : '',
 					$args['target'] === '_blank' ? ' target="_blank" rel="noopener"' : '',
+					self::_lang( $appData, $args ),
 					$args['value'],
 				],
 				self::$html[$href !== null && $href !== '' ? 'button' : 'button-span']

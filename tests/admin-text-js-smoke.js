@@ -857,7 +857,7 @@ const homeData = ( extra ) => Object.assign( { entries : homeKeys.filter( e => e
 
 // --- the Text panel: the list, the search, the form ------------------------------------
 
-const textResponse = ( extra ) => Object.assign( { keys : homeKeys.filter( e => e.blacklisted === false ), locales : [ 'de_DE', 'en_US' ], selectedLocale : 'de_DE', order : homeOrder, pages : homePages,
+const textResponse = ( extra ) => Object.assign( { keys : homeKeys.filter( e => e.blacklisted === false ), locales : [ { locale : 'de_DE', active : true }, { locale : 'en_US', active : true } ], selectedLocale : 'de_DE', order : homeOrder, pages : homePages,
 	templates : homeData().templates, features : homeData().features }, extra ?? {} );
 
 function openedText( response, hash, locale ) {
@@ -1155,7 +1155,7 @@ function openedText( response, hash, locale ) {
 
 // --- the Keys tab: the list, the search, the form that creates and renames --------------
 
-const keysResponse = ( extra ) => Object.assign( { keys : homeKeys.map( e => Object.assign( {}, e ) ), locales : [ 'de_DE', 'en_US' ], selectedLocale : 'en_US',
+const keysResponse = ( extra ) => Object.assign( { keys : homeKeys.map( e => Object.assign( {}, e ) ), locales : [ { locale : 'de_DE', active : true }, { locale : 'en_US', active : true } ], selectedLocale : 'en_US',
 	categories : { template : [ 'common', 'frame-header', 'page-services' ], feature : [ 'consent' ], module : [ 'form', 'localepicker' ], project : [ 'company', 'website', 'mail', 'catalog' ] } }, extra ?? {} );
 
 // What the tab asked of the server last, the reload that follows every write aside
@@ -1519,6 +1519,28 @@ function openedKeys( response, hash ) {
 	// the tab has no list of pages, so it cannot say of a page's details that they have no page
 	const k = openedKeys( keysResponse() );
 	check( 'the row of the details of pages is called by the neutral "Seitenangaben" in the Keys tab', k.list.querySelectorAll('a').find( a => a.dataset.group === '_nino/webpage' ).querySelector('strong').textContent === 'Seitenangaben' );
+}
+
+// --- a language that has a text file and is not served: the selects say so ----------------
+
+{
+	// The answer names the languages of the files, each with whether the website serves it; the panels translate into one before it is switched on
+	const withOff = [ { locale : 'de_DE', active : true }, { locale : 'en_US', active : true }, { locale : 'it_IT', active : false } ];
+	const optionTexts = select => select.children.map( o => o.textContent ).join('|');
+	const t = openedText( textResponse( { locales : withOff } ) );
+	const word = t.words['/_admin/common/word/inactive'];
+	check( 'the Text panel offers every language the answer names, and the one the website does not serve says so - the word of the workbench for it, in parentheses behind the code', word !== undefined && word !== ''
+		&& t.text._locales.join() === 'de_DE,en_US,it_IT' && t.text._inactive.join() === 'it_IT'
+		&& optionTexts( t.list.querySelector('#text-list-locale') ) === 'de_DE|en_US|it_IT ('+ word+ ')' && t.list.querySelector('#text-list-locale').children.map( o => o.value ).join() === 'de_DE,en_US,it_IT' );
+	t.list.querySelectorAll('.admin-type-btn').find( r => r.dataset.group === 'template/page-services' ).click();
+	check( '...in the form of a row too, whose select keeps the code as its value', optionTexts( t.form.querySelector('#text-form-locale-select') ) === 'de_DE|en_US|it_IT ('+ word+ ')' );
+	const every = openedText( textResponse() );
+	check( '...and a site whose languages are all served marks none', every.text._inactive.length === 0 && optionTexts( every.list.querySelector('#text-list-locale') ) === 'de_DE|en_US' );
+
+	const k = openedKeys( keysResponse( { locales : withOff } ) );
+	k.list.querySelectorAll('a').find( a => a.dataset.group === 'project/company' ).click();
+	check( 'the Keys tab does the same in the form of a row', k.keys._locales.join() === 'de_DE,en_US,it_IT' && k.keys._inactive.join() === 'it_IT'
+		&& optionTexts( k.form.querySelector('#keys-form-locale-select') ) === 'de_DE|en_US|it_IT ('+ word+ ')' );
 }
 
 done();

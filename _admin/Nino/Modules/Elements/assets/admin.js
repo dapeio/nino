@@ -263,7 +263,7 @@
 					Nino.admin.elements._destroyHtmlEditors();
 					Nino.admin.elements._showList();
 					// The form's locale switch moves the workbench's content locale
-					if( Nino.admin.elements._listLocale !== ( Nino.admin.sessionLocale.current ?? '' ) )
+					if( Nino.admin.elements._listLocale !== Nino.admin.elements._workingLocale( '' ) )
 						Nino.admin.elements._refreshList();
 					return;
 				}
@@ -756,7 +756,7 @@
 
 			dc.querySelectorAll('.admin-type-btn').forEach( function( btn ) { btn.classList.toggle( 'active', btn.dataset.type === type ) } );
 
-			Nino.admin.elements._apiCall( 'list', { type : type, locale : Nino.admin.sessionLocale.current ?? '' }, function( status, response ) {
+			Nino.admin.elements._apiCall( 'list', { type : type, locale : Nino.admin.elements._workingLocale( '' ) }, function( status, response ) {
 				if( requestId !== Nino.admin.elements._listRequest || type !== Nino.admin.elements._currentType )
 					return;
 				// Shown as well as written: this runs while the type picker is the
@@ -786,10 +786,27 @@
 		 */
 		_refreshList : function() {
 			const type = Nino.admin.elements._currentType;
-			Nino.admin.elements._apiCall( 'list', { type : type, locale : Nino.admin.sessionLocale.current ?? '' }, function( status, response ) {
+			Nino.admin.elements._apiCall( 'list', { type : type, locale : Nino.admin.elements._workingLocale( '' ) }, function( status, response ) {
 				if( status === 200 && response !== null && type === Nino.admin.elements._currentType )
 					Nino.admin.elements._renderList( response.elements, response.columns ?? [] );
 			} );
+		},
+
+		/**
+		 *	The working language as far as this panel can show it: the session's
+		 *	where it is one of the site's languages, else $otherwise. The Text panel
+		 *	also names languages the website does not serve yet, and an element has
+		 *	no select for those here
+		 *
+		 *	@param		{string}	otherwise		Answered for a language this panel has none of
+		 *
+		 *	@return		{string}
+		 */
+		_workingLocale : function( otherwise ) {
+
+			const current = Nino.admin.sessionLocale.current;
+
+			return Nino.admin.elements._locales.indexOf( current ) !== -1 ? current : otherwise;
 		},
 
 		/**
@@ -807,7 +824,7 @@
 		_renderList : function( elements, columns ) {
 
 			Nino.admin.elements._elements = elements;
-			Nino.admin.elements._listLocale = Nino.admin.sessionLocale.current ?? '';
+			Nino.admin.elements._listLocale = Nino.admin.elements._workingLocale( '' );
 			columns = Array.isArray( columns ) ? columns : [];
 
 			// The list is re-read after every save, so a form open on one of
@@ -934,7 +951,7 @@
 				Nino.admin.elements._dirtyLocales	= [];
 				Nino.admin.elements._resetEdits();
 				Nino.admin.elements._remember();
-				Nino.admin.elements._selectedLocale = Nino.admin.sessionLocale.current ?? Nino.admin.elements._locales[0] ?? '';
+				Nino.admin.elements._selectedLocale = Nino.admin.elements._workingLocale( Nino.admin.elements._locales[0] ?? '' );
 				Nino.admin.elements._loadReferenceOptions( function() {
 					if( requestId !== Nino.admin.elements._formRequest || type !== Nino.admin.elements._currentType )
 						return;
@@ -2503,7 +2520,7 @@
 				Nino.admin.elements._showList( Nino.admin.elements._backTarget() );
 				// The form's locale switch moves the workbench's content locale;
 				// the list's cells show one translation, so they follow
-				if( Nino.admin.elements._listLocale !== ( Nino.admin.sessionLocale.current ?? '' ) )
+				if( Nino.admin.elements._listLocale !== Nino.admin.elements._workingLocale( '' ) )
 					Nino.admin.elements._refreshList();
 			} );
 			const toolbar = Nino.admin.formToolbar( backLink );

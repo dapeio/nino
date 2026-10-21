@@ -1250,6 +1250,107 @@ check( 'a unit without a manifest applies nothing', ( static function() use ( $a
 	return $r === [ 'a' => 1 ] && $b === [] && $c === [] && \Nino\Features::readUnitManifest( $sandbox. '/no-unit' ) === null;
 } )() );
 
+// A language the unit has no words of gets its keys - empty - from one it has: the native language's, else English, else the first by its code
+$ut = ninoSandbox( 'unit-texts' );
+$utUnit = static function( string $name, array $fragments ) use ( $ut ): string {
+	$dir = ninoSandboxDir( $ut ). '/'. $name;
+	mkdir( $dir. '/text', 0755, true );
+	foreach( $fragments as $fragmentName => $fragment )
+		file_put_contents( $dir. '/text/'. $fragmentName. '.php', '<?php return '. var_export( $fragment, true ). ';' );
+	return $dir;
+};
+$utRead = static fn( string $locale ): array => \Nino\Filesystem::getFileContent( $ut, '/text/'. $locale. '.php', [] );
+$utNative = $utUnit( 'native', [ 'global' => [ '[[/u/g]]' => 'g' ], 'de_DE' => [ '[[/u/a]]' => 'a de', '[[/u/b]]' => 'b de' ], 'en_US' => [ '[[/u/a]]' => 'a en', '[[/u/c]]' => 'c en' ] ] );
+\Nino\Filesystem::putFileContent( $ut, '/text/it_IT.php', [ '[[/u/a]]' => 'mine' ] );
+$utAdded = \Nino\Features::applyUnitTexts( $ut, $utNative, [ 'de_DE', 'en_US', 'it_IT', 'fr_FR' ], true );
+check( 'a language the unit has no words of gets the keys of the native language\'s words, each empty, and keeps a text it has - the unit overwrites nothing of it, whatever it is asked',
+	$utRead( 'it_IT' ) === [ '[[/u/a]]' => 'mine', '[[/u/b]]' => '' ] && $utRead( 'fr_FR' ) === [ '[[/u/a]]' => '', '[[/u/b]]' => '' ] );
+check( '...a language it has words of gets them as it always did, and the global ones are as they were', $utRead( 'de_DE' ) === [ '[[/u/a]]' => 'a de', '[[/u/b]]' => 'b de' ] && $utRead( 'en_US' ) === [ '[[/u/a]]' => 'a en', '[[/u/c]]' => 'c en' ]
+	&& $utRead( 'global' ) === [ '[[/u/g]]' => 'g' ] );
+check( '...and the answer is how many keys were new to the files, the empty ones included', $utAdded === 1 + 2 + 2 + 1 + 2 );
+check( 'applied again, it adds nothing: the keys are there, and an empty one is not filled in by a second run', \Nino\Features::applyUnitTexts( $ut, $utNative, [ 'de_DE', 'en_US', 'it_IT', 'fr_FR' ], false ) === 0 );
+
+$utEnglish = $utUnit( 'english', [ 'en_US' => [ '[[/u/e]]' => 'e en' ], 'ar_EG' => [ '[[/u/r]]' => 'r ar' ] ] );
+\Nino\Features::applyUnitTexts( $ut, $utEnglish, [ 'pt_PT' ], false );
+check( '...with no words of the native language it is the English ones the keys are taken from', $utRead( 'pt_PT' ) === [ '[[/u/e]]' => '' ] );
+$utOther = $utUnit( 'other', [ 'fr_FR' => [ '[[/u/f]]' => 'f fr' ], 'es_ES' => [ '[[/u/s]]' => 's es' ], 'a_notes' => [ '[[/u/n]]' => 'no language' ] ] );
+\Nino\Features::applyUnitTexts( $ut, $utOther, [ 'ja_JP' ], false );
+check( '...and with neither, the first fragment by its code - a file that is no language is none', $utRead( 'ja_JP' ) === [ '[[/u/s]]' => '' ] );
+$utNone = $utUnit( 'none', [] );
+check( 'a unit with no words creates no file and adds no key', \Nino\Features::applyUnitTexts( $ut, $utNone, [ 'ko_KR' ], false ) === 0 && is_file( \Nino\Filesystem::path( $ut, '/text/ko_KR.php' ) ) === false );
+
+mkdir( \Nino\Filesystem::path( $ut, '/text' ). '/zh_CN.php' );
+$utFailed = ninoErrors( function() use ( $ut, $utNative, &$utFailure ) {
+	$utFailure = \Nino\Features::applyUnitTexts( $ut, $utNative, [ 'zh_CN' ], false );
+} );
+check( 'a file that cannot be written is the answer, and applyUnit() says so in its words', $utFailure === '/text/zh_CN.php' && ( static function() use ( $ut, $utNative ): bool {
+	$routes = []; $blacklist = []; $config = [];
+	file_put_contents( $utNative. '/manifest.php', '<?php return [];' );
+	return \Nino\Features::applyUnit( $ut, $utNative, [ 'zh_CN' ], $routes, $blacklist, $config, false ) === 'could not write /text/zh_CN.php';
+} )() );
+ninoWarnings();
+\Nino\Filesystem::removeDir( ninoSandboxDir( $ut ) );
+
+echo "\n";
+
+
+// --- The words of the base unit at the update -----------------------------------
+
+echo "Admin::guard - the base unit's words reach a site that exists, once for each kernel version\n";
+
+// A site that was set up before the key existed: three languages, the words it has of its own, and a language the base unit has no words of
+$bt = ninoSandbox( 'base-texts' );
+$bt['/nino/dir'] = '';
+$bt['/nino/locales/available'] = [ 'de_DE', 'en_US', 'it_IT' ];
+unset( $bt['/nino/install/texts'] );
+$btUnit = dirname( __DIR__ ). '/_admin/install/library/base/text';
+$btGlobal = (array) include $btUnit. '/global.php';
+$btNative = (array) include $btUnit. '/de_DE.php';
+$btEnglish = (array) include $btUnit. '/en_US.php';
+$btMine = array_key_first( $btNative );
+\Nino\Filesystem::putFileContent( $bt, '/text/de_DE.php', [ $btMine => 'mine' ] );
+\Nino\Filesystem::putFileContent( $bt, '/text/en_US.php', [] );
+$btLines = static function() use ( $bt ): array {
+	$path = ninoSandboxDir( $bt ). '/private/.logs/'. date( 'Y-m-d' ). '.php';
+	$prefix = "<?php http_response_code(403); exit; return '";
+	return is_file( $path ) === false ? [] : array_values( array_filter( explode( "\n", (string) base64_decode( substr( (string) file_get_contents( $path ), strlen( $prefix ), -strlen( "';\n" ) ) ) ), static fn( string $line ): bool => str_contains( $line, 'Base Texts' ) ) );
+};
+$btRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+
+check( 'a request nobody is signed in for runs nothing: the words are for a site whose workbench somebody uses', \Nino\Admin\Admin::guard( $bt, $btRequest ) === false && isset( $bt['/nino/install/texts'] ) === false
+	&& \Nino\Filesystem::getFileContent( $bt, '/text/global.php', [] ) === [] );
+
+ninoUser( $bt, 'admin@example.com' );
+$btRequest = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+check( 'the first request of a workbench after the update lets the guard through', \Nino\Admin\Admin::guard( $bt, $btRequest ) === true );
+$btDe = \Nino\Filesystem::getFileContent( $bt, '/text/de_DE.php', [] );
+$btEn = \Nino\Filesystem::getFileContent( $bt, '/text/en_US.php', [] );
+$btIt = \Nino\Filesystem::getFileContent( $bt, '/text/it_IT.php', [] );
+check( '...and every word of the base unit is in the text files: the global ones, those of each language it has words of - a text the site had kept - and for a language it has none of the keys of the native ones, empty',
+	\Nino\Filesystem::getFileContent( $bt, '/text/global.php', [] ) === $btGlobal && $btDe === array_merge( $btNative, [ $btMine => 'mine' ] ) && $btEn === $btEnglish
+	&& array_keys( $btIt ) === array_keys( $btNative ) && array_filter( $btIt, static fn( mixed $text ): bool => $text !== '' ) === [] );
+check( '...the version it ran for is kept in config.php, and the activity log says how many keys it added', $bt['/nino/install/texts'] === \Nino\VERSION
+	&& ( \Nino\Filesystem::getFileContent( $bt, '/config.php', [] )['/nino/install/texts'] ?? '' ) === \Nino\VERSION
+	&& count( $btLines() ) === 1 && str_ends_with( $btLines()[0], 'Add Base Texts '. ( count( $btGlobal ) + count( $btNative ) - 1 + count( $btEnglish ) + count( $btNative ) ) ) === true
+	&& str_contains( $btLines()[0], 'admin@example.com' ) === true );
+check( '...and nothing else of the unit: no template, no file', glob( \Nino\Filesystem::path( $bt, '/templates' ). '/*' ) === [] && glob( \Nino\Filesystem::path( $bt, '/assets' ). '/*' ) === [] );
+
+// Once for each version: what the site deleted afterwards is not brought back by the next request, a newer kernel brings it
+\Nino\Filesystem::mutate( $bt, '/text/global.php', static function( array $texts ) use ( $btGlobal ): array {
+	unset( $texts[array_key_first( $btGlobal )] );
+	return $texts;
+}, [] );
+\Nino\Admin\Admin::guard( $bt, $btRequest );
+check( 'a request later in the same version brings back nothing, and says nothing', isset( \Nino\Filesystem::getFileContent( $bt, '/text/global.php', [] )[array_key_first( $btGlobal )] ) === false && count( $btLines() ) === 1 );
+$bt['/nino/install/texts'] = '0.0.1';
+\Nino\Admin\Admin::guard( $bt, $btRequest );
+check( 'a new version of the kernel runs it again: the key is back, the line says one, and the version is the new one', ( \Nino\Filesystem::getFileContent( $bt, '/text/global.php', [] )[array_key_first( $btGlobal )] ?? null ) === $btGlobal[array_key_first( $btGlobal )]
+	&& count( $btLines() ) === 2 && str_ends_with( $btLines()[1], 'Add Base Texts 1' ) === true && $bt['/nino/install/texts'] === \Nino\VERSION );
+$bt['/nino/install/texts'] = '0.0.1';
+\Nino\Admin\Admin::guard( $bt, $btRequest );
+check( '...and where it finds nothing to add it says nothing at all, and still keeps the version', count( $btLines() ) === 2 && $bt['/nino/install/texts'] === \Nino\VERSION );
+\Nino\Filesystem::removeDir( ninoSandboxDir( $bt ) );
+
 echo "\n";
 
 

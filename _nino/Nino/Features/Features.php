@@ -1227,7 +1227,9 @@ namespace Nino {
 		 *	add its 'elements' to the types they name, collect its blacklist
 		 *	entries and its config defaults for keys the project has nothing
 		 *	for yet, and merge its text/global.php and
-		 *	text/<locale>.php fragments into the real /text files.
+		 *	text/<locale>.php fragments into the real /text files (see
+		 *	applyUnitTexts(): a language that has no fragment gets the keys of
+		 *	another's, empty).
 		 *
 		 *	The config defaults are collected, not written. This method used to
 		 *	write them itself, and config.php cannot be both written here and
@@ -1346,17 +1348,94 @@ namespace Nino {
 					$config[$configKey] = $configValue;
 				}
 
+			$texts = self::applyUnitTexts( $appData, $unitDir, $locales, $overwrite );
+
+			return is_string( $texts ) === true ? 'could not write '. $texts : true;
+		}
+
+		/**
+		 *	Merge the words of a unit into the project's text files, and nothing
+		 *	else of it: text/global.php into /text/global.php and, for each of
+		 *	$locales, its fragment text/<locale>.php into /text/<locale>.php - the
+		 *	unit wins a key collision with $overwrite, the project without it.
+		 *
+		 *	A language the unit has no fragment of gets the keys of one that it has -
+		 *	the native language's fragment, else the one of en_US, else the first
+		 *	there is - with an empty text each, and add-only whatever $overwrite
+		 *	says: it never replaces a text. Every key of the unit then exists in
+		 *	every language the project serves, so that a page shows the text of
+		 *	the native language where the language has none of its own (see
+		 *	\Nino\Html::getFills()), and the Dashboard counts what is left to
+		 *	translate (see \Nino\Modules\Text\Admin::untranslatedCounts()).
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$unitDir			Absolute path to the unit
+		 *	@param		array 		$locales			The languages to merge for
+		 *	@param		bool			$overwrite			Whether the unit replaces what the project has
+		 *
+		 *	@return 	int|string							How many keys were new to the files, or the first file that could not be written - '/text/global.php'
+		 */
+		public static function applyUnitTexts( array &$appData, string $unitDir, array $locales, bool $overwrite = true ): int|string {
+
+			$unitDir	= rtrim( $unitDir, '/' );
+			$added		= 0;
+			$empty		= null;
+
+			$merge = function( string $path, array $fragment, bool $replace ) use ( &$appData, &$added ): bool {
+
+				$before = \Nino\Filesystem::getFileContent( $appData, $path, [] );
+				$added += count( array_diff_key( $fragment, is_array( $before ) === true ? $before : [] ) );
+
+				return self::mergeText( $appData, $path, $fragment, $replace );
+			};
+
 			$globalFragment = $unitDir. '/text/global.php';
-			if( is_file( $globalFragment ) === true && self::mergeText( $appData, '/text/global.php', (array) include $globalFragment, $overwrite ) === false )
-				return 'could not write /text/global.php';
+			if( is_file( $globalFragment ) === true && $merge( '/text/global.php', (array) include $globalFragment, $overwrite ) === false )
+				return '/text/global.php';
 
 			foreach( $locales as $locale ) {
+
 				$localeFragment = $unitDir. '/text/'. $locale. '.php';
-				if( is_file( $localeFragment ) === true && self::mergeText( $appData, '/text/'. $locale. '.php', (array) include $localeFragment, $overwrite ) === false )
-					return 'could not write /text/'. $locale. '.php';
+
+				if( is_file( $localeFragment ) === true ) {
+
+					if( $merge( '/text/'. $locale. '.php', (array) include $localeFragment, $overwrite ) === false )
+						return '/text/'. $locale. '.php';
+
+					continue;
+				}
+
+				$empty ??= self::_emptyFragment( $appData, $unitDir );
+
+				if( $empty !== [] && $merge( '/text/'. $locale. '.php', $empty, false ) === false )
+					return '/text/'. $locale. '.php';
 			}
 
-			return true;
+			return $added;
+		}
+
+		/**
+		 *	The keys of a unit's words in one language, each with an empty text -
+		 *	what a language the unit has no words of is given (see applyUnitTexts()).
+		 *	The language is the native one where the unit has a fragment of it,
+		 *	else en_US, else the first fragment there is
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$unitDir			Absolute path to the unit
+		 *
+		 *	@return 	array								'[[key]]' => '', [] where the unit has no words of any language
+		 */
+		private static function _emptyFragment( array &$appData, string $unitDir ): array {
+
+			$fragments = array_filter( glob( $unitDir. '/text/*.php' ) ?: [], static fn( string $file ): bool => preg_match( \Nino\Locales::PATTERN, basename( $file, '.php' ) ) === 1 && is_file( $file ) === true );
+
+			foreach( [ \Nino\Locales::getNativeLocale( $appData ), 'en_US' ] as $locale )
+				if( in_array( $unitDir. '/text/'. $locale. '.php', $fragments, true ) === true )
+					return array_fill_keys( array_keys( (array) include $unitDir. '/text/'. $locale. '.php' ), '' );
+
+			sort( $fragments );
+
+			return $fragments === [] ? [] : array_fill_keys( array_keys( (array) include $fragments[0] ), '' );
 		}
 
 		/**

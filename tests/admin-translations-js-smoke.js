@@ -8,7 +8,7 @@
 'use strict';
 
 const vm = require('vm');
-const { check, done, source, load } = require( './harness.js' );
+const { check, done, source, load, fills, element, documentOf, findAll } = require( './harness.js' );
 
 const callbacks = [];
 const Nino = {
@@ -43,6 +43,50 @@ let rejectedInvalid = false;
 try { parse('{broken') } catch( error ) { rejectedInvalid = true }
 check( 'rejects malformed JSON', rejectedInvalid );
 check( 'registers its ready callback', callbacks.length === 1 );
+
+console.log('\nImport target');
+
+// A language that has a text file is one a translation is imported into, whether the website serves it or not. The cards are written with
+// innerHTML, which the document stand-in does not read: what they hold is put there the way the markup would
+{
+	const page = element('div');
+	const wrap = element('div');
+	wrap.id = 'translations-content';
+	page.appendChild( wrap );
+	const base = documentOf( page );
+	const document = Object.assign( {}, base, { createElement : function( tag ) {
+		const el = base.createElement( tag );
+		return tag !== 'section' ? el : new Proxy( el, { set : function( target, name, value ) {
+			if( name !== 'innerHTML' ) {
+				target[name] = value;
+				return true;
+			}
+			const copy = base.createElement('div');
+			copy.appendChild( base.createElement('h2') );
+			copy.appendChild( base.createElement('p') );
+			target.appendChild( base.createElement('span') );
+			target.appendChild( copy );
+			return true;
+		} } );
+	} } );
+	const words = fills('_admin/text/en_US.php');
+	const Nino = { admin : {}, events : { bindCallback : function() {} }, http : { sendRequest : function() {} }, content : { getText : function( key ) { return words[key] ?? '' } }, adminUi : { format : function( text ) { return text } } };
+	const drawn = vm.createContext( { window : { Nino : Nino }, document : document, Nino : Nino, console : console, JSON : JSON, TypeError : TypeError } );
+	load( '_admin/Nino/Modules/Language/assets/translations.js', drawn );
+	const draw = function( locales ) {
+		Nino.admin.translations._info = { nativeLocale : 'de_DE', locales : locales, textCount : 3, elementCount : 4 };
+		Nino.admin.translations._render();
+		return findAll( page, function( el ) { return el.id === 'translations-target-locale' } )[0];
+	};
+
+	const target = draw( [ { locale : 'de_DE', active : true }, { locale : 'en_US', active : true }, { locale : 'it_IT', active : false } ] );
+	const word = words['/_admin/common/word/inactive'];
+	check( 'the target select has an option for every language the answer names, the code its value', word !== undefined && word !== '' && target.children.map( function( o ) { return o.value } ).join() === 'de_DE,en_US,it_IT' );
+	check( '...the one the website does not serve says so, the word of the workbench in parentheses behind the code - the others do not', target.children[2].textContent === 'it_IT ('+ word+ ')'
+		&& target.children[1].textContent === 'en_US' && target.children[0].textContent.indexOf( word ) === -1 );
+	check( '...and the first language that is not the native one is the one picked', target.value === 'en_US' );
+	check( 'a site with the native language alone offers the native language', draw( [ { locale : 'de_DE', active : true } ] ).value === 'de_DE' );
+}
 
 console.log('\nShared HTML editor');
 

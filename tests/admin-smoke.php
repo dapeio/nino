@@ -170,10 +170,10 @@ echo "\n";
 
 echo "Text::untranslatedCounts - what the Dashboard says is not translated yet\n";
 
-/*	Counted per language: a key the native language has a text for and the
-	other has none, or an empty one. Hidden keys and the language-independent
-	ones are no translation work, an empty native text is nothing to translate,
-	and the native language is never counted against itself	*/
+/*	Counted per language of the site, the native one included: a key a language
+	of the files has a text for and this one has none, an empty one or one of
+	whitespace. Hidden keys and the language-independent ones are no
+	translation work, and a key that is empty everywhere is nothing to translate	*/
 check( 'one key of the sandbox lacks an English text, and that is all there is', \Nino\Modules\Text\Admin::untranslatedCounts( $appData ) === [ 'en_US' => 1 ] );
 
 \Nino\Filesystem::mutate( $appData, '/text/de_DE.php', fn( array $texts ): array => $texts + [ '[[/gap/empty]]' => 'Leer', '[[/gap/blank]]' => '', '[[/gap/hidden]]' => 'Versteckt', '[[/gap/only-en]]' => '' ] );
@@ -183,15 +183,29 @@ $gapAppData = $appData;
 $gapAppData['/nino/locales/available'] = [ 'de_DE', 'en_US', 'fr_FR' ];
 $counts = \Nino\Modules\Text\Admin::untranslatedCounts( $gapAppData );
 check( 'an empty value counts as untranslated, as an absent one does', ( $counts['en_US'] ?? 0 ) === 2 );
-check( '...the native language is never counted against itself', array_keys( $counts ) === [ 'en_US', 'fr_FR' ] );
-check( 'a configured language with no text file counts every native text - and not the hidden key, the global ones or a native text that is empty', ( $counts['fr_FR'] ?? 0 ) === 4 );
+check( '...the native language is counted like the others: a key it has no text for that another language has is a gap there too, and only the languages of the site are counted', ( $counts['de_DE'] ?? 0 ) === 1
+	&& array_diff( array_keys( $counts ), [ 'de_DE', 'en_US', 'fr_FR' ] ) === [] );
+check( 'a configured language with no text file counts every text some language has - and not the hidden key, the global ones or a text that is empty everywhere', ( $counts['fr_FR'] ?? 0 ) === 5 );
 
 \Nino\Filesystem::mutate( $appData, '/text/en_US.php', fn( array $texts ): array => [ '[[/gap/empty]]' => 'Done' ] + $texts );
 check( 'a text written into the language is no longer counted', ( \Nino\Modules\Text\Admin::untranslatedCounts( $gapAppData )['en_US'] ?? 0 ) === 1 );
 
+// Whitespace is nothing, and a language that has a file and is not switched on holds texts that are work for the languages that are
+$gapBase = \Nino\Modules\Text\Admin::untranslatedCounts( $gapAppData );
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', fn( array $texts ): array => $texts + [ '[[/gap/space]]' => " \n\t " ] );
+\Nino\Filesystem::mutate( $appData, '/text/en_US.php', fn( array $texts ): array => $texts + [ '[[/gap/space]]' => 'Only English too' ] );
+$gapSpace = \Nino\Modules\Text\Admin::untranslatedCounts( $gapAppData );
+check( 'a text of whitespace is an empty one: the native language lacks one, a language with no file lacks it too', $gapSpace['de_DE'] === $gapBase['de_DE'] + 1 && $gapSpace['fr_FR'] === $gapBase['fr_FR'] + 1 && ( $gapSpace['en_US'] ?? 0 ) === ( $gapBase['en_US'] ?? 0 ) );
+\Nino\Filesystem::putFileContent( $gapAppData, '/text/it_IT.php', [ '[[/gap/switched-off]]' => 'Solo' ] );
+$gapOff = \Nino\Modules\Text\Admin::untranslatedCounts( $gapAppData );
+check( 'a text only a language that is switched off has is a gap in every language of the site, and that language is not counted itself', $gapOff['de_DE'] === $gapSpace['de_DE'] + 1 && $gapOff['en_US'] === ( $gapSpace['en_US'] ?? 0 ) + 1 && $gapOff['fr_FR'] === $gapSpace['fr_FR'] + 1
+	&& array_key_exists( 'it_IT', $gapOff ) === false );
+unlink( \Nino\Filesystem::path( $appData, '/text/it_IT.php' ) );
+unset( $gapAppData['./nino/filesystem/cache'], $gapAppData['./nino/locales/text'], $gapAppData['./nino/html/filecache'] );
+
 // Back to what the rest of this suite starts from
 \Nino\Text::setBlacklisted( $appData, '/gap/hidden', false );
-foreach( [ 'de_DE' => [ '[[/gap/empty]]', '[[/gap/blank]]', '[[/gap/hidden]]', '[[/gap/only-en]]' ], 'en_US' => [ '[[/gap/empty]]', '[[/gap/only-en]]' ] ] as $gapLocale => $gapKeys )
+foreach( [ 'de_DE' => [ '[[/gap/empty]]', '[[/gap/blank]]', '[[/gap/hidden]]', '[[/gap/only-en]]', '[[/gap/space]]' ], 'en_US' => [ '[[/gap/empty]]', '[[/gap/only-en]]', '[[/gap/space]]' ] ] as $gapLocale => $gapKeys )
 	\Nino\Filesystem::mutate( $appData, '/text/'. $gapLocale. '.php', fn( array $texts ): array => array_diff_key( $texts, array_flip( $gapKeys ) ) );
 
 echo "\n";
@@ -216,6 +230,20 @@ check( '...and nothing else moved: the select edits a translation, it does not s
 
 [ , $body ] = ninoCall( $appData, [ \Nino\Modules\Elements\Admin::class, 'apiTypes' ] );
 check( 'Elements::apiTypes also exposes the (now updated) working language, while the workbench speaks the other', ( $body['selectedLocale'] ?? null ) === 'en_US' && \Nino\Admin\Admin::sessionLocale( $appData ) === 'de_DE' );
+check( 'a panel that works on the languages of the site asks for those: the working language of an available one is the same', \Nino\Admin\Admin::contentLocale( $appData, true ) === 'en_US' );
+
+// A language that has a text file and is not switched on: the Text panel works in it, and the panels of the site's languages do not
+\Nino\Filesystem::putFileContent( $appData, '/text/it_IT.php', [] );
+[ $status ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'apiSetLocale' ], [ 'locale' => 'it_IT' ] );
+check( 'apiSetLocale accepts a language that has a text file only - the Text panel offers it to translate into before it is switched on - and contentLocale() returns it', $status === 200 && \Nino\Admin\Admin::contentLocale( $appData ) === 'it_IT' );
+[ , $body ] = ninoCall( $appData, [ \Nino\Modules\Elements\Admin::class, 'apiTypes' ] );
+check( '...a panel that works on the languages of the site gets the native language then, and so does the Elements list', \Nino\Admin\Admin::contentLocale( $appData, true ) === 'de_DE' && ( $body['selectedLocale'] ?? null ) === 'de_DE' );
+[ $status ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'apiSetLocale' ], [ 'locale' => 'ja_JP' ] );
+check( '...and a language with no file is still refused, the working language as it was', $status === 400 && \Nino\Admin\Admin::contentLocale( $appData ) === 'it_IT' );
+unlink( \Nino\Filesystem::path( $appData, '/text/it_IT.php' ) );
+unset( $appData['./nino/filesystem/cache'], $appData['./nino/locales/text'], $appData['./nino/html/filecache'] );
+check( '...and a working language whose file is gone is the native language again', \Nino\Admin\Admin::contentLocale( $appData ) === 'de_DE' );
+\Nino\Runtime::setSessionValue( $appData, './admin/content-locale', 'en_US' );
 
 echo "\n";
 

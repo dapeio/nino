@@ -489,8 +489,12 @@ namespace Nino\Modules\Backups {
 			// later in this same request (or a request landing in the same
 			// wall-clock second - see AppData::writeContentData()'s docblock
 			// for why that specifically matters) re-reads the restored files
-			// instead of whatever was cached from before the restore
-			unset( $appData['./nino/filesystem/cache'] );
+			// instead of whatever was cached from before the restore. What
+			// is made of the text files for the request - the fills of a
+			// language and the list of the languages that have a file - goes
+			// with it: a write through Filesystem drops those, and this one
+			// is none
+			unset( $appData['./nino/filesystem/cache'], $appData['./nino/html/filecache'], $appData['./nino/locales/text'] );
 
 			if( function_exists( 'opcache_reset' ) === true )
 				opcache_reset();

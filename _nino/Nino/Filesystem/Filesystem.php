@@ -177,6 +177,16 @@ namespace Nino {
 			// Update cache only after persistence
 			$appData['./nino/filesystem/cache'][$filename]['content'] = $cacheContent;
 
+			/*	What the text files feed is made once for a request and kept: the
+				fills of a language with where each came from (\Nino\Html::getFills())
+				and the list of the languages that have a file
+				(\Nino\Locales::getTextLocales()). A write under /text/ makes both stale
+				for the rest of the request, and a save of a text in a workbench
+				request is seen by the next fill. mutate() ends in this method, so
+				this is the one place.	*/
+			if( str_starts_with( '/'. ltrim( $filename, '/' ), '/text/' ) === true )
+				unset( $appData['./nino/html/filecache'], $appData['./nino/locales/text'] );
+
 			// Reset opcache
 			if( function_exists( 'opcache_invalidate' ) === true && is_file( $path ) === true )
 				opcache_invalidate( $path, true );

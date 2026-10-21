@@ -562,11 +562,12 @@ echo "\n";
 
 echo "Elements - element content CRUD\n";
 
-// The three languages the checks below expect
+// The three languages the checks below expect, each with the text file the Language panel makes of a language
 callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiSave', [ 'fields' => [
 	'/nino/locales/available' => [ 'de_DE', 'en_US', 'fr_FR' ],
 	'/nino/locales/native' 		=> 'de_DE',
 ] ] );
+\Nino\Filesystem::putFileContent( $appData, '/text/fr_FR.php', [] );
 
 // A second type alongside testtype, with both a global and a locale field, so
 // the global/locale split and the raw-bucket view have something real to show
@@ -823,7 +824,7 @@ unset( $appData['./nino/elements/cache'] );
 
 [ $status, $info ] = callDev( $appData, \Nino\Modules\Language\Translations::class, 'apiInfo' );
 check( 'apiInfo succeeds and fixes the source to the native locale', $status === 200 && $info['nativeLocale'] === 'de_DE' );
-check( 'apiInfo offers every configured import target', $info['locales'] === [ 'de_DE', 'en_US', 'fr_FR' ] );
+check( 'apiInfo offers every language that has a text file as an import target, each with whether the website serves it', $info['locales'] === [ [ 'locale' => 'de_DE', 'active' => true ], [ 'locale' => 'en_US', 'active' => true ], [ 'locale' => 'fr_FR', 'active' => true ] ] );
 
 [ $status ] = ninoCall( $appData, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'translations/info' );
 check( 'Translations is registered in Admin\'s central action dispatcher', $status === 200 );
@@ -921,6 +922,36 @@ $badTranslation['version'] = 99;
 check( 'apiImport rejects an incompatible format version', $status === 400 );
 [ $status ] = callDev( $appData, \Nino\Modules\Language\Translations::class, 'apiImport', [ 'targetLocale' => 'xx_XX', 'translation' => $translation ] );
 check( 'apiImport rejects an unknown target locale', $status === 400 );
+
+// An empty value is no translation: it never blanks a text the language has, for a text and for an element field alike
+$emptyTranslation = $translation;
+$emptyTranslation['text'] = [ '/translation/title' => '', '/translation/plain' => '   ' ];
+$emptyTranslation['elements'] = [ 'translationtype' => [ 'item' => [ 'title' => '', 'description' => ' ' ] ] ];
+$translatedBefore = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
+$elementsBefore = \Nino\Filesystem::getFileContent( $appData, '/elements/translationtype.php', [] )['en_US']['item'];
+[ $status, $result ] = callDev( $appData, \Nino\Modules\Language\Translations::class, 'apiImport', [ 'targetLocale' => 'en_US', 'translation' => $emptyTranslation ] );
+check( 'an empty value of the document - none, empty or whitespace - is skipped where the language has a text, and counted as skipped, for the texts and for the element fields',
+	$status === 200 && $result['text'] === [ 'imported' => 0, 'skipped' => 2 ] && $result['elements'] === [ 'imported' => 0, 'skipped' => 2 ] );
+check( '...and the texts and the fields stay as they were', \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] ) === $translatedBefore && \Nino\Filesystem::getFileContent( $appData, '/elements/translationtype.php', [] )['en_US']['item'] === $elementsBefore );
+[ $status, $result ] = callDev( $appData, \Nino\Modules\Language\Translations::class, 'apiImport', [ 'targetLocale' => 'fr_FR', 'translation' => $emptyTranslation ] );
+check( '...where the language has none there is nothing to protect: the empty value is written as the empty text it is', $status === 200 && $result['text'] === [ 'imported' => 2, 'skipped' => 0 ] && $result['elements'] === [ 'imported' => 2, 'skipped' => 0 ]
+	&& \Nino\Filesystem::getFileContent( $appData, '/text/fr_FR.php', [] )['[[/translation/title]]'] === '' );
+
+// A language with a text file that the website does not serve is one a document is imported into: translated before it is switched on
+\Nino\Filesystem::putFileContent( $appData, '/text/it_IT.php', [] );
+[ , $infoOff ] = callDev( $appData, \Nino\Modules\Language\Translations::class, 'apiInfo' );
+$offTranslation = $translation;
+$offTranslation['text'] = [ '/translation/title' => 'Casa <code>Nino</code>' ];
+$offTranslation['elements'] = [ 'translationtype' => [ 'item' => [ 'title' => 'Progetto' ] ] ];
+[ $status, $result ] = callDev( $appData, \Nino\Modules\Language\Translations::class, 'apiImport', [ 'targetLocale' => 'it_IT', 'translation' => $offTranslation ] );
+check( 'a language that has a text file and is not one of the site\'s is offered as a target, flagged as not served, and imported into: its text file and its element bucket hold the translation',
+	end( $infoOff['locales'] ) === [ 'locale' => 'it_IT', 'active' => false ] && $status === 200 && $result['text'] === [ 'imported' => 1, 'skipped' => 0 ] && $result['elements'] === [ 'imported' => 1, 'skipped' => 0 ]
+	&& \Nino\Filesystem::getFileContent( $appData, '/text/it_IT.php', [] )['[[/translation/title]]'] === 'Casa <code>Nino</code>' && \Nino\Filesystem::getFileContent( $appData, '/elements/translationtype.php', [] )['it_IT']['item']['title'] === 'Progetto'
+	&& in_array( 'it_IT', \Nino\Locales::getAvailableLocales( $appData ), true ) === false );
+unlink( \Nino\Filesystem::path( $appData, '/text/it_IT.php' ) );
+unset( $appData['./nino/filesystem/cache'], $appData['./nino/locales/text'], $appData['./nino/html/filecache'], $appData['./nino/elements/cache'] );
+[ $status ] = callDev( $appData, \Nino\Modules\Language\Translations::class, 'apiImport', [ 'targetLocale' => 'it_IT', 'translation' => $offTranslation ] );
+check( '...and once its file is gone it is no target again', $status === 400 );
 
 \Nino\Auth::logoutUser( $appData );
 [ $status ] = callDev( $appData, \Nino\Modules\Language\Translations::class, 'apiExport' );

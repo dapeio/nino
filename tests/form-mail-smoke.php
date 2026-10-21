@@ -386,6 +386,35 @@ check( '...and neither takes a locale this project does not have', \Nino\Locales
 \Nino\Runtime::unsetSessionValue( $appData, './nino/locales/current' );
 \Nino\Locales::useLocale( $appData, 'de_DE' );
 
+/*	A mail in a language that has no text for its subject says the native one:
+	the fills fall back to the native language where a language has none (see
+	\Nino\Html::getFills()), the mail the visitor gets - rendered in their
+	language - included. The words of the mail are the text files', so the fills
+	a block above registered for every language are taken back first	*/
+$userSubject = '[[/module/form/subject/user]]';
+unset( $appData['./nino/html/fills']['*'][$userSubject] );
+\Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', [ $userSubject => 'Danke fuer Ihre Nachricht' ] );
+\Nino\Filesystem::putFileContent( $appData, '/text/en_US.php', [ $userSubject => '' ] );
+\Nino\Locales::useLocale( $appData, 'en_US' );
+$localeMails = [];
+$fallbackRequest = submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'Hi' ] );
+$userMails = array_values( array_filter( $localeMails, static fn( array $mail ): bool => $mail['to'] === 'jo@example.com' ) );
+check( 'the mail the visitor gets is in their language, and where it has no subject there it says the native one', $fallbackRequest['/nino/http/response']['statusCode'] === 200 && count( $userMails ) === 1
+	&& $userMails[0]['subject'] === 'Danke fuer Ihre Nachricht' );
+
+// The head of a mail says the language it is drawn in: the website's own tag where the language has one, else the tag of the language - it is
+// worked out for the language the mail is rendered in, which is not the visitor's, and never the native language's tag for another
+$mailHead = (string) file_get_contents( dirname( __DIR__ ). '/_nino/Nino/Modules/Form/install/templates/mail-header.tpl' );
+\Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', [ '[[/project/website/html/lang]]' => 'de' ] );
+\Nino\Filesystem::putFileContent( $appData, '/text/en_US.php', [ '[[/project/website/html/lang]]' => '' ] );
+$englishHead = \Nino\Html::renderHtml( $appData, $mailHead );
+\Nino\Locales::useLocale( $appData, 'de_DE' );
+$germanHead = \Nino\Html::renderHtml( $appData, $mailHead );
+check( 'the head of a mail carries the tag of the language it is rendered in: the key of the website where the language has one, the tag of the language where it has none',
+	str_contains( $englishHead, '<html lang="en-US">' ) === true && str_contains( $germanHead, '<html lang="de">' ) === true );
+\Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', [] );
+\Nino\Filesystem::putFileContent( $appData, '/text/en_US.php', [] );
+
 unset( $appData[ \Nino\Form::STORE ], $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ], $appData['./nino/html/shortcodes']['template'], $appData['./nino/callbacks']['/nino/html/shortcode/template'] );
 $appData[ \Nino\Form::FORMS ] = $formsBefore;
 @unlink( \Nino\Filesystem::path( $appData, '/templates/mail-test.tpl' ) );

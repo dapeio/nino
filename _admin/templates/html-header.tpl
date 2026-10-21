@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="[[/project/website/html/lang]]">
+<html lang="[[/_admin/lang]]">
 		<head>
 			<meta charset="utf-8">
 

@@ -7,7 +7,9 @@ declare(strict_types=1);
  *											formats of a field - sanitizeHtml() with its profiles,
  *											detectFormat(), fieldFormat(), fieldValue() - as the element
  *											shortcodes apply them, the [json] shortcode, and the fills of
- *											another language, the address of the site and a fill taken back.
+ *											another language, the address of the site and a fill taken back,
+ *											the fallback of the fills to another language and the helpers
+ *											of \Nino\Locales it reads.
  *											Runs against an isolated sandbox directory, never touches the real
  *											project data.
  *
@@ -263,11 +265,12 @@ file_put_contents( \Nino\Filesystem::path( $fills, '/text' ). '/*.php', '<?php r
 
 $fillsOfCurrent = \Nino\Html::getFills( $fills );
 check( 'getFills() is the current language\'s: the global text, the language\'s own, its runtime fills and last those of *, as it always was', $fillsOfCurrent['[[/t/global]]'] === 'in every language'
-	&& $fillsOfCurrent['[[/t/both]]'] === 'de runtime' && $fillsOfCurrent['[[/t/de]]'] === 'only de' && $fillsOfCurrent['[[/t/star]]'] === 'star' && isset( $fillsOfCurrent['[[/t/en]]'] ) === false );
+	&& $fillsOfCurrent['[[/t/both]]'] === 'de runtime' && $fillsOfCurrent['[[/t/de]]'] === 'only de' && $fillsOfCurrent['[[/t/star]]'] === 'star' );
+check( '...a text it has none of is the other language\'s text, not its runtime fill', $fillsOfCurrent['[[/t/en]]'] === 'only en' );
 check( '...and so it is for null and for \'\'', \Nino\Html::getFills( $fills, null ) === $fillsOfCurrent && \Nino\Html::getFills( $fills, '' ) === $fillsOfCurrent && \Nino\Html::getFills( $fills, 'de_DE' ) === $fillsOfCurrent );
 $fillsOfOther = \Nino\Html::getFills( $fills, 'en_US' );
 check( 'the fills of another language of the site are its own text and its own runtime fills, merged the same way, while the visitor stays in theirs', $fillsOfOther['[[/t/global]]'] === 'in every language'
-	&& $fillsOfOther['[[/t/both]]'] === 'en text' && $fillsOfOther['[[/t/en]]'] === 'en runtime' && isset( $fillsOfOther['[[/t/de]]'] ) === false && \Nino\Locales::getCurrentLocale( $fills ) === 'de_DE' );
+	&& $fillsOfOther['[[/t/both]]'] === 'en text' && $fillsOfOther['[[/t/en]]'] === 'en runtime' && $fillsOfOther['[[/t/de]]'] === 'only de' && \Nino\Locales::getCurrentLocale( $fills ) === 'de_DE' );
 check( '...and the fills that belong to no language win there too', $fillsOfOther['[[/t/star]]'] === 'star' );
 $fillsOfNone = \Nino\Html::getFills( $fills, '*' );
 check( 'asked for *, it is the global text and the fills that belong to no language - no language\'s own', $fillsOfNone['[[/t/global]]'] === 'in every language' && $fillsOfNone['[[/t/star]]'] === 'star'
@@ -320,6 +323,167 @@ check( 'a fill that is not there, and a language the site does not have, are not
 
 echo "\n";
 
+
+// --- Html::getFills - the fallback of the fills ----------------------------------
+
+echo "Html::getFills and fillOrigin - a text the language has none of is the text of the first language that has one\n";
+
+// de_DE is native and listed second; on, in this order: it_IT, de_DE, fr_FR, en_US; a file and off: es_ES and pt_PT.
+// What each language says is told by the text itself, so a pin names the language that gave it
+$fb = ninoSandbox( 'html-fallback' );
+$fb['/nino/locales/available'] = [ 'it_IT', 'de_DE', 'fr_FR', 'en_US' ];
+$fb['/nino/dir'] = '';
+
+$fbTexts = [
+	'/t/own'		=> [ 'de_DE' => 'de own', 'fr_FR' => 'fr own', 'en_US' => 'en own' ],
+	'/t/mother'	=> [ 'de_DE' => 'de mother', 'it_IT' => 'it mother', 'fr_FR' => 'fr mother', 'en_US' => '' ],
+	'/t/space'	=> [ 'de_DE' => 'de space', 'en_US' => " \n\t " ],
+	'/t/order'	=> [ 'de_DE' => '', 'it_IT' => 'it order', 'fr_FR' => 'fr order', 'es_ES' => 'es order' ],
+	'/t/rest'		=> [ 'de_DE' => '', 'it_IT' => ' ', 'fr_FR' => '', 'pt_PT' => 'pt rest', 'es_ES' => 'es rest' ],
+	'/t/only'		=> [ 'pt_PT' => 'pt only' ],
+	'/t/none'		=> [ 'de_DE' => '', 'fr_FR' => ' ', 'en_US' => '' ],
+	'/project/website/html/lang' => [ 'de_DE' => 'de', 'en_US' => '' ],
+];
+$fbFiles = [];
+foreach( $fbTexts as $fbKey => $fbValues )
+	foreach( $fbValues as $fbLocale => $fbValue )
+		$fbFiles[$fbLocale]['[['. $fbKey. ']]'] = $fbValue;
+foreach( $fbFiles as $fbLocale => $fbFile )
+	\Nino\Filesystem::putFileContent( $fb, '/text/'. $fbLocale. '.php', $fbFile );
+\Nino\Filesystem::putFileContent( $fb, '/text/global.php', [ '[[/t/global]]' => 'in every language' ] );
+// What is no language: a name that is no locale id, and a directory named like one
+\Nino\Filesystem::putFileContent( $fb, '/text/notes.php', [ '[[/t/junk]]' => 'from a file that is no language' ] );
+mkdir( \Nino\Filesystem::path( $fb, '/text' ). '/nl_NL.php' );
+\Nino\Locales::setCurrentLocale( $fb, 'en_US' );
+
+check( 'the text files that are languages are listed, the available ones first in the order the site lists them, then the others by their code - no file that is no locale id, no directory',
+	\Nino\Locales::getTextLocales( $fb ) === [ 'it_IT', 'de_DE', 'fr_FR', 'en_US', 'es_ES', 'pt_PT' ] );
+
+$fbFills = \Nino\Html::getFills( $fb );
+check( 'a text the language has is its own, whatever the others say', $fbFills['[[/t/own]]'] === 'en own' && \Nino\Html::fillOrigin( $fb, '/t/own' ) === null );
+check( 'one it has none of - empty, or only whitespace - is the native language\'s, although two others have one as well', $fbFills['[[/t/mother]]'] === 'de mother' && $fbFills['[[/t/space]]'] === 'de space'
+	&& \Nino\Html::fillOrigin( $fb, '/t/mother' ) === 'de_DE' && \Nino\Html::fillOrigin( $fb, '/t/space' ) === 'de_DE' );
+check( '...where the native one has none, the next available language in the order the site lists them - not the first by name', $fbFills['[[/t/order]]'] === 'it order' && \Nino\Html::fillOrigin( $fb, '/t/order' ) === 'it_IT' );
+check( '...where none of those has one, a language that is only a file, by its code; a whitespace text on the way is no text', $fbFills['[[/t/rest]]'] === 'es rest' && \Nino\Html::fillOrigin( $fb, '/t/rest' ) === 'es_ES'
+	&& $fbFills['[[/t/only]]'] === 'pt only' && \Nino\Html::fillOrigin( $fb, '/t/only' ) === 'pt_PT' );
+check( '...and where no language has one, it stays what the language wrote, with no origin; a key nobody has is not made up', $fbFills['[[/t/none]]'] === '' && \Nino\Html::fillOrigin( $fb, '/t/none' ) === null
+	&& isset( $fbFills['[[/t/nobody]]'] ) === false && \Nino\Html::fillOrigin( $fb, '/t/nobody' ) === null );
+check( 'the global text is as it was, and a file that is no language is read by nobody', $fbFills['[[/t/global]]'] === 'in every language' && isset( $fbFills['[[/t/junk]]'] ) === false );
+check( 'a page shows the fallback where there is one, and an empty text as nothing', \Nino\Html::renderHtml( $fb, '[[/t/mother]]|[[/t/none]]|[[/t/order]]' ) === 'de mother||it order' );
+
+$fbNative = \Nino\Html::getFills( $fb, 'de_DE' );
+check( 'the same goes for any language the site has: the native one takes from the other available languages in their order, another from the native one first', $fbNative['[[/t/order]]'] === 'it order' && $fbNative['[[/t/own]]'] === 'de own'
+	&& \Nino\Html::getFills( $fb, 'fr_FR' )['[[/t/space]]'] === 'de space' && \Nino\Html::getFills( $fb, 'fr_FR' )['[[/t/own]]'] === 'fr own' );
+check( '...and a language of a file only has no fills, as before', \Nino\Html::getFills( $fb, 'es_ES' ) === [] && ninoWarnings() === [] );
+
+$fbNone = \Nino\Html::getFills( $fb, '*' );
+check( 'asked for *, it has no chain: the global text, and nothing a language gave', $fbNone['[[/t/global]]'] === 'in every language' && isset( $fbNone['[[/t/mother]]'] ) === false && isset( $fbNone['[[/t/order]]'] ) === false );
+
+\Nino\Html::addFills( $fb, [ '/t/mother' => 'runtime mother' ], 'en_US' );
+\Nino\Html::addFills( $fb, [ '/t/order' => 'runtime star' ], '*' );
+$fbRuntime = \Nino\Html::getFills( $fb );
+check( 'a fill added at runtime wins over the text of another language - the language\'s own and the one of *', $fbRuntime['[[/t/mother]]'] === 'runtime mother' && $fbRuntime['[[/t/order]]'] === 'runtime star' );
+check( '...and then nothing was taken from anywhere: it has no origin', \Nino\Html::fillOrigin( $fb, '/t/mother' ) === null && \Nino\Html::fillOrigin( $fb, '/t/order' ) === null );
+\Nino\Html::removeFill( $fb, '/t/mother', 'en_US' );
+\Nino\Html::removeFill( $fb, '/t/order' );
+check( '...taken back, the text of the other language is what the page shows again', \Nino\Html::getFills( $fb )['[[/t/mother]]'] === 'de mother' && \Nino\Html::fillOrigin( $fb, '/t/mother' ) === 'de_DE' && \Nino\Html::getFills( $fb )['[[/t/order]]'] === 'it order' );
+
+// The tag of a page: the one fill that never falls back, and the fill the kernel makes of it
+check( 'the lang of a page never falls back: a language that has none of its own has none, whatever the native language wrote', $fbFills['[[/project/website/html/lang]]'] === '' && \Nino\Html::fillOrigin( $fb, '/project/website/html/lang' ) === null
+	&& $fbNative['[[/project/website/html/lang]]'] === 'de' );
+check( '[[/nino/html/lang]] is that value where the language has one, else the tag of the language - for each of them', $fbFills['[[/nino/html/lang]]'] === 'en-US' && $fbNative['[[/nino/html/lang]]'] === 'de'
+	&& \Nino\Html::getFills( $fb, 'fr_FR' )['[[/nino/html/lang]]'] === 'fr-FR' && in_array( '/nino/html/lang', \Nino\Html::runtimeFillKeys( $fb ), true ) === true );
+check( '...not for *, which is no language', isset( $fbNone['[[/nino/html/lang]]'] ) === false );
+\Nino\Filesystem::mutate( $fb, '/text/en_US.php', static function( array $texts ): array {
+	$texts['[[/project/website/html/lang]]'] = ' ';
+	return $texts;
+} );
+$fbSpaceLang = \Nino\Html::getFills( $fb )['[[/nino/html/lang]]'];
+\Nino\Filesystem::mutate( $fb, '/text/en_US.php', static function( array $texts ): array {
+	$texts['[[/project/website/html/lang]]'] = 'en';
+	return $texts;
+} );
+check( '...a value of whitespace is none, and a value the language wrote is the tag, as the site wrote it', $fbSpaceLang === 'en-US' && \Nino\Html::getFills( $fb )['[[/nino/html/lang]]'] === 'en' );
+
+// Made once for a request, dropped by a write
+$fbPrimed = \Nino\Html::getFills( $fb )['[[/t/space]]'];
+file_put_contents( \Nino\Filesystem::path( $fb, '/text' ). '/de_DE.php', '<?php return [ \'[[/t/space]]\' => \'de space, written behind the kernel\' ];' );
+$fbBehind = \Nino\Html::getFills( $fb )['[[/t/space]]'];
+\Nino\Filesystem::putFileContent( $fb, '/data/unrelated.php', [] );
+$fbElsewhere = \Nino\Html::getFills( $fb )['[[/t/space]]'];
+\Nino\Filesystem::putFileContent( $fb, '/text/global.php', [ '[[/t/global]]' => 'in every language' ] );
+check( 'what the text files give a language is made once per request: a file changed behind the kernel\'s back is not read again, a write elsewhere leaves that, a write under /text drops it',
+	$fbPrimed === 'de space' && $fbBehind === 'de space' && $fbElsewhere === 'de space' && \Nino\Html::getFills( $fb )['[[/t/space]]'] === 'de space, written behind the kernel' );
+$fbFrench = \Nino\Html::getFills( $fb, 'fr_FR' )['[[/t/space]]'];
+\Nino\Filesystem::mutate( $fb, '/text/de_DE.php', static function( array $texts ): array {
+	$texts['[[/t/space]]'] = 'de space, mutated';
+	return $texts;
+} );
+check( '...also by mutate(), for the language that was written and for every other one that takes from it', $fbFrench === 'de space, written behind the kernel' && \Nino\Html::getFills( $fb )['[[/t/space]]'] === 'de space, mutated'
+	&& \Nino\Html::fillOrigin( $fb, '/t/space' ) === 'de_DE' && \Nino\Html::getFills( $fb, 'fr_FR' )['[[/t/space]]'] === 'de space, mutated' );
+\Nino\Filesystem::putFileContent( $fb, '/text/en_US.php', [ '[[/t/space]]' => 'en space' ] );
+check( '...so a text saved in the language is the next fill of the same request, and the origin is gone with the fallback', \Nino\Html::getFills( $fb )['[[/t/space]]'] === 'en space' && \Nino\Html::fillOrigin( $fb, '/t/space' ) === null );
+$fbBefore = \Nino\Locales::getTextLocales( $fb );
+\Nino\Filesystem::putFileContent( $fb, '/text/ja_JP.php', [ '[[/t/japan]]' => 'ja' ] );
+check( '...and the list of the text files: a language written is listed at once, among the others by its code, and the others take from it', in_array( 'ja_JP', $fbBefore, true ) === false
+	&& \Nino\Locales::getTextLocales( $fb ) === [ 'it_IT', 'de_DE', 'fr_FR', 'en_US', 'es_ES', 'ja_JP', 'pt_PT' ] && \Nino\Html::getFills( $fb )['[[/t/japan]]'] === 'ja' && \Nino\Html::fillOrigin( $fb, '/t/japan' ) === 'ja_JP' );
+
+\Nino\Filesystem::removeDir( ninoSandboxDir( $fb ) );
+
+// A native language the site does not list - a config that was edited by hand - is no first choice: the site does not serve it, it only has a file
+$nn = ninoSandbox( 'html-native' );
+$nn['/nino/locales/native'] = 'fr_FR';
+\Nino\Filesystem::putFileContent( $nn, '/text/de_DE.php', [] );
+\Nino\Filesystem::putFileContent( $nn, '/text/en_US.php', [ '[[/t/name]]' => 'en name' ] );
+\Nino\Filesystem::putFileContent( $nn, '/text/fr_FR.php', [ '[[/t/name]]' => 'fr name', '[[/t/only]]' => 'fr only' ] );
+check( 'a native language the site does not list is one of the languages that only have a file: the languages of the site come first, and it is the last resort', \Nino\Html::getFills( $nn )['[[/t/name]]'] === 'en name'
+	&& \Nino\Html::getFills( $nn )['[[/t/only]]'] === 'fr only' && \Nino\Html::fillOrigin( $nn, '/t/name' ) === 'en_US' );
+\Nino\Filesystem::removeDir( ninoSandboxDir( $nn ) );
+
+// What the fallback costs: a page asks for the fills of its language in every pass of its rendering, and the languages of a site may be asked for in turn.
+// Each text file is read - included - once for the request, the ones of the chain too, as the single file of a language was before
+$rc = ninoSandbox( 'html-reads' );
+$rc['/nino/locales/available'] = [ 'de_DE', 'en_US', 'fr_FR' ];
+\Nino\Filesystem::forceDir( $rc, '/text' );
+foreach( [ 'global', 'de_DE', 'en_US', 'fr_FR', 'es_ES' ] as $rcFile )
+	file_put_contents( \Nino\Filesystem::path( $rc, '/text/'. $rcFile. '.php' ), '<?php $GLOBALS[\'ninoTextReads\'][\''. $rcFile. '\'] = ( $GLOBALS[\'ninoTextReads\'][\''. $rcFile. '\'] ?? 0 ) + 1; return [ \'[[/t/own]]\' => \''. $rcFile. '\', \'[[/t/\' . strtolower( $rcFile ). \']]\' => \'x\' ];' );
+$GLOBALS['ninoTextReads'] = [];
+foreach( [ 1, 2, 3 ] as $rcPass )
+	foreach( [ 'en_US', 'de_DE', 'fr_FR' ] as $rcLocale ) {
+		\Nino\Locales::useLocale( $rc, $rcLocale );
+		\Nino\Html::getFills( $rc );
+		\Nino\Html::fillOrigin( $rc, '/t/own' );
+		\Nino\Html::renderHtml( $rc, '[[/t/own]]' );
+	}
+$rcReads = $GLOBALS['ninoTextReads'];
+ksort( $rcReads );
+check( 'a request reads each text file once - the files of the chain too - however many languages it is asked for and however often', $rcReads === [ 'de_DE' => 1, 'en_US' => 1, 'es_ES' => 1, 'fr_FR' => 1, 'global' => 1 ] );
+\Nino\Filesystem::removeDir( ninoSandboxDir( $rc ) );
+
+echo "\n";
+
+// --- Locales::getVisitorLocale and languageTag --------------------------------------
+
+echo "Locales::getVisitorLocale and languageTag - the language of the visitor, the tag of a language\n";
+
+$vl = ninoSandbox( 'html-visitor' );
+$vl['/nino/locales/available'] = [ 'de_DE', 'fr_FR', 'en_US' ];
+$vl['./nino/locales/current'] = 'en_US';
+check( 'the visitor of a browser that picked none is served the native language, whatever language this request is rendered in', \Nino\Locales::getVisitorLocale( $vl ) === 'de_DE' );
+\Nino\Runtime::setSessionValue( $vl, './nino/locales/current', 'fr_FR' );
+$vl['./nino/locales/current'] = 'de_DE';
+check( '...the language the browser picked where the site has it - and not the request\'s: the workbench renders in its own', \Nino\Locales::getVisitorLocale( $vl ) === 'fr_FR' && \Nino\Locales::getCurrentLocale( $vl ) === 'de_DE' );
+\Nino\Runtime::setSessionValue( $vl, './nino/locales/current', 'ja_JP' );
+check( '...and the native one where the site does not have it any more', \Nino\Locales::getVisitorLocale( $vl ) === 'de_DE' );
+\Nino\Runtime::setSessionValue( $vl, './nino/locales/current', [ 'fr_FR' ] );
+check( '...a value that is no text is none', \Nino\Locales::getVisitorLocale( $vl ) === 'de_DE' );
+$vl['/nino/locales/native'] = 'ja_JP';
+check( '...and a native language the site does not list gives way to the first language it lists', \Nino\Locales::getVisitorLocale( $vl ) === 'de_DE' );
+\Nino\Runtime::unsetSessionValue( $vl, './nino/locales/current' );
+check( 'the tag of a language is its id with a hyphen, as a lang attribute is written', \Nino\Locales::languageTag( 'de_DE' ) === 'de-DE' && \Nino\Locales::languageTag( 'fr_FR' ) === 'fr-FR' && \Nino\Locales::languageTag( 'en' ) === 'en' );
+\Nino\Filesystem::removeDir( ninoSandboxDir( $vl ) );
+
+echo "\n";
 
 // --- Html::shortcodeCalls ---------------------------------------------------
 

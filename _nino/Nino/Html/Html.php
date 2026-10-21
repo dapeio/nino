@@ -35,6 +35,25 @@ namespace Nino {
 		// before _doShortcode() stops unrolling - see there
 		private const int MAX_RENDER_DEPTH = 20;
 
+		// The one fill that never falls back to another language: the lang
+		// attribute of a page. A text in the wrong language is still a text; a
+		// French page that says it is German is worse than a page that says
+		// nothing, since a screen reader reads it with the wrong voice. The tag
+		// has its own way (LANG_FILL) when this one is empty
+		private const string NO_FALLBACK = '[[/project/website/html/lang]]';
+
+		// The fill the kernel works out for a language from its text instead of
+		// registering it: the tag a page of that language is marked with - the
+		// value of /project/website/html/lang where the language has one, else the
+		// language's own tag (\Nino\Locales::languageTag())
+		private const string LANG_FILL = '[[/nino/html/lang]]';
+
+		// Where getFills() keeps what it made of the text files for the length of
+		// the request, a language each: the fills and the language each was taken
+		// from where it was not the language's own. A write under /text/ drops it
+		// (see \Nino\Filesystem::putFileContent())
+		private const string FILE_CACHE = './nino/html/filecache';
+
 		// The shortcodes the kernel provides itself. Called unconditionally
 		// from \Nino\init(), same as Csrf::init() - the base templates use
 		// [json] in their schema.org block, so it has to be there whichever
@@ -301,7 +320,7 @@ namespace Nino {
 		}
 
 		public static function runtimeFillKeys( array &$appData ): array {
-			return array_map( static fn( string $fill ): string => trim( $fill, '[]' ), array_keys( self::bootFills( $appData ) + self::requestFills( [], '' ) ) );
+			return array_map( static fn( string $fill ): string => trim( $fill, '[]' ), array_keys( self::bootFills( $appData ) + self::requestFills( [], '' ) + [ self::LANG_FILL => '' ] ) );
 		}
 
 		public static function getAssets( array &$appData, string $library ): array {
@@ -310,11 +329,31 @@ namespace Nino {
 
 		/**
 		 *	Every fill of a language, merged the way a page reads them: the text
-		 *	files (/text/global.php, then the language's own), the fills added
-		 *	at runtime for the language, and last those added for '*', so that a
-		 *	fill that belongs to no language wins. The language is the current
-		 *	one, or another that the code asks for - a mail in the language of the
-		 *	visitor, a title in the language of the page that is listed.
+		 *	files (/text/global.php, then the language's own - with what the
+		 *	language has no text for taken from another, see below), the fills
+		 *	added at runtime for the language, and last those added for '*', so
+		 *	that a fill that belongs to no language wins. The language is the
+		 *	current one, or another that the code asks for - a mail in the language
+		 *	of the visitor, a title in the language of the page that is listed.
+		 *
+		 *	A key the language has no text for - none at all, or one that is empty,
+		 *	which is a value of nothing but whitespace as well - takes the text of
+		 *	the first language that has one: the native one - where the site serves
+		 *	it - then the other available languages in the order config.php lists
+		 *	them, then the others that have a text file
+		 *	(\Nino\Locales::getTextLocales()), so that a site whose only language
+		 *	has no texts of a feature yet still shows the ones the file of another
+		 *	has. A native language the site does not list is one of those others.
+		 *	The language's own text always wins, and so do the fills added at
+		 *	runtime. global.php has no languages and '*' no chain, and
+		 *	/project/website/html/lang has none either (NO_FALLBACK). Where a text
+		 *	came from is fillOrigin()'s answer.
+		 *
+		 *	The fills of the text files are made once for a request and a language
+		 *	and kept; a write under /text/ drops them (see
+		 *	\Nino\Filesystem::putFileContent()). The fill [[/nino/html/lang]] is
+		 *	made here: the value /project/website/html/lang has in the language, else
+		 *	its tag (LANG_FILL).
 		 *
 		 *	The language is checked as addFills() checks it: '*' is the bucket of
 		 *	the fills that belong to no language, null or '' the current language,
@@ -335,15 +374,99 @@ namespace Nino {
 			else if( $locale !== '*' && \Nino\Locales::verifyLocale( $appData, $locale ) === false )
 				return [];
 
-			// '*' is no language and has no file: /text/*.php would be a file with a star in its name, not a pattern
-			$language = $locale === '*' ? [] : \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
-
-			return array_merge(
-				\Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] ),
-				$language,
+			$fills = array_merge(
+				self::_textFills( $appData, $locale )['fills'],
 				( $appData['./nino/html/fills'][$locale] ?? [] ),
 				( $appData['./nino/html/fills']['*'] ?? [] )
 			);
+
+			// '*' is no language and has no tag; a fill added at runtime under that name is the code's own
+			if( $locale !== '*' && array_key_exists( self::LANG_FILL, $fills ) === false ) {
+
+				$own = $fills[self::NO_FALLBACK] ?? null;
+
+				$fills[self::LANG_FILL] = self::_blank( $own ) === false && is_string( $own ) === true ? $own : \Nino\Locales::languageTag( $locale );
+			}
+
+			return $fills;
+		}
+
+		/**
+		 *	The language a fill's text was taken from when the language on the page
+		 *	has none of its own for the key (see getFills()) - what a block that
+		 *	shows it says with a lang attribute. Null where the text is the
+		 *	language's own, where a fill added at runtime has the key, and where
+		 *	there is no text in any language
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					The key without brackets, eg. '/template/page-home/welcome/title'
+		 *
+		 *	@return 	string|null							A locale id, eg. 'de_DE'; null for the current language's own text
+		 */
+		public static function fillOrigin( array &$appData, string $key ): ?string {
+
+			$locale 	= \Nino\Locales::getCurrentLocale( $appData );
+			$bracket 	= '[['. $key. ']]';
+
+			if( isset( $appData['./nino/html/fills'][$locale][$bracket] ) === true || isset( $appData['./nino/html/fills']['*'][$bracket] ) === true )
+				return null;
+
+			return self::_textFills( $appData, $locale )['origin'][$bracket] ?? null;
+		}
+
+		/**
+		 *	What the text files give a language: global.php, then the language's
+		 *	own file, and for every key the file has no text for - or an empty one -
+		 *	the text of the first language of the chain that has one, the chain
+		 *	getFills() describes. Made once for a request and a language
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$locale				A language of the site, or '*' for global.php alone
+		 *
+		 *	@return 	array										[ 'fills' => '[[key]]' => value, 'origin' => '[[key]]' => the locale a fallback text is of ]
+		 */
+		private static function _textFills( array &$appData, string $locale ): array {
+
+			if( isset( $appData[self::FILE_CACHE][$locale] ) === true )
+				return $appData[self::FILE_CACHE][$locale];
+
+			$global = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
+
+			// '*' is no language and has no file: /text/*.php would be a file with a star in its name, not a pattern
+			if( $locale === '*' )
+				return $appData[self::FILE_CACHE][$locale] = [ 'fills' => $global, 'origin' => [] ];
+
+			$language = \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
+			$origin 	= [];
+
+			// The native language first where the site serves it; one it does not serve is a language that only has a file, and comes with those
+			$native		= \Nino\Locales::getNativeLocale( $appData );
+			$chain 		= array_diff( array_unique( array_merge( \Nino\Locales::verifyLocale( $appData, $native ) === true ? [ $native ] : [], \Nino\Locales::getAvailableLocales( $appData ), \Nino\Locales::getTextLocales( $appData ) ) ), [ $locale ] );
+
+			foreach( $chain as $other )
+				foreach( \Nino\Filesystem::getFileContent( $appData, '/text/'. $other. '.php', [] ) as $key => $value ) {
+
+					if( self::_blank( $value ) === true || self::_blank( $language[$key] ?? null ) === false || $key === self::NO_FALLBACK )
+						continue;
+
+					$language[$key] = $value;
+					$origin[$key] 	= $other;
+				}
+
+			return $appData[self::FILE_CACHE][$locale] = [ 'fills' => array_merge( $global, $language ), 'origin' => $origin ];
+		}
+
+		/**
+		 *	Whether a text has nothing to say: there is none, or it is empty or
+		 *	only whitespace. A number or a list is a text of something
+		 *
+		 *	@param		mixed			$value
+		 *
+		 *	@return 	bool
+		 */
+		private static function _blank( mixed $value ): bool {
+
+			return $value === null || ( is_string( $value ) === true && trim( $value ) === '' );
 		}
 
 		/**

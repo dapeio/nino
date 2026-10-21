@@ -146,13 +146,13 @@
 			localeLabel.appendChild( dc.createElement('span') ).textContent = Nino.content.getText('/_admin/translations/label/target');
 			const localeSelect = dc.createElement('select');
 			localeSelect.id = 'translations-target-locale';
-			info.locales.forEach( function( locale ) {
+			info.locales.forEach( function( entry ) {
 				const option = dc.createElement('option');
-				option.value = locale;
-				option.textContent = locale+ ( locale === info.nativeLocale ? ' '+ Nino.content.getText('/_admin/translations/label/native') : '' );
+				option.value = entry.locale;
+				option.textContent = entry.locale+ ( entry.locale === info.nativeLocale ? ' '+ Nino.content.getText('/_admin/translations/label/native') : '' )+ ( entry.active === false ? ' ('+ Nino.content.getText('/_admin/common/word/inactive')+ ')' : '' );
 				localeSelect.appendChild( option );
 			} );
-			localeSelect.value = info.locales.find( function( locale ) { return locale !== info.nativeLocale } ) ?? info.nativeLocale;
+			localeSelect.value = ( info.locales.find( function( entry ) { return entry.locale !== info.nativeLocale } ) ?? { locale : info.nativeLocale } ).locale;
 			localeLabel.appendChild( localeSelect );
 			fields.appendChild( localeLabel );
 

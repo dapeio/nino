@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="[[/project/website/html/lang]]">
+<html lang="[[/nino/html/lang]]">
 <head>
 	<meta charset="[[/project/website/html/charset]]">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">

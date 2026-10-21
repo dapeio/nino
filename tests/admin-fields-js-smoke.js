@@ -21,7 +21,7 @@ const page = element('div');
 // The shell's own words, as a page has them: a select with no name of its caller's reads the shared one
 const words = fills('_admin/text/en_US.php');
 
-const sandbox = { console : console, document : documentOf( page ), Nino : { content : { getText : function( key ) { return key === '/_admin/common/label/locale' ? words[key] : '' } } } };
+const sandbox = { console : console, document : documentOf( page ), Nino : { content : { getText : function( key ) { return key === '/_admin/common/label/locale' || key === '/_admin/common/word/inactive' ? words[key] : '' } } } };
 sandbox.window = { Nino : sandbox.Nino };
 load( '_admin/assets/Nino.admin.js', vm.createContext( sandbox ) );
 
@@ -133,6 +133,12 @@ check( '...and the id and the name it was given', locales.id === 'text-form-loca
 locales.value = 'fr_FR';
 fire( locales, 'change' );
 check( 'a change calls onChange with the code picked', picked.join() === 'fr_FR' );
+
+// A language the website does not serve yet - one that has a text file and is translated before it is switched on - says so in its option
+const switchedOff = ui.localeSelect( { locales : [ 'de_DE', 'en_US', 'fr_FR' ], inactive : [ 'fr_FR' ], current : 'de_DE' } );
+check( 'a language named as inactive says it with the shared word in parentheses behind its code, and the value stays the code - the others are the bare code',
+	words['/_admin/common/word/inactive'] !== undefined && words['/_admin/common/word/inactive'] !== '' && switchedOff.children.map( function( option ) { return option.value } ).join() === 'de_DE,en_US,fr_FR'
+	&& switchedOff.children[2].textContent === 'fr_FR ('+ words['/_admin/common/word/inactive']+ ')' && switchedOff.children[0].textContent === 'de_DE' && switchedOff.children[1].textContent === 'en_US' );
 
 const unnamed = ui.localeSelect( { locales : [ 'de_DE', 'en_US' ], current : 'de_DE' } );
 check( 'without an id it has none, and a change without a handler is nothing', unnamed.id === '' && unnamed.value === 'de_DE' && fire( unnamed, 'change' ) === undefined );

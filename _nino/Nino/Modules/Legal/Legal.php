@@ -202,7 +202,7 @@ namespace Nino\Modules {
 
 				$html .= strtr( self::$html['section'], [
 					'[[anchor]]'	=> self::_attribute( $type. '-'. $id ),
-					'[[lang]]'		=> $from === $locale ? '' : ' lang="'. self::_attribute( str_replace( '_', '-', $from ) ). '"',
+					'[[lang]]'		=> $from === $locale ? '' : ' lang="'. self::_attribute( \Nino\Locales::languageTag( $from ) ). '"',
 					'[[title]]'		=> $title,
 					'[[text]]'		=> is_string( $section['html'] ?? null ) === true ? $section['html'] : $text,
 				] );
@@ -836,7 +836,10 @@ namespace Nino\Modules {
 		/**
 		 *	Title and text of an element in one language and, where the
 		 *	language has neither, in the native one, else in the first that
-		 *	has either
+		 *	has either - the available languages in the order the site lists
+		 *	them, and last the others that have a text file, so that a site
+		 *	whose own languages have no version of a section shows the one a
+		 *	file of a language that is switched off has
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$element			The element in $locale
@@ -846,7 +849,7 @@ namespace Nino\Modules {
 		 */
 		private static function _version( array &$appData, array $element, string $locale ): array {
 
-			foreach( array_unique( array_merge( [ $locale, \Nino\Locales::getNativeLocale( $appData ) ], \Nino\Locales::getAvailableLocales( $appData ) ) ) as $try ) {
+			foreach( array_unique( array_merge( [ $locale, \Nino\Locales::getNativeLocale( $appData ) ], \Nino\Locales::getAvailableLocales( $appData ), \Nino\Locales::getTextLocales( $appData ) ) ) as $try ) {
 
 				$version = $try === $locale ? $element : \Nino\Elements::getElement( $appData, (string) $element['.uri'], $try, [] );
 

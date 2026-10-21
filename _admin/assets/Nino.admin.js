@@ -1445,8 +1445,10 @@
 		 *	word for a translation where it has none - a combobox of bare codes
 		 *	is announced as nothing else
 		 *
-		 *	@param		{Object}		options					{ locales, current, label, id, onChange }
+		 *	@param		{Object}		options					{ locales, inactive, current, label, id, onChange }
 		 *														- locales    the codes, which are also what the options say
+		 *														- inactive   the codes of the languages the website does not serve yet,
+		 *														             which an option says with the word Inactive in parentheses behind its code
 		 *														- current    the code that is picked
 		 *														- label      the select's aria-label, /_admin/common/label/locale by default
 		 *														- onChange   called with the picked code on every change
@@ -1467,7 +1469,7 @@
 			( options.locales || [] ).forEach( function( locale ) {
 				const option = dc.createElement('option');
 				option.value = locale;
-				option.textContent = locale;
+				option.textContent = ( options.inactive || [] ).indexOf( locale ) === -1 ? locale : locale+ ' ('+ Nino.adminUi.text('/_admin/common/word/inactive')+ ')';
 				option.selected = ( locale === options.current );
 				select.appendChild( option );
 			} );

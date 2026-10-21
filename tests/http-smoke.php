@@ -48,7 +48,9 @@ $appData['/nino/http/routes'] = [
 // meant a project rendered in that hardcoded locale rather than its own
 // configured native one - and, for a project that doesn't install the
 // hardcoded one at all, out of a text file that does not exist: every
-// per-locale [[key]] on the page unresolved
+// per-locale [[key]] on the page unresolved (since the fill chain of
+// Html::getFills() such a language shows the native texts; the default
+// still has to be the project's own)
 // Its own uid, so its session bucket (keyed by exactly that, see
 // Runtime::getSessionValue()) cannot be one an earlier check already wrote
 $nativeAppData = [ './nino/uid' => $sandbox. '-native' ];
@@ -750,10 +752,16 @@ ninoUser( $appData, $hostileMail, [] );
 
 // The fills a request registers are the ones the kernel names as its runtime
 // fills, and the names are what the Text panel's scan reads - so a fill
-// added to one and not the other cannot happen: both are the same two lists
+// added to one and not the other cannot happen: both are the same two lists.
+// The one fill that is worked out for the language of the page (the tag of
+// the page) is named with them and made by getFills(), not registered
 $registeredFills = array_keys( $appData['./nino/html/fills']['*'] ?? [] );
+$madeFills = array_keys( \Nino\Html::getFills( $appData ) );
 $namedFills = method_exists( '\\Nino\\Html', 'runtimeFillKeys' ) === true ? array_map( fn( string $key ): string => '[['. $key. ']]', \Nino\Html::runtimeFillKeys( $appData ) ) : [];
-check( 'every fill the kernel names as a runtime fill is registered by a request, the clean uri included', $namedFills !== [] && in_array( '[[/nino/http/response/uri/clean]]', $namedFills, true ) === true && array_diff( $namedFills, $registeredFills ) === [] );
+check( 'every fill the kernel names as a runtime fill is made for a request - registered by it or worked out for the language - the clean uri included', $namedFills !== [] && in_array( '[[/nino/http/response/uri/clean]]', $namedFills, true ) === true
+	&& array_diff( $namedFills, $registeredFills, $madeFills ) === [] );
+check( '...the tag of the page is the one that is worked out: named, not registered, and the page\'s language decides it', in_array( '[[/nino/html/lang]]', $namedFills, true ) === true && in_array( '[[/nino/html/lang]]', $registeredFills, true ) === false
+	&& \Nino\Html::getFills( $appData )['[[/nino/html/lang]]'] === \Nino\Locales::languageTag( \Nino\Locales::getCurrentLocale( $appData ) ) );
 check( '...and the year is one of them, under /nino/ like the rest: a runtime fill is never a text key', in_array( '[[/nino/date/year]]', $namedFills, true ) === true
 	&& array_filter( $namedFills, static fn( string $fill ): bool => str_starts_with( $fill, '[[/nino/' ) === false ) === [] );
 

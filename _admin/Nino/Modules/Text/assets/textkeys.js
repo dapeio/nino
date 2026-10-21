@@ -687,7 +687,7 @@
 		 *	@param		{Object}	config
 		 *													query			what the box holds to begin with
 		 *													onQuery		called with what was typed
-		 *													select		null, or { locales, value, onChange } - a language switch
+		 *													select		null, or { locales, inactive, value, onChange } - a language switch, the languages the website does not serve yet marked
 		 *													chips			[ { id, onToggle } ] - the filters; their text and state are set by the caller
 		 *
 		 *	@return		{Object}									{ bar, input, select, chips : id => button }
@@ -714,6 +714,7 @@
 				select = Nino.adminUi.localeSelect( {
 					label : Nino.content.getText('/_admin/text/label/language'),
 					locales : config.select.locales,
+					inactive : config.select.inactive,
 					current : config.select.value,
 					onChange : function( locale ) { config.select.onChange( locale ) },
 				} );

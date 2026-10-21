@@ -147,7 +147,7 @@ namespace Nino\Modules\Elements {
 				];
 			}
 
-			\Nino\Http::ok( $request, [ 'types' => $types, 'locales' => \Nino\Locales::getAvailableLocales( $appData ), 'selectedLocale' => \Nino\Admin\Admin::contentLocale( $appData ) ] );
+			\Nino\Http::ok( $request, [ 'types' => $types, 'locales' => \Nino\Locales::getAvailableLocales( $appData ), 'selectedLocale' => \Nino\Admin\Admin::contentLocale( $appData, true ) ] );
 		}
 
 		/**

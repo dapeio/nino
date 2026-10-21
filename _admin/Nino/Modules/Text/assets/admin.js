@@ -24,7 +24,10 @@
 
 	Nino.admin.text = {
 
+		// The languages that have a text file, and which of them the website does
+		// not serve yet - the select says so
 		_locales				: [],
+		_inactive				: [],
 		// What the server sent (see \Nino\Modules\Text\Admin::apiKeys()) and the
 		// rows textkeys.js made of it: _groups is row id -> its keys, _model
 		// the rows, blocks and where each key sits
@@ -88,7 +91,8 @@
 				// _showList() would otherwise wipe the deep-link part it's trying to restore
 				const hash = Nino.admin.router.current();
 
-				Nino.admin.text._locales = response.locales;
+				Nino.admin.text._locales = response.locales.map( function( entry ) { return entry.locale } );
+				Nino.admin.text._inactive = response.locales.filter( function( entry ) { return entry.active === false } ).map( function( entry ) { return entry.locale } );
 				Nino.admin.sessionLocale.init( response.selectedLocale );
 				Nino.admin.text._data = response;
 				Nino.admin.text._buildModel();
@@ -336,7 +340,7 @@
 					Nino.admin.text._search.shown = 0;
 					Nino.admin.text._renderCategoryList();
 				},
-				select : { locales : Nino.admin.text._locales, value : Nino.admin.text._locale(), onChange : function( locale ) { Nino.admin.text._setLocale( locale ) } },
+				select : { locales : Nino.admin.text._locales, inactive : Nino.admin.text._inactive, value : Nino.admin.text._locale(), onChange : function( locale ) { Nino.admin.text._setLocale( locale ) } },
 				chips : [ { id : 'empty', onToggle : function() {
 					Nino.admin.text._search.emptyOnly = Nino.admin.text._search.emptyOnly === false;
 					Nino.admin.text._search.shown = 0;
@@ -1066,6 +1070,7 @@
 					id : 'text-form-locale-select',
 					label : Nino.content.getText('/_admin/text/label/language'),
 					locales : Nino.admin.text._locales,
+					inactive : Nino.admin.text._inactive,
 					current : Nino.admin.text._selectedLocale,
 					onChange : function( locale ) {
 						Nino.admin.text._storeVisibleLocaleFields();

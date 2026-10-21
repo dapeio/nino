@@ -220,7 +220,8 @@ check( 'apiCreate creates a per-locale key', $status === 200 );
 
 $deDE = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
 $enUS = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
-check( 'the initial value is written into every available locale', $deDE['[[/template/page-home/welcome/subtitle]]'] === 'Start' && $enUS['[[/template/page-home/welcome/subtitle]]'] === 'Start' );
+check( 'the initial value is written into the working language, and every other available language holds the key empty', $deDE['[[/template/page-home/welcome/subtitle]]'] === 'Start' && $enUS['[[/template/page-home/welcome/subtitle]]'] === ''
+	&& \Nino\Filesystem::getFileContent( $appData, '/text/fr_FR.php', [] )['[[/template/page-home/welcome/subtitle]]'] === '' );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/project/company/general/tagline', 'global' => true, 'value' => 'Immer' ] );
 check( 'apiCreate creates a global key', $status === 200 );
@@ -501,6 +502,79 @@ check( 'the deleted key is also gone from the blacklist', in_array( '/template/p
 
 [ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/does/not/exist' ] );
 check( 'apiDelete 404s for an unknown key', $status === 404 );
+
+echo "\n";
+
+
+// --- Text - a language that is only a text file, and where a key starts -------------
+
+echo "Text - a language is translated before it is switched on, and a new key starts in the working language\n";
+
+// Italian has a text file and is none of the site's languages: the panel offers it, the website does not serve it
+\Nino\Filesystem::putFileContent( $appData, '/text/it_IT.php', [ '[[/template/page-lang/seed/heading]]' => 'Ciao' ] );
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', static function( array $texts ): array {
+	$texts['[[/template/page-lang/seed/heading]]'] = 'Hallo';
+	return $texts;
+}, [] );
+$langOffered = [ [ 'locale' => 'de_DE', 'active' => true ], [ 'locale' => 'en_US', 'active' => true ], [ 'locale' => 'fr_FR', 'active' => true ], [ 'locale' => 'it_IT', 'active' => false ] ];
+[ , $langPanel ] = callDev( $appData, \Nino\Modules\Text\Admin::class, 'apiKeys' );
+[ , $langKeys ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiList' );
+check( 'the Text panel and the Keys tab offer every language that has a text file, each with whether the website serves it - the ones it serves first, in its order', ( $langPanel['locales'] ?? [] ) === $langOffered && ( $langKeys['locales'] ?? [] ) === $langOffered );
+$langEntry = array_column( \Nino\Text::entries( $appData ), null, 'key' )['/template/page-lang/seed/heading'] ?? [];
+check( '...and the keys carry what each of them has, null where a language has none', ( $langEntry['values']['it_IT'] ?? '' ) === 'Ciao' && ( $langEntry['values']['de_DE'] ?? '' ) === 'Hallo' && array_key_exists( 'en_US', $langEntry['values'] ?? [] ) === true
+	&& $langEntry['values']['en_US'] === null );
+
+[ $status, $langSaved ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiSaveBatch', [ 'items' => [
+	[ 'key' => '/template/page-lang/seed/heading', 'locale' => 'it_IT', 'value' => 'Buongiorno' ],
+	[ 'key' => '/template/page-home/welcome/title', 'locale' => 'ja_JP', 'value' => 'x' ],
+] ] );
+check( 'a text is saved into such a language, and into none that has no file', $status === 200 && ( $langSaved['results']['/template/page-lang/seed/heading']['ok'] ?? false ) === true
+	&& \Nino\Filesystem::getFileContent( $appData, '/text/it_IT.php', [] )['[[/template/page-lang/seed/heading]]'] === 'Buongiorno' && ( $langSaved['results']['/template/page-home/welcome/title']['ok'] ?? true ) === false
+	&& is_file( $sandbox. '/private/text/ja_JP.php' ) === false );
+
+// A new key: its start value in the working language, an empty text in every other language of the site
+$langKeyFill = static function( string $key ) use ( &$appData ): array {
+	$files = [];
+	foreach( [ 'de_DE', 'en_US', 'fr_FR', 'it_IT' ] as $locale )
+		$files[$locale] = \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] )['[['. $key. ']]'] ?? null;
+	return $files;
+};
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/template/page-lang/start/native', 'global' => false, 'value' => 'Anfang' ] );
+check( 'a key made by hand holds its start value in the working language - the native one where none was picked - and nothing in every other language of the site, the key there all the same',
+	$langKeyFill( '/template/page-lang/start/native' ) === [ 'de_DE' => 'Anfang', 'en_US' => '', 'fr_FR' => '', 'it_IT' => null ] );
+\Nino\Runtime::setSessionValue( $appData, './admin/content-locale', 'en_US' );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/template/page-lang/start/english', 'global' => false, 'value' => 'Start' ] );
+check( '...in the language the person works in, whichever it is', $langKeyFill( '/template/page-lang/start/english' ) === [ 'de_DE' => '', 'en_US' => 'Start', 'fr_FR' => '', 'it_IT' => null ] );
+\Nino\Runtime::setSessionValue( $appData, './admin/content-locale', 'it_IT' );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/template/page-lang/start/italian', 'global' => false, 'value' => 'Inizio' ] );
+check( '...one that is not switched on included: it is given the key and the text, and the languages of the site an empty one', $langKeyFill( '/template/page-lang/start/italian' ) === [ 'de_DE' => '', 'en_US' => '', 'fr_FR' => '', 'it_IT' => 'Inizio' ] );
+\Nino\Runtime::unsetSessionValue( $appData, './admin/content-locale' );
+
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/template/page-lang/start/several', 'global' => false, 'value' => 'ignored', 'values' => [ 'de_DE' => 'Mehrere', 'it_IT' => 'Vari', 'en_US' => '' ] ] );
+check( 'a caller that knows the languages hands them: each one named gets its text, one that is named empty an empty one, the others of the site none - the value beside is not read', $langKeyFill( '/template/page-lang/start/several' ) === [ 'de_DE' => 'Mehrere', 'en_US' => '', 'fr_FR' => '', 'it_IT' => 'Vari' ] );
+$langBefore = array_map( static fn( string $locale ): array => \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] ), [ 'de_DE', 'en_US', 'fr_FR', 'it_IT' ] );
+$langRefused = [];
+foreach( [ 'a language no file has' => [ 'ja_JP' => 'x' ], 'a text that is none' => [ 'de_DE' => [ 'x' ] ], 'a list' => [ 'Mehrere' ], 'no array' => 'Mehrere' ] as $langWhy => $langValues ) {
+	[ $status ] = callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/template/page-lang/start/refused', 'global' => false, 'value' => 'x', 'values' => $langValues ] );
+	if( $status !== 400 )
+		$langRefused[] = $langWhy;
+}
+check( '...and values that name a language no file exists of, hold no text or are no list of languages are refused with 400, writing nothing'. ( $langRefused === [] ? '' : ' - not: '. implode( ', ', $langRefused ) ),
+	$langRefused === [] && $langBefore === array_map( static fn( string $locale ): array => \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] ), [ 'de_DE', 'en_US', 'fr_FR', 'it_IT' ] ) );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiCreate', [ 'key' => '/template/page-lang/start/shared', 'global' => true, 'value' => 'Alle', 'values' => [ 'de_DE' => 'Nope' ] ] );
+check( 'a global key is as it was: one text in global.php, and none in any language', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/template/page-lang/start/shared]]'] ?? null ) === 'Alle'
+	&& $langKeyFill( '/template/page-lang/start/shared' ) === [ 'de_DE' => null, 'en_US' => null, 'fr_FR' => null, 'it_IT' => null ] );
+
+// What the other writers of a key do with a language that is only a file
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiRename', [ 'key' => '/template/page-lang/start/several', 'newKey' => '/template/page-lang/start/many' ] );
+check( 'a key is renamed in every language that has a file, the one that is switched off too', $langKeyFill( '/template/page-lang/start/many' ) === [ 'de_DE' => 'Mehrere', 'en_US' => '', 'fr_FR' => '', 'it_IT' => 'Vari' ] && $langKeyFill( '/template/page-lang/start/several' ) === [ 'de_DE' => null, 'en_US' => null, 'fr_FR' => null, 'it_IT' => null ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/template/page-lang/start/many' ] );
+check( '...and deleted from every one of them', $langKeyFill( '/template/page-lang/start/many' ) === [ 'de_DE' => null, 'en_US' => null, 'fr_FR' => null, 'it_IT' => null ] );
+foreach( [ 'native', 'english', 'italian', 'shared' ] as $langKey )
+	callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/template/page-lang/start/'. $langKey ] );
+callDev( $appData, \Nino\Modules\Text\Keys::class, 'apiDelete', [ 'key' => '/template/page-lang/seed/heading' ] );
+unlink( $sandbox. '/private/text/it_IT.php' );
+unset( $appData['./nino/filesystem/cache'], $appData['./nino/locales/text'], $appData['./nino/html/filecache'] );
 
 echo "\n";
 
@@ -973,7 +1047,7 @@ check( 'a row left empty is counted as left for later', ( $body['skipped'] ?? nu
 
 $deApply = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
 $enApply = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
-check( 'the created key holds its starting value in every language', ( $deApply['[[/template/page-apply/intro/heading]]'] ?? null ) === 'Willkommen' && ( $enApply['[[/template/page-apply/intro/heading]]'] ?? null ) === 'Willkommen' );
+check( 'the created key holds its starting value in the working language, and the key empty in the others', ( $deApply['[[/template/page-apply/intro/heading]]'] ?? null ) === 'Willkommen' && ( $enApply['[[/template/page-apply/intro/heading]]'] ?? null ) === '' );
 // A field holding nothing but spaces is the same "not decided yet" an empty
 // one is, and a key created from it would look filled in without being it
 check( 'the starting value is trimmed rather than stored as typed', str_contains( (string) ( $deApply['[[/template/page-apply/intro/heading]]'] ?? '' ), ' ' ) === false );

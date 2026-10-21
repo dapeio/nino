@@ -71,6 +71,8 @@ function build() {
 		requests : requests,
 		/** Answer the last request the panel made */
 		answer : function( status, body ) { requests[requests.length - 1].callback( status, body ) },
+		/** A sentence of the panel as it is said, its placeholders filled the way the panel fills them */
+		said : function( key, ...params ) { return Nino.adminUi.format( text( key ), ...params ) },
 		field : function( id ) { return findAll( mount, function( el ) { return el.id === id } )[0] },
 		/** What a person has in front of them */
 		focused : function() { return findAll( mount, function( el ) { return el.focused === true } )[0] ?? null },
@@ -156,6 +158,43 @@ console.log('Admin Language');
 	const added = t.panel._locales.find( function( locale ) { return locale.code === 'it_IT' } );
 	check( 'a language that was made is listed, switched off - a skeleton of empty keys is not served', added !== undefined && added.hasText === true && added.active === false && input.value === '' );
 	check( '...and the line says what was made, politely', line.attributes.role === 'status' && line.textContent.indexOf( 'it_IT' ) !== -1 );
+	check( '...in the words for a language that is left off, as one that is not ticked is', line.textContent === t.said( '/_admin/language/msg/created', 'it_IT', 3, 'de_DE', 'it_IT' ) );
+}
+
+
+// --- the adder: the file of a language that is on already --------------------
+
+{
+	const t = opened();
+	const line = t.field('language-locale-msg');
+	const french = function() { return t.field('language-locales').children.find( function( row ) { return row.children[0].dataset.locale === 'fr_FR' } ).children[0] };
+
+	// What the warning of a language without a file leads to: it is ticked, and its file is made
+	french().checked = true;
+	fire( french(), 'change' );
+	check( 'a language that is ticked and has no file is warned about, and the warning names the adder', line.attributes.role === 'alert' && line.textContent === t.said( '/_admin/language/error/missing', 'fr_FR' ) );
+
+	const input = t.field('language-locale-new');
+	input.value = 'fr_FR';
+	t.panel._addLocale();
+	t.answer( 200, { created : true, keys : 3, from : 'de_DE' } );
+
+	const made = t.panel._locales.find( function( locale ) { return locale.code === 'fr_FR' } );
+	check( 'its file is made and it stays ticked: the language is on, as it was', made.hasText === true && made.active === true && french().checked === true && t.panel._locales.length === LOCALES.length );
+	check( '...and the line does not say it is left off: it says what its pages show, a status', line.attributes.role === 'status' && line.textContent === t.said( '/_admin/language/msg/served', 'fr_FR', 3, 'de_DE', 'fr_FR' ) && line.textContent !== t.said( '/_admin/language/msg/created', 'fr_FR', 3, 'de_DE', 'fr_FR' ) );
+}
+
+
+// --- the adder: a file that is there already ---------------------------------
+
+{
+	const t = opened();
+	const line = t.field('language-locale-msg');
+
+	t.field('language-locale-new').value = 'fr_FR';
+	t.panel._addLocale();
+	t.answer( 200, { created : false, keys : 3, from : 'de_DE' } );
+	check( 'a file the server had already is said to be left untouched, in a line of its own', line.attributes.role === 'status' && line.textContent === t.said( '/_admin/language/msg/existed', 'fr_FR', 3 ) );
 }
 
 

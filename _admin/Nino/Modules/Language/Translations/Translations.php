@@ -100,7 +100,7 @@ namespace Nino\Modules\Language {
 
 			\Nino\Http::ok( $request, [
 				'nativeLocale' 	=> $translation['sourceLocale'],
-				'locales' 			=> \Nino\Locales::getAvailableLocales( $appData ),
+				'locales' 			=> \Nino\Admin\Admin::textLocales( $appData ),
 				'textCount' 		=> count( $translation['text'] ),
 				'elementCount' 	=> $elementFields,
 			] );
@@ -118,9 +118,14 @@ namespace Nino\Modules\Language {
 		}
 
 		/**
-		 *	Merge a translated hand-off document into one configured locale.
-		 *	The document's keys are untrusted: only paths which still occur in
-		 *	a freshly generated native package may reach the write APIs.
+		 *	Merge a translated hand-off document into one language that has a
+		 *	text file - one the site serves or not yet, so that a language is
+		 *	translated before it is switched on. The document's keys are
+		 *	untrusted: only paths which still occur in a freshly generated native
+		 *	package may reach the write APIs. An empty value of the document -
+		 *	one a translator has not translated - never overwrites a text the
+		 *	language already has: it is skipped, and counted as skipped, for a text
+		 *	and for an element field alike.
 		 */
 		public static function apiImport( array &$appData, array &$request ): void {
 
@@ -131,7 +136,7 @@ namespace Nino\Modules\Language {
 			$targetLocale = \Nino\Admin\Admin::postString( $data, 'targetLocale' );
 			$translation 	= $data['translation'] ?? null;
 
-			if( \Nino\Locales::verifyLocale( $appData, $targetLocale ) === false ) {
+			if( in_array( $targetLocale, \Nino\Locales::getTextLocales( $appData ), true ) === false ) {
 				\Nino\Http::fail( $request, 400, 'invalid target locale' );
 				return;
 			}
@@ -153,8 +158,14 @@ namespace Nino\Modules\Language {
 			$textItems 		= [];
 			$textSkipped 	= 0;
 
+			// What the language has now, to tell an empty value that would blank a translation from one that fills a gap
+			$held = [];
+			foreach( \Nino\Text::entries( $appData, false ) as $entry )
+				if( $entry['global'] === false )
+					$held[$entry['key']] = $entry['values'][$targetLocale] ?? null;
+
 			foreach( $translation['text'] as $key => $value ) {
-				if( is_string( $key ) === false || array_key_exists( $key, $reference['text'] ) === false || is_string( $value ) === false ) {
+				if( is_string( $key ) === false || array_key_exists( $key, $reference['text'] ) === false || is_string( $value ) === false || ( self::_blank( $value ) === true && self::_blank( $held[$key] ?? null ) === false ) ) {
 					$textSkipped++;
 					continue;
 				}
@@ -208,7 +219,7 @@ namespace Nino\Modules\Language {
 						}
 
 						$value = self::_sanitizeElementValue( $value, $field );
-						if( self::_validElementValue( $value, $field ) === false ) {
+						if( self::_validElementValue( $value, $field ) === false || ( self::_blank( $value ) === true && self::_blank( $typeData[$targetLocale][$elementUri][$key] ?? null ) === false ) ) {
 							$elementSkipped++;
 							continue;
 						}
@@ -372,6 +383,15 @@ namespace Nino\Modules\Language {
 				return false;
 
 			return true;
+		}
+
+		/**
+		 *	Whether a value is no translation: nothing, an empty list, or a text
+		 *	of nothing but whitespace
+		 */
+		private static function _blank( mixed $value ): bool {
+
+			return $value === null || $value === [] || ( is_string( $value ) === true && trim( $value ) === '' );
 		}
 
 		/**

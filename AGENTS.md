@@ -161,6 +161,15 @@ of its own (`/template/common/label/phone`), the fact comes from
 this; the Text Keys tab creates and renames only keys that follow it. The rules
 and the reasons are in [docs/development.md](docs/development.md#the-key-grammar).
 
+A language that has no text for a key - none, empty, whitespace - shows the text
+of the native language, then of the other languages of the site in their order,
+then of a language that only has a file (`\Nino\Html::getFills()`): so a unit
+delivers the same keys in every language it serves (a language it has no words of
+gets them empty), a new key starts in the working language alone, and a block
+that shows a key writes `lang` where `\Nino\Html::fillOrigin()` names another
+language. `/project/website/html/lang` never falls back; a template that writes
+the tag of a page asks for `[[/nino/html/lang]]`.
+
 ### Response rules
 
 Runtime handlers MUST NOT call `echo`, `header()`, `http_response_code()`, or

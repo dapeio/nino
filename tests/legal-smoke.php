@@ -205,6 +205,36 @@ unset( $appData['./nino/elements/cache'] );
 $fallbackHtml = \Nino\Html::renderHtml( $appData, '[privacy]' );
 check( 'a section with no version in this language is drawn in the native one, marked with its language', str_contains( $fallbackHtml, '<section class="nino-legal-section" id="privacy-hosting" lang="de-DE">' )
 	&& str_contains( $fallbackHtml, 'id="privacy-overview">' ) === true );
+
+// ...and, where no language of the site has a version, in the language of a text file that has one - the languages of the site first
+\Nino\Filesystem::putFileContent( $appData, '/text/fr_FR.php', [] );
+$hostingOriginal = null;
+\Nino\Filesystem::mutate( $appData, '/elements/privacy.php', static function( array $type ) use ( &$hostingOriginal ): array {
+	$hostingOriginal = $type['de_DE']['hosting'] ?? null;
+	unset( $type['de_DE']['hosting'] );
+	$type['fr_FR']['hosting'] = [ 'title' => 'Hebergement', 'text' => 'Chez un hebergeur.' ];
+	return $type;
+}, [] );
+unset( $appData['./nino/elements/cache'] );
+$textFileHtml = \Nino\Html::renderHtml( $appData, '[privacy]' );
+check( 'a section that no language of the site has a version of is drawn in the language of a text file that has one, marked with it', str_contains( $textFileHtml, '<section class="nino-legal-section" id="privacy-hosting" lang="fr-FR">' ) === true
+	&& str_contains( $textFileHtml, 'Hebergement' ) === true && is_array( $hostingOriginal ) === true );
+$appData['/nino/locales/available'] = [ 'de_DE', 'en_US', 'it_IT' ];
+\Nino\Filesystem::mutate( $appData, '/elements/privacy.php', static function( array $type ): array {
+	$type['it_IT']['hosting'] = [ 'title' => 'Hosting', 'text' => 'Presso un fornitore.' ];
+	return $type;
+}, [] );
+unset( $appData['./nino/elements/cache'] );
+$siteFirstHtml = \Nino\Html::renderHtml( $appData, '[privacy]' );
+check( '...and the version of a language of the site comes before the one of a text file, wherever the native language stands', str_contains( $siteFirstHtml, 'id="privacy-hosting" lang="it-IT">' ) === true && str_contains( $siteFirstHtml, 'Hebergement' ) === false );
+\Nino\Filesystem::mutate( $appData, '/elements/privacy.php', static function( array $type ) use ( $hostingOriginal ): array {
+	$type['de_DE']['hosting'] = $hostingOriginal;
+	unset( $type['fr_FR'], $type['it_IT'] );
+	return $type;
+}, [] );
+$appData['/nino/locales/available'] = [ 'de_DE', 'en_US' ];
+unlink( \Nino\Filesystem::path( $appData, '/text/fr_FR.php' ) );
+unset( $appData['./nino/elements/cache'], $appData['./nino/filesystem/cache'], $appData['./nino/locales/text'], $appData['./nino/html/filecache'] );
 \Nino\Locales::useLocale( $appData, 'de_DE' );
 
 // hidden takes a section off the page without deleting it

@@ -491,7 +491,13 @@ The words of a unit live in `/feature/<key>/<part>/<name>` (the feature's own
 function) and `/template/<file name without .tpl>/<part>/<name>` (a word only a
 template of the unit reads: `page-hello.tpl` reads
 `/template/page-hello/intro/title`); a unit never delivers a `/project` key ([the
-key grammar](development.md#the-key-grammar)).
+key grammar](development.md#the-key-grammar)). A language the unit has no
+`text/<locale>.php` of is given the keys of one it has - the native language's,
+else English's, else the first by its code - with an empty text each, add-only, so
+that every key of the unit exists in every active language: the page shows the
+native text where a language has none of its own (the [fills
+chain](development.md#textfills)), and the Dashboard counts what is left to
+translate. A language the unit has words of gets them as before.
 
 A feature that processes personal data brings its own section of the privacy policy
 with the `elements` key, a map of an element type's uri to a file of the unit. The

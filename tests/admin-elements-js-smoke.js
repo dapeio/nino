@@ -483,6 +483,8 @@ check( '...and coming back to the overview re-reads it, which is what that secon
 	vm.runInContext( source, context, { filename : 'elements.js' } );
 
 	const module = box.Nino.admin.elements;
+	// The languages the panel works in, as elements/types names them
+	module._locales = [ 'de_DE', 'en_US' ];
 	const teamModel = { title : { type : 'string' } };
 	const levels = { form : 'elements-form', list : 'elements-list', types : 'elements-types' };
 
@@ -803,6 +805,7 @@ if( typeof elements._renderNav === 'function' ) {
 	sandbox.Nino.adminUi.listActions = () => dom.make('div');
 	// The list notes the workbench's content locale, which the shell owns
 	sandbox.Nino.admin.sessionLocale = { current : 'de_DE', set(){}, init(){} };
+	elements._locales = [ 'de_DE', 'en_US' ];
 	elements._renderList( [ { uri : 'cy', label : 'Cy' }, { uri : 'dee', label : 'Dee' } ] );
 	const refreshed = formNode.querySelectorAll('.admin-element-nav button');
 	check( 'a fresh list re-points the open form\'s buttons', refreshed.length === 2 && refreshed[0].disabled === true && refreshed[1].dataset.uri === 'dee' );
@@ -853,6 +856,15 @@ if( typeof elements._renderNav === 'function' ) {
 		rows[1].listeners.click();
 	check( 'a row opens its element', JSON.stringify( opened ) === '["bob"]' );
 	check( 'the list remembers the translation it shows', elements._listLocale === 'de_DE' );
+
+	// The Text panel works in languages the website does not serve yet; an element has no version of one to show or to edit here
+	sandbox.Nino.admin.sessionLocale = { current : 'it_IT', set(){}, init(){} };
+	elements._renderList( [ { uri : 'ada', label : 'Ada', values : {} } ], [] );
+	check( 'a working language this panel does not offer - one the website does not serve yet - is none for it: the list reads the server\'s own', elements._workingLocale( '' ) === '' && elements._listLocale === '' );
+	check( '...and a form opens on the first language it has, or the one it is told', elements._workingLocale( 'de_DE' ) === 'de_DE' );
+	sandbox.Nino.admin.sessionLocale = { current : 'en_US', set(){}, init(){} };
+	check( '...a language it offers is the working language as it was', elements._workingLocale( '' ) === 'en_US' );
+	sandbox.Nino.admin.sessionLocale = { current : 'de_DE', set(){}, init(){} };
 
 	// No column: the plain list
 	elements._renderList( [ { uri : 'ada', label : 'Ada', values : {} } ], [] );

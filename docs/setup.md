@@ -54,6 +54,8 @@ The step is named for what it asks about, and it is what the wizard applies the 
 
 When reapplying, the visible language selection replaces the previous state. The default language is retained as long as it is still selected; otherwise, Nino uses the first selected language.
 
+The wizard offers two languages. A third - or a second one the wizard did not list - is added later, in the workbench's **Language** panel: **Add a language** creates its text file with every key of the native language, all empty, and the language is **not** switched on yet. Translate it first, under **Text** - the select lists it marked as inactive - or hand a file over under **Language › Translations**, which exports the native texts as JSON for a translator and imports the translated document into a language that is ticked or not. Tick the language when it is ready. Until then, and for every text it still lacks afterwards, the site shows the text of the native language and says in which language it is (`lang`); the Dashboard counts what is still to translate in each language.
+
 ### Modules
 
 Navigation, language selection (the locale picker), the contact form and the legal texts are no longer a choice: `\Nino\Install\Setup::ALWAYS_MODULES` names their unit keys, and every Setup run applies all four units and lists all four classes in `/nino/modules`, exactly as it would for a module actually picked. `Maintenance`, the developer tool that ships as a kernel module, has no unit to apply and is listed on every run as well.

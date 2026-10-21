@@ -8,7 +8,8 @@ declare(strict_types=1);
  *											several elements, sequential uris, queryElementValues(), the sort,
  *											offset and limit of queryElements(), seed() and the 'elements' key
  *											of an install unit, the [element], [elements] and [elementvalues]
- *											shortcodes that draw them, and the hook points of the accounts and
+ *											shortcodes that draw them, an element that takes what it has no
+ *											value for in a language from another, and the hook points of the accounts and
  *											of the elements. Runs against an isolated sandbox directory, never
  *											touches the real project data.
  *
@@ -780,12 +781,125 @@ check( '...and so does a rich field, whose text nodes go through the sanitizer i
 ] );
 $altLoop = '[elements /alttest locale="%s"]<img src="[[photo]]" alt="[[photoAlt]]" data-plain="[[globalAlt]]">|[/elements]';
 check( '[elements] renders the stored alt text of an element, and alt="" for one that has none', \Nino\Html::renderHtml( $appData, sprintf( $altLoop, 'de_DE' ) )
-	=== '<img src="one.jpg" alt="Ein Haus" data-plain="[[globalAlt]]">|<img src="two.jpg" alt="" data-plain="[[globalAlt]]">|' );
-check( '...and alt="" for every element in a language nobody wrote one for', \Nino\Html::renderHtml( $appData, sprintf( $altLoop, 'en_US' ) )
-	=== '<img src="one.jpg" alt="" data-plain="[[globalAlt]]">|<img src="two.jpg" alt="" data-plain="[[globalAlt]]">|' );
+	=== '<img src="one.jpg" alt="Ein Haus" data-plain="">|<img src="two.jpg" alt="" data-plain="">|' );
+check( '...in a language nobody wrote one for it is the text of the language that did, and alt="" where no language has one', \Nino\Html::renderHtml( $appData, sprintf( $altLoop, 'en_US' ) )
+	=== '<img src="one.jpg" alt="Ein Haus" data-plain="">|<img src="two.jpg" alt="" data-plain="">|' );
 check( '[element] does the same, for a language with a value and for one without', \Nino\Html::renderHtml( $appData, '[element /alttest/one locale="de_DE"][[photoAlt]][/element]' ) === 'Ein Haus'
 	&& \Nino\Html::renderHtml( $appData, '[element /alttest/one locale="en_US"]<[[photoAlt]]>[/element]' ) === '<>' );
-check( 'a link to a field that is global is not read: the fill stays what it was', str_contains( \Nino\Html::renderHtml( $appData, sprintf( $altLoop, 'de_DE' ) ), '[[globalAlt]]' ) === true );
+check( 'a link to a field that is global is not read, and the field the element has no value for is nothing like any other of the model: no fill is left standing', str_contains( \Nino\Html::renderHtml( $appData, sprintf( $altLoop, 'de_DE' ) ), '[[globalAlt]]' ) === false
+	&& str_contains( \Nino\Html::renderHtml( $appData, sprintf( $altLoop, 'de_DE' ) ), 'data-plain=""' ) === true );
+
+// --- Elements::getElementWithFallback and [elements] - the language an element has none of ----
+
+echo "Elements::getElementWithFallback and [elements] - a field the element has no value for in the language is the one of another language\n";
+
+// de_DE is native and the site lists English before it; fr_FR has a text file and is off, and the type file holds a bucket of it
+$fe = ninoSandbox( 'elements-fallback' );
+$fe['/nino/dir'] = '';
+$fe['/nino/locales/available'] = [ 'en_US', 'de_DE' ];
+\Nino\Modules\Elements::init( $fe );
+foreach( [ 'de_DE', 'en_US', 'fr_FR' ] as $feLocale )
+	\Nino\Filesystem::putFileContent( $fe, '/text/'. $feLocale. '.php', [] );
+\Nino\Filesystem::putFileContent( $fe, '/elements/notes.php', [
+	'title'	=> 'Notes',
+	'model'	=> [
+		'title'		=> [ 'type' => 'string', 'locale' => true ],
+		'summary'	=> [ 'type' => 'string', 'locale' => true ],
+		'tags'		=> [ 'type' => 'array', 'locale' => true ],
+		'rank'		=> [ 'type' => 'integer' ],
+	],
+	'*'			=> [ '*' => [], 'one' => [ 'rank' => 1 ], 'two' => [ 'rank' => 2 ], 'three' => [ 'rank' => 3 ], 'four' => [ 'rank' => 4 ], 'five' => [ 'rank' => 5 ], 'six' => [ 'rank' => 6 ], 'seven' => [ 'rank' => 7 ] ],
+	'de_DE'	=> [
+		'one'		=> [ 'title' => 'Eins', 'summary' => 'Zusammenfassung', 'tags' => [ 'a' ] ],
+		'two'		=> [ 'title' => 'Zwei', 'summary' => 'Zwei text' ],
+		'four'	=> [ 'title' => 'Vier' ],
+		'six'		=> [ 'title' => 'Sechs', 'summary' => 'Sechs text' ],
+	],
+	'en_US'	=> [
+		'one'		=> [ 'title' => 'One', 'summary' => '   ', 'tags' => [] ],
+		'six'		=> [ 'title' => '0', 'summary' => 'Six text' ],
+		'seven'	=> [ 'title' => 'Seven en' ],
+	],
+	'fr_FR'	=> [
+		'three'	=> [ 'title' => 'Trois', 'summary' => 'Trois text' ],
+		'four'	=> [ 'summary' => 'Quatre text' ],
+		'seven'	=> [ 'title' => 'Sept fr' ],
+	],
+] );
+$fe['./nino/locales/current'] = 'en_US';
+
+$feOne = \Nino\Elements::getElementWithFallback( $fe, '/notes/one', 'en_US' );
+check( 'an element takes each field it has no value for in the language - none, an empty one, whitespace, an empty list - from the native language, and keeps what it has',
+	$feOne['title'] === 'One' && $feOne['summary'] === 'Zusammenfassung' && $feOne['tags'] === [ 'a' ] && $feOne['rank'] === 1 );
+check( '...with the tag of the language it took from beside it, and the place and the language the way getElement() has them', $feOne['.lang'] === 'de-DE' && $feOne['.locale'] === 'en_US' && $feOne['.uri'] === '/notes/one'
+	&& \Nino\Elements::getElement( $fe, '/notes/one', 'en_US' )['summary'] === '   ' );
+$feOwn = \Nino\Elements::getElementWithFallback( $fe, '/notes/one', 'de_DE' );
+check( '...and an element that has it all in the language is what getElement() answers, with no language taken from', $feOwn['.lang'] === '' && array_diff_key( $feOwn, [ '.lang' => '' ] ) === \Nino\Elements::getElement( $fe, '/notes/one', 'de_DE' ) );
+$feSix = \Nino\Elements::getElementWithFallback( $fe, '/notes/six', 'en_US' );
+check( 'a text of 0 is a text: it is kept, and nothing is taken for it', $feSix['title'] === '0' && $feSix['summary'] === 'Six text' && $feSix['.lang'] === '' );
+
+$feTwo = \Nino\Elements::getElementWithFallback( $fe, '/notes/two', 'en_US' );
+check( 'an element the language has no version of at all is answered with every field of another one: it exists, and getElement() has no text of it', $feTwo['title'] === 'Zwei' && $feTwo['summary'] === 'Zwei text' && $feTwo['.lang'] === 'de-DE'
+	&& isset( \Nino\Elements::getElement( $fe, '/notes/two', 'en_US' )['title'] ) === false );
+$feThree = \Nino\Elements::getElementWithFallback( $fe, '/notes/three', 'en_US' );
+check( '...the others the type file holds a bucket of come last: an element that only a language the site has switched off wrote is answered, and says which', $feThree['title'] === 'Trois' && $feThree['.lang'] === 'fr-FR' );
+$feFour = \Nino\Elements::getElementWithFallback( $fe, '/notes/four', 'en_US' );
+check( '...every field from the first language that has it, and the tag is the one of the first field that was taken', $feFour['title'] === 'Vier' && $feFour['summary'] === 'Quatre text' && $feFour['.lang'] === 'de-DE'
+	&& \Nino\Elements::getElementWithFallback( $fe, '/notes/four', 'de_DE' )['.lang'] === 'fr-FR' );
+check( '...the native language first, then the other languages of the site, then the type file\'s own: asked in the language of a file only, the native text is taken before the English one, and the English before the French',
+	\Nino\Elements::getElementWithFallback( $fe, '/notes/one', 'fr_FR' )['title'] === 'Eins' && \Nino\Elements::getElementWithFallback( $fe, '/notes/seven', 'de_DE' )['title'] === 'Seven en'
+	&& \Nino\Elements::getElementWithFallback( $fe, '/notes/seven', 'de_DE' )['.lang'] === 'en-US' );
+$feFive = \Nino\Elements::getElementWithFallback( $fe, '/notes/five', 'en_US' );
+check( 'an element that has only its global fields is answered with them and nothing taken, and one no language has, in a type that is there or is not, is false',
+	$feFive['rank'] === 5 && isset( $feFive['title'] ) === false && $feFive['.lang'] === '' && \Nino\Elements::getElementWithFallback( $fe, '/notes/ghost', 'en_US' ) === false
+	&& \Nino\Elements::getElementWithFallback( $fe, '/nonesuch/one', 'en_US' ) === false );
+$feStar = \Nino\Elements::getElementWithFallback( $fe, '/notes/one', '*' );
+check( 'asked for *, which is no language, it is getElement()\'s answer for the first language that holds it, with no tag - and false where none does',
+	$feStar['.lang'] === '' && array_diff_key( $feStar, [ '.lang' => '' ] ) === \Nino\Elements::getElement( $fe, '/notes/one', '*' ) && \Nino\Elements::getElementWithFallback( $fe, '/notes/ghost', '*' ) === false );
+check( '...and \'\' or a name that is no language is the current language, as for getElement()', \Nino\Elements::getElementWithFallback( $fe, '/notes/one', '' ) === $feOne && \Nino\Elements::getElementWithFallback( $fe, '/notes/one', 'xx_XX' ) === $feOne );
+
+// A language that has a text file but is not switched on is one an element is read, queried and written in
+check( 'getElement() and queryElements() read the bucket of a language that is only a text file, and a name that is neither is the current language',
+	\Nino\Elements::getElement( $fe, '/notes/three', 'fr_FR' )['title'] === 'Trois' && isset( \Nino\Elements::getElement( $fe, '/notes/three', 'xx_XX' )['title'] ) === false
+	&& array_map( static fn( array $element ): string => basename( (string) $element['.uri'] ), \Nino\Elements::queryElements( $fe, '/notes', [ 'title' => 'Trois' ], 'fr_FR', [] ) ) === [ 'three' ] );
+\Nino\Elements::insertElement( $fe, '/notes/eight', [ 'title' => 'Huit', 'rank' => 8 ], 'fr_FR' );
+\Nino\Elements::insertElement( $fe, '/notes/nine', [ 'title' => 'Neun', 'rank' => 9 ], 'ja_JP' );
+$feFile = \Nino\Filesystem::getFileContent( $fe, '/elements/notes.php', [] );
+check( '...and writes into it: an element made in that language is in its bucket of the type file, in a name that is none it is in the current language\'s', ( $feFile['fr_FR']['eight']['title'] ?? '' ) === 'Huit'
+	&& isset( $feFile['ja_JP'] ) === false && ( $feFile['en_US']['nine']['title'] ?? '' ) === 'Neun' );
+\Nino\Elements::deleteElement( $fe, '/notes/eight', 'fr_FR' );
+\Nino\Elements::deleteElement( $fe, '/notes/nine' );
+
+// The loop: the element in the language of the page, the tag of the language it took from, no leftover
+$feLoop = '[elements /notes sort="%s" locale="%s"]<li[[.lang]] data-rank="[[rank]]">[[title]]|[[summary]]</li>[/elements]';
+$feEnglish = \Nino\Html::renderHtml( $fe, sprintf( $feLoop, 'rank', 'en_US' ) );
+check( '[elements] draws every element the query lists, what it has no value for from another language, and says so with [[.lang]] - an attribute with its space in front, nothing where the page\'s language has it all',
+	$feEnglish === '<li lang="de-DE" data-rank="1">One|Zusammenfassung</li><li lang="de-DE" data-rank="2">Zwei|Zwei text</li><li lang="fr-FR" data-rank="3">Trois|Trois text</li><li lang="de-DE" data-rank="4">Vier|Quatre text</li>'
+	. '<li data-rank="5">|</li><li data-rank="6">0|Six text</li><li data-rank="7">Seven en|</li>' );
+check( '...the same in the other language of the site, where the fallback is another one', \Nino\Html::renderHtml( $fe, sprintf( $feLoop, 'rank', 'de_DE' ) )
+	=== '<li data-rank="1">Eins|Zusammenfassung</li><li data-rank="2">Zwei|Zwei text</li><li lang="fr-FR" data-rank="3">Trois|Trois text</li><li lang="fr-FR" data-rank="4">Vier|Quatre text</li>'
+	. '<li data-rank="5">|</li><li data-rank="6">Sechs|Sechs text</li><li lang="en-US" data-rank="7">Seven en|</li>' );
+check( '...and a field of the model that no language has a value for is nothing, never a leftover that the shortcode pass makes "[]" of', str_contains( $feEnglish, '[' ) === false && str_contains( $feEnglish, '<li data-rank="5">|</li>' ) === true );
+check( 'the order of a sort is the order of what is drawn: a title taken from another language stands where it sorts, an element with none comes last', preg_match_all( '/data-rank="(\d)"/', \Nino\Html::renderHtml( $fe, sprintf( $feLoop, 'title', 'en_US' ) ), $feRanks ) === 7
+	&& implode( ',', $feRanks[1] ) === '6,1,7,3,4,2,5' );
+
+$feSeen = [];
+\Nino\Callbacks::registerCallback( $fe, '/test/notes/seen', static function( array &$appData, array &$elements ) use ( &$feSeen ): void {
+	$feSeen = array_column( $elements, 'title' );
+	$elements = array_slice( $elements, 1 );
+} );
+$feCut = \Nino\Html::renderHtml( $fe, '[elements /notes sort="rank" locale="en_US" callback="/test/notes/seen" offset="1" limit="2"]<i[[.lang]]>[[title]]</i>[/elements]' );
+check( 'a callback of the loop is handed what is drawn - the fallback, titles taken from another language among them - and offset and limit cut what it leaves',
+	$feSeen === [ 'One', 'Zwei', 'Trois', 'Vier', '0', 'Seven en' ] && $feCut === '<i lang="fr-FR">Trois</i><i lang="de-DE">Vier</i>' );
+
+// A native language the site does not list is no first choice either: the type file's buckets of languages the site does not serve are the last resort
+$fe['/nino/locales/native'] = 'fr_FR';
+$feNotListed = \Nino\Elements::getElementWithFallback( $fe, '/notes/seven', 'de_DE' );
+check( 'a native language the site does not list comes with the other buckets of the type file, after the languages of the site', $feNotListed['title'] === 'Seven en' && $feNotListed['.lang'] === 'en-US' );
+
+\Nino\Filesystem::removeDir( ninoSandboxDir( $fe ) );
+
+echo "\n";
 
 // --- Elements::seed ---------------------------------------------------------
 //

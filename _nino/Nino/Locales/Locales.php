@@ -13,6 +13,15 @@ namespace Nino {
 	// Locales - current-locale resolution, switching, and redirects
 	class Locales {
 
+		// A locale id is exactly language_TERRITORY. Narrow on purpose: the value
+		// becomes a filename (text/<locale>.php), so anything looser is a path
+		// question, and every locale Nino itself ships uses this shape. What the
+		// Language panel validates a new language with, and getTextLocales() lists by
+		public const string PATTERN = '/^[a-z]{2}_[A-Z]{2}$/D';
+
+		// Where getTextLocales() keeps its answer for the length of the request
+		private const string TEXT_CACHE = './nino/locales/text';
+
 		public static function init( array &$appData ): void {
 
 			// The project's configured native locale is the default for anyone
@@ -23,7 +32,10 @@ namespace Nino {
 			// hardcoded rather than the project's own, and a project that does
 			// not install that locale at all fell through to a text file that
 			// does not exist: an unresolved [[key]] in place of every per-locale
-			// fill on the page, the <html lang> and <title> included.
+			// fill on the page, the <html lang> and <title> included (since the
+			// fill chain of \Nino\Html::getFills() such a language shows the
+			// native language's texts; the default is still resolved here, so
+			// that a first visit is in the project's own language).
 			//
 			// A native locale that isn't among the available ones is a broken
 			// config: neither Install\Setup nor the Language panel writes one,
@@ -39,11 +51,7 @@ namespace Nino {
 			// this assignment stands before the fallback it would use means
 			// anything - './nino/locales/current' is still AppData's
 			// hardcoded placeholder at this point, not a locale.
-			$available 	= $appData['/nino/locales/available'] ?? [];
-			$default 		= (string) ( $appData['/nino/locales/native'] ?? '' );
-
-			if( in_array( $default, $available, true ) === false )
-				$default = (string) ( $available[0] ?? '' );
+			$default = self::_default( $appData );
 
 			if( $default !== '' )
 				$appData['./nino/locales/current'] = $default;
@@ -209,6 +217,102 @@ namespace Nino {
 		public static function verifyLocale( array &$appData, string $locale ): bool {
 
 			return in_array( $locale, \Nino\Locales::getAvailableLocales( $appData ) );
+		}
+
+		/**
+		 *	Every language that has a text file, /text/<locale>.php, in the project:
+		 *	the available ones first, in the order config.php lists them, then the
+		 *	others by their codes. A language the Language panel made a skeleton of
+		 *	and left off is one of the others, and so is one whose file was copied
+		 *	or imported in - what is translated there is shown by the Text panel
+		 *	before the language is switched on, and a page that lacks a text falls
+		 *	back to it as a last resort (see \Nino\Html::getFills()). The name of the
+		 *	file has to be a locale id (PATTERN) and the file a file. The directory
+		 *	is read once for the request; a write under /text/ drops the answer
+		 *	(see \Nino\Filesystem::putFileContent()). The website serves the
+		 *	available languages only, verifyLocale() is unchanged by this.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array							Locale ids, eg. [ 'de_DE', 'en_US', 'fr_FR' ]
+		 */
+		public static function getTextLocales( array &$appData ): array {
+
+			if( isset( $appData[self::TEXT_CACHE] ) === true )
+				return $appData[self::TEXT_CACHE];
+
+			$found = [];
+
+			foreach( glob( \Nino\Filesystem::path( $appData, '/text' ). '/*.php' ) ?: [] as $file ) {
+
+				$locale = basename( $file, '.php' );
+
+				if( preg_match( self::PATTERN, $locale ) === 1 && is_file( $file ) === true )
+					$found[] = $locale;
+			}
+
+			sort( $found );
+
+			$available = array_values( array_intersect( \Nino\Locales::getAvailableLocales( $appData ), $found ) );
+
+			return $appData[self::TEXT_CACHE] = array_merge( $available, array_values( array_diff( $found, $available ) ) );
+		}
+
+		/**
+		 *	The language the site shows the visitor of this browser: the one they
+		 *	picked, kept in their session, where it is one of the available ones,
+		 *	else the project's own default - the native language, or the first
+		 *	available if that is none - as init() starts every request with.
+		 *
+		 *	Not getCurrentLocale(), which in a workbench request is the interface
+		 *	language the workbench speaks (see \Nino\Admin\Admin::sessionLocale()).
+		 *	What draws the site for somebody who is working on it - the Design
+		 *	preview - asks this instead.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string							A locale id, eg. 'de_DE'
+		 */
+		public static function getVisitorLocale( array &$appData ): string {
+
+			$picked = \Nino\Runtime::getSessionValue( $appData, './nino/locales/current' );
+
+			if( is_string( $picked ) === true && \Nino\Locales::verifyLocale( $appData, $picked ) === true )
+				return $picked;
+
+			return self::_default( $appData );
+		}
+
+		/**
+		 *	The BCP 47 tag of a locale id, what a lang attribute is written in:
+		 *	de_DE is de-DE
+		 *
+		 *	@param		string		$locale				A locale id, eg. 'fr_FR'
+		 *
+		 *	@return 	string							Its language tag, eg. 'fr-FR'
+		 */
+		public static function languageTag( string $locale ): string {
+
+			return str_replace( '_', '-', $locale );
+		}
+
+		/**
+		 *	The language a visitor who picked none is served - init() says why it
+		 *	is the native one, and the first available where that is none of them
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string							A locale id; '' where the project lists none
+		 */
+		private static function _default( array &$appData ): string {
+
+			$available 	= $appData['/nino/locales/available'] ?? [];
+			$default 		= (string) ( $appData['/nino/locales/native'] ?? '' );
+
+			if( in_array( $default, $available, true ) === false )
+				$default = (string) ( $available[0] ?? '' );
+
+			return $default;
 		}
 
 		/**

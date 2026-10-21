@@ -151,7 +151,7 @@ namespace Nino\Modules\Text {
 
 			\Nino\Http::ok( $request, [
 				'keys' 		=> $keys,
-				'locales' => \Nino\Locales::getAvailableLocales( $appData ),
+				'locales' => \Nino\Admin\Admin::textLocales( $appData ),
 				'selectedLocale' => \Nino\Admin\Admin::contentLocale( $appData ),
 				'categories' => self::_categories( $appData, $keys ),
 			] );
@@ -206,8 +206,12 @@ namespace Nino\Modules\Text {
 
 		/**
 		 *	Create a brand new key with an initial value - global.php gets
-		 *	one value, or every locale file gets the same starting value,
-		 *	depending on $isGlobal.
+		 *	one value, or the locale files get the starting value in the
+		 *	language the person works in and nothing in the others, depending
+		 *	on $isGlobal (see _writeKey()). A caller that knows the languages -
+		 *	the Builder - posts 'values' beside 'value': { locale: text, ... },
+		 *	an empty text allowed, each language named gets its text and the
+		 *	others none. Every language named has a text file.
 		 *
 		 *	The key has to follow the grammar of a text key,
 		 *	/<namespace>/<category>/<part>/<name> (see
@@ -229,10 +233,16 @@ namespace Nino\Modules\Text {
 			$key 			= \Nino\Admin\Admin::postString( $data, 'key' );
 			$isGlobal = ( $data['global'] ?? false ) === true;
 			$value 		= \Nino\Admin\Admin::postString( $data, 'value' );
+			$values 	= self::_postedValues( $appData, $data );
 			$format 	= self::_postedFormat( $data );
 
 			if( \Nino\Text::isGrammarKey( $key ) === false ) {
 				\Nino\Http::fail( $request, 400, 'invalid key', 'keys_invalid', [ $key ], 'key' );
+				return;
+			}
+
+			if( $values === false ) {
+				\Nino\Http::fail( $request, 400, 'values name a language that has no text file, or a text that is none' );
 				return;
 			}
 
@@ -246,7 +256,7 @@ namespace Nino\Modules\Text {
 				return;
 			}
 
-			self::_writeKey( $appData, $key, $isGlobal, $value, $format );
+			self::_writeKey( $appData, $key, $isGlobal, $value, $format, $values );
 
 			// A format that was chosen is remembered; one that was only
 			// detected is not, it follows the value
@@ -257,31 +267,40 @@ namespace Nino\Modules\Text {
 		}
 
 		/**
-		 *	Write one key's starting value - into global.php once, or into
-		 *	every locale file with the same text. Shared by apiCreate() and
-		 *	apiScanApply(), which create keys on exactly the same terms: one
-		 *	starting value, to be translated later (see the Translations tab's
-		 *	export/import round-trip)
+		 *	Write one key's starting value - into global.php once, or into the
+		 *	locale files: the value in the working language (see
+		 *	\Nino\Admin\Admin::contentLocale()) and an empty text in every other
+		 *	language of the site. A page then shows the text of the native language
+		 *	until the language has one of its own, and says it is another language's
+		 *	(see \Nino\Html::getFills()), and the Dashboard counts the gap - where
+		 *	the same words in every language read as translated and were counted by
+		 *	nobody. A caller that knows the languages hands $values, locale => text,
+		 *	an empty text allowed: each language named gets its text and the others
+		 *	none. Shared by apiCreate() and apiScanApply(), which create keys on
+		 *	exactly the same terms: one starting value, to be translated later (see
+		 *	the Translations tab's export/import round-trip)
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$key					A key that passed \Nino\Text::isGrammarKey()
 		 *	@param		bool			$isGlobal			Whether it lives in global.php
 		 *	@param		string		$value				The starting value
 		 *	@param		string|null	$format			The format it is kept in, null to read it from the value
+		 *	@param		array|null	$values				The text of each language, null for $value in the working language alone
 		 *
 		 *	@return 	void
 		 */
-		private static function _writeKey( array &$appData, string $key, bool $isGlobal, string $value, ?string $format = null ): void {
+		private static function _writeKey( array &$appData, string $key, bool $isGlobal, string $value, ?string $format = null, ?array $values = null ): void {
 
 			$bracketKey = '[['. $key. ']]';
 
-			// Like any value saved from the workbench: through the format's
-			// whitelist, with the shortcodes taken out. It used to be stored
-			// as it came, which is the one road into a text file that skipped
-			// \Nino\Text::sanitizeValue()
-			$value = \Nino\Text::sanitizeValue( $value, $format ?? \Nino\Html::detectFormat( $value ) );
-
 			if( $isGlobal === true ) {
+
+				// Like any value saved from the workbench: through the format's
+				// whitelist, with the shortcodes taken out. It used to be stored
+				// as it came, which is the one road into a text file that skipped
+				// \Nino\Text::sanitizeValue()
+				$value = \Nino\Text::sanitizeValue( $value, $format ?? \Nino\Html::detectFormat( $value ) );
+
 				\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ) use ( $bracketKey, $value ): array {
 					$global[$bracketKey] = $value;
 					return $global;
@@ -289,11 +308,48 @@ namespace Nino\Modules\Text {
 				return;
 			}
 
-			foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale )
-				\Nino\Filesystem::mutate( $appData, '/text/'. $locale. '.php', function( array $localeData ) use ( $bracketKey, $value ): array {
-					$localeData[$bracketKey] = $value;
+			$values ??= [ \Nino\Admin\Admin::contentLocale( $appData ) => $value ];
+			$format ??= \Nino\Html::detectFormat( implode( ' ', $values ) );
+
+			// Each language's text through the whitelist as well. A language the site
+			// does not serve gets the key where a text is named for it, and the
+			// languages of the site always
+			foreach( array_unique( array_merge( \Nino\Locales::getAvailableLocales( $appData ), array_keys( $values ) ) ) as $locale ) {
+
+				$text = \Nino\Text::sanitizeValue( $values[$locale] ?? '', $format );
+
+				\Nino\Filesystem::mutate( $appData, '/text/'. $locale. '.php', function( array $localeData ) use ( $bracketKey, $text ): array {
+					$localeData[$bracketKey] = $text;
 					return $localeData;
 				} );
+			}
+		}
+
+		/**
+		 *	The texts a key is created with, language by language: the posted
+		 *	'values', which name only languages that have a text file and hold
+		 *	only texts - or null where the post has none
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$data					The posted payload
+		 *
+		 *	@return 	array|false|null				locale => text; false for values that are none or name a language the project has no text file of
+		 */
+		private static function _postedValues( array &$appData, array $data ): array|false|null {
+
+			if( array_key_exists( 'values', $data ) === false )
+				return null;
+
+			if( is_array( $data['values'] ) === false )
+				return false;
+
+			$textLocales = \Nino\Locales::getTextLocales( $appData );
+
+			foreach( $data['values'] as $locale => $text )
+				if( is_string( $text ) === false || in_array( $locale, $textLocales, true ) === false )
+					return false;
+
+			return $data['values'];
 		}
 
 		/**
@@ -320,7 +376,7 @@ namespace Nino\Modules\Text {
 			// Empty in every locale, and per-locale rather than global - the
 			// shape a key gets when the scan form creates one
 			$values = [];
-			foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale )
+			foreach( \Nino\Locales::getTextLocales( $appData ) as $locale )
 				$values[$locale] = null;
 
 			$entries = [];
@@ -521,7 +577,7 @@ namespace Nino\Modules\Text {
 		private static function _convertFormat( array &$appData, string $key, bool $isGlobal, string $format ): void {
 
 			$bracketKey = '[['. $key. ']]';
-			$files 			= $isGlobal === true ? [ '/text/global.php' ] : array_map( fn( string $locale ): string => '/text/'. $locale. '.php', \Nino\Locales::getAvailableLocales( $appData ) );
+			$files 			= $isGlobal === true ? [ '/text/global.php' ] : array_map( fn( string $locale ): string => '/text/'. $locale. '.php', \Nino\Locales::getTextLocales( $appData ) );
 
 			foreach( $files as $file )
 				\Nino\Filesystem::mutate( $appData, $file, function( array $content ) use ( $bracketKey, $format ): ?array {
@@ -646,7 +702,7 @@ namespace Nino\Modules\Text {
 					return $global;
 				} );
 			} else {
-				foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale )
+				foreach( \Nino\Locales::getTextLocales( $appData ) as $locale )
 					\Nino\Filesystem::mutate( $appData, '/text/'. $locale. '.php', function( array $localeData ) use ( $oldBracket, $newBracket ): array {
 						$localeData[$newBracket] = $localeData[$oldBracket] ?? '';
 						unset( $localeData[$oldBracket] );
@@ -707,7 +763,7 @@ namespace Nino\Modules\Text {
 					return $global;
 				} );
 			} else {
-				foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale )
+				foreach( \Nino\Locales::getTextLocales( $appData ) as $locale )
 					\Nino\Filesystem::mutate( $appData, '/text/'. $locale. '.php', function( array $localeData ) use ( $bracketKey ): array {
 						unset( $localeData[$bracketKey] );
 						return $localeData;
@@ -736,7 +792,7 @@ namespace Nino\Modules\Text {
 		private static function _convertShape( array &$appData, string $key, array $entry, bool $toGlobal ): void {
 
 			$bracketKey = '[['. $key. ']]';
-			$locales 		= \Nino\Locales::getAvailableLocales( $appData );
+			$locales 		= \Nino\Locales::getTextLocales( $appData );
 
 			if( $toGlobal === true ) {
 

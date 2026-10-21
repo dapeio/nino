@@ -177,13 +177,21 @@ namespace Nino\Modules {
 		 *	the offset and the limit. One place, so that the two read the same
 		 *	arguments the same way
 		 *
+		 *	With $fallback each element is the one \Nino\Elements::getElementWithFallback()
+		 *	answers for the language of the loop - what it has no value for taken
+		 *	from another language, with '.lang' - before the sort, the callback and
+		 *	the cut see it, so that they work on what is drawn. What the query asks
+		 *	for is still asked of the language's own version: it lists the elements
+		 *	it lists.
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments of the shortcode: the type uri at 0, and
 		 *																	locale, callback, sort, offset, limit and query
+		 *	@param		bool			$fallback			Whether an element takes the fields it has no value for from another language
 		 *
 		 *	@return 	array										The elements, [] when the type has none
 		 */
-		public static function queryLoop( array &$appData, array $args ): array {
+		public static function queryLoop( array &$appData, array $args, bool $fallback = false ): array {
 
 			$uri			= $args[0] ?? '';
 			$locale 	= $args['locale'] ?? '';
@@ -195,10 +203,20 @@ namespace Nino\Modules {
 
 			// Sorted by the query, cut here: offset and limit come after the
 			// callback, which may drop or reorder hits of its own, so a page
-			// is a page of what the callback let through
-			$result = \Nino\Elements::queryElements( $appData, $uri, $queryArr, $locale, [], [ 'sort' => $sort ] );
+			// is a page of what the callback let through. With the fallback the
+			// order is the one of what is drawn - a title taken from another
+			// language stands where it sorts - so the sort waits for it
+			$result = \Nino\Elements::queryElements( $appData, $uri, $queryArr, $locale, [], $fallback === true ? [] : [ 'sort' => $sort ] );
 			if( $result === [] )
 				return [];
+
+			if( $fallback === true ) {
+
+				foreach( $result as $index => $element )
+					$result[$index] = ( is_array( $element ) === true && is_string( $element['.uri'] ?? null ) === true ? \Nino\Elements::getElementWithFallback( $appData, $element['.uri'], $locale ) : false ) ?: $element;
+
+				$result = \Nino\Elements::sortElements( $result, $sort );
+			}
 
 			if( $callback !== '' )
 				\Nino\Callbacks::doCallbacks( $appData, $callback, $result );
@@ -213,7 +231,16 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	Replace elements shortcode
+		 *	Replace elements shortcode: the block between the tags once for each
+		 *	element, with [[.id]] the number in the loop and [[<field>]] each field
+		 *	of the element. The element is the one in the language of the page with
+		 *	every field of it that has no value there taken from another language
+		 *	(\Nino\Elements::getElementWithFallback()), and [[.lang]] says so: the lang
+		 *	attribute of the language it was taken from with a space in front - put
+		 *	on the element that shows the text - or nothing where the page's own
+		 *	language had it all. Where a field of the model has no value in any
+		 *	language its [[field]] is replaced by nothing, so that the block never
+		 *	shows a leftover and the shortcode pass never makes "[]" of one.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					Shortcode arguments
@@ -225,7 +252,7 @@ namespace Nino\Modules {
 			$uri			= $args[0] ?? '';
 			$content	= $args['content'] ?? '';
 
-			$result = self::queryLoop( $appData, $args );
+			$result = self::queryLoop( $appData, $args, true );
 			if( $result === [] )
 				return '';
 
@@ -236,9 +263,12 @@ namespace Nino\Modules {
 			$model = \Nino\Elements::getElementModel( $appData, $uri );
 			$altSeed = self::_altSeed( $model );
 
+			// Every field of the model starts as a blank fill: what an element has no value for in any language is still a field
+			$blank = array_fill_keys( array_map( static fn( int|string $field ): string => '[['. $field. ']]', array_keys( $model ) ), '' );
+
 			foreach( $result as $element ) {
 
-				$fills = [ '[[.id]]' => $id ] + $altSeed;
+				$fills = [ '[[.id]]' => $id ] + $altSeed + $blank;
 
 				foreach( $element as $key => $value ) {
 					if( is_scalar( $value ) === false )
@@ -246,6 +276,8 @@ namespace Nino\Modules {
 
 					$fills['[['. $key. ']]'] = self::_escapeFieldValue( $value, $model[$key] ?? [] );
 				}
+
+				$fills['[[.lang]]'] = is_string( $element['.lang'] ?? null ) === true && $element['.lang'] !== '' ? ' lang="'. htmlspecialchars( $element['.lang'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ). '"' : '';
 
 				$html .= str_replace( array_keys( $fills ), array_values( $fills ), $content );
 

@@ -557,6 +557,22 @@ check( 'a restore keeps the newest three snapshots and drops the rest', count( g
 
 check( 'three restores left nothing behind in the temp directory - neither their own file nor the snapshot\'s', $tempFiles() === $tempBefore );
 
+// The restore writes to disk behind the filesystem. What a page of the same request has made of the text files - the fills of a language and the list of
+// the languages that have a file, once per request - goes with the cache of the filesystem, so that the next fill is the text the archive put back
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+\Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', [ '[[/restore/probe/text]]' => 'in the archive' ] );
+[ , $textArchive ] = $nowCall( $appData );
+\Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', [ '[[/restore/probe/text]]' => 'written after the archive' ] );
+$restoreSeen = \Nino\Html::getFills( $appData )['[[/restore/probe/text]]'] ?? null;
+$restoreListed = \Nino\Locales::getTextLocales( $appData );
+file_put_contents( \Nino\Filesystem::path( $appData, '/text' ). '/ja_JP.php', '<?php return [];' );
+[ , $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $textArchive['id'] ?? '' ] );
+check( 'a restore is seen by the fills of its own request: the text the archive put back, not the one a page made of the file before', ( $body['ok'] ?? false ) === true && $restoreSeen === 'written after the archive'
+	&& ( \Nino\Html::getFills( $appData )['[[/restore/probe/text]]'] ?? null ) === 'in the archive' );
+check( '...and by the list of the languages that have a file, which is as long as the directory is', in_array( 'ja_JP', $restoreListed, true ) === false && in_array( 'ja_JP', \Nino\Locales::getTextLocales( $appData ), true ) === true );
+unlink( \Nino\Filesystem::path( $appData, '/text' ). '/ja_JP.php' );
+unset( $appData['./nino/locales/text'] );
+
 /*	An archive that decrypts but is not one: a backup file somebody truncated
 	or replaced, encrypted with the project's own key so that it passes the
 	one check before unpacking. PharData threw out of restore(), which the
@@ -858,7 +874,8 @@ check( 'apiList returns the two locale settings and the stored native language',
 // The locale inventory is the union of what config.php lists and what has a
 // text file on disk - a translated language that is merely switched off should
 // be one checkbox away from being back on, and a configured language without a
-// text file renders every per-locale fill unresolved
+// text file has none of its own: its pages show the native language's texts and
+// it is in neither the Text panel nor the Translations tab
 \Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', [ '[[/a]]' => 'a', '[[/b]]' => 'b' ] );
 \Nino\Filesystem::putFileContent( $appData, '/text/fr_FR.php', [ '[[/a]]' => 'a' ] );
 [ , $body ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiList' );
@@ -871,10 +888,10 @@ check( 'a known locale gets a readable name', $inventory['de_DE']['name'] === 'G
 
 // --- apiAddLocale -------------------------------------------------------
 //
-// Adding a language used to leave the project in exactly the state
-// Locales::init() warns about: a configured locale with no text file of its
-// own renders every per-locale fill as a raw [[key]]. Text::saveBatch() cannot
-// bootstrap one either - it validates against keys that already exist.
+// Adding a language used to leave a configured locale with no text file of its
+// own, one that is in neither the Text panel nor the Translations tab and whose
+// pages show the native language's texts. Text::saveBatch() cannot bootstrap
+// one either - it validates against keys that already exist.
 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiAddLocale', [ 'locale' => 'it_IT' ] );
 check( 'apiAddLocale creates a text file for a new language', $status === 200 && ( $body['created'] ?? null ) === true );
@@ -923,6 +940,25 @@ check( 'a language that has a name already keeps it when its file is created', $
 unlink( \Nino\Filesystem::path( $appData, '/text/es_ES.php' ) );
 check( '...reporting what that file actually holds', ( $body['keys'] ?? 0 ) === 2 );
 check( '...and leaving its values untouched', \Nino\Filesystem::getFileContent( $appData, '/text/it_IT.php', [] )['[[/a]]'] === 'tradotto' );
+
+// The tag of the pages of a language: the one text of the skeleton that is not empty - the language subtag of the new language - where the native
+// language has the key; no key is made up where it has not
+$tagKey = '[[/project/website/html/lang]]';
+check( 'a skeleton made where the native language has no key for the tag of its pages has none', isset( \Nino\Filesystem::getFileContent( $appData, '/text/it_IT.php', [] )[$tagKey] ) === false );
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', fn( array $texts ): array => $texts + [ $tagKey => 'de' ] );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiAddLocale', [ 'locale' => 'pt_BR' ] );
+$tagSkeleton = \Nino\Filesystem::getFileContent( $appData, '/text/pt_BR.php', [] );
+check( 'the skeleton of a language says the language subtag in the key of the tag of its pages, not the native one\'s and not a tag of both parts, and every other text of it is empty', $status === 200 && ( $tagSkeleton[$tagKey] ?? null ) === 'pt'
+	&& array_values( array_unique( array_diff_key( $tagSkeleton, [ $tagKey => 1 ] ) ) ) === [ '' ] );
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', function( array $texts ) use ( $tagKey ): array {
+	unset( $texts[$tagKey] );
+	return $texts;
+} );
+unlink( \Nino\Filesystem::path( $appData, '/text/pt_BR.php' ) );
+\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ): array {
+	unset( $global['[[/_nino/locale/pt_BR/name]]'] );
+	return $global;
+} );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiAddLocale', [ 'locale' => 'notalocale' ] );
 check( 'apiAddLocale rejects a malformed language id', $status === 400 );

@@ -184,7 +184,7 @@ namespace Nino\Modules\Text {
 
 			\Nino\Http::ok( $request, [
 				'keys' 					=> $keys,
-				'locales' 			=> \Nino\Locales::getAvailableLocales( $appData ),
+				'locales' 			=> \Nino\Admin\Admin::textLocales( $appData ),
 				'selectedLocale' => \Nino\Admin\Admin::contentLocale( $appData ),
 				'order' 				=> self::_order( $appData, array_column( $keys, 'key' ) ),
 				'pages' 				=> self::_pages( $appData ),
@@ -505,14 +505,18 @@ namespace Nino\Modules\Text {
 		}
 
 		/**
-		 *	How many keys each language still has no text for: those with a
-		 *	text in the native language and none, or an empty one, in the
-		 *	other - the work the panel's own list shows as empty fields.
-		 *	A language without a text file counts every such key, since its
-		 *	pages render the raw keys. Hidden (blacklisted) keys and the
-		 *	locale-independent ones are no translation work and stay out;
-		 *	nothing is created and no language falls back to another here -
-		 *	shared by \Nino\Modules\Dashboard\Admin::apiSummary
+		 *	How many keys each language of the site still has no text for: those
+		 *	with an empty text - none, an empty one or one of whitespace - in the
+		 *	language while a language that has a text file holds a text of the
+		 *	key, the work the panel's own list shows as empty fields. The native
+		 *	language is counted like the others: where it has no text for a key
+		 *	another language has - a language made the native one that was
+		 *	translated into, a feature switched on that had no words of the native
+		 *	one - the gap is work too. A language without a text file counts every
+		 *	such key, since its pages show the text of another language. Hidden
+		 *	(blacklisted) keys and the locale-independent ones are no translation
+		 *	work and stay out; nothing is created here - shared by
+		 *	\Nino\Modules\Dashboard\Admin::apiSummary
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -520,29 +524,17 @@ namespace Nino\Modules\Text {
 		 */
 		public static function untranslatedCounts( array &$appData ): array {
 
-			$native = \Nino\Locales::getNativeLocale( $appData );
+			$blank	= static fn( mixed $value ): bool => $value === null || ( is_string( $value ) === true && trim( $value ) === '' );
 			$counts = [];
 
 			foreach( \Nino\Text::entries( $appData, false ) as $entry ) {
 
-				if( $entry['global'] === true )
+				if( $entry['global'] === true || count( array_filter( $entry['values'], static fn( mixed $value ): bool => $blank( $value ) === false ) ) === 0 )
 					continue;
 
-				$source = $entry['values'][$native] ?? null;
-
-				if( is_string( $source ) === false || $source === '' )
-					continue;
-
-				foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale ) {
-
-					if( $locale === $native )
-						continue;
-
-					$value = $entry['values'][$locale] ?? null;
-
-					if( $value === null || $value === '' )
+				foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale )
+					if( $blank( $entry['values'][$locale] ?? null ) === true )
 						$counts[$locale] = ( $counts[$locale] ?? 0 ) + 1;
-				}
 			}
 
 			return $counts;

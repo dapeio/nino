@@ -172,7 +172,13 @@ namespace Nino\Admin {
 				if( $panel['text'] !== '' )
 					\Nino\Html::addFills( $appData, self::textFills( $appData, $panel['text'], $currentLocale ), $currentLocale );
 
-			\Nino\Html::addFills( $appData, [ '[[/_admin/localepicker]]' => self::_localePickerHtml( $appData, $currentLocale ) ], '*' );
+			// The language the shell's words are in, which is the interface language
+			// where the workbench has words of it and English where it has none - not
+			// the website's own lang, which belongs to the website
+			\Nino\Html::addFills( $appData, [
+				'[[/_admin/localepicker]]'	=> self::_localePickerHtml( $appData, $currentLocale ),
+				'[[/_admin/lang]]'					=> \Nino\Locales::languageTag( self::textLocale( $appData, '/_admin/text', $currentLocale ) ),
+			], '*' );
 
 			// The workbench's own scripts read their words out of the inline
 			// [jstext] block, so the shell says which those are - the block
@@ -694,7 +700,51 @@ namespace Nino\Admin {
 			if( class_exists( '\\Nino\\Modules\\Backups' ) === true )
 				\Nino\Modules\Backups::maybeRun( $appData );
 
+			self::_baseTexts( $appData );
+
 			return true;
+		}
+
+		/**
+		 *	The words of the base unit, for a site that exists: once for every kernel
+		 *	version - '/nino/install/texts' in config.php holds the version it last
+		 *	ran for, and is absent on a site that was set up before it, so the first
+		 *	login after an update runs it - the unit's text/global.php and
+		 *	text/<locale>.php are merged into the project's text files for every
+		 *	language the site serves, add-only: a key the project has stays as it
+		 *	is, and a language the unit has no words of gets its keys empty (see
+		 *	\Nino\Features::applyUnitTexts()). Texts only, no template, no file and no
+		 *	route of the unit, so that an update brings the words a new version of a
+		 *	template reads without touching the templates a project has made its
+		 *	own. The activity log says how many keys were new where any were. A site
+		 *	that was just set up runs it too, and adds nothing. The wizard's library
+		 *	is a directory a delivery may drop after the setup: without it there is
+		 *	nothing to add, and a file that could not be written is tried again with
+		 *	the next request
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		private static function _baseTexts( array &$appData ): void {
+
+			$unit = __DIR__. '/install/library/base';
+
+			if( ( $appData['/nino/install/texts'] ?? '' ) === \Nino\VERSION || is_dir( $unit ) === false )
+				return;
+
+			$added = \Nino\Features::applyUnitTexts( $appData, $unit, \Nino\Locales::getAvailableLocales( $appData ), false );
+
+			if( is_int( $added ) === false )
+				return;
+
+			$appData['/nino/install/texts'] = \Nino\VERSION;
+			\Nino\AppData::writeContentData( $appData, [ '/nino/install/texts' ] );
+
+			$user = \Nino\Auth::getCurrentUser( $appData );
+
+			if( $added > 0 && $user !== false )
+				self::record( $appData, $user['mail'], 'Add Base Texts '. $added );
 		}
 
 		/**
@@ -835,20 +885,47 @@ namespace Nino\Admin {
 		 *	the interface language (sessionLocale()) and from the visitor's
 		 *	locale, which the workbench never writes. Falls back to the site's
 		 *	native locale if nothing has been chosen yet, or the stored one is
-		 *	no longer available.
+		 *	neither a language of the site nor one that has a text file.
+		 *
+		 *	It may be a language that is switched off: the Text panel and the Keys
+		 *	tab offer those, so that a language is translated before the website
+		 *	serves it (see \Nino\Locales::getTextLocales()). A panel that offers
+		 *	the languages of the site only - Elements, Routes - asks for $activeOnly,
+		 *	and a working language that is switched off is none for it.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		bool			$activeOnly		Whether a language the site does not serve counts as none
 		 *
 		 *	@return 	string
 		 */
-		public static function contentLocale( array &$appData ): string {
+		public static function contentLocale( array &$appData, bool $activeOnly = false ): string {
 
 			$locale = \Nino\Runtime::getSessionValue( $appData, './admin/content-locale', '' );
 
-			if( $locale === '' || \Nino\Locales::verifyLocale( $appData, $locale ) === false )
+			if( $locale === '' || ( \Nino\Locales::verifyLocale( $appData, $locale ) === false && ( $activeOnly === true || in_array( $locale, \Nino\Locales::getTextLocales( $appData ), true ) === false ) ) )
 				return \Nino\Locales::getNativeLocale( $appData );
 
 			return $locale;
+		}
+
+		/**
+		 *	The languages the Text panel and the Text Keys tab offer to work in:
+		 *	every one that has a text file, each with whether the website serves it.
+		 *	A language that is switched off is translated here before it is
+		 *	switched on
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array										[ { locale, active } ], the languages of the site first in its order
+		 */
+		public static function textLocales( array &$appData ): array {
+
+			$locales = [];
+
+			foreach( \Nino\Locales::getTextLocales( $appData ) as $locale )
+				$locales[] = [ 'locale' => $locale, 'active' => \Nino\Locales::verifyLocale( $appData, $locale ) ];
+
+			return $locales;
 		}
 
 		/**
@@ -907,8 +984,9 @@ namespace Nino\Admin {
 
 		/**
 		 *	Remember the working language a panel's select names for this
-		 *	session (see contentLocale()). The interface language is not
-		 *	touched, and neither is the visitor's locale
+		 *	session (see contentLocale()), one of the site's languages or one that
+		 *	has a text file. The interface language is not touched, and neither is
+		 *	the visitor's locale
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -924,7 +1002,7 @@ namespace Nino\Admin {
 			if( is_string( $locale ) === false )
 				$locale = '';
 
-			if( \Nino\Locales::verifyLocale( $appData, $locale ) === false ) {
+			if( \Nino\Locales::verifyLocale( $appData, $locale ) === false && in_array( $locale, \Nino\Locales::getTextLocales( $appData ), true ) === false ) {
 				\Nino\Http::fail( $request, 400, 'unknown locale' );
 				return;
 			}
@@ -1059,12 +1137,25 @@ namespace Nino\Admin {
 		 */
 		public static function textFills( array &$appData, string $dir, string $locale ): array {
 
-			$fills = \Nino\Filesystem::getFileContent( $appData, $dir. '/'. $locale. '.php', false );
+			return (array) \Nino\Filesystem::getFileContent( $appData, $dir. '/'. self::textLocale( $appData, $dir, $locale ). '.php', [] );
+		}
 
-			if( is_array( $fills ) === true )
-				return $fills;
+		/**
+		 *	The language textFills() reads one text directory in: the interface
+		 *	language where the directory has a file for it, else English. What
+		 *	the shell says its own <html lang> is - the project's own key belongs to
+		 *	the website, and the workbench is not drawn in its language where it
+		 *	has no words of that
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$dir					A text directory, virtual path (eg. '/_admin/text')
+		 *	@param		string		$locale				The interface language
+		 *
+		 *	@return 	string										$locale, or 'en_US' where $dir has no file for it
+		 */
+		public static function textLocale( array &$appData, string $dir, string $locale ): string {
 
-			return (array) \Nino\Filesystem::getFileContent( $appData, $dir. '/en_US.php', [] );
+			return is_array( \Nino\Filesystem::getFileContent( $appData, $dir. '/'. $locale. '.php', false ) ) === true ? $locale : 'en_US';
 		}
 
 		/**

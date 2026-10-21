@@ -461,7 +461,9 @@ namespace Nino {
 		 *
 		 *	The same rule for a page script is Nino.slug(); its table and
 		 *	TRANSLITERATIONS must stay equal. The normalizer a search builds for
-		 *	comparing words is another thing and stays its own.
+		 *	comparing words is another function of its own, but it folds its
+		 *	letters with this table too, so that a word typed without its accent
+		 *	is the word the index holds with it.
 		 *
 		 *	@param		string		$text
 		 *	@param		int				$max					The longest slug, in characters
