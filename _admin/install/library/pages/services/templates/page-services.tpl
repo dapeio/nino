@@ -1,6 +1,6 @@
 [template /templates/html-header]
-<section class="nino-section nino-section--fullwidth nino-text-center">
-	<div class="nino-grid-row">
+<section class="nino-section nino-text-center">
+	<div class="nino-grid-row nino-grid-row--full nino-pl-0 nino-pr-0">
 		<div class="nino-grid-100">
 			<h2 class="nino-section-title">[[/template/page-services/intro/title]]</h2>
 			<p class="nino-section-subtitle">[[/template/page-services/intro/text]]</p>

@@ -1028,7 +1028,7 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
  *
  *
  *			.nino-hero(--fullscreen), .nino-hero(-title, -subtitle, -arrowdown)
- *			.nino-section(--alt, --tint, --dark, --black, --primary, --brand-alt, --dim, --fullwidth, --border-1/2/3), .nino-section(-title, -subtitle)
+ *			.nino-section(--alt, --tint, --dark, --black, --primary, --brand-alt, --dim, --border-1/2/3), .nino-section(-title, -subtitle)
  *			.nino-grid-row(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim), .nino-grid-row-bg
  *			.nino-grid(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim)
  *			.nino-card(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim, --fill, --middle, --bottom, --last-bottom, --fullwidth), .nino-card(-content, -title, -subtitle, -descr, -img, -price, -bg)
@@ -1135,15 +1135,6 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	color: var(--color-section-default-text);
 	box-sizing: border-box;
 	width: 100%;
-}
-.nino-section--fullwidth, .nino-section--fullwidth > .nino-grid-row {
-	padding-left: 0;
-	padding-right: 0;
-	margin: 0;
-}
-/* ...and the row goes to the edges on a screen wider than the grid as well: without this it would stand at the left, its maximum wide */
-.nino-section--fullwidth > .nino-grid-row {
-	max-width: none;
 }
 /*	Grounds. A section, a row, a column and a card paint a ground with the
 	same words - alt, tint, dark, black, primary and brand-alt, written
@@ -1634,8 +1625,6 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	.nino-hero-title { font-size: calc( var(--font-title-size) * var(--hero-title-scale) ); line-height: calc( var(--font-title-size) * var(--hero-title-scale) *1.2 );}
 	.nino-hero-subtitle { font-size: calc( var(--font-subtitle-size) * var(--hero-text-scale) ); line-height: calc( var(--font-subtitle-size) * var(--hero-text-scale) *1.2 );}
 	.nino-section { padding: calc(var(--space-5) * var(--whitespace-scale)) calc(var(--space-3) * var(--whitespace-scale)); }
-	.nino-section--fullwidth { padding-left: 0; padding-right: 0; }
-	.nino-section--fullheight { padding-top: 0; padding-bottom: 0; }
 	/*	A row at the edge takes the section's side padding with it. From 768px the
 		section has a side padding of its own, the room between the page and its
 		row, and a row that says nino-pl-0 or nino-pr-0 - its content at the edge -
@@ -1788,9 +1777,6 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 }
 .nino-card--fullwidth .nino-card-img {
 	border-radius:var(--radius-card) var(--radius-card) 0 0;
-}
-.nino-section--fullheight .nino-card-content {
-	padding: calc(var(--space-4) * var(--whitespace-scale)) calc(var(--space-2) * var(--whitespace-scale)) calc(var(--space-3) * var(--whitespace-scale));
 }
 /* Price display for a .nino-card that presents a product or a service - distinct
    from .nino-pricing-price (used inside .nino-pricing-item, see 05 Helper), for
@@ -3547,12 +3533,10 @@ header .nino-headernav-logo:empty {
 		--cover-padding-y: calc(var(--space-5) * var(--whitespace-scale));
 		--cover-padding-x: calc(var(--space-3) * var(--whitespace-scale));
 	}
-	.nino-cover--padded.nino-section--fullheight { --cover-padding-y: 0px; }
 	/*	A section with no padding above and below, nino-pt-0 and nino-pb-0, has no
 		inset there either - both, since the two sides are one property	*/
 	.nino-cover--padded.nino-pt-0.nino-pb-0 { --cover-padding-y: 0px; }
 }
-.nino-cover--padded.nino-section--fullwidth { --cover-padding-x: 0px; }
 /*	A row at the edge on both sides, nino-pl-0 and nino-pr-0, takes the section's
 	side padding with it, and so the inset at the sides: both, since the two sides
 	are one property, and asked of the row because the classes are its own	*/

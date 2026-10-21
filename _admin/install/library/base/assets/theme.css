@@ -965,17 +965,16 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 /*	The space of a section, unless the section says its own: the spacing
 	classes of Nino.css (nino-pt-3, nino-p-2 ...) come last in its stylesheet so
 	that they win, and a rule of a design layer that came after them would
-	beat them - so a section that names a padding is left alone. One with the
-	fullheight class keeps the padding Nino.css gives it from 768px, none.
+	beat them - so a section that names a padding is left alone.
 	What a set spaces it spaces times the whitespace of the page, as Nino.css
 	does - --whitespace-scale for an area, --whitespace-text for the room under
 	a text, and 1 where the framework says none - since a rule that came after
 	Nino.css and said the space without the factor would stop the position of
 	the Global tab at the set	*/
-.nino-section:where(:not(.nino-section--fullheight, [class*="nino-pt-"], [class*="nino-p-"])) {
+.nino-section:where(:not([class*="nino-pt-"], [class*="nino-p-"])) {
 	padding-top: calc( var(--content-section-space) * var(--whitespace-scale, 1) );
 }
-.nino-section:where(:not(.nino-section--fullheight, [class*="nino-pb-"], [class*="nino-p-"])) {
+.nino-section:where(:not([class*="nino-pb-"], [class*="nino-p-"])) {
 	padding-bottom: calc( var(--content-section-space) * var(--whitespace-scale, 1) );
 }
 

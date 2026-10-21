@@ -1,7 +1,6 @@
 <!-- nino:template-name Home -->
-<!-- nino:template-vpa on -->
 [template /templates/html-header]
-<section id="fullscreen-image" class="nino-section nino-section--fullwidth nino-section--black nino-cover nino-cover--dim nino-img-focus--5 nino-mt-0 nino-mb-0" data-cover-height="100" aria-labelledby="fullscreen-image-title">
+<section id="fullscreen-image" class="nino-section nino-section--black nino-cover nino-cover--dim nino-img-focus--5 nino-mt-0 nino-mb-0 nino-pl-0 nino-pr-0" data-cover-height="100" aria-labelledby="fullscreen-image-title">
 	[image /template/page-home/fullscreen-image/background alt=""]
 	<div class="nino-cover-content">
 		<div class="nino-grid-row nino-grid-row--wide nino-vpa">

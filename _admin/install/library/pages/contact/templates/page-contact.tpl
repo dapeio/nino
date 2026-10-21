@@ -1,5 +1,4 @@
 <!-- nino:template-name Contact -->
-<!-- nino:template-vpa on -->
 [template /templates/html-header]
 <section id="hero" class="nino-section nino-section--dark nino-cover nino-pt-6 nino-pb-6 nino-mt-0 nino-mb-0" data-cover-height="50" aria-labelledby="hero-title">
 	<div class="nino-cover-content">

@@ -720,7 +720,7 @@ foreach( $groundBlocks as [ , $whitespaceSelectors, $whitespaceBody ] ) {
 $whitespaceWhere = [
 	'--whitespace-scale' => [
 		'.nino-section', '.nino-card', '.nino-card--alt, .nino-card--tint, .nino-card--dark, .nino-card--black, .nino-card--primary, .nino-card--brand-alt, .nino-card--counter, .nino-card--dim',
-		'.nino-card--wide', '.nino-card-content', '.nino-section--fullheight .nino-card-content', '.nino-card--fullwidth .nino-card-content',
+		'.nino-card--wide', '.nino-card-content', '.nino-card--fullwidth .nino-card-content',
 		'.nino-grid-row--alt, .nino-grid-row--tint, .nino-grid-row--dark, .nino-grid-row--black, .nino-grid-row--primary, .nino-grid-row--brand-alt, .nino-grid-row--counter, .nino-grid-row--dim, .nino-grid-row:where(:has(> .nino-grid-row-bg))',
 		'.nino-card-cols', '.nino-card-cols-s', '.nino-card-cols-m', '.nino-card-cols-l', '.nino-card-cols-xl',
 		'.nino-card--grid.nino-grid-m-25', '.nino-card--grid.nino-grid-m-33', '.nino-card--grid.nino-grid-m-50', '.nino-cover--padded',
@@ -808,11 +808,9 @@ $coverPadding = [];
 foreach( $groundEach['.nino-cover--padded'] ?? [] as $groundBody )
 	if( preg_match( '/--cover-padding-y\s*:\s*([^;]+);/', $groundBody, $coverY ) === 1 && preg_match( '/--cover-padding-x\s*:\s*([^;]+);/', $groundBody, $coverX ) === 1 )
 		$coverPadding[] = [ trim( $coverY[1] ), trim( $coverX[1] ) ];
-check( '...its distances are the section\'s - above and below, and at the sides from 768px - and the full width cover has no side padding, as the section has none, and a full height one none above and below from 768px',
+check( '...its distances are the section\'s - above and below, and at the sides from 768px; below 768px the section has no side padding and the cover has none',
 	count( $sectionPadding ) === 2 && count( $coverPadding ) === 2
-	&& $coverPadding[0] === [ $sectionPadding[0][0], $sectionPadding[0][1] === '0' ? '0px' : $sectionPadding[0][1] ] && $coverPadding[1] === [ $sectionPadding[1][0], $sectionPadding[1][1] ]
-	&& $groundSets( $groundOf( '.nino-cover--padded.nino-section--fullwidth' ), '--cover-padding-x', '0px' ) === true && $groundSets( $groundOf( '.nino-cover--padded.nino-section--fullheight' ), '--cover-padding-y', '0px' ) === true
-	&& $groundSets( $groundOf( '.nino-section--fullwidth' ), 'padding-left', '0' ) === true && $groundSets( $groundOf( '.nino-section--fullheight' ), 'padding-top', '0' ) === true );
+	&& $sectionPadding[0][1] === '0' && $coverPadding[0] === [ $sectionPadding[0][0], '0px' ] && $coverPadding[1] === [ $sectionPadding[1][0], $sectionPadding[1][1] ] );
 /*	The frame follows the content to the edge. A row that stands at both edges, nino-pl-0 and nino-pr-0, has no side padding of the section round it, and a section with no padding above and below,
 	nino-pt-0 and nino-pb-0, none there: the inset of the picture, the scrim and the row is that padding, so each takes it away - both of a direction, since the two sides are one property. The sides
 	at every width or from 768px, where the section has its padding; above and below from 768px only, as the padding of the section there is	*/
@@ -822,6 +820,41 @@ $frameAbove = '.nino-cover--padded.nino-pt-0.nino-pb-0';
 check( '...and its frame goes with the content to the edge: no inset at the sides where its row says nino-pl-0 and nino-pr-0, at every width the section has one, and none above and below where its section says nino-pt-0 and nino-pb-0, from 768px',
 	$groundSets( $groundOf( $frameSides ), '--cover-padding-x', '0px' ) === true && in_array( $groundConditions( $frameSides ), $sideConditions, true ) === true
 	&& $groundSets( $groundOf( $frameAbove ), '--cover-padding-y', '0px' ) === true && $groundConditions( $frameAbove ) === [ [ '@media (min-width: 768px)' ] ] );
+/*	Nothing else takes a section or its cover to the edge. A distance of the padded cover that is 0 is the cover's own at the sides below 768px and the two frames above; a side of a section's padding that is
+	0 is the section's own below 768px and the edge rule of each side; and the one row without a maximum width is the row that says so in a class. A rule that does the same under any other selector - a class of
+	the section, a pair of classes of the cover, a row inside a section - is found here, whatever it is called, and so is a second rule under one of the selectors that may:
+	rules are counted, not selectors	*/
+$zeroSides = static fn( string $body ): bool => preg_match( '/(?<![\w-])padding-(?:top|right|bottom|left)\s*:\s*0(?:px)?\s*(?:;|$)/', $body ) === 1
+	|| ( preg_match( '/(?<![\w-])padding\s*:\s*([^;]+)/', $body, $zeroShort ) === 1 && array_intersect( $paddingParts( $zeroShort[1] ), [ '0', '0px' ] ) !== [] );
+$zeroFound = [ 'cover-x' => [], 'cover-y' => [], 'section' => [], 'row' => [] ];
+foreach( $groundEach as $zeroSelector => $zeroBodies )
+	foreach( $zeroBodies as $zeroBody ) {
+		foreach( [ 'x', 'y' ] as $zeroAxis )
+			if( preg_match( '/(?<![\w-])--cover-padding-'. $zeroAxis. '\s*:\s*0(?:px)?\s*(?:;|$)/', $zeroBody ) === 1 )
+				$zeroFound['cover-'. $zeroAxis][] = (string) $zeroSelector;
+		if( preg_match( '/\.nino-section(?:--[\w-]+)?(?![\w-])/', (string) $zeroSelector ) === 1 && $zeroSides( $zeroBody ) === true )
+			$zeroFound['section'][] = (string) $zeroSelector;
+		if( preg_match( '/\.nino-grid-row(?:--[\w-]+)?(?![\w-])/', (string) $zeroSelector ) === 1 && $groundSets( $zeroBody, 'max-width', 'none' ) === true )
+			$zeroFound['row'][] = (string) $zeroSelector;
+	}
+$zeroWrong = [];
+foreach( [ 'cover-x' => [ '.nino-cover--padded', $frameSides ], 'cover-y' => [ $frameAbove ],
+	'section' => [ '.nino-section', '.nino-section:has(> .nino-grid-row.nino-pl-0)', '.nino-section:has(> .nino-grid-row.nino-pr-0)' ], 'row' => [ '.nino-grid-row--full' ] ] as $zeroKey => $zeroList ) {
+	$zeroGot = $zeroFound[$zeroKey];
+	sort( $zeroGot );
+	sort( $zeroList );
+	if( $zeroGot !== $zeroList ) {
+		$zeroMore = $zeroGot;
+		foreach( $zeroList as $zeroOne ) {
+			$zeroAt = array_search( $zeroOne, $zeroMore, true );
+			if( $zeroAt !== false )
+				unset( $zeroMore[$zeroAt] );
+		}
+		$zeroWrong[] = $zeroKey. ' - also: '. implode( ' | ', $zeroMore ). '; not: '. implode( ' | ', array_diff( $zeroList, $zeroGot ) );
+	}
+}
+check( '...and nothing else takes a section or its cover to the edge: a distance of the cover that is 0 is its own below 768px and the two frames, a side of a section\'s padding that is 0 is the section\'s own below 768px and the edge rule of each side, and the one row with no maximum width is .nino-grid-row--full'
+	. ( $zeroWrong === [] ? '' : ' - '. implode( '; ', $zeroWrong ) ), $zeroWrong === [] );
 check( '...and the content stands over the picture as it does in any cover: the row and the content of a hand-written cover keep to the picture\'s width - the row as wide as the two offsets leave it, not the 100% every row says - and to its top or its bottom edge where the cover says so',
 	$groundSets( $groundOf( '.nino-cover--padded > .nino-grid-row' ), 'left', 'var(--cover-padding-x)' ) === true && $groundSets( $groundOf( '.nino-cover--padded > .nino-grid-row' ), 'right', 'var(--cover-padding-x)' ) === true
 	&& $hookValue( $groundOf( '.nino-cover--padded > .nino-grid-row' ), 'width' ) === 'auto'
