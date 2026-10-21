@@ -600,7 +600,7 @@ h1, h2, h3, h4, h5, h6 {
  *			flexbox, mobile-first designed
  *
  *
- *			.nino-grid-row(--*), .nino-grid(-25, -33, -50, -66, -75, -100)
+ *			.nino-grid-row(--narrow, --wide, --full, --left, --right), .nino-grid(-25, -33, -50, -66, -75, -100)
  *			.nino-grid(-top, -middle, -bottom, -center)
  *			.nino-grid(-s,-m, -l, -xl)(-25, -33, -50, -66, -75, -100)
  *			.nino-hide-(s, m, l), .nino-stack(-start, -center, -end, -gap-0...6)
@@ -619,6 +619,15 @@ h1, h2, h3, h4, h5, h6 {
 }
 .nino-grid-row--narrow { max-width: 52rem; }
 .nino-grid-row--wide { max-width: 92rem; }
+/*	No maximum width at all: the row is as wide as the box it stands in and keeps
+	its gutter, which nino-pl-0 and nino-pr-0 take away where the content is to
+	stand at the edge too	*/
+.nino-grid-row--full { max-width: none; }
+/*	A row narrower than the page stands in the middle because it has an auto
+	margin at both sides. --left and --right say one of them 0, and the auto one
+	at the other side gets all the room that is left - one side is enough	*/
+.nino-grid-row--left { margin-left: 0; }
+.nino-grid-row--right { margin-right: 0; }
 
 .nino-grid--fullwidth {
 	padding-left: 0;
@@ -1421,9 +1430,14 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	width ladder's to move, and the row keeps its maximum width. A row with a
 	picture behind it (the block of its own, below) is the same box, and a
 	dimmed one is the dark of its scrim: it is in the list of the inks of a
-	dimmed cover, which comes after the grounds	*/
+	dimmed cover, which comes after the grounds. The picture is asked for in
+	:where(), which counts for nothing: the rule is one class heavy, as the base
+	rule of the row before it, the grounds in its list and the padding classes
+	at the end of the file are, so that the order decides - and nino-pt-2 or
+	nino-pl-0 on such a row says what it says, where the two classes of :has()
+	would have beaten it wherever it stood	*/
 .nino-grid-row--alt, .nino-grid-row--tint, .nino-grid-row--dark, .nino-grid-row--black, .nino-grid-row--primary, .nino-grid-row--brand-alt, .nino-grid-row--counter, .nino-grid-row--dim,
-.nino-grid-row:has(> .nino-grid-row-bg) {
+.nino-grid-row:where(:has(> .nino-grid-row-bg)) {
 	padding: calc(var(--space-3) * var(--whitespace-scale)) var(--grid-gutter);
 	border-radius: var(--radius-small);
 }
@@ -1567,6 +1581,13 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	.nino-section { padding: calc(var(--space-5) * var(--whitespace-scale)) calc(var(--space-3) * var(--whitespace-scale)); }
 	.nino-section--fullwidth { padding-left: 0; padding-right: 0; }
 	.nino-section--fullheight { padding-top: 0; padding-bottom: 0; }
+	/*	A row at the edge takes the section's side padding with it. From 768px the
+		section has a side padding of its own, the room between the page and its
+		row, and a row that says nino-pl-0 or nino-pr-0 - its content at the edge -
+		would still stand that far from it. So the section that holds such a row
+		gives up the padding on that side; below 768px it has none	*/
+	.nino-section:has(> .nino-grid-row.nino-pl-0) { padding-left: 0; }
+	.nino-section:has(> .nino-grid-row.nino-pr-0) { padding-right: 0; }
 }
 
 .nino-card {
@@ -3418,7 +3439,11 @@ header .nino-headernav-logo:empty {
 	the section's own - the same distances, said here once as --cover-padding-y
 	and --cover-padding-x, since the picture, the scrim of a dimmed cover and the
 	content are laid out by them (a spacing class moves the section's padding and
-	not these two; set them to move both). The picture has the corners of a card,
+	not these two; set them to move both - which the frame does itself where its
+	content stands at the edge: a row that says nino-pl-0 and nino-pr-0 sets
+	--cover-padding-x to 0, and a section that says nino-pt-0 and nino-pb-0 sets
+	--cover-padding-y to 0 from 768px, so that the picture goes out to the edge
+	with its content). The picture has the corners of a card,
 	--radius-small, which a design layer says again with its own. The content
 	stands over it as it does in any cover - in the middle, or at its top or its
 	bottom edge - and the picture of a parallax is in a .nino-section-bg, which
@@ -3467,8 +3492,15 @@ header .nino-headernav-logo:empty {
 		--cover-padding-x: calc(var(--space-3) * var(--whitespace-scale));
 	}
 	.nino-cover--padded.nino-section--fullheight { --cover-padding-y: 0px; }
+	/*	A section with no padding above and below, nino-pt-0 and nino-pb-0, has no
+		inset there either - both, since the two sides are one property	*/
+	.nino-cover--padded.nino-pt-0.nino-pb-0 { --cover-padding-y: 0px; }
 }
 .nino-cover--padded.nino-section--fullwidth { --cover-padding-x: 0px; }
+/*	A row at the edge on both sides, nino-pl-0 and nino-pr-0, takes the section's
+	side padding with it, and so the inset at the sides: both, since the two sides
+	are one property, and asked of the row because the classes are its own	*/
+.nino-cover--padded:has(> .nino-grid-row.nino-pl-0.nino-pr-0) { --cover-padding-x: 0px; }
 
 /*	The picture behind a column, in a block of its own that the content of the
 	column follows: what .nino-section-bg is to a section, for a column. It
@@ -4077,6 +4109,24 @@ header .nino-headernav-logo:empty {
 .nino-pb-4 { padding-bottom: var(--space-4); }
 .nino-pb-5 { padding-bottom: var(--space-5); }
 .nino-pb-6 { padding-bottom: var(--space-6); }
+/*	The sides of a padding, as the top and the bottom have them: what a grid row
+	says to put its content at the edge or a step in from it. nino-pl-0 and
+	nino-pr-0 also take the side padding of the section the row stands in away
+	(the edge rule of the section, chapter 04)	*/
+.nino-pl-0 { padding-left: 0; }
+.nino-pl-1 { padding-left: var(--space-1); }
+.nino-pl-2 { padding-left: var(--space-2); }
+.nino-pl-3 { padding-left: var(--space-3); }
+.nino-pl-4 { padding-left: var(--space-4); }
+.nino-pl-5 { padding-left: var(--space-5); }
+.nino-pl-6 { padding-left: var(--space-6); }
+.nino-pr-0 { padding-right: 0; }
+.nino-pr-1 { padding-right: var(--space-1); }
+.nino-pr-2 { padding-right: var(--space-2); }
+.nino-pr-3 { padding-right: var(--space-3); }
+.nino-pr-4 { padding-right: var(--space-4); }
+.nino-pr-5 { padding-right: var(--space-5); }
+.nino-pr-6 { padding-right: var(--space-6); }
 
 /* Text alignment */
 .nino-text-left { text-align: left; }

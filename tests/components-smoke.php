@@ -463,6 +463,27 @@ $groundLastOf = static function( array $names, string $property = '' ) use ( $gr
 			$last = $groundAt;
 	return $last;
 };
+/*	The conditions a rule stands in: for each rule whose selector list is exactly the one given, the at-rules that hold it, the outermost first and their spaces squeezed - [] for a rule at the
+	top of the file, [ '@media (min-width: 768px)' ] for one in the 768px query	*/
+$groundConditions = static function( string $selector ) use ( $hookCss ): array {
+	$found = [];
+	$open = [];
+	$head = '';
+	foreach( (array) preg_split( '/([{};])/', $hookCss, -1, PREG_SPLIT_DELIM_CAPTURE ) as $part )
+		if( $part === '{' ) {
+			$open[] = trim( (string) preg_replace( '/\s+/', ' ', $head ) );
+			if( $open[ count( $open ) - 1 ] === $selector )
+				$found[] = array_values( array_map( static fn( string $rule ): string => (string) preg_replace( '/\s*:\s*/', ': ', $rule ), array_filter( array_slice( $open, 0, -1 ), static fn( string $rule ): bool => str_starts_with( $rule, '@' ) ) ) );
+			$head = '';
+		} elseif( $part === '}' ) {
+			array_pop( $open );
+			$head = '';
+		} elseif( $part === ';' )
+			$head = '';
+		else
+			$head .= $part;
+	return $found;
+};
 
 /*	A card in the cell of a stack takes no margin of its own: the half gap of the cell is the room between neighbours and the edges of the stack are the column's. Measured at 1280px with
 	a gap of 2, the neighbours stood 36px apart where the gap is 18px, and the first card 9px in from the column's edge. It is the rule of a card in a cell, with more classes in its selector
@@ -699,7 +720,7 @@ $whitespaceWhere = [
 	'--whitespace-scale' => [
 		'.nino-section', '.nino-card', '.nino-card--alt, .nino-card--tint, .nino-card--dark, .nino-card--black, .nino-card--primary, .nino-card--brand-alt, .nino-card--counter, .nino-card--dim',
 		'.nino-card--wide', '.nino-card-content', '.nino-section--fullheight .nino-card-content', '.nino-card--fullwidth .nino-card-content',
-		'.nino-grid-row--alt, .nino-grid-row--tint, .nino-grid-row--dark, .nino-grid-row--black, .nino-grid-row--primary, .nino-grid-row--brand-alt, .nino-grid-row--counter, .nino-grid-row--dim, .nino-grid-row:has(> .nino-grid-row-bg)',
+		'.nino-grid-row--alt, .nino-grid-row--tint, .nino-grid-row--dark, .nino-grid-row--black, .nino-grid-row--primary, .nino-grid-row--brand-alt, .nino-grid-row--counter, .nino-grid-row--dim, .nino-grid-row:where(:has(> .nino-grid-row-bg))',
 		'.nino-card-cols', '.nino-card-cols-s', '.nino-card-cols-m', '.nino-card-cols-l', '.nino-card-cols-xl',
 		'.nino-card--grid.nino-grid-m-25', '.nino-card--grid.nino-grid-m-33', '.nino-card--grid.nino-grid-m-50', '.nino-cover--padded',
 	],
@@ -791,6 +812,15 @@ check( '...its distances are the section\'s - above and below, and at the sides 
 	&& $coverPadding[0] === [ $sectionPadding[0][0], $sectionPadding[0][1] === '0' ? '0px' : $sectionPadding[0][1] ] && $coverPadding[1] === [ $sectionPadding[1][0], $sectionPadding[1][1] ]
 	&& $groundSets( $groundOf( '.nino-cover--padded.nino-section--fullwidth' ), '--cover-padding-x', '0px' ) === true && $groundSets( $groundOf( '.nino-cover--padded.nino-section--fullheight' ), '--cover-padding-y', '0px' ) === true
 	&& $groundSets( $groundOf( '.nino-section--fullwidth' ), 'padding-left', '0' ) === true && $groundSets( $groundOf( '.nino-section--fullheight' ), 'padding-top', '0' ) === true );
+/*	The frame follows the content to the edge. A row that stands at both edges, nino-pl-0 and nino-pr-0, has no side padding of the section round it, and a section with no padding above and below,
+	nino-pt-0 and nino-pb-0, none there: the inset of the picture, the scrim and the row is that padding, so each takes it away - both of a direction, since the two sides are one property. The sides
+	at every width or from 768px, where the section has its padding; above and below from 768px only, as the padding of the section there is	*/
+$sideConditions = [ [ [] ], [ [ '@media (min-width: 768px)' ] ] ];
+$frameSides = '.nino-cover--padded:has(> .nino-grid-row.nino-pl-0.nino-pr-0)';
+$frameAbove = '.nino-cover--padded.nino-pt-0.nino-pb-0';
+check( '...and its frame goes with the content to the edge: no inset at the sides where its row says nino-pl-0 and nino-pr-0, at every width the section has one, and none above and below where its section says nino-pt-0 and nino-pb-0, from 768px',
+	$groundSets( $groundOf( $frameSides ), '--cover-padding-x', '0px' ) === true && in_array( $groundConditions( $frameSides ), $sideConditions, true ) === true
+	&& $groundSets( $groundOf( $frameAbove ), '--cover-padding-y', '0px' ) === true && $groundConditions( $frameAbove ) === [ [ '@media (min-width: 768px)' ] ] );
 check( '...and the content stands over the picture as it does in any cover: the row and the content of a hand-written cover keep to the picture\'s width - the row as wide as the two offsets leave it, not the 100% every row says - and to its top or its bottom edge where the cover says so',
 	$groundSets( $groundOf( '.nino-cover--padded > .nino-grid-row' ), 'left', 'var(--cover-padding-x)' ) === true && $groundSets( $groundOf( '.nino-cover--padded > .nino-grid-row' ), 'right', 'var(--cover-padding-x)' ) === true
 	&& $hookValue( $groundOf( '.nino-cover--padded > .nino-grid-row' ), 'width' ) === 'auto'
@@ -820,7 +850,7 @@ foreach( [ 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt', 'counter', 'd
 		$rowWrong[] = '.nino-grid-row--'. $rowGround;
 check( 'a row that paints a ground, the counter and a dimmed one have the section\'s step above and below, times the whitespace, the gutter of a row at the sides, and the corners of a card - and so has a row with a picture behind it'
 	. ( $rowWrong === [] ? '' : ' - not: '. implode( ', ', $rowWrong ) ),
-	$rowWrong === [] && $groundSets( $groundOf( '.nino-grid-row:has(> .nino-grid-row-bg)' ), 'padding', 'calc(var(--space-3) * var(--whitespace-scale)) var(--grid-gutter)' ) === true
+	$rowWrong === [] && $groundSets( $groundOf( '.nino-grid-row:where(:has(> .nino-grid-row-bg))' ), 'padding', 'calc(var(--space-3) * var(--whitespace-scale)) var(--grid-gutter)' ) === true
 	&& $groundLastOf( [ '.nino-grid-row--alt' ], 'padding' ) > $groundLastOf( [ '.nino-grid-row' ], 'padding' ) && preg_match( '/(?<![\w-])max-width\s*:/', $groundOf( '.nino-grid-row--alt' ) ) !== 1 );
 check( 'a row may carry a picture, after the pattern of the column\'s: .nino-grid-row-bg has the declarations of .nino-grid-bg and its image those of the column\'s - lies over the row, cut at its corners and behind its columns - and the row with one is the box it is placed in, a stacking context of its own, and cut at its edge',
 	$groundBgBody( '.nino-grid-row-bg' ) !== '' && $groundBgBody( '.nino-grid-row-bg' ) === $groundBgBody( '.nino-grid-bg' ) && $groundBgBody( '.nino-grid-row-bg > img' ) === $groundBgBody( '.nino-grid-bg > img' )
@@ -833,6 +863,71 @@ check( 'a dimmed row darkens the picture of its block with the scrim of a dimmed
 	&& $groundSets( $groundOf( '.nino-section--dim > .nino-section-bg::after' ), 'background-color', 'var(--color-background-dim)' ) === true
 	&& $groundBgBody( '.nino-section--dim > .nino-section-bg::after' ) === $groundBgBody( '.nino-grid--dim > .nino-grid-bg::after' )
 	&& $groundInkRule( '.nino-cover--dim' ) !== [] && $groundInkRule( '.nino-cover--dim' ) === $groundInkRule( '.nino-section--dim' ) && $groundInkRule( '.nino-cover--dim' ) === $groundInkRule( '.nino-grid-row--dim' ) );
+
+/*	A row says its maximum width, its place and its padding in classes. --full has no maximum width and keeps the gutter; --left and --right say the margin at one side 0 and
+	nothing else, since the row has an auto margin at both sides and the one at the other side takes the room that is left; and the three come after the rule of the row, a rule
+	of the same specificity, so that they are the ones that win	*/
+$rowBaseAt = $groundLastOf( [ '.nino-grid-row' ], 'max-width' );
+$rowWrong = [];
+foreach( [ '.nino-grid-row--full' => [ 'max-width', 'none' ], '.nino-grid-row--left' => [ 'margin-left', '0' ], '.nino-grid-row--right' => [ 'margin-right', '0' ] ] as $rowClass => [ $rowProperty, $rowValue ] ) {
+	if( $groundSets( $groundOf( $rowClass ), $rowProperty, $rowValue ) === false )
+		$rowWrong[] = $rowClass. ' does not say '. $rowProperty. ': '. $rowValue;
+	if( $groundLastOf( [ $rowClass ] ) <= $rowBaseAt )
+		$rowWrong[] = $rowClass. ' is not after the rule of the row';
+}
+check( 'a row says its width and its place in classes: .nino-grid-row--full has no maximum width and no padding of its own, --left and --right say the margin at one side 0 and no other, and all three come after the rule of the row'
+	. ( $rowWrong === [] ? '' : ' - '. implode( '; ', $rowWrong ) ),
+	$rowWrong === [] && $rowBaseAt > 0 && preg_match( '/(?<![\w-])padding/', $groundOf( '.nino-grid-row--full' ) ) !== 1
+	&& preg_match( '/(?<![\w-])margin(?!-left)/', $groundOf( '.nino-grid-row--left' ) ) !== 1 && preg_match( '/(?<![\w-])margin(?!-right)/', $groundOf( '.nino-grid-row--right' ) ) !== 1 );
+
+// The sides of a padding have the scale of the margins - 0 and the space steps one to six, the declaration of the class and nothing else - and come after every rule that gives a row its padding
+$sideAfter = max( $groundLastOf( [ '.nino-grid-row' ], 'padding' ), $groundLastOf( [ '.nino-grid-row--alt' ], 'padding' ), $groundLastOf( [ '.nino-grid-row:where(:has(> .nino-grid-row-bg))' ], 'padding' ) );
+$sideWrong = [];
+foreach( [ 'pl' => 'left', 'pr' => 'right' ] as $sideKey => $sideName )
+	foreach( [ '0', '1', '2', '3', '4', '5', '6' ] as $sideStep ) {
+		$sideClass = '.nino-'. $sideKey. '-'. $sideStep;
+		$sideValue = $sideStep === '0' ? '0' : 'var(--space-'. $sideStep. ')';
+		if( $groundBgBody( $sideClass ) !== 'padding-'. $sideName. ': '. $sideValue. ';' || $groundSets( $groundOf( '.nino-m'. $sideName[0]. '-'. $sideStep ), 'margin-'. $sideName, $sideValue ) === false )
+			$sideWrong[] = $sideClass;
+		elseif( $groundLastOf( [ $sideClass ] ) <= $sideAfter )
+			$sideWrong[] = $sideClass. ' is before a rule that gives a row its padding';
+	}
+check( 'the sides of a padding are .nino-pl-<n> and .nino-pr-<n>, 0 to 6, the scale of the margins .nino-ml-<n> and .nino-mr-<n>, and come after every rule that gives a row its padding - the base rule, the grounds and the picture - so that they win'
+	. ( $sideWrong === [] ? '' : ' - not: '. implode( '; ', $sideWrong ) ), $sideWrong === [] && $sideAfter > 0 );
+
+/*	A row at the edge takes the section's side padding with it: from 768px the section has one of its own, and the section that holds a row that says nino-pl-0 or nino-pr-0 gives up the
+	padding at that side. The selector counts the classes of the row too, so that the rule is heavier than the padding of the section wherever it stands - and it stands where the padding does, in
+	the 768px query or in none: in a query of another width a row at the edge would keep the padding of its section from 768px up to that width	*/
+$edgeWrong = [];
+foreach( [ 'pl' => 'left', 'pr' => 'right' ] as $edgeKey => $edgeName ) {
+	$edgeSelector = '.nino-section:has(> .nino-grid-row.nino-'. $edgeKey. '-0)';
+	if( $groundBgBody( $edgeSelector ) !== 'padding-'. $edgeName. ': 0;' )
+		$edgeWrong[] = $edgeSelector. ' does not say padding-'. $edgeName. ': 0';
+	if( in_array( $groundConditions( $edgeSelector ), $sideConditions, true ) === false )
+		$edgeWrong[] = $edgeSelector. ' does not stand once, in the 768px query or in none';
+}
+check( 'a row at the edge takes the section\'s side padding with it: the section with a row that says nino-pl-0 has no padding at the left, the one with nino-pr-0 none at the right, at every width it has one'
+	. ( $edgeWrong === [] ? '' : ' - '. implode( '; ', $edgeWrong ) ), $edgeWrong === [] );
+
+/*	The padding of a row with a picture behind it is the rule of the grounds, and no rule that gives it padding is heavier than one class: the base rule of the row, the grounds in the list and the
+	padding classes are one class each, so that the order decides. The picture is asked for in :where(), which counts for nothing, and the rule comes after the base rule of the row and ahead of every
+	padding class, so that nino-pt-<n> and nino-pl-<n> on such a row are what they say. The other rule of the picture, which makes the row the box it is placed in, has no padding and keeps the two classes of :has()	*/
+$innerSelector = '.nino-grid-row:where(:has(> .nino-grid-row-bg))';
+$innerWeight = static fn( string $selector ): int => substr_count( (string) preg_replace( '/:where\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)/', '', $selector ), '.nino-' );
+$innerHeavy = [];
+foreach( $groundEach as $groundSelector => $groundBodies )
+	if( str_contains( (string) $groundSelector, 'nino-grid-row-bg' ) === true && preg_match( '/(?<![\w-])padding/', implode( ' ', $groundBodies ) ) === 1 && $innerWeight( (string) $groundSelector ) > 1 )
+		$innerHeavy[] = (string) $groundSelector;
+$innerAt = $groundLastOf( [ $innerSelector ], 'padding' );
+$innerClassAt = -1;
+foreach( $groundMembers as $groundAt => $groundList )
+	foreach( $groundList as $groundMember )
+		if( preg_match( '/^\.nino-p[tblr]?-\d$/', $groundMember ) === 1 && ( $innerClassAt < 0 || $groundAt < $innerClassAt ) )
+			$innerClassAt = $groundAt;
+check( 'a row with a picture has its padding of a rule one class heavy, as the rule of the row, the grounds and the padding classes are - the picture asked for in :where() - that comes after the base rule of the row and ahead of the first padding class of the file, so that nino-pt-<n> and nino-pl-<n> on such a row are what they say'
+	. ( $innerHeavy === [] ? '' : ' - heavier: '. implode( ' | ', $innerHeavy ) ),
+	$groundSets( $groundOf( $innerSelector ), 'padding', 'calc(var(--space-3) * var(--whitespace-scale)) var(--grid-gutter)' ) === true && $innerHeavy === [] && $innerWeight( $innerSelector ) === 1
+	&& $groundLastOf( [ '.nino-grid-row' ], 'padding' ) > 0 && $innerAt > $groundLastOf( [ '.nino-grid-row' ], 'padding' ) && $innerClassAt > $innerAt );
 
 // The ink of a text: two classes, the inks a ground resolves, after every rule that sets the colour of a title, a subtitle or a text
 $inkAfter = $groundLastOf( [ '.nino-section-title', '.nino-section-subtitle', '.nino-section-text', '.nino-card-title', '.nino-card-subtitle', '.nino-card-descr', '.nino-hero-title', '.nino-hero-subtitle',
@@ -2058,7 +2153,7 @@ $home = (string) file_get_contents( __DIR__. '/fixtures/builder-page-home.tpl' )
 $page = $render( $home );
 $foreign = '<!-- nino:html -->'. "\n". '<section id="map" class="nino-section nino-section--alt">'. "\n". '	<div class="nino-grid-row"><div class="nino-grid-100">[osm lat="48.1" lon="11.5" zoom="12"]</div></div>'. "\n". '</section>'. "\n". '<!-- /nino:html -->';
 check( 'a file of the Builder renders by the kernel alone: no shortcode of it is left standing', str_contains( str_replace( $foreign, '', $page ), '[' ) === false );
-check( '...the section, the row and the columns are the markup of the file', str_contains( $page, '<section id="hero" class="nino-section nino-section--fullwidth nino-section--black nino-cover nino-cover--dim nino-vpa" data-cover-height="100">' ) === true
+check( '...the section, the row and the columns are the markup of the file', str_contains( $page, '<section id="hero" class="nino-section nino-section--black nino-cover nino-cover--dim nino-vpa" data-cover-height="100">' ) === true
 	&& str_contains( $page, '<div class="nino-section-bg nino-img-focus--5"><img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt=""></div>' ) === true
 	&& str_contains( $page, '<div class="nino-grid-s-100 nino-grid-m-100 nino-grid-l-66 nino-text-left">' ) === true
 	&& str_contains( $page, '<section id="contact" class="nino-section nino-section--primary nino-text-center">' ) === true

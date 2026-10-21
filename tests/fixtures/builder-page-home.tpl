@@ -1,7 +1,7 @@
 <!-- nino:template-name Home -->
 [template /templates/html-header]
 
-<section id="hero" class="nino-section nino-section--fullwidth nino-section--black nino-cover nino-cover--dim nino-vpa" data-cover-height="100">
+<section id="hero" class="nino-section nino-section--black nino-cover nino-cover--dim nino-vpa" data-cover-height="100">
 	<div class="nino-section-bg nino-img-focus--5">[image /template/page-home/hero/background alt=""]</div>
 	<div class="nino-grid-row nino-grid-row--wide nino-grid-middle">
 		<div class="nino-grid-s-100 nino-grid-m-100 nino-grid-l-66 nino-text-left">

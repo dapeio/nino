@@ -555,6 +555,15 @@ Two rules follow. **A stack never stands directly inside another, and a `[card]`
 
 The classes the markup uses are in `Nino.css`, and the custom properties a design layer sets to turn it - the font roles, the type scale, the grounds and the rest - are declared and commented at its `:root`. The catalogue's Design feature documents what it compiles from them in the manual of its `feature.php`.
 
+**The row of a section.** What a section holds stands in a `nino-grid-row`: at most `--grid-max-width` wide, in the middle of the section, with the gutter of the grid at its sides. Its width and its place are classes of their own:
+
+- `nino-grid-row--narrow` and `nino-grid-row--wide` are two maximum widths below the grid's.
+- `nino-grid-row--full` has no maximum width: the row is as wide as the box it stands in, its gutter kept.
+- `nino-grid-row--left` puts a row that is narrower than the page at the left edge of the section instead of in the middle.
+- `nino-grid-row--right` puts it at the right edge.
+
+Its padding is a utility for each side, `nino-pt-<n>`, `nino-pb-<n>`, `nino-pl-<n>` and `nino-pr-<n>`, a step of the space scale from `0` to `6` as the margins `nino-mt-<n>`, `nino-mb-<n>`, `nino-ml-<n>` and `nino-mr-<n>` have it, and it wins over the padding the row has of its own: the gutter, and the room of a row that paints a ground or holds a picture. A row at the edge, `nino-pl-0` or `nino-pr-0`, takes the side padding of its section with it - from 768px the section has one of its own, and the row would still stand that far from the edge. A padded cover (`nino-cover--padded`) holds its picture inside that padding, and the picture follows the content to the edge: it has no inset at the sides where the row says both `nino-pl-0` and `nino-pr-0`, and none above and below, from 768px, where the section says both `nino-pt-0` and `nino-pb-0`. The Builder keeps all of these as settings of a section's row.
+
 ### Forms
 
 `Modules\Form` owns the route `POST /.form` and nothing else: what a submission is, what it has to look like, the mail pair it sends and the record it leaves is `\Nino\Form`, and the split is what lets a project have more than one form without a second endpoint answering the same uri.
