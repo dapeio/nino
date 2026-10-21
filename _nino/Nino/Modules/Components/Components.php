@@ -354,7 +354,6 @@ namespace Nino\Modules {
 					'target' => self::LINK['target'],
 				], null, 'a .nino-btn', null, false, 'global' ],
 				[ 'image', 'Image', 'Bild', 'image', 'image', [
-					'style' => [ 'type' => 'variant', 'options' => [ '', 'rounded' ], 'prefix' => 'nino-image--', 'default' => '', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ] ],
 					'alt' => [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Alternative text', 'de_DE' => 'Alternativtext' ],
 						'hint' => [ 'en_US' => 'Used where the slot has no text of its own. Empty marks the picture as decoration.', 'de_DE' => 'Gilt, wo der Slot keinen eigenen Text hat. Leer kennzeichnet das Bild als Dekoration.' ] ],
 					'focus' => [ 'type' => 'select', 'options' => [ '', '1', '2', '3', '4', '5', '6', '7', '8', '9' ], 'default' => '', 'label' => [ 'en_US' => 'Focus', 'de_DE' => 'Fokus' ],
@@ -1927,11 +1926,12 @@ namespace Nino\Modules {
 		 *	alt text an editor wrote must not be able to open a fill or a
 		 *	shortcode there.
 		 *
-		 *	A focus, a ratio, a style or a class of its own puts the <img> in a frame,
-		 *	<div class="nino-image ...">, which crops it as Nino.css has it. The style
-		 *	(rounded, a variant written as nino-image--rounded) and the class are the
-		 *	frame's, never the <img>'s: the frame, cut at its corners, is what rounds
-		 *	the picture.
+		 *	A focus, a ratio or a class of its own puts the <img> in a frame,
+		 *	<div class="nino-image ...">, which crops it as Nino.css has it. The class
+		 *	is the frame's, never the <img>'s: the frame, cut at its corners, is what
+		 *	gives the picture its radius, the one of the image kind (--radius-image),
+		 *	or the other strength where the class says nino-radius or nino-radius-alt.
+		 *	A bare <img> has no frame, and no corners of its own.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments made ready by dispatch()
@@ -1969,15 +1969,15 @@ namespace Nino\Modules {
 		 *	is one.
 		 *
 		 *	The picture of [image] is its frame, nino-image, which the fragment
-		 *	names. A focus, a ratio, a style or a class of its own call for it, and
-		 *	the style and the class are the frame's, in that order behind the ratio
-		 *	and the focus; with none of them the picture is the bare <img>, which
-		 *	has no class attribute. The picture of a card is the box nino-card-img
-		 *	names, and its style and its class of its own are the classes of that
-		 *	box: the <img>, which then has all three as its class attribute, or the
-		 *	frame where a focus or a ratio call for one, which then has them in the
-		 *	place of its class and holds an <img> with none. The style is a variant,
-		 *	written as the class its prefix and the word make
+		 *	names. A focus, a ratio or a class of its own call for it, and the class
+		 *	is the frame's, behind the ratio and the focus; with none of them the
+		 *	picture is the bare <img>, which has no class attribute. The picture of
+		 *	a card is the box nino-card-img names, and its style and its class of its
+		 *	own are the classes of that box: the <img>, which then has all three as
+		 *	its class attribute, or the frame where a focus or a ratio call for one,
+		 *	which then has them in the place of its class and holds an <img> with
+		 *	none. The style, where a component has one, is a variant, written as the
+		 *	class its prefix and the word make
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$component		The component: image or card-image

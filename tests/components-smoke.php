@@ -8,8 +8,8 @@ declare(strict_types=1);
  *											escape() and the lang attribute of a text that is another language's
  *											- and for what Nino.css hands a design layer: the hero,
  *											the font roles, the scale, the hooks and the grounds on three
- *											levels. Runs against an isolated sandbox directory, never touches
- *											the real project data.
+ *											levels, and the radius of a surface. Runs against an isolated
+ *											sandbox directory, never touches the real project data.
  *
  *	Usage: php tests/components-smoke.php
  */
@@ -344,12 +344,12 @@ foreach( array_keys( $groundEach ) as $groundSelector )
 check( 'no rule compares the ground of a thing with the ground it sits on: no selector has a section or a column of a ground above a column or a card of one'. ( $groundCompared === [] ? '' : ' - '. implode( ' | ', $groundCompared ) ),
 	$groundCompared === [] && isset( $groundEach['.nino-section--alt .nino-card--alt'] ) === false && count( $groundEach ) > 400 );
 
-// A column that paints keeps its content off the colour and is rounded as a card is
+// A column that paints keeps its content off the colour
 $groundWrong = [];
 foreach( [ 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt', 'counter', 'dim' ] as $ground )
-	if( $groundSets( $groundOf( '.nino-grid--'. $ground ), 'padding', 'var(--space-2)' ) === false || $groundSets( $groundOf( '.nino-grid--'. $ground ), 'border-radius', 'var(--radius)' ) === false )
+	if( $groundSets( $groundOf( '.nino-grid--'. $ground ), 'padding', 'var(--space-2)' ) === false )
 		$groundWrong[] = '.nino-grid--'. $ground;
-check( 'a column that paints a ground, the counter and a dimmed one have padding of one step and the radius of a card'. ( $groundWrong === [] ? '' : ' - not: '. implode( ', ', $groundWrong ) ), $groundWrong === [] );
+check( 'a column that paints a ground, the counter and a dimmed one have padding of one step'. ( $groundWrong === [] ? '' : ' - not: '. implode( ', ', $groundWrong ) ), $groundWrong === [] );
 
 // A card of any ground has the chrome the alt card had, and the borderless one still has none
 $groundWrong = [];
@@ -383,9 +383,9 @@ check( 'a borderless card that names a ground keeps its fill: every .nino-card--
 	&& preg_match( '/(?<![\w-])background(?:-color)?\s*:\s*transparent/', $groundOf( '.nino-card--borderless' ) ) === 1 );
 
 // The picture of a column
-check( 'a column may carry a picture: .nino-grid-bg lies over the column and is cut at its corners, its image covers it, the column becomes the box it is placed in',
+check( 'a column may carry a picture: .nino-grid-bg lies over the column and is cut at the radius of the column\'s kind, its image covers it, the column becomes the box it is placed in',
 	$groundSets( $groundOf( '.nino-grid-bg' ), 'position', 'absolute' ) && $groundSets( $groundOf( '.nino-grid-bg' ), 'inset', '0' ) && $groundSets( $groundOf( '.nino-grid-bg' ), 'overflow', 'hidden' )
-	&& $groundSets( $groundOf( '.nino-grid-bg' ), 'border-radius', 'inherit' ) && $groundSets( $groundOf( '.nino-grid-bg > img' ), 'object-fit', 'cover' )
+	&& $groundSets( $groundOf( '.nino-grid-bg' ), 'border-radius', 'var(--radius-column)' ) && $groundSets( $groundOf( '.nino-grid-bg > img' ), 'object-fit', 'cover' )
 	&& $groundSets( $groundOf( ':has(> .nino-grid-bg, > .nino-card-bg)' ), 'position', 'relative' ) && $groundSets( $groundOf( ':has(> .nino-grid-bg, > .nino-card-bg)' ), 'isolation', 'isolate' ) );
 $groundWrong = [];
 foreach( [ '--color-ground' => 'bg', '--color-ink' => 'text', '--color-title' => 'title', '--color-subtitle' => 'text', '--color-accent' => 'accent', '--color-focus' => 'focus', '--color-border' => 'border' ] as $groundRole => $groundPart )
@@ -542,9 +542,10 @@ check( '...a button in it is as wide as its label and sits where the text does, 
 	&& $groundSets( $groundOf( $groundVertical. '.nino-text-center > .nino-btn' ), 'align-self', 'center' ) === true
 	&& $groundSets( $groundOf( $groundVertical. '.nino-text-right > .nino-btn' ), 'align-self', 'flex-end' ) === true );
 
-// The picture behind a card, after the pattern of the one behind a column: the same rules, and the rule that makes the parent the box it is placed in is one for both
-$groundBgBody = static fn( string $selector ): string => trim( (string) preg_replace( '/\s+/', ' ', $groundOf( $selector ) ) );
-check( 'a card may carry a picture, after the pattern of the column\'s: .nino-card-bg lies over the card, is cut at its corners and behind its content, its image covers it - the declarations of .nino-grid-bg',
+// The picture behind a card, after the pattern of the one behind a column: the same rules but for the radius - the column's picture reads the column's kind, the card's and the row's take
+// the corners of the card and of the row they lie in - and the rule that makes the parent the box it is placed in is one for both
+$groundBgBody = static fn( string $selector ): string => trim( (string) preg_replace( '/\s+/', ' ', (string) preg_replace( '/(?<![\w-])border-radius\s*:[^;]*;/', '', $groundOf( $selector ) ) ) );
+check( 'a card may carry a picture, after the pattern of the column\'s: .nino-card-bg lies over the card, is cut at its corners and behind its content, its image covers it - the declarations of .nino-grid-bg, the radius apart',
 	$groundSets( $groundOf( '.nino-card-bg' ), 'position', 'absolute' ) && $groundSets( $groundOf( '.nino-card-bg' ), 'inset', '0' ) && $groundSets( $groundOf( '.nino-card-bg' ), 'overflow', 'hidden' )
 	&& $groundSets( $groundOf( '.nino-card-bg' ), 'border-radius', 'inherit' ) && $groundSets( $groundOf( '.nino-card-bg' ), 'z-index', '-1' )
 	&& $groundSets( $groundOf( '.nino-card-bg > img' ), 'object-fit', 'cover' ) && $groundSets( $groundOf( '.nino-card-bg > img' ), 'width', '100%' ) && $groundSets( $groundOf( '.nino-card-bg > img' ), 'height', '100%' )
@@ -752,15 +753,15 @@ foreach( $whitespaceReads as $whitespaceToken => $whitespaceRules )
 				$whitespaceUsed[] = $whitespaceSelectors. ' says '. $whitespaceProperty. ' by '. $whitespaceToken;
 check( '...each in the properties it is for: the areas in padding, margin, the gap between columns and a width, the gap of a stack in gap, the text in margin - never a line height, a size or a colour'. ( $whitespaceUsed === [] ? '' : ' - '. implode( '; ', $whitespaceUsed ) ), $whitespaceUsed === [] );
 
-// The picture of a card, a frame with rounded corners
+// The picture of a card, and the frame that cuts a picture
 check( 'the picture of a card is as wide as the card and never wider, and --inline is the other way round - in line, at its own size, capped by the card all the same',
 	$hookValue( $groundOf( '.nino-card-img' ), 'width' ) === '100%' && $hookValue( $groundOf( '.nino-card-img' ), 'max-width' ) === '100%' && $hookValue( $groundOf( '.nino-card-img' ), 'display' ) === null
 	&& $hookValue( $groundOf( '.nino-card-img--inline' ), 'display' ) === 'inline-block' && $hookValue( $groundOf( '.nino-card-img--inline' ), 'width' ) === 'auto'
 	&& $hookValue( $groundOf( '.nino-card-img--inline' ), 'max-width' ) === null );
 check( '...and it sits on the bottom of its line, so the room below an --inline picture is its margin and not the margin and the descender of the line',
 	$hookValue( $groundOf( '.nino-card-img--inline' ), 'vertical-align' ) === 'bottom' );
-check( 'the rounded frame is cut at the kernel\'s own large radius - no token of a design layer - and it is the frame that cuts: .nino-image has the overflow',
-	$hookValue( $groundOf( '.nino-image--rounded' ), 'border-radius' ) === 'var(--radius-large)' && $hookValue( $groundOf( '.nino-image' ), 'overflow' ) === 'hidden' );
+check( 'it is the frame that cuts a picture: .nino-image has the overflow, so the corners it has are the picture\'s',
+	$hookValue( $groundOf( '.nino-image' ), 'overflow' ) === 'hidden' );
 
 // A section with a picture behind it lays its row out in the middle of itself
 $groundPictured = '.nino-section:not(.nino-cover, .nino-parallex):has(> .nino-section-bg)';
@@ -772,8 +773,8 @@ check( 'a section with a picture behind it that is no cover and no parallax is a
 // The padded cover
 $paddedPair = 'var(--cover-padding-y) var(--cover-padding-x)';
 $paddedPicture = [ '.nino-cover--padded > .nino-section-bg', '.nino-cover--padded.nino-cover--dim::before', '.nino-cover--padded.nino-parallex--dim::before', '.nino-cover--padded:not(.nino-parallex) > img' ];
-$paddedWrong = array_filter( $paddedPicture, static fn( string $selector ): bool => $groundSets( $groundOf( $selector ), 'border-radius', 'var(--radius-small)' ) === false );
-check( 'a padded cover keeps the padding of its section and lays its picture inside it: --cover-padding-y and --cover-padding-x are its padding and place the picture of a Builder section, the image straight in a cover and the scrim of a dimmed cover, and the picture has the corners of a card'
+$paddedWrong = array_filter( $paddedPicture, static fn( string $selector ): bool => $groundSets( $groundOf( $selector ), 'border-radius', 'var(--radius-cover)' ) === false );
+check( 'a padded cover keeps the padding of its section and lays its picture inside it: --cover-padding-y and --cover-padding-x are its padding and place the picture of a Builder section, the image straight in a cover and the scrim of a dimmed cover, and the picture has the radius of the cover kind'
 	. ( $paddedWrong === [] ? '' : ' - square: '. implode( ', ', $paddedWrong ) ),
 	$paddedWrong === [] && $groundSets( $groundOf( '.nino-cover--padded' ), 'padding', $paddedPair ) === true
 	&& $groundSets( $groundOf( '.nino-cover--padded > .nino-section-bg' ), 'inset', $paddedPair ) === true && $groundSets( $groundOf( '.nino-cover--padded.nino-cover--dim::before' ), 'inset', $paddedPair ) === true
@@ -846,14 +847,16 @@ check( 'the whitespace has four classes, .nino-whitespace--least, --less, --more
 // A row that paints a ground, or has a picture behind it: the grounds of a column for a row, the room above and below the section's step times the whitespace, the gutter at the sides left to the row
 $rowWrong = [];
 foreach( [ 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt', 'counter', 'dim' ] as $rowGround )
-	if( $groundSets( $groundOf( '.nino-grid-row--'. $rowGround ), 'padding', 'calc(var(--space-3) * var(--whitespace-scale)) var(--grid-gutter)' ) === false || $groundSets( $groundOf( '.nino-grid-row--'. $rowGround ), 'border-radius', 'var(--radius-small)' ) === false )
+	if( $groundSets( $groundOf( '.nino-grid-row--'. $rowGround ), 'padding', 'calc(var(--space-3) * var(--whitespace-scale)) var(--grid-gutter)' ) === false || $groundSets( $groundOf( '.nino-grid-row--'. $rowGround ), 'border-radius', 'var(--radius-row)' ) === false )
 		$rowWrong[] = '.nino-grid-row--'. $rowGround;
-check( 'a row that paints a ground, the counter and a dimmed one have the section\'s step above and below, times the whitespace, the gutter of a row at the sides, and the corners of a card - and so has a row with a picture behind it'
+check( 'a row that paints a ground, the counter and a dimmed one have the section\'s step above and below, times the whitespace, the gutter of a row at the sides, and the radius of the row kind - and so has a row with a picture behind it'
 	. ( $rowWrong === [] ? '' : ' - not: '. implode( ', ', $rowWrong ) ),
 	$rowWrong === [] && $groundSets( $groundOf( '.nino-grid-row:where(:has(> .nino-grid-row-bg))' ), 'padding', 'calc(var(--space-3) * var(--whitespace-scale)) var(--grid-gutter)' ) === true
+	&& $groundSets( $groundOf( '.nino-grid-row:where(:has(> .nino-grid-row-bg))' ), 'border-radius', 'var(--radius-row)' ) === true
 	&& $groundLastOf( [ '.nino-grid-row--alt' ], 'padding' ) > $groundLastOf( [ '.nino-grid-row' ], 'padding' ) && preg_match( '/(?<![\w-])max-width\s*:/', $groundOf( '.nino-grid-row--alt' ) ) !== 1 );
-check( 'a row may carry a picture, after the pattern of the column\'s: .nino-grid-row-bg has the declarations of .nino-grid-bg and its image those of the column\'s - lies over the row, cut at its corners and behind its columns - and the row with one is the box it is placed in, a stacking context of its own, and cut at its edge',
+check( 'a row may carry a picture, after the pattern of the column\'s: .nino-grid-row-bg has the declarations of .nino-grid-bg, the radius apart, and its image those of the column\'s - lies over the row, cut at its corners and behind its columns - and the row with one is the box it is placed in, a stacking context of its own, and cut at its edge',
 	$groundBgBody( '.nino-grid-row-bg' ) !== '' && $groundBgBody( '.nino-grid-row-bg' ) === $groundBgBody( '.nino-grid-bg' ) && $groundBgBody( '.nino-grid-row-bg > img' ) === $groundBgBody( '.nino-grid-bg > img' )
+	&& $groundSets( $groundOf( '.nino-grid-row-bg' ), 'border-radius', 'inherit' ) === true
 	&& $groundSets( $groundOf( '.nino-grid-row-bg' ), 'z-index', '-1' ) === true && $groundSets( $groundOf( '.nino-grid-row:has(> .nino-grid-row-bg)' ), 'position', 'relative' ) === true
 	&& $groundSets( $groundOf( '.nino-grid-row:has(> .nino-grid-row-bg)' ), 'isolation', 'isolate' ) === true && $groundSets( $groundOf( '.nino-grid-row:has(> .nino-grid-row-bg)' ), 'overflow', 'hidden' ) === true );
 $groundInkRule = static fn( string $selector ): array => array_values( array_filter( $groundEach[$selector] ?? [], static fn( string $body ): bool => str_contains( $body, '--color-subtitle' ) === true ) );
@@ -1024,6 +1027,124 @@ foreach( [ 'left' => [ 'X', 1 ], 'right' => [ 'X', -1 ], 'up' => [ 'Y', 1 ], 'do
 	}
 check( 'the slides are named for the motion the visitor sees: left and up start at a positive translate of their axis - to the right of their place, below it - right and down at a negative one, at 1.5, 3 and 6rem, and all of them end at 0'
 	. ( $vpaWrong === [] ? '' : ' - not: '. implode( ', ', $vpaWrong ) ), $vpaWrong === [] );
+
+echo "\n";
+
+
+// --- The radius of a surface ------------------------------------------------
+
+echo "Nino.css - the radius of a surface: two strengths, a token and a marker for each kind, and a class that takes the other\n";
+
+/*	The corners of a surface are the page's: two strengths for the whole page and five kinds of surface, each with a token that points at one of them and a marker that
+	says which, as a word - for a tool that wants the default of a kind without resolving a length. What reads a token and what the class of one element sets is pinned by
+	selector and never by a length: a design layer says the lengths	*/
+$radiusKinds = [ 'cover', 'row', 'column', 'card', 'image' ];
+$radiusPoints = [ 'standard' => 'var(--radius-surface)', 'alternative' => 'var(--radius-surface-alt)' ];
+// A length of the root in rem, a var() followed through the declarations of the root
+$radiusLength = static function( string $property ) use ( &$radiusLength, $hookRoot, $hookValue ): ?float {
+	$value = $hookValue( $hookRoot, $property );
+	if( $value !== null && preg_match( '/^var\((--[\w-]+)\)$/', $value, $radiusRef ) === 1 )
+		return $radiusLength( $radiusRef[1] );
+	return $value !== null && preg_match( '/^(\d*\.?\d+)rem$/', $value, $radiusNumber ) === 1 ? (float) $radiusNumber[1] : null;
+};
+$radiusWrong = [];
+foreach( [ '--radius-surface', '--radius-surface-alt' ] as $radiusStrength )
+	if( $radiusLength( $radiusStrength ) === null )
+		$radiusWrong[] = $radiusStrength. ' is no length';
+foreach( $radiusKinds as $radiusKind ) {
+	$radiusToken = $hookValue( $hookRoot, '--radius-'. $radiusKind );
+	$radiusMarker = (string) $hookValue( $hookRoot, '--radius-'. $radiusKind. '-default' );
+	if( in_array( $radiusToken, $radiusPoints, true ) === false )
+		$radiusWrong[] = '--radius-'. $radiusKind. ' points at none of the two strengths';
+	if( ( $radiusPoints[$radiusMarker] ?? null ) !== $radiusToken )
+		$radiusWrong[] = '--radius-'. $radiusKind. '-default does not say which strength the token points at';
+}
+check( ':root declares the two strengths of the radius of a surface - lengths, the alternative the larger - and for each of the five kinds, cover, row, column, card and image, a token that points at one of them and a marker that says which, as the word standard or alternative'
+	. ( $radiusWrong === [] ? '' : ' - '. implode( '; ', $radiusWrong ) ), $radiusWrong === [] && $radiusLength( '--radius-surface' ) < $radiusLength( '--radius-surface-alt' ) );
+check( '...and a marker draws nothing: no rule of the stylesheet reads one',
+	preg_match( '/var\(\s*--radius-(?:'. implode( '|', $radiusKinds ). ')-default/', $hookCss ) !== 1 );
+
+// Each surface reads the token of its kind as its border-radius, and no other rule reads one
+$radiusGrounds = [ 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt', 'counter', 'dim' ];
+$radiusReaders = [
+	'cover'		=> [ '.nino-cover--padded > .nino-section-bg', '.nino-cover--padded.nino-cover--dim::before', '.nino-cover--padded.nino-parallex--dim::before', '.nino-cover--padded:not(.nino-parallex) > img' ],
+	'row'			=> array_merge( array_map( static fn( string $ground ): string => '.nino-grid-row--'. $ground, $radiusGrounds ), [ '.nino-grid-row:where(:has(> .nino-grid-row-bg))' ] ),
+	'column'	=> array_merge( array_map( static fn( string $ground ): string => '.nino-grid--'. $ground, $radiusGrounds ), [ '.nino-grid-bg' ] ),
+	'card'		=> [ '.nino-card', '.nino-card-img', '.nino-card--fullwidth .nino-card-img' ],
+	'image'		=> [ '.nino-image:not(.nino-card-img)' ],
+];
+$radiusWrong = [];
+foreach( $radiusReaders as $radiusKind => $radiusExpected ) {
+	$radiusFound = [];
+	foreach( $groundBlocks as [ , $radiusList, $radiusBody ] )
+		if( preg_match( '/(?<![\w-])border-radius\s*:[^;]*var\(\s*--radius-'. $radiusKind. '\s*\)/', $radiusBody ) === 1 )
+			$radiusFound = array_merge( $radiusFound, $groundSplit( $radiusList ) );
+	sort( $radiusFound );
+	sort( $radiusExpected );
+	if( $radiusFound !== $radiusExpected )
+		$radiusWrong[] = '--radius-'. $radiusKind. ' is read where it should not be: '. implode( ' | ', array_diff( $radiusFound, $radiusExpected ) ). '; not read where it should be: '. implode( ' | ', array_diff( $radiusExpected, $radiusFound ) );
+}
+check( 'every surface reads the token of its kind as its border-radius - the picture, the box of a parallax and the scrim of a padded cover, a row that paints a ground or holds a picture, a column that paints a ground or holds a picture, a card and its picture, the frame of the image component - and no other rule reads one'
+	. ( $radiusWrong === [] ? '' : ' - '. implode( '; ', $radiusWrong ) ), $radiusWrong === [] );
+
+// The exception of one element: two classes, and a rule for each kind and each class, on the element of its kind and setting the token of that kind and no other
+$radiusElement = [
+	'cover'		=> [ '.nino-cover--padded' ],
+	'row'			=> [ '.nino-grid-row' ],
+	'column'	=> array_merge( array_map( static fn( string $ground ): string => '.nino-grid--'. $ground, $radiusGrounds ), [ ':has(> .nino-grid-bg)' ] ),
+	'card'		=> [ '.nino-card' ],
+	'image'		=> [ '.nino-image' ],
+];
+$radiusClasses = [ '.nino-radius' => 'var(--radius-surface)', '.nino-radius-alt' => 'var(--radius-surface-alt)' ];
+$radiusRules = [];
+foreach( $groundBlocks as [ , $radiusList, $radiusBody ] )
+	foreach( $groundSplit( $radiusList ) as $radiusSelector )
+		if( preg_match( '/\.nino-radius(?:-alt)?$/', $radiusSelector ) === 1 )
+			$radiusRules[] = [ $radiusSelector, trim( $radiusBody ) ];
+$radiusWrong = [];
+$radiusSeen = [];
+foreach( $radiusRules as [ $radiusSelector, $radiusBody ] ) {
+	$radiusClass = str_ends_with( $radiusSelector, '-alt' ) === true ? '.nino-radius-alt' : '.nino-radius';
+	if( preg_match( '/^--radius-('. implode( '|', $radiusKinds ). ')\s*:\s*(var\(--radius-surface(?:-alt)?\))\s*;?$/', $radiusBody, $radiusParts ) !== 1 ) {
+		$radiusWrong[] = $radiusSelector. ' sets more than the token of one kind';
+		continue;
+	}
+	$radiusOuter = substr( $radiusSelector, 0, -strlen( $radiusClass ) );
+	$radiusSeen[$radiusParts[1]][] = $radiusClass;
+	if( $radiusParts[2] !== $radiusClasses[$radiusClass] )
+		$radiusWrong[] = $radiusSelector. ' sets the other strength';
+	foreach( $radiusElement[$radiusParts[1]] as $radiusNeedle )
+		if( str_contains( $radiusOuter, $radiusNeedle ) === false )
+			$radiusWrong[] = $radiusSelector. ' does not name '. $radiusNeedle;
+	if( preg_match( '/[\s>+~]/', (string) preg_replace( '/\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)/', '', $radiusOuter ) ) === 1 )
+		$radiusWrong[] = $radiusSelector. ' reaches below its element';
+}
+foreach( $radiusKinds as $radiusKind ) {
+	$radiusOnes = $radiusSeen[$radiusKind] ?? [];
+	sort( $radiusOnes );
+	if( $radiusOnes !== [ '.nino-radius', '.nino-radius-alt' ] )
+		$radiusWrong[] = '--radius-'. $radiusKind. ' has the classes: '. implode( ' ', $radiusOnes );
+}
+check( 'the exception of one element is two classes, nino-radius and nino-radius-alt: ten rules, one for each of the five kinds and each class, on the element of its kind - a column is one that paints any ground or holds a picture - setting the token of that kind and no other - to the strength the class names - so that a class on a column reaches no card in it'
+	. ( $radiusWrong === [] ? '' : ' - '. implode( '; ', $radiusWrong ) ), $radiusWrong === [] && count( $radiusRules ) === 10 );
+$radiusWrong = [];
+foreach( $groundBlocks as [ , $radiusList, $radiusBody ] )
+	if( preg_match( '/var\(\s*--radius-surface(?:-alt)?\s*\)/', $radiusBody ) === 1 )
+		foreach( $groundSplit( $radiusList ) as $radiusSelector )
+			if( $radiusSelector !== ':root' && preg_match( '/\.nino-radius(?:-alt)?$/', $radiusSelector ) !== 1 )
+				$radiusWrong[] = $radiusSelector;
+check( '...a surface reads its kind and never a strength: the two strengths are read by the tokens of the kinds in :root and by the ten rules of the exception, and by no other rule'
+	. ( $radiusWrong === [] ? '' : ' - '. implode( ' | ', $radiusWrong ) ), $radiusWrong === [] );
+
+// The frame of the image component has the corners of its kind and no other: a rule that names it, or a modifier of it, and says a radius says the token of the image kind
+$radiusWrong = [];
+foreach( $groundBlocks as [ , $radiusList, $radiusBody ] )
+	foreach( $groundSplit( $radiusList ) as $radiusSelector )
+		if( preg_match( '/\.nino-image(?!\w)/', $radiusSelector ) === 1 && preg_match( '/(?<![\w-])border-radius\s*:/', $radiusBody ) === 1
+			&& preg_match( '/(?<![\w-])border-radius\s*:\s*var\(\s*--radius-image\s*\)\s*(?:;|$)/', $radiusBody ) !== 1 )
+			$radiusWrong[] = $radiusSelector;
+check( 'a picture is a surface like the others: the frame of the image component has no radius of its own, and no modifier of it has one - every rule that names the frame and says a border-radius says the token of the image kind'
+	. ( $radiusWrong === [] ? '' : ' - '. implode( ' | ', $radiusWrong ) ), $radiusWrong === [] );
 
 echo "\n";
 
@@ -1396,12 +1517,19 @@ check( 'the registry has the image of a card: labelled in both languages, a pict
 check( '...its style is the one choice of a card\'s picture, a variant that is none or inline - the class nino-card-img--inline - and its alt text, focus and ratio are those of [image] word for word, the hints with them',
 	array_keys( $registryOf( 'card-image' )['attributes'] ) === [ 'style', 'alt', 'focus', 'ratio' ]
 	&& $registryOf( 'card-image' )['attributes']['style'] === [ 'type' => 'variant', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ], 'hint' => '', 'options' => [ '', 'inline' ], 'prefix' => 'nino-card-img--', 'default' => '' ]
-	&& array_diff_key( $registryOf( 'card-image' )['attributes'], [ 'style' => 1 ] ) === array_diff_key( $registryOf( 'image' )['attributes'], [ 'style' => 1 ] ) );
-check( '[image] has a style, the first of its attributes: a variant that is none or rounded - the class nino-image--rounded - and a place in the registry the style of a card\'s picture does not share',
-	array_keys( $registryOf( 'image' )['attributes'] ) === [ 'style', 'alt', 'focus', 'ratio' ]
-	&& $registryOf( 'image' )['attributes']['style'] === [ 'type' => 'variant', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ], 'hint' => '', 'options' => [ '', 'rounded' ], 'prefix' => 'nino-image--', 'default' => '' ]
-	&& \Nino\Modules\Components::defaults( $appData, 'image' ) === [ 'style' => '', 'alt' => '', 'focus' => '', 'ratio' => '', 'href' => '', 'target' => '', 'class' => '' ]
+	&& array_diff_key( $registryOf( 'card-image' )['attributes'], [ 'style' => 1 ] ) === $registryOf( 'image' )['attributes'] );
+check( '[image] has no style: its attributes are the alt text, the focus and the ratio, in that order, and its defaults say none - the radius of its frame is the one of its kind, or the other strength where a class of its own says so',
+	array_keys( $registryOf( 'image' )['attributes'] ) === [ 'alt', 'focus', 'ratio' ]
+	&& \Nino\Modules\Components::defaults( $appData, 'image' ) === [ 'alt' => '', 'focus' => '', 'ratio' => '', 'href' => '', 'target' => '', 'class' => '' ]
 	&& \Nino\Modules\Components::defaults( $appData, 'card-image' ) === [ 'style' => '', 'alt' => '', 'focus' => '', 'ratio' => '', 'href' => '', 'target' => '', 'class' => '' ] );
+// The frame of [image] is drawn by Nino.css for what the component can write: every modifier the stylesheet has for it is a ratio of the registry, and every ratio has its modifier
+preg_match_all( '/\.nino-image--([\w-]+)/', $hookCss, $imageModifiers );
+$imageModifiers = array_values( array_unique( $imageModifiers[1] ) );
+$imageRatios = array_values( array_filter( $registryOf( 'image' )['attributes']['ratio']['options'], static fn( string $ratio ): bool => $ratio !== '' ) );
+sort( $imageModifiers );
+sort( $imageRatios );
+check( '...and the modifiers of its frame in Nino.css are the ratios it can write, no more and no fewer: the stylesheet and the registry say the same words'
+	. ( $imageModifiers === $imageRatios ? '' : ' - the stylesheet says '. implode( ' ', $imageModifiers ). ', the registry '. implode( ' ', $imageRatios ) ), $imageRatios !== [] && $imageModifiers === $imageRatios );
 // The icons of the fifteen: each component of the kernel is shown by the parts of a 24 by 24 icon of Lucide, which the registry hands to a tool
 $iconTags = [ 'path' => [ [ 'd' ], [] ], 'circle' => [ [ 'cx', 'cy', 'r' ], [] ], 'ellipse' => [ [ 'cx', 'cy', 'rx', 'ry' ], [] ], 'rect' => [ [ 'x', 'y', 'width', 'height' ], [ 'rx', 'ry' ] ],
 	'line' => [ [ 'x1', 'y1', 'x2', 'y2' ], [] ], 'polyline' => [ [ 'points' ], [] ], 'polygon' => [ [ 'points' ], [] ] ];
@@ -1893,17 +2021,16 @@ check( '[image] in a stack: an image field is the file it holds, its size is the
 check( '...a slot still works there, and a name that is neither a field nor a slot renders nothing', str_contains( $image, '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="">' ) === true && substr_count( $image, '<img' ) === 2 );
 check( '...and an image field with no file renders nothing', substr_count( $render( '[stack /services sort="title" limit="1"][image image][/stack]' ), '<img' ) === 0 );
 
-// The style of [image]: the frame is what rounds a picture, so a style makes the frame, and is the frame's
+// The class of [image]: the frame is what cuts a picture, so a class makes the frame, and is the frame's
 $slotImg = '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="">';
-check( '[image style="rounded"] is framed, the frame carries the class of the style - behind the ratio and the focus, before a class of its own - and the <img> in it has none',
-	$render( '[image /template/page-home/hero/background style="rounded"]' ) === '<div class="nino-image nino-image--rounded">'. $slotImg. '</div>'
-	&& $render( '[image /template/page-home/hero/background ratio="16-9" focus="5" style="rounded" class="x"]' ) === '<div class="nino-image nino-image--16-9 nino-img-focus--5 nino-image--rounded x">'. $slotImg. '</div>'
-	&& $render( '[image /template/page-home/hero/background class="x"]' ) === '<div class="nino-image x">'. $slotImg. '</div>' );
-check( '...a style outside the options is none: the bare <img> - the class of a style is no value of it, nor is the style of a card\'s picture one of [image]\'s',
+check( '[image] with a class of its own is framed, the frame carries it - behind the ratio and the focus - and the <img> in it has none: nino-image is the element the exception of the image kind names, nino-radius and nino-radius-alt the classes it is written as',
+	$render( '[image /template/page-home/hero/background class="x"]' ) === '<div class="nino-image x">'. $slotImg. '</div>'
+	&& $render( '[image /template/page-home/hero/background ratio="16-9" focus="5" class="nino-radius-alt"]' ) === '<div class="nino-image nino-image--16-9 nino-img-focus--5 nino-radius-alt">'. $slotImg. '</div>'
+	&& isset( $groundEach['.nino-image.nino-radius'], $groundEach['.nino-image.nino-radius-alt'] ) === true );
+check( '...[image] has no style: one written on it is an attribute that is not declared and is ignored, the picture is the bare <img> as without it - and the style of a card\'s picture is none of [image]\'s',
 	$render( '[image /template/page-home/hero/background style="weird"]' ) === $slotImg
 	&& $render( '[image /template/page-home/hero/background style="inline"]' ) === $slotImg
-	&& $render( '[image /template/page-home/hero/background style="nino-image--rounded"]' ) === $slotImg
-	&& $render( '[image /template/page-home/hero/background style="rounded" alt="B"]' ) === '<div class="nino-image nino-image--rounded"><img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="B"></div>' );
+	&& $render( '[image /template/page-home/hero/background style="weird" alt="B"]' ) === '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="B">' );
 // [card-image]: the picture of a card is the <img> of nino-card-img - or, cropped, the frame, which carries the class
 check( '[card-image] is the <img> of the slot with the class nino-card-img - the class attribute is there because there is a class to write - and the class of the style and a class of its own follow it',
 	$render( '[card-image /template/page-home/hero/background alt="A"]' ) === '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="A" class="nino-card-img">'
@@ -1914,12 +2041,15 @@ check( '...a focus or a ratio puts it in the frame of [image], which carries nin
 	$render( '[card-image /template/page-home/hero/background ratio="4-3" focus="3"]' ) === '<div class="nino-image nino-image--4-3 nino-img-focus--3 nino-card-img">'. $slotImg. '</div>'
 	&& $render( '[card-image /template/page-home/hero/background focus="5" style="inline" class="x"]' ) === '<div class="nino-image nino-img-focus--5 nino-card-img nino-card-img--inline x">'. $slotImg. '</div>'
 	&& $render( '[card-image /template/page-home/hero/background ratio="21-9"]' ) === '<div class="nino-image nino-image--21-9 nino-card-img">'. $slotImg. '</div>' );
-check( '...a style that is [image]\'s is none of it, a focus or a ratio that is none is none, and the alt text, the slot with no file and the content form are those of [image]',
-	$render( '[card-image /template/page-home/hero/background style="rounded" focus="12" ratio="2-1"]' ) === $render( '[card-image /template/page-home/hero/background]' )
+check( '...a style outside its options is none, a focus or a ratio that is none is none, and the alt text, the slot with no file and the content form are those of [image]',
+	$render( '[card-image /template/page-home/hero/background style="weird" focus="12" ratio="2-1"]' ) === $render( '[card-image /template/page-home/hero/background]' )
 	&& $render( '[card-image /template/page-home/hero/withalt alt="Own"]' ) === '<img src="/public/images/alt.800x600.jpg" width="800" height="600" alt="Stored &quot;alt&quot; &#91;x]" class="nino-card-img">'
 	&& $render( '[card-image /template/page-home/hero/empty]' ) === '' && $render( '[card-image /template/page-home/nope/nope]' ) === ''
 	&& $render( '[card-image /template/page-home/hero/background]<meta content="[[src]]" data-size="[[width]]x[[height]]">[/card-image]' ) === '<meta content="/public/images/bg.1600x900.jpg" data-size="1600x900">' );
 $cardImage = $render( '[stack /services sort="title" offset="1" limit="1"][card][card-image image focus="2"][card-image /template/page-home/hero/background][card-image nope][/card][/stack]' );
+check( '...the frame of a card\'s picture carries nino-image as well, and the rule of the image kind leaves it out: its radius is the card\'s',
+	str_contains( $render( '[card-image /template/page-home/hero/background focus="5"]' ), '<div class="nino-image nino-img-focus--5 nino-card-img">' ) === true
+	&& isset( $groundEach['.nino-image:not(.nino-card-img)'] ) === true );
 check( '...in a stack the image field is the file it holds, with its alt text, framed and bare, and a name that is neither a field nor a slot renders nothing',
 	str_contains( $cardImage, '<div class="nino-image nino-img-focus--2 nino-card-img"><img src="/public/images/services/web/image.webp" width="400" height="300" alt="Alt &quot;q&quot;"></div>' ) === true
 	&& str_contains( $cardImage, '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="" class="nino-card-img">' ) === true && substr_count( $cardImage, '<img' ) === 2 );
@@ -1927,7 +2057,7 @@ check( '...in a stack the image field is the file it holds, with its alt text, f
 $emptyClass = static fn( string $html ): bool => preg_match( '/\sclass=""/', $html ) === 1;
 $classForms = [
 	'[image /template/page-home/hero/background]', '[image uri="/template/page-home/hero/background" alt="B"]', '[image /template/page-home/hero/background focus="5" ratio="16-9" class="x"]',
-	'[image /template/page-home/hero/background style="rounded"]', '[card-image /template/page-home/hero/background]', '[card-image /template/page-home/hero/background ratio="4-3"]',
+	'[image /template/page-home/hero/background class="nino-radius-alt"]', '[card-image /template/page-home/hero/background]', '[card-image /template/page-home/hero/background ratio="4-3"]',
 	'[card background="/template/page-home/hero/background" focus="3"]x[/card]', '[stack /services sort="title"][card background="image"][image image][card-image image][/card][/stack]',
 ];
 check( 'no form of [image], [card-image] or [card] writes an empty class attribute: it is there where there is a class to write and nowhere else',

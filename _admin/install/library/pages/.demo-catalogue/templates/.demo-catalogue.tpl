@@ -85,6 +85,7 @@
 				<a href="#bewegungsvarianten" class="nino-btn nino-btn--outline nino-btn--small">Motion, all variants</a>
 				<a href="#raster-fest" class="nino-btn nino-btn--outline nino-btn--small">Grid without breakpoint</a>
 				<a href="#karten-fest" class="nino-btn nino-btn--outline nino-btn--small">Cards without breakpoint</a>
+				<a href="#radius" class="nino-btn nino-btn--outline nino-btn--small">Radius of a surface</a>
 			</p>
 		</div>
 	</div>
@@ -2081,9 +2082,9 @@
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-mb-2">
 			<h3 class="nino-section-title nino-text-left" id="bilder-title">Images</h3>
-			<p class="nino-section-subtitle nino-text-left">An image fills its box while preserving its important crop — nine focal points, like a numeric keypad. A frame cuts it to a shape and may round its corners.</p>
+			<p class="nino-section-subtitle nino-text-left">An image fills its box while preserving its important crop — nine focal points, like a numeric keypad. A frame cuts it to a shape and gives it the radius of the image kind.</p>
 		</div>
-		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-img-cover</span> <span class="nino-badge nino-badge--pill">.nino-img-focus--1 … --9</span> <span class="nino-badge nino-badge--pill">.nino-img-background</span> <span class="nino-badge nino-badge--pill">.nino-img-background--dim</span> <span class="nino-badge nino-badge--pill">.nino-img-background-content</span> <span class="nino-badge nino-badge--pill">.nino-image--rounded</span></div>
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-img-cover</span> <span class="nino-badge nino-badge--pill">.nino-img-focus--1 … --9</span> <span class="nino-badge nino-badge--pill">.nino-img-background</span> <span class="nino-badge nino-badge--pill">.nino-img-background--dim</span> <span class="nino-badge nino-badge--pill">.nino-img-background-content</span> <span class="nino-badge nino-badge--pill">.nino-radius-alt</span></div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-pr-2 nino-mb-3">
 			<div class="nino-grid-row">
 				<div class="nino-grid-33 nino-grid-m-33 nino-p-1"><div class="nino-img-cover nino-img-focus--1"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy"></div><p class="nino-section-text--quiet nino-text-center">--1</p></div>
@@ -2106,8 +2107,8 @@
 				</div>
 			</div>
 		</div>
-		<div class="nino-grid-100 nino-grid-m-50 nino-p-1"><div class="nino-image nino-image--rounded"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="" loading="lazy" width="1200" height="800"></div><p class="nino-section-text--quiet nino-text-center">.nino-image--rounded</p></div>
-		<div class="nino-grid-100 nino-grid-m-50 nino-p-1"><div class="nino-image nino-image--4-3 nino-img-focus--3 nino-image--rounded"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy" width="1200" height="800"></div><p class="nino-section-text--quiet nino-text-center">.nino-image--rounded, cut to 4:3 with the focus on the right</p></div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-p-1"><div class="nino-image"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="" loading="lazy" width="1200" height="800"></div><p class="nino-section-text--quiet nino-text-center">.nino-image, at the radius of its kind</p></div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-p-1"><div class="nino-image nino-image--4-3 nino-img-focus--3 nino-radius-alt"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy" width="1200" height="800"></div><p class="nino-section-text--quiet nino-text-center">.nino-radius-alt, cut to 4:3 with the focus on the right</p></div>
 	</div>
 </section>
 
@@ -2639,6 +2640,54 @@
 				<div class="nino-grid-50 nino-p-1 nino-vpa nino-vpa--repeat nino-vpa--speed-fast"><p class="nino-alert nino-text-center"><small>--speed-fast</small></p></div>
 				<div class="nino-grid-50 nino-p-1 nino-vpa nino-vpa--repeat nino-vpa--speed-medium"><p class="nino-alert nino-text-center"><small>--speed-medium</small></p></div>
 			</div>
+		</div>
+	</div>
+</section>
+
+<section class="nino-section nino-mt-0 nino-mb-0" id="radius" aria-labelledby="radius-title">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100 nino-mb-2">
+			<h3 class="nino-section-title nino-text-left" id="radius-title">Radius of a surface</h3>
+			<p class="nino-section-subtitle nino-text-left">Two strengths for the whole page, the standard and the alternative, and a default for each kind of surface: a padded cover, a row, a column, a card and a picture. A class on one element takes the other strength; what stands in it follows.</p>
+		</div>
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-radius</span> <span class="nino-badge nino-badge--pill">.nino-radius-alt</span></div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-grid-l-25 nino-p-1">
+			<div class="nino-grid-100 nino-grid--alt nino-radius-alt">
+				<p class="nino-section-text">A column on alt, .nino-radius-alt.</p>
+				<article class="nino-card nino-card--counter"><p>A card in it keeps the radius of its kind.</p></article>
+			</div>
+		</div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-grid-l-25 nino-p-1">
+			<article class="nino-card nino-card--alt nino-radius-alt"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="" loading="lazy" class="nino-card-img nino-card-img--maxheight"><div class="nino-card-content"><h4 class="nino-card-title">A card</h4><div class="nino-card-descr">.nino-radius-alt, and so on its picture.</div></div></article>
+		</div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-grid-l-25 nino-p-1">
+			<div class="nino-image nino-image--4-3 nino-radius-alt"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy" width="1200" height="800"></div><p class="nino-section-text--quiet nino-text-center">A picture, .nino-radius-alt</p>
+		</div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-grid-l-25 nino-p-1">
+			<div class="nino-grid-row nino-grid-row--alt nino-radius-alt"><div class="nino-grid-100"><p class="nino-section-text">A row on alt, .nino-radius-alt.</p></div></div>
+		</div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-grid-l-25 nino-p-1">
+			<div class="nino-grid-100 nino-grid--alt nino-radius">
+				<p class="nino-section-text">A column on alt, .nino-radius.</p>
+				<article class="nino-card nino-card--counter"><p>A card in it keeps the radius of its kind.</p></article>
+			</div>
+		</div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-grid-l-25 nino-p-1">
+			<article class="nino-card nino-card--alt nino-radius"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="" loading="lazy" class="nino-card-img nino-card-img--maxheight"><div class="nino-card-content"><h4 class="nino-card-title">A card</h4><div class="nino-card-descr">.nino-radius, and so on its picture.</div></div></article>
+		</div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-grid-l-25 nino-p-1">
+			<div class="nino-image nino-image--4-3 nino-radius"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy" width="1200" height="800"></div><p class="nino-section-text--quiet nino-text-center">A picture, .nino-radius</p>
+		</div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-grid-l-25 nino-p-1">
+			<div class="nino-grid-row nino-grid-row--alt nino-radius"><div class="nino-grid-100"><p class="nino-section-text">A row on alt, .nino-radius.</p></div></div>
+		</div>
+	</div>
+</section>
+<section id="radius-cover" class="nino-section nino-section--dark nino-cover nino-cover--dim nino-cover--padded nino-radius-alt nino-img-focus--5 nino-mt-0 nino-mb-0" data-cover-height="40" aria-labelledby="radius-cover-title">
+	<img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="">
+	<div class="nino-cover-content">
+		<div class="nino-grid-row">
+			<div class="nino-grid-100 nino-text-center"><h3 class="nino-section-title" id="radius-cover-title">A padded cover</h3><p class="nino-section-text">.nino-radius-alt: the picture and its scrim take the alternative strength.</p></div>
 		</div>
 	</div>
 </section>

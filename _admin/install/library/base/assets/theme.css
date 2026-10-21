@@ -630,7 +630,20 @@
 @media (min-width: 768px) { :root { --nino-base-size: 112.5%; } }
 
 /* ==== 6. the page ==== */
-/* a row of the width Nino.css gives it, the air it has, and the animation Nino.css has */
+:root {
+	--radius-surface: .1rem;
+	--radius-surface-alt: .4rem;
+	--radius-cover: var(--radius-surface);
+	--radius-cover-default: standard;
+	--radius-row: var(--radius-surface);
+	--radius-row-default: standard;
+	--radius-column: var(--radius-surface);
+	--radius-column-default: standard;
+	--radius-card: var(--radius-surface);
+	--radius-card-default: standard;
+	--radius-image: var(--radius-surface);
+	--radius-image-default: standard;
+}
 
 /* ==== 7. header: classic-default ==== */
 /*	@name				Classic, default
@@ -752,7 +765,7 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 }
 
 
-/* ==== 9. content: regular (hero-title default, hero-text default, quiet default, loud default, section-title default, section-subtitle default, section-space default, section-line default, card-title default, card-subtitle default, card-space default, corners default, border default, shadow default) ==== */
+/* ==== 9. content: regular (hero-title default, hero-text default, quiet default, loud default, section-title default, section-subtitle default, section-space default, section-line default, card-title default, card-subtitle default, card-space default, border default, shadow default) ==== */
 /*	@name			Regular
  *	@description	The framework as it is: the middle of every ladder. Hero, sections and cards as Nino.css draws them.
  *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Hero, Sektionen und Karten, wie Nino.css sie zeichnet.
@@ -768,7 +781,6 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
  *	@knob	card-title			Size of the title of a card
  *	@knob	card-subtitle		Size of the subtitle of a card
  *	@knob	card-space			Space inside a card and between its parts
- *	@knob	corners				Corners of a card
  *	@knob	border				Line round a card that has a ground
  *	@knob	shadow				Shadow of a card
  *
@@ -890,15 +902,6 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 	--content-card-space--more: 		var(--space-3);
 	--content-card-space--most: 		var(--space-4);
 
-	/*	The kernel's radii are .1rem, .2rem and .4rem. Between 0 and .1rem there
-		is nothing worth a position, so the sharp end is a plateau: the two least
-		are square. The ends are well apart, a corner and a curve	*/
-	--content-corners--least: 				0rem;
-	--content-corners--less: 					0rem;
-	--content-corners--default: 			var(--radius-small);
-	--content-corners--more: 					var(--radius-large);
-	--content-corners--most: 					1rem;
-
 	/*	The line round a card that names a ground - a plain card has none. The
 		half pixel is a hairline where the screen can draw one, and a line of
 		1px where it cannot	*/
@@ -988,32 +991,6 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 	margin-bottom: calc( var(--content-card-space) / 2 * var(--whitespace-text, 1) );
 }
 
-/*	A card, its picture inside it, a column that paints a ground or holds a picture
-	and the picture of a padded cover - rounded as the corners knob says, the
-	pictures and the grounds at .7 of a card's corner. The padded cover says the
-	selectors of Nino.css again, with the same weight, since a rule of the design
-	layer that came after them has to win against each of them: the picture, the
-	box of a parallax and the scrim of a dimmed cover, which has the inset of the
-	picture and so its corners	*/
-.nino-card {
-	border-radius: var(--content-corners);
-}
-.nino-card-img {
-	border-radius: calc( var(--content-corners) * .7 );
-}
-.nino-card--fullwidth .nino-card-img {
-	border-radius: var(--content-corners) var(--content-corners) 0 0;
-}
-.nino-grid-bg, .nino-grid--alt, .nino-grid--tint, .nino-grid--dark, .nino-grid--black, .nino-grid--primary, .nino-grid--brand-alt, .nino-grid--counter, .nino-grid--dim,
-.nino-cover--padded > .nino-section-bg, .nino-cover--padded:not(.nino-parallex) > img, .nino-cover--padded.nino-cover--dim::before, .nino-cover--padded.nino-parallex--dim::before {
-	border-radius: calc( var(--content-corners) * .7 );
-}
-/*	A picture that asks to be rounded (nino-image--rounded) takes the corners of a
-	card twice, where Nino.css gives it --radius-large: the corners knob rounds it
-	further	*/
-.nino-image--rounded {
-	border-radius: calc( var(--content-corners) * 2 );
-}
 .nino-card--alt, .nino-card--tint, .nino-card--dark, .nino-card--black, .nino-card--primary, .nino-card--brand-alt, .nino-card--counter, .nino-card--dim {
 	border-width: var(--content-border);
 }
@@ -1394,7 +1371,6 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 	--content-card-space: var(--content-card-space--default);
 	--content-card-subtitle: var(--content-card-subtitle--default);
 	--content-card-title: var(--content-card-title--default);
-	--content-corners: var(--content-corners--default);
 	--content-hero-text: var(--content-hero-text--default);
 	--content-hero-title: var(--content-hero-title--default);
 	--content-loud: var(--content-loud--default);
