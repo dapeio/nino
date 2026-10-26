@@ -30,6 +30,13 @@
 		// the Elements form names by it too)
 		KEY_WORDS 			: [ 'title', 'subtitle', 'text', 'description', 'image', 'alt', 'caption', 'link', 'label', 'name', 'email', 'phone', 'address', 'date', 'author', 'price', 'icon' ],
 
+		// The type a field of such a word most often has - a picture for the image
+		// and the icon, a date for the date, a number with decimals for the price,
+		// text for the rest: choosing the word puts its type on the select of the
+		// field, which can be changed after. Each is one of the field types the
+		// server lists
+		KEY_TYPES 			: { title : 'string', subtitle : 'string', text : 'string', description : 'string', image : 'image', alt : 'string', caption : 'string', link : 'string', label : 'string', name : 'string', email : 'string', phone : 'string', address : 'string', date : 'date', author : 'string', price : 'double', icon : 'image' },
+
 		_types 					: [],
 		_fieldTypes 		: [],
 		// The field types a unit/suffix applies to, as the server states them
@@ -308,8 +315,20 @@
 				const word = keySelect.value;
 				keyInput.hidden = ( word !== '' );
 
-				if( word !== '' )
+				if( word !== '' ) {
+
 					keyInput.value = word;
+
+					// The word says what the field is: its type follows, and the options of
+					// that type with it - the same change a pick on the type select makes.
+					// An own key leaves the type as it is
+					const type = Nino.admin.types.KEY_TYPES[word];
+
+					if( Nino.admin.types._fieldTypes.indexOf( type ) !== -1 && typeSelect.value !== type ) {
+						typeSelect.value = type;
+						typeSelect.dispatchEvent( new wn.Event( 'change' ) );
+					}
+				}
 				else
 					keyInput.focus();
 

@@ -1369,11 +1369,15 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 }
 
 /*	A column that paints a ground keeps its content off the colour, and has the
-	radius of its kind, --radius-column, where a card has its own. The cards in it
-	take the counter of its ground	*/
+	radius of its kind, --radius-column, where a card has its own - and cuts what
+	is in it at that radius: a picture or a ground of a child that reaches its edge
+	(nino-p-0) would otherwise stand out of the corner. clip, not hidden: nothing
+	scrolls in it, and it makes no box of its own for the margins and the floats
+	inside. The cards in it take the counter of its ground	*/
 .nino-grid--alt, .nino-grid--tint, .nino-grid--dark, .nino-grid--black, .nino-grid--primary, .nino-grid--brand-alt, .nino-grid--counter, .nino-grid--dim {
 	padding: var(--space-2);
 	border-radius: var(--radius-column);
+	overflow: clip;
 }
 .nino-grid--dark {
 	--counter-card-bg: var(--color-section-black-bg);
@@ -1481,11 +1485,14 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	heavy, as the base rule of the row before it, the grounds in its list and
 	the padding classes at the end of the file are, so that the order decides -
 	and nino-pt-2 or nino-pl-0 on such a row says what it says, where the two
-	classes of :has() would have beaten it wherever it stood	*/
+	classes of :has() would have beaten it wherever it stood. It cuts what is in
+	it at its radius, as a column does, so that a column with a ground of its own
+	at the edge of the row (nino-p-0) does not stand out of the corner	*/
 .nino-grid-row--alt, .nino-grid-row--tint, .nino-grid-row--dark, .nino-grid-row--black, .nino-grid-row--primary, .nino-grid-row--brand-alt, .nino-grid-row--counter, .nino-grid-row--dim,
 .nino-grid-row:where(:has(> .nino-grid-row-bg)) {
 	padding: calc(var(--space-3) * var(--whitespace-scale)) var(--grid-gutter);
 	border-radius: var(--radius-row);
+	overflow: clip;
 }
 
 /*	A section title and a section subtitle take the size of their role times a
@@ -1602,19 +1609,29 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	--color-accent: var(--color-accent-black);
 }
 
-.nino-section--border-1 { border-bottom: 1px solid rgba(0,0,0,.1); }
-.nino-section--border-2 { border-bottom: .25rem solid rgba(0,0,0,.1); }
-.nino-section--border-3 { border-bottom: .5rem solid rgba(0,0,0,.1); }
-.nino-section--dark.nino-section--border-1,
-.nino-section--dark.nino-section--border-2,
-.nino-section--dark.nino-section--border-3,
-.nino-section--black.nino-section--border-1,
-.nino-section--black.nino-section--border-2,
-.nino-section--black.nino-section--border-3 {
-	border-color: rgba(255,255,255,.1);
+/*	The rule under a section. The strength, .nino-section--border-1 to -3, is its
+	thickness and says nothing of its colour; the colour is --section-border-color,
+	which is the faint dark line, rgba(0,0,0,.1), where nothing sets it, the faint
+	light one on a dark or a black section that has a rule, and the brand colour
+	where the section says nino-section--border-primary. Three classes used to set
+	one property between them, and the dark rule - two classes heavy - beat the
+	brand colour on a dark and a black section, whichever way round the classes
+	stood. Now the dark and the black rule is asked for in :where() and stands at
+	one class, as the brand colour does, and the colour that comes after it wins.
+	The variable is inherited like any other: a container that sets it colours the
+	rules in it that set none of their own	*/
+.nino-section--border-1 { border-bottom-width: 1px; border-bottom-style: solid; }
+.nino-section--border-2 { border-bottom-width: .25rem; border-bottom-style: solid; }
+.nino-section--border-3 { border-bottom-width: .5rem; border-bottom-style: solid; }
+.nino-section--border-1, .nino-section--border-2, .nino-section--border-3 {
+	border-bottom-color: var(--section-border-color, rgba(0,0,0,.1));
+}
+.nino-section--dark:where(.nino-section--border-1, .nino-section--border-2, .nino-section--border-3),
+.nino-section--black:where(.nino-section--border-1, .nino-section--border-2, .nino-section--border-3) {
+	--section-border-color: rgba(255,255,255,.1);
 }
 .nino-section--border-primary {
-	border-color:var(--color-primary);
+	--section-border-color: var(--color-primary);
 }
 
 @media (min-width: 768px) {
@@ -1634,12 +1651,17 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	.nino-section:has(> .nino-grid-row.nino-pr-0) { padding-right: 0; }
 }
 
+/*	A card has the radius of its kind and cuts what is in it at it: the picture of
+	a card that reaches the edge (nino-p-0) is cut at the corner of the card and
+	not at its own, which is the smaller one, and so are a ground and a picture
+	behind the content. clip, not hidden, as for a column	*/
 .nino-card {
 	margin: 0 0 calc(var(--space-1) * var(--whitespace-scale));
 	padding: 0 0 calc(var(--space-1) * var(--whitespace-scale));
 	box-sizing: border-box;
 	border-radius: var(--radius-card);
 	box-shadow: var(--shadow-card);
+	overflow: clip;
 }
 .nino-card--fullwidth, .nino-card--fullwidth:is(.nino-card--alt, .nino-card--tint, .nino-card--dark, .nino-card--black, .nino-card--primary, .nino-card--brand-alt, .nino-card--counter, .nino-card--dim) {
 	padding-left: 0;
@@ -1755,6 +1777,13 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	padding-top: calc(var(--space-1) * var(--whitespace-scale));
 	box-sizing: border-box;
 }
+/*	The block pads the content only where the card does not pad it: a card with
+	no padding of its own (nino-p-0), a fullwidth card, whose sides and top are 0,
+	and a counter card, whose block stands beside its counter. In every other
+	card the padding of the card is the inset of its content, so that a card
+	[card] draws stands as it stood before it drew the block. :where() keeps the
+	weight at the two classes of the path	*/
+.nino-card:where(:not(.nino-p-0, .nino-card--fullwidth, .nino-card--counter)) > .nino-card-content { padding: 0; }
 
 .nino-card-title {
 	font-family: var(--fontfamily-title);
@@ -1808,15 +1837,21 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 .nino-card-descr--quiet { font-size: calc( var(--font-text-size) * var(--scale-quiet) ); opacity: .8; }
 .nino-card-descr--loud { font-size: calc( var(--font-text-size) * var(--scale-loud) ); line-height: calc( var(--font-text-size) * var(--scale-loud) *1.4 ); }
 
-/*	The colour of a title, a subtitle or a text: one of the inks the ground it
-	stands on resolves - --color-subtitle, the quiet one, and --color-accent,
-	the brand as ink on that ground - and so a role and never a colour. There is
-	no light and no dark and no status colour among them: a ground says what is
-	light on it, and the word that is white on a dark section is dark on the
-	next. After every rule of a title, a subtitle and a text, which set the
+/*	The colour of a title, a subtitle or a text: one of two inks, and so a role
+	and never a colour. muted is the ink the text inherits, at four fifths of its
+	strength - currentColor in the color property is the inherited colour, mixed
+	with nothing - so that it fades on any ground, a dark or a primary one
+	included, where the quiet ink of the ground (--color-subtitle) is the ink
+	itself there. It is the colour that fades and not the box, as an opacity would
+	have it: what stands in the text with a ground of its own keeps it. A title or
+	a subtitle that says muted takes that ink in place of the colour of its own
+	role. accent is --color-accent, the brand as ink on that ground.
+	There is no light and no dark and no status colour among them: a ground says
+	what is light on it, and the word that is white on a dark section is dark on
+	the next. After every rule of a title, a subtitle and a text, which set the
 	colour of their own at the specificity of one class, so that these are the
 	ones that win	*/
-.nino-ink--muted { color: var(--color-subtitle); }
+.nino-ink--muted { color: color-mix(in srgb, currentColor 80%, transparent); }
 .nino-ink--accent { color: var(--color-accent); }
 
 .nino-card-img--maxheight {
@@ -1904,7 +1939,14 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	no picture. The margins of the items of a flex column do not collapse, though: a
 	spacer keeps its whole top margin, and two buttons that stood side by side stand
 	one under the other. A flex item is stretched over the column; a button is as wide
-	as its label and sits where the text does, as in the stack above	*/
+	as its label and sits where the text does, as in the stack above.
+
+	A card that [card] draws holds its picture and a div, .nino-card-content, with all
+	the rest in it. In the middle and at the bottom it is the group of the two that
+	stands there. With last-bottom the div takes the height that is left and is a
+	flex column itself, so that it is its last element that is pushed down and
+	the picture, above it, stays at the top - the rules for the pieces of a card
+	that stand in the card itself go on being what a hand-written card has	*/
 .nino-card--middle, .nino-card--bottom, .nino-card--last-bottom {
 	display: flex;
 	flex-direction: column;
@@ -1912,9 +1954,14 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 .nino-card--middle { justify-content: center; }
 .nino-card--bottom { justify-content: flex-end; }
 .nino-card--last-bottom > :last-child { margin-top: auto; }
-:is(.nino-card--middle, .nino-card--bottom, .nino-card--last-bottom) > .nino-btn { align-self: flex-start; }
-:is(.nino-card--middle, .nino-card--bottom, .nino-card--last-bottom).nino-text-center > .nino-btn { align-self: center; }
-:is(.nino-card--middle, .nino-card--bottom, .nino-card--last-bottom).nino-text-right > .nino-btn { align-self: flex-end; }
+.nino-card--last-bottom > .nino-card-content { flex: 1 1 auto; display: flex; flex-direction: column; }
+.nino-card--last-bottom > .nino-card-content > :last-child { margin-top: auto; }
+:is(.nino-card--middle, .nino-card--bottom, .nino-card--last-bottom) > .nino-btn,
+.nino-card--last-bottom > .nino-card-content > .nino-btn { align-self: flex-start; }
+:is(.nino-card--middle, .nino-card--bottom, .nino-card--last-bottom).nino-text-center > .nino-btn,
+.nino-card--last-bottom.nino-text-center > .nino-card-content > .nino-btn { align-self: center; }
+:is(.nino-card--middle, .nino-card--bottom, .nino-card--last-bottom).nino-text-right > .nino-btn,
+.nino-card--last-bottom.nino-text-right > .nino-card-content > .nino-btn { align-self: flex-end; }
 
 
 /****************************************************************************************************
@@ -2222,11 +2269,20 @@ textarea:disabled {
 	height: 100%;
 	object-fit: cover;
 }
-.nino-image--1-1 { aspect-ratio: 1 / 1; }
-.nino-image--4-3 { aspect-ratio: 4 / 3; }
-.nino-image--3-2 { aspect-ratio: 3 / 2; }
-.nino-image--16-9 { aspect-ratio: 16 / 9; }
-.nino-image--21-9 { aspect-ratio: 21 / 9; }
+/* The ratio of a frame is the ratio of the picture in it as well. The picture
+   fills the frame with a height of 100%, which is worked out against the
+   height the frame has from its ratio - and an engine that does not work that
+   out leaves the picture the ratio it has of its own, in a frame of another:
+   a square one in 16 / 9 stands taller than the frame and is cut off at the
+   bottom, where object-fit and the focus would have cropped it. So the
+   picture says the ratio too, and has it whether or not the percentage is
+   resolved; where it is, both agree, and the frame being stretched or held
+   short by a box round it, the picture follows the frame as it did */
+.nino-image--1-1, .nino-image--1-1 > img { aspect-ratio: 1 / 1; }
+.nino-image--4-3, .nino-image--4-3 > img { aspect-ratio: 4 / 3; }
+.nino-image--3-2, .nino-image--3-2 > img { aspect-ratio: 3 / 2; }
+.nino-image--16-9, .nino-image--16-9 > img { aspect-ratio: 16 / 9; }
+.nino-image--21-9, .nino-image--21-9 > img { aspect-ratio: 21 / 9; }
 /* A nino-badge placed as a sibling of the img instead of inside it floats
    free in the top-right corner - eg. "New"/a discount/a category label */
 .nino-img-cover > .nino-badge {
@@ -3571,6 +3627,28 @@ header .nino-headernav-logo:empty {
 .nino-cover--padded > .nino-grid-row {
 	width: auto;
 }
+/*	What the row of a padded cover holds is cut at the corners of the picture it
+	stands on: a column with a ground, or a picture, at the edge of the row
+	(nino-p-0) would stand out of the rounded corner of the picture, square. The
+	row has the offsets of the picture at the sides, and at the top with
+	nino-cover-top or at the bottom with nino-cover-bottom (below): only the two
+	corners of that side are the picture's, and only those are cut, at the radius
+	of the cover. The other two stand in the middle of the picture, where a column
+	keeps the radius of its own, and the side between them is open - by a screen's
+	height, so that the arrow of a hero and what is lifted out of the row stand out
+	of it as they did. A row in the middle has no corner of the picture and cuts
+	nothing. clip-path and not overflow: clip, which cuts on all four sides. It is
+	laid on the margin box, which spans the picture where a maximum width centres
+	the row between its auto margins: the corners that are rounded are the
+	picture's, not those of a row that is narrower. It is the row that cuts and not
+	the section, which clips at its own edge, the picture's only where the padding
+	is 0. :where() leaves the rules no weight of their own	*/
+:where(.nino-cover--padded.nino-cover-top > .nino-grid-row) {
+	clip-path: inset(0 0 -100vh 0 round var(--radius-cover) var(--radius-cover) 0 0) margin-box;
+}
+:where(.nino-cover--padded.nino-cover-bottom > .nino-grid-row) {
+	clip-path: inset(-100vh 0 0 0 round 0 0 var(--radius-cover) var(--radius-cover)) margin-box;
+}
 .nino-cover--padded.nino-cover-top > .nino-grid-row,
 .nino-cover--padded.nino-cover-top > .nino-cover-content { top: var(--cover-padding-y); }
 .nino-cover--padded.nino-cover-bottom > .nino-grid-row,
@@ -3614,6 +3692,13 @@ header .nino-headernav-logo:empty {
 :has(> .nino-grid-bg, > .nino-card-bg) {
 	position: relative;
 	isolation: isolate;
+}
+/*	The column with a picture has the radius its picture is cut at, and cuts what
+	is in it there too - the card has both already, a column of a ground has them
+	from its rule above	*/
+:has(> .nino-grid-bg) {
+	border-radius: var(--radius-column);
+	overflow: clip;
 }
 .nino-grid--dim > .nino-grid-bg::after {
 	content: '';
@@ -3671,7 +3756,6 @@ header .nino-headernav-logo:empty {
 .nino-grid-row:has(> .nino-grid-row-bg) {
 	position: relative;
 	isolation: isolate;
-	overflow: hidden;
 }
 .nino-grid-row--dim > .nino-grid-row-bg::after {
 	content: '';
@@ -3680,18 +3764,44 @@ header .nino-headernav-logo:empty {
 	background-color: var(--color-background-dim);
 }
 
+/*	Where the picture behind an element starts and ends at the sides. It lies over
+	the whole of the element; nino-bg-pl-<n> and nino-bg-pr-<n> on a row, a column
+	or a card that holds one take it in from the left or from the right by a step
+	of the space scale, 0 to 3 - 0 is the edge it lies at without a class. The
+	element is as wide as it was and its content stands where it stood: only the
+	ground is narrower. Asked for as a child of the element, so that a picture
+	behind an element inside it keeps its own sides	*/
+.nino-bg-pl-0 > :is(.nino-grid-bg, .nino-card-bg, .nino-grid-row-bg) { left: 0; }
+.nino-bg-pl-1 > :is(.nino-grid-bg, .nino-card-bg, .nino-grid-row-bg) { left: var(--space-1); }
+.nino-bg-pl-2 > :is(.nino-grid-bg, .nino-card-bg, .nino-grid-row-bg) { left: var(--space-2); }
+.nino-bg-pl-3 > :is(.nino-grid-bg, .nino-card-bg, .nino-grid-row-bg) { left: var(--space-3); }
+.nino-bg-pr-0 > :is(.nino-grid-bg, .nino-card-bg, .nino-grid-row-bg) { right: 0; }
+.nino-bg-pr-1 > :is(.nino-grid-bg, .nino-card-bg, .nino-grid-row-bg) { right: var(--space-1); }
+.nino-bg-pr-2 > :is(.nino-grid-bg, .nino-card-bg, .nino-grid-row-bg) { right: var(--space-2); }
+.nino-bg-pr-3 > :is(.nino-grid-bg, .nino-card-bg, .nino-grid-row-bg) { right: var(--space-3); }
+
 /* Contentslider */
 /*	content-box against the page's own border-box: Nino.ui.js measures the
 	track and writes that height onto the slider, and under border-box the
 	padding below is taken out of it - the absolutely positioned track then
 	ran into the band the controls sit in, and .nino-slider-controls was
 	drawn over the last 40px of every slide. The padding is room for the
-	controls, which is what it says, and now what it is	*/
+	controls, which is what it says, and now what it is.
+
+	Its track is absolutely positioned, so the slider holds nothing in the flow
+	and a box that sizes it by its content - an item of a flex row, of a grid that
+	places its content at the start - made it as wide as nothing, and the slides
+	were as wide as that. It says its width: the box it stands in, from which
+	Nino.ui.js measures, min-width 0 so that nothing holds it wider than that
+	box, and align-self so that it is stretched, not sized, in a flex column	*/
 .nino-slider {
 	position: relative;
 	overflow: hidden;
 	box-sizing: content-box;
 	padding-bottom: 40px; /* room for .nino-slider-controls */
+	width: 100%;
+	min-width: 0;
+	align-self: stretch;
 }
 .nino-slider ul {
 	display: flex;
@@ -4226,8 +4336,8 @@ header .nino-headernav-logo:empty {
 .nino-text-left :is(.nino-section-title, .nino-section-subtitle, .nino-hero-title, .nino-hero-subtitle) { text-align: left; }
 .nino-text-center :is(.nino-section-title, .nino-section-subtitle, .nino-hero-title, .nino-hero-subtitle) { text-align: center; }
 .nino-text-right :is(.nino-section-title, .nino-section-subtitle, .nino-hero-title, .nino-hero-subtitle) { text-align: right; }
-.nino-text-center > .nino-btn { margin-right: calc(var(--space-1) / 2); margin-left: calc(var(--space-1) / 2); }
-.nino-text-right > .nino-btn { margin-left: var(--space-1); }
+.nino-text-center > .nino-btn, .nino-text-center > .nino-card-content > .nino-btn { margin-right: calc(var(--space-1) / 2); margin-left: calc(var(--space-1) / 2); }
+.nino-text-right > .nino-btn, .nino-text-right > .nino-card-content > .nino-btn { margin-left: var(--space-1); }
 
 @media (min-width: 640px) {
 	.nino-text-s-left { text-align: left; }

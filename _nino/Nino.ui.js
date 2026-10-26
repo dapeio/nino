@@ -718,8 +718,32 @@
 
 				let
 					/**
+					 *	A length a slider's attribute says, in pixels: a number is pixels, with the
+					 *	unit px or without one, and a number with a % is that share of the width
+					 *	of the slider. What is no such length - not a number at all, a number below
+					 *	0, a number in any other unit (rem, em, vw) - is read as the fallback, by
+					 *	the same rules
+					 *
+					 *	@param		{string}	value						What the attribute says
+					 *	@param		{number}	base						The width of the slider, the 100% of a percentage
+					 *	@param		{string}	fallback				What a value that is none is taken for: '75%' or '300'
+					 *
+					 *	@return		{number}
+					 */
+					toPx = function( value, base, fallback ) {
+
+						const pattern = /^(\d*\.?\d+)(px|%)?$/i;
+						const [ , number, unit ] = pattern.exec( String( value ).trim() ) ?? pattern.exec( fallback );
+
+						return unit === '%' ? base * ( parseFloat( number ) / 100 ) : parseFloat( number );
+					},
+
+					/**
 					 *	Recalculate slide widths and re-position each .nino-slider track
-					 *	around its currently active slide
+					 *	around its currently active slide. A slider that was not wired - no list,
+					 *	or none with a slide in it - has nothing to size and is left out, and so is
+					 *	one that measures 0 wide, hidden or not laid out yet: it keeps the sizes it
+					 *	has and is measured when the window resizes after it was shown
 					 *
 					 *	@return		void
 					 */
@@ -727,14 +751,18 @@
 
 						for( let i=0, l=e.slider.length; i<l; i++ ) {
 
-							let
-								wW	= e.slider[i].getBoundingClientRect().width,
-								mW	= e.slider[i].getAttribute('data-slider-min') ?? '0',
-								sW	= e.slider[i].getAttribute('data-slider-width') ?? '75%',
-								liW = ( sW.slice(-1) === '%' ) ? wW * ( sW.slice(0,-1) / 100 ) : sW.slice(0,-2);
-							mW = ( mW.slice(-1) === '%' ) ? wW * ( mW.slice(0,-1) / 100 ) : mW.slice(0,-2);
+							if( e.slider[i].lis === undefined || e.slider[i].lis.length === 0 )
+								continue;
 
-							liW = Math.min( wW, Math.max(liW,mW) );
+							const wW = e.slider[i].getBoundingClientRect().width;
+
+							if( wW === 0 )
+								continue;
+
+							let
+								mW	= toPx( e.slider[i].getAttribute('data-slider-min') ?? '0', wW, '300' ),
+								sW	= toPx( e.slider[i].getAttribute('data-slider-width') ?? '75%', wW, '75%' ),
+								liW = Math.min( wW, Math.max(sW,mW) );
 
 							for( let lii=0, lil = e.slider[i].lis.length; lii<lil; lii++ )
 								e.slider[i].lis[lii].style.width = liW + 'px';

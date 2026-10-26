@@ -41,7 +41,7 @@ namespace Nino\Modules {
 				'subtitle'		=> '<[[tag]] class="nino-section-subtitle[[style]][[color]][[class]]"[[lang]]>[[value]]</[[tag]]>',
 				'card-subtitle'	=> '<[[tag]] class="nino-card-subtitle[[style]][[color]][[class]]"[[lang]]>[[value]]</[[tag]]>',
 				'hero-subtitle'	=> '<[[tag]] class="nino-hero-subtitle[[style]][[color]][[class]]"[[lang]]>[[value]]</[[tag]]>',
-				'text'				=> '<div class="[[base]][[richtext]][[style]][[color]][[class]]"[[lang]]>[[value]]</div>',
+				'text'				=> '<[[tag]] class="[[base]][[richtext]][[style]][[color]][[class]]"[[lang]]>[[value]]</[[tag]]>',
 				'img'					=> '<img src="[[src]]" width="[[width]]" height="[[height]]" alt="[[alt]]"[[class]]>',
 				'image'				=> '<div class="nino-image[[ratio]][[focus]][[class]]">[[img]]</div>',
 				'button'			=> '<a class="nino-btn[[style]][[size]][[width]][[class]]"[[href]][[target]][[lang]]>[[value]]</a>',
@@ -51,6 +51,7 @@ namespace Nino\Modules {
 				'spacer'			=> '<div class="nino-mt-[[size]][[class]]"></div>',
 				'card'				=> '<article class="nino-card[[ground]][[dim]][[borderless]][[fill]][[linked]][[vertical]][[align]][[padding]][[class]]">[[background]][[inner]]</article>',
 				'card-bg'			=> '<div class="nino-card-bg[[focus]]">[[img]]</div>',
+				'card-content'	=> '<div class="nino-card-content">[[inner]]</div>',
 				'cell'				=> '<div[[class]][[attributes]]>[[inner]]</div>',
 				'stack'				=> '<div class="nino-grid-row nino-stack[[gap]][[class]]"[[id]]>[[cells]]</div>',
 				'slider'			=> '<div class="nino-slider[[class]]"[[id]][[width]][[min]]><ul>[[cells]]</ul></div>',
@@ -315,6 +316,7 @@ namespace Nino\Modules {
 				[ 'subtitle', 'Subtitle (Section)', 'Untertitel (Sektion)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'p', 'h4', 'h5' ], 'div' ), 'style' => self::_style(), 'color' => self::_color() ], [ 'hero', 'section' ], '{tag} .nino-section-subtitle', null, true, 'section' ],
 				[ 'text', 'Text', 'Text', 'text', 'text', [
 					'format' => [ 'type' => 'select', 'options' => [ 'inline', 'lines', 'blocks' ], 'default' => 'blocks', 'input' => 'segment', 'label' => [ 'en_US' => 'Format', 'de_DE' => 'Format' ] ],
+					'tag' => self::_tag( [ 'p', 'div', 'span' ], 'p' ) + [ 'hint' => [ 'en_US' => 'In the format blocks, which holds paragraphs and lists, the text is always a div.', 'de_DE' => 'Im Format blocks, das Absätze und Listen enthält, ist der Text immer ein div.' ] ],
 					'style' => self::_style(),
 					'color' => self::_color(),
 				], null, null, null, true, 'global' ],
@@ -1201,13 +1203,45 @@ namespace Nino\Modules {
 		}
 
 		/**
+		 *	The fixed text of a call with the fills in it put in, as the fill pass of
+		 *	a page puts them in: every [[key]] is the text of the key in the language
+		 *	of the page, as the fills hold it - a plain text with its quotes and
+		 *	brackets as entities, which value() reads as the characters they are - and
+		 *	nothing where the key has no text. The fills inside that text stay as they
+		 *	are. A page has its fills put in before its shortcodes run, so this is the
+		 *	path of a call that comes from elsewhere, a renderer or a tool that calls
+		 *	the shortcode itself; what the text goes on to be is the renderer's
+		 *	business, which writes it safe
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$value				The fixed text of the call
+		 *
+		 *	@return 	string
+		 */
+		private static function _fills( array &$appData, string $value ): string {
+
+			if( strpos( $value, '[[' ) === false )
+				return $value;
+
+			$callback = function( array $match ) use ( &$appData ): string {
+				return \Nino\Html::renderTextfill( $appData, $match[1] );
+			};
+
+			return (string) preg_replace_callback( '/\[\[([^\[\]]+)\]\]/', $callback, $value );
+		}
+
+		/**
 		 *	The part every registered shortcode of this module runs before its
-		 *	callback: the first argument is resolved over value(), the missing
-		 *	attributes are filled from the schema and the ones outside their
-		 *	options are reset, and a component that has no value renders
-		 *	nothing. Public because the closure that stands for the callback in
-		 *	the shortcodes has to reach it from the callback's class (see
-		 *	_register()), not because a page calls it
+		 *	callback: the fixed text of the call is read with the fills in it put
+		 *	in (see _fills()), the first argument is resolved over value(), the
+		 *	missing attributes are filled from the schema and the ones outside
+		 *	their options are reset, and a component that has no value renders
+		 *	nothing. The fixed text is the one static value: the other attributes
+		 *	are taken as they stand, a fill in the first argument is not a source
+		 *	and the content is left to the rendering that follows. Public because
+		 *	the closure that stands for the callback in the shortcodes has to
+		 *	reach it from the callback's class (see _register()), not because a
+		 *	page calls it
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments of the shortcode
@@ -1222,7 +1256,9 @@ namespace Nino\Modules {
 
 			$source		= (string) ( $args[0] ?? '' );
 			$content	= (string) ( $args['content'] ?? '' );
-			$fixed		= is_string( $args['text'] ?? null ) === true ? $args['text'] : null;
+
+			// A fixed text says what it says with its fills put in, before anything is done with it
+			$fixed		= is_string( $args['text'] ?? null ) === true ? self::_fills( $appData, $args['text'] ) : null;
 
 			$prepared = [ 'source' => $source, 'content' => $content ];
 
@@ -1307,7 +1343,9 @@ namespace Nino\Modules {
 		 *	where the type has no such field - and .id and .uri are the
 		 *	number of the element in the loop and its uri. Outside a stack,
 		 *	both are nothing. A fixed value, the text="..." attribute, takes
-		 *	the place of the argument altogether.
+		 *	the place of the argument altogether; in the format plain it is read
+		 *	as the text of a key is, an entity in it being the character it
+		 *	stands for.
 		 *
 		 *	Whatever it answers can be written into html as it is: escaped,
 		 *	and with every '[' as &#91;, because shortcode output is rendered
@@ -1334,8 +1372,17 @@ namespace Nino\Modules {
 			if( $kind === 'none' )
 				return '';
 
-			if( $fixed !== null && $kind !== 'image' && $kind !== 'content' )
+			if( $fixed !== null && $kind !== 'image' && $kind !== 'content' ) {
+
+				// A fixed plain text is read as the plain text of a key is: what a page's fill
+				// puts into text="..." is the text as it is stored, its quotes and brackets
+				// entities (\Nino\Text::sanitizeValue()), and an author may write an entity
+				// as well; they are decoded here, so that escaping them once is the only time
+				if( $format === 'plain' )
+					$fixed = html_entity_decode( $fixed, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+
 				return $kind === 'href' ? self::_href( $fixed ) : self::_formatText( $fixed, $format );
+			}
 
 			if( $source === '' )
 				return null;
@@ -1734,9 +1781,12 @@ namespace Nino\Modules {
 
 		/**
 		 *	The part of [text] and [card-text] they share: the fragment of the text,
-		 *	filled with the class the text draws, the wrapper's mark as rich text
-		 *	where it holds paragraphs and lists, its style and its colour as variants
-		 *	of that class and of the ink, its own class and its value
+		 *	filled with its tag, the class the text draws, the wrapper's mark as rich
+		 *	text where it holds paragraphs and lists, its style and its colour as
+		 *	variants of that class and of the ink, its own class and its value. A
+		 *	text that holds paragraphs and lists is a div, whatever tag was asked
+		 *	for - a p or a span cannot hold a p -, and so is the text of a card, which
+		 *	asks for none
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$component		The component: text or card-text
@@ -1749,9 +1799,15 @@ namespace Nino\Modules {
 
 			$declared = self::_declared( $appData, $component );
 
+			// Paragraphs and lists are no content of a p or a span: that text is a div. The tag of another
+			// is written as it is, one of the select's options which dispatch() reduced it to; the text of
+			// a card has none
+			$tag = $args['format'] === 'blocks' ? 'div' : (string) ( $args['tag'] ?? 'div' );
+
 			return str_replace(
-				[ '[[base]]', '[[richtext]]', '[[style]]', '[[color]]', '[[class]]', '[[lang]]', '[[value]]' ],
+				[ '[[tag]]', '[[base]]', '[[richtext]]', '[[style]]', '[[color]]', '[[class]]', '[[lang]]', '[[value]]' ],
 				[
+					$tag,
 					$base,
 					$args['format'] === 'blocks' ? ' nino-richtext' : '',
 					self::_variant( $base, (array) ( $declared['style'] ?? [] ), $args['style'] ),
@@ -1841,7 +1897,9 @@ namespace Nino\Modules {
 		 *	format the attribute names - a field keeps the one its type
 		 *	declares. The value is what \Nino\Html::sanitizeHtml() left of
 		 *	it, a text key's value read again as that format, so the wrapper
-		 *	carries .nino-richtext where it holds paragraphs and lists
+		 *	carries .nino-richtext where it holds paragraphs and lists. The wrapper
+		 *	is the p, the div or the span that 'tag' says, and a div where the format
+		 *	is blocks, which holds paragraphs of its own
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments made ready by dispatch()
@@ -1856,7 +1914,7 @@ namespace Nino\Modules {
 		 *	Replace [card-text]: the text of a card, as [text] has it - the rich text
 		 *	of a key or of a field, in the format the attribute names, and the
 		 *	wrapper marked as rich text where it holds paragraphs and lists - in the
-		 *	class of the text of a card, nino-card-descr
+		 *	class of the text of a card, nino-card-descr, and always in a div
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments made ready by dispatch()
@@ -2147,8 +2205,14 @@ namespace Nino\Modules {
 		 *	stands once in a column - a card beside a picture - and in the content
 		 *	of a stack once per element: the cards of a loop.
 		 *
-		 *	The content is $args['value'] as it is, and it is not rendered here.
-		 *	The engine renders the output of a shortcode again
+		 *	The content is $args['value'], and it is not rendered here, only sorted
+		 *	(see _sorted()): the first child that is a picture stands first in the
+		 *	<article>, and every other child stands behind it in a <div> of the class
+		 *	nino-card-content, in the order it was written in. A card with no padding
+		 *	of its own, nino-p-0, has its picture at its edges and its words in a room
+		 *	of their own; a card without a picture has the div alone, and one with
+		 *	nothing but a picture has no div. The engine renders the output of a
+		 *	shortcode again
 		 *	(\Nino\Html::_doShortcode(), to a depth it caps), which is what makes
 		 *	[template] work, so the components in the card are rendered as soon as
 		 *	this returns - in a stack with the element still their context,
@@ -2156,8 +2220,8 @@ namespace Nino\Modules {
 		 *	this card is rendered in. That is why the renderer calls no
 		 *	renderHtml() of its own. A card with nothing between its tags renders
 		 *	nothing (dispatch() sees to that for a source of content); a card whose
-		 *	components all render nothing is an empty <article>, as a section with
-		 *	nothing in it is a section.
+		 *	components all render nothing is an <article> with an empty div, as a
+		 *	section with nothing in it is a section.
 		 *
 		 *	The picture is looked up as [image] looks its picture up - a slot by
 		 *	its uri, in a stack a field of the element's model of the type image
@@ -2190,6 +2254,10 @@ namespace Nino\Modules {
 			$picture		= self::_picture( $appData, $args['background'] );
 			$background	= '';
 
+			[ $first, $rest ] = self::_sorted( $appData, $args['value'] );
+
+			$inner = $first. ( $rest === '' ? '' : str_replace( '[[inner]]', $rest, self::$html['card-content'] ) );
+
 			if( $picture !== null ) {
 
 				$img = str_replace(
@@ -2218,10 +2286,42 @@ namespace Nino\Modules {
 					self::_modifier( 'nino-p-', $args['padding'] ),
 					self::_modifier( '', $args['class'] ),
 					$background,
-					$args['value'],
+					$inner,
 				],
 				self::$html['card']
 			);
+		}
+
+		/**
+		 *	What stands between the tags of a card, sorted: the call of its first
+		 *	picture - a component whose source is an image, wherever among the others
+		 *	it stands - and the rest as it was written, in its order and without the
+		 *	white space at its ends. The calls are found as the rendering finds them
+		 *	(\Nino\Html::shortcodeParts()), so a picture in the content of another call
+		 *	is that call's and not the card's. Nothing is rendered
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$content			html+, the content of the card
+		 *
+		 *	@return 	array										[ the call of the picture or '' where there is none, the rest ]
+		 */
+		private static function _sorted( array &$appData, string $content ): array {
+
+			$components	= self::components( $appData );
+			$picture		= '';
+			$rest				= '';
+
+			foreach( \Nino\Html::shortcodeParts( $appData, $content ) as $part ) {
+
+				if( $picture === '' && $part['name'] !== '' && ( $components[$part['name']]['source'] ?? '' ) === 'image' ) {
+					$picture = $part['text'];
+					continue;
+				}
+
+				$rest .= $part['text'];
+			}
+
+			return [ $picture, trim( $rest ) ];
 		}
 
 		/**

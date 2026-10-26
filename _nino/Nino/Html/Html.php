@@ -707,6 +707,47 @@ namespace Nino {
 			return $calls;
 		}
 
+		/**
+		 *	A piece of html+ cut into what stands at its top level: the calls of the
+		 *	registered shortcodes, each as the text it is written in, and the text
+		 *	between and around them. Found with the pattern of the rendering, as
+		 *	shortcodeCalls() finds them; what stands between the tags of a call is
+		 *	that call's and is not looked into. The pieces put one after the other
+		 *	are the html again, byte for byte - which is what a component that sorts
+		 *	its children, a card, relies on
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$html					html+, eg. the content of a call
+		 *
+		 *	@return 	array										[ [ 'name' => 'card-title', 'text' => '[card-title /k]' ], [ 'name' => '', 'text' => ' ' ], ... ], in the order they stand; 'name' is '' for text that is no call
+		 */
+		public static function shortcodeParts( array &$appData, string $html ): array {
+
+			if( $html === '' )
+				return [];
+
+			$parts	= [];
+			$at			= 0;
+
+			if( strpos( $html, '[' ) !== false && empty( $appData['./nino/html/shortcodes'] ) === false
+				&& preg_match_all( self::_shortcodePattern( $appData ), $html, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE ) !== false )
+				foreach( $matches as $match ) {
+
+					[ $text, $start ] = $match[0];
+
+					if( $start > $at )
+						$parts[] = [ 'name' => '', 'text' => substr( $html, $at, $start - $at ) ];
+
+					$parts[] = [ 'name' => $match[1][0], 'text' => $text ];
+					$at = $start + strlen( $text );
+				}
+
+			if( $at < strlen( $html ) )
+				$parts[] = [ 'name' => '', 'text' => substr( $html, $at ) ];
+
+			return $parts;
+		}
+
 		// Whether a value currently contains one of the allowed inline tags -
 		// the last step of detectFormat() below, which is how \Nino\Text and
 		// the Text Keys tab read the format of a key that names none.

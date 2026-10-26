@@ -523,6 +523,30 @@ check( '...nothing for a text with no bracket, an empty text and a bracket that 
 check( 'a shortcode registered after the first read is found by the next one', array_column( \Nino\Html::shortcodeCalls( $calls, '[late x]' ), 'name' ) === [ 'late' ] );
 check( '...and a name the app data at hand did not register is no call there, whatever another one has', \Nino\Html::shortcodeCalls( $appData, '[probe /a/b]' ) === [] );
 
+// shortcodeParts() cuts the same text by the same pattern into what stands at its top level - a component that sorts its children relies on the pieces being the text again
+$parts = \Nino\Html::shortcodeParts( $calls, $callsSource );
+check( 'the parts are the calls and the text between and around them, in the order they stand: each call as it is written, with the name it has, and what stands between the tags of a call is that call\'s and is not cut again',
+	$parts === [
+		[ 'name' => 'probe', 'text' => '[probe /a/b name="x y" flag]' ],
+		[ 'name' => '', 'text' => ' text ' ],
+		[ 'name' => 'wrap', 'text' => '[wrap size="2"]inner [probe /c/d][/wrap]' ],
+		[ 'name' => '', 'text' => ' [unknown /e] ' ],
+		[ 'name' => 'probe', 'text' => '[probe]' ],
+		[ 'name' => '', 'text' => ' ' ],
+		[ 'name' => 'probe', 'text' => '[probe empty="" /f/g]' ],
+		[ 'name' => '', 'text' => ' ' ],
+		[ 'name' => 'probe', 'text' => '[probe alt=""]' ],
+	] );
+check( '...put one after the other they are the text again, byte for byte, whatever it holds - a name nobody registered, a bracket that opens no call, a line break and a tab, text behind the last call',
+	implode( '', array_column( $parts, 'text' ) ) === $callsSource
+	&& array_filter( [ '', 'plain text', '[ probe ] [probes] [/probe]', "a\n\t[probe x]\n[wrap]\n[probe y]\n[/wrap] tail [", '[[probe]] [probe]]' ],
+		static fn( string $source ): bool => implode( '', array_column( \Nino\Html::shortcodeParts( $calls, $source ), 'text' ) ) !== $source ) === [] );
+check( '...nothing for an empty text, one part of no name for a text with no call, and a name that is registered later is found by the next cut',
+	\Nino\Html::shortcodeParts( $calls, '' ) === [] && \Nino\Html::shortcodeParts( $calls, 'plain text' ) === [ [ 'name' => '', 'text' => 'plain text' ] ]
+	&& \Nino\Html::shortcodeParts( $calls, '[ probe ] [probes] [/probe]' ) === [ [ 'name' => '', 'text' => '[ probe ] [probes] [/probe]' ] ]
+	&& array_column( \Nino\Html::shortcodeParts( $calls, 'a [late x] b' ), 'name' ) === [ '', 'late', '' ]
+	&& \Nino\Html::shortcodeParts( $appData, '[probe /a/b]' ) === [ [ 'name' => '', 'text' => '[probe /a/b]' ] ] );
+
 \Nino\Filesystem::removeDir( ninoSandboxDir( $calls ) );
 
 echo "\n";

@@ -541,6 +541,17 @@ check( '...a button in it is as wide as its label and sits where the text does, 
 	$groundSets( $groundOf( $groundVertical. ' > .nino-btn' ), 'align-self', 'flex-start' ) === true
 	&& $groundSets( $groundOf( $groundVertical. '.nino-text-center > .nino-btn' ), 'align-self', 'center' ) === true
 	&& $groundSets( $groundOf( $groundVertical. '.nino-text-right > .nino-btn' ), 'align-self', 'flex-end' ) === true );
+check( '...a card that [card] draws holds its picture and a div of the content: with last-bottom the div takes the room that is left and is a flex column itself, so that it is its last element that is pushed down and the picture stays above - and a button in it is placed as one in the card is',
+	$groundSets( $groundOf( '.nino-card--last-bottom > .nino-card-content' ), 'flex', '1 1 auto' ) === true && $groundSets( $groundOf( '.nino-card--last-bottom > .nino-card-content' ), 'display', 'flex' ) === true
+	&& $groundSets( $groundOf( '.nino-card--last-bottom > .nino-card-content' ), 'flex-direction', 'column' ) === true
+	&& $groundSets( $groundOf( '.nino-card--last-bottom > .nino-card-content > :last-child' ), 'margin-top', 'auto' ) === true
+	&& $groundSets( $groundOf( '.nino-card--last-bottom > .nino-card-content > .nino-btn' ), 'align-self', 'flex-start' ) === true
+	&& $groundSets( $groundOf( '.nino-card--last-bottom.nino-text-center > .nino-card-content > .nino-btn' ), 'align-self', 'center' ) === true
+	&& $groundSets( $groundOf( '.nino-card--last-bottom.nino-text-right > .nino-card-content > .nino-btn' ), 'align-self', 'flex-end' ) === true );
+check( '...the block pads the content only where the card does not pad it - a card with no padding, a fullwidth card, a counter card - and the margins of a button in a centred or right-aligned card reach the button inside the block',
+	$groundSets( $groundOf( '.nino-card:where(:not(.nino-p-0, .nino-card--fullwidth, .nino-card--counter)) > .nino-card-content' ), 'padding', '0' ) === true
+	&& $groundSets( $groundOf( '.nino-text-center > .nino-card-content > .nino-btn' ), 'margin-left', 'calc(var(--space-1) / 2)' ) === true
+	&& $groundSets( $groundOf( '.nino-text-right > .nino-card-content > .nino-btn' ), 'margin-left', 'var(--space-1)' ) === true );
 
 // The picture behind a card, after the pattern of the one behind a column: the same rules but for the radius - the column's picture reads the column's kind, the card's and the row's take
 // the corners of the card and of the row they lie in - and the rule that makes the parent the box it is placed in is one for both
@@ -551,7 +562,7 @@ check( 'a card may carry a picture, after the pattern of the column\'s: .nino-ca
 	&& $groundSets( $groundOf( '.nino-card-bg > img' ), 'object-fit', 'cover' ) && $groundSets( $groundOf( '.nino-card-bg > img' ), 'width', '100%' ) && $groundSets( $groundOf( '.nino-card-bg > img' ), 'height', '100%' )
 	&& $groundBgBody( '.nino-card-bg' ) === $groundBgBody( '.nino-grid-bg' ) && $groundBgBody( '.nino-card-bg > img' ) === $groundBgBody( '.nino-grid-bg > img' ) );
 check( '...a card with a picture is the box it is placed in and a stacking context of its own by the rule of the column\'s - extended, not copied - and --dim darkens it with the scrim of a dimmed cover',
-	isset( $groundEach[':has(> .nino-grid-bg)'] ) === false && isset( $groundEach[':has(> .nino-card-bg)'] ) === false
+	preg_match( '/(?<![\w-])(?:position|isolation)\s*:/', $groundOf( ':has(> .nino-grid-bg)' ) ) !== 1 && isset( $groundEach[':has(> .nino-card-bg)'] ) === false
 	&& $groundSets( $groundOf( ':has(> .nino-grid-bg, > .nino-card-bg)' ), 'position', 'relative' ) && $groundSets( $groundOf( ':has(> .nino-grid-bg, > .nino-card-bg)' ), 'isolation', 'isolate' )
 	&& $groundSets( $groundOf( '.nino-card--dim > .nino-card-bg::after' ), 'background-color', 'var(--color-background-dim)' )
 	&& $groundBgBody( '.nino-card--dim > .nino-card-bg::after' ) === $groundBgBody( '.nino-grid--dim > .nino-grid-bg::after' ) );
@@ -935,7 +946,8 @@ check( 'a row may carry a picture, after the pattern of the column\'s: .nino-gri
 	$groundBgBody( '.nino-grid-row-bg' ) !== '' && $groundBgBody( '.nino-grid-row-bg' ) === $groundBgBody( '.nino-grid-bg' ) && $groundBgBody( '.nino-grid-row-bg > img' ) === $groundBgBody( '.nino-grid-bg > img' )
 	&& $groundSets( $groundOf( '.nino-grid-row-bg' ), 'border-radius', 'inherit' ) === true
 	&& $groundSets( $groundOf( '.nino-grid-row-bg' ), 'z-index', '-1' ) === true && $groundSets( $groundOf( '.nino-grid-row:has(> .nino-grid-row-bg)' ), 'position', 'relative' ) === true
-	&& $groundSets( $groundOf( '.nino-grid-row:has(> .nino-grid-row-bg)' ), 'isolation', 'isolate' ) === true && $groundSets( $groundOf( '.nino-grid-row:has(> .nino-grid-row-bg)' ), 'overflow', 'hidden' ) === true );
+	&& $groundSets( $groundOf( '.nino-grid-row:has(> .nino-grid-row-bg)' ), 'isolation', 'isolate' ) === true && $groundSets( $groundOf( '.nino-grid-row:where(:has(> .nino-grid-row-bg))' ), 'overflow', 'clip' ) === true
+	&& preg_match( '/(?<![\w-])overflow\s*:/', $groundOf( '.nino-grid-row:has(> .nino-grid-row-bg)' ) ) !== 1 );
 $groundInkRule = static fn( string $selector ): array => array_values( array_filter( $groundEach[$selector] ?? [], static fn( string $body ): bool => str_contains( $body, '--color-subtitle' ) === true ) );
 check( 'a dimmed row darkens the picture of its block with the scrim of a dimmed column, a plain section with a picture does the same, and both are the dimmed cover for what is written on them: the one rule of its ink',
 	$groundSets( $groundOf( '.nino-grid-row--dim > .nino-grid-row-bg::after' ), 'background-color', 'var(--color-background-dim)' ) === true
@@ -1012,10 +1024,49 @@ check( 'a row with a picture has its padding of a rule one class heavy, as the r
 // The ink of a text: two classes, the inks a ground resolves, after every rule that sets the colour of a title, a subtitle or a text
 $inkAfter = $groundLastOf( [ '.nino-section-title', '.nino-section-subtitle', '.nino-section-text', '.nino-card-title', '.nino-card-subtitle', '.nino-card-descr', '.nino-hero-title', '.nino-hero-subtitle',
 	'.nino-section-title--quiet', '.nino-section-title--loud', '.nino-hero-title--quiet', '.nino-hero-subtitle--quiet', '.nino-card-title--quiet' ], 'color' );
-check( 'the colour of a text is one of two inks of the ground it stands on - .nino-ink--muted is the subtitle\'s and .nino-ink--accent the accent - written by a role, and no light, no dark and no status colour is among them; both come after every rule that sets the colour of a title, a subtitle or a text, so that they win'
+check( 'the colour of a text is one of two inks - .nino-ink--muted is the ink the text inherits at four fifths of its strength, mixed with nothing, which fades the colour and not the box as an opacity would, and .nino-ink--accent the accent of the ground, a role - and no light, no dark and no status colour is among them; both come after every rule that sets the colour of a title, a subtitle or a text, so that they win'
 	. ( $inkAfter > 0 ? '' : ' - no rule to come after' ),
-	$groundSets( $groundOf( '.nino-ink--muted' ), 'color', 'var(--color-subtitle)' ) === true && $groundSets( $groundOf( '.nino-ink--accent' ), 'color', 'var(--color-accent)' ) === true
+	$groundSets( $groundOf( '.nino-ink--muted' ), 'color', 'color-mix(in srgb, currentColor 80%, transparent)' ) === true && preg_match( '/(?<![\w-])opacity\s*:/', $groundOf( '.nino-ink--muted' ) ) !== 1
+	&& $groundSets( $groundOf( '.nino-ink--accent' ), 'color', 'var(--color-accent)' ) === true
 	&& preg_match_all( '/\.nino-ink--[a-z-]+\s*[,{]/', $hookCss ) === 2 && $inkAfter > 0 && $groundLastOf( [ '.nino-ink--muted' ] ) > $inkAfter && $groundLastOf( [ '.nino-ink--accent' ] ) > $inkAfter );
+
+/*	The rule under a section: the strength is its thickness and says nothing of its colour. The colour is --section-border-color, the faint dark line where nothing sets it, and the words that colour it set
+	that variable and no property of the border: the faint light line of a dark and a black section, with the strength asked for in :where(), and the brand colour of nino-section--border-primary - each
+	one class heavy and the brand colour after the other, so that the colour that comes later wins whichever way round the classes are written. Two classes for the dark line were once heavier than the
+	one class of the brand colour, and a primary rule under a dark section came out faint light	*/
+$borderStrengths = [ '.nino-section--border-1' => '1px', '.nino-section--border-2' => '.25rem', '.nino-section--border-3' => '.5rem' ];
+$borderWrong = [];
+foreach( $borderStrengths as $borderClass => $borderWidth ) {
+	$borderBody = $groundOf( $borderClass );
+	if( $groundSets( $borderBody, 'border-bottom-width', $borderWidth ) === false || $groundSets( $borderBody, 'border-bottom-style', 'solid' ) === false )
+		$borderWrong[] = $borderClass. ' does not say its width and its style';
+	if( $groundSets( $borderBody, 'border-bottom-color', 'var(--section-border-color, rgba(0,0,0,.1))' ) === false || preg_match_all( '/(?<![\w-])border-bottom-color\s*:/', $borderBody ) !== 1 )
+		$borderWrong[] = $borderClass. ' does not take its colour from --section-border-color, and from nowhere else';
+	if( preg_match( '/(?<![\w-])border(?:-bottom|-color)?\s*:/', $borderBody ) === 1 )
+		$borderWrong[] = $borderClass. ' says the border as a shorthand';
+}
+$borderSetters = [];
+foreach( $groundBlocks as [ , $borderList, $borderBody ] )
+	if( preg_match( '/(?<![\w-])--section-border-color\s*:/', $borderBody ) === 1 )
+		foreach( $groundSplit( $borderList ) as $borderSelector )
+			$borderSetters[$borderSelector] = trim( $borderBody );
+$borderDark = ':where('. implode( ', ', array_keys( $borderStrengths ) ). ')';
+$borderExpected = [
+	'.nino-section--dark'. $borderDark => '--section-border-color: rgba(255,255,255,.1);',
+	'.nino-section--black'. $borderDark => '--section-border-color: rgba(255,255,255,.1);',
+	'.nino-section--border-primary' => '--section-border-color: var(--color-primary);',
+];
+ksort( $borderSetters );
+ksort( $borderExpected );
+if( $borderSetters !== $borderExpected )
+	$borderWrong[] = 'the rules that set --section-border-color are '. implode( ' | ', array_keys( $borderSetters ) );
+foreach( array_keys( $borderExpected ) as $borderSelector )
+	if( $innerWeight( $borderSelector ) !== 1 )
+		$borderWrong[] = $borderSelector. ' is not one class heavy';
+$borderLight = [ '.nino-section--dark'. $borderDark, '.nino-section--black'. $borderDark ];
+check( 'the rule under a section: the strengths, nino-section--border-1 to -3, say its width and its style and no colour of their own - the colour is --section-border-color, the faint dark line where nothing sets it - and the words that colour it set that variable and nothing else: the faint light line of a dark and a black section and the brand colour of nino-section--border-primary, each one class heavy and the brand colour after the other, so that the colour wins whichever way round the classes stand'
+	. ( $borderWrong === [] ? '' : ' - '. implode( '; ', $borderWrong ) ),
+	$borderWrong === [] && $groundLastOf( [ '.nino-section--border-primary' ] ) > $groundLastOf( $borderLight ) && $groundLastOf( $borderLight ) > 0 );
 
 // The width of a button: as wide as the box it stands in, centred, and said after the sizes, whose display it replaces
 check( 'a full-width button is a block as wide as the box it stands in, its label in the middle, and says stretch to the placements of a stack and a flex card - after the small and the big one, which are flex and block of a width of their own',
@@ -1146,7 +1197,7 @@ $radiusGrounds = [ 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt', 'coun
 $radiusReaders = [
 	'cover'		=> [ '.nino-cover--padded > .nino-section-bg', '.nino-cover--padded.nino-cover--dim::before', '.nino-cover--padded.nino-parallex--dim::before', '.nino-cover--padded:not(.nino-parallex) > img' ],
 	'row'			=> array_merge( array_map( static fn( string $ground ): string => '.nino-grid-row--'. $ground, $radiusGrounds ), [ '.nino-grid-row:where(:has(> .nino-grid-row-bg))' ] ),
-	'column'	=> array_merge( array_map( static fn( string $ground ): string => '.nino-grid--'. $ground, $radiusGrounds ), [ '.nino-grid-bg' ] ),
+	'column'	=> array_merge( array_map( static fn( string $ground ): string => '.nino-grid--'. $ground, $radiusGrounds ), [ '.nino-grid-bg', ':has(> .nino-grid-bg)' ] ),
 	'card'		=> [ '.nino-card', '.nino-card-img', '.nino-card--fullwidth .nino-card-img' ],
 	'image'		=> [ '.nino-image:not(.nino-card-img)' ],
 ];
@@ -1161,7 +1212,7 @@ foreach( $radiusReaders as $radiusKind => $radiusExpected ) {
 	if( $radiusFound !== $radiusExpected )
 		$radiusWrong[] = '--radius-'. $radiusKind. ' is read where it should not be: '. implode( ' | ', array_diff( $radiusFound, $radiusExpected ) ). '; not read where it should be: '. implode( ' | ', array_diff( $radiusExpected, $radiusFound ) );
 }
-check( 'every surface reads the token of its kind as its border-radius - the picture, the box of a parallax and the scrim of a padded cover, a row that paints a ground or holds a picture, a column that paints a ground or holds a picture, a card and its picture, the frame of the image component - and no other rule reads one'
+check( 'every surface reads the token of its kind as its border-radius - the picture, the box of a parallax and the scrim of a padded cover, a row that paints a ground or holds a picture, a column that paints a ground or holds a picture and its picture, a card and its picture, the frame of the image component - and no other rule reads one'
 	. ( $radiusWrong === [] ? '' : ' - '. implode( '; ', $radiusWrong ) ), $radiusWrong === [] );
 
 // The exception of one element: two classes, and a rule for each kind and each class, on the element of its kind and setting the token of that kind and no other
@@ -1222,6 +1273,64 @@ foreach( $groundBlocks as [ , $radiusList, $radiusBody ] )
 			$radiusWrong[] = $radiusSelector;
 check( 'a picture is a surface like the others: the frame of the image component has no radius of its own, and no modifier of it has one - every rule that names the frame and says a border-radius says the token of the image kind'
 	. ( $radiusWrong === [] ? '' : ' - '. implode( ' | ', $radiusWrong ) ), $radiusWrong === [] );
+
+/*	A surface cuts what is in it at its radius: a picture or a ground of a child that reaches its edge (nino-p-0) stood out of the corner, square. The column and the row that paint a ground, the row
+	that holds a picture, the column that holds one and the card say overflow clip - clip and not hidden, which would make a box of its own for the margins and the floats inside - once each, and the
+	column that holds a picture has the radius of its kind to cut at, as the one that paints a ground has. The section is none of these: the arrow of a hero and the elements lifted over its edge stand out
+	of it. The picture of a padded cover is cut at the radius of the cover by its own block, but what stands on it is not: the section is a cover and clips at its own edge, which is the picture's only where
+	the padding is 0 and is square - so the row of a padded cover cuts what it holds at the corners of the picture, and only at the two of the side where its edge is the picture's: the top with nino-cover-top,
+	the bottom with nino-cover-bottom. It does so with a clip-path that leaves the other side open, and not with an overflow, which cuts on all four sides: the other two corners stand in the middle of the
+	picture, and the arrow of a hero and what is lifted out of the row stand out of the open side	*/
+$clipSelectors = array_merge( array_map( static fn( string $ground ): string => '.nino-grid--'. $ground, $radiusGrounds ), array_map( static fn( string $ground ): string => '.nino-grid-row--'. $ground, $radiusGrounds ),
+	[ '.nino-grid-row:where(:has(> .nino-grid-row-bg))', ':has(> .nino-grid-bg)', '.nino-card' ] );
+$clipWrong = [];
+foreach( $clipSelectors as $clipSelector )
+	if( preg_match_all( '/(?<![\w-])overflow\s*:\s*clip\s*(?:;|$)/', $groundOf( $clipSelector ) ) !== 1 || preg_match_all( '/(?<![\w-])overflow\s*:/', $groundOf( $clipSelector ) ) !== 1 )
+		$clipWrong[] = $clipSelector;
+check( 'a surface cuts what is in it at its radius: the column and the row that paint a ground, the row and the column that hold a picture and the card say overflow: clip, once each - not hidden - and the column that holds a picture has the radius of the column kind'
+	. ( $clipWrong === [] ? '' : ' - not: '. implode( ', ', $clipWrong ) ),
+	$clipWrong === [] && count( $clipSelectors ) === 19 && $groundSets( $groundOf( ':has(> .nino-grid-bg)' ), 'border-radius', 'var(--radius-column)' ) === true );
+check( '...the section is not one of them, its arrow and its lifted elements stand out of it - and the pictures themselves are still cut by the block that holds them, which is the box of the picture and nothing else',
+	preg_match( '/(?<![\w-])overflow\s*:/', $groundOf( '.nino-section' ) ) !== 1 && preg_match( '/(?<![\w-])overflow\s*:/', $groundOf( '.nino-section--dim' ) ) !== 1
+	&& $groundSets( $groundOf( '.nino-grid-bg' ), 'overflow', 'hidden' ) === true && $groundSets( $groundOf( '.nino-card-bg' ), 'overflow', 'hidden' ) === true && $groundSets( $groundOf( '.nino-grid-row-bg' ), 'overflow', 'hidden' ) === true );
+$coverRows = [
+	':where(.nino-cover--padded.nino-cover-top > .nino-grid-row)'		=> 'inset(0 0 -100vh 0 round var(--radius-cover) var(--radius-cover) 0 0) margin-box',
+	':where(.nino-cover--padded.nino-cover-bottom > .nino-grid-row)'	=> 'inset(-100vh 0 0 0 round 0 0 var(--radius-cover) var(--radius-cover)) margin-box',
+];
+$coverWrong = [];
+foreach( $coverRows as $coverSelector => $coverShape )
+	if( trim( $groundOf( $coverSelector ) ) !== 'clip-path: '. $coverShape. ';' || $innerWeight( $coverSelector ) !== 0 )
+		$coverWrong[] = $coverSelector;
+check( 'the row of a padded cover is cut where its edge is the picture\'s edge, and there only: with nino-cover-top at the two corners of its top, with nino-cover-bottom at the two of its bottom - a clip-path at the radius of the cover kind, laid on the margin box, which spans the picture where a maximum width centres the row, and open by 100vh on the other side - in rules that have no weight of their own'
+	. ( $coverWrong === [] ? '' : ' - not: '. implode( ' | ', $coverWrong ) ), $coverWrong === [] && count( $coverRows ) === 2 );
+$coverRest = [];
+foreach( $groundEach as $coverSelector => $coverBodies )
+	if( str_contains( (string) $coverSelector, '.nino-cover--padded' ) === true && isset( $coverRows[$coverSelector] ) === false && in_array( $coverSelector, $paddedPicture, true ) === false
+		&& preg_match( '/(?<![\w-])(?:border-radius|overflow|clip-path)\s*:/', implode( ' ', $coverBodies ) ) === 1 )
+		$coverRest[] = (string) $coverSelector;
+check( '...no other rule of the padded cover or of its row says a radius, an overflow or a clip, and the cover has no radius, which a section that clips would have: a row in the middle is not cut, a column with a ground at the corner of the picture is cut with it, and the arrow of a hero and what is lifted out of the row are not'
+	. ( $coverRest === [] ? '' : ' - found: '. implode( ' | ', $coverRest ) ),
+	$coverRest === [] && preg_match( '/(?<![\w-])border-radius\s*:/', $groundOf( '.nino-cover' ) ) !== 1 );
+
+/*	Where the picture behind an element starts and ends at the sides: nino-bg-pl-<n> and nino-bg-pr-<n>, 0 to 3, take the block of a row, a column or a card in from the left or from the right by a step of
+	the space scale - 0 is the edge it lies at without a class. The rule asks for the block as a child of the element with the class, so that a picture behind an element inside keeps its own sides; it
+	is a class heavier than the rule that lays the block over the whole element, so that the order of the two decides nothing	*/
+$offsetWrong = [];
+$offsetCount = 0;
+foreach( [ 'pl' => 'left', 'pr' => 'right' ] as $offsetKey => $offsetSide )
+	foreach( [ '0', '1', '2', '3' ] as $offsetStep ) {
+		$offsetSelector = '.nino-bg-'. $offsetKey. '-'. $offsetStep. ' > :is(.nino-grid-bg, .nino-card-bg, .nino-grid-row-bg)';
+		$offsetCount++;
+		if( trim( $groundOf( $offsetSelector ) ) !== $offsetSide. ': '. ( $offsetStep === '0' ? '0' : 'var(--space-'. $offsetStep. ')' ). ';' )
+			$offsetWrong[] = $offsetSelector;
+	}
+check( 'the picture behind a row, a column or a card starts and ends where a class says: nino-bg-pl-0 to -3 set the left of its block and nino-bg-pr-0 to -3 the right, to a step of the space scale and to 0 for 0 - eight rules, each for the block as a child of the element with the class'
+	. ( $offsetWrong === [] ? '' : ' - not: '. implode( ' | ', $offsetWrong ) ),
+	$offsetWrong === [] && $offsetCount === 8 && $groundSets( $groundOf( '.nino-grid-bg' ), 'inset', '0' ) === true && $groundSets( $groundOf( '.nino-card-bg' ), 'inset', '0' ) === true && $groundSets( $groundOf( '.nino-grid-row-bg' ), 'inset', '0' ) === true );
+
+// The slider says its width: the track is out of the flow, so a box that sizes the slider by its content - an item of a flex row, a grid that places its content at the start - made it as wide as nothing
+check( 'a slider is as wide as the box it stands in: width 100%, min-width 0 so that nothing holds it wider, and stretched in a flex column - its track is out of the flow, and Nino.ui.js measures the slider to size the slides',
+	$groundSets( $groundOf( '.nino-slider' ), 'width', '100%' ) === true && $groundSets( $groundOf( '.nino-slider' ), 'min-width', '0' ) === true && $groundSets( $groundOf( '.nino-slider' ), 'align-self', 'stretch' ) === true );
 
 echo "\n";
 
@@ -1590,8 +1699,9 @@ $registryOf = static fn( string $name ): array => \Nino\Modules\Components::comp
 check( 'the registry has the text of a card: labelled in both languages, a text read from a key or a field, offered in a card alone, drawing the <div> of nino-card-descr',
 	$registryOf( 'card-text' )['label'] === [ 'en_US' => 'Text (Card)', 'de_DE' => 'Text (Karte)' ] && $registryOf( 'card-text' )['source'] === 'text' && $registryOf( 'card-text' )['preview'] === 'text'
 	&& $registryOf( 'card-text' )['in'] === [ 'card' ] && $registryOf( 'card-text' )['draws'] === 'div .nino-card-descr' && array_key_exists( 'holds', $registryOf( 'card-text' ) ) === false );
-check( '...with the attributes of [text], format, style and colour, word for word - and [text] is still offered everywhere and draws nothing',
-	array_keys( $registryOf( 'card-text' )['attributes'] ) === [ 'format', 'style', 'color' ] && $registryOf( 'card-text' )['attributes'] === $registryOf( 'text' )['attributes']
+check( '...with the attributes of [text], format, style and colour, word for word - [text] has the tag besides, after the format, which a text in a card has none of - and [text] is still offered everywhere and draws nothing',
+	array_keys( $registryOf( 'card-text' )['attributes'] ) === [ 'format', 'style', 'color' ] && $registryOf( 'card-text' )['attributes'] === array_diff_key( $registryOf( 'text' )['attributes'], [ 'tag' => 1 ] )
+	&& array_keys( $registryOf( 'text' )['attributes'] ) === [ 'format', 'tag', 'style', 'color' ]
 	&& array_key_exists( 'in', $registryOf( 'text' ) ) === false && array_key_exists( 'draws', $registryOf( 'text' ) ) === false );
 check( 'the registry has the image of a card: labelled in both languages, a picture of a slot or an image field, offered in a card alone, drawing the <img> of nino-card-img',
 	$registryOf( 'card-image' )['label'] === [ 'en_US' => 'Image (Card)', 'de_DE' => 'Bild (Karte)' ] && $registryOf( 'card-image' )['source'] === 'image' && $registryOf( 'card-image' )['preview'] === 'image'
@@ -1612,6 +1722,15 @@ sort( $imageModifiers );
 sort( $imageRatios );
 check( '...and the modifiers of its frame in Nino.css are the ratios it can write, no more and no fewer: the stylesheet and the registry say the same words'
 	. ( $imageModifiers === $imageRatios ? '' : ' - the stylesheet says '. implode( ' ', $imageModifiers ). ', the registry '. implode( ' ', $imageRatios ) ), $imageRatios !== [] && $imageModifiers === $imageRatios );
+// The ratio of a frame is the ratio of the picture in it: the picture fills the frame at a height of 100%, which is worked out against the height the frame has from its ratio, and where it is not worked out
+// - a frame in a box that sizes it by its content - the picture would have the ratio of its own, in a frame of another. So the <img> directly in the frame says the ratio as the frame does
+$ratioWrong = [];
+foreach( $imageRatios as $imageRatio )
+	foreach( [ '.nino-image--'. $imageRatio, '.nino-image--'. $imageRatio. ' > img' ] as $ratioSelector )
+		if( $groundSets( $groundOf( $ratioSelector ), 'aspect-ratio', str_replace( '-', ' / ', $imageRatio ) ) === false )
+			$ratioWrong[] = $ratioSelector;
+check( 'every ratio of the frame is said by the frame and by the <img> directly in it - .nino-image--<x>-<y> and .nino-image--<x>-<y> > img, aspect-ratio: x / y - so that the picture has the ratio of the frame whether or not its height of 100% is worked out'
+	. ( $ratioWrong === [] ? '' : ' - not: '. implode( ', ', $ratioWrong ) ), $ratioWrong === [] && count( $imageRatios ) === 5 );
 // The icons of the fifteen: each component of the kernel is shown by the parts of a 24 by 24 icon of Lucide, which the registry hands to a tool
 $iconTags = [ 'path' => [ [ 'd' ], [] ], 'circle' => [ [ 'cx', 'cy', 'r' ], [] ], 'ellipse' => [ [ 'cx', 'cy', 'rx', 'ry' ], [] ], 'rect' => [ [ 'x', 'y', 'width', 'height' ], [ 'rx', 'ry' ] ],
 	'line' => [ [ 'x1', 'y1', 'x2', 'y2' ], [] ], 'polyline' => [ [ 'points' ], [] ], 'polygon' => [ [ 'points' ], [] ] ];
@@ -1939,6 +2058,13 @@ check( 'value(): a stored plain value is decoded before it is escaped once, not 
 	&& \Nino\Modules\Components::value( $appData, '/template/page-home/stored/link', 'href' ) === '/a?b=&quot;c&quot;&amp;d=1' );
 check( '[title] and a [button] label of a stored value show the characters', $render( '[title /template/page-home/stored/title]' ) === '<h3 class="nino-section-title">Let&#039;s talk about &quot;us&quot; &#91;today]</h3>'
 	&& $render( '[button /template/page-home/stored/title href="#x"]' ) === '<a class="nino-btn" href="#x">Let&#039;s talk about &quot;us&quot; &#91;today]</a>' );
+check( 'value(): a fixed plain text is read as a stored one is - an entity is the character it stands for, escaped once, and a bracket that was an entity is written inert after it is decoded, never before',
+	\Nino\Modules\Components::value( $appData, '', 'text', 'plain', 'Let&#039;s &amp; "go" &#91;now&#93;' ) === 'Let&#039;s &amp; &quot;go&quot; &#91;now]'
+	&& \Nino\Modules\Components::value( $appData, '', 'text', 'plain', 'Fish & Chips' ) === 'Fish &amp; Chips' && \Nino\Modules\Components::value( $appData, '', 'text', 'plain', '&amp;lt;' ) === '&amp;lt;'
+	&& \Nino\Modules\Components::value( $appData, '', 'href', 'plain', '/a?b=&quot;c&quot;&amp;d=1' ) === '/a?b=&quot;c&quot;&amp;d=1'
+	&& \Nino\Modules\Components::value( $appData, '', 'href', 'plain', 'javascript&#58;alert(1)' ) === '#' );
+check( '...and the other formats are sanitized as they stand: an entity in a fixed text of the format inline is text, as it is in a key of that format, and no tag that was typed is left',
+	\Nino\Modules\Components::value( $appData, '', 'text', 'inline', 'x &lt;b&gt;y&lt;/b&gt;' ) === 'x &lt;b&gt;y&lt;/b&gt;' && \Nino\Modules\Components::value( $appData, '', 'text', 'inline', 'x <b>y</b>' ) === 'x y' );
 
 // Two components written the way a project's own are: one that says what it
 // sees, one that reads value() inside a stack
@@ -2033,10 +2159,28 @@ check( 'the title of a section may be an h2 as well as an h3 - the h3 it is wher
 	$render( '[title /template/page-home/hero/title tag="h2"]' ) === '<h2 class="nino-section-title">Hi &#91;there]</h2>' && $render( '[title /template/page-home/hero/title]' ) === '<h3 class="nino-section-title">Hi &#91;there]</h3>'
 	&& in_array( 'h2', \Nino\Modules\Components::components( $appData )['title']['attributes']['tag']['options'], true ) === true );
 check( '[text] keeps the paragraphs and lists of its key and marks the wrapper as rich text', $render( '[text /template/page-home/services/text]' ) === '<div class="nino-section-text nino-richtext"><p>One</p><ul><li>a</li></ul></div>' );
-check( '[text format="inline"] sanitizes to that format', $render( '[text /template/page-home/services/text format="inline" style="quiet"]' ) === '<div class="nino-section-text nino-section-text--quiet">One a</div>' );
+check( '[text format="inline"] sanitizes to that format', $render( '[text /template/page-home/services/text format="inline" style="quiet"]' ) === '<p class="nino-section-text nino-section-text--quiet">One a</p>' );
 check( '[text] keeps the classes it always had, in the order it always had them: the class, the mark as rich text, the style, its own',
 	$render( '[text /template/page-home/services/text style="loud" class="x"]' ) === '<div class="nino-section-text nino-richtext nino-section-text--loud x"><p>One</p><ul><li>a</li></ul></div>'
-	&& $render( '[text /template/page-home/services/text format="lines" class="x y"]' ) === '<div class="nino-section-text x y">One<br>a</div>' );
+	&& $render( '[text /template/page-home/services/text format="lines" class="x y"]' ) === '<p class="nino-section-text x y">One<br>a</p>' );
+// The tag of [text]: a p unless the call says a div or a span - and a div for the paragraphs and lists of the format blocks, whatever it says, which a p or a span cannot hold
+$textTag = $registryOf( 'text' )['attributes']['tag'] ?? [];
+check( '[text] has a tag, a choice of p, div and span, the p where the call names none: the labelled select of the registry, with a hint that says what the format blocks does with it - and the text of a card has none',
+	( $textTag['type'] ?? null ) === 'select' && ( $textTag['options'] ?? null ) === [ 'p', 'div', 'span' ] && ( $textTag['default'] ?? null ) === 'p'
+	&& ( $textTag['label'] ?? null ) === [ 'en_US' => 'HTML tag', 'de_DE' => 'HTML-Tag' ] && array_keys( (array) ( $textTag['hint'] ?? null ) ) === [ 'en_US', 'de_DE' ]
+	&& \Nino\Modules\Components::defaults( $appData, 'text' ) === [ 'format' => 'blocks', 'tag' => 'p', 'style' => '', 'color' => '', 'href' => '', 'target' => '', 'class' => '' ]
+	&& array_key_exists( 'tag', $registryOf( 'card-text' )['attributes'] ) === false );
+check( '...the format inline and the format lines are written in the element that was asked for - the p by default - with the classes they always had, the colour and the class of its own behind them',
+	$render( '[text /template/page-home/services/text format="inline"]' ) === '<p class="nino-section-text">One a</p>'
+	&& $render( '[text /template/page-home/services/text format="inline" tag="div"]' ) === '<div class="nino-section-text">One a</div>'
+	&& $render( '[text /template/page-home/services/text format="lines" tag="span" style="quiet" color="muted" class="x"]' ) === '<span class="nino-section-text nino-section-text--quiet nino-ink--muted x">One<br>a</span>'
+	&& $render( '[text text="Fixed [x" format="inline" tag="p"]' ) === '<p class="nino-section-text">Fixed &#91;x</p>' );
+check( '...the paragraphs and lists of the format blocks, which is the default, are held by a div whatever the tag says: a p or a span cannot hold a p, and a browser closes it ahead of the content - and a tag that is none of the three is the p',
+	$render( '[text /template/page-home/services/text tag="p"]' ) === '<div class="nino-section-text nino-richtext"><p>One</p><ul><li>a</li></ul></div>'
+	&& $render( '[text /template/page-home/services/text tag="span" format="blocks"]' ) === '<div class="nino-section-text nino-richtext"><p>One</p><ul><li>a</li></ul></div>'
+	&& $render( '[text /template/page-home/services/text format="inline" tag="h1"]' ) === '<p class="nino-section-text">One a</p>'
+	&& $render( '[text /template/page-home/services/text format="inline" tag="DIV"]' ) === '<p class="nino-section-text">One a</p>'
+	&& $render( '[text /template/page-home/services/text format="inline" tag="p onclick=x"]' ) === '<p class="nino-section-text">One a</p>' );
 check( '[card-text] is the text of a card: [text] in the class nino-card-descr - the paragraphs and lists of a key in a wrapper marked as rich text, the format, the style behind the class it varies and a class of its own last',
 	$render( '[card-text /template/page-home/services/text]' ) === '<div class="nino-card-descr nino-richtext"><p>One</p><ul><li>a</li></ul></div>'
 	&& $render( '[card-text /template/page-home/services/text format="inline" style="quiet"]' ) === '<div class="nino-card-descr nino-card-descr--quiet">One a</div>'
@@ -2046,9 +2190,9 @@ check( '...a source that resolves to nothing renders nothing, a style outside it
 	$render( '[card-text /template/page-home/nope/title]' ) === '' && $render( '[card-text /template/page-home/empty/title]' ) === '' && $render( '[card-text]' ) === ''
 	&& $render( '[card-text /template/page-home/services/text style="weird" format="nonsense"]' ) === $render( '[card-text /template/page-home/services/text]' )
 	&& $render( '[card][card-title /template/page-home/hero/title][card-text /template/page-home/services/text format="inline"][/card]' )
-		=== '<article class="nino-card"><h4 class="nino-card-title">Hi &#91;there]</h4><div class="nino-card-descr">One a</div></article>' );
+		=== '<article class="nino-card"><div class="nino-card-content"><h4 class="nino-card-title">Hi &#91;there]</h4><div class="nino-card-descr">One a</div></div></article>' );
 check( '...in a stack it reads the field of its element, as [text] does, and the class of the text of a card is the one Nino.css styles',
-	str_contains( $render( '[stack /services sort="title" limit="1"][card][card-text summary][/card][/stack]' ), '<article class="nino-card"><div class="nino-card-descr nino-richtext"><p>Two</p></div></article>' ) === true
+	str_contains( $render( '[stack /services sort="title" limit="1"][card][card-text summary][/card][/stack]' ), '<article class="nino-card"><div class="nino-card-content"><div class="nino-card-descr nino-richtext"><p>Two</p></div></div></article>' ) === true
 	&& $hookRules( '.nino-card-descr' ) !== '' && $hookRules( '.nino-card-descr--quiet' ) !== '' && $hookRules( '.nino-card-descr--loud' ) !== '' );
 check( '[spacer] is an empty box with a margin of the size it says', $render( '[spacer size="4"]' ) === '<div class="nino-mt-4"></div>' && $render( '[spacer]' ) === '<div class="nino-mt-2"></div>' );
 check( '[html] is its content as rich text, and nothing without content', $render( '[html]<p>Hi</p><script>alert(1)</script>[/html]' ) === '<p>Hi</p>' && $render( '[html][/html]' ) === '' );
@@ -2065,10 +2209,10 @@ check( '[button] with a scheme that is no safe one is a link to nowhere, and its
 // The card: the <article> of a component that holds components. What stands between its tags is the template's own markup, rendered with the output
 check( '[card] renders nothing without content, and the <article> with its class around what it holds',
 	$render( '[card][/card]' ) === '' && $render( '[card]  [/card]' ) === '' && $render( '[card ground="alt"][/card]' ) === ''
-	&& $render( '[card]x[/card]' ) === '<article class="nino-card">x</article>'
-	&& $render( '[card][card-title /template/page-home/hero/title][card-subtitle /template/page-home/hero/subtitle][/card]' ) === '<article class="nino-card"><h4 class="nino-card-title">Hi &#91;there]</h4><p class="nino-card-subtitle">Sub</p></article>' );
-check( '...a card whose components all render nothing is an empty <article>, as a section with nothing in it is a section',
-	$render( '[card][title /template/page-home/nope/title][/card]' ) === '<article class="nino-card"></article>' );
+	&& $render( '[card]x[/card]' ) === '<article class="nino-card"><div class="nino-card-content">x</div></article>'
+	&& $render( '[card][card-title /template/page-home/hero/title][card-subtitle /template/page-home/hero/subtitle][/card]' ) === '<article class="nino-card"><div class="nino-card-content"><h4 class="nino-card-title">Hi &#91;there]</h4><p class="nino-card-subtitle">Sub</p></div></article>' );
+check( '...a card whose components all render nothing is an <article> with an empty div of the content, as a section with nothing in it is a section',
+	$render( '[card][title /template/page-home/nope/title][/card]' ) === '<article class="nino-card"><div class="nino-card-content"></div></article>' );
 // Every attribute is its class, and the classes follow the fragment: the ground, the dim, the border, the fill, the link, where the content stands, the alignment, the padding and the class of its own
 $cardClasses = [];
 foreach( [ 'counter', 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt' ] as $cardGround )
@@ -2086,62 +2230,94 @@ $cardClasses['linked="1"'] = ' nino-card--linked';
 $cardClasses['class="a b"'] = ' a b';
 $cardWrong = [];
 foreach( $cardClasses as $cardAttribute => $cardClass )
-	if( $render( '[card '. $cardAttribute. ']x[/card]' ) !== '<article class="nino-card'. $cardClass. '">x</article>' )
+	if( $render( '[card '. $cardAttribute. ']x[/card]' ) !== '<article class="nino-card'. $cardClass. '"><div class="nino-card-content">x</div></article>' )
 		$cardWrong[] = $cardAttribute;
 check( '[card] writes each of its attributes as the class of it: a ground, where the content stands, the alignment, the padding of every step - the 0 among them - the fill, the dim, the border, the link of the title, and a class of its own'. ( $cardWrong === [] ? '' : ' - not: '. implode( ', ', $cardWrong ) ), $cardWrong === [] && count( $cardClasses ) === 25 );
 check( '...all at once, in the order of the fragment, and a class of its own last, escaped',
 	$render( '[card ground="alt" padding="3" fill="1" linked="1" vertical="last-bottom" align="right" dim="1" borderless="1" class="mine"]x[/card]' )
-		=== '<article class="nino-card nino-card--alt nino-card--dim nino-card--borderless nino-card--fill nino-card--linked nino-card--last-bottom nino-text-right nino-p-3 mine">x</article>'
-	&& $render( '[card class="a b&c"]x[/card]' ) === '<article class="nino-card a b&amp;c">x</article>'
-	&& $render( '[card ground="counter" class="x"]x[/card]' ) === '<article class="nino-card nino-card--counter x">x</article>' );
+		=== '<article class="nino-card nino-card--alt nino-card--dim nino-card--borderless nino-card--fill nino-card--linked nino-card--last-bottom nino-text-right nino-p-3 mine"><div class="nino-card-content">x</div></article>'
+	&& $render( '[card class="a b&c"]x[/card]' ) === '<article class="nino-card a b&amp;c"><div class="nino-card-content">x</div></article>'
+	&& $render( '[card ground="counter" class="x"]x[/card]' ) === '<article class="nino-card nino-card--counter x"><div class="nino-card-content">x</div></article>' );
 check( '...a word outside what an attribute offers is the default, and so is a bool that is none: the class is not written',
-	$render( '[card ground="weird" padding="9" vertical="weird" align="weird" fill="maybe" dim="x" borderless="2" linked="2" focus="12"]x[/card]' ) === '<article class="nino-card">x</article>'
-	&& $render( '[card ground="ALT" align="Center" padding="-1"]x[/card]' ) === '<article class="nino-card">x</article>'
-	&& $render( '[card ground="alt&quot; onclick=&quot;x"]x[/card]' ) === '<article class="nino-card">x</article>'
-	&& $render( '[card bogus="x" onclick="y"]x[/card]' ) === '<article class="nino-card">x</article>'
-	&& $render( '[card fill="true" dim="yes" borderless="on" linked="yes"]x[/card]' ) === '<article class="nino-card nino-card--dim nino-card--borderless nino-card--fill nino-card--linked">x</article>' );
+	$render( '[card ground="weird" padding="9" vertical="weird" align="weird" fill="maybe" dim="x" borderless="2" linked="2" focus="12"]x[/card]' ) === '<article class="nino-card"><div class="nino-card-content">x</div></article>'
+	&& $render( '[card ground="ALT" align="Center" padding="-1"]x[/card]' ) === '<article class="nino-card"><div class="nino-card-content">x</div></article>'
+	&& $render( '[card ground="alt&quot; onclick=&quot;x"]x[/card]' ) === '<article class="nino-card"><div class="nino-card-content">x</div></article>'
+	&& $render( '[card bogus="x" onclick="y"]x[/card]' ) === '<article class="nino-card"><div class="nino-card-content">x</div></article>'
+	&& $render( '[card fill="true" dim="yes" borderless="on" linked="yes"]x[/card]' ) === '<article class="nino-card nino-card--dim nino-card--borderless nino-card--fill nino-card--linked"><div class="nino-card-content">x</div></article>' );
 /*	The card is no <a>, whatever it says: it holds buttons, and a link in a link is no markup. [card linked] writes the class and nothing else, and the link it makes of the card is the one of
 	its title - the <a> that [card-title] draws, with the title as its one child, which is what Nino.css stretches over the card - so that a card whose title has no address has no link at all	*/
 check( '[card linked] is no link itself: the <article> with the class, and the link of its title - the <a> around the title - and the button after it as they are anywhere; a title with no address is no link, and the card has none',
 	$render( '[card linked="1"][card-title /template/page-home/hero/title href="/contact"][button text="More" href="#x"][/card]' )
-		=== '<article class="nino-card nino-card--linked"><a href="/contact"><h4 class="nino-card-title">Hi &#91;there]</h4></a><a class="nino-btn" href="#x">More</a></article>'
-	&& $render( '[card linked="1"][card-title /template/page-home/hero/title][/card]' ) === '<article class="nino-card nino-card--linked"><h4 class="nino-card-title">Hi &#91;there]</h4></article>'
+		=== '<article class="nino-card nino-card--linked"><div class="nino-card-content"><a href="/contact"><h4 class="nino-card-title">Hi &#91;there]</h4></a><a class="nino-btn" href="#x">More</a></div></article>'
+	&& $render( '[card linked="1"][card-title /template/page-home/hero/title][/card]' ) === '<article class="nino-card nino-card--linked"><div class="nino-card-content"><h4 class="nino-card-title">Hi &#91;there]</h4></div></article>'
 	&& str_contains( $render( '[card linked="1"][card-title /template/page-home/hero/title][/card]' ), '</a>' ) === false
 	&& str_starts_with( $render( '[card linked="1"]x[/card]' ), '<article' ) === true && str_starts_with( \Nino\Modules\Components::$html['link'], '<a' ) === true );
 // The picture behind it
 $appData['/nino/html/images']['/template/page-home/hero/withalt'] = [ 'label' => 'With alt', 'width' => 800, 'height' => 600, 'filename' => 'alt.800x600.jpg', 'alt' => [ 'de_DE' => 'Stored "alt" [x]' ] ];
 check( '[card] with a picture - a slot by its uri - has the picture in a div of its own before the content, as an img with an empty alt text, and the focus is a class of that div',
-	$render( '[card background="/template/page-home/hero/background" focus="3"]x[/card]' ) === '<article class="nino-card"><div class="nino-card-bg nino-img-focus--3"><img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt=""></div>x</article>'
-	&& $render( '[card background="/template/page-home/hero/background" ground="alt" dim="1"]x[/card]' ) === '<article class="nino-card nino-card--alt nino-card--dim"><div class="nino-card-bg"><img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt=""></div>x</article>' );
+	$render( '[card background="/template/page-home/hero/background" focus="3"]x[/card]' ) === '<article class="nino-card"><div class="nino-card-bg nino-img-focus--3"><img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt=""></div><div class="nino-card-content">x</div></article>'
+	&& $render( '[card background="/template/page-home/hero/background" ground="alt" dim="1"]x[/card]' ) === '<article class="nino-card nino-card--alt nino-card--dim"><div class="nino-card-bg"><img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt=""></div><div class="nino-card-content">x</div></article>' );
 check( '...the alt text is none even where the slot has one: behind a card the picture is decoration - and [image] of the same slot still says it',
 	str_contains( $render( '[card background="/template/page-home/hero/withalt"]x[/card]' ), '<img src="/public/images/alt.800x600.jpg" width="800" height="600" alt="">' ) === true
 	&& str_contains( $render( '[image /template/page-home/hero/withalt]' ), 'alt="Stored &quot;alt&quot; &#91;x]"' ) === true );
 check( '...no picture, no div: a slot with no file, a slot there is none of, an empty reference and a focus without a picture write none',
-	$render( '[card background="/template/page-home/hero/empty" focus="5"]x[/card]' ) === '<article class="nino-card">x</article>'
-	&& $render( '[card background="/template/page-home/nope/nope" focus="5"]x[/card]' ) === '<article class="nino-card">x</article>'
-	&& $render( '[card background="" focus="5"]x[/card]' ) === '<article class="nino-card">x</article>'
-	&& $render( '[card background="image"]x[/card]' ) === '<article class="nino-card">x</article>' );
+	$render( '[card background="/template/page-home/hero/empty" focus="5"]x[/card]' ) === '<article class="nino-card"><div class="nino-card-content">x</div></article>'
+	&& $render( '[card background="/template/page-home/nope/nope" focus="5"]x[/card]' ) === '<article class="nino-card"><div class="nino-card-content">x</div></article>'
+	&& $render( '[card background="" focus="5"]x[/card]' ) === '<article class="nino-card"><div class="nino-card-content">x</div></article>'
+	&& $render( '[card background="image"]x[/card]' ) === '<article class="nino-card"><div class="nino-card-content">x</div></article>' );
 // In a stack: a card to an element, the cell a div and the card in it, and the element is the context of what the card holds
 check( '[card] in a [stack]: one card to an element in the div of the cell, and the components in it see their element - their values escaped as anywhere, the [ of a title written as &#91;',
 	$render( '[stack /services sort="title"][card ground="counter"][card-title title][card-subtitle category][/card][/stack]' ) === '<div class="nino-grid-row nino-stack nino-stack-gap-2">'
-		. '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><article class="nino-card nino-card--counter"><h4 class="nino-card-title">App</h4><p class="nino-card-subtitle">app</p></article></div>'
-		. '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><article class="nino-card nino-card--counter"><h4 class="nino-card-title">Web &lt;b&gt;&#91;x]&lt;/b&gt;</h4><p class="nino-card-subtitle">web</p></article></div></div>'
+		. '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><article class="nino-card nino-card--counter"><div class="nino-card-content"><h4 class="nino-card-title">App</h4><p class="nino-card-subtitle">app</p></div></article></div>'
+		. '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><article class="nino-card nino-card--counter"><div class="nino-card-content"><h4 class="nino-card-title">Web &lt;b&gt;&#91;x]&lt;/b&gt;</h4><p class="nino-card-subtitle">web</p></div></article></div></div>'
 	&& str_contains( $render( '[stack /services sort="title" limit="1" offset="1"][card][card-title title][/card][/stack]' ), '&#91;x]' ) === true
 	&& str_contains( $render( '[stack /services sort="title" limit="1" offset="1"][card][card-title title][/card][/stack]' ), '[x]' ) === false );
 $cardStack = $render( '[stack /services sort="title"][card background="image" focus="2" ground="alt"][card-title title][/card][/stack]' );
 check( '...background="image" takes the picture of the element\'s image field, with an empty alt text - the field names one - and an element whose field holds no file has no div',
-	str_contains( $cardStack, '<article class="nino-card nino-card--alt"><div class="nino-card-bg nino-img-focus--2"><img src="/public/images/services/web/image.webp" width="400" height="300" alt=""></div><h4 class="nino-card-title">Web' ) === true
-	&& substr_count( $cardStack, 'nino-card-bg' ) === 1 && str_contains( $cardStack, '<article class="nino-card nino-card--alt"><h4 class="nino-card-title">App</h4></article>' ) === true
+	str_contains( $cardStack, '<article class="nino-card nino-card--alt"><div class="nino-card-bg nino-img-focus--2"><img src="/public/images/services/web/image.webp" width="400" height="300" alt=""></div><div class="nino-card-content"><h4 class="nino-card-title">Web' ) === true
+	&& substr_count( $cardStack, 'nino-card-bg' ) === 1 && str_contains( $cardStack, '<article class="nino-card nino-card--alt"><div class="nino-card-content"><h4 class="nino-card-title">App</h4></div></article>' ) === true
 	&& str_contains( $cardStack, 'Alt' ) === false );
 check( '...a slot works there as well, a card outside a stack sees no element, and the context is gone after the stack',
 	str_contains( $render( '[stack /services limit="1"][card background="/template/page-home/hero/background"][probe][/card][/stack]' ), '<article class="nino-card"><div class="nino-card-bg"><img src="/public/images/bg.1600x900.jpg"' ) === true
-	&& $render( '[card][probe][/card]' ) === '<article class="nino-card">outside</article>' && \Nino\Modules\Components::element( $appData ) === null );
-check( '...the cards of a stack are drawn the same each time, and each card is the first thing in its cell',
+	&& $render( '[card][probe][/card]' ) === '<article class="nino-card"><div class="nino-card-content">outside</div></article>' && \Nino\Modules\Components::element( $appData ) === null );
+check( '...the cards of a stack are drawn the same each time, and each card is the first thing in its cell, its content in the div of its own',
 	$render( '[stack /services sort="title"][card fill="1"]x[/card][/stack]' ) === $render( '[stack /services sort="title"][card fill="1"]x[/card][/stack]' )
-	&& substr_count( $render( '[stack /services sort="title"][card fill="1"]x[/card][/stack]' ), '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><article class="nino-card nino-card--fill">x</article></div>' ) === 2 );
+	&& substr_count( $render( '[stack /services sort="title"][card fill="1"]x[/card][/stack]' ), '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><article class="nino-card nino-card--fill"><div class="nino-card-content">x</div></article></div>' ) === 2 );
 check( 'the markup of the card and of its picture is a property like that of any component, and what the content holds is never looked at again for a token of the fragment',
 	str_contains( (string) \Nino\Modules\Components::$html['card'], '[[background]][[inner]]</article>' ) === true && \Nino\Modules\Components::$html['card-bg'] === '<div class="nino-card-bg[[focus]]">[[img]]</div>'
-	&& $render( '[card ground="alt"]x [[class]] [[background]] [[ground]][/card]' ) === '<article class="nino-card nino-card--alt">x [[class]] [[background]] [[ground]]</article>' );
+	&& $render( '[card ground="alt"]x [[class]] [[background]] [[ground]][/card]' ) === '<article class="nino-card nino-card--alt"><div class="nino-card-content">x [[class]] [[background]] [[ground]]</div></article>' );
+
+// The card sorts its children: the first picture stands first in the <article>, after the picture behind the card, and every other child stands behind it in the div of the content
+\Nino\Modules\Components::addComponent( $appData, 'imageprobe', static fn( array &$appData, array $args ): string => '<b>'. $args['value']. '</b>', [ 'label' => 'x', 'source' => 'image', 'group' => 'global' ] );
+$cardPicture = '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="" class="nino-card-img">';
+$cardTitle = '<h4 class="nino-card-title">Hi &#91;there]</h4>';
+$cardText = '<div class="nino-card-descr nino-richtext"><p>One</p><ul><li>a</li></ul></div>';
+check( '[card] sorts what it holds: the first child that is a picture - a [card-image], an [image], any component whose source is an image - stands first in the <article>, wherever among the others it was written, and every other child stands behind it in a <div class="nino-card-content">, in the order it was written in',
+	$render( '[card][card-image /template/page-home/hero/background][card-title /template/page-home/hero/title][card-text /template/page-home/services/text][/card]' )
+		=== '<article class="nino-card">'. $cardPicture. '<div class="nino-card-content">'. $cardTitle. $cardText. '</div></article>'
+	&& $render( '[card][card-title /template/page-home/hero/title][card-image /template/page-home/hero/background][card-text /template/page-home/services/text][/card]' )
+		=== '<article class="nino-card">'. $cardPicture. '<div class="nino-card-content">'. $cardTitle. $cardText. '</div></article>'
+	&& $render( '[card][card-title /template/page-home/hero/title][image /template/page-home/hero/background][/card]' ) === '<article class="nino-card"><img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt=""><div class="nino-card-content">'. $cardTitle. '</div></article>'
+	&& $render( '[card][card-title /template/page-home/hero/title][imageprobe /template/page-home/hero/background][/card]' ) === '<article class="nino-card"><b>/template/page-home/hero/background</b><div class="nino-card-content">'. $cardTitle. '</div></article>' );
+check( '...white space between the children is the div\'s: the picture is the first thing in the <article> and the div the second, with nothing between them or around them, and the lines of the template stay between the children of the div',
+	$render( "[card]\n\t[card-image /template/page-home/hero/background]\n\t[card-title /template/page-home/hero/title]\n\t[card-text /template/page-home/services/text]\n[/card]" )
+		=== '<article class="nino-card">'. $cardPicture. "<div class=\"nino-card-content\">". $cardTitle. "\n\t". $cardText. '</div></article>' );
+check( '...a card without a picture has the div alone, and one with nothing but a picture has no div - the picture behind the card is before both, and the stack draws the same card for every element',
+	$render( '[card][card-title /template/page-home/hero/title][/card]' ) === '<article class="nino-card"><div class="nino-card-content">'. $cardTitle. '</div></article>'
+	&& $render( '[card][card-image /template/page-home/hero/background][/card]' ) === '<article class="nino-card">'. $cardPicture. '</article>'
+	&& $render( '[card background="/template/page-home/hero/background" ground="dark"][card-image /template/page-home/hero/background][card-title /template/page-home/hero/title][/card]' )
+		=== '<article class="nino-card nino-card--dark"><div class="nino-card-bg"><img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt=""></div>'. $cardPicture. '<div class="nino-card-content">'. $cardTitle. '</div></article>'
+	&& str_contains( $render( '[stack /services sort="title" offset="1" limit="1"][card][card-title title][card-image image][/card][/stack]' ),
+		'<article class="nino-card"><img src="/public/images/services/web/image.webp" width="400" height="300" alt="Alt &quot;q&quot;" class="nino-card-img"><div class="nino-card-content"><h4 class="nino-card-title">Web &lt;b&gt;&#91;x]&lt;/b&gt;</h4></div></article>' ) === true );
+check( '...only the first picture is the card\'s: a second one is a child like the others and stands in the div, a picture that renders nothing is still the first, and a picture inside the content of another call is that call\'s',
+	$render( '[card][card-image /template/page-home/hero/background][card-title /template/page-home/hero/title][card-image /template/page-home/hero/background class="x"][/card]' )
+		=== '<article class="nino-card">'. $cardPicture. '<div class="nino-card-content">'. $cardTitle. '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="" class="nino-card-img x"></div></article>'
+	&& $render( '[card][card-image /template/page-home/hero/empty][card-title /template/page-home/hero/title][card-image /template/page-home/hero/background][/card]' )
+		=== '<article class="nino-card"><div class="nino-card-content">'. $cardTitle. $cardPicture. '</div></article>'
+	&& $render( '[card][html]<p>x</p>[card-image /template/page-home/hero/background][/html][card-title /template/page-home/hero/title][/card]' ) === '<article class="nino-card"><div class="nino-card-content"><p>x</p><p>'. $cardPicture. '</p>'. $cardTitle. '</div></article>' );
+check( '...the markup of the div is a property like the card\'s, and what the card holds is put into it once: the token of the fragment is never looked at in what the card holds',
+	\Nino\Modules\Components::$html['card-content'] === '<div class="nino-card-content">[[inner]]</div>'
+	&& $render( '[card]x [[inner]] [[class]][/card]' ) === '<article class="nino-card"><div class="nino-card-content">x [[inner]] [[class]]</div></article>' );
 
 // Whatever a hand-written file gets wrong still renders
 check( 'an attribute that is not declared is ignored', $render( '[title /template/page-home/hero/title bogus="x" onclick="y"]' ) === $render( '[title /template/page-home/hero/title]' ) );
@@ -2151,6 +2327,65 @@ check( 'a source that resolves to nothing renders nothing - not a heading with n
 	&& $render( '[text /template/page-home/nope/title]' ) === '' && $render( '[button /template/page-home/nope/title href="#"]' ) === '' && $render( '[title]' ) === ''
 	&& $render( '[title /template/page-home/empty/title]' ) === '' && $render( '[title title]' ) === '' );
 check( 'a fill in the first argument is not a thing: the source is the key, not its value', str_contains( $render( '[title [[/template/page-home/hero/title]]]' ), 'nino-section-title' ) === false );
+
+// The fixed text of a call that carries a [[key]] on a page: the fills of a page are put in before its shortcodes run, so the call gets text="..." with the text of the key in it as the fills hold it -
+// a plain text with its quotes and brackets as entities, as the panels store it - and reads it as it reads the text of a key: an entity is the character it stands for, written once. So does the
+// call of an author who types an entity, as in any attribute of html. The renderers have no say in it
+\Nino\Html::addFills( $appData, [
+	'/template/page-home/stored/call'		=> \Nino\Text::sanitizeValue( '[title /template/page-home/hero/title]', 'plain' ),
+	'/template/page-home/stored/amp'		=> \Nino\Text::sanitizeValue( 'Müller & Söhne', 'plain' ),
+	'/template/page-home/stored/entity'	=> 'Müller &amp; Söhne',
+	'/template/page-home/probe/entities'	=> 'x &lt;b&gt;y&lt;/b&gt; &amp; z',
+	'/template/page-home/probe/doubled'	=> '&amp;lt;b&amp;gt;',
+], '*' );
+check( 'the fixed text of a call on a page shows the text of a key once, as the key shows it as the source of the same component: the apostrophe, the quotes and the brackets of a stored plain value are the characters they were typed as, not an entity escaped again - in a title, in the middle of a text and in a button',
+	$render( '[title text="[[/template/page-home/stored/title]]"]' ) === $render( '[title /template/page-home/stored/title]' )
+	&& $render( '[title text="[[/template/page-home/stored/title]]"]' ) === '<h3 class="nino-section-title">Let&#039;s talk about &quot;us&quot; &#91;today]</h3>'
+	&& $render( '[title text="So: [[/template/page-home/stored/title]]!"]' ) === '<h3 class="nino-section-title">So: Let&#039;s talk about &quot;us&quot; &#91;today]!</h3>'
+	&& $render( '[button text="[[/template/page-home/stored/title]]" href="#x"]' ) === $render( '[button /template/page-home/stored/title href="#x"]' ) );
+check( '...an ampersand is one: a key that holds Müller & Söhne and a key that holds it written Müller &amp; Söhne both show it once - not as the &amp;amp; that escaping the entity again made',
+	$render( '[title text="[[/template/page-home/stored/amp]]"]' ) === '<h3 class="nino-section-title">Müller &amp; Söhne</h3>' && $render( '[title text="[[/template/page-home/stored/entity]]"]' ) === '<h3 class="nino-section-title">Müller &amp; Söhne</h3>'
+	&& $render( '[title text="[[/template/page-home/stored/amp]]"]' ) === $render( '[title /template/page-home/stored/amp]' ) && $render( '[title text="[[/template/page-home/stored/entity]]"]' ) === $render( '[title /template/page-home/stored/entity]' ) );
+check( '...an entity that an author types in the fixed text is the character, as in an attribute of html, and a character that is none stays one: Fish &amp; Chips and Fish & Chips are the same words, &lt;b&gt; is text and no element, and &amp;lt; is the five characters it spells',
+	$render( '[title text="Fish &amp; Chips"]' ) === '<h3 class="nino-section-title">Fish &amp; Chips</h3>' && $render( '[title text="Fish & Chips"]' ) === '<h3 class="nino-section-title">Fish &amp; Chips</h3>'
+	&& $render( '[title text="&lt;b&gt;x&lt;/b&gt;"]' ) === '<h3 class="nino-section-title">&lt;b&gt;x&lt;/b&gt;</h3>' && $render( '[title text="&amp;lt;"]' ) === '<h3 class="nino-section-title">&amp;lt;</h3>' );
+check( '...a bracket written as an entity is a bracket once the text is decoded, and it is written inert with the rest: a stored value that spells a call, or a fixed text that does, is shown and opens nothing',
+	$render( '[title text="[[/template/page-home/stored/call]]"]' ) === '<h3 class="nino-section-title">&#91;title /template/page-home/hero/title]</h3>'
+	&& $render( '[title text="&#91;title text=&quot;x&quot;&#93;"]' ) === '<h3 class="nino-section-title">&#91;title text=&quot;x&quot;]</h3>' );
+check( '...the other formats are not decoded: the fixed text of [text format="inline"] is sanitized as typed, as the text of a key of that format is - an &lt;b&gt; in it is text, and no element',
+	$render( '[text text="x &lt;b&gt;y&lt;/b&gt;" format="inline"]' ) === '<p class="nino-section-text">x &lt;b&gt;y&lt;/b&gt;</p>'
+	&& $render( '[text text="[[/template/page-home/probe/entities]]" format="inline"]' ) === $render( '[text /template/page-home/probe/entities format="inline"]' )
+	&& $render( '[text text="[[/template/page-home/probe/entities]]" format="inline"]' ) === '<p class="nino-section-text">x &lt;b&gt;y&lt;/b&gt; &amp; z</p>' );
+
+// A call that comes from elsewhere has none put in: the call is made to the callback of the shortcode as a page makes it, with the arguments as they were written, and dispatch() puts the fills in
+// of the fixed text as the pass of a page does - the text of the key as the fills hold it, read by value() as above - so that the two are the same call
+\Nino\Html::addFills( $appData, [
+	'/template/page-home/probe/tag'		=> 'h2',
+	'/template/page-home/probe/class'	=> 'one two',
+	'/template/page-home/probe/outer'	=> 'Outer [[/template/page-home/hero/title]]',
+	'/template/page-home/probe/key'		=> '/template/page-home/hero/title',
+], '*' );
+$direct = static fn( string $shortcode, array $args ): string => (string) \Nino\Callbacks::doCallbacks( $appData, '/nino/html/shortcode/'. $shortcode, $args );
+check( 'a [[key]] in the fixed text of a call is the text of the key, written once - and the call a page makes with the fill put in is the same call',
+	$direct( 'title', [ 'text' => '[[/template/page-home/hero/title]]' ] ) === '<h3 class="nino-section-title">Hi &#91;there]</h3>'
+	&& $direct( 'title', [ 'text' => 'A [[/template/page-home/hero/subtitle]] B' ] ) === '<h3 class="nino-section-title">A Sub B</h3>'
+	&& $direct( 'title', [ 'text' => 'A [[/template/page-home/hero/subtitle]] B' ] ) === $render( '[title text="A [[/template/page-home/hero/subtitle]] B"]' )
+	&& $direct( 'button', [ 'text' => '[[/template/page-home/hero/subtitle]]', 'href' => '#' ] ) === '<a class="nino-btn" href="#">Sub</a>' );
+check( '...a plain value stored with its quotes and brackets as entities shows the characters it was typed with, as value() shows a key - and as the page does: the two paths are one call, decoded once, whatever the text holds',
+	$direct( 'title', [ 'text' => '[[/template/page-home/stored/title]]' ] ) === $render( '[title /template/page-home/stored/title]' )
+	&& $direct( 'title', [ 'text' => '[[/template/page-home/stored/title]]' ] ) === $render( '[title text="[[/template/page-home/stored/title]]"]' )
+	&& $direct( 'title', [ 'text' => '[[/template/page-home/probe/doubled]]' ] ) === $render( '[title /template/page-home/probe/doubled]' ) && $direct( 'title', [ 'text' => '[[/template/page-home/probe/doubled]]' ] ) === '<h3 class="nino-section-title">&amp;lt;b&amp;gt;</h3>'
+	&& $direct( 'text', [ 'text' => '[[/template/page-home/probe/entities]]', 'format' => 'inline' ] ) === $render( '[text /template/page-home/probe/entities format="inline"]' )
+	&& $direct( 'title', [ 'text' => '[[/template/page-home/stored/call]]' ] ) === $render( '[title text="[[/template/page-home/stored/call]]"]' ) );
+check( '...a key with no text is nothing, and a fill inside the text of a fill is not resolved: it is written as the text it is, with its brackets escaped like any other',
+	$direct( 'title', [ 'text' => 'A [[/template/page-home/nope/nope]] B' ] ) === '<h3 class="nino-section-title">A  B</h3>'
+	&& $direct( 'title', [ 'text' => '[[/template/page-home/probe/outer]]' ] ) === '<h3 class="nino-section-title">Outer &#91;&#91;/template/page-home/hero/title]]</h3>' );
+check( '...and nothing else of a call is read like that: the attributes are taken as they stand - a select with a fill in it is outside its options, a class writes the brackets inert -, the first argument is no source with a fill in it, not even where the text of the fill is the key of a text, and the content is left to the rendering that follows',
+	$direct( 'title', [ '/template/page-home/hero/title', 'tag' => '[[/template/page-home/probe/tag]]' ] ) === '<h3 class="nino-section-title">Hi &#91;there]</h3>'
+	&& $direct( 'title', [ '/template/page-home/hero/title', 'class' => 'a [[/template/page-home/probe/class]] b' ] ) === '<h3 class="nino-section-title a &#91;&#91;/template/page-home/probe/class]] b">Hi &#91;there]</h3>'
+	&& $direct( 'title', [ '[[/template/page-home/hero/title]]' ] ) === '' && $direct( 'title', [ '[[/template/page-home/probe/key]]' ] ) === ''
+	&& $direct( 'title', [ '/template/page-home/probe/key' ] ) === '<h3 class="nino-section-title">/template/page-home/hero/title</h3>'
+	&& $direct( 'html', [ 'content' => '<p>[[/template/page-home/hero/title]]</p>' ] ) === '<p>[[/template/page-home/hero/title]]</p>' );
 
 // [image] is a component now, and what it did it still does
 check( '[image] of a slot: the same <img> as before', $render( '[image /template/page-home/hero/background alt="A"]' ) === '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="A">' );
@@ -2264,7 +2499,7 @@ check( '...a source that resolves to nothing is nothing, not an empty link, and 
 	$render( '[title /template/page-home/nope/title href="#x"]' ) === '' && $render( '[image /template/page-home/hero/empty href="#x"]' ) === ''
 	&& $render( '[stack /services sort="title" limit="1"][title title href=".uri" target="_blank"][/stack]' ) === '<div class="nino-grid-row nino-stack nino-stack-gap-2"><div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><a href="/services/app" target="_blank" rel="noopener"><h3 class="nino-section-title">App</h3></a></div></div>' );
 check( '...the others take no link: the card holds buttons, the button has an address of its own, and the html, the spacer and the scroll hint do not name one - an href on them is an attribute nobody declared, and ignored',
-	$render( '[card href="#x" target="_blank"]x[/card]' ) === '<article class="nino-card">x</article>' && $render( '[spacer href="#x"]' ) === '<div class="nino-mt-2"></div>'
+	$render( '[card href="#x" target="_blank"]x[/card]' ) === '<article class="nino-card"><div class="nino-card-content">x</div></article>' && $render( '[spacer href="#x"]' ) === '<div class="nino-mt-2"></div>'
 	&& $render( '[html href="#x"]<p>Hi</p>[/html]' ) === '<p>Hi</p>' && $render( '[button text="Go" href="#x" target="_blank"]' ) === '<a class="nino-btn" href="#x" target="_blank" rel="noopener">Go</a>'
 	&& $render( '[scroll-hint href="#x" target="_blank"]' ) === $render( '[scroll-hint]' ) );
 check( '...and a component of a project that says link is wrapped the same way, a component that does not is not',
@@ -2346,8 +2581,8 @@ check( '[stack] draws a nested grid row, one cell to an element, in the widths o
 // The cell of a stack is the div of the grid, and a card is a component in its content - a property of the content, written once in the template
 check( '[stack] draws a div to the cell and the card in it: the stack brings the grid, the content brings the card',
 	$render( '[stack /services sort="title" cols="100 50" gap="4" id="svc"][card ground="alt"][title title tag="h4"][/card][/stack]' ) === '<div class="nino-grid-row nino-stack nino-stack-gap-4" id="svc">'
-		. '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><article class="nino-card nino-card--alt"><h4 class="nino-section-title">App</h4></article></div>'
-		. '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><article class="nino-card nino-card--alt"><h4 class="nino-section-title">Web &lt;b&gt;&#91;x]&lt;/b&gt;</h4></article></div></div>' );
+		. '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><article class="nino-card nino-card--alt"><div class="nino-card-content"><h4 class="nino-section-title">App</h4></div></article></div>'
+		. '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><article class="nino-card nino-card--alt"><div class="nino-card-content"><h4 class="nino-section-title">Web &lt;b&gt;&#91;x]&lt;/b&gt;</h4></div></article></div></div>' );
 check( '...a stack has no attribute for what a cell looks like: card="..." is ignored as any attribute that is not declared is, and the cell stays a div whatever the shortcode says',
 	array_filter( [ 'card', 'counter', 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt', 'weird', '' ], static fn( string $word ): bool =>
 		$render( '[stack /services limit="1" card="'. $word. '"][probe][/stack]' ) !== $render( '[stack /services limit="1"][probe][/stack]' )
@@ -2355,18 +2590,18 @@ check( '...a stack has no attribute for what a cell looks like: card="..." is ig
 	&& str_contains( $render( '[stack /services limit="1" card="alt"][probe][/stack]' ), '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33">' ) === true
 	&& str_contains( $render( '[stack /services limit="1" card="alt"][probe][/stack]' ), 'nino-card' ) === false );
 check( '...the autoheight group is an attribute of the div, and the id and the gap stay on the row',
-	str_contains( $render( '[stack /services limit="1" autoheight="1" id="svc"][card ground="dark"][probe][/card][/stack]' ), '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33 nino-autoheight" data-autoheight-group="svc"><article class="nino-card nino-card--dark">' ) === true
+	str_contains( $render( '[stack /services limit="1" autoheight="1" id="svc"][card ground="dark"][probe][/card][/stack]' ), '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33 nino-autoheight" data-autoheight-group="svc"><article class="nino-card nino-card--dark"><div class="nino-card-content">' ) === true
 	&& str_starts_with( $render( '[stack /services limit="1" gap="3" id="svc"][card ground="dark"][probe][/card][/stack]' ), '<div class="nino-grid-row nino-stack nino-stack-gap-3" id="svc"><div class="nino-grid-s-100' ) );
 $cardFilter = $render( '[filter /services sort="title" by="category" id="f"][card ground="counter"][probe][/card][/filter]' );
 check( '[filter] draws the same: the cell is the div that carries the class and the value the filter needs, and the card is in it',
-	str_contains( $cardFilter, '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33 nino-filter-item" data-filter-item="app"><article class="nino-card nino-card--counter">inside:/services#0#/services/app#string</article></div>' ) === true
-	&& str_contains( $cardFilter, '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33 nino-filter-item" data-filter-item="web"><article class="nino-card nino-card--counter">inside:/services#1#/services/web#string</article></div>' ) === true
+	str_contains( $cardFilter, '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33 nino-filter-item" data-filter-item="app"><article class="nino-card nino-card--counter"><div class="nino-card-content">inside:/services#0#/services/app#string</div></article></div>' ) === true
+	&& str_contains( $cardFilter, '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33 nino-filter-item" data-filter-item="web"><article class="nino-card nino-card--counter"><div class="nino-card-content">inside:/services#1#/services/web#string</div></article></div>' ) === true
 	&& substr_count( $cardFilter, '<article' ) === 2 && substr_count( $cardFilter, '</article>' ) === 2 );
 check( '[slider] and [list] draw what they drew, and a card is as much a content in them as in a stack',
 	$render( '[slider /services sort="title" card="alt"][probe][/slider]' ) === $render( '[slider /services sort="title"][probe][/slider]' )
 	&& $render( '[list /services sort="title" card="alt"][probe][/list]' ) === $render( '[list /services sort="title"][probe][/list]' )
-	&& str_contains( $render( '[slider /services sort="title" limit="1"][card][probe][/card][/slider]' ), '<li><article class="nino-card">inside:/services#0#/services/app#string</article></li>' ) === true
-	&& str_contains( $render( '[list /services sort="title" limit="1"][card][probe][/card][/list]' ), '<li><article class="nino-card">inside:/services#0#/services/app#string</article></li>' ) === true );
+	&& str_contains( $render( '[slider /services sort="title" limit="1"][card][probe][/card][/slider]' ), '<li><article class="nino-card"><div class="nino-card-content">inside:/services#0#/services/app#string</div></article></li>' ) === true
+	&& str_contains( $render( '[list /services sort="title" limit="1"][card][probe][/card][/list]' ), '<li><article class="nino-card"><div class="nino-card-content">inside:/services#0#/services/app#string</div></article></li>' ) === true );
 $gridAttributes = (array) ( new ReflectionClassConstant( '\Nino\Modules\Components', 'GRID' ) )->getValue();
 check( 'the grid of a stack is three attributes - the widths of the cells, the gap between them and whether they are one height - and nothing about a card; the constant of the cards is gone, and the fragment of a cell is a div',
 	array_keys( $gridAttributes ) === [ 'cols', 'gap', 'autoheight' ]

@@ -172,4 +172,101 @@ check( 'a slider with no slides in it is left alone rather than throwing out of 
 check( '...and one with no list at all too - nothing appended, nothing wired', readyThrew === null && noStage.children.length === 0 && noStage.pos === undefined );
 check( '...while the finished slider beside them is still wired', slider.pos === 1 );
 
+// The widths of the slides: data-slider-width and data-slider-min are lengths, and toPx() reads them - a number is pixels, with the unit px or with none, a number with a % is that share of the
+// width of the slider, and what is no such length - no number, a number below 0, a number in any other unit - is read as the fallback by the same rules: '75%' for the width, '300' for the least
+// width. A slider whose width is not known yet is left as it is
+function sized( attributes, width, count ) {
+	const lis = [];
+	for( let i = 0; i < ( count ?? 3 ); i++ )
+		lis.push( element('LI') );
+	const track = element('UL');
+	track.getElementsByTagName = function( tagName ) { return tagName === 'li' ? lis : []; };
+	track.getBoundingClientRect = function() { return { height : 90 }; };
+	const wrap = element('DIV');
+	wrap.attributes = Object.assign( { 'data-slider-pos' : '0' }, attributes );
+	wrap.getAttribute = function( name ) { return this.attributes[name] ?? null; };
+	wrap.measured = width;
+	wrap.getBoundingClientRect = function() { return { width : this.measured }; };
+	wrap.getElementsByTagName = function( tagName ) { return tagName === 'ul' ? [ track ] : []; };
+	wrap.slides = lis;
+	wrap.track = track;
+	return wrap;
+}
+function resized( wraps ) {
+	document.querySelectorAll = function( selector ) { return selector === '.nino-slider' ? wraps : []; };
+	ui.onReady();
+	ui._onResize[ ui._onResize.length - 1 ]();
+	return wraps.map( function( wrap ) { return wrap.slides.map( function( li ) { return li.style.width; } ); } );
+}
+function slideWidth( attributes, width ) {
+	return resized( [ sized( attributes, width ?? 400 ) ] )[0][0];
+}
+
+check( 'a slide is three quarters of the slider where the markup names no width, and a width in percent is that share of the slider',
+	slideWidth( {} ) === '300px' && slideWidth( { 'data-slider-width' : '50%' } ) === '200px' && slideWidth( { 'data-slider-width' : '12.5%' } ) === '50px' && slideWidth( { 'data-slider-width' : '75%' }, 640 ) === '480px' );
+check( '...a width in pixels is those pixels, with the unit or with none - 300 is 300px, not the 3 that cutting two characters off it left - and a decimal is read whole',
+	slideWidth( { 'data-slider-width' : '320px' } ) === '320px' && slideWidth( { 'data-slider-width' : '320' } ) === '320px' && slideWidth( { 'data-slider-width' : '250.5px' } ) === '250.5px'
+	&& slideWidth( { 'data-slider-width' : '  60%  ' } ) === '240px' && slideWidth( { 'data-slider-width' : '12px' } ) === '12px' && slideWidth( { 'data-slider-width' : '320PX' } ) === '320px' );
+check( '...a width that is no length - not a number, nothing, a % alone, a number below 0, one that is not finite, a number in a unit that is neither px nor % - is the three quarters of the slider, by the same rules: 40rem is not 40 pixels, and on a slider of 640 it is the three quarters of that one and not the 300 pixels that are the fallback of the least width',
+	[ 'wide', '', '%', 'px', '-20px', '-5%', 'Infinity', 'NaN', '40rem', '2em', '50vw', '320 px' ].every( function( value ) { return slideWidth( { 'data-slider-width' : value } ) === '300px'; } )
+	&& slideWidth( { 'data-slider-width' : '40rem' }, 640 ) === '480px' );
+check( '...the least width keeps a slide from the share of the slider that would be narrower, in pixels or in percent, and has no effect where it is the narrower of the two',
+	slideWidth( { 'data-slider-width' : '25%', 'data-slider-min' : '150px' } ) === '150px' && slideWidth( { 'data-slider-width' : '25%', 'data-slider-min' : '150' } ) === '150px'
+	&& slideWidth( { 'data-slider-width' : '25%', 'data-slider-min' : '60%' } ) === '240px' && slideWidth( { 'data-slider-width' : '75%', 'data-slider-min' : '100px' } ) === '300px'
+	&& slideWidth( { 'data-slider-width' : '25%', 'data-slider-min' : '0' } ) === '100px' );
+check( '...none named is none, and a least width that is no length is 300 pixels, by the same rules as the width\'s',
+	slideWidth( { 'data-slider-width' : '25%' } ) === '100px'
+	&& [ 'big', '', '%', '-20px', '-5%', 'Infinity', '40rem', '2em', '50vw' ].every( function( value ) { return slideWidth( { 'data-slider-width' : '25%', 'data-slider-min' : value } ) === '300px'; } ) );
+check( '...and a slide is never wider than the slider, whichever of the two asks for more',
+	slideWidth( { 'data-slider-width' : '150%' } ) === '400px' && slideWidth( { 'data-slider-width' : '900px' } ) === '400px' && slideWidth( { 'data-slider-width' : '25%', 'data-slider-min' : '700px' } ) === '400px'
+	&& slideWidth( { 'data-slider-width' : '25%', 'data-slider-min' : 'x' }, 200 ) === '200px' );
+
+// The track is as wide as its slides and stands around the active one, the height is the track's
+const placed = sized( { 'data-slider-width' : '50%', 'data-slider-pos' : '1' }, 400, 4 );
+resized( [ placed ] );
+check( 'the track is as wide as all its slides, stands with the active slide in the middle of the slider, and the slider is as tall as the track',
+	placed.track.style.width === '800px' && placed.posLeft === 0 - ( 200 * 1 - ( 400 - 200 ) / 2 ) && placed.track.style.left === placed.posLeft + 'px' && placed.style.height === '90px' );
+
+// A slider that measures 0 wide - hidden, or not laid out yet - keeps the sizes it has, and is measured when the window resizes after it was shown
+const hidden = sized( {}, 400 );
+const shown = sized( { 'data-slider-width' : '50%' }, 400 );
+document.querySelectorAll = function( selector ) { return selector === '.nino-slider' ? [ hidden, shown ] : []; };
+ui.onReady();
+const resizeBoth = ui._onResize[ ui._onResize.length - 1 ];
+resizeBoth();
+const before = [ hidden.slides[0].style.width, hidden.track.style.left, hidden.track.style.width, hidden.style.height ];
+hidden.measured = 0;
+shown.measured = 800;
+let zeroThrew = null;
+try { resizeBoth(); } catch( error ) { zeroThrew = error.constructor.name+ ': '+ error.message }
+check( 'a slider that measures 0 wide is left as it is - no slide of 0px or NaN, no track moved - while the slider beside it is measured again',
+	zeroThrew === null && JSON.stringify( [ hidden.slides[0].style.width, hidden.track.style.left, hidden.track.style.width, hidden.style.height ] ) === JSON.stringify( before ) && shown.slides[0].style.width === '400px' );
+hidden.measured = 200;
+resizeBoth();
+check( '...and is sized once it has a width', hidden.slides[0].style.width === '150px' && hidden.slides.every( function( li ) { return li.style.width === '150px'; } ) );
+
+// A slider that was not wired - no list, or a list with nothing in it - has nothing to size: it is left out of the resize, which neither throws nor writes into it, and the sliders beside it are sized
+const noList = element('DIV');
+noList.attributes = {};
+noList.getAttribute = function( name ) { return this.attributes[name] ?? null };
+noList.getBoundingClientRect = function() { return { width : 400 } };
+noList.getElementsByTagName = function() { return [] };
+const emptyList = element('UL');
+emptyList.getElementsByTagName = function() { return [] };
+emptyList.getBoundingClientRect = function() { return { height : 0 } };
+const noSlides = element('DIV');
+noSlides.attributes = {};
+noSlides.getAttribute = function( name ) { return this.attributes[name] ?? null };
+noSlides.getBoundingClientRect = function() { return { width : 400 } };
+noSlides.getElementsByTagName = function( tagName ) { return tagName === 'ul' ? [ emptyList ] : [] };
+const neighbour = sized( {}, 400 );
+document.querySelectorAll = function( selector ) { return selector === '.nino-slider' ? [ noList, noSlides, neighbour ] : []; };
+ui.onReady();
+let skipThrew = null;
+try { ui._onResize[ ui._onResize.length - 1 ](); } catch( error ) { skipThrew = error.constructor.name+ ': '+ error.message }
+check( 'a slider without a list is left out of the resize rather than throwing out of it - and the one beside it, wired after it, is sized',
+	skipThrew === null && noList.lis === undefined && Object.keys( noList.style ).length === 0 && neighbour.slides[0].style.width === '300px' );
+check( '...and one with a list with no slide in it too, whose list is not given a left or a width of NaN',
+	skipThrew === null && noSlides.lis.length === 0 && emptyList.style.left === undefined && emptyList.style.width === undefined && noSlides.style.height === undefined );
+
 done();

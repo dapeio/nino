@@ -494,6 +494,49 @@ check( 'the danger zone is not rendered while creating a new type',
 	select.children.forEach( o => { o.selected = ( o.value === '' ) } );
 	fire( select, 'change' );
 	check( '...and "own key" shows the field again, with the word still in it, and puts the cursor there', input.hidden === false && input.value === 'author' && input.focused === true );
+
+	// The word says what the field is: choosing it puts the type that most often goes with it on the type select of the row, and the options of that type are drawn as for a pick on the
+	// select; an own key leaves the type as it is. Each type is one of the field types the server lists
+	const picked = ( field, word ) => {
+		const r = elementTypes._renderFieldRow( field, 0 );
+		const keySelect = findAll( r, n => n.className === 'admin-field-key-select' )[0];
+		keySelect.children.forEach( o => { o.selected = ( o.value === word ) } );
+		fire( keySelect, 'change' );
+		const has = name => findAll( r, n => n.className === name ).length;
+		return { type : findAll( r, n => n.className === 'admin-field-type' )[0].value, width : has( 'admin-field-width' ), html : has( 'admin-field-html' ), suffix : has( 'admin-field-suffix' ), required : has( 'admin-field-required' ) };
+	};
+	elementTypes._suffixTypes = [ 'string', 'integer', 'double', 'array', 'date', 'datetime' ];
+	const wordTypes = elementTypes.KEY_TYPES;
+	check( 'every word of the choice says a type, and it is one the server lists - a picture for the image and the icon, a date for the date, a number for the price, text for the rest',
+		JSON.stringify( Object.keys( wordTypes ) ) === JSON.stringify( elementTypes.KEY_WORDS ) && Object.values( wordTypes ).every( t => elementTypes._fieldTypes.includes( t ) )
+		&& wordTypes.image === 'image' && wordTypes.icon === 'image' && wordTypes.date === 'date' && wordTypes.price === 'double'
+		&& elementTypes.KEY_WORDS.filter( w => ![ 'image', 'icon', 'date', 'price' ].includes( w ) ).every( w => wordTypes[w] === 'string' ) );
+	const asImage = picked( { key : 'a', type : 'string' }, 'image' );
+	check( 'choosing the word image puts the type image on the field, and the options of a picture are drawn - its size, and no rule that it is required', asImage.type === 'image' && asImage.width === 1 && asImage.html === 0 && asImage.required === 0 );
+	const asPrice = picked( { key : 'a', type : 'string' }, 'price' );
+	check( '...the price is a number with decimals, which the unit input is offered for and the rich text of a string is not', asPrice.type === 'double' && asPrice.suffix === 1 && asPrice.html === 0 && asPrice.required === 1 );
+	const asTitle = picked( { key : 'a', type : 'double' }, 'title' );
+	check( '...a text word on a field of another type makes it a string, with the options of one', asTitle.type === 'string' && asTitle.html === 1 && asTitle.suffix === 1 );
+	check( '...the date is the type date, and a word whose type the field has already changes nothing',
+		picked( { key : 'a', type : 'string' }, 'date' ).type === 'date' && picked( { key : 'a', type : 'image' }, 'icon' ).type === 'image' && picked( { key : 'a', type : 'string' }, 'author' ).type === 'string' );
+	check( '...an own key leaves the type as it is, whatever it is, and a word is not a command: the type can be changed after',
+		[ 'image', 'double', 'string', 'date' ].every( t => picked( { key : 'title', type : t }, '' ).type === t )
+		&& ( () => {
+			const r = elementTypes._renderFieldRow( { key : 'a', type : 'string' }, 0 );
+			const keySelect = findAll( r, n => n.className === 'admin-field-key-select' )[0];
+			const typeSelect = findAll( r, n => n.className === 'admin-field-type' )[0];
+			keySelect.children.forEach( o => { o.selected = ( o.value === 'image' ) } );
+			fire( keySelect, 'change' );
+			typeSelect.value = 'string';
+			fire( typeSelect, 'change' );
+			return typeSelect.value === 'string' && findAll( r, n => n.className === 'admin-field-width' ).length === 0;
+		} )() );
+	const listedTypes = elementTypes._fieldTypes;
+	elementTypes._fieldTypes = listedTypes.filter( t => t !== 'double' );
+	const unlisted = picked( { key : 'a', type : 'string' }, 'price' );
+	elementTypes._fieldTypes = listedTypes;
+	check( '...a type the server does not list is not put on the select: where it names no double the word price leaves a string a string, with the options of one, and where it names it the type follows',
+		unlisted.type === 'string' && unlisted.html === 1 && picked( { key : 'a', type : 'string' }, 'price' ).type === 'double' );
 	check( '_storeFields() reads the type from its own select, not from the first select of the row', typesSource.includes( "row.querySelector('.admin-field-type').value" ) && typesSource.includes( "row.querySelector('select').value" ) === false );
 }
 

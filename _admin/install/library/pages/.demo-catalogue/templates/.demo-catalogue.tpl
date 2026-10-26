@@ -1661,6 +1661,59 @@
 	</div>
 </section>
 
+<!--	Where the picture behind a row, a column or a card starts and ends at the sides: nino-bg-pl-<n> takes it
+			in from the left and nino-bg-pr-<n> from the right, by a step of the space scale, 0 to 3 - 0 is the edge
+			it lies at without a class. The element is as wide as it was and its content stands where it stood; only
+			the picture is narrower.	-->
+<section class="nino-section nino-pt-3 nino-pb-3 nino-mt-0 nino-mb-0" id="v-levels-sides">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-2">
+			<span class="nino-badge nino-badge--pill">.nino-bg-pl-0 … -3</span>
+			<span class="nino-badge nino-badge--pill">.nino-bg-pr-0 … -3</span>
+			<span class="nino-badge nino-badge--pill">.nino-grid-bg</span>
+			<span class="nino-badge nino-badge--pill">.nino-card-bg</span>
+			<span class="nino-badge nino-badge--pill">.nino-grid-row-bg</span>
+		</div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-grid-l-25 nino-p-1">
+			<div class="nino-grid-100 nino-grid--dim nino-bg-pl-0 nino-bg-pr-0">
+				<div class="nino-grid-bg"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy"></div>
+				<h3 class="nino-section-title nino-text-left">0 and 0</h3>
+				<p>The picture lies over the whole column.</p>
+			</div>
+		</div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-grid-l-25 nino-p-1">
+			<div class="nino-grid-100 nino-grid--dim nino-bg-pl-1 nino-bg-pr-1">
+				<div class="nino-grid-bg"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="" loading="lazy"></div>
+				<h3 class="nino-section-title nino-text-left">1 and 1</h3>
+				<p>A step in from both sides.</p>
+			</div>
+		</div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-grid-l-25 nino-p-1">
+			<div class="nino-grid-100 nino-grid--dim nino-bg-pl-2 nino-bg-pr-2">
+				<div class="nino-grid-bg"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="" loading="lazy"></div>
+				<h3 class="nino-section-title nino-text-left">2 and 2</h3>
+				<p>Two steps.</p>
+			</div>
+		</div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-grid-l-25 nino-p-1">
+			<div class="nino-grid-100 nino-grid--dim nino-bg-pl-3 nino-bg-pr-3">
+				<div class="nino-grid-bg"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy"></div>
+				<h3 class="nino-section-title nino-text-left">3 and 3</h3>
+				<p>Three steps, the content where it was.</p>
+			</div>
+		</div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-p-1">
+			<article class="nino-card nino-card--dim nino-card--fill nino-p-3 nino-bg-pl-2"><div class="nino-card-bg"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="" loading="lazy"></div><h4 class="nino-card-title">A card, in from the left</h4><p>The same two classes work on the picture behind a card.</p></article>
+		</div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-p-1">
+			<div class="nino-grid-row nino-grid-row--full nino-grid-row--dark nino-grid-row--dim nino-bg-pr-3">
+				<div class="nino-grid-row-bg"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy"></div>
+				<div class="nino-grid-100"><h3 class="nino-section-title nino-text-left">A row, in from the right</h3><p>And on the picture behind a row.</p></div>
+			</div>
+		</div>
+	</div>
+</section>
+
 <!--	A card that is the link of its title, the stretched way: the card is no <a>, since it holds
 			a button - the link of the title is stretched over it by its ::after. A click anywhere on the
 			card follows that link, the keyboard stops on it once, and the button stays above the overlay
@@ -1764,6 +1817,13 @@
 				<ul><li>A list item with a bullet</li><li>A second item</li></ul>
 				<ol><li>A numbered item</li><li>A second numbered item</li></ol>
 			</div>
+		</div>
+		<div class="nino-grid-100 nino-mb-3">
+			<p class="nino-badge-cloud nino-badge-cloud--left nino-mb-1"><span class="nino-badge nino-badge--pill">&#91;text tag="p"&#93;</span> <span class="nino-badge nino-badge--pill">&#91;text tag="div"&#93;</span> <span class="nino-badge nino-badge--pill">&#91;text tag="span"&#93;</span></p>
+			<p class="nino-section-text nino-text-left">A text of one line or a few is a p, the tag of the text component by default.</p>
+			<div class="nino-section-text nino-text-left">The same class on a div, for a text that stands in a box of its own.</div>
+			<div class="nino-section-text nino-text-left">A <span class="nino-section-text">span</span> stays in the line it stands in.</div>
+			<div class="nino-richtext nino-section-text nino-text-left"><p>A text with paragraphs and lists is always a div, whatever the tag says: it holds paragraphs of its own, and a p cannot hold a p.</p></div>
 		</div>
 	</div>
 </section>
@@ -1951,6 +2011,8 @@
 			<div class="nino-grid-100 nino-mb-2"><article class="nino-card nino-card--counter nino-card--wide nino-card-cols-m"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy" class="nino-card-img nino-card-img--dim"><div class="nino-card-content"><h4 class="nino-card-title nino-card-title--loud">.nino-card-cols-m</h4><div class="nino-card-descr nino-card-descr--quiet">Image and text side by side from the m breakpoint. The variant exists for every level: -s, -m, -l and -xl.</div><a href="#karten" class="nino-btn nino-btn--outline nino-btn--small">More</a></div></article></div>
 			<div class="nino-grid-100"><article class="nino-card nino-card--counter nino-card--fullwidth"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="" loading="lazy" class="nino-card-img"><div class="nino-card-content"><h4 class="nino-card-title nino-card-title--quiet">.nino-card--fullwidth</h4><div class="nino-card-descr nino-card-descr--loud">The image extends to the edges of the card.</div></div></article></div>
 		</div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-p-1"><article class="nino-card nino-card--counter nino-p-0"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="" loading="lazy" class="nino-card-img nino-card-img--maxheight"><div class="nino-card-content"><h4 class="nino-card-title">nino-p-0, with a picture</h4><div class="nino-card-descr">The card has no padding of its own: the picture goes out to its edges and is cut at its corners, and the words stand in the room of the content, which is where the component puts everything but the picture.</div></div></article></div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-p-1"><article class="nino-card nino-card--counter nino-p-0"><div class="nino-card-content"><h4 class="nino-card-title">nino-p-0, without a picture</h4><div class="nino-card-descr">The same card with no picture: the words keep the room of the content and do not stand on the edge of the card.</div></div></article></div>
 	</div>
 </section>
 
