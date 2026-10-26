@@ -1031,7 +1031,7 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
  *			.nino-section(--alt, --tint, --dark, --black, --primary, --brand-alt, --dim, --border-1/2/3), .nino-section(-title, -subtitle)
  *			.nino-grid-row(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim), .nino-grid-row-bg
  *			.nino-grid(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim)
- *			.nino-card(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim, --fill, --middle, --bottom, --last-bottom, --fullwidth), .nino-card(-content, -title, -subtitle, -descr, -img, -price, -bg)
+ *			.nino-card(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim, --fill, --middle, --bottom, --last-bottom, --linked, --fullwidth), .nino-card(-content, -title, -subtitle, -descr, -img, -price, -bg)
  *			.nino-ink(--muted, --accent)
  *
  *
@@ -1701,6 +1701,53 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	--color-text: var(--color-section-dark-text);
 	background-color: var(--color-ground);
 	color: var(--color-ink);
+}
+
+/*	A card that is a link the stretched way (Inclusive Components, "Cards"; the
+	stretched link of Bootstrap). The card itself is no <a>: it holds buttons,
+	and a link in a link is no markup, which the keyboard and a screen reader
+	cannot make sense of. The link of its title - the <a> that [card-title] draws
+	around the title when it has an address - is stretched over the card by its
+	::after, so that the keyboard has one stop with the name of the title, the
+	pointer has the whole area, and nothing is drawn twice or added. The card is
+	the box the overlay is placed in and a stacking context of its own, so that
+	what is lifted stays in it; the title's link is the one element that stays
+	where it is, since placed itself the overlay would be as large as the link.
+	The overlay lies over everything that is not lifted - a picture in a frame
+	that is placed itself included - and under whatever else in the card is there
+	to be used for its own sake: a button, another link, a field and its label, the
+	summary of a disclosure, a frame, a player with controls. Those are lifted over
+	it and keep targets of their own, and :where() holds the lift at the
+	specificity of one class, so that an element that places itself and says so
+	later in this file - the close button of a dialog, the dot of a slider - keeps
+	its place. Text in a linked card cannot be selected, and a card whose title is
+	no link shows nothing of it	*/
+.nino-card--linked {
+	position: relative;
+	isolation: isolate;
+}
+.nino-card--linked a:has(> .nino-card-title)::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: 1;
+}
+.nino-card--linked :where(a, button, iframe, input, label, select, summary, textarea, [contenteditable], [controls], [tabindex]):where(:not(:has(> .nino-card-title))) {
+	position: relative;
+	z-index: 2;
+}
+/*	The keyboard has one stop in a linked card, and it shows for the whole card.
+	The link is an inline box around a block, the heading, and Chromium draws no
+	ring for that in a card, so the ring is the card's, at the edge inside it: that
+	is the ground the focus colour of the card was solved against, and no parent
+	that clips can cut it off. The generic ring is :where(), so that these two win
+	without a word more	*/
+.nino-card--linked a:focus-visible:has(> .nino-card-title) {
+	outline: none;
+}
+.nino-card--linked:has(a:focus-visible > .nino-card-title) {
+	outline: 2px solid var(--color-focus);
+	outline-offset: -2px;
 }
 
 .nino-card-content {

@@ -133,7 +133,12 @@ The rules the module keeps for you, and the ones it leaves to the renderer:
   schema reads it from the registry. `input`
   on a `select`, a `variant` or a `bool` is a hint for the tool on how to draw
   the attribute (`segment` or `icons` for words, `checkbox` for a flag) and
-  changes nothing about the rendering.
+  changes nothing about the rendering. `tab` is another such hint, on an
+  attribute of any type: `'tab' => 'background'` says that a tool draws the
+  attribute on the tab of the background in its dialog for the component, with
+  the others that say so (the kernel's card does for its colour, its picture,
+  its focus and its dimming). The word has to be one of `Components::TABS`, the
+  list the registry knows.
 - `link => true` makes a component a link where it is given one: it has an
   `href` and a `target` without declaring them, and what the renderer made is
   wrapped in the `<a>` they say - nothing the renderer has to know. The `<a>` is

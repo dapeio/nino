@@ -1661,6 +1661,26 @@
 	</div>
 </section>
 
+<!--	A card that is the link of its title, the stretched way: the card is no <a>, since it holds
+			a button - the link of the title is stretched over it by its ::after. A click anywhere on the
+			card follows that link, the keyboard stops on it once, and the button stays above the overlay
+			with a target of its own. A title that is no link has nothing to stretch.	-->
+<section class="nino-section nino-section--alt nino-pt-3 nino-pb-3 nino-mt-0 nino-mb-0" id="v-levels-card-linked">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-2">
+			<span class="nino-badge nino-badge--pill">&#91;card linked="1"&#93;</span>
+			<span class="nino-badge nino-badge--pill">.nino-card--linked</span>
+			<span class="nino-badge nino-badge--pill">.nino-card--counter</span>
+		</div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-p-1">
+			<article class="nino-card nino-card--counter nino-card--linked"><a href="#v-levels-card-linked"><h4 class="nino-card-title">The whole card is the link</h4></a><div class="nino-section-text">A click anywhere on the card follows the link of its title.</div><a href="#v-levels-card-picture" class="nino-btn nino-btn--outline nino-btn--small">More</a></article>
+		</div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-p-1">
+			<article class="nino-card nino-card--counter nino-card--linked"><h4 class="nino-card-title">A title that is no link</h4><div class="nino-section-text">The class does nothing here: there is no link to stretch.</div></article>
+		</div>
+	</div>
+</section>
+
 <!-- ============================== 2 · Bausteine ======================== -->
 
 <section class="nino-section nino-section--black nino-mt-0 nino-mb-0" id="katalog-elemente" aria-labelledby="katalog-elemente-title">

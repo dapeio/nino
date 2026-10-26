@@ -49,7 +49,7 @@ namespace Nino\Modules {
 				'link'				=> '<a[[href]][[target]]>[[inner]]</a>',
 				'scroll-hint'	=> '<a class="nino-hero-arrowdown[[class]]" href="#[[to]]"[[next]] aria-label="[[/template/common/navigation/next-section]]"></a>',
 				'spacer'			=> '<div class="nino-mt-[[size]][[class]]"></div>',
-				'card'				=> '<article class="nino-card[[ground]][[dim]][[borderless]][[fill]][[vertical]][[align]][[padding]][[class]]">[[background]][[inner]]</article>',
+				'card'				=> '<article class="nino-card[[ground]][[dim]][[borderless]][[fill]][[linked]][[vertical]][[align]][[padding]][[class]]">[[background]][[inner]]</article>',
 				'card-bg'			=> '<div class="nino-card-bg[[focus]]">[[img]]</div>',
 				'cell'				=> '<div[[class]][[attributes]]>[[inner]]</div>',
 				'stack'				=> '<div class="nino-grid-row nino-stack[[gap]][[class]]"[[id]]>[[cells]]</div>',
@@ -103,6 +103,14 @@ namespace Nino\Modules {
 			'variant'	=> [ 'select', 'segment', 'icons' ],
 			'bool'		=> [ 'switch', 'checkbox' ],
 		];
+
+		// The tabs of a tool's dialog an attribute may ask to be drawn on - the 'tab' of an
+		// attribute, where the others stand among the properties: the colour of a card,
+		// its picture, the focus and the dimming of that picture belong on the tab of the
+		// background. The registry owns the list, so that a tool draws the attributes of
+		// a tab together and knows no component by name. A hint for the tool and nothing
+		// the rendering reads
+		public const array TABS = [ 'background' ];
 
 		// The words a tool has an icon for, by alignment: where a text stands,
 		// where the content stands in a box - last-bottom is the card's, the
@@ -338,13 +346,15 @@ namespace Nino\Modules {
 					'padding' => [ 'type' => 'select', 'options' => [ '', '0', '1', '2', '3', '4', '5', '6' ], 'default' => '', 'label' => [ 'en_US' => 'Padding', 'de_DE' => 'Padding' ] ],
 					'vertical' => [ 'type' => 'select', 'options' => [ '', 'middle', 'bottom', 'last-bottom' ], 'default' => '', 'input' => 'icons', 'label' => [ 'en_US' => 'Vertical element alignment', 'de_DE' => 'Vertikale Element-Ausrichtung' ] ],
 					'align' => [ 'type' => 'select', 'options' => [ '', 'left', 'center', 'right' ], 'default' => '', 'input' => 'icons', 'label' => [ 'en_US' => 'Horizontal text alignment', 'de_DE' => 'Horizontale Text-Ausrichtung' ] ],
-					'ground' => [ 'type' => 'select', 'options' => [ '', 'counter', 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt' ], 'default' => '', 'label' => [ 'en_US' => 'Background colour', 'de_DE' => 'Hintergrund-Farbe' ] ],
+					'ground' => [ 'type' => 'select', 'options' => [ '', 'counter', 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt' ], 'default' => '', 'tab' => 'background', 'label' => [ 'en_US' => 'Background colour', 'de_DE' => 'Hintergrund-Farbe' ] ],
 					'borderless' => [ 'type' => 'bool', 'default' => false, 'label' => [ 'en_US' => 'Without border', 'de_DE' => 'Ohne Rahmen' ] ],
-					'background' => [ 'type' => 'image', 'default' => '', 'label' => [ 'en_US' => 'Background picture', 'de_DE' => 'Hintergrund-Bild' ],
+					'linked' => [ 'type' => 'bool', 'default' => false, 'label' => [ 'en_US' => 'Whole card is the link', 'de_DE' => 'Ganze Karte verlinkt' ],
+						'hint' => [ 'en_US' => 'The link of the card\'s title covers the whole card; text in the card cannot be selected then.', 'de_DE' => 'Der Link des Kartentitels gilt für die ganze Fläche; Text in der Karte lässt sich dann nicht markieren.' ] ],
+					'background' => [ 'type' => 'image', 'default' => '', 'tab' => 'background', 'label' => [ 'en_US' => 'Background picture', 'de_DE' => 'Hintergrund-Bild' ],
 						'hint' => [ 'en_US' => 'A slot, or in a stack an image field of the element, laid behind the content.', 'de_DE' => 'Ein Slot oder in einem Stapel ein Bildfeld des Elements, hinter den Inhalt gelegt.' ] ],
-					'focus' => [ 'type' => 'select', 'options' => [ '', '1', '2', '3', '4', '5', '6', '7', '8', '9' ], 'default' => '', 'label' => [ 'en_US' => 'Focus', 'de_DE' => 'Fokus' ],
+					'focus' => [ 'type' => 'select', 'options' => [ '', '1', '2', '3', '4', '5', '6', '7', '8', '9' ], 'default' => '', 'tab' => 'background', 'label' => [ 'en_US' => 'Focus', 'de_DE' => 'Fokus' ],
 						'hint' => [ 'en_US' => 'Which part of the picture survives a crop, as one of nine positions.', 'de_DE' => 'Welcher Teil des Bildes beim Zuschneiden bleibt, als eine von neun Positionen.' ] ],
-					'dim' => [ 'type' => 'bool', 'default' => false, 'label' => [ 'en_US' => 'Dim the picture', 'de_DE' => 'Bild abdunkeln' ] ],
+					'dim' => [ 'type' => 'bool', 'default' => false, 'tab' => 'background', 'label' => [ 'en_US' => 'Dim the picture', 'de_DE' => 'Bild abdunkeln' ] ],
 				], [ 'section', 'hero' ], 'article .nino-card', 'card', false, 'card' ],
 				[ 'button', 'Button', 'Button', 'button', 'text', [
 					'href' => self::LINK['href'],
@@ -952,6 +962,17 @@ namespace Nino\Modules {
 					return $where. '"input" of a '. $type. ' must be one of '. implode( ', ', $inputs );
 
 				$clean['input'] = $declared['input'];
+			}
+
+			// On which tab of its dialog a tool draws it, where the schema says: one word
+			// of TABS, a hint for the tool like the input, and left out of the clean schema
+			// where the schema leaves it out. Any type may have one
+			if( isset( $declared['tab'] ) === true ) {
+
+				if( in_array( $declared['tab'], self::TABS, true ) === false )
+					return $where. '"tab" must be one of '. implode( ', ', self::TABS );
+
+				$clean['tab'] = $declared['tab'];
 			}
 
 			if( isset( $declared['prefix'] ) === true && $type !== 'variant' )
@@ -2121,9 +2142,10 @@ namespace Nino\Modules {
 		 *	between its tags is the calls of the components of a card, and this
 		 *	draws the <article> around them: its ground, its padding, whether it
 		 *	takes the whole height of its column or cell, where its content stands
-		 *	in it, a picture behind the content, its border, and a class of its
-		 *	own. It stands once in a column - a card beside a picture - and in
-		 *	the content of a stack once per element: the cards of a loop.
+		 *	in it, a picture behind the content, its border, whether the link of its
+		 *	title is stretched over the whole of it, and a class of its own. It
+		 *	stands once in a column - a card beside a picture - and in the content
+		 *	of a stack once per element: the cards of a loop.
 		 *
 		 *	The content is $args['value'] as it is, and it is not rendered here.
 		 *	The engine renders the output of a shortcode again
@@ -2144,6 +2166,15 @@ namespace Nino\Modules {
 		 *	file and a field that holds none draw no <div>. The kernel writes every
 		 *	class it is told to: a dim without a picture is the author's mistake
 		 *	and a builder's business, as the dim of a column is.
+		 *
+		 *	The card is no <a>, whatever 'linked' says: it holds buttons, and a link
+		 *	in a link is no markup. 'linked' writes the class nino-card--linked and
+		 *	nothing else; Nino.css stretches the link of the card's title - the <a>
+		 *	that a [card-title] with an address is drawn in (see _linked()) - over
+		 *	the whole card with its ::after, so that the keyboard has one stop with
+		 *	the name of the title, shown as a ring on the card, and the pointer the
+		 *	whole area, and the buttons, links, fields, frames and players in the
+		 *	card stay above it. A card whose title is no link shows nothing of it.
 		 *
 		 *	A [card] directly inside a [card] is not supported, for the
 		 *	reason a stack inside a stack is not: the shortcode reads its content
@@ -2175,12 +2206,13 @@ namespace Nino\Modules {
 			}
 
 			return str_replace(
-				[ '[[ground]]', '[[dim]]', '[[borderless]]', '[[fill]]', '[[vertical]]', '[[align]]', '[[padding]]', '[[class]]', '[[background]]', '[[inner]]' ],
+				[ '[[ground]]', '[[dim]]', '[[borderless]]', '[[fill]]', '[[linked]]', '[[vertical]]', '[[align]]', '[[padding]]', '[[class]]', '[[background]]', '[[inner]]' ],
 				[
 					self::_modifier( 'nino-card--', $args['ground'] ),
 					self::_modifier( 'nino-card--', $args['dim'] === '1' ? 'dim' : '' ),
 					self::_modifier( 'nino-card--', $args['borderless'] === '1' ? 'borderless' : '' ),
 					self::_modifier( 'nino-card--', $args['fill'] === '1' ? 'fill' : '' ),
+					self::_modifier( 'nino-card--', $args['linked'] === '1' ? 'linked' : '' ),
 					self::_modifier( 'nino-card--', $args['vertical'] ),
 					self::_modifier( 'nino-text-', $args['align'] ),
 					self::_modifier( 'nino-p-', $args['padding'] ),

@@ -603,6 +603,50 @@ foreach( [ 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt', 'counter', 'd
 		$groundWrong[] = '.nino-card--'. $groundName;
 check( '...and the full-width rule lists it with the seven grounds, so a full-width dimmed card has no side padding either'. ( $groundWrong === [] ? '' : ' - not in it: '. implode( ', ', $groundWrong ) ), $groundWrong === [] );
 
+/*	A card is the link of its title the stretched way: the card is no <a>, since it holds buttons, and the link of its title is stretched over it by its ::after. The card is the box the
+	overlay is placed in and a stacking context of its own, so that what is lifted stays in it. The overlay is the pseudo-element of the <a> that holds the title - the link [card-title]
+	draws, the title its one child - which is the one element that is placed by no rule, or the overlay would be as large as the link. It lies over everything that is not lifted, a framed
+	picture that is placed itself among it, and what else in the card can take focus is lifted over it: a position and a z-index above the overlay's, at the specificity of one class
+	(:where()), so that an element that places itself and says so later keeps its place. The one stop of the keyboard shows on the card, and the link has no ring of its own	*/
+$linkedLink = '.nino-card--linked a:has(> .nino-card-title)';
+$linkedOverlay = $groundOf( $linkedLink. '::after' );
+$linkedLiftAt = array_values( array_filter( array_keys( $groundEach ), static fn( string $selector ): bool => str_starts_with( $selector, '.nino-card--linked :where(' ) === true ) );
+$linkedLift = $groundOf( $linkedLiftAt[0] ?? '' );
+$linkedZ = static fn( string $body ): int => (int) ( $hookValue( $body, 'z-index' ) ?? PHP_INT_MIN );
+// What is left of a selector when its :where() groups are taken out: what counts for its specificity
+$linkedFlat = static function( string $selector ): string {
+	$flat = '';
+	$depth = 0;
+	for( $at = 0; $at < strlen( $selector ); $at++ ) {
+		if( $depth === 0 && substr( $selector, $at, 7 ) === ':where(' ) {
+			$depth = 1;
+			$at += 6;
+		}
+		elseif( $depth > 0 )
+			$depth += $selector[$at] === '(' ? 1 : ( $selector[$at] === ')' ? -1 : 0 );
+		else
+			$flat .= $selector[$at];
+	}
+	return trim( $flat );
+};
+$linkedOwn = array_map( static fn( string $declaration ): string => trim( explode( ':', $declaration )[0] ), array_filter( explode( ';', $groundOf( '.nino-card--linked' ) ), static fn( string $declaration ): bool => trim( $declaration ) !== '' ) );
+check( 'a card may be the link of its title, the stretched way: .nino-card--linked is the box the overlay is placed in - placed, and a stacking context of its own - and says nothing else of the card, so that a card whose title is no link is as without it',
+	$groundSets( $groundOf( '.nino-card--linked' ), 'position', 'relative' ) === true && $groundSets( $groundOf( '.nino-card--linked' ), 'isolation', 'isolate' ) === true
+	&& array_values( $linkedOwn ) === [ 'position', 'isolation' ] && count( $groundEach['.nino-card--linked'] ?? [] ) === 1 );
+check( '...the overlay is the pseudo-element of the <a> that holds the title - the link that [card-title] draws, with the title as its one child - an empty box over the whole card with a z-index of its own; and no rule places that link',
+	$groundSets( $linkedOverlay, 'content', "''" ) === true && $groundSets( $linkedOverlay, 'position', 'absolute' ) === true && $groundSets( $linkedOverlay, 'inset', '0' ) === true && $linkedZ( $linkedOverlay ) > 0
+	&& preg_match( '/(?<![\w-])(?:position|z-index|inset|top|right|bottom|left)\s*:/', $groundOf( $linkedLink ) ) !== 1
+	&& str_starts_with( \Nino\Modules\Components::$html['link'], '<a' ) === true && str_contains( \Nino\Modules\Components::$html['card-title'], 'class="nino-card-title' ) === true );
+check( '...what else in the card is there to be used for its own sake is lifted over it - a link, a button, a field and its label, a disclosure, a frame, a player with controls, whatever has a tabindex, but the link that holds the title - by a position and a z-index above the overlay\'s, at the specificity of one class'
+	. ( $linkedLiftAt === [] ? ' - no such rule' : '' ),
+	count( $linkedLiftAt ) === 1 && $groundSets( $linkedLift, 'position', 'relative' ) === true && $linkedZ( $linkedLift ) > $linkedZ( $linkedOverlay )
+	&& array_filter( [ 'a', 'button', 'iframe', 'input', 'label', 'select', 'summary', 'textarea', '[controls]', '[tabindex]' ], static fn( string $element ): bool => preg_match( '/:where\((?:[^()]*, )?'. preg_quote( $element, '/' ). '(?:,|\))/', $linkedLiftAt[0] ?? '' ) !== 1 ) === []
+	&& str_ends_with( $linkedLiftAt[0] ?? '', ':where(:not(:has(> .nino-card-title)))' ) === true && $linkedFlat( $linkedLiftAt[0] ?? '' ) === '.nino-card--linked' );
+check( '...the one stop of the keyboard shows on the card, inside it, and the link that holds the title has no ring of its own',
+	$groundSets( $groundOf( '.nino-card--linked a:focus-visible:has(> .nino-card-title)' ), 'outline', 'none' ) === true
+	&& $groundSets( $groundOf( '.nino-card--linked:has(a:focus-visible > .nino-card-title)' ), 'outline', '2px solid var(--color-focus)' ) === true
+	&& (int) $hookValue( $groundOf( '.nino-card--linked:has(a:focus-visible > .nino-card-title)' ), 'outline-offset' ) < 0 );
+
 // The padding of a card is a utility's to say: .nino-p-<n> is the last chapter of the file, after the rules that give a card its own - the base, the 768px and the 1280px ones, and the ground's
 $groundCardPaddingAt = -1;
 foreach( $groundMembers as $groundAt => $groundList )
@@ -1423,6 +1467,11 @@ $badSchemas = [
 	'a group that is a list'										=> [ 'listgroup', [ 'label' => 'x', 'source' => 'text', 'group' => [ 'section' ] ], '"group" must be one of section, hero, card, global' ],
 	'a component that says nino itself and names no group'	=> [ 'ninogroup', [ 'label' => 'x', 'source' => 'text', 'by' => 'nino' ], '"group" must be one of section, hero, card, global' ],
 	'a group named by the component of a feature'	=> [ 'ownedgroup', [ 'label' => 'x', 'source' => 'text', 'by' => 'hello', 'group' => 'section' ], 'a feature\'s components are offered under the feature, not under a group' ],
+	'a tab that is none of the words'						=> [ 'badtab', $withAttribute( [ 'type' => 'string', 'default' => '', 'tab' => 'sidebar' ] ), '"tab" must be one of '. implode( ', ', \Nino\Modules\Components::TABS ) ],
+	'a tab that is an empty word'							=> [ 'emptytab', $withAttribute( [ 'type' => 'string', 'default' => '', 'tab' => '' ] ), '"tab" must be one of' ],
+	'a tab in capitals'										=> [ 'captab', $withAttribute( [ 'type' => 'bool', 'default' => false, 'tab' => strtoupper( \Nino\Modules\Components::TABS[0] ) ] ), '"tab" must be one of' ],
+	'a tab that is the list of the words'				=> [ 'listtab', $withAttribute( [ 'type' => 'select', 'options' => [ '', 'a' ], 'default' => '', 'tab' => \Nino\Modules\Components::TABS ] ), '"tab" must be one of' ],
+	'a tab that is a number'								=> [ 'numtab', $withAttribute( [ 'type' => 'int', 'default' => 0, 'tab' => 5 ] ), '"tab" must be one of' ],
 ];
 foreach( $badSchemas as $what => [ $name, $schema, $why ] ) {
 	$schemaErrors = $errorsOf( function() use ( &$appData, $noop, $name, $schema ) { \Nino\Modules\Components::addComponent( $appData, $name, $noop, $schema ); } );
@@ -1612,9 +1661,9 @@ check( 'the card is declared as the registry says: a label in both languages, th
 	$cardSchema['label'] === [ 'en_US' => 'Card', 'de_DE' => 'Karte' ] && $cardSchema['source'] === 'content' && $cardSchema['loop'] === true && $cardSchema['preview'] === 'block'
 	&& $cardSchema['in'] === [ 'section', 'hero' ] && $cardSchema['draws'] === 'article .nino-card' && $cardSchema['holds'] === 'card'
 	&& array_keys( $cardSchema ) === [ 'label', 'source', 'loop', 'preview', 'icon', 'attributes', 'in', 'draws', 'holds', 'link', 'by', 'group' ] );
-check( '...its attributes are nine, in the order the form shows them: whether it fills, the padding, where its content stands, how it is aligned, the ground, the border, the picture, its focus and the dim',
-	array_keys( $cardSchema['attributes'] ) === [ 'fill', 'padding', 'vertical', 'align', 'ground', 'borderless', 'background', 'focus', 'dim' ] );
-$cardTypes = [ 'ground' => 'select', 'padding' => 'select', 'fill' => 'bool', 'vertical' => 'select', 'align' => 'select', 'background' => 'image', 'focus' => 'select', 'dim' => 'bool', 'borderless' => 'bool' ];
+check( '...its attributes are ten, in the order the form shows them: whether it fills, the padding, where its content stands, how it is aligned, the ground, the border, whether the whole card is the link of its title, the picture, its focus and the dim',
+	array_keys( $cardSchema['attributes'] ) === [ 'fill', 'padding', 'vertical', 'align', 'ground', 'borderless', 'linked', 'background', 'focus', 'dim' ] );
+$cardTypes = [ 'ground' => 'select', 'padding' => 'select', 'fill' => 'bool', 'vertical' => 'select', 'align' => 'select', 'background' => 'image', 'focus' => 'select', 'dim' => 'bool', 'borderless' => 'bool', 'linked' => 'bool' ];
 $cardOptions = [
 	'ground'		=> [ '', 'counter', 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt' ],
 	'padding'		=> [ '', '0', '1', '2', '3', '4', '5', '6' ],
@@ -1646,7 +1695,7 @@ check( '...the focus is the focus of [image], word for word, and the other label
 check( '...the card is the one component of the kernel that holds components, and no stack does',
 	array_keys( array_filter( \Nino\Modules\Components::components( $appData ), static fn( array $schema ): bool => array_key_exists( 'holds', $schema ) === true ) ) === [ 'card' ]
 	&& array_filter( \Nino\Modules\Components::stacks( $appData ), static fn( array $stack ): bool => array_key_exists( 'holds', $stack ) === true ) === []
-	&& \Nino\Modules\Components::defaults( $appData, 'card' ) === [ 'fill' => '0', 'padding' => '', 'vertical' => '', 'align' => '', 'ground' => '', 'borderless' => '0', 'background' => '', 'focus' => '', 'dim' => '0', 'class' => '' ] );
+	&& \Nino\Modules\Components::defaults( $appData, 'card' ) === [ 'fill' => '0', 'padding' => '', 'vertical' => '', 'align' => '', 'ground' => '', 'borderless' => '0', 'linked' => '0', 'background' => '', 'focus' => '', 'dim' => '0', 'class' => '' ] );
 // The variants are factors of the role (Nino.css), and the label of the style says it all: none of the seven carries a hint
 check( '...and the style of the six titles and of the two texts has no hint under its name, in neither language',
 	array_filter( [ 'title', 'card-title', 'hero-title', 'subtitle', 'card-subtitle', 'hero-subtitle', 'text', 'card-text' ], static fn( string $name ): bool => ( \Nino\Modules\Components::components( $appData )[$name]['attributes']['style']['hint'] ?? '' ) !== '' ) === [] );
@@ -1674,6 +1723,50 @@ check( 'validate() takes how a tool draws an attribute - a select or a variant a
 check( '...the icons are drawn for an alignment: the empty word and words of left|center|right, of top|middle|bottom|last-bottom or of start|center|end - some of them, as a card\'s vertical alignment has no top, the empty word is it',
 	array_filter( [ [ '', 'left', 'right' ], [ '', 'center' ], [ '', 'top', 'middle', 'bottom' ], [ '', 'middle', 'bottom', 'last-bottom' ], [ '', 'start', 'center', 'end' ], [ 'center', '', 'end' ] ],
 		static fn( array $options ): bool => is_array( $lookOf( [ 'type' => 'select', 'options' => $options, 'default' => '', 'input' => 'icons' ] ) ) === false ) === [] );
+
+// On which tab of its dialog a tool draws an attribute: a hint of the same kind as the input - one word of TABS, for an attribute of any type, kept by the clean schema, handed on by the registry and read by nothing that renders
+$tabOf = static fn( array $declared ): array => (array) ( $lookOf( $declared )['attributes']['look'] ?? [] );
+$tabRest = [
+	'string'	=> [ 'default' => '' ],
+	'int'			=> [ 'default' => 0 ],
+	'bool'		=> [ 'default' => false ],
+	'select'	=> [ 'options' => [ '', 'a' ], 'default' => '' ],
+	'variant'	=> [ 'options' => [ '', 'a' ], 'default' => '' ],
+	'lines'		=> [ 'default' => '' ],
+	'key'			=> [ 'default' => '' ],
+	'image'		=> [ 'default' => '' ],
+	'href'		=> [ 'default' => '' ],
+];
+$tabWrong = [];
+foreach( \Nino\Modules\Components::TYPES as $tabType )
+	foreach( \Nino\Modules\Components::TABS as $tabWord )
+		if( isset( $tabRest[$tabType] ) === false || ( $tabOf( [ 'type' => $tabType, 'tab' => $tabWord ] + $tabRest[$tabType] )['tab'] ?? null ) !== $tabWord
+			|| array_key_exists( 'tab', $tabOf( [ 'type' => $tabType ] + $tabRest[$tabType] ) ) === true )
+			$tabWrong[] = $tabType. ' '. $tabWord;
+check( 'validate() takes the tab a tool draws an attribute on - one word of TABS, for an attribute of any type - and keeps it in the clean schema; an attribute that says none has no such key'. ( $tabWrong === [] ? '' : ' - not: '. implode( ', ', $tabWrong ) ),
+	$tabWrong === [] && \Nino\Modules\Components::TABS !== [] && array_is_list( \Nino\Modules\Components::TABS ) === true
+	&& array_filter( \Nino\Modules\Components::TABS, static fn( string $word ): bool => preg_match( '/^[a-z]+(?:-[a-z]+)*$/D', $word ) !== 1 ) === [] );
+$tabSchema = static fn( array $tab ): array => [ 'label' => 'x', 'source' => 'none', 'group' => 'global', 'attributes' => [
+	'look' => [ 'type' => 'select', 'options' => [ 'a', 'b' ], 'default' => 'a' ] + $tab,
+	'more' => [ 'type' => 'string', 'default' => '' ],
+] ];
+$tabRender = static fn( array &$appData, array $args ): string => $args['look']. $args['more'];
+\Nino\Modules\Components::addComponent( $appData, 'tabbed', $tabRender, $tabSchema( [ 'tab' => \Nino\Modules\Components::TABS[0] ] ) );
+\Nino\Modules\Components::addComponent( $appData, 'tabless', $tabRender, $tabSchema( [] ) );
+$tabJson = (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), true );
+check( 'a component registered with a tab on one attribute carries it in the registry and in the json a tool reads - on that attribute and on no other - and the component that says none has none',
+	( \Nino\Modules\Components::components( $appData )['tabbed']['attributes']['look']['tab'] ?? null ) === \Nino\Modules\Components::TABS[0]
+	&& array_key_exists( 'tab', \Nino\Modules\Components::components( $appData )['tabbed']['attributes']['more'] ) === false
+	&& ( $tabJson['tabbed']['attributes']['look']['tab'] ?? null ) === \Nino\Modules\Components::TABS[0] && array_key_exists( 'tab', $tabJson['tabbed']['attributes']['more'] ) === false
+	&& array_filter( $tabJson['tabless']['attributes'], static fn( array $declared ): bool => array_key_exists( 'tab', $declared ) === true ) === [] );
+check( '...the rendering reads nothing of it: the defaults, and what the two components draw, are the same with the tab and without',
+	\Nino\Modules\Components::defaults( $appData, 'tabbed' ) === \Nino\Modules\Components::defaults( $appData, 'tabless' )
+	&& \Nino\Html::renderHtml( $appData, '[tabbed look="b" more="x"][tabbed look="c"]' ) === \Nino\Html::renderHtml( $appData, '[tabless look="b" more="x"][tabless look="c"]' )
+	&& \Nino\Html::renderHtml( $appData, '[tabbed look="b" more="x"][tabbed look="c"]' ) === 'bxa' );
+check( '...a clean schema with a tab validates again as it is, and the component of a feature and the attribute of a stack may say one like the kernel\'s',
+	\Nino\Modules\Components::validate( 'tabbed', \Nino\Modules\Components::components( $appData )['tabbed'] ) === \Nino\Modules\Components::components( $appData )['tabbed']
+	&& ( \Nino\Modules\Components::validate( 'probe', array_diff_key( $tabSchema( [ 'tab' => \Nino\Modules\Components::TABS[0] ] ), [ 'group' => 1 ] ), false, 'hello' )['attributes']['look']['tab'] ?? null ) === \Nino\Modules\Components::TABS[0]
+	&& ( \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'attributes' => [ 'look' => [ 'type' => 'string', 'default' => '', 'tab' => \Nino\Modules\Components::TABS[0] ] ] ], true )['attributes']['look']['tab'] ?? null ) === \Nino\Modules\Components::TABS[0] );
 
 // A link on a component, who registered it: the clean schema says both, after the keys of its place, and a stack has neither
 $linkable = [ 'label' => 'x', 'source' => 'text', 'attributes' => [ 'tag' => [ 'type' => 'select', 'options' => [ 'div', 'h3' ], 'default' => 'h3' ] ] ];
@@ -1734,6 +1827,14 @@ foreach( array_intersect_key( \Nino\Modules\Components::components( $appData ), 
 			$kernelInputs[$inputName. '.'. $inputAttribute] = $inputDeclared['input'];
 check( 'the kernel says how a tool draws an attribute where it matters: the alignment of a card as icons, the format of a text and the size and the width of a button as a row of buttons - and says nothing else',
 	$kernelInputs === [ 'text.format' => 'segment', 'card-text.format' => 'segment', 'card.vertical' => 'icons', 'card.align' => 'icons', 'button.size' => 'segment', 'button.width' => 'segment' ] );
+$kernelTabs = [];
+foreach( array_intersect_key( \Nino\Modules\Components::components( $appData ), array_flip( $kernelAll ) ) as $kernelTabName => $kernelTabSchema )
+	foreach( $kernelTabSchema['attributes'] as $kernelTabAttribute => $kernelTabDeclared )
+		if( isset( $kernelTabDeclared['tab'] ) === true )
+			$kernelTabs[$kernelTabName. '.'. $kernelTabAttribute] = $kernelTabDeclared['tab'];
+check( '...and on which tab where it matters: the colour, the picture, the focus and the dimming of a card on the tab of the background - and says nothing else',
+	$kernelTabs === [ 'card.ground' => 'background', 'card.background' => 'background', 'card.focus' => 'background', 'card.dim' => 'background' ]
+	&& array_diff( $kernelTabs, \Nino\Modules\Components::TABS ) === [] );
 $eightTexts = [ 'title', 'subtitle', 'text', 'card-title', 'card-subtitle', 'card-text', 'hero-title', 'hero-subtitle' ];
 check( 'the style of the eight text components is a variant - none, loud or quiet - of the class each is named for, and their colour another, the last attribute after the style: none, muted or accent, written as nino-ink--<word>, the ink of the ground the text stands on',
 	array_filter( $eightTexts, static fn( string $name ): bool => ( $registryOf( $name )['attributes']['style'] ?? null ) !== [ 'type' => 'variant', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ], 'hint' => '', 'options' => [ '', 'loud', 'quiet' ], 'default' => '' ]
@@ -1968,7 +2069,7 @@ check( '[card] renders nothing without content, and the <article> with its class
 	&& $render( '[card][card-title /template/page-home/hero/title][card-subtitle /template/page-home/hero/subtitle][/card]' ) === '<article class="nino-card"><h4 class="nino-card-title">Hi &#91;there]</h4><p class="nino-card-subtitle">Sub</p></article>' );
 check( '...a card whose components all render nothing is an empty <article>, as a section with nothing in it is a section',
 	$render( '[card][title /template/page-home/nope/title][/card]' ) === '<article class="nino-card"></article>' );
-// Every attribute is its class, and the classes follow the fragment: the ground, the dim, the border, the fill, where the content stands, the alignment, the padding and the class of its own
+// Every attribute is its class, and the classes follow the fragment: the ground, the dim, the border, the fill, the link, where the content stands, the alignment, the padding and the class of its own
 $cardClasses = [];
 foreach( [ 'counter', 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt' ] as $cardGround )
 	$cardClasses['ground="'. $cardGround. '"'] = ' nino-card--'. $cardGround;
@@ -1981,23 +2082,32 @@ foreach( [ '0', '1', '2', '3', '4', '5', '6' ] as $cardPadding )
 $cardClasses['fill="1"'] = ' nino-card--fill';
 $cardClasses['dim="1"'] = ' nino-card--dim';
 $cardClasses['borderless="1"'] = ' nino-card--borderless';
+$cardClasses['linked="1"'] = ' nino-card--linked';
 $cardClasses['class="a b"'] = ' a b';
 $cardWrong = [];
 foreach( $cardClasses as $cardAttribute => $cardClass )
 	if( $render( '[card '. $cardAttribute. ']x[/card]' ) !== '<article class="nino-card'. $cardClass. '">x</article>' )
 		$cardWrong[] = $cardAttribute;
-check( '[card] writes each of its attributes as the class of it: a ground, where the content stands, the alignment, the padding of every step - the 0 among them - the fill, the dim, the border, and a class of its own'. ( $cardWrong === [] ? '' : ' - not: '. implode( ', ', $cardWrong ) ), $cardWrong === [] && count( $cardClasses ) === 24 );
+check( '[card] writes each of its attributes as the class of it: a ground, where the content stands, the alignment, the padding of every step - the 0 among them - the fill, the dim, the border, the link of the title, and a class of its own'. ( $cardWrong === [] ? '' : ' - not: '. implode( ', ', $cardWrong ) ), $cardWrong === [] && count( $cardClasses ) === 25 );
 check( '...all at once, in the order of the fragment, and a class of its own last, escaped',
-	$render( '[card ground="alt" padding="3" fill="1" vertical="last-bottom" align="right" dim="1" borderless="1" class="mine"]x[/card]' )
-		=== '<article class="nino-card nino-card--alt nino-card--dim nino-card--borderless nino-card--fill nino-card--last-bottom nino-text-right nino-p-3 mine">x</article>'
+	$render( '[card ground="alt" padding="3" fill="1" linked="1" vertical="last-bottom" align="right" dim="1" borderless="1" class="mine"]x[/card]' )
+		=== '<article class="nino-card nino-card--alt nino-card--dim nino-card--borderless nino-card--fill nino-card--linked nino-card--last-bottom nino-text-right nino-p-3 mine">x</article>'
 	&& $render( '[card class="a b&c"]x[/card]' ) === '<article class="nino-card a b&amp;c">x</article>'
 	&& $render( '[card ground="counter" class="x"]x[/card]' ) === '<article class="nino-card nino-card--counter x">x</article>' );
 check( '...a word outside what an attribute offers is the default, and so is a bool that is none: the class is not written',
-	$render( '[card ground="weird" padding="9" vertical="weird" align="weird" fill="maybe" dim="x" borderless="2" focus="12"]x[/card]' ) === '<article class="nino-card">x</article>'
+	$render( '[card ground="weird" padding="9" vertical="weird" align="weird" fill="maybe" dim="x" borderless="2" linked="2" focus="12"]x[/card]' ) === '<article class="nino-card">x</article>'
 	&& $render( '[card ground="ALT" align="Center" padding="-1"]x[/card]' ) === '<article class="nino-card">x</article>'
 	&& $render( '[card ground="alt&quot; onclick=&quot;x"]x[/card]' ) === '<article class="nino-card">x</article>'
 	&& $render( '[card bogus="x" onclick="y"]x[/card]' ) === '<article class="nino-card">x</article>'
-	&& $render( '[card fill="true" dim="yes" borderless="on"]x[/card]' ) === '<article class="nino-card nino-card--dim nino-card--borderless nino-card--fill">x</article>' );
+	&& $render( '[card fill="true" dim="yes" borderless="on" linked="yes"]x[/card]' ) === '<article class="nino-card nino-card--dim nino-card--borderless nino-card--fill nino-card--linked">x</article>' );
+/*	The card is no <a>, whatever it says: it holds buttons, and a link in a link is no markup. [card linked] writes the class and nothing else, and the link it makes of the card is the one of
+	its title - the <a> that [card-title] draws, with the title as its one child, which is what Nino.css stretches over the card - so that a card whose title has no address has no link at all	*/
+check( '[card linked] is no link itself: the <article> with the class, and the link of its title - the <a> around the title - and the button after it as they are anywhere; a title with no address is no link, and the card has none',
+	$render( '[card linked="1"][card-title /template/page-home/hero/title href="/contact"][button text="More" href="#x"][/card]' )
+		=== '<article class="nino-card nino-card--linked"><a href="/contact"><h4 class="nino-card-title">Hi &#91;there]</h4></a><a class="nino-btn" href="#x">More</a></article>'
+	&& $render( '[card linked="1"][card-title /template/page-home/hero/title][/card]' ) === '<article class="nino-card nino-card--linked"><h4 class="nino-card-title">Hi &#91;there]</h4></article>'
+	&& str_contains( $render( '[card linked="1"][card-title /template/page-home/hero/title][/card]' ), '</a>' ) === false
+	&& str_starts_with( $render( '[card linked="1"]x[/card]' ), '<article' ) === true && str_starts_with( \Nino\Modules\Components::$html['link'], '<a' ) === true );
 // The picture behind it
 $appData['/nino/html/images']['/template/page-home/hero/withalt'] = [ 'label' => 'With alt', 'width' => 800, 'height' => 600, 'filename' => 'alt.800x600.jpg', 'alt' => [ 'de_DE' => 'Stored "alt" [x]' ] ];
 check( '[card] with a picture - a slot by its uri - has the picture in a div of its own before the content, as an img with an empty alt text, and the focus is a class of that div',
