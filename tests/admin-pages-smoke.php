@@ -4,10 +4,10 @@ declare(strict_types=1);
 /**
  *	Nino								A compact filesystembased php framework
  *	admin-pages-smoke.php	Dependency-free smoke test for the page panels of the workbench:
- *											PageEditor - create, edit and delete a page route, the pages a feature
- *											routes at runtime - and Modules\Navigation\Admin, which menus exist and
- *											what stands in them. Runs against an isolated sandbox directory, never
- *											touches the real project data.
+ *											PageEditor - create, edit and delete a page, with one address for every
+ *											language or one for each, the pages a feature routes at runtime - and
+ *											Modules\Navigation\Admin, which menus exist and what stands in them. Runs
+ *											against an isolated sandbox directory, never touches the real project data.
  *
  *	Usage: php tests/admin-pages-smoke.php
  */
@@ -74,6 +74,16 @@ check( 'the list names the working language, which is one of the site\'s', $body
 \Nino\Runtime::unsetSessionValue( $appData, './admin/content-locale' );
 check( 'the list opens on the working language when the workbench speaks another', $localeBody['selectedLocale'] === 'fr_FR' );
 
+// The form has a field for each language, named by it: the name the site gives the language for its picker, and the code of one nobody named
+\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $content ): array {
+	return array_merge( $content, [ '[[/_nino/locale/de_DE/name]]' => 'Deutsch', '[[/_nino/locale/en_US/name]]' => 'English' ] );
+} );
+[ , $namedBody ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiList' );
+\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $content ): array {
+	return array_diff_key( $content, [ '[[/_nino/locale/de_DE/name]]' => true, '[[/_nino/locale/en_US/name]]' => true ] );
+} );
+check( 'the list names each language the way the site\'s picker does, in the order of the languages, and by its code where nobody named it', $namedBody['localeNames'] === [ 'de_DE' => 'Deutsch', 'en_US' => 'English', 'fr_FR' => 'fr_FR' ] );
+
 // A directory that is called page-x.tpl is no template: the select the form offers leaves it out, and nothing is read from it
 mkdir( $sandbox. '/private/templates/page-dir.tpl' );
 ninoWarnings();
@@ -104,17 +114,17 @@ $pageText = static function( string $name ) use ( &$appData ): array {
 check( 'the fixture project has more than two active languages, so "every language" is more than a pair', count( $pageText('x') ) >= 3 );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
-	'originalHttpUri' => '', 'uri' => '../etc/passwd', 'httpUri' => '/about', 'template' => 'page-about', 'text' => [],
+	'originalUri' => '', 'uri' => '../etc/passwd', 'httpUris' => [ '' => '/about' ], 'template' => 'page-about', 'text' => [],
 ] );
 check( 'rejects an unsafe Element-URI with 400', $status === 400 );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
-	'originalHttpUri' => '', 'uri' => '/about', 'httpUri' => '../etc/passwd', 'template' => 'page-about', 'text' => [],
+	'originalUri' => '', 'uri' => '/about', 'httpUris' => [ '' => '../etc/passwd' ], 'template' => 'page-about', 'text' => [],
 ] );
 check( 'rejects an unsafe Http-URI with 400', $status === 400 );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
-	'originalHttpUri' => '', 'uri' => '/admin-shadow', 'httpUri' => '/_admin', 'template' => 'page-about', 'text' => [],
+	'originalUri' => '', 'uri' => '/admin-shadow', 'httpUris' => [ '' => '/_admin' ], 'template' => 'page-about', 'text' => [],
 ] );
 check( 'rejects a page mounted on a runtime-owned tool uri', $status === 409 );
 
@@ -124,13 +134,13 @@ check( 'rejects a page mounted on a runtime-owned tool uri', $status === 409 );
 } );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
-	'originalHttpUri' => '', 'uri' => '/owned-page', 'httpUri' => '/owned', 'template' => 'page-about', 'text' => [],
+	'originalUri' => '', 'uri' => '/owned-page', 'httpUris' => [ '' => '/owned' ], 'template' => 'page-about', 'text' => [],
 ] );
 check( 'rejects an Http-URI already owned by a non-page route', $status === 409 );
 check( 'keeps the colliding hand-written route unchanged', ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://owned']['body'] ?? null ) === 'hand-written route' );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
-	'originalHttpUri' => '', 'uri' => '/about', 'httpUri' => '/about', 'template' => 'not-a-page', 'text' => [],
+	'originalUri' => '', 'uri' => '/about', 'httpUris' => [ '' => '/about' ], 'template' => 'not-a-page', 'text' => [],
 ] );
 check( 'rejects a template outside the page-*.tpl whitelist with 400', $status === 400 );
 
@@ -138,7 +148,7 @@ check( 'rejects a template outside the page-*.tpl whitelist with 400', $status =
 // Http-URI, to prove the class uses the entry's own uri, not the request
 // path, for the route's own data field/meta namespace
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
-	'originalHttpUri' => '', 'uri' => '/site-about', 'httpUri' => '/about', 'template' => 'page-about', 'statusCode' => 200, 'text' => [
+	'originalUri' => '', 'uri' => '/site-about', 'httpUris' => [ '' => '/about' ], 'template' => 'page-about', 'statusCode' => 200, 'text' => [
 		'de_DE' => [ 'name' => 'Über uns', 'title' => 'Über uns', 'description' => 'Über unser Unternehmen.' ],
 		'en_US' => [ 'name' => 'About us', 'title' => 'About us', 'description' => '' ],
 		'fr_FR' => [ 'name' => 'A propos', 'title' => 'A propos' ],
@@ -162,8 +172,9 @@ check( 'a blank description is stored as it is, empty - there is no filler text 
 check( '...and no "Page" or "Page Title" placeholder is written anywhere', in_array( 'Page', $enAfterSave, true ) === false && in_array( 'Page Title', $deAfterSave + $enAfterSave, true ) === false );
 
 $globalAfterSave = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
-check( 'writes the page\'s reachable Http-URI as one global fill a template can link to by name', ( $globalAfterSave['[[/_nino/webpage/site-about/uri]]'] ?? null ) === '/about'
-	&& isset( $deAfterSave['[[/_nino/webpage/site-about/uri]]'], $enAfterSave['[[/_nino/webpage/site-about/uri]]'] ) === false );
+$frAfterSave = \Nino\Filesystem::getFileContent( $appData, '/text/fr_FR.php', [] );
+check( 'writes the page\'s reachable Http-URI as a fill a template can link to by name - global.php has it, and so has the file of every language, with that language\'s address', ( $globalAfterSave['[[/_nino/webpage/site-about/uri]]'] ?? null ) === '/about'
+	&& ( $deAfterSave['[[/_nino/webpage/site-about/uri]]'] ?? null ) === '/about' && ( $enAfterSave['[[/_nino/webpage/site-about/uri]]'] ?? null ) === '/about' && ( $frAfterSave['[[/_nino/webpage/site-about/uri]]'] ?? null ) === '/about' );
 check( 'that uri is blacklisted as a technical value, like every other route key', in_array( '/_nino/webpage/site-about/uri', \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), true ) );
 
 // A name and a title are required in every active language, and a refusal
@@ -182,7 +193,7 @@ $refusals = [
 ];
 foreach( $refusals as $label => [ $refusedText, $refusedCode, $refusedLocale ] ) {
 	[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
-		'originalHttpUri' => '', 'uri' => '/site-contact', 'httpUri' => '/contact', 'template' => 'page-contact', 'text' => $refusedText,
+		'originalUri' => '', 'uri' => '/site-contact', 'httpUris' => [ '' => '/contact' ], 'template' => 'page-contact', 'text' => $refusedText,
 	] );
 	check( $label. ' is refused with 400, a code and the language', $status === 400 && ( $body['code'] ?? '' ) === $refusedCode && ( $body['params'] ?? [] ) === [ $refusedLocale ] );
 }
@@ -191,18 +202,18 @@ check( '...and every one of them left config.php and the text files exactly as t
 
 // Duplicate checks: a second entry may not reuse either uri
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
-	'originalHttpUri' => '', 'uri' => '/site-about', 'httpUri' => '/contact', 'template' => 'page-contact', 'text' => [],
+	'originalUri' => '', 'uri' => '/site-about', 'httpUris' => [ '' => '/contact' ], 'template' => 'page-contact', 'text' => [],
 ] );
 check( 'rejects a duplicate Element-URI with 400', $status === 400 );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
-	'originalHttpUri' => '', 'uri' => '/site-contact', 'httpUri' => '/about', 'template' => 'page-contact', 'text' => [],
+	'originalUri' => '', 'uri' => '/site-contact', 'httpUris' => [ '' => '/about' ], 'template' => 'page-contact', 'text' => [],
 ] );
 check( 'rejects a duplicate Http-URI with 400', $status === 400 );
 
 // A real second entry, with a non-200 status code and explicit menu membership
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
-	'originalHttpUri' => '', 'uri' => '/site-contact', 'httpUri' => '/contact', 'template' => 'page-contact', 'statusCode' => 404, 'navs' => [ 'main' ], 'text' => $pageText('Kontakt'),
+	'originalUri' => '', 'uri' => '/site-contact', 'httpUris' => [ '' => '/contact' ], 'template' => 'page-contact', 'statusCode' => 404, 'navs' => [ 'main' ], 'text' => $pageText('Kontakt'),
 ] );
 check( 'apiSave succeeds for the second entry too', $status === 200 );
 
@@ -217,9 +228,9 @@ $appData['/nino/modules'][] = '\\Nino\\Modules\\Navigation';
 $appData['/nino/html/navs'] = [ 'main' ];
 
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
-	'originalHttpUri' => '/contact', 'uri' => '/site-contact', 'httpUri' => '/contact', 'template' => 'page-contact', 'navs' => [ 'main' ], 'text' => $pageText('Kontakt'),
+	'originalUri' => '/site-contact', 'uri' => '/site-contact', 'httpUris' => [ '' => '/contact' ], 'template' => 'page-contact', 'navs' => [ 'main' ], 'text' => $pageText('Kontakt'),
 ] );
-check( 'resaving an existing entry unchanged (identified by originalHttpUri) succeeds', $status === 200 );
+check( 'resaving an existing entry unchanged (identified by originalUri) succeeds', $status === 200 );
 
 // Menu membership lives on the route this entry owns, not in a generated
 // textfill - see \Nino\Modules\Navigation::routeLines()
@@ -230,26 +241,26 @@ check( 'a page in no menu carries no membership at all', isset( $routesAfterNav[
 // Reordering: assign both entries to main so the generated menu actually
 // shows a reorder, not just the list itself
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
-	'originalHttpUri' => '/about', 'uri' => '/site-about', 'httpUri' => '/about', 'template' => 'page-about', 'navs' => [ 'main' ], 'text' => $pageText('About'),
+	'originalUri' => '/site-about', 'uri' => '/site-about', 'httpUris' => [ '' => '/about' ], 'template' => 'page-about', 'navs' => [ 'main' ], 'text' => $pageText('About'),
 ] );
 check( 'assigning the first entry to main too succeeds', $status === 200 );
 
 // A membership a save newly adds goes behind everything already in that menu
 check( 'the second page to join the menu lands behind the first, not on top of it', ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://about']['navs'] ?? null ) === [ 'main' => 2 ] );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiMove', [ 'httpUri' => '/about', 'direction' => 'up' ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiMove', [ 'uri' => '/site-about', 'direction' => 'up' ] );
 check( 'moving the first entry up (already at the top) 400s', $status === 400 );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiMove', [ 'httpUri' => '/contact', 'direction' => 'down' ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiMove', [ 'uri' => '/site-contact', 'direction' => 'down' ] );
 check( 'moving the last entry down (already at the bottom) 400s', $status === 400 );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiMove', [ 'httpUri' => '/about', 'direction' => 'sideways' ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiMove', [ 'uri' => '/site-about', 'direction' => 'sideways' ] );
 check( 'rejects an invalid direction with 400', $status === 400 );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiMove', [ 'httpUri' => '/does-not-exist', 'direction' => 'up' ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiMove', [ 'uri' => '/does-not-exist', 'direction' => 'up' ] );
 check( 'apiMove 404s for an unknown httpUri', $status === 404 );
 
-[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiMove', [ 'httpUri' => '/about', 'direction' => 'down' ] );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiMove', [ 'uri' => '/site-about', 'direction' => 'down' ] );
 check( 'moving the first entry down succeeds', $status === 200 );
 check( 'the two entries actually swapped places', array_column( $body['pages'], 'httpUri' ) === [ '/contact', '/about' ] );
 
@@ -259,13 +270,13 @@ check( 'the hand-written route the swap stepped over kept its own slot', array_k
 
 // Move it back for the rename/delete checks below, which assume the
 // original order ("about" first)
-[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiMove', [ 'httpUri' => '/about', 'direction' => 'up' ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiMove', [ 'uri' => '/site-about', 'direction' => 'up' ] );
 check( 'moving it back up succeeds', $status === 200 );
 
 // Renaming an entry's Http-URI: the old route key must disappear, the new
 // one appear, and the list must stay at 2 entries (replaced in place)
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
-	'originalHttpUri' => '/about', 'uri' => '/site-about', 'httpUri' => '/ueber-uns', 'template' => 'page-about', 'text' => $pageText('Über uns'),
+	'originalUri' => '/site-about', 'uri' => '/site-about', 'httpUris' => [ '' => '/ueber-uns' ], 'template' => 'page-about', 'text' => $pageText('Über uns'),
 ] );
 check( 'renaming an entry\'s Http-URI succeeds', $status === 200 );
 
@@ -276,7 +287,7 @@ check( 'still exactly two page routes - rename replaced in place, did not append
 check( 'the renamed route keeps the slot the old key stood in, rather than dropping to the bottom', array_slice( array_keys( $configAfterRename['/nino/http/routes'] ), -2 ) === [ 'GET://ueber-uns', 'GET://contact' ] );
 
 // Delete
-[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'httpUri' => '/ueber-uns' ] );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/site-about' ] );
 check( 'apiDelete succeeds', $status === 200 );
 check( 'exactly one page remains', count( $body['pages'] ) === 1 );
 
@@ -287,7 +298,7 @@ check( 'the surviving entry\'s route is untouched', isset( $configAfterDelete['/
 $deAfterDelete = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
 check( 'the deleted entry\'s own text meta is left in place - additive-only, never auto-deleted', isset( $deAfterDelete['[[/_nino/webpage/site-about/name]]'] ) === true );
 
-[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'httpUri' => '/does-not-exist' ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/does-not-exist' ] );
 check( 'apiDelete 404s for an unknown httpUri', $status === 404 );
 
 // What a route carries that the form does not edit stays. Somebody put a
@@ -295,7 +306,7 @@ check( 'apiDelete 404s for an unknown httpUri', $status === 404 );
 // first keeps a page up while the site is down - and a save used to build the
 // route anew from the form's four fields and drop the rest
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
-	'originalHttpUri' => '', 'uri' => '/site-kept', 'httpUri' => '/kept', 'template' => 'page-about', 'navs' => [ 'main' ], 'text' => $pageText('Kept'),
+	'originalUri' => '', 'uri' => '/site-kept', 'httpUris' => [ '' => '/kept' ], 'template' => 'page-about', 'navs' => [ 'main' ], 'text' => $pageText('Kept'),
 ] );
 check( 'a page for the fields-kept check is created', $status === 200 );
 \Nino\Filesystem::mutate( $appData, '/config.php', function( array $config ): array {
@@ -303,14 +314,15 @@ check( 'a page for the fields-kept check is created', $status === 200 );
 	return $config;
 } );
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
-	'originalHttpUri' => '/kept', 'uri' => '/site-kept', 'httpUri' => '/kept-on', 'template' => 'page-contact', 'statusCode' => 200, 'navs' => [], 'text' => $pageText('Kept'),
+	'originalUri' => '/site-kept', 'uri' => '/site-kept', 'httpUris' => [ '' => '/kept-on' ], 'template' => 'page-contact', 'statusCode' => 200, 'navs' => [], 'text' => $pageText('Kept'),
 ] );
 $keptRoutes = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
 check( 'a save keeps the fields of the route it does not edit - it moved to its new path with them', $status === 200 && isset( $keptRoutes['GET://kept'] ) === false
-	&& ( $keptRoutes['GET://kept-on']['maintenance'] ?? null ) === false && ( $keptRoutes['GET://kept-on']['locale'] ?? null ) === 'de_DE' && ( $keptRoutes['GET://kept-on']['header'] ?? null ) === [ 'X-Kept' => '1' ] );
+	&& ( $keptRoutes['GET://kept-on']['maintenance'] ?? null ) === false && ( $keptRoutes['GET://kept-on']['header'] ?? null ) === [ 'X-Kept' => '1' ] );
+check( '...but not its language: that is what the addresses say, and a page that has one address for every language has none', isset( $keptRoutes['GET://kept-on']['locale'] ) === false );
 check( '...and sets the four it does edit: the body, the status code - 200 is no field -, the menus', $keptRoutes['GET://kept-on']['body'] === '[template /templates/page-contact]'
 	&& isset( $keptRoutes['GET://kept-on']['statusCode'] ) === false && isset( $keptRoutes['GET://kept-on']['navs'] ) === false && $keptRoutes['GET://kept-on']['uri'] === '/site-kept' );
-callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'httpUri' => '/kept-on' ] );
+callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/site-kept' ] );
 
 // The key of the page's address goes on the blacklist, and a blacklist that
 // cannot be written is an answer of its own: a directory where the sidecar lock
@@ -321,27 +333,242 @@ unset( $appData['./nino/filesystem/locks'] );
 @mkdir( $blacklistLock );
 check( 'Text::setBlacklisted() says false when the list cannot be written', \Nino\Text::setBlacklisted( $appData, '/_nino/webpage/site-hidden/uri', true ) === false );
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
-	'originalHttpUri' => '', 'uri' => '/site-hidden', 'httpUri' => '/hidden', 'template' => 'page-about', 'text' => $pageText('Hidden'),
+	'originalUri' => '', 'uri' => '/site-hidden', 'httpUris' => [ '' => '/hidden' ], 'template' => 'page-about', 'text' => $pageText('Hidden'),
 ] );
 check( 'routes/save that could not write the blacklist says so rather than reporting success', $status === 500 && str_contains( (string) ( $body['error'] ?? '' ), '/text/blacklist.php' ) === true && isset( $body['pages'] ) === false );
 @rmdir( $blacklistLock );
 unset( $appData['./nino/filesystem/locks'], $appData['./nino/filesystem/cache'] );
 check( '...and true when it can, and when the key is already as asked', \Nino\Text::setBlacklisted( $appData, '/_nino/webpage/site-hidden/uri', true ) === true && \Nino\Text::setBlacklisted( $appData, '/_nino/webpage/site-hidden/uri', true ) === true
 	&& \Nino\Text::setBlacklisted( $appData, '/_nino/webpage/site-hidden/uri', false ) === true && \Nino\Text::setBlacklisted( $appData, '/_nino/webpage/site-hidden/uri', false ) === true );
-callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'httpUri' => '/hidden' ] );
+callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/site-hidden' ] );
 
 // The imprint and the privacy policy are the Legal module's
 $configBeforeReserved = file_get_contents( $sandbox. '/private/config.php' );
 foreach( [ '/legal/imprint', '/legal/privacy' ] as $reservedUri ) {
 	[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
-		'originalHttpUri' => '', 'uri' => $reservedUri, 'httpUri' => '/mine', 'template' => 'page-about', 'text' => $pageText('Mine'),
+		'originalUri' => '', 'uri' => $reservedUri, 'httpUris' => [ '' => '/mine' ], 'template' => 'page-about', 'text' => $pageText('Mine'),
 	] );
 	check( 'a page with the Element-URI '. $reservedUri. ' is refused with 409, a code and the uri', $status === 409 && ( $body['code'] ?? '' ) === 'routes_reserved_uri' && ( $body['params'] ?? [] ) === [ $reservedUri ] );
 }
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [
-	'originalHttpUri' => '/contact', 'uri' => '/legal/imprint', 'httpUri' => '/contact', 'template' => 'page-contact', 'text' => $pageText('Kontakt'),
+	'originalUri' => '/site-contact', 'uri' => '/legal/imprint', 'httpUris' => [ '' => '/contact' ], 'template' => 'page-contact', 'text' => $pageText('Kontakt'),
 ] );
 check( '...and so is an existing page that is moved onto one, and nothing was written', $status === 409 && file_get_contents( $sandbox. '/private/config.php' ) === $configBeforeReserved );
+
+// --- a page with an address per language -------------------------------------
+
+echo "PageEditor - a page with an address per language\n";
+
+/*	A page has one address for every language - one route, as it always had - or one for each language: a route each, with the language it is
+	for and the Element-URI of the page, and a route without a language for an address several languages share (the rule Modules\Legal
+	routes its pages by). The sandbox has three languages and German is the native one	*/
+$routesNow = static function() use ( &$appData ): array {
+	return \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
+};
+$routesOf = static fn( string $uri ): array => array_filter( $routesNow(), static fn( mixed $route ): bool => is_array( $route ) === true && ( $route['uri'] ?? null ) === $uri );
+$textNow = static function( string $locale ) use ( &$appData ): array {
+	return \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
+};
+$saveAddresses = static function( array $payload ) use ( &$appData, $pageText ): array {
+	return callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', $payload + [ 'originalUri' => '', 'template' => 'page-about', 'text' => $pageText('Trip') ] );
+};
+$tripUri = '/site-trip';
+
+[ $status, $body ] = $saveAddresses( [ 'uri' => $tripUri, 'httpUris' => [ 'de_DE' => '/reise', 'en_US' => '/trip', 'fr_FR' => '/voyage' ], 'navs' => [ 'main' ], 'statusCode' => 201 ] );
+$tripRoutes = $routesOf( $tripUri );
+check( 'a save with an address per language writes one route for each, with the Element-URI of the page and the language it is for',
+	$status === 200 && array_keys( $tripRoutes ) === [ 'GET://reise', 'GET://trip', 'GET://voyage' ] && array_column( $tripRoutes, 'locale' ) === [ 'de_DE', 'en_US', 'fr_FR' ] );
+$tripMenus = array_unique( array_map( 'json_encode', array_column( $tripRoutes, 'navs' ) ) );
+check( '...every one with the body, the status code and the menus of the page', array_column( $tripRoutes, 'body' ) === array_fill( 0, 3, '[template /templates/page-about]' )
+	&& array_column( $tripRoutes, 'statusCode' ) === [ 201, 201, 201 ] && count( array_column( $tripRoutes, 'navs' ) ) === 3 && count( $tripMenus ) === 1 && array_keys( array_column( $tripRoutes, 'navs' )[0] ) === [ 'main' ] );
+$tripPage = array_column( $body['pages'], null, 'uri' )[$tripUri] ?? [];
+check( '...and the list answers them as one page, the address of each language named, and the native language\'s the one the line of the list shows',
+	count( array_filter( $body['pages'], static fn( array $page ): bool => $page['uri'] === '/site-trip' ) ) === 1
+	&& ( $tripPage['httpUris'] ?? null ) === [ 'de_DE' => '/reise', 'en_US' => '/trip', 'fr_FR' => '/voyage' ] && ( $tripPage['httpUri'] ?? null ) === '/reise' );
+check( '...and the fill of the page\'s address says in each language the address of that language, and in global.php the native one',
+	( $textNow('de_DE')['[[/_nino/webpage/site-trip/uri]]'] ?? null ) === '/reise' && ( $textNow('en_US')['[[/_nino/webpage/site-trip/uri]]'] ?? null ) === '/trip'
+	&& ( $textNow('fr_FR')['[[/_nino/webpage/site-trip/uri]]'] ?? null ) === '/voyage' && ( $textNow('global')['[[/_nino/webpage/site-trip/uri]]'] ?? null ) === '/reise' );
+check( '...a template that links to it reads the address of the language the page is in',
+	\Nino\Html::getFills( $appData, 'en_US' )['[[/_nino/webpage/site-trip/uri]]'] === '/trip' && \Nino\Html::getFills( $appData, 'fr_FR' )['[[/_nino/webpage/site-trip/uri]]'] === '/voyage' );
+check( '...and the key is blacklisted like the one of a page with one address', in_array( '/_nino/webpage/site-trip/uri', \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), true ) );
+check( 'the dashboard tile counts pages, not routes: a page with three routes is one', \Nino\Modules\Routes\Admin::count( $appData ) === count( $body['pages'] ) );
+
+// Another page behind it, so that a page that is saved again shows whether it keeps its place
+$saveAddresses( [ 'uri' => '/site-after', 'httpUris' => [ '' => '/after' ] ] );
+check( 'a page written after it stands behind its routes', array_slice( array_keys( $routesNow() ), -4 ) === [ 'GET://reise', 'GET://trip', 'GET://voyage', 'GET://after' ] );
+
+// English and French share an address now: it is the empty key's, that of the languages with none of their own
+[ $status, $body ] = $saveAddresses( [ 'originalUri' => $tripUri, 'uri' => $tripUri, 'httpUris' => [ 'de_DE' => '/reise', '' => '/trip' ], 'navs' => [ 'main' ], 'statusCode' => 201 ] );
+$tripRoutes = $routesOf( $tripUri );
+check( 'languages that share an address share one route, which has no language - and the route of a language of its own stands before it',
+	$status === 200 && array_keys( $tripRoutes ) === [ 'GET://reise', 'GET://trip' ] && ( $tripRoutes['GET://reise']['locale'] ?? null ) === 'de_DE' && isset( $tripRoutes['GET://trip']['locale'] ) === false );
+check( '...the routes of before are replaced at the slot the page had, and not at the end', array_slice( array_keys( $routesNow() ), -3 ) === [ 'GET://reise', 'GET://trip', 'GET://after' ]
+	&& isset( $routesNow()['GET://voyage'] ) === false );
+check( '...the list names them as they are: the address of one language, and the one that serves the others under the empty key', ( array_column( $body['pages'], null, 'uri' )[$tripUri]['httpUris'] ?? null ) === [ 'de_DE' => '/reise', '' => '/trip' ] );
+check( '...and the fill in each language is the address that language is reached at, global.php has the shared one',
+	( $textNow('de_DE')['[[/_nino/webpage/site-trip/uri]]'] ?? null ) === '/reise' && ( $textNow('en_US')['[[/_nino/webpage/site-trip/uri]]'] ?? null ) === '/trip'
+	&& ( $textNow('fr_FR')['[[/_nino/webpage/site-trip/uri]]'] ?? null ) === '/trip' && ( $textNow('global')['[[/_nino/webpage/site-trip/uri]]'] ?? null ) === '/trip' );
+check( 'a page keeps the priority it was given in a menu when it is saved again - the same one on each of its routes', count( array_column( $tripRoutes, 'navs' ) ) === count( $tripRoutes ) && array_unique( array_map( 'json_encode', array_column( $tripRoutes, 'navs' ) ) ) === $tripMenus );
+
+// The address for every language, with a language of its own beside it
+[ $status ] = $saveAddresses( [ 'originalUri' => $tripUri, 'uri' => $tripUri, 'httpUris' => [ '' => '/trip', 'fr_FR' => '/voyage' ] ] );
+$tripRoutes = $routesOf( $tripUri );
+check( 'an address for every language beside the address of one: the routes of the languages that share it carry no language, the other one is its language\'s',
+	$status === 200 && array_keys( $tripRoutes ) === [ 'GET://voyage', 'GET://trip' ] && ( $tripRoutes['GET://voyage']['locale'] ?? null ) === 'fr_FR' && isset( $tripRoutes['GET://trip']['locale'] ) === false );
+[ $status ] = $saveAddresses( [ 'originalUri' => $tripUri, 'uri' => $tripUri, 'httpUris' => [ '' => '/unused', 'de_DE' => '/reise', 'en_US' => '/trip', 'fr_FR' => '/voyage' ] ] );
+check( '...an address that no language needs is no route', $status === 200 && isset( $routesNow()['GET://unused'] ) === false && array_keys( $routesOf( $tripUri ) ) === [ 'GET://reise', 'GET://trip', 'GET://voyage' ] );
+
+// What no language's file decides, global.php: the address that serves every language - above -, else the native language's, else the first
+$siteNative = $appData['/nino/locales/native'];
+foreach( [ 'en_US' => '/b', 'it_IT' => '/a' ] as $nativeLocale => $expected ) {
+	$appData['/nino/locales/native'] = $nativeLocale;
+	$saveAddresses( [ 'uri' => '/site-global', 'httpUris' => [ 'de_DE' => '/a', 'en_US' => '/b', 'fr_FR' => '/c' ] ] );
+	check( $nativeLocale === 'en_US' ? '...with no address that every language shares, global.php has the one of the native language, wherever that one stands in the list' : '...and the first one where the native language is none the site has',
+		( $textNow('global')['[[/_nino/webpage/site-global/uri]]'] ?? null ) === $expected );
+	callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/site-global' ] );
+}
+$appData['/nino/locales/native'] = $siteNative;
+
+// One address for every language is the route there always was
+[ $status ] = $saveAddresses( [ 'originalUri' => $tripUri, 'uri' => $tripUri, 'httpUris' => [ '' => '/trip' ], 'text' => $pageText('Trip') ] );
+check( 'a save with the empty key alone writes the one route of a page that has one address: no language on it, and nothing but what that route had',
+	$status === 200 && $routesOf( $tripUri ) === [ 'GET://trip' => [ 'uri' => $tripUri, 'body' => '[template /templates/page-about]' ] ] );
+check( '...the fill is that address in every language file and in global.php',
+	array_unique( [ $textNow('de_DE')['[[/_nino/webpage/site-trip/uri]]'], $textNow('en_US')['[[/_nino/webpage/site-trip/uri]]'], $textNow('fr_FR')['[[/_nino/webpage/site-trip/uri]]'], $textNow('global')['[[/_nino/webpage/site-trip/uri]]'] ] ) === [ '/trip' ] );
+check( '...and the list answers it as the one address of every language', ( array_column( $saveAddresses( [ 'originalUri' => $tripUri, 'uri' => $tripUri, 'httpUris' => [ '' => '/trip' ] ] )[1]['pages'], null, 'uri' )[$tripUri]['httpUris'] ?? null ) === [ '' => '/trip' ] );
+
+// A site with one language has an address for every language, whatever the form says
+$siteLanguages = $appData['/nino/locales/available'];
+$appData['/nino/locales/available'] = [ 'de_DE' ];
+[ $status ] = $saveAddresses( [ 'originalUri' => $tripUri, 'uri' => $tripUri, 'httpUris' => [ 'de_DE' => '/reise' ] ] );
+$oneLanguage = $routesOf( $tripUri );
+[ $oneStatus, $oneBody ] = $saveAddresses( [ 'originalUri' => $tripUri, 'uri' => $tripUri, 'httpUris' => [ 'de_DE' => '/after' ] ] );
+$appData['/nino/locales/available'] = $siteLanguages;
+check( 'the one language of a site is every language: its address is the route without a language', $status === 200 && array_keys( $oneLanguage ) === [ 'GET://reise' ] && isset( $oneLanguage['GET://reise']['locale'] ) === false );
+check( '...and when that address is another page\'s the refusal names the field of the key it was posted with, the one the form draws for the language - and not a field for every language', $oneStatus === 400
+	&& ( $oneBody['code'] ?? '' ) === 'routes_duplicate_http_uri' && ( $oneBody['params'] ?? [] ) === [ '/after' ] && ( $oneBody['field'] ?? '' ) === 'httpUri-de_DE' );
+$saveAddresses( [ 'originalUri' => $tripUri, 'uri' => $tripUri, 'httpUris' => [ 'de_DE' => '/reise', 'en_US' => '/trip', 'fr_FR' => '/voyage' ], 'navs' => [ 'main' ] ] );
+
+// What the form does not edit stays on every route; a new Element-URI takes every route of the page with it
+\Nino\Filesystem::mutate( $appData, '/config.php', function( array $config ): array {
+	$config['/nino/http/routes']['GET://reise'] = array_merge( $config['/nino/http/routes']['GET://reise'], [ 'maintenance' => false, 'header' => [ 'X-Trip' => '1' ] ] );
+	return $config;
+} );
+[ $status ] = $saveAddresses( [ 'originalUri' => $tripUri, 'uri' => '/site-journey', 'httpUris' => [ 'de_DE' => '/reise', 'en_US' => '/trip', 'fr_FR' => '/voyage' ], 'navs' => [ 'main' ], 'text' => $pageText('Journey') ] );
+$journeyRoutes = $routesOf( '/site-journey' );
+check( 'a rename of the Element-URI moves every route of the page: none stands under the old one, and each is bound to its language still',
+	$status === 200 && $routesOf( $tripUri ) === [] && array_keys( $journeyRoutes ) === [ 'GET://reise', 'GET://trip', 'GET://voyage' ] && array_column( $journeyRoutes, 'locale' ) === [ 'de_DE', 'en_US', 'fr_FR' ] );
+check( '...with what the form does not edit, which the first route carried, on all of them', array_column( $journeyRoutes, 'maintenance' ) === [ false, false, false ]
+	&& array_column( $journeyRoutes, 'header' ) === array_fill( 0, 3, [ 'X-Trip' => '1' ] ) );
+check( '...in the slot the page stood in', array_slice( array_keys( $routesNow() ), -4 ) === [ 'GET://reise', 'GET://trip', 'GET://voyage', 'GET://after' ] );
+check( '...and the fills of its addresses are written under the new one', ( $textNow('en_US')['[[/_nino/webpage/site-journey/uri]]'] ?? null ) === '/trip' && ( $textNow('de_DE')['[[/_nino/webpage/site-journey/uri]]'] ?? null ) === '/reise' );
+$tripUri = '/site-journey';
+
+// Refusals: each says why, with its code, the address and the field, and writes nothing
+$configBeforeAddresses = file_get_contents( $sandbox. '/private/config.php' );
+$textBeforeAddresses = array_map( static fn( string $name ): string => (string) file_get_contents( $sandbox. '/private/text/'. $name. '.php' ), [ 'de_DE', 'en_US', 'fr_FR', 'global' ] );
+$refusedAddresses = [
+	'an address that another route has'								=> [ [ 'de_DE' => '/owned', 'en_US' => '/trip', 'fr_FR' => '/voyage' ], 409, 'routes_http_uri_taken', [ '/owned' ], 'httpUri-de_DE' ],
+	'an address that another page has'								=> [ [ 'de_DE' => '/reise', 'en_US' => '/contact', 'fr_FR' => '/voyage' ], 400, 'routes_duplicate_http_uri', [ '/contact' ], 'httpUri-en_US' ],
+	'an address that is shared and another page has'	=> [ [ '' => '/after' ], 400, 'routes_duplicate_http_uri', [ '/after' ], 'httpUri' ],
+	'an address the workbench owns'										=> [ [ 'de_DE' => '/reise', 'en_US' => '/_admin', 'fr_FR' => '/voyage' ], 409, 'routes_reserved_http_uri', [ '/_admin' ], 'httpUri-en_US' ],
+	'an address that is no path'											=> [ [ 'de_DE' => '/reise', 'en_US' => '/trip', 'fr_FR' => '../etc/passwd' ], 400, 'routes_invalid_http_uri', [ '../etc/passwd' ], 'httpUri-fr_FR' ],
+	'a language that has none'												=> [ [ 'de_DE' => '/reise', 'en_US' => '/trip' ], 400, 'routes_missing_http_uri', [ 'fr_FR' ], 'httpUri-fr_FR' ],
+	'a language whose address is blank'								=> [ [ 'de_DE' => '/reise', 'en_US' => '   ', 'fr_FR' => '/voyage' ], 400, 'routes_missing_http_uri', [ 'en_US' ], 'httpUri-en_US' ],
+	'a language whose address is no text'							=> [ [ 'de_DE' => '/reise', 'en_US' => [ '/trip' ], 'fr_FR' => '/voyage' ], 400, 'routes_missing_http_uri', [ 'en_US' ], 'httpUri-en_US' ],
+	'no address at all'																=> [ [], 400, 'routes_missing_http_uri', [ 'de_DE' ], 'httpUri-de_DE' ],
+	'a key that is no language of the site'						=> [ [ 'de_DE' => '/reise', 'en_US' => '/trip', 'fr_FR' => '/voyage', 'it_IT' => '/viaggio' ], 400, 'routes_unknown_locale', [ 'it_IT' ], 'httpUri-it_IT' ],
+	'a key that is a path and no language'						=> [ [ '/reise' => '/reise', '' => '/trip' ], 400, 'routes_unknown_locale', [ '/reise' ], 'httpUri-/reise' ],
+	'an address given for two languages'							=> [ [ 'de_DE' => '/reise', 'en_US' => '/trip', 'fr_FR' => '/trip' ], 400, 'routes_duplicate_http_uri', [ '/trip' ], 'httpUri-fr_FR' ],
+	'an address given for the first two of three languages'	=> [ [ 'de_DE' => '/trip', 'en_US' => '/trip', 'fr_FR' => '/voyage' ], 400, 'routes_duplicate_http_uri', [ '/trip' ], 'httpUri-en_US' ],
+	'an address given for every language and again for a language'	=> [ [ '' => '/trip', 'en_US' => '/trip' ], 400, 'routes_duplicate_http_uri', [ '/trip' ], 'httpUri-en_US' ],
+	'an address given for a language and again for every language'	=> [ [ 'en_US' => '/trip', '' => '/trip' ], 400, 'routes_duplicate_http_uri', [ '/trip' ], 'httpUri' ],
+	'an address given for two languages that another page has'	=> [ [ 'de_DE' => '/contact', 'en_US' => '/contact', 'fr_FR' => '/voyage' ], 400, 'routes_duplicate_http_uri', [ '/contact' ], 'httpUri-en_US' ],
+	'an address for the languages that have none of their own, which another page has'	=> [ [ '' => '/contact', 'fr_FR' => '/voyage' ], 400, 'routes_duplicate_http_uri', [ '/contact' ], 'httpUri' ],
+	'an address for every language that only one is left with, which another page has'	=> [ [ 'de_DE' => '/reise', 'en_US' => '/trip', '' => '/contact' ], 400, 'routes_duplicate_http_uri', [ '/contact' ], 'httpUri' ],
+];
+foreach( $refusedAddresses as $label => [ $refusedMap, $refusedStatus, $refusedCode, $refusedParams, $refusedField ] ) {
+	[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [ 'originalUri' => $tripUri, 'uri' => $tripUri, 'httpUris' => $refusedMap, 'template' => 'page-about', 'text' => $pageText('Journey') ] );
+	check( $label. ' is refused with '. $refusedStatus. ', its code, what was wrong and the field', $status === $refusedStatus && ( $body['code'] ?? '' ) === $refusedCode && ( $body['params'] ?? [] ) === $refusedParams && ( $body['field'] ?? '' ) === $refusedField );
+}
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [ 'originalHttpUri' => '/trip', 'uri' => '/site-old-keys', 'httpUri' => '/old-keys', 'template' => 'page-about', 'text' => $pageText('Old') ] );
+check( 'the request of the old shape - the address in httpUri, the page by the address it had - is read as none: a request without an address, refused with the language', $status === 400 && ( $body['code'] ?? '' ) === 'routes_missing_http_uri' && ( $body['params'] ?? [] ) === [ 'de_DE' ] );
+check( '...and every one of these refusals left config.php and the text files exactly as they were', file_get_contents( $sandbox. '/private/config.php' ) === $configBeforeAddresses
+	&& $textBeforeAddresses === array_map( static fn( string $name ): string => (string) file_get_contents( $sandbox. '/private/text/'. $name. '.php' ), [ 'de_DE', 'en_US', 'fr_FR', 'global' ] ) );
+
+// Four languages that want two addresses, a pair each: a page has one address that several languages share - the empty key's - and
+// a second pair has no way to say it, so the request is refused rather than written as two routes without a language, which
+// would serve every language from the first of them
+$fourLanguages = [ 'de_DE', 'de_AT', 'en_US', 'en_GB' ];
+$appData['/nino/locales/available'] = $fourLanguages;
+$textFiles = static fn(): array => array_map( static fn( string $file ): string => $file. ' '. md5( (string) file_get_contents( $file ) ), glob( $sandbox. '/private/text/*.php' ) ?: [] );
+$configBeforePairs = file_get_contents( $sandbox. '/private/config.php' );
+$textBeforePairs = $textFiles();
+$pairs = [
+	'two pairs of languages that each give one address'	=> [ [ 'de_DE' => '/pair-de', 'de_AT' => '/pair-de', 'en_US' => '/pair-en', 'en_GB' => '/pair-en' ], '/pair-de', 'httpUri-de_AT' ],
+	'...with the first pair sent as the empty key\'s, which is all a form can do'	=> [ [ '' => '/pair-de', 'en_US' => '/pair-en', 'en_GB' => '/pair-en' ], '/pair-en', 'httpUri-en_GB' ],
+];
+foreach( $pairs as $label => [ $pairMap, $pairAddress, $pairField ] ) {
+	[ $status, $body ] = $saveAddresses( [ 'uri' => '/site-pairs', 'httpUris' => $pairMap ] );
+	check( $label. ' are refused with 400, a code, the address and the later field', $status === 400 && ( $body['code'] ?? '' ) === 'routes_duplicate_http_uri' && ( $body['params'] ?? [] ) === [ $pairAddress ] && ( $body['field'] ?? '' ) === $pairField );
+}
+check( '...and nothing was written: no route, no text, no language file', file_get_contents( $sandbox. '/private/config.php' ) === $configBeforePairs && $routesOf( '/site-pairs' ) === [] && $textFiles() === $textBeforePairs );
+[ $status ] = $saveAddresses( [ 'uri' => '/site-pairs', 'httpUris' => [ '' => '/pair-de', 'en_US' => '/pair-us', 'en_GB' => '/pair-uk' ] ] );
+$pairRoutes = $routesOf( '/site-pairs' );
+check( 'one pair is possible, as the empty key\'s, beside an address of its own for each of the other languages: the pair is the route without a language', $status === 200
+	&& array_keys( $pairRoutes ) === [ 'GET://pair-us', 'GET://pair-uk', 'GET://pair-de' ] && array_column( $pairRoutes, 'locale' ) === [ 'en_US', 'en_GB' ] && isset( $pairRoutes['GET://pair-de']['locale'] ) === false );
+callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/site-pairs' ] );
+$appData['/nino/locales/available'] = $siteLanguages;
+@unlink( $sandbox. '/private/text/de_AT.php' );
+@unlink( $sandbox. '/private/text/en_GB.php' );
+
+// A page that is saved again keeps its own addresses, whatever it does with the route that carries them
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [ 'originalUri' => $tripUri, 'uri' => $tripUri, 'httpUris' => [ 'de_DE' => '/trip', 'en_US' => '/reise', 'fr_FR' => '/voyage' ], 'template' => 'page-about', 'text' => $pageText('Journey') ] );
+check( 'the addresses of a page may trade places between its languages: they are its own', $status === 200 && ( $routesNow()['GET://trip']['locale'] ?? null ) === 'de_DE' && ( $routesNow()['GET://reise']['locale'] ?? null ) === 'en_US' );
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [ 'originalUri' => $tripUri, 'uri' => '/site-contact', 'httpUris' => [ '' => '/trip' ], 'template' => 'page-about', 'text' => $pageText('Journey') ] );
+check( 'the Element-URI of another page is refused to a page that has several routes, as to one that has one', $status === 400 && count( $routesOf( $tripUri ) ) === 3 );
+$saveAddresses( [ 'originalUri' => $tripUri, 'uri' => $tripUri, 'httpUris' => [ 'de_DE' => '/reise', 'en_US' => '/trip', 'fr_FR' => '/voyage' ] ] );
+
+// The pages as the routes make them, in the order of the first route of each
+$languageRoutes = [
+	'GET://p-en' 		=> [ 'uri' => '/p', 'locale' => 'en_US', 'body' => '[template /templates/page-about]', 'navs' => [ 'main' => 1 ] ],
+	'GET://q-fr' 		=> [ 'uri' => '/q', 'locale' => 'fr_FR', 'body' => '[template /templates/page-contact]', 'statusCode' => 404 ],
+	'GET://p-de' 		=> [ 'uri' => '/p', 'locale' => 'de_DE', 'body' => '[template /templates/page-about]' ],
+	'GET://q' 			=> [ 'uri' => '/q', 'body' => '[template /templates/page-contact]' ],
+	'GET://r-en' 		=> [ 'uri' => '/r', 'locale' => 'en_US', 'body' => '[template /templates/page-about]' ],
+	'GET://robots.txt' => [ 'uri' => '/robots.txt', 'body' => 'plain text' ],
+	'POST://p-form' => [ 'uri' => '/p', 'body' => '' ],
+];
+$listed = \Nino\Modules\Routes\Admin::pages( $appData, $languageRoutes, [ 'de_DE', 'en_US', 'fr_FR' ], [ 'main' ] );
+check( 'the routes of one Element-URI are one page, in the order of the first route of each - a route that is no page, and the endpoint of a page, are none',
+	array_column( $listed, 'uri' ) === [ '/p', '/q', '/r' ] );
+check( '...httpUris names the address of each language, the key of the one that has no language being empty', array_column( $listed, 'httpUris' ) === [ [ 'en_US' => '/p-en', 'de_DE' => '/p-de' ], [ 'fr_FR' => '/q-fr', '' => '/q' ], [ 'en_US' => '/r-en' ] ] );
+check( '...and httpUri the one the line of the list shows: the native language\'s, else the one that has no language, else the first', array_column( $listed, 'httpUri' ) === [ '/p-de', '/q', '/r-en' ] );
+check( '...with the template, the status code and the menus of the first route', array_column( $listed, 'template' ) === [ 'page-about', 'page-contact', 'page-about' ] && array_column( $listed, 'statusCode' ) === [ 200, 404, 200 ] && $listed[0]['navs'] === [ 'main' ] );
+
+// Moving and deleting take the page, with all its routes
+$orderBeforeMove = array_keys( $routesNow() );
+$tripBlock = array_keys( $routesOf( $tripUri ) );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiMove', [ 'uri' => $tripUri, 'direction' => 'up' ] );
+$orderAfterMove = array_keys( $routesNow() );
+check( 'moving a page that has a route per language moves them as one block, past the page before it', $status === 200
+	&& array_slice( $orderAfterMove, array_search( $tripBlock[0], $orderAfterMove, true ), 3 ) === $tripBlock && array_search( 'GET://contact', $orderAfterMove, true ) === array_search( $tripBlock[0], $orderAfterMove, true ) + 3 );
+check( '...the list answers the pages in that order, and a route of somebody else stays where it stood', array_slice( array_column( $body['pages'], 'uri' ), -3 ) === [ $tripUri, '/site-contact', '/site-after' ] && array_keys( $routesNow() )[0] === 'GET://owned' );
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiMove', [ 'uri' => '/site-after', 'direction' => 'down' ] );
+check( '...and the last page cannot move down', $status === 400 );
+callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiMove', [ 'uri' => $tripUri, 'direction' => 'down' ] );
+check( '...the block moves back where it stood', array_keys( $routesNow() ) === $orderBeforeMove );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => 'GET://reise' ] );
+check( 'a delete takes the Element-URI of a page: the key of one of its routes is none', $status === 404 && count( $routesOf( $tripUri ) ) === 3 );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => $tripUri ] );
+check( 'a delete removes every route of the page, and no other', $status === 200 && $routesOf( $tripUri ) === [] && isset( $routesNow()['GET://after'], $routesNow()['GET://contact'], $routesNow()['GET://owned'] ) && array_column( $body['pages'], 'uri' ) === [ '/site-contact', '/site-after' ] );
+check( '...its texts and the fills of its addresses stay, in every language, as they do for a page with one address', ( $textNow('de_DE')['[[/_nino/webpage/site-journey/name]]'] ?? null ) === 'Trip'
+	&& ( $textNow('fr_FR')['[[/_nino/webpage/site-journey/uri]]'] ?? null ) === '/voyage' && ( $textNow('global')['[[/_nino/webpage/site-journey/uri]]'] ?? null ) === '/reise' );
+callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/site-after' ] );
+
+echo "\n";
+
 
 // --- the pages a feature routes at runtime ---------------------------------
 //
@@ -432,6 +659,14 @@ check( 'a title missing in one language is refused with the code and the field, 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSaveTexts', [ 'uri' => '/hello', 'text' => $runtimeText( [ 'name' => '', 'title' => 'y' ], [ 'name' => 'Hello', 'title' => 'x' ] ) ] );
 check( '...and so is a missing name', $status === 400 && ( $body['code'] ?? '' ) === 'routes_missing_name' );
 check( 'the log has a line for it, with the Element-URI', \Nino\Modules\Routes\Admin::log( 'routes/savetexts', [ 'uri' => '/.newsletter' ] ) === 'Edit Feature Route /.newsletter' );
+$logLines = [
+	\Nino\Modules\Routes\Admin::log( 'routes/save', [ 'originalUri' => '', 'uri' => '/site-x' ] ),
+	\Nino\Modules\Routes\Admin::log( 'routes/save', [ 'originalUri' => '/site-x', 'uri' => '/site-x' ] ),
+	\Nino\Modules\Routes\Admin::log( 'routes/delete', [ 'uri' => '/site-x' ] ),
+	\Nino\Modules\Routes\Admin::log( 'routes/move', [ 'uri' => '/site-x', 'direction' => 'down' ] ),
+];
+check( '...and so has the page of a save, a delete and a move: the Element-URI names it, a new page is told from one saved again, and a move says which way', count( array_unique( $logLines ) ) === 4
+	&& count( array_filter( $logLines, fn( string $line ): bool => str_contains( $line, '/site-x' ) ) ) === 4 && str_contains( $logLines[3], 'down' ) );
 \Nino\Auth::logoutUser( $appData );
 [ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSaveTexts', [ 'uri' => '/hello', 'text' => [] ] );
 check( '...and routes/savetexts needs the panel\'s session and permission like every action of it', $status === 401 );
@@ -459,7 +694,7 @@ check( 'PageEditor actions require an authed _admin session too', $status === 40
 // before they read through AppData::stored(): the tile counts none and a move finds no page, where a TypeError is a 500
 $routesStored = \Nino\AppData::stored( $appData, '/nino/http/routes' );
 \Nino\Filesystem::mutate( $appData, '/config.php', static function( array $config ): array { $config['/nino/http/routes'] = null; return $config; } );
-[ $nullStatus ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiMove', [ 'httpUri' => '/about', 'direction' => 'up' ] );
+[ $nullStatus ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiMove', [ 'uri' => '/site-about', 'direction' => 'up' ] );
 check( 'a config.php that holds the routes as null is a project without routes: the dashboard tile counts none and a move finds no page', \Nino\Modules\Routes\Admin::count( $appData ) === 0 && $nullStatus === 404 );
 \Nino\Filesystem::mutate( $appData, '/config.php', static function( array $config ) use ( $routesStored ): array { $config['/nino/http/routes'] = $routesStored; return $config; } );
 

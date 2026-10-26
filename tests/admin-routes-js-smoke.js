@@ -11,6 +11,12 @@
  *													what is on screen afterwards has to be what is on
  *													disk. The checks below are about exactly that.
  *
+ *													A page has one Http URI for every language or one for
+ *													each: a switch says which, the form draws the one field
+ *													or a field per language, and what the fields hold is
+ *													what is sent. The section on the address per language
+ *													is about that.
+ *
  *	Usage: node tests/admin-routes-js-smoke.js
  */
 
@@ -131,12 +137,13 @@ const sandbox = {
 	console : console,
 	document : {
 		createElement : control,
+		createTextNode : function( content ) { return Object.assign( element('#text'), { textContent : String( content ) } ) },
 		getElementById : function( id ) {
 			if( id === 'routes-list' ) return mount;
 			if( id === 'routes-form' ) return form;
 			return findAll( mount, function( el ) { return el.id === id } )[0] ?? findAll( form, function( el ) { return el.id === id } )[0] ?? null;
 		},
-		// Only the three selectors the panel asks the form for
+		// Only the four selectors the panel asks the form for
 		querySelectorAll : function( selector ) {
 			if( selector === '#routes-form-locales [data-locale]' )
 				return findAll( form, function( el ) { return el.dataset.locale !== undefined } );
@@ -144,6 +151,8 @@ const sandbox = {
 				return findAll( form, function( el ) { return 'aria-invalid' in el.attributes } );
 			if( selector === '#routes-form [data-nav]' )
 				return findAll( form, function( el ) { return el.dataset.nav !== undefined } );
+			if( selector === '#routes-form-addresses [data-address]' )
+				return findAll( form, function( el ) { return el.dataset.address !== undefined } );
 			return [];
 		},
 		documentElement : null,
@@ -170,12 +179,13 @@ const NAMES = { '/' : 'Start', '/about' : 'Über uns', '/contact' : 'Kontakt' };
 function listing( order, extra ) {
 	return Object.assign( {
 		pages 		: order.map( function( uri ) {
-			return { httpUri : uri, uri : uri, template : 'page'+ uri.replace('/','-'), body : '[template /templates/page'+ uri.replace('/','-')+ ']',
+			return { httpUri : uri, httpUris : { '' : uri }, uri : uri, template : 'page'+ uri.replace('/','-'), body : '[template /templates/page'+ uri.replace('/','-')+ ']',
 				text : { de_DE : { name : NAMES[uri] || '', title : '', description : '' }, en_US : { name : '', title : '', description : '' } } };
 		} ),
 		templates 			: [],
 		defaultTemplate : '',
 		locales 				: [ 'de_DE', 'en_US' ],
+		localeNames 			: { de_DE : 'Deutsch', en_US : 'English' },
 		selectedLocale 	: 'de_DE',
 		navs 						: [],
 	}, extra || {} );
@@ -195,7 +205,7 @@ check( 'the list carries the line a refused move reports into', messageText() ==
 fire( moveButton( '/contact', 'up' ), 'click' );
 check( 'the move is sent for the row whose arrow was pressed', requests.length === 2
 	&& requests[1].action === 'routes/move'
-	&& requests[1].payload.httpUri === '/contact' && requests[1].payload.direction === 'up' );
+	&& requests[1].payload.uri === '/contact' && requests[1].payload.direction === 'up' );
 
 answer( 200, { pages : listing( [ '/', '/contact', '/about' ] ).pages } );
 check( 'an accepted move redraws the list in the order the server answers with', rowLabels().join(',') === '/,/contact,/about' );
@@ -365,7 +375,7 @@ field('routes-form-http-uri').value = '/new';
 field('routes-form-http-uri').focus();
 save();
 check( 'a complete form is sent, an empty description with it', requests.length === before + 1 && requests[before].action === 'routes/save'
-	&& requests[before].payload.template === 'page-blank' && requests[before].payload.text.en_US.description === '' && requests[before].payload.originalHttpUri === '' );
+	&& requests[before].payload.template === 'page-blank' && requests[before].payload.text.en_US.description === '' && requests[before].payload.originalUri === '' );
 touched.length = 0;
 answer( 200, {} );
 check( 'a save that went through tells the other panels that routes were written', touched.join() === 'routes' );
@@ -438,7 +448,7 @@ check( 'a route that picks its template at runtime names its body instead', conf
 confirmAnswer = true;
 confirms.length = 0;
 fire( deleteButton(), 'click' );
-check( 'a confirmed question deletes the route', requests[requests.length - 1].action === 'routes/delete' && requests[requests.length - 1].payload.httpUri === '/about' );
+check( 'a confirmed question deletes the route', requests[requests.length - 1].action === 'routes/delete' && requests[requests.length - 1].payload.uri === '/site-about' );
 confirmAnswer = false;
 touched.length = 0;
 answer( 200, {} );
@@ -460,6 +470,238 @@ save();
 check( 'a route with a runtime body saves without choosing a template', requests.length === sentBefore + 1 && requests[sentBefore].payload.template === '' );
 answer( 200, {} );
 answer( 200, listing( [ '/', '/contact' ] ) );
+
+/*	A page has one Http URI for every language, or one for each. The switch
+	says which: the form draws the one field, or a field per language named by
+	its language, and what the fields hold is what is sent. The list names every
+	address a page has, and a move or a delete names the page by its Element URI	*/
+function oneSwitch() {
+	return findAll( form, function( el ) { return el.className === 'nino-admin-switch' } )[0];
+}
+function oneBox() {
+	return oneSwitch().children[0];
+}
+function turnSwitch( on ) {
+	oneBox().checked = on;
+	fire( oneBox(), 'change' );
+}
+function addressInputs() {
+	return findAll( form, function( el ) { return el.dataset.address !== undefined } );
+}
+function address( locale ) {
+	return addressInputs().find( function( input ) { return input.dataset.address === locale } );
+}
+function addressName( locale ) {
+	return address( locale ).parentNode.children[0].textContent;
+}
+function fillTexts() {
+	[ 'de_DE', 'en_US' ].forEach( function( locale ) { localeInput( locale, 'name' ).value = 'N'; localeInput( locale, 'title' ).value = 'T' } );
+}
+function openPath( path ) {
+	fire( backLink(), 'click' );
+	openRoute( path );
+}
+
+const addressed = listing( [ '/', '/about', '/contact' ], { templates : [ 'page-about', 'page-blank', 'page-contact' ], defaultTemplate : 'page-blank', localeNames : { de_DE : 'Deutsch', en_US : 'English' } } );
+addressed.pages[1].httpUri = '/ueber-uns';
+addressed.pages[1].httpUris = { de_DE : '/ueber-uns', en_US : '/about' };
+addressed.pages[2].httpUri = '/kontakt';
+addressed.pages[2].httpUris = { '' : '/contact', de_DE : '/kontakt' };
+panel.init();
+answer( 200, addressed );
+
+check( 'a page with an address per language is one row, and the row names every address - the one several languages share too', rowLabels().join(' | ') === '/ | /ueber-uns, /about | /contact, /kontakt' );
+check( '...and the link out goes to the address the server gave the page as its own', openLink( '/ueber-uns, /about' ).href === '/site/ueber-uns' && openLink( '/contact, /kontakt' ).href === '/site/kontakt' );
+
+touched.length = 0;
+fire( moveButton( '/ueber-uns, /about', 'down' ), 'click' );
+check( 'a move names the page by its Element URI and not by one of its addresses', JSON.stringify( requests[requests.length - 1].payload ) === '{"uri":"/about","direction":"down"}' );
+answer( 200, { pages : addressed.pages } );
+touched.length = 0;
+
+openRoute( '/' );
+check( 'a page with one address for every language opens with the switch on and the one field', oneBox().checked === true && addressInputs().length === 1 && addressInputs()[0].dataset.address === ''
+	&& field('routes-form-http-uri') === addressInputs()[0] && field('routes-form-http-uri').value === '/' );
+check( '...named as the Http URI, and not drawn as a group', addressName( '' ) === text('/_admin/routes/label/httpuri') && text('/_admin/routes/label/httpuri') !== ''
+	&& field('routes-form-addresses').attributes.role === undefined );
+
+const switchCopy = findAll( form, function( el ) { return el.className === 'nino-admin-switch-copy' } )[0];
+check( 'the switch says what it is for in the words of the panel, with a hint under it', switchCopy.children[0].textContent === text('/_admin/routes/label/one-address') && switchCopy.children[1].textContent === text('/_admin/routes/hint/one-address')
+	&& text('/_admin/routes/label/one-address') !== '' && text('/_admin/routes/hint/one-address') !== '' );
+
+turnSwitch( false );
+check( 'turned off on a page that has one address for every language, every language starts from it', addressInputs().map( function( input ) { return input.dataset.address } ).join() === 'de_DE,en_US'
+	&& address( 'de_DE' ).value === '/' && address( 'en_US' ).value === '/' && field('routes-form-http-uri') === undefined );
+
+openPath( '/ueber-uns, /about' );
+check( 'a page with an address per language opens with the switch off and a field for each language, in the order of the languages', oneBox().checked === false
+	&& addressInputs().map( function( input ) { return input.dataset.address } ).join() === 'de_DE,en_US' && field('routes-form-http-uri') === undefined );
+check( '...each named by its language and not by its code, and holding that language\'s own address', addressName( 'de_DE' ) === 'Deutsch' && addressName( 'en_US' ) === 'English'
+	&& address( 'de_DE' ).value === '/ueber-uns' && address( 'en_US' ).value === '/about' );
+check( '...each required, and named for the server by the field it marks when it refuses that language\'s address', addressInputs().every( function( input ) {
+	return input.required === true && input.attributes['aria-required'] === 'true' && input.dataset.field === 'httpUri-'+ input.dataset.address && input.id === 'routes-form-http-uri-'+ input.dataset.address;
+} ) );
+check( '...in a group that the Http URI names', field('routes-form-addresses').attributes.role === 'group' && field('routes-form-addresses').attributes['aria-label'] === text('/_admin/routes/label/httpuri') );
+
+openPath( '/contact, /kontakt' );
+check( 'a page with an address for every language and one of its own for a language shows that one in the row of the language, and the shared one in the others', oneBox().checked === false
+	&& address( 'de_DE' ).value === '/kontakt' && address( 'en_US' ).value === '/contact' );
+
+panel._openForm( Object.assign( {}, addressed.pages[1], { httpUris : { de_DE : '/ueber-uns' } } ), null );
+check( 'a language the page has no address for starts empty, to be filled in', address( 'de_DE' ).value === '/ueber-uns' && address( 'en_US' ).value === '' );
+
+openPath( '/ueber-uns, /about' );
+turnSwitch( true );
+check( 'turned to one address for every language, the fields of the languages give way to the one field', addressInputs().length === 1 && addressInputs()[0].dataset.address === '' && addressInputs()[0].dataset.field === 'httpUri'
+	&& field('routes-form-addresses').attributes.role === undefined && field('routes-form-addresses').attributes['aria-label'] === undefined );
+check( '...which starts from the address of the first language that has one', field('routes-form-http-uri').value === '/ueber-uns' );
+field('routes-form-http-uri').value = '/everywhere';
+turnSwitch( false );
+check( 'turned off again, the languages hold what they held: nothing typed is lost between two turns', address( 'de_DE' ).value === '/ueber-uns' && address( 'en_US' ).value === '/about' );
+address( 'en_US' ).value = '/en-about';
+turnSwitch( true );
+check( '...and the one field shows again what was typed into it before', field('routes-form-http-uri').value === '/everywhere' );
+turnSwitch( false );
+check( '...and so does a language what was typed into its field', address( 'en_US' ).value === '/en-about' && address( 'de_DE' ).value === '/ueber-uns' );
+
+// A new page, with an address for each language: the map is what is sent
+openPath( '/ueber-uns, /about' );
+fire( backLink(), 'click' );
+fire( listActionButton(), 'click' );
+check( 'a new page starts with the switch on and the one field empty', oneBox().checked === true && addressInputs().length === 1 && addressInputs()[0].dataset.address === '' && addressInputs()[0].value === '' );
+field('routes-form-uri').value = '/trip';
+field('routes-form-http-uri').value = '/trip';
+fillTexts();
+turnSwitch( false );
+check( 'turned off, every language starts from what the one field held', address( 'de_DE' ).value === '/trip' && address( 'en_US' ).value === '/trip' );
+address( 'en_US' ).value = '/reise';
+const beforeMap = requests.length;
+save();
+check( 'a page with an address per language is sent as a map of language to address', requests.length === beforeMap + 1 && requests[beforeMap].action === 'routes/save'
+	&& JSON.stringify( requests[beforeMap].payload.httpUris ) === '{"de_DE":"/trip","en_US":"/reise"}' );
+check( '...beside the Element URI, the one the page had - none, for a new page - and none of the keys of the shape before', Object.keys( requests[beforeMap].payload ).sort().join() === 'httpUris,navs,originalUri,statusCode,template,text,uri'
+	&& requests[beforeMap].payload.originalUri === '' && requests[beforeMap].payload.uri === '/trip' );
+
+answer( 400, { error : 'missing', code : 'routes_missing_http_uri', params : [ 'en_US' ], field : 'httpUri-en_US' } );
+check( 'a refusal that names the address of a language marks that field and puts the focus on it, and no other', address( 'en_US' ).attributes['aria-invalid'] === 'true' && active === address( 'en_US' )
+	&& address( 'de_DE' ).attributes['aria-invalid'] === undefined );
+check( '...and the line of the form tells it in the words of the code, with the language', text('/_admin/error/routes_missing_http_uri') !== ''
+	&& field('routes-form-msg').textContent === Nino.adminUi.format( text('/_admin/error/routes_missing_http_uri'), 'en_US' ) );
+
+turnSwitch( true );
+const beforeOne = requests.length;
+save();
+check( 'with the switch on the same page is sent as the one address of every language', requests.length === beforeOne + 1 && JSON.stringify( requests[beforeOne].payload.httpUris ) === '{"":"/trip"}' );
+answer( 409, { error : 'taken', code : 'routes_http_uri_taken', params : [ '/trip' ], field : 'httpUri' } );
+check( 'a refusal that names the address of every language marks the one field', field('routes-form-http-uri').attributes['aria-invalid'] === 'true' && active === field('routes-form-http-uri') );
+
+/*	A request gives an address once. Fields of languages that hold the same address are the address of those languages together - that of
+	every language with none of its own, which the server writes as the one route without a language - and are sent as that, the empty
+	key. The server's refusal of that address is for the first of those fields: no field of the form is called for every language	*/
+fire( backLink(), 'click' );
+fire( listActionButton(), 'click' );
+field('routes-form-uri').value = '/trip';
+field('routes-form-http-uri').value = '/trip';
+fillTexts();
+turnSwitch( false );
+const beforeFold = requests.length;
+save();
+check( 'fields per language that hold one address are sent as the address of every language, once - what the switch turned on would send', requests.length === beforeFold + 1
+	&& JSON.stringify( requests[beforeFold].payload.httpUris ) === '{"":"/trip"}' );
+answer( 400, { error : 'taken', code : 'routes_duplicate_http_uri', params : [ '/trip' ], field : 'httpUri' } );
+check( 'a refusal of that address marks and focuses the first of the fields it was sent for, and no other', address( 'de_DE' ).attributes['aria-invalid'] === 'true' && active === address( 'de_DE' )
+	&& address( 'en_US' ).attributes['aria-invalid'] === undefined );
+
+// A page with an address for one language and one for the others, opened with the switch off, is saved as it is
+const threeLanguages = [ 'de_DE', 'en_US', 'fr_FR' ];
+panel._locales = threeLanguages;
+panel._localeNames = { de_DE : 'Deutsch', en_US : 'English', fr_FR : 'Français' };
+panel._openForm( { uri : '/trip', httpUri : '/reise', httpUris : { de_DE : '/reise', '' : '/trip' }, template : 'page-about', body : '[template /templates/page-about]', text : {} }, null );
+check( 'a page that has an address of its own for a language and one for the others shows the one for the others in each of their fields', oneBox().checked === false
+	&& address( 'de_DE' ).value === '/reise' && address( 'en_US' ).value === '/trip' && address( 'fr_FR' ).value === '/trip' );
+threeLanguages.forEach( function( locale ) { localeInput( locale, 'name' ).value = 'N'; localeInput( locale, 'title' ).value = 'T' } );
+const beforeThree = requests.length;
+save();
+check( '...and saved unchanged it sends the shared address as the empty key and the language of its own as itself: the same page again', requests.length === beforeThree + 1
+	&& JSON.stringify( requests[beforeThree].payload.httpUris ) === '{"":"/trip","de_DE":"/reise"}' && requests[beforeThree].payload.originalUri === '/trip' );
+answer( 200, {} );
+answer( 200, addressed );
+
+// Two pairs of languages that each hold an address: one is the address of its languages, the other cannot say so, and the server refuses it for its later field
+const fourLanguages = [ 'de_DE', 'de_AT', 'en_US', 'en_GB' ];
+panel._locales = fourLanguages;
+panel._localeNames = { de_DE : 'Deutsch', de_AT : 'Österreich', en_US : 'English', en_GB : 'Britain' };
+fire( listActionButton(), 'click' );
+field('routes-form-uri').value = '/pairs';
+field('routes-form-http-uri').value = '/kontakt';
+fourLanguages.forEach( function( locale ) { localeInput( locale, 'name' ).value = 'N'; localeInput( locale, 'title' ).value = 'T' } );
+turnSwitch( false );
+address( 'en_US' ).value = '/contact';
+address( 'en_GB' ).value = ' /contact ';
+const beforePairs = requests.length;
+save();
+check( 'two pairs of fields that each hold one address: the first is sent as the empty key, the second as it stands', requests.length === beforePairs + 1
+	&& JSON.stringify( requests[beforePairs].payload.httpUris ) === '{"":"/kontakt","en_US":"/contact","en_GB":" /contact "}' );
+answer( 400, { error : 'twice', code : 'routes_duplicate_http_uri', params : [ '/contact' ], field : 'httpUri-en_GB' } );
+check( '...and the refusal, which names the later of the second pair, marks and focuses that field', address( 'en_GB' ).attributes['aria-invalid'] === 'true' && active === address( 'en_GB' )
+	&& [ 'de_DE', 'de_AT', 'en_US' ].every( function( locale ) { return address( locale ).attributes['aria-invalid'] === undefined } ) );
+panel._locales = [ 'de_DE', 'en_US' ];
+panel._localeNames = { de_DE : 'Deutsch', en_US : 'English' };
+
+// The map a save sends, by itself
+const fieldsOf = function( pairs ) { return pairs.map( function( pair ) { return { locale : pair[0], value : pair[1] } } ) };
+const mapOf = function( pairs ) { return JSON.stringify( panel._addressMap( fieldsOf( pairs ) ) ) };
+check( 'fields that hold different addresses are sent as they are, and the field of every language as the empty key', mapOf( [ [ 'de_DE', '/a' ], [ 'en_US', '/b' ] ] ) === '{"httpUris":{"de_DE":"/a","en_US":"/b"},"folded":[]}'
+	&& mapOf( [ [ '', '/a' ] ] ) === '{"httpUris":{"":"/a"},"folded":[]}' );
+check( '...fields that hold one address are folded into the empty key, in the order they stand in, with the languages that were', mapOf( [ [ 'de_DE', '/a' ], [ 'en_US', '/b' ], [ 'fr_FR', '/b' ] ] ) === '{"httpUris":{"":"/b","de_DE":"/a"},"folded":["en_US","fr_FR"]}' );
+check( '...a blank around an address is none of it', mapOf( [ [ 'de_DE', ' /a' ], [ 'en_US', '/a ' ] ] ) === '{"httpUris":{"":"/a"},"folded":["de_DE","en_US"]}' );
+check( '...nor is the slash the server adds in front or drops behind: a, /a and /a/ are one address, sent as the server reads it', mapOf( [ [ 'de_DE', 'a' ], [ 'en_US', '/a/' ], [ 'fr_FR', '/a' ] ] ) === '{"httpUris":{"":"/a"},"folded":["de_DE","en_US","fr_FR"]}'
+	&& mapOf( [ [ 'de_DE', '/' ], [ 'en_US', '/' ] ] ) === '{"httpUris":{"":"/"},"folded":["de_DE","en_US"]}' );
+check( '...fields that are empty are not an address they share', mapOf( [ [ 'de_DE', '' ], [ 'en_US', '' ] ] ) === '{"httpUris":{"de_DE":"","en_US":""},"folded":[]}' );
+check( '...and only one address is folded, the first one that two fields hold: the rest stand as they are for the server to refuse', mapOf( [ [ 'de_DE', '/a' ], [ 'de_AT', '/b' ], [ 'en_US', '/b' ], [ 'en_GB', '/a' ] ] )
+	=== '{"httpUris":{"":"/a","de_AT":"/b","en_US":"/b"},"folded":["de_DE","en_GB"]}' );
+const refusedHttpUri = { error : 'taken', code : 'routes_http_uri_taken', params : [ '/a' ], field : 'httpUri' };
+check( 'a refusal naming the empty key\'s field is made the first of the folded fields', JSON.stringify( panel._refusedField( refusedHttpUri, [ 'en_US', 'fr_FR' ] ) ) === JSON.stringify( Object.assign( {}, refusedHttpUri, { field : 'httpUri-en_US' } ) ) && refusedHttpUri.field === 'httpUri' );
+check( '...and stays as it is where nothing was folded, names another field, or is no answer', panel._refusedField( refusedHttpUri, [] ) === refusedHttpUri && panel._refusedField( null, [ 'en_US' ] ) === null
+	&& panel._refusedField( { field : 'httpUri-fr_FR' }, [ 'en_US' ] ).field === 'httpUri-fr_FR' );
+
+// Every address field is a required one: marked, told, and the first of them takes the focus once the Element URI is there
+fire( backLink(), 'click' );
+fire( listActionButton(), 'click' );
+turnSwitch( false );
+focused.length = 0;
+save();
+check( 'a field per language that is empty is marked, each with a sentence of its own under its label', addressInputs().length === 2 && addressInputs().every( function( input ) {
+	const sentence = sentences().find( function( el ) { return el.id === input.attributes['aria-describedby'] } );
+	return input.attributes['aria-invalid'] === 'true' && sentence !== undefined && sentence.textContent === text('/_admin/common/error/required')
+		&& input.parentNode.parentNode.children.indexOf( sentence ) === input.parentNode.parentNode.children.indexOf( input.parentNode ) + 1;
+} ) && new Set( addressInputs().map( function( input ) { return input.attributes['aria-describedby'] } ) ).size === 2 );
+check( '...and the Element URI, which stands first, has the focus', focused.length === 1 && focused[0] === field('routes-form-uri') );
+
+field('routes-form-uri').value = '/x';
+fillTexts();
+focused.length = 0;
+save();
+check( 'once that is filled the focus goes to the first address that is missing', focused.length === 1 && focused[0] === address( 'de_DE' ) && field('routes-form-uri').attributes['aria-invalid'] === undefined );
+address( 'de_DE' ).value = '/x';
+focused.length = 0;
+save();
+check( 'only the address that is still missing stays marked, with the focus', address( 'de_DE' ).attributes['aria-invalid'] === undefined && address( 'en_US' ).attributes['aria-invalid'] === 'true'
+	&& focused.length === 1 && focused[0] === address( 'en_US' ) );
+
+// A page with several addresses is deleted whole, and the question names them all
+openPath( '/ueber-uns, /about' );
+confirms.length = 0;
+fire( deleteButton(), 'click' );
+check( 'the delete question names every address of the page', confirms.length === 1 && confirms[0].includes('/ueber-uns, /about') );
+confirmAnswer = true;
+fire( deleteButton(), 'click' );
+check( 'a confirmed question deletes the page by its Element URI - one request, the routes of every language with it', requests[requests.length - 1].action === 'routes/delete'
+	&& JSON.stringify( requests[requests.length - 1].payload ) === '{"uri":"/about"}' );
+confirmAnswer = false;
+answer( 200, {} );
+answer( 200, listing( [ '/', '/contact' ] ) );
+touched.length = 0;
 
 /*	The pages a feature routes at runtime: listed under the persisted ones, with
 	no arrows and no way to delete, and a form of the path - read only - and the

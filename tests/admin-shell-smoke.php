@@ -1305,7 +1305,7 @@ check( 'a text key that is no key is "keys_invalid" with the key and the field',
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Elements\Types::class, 'apiCreate', [ 'uri' => 'Bad Uri', 'title' => 'X', 'model' => [] ] );
 check( 'an element type uri that is none is "types_invalid_uri"', $status === 400 && ( $body['code'] ?? '' ) === 'types_invalid_uri' && ( $body['field'] ?? '' ) === 'uri' );
 
-[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [ 'uri' => '/ok', 'httpUri' => 'no spaces allowed', 'template' => 'page-home' ] );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [ 'uri' => '/ok', 'httpUris' => [ '' => 'no spaces allowed' ], 'template' => 'page-home' ] );
 check( 'a page with an http uri that is none is "routes_invalid_http_uri" with the value and the field', $status === 400 && ( $body['code'] ?? '' ) === 'routes_invalid_http_uri' && $body['params'] === [ 'no spaces allowed' ] && ( $body['field'] ?? '' ) === 'httpUri' );
 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiSave', [ 'key' => 'Bad Id', 'originalKey' => '' ] );

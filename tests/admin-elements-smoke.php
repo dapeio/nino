@@ -1090,8 +1090,8 @@ check( 'the next line is written once the file can be again', str_contains( impl
 // is how the whole Templates panel logged nothing. So: the handler of every
 // one of these actions is the class asked, and it answers
 $described = [
-	[ \Nino\Modules\Routes\Admin::class,						'routes/save',				[ 'httpUri' => '/x' ],							'/x' ],
-	[ \Nino\Modules\Routes\Admin::class,						'routes/delete',			[ 'httpUri' => '/x' ],							'/x' ],
+	[ \Nino\Modules\Routes\Admin::class,						'routes/save',				[ 'uri' => '/x' ],								'/x' ],
+	[ \Nino\Modules\Routes\Admin::class,						'routes/delete',			[ 'uri' => '/x' ],								'/x' ],
 	[ \Nino\Modules\Routes\Admin::class,						'routes/savetexts',		[ 'uri' => '/.newsletter' ],				'/.newsletter' ],
 	[ \Nino\Modules\Config\Admin::class,						'config/save',				[ 'fields' => [ '/nino/cache/ttl' => 1 ] ],	'/nino/cache/ttl' ],
 	[ \Nino\Modules\Images\Slots::class,						'slots/delete',				[ 'uri' => '/home/hero' ],					'/home/hero' ],

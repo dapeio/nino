@@ -1071,7 +1071,7 @@ check( 'every Webpages-made entry names a template /_admin actually offers', cou
 ) ) === 0 );
 
 [ $status ] = ninoCall( $appData, [ \Nino\Modules\Routes\Admin::class, 'apiSave' ], [
-	'originalHttpUri' => '/404', 'uri' => '/site-404', 'httpUri' => '/404',
+	'originalUri' => '/site-404', 'uri' => '/site-404', 'httpUris' => [ '' => '/404' ],
 	'template' => $adminPages[1]['template'], 'navs' => [],
 	'statusCode' => $adminPages[1]['statusCode'], 'text' => $adminPages[1]['text'],
 ] );
@@ -1086,7 +1086,7 @@ check( 'the entry still resolves to /_install\'s own "404" unit after a save mad
 // entry from /_admin keeps the body it already has rather than flattening it
 // into whichever option the disabled select happened to preselect
 [ $status ] = ninoCall( $appData, [ \Nino\Modules\Routes\Admin::class, 'apiSave' ], [
-	'originalHttpUri' => '/legal', 'uri' => '/site-legal', 'httpUri' => '/legal',
+	'originalUri' => '/site-legal', 'uri' => '/site-legal', 'httpUris' => [ '' => '/legal' ],
 	'template' => '', 'navs' => [], 'statusCode' => 200, 'text' => $adminPages[2]['text'],
 ] );
 check( 'saving the locale-resolving entry from /_admin succeeds', $status === 200 );
@@ -1098,7 +1098,7 @@ check( '...and the derived list claims no template for it', ( \Nino\Install\Webp
 // An entry /_admin created has no library unit at all - Webpages has to carry
 // it through its own replace rather than reject it as an unknown template
 [ $status ] = ninoCall( $appData, [ \Nino\Modules\Routes\Admin::class, 'apiSave' ], [
-	'originalHttpUri' => '', 'uri' => '/dev-made', 'httpUri' => '/dev-made',
+	'originalUri' => '', 'uri' => '/dev-made', 'httpUris' => [ '' => '/dev-made' ],
 	'template' => 'page-home', 'navs' => [], 'statusCode' => 201,
 	// A name and a title in every active language are required there
 	'text' => array_fill_keys( \Nino\Locales::getAvailableLocales( $appData ), [ 'name' => 'Dev made', 'title' => 'Dev made' ] ),
@@ -1115,7 +1115,7 @@ check( '...including its own status code', ( $afterReapply['/nino/http/routes'][
 check( 'the library-backed entries still resolve their own units too', ( $afterReapply['/nino/http/routes']['GET://404']['statusCode'] ?? 200 ) === 404 );
 
 [ $status ] = ninoCall( $appData, [ \Nino\Modules\Routes\Admin::class, 'apiSave' ], [
-	'originalHttpUri' => '/404', 'uri' => '/site-404', 'httpUri' => '/404',
+	'originalUri' => '/site-404', 'uri' => '/site-404', 'httpUris' => [ '' => '/404' ],
 	'template' => 'page-nope', 'navs' => [], 'statusCode' => 404, 'text' => [],
 ] );
 check( 'a genuinely unknown template is still rejected', $status === 400 );

@@ -32,10 +32,27 @@ namespace Nino\Modules\Routes {
 	 *												thing from the routes on every request, so a route
 	 *												written here, in the wizard or by hand in config.php is
 	 *												the same page to all three. apiMove() swaps one page
-	 *												route with its neighbor, the same ↑/↓ reordering
-	 *												Webpages' own list does while the wizard is still around;
-	 *												the route order is also what breaks a tie between two
-	 *												equal menu priorities (see Modules\Navigation).
+	 *												with its neighbor, the same ↑/↓ reordering Webpages' own
+	 *												list does while the wizard is still around; the route
+	 *												order is also what breaks a tie between two equal menu
+	 *												priorities (see Modules\Navigation).
+	 *
+	 *												A page has one address for every language, or one for
+	 *												each. The first is one route; the second is a route for
+	 *												each language that has an address of its own, with the
+	 *												'locale' it is for and the 'uri' of the page - the way
+	 *												Modules\Legal routes its two pages - and a route
+	 *												without a 'locale' for the address the languages that
+	 *												have none of their own share. An address is given once
+	 *												in a request, so a page has at most one route without a
+	 *												'locale'. The address of a language sets the language the
+	 *												visitor is in when it is hit (see
+	 *												\Nino\Locales::response()) and the language switch
+	 *												leads to the address of the language picked, so pages()
+	 *												reads the routes of one Element-URI back as one page,
+	 *												and the fill /_nino/webpage&lt;uri&gt;/uri says the
+	 *												address of each language in the text file of that
+	 *												language.
 	 *
 	 *												A page a feature or a module routes at runtime - Posts'
 	 *												/blog, the Newsletter's /.newsletter, Hello's /hello, the
@@ -49,11 +66,13 @@ namespace Nino\Modules\Routes {
 	 *												writes exactly those three keys. A page that has a route
 	 *												per language is one entry, with its paths.
 	 *
-	 *												Saving a page keeps whatever its route carries that this
-	 *												form does not edit - a 'maintenance' => false, a
-	 *												'locale' or a 'header' somebody put into config.php by
-	 *												hand - and the two Element-URIs of the legal pages are
-	 *												the module's: no page of the project's own may take them.
+	 *												Saving a page keeps whatever its first route carries that
+	 *												this form does not edit - a 'maintenance' => false or a
+	 *												'header' somebody put into config.php by hand - on every
+	 *												route of the page, the 'locale' of each being the
+	 *												language it is the address of. The two Element-URIs of
+	 *												the legal pages are the module's: no page of the
+	 *												project's own may take them.
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -141,7 +160,8 @@ namespace Nino\Modules\Routes {
 		}
 
 		/**
-		 *	How many pages are persisted - the Dashboard tile, see summary()
+		 *	How many pages are persisted - the Dashboard tile, see summary(). A
+		 *	page with a route per language is one
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -152,28 +172,28 @@ namespace Nino\Modules\Routes {
 			$routes = \Nino\AppData::stored( $appData, '/nino/http/routes', [] );
 			$routes = is_array( $routes ) === true ? $routes : [];
 
-			return count( array_filter( $routes, fn( array $r, string $k ): bool => self::isPageRoute( $k, $r ), ARRAY_FILTER_USE_BOTH ) );
+			return count( self::_blocks( $routes ) );
 		}
 
 		public static function log( string $action, array $data ): string {
 			return match( $action ) {
-				'routes/save'		=> ( ( $data['originalHttpUri'] ?? '' ) === '' ? 'Add Route ' : 'Edit Route ' ). ( $data['httpUri'] ?? '' ),
-				'routes/delete'	=> 'Delete Route '. ( $data['httpUri'] ?? '' ),
-				'routes/move'		=> 'Move Route '. ( $data['httpUri'] ?? '' ). ' '. ( $data['direction'] ?? '' ),
+				'routes/save'		=> ( \Nino\Admin\Admin::postString( $data, 'originalUri' ) === '' ? 'Add Route ' : 'Edit Route ' ). \Nino\Admin\Admin::postString( $data, 'uri' ),
+				'routes/delete'	=> 'Delete Route '. \Nino\Admin\Admin::postString( $data, 'uri' ),
+				'routes/move'		=> 'Move Route '. \Nino\Admin\Admin::postString( $data, 'uri' ). ' '. \Nino\Admin\Admin::postString( $data, 'direction' ),
 				'routes/savetexts' => 'Edit Feature Route '. ( $data['uri'] ?? '' ),
 				default	=> '',
 			};
 		}
 
 		/**
-		 *	List the page routes, every templates/page-*.tpl file available to
+		 *	List the pages, every templates/page-*.tpl file available to
 		 *	pick from, the template a new route is proposed ('' when the project
 		 *	has no page-blank - then the form asks for a choice), the active
-		 *	locales with the one the workbench is on, and the navigations a
-		 *	page can be put into (empty while the Navigation module is
-		 *	inactive, which is what tells the frontend to offer no menu
-		 *	fields at all), and the pages features route at runtime
-		 *	(see runtimeRoutes()), apart from the persisted ones
+		 *	locales with what each is called and the one the workbench is on,
+		 *	and the navigations a page can be put into (empty while the
+		 *	Navigation module is inactive, which is what tells the frontend to
+		 *	offer no menu fields at all), and the pages features route at
+		 *	runtime (see runtimeRoutes()), apart from the persisted ones
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -196,6 +216,7 @@ namespace Nino\Modules\Routes {
 				'templates' 		=> $templates,
 				'defaultTemplate' => in_array( self::DEFAULT_TEMPLATE, $templates, true ) === true ? self::DEFAULT_TEMPLATE : '',
 				'locales' 			=> $locales,
+				'localeNames' 	=> self::_localeNames( $appData, $locales ),
 				'selectedLocale' => \Nino\Admin\Admin::contentLocale( $appData, true ),
 				'navs' 					=> $navs,
 			] );
@@ -236,12 +257,22 @@ namespace Nino\Modules\Routes {
 		 *	name/title/description are the /_nino/webpage&lt;uri&gt;/* keys both
 		 *	tools write into /text/&lt;locale&gt;.php
 		 *
+		 *	The routes of one Element-URI are one page: a page has an address
+		 *	for every language - one route, no 'locale' - or one for each, and
+		 *	'httpUris' maps what a language is reached at, the key being the
+		 *	language of a route that has one and '' that of a route that has
+		 *	none (the first of each). 'httpUri' is the one address the list
+		 *	line and the link out use: the native language's where it has one
+		 *	of its own, else the one for every language, else the first. The
+		 *	template, the menus, the status code and the body are the first
+		 *	route's, which is what apiSave() has written to all of them
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$routes				The persisted route array
 		 *	@param		array 		$locales			Available locales
 		 *	@param		array 		$navKeys			Registered nav keys (see navKeys())
 		 *
-		 *	@return 	array										One entry per page route, in route order
+		 *	@return 	array										One entry per page, in the order of its first route
 		 */
 		public static function pages( array &$appData, array $routes, array $locales, array $navKeys ): array {
 
@@ -249,7 +280,8 @@ namespace Nino\Modules\Routes {
 			foreach( $locales as $locale )
 				$text[$locale] = \Nino\Filesystem::getFileContent( $appData, '/text/'. $locale. '.php', [] );
 
-			$pages = [];
+			$native = \Nino\Locales::getNativeLocale( $appData );
+			$pages 	= [];
 
 			foreach( $routes as $routeKey => $route ) {
 
@@ -257,21 +289,32 @@ namespace Nino\Modules\Routes {
 					continue;
 
 				$httpUri 	= substr( $routeKey, strlen( 'GET:/' ) );
-				$uri 			= (string) ( $route['uri'] ?? $httpUri );
-				$body 		= (string) ( $route['body'] ?? '' );
+				$uri 			= self::_uriOf( $routeKey, $route );
+				$locale 	= is_string( $route['locale'] ?? null ) === true ? $route['locale'] : '';
 
-				$pages[] = [
-					'uri' 				=> $uri,
-					'httpUri' 		=> $httpUri,
-					'template' 		=> self::_templateFromBody( $body ) ?? '',
-					'navs' 				=> array_values( array_intersect( $navKeys, array_keys( (array) ( $route['navs'] ?? [] ) ) ) ),
-					'statusCode' 	=> (int) ( $route['statusCode'] ?? 200 ),
-					'body' 				=> $body,
-					'text' 				=> self::_pageText( $text, $locales, $uri ),
-				];
+				if( isset( $pages[$uri] ) === false ) {
+
+					$body = (string) ( $route['body'] ?? '' );
+
+					$pages[$uri] = [
+						'uri' 				=> $uri,
+						'httpUri' 		=> $httpUri,
+						'httpUris' 		=> [],
+						'template' 		=> self::_templateFromBody( $body ) ?? '',
+						'navs' 				=> array_values( array_intersect( $navKeys, array_keys( (array) ( $route['navs'] ?? [] ) ) ) ),
+						'statusCode' 	=> (int) ( $route['statusCode'] ?? 200 ),
+						'body' 				=> $body,
+						'text' 				=> self::_pageText( $text, $locales, $uri ),
+					];
+				}
+
+				$pages[$uri]['httpUris'][$locale] ??= $httpUri;
 			}
 
-			return $pages;
+			foreach( $pages as $key => $page )
+				$pages[$key]['httpUri'] = $page['httpUris'][$native] ?? $page['httpUris'][''] ?? $page['httpUri'];
+
+			return array_values( $pages );
 		}
 
 		/**
@@ -496,18 +539,37 @@ namespace Nino\Modules\Routes {
 		}
 
 		/**
-		 *	Create a brand new page entry, or save an existing one -
-		 *	identified by $data['originalHttpUri'] (empty for a new entry),
-		 *	since httpUri is this list's real, unique identity. Both uris
-		 *	are independently validated and deduped against every *other*
-		 *	entry (the one being edited, found via originalHttpUri, is
-		 *	excluded from its own dedupe check, so re-saving an entry
-		 *	unchanged - or renaming only one of its two uris - never
-		 *	falsely collides with itself); template is checked against
-		 *	_templates()'s whitelist. A name and a title are required for
-		 *	every active language - a key nobody wrote renders as the raw
-		 *	[[...]] - and refused before anything is written; the
-		 *	description is optional and may stay empty.
+		 *	Create a brand new page, or save an existing one - identified by
+		 *	$data['originalUri'], the Element-URI it has now (empty for a new
+		 *	page): that is a page's identity, since it has one address for every
+		 *	language or one for each. The addresses are $data['httpUris'], a
+		 *	language for each and '' for the one that serves the languages that
+		 *	have none of their own (see _postedAddresses()). The languages are
+		 *	grouped by address, the way Modules\Legal does it for its two pages:
+		 *	an address of one language is a route with that 'locale', an address
+		 *	several languages share is a route without one, and a page whose
+		 *	languages all share the address is the one route it always was
+		 *	(see _routePlan()). They replace the page's routes of before, at the
+		 *	slot of the first of them, all with the same body, status code and
+		 *	menus.
+		 *
+		 *	The Element-URI is deduped against every *other* page (the page being
+		 *	edited, found via originalUri, is excluded from its own dedupe check,
+		 *	so re-saving a page unchanged - or renaming only one of its uris -
+		 *	never falsely collides with itself); an address counts against every
+		 *	route there is but the page's own and against the others of the
+		 *	request; template is checked against _templates()'s whitelist. A
+		 *	name and a title are required for every active language - a key
+		 *	nobody wrote renders as the raw [[...]] - and refused before
+		 *	anything is written; the description is optional and may stay
+		 *	empty.
+		 *
+		 *	The fill /_nino/webpage&lt;uri&gt;/uri says the address of the page
+		 *	in the language it is read in, so it is written into the text file
+		 *	of every active language - the fallback chain of \Nino\Html::getFills()
+		 *	would otherwise give a language without it the address of another
+		 *	one - and into global.php for what no language file decides: the
+		 *	address that serves every language, else the native language's.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -533,11 +595,10 @@ namespace Nino\Modules\Routes {
 
 			try {
 
-				$data 						= \Nino\Admin\Admin::postData();
-				$originalHttpUri 	= \Nino\Admin\Admin::postString( $data, 'originalHttpUri' );
+				$data 				= \Nino\Admin\Admin::postData();
+				$originalUri 	= \Nino\Admin\Admin::postString( $data, 'originalUri' );
 
 				$uri 			= self::_normalizeUri( \Nino\Admin\Admin::postString( $data, 'uri' ) );
-				$httpUri 	= self::_normalizeUri( \Nino\Admin\Admin::postString( $data, 'httpUri' ) );
 				$template = \Nino\Admin\Admin::postString( $data, 'template' );
 
 				if( $uri === null ) {
@@ -545,15 +606,13 @@ namespace Nino\Modules\Routes {
 					return;
 				}
 
-				if( $httpUri === null ) {
-					\Nino\Http::fail( $request, 400, 'invalid http uri: "'. ( \Nino\Admin\Admin::postString( $data, 'httpUri' ) ). '"', 'routes_invalid_http_uri', [ \Nino\Admin\Admin::postString( $data, 'httpUri' ) ], 'httpUri' );
-					return;
-				}
+				$locales = \Nino\Locales::getAvailableLocales( $appData );
 
-				if( in_array( $httpUri, self::RESERVED_HTTP_URIS, true ) === true ) {
-					\Nino\Http::fail( $request, 409, 'reserved http uri: "'. $httpUri. '"', 'routes_reserved_http_uri', [ $httpUri ], 'httpUri' );
+				$posted = self::_postedAddresses( $request, $data, $locales );
+				if( $posted === null )
 					return;
-				}
+
+				[ $addresses, $fields ] = $posted;
 
 				// The imprint and the privacy policy are the Legal module's, with
 				// their routes, names and menu entries: a page of the project's own
@@ -569,45 +628,43 @@ namespace Nino\Modules\Routes {
 				if( $statusCode < 100 || $statusCode > 599 )
 					$statusCode = 200;
 
-				$locales = \Nino\Locales::getAvailableLocales( $appData );
-
 				$config = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 				$routes = $config['/nino/http/routes'] ?? [];
 				$navKeys = self::navKeys( $appData );
-				$pages 	= self::pages( $appData, $routes, $locales, $navKeys );
 
-				$selfIndex = null;
+				// The page as it is now: its routes in the order they stand in, the
+				// first of them leading. A page that is gone since the form was opened
+				// is a new one
+				$previousKeys = $originalUri !== '' ? self::_pageKeys( $routes, $originalUri ) : [];
+				$first 				= $previousKeys !== [] && is_array( $routes[$previousKeys[0]] ?? null ) === true ? $routes[$previousKeys[0]] : [];
 
-				foreach( $pages as $index => $existing ) {
-
-					if( $originalHttpUri !== '' && ( $existing['httpUri'] ?? null ) === $originalHttpUri ) {
-						$selfIndex = $index;
-						continue;
-					}
-
-					if( ( $existing['uri'] ?? null ) === $uri ) {
-						\Nino\Http::fail( $request, 400, 'duplicate uri: "'. $uri. '"', 'routes_duplicate_uri', [ $uri ], 'uri' );
-						return;
-					}
-
-					if( ( $existing['httpUri'] ?? null ) === $httpUri ) {
-						\Nino\Http::fail( $request, 400, 'duplicate http uri: "'. $httpUri. '"', 'routes_duplicate_http_uri', [ $httpUri ], 'httpUri' );
-						return;
-					}
-				}
-
-				$routeKey 			= self::_routeKey( $httpUri );
-				$previousRouteKey = $selfIndex !== null ? self::_routeKey( (string) $pages[$selfIndex]['httpUri'] ) : null;
-
-				// Every route counts here, not just the page ones: a page may
-				// never take a uri robots.txt, a module or a developer already
-				// answers on
-				if( isset( $routes[$routeKey] ) === true && $routeKey !== $previousRouteKey ) {
-					\Nino\Http::fail( $request, 409, 'http uri already belongs to another route: "'. $httpUri. '"', 'routes_http_uri_taken', [ $httpUri ], 'httpUri' );
+				if( $uri !== $originalUri && self::_pageKeys( $routes, $uri ) !== [] ) {
+					\Nino\Http::fail( $request, 400, 'duplicate uri: "'. $uri. '"', 'routes_duplicate_uri', [ $uri ], 'uri' );
 					return;
 				}
 
-				$previous = $selfIndex !== null ? $pages[$selfIndex] : [];
+				$plan = self::_routePlan( $addresses );
+
+				// Every route counts here, not just the page ones: a page may
+				// never take a uri robots.txt, a module or a developer already
+				// answers on. Its own routes of before are the one place it may stay
+				foreach( $plan as $entry ) {
+
+					$routeKey = self::_routeKey( $entry['address'] );
+
+					if( isset( $routes[$routeKey] ) === false || in_array( $routeKey, $previousKeys, true ) === true )
+						continue;
+
+					// The field of the key the request posted this address with
+					$field = $fields[ $entry['address'] ];
+
+					if( is_array( $routes[$routeKey] ) === true && self::isPageRoute( $routeKey, $routes[$routeKey] ) === true )
+						\Nino\Http::fail( $request, 400, 'duplicate http uri: "'. $entry['address']. '"', 'routes_duplicate_http_uri', [ $entry['address'] ], $field );
+					else
+						\Nino\Http::fail( $request, 409, 'http uri already belongs to another route: "'. $entry['address']. '"', 'routes_http_uri_taken', [ $entry['address'] ], $field );
+
+					return;
+				}
 
 				$body = '[template /templates/'. $template. ']';
 
@@ -617,13 +674,13 @@ namespace Nino\Modules\Routes {
 				// way to spell that. Keep the body such an entry already carries
 				// instead of flattening it into whichever single option happened to
 				// be preselected
-				if( isset( $previous['body'] ) === true && self::_templateFromBody( (string) $previous['body'] ) === null ) {
-					$body 		= (string) $previous['body'];
+				if( isset( $first['body'] ) === true && self::_templateFromBody( (string) $first['body'] ) === null ) {
+					$body 		= (string) $first['body'];
 					// ...and with it the template field, which for such an entry
 					// names nothing: the disabled <select> still posts whichever
 					// option the browser preselected, and storing that would
 					// leave the list claiming a template this page never uses
-					$template = (string) ( $previous['template'] ?? '' );
+					$template = '';
 				}
 
 				// Checked here rather than up front: an entry whose body the
@@ -642,31 +699,43 @@ namespace Nino\Modules\Routes {
 				if( $text === null )
 					return;
 
-				// Menu membership lives on the route and nowhere else - that is
+				// Menu membership lives on the routes and nowhere else - that is
 				// what Modules\Navigation::routeLines() reads, and the only copy
 				// that renders
 				$navs = self::entryNavs( $data, $navKeys );
 
-				// What the route carries and this form does not edit stays: a
-				// 'maintenance' => false that keeps a page up while the site is
-				// down, the 'locale' of a page that exists in one language, a
-				// 'header' - put there by hand in config.php. Only the four
-				// the form is about are set anew, and a status code of 200 is no
-				// field, as before
-				$kept 			= $selfIndex !== null && is_array( $routes[$previousRouteKey] ?? null ) === true ? $routes[$previousRouteKey] : [];
-				$routeData 	= [ 'uri' => $uri, 'body' => $body ] + array_diff_key( $kept, [ 'uri' => true, 'body' => true, 'statusCode' => true, 'navs' => true ] );
-				if( $statusCode !== 200 )
-					$routeData['statusCode'] = $statusCode;
+				// What the first route carries and this form does not edit stays, on
+				// every route of the page: a 'maintenance' => false that keeps a page up
+				// while the site is down, a 'header' - put there by hand in config.php.
+				// Only the four the form is about are set anew - and the 'locale' of
+				// each, which is the rule's -, and a status code of 200 is no field,
+				// as before
+				$kept = array_diff_key( $first, [ 'uri' => true, 'locale' => true, 'body' => true, 'statusCode' => true, 'navs' => true ] );
 
-				// A priority someone tuned on this route is not this save's to
+				// A priority someone tuned on this page is not this save's to
 				// reset - only the set of keys is rewritten (see the shortcode's
 				// own routeLines() for what the value means). A membership this
 				// save adds starts behind everything already in that menu
-				$prios = $routes[$previousRouteKey ?? $routeKey]['navs'] ?? [];
+				$prios 		= is_array( $first['navs'] ?? null ) === true ? $first['navs'] : [];
+				$memberOf = [];
 				foreach( $navs as $navKey )
-					$routeData['navs'][$navKey] = (int) ( $prios[$navKey] ?? self::_nextPrio( $routes, $navKey ) );
+					$memberOf[$navKey] = (int) ( $prios[$navKey] ?? self::_nextPrio( $routes, $navKey ) );
 
-				$routes = self::_putRoute( $routes, $previousRouteKey, $routeKey, $routeData );
+				$put = [];
+
+				foreach( $plan as $entry ) {
+
+					$routeData = [ 'uri' => $uri ] + ( $entry['locale'] !== '' ? [ 'locale' => $entry['locale'] ] : [] ) + [ 'body' => $body ] + $kept;
+
+					if( $statusCode !== 200 )
+						$routeData['statusCode'] = $statusCode;
+					if( $memberOf !== [] )
+						$routeData['navs'] = $memberOf;
+
+					$put[ self::_routeKey( $entry['address'] ) ] = $routeData;
+				}
+
+				$routes = self::_putRoute( $routes, $previousKeys, $put );
 
 				$appData['/nino/http/routes'] = $routes;
 
@@ -677,6 +746,7 @@ namespace Nino\Modules\Routes {
 						'[[/_nino/webpage'. $uri. '/name]]' 				=> $text[$locale]['name'],
 						'[[/_nino/webpage'. $uri. '/title]]' 			=> $text[$locale]['title'],
 						'[[/_nino/webpage'. $uri. '/description]]' => $text[$locale]['description'],
+						'[[/_nino/webpage'. $uri. '/uri]]' 				=> $addresses[$locale],
 					] ) === false ) {
 						\Nino\Http::fail( $request, 500, 'could not write /text/'. $locale. '.php' );
 						return;
@@ -684,10 +754,20 @@ namespace Nino\Modules\Routes {
 
 				// The page's reachable path as a fill, so a template can link to
 				// it by name - [[/_nino/webpage/site-home/uri]] - rather than repeating
-				// a path this form can change. Global, because an entry has one
-				// Http-URI for every locale, and blacklisted like every other
-				// technical value: /_admin's Text panel edits wording, not routes
-				if( self::_mergeText( $appData, '/text/global.php', [ '[[/_nino/webpage'. $uri. '/uri]]' => $httpUri ] ) === false ) {
+				// a path this form can change. Each language's own file says the address of
+				// that language (above); this one is for what no language's file decides: the
+				// address that serves every language, else the native language's, else the
+				// first. Blacklisted like every other technical value: /_admin's Text panel
+				// edits wording, not routes
+				$global = $addresses[ \Nino\Locales::getNativeLocale( $appData ) ] ?? (string) reset( $addresses );
+
+				foreach( $plan as $entry )
+					if( $entry['locale'] === '' ) {
+						$global = $entry['address'];
+						break;
+					}
+
+				if( self::_mergeText( $appData, '/text/global.php', [ '[[/_nino/webpage'. $uri. '/uri]]' => $global ] ) === false ) {
 					\Nino\Http::fail( $request, 500, 'could not write /text/global.php' );
 					return;
 				}
@@ -701,6 +781,125 @@ namespace Nino\Modules\Routes {
 			} finally {
 				\Nino\Filesystem::unlockFile( $appData, '/config.php' );
 			}
+		}
+
+		/**
+		 *	The addresses a request posts, one for each active language:
+		 *	'httpUris' maps a language to its address, and '' to the address of
+		 *	every language that has none of its own. Every address is made a
+		 *	safe path and kept off what the workbench owns, and is given once: an
+		 *	address posted for two keys is refused, the later key named, like an
+		 *	address another page has - languages that are to be reached at the
+		 *	same address are the empty key's, not two entries that agree. An
+		 *	empty one is none, so a language has an address of its own, else the
+		 *	shared one, else the request is refused for it. So is a key that is
+		 *	no language of the site - the one a form drawn before a language was
+		 *	removed sends. The first thing wrong fails the request, and nothing
+		 *	is written
+		 *
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		array 		$data					The posted data
+		 *	@param		array 		$locales			Available locales
+		 *
+		 *	@return 	array|null							[ addresses, fields ]: addresses is locale => its address, in the order of the locales, fields is address => the field of the key it was posted with; null once the request has failed
+		 */
+		private static function _postedAddresses( array &$request, array $data, array $locales ): ?array {
+
+			$posted = is_array( $data['httpUris'] ?? null ) === true ? $data['httpUris'] : [];
+			$given 	= [];
+			$fields = [];
+
+			foreach( $posted as $key => $value ) {
+
+				$key 		= (string) $key;
+				$field 	= $key === '' ? 'httpUri' : 'httpUri-'. $key;
+
+				if( $key !== '' && in_array( $key, $locales, true ) === false ) {
+					\Nino\Http::fail( $request, 400, 'unknown language: "'. $key. '"', 'routes_unknown_locale', [ $key ], $field );
+					return null;
+				}
+
+				$raw = is_string( $value ) === true ? trim( $value ) : '';
+
+				if( $raw === '' )
+					continue;
+
+				$address = self::_normalizeUri( $raw );
+
+				if( $address === null ) {
+					\Nino\Http::fail( $request, 400, 'invalid http uri: "'. $raw. '"', 'routes_invalid_http_uri', [ $raw ], $field );
+					return null;
+				}
+
+				if( in_array( $address, self::RESERVED_HTTP_URIS, true ) === true ) {
+					\Nino\Http::fail( $request, 409, 'reserved http uri: "'. $address. '"', 'routes_reserved_http_uri', [ $address ], $field );
+					return null;
+				}
+
+				// Once: languages that are to share an address are the empty key's to say
+				if( isset( $fields[$address] ) === true ) {
+					\Nino\Http::fail( $request, 400, 'duplicate http uri: "'. $address. '"', 'routes_duplicate_http_uri', [ $address ], $field );
+					return null;
+				}
+
+				$given[$key]		= $address;
+				$fields[$address]	= $field;
+			}
+
+			$addresses = [];
+
+			foreach( $locales as $locale ) {
+
+				$address = $given[$locale] ?? $given[''] ?? null;
+
+				if( $address === null ) {
+					\Nino\Http::fail( $request, 400, 'missing http uri for '. $locale, 'routes_missing_http_uri', [ $locale ], 'httpUri-'. $locale );
+					return null;
+				}
+
+				$addresses[$locale] = $address;
+			}
+
+			return [ $addresses, $fields ];
+		}
+
+		/**
+		 *	The routes a page gets from the address of each language: the
+		 *	languages are grouped by address, the rule \Nino\Modules\Legal routes
+		 *	its pages by. An address of exactly one language is a route of that
+		 *	language, an address several languages share is a route without one,
+		 *	and when every language shares the address - a page that has one, on
+		 *	a site with one language as well - that is the one route that serves
+		 *	them all, with no language. An address is given once in a request
+		 *	(see _postedAddresses()), so the languages that share one are those
+		 *	the empty key serves, and a page has at most one route without a
+		 *	language. The routes of one language stand first, as
+		 *	\Nino\Http::findRouteUri() answers the first route that fits
+		 *
+		 *	@param		array 		$addresses		Locale => its address
+		 *
+		 *	@return 	array										[ [ 'address' => ..., 'locale' => the language, '' for every one ], ... ] in the order the routes are written
+		 */
+		private static function _routePlan( array $addresses ): array {
+
+			$groups = [];
+
+			foreach( $addresses as $locale => $address )
+				$groups[$address][] = (string) $locale;
+
+			if( count( $groups ) === 1 )
+				return [ [ 'address' => (string) array_key_first( $groups ), 'locale' => '' ] ];
+
+			$bound 	= [];
+			$shared = [];
+
+			foreach( $groups as $address => $sharing )
+				if( count( $sharing ) === 1 )
+					$bound[] = [ 'address' => (string) $address, 'locale' => $sharing[0] ];
+				else
+					$shared[] = [ 'address' => (string) $address, 'locale' => '' ];
+
+			return array_merge( $bound, $shared );
 		}
 
 		/**
@@ -823,46 +1022,129 @@ namespace Nino\Modules\Routes {
 		}
 
 		/**
-		 *	Write one route, keeping the slot it already occupies even when
-		 *	its key changes: the route array's own order is what breaks a tie
-		 *	between two equal menu priorities (see
+		 *	Write the routes of one page, keeping the slot the page already
+		 *	occupies even when its keys change: the route array's own order is
+		 *	what breaks a tie between two equal menu priorities (see
 		 *	Modules\Navigation::routeLines()) and what the list in the browser
 		 *	is sorted by, so renaming a page's http uri must not quietly move
-		 *	it to the bottom of both
+		 *	it to the bottom of both. The routes it had before go, and the new
+		 *	ones stand where the first of them stood - behind everything for a
+		 *	page that had none
 		 *
 		 *	@param		array 		$routes				The persisted route array
-		 *	@param		string|null	$previousKey	The key this route currently occupies, null for a new one
-		 *	@param		string		$routeKey			The key it should occupy afterwards
-		 *	@param		array 		$routeData
+		 *	@param		array 		$previousKeys	The keys of the page's routes now, in the order they stand in; none for a new page
+		 *	@param		array 		$put					Route key => route, the routes to write in the order they are to stand in
 		 *
 		 *	@return 	array
 		 */
-		private static function _putRoute( array $routes, ?string $previousKey, string $routeKey, array $routeData ): array {
+		private static function _putRoute( array $routes, array $previousKeys, array $put ): array {
 
-			if( $previousKey === null || isset( $routes[$previousKey] ) === false ) {
-				$routes[$routeKey] = $routeData;
-				return $routes;
-			}
+			$present = array_values( array_filter( $previousKeys, fn( string $key ): bool => isset( $routes[$key] ) ) );
+
+			if( $present === [] )
+				return $routes + $put;
 
 			$out = [];
 
 			foreach( $routes as $key => $route )
-				if( $key === $previousKey )
-					$out[$routeKey] = $routeData;
-				else
+				if( in_array( $key, $present, true ) === false )
 					$out[$key] = $route;
+				else if( $key === $present[0] )
+					$out = $out + $put;
 
 			return $out;
 		}
 
 		/**
-		 *	Remove one page route. Its /_nino/webpage&lt;uri&gt;/* text meta is
-		 *	deliberately left in place - same additive-only philosophy every
-		 *	other apply/save in this codebase follows, deleting a file/key a
-		 *	developer may have since hand-edited is a much riskier "undo" than
-		 *	dropping one route. The template file stays as well, whether or not
-		 *	another route uses it - the browser's confirmation names both (see
-		 *	assets/admin.js's _delete())
+		 *	The pages of a route array, one block of routes each: the page
+		 *	routes of one Element-URI, in the order of the first route of each
+		 *	page - the order the list stands in
+		 *
+		 *	@param		array 		$routes				The persisted route array
+		 *
+		 *	@return 	array										[ [ 'uri' => the Element-URI, 'keys' => [ route key, ... ] ], ... ]
+		 */
+		private static function _blocks( array $routes ): array {
+
+			$blocks = [];
+
+			foreach( $routes as $routeKey => $route ) {
+
+				if( is_array( $route ) === false || self::isPageRoute( (string) $routeKey, $route ) === false )
+					continue;
+
+				$uri 	= self::_uriOf( (string) $routeKey, $route );
+				$at 	= array_search( $uri, array_column( $blocks, 'uri' ), true );
+
+				if( $at === false )
+					$blocks[] = [ 'uri' => $uri, 'keys' => [ (string) $routeKey ] ];
+				else
+					$blocks[$at]['keys'][] = (string) $routeKey;
+			}
+
+			return $blocks;
+		}
+
+		/**
+		 *	The route keys of one page, in the order they stand in
+		 *
+		 *	@param		array 		$routes				The persisted route array
+		 *	@param		string		$uri					The page's Element-URI
+		 *
+		 *	@return 	array										Route keys, none for a uri no page has
+		 */
+		private static function _pageKeys( array $routes, string $uri ): array {
+
+			foreach( self::_blocks( $routes ) as $block )
+				if( $block['uri'] === $uri )
+					return $block['keys'];
+
+			return [];
+		}
+
+		/**
+		 *	The Element-URI of a page route: its own 'uri', else its path
+		 *
+		 *	@param		string		$routeKey			Eg. 'GET://kontakt'
+		 *	@param		array 		$route
+		 *
+		 *	@return 	string
+		 */
+		private static function _uriOf( string $routeKey, array $route ): string {
+			return (string) ( $route['uri'] ?? substr( $routeKey, strlen( 'GET:/' ) ) );
+		}
+
+		/**
+		 *	What each language is called, the way the picker of the site names
+		 *	it - the fill /_nino/locale/<code>/name, which the project gives -
+		 *	and the code itself where nothing does
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$locales			Available locales
+		 *
+		 *	@return 	array										Locale => name
+		 */
+		private static function _localeNames( array &$appData, array $locales ): array {
+
+			$names = [];
+
+			foreach( $locales as $locale ) {
+				$name = \Nino\Html::renderTextfill( $appData, '/_nino/locale/'. $locale. '/name' );
+				$names[$locale] = $name !== '' ? $name : $locale;
+			}
+
+			return $names;
+		}
+
+		/**
+		 *	Remove a page: every route it has. Its /_nino/webpage&lt;uri&gt;/* text
+		 *	meta - the fills of its addresses among it - is deliberately left in
+		 *	place, same additive-only philosophy every other apply/save in this
+		 *	codebase follows, deleting a file/key a developer may have since
+		 *	hand-edited is a much riskier "undo" than dropping the routes. The
+		 *	template file stays as well, whether or not another route uses it -
+		 *	the browser's confirmation names both (see assets/admin.js's
+		 *	_delete())
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -888,19 +1170,21 @@ namespace Nino\Modules\Routes {
 
 			try {
 
-				$httpUri 	= \Nino\Admin\Admin::postString( \Nino\Admin\Admin::postData(), 'httpUri' );
-				$routes 	= \Nino\AppData::stored( $appData, '/nino/http/routes', [] );
-				$routeKey = self::_routeKey( $httpUri );
+				$uri 		= \Nino\Admin\Admin::postString( \Nino\Admin\Admin::postData(), 'uri' );
+				$routes = \Nino\AppData::stored( $appData, '/nino/http/routes', [] );
+				$routes = is_array( $routes ) === true ? $routes : [];
+				$keys 	= self::_pageKeys( $routes, $uri );
 
-				// Only ever a page route: this module lists nothing else, so
-				// anything else under that key is a module's or a developer's and
-				// not this button's to delete
-				if( isset( $routes[$routeKey] ) === false || self::isPageRoute( $routeKey, $routes[$routeKey] ) === false ) {
+				// Only ever the routes of a page: this module lists nothing else, so
+				// anything else is a module's or a developer's and not this button's
+				// to delete
+				if( $keys === [] ) {
 					\Nino\Http::fail( $request, 404, 'unknown page' );
 					return;
 				}
 
-				unset( $routes[$routeKey] );
+				foreach( $keys as $routeKey )
+					unset( $routes[$routeKey] );
 
 				$appData['/nino/http/routes'] = $routes;
 
@@ -913,12 +1197,13 @@ namespace Nino\Modules\Routes {
 		}
 
 		/**
-		 *	Swap one page route with its immediate neighbor - the order this
-		 *	list stands in, and the tie-breaker between two equal menu
-		 *	priorities (see Modules\Navigation::routeLines()). A swap rather
-		 *	than an arbitrary posted index: the list itself never leaves the
-		 *	browser, only which of two neighbors should trade places - nothing
-		 *	to validate beyond "is this still a valid direction from here"
+		 *	Swap one page with its immediate neighbor - the order this list
+		 *	stands in, and the tie-breaker between two equal menu priorities
+		 *	(see Modules\Navigation::routeLines()). A swap rather than an
+		 *	arbitrary posted index: the list itself never leaves the browser,
+		 *	only which of two neighbors should trade places - nothing to
+		 *	validate beyond "is this still a valid direction from here". The
+		 *	page goes with all of its routes, as one block
 		 *
 		 *	Only page routes take part. Everything else in the array - a
 		 *	module's route, a hand-written one - keeps the exact slot it
@@ -950,7 +1235,7 @@ namespace Nino\Modules\Routes {
 			try {
 
 				$data 			= \Nino\Admin\Admin::postData();
-				$httpUri 		= \Nino\Admin\Admin::postString( $data, 'httpUri' );
+				$uri 				= \Nino\Admin\Admin::postString( $data, 'uri' );
 				$direction 	= \Nino\Admin\Admin::postString( $data, 'direction' );
 
 				if( in_array( $direction, [ 'up', 'down' ], true ) === false ) {
@@ -958,11 +1243,11 @@ namespace Nino\Modules\Routes {
 					return;
 				}
 
-				$routes 	= \Nino\AppData::stored( $appData, '/nino/http/routes', [] );
-				$routes 	= is_array( $routes ) === true ? $routes : [];
-				$pageKeys = array_keys( array_filter( $routes, fn( array $r, string $k ): bool => self::isPageRoute( $k, $r ), ARRAY_FILTER_USE_BOTH ) );
+				$routes = \Nino\AppData::stored( $appData, '/nino/http/routes', [] );
+				$routes = is_array( $routes ) === true ? $routes : [];
+				$blocks = self::_blocks( $routes );
 
-				$index = array_search( self::_routeKey( $httpUri ), $pageKeys, true );
+				$index = array_search( $uri, array_column( $blocks, 'uri' ), true );
 
 				if( $index === false ) {
 					\Nino\Http::fail( $request, 404, 'unknown page' );
@@ -971,20 +1256,21 @@ namespace Nino\Modules\Routes {
 
 				$swapWith = $direction === 'up' ? $index - 1 : $index + 1;
 
-				if( $swapWith < 0 || $swapWith >= count( $pageKeys ) ) {
+				if( $swapWith < 0 || $swapWith >= count( $blocks ) ) {
 					\Nino\Http::fail( $request, 400, 'already at the '. ( $direction === 'up' ? 'top' : 'bottom' ), $direction === 'up' ? 'already_top' : 'already_bottom' );
 					return;
 				}
 
-				[ $pageKeys[$index], $pageKeys[$swapWith] ] = [ $pageKeys[$swapWith], $pageKeys[$index] ];
+				[ $blocks[$index], $blocks[$swapWith] ] = [ $blocks[$swapWith], $blocks[$index] ];
 
 				// Refill the slots the page routes occupy, in the swapped order -
 				// every other route stays exactly where it was
+				$pageKeys = array_merge( ...array_column( $blocks, 'keys' ) );
 				$ordered 	= [];
 				$next 		= 0;
 
 				foreach( $routes as $routeKey => $route )
-					if( self::isPageRoute( $routeKey, $route ) === true ) {
+					if( is_array( $route ) === true && self::isPageRoute( (string) $routeKey, $route ) === true ) {
 						$ordered[ $pageKeys[$next] ] = $routes[ $pageKeys[$next] ];
 						$next++;
 					} else {

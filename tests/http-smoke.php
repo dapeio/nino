@@ -4,10 +4,11 @@ declare(strict_types=1);
 /**
  *	Nino								A compact filesystembased php framework
  *	http-smoke.php			Dependency-free smoke test for \Nino\Http: the headers a response is
- *											composed with, the csp and the locale redirects, the query a request
- *											is read with, the shipped .htaccess files and router.php - which is
- *											run - and the nginx recipe of docs/deployment.md, Modules\Navigation,
- *											and Modules\Cache - the full-page cache for an anonymous GET. Runs
+ *											composed with, the csp and the locale redirects, the address a
+ *											page has per language, the query a request is read with, the
+ *											shipped .htaccess files and router.php - which is run - and the
+ *											nginx recipe of docs/deployment.md, Modules\Navigation, and
+ *											Modules\Cache - the full-page cache for an anonymous GET. Runs
  *											against an isolated sandbox directory, never touches the real
  *											project data.
  *
@@ -683,6 +684,71 @@ check( 'the locale switch is one method taking the query key, so a project can a
 	&& ( $ownKeyRequest['/nino/http/response']['header']['Location'] ?? '' ) === '/rechtliches'
 	&& \Nino\Locales::getCurrentLocale( $appData ) === 'de_DE' );
 \Nino\Locales::setCurrentLocale( $appData, 'en_US' );
+
+/*	A page that has an address per language: one route per language with the Element-URI of the page and the language of its own - what the
+	Routes panel writes, and Modules\Legal for its two pages. The address a visitor hits sets the language; the switch leads to the address
+	of the language picked. A route without a language is the address of every language: it changes nothing for the visitor, and the
+	switch stays where it is. The endpoint a page's form posts to has the Element-URI of the page, and may stand before it in the table	*/
+$addressesAppData = $appData;
+$addressesAppData['/nino/http/routes'] = [
+	'POST://.newsletter'	=> [ 'uri' => '/.newsletter', 'body' => '' ],
+	'GET://.newsletter'		=> [ 'uri' => '/.newsletter', 'body' => '' ],
+	'GET://contact'				=> [ 'uri' => '/site-contact', 'locale' => 'en_US', 'body' => '' ],
+	'GET://kontakt'				=> [ 'uri' => '/site-contact', 'locale' => 'de_DE', 'body' => '' ],
+	'GET://reise'				=> [ 'uri' => '/site-trip', 'locale' => 'de_DE', 'body' => '' ],
+	'GET://trip'				=> [ 'uri' => '/site-trip', 'body' => '' ],
+	'GET://about'					=> [ 'uri' => '/site-about', 'body' => '' ],
+];
+$visitAs = static function( string $uri, string $locale ) use ( &$addressesAppData ): array {
+
+	// The visitor is in $locale when the request comes; what the request leaves of that is read after it
+	\Nino\Locales::setCurrentLocale( $addressesAppData, $locale );
+	$request = ninoVisit( $addressesAppData, $uri );
+	\Nino\Http::response( $addressesAppData, $request );
+	\Nino\Locales::response( $addressesAppData, $request );
+
+	return $request;
+};
+
+check( 'findRouteUri() answers a route of the method it is asked for, GET without one - the POST endpoint that stands first is no address of the page',
+	\Nino\Http::findRouteUri( $addressesAppData, '/.newsletter', 'de_DE' ) === 'GET://.newsletter'
+	&& \Nino\Http::findRouteUri( $addressesAppData, '/.newsletter', 'de_DE', 'POST' ) === 'POST://.newsletter'
+	&& \Nino\Http::findRouteUri( $addressesAppData, '/.newsletter', 'de_DE', 'PUT' ) === null );
+check( '...a route of one language answers for that language alone, and a route without one for every language',
+	\Nino\Http::findRouteUri( $addressesAppData, '/site-contact', 'de_DE' ) === 'GET://kontakt' && \Nino\Http::findRouteUri( $addressesAppData, '/site-contact', 'en_US' ) === 'GET://contact'
+	&& \Nino\Http::findRouteUri( $addressesAppData, '/site-contact', 'fr_FR' ) === null && \Nino\Http::findRouteUri( $addressesAppData, '/site-about', 'fr_FR' ) === 'GET://about' );
+check( '...and a language that has an address of its own beside the one the others share is answered with its own, which stands first, the others with the shared one',
+	\Nino\Http::findRouteUri( $addressesAppData, '/site-trip', 'de_DE' ) === 'GET://reise' && \Nino\Http::findRouteUri( $addressesAppData, '/site-trip', 'en_US' ) === 'GET://trip' );
+
+ninoWarnings();
+$formPageSwitch = $visitAs( '/.newsletter?/_nino/locales/current=en_US', 'de_DE' );
+$formPageWarnings = ninoWarnings();
+check( 'the language switch of a page whose POST endpoint stands first in the table redirects to the page, with no warning',
+	$formPageSwitch['/nino/http/response']['statusCode'] === 302 && ( $formPageSwitch['/nino/http/response']['header']['Location'] ?? '' ) === '/.newsletter' && $formPageWarnings === [] );
+
+$boundHit = $visitAs( '/contact', 'de_DE' );
+check( 'a request to the address of a language answers in that language and makes it the visitor\'s',
+	$boundHit['/nino/http/response']['locale'] === 'en_US' && \Nino\Locales::getCurrentLocale( $addressesAppData ) === 'en_US' && \Nino\Runtime::getSessionValue( $addressesAppData, './nino/locales/current' ) === 'en_US' );
+$boundHit = $visitAs( '/kontakt', 'en_US' );
+check( '...whichever language the visitor came in', $boundHit['/nino/http/response']['locale'] === 'de_DE' && \Nino\Locales::getCurrentLocale( $addressesAppData ) === 'de_DE' );
+
+$sharedHit = $visitAs( '/about', 'de_DE' );
+$sharedHitEnglish = $visitAs( '/about', 'en_US' );
+check( 'a request to the address that every language shares leaves the visitor\'s language as it is',
+	$sharedHit['/nino/http/response']['locale'] === 'de_DE' && $sharedHitEnglish['/nino/http/response']['locale'] === 'en_US' && \Nino\Locales::getCurrentLocale( $addressesAppData ) === 'en_US' );
+
+$toGerman = $visitAs( '/contact?/_nino/locales/current=de_DE', 'en_US' );
+check( 'the switch of a page with an address per language lands on the address of the language picked, and that stays the visitor\'s language',
+	$toGerman['/nino/http/response']['statusCode'] === 302 && ( $toGerman['/nino/http/response']['header']['Location'] ?? '' ) === '/kontakt' && \Nino\Locales::getCurrentLocale( $addressesAppData ) === 'de_DE' );
+$toEnglish = $visitAs( '/kontakt?/_nino/locales/current=en_US', 'de_DE' );
+check( '...from the other address to the first', ( $toEnglish['/nino/http/response']['header']['Location'] ?? '' ) === '/contact' && \Nino\Locales::getCurrentLocale( $addressesAppData ) === 'en_US' );
+$stays = $visitAs( '/about?/_nino/locales/current=de_DE', 'en_US' );
+check( 'the switch of a page with the one address for every language stays at it, in the language picked',
+	$stays['/nino/http/response']['statusCode'] === 302 && ( $stays['/nino/http/response']['header']['Location'] ?? '' ) === '/about' && \Nino\Locales::getCurrentLocale( $addressesAppData ) === 'de_DE' );
+$fromShared = $visitAs( '/trip?/_nino/locales/current=de_DE', 'en_US' );
+check( 'the switch from the address that every language shares to a language that has one of its own lands on it', ( $fromShared['/nino/http/response']['header']['Location'] ?? '' ) === '/reise' && \Nino\Locales::getCurrentLocale( $addressesAppData ) === 'de_DE' );
+\Nino\Locales::setCurrentLocale( $addressesAppData, 'en_US' );
+unset( $addressesAppData );
 
 $queryParser = new ReflectionMethod( '\Nino\Http', '_getRequestQueryVarsPart' );
 $queryParser->setAccessible( true );

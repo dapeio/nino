@@ -13,6 +13,10 @@
  *													shape follows slots.js closely; the list's own ↑/↓ buttons
  *													reorder the routes with it, which is what orders every
  *													menu those pages appear in (see \Nino\Modules\Navigation).
+ *													A page has one Http URI for every language or one for each: a
+ *													switch says which, and the form draws the one field or a field
+ *													per language, each named by its language - and languages
+ *													whose fields hold one address share it (see _addressMap()).
  *													The pages a feature or a module routes at runtime - which no
  *													config.php has - are listed below them, one row per
  *													Element-URI, without ↑/↓ and without delete: their form
@@ -36,8 +40,9 @@
 		_defaultTemplate : '',
 		_locales 				: [],
 		_selectedLocale : '',
+		_localeNames 		: {},
 		_navs 					: [],
-		_currentHttpUri : null,
+		_currentUri 		: null,
 		_currentRuntime : null,
 		_isNew 					: false,
 		_ready 					: false,
@@ -46,6 +51,11 @@
 		_opener 				: null,
 		// The status line of the form that is open (see Nino.adminUi.status())
 		_line 					: null,
+		// What the address fields of the form that is open start from, and what
+		// they are given back from when the switch is turned: { one, shared,
+		// bound } (see _addressesOf()). Between two turns the fields on screen
+		// are the truth
+		_addresses 			: null,
 		// The stamp of the templates (see Nino.admin.touch()) the list was asked
 		// for: the form offers the templates the answer held, and one written
 		// since is not among them
@@ -75,6 +85,7 @@
 				Nino.admin.routes._defaultTemplate 	= response.defaultTemplate || '';
 				Nino.admin.routes._locales 					= response.locales;
 				Nino.admin.routes._selectedLocale 	= response.selectedLocale || '';
+				Nino.admin.routes._localeNames 			= response.localeNames || {};
 				Nino.admin.routes._navs 						= response.navs;
 				Nino.admin.routes._renderList();
 				Nino.admin.routes._showList();
@@ -150,11 +161,11 @@
 
 		/**
 		 *	Render the page list, plus a "New page" action below it. A row is
-		 *	the page's name over its path, a button that opens its form and a
-		 *	link that opens the page itself; its ↑/↓ buttons reorder the
-		 *	persisted list and the routes with it - equal menu priorities
-		 *	follow route order, so this is what orders the menus (see
-		 *	Admin.php's apiMove())
+		 *	the page's name over its addresses, a button that opens its form and
+		 *	a link that opens the page itself; its ↑/↓ buttons reorder the
+		 *	persisted list - a page goes with all of its routes - and equal
+		 *	menu priorities follow route order, so this is what orders the
+		 *	menus (see Admin.php's apiMove())
 		 *
 		 *	@return		void
 		 */
@@ -185,7 +196,7 @@
 				name.textContent = Nino.admin.routes._pageName( entry );
 				copy.appendChild( name );
 				const path = dc.createElement('small');
-				path.textContent = entry.httpUri;
+				path.textContent = Nino.admin.routes._paths( entry );
 				copy.appendChild( path );
 				edit.appendChild( copy );
 				edit.addEventListener( 'click', function() { Nino.admin.routes._openForm( entry, edit ) } );
@@ -215,7 +226,7 @@
 				// title is a hover hint, not a name - see Nino.adminUi.elementList()
 				upBtn.setAttribute( 'aria-label', Nino.content.getText('/_admin/routes/label/moveup') );
 				upBtn.disabled = index === 0;
-				upBtn.addEventListener( 'click', function() { Nino.admin.routes._move( entry.httpUri, 'up' ) } );
+				upBtn.addEventListener( 'click', function() { Nino.admin.routes._move( entry.uri, 'up' ) } );
 				moveWrap.appendChild( upBtn );
 
 				const downBtn = dc.createElement('button');
@@ -224,7 +235,7 @@
 				downBtn.title = Nino.content.getText('/_admin/routes/label/movedown');
 				downBtn.setAttribute( 'aria-label', Nino.content.getText('/_admin/routes/label/movedown') );
 				downBtn.disabled = index === Nino.admin.routes._pages.length - 1;
-				downBtn.addEventListener( 'click', function() { Nino.admin.routes._move( entry.httpUri, 'down' ) } );
+				downBtn.addEventListener( 'click', function() { Nino.admin.routes._move( entry.uri, 'down' ) } );
 				moveWrap.appendChild( downBtn );
 
 				li.appendChild( moveWrap );
@@ -304,15 +315,21 @@
 		},
 
 		/**
-		 *	The paths a feature's page is reached at: all of them for a page
-		 *	with a route per language, the one of any other
+		 *	The paths a page is reached at: every one of a page that has an
+		 *	address per language, the one of any other. A page of the project
+		 *	says them by language - its 'httpUris' is a map -, a page a feature
+		 *	routes has a list of them
 		 *
-		 *	@param		{Object}	entry					One entry from _runtime
+		 *	@param		{Object}	entry					One entry from _pages or _runtime
 		 *
 		 *	@return		{string}
 		 */
 		_paths : function( entry ) {
-			return Array.isArray( entry.httpUris ) === true && entry.httpUris.length > 0 ? entry.httpUris.join(', ') : entry.httpUri;
+
+			const uris = entry.httpUris || {};
+			const list = Object.keys( uris ).map( function( key ) { return uris[key] } );
+
+			return list.length > 0 ? list.join(', ') : entry.httpUri;
 		},
 
 		/**
@@ -357,13 +374,13 @@
 		 *	Swap one page with its neighbor and re-render - see Admin.php's
 		 *	apiMove()
 		 *
-		 *	@param		{string}	httpUri
+		 *	@param		{string}	uri						The Element-URI of the page
 		 *	@param		{string}	direction			'up' | 'down'
 		 *
 		 *	@return		void
 		 */
-		_move : function( httpUri, direction ) {
-			Nino.admin.routes._apiCall( 'move', { httpUri : httpUri, direction : direction }, function( status, response ) {
+		_move : function( uri, direction ) {
+			Nino.admin.routes._apiCall( 'move', { uri : uri, direction : direction }, function( status, response ) {
 
 				/*	A move the server refused used to end right here, without a
 					word: the row stayed where it was, nothing said why, and the
@@ -428,11 +445,11 @@
 		_openForm : function( entry, opener ) {
 
 			Nino.admin.routes._isNew 					= entry === null;
-			Nino.admin.routes._currentHttpUri = entry ? entry.httpUri : null;
+			Nino.admin.routes._currentUri 		= entry ? entry.uri : null;
 			Nino.admin.routes._currentRuntime = null;
 			Nino.admin.routes._opener 				= opener ?? null;
 
-			Nino.admin.routes._renderForm( entry || { uri : '', httpUri : '', template : Nino.admin.routes._defaultTemplate } );
+			Nino.admin.routes._renderForm( entry || { uri : '', httpUris : {}, template : Nino.admin.routes._defaultTemplate } );
 			Nino.adminUi.showLevel( 'routes-form' );
 		},
 
@@ -449,7 +466,7 @@
 		_openRuntimeForm : function( entry, opener ) {
 
 			Nino.admin.routes._isNew 					= false;
-			Nino.admin.routes._currentHttpUri = null;
+			Nino.admin.routes._currentUri 		= null;
 			Nino.admin.routes._currentRuntime = entry;
 			Nino.admin.routes._opener 				= opener ?? null;
 
@@ -553,9 +570,11 @@
 		},
 
 		/**
-		 *	Render the page editor: back-link, Element/Http URI, template,
-		 *	status code, nav (only while the Navigation module is active),
-		 *	one name/title/description row per active locale, save/delete.
+		 *	Render the page editor: back-link, Element URI, the switch for one
+		 *	Http URI for every language and the field - or the field per
+		 *	language - it draws, template, status code, nav (only while the
+		 *	Navigation module is active), one name/title/description row per
+		 *	active locale, save/delete.
 		 *	The form checks its required fields itself (see _save()), so the
 		 *	browser's own bubble - in the browser's language, not the
 		 *	workbench's - never gets to speak
@@ -605,21 +624,22 @@
 			uriLabel.appendChild( uriInput );
 			pageFieldset.appendChild( uriLabel );
 
-			const httpUriLabel = dc.createElement('label');
-			httpUriLabel.className = 'nino-admin-field';
-			const httpUriSpan = dc.createElement('span');
-			httpUriSpan.textContent = Nino.content.getText('/_admin/routes/label/httpuri');
-			httpUriSpan.appendChild( Nino.admin.routes._star() );
-			httpUriLabel.appendChild( httpUriSpan );
-			const httpUriInput = dc.createElement('input');
-			httpUriInput.type = 'text';
-			httpUriInput.id = 'routes-form-http-uri';
-			httpUriInput.placeholder = Nino.content.getText('/_admin/routes/placeholder/httpuri');
-			httpUriInput.value = entry.httpUri || '';
-			httpUriInput.required = true;
-			httpUriInput.setAttribute( 'aria-required', 'true' );
-			httpUriLabel.appendChild( httpUriInput );
-			pageFieldset.appendChild( httpUriLabel );
+			Nino.admin.routes._addresses = Nino.admin.routes._addressesOf( entry );
+
+			const oneSwitch = Nino.adminUi.switchField( {
+				key 		: 'one-address',
+				checked : Nino.admin.routes._addresses.one,
+				label 	: Nino.content.getText('/_admin/routes/label/one-address'),
+				hint 		: Nino.content.getText('/_admin/routes/hint/one-address'),
+			} );
+			oneSwitch.querySelector('input').addEventListener( 'change', function( ev ) { Nino.admin.routes._switchAddresses( ev.target.checked ) } );
+			pageFieldset.appendChild( oneSwitch );
+
+			const addressWrap = dc.createElement('div');
+			addressWrap.id = 'routes-form-addresses';
+			addressWrap.className = 'nino-admin-fieldgrid';
+			Nino.admin.routes._renderAddresses( addressWrap );
+			pageFieldset.appendChild( addressWrap );
 
 			const templateLabel = dc.createElement('label');
 			templateLabel.className = 'nino-admin-field';
@@ -772,6 +792,184 @@
 		},
 
 		/**
+		 *	What the address fields of a page start from: the one field for
+		 *	every language where the page has one address for them all - a new
+		 *	page has none yet - and a field per language where it has one for
+		 *	each. 'shared' is what the one field starts from, 'bound' the
+		 *	address each language has of its own, empty for one that has none
+		 *
+		 *	@param		{Object}		entry					One entry from _pages, or the empty one of a new page
+		 *
+		 *	@return		{Object}									{ one, shared, bound } - bound is locale => address
+		 */
+		_addressesOf : function( entry ) {
+
+			const map = entry.httpUris || {};
+			const keys = Object.keys( map );
+			const bound = {};
+
+			Nino.admin.routes._locales.forEach( function( locale ) {
+				bound[locale] = map[locale] ?? '';
+			} );
+
+			return { one : keys.length === 0 || ( keys.length === 1 && keys[0] === '' ), shared : map[''] ?? '', bound : bound };
+		},
+
+		/**
+		 *	Draw the address fields into their container: the one field, or a
+		 *	field per language - one that has no address of its own yet starts
+		 *	from the address of every language, which is what it is reached
+		 *	at until it is given one
+		 *
+		 *	@param		{Element}		wrap					The container of the fields
+		 *
+		 *	@return		void
+		 */
+		_renderAddresses : function( wrap ) {
+
+			const addresses = Nino.admin.routes._addresses;
+
+			wrap.innerHTML = '';
+
+			if( addresses.one === true ) {
+				wrap.removeAttribute('role');
+				wrap.removeAttribute('aria-label');
+				wrap.appendChild( Nino.admin.routes._addressField( '', Nino.content.getText('/_admin/routes/label/httpuri'), addresses.shared ) );
+				return;
+			}
+
+			// The fields are named by their language: what they are the address of is said by the group
+			wrap.setAttribute( 'role', 'group' );
+			wrap.setAttribute( 'aria-label', Nino.content.getText('/_admin/routes/label/httpuri') );
+
+			Nino.admin.routes._locales.forEach( function( locale ) {
+				wrap.appendChild( Nino.admin.routes._addressField( locale, Nino.admin.routes._localeNames[locale] || locale, addresses.bound[locale] || addresses.shared ) );
+			} );
+		},
+
+		/**
+		 *	One address field. data-address says whose it is - a language, or ''
+		 *	for the one that serves every language - and data-field is the name
+		 *	the server marks it by where it refuses it (see Admin.php's
+		 *	_postedAddresses())
+		 *
+		 *	@param		{string}		locale				The language the address is for, '' for every language
+		 *	@param		{string}		name					What the field is called
+		 *	@param		{string}		value
+		 *
+		 *	@return		{Element}									The label
+		 */
+		_addressField : function( locale, name, value ) {
+
+			const label = dc.createElement('label');
+			label.className = 'nino-admin-field';
+			const span = dc.createElement('span');
+			span.textContent = name;
+			span.appendChild( Nino.admin.routes._star() );
+			label.appendChild( span );
+			const input = dc.createElement('input');
+			input.type = 'text';
+			input.id = locale === '' ? 'routes-form-http-uri' : 'routes-form-http-uri-'+ locale;
+			input.dataset.address = locale;
+			input.dataset.field = locale === '' ? 'httpUri' : 'httpUri-'+ locale;
+			input.placeholder = Nino.content.getText('/_admin/routes/placeholder/httpuri');
+			input.value = value;
+			input.required = true;
+			input.setAttribute( 'aria-required', 'true' );
+			label.appendChild( input );
+
+			return label;
+		},
+
+		/**
+		 *	Turn the switch: what the fields on screen hold is kept, and the
+		 *	other kind of field is drawn from it. Turned to one address for
+		 *	every language, the field starts from the first address a language
+		 *	has where none was given for all of them
+		 *
+		 *	@param		{boolean}		one						Whether the page has one address for every language now
+		 *
+		 *	@return		void
+		 */
+		_switchAddresses : function( one ) {
+
+			const addresses = Nino.admin.routes._addresses;
+
+			dc.querySelectorAll('#routes-form-addresses [data-address]').forEach( function( input ) {
+				if( input.dataset.address === '' )
+					addresses.shared = input.value;
+				else
+					addresses.bound[input.dataset.address] = input.value;
+			} );
+
+			if( one === true && addresses.shared === '' )
+				addresses.shared = Nino.admin.routes._locales.map( function( locale ) { return addresses.bound[locale] } ).find( function( value ) { return value !== '' } ) ?? '';
+
+			addresses.one = one;
+			Nino.admin.routes._renderAddresses( dc.getElementById('routes-form-addresses') );
+		},
+
+		/**
+		 *	The map of language to address that a save sends for the address fields
+		 *	on screen. Fields that hold one address are the address of those
+		 *	languages together, and a request gives an address once: they are sent
+		 *	as the empty key, which is the address of every language that has none
+		 *	of its own. A page has one such address - a second pair of fields that
+		 *	hold one is sent as it stands, and the server refuses it. Two fields
+		 *	hold one address when it reads as one the way the server reads it: a
+		 *	slash in front, none behind, no blank around (see Admin.php's
+		 *	_normalizeUri())
+		 *
+		 *	@param		{Array}			fields				[ { locale, value } ] in the order the fields stand in; locale is '' for the field of every language
+		 *
+		 *	@return		{Object}									{ httpUris, folded } - folded is the languages whose fields were sent as the empty key
+		 */
+		_addressMap : function( fields ) {
+
+			const read = function( value ) {
+				let address = String( value ).trim();
+				if( address !== '' && address[0] !== '/' )
+					address = '/'+ address;
+				return address === '/' ? address : address.replace( /\/+$/, '' );
+			};
+			const held = fields.filter( function( field ) { return field.locale !== '' } ).map( function( field ) { return read( field.value ) } );
+			const twice = held.find( function( value, index ) { return value !== '' && held.indexOf( value ) === index && held.lastIndexOf( value ) !== index } );
+			const httpUris = {};
+			const folded = [];
+
+			if( twice !== undefined )
+				httpUris[''] = twice;
+
+			fields.forEach( function( field ) {
+				if( twice !== undefined && field.locale !== '' && read( field.value ) === twice )
+					folded.push( field.locale );
+				else
+					httpUris[field.locale] = field.value;
+			} );
+
+			return { httpUris : httpUris, folded : folded };
+		},
+
+		/**
+		 *	A refusal of a save, with the field it names made one the form draws.
+		 *	The empty key is the address of the fields that were sent as one (see
+		 *	_addressMap()), and no field of the form is called so while the
+		 *	languages have one each: the refusal is for the first of those fields
+		 *
+		 *	@param		{*}					response			The answer of the server
+		 *	@param		{Array}			folded				The languages whose fields were sent as the empty key
+		 *
+		 *	@return		{*}												The answer, naming the field of the first of them where it named the empty key's
+		 */
+		_refusedField : function( response, folded ) {
+
+			if( folded.length === 0 || response === null || typeof response !== 'object' || response.field !== 'httpUri' )
+				return response;
+
+			return Object.assign( {}, response, { field : 'httpUri-'+ folded[0] } );
+		},
+
+		/**
 		 *	The mark after the name of a field that cannot be left empty - drawn
 		 *	aria-hidden, the control says it with aria-required
 		 *
@@ -878,7 +1076,7 @@
 			// A page a feature routes has its texts and nothing else to fill in
 			if( Nino.admin.routes._currentRuntime === null ) {
 				need( dc.getElementById('routes-form-uri') );
-				need( dc.getElementById('routes-form-http-uri') );
+				dc.querySelectorAll('#routes-form-addresses [data-address]').forEach( need );
 				need( dc.getElementById('routes-form-template') );
 			}
 			dc.querySelectorAll('#routes-form-locales [data-locale]').forEach( function( row ) {
@@ -905,17 +1103,24 @@
 					navs.push( input.dataset.nav );
 			} );
 
+			// What is on screen: language => address, or '' for the one address of
+			// every language - which is also the address of the languages whose
+			// fields hold the same one
+			const addressed = Nino.admin.routes._addressMap( Array.from( dc.querySelectorAll('#routes-form-addresses [data-address]') ).map( function( input ) {
+				return { locale : input.dataset.address, value : input.value };
+			} ) );
+
 			Nino.admin.routes._apiCall( 'save', {
-				originalHttpUri : Nino.admin.routes._isNew ? '' : Nino.admin.routes._currentHttpUri,
+				originalUri 		: Nino.admin.routes._isNew ? '' : Nino.admin.routes._currentUri,
 				uri 						: dc.getElementById('routes-form-uri').value,
-				httpUri 				: dc.getElementById('routes-form-http-uri').value,
+				httpUris 				: addressed.httpUris,
 				template 				: dc.getElementById('routes-form-template').value,
 				statusCode 			: dc.getElementById('routes-form-status').value,
 				navs						: navs,
 				text 						: text,
 			}, function( status, response ) {
 				if( status !== 200 || response === null ) {
-					line.error( status, response, '/_admin/common/error/save' );
+					line.error( status, Nino.admin.routes._refusedField( response, addressed.folded ), '/_admin/common/error/save' );
 					report( false );
 					return;
 				}
@@ -982,6 +1187,15 @@
 		},
 
 		/**
+		 *	The entry of the page that is open, from the list the panel holds
+		 *
+		 *	@return		{Object|undefined}
+		 */
+		_currentEntry : function() {
+			return Nino.admin.routes._pages.find( function( page ) { return page.uri === Nino.admin.routes._currentUri } );
+		},
+
+		/**
 		 *	What a delete leaves behind, in words, built from what the list
 		 *	already holds: the page's texts (the keys of the languages that hold
 		 *	a value, and the path fill) and the template file - shared with how
@@ -992,7 +1206,7 @@
 		 */
 		_staysLine : function() {
 
-			const entry = Nino.admin.routes._pages.find( function( page ) { return page.httpUri === Nino.admin.routes._currentHttpUri } );
+			const entry = Nino.admin.routes._currentEntry();
 
 			if( entry === undefined )
 				return '';
@@ -1029,7 +1243,7 @@
 				return stays.join('; ');
 			}
 
-			const others = Nino.admin.routes._pages.filter( function( page ) { return page.template === entry.template && page.httpUri !== entry.httpUri } ).length;
+			const others = Nino.admin.routes._pages.filter( function( page ) { return page.template === entry.template && page.uri !== entry.uri } ).length;
 
 			if( others === 0 )
 				stays.push( Nino.adminUi.format( Nino.content.getText('/_admin/routes/confirm/stays-template'), entry.template ) );
@@ -1042,23 +1256,26 @@
 		},
 
 		/**
-		 *	Confirm, then delete the page currently open. Its route is
-		 *	removed; any /_nino/webpage.../name,title,description text meta is
-		 *	left in place, same additive-only rule the rest of Nino follows -
-		 *	and so is its template file, which is why the question says
-		 *	what stays (see _staysLine())
+		 *	Confirm, then delete the page currently open. Its routes are
+		 *	removed - every address it has, which the question names; any
+		 *	/_nino/webpage.../name,title,description,uri text meta is left in
+		 *	place, same additive-only rule the rest of Nino follows - and so
+		 *	is its template file, which is why the question says what stays
+		 *	(see _staysLine())
 		 *
 		 *	@return		void
 		 */
 		_delete : function() {
 
-			if( wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/routes/confirm/delete-left'), Nino.admin.routes._currentHttpUri, Nino.admin.routes._staysLine() ) ) === false )
+			const entry = Nino.admin.routes._currentEntry();
+
+			if( wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/routes/confirm/delete-left'), entry === undefined ? Nino.admin.routes._currentUri : Nino.admin.routes._paths( entry ), Nino.admin.routes._staysLine() ) ) === false )
 				return;
 
 			const line = Nino.admin.routes._line;
 			line.idle( Nino.content.getText('/_admin/common/msg/deleting') );
 
-			Nino.admin.routes._apiCall( 'delete', { httpUri : Nino.admin.routes._currentHttpUri }, function( status, response ) {
+			Nino.admin.routes._apiCall( 'delete', { uri : Nino.admin.routes._currentUri }, function( status, response ) {
 				if( status !== 200 || response === null ) {
 					line.error( status, response, '/_admin/common/error/delete' );
 					return;

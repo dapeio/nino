@@ -136,7 +136,9 @@ namespace Nino {
 			// switch above would never survive past this same request
 			$request['/nino/http/response']['locale'] = $locale;
 
-			$newUri = \Nino\Http::findRouteUri( $appData, $request['/nino/http/response']['uri'], $locale );
+			// A GET route: a page can share its Element-URI with the endpoint its
+			// form posts to, and that one is no place to send a visitor
+			$newUri = \Nino\Http::findRouteUri( $appData, $request['/nino/http/response']['uri'], $locale, 'GET' );
 
 			// Redirect via the response array - a direct header() call would be
 			// overwritten by Http::output()'s own http_response_code() pass.
@@ -144,7 +146,7 @@ namespace Nino {
 			// to is not: a site served from a directory puts it in front, or
 			// the switch lands beside the site (see Http::_projectUri())
 			if( $newUri !== null )
-				\Nino\Http::redirect( $appData, $request, str_replace( $request['/nino/http/request']['method']. ':/', '', $newUri ), 302 );
+				\Nino\Http::redirect( $appData, $request, substr( $newUri, strlen( 'GET:/' ) ), 302 );
 		}
 
 		// Apply the locale of the resolved route, if it declares one (eg.

@@ -303,7 +303,7 @@ namespace Nino\Modules {
 
 			foreach( array_unique( [ $wanted, \Nino\Locales::getNativeLocale( $appData ) ] ) as $try ) {
 
-				$routeKey = \Nino\Http::findRouteUri( $appData, self::PAGES[$page]['uri'], $try );
+				$routeKey = \Nino\Http::findRouteUri( $appData, self::PAGES[$page]['uri'], $try, 'GET' );
 
 				if( $routeKey !== null && self::_isOurs( $appData['/nino/http/routes'][$routeKey] ?? [], $page ) === true )
 					return rtrim( \Nino\Filesystem::getDir( $appData ), '/' ). substr( $routeKey, strlen( 'GET:/' ) );

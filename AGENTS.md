@@ -208,6 +208,14 @@ module serves in every language by itself (`\Nino\Modules\Legal`) is the
 exception: it registers one route per language in `init()`, all with the same
 `uri` - the Element-URI - and the language's `locale`.
 
+A page of the project may have an address per language in the same shape - one
+route per language with the page's `uri` and the language's `locale`, and a route
+without `locale` for an address that serves every language - which the Routes
+panel writes: the address of one language sets the visitor's language, and the
+fill `/_nino/webpage<uri>/uri` is the address of the current language.
+`\Nino\Http::findRouteUri()` asks for the method as well (`GET` by default),
+because the endpoint of a form can share the `uri` of its page.
+
 A route MAY carry `'maintenance' => false`: `Modules\Maintenance` then leaves it
 reachable while the site is in maintenance. Only code or `config.php` sets it -
 the legal pages and `Auth`'s login route do - never a request, and the Routes

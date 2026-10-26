@@ -558,10 +558,28 @@ namespace Nino {
 			return $result;
 		}
 
-		// Find the route key (eg. "GET://about") that renders a given
-		// response uri in a specific locale, eg. to redirect to the
-		// locale-specific variant of the current page
-		public static function findRouteUri( array &$appData, string $responseUri, string $locale ): ?string {
+		/**
+		 *	The route key (eg. "GET://about") that renders a response uri in a
+		 *	language for one method - eg. to redirect to the language's own
+		 *	address of the current page. A route fits when its 'uri' is the
+		 *	response uri and it has no 'locale' or this one, and the first that
+		 *	fits in the order of the table is the answer: the routes of one
+		 *	language stand before the ones several languages share (see
+		 *	\Nino\Modules\Legal and the Routes panel).
+		 *
+		 *	The method is part of the question. A page and the endpoint its form
+		 *	posts to share an Element-URI (the Newsletter's page and
+		 *	POST://.newsletter), and the endpoint may stand first in the table:
+		 *	its key is no address a visitor can be sent to.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$responseUri	The Element-URI a route renders, eg. '/about'
+		 *	@param		string		$locale				The language wanted
+		 *	@param		string		$method				The method of the route: GET, POST...
+		 *
+		 *	@return 	string|null							The route key; null where no route of that method fits
+		 */
+		public static function findRouteUri( array &$appData, string $responseUri, string $locale, string $method = 'GET' ): ?string {
 
 			// '??' like every other route read in this file: a route entry
 			// without a 'uri' (hand-edited config.php, a module registering
@@ -569,7 +587,7 @@ namespace Nino {
 			// Runtime::handleError() treats an engine-raised level as fatal -
 			// so one typo in the config turned every locale switch into a 500
 			foreach( $appData['/nino/http/routes'] as $routeUri => $routeData )
-				if( ( $routeData['uri'] ?? null ) === $responseUri && ( isset( $routeData['locale'] ) === false || $routeData['locale'] === $locale ) )
+				if( str_starts_with( (string) $routeUri, $method. ':/' ) === true && ( $routeData['uri'] ?? null ) === $responseUri && ( isset( $routeData['locale'] ) === false || $routeData['locale'] === $locale ) )
 					return $routeUri;
 
 			return null;
