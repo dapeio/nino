@@ -1028,7 +1028,7 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
  *
  *
  *			.nino-hero(--fullscreen), .nino-hero(-title, -subtitle, -arrowdown)
- *			.nino-section(--alt, --tint, --dark, --black, --primary, --brand-alt, --dim, --border-1/2/3), .nino-section(-title, -subtitle)
+ *			.nino-section(--alt, --tint, --dark, --black, --primary, --brand-alt, --dim, --border-1/2/3, --mirrored), .nino-section(-title, -subtitle)
  *			.nino-grid-row(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim), .nino-grid-row-bg
  *			.nino-grid(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim)
  *			.nino-card(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim, --fill, --middle, --bottom, --last-bottom, --linked, --fullwidth), .nino-card(-content, -title, -subtitle, -descr, -img, -price, -bg)
@@ -1649,6 +1649,15 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 		gives up the padding on that side; below 768px it has none	*/
 	.nino-section:has(> .nino-grid-row.nino-pl-0) { padding-left: 0; }
 	.nino-section:has(> .nino-grid-row.nino-pr-0) { padding-right: 0; }
+	/*	A mirrored section has the columns of its row in the opposite order - the
+		first one at the right - so that a loop that says alternate="1" puts the
+		picture on the other side from one section to the next. [sections] writes
+		the class on every second section, and a template may write it on a
+		section of its own. From 768px only: below it the columns keep the order of
+		the markup, which puts a picture above its text in every section on a phone.
+		The lines of a row that wraps keep their order, and the picture behind a
+		row, which is placed on its own, does not move	*/
+	.nino-section--mirrored > .nino-grid-row { flex-direction: row-reverse; }
 }
 
 /*	A card has the radius of its kind and cuts what is in it at it: the picture of

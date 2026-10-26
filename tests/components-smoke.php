@@ -1972,7 +1972,11 @@ check( 'the scroll hint is the arrow of a hero: labelled in both languages, no s
 	&& $registryOf( 'scroll-hint' )['link'] === false && \Nino\Modules\Components::defaults( $appData, 'scroll-hint' ) === [ 'to' => '', 'class' => '' ] );
 check( 'the sections are a stack with a loop and no grid: a section to an element, so that it has the attributes of every loop and none of a grid - cols, gap and autoheight are left to the stacks that draw cells',
 	\Nino\Modules\Components::stacks( $appData )['sections']['grid'] === false && \Nino\Modules\Components::stacks( $appData )['sections']['label'] === [ 'en_US' => 'Sections', 'de_DE' => 'Sektionen' ]
-	&& \Nino\Modules\Components::defaults( $appData, 'sections', true ) === [ 'sort' => '', 'offset' => '0', 'limit' => '0', 'query' => '', 'callback' => '', 'locale' => '', 'id' => '', 'class' => '' ] );
+	&& \Nino\Modules\Components::defaults( $appData, 'sections', true ) === [ 'sort' => '', 'offset' => '0', 'limit' => '0', 'query' => '', 'callback' => '', 'locale' => '', 'id' => '', 'alternate' => '0', 'class' => '' ] );
+$sectionsAlternate = \Nino\Modules\Components::stacks( $appData )['sections']['attributes']['alternate'] ?? [];
+check( '...and the one attribute it has of its own is alternate, a bool that is off - the switch that mirrors every second section - with a label and a hint in both languages for a tool to draw it by',
+	array_keys( \Nino\Modules\Components::stacks( $appData )['sections']['attributes'] ) === [ 'alternate' ] && ( $sectionsAlternate['type'] ?? '' ) === 'bool' && ( $sectionsAlternate['default'] ?? null ) === false
+	&& array_filter( [ 'label', 'hint' ], static fn( string $words ): bool => array_keys( (array) ( $sectionsAlternate[$words] ?? [] ) ) !== [ 'en_US', 'de_DE' ] || in_array( '', $sectionsAlternate[$words], true ) === true ) === [] );
 
 check( 'a clean schema validates again as it is - what a manifest hands over after Features::manifest() has read it', \Nino\Modules\Components::validate( 'title', \Nino\Modules\Components::components( $appData )['title'] ) === \Nino\Modules\Components::components( $appData )['title']
 	&& \Nino\Modules\Components::validate( 'filter', \Nino\Modules\Components::stacks( $appData )['filter'], true ) === \Nino\Modules\Components::stacks( $appData )['filter'] );
@@ -2553,6 +2557,36 @@ check( '...an id is a slug that starts with a letter, the whole of it: one with 
 	$render( "[sections /posts sort=\"title\" offset=\"2\" id=\"a\n\"][title title][/sections]" ) === '<section class="nino-section"><h3 class="nino-section-title">Two</h3></section>'
 	&& str_starts_with( $render( "[stack /services limit=\"1\" gap=\"3\" id=\"svc\n\"][probe][/stack]" ), '<div class="nino-grid-row nino-stack nino-stack-gap-3"><div class="nino-grid-s-100' ) === true
 	&& $render( "[scroll-hint to=\"a\n\"]" ) === $render( '[scroll-hint]' ) );
+
+// The sections that alternate: the class that turns the row of every second one around is written by the renderer, which counts the loop it draws
+$sectionOf = static fn( string $title, string $classes = '', string $id = '' ): string => '<section'. $id. ' class="nino-section'. $classes. '"><h3 class="nino-section-title">'. $title. '</h3></section>';
+check( '[sections alternate="1"] gives every second section the class nino-section--mirrored: the second of three and no other, after the classes of the call and the id - the first and the third are as they were',
+	$render( '[sections /posts sort="title" id="n" class="nino-section--alt nino-pt-2" alternate="1"][title title][/sections]' )
+		=== $sectionOf( 'One', ' nino-section--alt nino-pt-2', ' id="n-1"' ). $sectionOf( 'Three', ' nino-section--alt nino-pt-2 nino-section--mirrored', ' id="n-2"' ). $sectionOf( 'Two', ' nino-section--alt nino-pt-2', ' id="n-3"' )
+	&& $render( '[sections /posts sort="title" alternate="1"][title title][/sections]' ) === $sectionOf( 'One' ). $sectionOf( 'Three', ' nino-section--mirrored' ). $sectionOf( 'Two' ) );
+\Nino\Elements::insertElementType( $appData, '/stripes', [ 'title' => [ 'type' => 'string', 'locale' => true ] ] );
+foreach( [ 'a', 'b', 'c', 'd', 'e' ] as $stripe )
+	\Nino\Elements::insertElement( $appData, '/stripes/'. $stripe, [ 'title' => strtoupper( $stripe ) ], 'de_DE' );
+check( '...every second one and not the second alone: of five it is the second and the fourth, which are the elements 1 and 3 of the loop counted from 0',
+	$render( '[sections /stripes sort="title" alternate="1"][title title][/sections]' )
+		=== $sectionOf( 'A' ). $sectionOf( 'B', ' nino-section--mirrored' ). $sectionOf( 'C' ). $sectionOf( 'D', ' nino-section--mirrored' ). $sectionOf( 'E' ) );
+$sectionsPlain = '<section class="nino-section"><h3 class="nino-section-title">One</h3></section><section class="nino-section"><h3 class="nino-section-title">Three</h3></section><section class="nino-section"><h3 class="nino-section-title">Two</h3></section>';
+check( '...without the attribute no section carries the class and the output is what it was, byte for byte - as it is with the attribute off and with a word that is none of a bool\'s',
+	$render( '[sections /posts sort="title"][title title][/sections]' ) === $sectionsPlain && $render( '[sections /posts sort="title" alternate="0"][title title][/sections]' ) === $sectionsPlain
+	&& $render( '[sections /posts sort="title" alternate="maybe"][title title][/sections]' ) === $sectionsPlain );
+check( '...it counts the sections as the loop draws them, and each loop for itself: after an offset the first section drawn is the first, and a second loop on the page starts again - which no rule of a stylesheet could tell',
+	$render( '[sections /posts sort="title" offset="1" alternate="1"][title title][/sections]' ) === $sectionOf( 'Three' ). $sectionOf( 'Two', ' nino-section--mirrored' )
+	&& $render( '[sections /posts sort="title" limit="1" alternate="1"][title title][/sections][sections /posts sort="title" offset="1" alternate="1"][title title][/sections]' )
+		=== $sectionOf( 'One' ). $sectionOf( 'Three' ). $sectionOf( 'Two', ' nino-section--mirrored' ) );
+/*	From the tablet breakpoint the row that is a child of a mirrored section stands the other way round, and that is all the stylesheet does about it: one rule, which asks for the class and for nothing
+	of how it got there, so that a section that carries it by hand is turned the same way as one the renderer wrote it on. Below 768px no rule names it - the columns keep the order of the markup, and
+	a picture stands above its text in every section on a phone	*/
+$mirrorQuery = '/@media\s*\(min-width:\s*768px\)\s*(\{(?:[^{}]++|(?1))*\})/';
+$outsideMirrorQuery = preg_replace( $mirrorQuery, '', $hookCss );
+check( 'the row of a mirrored section is turned around by one rule - row-reverse, in the query of the tablet breakpoint - and no rule names the class anywhere else',
+	count( $groundEach['.nino-section--mirrored > .nino-grid-row'] ?? [] ) === 1 && $groundSets( $groundOf( '.nino-section--mirrored > .nino-grid-row' ), 'flex-direction', 'row-reverse' ) === true
+	&& $groundConditions( '.nino-section--mirrored > .nino-grid-row' ) === [ [ '@media (min-width: 768px)' ] ]
+	&& $outsideMirrorQuery !== null && substr_count( $outsideMirrorQuery, 'nino-section--mirrored' ) === 0 );
 
 // A project's own component replaces the one of the kernel, and nothing else answers for it
 \Nino\Modules\Components::addComponent( $appData, 'title', static function( array &$appData, array $args ): string {

@@ -420,8 +420,12 @@ namespace Nino\Modules {
 					'style' => [ 'type' => 'select', 'options' => [ '', 'check', 'numbered', 'columns' ], 'default' => '', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ] ],
 				] ],
 				// What the stack loops is a whole section each: no grid, no cell, the
-				// sections one after the other where the call stands
-				[ 'sections', 'Sections', 'Sektionen', 'cells', false, [] ],
+				// sections one after the other where the call stands. 'alternate' has
+				// every second of them mirrored, see stackSections()
+				[ 'sections', 'Sections', 'Sektionen', 'cells', false, [
+					'alternate' => [ 'type' => 'bool', 'default' => false, 'label' => [ 'en_US' => 'Mirror every second', 'de_DE' => 'Jede zweite spiegeln' ],
+						'hint' => [ 'en_US' => 'Every second section shows its columns in the opposite order, from tablet width up.', 'de_DE' => 'Jede zweite Sektion zeigt ihre Spalten in der umgekehrten Reihenfolge, ab Tablet-Breite.' ] ],
+				] ],
 			];
 
 			foreach( $stacks as [ $name, $en, $de, $preview, $grid, $attributes ] )
@@ -2486,7 +2490,12 @@ namespace Nino\Modules {
 		 *	that what a page says of its first section and of its sections one after
 		 *	the other stays true. A section has the class 'class' says after
 		 *	nino-section, and an id where the call has one: the id and the number of
-		 *	the element in the loop, counted from 1
+		 *	the element in the loop, counted from 1. With 'alternate' on, every
+		 *	second section - the second, the fourth and so on - has the class
+		 *	nino-section--mirrored after the classes of the call, and Nino.css turns
+		 *	the row of such a section around from 768px. The class is written here
+		 *	and no rule counts sections: two loops on a page count each for itself,
+		 *	and a <section> that carries the class by hand is turned the same way
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments made ready by dispatch()
@@ -2498,9 +2507,14 @@ namespace Nino\Modules {
 			$id = self::_id( $args['id'] );
 
 			return self::renderStack( $appData, $args, static function( string $inner, array $element, int $index ) use ( $id, $args ): string {
+
+				// The index counts from 0: the second section is 1. The class goes into the [[class]] of the
+				// fragment, behind the classes of the call, so that a project's own fragment needs no token for it
+				$mirrored = $args['alternate'] === '1' && $index % 2 === 1;
+
 				return str_replace(
 					[ '[[class]]', '[[id]]', '[[inner]]' ],
-					[ self::_modifier( '', $args['class'] ), self::_attribute( 'id', $id !== '' ? $id. '-'. ( $index + 1 ) : '' ), $inner ],
+					[ self::_modifier( '', $args['class'] ). self::_modifier( 'nino-section--', $mirrored === true ? 'mirrored' : '' ), self::_attribute( 'id', $id !== '' ? $id. '-'. ( $index + 1 ) : '' ), $inner ],
 					self::$html['sections']
 				);
 			} );
