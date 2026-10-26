@@ -823,7 +823,48 @@ $groundPictured = '.nino-section:not(.nino-cover, .nino-parallex):has(> .nino-se
 check( 'a section with a picture behind it that is no cover and no parallax is a flex column that centres its row, and nino-cover-top and nino-cover-bottom keep the row at the top and at the bottom, as they do for a cover',
 	$groundSets( $groundOf( $groundPictured ), 'display', 'flex' ) === true && $groundSets( $groundOf( $groundPictured ), 'flex-direction', 'column' ) === true && $groundSets( $groundOf( $groundPictured ), 'justify-content', 'center' ) === true
 	&& $groundSets( $groundOf( $groundPictured. '.nino-cover-top' ), 'justify-content', 'flex-start' ) === true && $groundSets( $groundOf( $groundPictured. '.nino-cover-bottom' ), 'justify-content', 'flex-end' ) === true
-	&& $groundSets( $groundOf( '.nino-cover.nino-cover-top > .nino-grid-row' ), 'top', '0' ) === true && $groundSets( $groundOf( '.nino-cover > .nino-grid-row' ), 'transform', 'translateY(-50%)' ) === true );
+	&& $groundSets( $groundOf( '.nino-cover.nino-cover-top > .nino-grid-row' ), 'top', '0' ) === true );
+
+/*	What a cover centres - the row of a cover and of a parallax, the content of a hand-written one, the arrow of a hero - is centred by the translate property and not by transform. The viewport animation of
+	the same element (nino-vpa, which the Builder writes on the row) is a transform, and of two rules for one property one wins: in the standard mode the row stayed centred and did not slide in, in the repeat
+	mode it stood half its own height too low (measured: 54.9px for a row of 109.8px at 1280). translate composes with transform instead. The rules that put the row or the content at the top or at the bottom
+	take the centring back with translate: none, and not one of these rules says transform - nor does the bounce of the arrow say how it is centred	*/
+$centredBy = [
+	'.nino-cover > .nino-grid-row' => '0 -50%', '.nino-parallex > .nino-grid-row' => '0 -50%',
+	'.nino-cover > .nino-cover-content' => '0 -50%', '.nino-parallex > .nino-cover-content' => '0 -50%',
+	'.nino-hero-arrowdown' => '-50% 0',
+];
+foreach( [ '.nino-cover', '.nino-parallex' ] as $centredCover )
+	foreach( [ 'top', 'bottom' ] as $centredEdge )
+		foreach( [ '.nino-grid-row', '.nino-cover-content' ] as $centredPart )
+			$centredBy[ $centredCover. '.nino-cover-'. $centredEdge. ' > '. $centredPart ] = 'none';
+$centredWrong = [];
+foreach( $centredBy as $centredSelector => $centredValue )
+	if( $groundSets( $groundOf( $centredSelector ), 'translate', $centredValue ) === false || preg_match( '/(?<![\w-])transform\s*:/', $groundOf( $centredSelector ) ) === 1 )
+		$centredWrong[] = $centredSelector;
+preg_match( '/@keyframes\s+nino-hero-arrowdown-bounce\s*\{((?:[^{}]|\{[^{}]*\})*)\}/', $hookCss, $centredBounce );
+check( 'what a cover centres is centred by translate and not by transform, so that a viewport animation of the same element composes with the centring instead of replacing it: the row of a cover and of a parallax and the content of a hand-written one by 0 -50%, the arrow of a hero by -50% 0, and the rules that put the row or the content at the top or at the bottom say translate: none - not one of them says transform, and the bounce of the arrow moves it up and down and says nothing of how it is centred'
+	. ( $centredWrong === [] ? '' : ' - not so: '. implode( ' | ', $centredWrong ) ),
+	$centredWrong === [] && str_contains( $centredBounce[1] ?? '', 'translateY' ) === true && str_contains( $centredBounce[1] ?? '', 'translateX' ) === false );
+
+/*	A section is the containing block of what is placed in it - the arrow at its foot, the picture behind it - whichever kind of section it is. A plain section and one whose picture stands in its row had
+	none, so that the arrow lay at the foot of the first screen of the page (measured: 788px to 828px at 390px, under a section that begins 1177px down), as the cover, the parallax and the section with a
+	picture behind it, which were placed, never had it. The section is placed and makes no stacking context - no z-index, no isolation, no property that creates one - so that the layers inside it order in
+	the context round it, as they did when it was not placed. Every rule of the section element is asked - the one of its own class, those of its grounds and its borders
+	(.nino-section--<x>) and those of a cover, a parallax and a hero, which are classes of the same element, each alone or compounded with a class or a pseudo-class; a
+	pseudo-element of a section (the scrim of a dimmed cover) is a box of its own, which may order what it holds	*/
+$sectionLayers = [];
+foreach( $groundEach as $sectionSelector => $sectionBodies )
+	if( str_contains( (string) $sectionSelector, '::' ) === false && preg_match( '/^\.nino-(?:section|cover|parallex|hero)(?:--[\w-]+)?(?:[:.\[][^\s>+~]*)*$/', (string) preg_replace( '/\((?:[^()]|\([^()]*\))*\)/', '()', (string) $sectionSelector ) ) === 1 )
+		foreach( [ 'z-index', 'isolation', 'transform', 'translate', 'rotate', 'scale', 'opacity', 'filter', 'backdrop-filter', 'perspective', 'contain', 'will-change', 'mix-blend-mode', 'clip-path', 'mask-image' ] as $sectionLayer )
+			if( preg_match( '/(?<![\w-])'. preg_quote( $sectionLayer, '/' ). '\s*:/', implode( ' ', $sectionBodies ) ) === 1 )
+				$sectionLayers[] = $sectionSelector. ' says '. $sectionLayer;
+$sectionArrow = $groundOf( '.nino-hero-arrowdown' );
+check( 'a section is placed, once, in the rule of the section itself - position: relative - so that the arrow at its foot, which is absolute and has a bottom and no top, stands at the foot of its own section on every kind of section',
+	count( array_filter( $groundEach['.nino-section'] ?? [], static fn( string $body ): bool => $groundSets( $body, 'position', 'relative' ) ) ) === 1
+	&& $groundSets( $sectionArrow, 'position', 'absolute' ) === true && $hookValue( $sectionArrow, 'bottom' ) !== null && $hookValue( $sectionArrow, 'top' ) === null );
+check( '...and no rule of a section - of its own class, of a ground or a border of it, of a cover, a parallax or a hero, alone or compounded - makes it a stacking context: not a z-index, an isolation, a transform, an opacity or a filter, which would take what is inside it out of the order of the page round it'
+	. ( $sectionLayers === [] ? '' : ' - '. implode( '; ', $sectionLayers ) ), $sectionLayers === [] && isset( $groundEach['.nino-section'] ) === true );
 
 // The padded cover
 $paddedPair = 'var(--cover-padding-y) var(--cover-padding-x)';
@@ -2198,6 +2239,22 @@ check( '...a source that resolves to nothing renders nothing, a style outside it
 check( '...in a stack it reads the field of its element, as [text] does, and the class of the text of a card is the one Nino.css styles',
 	str_contains( $render( '[stack /services sort="title" limit="1"][card][card-text summary][/card][/stack]' ), '<article class="nino-card"><div class="nino-card-content"><div class="nino-card-descr nino-richtext"><p>Two</p></div></div></article>' ) === true
 	&& $hookRules( '.nino-card-descr' ) !== '' && $hookRules( '.nino-card-descr--quiet' ) !== '' && $hookRules( '.nino-card-descr--loud' ) !== '' );
+
+/*	A link in a text is the brand as ink on the ground the text stands on - --color-accent, which a section, a row, a column and a card hand on to what is in them - and is underlined where the pointer is
+	over it or the keyboard is on it. The stylesheet names the classes [text] and [card-text] write, the first class of their element whatever the format, the size and the colour of the text, and leaves out
+	a link that is a button. The kernel's links stay as the kernel set them, the colour of what they stand in and no underline: it is this rule that says otherwise, for these two classes and for none
+	of the titles	*/
+$linkTexts = array_map( static fn( string $call ): string => preg_match( '/^<[a-z]+ class="([a-z-]+)[" ]/', $render( $call ), $linkFound ) === 1 ? $linkFound[1] : '', [ '[text text="x"]', '[card-text text="x"]' ] );
+$linkRule = ':where(.'. implode( ', .', $linkTexts ). ') a:where(:not(.nino-btn))';
+$linkTitles = array_filter( array_keys( $groundEach ), static fn( string $selector ): bool => preg_match( '/\.nino-(?:section|card|hero)-(?:title|subtitle)(?![\w-]).*\sa(?![\w-])/', $selector ) === 1 );
+check( 'a link in a text takes the accent ink of its ground: one rule for the classes [text] and [card-text] write, which leaves out a link that is a button and says color: var(--color-accent) and nothing else'
+	. ( count( array_filter( $linkTexts ) ) === 2 ? '' : ' - the two texts write no class' ),
+	count( array_filter( $linkTexts ) ) === 2 && $linkTexts[0] !== $linkTexts[1] && count( $groundEach[$linkRule] ?? [] ) === 1
+	&& $groundSets( $groundOf( $linkRule ), 'color', 'var(--color-accent)' ) === true && substr_count( $groundOf( $linkRule ), ':' ) === 1 );
+check( '...and it is underlined where the pointer is over it or the keyboard is on it, :hover and :focus-visible in one rule that says nothing else, and not at rest - while a stays the colour of what it stands in and has no underline, and no selector of a title has a link in it',
+	$groundSets( $groundOf( $linkRule. ':is(:hover, :focus-visible)' ), 'text-decoration', 'underline' ) === true && substr_count( $groundOf( $linkRule. ':is(:hover, :focus-visible)' ), ':' ) === 1
+	&& preg_match( '/(?<![\w-])text-decoration/', $groundOf( $linkRule ) ) !== 1
+	&& $groundSets( $groundOf( 'a' ), 'color', 'inherit' ) === true && $groundSets( $groundOf( 'a' ), 'text-decoration', 'none' ) === true && $linkTitles === [] );
 check( '[spacer] is an empty box with a margin of the size it says', $render( '[spacer size="4"]' ) === '<div class="nino-mt-4"></div>' && $render( '[spacer]' ) === '<div class="nino-mt-2"></div>' );
 check( '[html] is its content as rich text, and nothing without content', $render( '[html]<p>Hi</p><script>alert(1)</script>[/html]' ) === '<p>Hi</p>' && $render( '[html][/html]' ) === '' );
 check( '[button] is a link drawn as one: label from a key, address from a key, a style', $render( '[button /_nino/webpage/contact/name href="/_nino/webpage/contact/uri" style="primary"]' ) === '<a class="nino-btn nino-btn--primary" href="/contact">Contact us</a>' );

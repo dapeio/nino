@@ -1028,11 +1028,18 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
  *
  *
  *			.nino-hero(--fullscreen), .nino-hero(-title, -subtitle, -arrowdown)
- *			.nino-section(--alt, --tint, --dark, --black, --primary, --brand-alt, --dim, --border-1/2/3, --mirrored), .nino-section(-title, -subtitle)
+ *			.nino-section(--alt, --tint, --dark, --black, --primary, --brand-alt, --dim, --border-1/2/3, --mirrored), .nino-section(-title, -subtitle, -text)
  *			.nino-grid-row(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim), .nino-grid-row-bg
  *			.nino-grid(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim)
  *			.nino-card(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim, --fill, --middle, --bottom, --last-bottom, --linked, --fullwidth), .nino-card(-content, -title, -subtitle, -descr, -img, -price, -bg)
  *			.nino-ink(--muted, --accent)
+ *
+ *			Three rules that reach beyond the class they stand at: a section is the box
+ *			its arrow and its picture are placed in (.nino-section is positioned); the
+ *			row of a cover is centred by translate, so that the viewport animation of
+ *			the row composes with it (chapter 08); a link in a text (.nino-section-text,
+ *			.nino-card-descr) is the accent ink of its ground and is underlined on
+ *			hover and on keyboard focus.
  *
  *
  ****************************************************************************************************/
@@ -1080,12 +1087,16 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
  *	would show a keyboard user no ring at all. A link with data-arrow-next and
  *	a # for an address goes to the section after the one it is in. Click
  *	behavior (smooth-scroll to data-arrow-target, or to the next section) is
- *	wired in Nino.ui.js */
+ *	wired in Nino.ui.js. It stands at the foot of the section it is in - every
+ *	section is the box it is placed against, see .nino-section - and it is
+ *	centred by translate and not by transform: the bounce below moves transform,
+ *	so would a viewport animation on the arrow (nino-vpa), and a property has one
+ *	value at a time, so that whichever of them applies takes the centring away */
 .nino-hero-arrowdown {
 	position: absolute;
 	bottom: var(--space-2);
 	left: 50%;
-	transform: translateX(-50%);
+	translate: -50% 0;
 	z-index: 100;
 	width: 2.5rem;
 	height: 2.5rem;
@@ -1113,8 +1124,8 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	mask-size: contain;
 }
 @keyframes nino-hero-arrowdown-bounce {
-	0%, 100% { transform: translateX(-50%) translateY(0); }
-	50% { transform: translateX(-50%) translateY(.4rem); }
+	0%, 100% { transform: translateY(0); }
+	50% { transform: translateY(.4rem); }
 }
 
 /* Fullscreen hero without an image - nino-cover/nino-parallex size themselves
@@ -1127,9 +1138,18 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	box-sizing: border-box;
 }
 
+/*	Every section is the containing block of what is placed in it: the arrow at
+	its foot (.nino-hero-arrowdown, absolute, the last child of the section) and
+	the picture behind it (.nino-section-bg). The cover, the parallax and the
+	section with a picture behind it were; a plain section and one whose picture
+	stands in its row were not, and their arrow stood at the foot of the first
+	screen of the page. No z-index, and nothing else that makes a stacking
+	context: the layers inside a section order in the context round it, as they
+	did when the section was not placed	*/
 .nino-section {
 	--color-ground: var(--color-section-default-bg);
 	--color-ink: var(--color-section-default-text);
+	position: relative;
 	padding: calc(var(--space-4) * var(--whitespace-scale)) 0;
 	background-color: var(--color-section-default-bg);
 	color: var(--color-section-default-text);
@@ -1862,6 +1882,24 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	ones that win	*/
 .nino-ink--muted { color: color-mix(in srgb, currentColor 80%, transparent); }
 .nino-ink--accent { color: var(--color-accent); }
+
+/*	A link in a text is the brand as ink on the ground the text stands on, and is
+	underlined where the pointer is over it or the keyboard is on it. The
+	kernel's links take the colour of what they stand in and have no underline,
+	which is right for a menu, a title or a card and leaves a link in a sentence
+	looking like the words round it. The text is what [text] and [card-text]
+	draw, whatever their format, size and colour: nino-section-text and
+	nino-card-descr. A button in a text keeps its own rules, and so does the link
+	that a linked card stretches over its whole area - the title's, and no part
+	of a text; the titles get nothing. :where() leaves the rules the weight of a
+	link, so that a class of a link of its own - a button's, a design layer's -
+	wins over them	*/
+:where(.nino-section-text, .nino-card-descr) a:where(:not(.nino-btn)) {
+	color: var(--color-accent);
+}
+:where(.nino-section-text, .nino-card-descr) a:where(:not(.nino-btn)):is(:hover, :focus-visible) {
+	text-decoration: underline;
+}
 
 .nino-card-img--maxheight {
 	max-height: var(--card-img-max-height);
@@ -3475,7 +3513,9 @@ header .nino-headernav-logo:empty {
 	static position *inside* the padding, so the content hung over the right
 	edge by exactly the section's left padding and was clipped there by
 	.nino-cover's own overflow:hidden. Inheriting the horizontal padding keeps
-	the cover's content on the same inset as every other section's	*/
+	the cover's content on the same inset as every other section's. It is
+	centred by translate and not by transform, as the row of a cover is (see
+	below), so that a viewport animation on it composes with the centring	*/
 .nino-parallex > .nino-cover-content,
 .nino-cover > .nino-cover-content {
 	position: absolute;
@@ -3488,7 +3528,7 @@ header .nino-headernav-logo:empty {
 	left: 0;
 	right: 0;
 	width: auto;
-	transform: translateY(-50%);
+	translate: 0 -50%;
 }
 /*	The box already spans both edges, so centring is the text's alignment and
 	nothing else - the left:50% + translateX(-50%) pair this used to carry was
@@ -3498,9 +3538,9 @@ header .nino-headernav-logo:empty {
 	text-align: center;
 }
 .nino-parallex.nino-cover-top > .nino-cover-content,
-.nino-cover.nino-cover-top > .nino-cover-content { top: 0; transform: none; }
+.nino-cover.nino-cover-top > .nino-cover-content { top: 0; translate: none; }
 .nino-parallex.nino-cover-bottom > .nino-cover-content,
-.nino-cover.nino-cover-bottom > .nino-cover-content { top: auto; bottom: 0; transform: none; }
+.nino-cover.nino-cover-bottom > .nino-cover-content { top: auto; bottom: 0; translate: none; }
 .nino-parallex.nino-hero,
 .nino-cover.nino-hero {
 	margin-top: 0 !important;
@@ -3511,13 +3551,13 @@ header .nino-headernav-logo:empty {
 	content follows - what a section the Builder writes has instead of an
 	image directly in the cover. It lies over the whole section and is cut at
 	its edges, the picture covers it, and the content stands above it (and
-	above the scrim of a --dim cover, which sits at 50). A section that is no
-	cover has nothing that makes it the box the picture is placed in, so it
-	becomes one. In a cover or a parallax the content is laid out the way
-	.nino-cover-content is: over the middle, or the top or the bottom where
-	the section says so - with or without a picture in front of it: the cover
-	is the section's height, not the picture's. The row is a direct child of
-	the section either way, which no hand-written cover has: its row stands
+	above the scrim of a --dim cover, which sits at 50). Every section is the
+	box the picture is placed in (see .nino-section), a cover and a parallax
+	as much as a plain one. In a cover or a parallax the content is laid out
+	the way .nino-cover-content is: over the middle, or the top or the bottom
+	where the section says so - with or without a picture in front of it: the
+	cover is the section's height, not the picture's. The row is a direct child
+	of the section either way, which no hand-written cover has: its row stands
 	in .nino-cover-content	*/
 .nino-section-bg {
 	position: absolute;
@@ -3530,9 +3570,6 @@ header .nino-headernav-logo:empty {
 	width: 100%;
 	height: 100%;
 	object-fit: cover;
-}
-.nino-section:has(> .nino-section-bg) {
-	position: relative;
 }
 .nino-section-bg + .nino-grid-row {
 	position: relative;
@@ -3561,6 +3598,14 @@ header .nino-headernav-logo:empty {
 }
 .nino-section:not(.nino-cover, .nino-parallex):has(> .nino-section-bg).nino-cover-top { justify-content: flex-start; }
 .nino-section:not(.nino-cover, .nino-parallex):has(> .nino-section-bg).nino-cover-bottom { justify-content: flex-end; }
+/*	The row of a cover is centred by translate and not by transform. The viewport
+	animation of the row - the nino-vpa classes the Builder writes on it - is a
+	transform of the same element, and of two rules for one property one wins:
+	in the standard mode the row stayed centred and did not slide in, in the
+	repeat mode it stood half its own height too low, since the animation ends
+	at translateY(0). translate composes with transform, so the centring and
+	the animation each have a property of their own, and the rules that put the
+	row at the top or at the bottom take the centring back with translate: none	*/
 .nino-parallex > .nino-grid-row,
 .nino-cover > .nino-grid-row {
 	position: absolute;
@@ -3568,12 +3613,12 @@ header .nino-headernav-logo:empty {
 	left: 0;
 	right: 0;
 	z-index: 101;
-	transform: translateY(-50%);
+	translate: 0 -50%;
 }
 .nino-parallex.nino-cover-top > .nino-grid-row,
-.nino-cover.nino-cover-top > .nino-grid-row { top: 0; transform: none; }
+.nino-cover.nino-cover-top > .nino-grid-row { top: 0; translate: none; }
 .nino-parallex.nino-cover-bottom > .nino-grid-row,
-.nino-cover.nino-cover-bottom > .nino-grid-row { top: auto; bottom: 0; transform: none; }
+.nino-cover.nino-cover-bottom > .nino-grid-row { top: auto; bottom: 0; translate: none; }
 .nino-parallex > .nino-section-bg > img {
 	position: absolute;
 	top: 0;
