@@ -5,7 +5,7 @@
  *									assets/style.css comes after it and overrules it.
  *
  *									Everything below this comment is what the catalogue's
- *									Design feature compiles at its defaults: the twelve
+ *									Design feature compiles at its defaults: the fourteen
  *									numbered sections, every part on the set the first
  *									shipped theme names - Nino, the default construction
  *									of each tab -, every knob in the middle. It is regenerated from
@@ -645,35 +645,109 @@
 	--radius-image-default: standard;
 }
 
-/* ==== 7. header: classic-default ==== */
+/* ==== 7. header: classic-default (nav default, height default, space default, ground default) ==== */
 /*	@name				Classic, default
  *	@description	A bar on the page ground with a rule under it, five rem tall. The one a fresh Nino installs.
  *	@description-de	Eine Leiste auf dem Grund der Seite mit einer Linie darunter, fünf rem hoch. Die, die ein frisches Nino mitbringt.
  *
+ *	@knob	nav		Size of the links of the navigation
+ *	@knob	height		How tall the bar is
+ *	@knob	space		Space between the logo, the links and the edges
+ *	@knob	ground		What the bar stands on
+ *
  *	The name and the description are what the Design panel lists this
  *	variant as. Every library file carries them; a file without a @name
  *	is offered under its own file name instead.
+ *
+ *	The four knobs are ladders, declared below, the middle of each this set as it
+ *	was before it had any: nav is a factor on the size of the links of the
+ *	navigation, height the height of the bar - and of the room main leaves under
+ *	it -, space a factor on the gaps between the logo, the links and the edges,
+ *	and ground a choice of three: the ground and the ink of the page, this set's
+ *	own, and the dark pair of the palette. What the text, the icons, the links and
+ *	the lines of the bar are read in comes with it, as aspects of the ground
+ *	(--header-ground-ink, -title, -accent, -focus and -border), and is put on the
+ *	header as the roles Nino.css reads - so the bar is legible on each of the
+ *	three. The menu that opens over the page is the page's again, as in Nino.css.
  */
 
-/*	The height of the bar, once: the bar is that tall, and main, which the fixed
-	header would cover, starts below it	*/
 :root {
-	--header-height: 5rem;
+	/*	The size of the links of the navigation, as a factor of the size this set sets them in	*/
+	--header-nav--least:	.85;
+	--header-nav--less:	.92;
+	--header-nav--default:	1;
+	--header-nav--more:	1.1;
+	--header-nav--most:	1.2;
+
+	/*	The height of the bar, once: the bar is that tall, and main, which the fixed
+			header would cover, starts below it. The middle is five rem	*/
+	--header-height--least:	calc( 5rem * .7 );
+	--header-height--less:	calc( 5rem * .85 );
+	--header-height--default:	5rem;
+	--header-height--more:	calc( 5rem * 1.25 );
+	--header-height--most:	calc( 5rem * 1.5 );
+
+	/*	The gaps between the logo, the links and the edges, as a factor of what this set has	*/
+	--header-space--least:	.5;
+	--header-space--less:	.75;
+	--header-space--default:	1;
+	--header-space--more:	1.5;
+	--header-space--most:	2;
+
+	/*	What the bar stands on: the ground of the page, this set's own, the dark pair of the palette	*/
+	--header-ground--less:	var(--color-background);
+	--header-ground--default:	var(--color-background);
+	--header-ground--more:	var(--color-section-dark-bg);
+
+	/*	The ink of the text on it	*/
+	--header-ground-ink--less:	var(--color-text);
+	--header-ground-ink--default:	var(--color-text);
+	--header-ground-ink--more:	var(--color-section-dark-text);
+
+	/*	The title role, which the icon of the menu is drawn in	*/
+	--header-ground-title--less:	var(--color-title);
+	--header-ground-title--default:	var(--color-title);
+	--header-ground-title--more:	var(--color-section-dark-text);
+
+	/*	The accent role: the link that is current	*/
+	--header-ground-accent--less:	var(--color-accent);
+	--header-ground-accent--default:	var(--color-accent);
+	--header-ground-accent--more:	var(--color-accent-dark);
+
+	/*	The ring of the focus	*/
+	--header-ground-focus--less:	var(--color-focus);
+	--header-ground-focus--default:	var(--color-focus);
+	--header-ground-focus--more:	var(--color-focus-dark);
+
+	/*	The line under it	*/
+	--header-ground-border--less:	var(--color-border);
+	--header-ground-border--default:	var(--color-border);
+	--header-ground-border--more:	var(--color-border-dark);
 }
 
 .nino-frame-header {
 	border-bottom: 1px solid var(--color-border);
+	--color-title: var(--header-ground-title);
+	--color-accent: var(--header-ground-accent);
+	--color-focus: var(--header-ground-focus);
+	--color-border: var(--header-ground-border);
+}
+
+.nino-frame-header .nino-grid-row {
+	padding-right: calc( var(--grid-gutter) * var(--header-space) );
+	padding-left: calc( var(--grid-gutter) * var(--header-space) );
 }
 
 .nino-frame-header .nino-scroll-header {
 	min-height: var(--header-height);
 	opacity: 1;
-	background-color: var(--color-background);
+	color: var(--header-ground-ink);
+	background-color: var(--header-ground);
 	display:flex;
 }
 
 body.nino-scroll-atf .nino-frame-header .nino-scroll-header {
-	background-color: var(--color-background);
+	background-color: var(--header-ground);
 }
 
 .nino-frame-header .nino-logo {
@@ -693,6 +767,10 @@ body.nino-scroll-atf .nino-frame-header .nino-scroll-header {
 	fill: var(--color-title);
 }
 
+.nino-frame-header .nino-nav-burger > button[aria-expanded="true"] > svg {
+	fill: var(--color-title-default);
+}
+
 
 body main {
 	padding-top: var(--header-height);
@@ -708,9 +786,13 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 @media (min-width: 768px) {
 	.nino-frame-header .nino-nav-content li a {
 		position: relative;
-		padding: var(--space-1);
-		font-size: var(--fontsize-btn);
+		padding: calc( var(--space-1) * var(--header-space) );
+		font-size: calc( var(--fontsize-btn) * var(--header-nav) );
 		letter-spacing: .04em;
+	}
+
+	.nino-frame-header .nino-nav-content ul {
+		gap: calc( var(--space-2) * var(--header-space) );
 	}
 
 	.nino-frame-header .nino-nav-content li a::after {
@@ -741,22 +823,110 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 }
 
 
-/* ==== 8. footer: one-legal-row ==== */
+/* ==== 8. footer: one-legal-row (scale default, height default, space default, ground default) ==== */
 /*	@name				One legal row
  *	@description	Copyright, the footer navigation and the legal links on a single row. The smallest footer there is.
  *	@description-de	Copyright, die Footer-Navigation und die rechtlichen Links in einer einzigen Zeile. Der kleinste Footer, den es gibt.
  *
+ *	@knob	scale		Type size of the footer
+ *	@knob	height		Space above and below the content of the footer
+ *	@knob	space		Space between its columns, lines and links
+ *	@knob	ground		What the footer stands on
+ *
  *	The name and the description are what the Design panel lists this
  *	variant as. Every library file carries them; a file without a @name
  *	is offered under its own file name instead.
+ *
+ *	The four knobs are ladders, declared below, the middle of each this set as it
+ *	was before it had any: scale is a factor on the type size of the footer, height
+ *	a factor on the room above and below its content, space a factor on the gaps
+ *	between its columns, lines and links, and ground a choice of three: the ground
+ *	and the ink of the page, this set's own, and the dark pair of the palette. What
+ *	the text, the links and the lines of the footer are read in comes with it, as
+ *	aspects of the ground (--footer-ground-ink, -subtitle, -title, -accent, -focus
+ *	and -border), and is put on the footer as the roles Nino.css reads - so the
+ *	footer is legible on each of the three.
  */
+
+:root {
+	/*	The type size of the footer, as a factor of the one it has: .8em of the text round it, and the sizes this set gives its parts	*/
+	--footer-scale--least:	.85;
+	--footer-scale--less:	.92;
+	--footer-scale--default:	1;
+	--footer-scale--more:	1.1;
+	--footer-scale--most:	1.2;
+
+	/*	The room above and below the content, as a factor of what this set has	*/
+	--footer-height--least:	.5;
+	--footer-height--less:	.75;
+	--footer-height--default:	1;
+	--footer-height--more:	1.5;
+	--footer-height--most:	2;
+
+	/*	The gaps between its columns, lines and links, as a factor of what this set has	*/
+	--footer-space--least:	.5;
+	--footer-space--less:	.75;
+	--footer-space--default:	1;
+	--footer-space--more:	1.5;
+	--footer-space--most:	2;
+
+	/*	What the footer stands on: the ground of the page, this set's own - the pair the palette has for the legal band -, the dark pair of the palette	*/
+	--footer-ground--less:	var(--color-background);
+	--footer-ground--default:	var(--color-footer-bg-legal);
+	--footer-ground--more:	var(--color-section-dark-bg);
+
+	/*	The ink of the text on it	*/
+	--footer-ground-ink--less:	var(--color-text);
+	--footer-ground-ink--default:	var(--color-footer-text-legal);
+	--footer-ground-ink--more:	var(--color-section-dark-text);
+
+	/*	The subtitle role	*/
+	--footer-ground-subtitle--less:	var(--color-subtitle);
+	--footer-ground-subtitle--default:	var(--color-subtitle);
+	--footer-ground-subtitle--more:	var(--color-section-dark-text);
+
+	/*	The title role	*/
+	--footer-ground-title--less:	var(--color-title);
+	--footer-ground-title--default:	var(--color-title);
+	--footer-ground-title--more:	var(--color-section-dark-text);
+
+	/*	The accent role	*/
+	--footer-ground-accent--less:	var(--color-accent);
+	--footer-ground-accent--default:	var(--color-accent);
+	--footer-ground-accent--more:	var(--color-accent-dark);
+
+	/*	The ring of the focus	*/
+	--footer-ground-focus--less:	var(--color-focus);
+	--footer-ground-focus--default:	var(--color-focus);
+	--footer-ground-focus--more:	var(--color-focus-dark);
+
+	/*	The lines in it	*/
+	--footer-ground-border--less:	var(--color-border);
+	--footer-ground-border--default:	var(--color-border);
+	--footer-ground-border--more:	var(--color-border-dark);
+}
+
+footer {
+	font-size: calc( .8em * var(--footer-scale) );
+	--color-subtitle: var(--footer-ground-subtitle);
+	--color-title: var(--footer-ground-title);
+	--color-accent: var(--footer-ground-accent);
+	--color-focus: var(--footer-ground-focus);
+	--color-border: var(--footer-ground-border);
+}
+
+.nino-footer-legal {
+	padding: calc( var(--space-1) * var(--footer-height) ) calc( var(--space-3) * var(--footer-space) );
+	background: var(--footer-ground);
+	color: var(--footer-ground-ink);
+}
 
 .nino-footer-nav .nino-footer-title {
 	display:none;
 }
 .nino-footer-nav {
 	display:flex;
-	gap:var(--space-3);
+	gap: calc( var(--space-3) * var(--footer-space) );
 	align-items: center;
 }
 .nino-footer-copyright {
@@ -765,24 +935,20 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 }
 
 
-/* ==== 9. content: regular (hero-title default, hero-text default, quiet default, loud default, section-title default, section-subtitle default, section-space default, section-line default, card-title default, card-subtitle default, card-space default, border default, shadow default) ==== */
+/* ==== 9. section: regular (hero-title default, hero-text default, quiet default, loud default, title default, subtitle default, space default, rule default, dim default) ==== */
 /*	@name			Regular
- *	@description	The framework as it is: the middle of every ladder. Hero, sections and cards as Nino.css draws them.
- *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Hero, Sektionen und Karten, wie Nino.css sie zeichnet.
+ *	@description	The framework as it is: the middle of every ladder. The hero, the sections, their titles and the covers as Nino.css draws them.
+ *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Hero, Sektionen, ihre Titel und die Cover, wie Nino.css sie zeichnet.
  *
  *	@knob	hero-title			Size of the title of a hero
  *	@knob	hero-text			Size of the text of a hero
  *	@knob	quiet				Size of a quiet title, subtitle and text
  *	@knob	loud				Size of a loud title, subtitle and text
- *	@knob	section-title		Size of the title of a section
- *	@knob	section-subtitle	Size of the subtitle of a section
- *	@knob	section-space		Space above and below the content of a section
- *	@knob	section-line		Rule under the title of a section
- *	@knob	card-title			Size of the title of a card
- *	@knob	card-subtitle		Size of the subtitle of a card
- *	@knob	card-space			Space inside a card and between its parts
- *	@knob	border				Line round a card that has a ground
- *	@knob	shadow				Shadow of a card
+ *	@knob	title				Size of the title of a section
+ *	@knob	subtitle			Size of the subtitle of a section
+ *	@knob	space				Space above and below the content of a section
+ *	@knob	rule				Rule under the title of a section
+ *	@knob	dim					How dark the scrim of a dimmed cover is
  *
  *	Regular is the starting point, not a design. Every value it declares is the
  *	framework's own, so a page under it looks as it does under Nino.css alone -
@@ -794,8 +960,10 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
  *	Two rules for a set:
  *
  *	  - Only the classes of this template: the hero, the section, the column
- *	    on a ground and the card. A set of buttons does not touch a section
- *	    title, however tempting.
+ *	    on a ground and the cover. A set of buttons does not touch a section
+ *	    title, however tempting, and a section set does not touch a card -
+ *	    where it has to read a value of the card family it reads it by its
+ *	    token, and says so in its opening comment.
  *	  - Colours through the roles, never as literals: var(--color-title),
  *	    var(--color-primary), var(--color-section-tint-bg). A ground is a
  *	    class of Nino.css (nino-section--alt, nino-grid--counter ...) that
@@ -803,13 +971,17 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
  *	    one, and never compares one ground with another.
  *
  *	A value a knob should reach declares its five steps instead of one
- *	value, named after the tab and the knob (--content-section-space--least,
+ *	value, named after the part and the knob (--section-space--least,
  *	--less, --default, --more, --most), and the rule reads the knob
- *	(var(--content-section-space)). The knobs of Nino.css itself - the factors
- *	of the hero, of a section's and a card's title and subtitle and of the
- *	variants, the rule under a section title, the shadow of a card - need no
- *	rule: the set only points them at the ladder. Copy this file under a name of
- *	your own and start there.
+ *	(var(--section-space)). The knobs of Nino.css itself - the factors
+ *	of the hero, of a section's title and subtitle and of the variants, the
+ *	rule under a section title - need no rule: the set only points them at
+ *	the ladder. The scrim of a dimmed cover is the one thing that does: its
+ *	rule reads the ladder of the dimming, on the two pseudo-elements Nino.css
+ *	draws it with and on the block of a picture behind a section, a row and
+ *	a column, which carry one of their own. The card family has the same four
+ *	names (Regular, Open, Panel, Box) and a theme names a sensible pair.
+ *	Copy this file under a name of your own and start there.
  */
 
 :root {
@@ -817,149 +989,112 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 		subtitle role by, in a hero: 1.4 and 1.2, from 768px 1.45 and 10 / 9.
 		A step is the ratio 1.25 to either side of the middle, twice: times .64,
 		.8, 1, 1.25 and 1.5625	*/
-	--content-hero-title--least: 		.896;
-	--content-hero-title--less: 		1.12;
-	--content-hero-title--default: 	1.4;
-	--content-hero-title--more: 		1.75;
-	--content-hero-title--most: 		2.1875;
+	--section-hero-title--least: 		.896;
+	--section-hero-title--less: 		1.12;
+	--section-hero-title--default: 	1.4;
+	--section-hero-title--more: 		1.75;
+	--section-hero-title--most: 		2.1875;
 
-	--content-hero-text--least: 		.768;
-	--content-hero-text--less: 			.96;
-	--content-hero-text--default: 	1.2;
-	--content-hero-text--more: 			1.5;
-	--content-hero-text--most: 			1.875;
+	--section-hero-text--least: 		.768;
+	--section-hero-text--less: 			.96;
+	--section-hero-text--default: 	1.2;
+	--section-hero-text--more: 			1.5;
+	--section-hero-text--most: 			1.875;
 
 	/*	How much smaller a --quiet variant is than the class it varies, and how
 		much larger a --loud one: .85 and 1.2. The quiet ones stay under 1 and
 		the loud ones over it, whatever the position	*/
-	--content-quiet--least: 				.6;
-	--content-quiet--less: 					.75;
-	--content-quiet--default: 			.85;
-	--content-quiet--more: 					.92;
-	--content-quiet--most: 					.97;
+	--section-quiet--least: 				.6;
+	--section-quiet--less: 					.75;
+	--section-quiet--default: 			.85;
+	--section-quiet--more: 					.92;
+	--section-quiet--most: 					.97;
 
-	--content-loud--least: 					1.05;
-	--content-loud--less: 					1.1;
-	--content-loud--default: 				1.2;
-	--content-loud--more: 					1.35;
-	--content-loud--most: 					1.6;
+	--section-loud--least: 					1.05;
+	--section-loud--less: 					1.1;
+	--section-loud--default: 				1.2;
+	--section-loud--more: 					1.35;
+	--section-loud--most: 					1.6;
 
 	/*	The factors Nino.css multiplies the size of the title role by in a section
 		title, and the size of the subtitle role by in a section subtitle: 1 and 1.
 		The steps run from .8 to 1.3 for a title and from .85 to 1.2 for a subtitle,
 		each a tenth or so of the size from the next	*/
-	--content-section-title--least: 	.8;
-	--content-section-title--less: 		.9;
-	--content-section-title--default: 	1;
-	--content-section-title--more: 		1.15;
-	--content-section-title--most: 		1.3;
+	--section-title--least: 	.8;
+	--section-title--less: 		.9;
+	--section-title--default: 	1;
+	--section-title--more: 		1.15;
+	--section-title--most: 		1.3;
 
-	--content-section-subtitle--least: 		.85;
-	--content-section-subtitle--less: 		.92;
-	--content-section-subtitle--default: 	1;
-	--content-section-subtitle--more: 		1.1;
-	--content-section-subtitle--most: 		1.2;
+	--section-subtitle--least: 		.85;
+	--section-subtitle--less: 		.92;
+	--section-subtitle--default: 	1;
+	--section-subtitle--more: 		1.1;
+	--section-subtitle--most: 		1.2;
 
 	/*	The space above and below what is in a section: --space-4, and --space-5
 		from 768px. Two steps of the scale to either side	*/
-	--content-section-space--least: 	var(--space-2);
-	--content-section-space--less: 		var(--space-3);
-	--content-section-space--default: var(--space-4);
-	--content-section-space--more: 		var(--space-5);
-	--content-section-space--most: 		var(--space-6);
+	--section-space--least: 	var(--space-2);
+	--section-space--less: 		var(--space-3);
+	--section-space--default: var(--space-4);
+	--section-space--more: 		var(--space-5);
+	--section-space--most: 		var(--space-6);
 
 	/*	The rule under the title of a section: none, as Nino.css has it, up to the
 		middle, then a hairline and twice that. Nino.css leaves six times its
 		thickness of air between the title and it	*/
-	--content-section-line--least: 		0px;
-	--content-section-line--less: 		0px;
-	--content-section-line--default: 	0px;
-	--content-section-line--more: 		1px;
-	--content-section-line--most: 		2px;
+	--section-rule--least: 		0px;
+	--section-rule--less: 		0px;
+	--section-rule--default: 	0px;
+	--section-rule--more: 		1px;
+	--section-rule--most: 		2px;
 
-	/*	The factors Nino.css multiplies the size of the title role by in a card
-		title, 5 / 6 and from 768px 25 / 32, and the size of the subtitle role by in
-		a card subtitle, 1. The steps are a section's, taken times the number
-		Nino.css has for the title, so that the middle is the card as it is	*/
-	--content-card-title--least: 	calc(.8 * 5 / 6);
-	--content-card-title--less: 	calc(.9 * 5 / 6);
-	--content-card-title--default: 	calc(5 / 6);
-	--content-card-title--more: 	calc(1.15 * 5 / 6);
-	--content-card-title--most: 	calc(1.3 * 5 / 6);
-
-	--content-card-subtitle--least: 	.85;
-	--content-card-subtitle--less: 		.92;
-	--content-card-subtitle--default: 	1;
-	--content-card-subtitle--more: 		1.1;
-	--content-card-subtitle--most: 		1.2;
-
-	/*	Twice the padding of a card's content, and the space under its title,
-		subtitle and description. The picture above them has half of it. The
-		scale ends below --space-1, so the least is half of that	*/
-	--content-card-space--least: 		calc( var(--space-1) * .5 );
-	--content-card-space--less: 		var(--space-1);
-	--content-card-space--default: var(--space-2);
-	--content-card-space--more: 		var(--space-3);
-	--content-card-space--most: 		var(--space-4);
-
-	/*	The line round a card that names a ground - a plain card has none. The
-		half pixel is a hairline where the screen can draw one, and a line of
-		1px where it cannot	*/
-	--content-border--least: 					0px;
-	--content-border--less: 					.5px;
-	--content-border--default: 				1px;
-	--content-border--more: 					2px;
-	--content-border--most: 					3px;
-
-	/*	A card casts none until a design layer gives it one: none up to the middle,
-		then the shadow of a card that is lifted, and one that is lifted high	*/
-	--content-shadow--least: 					none;
-	--content-shadow--less: 					none;
-	--content-shadow--default: 				none;
-	--content-shadow--more: 					0 .125rem .75rem var(--nino-default-shadow);
-	--content-shadow--most: 					0 .25rem 1.5rem var(--nino-default-shadow), 0 .0625rem .25rem var(--nino-default-shadow);
+	/*	The scrim over a dimmed cover, a dimmed parallax and the picture of a dimmed
+		section, row or column. The middle is the one the palette solves for it
+		(--color-background-dim): the lightest scrim that still carries the ink on
+		the lightest picture there could be. The two steps under it let more of the
+		picture through - the scrim at three quarters and at half of its strength,
+		for a picture that is dark already - and the ink on them is no longer
+		held to that; the two over it deepen it toward the black of the palette, by
+		a quarter and by a half	*/
+	--section-dim--least: 		color-mix( in srgb, var(--color-background-dim) 50%, transparent );
+	--section-dim--less: 		color-mix( in srgb, var(--color-background-dim) 75%, transparent );
+	--section-dim--default: 	var(--color-background-dim);
+	--section-dim--more: 		color-mix( in srgb, var(--color-background-dim) 75%, var(--color-section-black-bg) );
+	--section-dim--most: 		color-mix( in srgb, var(--color-background-dim) 50%, var(--color-section-black-bg) );
 }
 
 @media (min-width: 768px) {
 	:root {
-		--content-hero-title--least: 		.928;
-		--content-hero-title--less: 		1.16;
-		--content-hero-title--default: 	1.45;
-		--content-hero-title--more: 		1.8125;
-		--content-hero-title--most: 		2.2656;
+		--section-hero-title--least: 		.928;
+		--section-hero-title--less: 		1.16;
+		--section-hero-title--default: 	1.45;
+		--section-hero-title--more: 		1.8125;
+		--section-hero-title--most: 		2.2656;
 
-		--content-hero-text--least: 		calc(.64 * 10 / 9);
-		--content-hero-text--less: 			calc(.8 * 10 / 9);
-		--content-hero-text--default: 	calc(10 / 9);
-		--content-hero-text--more: 			calc(1.25 * 10 / 9);
-		--content-hero-text--most: 			calc(1.5625 * 10 / 9);
+		--section-hero-text--least: 		calc(.64 * 10 / 9);
+		--section-hero-text--less: 			calc(.8 * 10 / 9);
+		--section-hero-text--default: 	calc(10 / 9);
+		--section-hero-text--more: 			calc(1.25 * 10 / 9);
+		--section-hero-text--most: 			calc(1.5625 * 10 / 9);
 
-		--content-section-space--least: 	var(--space-3);
-		--content-section-space--less: 		var(--space-4);
-		--content-section-space--default: var(--space-5);
-		--content-section-space--more: 		var(--space-6);
-		--content-section-space--most: 		calc( var(--space-6) * 1.25 );
-
-		--content-card-title--least: 	calc(.8 * 25 / 32);
-		--content-card-title--less: 	calc(.9 * 25 / 32);
-		--content-card-title--default: 	calc(25 / 32);
-		--content-card-title--more: 	calc(1.15 * 25 / 32);
-		--content-card-title--most: 	calc(1.3 * 25 / 32);
+		--section-space--least: 	var(--space-3);
+		--section-space--less: 		var(--space-4);
+		--section-space--default: var(--space-5);
+		--section-space--more: 		var(--space-6);
+		--section-space--most: 		calc( var(--space-6) * 1.25 );
 	}
 }
 
-/*	The eight numbers, the line and the shadow Nino.css reads by name	*/
+/*	The six numbers and the rule Nino.css reads by name	*/
 :root {
-	--hero-title-scale: var(--content-hero-title);
-	--hero-text-scale: var(--content-hero-text);
-	--section-title-scale: var(--content-section-title);
-	--section-subtitle-scale: var(--content-section-subtitle);
-	--card-title-scale: var(--content-card-title);
-	--card-subtitle-scale: var(--content-card-subtitle);
-	--section-line: var(--content-section-line);
-	--scale-quiet: var(--content-quiet);
-	--scale-loud: var(--content-loud);
-	--shadow-card: var(--content-shadow);
+	--hero-title-scale: var(--section-hero-title);
+	--hero-text-scale: var(--section-hero-text);
+	--section-title-scale: var(--section-title);
+	--section-subtitle-scale: var(--section-subtitle);
+	--section-line: var(--section-rule);
+	--scale-quiet: var(--section-quiet);
+	--scale-loud: var(--section-loud);
 }
 
 /*	The space of a section, unless the section says its own: the spacing
@@ -969,33 +1104,201 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 	What a set spaces it spaces times the whitespace of the page, as Nino.css
 	does - --whitespace-scale for an area, --whitespace-text for the room under
 	a text, and 1 where the framework says none - since a rule that came after
-	Nino.css and said the space without the factor would stop the position of
-	the Global tab at the set	*/
+	Nino.css and said the space without the factor would stop the whitespace
+	of the page at the set	*/
 .nino-section:where(:not([class*="nino-pt-"], [class*="nino-p-"])) {
-	padding-top: calc( var(--content-section-space) * var(--whitespace-scale, 1) );
+	padding-top: calc( var(--section-space) * var(--whitespace-scale, 1) );
 }
 .nino-section:where(:not([class*="nino-pb-"], [class*="nino-p-"])) {
-	padding-bottom: calc( var(--content-section-space) * var(--whitespace-scale, 1) );
+	padding-bottom: calc( var(--section-space) * var(--whitespace-scale, 1) );
+}
+
+/*	The scrim, as the ladder of the dimming says it. What Nino.css draws it with:
+	the ::before of a dimmed cover and of a dimmed parallax, and for a section, a
+	row and a column that have a picture behind them - and so no cover to draw one
+	with - the ::after of the block of the picture. A card draws one of its own and
+	is the card family's, the picture of the image component is the component's	*/
+.nino-parallex--dim::before,
+.nino-cover--dim::before,
+.nino-section--dim > .nino-section-bg::after,
+.nino-grid-row--dim > .nino-grid-row-bg::after,
+.nino-grid--dim > .nino-grid-bg::after {
+	background-color: var(--section-dim);
+}
+
+
+/* ==== 10. card: regular (title default, subtitle default, space default, border default, shadow default, tone default, hover default) ==== */
+/*	@name			Regular
+ *	@description	The framework as it is: the middle of every ladder. Cards as Nino.css draws them.
+ *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Karten, wie Nino.css sie zeichnet.
+ *
+ *	@knob	title		Size of the title of a card
+ *	@knob	subtitle	Size of the subtitle of a card
+ *	@knob	space		Space inside a card and between its parts
+ *	@knob	border		Line round a card that has a ground
+ *	@knob	shadow		Shadow of a card
+ *	@knob	tone		Colour the shadow is drawn in
+ *	@knob	hover		What a card does under the pointer
+ *
+ *	Regular is the starting point, not a design. Every value it declares is the
+ *	framework's own, so a page under it looks as it does under Nino.css alone -
+ *	and every one of them is a ladder, so each knob has something to reach: the
+ *	five values of a scale, the middle of them Nino.css and the others two steps
+ *	to each side, or the three of a choice. Where Nino.css changes a number at
+ *	768px the ladder does the same, in a media query of its own.
+ *
+ *	Two rules for a set:
+ *
+ *	  - Only the classes of this template: the card and its parts. A set of
+ *	    buttons does not touch a card title, however tempting, and a card set
+ *	    does not touch a section - where it has to read a value of the section
+ *	    family it reads it by its token, and says so in its opening comment.
+ *	  - Colours through the roles, never as literals: var(--color-title),
+ *	    var(--color-primary), var(--color-section-tint-bg). A ground is a
+ *	    class of Nino.css (nino-card--alt, nino-card--counter ...) that sets
+ *	    the pair and the roles solved against it; a set never paints one, and
+ *	    never compares one ground with another.
+ *
+ *	A value a knob should reach declares its steps instead of one value,
+ *	named after the part and the knob (--card-space--least, --less,
+ *	--default, --more, --most), and the rule reads the knob (var(--card-space)).
+ *	The knobs of Nino.css itself - the factors of a card's title and subtitle,
+ *	the shadow of a card - need no rule: the set only points them at the
+ *	ladder. A knob that is more than one value declares one more ladder for
+ *	each, named after the knob and an aspect of it (--card-hover-shadow--less
+ *	...), as long as the knob's own: the hover is a movement and a shadow, and
+ *	they move together. A choice is declared under less, default and more.
+ *
+ *	The tone is the colour of the shadow - the page's ink thinned, the palette's
+ *	own shadow colour, which is the middle, or the brand colour thinned - and the
+ *	ladder of the shadow reads it where it names a colour. The hover is for the
+ *	card the pointer can mean as a whole: a card that is a link (.nino-card--linked),
+ *	of which Nino.css stretches the link of its title over the whole card. A card
+ *	whose title alone is a link is not stretched, the pointer means its title, and
+ *	it does not move. This set does nothing under the pointer by itself, so the
+ *	middle is as little as the first position; the third lifts the card by a
+ *	quarter of a rem with the strongest step of the shadow, and only where the
+ *	visitor has not asked for less motion. The section family has the same four
+ *	names (Regular, Open, Panel, Box) and a theme names a sensible pair.
+ *	Copy this file under a name of your own and start there.
+ */
+
+:root {
+	/*	The factors Nino.css multiplies the size of the title role by in a card
+		title, 5 / 6 and from 768px 25 / 32, and the size of the subtitle role by in
+		a card subtitle, 1. The steps are a section's, taken times the number
+		Nino.css has for the title, so that the middle is the card as it is	*/
+	--card-title--least: 	calc(.8 * 5 / 6);
+	--card-title--less: 	calc(.9 * 5 / 6);
+	--card-title--default: 	calc(5 / 6);
+	--card-title--more: 	calc(1.15 * 5 / 6);
+	--card-title--most: 	calc(1.3 * 5 / 6);
+
+	--card-subtitle--least: 	.85;
+	--card-subtitle--less: 		.92;
+	--card-subtitle--default: 	1;
+	--card-subtitle--more: 		1.1;
+	--card-subtitle--most: 		1.2;
+
+	/*	Twice the padding of a card's content, and the space under its title,
+		subtitle and description. The picture above them has half of it. The
+		scale ends below --space-1, so the least is half of that	*/
+	--card-space--least: 		calc( var(--space-1) * .5 );
+	--card-space--less: 		var(--space-1);
+	--card-space--default: var(--space-2);
+	--card-space--more: 		var(--space-3);
+	--card-space--most: 		var(--space-4);
+
+	/*	The line round a card that names a ground - a plain card has none. The
+		half pixel is a hairline where the screen can draw one, and a line of
+		1px where it cannot	*/
+	--card-border--least: 					0px;
+	--card-border--less: 					.5px;
+	--card-border--default: 				1px;
+	--card-border--more: 					2px;
+	--card-border--most: 					3px;
+
+	/*	A card casts none until a design layer gives it one: none up to the middle,
+		then the shadow of a card that is lifted, and one that is lifted high - in
+		the colour of the tone	*/
+	--card-shadow--least: 					none;
+	--card-shadow--less: 					none;
+	--card-shadow--default: 				none;
+	--card-shadow--more: 					0 .125rem .75rem var(--card-tone);
+	--card-shadow--most: 					0 .25rem 1.5rem var(--card-tone), 0 .0625rem .25rem var(--card-tone);
+
+	/*	The colour a shadow is drawn in: the ink of the page, thinned to the strength
+		the palette's shadow has, the palette's own shadow colour, and the brand colour
+		as it was picked, thinned - a shadow that is a tone of the page, as it is, or a
+		tone of the brand	*/
+	--card-tone--less: 			color-mix( in srgb, var(--color-text) 12%, transparent );
+	--card-tone--default: 	var(--nino-default-shadow);
+	--card-tone--more: 			color-mix( in srgb, var(--color-secondary) 30%, transparent );
+
+	/*	What a card does under the pointer: nothing, as the framework has it - and as
+		this set has it, so the middle is the first position -, and lifted: a rise of a
+		quarter of a rem (the translate, which lies beside the transform of an animation
+		and not over it) and the strongest step of the shadow. The shadow of the first
+		two positions is the card's own at rest, so that nothing changes under the pointer	*/
+	--card-hover--less: 			none;
+	--card-hover--default: 		none;
+	--card-hover--more: 			0 -.25rem;
+
+	--card-hover-shadow--less: 			var(--shadow-card);
+	--card-hover-shadow--default: 	var(--shadow-card);
+	--card-hover-shadow--more: 			0 .25rem 1.5rem var(--card-tone), 0 .0625rem .25rem var(--card-tone);
+}
+
+@media (min-width: 768px) {
+	:root {
+		--card-title--least: 	calc(.8 * 25 / 32);
+		--card-title--less: 	calc(.9 * 25 / 32);
+		--card-title--default: 	calc(25 / 32);
+		--card-title--more: 	calc(1.15 * 25 / 32);
+		--card-title--most: 	calc(1.3 * 25 / 32);
+	}
+}
+
+/*	The two numbers and the shadow Nino.css reads by name	*/
+:root {
+	--card-title-scale: var(--card-title);
+	--card-subtitle-scale: var(--card-subtitle);
+	--shadow-card: var(--card-shadow);
 }
 
 .nino-card-content:where(:not([class*="nino-pt-"], [class*="nino-pb-"], [class*="nino-p-"])) {
-	padding: calc( var(--content-card-space) / 2 * var(--whitespace-scale, 1) ) calc( var(--content-card-space) * var(--whitespace-scale, 1) );
+	padding: calc( var(--card-space) / 2 * var(--whitespace-scale, 1) ) calc( var(--card-space) * var(--whitespace-scale, 1) );
 }
 .nino-card-title:where(:not([class*="nino-mb-"], [class*="nino-m-"])),
 .nino-card-subtitle:where(:not([class*="nino-mb-"], [class*="nino-m-"])),
 .nino-card-descr:where(:not([class*="nino-mb-"], [class*="nino-m-"])) {
-	margin-bottom: calc( var(--content-card-space) * var(--whitespace-text, 1) );
+	margin-bottom: calc( var(--card-space) * var(--whitespace-text, 1) );
 }
 .nino-card-img:where(:not([class*="nino-mb-"], [class*="nino-m-"])) {
-	margin-bottom: calc( var(--content-card-space) / 2 * var(--whitespace-text, 1) );
+	margin-bottom: calc( var(--card-space) / 2 * var(--whitespace-text, 1) );
 }
 
 .nino-card--alt, .nino-card--tint, .nino-card--dark, .nino-card--black, .nino-card--primary, .nino-card--brand-alt, .nino-card--counter, .nino-card--dim {
-	border-width: var(--content-border);
+	border-width: var(--card-border);
+}
+
+/*	The hover, as the ladder says it. Only where the visitor has not asked for less
+	motion: a card that moves is motion. The transition is the hover's own, so that
+	it does not take the one a viewport animation has on the card away - the card
+	comes back at once, as it was before the animation could matter. A borderless
+	card has no shadow to lift	*/
+@media (prefers-reduced-motion: no-preference) {
+	.nino-card--linked:hover {
+		translate: var(--card-hover);
+		transition: translate .2s ease, box-shadow .2s ease;
+	}
+	.nino-card--linked:where(:not(.nino-card--borderless)):hover {
+		box-shadow: var(--card-hover-shadow);
+	}
 }
 
 
-/* ==== 10. buttons: regular (size default, spread default, space default, corners default) ==== */
+/* ==== 11. buttons: regular (size default, spread default, space default, corners default, hover default) ==== */
 /*	@name			Regular
  *	@description	The framework as it is: the middle of every ladder. Every .nino-btn variant and the link that looks like one.
  *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Jede .nino-btn-Variante und der Link, der wie eine aussieht.
@@ -1004,26 +1307,40 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
  *	@knob	spread		How far a small and a big button stand from it
  *	@knob	space		Space around the label
  *	@knob	corners		Corner radius
+ *	@knob	hover		What a button does under the pointer
  *
  *	Regular is the starting point, not a design. Every value it declares is the
  *	framework's own, so a button under it looks as it does under Nino.css
- *	alone, and every one of them is a ladder of five, so each knob has
- *	something to reach: the middle of a ladder is Nino.css, the others are
- *	two steps to each side.
+ *	alone, and every one of them is a ladder, so each knob has something to
+ *	reach: the five values of a scale, the middle of them Nino.css and the
+ *	others two steps to each side, or the three of a choice.
  *
  *	Two rules for a set:
  *
  *	  - Only the classes of this template: the button and its variants. A
  *	    button set does not touch a section title, however tempting.
  *	  - Colours through the roles, never as literals. Nor the font: the face,
- *	    the weight and the case of a button are the button role of the Fonts
+ *	    the weight and the case of a button are the button role of the type
  *	    tab (--font-button-*), and a set that wrote its own would contradict
  *	    the panel.
  *
  *	The size is what the padding, the type and the radius of a button are
  *	multiplied by. The variants are that size times a number, in Nino.css as
  *	here: a small button is the size times 1 less the spread, a big one the
- *	size times 1 plus it. Copy this file under a name of your own and start there.
+ *	size times 1 plus it.
+ *
+ *	The hover is a choice of three: nothing, which is the button as Nino.css
+ *	has it and also what this set does by itself, so the middle is the first
+ *	position; and lifted, a rise of one pixel with a shadow under it, for the
+ *	button a pointer rests on - and only where the visitor has not asked for
+ *	less motion. Nino.css answers the pointer itself, with the ground of the
+ *	outline and of the dark button and the dimming of the two brand buttons,
+ *	and that stays at every position, as does the focus: a button the keyboard
+ *	has does not rise and keeps its ring. A button that is off does not rise,
+ *	and the outline, which has no ground to cast a shadow from, rises without
+ *	one.
+ *
+ *	Copy this file under a name of your own and start there.
  */
 
 :root {
@@ -1056,6 +1373,20 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 	--buttons-corners--default: var(--radius);
 	--buttons-corners--more: 		var(--radius-large);
 	--buttons-corners--most: 		999rem;
+
+	/*	What a button does under the pointer: nothing, as Nino.css has it - and as this
+		set has it, so the middle is the first position -, or lifted: a rise of one pixel
+		(the translate, which lies beside the transform of an animation and does not
+		replace it) with the shadow of a button that stands over the page. The shadow is
+		a second ladder of the knob, as long as its own; the first two positions name the
+		shadow the button has at rest, so that nothing changes under the pointer	*/
+	--buttons-hover--less: 		none;
+	--buttons-hover--default: 	none;
+	--buttons-hover--more: 		0 -1px;
+
+	--buttons-hover-shadow--less: 		none;
+	--buttons-hover-shadow--default: 	none;
+	--buttons-hover-shadow--more: 		0 .25rem .5rem var(--nino-default-shadow);
 }
 
 /*	Not where the button names a padding of its own: the spacing classes of
@@ -1082,301 +1413,311 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 	border-radius: calc( var(--buttons-corners) * var(--buttons-size) * ( 1 + var(--buttons-spread) ) );
 }
 
+/*	The hover, as the ladder says it. Only where the visitor has not asked for less
+	motion, and not for a button that is off or that the keyboard has: the ring of the
+	focus is the framework's and is never covered. The transition is the hover's own -
+	the framework's, which it replaces while the pointer is on the button, with the
+	rise and the shadow added - so that the ones a viewport animation or the button's
+	variants have on it at rest are not taken from it. The outline casts no shadow	*/
+@media (prefers-reduced-motion: no-preference) {
+	.nino-btn:where(:not(:focus-visible, :disabled, [aria-disabled="true"])):hover {
+		translate: var(--buttons-hover);
+		transition: background-color .2s ease, color .2s ease, border-color .2s ease, opacity .3s, translate .2s ease, box-shadow .2s ease;
+	}
+	.nino-btn:where(:not(.nino-btn--outline, :focus-visible, :disabled, [aria-disabled="true"])):hover {
+		box-shadow: var(--buttons-hover-shadow);
+	}
+}
 
-/* ==== 11. components: regular (scale default, space default, corners default, border default, zebra default, labels default) ==== */
+
+/* ==== 12. lists: regular (scale default, space default, marker default) ==== */
 /*	@name			Regular
- *	@description	The framework as it is: the middle of every ladder. Fields, labels, tables, lists, alerts, badges and the building blocks.
- *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Felder, Beschriftungen, Tabellen, Listen, Alerts, Badges und die Bausteine.
+ *	@description	The framework as it is: the middle of every ladder. Plain lists, lists with a check and numbered lists.
+ *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Einfache Listen, Listen mit Haken und nummerierte Listen.
  *
- *	@knob	scale		Type size of the fields and the tables
- *	@knob	space		Space inside a field, a cell, a block and between them
- *	@knob	corners		Corner radius of a field and of everything boxed
- *	@knob	border		Weight of the lines of a field, a table and a block
- *	@knob	zebra		Stripes of a table that asks for them
- *	@knob	labels		Where the label of a field stands
+ *	@knob	scale		Type size of a list
+ *	@knob	space		Space between the items
+ *	@knob	marker		The mark before an item of a check list and of a numbered list
  *
  *	Regular is the starting point, not a design. Every value it declares is the
- *	framework's own, so a form, a table or a block under it looks as it does
- *	under Nino.css alone - and every one of them is a ladder, so each knob has
- *	something to reach: the five values of a scale, the middle of them Nino.css
- *	and the others two steps to each side, or the three of a choice.
+ *	framework's own, so a list under it looks as it does under Nino.css alone -
+ *	and every one of them is a ladder, so each knob has something to reach: the
+ *	five values of a scale, the middle of them Nino.css and the others two steps
+ *	to each side, or the three of a choice.
  *
  *	Two rules for a set:
  *
- *	  - Only the classes of this template: the field, the table, the list,
- *	    the badge, the alert, the accordion, the pricing table and the
- *	    timeline. A set of buttons does not touch a field, however tempting.
- *	  - Colours through the roles, never as literals. Nor the font: the face,
- *	    the weight and the case of the text are the roles of the Fonts tab.
+ *	  - Only the classes of this template: the list, its items and the marks
+ *	    before them. A set of tables does not touch a list, however tempting.
+ *	  - Colours through the roles, never as literals. Nor the font: the face
+ *	    and the case of the text are the roles of the type tab.
  *
- *	A knob that is more than one value - the stripes of a table are a
- *	background and a colour of text, the place of a label is a layout and a
- *	lift - declares one more ladder for each, named after the knob and an
- *	aspect of it (--components-zebra-ink--less ...), as long as the knob's own.
- *	They move together: the compiler selects every ladder of a knob where it
- *	stands. An aspect at its middle step names the value the property has
- *	anyway, so a rule that reads it changes nothing there. The stripes and the
- *	label are a choice of three, declared under less, default and more; the
- *	rest are scales of five.
+ *	The size of a list is the size of the text round it, times the scale; the
+ *	marks and the room they stand in follow it. The space is the gap between
+ *	two items. A list in columns keeps the gaps Nino.css gives it.
  *
- *	The spacing classes of Nino.css (nino-p-2, nino-mb-3 ...) come last in its
- *	stylesheet so that they win. A rule of a design layer would beat them, so
- *	a box that names a padding or a margin of its own is left alone.
+ *	The marker is a choice of three: plain - the glyph and the number in the
+ *	colour and the weight of the text, with nothing under them -, the middle,
+ *	which is Nino.css (the glyph bold in the success colour, the number bold
+ *	on a disc of the primary colour), and emphasised, with the disc under both,
+ *	in the primary colour and the text solved for it. A mark is more than one
+ *	value - its weight, and for each kind of list the ink and the ground, and
+ *	the size of the disc where the glyph has one -, so the knob declares one
+ *	more ladder for each, named after the knob, the kind and the aspect
+ *	(--lists-marker-check-ink--less ...), as long as the knob's own, which is
+ *	the weight. They move together: the compiler selects every ladder of a
+ *	knob where it stands. A choice is declared under less, default and more.
  *	Copy this file under a name of your own and start there.
  */
 
 :root {
-	/*	The type size of a field is 1rem and of a table is the size of the text
-		around it, times this	*/
-	--components-scale--least: 		.75;
-	--components-scale--less: 		.87;
-	--components-scale--default: 	1;
-	--components-scale--more: 		1.15;
-	--components-scale--most: 		1.32;
+	/*	The type size of a list is the size of the text round it, times this	*/
+	--lists-scale--least: 		.8;
+	--lists-scale--less: 		.9;
+	--lists-scale--default: 	1;
+	--lists-scale--more: 		1.15;
+	--lists-scale--most: 		1.3;
 
-	/*	Half the padding of a cell, the padding of a field and the space under
-		it, and a quarter of the padding of a block. A field's space is finer than
-		a card's, so the steps are fractions of the middle and not steps of the scale	*/
-	--components-space--least: 		calc( var(--space-1) * .4 );
-	--components-space--less: 		calc( var(--space-1) * .7 );
-	--components-space--default: 	var(--space-1);
-	--components-space--more: 		calc( var(--space-1) * 1.5 );
-	--components-space--most: 		calc( var(--space-1) * 2.2 );
+	/*	The gap between two items: --space-1, two steps to each side in fractions of it,
+		since the room between two lines of text is finer than a step of the scale	*/
+	--lists-space--least: 		calc( var(--space-1) * .4 );
+	--lists-space--less: 		calc( var(--space-1) * .7 );
+	--lists-space--default: 	var(--space-1);
+	--lists-space--more: 		calc( var(--space-1) * 1.5 );
+	--lists-space--most: 		calc( var(--space-1) * 2.2 );
 
-	/*	The radius of a field. A badge, an alert and a block are twice it. Nothing
-		between square and .1rem is worth a position, so the sharp end is a plateau
-		- the two least are square	*/
-	--components-corners--least: 	0rem;
-	--components-corners--less: 	0rem;
-	--components-corners--default: 	var(--radius-small);
-	--components-corners--more: 	var(--radius-large);
-	--components-corners--most: 	1rem;
+	/*	The weight of the mark. Plain is the weight of the text, Nino.css has it bold	*/
+	--lists-marker--less: 		normal;
+	--lists-marker--default: 	bold;
+	--lists-marker--more: 		bold;
+
+	/*	The glyph of a check list: its ink, the disc under it and the size of that disc.
+		Nino.css draws the glyph in the success colour with no disc, and a glyph with none
+		is as big as itself, which is what auto says. The emphasised mark is on a disc of
+		the primary colour, in the ink solved for it	*/
+	--lists-marker-check-ink--less: 		currentcolor;
+	--lists-marker-check-ink--default: 		var(--color-success);
+	--lists-marker-check-ink--more: 		var(--color-primary-text);
+
+	--lists-marker-check-ground--less: 		transparent;
+	--lists-marker-check-ground--default: 	transparent;
+	--lists-marker-check-ground--more: 		var(--color-primary);
+
+	--lists-marker-check-box--less: 		auto;
+	--lists-marker-check-box--default: 		auto;
+	--lists-marker-check-box--more: 		1.5em;
+
+	/*	The number of a numbered list: its ink and the disc under it. Nino.css draws it
+		in the ink solved for the primary colour, on a disc of it; plain takes the disc away	*/
+	--lists-marker-number-ink--less: 		currentcolor;
+	--lists-marker-number-ink--default: 	var(--color-primary-text);
+	--lists-marker-number-ink--more: 		var(--color-primary-text);
+
+	--lists-marker-number-ground--less: 	transparent;
+	--lists-marker-number-ground--default: 	var(--color-primary);
+	--lists-marker-number-ground--more: 	var(--color-primary);
+}
+
+/*	The size and the gap. A list in columns keeps its own gaps	*/
+.nino-list {
+	font-size: calc( 1em * var(--lists-scale) );
+}
+.nino-list:not(.nino-list--columns) {
+	gap: var(--lists-space);
+}
+
+/*	The room the marks stand in grows with the type, so that the middle is Nino.css and
+	a list at +2 has marks that are not lost in it	*/
+.nino-list--check li {
+	padding-left: calc( var(--space-3) * var(--lists-scale) );
+}
+.nino-list--check li::before {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: var(--lists-marker-check-box);
+	height: var(--lists-marker-check-box);
+	border-radius: 50%;
+	background-color: var(--lists-marker-check-ground);
+	color: var(--lists-marker-check-ink);
+	font-weight: var(--lists-marker);
+}
+.nino-list--numbered li {
+	min-height: calc( var(--space-3) * var(--lists-scale) );
+	padding-left: calc( var(--space-4) * var(--lists-scale) );
+}
+.nino-list--numbered li::before {
+	width: calc( var(--space-3) * var(--lists-scale) );
+	height: calc( var(--space-3) * var(--lists-scale) );
+	background-color: var(--lists-marker-number-ground);
+	color: var(--lists-marker-number-ink);
+	font-weight: var(--lists-marker);
+}
+
+
+/* ==== 13. tables: regular (scale default, space default, border default, zebra default, stripes default) ==== */
+/*	@name			Regular
+ *	@description	The framework as it is: the middle of every ladder. Tables, their cells, their lines and the stripes of one that asks for them.
+ *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Tabellen, ihre Zellen, ihre Linien und die Streifen einer, die danach fragt.
+ *
+ *	@knob	scale		Type size of a table
+ *	@knob	space		Space inside a cell
+ *	@knob	border		Weight of the lines of a table
+ *	@knob	zebra		Stripes of a table that asks for them
+ *	@knob	stripes		How strong the stripes are
+ *
+ *	Regular is the starting point, not a design. Every value it declares is the
+ *	framework's own, so a table under it looks as it does under Nino.css alone -
+ *	and every one of them is a ladder, so each knob has something to reach: the
+ *	five values of a scale, the middle of them Nino.css and the others two steps
+ *	to each side, or the three of a choice.
+ *
+ *	Two rules for a set:
+ *
+ *	  - Only the classes of this template: the table, its cells, its head, the
+ *	    one that is bordered and the one that is striped. A set of buttons does
+ *	    not touch a table, however tempting.
+ *	  - Colours through the roles, never as literals. Nor the font: the face,
+ *	    the weight and the case of the text are the roles of the type tab.
+ *
+ *	A knob that is more than one value - the stripes of a table are a
+ *	background and a colour of text - declares one more ladder for each, named
+ *	after the knob and an aspect of it (--tables-zebra-ink--less ...), as long as
+ *	the knob's own. They move together: the compiler selects every ladder of a
+ *	knob where it stands. An aspect at its middle step names the value the
+ *	property has anyway, so a rule that reads it changes nothing there. The
+ *	zebra is a choice of three, declared under less, default and more: no
+ *	stripes, the stripes, and the stripes with a line over them.
+ *
+ *	How strong the stripes are is a scale of its own, and the zebra reads it
+ *	where it names the second ground of the page: the middle is the kernel's
+ *	--color-section-alt-bg, the two steps under it are that ground mixed toward
+ *	the ground of the page, the two over it mixed toward its ink.
+ *
+ *	The spacing classes of Nino.css (nino-p-2, nino-mb-3 ...) come last in its
+ *	stylesheet so that they win. Copy this file under a name of your own and
+ *	start there.
+ */
+
+:root {
+	/*	The type size of a table is the size of the text around it, times this	*/
+	--tables-scale--least: 		.75;
+	--tables-scale--less: 		.87;
+	--tables-scale--default: 	1;
+	--tables-scale--more: 		1.15;
+	--tables-scale--most: 		1.32;
+
+	/*	Half the padding of a cell. A cell's space is finer than a card's, so the
+		steps are fractions of the middle and not steps of the scale	*/
+	--tables-space--least: 		calc( var(--space-1) * .4 );
+	--tables-space--less: 		calc( var(--space-1) * .7 );
+	--tables-space--default: 	var(--space-1);
+	--tables-space--more: 		calc( var(--space-1) * 1.5 );
+	--tables-space--most: 		calc( var(--space-1) * 2.2 );
 
 	/*	The half pixel is a hairline where the screen can draw one, and 1px where it cannot	*/
-	--components-border--least: 	0px;
-	--components-border--less: 		.5px;
-	--components-border--default: 	1px;
-	--components-border--more: 		2px;
-	--components-border--most: 		3px;
+	--tables-border--least: 	0px;
+	--tables-border--less: 		.5px;
+	--tables-border--default: 	1px;
+	--tables-border--more: 		2px;
+	--tables-border--most: 		3px;
 
-	/*	The even rows of a table that has the class: none, the second ground of
-		the page, or that with a line over it. The text on them is the ink of
-		that ground - or, with no stripe, the text round the table	*/
-	--components-zebra--less: 		transparent;
-	--components-zebra--default: 	var(--color-section-alt-bg);
-	--components-zebra--more: 		linear-gradient( var(--color-border), var(--color-border) ) top / 100% 1px no-repeat var(--color-section-alt-bg);
+	/*	The even rows of a table that has the class: none, the stripes, or the stripes
+		with a line over them. The text on them is the ink of the second ground - or,
+		with no stripe, the text round the table	*/
+	--tables-zebra--less: 		transparent;
+	--tables-zebra--default: 	var(--tables-stripes);
+	--tables-zebra--more: 		linear-gradient( var(--color-border), var(--color-border) ) top / 100% 1px no-repeat var(--tables-stripes);
 
-	--components-zebra-ink--less: 		initial;
-	--components-zebra-ink--default: 	var(--color-section-alt-text);
-	--components-zebra-ink--more: 		var(--color-section-alt-text);
+	--tables-zebra-ink--less: 		initial;
+	--tables-zebra-ink--default: 	var(--color-section-alt-text);
+	--tables-zebra-ink--more: 		var(--color-section-alt-text);
 
-	/*	Where a label stands. Above the field is Nino.css: the form is a block
-		and the label a line of text. In the row the form is a grid of a column
-		for the labels and a column for the fields, this far apart. Floating, the
-		label is lifted onto the top edge of its field, a little smaller, on the
-		ground the field stands on	*/
-	--components-labels--less: 		var(--space-2);
-	--components-labels--default: 	normal;
-	--components-labels--more: 		normal;
-
-	--components-labels-form--less: 		grid;
-	--components-labels-form--default: 		block;
-	--components-labels-form--more: 		block;
-
-	--components-labels-cols--less: 		max-content minmax(0, 1fr);
-	--components-labels-cols--default: 		none;
-	--components-labels-cols--more: 		none;
-
-	--components-labels-align--less: 		baseline;
-	--components-labels-align--default: 	normal;
-	--components-labels-align--more: 		normal;
-
-	--components-labels-wide--less: 		1 / -1;
-	--components-labels-wide--default: 		auto;
-	--components-labels-wide--more: 		auto;
-
-	--components-labels-start--less: 		start;
-	--components-labels-start--default: 		auto;
-	--components-labels-start--more: 		auto;
-
-	--components-labels-block--less: 		inline;
-	--components-labels-block--default: 	inline;
-	--components-labels-block--more: 		table;
-
-	--components-labels-pos--less: 			static;
-	--components-labels-pos--default: 		static;
-	--components-labels-pos--more: 			relative;
-
-	--components-labels-lift--less: 		0em;
-	--components-labels-lift--default: 		0em;
-	--components-labels-lift--more: 		.8em;
-
-	--components-labels-cut--less: 			transparent;
-	--components-labels-cut--default: 		transparent;
-	--components-labels-cut--more: 			var(--color-ground);
+	/*	How far the even rows depart from the ground. The middle is the second ground of
+		the page, which is what Nino.css paints them with; under it that ground mixed
+		toward the ground of the page, over it mixed toward the ink it carries - the stripe
+		stays a tint of the pair the palette solved, and the ink on it stays legible	*/
+	--tables-stripes--least: 		color-mix( in srgb, var(--color-section-alt-bg) 35%, var(--color-background) );
+	--tables-stripes--less: 		color-mix( in srgb, var(--color-section-alt-bg) 70%, var(--color-background) );
+	--tables-stripes--default: 		var(--color-section-alt-bg);
+	--tables-stripes--more: 		color-mix( in srgb, var(--color-section-alt-text) 8%, var(--color-section-alt-bg) );
+	--tables-stripes--most: 		color-mix( in srgb, var(--color-section-alt-text) 16%, var(--color-section-alt-bg) );
 }
-
-/* ---- fields ---- */
-
-.nino-form-input,
-.nino-form-textarea,
-.nino-form-select {
-	border-width: var(--components-border);
-	border-radius: var(--components-corners);
-	font-size: calc( 1rem * var(--components-scale) );
-}
-.nino-form-input:where(:not([class*="nino-p-"], [class*="nino-pt-"], [class*="nino-pb-"])),
-.nino-form-textarea:where(:not([class*="nino-p-"], [class*="nino-pt-"], [class*="nino-pb-"])),
-.nino-form-select:where(:not([class*="nino-p-"], [class*="nino-pt-"], [class*="nino-pb-"])) {
-	padding: var(--components-space);
-}
-.nino-form-select:where(:not([class*="nino-p-"], [class*="nino-pt-"], [class*="nino-pb-"])) {
-	padding-right: 2.5rem;
-}
-.nino-form-input:where(:not([class*="nino-mb-"], [class*="nino-m-"])),
-.nino-form-textarea:where(:not([class*="nino-mb-"], [class*="nino-m-"])),
-.nino-form-select:where(:not([class*="nino-mb-"], [class*="nino-m-"])) {
-	margin-bottom: var(--components-space);
-}
-
-.nino-form.nino-is-error .nino-form-message,
-.nino-form.nino-is-success .nino-form-message {
-	padding: var(--components-space) calc( var(--components-space) * 2 );
-	border-radius: calc( var(--components-corners) * 2 );
-}
-
-/* ---- labels ---- */
-
-/*	A form of rows - not the inline one, nor the newsletter's, which are flex
-	boxes of their own. In the grid a label and the field after it share a row;
-	everything else (a checkbox, a message, the button) takes the whole of it -
-	but for a button and a checkbox, which a form of blocks leaves as wide as
-	their words and a grid would stretch to the row	*/
-.nino-form:where(:not(.nino-form--inline, .nino-newsletter-inline)) {
-	display: var(--components-labels-form);
-	grid-template-columns: var(--components-labels-cols);
-	column-gap: var(--components-labels);
-	align-items: var(--components-labels-align);
-}
-.nino-form:where(:not(.nino-form--inline, .nino-newsletter-inline)) > :where(:not(
-	label:not(.nino-forms-check, .nino-sr-only),
-	label:not(.nino-forms-check, .nino-sr-only) + :is(.nino-form-input, .nino-form-select, .nino-form-textarea),
-	.nino-form-trap, .nino-sr-only
-)) {
-	grid-column: var(--components-labels-wide);
-}
-.nino-form:where(:not(.nino-form--inline, .nino-newsletter-inline)) > :is(.nino-btn, .nino-forms-check) {
-	justify-self: var(--components-labels-start);
-}
-.nino-form:where(:not(.nino-form--inline, .nino-newsletter-inline)) > label:where(:not(.nino-forms-check, .nino-sr-only)) {
-	display: var(--components-labels-block);
-	position: var(--components-labels-pos);
-	margin: 0 0 calc( var(--components-labels-lift) * -.55 ) var(--components-labels-lift);
-	padding: 0 calc( var(--components-labels-lift) / 4 );
-	background-color: var(--components-labels-cut);
-	font-size: calc( 1em - var(--components-labels-lift) * .25 );
-}
-
-/* ---- tables ---- */
 
 .nino-table {
-	font-size: calc( 1em * var(--components-scale) );
+	font-size: calc( 1em * var(--tables-scale) );
 }
 .nino-table th,
 .nino-table td {
-	padding: var(--components-space) calc( var(--components-space) * 2 );
-	border-bottom-width: var(--components-border);
+	padding: var(--tables-space) calc( var(--tables-space) * 2 );
+	border-bottom-width: var(--tables-border);
 }
 .nino-table--bordered th,
 .nino-table--bordered td {
-	border-width: var(--components-border);
+	border-width: var(--tables-border);
 }
 .nino-table--striped tbody tr:nth-child(even) {
-	background: var(--components-zebra);
-	color: var(--components-zebra-ink, currentcolor);
-}
-
-/* ---- lists, badges, alerts ---- */
-
-.nino-list:not(.nino-list--columns) {
-	gap: var(--components-space);
-}
-.nino-badge:not(.nino-badge--pill) {
-	border-radius: calc( var(--components-corners) * 2 );
-}
-.nino-alert {
-	border-width: var(--components-border);
-	border-radius: calc( var(--components-corners) * 2 );
-}
-.nino-alert:where(:not([class*="nino-p-"], [class*="nino-pt-"], [class*="nino-pb-"])) {
-	padding: calc( var(--components-space) * 2 );
-}
-.nino-alert--content {
-	border-radius: calc( var(--components-corners) * 4 );
-}
-.nino-alert--content:where(:not([class*="nino-p-"], [class*="nino-pt-"], [class*="nino-pb-"])) {
-	padding: calc( var(--components-space) * 4 );
-}
-
-/* ---- blocks ---- */
-
-.nino-pricing-row {
-	gap: calc( var(--components-space) * 2 );
-}
-.nino-pricing-item {
-	border-radius: calc( var(--components-corners) * 2 );
-}
-.nino-pricing-item:where(:not([class*="nino-p-"], [class*="nino-pt-"], [class*="nino-pb-"])) {
-	padding: calc( var(--components-space) * 2 );
-}
-.nino-pricing-item:not(.nino-pricing-item--featured) {
-	border-width: var(--components-border);
-}
-
-.nino-accordion {
-	border-bottom-width: var(--components-border);
-}
-.nino-accordion-trigger {
-	padding: calc( var(--components-space) * 2 ) 0;
-}
-.nino-accordion-panel {
-	padding: 0 0 calc( var(--components-space) * 2 ) 1em;
+	background: var(--tables-zebra);
+	color: var(--tables-zebra-ink, currentcolor);
 }
 
 
-/* ==== 12. the knob positions ==== */
+/* ==== 14. the knob positions ==== */
 :root {
 	--buttons-corners: var(--buttons-corners--default);
+	--buttons-hover: var(--buttons-hover--default);
+	--buttons-hover-shadow: var(--buttons-hover-shadow--default);
 	--buttons-size: var(--buttons-size--default);
 	--buttons-space: var(--buttons-space--default);
 	--buttons-spread: var(--buttons-spread--default);
-	--components-border: var(--components-border--default);
-	--components-corners: var(--components-corners--default);
-	--components-labels: var(--components-labels--default);
-	--components-labels-align: var(--components-labels-align--default);
-	--components-labels-block: var(--components-labels-block--default);
-	--components-labels-cols: var(--components-labels-cols--default);
-	--components-labels-cut: var(--components-labels-cut--default);
-	--components-labels-form: var(--components-labels-form--default);
-	--components-labels-lift: var(--components-labels-lift--default);
-	--components-labels-pos: var(--components-labels-pos--default);
-	--components-labels-start: var(--components-labels-start--default);
-	--components-labels-wide: var(--components-labels-wide--default);
-	--components-scale: var(--components-scale--default);
-	--components-space: var(--components-space--default);
-	--components-zebra: var(--components-zebra--default);
-	--components-zebra-ink: var(--components-zebra-ink--default);
-	--content-border: var(--content-border--default);
-	--content-card-space: var(--content-card-space--default);
-	--content-card-subtitle: var(--content-card-subtitle--default);
-	--content-card-title: var(--content-card-title--default);
-	--content-hero-text: var(--content-hero-text--default);
-	--content-hero-title: var(--content-hero-title--default);
-	--content-loud: var(--content-loud--default);
-	--content-quiet: var(--content-quiet--default);
-	--content-section-line: var(--content-section-line--default);
-	--content-section-space: var(--content-section-space--default);
-	--content-section-subtitle: var(--content-section-subtitle--default);
-	--content-section-title: var(--content-section-title--default);
-	--content-shadow: var(--content-shadow--default);
+	--card-border: var(--card-border--default);
+	--card-hover: var(--card-hover--default);
+	--card-hover-shadow: var(--card-hover-shadow--default);
+	--card-shadow: var(--card-shadow--default);
+	--card-space: var(--card-space--default);
+	--card-subtitle: var(--card-subtitle--default);
+	--card-title: var(--card-title--default);
+	--card-tone: var(--card-tone--default);
+	--footer-ground: var(--footer-ground--default);
+	--footer-ground-accent: var(--footer-ground-accent--default);
+	--footer-ground-border: var(--footer-ground-border--default);
+	--footer-ground-focus: var(--footer-ground-focus--default);
+	--footer-ground-ink: var(--footer-ground-ink--default);
+	--footer-ground-subtitle: var(--footer-ground-subtitle--default);
+	--footer-ground-title: var(--footer-ground-title--default);
+	--footer-height: var(--footer-height--default);
+	--footer-scale: var(--footer-scale--default);
+	--footer-space: var(--footer-space--default);
+	--header-ground: var(--header-ground--default);
+	--header-ground-accent: var(--header-ground-accent--default);
+	--header-ground-border: var(--header-ground-border--default);
+	--header-ground-focus: var(--header-ground-focus--default);
+	--header-ground-ink: var(--header-ground-ink--default);
+	--header-ground-title: var(--header-ground-title--default);
+	--header-height: var(--header-height--default);
+	--header-nav: var(--header-nav--default);
+	--header-space: var(--header-space--default);
+	--lists-marker: var(--lists-marker--default);
+	--lists-marker-check-box: var(--lists-marker-check-box--default);
+	--lists-marker-check-ground: var(--lists-marker-check-ground--default);
+	--lists-marker-check-ink: var(--lists-marker-check-ink--default);
+	--lists-marker-number-ground: var(--lists-marker-number-ground--default);
+	--lists-marker-number-ink: var(--lists-marker-number-ink--default);
+	--lists-scale: var(--lists-scale--default);
+	--lists-space: var(--lists-space--default);
+	--section-dim: var(--section-dim--default);
+	--section-hero-text: var(--section-hero-text--default);
+	--section-hero-title: var(--section-hero-title--default);
+	--section-loud: var(--section-loud--default);
+	--section-quiet: var(--section-quiet--default);
+	--section-rule: var(--section-rule--default);
+	--section-space: var(--section-space--default);
+	--section-subtitle: var(--section-subtitle--default);
+	--section-title: var(--section-title--default);
+	--tables-border: var(--tables-border--default);
+	--tables-scale: var(--tables-scale--default);
+	--tables-space: var(--tables-space--default);
+	--tables-stripes: var(--tables-stripes--default);
+	--tables-zebra: var(--tables-zebra--default);
+	--tables-zebra-ink: var(--tables-zebra-ink--default);
 }
