@@ -2028,13 +2028,17 @@ namespace Nino\Modules {
 		/**
 		 *	Replace [card-image]: the picture of a card, found and written as
 		 *	[image] finds and writes its own - the slot or the image field, the
-		 *	alt text, the content form - as the <img> of .nino-card-img. A focus
-		 *	or a ratio puts it in the frame of [image], which then carries
-		 *	.nino-card-img: the rules of the picture of a card (the width, the
-		 *	room below it, the corners, the style inline, which is the class
-		 *	nino-card-img--inline) work on the frame as on the <img>, and the frame
-		 *	crops. The style and the class of its own go where .nino-card-img goes:
-		 *	on the <img> where there is no frame, on the frame where there is one
+		 *	alt text, the content form - as the <img> of .nino-card-img. A focus,
+		 *	a ratio or a class of its own puts it in the frame of [image], which
+		 *	then carries .nino-card-img: the rules of the picture of a card (the
+		 *	width, the room below it, the corners, the style inline, which is the
+		 *	class nino-card-img--inline) work on the frame as on the <img>, and the
+		 *	frame crops and has the classes that stand on a frame, nino-hover among
+		 *	them. The class of its own is always the frame's, since it is what makes
+		 *	one; the style goes where .nino-card-img goes: on the <img> where there
+		 *	is no frame, on the frame where there is one - and makes none: a
+		 *	picture with style="inline" and nothing else is the bare <img>, at its
+		 *	own size
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments made ready by dispatch()
@@ -2049,18 +2053,19 @@ namespace Nino\Modules {
 		 *	The part of [image] and [card-image] they share: the picture a
 		 *	reference names as an <img> - or as what the content between the tags
 		 *	makes of it, the same for both - and the frame around it where there
-		 *	is one.
+		 *	is one. A focus, a ratio or a class of its own call for the frame, in
+		 *	the one as in the other, and the class is the frame's, behind the ratio
+		 *	and the focus.
 		 *
 		 *	The picture of [image] is its frame, nino-image, which the fragment
-		 *	names. A focus, a ratio or a class of its own call for it, and the class
-		 *	is the frame's, behind the ratio and the focus; with none of them the
-		 *	picture is the bare <img>, which has no class attribute. The picture of
-		 *	a card is the box nino-card-img names, and its style and its class of its
-		 *	own are the classes of that box: the <img>, which then has all three as
-		 *	its class attribute, or the frame where a focus or a ratio call for one,
-		 *	which then has them in the place of its class and holds an <img> with
-		 *	none. The style, where a component has one, is a variant, written as the
-		 *	class its prefix and the word make
+		 *	names; with none of the three it is the bare <img>, which has no class
+		 *	attribute. The picture of a card is the box nino-card-img names, and what
+		 *	it carries - that class, then its style and its class of its own - stands
+		 *	on the frame where there is one, in the place of its class, which then
+		 *	holds an <img> with none, and on the <img> where there is none. A style
+		 *	is no call for a frame, so a card's picture with a style and nothing else
+		 *	is that <img>. The style, where a component has one, is a variant, written
+		 *	as the class its prefix and the word make
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$component		The component: image or card-image
@@ -2083,13 +2088,14 @@ namespace Nino\Modules {
 			$content = trim( $args['content'] ) !== '' ? $args['content'] : null;
 
 			// What the picture carries - the class of a card, then its style and its class of
-			// its own - is the frame's in [image], which is only there for a focus, a ratio or
-			// a class to carry, and the <img>'s in a card, which is framed for a focus or a
-			// ratio alone
+			// its own - is the frame's where there is one and the <img>'s where there is none.
+			// A focus, a ratio or a class of its own call for the frame, in a card as in [image];
+			// the class of the card and the style do not, so $framed reads the class of the call
+			// and not the list that is made of all three
 			$card	= $base === 'nino-card-img';
 			$style	= trim( self::_variant( $base, (array) ( self::_declared( $appData, $component )['style'] ?? [] ), $args['style'] ?? '' ) );
 			$class	= implode( ' ', array_filter( [ $card === true ? $base : '', $style, $args['class'] ], static fn( string $word ): bool => $word !== '' ) );
-			$framed	= $args['focus'] !== '' || $args['ratio'] !== '' || ( $card === false && $class !== '' );
+			$framed	= $args['focus'] !== '' || $args['ratio'] !== '' || $args['class'] !== '';
 
 			$img = str_replace(
 				[ '[[src]]', '[[width]]', '[[height]]', '[[alt]]' ],

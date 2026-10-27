@@ -815,6 +815,9 @@ check( 'the picture of a card is as wide as the card and never wider, and --inli
 	&& $hookValue( $groundOf( '.nino-card-img--inline' ), 'max-width' ) === null );
 check( '...and it sits on the bottom of its line, so the room below an --inline picture is its margin and not the margin and the descender of the line',
 	$hookValue( $groundOf( '.nino-card-img--inline' ), 'vertical-align' ) === 'bottom' );
+check( '...and the cap of its height, nino-card-img--maxheight, holds the picture in the frame as it holds the frame and the bare <img>: capped itself, the framed picture is cropped at its middle by object-fit and not cut off at the bottom by the frame',
+	$hookValue( $groundOf( '.nino-card-img--maxheight' ), 'max-height' ) === 'var(--card-img-max-height)'
+	&& $hookValue( $groundOf( '.nino-image.nino-card-img--maxheight > img' ), 'max-height' ) === 'var(--card-img-max-height)' );
 check( 'it is the frame that cuts a picture: .nino-image has the overflow, so the corners it has are the picture\'s',
 	$hookValue( $groundOf( '.nino-image' ), 'overflow' ) === 'hidden' );
 
@@ -2451,7 +2454,7 @@ check( '...a card without a picture has the div alone, and one with nothing but 
 		'<article class="nino-card"><img src="/public/images/services/web/image.webp" width="400" height="300" alt="Alt &quot;q&quot;" class="nino-card-img"><div class="nino-card-content"><h4 class="nino-card-title">Web &lt;b&gt;&#91;x]&lt;/b&gt;</h4></div></article>' ) === true );
 check( '...only the first picture is the card\'s: a second one is a child like the others and stands in the div, a picture that renders nothing is still the first, and a picture inside the content of another call is that call\'s',
 	$render( '[card][card-image /template/page-home/hero/background][card-title /template/page-home/hero/title][card-image /template/page-home/hero/background class="x"][/card]' )
-		=== '<article class="nino-card">'. $cardPicture. '<div class="nino-card-content">'. $cardTitle. '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="" class="nino-card-img x"></div></article>'
+		=== '<article class="nino-card">'. $cardPicture. '<div class="nino-card-content">'. $cardTitle. '<div class="nino-image nino-card-img x"><img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt=""></div></div></article>'
 	&& $render( '[card][card-image /template/page-home/hero/empty][card-title /template/page-home/hero/title][card-image /template/page-home/hero/background][/card]' )
 		=== '<article class="nino-card"><div class="nino-card-content">'. $cardTitle. $cardPicture. '</div></article>'
 	&& $render( '[card][html]<p>x</p>[card-image /template/page-home/hero/background][/html][card-title /template/page-home/hero/title][/card]' ) === '<article class="nino-card"><div class="nino-card-content"><p>x</p><p>'. $cardPicture. '</p>'. $cardTitle. '</div></article>' );
@@ -2549,16 +2552,22 @@ check( '...[image] has no style: one written on it is an attribute that is not d
 	$render( '[image /template/page-home/hero/background style="weird"]' ) === $slotImg
 	&& $render( '[image /template/page-home/hero/background style="inline"]' ) === $slotImg
 	&& $render( '[image /template/page-home/hero/background style="weird" alt="B"]' ) === '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="B">' );
-// [card-image]: the picture of a card is the <img> of nino-card-img - or, cropped, the frame, which carries the class
-check( '[card-image] is the <img> of the slot with the class nino-card-img - the class attribute is there because there is a class to write - and the class of the style and a class of its own follow it',
+// [card-image]: the picture of a card is the <img> of nino-card-img - or, for a focus, a ratio or a class of its own, the frame, which carries the class
+check( '[card-image] is the <img> of the slot with the class nino-card-img - the class attribute is there because there is a class to write - and the class of the style follows it',
 	$render( '[card-image /template/page-home/hero/background alt="A"]' ) === '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="A" class="nino-card-img">'
-	&& $render( '[card-image /template/page-home/hero/background style="inline"]' ) === '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="" class="nino-card-img nino-card-img--inline">'
-	&& $render( '[card-image /template/page-home/hero/background class="x &quot;y"]' ) === '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="" class="nino-card-img x &amp;quot;y">'
-	&& $render( '[card-image /template/page-home/hero/background style="inline" class="x"]' ) === '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="" class="nino-card-img nino-card-img--inline x">' );
-check( '...a focus or a ratio puts it in the frame of [image], which carries nino-card-img - with the class of the style and the class of its own - and holds an <img> with no class, so that what styles the picture of a card styles the frame',
+	&& $render( '[card-image /template/page-home/hero/background style="inline"]' ) === '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="" class="nino-card-img nino-card-img--inline">' );
+check( '...a focus, a ratio or a class of its own puts it in the frame of [image], which carries nino-card-img - with the class of the style and the class of its own - and holds an <img> with no class, so that what styles the picture of a card styles the frame',
 	$render( '[card-image /template/page-home/hero/background ratio="4-3" focus="3"]' ) === '<div class="nino-image nino-image--4-3 nino-img-focus--3 nino-card-img">'. $slotImg. '</div>'
 	&& $render( '[card-image /template/page-home/hero/background focus="5" style="inline" class="x"]' ) === '<div class="nino-image nino-img-focus--5 nino-card-img nino-card-img--inline x">'. $slotImg. '</div>'
-	&& $render( '[card-image /template/page-home/hero/background ratio="21-9"]' ) === '<div class="nino-image nino-image--21-9 nino-card-img">'. $slotImg. '</div>' );
+	&& $render( '[card-image /template/page-home/hero/background ratio="21-9"]' ) === '<div class="nino-image nino-image--21-9 nino-card-img">'. $slotImg. '</div>'
+	&& $render( '[card-image /template/page-home/hero/background class="x &quot;y"]' ) === '<div class="nino-image nino-card-img x &amp;quot;y">'. $slotImg. '</div>'
+	&& $render( '[card-image /template/page-home/hero/background style="inline" class="x"]' ) === '<div class="nino-image nino-card-img nino-card-img--inline x">'. $slotImg. '</div>' );
+// A style is no call for the frame: it is the class of the box and goes where that goes, on the <img> as long as nothing else asks for a frame
+$cardStyles = array_values( array_filter( (array) $registryOf( 'card-image' )['attributes']['style']['options'], static fn( string $word ): bool => $word !== '' ) );
+$cardStyleClass = static fn( string $word ): string => 'nino-card-img '. $registryOf( 'card-image' )['attributes']['style']['prefix']. $word;
+check( '...and a style alone is no call for it: each style a card\'s picture offers, with nothing else on the call, leaves it the bare <img> with the class of the box and the class of the style, outside a card and in one',
+	$cardStyles !== [] && array_filter( $cardStyles, static fn( string $word ): bool => $render( '[card-image /template/page-home/hero/background style="'. $word. '"]' ) !== '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="" class="'. $cardStyleClass( $word ). '">'
+		|| $render( '[card][card-image /template/page-home/hero/background style="'. $word. '"][/card]' ) !== '<article class="nino-card"><img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="" class="'. $cardStyleClass( $word ). '"></article>' ) === [] );
 check( '...a style outside its options is none, a focus or a ratio that is none is none, and the alt text, the slot with no file and the content form are those of [image]',
 	$render( '[card-image /template/page-home/hero/background style="weird" focus="12" ratio="2-1"]' ) === $render( '[card-image /template/page-home/hero/background]' )
 	&& $render( '[card-image /template/page-home/hero/withalt alt="Own"]' ) === '<img src="/public/images/alt.800x600.jpg" width="800" height="600" alt="Stored &quot;alt&quot; &#91;x]" class="nino-card-img">'
@@ -2572,13 +2581,13 @@ check( '...in a stack the image field is the file it holds, with its alt text, f
 	str_contains( $cardImage, '<div class="nino-image nino-img-focus--2 nino-card-img"><img src="/public/images/services/web/image.webp" width="400" height="300" alt="Alt &quot;q&quot;"></div>' ) === true
 	&& str_contains( $cardImage, '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="" class="nino-card-img">' ) === true && substr_count( $cardImage, '<img' ) === 2 );
 // The class of the hover of a picture is the frame's, as nino-radius is: the stylesheet names .nino-image.nino-hover (see the hover of a picture above), and the renderers put the class where the frame is
-check( 'the class nino-hover stands on the frame, behind the ratio and the focus - [image] frames a picture for any class, [card-image] has the frame of [image] where a ratio or a focus makes one, with nino-card-img before the class - and the <img> in it has none, and an <a> wraps the frame where there is an address',
+check( 'the class nino-hover stands on the frame, behind the ratio and the focus - [image] and [card-image] frame a picture for any class, the card\'s with nino-card-img before the class - and the <img> in it has none, and an <a> wraps the frame where there is an address',
 	$render( '[image /template/page-home/hero/background class="nino-hover" ratio="3-2"]' ) === '<div class="nino-image nino-image--3-2 nino-hover">'. $slotImg. '</div>'
 	&& $render( '[image /template/page-home/hero/background class="nino-hover"]' ) === '<div class="nino-image nino-hover">'. $slotImg. '</div>'
 	&& $render( '[card-image /template/page-home/hero/background class="nino-hover" ratio="3-2"]' ) === '<div class="nino-image nino-image--3-2 nino-card-img nino-hover">'. $slotImg. '</div>'
 	&& $render( '[image /template/page-home/hero/background class="nino-hover" href="#x"]' ) === '<a href="#x"><div class="nino-image nino-hover">'. $slotImg. '</div></a>' );
-check( '...and the picture of a card that has the class and no ratio or focus is the bare <img> of nino-card-img with it, which has no frame to carry it and nothing styles',
-	$render( '[card-image /template/page-home/hero/background class="nino-hover"]' ) === '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="" class="nino-card-img nino-hover">' );
+check( '...and the picture of a card that has the class and no ratio or focus is framed as well, with nino-card-img before the class on the frame and an <img> with none in it: the class has the frame to stand on that it has in [image]',
+	$render( '[card-image /template/page-home/hero/background class="nino-hover"]' ) === '<div class="nino-image nino-card-img nino-hover">'. $slotImg. '</div>' );
 // The class attribute is written where there is a class, and nowhere else: not on a bare picture, not on the one behind a card, not on the one in a frame
 $emptyClass = static fn( string $html ): bool => preg_match( '/\sclass=""/', $html ) === 1;
 $classForms = [
@@ -2642,7 +2651,7 @@ check( 'each of the ten components that can be a link draws what it draws in an 
 check( '...the address is written as it is made safe, once: the & of a query is &amp;, not &amp;amp; - what it holds written as a key\'s value is what it is - and what a link wraps is the frame of a picture, not its <img>',
 	$render( '[title /template/page-home/hero/title href="/template/page-home/stored/link"]' ) === '<a href="/a?b=&quot;c&quot;&amp;d=1"><h3 class="nino-section-title">Hi &#91;there]</h3></a>'
 	&& $render( '[image /template/page-home/hero/background ratio="4-3" href="#x"]' ) === '<a href="#x"><div class="nino-image nino-image--4-3">'. $slotImg. '</div></a>'
-	&& $render( '[card-image /template/page-home/hero/background class="x" href="#x"]' ) === '<a href="#x"><img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="" class="nino-card-img x"></a>' );
+	&& $render( '[card-image /template/page-home/hero/background class="x" href="#x"]' ) === '<a href="#x"><div class="nino-image nino-card-img x">'. $slotImg. '</div></a>' );
 check( '...a source that resolves to nothing is nothing, not an empty link, and in a stack the address is a field of the element or the place in the loop, drawn once per element',
 	$render( '[title /template/page-home/nope/title href="#x"]' ) === '' && $render( '[image /template/page-home/hero/empty href="#x"]' ) === ''
 	&& $render( '[stack /services sort="title" limit="1"][title title href=".uri" target="_blank"][/stack]' ) === '<div class="nino-grid-row nino-stack nino-stack-gap-2"><div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><a href="/services/app" target="_blank" rel="noopener"><h3 class="nino-section-title">App</h3></a></div></div>' );

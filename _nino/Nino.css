@@ -1837,12 +1837,12 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 }
 
 /*	The picture of a card is as wide as the card and never wider: it is the
-	<img> [card-image] writes, or the frame it puts round it for a focus or a
-	ratio, which carries the class as well and is cropped by it. --inline is the
-	other way round - the picture at its own size, capped by the width of the
-	card, and it follows the text alignment of the card. It sits on the bottom of
-	its line, so the room below it is its margin and not the margin and the
-	descender of the line	*/
+	<img> [card-image] writes, or the frame it puts round it for a focus, a
+	ratio or a class of its own, which carries the class as well and is cropped
+	by it. --inline is the other way round - the picture at its own size, capped
+	by the width of the card, and it follows the text alignment of the card. It
+	sits on the bottom of its line, so the room below it is its margin and not
+	the margin and the descender of the line	*/
 .nino-card-img {
 	height: auto;
 	width: 100%;
@@ -1901,7 +1901,12 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	text-decoration: underline;
 }
 
-.nino-card-img--maxheight {
+/*	The cap of the height of a card's picture holds the frame as it holds the
+	bare <img>, and the picture in the frame as well: capped itself, the picture
+	is cropped at its middle by object-fit, as the bare one is, and the frame is
+	as tall as that - and not a frame that is held while the picture in it is
+	not, which would cut it off at the bottom	*/
+.nino-card-img--maxheight, .nino-image.nino-card-img--maxheight > img {
 	max-height: var(--card-img-max-height);
 }
 .nino-card--fullwidth .nino-card-img {
@@ -2295,9 +2300,9 @@ textarea:disabled {
 .nino-img-focus--7 > img { object-position: left bottom; }
 .nino-img-focus--8 > img { object-position: center bottom; }
 .nino-img-focus--9 > img { object-position: right bottom; }
-/* The frame [image] puts around a picture that has a ratio or a focus: the
-   box takes the shape, the picture covers it, and nino-img-focus-- above
-   decides which part of it is kept */
+/* The frame [image] and [card-image] put around a picture that has a focus,
+   a ratio or a class of its own: the box takes the shape, the picture covers
+   it, and nino-img-focus-- above decides which part of it is kept */
 .nino-image {
 	position: relative;
 	overflow: hidden;
@@ -2331,9 +2336,9 @@ textarea:disabled {
 .nino-image--16-9, .nino-image--16-9 > img { aspect-ratio: 16 / 9; }
 .nino-image--21-9, .nino-image--21-9 > img { aspect-ratio: 21 / 9; }
 /*	The hover of a picture, for the frame that is asked for it: nino-hover on the
-	frame - [image /pic class="nino-hover"], and [card-image /pic ratio="3-2"
-	class="nino-hover"], which has a frame to carry the class where a ratio or a
-	focus makes one. A bare <img> has none, as it has none for nino-radius. Under
+	frame - [image /pic class="nino-hover"], [card-image /pic class="nino-hover"]
+	- which the class of its own makes, in a card as in [image], so that it has
+	one to stand on. A bare <img> has none, as it has none for nino-radius. Under
 	the pointer - and under the keyboard where the picture is a link, the <a> that
 	[image href] puts round the frame - the frame rises and casts its shadow, and
 	the picture in it grows and brightens, each over the same time. The frame has
