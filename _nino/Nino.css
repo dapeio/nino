@@ -2330,6 +2330,84 @@ textarea:disabled {
 .nino-image--3-2, .nino-image--3-2 > img { aspect-ratio: 3 / 2; }
 .nino-image--16-9, .nino-image--16-9 > img { aspect-ratio: 16 / 9; }
 .nino-image--21-9, .nino-image--21-9 > img { aspect-ratio: 21 / 9; }
+/*	The hover of a picture, for the frame that is asked for it: nino-hover on the
+	frame - [image /pic class="nino-hover"], and [card-image /pic ratio="3-2"
+	class="nino-hover"], which has a frame to carry the class where a ratio or a
+	focus makes one. A bare <img> has none, as it has none for nino-radius. Under
+	the pointer - and under the keyboard where the picture is a link, the <a> that
+	[image href] puts round the frame - the frame rises and casts its shadow, and
+	the picture in it grows and brightens, each over the same time. The frame has
+	the overflow, so what grew stays inside it and inside its corners; a lift and a
+	shadow stand outside it, and a card or a column that clips at its edge
+	(overflow: clip) cuts them there. The five numbers are custom properties,
+	declared on :root beside the viewport animation's, and they are the handles: a
+	design layer sets them on main, as it sets that animation's, and a template on
+	the frame or on an element round it. Their defaults are a gentle zoom and
+	nothing else, and the rules here read them and decide nothing more.
+
+	In a linked card the pointer stands on the overlay of the link of the title and
+	never on the frame, so the picture of a linked card follows the card: its hover,
+	and the focus of its link.
+
+	A coarse pointer has none of it: a tap leaves the hover where it was, and a
+	picture that stays grown after the finger is gone is no effect anybody asked
+	for. The rules that give the effect stand in a query that leaves the coarse
+	pointer out, and nothing is said for it besides - a none would take from the
+	frame, under the tap, the shadow or the place that a design layer gave it at
+	rest - so a tap changes nothing. A visitor who asked for less motion has the
+	frame keep its place and the picture its size, as the parallax's picture does,
+	and the brightness and the shadow, which are no motion, may still change: the
+	block after the effect takes back the transform of both, for the fine pointer
+	and for none - every pointer but the coarse one, which the effect does not
+	reach - in the form the rest of the file gives its queries, a list and no not
+	inside a parenthesis, so that no engine drops the block and leaves the motion
+	in.
+
+	A frame that rises is a transformed box, and so a stacking context, which is why
+	the rules round it were read. A badge placed beside the picture
+	(.nino-img-cover > .nino-badge, below) is absolute in its wrapper and not in the
+	frame, so it does not move with the frame; and the frame is placed already
+	(position: relative), so a transform changes neither the layer it is painted in
+	nor its order there: a badge after it in the markup stays over it and one before
+	it stays under it, as without the class	*/
+.nino-image.nino-hover {
+	transition-property: transform, box-shadow;
+	transition-duration: var(--image-hover-duration);
+}
+.nino-image.nino-hover > img {
+	transition-property: transform, filter;
+	transition-duration: var(--image-hover-duration);
+}
+@media not all and (pointer: coarse) {
+	.nino-image.nino-hover:hover,
+	a:focus-visible > .nino-image.nino-hover,
+	.nino-card--linked:hover .nino-image.nino-hover,
+	.nino-card--linked:has(a:focus-visible > .nino-card-title) .nino-image.nino-hover {
+		transform: translateY(var(--image-hover-lift));
+		box-shadow: var(--image-hover-shadow);
+	}
+	.nino-image.nino-hover:hover > img,
+	a:focus-visible > .nino-image.nino-hover > img,
+	.nino-card--linked:hover .nino-image.nino-hover > img,
+	.nino-card--linked:has(a:focus-visible > .nino-card-title) .nino-image.nino-hover > img {
+		transform: scale(var(--image-hover-scale));
+		filter: brightness(var(--image-hover-brightness));
+	}
+}
+@media (prefers-reduced-motion: reduce) and (pointer: fine), (prefers-reduced-motion: reduce) and (pointer: none) {
+	.nino-image.nino-hover:hover,
+	a:focus-visible > .nino-image.nino-hover,
+	.nino-card--linked:hover .nino-image.nino-hover,
+	.nino-card--linked:has(a:focus-visible > .nino-card-title) .nino-image.nino-hover {
+		transform: none;
+	}
+	.nino-image.nino-hover:hover > img,
+	a:focus-visible > .nino-image.nino-hover > img,
+	.nino-card--linked:hover .nino-image.nino-hover > img,
+	.nino-card--linked:has(a:focus-visible > .nino-card-title) .nino-image.nino-hover > img {
+		transform: none;
+	}
+}
 /* A nino-badge placed as a sibling of the img instead of inside it floats
    free in the top-right corner - eg. "New"/a discount/a category label */
 .nino-img-cover > .nino-badge {
@@ -4051,6 +4129,23 @@ header .nino-headernav-logo:empty {
 .nino-vpa--flip-soft { --vpa-t-hidden: perspective(800px) rotateX(-20deg); --vpa-t-visible: perspective(800px) rotateX(0deg); --vpa-origin: top center; }
 .nino-vpa--flip-medium { --vpa-t-hidden: perspective(800px) rotateX(-40deg); --vpa-t-visible: perspective(800px) rotateX(0deg); --vpa-origin: top center; }
 .nino-vpa--flip-hard { --vpa-t-hidden: perspective(800px) rotateX(-65deg); --vpa-t-visible: perspective(800px) rotateX(0deg); --vpa-origin: top center; }
+
+/*	The five handles of the hover of a picture (.nino-hover, with the images): a
+	design layer sets them on main, as it sets the viewport animation's above, and a
+	template on a frame or round it. What stands here is the kernel's own, a gentle
+	zoom and nothing else:
+		--image-hover-scale       a factor: the picture grows inside its frame
+		--image-hover-lift        a length: the frame rises, which a negative one does
+		--image-hover-brightness  a factor: the picture brightens
+		--image-hover-shadow      a box-shadow: cast by the frame while the effect shows
+		--image-hover-duration    a time: how long the change takes	*/
+:root {
+	--image-hover-scale: 1.04;
+	--image-hover-lift: 0px;
+	--image-hover-brightness: 1;
+	--image-hover-shadow: none;
+	--image-hover-duration: .3s;
+}
 
 /* Preloader */
 .nino-preloader {

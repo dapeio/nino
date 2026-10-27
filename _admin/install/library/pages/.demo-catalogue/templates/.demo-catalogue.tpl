@@ -2167,9 +2167,9 @@
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-mb-2">
 			<h3 class="nino-section-title nino-text-left" id="bilder-title">Images</h3>
-			<p class="nino-section-subtitle nino-text-left">An image fills its box while preserving its important crop — nine focal points, like a numeric keypad. A frame cuts it to a shape and gives it the radius of the image kind.</p>
+			<p class="nino-section-subtitle nino-text-left">An image fills its box while preserving its important crop — nine focal points, like a numeric keypad. A frame cuts it to a shape, gives it the radius of the image kind and, where it says nino-hover, lets the picture grow under the pointer.</p>
 		</div>
-		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-img-cover</span> <span class="nino-badge nino-badge--pill">.nino-img-focus--1 … --9</span> <span class="nino-badge nino-badge--pill">.nino-img-background</span> <span class="nino-badge nino-badge--pill">.nino-img-background--dim</span> <span class="nino-badge nino-badge--pill">.nino-img-background-content</span> <span class="nino-badge nino-badge--pill">.nino-radius-alt</span></div>
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-img-cover</span> <span class="nino-badge nino-badge--pill">.nino-img-focus--1 … --9</span> <span class="nino-badge nino-badge--pill">.nino-img-background</span> <span class="nino-badge nino-badge--pill">.nino-img-background--dim</span> <span class="nino-badge nino-badge--pill">.nino-img-background-content</span> <span class="nino-badge nino-badge--pill">.nino-radius-alt</span> <span class="nino-badge nino-badge--pill">.nino-hover</span></div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-pr-2 nino-mb-3">
 			<div class="nino-grid-row">
 				<div class="nino-grid-33 nino-grid-m-33 nino-p-1"><div class="nino-img-cover nino-img-focus--1"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy"></div><p class="nino-section-text--quiet nino-text-center">--1</p></div>
@@ -2194,6 +2194,7 @@
 		</div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-p-1"><div class="nino-image"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="" loading="lazy" width="1200" height="800"></div><p class="nino-section-text--quiet nino-text-center">.nino-image, at the radius of its kind</p></div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-p-1"><div class="nino-image nino-image--4-3 nino-img-focus--3 nino-radius-alt"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy" width="1200" height="800"></div><p class="nino-section-text--quiet nino-text-center">.nino-radius-alt, cut to 4:3 with the focus on the right</p></div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-p-1"><div class="nino-image nino-image--4-3 nino-hover"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="" loading="lazy" width="1200" height="800"></div><p class="nino-section-text--quiet nino-text-center">.nino-hover, the picture grows inside its frame under the pointer</p></div>
 	</div>
 </section>
 

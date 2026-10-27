@@ -207,13 +207,13 @@ check( '--shadow-card is none until a design layer says otherwise, and the two c
 	&& str_contains( $hookRules( '.nino-pricing-item' ), 'box-shadow: var(--shadow-card)' ) === true );
 check( '...a borderless card is without a surface, and a shadow is part of one: it keeps none', str_contains( $hookRules( '.nino-card--borderless' ), 'box-shadow: none' ) === true );
 
-// What the card shadow leaves alone: no rule but these writes a box-shadow of its own
+// What the shadows a design layer hands out - the card's and the one the frame of a picture casts while the effect shows, each a custom property - leave alone: no rule but these writes a box-shadow of its own
 $hookShadows = [];
 preg_match_all( '/([^{}]+)\{([^{}]*)\}/', $hookCss, $hookBlocks, PREG_SET_ORDER );
 foreach( $hookBlocks as [ , $hookBlockSelector, $hookBlockBody ] )
 	if( preg_match_all( '/(?<![\w-])box-shadow\s*:\s*([^;]+?)\s*(?:;|$)/', $hookBlockBody, $hookBlockShadows ) > 0 )
 		foreach( $hookBlockShadows[1] as $hookBlockShadow )
-			if( in_array( $hookBlockShadow, [ 'var(--shadow-card)', 'none' ], true ) === false )
+			if( in_array( $hookBlockShadow, [ 'var(--shadow-card)', 'var(--image-hover-shadow)', 'none' ], true ) === false )
 				$hookShadows[] = trim( (string) preg_replace( '/\s+/', ' ', $hookBlockSelector ) );
 check( 'the only box-shadows Nino.css writes itself are those of the middle card of .nino-pricing-row--feature-middle and of the toast - and the second line of two focus rings, the one of a button on a cover or a hero and the one of the dot of a slider'. ( $hookShadows === [] ? ' - none found' : ' - found: '. implode( ', ', $hookShadows ) ),
 	$hookShadows === [ ':is(.nino-cover, .nino-parallex, .nino-hero) .nino-btn:focus-visible', '.nino-pricing-row--feature-middle > .nino-pricing-item:nth-child(2)', '.nino-slider-point:focus-visible', '.nino-toast' ] );
@@ -1376,6 +1376,85 @@ check( 'a slider is as wide as the box it stands in: width 100%, min-width 0 so 
 echo "\n";
 
 
+// --- The hover of a picture -------------------------------------------------
+
+echo "Nino.css - the hover of a picture: five handles on :root, the class on the frame, the linked card, less motion and the coarse pointer\n";
+
+/*	The effect is the class nino-hover on the frame of a picture - the box that crops it, which a bare <img> has not - and what it does is said by five custom properties that a design layer
+	or a template sets: the kernel's own are a zoom and nothing else. What the rules read, where they stand and what they leave out is pinned by selector and by the query they stand in,
+	never by a length: the values are the handles'	*/
+$hoverHandles = [ '--image-hover-scale', '--image-hover-lift', '--image-hover-brightness', '--image-hover-shadow', '--image-hover-duration' ];
+$hoverRoots = [];
+preg_match_all( '/(?:^|\})\s*:root\s*\{([^{}]*)\}/', $hookCss, $hoverBlocks );
+foreach( $hoverBlocks[1] as $hoverBlock )
+	if( str_contains( $hoverBlock, '--image-hover-' ) === true )
+		$hoverRoots[] = $hoverBlock;
+$hoverRoot = count( $hoverRoots ) === 1 ? $hoverRoots[0] : '';
+$hoverMissing = array_values( array_filter( $hoverHandles, static fn( string $handle ): bool => $hookValue( $hoverRoot, $handle ) === null ) );
+check( 'Nino.css declares the five handles of the hover of a picture in one :root block - the scale, the lift, the brightness, the shadow and the duration, each --image-hover-<name> - and no other of that name'
+	. ( $hoverMissing === [] ? '' : ' - missing: '. implode( ', ', $hoverMissing ) ),
+	count( $hoverRoots ) === 1 && $hoverMissing === [] && preg_match_all( '/--image-hover-[\w-]+\s*:/', $hookCss ) === count( $hoverHandles ) );
+check( '...a zoom by default and nothing else: the scale is above 1, the lift 0px, the brightness 1 and the shadow none, and the duration is a time that is not nothing',
+	(float) $hookValue( $hoverRoot, '--image-hover-scale' ) > 1 && $hookValue( $hoverRoot, '--image-hover-lift' ) === '0px'
+	&& $hookValue( $hoverRoot, '--image-hover-brightness' ) === '1' && $hookValue( $hoverRoot, '--image-hover-shadow' ) === 'none'
+	&& preg_match( '/^(?:\d*\.)?\d+m?s$/', (string) $hookValue( $hoverRoot, '--image-hover-duration' ) ) === 1 && (float) $hookValue( $hoverRoot, '--image-hover-duration' ) > 0 );
+
+// The four places the effect shows - under the pointer, under the keyboard where the picture is a link, and in a linked card for its hover and for the focus of the link of its title - for the frame, and for the picture in it
+$hoverFrames = [ '.nino-image.nino-hover:hover', 'a:focus-visible > .nino-image.nino-hover', '.nino-card--linked:hover .nino-image.nino-hover', '.nino-card--linked:has(a:focus-visible > .nino-card-title) .nino-image.nino-hover' ];
+$hoverPictures = array_map( static fn( string $selector ): string => $selector. ' > img', $hoverFrames );
+// The bodies of the rules whose list of selectors is exactly the one given, squeezed, in the order of the stylesheet
+$hoverBodies = static function( array $members ) use ( $groundBlocks, $groundSplit ): array {
+	$found = [];
+	foreach( $groundBlocks as [ , $hoverList, $hoverBody ] )
+		if( $groundSplit( $hoverList ) === $members )
+			$found[] = trim( (string) preg_replace( '/\s+/', ' ', (string) $hoverBody ) );
+	return $found;
+};
+$hoverFrameBodies = $hoverBodies( $hoverFrames );
+$hoverPictureBodies = $hoverBodies( $hoverPictures );
+check( 'under the pointer the frame takes translateY( the lift ) and the shadow and the picture in it scale( the scale ) and brightness( the brightness ) - a rule for .nino-image.nino-hover:hover and one for .nino-image.nino-hover:hover > img that read the handles and say no number of their own',
+	$groundSets( $groundOf( '.nino-image.nino-hover:hover' ), 'transform', 'translateY(var(--image-hover-lift))' ) === true && $groundSets( $groundOf( '.nino-image.nino-hover:hover' ), 'box-shadow', 'var(--image-hover-shadow)' ) === true
+	&& $groundSets( $groundOf( '.nino-image.nino-hover:hover > img' ), 'transform', 'scale(var(--image-hover-scale))' ) === true && $groundSets( $groundOf( '.nino-image.nino-hover:hover > img' ), 'filter', 'brightness(var(--image-hover-brightness))' ) === true
+	&& preg_match( '/\d/', implode( ' ', array_merge( $hoverFrameBodies, $hoverPictureBodies ) ) ) !== 1 );
+check( '...each transitioning over the duration: the frame its transform and its box-shadow, the picture its transform and its filter, on the frame that says the class - the rules of the frame itself say nothing of the effect, so that a frame without the class draws as it did',
+	$hookValue( $groundOf( '.nino-image.nino-hover' ), 'transition-property' ) === 'transform, box-shadow' && $hookValue( $groundOf( '.nino-image.nino-hover' ), 'transition-duration' ) === 'var(--image-hover-duration)'
+	&& $hookValue( $groundOf( '.nino-image.nino-hover > img' ), 'transition-property' ) === 'transform, filter' && $hookValue( $groundOf( '.nino-image.nino-hover > img' ), 'transition-duration' ) === 'var(--image-hover-duration)'
+	&& preg_match( '/(?<![\w-])(?:transition[\w-]*|transform|filter|box-shadow)\s*:/', $groundOf( '.nino-image' ). ' '. $groundOf( '.nino-image > img' ) ) !== 1 );
+// The class is the frame's: no selector names it without the frame - a bare <img> that carries it has no rule
+$hoverBare = [];
+foreach( $groundBlocks as [ , $hoverList ] )
+	foreach( $groundSplit( $hoverList ) as $hoverSelector )
+		if( preg_match_all( '/\.nino-hover(?![\w-])/', $hoverSelector ) !== preg_match_all( '/\.nino-image\.nino-hover(?![\w-])/', $hoverSelector ) )
+			$hoverBare[] = $hoverSelector;
+check( '...and the class is the frame\'s, as nino-radius is: every selector that names nino-hover names the frame it stands on, .nino-image.nino-hover'. ( $hoverBare === [] ? '' : ' - not: '. implode( ' | ', $hoverBare ) ),
+	$hoverBare === [] && isset( $groundEach['.nino-image.nino-hover'], $groundEach['.nino-image.nino-hover > img'] ) === true );
+
+// A linked card is no <a>: the pointer stands on the overlay the link of its title stretches over the card, never on the frame, and the keyboard rests on that link
+$hoverCards = [ '.nino-card--linked:hover .nino-image.nino-hover', '.nino-card--linked:has(a:focus-visible > .nino-card-title) .nino-image.nino-hover', '.nino-card--linked:hover .nino-image.nino-hover > img', '.nino-card--linked:has(a:focus-visible > .nino-card-title) .nino-image.nino-hover > img' ];
+check( 'in a linked card the picture follows the card - its hover and the focus of the link of its title, the selector the ring of the card is drawn for - the same rules for the frame and for the picture, one list each: the pointer, the keyboard on a link, and the card',
+	count( $hoverFrameBodies ) === 2 && count( $hoverPictureBodies ) === 2 && array_diff( $hoverCards, array_keys( $groundEach ) ) === []
+	&& isset( $groundEach['.nino-card--linked:has(a:focus-visible > .nino-card-title)'] ) === true );
+
+// A coarse pointer and less motion: the effect stands in a query that leaves the coarse pointer out, and the block that takes the motion back for less motion names the fine pointer and none, a list in the form the rest of the file gives its queries - a tap changes nothing, and no engine drops the block
+$hoverFramesWhere = $groundConditions( implode( ', ', $hoverFrames ) );
+$hoverPicturesWhere = $groundConditions( implode( ', ', $hoverPictures ) );
+$hoverOther = [];
+foreach( $groundBlocks as [ , $hoverList, $hoverBody ] )
+	if( str_contains( $hoverList, '.nino-hover' ) === true && $groundSplit( $hoverList ) !== $hoverFrames && $groundSplit( $hoverList ) !== $hoverPictures
+		&& preg_match( '/(?<![\w-])(?:transform|filter|box-shadow)\s*:/', (string) $hoverBody ) === 1 )
+		$hoverOther[] = trim( (string) preg_replace( '/\s+/', ' ', $hoverList ) );
+check( 'a coarse pointer has none of it: a hover that sticks after a tap is no effect anybody asked for, so the rules that give the frame and the picture the effect stand in a query that leaves the coarse pointer out, no other rule of the class declares it, and the block that takes the motion back for less motion stands for the fine pointer and for none, in the form the rest of the file gives its queries - a tap changes nothing, not even a shadow that the frame has at rest'
+	. ( $hoverOther === [] ? '' : ' - declared by: '. implode( ' | ', $hoverOther ) ),
+	$hoverFramesWhere === [ [ '@media not all and (pointer: coarse)' ], [ '@media (prefers-reduced-motion: reduce) and (pointer: fine), (prefers-reduced-motion: reduce) and (pointer: none)' ] ]
+	&& $hoverPicturesWhere === [ [ '@media not all and (pointer: coarse)' ], [ '@media (prefers-reduced-motion: reduce) and (pointer: fine), (prefers-reduced-motion: reduce) and (pointer: none)' ] ]
+	&& str_contains( $hoverFrameBodies[0] ?? '', 'translateY(' ) === true && str_contains( $hoverPictureBodies[0] ?? '', 'scale(' ) === true && $hoverOther === [] );
+check( 'less motion keeps the frame in its place and the picture at its size: the block that follows the effect says transform: none for both and nothing else - it takes neither the shadow nor the filter back, as the brightness and the shadow are no motion and may still change',
+	( $hoverFrameBodies[1] ?? '' ) === 'transform: none;' && ( $hoverPictureBodies[1] ?? '' ) === 'transform: none;'
+	&& preg_match( '/(?<![\w-])filter\s*:/', $hoverPictureBodies[1] ?? '' ) !== 1 && str_contains( $hoverPictureBodies[0] ?? '', 'filter: brightness(var(--image-hover-brightness))' ) === true );
+
+echo "\n";
+
+
 // --- Modules\Components ----------------------------------------------------
 
 echo "Modules\\Components - the registry, the sources, the stacks\n";
@@ -2492,6 +2571,14 @@ check( '...the frame of a card\'s picture carries nino-image as well, and the ru
 check( '...in a stack the image field is the file it holds, with its alt text, framed and bare, and a name that is neither a field nor a slot renders nothing',
 	str_contains( $cardImage, '<div class="nino-image nino-img-focus--2 nino-card-img"><img src="/public/images/services/web/image.webp" width="400" height="300" alt="Alt &quot;q&quot;"></div>' ) === true
 	&& str_contains( $cardImage, '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="" class="nino-card-img">' ) === true && substr_count( $cardImage, '<img' ) === 2 );
+// The class of the hover of a picture is the frame's, as nino-radius is: the stylesheet names .nino-image.nino-hover (see the hover of a picture above), and the renderers put the class where the frame is
+check( 'the class nino-hover stands on the frame, behind the ratio and the focus - [image] frames a picture for any class, [card-image] has the frame of [image] where a ratio or a focus makes one, with nino-card-img before the class - and the <img> in it has none, and an <a> wraps the frame where there is an address',
+	$render( '[image /template/page-home/hero/background class="nino-hover" ratio="3-2"]' ) === '<div class="nino-image nino-image--3-2 nino-hover">'. $slotImg. '</div>'
+	&& $render( '[image /template/page-home/hero/background class="nino-hover"]' ) === '<div class="nino-image nino-hover">'. $slotImg. '</div>'
+	&& $render( '[card-image /template/page-home/hero/background class="nino-hover" ratio="3-2"]' ) === '<div class="nino-image nino-image--3-2 nino-card-img nino-hover">'. $slotImg. '</div>'
+	&& $render( '[image /template/page-home/hero/background class="nino-hover" href="#x"]' ) === '<a href="#x"><div class="nino-image nino-hover">'. $slotImg. '</div></a>' );
+check( '...and the picture of a card that has the class and no ratio or focus is the bare <img> of nino-card-img with it, which has no frame to carry it and nothing styles',
+	$render( '[card-image /template/page-home/hero/background class="nino-hover"]' ) === '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="" class="nino-card-img nino-hover">' );
 // The class attribute is written where there is a class, and nowhere else: not on a bare picture, not on the one behind a card, not on the one in a frame
 $emptyClass = static fn( string $html ): bool => preg_match( '/\sclass=""/', $html ) === 1;
 $classForms = [
