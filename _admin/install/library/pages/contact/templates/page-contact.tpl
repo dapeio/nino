@@ -1,12 +1,18 @@
 <!-- nino:template-name Contact -->
 [template /templates/html-header]
-<section id="hero" class="nino-section nino-section--dark nino-cover nino-pt-6 nino-pb-6 nino-mt-0 nino-mb-0" data-cover-height="50" aria-labelledby="hero-title">
-	<div class="nino-cover-content">
-		<div class="nino-grid-row nino-vpa">
-			<div class="nino-grid-100 nino-text-left"><h2 class="nino-hero-title" id="hero-title">[[/template/page-contact/hero/title]]</h2><p class="nino-hero-subtitle">[[/template/page-contact/hero/subtitle]]</p></div>
+<div class="nino-wrap nino-wrap--vpa">
+
+<section id="hero" class="nino-section nino-section--dark nino-cover nino-mt-0 nino-mb-0 nino-pt-6 nino-pb-6" data-cover-height="50">
+	<div class="nino-grid-row nino-pt-3 nino-vpa">
+		<div class="nino-grid-100 nino-text-left">
+			[hero-title /template/page-contact/hero/title]
+			[hero-subtitle /template/page-contact/hero/subtitle]
 		</div>
 	</div>
-</section><section id="contact-form" class="nino-section nino-mt-0 nino-mb-0" aria-labelledby="contact-form-title">
+</section>
+
+<!-- nino:html -->
+<section id="contact-form" class="nino-section nino-mt-0 nino-mb-0" aria-labelledby="contact-form-title">
 	<div class="nino-grid-row nino-vpa">
 		<div class="nino-grid-100 nino-grid-m-50 nino-p-2">
 			<div class="nino-mb-3 nino-text-left"><h2 class="nino-section-title" id="contact-form-title">[[/project/company/general/name]]</h2><p class="nino-section-subtitle">[[/project/company/general/description]]</p></div>
@@ -38,4 +44,7 @@
 		</div>
 	</div>
 </section>
+<!-- /nino:html -->
+
+</div>
 [template /templates/html-footer]

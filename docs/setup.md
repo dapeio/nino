@@ -126,15 +126,15 @@ A new page starts from the selected library template's own suggestions: its HTTP
 Of the one route in a page unit's `routes`, the step reads the `body`, the `statusCode`, the `navs` it proposes and a `locale` that limits the unit to one language. The key and the `uri` are the step's to write: it keys the route by the HTTP URI of the page and sets `uri` to its Element URI. The library's units spell out what that gives by default - `GET:/` plus the suggested URI (`GET://404` for `/404`, `GET://` for `/`), and `/<unit folder>` - and changing either in a manifest moves nothing.
 
 A page unit may also declare unit-relative `files`. They are copied to the same
-virtual project paths, so `images/template/page-home/fullscreen-image/background.svg`
-becomes the project's public `images/template/page-home/fullscreen-image/background.svg`.
+virtual project paths, so `images/template/page-home/hero/background.svg`
+becomes the project's public `images/template/page-home/hero/background.svg`.
 
 A unit that shows a picture declares it as an **image slot** with
-`imageSlots`, keyed by the slot uri - `'/template/page-home/fullscreen-image/background'
+`imageSlots`, keyed by the slot uri - `'/template/page-home/hero/background'
 => [ 'label' => [ 'en_US' => 'Home – hero image', 'de_DE' => 'Startseite –
 Titelbild' ], 'width' => 1920, 'height' => 1080, 'filename' =>
-'template/page-home/fullscreen-image/background.svg' ]` - and its template shows it with
-`[image /template/page-home/fullscreen-image/background alt=""]` instead of a literal
+'template/page-home/hero/background.svg' ]` - and its template shows it with
+`[image /template/page-home/hero/background alt=""]` instead of a literal
 `<img>`. The starter site's home hero is seeded with a neutral placeholder
 drawing, a small SVG Nino ships; it carries the slot's own name, so an upload
 replaces it and **Remove image** deletes it, and the library keeps the source.

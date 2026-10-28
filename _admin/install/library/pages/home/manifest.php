@@ -19,17 +19,17 @@
 		'description' => [ 'en_US' => 'This is your first impression.', 'de_DE' => 'Hier steht Dein erster Eindruck.' ],
 	],
 	'files' => [
-		'images/template/page-home/fullscreen-image/background.svg',
+		'images/template/page-home/hero/background.svg',
 	],
 	// The hero of the page is an image slot like any other, seeded with a
 	// neutral placeholder drawing - an editor replaces it in the Images panel,
 	// and the file, which carries the slot's own name, goes with it
 	'imageSlots' => [
-		'/template/page-home/fullscreen-image/background' => [
+		'/template/page-home/hero/background' => [
 			'label' 		=> [ 'en_US' => 'Home – hero image', 'de_DE' => 'Startseite – Titelbild' ],
 			'width' 		=> 1920,
 			'height' 		=> 1080,
-			'filename' 	=> 'template/page-home/fullscreen-image/background.svg',
+			'filename' 	=> 'template/page-home/hero/background.svg',
 		],
 	],
 ];

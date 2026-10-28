@@ -1,4 +1,4 @@
 <?php return [
-	'[[/template/page-home/welcome/title]]' => 'Welcome.',
-	'[[/template/page-home/welcome/subtitle]]' => 'This is your first impression.',
+	'[[/template/page-home/hero/title]]' => 'Welcome.',
+	'[[/template/page-home/hero/subtitle]]' => 'This is your first impression.',
 ];

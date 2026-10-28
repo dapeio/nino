@@ -769,12 +769,12 @@ rmdir( $sandbox. '/private/templates/page-contact.tpl' );
 /*	The home unit's hero is an image slot seeded with its shipped placeholder.
 	A picture the step cannot put in place fails the step by name, the way the
 	template above did - and no slot is seeded for a file that is not there	*/
-$seedFile = $sandbox. '/public/images/template/page-home/fullscreen-image/background.svg';
+$seedFile = $sandbox. '/public/images/template/page-home/hero/background.svg';
 if( is_file( $seedFile ) === true )
 	unlink( $seedFile );
 mkdir( $seedFile, 0755, true );
 [ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], $firstApply );
-check( 'a seed file the step cannot copy fails the apply and names the file', $status === 500 && str_contains( (string) ( $body['error'] ?? '' ), '/images/template/page-home/fullscreen-image/background.svg' ) === true );
+check( 'a seed file the step cannot copy fails the apply and names the file', $status === 500 && str_contains( (string) ( $body['error'] ?? '' ), '/images/template/page-home/hero/background.svg' ) === true );
 check( '...and no page image slot is seeded', array_keys( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/images'] ?? [] ) === [ '/logo' ] );
 rmdir( $seedFile );
 
@@ -795,21 +795,21 @@ check( 'a hand-written route outside the library still survives Webpages apply t
 
 check( 'copies "forms"\'s own mail-header/footer templates too, auto-pulled in by "contact"', \Nino\Filesystem::fileExists( $appData, '/templates/mail-header.tpl' ) === true );
 check( 'copies "contact"\'s own template', \Nino\Filesystem::fileExists( $appData, '/templates/page-contact.tpl' ) === true );
-check( 'copies a page unit\'s declared files into the project', is_file( $sandbox. '/public/images/template/page-home/fullscreen-image/background.svg' ) === true );
+check( 'copies a page unit\'s declared files into the project', is_file( $sandbox. '/public/images/template/page-home/hero/background.svg' ) === true );
 
 // The hero is the slot the page template names, and nothing is literal in it
-$heroSlot = $configAfterWpApply['/nino/html/images']['/template/page-home/fullscreen-image/background'] ?? [];
+$heroSlot = $configAfterWpApply['/nino/html/images']['/template/page-home/hero/background'] ?? [];
 // The native locale of this run is en_US (the steps above moved it), so the label is that one
 check( 'seeds the unit\'s image slot into config.php: the native-locale label, 1920x1080 and the shipped placeholder', ( $heroSlot['label'] ?? null ) === 'Home – hero image'
-	&& ( $heroSlot['width'] ?? null ) === 1920 && ( $heroSlot['height'] ?? null ) === 1080 && ( $heroSlot['filename'] ?? null ) === 'template/page-home/fullscreen-image/background.svg'
+	&& ( $heroSlot['width'] ?? null ) === 1920 && ( $heroSlot['height'] ?? null ) === 1080 && ( $heroSlot['filename'] ?? null ) === 'template/page-home/hero/background.svg'
 	&& is_file( $sandbox. '/public/images/'. ( $heroSlot['filename'] ?? 'missing' ) ) === true );
 
-check( 'the seeded placeholder carries the slot\'s own name, so an upload replaces it and Remove image deletes it, as for any file the slot wrote', str_starts_with( (string) ( $heroSlot['filename'] ?? '' ), 'template/page-home/fullscreen-image/background.' ) === true
+check( 'the seeded placeholder carries the slot\'s own name, so an upload replaces it and Remove image deletes it, as for any file the slot wrote', str_starts_with( (string) ( $heroSlot['filename'] ?? '' ), 'template/page-home/hero/background.' ) === true
 	&& is_file( __DIR__. '/../_admin/install/library/pages/home/images/demo.jpg' ) === false );
 \Nino\Modules\Components::init( $appData );
 \Nino\Modules\Template::init( $appData );
 $homeHtml = \Nino\Html::renderHtml( $appData, '[template /templates/page-home]' );
-check( 'the home template renders the slot as an <img> with its size and an empty alt, and no literal image path', str_contains( $homeHtml, '/images/template/page-home/fullscreen-image/background.svg" width="1920" height="1080" alt="">' ) === true
+check( 'the home template renders the slot as an <img> with its size and an empty alt, and no literal image path', str_contains( $homeHtml, '/images/template/page-home/hero/background.svg" width="1920" height="1080" alt="">' ) === true
 	&& str_contains( $homeHtml, '[[/nino/public]]/images/' ) === false && str_contains( $homeHtml, '[image' ) === false );
 
 // The logo, which is a slot too: nothing in the shipped frames, the navigation
@@ -846,7 +846,7 @@ check( '...and the mail an <img> with the absolute address and the company name 
 $appData['/nino/html/images']['/logo']['filename'] = null;
 
 // So the Image Slots tab's scan has nothing to propose for it: the copied template is no literal <img> of the images directory
-check( 'the copied home template names the slot and has no literal <img> of the images directory for the template scan to find', str_contains( (string) file_get_contents( $sandbox. '/private/templates/page-home.tpl' ), '[image /template/page-home/fullscreen-image/background alt=""]' ) === true
+check( 'the copied home template names the slot and has no literal <img> of the images directory for the template scan to find', str_contains( (string) file_get_contents( $sandbox. '/private/templates/page-home.tpl' ), '[image /template/page-home/hero/background alt=""]' ) === true
 	&& preg_match( '#<img\b[^>]*src="[^"]*/images/#i', (string) file_get_contents( $sandbox. '/private/templates/page-home.tpl' ) ) === 0 );
 // A fresh install is the thing the dashboard's "Missing image slots" tile counts: with the logo and the hero both slots, no template has an <img> of the images directory left
 check( 'on a fresh install the Missing image slots tile reads 0 - every picture of the starter site is a slot', \Nino\Modules\Images\Slots::missingCount( $appData ) === 0 );
@@ -876,7 +876,7 @@ check( 'writes every page\'s reachable Http-URI as one global fill, so a templat
 check( 'a page uri is a technical value, blacklisted out of the Text panel like every other route key', in_array( '/_nino/webpage/site-home/uri', $blacklistAfterWpApply, true )
 	&& in_array( '/_nino/webpage/site-contact/uri', $blacklistAfterWpApply, true )
 	&& count( array_unique( $blacklistAfterWpApply ) ) === count( $blacklistAfterWpApply ) );
-check( 'a template\'s own deeper content (unprefixed, shared across instances) still merges in', isset( $deAfterWpApply['[[/template/page-home/welcome/title]]'] ) === true );
+check( 'a template\'s own deeper content (unprefixed, shared across instances) still merges in', isset( $deAfterWpApply['[[/template/page-home/hero/title]]'] ) === true );
 
 [ , $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiList' ] );
 check( 'apiList now reflects the persisted, current list', array_column( $body['webpages'], 'httpUri' ) === [ '/', '/kontakt' ] );
@@ -889,8 +889,8 @@ check( 'apiList now reflects the persisted, current list', array_column( $body['
 // one-off and keeps sharing - that is what its template is for
 // An editor has replaced the hero's image and renamed the slot since: applying
 // the step again only adds, it never puts the shipped state back
-$appData['/nino/html/images']['/template/page-home/fullscreen-image/background']['label'] = 'Mein Titelbild';
-$appData['/nino/html/images']['/template/page-home/fullscreen-image/background']['filename'] = 'template/page-home/fullscreen-image/background.1920x1080.jpg';
+$appData['/nino/html/images']['/template/page-home/hero/background']['label'] = 'Mein Titelbild';
+$appData['/nino/html/images']['/template/page-home/hero/background']['filename'] = 'template/page-home/hero/background.1920x1080.jpg';
 \Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
 
 $perRoute = [ 'webpages' => [
@@ -904,9 +904,9 @@ check( 'applying two blank routes succeeds', $status === 200 );
 
 $configPerRoute = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
-$heroAfterSecondApply = $configPerRoute['/nino/html/images']['/template/page-home/fullscreen-image/background'] ?? [];
+$heroAfterSecondApply = $configPerRoute['/nino/html/images']['/template/page-home/hero/background'] ?? [];
 check( 'a second apply keeps a slot the project already has - its label and its changed image', ( $heroAfterSecondApply['label'] ?? null ) === 'Mein Titelbild'
-	&& ( $heroAfterSecondApply['filename'] ?? null ) === 'template/page-home/fullscreen-image/background.1920x1080.jpg' && array_keys( $configPerRoute['/nino/html/images'] ) === [ '/logo', '/template/page-home/fullscreen-image/background' ] );
+	&& ( $heroAfterSecondApply['filename'] ?? null ) === 'template/page-home/hero/background.1920x1080.jpg' && array_keys( $configPerRoute['/nino/html/images'] ) === [ '/logo', '/template/page-home/hero/background' ] );
 
 check( 'each blank route gets its own template file, named after its Element-URI', \Nino\Filesystem::fileExists( $appData, '/templates/page-team.tpl' ) === true && \Nino\Filesystem::fileExists( $appData, '/templates/page-jobs-open.tpl' ) === true );
 check( '...and renders it, rather than the unit\'s shared one', ( $configPerRoute['/nino/http/routes']['GET://team']['body'] ?? null ) === '[template /templates/page-team]'
@@ -1520,6 +1520,44 @@ foreach( scandir( $realRoot. '/_admin/install/library/pages' ) ?: [] as $pageEnt
 }
 
 check( 'every page unit ships the templates its own routes render'. ( $pageFailures === [] ? '' : ' - '. implode( ' | ', $pageFailures ) ), $pageFailures === [] );
+
+/*	The pages of the library are written in the form the Builder reads, so a fresh project edits them in it. A template that holds a section
+	has its name line at byte zero, the head, the wrap as the first line after the head and its closing tag as the last line before the foot,
+	and every section outside the markers of a block the Builder leaves alone has an id and no attribute but the ones the Builder keeps.
+	By grammar and position: no page, section or key of the library is named here	*/
+$shapeFailures	= [];
+$shapeTemplates	= 0;
+
+foreach( glob( $realRoot. '/_admin/install/library/pages/[!.]*/templates/*.tpl' ) ?: [] as $shapeFile ) {
+
+	$shapeSource = (string) file_get_contents( $shapeFile );
+
+	if( str_contains( $shapeSource, '<section' ) === false )
+		continue;
+
+	$shapeTemplates++;
+	$shapeLabel	= substr( $shapeFile, strlen( $realRoot. '/_admin/install/library/pages/' ) );
+	$shapeIds	= [];
+
+	if( preg_match( '~\A<!-- nino:template-name [^\r\n<>]+ -->\n\[template /templates/html-header(?:-[a-z0-9]+)*\]\n<div class="(?:[^"]* )?nino-wrap(?: [^"]*)?">\n.*\n</div>\n\[template /templates/html-footer(?:-[a-z0-9]+)*\]\n\z~s', $shapeSource ) !== 1 )
+		$shapeFailures[] = $shapeLabel. ': the name line, the head, the wrap, its closing tag and the foot do not stand where the Builder reads them';
+
+	// What stands between the markers of a block is the Builder's to leave alone
+	preg_match_all( '~<section\b([^>]*)>~', (string) preg_replace( '~<!-- nino:html -->.*?<!-- /nino:html -->~s', '', $shapeSource ), $shapeTags );
+
+	foreach( $shapeTags[1] as $shapeTag ) {
+
+		if( preg_match( '~\A(?: (?:id|class|data-cover-height)="[^"]*")+\z~', $shapeTag ) !== 1 )
+			$shapeFailures[] = $shapeLabel. ': a section with an attribute the Builder does not keep ('. trim( $shapeTag ). ')';
+		elseif( preg_match( '~ id="([a-z0-9]+(?:-[a-z0-9]+)*)"~', $shapeTag, $shapeId ) !== 1 || isset( $shapeIds[$shapeId[1]] ) === true )
+			$shapeFailures[] = $shapeLabel. ': a section without an id that is a slug, or with one a section before it has ('. trim( $shapeTag ). ')';
+		else
+			$shapeIds[$shapeId[1]] = true;
+	}
+}
+
+check( 'the pages of the library are written in the form the Builder reads ('. $shapeTemplates. ' templates)'. ( $shapeFailures === [] ? '' : ' - '. implode( ' | ', $shapeFailures ) ), $shapeFailures === [] && $shapeTemplates >= 5 );
+
 // The three a starter site is normally built from have to be among them, or
 // the Routes step has nothing to offer on a fresh install
 check( 'the page library offers the three a starter site is built from', count( array_intersect( [ 'home', 'contact', '404' ], $pageUnits ) ) === 3 );
@@ -1666,8 +1704,17 @@ check( '...and every one of them ends in a bare generic family'. ( $withoutBacku
 $rootAbsoluteTemplates = [];
 $libraryTemplates = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( __DIR__. '/../_admin/install/library', FilesystemIterator::SKIP_DOTS ) );
 foreach( $libraryTemplates as $libraryTemplate )
-	if( str_ends_with( $libraryTemplate->getFilename(), '.tpl' ) === true && preg_match( '/\b(?:action|href)="\//', (string) file_get_contents( $libraryTemplate->getPathname() ) ) === 1 )
-		$rootAbsoluteTemplates[] = substr( $libraryTemplate->getPathname(), strlen( __DIR__. '/../_admin/install/library/' ) );
+	if( str_ends_with( $libraryTemplate->getFilename(), '.tpl' ) === true ) {
+
+		// The href of a component's call that begins with the namespace of a text key names that key - the address of a page a template links to is the Routes step's fill,
+		// /_nino/webpage/contact/uri - and a call is looked at without it. What the key holds is the page's address within the project, without the directory a project in
+		// a subdirectory is served from, and a component's href writes it as it stands (Navigation puts the directory in front): so this pin sees the address a template
+		// writes and not the one a key resolves to
+		$libraryMarkup = (string) preg_replace( '#(\[[a-z][a-z0-9-]* [^\]]*?) href="/(?:_nino|template|project|feature|module)/[^"]*"#', '$1', (string) file_get_contents( $libraryTemplate->getPathname() ) );
+
+		if( preg_match( '/\b(?:action|href)="\//', $libraryMarkup ) === 1 )
+			$rootAbsoluteTemplates[] = substr( $libraryTemplate->getPathname(), strlen( __DIR__. '/../_admin/install/library/' ) );
+	}
 sort( $rootAbsoluteTemplates );
 check( 'no template of the install library writes an address from the domain root - a site in a subdirectory posts and links within itself'. ( $rootAbsoluteTemplates === [] ? '' : ' - '. implode( ', ', $rootAbsoluteTemplates ) ), $rootAbsoluteTemplates === [] );
 

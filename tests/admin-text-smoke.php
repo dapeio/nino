@@ -735,8 +735,6 @@ foreach( array_keys( $shippedKeys ) as $shippedKey ) {
 	foreach( [ 'category' => $segments[2], 'part' => $segments[3], 'name' => $segments[4] ] as $role => $slug ) {
 		if( $role === 'category' && ( $segments[1] === 'feature' || ( $segments[1] === 'template' && str_starts_with( $slug, 'page-' ) === true ) ) )
 			continue;
-		if( in_array( $slug, [ 'contact-form', 'fullscreen-image' ], true ) === true )
-			continue;
 		if( $slugCovered( $slug ) === false )
 			$uncovered[$role. ' '. $slug] = $shippedKey;
 	}

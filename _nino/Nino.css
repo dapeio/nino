@@ -962,7 +962,10 @@ main[tabindex="-1"]:focus-visible {
 	outline: none;
 }
 /* The Builder writes a div.nino-wrap around a page's sections, which puts the
-   hero one level down - the second selector of each pair is that form */
+   hero one level down - the second selector of each pair is that form. A wrap
+   with the class .nino-wrap--vpa says the sections of the page animate: a
+   marker the Builder reads and no rule styles, the animation is the nino-vpa
+   classes of the rows */
 main:has(> .nino-cover.nino-hero:first-child),
 main:has(> .nino-wrap > .nino-cover.nino-hero:first-child),
 main:has(> .nino-parallex.nino-hero:first-child),

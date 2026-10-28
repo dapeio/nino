@@ -1,13 +1,16 @@
+<!-- nino:template-name Page not found -->
 [template /templates/html-header]
-<section class="nino-hero nino-section nino-section--dark nino-text-center nino-cover nino-p-0" data-cover-height="100">
-	<div class="nino-cover-content">
-	<div class="nino-grid-row">
+<div class="nino-wrap">
+
+<section id="hero" class="nino-section nino-section--dark nino-cover nino-p-0 nino-text-center nino-hero" data-cover-height="100">
+	<div class="nino-grid-row nino-pt-3">
 		<div class="nino-grid-100">
-			<h2 class="nino-hero-title">[[/_nino/webpage[[/nino/http/response/uri]]/name]]</h2>
-			<p class="nino-hero-subtitle">[[/template/page-404/hero/subtitle]]</p>
-			<a href="[[/nino/dir]]/" class="nino-btn nino-btn--primary">[[/template/page-404/hero/button]]</a>
-		</div>
+			[hero-title /template/page-404/hero/title]
+			[hero-subtitle /template/page-404/hero/subtitle]
+			[button /template/page-404/hero/button href="/_nino/webpage/home/uri" style="primary"]
 		</div>
 	</div>
 </section>
+
+</div>
 [template /templates/html-footer]
