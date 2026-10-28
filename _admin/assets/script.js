@@ -2120,9 +2120,10 @@
 			} );
 
 			// tab name -> the panel whose pane holds it, and per panel the tab
-			// last open, so coming back to a panel lands where you left it.
-			// Only a pane's direct children count: a panel's own markup (the
-			// Builder's, say) may use data-tab for its own purposes
+			// last open, so coming back to a panel through the rail lands where
+			// you left it (see fromRail()). Only a pane's direct children count:
+			// a panel's own markup (the Builder's, say) may use data-tab for its
+			// own purposes
 			const tabOwner = {};
 			const lastTab  = {};
 			Object.keys( panels ).forEach( function( panel ) {
@@ -2160,8 +2161,9 @@
 			 *	Switch panel and mark the clicked link active - each panel keeps
 			 *	its own drill-down state, switching never resets it, so jumping
 			 *	back and forth is always exactly where you left it. A pane with
-			 *	tabs opens on the requested one, else the one last open, else
-			 *	its first.
+			 *	tabs opens on the requested one, else its first - the panel's own
+			 *	screen: what the rail passes for a panel that was open before is
+			 *	the tab last open (see fromRail()).
 			 *
 			 *	A move to another panel leaves the one on screen, and what that
 			 *	holds unsaved - in the panel or in a tab of it - is asked about first,
@@ -2239,6 +2241,25 @@
 			}
 
 			/**
+			 *	The rail's move to a panel - its link, or the select that stands for
+			 *	the rail on a phone: the person's own move, to the tab last open in
+			 *	that panel, so that coming back lands where you left it, and the
+			 *	address written is that tab's. A panel not opened before, or whose
+			 *	tab is gone, opens on its first. The address #<panel>, typed, linked
+			 *	or written by a panel's own back link, is the other way in and does
+			 *	not remember: it opens the panel's own screen, its first tab (see
+			 *	openTab()), and #<tab> opens that tab
+			 *
+			 *	@param		{string}		panel					Panel name
+			 *	@param		{Function}	[then]			Called once the panel is on screen - at once, or after the question was answered
+			 *
+			 *	@return		void
+			 */
+			function fromRail( panel, then ) {
+				selectTab( panel, lastTab[panel], true, then );
+			}
+
+			/**
 			 *	Put the focus on the name of the panel a person has just opened from
 			 *	the rail. The pane is new to them, and the Tab key would otherwise
 			 *	carry on from the link they pressed - through the rest of the rail -
@@ -2262,7 +2283,9 @@
 			}
 
 			/**
-			 *	What selectTab() does, without the history entry
+			 *	What selectTab() does, without the history entry. A pane with tabs
+			 *	opens on `tab` where it has it, else on its first tab, the panel's own
+			 *	screen - that is what the address #<panel> asks for
 			 *
 			 *	@param		{string}	panel
 			 *	@param		{string}	[tab]
@@ -2315,7 +2338,7 @@
 				}
 
 				const names 	= tabPanes.map( function( p ) { return p.dataset.tab } );
-				const current = names.indexOf( tab ) !== -1 ? tab : ( names.indexOf( lastTab[panel] ) !== -1 ? lastTab[panel] : names[0] );
+				const current = names.indexOf( tab ) !== -1 ? tab : names[0];
 				lastTab[panel] = current;
 
 				tabPanes.forEach( function( p ) { p.hidden = p.dataset.tab !== current } );
@@ -2373,7 +2396,7 @@
 					if( ev.defaultPrevented === true || ( ev.button || 0 ) !== 0 || ev.metaKey === true || ev.ctrlKey === true || ev.shiftKey === true || ev.altKey === true )
 						return;
 					ev.preventDefault();
-					selectTab( panel, undefined, true, function() { focusTitle( panel ) } );
+					fromRail( panel, function() { focusTitle( panel ) } );
 				} );
 			} );
 			// The skip link is a real one, and the address belongs to the router: an
@@ -2426,7 +2449,7 @@
 			// The group headings and, below 64rem, the select that stands for the
 			// strip - read from the rail as rendered, before the first panel is
 			// selected so that one finds its group and its entry
-			Nino.admin.navGroups.init( function( panel ) { selectTab( panel, undefined, true ) } );
+			Nino.admin.navGroups.init( function( panel ) { fromRail( panel ) } );
 
 			// Restore the panel from a refresh/deep link, and react to manual hash
 			// edits or the browser back/forward buttons (our own updates use

@@ -703,6 +703,12 @@ a {
 	color: var(--editor-text-secondary);
 }
 
+/* The chip Nino.adminUi.tabBadge() puts on the button of a tab: a little away
+   from the label it follows */
+:where(.nino-admin) .nino-admin-tab-badge {
+	margin-left: .45rem;
+}
+
 /* The square buttons at the end of a row of an ordered list - up, down,
    remove - as one cluster. A disabled one keeps the ring that the base rule
    for a disabled button takes off, and is dimmed further (.32 against .45), so

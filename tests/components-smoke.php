@@ -486,15 +486,38 @@ $groundConditions = static function( string $selector ) use ( $hookCss ): array 
 };
 
 /*	A card in the cell of a stack takes no margin of its own: the half gap of the cell is the room between neighbours and the edges of the stack are the column's. Measured at 1280px with
-	a gap of 2, the neighbours stood 36px apart where the gap is 18px, and the first card 9px in from the column's edge. It is the rule of a card in a cell, with more classes in its selector
-	than any rule that gives a card a margin - the base one and the 768px one among them - so that it wins wherever it stands in the file; the margins of a card are for a card that stands
-	in a column	*/
-$groundCellCard = '.nino-stack > * > .nino-card';
+	a gap of 2, the neighbours stood 36px apart where the gap is 18px, and the first card 9px in from the column's edge. The rule is as heavy as the rules that give a card a margin - one
+	class, the cell being asked for in :where() - so that the order decides: it comes after every rule of .nino-card, the 768px one among them, and before the margin classes, which win
+	over it. The margin of a card that a column of the Builder writes (nino-mt-2) lost to the rule when it weighed two classes; with the whole selector in :where() it weighed nothing
+	and the margin of .nino-card won in the cell. The margins of a card are for a card that stands in a column	*/
+$groundCellCard = ':where(.nino-stack > *) > .nino-card';
 $groundSlotAt = $groundLastOf( [ '.nino-stack > *' ], 'display' );
-check( 'a card in the cell of a stack takes no margin of its own: '. $groundCellCard. ' says margin: 0, once and as the only margin it sets, has more classes than the rules of a card, and comes after the slot rule',
+$groundHeavy = array_values( array_filter( array_keys( $groundEach ), static fn( mixed $selector ): bool => str_contains( (string) $selector, '.nino-card' ) === true
+	&& str_contains( (string) preg_replace( '/:where\([^()]*\)/', '', (string) $selector ), '.nino-stack' ) === true && preg_match( '/(?<![\w-])margin\s*:/', $groundOf( (string) $selector ) ) === 1 ) );
+$groundWrong = [];
+foreach( [ 'm', 'mt', 'mb', 'ml', 'mr' ] as $groundSide )
+	foreach( [ 0, 1, 2, 3, 4, 5, 6 ] as $groundStep )
+		if( $groundLastOf( [ $groundCellCard ] ) >= $groundLastOf( [ '.nino-'. $groundSide. '-'. $groundStep ] ) )
+			$groundWrong[] = '.nino-'. $groundSide. '-'. $groundStep;
+check( 'a card in the cell of a stack takes no margin of its own: '. $groundCellCard. ' says margin: 0, once and as the only margin it sets, and no rule that gives a card in a cell a margin asks for the cell outside :where()'
+	. ( $groundHeavy === [] ? '' : ' - heavier: '. implode( ' | ', $groundHeavy ) ),
 	$groundSets( $groundOf( $groundCellCard ), 'margin', '0' ) === true && count( $groundEach[$groundCellCard] ?? [] ) === 1
-	&& preg_match( '/(?<![\w-])margin-(?:top|right|bottom|left)\s*:/', $groundOf( $groundCellCard ) ) !== 1
-	&& substr_count( $groundCellCard, '.nino-' ) > substr_count( '.nino-card', '.nino-' ) && $groundSlotAt > 0 && $groundLastOf( [ $groundCellCard ] ) > $groundSlotAt );
+	&& preg_match( '/(?<![\w-])margin-(?:top|right|bottom|left)\s*:/', $groundOf( $groundCellCard ) ) !== 1 && $groundHeavy === []
+	&& substr_count( (string) preg_replace( '/:where\([^()]*\)/', '', $groundCellCard ), '.nino-' ) === substr_count( '.nino-card', '.nino-' ) );
+check( '...it stands after every rule of .nino-card, the 768px one among them, so that it wins over them at the same weight - and before every margin class, which wins over it: a card in a cell that says nino-mt-2 has that room'
+	. ( $groundWrong === [] ? '' : ' - not before: '. implode( ', ', $groundWrong ) ),
+	$groundWrong === [] && $groundLastOf( [ '.nino-card' ] ) > 0 && $groundLastOf( [ $groundCellCard ] ) > $groundLastOf( [ '.nino-card' ] ) && $groundLastOf( [ $groundCellCard ] ) > $groundSlotAt && $groundSlotAt > 0 );
+
+// The room [spacer] leaves is a height of its own: nino-spacer-1 to -6, the steps of the margin classes, and no margin - which a margin class written on it would compete with
+$groundWrong = [];
+foreach( [ 1, 2, 3, 4, 5, 6 ] as $groundStep ) {
+	$groundSpacer = $groundOf( '.nino-spacer-'. $groundStep );
+	if( count( $groundEach['.nino-spacer-'. $groundStep] ?? [] ) !== 1 || $groundSets( $groundSpacer, 'height', 'var(--space-'. $groundStep. ')' ) === false || preg_match( '/(?<![\w-])margin/', $groundSpacer ) === 1
+		|| $groundSets( $groundOf( '.nino-mt-'. $groundStep ), 'margin-top', 'var(--space-'. $groundStep. ')' ) === false )
+		$groundWrong[] = '.nino-spacer-'. $groundStep;
+}
+check( 'the room of a [spacer] is a height of its own: .nino-spacer-1 to -6 say height: var(--space-<n>), the step the margin class of that number has, once each and with no margin'
+	. ( $groundWrong === [] ? '' : ' - not: '. implode( ', ', $groundWrong ) ), $groundWrong === [] );
 
 /*	The cells of a stack on a phone: the classes of the grid are the only width a cell has - the -s- widths from 640px, the -m- ones from 768px, the -l- ones from 1024px - so below
 	640px a cell was as wide as its content, and a loop of cards with short texts drew narrow cards side by side at 375px (55, 55 and 68px wide, measured). The cells are one below the
@@ -2337,7 +2360,11 @@ check( '...and it is underlined where the pointer is over it or the keyboard is 
 	$groundSets( $groundOf( $linkRule. ':is(:hover, :focus-visible)' ), 'text-decoration', 'underline' ) === true && substr_count( $groundOf( $linkRule. ':is(:hover, :focus-visible)' ), ':' ) === 1
 	&& preg_match( '/(?<![\w-])text-decoration/', $groundOf( $linkRule ) ) !== 1
 	&& $groundSets( $groundOf( 'a' ), 'color', 'inherit' ) === true && $groundSets( $groundOf( 'a' ), 'text-decoration', 'none' ) === true && $linkTitles === [] );
-check( '[spacer] is an empty box with a margin of the size it says', $render( '[spacer size="4"]' ) === '<div class="nino-mt-4"></div>' && $render( '[spacer]' ) === '<div class="nino-mt-2"></div>' );
+check( '[spacer] is an empty box of a class of its own, the step of the size it says - 1 to 6, 2 where it says none',
+	array_filter( [ 1, 2, 3, 4, 5, 6 ], fn( int $step ): bool => $render( '[spacer size="'. $step. '"]' ) !== '<div class="nino-spacer nino-spacer-'. $step. '"></div>' ) === []
+	&& $render( '[spacer]' ) === '<div class="nino-spacer nino-spacer-2"></div>' );
+check( '...and the markup it is made from has no margin class: the margin a column writes on it is room beside its height and does not compete with its size',
+	str_contains( \Nino\Modules\Components::$html['spacer'], 'nino-mt-' ) === false && str_contains( $render( '[spacer size="3" class="nino-mt-2"]' ), 'nino-spacer-3 nino-mt-2"' ) === true );
 check( '[html] is its content as rich text, and nothing without content', $render( '[html]<p>Hi</p><script>alert(1)</script>[/html]' ) === '<p>Hi</p>' && $render( '[html][/html]' ) === '' );
 check( '[button] is a link drawn as one: label from a key, address from a key, a style', $render( '[button /_nino/webpage/contact/name href="/_nino/webpage/contact/uri" style="primary"]' ) === '<a class="nino-btn nino-btn--primary" href="/contact">Contact us</a>' );
 check( '[button] takes a fixed label, a size, a target - and a target that is another window says it is no concern of the opener', $render( '[button text="Go" href="https://example.com" size="big" target="_blank"]' ) === '<a class="nino-btn nino-btn--big" href="https://example.com" target="_blank" rel="noopener">Go</a>' );
@@ -2465,7 +2492,7 @@ check( '...the markup of the div is a property like the card\'s, and what the ca
 // Whatever a hand-written file gets wrong still renders
 check( 'an attribute that is not declared is ignored', $render( '[title /template/page-home/hero/title bogus="x" onclick="y"]' ) === $render( '[title /template/page-home/hero/title]' ) );
 check( 'a select outside its options is the default', $render( '[title /template/page-home/hero/title tag="h9" style="weird"]' ) === '<h3 class="nino-section-title">Hi &#91;there]</h3>'
-	&& $render( '[spacer size="99"]' ) === '<div class="nino-mt-2"></div>' && $render( '[text /template/page-home/services/text format="nonsense"]' ) === $render( '[text /template/page-home/services/text]' ) );
+	&& $render( '[spacer size="99"]' ) === '<div class="nino-spacer nino-spacer-2"></div>' && $render( '[text /template/page-home/services/text format="nonsense"]' ) === $render( '[text /template/page-home/services/text]' ) );
 check( 'a source that resolves to nothing renders nothing - not a heading with nothing in it', $render( '[title /template/page-home/nope/title]' ) === '' && $render( '[subtitle /template/page-home/nope/title]' ) === ''
 	&& $render( '[text /template/page-home/nope/title]' ) === '' && $render( '[button /template/page-home/nope/title href="#"]' ) === '' && $render( '[title]' ) === ''
 	&& $render( '[title /template/page-home/empty/title]' ) === '' && $render( '[title title]' ) === '' );
@@ -2656,7 +2683,7 @@ check( '...a source that resolves to nothing is nothing, not an empty link, and 
 	$render( '[title /template/page-home/nope/title href="#x"]' ) === '' && $render( '[image /template/page-home/hero/empty href="#x"]' ) === ''
 	&& $render( '[stack /services sort="title" limit="1"][title title href=".uri" target="_blank"][/stack]' ) === '<div class="nino-grid-row nino-stack nino-stack-gap-2"><div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><a href="/services/app" target="_blank" rel="noopener"><h3 class="nino-section-title">App</h3></a></div></div>' );
 check( '...the others take no link: the card holds buttons, the button has an address of its own, and the html, the spacer and the scroll hint do not name one - an href on them is an attribute nobody declared, and ignored',
-	$render( '[card href="#x" target="_blank"]x[/card]' ) === '<article class="nino-card"><div class="nino-card-content">x</div></article>' && $render( '[spacer href="#x"]' ) === '<div class="nino-mt-2"></div>'
+	$render( '[card href="#x" target="_blank"]x[/card]' ) === '<article class="nino-card"><div class="nino-card-content">x</div></article>' && $render( '[spacer href="#x"]' ) === '<div class="nino-spacer nino-spacer-2"></div>'
 	&& $render( '[html href="#x"]<p>Hi</p>[/html]' ) === '<p>Hi</p>' && $render( '[button text="Go" href="#x" target="_blank"]' ) === '<a class="nino-btn" href="#x" target="_blank" rel="noopener">Go</a>'
 	&& $render( '[scroll-hint href="#x" target="_blank"]' ) === $render( '[scroll-hint]' ) );
 check( '...and a component of a project that says link is wrapped the same way, a component that does not is not',
@@ -2876,7 +2903,7 @@ check( '[filter] says a stored label as the characters it is', str_contains( $re
 
 // class: every component takes it, and the renderer puts it on its outer element
 check( '[spacer] and the four stacks carry the class they are given on their outer element',
-	$render( '[spacer class="x"]' ) === '<div class="nino-mt-2 x"></div>'
+	$render( '[spacer class="x"]' ) === '<div class="nino-spacer nino-spacer-2 x"></div>'
 	&& str_contains( $render( '[stack /services class="x"][probe][/stack]' ), '<div class="nino-grid-row nino-stack nino-stack-gap-2 x">' ) === true
 	&& str_contains( $render( '[slider /services class="x"][probe][/slider]' ), '<div class="nino-slider x" data-slider-width="75%"><ul>' ) === true
 	&& str_contains( $render( '[filter /services class="x"][probe][/filter]' ), '<div class="nino-filter x">' ) === true

@@ -19,6 +19,29 @@ namespace Nino {
 		// Language panel validates a new language with, and getTextLocales() lists by
 		public const string PATTERN = '/^[a-z]{2}_[A-Z]{2}$/D';
 
+		// A language in its own tongue: the name a visitor of that language reads in
+		// the language switch of the site (the fill /_nino/locale/<code>/name), which
+		// the setup wizard and the Language panel write when they add a language to a
+		// project - from then on it is the editors' to change. The codes are the ones
+		// that turn up in practice, never a whitelist of what a project may add: a
+		// language with no entry here is named by its code
+		public const array ENDONYMS = [
+			'de_DE' => 'Deutsch',
+			'de_AT' => 'Deutsch (Österreich)',
+			'de_CH' => 'Deutsch (Schweiz)',
+			'en_US' => 'English (US)',
+			'en_GB' => 'English (UK)',
+			'fr_FR' => 'Français',
+			'it_IT' => 'Italiano',
+			'es_ES' => 'Español',
+			'nl_NL' => 'Nederlands',
+			'pl_PL' => 'Polski',
+			'pt_PT' => 'Português',
+			'cs_CZ' => 'Čeština',
+			'da_DK' => 'Dansk',
+			'sv_SE' => 'Svenska',
+		];
+
 		// Where getTextLocales() keeps its answer for the length of the request
 		private const string TEXT_CACHE = './nino/locales/text';
 

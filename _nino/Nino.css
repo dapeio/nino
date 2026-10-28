@@ -813,10 +813,6 @@ h1, h2, h3, h4, h5, h6 {
 	gap: calc(var(--space-1) * var(--whitespace-gap));
 	padding: calc(var(--nino-stack-gap-scaled) / 2);
 }
-/*	A card in a cell takes no margin of its own: the half gap of its cell is the
-	room between neighbours, and the stack's edges are the column's. A card's own
-	margins are for a card that stands in a column	*/
-.nino-stack > * > .nino-card { margin: 0; }
 .nino-stack > * > .nino-btn { justify-self: start; }
 /*	The cells of a stack are one below the other on a phone. The classes of the
 	grid are the only width a cell has, and the three widths of a stack start at
@@ -1963,6 +1959,19 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	.nino-card-cols-xl > .nino-card-img { max-height: none; max-width: var(--card-img-max-width); }
 }
 
+/*	A card in the cell of a stack takes no margin of its own: the half gap of the
+	cell is the room between neighbours, and the stack's edges are the column's. A
+	card's own margins are for a card that stands in a column. The cell is asked
+	for in :where(), which counts for nothing, so that the rule is one class heavy
+	- as the margins of .nino-card above are, the 768px block among them - and the
+	order decides: it wins over them by standing after them, and loses to the
+	margin classes at the end of the file by standing before them, so that a card
+	in a cell that says nino-mt-2 has that room above it, which is what a column
+	of the Builder writes on a component. The card itself stays out of :where():
+	with the whole selector in it the rule weighs nothing, and the margin of
+	.nino-card wins in the cell again	*/
+:where(.nino-stack > *) > .nino-card { margin: 0; }
+
 /*	A card as tall as the column or the cell it stands in, so that the cards of one
 	row end on one line. It has no margin at all, or it would not be that box: the
 	bottom margin pushes it out of the box by exactly that much, and from 768px,
@@ -1989,9 +1998,9 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	top and a button ends the card. The pieces of a card have a bottom margin only and
 	the global img rule is height: auto, so for them the column changes no spacing and
 	no picture. The margins of the items of a flex column do not collapse, though: a
-	spacer keeps its whole top margin, and two buttons that stood side by side stand
-	one under the other. A flex item is stretched over the column; a button is as wide
-	as its label and sits where the text does, as in the stack above.
+	margin class on a spacer keeps its whole room, and two buttons that stood side by side
+	stand one under the other. A flex item is stretched over the column; a button is as
+	wide as its label and sits where the text does, as in the stack above.
 
 	A card that [card] draws holds its picture and a div, .nino-card-content, with all
 	the rest in it. In the middle and at the bottom it is the group of the two that
@@ -4395,6 +4404,7 @@ header .nino-headernav-logo:empty {
  *
  *
  *			.nino-m(t,r,b,l)(-0 … -6), .nino-p(t,r,b,l)(-0 … -6), .nino-mx-auto
+ *			.nino-spacer(-1 … -6)
  *			.nino-text(*, -s, -m, -l, -xl)(-left, -center, -right)
  *			.nino-opacity(-10 … -90)
  *			.nino-hidden(*, -s, -m, -l, -xl), .nino-visible(-s, -m, -l, -xl)
@@ -4440,6 +4450,16 @@ header .nino-headernav-logo:empty {
 .nino-mr-4 { margin-right: var(--space-4); }
 .nino-mr-5 { margin-right: var(--space-5); }
 .nino-mr-6 { margin-right: var(--space-6); }
+/*	The room [spacer] leaves, as a height of its own: nino-spacer-1 to -6, the
+	steps of the margins above. A spacer used to be nino-mt-N, so that its size
+	and the margin a column writes on it (nino-mt-2) were one property and the
+	larger step won; with a height the margin is room on top of it	*/
+.nino-spacer-1 { height: var(--space-1); }
+.nino-spacer-2 { height: var(--space-2); }
+.nino-spacer-3 { height: var(--space-3); }
+.nino-spacer-4 { height: var(--space-4); }
+.nino-spacer-5 { height: var(--space-5); }
+.nino-spacer-6 { height: var(--space-6); }
 .nino-p-0 { padding: 0; }
 .nino-p-1 { padding: var(--space-1); }
 .nino-p-2 { padding: var(--space-2); }

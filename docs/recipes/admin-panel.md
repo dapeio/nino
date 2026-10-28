@@ -67,8 +67,18 @@ request:
 - `uri` is a slug (`/^[a-z][a-z0-9-]*$/`) and MUST be unique. It names the
   link (`admin-nav-<uri>`), the pane (`admin-content-<uri>`), the shell state
   class `show-<uri>`, the hash prefix (`#<uri>/...`) and the JS namespace the
-  shell calls (`Nino.admin.<uri>`). A second class claiming a taken uri is
-  dropped with a warning, so a module cannot replace a core screen.
+  shell calls (`Nino.admin.<uri>`). The first claim of a uri stands: a second
+  class claiming a taken one is dropped with a warning that names both, so a
+  module cannot replace a core screen. The claims are made in the order of the
+  workbench's own panels with their tabs, the panels of the kernel's own
+  modules, and then the other modules' panels as `/nino/modules` lists them.
+  The uris of the first two are therefore reserved, wherever a module stands in
+  that list: `dashboard`, `elements`, `types`, `text`, `keys`, `images`,
+  `slots`, `logs`, `routes`, `users`, `roles`, `lockout`, `recoverypw`,
+  `language`, `translations`, `backups`, `features` and `config`, and the
+  screens of the Form, Navigation and Maintenance modules - `submissions`,
+  `navs` and `maintenance`. Two modules naming one uri that is neither: the
+  module listed first keeps it.
 - A `label` starting with `/` is a fill key, resolved by the normal fill pass
   from `_admin/text/<locale>.php` and the panel's `text()` files; anything
   else is literal text and is escaped. Every shipped panel uses a fill - the
@@ -154,6 +164,19 @@ buttons over its screen appends them to `.actions`. `panelHead()` answers
 `null` where there is no head, so a script rendered somewhere other than its
 pane keeps its strip where it drew it. `head()` returning `false` drops the
 row; the Dashboard does that, because its screen has no single subject.
+
+A word on a tab - how many of something wait in it, what state it is in - is
+`Nino.adminUi.tabBadge( tab, text, state )`: one chip, the workbench's
+`.nino-admin-badge` pill, after the label on the registry's button for that
+tab (`#admin-tabbutton-<uri>`). `state` is `ok`, `warn`, `error` or `muted`,
+the `data-state` the other badges take; without one the chip is the colour of
+the label. A second call replaces the chip, an empty text or `null` takes it
+away, and `tabBadge( tab )` answers the word it was given, `''` for none. The
+shell draws its strip once and never again - a move between panels and tabs
+changes the classes of the buttons and not the buttons - so the chip stays
+until the panel changes it; the panel calls it where the number changes, and
+a tab the account has no button for draws nothing. A chip of a panel's own on
+the same button is left alone.
 
 ### The manual
 
@@ -613,7 +636,10 @@ that adds an entry, does nothing where the address already says it, and the
 `set()` the level then makes finds it true. The shell does the same for the
 rail, the tabs and the phone's select (`selectTab( panel, tab, true )`); the
 page load, the arrow keys of a tab strip and a step through the history only
-replace. And `showCurrent()` follows the hash: when `router.current().panel`
+replace. The address of the panel itself, `#catalog`, is its own screen: for a
+pane with tabs the shell opens the first tab, whichever was open last, and
+`#<tab>` opens that tab - only the rail, and the phone's select, come back to
+the tab last open. And `showCurrent()` follows the hash: when `router.current().panel`
 names this panel, the level its parts name is shown - a step through the
 history changes the address and nothing else - and a hash that names another
 panel (a click on the rail) keeps the level in memory, as before. Leaving an
@@ -1121,7 +1147,7 @@ Reach for an existing class first; only invent one when no role fits.
 | Primary / destructive button | `.nino-admin-btn-primary`, `.nino-admin-btn-danger`, built with `Nino.adminUi.button()` |
 | A button small enough for a row - the actions of one entry, a button beside a field | `.nino-admin-btn--small` beside the variant that says what it does (30px high, where the base button is as high as a field) |
 | Buttons and a status line in one row inside a form or under a list - not the fixed bar | `.nino-admin-actions` (wraps; `--end` stands it at the right edge, `--between` spreads it); the space above it is the screen's own rule |
-| A short word as a pill beside a name - a state, a kind, a count | `.nino-admin-badge`; `data-state="ok"`, `"warn"`, `"error"` or `"muted"` colours it like the status line's saved, unsaved, failed and quiet text, and the word says it too |
+| A short word as a pill beside a name - a state, a kind, a count | `.nino-admin-badge`; `data-state="ok"`, `"warn"`, `"error"` or `"muted"` colours it like the status line's saved, unsaved, failed and quiet text, and the word says it too. On the button of a tab it is drawn by `Nino.adminUi.tabBadge( tab, text, state )` |
 | Up, down and remove at the end of a row of an ordered list | `.nino-admin-move` around the square buttons (inside a `.nino-admin-list` row it keeps off the row's edge) |
 | Raised panel | `.nino-admin-card` (a `fieldset` is one already) |
 | Clickable drill-down list | `.nino-admin-list` (+ `.nino-admin-list-copy` per row); a row that writes no address is a `button.nino-admin-list-link`, one that writes an address a link with the `href` of `Nino.admin.router.href()` |

@@ -6,7 +6,8 @@
  *													answer and with a failure, what a second showing
  *													does, and the level it shows - and showLevel() and
  *													backTo(), which move the focus into a level and back
- *													to the control that opened it. Nino.admin.js is loaded
+ *													to the control that opened it, and tabBadge(), the
+ *													word on the button of a tab. Nino.admin.js is loaded
  *													the way the panel suites load it, with the shell's
  *													dirty registry and router as stand-ins - and in a
  *													page that has no Nino.admin at all, which is what the
@@ -628,6 +629,75 @@ console.log( '\nNino.adminUi.backTo - back to the control that opened the level\
 
 	d.Nino.adminUi.showLevel( 'catalog-form' );
 	check( 'back without an opener is the level\'s own heading as well', d.Nino.adminUi.backTo( 'catalog-list' ) === d.name && d.Nino.adminUi.backTo( 'catalog-list', null ) === d.name );
+}
+
+// --- tabBadge ---------------------------------------------------------------
+
+console.log( '\nNino.adminUi.tabBadge - a word on the button of a tab\n' );
+
+{
+	const w = world( {} );
+	const ui = w.Nino.adminUi;
+
+	// The strip the registry renders: a button a tab, with the id the shell gives it (see Panels::$html)
+	const strip = element('div');
+	const tabs = {};
+	[ 'roles', 'lockout' ].forEach( function( name ) {
+		const button = element('button');
+		button.id = 'admin-tabbutton-'+ name;
+		button.className = 'nino-admin-tab';
+		button.textContent = name;
+		strip.appendChild( button );
+		tabs[name] = button;
+	} );
+	w.page.appendChild( strip );
+
+	const chips = function( button ) { return button.children.filter( function( child ) { return child.classList.contains('nino-admin-badge') } ) };
+
+	check( 'a tab that was given nothing answers an empty word and has no chip', ui.tabBadge('roles') === '' && chips( tabs.roles ).length === 0 );
+
+	ui.tabBadge( 'roles', '3', 'warn' );
+	check( 'a word is one chip on the button of the tab: the workbench\'s pill, the word its text, the state its data-state', chips( tabs.roles ).length === 1
+		&& chips( tabs.roles )[0].tagName === 'SPAN' && chips( tabs.roles )[0].textContent === '3' && chips( tabs.roles )[0].dataset.state === 'warn' && chips( tabs.lockout ).length === 0 );
+	check( '...and the tab alone answers the word', ui.tabBadge('roles') === '3' );
+
+	ui.tabBadge( 'roles', '12', 'ok' );
+	check( 'a second word replaces the first: still one chip, with the new word and the new state', chips( tabs.roles ).length === 1 && chips( tabs.roles )[0].textContent === '12'
+		&& chips( tabs.roles )[0].dataset.state === 'ok' && ui.tabBadge('roles') === '12' );
+
+	ui.tabBadge( 'roles', '5', 'purple' );
+	check( 'a state that is none of the four draws the chip without one, in the colour of the label', chips( tabs.roles ).length === 1 && chips( tabs.roles )[0].dataset.state === undefined );
+	ui.tabBadge( 'roles', '6' );
+	check( '...as does no state at all', chips( tabs.roles ).length === 1 && chips( tabs.roles )[0].textContent === '6' && chips( tabs.roles )[0].dataset.state === undefined );
+
+	ui.tabBadge( 'roles', '' );
+	check( 'an empty word takes the chip away, and the record with it', chips( tabs.roles ).length === 0 && ui.tabBadge('roles') === '' );
+	ui.tabBadge( 'roles', '2', 'muted' );
+	ui.tabBadge( 'roles', null );
+	check( 'so does null', chips( tabs.roles ).length === 0 && ui.tabBadge('roles') === '' );
+	ui.tabBadge( 'roles', '  ' );
+	check( '...and a word of nothing but spaces, which would draw an empty pill', chips( tabs.roles ).length === 0 && ui.tabBadge('roles') === '' );
+
+	ui.tabBadge( 'roles', 7 );
+	check( 'a number is its digits', chips( tabs.roles )[0].textContent === '7' && ui.tabBadge('roles') === '7' );
+	ui.tabBadge( 'roles', '<b>1</b>' );
+	check( 'the word is text and never markup', chips( tabs.roles )[0].textContent === '<b>1</b>' && chips( tabs.roles )[0].children.length === 0 );
+	ui.tabBadge( 'roles', '' );
+
+	// What another script put on the same button is its own
+	const own = element('span');
+	own.className = 'nino-admin-badge design-tab-changed';
+	tabs.lockout.appendChild( own );
+	ui.tabBadge( 'lockout', '1' );
+	check( 'a chip another script drew on the same button stays beside the one drawn here', chips( tabs.lockout ).length === 2 && chips( tabs.lockout )[0] === own );
+	ui.tabBadge( 'lockout', '' );
+	check( '...and is not taken away with it', chips( tabs.lockout ).length === 1 && chips( tabs.lockout )[0] === own );
+
+	// A tab the page has no button for is recorded, and nothing is drawn
+	ui.tabBadge( 'nope', '4' );
+	check( 'a tab with no button in the page - the account lacks its permission - is recorded and draws nothing', ui.tabBadge('nope') === '4' && findAll( w.page, function( el ) { return el.classList.contains('nino-admin-tab-badge') } ).length === 0 );
+	ui.tabBadge( 'No Slug', 'x' );
+	check( 'a name that is no slug is no tab: nothing is recorded', ui.tabBadge('No Slug') === '' && ui.tabBadge( 42 ) === '' );
 }
 
 // --- manual and manualDialog -----------------------------------------------

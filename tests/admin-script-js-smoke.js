@@ -163,6 +163,20 @@ function node( id, attributes ) {
 			other.parent = el;
 			return other;
 		},
+		// A child of another stand-in - a chip on the button of a tab - comes and goes
+		appendChild : function( other ) {
+			el.children.push( other );
+			other.parent = el;
+			other.parentNode = el;
+			return other;
+		},
+		removeChild : function( other ) {
+			const at = el.children.indexOf( other );
+			if( at !== -1 ) el.children.splice( at, 1 );
+			other.parent = null;
+			other.parentNode = null;
+			return other;
+		},
 		remove : function() {
 			if( el.parent === null ) return;
 			const at = el.parent.children.indexOf( el );
@@ -255,6 +269,8 @@ const shellNodes = {
 	'admin-content-users' : usersPane,
 	'admin-tab-roles' : rolesPane,
 	'admin-tab-lockout' : lockoutPane,
+	'admin-tabbutton-roles' : rolesTab,
+	'admin-tabbutton-lockout' : lockoutTab,
 };
 
 // The interface-language picker: a select whose current option is the one the page was drawn with
@@ -451,6 +467,90 @@ navSelect.value = 'users';
 navSelect.listeners.change();
 check( 'a change of the select opens that panel as a person\'s own move: one entry, its group open', railLinks.users.getAttribute('aria-current') === 'page'
 	&& browser.entries[browser.entries.length - 1] === '#roles' && browser.entries.length === 6 && railLinks.users.classList.contains('nino-admin-nav-collapsed') === false && storage[GROUPS_KEY] === undefined );
+
+/*	The address of a panel is its own screen. #<panel> - typed, linked, or written by the back link of a panel - opens the
+	first tab of the pane, whichever was open last; #<tab> opens that tab. The rail is the way back to where one was: its
+	links, and the select that stands for it on a phone, open the tab last open and write that tab's address	*/
+{
+	// An address typed: the browser makes the entry and tells the page, with no step of ours behind it
+	const typed = function( hash ) {
+		browser.entries.splice( browser.at + 1 );
+		browser.states.splice( browser.at + 1 );
+		browser.entries.push( hash );
+		browser.states.push( null );
+		browser.at++;
+		shell.location.hash = hash;
+		windowListeners.hashchange();
+	};
+	const openTab = function() { return rolesPane.hidden === false && lockoutPane.hidden === true ? 'roles' : ( lockoutPane.hidden === false && rolesPane.hidden === true ? 'lockout' : '' ) };
+	const clickRail = function( link ) { link.listeners.click( { preventDefault : function() {} } ) };
+
+	lockoutTab.listeners.click();
+	check( 'the second tab of the pane is open and its address is written', openTab() === 'lockout' && shell.location.hash === '#lockout' );
+
+	clickRail( railLinks.dashboard );
+	typed( '#users' );
+	check( 'the address of a panel with tabs opens its first tab, not the one open last: the panel\'s own screen', openTab() === 'roles' && railLinks.users.getAttribute('aria-current') === 'page' );
+	check( '...the strip says so, and the address becomes the first tab\'s', rolesTab.getAttribute('aria-selected') === 'true' && lockoutTab.getAttribute('aria-selected') === 'false'
+		&& rolesTab.tabIndex === 0 && lockoutTab.tabIndex === -1 && shell.location.hash === '#roles' );
+
+	lockoutTab.listeners.click();
+	typed( '#users' );
+	check( '...also with the panel on screen, on its second tab: a link to the panel or its back link says the panel', openTab() === 'roles' && shell.location.hash === '#roles' );
+
+	clickRail( railLinks.dashboard );
+	typed( '#lockout' );
+	check( 'the address of a tab opens that tab', openTab() === 'lockout' && railLinks.users.getAttribute('aria-current') === 'page' && shell.location.hash === '#lockout' );
+
+	clickRail( railLinks.dashboard );
+	clickRail( railLinks.users );
+	check( 'the rail opens the tab last open, and writes its address', openTab() === 'lockout' && shell.location.hash === '#lockout' );
+
+	navSelect.value = 'dashboard';
+	navSelect.listeners.change();
+	navSelect.value = 'users';
+	navSelect.listeners.change();
+	check( '...so does the select that stands for the rail on a phone', openTab() === 'lockout' && shell.location.hash === '#lockout' && railLinks.users.getAttribute('aria-current') === 'page' );
+
+	// What the checks below find, as before: the pane on its first tab
+	rolesTab.listeners.click();
+	check( 'a click on the first tab is the way back to where the checks below start', openTab() === 'roles' && shell.location.hash === '#roles' );
+}
+
+/*	A word on the button of a tab (Nino.adminUi.tabBadge()) stays through every move of the shell: the strip is rendered by the
+	server and wired once, and a move changes the classes and attributes of its buttons, never the buttons	*/
+{
+	const realCreate = shell.document.createElement;
+	shell.document.createElement = element;
+
+	const chipsOn = function( button ) { return button.children.filter( function( child ) { return child.classList.contains('nino-admin-tab-badge') } ) };
+	const clickRail = function( link ) { link.listeners.click( { preventDefault : function() {} } ) };
+
+	shell.Nino.adminUi.tabBadge( 'lockout', '2', 'warn' );
+	const chip = chipsOn( lockoutTab )[0];
+	check( 'a word is drawn on the button the shell rendered for the tab, and on no other', chipsOn( lockoutTab ).length === 1 && chip.textContent === '2' && chip.dataset.state === 'warn' && chipsOn( rolesTab ).length === 0 );
+
+	rolesTab.listeners.click();
+	lockoutTab.listeners.click();
+	clickRail( railLinks.dashboard );
+	clickRail( railLinks.users );
+	navSelect.value = 'dashboard';
+	navSelect.listeners.change();
+	navSelect.value = 'users';
+	navSelect.listeners.change();
+	rolesTab.listeners.keydown( { key : 'ArrowRight', preventDefault : function() {} } );
+	browser.step( -1 );
+	browser.step( 1 );
+	check( 'it survives the moves of the shell - a tab, the rail, the select, an arrow key, the history - as the one chip that was drawn, and the record is the same', chipsOn( lockoutTab ).length === 1 && chipsOn( lockoutTab )[0] === chip
+		&& chip.textContent === '2' && shell.Nino.adminUi.tabBadge('lockout') === '2' );
+
+	shell.Nino.adminUi.tabBadge( 'lockout', '' );
+	check( 'and goes when it is asked to', chipsOn( lockoutTab ).length === 0 && shell.Nino.adminUi.tabBadge('lockout') === '' );
+
+	shell.document.createElement = realCreate;
+	// Where the checks below start: the pane on its first tab
+	rolesTab.listeners.click();
+}
 
 /*	A step through the history that is refused. Back from a form that holds input
 	nobody saved is a hashchange; the panel asks, and on Cancel the screen stays

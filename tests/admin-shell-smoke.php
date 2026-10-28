@@ -103,6 +103,39 @@ class AdminSmokeShadowModule {
 	public static function adminPanels( array &$appData ): array { return [ 'AdminSmokeShadowPanel' ]; }
 }
 
+/** A panel claiming the uri of a screen of the kernel's own modules - whichever the check sets, Navigations, Submissions or Maintenance */
+class AdminSmokeKernelClaimPanel {
+	public static string $uri = 'navs';
+	public static function actions(): array { return [ 'kernelclaim/list' => [ self::class, 'apiList' ] ]; }
+	public static function nav(): array { return [ self::$uri, 'Kernel claim', 5 ]; }
+	public static function apiList( array &$appData, array &$request ): void { \Nino\Http::ok( $request ); }
+}
+
+class AdminSmokeKernelClaimModule {
+	public static function adminPanels( array &$appData ): array { return [ 'AdminSmokeKernelClaimPanel' ]; }
+}
+
+/** Two panels of two modules wanting one uri that nobody else has */
+class AdminSmokeClaimPanelA {
+	public static function actions(): array { return [ 'claima/list' => [ self::class, 'apiList' ] ]; }
+	public static function nav(): array { return [ 'claimed', 'Claim A', 56 ]; }
+	public static function apiList( array &$appData, array &$request ): void { \Nino\Http::ok( $request ); }
+}
+
+class AdminSmokeClaimPanelB {
+	public static function actions(): array { return [ 'claimb/list' => [ self::class, 'apiList' ] ]; }
+	public static function nav(): array { return [ 'claimed', 'Claim B', 57 ]; }
+	public static function apiList( array &$appData, array &$request ): void { \Nino\Http::ok( $request ); }
+}
+
+class AdminSmokeClaimModuleA {
+	public static function adminPanels( array &$appData ): array { return [ 'AdminSmokeClaimPanelA' ]; }
+}
+
+class AdminSmokeClaimModuleB {
+	public static function adminPanels( array &$appData ): array { return [ 'AdminSmokeClaimPanelB' ]; }
+}
+
 /** A panel naming a script that is not on disk - the registry has to say so */
 class AdminSmokeGhostPanel {
 	public static function actions(): array { return [ 'ghost/list' => [ self::class, 'apiList' ] ]; }
@@ -630,10 +663,10 @@ foreach( [ 'en_US', 'de_DE', 'fr_FR' ] as $locale ) {
 			$markup .= (string) file_get_contents( $file );
 	}
 
-	// The language switcher names each locale from a fill the Localepicker
-	// module's install step writes - an optional unit, and one that cannot know
-	// about a locale added later through the Language panel. An option with no
-	// name is a switcher nobody can use, so the code stands in for the word
+	// The language switcher names each locale from a fill the setup writes for
+	// the languages it installs and the Language panel for one it adds later;
+	// a project put together by hand has none. An option with no name is a
+	// switcher nobody can use, so the code stands in for the word
 	if( $locale === 'en_US' ) {
 		$noNames = $render;
 		$noNames['/nino/locales/available'] = [ 'de_DE', 'en_US', 'fr_FR' ];
@@ -771,6 +804,42 @@ $withoutModule = $appData;
 $withoutModule['/nino/modules'] = [];
 [ $status ] = ninoCall( $withoutModule, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'navs/list' );
 check( 'with the Navigation module off, navs/list is an unknown action and the panel is gone', $status === 404 && isset( \Nino\Admin\Admin::panels( $withoutModule )['navs'] ) === false );
+
+/*	The first claim of a uri stands, and the claims are made in an order of their own: the tool's panels, then the panels
+	of the kernel's own modules, then the others as the module list has them. A module standing before Navigation, Form or
+	Maintenance in that list does not get the uri of their screens, and the module list can put it there: it is a file	*/
+foreach( [ 'navs' => '\\Nino\\Modules\\Navigation', 'submissions' => '\\Nino\\Modules\\Form', 'maintenance' => '\\Nino\\Modules\\Maintenance' ] as $kernelUri => $kernelModule ) {
+
+	AdminSmokeKernelClaimPanel::$uri = $kernelUri;
+	$kernelClaim = $appData;
+	unset( $kernelClaim['./_admin/panels'] );
+	$kernelClaim['/nino/modules'] = [ 'AdminSmokeKernelClaimModule', $kernelModule ];
+
+	ninoWarnings();
+	$kernelClaimPanels = \Nino\Admin\Admin::panels( $kernelClaim );
+	$kernelClaimWarnings = ninoWarnings();
+
+	check( 'a module before '. ltrim( $kernelModule, '\\' ). ' in the module list does not take '. $kernelUri. ': the kernel\'s panel keeps the uri, the claim is dropped with the warning that names both',
+		( $kernelClaimPanels[$kernelUri]['class'] ?? '' ) === ltrim( $kernelModule, '\\' ). '\\Admin'
+		&& in_array( 'AdminSmokeKernelClaimPanel', array_column( \Nino\Admin\Admin::allPanels( $kernelClaim ), 'class' ), true ) === false
+		&& count( $kernelClaimWarnings ) === 1 && str_contains( $kernelClaimWarnings[0], 'AdminSmokeKernelClaimPanel' ) === true && str_contains( $kernelClaimWarnings[0], ltrim( $kernelModule, '\\' ). '\\Admin' ) === true );
+}
+
+foreach( [ [ 'A', 'B' ], [ 'B', 'A' ] ] as [ $firstClaim, $secondClaim ] ) {
+
+	$twoClaims = $appData;
+	unset( $twoClaims['./_admin/panels'] );
+	$twoClaims['/nino/modules'] = [ 'AdminSmokeClaimModule'. $firstClaim, 'AdminSmokeClaimModule'. $secondClaim ];
+
+	ninoWarnings();
+	$twoClaimsPanels = \Nino\Admin\Admin::panels( $twoClaims );
+	$twoClaimsWarnings = ninoWarnings();
+
+	check( 'two modules wanting one new uri: the first of the module list keeps it ('. $firstClaim. ' before '. $secondClaim. '), the other is dropped with a warning',
+		( $twoClaimsPanels['claimed']['class'] ?? '' ) === 'AdminSmokeClaimPanel'. $firstClaim
+		&& count( array_filter( $twoClaimsPanels, static fn( array $panel ): bool => $panel['class'] === 'AdminSmokeClaimPanel'. $secondClaim ) ) === 0
+		&& count( array_filter( $twoClaimsWarnings, static fn( string $m ): bool => str_contains( $m, 'AdminSmokeClaimPanel'. $secondClaim ) && str_contains( $m, 'already taken by AdminSmokeClaimPanel'. $firstClaim ) ) ) === 1 );
+}
 
 // What the registry keeps of the answers of a panel a project brings, and
 // what the rail, the panes, the dashboard and the roles form make of it

@@ -185,7 +185,6 @@ foreach( $units as $unit )
 		foreach( $unit['text'][$file] as $key => $value ) {
 			$allowed = isset( KEYS_NAMED_EXCEPTION[$unit['id']] ) === true && in_array( $key, KEYS_NAMED_EXCEPTION[$unit['id']], true ) === true;
 			if( \Nino\Text::isGrammarKey( $key ) === false && $allowed === false
-				&& ( $unit['id'] === 'module:localepicker' && preg_match( KEYS_SYSTEM_LOCALE, $key ) === 1 ) === false
 				&& ( $unit['id'] === 'module:legal' && ( preg_match( KEYS_LEGAL_PAGES, $key ) === 1 || preg_match( KEYS_LEGAL_ADMIN, $key ) === 1 ) ) === false )
 				$badShape[] = $unit['id']. ' '. $file. ' '. $key;
 			if( is_string( $value ) === false )
@@ -198,7 +197,7 @@ foreach( $units as $unit )
 			$numbered[] = $unit['id']. ' '. $key;
 check( 'no key a unit delivers ends in a number: a name says what the text is, not which one it is'. ( $numbered === [] ? '' : ' - '. implode( ', ', array_slice( $numbered, 0, 6 ) ) ), $numbered === [] );
 
-check( 'every key a unit delivers follows the grammar - or is a form its unit is named for: a language\'s name from the Localepicker, the details of the two pages and the types\' words of the Legal module'. ( $badShape === [] ? '' : ' - '. implode( ', ', array_slice( $badShape, 0, 6 ) ) ), $badShape === [] );
+check( 'every key a unit delivers follows the grammar - or is a form its unit is named for: the details of the two pages and the types\' words of the Legal module; the name of a language is no unit\'s, the setup writes it'. ( $badShape === [] ? '' : ' - '. implode( ', ', array_slice( $badShape, 0, 6 ) ) ), $badShape === [] );
 
 // ...and those exceptions are exactly what they say, nothing a unit of another module may do, and each one blacklisted that is the workbench's
 $legalKeys = array_values( array_filter( $units['module:legal']['keys'], static fn( string $key ): bool => \Nino\Text::isGrammarKey( $key ) === false ) );

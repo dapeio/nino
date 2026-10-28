@@ -1151,6 +1151,72 @@
 			return roving;
 		},
 
+		// What tabBadge() was told, by tab: { text, state }. The record of the chips,
+		// whether the button that carries one is in the page or not
+		_tabBadges : new Map(),
+
+		/**
+		 *	A short word as a chip on the button of a tab in the pane's strip - how
+		 *	many of something wait in that tab, what state it is in. The button is
+		 *	the registry's (id admin-tabbutton-<tab>, see \Nino\Admin\Panels::$html),
+		 *	and the kernel has no place in its label for a word of a panel's, so the
+		 *	panel's script puts one there: the workbench's own pill, .nino-admin-badge,
+		 *	after the label. One chip at most: a second call replaces the first, and an
+		 *	empty text - or null - takes it away. Asked with the tab alone, it answers
+		 *	the word it was given, '' where there is none.
+		 *
+		 *	The shell does not draw its strip again - a move between panels and tabs
+		 *	changes the classes and attributes of the buttons, never the buttons - so a
+		 *	chip stays where it was put. The word is recorded all the same, by tab, and
+		 *	is answered from the record: also for a tab that has no button in the page
+		 *	(the account lacks its permission), where nothing is drawn. A chip of a
+		 *	script's own on the same button - a class of its own beside nino-admin-badge -
+		 *	is left as it is
+		 *
+		 *	@param		{string}				tab							The uri of the tab, a slug
+		 *	@param		{string|number}	[text]					The word; empty or null removes the chip; left out, the call answers
+		 *	@param		{string}				[state]					ok, warn, error or muted, the colours of .nino-admin-badge; none, or any other, draws it in the colour of the label
+		 *
+		 *	@return		{string|undefined}									The word, for a call with the tab alone
+		 */
+		tabBadge : function( tab, text, state ) {
+
+			const badges = Nino.adminUi._tabBadges;
+
+			if( arguments.length < 2 )
+				return badges.has( tab ) === true ? badges.get( tab ).text : '';
+
+			if( typeof tab !== 'string' || /^[a-z][a-z0-9-]*$/.test( tab ) === false )
+				return;
+
+			const word = text === null || text === undefined ? '' : String( text ).trim();
+
+			if( word === '' )
+				badges.delete( tab );
+			else
+				badges.set( tab, { text : word, state : state } );
+
+			const button = dc.getElementById( 'admin-tabbutton-'+ tab );
+
+			if( button === null )
+				return;
+
+			const before = button.querySelector(':scope > .nino-admin-tab-badge');
+
+			if( before !== null )
+				before.remove();
+
+			if( word === '' )
+				return;
+
+			const chip = Nino.adminUi.el( 'span', 'nino-admin-badge nino-admin-tab-badge', word );
+
+			if( [ 'ok', 'warn', 'error', 'muted' ].indexOf( state ) !== -1 )
+				chip.setAttribute( 'data-state', state );
+
+			button.appendChild( chip );
+		},
+
 		/**
 		 *	One setting picked from a fixed list, as a labelled select.
 		 *

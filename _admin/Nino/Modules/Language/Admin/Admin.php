@@ -55,9 +55,11 @@ namespace Nino\Modules\Language {
 		// is also what lists the languages that have a text file
 		public const string LOCALE_PATTERN = \Nino\Locales::PATTERN;
 
-		// Display names for the locales that actually turn up in practice. A
-		// code with no entry renders as itself - this is a convenience for
-		// reading the list, never a whitelist of what may be added
+		// Display names for the locales that actually turn up in practice, in the
+		// language of the list. A code with no entry renders as itself - this is a
+		// convenience for reading the list, never a whitelist of what may be added.
+		// The name the site's own language switch shows is another one, the
+		// language's own: \Nino\Locales::ENDONYMS, for the same codes
 		private const array LOCALE_NAMES = [
 			'de_DE' => 'German (Germany)',			'de_AT' => 'German (Austria)',
 			'de_CH' => 'German (Switzerland)',	'en_US' => 'English (US)',
@@ -265,10 +267,12 @@ namespace Nino\Modules\Language {
 		 *
 		 *	The language's name, which the language pickers show, is the
 		 *	system's to create: /_nino/locale/<code>/name goes into
-		 *	global.php with the code as its value, unless the key is there
-		 *	already - the Text Keys tab does not create a /_nino key, and a
-		 *	picker with no name shows the raw fill or the bare code. Editors
-		 *	give it a real name in the Text panel.
+		 *	global.php with the name of the language in its own tongue as its
+		 *	value (\Nino\Locales::ENDONYMS; the code for a language that table
+		 *	does not know), unless the key is there already - the Text Keys tab
+		 *	does not create a /_nino key, and a picker with no name shows the
+		 *	raw fill or the bare code. Editors change it in the Text panel,
+		 *	and give a language named by its code a real name there.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -374,8 +378,10 @@ namespace Nino\Modules\Language {
 		}
 
 		/**
-		 *	Name a language in global.php, with its code as the value. A name
-		 *	there already is left as it is, whoever wrote it
+		 *	Name a language in global.php, in its own tongue: the value is the
+		 *	name \Nino\Locales::ENDONYMS gives the code, the code itself where
+		 *	that table has none. A name there already is left as it is, whoever
+		 *	wrote it
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$textDir			Eg. '/text'
@@ -390,7 +396,7 @@ namespace Nino\Modules\Language {
 			return \Nino\Filesystem::mutate( $appData, $textDir. '/global.php', function( mixed $global ) use ( $nameKey, $locale ): array {
 
 				$global = is_array( $global ) === true ? $global : [];
-				$global[$nameKey] ??= $locale;
+				$global[$nameKey] ??= \Nino\Locales::ENDONYMS[$locale] ?? $locale;
 
 				return $global;
 			}, [] );

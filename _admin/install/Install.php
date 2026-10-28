@@ -627,6 +627,14 @@ namespace Nino\Install {
 		 *	\Nino\Features::activate() and Webpages::_applyModule() do not read
 		 *	'navs': a feature brings no menu. See _applyNavs().
 		 *
+		 *	The name of each language the project has is written here too, in the
+		 *	language's own tongue: [[/_nino/locale/<code>/name]] in text/global.php,
+		 *	from \Nino\Locales::ENDONYMS - the code itself for a language that table
+		 *	does not know - and only where the project has no name for it yet, so
+		 *	that from the first run on the name is the editors'. No unit delivers
+		 *	it: the text of a unit reaches every project that applies it, the
+		 *	languages that project has or not.
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
 		 *
@@ -757,6 +765,17 @@ namespace Nino\Install {
 					\Nino\Http::fail( $request, 500, 'the unit "'. $key. '" could not be applied: '. $applied );
 					return;
 				}
+			}
+
+			// Each language the project has, named in its own tongue and added to
+			// the names there are - see the docblock
+			$names = [];
+			foreach( $locales as $locale )
+				$names['[[/_nino/locale/'. $locale. '/name]]'] = \Nino\Locales::ENDONYMS[$locale] ?? $locale;
+
+			if( \Nino\Features::mergeText( $appData, '/text/global.php', $names, false ) === false ) {
+				\Nino\Http::fail( $request, 500, 'could not write /text/global.php' );
+				return;
 			}
 
 			$appData['/nino/http/routes'] = $routes;

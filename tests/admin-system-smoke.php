@@ -886,6 +886,18 @@ check( 'a locale with a text file reports its key count', $inventory['de_DE']['h
 check( 'a configured locale without a text file is flagged as such', $inventory['en_US']['hasText'] === false && $inventory['en_US']['active'] === true );
 check( 'a known locale gets a readable name', $inventory['de_DE']['name'] === 'German (Germany)' );
 
+// The name the site's language switch shows is another one, the language's own: the kernel's table, for the codes this panel names
+$endonyms 		= \Nino\Locales::ENDONYMS;
+$panelCodes 	= array_keys( ( new ReflectionClassConstant( \Nino\Modules\Language\Admin::class, 'LOCALE_NAMES' ) )->getValue() );
+$endonymCodes = array_keys( $endonyms );
+sort( $panelCodes ); sort( $endonymCodes );
+check( 'the table of the languages\' own names has a language id for each name, a name that is a text of its own and no two languages with the same one', $endonyms !== []
+	&& array_filter( array_keys( $endonyms ), static fn( string $code ): bool => preg_match( \Nino\Locales::PATTERN, $code ) !== 1 ) === []
+	&& array_filter( $endonyms, static fn( string $name, string $code ): bool => $name === '' || $name !== trim( $name ) || $name === $code, ARRAY_FILTER_USE_BOTH ) === []
+	&& count( array_unique( $endonyms ) ) === count( $endonyms ) );
+check( '...and it names the languages this panel names, no more and no fewer', $endonymCodes === $panelCodes );
+check( '...and the languages added below are two it knows and one it does not', isset( $endonyms['it_IT'], $endonyms['fr_FR'] ) === true && isset( $endonyms['pt_BR'] ) === false );
+
 // --- apiAddLocale -------------------------------------------------------
 //
 // Adding a language used to leave a configured locale with no text file of its
@@ -896,7 +908,7 @@ check( 'a known locale gets a readable name', $inventory['de_DE']['name'] === 'G
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiAddLocale', [ 'locale' => 'it_IT' ] );
 check( 'apiAddLocale creates a text file for a new language', $status === 200 && ( $body['created'] ?? null ) === true );
 check( '...copying the key count of the native language', ( $body['keys'] ?? 0 ) === 2 && ( $body['from'] ?? '' ) === 'de_DE' );
-check( '...and names the language, with its code, in global.php: /_nino/locale/<code>/name is the system\'s to write, no editor creates it', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/_nino/locale/it_IT/name]]'] ?? null ) === 'it_IT' );
+check( '...and names the language, in its own tongue, in global.php: /_nino/locale/<code>/name is the system\'s to write, no editor creates it', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/_nino/locale/it_IT/name]]'] ?? null ) === $endonyms['it_IT'] );
 
 $skeleton = \Nino\Filesystem::getFileContent( $appData, '/text/it_IT.php', false );
 check( '...the file really is on disk', is_array( $skeleton ) === true );
@@ -917,20 +929,20 @@ check( '...but the inventory now offers it as a translated, inactive language', 
 // finished translation
 \Nino\Filesystem::putFileContent( $appData, '/text/it_IT.php', [ '[[/a]]' => 'tradotto', '[[/b]]' => 'anche' ] );
 \Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ): array {
-	$global['[[/_nino/locale/it_IT/name]]'] = 'Italiano';
+	$global['[[/_nino/locale/it_IT/name]]'] = 'Lingua italiana';
 	return $global;
 } );
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiAddLocale', [ 'locale' => 'it_IT' ] );
 check( 'apiAddLocale refuses to overwrite an existing translation', $status === 200 && ( $body['created'] ?? null ) === false );
-check( '...and keeps the name an editor gave the language since', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/_nino/locale/it_IT/name]]'] ?? null ) === 'Italiano' );
+check( '...and keeps the name an editor gave the language since', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/_nino/locale/it_IT/name]]'] ?? null ) === 'Lingua italiana' );
 // A file made by hand or imported has no name: the existing file's answer adds it, and nothing else
 \Nino\Filesystem::putFileContent( $appData, '/text/fr_FR.php', [ '[[/a]]' => 'traduit' ] );
 check( 'a hand-made language file has no name to begin with', isset( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/_nino/locale/fr_FR/name]]'] ) === false );
 [ $handStatus, $handBody ] = callDev( $appData, \Nino\Modules\Language\Admin::class, 'apiAddLocale', [ 'locale' => 'fr_FR' ] );
-check( '...so apiAddLocale names its language when it answers "exists", the one thing it adds', $handStatus === 200 && ( $handBody['created'] ?? null ) === false
-	&& ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/_nino/locale/fr_FR/name]]'] ?? null ) === 'fr_FR' && \Nino\Filesystem::getFileContent( $appData, '/text/fr_FR.php', [] ) === [ '[[/a]]' => 'traduit' ] );
+check( '...so apiAddLocale names its language when it answers "exists", the one thing it adds - and in its own tongue', $handStatus === 200 && ( $handBody['created'] ?? null ) === false
+	&& ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/_nino/locale/fr_FR/name]]'] ?? null ) === $endonyms['fr_FR'] && \Nino\Filesystem::getFileContent( $appData, '/text/fr_FR.php', [] ) === [ '[[/a]]' => 'traduit' ] );
 unlink( \Nino\Filesystem::path( $appData, '/text/fr_FR.php' ) );
-// A name somebody already wrote - the Localepicker unit's, or an editor's - is left alone
+// A name somebody already wrote - the installer's, or an editor's - is left alone
 \Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ): array {
 	$global['[[/_nino/locale/es_ES/name]]'] = 'Español';
 	return $global;
@@ -950,6 +962,7 @@ check( 'a skeleton made where the native language has no key for the tag of its 
 $tagSkeleton = \Nino\Filesystem::getFileContent( $appData, '/text/pt_BR.php', [] );
 check( 'the skeleton of a language says the language subtag in the key of the tag of its pages, not the native one\'s and not a tag of both parts, and every other text of it is empty', $status === 200 && ( $tagSkeleton[$tagKey] ?? null ) === 'pt'
 	&& array_values( array_unique( array_diff_key( $tagSkeleton, [ $tagKey => 1 ] ) ) ) === [ '' ] );
+check( 'a language the table of own names does not know is named by its code', ( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/_nino/locale/pt_BR/name]]'] ?? null ) === 'pt_BR' );
 \Nino\Filesystem::mutate( $appData, '/text/de_DE.php', function( array $texts ) use ( $tagKey ): array {
 	unset( $texts[$tagKey] );
 	return $texts;

@@ -205,6 +205,20 @@ check( 'reports back every always-on unit and nothing else, and each of them has
 $configAfterApply = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
 check( 'picking only the already-native de_DE does not pull in en_US too', $configAfterApply['/nino/locales/available'] === [ 'de_DE' ] );
+// A language is named once the project has it, in its own tongue: the Localepicker unit used to write the names of both languages the library ships
+// into every project, the one it had not chosen among them
+$languageNames = function() use ( &$appData ): array {
+	$names = array_filter( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] ), static fn( string $key ): bool => str_starts_with( $key, '[[/_nino/locale/' ), ARRAY_FILTER_USE_KEY );
+	ksort( $names );
+	return $names;
+};
+check( 'the setup names the language the project has, in its own tongue, and no language it has not', $languageNames() === [ '[[/_nino/locale/de_DE/name]]' => \Nino\Locales::ENDONYMS['de_DE'] ] );
+$pickerNameLines = [];
+foreach( glob( \Nino\Install\Setup::units()['localepicker']. '/text/*.php' ) ?: [] as $file )
+	foreach( array_keys( (array) include $file ) as $key )
+		if( str_contains( (string) $key, '/_nino/locale/' ) === true )
+			$pickerNameLines[] = basename( $file ). ' '. $key;
+check( '...since no unit delivers it: the text of the Localepicker unit has no name of a language in it, and reaches every project the languages it has or not', $pickerNameLines === [] );
 // The look is not a choice any more: the base unit delivers one theme.css and
 // this step puts it in the bundle, with the project's own stylesheet last
 var_export( $configAfterApply['/nino/html/assets'] ); echo "
@@ -405,6 +419,19 @@ check( 'text/en_US.php now exists, written by the second run', \Nino\Filesystem:
 check( 'apply succeeds with a native locale posted explicitly', $status === 200 );
 check( 'response echoes the newly picked native locale', $body['nativeLocale'] === 'de_DE' );
 check( 'a posted native locale wins even though the previous native is still among the picked locales', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/locales/native'] === 'de_DE' );
+check( 'a project that has both languages has both names, each in its own tongue', $languageNames() === [ '[[/_nino/locale/de_DE/name]]' => \Nino\Locales::ENDONYMS['de_DE'], '[[/_nino/locale/en_US/name]]' => \Nino\Locales::ENDONYMS['en_US'] ] );
+
+// ...and the name is the project's from then on: an editor changed it, and the setup run again leaves it
+\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ): array {
+	$global['[[/_nino/locale/de_DE/name]]'] = 'Deutsch (Standard)';
+	return $global;
+} );
+ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [], 'native' => 'de_DE' ] );
+check( '...and applying the setup again leaves a name an editor gave a language', ( $languageNames()['[[/_nino/locale/de_DE/name]]'] ?? null ) === 'Deutsch (Standard)' );
+\Nino\Filesystem::mutate( $appData, '/text/global.php', function( array $global ): array {
+	$global['[[/_nino/locale/de_DE/name]]'] = \Nino\Locales::ENDONYMS['de_DE'];
+	return $global;
+} );
 
 // A posted native locale that isn't among this call's own picked locales
 // is ignored - falls back to the same rule as posting none at all: keep

@@ -391,7 +391,10 @@ namespace Nino\Admin {
 		 *	shell reads. The workbench's own modules come first (see
 		 *	modules()), then every panel a runtime module contributes by
 		 *	answering adminPanels() with a class name, so a runtime module
-		 *	can add a screen but never take one over. A panel is a class
+		 *	can add a screen but never take one over - the screens of the
+		 *	kernel's own modules (Navigations, Submissions, Maintenance)
+		 *	included, wherever the module list has them (see
+		 *	Panels::collect()). A panel is a class
 		 *	with actions() and nav(), and optionally perm(), panes(), template(),
 		 *	layout(), head(), icon(), tab(), tabs(), assets(), text(), summary(),
 		 *	log() and scopes() (see Panels, and docs/recipes/admin-panel.md, "The
@@ -953,13 +956,12 @@ namespace Nino\Admin {
 			foreach( \Nino\Locales::getAvailableLocales( $appData ) as $locale ) {
 
 				// The name of a language is the project's to give, and the fill
-				// that carries it is written by the Localepicker module's install
-				// step for the two languages the wizard offers - an optional unit
-				// an operator may uncheck - and by the Language panel, with the
-				// code as the name, for one it adds later. A project that wrote
-				// neither has none. Without the fallback every such option
-				// renders empty, which is a language switcher with nothing
-				// readable in it
+				// that carries it is written by the setup wizard for each language
+				// it installs and by the Language panel for one it adds later - in
+				// the language's own tongue where \Nino\Locales::ENDONYMS knows it,
+				// else as the code. A project that was put together by hand has
+				// none. Without the fallback every such option renders empty,
+				// which is a language switcher with nothing readable in it
 				$label = \Nino\Html::renderTextfill( $appData, '/_nino/locale/'. $locale. '/name' );
 
 				// The name is editor content - the Text panel writes that key -
@@ -1505,6 +1507,11 @@ namespace Nino\Admin {
 		 *	A second panel claiming an already taken uri is dropped with a
 		 *	warning rather than allowed to shadow the first: a module must
 		 *	not be able to replace a core screen by picking its name. The
+		 *	first claim stands, and the claims come in an order of their own,
+		 *	not the order of the rail: the workbench's panels with their tabs,
+		 *	then the panels of the kernel's own modules (Navigations,
+		 *	Submissions, Maintenance - wherever the module list has them), then
+		 *	the panels of any other module in the order of the module list. The
 		 *	same goes for a class missing actions() or nav() - the workbench keeps
 		 *	working without it, and the warning names it.
 		 *
@@ -1544,7 +1551,15 @@ namespace Nino\Admin {
 			$panels = [];
 			$taken	= [];
 
-			foreach( array_merge( $core, \Nino\Modules::collect( $appData, $method ) ) as $class ) {
+			// The first claim of a uri stands, so the order of the claims is the
+			// guard: the workbench's own panels, then those of the kernel's own
+			// modules, then the rest as the module list has them. Left to that
+			// list alone, a module standing before Navigation in it would hold
+			// the uri of the Navigations panel
+			$brought	= \Nino\Modules::collect( $appData, $method );
+			$kernel		= array_filter( $brought, [ self::class, '_isKernelPanel' ] );
+
+			foreach( array_merge( $core, $kernel, array_diff_key( $brought, $kernel ) ) as $class ) {
 
 				$entry = self::_entry( $class, $taken );
 
@@ -1922,6 +1937,29 @@ namespace Nino\Admin {
 				// holds one of its tabs'
 				'own'			=> true,
 			];
+		}
+
+		/**
+		 *	Whether $class is a panel one of the kernel's own modules brings -
+		 *	its class file lies below the directory of the kernel's modules
+		 *	(\Nino\Modules), the way a feature's lies below the features
+		 *	directory (see _isFeaturePanel()). Whatever a module answered that
+		 *	is no class at all is no kernel panel; _entry() says what is wrong
+		 *	with it
+		 *
+		 *	@param		mixed 		$class				What a module answered - a class name, hopefully
+		 *
+		 *	@return 	bool
+		 */
+		private static function _isKernelPanel( mixed $class ): bool {
+
+			if( is_string( $class ) === false || class_exists( $class ) === false )
+				return false;
+
+			$file = realpath( (string) ( new \ReflectionClass( $class ) )->getFileName() );
+			$dir 	= realpath( dirname( (string) ( new \ReflectionClass( \Nino\Modules::class ) )->getFileName() ) );
+
+			return $file !== false && $dir !== false && str_starts_with( $file, $dir. DIRECTORY_SEPARATOR );
 		}
 
 		/**

@@ -48,7 +48,7 @@ namespace Nino\Modules {
 				'button-span'	=> '<span class="nino-btn[[style]][[size]][[width]][[class]]"[[lang]]>[[value]]</span>',
 				'link'				=> '<a[[href]][[target]]>[[inner]]</a>',
 				'scroll-hint'	=> '<a class="nino-hero-arrowdown[[class]]" href="#[[to]]"[[next]] aria-label="[[/template/common/navigation/next-section]]"></a>',
-				'spacer'			=> '<div class="nino-mt-[[size]][[class]]"></div>',
+				'spacer'			=> '<div class="nino-spacer nino-spacer-[[size]][[class]]"></div>',
 				'card'				=> '<article class="nino-card[[ground]][[dim]][[borderless]][[fill]][[linked]][[vertical]][[align]][[padding]][[class]]">[[background]][[inner]]</article>',
 				'card-bg'			=> '<div class="nino-card-bg[[focus]]">[[img]]</div>',
 				'card-content'	=> '<div class="nino-card-content">[[inner]]</div>',
@@ -2168,7 +2168,11 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	Replace [spacer]: empty room between two components
+		 *	Replace [spacer]: empty room between two components - a div of the
+		 *	class nino-spacer-<size>, whose height is that step of the scale
+		 *	(1 to 6), and not a margin: a margin class given to it - the side
+		 *	classes of the Builder, nino-mt-2 - is room beside the height, where a
+		 *	nino-mt-<size> of its own was the same property and the larger step won
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments made ready by dispatch()
