@@ -1708,8 +1708,8 @@ foreach( $libraryTemplates as $libraryTemplate )
 
 		// The href of a component's call that begins with the namespace of a text key names that key - the address of a page a template links to is the Routes step's fill,
 		// /_nino/webpage/contact/uri - and a call is looked at without it. What the key holds is the page's address within the project, without the directory a project in
-		// a subdirectory is served from, and a component's href writes it as it stands (Navigation puts the directory in front): so this pin sees the address a template
-		// writes and not the one a key resolves to
+		// a subdirectory is served from, and a component puts the directory in front of the address such a key resolves to (Components::value(), as the navigation does): which
+		// is why the key is the right form of the address of a page, and why this pin sees the address a template writes and not the one a key resolves to
 		$libraryMarkup = (string) preg_replace( '#(\[[a-z][a-z0-9-]* [^\]]*?) href="/(?:_nino|template|project|feature|module)/[^"]*"#', '$1', (string) file_get_contents( $libraryTemplate->getPathname() ) );
 
 		if( preg_match( '/\b(?:action|href)="\//', $libraryMarkup ) === 1 )

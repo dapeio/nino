@@ -935,13 +935,11 @@ footer {
 }
 
 
-/* ==== 9. section: regular (hero-title default, hero-text default, quiet default, loud default, title default, subtitle default, space default, rule default, dim default) ==== */
+/* ==== 9. section: regular (quiet default, loud default, title default, subtitle default, space default, rule default, dim default) ==== */
 /*	@name			Regular
  *	@description	The framework as it is: the middle of every ladder. The hero, the sections, their titles and the covers as Nino.css draws them.
  *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Hero, Sektionen, ihre Titel und die Cover, wie Nino.css sie zeichnet.
  *
- *	@knob	hero-title			Size of the title of a hero
- *	@knob	hero-text			Size of the text of a hero
  *	@knob	quiet				Size of a quiet title, subtitle and text
  *	@knob	loud				Size of a loud title, subtitle and text
  *	@knob	title				Size of the title of a section
@@ -974,36 +972,23 @@ footer {
  *	value, named after the part and the knob (--section-space--least,
  *	--less, --default, --more, --most), and the rule reads the knob
  *	(var(--section-space)). The knobs of Nino.css itself - the factors
- *	of the hero, of a section's title and subtitle and of the variants, the
- *	rule under a section title - need no rule: the set only points them at
- *	the ladder. The scrim of a dimmed cover is the one thing that does: its
- *	rule reads the ladder of the dimming, on the two pseudo-elements Nino.css
- *	draws it with and on the block of a picture behind a section, a row and
- *	a column, which carry one of their own. The card family has the same four
- *	names (Regular, Open, Panel, Box) and a theme names a sensible pair.
- *	Copy this file under a name of your own and start there.
+ *	of a section's title and subtitle and of the variants, the hero's among
+ *	them, since the hero is the loud variant, and the rule under a section
+ *	title - need no rule: the set only points them at the ladder. The scrim
+ *	of a dimmed cover is the one thing that does: its rule reads the ladder
+ *	of the dimming, on the two pseudo-elements Nino.css draws it with and on
+ *	the block of a picture behind a section, a row and a column, which carry
+ *	one of their own. The card family has the same four names (Regular,
+ *	Open, Panel, Box) and a theme names a sensible pair. Copy this file
+ *	under a name of your own and start there.
  */
 
 :root {
-	/*	The factors Nino.css multiplies the size of the title role and of the
-		subtitle role by, in a hero: 1.4 and 1.2, from 768px 1.45 and 10 / 9.
-		A step is the ratio 1.25 to either side of the middle, twice: times .64,
-		.8, 1, 1.25 and 1.5625	*/
-	--section-hero-title--least: 		.896;
-	--section-hero-title--less: 		1.12;
-	--section-hero-title--default: 	1.4;
-	--section-hero-title--more: 		1.75;
-	--section-hero-title--most: 		2.1875;
-
-	--section-hero-text--least: 		.768;
-	--section-hero-text--less: 			.96;
-	--section-hero-text--default: 	1.2;
-	--section-hero-text--more: 			1.5;
-	--section-hero-text--most: 			1.875;
-
 	/*	How much smaller a --quiet variant is than the class it varies, and how
 		much larger a --loud one: .85 and 1.2. The quiet ones stay under 1 and
-		the loud ones over it, whatever the position	*/
+		the loud ones over it, whatever the position. The hero is the loud
+		variant - the size of the title role and of the subtitle role times the
+		loud number - so the loud ladder sizes it too	*/
 	--section-quiet--least: 				.6;
 	--section-quiet--less: 					.75;
 	--section-quiet--default: 			.85;
@@ -1066,18 +1051,6 @@ footer {
 
 @media (min-width: 768px) {
 	:root {
-		--section-hero-title--least: 		.928;
-		--section-hero-title--less: 		1.16;
-		--section-hero-title--default: 	1.45;
-		--section-hero-title--more: 		1.8125;
-		--section-hero-title--most: 		2.2656;
-
-		--section-hero-text--least: 		calc(.64 * 10 / 9);
-		--section-hero-text--less: 			calc(.8 * 10 / 9);
-		--section-hero-text--default: 	calc(10 / 9);
-		--section-hero-text--more: 			calc(1.25 * 10 / 9);
-		--section-hero-text--most: 			calc(1.5625 * 10 / 9);
-
 		--section-space--least: 	var(--space-3);
 		--section-space--less: 		var(--space-4);
 		--section-space--default: var(--space-5);
@@ -1086,10 +1059,8 @@ footer {
 	}
 }
 
-/*	The six numbers and the rule Nino.css reads by name	*/
+/*	The four numbers and the rule Nino.css reads by name	*/
 :root {
-	--hero-title-scale: var(--section-hero-title);
-	--hero-text-scale: var(--section-hero-text);
 	--section-title-scale: var(--section-title);
 	--section-subtitle-scale: var(--section-subtitle);
 	--section-line: var(--section-rule);
@@ -1282,15 +1253,20 @@ footer {
 	border-width: var(--card-border);
 }
 
-/*	The hover, as the ladder says it. Only where the visitor has not asked for less
-	motion: a card that moves is motion. The transition is the hover's own, so that
-	it does not take the one a viewport animation has on the card away - the card
-	comes back at once, as it was before the animation could matter. A borderless
-	card has no shadow to lift	*/
+/*	The hover, as the ladder says it: the card rises and takes the shadow. Only for the card the pointer
+	can mean as a whole (.nino-card--linked), and only where the visitor has not asked for less motion.
+	The transition is the hover's own, so that the one a viewport animation has on the card is not
+	taken from it while it is at rest - and it carries the animation's: its three properties with the
+	time and the easing Nino.css gives them (the easing is written out, Nino.css names no custom
+	property for it), so that a card hovered while it arrives goes on arriving. A borderless card has
+	no shadow to lift	*/
 @media (prefers-reduced-motion: no-preference) {
 	.nino-card--linked:hover {
 		translate: var(--card-hover);
-		transition: translate .2s ease, box-shadow .2s ease;
+		transition: translate .2s ease, box-shadow .2s ease,
+			opacity var(--vpa-duration) cubic-bezier(0.5, 0, 0.7, 1),
+			transform var(--vpa-duration) cubic-bezier(0.5, 0, 0.7, 1),
+			filter var(--vpa-duration) cubic-bezier(0.5, 0, 0.7, 1);
 	}
 	.nino-card--linked:where(:not(.nino-card--borderless)):hover {
 		box-shadow: var(--card-hover-shadow);
@@ -1417,12 +1393,17 @@ footer {
 	motion, and not for a button that is off or that the keyboard has: the ring of the
 	focus is the framework's and is never covered. The transition is the hover's own -
 	the framework's, which it replaces while the pointer is on the button, with the
-	rise and the shadow added - so that the ones a viewport animation or the button's
-	variants have on it at rest are not taken from it. The outline casts no shadow	*/
+	rise and the shadow added - and the transform and the filter of the viewport
+	animation, with the time and the easing Nino.css gives them (the easing is written
+	out, Nino.css names no custom property for it): the opacity keeps the .3s of the
+	framework, the brand buttons dim under the pointer, and a button hovered while it
+	arrives goes on arriving. The outline casts no shadow	*/
 @media (prefers-reduced-motion: no-preference) {
 	.nino-btn:where(:not(:focus-visible, :disabled, [aria-disabled="true"])):hover {
 		translate: var(--buttons-hover);
-		transition: background-color .2s ease, color .2s ease, border-color .2s ease, opacity .3s, translate .2s ease, box-shadow .2s ease;
+		transition: background-color .2s ease, color .2s ease, border-color .2s ease, opacity .3s, translate .2s ease, box-shadow .2s ease,
+			transform var(--vpa-duration) cubic-bezier(0.5, 0, 0.7, 1),
+			filter var(--vpa-duration) cubic-bezier(0.5, 0, 0.7, 1);
 	}
 	.nino-btn:where(:not(.nino-btn--outline, :focus-visible, :disabled, [aria-disabled="true"])):hover {
 		box-shadow: var(--buttons-hover-shadow);
@@ -1706,8 +1687,6 @@ footer {
 	--lists-scale: var(--lists-scale--default);
 	--lists-space: var(--lists-space--default);
 	--section-dim: var(--section-dim--default);
-	--section-hero-text: var(--section-hero-text--default);
-	--section-hero-title: var(--section-hero-title--default);
 	--section-loud: var(--section-loud--default);
 	--section-quiet: var(--section-quiet--default);
 	--section-rule: var(--section-rule--default);

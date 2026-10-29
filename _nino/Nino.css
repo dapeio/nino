@@ -291,14 +291,16 @@
 	--text-6: calc(var(--font-text-size) * 2.5);
 
 	/*	What a design layer scales without choosing a size. The hero takes the
-		size of the title and of the subtitle role times a number of its own -
-		1.4 and 1.2 below 768px, 1.45 and 10 / 9 from there - and so does a card
-		title: the size of the title role times 5 / 6, because it stood on
-		--text-3 where the title role stood on --text-4, and keeps that ratio to
-		it. Each is another number from 768px, where the scale above steps up
-		(see below). A section title, a section subtitle and a card subtitle have a
-		number of their own too, 1 at every width, and a section title has a
-		rule under it, none until a design layer gives it a thickness:
+		size of the title and of the subtitle role times --scale-loud and has no
+		number of its own: it is the loud variant of a section's title and
+		subtitle, and a design layer that moves --scale-loud moves the hero with
+		it. A card title takes the size of the title role times a number of its
+		own, 5 / 6, because it stood on --text-3 where the title role stood on
+		--text-4, and keeps that ratio to it; it is another number from 768px,
+		where the scale above steps up (see below). A section title, a section
+		subtitle and a card subtitle have a number of their own too, 1 at every
+		width, and a section title has a rule under it, none until a design layer
+		gives it a thickness:
 			--section-title-scale     times the title role: a section title
 			--section-subtitle-scale  times the subtitle role: a section subtitle
 			--card-subtitle-scale     times the subtitle role: a card subtitle
@@ -307,8 +309,6 @@
 		the size of the class they vary - the role times its number, where the
 		class has one - times --scale-quiet or --scale-loud: a title that is
 		made larger has a quiet and a loud variant that follow it.	*/
-	--hero-title-scale: 1.4;
-	--hero-text-scale: 1.2;
 	--card-title-scale: calc(5 / 6);
 	--section-title-scale: 1;
 	--section-subtitle-scale: 1;
@@ -409,8 +409,6 @@
     --text-4: calc(var(--font-text-size) * 1.6);
     --text-5: calc(var(--font-text-size) * 2);
     --text-6: calc(var(--font-text-size) * 3);
-		--hero-title-scale: 1.45;
-		--hero-text-scale: calc(10 / 9);
 		--card-title-scale: calc(25 / 32);
 		--grid-gutter: var(--space-3);
   }
@@ -1036,9 +1034,10 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
  *			Three rules that reach beyond the class they stand at: a section is the box
  *			its arrow and its picture are placed in (.nino-section is positioned); the
  *			row of a cover is centred by translate, so that the viewport animation of
- *			the row composes with it (chapter 08); a link in a text (.nino-section-text,
- *			.nino-card-descr) is the accent ink of its ground and is underlined on
- *			hover and on keyboard focus.
+ *			the row composes with it, and has the air above its content and from 768px
+ *			the side padding of the section (chapter 08); a link in a text
+ *			(.nino-section-text, .nino-card-descr) is the accent ink of its ground and
+ *			is underlined on hover and on keyboard focus.
  *
  *
  ****************************************************************************************************/
@@ -1047,34 +1046,35 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	position: relative;
 }
 /*	The hero takes the face of the title and of the subtitle role, and their
-	size times a number of its own (--hero-title-scale, --hero-text-scale).
-	The leading keeps its ratio to the size - 1.3 / 1.2 below 768px, 1.2 from
-	there - and moves with it	*/
+	size times --scale-loud: it is the loud variant of a section's title and
+	subtitle and has no number of its own. The leading keeps its ratio to the
+	size - 1.3 / 1.2 below 768px, 1.2 from there - and moves with it	*/
 .nino-hero-title {
 	font-family: var(--fontfamily-title);
-	font-size: calc( var(--font-title-size) * var(--hero-title-scale) );
+	font-size: calc( var(--font-title-size) * var(--scale-loud) );
 	text-transform: var(--font-title-transform);
 	color: var(--color-title);
 	margin-bottom: calc(var(--space-3) * var(--whitespace-text));
-	line-height: calc( var(--font-title-size) * var(--hero-title-scale) *1.3 / 1.2 );
+	line-height: calc( var(--font-title-size) * var(--scale-loud) *1.3 / 1.2 );
 }
 .nino-hero-subtitle {
 	font-family: var(--fontfamily-subtitle);
-	font-size: calc( var(--font-subtitle-size) * var(--hero-text-scale) );
+	font-size: calc( var(--font-subtitle-size) * var(--scale-loud) );
 	font-weight: var(--font-subtitle-weight);
 	text-transform: var(--font-subtitle-transform);
 	color: var(--color-subtitle);
 	opacity: .8;
-	line-height: calc( var(--font-subtitle-size) * var(--hero-text-scale) *1.3 / 1.2 );
+	line-height: calc( var(--font-subtitle-size) * var(--scale-loud) *1.3 / 1.2 );
 	margin-bottom: calc(var(--space-3) * var(--whitespace-text));
 }
-/*	The variants are the size the hero has, times --scale-quiet or
-	--scale-loud, and the leading keeps its ratio to the size: 1.3 / 1.2 for a
-	quiet title, 1 for a loud one, 1.4 / 1.2 and 1.3 / 1.2 for the subtitles	*/
-.nino-hero-title--quiet { font-size: calc( var(--font-title-size) * var(--hero-title-scale) * var(--scale-quiet) ); line-height: calc( var(--font-title-size) * var(--hero-title-scale) * var(--scale-quiet) *1.3 / 1.2 ); }
-.nino-hero-title--loud { font-size: calc( var(--font-title-size) * var(--hero-title-scale) * var(--scale-loud) ); line-height: calc( var(--font-title-size) * var(--hero-title-scale) * var(--scale-loud) ); }
-.nino-hero-subtitle--quiet { font-size: calc( var(--font-subtitle-size) * var(--hero-text-scale) * var(--scale-quiet) ); line-height: calc( var(--font-subtitle-size) * var(--hero-text-scale) * var(--scale-quiet) *1.4 / 1.2 ); opacity: .7; }
-.nino-hero-subtitle--loud { font-size: calc( var(--font-subtitle-size) * var(--hero-text-scale) * var(--scale-loud) ); line-height: calc( var(--font-subtitle-size) * var(--hero-text-scale) * var(--scale-loud) *1.3 / 1.2 ); opacity: 1; }
+/*	The variants are the size the hero has - the role times --scale-loud -
+	times --scale-quiet or --scale-loud again, and the leading keeps its ratio
+	to the size: 1.3 / 1.2 for a quiet title, 1 for a loud one, 1.4 / 1.2 and
+	1.3 / 1.2 for the subtitles	*/
+.nino-hero-title--quiet { font-size: calc( var(--font-title-size) * var(--scale-loud) * var(--scale-quiet) ); line-height: calc( var(--font-title-size) * var(--scale-loud) * var(--scale-quiet) *1.3 / 1.2 ); }
+.nino-hero-title--loud { font-size: calc( var(--font-title-size) * var(--scale-loud) * var(--scale-loud) ); line-height: calc( var(--font-title-size) * var(--scale-loud) * var(--scale-loud) ); }
+.nino-hero-subtitle--quiet { font-size: calc( var(--font-subtitle-size) * var(--scale-loud) * var(--scale-quiet) ); line-height: calc( var(--font-subtitle-size) * var(--scale-loud) * var(--scale-quiet) *1.4 / 1.2 ); opacity: .7; }
+.nino-hero-subtitle--loud { font-size: calc( var(--font-subtitle-size) * var(--scale-loud) * var(--scale-loud) ); line-height: calc( var(--font-subtitle-size) * var(--scale-loud) * var(--scale-loud) *1.3 / 1.2 ); opacity: 1; }
 /*	Self-contained: the chevron is a mask over currentColor, so it always
  *	matches the text color around it - dark hero, light hero, whatever - and
  *	using it is just <a class="nino-hero-arrowdown" href="#some-id"
@@ -1658,8 +1658,8 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 		--quiet and --loud rules above: an element with the base class and a
 		variant gets the base size there, so the variant only acts below
 		768px on it	*/
-	.nino-hero-title { font-size: calc( var(--font-title-size) * var(--hero-title-scale) ); line-height: calc( var(--font-title-size) * var(--hero-title-scale) *1.2 );}
-	.nino-hero-subtitle { font-size: calc( var(--font-subtitle-size) * var(--hero-text-scale) ); line-height: calc( var(--font-subtitle-size) * var(--hero-text-scale) *1.2 );}
+	.nino-hero-title { font-size: calc( var(--font-title-size) * var(--scale-loud) ); line-height: calc( var(--font-title-size) * var(--scale-loud) *1.2 );}
+	.nino-hero-subtitle { font-size: calc( var(--font-subtitle-size) * var(--scale-loud) ); line-height: calc( var(--font-subtitle-size) * var(--scale-loud) *1.2 );}
 	.nino-section { padding: calc(var(--space-5) * var(--whitespace-scale)) calc(var(--space-3) * var(--whitespace-scale)); }
 	/*	A row at the edge takes the section's side padding with it. From 768px the
 		section has a side padding of its own, the room between the page and its
@@ -3714,6 +3714,41 @@ header .nino-headernav-logo:empty {
 .nino-cover.nino-cover-top > .nino-grid-row { top: 0; translate: none; }
 .nino-parallex.nino-cover-bottom > .nino-grid-row,
 .nino-cover.nino-cover-bottom > .nino-grid-row { top: auto; bottom: 0; translate: none; }
+/*	The row of a cover has what .nino-cover-content has in a hand-written one:
+	the air above its content, a step of the space scale, and from 768px the
+	side padding of the section, which a placed box does not stand in. Its left
+	and its right are that padding - the space step times the whitespace - and
+	its width is what they leave, not the 100% every row says, which a placed
+	box measures against the padding box and which would hang over the right
+	edge by the left one. A side keeps the edge it had where the section says
+	nino-pl-0 or nino-pr-0 and where the row does, and so does a row with no
+	maximum width, nino-grid-row--full; the padded cover has its offsets from
+	--cover-padding-x (below). A row that paints a ground - the colour round its
+	columns, or a picture behind them (chapter 04) - has the room above and
+	below of its own, the space step times the whitespace, and keeps it: the air,
+	a step that the whitespace does not move, would replace its top and leave
+	the other three sides to follow the whitespace alone. The air leaves out what
+	the rule of those grounds lists, and all of it but the row's own class is
+	asked for in :where(), so that the rule is one class heavy, as the base rule
+	of the row and the padding classes at the end of the file are, and the order
+	decides: a nino-pt-<n> on the row says what it says	*/
+:where(.nino-parallex, .nino-cover) > .nino-grid-row:where(:not(.nino-grid-row--alt, .nino-grid-row--tint, .nino-grid-row--dark, .nino-grid-row--black, .nino-grid-row--primary, .nino-grid-row--brand-alt, .nino-grid-row--counter, .nino-grid-row--dim):not(:has(> .nino-grid-row-bg))) {
+	padding-top: var(--space-3);
+}
+@media (min-width: 768px) {
+	.nino-parallex > .nino-grid-row,
+	.nino-cover > .nino-grid-row {
+		width: auto;
+	}
+	.nino-parallex:not(.nino-cover--padded, .nino-pl-0) > .nino-grid-row:not(.nino-pl-0, .nino-grid-row--full),
+	.nino-cover:not(.nino-cover--padded, .nino-pl-0) > .nino-grid-row:not(.nino-pl-0, .nino-grid-row--full) {
+		left: calc(var(--space-3) * var(--whitespace-scale));
+	}
+	.nino-parallex:not(.nino-cover--padded, .nino-pr-0) > .nino-grid-row:not(.nino-pr-0, .nino-grid-row--full),
+	.nino-cover:not(.nino-cover--padded, .nino-pr-0) > .nino-grid-row:not(.nino-pr-0, .nino-grid-row--full) {
+		right: calc(var(--space-3) * var(--whitespace-scale));
+	}
+}
 .nino-parallex > .nino-section-bg > img {
 	position: absolute;
 	top: 0;

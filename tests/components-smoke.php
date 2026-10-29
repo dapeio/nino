@@ -76,10 +76,10 @@ $hookReads = [
 	'h1, h2, h3, h4, h5, h6'		=> [ '--font-title-weight', '--font-title-transform' ],
 	'.nino-section-title'				=> [ '--fontfamily-title', '--font-title-size', '--font-title-transform', '--section-title-scale' ],
 	'.nino-card-title'					=> [ '--fontfamily-title', '--font-title-size', '--font-title-transform', '--card-title-scale' ],
-	'.nino-hero-title'					=> [ '--fontfamily-title', '--font-title-size', '--font-title-transform', '--hero-title-scale' ],
+	'.nino-hero-title'					=> [ '--fontfamily-title', '--font-title-size', '--font-title-transform', '--scale-loud' ],
 	'.nino-section-subtitle'		=> [ '--fontfamily-subtitle', '--font-subtitle-size', '--font-subtitle-weight', '--font-subtitle-transform', '--section-subtitle-scale' ],
 	'.nino-card-subtitle'			=> [ '--fontfamily-subtitle', '--font-subtitle-size', '--font-subtitle-weight', '--font-subtitle-transform', '--card-subtitle-scale' ],
-	'.nino-hero-subtitle'				=> [ '--fontfamily-subtitle', '--font-subtitle-size', '--font-subtitle-weight', '--font-subtitle-transform', '--hero-text-scale' ],
+	'.nino-hero-subtitle'				=> [ '--fontfamily-subtitle', '--font-subtitle-size', '--font-subtitle-weight', '--font-subtitle-transform', '--scale-loud' ],
 	'.nino-btn'									=> [ '--fontfamily-button', '--font-button-size', '--font-button-weight', '--font-button-transform' ],
 	'.nino-code'								=> [ '--fontfamily-code', '--font-code-size', '--font-code-weight', '--font-code-transform' ],
 ];
@@ -132,10 +132,26 @@ foreach( [ 4 => '1.6', 5 => '2', 6 => '3' ] as $hookStep => $hookFactor )
 	$hookScale = $hookScale && $hookValue( $hookRootWide, '--text-'. $hookStep ) === 'calc(var(--font-text-size) * '. $hookFactor. ')';
 check( '--text-1 is the text size, and --text-2 to --text-6 are factors of it - the ones from 768px their own', $hookScale );
 
-// The hero and the variants are numbers a design layer moves
-check( 'the hero takes the title and the subtitle role times a number of its own: one below 768px and another from there',
-	$hookValue( $hookRoot, '--hero-title-scale' ) === '1.4' && $hookValue( $hookRootWide, '--hero-title-scale' ) === '1.45'
-	&& $hookValue( $hookRoot, '--hero-text-scale' ) === '1.2' && $hookValue( $hookRootWide, '--hero-text-scale' ) === 'calc(10 / 9)' );
+// The hero is the loud variant of a section's title and subtitle, and the variants are numbers a design layer moves
+$hookHeroWrong = [];
+foreach( [ '.nino-hero-title' => '--font-title-size', '.nino-hero-subtitle' => '--font-subtitle-size' ] as $hookHeroClass => $hookHeroRole ) {
+	preg_match_all( '/(?<![\w-])font-size\s*:\s*([^;]+?)\s*;/', $hookRules( $hookHeroClass ), $hookHeroSizes );
+	if( count( $hookHeroSizes[1] ) < 1 )
+		$hookHeroWrong[] = $hookHeroClass. ' states no size';
+	foreach( $hookHeroSizes[1] as $hookHeroSize )
+		if( preg_replace( '/\s+/', '', $hookHeroSize ) !== 'calc(var('. $hookHeroRole. ')*var(--scale-loud))' )
+			$hookHeroWrong[] = $hookHeroClass. ' is '. $hookHeroSize;
+}
+check( 'the hero is the loud variant of a section\'s title and subtitle: wherever it states its size, below 768px and from there, it is the size of the title or of the subtitle role times --scale-loud, and no number of its own'
+	. ( $hookHeroWrong === [] ? '' : ' - '. implode( ', ', $hookHeroWrong ) ), $hookHeroWrong === [] );
+preg_match_all( '/(?<![\w-])(--[\w-]+)\s*:/', $hookCss, $hookDeclared );
+$hookHeroReads = [];
+foreach( [ '.nino-hero-title', '.nino-hero-subtitle' ] as $hookHeroClass )
+	foreach( [ '', '--quiet', '--loud' ] as $hookHeroVariant )
+		if( preg_match_all( '/var\((--[\w-]+)/', $hookRules( $hookHeroClass. $hookHeroVariant ), $hookHeroFound ) > 0 )
+			$hookHeroReads = array_merge( $hookHeroReads, $hookHeroFound[1] );
+check( '...and every custom property the rules of the hero read is one that Nino.css declares'. ( array_diff( $hookHeroReads, $hookDeclared[1] ) === [] ? '' : ' - not: '. implode( ', ', array_unique( array_diff( $hookHeroReads, $hookDeclared[1] ) ) ) ),
+	count( $hookHeroReads ) > 0 && array_diff( $hookHeroReads, $hookDeclared[1] ) === [] );
 check( 'a card title takes the title role times a number of its own: 5 / 6, what --text-3 was of --text-4, and 25 / 32 from 768px, where --text-4 steps up and --text-3 does not',
 	$hookValue( $hookRoot, '--card-title-scale' ) === 'calc(5 / 6)' && $hookValue( $hookRootWide, '--card-title-scale' ) === 'calc(25 / 32)' );
 check( 'a section title, a section subtitle and a card subtitle take their role times a number of their own, 1 at every width, and the rule under a section title is 0px until a design layer gives it a thickness',
@@ -149,8 +165,9 @@ foreach( [ '.nino-section-title', '.nino-section-title--quiet', '.nino-section-t
 			$hookUnruled[] = $hookTitle. ' does not say '. $hookDeclaration;
 check( 'a section title draws a rule of --section-line under itself, with six times that much air, and so do its quiet and its loud variant'. ( $hookUnruled === [] ? '' : ' - '. implode( '; ', $hookUnruled ) ), $hookUnruled === [] );
 /*	A variant is a factor of its role: the size is the size of the class it varies - the role, and for every title and subtitle of a
-	section, a card and a hero the scale that class has - times --scale-quiet or --scale-loud, and so is the leading where the variant
-	states one. The variants of the pricing table are not: they stay on the ladder	*/
+	section, a card and a hero the scale that class has, the hero's being --scale-loud itself - times --scale-quiet or --scale-loud, and so
+	is the leading where the variant states one: a loud hero title is the role times --scale-loud twice. The variants of the pricing table
+	are not: they stay on the ladder	*/
 $hookVariants = [
 	'.nino-section-title'			=> [ 'var(--font-title-size)', 'var(--section-title-scale)' ],
 	'.nino-section-subtitle'	=> [ 'var(--font-subtitle-size)', 'var(--section-subtitle-scale)' ],
@@ -158,8 +175,8 @@ $hookVariants = [
 	'.nino-card-title'				=> [ 'var(--font-title-size)', 'var(--card-title-scale)' ],
 	'.nino-card-subtitle'		=> [ 'var(--font-subtitle-size)', 'var(--card-subtitle-scale)' ],
 	'.nino-card-descr'				=> [ 'var(--font-text-size)' ],
-	'.nino-hero-title'				=> [ 'var(--font-title-size)', 'var(--hero-title-scale)' ],
-	'.nino-hero-subtitle'			=> [ 'var(--font-subtitle-size)', 'var(--hero-text-scale)' ],
+	'.nino-hero-title'				=> [ 'var(--font-title-size)', 'var(--scale-loud)' ],
+	'.nino-hero-subtitle'			=> [ 'var(--font-subtitle-size)', 'var(--scale-loud)' ],
 ];
 $hookUnscaled = [];
 foreach( $hookVariants as $hookBase => $hookFactors )
@@ -171,15 +188,15 @@ foreach( $hookVariants as $hookBase => $hookFactors )
 		if( count( $hookSizes[1] ) < 1 )
 			$hookUnscaled[] = $hookBase. '--'. $hookKind;
 		foreach( $hookSizes[1] as $hookSize )
-			foreach( array_merge( $hookFactors, [ 'var(--scale-'. $hookKind. ')' ] ) as $hookFactor )
-				if( str_contains( $hookSize, $hookFactor ) === false )
-					$hookUnscaled[] = $hookBase. '--'. $hookKind. ' does not read '. $hookFactor;
+			foreach( array_count_values( array_merge( $hookFactors, [ 'var(--scale-'. $hookKind. ')' ] ) ) as $hookFactor => $hookTimes )
+				if( substr_count( $hookSize, (string) $hookFactor ) < $hookTimes )
+					$hookUnscaled[] = $hookBase. '--'. $hookKind. ' does not read '. $hookFactor. ( $hookTimes > 1 ? ' '. $hookTimes. ' times' : '' );
 	}
 check( 'the quiet and the loud variants of a section, a card and a hero are their role times the number of their class, where it has one, times --scale-quiet and --scale-loud, which are .85 and 1.2'. ( $hookUnscaled === [] ? '' : ' - not: '. implode( ', ', $hookUnscaled ) ),
 	$hookUnscaled === [] && $hookValue( $hookRoot, '--scale-quiet' ) === '.85' && $hookValue( $hookRoot, '--scale-loud' ) === '1.2' );
-// The three classes that took a number of their own are the same factors themselves: the size, and the leading of the two section classes, which moves with it
+// The classes that took a number of their own are the same factors themselves: the size, and the leading of the two section classes and of the hero, which moves with it
 $hookUnscaledBase = [];
-foreach( [ '.nino-section-title', '.nino-section-subtitle', '.nino-card-subtitle' ] as $hookBase ) {
+foreach( [ '.nino-section-title', '.nino-section-subtitle', '.nino-card-subtitle', '.nino-hero-title', '.nino-hero-subtitle' ] as $hookBase ) {
 	preg_match_all( '/(?<![\w-])(?:font-size|line-height)\s*:([^;]*);/', $hookRules( $hookBase ), $hookSizes );
 	if( count( $hookSizes[1] ) < 1 )
 		$hookUnscaledBase[] = $hookBase;
@@ -188,7 +205,7 @@ foreach( [ '.nino-section-title', '.nino-section-subtitle', '.nino-card-subtitle
 			if( str_contains( $hookSize, $hookFactor ) === false )
 				$hookUnscaledBase[] = $hookBase. ' does not read '. $hookFactor;
 }
-check( '...and so are a section title, a section subtitle and a card subtitle themselves - the leading of the two section classes with their size'. ( $hookUnscaledBase === [] ? '' : ' - not: '. implode( ', ', $hookUnscaledBase ) ), $hookUnscaledBase === [] );
+check( '...and so are a section title, a section subtitle, a card subtitle and the title and the subtitle of a hero themselves - the leading of the two section classes and of the hero with their size'. ( $hookUnscaledBase === [] ? '' : ' - not: '. implode( ', ', $hookUnscaledBase ) ), $hookUnscaledBase === [] );
 $hookVariantRules = '';
 foreach( array_keys( $hookVariants ) as $hookBase )
 	$hookVariantRules .= $hookRules( $hookBase. '--quiet' ). ' '. $hookRules( $hookBase. '--loud' ). ' ';
@@ -802,6 +819,8 @@ $whitespaceWhere = [
 		'.nino-grid-row--alt, .nino-grid-row--tint, .nino-grid-row--dark, .nino-grid-row--black, .nino-grid-row--primary, .nino-grid-row--brand-alt, .nino-grid-row--counter, .nino-grid-row--dim, .nino-grid-row:where(:has(> .nino-grid-row-bg))',
 		'.nino-card-cols', '.nino-card-cols-s', '.nino-card-cols-m', '.nino-card-cols-l', '.nino-card-cols-xl',
 		'.nino-card--grid.nino-grid-m-25', '.nino-card--grid.nino-grid-m-33', '.nino-card--grid.nino-grid-m-50', '.nino-cover--padded',
+		'.nino-parallex:not(.nino-cover--padded, .nino-pl-0) > .nino-grid-row:not(.nino-pl-0, .nino-grid-row--full), .nino-cover:not(.nino-cover--padded, .nino-pl-0) > .nino-grid-row:not(.nino-pl-0, .nino-grid-row--full)',
+		'.nino-parallex:not(.nino-cover--padded, .nino-pr-0) > .nino-grid-row:not(.nino-pr-0, .nino-grid-row--full), .nino-cover:not(.nino-cover--padded, .nino-pr-0) > .nino-grid-row:not(.nino-pr-0, .nino-grid-row--full)',
 	],
 	'--whitespace-gap' => [
 		'.nino-grid-row > .nino-stack-start, .nino-grid-row > .nino-stack-center, .nino-grid-row > .nino-stack-end, .nino-grid-row > [class*="nino-stack-gap-"]:not(.nino-stack)',
@@ -820,16 +839,16 @@ foreach( $whitespaceWhere as $whitespaceToken => $whitespaceExpected ) {
 	if( $whitespaceFound !== $whitespaceExpected )
 		$whitespaceWrong[] = $whitespaceToken. ' - read where it should not be: '. implode( ' | ', array_diff( $whitespaceFound, $whitespaceExpected ) ). '; not read where it should be: '. implode( ' | ', array_diff( $whitespaceExpected, $whitespaceFound ) );
 }
-check( 'the areas read --whitespace-scale itself - the padding of a section, the margin and the padding of a card and of its content, the gap between the columns of a row of cards, the widths that give a card\'s margin up - the stack its gap and the texts theirs, and no other rule reads any of the three'
+check( 'the areas read --whitespace-scale itself - the padding of a section, the margin and the padding of a card and of its content, the gap between the columns of a row of cards, the widths that give a card\'s margin up, the sides of the row of a cover - the stack its gap and the texts theirs, and no other rule reads any of the three'
 	. ( $whitespaceWrong === [] ? '' : ' - '. implode( '; ', $whitespaceWrong ) ), $whitespaceWrong === [] );
-$whitespaceMay = [ '--whitespace-scale' => [ 'padding', 'padding-top', 'margin', 'column-gap', 'width', '--cover-padding-y', '--cover-padding-x' ], '--whitespace-gap' => [ 'gap', '--nino-stack-gap-scaled' ], '--whitespace-text' => [ 'margin', 'margin-top', 'margin-bottom' ] ];
+$whitespaceMay = [ '--whitespace-scale' => [ 'padding', 'padding-top', 'margin', 'column-gap', 'width', 'left', 'right', '--cover-padding-y', '--cover-padding-x' ], '--whitespace-gap' => [ 'gap', '--nino-stack-gap-scaled' ], '--whitespace-text' => [ 'margin', 'margin-top', 'margin-bottom' ] ];
 $whitespaceUsed = [];
 foreach( $whitespaceReads as $whitespaceToken => $whitespaceRules )
 	foreach( $whitespaceRules as $whitespaceSelectors => $whitespaceProperties )
 		foreach( array_keys( $whitespaceProperties ) as $whitespaceProperty )
 			if( in_array( $whitespaceProperty, $whitespaceMay[$whitespaceToken], true ) === false )
 				$whitespaceUsed[] = $whitespaceSelectors. ' says '. $whitespaceProperty. ' by '. $whitespaceToken;
-check( '...each in the properties it is for: the areas in padding, margin, the gap between columns and a width, the gap of a stack in gap, the text in margin - never a line height, a size or a colour'. ( $whitespaceUsed === [] ? '' : ' - '. implode( '; ', $whitespaceUsed ) ), $whitespaceUsed === [] );
+check( '...each in the properties it is for: the areas in padding, margin, the gap between columns and a width, the sides of the row of a cover in left and right, the gap of a stack in gap, the text in margin - never a line height, a size or a colour'. ( $whitespaceUsed === [] ? '' : ' - '. implode( '; ', $whitespaceUsed ) ), $whitespaceUsed === [] );
 
 // The picture of a card, and the frame that cuts a picture
 check( 'the picture of a card is as wide as the card and never wider, and --inline is the other way round - in line, at its own size, capped by the card all the same',
@@ -872,6 +891,66 @@ preg_match( '/@keyframes\s+nino-hero-arrowdown-bounce\s*\{((?:[^{}]|\{[^{}]*\})*
 check( 'what a cover centres is centred by translate and not by transform, so that a viewport animation of the same element composes with the centring instead of replacing it: the row of a cover and of a parallax and the content of a hand-written one by 0 -50%, the arrow of a hero by -50% 0, and the rules that put the row or the content at the top or at the bottom say translate: none - not one of them says transform, and the bounce of the arrow moves it up and down and says nothing of how it is centred'
 	. ( $centredWrong === [] ? '' : ' - not so: '. implode( ' | ', $centredWrong ) ),
 	$centredWrong === [] && str_contains( $centredBounce[1] ?? '', 'translateY' ) === true && str_contains( $centredBounce[1] ?? '', 'translateX' ) === false );
+
+/*	The row of a cover - a direct child of the section, which no hand-written cover has: its row stands in .nino-cover-content - has what the content of a hand-written cover has: the air above
+	it, a step of the space scale, and from 768px the side padding of the section, which a placed box does not stand in. The air is in a rule one class heavy, everything but the one class of the
+	row being asked for in :where(), that stands after the base rule of every row and before the padding classes, so that a nino-pt-<n> on the row says what it says. A row that paints a ground has
+	the room above and below of its own, the space step times the whitespace, from the rule of the grounds, and is left out of the air: the unscaled step above it replaced the top of such a row and
+	left the other three sides to follow the whitespace (measured with nino-whitespace--most: 36px above and 72px below at 1280, 32px and 64px at 390, where a plain section gives 72px and 64px
+	both ways). What the air leaves out is every selector of the rule of the grounds, as that rule lists them, read from the stylesheet - a ground it gains is left out in the same change. The
+	sides are left and right, the space step times the whitespace, in one rule each - and what keeps the edge it had is left out of it: the section that says nino-pl-0 or nino-pr-0, the row that
+	says one of them, the row with no maximum width, and the padded cover, which has its offsets from --cover-padding-x. The width is what the two offsets leave, and not the 100% every row says	*/
+$coverAirBase = ':where(.nino-parallex, .nino-cover) > .nino-grid-row';
+$coverAirRules = [];
+foreach( $groundMembers as $airIndex => $airList )
+	foreach( $airList as $airMember )
+		if( str_starts_with( $airMember, $coverAirBase ) === true )
+			$coverAirRules[$airIndex] = substr( $airMember, strlen( $coverAirBase ) );
+$airAt = array_key_first( $coverAirRules ) ?? -1;
+$airRest = $coverAirRules[$airAt] ?? '';
+$airLeft = [];
+if( preg_match_all( '/:not\(((?:[^()]|\([^()]*\))*)\)/', $airRest, $airNots ) > 0 )
+	foreach( $airNots[1] as $airNot )
+		$airLeft = array_merge( $airLeft, $groundSplit( $airNot ) );
+$airGround = array_map( static fn( string $member ): string => (string) preg_replace( '/^\.nino-grid-row:where\((.*)\)$/', '$1', $member ), $groundMembers[ $groundLastOf( [ '.nino-grid-row--alt' ], 'padding' ) ] ?? [] );
+$airWrong = [];
+if( count( $coverAirRules ) !== 1 )
+	$airWrong[] = count( $coverAirRules ). ' rules say the air';
+if( $groundSets( $groundBlocks[$airAt][2] ?? '', 'padding-top', 'var(--space-3)' ) === false )
+	$airWrong[] = 'the air is not the space step';
+if( preg_match( '/^:where\((?::not\((?:[^()]|\([^()]*\))*\))+\)$/', $airRest ) !== 1 )
+	$airWrong[] = 'what it leaves out is not asked for in one :where(), so that the rule is one class heavy: '. $airRest;
+if( $groundLastOf( [ '.nino-grid-row' ], 'padding' ) >= $airAt || $airAt >= $groundLastOf( [ '.nino-pt-0' ] ) )
+	$airWrong[] = 'it does not stand after the base rule of the row and before the padding classes';
+if( $airGround === [] || array_diff( $airGround, $airLeft ) !== [] || array_diff( $airLeft, $airGround ) !== [] )
+	$airWrong[] = 'it does not leave out the selectors of the rule of the grounds, '. implode( ' | ', $airGround ). ' - it leaves out '. implode( ' | ', $airLeft );
+check( 'the row of a cover has a step of the space scale above its content, as the content of a hand-written cover has - in a rule one class heavy that stands after the base rule of the row and before the padding classes, so that a nino-pt-<n> on the row says what it says - and a row that paints a ground, which has the room above and below of its own, the space step times the whitespace, is left out of it: every selector of the rule of the grounds'
+	. ( $airWrong === [] ? '' : ' - '. implode( '; ', $airWrong ) ), $airWrong === [] );
+$coverInset = [];
+foreach( $groundEach as $insetSelector => $insetBodies )
+	if( preg_match( '/^\.nino-cover:not\(([^()]*)\) > \.nino-grid-row:not\(([^()]*)\)$/', (string) $insetSelector, $insetFound ) === 1 )
+		foreach( [ 'left', 'right' ] as $insetSide )
+			if( preg_match( '/(?<![\w-])'. $insetSide. '\s*:/', implode( ' ', $insetBodies ) ) === 1 )
+				$coverInset[$insetSide] = [ 'cover' => array_map( 'trim', explode( ',', $insetFound[1] ) ), 'row' => array_map( 'trim', explode( ',', $insetFound[2] ) ), 'body' => implode( ' ', $insetBodies ), 'selector' => (string) $insetSelector ];
+$insetWrong = [];
+foreach( [ 'left' => 'pl', 'right' => 'pr' ] as $insetSide => $insetClass ) {
+	$inset = $coverInset[$insetSide] ?? null;
+	if( $inset === null ) {
+		$insetWrong[] = 'no rule says '. $insetSide;
+		continue;
+	}
+	if( $groundSets( $inset['body'], $insetSide, 'calc(var(--space-3) * var(--whitespace-scale))' ) === false )
+		$insetWrong[] = $insetSide. ' is not the space step times the whitespace';
+	foreach( [ 'cover' => [ '.nino-cover--padded', '.nino-'. $insetClass. '-0' ], 'row' => [ '.nino-'. $insetClass. '-0', '.nino-grid-row--full' ] ] as $insetPart => $insetKept )
+		if( array_diff( $insetKept, $inset[$insetPart] ) !== [] )
+			$insetWrong[] = $insetSide. ' does not leave out '. implode( ', ', array_diff( $insetKept, $inset[$insetPart] ) );
+	if( $groundConditions( '.nino-parallex'. substr( $inset['selector'], strlen( '.nino-cover' ) ). ', '. $inset['selector'] ) !== [ [ '@media (min-width: 768px)' ] ] )
+		$insetWrong[] = $insetSide. ' is not for the parallax and the cover from 768px alone';
+}
+check( 'from 768px the row of a cover and of a parallax stands inside the side padding of the section - the space step times the whitespace on the left and on the right, as wide as the two leave it - and a side keeps the edge it had where the section says nino-pl-0 or nino-pr-0 and where the row does, for the row with no maximum width and for the padded cover'
+	. ( $insetWrong === [] ? '' : ' - '. implode( '; ', $insetWrong ) ),
+	$insetWrong === [] && count( $coverInset ) === 2 && $groundSets( $groundOf( '.nino-cover > .nino-grid-row' ), 'width', 'auto' ) === true
+	&& in_array( [ '@media (min-width: 768px)' ], $groundConditions( '.nino-parallex > .nino-grid-row, .nino-cover > .nino-grid-row' ), true ) === true );
 
 /*	A section is the containing block of what is placed in it - the arrow at its foot, the picture behind it - whichever kind of section it is. A plain section and one whose picture stands in its row had
 	none, so that the arrow lay at the foot of the first screen of the page (measured: 788px to 828px at 390px, under a section that begins 1177px down), as the cover, the parallax and the section with a
@@ -2189,6 +2268,25 @@ check( 'value(): an address passes, a scheme that is none a link may take does n
 	&& \Nino\Modules\Components::value( $appData, '/not-a-key', 'href' ) === '/not-a-key' );
 check( 'value(): a fixed text="..." of an href source is checked like a key', \Nino\Modules\Components::value( $appData, '', 'href', 'plain', 'javascript:alert(1)' ) === '#'
 	&& \Nino\Modules\Components::value( $appData, '', 'href', 'plain', '/contact' ) === '/contact' );
+
+// The address of a page - a key under /_nino/webpage/, which the Routes step writes within the project - has the directory the project is served from in front of it, as the navigation writes it
+\Nino\Html::addFills( $appData, [
+	'/_nino/webpage/home/uri'				=> '/',
+	'/_nino/webpage/elsewhere/uri'			=> 'https://example.org/x',
+	'/template/page-home/dir/link'			=> '/x',
+], '*' );
+$appData['/nino/dir'] = '/shop';
+check( 'value(): the address of a page, a key under /_nino/webpage/, has the directory the project is served from in front of it - /shop/contact for a page, /shop/ for the home page - and so has the link of a [button] that names it',
+	\Nino\Modules\Components::value( $appData, '/_nino/webpage/contact/uri', 'href' ) === '/shop/contact' && \Nino\Modules\Components::value( $appData, '/_nino/webpage/home/uri', 'href' ) === '/shop/'
+	&& $render( '[button /_nino/webpage/contact/name href="/_nino/webpage/contact/uri" style="primary"]' ) === '<a class="nino-btn nino-btn--primary" href="/shop/contact">Contact us</a>' );
+check( '...and nothing else has it: a fixed address, an anchor, a key outside /_nino/webpage/ whose fill is an address, a key under it whose fill is a full address and not one within the project, and the key of a page that has no fill, which stays the key',
+	\Nino\Modules\Components::value( $appData, '', 'href', 'plain', '/contact' ) === '/contact' && $render( '[button text="Go" href="/contact"]' ) === '<a class="nino-btn" href="/contact">Go</a>'
+	&& \Nino\Modules\Components::value( $appData, '#top', 'href' ) === '#top' && \Nino\Modules\Components::value( $appData, '/template/page-home/dir/link', 'href' ) === '/x'
+	&& \Nino\Modules\Components::value( $appData, '/_nino/webpage/elsewhere/uri', 'href' ) === 'https://example.org/x'
+	&& \Nino\Modules\Components::value( $appData, '/_nino/webpage/nowhere/uri', 'href' ) === '/_nino/webpage/nowhere/uri' );
+$appData['/nino/dir'] = '';
+check( '...and a project at the domain root has the address as the Routes step wrote it', \Nino\Modules\Components::value( $appData, '/_nino/webpage/contact/uri', 'href' ) === '/contact'
+	&& \Nino\Modules\Components::value( $appData, '/_nino/webpage/home/uri', 'href' ) === '/' );
 check( 'value(): a control character in front of a scheme - a browser drops it before it reads the address - is a #, wherever in the address it stands',
 	\Nino\Modules\Components::value( $appData, "\x01javascript:alert(1)", 'href' ) === '#'
 	&& \Nino\Modules\Components::value( $appData, "\x1fjavascript:alert(1)", 'href' ) === '#'

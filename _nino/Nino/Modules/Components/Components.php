@@ -1360,7 +1360,10 @@ namespace Nino\Modules {
 		 *	is safe to write; the renderer looks the picture up through
 		 *	\Nino\Images by $args['source'], or by the field it names. An
 		 *	address is escaped like text, and one with
-		 *	a scheme that is not http, https, mailto or tel is a '#'.
+		 *	a scheme that is not http, https, mailto or tel is a '#'. An address
+		 *	that is a key under /_nino/webpage/ - a page's own, which the Routes
+		 *	step writes without the directory the project is served from - is
+		 *	written with that directory in front of it, as the navigation writes it.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$source				The first argument of the shortcode
@@ -1415,8 +1418,16 @@ namespace Nino\Modules {
 				if( $fill !== null && $format === 'plain' )
 					$fill = html_entity_decode( $fill, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 
-				if( $kind === 'href' )
+				if( $kind === 'href' ) {
+
+					// The address of a page is its own within the project, '/contact', and the
+					// project may be served from a directory: a link to the page carries it, as
+					// a navigation does. A key that has no fill stays the key
+					if( $fill !== null && str_starts_with( $source, '/_nino/webpage/' ) === true && str_starts_with( $fill, '/' ) === true )
+						$fill = rtrim( \Nino\Filesystem::getDir( $appData ), '/' ). $fill;
+
 					return self::_href( $fill ?? $source );
+				}
 
 				return $fill === null ? null : self::_formatText( $fill, $format );
 			}
