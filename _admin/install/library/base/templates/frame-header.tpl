@@ -10,6 +10,9 @@
 						<nav class="nino-frame-header-nav" aria-label="[[/template/frame-header/navigation/label]]">
 							[template /templates/html-header-nav]
 						</nav>
+						<div class="nino-frame-header-cta">
+							[button /template/frame-header/button/label href="/template/frame-header/button/link" style="primary"]
+						</div>
 					</div>
 				</div>
 			</div>

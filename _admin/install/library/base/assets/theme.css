@@ -8,7 +8,9 @@
  *									Design feature compiles at its defaults: the fourteen
  *									numbered sections, every part on the set the first
  *									shipped theme names - Nino, the default construction
- *									of each tab -, every knob in the middle. It is regenerated from
+ *									of each tab -, every knob where that theme puts it: the middle,
+ *									but for the navigation of the header on the right and its button
+ *									hidden. It is regenerated from
  *									that compiler with each kernel release, so that the look
  *									a project starts from and the look Design compiles have
  *									one source. Nino.css carries the defaults; this file is
@@ -645,8 +647,8 @@
 	--radius-image-default: standard;
 }
 
-/* ==== 7. header: classic-default (nav default, height default, space default, ground default) ==== */
-/*	@name				Classic, default
+/* ==== 7. header: regular (nav default, height default, space default, ground default, border-size default, border-color default, position more, cta less) ==== */
+/*	@name				Regular
  *	@description	A bar on the page ground with a rule under it, five rem tall. The one a fresh Nino installs.
  *	@description-de	Eine Leiste auf dem Grund der Seite mit einer Linie darunter, fünf rem hoch. Die, die ein frisches Nino mitbringt.
  *
@@ -654,12 +656,16 @@
  *	@knob	height		How tall the bar is
  *	@knob	space		Space between the logo, the links and the edges
  *	@knob	ground		What the bar stands on
+ *	@knob	border-size	Width of the border
+ *	@knob	border-color	Colour of the border
+ *	@knob	position	Where the navigation stands
+ *	@knob	cta		Visibility and size of the button of the header
  *
  *	The name and the description are what the Design panel lists this
  *	variant as. Every library file carries them; a file without a @name
  *	is offered under its own file name instead.
  *
- *	The four knobs are ladders, declared below, the middle of each this set as it
+ *	The eight knobs are ladders, declared below, the middle of each this set as it
  *	was before it had any: nav is a factor on the size of the links of the
  *	navigation, height the height of the bar - and of the room main leaves under
  *	it -, space a factor on the gaps between the logo, the links and the edges,
@@ -669,6 +675,13 @@
  *	(--header-ground-ink, -title, -accent, -focus and -border), and is put on the
  *	header as the roles Nino.css reads - so the bar is legible on each of the
  *	three. The menu that opens over the page is the page's again, as in Nino.css.
+ *
+ *	The other four: border-size is the width of the border the bar has, border-color a
+ *	choice of three for its colour - the ink of the page, the border of the page and the
+ *	brand -, position a choice of three for where the navigation stands - left, centre or
+ *	right of the bar - and cta a choice of three for the button of the header - hidden,
+ *	small, or as large as a button is. The button is scaled by --header-cta-scale, the
+ *	factor its font, its padding and its corners are drawn with.
  */
 
 :root {
@@ -723,10 +736,36 @@
 	--header-ground-border--less:	var(--color-border);
 	--header-ground-border--default:	var(--color-border);
 	--header-ground-border--more:	var(--color-border-dark);
+
+	--header-border-size--least:	0;
+	--header-border-size--less:	.5px;
+	--header-border-size--default: 1px;
+	--header-border-size--more:	2px;
+	--header-border-size--most:	6px;
+
+	--header-border-color--less:	var(--color-text);
+	--header-border-color--default:	var(--color-border);
+	--header-border-color--more:	var(--color-primary);
+
+	--header-position--less: 0 auto 0 0;
+	--header-position--default: 0 auto;
+	--header-position--more: 0 0 0 auto;
+
+	--header-position-cta--less: 0;
+	--header-position-cta--default: clamp(7rem, 9vw, 9rem);
+	--header-position-cta--more: 0;
+
+	--header-cta--less: none;
+	--header-cta--default: block;
+	--header-cta--more: block;
+
+	--header-cta-scale--less: .7;
+	--header-cta-scale--default: .7;
+	--header-cta-scale--more: 1;
 }
 
 .nino-frame-header {
-	border-bottom: 1px solid var(--color-border);
+	border-bottom: solid var(--header-border-color) var(--header-border-size);
 	--color-title: var(--header-ground-title);
 	--color-accent: var(--header-ground-accent);
 	--color-focus: var(--header-ground-focus);
@@ -743,7 +782,7 @@
 	opacity: 1;
 	color: var(--header-ground-ink);
 	background-color: var(--header-ground);
-	display:flex;
+	display: flex;
 }
 
 body.nino-scroll-atf .nino-frame-header .nino-scroll-header {
@@ -758,9 +797,19 @@ body.nino-scroll-atf .nino-frame-header .nino-scroll-header {
 	margin: 0;
 	background-image: none;
 }
+.nino-frame-header-cta {
+	display: var(--header-cta);
+	min-width: var(--header-position-cta);
+}
+.nino-frame-header-cta a {
+	display: block;
+	font-size: calc( var(--font-button-size) * var(--header-cta-scale) );
+	padding: calc( var(--space-1) * var(--header-cta-scale) ) calc( var(--space-2) * var(--header-cta-scale) );
+	border-radius: calc( var(--radius) * var(--header-cta-scale) );
+}
 
 .nino-frame-header .nino-frame-header-nav {
-	margin-left: auto;
+	margin: var(--header-position);
 }
 
 .nino-frame-header .nino-nav-burger > button > svg {
@@ -1669,6 +1718,10 @@ footer {
 	--footer-height: var(--footer-height--default);
 	--footer-scale: var(--footer-scale--default);
 	--footer-space: var(--footer-space--default);
+	--header-border-color: var(--header-border-color--default);
+	--header-border-size: var(--header-border-size--default);
+	--header-cta: var(--header-cta--less);
+	--header-cta-scale: var(--header-cta-scale--less);
 	--header-ground: var(--header-ground--default);
 	--header-ground-accent: var(--header-ground-accent--default);
 	--header-ground-border: var(--header-ground-border--default);
@@ -1677,6 +1730,8 @@ footer {
 	--header-ground-title: var(--header-ground-title--default);
 	--header-height: var(--header-height--default);
 	--header-nav: var(--header-nav--default);
+	--header-position: var(--header-position--more);
+	--header-position-cta: var(--header-position-cta--more);
 	--header-space: var(--header-space--default);
 	--lists-marker: var(--lists-marker--default);
 	--lists-marker-check-box: var(--lists-marker-check-box--default);
