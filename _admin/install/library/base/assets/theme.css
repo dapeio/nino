@@ -592,9 +592,9 @@
 	--color-warning-text: var(--nino-on-warning);
 
 	/* The type is the compiler's: the five font roles (--fontfamily-<role>,
-	   --font-<role>-weight, -transform and -size) and the @font-face rules
-	   behind them are written from the setup's fonts, a section of their own
-	   before this one. A webface is a file this unit ships, not a value
+	   --font-<role>-weight and -size) and the @font-face rules behind them
+	   are written from the setup's fonts, a section of their own before
+	   this one. A webface is a file this unit ships, not a value
 	   anything can generate */
 
 	/* Sizes are assignments too. The raster is section 1's: the framework's
@@ -647,7 +647,7 @@
 	--radius-image-default: standard;
 }
 
-/* ==== 7. header: regular (nav default, height default, space default, ground default, border-size default, border-color default, position more, cta less) ==== */
+/* ==== 7. header: regular (nav default, height default, space default, ground default, border-size default, border-color default, position more, cta less, nav-case default) ==== */
 /*	@name				Regular
  *	@description	A bar on the page ground with a rule under it, five rem tall. The one a fresh Nino installs.
  *	@description-de	Eine Leiste auf dem Grund der Seite mit einer Linie darunter, fünf rem hoch. Die, die ein frisches Nino mitbringt.
@@ -660,12 +660,13 @@
  *	@knob	border-color	Colour of the border
  *	@knob	position	Where the navigation stands
  *	@knob	cta		Visibility and size of the button of the header
+ *	@knob	nav-case	Capitals in the links of the navigation
  *
  *	The name and the description are what the Design panel lists this
  *	variant as. Every library file carries them; a file without a @name
  *	is offered under its own file name instead.
  *
- *	The eight knobs are ladders, declared below, the middle of each this set as it
+ *	The nine knobs are ladders, declared below, the middle of each this set as it
  *	was before it had any: nav is a factor on the size of the links of the
  *	navigation, height the height of the bar - and of the room main leaves under
  *	it -, space a factor on the gaps between the logo, the links and the edges,
@@ -682,6 +683,10 @@
  *	right of the bar - and cta a choice of three for the button of the header - hidden,
  *	small, or as large as a button is. The button is scaled by --header-cta-scale, the
  *	factor its font, its padding and its corners are drawn with.
+ *
+ *	The ninth, nav-case, is a toggle: two rungs, none and uppercase, and the links
+ *	of the navigation - in the bar, and in the menu that opens over the page - are
+ *	set in the one its position picks.
  */
 
 :root {
@@ -762,6 +767,10 @@
 	--header-cta-scale--less: .7;
 	--header-cta-scale--default: .7;
 	--header-cta-scale--more: 1;
+
+	/*	The case of the links of the navigation: as they are written, or in capitals	*/
+	--header-nav-case--default: none;
+	--header-nav-case--more: uppercase;
 }
 
 .nino-frame-header {
@@ -810,6 +819,10 @@ body.nino-scroll-atf .nino-frame-header .nino-scroll-header {
 
 .nino-frame-header .nino-frame-header-nav {
 	margin: var(--header-position);
+}
+
+.nino-frame-header .nino-nav-content li a {
+	text-transform: var(--header-nav-case);
 }
 
 .nino-frame-header .nino-nav-burger > button > svg {
@@ -872,7 +885,7 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 }
 
 
-/* ==== 8. footer: one-legal-row (scale default, height default, space default, ground default) ==== */
+/* ==== 8. footer: one-legal-row (scale default, height default, space default, ground default, nav-case default) ==== */
 /*	@name				One legal row
  *	@description	Copyright, the footer navigation and the legal links on a single row. The smallest footer there is.
  *	@description-de	Copyright, die Footer-Navigation und die rechtlichen Links in einer einzigen Zeile. Der kleinste Footer, den es gibt.
@@ -881,12 +894,13 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
  *	@knob	height		Space above and below the content of the footer
  *	@knob	space		Space between its columns, lines and links
  *	@knob	ground		What the footer stands on
+ *	@knob	nav-case	Capitals in the links of the navigation
  *
  *	The name and the description are what the Design panel lists this
  *	variant as. Every library file carries them; a file without a @name
  *	is offered under its own file name instead.
  *
- *	The four knobs are ladders, declared below, the middle of each this set as it
+ *	The five knobs are ladders, declared below, the middle of each this set as it
  *	was before it had any: scale is a factor on the type size of the footer, height
  *	a factor on the room above and below its content, space a factor on the gaps
  *	between its columns, lines and links, and ground a choice of three: the ground
@@ -894,7 +908,9 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
  *	the text, the links and the lines of the footer are read in comes with it, as
  *	aspects of the ground (--footer-ground-ink, -subtitle, -title, -accent, -focus
  *	and -border), and is put on the footer as the roles Nino.css reads - so the
- *	footer is legible on each of the three.
+ *	footer is legible on each of the three. The fifth, nav-case, is a toggle: two
+ *	rungs, none and uppercase, and the links of the navigation and the legal links
+ *	are set in the one its position picks.
  */
 
 :root {
@@ -953,6 +969,10 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 	--footer-ground-border--less:	var(--color-border);
 	--footer-ground-border--default:	var(--color-border);
 	--footer-ground-border--more:	var(--color-border-dark);
+
+	/*	The case of the links of the navigation: as they are written, or in capitals	*/
+	--footer-nav-case--default: none;
+	--footer-nav-case--more: uppercase;
 }
 
 footer {
@@ -973,6 +993,9 @@ footer {
 .nino-footer-nav .nino-footer-title {
 	display:none;
 }
+.nino-footer-nav .nino-nav-content li a {
+	text-transform: var(--footer-nav-case);
+}
 .nino-footer-nav {
 	display:flex;
 	gap: calc( var(--space-3) * var(--footer-space) );
@@ -984,7 +1007,7 @@ footer {
 }
 
 
-/* ==== 9. section: regular (quiet default, loud default, title default, subtitle default, space default, rule default, dim default) ==== */
+/* ==== 9. section: regular (quiet default, loud default, title default, subtitle default, space default, rule default, dim default, title-case default, subtitle-case default) ==== */
 /*	@name			Regular
  *	@description	The framework as it is: the middle of every ladder. The hero, the sections, their titles and the covers as Nino.css draws them.
  *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Hero, Sektionen, ihre Titel und die Cover, wie Nino.css sie zeichnet.
@@ -996,6 +1019,8 @@ footer {
  *	@knob	space				Space above and below the content of a section
  *	@knob	rule				Rule under the title of a section
  *	@knob	dim					How dark the scrim of a dimmed cover is
+ *	@knob	title-case		Capitals in the title of a section
+ *	@knob	subtitle-case	Capitals in the subtitle of a section
  *
  *	Regular is the starting point, not a design. Every value it declares is the
  *	framework's own, so a page under it looks as it does under Nino.css alone -
@@ -1027,7 +1052,9 @@ footer {
  *	of a dimmed cover is the one thing that does: its rule reads the ladder
  *	of the dimming, on the two pseudo-elements Nino.css draws it with and on
  *	the block of a picture behind a section, a row and a column, which carry
- *	one of their own. The card family has the same four names (Regular,
+ *	one of their own. The two cases are toggles of two rungs, none and uppercase,
+ *	and read by a rule each: the title of a section and the hero's, the subtitle
+ *	of a section and the hero's. The card family has the same four names (Regular,
  *	Open, Panel, Box) and a theme names a sensible pair. Copy this file
  *	under a name of your own and start there.
  */
@@ -1096,6 +1123,13 @@ footer {
 	--section-dim--default: 	var(--color-background-dim);
 	--section-dim--more: 		color-mix( in srgb, var(--color-background-dim) 75%, var(--color-section-black-bg) );
 	--section-dim--most: 		color-mix( in srgb, var(--color-background-dim) 50%, var(--color-section-black-bg) );
+
+	/*	The case of the title and of the subtitle: as they are written, or in capitals	*/
+	--section-title-case--default: 		none;
+	--section-title-case--more: 			uppercase;
+
+	--section-subtitle-case--default: 	none;
+	--section-subtitle-case--more: 		uppercase;
 }
 
 @media (min-width: 768px) {
@@ -1115,6 +1149,16 @@ footer {
 	--section-line: var(--section-rule);
 	--scale-quiet: var(--section-quiet);
 	--scale-loud: var(--section-loud);
+}
+
+/*	The case of the titles and of the subtitles, the hero's with them: the hero is the loud variant of the same	*/
+.nino-section-title,
+.nino-hero-title {
+	text-transform: var(--section-title-case);
+}
+.nino-section-subtitle,
+.nino-hero-subtitle {
+	text-transform: var(--section-subtitle-case);
 }
 
 /*	The space of a section, unless the section says its own: the spacing
@@ -1147,7 +1191,7 @@ footer {
 }
 
 
-/* ==== 10. card: regular (title default, subtitle default, space default, border default, shadow default, tone default, hover default) ==== */
+/* ==== 10. card: regular (title default, subtitle default, space default, border default, shadow default, tone default, hover default, title-case default, subtitle-case default) ==== */
 /*	@name			Regular
  *	@description	The framework as it is: the middle of every ladder. Cards as Nino.css draws them.
  *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Karten, wie Nino.css sie zeichnet.
@@ -1159,6 +1203,8 @@ footer {
  *	@knob	shadow		Shadow of a card
  *	@knob	tone		Colour the shadow is drawn in
  *	@knob	hover		What a card does under the pointer
+ *	@knob	title-case	Capitals in the title of a card
+ *	@knob	subtitle-case	Capitals in the subtitle of a card
  *
  *	Regular is the starting point, not a design. Every value it declares is the
  *	framework's own, so a page under it looks as it does under Nino.css alone -
@@ -1198,7 +1244,9 @@ footer {
  *	it does not move. This set does nothing under the pointer by itself, so the
  *	middle is as little as the first position; the third lifts the card by a
  *	quarter of a rem with the strongest step of the shadow, and only where the
- *	visitor has not asked for less motion. The section family has the same four
+ *	visitor has not asked for less motion. The two cases are toggles of two rungs,
+ *	none and uppercase, read by a rule each: the title and the subtitle of a card.
+ *	The section family has the same four
  *	names (Regular, Open, Panel, Box) and a theme names a sensible pair.
  *	Copy this file under a name of your own and start there.
  */
@@ -1267,6 +1315,13 @@ footer {
 	--card-hover-shadow--less: 			var(--shadow-card);
 	--card-hover-shadow--default: 	var(--shadow-card);
 	--card-hover-shadow--more: 			0 .25rem 1.5rem var(--card-tone), 0 .0625rem .25rem var(--card-tone);
+
+	/*	The case of the title and of the subtitle: as they are written, or in capitals	*/
+	--card-title-case--default: 		none;
+	--card-title-case--more: 			uppercase;
+
+	--card-subtitle-case--default: 	none;
+	--card-subtitle-case--more: 		uppercase;
 }
 
 @media (min-width: 768px) {
@@ -1284,6 +1339,13 @@ footer {
 	--card-title-scale: var(--card-title);
 	--card-subtitle-scale: var(--card-subtitle);
 	--shadow-card: var(--card-shadow);
+}
+
+.nino-card-title {
+	text-transform: var(--card-title-case);
+}
+.nino-card-subtitle {
+	text-transform: var(--card-subtitle-case);
 }
 
 .nino-card-content:where(:not([class*="nino-pt-"], [class*="nino-pb-"], [class*="nino-p-"])) {
@@ -1323,7 +1385,7 @@ footer {
 }
 
 
-/* ==== 11. buttons: regular (size default, spread default, space default, corners default, hover default) ==== */
+/* ==== 11. buttons: regular (size default, spread default, space default, corners default, hover default, case default) ==== */
 /*	@name			Regular
  *	@description	The framework as it is: the middle of every ladder. Every .nino-btn variant and the link that looks like one.
  *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Jede .nino-btn-Variante und der Link, der wie eine aussieht.
@@ -1333,6 +1395,7 @@ footer {
  *	@knob	space		Space around the label
  *	@knob	corners		Corner radius
  *	@knob	hover		What a button does under the pointer
+ *	@knob	case		Capitals in the label of a button
  *
  *	Regular is the starting point, not a design. Every value it declares is the
  *	framework's own, so a button under it looks as it does under Nino.css
@@ -1344,10 +1407,11 @@ footer {
  *
  *	  - Only the classes of this template: the button and its variants. A
  *	    button set does not touch a section title, however tempting.
- *	  - Colours through the roles, never as literals. Nor the font: the face,
- *	    the weight and the case of a button are the button role of the type
- *	    tab (--font-button-*), and a set that wrote its own would contradict
- *	    the panel.
+ *	  - Colours through the roles, never as literals. Nor the font: the face
+ *	    and the weight of a button are the button role of the type tab
+ *	    (--font-button-*), and a set that wrote its own would contradict the
+ *	    panel. The case is the knob's: a toggle of two rungs, none and
+ *	    uppercase, which the set reads.
  *
  *	The size is what the padding, the type and the radius of a button are
  *	multiplied by. The variants are that size times a number, in Nino.css as
@@ -1412,6 +1476,10 @@ footer {
 	--buttons-hover-shadow--less: 		none;
 	--buttons-hover-shadow--default: 	none;
 	--buttons-hover-shadow--more: 		0 .25rem .5rem var(--nino-default-shadow);
+
+	/*	The case of the label: as it is written, or in capitals	*/
+	--buttons-case--default: 	none;
+	--buttons-case--more: 		uppercase;
 }
 
 /*	Not where the button names a padding of its own: the spacing classes of
@@ -1422,6 +1490,7 @@ footer {
 .nino-btn {
 	font-size: calc( var(--font-button-size) * var(--buttons-size) );
 	border-radius: calc( var(--buttons-corners) * var(--buttons-size) );
+	text-transform: var(--buttons-case);
 }
 .nino-btn--small:where(:not([class*="nino-pt-"], [class*="nino-pb-"], [class*="nino-p-"])) {
 	padding: calc( var(--buttons-space) / 2 * var(--buttons-size) * ( 1 - var(--buttons-spread) ) ) calc( var(--buttons-space) * var(--buttons-size) * ( 1 - var(--buttons-spread) ) );
@@ -1694,6 +1763,7 @@ footer {
 
 /* ==== 14. the knob positions ==== */
 :root {
+	--buttons-case: var(--buttons-case--default);
 	--buttons-corners: var(--buttons-corners--default);
 	--buttons-hover: var(--buttons-hover--default);
 	--buttons-hover-shadow: var(--buttons-hover-shadow--default);
@@ -1706,7 +1776,9 @@ footer {
 	--card-shadow: var(--card-shadow--default);
 	--card-space: var(--card-space--default);
 	--card-subtitle: var(--card-subtitle--default);
+	--card-subtitle-case: var(--card-subtitle-case--default);
 	--card-title: var(--card-title--default);
+	--card-title-case: var(--card-title-case--default);
 	--card-tone: var(--card-tone--default);
 	--footer-ground: var(--footer-ground--default);
 	--footer-ground-accent: var(--footer-ground-accent--default);
@@ -1716,6 +1788,7 @@ footer {
 	--footer-ground-subtitle: var(--footer-ground-subtitle--default);
 	--footer-ground-title: var(--footer-ground-title--default);
 	--footer-height: var(--footer-height--default);
+	--footer-nav-case: var(--footer-nav-case--default);
 	--footer-scale: var(--footer-scale--default);
 	--footer-space: var(--footer-space--default);
 	--header-border-color: var(--header-border-color--default);
@@ -1730,6 +1803,7 @@ footer {
 	--header-ground-title: var(--header-ground-title--default);
 	--header-height: var(--header-height--default);
 	--header-nav: var(--header-nav--default);
+	--header-nav-case: var(--header-nav-case--default);
 	--header-position: var(--header-position--more);
 	--header-position-cta: var(--header-position-cta--more);
 	--header-space: var(--header-space--default);
@@ -1747,7 +1821,9 @@ footer {
 	--section-rule: var(--section-rule--default);
 	--section-space: var(--section-space--default);
 	--section-subtitle: var(--section-subtitle--default);
+	--section-subtitle-case: var(--section-subtitle-case--default);
 	--section-title: var(--section-title--default);
+	--section-title-case: var(--section-title-case--default);
 	--tables-border: var(--tables-border--default);
 	--tables-scale: var(--tables-scale--default);
 	--tables-space: var(--tables-space--default);
