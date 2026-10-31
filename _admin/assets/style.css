@@ -109,6 +109,9 @@
 	--nino-admin-rail-folded-width: 3.75rem;
 	--nino-admin-actionbar-height: 4.25rem;
 	--nino-admin-contextbar-height: 52px;
+	/* The head of the rail and the head of a panel: one height, so the line
+	   under the one is the line under the other */
+	--nino-admin-head-height: 52px;
 	--nino-admin-content-inline: clamp(1.25rem, 3vw, 3rem);
 	--nino-admin-control-height: 38px;
 	--nino-admin-row-height: 46px;
@@ -3041,7 +3044,8 @@ a {
  *	here. It reads as the same piece of chrome the context bar is, the pane's
  *	own bar rather than a title floating in the content: the bar surface,
  *	bled through the pane's inline padding to both edges and closed flush
- *	against the top of the pane, a hairline under it.
+ *	against the top of the pane, a hairline under it - as high as the brand row
+ *	of the rail (--nino-admin-head-height), on the same line.
  *
  *	Not sticky, unlike .nino-admin-contextbar: a panel drills into forms that
  *	bring a context bar of their own, and two bars pinned to the same edge
@@ -3052,7 +3056,7 @@ a {
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 0 1.5rem;
-	min-height: 52px;
+	min-height: var(--nino-admin-head-height);
 	margin: -1rem calc(var(--nino-admin-content-inline) * -1) 1.25rem;
 	padding: .35rem var(--nino-admin-content-inline) 0;
 	border-bottom: 1px solid var(--editor-separator);
@@ -3152,6 +3156,44 @@ a {
 	align-items: center;
 	gap: .65rem;
 	min-width: 0;
+}
+/*	On the desktop the head of the rail is the brand row: the account row
+ *	under it is the first thing in the rail's body, not part of the head. The
+ *	row is as high as a panel's head and closed by the same line, bled through
+ *	the padding of the rail and of its head to both edges, so that the two
+ *	lines are one line across the workbench (see the head of a panel above).
+ *	The rail's top padding goes for the row to start at the top edge, and the
+ *	wizard, whose rail has no brand row, keeps the padding it has: this is
+ *	why it is here and not with the rail in the design system. Folded, the row
+ *	is the column of the nino.local rule below and justify-content: center
+ *	centres the mark in the row's height; the fold button and the head's
+ *	margin follow the row's height as well. */
+@media (min-width: 64rem) {
+	#admin-page-wrap .nino-admin-rail {
+		padding-top: 0;
+	}
+	#admin-page-wrap .nino-admin-rail-head {
+		gap: .5rem;
+	}
+	/* The bleed is the rail's inline padding plus the head's own */
+	#admin-page-wrap .nino-admin-rail-head > .admin-brand {
+		min-height: var(--nino-admin-head-height);
+		margin-inline: calc(-.72rem - .35rem);
+		padding-inline: calc(.72rem + .35rem);
+		border-bottom: 1px solid var(--editor-separator);
+	}
+	/* Folded, the rail's inline padding is .5rem */
+	#admin-page-wrap.nino-admin-shell--folded .nino-admin-rail-head > .admin-brand {
+		justify-content: center;
+		margin-inline: calc(-.5rem - .35rem);
+		padding-inline: calc(.5rem + .35rem);
+	}
+	#admin-page-wrap.nino-admin-shell--folded .nino-admin-rail-head {
+		margin-bottom: .5rem;
+	}
+	#admin-page-wrap.nino-admin-shell--folded .nino-admin-rail-toggle {
+		top: calc(var(--nino-admin-head-height) + .25rem);
+	}
 }
 #admin-user-email {
 	min-width: 0;
