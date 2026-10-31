@@ -1806,6 +1806,9 @@ $badSchemas = [
 	'a tab in capitals'										=> [ 'captab', $withAttribute( [ 'type' => 'bool', 'default' => false, 'tab' => strtoupper( \Nino\Modules\Components::TABS[0] ) ] ), '"tab" must be one of' ],
 	'a tab that is the list of the words'				=> [ 'listtab', $withAttribute( [ 'type' => 'select', 'options' => [ '', 'a' ], 'default' => '', 'tab' => \Nino\Modules\Components::TABS ] ), '"tab" must be one of' ],
 	'a tab that is a number'								=> [ 'numtab', $withAttribute( [ 'type' => 'int', 'default' => 0, 'tab' => 5 ] ), '"tab" must be one of' ],
+	'a stretching of a component that holds nothing'	=> [ 'stretchnone', [ 'label' => 'x', 'source' => 'text', 'group' => 'card', 'stretches' => 'card-title' ], '"stretches" needs "holds"' ],
+	'a stretching of a name that is no slug'			=> [ 'stretchslug', [ 'label' => 'x', 'source' => 'content', 'holds' => 'card', 'group' => 'card', 'stretches' => 'Card Title' ], '"stretches" names a component, a slug' ],
+	'a stretching of a list'							=> [ 'stretchlist', [ 'label' => 'x', 'source' => 'content', 'holds' => 'card', 'group' => 'card', 'stretches' => [ 'card-title' ] ], '"stretches" names a component, a slug' ],
 ];
 foreach( $badSchemas as $what => [ $name, $schema, $why ] ) {
 	$schemaErrors = $errorsOf( function() use ( &$appData, $noop, $name, $schema ) { \Nino\Modules\Components::addComponent( $appData, $name, $noop, $schema ); } );
@@ -1820,6 +1823,25 @@ $schemaErrors = $errorsOf( function() use ( &$appData, $noop ) { \Nino\Modules\C
 check( '...and one whose assets climb out of the project', count( $schemaErrors ) === 1 && str_contains( $schemaErrors[0][1], 'assets' ) === true );
 check( 'the registry was left alone by every refusal', array_keys( \Nino\Modules\Components::components( $appData ) ) === $kernelAll
 	&& array_keys( \Nino\Modules\Components::stacks( $appData ) ) === $kernelStacks );
+// What a holder 'stretches' names is told by the components registered before it, and a name that does not do is no reason for a fatal error - a manifest cannot know the
+// other components, and an E_USER_ERROR at registration would be one on every request: the holder is registered without the key, and a warning says why
+$stretching = [
+	'a component that is not there'					=> [ 'stretchunknown', 'card-headline', 'card', '"stretches" names a component that is registered before it: "card-headline" is not' ],
+	'itself'												=> [ 'stretchself', 'stretchself', 'card', '"stretches" names a component that is registered before it: "stretchself" is not' ],
+	'a component that is no link'						=> [ 'stretchnolink', 'button', 'section', '"stretches" names a component that is a link: "button" is not' ],
+	'a component that is offered in another place'	=> [ 'stretchplace', 'title', 'card', '"stretches" names a component that is offered in card, the place it holds: "title" is not' ],
+];
+foreach( $stretching as $what => [ $name, $stretches, $holds, $why ] ) {
+	$probe = $appData;
+	$warned = $errorsOf( function() use ( &$probe, $noop, $name, $stretches, $holds ) { \Nino\Modules\Components::addComponent( $probe, $name, $noop, [ 'label' => 'x', 'source' => 'content', 'holds' => $holds, 'group' => 'card', 'stretches' => $stretches ] ); } );
+	check( 'addComponent() registers a holder that stretches '. $what. ' without the key, and says so in one E_USER_WARNING', count( $warned ) === 1 && $warned[0][0] === E_USER_WARNING
+		&& str_contains( $warned[0][1], 'component "'. $name. '": '. $why. ' - registered without it' ) === true
+		&& isset( \Nino\Modules\Components::components( $probe )[$name] ) === true && array_key_exists( 'stretches', \Nino\Modules\Components::components( $probe )[$name] ) === false
+		&& \Nino\Modules\Components::components( $probe )[$name]['holds'] === $holds && isset( \Nino\Modules\Components::components( $appData )[$name] ) === false );
+}
+$probe = $appData;
+$kept = $errorsOf( function() use ( &$probe, $noop ) { \Nino\Modules\Components::addComponent( $probe, 'stretchgood', $noop, [ 'label' => 'x', 'source' => 'content', 'holds' => 'card', 'group' => 'card', 'stretches' => 'card-title' ] ); } );
+check( '...and one whose name does keeps it, with no word said', $kept === [] && \Nino\Modules\Components::components( $probe )['stretchgood']['stretches'] === 'card-title' );
 check( 'a schema that validates is returned complete, a stack with its assets', \Nino\Modules\Components::validate( 'rows', [ 'label' => 'Rows', 'grid' => true, 'assets' => [ 'css' => [ '/features/Rows/assets/rows.css' ] ] ], true ) === [
 	'label' => 'Rows', 'grid' => true, 'preview' => 'cells', 'attributes' => [], 'assets' => [ 'css' => [ '/features/Rows/assets/rows.css' ] ],
 ] );
@@ -1852,6 +1874,10 @@ check( '...and gives the sentence of the first thing wrong with it: a place that
 	array_filter( [ 'page', 'cell', 'Card', [ 'card' ], 5, '', true ], static fn( mixed $wrong ): bool => str_contains( $holdsAnswer( $holding + [ 'holds' => $wrong ] ), '"holds" names a place: section, card or hero' ) === false ) === []
 	&& array_filter( [ 'text', 'image', 'href', 'none' ], static fn( string $source ): bool => str_contains( $holdsAnswer( [ 'source' => $source, 'holds' => 'card' ] + $holding ), '"holds" needs the source content' ) === false ) === []
 	&& $holdsAnswer( [ 'holds' => 'weird', 'source' => 'text' ] + $holding ) !== '' && str_contains( $holdsAnswer( [ 'holds' => 'weird', 'source' => 'text' ] + $holding ), 'names a place' ) === true );
+check( 'validate() carries what a holder stretches over itself when it is linked, a name, in the clean schema; a schema that says nothing stretches nothing, and the names are checked when the holder is registered',
+	( \Nino\Modules\Components::validate( 'box', $holding + [ 'holds' => 'card', 'stretches' => 'card-title' ] )['stretches'] ?? null ) === 'card-title'
+	&& array_key_exists( 'stretches', \Nino\Modules\Components::validate( 'box', $holding + [ 'holds' => 'card' ] ) ) === false
+	&& str_contains( $holdsAnswer( $holding + [ 'stretches' => 'card-title' ] ), '"stretches" needs "holds"' ) === true );
 // An icon: the parts of a 24 by 24 picture that a tool draws with a stroke, which validate() carries into the clean schema as it was given - the refusals are in the table above
 $iconAnswer = static fn( mixed $icon ): array|string => \Nino\Modules\Components::validate( 'probe', $placed + [ 'icon' => $icon ] );
 $iconSeven = [
@@ -2004,7 +2030,11 @@ $cardSchema = \Nino\Modules\Components::components( $appData )['card'];
 check( 'the card is declared as the registry says: a label in both languages, the source content, the picture of a block, its icon, offered in a section and a hero, drawing the <article> with its class, and holding the components of a card',
 	$cardSchema['label'] === [ 'en_US' => 'Card', 'de_DE' => 'Karte' ] && $cardSchema['source'] === 'content' && $cardSchema['loop'] === true && $cardSchema['preview'] === 'block'
 	&& $cardSchema['in'] === [ 'section', 'hero' ] && $cardSchema['draws'] === 'article .nino-card' && $cardSchema['holds'] === 'card'
-	&& array_keys( $cardSchema ) === [ 'label', 'source', 'loop', 'preview', 'icon', 'attributes', 'in', 'draws', 'holds', 'link', 'by', 'group' ] );
+	&& array_keys( $cardSchema ) === [ 'label', 'source', 'loop', 'preview', 'icon', 'attributes', 'in', 'draws', 'holds', 'stretches', 'link', 'by', 'group' ] );
+check( '...and it stretches its title: the card says the component whose address it takes where it is linked, the registry gives it back in json, and no other component of the kernel says one', $cardSchema['stretches'] === 'card-title'
+	&& ( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), true ) )['card']['stretches'] === 'card-title'
+	&& array_keys( array_filter( \Nino\Modules\Components::components( $appData ), static fn( array $schema ): bool => array_key_exists( 'stretches', $schema ) === true ) ) === [ 'card' ]
+	&& \Nino\Modules\Components::components( $appData )['card-title']['link'] === true && \Nino\Modules\Components::components( $appData )['card-title']['in'] === [ 'card' ] );
 check( '...its attributes are ten, in the order the form shows them: whether it fills, the padding, where its content stands, how it is aligned, the ground, the border, whether the whole card is the link of its title, the picture, its focus and the dim',
 	array_keys( $cardSchema['attributes'] ) === [ 'fill', 'padding', 'vertical', 'align', 'ground', 'borderless', 'linked', 'background', 'focus', 'dim' ] );
 $cardTypes = [ 'ground' => 'select', 'padding' => 'select', 'fill' => 'bool', 'vertical' => 'select', 'align' => 'select', 'background' => 'image', 'focus' => 'select', 'dim' => 'bool', 'borderless' => 'bool', 'linked' => 'bool' ];

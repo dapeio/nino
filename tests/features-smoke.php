@@ -57,7 +57,7 @@ $warnings = ninoWarnings();
 
 check( 'dir() is the constant', \Nino\Features::dir() === __DIR__. '/fixtures/features' );
 check( 'a virtual /features path resolves there too, so a feature can name its own files', \Nino\Filesystem::path( $appData, '/features/Sample/feature.php' ) === __DIR__. '/fixtures/features/Sample/feature.php' );
-check( 'every readable manifest is listed, sorted by key', array_keys( $all ) === [ 'helper', 'mute', 'old', 'sample', 'strict' ] );
+check( 'every readable manifest is listed, sorted by key', array_keys( $all ) === [ 'boxy', 'helper', 'mute', 'old', 'sample', 'strict' ] );
 check( 'a directory whose manifest does not validate is skipped with a warning naming it', isset( $all['broken'] ) === false
 	&& count( array_filter( $warnings, static fn( string $w ): bool => str_contains( $w, '/Broken/feature.php' ) && str_contains( $w, 'version' ) ) ) === 1 );
 check( 'the module class is derived from the directory', $all['sample']['module'] === '\\Nino\\Modules\\Sample' && $all['helper']['module'] === '\\Nino\\Modules\\Helper' );
@@ -612,6 +612,24 @@ check( '...and the shortcodes are the feature\'s: the class of the renderer is w
 check( 'a component whose class has no renderer of its name is rendered by the class\'s doShortcode()', \Nino\Modules\Components::components( $declared )['caption']['source'] === 'none'
 	&& \Nino\Html::renderHtml( $declared, '[caption]' ) === \Nino\Modules\Sample::doShortcode( $declared, [] ) && \Nino\Html::renderHtml( $declared, '[caption]' ) !== '' );
 check( '...the renderer a class does name still wins over its doShortcode()', \Nino\Html::renderHtml( $declared, '[greeting /feature/sample/greeting/text]' ) === '<p class="sample-greeting">Hello &#91;there]</p>' );
+
+// A holder whose 'stretches' names a component that does not do - here one that is offered in a section and not in a card, the place the box holds - is no reason for
+// a fatal error on every request: its manifest is read as it is, since a manifest cannot know the other components, and the holder is registered without the key, with
+// a warning that says why
+$boxy = ninoSandbox( 'boxy' );
+$boxy['/nino/dir'] = '';
+\Nino\Html::init( $boxy );
+ninoWarnings();
+check( 'a feature whose holder stretches what cannot be is read and activates: the manifest holds the key as it was written, and nothing is said until the components are registered',
+	\Nino\Features::manifest( \Nino\Features::dir(). '/Boxy' )['components']['boxy-box']['stretches'] === 'boxy-title' && \Nino\Features::activate( $boxy, 'boxy' ) === true
+	&& array_filter( ninoWarnings(), static fn( string $warning ): bool => str_contains( $warning, 'Boxy' ) === true ) === [] );
+\Nino\Features::registerComponents( $boxy );
+$boxyWarnings = ninoWarnings();
+check( '...registering it warns once, in the words of the refusal, and registers the holder without the key - the title it named is registered as it was', count( $boxyWarnings ) === 1
+	&& str_contains( $boxyWarnings[0], 'component "boxy-box": "stretches" names a component that is offered in card, the place it holds: "boxy-title" is not - registered without it' )
+	&& isset( \Nino\Modules\Components::components( $boxy )['boxy-box'] ) === true && array_key_exists( 'stretches', \Nino\Modules\Components::components( $boxy )['boxy-box'] ) === false
+	&& \Nino\Modules\Components::components( $boxy )['boxy-box']['holds'] === 'card' && isset( \Nino\Modules\Components::components( $boxy )['boxy-title'] ) === true );
+check( '...and the holder renders', \Nino\Html::renderHtml( $boxy, '[boxy-box]inside[/boxy-box]' ) === '<div class="boxy-box">inside</div>' && ninoWarnings() === [] );
 
 // ...and where the class has neither, the component is skipped with the warning
 // that names the renderer it looked for, and nothing is registered
@@ -1432,8 +1450,8 @@ foreach( $panelActions as $method => $data )
 // and would come last if the panel still answered in key order
 check( 'apiList answers the directory the panel reads from, the catalogue url, whether it is writable, no cached catalogue yet, and every feature, sorted by the localized name', $status === 200 && $body['dir'] === '/tests/fixtures/features'
 	&& $body['catalogueUrl'] === \Nino\Catalogue::DEFAULT_URL && $body['writable'] === true && $body['catalogue'] === null
-	&& array_keys( $body ) === [ 'dir', 'catalogueUrl', 'writable', 'catalogue', 'features' ] && array_column( $body['features'], 'key' ) === [ 'sample', 'helper', 'mute', 'old', 'strict' ]
-	&& array_column( $body['features'], 'name' ) === [ 'Beispiel-Feature', 'Helper', 'Mute', 'Old', 'Strict' ] );
+	&& array_keys( $body ) === [ 'dir', 'catalogueUrl', 'writable', 'catalogue', 'features' ] && array_column( $body['features'], 'key' ) === [ 'sample', 'boxy', 'helper', 'mute', 'old', 'strict' ]
+	&& array_column( $body['features'], 'name' ) === [ 'Beispiel-Feature', 'Boxy', 'Helper', 'Mute', 'Old', 'Strict' ] );
 $byKey = array_column( $body['features'], null, 'key' );
 check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'manual', 'manualSections', 'category', 'maturity', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings', 'settingsTab' ] );
 check( 'names and descriptions arrive in the session locale - de_DE, the native language, since none was chosen', $byKey['sample']['name'] === 'Beispiel-Feature' && $byKey['sample']['description'] === 'Prüft den ganzen Feature-Vertrag.'

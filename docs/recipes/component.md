@@ -105,7 +105,11 @@ The rules the module keeps for you, and the ones it leaves to the renderer:
   with a name in braces for an attribute of the schema), where a tool offers the
   component (a list of the places `section`, `card` and `hero`) and, for a
   component whose source is `content`, the place whose components its content
-  is the calls of (`'holds' => 'card'` is the kernel's `[card]`). A renderer
+  is the calls of (`'holds' => 'card'` is the kernel's `[card]`), and
+  `stretches` names the component of that place whose address the holder takes
+  where it is linked (`'stretches' => 'card-title'` is the card's: a component
+  registered before it, offered in that place and with `'link' => true`; a name
+  that is none of these is dropped with a warning). A renderer
   reads no context, so a component that is drawn another way in another place
   is another component. A container does not render its content itself: the
   engine renders the output of a shortcode again, so what it returns inside its

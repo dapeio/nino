@@ -386,10 +386,13 @@ namespace Nino\Modules {
 
 			// Each class is a component of its own, and the schema says where a tool
 			// offers it ('in') and under which group ('group'), what it draws ('draws')
-			// and what it holds ('holds', the card's): the renderer reads no context, so
-			// a title in a card is the one that draws the title of a card. Its icon is
-			// the shape ICONS names, as the parts SHAPES holds, and 'link' whether a link
-			// may wrap what it draws
+			// and what it holds ('holds', the card's) - and, of what it holds, whose address
+			// it takes when it is linked ('stretches', the card's title): the renderer reads
+			// no context, so a title in a card is the one that draws the title of a card. Its
+			// icon is the shape ICONS names, as the parts SHAPES holds, and 'link' whether a
+			// link may wrap what it draws
+			$stretches = [ 'card' => 'card-title' ];
+
 			foreach( $components as [ $name, $en, $de, $preview, $source, $attributes, $in, $draws, $holds, $link, $group ] )
 				self::addComponent( $appData, $name, [ self::class, 'component'. str_replace( ' ', '', ucwords( str_replace( '-', ' ', $name ) ) ) ], [
 					'label'				=> [ 'en_US' => $en, 'de_DE' => $de ],
@@ -400,7 +403,7 @@ namespace Nino\Modules {
 					'icon'				=> self::SHAPES[ self::ICONS[$name] ],
 					'link'				=> $link,
 					'group'				=> $group,
-				] + ( $in !== null ? [ 'in' => $in ] : [] ) + ( $draws !== null ? [ 'draws' => $draws ] : [] ) + ( $holds !== null ? [ 'holds' => $holds ] : [] ) );
+				] + ( $in !== null ? [ 'in' => $in ] : [] ) + ( $draws !== null ? [ 'draws' => $draws ] : [] ) + ( $holds !== null ? [ 'holds' => $holds ] : [] ) + ( isset( $stretches[$name] ) === true ? [ 'stretches' => $stretches[$name] ] : [] ) );
 
 			$stacks = [
 				[ 'stack', 'Stack', 'Stapel', 'cells', true, [] ],
@@ -528,10 +531,53 @@ namespace Nino\Modules {
 
 			$clean = self::validate( $name, $schema, $stack );
 
+			// What a schema says of another component is told by the components registered before it. A holder whose 'stretches' names none that will do is registered
+			// without it, with a warning: a manifest cannot know the other components when it is read, so a name that is wrong is found here, and a fatal error
+			// here would be one on every request of the site
+			if( is_string( $clean ) === false && isset( $clean['stretches'] ) === true ) {
+
+				$why = self::_stretches( $appData, $name, $clean );
+
+				if( $why !== null ) {
+					trigger_error( 'Components::'. ( $stack === true ? 'addStack' : 'addComponent' ). '(): '. $why. ' - registered without it', E_USER_WARNING );
+					unset( $clean['stretches'] );
+				}
+			}
+
 			if( is_string( $clean ) === true )
 				trigger_error( 'Components::'. ( $stack === true ? 'addStack' : 'addComponent' ). '(): '. $clean, E_USER_ERROR );
 			else
 				self::_store( $appData, $name, $callback, $clean, $stack );
+		}
+
+		/**
+		 *	What 'stretches' names, checked against the components registered so far: a
+		 *	component that is registered, that is offered in the place the holder holds
+		 *	(no 'in' is every place) and that says 'link' - the address of anything
+		 *	else would be no link of the holder's
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$name					The holder
+		 *	@param		array			$clean				Its clean schema, with 'stretches'
+		 *
+		 *	@return 	string|null							What is wrong with it, null where it will do
+		 */
+		private static function _stretches( array &$appData, string $name, array $clean ): ?string {
+
+			$what = 'component "'. $name. '"';
+			$known = self::components( $appData );
+			$target = $known[$clean['stretches']] ?? null;
+
+			if( $clean['stretches'] === $name || is_array( $target ) === false )
+				return $what. ': "stretches" names a component that is registered before it: "'. $clean['stretches']. '" is not';
+
+			if( isset( $target['in'] ) === true && in_array( $clean['holds'], (array) $target['in'], true ) === false )
+				return $what. ': "stretches" names a component that is offered in '. $clean['holds']. ', the place it holds: "'. $clean['stretches']. '" is not';
+
+			if( ( $target['link'] ?? false ) !== true )
+				return $what. ': "stretches" names a component that is a link: "'. $clean['stretches']. '" is not';
+
+			return null;
 		}
 
 		/**
@@ -706,7 +752,7 @@ namespace Nino\Modules {
 		 *
 		 *	@param		string		$name					The shortcode, a slug
 		 *	@param		mixed			$schema				label, source (not for a stack), loop, attributes, preview;
-		 *																	icon, in, draws, holds, link, by and group for a component, grid and assets for a stack.
+		 *																	icon, in, draws, holds, stretches, link, by and group for a component, grid and assets for a stack.
 		 *																	See docs/development.md, "Components"
 		 *	@param		bool			$stack				Read it as a stack's
 		 *	@param		string|null	$feature			The key of the feature whose manifest the schema is read from, null for a module's: its components are the feature's own, whatever 'by' they say
@@ -847,6 +893,23 @@ namespace Nino\Modules {
 						return $what. ': "holds" needs the source content';
 
 					$clean['holds'] = $schema['holds'];
+				}
+
+				// Which of what it holds it takes the address of where it is linked - the
+				// card's 'linked' makes the link of its title the link of the whole card.
+				// Optional, a holder's alone and left out of the clean schema where the
+				// schema leaves it out; that it is a component that is registered, offered
+				// in the place the holder holds and a link is checked when the holder is
+				// registered (see _stretches()), since only then are the components known
+				if( isset( $schema['stretches'] ) === true ) {
+
+					if( isset( $clean['holds'] ) === false )
+						return $what. ': "stretches" needs "holds": only a component that holds components has one to take the address of';
+
+					if( is_string( $schema['stretches'] ) === false || preg_match( '/^[a-z][a-z0-9-]*$/D', $schema['stretches'] ) !== 1 )
+						return $what. ': "stretches" names a component, a slug of lower case letters, digits and hyphens';
+
+					$clean['stretches'] = $schema['stretches'];
 				}
 
 				// Whether what it draws may be a link: the component then has the
