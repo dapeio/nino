@@ -126,9 +126,29 @@ The rules the module keeps for you, and the ones it leaves to the renderer:
   `circle`, `ellipse`, `rect`, `line`, `polyline` or `polygon`) and the map of
   the attributes that tag takes, every value a string.
   `'icon' => [ [ 'path', [ 'd' => 'M4 12h16' ] ] ]` is a line across the middle.
+  Optional does not mean left out: a component should carry `draws`, `in` and
+  `icon`, so that the Builder can show it, place it and offer it with a picture.
   A 24 by 24 stroke icon of Lucide is the shape the workbench draws, so an icon
   of that kind sits among the kernel's own; the tool builds the elements from
   the parts.
+- The options of a `select` or a `variant` are a list, or the name of a static
+  method of the feature's own class (`\Nino\Modules\<Directory>` or below it)
+  that answers them where the project alone knows them (its forms, its albums):
+  `'options' => '\Nino\Modules\Countdown::zones'`, a method
+  `public static function zones( array &$appData, string $attribute ): array`
+  that answers `value => label`, a label a string or a `locale => string` map.
+  It is asked when the schema is handed out (`components()`, `stacks()`) and
+  when a value is made ready, once for each attribute in a request, and a value
+  outside the list is the default. A manifest is read without loading anything,
+  so a class or method that is not there is found out when it is asked. An
+  answer that cannot be read - no array, a label that is no string or map, a
+  class or a method that is none, a method that throws - is an `E_USER_WARNING`
+  and the attribute a `string`, so **a renderer checks the value itself** where
+  it names a record or a file: after a failure any value passes (a `variant`
+  keeps to words). The default is a string, and `input` `icons` needs a list of
+  its own. `components()` and `stacks()` hand out schemas with the answers in
+  them; to register a component again, read `Components::registered()`. The full
+  contract is in the [development manual](../development.md#components).
 - A `variant` is a `select` whose words are the modifiers of a class:
   `[ 'type' => 'variant', 'options' => [ '', 'big' ], 'default' => '', 'prefix' => 'project-countdown--' ]`
   is a style that is none or `project-countdown--big`. The options are words,
@@ -250,7 +270,10 @@ Add the cases to the module's own test, or to the feature's
   `Components::element( $appData )` is `null` again;
 - a schema with a `select` whose default is no option is refused with an
   `E_USER_ERROR` (capture it with a handler of the test's own; php 8.4 raises
-  a deprecation beside it).
+  a deprecation beside it);
+- for options that come from a method: the list in the schema that is handed
+  out, a value outside it, an answer that is no array or a class that does not
+  load (a warning, a `string`), and how often the method is asked in a request.
 
 Run `tests/components-smoke.php`, `tests/features-smoke.php` and the feature's
 own test, then the syntax checks and the static analysis of the

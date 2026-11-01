@@ -3125,6 +3125,248 @@ check( 'cell() draws a div, always: the classes and the attributes it is given a
 	&& \Nino\Modules\Components::cell( [ 'class' => 'a', 'card' => 'card' ], 'in', 'b', ' id="c"' ) === '<div class="a b" id="c">in</div>'
 	&& \Nino\Modules\Components::cell( [ 'card' => 'brand-alt' ], 'in' ) === '<div>in</div>' );
 
+// --- The options of an attribute that a method of the feature answers --------------
+
+echo "Modules\\Components - the options of a select may be the name of a method of the feature\n";
+
+require_once __DIR__. '/fixtures/component-options/Picker/Picker.php';
+
+$pick = ninoSandbox( 'components-options' );
+$pick['/nino/dir'] = '';
+\Nino\Modules\Components::init( $pick );
+ninoWarnings();
+
+// Registered the way a feature's manifest is: read by Features::manifest(), then each schema as it was read
+$pickManifest = \Nino\Features::manifest( __DIR__. '/fixtures/component-options/Picker' );
+foreach( [ 'components' => 'addComponent', 'stacks' => 'addStack' ] as $pickKind => $pickAdd )
+	foreach( (array) ( $pickManifest[$pickKind] ?? [] ) as $pickName => $pickSchema )
+		\Nino\Modules\Components::$pickAdd( $pick, (string) $pickName, [ \Nino\Modules\Picker::class, ( $pickKind === 'stacks' ? 'stack' : 'component' ). str_replace( ' ', '', ucwords( str_replace( '-', ' ', (string) $pickName ) ) ) ], $pickSchema );
+$pickRegistered = ninoWarnings();
+$pickRender = static function( string $html ) use ( &$pick ): string {
+	return \Nino\Html::renderHtml( $pick, $html );
+};
+
+check( 'a manifest whose select names a method is read without a warning and registers its components and its stack: nothing is asked while it is',
+	is_array( $pickManifest ) === true && $pickRegistered === [] && isset( $pick[\Nino\Modules\Components::REGISTRY]['picker-form'], $pick[\Nino\Modules\Components::REGISTRY]['picker-broken'], $pick[\Nino\Modules\Components::STACKS]['picker-rows'] )
+	&& \Nino\Modules\Picker::$asked === []
+	&& $pick[\Nino\Modules\Components::REGISTRY]['picker-form']['attributes']['form']['options'] === '\Nino\Modules\Picker::forms' );
+check( '...and neither the defaults nor the question whether a shortcode is the module\'s ask it: the default is the string it was written as',
+	\Nino\Modules\Components::defaults( $pick, 'picker-form' ) === [ 'form' => '', 'tone' => '', 'size' => '', 'class' => '' ]
+	&& \Nino\Feature::shortcode( $pick, 'picker-form', static fn( array &$appData, array $args ): string => '' ) === false
+	&& \Nino\Modules\Picker::$asked === [] );
+
+// The first render asks, and a value of the list is the value, one the list lacks is the default
+check( 'a value that is in the list the method answers renders, one that is not falls back to the default - and the first render is the first time it is asked, with the name of the attribute',
+	$pickRender( '[picker-form form="contact"]' ) === '<p class="picker-form" data-form="contact"></p>'
+	&& $pickRender( '[picker-form form="nope"]' ) === '<p class="picker-form" data-form=""></p>'
+	&& $pickRender( '[picker-form]' ) === '<p class="picker-form" data-form=""></p>'
+	&& $pickRender( '[picker-form form="news"]' ) === '<p class="picker-form" data-form="news"></p>'
+	&& \Nino\Modules\Picker::$asked === [ 'forms' => 1, 'formsFor' => 'form' ] );
+
+// The schema that is handed out carries the list
+$pickIssued = \Nino\Modules\Components::components( $pick )['picker-form']['attributes'];
+check( 'the schema a tool is handed carries the list the method answered, as the values and, value by value, the label: a string or a locale map that localized() reads',
+	$pickIssued['form']['type'] === 'select' && $pickIssued['form']['options'] === [ '', 'contact', 'news' ] && $pickIssued['form']['default'] === ''
+	&& array_keys( $pickIssued['form']['optionLabels'] ) === [ '', 'contact', 'news' ]
+	&& \Nino\Features::localized( $pickIssued['form']['optionLabels'][''], 'de_DE' ) === 'Keines' && \Nino\Features::localized( $pickIssued['form']['optionLabels']['news'], 'de_DE' ) === 'Rundbrief'
+	&& \Nino\Features::localized( $pickIssued['form']['optionLabels']['news'], 'fr_FR' ) === 'Newsletter' && \Nino\Features::localized( $pickIssued['form']['optionLabels']['contact'], 'de_DE' ) === 'Contact'
+	&& str_contains( json_encode( \Nino\Modules\Components::components( $pick ) ), 'Picker' ) === false );
+check( '...a list of its own stays what it was, with no labels, and a variant\'s words are checked and carry theirs',
+	$pickIssued['size']['options'] === [ '', 'big' ] && array_key_exists( 'optionLabels', $pickIssued['size'] ) === false
+	&& $pickIssued['tone']['type'] === 'variant' && $pickIssued['tone']['options'] === [ '', 'loud', 'soft-grey' ] && $pickIssued['tone']['prefix'] === 'picker-form--'
+	&& $pickRender( '[picker-form tone="soft-grey"]' ) === '<p class="picker-form picker-form--soft-grey" data-form=""></p>' && $pickRender( '[picker-form tone="other"]' ) === '<p class="picker-form" data-form=""></p>' );
+
+// Once for each attribute in a request, however often the schema is handed out and the shortcode rendered
+for( $pickCount = 0; $pickCount < 20; $pickCount++ ) {
+	\Nino\Modules\Components::components( $pick );
+	$pickRender( '[picker-form form="contact"]' );
+}
+check( 'the method is asked once in a request: the schema handed out a score of times and a page of twenty shortcodes ask it no more',
+	\Nino\Modules\Picker::$asked['forms'] === 1 );
+
+// A stack takes the same
+$pickStack = \Nino\Modules\Components::stacks( $pick )['picker-rows']['attributes']['form'];
+check( 'a stack\'s attribute takes its options from a method as a component\'s does: the list in the schema, the default for a value outside it - asked once more, for the stack',
+	$pickStack['options'] === [ '', 'contact', 'news' ] && \Nino\Features::localized( $pickStack['optionLabels']['news'], 'en_US' ) === 'Newsletter'
+	&& $pickRender( '[picker-rows /nothing form="news"][/picker-rows]' ) === '<div class="picker-rows" data-form="news"></div>' && $pickRender( '[picker-rows /nothing form="nope"][/picker-rows]' ) === '<div class="picker-rows" data-form=""></div>'
+	&& \Nino\Modules\Picker::$asked['forms'] === 2 );
+
+// A method that answers nothing that can be read
+$pickBroken = \Nino\Modules\Components::components( $pick )['picker-broken']['attributes'];
+$pickWarned = ninoWarnings();
+check( 'a method that does not answer an array is a warning and the attribute a string: no options, no input, the default kept - and what a shortcode says goes through',
+	$pickBroken['flat']['type'] === 'string' && array_key_exists( 'options', $pickBroken['flat'] ) === false && array_key_exists( 'input', $pickBroken['flat'] ) === false && $pickBroken['flat']['default'] === 'a'
+	&& count( array_filter( $pickWarned, static fn( string $warning ): bool => str_contains( $warning, 'component "picker-broken", attribute "flat": \Nino\Modules\Picker::flat() did not answer an array' ) && str_contains( $warning, 'treated as a string' ) ) ) === 1
+	&& $pickRender( '[picker-broken flat="anything at all"]' ) === '<p class="picker-broken" data-flat="anything at all" data-thrown="a" data-label="a" data-word=""></p>' );
+check( '...so is one that throws, one whose label is no string or map, and a variant\'s answer that is no word - each a warning that names the attribute, and a string',
+	$pickBroken['thrown']['type'] === 'string' && $pickBroken['label']['type'] === 'string' && $pickBroken['word']['type'] === 'string' && array_key_exists( 'prefix', $pickBroken['word'] ) === false
+	&& count( array_filter( $pickWarned, static fn( string $warning ): bool => str_contains( $warning, 'attribute "thrown": \Nino\Modules\Picker::thrown() threw RuntimeException: no forms today' ) ) ) === 1
+	&& count( array_filter( $pickWarned, static fn( string $warning ): bool => str_contains( $warning, 'attribute "label": \Nino\Modules\Picker::unlabelled() answers no string or locale => string map as the label of "b"' ) ) ) === 1
+	&& count( array_filter( $pickWarned, static fn( string $warning ): bool => str_contains( $warning, 'attribute "word": \Nino\Modules\Picker::notWords() answers "Loud Word", which is no word of a variant' ) ) ) === 1
+	&& $pickRender( '[picker-broken thrown="x" label="y" word="z"]' ) === '<p class="picker-broken" data-flat="a" data-thrown="x" data-label="y" data-word="z"></p>' );
+check( '...and it is said once in a request, not for every shortcode and every time the schema is handed out; the method that threw was asked once',
+	ninoWarnings() === [] && count( $pickWarned ) === 4 && \Nino\Modules\Picker::$asked['thrown'] === 1 && \Nino\Modules\Picker::$asked['flat'] === 1 );
+check( 'a method that asks for the registry itself is not asked again by it: it is asked once, and its answer is the list',
+	\Nino\Modules\Picker::$asked['again'] === 1 && $pickBroken['again']['type'] === 'select' && $pickBroken['again']['options'] === [ '', 'x' ] );
+
+// Another method under the same name is asked again
+$pickAgain = $pick;
+$pickAgain[\Nino\Modules\Components::REGISTRY]['picker-form']['attributes']['form']['options'] = '\Nino\Modules\Picker::tones';
+check( 'the list is kept for the method that was asked: a registry that names another method for the attribute asks that one',
+	\Nino\Modules\Components::components( $pickAgain )['picker-form']['attributes']['form']['options'] === [ '', 'loud', 'soft-grey' ] && $pickIssued['form']['options'] === [ '', 'contact', 'news' ] );
+
+// What is refused when the manifest is read: on paper alone, nothing is loaded. A directory name stands for the class a feature brings
+$pickDir = ninoSandboxDir( $pick ). '/refused';
+$pickWrite = static function( string $name, array $attribute, bool $withClass = true ) use ( $pickDir ): string {
+
+	// '@' is the method of the feature's own class, whatever its directory is called
+	if( ( $attribute['options'] ?? null ) === '@' )
+		$attribute['options'] = '\Nino\Modules\\'. $name. '::forms';
+
+	@mkdir( $pickDir. '/'. $name, 0755, true );
+	file_put_contents( $pickDir. '/'. $name. '/feature.php', '<?php return '. var_export( [ 'name' => $name, 'version' => '1.0.0', 'components' => [ 'probe' => [ 'label' => 'Probe', 'source' => 'none', 'attributes' => [ 'which' => $attribute ] ] ] ], true ). ';' );
+	file_put_contents( $pickDir. '/'. $name. '/'. $name. '.php', '<?php' );
+	ninoWarnings();
+
+	return $pickDir. '/'. $name;
+};
+$pickRefused = static function( string $name, array $attribute ) use ( $pickWrite ): string {
+
+	$manifest = \Nino\Features::manifest( $pickWrite( $name, $attribute ) );
+	$warnings = ninoWarnings();
+
+	return $manifest === null && count( $warnings ) === 1 ? $warnings[0] : 'accepted or said otherwise: '. implode( ' | ', $warnings );
+};
+$pickSelect = [ 'type' => 'select', 'default' => '' ];
+$pickWhere = 'component "probe", attribute "which": ';
+
+// The class of this manifest is nowhere loaded and the directory is none of the features directory's: a staging directory, a feature that is off, the previous version of the class loaded
+$pickLazy = \Nino\Features::manifest( $pickWrite( 'Lazy', $pickSelect + [ 'options' => '@' ] ) );
+$pickLazyWarned = ninoWarnings();
+check( 'a manifest that names a method of its own class is accepted from a directory outside features/ with the class not loaded - and nothing is loaded to read it',
+	is_array( $pickLazy ) === true && $pickLazyWarned === [] && class_exists( 'Nino\Modules\Lazy', false ) === false
+	&& $pickLazy['components']['probe']['attributes']['which']['options'] === '\Nino\Modules\Lazy::forms'
+	&& is_array( \Nino\Features::manifest( $pickWrite( 'Nested', $pickSelect + [ 'options' => 'Nino\Modules\Nested\Lists\Source::forms' ] ) ) ) === false
+	&& str_contains( ninoWarnings()[0] ?? '', 'whose file is not in the feature' ) );
+@mkdir( $pickDir. '/Nested/Lists/Source', 0755, true );
+file_put_contents( $pickDir. '/Nested/Lists/Source/Source.php', '<?php' );
+check( '...a class below the feature\'s own is looked for where the autoloader looks for it, and is accepted when its file is there',
+	is_array( \Nino\Features::manifest( $pickWrite( 'Nested', $pickSelect + [ 'options' => 'Nino\Modules\Nested\Lists\Source::forms' ] ) ) ) === true && ninoWarnings() === [] );
+check( 'a method of a class outside \Nino\Modules\<Directory> is refused when the manifest is read - the kernel\'s static methods are not for a schema to ask - and so is a class whose file the feature lacks',
+	str_contains( $pickRefused( 'Outside', $pickSelect + [ 'options' => '\Nino\Modules\NoSuchClass::forms' ] ), $pickWhere. '"options" names a static method of the feature\'s own class, \Nino\Modules\Outside or below it: "\Nino\Modules\NoSuchClass::forms" is not' )
+	&& str_contains( $pickRefused( 'Kernel', $pickSelect + [ 'options' => '\Nino\Filesystem::forceDir' ] ), $pickWhere. '"options" names a static method of the feature\'s own class, \Nino\Modules\Kernel or below it' )
+	&& str_contains( $pickRefused( 'Sibling', $pickSelect + [ 'options' => '\Nino\Modules\SiblingExtra::forms' ] ), 'or below it: "\Nino\Modules\SiblingExtra::forms" is not' )
+	&& str_contains( $pickRefused( 'NoFile', $pickSelect + [ 'options' => '\Nino\Modules\NoFile\Missing::forms' ] ), $pickWhere. '"options" names a class whose file is not in the feature: "\Nino\Modules\NoFile\Missing::forms"' ) );
+check( '...so does a name that is not Class::method, and a list that is none',
+	str_contains( $pickRefused( 'NoForm', $pickSelect + [ 'options' => 'forms' ] ), $pickWhere. '"options" is a list of values or the name of a static method, written \Namespace\Class::method - "forms" is none' )
+	&& str_contains( $pickRefused( 'NoStatic', $pickSelect + [ 'options' => '\Nino\Modules\NoStatic::forms()' ] ), '"options" is a list of values or the name of a static method' )
+	&& str_contains( $pickRefused( 'NoList', $pickSelect + [ 'options' => [] ] ), $pickWhere. 'a select needs "options", a list of values or the name of a static method' ) );
+check( '...and a default that is no string, and icons, which no one can check to be an alignment before the list is asked for',
+	str_contains( $pickRefused( 'IntDefault', [ 'type' => 'select', 'default' => 1, 'options' => '@' ] ), $pickWhere. 'the default of a select whose options are a method must be a string' )
+	&& str_contains( $pickRefused( 'Icons', $pickSelect + [ 'options' => '@', 'input' => 'icons' ] ), $pickWhere. '"input" icons is for an alignment' ) );
+check( '...a variant\'s default is a word or the empty word, as its list is',
+	str_contains( $pickRefused( 'BadVariant', [ 'type' => 'variant', 'default' => 'Not A Word', 'options' => '@' ] ), $pickWhere. 'the default of a variant is a word' )
+	&& is_array( \Nino\Features::manifest( $pickWrite( 'GoodVariant', [ 'type' => 'variant', 'default' => 'loud', 'options' => '@' ] ) ) ) && ninoWarnings() === [] );
+
+// A module registers through addComponent(): there the class is checked itself
+$pickFull = static fn( string $options ): string => (string) \Nino\Modules\Components::validate( 'probe', [ 'label' => 'Probe', 'source' => 'none', 'group' => 'global', 'attributes' => [ 'which' => $pickSelect + [ 'options' => $options ] ] ] );
+check( 'a module\'s registration is checked as a whole: the class has to load, and the method has to be a public static one - a private method of the Components class itself is none',
+	str_contains( $pickFull( '\Nino\Modules\NoSuchClass::forms' ), $pickWhere. '"options" names a method of a class that cannot be loaded: "\Nino\Modules\NoSuchClass::forms"' )
+	&& str_contains( $pickFull( '\Nino\Modules\Picker::missing' ), $pickWhere. '"options" names a method that is no public static method: "\Nino\Modules\Picker::missing"' )
+	&& str_contains( $pickFull( '\Nino\Modules\Components::_resolve' ), $pickWhere. '"options" names a method that is no public static method' )
+	&& is_array( \Nino\Modules\Components::validate( 'probe', [ 'label' => 'Probe', 'source' => 'none', 'group' => 'global', 'attributes' => [ 'which' => $pickSelect + [ 'options' => '\Nino\Modules\Picker::forms' ] ] ] ) ) === true );
+check( 'a select with a list of its own is read as before: the old refusals stay and the default has to be one of the options',
+	str_contains( $pickRefused( 'OldDefault', [ 'type' => 'select', 'default' => 'z', 'options' => [ 'a', 'b' ] ] ), $pickWhere. 'the default is not one of the options' )
+	&& str_contains( $pickRefused( 'OldWord', [ 'type' => 'variant', 'default' => '', 'options' => [ '', 'Big Word' ] ] ), $pickWhere. 'the options of a variant are words, and "Big Word" is none' ) );
+
+// What the asking finds out, a manifest having passed: a class that does not load or a method that is none is a warning and a string, as an answer nobody can read is
+$pickLate = $pick;
+$pickLate[\Nino\Modules\Components::REGISTRY]['picker-form']['attributes']['form']['options'] = '\Nino\Modules\NoSuchClass::forms';
+$pickLate[\Nino\Modules\Components::REGISTRY]['picker-form']['attributes']['tone']['options'] = '\Nino\Modules\Picker::missing';
+ninoWarnings();
+$pickLateAttributes = \Nino\Modules\Components::components( $pickLate )['picker-form']['attributes'];
+$pickLateWarned = ninoWarnings();
+check( 'a method whose class does not load, or that the class lacks, is found out when it is asked for: one warning each and a string, not a fatal error',
+	$pickLateAttributes['form']['type'] === 'string' && array_key_exists( 'options', $pickLateAttributes['form'] ) === false && $pickLateAttributes['tone']['type'] === 'string' && count( $pickLateWarned ) === 2
+	&& str_contains( $pickLateWarned[0], 'component "picker-form", attribute "form": "options" names a method of a class that cannot be loaded: "\Nino\Modules\NoSuchClass::forms" - treated as a string' )
+	&& str_contains( $pickLateWarned[1], 'attribute "tone": "options" names a method that is no public static method: "\Nino\Modules\Picker::missing" - treated as a string' ) );
+check( '...and a variant whose method could not be read keeps what a variant is: the empty word and words pass, anything else is the default - while the schema handed out says a plain string',
+	$pickRender( '[picker-broken word="loud"]' ) === '<p class="picker-broken" data-flat="a" data-thrown="a" data-label="a" data-word="loud"></p>'
+	&& $pickRender( '[picker-broken word="Not A Word"]' ) === '<p class="picker-broken" data-flat="a" data-thrown="a" data-label="a" data-word=""></p>'
+	&& $pickRender( '[picker-broken word="x\' onclick=\'y"]' ) === '<p class="picker-broken" data-flat="a" data-thrown="a" data-label="a" data-word=""></p>'
+	&& array_key_exists( 'words', $pickBroken['word'] ) === false && $pickBroken['word']['type'] === 'string' );
+
+// registered() is the registry as it was registered
+ninoWarnings();
+$pickAsked = \Nino\Modules\Picker::$asked['forms'];
+$pickRegistry = \Nino\Modules\Components::registered( $pick );
+check( 'registered() answers the registry as it was registered, with the name of the method where the options are one, and asks nothing; the stacks are the second argument',
+	$pickRegistry['picker-form']['attributes']['form']['options'] === '\Nino\Modules\Picker::forms' && array_key_exists( 'optionLabels', $pickRegistry['picker-form']['attributes']['form'] ) === false
+	&& \Nino\Modules\Components::registered( $pick, true )['picker-rows']['attributes']['form']['options'] === '\Nino\Modules\Picker::forms'
+	&& array_keys( $pickRegistry ) === array_keys( \Nino\Modules\Components::components( $pick ) ) && \Nino\Modules\Picker::$asked['forms'] === $pickAsked );
+check( '...and what it answers registers again: a component handed back to addComponent() keeps its method',
+	( static function() use ( &$pick, $pickRegistry ): bool {
+		$again = ninoSandbox( 'components-options-again' );
+		$again['/nino/dir'] = '';
+		\Nino\Modules\Components::init( $again );
+		\Nino\Modules\Components::addComponent( $again, 'picker-copy', [ \Nino\Modules\Picker::class, 'componentPickerForm' ], $pickRegistry['picker-form'] );
+		$kept = \Nino\Modules\Components::registered( $again )['picker-copy']['attributes']['form']['options'] === '\Nino\Modules\Picker::forms';
+		\Nino\Filesystem::removeDir( ninoSandboxDir( $again ) );
+		return $kept;
+	} )() === true );
+
+// A feature that is listed is registered with the check of a module: a class that does not load is a warning and the component is left out, no fatal error on every request
+$pickFeature = ninoSandbox( 'components-options-feature' );
+$pickFeature['/nino/dir'] = '';
+\Nino\Modules\Components::init( $pickFeature );
+$pickGood = $pickManifest['components']['picker-broken'];
+$pickBad = $pickManifest['components']['picker-form'];
+$pickBad['attributes']['form']['options'] = '\Nino\Modules\Picker::missing';
+$pickFeature['/nino/modules'] = [ '\Nino\Modules\Picker' ];
+$pickFeature['./nino/features/listed'] = [ 'modules' => $pickFeature['/nino/modules'], 'manifests' => [ [ 'key' => 'picker', 'dir' => '/features/Picker', 'module' => '\Nino\Modules\Picker', 'components' => [ 'picker-form' => $pickBad, 'picker-broken' => $pickGood ], 'stacks' => [] ] ] ];
+ninoWarnings();
+$pickRegisterErrors = ninoErrors( static function() use ( &$pickFeature ): void {
+	\Nino\Features::registerComponents( $pickFeature );
+} );
+check( 'a listed feature whose method is not there is registered without that component and with a warning, not a fatal error - the others of its manifest are registered',
+	count( $pickRegisterErrors ) === 1 && $pickRegisterErrors[0][0] === E_USER_WARNING
+	&& str_contains( $pickRegisterErrors[0][1], 'component "picker-form", attribute "form": "options" names a method that is no public static method: "\Nino\Modules\Picker::missing" - not registered' )
+	&& isset( $pickFeature[\Nino\Modules\Components::REGISTRY]['picker-form'] ) === false && isset( $pickFeature[\Nino\Modules\Components::REGISTRY]['picker-broken'] ) === true );
+
+// ...and one whose class does not even parse: loading it for the check throws, which is the same warning and not a 500 for every request. The class stands in the app root
+// the autoloader reads last, a directory of the sandbox
+$pickApp = ninoSandboxDir( $pickFeature ). '/app';
+@mkdir( $pickApp. '/Nino/Modules/Parsebroken', 0755, true );
+file_put_contents( $pickApp. '/Nino/Modules/Parsebroken/Parsebroken.php', "<?php\nnamespace Nino\\Modules { class Parsebroken { public static function forms( array &\$appData, string \$attribute ): array { return [ ; } }\n" );
+defined( 'NINO_APP_DIR' ) === true || define( 'NINO_APP_DIR', $pickApp );
+$pickParse = ninoSandbox( 'components-options-parse' );
+$pickParse['/nino/dir'] = '';
+\Nino\Modules\Components::init( $pickParse );
+$pickRows = $pickManifest['stacks']['picker-rows'];
+$pickRows['attributes']['form']['options'] = '\Nino\Modules\Parsebroken::forms';
+$pickParse['/nino/modules'] = [ '\Nino\Modules\Picker' ];
+$pickParse['./nino/features/listed'] = [ 'modules' => $pickParse['/nino/modules'], 'manifests' => [ [ 'key' => 'picker', 'dir' => '/features/Picker', 'module' => '\Nino\Modules\Picker', 'components' => [ 'picker-broken' => $pickGood ], 'stacks' => [ 'picker-rows' => $pickRows ] ] ] ];
+ninoWarnings();
+$pickThrown = null;
+$pickParseErrors = ninoErrors( static function() use ( &$pickParse, &$pickThrown ): void {
+	try {
+		\Nino\Features::registerComponents( $pickParse );
+	}
+	catch( \Throwable $thrown ) {
+		$pickThrown = $thrown;
+	}
+} );
+check( 'a listed feature whose options class does not parse is one warning and the stack is left out, the others of its manifest registered - nothing thrown into the request',
+	$pickThrown === null && count( $pickParseErrors ) === 1 && $pickParseErrors[0][0] === E_USER_WARNING
+	&& str_contains( $pickParseErrors[0][1], 'stack "picker-rows": "options": ParseError: ' ) && str_ends_with( $pickParseErrors[0][1], ' - not registered' )
+	&& isset( $pickParse[\Nino\Modules\Components::STACKS]['picker-rows'] ) === false && isset( $pickParse[\Nino\Modules\Components::REGISTRY]['picker-broken'] ) === true );
+\Nino\Filesystem::removeDir( ninoSandboxDir( $pickParse ) );
+\Nino\Filesystem::removeDir( ninoSandboxDir( $pickFeature ) );
+
+\Nino\Filesystem::removeDir( ninoSandboxDir( $pick ) );
+
+echo "\n";
+
 // --- What a block says of the language of its text ----------------------------------
 
 echo "Modules\\Components - a text that is the words of another language says so with a lang attribute\n";

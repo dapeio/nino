@@ -322,6 +322,15 @@ namespace Nino {
 			if( preg_match( self::DIRECTORY_PATTERN, $name ) !== 1 )
 				return $fail( 'the directory name must be a class name segment (Newsletter, not newsletter)' );
 
+			// \Nino\Modules\<Name> is served by the first of the roots that holds it - _nino/,
+			// _admin/, then features/ (the autoloader in Nino.php) - so the class of a feature
+			// named like a module of the kernel or of the workbench, or a class below it (its
+			// panel is \Nino\Modules\<Name>\Admin), is the kernel's and never the feature's:
+			// a directory of that name in either root takes the name
+			foreach( [ 'the kernel' => dirname( __DIR__, 2 ), 'the workbench' => dirname( __DIR__, 3 ). '/_admin' ] as $owner => $root )
+				if( is_dir( $root. '/Nino/Modules/'. $name ) === true )
+					return $fail( 'the directory name is taken: \\Nino\\Modules\\'. $name. ' is a module of '. $owner. ', which the autoloader serves before a feature\'s' );
+
 			if( is_file( $path ) === false )
 				return $fail( 'no such file' );
 
@@ -496,7 +505,8 @@ namespace Nino {
 			// rendered - and a component's schema as it is registered, which is
 			// the feature's own: "by", the registry's word for who registered it,
 			// is the key of the feature whatever the schema says, which is why the
-			// reader is handed the key, and a tool offers it under the feature, so
+			// reader is handed the key (and the directory, which a method named for the
+			// options of an attribute is looked for in), and a tool offers it under the feature, so
 			// that a schema naming a "group" is refused. The callbacks are not
 			// declared but derived (see registerComponents())
 			$declared = [ 'components' => [], 'stacks' => [] ];
@@ -507,7 +517,7 @@ namespace Nino {
 
 				foreach( (array) ( $raw[$what] ?? [] ) as $name => $schema ) {
 
-					$clean = \Nino\Modules\Components::validate( (string) $name, $schema, $what === 'stacks', $key );
+					$clean = \Nino\Modules\Components::validate( (string) $name, $schema, $what === 'stacks', $key, $dir );
 					if( is_string( $clean ) === true )
 						return $fail( $clean );
 
@@ -581,6 +591,30 @@ namespace Nino {
 
 						if( is_callable( $callback ) === false ) {
 							trigger_error( 'Feature manifest '. $manifest['dir']. '/'. self::MANIFEST. ': the '. $prefix. ' "'. $name. '" has no renderer '. $callback[0]. '::'. $callback[1]. '()', E_USER_WARNING );
+							continue;
+						}
+
+						// A manifest is read on paper where it names a method for the options of an
+						// attribute, and a class that does not load or lacks the method is found
+						// here, with the check a module's registration gets: said and left out like a
+						// renderer that is missing, and not the E_USER_ERROR of addComponent() on
+						// every request
+						$problem = null;
+
+						if( array_filter( array_column( (array) $schema['attributes'], 'options' ), 'is_string' ) !== [] )
+							try {
+								$problem = \Nino\Modules\Components::validate( (string) $name, $schema, $what === 'stacks', $manifest['key'] );
+							}
+							catch( \Throwable $thrown ) {
+
+								// Loading the class is what the check does: a file that does not parse, or
+								// anything else that goes wrong as it loads, is a feature that is left out
+								// of the registry and not a page that is a 500 for every visitor
+								$problem = $prefix. ' "'. $name. '": "options": '. get_class( $thrown ). ': '. $thrown->getMessage();
+							}
+
+						if( is_string( $problem ) === true ) {
+							trigger_error( 'Feature manifest '. $manifest['dir']. '/'. self::MANIFEST. ': '. $problem. ' - not registered', E_USER_WARNING );
 							continue;
 						}
 

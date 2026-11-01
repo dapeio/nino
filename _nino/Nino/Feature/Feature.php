@@ -419,9 +419,11 @@ namespace Nino {
 
 		/**
 		 *	Register a shortcode unless the Components module owns the name:
-		 *	\Nino\Modules\Components::components() or stacks() has an entry for it
-		 *	when the manifest of a feature registered it as a component or as a
-		 *	stack, and the two registries are the whole answer to "is the module
+		 *	\Nino\Modules\Components::REGISTRY or STACKS has an entry for it when
+		 *	the manifest of a feature registered it as a component or as a stack
+		 *	(read as they stand: components() and stacks() ask the methods that an
+		 *	attribute's options may name, and a registration is no time for that),
+		 *	and the two registries are the whole answer to "is the module
 		 *	on and does it know it". What the module owns it renders itself -
 		 *	registering a callback beside it would chain a second renderer onto
 		 *	the first.
@@ -443,7 +445,7 @@ namespace Nino {
 		 */
 		public static function shortcode( array &$appData, string $name, callable $callback ): bool {
 
-			if( isset( \Nino\Modules\Components::components( $appData )[$name] ) === true || isset( \Nino\Modules\Components::stacks( $appData )[$name] ) === true )
+			if( isset( $appData[\Nino\Modules\Components::REGISTRY][$name] ) === true || isset( $appData[\Nino\Modules\Components::STACKS][$name] ) === true )
 				return false;
 
 			\Nino\Html::addShortcode( $appData, $name, $callback );

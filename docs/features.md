@@ -31,7 +31,11 @@ project holds it with a version, settings in `config.php` and files under `data/
 autoloader serves `Nino\Modules\*` from `_nino/`, `_admin/`, `features/` and `app/`
 in this order, so a feature never shadows a kernel module or a workbench screen and
 `app/` never replaces a feature ([autoload
-layout](recipes/runtime-module.md#autoload-layout)). `NINO_FEATURES_DIR`, defined
+layout](recipes/runtime-module.md#autoload-layout)); for the same reason a manifest
+whose directory is named like a module of the kernel or of the workbench - a
+directory `Nino/Modules/<Name>` in `_nino/` or `_admin/`: `Components`, `Elements`,
+`Users`, `Logs` - is refused, the name being taken: the class below it, a panel's
+`\Nino\Modules\<Name>\Admin` among them, would be the kernel's. `NINO_FEATURES_DIR`, defined
 before `_nino/Nino.php` loads (the entry points carry the line commented out),
 replaces the directory as a whole.
 
@@ -73,10 +77,18 @@ return [
 		'longest'		=> [ 'type' => 'int', 'label' => 'Longest name', 'min' => 1, 'max' => 60, 'unit' => 'characters', 'default' => 40 ],
 	],
 	// A shortcode with a schema; the class has no componentHello(), so doShortcode() renders it
-	'components'	=> [ 'hello' => [ 'label' => 'Greeting', 'source' => 'none', 'attributes' => [
-		'name'	=> [ 'type' => 'string', 'default' => '', 'label' => 'Name' ],
-		'shout'	=> [ 'type' => 'bool', 'default' => false, 'label' => 'Capitals' ],
-	] ] ],
+	'components'	=> [ 'hello' => [ 'label' => 'Greeting', 'source' => 'none', 'preview' => 'text', 'draws' => 'p .nino-hello', 'in' => [ 'section', 'card', 'hero' ],
+		'icon' => [
+			[ 'path', [ 'd' => 'M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2' ] ],
+			[ 'path', [ 'd' => 'M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2' ] ],
+			[ 'path', [ 'd' => 'M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8' ] ],
+			[ 'path', [ 'd' => 'M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15' ] ],
+		],
+		'attributes' => [
+			'name'	=> [ 'type' => 'string', 'default' => '', 'label' => 'Name' ],
+			'shout'	=> [ 'type' => 'bool', 'default' => false, 'label' => 'Capitals' ],
+		],
+	] ],
 ];
 ```
 
@@ -131,7 +143,30 @@ is registered is what the manifest declares - and a tool such as the Builder
 groups what it offers by it. A manifest names no `group`, the word by which a
 component of the kernel or of a project says which group a tool offers it under:
 a feature's components are offered under the feature, and a manifest that names
-one is refused.
+one is refused. A component should carry `draws`, `in` and `icon`, optional as they
+are ([component recipe](recipes/component.md)): they are how the Builder shows it
+in a section, places it where it may stand and offers it with a picture.
+
+The `options` of a `select` or a `variant` may be the name of a static method of
+the feature's own class, `'\Nino\Modules\Forms::formOptions'` (`\Nino\Modules\<Directory>`
+or a class below it - a manifest cannot have the schema ask any other static
+method), for a choice only the project can list: the method is
+`( array &$appData, string $attribute ): array`, answers `value => label` (a
+string or a `locale => string` map, read by `localized()`), and is asked when the
+schema is handed out and when a value is made ready, once for each attribute in a
+request. The manifest is read on paper alone, since it is read for features that
+are off, from a staging directory and while the previous version of the class is
+loaded: it is refused where the name is no `Class::method`, the class is not the
+feature's, its file is not below the feature's directory, the default is no string
+or `input` is `icons`. Whether the class loads and the method is a public static
+one is found out when it is asked, and an answer that cannot be read is a warning
+and the attribute a `string` for the rest of the request - a renderer validates a
+value that names a record or a file itself. A tool is handed the answer as
+`options` (the values, in their order) and `optionLabels`, and loads it once per
+session; `components()` and
+`stacks()` hand out such schemas, and `Components::registered()` the registry as
+it was registered, which is what a feature re-registering a component reads
+([Components](development.md#components)).
 
 ### The manual
 

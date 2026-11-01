@@ -76,6 +76,16 @@ namespace Nino\Modules {
 		// autoheight group of one is made from it
 		private const string COUNTER = './nino/components/count';
 
+		// The lists the methods named by an attribute's 'options' have answered
+		// in this request, one entry for each component or stack and attribute:
+		// the method asked and what it answered, null where it answered nothing
+		// that can be read - see _resolve()
+		private const string OPTIONS = './nino/components/options';
+
+		// What a variant's word is: lower case letters and digits, hyphens
+		// between them
+		private const string WORD = '/^[a-z0-9]+(?:-[a-z0-9]+)*$/D';
+
 		// What a component takes its first argument from, see value()
 		public const array SOURCES = [ 'text', 'image', 'href', 'content', 'none' ];
 
@@ -565,7 +575,7 @@ namespace Nino\Modules {
 		private static function _stretches( array &$appData, string $name, array $clean ): ?string {
 
 			$what = 'component "'. $name. '"';
-			$known = self::components( $appData );
+			$known = self::registered( $appData, false );
 			$target = $known[$clean['stretches']] ?? null;
 
 			if( $clean['stretches'] === $name || is_array( $target ) === false )
@@ -617,25 +627,187 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	The components registered, by name - read only
+		 *	The components registered, by name - read only. The schema as a tool
+		 *	reads it: an attribute whose 'options' name a method (see validate())
+		 *	carries the list that method answers - the answer of this request's
+		 *	first call, see _resolve() - as 'options', the values, and
+		 *	'optionLabels', value => label, where a label is a string or a
+		 *	locale => string map (\Nino\Features::localized() reads it); one
+		 *	whose method answered nothing readable is a 'string'
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
 		 *	@return 	array										name => schema, in registration order
 		 */
 		public static function components( array &$appData ): array {
-			return (array) ( $appData[self::REGISTRY] ?? [] );
+			return self::_issued( $appData, self::registered( $appData, false ), false );
 		}
 
 		/**
-		 *	The stacks registered, by name - read only
+		 *	The stacks registered, by name - read only, and as components() hands out
+		 *	the components
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
 		 *	@return 	array										name => schema, in registration order
 		 */
 		public static function stacks( array &$appData ): array {
-			return (array) ( $appData[self::STACKS] ?? [] );
+			return self::_issued( $appData, self::registered( $appData, true ), true );
+		}
+
+		/**
+		 *	The registry as it was registered, with no method asked: the clean schemas
+		 *	as validate() made them, an attribute whose options are a method still
+		 *	carrying the name of the method as 'options'. What the module itself reads
+		 *	at registration and at every render, and what a feature reads that
+		 *	registers a component again in its init() (addComponent() takes a clean
+		 *	schema). components() and stacks() are not that: they are the schemas
+		 *	handed to a tool, with the answers in place of the names, and a schema of
+		 *	theirs is not one to register
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		bool			$stack				The stacks and not the components
+		 *
+		 *	@return 	array										name => clean schema, in registration order
+		 */
+		public static function registered( array &$appData, bool $stack = false ): array {
+			return (array) ( $appData[ $stack === true ? self::STACKS : self::REGISTRY ] ?? [] );
+		}
+
+		/**
+		 *	The schemas with the lists their methods answer in the place of the
+		 *	names of the methods
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$schemas			name => clean schema
+		 *	@param		bool			$stack
+		 *
+		 *	@return 	array										name => schema
+		 */
+		private static function _issued( array &$appData, array $schemas, bool $stack ): array {
+
+			foreach( $schemas as $name => $schema )
+				foreach( (array) ( $schema['attributes'] ?? [] ) as $attribute => $declared )
+					if( is_string( $declared['options'] ?? null ) === true ) {
+
+						$schemas[$name]['attributes'][$attribute] = self::_resolve( $appData, (string) $name, $stack, (string) $attribute, $declared );
+
+						// A mark for _normalize() and nobody else's
+						unset( $schemas[$name]['attributes'][$attribute]['words'] );
+					}
+
+			return $schemas;
+		}
+
+		/**
+		 *	An attribute whose 'options' name a method, with the list in the place of
+		 *	the name: 'options' the values and 'optionLabels' value => label. Asked
+		 *	once for each component or stack and attribute in a request (the method
+		 *	is asked again only where the registry names another by then), at the
+		 *	first time the schema is issued or a value is made ready. An answer
+		 *	nothing can be read from is a warning, once, and the attribute a
+		 *	'string' for the rest of the request - what a shortcode says passes
+		 *	through, a tool draws a text field - without 'input', 'prefix' and a list.
+		 *	An empty answer is a list: a project with nothing to choose from yet.
+		 *	An attribute that has a list of its own is returned as it is
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$name					The component's or the stack's name
+		 *	@param		bool			$stack
+		 *	@param		string		$attribute
+		 *	@param		array			$declared			The attribute's clean schema
+		 *
+		 *	@return 	array										The attribute's schema
+		 */
+		private static function _resolve( array &$appData, string $name, bool $stack, string $attribute, array $declared ): array {
+
+			if( is_string( $declared['options'] ?? null ) === false )
+				return $declared;
+
+			$method	= $declared['options'];
+			$at			= ( $stack === true ? 'stack' : 'component' ). '/'. $name. '/'. $attribute;
+
+			if( ( $appData[self::OPTIONS][$at]['method'] ?? null ) !== $method ) {
+
+				// Entered before it is asked: a method that asks for the registry itself
+				// finds this attribute a string, and does not ask itself again
+				$appData[self::OPTIONS][$at] = [ 'method' => $method, 'answer' => null ];
+
+				$answer = self::_ask( $appData, $method, $attribute, (string) $declared['type'] );
+
+				if( is_string( $answer ) === true )
+					trigger_error( 'Components: '. ( $stack === true ? 'stack' : 'component' ). ' "'. $name. '", attribute "'. $attribute. '": '. $answer. ' - treated as a string', E_USER_WARNING );
+				else
+					$appData[self::OPTIONS][$at]['answer'] = $answer;
+			}
+
+			$answer = $appData[self::OPTIONS][$at]['answer'];
+
+			if( is_array( $answer ) === false ) {
+
+				// A variant is written as a class and stays a word: what passes is the empty word
+				// and a word (see _normalize(), which reads the mark)
+				if( $declared['type'] === 'variant' )
+					$declared['words'] = true;
+
+				$declared['type'] = 'string';
+				unset( $declared['options'], $declared['input'], $declared['prefix'] );
+
+				return $declared;
+			}
+
+			$declared['options'] = array_map( 'strval', array_keys( $answer ) );
+			$declared['optionLabels'] = $answer;
+
+			return $declared;
+		}
+
+		/**
+		 *	Ask the method of an attribute for its options and read the answer
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$method				'\Namespace\Class::method'
+		 *	@param		string		$attribute
+		 *	@param		string		$type					select or variant: the words of a variant are checked
+		 *
+		 *	@return 	array|string						value => label, or what is wrong with the answer
+		 */
+		private static function _ask( array &$appData, string $method, string $attribute, string $type ): array|string {
+
+			try {
+
+				// What a manifest was not asked about when it was read: that the class loads
+				// and the method is a public static one
+				$why = self::_method( $method );
+
+				if( $why !== null )
+					return $why;
+
+				$answer = call_user_func_array( $method, [ &$appData, $attribute ] );
+			}
+			catch( \Throwable $thrown ) {
+				return $method. '() threw '. get_class( $thrown ). ': '. $thrown->getMessage();
+			}
+
+			if( is_array( $answer ) === false )
+				return $method. '() did not answer an array of value => label';
+
+			$list = [];
+
+			foreach( $answer as $value => $label ) {
+
+				$value = (string) $value;
+
+				if( \Nino\Features::localizedValid( $label ) === false )
+					return $method. '() answers no string or locale => string map as the label of "'. $value. '"';
+
+				if( $type === 'variant' && $value !== '' && preg_match( self::WORD, $value ) !== 1 )
+					return $method. '() answers "'. $value. '", which is no word of a variant';
+
+				$list[$value] = $label;
+			}
+
+			return $list;
 		}
 
 		/**
@@ -653,7 +825,7 @@ namespace Nino\Modules {
 		 */
 		public static function defaults( array &$appData, string $name, bool $stack = false ): array {
 
-			$schema = ( $stack === true ? self::stacks( $appData ) : self::components( $appData ) )[$name] ?? null;
+			$schema = self::registered( $appData, $stack )[$name] ?? null;
 
 			if( is_array( $schema ) === false )
 				return [];
@@ -700,7 +872,7 @@ namespace Nino\Modules {
 		 */
 		public static function sources( array &$appData, string $content ): array {
 
-			$components = self::components( $appData );
+			$components = self::registered( $appData, false );
 			$sources = [];
 
 			// A key or a slot begins with a slash; what has a [ in it is a fill the
@@ -756,10 +928,11 @@ namespace Nino\Modules {
 		 *																	See docs/development.md, "Components"
 		 *	@param		bool			$stack				Read it as a stack's
 		 *	@param		string|null	$feature			The key of the feature whose manifest the schema is read from, null for a module's: its components are the feature's own, whatever 'by' they say
+		 *	@param		string|null	$directory		The directory of that feature: a method that names the options of an attribute is then checked on paper alone (it is a static method of the feature's own class, whose file stands in the directory), where the class may not be loadable yet; null checks the class itself, as a module's registration does
 		 *
 		 *	@return 	array|string						The clean schema, or what is wrong with it
 		 */
-		public static function validate( string $name, mixed $schema, bool $stack = false, ?string $feature = null ): array|string {
+		public static function validate( string $name, mixed $schema, bool $stack = false, ?string $feature = null, ?string $directory = null ): array|string {
 
 			$what = ( $stack === true ? 'stack' : 'component' ). ' "'. $name. '"';
 
@@ -830,7 +1003,7 @@ namespace Nino\Modules {
 				if( in_array( $attribute, $taken, true ) === true )
 					return $what. ': "'. $attribute. '" is an argument the kernel reads itself and cannot be an attribute';
 
-				$result = self::_attributeSchema( $what, $attribute, $declared );
+				$result = self::_attributeSchema( $what, $attribute, $declared, $directory );
 
 				if( is_string( $result ) === true )
 					return $result;
@@ -987,10 +1160,11 @@ namespace Nino\Modules {
 		 *	@param		string		$what					How the message names the component
 		 *	@param		string		$attribute
 		 *	@param		mixed			$declared
+		 *	@param		string|null	$directory		The feature's directory, see validate()
 		 *
 		 *	@return 	array|string						The clean schema, or what is wrong with it
 		 */
-		private static function _attributeSchema( string $what, string $attribute, mixed $declared ): array|string {
+		private static function _attributeSchema( string $what, string $attribute, mixed $declared, ?string $directory = null ): array|string {
 
 			$where = $what. ', attribute "'. $attribute. '": ';
 
@@ -1053,36 +1227,66 @@ namespace Nino\Modules {
 
 				$options = $declared['options'] ?? null;
 
-				if( is_array( $options ) === false || $options === [] || array_is_list( $options ) === false )
-					return $where. 'a '. $type. ' needs "options", a list of values';
+				// The other form of 'options': the name of a static method that answers
+				// them, asked when the schema is issued and a value is made ready - not
+				// here, a manifest is read for features that are off as well, and while a
+				// feature is being installed or updated, when its class is not the one that
+				// is loaded. What can be said now is said now: the name is a method of the
+				// feature's own class (see _method()) and the default a string; that the
+				// method is there, that the default is one of the options, and that the
+				// answer is readable, only the asking can tell
+				if( is_string( $options ) === true ) {
 
-				$clean['options'] = [];
+					$why = self::_method( $options, $directory );
 
-				foreach( $options as $option )
-					if( is_string( $option ) === false && is_int( $option ) === false )
-						return $where. '"options" is a list of strings';
-					else
-						$clean['options'][] = (string) $option;
+					if( $why !== null )
+						return $where. $why;
 
-				// What a variant's value is written as is a class, one: a word of lower case
-				// letters and digits, hyphens between them - and the empty word, which is none
-				if( $type === 'variant' )
-					foreach( $clean['options'] as $option )
-						if( $option !== '' && preg_match( '/^[a-z0-9]+(?:-[a-z0-9]+)*$/D', $option ) !== 1 )
-							return $where. 'the options of a variant are words, and "'. $option. '" is none';
+					if( ( $clean['input'] ?? '' ) === 'icons' )
+						return $where. '"input" icons is for an alignment, which a list that is asked for later cannot be checked to be';
 
-				// A row of icons is drawn for an alignment: the empty word - the one the
-				// default is - and words of one set of ALIGNMENTS
-				if( ( $clean['input'] ?? '' ) === 'icons' ) {
+					if( is_string( $default ) === false )
+						return $where. 'the default of a '. $type. ' whose options are a method must be a string';
 
-					$words = array_diff( $clean['options'], [ '' ] );
+					// A variant's list is words and the empty word (see _ask()): so is its default
+					if( $type === 'variant' && $default !== '' && preg_match( self::WORD, $default ) !== 1 )
+						return $where. 'the default of a variant is a word';
 
-					if( in_array( '', $clean['options'], true ) === false || $words === [] || array_filter( self::ALIGNMENTS, static fn( array $set ): bool => array_diff( $words, $set ) === [] ) === [] )
-						return $where. '"input" icons is for an alignment: the options are "" and words of '. implode( ' or ', array_map( static fn( array $set ): string => implode( '|', $set ), self::ALIGNMENTS ) );
+					$clean['options'] = $options;
 				}
+				else {
 
-				if( ( is_string( $default ) === false && is_int( $default ) === false ) || in_array( (string) $default, $clean['options'], true ) === false )
-					return $where. 'the default is not one of the options';
+					if( is_array( $options ) === false || $options === [] || array_is_list( $options ) === false )
+						return $where. 'a '. $type. ' needs "options", a list of values or the name of a static method';
+
+					$clean['options'] = [];
+
+					foreach( $options as $option )
+						if( is_string( $option ) === false && is_int( $option ) === false )
+							return $where. '"options" is a list of strings';
+						else
+							$clean['options'][] = (string) $option;
+
+					// What a variant's value is written as is a class, one: a word of lower case
+					// letters and digits, hyphens between them - and the empty word, which is none
+					if( $type === 'variant' )
+						foreach( $clean['options'] as $option )
+							if( $option !== '' && preg_match( self::WORD, $option ) !== 1 )
+								return $where. 'the options of a variant are words, and "'. $option. '" is none';
+
+					// A row of icons is drawn for an alignment: the empty word - the one the
+					// default is - and words of one set of ALIGNMENTS
+					if( ( $clean['input'] ?? '' ) === 'icons' ) {
+
+						$words = array_diff( $clean['options'], [ '' ] );
+
+						if( in_array( '', $clean['options'], true ) === false || $words === [] || array_filter( self::ALIGNMENTS, static fn( array $set ): bool => array_diff( $words, $set ) === [] ) === [] )
+							return $where. '"input" icons is for an alignment: the options are "" and words of '. implode( ' or ', array_map( static fn( array $set ): string => implode( '|', $set ), self::ALIGNMENTS ) );
+					}
+
+					if( ( is_string( $default ) === false && is_int( $default ) === false ) || in_array( (string) $default, $clean['options'], true ) === false )
+						return $where. 'the default is not one of the options';
+				}
 
 				// The class a variant is written as: this prefix and the word. Left out, the
 				// renderer's own - the class of the component and two hyphens
@@ -1137,6 +1341,62 @@ namespace Nino\Modules {
 			$clean['default'] = $default;
 
 			return $clean;
+		}
+
+		/**
+		 *	Whether the 'options' of an attribute name a method it can be asked: the
+		 *	form '\Namespace\Class::method', and then
+		 *
+		 *	- for a feature's manifest ($directory): on paper alone. The class is the
+		 *	feature's own, \Nino\Modules\<Directory> or below it - so that a manifest
+		 *	cannot have the schema ask any other static method of the kernel or of the
+		 *	project - and its file stands where the autoloader looks for it, below the
+		 *	directory. Nothing is loaded: a manifest is read for features that are off,
+		 *	from a staging directory before an install, and while the previous version of
+		 *	the class is the one that is loaded, and none of that is a reason to refuse it
+		 *	- the asking finds out whether the class loads and the method is a public
+		 *	static one (see _ask()), and says so as it says any answer it cannot read
+		 *	- otherwise, for a module's registration: a class the autoloader serves and a
+		 *	public static method of it
+		 *
+		 *	@param		string		$method
+		 *	@param		string|null	$directory		The feature's directory, null for the full check
+		 *
+		 *	@return 	string|null							What is wrong with it, null where it will do
+		 */
+		private static function _method( string $method, ?string $directory = null ): ?string {
+
+			if( preg_match( '/^\\\\?[A-Za-z_]\w*(?:\\\\[A-Za-z_]\w*)*::[A-Za-z_]\w*$/D', $method ) !== 1 )
+				return '"options" is a list of values or the name of a static method, written \\Namespace\\Class::method - "'. $method. '" is none';
+
+			[ $class, $name ] = explode( '::', $method );
+			$class = ltrim( $class, '\\' );
+
+			if( $directory !== null ) {
+
+				$module = 'Nino\\Modules\\'. basename( rtrim( $directory, '/' ) );
+
+				if( $class !== $module && str_starts_with( $class, $module. '\\' ) === false )
+					return '"options" names a static method of the feature\'s own class, \\'. $module. ' or below it: "'. $method. '" is not';
+
+				// The autoloader's layout: the module's file is <Directory>/<Directory>.php, a class
+				// below it <Directory>/<Segments>/<Class>/<Class>.php
+				$below = $class === $module ? [] : explode( '\\', substr( $class, strlen( $module ) + 1 ) );
+				$file = rtrim( $directory, '/' ). ( $below === [] ? '' : '/'. implode( '/', $below ) ). '/'. basename( str_replace( '\\', '/', $class ) ). '.php';
+
+				return is_file( $file ) === true ? null : '"options" names a class whose file is not in the feature: "'. $method. '"';
+			}
+
+			if( class_exists( $class ) === false )
+				return '"options" names a method of a class that cannot be loaded: "'. $method. '"';
+
+			// Not is_callable(): asked from here, it would say yes to a private method of this class
+			$reflected = method_exists( $class, $name ) === true ? new \ReflectionMethod( $class, $name ) : null;
+
+			if( $reflected === null || $reflected->isPublic() === false || $reflected->isStatic() === false )
+				return '"options" names a method that is no public static method: "'. $method. '"';
+
+			return null;
 		}
 
 		/**
@@ -1266,6 +1526,10 @@ namespace Nino\Modules {
 					return in_array( strtolower( $raw ), self::OFF, true ) === true ? '0' : $default;
 			}
 
+			// A variant whose method could not be read: the word it is written as, or none
+			if( ( $declared['words'] ?? false ) === true && $raw !== '' && preg_match( self::WORD, $raw ) !== 1 )
+				return $default;
+
 			return $raw;
 		}
 
@@ -1330,7 +1594,7 @@ namespace Nino\Modules {
 			$prepared = [ 'source' => $source, 'content' => $content ];
 
 			foreach( self::_attributes( $schema, $stack ) as $attribute => $declared )
-				$prepared[$attribute] = self::_normalize( $declared, $args[$attribute] ?? null );
+				$prepared[$attribute] = self::_normalize( self::_resolve( $appData, $name, $stack, (string) $attribute, $declared ), $args[$attribute] ?? null );
 
 			if( $fixed !== null )
 				$prepared['text'] = $fixed;
@@ -1797,7 +2061,7 @@ namespace Nino\Modules {
 		 *	@return 	array										attribute => its clean schema, [] for a name nobody registered
 		 */
 		private static function _declared( array &$appData, string $component ): array {
-			return (array) ( self::components( $appData )[$component]['attributes'] ?? [] );
+			return (array) ( self::registered( $appData, false )[$component]['attributes'] ?? [] );
 		}
 
 		/**
@@ -2417,7 +2681,7 @@ namespace Nino\Modules {
 		 */
 		private static function _sorted( array &$appData, string $content ): array {
 
-			$components	= self::components( $appData );
+			$components	= self::registered( $appData, false );
 			$picture		= '';
 			$rest				= '';
 

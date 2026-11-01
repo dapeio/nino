@@ -104,6 +104,10 @@ function manifestFails( string $dir, string $name, mixed $manifest, string $why,
 
 check( 'a minimal manifest is name and version', is_array( \Nino\Features::manifest( writeManifest( $manifestDir, 'Mini', [ 'name' => 'Mini', 'version' => '0.1.0' ] ) ) ) && ninoWarnings() === [] );
 check( 'the key defaults to the lowercased directory name', \Nino\Features::manifest( $manifestDir. '/Mini' )['key'] === 'mini' );
+check( 'a directory named like a module of the kernel or of the workbench is refused: the autoloader serves that class before a feature\'s, so the name is taken',
+	manifestFails( $manifestDir, 'Components', [ 'name' => 'x', 'version' => '1.0.0' ], 'the directory name is taken: \\Nino\\Modules\\Components is a module of the kernel' )
+	&& manifestFails( $manifestDir, 'Users', [ 'name' => 'x', 'version' => '1.0.0' ], 'the directory name is taken: \\Nino\\Modules\\Users is a module of the workbench' )
+	&& is_array( \Nino\Features::manifest( writeManifest( $manifestDir, 'Componentsx', [ 'name' => 'x', 'version' => '1.0.0' ] ) ) ) && ninoWarnings() === [] );
 check( 'a lowercase directory is refused - it cannot serve a class', manifestFails( $manifestDir, 'lower', [ 'name' => 'x', 'version' => '1.0.0' ], 'directory name' ) );
 check( 'a missing class file is refused', manifestFails( $manifestDir, 'NoClass', [ 'name' => 'x', 'version' => '1.0.0' ], 'NoClass.php is missing', false ) );
 check( 'a manifest that is not an array is refused', ( static function() use ( $manifestDir ): bool {
