@@ -998,12 +998,6 @@ namespace Nino\Install {
 
 		private const string LIBRARY = __DIR__. '/library';
 
-		// The workbench's runtime-owned route is not persisted in config.php,
-		// so a collision check against the on-disk route array alone cannot
-		// see it. A public page at this exact path would hide the workbench's
-		// own GET response once its login passes.
-		private const array RESERVED_HTTP_URIS = [ '/_admin' ];
-
 		// A fresh entry's text fields when the frontend doesn't post its
 		// own (or posts a blank one) - see apiApply()'s $text loop.
 		// Deliberately generic: unlike a template's own deeper content
@@ -1531,7 +1525,7 @@ namespace Nino\Install {
 					return;
 				}
 
-				if( in_array( $httpUri, self::RESERVED_HTTP_URIS, true ) === true ) {
+				if( \Nino\Http::isReservedUri( $httpUri ) === true ) {
 					\Nino\Http::fail( $request, 409, 'reserved http uri: "'. $httpUri. '"' );
 					return;
 				}

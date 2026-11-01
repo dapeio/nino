@@ -86,11 +86,6 @@ namespace Nino\Modules\Routes {
 			return self::MANAGE_PERM;
 		}
 
-		// Kept in sync with the wizard's Webpages class. The workbench owns
-		// this route at runtime, so it does not show up in the persisted route
-		// array used for the general collision check.
-		private const array RESERVED_HTTP_URIS = [ '/_admin' ];
-
 		// The template a new route starts on, when the project has it: the
 		// wizard's blank page. Never another one - the templates a project has
 		// are finished pages (a contact page, the 404), and one of them
@@ -831,7 +826,7 @@ namespace Nino\Modules\Routes {
 					return null;
 				}
 
-				if( in_array( $address, self::RESERVED_HTTP_URIS, true ) === true ) {
+				if( \Nino\Http::isReservedUri( $address ) === true ) {
 					\Nino\Http::fail( $request, 409, 'reserved http uri: "'. $address. '"', 'routes_reserved_http_uri', [ $address ], $field );
 					return null;
 				}

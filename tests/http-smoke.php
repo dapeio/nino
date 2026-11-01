@@ -885,6 +885,23 @@ foreach( [ '/contact' => true, '/blog' => true, '/blog/post-1' => true, '/blog/2
 check( 'a pattern is editable text: one that looks like a regular expression is matched literally, never evaluated', \Nino\Http::matchesPath( '/home', [ '/.*' ] ) === false && \Nino\Http::matchesPath( '/.*', [ '/.*' ] ) === true );
 check( 'a pattern that is no string or is empty matches nothing, and neither does an empty list', \Nino\Http::matchesPath( '/home', [ '', null, 7, [ '/home' ] ] ) === false && \Nino\Http::matchesPath( '/home', [] ) === false && \Nino\Http::matchesPath( '', [ '' ] ) === false );
 
+// isReservedUri(): the paths a page cannot have - the address and what is below it, a run of slashes as one, any case
+foreach( [ '/features' => true, '/features/x' => true, '/featured' => false, '/apps' => false, '/app/x' => true, '//features' => true, '/Features' => true, '/DOCS/x' => true, '/_admin' => true, '/_admin/x' => true, '/_nino/x' => true, '/public/a' => true, '/' => false, '/home' => false ] as $reservedUri => $expectReserved )
+	check( 'isReservedUri: '. $reservedUri. ' is '. ( $expectReserved === true ? '' : 'not ' ). 'reserved', \Nino\Http::isReservedUri( $reservedUri ) === $expectReserved );
+// /docs and /history are reserved while the checkout has the directory - judged here against roots of their own, since the checkout this runs in has both
+$withTrees = sys_get_temp_dir(). '/nino-reserved-with-'. uniqid();
+$withoutTrees = sys_get_temp_dir(). '/nino-reserved-without-'. uniqid();
+mkdir( $withTrees. '/docs', 0777, true );
+mkdir( $withTrees. '/history', 0777, true );
+mkdir( $withoutTrees, 0777, true );
+check( '/docs and /history, and what is below them, are reserved in a checkout that has the directories', \Nino\Http::isReservedUri( '/docs' ) === true && \Nino\Http::isReservedUri( '/history/x', $withTrees ) === true && \Nino\Http::isReservedUri( '/docs', $withTrees ) === true );
+check( '...and are no reserved address in one that has not, where the rest still is', \Nino\Http::isReservedUri( '/docs', $withoutTrees ) === false && \Nino\Http::isReservedUri( '/history/x', $withoutTrees ) === false && \Nino\Http::isReservedUri( '/DOCS', $withoutTrees ) === false
+	&& \Nino\Http::isReservedUri( '/features', $withoutTrees ) === true && \Nino\Http::isReservedUri( '/_admin/x', $withoutTrees ) === true );
+rmdir( $withTrees. '/docs' );
+rmdir( $withTrees. '/history' );
+rmdir( $withTrees );
+rmdir( $withoutTrees );
+
 // answersHtml(): the first Content-Type decides, none is html
 check( 'a route that names no header answers html', \Nino\Http::answersHtml( [] ) === true && \Nino\Http::answersHtml( [ 'uri' => '/x' ] ) === true && \Nino\Http::answersHtml( [ 'header' => [] ] ) === true && \Nino\Http::answersHtml( [ 'header' => [ 'X-Other' => 'text/plain' ] ] ) === true );
 check( '...so does text/html, with a charset or without, in any case of letters and with space around', \Nino\Http::answersHtml( [ 'header' => [ 'Content-Type' => 'text/html' ] ] ) === true

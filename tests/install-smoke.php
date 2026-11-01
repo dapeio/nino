@@ -720,6 +720,12 @@ foreach( [ '/legal/imprint', '/legal/privacy' ] as $reservedElementUri ) {
 [ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [ [ 'uri' => '/installer-shadow', 'httpUri' => '/_admin', 'libraryKey' => 'home', 'text' => [] ] ] ] );
 check( 'rejects a Webpage mounted on the installer\'s own runtime uri', $status === 409 );
 
+// ...and so are the addresses the router never serves, as the address and as a
+// path below it - a page there would be accepted and never reached
+foreach( [ '/features', '/features/x', '/docs', '/_nino/x', '/private/a', '//features', '/Features', '/DOCS/x' ] as $neverServed ) {
+	[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [ [ 'uri' => '/never-served', 'httpUri' => $neverServed, 'libraryKey' => 'home', 'text' => [] ] ] ] );
+	check( 'rejects a Webpage mounted on '. $neverServed. ', which the router never serves, with 409', $status === 409 && isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET:/'. $neverServed] ) === false );
+}
 
 [ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [ [ 'uri' => '/custom-page', 'httpUri' => '/custom', 'libraryKey' => 'home', 'text' => [] ] ] ] );
 check( 'rejects an Http-URI already owned by a non-Webpages route', $status === 409 );
@@ -1841,6 +1847,16 @@ if( defined( 'NINO_APP_DIR' ) === true ) {
 	file_put_contents( $appDir. '/Acme/Widget/install/manifest.php', '<?php return '. var_export( [ 'label' => 'Widget', 'moduleClass' => '\\Acme\\Widget', 'requiresModules' => [ 'nonexistent' ] ], true ). ';' );
 	[ , $body ] = ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE' ], 'modules' => [ 'widget' ] ] );
 	check( 'a requirement no unit answers to is left out of the applied set - only the always-on four plus what was actually picked remain', ( $body['modules'] ?? null ) === [ 'forms', 'navigation', 'localepicker', 'legal', 'widget' ] );
+}
+
+
+// --- Addresses that only start like a reserved one -------------------------
+
+// Such a name is no reserved address. Run last: a page applied here stays in
+// the project, and the checks above read it as it was
+foreach( [ '/featured', '/apps' ] as $servedAddress ) {
+	[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [ [ 'uri' => '/served-anyway', 'httpUri' => $servedAddress, 'libraryKey' => 'home', 'text' => [] ] ] ] );
+	check( 'accepts a Webpage mounted on '. $servedAddress. ', which only starts like a reserved one', $status === 200 && isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET:/'. $servedAddress] ) === true );
 }
 
 

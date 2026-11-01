@@ -95,6 +95,24 @@ namespace Nino {
 			'trusted-types'		=> [],
 		];
 
+		/*	The addresses a page of the project cannot have: the paths router.php and
+			the .htaccess files never hand to a page (the private and the source
+			halves, the checkout's own tests, features, docs and history), and the
+			kernel's and the workbench's own trees, which reach index.php on Apache
+			and nginx but are not the project's to take (/_nino, /_admin) or are the
+			asset tree (/public). A route at one of them, or below it, would be
+			accepted and never reached. router.php and the .htaccess files are the
+			source of the list: a directory they come to refuse is added here as
+			well. /docs and /history are reserved for as long as their directory is
+			there (see WHILE_PRESENT) - a project with a page of its own at one of them
+			deletes the directory, as router.php says. The Routes panel and the setup
+			wizard read the list through isReservedUri()	*/
+		public const array RESERVED_URIS = [ '/_admin', '/_nino', '/private', '/public', '/app', '/tests', '/features', '/docs', '/history' ];
+
+		// The ones of RESERVED_URIS that router.php refuses only while the
+		// directory of the same name is in the checkout
+		private const array WHILE_PRESENT = [ '/docs', '/history' ];
+
 		public static function request( array &$appData, array &$request ): void {
 
 			$currentLocale = \Nino\Locales::getCurrentLocale( $appData );
@@ -700,6 +718,36 @@ namespace Nino {
 			}
 
 			return false;
+		}
+
+		/**
+		 *	Whether an address is one a page cannot have: one of RESERVED_URIS or
+		 *	a path below one of them ('/features' and '/features/x', not
+		 *	'/featured'). A run of slashes is one slash and the case of the letters
+		 *	does not matter - the server and a case-insensitive filesystem judge an
+		 *	address that way (see router.php), and an address is ASCII. '/docs' and
+		 *	'/history' count while their directory is in the checkout.
+		 *
+		 *	@param		string		$uri					An address without the directory, eg. '/docs/guide'
+		 *	@param		string|null	$root				The checkout's root; the one this file is in unless a test names another
+		 *
+		 *	@return 	bool
+		 */
+		public static function isReservedUri( string $uri, ?string $root = null ): bool {
+
+			$uri = strtolower( (string) preg_replace( '#/{2,}#', '/', $uri ) );
+			$root ??= dirname( __DIR__, 3 );
+			$patterns = [];
+
+			foreach( self::RESERVED_URIS as $reserved ) {
+
+				if( in_array( $reserved, self::WHILE_PRESENT, true ) === true && is_dir( $root. $reserved ) === false )
+					continue;
+
+				$patterns[] = $reserved. '/*';
+			}
+
+			return self::matchesPath( $uri, $patterns );
 		}
 
 		/**

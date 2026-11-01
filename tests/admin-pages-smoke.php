@@ -472,6 +472,12 @@ $refusedAddresses = [
 	'an address that another page has'								=> [ [ 'de_DE' => '/reise', 'en_US' => '/contact', 'fr_FR' => '/voyage' ], 400, 'routes_duplicate_http_uri', [ '/contact' ], 'httpUri-en_US' ],
 	'an address that is shared and another page has'	=> [ [ '' => '/after' ], 400, 'routes_duplicate_http_uri', [ '/after' ], 'httpUri' ],
 	'an address the workbench owns'										=> [ [ 'de_DE' => '/reise', 'en_US' => '/_admin', 'fr_FR' => '/voyage' ], 409, 'routes_reserved_http_uri', [ '/_admin' ], 'httpUri-en_US' ],
+	'an address the router never serves'							=> [ [ 'de_DE' => '/reise', 'en_US' => '/features', 'fr_FR' => '/voyage' ], 409, 'routes_reserved_http_uri', [ '/features' ], 'httpUri-en_US' ],
+	'an address below one the router never serves'		=> [ [ 'de_DE' => '/reise', 'en_US' => '/trip', 'fr_FR' => '/features/x' ], 409, 'routes_reserved_http_uri', [ '/features/x' ], 'httpUri-fr_FR' ],
+	'an address with a doubled slash'									=> [ [ 'de_DE' => '/reise', 'en_US' => '//features', 'fr_FR' => '/voyage' ], 409, 'routes_reserved_http_uri', [ '//features' ], 'httpUri-en_US' ],
+	'an address in other letters'										=> [ [ 'de_DE' => '/reise', 'en_US' => '/trip', 'fr_FR' => '/Features' ], 409, 'routes_reserved_http_uri', [ '/Features' ], 'httpUri-fr_FR' ],
+	'an address below one in other letters'				=> [ [ '' => '/DOCS/x' ], 409, 'routes_reserved_http_uri', [ '/DOCS/x' ], 'httpUri' ],
+	'another address the router never serves'					=> [ [ '' => '/docs' ], 409, 'routes_reserved_http_uri', [ '/docs' ], 'httpUri' ],
 	'an address that is no path'											=> [ [ 'de_DE' => '/reise', 'en_US' => '/trip', 'fr_FR' => '../etc/passwd' ], 400, 'routes_invalid_http_uri', [ '../etc/passwd' ], 'httpUri-fr_FR' ],
 	'a language that has none'												=> [ [ 'de_DE' => '/reise', 'en_US' => '/trip' ], 400, 'routes_missing_http_uri', [ 'fr_FR' ], 'httpUri-fr_FR' ],
 	'a language whose address is blank'								=> [ [ 'de_DE' => '/reise', 'en_US' => '   ', 'fr_FR' => '/voyage' ], 400, 'routes_missing_http_uri', [ 'en_US' ], 'httpUri-en_US' ],
@@ -495,6 +501,14 @@ foreach( $refusedAddresses as $label => [ $refusedMap, $refusedStatus, $refusedC
 check( 'the request of the old shape - the address in httpUri, the page by the address it had - is read as none: a request without an address, refused with the language', $status === 400 && ( $body['code'] ?? '' ) === 'routes_missing_http_uri' && ( $body['params'] ?? [] ) === [ 'de_DE' ] );
 check( '...and every one of these refusals left config.php and the text files exactly as they were', file_get_contents( $sandbox. '/private/config.php' ) === $configBeforeAddresses
 	&& $textBeforeAddresses === array_map( static fn( string $name ): string => (string) file_get_contents( $sandbox. '/private/text/'. $name. '.php' ), [ 'de_DE', 'en_US', 'fr_FR', 'global' ] ) );
+
+// A name that only starts like one of those is no such address: written, and taken away again
+foreach( [ '/featured', '/apps' ] as $servedAddress ) {
+	[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiSave', [ 'originalUri' => '', 'uri' => '/site-served', 'httpUris' => [ '' => $servedAddress ], 'template' => 'page-about', 'text' => $pageText('Served') ] );
+	check( 'a page at '. $servedAddress. ', which only starts like an address the router never serves, is saved', $status === 200 && array_keys( $routesOf( '/site-served' ) ) === [ 'GET:/'. $servedAddress ] );
+	[ $status ] = callDev( $appData, \Nino\Modules\Routes\Admin::class, 'apiDelete', [ 'uri' => '/site-served' ] );
+	check( '...and deleted again', $status === 200 && $routesOf( '/site-served' ) === [] );
+}
 
 // Four languages that want two addresses, a pair each: a page has one address that several languages share - the empty key's - and
 // a second pair has no way to say it, so the request is refused rather than written as two routes without a language, which
