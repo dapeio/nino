@@ -662,6 +662,9 @@
  *	@knob	cta		Visibility and size of the button of the header
  *	@knob	nav-case	Capitals in the links of the navigation
  *
+ *	@style		nav-hover	Hover of the links
+ *	@style-de	nav-hover	Hover der Links
+ *
  *	The name and the description are what the Design panel lists this
  *	variant as. Every library file carries them; a file without a @name
  *	is offered under its own file name instead.
@@ -678,7 +681,7 @@
  *	three. The menu that opens over the page is the page's again, as in Nino.css.
  *
  *	The other four: border-size is the width of the border the bar has, border-color a
- *	choice of three for its colour - the ink of the page, the border of the page and the
+ *	choice of three for its colour - the ink of its ground, the border of its ground and the
  *	brand -, position a choice of three for where the navigation stands - left, centre or
  *	right of the bar - and cta a choice of three for the button of the header - hidden,
  *	small, or as large as a button is. The button is scaled by --header-cta-scale, the
@@ -687,6 +690,12 @@
  *	The ninth, nav-case, is a toggle: two rungs, none and uppercase, and the links
  *	of the navigation - in the bar, and in the menu that opens over the page - are
  *	set in the one its position picks.
+ *
+ *	The style, nav-hover, is the hover of the links of the navigation from 768 px.
+ *	None leaves what this set draws: the line that grows under a link. Fade and Pill,
+ *	the files nav-hover-fade.css and nav-hover-pill.css beside this one, replace that
+ *	line - the others dim in the first, a pill stands behind the link in the second -
+ *	and read the roles of the bar, so they follow its ground.
  */
 
 :root {
@@ -748,8 +757,8 @@
 	--header-border-size--more:	2px;
 	--header-border-size--most:	6px;
 
-	--header-border-color--less:	var(--color-text);
-	--header-border-color--default:	var(--color-border);
+	--header-border-color--less:	var(--header-ground-ink);
+	--header-border-color--default:	var(--header-ground-border);
 	--header-border-color--more:	var(--color-primary);
 
 	--header-position--less: 0 auto 0 0;
