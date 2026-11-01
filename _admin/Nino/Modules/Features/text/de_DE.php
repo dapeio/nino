@@ -60,6 +60,7 @@ return [
 	'[[/_admin/features/msg/installed-active]]'	=> 'Installiert und eingeschaltet.',
 	'[[/_admin/features/msg/installed-active-with]]'	=> 'Installiert und eingeschaltet, zusammen mit dem, was es benötigt: %s.',
 	'[[/_admin/features/label/deactivate]]'		=> 'Deaktivieren',
+	'[[/_admin/features/confirm/deactivate]]'		=> '„%s“ deaktivieren? Seiten behalten seine Shortcodes; sie erscheinen als Text, solange es aus ist. Seine Abschnitte der Datenschutzerklärung bleiben, ebenso alles, was es installiert hat.',
 	'[[/_admin/features/label/update]]'				=> 'Auf %s aktualisieren',
 	'[[/_admin/features/hint/secret-set]]'		=> 'Ein Wert ist gespeichert. Lass das Feld leer, um ihn zu behalten, oder gib einen neuen ein, um ihn zu ersetzen.',
 	'[[/_admin/features/hint/secret-unset]]'	=> 'Noch nichts gespeichert.',

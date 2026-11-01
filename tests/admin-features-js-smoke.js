@@ -154,6 +154,8 @@ const sandbox = {
 	Nino : Nino,
 };
 let confirmAnswer = true;
+// ...and what the dialog was asked, in order
+const confirms = [];
 // What an install said before it reloaded, in order - the dialog is where an
 // install's word goes, because the offer it was pressed on is gone afterwards
 const alerts = [];
@@ -163,7 +165,7 @@ const alertsAt = [];
 sandbox.window = {
 	Nino : Nino,
 	alert : function( said ) { alerts.push( said ); alertsAt.push( reloads ) },
-	confirm : function() { return confirmAnswer },
+	confirm : function( asked ) { confirms.push( asked ); return confirmAnswer },
 	location : { hash : '', reload : function() { reloads++ } },
 };
 
@@ -782,7 +784,19 @@ answer( 200, listAnswer( CATALOGUE_URL, true, null ) );
 fire( tabs[0], 'click' );
 fire( row( mount, 'sample' ), 'click' );
 const deactivate = byTag( screen, 'button' ).filter( function( el ) { return el.textContent === text('/_admin/features/label/deactivate') } )[0];
+const deactivateMsg = byTag( screen, 'p' ).filter( function( el ) { return el.attributes['aria-live'] === 'polite' } )[0];
+const confirmsBefore = confirms.length;
+const requestsBeforeDeactivate = requests.length;
+confirmAnswer = false;
 fire( deactivate, 'click' );
+check( 'Deactivate asks first, with the name of the feature, and the text is the one the English file holds',
+	confirms.length === confirmsBefore + 1 && confirms[confirms.length - 1] === text('/_admin/features/confirm/deactivate').replace( '%s', 'Beispiel-Feature' )
+	&& confirms[confirms.length - 1].indexOf( 'Beispiel-Feature' ) !== -1 && text('/_admin/features/confirm/deactivate').indexOf( '%s' ) !== -1 );
+check( '...declining sends nothing, holds no button and says nothing', requests.length === requestsBeforeDeactivate && deactivate.disabled === false
+	&& deactivateMsg !== undefined && deactivateMsg.textContent === '' && reloads === 1 );
+confirmAnswer = true;
+fire( deactivate, 'click' );
+check( '...and confirming asks once more, then posts', confirms.length === confirmsBefore + 2 && requests.length === requestsBeforeDeactivate + 1 );
 check( 'Deactivate, from the screen, posts features/deactivate with the key', requests[requests.length - 1].action === 'features/deactivate' && requests[requests.length - 1].payload.key === 'sample' && hasClass( deactivate, 'nino-admin-btn-danger' ) );
 answer( 200, { feature : FEATURES[2] } );
 check( '...and reloads too', reloads === 2 );
@@ -1067,11 +1081,19 @@ check( 'a failed load is reported through the workbench\'s words', mount.childre
 	const sentBefore = requests.length;
 	const reloadsBefore = reloads;
 
-	panel._switch( { key : 'sample' }, 'deactivate', button, line );
-	check( 'switching a feature asks about unsaved input in the whole workbench first, and sends nothing before the answer',
-		asked.length === 1 && asked[0].names === null && requests.length === sentBefore && button.disabled === false );
+	// The deactivation is asked about before the unsaved input is: a refusal
+	// leaves that question unasked, and the answer to it does not ask again
+	const confirmsBeforeSwitch = confirms.length;
+	confirmAnswer = false;
+	panel._switch( { key : 'sample', name : 'Beispiel-Feature' }, 'deactivate', button, line );
+	check( 'declining the deactivation leaves the question about unsaved input unasked and sends nothing',
+		confirms.length === confirmsBeforeSwitch + 1 && asked.length === 0 && requests.length === sentBefore && button.disabled === false );
+	confirmAnswer = true;
+	panel._switch( { key : 'sample', name : 'Beispiel-Feature' }, 'deactivate', button, line );
+	check( 'switching a feature off asks the deactivation first, then about unsaved input in the whole workbench, and sends nothing before the answer',
+		confirms.length === confirmsBeforeSwitch + 2 && asked.length === 1 && asked[0].names === null && requests.length === sentBefore && button.disabled === false );
 	asked[0].proceed();
-	check( '...and sends the request once answered', requests.length === sentBefore + 1 && requests[requests.length - 1].action === 'features/deactivate' && button.disabled === true );
+	check( '...and sends the request once answered, without asking the deactivation again', confirms.length === confirmsBeforeSwitch + 2 && requests.length === sentBefore + 1 && requests[requests.length - 1].action === 'features/deactivate' && button.disabled === true );
 	answer( 200, { feature : FEATURES[2] } );
 	check( '...the reload comes after it', reloads === reloadsBefore + 1 );
 
@@ -1089,8 +1111,8 @@ check( 'a failed load is reported through the workbench\'s words', mount.childre
 
 	delete Nino.admin.dirty;
 	const sent = requests.length;
-	panel._switch( { key : 'sample' }, 'deactivate', button, line );
-	check( 'a shell without the registry asks nothing', requests.length === sent + 1 );
+	panel._switch( { key : 'sample', name : 'Beispiel-Feature' }, 'deactivate', button, line );
+	check( 'a shell without the registry asks nothing about unsaved input', requests.length === sent + 1 );
 }
 
 /*	What a switch says. _switch() is driven directly - the question about unsaved

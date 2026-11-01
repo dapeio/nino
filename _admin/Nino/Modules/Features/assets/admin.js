@@ -1084,17 +1084,26 @@
 		/**
 		 *	Switch a feature on or off, or apply its update - the kernel's
 		 *	one step for an update is activating again, so the two post the
-		 *	same action. Ends in a reload: the rail is rendered server-side
+		 *	same action. Ends in a reload: the rail is rendered server-side.
+		 *	Deactivating asks first, and a refusal does nothing
 		 *
 		 *	@param		{Object}	feature
 		 *	@param		{string}	what				'activate', 'update' or 'deactivate'
 		 *	@param		{Element}	btn
 		 *	@param		{Element}	msg
-		 *	@param		{boolean}	[guarded]		The unsaved input of the page was asked about already
+		 *	@param		{boolean}	[guarded]		The questions were asked already: the unsaved input of the page, and the deactivation
 		 *
 		 *	@return		void
 		 */
 		_switch : function( feature, what, btn, msg, guarded ) {
+
+			// Switching off is asked about, as removing is: it leaves the shortcodes
+			// on the pages, the sections of the privacy policy and what the feature
+			// installed, which the dialog afterwards names, too late to decide
+			// against it. Asked once, before the question about unsaved input
+			if( guarded !== true && what === 'deactivate'
+				&& wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/features/confirm/deactivate'), feature.name ) ) === false )
+				return;
 
 			// The reload this ends in builds every form of the workbench again
 			if( guarded !== true ) {

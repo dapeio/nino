@@ -60,6 +60,7 @@ return [
 	'[[/_admin/features/msg/installed-active]]'	=> 'Installed and switched on.',
 	'[[/_admin/features/msg/installed-active-with]]'	=> 'Installed and switched on, together with what it requires: %s.',
 	'[[/_admin/features/label/deactivate]]'		=> 'Deactivate',
+	'[[/_admin/features/confirm/deactivate]]'		=> 'Deactivate "%s"? Pages keep its shortcodes, which show as plain text while it is off. Its sections of the privacy policy stay, and so does what it installed.',
 	'[[/_admin/features/label/update]]'				=> 'Update to %s',
 	'[[/_admin/features/hint/secret-set]]'		=> 'A value is stored. Leave the field empty to keep it, or type a new one to replace it.',
 	'[[/_admin/features/hint/secret-unset]]'	=> 'Nothing is stored yet.',
