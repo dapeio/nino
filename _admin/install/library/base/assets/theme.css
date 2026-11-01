@@ -5,7 +5,7 @@
  *									assets/style.css comes after it and overrules it.
  *
  *									Everything below this comment is what the catalogue's
- *									Design feature compiles at its defaults: the fourteen
+ *									Design feature compiles at its defaults: the fifteen
  *									numbered sections, every part on the set the first
  *									shipped theme names - Nino, the default construction
  *									of each tab -, every knob where that theme puts it: the middle,
@@ -1770,7 +1770,130 @@ footer {
 }
 
 
-/* ==== 14. the knob positions ==== */
+/* ==== 14. forms: regular (scale default, space default, corners default, line default, labels default, edge default, label default, label-case default) ==== */
+/*	@name			Regular
+ *	@description	The form as the kernel draws it: a line round the field, the label above it, the middle of every ladder.
+ *	@description-de	Das Formular, wie der Kernel es zeichnet: eine Linie um das Feld, die Beschriftung darüber, die Mitte jeder Leiter.
+ *
+ *	@knob	scale		Size of the fields' text
+ *	@knob	space		Space inside a field and under it
+ *	@knob	corners		Corners of a field
+ *	@knob	line		Weight of the line of a field
+ *	@knob	labels		Where the label of a field stands
+ *	@knob	edge		Colour of the lines
+ *	@knob	label		Colour of the labels
+ *	@knob	label-case	Capitals in the labels
+ *
+ *	Regular is the starting point, not a design. Every value it declares is the one Nino.css has as its own default, so a
+ *	form under it looks as the kernel draws it - and each knob has something to reach: the five values of a scale, the
+ *	middle of them the kernel's own, the three of a choice, the two of a toggle, and for an ink the tone the kernel gives
+ *	it. It declares no rule and no property of a look, only the ladders: the rules are the kernel's, which draws the
+ *	fields, the labels, the status line, the checkbox and the radio group from the properties --forms-* (see Nino.css).
+ *
+ *	Two rules for a set, as for every other part:
+ *
+ *	  - Only the properties of the form: a forms set sets the custom properties the rules of Nino.css read, and no rule
+ *	    of its own for a class of another part.
+ *	  - Colours through the roles, never as literals. Nor the case of a label, which is the knob's: a toggle of two
+ *	    rungs, none and uppercase, which the kernel's rule for a label reads.
+ *
+ *	Copy this file under a name of your own and start there.
+ */
+
+:root {
+	/*	The type size of a field is 1rem, times this. The two steps under the middle are what they say on a pointer; on a
+		touch screen a field is held to 1rem (see Nino.css)	*/
+	--forms-scale--least:	.87;
+	--forms-scale--less:	.94;
+	--forms-scale--default:	1;
+	--forms-scale--more:	1.15;
+	--forms-scale--most:	1.32;
+
+	/*	The padding of a field and the space under it. A field's space is finer than a card's, so the steps are fractions of
+		the middle and not steps of the scale	*/
+	--forms-space--least:	calc( var(--space-1) * .4 );
+	--forms-space--less:	calc( var(--space-1) * .7 );
+	--forms-space--default:	var(--space-1);
+	--forms-space--more:	calc( var(--space-1) * 1.5 );
+	--forms-space--most:	calc( var(--space-1) * 2.2 );
+
+	/*	The radius of a field. Nothing between square and .1rem is worth a position, so the sharp end is a plateau - the
+		two least are square	*/
+	--forms-corners--least:		0rem;
+	--forms-corners--less:		0rem;
+	--forms-corners--default:	var(--radius-small);
+	--forms-corners--more:		var(--radius-large);
+	--forms-corners--most:		1rem;
+
+	/*	The weight of the line of a field. The half pixel is a hairline where the screen can draw one, and 1px where it
+		cannot	*/
+	--forms-line--least:	0px;
+	--forms-line--less:		.5px;
+	--forms-line--default:	1px;
+	--forms-line--more:		2px;
+	--forms-line--most:		3px;
+
+	/*	Where a label stands. Above the field is Nino.css: the form is a block and the label a line of text. Beside, the
+		form is a grid of a column for the labels and a column for the fields, this far apart. Floating, the label is
+		lifted onto the top edge of its field, a little smaller, and cut out of the fill of its field: the cut is left
+		initial there, so that the label reads the fill where it stands - a colour written here would be read on :root,
+		the page's ground on a dark section too	*/
+	--forms-labels--less:		var(--space-2);
+	--forms-labels--default:	normal;
+	--forms-labels--more:		normal;
+
+	--forms-labels-form--less:		grid;
+	--forms-labels-form--default:	block;
+	--forms-labels-form--more:		block;
+
+	--forms-labels-cols--less:		max-content minmax(0, 1fr);
+	--forms-labels-cols--default:	none;
+	--forms-labels-cols--more:		none;
+
+	--forms-labels-align--less:		baseline;
+	--forms-labels-align--default:	normal;
+	--forms-labels-align--more:		normal;
+
+	--forms-labels-wide--less:		1 / -1;
+	--forms-labels-wide--default:	auto;
+	--forms-labels-wide--more:		auto;
+
+	--forms-labels-start--less:		start;
+	--forms-labels-start--default:	auto;
+	--forms-labels-start--more:		auto;
+
+	--forms-labels-block--less:		inline;
+	--forms-labels-block--default:	inline;
+	--forms-labels-block--more:		table;
+
+	--forms-labels-pos--less:		static;
+	--forms-labels-pos--default:	static;
+	--forms-labels-pos--more:		relative;
+
+	--forms-labels-lift--less:		0em;
+	--forms-labels-lift--default:	0em;
+	--forms-labels-lift--more:		.8em;
+
+	--forms-labels-cut--less:		transparent;
+	--forms-labels-cut--default:	transparent;
+	--forms-labels-cut--more:		initial;
+
+	/*	The case of a label: as it is written, or in capitals	*/
+	--forms-label-case--default:	none;
+	--forms-label-case--more:		uppercase;
+}
+
+/*	The colour of a line and of a label is the tone of the page on the ground the field stands on, so the rung of an ink
+	is declared on every element (see Nino.css): a tone of the roles is the page's on :root, and on a dark section the
+	field would keep the line of a light one. The rung is the tone this set gives; the knob selects it, or a tone of its
+	own	*/
+:root, :root * {
+	--forms-edge--default:	var(--color-border);
+	--forms-label--default:	var(--color-ink);
+}
+
+
+/* ==== 15. the knob positions ==== */
 :root {
 	--buttons-case: var(--buttons-case--default);
 	--buttons-corners: var(--buttons-corners--default);
@@ -1800,6 +1923,21 @@ footer {
 	--footer-nav-case: var(--footer-nav-case--default);
 	--footer-scale: var(--footer-scale--default);
 	--footer-space: var(--footer-space--default);
+	--forms-corners: var(--forms-corners--default);
+	--forms-label-case: var(--forms-label-case--default);
+	--forms-labels: var(--forms-labels--default);
+	--forms-labels-align: var(--forms-labels-align--default);
+	--forms-labels-block: var(--forms-labels-block--default);
+	--forms-labels-cols: var(--forms-labels-cols--default);
+	--forms-labels-cut: var(--forms-labels-cut--default);
+	--forms-labels-form: var(--forms-labels-form--default);
+	--forms-labels-lift: var(--forms-labels-lift--default);
+	--forms-labels-pos: var(--forms-labels-pos--default);
+	--forms-labels-start: var(--forms-labels-start--default);
+	--forms-labels-wide: var(--forms-labels-wide--default);
+	--forms-line: var(--forms-line--default);
+	--forms-scale: var(--forms-scale--default);
+	--forms-space: var(--forms-space--default);
 	--header-border-color: var(--header-border-color--default);
 	--header-border-size: var(--header-border-size--default);
 	--header-cta: var(--header-cta--less);
@@ -1839,4 +1977,9 @@ footer {
 	--tables-stripes: var(--tables-stripes--default);
 	--tables-zebra: var(--tables-zebra--default);
 	--tables-zebra-ink: var(--tables-zebra-ink--default);
+}
+
+:root, :root * {
+	--forms-edge: var(--forms-edge--default);
+	--forms-label: var(--forms-label--default);
 }

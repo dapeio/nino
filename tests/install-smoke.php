@@ -589,6 +589,30 @@ check( '...and a jump to an anchor is a jump, not a ride', str_contains( $reduce
 check( 'the stylesheet keeps what the scripts hide hidden', str_contains( $ninoCss, '.nino-tabs-panel[hidden]' ) === true
 	&& str_contains( $ninoCss, '.nino-filter-item[hidden]' ) === true );
 
+// The form block: the fields, the labels, the status line, the checkbox and the radio group read custom properties, and a property a rule reads is
+// declared where it has no specificity - lengths, numbers and keywords at :where(:root), the colours a ground gives a role at :where(*) - so that a theme
+// moves it with a plain :root, whatever the order of the sheets. A property the rules read and nobody declares would leave the form without a value
+$formRead 	= [];
+$formRoot 	= $ninoBody( $ninoAlone, ':where(:root)' );
+$formEvery 	= $ninoBody( $ninoAlone, ':where(*)' );
+
+preg_match_all( '/var\(\s*(--forms-[a-z0-9-]+)/', $ninoBare, $formRead );
+
+$formRead 	= array_values( array_unique( $formRead[1] ) );
+$formKept 	= [];
+
+preg_match_all( '/(--forms-[a-z0-9-]+)\s*:/', $formRoot. ' '. $formEvery, $formKept );
+
+$formMissing = array_values( array_diff( $formRead, array_unique( $formKept[1] ) ) );
+
+check( 'the form block of Nino.css declares every --forms-* property its rules read, at :where(:root) and :where(*) - none is left without a value'. ( $formMissing === [] ? '' : ' - missing: '. implode( ', ', $formMissing ) ),
+	count( $formRead ) >= 20 && $formMissing === [] );
+check( '...the size, the space, the corners and the line of a field and the place of a label are lengths and numbers, so they stand at :where(:root); the line, the ink, the fill and the focus colour are roles of the ground a field stands on, so they stand at :where(*)',
+	preg_match_all( '/--forms-(?:scale|space|corners|line|labels)\s*:/', $formRoot ) === 5 && preg_match_all( '/--forms-(?:edge|label|fill|edge-focus)\s*:/', $formEvery ) === 4
+	&& preg_match( '/--forms-(?:edge|label|fill)\s*:/', $formRoot ) !== 1 );
+check( '...and no plain :root declares one: a default that had a specificity could not be moved by a theme that comes after it, nor by one that comes before',
+	preg_match( '/(?:^|[}\s])(?<![\w-]):root\s*\{[^{}]*--forms-/', $ninoBare ) !== 1 );
+
 // And the delivered header must not reach for the one thing that rule cannot
 // take back. A plain height on the bar would survive all of it - so the frame
 // the base unit ships does not have one, and this is where a replacement that

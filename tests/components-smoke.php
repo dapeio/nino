@@ -1260,7 +1260,11 @@ check( '...the ring is the one outline of everything that can take the focus, an
 	&& $groundSets( $groundOf( ':is(.nino-cover, .nino-parallex, .nino-hero) .nino-btn:focus-visible' ), 'box-shadow', '0 0 0 2px var(--color-ink)' ) === true );
 
 // What a field shows before anything is written in it is the muted role of the ground it stands on, at the strength it was solved for, on a field that has that ground and its ink
-$a11yField = array_filter( [ '.nino-form-input', '.nino-form-textarea', '.nino-form-select' ], static fn( string $selector ): bool => $groundSets( $groundOf( $selector ), 'background-color', 'var(--color-ground)' ) === false || $groundSets( $groundOf( $selector ), 'color', 'var(--color-ink)' ) === false );
+// ...the field is painted in --forms-fill, the fill of the form block, whose default on every element is the ground that element stands on - the property a theme moves, and the ground where it moves nothing
+$a11yField = array_filter( [ '.nino-form-input', '.nino-form-textarea', '.nino-form-select' ], static fn( string $selector ): bool => $groundSets( $groundOf( $selector ), 'background-color', 'var(--forms-fill)' ) === false || $groundSets( $groundOf( $selector ), 'color', 'var(--color-ink)' ) === false );
+
+if( $groundSets( $groundOf( ':where(*)' ), '--forms-fill', 'var(--color-ground)' ) === false )
+	$a11yField[] = ':where(*) - the default of --forms-fill is not the ground';
 $a11yHint = array_filter( [ '.nino-form-input::placeholder', '.nino-form-textarea::placeholder' ], static fn( string $selector ): bool => $groundSets( $groundOf( $selector ), 'color', 'var(--color-subtitle)' ) === false || $groundSets( $groundOf( $selector ), 'opacity', '1' ) === false );
 check( 'the placeholder of a field is the muted role at full strength, and the field is painted in the ground it stands on and written in its ink: the browser\'s own grey was 2.4:1 on the dark field of a dark page, and the role is measured against a ground'
 	. ( $a11yField === [] ? '' : ' - not so: '. implode( ', ', $a11yField ) ). ( $a11yHint === [] ? '' : ' - not so: '. implode( ', ', $a11yHint ) ), $a11yField === [] && $a11yHint === [] );

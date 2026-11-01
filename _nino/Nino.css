@@ -2214,23 +2214,131 @@ textarea:disabled {
 	cursor: not-allowed;
 }
 
-/* Form fields - generic input skin, independent of whatever wires the
-   actual submit (see docs/development.md, Forms) */
+/*	Form fields - generic input skin, independent of whatever wires the actual
+	submit (see docs/development.md, Forms). The fields, the labels and the
+	status line of every form that carries these classes - drawn by a feature
+	or written by hand: .nino-form, .nino-form-input, -textarea, -select and
+	.nino-form-message - read the custom properties below, and the default of
+	each is what the form always looked like, so that a form is drawn as it
+	was until a property is moved. The checkbox beside its words and the group
+	of radio buttons under one question are .nino-forms-check and
+	.nino-forms-group, which a feature that writes a form uses; they read the
+	same properties. The send button, the honeypot, the inline form and the
+	newsletter's rules are their own, further down: a rule that sets a
+	property of a field leaves what theirs set on it, which is more specific.
+
+	The properties are what a design layer moves: a theme sets them on :root,
+	where a declaration beats a default here whatever the order of the sheets,
+	because a default is declared in :where(), which has no specificity. A
+	project restyles a field the same way, without overriding a rule: a
+	length, a number or a keyword on :root, a colour as the next paragraph
+	says.
+
+	Two places for the defaults. Lengths, numbers and keywords stand in
+	:where(:root). A colour the page gives a role - the line, the ink of a
+	label, the fill of a field, the colour of its line in focus - stands in
+	:where(*), because a custom property is resolved where it is declared: read
+	on :root, --color-ground would be the page's on every ground, and a field
+	in a dark section would keep a light fill. Such a colour is moved on :root,
+	:root *. No colour literal, and no !important.	*/
+:where(:root) {
+
+	/*	The size of the text of a field, the padding of a field and the space
+		under it, its corners and the weight of its line	*/
+	--forms-scale: 1;
+	--forms-space: var(--space-1);
+	--forms-corners: var(--radius-small);
+	--forms-line: 1px;
+
+	/*	Where the label of a field stands: above it, in the row beside it, or
+		lifted onto its top edge. --forms-labels is the gap between the two
+		columns of a form in rows, the others say what the form and the label
+		are then (see the rules below); the middle of each is the plain block
+		form, which is no value at all. The cut is what a lifted label is cut
+		out of its field with: a colour, or - left initial - the fill of the
+		field, which the label reads where it stands. A colour written for it is
+		read on :root, the page's on every ground, and on a dark section the
+		lifted label would be a light box	*/
+	--forms-labels: normal;
+	--forms-labels-form: block;
+	--forms-labels-cols: none;
+	--forms-labels-align: normal;
+	--forms-labels-wide: auto;
+	--forms-labels-start: auto;
+	--forms-labels-block: inline;
+	--forms-labels-pos: static;
+	--forms-labels-lift: 0em;
+	--forms-labels-cut: transparent;
+
+	/*	What a look sets besides: the width of the line of a field at rest and
+		in focus, the ring in focus and how far it stands off, the padding of a
+		field, the space under a field, a check and a group, the padding and
+		the corners of the status line, the case, the tracking and the size of a
+		label - which a label that floats takes smaller - and the floor of the
+		size of a field	*/
+	--forms-width: var(--forms-line);
+	--forms-width-focus: var(--forms-width);
+	--forms-ring: 2px;
+	--forms-ring-offset: 2px;
+	--forms-pad: var(--forms-space);
+	--forms-gap: var(--forms-space);
+	--forms-message-pad: var(--space-1) var(--space-2);
+	--forms-message-corners: var(--radius);
+	--forms-label-case: none;
+	--forms-label-tracking: normal;
+	--forms-label-size: calc( 1em - var(--forms-labels-lift) * .25 );
+	--forms-floor: 0rem;
+}
+
+/*	A field under 1rem makes the browser of a phone zoom into it when it is
+	focused. On a pointer the two lower positions of the size are what they
+	say; on a touch screen a field is never set smaller	*/
+@media (pointer: coarse) {
+	:where(:root) {
+		--forms-floor: 1rem;
+	}
+}
+
+/*	The colours, where they are used (see above): the line of a field and the
+	ink of a label, the fill of a field at rest and in focus and the colour of
+	its line in focus. A field in focus keeps the border it has and paints it
+	clear	*/
+:where(*) {
+	--forms-edge: var(--color-border);
+	--forms-label: var(--color-ink);
+	--forms-fill: var(--color-ground);
+	--forms-fill-focus: var(--forms-fill);
+	--forms-edge-focus: transparent;
+}
+
+/*	The paddings and the margin of a field give way to the spacing classes
+	further down (nino-p-2, nino-pl-3, nino-mb-3 ...): they come last, with the
+	specificity of this rule. The line is written by its parts, since a look
+	may give each side its own width	*/
 .nino-form-input, .nino-form-textarea, .nino-form-select {
 	width: 100%;
-	padding: var(--space-1);
-	border: 1px solid var(--color-border);
-	border-radius: var(--radius-small);
-	font-size: 1rem;
+	padding: var(--forms-pad);
+	border-style: solid;
+	border-width: var(--forms-width);
+	border-color: var(--forms-edge);
+	border-radius: var(--forms-corners);
+	font-size: max( var(--forms-floor), calc( 1rem * var(--forms-scale) ) );
 	box-sizing: border-box;
-	background-color: var(--color-ground);
+	background-color: var(--forms-fill);
 	color: var(--color-ink);
 	transition: border-color .2s ease;
-	margin-bottom: var(--space-1);
+	margin-bottom: var(--forms-gap);
 }
+/*	The ring of a field in focus, stood off by the floor the rule for every
+	:focus-visible gives it, so the offset is set for that state alone	*/
 .nino-form-input:focus, .nino-form-textarea:focus, .nino-form-select:focus {
-	outline: 2px solid var(--color-focus);
-	border-color: transparent;
+	outline: var(--forms-ring) solid var(--color-focus);
+	border-width: var(--forms-width-focus);
+	border-color: var(--forms-edge-focus);
+	background-color: var(--forms-fill-focus);
+}
+.nino-form-input:focus-visible, .nino-form-textarea:focus-visible, .nino-form-select:focus-visible {
+	outline-offset: var(--forms-ring-offset);
 }
 /*	What a field shows before anything is written in it is the muted role of the
 	ground it stands on, at the strength the role was solved for: the browser's
@@ -2270,8 +2378,8 @@ textarea:disabled {
 .nino-form-message:empty { display: none; }
 .nino-form.nino-is-error .nino-form-message,
 .nino-form.nino-is-success .nino-form-message {
-	padding: var(--space-1) var(--space-2);
-	border-radius: var(--radius);
+	padding: var(--forms-message-pad);
+	border-radius: var(--forms-message-corners);
 }
 .nino-form.nino-is-error .nino-form-message {
 	background-color: var(--color-error);
@@ -2286,6 +2394,106 @@ textarea:disabled {
 	--color-ink: var(--color-success-text);
 }
 .nino-form.nino-is-pending .nino-form-submit { opacity: .6; pointer-events: none; }
+
+/* ---- the labels ---- */
+
+/*	The colour, the case and the tracking of a label. Nothing above styles a
+	label, so the rule is :where() as well - a rule of the project's own wins,
+	whatever its specificity. A legend has the colour of the text of the page,
+	which on a dark section is dark text on a dark ground: the legend of a
+	group is set below, in the ink of the place it stands. The words of a check
+	keep their sentence	*/
+:where(.nino-form label:not(.nino-forms-check, .nino-sr-only)) {
+	color: var(--forms-label);
+	letter-spacing: var(--forms-label-tracking);
+	text-transform: var(--forms-label-case);
+}
+
+/*	The layout of a form in rows - not the inline one, nor the newsletter's,
+	which are flex boxes of their own. In the grid a label and the field after
+	it share a row; everything else (a check, the message, the button) takes the
+	whole of it - but for the button and a check, which a form of blocks leaves
+	as wide as their words and a grid would stretch to the row. The button is
+	named by what it is, not by a class: its look stays the page's primary
+	button, and only the place it takes in the grid is set. :where() for all of
+	it: the middle of every property is what a block form has anyway, and a
+	layout of the project's own wins over it	*/
+:where(.nino-form:not(.nino-form--inline, .nino-newsletter-inline)) {
+	display: var(--forms-labels-form);
+	grid-template-columns: var(--forms-labels-cols);
+	column-gap: var(--forms-labels);
+	align-items: var(--forms-labels-align);
+}
+:where(.nino-form:not(.nino-form--inline, .nino-newsletter-inline) > :not(
+	label:not(.nino-forms-check, .nino-sr-only),
+	label:not(.nino-forms-check, .nino-sr-only) + :is(.nino-form-input, .nino-form-select, .nino-form-textarea),
+	.nino-form-trap, .nino-sr-only
+)) {
+	grid-column: var(--forms-labels-wide);
+}
+:where(.nino-form:not(.nino-form--inline, .nino-newsletter-inline) > :is(button, input[type="submit"], .nino-forms-check)) {
+	justify-self: var(--forms-labels-start);
+}
+
+/*	The label itself: a block or a line of text, lifted - a negative margin
+	under it and a little room each side - onto the top edge of its field, cut
+	out of the fill of the field unless the cut says otherwise, and the smaller
+	for it	*/
+:where(.nino-form:not(.nino-form--inline, .nino-newsletter-inline) > label:not(.nino-forms-check, .nino-sr-only)) {
+	display: var(--forms-labels-block);
+	position: var(--forms-labels-pos);
+	margin: 0 0 calc( var(--forms-labels-lift) * -.55 ) var(--forms-labels-lift);
+	padding: 0 calc( var(--forms-labels-lift) / 4 );
+	background-color: var(--forms-labels-cut, var(--forms-fill));
+	font-size: var(--forms-label-size);
+}
+
+/*	A display read from a property is an author rule, and an author rule beats
+	the browser's own display: none for the hidden attribute, whatever its
+	specificity: the two rules above would show a form or a label that is
+	hidden. Said again here, after them, :where() as well, so that it wins over
+	them and gives way to a rule of the project's own	*/
+:where(.nino-form[hidden], .nino-form > label:not(.nino-forms-check, .nino-sr-only)[hidden]) {
+	display: none;
+}
+
+/* ---- the checkbox and the radio group ---- */
+
+.nino-forms-check {
+	--nino-forms-gap: .5rem;
+
+	display: flex;
+	align-items: baseline;
+	gap: var(--nino-forms-gap);
+	margin: 0 0 var(--forms-gap);
+	color: var(--forms-label);
+}
+
+/*	The check's own display is a flex box - an author rule as well, which would
+	show a check that is hidden - so the attribute says display: none again, at
+	the weight of the class and the attribute	*/
+.nino-forms-check[hidden] {
+	display: none;
+}
+
+.nino-forms-check > input {
+	flex: 0 0 auto;
+}
+
+.nino-forms-group {
+	min-width: 0;
+	margin: 0 0 var(--forms-gap);
+	padding: 0;
+	border: 0;
+}
+
+.nino-forms-group > legend {
+	margin-bottom: var(--space-1);
+	color: var(--forms-label);
+	font-size: var(--forms-label-size);
+	letter-spacing: var(--forms-label-tracking);
+	text-transform: var(--forms-label-case);
+}
 
 .nino-newsletter-form .nino-form-input {
 	max-width:45vw;
