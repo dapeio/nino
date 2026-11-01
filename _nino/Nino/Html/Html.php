@@ -486,6 +486,11 @@ namespace Nino {
 		 *	neither does the path - which is why $path starts with a slash, or
 		 *	is ''.
 		 *
+		 *	So the path of a file a project serves is given without the directory:
+		 *	an address that has it, [[src]] of an image, would name it twice. The
+		 *	content form of [image] gives its [[url]] this way - the path of the
+		 *	picture's file with the directory taken off once.
+		 *
 		 *	A site without an address has no absolute one: the answer is '' and
 		 *	the caller decides what a link without a host is worth.
 		 *

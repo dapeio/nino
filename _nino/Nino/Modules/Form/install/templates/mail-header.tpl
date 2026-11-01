@@ -67,6 +67,6 @@
 <body>
 	<div class="mail-container">
 		<div class="mail-header">
-			[image /logo]<img src="https://[[/project/website/general/url]][[src]]" width="180" alt="[[/project/company/general/name]]">[/image]
+			[image /logo]<img src="[[url]]" width="180" alt="[[/project/company/general/name]]">[/image]
 		</div>
 		<div class="mail-body">

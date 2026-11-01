@@ -16,11 +16,11 @@
 			<meta property="og:description" content="[[/_nino/webpage[[/nino/http/response/uri]]/description]]">
 			<meta property="og:url" content="https://[[/project/website/general/url]][[/nino/http/request/uri]]">
 			<meta property="og:locale" content="[[/nino/http/response/locale]]">
-			[image /logo]<meta property="og:image" content="https://[[/project/website/general/url]][[src]]">[/image]
+			[image /logo]<meta property="og:image" content="[[url]]">[/image]
 			<meta name="twitter:card" content="summary_large_image">
 			<meta name="twitter:title" content="[[/_nino/webpage[[/nino/http/response/uri]]/title]] | [[/project/company/general/name]]">
 			<meta name="twitter:description" content="[[/_nino/webpage[[/nino/http/response/uri]]/description]]">
-			[image /logo]<meta name="twitter:image" content="https://[[/project/website/general/url]][[src]]">[/image]
+			[image /logo]<meta name="twitter:image" content="[[url]]">[/image]
 
 			<link rel="icon" href="[[/nino/public]]/favicon/favicon.ico" sizes="any">
 			<link rel="apple-touch-icon" sizes="180x180" href="[[/nino/public]]/favicon/apple-touch-icon.png">

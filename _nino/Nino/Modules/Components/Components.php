@@ -2066,12 +2066,20 @@ namespace Nino\Modules {
 		 *
 		 *	With content - [image logo]...[/image] - that content is what is
 		 *	rendered instead of the <img>, and again only when the slot has an
-		 *	image: [[src]] (the path of the file, from the site's root - an
-		 *	absolute address is "https://[[/project/website/general/url]][[src]]"), [[width]],
-		 *	[[height]] and [[alt]] are filled in with the same values the <img>
-		 *	gets. That is how a place that needs the address and not a picture
-		 *	- a meta tag, a mail - is written without being left as an empty
-		 *	tag, or a broken one, where nothing is uploaded yet.
+		 *	image: [[src]] (the path of the file, from the site's root, with the
+		 *	directory the project is served from in front of it - what an <img>
+		 *	takes), [[width]], [[height]] and [[alt]] are filled in with the values
+		 *	the <img> gets, and [[url]] with the absolute address of the file. A place
+		 *	that needs the absolute address - a meta tag, a mail - writes [[url]],
+		 *	and never "https://[[/project/website/general/url]][[src]]": the address
+		 *	of the website carries the directory already, and so does [[src]], so
+		 *	that form names it twice under a subdirectory. [[url]] is
+		 *	Html::absoluteUrl() of the path without the directory, which names it
+		 *	once; where the website has no address it is the path as [[src]] has
+		 *	it - a relative address is still an address in a meta tag or a mail,
+		 *	an empty string is none. That is how such a place is written without
+		 *	being left as an empty tag, or a broken one, where nothing is uploaded
+		 *	yet.
 		 *
 		 *	The alt text is, in this order: the one stored for the slot in
 		 *	the current language (the Images panel keeps it; for an image
@@ -2171,10 +2179,24 @@ namespace Nino\Modules {
 			$class	= implode( ' ', array_filter( [ $card === true ? $base : '', $style, $args['class'] ], static fn( string $word ): bool => $word !== '' ) );
 			$framed	= $args['focus'] !== '' || $args['ratio'] !== '' || $args['class'] !== '';
 
+			// The absolute address is the website's, which carries the directory, and the path of the
+			// file without the one the picture's own address starts with; where the website has none
+			// the address of the picture is all there is
+			$url		= $picture['url'];
+			$markup	= $content ?? str_replace( '[[class]]', $card === true && $framed === false ? self::_attribute( 'class', $class ) : '', self::$html['img'] );
+
+			// Worked out where the markup asks for it - the content form, or a fragment a project put [[url]] into
+			if( str_contains( $markup, '[[url]]' ) === true ) {
+
+				$dir	= rtrim( \Nino\Filesystem::getDir( $appData ), '/' );
+				$path	= $dir !== '' && str_starts_with( $url, $dir. '/' ) === true ? substr( $url, strlen( $dir ) ) : $url;
+				$url	= \Nino\Html::absoluteUrl( $appData, $path ) ?: $url;
+			}
+
 			$img = str_replace(
-				[ '[[src]]', '[[width]]', '[[height]]', '[[alt]]' ],
-				[ self::escape( $picture['url'] ), (string) $picture['width'], (string) $picture['height'], self::escape( $alt ) ],
-				$content ?? str_replace( '[[class]]', $card === true && $framed === false ? self::_attribute( 'class', $class ) : '', self::$html['img'] )
+				[ '[[src]]', '[[url]]', '[[width]]', '[[height]]', '[[alt]]' ],
+				[ self::escape( $picture['url'] ), self::escape( $url ), (string) $picture['width'], (string) $picture['height'], self::escape( $alt ) ],
+				$markup
 			);
 
 			if( $content !== null || $framed === false )

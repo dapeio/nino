@@ -2690,6 +2690,47 @@ check( '[image] of a slot: the same <img> as before', $render( '[image /template
 check( '[image] as before in the named form, with the alt of the template', $render( '[image uri="/template/page-home/hero/background" alt="B"]' ) === '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="B">' );
 check( '[image] with content as before: the content, filled, and nothing for a slot with no file', $render( '[image /template/page-home/hero/background]<meta content="[[src]]" data-size="[[width]]x[[height]]">[/image]' ) === '<meta content="/public/images/bg.1600x900.jpg" data-size="1600x900">'
 	&& $render( '[image /template/page-home/hero/empty]<meta content="[[src]]">[/image]' ) === '' && $render( '[image /template/page-home/hero/empty]' ) === '' );
+// [[url]] is the absolute address of the file in the content form: the directory the project is served from stands once, since the address of the website carries it and the path is given without it
+$urlForm = '[image /template/page-home/hero/background]<meta content="[[url]]" data-src="[[src]]">[/image]';
+\Nino\Html::addFills( $appData, [ '/project/website/general/url' => 'host.example/sub/' ], '*' );
+$appData['/nino/dir'] = '/sub';
+$underSub = $render( $urlForm );
+\Nino\Html::addFills( $appData, [ '/project/website/general/url' => 'host.example' ], '*' );
+$appData['/nino/dir'] = '';
+$atRoot = $render( $urlForm );
+\Nino\Html::removeFill( $appData, '/project/website/general/url' );
+$appData['/nino/dir'] = '/sub';
+$noAddress = $render( $urlForm );
+$appData['/nino/dir'] = '';
+check( '[image] with content: [[url]] is the absolute address of the file - https://host/sub/public/... for a project under /sub whose website is host/sub, https://host/public/... at the root - and [[src]] is the path with the directory, as before',
+	$underSub === '<meta content="https://host.example/sub/public/images/bg.1600x900.jpg" data-src="/sub/public/images/bg.1600x900.jpg">'
+	&& $atRoot === '<meta content="https://host.example/public/images/bg.1600x900.jpg" data-src="/public/images/bg.1600x900.jpg">' );
+check( '...where the website has no address [[url]] is the path alone, as [[src]] has it, and not an empty string; and a slot with no file is still nothing, [card-image] has it too',
+	$noAddress === '<meta content="/sub/public/images/bg.1600x900.jpg" data-src="/sub/public/images/bg.1600x900.jpg">'
+	&& $render( '[image /template/page-home/hero/empty]<meta content="[[url]]">[/image]' ) === ''
+	&& $render( '[card-image /template/page-home/hero/background]<meta content="[[url]]">[/card-image]' ) === '<meta content="/public/images/bg.1600x900.jpg">' );
+// The templates that ship write it: the head of a page under /sub carries og:image and twitter:image with the directory once
+$appData['/nino/html/images']['/logo'] = [ 'label' => 'Logo', 'width' => 500, 'height' => 100, 'filename' => 'logo.500x100.png' ];
+$shipped = [ 'head' => '/_admin/install/library/base/templates/html-header.tpl', 'mail' => '/_nino/Nino/Modules/Form/install/templates/mail-header.tpl' ];
+$shippedHead = (string) file_get_contents( dirname( __DIR__ ). $shipped['head'] );
+$shippedMail = (string) file_get_contents( dirname( __DIR__ ). $shipped['mail'] );
+\Nino\Html::addFills( $appData, [ '/project/website/general/url' => 'host.example/sub' ], '*' );
+$appData['/nino/dir'] = '/sub';
+$headUnder = \Nino\Html::renderHtml( $appData, $shippedHead );
+$mailUnder = \Nino\Html::renderHtml( $appData, $shippedMail );
+\Nino\Html::addFills( $appData, [ '/project/website/general/url' => 'host.example' ], '*' );
+$appData['/nino/dir'] = '';
+$headRoot = \Nino\Html::renderHtml( $appData, $shippedHead );
+$mailRoot = \Nino\Html::renderHtml( $appData, $shippedMail );
+\Nino\Html::removeFill( $appData, '/project/website/general/url' );
+unset( $appData['/nino/html/images']['/logo'] );
+check( 'the head of a page that ships, rendered for a project under /sub, carries og:image and twitter:image with /sub once - and the mail header of the Form module the logo with /sub once; at the root with none',
+	str_contains( $headUnder, '<meta property="og:image" content="https://host.example/sub/public/images/logo.500x100.png">' ) === true
+	&& str_contains( $headUnder, '<meta name="twitter:image" content="https://host.example/sub/public/images/logo.500x100.png">' ) === true
+	&& str_contains( $mailUnder, '<img src="https://host.example/sub/public/images/logo.500x100.png" width="180"' ) === true
+	&& str_contains( $headRoot, '<meta property="og:image" content="https://host.example/public/images/logo.500x100.png">' ) === true
+	&& str_contains( $headRoot, '<meta name="twitter:image" content="https://host.example/public/images/logo.500x100.png">' ) === true
+	&& str_contains( $mailRoot, '<img src="https://host.example/public/images/logo.500x100.png" width="180"' ) === true );
 check( '[image] with a focus, a ratio or a class of its own is framed - the frame is what crops', $render( '[image /template/page-home/hero/background focus="5" ratio="16-9" class="x"]' ) === '<div class="nino-image nino-image--16-9 nino-img-focus--5 x"><img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt=""></div>'
 	&& $render( '[image /template/page-home/hero/background focus="12" ratio="2-1"]' ) === '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="">' );
 $image = $render( '[stack /services sort="title" offset="1" limit="1"][image image focus="2"][image /template/page-home/hero/background][image nope][/stack]' );
