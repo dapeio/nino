@@ -39,7 +39,9 @@ namespace Nino\Modules {
 
 
 		/**
-		 *	Replace element shortcode
+		 *	Replace element shortcode: the block with [[.id]] as 0, [[.uri]] and
+		 *	[[.slug]] of the element and [[<field>]] of each scalar key. [[.lang]]
+		 *	is the fill of [elements] and is not made here
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					Shortcode arguments
@@ -75,6 +77,8 @@ namespace Nino\Modules {
 
 				$fills['[['. $key. ']]'] = self::_escapeFieldValue( $value, $model[$key] ?? [] );
 			}
+
+			$fills['[[.slug]]'] = self::_escapeFieldValue( self::slug( $element ), [] );
 
 			return str_replace( array_keys( $fills ), array_values( $fills ), $content );
 		}
@@ -232,8 +236,10 @@ namespace Nino\Modules {
 
 		/**
 		 *	The fills of one element in a loop: [[.id]] the number in the loop,
-		 *	[[<field>]] each scalar key of the element - [[.uri]] among them - escaped
-		 *	by the type of its field (see _escapeFieldValue()), and [[.lang]] the
+		 *	[[<field>]] each scalar key of the element - [[.uri]] among them, the
+		 *	whole uri '/<type>/<name>' - escaped by the type of its field (see
+		 *	_escapeFieldValue()), [[.slug]] the name alone, the last segment of the
+		 *	uri (see slug()), escaped as a plain text is, and [[.lang]] the
 		 *	lang attribute of the language the element was taken from, with a space
 		 *	in front, or nothing. A field of the model the element has no value
 		 *	for is a fill of nothing, as is the alt text an image field names, so
@@ -263,9 +269,29 @@ namespace Nino\Modules {
 				$fills['[['. $key. ']]'] = self::_escapeFieldValue( $value, $model[$key] ?? [] );
 			}
 
+			$fills['[[.slug]]'] = self::_escapeFieldValue( self::slug( $element ), [] );
 			$fills['[[.lang]]'] = is_string( $element['.lang'] ?? null ) === true && $element['.lang'] !== '' ? ' lang="'. htmlspecialchars( $element['.lang'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ). '"' : '';
 
 			return $fills;
+		}
+
+		/**
+		 *	The slug of an element: the last segment of its uri, the name alone
+		 *	where '.uri' is '/<type>/<name>' - what a link to a page of the element
+		 *	(the page '/blog' and a sub-path '/blog/<name>') needs, and what
+		 *	[[.slug]] and the source .slug of a component are. Unescaped; nothing
+		 *	where the element has no uri
+		 *
+		 *	@param		array 		$element			The element, with '.uri'
+		 *
+		 *	@return 	string										The name, '' where there is no uri
+		 */
+		public static function slug( array $element ): string {
+
+			$uri	= is_string( $element['.uri'] ?? null ) === true ? $element['.uri'] : '';
+			$slash	= strrpos( $uri, '/' );
+
+			return $slash === false ? $uri : substr( $uri, $slash + 1 );
 		}
 
 		/**

@@ -2440,7 +2440,21 @@ check( 'value(): in a stack, a field is drawn after its type, .id is the place i
 	. '<i>Web &lt;b&gt;&#91;x]&lt;/b&gt;</i><i><p>Hello &#91;&#91;/k]] &#91;button x]</p></i><i>0</i><i>/services/web</i><i>NULL</i><i>web</i>'
 	. '<i>services/web/image.webp</i><i>services/web/image.webp</i><i>Web &lt;b&gt;&#91;x]&lt;/b&gt;</i><i>/services/web</i><i>#top</i></div></div>' );
 
-// The fills of the element in the cell of a stack: [[.id]], [[.uri]] and the fields, as [elements] fills them
+check( 'value(): .slug is the last segment of the element\'s uri - the name alone - as a text and as an address, and nothing without a stack',
+	$render( '[stack /services sort="title" offset="1" limit="1" cols="100"][values of=".slug"][values of=".slug" kind="href"][values of=".uri"][/stack]' )
+	=== '<div class="nino-grid-row nino-stack nino-stack-gap-2"><div class="nino-grid-s-100 nino-grid-m-100 nino-grid-l-100"><i>web</i><i>web</i><i>/services/web</i></div></div>'
+	&& \Nino\Modules\Components::value( $appData, '.slug', 'text' ) === null && \Nino\Modules\Components::value( $appData, '.slug', 'href' ) === null );
+$appData[\Nino\Modules\Components::CONTEXT] = [ 'uri' => '/services', 'id' => 0, 'element' => [ '.uri' => '/services/a"b[c' ], 'model' => [] ];
+$slugTextHref = [ \Nino\Modules\Components::value( $appData, '.slug', 'text' ), \Nino\Modules\Components::value( $appData, '.slug', 'href' ) ];
+$appData[\Nino\Modules\Components::CONTEXT]['element'] = [ '.uri' => '/services/javascript:go' ];
+$slugScheme = [ \Nino\Modules\Components::value( $appData, '.slug', 'text' ), \Nino\Modules\Components::value( $appData, '.slug', 'href' ) ];
+$appData[\Nino\Modules\Components::CONTEXT]['element'] = [];
+$slugNone = [ \Nino\Modules\Components::value( $appData, '.slug', 'text' ), \Nino\Modules\Components::value( $appData, '.slug', 'href' ) ];
+unset( $appData[\Nino\Modules\Components::CONTEXT] );
+check( '...escaped as the uri is - the text with its quote and its [ inert, the address a "#" where it names a scheme that is not allowed - and, for an element that has no uri, the empty text and the empty address',
+	$slugTextHref === [ 'a&quot;b&#91;c', 'a&quot;b&#91;c' ] && $slugScheme === [ 'javascript:go', '#' ] && $slugNone === [ '', '' ] && \Nino\Modules\Components::element( $appData ) === null );
+
+// The fills of the element in the cell of a stack: [[.id]], [[.uri]], [[.slug]] and the fields, as [elements] fills them
 \Nino\Elements::insertElementType( $appData, '/fillbox', [
 	'title'	=> [ 'type' => 'string', 'locale' => true ],
 	'slug'	=> [ 'type' => 'string' ],
@@ -2456,6 +2470,12 @@ $fillCells = static fn( string ...$cells ): string => $fillRow. $fillCell. implo
 
 check( 'a stack\'s cell is filled with the element: [[.id]], [[.uri]] - the uri of the element, /<type>/<name> - [[.lang]] and [[title]] in running text are the element\'s - the field escaped once, with its [ and ] inert - and a field of the model without a value is nothing',
 	$fillOf( '<i>[[.id]]|[[.uri]]|[[.lang]]|[[title]]|[[note]]|[[link]]</i>' ) === $fillCells( '<i>0|/fillbox/one||a&amp;b &quot;c&quot; &#91;x&#93;||/p?a=1&amp;b=&quot;c&quot;</i>', '<i>1|/fillbox/two||Two||/two</i>' ) );
+check( '[[.slug]] in a cell is the name of the element, the last segment of its uri, whatever a field of the type called slug holds: in running text and in the address of a call',
+	$fillOf( '<i>[[.slug]]|[[slug]]|[[.uri]]</i>' ) === $fillCells( '<i>one|first|/fillbox/one</i>', '<i>two|second|/fillbox/two</i>' )
+	&& $fillOf( '[button text="More" href="/blog/[[.slug]]"]' ) === $fillCells( '<a class="nino-btn" href="/blog/one">More</a>', '<a class="nino-btn" href="/blog/two">More</a>' )
+	&& $fillOf( '[button text="[[.slug]]" href="[[.slug]]"]' ) === $fillCells( '<a class="nino-btn" href="one">one</a>', '<a class="nino-btn" href="two">two</a>' ) );
+check( '...a call whose source is .slug writes the name too',
+	$fillOf( '[button .slug text="More"]' ) === $fillCells( '<a class="nino-btn" href="one">More</a>', '<a class="nino-btn" href="two">More</a>' ) );
 check( '...inside the value of a call as in text: the call is whole and its address the element\'s',
 	$fillOf( '[button text="More" href="/blog/[[slug]]"]' ) === $fillCells( '<a class="nino-btn" href="/blog/first">More</a>', '<a class="nino-btn" href="/blog/second">More</a>' )
 	&& $fillOf( '[button text="[[.id]]: [[title]]" href="[[.uri]]"]' ) === $fillCells( '<a class="nino-btn" href="/fillbox/one">0: a&amp;b &quot;c&quot; &#91;x]</a>', '<a class="nino-btn" href="/fillbox/two">1: Two</a>' ) );
@@ -2502,6 +2522,8 @@ $fillLoop = '<a href="[[.uri]]">[[.id]] [[title]]</a>';
 check( '[elements] in the cell of a stack draws each of its elements with its own .uri, .id and fields, not the outer element\'s',
 	$fillOf( '[elements /fillpost sort="uri"]'. $fillLoop. '[/elements]' ) === $fillCells(
 		'<a href="/fillpost/p1">0 Post 1</a><a href="/fillpost/p2">1 Post 2</a><a href="/fillpost/p3">2 Post 3</a>', '<a href="/fillpost/p1">0 Post 1</a><a href="/fillpost/p2">1 Post 2</a><a href="/fillpost/p3">2 Post 3</a>' ) );
+check( '...[[.slug]] between the tags of an [elements] written in the cell is the name of the loop\'s element, not the cell\'s',
+	$fillOf( '[elements /fillpost sort="uri" limit="2"]<u>[[.slug]]</u>[/elements]|[[.slug]]' ) === $fillCells( '<u>p1</u><u>p2</u>|one', '<u>p1</u><u>p2</u>|two' ) );
 check( '...its opening tag is the cell\'s: a query by a field of the outer element takes it, one element\'s posts to the next, while the block between the tags stays the loop\'s',
 	$fillOf( '[elements /fillpost sort="uri" query="cat=[[slug]]"]<b>[[title]]</b>[/elements]' ) === $fillCells( '<b>Post 1</b><b>Post 3</b>', '<b>Post 2</b>' ) );
 check( '...a lone [ in a quoted value of its opening tag does not make it the cell\'s: the call ends at the first ], as the shortcode pass reads it, and the loop keeps its own element',

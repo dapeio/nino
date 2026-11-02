@@ -1633,12 +1633,13 @@ namespace Nino\Modules {
 		 *	in the current language, null where it has none. In a stack, a
 		 *	name without one is a field of the element the cell is rendered
 		 *	for - drawn by \Nino\Html::fieldValue() after its field type, null
-		 *	where the type has no such field - and .id and .uri are the
-		 *	number of the element in the loop and its uri. Outside a stack,
-		 *	both are nothing. A fixed value, the text="..." attribute, takes
-		 *	the place of the argument altogether; in the format plain it is read
-		 *	as the text of a key is, an entity in it being the character it
-		 *	stands for.
+		 *	where the type has no such field - and .id, .uri and .slug are the
+		 *	number of the element in the loop, its uri '/<type>/<name>' and the
+		 *	name alone, the last segment of the uri (see
+		 *	\Nino\Modules\Elements::slug()). Outside a stack, all three are
+		 *	nothing. A fixed value, the text="..." attribute, takes the place of
+		 *	the argument altogether; in the format plain it is read as the text
+		 *	of a key is, an entity in it being the character it stands for.
 		 *
 		 *	Whatever it answers can be written into html as it is: escaped,
 		 *	and with every '[' as &#91;, because shortcode output is rendered
@@ -1732,6 +1733,13 @@ namespace Nino\Modules {
 				if( $source === '.uri' )
 					return $kind === 'href' ? self::_href( (string) ( $context['element']['.uri'] ?? '' ) ) : self::escape( (string) ( $context['element']['.uri'] ?? '' ) );
 
+				if( $source === '.slug' ) {
+
+					$slug = \Nino\Modules\Elements::slug( is_array( $context['element'] ) === true ? $context['element'] : [] );
+
+					return $kind === 'href' ? self::_href( $slug ) : self::escape( $slug );
+				}
+
 				if( isset( $context['model'][$source] ) === true ) {
 
 					$field = $context['element'][$source] ?? '';
@@ -1746,7 +1754,7 @@ namespace Nino\Modules {
 			// An address that is no key is itself - the '#contact' of a button.
 			// Anything else names a field there is none of, or an element there
 			// is none of
-			if( $kind === 'href' && in_array( $source, [ '.id', '.uri' ], true ) === false )
+			if( $kind === 'href' && in_array( $source, [ '.id', '.uri', '.slug' ], true ) === false )
 				return self::_href( html_entity_decode( $source, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
 
 			return null;
@@ -1839,11 +1847,13 @@ namespace Nino\Modules {
 		 *	shortcode reads the content up to the first closing tag.
 		 *
 		 *	The content is first filled with the element, by the fills [elements]
-		 *	makes (see \Nino\Modules\Elements::fills()): [[.id]], [[.uri]] and
-		 *	[[<field>]] of the element, in running text and inside the value of a
-		 *	call - text="[[title]]", href="/blog/[[slug]]". [[.uri]] is the uri of the
-		 *	element, '/<type>/<name>'; [[.lang]] is nothing here, a stack does not take
-		 *	a field from another language. A value is escaped as a field is written
+		 *	makes (see \Nino\Modules\Elements::fills()): [[.id]], [[.uri]],
+		 *	[[.slug]] and [[<field>]] of the element, in running text and inside
+		 *	the value of a call - text="[[title]]", href="/blog/[[.slug]]".
+		 *	[[.uri]] is the uri of the element, '/<type>/<name>', and [[.slug]]
+		 *	the name alone, its last segment - the token of a link to a page of
+		 *	the element; [[.lang]] is nothing here, a stack does not take a field
+		 *	from another language. A value is escaped as a field is written
 		 *	into [elements], with every '[' as &#91; and, because a call ends at the
 		 *	first ']' it meets, every ']' as &#93;. In text= and href= it is escaped
 		 *	once: the first is read as a text is and the second as an address, an

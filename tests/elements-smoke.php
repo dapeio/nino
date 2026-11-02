@@ -801,12 +801,26 @@ $fillsWant = static function( array $fills ): array {
 	ksort( $fills );
 	return $fills;
 };
-check( 'Elements::fills() makes the fills of one element: the number in the loop, each scalar key of the element escaped by the type of its field, [[.uri]] among them, and [[.lang]] as the attribute',
+check( 'Elements::fills() makes the fills of one element: the number in the loop, each scalar key of the element escaped by the type of its field, [[.uri]] among them, [[.slug]] the last segment of the uri, and [[.lang]] as the attribute',
 	$fillsOf( [ 'photo' => 'one.jpg', 'photoAlt' => 'A "q" [x]', '.uri' => '/alttest/one', '.lang' => 'de-DE', 'list' => [ 1 ] ], $fillsModel, 3 )
-	=== $fillsWant( [ '[[.id]]' => 3, '[[.lang]]' => ' lang="de-DE"', '[[.uri]]' => '/alttest/one', '[[globalAlt]]' => '', '[[photo]]' => 'one.jpg', '[[photoAlt]]' => 'A &quot;q&quot; &#91;x]', '[[plain]]' => '' ] ) );
+	=== $fillsWant( [ '[[.id]]' => 3, '[[.lang]]' => ' lang="de-DE"', '[[.uri]]' => '/alttest/one', '[[.slug]]' => 'one', '[[globalAlt]]' => '', '[[photo]]' => 'one.jpg', '[[photoAlt]]' => 'A &quot;q&quot; &#91;x]', '[[plain]]' => '' ] ) );
 check( '...an element with no value at all has a blank fill for every field of the model, the alt text of an image among them, and no language: nothing, never a leftover token',
-	$fillsOf( [], $fillsModel, 0 ) === $fillsWant( [ '[[.id]]' => 0, '[[.lang]]' => '', '[[globalAlt]]' => '', '[[photo]]' => '', '[[photoAlt]]' => '', '[[plain]]' => '' ] )
+	$fillsOf( [], $fillsModel, 0 ) === $fillsWant( [ '[[.id]]' => 0, '[[.lang]]' => '', '[[.slug]]' => '', '[[globalAlt]]' => '', '[[photo]]' => '', '[[photoAlt]]' => '', '[[plain]]' => '' ] )
 	&& \Nino\Modules\Elements::fills( [ 'x' => 1 ], [], 2 )['[[x]]'] === '1' );
+// The slug is the name alone: the part of the uri after its last slash, escaped as a plain text is
+$slugOf = static fn( array $element ): string => \Nino\Modules\Elements::fills( $element, [], 0 )['[[.slug]]'];
+check( 'Elements::fills() fills [[.slug]] with the part of the uri after its last slash, and [[.uri]] keeps the whole of it',
+	$slugOf( [ '.uri' => '/alttest/one' ] ) === 'one' && $slugOf( [ '.uri' => '/a/b/c-d_e' ] ) === 'c-d_e' && $slugOf( [ '.uri' => '/one' ] ) === 'one'
+	&& \Nino\Modules\Elements::fills( [ '.uri' => '/alttest/one' ], [], 0 )['[[.uri]]'] === '/alttest/one' );
+check( '...escaped as a plain text is - the quotes, the ampersand and the opening bracket - and nothing where the element has no uri',
+	$slugOf( [ '.uri' => '/t/a&b"c[x]' ] ) === 'a&amp;b&quot;c&#91;x]' && $slugOf( [] ) === '' && $slugOf( [ '.uri' => 7 ] ) === '' );
+
+check( '[element] fills [[.slug]] as [elements] does - the name of the element, escaped - beside [[.uri]] and [[.id]]',
+	\Nino\Html::renderHtml( $appData, '[element /alttest/one]<a href="/artikel/[[.slug]]">[[.slug]] [[.uri]] [[.id]]</a>[/element]' )
+	=== '<a href="/artikel/one">one /alttest/one 0</a>' );
+check( '[elements] fills [[.slug]] with the name of each element, in running text and in an attribute, beside [[.uri]] with its type',
+	\Nino\Html::renderHtml( $appData, '[elements /alttest]<a href="/artikel/[[.slug]]">[[.slug]] [[.uri]]</a>[/elements]' )
+	=== '<a href="/artikel/one">one /alttest/one</a><a href="/artikel/two">two /alttest/two</a>' );
 
 // --- Elements::getElementWithFallback and [elements] - the language an element has none of ----
 

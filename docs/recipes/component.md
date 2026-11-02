@@ -82,8 +82,8 @@ The rules the module keeps for you, and the ones it leaves to the renderer:
 
 - The first argument is resolved over `Components::value()` before the
   renderer runs: a `/key` is its text, a name without a slash is a field of the
-  element in a stack, `.id` and `.uri` are the place in the loop and the
-  element's uri, and `text="..."` is a fixed value. A source that resolves to
+  element in a stack, `.id`, `.uri` and `.slug` are the place in the loop, the
+  element's uri and its name alone (the last segment of the uri), and `text="..."` is a fixed value. A source that resolves to
   nothing renders nothing - the renderer is not called.
 - Missing attributes arrive as their defaults, a `select` outside its options
   is the default, an attribute nobody declared is not there. All strings.
