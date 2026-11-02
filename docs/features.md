@@ -34,7 +34,7 @@ in this order, so a feature never shadows a kernel module or a workbench screen 
 layout](recipes/runtime-module.md#autoload-layout)); for the same reason a manifest
 whose directory is named like a module of the kernel or of the workbench - a
 directory `Nino/Modules/<Name>` in `_nino/` or `_admin/`: `Components`, `Elements`,
-`Users`, `Logs` - is refused, the name being taken: the class below it, a panel's
+`Users`, `Logs` - is refused by a **1.9** kernel, the name being taken: the class below it, a panel's
 `\Nino\Modules\<Name>\Admin` among them, would be the kernel's. `NINO_FEATURES_DIR`, defined
 before `_nino/Nino.php` loads (the entry points carry the line commented out),
 replaces the directory as a whole.
@@ -97,7 +97,7 @@ return [
 | `key` | a slug (`/^[a-z][a-z0-9-]*$/D`), the lower-cased directory name where left out; `requires` and `/nino/features` name features by it |
 | `name`, `description`, `label`, `hint`, the label of an `options` entry | a string or a `locale => string` map, `name` required: the panel shows features that are not active, whose fills are not loaded, so the words travel in the manifest. `\Nino\Features::localized( $value, $locale )` reads one: the locale asked for, else `en_US`, else the first entry, else `''` |
 | `version`, `maturity` | `major.minor.patch`, a pre-release suffix allowed; a string or a `locale => string` map of at most 24 characters each |
-| `nino` | the constraint on the kernel, `*` where left out: the floor, the kernel whose vocabulary the feature uses. What [The toolset](#the-toolset) marks **1.8**, the key `assets` and the renderer `doShortcode()` are 1.8: a feature that uses one of them says `^1.8`, and an older kernel refuses it. The vocabulary is that of `\Nino\Features::satisfies( $constraint, $version )`: `*`, a version (`1.2.3`, `1.2`, `1`), a comparison (`>=1.2`, `!=1.2.3`), a caret (`^1.0`: the same major version from there on; `^0.13` the same minor version) or tilde (`~1.2`: the same major version from 1.2; `~1.2.3` the same minor version from 1.2.3), parts joined by a comma or a space (all must hold) and alternatives joined by `\|\|`; a pre-release kernel counts as the release it precedes |
+| `nino` | the constraint on the kernel, `*` where left out: the floor, the kernel whose vocabulary the feature uses. What this manual marks **1.8** or **1.9** is that version's, and so are the key `assets` and the renderer `doShortcode()` (1.8) and the `options` of a `select` or a `variant` that are a method, the keys `link` and `stretched` of a schema, the attribute type `variant` with its key `prefix`, and `[[.slug]]` and the source `.slug` in the cell of a stack (1.9): a feature that uses one of them says `^1.8` or `^1.9`, and an older kernel refuses it. The vocabulary is that of `\Nino\Features::satisfies( $constraint, $version )`: `*`, a version (`1.2.3`, `1.2`, `1`), a comparison (`>=1.2`, `!=1.2.3`), a caret (`^1.0`: the same major version from there on; `^0.13` the same minor version) or tilde (`~1.2`: the same major version from 1.2; `~1.2.3` the same minor version from 1.2.3), parts joined by a comma or a space (all must hold) and alternatives joined by `\|\|`; a pre-release kernel counts as the release it precedes |
 | `php`, `requires`, `data` | `php` => `ext`, the extensions it needs; the feature keys it cannot run without (its own is dropped; an activation activates them first); the files under `/data/` it owns, no `..` - what a backup carries |
 | `assets`, `components`, `stacks`, `settings` | the subsections below and the chapter [Settings](#settings) |
 | `module` | may name `\Nino\Modules\<Directory>` and nothing else, and the class file must exist |
@@ -134,21 +134,35 @@ left out. The Components module registers both at every boot while the feature i
 listed in `/nino/modules`, before its `init()` (activation lists a feature after
 that module). A component is registered one way, by the manifest or by
 `addComponent()` in `init()`; [`\Nino\Feature::shortcode()`](#the-toolset) keeps a
-plain registration from meeting the manifest's; a plain registration names `by`,
+plain registration from meeting the manifest's; a plain registration names `by` (**1.9**),
 the feature's key, or its schema reads as the kernel's, has to name a `group`
-and is offered among the kernel's groups and not under the feature. A component
+(**1.9**) and is offered among the kernel's groups and not under the feature. A component
 of a manifest is registered as the feature's own: the registry says so in `by`, the feature's key,
 whatever the schema says - the manifest as it is read says so too, so that what
 is registered is what the manifest declares - and a tool such as the Builder
 groups what it offers by it. A manifest names no `group`, the word by which a
 component of the kernel or of a project says which group a tool offers it under:
-a feature's components are offered under the feature, and a manifest that names
-one is refused. A component should carry `draws`, `in` and `icon`, optional as they
+a feature's components are offered under the feature, and a **1.9** kernel refuses a
+manifest that names one. A component should carry `draws`, `in` and `icon`, optional as they
 are ([component recipe](recipes/component.md)): they are how the Builder shows it
 in a section, places it where it may stand and offers it with a picture.
 
-The `options` of a `select` or a `variant` may be the name of a static method of
-the feature's own class, `'\Nino\Modules\Forms::formOptions'` (`\Nino\Modules\<Directory>`
+A schema that says `'link' => true` (**1.9**) makes a component a link where it is
+given one: it has an `href` and a `target` without declaring them, and what the
+renderer made is wrapped in the `<a>` they say. A schema that says
+`'stretched' => true` (**1.9**) names a component whose one link may be the link of
+the card it stands in, where the card says `linked`: the `<a>` carries the class
+`nino-stretch`, written by the kernel around a component that says `link` and by
+the component itself where it draws its own `<a>`; a component that holds
+components cannot say it ([component recipe](recipes/component.md)).
+
+An attribute of the type `variant` (**1.9**) is a `select` whose words are the
+modifiers of one class: the renderer writes a word that is not empty as that class
+after the attribute's `prefix`, which is the class of the component and two hyphens
+where the schema names none ([Components](development.md#components)).
+
+The `options` of a `select` or a `variant` may be the name of a static method
+(**1.9**) of the feature's own class, `'\Nino\Modules\Forms::formOptions'` (`\Nino\Modules\<Directory>`
 or a class below it - a manifest cannot have the schema ask any other static
 method), for a choice only the project can list: the method is
 `( array &$appData, string $attribute ): array`, answers `value => label` (a
@@ -164,9 +178,20 @@ and the attribute a `string` for the rest of the request - a renderer validates 
 value that names a record or a file itself. A tool is handed the answer as
 `options` (the values, in their order) and `optionLabels`, and loads it once per
 session; `components()` and
-`stacks()` hand out such schemas, and `Components::registered()` the registry as
-it was registered, which is what a feature re-registering a component reads
+`stacks()` hand out such schemas, and `Components::registered()` (**1.9**) the registry
+as it was registered, which is what a feature re-registering a component reads
 ([Components](development.md#components)).
+
+The content of a stack is filled with the element of each cell before it is
+rendered (**1.9**), by the fills `\Nino\Modules\Elements::fills()` makes for
+`[elements]` as well: `[[.id]]`, `[[.uri]]`, `[[.slug]]` - the name of the element
+alone, the last segment of its uri - and `[[<field>]]`, in the text of the cell and
+in the value of a call, `[button text="More" href="/blog/[[.slug]]"]`; `[elements]` has
+`[[.lang]]` (**1.9**) besides, the `lang` attribute of the language an element was taken
+from, with a space in front, or nothing, which a cell does not fill. The first
+argument of a component in a cell may be `.slug` as it may be `.uri` and `.id`
+([Components](development.md#components)); the renderer of a stack calls `renderStack()`
+and finds the cell filled.
 
 ### The manual
 
@@ -298,8 +323,8 @@ the Routes panel under *Routes of features and modules*).
 
 What a feature once wrote for itself, the kernel has once, and the docblock of a
 member is its reference. A method whose name starts with `_` is internal, every
-other is public; **1.8** marks what kernels before it lack, so a feature that calls
-one says `^1.8`. `\Nino\Feature` **1.8** (not `\Nino\Features`, the contract) holds
+other is public; **1.8** and **1.9** mark what kernels before them lack, so a feature
+that calls one says `^1.8` or `^1.9`. `\Nino\Feature` **1.8** (not `\Nino\Features`, the contract) holds
 the helpers of a feature's own code, static methods that render no markup:
 
 | Call | What it does |
@@ -319,16 +344,24 @@ The kernel classes a feature calls, by home:
 | `\Nino\Features` | `setting( $appData, $key, $name, $default )`, `settings()`, `saveSettings()` ([Settings](#settings)); `get()` one feature as `all()` answers it; `localized()`, `satisfies()` |
 | `\Nino\Filesystem` | `getFileContent()`, `putFileContent()` a whole file by its virtual path; `mutate( $appData, $path, $fn, $default )` every read-modify-write: it locks, reads, calls `$fn( $state )` and writes what that answers, `null` aborts and `mutate()` answers `false` - a file whose shape may change carries a `format` key; `fileExists()`; `path()`, the real path, to `glob()` a directory; `forceDir()`, `removeDir()`; `getDir()`, `getPublicDir()`, `getPublicPath()` |
 | `\Nino\AppData` | `writeContentData( $appData, $keys )` persists the given top-level keys of `config.php`; `stored()` **1.8** reads one as the file holds it |
-| `\Nino\Http` | `fail( $request, $status, $error, $code, $params, $field )` and `ok( $request, $body )` end a handler; `redirect()`, `allowSource()` a policy directive widened by one source, `pages()`, `matchesPath()`, `answersHtml()` for a sitemap or a protected area, all **1.8**; `requestRoute()`, `getRequest()`, `getClientIp()` |
-| `\Nino\Html` | `renderHtml()` a string as a page is rendered; `renderTextfill()`, `resolveTextfill()` one fill; `addShortcode()`, `addAsset()`; `addFills()`; `getFills( $appData, $locale )` every fill of a language, the argument **1.8**; `removeFill()`, `absoluteUrl()` **1.8**; `sanitizeHtml()` |
+| `\Nino\Http` | `fail( $request, $status, $error, $code, $params, $field )` and `ok( $request, $body )` end a handler; `redirect()`, `allowSource()` a policy directive widened by one source, `pages()`, `matchesPath()`, `answersHtml()` for a sitemap or a protected area, all **1.8**; `isReservedUri( $uri )` **1.9** whether an address is one a page cannot have, `/_nino` or `/features` and what lies below; `requestRoute()`, `getRequest()`, `getClientIp()` |
+| `\Nino\Html` | `renderHtml()` a string as a page is rendered; `renderTextfill()`, `resolveTextfill()` one fill; `addShortcode()`, `addAsset()`; `addFills()`; `getFills( $appData, $locale )` every fill of a language, the argument **1.8**; `removeFill()`, `absoluteUrl()` **1.8**; `sanitizeHtml()`; `shortcodeCalls()` the calls a template makes, `shortcodeParts()` a piece of html cut into its calls and the text between, `fillOrigin()` the language a fill's text was taken from, all **1.9** |
 | `\Nino\Text` | `entries()`, `entry()`, `isGrammarKey()`, `sanitizeValue()`: the project's texts and their keys |
 | `\Nino\Form` | `forms()`, `form()`, `posted()`, `validate()`, `entries()`; `blocked()` **1.8** whether the CSRF guard refused the request |
 | `\Nino\Images` | `getUrl()`, `getSlot()`, `getSlots()`, `setSlotFilename()`, `setSlotAlt()`, `cleanAlt()`, `process()`, `fit()`, `limits()`, `reject()`, `read()`, `restore()`, `delete()` |
 | `\Nino\Mail` | `send()`; `rateLimited()` **1.8** whether the last send was refused by the cap per ip |
-| `\Nino\Locales` | `getCurrentLocale()`, `getNativeLocale()`, `getAvailableLocales()`, `verifyLocale()`, `useLocale()` for the rest of the request |
-| `\Nino\Modules\Components` | `components()`, `stacks()`, `defaults()`, `addComponent()`; `escape()` a value into html or an attribute; `renderStack()`, `cell()`, `element()` for a stack |
-| `\Nino\Admin\Admin` | `guardPerm()`; `postData()` the json of the posted `data`; `postString()` **1.8** one posted value as a string, never a cast; `cleanInt()`, `failType()`, `uploadError()`; `sessionLocale()` the language the workbench speaks, `contentLocale()` **1.8** the language a panel edits in - its own value of the session, which the select above a panel's screen sets and nothing else does; `textFills()`; `\Nino\Admin\Panels::relative()` |
-| beside them | `\Nino\Callbacks::registerCallback()`; `\Nino\Elements::queryElements()`, `getElement()`, `getElementModel()`; `\Nino\Auth::getCurrentUser()`, `checkPermission()`; `\Nino\Fetch::get()`, the one way to the network; `\Nino\Modules\Jstext::publish()` fills for a public script; `\Nino\Modules::callModules()` |
+| `\Nino\Locales` | `getCurrentLocale()`, `getNativeLocale()`, `getAvailableLocales()`, `verifyLocale()`, `useLocale()` for the rest of the request; `getVisitorLocale()` the language the site shows the visitor of this browser, `getTextLocales()` the languages that have a text file, `languageTag()` a locale id as the tag of a `lang` attribute, all **1.9** |
+| `\Nino\Modules\Components` | `components()`, `stacks()`, `defaults()`, `addComponent()`; `registered()` **1.9** the registry as it was registered; `escape()` a value into html or an attribute; `renderStack()` - it fills the cell with the fills of its element **1.9** -, `cell()`, `element()` for a stack |
+| `\Nino\Admin\Admin` | `guardPerm()`; `postData()` the json of the posted `data`; `postString()` **1.8** one posted value as a string, never a cast; `cleanInt()`, `failType()`, `uploadError()`; `sessionLocale()` the language the workbench speaks, `contentLocale()` **1.9** the language a panel edits in - its own value of the session, which the select above a panel's screen sets and nothing else does; `textFills()`; `\Nino\Admin\Panels::relative()` |
+| beside them | `\Nino\Callbacks::registerCallback()`; `\Nino\Elements::queryElements()`, `getElement()`, `getElementModel()`; `getElementWithFallback()` **1.9** an element in the language asked, else from another one, with its `.lang`; `\Nino\Modules\Elements::fills()` and `slug()` **1.9** the fills of one element in a loop and its name alone; `\Nino\Auth::getCurrentUser()`, `checkPermission()`; `\Nino\Fetch::get()`, the one way to the network; `\Nino\Modules\Jstext::publish()` fills for a public script; `\Nino\Modules::callModules()` |
+
+The markup of the kernel a feature's template and its stylesheet write against:
+
+| Where | Members |
+|---|---|
+| `[image]`; `[card-image]` **1.9** | `ratio` is one of `1-1`, `4-3`, `3-2`, `16-9`, `21-9` and, **1.9**, `4-1` and `5-1`; the content form of `[image]` answers `[[src]]`, the path of the file, and `[[url]]` **1.9**, its absolute address, the one a meta tag or a mail writes |
+| `[logo]` | **1.9**: the picture that is read on every ground, the image slots `/logo` and `/logo/dark` in one `nino-logo-set`; which of the two is seen is the pair `--logo-light` and `--logo-dark`, a display value each, that every ground sets |
+| `[card-text]`, `[scroll-hint]`, `[sections]` | **1.9**: `[card-text]` is `[text]` in the class of the text of a card, `nino-card-descr`; `[scroll-hint]` the arrow at the foot of a hero, a link to the section its `to` names and to the next one where it names none; `[sections]` a stack that draws a section for each element, every second one turned around from 768px where `alternate` is on |
 
 In the browser:
 
@@ -336,9 +369,9 @@ In the browser:
 |---|---|
 | `Nino` | `slug( text, max )`, `clipboard( text )` (a promise of `true` or `false`), **1.8**; `content.getText( key )`; `dir`; `events.bindCallback( evt, cb )`: a callback bound after the event fired runs at once, every callback runs on its own and an error is thrown again from a timer, so one cannot stop the next, and the listeners are passive (**1.8**) |
 | `Nino.ui`, the site only | `reducedMotion()`, `options( el, prefix, schema )` the `data-<prefix>-<name>` attributes of an element read against a schema, `whenVisible( el, callback )`, all **1.8**. A site script never reaches `Nino.adminUi` and a panel script never `Nino.ui`; what both need is on `Nino` |
-| `Nino.adminUi` | `panel( spec )`, `levels( prefix, names )`, `hint()`, `textField()`, `el()`, `button()`, `localeSelect()`, `manual( content, options )` and `manualDialog( title, content, opener )` **1.8**; `api.call()`, `api.errorText()`, `showError()`, `status()`, `format()`, `text()`, `emptyState()`, `notice()`, `panelHead()`, `contextBar()`, `actionBar()`, `listActions()`, `selectField()`, `switchField()`, `numberField()`, `elementList()`, `stringList()`, `table()`, `buttonRow()`, `choiceDialog()`, `checkImage()`, `limits()` |
+| `Nino.adminUi` | `panel( spec )`, `levels( prefix, names )`, `hint()`, `textField()`, `el()`, `button()`, `localeSelect()` **1.8**; `manual( content, options )` and `manualDialog( title, content, opener )`, `showLevel( level, options )` a level of a drill-down shown and the focus moved in, `backTo( level, opener )` back to the level it came from and the focus to the control that opened the one left, `fieldError()` the sentence at an invalid field and `clearFieldErrors()` taking them off, `tabBadge( tab, text, state )` the chip with a word on a tab button, `isWord( slug )` whether the interface's vocabulary covers a slug, all **1.9**; `api.call()`, `api.errorText()`, `showError()`, `status()`, `format()`, `text()`, `emptyState()`, `notice()`, `panelHead()`, `contextBar()`, `actionBar()`, `listActions()`, `selectField()`, `switchField()`, `numberField()`, `elementList()`, `stringList()`, `table()`, `buttonRow()`, `choiceDialog()`, `checkImage()`, `limits()` |
 | `Nino.admin`, the shell | `dirty` (`register`, `watchForm`, `snapshot`, `isDirty`, `guard`, `refresh`), `router` (`set`, `current`, `go`, `leave`), `sessionLocale`, `assetUrl()`, `publicUrl()`; a panel script reads none of it at load, `panel()` and `levels()` look it up when asked |
-| CSS | the site: the custom properties at `:root` of `_nino/Nino.css` are the tokens a feature's stylesheet uses, written without a fallback (`var( --space-2 )`: the token is there, or the kernel is older than the feature's floor); `.nino-btn` with its `--` variants and `.nino-sr-only`. The workbench: the classes of the [panel recipe](recipes/admin-panel.md#designing-an-admin-frontend), among them the four of 1.8 - `.nino-admin-btn--small`, `.nino-admin-actions`, `.nino-admin-badge[data-state]`, `.nino-admin-move`; a panel stylesheet opens with `@layer nino.system, nino.tool, nino.local;` and writes into `nino.tool`, scoped to its own root |
+| CSS | the site: the custom properties at `:root` of `_nino/Nino.css` are the tokens a feature's stylesheet uses, written without a fallback (`var( --space-2 )`: the token is there, or the kernel is older than the feature's floor); `.nino-btn` with its `--` variants and `.nino-sr-only`; **1.9** adds `nino-grid-gap-<n>`, `<n>` from `0` to `6`, the gap between the columns of a `nino-grid-row`, `nino-stretch`, the class of the link a linked card stretches over itself, and `--nino-header-grow`, how far the bar of the header has grown past its min-height, which a frame that clears the fixed header adds to its padding; `nino-hover`, the hover effect of a picture on the frame of an `[image]` (`.nino-image.nino-hover`), with its five handles `--image-hover-scale`, `-lift`, `-brightness`, `-shadow` and `-duration`; `nino-forms-check` and `nino-forms-group`, the checkbox beside its words and the group of radio buttons under one question in a form a feature writes; the whitespace tokens `--whitespace-scale`, `--whitespace-gap` and `--whitespace-text`; and the radius of a surface, `--radius-surface`, `--radius-surface-alt` and the `--radius-<kind>` of `cover`, `row`, `column`, `card` and `image`. The workbench: the classes of the [panel recipe](recipes/admin-panel.md#designing-an-admin-frontend), among them the four of 1.8 - `.nino-admin-btn--small`, `.nino-admin-actions`, `.nino-admin-badge[data-state]`, `.nino-admin-move`; a panel stylesheet opens with `@layer nino.system, nino.tool, nino.local;` and writes into `nino.tool`, scoped to its own root |
 
 ## The panel
 
@@ -532,7 +565,7 @@ else English's, else the first by its code - with an empty text each, add-only, 
 that every key of the unit exists in every active language: the page shows the
 native text where a language has none of its own (the [fills
 chain](development.md#textfills)), and the Dashboard counts what is left to
-translate. A language the unit has words of gets them as before.
+translate. A language the unit has words of keeps them.
 
 A feature that processes personal data brings its own section of the privacy policy
 with the `elements` key, a map of an element type's uri to a file of the unit. The
@@ -726,7 +759,8 @@ A feature's script is tested over the same stand-ins: `tests/<key>-js-smoke.js`
 takes `check()`, `done()`, `load()`, `element()` and `documentOf()` from the
 checkout's `tests/harness.js` (1.8; `NINO_ROOT` or three levels up) and `load()`s
 `_admin/assets/Nino.admin.js` and the feature's own script over a stand-in for
-`Nino` that keeps the requests. `load()` reads from the root of the checkout, so a
+`Nino` that keeps the requests; the stand-in `element()` has `isConnected` and
+`after()` **1.9**. `load()` reads from the root of the checkout, so a
 feature outside it names its script as `path.relative( root, ... )`. The catalogue's
 JavaScript tests carry a stand-in of their own and run with any Nino.
 
