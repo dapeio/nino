@@ -655,14 +655,17 @@ h1, h2, h3, h4, h5, h6 {
  *			.nino-grid-row(--narrow, --wide, --full, --left, --right), .nino-grid(-25, -33, -50, -66, -75, -100)
  *			.nino-grid(-top, -middle, -bottom, -center)
  *			.nino-grid(-s,-m, -l, -xl)(-25, -33, -50, -66, -75, -100)
+ *			.nino-grid-gap-0...6
  *			.nino-hide-(s, m, l), .nino-stack(-start, -center, -end, -gap-0...6)
  *
  *
  ****************************************************************************************************/
 
 .nino-grid-row {
+	--nino-grid-gap: 0px;
 	display: flex;
 	flex-wrap: wrap;
+	gap: var(--nino-grid-gap);
 	padding: 0 var(--grid-gutter);
 	margin: 0 auto;
 	width: 100%;
@@ -692,11 +695,19 @@ h1, h2, h3, h4, h5, h6 {
 	padding-bottom: 0;
 }
 
-.nino-grid-25 { width: 25%; }
-.nino-grid-33 { width: calc(100% / 3); }
-.nino-grid-50 { width: 50%; }
-.nino-grid-66 { width: calc(100% / 1.5); }
-.nino-grid-75 { width: 75%; }
+/*	The row draws --nino-grid-gap between its columns, and a column gives back
+	the share of it that a column of its width takes in a row of equal columns:
+	3/4 of a gap for a quarter, 2/3 for a third, 1/2, 1/3 and 1/4 for the
+	others, none for a column of the whole row. The shares of a row add up to
+	(k - 1) gaps for k columns whatever the mix of widths, since a share is
+	1 - w and the widths add up to 1, so that a third beside two thirds take one
+	gap and a row never wraps for its gap. With the property at 0px, which a row
+	without a gap class has, every width is the percentage it always was	*/
+.nino-grid-25 { width: calc(25% - .75 * var(--nino-grid-gap, 0px)); }
+.nino-grid-33 { width: calc(100% / 3 - var(--nino-grid-gap, 0px) * 2 / 3); }
+.nino-grid-50 { width: calc(50% - .5 * var(--nino-grid-gap, 0px)); }
+.nino-grid-66 { width: calc(100% / 1.5 - var(--nino-grid-gap, 0px) / 3); }
+.nino-grid-75 { width: calc(75% - .25 * var(--nino-grid-gap, 0px)); }
 .nino-grid-100 { width: 100%; }
 
 .nino-grid-top { align-items: flex-start; }
@@ -710,38 +721,38 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 @media (min-width: 640px) {
-	.nino-grid-s-25 { width: 25%; }
-	.nino-grid-s-33 { width: calc(100% / 3); }
-	.nino-grid-s-50 { width: 50%; }
-	.nino-grid-s-66 { width: calc(100% / 1.5); }
-	.nino-grid-s-75 { width: 75%; }
+	.nino-grid-s-25 { width: calc(25% - .75 * var(--nino-grid-gap, 0px)); }
+	.nino-grid-s-33 { width: calc(100% / 3 - var(--nino-grid-gap, 0px) * 2 / 3); }
+	.nino-grid-s-50 { width: calc(50% - .5 * var(--nino-grid-gap, 0px)); }
+	.nino-grid-s-66 { width: calc(100% / 1.5 - var(--nino-grid-gap, 0px) / 3); }
+	.nino-grid-s-75 { width: calc(75% - .25 * var(--nino-grid-gap, 0px)); }
 	.nino-grid-s-100 { width: 100%; }
 }
 
 @media (min-width: 768px) {
-	.nino-grid-m-25 { width: 25%; }
-	.nino-grid-m-33 { width: calc(100% / 3); }
-	.nino-grid-m-50 { width: 50%; }
-	.nino-grid-m-66 { width: calc(100% / 1.5); }
-	.nino-grid-m-75 { width: 75%; }
+	.nino-grid-m-25 { width: calc(25% - .75 * var(--nino-grid-gap, 0px)); }
+	.nino-grid-m-33 { width: calc(100% / 3 - var(--nino-grid-gap, 0px) * 2 / 3); }
+	.nino-grid-m-50 { width: calc(50% - .5 * var(--nino-grid-gap, 0px)); }
+	.nino-grid-m-66 { width: calc(100% / 1.5 - var(--nino-grid-gap, 0px) / 3); }
+	.nino-grid-m-75 { width: calc(75% - .25 * var(--nino-grid-gap, 0px)); }
 	.nino-grid-m-100 { width: 100%; }
 }
 
 @media (min-width: 1024px) {
-	.nino-grid-l-25 { width: 25%; }
-	.nino-grid-l-33 { width: calc(100% / 3); }
-	.nino-grid-l-50 { width: 50%; }
-	.nino-grid-l-66 { width: calc(100% / 1.5); }
-	.nino-grid-l-75 { width: 75%; }
+	.nino-grid-l-25 { width: calc(25% - .75 * var(--nino-grid-gap, 0px)); }
+	.nino-grid-l-33 { width: calc(100% / 3 - var(--nino-grid-gap, 0px) * 2 / 3); }
+	.nino-grid-l-50 { width: calc(50% - .5 * var(--nino-grid-gap, 0px)); }
+	.nino-grid-l-66 { width: calc(100% / 1.5 - var(--nino-grid-gap, 0px) / 3); }
+	.nino-grid-l-75 { width: calc(75% - .25 * var(--nino-grid-gap, 0px)); }
 	.nino-grid-l-100 { width: 100%; }
 }
 
 @media (min-width: 1280px) {
-	.nino-grid-xl-25 { width: 25%; }
-	.nino-grid-xl-33 { width: calc(100% / 3); }
-	.nino-grid-xl-50 { width: 50%; }
-	.nino-grid-xl-66 { width: calc(100% / 1.5); }
-	.nino-grid-xl-75 { width: 75%; }
+	.nino-grid-xl-25 { width: calc(25% - .75 * var(--nino-grid-gap, 0px)); }
+	.nino-grid-xl-33 { width: calc(100% / 3 - var(--nino-grid-gap, 0px) * 2 / 3); }
+	.nino-grid-xl-50 { width: calc(50% - .5 * var(--nino-grid-gap, 0px)); }
+	.nino-grid-xl-66 { width: calc(100% / 1.5 - var(--nino-grid-gap, 0px) / 3); }
+	.nino-grid-xl-75 { width: calc(75% - .25 * var(--nino-grid-gap, 0px)); }
 	.nino-grid-xl-100 { width: 100%; }
 }
 
@@ -796,8 +807,14 @@ h1, h2, h3, h4, h5, h6 {
 	Inside, the pieces of a cell are one below the other, a space apart. The
 	gap is the one the classes set times --whitespace-gap, said once as
 	--nino-stack-gap-scaled, so that the padding of the cells and the reach of
-	the row cannot part	*/
+	the row cannot part. The stack draws its gaps as padding and no row gap, so
+	it says --nino-grid-gap: 0px: the property is inherited from the row of a
+	section that the stack stands in, and the cells here, columns by their width
+	classes, would give back a gap that is not drawn. The stack is a
+	.nino-grid-row, whose own declaration does the same; it is said here as well
+	because this is the rule that is about the stack	*/
 .nino-stack {
+	--nino-grid-gap: 0px;
 	--nino-stack-gap: var(--space-2);
 	--nino-stack-gap-scaled: calc(var(--nino-stack-gap) * var(--whitespace-gap));
 	width: calc(100% + var(--nino-stack-gap-scaled));
@@ -829,6 +846,19 @@ h1, h2, h3, h4, h5, h6 {
 .nino-stack-gap-4 { --nino-stack-gap: var(--space-4); }
 .nino-stack-gap-5 { --nino-stack-gap: var(--space-5); }
 .nino-stack-gap-6 { --nino-stack-gap: var(--space-6); }
+
+/*	The gap between the columns of a row: --nino-grid-gap, which the row draws
+	as its gap and its columns give back in their widths. No gap, or a step of
+	the space scale times the whitespace between pieces, as the gap of a stack is.
+	After .nino-grid-row, which declares 0px, so that the class on the same
+	element is the later one	*/
+.nino-grid-gap-0 { --nino-grid-gap: 0px; }
+.nino-grid-gap-1 { --nino-grid-gap: calc(var(--space-1) * var(--whitespace-gap)); }
+.nino-grid-gap-2 { --nino-grid-gap: calc(var(--space-2) * var(--whitespace-gap)); }
+.nino-grid-gap-3 { --nino-grid-gap: calc(var(--space-3) * var(--whitespace-gap)); }
+.nino-grid-gap-4 { --nino-grid-gap: calc(var(--space-4) * var(--whitespace-gap)); }
+.nino-grid-gap-5 { --nino-grid-gap: calc(var(--space-5) * var(--whitespace-gap)); }
+.nino-grid-gap-6 { --nino-grid-gap: calc(var(--space-6) * var(--whitespace-gap)); }
 
 /****************************************************************************************************
  *
@@ -1942,10 +1972,11 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 @media (min-width: 768px) {
 	.nino-card { margin: calc(var(--space-1) * var(--whitespace-scale)); padding: calc(var(--space-1) * var(--whitespace-scale)); }
 	/* nino-card adds horizontal margins from here on. Account for those
-	   gutters when the card itself is also the grid column */
-	.nino-card--grid.nino-grid-m-25 { width: calc(25% - var(--space-1) * var(--whitespace-scale) - var(--space-1) * var(--whitespace-scale)); }
-	.nino-card--grid.nino-grid-m-33 { width: calc((100% / 3) - var(--space-1) * var(--whitespace-scale) - var(--space-1) * var(--whitespace-scale)); }
-	.nino-card--grid.nino-grid-m-50 { width: calc(50% - var(--space-1) * var(--whitespace-scale) - var(--space-1) * var(--whitespace-scale)); }
+	   gutters when the card itself is also the grid column, and give back
+	   its share of the gap of the row as the width classes do */
+	.nino-card--grid.nino-grid-m-25 { width: calc(25% - var(--space-1) * var(--whitespace-scale) - var(--space-1) * var(--whitespace-scale) - .75 * var(--nino-grid-gap, 0px)); }
+	.nino-card--grid.nino-grid-m-33 { width: calc((100% / 3) - var(--space-1) * var(--whitespace-scale) - var(--space-1) * var(--whitespace-scale) - var(--nino-grid-gap, 0px) * 2 / 3); }
+	.nino-card--grid.nino-grid-m-50 { width: calc(50% - var(--space-1) * var(--whitespace-scale) - var(--space-1) * var(--whitespace-scale) - .5 * var(--nino-grid-gap, 0px)); }
 	.nino-card-cols-m { display: flex; flex-direction: row; justify-content: center; column-gap: calc(var(--space-2) * var(--whitespace-scale)); }
 	.nino-card-cols-m > .nino-card-img { max-height: none; max-width: var(--card-img-max-width); }
 }

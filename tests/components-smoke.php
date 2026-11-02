@@ -825,6 +825,7 @@ $whitespaceWhere = [
 	'--whitespace-gap' => [
 		'.nino-grid-row > .nino-stack-start, .nino-grid-row > .nino-stack-center, .nino-grid-row > .nino-stack-end, .nino-grid-row > [class*="nino-stack-gap-"]:not(.nino-stack)',
 		'.nino-stack', '.nino-stack > *',
+		'.nino-grid-gap-1', '.nino-grid-gap-2', '.nino-grid-gap-3', '.nino-grid-gap-4', '.nino-grid-gap-5', '.nino-grid-gap-6',
 	],
 	'--whitespace-text' => [
 		'.nino-hero-title', '.nino-hero-subtitle', '.nino-section-title', '.nino-section-subtitle', '.nino-section-text', '.nino-richtext p, .nino-richtext ul, .nino-richtext ol',
@@ -839,16 +840,16 @@ foreach( $whitespaceWhere as $whitespaceToken => $whitespaceExpected ) {
 	if( $whitespaceFound !== $whitespaceExpected )
 		$whitespaceWrong[] = $whitespaceToken. ' - read where it should not be: '. implode( ' | ', array_diff( $whitespaceFound, $whitespaceExpected ) ). '; not read where it should be: '. implode( ' | ', array_diff( $whitespaceExpected, $whitespaceFound ) );
 }
-check( 'the areas read --whitespace-scale itself - the padding of a section, the margin and the padding of a card and of its content, the gap between the columns of a row of cards, the widths that give a card\'s margin up, the sides of the row of a cover - the stack its gap and the texts theirs, and no other rule reads any of the three'
+check( 'the areas read --whitespace-scale itself - the padding of a section, the margin and the padding of a card and of its content, the gap between the columns of a row of cards, the widths that give a card\'s margin up, the sides of the row of a cover - the stack its gap, the row of a section the gap between its columns and the texts theirs, and no other rule reads any of the three'
 	. ( $whitespaceWrong === [] ? '' : ' - '. implode( '; ', $whitespaceWrong ) ), $whitespaceWrong === [] );
-$whitespaceMay = [ '--whitespace-scale' => [ 'padding', 'padding-top', 'margin', 'column-gap', 'width', 'left', 'right', '--cover-padding-y', '--cover-padding-x' ], '--whitespace-gap' => [ 'gap', '--nino-stack-gap-scaled' ], '--whitespace-text' => [ 'margin', 'margin-top', 'margin-bottom' ] ];
+$whitespaceMay = [ '--whitespace-scale' => [ 'padding', 'padding-top', 'margin', 'column-gap', 'width', 'left', 'right', '--cover-padding-y', '--cover-padding-x' ], '--whitespace-gap' => [ 'gap', '--nino-stack-gap-scaled', '--nino-grid-gap' ], '--whitespace-text' => [ 'margin', 'margin-top', 'margin-bottom' ] ];
 $whitespaceUsed = [];
 foreach( $whitespaceReads as $whitespaceToken => $whitespaceRules )
 	foreach( $whitespaceRules as $whitespaceSelectors => $whitespaceProperties )
 		foreach( array_keys( $whitespaceProperties ) as $whitespaceProperty )
 			if( in_array( $whitespaceProperty, $whitespaceMay[$whitespaceToken], true ) === false )
 				$whitespaceUsed[] = $whitespaceSelectors. ' says '. $whitespaceProperty. ' by '. $whitespaceToken;
-check( '...each in the properties it is for: the areas in padding, margin, the gap between columns and a width, the sides of the row of a cover in left and right, the gap of a stack in gap, the text in margin - never a line height, a size or a colour'. ( $whitespaceUsed === [] ? '' : ' - '. implode( '; ', $whitespaceUsed ) ), $whitespaceUsed === [] );
+check( '...each in the properties it is for: the areas in padding, margin, the gap between columns and a width, the sides of the row of a cover in left and right, the gap of a stack in gap, the gap of a row in the property its columns give back, the text in margin - never a line height, a size or a colour'. ( $whitespaceUsed === [] ? '' : ' - '. implode( '; ', $whitespaceUsed ) ), $whitespaceUsed === [] );
 
 // The picture of a card, and the frame that cuts a picture
 check( 'the picture of a card is as wide as the card and never wider, and --inline is the other way round - in line, at its own size, capped by the card all the same',
@@ -1305,6 +1306,75 @@ foreach( [ 'left' => [ 'X', 1 ], 'right' => [ 'X', -1 ], 'up' => [ 'Y', 1 ], 'do
 	}
 check( 'the slides are named for the motion the visitor sees: left and up start at a positive translate of their axis - to the right of their place, below it - right and down at a negative one, at 1.5, 3 and 6rem, and all of them end at 0'
 	. ( $vpaWrong === [] ? '' : ' - not: '. implode( ', ', $vpaWrong ) ), $vpaWrong === [] );
+
+echo "\n";
+
+
+// --- A gap between the columns of a row --------------------------------------
+
+echo "Nino.css - a gap between the columns of a row: nino-grid-gap-<n> on the row, the width classes give it back\n";
+
+/*	The row draws --nino-grid-gap between its columns in both directions and declares 0px, so that a row without a class is what it was. A stack stands in a column of such a row and says 0px as
+	well: the property is inherited, and the cells of a stack are columns by their width classes. The seven classes come after the row and the stack, which declare the property, and after the
+	classes of the gap of a stack, in their manner: the step of the scale times the whitespace between pieces, the property and nothing else	*/
+check( 'the row declares --nino-grid-gap as 0px and draws it as its gap, in both directions - gap and not column-gap',
+	$groundSets( $groundOf( '.nino-grid-row' ), '--nino-grid-gap', '0px' ) === true && $groundSets( $groundOf( '.nino-grid-row' ), 'gap', 'var(--nino-grid-gap)' ) === true
+	&& preg_match( '/(?<![\w-])(?:column|row)-gap\s*:/', $groundOf( '.nino-grid-row' ) ) !== 1 );
+check( '...and the stack resets it to 0px, so that the gap of a section\'s row does not reach the cells of a stack that stands in one of its columns',
+	$groundSets( $groundOf( '.nino-stack' ), '--nino-grid-gap', '0px' ) === true );
+$gapWrong = [];
+foreach( [ 0, 1, 2, 3, 4, 5, 6 ] as $gapStep ) {
+	$gapClass = '.nino-grid-gap-'. $gapStep;
+	$gapBody = $groundOf( $gapClass );
+	if( count( $groundEach[$gapClass] ?? [] ) !== 1 || substr_count( $gapBody, ':' ) !== 1
+		|| $groundSets( $gapBody, '--nino-grid-gap', $gapStep === 0 ? '0px' : 'calc(var(--space-'. $gapStep. ') * var(--whitespace-gap))' ) === false )
+		$gapWrong[] = $gapClass;
+	elseif( $groundLastOf( [ $gapClass ] ) <= $groundLastOf( [ '.nino-grid-row' ] ) || $groundLastOf( [ $gapClass ] ) <= $groundLastOf( [ '.nino-stack' ] ) || $groundLastOf( [ $gapClass ] ) <= $groundLastOf( [ '.nino-stack-gap-6' ] ) )
+		$gapWrong[] = $gapClass. ' is not after the row, the stack and the gap classes of a stack';
+}
+check( '.nino-grid-gap-0 to -6 set --nino-grid-gap to 0px and to the step of the space scale times --whitespace-gap, once each and nothing else, after the row, the stack and the classes of the gap of a stack'
+	. ( $gapWrong === [] ? '' : ' - not: '. implode( ', ', $gapWrong ) ), $gapWrong === [] && $groundLastOf( [ '.nino-stack-gap-6' ] ) > 0 );
+
+/*	What the shares come to on a page, measured in headless Chromium at 1280px and at 390px in a row of the grid, the base stylesheet beside this one: with no gap class every rect of
+	a row of four quarters, of a third and two thirds and of three thirds is the one the base stylesheet gives (302px a quarter at 1280px, 89.5px at 390px; 402.656px and 805.328px
+	for a third and two thirds at 1280px). With nino-grid-gap-2 the gap is 18px at 1280px and 16px at 390px, the quarters are 288.5px and 77.5px, the thirds 390.656px and 108.656px,
+	two thirds 799.328px and 233.328px, every row stays on one line and the last column ends at the content edge of the row to within 0.03px. Three columns of 100% below 1024px and
+	a third from there stand a gap above one another on a phone, as wide as the row. The stylesheet is read here, the page is not: nothing in the kernel's suites drives a browser	*/
+/*	Every width class gives the gap back, at its tier: the base ones at the top of the file, the -s- ones from 640px, the -m- from 768px, the -l- from 1024px, the -xl- from 1280px. The share is that of
+	a column of the width in a row of equal columns, (k - 1) / k of a gap: 3/4, 2/3, 1/2, 1/3, 1/4 - and a whole row gives nothing back	*/
+$gapShare = [
+	'25'	=> 'calc(25% - .75 * var(--nino-grid-gap, 0px))',
+	'33'	=> 'calc(100% / 3 - var(--nino-grid-gap, 0px) * 2 / 3)',
+	'50'	=> 'calc(50% - .5 * var(--nino-grid-gap, 0px))',
+	'66'	=> 'calc(100% / 1.5 - var(--nino-grid-gap, 0px) / 3)',
+	'75'	=> 'calc(75% - .25 * var(--nino-grid-gap, 0px))',
+	'100'	=> '100%',
+];
+$gapTiers = [ '' => [], 's-' => [ '@media (min-width: 640px)' ], 'm-' => [ '@media (min-width: 768px)' ], 'l-' => [ '@media (min-width: 1024px)' ], 'xl-' => [ '@media (min-width: 1280px)' ] ];
+$gapWrong = [];
+foreach( $gapTiers as $gapTier => $gapCondition )
+	foreach( $gapShare as $gapWidth => $gapValue ) {
+		$gapClass = '.nino-grid-'. $gapTier. $gapWidth;
+		if( count( $groundEach[$gapClass] ?? [] ) !== 1 || $groundSets( $groundOf( $gapClass ), 'width', $gapValue ) === false || $groundConditions( $gapClass ) !== [ $gapCondition ] )
+			$gapWrong[] = $gapClass;
+	}
+check( 'the width classes give the gap back in the five tiers - mobile-first, the base ones and the -s-, -m-, -l- and -xl- ones from 640, 768, 1024 and 1280px - 3/4 of it for a quarter, 2/3 for a third, 1/2, 1/3 and 1/4, and nothing for 100'
+	. ( $gapWrong === [] ? '' : ' - not: '. implode( ', ', $gapWrong ) ), $gapWrong === [] );
+
+// A card that is a column of the 768px tier has the margins to give up and the share of the gap to give back, in the same calc: three of them in a row with a gap stand on one line
+$gapCards = [
+	'25'	=> 'calc(25% - var(--space-1) * var(--whitespace-scale) - var(--space-1) * var(--whitespace-scale) - .75 * var(--nino-grid-gap, 0px))',
+	'33'	=> 'calc((100% / 3) - var(--space-1) * var(--whitespace-scale) - var(--space-1) * var(--whitespace-scale) - var(--nino-grid-gap, 0px) * 2 / 3)',
+	'50'	=> 'calc(50% - var(--space-1) * var(--whitespace-scale) - var(--space-1) * var(--whitespace-scale) - .5 * var(--nino-grid-gap, 0px))',
+];
+$gapWrong = [];
+foreach( $gapCards as $gapWidth => $gapValue ) {
+	$gapClass = '.nino-card--grid.nino-grid-m-'. $gapWidth;
+	if( count( $groundEach[$gapClass] ?? [] ) !== 1 || $groundSets( $groundOf( $gapClass ), 'width', $gapValue ) === false || $groundConditions( $gapClass ) !== [ [ '@media (min-width: 768px)' ] ] )
+		$gapWrong[] = $gapClass;
+}
+check( '...and so does a card that is a column, from 768px: its margins and its share of the gap, so that three of them in a row with a gap stay on one line'
+	. ( $gapWrong === [] ? '' : ' - not: '. implode( ', ', $gapWrong ) ), $gapWrong === [] );
 
 echo "\n";
 
