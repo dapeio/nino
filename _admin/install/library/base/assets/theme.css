@@ -894,7 +894,7 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 }
 
 
-/* ==== 8. footer: one-legal-row (scale default, height default, space default, ground default, nav-case default) ==== */
+/* ==== 8. footer: one-legal-row (scale default, height default, space default, ground default, border-size default, border-color default, position default, nav-case default) ==== */
 /*	@name				One legal row
  *	@description	Copyright, the footer navigation and the legal links on a single row. The smallest footer there is.
  *	@description-de	Copyright, die Footer-Navigation und die rechtlichen Links in einer einzigen Zeile. Der kleinste Footer, den es gibt.
@@ -903,23 +903,39 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
  *	@knob	height		Space above and below the content of the footer
  *	@knob	space		Space between its columns, lines and links
  *	@knob	ground		What the footer stands on
+ *	@knob	border-size	Weight of the line over the footer
+ *	@knob	border-color	Colour of that line
+ *	@knob	position	Where the content of the footer stands
  *	@knob	nav-case	Capitals in the links of the navigation
  *
  *	The name and the description are what the Design panel lists this
  *	variant as. Every library file carries them; a file without a @name
  *	is offered under its own file name instead.
  *
- *	The five knobs are ladders, declared below, the middle of each this set as it
- *	was before it had any: scale is a factor on the type size of the footer, height
+ *	The eight knobs are ladders, declared below, the middle of each this set as it
+ *	is: scale is a factor on the type size of the footer, height
  *	a factor on the room above and below its content, space a factor on the gaps
  *	between its columns, lines and links, and ground a choice of three: the ground
  *	and the ink of the page, this set's own, and the dark pair of the palette. What
  *	the text, the links and the lines of the footer are read in comes with it, as
  *	aspects of the ground (--footer-ground-ink, -subtitle, -title, -accent, -focus
  *	and -border), and is put on the footer as the roles Nino.css reads - so the
- *	footer is legible on each of the three. The fifth, nav-case, is a toggle: two
- *	rungs, none and uppercase, and the links of the navigation and the legal links
- *	are set in the one its position picks.
+ *	footer is legible on each of the three.
+ *
+ *	The line over the footer is two knobs. border-size is its weight, drawn as the top
+ *	border of the frame that paints the ground, and border-color a choice of three for its
+ *	colour: the ink of the ground, the line of the ground - where it stands at the middle -
+ *	and the brand. Of the three, the first two are roles of the footer's own ground, so
+ *	a ground of another kind brings its line with it.
+ *
+ *	The seventh, position, is a choice of three for where the content stands. The row has
+ *	its three cells across the whole width at the middle, the template: the copyright, the
+ *	navigation and the locale in a quarter, a half and a quarter. Left and centre let
+ *	each cell be as wide as its content (--footer-position-basis), put the gap between
+ *	them (--footer-position-gap) and pack them at the left edge or in the middle of the row.
+ *
+ *	The eighth, nav-case, is a toggle: two rungs, none and uppercase, and the links of
+ *	the navigation and the legal links are set in the one it is on.
  */
 
 :root {
@@ -966,18 +982,41 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 
 	/*	The accent role	*/
 	--footer-ground-accent--less:	var(--color-accent);
-	--footer-ground-accent--default:	var(--color-accent);
+	--footer-ground-accent--default:	var(--color-accent-black);
 	--footer-ground-accent--more:	var(--color-accent-dark);
 
 	/*	The ring of the focus	*/
 	--footer-ground-focus--less:	var(--color-focus);
-	--footer-ground-focus--default:	var(--color-focus);
+	--footer-ground-focus--default:	var(--color-focus-black);
 	--footer-ground-focus--more:	var(--color-focus-dark);
 
 	/*	The lines in it	*/
 	--footer-ground-border--less:	var(--color-border);
-	--footer-ground-border--default:	var(--color-border);
+	--footer-ground-border--default:	var(--color-border-black);
 	--footer-ground-border--more:	var(--color-border-dark);
+
+	/*	The weight of the line over the footer: none at the middle - this set draws no line of its own - a hairline and a rule beyond it	*/
+	--footer-border-size--least:	0;
+	--footer-border-size--less:	0;
+	--footer-border-size--default:	0;
+	--footer-border-size--more:	1px;
+	--footer-border-size--most:	2px;
+
+	/*	The colour of that line: the ink of the ground the footer stands on, the line of that ground, the brand - so a dark ground brings its own line	*/
+	--footer-border-color--less:	var(--footer-ground-ink);
+	--footer-border-color--default:	var(--footer-ground-border);
+	--footer-border-color--more:	var(--color-primary);
+
+	/*	Where the content stands: the cells of the row are packed at the left edge or in the middle - as wide as their content, with a gap between them - and fill the row as the template has it, a quarter, a half and a quarter in between	*/
+	--footer-position--less:	start;
+	--footer-position--default:	start;
+	--footer-position--more:	center;
+	--footer-position-basis--less:	max-content;
+	--footer-position-basis--default:	auto;
+	--footer-position-basis--more:	max-content;
+	--footer-position-gap--less:	1;
+	--footer-position-gap--default:	0;
+	--footer-position-gap--more:	1;
 
 	/*	The case of the links of the navigation: as they are written, or in capitals	*/
 	--footer-nav-case--default: none;
@@ -996,9 +1035,19 @@ footer {
 .nino-footer-legal {
 	padding: calc( var(--space-1) * var(--footer-height) ) calc( var(--space-3) * var(--footer-space) );
 	background: var(--footer-ground);
+	border-top: solid var(--footer-border-color) var(--footer-border-size);
 	color: var(--footer-ground-ink);
+	--color-ink: var(--footer-ground-ink);
+	--color-ground: var(--footer-ground);
 }
 
+.nino-footer-legal .nino-grid-row {
+	justify-content: var(--footer-position);
+	column-gap: calc( var(--space-3) * var(--footer-space) * var(--footer-position-gap) );
+}
+.nino-footer-legal .nino-grid-row > * {
+	flex-basis: var(--footer-position-basis);
+}
 .nino-footer-nav .nino-footer-title {
 	display:none;
 }
@@ -1912,6 +1961,8 @@ footer {
 	--card-title: var(--card-title--default);
 	--card-title-case: var(--card-title-case--default);
 	--card-tone: var(--card-tone--default);
+	--footer-border-color: var(--footer-border-color--default);
+	--footer-border-size: var(--footer-border-size--default);
 	--footer-ground: var(--footer-ground--default);
 	--footer-ground-accent: var(--footer-ground-accent--default);
 	--footer-ground-border: var(--footer-ground-border--default);
@@ -1921,6 +1972,9 @@ footer {
 	--footer-ground-title: var(--footer-ground-title--default);
 	--footer-height: var(--footer-height--default);
 	--footer-nav-case: var(--footer-nav-case--default);
+	--footer-position: var(--footer-position--default);
+	--footer-position-basis: var(--footer-position-basis--default);
+	--footer-position-gap: var(--footer-position-gap--default);
 	--footer-scale: var(--footer-scale--default);
 	--footer-space: var(--footer-space--default);
 	--forms-corners: var(--forms-corners--default);
