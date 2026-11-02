@@ -228,17 +228,17 @@ lowercase hyphenated IDs.
 
 - `[[.id]]` is the internal record ID.
 - `[[.lang]]` is ` lang="<tag>"` - the attribute with its space in front - where the block shows text of another language than the page's, and nothing where the page's language had it all: put it on the element that holds the text. A per-language field that the page's language has no value for - no version of the element at all, or an empty field - takes its value from the native language, then the other languages of the site in their order, then the other languages the type file holds (`\Nino\Elements::getElementWithFallback()`); the element is listed in every language the query lists it for.
-- `[[field]]` is local to the current Elements block. A field of the model that no language has a value for is empty: the placeholder never stays standing.
+- `[[field]]` is local to the current Elements block, and to the cell of a stack. A field of the model that no language has a value for is empty: the placeholder never stays standing.
 - normal field output is HTML-escaped;
 - `html: true` fields are sanitized by the Elements renderer, to the inline tags, or - with `blocks: true` - to paragraphs and lists as well; a `breaks: true` field is escaped and its newlines become `<br>`. The rule is `\Nino\Html::fieldValue( $value, $field )`, which `[element]` and `[elements]` call and a feature that draws a field itself calls instead of a copy. `[elementvalues]` lists values and always escapes them;
 - wrap the output of a `blocks` field in an element with the class `nino-richtext`: the reset at the top of `Nino.css` takes every paragraph gap and list marker away, and the class restores them;
-- a `breaks` or `blocks` value has `<br>` in it, so it does not belong in an attribute or in a `[json ...]` shortcode that expects plain text;
+- a `breaks` or `blocks` value has `<br>` in it, and the text of every `html: true` field keeps a raw `"`, so none of them belongs in an attribute or in a `[json ...]` shortcode that expects plain text;
 - `limit` bounds output;
 - `query` matches model values and supports the existing percent wildcard
   forms.
 
 Do not use absolute `[[/template/*]]` fills for per-record data. Do not use local
-`[[title]]` outside an Element block.
+`[[title]]` outside an Element block or the cell of a stack.
 
 ## Render one field's distinct values
 

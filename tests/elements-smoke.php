@@ -789,6 +789,25 @@ check( '[element] does the same, for a language with a value and for one without
 check( 'a link to a field that is global is not read, and the field the element has no value for is nothing like any other of the model: no fill is left standing', str_contains( \Nino\Html::renderHtml( $appData, sprintf( $altLoop, 'de_DE' ) ), '[[globalAlt]]' ) === false
 	&& str_contains( \Nino\Html::renderHtml( $appData, sprintf( $altLoop, 'de_DE' ) ), 'data-plain=""' ) === true );
 
+// Elements::fills() is what [elements] fills one element with, and what the cell of a stack is filled with
+$fillsModel = \Nino\Elements::getElementModel( $appData, '/alttest' );
+// Compared as a map: the order of the keys is the order of the replacing, and no token holds another
+$fillsOf = static function( array $element, array $model, int $id ): array {
+	$fills = \Nino\Modules\Elements::fills( $element, $model, $id );
+	ksort( $fills );
+	return $fills;
+};
+$fillsWant = static function( array $fills ): array {
+	ksort( $fills );
+	return $fills;
+};
+check( 'Elements::fills() makes the fills of one element: the number in the loop, each scalar key of the element escaped by the type of its field, [[.uri]] among them, and [[.lang]] as the attribute',
+	$fillsOf( [ 'photo' => 'one.jpg', 'photoAlt' => 'A "q" [x]', '.uri' => '/alttest/one', '.lang' => 'de-DE', 'list' => [ 1 ] ], $fillsModel, 3 )
+	=== $fillsWant( [ '[[.id]]' => 3, '[[.lang]]' => ' lang="de-DE"', '[[.uri]]' => '/alttest/one', '[[globalAlt]]' => '', '[[photo]]' => 'one.jpg', '[[photoAlt]]' => 'A &quot;q&quot; &#91;x]', '[[plain]]' => '' ] ) );
+check( '...an element with no value at all has a blank fill for every field of the model, the alt text of an image among them, and no language: nothing, never a leftover token',
+	$fillsOf( [], $fillsModel, 0 ) === $fillsWant( [ '[[.id]]' => 0, '[[.lang]]' => '', '[[globalAlt]]' => '', '[[photo]]' => '', '[[photoAlt]]' => '', '[[plain]]' => '' ] )
+	&& \Nino\Modules\Elements::fills( [ 'x' => 1 ], [], 2 )['[[x]]'] === '1' );
+
 // --- Elements::getElementWithFallback and [elements] - the language an element has none of ----
 
 echo "Elements::getElementWithFallback and [elements] - a field the element has no value for in the language is the one of another language\n";

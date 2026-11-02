@@ -231,6 +231,44 @@ namespace Nino\Modules {
 		}
 
 		/**
+		 *	The fills of one element in a loop: [[.id]] the number in the loop,
+		 *	[[<field>]] each scalar key of the element - [[.uri]] among them - escaped
+		 *	by the type of its field (see _escapeFieldValue()), and [[.lang]] the
+		 *	lang attribute of the language the element was taken from, with a space
+		 *	in front, or nothing. A field of the model the element has no value
+		 *	for is a fill of nothing, as is the alt text an image field names, so
+		 *	that no token of the block is left standing. The one making of them, for
+		 *	[elements] and for the cell of a stack (see
+		 *	\Nino\Modules\Components::renderStack()); a caller replaces the tokens
+		 *	of its block by the values with str_replace()
+		 *
+		 *	@param		array 		$element			The element, with '.uri' and, from getElementWithFallback(), '.lang'
+		 *	@param		array			$model				The model of its type
+		 *	@param		int				$id						The number of the element in the loop
+		 *
+		 *	@return 	array										[ '[[token]]' => value ]
+		 */
+		public static function fills( array $element, array $model, int $id ): array {
+
+			// Every field of the model starts as a blank fill: what an element has no value for in any language is still a field
+			$blank = array_fill_keys( array_map( static fn( int|string $field ): string => '[['. $field. ']]', array_keys( $model ) ), '' );
+
+			// A map, not two parallel lists: the blank fills go in first and the element's own values over them
+			$fills = [ '[[.id]]' => $id ] + self::_altSeed( $model ) + $blank;
+
+			foreach( $element as $key => $value ) {
+				if( is_scalar( $value ) === false )
+					continue;
+
+				$fills['[['. $key. ']]'] = self::_escapeFieldValue( $value, $model[$key] ?? [] );
+			}
+
+			$fills['[[.lang]]'] = is_string( $element['.lang'] ?? null ) === true && $element['.lang'] !== '' ? ' lang="'. htmlspecialchars( $element['.lang'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ). '"' : '';
+
+			return $fills;
+		}
+
+		/**
 		 *	Replace elements shortcode: the block between the tags once for each
 		 *	element, with [[.id]] the number in the loop and [[<field>]] each field
 		 *	of the element. The element is the one in the language of the page with
@@ -261,23 +299,10 @@ namespace Nino\Modules {
 			$id = 0;
 
 			$model = \Nino\Elements::getElementModel( $appData, $uri );
-			$altSeed = self::_altSeed( $model );
-
-			// Every field of the model starts as a blank fill: what an element has no value for in any language is still a field
-			$blank = array_fill_keys( array_map( static fn( int|string $field ): string => '[['. $field. ']]', array_keys( $model ) ), '' );
 
 			foreach( $result as $element ) {
 
-				$fills = [ '[[.id]]' => $id ] + $altSeed + $blank;
-
-				foreach( $element as $key => $value ) {
-					if( is_scalar( $value ) === false )
-						continue;
-
-					$fills['[['. $key. ']]'] = self::_escapeFieldValue( $value, $model[$key] ?? [] );
-				}
-
-				$fills['[[.lang]]'] = is_string( $element['.lang'] ?? null ) === true && $element['.lang'] !== '' ? ' lang="'. htmlspecialchars( $element['.lang'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ). '"' : '';
+				$fills = self::fills( $element, $model, $id );
 
 				$html .= str_replace( array_keys( $fills ), array_values( $fills ), $content );
 

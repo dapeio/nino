@@ -2380,6 +2380,76 @@ check( 'value(): in a stack, a field is drawn after its type, .id is the place i
 	. '<i>Web &lt;b&gt;&#91;x]&lt;/b&gt;</i><i><p>Hello &#91;&#91;/k]] &#91;button x]</p></i><i>0</i><i>/services/web</i><i>NULL</i><i>web</i>'
 	. '<i>services/web/image.webp</i><i>services/web/image.webp</i><i>Web &lt;b&gt;&#91;x]&lt;/b&gt;</i><i>/services/web</i><i>#top</i></div></div>' );
 
+// The fills of the element in the cell of a stack: [[.id]], [[.uri]] and the fields, as [elements] fills them
+\Nino\Elements::insertElementType( $appData, '/fillbox', [
+	'title'	=> [ 'type' => 'string', 'locale' => true ],
+	'slug'	=> [ 'type' => 'string' ],
+	'link'	=> [ 'type' => 'string' ],
+	'note'	=> [ 'type' => 'string', 'locale' => true ],
+] );
+\Nino\Elements::insertElement( $appData, '/fillbox/one', [ 'title' => 'a&b "c" [x]', 'slug' => 'first', 'link' => '/p?a=1&b="c"' ], 'de_DE' );
+\Nino\Elements::insertElement( $appData, '/fillbox/two', [ 'title' => 'Two', 'slug' => 'second', 'link' => '/two' ], 'de_DE' );
+$fillCell = '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33">';
+$fillRow = '<div class="nino-grid-row nino-stack nino-stack-gap-2">';
+$fillOf = static fn( string $content ): string => $render( '[stack /fillbox sort="uri"]'. $content. '[/stack]' );
+$fillCells = static fn( string ...$cells ): string => $fillRow. $fillCell. implode( '</div>'. $fillCell, $cells ). '</div></div>';
+
+check( 'a stack\'s cell is filled with the element: [[.id]], [[.uri]] - the uri of the element, /<type>/<name> - [[.lang]] and [[title]] in running text are the element\'s - the field escaped once, with its [ and ] inert - and a field of the model without a value is nothing',
+	$fillOf( '<i>[[.id]]|[[.uri]]|[[.lang]]|[[title]]|[[note]]|[[link]]</i>' ) === $fillCells( '<i>0|/fillbox/one||a&amp;b &quot;c&quot; &#91;x&#93;||/p?a=1&amp;b=&quot;c&quot;</i>', '<i>1|/fillbox/two||Two||/two</i>' ) );
+check( '...inside the value of a call as in text: the call is whole and its address the element\'s',
+	$fillOf( '[button text="More" href="/blog/[[slug]]"]' ) === $fillCells( '<a class="nino-btn" href="/blog/first">More</a>', '<a class="nino-btn" href="/blog/second">More</a>' )
+	&& $fillOf( '[button text="[[.id]]: [[title]]" href="[[.uri]]"]' ) === $fillCells( '<a class="nino-btn" href="/fillbox/one">0: a&amp;b &quot;c&quot; &#91;x]</a>', '<a class="nino-btn" href="/fillbox/two">1: Two</a>' ) );
+check( '...a token of a field no language has a value for is nothing in a call as well: not the token, and not a "[]" the shortcode pass makes of it',
+	$fillOf( '[button text="Go" href="/n/[[note]]"]|[[note]]|' ) === $fillCells( '<a class="nino-btn" href="/n/">Go</a>||', '<a class="nino-btn" href="/n/">Go</a>||' ) );
+check( '...a [ in a field is written &#91; and a ] &#93; whether it stands in text or in a call, so that a value an editor wrote opens no fill and no shortcode and ends no call',
+	str_contains( $fillOf( '[[title]]' ), 'a&amp;b &quot;c&quot; &#91;x&#93;' ) === true && str_contains( $fillOf( '[[title]]' ), '[' ) === false
+	&& str_contains( $fillOf( '[title title href="/t/[[title]]"]' ), '<a href="/t/a&amp;b &quot;c&quot; &#91;x]">' ) === true
+	&& substr_count( $fillOf( '[title title href="/t/[[title]]"]' ), '</a>' ) === 2 && str_contains( $fillOf( '[title title href="/t/[[title]]"]' ), '"]' ) === false );
+check( '...the page\'s fills come first: a key of the page between double brackets is the page\'s in the cell, a token that is the element\'s is the element\'s, and what neither knows stays as it is',
+	$fillOf( '[[/_nino/webpage/contact/uri]]|[[.uri]]|[[nothing]]' ) === $fillCells( '/contact|/fillbox/one|[[nothing]]', '/contact|/fillbox/two|[[nothing]]' ) );
+
+// The & of a field is escaped once in an address: the fill wrote it &amp;, the address is read as a text is and escaped by _href() the one time
+check( 'an address carries every character of a field once: the & of a query is &amp; and a " is &quot;, whether it comes from a fill, from a field of the element or from the author',
+	$fillOf( '[button text="Go" href="/x/[[link]]"]' ) === $fillCells( '<a class="nino-btn" href="/x//p?a=1&amp;b=&quot;c&quot;">Go</a>', '<a class="nino-btn" href="/x//two">Go</a>' )
+	&& str_contains( $fillOf( '[button text="Go" href="/x/[[title]]"]' ), 'href="/x/a&amp;b &quot;c&quot; &#91;x]"' ) === true
+	&& str_contains( $fillOf( '[button text="Go" href="link"]' ), 'href="/p?a=1&amp;b=&quot;c&quot;"' ) === true
+	&& str_contains( $fillOf( '[button text="Go" href="/x?a=1&amp;b=2&c=3"]' ), 'href="/x?a=1&amp;b=2&amp;c=3"' ) === true );
+check( 'value(): an address is read as a text is - an entity in it is the character it stands for, escaped once - wherever it comes from: a key that has no fill, a fixed text, an address that is no key',
+	\Nino\Modules\Components::value( $appData, '/x/a&amp;b&quot;c&quot;', 'href' ) === '/x/a&amp;b&quot;c&quot;'
+	&& \Nino\Modules\Components::value( $appData, '/x/a&b "c"', 'href' ) === '/x/a&amp;b &quot;c&quot;'
+	&& \Nino\Modules\Components::value( $appData, '#a&amp;b', 'href' ) === '#a&amp;b' && \Nino\Modules\Components::value( $appData, '#a&b', 'href' ) === '#a&amp;b'
+	&& \Nino\Modules\Components::value( $appData, '', 'href', 'plain', 'a&amp;b &quot;c&quot;' ) === 'a&amp;b &quot;c&quot;'
+	&& \Nino\Modules\Components::value( $appData, '#x&copy=1', 'href' ) === '#x&amp;copy=1'
+	&& \Nino\Modules\Components::value( $appData, 'javascript&#58;alert(1)', 'href' ) === '#' && \Nino\Modules\Components::value( $appData, '/x/&#91;y&#93;', 'href' ) === '/x/&#91;y]' );
+
+// Stacks in stacks: the cell is filled by plain replacement over what is written in it, the outer element first
+\Nino\Elements::insertElementType( $appData, '/fillnest', [ 'title' => [ 'type' => 'string', 'locale' => true ], 'tag' => [ 'type' => 'string' ] ] );
+\Nino\Elements::insertElement( $appData, '/fillnest/in', [ 'title' => 'Inner', 'tag' => 'T' ], 'de_DE' );
+\Nino\Filesystem::putFileContent( $appData, '/templates/fill-inner.tpl', '[stack /fillnest]in:[[.id]]|[[title]]|[[.uri]][/stack]' );
+$fillTemplate = $render( '[stack /fillbox sort="uri" limit="1"]out:[[title]][template /templates/fill-inner][/stack]' );
+check( 'a stack in a template that a stack includes has the fills of its own element - the template is not part of what the outer cell is filled over - and the outer keeps its own',
+	$fillTemplate === $fillRow. $fillCell. 'out:a&amp;b &quot;c&quot; &#91;x&#93;'. $fillRow. $fillCell. 'in:0|Inner|/fillnest/in</div></div></div></div>' );
+$fillList = $render( '[stack /fillbox sort="uri" limit="1"]out:[[title]][list /fillnest]in:[[title]]|[[tag]]|[[.uri]]|[[.id]][/list][/stack]' );
+check( 'a call of another stack written in the cell keeps its own element: what stands between its tags is not filled with the outer one - not a field the two types share, not .uri or .id - and is rendered with the inner',
+	str_contains( $fillList, 'out:a&amp;b &quot;c&quot; &#91;x&#93;' ) === true && str_contains( $fillList, 'in:Inner|T|/fillnest/in|0' ) === true && substr_count( $fillList, 'a&amp;b' ) === 1 );
+
+// A loop written in the cell is the loop's: [elements] draws each of its elements with its own values, and its opening tag is the cell's to fill
+\Nino\Elements::insertElementType( $appData, '/fillpost', [ 'title' => [ 'type' => 'string', 'locale' => true ], 'cat' => [ 'type' => 'string' ] ] );
+\Nino\Elements::insertElement( $appData, '/fillpost/p1', [ 'title' => 'Post 1', 'cat' => 'first' ], 'de_DE' );
+\Nino\Elements::insertElement( $appData, '/fillpost/p2', [ 'title' => 'Post 2', 'cat' => 'second' ], 'de_DE' );
+\Nino\Elements::insertElement( $appData, '/fillpost/p3', [ 'title' => 'Post 3', 'cat' => 'first' ], 'de_DE' );
+$fillLoop = '<a href="[[.uri]]">[[.id]] [[title]]</a>';
+check( '[elements] in the cell of a stack draws each of its elements with its own .uri, .id and fields, not the outer element\'s',
+	$fillOf( '[elements /fillpost sort="uri"]'. $fillLoop. '[/elements]' ) === $fillCells(
+		'<a href="/fillpost/p1">0 Post 1</a><a href="/fillpost/p2">1 Post 2</a><a href="/fillpost/p3">2 Post 3</a>', '<a href="/fillpost/p1">0 Post 1</a><a href="/fillpost/p2">1 Post 2</a><a href="/fillpost/p3">2 Post 3</a>' ) );
+check( '...its opening tag is the cell\'s: a query by a field of the outer element takes it, one element\'s posts to the next, while the block between the tags stays the loop\'s',
+	$fillOf( '[elements /fillpost sort="uri" query="cat=[[slug]]"]<b>[[title]]</b>[/elements]' ) === $fillCells( '<b>Post 1</b><b>Post 3</b>', '<b>Post 2</b>' ) );
+check( '...a lone [ in a quoted value of its opening tag does not make it the cell\'s: the call ends at the first ], as the shortcode pass reads it, and the loop keeps its own element',
+	$fillOf( '[elements /fillpost sort="uri" limit="1" class="a[b"]<u>[[.uri]]|[[title]]</u>[/elements]' ) === $fillCells( '<u>/fillpost/p1|Post 1</u>', '<u>/fillpost/p1|Post 1</u>' ) );
+check( '...and what stands between the tags of a component is still the cell\'s, a loop in it keeping its own',
+	str_contains( $fillOf( '[card]<i>[[.uri]]</i>[elements /fillpost sort="uri" limit="1"]<u>[[.uri]]</u>[/elements]<i>[[.id]]</i>[/card]' ), '<i>/fillbox/one</i><u>/fillpost/p1</u><i>0</i>' ) === true
+	&& str_contains( $fillOf( '[card]<i>[[.uri]]</i>[elements /fillpost sort="uri" limit="1"]<u>[[.uri]]</u>[/elements]<i>[[.id]]</i>[/card]' ), '<i>/fillbox/two</i><u>/fillpost/p1</u><i>1</i>' ) === true );
+
 // The components, one by one
 check( '[title] is a heading with the class of a section title, a tag and a style', $render( '[title /template/page-home/hero/title tag="h4" style="loud"]' ) === '<h4 class="nino-section-title nino-section-title--loud">Hi &#91;there]</h4>'
 	&& $render( '[title /template/page-home/hero/title]' ) === '<h3 class="nino-section-title">Hi &#91;there]</h3>'

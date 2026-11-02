@@ -1686,11 +1686,14 @@ namespace Nino\Modules {
 		 *	the filename an image field holds - escaped like text, so that it
 		 *	is safe to write; the renderer looks the picture up through
 		 *	\Nino\Images by $args['source'], or by the field it names. An
-		 *	address is escaped like text, and one with
-		 *	a scheme that is not http, https, mailto or tel is a '#'. An address
-		 *	that is a key under /_nino/webpage/ - a page's own, which the Routes
-		 *	step writes without the directory the project is served from - is
-		 *	written with that directory in front of it, as the navigation writes it.
+		 *	address is escaped like text, and one with a scheme that is not http,
+		 *	https, mailto or tel is a '#'. An address that is written, in an
+		 *	attribute or in a fixed text, is read as a text is: an entity in it - the
+		 *	&amp; that a fill of a field puts there - is the character it stands for,
+		 *	so that it is escaped once. An address that is a key under /_nino/webpage/ -
+		 *	a page's own, which the Routes step writes without the directory the
+		 *	project is served from - is written with that directory in front of it,
+		 *	as the navigation writes it.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$source				The first argument of the shortcode
@@ -1753,7 +1756,7 @@ namespace Nino\Modules {
 					if( $fill !== null && str_starts_with( $source, '/_nino/webpage/' ) === true && str_starts_with( $fill, '/' ) === true )
 						$fill = rtrim( \Nino\Filesystem::getDir( $appData ), '/' ). $fill;
 
-					return self::_href( $fill ?? $source );
+					return self::_href( $fill ?? html_entity_decode( $source, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
 				}
 
 				return $fill === null ? null : self::_formatText( $fill, $format );
@@ -1782,7 +1785,7 @@ namespace Nino\Modules {
 			// Anything else names a field there is none of, or an element there
 			// is none of
 			if( $kind === 'href' && in_array( $source, [ '.id', '.uri' ], true ) === false )
-				return self::_href( $source );
+				return self::_href( html_entity_decode( $source, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
 
 			return null;
 		}
@@ -1873,6 +1876,30 @@ namespace Nino\Modules {
 		 *	it. A stack directly inside another is not supported - the
 		 *	shortcode reads the content up to the first closing tag.
 		 *
+		 *	The content is first filled with the element, by the fills [elements]
+		 *	makes (see \Nino\Modules\Elements::fills()): [[.id]], [[.uri]] and
+		 *	[[<field>]] of the element, in running text and inside the value of a
+		 *	call - text="[[title]]", href="/blog/[[slug]]". [[.uri]] is the uri of the
+		 *	element, '/<type>/<name>'; [[.lang]] is nothing here, a stack does not take
+		 *	a field from another language. A value is escaped as a field is written
+		 *	into [elements], with every '[' as &#91; and, because a call ends at the
+		 *	first ']' it meets, every ']' as &#93;. In text= and href= it is escaped
+		 *	once: the first is read as a text is and the second as an address, an
+		 *	entity in either being the character it stands for. Any other attribute is
+		 *	taken as it stands and escaped again by the component. A field of the
+		 *	model without a value is nothing. The page's own fills come first:
+		 *	renderHtml() has put them in before the shortcode is read, so a key
+		 *	between double brackets that is a text key is the page's.
+		 *
+		 *	The fill is a plain replacement over the content as it is written, with
+		 *	one exception: what stands between the tags of a call that is no
+		 *	component - [elements], another stack, a feature's loop - is that call's
+		 *	own and is left as it is, to be filled with its own element; its opening
+		 *	tag is filled, so that query="category=[[slug]]" takes the field of the
+		 *	outer element. What stands between the tags of a component, a [card],
+		 *	is filled. What a template included in the cell brings is not part of
+		 *	the content and is not filled.
+		 *
 		 *	With a grid, each cell is told the classes of its width in the
 		 *	viewports (nino-grid-s-, -m- and -l-, from 'cols'), nino-autoheight
 		 *	and its group if 'autoheight' is set; without, nothing. The cell
@@ -1936,7 +1963,8 @@ namespace Nino\Modules {
 				}
 			}
 
-			$html = '';
+			$html		= '';
+			$parts	= self::_cellParts( $appData, $content );
 
 			foreach( array_values( $elements ) as $index => $element ) {
 
@@ -1944,8 +1972,13 @@ namespace Nino\Modules {
 
 				$appData[self::CONTEXT] = [ 'uri' => $typeUri, 'id' => $index, 'element' => $element, 'model' => $model ];
 
+				$fills = array_map(
+					static fn( string|int $fill ): string => str_replace( ']', '&#93;', (string) $fill ),
+					\Nino\Modules\Elements::fills( is_array( $element ) === true ? $element : [], $model, $index )
+				);
+
 				try {
-					$inner = \Nino\Html::renderHtml( $appData, $content );
+					$inner = \Nino\Html::renderHtml( $appData, self::_fillCell( $parts, $fills ) );
 				}
 				finally {
 					if( $previous === null )
@@ -1956,6 +1989,70 @@ namespace Nino\Modules {
 
 				$html .= $cell( $inner, is_array( $element ) === true ? $element : [], $index, $info );
 			}
+
+			return $html;
+		}
+
+		/**
+		 *	The content of a stack cut where a call that is no component holds
+		 *	something between its tags: [elements], another stack, a feature's
+		 *	loop. The text up to and including the opening tag of such a call is
+		 *	one part and what stands between its tags is the next, so that the
+		 *	fill of the cell (see _fillCell()) leaves the second as it is - it is
+		 *	the call's own, filled with its own element - and fills the opening
+		 *	tag, in which a token may stand. A component holds components and is
+		 *	not cut: what is between its tags is the cell's. The opening tag is
+		 *	read with a token in its arguments, which the shortcode pass will see
+		 *	once it is filled
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$content			The content of the stack
+		 *
+		 *	@return 	array										[ [ text, whether it is the call's own ], ... ], put together the content again
+		 */
+		private static function _cellParts( array &$appData, string $content ): array {
+
+			$names = array_diff( \Nino\Html::shortcodes( $appData ), array_keys( self::components( $appData ) ) );
+
+			if( $names === [] || strpos( $content, '[/' ) === false
+				|| preg_match_all( '/\[('. implode( '|', array_map( static fn( string $name ): string => preg_quote( $name, '/' ), $names ) ). ')(?: (?>\[\[[^\[\]]+\]\]|[^\]])*+)?\]([^\[]*+(?:\[(?!\/\1\])[^\[]*+)*+)\[\/\1\]/', $content, $found, PREG_SET_ORDER | PREG_OFFSET_CAPTURE ) < 1 )
+				return [ [ $content, false ] ];
+
+			$parts	= [];
+			$at			= 0;
+
+			foreach( $found as $call ) {
+
+				[ $inner, $start ] = $call[2];
+
+				$parts[] = [ substr( $content, $at, $start - $at ), false ];
+				$parts[] = [ $inner, true ];
+
+				$at = $start + strlen( $inner );
+			}
+
+			$parts[] = [ substr( $content, $at ), false ];
+
+			return $parts;
+		}
+
+		/**
+		 *	The content of a stack filled with the fills of one element, except the
+		 *	parts that are a call's own (see _cellParts())
+		 *
+		 *	@param		array			$parts				From _cellParts()
+		 *	@param		array			$fills				'[[token]]' => value
+		 *
+		 *	@return 	string
+		 */
+		private static function _fillCell( array $parts, array $fills ): string {
+
+			$tokens	= array_keys( $fills );
+			$values	= array_values( $fills );
+			$html		= '';
+
+			foreach( $parts as [ $text, $own ] )
+				$html .= $own === true ? $text : str_replace( $tokens, $values, $text );
 
 			return $html;
 		}
