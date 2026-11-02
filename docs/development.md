@@ -141,7 +141,8 @@ The runtime textfills are added in two passes, and the split matters. `/nino/dir
 - Non-string bodies are JSON-encoded and receive a suitable `Content-Type`.
 - Project and standard headers are merged.
 - Status code and headers are sent.
-- For `HEAD`, the body is not output.
+- A response that names a `file` has the file sent in place of its body, after the headers and in pieces: whole, or as the one byte range the request asked for. Every output buffer is ended first and PHP's own output compression is switched off for the request, so that the bytes leave as they are, and the visitor's session is closed, so that a long download does not keep their other requests waiting (see [Answering a File](#answering-a-file)).
+- For `HEAD`, the body is not output - and no byte of a file.
 - Then the script ends with `exit`.
 
 > **No direct output during runtime:** `echo`, `header()`, and `http_response_code()` break Nino's fundamental concept and must not be used in the regular request/response lifecycle. They bypass the common response path and can corrupt headers, JSON responses, and tests. Instead, modify `/nino/http/response`.
@@ -204,6 +205,37 @@ Route-specific callbacks use the **internal response URI**:
 ```
 
 For `GET` and the internal URI `/contact`, the name is therefore `/nino/http/response/GET://contact`. It is only executed after the general callback `/nino/http/response`.
+
+### Answering a File
+
+A response that is a file - a download, a document, an audio or video file - names it instead of holding it. The module sets `file` on `$request['/nino/http/response']` to the absolute path of a regular, readable file, sets the headers it knows (`Content-Type`, `Content-Disposition`, `Cache-Control`) and writes no body:
+
+```php
+// in init(): the endpoint belongs to the module
+$appData['/nino/http/routes']['GET://download/report'] = [ 'uri' => '/download/report' ];
+
+\Nino\Callbacks::registerCallback(
+    $appData,
+    '/nino/http/response/GET://download/report',
+    static function( array &$appData, array &$request ): void {
+        $request['/nino/http/response']['file'] = \Nino\Filesystem::path( $appData, '/data/reports/report.pdf' );
+        $request['/nino/http/response']['header']['Content-Type'] = 'application/pdf';
+        $request['/nino/http/response']['header']['Content-Disposition'] = 'attachment; filename="report.pdf"';
+        $request['/nino/http/response']['header']['Cache-Control'] = 'private, max-age=3600';
+    }
+);
+```
+
+The path is the module's own: resolved through `\Nino\Filesystem::path()` or from a directory the module owns, never built from what the request says. An identifier in the address is checked against a list of the module's before it picks a file, a file behind a permission is named only after `\Nino\Auth::checkPermission()` has said yes, and the name in `Content-Disposition` is a header value like any other: one that comes from data is built from an allowlist of characters, never from what a request or an editor typed. The module does not read the file, does not call `readfile()` or `fpassthru()` and does not echo it: the kernel sends it, after the headers and in pieces of at most 1 MiB with a flush after each, so that a file of any size costs no more memory than one piece, and stops when the client has gone. (`\Nino\Http::sendFile()` is the one place besides the body where the response path writes to the output.)
+
+What the kernel makes of a response with the status `200` that names a file:
+
+- `body` is ignored and emptied, whatever type it has. `Content-Length` is the size of the file, `Accept-Ranges: bytes` is added, `Content-Type` stays what the module set and is `application/octet-stream` where it set none, and `Last-Modified` is the time of the file as an HTTP date unless the module set one. The headers every response starts with are merged as for every response.
+- For `GET` and `HEAD`, a request for one range - `Range: bytes=0-499`, `bytes=500-` or `bytes=-500` - is answered `206 Partial Content` with `Content-Range: bytes 0-499/1234` and the length of the part as `Content-Length`; an end beyond the file is its last byte. A range that no byte satisfies - a start at or past the size, a suffix of `0`, any range of an empty file - is a `416` with `Content-Range: bytes */1234` and no body. A `Range` that is not of this shape, or asks for more than one range, is ignored and the whole file is answered, as is any `Range` sent with another method. `\Nino\Http::byteRange()` is that arithmetic, public and pure.
+- A `HEAD` request gets the headers of the `GET` and not a byte.
+- A `file` that is no regular, readable file when the response is sent - gone, renamed, a directory, no string - is a `404` with the body `Not Found` as plain text, without the `Content-Disposition` and the `Cache-Control` the module set for the file, and the kernel records a warning that names no path: a path is never written into a response.
+
+What is to be sent is left on the request under `./nino/http/stream` - `[ 'path' => ..., 'start' => ..., 'length' => ... ]` - by `_finalizeResponse()` alone - `output()` sends it for every method but `HEAD`, which gets the headers alone - and the key is absent where there is nothing to stream (no `file`, a status other than `200`, a `404`, a `416`). A response whose status is not `200` does not answer a file: its `file` is not read and the response is sent as it is, a `Range` on it or not. `If-Range` and ranges in several parts are not implemented - `If-Range` is not read, so a range is answered whether or not the file changed since the client saw it, and a request for several ranges is answered with the whole file. The Cache module never stores a response that names a file.
 
 ---
 

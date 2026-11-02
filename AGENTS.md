@@ -180,6 +180,13 @@ Runtime handlers MUST NOT call `echo`, `header()`, `http_response_code()`, or
 \Nino\Http::fail( $request, 400, 'invalid request' );
 ```
 
+A response that answers a file names it under `file` - the absolute path of a
+regular file the handler resolved itself, never one taken from the request -,
+sets its own `Content-Type`, `Content-Disposition` and `Cache-Control`, and
+leaves the length, the ranges and the streaming to the kernel
+([Answering a File](docs/development.md#answering-a-file)); a handler still
+never calls `readfile()`, `fpassthru()` or `echo`.
+
 Do not expose stack traces, local paths, tokens, email-existence checks, or raw
 exception messages in a public response.
 

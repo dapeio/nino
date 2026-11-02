@@ -7,7 +7,9 @@ declare(strict_types=1);
  *											composed with, the csp and the locale redirects, the address a
  *											page has per language, the query a request is read with, the
  *											shipped .htaccess files and router.php - which is run - and the
- *											nginx recipe of docs/deployment.md, Modules\Navigation, and
+ *											nginx recipe of docs/deployment.md, Modules\Navigation, the
+ *											file a response may name for the kernel to send - whole or as
+ *											a byte range, output() among it, which is run - and
  *											Modules\Cache - the full-page cache for an anonymous GET. Runs
  *											against an isolated sandbox directory, never touches the real
  *											project data.
@@ -1396,6 +1398,324 @@ check( '...at the same path, differing in the version alone', explode( '?', $bun
 echo "\n";
 
 
+// --- A response that names a file ----------------------------------------
+
+echo "Http - a response that names a file: the range, what the response becomes, the bytes sent\n";
+
+/*	A response may name a file in place of a body, and the kernel sends it in
+	pieces: whole, or as the one range of it the request asked for. Http::output()
+	exit()s, so what it decides is read where _finalizeResponse() leaves it - the
+	status, the headers, an empty body and, for the bytes, './nino/http/stream' -
+	what it writes is read from sendFile(), which writes the bytes and nothing else,
+	and output() itself is run in a process of its own at the end. The fixture is
+	3000 bytes of which every two are the number of the pair: a byte too many or
+	too few at either end of a range shows in the value and not only in the length	*/
+$fileBytes	= pack( 'n*', ...range( 0, 1499 ) );
+$filePath		= $sandbox. '/download.bin';
+file_put_contents( $filePath, $fileBytes );
+touch( $filePath, 1700000000 );
+
+// The one range a header names, as a file of 3000 bytes answers it: [ first, last ]
+// of the bytes it sends, null where there is nothing to answer and the whole file
+// goes out, false where no byte satisfies the header and the answer is a 416
+foreach( [
+	'bytes=0-499'									=> [ 0, 499 ],
+	'bytes=500-'									=> [ 500, 2999 ],
+	'bytes=-500'									=> [ 2500, 2999 ],
+	'bytes=0-99999'								=> [ 0, 2999 ],
+	'bytes=0-0'										=> [ 0, 0 ],
+	'bytes=2999-'									=> [ 2999, 2999 ],
+	'bytes=-99999'								=> [ 0, 2999 ],
+	'bytes=0-99999999999999999999'	=> [ 0, 2999 ],
+	'Bytes=10-19'									=> [ 10, 19 ],
+	' bytes=10-19 '								=> [ 10, 19 ],
+	'bytes=3000-'									=> false,
+	'bytes=3000-3999'							=> false,
+	'bytes=99999999999999999999-'	=> false,
+	'bytes=-0'										=> false,
+	'bytes=5-2'										=> null,
+	'bytes=0-499,600-700'					=> null,
+	'bytes=-'											=> null,
+	'bytes=a-b'										=> null,
+	'bytes 0-9'										=> null,
+	'items=0-1'										=> null,
+	''														=> null,
+] as $rangeHeader => $rangeAnswer )
+	check( 'byteRange: "'. $rangeHeader. '" of 3000 bytes is '. json_encode( $rangeAnswer ), \Nino\Http::byteRange( $rangeHeader, 3000 ) === $rangeAnswer );
+
+foreach( [ 'bytes=0-499', 'bytes=0-', 'bytes=-5', 'bytes=0-0' ] as $rangeHeader )
+	check( 'byteRange: "'. $rangeHeader. '" of an empty file is one no byte satisfies', \Nino\Http::byteRange( $rangeHeader, 0 ) === false );
+check( '...while a header that is no range is none, whatever the size', \Nino\Http::byteRange( 'bytes=5-2', 0 ) === null && \Nino\Http::byteRange( '', 0 ) === null );
+
+// A request as Http::request() leaves it, with the file named, and what
+// _finalizeResponse() makes of it
+$namesFile = static function( array $response = [], array $header = [], string $method = 'GET' ) use ( $filePath ): array {
+	return [
+		'/nino/http/request'	=> [ 'method' => $method === 'HEAD' ? 'GET' : $method, 'rawMethod' => $method, 'uri' => '/download', 'query' => [], 'header' => $header ],
+		'/nino/http/response'	=> array_merge( [ 'uri' => '/download', 'statusCode' => 200, 'header' => [], 'body' => '', 'file' => $filePath ], $response ),
+	];
+};
+$finalized = static function( array $request ) use ( $finalizeResponse ): array {
+	$finalizeResponse->invokeArgs( null, [ &$request ] );
+	return $request;
+};
+$streamsAll = [ 'path' => $filePath, 'start' => 0, 'length' => 3000 ];
+
+$whole = $finalized( $namesFile() );
+$wholeHeader = $whole['/nino/http/response']['header'];
+check( 'a response with the status 200 that names a file stays a 200 and says how long the file is, that it takes ranges and - the module having said nothing - that it is bytes of no kind',
+	$whole['/nino/http/response']['statusCode'] === 200 && ( $wholeHeader['Content-Length'] ?? null ) === '3000' && ( $wholeHeader['Accept-Ranges'] ?? null ) === 'bytes'
+	&& ( $wholeHeader['Content-Type'] ?? null ) === 'application/octet-stream' );
+check( '...with the time of the file as its Last-Modified, in the form of an http date', ( $wholeHeader['Last-Modified'] ?? null ) === 'Tue, 14 Nov 2023 22:13:20 GMT' );
+check( '...an empty body, and the stream for output() to send: the file from its first byte, all of it', $whole['/nino/http/response']['body'] === '' && ( $whole['./nino/http/stream'] ?? null ) === $streamsAll );
+check( '...with the headers every response starts with, as ever', ( $wholeHeader['X-Content-Type-Options'] ?? null ) === 'nosniff' && ( $wholeHeader['Cache-Control'] ?? null ) === 'no-store'
+	&& isset( $wholeHeader['Content-Security-Policy'] ) === true && ( $wholeHeader['Referrer-Policy'] ?? null ) === 'strict-origin-when-cross-origin' );
+
+$own = $finalized( $namesFile( [ 'header' => [ 'Content-Type' => 'audio/mpeg', 'Content-Disposition' => 'attachment; filename="song.mp3"', 'Cache-Control' => 'private, max-age=60', 'Last-Modified' => 'Wed, 01 Jan 2020 00:00:00 GMT' ] ] ) );
+$ownHeader = $own['/nino/http/response']['header'];
+check( 'what the module set stands: its Content-Type, Content-Disposition, Cache-Control and Last-Modified', ( $ownHeader['Content-Type'] ?? null ) === 'audio/mpeg'
+	&& ( $ownHeader['Content-Disposition'] ?? null ) === 'attachment; filename="song.mp3"' && ( $ownHeader['Cache-Control'] ?? null ) === 'private, max-age=60'
+	&& ( $ownHeader['Last-Modified'] ?? null ) === 'Wed, 01 Jan 2020 00:00:00 GMT' && ( $ownHeader['Content-Length'] ?? null ) === '3000' );
+$lower = $finalized( $namesFile( [ 'header' => [ 'content-type' => 'audio/ogg', 'last-modified' => 'Wed, 01 Jan 2020 00:00:00 GMT' ] ] ) )['/nino/http/response']['header'];
+check( '...whatever the case of letters it wrote the names in: no second Content-Type or Last-Modified is put beside them', ( $lower['content-type'] ?? null ) === 'audio/ogg'
+	&& ( $lower['last-modified'] ?? null ) === 'Wed, 01 Jan 2020 00:00:00 GMT' && array_key_exists( 'Content-Type', $lower ) === false && array_key_exists( 'Last-Modified', $lower ) === false );
+
+$arrayBody = $finalized( $namesFile( [ 'body' => [ 'ok' => true ] ] ) );
+check( 'the body of such a response is ignored whatever it holds - an array is not made json, and sets no json content type', $arrayBody['/nino/http/response']['body'] === ''
+	&& ( $arrayBody['/nino/http/response']['header']['Content-Type'] ?? null ) === 'application/octet-stream' && ( $arrayBody['./nino/http/stream'] ?? null ) === $streamsAll );
+check( '...a string is emptied', $finalized( $namesFile( [ 'body' => '<p>a page</p>' ] ) )['/nino/http/response']['body'] === '' );
+
+$part = $finalized( $namesFile( [], [ 'Range' => 'bytes=1000-1999' ] ) );
+$partHeader = $part['/nino/http/response']['header'];
+check( 'a Range for one range of the file is a 206 with the Content-Range of the part, as long as the part, and the stream is the part', $part['/nino/http/response']['statusCode'] === 206
+	&& ( $partHeader['Content-Range'] ?? null ) === 'bytes 1000-1999/3000' && ( $partHeader['Content-Length'] ?? null ) === '1000'
+	&& ( $part['./nino/http/stream'] ?? null ) === [ 'path' => $filePath, 'start' => 1000, 'length' => 1000 ] );
+check( '...with an empty body, and the ranges, the type and the time as for the whole file', $part['/nino/http/response']['body'] === '' && ( $partHeader['Accept-Ranges'] ?? null ) === 'bytes'
+	&& ( $partHeader['Content-Type'] ?? null ) === 'application/octet-stream' && ( $partHeader['Last-Modified'] ?? null ) === 'Tue, 14 Nov 2023 22:13:20 GMT' );
+
+foreach( [
+	'bytes=2500-'			=> [ 'bytes 2500-2999/3000', '500', 2500, 500 ],
+	'bytes=-100'			=> [ 'bytes 2900-2999/3000', '100', 2900, 100 ],
+	'bytes=2990-99999'	=> [ 'bytes 2990-2999/3000', '10', 2990, 10 ],
+	'bytes=0-0'				=> [ 'bytes 0-0/3000', '1', 0, 1 ],
+] as $rangeHeader => [ $contentRange, $contentLength, $partStart, $partLength ] ) {
+	$answered = $finalized( $namesFile( [], [ 'Range' => $rangeHeader ] ) );
+	check( '...'. $rangeHeader. ' is a 206 of '. $contentRange, $answered['/nino/http/response']['statusCode'] === 206 && ( $answered['/nino/http/response']['header']['Content-Range'] ?? null ) === $contentRange
+		&& ( $answered['/nino/http/response']['header']['Content-Length'] ?? null ) === $contentLength
+		&& ( $answered['./nino/http/stream'] ?? null ) === [ 'path' => $filePath, 'start' => $partStart, 'length' => $partLength ] );
+}
+
+$beyond = $finalized( $namesFile( [], [ 'Range' => 'bytes=3000-' ] ) );
+$beyondHeader = $beyond['/nino/http/response']['header'];
+check( 'a Range that no byte of the file satisfies is a 416 that says where the file ends', $beyond['/nino/http/response']['statusCode'] === 416 && ( $beyondHeader['Content-Range'] ?? null ) === 'bytes */3000' );
+check( '...with no body, no length of a part and nothing to stream', $beyond['/nino/http/response']['body'] === '' && array_key_exists( 'Content-Length', $beyondHeader ) === false
+	&& array_key_exists( './nino/http/stream', $beyond ) === false );
+
+$emptyPath = $sandbox. '/empty.bin';
+touch( $emptyPath );
+$emptyWhole = $finalized( $namesFile( [ 'file' => $emptyPath ] ) );
+$emptyRange = $finalized( $namesFile( [ 'file' => $emptyPath ], [ 'Range' => 'bytes=0-' ] ) );
+check( 'an empty file is a 200 of no bytes: the length 0, and a stream of nothing', $emptyWhole['/nino/http/response']['statusCode'] === 200 && ( $emptyWhole['/nino/http/response']['header']['Content-Length'] ?? null ) === '0'
+	&& ( $emptyWhole['./nino/http/stream'] ?? null ) === [ 'path' => $emptyPath, 'start' => 0, 'length' => 0 ] );
+check( '...and any range of it is a 416 that says it is 0 bytes long', $emptyRange['/nino/http/response']['statusCode'] === 416 && ( $emptyRange['/nino/http/response']['header']['Content-Range'] ?? null ) === 'bytes */0'
+	&& array_key_exists( './nino/http/stream', $emptyRange ) === false );
+
+// A Range the kernel does not read as one range of the file is none: the answer is the whole file
+foreach( [ 'bytes=5-2', 'bytes=0-499,600-700', 'items=0-1', 'bytes=a-b', '', [ 'bytes=0-9' ] ] as $ignored ) {
+	$ignoring = $finalized( $namesFile( [], [ 'Range' => $ignored ] ) );
+	check( 'a Range of '. json_encode( $ignored ). ' is ignored and the whole file is answered', $ignoring['/nino/http/response']['statusCode'] === 200 && ( $ignoring['./nino/http/stream'] ?? null ) === $streamsAll
+		&& ( $ignoring['/nino/http/response']['header']['Content-Length'] ?? null ) === '3000' && array_key_exists( 'Content-Range', $ignoring['/nino/http/response']['header'] ) === false );
+}
+
+// ...and a Range is read for a GET, and for the HEAD that stands for one (see the child process below): on any other method it is ignored
+foreach( [ 'POST', 'PUT', 'DELETE', 'OPTIONS' ] as $other ) {
+	$posted = $finalized( $namesFile( [], [ 'Range' => 'bytes=1000-1999' ], $other ) );
+	check( 'a Range sent with '. $other. ' is ignored and the whole file is answered', $posted['/nino/http/response']['statusCode'] === 200 && ( $posted['./nino/http/stream'] ?? null ) === $streamsAll
+		&& ( $posted['/nino/http/response']['header']['Content-Length'] ?? null ) === '3000' && array_key_exists( 'Content-Range', $posted['/nino/http/response']['header'] ) === false );
+}
+
+// Only a response with the status 200 answers a file
+$failed = $finalized( $namesFile( [ 'statusCode' => 404, 'body' => 'no such page' ], [ 'Range' => 'bytes=0-9' ] ) );
+$failedHeader = $failed['/nino/http/response']['header'];
+check( 'a file named by a response whose status is not 200 is left alone, a Range or not: the response is what it was, and streams nothing', $failed['/nino/http/response']['statusCode'] === 404
+	&& $failed['/nino/http/response']['body'] === 'no such page' && array_key_exists( './nino/http/stream', $failed ) === false
+	&& array_key_exists( 'Content-Length', $failedHeader ) === false && array_key_exists( 'Accept-Ranges', $failedHeader ) === false && array_key_exists( 'Content-Range', $failedHeader ) === false );
+$failedJson = $finalized( $namesFile( [ 'statusCode' => 404, 'body' => [ 'error' => 'no such page' ] ] ) );
+check( '...and its body is made json as ever', ( $failedJson['/nino/http/response']['header']['Content-Type'] ?? null ) === 'application/json; charset=utf-8'
+	&& ( json_decode( (string) $failedJson['/nino/http/response']['body'], true )['error'] ?? null ) === 'no such page' );
+$notNamed = $finalized( $namesFile( [ 'file' => null, 'body' => '<p>a page</p>' ], [ 'Range' => 'bytes=0-9' ] ) );
+check( 'a file of null is no file named: the response is what it was', $notNamed['/nino/http/response']['statusCode'] === 200 && $notNamed['/nino/http/response']['body'] === '<p>a page</p>'
+	&& array_key_exists( './nino/http/stream', $notNamed ) === false && array_key_exists( 'Content-Length', $notNamed['/nino/http/response']['header'] ) === false );
+
+// What is to be streamed is what this decides: a stream left on the request by anything else is not
+$planted = $namesFile( [ 'file' => null, 'body' => '<p>a page</p>' ] );
+$planted['./nino/http/stream'] = [ 'path' => $filePath, 'start' => 0, 'length' => 3000 ];
+check( 'a stream set by anything but a file the response names is removed', array_key_exists( './nino/http/stream', $finalized( $planted ) ) === false );
+
+// The length is the length of the file as it is: a module that looked at the file before it wrote it left a stat in the cache of php, which keeps the size it saw
+$growingPath = $sandbox. '/growing.bin';
+file_put_contents( $growingPath, 'abc' );
+filesize( $growingPath );
+file_put_contents( $growingPath, 'abcdef' );
+$grown = $finalized( $namesFile( [ 'file' => $growingPath ] ) );
+check( 'the length is that of the file now, not of a stat taken before it was written', ( $grown['/nino/http/response']['header']['Content-Length'] ?? null ) === '6'
+	&& ( $grown['./nino/http/stream'] ?? null ) === [ 'path' => $growingPath, 'start' => 0, 'length' => 6 ] );
+
+// A file that is gone: 404, in plain text, and the kernel says so without saying where
+ninoWarnings();
+$gone = $finalized( $namesFile( [ 'file' => $sandbox. '/gone.bin', 'header' => [ 'content-type' => 'audio/mpeg', 'Content-Disposition' => 'attachment; filename="gone.mp3"', 'cache-control' => 'public, max-age=31536000' ] ], [ 'Range' => 'bytes=0-9' ] ) );
+$goneWarnings = ninoWarnings();
+$goneHeader = $gone['/nino/http/response']['header'];
+check( 'a file that is not there is a 404 in plain text with the one body the kernel writes, and streams nothing', $gone['/nino/http/response']['statusCode'] === 404
+	&& ( $goneHeader['Content-Type'] ?? null ) === 'text/plain; charset=utf-8' && $gone['/nino/http/response']['body'] === 'Not Found' && array_key_exists( './nino/http/stream', $gone ) === false );
+check( '...without the type, the disposition and the lifetime the module set for the file, in whatever case of letters: the two words are no download, and a 404 is not for a cache to keep as it would the file',
+	array_key_exists( 'content-type', $goneHeader ) === false && array_key_exists( 'Content-Disposition', $goneHeader ) === false && array_key_exists( 'cache-control', $goneHeader ) === false
+	&& ( $goneHeader['Cache-Control'] ?? null ) === 'no-store' );
+check( '...and with none of the range, the length or the time of a file', array_key_exists( 'Content-Range', $goneHeader ) === false && array_key_exists( 'Content-Length', $goneHeader ) === false
+	&& array_key_exists( 'Accept-Ranges', $goneHeader ) === false && array_key_exists( 'Last-Modified', $goneHeader ) === false );
+check( '...and the kernel warns once, naming nothing of the path', count( $goneWarnings ) === 1 && str_contains( $goneWarnings[0], $sandbox ) === false && str_contains( $goneWarnings[0], 'gone.bin' ) === false );
+
+foreach( [ 'an empty path' => '', 'a boolean' => false, 'a number' => 7, 'a directory' => $sandbox, 'a path with a null byte' => "download\0.bin" ] as $unusable => $named ) {
+	ninoWarnings();
+	$unusableAnswer = $finalized( $namesFile( [ 'file' => $named ] ) );
+	check( $unusable. ' is no file: a 404, nothing to stream, and the warning', $unusableAnswer['/nino/http/response']['statusCode'] === 404 && $unusableAnswer['/nino/http/response']['body'] === 'Not Found'
+		&& array_key_exists( './nino/http/stream', $unusableAnswer ) === false && count( ninoWarnings() ) === 1 );
+}
+
+// A file the process may not read is none to send. Root reads every file, so this
+// is checked where the suite runs as somebody else - which CI does - and said to be
+// skipped where it does not
+if( function_exists( 'posix_geteuid' ) === true && posix_geteuid() !== 0 ) {
+
+	$secretPath = $sandbox. '/secret.bin';
+	file_put_contents( $secretPath, $fileBytes );
+	chmod( $secretPath, 0000 );
+	ninoWarnings();
+	$secret = $finalized( $namesFile( [ 'file' => $secretPath ] ) );
+	check( 'a file this process may not read is no file to send: a 404, nothing to stream, and the warning', $secret['/nino/http/response']['statusCode'] === 404
+		&& array_key_exists( './nino/http/stream', $secret ) === false && count( ninoWarnings() ) === 1 );
+	chmod( $secretPath, 0600 );
+}
+else
+	echo "  skip - a file this process may not read is no file to send (the suite runs as root, which reads every file)\n";
+
+// The request side is as it was: a Range header reaches the request, and a page whose response names no file is the page whatever the Range asks
+$appData['/nino/http/routes']['GET://']['body'] = '<p>the page</p>';
+$rangeVisit = ninoVisit( $appData, '/', 'GET', [ 'HTTP_RANGE' => 'bytes=0-4' ] );
+\Nino\Http::response( $appData, $rangeVisit );
+$rangeVisit = $finalized( $rangeVisit );
+check( 'a request with a Range header carries it under its name', ( $rangeVisit['/nino/http/request']['header']['Range'] ?? null ) === 'bytes=0-4' );
+check( '...and still routes to the page and renders it as before: a 200 with the body of the route, no range answered, nothing to stream', $rangeVisit['/nino/http/response']['statusCode'] === 200
+	&& $rangeVisit['/nino/http/response']['body'] === '<p>the page</p>' && array_key_exists( './nino/http/stream', $rangeVisit ) === false
+	&& array_key_exists( 'Content-Range', $rangeVisit['/nino/http/response']['header'] ) === false && array_key_exists( 'Content-Length', $rangeVisit['/nino/http/response']['header'] ) === false
+	&& array_key_exists( 'Accept-Ranges', $rangeVisit['/nino/http/response']['header'] ) === false );
+$appData['/nino/http/routes']['GET://']['body'] = '';
+
+// sendFile(): the bytes, captured the way a test can - it writes them and nothing else
+$sentOf = static function( string $path, int $start, int $length ): array {
+	ob_start();
+	$all = \Nino\Http::sendFile( $path, $start, $length );
+	return [ $all, (string) ob_get_clean() ];
+};
+check( 'sendFile writes the whole file and says that it did', $sentOf( $filePath, 0, 3000 ) === [ true, $fileBytes ] );
+check( '...a part of it from where it starts: 1000 bytes from the 1000th', $sentOf( $filePath, 1000, 1000 ) === [ true, substr( $fileBytes, 1000, 1000 ) ] );
+check( '...down to its last byte', $sentOf( $filePath, 2999, 1 ) === [ true, substr( $fileBytes, 2999 ) ] );
+check( '...a length of 0 writes nothing, which is all that was asked for', $sentOf( $filePath, 100, 0 ) === [ true, '' ] );
+check( '...a start past the end writes nothing and answers false', $sentOf( $filePath, 3000, 10 ) === [ false, '' ] && $sentOf( $filePath, 90000, 10 ) === [ false, '' ] );
+check( '...a file shorter than the length writes what there is and answers false', $sentOf( $filePath, 2990, 100 ) === [ false, substr( $fileBytes, 2990 ) ] );
+check( '...a start before the file writes nothing and answers false', $sentOf( $filePath, -1, 10 ) === [ false, '' ] );
+check( '...a path that is no file - not there, a directory, a stream wrapper - writes nothing and answers false', $sentOf( $sandbox. '/gone.bin', 0, 10 ) === [ false, '' ] && $sentOf( $sandbox, 0, 10 ) === [ false, '' ]
+	&& $sentOf( 'data://text/plain;base64,'. base64_encode( 'abc' ), 0, 3 ) === [ false, '' ] );
+
+// A file of more than two pieces: all of it in order, and a part across the borders between pieces
+$bigPath = $sandbox. '/big.bin';
+$bigBytes = random_bytes( 2 * 1048576 + 4321 );
+file_put_contents( $bigPath, $bigBytes );
+check( 'a file of more than two pieces is written whole and in order', $sentOf( $bigPath, 0, strlen( $bigBytes ) ) === [ true, $bigBytes ] );
+check( '...and so is a part across the borders between its pieces', $sentOf( $bigPath, 1048576 - 7, 1048576 + 14 ) === [ true, substr( $bigBytes, 1048576 - 7, 1048576 + 14 ) ] );
+
+// ...in pieces: a buffer that passes on every write it gets (a chunk size of 1) sees how large each one is
+$writes = [];
+ob_start( static function( string $buffer ) use ( &$writes ): string {
+	$writes[] = strlen( $buffer );
+	return '';
+}, 1 );
+\Nino\Http::sendFile( $bigPath, 0, strlen( $bigBytes ) );
+ob_end_clean();
+$writes = array_values( array_filter( $writes ) );
+check( '...with no piece above 1 MiB, and one more than that for a file of more than two', $writes !== [] && max( $writes ) <= 1048576 && count( $writes ) >= 3 && array_sum( $writes ) === strlen( $bigBytes ) );
+unlink( $bigPath );
+
+/*	Http::output() itself, run in a process of its own because it exit()s: what it
+	writes and the status it leaves - the headers it sets are the ones the
+	finalized response holds above, and the cli keeps none to read back. The
+	response carries a body that must not be sent, the process holds a buffer a
+	module left open with something in it, and the visitor has a session, as one
+	has who arrives with the cookie: the file is sent after the headers, and as it
+	is, and the session is let go before the first byte - which the driver reads
+	where the headers go out, since that is when the first byte does, and when the
+	process ends. One run has php's compression on and a client that takes gzip, as
+	a host and a browser may have it	*/
+mkdir( $sandbox. '/sessions' );
+$outputDriver = $sandbox. '/output-driver.php';
+file_put_contents( $outputDriver, '<?php
+declare(strict_types=1);
+[ , $root, $file, $method, $range, $stray, $result, $sessions ] = $argv;
+require $root. "/_nino/Nino.php";
+$warnings = [];
+set_error_handler( static function( int $level, string $message ) use ( &$warnings ): bool { $warnings[] = $message; return true; } );
+session_save_path( $sessions );
+session_start();
+$session = [ session_status(), null, null ];
+header_register_callback( static function() use ( &$session ): void { $session[1] = session_status(); } );
+register_shutdown_function( static function() use ( &$warnings, &$session, $result ): void {
+	$session[2] = session_status();
+	file_put_contents( $result, json_encode( [ http_response_code(), $warnings, $session ] ) );
+} );
+$appData = [];
+$request = [
+	"/nino/http/request"	=> [ "method" => $method === "HEAD" ? "GET" : $method, "rawMethod" => $method, "header" => $range === "" ? [] : [ "Range" => $range ] ],
+	"/nino/http/response"	=> [ "statusCode" => 200, "header" => [ "Content-Type" => "audio/mpeg" ], "body" => "a body that must not be sent", "file" => $file ],
+];
+if( $stray === "1" ) {
+	ob_start();
+	echo "something a module left in a buffer";
+}
+\Nino\Http::output( $appData, $request );
+' );
+$outputOf = static function( string $file, string $method = 'GET', string $range = '', bool $stray = false, bool $gzip = false ) use ( $outputDriver, $sandbox ): array {
+
+	$result = $sandbox. '/output-result.json';
+	@unlink( $result );
+
+	$bytes = (string) shell_exec( ( $gzip === true ? 'HTTP_ACCEPT_ENCODING=gzip ' : '' ). escapeshellarg( PHP_BINARY ). ( $gzip === true ? ' -d zlib.output_compression=1' : '' ). ' '. escapeshellarg( $outputDriver ). ' '. escapeshellarg( __DIR__. '/..' ). ' '. escapeshellarg( $file ). ' '. $method. ' '. escapeshellarg( $range ). ' '. ( $stray === true ? '1' : '0' ). ' '. escapeshellarg( $result ). ' '. escapeshellarg( $sandbox. '/sessions' ). ' 2>/dev/null' );
+	[ $status, $warnings, $session ] = json_decode( (string) @file_get_contents( $result ), true ) ?? [ 0, [], [] ];
+
+	return [ $bytes, $status, $warnings, $session ];
+};
+
+[ $outBytes, $outStatus, , $outSession ] = $outputOf( $filePath, 'GET', '', true );
+check( 'output() sends the file after the headers: its bytes, and nothing of the body or of a buffer a module left open', $outBytes === $fileBytes && $outStatus === 200 );
+check( '...with the session of the visitor let go before the first byte goes out, and kept so: a download is not to hold their other requests back', $outSession === [ PHP_SESSION_ACTIVE, PHP_SESSION_NONE, PHP_SESSION_NONE ] );
+// php itself drops zlib.output_compression for a response that carries a
+// Content-Length, so the ini line of output() is not what this run can see:
+// it runs with the stray buffer as well, which is what keeps the pin honest
+[ $outBytes, , $outWarnings ] = $outputOf( $filePath, 'GET', '', true, true );
+check( '...and the bytes as they are where php\'s compression is on and the client takes gzip, with nothing raised', $outBytes === $fileBytes && $outWarnings === [] );
+[ $outBytes, $outStatus ] = $outputOf( $filePath, 'GET', 'bytes=1000-1999', true );
+check( '...a range of it as a 206 of the part', $outBytes === substr( $fileBytes, 1000, 1000 ) && $outStatus === 206 );
+[ $outBytes, $outStatus ] = $outputOf( $filePath, 'HEAD' );
+check( '...a HEAD as the status of the GET and not a byte', $outBytes === '' && $outStatus === 200 );
+[ $outBytes, $outStatus ] = $outputOf( $filePath, 'HEAD', 'bytes=1000-1999' );
+check( '...and the status of the part for a HEAD with a Range', $outBytes === '' && $outStatus === 206 );
+[ $outBytes, $outStatus ] = $outputOf( $filePath, 'GET', 'bytes=3000-' );
+check( '...a range no byte satisfies as a 416 with nothing to send', $outBytes === '' && $outStatus === 416 );
+[ $outBytes, $outStatus, $outWarnings ] = $outputOf( $sandbox. '/gone.bin' );
+check( '...and a file that is gone as the 404 with its two words, once warned about', $outBytes === 'Not Found' && $outStatus === 404 && count( $outWarnings ) === 1 );
+
+echo "\n";
+
+
 // --- The private root is never reachable over http -----------------------
 
 echo "router.php - the private root is never served\n";
@@ -1641,6 +1961,24 @@ foreach( [
 	\Nino\Modules\Cache::callbackOutput( $appData, $req );
 	check( "$label is never stored", cacheEntryCount( $appData ) === 0 );
 }
+
+// A response that names a file is sent from the file by the kernel (see
+// Http::output()), whatever body it still holds: that body is not the answer,
+// and a copy of it would outlive the file and the lifetime its headers give. The
+// request is the one 'an anonymous GET 200 is stored' above stores, but for the file
+\Nino\Modules\Cache::_invalidate( $appData );
+$namesFileToCache = cacheRequest( '/home', 'GET', [ 'file' => $filePath ] );
+\Nino\Modules\Cache::callbackOutput( $appData, $namesFileToCache );
+check( 'a response that names a file is never stored, whatever body it still holds', cacheEntryCount( $appData ) === 0 );
+check( '...and is not told it was a miss either', isset( $namesFileToCache['/nino/http/response']['header']['X-Nino-Cache'] ) === false );
+\Nino\Modules\Cache::_invalidate( $appData );
+$streamToCache = cacheRequest( '/home' );
+$streamToCache['./nino/http/stream'] = [ 'path' => $filePath, 'start' => 0, 'length' => 3000 ];
+\Nino\Modules\Cache::callbackOutput( $appData, $streamToCache );
+check( '...nor one that carries the stream of a file', cacheEntryCount( $appData ) === 0 );
+$sameWithoutFile = cacheRequest( '/home' );
+\Nino\Modules\Cache::callbackOutput( $appData, $sameWithoutFile );
+check( '...while the same request without the file is stored', cacheEntryCount( $appData ) === 1 );
 
 // A query var is what makes a page not the same page for everyone - the
 // locale switch is exactly one

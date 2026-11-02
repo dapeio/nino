@@ -56,10 +56,11 @@ namespace Nino\Modules {
 	 *											endpoints), any response that is not a plain 200, every
 	 *											request from a logged in user, every page whose own route
 	 *											has a response callback registered for it, since
-	 *											answering from here would never call it, and everything a
+	 *											answering from here would never call it, everything a
 	 *											wildcard route answers, where the addresses are the
 	 *											visitor's to invent and one entry per invented one is
-	 *											disk a stranger decides the size of.
+	 *											disk a stranger decides the size of, and every response
+	 *											that names a file, which the kernel sends from the file.
 	 *
 	 *	@package						Dape/Nino
 	 *	@author							David Perchermeier <mail@dape.io>
@@ -216,8 +217,13 @@ namespace Nino\Modules {
 			$body = $request['/nino/http/response']['body'] ?? null;
 
 			// A json body is an api answer, not a page; a redirect's body is
-			// beside the point and its Location header is not stored at all
-			if( is_string( $body ) === false || $body === '' || isset( $request['/nino/http/response']['header']['Location'] ) === true )
+			// beside the point and its Location header is not stored at all; and
+			// a response that names a file, or carries the stream of one, is sent
+			// from the file and not from its body (see \Nino\Http::output()) -
+			// whatever body it still has is not the answer, and a copy of the
+			// bytes would outlive the file and the lifetime its headers give
+			if( is_string( $body ) === false || $body === '' || isset( $request['/nino/http/response']['header']['Location'] ) === true
+				|| isset( $request['/nino/http/response']['file'] ) === true || isset( $request['./nino/http/stream'] ) === true )
 				return;
 
 			// Says so on the way out as well as on a hit: without both, whether

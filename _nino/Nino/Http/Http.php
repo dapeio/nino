@@ -113,6 +113,10 @@ namespace Nino {
 		// directory of the same name is in the checkout
 		private const array WHILE_PRESENT = [ '/docs', '/history' ];
 
+		// The most one write of sendFile() carries: a file is sent in pieces
+		// of this size and never read as a whole
+		private const int CHUNK_SIZE = 1048576;
+
 		public static function request( array &$appData, array &$request ): void {
 
 			$currentLocale = \Nino\Locales::getCurrentLocale( $appData );
@@ -209,16 +213,45 @@ namespace Nino {
 			// folded to GET for routing, so the unmapped value is what decides
 			// here (see _cleanRawMethod()). Most sapis would drop the body
 			// anyway; not generating it is both cheaper and unambiguous.
-			if( ( $request['/nino/http/request']['rawMethod'] ?? '' ) !== 'HEAD' )
-				echo $request['/nino/http/response']['body'];
+			if( ( $request['/nino/http/request']['rawMethod'] ?? '' ) !== 'HEAD' ) {
+
+				// A response that names a file has no body to send but the file
+				// itself (see _finalizeFile()), which goes out in pieces. Nothing
+				// may stand between it and the client then: a buffer still open
+				// would hold the bytes - the file in memory as a whole, which is
+				// what sending it in pieces is for - and the compression php applies
+				// to the output would send a length the headers did not promise.
+				if( isset( $request['./nino/http/stream'] ) === true ) {
+
+					// A buffer that cannot be ended ends the loop rather than spinning it
+					while( ob_get_level() > 0 )
+						if( @ob_end_clean() === false )
+							break;
+
+					@ini_set( 'zlib.output_compression', '0' );
+
+					// A stream must not hold the visitor's session: php keeps it
+					// locked for as long as it is open, and a stream is long - a media
+					// element asks for one range after the other, and every other
+					// request of that visitor (another tab, the workbench) would queue
+					// behind each of them. Nothing writes to the session from here on,
+					// the exit that follows is all that is left
+					if( session_status() === PHP_SESSION_ACTIVE )
+						session_write_close();
+
+					self::sendFile( $request['./nino/http/stream']['path'], $request['./nino/http/stream']['start'], $request['./nino/http/stream']['length'] );
+				}
+				else
+					echo $request['/nino/http/response']['body'];
+			}
 
 			exit;
 		}
 
-		// json-encode a non-string body, then put back any default header the
-		// response left out - the part of output() that decides what would
-		// actually be sent, split out since output() itself exit()s and so
-		// can't be called from a test.
+		// json-encode a non-string body, answer the file a response names, then
+		// put back any default header the response left out - the part of
+		// output() that decides what would actually be sent, split out since
+		// output() itself exit()s and so can't be called from a test.
 		//
 		// Not run through filterHeaderFields(): that whitelist is built for
 		// the request side (Accept, Cookie, ...) and silently drops
@@ -228,8 +261,17 @@ namespace Nino {
 		// header() itself already refuses to send a value containing a CR/LF.
 		private static function _finalizeResponse( array &$request ): void {
 
+			// What is to be streamed is decided below and nowhere else: a key
+			// left standing by anything else names a file nobody has looked at
+			unset( $request['./nino/http/stream'] );
+
+			// A response with the status 200 that names a file answers that file
+			// and its body is not read, whatever type it has - it is not the json
+			// of an api answer, nor does it set the Content-Type of one
+			$answersFile = ( $request['/nino/http/response']['statusCode'] ?? 200 ) === 200 && isset( $request['/nino/http/response']['file'] ) === true;
+
 			// Catch json output
-			if( is_string( $request['/nino/http/response']['body'] ) === false ) {
+			if( $answersFile === false && is_string( $request['/nino/http/response']['body'] ) === false ) {
 
 				/*	JSON_INVALID_UTF8_SUBSTITUTE, because json_encode() answers
 					false for one malformed byte anywhere in the body and the
@@ -272,7 +314,226 @@ namespace Nino {
 				$request['/nino/http/response']['header']['Content-Type'] = 'application/json; charset=utf-8';
 			}
 
+			if( $answersFile === true )
+				self::_finalizeFile( $request );
+
 			$request['/nino/http/response']['header'] = array_merge( self::DEFAULT_HEADERS, $request['/nino/http/response']['header'] );
+		}
+
+		/*	The file branch of _finalizeResponse(): what a response with the status
+			200 that names a file is answered with - the file whole, the one range
+			of it the request asked for, the refusal of a range that no byte
+			satisfies, or the 404 of a file that is not there any more. All of it
+			ends up on $request: the status, the headers, an empty body and, for
+			the bytes, the stream output() sends them by. Nothing is sent here and
+			nothing is read of the file but its size and its time.
+
+			@param		array 		&$request			(reference) Current server request
+
+			@return 	void */
+		private static function _finalizeFile( array &$request ): void {
+
+			$path = is_string( $request['/nino/http/response']['file'] ) === true ? $request['/nino/http/response']['file'] : '';
+			$size = false;
+
+			// A null byte makes no path: the functions below answer it with an
+			// error of their own, and a file with one in its name cannot be there
+			if( $path !== '' && str_contains( $path, "\0" ) === false ) {
+
+				// The file as it is now: the size of an earlier stat is a length the
+				// client would wait for and never get
+				clearstatcache( true, $path );
+
+				if( is_file( $path ) === true && is_readable( $path ) === true )
+					$size = @filesize( $path );
+			}
+
+			// Gone, never there, or no file: the words are the kernel's and a path
+			// is never written into a response - nor into the warning about it
+			if( $size === false ) {
+
+				trigger_error( 'Http: the file a response names is no regular, readable file - it was answered as a 404', E_USER_WARNING );
+
+				// What the module set for the file is not for this answer: a
+				// disposition would save the two words as a download, and a lifetime
+				// would have a cache keep the 404 for as long as it keeps the file
+				foreach( array_keys( $request['/nino/http/response']['header'] ) as $name )
+					if( is_string( $name ) === true && in_array( strtolower( $name ), [ 'content-type', 'content-disposition', 'cache-control' ], true ) === true )
+						unset( $request['/nino/http/response']['header'][$name] );
+
+				$request['/nino/http/response']['statusCode'] = 404;
+				$request['/nino/http/response']['header']['Content-Type'] = 'text/plain; charset=utf-8';
+				$request['/nino/http/response']['body'] = 'Not Found';
+
+				return;
+			}
+
+			// A Range is read on a GET, and on the HEAD that stands for one: any
+			// other method has the header ignored and the whole file answered, as
+			// RFC 9110 has a server do
+			$method	= $request['/nino/http/request']['rawMethod'] ?? '';
+			$wanted	= $request['/nino/http/request']['header']['Range'] ?? '';
+			$range	= ( $method === 'GET' || $method === 'HEAD' ) && is_string( $wanted ) === true ? self::byteRange( $wanted, $size ) : null;
+
+			$request['/nino/http/response']['body'] = '';
+			$request['/nino/http/response']['header']['Accept-Ranges'] = 'bytes';
+
+			// A range no byte of the file satisfies: no bytes are sent, and the
+			// size says where the file ends
+			if( $range === false ) {
+
+				$request['/nino/http/response']['statusCode'] = 416;
+				$request['/nino/http/response']['header']['Content-Range'] = 'bytes */'. $size;
+
+				return;
+			}
+
+			// The whole file, an empty one included, is a range of its own
+			[ $start, $end ] = $range ?? [ 0, $size - 1 ];
+			$length = $end - $start + 1;
+
+			if( $range !== null ) {
+
+				$request['/nino/http/response']['statusCode'] = 206;
+				$request['/nino/http/response']['header']['Content-Range'] = 'bytes '. $start. '-'. $end. '/'. $size;
+			}
+
+			$request['/nino/http/response']['header']['Content-Length'] = (string) $length;
+
+			// What the module set stands, in whatever case of letters it wrote the
+			// name: a second Content-Type beside the module's would be the one sent
+			if( self::_hasHeader( $request['/nino/http/response']['header'], 'Content-Type' ) === false )
+				$request['/nino/http/response']['header']['Content-Type'] = 'application/octet-stream';
+
+			$modified = @filemtime( $path );
+
+			if( $modified !== false && self::_hasHeader( $request['/nino/http/response']['header'], 'Last-Modified' ) === false )
+				$request['/nino/http/response']['header']['Last-Modified'] = gmdate( 'D, d M Y H:i:s', $modified ). ' GMT';
+
+			$request['./nino/http/stream'] = [ 'path' => $path, 'start' => $start, 'length' => $length ];
+		}
+
+		/**
+		 *	@param		array 		$header				A response's header map
+		 *	@param		string		$name					A header name, eg. 'Content-Type'
+		 *
+		 *	@return 	bool										Whether the map names it, in any case of letters
+		 */
+		private static function _hasHeader( array $header, string $name ): bool {
+
+			foreach( array_keys( $header ) as $key )
+				if( is_string( $key ) === true && strcasecmp( $key, $name ) === 0 )
+					return true;
+
+			return false;
+		}
+
+		/**
+		 *	The one range of a Range header that a file of $size bytes can answer.
+		 *	Pure - it reads nothing but its two arguments - and the whole grammar
+		 *	of the header the kernel reads: bytes=<first>-<last>, bytes=<first>-
+		 *	and bytes=-<count>, the unit in any case of letters. A <last> beyond
+		 *	the file is the last byte of it, and so is a <count> beyond the file
+		 *	the whole of it.
+		 *
+		 *	A header that is no such range is nothing to answer, and the whole
+		 *	file is sent: an empty one, another unit, a <last> before its <first>,
+		 *	and a request for more than one range - an answer in several parts is
+		 *	not made. A range of the right shape that the file cannot satisfy is
+		 *	false, and is answered with a 416: a <first> at or past the end of the
+		 *	file, a <count> of 0, and any range of an empty file.
+		 *
+		 *	@param		string		$header				The value of the Range header, eg. 'bytes=0-499'
+		 *	@param		int			$size					The size of the file in bytes
+		 *
+		 *	@return 	array|null|false						[ first byte, last byte ], both included; null where there is no range to answer; false for one that no byte satisfies
+		 */
+		public static function byteRange( string $header, int $size ): array|null|false {
+
+			if( preg_match( '/^bytes=(\d*)-(\d*)$/Di', trim( $header ), $found ) !== 1 || ( $found[1] === '' && $found[2] === '' ) )
+				return null;
+
+			// bytes=-<count>: the last <count> bytes
+			if( $found[1] === '' ) {
+
+				$count = (int) $found[2];
+
+				return ( $count === 0 || $size === 0 ) ? false : [ max( 0, $size - $count ), $size - 1 ];
+			}
+
+			// A number past what an integer holds is as good as the largest one:
+			// php casts it to that, and every file is smaller
+			$first	= (int) $found[1];
+			$last		= ( $found[2] === '' ) ? PHP_INT_MAX : (int) $found[2];
+
+			if( $last < $first )
+				return null;
+
+			return ( $first >= $size ) ? false : [ $first, min( $last, $size - 1 ) ];
+		}
+
+		/**
+		 *	Write a part of a file to the output, in pieces: the bytes of a response
+		 *	that names a file, which output() sends after the headers.
+		 *
+		 *	It echoes, and is allowed to where a handler is not: a file is not a
+		 *	string. A handler that read it into the body would hold all of it in
+		 *	memory - the size of a video, of an archive - and one that echoed it
+		 *	itself would write before the headers are sent and skip every rule
+		 *	the response goes through. So a handler names the file under 'file'
+		 *	and the kernel sends it, here, in pieces of at most CHUNK_SIZE bytes
+		 *	with a flush after each, and stops once the client has gone.
+		 *
+		 *	It writes the bytes and nothing else: no header, and no output buffer
+		 *	is touched - output() has ended them by the time it calls this - so
+		 *	that a test captures what is written with ob_start().
+		 *
+		 *	The path is the caller's to have resolved: a file of the project
+		 *	through \Nino\Filesystem::path(), or one in a directory the module owns,
+		 *	and never one a request names.
+		 *
+		 *	@param		string		$path					The file, a regular one
+		 *	@param		int			$start				The first byte to send, counted from 0
+		 *	@param		int			$length				How many bytes to send, from there
+		 *
+		 *	@return 	bool										Whether all $length bytes were written - false for a file that cannot be opened, a start the file does not reach, a file that ended early or a client that went away
+		 */
+		public static function sendFile( string $path, int $start, int $length ): bool {
+
+			// A regular file only: a directory opens, and fails on its first read
+			$handle = ( is_file( $path ) === true ) ? @fopen( $path, 'rb' ) : false;
+
+			if( $handle === false )
+				return false;
+
+			// A start past the end of the file is not a failed seek - the first
+			// read finds nothing there, and that is what the answer says
+			if( fseek( $handle, $start ) !== 0 ) {
+
+				fclose( $handle );
+
+				return false;
+			}
+
+			$sent = 0;
+
+			while( $sent < $length && connection_aborted() === 0 ) {
+
+				$piece = @fread( $handle, min( self::CHUNK_SIZE, $length - $sent ) );
+
+				// The file is shorter than it was when its size was read
+				if( $piece === false || $piece === '' )
+					break;
+
+				echo $piece;
+				flush();
+
+				$sent += strlen( $piece );
+			}
+
+			fclose( $handle );
+
+			return $sent === $length;
 		}
 
 		/**
