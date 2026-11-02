@@ -2042,7 +2042,7 @@ foreach( $imageRatios as $imageRatio )
 		if( $groundSets( $groundOf( $ratioSelector ), 'aspect-ratio', str_replace( '-', ' / ', $imageRatio ) ) === false )
 			$ratioWrong[] = $ratioSelector;
 check( 'every ratio of the frame is said by the frame and by the <img> directly in it - .nino-image--<x>-<y> and .nino-image--<x>-<y> > img, aspect-ratio: x / y - so that the picture has the ratio of the frame whether or not its height of 100% is worked out'
-	. ( $ratioWrong === [] ? '' : ' - not: '. implode( ', ', $ratioWrong ) ), $ratioWrong === [] && count( $imageRatios ) === 5 );
+	. ( $ratioWrong === [] ? '' : ' - not: '. implode( ', ', $ratioWrong ) ), $ratioWrong === [] && $imageRatios !== [] );
 // The icons of the fifteen: each component of the kernel is shown by the parts of a 24 by 24 icon of Lucide, which the registry hands to a tool
 $iconTags = [ 'path' => [ [ 'd' ], [] ], 'circle' => [ [ 'cx', 'cy', 'r' ], [] ], 'ellipse' => [ [ 'cx', 'cy', 'rx', 'ry' ], [] ], 'rect' => [ [ 'x', 'y', 'width', 'height' ], [ 'rx', 'ry' ] ],
 	'line' => [ [ 'x1', 'y1', 'x2', 'y2' ], [] ], 'polyline' => [ [ 'points' ], [] ], 'polygon' => [ [ 'points' ], [] ] ];

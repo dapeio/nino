@@ -2590,6 +2590,8 @@ textarea:disabled {
 .nino-image--3-2, .nino-image--3-2 > img { aspect-ratio: 3 / 2; }
 .nino-image--16-9, .nino-image--16-9 > img { aspect-ratio: 16 / 9; }
 .nino-image--21-9, .nino-image--21-9 > img { aspect-ratio: 21 / 9; }
+.nino-image--4-1, .nino-image--4-1 > img { aspect-ratio: 4 / 1; }
+.nino-image--5-1, .nino-image--5-1 > img { aspect-ratio: 5 / 1; }
 /*	The hover of a picture, for the frame that is asked for it: nino-hover on the
 	frame - [image /pic class="nino-hover"], [card-image /pic class="nino-hover"]
 	- which the class of its own makes, in a card as in [image], so that it has
