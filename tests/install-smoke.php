@@ -545,6 +545,12 @@ check( '...the button the markup carries hidden is shown by the script, and a pa
 check( '...from 768px the button is gone whatever it says and the list is the bar, visible: nothing there is folded',
 	preg_match( '/display:\s*none/', $ninoBody( $ninoWide, '.nino-nav-burger > button' ) ) === 1 && preg_match( '/visibility:\s*visible/', $ninoBody( $ninoWide, '.nino-nav-burger .nino-nav-content' ) ) === 1
 	&& preg_match( '/position:\s*static/', $ninoBody( $ninoWide, '.nino-nav-burger .nino-nav-content' ) ) === 1 && preg_match( '/max-height:\s*none/', $ninoBody( $ninoWide, '.nino-nav-burger .nino-nav-content' ) ) === 1 );
+// The fold clips - overflow:hidden is what the max-height needs to fold the list - and a row that is open does not fold: the clipping goes with the fold, or it cuts the ring of the focus
+// of a link at the top, at the bottom and at both ends of the row, which reaches outside the box of the link
+check( '...and the list that is the bar, from 768px and with the button hidden, clips nothing: overflow is visible there, and hidden only where the list folds',
+	preg_match( '/overflow:\s*hidden/', $ninoBody( $ninoAlone, '.nino-nav-burger .nino-nav-content' ) ) === 1
+	&& preg_match( '/overflow:\s*visible/', $ninoBody( $ninoAlone, '.nino-nav-burger > button[hidden] ~ .nino-nav-content' ) ) === 1
+	&& preg_match( '/overflow:\s*visible/', $ninoBody( $ninoWide, '.nino-nav-burger .nino-nav-content' ) ) === 1 );
 // The layers of the open menu - the list that is the overlay, and the ground behind it - are rules of their own and each has a z-index. A rule that has none reads as 0, which every
 // button is above without trying: the check fails for it, so that the button is held above two layers that are there
 $burgerLayer  = static function( string $selector ) use ( $ninoBody, $ninoAlone ): int {

@@ -3595,10 +3595,13 @@ header .nino-headernav-logo:empty {
 
 /*	Without the script the button stays hidden, and a list that is folded away
 	has nothing to unfold it: it is the list it is from 768px on, in the bar
-	and not an overlay	*/
+	and not an overlay. The clipping goes with the fold: it is what the fold
+	needs and a row that is open does not, and it cut the ring of the focus of
+	a link at the top, at the bottom and at both ends of the row	*/
 .nino-nav-burger > button[hidden] ~ .nino-nav-content {
 	position: static;
 	max-height: none;
+	overflow: visible;
 	visibility: visible;
 	background-color: transparent;
 }
@@ -3610,6 +3613,7 @@ header .nino-headernav-logo:empty {
 	.nino-nav-burger .nino-nav-content {
 		position: static;
 		max-height: none;
+		overflow: visible;
 		visibility: visible;
 		background-color: transparent;
 	}
