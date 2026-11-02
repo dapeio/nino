@@ -4,7 +4,9 @@
  *													parallax offsets, and the one-callback-round-per-frame
  *													gate they hang off. A callback that throws used to take
  *													the gate down with it - and with the gate stuck shut,
- *													every scroll behaviour on the page stopped for good.
+ *													every scroll behaviour on the page stopped for good. And
+ *													the header that grows a row: --nino-header-grow, the part
+ *													of the bar above its min-height.
  *
  *	Usage: node tests/nino-ui-scroll-js-smoke.js
  */
@@ -36,6 +38,31 @@ const withPicture = parallex( picture, 120 );
 // A box a project wrote without a picture in it yet - or with the picture in
 // a wrapper this does not look into
 const withoutPicture = parallex( null, 200 );
+
+/**
+ *	The bar of the header, as the observer measures it: the height it has at the
+ *	moment, the min-height its frame gives it, the transitions it is running
+ *	(the list is the test's to fill) and the listeners it was given
+ */
+const bar = {
+	height : 80, minHeight : '80px', animations : [], listeners : [],
+	getBoundingClientRect : function() { return { height : bar.height } },
+	getAnimations : function() { return bar.animations },
+	addEventListener : function( name, listener ) { bar.listeners.push( { name : name, listener : listener } ) },
+};
+
+/**
+ *	ResizeObserver, as far as the script uses it: it remembers what it watches,
+ *	and fires when the test says the size changed
+ */
+const observers = [];
+function ResizeObserver( callback ) {
+	this.callback = callback;
+	this.watching = [];
+	observers.push( this );
+}
+ResizeObserver.prototype.observe = function( element ) { this.watching.push( element ) };
+ResizeObserver.prototype.fire = function() { this.callback( this.watching.map( function( target ) { return { target : target } } ) ) };
 
 /**
  *	Something an arrow can scroll to: it records how it was scrolled to
@@ -85,7 +112,13 @@ const arrows = {
 
 const frames = [];
 
-const documentElement = { clientHeight : 800, clientWidth : 1440, scrollLeft : 0, scrollTop : 0, style : {} };
+/** The inline style of <html>, which takes the custom properties the script writes */
+function rootStyle() {
+	const properties = {};
+	return { properties : properties, setProperty : function( name, value ) { properties[name] = value } };
+}
+
+const documentElement = { clientHeight : 800, clientWidth : 1440, scrollLeft : 0, scrollTop : 0, style : rootStyle() };
 // The body records what is written onto it, so the namespace check below can
 // read it back
 const bodyClasses = new Set();
@@ -105,6 +138,8 @@ const document = {
 	querySelectorAll : function( selector ) {
 		if( selector === '.nino-hero-arrowdown' )
 			return Object.values( arrows );
+		if( selector === 'header .nino-scroll-header' )
+			return [ bar ];
 		return selector === '.nino-parallex' ? [ withPicture, withoutPicture ] : [];
 	},
 	createElement : function() { return { classList : classList(), style : {}, setAttribute : function() {}, appendChild : function() {} } },
@@ -123,7 +158,8 @@ const sandbox = {
 	requestAnimationFrame : function( fn ) { frames.push( fn ); return frames.length },
 	setTimeout : function() {},
 	addEventListener : function() {},
-	getComputedStyle : function() { return { getPropertyValue : function() { return '0px' } } },
+	getComputedStyle : function( element ) { return { getPropertyValue : function( name ) { return element === bar && name === 'min-height' ? bar.minHeight : '0px' } } },
+	ResizeObserver : ResizeObserver,
 	matchMedia : function( query ) { return { matches : query === '(prefers-reduced-motion: reduce)' && reducedMotion } },
 };
 sandbox.window = sandbox;
@@ -179,6 +215,76 @@ runFrame();
 check( 'a scroll callback that throws does not leave the gate shut', ranAfterThrow === 1 );
 
 
+// --- The header that grows a row --------------------------------------------
+
+/*	The header is fixed and main clears it with the bar's min-height; a bar
+	that wraps its links onto a second row is taller than that, and the part
+	above the min-height is --nino-header-grow, which the padding of main adds	*/
+const growOf = function() { return documentElement.style.properties['--nino-header-grow'] };
+check( 'the bar of the header is watched by one ResizeObserver', observers.length === 1 && observers[0].watching.length === 1 && observers[0].watching[0] === bar );
+observers[0].fire();
+check( 'a bar of one row writes 0px onto <html>', growOf() === '0px' );
+bar.height = 128.4;
+observers[0].fire();
+check( 'a bar that grew a row writes what it is taller than its min-height, rounded up', growOf() === '49px' );
+bar.height = 60;
+observers[0].fire();
+check( '...and never less than 0px, for a bar shorter than its min-height', growOf() === '0px' );
+
+bar.height = 176;
+observers[0].fire();
+bodyClasses.add( 'nino-scroll-down' );
+bar.height = 0;
+bar.minHeight = '0px';
+observers[0].fire();
+check( 'while the page is scrolled down the folded bar leaves the padding where it was', growOf() === '96px' );
+bodyClasses.delete( 'nino-scroll-down' );
+bar.height = 152;
+bar.minHeight = '80px';
+observers[0].fire();
+check( '...and the bar open again is measured again', growOf() === '72px' );
+
+/*	Opening again, max-height travels up from 0 while the min-height is back at
+	once: for a moment the box is no taller than its min-height, and measured then
+	the padding would drop and come back. So the bar is measured when the
+	transition has ended, and not while it runs	*/
+const transitionEnd = function( target, propertyName ) {
+	bar.listeners.filter( function( entry ) { return entry.name === 'transitionend' } ).forEach( function( entry ) { entry.listener( { target : target, propertyName : propertyName } ) } );
+};
+bar.animations = [ { transitionProperty : 'max-height' } ];
+bar.height = 80;
+observers[0].fire();
+check( 'a bar whose max-height is on its way writes nothing, however tall it is at that moment', growOf() === '72px' );
+bar.height = 176;
+observers[0].fire();
+check( '...not for the heights on the way either', growOf() === '72px' );
+bar.animations = [];
+transitionEnd( bar, 'opacity' );
+transitionEnd( {}, 'max-height' );
+check( '...and the end of another transition, or of one of something else, measures nothing', growOf() === '72px' );
+transitionEnd( bar, 'max-height' );
+check( '...the end of its max-height measures it', growOf() === '96px' );
+bar.animations = [ { transitionProperty : 'opacity' } ];
+bar.height = 152;
+observers[0].fire();
+check( 'a transition of anything but the max-height does not hold the measuring back', growOf() === '72px' );
+bar.animations = [];
+
+let writes = 0;
+documentElement.style.setProperty = function( name, value ) { writes++; documentElement.style.properties[name] = value };
+observers[0].fire();
+observers[0].fire();
+check( 'a height that has not changed is not written again', writes === 0 );
+bar.height = 176;
+observers[0].fire();
+check( '...a changed one is', writes === 1 && growOf() === '96px' );
+
+bar.minHeight = 'auto';
+observers[0].fire();
+check( 'a bar whose min-height is no length is no bar to measure against: 0px', growOf() === '0px' );
+bar.minHeight = '80px';
+
+
 // --- A visitor who asked for less motion ---------------------------------
 
 /*	Nino.css has said this since the parallax was written, and the three
@@ -222,7 +328,7 @@ check( 'an arrow with neither attribute is a link like any other: the script doe
 	motion, and a project's own stylesheet can say otherwise. An inline style
 	on <html> is the one declaration neither can overrule without !important,
 	so the script writes none, whatever the visitor asked for	*/
-documentElement.style = {};
+documentElement.style = rootStyle();
 reducedMotion = true;
 ui.onReady();
 reducedMotion = false;

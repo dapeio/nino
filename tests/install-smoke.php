@@ -556,6 +556,15 @@ check( '...and the list that is the bar, from 768px and with the button hidden, 
 check( '...and the row of the links from 768px wraps: flex-wrap on the rule of the list, so that ten links make a second row and none runs out of the bar',
 	preg_match( '/display:\s*flex/', $ninoBody( $ninoWide, '.nino-nav-content ul' ) ) === 1 && preg_match( '/flex-wrap:\s*wrap\s*(;|$)/m', $ninoBody( $ninoWide, '.nino-nav-content ul' ) ) === 1
 	&& preg_match( '/\.nino-nav-content ul\s*\{[^}]*nowrap/', $ninoWide ) !== 1 );
+// The bar grows by a row at a time and its cap is what it may grow to: half of the window, and 200px where the window is lower than 400px - a row the bar clips is a row of links that
+// stay stops of the Tab key. The footer's contact icons take the colour of their row, since .nino-icon names the page's text colour for itself, and on a footer drawn in the ground
+// colour that is the ground
+check( '...the bar may grow to half the window, and to 200px in a window lower than that: no cap clips a row of links that stays a stop of the Tab key',
+	preg_match( '/max-height:\s*max\(200px,\s*50vh\)\s*;/', $ninoBody( $ninoAlone, '.nino-scroll-header' ) ) === 1 );
+check( '...the root declares how far the bar has grown, 0px where the script does not say',
+	preg_match( '/--nino-header-grow:\s*0px\s*;/', $ninoBody( $ninoAlone, ':root' ) ) === 1 );
+check( '...and the contact icons of a footer take the colour of their row, which they fill with',
+	preg_match( '/(?<![a-z-])color:\s*inherit\s*;/', $ninoBody( $ninoAlone, '.nino-footer-getintouch .nino-icon' ) ) === 1 && preg_match( '/fill:\s*currentColor/', $ninoBody( $ninoAlone, '.nino-footer-getintouch .nino-icon' ) ) === 1 );
 // The layers of the open menu - the list that is the overlay, and the ground behind it - are rules of their own and each has a z-index. A rule that has none reads as 0, which every
 // button is above without trying: the check fails for it, so that the button is held above two layers that are there
 $burgerLayer  = static function( string $selector ) use ( $ninoBody, $ninoAlone ): int {
@@ -674,6 +683,10 @@ $heroRule 	= preg_match( '/body main:has\(> \.nino-cover:first-child\)([^{}]*)\{
 check( 'the delivered frame takes main\'s top padding away for a cover and a parallax hero', $heroRule !== '' );
 check( '...also when the Builder\'s wrap stands between main and the hero', str_contains( $heroRule, 'main:has(> .nino-wrap > .nino-cover:first-child)' ) === true
 	&& str_contains( $heroRule, 'main:has(> .nino-wrap > .nino-parallex:first-child)' ) === true );
+// ...and below a header that grew a row it starts under the whole bar: the padding is the bar's min-height and what the script says the bar has grown by. Design's regular header
+// set writes the same line, and its suite compares the delivered file with its own compile of it
+check( 'the delivered frame clears the bar as it is, not as it is at its least: the padding of main is the height plus --nino-header-grow',
+	preg_match( '/\nbody main\s*\{\s*padding-top:\s*calc\( var\(--header-height\) \+ var\(--nino-header-grow, 0px\) \);\s*\}/', $frameStyle ) === 1 );
 
 echo "\n";
 

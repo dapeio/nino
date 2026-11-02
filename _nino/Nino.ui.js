@@ -312,6 +312,7 @@
 					navBurger	: dc.querySelectorAll( '.nino-nav-burger' ),
 					parallex	: dc.querySelectorAll( '.nino-parallex' ),
 					preloader	: dc.querySelectorAll( '.nino-preloader' ),
+					scrollHeader	: dc.querySelectorAll( 'header .nino-scroll-header' ),
 					slider		: dc.querySelectorAll( '.nino-slider' ),
 					statCounter	: dc.querySelectorAll( '.nino-stat-counter' ),
 					tabs			: dc.querySelectorAll( '.nino-tabs' ),
@@ -671,6 +672,59 @@
 
 			// Ignore the initial resize/scroll settling before tracking direction
 			setTimeout( function() { headerScroll.init = true; }, 1000 );
+
+			/*
+			 *	The header is position:fixed and main clears it with the bar's
+			 *	min-height, which is the bar's height only while its links fit one
+			 *	row: from 768px the list wraps and the bar grows by a row at a time.
+			 *	The part of the bar above its min-height is written onto :root as
+			 *	--nino-header-grow, for the padding of main to add (see Nino.css).
+			 *	Not while the bar is folded away on the way down: it is the page that
+			 *	is scrolled then, and a padding that followed the bar to nothing
+			 *	would pull the content up under it again. Nor while its max-height is
+			 *	on its way back up: the min-height is there at once and the box is
+			 *	no taller than that for a moment, which would take the padding away
+			 *	and give it back - the bar is measured once, when the transition
+			 *	ends - under reduced motion that is at once, the transition being
+			 *	as good as none - and as it changes where the browser knows no
+			 *	animations to ask
+			 */
+			const header = e.scrollHeader[0];
+
+			if( header !== undefined && typeof wn.ResizeObserver === 'function' ) {
+
+				let written = '';
+
+				const
+					headerMeasure = function() {
+
+						if( bd.classList.contains('nino-scroll-down') === true )
+							return;
+
+						const
+							min		= parseFloat( wn.getComputedStyle( header ).getPropertyValue('min-height') ),
+							grow	= ( Number.isFinite( min ) === true ? Math.max( 0, Math.ceil( header.getBoundingClientRect().height - min ) ) : 0 )+ 'px';
+
+						if( grow === written )
+							return;
+
+						written = grow;
+						dE.style.setProperty( '--nino-header-grow', grow );
+					},
+					headerGrow = function() {
+
+						if( typeof header.getAnimations === 'function' && header.getAnimations().some( function( animation ) { return animation.transitionProperty === 'max-height' } ) === true )
+							return;
+
+						headerMeasure();
+					};
+
+				new wn.ResizeObserver( headerGrow ).observe( header );
+				header.addEventListener( 'transitionend', function( event ) {
+					if( event.target === header && event.propertyName === 'max-height' )
+						headerMeasure();
+				} );
+			}
 
 			/*
 			 *	nino-back-to-top - visibility is handled in CSS via the

@@ -705,6 +705,10 @@ foreach( [ 'en_US', 'de_DE' ] as $vocabLocale ) {
 }
 $words = array_keys( $wordFills['en_US'] );
 check( 'a word is a slug: lower-case words joined by hyphens, one for each slug, in the alphabet', array_filter( $words, static fn( string $slug ): bool => preg_match( '/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug ) !== 1 ) === [] && $words === array_values( array_unique( $words ) ) && $words === ( static function( array $sorted ): array { sort( $sorted ); return $sorted; } )( $words ) );
+// The segments the catalogue's keys are made of that a feature stores in a list: the months and the days of the Countdown, and the states of a signup and a picture
+$featureWords = [ 'month', 'short', 'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday', 'expired', 'pending', 'requested', 'signup', 'unnamed', 'step' ];
+check( 'the segments of the features\' keys are words in both languages: the months and days, month and short, expired, pending, requested, signup, step and unnamed',
+	array_filter( $featureWords, static fn( string $slug ): bool => trim( $wordFills['en_US'][$slug] ?? '' ) === '' || trim( $wordFills['de_DE'][$slug] ?? '' ) === '' ) === [] );
 check( 'no word is an alias of another: no two slugs share a text in a language', count( array_unique( $wordFills['en_US'] ) ) === count( $words ) && count( array_unique( $wordFills['de_DE'] ) ) === count( $words ) );
 check( 'a word names no key and is no key: no fill, no slash in any of them', array_filter( array_merge( $wordFills['en_US'], $wordFills['de_DE'] ), static fn( string $text ): bool => preg_match( '/\[\[|\//', $text ) === 1 ) === [] );
 

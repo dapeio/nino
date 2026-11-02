@@ -872,6 +872,13 @@ h1, h2, h3, h4, h5, h6 {
  *
  ****************************************************************************************************/
 
+/*	How far the bar of the header has grown past its min-height: Nino.ui.js
+	writes it onto :root while the bar is wrapped onto a second row of links, and
+	a frame that clears the fixed header with the bar's height adds it to its
+	padding. 0 where the bar is one row, or the script does not run	*/
+:root {
+	--nino-header-grow: 0px;
+}
 header {
 	box-sizing: border-box;
 	position: fixed;
@@ -956,7 +963,11 @@ footer .nino-localepicker-wrap li :is(a, span) {
 	padding-bottom: var(--space-1);
 	display:flex;
 }
+/*	The icon is drawn in the colour of its row. .nino-icon sets the page's text
+	colour for itself, and on a footer whose ground is dark that is the colour
+	of the ground - an icon nobody sees	*/
 .nino-footer-getintouch .nino-icon {
+	color: inherit;
 	fill:currentColor;
 	margin-right: var(--space-1);
 }
@@ -1005,7 +1016,7 @@ main:has(> .nino-wrap > .nino-hero--fullscreen:first-child) {
 /* Scroll-driven header show/hide, opt-in via .nino-scroll-header */
 .nino-scroll-header {
 	overflow: hidden;
-	max-height: 200px;
+	max-height: max(200px, 50vh);
 	opacity: .6;
 	transition: max-height .4s, padding-top .4s, padding-bottom .4s, border-top-width .4s, border-bottom-width .4s, opacity .4s;
 	background-color:var(--color-header-bg);
@@ -3622,8 +3633,9 @@ header .nino-headernav-logo:empty {
 	/*	The row wraps: with ten links it ran out of the bar on the right, where
 		the header clips it and the links that were cut off stayed stops of the Tab
 		key. The second row has the gap of the first - the header is as tall as its
-		content, so it grows, up to the 200px of .nino-scroll-header, which clips
-		a fourth row	*/
+		content, so it grows, up to the half of the window that .nino-scroll-header
+		allows it - 200px in a window that is lower than 400px - and the page below
+		keeps clear of it by --nino-header-grow	*/
 	.nino-nav-content ul {
 		display: flex;
 		flex-wrap: wrap;
