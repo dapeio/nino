@@ -551,6 +551,11 @@ check( '...and the list that is the bar, from 768px and with the button hidden, 
 	preg_match( '/overflow:\s*hidden/', $ninoBody( $ninoAlone, '.nino-nav-burger .nino-nav-content' ) ) === 1
 	&& preg_match( '/overflow:\s*visible/', $ninoBody( $ninoAlone, '.nino-nav-burger > button[hidden] ~ .nino-nav-content' ) ) === 1
 	&& preg_match( '/overflow:\s*visible/', $ninoBody( $ninoWide, '.nino-nav-burger .nino-nav-content' ) ) === 1 );
+// The row of the links, from 768px, wraps: it is a flex row and without flex-wrap it was as wide as its links, ten of them ran out of the bar on the right, where the header clips them, and
+// the links that were cut off stayed stops of the Tab key. The bar is as tall as its content (min-height, never height), so the second row is room it grows into
+check( '...and the row of the links from 768px wraps: flex-wrap on the rule of the list, so that ten links make a second row and none runs out of the bar',
+	preg_match( '/display:\s*flex/', $ninoBody( $ninoWide, '.nino-nav-content ul' ) ) === 1 && preg_match( '/flex-wrap:\s*wrap\s*(;|$)/m', $ninoBody( $ninoWide, '.nino-nav-content ul' ) ) === 1
+	&& preg_match( '/\.nino-nav-content ul\s*\{[^}]*nowrap/', $ninoWide ) !== 1 );
 // The layers of the open menu - the list that is the overlay, and the ground behind it - are rules of their own and each has a z-index. A rule that has none reads as 0, which every
 // button is above without trying: the check fails for it, so that the button is held above two layers that are there
 $burgerLayer  = static function( string $selector ) use ( $ninoBody, $ninoAlone ): int {

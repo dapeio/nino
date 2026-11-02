@@ -3617,8 +3617,14 @@ header .nino-headernav-logo:empty {
 		visibility: visible;
 		background-color: transparent;
 	}
+	/*	The row wraps: with ten links it ran out of the bar on the right, where
+		the header clips it and the links that were cut off stayed stops of the Tab
+		key. The second row has the gap of the first - the header is as tall as its
+		content, so it grows, up to the 200px of .nino-scroll-header, which clips
+		a fourth row	*/
 	.nino-nav-content ul {
 		display: flex;
+		flex-wrap: wrap;
 		gap: var(--space-2);
 	}
 	.nino-nav-burger .nino-nav-content ul {
