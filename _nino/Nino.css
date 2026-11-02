@@ -1786,33 +1786,39 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 /*	A card that is a link the stretched way (Inclusive Components, "Cards"; the
 	stretched link of Bootstrap). The card itself is no <a>: it holds buttons,
 	and a link in a link is no markup, which the keyboard and a screen reader
-	cannot make sense of. The link of its title - the <a> that [card-title] draws
-	around the title when it has an address - is stretched over the card by its
-	::after, so that the keyboard has one stop with the name of the title, the
-	pointer has the whole area, and nothing is drawn twice or added. The card is
-	the box the overlay is placed in and a stacking context of its own, so that
-	what is lifted stays in it; the title's link is the one element that stays
-	where it is, since placed itself the overlay would be as large as the link.
-	The overlay lies over everything that is not lifted - a picture in a frame
-	that is placed itself included - and under whatever else in the card is there
-	to be used for its own sake: a button, another link, a field and its label, the
-	summary of a disclosure, a frame, a player with controls. Those are lifted over
-	it and keep targets of their own, and :where() holds the lift at the
+	cannot make sense of. One link in it is stretched over the card by its
+	::after, so that the keyboard has one stop with the name of that link, the
+	pointer has the whole area, and nothing is drawn twice or added. Which link
+	that is, is said by the class nino-stretch on the <a>: a component that says
+	stretched in its schema gives the one link it draws that class - the kernel's
+	wrapper does for a component the kernel links, the title of a card among
+	them, and a feature's template does where the feature draws the <a> itself.
+	A list of links is no candidate, so a feature gives the class to a lone link
+	and not to the links of its list. With two such links in one card both cover
+	it and the later one lies on top: one link per card is meant. The card is the
+	box the overlay is placed in and a stacking context of its own, so that what
+	is lifted stays in it; the stretched link is the one element that stays where
+	it is, since placed itself the overlay would be as large as the link. The
+	overlay lies over everything that is not lifted - a picture in a frame that is
+	placed itself included - and under whatever else in the card is there to be
+	used for its own sake: a button, another link, a field and its label, the
+	summary of a disclosure, a frame, a player with controls. Those are lifted
+	over it and keep targets of their own, and :where() holds the lift at the
 	specificity of one class, so that an element that places itself and says so
 	later in this file - the close button of a dialog, the dot of a slider - keeps
-	its place. Text in a linked card cannot be selected, and a card whose title is
-	no link shows nothing of it	*/
+	its place. Text in a linked card cannot be selected, and a card with no such
+	link shows nothing of it	*/
 .nino-card--linked {
 	position: relative;
 	isolation: isolate;
 }
-.nino-card--linked a:has(> .nino-card-title)::after {
+.nino-card--linked a.nino-stretch::after {
 	content: '';
 	position: absolute;
 	inset: 0;
 	z-index: 1;
 }
-.nino-card--linked :where(a, button, iframe, input, label, select, summary, textarea, [contenteditable], [controls], [tabindex]):where(:not(:has(> .nino-card-title))) {
+.nino-card--linked :where(a, button, iframe, input, label, select, summary, textarea, [contenteditable], [controls], [tabindex]):where(:not(.nino-stretch)) {
 	position: relative;
 	z-index: 2;
 }
@@ -1822,10 +1828,10 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	is the ground the focus colour of the card was solved against, and no parent
 	that clips can cut it off. The generic ring is :where(), so that these two win
 	without a word more	*/
-.nino-card--linked a:focus-visible:has(> .nino-card-title) {
+.nino-card--linked a.nino-stretch:focus-visible {
 	outline: none;
 }
-.nino-card--linked:has(a:focus-visible > .nino-card-title) {
+.nino-card--linked:has(a.nino-stretch:focus-visible) {
 	outline: 2px solid var(--color-focus);
 	outline-offset: -2px;
 }
@@ -1918,11 +1924,9 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	which is right for a menu, a title or a card and leaves a link in a sentence
 	looking like the words round it. The text is what [text] and [card-text]
 	draw, whatever their format, size and colour: nino-section-text and
-	nino-card-descr. A button in a text keeps its own rules, and so does the link
-	that a linked card stretches over its whole area - the title's, and no part
-	of a text; the titles get nothing. :where() leaves the rules the weight of a
-	link, so that a class of a link of its own - a button's, a design layer's -
-	wins over them	*/
+	nino-card-descr. A button in a text keeps its own rules; the titles get
+	nothing. :where() leaves the rules the weight of a link, so that a class of
+	a link of its own - a button's, a design layer's - wins over them	*/
 :where(.nino-section-text, .nino-card-descr) a:where(:not(.nino-btn)) {
 	color: var(--color-accent);
 }
@@ -2638,14 +2642,14 @@ textarea:disabled {
 	.nino-image.nino-hover:hover,
 	a:focus-visible > .nino-image.nino-hover,
 	.nino-card--linked:hover .nino-image.nino-hover,
-	.nino-card--linked:has(a:focus-visible > .nino-card-title) .nino-image.nino-hover {
+	.nino-card--linked:has(a.nino-stretch:focus-visible) .nino-image.nino-hover {
 		transform: translateY(var(--image-hover-lift));
 		box-shadow: var(--image-hover-shadow);
 	}
 	.nino-image.nino-hover:hover > img,
 	a:focus-visible > .nino-image.nino-hover > img,
 	.nino-card--linked:hover .nino-image.nino-hover > img,
-	.nino-card--linked:has(a:focus-visible > .nino-card-title) .nino-image.nino-hover > img {
+	.nino-card--linked:has(a.nino-stretch:focus-visible) .nino-image.nino-hover > img {
 		transform: scale(var(--image-hover-scale));
 		filter: brightness(var(--image-hover-brightness));
 	}
@@ -2654,13 +2658,13 @@ textarea:disabled {
 	.nino-image.nino-hover:hover,
 	a:focus-visible > .nino-image.nino-hover,
 	.nino-card--linked:hover .nino-image.nino-hover,
-	.nino-card--linked:has(a:focus-visible > .nino-card-title) .nino-image.nino-hover {
+	.nino-card--linked:has(a.nino-stretch:focus-visible) .nino-image.nino-hover {
 		transform: none;
 	}
 	.nino-image.nino-hover:hover > img,
 	a:focus-visible > .nino-image.nino-hover > img,
 	.nino-card--linked:hover .nino-image.nino-hover > img,
-	.nino-card--linked:has(a:focus-visible > .nino-card-title) .nino-image.nino-hover > img {
+	.nino-card--linked:has(a.nino-stretch:focus-visible) .nino-image.nino-hover > img {
 		transform: none;
 	}
 }

@@ -654,12 +654,12 @@ foreach( [ 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt', 'counter', 'd
 		$groundWrong[] = '.nino-card--'. $groundName;
 check( '...and the full-width rule lists it with the seven grounds, so a full-width dimmed card has no side padding either'. ( $groundWrong === [] ? '' : ' - not in it: '. implode( ', ', $groundWrong ) ), $groundWrong === [] );
 
-/*	A card is the link of its title the stretched way: the card is no <a>, since it holds buttons, and the link of its title is stretched over it by its ::after. The card is the box the
-	overlay is placed in and a stacking context of its own, so that what is lifted stays in it. The overlay is the pseudo-element of the <a> that holds the title - the link [card-title]
-	draws, the title its one child - which is the one element that is placed by no rule, or the overlay would be as large as the link. It lies over everything that is not lifted, a framed
-	picture that is placed itself among it, and what else in the card can take focus is lifted over it: a position and a z-index above the overlay's, at the specificity of one class
-	(:where()), so that an element that places itself and says so later keeps its place. The one stop of the keyboard shows on the card, and the link has no ring of its own	*/
-$linkedLink = '.nino-card--linked a:has(> .nino-card-title)';
+/*	A card is the link of a component that says stretched, the stretched way: the card is no <a>, since it holds buttons, and one link in it is stretched over it by its ::after. The card is the box the
+	overlay is placed in and a stacking context of its own, so that what is lifted stays in it. The overlay is the pseudo-element of the <a> that carries the class nino-stretch - the link the
+	component draws, the kernel's wrapper for the title or a feature's own <a> - which is the one element that is placed by no rule, or the overlay would be as large as the link. It lies over everything
+	that is not lifted, a framed picture that is placed itself among it, and what else in the card can take focus is lifted over it: a position and a z-index above the overlay's, at the specificity of
+	one class (:where()), so that an element that places itself and says so later keeps its place. The one stop of the keyboard shows on the card, and the link has no ring of its own	*/
+$linkedLink = '.nino-card--linked a.nino-stretch';
 $linkedOverlay = $groundOf( $linkedLink. '::after' );
 $linkedLiftAt = array_values( array_filter( array_keys( $groundEach ), static fn( string $selector ): bool => str_starts_with( $selector, '.nino-card--linked :where(' ) === true ) );
 $linkedLift = $groundOf( $linkedLiftAt[0] ?? '' );
@@ -681,22 +681,22 @@ $linkedFlat = static function( string $selector ): string {
 	return trim( $flat );
 };
 $linkedOwn = array_map( static fn( string $declaration ): string => trim( explode( ':', $declaration )[0] ), array_filter( explode( ';', $groundOf( '.nino-card--linked' ) ), static fn( string $declaration ): bool => trim( $declaration ) !== '' ) );
-check( 'a card may be the link of its title, the stretched way: .nino-card--linked is the box the overlay is placed in - placed, and a stacking context of its own - and says nothing else of the card, so that a card whose title is no link is as without it',
+check( 'a card may be the link of a component that says stretched, the stretched way: .nino-card--linked is the box the overlay is placed in - placed, and a stacking context of its own - and says nothing else of the card, so that a card with no such link is as without it',
 	$groundSets( $groundOf( '.nino-card--linked' ), 'position', 'relative' ) === true && $groundSets( $groundOf( '.nino-card--linked' ), 'isolation', 'isolate' ) === true
 	&& array_values( $linkedOwn ) === [ 'position', 'isolation' ] && count( $groundEach['.nino-card--linked'] ?? [] ) === 1 );
-check( '...the overlay is the pseudo-element of the <a> that holds the title - the link that [card-title] draws, with the title as its one child - an empty box over the whole card with a z-index of its own; and no rule places that link',
+check( '...the overlay is the pseudo-element of the <a> of the class nino-stretch - the link a component that says stretched draws - an empty box over the whole card with a z-index of its own; and no rule places that link',
 	$groundSets( $linkedOverlay, 'content', "''" ) === true && $groundSets( $linkedOverlay, 'position', 'absolute' ) === true && $groundSets( $linkedOverlay, 'inset', '0' ) === true && $linkedZ( $linkedOverlay ) > 0
 	&& preg_match( '/(?<![\w-])(?:position|z-index|inset|top|right|bottom|left)\s*:/', $groundOf( $linkedLink ) ) !== 1
-	&& str_starts_with( \Nino\Modules\Components::$html['link'], '<a' ) === true && str_contains( \Nino\Modules\Components::$html['card-title'], 'class="nino-card-title' ) === true );
-check( '...what else in the card is there to be used for its own sake is lifted over it - a link, a button, a field and its label, a disclosure, a frame, a player with controls, whatever has a tabindex, but the link that holds the title - by a position and a z-index above the overlay\'s, at the specificity of one class'
+	&& str_starts_with( \Nino\Modules\Components::$html['link'], '<a[[class]]' ) === true );
+check( '...what else in the card is there to be used for its own sake is lifted over it - a link, a button, a field and its label, a disclosure, a frame, a player with controls, whatever has a tabindex, but the link of the class nino-stretch - by a position and a z-index above the overlay\'s, at the specificity of one class'
 	. ( $linkedLiftAt === [] ? ' - no such rule' : '' ),
 	count( $linkedLiftAt ) === 1 && $groundSets( $linkedLift, 'position', 'relative' ) === true && $linkedZ( $linkedLift ) > $linkedZ( $linkedOverlay )
 	&& array_filter( [ 'a', 'button', 'iframe', 'input', 'label', 'select', 'summary', 'textarea', '[controls]', '[tabindex]' ], static fn( string $element ): bool => preg_match( '/:where\((?:[^()]*, )?'. preg_quote( $element, '/' ). '(?:,|\))/', $linkedLiftAt[0] ?? '' ) !== 1 ) === []
-	&& str_ends_with( $linkedLiftAt[0] ?? '', ':where(:not(:has(> .nino-card-title)))' ) === true && $linkedFlat( $linkedLiftAt[0] ?? '' ) === '.nino-card--linked' );
-check( '...the one stop of the keyboard shows on the card, inside it, and the link that holds the title has no ring of its own',
-	$groundSets( $groundOf( '.nino-card--linked a:focus-visible:has(> .nino-card-title)' ), 'outline', 'none' ) === true
-	&& $groundSets( $groundOf( '.nino-card--linked:has(a:focus-visible > .nino-card-title)' ), 'outline', '2px solid var(--color-focus)' ) === true
-	&& (int) $hookValue( $groundOf( '.nino-card--linked:has(a:focus-visible > .nino-card-title)' ), 'outline-offset' ) < 0 );
+	&& str_ends_with( $linkedLiftAt[0] ?? '', ':where(:not(.nino-stretch))' ) === true && $linkedFlat( $linkedLiftAt[0] ?? '' ) === '.nino-card--linked' );
+check( '...the one stop of the keyboard shows on the card, inside it, and the link of the class nino-stretch has no ring of its own',
+	$groundSets( $groundOf( '.nino-card--linked a.nino-stretch:focus-visible' ), 'outline', 'none' ) === true
+	&& $groundSets( $groundOf( '.nino-card--linked:has(a.nino-stretch:focus-visible)' ), 'outline', '2px solid var(--color-focus)' ) === true
+	&& (int) $hookValue( $groundOf( '.nino-card--linked:has(a.nino-stretch:focus-visible)' ), 'outline-offset' ) < 0 );
 
 // The padding of a card is a utility's to say: .nino-p-<n> is the last chapter of the file, after the rules that give a card its own - the base, the 768px and the 1280px ones, and the ground's
 $groundCardPaddingAt = -1;
@@ -1578,8 +1578,8 @@ check( '...a zoom by default and nothing else: the scale is above 1, the lift 0p
 	&& $hookValue( $hoverRoot, '--image-hover-brightness' ) === '1' && $hookValue( $hoverRoot, '--image-hover-shadow' ) === 'none'
 	&& preg_match( '/^(?:\d*\.)?\d+m?s$/', (string) $hookValue( $hoverRoot, '--image-hover-duration' ) ) === 1 && (float) $hookValue( $hoverRoot, '--image-hover-duration' ) > 0 );
 
-// The four places the effect shows - under the pointer, under the keyboard where the picture is a link, and in a linked card for its hover and for the focus of the link of its title - for the frame, and for the picture in it
-$hoverFrames = [ '.nino-image.nino-hover:hover', 'a:focus-visible > .nino-image.nino-hover', '.nino-card--linked:hover .nino-image.nino-hover', '.nino-card--linked:has(a:focus-visible > .nino-card-title) .nino-image.nino-hover' ];
+// The four places the effect shows - under the pointer, under the keyboard where the picture is a link, and in a linked card for its hover and for the focus of its stretched link - for the frame, and for the picture in it
+$hoverFrames = [ '.nino-image.nino-hover:hover', 'a:focus-visible > .nino-image.nino-hover', '.nino-card--linked:hover .nino-image.nino-hover', '.nino-card--linked:has(a.nino-stretch:focus-visible) .nino-image.nino-hover' ];
 $hoverPictures = array_map( static fn( string $selector ): string => $selector. ' > img', $hoverFrames );
 // The bodies of the rules whose list of selectors is exactly the one given, squeezed, in the order of the stylesheet
 $hoverBodies = static function( array $members ) use ( $groundBlocks, $groundSplit ): array {
@@ -1608,11 +1608,11 @@ foreach( $groundBlocks as [ , $hoverList ] )
 check( '...and the class is the frame\'s, as nino-radius is: every selector that names nino-hover names the frame it stands on, .nino-image.nino-hover'. ( $hoverBare === [] ? '' : ' - not: '. implode( ' | ', $hoverBare ) ),
 	$hoverBare === [] && isset( $groundEach['.nino-image.nino-hover'], $groundEach['.nino-image.nino-hover > img'] ) === true );
 
-// A linked card is no <a>: the pointer stands on the overlay the link of its title stretches over the card, never on the frame, and the keyboard rests on that link
-$hoverCards = [ '.nino-card--linked:hover .nino-image.nino-hover', '.nino-card--linked:has(a:focus-visible > .nino-card-title) .nino-image.nino-hover', '.nino-card--linked:hover .nino-image.nino-hover > img', '.nino-card--linked:has(a:focus-visible > .nino-card-title) .nino-image.nino-hover > img' ];
-check( 'in a linked card the picture follows the card - its hover and the focus of the link of its title, the selector the ring of the card is drawn for - the same rules for the frame and for the picture, one list each: the pointer, the keyboard on a link, and the card',
+// A linked card is no <a>: the pointer stands on the overlay its stretched link lays over the card, never on the frame, and the keyboard rests on that link
+$hoverCards = [ '.nino-card--linked:hover .nino-image.nino-hover', '.nino-card--linked:has(a.nino-stretch:focus-visible) .nino-image.nino-hover', '.nino-card--linked:hover .nino-image.nino-hover > img', '.nino-card--linked:has(a.nino-stretch:focus-visible) .nino-image.nino-hover > img' ];
+check( 'in a linked card the picture follows the card - its hover and the focus of its stretched link, the selector the ring of the card is drawn for - the same rules for the frame and for the picture, one list each: the pointer, the keyboard on a link, and the card',
 	count( $hoverFrameBodies ) === 2 && count( $hoverPictureBodies ) === 2 && array_diff( $hoverCards, array_keys( $groundEach ) ) === []
-	&& isset( $groundEach['.nino-card--linked:has(a:focus-visible > .nino-card-title)'] ) === true );
+	&& isset( $groundEach['.nino-card--linked:has(a.nino-stretch:focus-visible)'] ) === true );
 
 // A coarse pointer and less motion: the effect stands in a query that leaves the coarse pointer out, and the block that takes the motion back for less motion names the fine pointer and none, a list in the form the rest of the file gives its queries - a tap changes nothing, and no engine drops the block
 $hoverFramesWhere = $groundConditions( implode( ', ', $hoverFrames ) );
@@ -1880,9 +1880,9 @@ $badSchemas = [
 	'a tab in capitals'										=> [ 'captab', $withAttribute( [ 'type' => 'bool', 'default' => false, 'tab' => strtoupper( \Nino\Modules\Components::TABS[0] ) ] ), '"tab" must be one of' ],
 	'a tab that is the list of the words'				=> [ 'listtab', $withAttribute( [ 'type' => 'select', 'options' => [ '', 'a' ], 'default' => '', 'tab' => \Nino\Modules\Components::TABS ] ), '"tab" must be one of' ],
 	'a tab that is a number'								=> [ 'numtab', $withAttribute( [ 'type' => 'int', 'default' => 0, 'tab' => 5 ] ), '"tab" must be one of' ],
-	'a stretching of a component that holds nothing'	=> [ 'stretchnone', [ 'label' => 'x', 'source' => 'text', 'group' => 'card', 'stretches' => 'card-title' ], '"stretches" needs "holds"' ],
-	'a stretching of a name that is no slug'			=> [ 'stretchslug', [ 'label' => 'x', 'source' => 'content', 'holds' => 'card', 'group' => 'card', 'stretches' => 'Card Title' ], '"stretches" names a component, a slug' ],
-	'a stretching of a list'							=> [ 'stretchlist', [ 'label' => 'x', 'source' => 'content', 'holds' => 'card', 'group' => 'card', 'stretches' => [ 'card-title' ] ], '"stretches" names a component, a slug' ],
+	'a stretched that is no bool'								=> [ 'stretchyes', [ 'label' => 'x', 'source' => 'text', 'group' => 'card', 'link' => true, 'stretched' => 'yes' ], '"stretched" must be true or false' ],
+	'a stretched that is a number'							=> [ 'stretchone', [ 'label' => 'x', 'source' => 'text', 'group' => 'card', 'stretched' => 1 ], '"stretched" must be true or false' ],
+	'a stretched of a component that holds components'	=> [ 'stretchholder', [ 'label' => 'x', 'source' => 'content', 'holds' => 'card', 'group' => 'card', 'stretched' => true ], '"stretched" is for a component that draws a link, and a component that holds components is none' ],
 ];
 foreach( $badSchemas as $what => [ $name, $schema, $why ] ) {
 	$schemaErrors = $errorsOf( function() use ( &$appData, $noop, $name, $schema ) { \Nino\Modules\Components::addComponent( $appData, $name, $noop, $schema ); } );
@@ -1897,25 +1897,6 @@ $schemaErrors = $errorsOf( function() use ( &$appData, $noop ) { \Nino\Modules\C
 check( '...and one whose assets climb out of the project', count( $schemaErrors ) === 1 && str_contains( $schemaErrors[0][1], 'assets' ) === true );
 check( 'the registry was left alone by every refusal', array_keys( \Nino\Modules\Components::components( $appData ) ) === $kernelAll
 	&& array_keys( \Nino\Modules\Components::stacks( $appData ) ) === $kernelStacks );
-// What a holder 'stretches' names is told by the components registered before it, and a name that does not do is no reason for a fatal error - a manifest cannot know the
-// other components, and an E_USER_ERROR at registration would be one on every request: the holder is registered without the key, and a warning says why
-$stretching = [
-	'a component that is not there'					=> [ 'stretchunknown', 'card-headline', 'card', '"stretches" names a component that is registered before it: "card-headline" is not' ],
-	'itself'												=> [ 'stretchself', 'stretchself', 'card', '"stretches" names a component that is registered before it: "stretchself" is not' ],
-	'a component that is no link'						=> [ 'stretchnolink', 'button', 'section', '"stretches" names a component that is a link: "button" is not' ],
-	'a component that is offered in another place'	=> [ 'stretchplace', 'title', 'card', '"stretches" names a component that is offered in card, the place it holds: "title" is not' ],
-];
-foreach( $stretching as $what => [ $name, $stretches, $holds, $why ] ) {
-	$probe = $appData;
-	$warned = $errorsOf( function() use ( &$probe, $noop, $name, $stretches, $holds ) { \Nino\Modules\Components::addComponent( $probe, $name, $noop, [ 'label' => 'x', 'source' => 'content', 'holds' => $holds, 'group' => 'card', 'stretches' => $stretches ] ); } );
-	check( 'addComponent() registers a holder that stretches '. $what. ' without the key, and says so in one E_USER_WARNING', count( $warned ) === 1 && $warned[0][0] === E_USER_WARNING
-		&& str_contains( $warned[0][1], 'component "'. $name. '": '. $why. ' - registered without it' ) === true
-		&& isset( \Nino\Modules\Components::components( $probe )[$name] ) === true && array_key_exists( 'stretches', \Nino\Modules\Components::components( $probe )[$name] ) === false
-		&& \Nino\Modules\Components::components( $probe )[$name]['holds'] === $holds && isset( \Nino\Modules\Components::components( $appData )[$name] ) === false );
-}
-$probe = $appData;
-$kept = $errorsOf( function() use ( &$probe, $noop ) { \Nino\Modules\Components::addComponent( $probe, 'stretchgood', $noop, [ 'label' => 'x', 'source' => 'content', 'holds' => 'card', 'group' => 'card', 'stretches' => 'card-title' ] ); } );
-check( '...and one whose name does keeps it, with no word said', $kept === [] && \Nino\Modules\Components::components( $probe )['stretchgood']['stretches'] === 'card-title' );
 check( 'a schema that validates is returned complete, a stack with its assets', \Nino\Modules\Components::validate( 'rows', [ 'label' => 'Rows', 'grid' => true, 'assets' => [ 'css' => [ '/features/Rows/assets/rows.css' ] ] ], true ) === [
 	'label' => 'Rows', 'grid' => true, 'preview' => 'cells', 'attributes' => [], 'assets' => [ 'css' => [ '/features/Rows/assets/rows.css' ] ],
 ] );
@@ -1948,10 +1929,16 @@ check( '...and gives the sentence of the first thing wrong with it: a place that
 	array_filter( [ 'page', 'cell', 'Card', [ 'card' ], 5, '', true ], static fn( mixed $wrong ): bool => str_contains( $holdsAnswer( $holding + [ 'holds' => $wrong ] ), '"holds" names a place: section, card or hero' ) === false ) === []
 	&& array_filter( [ 'text', 'image', 'href', 'none' ], static fn( string $source ): bool => str_contains( $holdsAnswer( [ 'source' => $source, 'holds' => 'card' ] + $holding ), '"holds" needs the source content' ) === false ) === []
 	&& $holdsAnswer( [ 'holds' => 'weird', 'source' => 'text' ] + $holding ) !== '' && str_contains( $holdsAnswer( [ 'holds' => 'weird', 'source' => 'text' ] + $holding ), 'names a place' ) === true );
-check( 'validate() carries what a holder stretches over itself when it is linked, a name, in the clean schema; a schema that says nothing stretches nothing, and the names are checked when the holder is registered',
-	( \Nino\Modules\Components::validate( 'box', $holding + [ 'holds' => 'card', 'stretches' => 'card-title' ] )['stretches'] ?? null ) === 'card-title'
-	&& array_key_exists( 'stretches', \Nino\Modules\Components::validate( 'box', $holding + [ 'holds' => 'card' ] ) ) === false
-	&& str_contains( $holdsAnswer( $holding + [ 'stretches' => 'card-title' ] ), '"stretches" needs "holds"' ) === true );
+check( 'validate() carries stretched in the clean schema: true where a component that draws a link says so - with link and without - and false where the schema says nothing or says false',
+	( \Nino\Modules\Components::validate( 'box', $holding + [ 'stretched' => true ] )['stretched'] ?? null ) === true
+	&& ( \Nino\Modules\Components::validate( 'box', $holding + [ 'link' => true, 'stretched' => true ] )['stretched'] ?? null ) === true
+	&& ( \Nino\Modules\Components::validate( 'box', $holding )['stretched'] ?? null ) === false
+	&& ( \Nino\Modules\Components::validate( 'box', $holding + [ 'stretched' => false ] )['stretched'] ?? null ) === false
+	&& ( \Nino\Modules\Components::validate( 'box', $holding + [ 'link' => true ] )['stretched'] ?? null ) === false );
+check( '...a holder is no link and has none to give: stretched on a component that holds components is refused with the sentence, saying false or nothing is not, and so is a value that is no bool',
+	str_contains( $holdsAnswer( $holding + [ 'holds' => 'card', 'stretched' => true ] ), '"stretched" is for a component that draws a link' ) === true
+	&& is_array( \Nino\Modules\Components::validate( 'box', $holding + [ 'holds' => 'card', 'stretched' => false ] ) ) === true && is_array( \Nino\Modules\Components::validate( 'box', $holding + [ 'holds' => 'card' ] ) ) === true
+	&& array_filter( [ 'yes', 1, 0, 'true', [ true ] ], static fn( mixed $wrong ): bool => str_contains( $holdsAnswer( $holding + [ 'stretched' => $wrong ] ), '"stretched" must be true or false' ) === false ) === [] );
 // An icon: the parts of a 24 by 24 picture that a tool draws with a stroke, which validate() carries into the clean schema as it was given - the refusals are in the table above
 $iconAnswer = static fn( mixed $icon ): array|string => \Nino\Modules\Components::validate( 'probe', $placed + [ 'icon' => $icon ] );
 $iconSeven = [
@@ -2104,10 +2091,13 @@ $cardSchema = \Nino\Modules\Components::components( $appData )['card'];
 check( 'the card is declared as the registry says: a label in both languages, the source content, the picture of a block, its icon, offered in a section and a hero, drawing the <article> with its class, and holding the components of a card',
 	$cardSchema['label'] === [ 'en_US' => 'Card', 'de_DE' => 'Karte' ] && $cardSchema['source'] === 'content' && $cardSchema['loop'] === true && $cardSchema['preview'] === 'block'
 	&& $cardSchema['in'] === [ 'section', 'hero' ] && $cardSchema['draws'] === 'article .nino-card' && $cardSchema['holds'] === 'card'
-	&& array_keys( $cardSchema ) === [ 'label', 'source', 'loop', 'preview', 'icon', 'attributes', 'in', 'draws', 'holds', 'stretches', 'link', 'by', 'group' ] );
-check( '...and it stretches its title: the card says the component whose address it takes where it is linked, the registry gives it back in json, and no other component of the kernel says one', $cardSchema['stretches'] === 'card-title'
-	&& ( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), true ) )['card']['stretches'] === 'card-title'
-	&& array_keys( array_filter( \Nino\Modules\Components::components( $appData ), static fn( array $schema ): bool => array_key_exists( 'stretches', $schema ) === true ) ) === [ 'card' ]
+	&& array_keys( $cardSchema ) === [ 'label', 'source', 'loop', 'preview', 'icon', 'attributes', 'in', 'draws', 'holds', 'stretched', 'link', 'by', 'group' ] );
+check( '...it says stretched itself no more than a holder can - false, and the registry gives it back in json - and its schema has no key for the component whose address it takes: the title says that of itself, \'card-title\' is the only component of the kernel that does',
+	$cardSchema['stretched'] === false && ( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), true ) )['card']['stretched'] === false
+	&& array_key_exists( 'stretches', $cardSchema ) === false
+	&& ( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), true ) )['card-title']['stretched'] === true
+	&& array_keys( array_filter( \Nino\Modules\Components::components( $appData ), static fn( array $schema ): bool => $schema['stretched'] === true ) ) === [ 'card-title' ]
+	&& array_filter( \Nino\Modules\Components::components( $appData ), static fn( array $schema ): bool => array_key_exists( 'stretched', $schema ) === false ) === []
 	&& \Nino\Modules\Components::components( $appData )['card-title']['link'] === true && \Nino\Modules\Components::components( $appData )['card-title']['in'] === [ 'card' ] );
 check( '...its attributes are ten, in the order the form shows them: whether it fills, the padding, where its content stands, how it is aligned, the ground, the border, whether the whole card is the link of its title, the picture, its focus and the dim',
 	array_keys( $cardSchema['attributes'] ) === [ 'fill', 'padding', 'vertical', 'align', 'ground', 'borderless', 'linked', 'background', 'focus', 'dim' ] );
@@ -2219,7 +2209,7 @@ check( '...a clean schema with a tab validates again as it is, and the component
 // A link on a component, who registered it: the clean schema says both, after the keys of its place, and a stack has neither
 $linkable = [ 'label' => 'x', 'source' => 'text', 'attributes' => [ 'tag' => [ 'type' => 'select', 'options' => [ 'div', 'h3' ], 'default' => 'h3' ] ] ];
 check( 'validate() takes whether a component can be a link and who registered it - false and nino where the schema says nothing - and the clean schema has the two last, after holds; a stack has neither, whatever it says',
-	array_keys( \Nino\Modules\Components::validate( 'probe', $linkable + [ 'in' => [ 'card' ], 'draws' => '{tag} .x', 'link' => true, 'by' => 'hello' ] ) ) === [ 'label', 'source', 'loop', 'preview', 'attributes', 'in', 'draws', 'link', 'by' ]
+	array_keys( \Nino\Modules\Components::validate( 'probe', $linkable + [ 'in' => [ 'card' ], 'draws' => '{tag} .x', 'link' => true, 'by' => 'hello' ] ) ) === [ 'label', 'source', 'loop', 'preview', 'attributes', 'in', 'draws', 'stretched', 'link', 'by' ]
 	&& ( \Nino\Modules\Components::validate( 'probe', $linkable + [ 'link' => true, 'by' => 'hello' ] )['link'] ?? null ) === true && ( \Nino\Modules\Components::validate( 'probe', $linkable + [ 'link' => true, 'by' => 'hello' ] )['by'] ?? null ) === 'hello'
 	&& ( \Nino\Modules\Components::validate( 'probe', $linkable + [ 'group' => 'global' ] )['link'] ?? null ) === false && ( \Nino\Modules\Components::validate( 'probe', $linkable + [ 'group' => 'global' ] )['by'] ?? null ) === 'nino'
 	&& array_diff_key( (array) \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'link' => true, 'by' => 'hello' ], true ), [ 'label' => 1, 'grid' => 1, 'preview' => 1, 'attributes' => 1 ] ) === []
@@ -2237,7 +2227,7 @@ $groupSentence = 'component "probe": "group" must be one of section, hero, card,
 $featureSentence = 'component "probe": a feature\'s components are offered under the feature, not under a group';
 check( 'validate() takes the group a component is offered under, one of the four words, and the clean schema carries it as its last key, after who registered it; a stack has none, whatever it says',
 	array_filter( \Nino\Modules\Components::GROUPS, static fn( string $group ): bool => ( \Nino\Modules\Components::validate( 'probe', $ungrouped + [ 'group' => $group ] )['group'] ?? null ) !== $group ) === []
-	&& array_keys( \Nino\Modules\Components::validate( 'probe', $placed ) ) === [ 'label', 'source', 'loop', 'preview', 'attributes', 'link', 'by', 'group' ]
+	&& array_keys( \Nino\Modules\Components::validate( 'probe', $placed ) ) === [ 'label', 'source', 'loop', 'preview', 'attributes', 'stretched', 'link', 'by', 'group' ]
 	&& array_key_exists( 'group', (array) \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'group' => 'section' ], true ) ) === false
 	&& \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'group' => 'footer' ], true ) === \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x' ], true ) );
 check( '...and gives the sentence for a component of the kernel or of a project that names none, says nino and none, or names a word that is none of the four: a fifth word, one in capitals, one with a space, an empty word, a number, a list',
@@ -2687,12 +2677,13 @@ check( '...a word outside what an attribute offers is the default, and so is a b
 	&& $render( '[card bogus="x" onclick="y"]x[/card]' ) === '<article class="nino-card"><div class="nino-card-content">x</div></article>'
 	&& $render( '[card fill="true" dim="yes" borderless="on" linked="yes"]x[/card]' ) === '<article class="nino-card nino-card--dim nino-card--borderless nino-card--fill nino-card--linked"><div class="nino-card-content">x</div></article>' );
 /*	The card is no <a>, whatever it says: it holds buttons, and a link in a link is no markup. [card linked] writes the class and nothing else, and the link it makes of the card is the one of
-	its title - the <a> that [card-title] draws, with the title as its one child, which is what Nino.css stretches over the card - so that a card whose title has no address has no link at all	*/
+	its title - the <a class="nino-stretch"> that [card-title] draws, which is what Nino.css stretches over the card - so that a card whose title has no address has no link at all	*/
 check( '[card linked] is no link itself: the <article> with the class, and the link of its title - the <a> around the title - and the button after it as they are anywhere; a title with no address is no link, and the card has none',
 	$render( '[card linked="1"][card-title /template/page-home/hero/title href="/contact"][button text="More" href="#x"][/card]' )
-		=== '<article class="nino-card nino-card--linked"><div class="nino-card-content"><a href="/contact"><h4 class="nino-card-title">Hi &#91;there]</h4></a><a class="nino-btn" href="#x">More</a></div></article>'
+		=== '<article class="nino-card nino-card--linked"><div class="nino-card-content"><a class="nino-stretch" href="/contact"><h4 class="nino-card-title">Hi &#91;there]</h4></a><a class="nino-btn" href="#x">More</a></div></article>'
 	&& $render( '[card linked="1"][card-title /template/page-home/hero/title][/card]' ) === '<article class="nino-card nino-card--linked"><div class="nino-card-content"><h4 class="nino-card-title">Hi &#91;there]</h4></div></article>'
 	&& str_contains( $render( '[card linked="1"][card-title /template/page-home/hero/title][/card]' ), '</a>' ) === false
+	&& str_contains( $render( '[card linked="1"][card-title /template/page-home/hero/title][/card]' ), 'nino-stretch' ) === false
 	&& str_starts_with( $render( '[card linked="1"]x[/card]' ), '<article' ) === true && str_starts_with( \Nino\Modules\Components::$html['link'], '<a' ) === true );
 // The picture behind it
 $appData['/nino/html/images']['/template/page-home/hero/withalt'] = [ 'label' => 'With alt', 'width' => 800, 'height' => 600, 'filename' => 'alt.800x600.jpg', 'alt' => [ 'de_DE' => 'Stored "alt" [x]' ] ];
@@ -2977,16 +2968,17 @@ foreach( $linkOpens as $linkName => $linkOpen ) {
 	$linkPlain = $render( $linkOpen. ']' );
 	if( $linkPlain === '' || in_array( $linkName, $kernelLinked, true ) === false )
 		$linkWrong[] = $linkName. ' is no link or draws nothing';
-	if( $render( $linkOpen. ' href="/_nino/webpage/contact/uri"]' ) !== '<a href="/contact">'. $linkPlain. '</a>' )
+	$linkClass = $linkName === 'card-title' ? ' class="nino-stretch"' : '';
+	if( $render( $linkOpen. ' href="/_nino/webpage/contact/uri"]' ) !== '<a'. $linkClass. ' href="/contact">'. $linkPlain. '</a>' )
 		$linkWrong[] = $linkName. ' with the key of an address';
-	if( $render( $linkOpen. ' href="https://example.com/a" target="_blank"]' ) !== '<a href="https://example.com/a" target="_blank" rel="noopener">'. $linkPlain. '</a>' )
+	if( $render( $linkOpen. ' href="https://example.com/a" target="_blank"]' ) !== '<a'. $linkClass. ' href="https://example.com/a" target="_blank" rel="noopener">'. $linkPlain. '</a>' )
 		$linkWrong[] = $linkName. ' with an address and a target';
-	if( $render( $linkOpen. ' href="javascript:alert(1)"]' ) !== '<a href="#">'. $linkPlain. '</a>' )
+	if( $render( $linkOpen. ' href="javascript:alert(1)"]' ) !== '<a'. $linkClass. ' href="#">'. $linkPlain. '</a>' )
 		$linkWrong[] = $linkName. ' with a scheme that is none';
-	if( $render( $linkOpen. ' target="_blank"]' ) !== $linkPlain || $render( $linkOpen. ' href=""]' ) !== $linkPlain )
+	if( $render( $linkOpen. ' target="_blank"]' ) !== $linkPlain || $render( $linkOpen. ' href=""]' ) !== $linkPlain || str_contains( $linkPlain, 'nino-stretch' ) === true )
 		$linkWrong[] = $linkName. ' without an address';
 }
-check( 'each of the ten components that can be a link draws what it draws in an <a> that has the address of its href - a key is its text, an address is itself, a scheme that is none a #, and _blank says the new window has no business with the opener - and without an address it is no link, with a target alone either'
+check( 'each of the ten components that can be a link draws what it draws in an <a> that has the address of its href - a key is its text, an address is itself, a scheme that is none a #, and _blank says the new window has no business with the opener - and without an address it is no link, with a target alone either; the <a> of the one that says stretched, the card\'s title, has the class nino-stretch before its address, the other nine none'
 	. ( $linkWrong === [] ? '' : ' - '. implode( ', ', $linkWrong ) ), $linkWrong === [] && count( $linkOpens ) === 10 );
 check( '...the address is written as it is made safe, once: the & of a query is &amp;, not &amp;amp; - what it holds written as a key\'s value is what it is - and what a link wraps is the frame of a picture, not its <img>',
 	$render( '[title /template/page-home/hero/title href="/template/page-home/stored/link"]' ) === '<a href="/a?b=&quot;c&quot;&amp;d=1"><h3 class="nino-section-title">Hi &#91;there]</h3></a>'
@@ -3005,6 +2997,15 @@ check( '...and a component of a project that says link is wrapped the same way, 
 		\Nino\Modules\Components::addComponent( $appData, 'plainprobe', static fn( array &$appData, array $args ): string => '<i>'. $args['value']. '</i>', [ 'label' => 'x', 'source' => 'text', 'group' => 'global' ] );
 		return $render( '[plainprobe /template/page-home/hero/title href="#x"]' ) === '<i>Hi &#91;there]</i>';
 	} )() );
+// A component that says stretched gives the <a> of its address the class nino-stretch, in a card and out of one: the renderer reads no context. One that draws its own <a> gives it the class itself, and the kernel adds none
+\Nino\Modules\Components::addComponent( $appData, 'stretchprobe', static fn( array &$appData, array $args ): string => '<i>'. $args['value']. '</i>', $linkable + [ 'link' => true, 'stretched' => true, 'by' => 'hello', 'source' => 'text' ] );
+\Nino\Modules\Components::addComponent( $appData, 'ownprobe', static fn( array &$appData, array $args ): string => '<a class="own-probe" href="#own"><i>'. $args['value']. '</i></a>', $linkable + [ 'stretched' => true, 'by' => 'hello', 'source' => 'text' ] );
+check( '...and a component of a project that says stretched has the class on the <a> the kernel makes of its address - in a card and out of one, first, before the address and the window - and none where it has no address; one that says stretched and draws its own <a> has that <a> as it drew it',
+	$render( '[stretchprobe /template/page-home/hero/title href="#x" target="_blank"]' ) === '<a class="nino-stretch" href="#x" target="_blank" rel="noopener"><i>Hi &#91;there]</i></a>'
+	&& $render( '[card linked="1"][stretchprobe /template/page-home/hero/title href="#x"][/card]' ) === '<article class="nino-card nino-card--linked"><div class="nino-card-content"><a class="nino-stretch" href="#x"><i>Hi &#91;there]</i></a></div></article>'
+	&& $render( '[stretchprobe /template/page-home/hero/title]' ) === '<i>Hi &#91;there]</i>'
+	&& $render( '[ownprobe /template/page-home/hero/title href="#x"]' ) === '<a class="own-probe" href="#own"><i>Hi &#91;there]</i></a>'
+	&& \Nino\Modules\Components::components( $appData )['ownprobe']['stretched'] === true && array_keys( \Nino\Modules\Components::defaults( $appData, 'ownprobe' ) ) === [ 'tag', 'class' ] );
 
 // The width of a button: full is the class nino-btn--fullwidth, after the size
 check( '[button width="full"] is the class nino-btn--fullwidth after the style and the size and before its own class; none is no class, and a word outside the options is none',

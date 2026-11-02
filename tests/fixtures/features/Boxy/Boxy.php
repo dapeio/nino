@@ -3,15 +3,11 @@ declare(strict_types=1);
 
 namespace Nino\Modules {
 
-	// The renderers of Boxy: a title and a box around what it holds
+	// The renderer of Boxy: a link it draws itself, with the class a linked card stretches
 	class Boxy {
 
-		public static function componentBoxyTitle( array &$appData, array $args ): string {
-			return '<p class="boxy-title">'. $args['value']. '</p>';
-		}
-
-		public static function componentBoxyBox( array &$appData, array $args ): string {
-			return '<div class="boxy-box">'. (string) ( $args['content'] ?? '' ). '</div>';
+		public static function componentBoxyLink( array &$appData, array $args ): string {
+			return '<a class="nino-stretch boxy-link" href="#boxy">'. $args['value']. '</a>';
 		}
 	}
 }

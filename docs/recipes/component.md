@@ -106,10 +106,13 @@ The rules the module keeps for you, and the ones it leaves to the renderer:
   component (a list of the places `section`, `card` and `hero`) and, for a
   component whose source is `content`, the place whose components its content
   is the calls of (`'holds' => 'card'` is the kernel's `[card]`), and
-  `stretches` names the component of that place whose address the holder takes
-  where it is linked (`'stretches' => 'card-title'` is the card's: a component
-  registered before it, offered in that place and with `'link' => true`; a name
-  that is none of these is dropped with a warning). A renderer
+  `stretched` is a bool, `true` for a component whose one link may be the link
+  of a linked holder it stands in (the kernel's `card-title` says it; a holder
+  cannot, it is no link): the `<a>` carries the class `nino-stretch` - the
+  kernel writes it on the wrapper of a component that says `'link' => true`, a
+  component that draws its own `<a>` gives it the class in its template, to a
+  lone link and not to the links of a list - and `Nino.css` stretches that link
+  over a card that says `linked`, one link per card. A renderer
   reads no context, so a component that is drawn another way in another place
   is another component. A container does not render its content itself: the
   engine renders the output of a shortcode again, so what it returns inside its

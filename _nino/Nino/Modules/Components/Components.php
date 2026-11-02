@@ -46,7 +46,7 @@ namespace Nino\Modules {
 				'image'				=> '<div class="nino-image[[ratio]][[focus]][[class]]">[[img]]</div>',
 				'button'			=> '<a class="nino-btn[[style]][[size]][[width]][[class]]"[[href]][[target]][[lang]]>[[value]]</a>',
 				'button-span'	=> '<span class="nino-btn[[style]][[size]][[width]][[class]]"[[lang]]>[[value]]</span>',
-				'link'				=> '<a[[href]][[target]]>[[inner]]</a>',
+				'link'				=> '<a[[class]][[href]][[target]]>[[inner]]</a>',
 				'scroll-hint'	=> '<a class="nino-hero-arrowdown[[class]]" href="#[[to]]"[[next]] aria-label="[[/template/common/navigation/next-section]]"></a>',
 				'spacer'			=> '<div class="nino-spacer nino-spacer-[[size]][[class]]"></div>',
 				'card'				=> '<article class="nino-card[[ground]][[dim]][[borderless]][[fill]][[linked]][[vertical]][[align]][[padding]][[class]]">[[background]][[inner]]</article>',
@@ -361,7 +361,7 @@ namespace Nino\Modules {
 					'ground' => [ 'type' => 'select', 'options' => [ '', 'counter', 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt' ], 'default' => '', 'tab' => 'background', 'label' => [ 'en_US' => 'Background colour', 'de_DE' => 'Hintergrund-Farbe' ] ],
 					'borderless' => [ 'type' => 'bool', 'default' => false, 'label' => [ 'en_US' => 'Without border', 'de_DE' => 'Ohne Rahmen' ] ],
 					'linked' => [ 'type' => 'bool', 'default' => false, 'label' => [ 'en_US' => 'Whole card is the link', 'de_DE' => 'Ganze Karte verlinkt' ],
-						'hint' => [ 'en_US' => 'The link of the card\'s title covers the whole card; text in the card cannot be selected then.', 'de_DE' => 'Der Link des Kartentitels gilt für die ganze Fläche; Text in der Karte lässt sich dann nicht markieren.' ] ],
+						'hint' => [ 'en_US' => 'A link in the card - its title\'s, or another component\'s that may be the card\'s link - covers the whole card; text in the card cannot be selected then.', 'de_DE' => 'Ein Link in der Karte - der des Titels oder einer anderen Komponente, die der Link der Karte sein darf - gilt für die ganze Fläche; Text in der Karte lässt sich dann nicht markieren.' ] ],
 					'background' => [ 'type' => 'image', 'default' => '', 'tab' => 'background', 'label' => [ 'en_US' => 'Background picture', 'de_DE' => 'Hintergrund-Bild' ],
 						'hint' => [ 'en_US' => 'A slot, or in a stack an image field of the element, laid behind the content.', 'de_DE' => 'Ein Slot oder in einem Stapel ein Bildfeld des Elements, hinter den Inhalt gelegt.' ] ],
 					'focus' => [ 'type' => 'select', 'options' => [ '', '1', '2', '3', '4', '5', '6', '7', '8', '9' ], 'default' => '', 'tab' => 'background', 'label' => [ 'en_US' => 'Focus', 'de_DE' => 'Fokus' ],
@@ -396,12 +396,12 @@ namespace Nino\Modules {
 
 			// Each class is a component of its own, and the schema says where a tool
 			// offers it ('in') and under which group ('group'), what it draws ('draws')
-			// and what it holds ('holds', the card's) - and, of what it holds, whose address
-			// it takes when it is linked ('stretches', the card's title): the renderer reads
-			// no context, so a title in a card is the one that draws the title of a card. Its
+			// and what it holds ('holds', the card's) - and whether the one link it draws may
+			// be the link of a linked holder it stands in ('stretched', the card's title): the
+			// renderer reads no context, so a title is the same in a card and out of one. Its
 			// icon is the shape ICONS names, as the parts SHAPES holds, and 'link' whether a
 			// link may wrap what it draws
-			$stretches = [ 'card' => 'card-title' ];
+			$stretched = [ 'card-title' ];
 
 			foreach( $components as [ $name, $en, $de, $preview, $source, $attributes, $in, $draws, $holds, $link, $group ] )
 				self::addComponent( $appData, $name, [ self::class, 'component'. str_replace( ' ', '', ucwords( str_replace( '-', ' ', $name ) ) ) ], [
@@ -413,7 +413,7 @@ namespace Nino\Modules {
 					'icon'				=> self::SHAPES[ self::ICONS[$name] ],
 					'link'				=> $link,
 					'group'				=> $group,
-				] + ( $in !== null ? [ 'in' => $in ] : [] ) + ( $draws !== null ? [ 'draws' => $draws ] : [] ) + ( $holds !== null ? [ 'holds' => $holds ] : [] ) + ( isset( $stretches[$name] ) === true ? [ 'stretches' => $stretches[$name] ] : [] ) );
+				] + ( $in !== null ? [ 'in' => $in ] : [] ) + ( $draws !== null ? [ 'draws' => $draws ] : [] ) + ( $holds !== null ? [ 'holds' => $holds ] : [] ) + ( in_array( $name, $stretched, true ) === true ? [ 'stretched' => true ] : [] ) );
 
 			$stacks = [
 				[ 'stack', 'Stack', 'Stapel', 'cells', true, [] ],
@@ -541,53 +541,10 @@ namespace Nino\Modules {
 
 			$clean = self::validate( $name, $schema, $stack );
 
-			// What a schema says of another component is told by the components registered before it. A holder whose 'stretches' names none that will do is registered
-			// without it, with a warning: a manifest cannot know the other components when it is read, so a name that is wrong is found here, and a fatal error
-			// here would be one on every request of the site
-			if( is_string( $clean ) === false && isset( $clean['stretches'] ) === true ) {
-
-				$why = self::_stretches( $appData, $name, $clean );
-
-				if( $why !== null ) {
-					trigger_error( 'Components::'. ( $stack === true ? 'addStack' : 'addComponent' ). '(): '. $why. ' - registered without it', E_USER_WARNING );
-					unset( $clean['stretches'] );
-				}
-			}
-
 			if( is_string( $clean ) === true )
 				trigger_error( 'Components::'. ( $stack === true ? 'addStack' : 'addComponent' ). '(): '. $clean, E_USER_ERROR );
 			else
 				self::_store( $appData, $name, $callback, $clean, $stack );
-		}
-
-		/**
-		 *	What 'stretches' names, checked against the components registered so far: a
-		 *	component that is registered, that is offered in the place the holder holds
-		 *	(no 'in' is every place) and that says 'link' - the address of anything
-		 *	else would be no link of the holder's
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$name					The holder
-		 *	@param		array			$clean				Its clean schema, with 'stretches'
-		 *
-		 *	@return 	string|null							What is wrong with it, null where it will do
-		 */
-		private static function _stretches( array &$appData, string $name, array $clean ): ?string {
-
-			$what = 'component "'. $name. '"';
-			$known = self::registered( $appData, false );
-			$target = $known[$clean['stretches']] ?? null;
-
-			if( $clean['stretches'] === $name || is_array( $target ) === false )
-				return $what. ': "stretches" names a component that is registered before it: "'. $clean['stretches']. '" is not';
-
-			if( isset( $target['in'] ) === true && in_array( $clean['holds'], (array) $target['in'], true ) === false )
-				return $what. ': "stretches" names a component that is offered in '. $clean['holds']. ', the place it holds: "'. $clean['stretches']. '" is not';
-
-			if( ( $target['link'] ?? false ) !== true )
-				return $what. ': "stretches" names a component that is a link: "'. $clean['stretches']. '" is not';
-
-			return null;
 		}
 
 		/**
@@ -924,7 +881,7 @@ namespace Nino\Modules {
 		 *
 		 *	@param		string		$name					The shortcode, a slug
 		 *	@param		mixed			$schema				label, source (not for a stack), loop, attributes, preview;
-		 *																	icon, in, draws, holds, stretches, link, by and group for a component, grid and assets for a stack.
+		 *																	icon, in, draws, holds, stretched, link, by and group for a component, grid and assets for a stack.
 		 *																	See docs/development.md, "Components"
 		 *	@param		bool			$stack				Read it as a stack's
 		 *	@param		string|null	$feature			The key of the feature whose manifest the schema is read from, null for a module's: its components are the feature's own, whatever 'by' they say
@@ -1068,22 +1025,21 @@ namespace Nino\Modules {
 					$clean['holds'] = $schema['holds'];
 				}
 
-				// Which of what it holds it takes the address of where it is linked - the
-				// card's 'linked' makes the link of its title the link of the whole card.
-				// Optional, a holder's alone and left out of the clean schema where the
-				// schema leaves it out; that it is a component that is registered, offered
-				// in the place the holder holds and a link is checked when the holder is
-				// registered (see _stretches()), since only then are the components known
-				if( isset( $schema['stretches'] ) === true ) {
+				// Whether the one link it draws may be the link of a linked holder it
+				// stands in - the card's 'linked' makes the link of its title the link of
+				// the whole card, and a component of a feature that draws a link of its
+				// own says so the same way. Always in the clean schema, false where the
+				// schema says nothing; a holder says no, since a holder is no link. The
+				// renderer reads no context: the link carries the class nino-stretch in a
+				// card and out of one (see _linked()), and the stylesheet reads it only
+				// under a linked card
+				if( isset( $schema['stretched'] ) === true && is_bool( $schema['stretched'] ) === false )
+					return $what. ': "stretched" must be true or false';
 
-					if( isset( $clean['holds'] ) === false )
-						return $what. ': "stretches" needs "holds": only a component that holds components has one to take the address of';
+				$clean['stretched'] = ( $schema['stretched'] ?? false ) === true;
 
-					if( is_string( $schema['stretches'] ) === false || preg_match( '/^[a-z][a-z0-9-]*$/D', $schema['stretches'] ) !== 1 )
-						return $what. ': "stretches" names a component, a slug of lower case letters, digits and hyphens';
-
-					$clean['stretches'] = $schema['stretches'];
-				}
+				if( $clean['stretched'] === true && isset( $clean['holds'] ) === true )
+					return $what. ': "stretched" is for a component that draws a link, and a component that holds components is none';
 
 				// Whether what it draws may be a link: the component then has the
 				// attributes 'href' and 'target' without declaring them (see
@@ -1628,7 +1584,7 @@ namespace Nino\Modules {
 
 			$html = (string) call_user_func_array( $callback, [ &$appData, &$prepared ] );
 
-			return ( $schema['link'] ?? false ) === true ? self::_linked( $appData, $prepared, $html ) : $html;
+			return ( $schema['link'] ?? false ) === true ? self::_linked( $appData, $prepared, $html, ( $schema['stretched'] ?? false ) === true ) : $html;
 		}
 
 		/**
@@ -1640,13 +1596,19 @@ namespace Nino\Modules {
 		 *	which has escaped it: a second escaping would turn the & of a query
 		 *	into &amp;amp;
 		 *
+		 *	The <a> of a component that says 'stretched' carries the class
+		 *	nino-stretch, first, as the kernel writes the classes of its tags: it
+		 *	is written in a card and out of one, since the renderer reads no
+		 *	context, and Nino.css reads it only under a linked card.
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments made ready by dispatch(), the link's two among them
 		 *	@param		string		$html					What the renderer returned
+		 *	@param		bool			$stretched		Whether the schema says 'stretched'
 		 *
 		 *	@return 	string
 		 */
-		private static function _linked( array &$appData, array $args, string $html ): string {
+		private static function _linked( array &$appData, array $args, string $html, bool $stretched ): string {
 
 			if( $html === '' || $args['href'] === '' )
 				return $html;
@@ -1657,8 +1619,8 @@ namespace Nino\Modules {
 				return $html;
 
 			return str_replace(
-				[ '[[href]]', '[[target]]', '[[inner]]' ],
-				[ ' href="'. $href. '"', $args['target'] === '_blank' ? ' target="_blank" rel="noopener"' : '', $html ],
+				[ '[[class]]', '[[href]]', '[[target]]', '[[inner]]' ],
+				[ $stretched ? ' class="nino-stretch"' : '', ' href="'. $href. '"', $args['target'] === '_blank' ? ' target="_blank" rel="noopener"' : '', $html ],
 				self::$html['link']
 			);
 		}
@@ -2671,8 +2633,9 @@ namespace Nino\Modules {
 		 *	between its tags is the calls of the components of a card, and this
 		 *	draws the <article> around them: its ground, its padding, whether it
 		 *	takes the whole height of its column or cell, where its content stands
-		 *	in it, a picture behind the content, its border, whether the link of its
-		 *	title is stretched over the whole of it, and a class of its own. It
+		 *	in it, a picture behind the content, its border, whether its link - the
+		 *	title's, or another component's that may be the card's - is stretched over
+		 *	the whole of it, and a class of its own. It
 		 *	stands once in a column - a card beside a picture - and in the content
 		 *	of a stack once per element: the cards of a loop.
 		 *
@@ -2704,12 +2667,13 @@ namespace Nino\Modules {
 		 *
 		 *	The card is no <a>, whatever 'linked' says: it holds buttons, and a link
 		 *	in a link is no markup. 'linked' writes the class nino-card--linked and
-		 *	nothing else; Nino.css stretches the link of the card's title - the <a>
+		 *	nothing else; Nino.css stretches the link of a component that says
+		 *	'stretched' - the <a> of class nino-stretch, which for the title is the one
 		 *	that a [card-title] with an address is drawn in (see _linked()) - over
 		 *	the whole card with its ::after, so that the keyboard has one stop with
-		 *	the name of the title, shown as a ring on the card, and the pointer the
+		 *	the name of that link, shown as a ring on the card, and the pointer the
 		 *	whole area, and the buttons, links, fields, frames and players in the
-		 *	card stay above it. A card whose title is no link shows nothing of it.
+		 *	card stay above it. A card with no such link shows nothing of it.
 		 *
 		 *	A [card] directly inside a [card] is not supported, for the
 		 *	reason a stack inside a stack is not: the shortcode reads its content
