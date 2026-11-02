@@ -333,6 +333,17 @@ function keysReadBy( string $source ): array {
 		foreach( $image[1] as $key )
 			$reads[] = [ 'key' => $key, 'composed' => false, 'image' => true ];
 
+	// [logo] shows two slots, those its attributes name and, where it names none, /logo and /logo/dark
+	if( preg_match_all( '/\[logo(\s[^\]]*)?\]/', $source, $logos, PREG_SET_ORDER ) > 0 )
+		foreach( $logos as $logo )
+			foreach( [ 'light' => '/logo', 'dark' => '/logo/dark' ] as $attribute => $default ) {
+
+				$slot = preg_match( '/\s'. $attribute. '="([^"]*)"/', $logo[1] ?? '', $named ) === 1 ? $named[1] : $default;
+
+				if( $slot !== '' && $slot[0] === '/' )
+					$reads[] = [ 'key' => $slot, 'composed' => false, 'image' => true ];
+			}
+
 	return $reads;
 }
 

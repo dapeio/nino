@@ -44,6 +44,7 @@ namespace Nino\Modules {
 				'text'				=> '<[[tag]] class="[[base]][[richtext]][[style]][[color]][[class]]"[[lang]]>[[value]]</[[tag]]>',
 				'img'					=> '<img src="[[src]]" width="[[width]]" height="[[height]]" alt="[[alt]]"[[class]]>',
 				'image'				=> '<div class="nino-image[[ratio]][[focus]][[class]]">[[img]]</div>',
+				'logo'				=> '<span class="nino-logo-set[[class]]">[[light]][[dark]]</span>',
 				'button'			=> '<a class="nino-btn[[style]][[size]][[width]][[class]]"[[href]][[target]][[lang]]>[[value]]</a>',
 				'button-span'	=> '<span class="nino-btn[[style]][[size]][[width]][[class]]"[[lang]]>[[value]]</span>',
 				'link'				=> '<a[[class]][[href]][[target]]>[[inner]]</a>',
@@ -218,7 +219,7 @@ namespace Nino\Modules {
 			'target'			=> [ 'type' => 'select', 'options' => [ '', '_blank' ], 'default' => '', 'label' => [ 'en_US' => 'Opens in', 'de_DE' => 'Öffnet in' ] ],
 		];
 
-		// The icons of the kernel's components: nine icons of Lucide 0.577.0
+		// The icons of the kernel's components: ten icons of Lucide 0.577.0
 		// (lucide.dev, ISC - see THIRD-PARTY-NOTICES.md) under the names Lucide
 		// gives them. Each is 24 by 24 and drawn with a stroke by the tool that
 		// shows it, and is kept as parts - the elements inside the <svg> of its
@@ -270,11 +271,16 @@ namespace Nino\Modules {
 			'chevron-down' => [
 				[ 'path', [ 'd' => 'm6 9 6 6 6-6' ] ],
 			],
+			'contrast' => [
+				[ 'circle', [ 'cx' => '12', 'cy' => '12', 'r' => '10' ] ],
+				[ 'path', [ 'd' => 'M12 18a6 6 0 0 0 0-12v12z' ] ],
+			],
 		];
 
 		// Which of them each component carries: the three titles are one heading,
 		// the three subtitles one line of type, the two texts the lines of a text,
-		// the two images one picture and the scroll hint the chevron it draws
+		// the two images one picture, the logo the circle that is half light and
+		// half dark and the scroll hint the chevron it draws
 		private const array ICONS = [
 			'title'			=> 'heading',
 			'subtitle'		=> 'type',
@@ -288,6 +294,7 @@ namespace Nino\Modules {
 			'card'			=> 'panel-top',
 			'button'		=> 'mouse-pointer-click',
 			'image'			=> 'image',
+			'logo'			=> 'contrast',
 			'html'			=> 'code',
 			'spacer'		=> 'separator-horizontal',
 			'scroll-hint'	=> 'chevron-down',
@@ -304,7 +311,7 @@ namespace Nino\Modules {
 		 *	component by name. So the title, the subtitle and the text of a section
 		 *	come first, then the title, the subtitle, the text and the image of a
 		 *	card, then the title and the subtitle of a hero, and then the card, the
-		 *	button, the image, the html, the spacer and the scroll hint - and for any
+		 *	button, the image, the logo, the html, the spacer and the scroll hint - and for any
 		 *	one place ('in') that is the order its column has. The components of a
 		 *	feature follow these.
 		 *
@@ -382,6 +389,17 @@ namespace Nino\Modules {
 						'hint' => [ 'en_US' => 'Which part of the picture survives a crop, as one of nine positions.', 'de_DE' => 'Welcher Teil des Bildes beim Zuschneiden bleibt, als eine von neun Positionen.' ] ],
 					'ratio' => [ 'type' => 'select', 'options' => [ '', '1-1', '4-3', '3-2', '16-9', '21-9', '4-1', '5-1' ], 'default' => '', 'label' => [ 'en_US' => 'Ratio', 'de_DE' => 'Seitenverhältnis' ] ],
 				], null, null, null, true, 'global' ],
+				// The logo: the pictures of two slots in one set, and the ground it stands on says
+				// which of them shows (see componentLogo()). It has no source of its own - both
+				// slots are attributes - and no link: the frames wrap it in the link of their own
+				[ 'logo', 'Logo', 'Logo', 'block', 'none', [
+					'light' => [ 'type' => 'image', 'default' => '/logo', 'label' => [ 'en_US' => 'Picture for a light ground', 'de_DE' => 'Bild für hellen Grund' ],
+						'hint' => [ 'en_US' => 'A slot, or in a stack an image field of the element. Empty leaves the picture out.', 'de_DE' => 'Ein Slot oder in einem Stapel ein Bildfeld des Elements. Leer lässt das Bild weg.' ] ],
+					'dark' => [ 'type' => 'image', 'default' => '/logo/dark', 'label' => [ 'en_US' => 'Picture for a dark ground', 'de_DE' => 'Bild für dunklen Grund' ],
+						'hint' => [ 'en_US' => 'A slot, or in a stack an image field of the element. Empty leaves the picture out.', 'de_DE' => 'Ein Slot oder in einem Stapel ein Bildfeld des Elements. Leer lässt das Bild weg.' ] ],
+					'alt' => [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Alternative text', 'de_DE' => 'Alternativtext' ],
+						'hint' => [ 'en_US' => 'Used where the slot has no text of its own. Empty marks the picture as decoration.', 'de_DE' => 'Gilt, wo der Slot keinen eigenen Text hat. Leer kennzeichnet das Bild als Dekoration.' ] ],
+				], [ 'hero', 'section' ], 'span .nino-logo-set', null, false, 'global' ],
 				[ 'html', 'HTML', 'HTML', 'block', 'content', [], null, null, null, false, 'global' ],
 				[ 'spacer', 'Spacer', 'Abstand', 'block', 'none', [
 					'size' => [ 'type' => 'select', 'options' => [ '1', '2', '3', '4', '5', '6' ], 'default' => '2', 'label' => [ 'en_US' => 'Size', 'de_DE' => 'Größe' ] ],
@@ -820,7 +838,9 @@ namespace Nino\Modules {
 		 *	entry of the call, after the first argument's, with its attribute
 		 *	named, and the same rule keeps it: a value that begins with a slash
 		 *	and holds no [. One that does not is the image field of the element
-		 *	in a stack, which is nobody's slot
+		 *	in a stack, which is nobody's slot. A call that leaves such an attribute
+		 *	out names the slot its default names: [logo] is the entry of /logo and
+		 *	of /logo/dark
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$content			html+, eg. a template
@@ -853,7 +873,8 @@ namespace Nino\Modules {
 
 				foreach( (array) ( $components[ $call['name'] ]['attributes'] ?? [] ) as $attribute => $declared ) {
 
-					$source = $call['args'][$attribute] ?? null;
+					// An attribute the call leaves out is the slot its default names: [logo] shows /logo
+					$source = $call['args'][$attribute] ?? ( ( $declared['type'] ?? '' ) === 'image' ? $declared['default'] : null );
 
 					if( ( $declared['type'] ?? '' ) === 'image' && is_string( $source ) === true && $named( $source ) === true )
 						$sources[] = [ 'name' => $call['name'], 'kind' => 'image', 'source' => $source, 'attribute' => (string) $attribute ];
@@ -2462,6 +2483,62 @@ namespace Nino\Modules {
 		 */
 		public static function componentCardImage( array &$appData, array $args ): string {
 			return self::_image( $appData, 'card-image', 'nino-card-img', $args );
+		}
+
+		/**
+		 *	Replace [logo]: the pictures of two slots in one set, <span class="nino-logo-set">,
+		 *	and which of them is seen is the ground it stands on. 'light' is the picture
+		 *	for a light ground (the slot /logo) and 'dark' the one for a dark ground
+		 *	(/logo/dark); each is an <img> of the fragment [image] writes, of the class
+		 *	nino-logo-light or nino-logo-dark, with the size of its slot and its alt text,
+		 *	found as [image] finds it: the one stored for the slot, then the alt of the
+		 *	call, then none. Nino.css shows the one the pair --logo-light and --logo-dark
+		 *	names (see the logo in chapter 03 of Nino.css), so that nothing here knows a ground, and the
+		 *	pair is set by the ground a thing paints, a frame included.
+		 *
+		 *	A slot without a file draws no <img>: with one picture there is nothing to
+		 *	switch and the picture is always seen, whichever ground it stands on; with
+		 *	none the component draws nothing, which is what keeps a wrapper that hides
+		 *	itself when it is :empty - the logo of the navigation - empty, and lets the
+		 *	name of the site be seen in the link of a frame. A call that names a slot of
+		 *	its own, light="/brand/mark" dark="/brand/mark-white", or none, dark="",
+		 *	draws that. The content form, [logo]...[/logo], is not needed: both
+		 *	pictures are written whole, and a place that asks for the address of the
+		 *	file - a meta tag, a mail - asks [image /logo] for it
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$args					The arguments made ready by dispatch()
+		 *
+		 *	@return 	string
+		 */
+		public static function componentLogo( array &$appData, array $args ): string {
+
+			$pictures = [];
+
+			foreach( [ 'light', 'dark' ] as $ground ) {
+
+				$picture = self::_picture( $appData, (string) $args[$ground] );
+
+				if( $picture === null ) {
+					$pictures[$ground] = '';
+					continue;
+				}
+
+				$pictures[$ground] = str_replace(
+					[ '[[src]]', '[[width]]', '[[height]]', '[[alt]]', '[[class]]' ],
+					[ self::escape( $picture['url'] ), (string) $picture['width'], (string) $picture['height'], self::escape( $picture['alt'] !== '' ? $picture['alt'] : $args['alt'] ), self::_attribute( 'class', 'nino-logo-'. $ground ) ],
+					self::$html['img']
+				);
+			}
+
+			if( $pictures['light'] === '' && $pictures['dark'] === '' )
+				return '';
+
+			return str_replace(
+				[ '[[class]]', '[[light]]', '[[dark]]' ],
+				[ self::_modifier( '', $args['class'] ), $pictures['light'], $pictures['dark'] ],
+				self::$html['logo']
+			);
 		}
 
 		/**

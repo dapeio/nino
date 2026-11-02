@@ -61,12 +61,16 @@
 		'fonts',
 		'favicon'
 	],
-	/*	The logo is an image slot, not a file the base unit ships: the frames,
-		the navigation and the mails show it with [image /logo], and until
-		somebody uploads one - Images, in the workbench - they show nothing.
-		The size is the ratio of a wordmark; an upload is cut to it, so a
-		project whose logo is shaped otherwise changes it under Image Slots	*/
+	/*	The logo is two image slots, not files the base unit ships: /logo, the
+		picture for a light ground, and /logo/dark, the one for a dark ground.
+		The frames and the navigation show them with [logo], which draws the
+		one the ground says, the mails and the page head ask /logo alone with
+		[image /logo], and until somebody uploads one - Images, in the
+		workbench - they show nothing. The size is the ratio of a wordmark;
+		an upload is cut to it, so a project whose logo is shaped otherwise
+		changes it under Image Slots	*/
 	'imageSlots' => [
 		'/logo' => [ 'label' => 'Logo', 'width' => 500, 'height' => 100 ],
+		'/logo/dark' => [ 'label' => 'Logo, dark', 'width' => 500, 'height' => 100 ],
 	],
 ];

@@ -37,6 +37,8 @@
 	--nino-default-focus: #469cd7;
 	--nino-default-disabled: #aeaeaf;
 	--nino-default-shadow: rgb(15 23 42 / 12%);
+	--nino-default-logo-light: block;
+	--nino-default-logo-dark: none;
 	--nino-alt: #eef4fa;
 	--nino-on-alt: #0b0e10;
 	--nino-on-alt-muted: #6e6f71;
@@ -45,6 +47,8 @@
 	--nino-alt-focus: #3c94cd;
 	--nino-alt-disabled: #a5a6a7;
 	--nino-alt-shadow: rgb(15 23 42 / 12%);
+	--nino-alt-logo-light: block;
+	--nino-alt-logo-dark: none;
 	--nino-tint: #e3f3ff;
 	--nino-on-tint: #0b0e10;
 	--nino-on-tint-muted: #666f77;
@@ -53,6 +57,8 @@
 	--nino-tint-focus: #3b92cc;
 	--nino-tint-disabled: #9fa4a9;
 	--nino-tint-shadow: rgb(15 23 42 / 12%);
+	--nino-tint-logo-light: block;
+	--nino-tint-logo-dark: none;
 	--nino-dark: #2a2f32;
 	--nino-on-dark: #fcfcfc;
 	--nino-on-dark-muted: #939597;
@@ -61,6 +67,8 @@
 	--nino-dark-focus: #207db5;
 	--nino-dark-disabled: #616262;
 	--nino-dark-shadow: rgb(15 23 42 / 12%);
+	--nino-dark-logo-light: none;
+	--nino-dark-logo-dark: block;
 	--nino-black: #0e1216;
 	--nino-on-black: #fcfcfc;
 	--nino-on-black-muted: #7b7c7e;
@@ -69,6 +77,8 @@
 	--nino-black-focus: #00669a;
 	--nino-black-disabled: #4c4d4d;
 	--nino-black-shadow: rgb(15 23 42 / 12%);
+	--nino-black-logo-light: none;
+	--nino-black-logo-dark: block;
 	--nino-brand: #4faae8;
 	--nino-on-brand: #0b0e10;
 	--nino-on-brand-muted: #273b4b;
@@ -77,6 +87,8 @@
 	--nino-brand-focus: #005887;
 	--nino-brand-disabled: #5e6972;
 	--nino-brand-shadow: rgb(15 23 42 / 12%);
+	--nino-brand-logo-light: block;
+	--nino-brand-logo-dark: none;
 	--nino-brand-safe: #147bb7;
 	--nino-on-brand-safe: #fcfcfc;
 	--nino-on-brand-safe-muted: #fcfcfc;
@@ -85,6 +97,8 @@
 	--nino-brand-safe-focus: #a1d7ff;
 	--nino-brand-safe-disabled: #a9b5be;
 	--nino-brand-safe-shadow: rgb(15 23 42 / 12%);
+	--nino-brand-safe-logo-light: none;
+	--nino-brand-safe-logo-dark: block;
 	--nino-accent-safe: #147bb7;
 	--nino-on-accent-safe: #fcfcfc;
 	--nino-on-accent-safe-muted: #fcfcfc;
@@ -93,6 +107,8 @@
 	--nino-accent-safe-focus: #a1d7ff;
 	--nino-accent-safe-disabled: #a9b5be;
 	--nino-accent-safe-shadow: rgb(15 23 42 / 12%);
+	--nino-accent-safe-logo-light: none;
+	--nino-accent-safe-logo-dark: block;
 	--nino-success: #438061;
 	--nino-on-success: #fcfcfc;
 	--nino-on-success-muted: #eefff5;
@@ -101,6 +117,8 @@
 	--nino-success-focus: #7ee3b0;
 	--nino-success-disabled: #acb4af;
 	--nino-success-shadow: rgb(15 23 42 / 12%);
+	--nino-success-logo-light: none;
+	--nino-success-logo-dark: block;
 	--nino-warning: #986d00;
 	--nino-on-warning: #fcfcfc;
 	--nino-on-warning-muted: #fffbf4;
@@ -109,6 +127,8 @@
 	--nino-warning-focus: #fcc863;
 	--nino-warning-disabled: #b9b2a5;
 	--nino-warning-shadow: rgb(15 23 42 / 12%);
+	--nino-warning-logo-light: none;
+	--nino-warning-logo-dark: block;
 	--nino-danger: #cf4438;
 	--nino-on-danger: #fcfcfc;
 	--nino-on-danger-muted: #fffbfa;
@@ -117,6 +137,8 @@
 	--nino-danger-focus: #ffc2b8;
 	--nino-danger-disabled: #c4aeaa;
 	--nino-danger-shadow: rgb(15 23 42 / 12%);
+	--nino-danger-logo-light: none;
+	--nino-danger-logo-dark: block;
 	--nino-scrim: rgb(14 18 22 / 67%);
 	/* A percentage of the visitor's browser default, never a px length - see
 	   --base-size in Nino.css. A generated replacement for this file has to
@@ -153,6 +175,8 @@
 	--nino-default-focus: #469cd7;
 	--nino-default-disabled: #aeaeaf;
 	--nino-default-shadow: rgb(15 23 42 / 12%);
+	--nino-default-logo-light: block;
+	--nino-default-logo-dark: none;
 	--nino-alt: #eef4fa;
 	--nino-on-alt: #0b0e10;
 	--nino-on-alt-muted: #6e6f71;
@@ -161,6 +185,8 @@
 	--nino-alt-focus: #3c94cd;
 	--nino-alt-disabled: #a5a6a7;
 	--nino-alt-shadow: rgb(15 23 42 / 12%);
+	--nino-alt-logo-light: block;
+	--nino-alt-logo-dark: none;
 	--nino-tint: #e3f3ff;
 	--nino-on-tint: #0b0e10;
 	--nino-on-tint-muted: #666f77;
@@ -169,6 +195,8 @@
 	--nino-tint-focus: #3b92cc;
 	--nino-tint-disabled: #9fa4a9;
 	--nino-tint-shadow: rgb(15 23 42 / 12%);
+	--nino-tint-logo-light: block;
+	--nino-tint-logo-dark: none;
 	--nino-dark: #2a2f32;
 	--nino-on-dark: #fcfcfc;
 	--nino-on-dark-muted: #939597;
@@ -177,6 +205,8 @@
 	--nino-dark-focus: #207db5;
 	--nino-dark-disabled: #616262;
 	--nino-dark-shadow: rgb(15 23 42 / 12%);
+	--nino-dark-logo-light: none;
+	--nino-dark-logo-dark: block;
 	--nino-black: #0e1216;
 	--nino-on-black: #fcfcfc;
 	--nino-on-black-muted: #7b7c7e;
@@ -185,6 +215,8 @@
 	--nino-black-focus: #00669a;
 	--nino-black-disabled: #4c4d4d;
 	--nino-black-shadow: rgb(15 23 42 / 12%);
+	--nino-black-logo-light: none;
+	--nino-black-logo-dark: block;
 	--nino-brand: #4faae8;
 	--nino-on-brand: #0b0e10;
 	--nino-on-brand-muted: #273b4b;
@@ -193,6 +225,8 @@
 	--nino-brand-focus: #005887;
 	--nino-brand-disabled: #5e6972;
 	--nino-brand-shadow: rgb(15 23 42 / 12%);
+	--nino-brand-logo-light: block;
+	--nino-brand-logo-dark: none;
 	--nino-brand-safe: #147bb7;
 	--nino-on-brand-safe: #fcfcfc;
 	--nino-on-brand-safe-muted: #fcfcfc;
@@ -201,6 +235,8 @@
 	--nino-brand-safe-focus: #a1d7ff;
 	--nino-brand-safe-disabled: #a9b5be;
 	--nino-brand-safe-shadow: rgb(15 23 42 / 12%);
+	--nino-brand-safe-logo-light: none;
+	--nino-brand-safe-logo-dark: block;
 	--nino-accent-safe: #147bb7;
 	--nino-on-accent-safe: #fcfcfc;
 	--nino-on-accent-safe-muted: #fcfcfc;
@@ -209,6 +245,8 @@
 	--nino-accent-safe-focus: #a1d7ff;
 	--nino-accent-safe-disabled: #a9b5be;
 	--nino-accent-safe-shadow: rgb(15 23 42 / 12%);
+	--nino-accent-safe-logo-light: none;
+	--nino-accent-safe-logo-dark: block;
 	--nino-success: #438061;
 	--nino-on-success: #fcfcfc;
 	--nino-on-success-muted: #eefff5;
@@ -217,6 +255,8 @@
 	--nino-success-focus: #7ee3b0;
 	--nino-success-disabled: #acb4af;
 	--nino-success-shadow: rgb(15 23 42 / 12%);
+	--nino-success-logo-light: none;
+	--nino-success-logo-dark: block;
 	--nino-warning: #986d00;
 	--nino-on-warning: #fcfcfc;
 	--nino-on-warning-muted: #fffbf4;
@@ -225,6 +265,8 @@
 	--nino-warning-focus: #fcc863;
 	--nino-warning-disabled: #b9b2a5;
 	--nino-warning-shadow: rgb(15 23 42 / 12%);
+	--nino-warning-logo-light: none;
+	--nino-warning-logo-dark: block;
 	--nino-danger: #cf4438;
 	--nino-on-danger: #fcfcfc;
 	--nino-on-danger-muted: #fffbfa;
@@ -233,6 +275,8 @@
 	--nino-danger-focus: #ffc2b8;
 	--nino-danger-disabled: #c4aeaa;
 	--nino-danger-shadow: rgb(15 23 42 / 12%);
+	--nino-danger-logo-light: none;
+	--nino-danger-logo-dark: block;
 	--nino-scrim: rgb(14 18 22 / 67%);
 }
 
@@ -246,6 +290,8 @@
 		--nino-default-focus: #00679b;
 		--nino-default-disabled: #4d4e4e;
 		--nino-default-shadow: rgb(0 0 0 / 55%);
+		--nino-default-logo-light: none;
+		--nino-default-logo-dark: block;
 		--nino-alt: #1a1f22;
 		--nino-on-alt: #fcfcfc;
 		--nino-on-alt-muted: #848587;
@@ -254,6 +300,8 @@
 		--nino-alt-focus: #046fa6;
 		--nino-alt-disabled: #545555;
 		--nino-alt-shadow: rgb(0 0 0 / 55%);
+		--nino-alt-logo-light: none;
+		--nino-alt-logo-dark: block;
 		--nino-tint: #04253b;
 		--nino-on-tint: #fcfcfc;
 		--nino-on-tint-muted: #818b92;
@@ -262,6 +310,8 @@
 		--nino-tint-focus: #0d72aa;
 		--nino-tint-disabled: #54595c;
 		--nino-tint-shadow: rgb(0 0 0 / 55%);
+		--nino-tint-logo-light: none;
+		--nino-tint-logo-dark: block;
 		--nino-dark: #2a2f32;
 		--nino-on-dark: #fcfcfc;
 		--nino-on-dark-muted: #939597;
@@ -270,6 +320,8 @@
 		--nino-dark-focus: #207db5;
 		--nino-dark-disabled: #616262;
 		--nino-dark-shadow: rgb(0 0 0 / 55%);
+		--nino-dark-logo-light: none;
+		--nino-dark-logo-dark: block;
 		--nino-black: #05080b;
 		--nino-on-black: #fcfcfc;
 		--nino-on-black-muted: #767879;
@@ -278,6 +330,8 @@
 		--nino-black-focus: #006294;
 		--nino-black-disabled: #484949;
 		--nino-black-shadow: rgb(0 0 0 / 55%);
+		--nino-black-logo-light: none;
+		--nino-black-logo-dark: block;
 		--nino-brand: #4faae8;
 		--nino-on-brand: #0b0e10;
 		--nino-on-brand-muted: #273b4b;
@@ -286,6 +340,8 @@
 		--nino-brand-focus: #005887;
 		--nino-brand-disabled: #5e6972;
 		--nino-brand-shadow: rgb(0 0 0 / 55%);
+		--nino-brand-logo-light: block;
+		--nino-brand-logo-dark: none;
 		--nino-brand-safe: #1d81bc;
 		--nino-on-brand-safe: #0b0e10;
 		--nino-on-brand-safe-muted: #00101d;
@@ -294,6 +350,8 @@
 		--nino-brand-safe-focus: #003554;
 		--nino-brand-safe-disabled: #3d474f;
 		--nino-brand-safe-shadow: rgb(0 0 0 / 55%);
+		--nino-brand-safe-logo-light: block;
+		--nino-brand-safe-logo-dark: none;
 		--nino-accent-safe: #1d81bc;
 		--nino-on-accent-safe: #0b0e10;
 		--nino-on-accent-safe-muted: #00101d;
@@ -302,6 +360,8 @@
 		--nino-accent-safe-focus: #003554;
 		--nino-accent-safe-disabled: #3d474f;
 		--nino-accent-safe-shadow: rgb(0 0 0 / 55%);
+		--nino-accent-safe-logo-light: block;
+		--nino-accent-safe-logo-dark: none;
 		--nino-success: #488666;
 		--nino-on-success: #0b0e0c;
 		--nino-on-success-muted: #04100a;
@@ -310,6 +370,8 @@
 		--nino-success-focus: #003923;
 		--nino-success-disabled: #404743;
 		--nino-success-shadow: rgb(0 0 0 / 55%);
+		--nino-success-logo-light: block;
+		--nino-success-logo-dark: none;
 		--nino-warning: #b38100;
 		--nino-on-warning: #0f0d0a;
 		--nino-on-warning-muted: #2d220b;
@@ -318,6 +380,8 @@
 		--nino-warning-focus: #553b00;
 		--nino-warning-disabled: #595347;
 		--nino-warning-shadow: rgb(0 0 0 / 55%);
+		--nino-warning-logo-light: block;
+		--nino-warning-logo-dark: none;
 		--nino-danger: #d54a3d;
 		--nino-on-danger: #100c0c;
 		--nino-on-danger-muted: #210403;
@@ -326,6 +390,8 @@
 		--nino-danger-focus: #6a0001;
 		--nino-danger-disabled: #54413f;
 		--nino-danger-shadow: rgb(0 0 0 / 55%);
+		--nino-danger-logo-light: block;
+		--nino-danger-logo-dark: none;
 		--nino-scrim: rgb(5 8 11 / 64%);
 	}
 }
@@ -339,6 +405,8 @@
 	--nino-default-focus: #00679b;
 	--nino-default-disabled: #4d4e4e;
 	--nino-default-shadow: rgb(0 0 0 / 55%);
+	--nino-default-logo-light: none;
+	--nino-default-logo-dark: block;
 	--nino-alt: #1a1f22;
 	--nino-on-alt: #fcfcfc;
 	--nino-on-alt-muted: #848587;
@@ -347,6 +415,8 @@
 	--nino-alt-focus: #046fa6;
 	--nino-alt-disabled: #545555;
 	--nino-alt-shadow: rgb(0 0 0 / 55%);
+	--nino-alt-logo-light: none;
+	--nino-alt-logo-dark: block;
 	--nino-tint: #04253b;
 	--nino-on-tint: #fcfcfc;
 	--nino-on-tint-muted: #818b92;
@@ -355,6 +425,8 @@
 	--nino-tint-focus: #0d72aa;
 	--nino-tint-disabled: #54595c;
 	--nino-tint-shadow: rgb(0 0 0 / 55%);
+	--nino-tint-logo-light: none;
+	--nino-tint-logo-dark: block;
 	--nino-dark: #2a2f32;
 	--nino-on-dark: #fcfcfc;
 	--nino-on-dark-muted: #939597;
@@ -363,6 +435,8 @@
 	--nino-dark-focus: #207db5;
 	--nino-dark-disabled: #616262;
 	--nino-dark-shadow: rgb(0 0 0 / 55%);
+	--nino-dark-logo-light: none;
+	--nino-dark-logo-dark: block;
 	--nino-black: #05080b;
 	--nino-on-black: #fcfcfc;
 	--nino-on-black-muted: #767879;
@@ -371,6 +445,8 @@
 	--nino-black-focus: #006294;
 	--nino-black-disabled: #484949;
 	--nino-black-shadow: rgb(0 0 0 / 55%);
+	--nino-black-logo-light: none;
+	--nino-black-logo-dark: block;
 	--nino-brand: #4faae8;
 	--nino-on-brand: #0b0e10;
 	--nino-on-brand-muted: #273b4b;
@@ -379,6 +455,8 @@
 	--nino-brand-focus: #005887;
 	--nino-brand-disabled: #5e6972;
 	--nino-brand-shadow: rgb(0 0 0 / 55%);
+	--nino-brand-logo-light: block;
+	--nino-brand-logo-dark: none;
 	--nino-brand-safe: #1d81bc;
 	--nino-on-brand-safe: #0b0e10;
 	--nino-on-brand-safe-muted: #00101d;
@@ -387,6 +465,8 @@
 	--nino-brand-safe-focus: #003554;
 	--nino-brand-safe-disabled: #3d474f;
 	--nino-brand-safe-shadow: rgb(0 0 0 / 55%);
+	--nino-brand-safe-logo-light: block;
+	--nino-brand-safe-logo-dark: none;
 	--nino-accent-safe: #1d81bc;
 	--nino-on-accent-safe: #0b0e10;
 	--nino-on-accent-safe-muted: #00101d;
@@ -395,6 +475,8 @@
 	--nino-accent-safe-focus: #003554;
 	--nino-accent-safe-disabled: #3d474f;
 	--nino-accent-safe-shadow: rgb(0 0 0 / 55%);
+	--nino-accent-safe-logo-light: block;
+	--nino-accent-safe-logo-dark: none;
 	--nino-success: #488666;
 	--nino-on-success: #0b0e0c;
 	--nino-on-success-muted: #04100a;
@@ -403,6 +485,8 @@
 	--nino-success-focus: #003923;
 	--nino-success-disabled: #404743;
 	--nino-success-shadow: rgb(0 0 0 / 55%);
+	--nino-success-logo-light: block;
+	--nino-success-logo-dark: none;
 	--nino-warning: #b38100;
 	--nino-on-warning: #0f0d0a;
 	--nino-on-warning-muted: #2d220b;
@@ -411,6 +495,8 @@
 	--nino-warning-focus: #553b00;
 	--nino-warning-disabled: #595347;
 	--nino-warning-shadow: rgb(0 0 0 / 55%);
+	--nino-warning-logo-light: block;
+	--nino-warning-logo-dark: none;
 	--nino-danger: #d54a3d;
 	--nino-on-danger: #100c0c;
 	--nino-on-danger-muted: #210403;
@@ -419,6 +505,8 @@
 	--nino-danger-focus: #6a0001;
 	--nino-danger-disabled: #54413f;
 	--nino-danger-shadow: rgb(0 0 0 / 55%);
+	--nino-danger-logo-light: block;
+	--nino-danger-logo-dark: none;
 	--nino-scrim: rgb(5 8 11 / 64%);
 }
 
@@ -550,6 +638,42 @@
 	--color-border-primary: var(--nino-brand-safe-border);
 	--color-border-brand-alt: var(--nino-accent-safe-border);
 
+	/* The logo, per ground, as the border is: [logo] draws a picture for a light
+	   ground and one for a dark ground, and a ground that paints itself says
+	   which is seen - a pair of display values, block and none, that Nino.css
+	   sets beside --color-ground. The palette solves the pair of each surface
+	   from the ink that was solved for it, so the page flips with the mode and
+	   a brand ground with the colour it was given, and these are the surfaces
+	   the roles sit on: the same ones as the bg and the text above. Nino.css
+	   declares the pairs it has without a design layer - the page and the light
+	   grounds showing the picture for a light ground, the others the one for a
+	   dark ground - and the delivered theme.css is this file compiled at the
+	   defaults, so both assign them */
+	--color-logo-light: var(--nino-default-logo-light);
+	--color-logo-dark: var(--nino-default-logo-dark);
+	--color-section-default-logo-light: var(--nino-default-logo-light);
+	--color-section-default-logo-dark: var(--nino-default-logo-dark);
+	--color-section-alt-logo-light: var(--nino-alt-logo-light);
+	--color-section-alt-logo-dark: var(--nino-alt-logo-dark);
+	--color-section-tint-logo-light: var(--nino-tint-logo-light);
+	--color-section-tint-logo-dark: var(--nino-tint-logo-dark);
+	--color-section-dark-logo-light: var(--nino-dark-logo-light);
+	--color-section-dark-logo-dark: var(--nino-dark-logo-dark);
+	--color-section-black-logo-light: var(--nino-black-logo-light);
+	--color-section-black-logo-dark: var(--nino-black-logo-dark);
+	--color-primary-logo-light: var(--nino-brand-safe-logo-light);
+	--color-primary-logo-dark: var(--nino-brand-safe-logo-dark);
+	--color-brand-alt-logo-light: var(--nino-accent-safe-logo-light);
+	--color-brand-alt-logo-dark: var(--nino-accent-safe-logo-dark);
+	--color-error-logo-light: var(--nino-danger-logo-light);
+	--color-error-logo-dark: var(--nino-danger-logo-dark);
+	--color-success-logo-light: var(--nino-success-logo-light);
+	--color-success-logo-dark: var(--nino-success-logo-dark);
+	--color-warning-logo-light: var(--nino-warning-logo-light);
+	--color-warning-logo-dark: var(--nino-warning-logo-dark);
+	--color-footer-logo-light: var(--nino-black-logo-light);
+	--color-footer-logo-dark: var(--nino-black-logo-dark);
+
 	/* The scrim over a cover image. The palette solves it against the worst
 	   photograph it could be asked to cover - a white one - so this is the
 	   lightest scrim that still carries the ink on top of it, and the most
@@ -676,7 +800,7 @@
  *	and ground a choice of three: the ground and the ink of the page, this set's
  *	own, and the dark pair of the palette. What the text, the icons, the links and
  *	the lines of the bar are read in comes with it, as aspects of the ground
- *	(--header-ground-ink, -title, -accent, -focus and -border), and is put on the
+ *	(--header-ground-ink, -title, -accent, -focus, -border, -logo-light and -logo-dark), and is put on the
  *	header as the roles Nino.css reads - so the bar is legible on each of the
  *	three. The menu that opens over the page is the page's again, as in Nino.css.
  *
@@ -751,6 +875,14 @@
 	--header-ground-border--default:	var(--color-border);
 	--header-ground-border--more:	var(--color-border-dark);
 
+	/*	Which picture of the logo is seen: the one for a light ground or the one for a dark ground, as the pair of the ground says it - the page's, this set's own, the dark pair of the palette	*/
+	--header-ground-logo-light--less:	var(--color-logo-light);
+	--header-ground-logo-light--default:	var(--color-logo-light);
+	--header-ground-logo-light--more:	var(--color-section-dark-logo-light);
+	--header-ground-logo-dark--less:	var(--color-logo-dark);
+	--header-ground-logo-dark--default:	var(--color-logo-dark);
+	--header-ground-logo-dark--more:	var(--color-section-dark-logo-dark);
+
 	--header-border-size--least:	0;
 	--header-border-size--less:	.5px;
 	--header-border-size--default: 1px;
@@ -788,6 +920,8 @@
 	--color-accent: var(--header-ground-accent);
 	--color-focus: var(--header-ground-focus);
 	--color-border: var(--header-ground-border);
+	--logo-light: var(--header-ground-logo-light);
+	--logo-dark: var(--header-ground-logo-dark);
 }
 
 .nino-frame-header .nino-grid-row {
@@ -918,8 +1052,8 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
  *	between its columns, lines and links, and ground a choice of three: the ground
  *	and the ink of the page, this set's own, and the dark pair of the palette. What
  *	the text, the links and the lines of the footer are read in comes with it, as
- *	aspects of the ground (--footer-ground-ink, -subtitle, -title, -accent, -focus
- *	and -border), and is put on the footer as the roles Nino.css reads - so the
+ *	aspects of the ground (--footer-ground-ink, -subtitle, -title, -accent, -focus,
+ *	-border, -logo-light and -logo-dark), and is put on the footer as the roles Nino.css reads - so the
  *	footer is legible on each of the three.
  *
  *	The line over the footer is two knobs. border-size is its weight, drawn as the top
@@ -1018,6 +1152,14 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 	--footer-position-gap--default:	0;
 	--footer-position-gap--more:	1;
 
+	/*	Which picture of the logo is seen: the one for a light ground or the one for a dark ground, as the pair of the ground says it - the page's, this set's own, the dark pair of the palette	*/
+	--footer-ground-logo-light--less:	var(--color-logo-light);
+	--footer-ground-logo-light--default:	var(--color-footer-logo-light);
+	--footer-ground-logo-light--more:	var(--color-section-dark-logo-light);
+	--footer-ground-logo-dark--less:	var(--color-logo-dark);
+	--footer-ground-logo-dark--default:	var(--color-footer-logo-dark);
+	--footer-ground-logo-dark--more:	var(--color-section-dark-logo-dark);
+
 	/*	The case of the links of the navigation: as they are written, or in capitals	*/
 	--footer-nav-case--default: none;
 	--footer-nav-case--more: uppercase;
@@ -1030,6 +1172,8 @@ footer {
 	--color-accent: var(--footer-ground-accent);
 	--color-focus: var(--footer-ground-focus);
 	--color-border: var(--footer-ground-border);
+	--logo-light: var(--footer-ground-logo-light);
+	--logo-dark: var(--footer-ground-logo-dark);
 }
 
 .nino-footer-legal {
@@ -1968,6 +2112,8 @@ footer {
 	--footer-ground-border: var(--footer-ground-border--default);
 	--footer-ground-focus: var(--footer-ground-focus--default);
 	--footer-ground-ink: var(--footer-ground-ink--default);
+	--footer-ground-logo-dark: var(--footer-ground-logo-dark--default);
+	--footer-ground-logo-light: var(--footer-ground-logo-light--default);
 	--footer-ground-subtitle: var(--footer-ground-subtitle--default);
 	--footer-ground-title: var(--footer-ground-title--default);
 	--footer-height: var(--footer-height--default);
@@ -2001,6 +2147,8 @@ footer {
 	--header-ground-border: var(--header-ground-border--default);
 	--header-ground-focus: var(--header-ground-focus--default);
 	--header-ground-ink: var(--header-ground-ink--default);
+	--header-ground-logo-dark: var(--header-ground-logo-dark--default);
+	--header-ground-logo-light: var(--header-ground-logo-light--default);
 	--header-ground-title: var(--header-ground-title--default);
 	--header-height: var(--header-height--default);
 	--header-nav: var(--header-nav--default);

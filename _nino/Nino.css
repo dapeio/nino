@@ -161,9 +161,12 @@
 		toast with their status surfaces, a modal, the overlays - so that a rule
 		or a design layer that wants the pair, to mix a hover out of it or to draw
 		a hairline on it, reads it from here and not from the section it hopes it
-		is in.	*/
+		is in. --logo-light and --logo-dark, the pair of the logo, are set in the
+		same places and for the same reason.	*/
 	--color-ground: var(--color-section-default-bg);
 	--color-ink: var(--color-text);
+	--logo-light: var(--color-section-default-logo-light);
+	--logo-dark: var(--color-section-default-logo-dark);
 
 	/*	The border of each ground, handed down with the roles above. It is the
 		page's border until a design layer gives a ground one of its own - the
@@ -176,10 +179,51 @@
 	--color-border-primary: var(--color-border);
 	--color-border-brand-alt: var(--color-border);
 
+	/*	The logo, per ground, as the border is: a picture is drawn for one kind
+		of ground, and the ground it stands on says which. [logo] draws two, the
+		one for a light ground and the one for a dark ground, and shows the one
+		that a pair of properties names - --logo-light and --logo-dark, a
+		display value each, block or none, one of them each. A ground that paints
+		itself sets the pair beside --color-ground and --color-ink, from the
+		roles below, and hands it to what stands in it, so that the logo never
+		has to know which ground it was dropped onto. The roles are the pair of
+		each ground, the page's and the footer's among them: without a design
+		layer the page and the grounds that are written on in a dark ink show the
+		picture for a light ground, and the grounds that are written on in a
+		light ink - dark, black, the two brand grounds and the three statuses -
+		the one for a dark ground. A design layer solves them from the ink of each
+		surface (--nino-<surface>-logo-light and -logo-dark, see the Design
+		feature), so that the page flips with the colour scheme and a brand
+		ground with the colour it was given	*/
+	--color-logo-light: block;
+	--color-logo-dark: none;
+	--color-section-default-logo-light: block;
+	--color-section-default-logo-dark: none;
+	--color-section-alt-logo-light: block;
+	--color-section-alt-logo-dark: none;
+	--color-section-tint-logo-light: var(--color-section-alt-logo-light);
+	--color-section-tint-logo-dark: var(--color-section-alt-logo-dark);
+	--color-section-dark-logo-light: none;
+	--color-section-dark-logo-dark: block;
+	--color-section-black-logo-light: none;
+	--color-section-black-logo-dark: block;
+	--color-primary-logo-light: none;
+	--color-primary-logo-dark: block;
+	--color-brand-alt-logo-light: var(--color-primary-logo-light);
+	--color-brand-alt-logo-dark: var(--color-primary-logo-dark);
+	--color-error-logo-light: var(--color-primary-logo-light);
+	--color-error-logo-dark: var(--color-primary-logo-dark);
+	--color-success-logo-light: var(--color-primary-logo-light);
+	--color-success-logo-dark: var(--color-primary-logo-dark);
+	--color-warning-logo-light: var(--color-primary-logo-light);
+	--color-warning-logo-dark: var(--color-primary-logo-dark);
+	--color-footer-logo-light: none;
+	--color-footer-logo-dark: block;
+
 	/*	What a row, a column and a card become on the counter ground, in three
 		families of properties, one for each part of a ground (bg, text, title,
-		accent, focus, border). The framework alone sets them; a theme never
-		writes one:
+		accent, focus, border, logo-light, logo-dark). The framework alone sets
+		them; a theme never writes one:
 			--counter-grid-*        what a .nino-grid--counter and a
 			                        .nino-grid-row--counter become
 			--counter-grid-next-*   what a .nino-card--counter in a
@@ -196,18 +240,24 @@
 	--counter-grid-accent: var(--color-accent-alt);
 	--counter-grid-focus: var(--color-focus-alt);
 	--counter-grid-border: var(--color-border-alt);
+	--counter-grid-logo-light: var(--color-section-alt-logo-light);
+	--counter-grid-logo-dark: var(--color-section-alt-logo-dark);
 	--counter-grid-next-bg: var(--color-section-default-bg);
 	--counter-grid-next-text: var(--color-section-default-text);
 	--counter-grid-next-title: var(--color-title-default);
 	--counter-grid-next-accent: var(--color-accent-default);
 	--counter-grid-next-focus: var(--color-focus-default);
 	--counter-grid-next-border: var(--color-border-default);
+	--counter-grid-next-logo-light: var(--color-section-default-logo-light);
+	--counter-grid-next-logo-dark: var(--color-section-default-logo-dark);
 	--counter-card-bg: var(--color-section-alt-bg);
 	--counter-card-text: var(--color-section-alt-text);
 	--counter-card-title: var(--color-section-alt-text);
 	--counter-card-accent: var(--color-accent-alt);
 	--counter-card-focus: var(--color-focus-alt);
 	--counter-card-border: var(--color-border-alt);
+	--counter-card-logo-light: var(--color-section-alt-logo-light);
+	--counter-card-logo-dark: var(--color-section-alt-logo-dark);
 
 	/*	Deliberately under the text target: the one state that must not look
 		actionable. --nino-*-disabled is solved to 2.2:1 - identifiable, and
@@ -867,6 +917,7 @@ h1, h2, h3, h4, h5, h6 {
  *
  *
  *			header, .nino-logo, footer
+ *			.nino-logo-set (.nino-logo-light, .nino-logo-dark), see [logo]
  *			.nino-scroll-header (fades/hides on scroll, see Nino.ui.js)
  *
  *
@@ -920,10 +971,43 @@ header .nino-grid-100 {
 .nino-logo:has(img) > span[aria-hidden="true"] {
 	display: none;
 }
+/*	[logo], the pictures of two slots in one set: the one for a light ground and
+	the one for a dark ground. The ground says which is seen, through the pair
+	--logo-light and --logo-dark (see the roles in :root and Grounds in chapter 04);
+	where nothing set the pair, it is the page's, and the picture for a light
+	ground is seen. The hidden one is display none, so the box of the set is one
+	picture and .nino-logo img above sizes it. A set of one picture has nothing to
+	choose from and shows it on every ground	*/
+.nino-logo-set {
+	display: block;
+}
+.nino-logo-set .nino-logo-light {
+	display: var(--logo-light, block);
+}
+.nino-logo-set .nino-logo-dark {
+	display: var(--logo-dark, none);
+}
+.nino-logo-set > img:only-child {
+	display: block;
+}
+/*	On paper there is no ground: the sheet is white whatever a frame painted on
+	the screen, so the pair is the page's - the picture for a light ground - on
+	every element that stands in it. A dark header printed with the picture for a
+	dark ground would be a light mark on white paper. The one place a pair is
+	made to win against every ground, whatever its specificity and its place in
+	the sheet, hence the !important	*/
+@media print {
+	:root, :root * {
+		--logo-light: block !important;
+		--logo-dark: none !important;
+	}
+}
 footer {
 	width: 100%;
 	box-sizing: border-box;
 	font-size:.8em;
+	--logo-light: var(--color-footer-logo-light);
+	--logo-dark: var(--color-footer-logo-dark);
 }
 /*	Footer navigation and the locale picker are the one place a link is a
 	standalone control rather than part of a sentence, and at the footer's
@@ -955,6 +1039,8 @@ footer .nino-localepicker-wrap li :is(a, span) {
 	text-transform:uppercase;
 	padding-bottom: var(--space-1);
 }
+/*	The logo of a footer is the class of the set [logo] draws, on the wrapper:
+	the opacity and the width are the set's, and the pictures in it follow	*/
 .nino-footer-logo {
 	opacity:.7;
 	max-width:8rem;
@@ -1189,6 +1275,8 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 .nino-section {
 	--color-ground: var(--color-section-default-bg);
 	--color-ink: var(--color-section-default-text);
+	--logo-light: var(--color-section-default-logo-light);
+	--logo-dark: var(--color-section-default-logo-dark);
 	position: relative;
 	padding: calc(var(--space-4) * var(--whitespace-scale)) 0;
 	background-color: var(--color-section-default-bg);
@@ -1207,10 +1295,12 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	ground it was dropped onto. --color-ground and --color-ink name the pair;
 	--color-title, --color-subtitle, --color-accent, --color-focus and
 	--color-border are the roles that follow it, and a rule that reads one of
-	them is right on every ground. Nothing compares the ground of a thing
-	with the ground it sits on - there is no .nino-section--alt
-	.nino-card--alt - and an author who names a ground twice gets it
-	twice. That goes for what is written on a ground as well: the title and
+	them is right on every ground. --logo-light and --logo-dark, which of the
+	two pictures of a logo is seen, are set with the pair and handed down with
+	the roles, and the counter families carry them as well. Nothing compares
+	the ground of a thing with the ground it sits on - there is no
+	.nino-section--alt .nino-card--alt - and an author who names a ground
+	twice gets it twice. That goes for what is written on a ground as well: the title and
 	the subtitle of a section and of a hero read --color-title and
 	--color-subtitle, the outline button --color-accent, and the filter button
 	and the arrow of a hero take the ink the ground paints. No rule of a
@@ -1219,6 +1309,8 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 .nino-section--dark, .nino-grid--dark, .nino-card--dark, .nino-grid-row--dark {
 	--color-ground: var(--color-section-dark-bg);
 	--color-ink: var(--color-section-dark-text);
+	--logo-light: var(--color-section-dark-logo-light);
+	--logo-dark: var(--color-section-dark-logo-dark);
 	--color-title: var(--color-section-dark-text);
 	--color-subtitle: var(--color-section-dark-text);
 	--color-accent: var(--color-accent-dark);
@@ -1230,6 +1322,8 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 .nino-section--black, .nino-grid--black, .nino-card--black, .nino-grid-row--black {
 	--color-ground: var(--color-section-black-bg);
 	--color-ink: var(--color-section-black-text);
+	--logo-light: var(--color-section-black-logo-light);
+	--logo-dark: var(--color-section-black-logo-dark);
 	--color-title: var(--color-section-black-text);
 	--color-subtitle: var(--color-section-black-text);
 	--color-accent: var(--color-accent-black);
@@ -1245,6 +1339,8 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 .nino-section--primary, .nino-grid--primary, .nino-card--primary, .nino-grid-row--primary {
 	--color-ground: var(--color-primary);
 	--color-ink: var(--color-primary-text);
+	--logo-light: var(--color-primary-logo-light);
+	--logo-dark: var(--color-primary-logo-dark);
 	--color-title: var(--color-primary-text);
 	--color-subtitle: var(--color-primary-text);
 	--color-accent: var(--color-primary-text);
@@ -1256,6 +1352,8 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 .nino-section--alt, .nino-grid--alt, .nino-card--alt, .nino-grid-row--alt {
 	--color-ground: var(--color-section-alt-bg);
 	--color-ink: var(--color-section-alt-text);
+	--logo-light: var(--color-section-alt-logo-light);
+	--logo-dark: var(--color-section-alt-logo-dark);
 	--color-title: var(--color-section-alt-text);
 	--color-subtitle: var(--color-section-alt-text);
 	--color-accent: var(--color-accent-alt);
@@ -1267,6 +1365,8 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 .nino-section--tint, .nino-grid--tint, .nino-card--tint, .nino-grid-row--tint {
 	--color-ground: var(--color-section-tint-bg);
 	--color-ink: var(--color-section-tint-text);
+	--logo-light: var(--color-section-tint-logo-light);
+	--logo-dark: var(--color-section-tint-logo-dark);
 	--color-title: var(--color-section-tint-text);
 	--color-subtitle: var(--color-section-tint-text);
 	--color-accent: var(--color-accent-tint);
@@ -1278,6 +1378,8 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 .nino-section--brand-alt, .nino-grid--brand-alt, .nino-card--brand-alt, .nino-grid-row--brand-alt {
 	--color-ground: var(--color-brand-alt);
 	--color-ink: var(--color-brand-alt-text);
+	--logo-light: var(--color-brand-alt-logo-light);
+	--logo-dark: var(--color-brand-alt-logo-dark);
 	--color-title: var(--color-brand-alt-text);
 	--color-subtitle: var(--color-brand-alt-text);
 	--color-accent: var(--color-brand-alt-text);
@@ -1314,18 +1416,24 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	--counter-grid-accent: var(--color-accent-black);
 	--counter-grid-focus: var(--color-focus-black);
 	--counter-grid-border: var(--color-border-black);
+	--counter-grid-logo-light: var(--color-section-black-logo-light);
+	--counter-grid-logo-dark: var(--color-section-black-logo-dark);
 	--counter-grid-next-bg: var(--color-section-dark-bg);
 	--counter-grid-next-text: var(--color-section-dark-text);
 	--counter-grid-next-title: var(--color-section-dark-text);
 	--counter-grid-next-accent: var(--color-accent-dark);
 	--counter-grid-next-focus: var(--color-focus-dark);
 	--counter-grid-next-border: var(--color-border-dark);
+	--counter-grid-next-logo-light: var(--color-section-dark-logo-light);
+	--counter-grid-next-logo-dark: var(--color-section-dark-logo-dark);
 	--counter-card-bg: var(--color-section-black-bg);
 	--counter-card-text: var(--color-section-black-text);
 	--counter-card-title: var(--color-section-black-text);
 	--counter-card-accent: var(--color-accent-black);
 	--counter-card-focus: var(--color-focus-black);
 	--counter-card-border: var(--color-border-black);
+	--counter-card-logo-light: var(--color-section-black-logo-light);
+	--counter-card-logo-dark: var(--color-section-black-logo-dark);
 }
 .nino-section--black, .nino-grid-row--black {
 	--counter-grid-bg: var(--color-section-dark-bg);
@@ -1334,18 +1442,24 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	--counter-grid-accent: var(--color-accent-dark);
 	--counter-grid-focus: var(--color-focus-dark);
 	--counter-grid-border: var(--color-border-dark);
+	--counter-grid-logo-light: var(--color-section-dark-logo-light);
+	--counter-grid-logo-dark: var(--color-section-dark-logo-dark);
 	--counter-grid-next-bg: var(--color-section-black-bg);
 	--counter-grid-next-text: var(--color-section-black-text);
 	--counter-grid-next-title: var(--color-section-black-text);
 	--counter-grid-next-accent: var(--color-accent-black);
 	--counter-grid-next-focus: var(--color-focus-black);
 	--counter-grid-next-border: var(--color-border-black);
+	--counter-grid-next-logo-light: var(--color-section-black-logo-light);
+	--counter-grid-next-logo-dark: var(--color-section-black-logo-dark);
 	--counter-card-bg: var(--color-section-dark-bg);
 	--counter-card-text: var(--color-section-dark-text);
 	--counter-card-title: var(--color-section-dark-text);
 	--counter-card-accent: var(--color-accent-dark);
 	--counter-card-focus: var(--color-focus-dark);
 	--counter-card-border: var(--color-border-dark);
+	--counter-card-logo-light: var(--color-section-dark-logo-light);
+	--counter-card-logo-dark: var(--color-section-dark-logo-dark);
 }
 .nino-section--primary, .nino-grid-row--primary {
 	--counter-grid-bg: var(--color-brand-alt);
@@ -1354,18 +1468,24 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	--counter-grid-accent: var(--color-brand-alt-text);
 	--counter-grid-focus: var(--color-brand-alt-text);
 	--counter-grid-border: var(--color-border-brand-alt);
+	--counter-grid-logo-light: var(--color-brand-alt-logo-light);
+	--counter-grid-logo-dark: var(--color-brand-alt-logo-dark);
 	--counter-grid-next-bg: var(--color-primary);
 	--counter-grid-next-text: var(--color-primary-text);
 	--counter-grid-next-title: var(--color-primary-text);
 	--counter-grid-next-accent: var(--color-primary-text);
 	--counter-grid-next-focus: var(--color-primary-text);
 	--counter-grid-next-border: var(--color-border-primary);
+	--counter-grid-next-logo-light: var(--color-primary-logo-light);
+	--counter-grid-next-logo-dark: var(--color-primary-logo-dark);
 	--counter-card-bg: var(--color-brand-alt);
 	--counter-card-text: var(--color-brand-alt-text);
 	--counter-card-title: var(--color-brand-alt-text);
 	--counter-card-accent: var(--color-brand-alt-text);
 	--counter-card-focus: var(--color-brand-alt-text);
 	--counter-card-border: var(--color-border-brand-alt);
+	--counter-card-logo-light: var(--color-brand-alt-logo-light);
+	--counter-card-logo-dark: var(--color-brand-alt-logo-dark);
 }
 .nino-section--alt, .nino-grid-row--alt {
 	--counter-grid-bg: var(--color-section-default-bg);
@@ -1374,18 +1494,24 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	--counter-grid-accent: var(--color-accent-default);
 	--counter-grid-focus: var(--color-focus-default);
 	--counter-grid-border: var(--color-border-default);
+	--counter-grid-logo-light: var(--color-section-default-logo-light);
+	--counter-grid-logo-dark: var(--color-section-default-logo-dark);
 	--counter-grid-next-bg: var(--color-section-alt-bg);
 	--counter-grid-next-text: var(--color-section-alt-text);
 	--counter-grid-next-title: var(--color-section-alt-text);
 	--counter-grid-next-accent: var(--color-accent-alt);
 	--counter-grid-next-focus: var(--color-focus-alt);
 	--counter-grid-next-border: var(--color-border-alt);
+	--counter-grid-next-logo-light: var(--color-section-alt-logo-light);
+	--counter-grid-next-logo-dark: var(--color-section-alt-logo-dark);
 	--counter-card-bg: var(--color-section-default-bg);
 	--counter-card-text: var(--color-section-default-text);
 	--counter-card-title: var(--color-title-default);
 	--counter-card-accent: var(--color-accent-default);
 	--counter-card-focus: var(--color-focus-default);
 	--counter-card-border: var(--color-border-default);
+	--counter-card-logo-light: var(--color-section-default-logo-light);
+	--counter-card-logo-dark: var(--color-section-default-logo-dark);
 }
 .nino-section--tint, .nino-grid-row--tint {
 	--counter-grid-bg: var(--color-section-default-bg);
@@ -1394,18 +1520,24 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	--counter-grid-accent: var(--color-accent-default);
 	--counter-grid-focus: var(--color-focus-default);
 	--counter-grid-border: var(--color-border-default);
+	--counter-grid-logo-light: var(--color-section-default-logo-light);
+	--counter-grid-logo-dark: var(--color-section-default-logo-dark);
 	--counter-grid-next-bg: var(--color-section-alt-bg);
 	--counter-grid-next-text: var(--color-section-alt-text);
 	--counter-grid-next-title: var(--color-section-alt-text);
 	--counter-grid-next-accent: var(--color-accent-alt);
 	--counter-grid-next-focus: var(--color-focus-alt);
 	--counter-grid-next-border: var(--color-border-alt);
+	--counter-grid-next-logo-light: var(--color-section-alt-logo-light);
+	--counter-grid-next-logo-dark: var(--color-section-alt-logo-dark);
 	--counter-card-bg: var(--color-section-default-bg);
 	--counter-card-text: var(--color-section-default-text);
 	--counter-card-title: var(--color-title-default);
 	--counter-card-accent: var(--color-accent-default);
 	--counter-card-focus: var(--color-focus-default);
 	--counter-card-border: var(--color-border-default);
+	--counter-card-logo-light: var(--color-section-default-logo-light);
+	--counter-card-logo-dark: var(--color-section-default-logo-dark);
 }
 .nino-section--brand-alt, .nino-grid-row--brand-alt {
 	--counter-grid-bg: var(--color-primary);
@@ -1414,18 +1546,24 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	--counter-grid-accent: var(--color-primary-text);
 	--counter-grid-focus: var(--color-primary-text);
 	--counter-grid-border: var(--color-border-primary);
+	--counter-grid-logo-light: var(--color-primary-logo-light);
+	--counter-grid-logo-dark: var(--color-primary-logo-dark);
 	--counter-grid-next-bg: var(--color-brand-alt);
 	--counter-grid-next-text: var(--color-brand-alt-text);
 	--counter-grid-next-title: var(--color-brand-alt-text);
 	--counter-grid-next-accent: var(--color-brand-alt-text);
 	--counter-grid-next-focus: var(--color-brand-alt-text);
 	--counter-grid-next-border: var(--color-border-brand-alt);
+	--counter-grid-next-logo-light: var(--color-brand-alt-logo-light);
+	--counter-grid-next-logo-dark: var(--color-brand-alt-logo-dark);
 	--counter-card-bg: var(--color-primary);
 	--counter-card-text: var(--color-primary-text);
 	--counter-card-title: var(--color-primary-text);
 	--counter-card-accent: var(--color-primary-text);
 	--counter-card-focus: var(--color-primary-text);
 	--counter-card-border: var(--color-border-primary);
+	--counter-card-logo-light: var(--color-primary-logo-light);
+	--counter-card-logo-dark: var(--color-primary-logo-dark);
 }
 
 /*	A column that paints a ground keeps its content off the colour, and has the
@@ -1446,6 +1584,8 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	--counter-card-accent: var(--color-accent-black);
 	--counter-card-focus: var(--color-focus-black);
 	--counter-card-border: var(--color-border-black);
+	--counter-card-logo-light: var(--color-section-black-logo-light);
+	--counter-card-logo-dark: var(--color-section-black-logo-dark);
 }
 .nino-grid--black {
 	--counter-card-bg: var(--color-section-dark-bg);
@@ -1454,6 +1594,8 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	--counter-card-accent: var(--color-accent-dark);
 	--counter-card-focus: var(--color-focus-dark);
 	--counter-card-border: var(--color-border-dark);
+	--counter-card-logo-light: var(--color-section-dark-logo-light);
+	--counter-card-logo-dark: var(--color-section-dark-logo-dark);
 }
 .nino-grid--primary {
 	--counter-card-bg: var(--color-brand-alt);
@@ -1462,6 +1604,8 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	--counter-card-accent: var(--color-brand-alt-text);
 	--counter-card-focus: var(--color-brand-alt-text);
 	--counter-card-border: var(--color-border-brand-alt);
+	--counter-card-logo-light: var(--color-brand-alt-logo-light);
+	--counter-card-logo-dark: var(--color-brand-alt-logo-dark);
 }
 .nino-grid--alt {
 	--counter-card-bg: var(--color-section-default-bg);
@@ -1470,6 +1614,8 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	--counter-card-accent: var(--color-accent-default);
 	--counter-card-focus: var(--color-focus-default);
 	--counter-card-border: var(--color-border-default);
+	--counter-card-logo-light: var(--color-section-default-logo-light);
+	--counter-card-logo-dark: var(--color-section-default-logo-dark);
 }
 .nino-grid--tint {
 	--counter-card-bg: var(--color-section-default-bg);
@@ -1478,6 +1624,8 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	--counter-card-accent: var(--color-accent-default);
 	--counter-card-focus: var(--color-focus-default);
 	--counter-card-border: var(--color-border-default);
+	--counter-card-logo-light: var(--color-section-default-logo-light);
+	--counter-card-logo-dark: var(--color-section-default-logo-dark);
 }
 .nino-grid--brand-alt {
 	--counter-card-bg: var(--color-primary);
@@ -1486,10 +1634,14 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	--counter-card-accent: var(--color-primary-text);
 	--counter-card-focus: var(--color-primary-text);
 	--counter-card-border: var(--color-border-primary);
+	--counter-card-logo-light: var(--color-primary-logo-light);
+	--counter-card-logo-dark: var(--color-primary-logo-dark);
 }
 .nino-grid--counter, .nino-grid-row--counter {
 	--color-ground: var(--counter-grid-bg);
 	--color-ink: var(--counter-grid-text);
+	--logo-light: var(--counter-grid-logo-light);
+	--logo-dark: var(--counter-grid-logo-dark);
 	--color-title: var(--counter-grid-title);
 	--color-subtitle: var(--counter-grid-text);
 	--color-accent: var(--counter-grid-accent);
@@ -1501,6 +1653,8 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	--counter-card-accent: var(--counter-grid-next-accent);
 	--counter-card-focus: var(--counter-grid-next-focus);
 	--counter-card-border: var(--counter-grid-next-border);
+	--counter-card-logo-light: var(--counter-grid-next-logo-light);
+	--counter-card-logo-dark: var(--counter-grid-next-logo-dark);
 	background-color: var(--color-ground);
 	color: var(--color-ink);
 }
@@ -1516,6 +1670,8 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 .nino-grid--dim {
 	--color-ground: var(--color-section-dark-bg);
 	--color-ink: var(--color-section-dark-text);
+	--logo-light: var(--color-section-dark-logo-light);
+	--logo-dark: var(--color-section-dark-logo-dark);
 	--color-title: var(--color-section-dark-text);
 	--color-subtitle: var(--color-section-dark-text);
 	--color-accent: var(--color-accent-dark);
@@ -1528,6 +1684,8 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	--counter-card-accent: var(--color-accent-black);
 	--counter-card-focus: var(--color-focus-black);
 	--counter-card-border: var(--color-border-black);
+	--counter-card-logo-light: var(--color-section-black-logo-light);
+	--counter-card-logo-dark: var(--color-section-black-logo-dark);
 	background-color: var(--color-ground);
 	color: var(--color-ink);
 }
@@ -1663,6 +1821,8 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	color: var(--color-section-black-text);
 	--color-ground: var(--color-section-black-bg);
 	--color-ink: var(--color-section-black-text);
+	--logo-light: var(--color-section-black-logo-light);
+	--logo-dark: var(--color-section-black-logo-dark);
 	--color-title: var(--color-section-black-text);
 	--color-subtitle: var(--color-section-black-text);
 	--color-text: var(--color-section-black-text);
@@ -1761,6 +1921,8 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 .nino-card--counter {
 	--color-ground: var(--counter-card-bg);
 	--color-ink: var(--counter-card-text);
+	--logo-light: var(--counter-card-logo-light);
+	--logo-dark: var(--counter-card-logo-dark);
 	--color-title: var(--counter-card-title);
 	--color-subtitle: var(--counter-card-text);
 	--color-accent: var(--counter-card-accent);
@@ -1784,6 +1946,8 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 .nino-card--dim {
 	--color-ground: var(--color-section-dark-bg);
 	--color-ink: var(--color-section-dark-text);
+	--logo-light: var(--color-section-dark-logo-light);
+	--logo-dark: var(--color-section-dark-logo-dark);
 	--color-title: var(--color-section-dark-text);
 	--color-subtitle: var(--color-section-dark-text);
 	--color-accent: var(--color-accent-dark);
@@ -2432,12 +2596,16 @@ textarea:disabled {
 	color: var(--color-error-text);
 	--color-ground: var(--color-error);
 	--color-ink: var(--color-error-text);
+	--logo-light: var(--color-error-logo-light);
+	--logo-dark: var(--color-error-logo-dark);
 }
 .nino-form.nino-is-success .nino-form-message {
 	background-color: var(--color-success);
 	color: var(--color-success-text);
 	--color-ground: var(--color-success);
 	--color-ink: var(--color-success-text);
+	--logo-light: var(--color-success-logo-light);
+	--logo-dark: var(--color-success-logo-dark);
 }
 .nino-form.nino-is-pending .nino-form-submit { opacity: .6; pointer-events: none; }
 
@@ -2746,6 +2914,8 @@ textarea:disabled {
 	border-color: var(--color-success);
 	--color-ground: var(--color-success);
 	--color-ink: var(--color-success-text);
+	--logo-light: var(--color-success-logo-light);
+	--logo-dark: var(--color-success-logo-dark);
 }
 .nino-badge--error {
 	background-color: var(--color-error);
@@ -2753,6 +2923,8 @@ textarea:disabled {
 	border-color: var(--color-error);
 	--color-ground: var(--color-error);
 	--color-ink: var(--color-error-text);
+	--logo-light: var(--color-error-logo-light);
+	--logo-dark: var(--color-error-logo-dark);
 }
 .nino-badge-cloud {
 	display: flex;
@@ -2922,6 +3094,8 @@ textarea:disabled {
 	color: var(--color-text);
 	--color-ground: var(--color-background);
 	--color-ink: var(--color-text);
+	--logo-light: var(--color-logo-light);
+	--logo-dark: var(--color-logo-dark);
 	--color-title: var(--color-title-default);
 	--color-accent: var(--color-accent-default);
 }
@@ -2933,6 +3107,8 @@ textarea:disabled {
 	color: var(--color-success-text);
 	--color-ground: var(--color-success);
 	--color-ink: var(--color-success-text);
+	--logo-light: var(--color-success-logo-light);
+	--logo-dark: var(--color-success-logo-dark);
 }
 .nino-alert--error {
 	background-color: var(--color-error);
@@ -2940,6 +3116,8 @@ textarea:disabled {
 	color: var(--color-error-text);
 	--color-ground: var(--color-error);
 	--color-ink: var(--color-error-text);
+	--logo-light: var(--color-error-logo-light);
+	--logo-dark: var(--color-error-logo-dark);
 }
 .nino-alert--warning {
 	background-color: var(--color-warning);
@@ -2947,6 +3125,8 @@ textarea:disabled {
 	color: var(--color-warning-text);
 	--color-ground: var(--color-warning);
 	--color-ink: var(--color-warning-text);
+	--logo-light: var(--color-warning-logo-light);
+	--logo-dark: var(--color-warning-logo-dark);
 }
 .nino-alert--info { border-color: var(--color-accent); color: var(--color-accent); }
 /*	The large variant takes the large radius: a box at three times the padding
@@ -3010,6 +3190,8 @@ body.nino-scroll-btf .nino-back-to-top {
 	color: var(--color-section-alt-text);
 	--color-ground: var(--color-section-alt-bg);
 	--color-ink: var(--color-section-alt-text);
+	--logo-light: var(--color-section-alt-logo-light);
+	--logo-dark: var(--color-section-alt-logo-dark);
 	--color-title: var(--color-section-alt-text);
 	--color-accent: var(--color-accent-alt);
 }
@@ -3454,6 +3636,8 @@ body.nino-scroll-btf .nino-back-to-top {
 	color: var(--color-section-black-text);
 	--color-ground: var(--color-section-black-bg);
 	--color-ink: var(--color-section-black-text);
+	--logo-light: var(--color-section-black-logo-light);
+	--logo-dark: var(--color-section-black-logo-dark);
 	--color-title: var(--color-section-black-text);
 	--color-subtitle: var(--color-section-black-text);
 	--color-text: var(--color-section-black-text);
@@ -3554,6 +3738,8 @@ body.nino-scroll-btf .nino-back-to-top {
 	color: var(--color-text);
 	--color-ground: var(--color-background);
 	--color-ink: var(--color-text);
+	--logo-light: var(--color-logo-light);
+	--logo-dark: var(--color-logo-dark);
 	--color-title: var(--color-title-default);
 	--color-accent: var(--color-accent-default);
 }
@@ -3744,6 +3930,8 @@ header .nino-headernav-logo:empty {
 	color:var(--color-text);
 	--color-ground: var(--color-background);
 	--color-ink: var(--color-text);
+	--logo-light: var(--color-logo-light);
+	--logo-dark: var(--color-logo-dark);
 	--color-title: var(--color-title-default);
 	--color-accent: var(--color-accent-default);
 	position:fixed;
@@ -4610,6 +4798,8 @@ header .nino-headernav-logo:empty {
 	color: var(--color-text);
 	--color-ground: var(--color-background);
 	--color-ink: var(--color-text);
+	--logo-light: var(--color-logo-light);
+	--logo-dark: var(--color-logo-dark);
 	--color-title: var(--color-title-default);
 	--color-accent: var(--color-accent-default);
 }
@@ -4669,6 +4859,8 @@ header .nino-headernav-logo:empty {
 	color: var(--color-section-black-text);
 	--color-ground: var(--color-section-black-bg);
 	--color-ink: var(--color-section-black-text);
+	--logo-light: var(--color-section-black-logo-light);
+	--logo-dark: var(--color-section-black-logo-dark);
 	--color-title: var(--color-section-black-text);
 	--color-accent: var(--color-accent-black);
 	box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
@@ -4686,12 +4878,16 @@ header .nino-headernav-logo:empty {
 	color: var(--color-success-text);
 	--color-ground: var(--color-success);
 	--color-ink: var(--color-success-text);
+	--logo-light: var(--color-success-logo-light);
+	--logo-dark: var(--color-success-logo-dark);
 }
 .nino-toast--error {
 	background-color: var(--color-error);
 	color: var(--color-error-text);
 	--color-ground: var(--color-error);
 	--color-ink: var(--color-error-text);
+	--logo-light: var(--color-error-logo-light);
+	--logo-dark: var(--color-error-logo-dark);
 }
 
 /****************************************************************************************************

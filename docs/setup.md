@@ -91,7 +91,7 @@ Not a choice, and not a step: the base unit delivers one theme, and every projec
 
 The page templates include the two frames rather than carrying their markup, so either can be rewritten without touching the page frame around it. A missing include resolves to an empty string, which is why the base unit lists both files: a delivery that forgot one would ship a site with no header, silently.
 
-The delivery has no logo of its own. The header, the navigation, the Open Graph and Twitter tags in `html-header.tpl` and the mail header of the Form module all ask the **image slot `/logo`** (500 × 100, the shape of a wordmark) with `[image /logo]`, and the base unit declares it empty - `imageSlots`, see below. Upload the logo under **Images** in the workbench; until then the header and the navigation show no picture - the link of the logo in the header writes the name of the site instead, so that it has something to see and to focus - the mail header none, and the page head carries no `og:image` and no `twitter:image`, instead of a broken or an empty one. An upload is cut to the slot's shape, so a logo shaped otherwise needs the slot's size changed on the **Image Slots** tab first.
+The delivery has no logo of its own. It declares two **image slots** (500 × 100, the shape of a wordmark), `/logo`, the picture for a light ground, and `/logo/dark`, the picture for a dark ground, and the base unit declares them empty - `imageSlots`, see below. The header and the navigation draw them with `[logo]`, which puts both in one set and shows the one that suits the ground the logo stands on (the ground says which, see `[logo]` in the [development manual](development.md)); the Open Graph and Twitter tags in `html-header.tpl` and the mail header of the Form module ask `/logo` alone with `[image /logo]`. Upload the logo under **Images** in the workbench; a project with one picture uploads `/logo` and leaves `/logo/dark` empty, and the header then shows that one on every ground. Until there is one, the header and the navigation show no picture - the link of the logo in the header writes the name of the site instead, so that it has something to see and to focus - the mail header none, and the page head carries no `og:image` and no `twitter:image`, instead of a broken or an empty one. An upload is cut to the slot's shape, so a logo shaped otherwise needs the slot's size changed on the **Image Slots** tab first.
 
 The order in the css bundle is the whole contract, and each layer owns one slot in it:
 
@@ -140,7 +140,7 @@ drawing, a small SVG Nino ships; it carries the slot's own name, so an upload
 replaces it and **Remove image** deletes it, and the library keeps the source.
 A `filename` is a file the unit ships under `files` and is checked once the files
 are copied; without one the slot starts empty, which is how the base unit
-declares `/logo`. The label is one string for the project, in its native
+declares `/logo` and `/logo/dark`. The label is one string for the project, in its native
 language. The Routes step - and the Setup step, for the base unit - only **adds** slots: a slot
 the project already has - label, size and image - is left as it is, and the
 first unit to name a uri wins. A seed file that cannot be copied or a slot that

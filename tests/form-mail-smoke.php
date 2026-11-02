@@ -415,6 +415,22 @@ check( 'the head of a mail carries the tag of the language it is rendered in: th
 \Nino\Filesystem::putFileContent( $appData, '/text/de_DE.php', [] );
 \Nino\Filesystem::putFileContent( $appData, '/text/en_US.php', [] );
 
+// A mail has no ground to switch on: its header asks the slot of the picture for a light ground alone, whatever the site has uploaded for a dark one, and draws no set of [logo]
+$appData['/nino/html/images']['/logo'] = [ 'label' => 'Logo', 'width' => 500, 'height' => 100, 'filename' => 'logo.500x100.png' ];
+$appData['/nino/html/images']['/logo/dark'] = [ 'label' => 'Logo, dark', 'width' => 500, 'height' => 100, 'filename' => 'logo-dark.500x100.png' ];
+\Nino\Modules\Components::init( $appData );
+$dirBefore = $appData['/nino/dir'] ?? null;
+$appData['/nino/dir'] = '';
+$bothLogos = \Nino\Html::renderHtml( $appData, $mailHead );
+if( $dirBefore === null )
+	unset( $appData['/nino/dir'] );
+else
+	$appData['/nino/dir'] = $dirBefore;
+unset( $appData['/nino/html/images']['/logo'], $appData['/nino/html/images']['/logo/dark'] );
+check( 'the header of a mail keeps the picture for a light ground and none for a dark one: the slot /logo as an <img> of its own, no set, no second picture',
+	preg_match( '#<div class="mail-header">\s*<img src="[^"]*logo\.500x100\.png" width="180" alt="[^"]*">\s*</div>#', $bothLogos ) === 1
+	&& str_contains( $bothLogos, 'logo-dark' ) === false && str_contains( $bothLogos, 'nino-logo' ) === false && str_contains( $mailHead, '[image /logo]' ) === true && str_contains( $mailHead, '[logo' ) === false );
+
 unset( $appData[ \Nino\Form::STORE ], $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ], $appData['./nino/html/shortcodes']['template'], $appData['./nino/callbacks']['/nino/html/shortcode/template'] );
 $appData[ \Nino\Form::FORMS ] = $formsBefore;
 @unlink( \Nino\Filesystem::path( $appData, '/templates/mail-test.tpl' ) );

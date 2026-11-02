@@ -3,7 +3,7 @@
 				<div class="nino-grid-row nino-grid-middle">
 					<div class="nino-grid-100">
 						<a href="[[/nino/dir]]/" class="nino-logo">
-							[image /logo alt=""]
+							[logo alt=""]
 							<span aria-hidden="true">[[/project/company/general/name]]</span>
 							<h1 class="nino-sr-only" id="header-title">[[/project/company/general/name]] | [[/_nino/webpage[[/nino/http/response/uri]]/title]]</h1>
 						</a>

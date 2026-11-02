@@ -238,11 +238,15 @@ check( '...and so are the fonts it @font-faces: the three files of Open Sans and
 $bundled = array_merge( ...array_values( array_map( 'array_values', $configAfterApply['/nino/html/assets'] + \Nino\AppData::DEFAULTS['/nino/html/assets'] ) ) );
 $unbundled = array_filter( glob( $sandbox. '/private/assets/*.js' ) ?: [], static fn( string $file ): bool => in_array( '/assets/'. basename( $file ), $bundled, true ) === false );
 check( 'the Setup step copies no script into the project that no bundle loads', $unbundled === [] );
-// The logo is a slot with nothing in it: the frames, the navigation and the
-// mails show it with [image /logo], and ship no picture of their own
+// The logo is two slots with nothing in them: the frames and the navigation show
+// them with [logo], the mails and the page head ask the light one with [image /logo],
+// and none ships a picture of its own
 $logoSlot = $configAfterApply['/nino/html/images']['/logo'] ?? [];
+$logoDarkSlot = $configAfterApply['/nino/html/images']['/logo/dark'] ?? [];
 check( 'the base unit seeds the empty logo slot into config.php', ( $logoSlot['label'] ?? null ) === 'Logo' && ( $logoSlot['width'] ?? null ) === 500 && ( $logoSlot['height'] ?? null ) === 100
-	&& array_key_exists( 'filename', $logoSlot ) === true && $logoSlot['filename'] === null && array_keys( $configAfterApply['/nino/html/images'] ) === [ '/logo' ] );
+	&& array_key_exists( 'filename', $logoSlot ) === true && $logoSlot['filename'] === null && array_keys( $configAfterApply['/nino/html/images'] ) === [ '/logo', '/logo/dark' ] );
+check( '...and beside it the empty slot of the picture for a dark ground, of the same shape, labelled "Logo, dark"', ( $logoDarkSlot['label'] ?? null ) === 'Logo, dark' && ( $logoDarkSlot['width'] ?? null ) === 500 && ( $logoDarkSlot['height'] ?? null ) === 100
+	&& array_key_exists( 'filename', $logoDarkSlot ) === true && $logoDarkSlot['filename'] === null );
 check( '...and delivers no logo picture, the unit has no images directory', glob( $sandbox. '/public/images/*' ) === [] && is_dir( __DIR__. '/../_admin/install/library/base/images' ) === false );
 
 // Applying the step again only adds: the label, the size and the picture of a
@@ -668,7 +672,7 @@ check( 'the first element of the body of a page is a skip link to the main part,
 	preg_match( '/<body>\s*<a class="nino-sr-only" href="#nino-main">\[\[\/template\/common\/navigation\/skip\]\]<\/a>/', $documentHead ) === 1
 	&& substr_count( $documentHead, 'id="nino-main"' ) === 1 && preg_match( '/<main id="nino-main" tabindex="-1">/', $documentHead ) === 1 );
 check( '...and the link of the logo writes the name of the site out, for the day no logo is uploaded: a copy that a screen reader is spared, since the heading beside it says it',
-	preg_match( '/<a [^>]*class="nino-logo">\s*\[image \/logo alt=""\]\s*<span aria-hidden="true">\[\[\/project\/company\/general\/name\]\]<\/span>\s*<h1 class="nino-sr-only"/', $frameMarkup ) === 1 );
+	preg_match( '/<a [^>]*class="nino-logo">\s*\[logo alt=""\]\s*<span aria-hidden="true">\[\[\/project\/company\/general\/name\]\]<\/span>\s*<h1 class="nino-sr-only"/', $frameMarkup ) === 1 );
 $contactPage = (string) file_get_contents( __DIR__. '/../_admin/install/library/pages/contact/templates/page-contact.tpl' );
 check( 'the contact form says what its two fields are - autocomplete name and email - and leaves the saying of what is missing to the form\'s own words: the script checks the fields, in the language of the page, and the browser\'s bubble would be in its own',
 	preg_match( '/<input type="text" id="contact-form-name"[^>]* autocomplete="name"/', $contactPage ) === 1 && preg_match( '/<input type="email" id="contact-form-email"[^>]* autocomplete="email"/', $contactPage ) === 1
@@ -829,7 +833,7 @@ if( is_file( $seedFile ) === true )
 mkdir( $seedFile, 0755, true );
 [ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], $firstApply );
 check( 'a seed file the step cannot copy fails the apply and names the file', $status === 500 && str_contains( (string) ( $body['error'] ?? '' ), '/images/template/page-home/hero/background.svg' ) === true );
-check( '...and no page image slot is seeded', array_keys( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/images'] ?? [] ) === [ '/logo' ] );
+check( '...and no page image slot is seeded', array_keys( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/images'] ?? [] ) === [ '/logo', '/logo/dark' ] );
 rmdir( $seedFile );
 
 [ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], $firstApply );
@@ -880,7 +884,11 @@ $logoFrames = static function( array &$appData ): array {
 $logoShipped = '';
 foreach( [ '/templates/frame-header.tpl', '/templates/html-header.tpl', '/templates/mail-header.tpl', '/templates/html-header-nav.tpl' ] as $logoTemplate )
 	$logoShipped .= (string) \Nino\Filesystem::getFileContent( $appData, $logoTemplate, '' );
-check( 'no shipped template names a logo file: every one asks the logo slot', preg_match( '#images/logo#', $logoShipped ) === 0 && substr_count( $logoShipped, '[image /logo' ) === 5 );
+check( 'no shipped template names a logo file: every one asks the logo slots - the header and the navigation as [logo], the page head and the mail as the light slot alone', preg_match( '#images/logo#', $logoShipped ) === 0
+	&& substr_count( $logoShipped, '[logo' ) === 2 && substr_count( $logoShipped, '[image /logo' ) === 3
+	&& substr_count( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/frame-header.tpl', '' ), '[logo alt=""]' ) === 1
+	&& substr_count( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/mail-header.tpl', '' ), '[image /logo]' ) === 1
+	&& str_contains( $logoShipped, '/logo/dark' ) === false );
 
 \Nino\Html::addFills( $appData, [ '[[/project/website/general/url]]' => 'www.example.com', '[[/project/company/general/name]]' => 'Acme' ], '*' );
 $noLogo = $logoFrames( $appData );
@@ -892,8 +900,34 @@ check( '...the navigation\'s logo is an empty wrapper', str_contains( $noLogo['h
 $appData['/nino/html/images']['/logo']['filename'] = 'logo.webp';
 $withLogo = $logoFrames( $appData );
 $logoUrl = \Nino\Images::getUrl( $appData, 'logo.webp' );
-check( 'with a logo the header shows it with an empty alt, as the frame always did', str_contains( $withLogo['header'], '<img src="'. $logoUrl. '" width="500" height="100" alt="">' ) === true );
-check( '...the navigation shows it in its wrapper, with the company name as its alt', preg_match( '#<div class="nino-headernav-logo"><img src="'. preg_quote( $logoUrl, '#' ). '" width="500" height="100" alt="Acme"></div>#', $withLogo['header'] ) === 1 );
+check( 'with a logo the header shows it in the set of [logo] with an empty alt, as the frame always did - the one picture, of the class of the light ground, and no picture for the dark one',
+	str_contains( $withLogo['header'], '<span class="nino-logo-set"><img src="'. $logoUrl. '" width="500" height="100" alt="" class="nino-logo-light"></span>' ) === true && str_contains( $withLogo['header'], 'nino-logo-dark' ) === false );
+check( '...the navigation shows it in its wrapper, with an empty alt: the link of the frame names the site, and the slot\'s own alt text comes first', preg_match( '#<div class="nino-headernav-logo"><span class="nino-logo-set"><img src="'. preg_quote( $logoUrl, '#' ). '" width="500" height="100" alt="" class="nino-logo-light"></span></div>#', $withLogo['header'] ) === 1 );
+$appData['/nino/html/images']['/logo/dark']['filename'] = 'logo-dark.webp';
+$darkUrl = \Nino\Images::getUrl( $appData, 'logo-dark.webp' );
+$withBoth = $logoFrames( $appData );
+check( '...with the picture for a dark ground as well both are in the set, the light one first, in the header and in the navigation',
+	str_contains( $withBoth['header'], '<span class="nino-logo-set"><img src="'. $logoUrl. '" width="500" height="100" alt="" class="nino-logo-light"><img src="'. $darkUrl. '" width="500" height="100" alt="" class="nino-logo-dark"></span>' ) === true
+	&& str_contains( $withBoth['header'], '<div class="nino-headernav-logo"><span class="nino-logo-set"><img src="'. $logoUrl. '" width="500" height="100" alt="" class="nino-logo-light"><img src="'. $darkUrl. '" width="500" height="100" alt="" class="nino-logo-dark"></span></div>' ) === true );
+// The call of the logo carries no fill: a name with a quote or a bracket in it would break a call that had one, and the link of the frame names the site
+\Nino\Html::addFills( $appData, [ '[[/project/company/general/name]]' => 'O\'Brien\'s "Studio" [Nord] GmbH' ], '*' );
+$oddName = $logoFrames( $appData );
+\Nino\Html::addFills( $appData, [ '[[/project/company/general/name]]' => 'Acme' ], '*' );
+$navMarkup = (string) \Nino\Filesystem::getFileContent( $appData, '/templates/html-header-nav.tpl', '' );
+check( '...the navigation\'s logo asks for no fill in its call, so that a company name with a quote or a bracket in it breaks nothing: the set is whole, the alt text is empty, and no part of a call is left standing as text',
+	preg_match( '/\[logo[^\]]*\[\[/', $navMarkup ) !== 1 && str_contains( $navMarkup, '[logo alt=""]' ) === true
+	&& str_contains( $oddName['header'], '<div class="nino-headernav-logo"><span class="nino-logo-set"><img src="'. $logoUrl. '" width="500" height="100" alt="" class="nino-logo-light"><img src="'. $darkUrl. '" width="500" height="100" alt="" class="nino-logo-dark"></span></div>' ) === true
+	&& str_contains( $oddName['header'], '[logo' ) === false && str_contains( $oddName['header'], 'GmbH"]' ) === false );
+check( '...the page head and the mail ask the light slot alone: the dark one is in neither',
+	str_contains( $withBoth['meta'], 'https://www.example.com'. $darkUrl ) === false && str_contains( $withBoth['mail'], $darkUrl ) === false && str_contains( $withBoth['meta'], '<meta property="og:image" content="https://www.example.com'. $logoUrl. '">' ) === true
+	&& str_contains( $withBoth['mail'], '<img src="https://www.example.com'. $logoUrl. '" width="180" alt="Acme">' ) === true );
+$appData['/nino/html/images']['/logo']['filename'] = null;
+$onlyDark = $logoFrames( $appData );
+check( '...a project that uploaded the dark picture alone has it in the header, the one picture on every ground, and the mail and the page head have none',
+	str_contains( $onlyDark['header'], '<span class="nino-logo-set"><img src="'. $darkUrl. '" width="500" height="100" alt="" class="nino-logo-dark"></span>' ) === true && str_contains( $onlyDark['header'], 'nino-logo-light' ) === false
+	&& str_contains( $onlyDark['mail'], '<img' ) === false && str_contains( $onlyDark['meta'], 'og:image' ) === false );
+$appData['/nino/html/images']['/logo/dark']['filename'] = null;
+$appData['/nino/html/images']['/logo']['filename'] = 'logo.webp';
 check( '...og:image and twitter:image carry its absolute address', str_contains( $withLogo['meta'], '<meta property="og:image" content="https://www.example.com'. $logoUrl. '">' ) === true
 	&& str_contains( $withLogo['meta'], '<meta name="twitter:image" content="https://www.example.com'. $logoUrl. '">' ) === true );
 check( '...and the mail an <img> with the absolute address and the company name as its alt', preg_match( '#<img src="https://www\.example\.com'. preg_quote( $logoUrl, '#' ). '" width="180" alt="Acme">#', $withLogo['mail'] ) === 1 );
@@ -960,7 +994,7 @@ $configPerRoute = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] 
 
 $heroAfterSecondApply = $configPerRoute['/nino/html/images']['/template/page-home/hero/background'] ?? [];
 check( 'a second apply keeps a slot the project already has - its label and its changed image', ( $heroAfterSecondApply['label'] ?? null ) === 'Mein Titelbild'
-	&& ( $heroAfterSecondApply['filename'] ?? null ) === 'template/page-home/hero/background.1920x1080.jpg' && array_keys( $configPerRoute['/nino/html/images'] ) === [ '/logo', '/template/page-home/hero/background' ] );
+	&& ( $heroAfterSecondApply['filename'] ?? null ) === 'template/page-home/hero/background.1920x1080.jpg' && array_keys( $configPerRoute['/nino/html/images'] ) === [ '/logo', '/logo/dark', '/template/page-home/hero/background' ] );
 
 check( 'each blank route gets its own template file, named after its Element-URI', \Nino\Filesystem::fileExists( $appData, '/templates/page-team.tpl' ) === true && \Nino\Filesystem::fileExists( $appData, '/templates/page-jobs-open.tpl' ) === true );
 check( '...and renders it, rather than the unit\'s shared one', ( $configPerRoute['/nino/http/routes']['GET://team']['body'] ?? null ) === '[template /templates/page-team]'

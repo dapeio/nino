@@ -102,7 +102,7 @@ Supported unit keys in the current installer:
 | `routes` | Installer-owned route map |
 | `templates` | Files copied from the unit's `templates/` |
 | `files` | Files/directories copied to the same project-relative path |
-| `imageSlots` | The base unit and page units only: image slots the unit's templates show with `[image <uri>]`, `uri => [ 'label' => string or locale map, 'width', 'height', 'filename' ]`. `filename` is optional: a seed file below `images/` that the unit ships under `files`, or none for a slot that starts empty (the base unit's `/logo`). Added to `/nino/html/images` only where the project has no slot of that uri, so a re-applied step never resets an editor's image; the label is resolved for the native locale; a seed that is not there fails the step by name |
+| `imageSlots` | The base unit and page units only: image slots the unit's templates show with `[image <uri>]`, `uri => [ 'label' => string or locale map, 'width', 'height', 'filename' ]`. `filename` is optional: a seed file below `images/` that the unit ships under `files`, or none for a slot that starts empty (the base unit's `/logo` and `/logo/dark`). Added to `/nino/html/images` only where the project has no slot of that uri, so a re-applied step never resets an editor's image; the label is resolved for the native locale; a seed that is not there fails the step by name |
 | `elementTypes` | Unit-root files copied into project `elements/` |
 | `elements` | Elements added to element types, add-only: `type uri => file below the unit`, e.g. `'privacy' => 'elements/privacy.php'` - see below |
 | `navs` | Menus the wizard creates when the project does not have them: `nav key => [ Element-URI, ... ]`, e.g. `'legal' => [ '/legal/imprint', '/legal/privacy' ]` - see below |

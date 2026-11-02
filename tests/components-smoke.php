@@ -353,6 +353,102 @@ check( '...the plain section sets the pair of the default ground and paints it, 
 	$groundSets( $groundOf( '.nino-section' ), '--color-ground', 'var(--color-section-default-bg)' ) && $groundSets( $groundOf( '.nino-section' ), '--color-ink', 'var(--color-section-default-text)' )
 	&& $groundSets( $groundOf( '.nino-section' ), 'background-color', 'var(--color-section-default-bg)' ) && $groundSets( $groundOf( '.nino-section' ), 'color', 'var(--color-section-default-text)' ) );
 
+/*	The logo: [logo] draws a picture for a light ground and one for a dark ground, and the ground a thing stands on says which is seen. The pair of properties that says it,
+	--logo-light and --logo-dark, is set wherever --color-ground is - by every rule of the stylesheet that sets that, from the roles of the ground it paints - and the three
+	families of the counter ground carry it as they carry the other six parts. The role a ground names is read off the ground itself here, not off the stylesheet's answer	*/
+$logoRole = static function( string $ground, string $kind ): string {
+	if( preg_match( '/^var\((--color-section-(?:default|alt|tint|dark|black))-bg\)$/', $ground, $found ) === 1 )
+		return 'var('. $found[1]. '-logo-'. $kind. ')';
+	if( preg_match( '/^var\((--color-(?:primary|brand-alt|error|success|warning))\)$/', $ground, $found ) === 1 )
+		return 'var('. $found[1]. '-logo-'. $kind. ')';
+	if( $ground === 'var(--color-background)' )
+		return 'var(--color-logo-'. $kind. ')';
+	if( preg_match( '/^var\((--counter-(?:grid|grid-next|card))-bg\)$/', $ground, $found ) === 1 )
+		return 'var('. $found[1]. '-logo-'. $kind. ')';
+	return '';
+};
+$logoWrong = [];
+$logoGrounds = 0;
+$logoFamilies = 0;
+foreach( $groundBlocks as [ , $logoSelectors, $logoBody ] ) {
+	$logoName = trim( (string) preg_replace( '/\s+/', ' ', (string) $logoSelectors ) );
+	$logoGround = $hookValue( $logoBody, '--color-ground' );
+	if( $logoGround !== null ) {
+		$logoGrounds++;
+		foreach( [ 'light', 'dark' ] as $logoKind )
+			if( $logoRole( $logoGround, $logoKind ) === '' || $hookValue( $logoBody, '--logo-'. $logoKind ) !== $logoRole( $logoGround, $logoKind ) )
+				$logoWrong[] = $logoName. ' sets --color-ground to '. $logoGround. ' and --logo-'. $logoKind. ' to '. ( $hookValue( $logoBody, '--logo-'. $logoKind ) ?? 'nothing' );
+	}
+	foreach( [ 'grid', 'grid-next', 'card' ] as $logoFamily ) {
+		$logoBg = $hookValue( $logoBody, '--counter-'. $logoFamily. '-bg' );
+		if( $logoBg === null )
+			continue;
+		$logoFamilies++;
+		foreach( [ 'light', 'dark' ] as $logoKind )
+			if( $logoRole( $logoBg, $logoKind ) === '' || $hookValue( $logoBody, '--counter-'. $logoFamily. '-logo-'. $logoKind ) !== $logoRole( $logoBg, $logoKind ) )
+				$logoWrong[] = $logoName. ' sets --counter-'. $logoFamily. '-bg to '. $logoBg. ' and --counter-'. $logoFamily. '-logo-'. $logoKind. ' to '. ( $hookValue( $logoBody, '--counter-'. $logoFamily. '-logo-'. $logoKind ) ?? 'nothing' );
+	}
+}
+check( 'every rule that sets --color-ground sets the pair of the logo beside it, --logo-light and --logo-dark, to the roles of the ground it paints - the sections, the rows, the columns and the cards of a ground, the counter, the dimmed ones, the statuses of an alert, a badge, a toast and a message, the table stripe, and the overlays and the modal that put the page\'s ground back with the page\'s pair'
+	. ( $logoWrong === [] ? '' : ' - '. implode( '; ', $logoWrong ) ), $logoWrong === [] && $logoGrounds >= 29 );
+check( '...and every rule that sets a family of the counter ground sets its logo-light and logo-dark beside the border, from the same ground as its bg - :root, the grounds of a section and of a row, of a column, and the counter itself',
+	$logoWrong === [] && $logoFamilies >= 29 );
+
+// The roles: the pair of each ground, in :root - literal where a ground is written on in one ink for good, another pair where Nino.css collapses one ground onto another, as it does its ink
+$logoRoles = [ '--color-logo-' => 'page', '--color-section-default-logo-' => 'page', '--color-section-alt-logo-' => 'page', '--color-section-tint-logo-' => 'alt', '--color-section-dark-logo-' => 'dark', '--color-section-black-logo-' => 'dark',
+	'--color-primary-logo-' => 'dark', '--color-brand-alt-logo-' => 'primary', '--color-error-logo-' => 'primary', '--color-success-logo-' => 'primary', '--color-warning-logo-' => 'primary', '--color-footer-logo-' => 'dark' ];
+$logoWrong = [];
+foreach( $logoRoles as $logoRole => $logoFollows ) {
+	$logoLight = $hookValue( $hookRoot, $logoRole. 'light' );
+	$logoDark = $hookValue( $hookRoot, $logoRole. 'dark' );
+	if( $logoLight === null || $logoDark === null ) {
+		$logoWrong[] = $logoRole. ' is not declared as a pair';
+		continue;
+	}
+	$logoPair = [ $logoLight, $logoDark ];
+	if( $logoFollows === 'alt' )
+		$logoExpected = [ 'var(--color-section-alt-logo-light)', 'var(--color-section-alt-logo-dark)' ];
+	elseif( $logoFollows === 'primary' )
+		$logoExpected = [ 'var(--color-primary-logo-light)', 'var(--color-primary-logo-dark)' ];
+	else
+		$logoExpected = $logoFollows === 'page' ? [ 'block', 'none' ] : [ 'none', 'block' ];
+	if( $logoPair !== $logoExpected )
+		$logoWrong[] = $logoRole. ' is '. implode( ' / ', $logoPair ). ', not '. implode( ' / ', $logoExpected );
+}
+check( ':root declares the pair of every ground as a role, twelve of them: the page, the five grounds of a section, the two brand grounds, the three statuses and the footer - block and none where the ground is written on in one ink, the page and the light grounds showing the picture for a light ground and the dark, black, primary and footer the one for a dark ground, and the grounds Nino.css collapses onto another (tint onto alt, brand-alt and the statuses onto primary) following it'
+	. ( $logoWrong === [] ? '' : ' - '. implode( '; ', $logoWrong ) ), $logoWrong === [] && count( $logoRoles ) === 12
+	&& $hookValue( $hookRoot, '--logo-light' ) === 'var(--color-section-default-logo-light)' && $hookValue( $hookRoot, '--logo-dark' ) === 'var(--color-section-default-logo-dark)' );
+$logoCounterWrong = [];
+foreach( $groundFamilies as $logoFamily )
+	foreach( [ 'light', 'dark' ] as $logoKind )
+		if( $hookValue( $hookRoot, '--counter-'. $logoFamily. '-logo-'. $logoKind ) !== 'var(--color-section-'. ( $logoFamily === 'grid-next' ? 'default' : 'alt' ). '-logo-'. $logoKind. ')' )
+			$logoCounterWrong[] = '--counter-'. $logoFamily. '-logo-'. $logoKind;
+check( '...the page\'s counter families carry the pair as they carry the other six parts: the column is alt, a card in it default again, a card on the page alt'. ( $logoCounterWrong === [] ? '' : ' - not: '. implode( ', ', $logoCounterWrong ) ), $logoCounterWrong === [] );
+check( '...a counter column and a counter card read the pair from their family, and the column hands the next one to its cards',
+	$groundSets( $groundOf( '.nino-grid--counter' ), '--logo-light', 'var(--counter-grid-logo-light)' ) && $groundSets( $groundOf( '.nino-grid--counter' ), '--logo-dark', 'var(--counter-grid-logo-dark)' )
+	&& $groundSets( $groundOf( '.nino-grid--counter' ), '--counter-card-logo-light', 'var(--counter-grid-next-logo-light)' ) && $groundSets( $groundOf( '.nino-grid--counter' ), '--counter-card-logo-dark', 'var(--counter-grid-next-logo-dark)' )
+	&& $groundSets( $groundOf( '.nino-card--counter' ), '--logo-light', 'var(--counter-card-logo-light)' ) && $groundSets( $groundOf( '.nino-card--counter' ), '--logo-dark', 'var(--counter-card-logo-dark)' ) );
+check( '...the overlay of the burger and the modal put the page\'s ground back, and with it the page\'s pair',
+	$groundSets( $groundOf( '.nino-nav-burger > button[aria-expanded="true"] ~ .nino-nav-content' ), '--logo-light', 'var(--color-logo-light)' ) && $groundSets( $groundOf( '.nino-nav-burger > button[aria-expanded="true"] ~ .nino-nav-content' ), '--logo-dark', 'var(--color-logo-dark)' )
+	&& $groundSets( $groundOf( '.nino-modal' ), '--logo-light', 'var(--color-logo-light)' ) && $groundSets( $groundOf( '.nino-modal' ), '--logo-dark', 'var(--color-logo-dark)' ) );
+check( '...a footer sets the pair of its bands, which are the dark ground in Nino.css and in the delivered theme, and a frame that paints another ground says so after it; the logo of a footer is the set, with the opacity and the width it always had',
+	$groundSets( $groundOf( 'footer' ), '--logo-light', 'var(--color-footer-logo-light)' ) && $groundSets( $groundOf( 'footer' ), '--logo-dark', 'var(--color-footer-logo-dark)' )
+	&& $groundSets( $groundOf( '.nino-footer-logo' ), 'opacity', '.7' ) && $groundSets( $groundOf( '.nino-footer-logo' ), 'max-width', '8rem' ) );
+
+// Print: the paper is white whatever a frame painted on the screen, so the pair is the page's on every element in a print media rule that wins against every ground
+check( 'in print the pair is the page\'s on every element: an @media print rule sets --logo-light to block and --logo-dark to none on :root and everything under it, important, so that no ground a frame painted on the screen puts the picture for a dark ground on white paper',
+	preg_match( '/@media\s+print\s*\{\s*:root,\s*:root\s*\*\s*\{\s*--logo-light:\s*block\s*!important;\s*--logo-dark:\s*none\s*!important;\s*\}\s*\}/', $hookCss ) === 1 );
+
+// The switch: each picture is displayed as the pair says, and falls back to the page's own - the picture for a light ground is seen, the other not - so that a page without a ground to say is not blank
+check( 'the set switches on the pair: the picture for a light ground is displayed as --logo-light says, block where nothing does, and the one for a dark ground as --logo-dark says, none where nothing does',
+	$groundSets( $groundOf( '.nino-logo-set .nino-logo-light' ), 'display', 'var(--logo-light, block)' ) && $groundSets( $groundOf( '.nino-logo-set .nino-logo-dark' ), 'display', 'var(--logo-dark, none)' )
+	&& $groundSets( $groundOf( '.nino-logo-set' ), 'display', 'block' ) );
+check( '...a set of one picture has nothing to switch: the only child is shown whichever ground it stands on, in a rule heavier than the two that switch, a class, a type and a pseudo-class against two classes - whichever order they stand in',
+	$groundSets( $groundOf( '.nino-logo-set > img:only-child' ), 'display', 'block' ) );
+check( '...no rule of the switch writes a colour or a size of its own: the set is a box and the frame\'s .nino-logo img sizes what is in it',
+	preg_match( '/(?<![\w-])(?:color|width|height|opacity|filter)\s*:/', $groundOf( '.nino-logo-set' ). ' '. $groundOf( '.nino-logo-set .nino-logo-light' ). ' '. $groundOf( '.nino-logo-set .nino-logo-dark' ) ) !== 1
+	&& $groundSets( $groundOf( '.nino-logo img' ), 'width', '100%' ) && $groundSets( $groundOf( '.nino-logo img' ), 'height', 'auto' ) );
+
 // Nothing compares one ground with another: no selector names a ground of a section or a column above a ground of a column or a card
 $groundCompared = [];
 foreach( array_keys( $groundEach ) as $groundSelector )
@@ -1644,10 +1740,10 @@ echo "Modules\\Components - the registry, the sources, the stacks\n";
 \Nino\Modules\Elements::init( $appData );
 
 // The registry the module's own init() fills, read before the test adds to it
-$kernelAll = [ 'title', 'subtitle', 'text', 'card-title', 'card-subtitle', 'card-text', 'card-image', 'hero-title', 'hero-subtitle', 'card', 'button', 'image', 'html', 'spacer', 'scroll-hint' ];
+$kernelAll = [ 'title', 'subtitle', 'text', 'card-title', 'card-subtitle', 'card-text', 'card-image', 'hero-title', 'hero-subtitle', 'card', 'button', 'image', 'logo', 'html', 'spacer', 'scroll-hint' ];
 $kernelStacks = [ 'stack', 'slider', 'filter', 'list', 'sections' ];
-check( 'the module registers the components of the kernel in the order a column offers them: the title, the subtitle and the text of a section, the title, the subtitle, the text and the image of a card, the title and the subtitle of a hero, then the card, the button, the image, the html, the spacer and the scroll hint', array_keys( \Nino\Modules\Components::components( $appData ) ) === $kernelAll );
-check( '...and a tool is answered in that order: the registry as json is an object keyed by name, which read again lists the same fifteen in the same order',
+check( 'the module registers the components of the kernel in the order a column offers them: the title, the subtitle and the text of a section, the title, the subtitle, the text and the image of a card, the title and the subtitle of a hero, then the card, the button, the image, the logo, the html, the spacer and the scroll hint', array_keys( \Nino\Modules\Components::components( $appData ) ) === $kernelAll );
+check( '...and a tool is answered in that order: the registry as json is an object keyed by name, which read again lists the same sixteen in the same order',
 	str_starts_with( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), '{"title":{' ) === true
 	&& array_keys( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), true ) ) === $kernelAll );
 check( '...and its stacks', array_keys( \Nino\Modules\Components::stacks( $appData ) ) === $kernelStacks );
@@ -2043,7 +2139,7 @@ foreach( $imageRatios as $imageRatio )
 			$ratioWrong[] = $ratioSelector;
 check( 'every ratio of the frame is said by the frame and by the <img> directly in it - .nino-image--<x>-<y> and .nino-image--<x>-<y> > img, aspect-ratio: x / y - so that the picture has the ratio of the frame whether or not its height of 100% is worked out'
 	. ( $ratioWrong === [] ? '' : ' - not: '. implode( ', ', $ratioWrong ) ), $ratioWrong === [] && $imageRatios !== [] );
-// The icons of the fifteen: each component of the kernel is shown by the parts of a 24 by 24 icon of Lucide, which the registry hands to a tool
+// The icons of the sixteen: each component of the kernel is shown by the parts of a 24 by 24 icon of Lucide, which the registry hands to a tool
 $iconTags = [ 'path' => [ [ 'd' ], [] ], 'circle' => [ [ 'cx', 'cy', 'r' ], [] ], 'ellipse' => [ [ 'cx', 'cy', 'rx', 'ry' ], [] ], 'rect' => [ [ 'x', 'y', 'width', 'height' ], [ 'rx', 'ry' ] ],
 	'line' => [ [ 'x1', 'y1', 'x2', 'y2' ], [] ], 'polyline' => [ [ 'points' ], [] ], 'polygon' => [ [ 'points' ], [] ] ];
 $iconOf = static fn( string $name ): mixed => \Nino\Modules\Components::components( $appData )[$name]['icon'] ?? null;
@@ -2063,28 +2159,29 @@ foreach( $kernelAll as $iconName ) {
 			$iconWrong[] = $iconName. ' part '. ( $iconNumber + 1 ). ' is no complete part of an icon';
 	}
 }
-check( 'each of the fifteen components of the kernel carries an icon: a list of one to five parts, each a tag among the seven and a map of strings that holds the attributes of that tag'. ( $iconWrong === [] ? '' : ' - '. implode( ', ', $iconWrong ) ), $iconWrong === [] );
-check( '...the title is drawn by the three paths of the heading of Lucide, the card by a rect and a path, and the image by a rect, a circle and a path',
+check( 'each of the sixteen components of the kernel carries an icon: a list of one to five parts, each a tag among the seven and a map of strings that holds the attributes of that tag'. ( $iconWrong === [] ? '' : ' - '. implode( ', ', $iconWrong ) ), $iconWrong === [] );
+check( '...the title is drawn by the three paths of the heading of Lucide, the card by a rect and a path, the image by a rect, a circle and a path and the logo by a circle and a path, the circle half filled',
 	$iconOf( 'title' ) === [ [ 'path', [ 'd' => 'M6 12h12' ] ], [ 'path', [ 'd' => 'M6 20V4' ] ], [ 'path', [ 'd' => 'M18 20V4' ] ] ]
-	&& array_column( (array) $iconOf( 'card' ), 0 ) === [ 'rect', 'path' ] && array_column( (array) $iconOf( 'image' ), 0 ) === [ 'rect', 'circle', 'path' ] );
-$iconKinds = [ 'title', 'subtitle', 'text', 'card', 'button', 'image', 'html', 'spacer', 'scroll-hint' ];
-check( '...the three titles are drawn alike and so are the three subtitles, the two texts and the two images, and the title, the subtitle, the text, the card, the button, the image, the html, the spacer and the scroll hint each have a picture of their own',
+	&& array_column( (array) $iconOf( 'card' ), 0 ) === [ 'rect', 'path' ] && array_column( (array) $iconOf( 'image' ), 0 ) === [ 'rect', 'circle', 'path' ]
+	&& array_column( (array) $iconOf( 'logo' ), 0 ) === [ 'circle', 'path' ] );
+$iconKinds = [ 'title', 'subtitle', 'text', 'card', 'button', 'image', 'logo', 'html', 'spacer', 'scroll-hint' ];
+check( '...the three titles are drawn alike and so are the three subtitles, the two texts and the two images, and the title, the subtitle, the text, the card, the button, the image, the logo, the html, the spacer and the scroll hint each have a picture of their own',
 	$iconOf( 'title' ) === $iconOf( 'card-title' ) && $iconOf( 'title' ) === $iconOf( 'hero-title' )
 	&& $iconOf( 'subtitle' ) === $iconOf( 'card-subtitle' ) && $iconOf( 'subtitle' ) === $iconOf( 'hero-subtitle' )
 	&& $iconOf( 'text' ) === $iconOf( 'card-text' ) && $iconOf( 'image' ) === $iconOf( 'card-image' )
 	&& count( array_unique( array_map( static fn( string $name ): string => (string) json_encode( $iconOf( $name ) ), $iconKinds ) ) ) === count( $iconKinds ) );
-// Which icon of Lucide a component carries shows in the first part of it: the nine icons begin with nine different parts
+// Which icon of Lucide a component carries shows in the first part of it: the ten icons begin with ten different parts
 $iconFirst = [
 	'title' => [ 'path', [ 'd' => 'M6 12h12' ] ], 'subtitle' => [ 'path', [ 'd' => 'M12 4v16' ] ], 'text' => [ 'path', [ 'd' => 'M21 5H3' ] ],
 	'card' => [ 'rect', [ 'width' => '18', 'height' => '18', 'x' => '3', 'y' => '3', 'rx' => '2' ] ], 'button' => [ 'path', [ 'd' => 'M14 4.1 12 6' ] ],
-	'image' => [ 'rect', [ 'width' => '18', 'height' => '18', 'x' => '3', 'y' => '3', 'rx' => '2', 'ry' => '2' ] ], 'html' => [ 'path', [ 'd' => 'm16 18 6-6-6-6' ] ], 'spacer' => [ 'path', [ 'd' => 'm16 16-4 4-4-4' ] ],
+	'image' => [ 'rect', [ 'width' => '18', 'height' => '18', 'x' => '3', 'y' => '3', 'rx' => '2', 'ry' => '2' ] ], 'logo' => [ 'circle', [ 'cx' => '12', 'cy' => '12', 'r' => '10' ] ], 'html' => [ 'path', [ 'd' => 'm16 18 6-6-6-6' ] ], 'spacer' => [ 'path', [ 'd' => 'm16 16-4 4-4-4' ] ],
 	'scroll-hint' => [ 'path', [ 'd' => 'm6 9 6 6 6-6' ] ],
 ];
 $iconKindOf = [ 'title' => 'title', 'card-title' => 'title', 'hero-title' => 'title', 'subtitle' => 'subtitle', 'card-subtitle' => 'subtitle', 'hero-subtitle' => 'subtitle',
-	'text' => 'text', 'card-text' => 'text', 'card' => 'card', 'button' => 'button', 'image' => 'image', 'card-image' => 'image', 'html' => 'html', 'spacer' => 'spacer', 'scroll-hint' => 'scroll-hint' ];
-check( '...the titles are drawn as the heading of Lucide, the subtitles as its type, the texts as lines, the card as a panel, the button as a pointer, the images as a picture, the html as code, the spacer as a separator and the scroll hint as a chevron',
+	'text' => 'text', 'card-text' => 'text', 'card' => 'card', 'button' => 'button', 'image' => 'image', 'card-image' => 'image', 'logo' => 'logo', 'html' => 'html', 'spacer' => 'spacer', 'scroll-hint' => 'scroll-hint' ];
+check( '...the titles are drawn as the heading of Lucide, the subtitles as its type, the texts as lines, the card as a panel, the button as a pointer, the images as a picture, the logo as a half-filled circle, the html as code, the spacer as a separator and the scroll hint as a chevron',
 	array_filter( $iconKindOf, static fn( string $kind, string $name ): bool => ( $iconOf( $name )[0] ?? null ) !== $iconFirst[$kind], ARRAY_FILTER_USE_BOTH ) === [] && $iconOf( 'scroll-hint' ) === [ $iconFirst['scroll-hint'] ] );
-check( '...and the json of the registry gives each of the fifteen back as it is: the parts as lists and the attributes of a part as maps',
+check( '...and the json of the registry gives each of the sixteen back as it is: the parts as lists and the attributes of a part as maps',
 	array_filter( $kernelAll, static fn( string $name ): bool => ( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), true ) )[$name]['icon'] !== $iconOf( $name ) ) === [] );
 // The card: a component that holds components. What the registry says of it, and of nothing else of the kernel
 $cardSchema = \Nino\Modules\Components::components( $appData )['card'];
@@ -2299,7 +2396,7 @@ check( '...and the one attribute it has of its own is alternate, a bool that is 
 
 check( 'a clean schema validates again as it is - what a manifest hands over after Features::manifest() has read it', \Nino\Modules\Components::validate( 'title', \Nino\Modules\Components::components( $appData )['title'] ) === \Nino\Modules\Components::components( $appData )['title']
 	&& \Nino\Modules\Components::validate( 'filter', \Nino\Modules\Components::stacks( $appData )['filter'], true ) === \Nino\Modules\Components::stacks( $appData )['filter'] );
-check( '...icon and all: each of the fifteen, and a component registered with an icon of its own, validates again as it is, the parts and the maps of the icon in the order they were in',
+check( '...icon and all: each of the sixteen, and a component registered with an icon of its own, validates again as it is, the parts and the maps of the icon in the order they were in',
 	array_filter( array_merge( $kernelAll, [ 'pictured' ] ), static fn( string $name ): bool => \Nino\Modules\Components::validate( $name, \Nino\Modules\Components::components( $appData )[$name] ) !== \Nino\Modules\Components::components( $appData )[$name] ) === [] );
 \Nino\Callbacks::registerCallback( $appData, '/test/removable', static fn( array &$appData, mixed &$args ): string => 'x' );
 \Nino\Callbacks::registerCallback( $appData, '/test/removable', static fn( array &$appData, mixed &$args ): string => 'y' );
@@ -2894,6 +2991,71 @@ $image = $render( '[stack /services sort="title" offset="1" limit="1"][image ima
 check( '[image] in a stack: an image field is the file it holds, its size is the field\'s, its alt text the field the type names', str_contains( $image, '<div class="nino-image nino-img-focus--2"><img src="/public/images/services/web/image.webp" width="400" height="300" alt="Alt &quot;q&quot;"></div>' ) === true );
 check( '...a slot still works there, and a name that is neither a field nor a slot renders nothing', str_contains( $image, '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="">' ) === true && substr_count( $image, '<img' ) === 2 );
 check( '...and an image field with no file renders nothing', substr_count( $render( '[stack /services sort="title" limit="1"][image image][/stack]' ), '<img' ) === 0 );
+
+// [logo]: the pictures of two slots in one set, the ground says which is seen
+$logoUrl = '/public/images/logo.500x100.png';
+$logoDarkUrl = '/public/images/logo-dark.500x100.png';
+$appData['/nino/html/images']['/logo'] = [ 'label' => 'Logo', 'width' => 500, 'height' => 100, 'filename' => 'logo.500x100.png' ];
+$appData['/nino/html/images']['/logo/dark'] = [ 'label' => 'Logo, dark', 'width' => 500, 'height' => 100, 'filename' => 'logo-dark.500x100.png' ];
+$logoImg = static fn( string $url, string $ground, string $alt = '' ): string => '<img src="'. $url. '" width="500" height="100" alt="'. $alt. '" class="nino-logo-'. $ground. '">';
+check( 'the logo is a component of the kernel: labelled in both languages, no source of its own, the picture of a block, offered in a section and a hero and under global, drawing the set, no link - and a half-filled circle as its icon',
+	$registryOf( 'logo' )['label'] === [ 'en_US' => 'Logo', 'de_DE' => 'Logo' ] && $registryOf( 'logo' )['source'] === 'none' && $registryOf( 'logo' )['preview'] === 'block'
+	&& $registryOf( 'logo' )['in'] === [ 'hero', 'section' ] && $registryOf( 'logo' )['group'] === 'global' && $registryOf( 'logo' )['draws'] === 'span .nino-logo-set'
+	&& array_key_exists( 'holds', $registryOf( 'logo' ) ) === false && $registryOf( 'logo' )['link'] === false && $registryOf( 'logo' )['stretched'] === false && $registryOf( 'logo' )['by'] === 'nino'
+	&& array_column( (array) $registryOf( 'logo' )['icon'], 0 ) === [ 'circle', 'path' ] );
+check( '...its attributes are the two slots and the alt text, in that order: light and dark are of the type image and default to /logo and /logo/dark, the alt text is a string that is empty, and the defaults are those, with the class',
+	array_keys( $registryOf( 'logo' )['attributes'] ) === [ 'light', 'dark', 'alt' ]
+	&& $registryOf( 'logo' )['attributes']['light']['type'] === 'image' && $registryOf( 'logo' )['attributes']['light']['default'] === '/logo'
+	&& $registryOf( 'logo' )['attributes']['dark']['type'] === 'image' && $registryOf( 'logo' )['attributes']['dark']['default'] === '/logo/dark'
+	&& $registryOf( 'logo' )['attributes']['alt']['type'] === 'string' && $registryOf( 'logo' )['attributes']['alt']['default'] === ''
+	&& \Nino\Modules\Components::defaults( $appData, 'logo' ) === [ 'light' => '/logo', 'dark' => '/logo/dark', 'alt' => '', 'class' => '' ]
+	&& array_filter( [ 'light', 'dark', 'alt' ], static fn( string $name ): bool => array_keys( (array) $registryOf( 'logo' )['attributes'][$name]['label'] ) !== [ 'en_US', 'de_DE' ] ) === [] );
+check( '[logo] draws both pictures in one set, the one for a light ground first, each with the size of its slot and the class of its ground',
+	$render( '[logo]' ) === '<span class="nino-logo-set">'. $logoImg( $logoUrl, 'light' ). $logoImg( $logoDarkUrl, 'dark' ). '</span>' );
+check( '...[logo dark=""] only the light one and [logo light=""] only the dark one - a set of one picture, which Nino.css shows on every ground - and a slot that has no file draws no <img> either',
+	$render( '[logo dark=""]' ) === '<span class="nino-logo-set">'. $logoImg( $logoUrl, 'light' ). '</span>'
+	&& $render( '[logo light=""]' ) === '<span class="nino-logo-set">'. $logoImg( $logoDarkUrl, 'dark' ). '</span>'
+	&& $render( '[logo light="/template/page-home/hero/empty"]' ) === '<span class="nino-logo-set">'. $logoImg( $logoDarkUrl, 'dark' ). '</span>' );
+$appData['/nino/html/images']['/logo/dark']['filename'] = null;
+$logoOne = $render( '[logo]' );
+$appData['/nino/html/images']['/logo/dark']['filename'] = 'logo-dark.500x100.png';
+$appData['/nino/html/images']['/logo']['filename'] = null;
+$logoOther = $render( '[logo]' );
+$appData['/nino/html/images']['/logo/dark']['filename'] = null;
+$logoNone = [ $render( '[logo]' ), $render( '[logo alt="Acme" class="x"]' ), $render( '[logo light="" dark=""]' ), $render( '[logo light="/template/page-home/nope/nope"]' ) ];
+$appData['/nino/html/images']['/logo']['filename'] = 'logo.500x100.png';
+$appData['/nino/html/images']['/logo/dark']['filename'] = 'logo-dark.500x100.png';
+check( '...with the file of one slot missing the set holds the other, with the file of none it draws nothing at all - an empty string, which keeps the wrapper of the navigation :empty and lets a frame\'s link write the name of the site - however it is called',
+	$logoOne === '<span class="nino-logo-set">'. $logoImg( $logoUrl, 'light' ). '</span>' && $logoOther === '<span class="nino-logo-set">'. $logoImg( $logoDarkUrl, 'dark' ). '</span>'
+	&& $logoNone === [ '', '', '', '' ] );
+$appData['/nino/html/images']['/logo']['alt'] = [ 'de_DE' => 'Stored "alt" [x]' ];
+check( '...the alt text is the one stored for the slot, then the one of the call, then none - found as [image] finds it, on each of the two pictures, escaped and with its [ written as &#91;',
+	$render( '[logo alt="Call"]' ) === '<span class="nino-logo-set">'. $logoImg( $logoUrl, 'light', 'Stored &quot;alt&quot; &#91;x]' ). $logoImg( $logoDarkUrl, 'dark', 'Call' ). '</span>'
+	&& $render( '[logo alt="Call"]' ) === $render( '[logo alt="Call" light="/logo" dark="/logo/dark"]' )
+	&& $render( '[logo]' ) === '<span class="nino-logo-set">'. $logoImg( $logoUrl, 'light', 'Stored &quot;alt&quot; &#91;x]' ). $logoImg( $logoDarkUrl, 'dark' ). '</span>' );
+unset( $appData['/nino/html/images']['/logo']['alt'] );
+check( '...a class of the call goes on the set and nowhere else, after the class of the set, and the set writes no empty class attribute',
+	$render( '[logo class="nino-footer-logo"]' ) === '<span class="nino-logo-set nino-footer-logo">'. $logoImg( $logoUrl, 'light' ). $logoImg( $logoDarkUrl, 'dark' ). '</span>'
+	&& $render( '[logo class="x &quot;y"]' ) === '<span class="nino-logo-set x &amp;quot;y">'. $logoImg( $logoUrl, 'light' ). $logoImg( $logoDarkUrl, 'dark' ). '</span>'
+	&& preg_match( '/\sclass=""/', $render( '[logo]' ) ) !== 1 );
+check( '...a call that names slots of its own draws those, with their size - and a name that is neither a slot nor a field is no picture',
+	$render( '[logo light="/template/page-home/hero/background" dark="/logo"]' ) === '<span class="nino-logo-set"><img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="" class="nino-logo-light">'. $logoImg( $logoUrl, 'dark' ). '</span>'
+	&& $render( '[logo light="nope" dark="nope"]' ) === '' );
+check( '...it has no link, and the content form is not one: the set stands as it is where the call is written with a closing tag, and an href is an attribute it does not declare',
+	$render( '[logo href="#x" dark=""]' ) === $render( '[logo dark=""]' ) && $registryOf( 'logo' )['link'] === false && str_contains( $render( '[logo]' ), '<a ' ) === false
+	&& $render( '[logo dark=""][/logo]' ) === $render( '[logo dark=""]' ) );
+$logoStack = $render( '[stack /services sort="title" offset="1" limit="1"][logo light="image" dark=""][/stack]' );
+check( '...in a stack an image field is the file it holds, with its size and the alt text its type names; a field with no file draws nothing',
+	str_contains( $logoStack, '<span class="nino-logo-set"><img src="/public/images/services/web/image.webp" width="400" height="300" alt="Alt &quot;q&quot;" class="nino-logo-light"></span>' ) === true
+	&& substr_count( $render( '[stack /services sort="title" limit="1"][logo light="image" dark=""][/stack]' ), '<img' ) === 0 );
+check( '...a card does not take it for its picture, as it does a component whose source is an image: it stands in the content of the card, in the order it was written',
+	$render( '[card][logo dark=""][card-title text="T"][/card]' ) === '<article class="nino-card"><div class="nino-card-content"><span class="nino-logo-set">'. $logoImg( $logoUrl, 'light' ). '</span>'. $render( '[card-title text="T"]' ). '</div></article>' );
+check( '...the scan of a template finds the two slots a call names, those it leaves to their defaults included, and none that it leaves out',
+	\Nino\Modules\Components::sources( $appData, '[logo alt=""]' ) === [ [ 'name' => 'logo', 'kind' => 'image', 'source' => '/logo', 'attribute' => 'light' ], [ 'name' => 'logo', 'kind' => 'image', 'source' => '/logo/dark', 'attribute' => 'dark' ] ]
+	&& \Nino\Modules\Components::sources( $appData, '[logo dark=""]' ) === [ [ 'name' => 'logo', 'kind' => 'image', 'source' => '/logo', 'attribute' => 'light' ] ]
+	&& \Nino\Modules\Components::sources( $appData, '[logo light="/brand/mark" dark=""]' ) === [ [ 'name' => 'logo', 'kind' => 'image', 'source' => '/brand/mark', 'attribute' => 'light' ] ]
+	&& \Nino\Modules\Components::sources( $appData, '[logo light="image" dark=""]' ) === [] && \Nino\Modules\Components::sources( $appData, '[card background="/x"]a[/card]' ) === [ [ 'name' => 'card', 'kind' => 'image', 'source' => '/x', 'attribute' => 'background' ] ] );
+unset( $appData['/nino/html/images']['/logo'], $appData['/nino/html/images']['/logo/dark'] );
 
 // The class of [image]: the frame is what cuts a picture, so a class makes the frame, and is the frame's
 $slotImg = '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="">';

@@ -260,6 +260,9 @@ shellPanel._locales = [ 'de_DE', 'en_US' ];
 const grouped = shellPanel._groupSlots( [ '/template/page-home/hero/image', '/template/page-home/about/image', '/template/frame-header/logo/image', '/logo', '/home/hero', '/constructor/x' ].map( uri => ( { uri : uri } ) ) );
 check( 'slots are grouped as the Text panel groups keys: /template/<category> for a key of the grammar, the first segment for any other',
 	Object.keys( grouped ).join() === 'template/page-home,template/frame-header,logo,home,constructor' && grouped['template/page-home'].length === 2 && grouped['template/frame-header'].length === 1 );
+const logoGroups = shellPanel._groupSlots( [ '/logo', '/logo/dark' ].map( uri => ( { uri : uri } ) ) );
+check( 'the two logo slots, the picture for a light ground and the one for a dark ground, are one group in the list: the first segment of /logo/dark is logo',
+	Object.keys( logoGroups ).join() === 'logo' && logoGroups.logo.map( entry => entry.uri ).join() === '/logo,/logo/dark' );
 shellPanel._groups = { 'page-home' : [ slot() ] };
 const shellAnswer = function( status, body ) { shellRequests[shellRequests.length - 1].callback( { status : status, responseJSON : body } ) };
 const registered = registry._entries.images;
