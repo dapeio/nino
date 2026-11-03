@@ -2,7 +2,7 @@
 declare(strict_types=1);
 /**
  *	Nino								A compact filesystembased php framework
- *	Mail					Thin wrapper around mail() with shared headers and a per-ip send cap
+ *	Mail					Thin wrapper around mail() with shared headers and a per-address send cap
  *
  *	@package						Dape/Nino
  *	@author							David Perchermeier <mail@dape.io>
@@ -11,11 +11,13 @@ declare(strict_types=1);
 namespace Nino {
 
 	// Mail - thin wrapper around mail(): centralizes Content-Type/Reply-To
-	// headers (one place for a project-wide change) and a shared per-ip
-	// send cap (5/hour, counted by \Nino\Feature::count() in
-	// /data/ratelimit.php) - over budget, send() and sendAll() return false
-	// and rateLimited() answers true, which is what tells a caller "we
-	// refused to send this" apart from a mail() that failed:
+	// headers (one place for a project-wide change) and a shared per-address
+	// send cap - the calls of send() and sendAll() one client address may
+	// make in an hour, the key '/nino/mail/cap' of config.php (default 5,
+	// 0 for no cap; the Config panel edits it), counted by
+	// \Nino\Feature::count() in /data/ratelimit.php. Over budget, send()
+	// and sendAll() return false and rateLimited() answers true, which is
+	// what tells a caller "we refused to send this" apart from a mail() that failed:
 	// \Nino\Form::handle() asks it and answers 429 without recording the
 	// submission, where a mail no transport took is recorded and answered 500.
 	// The signal belongs to the call that was made, not to the request: both
@@ -38,7 +40,7 @@ namespace Nino {
 	// needs to send it itself
 	class Mail {
 
-		private const int MAX_TRIES 	= 5;
+		// How long a window of the cap lasts, in seconds - no key of its own
 		private const int WINDOW 		= 3600;
 
 		// Where the last failed call is kept - see failure()
@@ -57,7 +59,8 @@ namespace Nino {
 
 		/**
 		 *	Send an html mail with a Reply-To header, unless the current client
-		 *	ip has hit the send cap for this window. The cap is a counter of the
+		 *	address has hit the send cap for this window - '/nino/mail/cap' calls
+		 *	an hour, 0 for none, see _cap(). The cap is a counter of the
 		 *	toolset, \Nino\Feature::count() under the name 'ratelimit', keyed by the
 		 *	address of the client (hashed there, as every key is): a kernel class
 		 *	calls it because the counter is the same one a feature keeps its own
@@ -79,7 +82,7 @@ namespace Nino {
 			$appData['./nino/mail/results']			= [];
 			$appData['./nino/mail/ratelimited']	= false;
 
-			if( \Nino\Feature::count( $appData, 'ratelimit', \Nino\Http::getClientIp( $appData ), self::MAX_TRIES, self::WINDOW ) === false ) {
+			if( \Nino\Feature::count( $appData, 'ratelimit', \Nino\Http::getClientIp( $appData ), self::_cap( $appData ), self::WINDOW ) === false ) {
 
 				// Flagged rather than just reported through the return value, so
 				// a caller can tell "we refused to send this" apart from "mail()
@@ -101,7 +104,7 @@ namespace Nino {
 		/**
 		 *	Send several mails that are one action of one visitor - a contact
 		 *	form's owner notification and the confirmation that answers it -
-		 *	for one hit of the per-ip cap.
+		 *	for one hit of the per-address cap ('/nino/mail/cap', see send()).
 		 *
 		 *	Charging each mail separately made the cap count actions that are
 		 *	not the visitor's: with two mails per submission and a cap of five,
@@ -130,7 +133,7 @@ namespace Nino {
 			if( $mails === [] )
 				return true;
 
-			if( \Nino\Feature::count( $appData, 'ratelimit', \Nino\Http::getClientIp( $appData ), self::MAX_TRIES, self::WINDOW ) === false ) {
+			if( \Nino\Feature::count( $appData, 'ratelimit', \Nino\Http::getClientIp( $appData ), self::_cap( $appData ), self::WINDOW ) === false ) {
 				$appData['./nino/mail/ratelimited'] = true;
 				return false;
 			}
@@ -155,12 +158,13 @@ namespace Nino {
 		}
 
 		/**
-		 *	Whether the last send() or sendAll() was refused by the per-ip cap -
+		 *	Whether the last send() or sendAll() was refused by the per-address cap -
 		 *	which is not a mail() that failed: nothing was attempted, and a
 		 *	caller that records or reports the failure answers differently (a
 		 *	form answers 429 and keeps no submission). Per call, not sticky: each
 		 *	of the two sets it again, to false where the call was not refused, so
-		 *	a caller that sends twice reads the answer of the second.
+		 *	a caller that sends twice reads the answer of the second. Always false
+		 *	where no cap applies: the key is 0.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -169,6 +173,21 @@ namespace Nino {
 		public static function rateLimited( array &$appData ): bool {
 
 			return ( $appData['./nino/mail/ratelimited'] ?? false ) === true;
+		}
+
+		/**
+		 *	The calls an hour one client address may make: the key
+		 *	'/nino/mail/cap' of config.php (its default in \Nino\AppData::DEFAULTS).
+		 *	0 is no cap - \Nino\Feature::count() then counts nothing and touches
+		 *	no file.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	int
+		 */
+		private static function _cap( array &$appData ): int {
+
+			return (int) ( $appData['/nino/mail/cap'] ?? \Nino\AppData::DEFAULTS['/nino/mail/cap'] );
 		}
 
 		/**

@@ -847,12 +847,12 @@ function callDev( array &$appData, string $class, string $method, array $data = 
 check( 'apiList succeeds', $status === 200 );
 check( 'apiList returns the field schema in render order', array_column( $body['fields'], 'key' ) === [
 	'/nino/mode',
-	'/nino/error/log', '/nino/error/display', '/nino/session/force-secure-cookie', '/nino/http/proxies',
+	'/nino/error/log', '/nino/error/display', '/nino/session/force-secure-cookie', '/nino/http/proxies', '/nino/mail/cap',
 	'/nino/admin/backups', '/nino/admin/logs',
 	'/nino/cache/status', '/nino/cache/ttl', '/nino/cache/blacklist',
 ] );
 check( 'every field carries the type its editor renders from', array_column( $body['fields'], 'type' ) === [
-	'select', 'bool', 'bool', 'bool', 'lines', 'bool', 'bool', 'bool', 'int', 'lines',
+	'select', 'bool', 'bool', 'bool', 'lines', 'int', 'bool', 'bool', 'bool', 'int', 'lines',
 ] );
 check( 'apiList returns the group headings, the mode before the rest', array_keys( $body['groups'] ) === [ 'mode', 'diagnostics', 'editor', 'cache' ] );
 check( 'every field belongs to a declared group', array_diff( array_unique( array_column( $body['fields'], 'group' ) ), array_keys( $body['groups'] ) ) === [] );
@@ -861,6 +861,9 @@ $byKey = array_column( $body['fields'], null, 'key' );
 check( 'a stored value comes back typed, not as json text', $byKey['/nino/error/display']['value'] === true );
 check( 'an int comes back as an int', $byKey['/nino/cache/ttl']['value'] === 3600 );
 check( 'an int field carries the bounds its editor and apiSave share', $byKey['/nino/cache/ttl']['min'] === 10 && $byKey['/nino/cache/ttl']['max'] === 2592000 );
+check( 'the mail cap is an int field of the diagnostics group, bounded 0 to 1000, in calls per hour', $byKey['/nino/mail/cap']['group'] === 'diagnostics'
+	&& $byKey['/nino/mail/cap']['min'] === 0 && $byKey['/nino/mail/cap']['max'] === 1000 && $byKey['/nino/mail/cap']['unit'] === 'per-hour' );
+check( '...and a key absent from config.php reports its default, the 5 the mail cap runs with', $byKey['/nino/mail/cap']['value'] === 5 && $byKey['/nino/mail/cap']['value'] === \Nino\AppData::DEFAULTS['/nino/mail/cap'] );
 
 // A missing key must report the same default the runtime itself applies, or the
 // form shows a value the site is not actually running with
@@ -1051,6 +1054,27 @@ check( '...and a cidr prefix the address it belongs to cannot have', $status ===
 
 [ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/http/proxies' => '' ] ] );
 check( 'an emptied proxy list saves as the empty list that trusts nothing', $status === 200 && $appData['/nino/http/proxies'] === [] );
+
+// The mail cap: a count of calls an hour, 0 for none
+foreach( [ 0, 50 ] as $capValue ) {
+	[ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/mail/cap' => $capValue ] ] );
+	check( "apiSave writes the mail cap $capValue as an int", $status === 200 && $appData['/nino/mail/cap'] === $capValue
+		&& \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/mail/cap'] === $capValue );
+}
+foreach( [ -1, 1001, '5.5', 'many' ] as $capValue ) {
+	[ $status, $body ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/mail/cap' => $capValue ] ] );
+	check( 'apiSave refuses the mail cap '. var_export( $capValue, true ). ' and leaves the 50', $status === 400 && ( $body['field'] ?? '' ) === '/nino/mail/cap' && $appData['/nino/mail/cap'] === 50 );
+}
+[ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/mail/cap' => '1000' ] ] );
+check( 'apiSave takes the upper bound 1000 from a posted string', $status === 200 && $appData['/nino/mail/cap'] === 1000 );
+
+// Label and hint in both interface languages, and the unit the field names
+foreach( [ 'en_US', 'de_DE' ] as $locale ) {
+	$configText = require dirname( __DIR__ ). '/_admin/Nino/Modules/Config/text/'. $locale. '.php';
+	$commonText = require dirname( __DIR__ ). '/_admin/text/'. $locale. '.php';
+	check( "the mail cap has its label, its hint and its unit in $locale", trim( (string) ( $configText['[[/_admin/config/label/mailcap]]'] ?? '' ) ) !== ''
+		&& trim( (string) ( $configText['[[/_admin/config/hint/mailcap]]'] ?? '' ) ) !== '' && trim( (string) ( $commonText['[[/_admin/common/unit/per-hour]]'] ?? '' ) ) !== '' );
+}
 
 // Nothing is written until every field validates, so one bad value cannot leave
 // half a form saved

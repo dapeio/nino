@@ -269,7 +269,7 @@ check( 'a submitted value is never read as a placeholder - in the [[fields]] tab
 // were set before the flag was looked at, nothing had gone out and nothing
 // was recorded, and the visitor waited for a reply to a message nobody
 // received. Over budget is a 429 - the same generic message on the page,
-// and the visitor knows to try again later. The cap is Mail's, 5 per hour
+// and the visitor knows to try again later. The cap is Mail's, '/nino/mail/cap' calls an hour (5 by default)
 $mailed = [];
 $countBefore = count( \Nino\Filesystem::getFileContent( $appData, $formsFile, [] ) );
 \Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [ $clientKey => [ 'tries' => 5, 'reset' => time() + 3600 ] ] );
@@ -616,7 +616,7 @@ echo "\n";
 
 // --- Mail::send - the per-ip send cap --------------------------------------
 
-echo "Mail::send - the per-ip send cap: five a window, counted by Feature::count() under 'ratelimit'\n";
+echo "Mail::send - the per-address send cap: '/nino/mail/cap' calls a window (5 by default), counted by Feature::count() under 'ratelimit'\n";
 
 $ratelimitPath = '/data/ratelimit.php';
 
@@ -657,6 +657,50 @@ $rateState[$clientKey]['reset'] = time() - 1;
 check( 'a send after the window elapsed starts a fresh budget', \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' ) === true && \Nino\Mail::rateLimited( $appData ) === false );
 $rateState = \Nino\Filesystem::getFileContent( $appData, $ratelimitPath, [] );
 check( 'and the stale entry was dropped rather than accumulating forever', $rateState[$clientKey]['tries'] === 1 );
+
+check( 'the default of the key is 5, and the sandbox runs with it', \Nino\AppData::DEFAULTS['/nino/mail/cap'] === 5 && ( $appData['/nino/mail/cap'] ?? 5 ) === 5 );
+
+// The key: cap 2 refuses the third call of a visitor, cap 0 is no cap and
+// leaves the counter file alone, an absent key is the default 5
+$ownCap = $appData['/nino/mail/cap'] ?? null;
+$appData['/nino/mail/cap'] = 2;
+\Nino\Filesystem::putFileContent( $appData, $ratelimitPath, [] );
+check( 'with the key at 2 the first two calls of a visitor go through', \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' ) === true && \Nino\Mail::sendAll( $appData, $capBatch ) === true );
+check( '...the third is refused and rateLimited() says it was the cap', \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' ) === false && \Nino\Mail::rateLimited( $appData ) === true );
+check( '...sendAll() is refused at the same count', \Nino\Mail::sendAll( $appData, $capBatch ) === false && \Nino\Mail::rateLimited( $appData ) === true );
+
+$appData['/nino/mail/cap'] = 0;
+@unlink( \Nino\Filesystem::path( $appData, $ratelimitPath ) );
+$capMails = [];
+for( $i = 1; $i <= 10; $i++ )
+	if( \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' ) !== true || \Nino\Mail::rateLimited( $appData ) !== false )
+		break;
+check( 'with the key at 0 ten calls go through and none is flagged', $i === 11 && count( $capMails ) === 10 );
+check( '...and sendAll() goes through as well', \Nino\Mail::sendAll( $appData, $capBatch ) === true && \Nino\Mail::rateLimited( $appData ) === false );
+check( '...and the counter file is not written', is_file( \Nino\Filesystem::path( $appData, $ratelimitPath ) ) === false );
+
+unset( $appData['/nino/mail/cap'] );
+\Nino\Filesystem::putFileContent( $appData, $ratelimitPath, [] );
+$capMails = [];
+for( $i = 1; $i <= 7; $i++ )
+	\Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' );
+check( 'with the key absent the default 5 applies: five of seven calls went through', count( $capMails ) === 5 && \Nino\Mail::rateLimited( $appData ) === true );
+
+// The operator is counted like a visitor: signed in to the workbench at a cap
+// of 2, the third call is refused
+$appData['/nino/mail/cap'] = 2;
+\Nino\Filesystem::putFileContent( $appData, $ratelimitPath, [] );
+ninoUser( $appData, 'operator@example.org' );
+check( 'an account is signed in for this request', \Nino\Auth::getCurrentUser( $appData ) !== false );
+check( 'a signed-in workbench account is counted: its first two calls go through', \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' ) === true && \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' ) === true );
+check( '...and its third is refused, rateLimited() true', \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' ) === false && \Nino\Mail::rateLimited( $appData ) === true );
+\Nino\Auth::logoutUser( $appData );
+
+if( $ownCap === null )
+	unset( $appData['/nino/mail/cap'] );
+else
+	$appData['/nino/mail/cap'] = $ownCap;
+\Nino\Filesystem::putFileContent( $appData, $ratelimitPath, [] );
 
 unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
 

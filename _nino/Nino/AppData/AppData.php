@@ -114,6 +114,9 @@ namespace Nino {
 			// the tcp peer is the visitor and X-Forwarded-For is ignored
 			// entirely (see \Nino\Http::getClientIp())
 			'/nino/http/proxies'	=> [],
+			// How many calls of \Nino\Mail::send() and sendAll() one client
+			// address may make in an hour; 0 is no cap
+			'/nino/mail/cap'			=> 5,
 			// webp for every derived image, where this gd can write one.
 			// Smaller than both formats it replaces, at the same quality:
 			// lossless where the alternative was png and lossy where it was

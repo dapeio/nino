@@ -137,6 +137,19 @@ namespace Nino\Modules\Config {
 				'label'	=> '/_admin/config/label/proxies',
 				'hint' 	=> '/_admin/config/hint/proxies',
 			],
+			// How many calls of \Nino\Mail::send() and sendAll() one client
+			// address may make in an hour. It sits beside the proxies because
+			// the address it counts is the one they decide; 0 switches the cap
+			// off, which the hint says in so many words
+			'/nino/mail/cap' => [
+				'type' 	=> 'int',
+				'group'	=> 'diagnostics',
+				'min' 	=> 0,
+				'max' 	=> 1000,
+				'unit' 	=> 'per-hour',
+				'label'	=> '/_admin/config/label/mailcap',
+				'hint' 	=> '/_admin/config/hint/mailcap',
+			],
 			// Both flags are read by the workbench (\Nino\Modules\Backups::maybeRun(), \Nino\Modules\Logs\Admin::record()),
 			// which is also where the keys are named after.
 			'/nino/admin/backups' => [
