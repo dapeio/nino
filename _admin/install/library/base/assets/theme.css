@@ -1600,10 +1600,12 @@ footer {
 :is(.nino-section-text, .nino-section-text--quiet, .nino-section-text--loud):where(:not([class*="nino-text-"], [class*="nino-text-"] *)) {
 	text-align: var(--section-align-flow);
 }
-:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud):where(:not([class*="nino-text-"], [class*="nino-text-"] *, [class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+/*	The margins of the boxes stand down for the classes that align at every width - left, centre and right - and for what stands in one. A class that aligns
+	from a breakpoint leaves a box where the alignment says below it, and the mirrors after this rule take it from the breakpoint on	*/
+:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud):where(:not(.nino-text-left, .nino-text-center, .nino-text-right, :is(.nino-text-left, .nino-text-center, .nino-text-right) *, [class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
 	margin-inline: var(--section-align-margin);
 }
-:is(.nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud):where(:not([class*="nino-text-"], [class*="nino-text-"] *, [class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+:is(.nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud):where(:not(.nino-text-left, .nino-text-center, .nino-text-right, :is(.nino-text-left, .nino-text-center, .nino-text-right) *, [class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
 	margin-inline: var(--section-align-column);
 }
 
@@ -1629,90 +1631,73 @@ footer {
 :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-right {
 	background-position: right bottom;
 }
+/*	A class that aligns from a breakpoint moves the words of a title only on the title itself - a title carries its own text-align, and Nino.css has the
+	ancestor form for the classes that align at every width alone. The box and the rule follow the words, so the mirrors name the title, and a class on
+	what the title stands in leaves it where the alignment of the template puts it	*/
 @media (min-width: 640px) {
-	.nino-text-s-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-s-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
 		margin-inline: auto;
 	}
-	.nino-text-s-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-s-right:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
 		margin-inline: auto 0;
 	}
-	.nino-text-s-left :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-s-left {
 		background-position: left bottom;
 	}
-	.nino-text-s-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-s-center {
 		background-position: center bottom;
 	}
-	.nino-text-s-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-s-right {
 		background-position: right bottom;
 	}
 }
 @media (min-width: 768px) {
-	.nino-text-m-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-m-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
 		margin-inline: auto;
 	}
-	.nino-text-m-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-m-right:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
 		margin-inline: auto 0;
 	}
-	.nino-text-m-left :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-m-left {
 		background-position: left bottom;
 	}
-	.nino-text-m-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-m-center {
 		background-position: center bottom;
 	}
-	.nino-text-m-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-m-right {
 		background-position: right bottom;
 	}
 }
 @media (min-width: 1024px) {
-	.nino-text-l-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-l-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
 		margin-inline: auto;
 	}
-	.nino-text-l-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-l-right:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
 		margin-inline: auto 0;
 	}
-	.nino-text-l-left :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-l-left {
 		background-position: left bottom;
 	}
-	.nino-text-l-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-l-center {
 		background-position: center bottom;
 	}
-	.nino-text-l-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-l-right {
 		background-position: right bottom;
 	}
 }
 @media (min-width: 1280px) {
-	.nino-text-xl-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-xl-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
 		margin-inline: auto;
 	}
-	.nino-text-xl-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-xl-right:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
 		margin-inline: auto 0;
 	}
-	.nino-text-xl-left :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-xl-left {
 		background-position: left bottom;
 	}
-	.nino-text-xl-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-xl-center {
 		background-position: center bottom;
 	}
-	.nino-text-xl-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-xl-right {
 		background-position: right bottom;
 	}
@@ -1977,7 +1962,10 @@ footer {
 .nino-card--last-bottom:where(:not([class*="nino-text-"], [class*="nino-text-"] *)) > .nino-card-content > .nino-btn {
 	align-self: var(--card-align-button);
 }
-:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not([class*="nino-text-"], [class*="nino-text-"] *, [class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+/*	The margins of the title stand down for the classes that align it at every width - left, centre and right - and for any class on what it stands in, since
+	the words of a card are inherited from the card. A class that aligns the title itself from a breakpoint leaves it where the alignment says below it, and the
+	mirrors after this rule take it from the breakpoint on	*/
+:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not(.nino-text-left, .nino-text-center, .nino-text-right, [class*="nino-text-"] *, [class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
 	margin-inline: var(--card-align-margin);
 }
 .nino-text-center :is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
