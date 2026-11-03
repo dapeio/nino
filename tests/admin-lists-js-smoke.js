@@ -816,6 +816,8 @@ localizedScripts.concat( [ [ 'Maintenance/admin.js', moduleAsset( 'Maintenance',
 check( '...each behind a check that the shell has the registry', registered.every( r => r.guarded === true ) );
 // A tab whose uri is not its directory's name (RecoveryPassword/ is the tab "recoverypw") is named here
 const paneUris = new Set( [ 'navs', 'maintenance', 'recoverypw' ] );
+// A feature's panel is named like its directory below features/, lower-cased the way the modules are
+FEATURES.forEach( f => paneUris.add( f.toLowerCase() ) );
 ADMIN_MODULES.forEach( m => {
 	paneUris.add( m.toLowerCase() );
 	fs.readdirSync( path.join( __dirname, '../_admin/Nino/Modules', m ), { withFileTypes : true } )
