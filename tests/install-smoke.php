@@ -693,6 +693,13 @@ check( '...also when the Builder\'s wrap stands between main and the hero', str_
 check( 'the delivered frame clears the bar as it is, not as it is at its least: the padding of main is the height plus --nino-header-grow, times the factor of the behaviour of the bar',
 	preg_match( '/\nbody main\s*\{\s*padding-top:\s*calc\( \( var\(--header-height\) \+ var\(--nino-header-grow, 0px\) \) \* var\(--header-behaviour-clear\) \);\s*\}/', $frameStyle ) === 1 );
 
+// The rule under a section title is the line Nino.css draws as the border of the title, drawn by the delivered stylesheet as a background of it - as high as the rule, as long as the
+// length - with the border taken to nothing and the room under the title the six times the line and the line itself, so that it can be short. Design's section sets write the same
+// rule, and its suite compares the delivered file with its own compile of it
+check( 'the delivered stylesheet draws the rule under a section title as a background as high as the rule and as long as its length, with no border of its own and seven times the rule of room under the title',
+	preg_match( '/\.nino-section-title[^{}]*\{[^}]*border-bottom-width:\s*0;[^}]*background-size:\s*var\(--section-rule-length\) var\(--section-rule\);/', $frameStyle ) === 1
+	&& preg_match( '/\.nino-section-title[^{}]*\{[^}]*padding-bottom:\s*calc\( [^;]*var\(--section-rule\) \* 7 \);/', $frameStyle ) === 1 );
+
 echo "\n";
 
 

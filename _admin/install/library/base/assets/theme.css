@@ -1257,7 +1257,7 @@ footer {
 }
 
 
-/* ==== 9. section: regular (quiet default, loud default, title default, subtitle default, space default, rule default, dim default, title-case default, subtitle-case default) ==== */
+/* ==== 9. section: regular (quiet default, loud default, title default, subtitle default, title-tracking default, space default, rule default, rule-length default, title-shadow default, dim default, title-ground default, rule-color default, align default, measure default, title-case default, subtitle-case default) ==== */
 /*	@name			Regular
  *	@description	The framework as it is: the middle of every ladder. The hero, the sections, their titles and the covers as Nino.css draws them.
  *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Hero, Sektionen, ihre Titel und die Cover, wie Nino.css sie zeichnet.
@@ -1266,17 +1266,24 @@ footer {
  *	@knob	loud				Size of a loud title, subtitle and text
  *	@knob	title				Size of the title of a section
  *	@knob	subtitle			Size of the subtitle of a section
+ *	@knob	title-tracking		Letter-spacing of the title of a section
  *	@knob	space				Space above and below the content of a section
  *	@knob	rule				Rule under the title of a section
+ *	@knob	rule-length			How long the rule under the title is
+ *	@knob	title-shadow		Shadow of the title of a section
  *	@knob	dim					How dark the scrim of a dimmed cover is
+ *	@knob	title-ground		Ground behind the title of a section
+ *	@knob	rule-color			Colour of the rule under the title
+ *	@knob	align				Where the title, the subtitle and the text stand
+ *	@knob	measure				Width of the column of the subtitle and of the text
  *	@knob	title-case		Capitals in the title of a section
  *	@knob	subtitle-case	Capitals in the subtitle of a section
  *
  *	Regular is the starting point, not a design. Every value it declares is the
  *	framework's own, so a page under it looks as it does under Nino.css alone -
- *	and every one of them is a ladder of five, so each knob has something to
- *	reach. The middle of a ladder is Nino.css, the others are two steps to
- *	each side. Where Nino.css changes a number at 768px the ladder does the
+ *	and every one of them is a ladder, so each knob has something to
+ *	reach. The middle of a ladder is Nino.css, the others are the steps to
+ *	each side of it. Where Nino.css changes a number at 768px the ladder does the
  *	same, in a media query of its own.
  *
  *	Two rules for a set:
@@ -1297,16 +1304,21 @@ footer {
  *	--less, --default, --more, --most), and the rule reads the knob
  *	(var(--section-space)). The knobs of Nino.css itself - the factors
  *	of a section's title and subtitle and of the variants, the hero's among
- *	them, since the hero is the loud variant, and the rule under a section
- *	title - need no rule: the set only points them at the ladder. The scrim
- *	of a dimmed cover is the one thing that does: its rule reads the ladder
+ *	them, since the hero is the loud variant - need no rule: the set only
+ *	points them at the ladder. The rule under a section title is drawn by the
+ *	set as a background of the title, so that it can be short, and so is what the
+ *	knobs of the words say (see the end of the file); the scrim
+ *	of a dimmed cover is the other thing that has a rule: it reads the ladder
  *	of the dimming, on the two pseudo-elements Nino.css draws it with and on
  *	the block of a picture behind a section, a row and a column, which carry
  *	one of their own. The two cases are toggles of two rungs, none and uppercase,
  *	and read by a rule each: the title of a section and the hero's, the subtitle
- *	of a section and the hero's. The card family has the same four names (Regular,
- *	Open, Panel, Box) and a theme names a sensible pair. Copy this file
+ *	of a section and the hero's. The card family has the same names
+ *	and a fourth, Box, and a theme names a sensible pair. Copy this file
  *	under a name of your own and start there.
+ *
+ *	The knobs of the title, the rule and the words are read by the rules at the end of the file, and they leave what the page aligns by a class
+ *	of its own (nino-text-*) alone.
  */
 
 :root {
@@ -1374,6 +1386,93 @@ footer {
 	--section-dim--more: 		color-mix( in srgb, var(--color-background-dim) 75%, var(--color-section-black-bg) );
 	--section-dim--most: 		color-mix( in srgb, var(--color-background-dim) 50%, var(--color-section-black-bg) );
 
+	/*	The letter-spacing of the title of a section and of the hero, as a step from what the template gives it: nothing at the middle, so that the middle is
+		the template, whichever it is. Tighter on the two steps below it, looser on the two above	*/
+	--section-title-tracking--least: 	-.03em;
+	--section-title-tracking--less: 		-.015em;
+	--section-title-tracking--default: 	0em;
+	--section-title-tracking--more: 		.04em;
+	--section-title-tracking--most: 		.1em;
+
+	/*	How long the rule under the title is: the length of the line at the foot of the title - short, the width of the title as Nino.css draws
+		it, or the width of its words, which is the width of the title then (its aspect is that width, as a maximum). The line is a background
+		of the title at every length, as thick as the rule knob says	*/
+	--section-rule-length--less: 			3rem;
+	--section-rule-length--default: 	100%;
+	--section-rule-length--more: 			100%;
+
+	--section-rule-length-fit--less: 		none;
+	--section-rule-length-fit--default: none;
+	--section-rule-length-fit--more: 		fit-content;
+
+	/*	The shadow of the words of the title of a section and of the hero: none up to the middle, then a soft one and a strong one, in the
+		black of the palette, thinned	*/
+	--section-title-shadow--least: 		none;
+	--section-title-shadow--less: 			none;
+	--section-title-shadow--default: 	none;
+	--section-title-shadow--more: 			0 .04em .12em color-mix( in srgb, var(--color-section-black-bg) 30%, transparent );
+	--section-title-shadow--most: 			0 .06em .25em color-mix( in srgb, var(--color-section-black-bg) 55%, transparent );
+
+	/*	The ground behind the words of the title of a section and of the hero: none, as Nino.css has it, soft or full. The ladder is the share of the colour of the title
+		in the ground, 12% and 100%, over what the title stands on; its aspects are the share of the ground in the words (the words of a
+		full ground are the ground's own), the factor of the room round them and of the radius, and the width: a title with a ground is as wide
+		as its words. The roles are read where the title stands, so that each ground is its own	*/
+	--section-title-ground--less: 			12%;
+	--section-title-ground--default: 	0%;
+	--section-title-ground--more: 			100%;
+
+	--section-title-ground-ink--less: 		0%;
+	--section-title-ground-ink--default: 0%;
+	--section-title-ground-ink--more: 		100%;
+
+	--section-title-ground-fit--less: 		1;
+	--section-title-ground-fit--default: 0;
+	--section-title-ground-fit--more: 		1;
+
+	--section-title-ground-width--less: 		fit-content;
+	--section-title-ground-width--default: auto;
+	--section-title-ground-width--more: 		fit-content;
+
+	/*	The colour of the rule under the title, read where the title stands: the ink of the ground, the border of the ground, which is the
+		rule as Nino.css has it, or the brand as ink on it. The ladder is the share of the ink and its aspect the share of the border in what
+		is left; what neither takes is the brand	*/
+	--section-rule-color--less: 			100%;
+	--section-rule-color--default: 	0%;
+	--section-rule-color--more: 			0%;
+
+	--section-rule-color-border--less: 			0%;
+	--section-rule-color-border--default: 	100%;
+	--section-rule-color-border--more: 			0%;
+
+	/*	Where the title and the subtitle stand: left, centred - as Nino.css has them - or right. The aspects say where the boxes that are
+		narrower than their column stand (a title as wide as its words, a column of text) and where the text of a section and the hero stand,
+		which have no alignment of their own: they take the one they stand in, and match-parent says so	*/
+	--section-align--less: 		left;
+	--section-align--default: center;
+	--section-align--more: 		right;
+
+	--section-align-flow--less: 			left;
+	--section-align-flow--default: 	match-parent;
+	--section-align-flow--more: 			right;
+
+	--section-align-margin--less: 		0 auto;
+	--section-align-margin--default: auto;
+	--section-align-margin--more: 		auto 0;
+
+	--section-align-column--less: 		0 auto;
+	--section-align-column--default: 0;
+	--section-align-column--more: 		auto 0;
+
+	/*	The width of the column of the subtitle and of the text: narrower, the template's own, wider. A text that says loud has a measure of
+		its own in Nino.css, which the knob moves as well	*/
+	--section-measure--less: 			40rem;
+	--section-measure--default: 	none;
+	--section-measure--more: 			56rem;
+
+	--section-measure-loud--less: 			40rem;
+	--section-measure-loud--default: 	52rem;
+	--section-measure-loud--more: 			56rem;
+
 	/*	The case of the title and of the subtitle: as they are written, or in capitals	*/
 	--section-title-case--default: 		none;
 	--section-title-case--more: 			uppercase;
@@ -1440,19 +1539,209 @@ footer {
 	background-color: var(--section-dim);
 }
 
+/* ---- the title, the rule and the words ---- */
 
-/* ==== 10. card: regular (title default, subtitle default, space default, border default, shadow default, tone default, hover default, title-case default, subtitle-case default) ==== */
+/*	The letter-spacing and the shadow of the title of a section and of the hero	*/
+:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud) {
+	letter-spacing: var(--section-title-tracking);
+	text-shadow: var(--section-title-shadow);
+}
+
+/*	The ground behind the words of a title, a share of its colour and of the ground in its words (the roles are read where the title stands)
+	and the room round it - none at the middle - and the width: a title with a ground is as wide as its words	*/
+:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud) {
+	background-color: color-mix( in srgb, var(--color-title) var(--section-title-ground), transparent );
+	border-radius: calc( var(--radius) * var(--section-title-ground-fit) );
+	width: var(--section-title-ground-width);
+}
+:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud):where(:not([class*="nino-ink--"])) {
+	color: color-mix( in srgb, var(--color-ground) var(--section-title-ground-ink), var(--color-title) );
+}
+/*	The two inks a title may say - the brand and the muted one - take the share of the ground in the words as well, so that a full ground does not leave
+	them in the colour of the ground	*/
+:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud).nino-ink--accent {
+	color: color-mix( in srgb, var(--color-ground) var(--section-title-ground-ink), var(--color-accent) );
+}
+:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud).nino-ink--muted {
+	color: color-mix( in srgb, var(--color-ground) var(--section-title-ground-ink), color-mix(in srgb, currentColor 80%, transparent) );
+}
+:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud):where(:not([class*="nino-p-"], [class*="nino-pt-"], [class*="nino-pl-"], [class*="nino-pr-"])) {
+	padding-top: calc( .15em * var(--section-title-ground-fit) );
+	padding-inline: calc( .5em * var(--section-title-ground-fit) );
+}
+:is(.nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud):where(:not([class*="nino-p-"], [class*="nino-pb-"])) {
+	padding-bottom: calc( .15em * var(--section-title-ground-fit) );
+}
+
+/*	The rule under the title is a background of it, as long as the length says, in the colour of the rule: the line Nino.css draws as the border is
+	drawn here, so that it can be short, and the air under the title is the six times the line Nino.css leaves, and the line itself	*/
+:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud):where(:not([class*="nino-p-"], [class*="nino-pb-"])) {
+	padding-bottom: calc( .15em * var(--section-title-ground-fit) + var(--section-rule) * 7 );
+}
+:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud) {
+	border-bottom-width: 0;
+	background-image: linear-gradient( color-mix( in srgb, var(--color-ink) var(--section-rule-color), color-mix( in srgb, var(--color-border) var(--section-rule-color-border), var(--color-accent) ) ) 0 100% );
+	background-repeat: no-repeat;
+	background-size: var(--section-rule-length) var(--section-rule);
+	background-position: var(--section-align) bottom;
+	max-width: var(--section-rule-length-fit);
+}
+
+/*	The alignment: where the title and the subtitle stand, where the text of a section does, and the hero. Only where the page says nothing of
+	its own - a nino-text-* class on the element, or on what it stands in, is the page's, and Nino.css carries the one on what it stands in into the
+	titles and the subtitles. The boxes that are narrower than their column stand where the alignment says: a title as wide as its words and the
+	column of a text take the margins of the knob	*/
+:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud):where(:not([class*="nino-text-"])) {
+	text-align: var(--section-align);
+}
+:is(.nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud):where(:not([class*="nino-text-"])) {
+	text-align: var(--section-align-flow);
+}
+:is(.nino-section-text, .nino-section-text--quiet, .nino-section-text--loud):where(:not([class*="nino-text-"], [class*="nino-text-"] *)) {
+	text-align: var(--section-align-flow);
+}
+:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud):where(:not([class*="nino-text-"], [class*="nino-text-"] *, [class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+	margin-inline: var(--section-align-margin);
+}
+:is(.nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud):where(:not([class*="nino-text-"], [class*="nino-text-"] *, [class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+	margin-inline: var(--section-align-column);
+}
+
+/*	What the page aligns by a class stands where the class says: a box narrower than its column takes the margins of the alignment, and the
+	rule under a title its place	*/
+.nino-text-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud).nino-text-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+	margin-inline: auto;
+}
+.nino-text-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud).nino-text-right:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+	margin-inline: auto 0;
+}
+.nino-text-left :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
+:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-left {
+	background-position: left bottom;
+}
+.nino-text-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
+:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-center {
+	background-position: center bottom;
+}
+.nino-text-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
+:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-right {
+	background-position: right bottom;
+}
+@media (min-width: 640px) {
+	.nino-text-s-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-s-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: auto;
+	}
+	.nino-text-s-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-s-right:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: auto 0;
+	}
+	.nino-text-s-left :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-s-left {
+		background-position: left bottom;
+	}
+	.nino-text-s-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-s-center {
+		background-position: center bottom;
+	}
+	.nino-text-s-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-s-right {
+		background-position: right bottom;
+	}
+}
+@media (min-width: 768px) {
+	.nino-text-m-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-m-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: auto;
+	}
+	.nino-text-m-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-m-right:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: auto 0;
+	}
+	.nino-text-m-left :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-m-left {
+		background-position: left bottom;
+	}
+	.nino-text-m-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-m-center {
+		background-position: center bottom;
+	}
+	.nino-text-m-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-m-right {
+		background-position: right bottom;
+	}
+}
+@media (min-width: 1024px) {
+	.nino-text-l-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-l-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: auto;
+	}
+	.nino-text-l-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-l-right:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: auto 0;
+	}
+	.nino-text-l-left :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-l-left {
+		background-position: left bottom;
+	}
+	.nino-text-l-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-l-center {
+		background-position: center bottom;
+	}
+	.nino-text-l-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-l-right {
+		background-position: right bottom;
+	}
+}
+@media (min-width: 1280px) {
+	.nino-text-xl-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-xl-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: auto;
+	}
+	.nino-text-xl-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-xl-right:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: auto 0;
+	}
+	.nino-text-xl-left :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-xl-left {
+		background-position: left bottom;
+	}
+	.nino-text-xl-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-xl-center {
+		background-position: center bottom;
+	}
+	.nino-text-xl-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-xl-right {
+		background-position: right bottom;
+	}
+}
+
+/*	The width of the column of the subtitle and of the text. The text that says loud has the measure of its own, after the others	*/
+.nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet {
+	max-width: var(--section-measure);
+}
+.nino-section-text--loud {
+	max-width: var(--section-measure-loud);
+}
+
+
+/* ==== 10. card: regular (title default, subtitle default, title-tracking default, space default, border default, shadow default, tone default, title-ground default, hover default, align default, title-case default, subtitle-case default) ==== */
 /*	@name			Regular
  *	@description	The framework as it is: the middle of every ladder. Cards as Nino.css draws them.
  *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Karten, wie Nino.css sie zeichnet.
  *
  *	@knob	title		Size of the title of a card
  *	@knob	subtitle	Size of the subtitle of a card
+ *	@knob	title-tracking		Letter-spacing of the title of a card
  *	@knob	space		Space inside a card and between its parts
  *	@knob	border		Line round a card that has a ground
  *	@knob	shadow		Shadow of a card
  *	@knob	tone		Colour the shadow is drawn in
+ *	@knob	title-ground		Ground behind the title of a card
  *	@knob	hover		What a card does under the pointer
+ *	@knob	align				Where the words and the button of a card stand
  *	@knob	title-case	Capitals in the title of a card
  *	@knob	subtitle-case	Capitals in the subtitle of a card
  *
@@ -1496,8 +1785,8 @@ footer {
  *	quarter of a rem with the strongest step of the shadow, and only where the
  *	visitor has not asked for less motion. The two cases are toggles of two rungs,
  *	none and uppercase, read by a rule each: the title and the subtitle of a card.
- *	The section family has the same four
- *	names (Regular, Open, Panel, Box) and a theme names a sensible pair.
+ *	The section family has the same
+ *	names, but for Box, and a theme names a sensible pair.
  *	Copy this file under a name of your own and start there.
  */
 
@@ -1566,6 +1855,49 @@ footer {
 	--card-hover-shadow--default: 	var(--shadow-card);
 	--card-hover-shadow--more: 			0 .25rem 1.5rem var(--card-tone), 0 .0625rem .25rem var(--card-tone);
 
+	/*	The letter-spacing of the title of a card, as a step from what the template gives it: nothing at the middle, so that the middle is
+		the template, whichever it is. Tighter on the two steps below it, looser on the two above	*/
+	--card-title-tracking--least: 	-.03em;
+	--card-title-tracking--less: 		-.015em;
+	--card-title-tracking--default: 	0em;
+	--card-title-tracking--more: 		.04em;
+	--card-title-tracking--most: 		.1em;
+
+	/*	The ground behind the words of the title of a card: none, as Nino.css has it, soft or full. The ladder is the share of the colour of the title
+		in the ground, 12% and 100%, over what the title stands on; its aspects are the share of the ground in the words (the words of a
+		full ground are the ground's own), the factor of the room round them and of the radius, and the width: a title with a ground is as wide
+		as its words. The roles are read where the title stands, so that each ground is its own	*/
+	--card-title-ground--less: 			12%;
+	--card-title-ground--default: 	0%;
+	--card-title-ground--more: 			100%;
+
+	--card-title-ground-ink--less: 		0%;
+	--card-title-ground-ink--default: 0%;
+	--card-title-ground-ink--more: 		100%;
+
+	--card-title-ground-fit--less: 		1;
+	--card-title-ground-fit--default: 0;
+	--card-title-ground-fit--more: 		1;
+
+	--card-title-ground-width--less: 		fit-content;
+	--card-title-ground-width--default: auto;
+	--card-title-ground-width--more: 		fit-content;
+
+	/*	Where the words and the button of a card stand: in the middle, as the card they stand in has them - which is the left, unless the page says
+		otherwise - or right. The aspects say where a title as wide as its words stands and where a button stands in a card that lays itself out
+		in a column	*/
+	--card-align--less: 			center;
+	--card-align--default: 	match-parent;
+	--card-align--more: 			right;
+
+	--card-align-margin--less: 			auto;
+	--card-align-margin--default: 	0;
+	--card-align-margin--more: 			auto 0;
+
+	--card-align-button--less: 			center;
+	--card-align-button--default: 	flex-start;
+	--card-align-button--more: 			flex-end;
+
 	/*	The case of the title and of the subtitle: as they are written, or in capitals	*/
 	--card-title-case--default: 		none;
 	--card-title-case--more: 			uppercase;
@@ -1632,6 +1964,89 @@ footer {
 	.nino-card--linked:where(:not(.nino-card--borderless)):hover {
 		box-shadow: var(--card-hover-shadow);
 	}
+}
+
+/* ---- the title and the words ---- */
+
+/*	The alignment of what is in the card, only where the page says nothing of its own; the button of a card that is a column; the place of a title
+	that is as wide as its words; and where the page aligns by a class, the place that class gives it	*/
+.nino-card:where(:not([class*="nino-text-"], [class*="nino-text-"] *)) {
+	text-align: var(--card-align);
+}
+:is(.nino-card--middle, .nino-card--bottom, .nino-card--last-bottom):where(:not([class*="nino-text-"], [class*="nino-text-"] *)) > .nino-btn,
+.nino-card--last-bottom:where(:not([class*="nino-text-"], [class*="nino-text-"] *)) > .nino-card-content > .nino-btn {
+	align-self: var(--card-align-button);
+}
+:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not([class*="nino-text-"], [class*="nino-text-"] *, [class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+	margin-inline: var(--card-align-margin);
+}
+.nino-text-center :is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud).nino-text-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+	margin-inline: auto;
+}
+.nino-text-right :is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud).nino-text-right:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+	margin-inline: auto 0;
+}
+@media (min-width: 640px) {
+	.nino-text-s-center :is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud).nino-text-s-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: auto;
+	}
+	.nino-text-s-right :is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud).nino-text-s-right:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: auto 0;
+	}
+}
+@media (min-width: 768px) {
+	.nino-text-m-center :is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud).nino-text-m-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: auto;
+	}
+	.nino-text-m-right :is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud).nino-text-m-right:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: auto 0;
+	}
+}
+@media (min-width: 1024px) {
+	.nino-text-l-center :is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud).nino-text-l-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: auto;
+	}
+	.nino-text-l-right :is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud).nino-text-l-right:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: auto 0;
+	}
+}
+@media (min-width: 1280px) {
+	.nino-text-xl-center :is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud).nino-text-xl-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: auto;
+	}
+	.nino-text-xl-right :is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud).nino-text-xl-right:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: auto 0;
+	}
+}
+:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud) {
+	letter-spacing: var(--card-title-tracking);
+}
+:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud) {
+	background-color: color-mix( in srgb, var(--color-title) var(--card-title-ground), transparent );
+	border-radius: calc( var(--radius) * var(--card-title-ground-fit) );
+	width: var(--card-title-ground-width);
+}
+:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not([class*="nino-ink--"])) {
+	color: color-mix( in srgb, var(--color-ground) var(--card-title-ground-ink), var(--color-title) );
+}
+:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud).nino-ink--accent {
+	color: color-mix( in srgb, var(--color-ground) var(--card-title-ground-ink), var(--color-accent) );
+}
+:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud).nino-ink--muted {
+	color: color-mix( in srgb, var(--color-ground) var(--card-title-ground-ink), color-mix(in srgb, currentColor 80%, transparent) );
+}
+:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not([class*="nino-p-"], [class*="nino-pt-"], [class*="nino-pb-"], [class*="nino-pl-"], [class*="nino-pr-"])) {
+	padding: calc( .15em * var(--card-title-ground-fit) ) calc( .5em * var(--card-title-ground-fit) );
 }
 
 
@@ -2143,6 +2558,9 @@ footer {
 	--buttons-size: var(--buttons-size--default);
 	--buttons-space: var(--buttons-space--default);
 	--buttons-spread: var(--buttons-spread--default);
+	--card-align: var(--card-align--default);
+	--card-align-button: var(--card-align-button--default);
+	--card-align-margin: var(--card-align-margin--default);
 	--card-border: var(--card-border--default);
 	--card-hover: var(--card-hover--default);
 	--card-hover-shadow: var(--card-hover-shadow--default);
@@ -2152,6 +2570,11 @@ footer {
 	--card-subtitle-case: var(--card-subtitle-case--default);
 	--card-title: var(--card-title--default);
 	--card-title-case: var(--card-title-case--default);
+	--card-title-ground: var(--card-title-ground--default);
+	--card-title-ground-fit: var(--card-title-ground-fit--default);
+	--card-title-ground-ink: var(--card-title-ground-ink--default);
+	--card-title-ground-width: var(--card-title-ground-width--default);
+	--card-title-tracking: var(--card-title-tracking--default);
 	--card-tone: var(--card-tone--default);
 	--footer-border-color: var(--footer-border-color--default);
 	--footer-border-size: var(--footer-border-size--default);
@@ -2218,15 +2641,31 @@ footer {
 	--lists-marker-number-ink: var(--lists-marker-number-ink--default);
 	--lists-scale: var(--lists-scale--default);
 	--lists-space: var(--lists-space--default);
+	--section-align: var(--section-align--default);
+	--section-align-column: var(--section-align-column--default);
+	--section-align-flow: var(--section-align-flow--default);
+	--section-align-margin: var(--section-align-margin--default);
 	--section-dim: var(--section-dim--default);
 	--section-loud: var(--section-loud--default);
+	--section-measure: var(--section-measure--default);
+	--section-measure-loud: var(--section-measure-loud--default);
 	--section-quiet: var(--section-quiet--default);
 	--section-rule: var(--section-rule--default);
+	--section-rule-color: var(--section-rule-color--default);
+	--section-rule-color-border: var(--section-rule-color-border--default);
+	--section-rule-length: var(--section-rule-length--default);
+	--section-rule-length-fit: var(--section-rule-length-fit--default);
 	--section-space: var(--section-space--default);
 	--section-subtitle: var(--section-subtitle--default);
 	--section-subtitle-case: var(--section-subtitle-case--default);
 	--section-title: var(--section-title--default);
 	--section-title-case: var(--section-title-case--default);
+	--section-title-ground: var(--section-title-ground--default);
+	--section-title-ground-fit: var(--section-title-ground-fit--default);
+	--section-title-ground-ink: var(--section-title-ground-ink--default);
+	--section-title-ground-width: var(--section-title-ground-width--default);
+	--section-title-shadow: var(--section-title-shadow--default);
+	--section-title-tracking: var(--section-title-tracking--default);
 	--tables-border: var(--tables-border--default);
 	--tables-scale: var(--tables-scale--default);
 	--tables-space: var(--tables-space--default);
