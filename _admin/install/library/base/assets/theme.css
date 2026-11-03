@@ -771,7 +771,7 @@
 	--radius-image-default: standard;
 }
 
-/* ==== 7. header: regular (nav default, height default, space default, ground default, border-size default, border-color default, position more, cta less, nav-case default) ==== */
+/* ==== 7. header: regular (nav default, height default, space default, logo default, ground default, border-size default, border-color default, shadow default, position more, cta less, behaviour default, nav-case default) ==== */
 /*	@name				Regular
  *	@description	A bar on the page ground with a rule under it, five rem tall. The one a fresh Nino installs.
  *	@description-de	Eine Leiste auf dem Grund der Seite mit einer Linie darunter, fünf rem hoch. Die, die ein frisches Nino mitbringt.
@@ -779,11 +779,14 @@
  *	@knob	nav		Size of the links of the navigation
  *	@knob	height		How tall the bar is
  *	@knob	space		Space between the logo, the links and the edges
+ *	@knob	logo		Width of the logo
  *	@knob	ground		What the bar stands on
  *	@knob	border-size	Width of the border
  *	@knob	border-color	Colour of the border
+ *	@knob	shadow		Shadow of the bar
  *	@knob	position	Where the navigation stands
  *	@knob	cta		Visibility and size of the button of the header
+ *	@knob	behaviour	What the bar does when the page is scrolled
  *	@knob	nav-case	Capitals in the links of the navigation
  *
  *	@style		nav-hover	Hover of the links
@@ -793,7 +796,7 @@
  *	variant as. Every library file carries them; a file without a @name
  *	is offered under its own file name instead.
  *
- *	The nine knobs are ladders, declared below, the middle of each this set as it
+ *	The twelve knobs are ladders, declared below, the middle of each this set as it
  *	was before it had any: nav is a factor on the size of the links of the
  *	navigation, height the height of the bar - and of the room main leaves under
  *	it -, space a factor on the gaps between the logo, the links and the edges,
@@ -811,7 +814,16 @@
  *	small, or as large as a button is. The button is scaled by --header-cta-scale, the
  *	factor its font, its padding and its corners are drawn with.
  *
- *	The ninth, nav-case, is a toggle: two rungs, none and uppercase, and the links
+ *	logo is a factor on the width of the logo, and shadow the shadow the bar casts on the
+ *	page: none at the middle, a soft one and a strong one beyond it, in the palette's colour
+ *	for a shadow. behaviour is a choice of three for what the bar does when the page is
+ *	scrolled: it goes with the page, it is fixed and folds away on the way down - as
+ *	Nino.css has it - or it is fixed and stays. Its rungs are the position of the header
+ *	(--header-behaviour), and beside them stand the greatest height the bar has once the page
+ *	is scrolled down (-collapse), a factor on the height it keeps there (-keep) and a factor
+ *	on the room main leaves under it (-clear): a bar that goes with the page needs none.
+ *
+ *	The twelfth, nav-case, is a toggle: two rungs, none and uppercase, and the links
  *	of the navigation - in the bar, and in the menu that opens over the page - are
  *	set in the one its position picks.
  *
@@ -844,6 +856,13 @@
 	--header-space--default:	1;
 	--header-space--more:	1.5;
 	--header-space--most:	2;
+
+	/*	The width of the logo, as a factor of the width this set gives it	*/
+	--header-logo--least:	.7;
+	--header-logo--less:	.85;
+	--header-logo--default:	1;
+	--header-logo--more:	1.25;
+	--header-logo--most:	1.5;
 
 	/*	What the bar stands on: the ground of the page, this set's own, the dark pair of the palette	*/
 	--header-ground--less:	var(--color-background);
@@ -893,6 +912,13 @@
 	--header-border-color--default:	var(--header-ground-border);
 	--header-border-color--more:	var(--color-primary);
 
+	/*	The shadow the bar casts on the page: none at the middle - this set casts none of its own - a soft one and a strong one beyond it, in the palette's colour for a shadow	*/
+	--header-shadow--least:	none;
+	--header-shadow--less:	none;
+	--header-shadow--default:	none;
+	--header-shadow--more:	0 .5rem 1.5rem var(--nino-default-shadow);
+	--header-shadow--most:	0 .75rem 2rem var(--nino-default-shadow), 0 .125rem .5rem var(--nino-default-shadow);
+
 	--header-position--less: 0 auto 0 0;
 	--header-position--default: 0 auto;
 	--header-position--more: 0 0 0 auto;
@@ -909,12 +935,27 @@
 	--header-cta-scale--default: .7;
 	--header-cta-scale--more: 1;
 
+	/*	What the bar does when the page is scrolled: it goes with the page, it is fixed and folds away on the way down - as Nino.css has it - or it is fixed and stays. The rung is the position of the header; beside it stand what follows from it: the greatest height of the bar once the page is scrolled down, how much of its height it keeps there (a factor, 0 being folded) and a factor on the room main leaves under it, which a bar in the flow of the page needs none of	*/
+	--header-behaviour--less:	relative;
+	--header-behaviour--default:	fixed;
+	--header-behaviour--more:	fixed;
+	--header-behaviour-collapse--less:	none;
+	--header-behaviour-collapse--default:	0;
+	--header-behaviour-collapse--more:	none;
+	--header-behaviour-keep--less:	1;
+	--header-behaviour-keep--default:	0;
+	--header-behaviour-keep--more:	1;
+	--header-behaviour-clear--less:	0;
+	--header-behaviour-clear--default:	1;
+	--header-behaviour-clear--more:	1;
+
 	/*	The case of the links of the navigation: as they are written, or in capitals	*/
 	--header-nav-case--default: none;
 	--header-nav-case--more: uppercase;
 }
 
 .nino-frame-header {
+	position: var(--header-behaviour);
 	border-bottom: solid var(--header-border-color) var(--header-border-size);
 	--color-title: var(--header-ground-title);
 	--color-accent: var(--header-ground-accent);
@@ -934,6 +975,7 @@
 	opacity: 1;
 	color: var(--header-ground-ink);
 	background-color: var(--header-ground);
+	box-shadow: var(--header-shadow);
 	display: flex;
 }
 
@@ -941,8 +983,14 @@ body.nino-scroll-atf .nino-frame-header .nino-scroll-header {
 	background-color: var(--header-ground);
 }
 
+/*	What Nino.css folds away on the way down - the bar's height, its room and its line - this set takes back, or says again, as the behaviour has it. One rule more specific than the kernel's, with the same exception: not while the focus is in the bar	*/
+body.nino-scroll-down .nino-frame-header .nino-scroll-header:where(:not(:has(:focus-visible))) {
+	max-height: var(--header-behaviour-collapse);
+	min-height: calc( var(--header-height) * var(--header-behaviour-keep) );
+}
+
 .nino-frame-header .nino-logo {
-	width: clamp(7.5rem, 10vw, 10rem);
+	width: calc( clamp(7.5rem, 10vw, 10rem) * var(--header-logo) );
 	height: auto;
 	min-width: 0;
 	min-height: 0;
@@ -978,7 +1026,7 @@ body.nino-scroll-atf .nino-frame-header .nino-scroll-header {
 
 
 body main {
-	padding-top: calc( var(--header-height) + var(--nino-header-grow, 0px) );
+	padding-top: calc( ( var(--header-height) + var(--nino-header-grow, 0px) ) * var(--header-behaviour-clear) );
 }
 
 body main:has(> .nino-cover:first-child),
@@ -2138,6 +2186,10 @@ footer {
 	--forms-line: var(--forms-line--default);
 	--forms-scale: var(--forms-scale--default);
 	--forms-space: var(--forms-space--default);
+	--header-behaviour: var(--header-behaviour--default);
+	--header-behaviour-clear: var(--header-behaviour-clear--default);
+	--header-behaviour-collapse: var(--header-behaviour-collapse--default);
+	--header-behaviour-keep: var(--header-behaviour-keep--default);
 	--header-border-color: var(--header-border-color--default);
 	--header-border-size: var(--header-border-size--default);
 	--header-cta: var(--header-cta--less);
@@ -2151,10 +2203,12 @@ footer {
 	--header-ground-logo-light: var(--header-ground-logo-light--default);
 	--header-ground-title: var(--header-ground-title--default);
 	--header-height: var(--header-height--default);
+	--header-logo: var(--header-logo--default);
 	--header-nav: var(--header-nav--default);
 	--header-nav-case: var(--header-nav-case--default);
 	--header-position: var(--header-position--more);
 	--header-position-cta: var(--header-position-cta--more);
+	--header-shadow: var(--header-shadow--default);
 	--header-space: var(--header-space--default);
 	--lists-marker: var(--lists-marker--default);
 	--lists-marker-check-box: var(--lists-marker-check-box--default);

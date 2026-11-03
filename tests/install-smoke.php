@@ -687,10 +687,11 @@ $heroRule 	= preg_match( '/body main:has\(> \.nino-cover:first-child\)([^{}]*)\{
 check( 'the delivered frame takes main\'s top padding away for a cover and a parallax hero', $heroRule !== '' );
 check( '...also when the Builder\'s wrap stands between main and the hero', str_contains( $heroRule, 'main:has(> .nino-wrap > .nino-cover:first-child)' ) === true
 	&& str_contains( $heroRule, 'main:has(> .nino-wrap > .nino-parallex:first-child)' ) === true );
-// ...and below a header that grew a row it starts under the whole bar: the padding is the bar's min-height and what the script says the bar has grown by. Design's regular header
-// set writes the same line, and its suite compares the delivered file with its own compile of it
-check( 'the delivered frame clears the bar as it is, not as it is at its least: the padding of main is the height plus --nino-header-grow',
-	preg_match( '/\nbody main\s*\{\s*padding-top:\s*calc\( var\(--header-height\) \+ var\(--nino-header-grow, 0px\) \);\s*\}/', $frameStyle ) === 1 );
+// ...and below a header that grew a row it starts under the whole bar: the padding is the bar's min-height and what the script says the bar has grown by, times the factor
+// the behaviour of the bar gives it - one where the bar stands fixed, nought where it goes with the page and needs no room. Design's regular header set writes the same line,
+// and its suite compares the delivered file with its own compile of it
+check( 'the delivered frame clears the bar as it is, not as it is at its least: the padding of main is the height plus --nino-header-grow, times the factor of the behaviour of the bar',
+	preg_match( '/\nbody main\s*\{\s*padding-top:\s*calc\( \( var\(--header-height\) \+ var\(--nino-header-grow, 0px\) \) \* var\(--header-behaviour-clear\) \);\s*\}/', $frameStyle ) === 1 );
 
 echo "\n";
 
