@@ -1302,10 +1302,11 @@
 		 *
 		 *	@param		{Function}	[done]				Called once with true when the type was written, false otherwise
 		 *	@param		{boolean}		[guarded]			The unsaved input of an open element form was asked about already
+		 *	@param		{boolean}		[confirmed]		The renames were asked about already
 		 *
 		 *	@return		void
 		 */
-		_save : function( done, guarded ) {
+		_save : function( done, guarded, confirmed ) {
 
 			const report = function( ok ) {
 				if( typeof done === 'function' )
@@ -1325,14 +1326,26 @@
 
 			// A rename moves stored values and leaves the rest where it is: said
 			// before it is made, with what it does not reach
-			if( Object.keys( renames ).length > 0 ) {
+			if( Object.keys( renames ).length > 0 && confirmed !== true ) {
 
 				const pairs = Object.keys( renames ).map( function( old ) { return old+ ' \u2192 '+ renames[old] } ).join(', ');
 
-				if( wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/types/confirm/rename'), pairs ) ) === false ) {
+				// Asked again from the top once answered: a question that was not
+				// asked (another is open) ends the Save like one that was refused
+				if( Nino.adminUi.confirm( 'big', {
+					message		: Nino.adminUi.format( Nino.content.getText('/_admin/types/confirm/rename'), pairs ),
+					yes				: Nino.content.getText('/_admin/common/label/rename'),
+					no				: Nino.content.getText('/_admin/common/label/cancel'),
+					onChoose	: function( ok ) {
+						if( ok === true )
+							Nino.admin.types._save( done, true, true );
+						else
+							report( false );
+					},
+				} ) === false )
 					report( false );
-					return;
-				}
+
+				return;
 			}
 
 			msg.textContent = Nino.content.getText('/_admin/common/msg/saving');

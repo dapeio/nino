@@ -86,6 +86,26 @@ console.log('\nImport target');
 		&& target.children[1].textContent === 'en_US' && target.children[0].textContent.indexOf( word ) === -1 );
 	check( '...and the first language that is not the native one is the one picked', target.value === 'en_US' );
 	check( 'a site with the native language alone offers the native language', draw( [ { locale : 'de_DE', active : true } ] ).value === 'de_DE' );
+
+	// Importing into the native language overwrites the source: asked first, and a No sends nothing
+	const questions = [];
+	let answer = false;
+	Nino.adminUi.confirm = function( level, options ) { questions.push( level ); options.onChoose( answer ); return true };
+	const sent = [];
+	Nino.admin.translations._apiCall = function( endpoint ) { sent.push( endpoint ) };
+	const importButton = findAll( page, function( el ) { return el.tagName === 'BUTTON' && el.className === 'nino-admin-btn-primary' } ).pop();
+	const textarea = findAll( page, function( el ) { return el.tagName === 'TEXTAREA' } )[0];
+	textarea.value = '{"format":"nino.translation"}';
+	importButton.click();
+	check( 'an import into the native language is a big question, and a No sends nothing', questions.join() === 'big' && sent.length === 0 );
+	answer = true;
+	importButton.click();
+	check( '...and a Yes sends it', sent.join() === 'import' );
+	draw( [ { locale : 'de_DE', active : true }, { locale : 'en_US', active : true } ] );
+	const other = findAll( page, function( el ) { return el.tagName === 'BUTTON' && el.className === 'nino-admin-btn-primary' } ).pop();
+	findAll( page, function( el ) { return el.tagName === 'TEXTAREA' } )[0].value = '{"format":"nino.translation"}';
+	other.click();
+	check( 'an import into another language asks nothing', questions.length === 2 && sent.length === 2 );
 }
 
 console.log('\nShared HTML editor');

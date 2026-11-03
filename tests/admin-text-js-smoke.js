@@ -256,9 +256,12 @@ keysSandbox.document.getElementById = function( id ) {
 };
 keysSandbox.confirm = function() { return true };
 keysSandbox.Nino.content.getText = function( key ) { return key === '/_admin/keys/error/save-partial' ? 'partial: %s' : key };
+// The question of the design system, with the browser's confirm as its answer, and the weights it was asked with
+const askedLevels = [];
 keysSandbox.Nino.adminUi = {
 	api : { errorText : function( status ) { return 'error '+ status } },
 	format : function( text, ...params ) { let at = 0; return String( text ).replace( /%[sdn]/g, function( token ) { return at < params.length ? String( params[at++] ) : token } ) },
+	confirm : function( level, options ) { askedLevels.push( level ); options.onChoose( keysSandbox.window.confirm( options.message ) === true ); return true },
 };
 keys._renderCategoryList = function() { keysSandbox.listDrawn = ( keysSandbox.listDrawn ?? 0 ) + 1 };
 
@@ -404,10 +407,15 @@ requests.length = 0;
 let undone = 0;
 let opened = 0;
 keys._showForm = function() { opened++ };
+keysSandbox.window.confirm = function() { return false };
+keys._deleteKey( '/g/title' );
+check( 'a delete that is answered No asks the shell nothing and sends nothing', asked.length === 0 && requests.length === 0 );
+keysSandbox.window.confirm = function() { return true };
 keys._saveSchema( '/g/title', true, false, function() { undone++ } );
 keys._openNewKeyForm( '/g/title' );
 keys._deleteKey( '/g/title' );
 check( 'a schema change, the form that renames and a delete ask about the open row before anything happens', asked.length === 3 && requests.length === 0 && opened === 0 && asked.every( function( a ) { return JSON.stringify( a.names ) === '["keys"]' } ) );
+check( '...the delete is asked as a destructive question first, and the others are no question of the weights', askedLevels.join() === 'destructive,destructive' );
 asked[0].onCancel();
 check( '...a Cancel on a schema checkbox puts the box back', undone === 1 && requests.length === 0 );
 const written = keysSandbox.touched.length;
@@ -452,7 +460,7 @@ keys._saveSettings( { key : '/g/body', format : 'lines' }, true, true, 'auto', '
 check( 'a limit left empty is posted as null - automatic - and "auto" as itself', JSON.stringify( requests[1].payload ) === JSON.stringify( { key : '/g/body', global : true, blacklisted : true, format : 'auto', maxlength : null } ) && confirms.length === 0 );
 
 keys._saveSettings( { key : '/g/body', format : 'blocks' }, false, false, 'plain', '' );
-check( 'narrowing asks first, naming the key, the two formats and what becomes of the text', confirms.length === 1 && confirms[0].includes( '/g/body' ) && confirms[0].includes( '/_admin/keys/format/blocks' ) && confirms[0].includes( '/_admin/keys/format/plain' ) && confirms[0].includes( '/_admin/keys/convert/plain' ) === true );
+check( 'narrowing asks first, as a big question, naming the key, the two formats and what becomes of the text', confirms.length === 1 && askedLevels.slice(-1)[0] === 'big' && confirms[0].includes( '/g/body' ) && confirms[0].includes( '/_admin/keys/format/blocks' ) && confirms[0].includes( '/_admin/keys/format/plain' ) && confirms[0].includes( '/_admin/keys/convert/plain' ) === true );
 keysSandbox.window.confirm = function( question ) { confirms.push( question ); return false };
 keys._saveSettings( { key : '/g/body', format : 'blocks' }, false, false, 'inline', '' );
 check( '...and a No sends nothing', requests.length === 3 );

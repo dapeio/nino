@@ -4,6 +4,12 @@
 // workbench's own text/<locale>.php has
 return [
 	'[[/_admin/nav/config]]'						=> 'Config',
+	'[[/_admin/config/group/mode]]'			=> 'Mode',
+	'[[/_admin/config/intro/mode]]'			=> 'Whether this site is being built or is live. Switching it sets the four values it names, which stay yours to change afterwards.',
+	'[[/_admin/config/label/mode]]'			=> 'Mode',
+	'[[/_admin/config/hint/mode]]'			=> 'Development shows errors on the page, caches nothing and asks only before something is deleted. Production hides errors, caches pages for an hour and asks before every deletion and every larger change.',
+	'[[/_admin/config/option/production]]'	=> 'Production',
+	'[[/_admin/config/option/development]]'	=> 'Development',
 	'[[/_admin/config/group/diagnostics]]'	=> 'Errors and diagnostics',
 	'[[/_admin/config/intro/diagnostics]]'	=> 'What happens when php raises an error, how the session cookie is issued, and which address a visitor is counted as.',
 	'[[/_admin/config/group/editor]]'		=> 'Workbench',
@@ -31,6 +37,7 @@ return [
 
 	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
 	'[[/_admin/config/manual/intro]]'	=> 'Settings that apply to the whole project and rarely change – mostly for developers.',
+	'[[/_admin/config/manual/mode]]'	=> 'Mode says whether the site is being built or is live. Switching to development shows errors, logs them, turns the page cache off and sets its lifetime to 60 seconds; switching to production hides errors, logs them, turns the cache on and sets its lifetime to 3600 seconds. The four stay fields below and can be changed one by one.',
 	'[[/_admin/config/manual/error]]'	=> '“Errors and diagnostics” decides whether PHP errors are written to a log or shown on the site, how the session cookie is issued and which proxies stand in front of the site. A live site never shows errors.',
 	'[[/_admin/config/manual/backup]]'	=> 'Daily encrypted backup switches the automatic backup on or off. The backups are restored under Backups.',
 	'[[/_admin/config/manual/log]]'	=> 'Record an audit trail switches the Log on or off: one line per login and per change, kept for fourteen days.',

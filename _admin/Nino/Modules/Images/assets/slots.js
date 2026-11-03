@@ -347,19 +347,27 @@
 		 */
 		_delete : function() {
 
-			if( wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/slots/confirm/delete'), Nino.admin.slots._currentUri ) ) === false )
-				return;
+			Nino.adminUi.confirm( 'destructive', {
+				message		: Nino.adminUi.format( Nino.content.getText('/_admin/slots/confirm/delete'), Nino.admin.slots._currentUri ),
+				yes				: Nino.content.getText('/_admin/common/label/delete'),
+				no				: Nino.content.getText('/_admin/common/label/cancel'),
+				onChoose	: function( ok ) {
 
-			const msg = dc.getElementById('slots-form-msg');
-			msg.textContent = Nino.content.getText('/_admin/common/msg/deleting');
+					if( ok === false )
+						return;
 
-			Nino.admin.slots._apiCall( 'delete', { uri : Nino.admin.slots._currentUri }, function( status, response ) {
-				if( status !== 200 || response === null ) {
-					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/delete' );
-					return;
-				}
-				Nino.admin.touch( 'slots' );
-				Nino.admin.slots.init();
+					const msg = dc.getElementById('slots-form-msg');
+					msg.textContent = Nino.content.getText('/_admin/common/msg/deleting');
+
+					Nino.admin.slots._apiCall( 'delete', { uri : Nino.admin.slots._currentUri }, function( status, response ) {
+						if( status !== 200 || response === null ) {
+							msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/delete' );
+							return;
+						}
+						Nino.admin.touch( 'slots' );
+						Nino.admin.slots.init();
+					} );
+				},
 			} );
 		},
 

@@ -205,6 +205,39 @@ answer( 200, { status : false, retry : 3600, min : 120, max : 86400 } );
 const retryInput = form.querySelector('[data-key="retry"]');
 check( 'the seconds field takes its bounds from the answer', retryInput !== null && retryInput.min === 120 && retryInput.max === 86400 );
 
+// --- the shell is told ---------------------------------------------------------
+
+// What the shell asks how much to ask by (Nino.admin.mode.policy()) follows the
+// maintenance page: told by every answer that says what state it is in, and not
+// by a request that failed
+const told = [];
+Nino.admin.mode = { maintenance : function( on ) { told.push( on ) } };
+present( true );
+requests.length = 0;
+panel.init();
+answer( 200, { status : true, retry : 3600 } );
+check( 'a status answer tells the shell whether the maintenance page is up', told.join() === 'true' );
+requests.length = 0;
+panel.init();
+answer( 200, { status : false, retry : 3600 } );
+check( '...and when it is not', told.join() === 'true,false' );
+requests.length = 0;
+panel.init();
+answer( 403, { error : 'no' } );
+check( '...but a refusal tells it nothing: the state is not known', told.length === 2 );
+panel.init();
+answer( 200, { status : false, retry : 3600 } );
+form.querySelector('[data-key="status"]').checked = true;
+panel._save();
+answer( 200, { status : true, retry : 3600 } );
+check( 'a save that switched it on tells the shell, with what the server now holds', told[told.length - 1] === true );
+delete Nino.admin.mode;
+present( true );
+requests.length = 0;
+panel.init();
+answer( 200, { status : true, retry : 3600 } );
+check( 'a shell that has no mode is told nothing, and the notice is drawn all the same', banners( content ).length === 1 );
+
 // --- the words ---------------------------------------------------------------
 
 check( 'both interface languages have the two words', [ moduleEn, moduleDe ].every( function( map ) {

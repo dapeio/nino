@@ -32,6 +32,21 @@ function restoreButton( date ) {
 	return row === undefined ? null : row.children[1];
 }
 
+/**
+ *	Press the restore button of a date and answer the question it asks - yes or
+ *	no as `confirmAnswer` says. The question is a dialog of the design system
+ *	(Nino.adminUi.confirm()), and it is taken out of the list the checks below
+ *	count: they are about the dialog the restore ends in
+ */
+function pressRestore( date ) {
+	const before = dialogs.length;
+	fire( restoreButton( date ), 'click' );
+	if( dialogs.length === before )
+		return;
+	const question = dialogs.pop();
+	fire( findAll( question, function( el ) { return el.tagName === 'BUTTON' } )[confirmAnswer === true ? 0 : 1], 'click' );
+}
+
 function messageLine() {
 	return findAll( mount, function( el ) { return el.id === 'backups-message' } )[0] ?? null;
 }
@@ -95,7 +110,7 @@ sandbox.document.createElement = function( tag ) {
 };
 sandbox.window = {
 	Nino : Nino,
-	confirm : function() { return confirmAnswer },
+	confirm : function() { throw new Error( 'the restore asks in a dialog of the design system, not with the browser\'s confirm' ) },
 	alert : function( message ) { alerts.push( message ) },
 	location : { reload : function() { reloaded++ } },
 };
@@ -126,7 +141,7 @@ check( 'the list carries the line an error reports into', messageLine() !== null
 	panel offers is still exactly as valid as it was a second ago - so the
 	list has to survive it, or the one screen for getting a broken site back
 	has replaced its backups with a sentence and only a reload undoes that	*/
-fire( restoreButton('2024-05-02'), 'click' );
+pressRestore('2024-05-02');
 check( 'the restore is sent for the date whose button was pressed', requests.length === 2
 	&& requests[1].action === 'backups/restore' && requests[1].payload.date === '2024-05-02' );
 
@@ -139,7 +154,7 @@ check( '...and does not pretend the restore happened', alerts.length === 0 && re
 
 // An answer with no reason of its own falls back to a sentence of the
 // workbench's own rather than to an empty line
-fire( restoreButton('2024-05-01'), 'click' );
+pressRestore('2024-05-01');
 answer( 503, null );
 check( 'an answer with no reason still says what happened', messageText() === '(503) '+ text('/_admin/common/error/request')
 	&& text('/_admin/common/error/request') !== '' );
@@ -153,7 +168,7 @@ const dialogButtons = function( dialog ) { return findAll( dialog, function( el 
 // A restore that worked: everything the workbench has in memory is about the state that was
 // just replaced, and the sessions with it - the reload lands on the login page. What it says
 // is read in a dialog first, and the reload is the dialog's one choice, not a timer
-fire( restoreButton('2024-05-03'), 'click' );
+pressRestore('2024-05-03');
 answer( 200, { ok : true } );
 check( 'a restore that succeeded opens a dialog with the date in its message - and neither an alert nor a reload', dialogs.length === 1 && dialogs[0].open === true && alerts.length === 0 && reloaded === 0
 	&& dialogText( dialogs[0] ) === text('/_admin/backups/msg/restored').replace( '%s', '2024-05-03' ) );
@@ -170,7 +185,7 @@ check( 'the choice reloads the page, once, and closes the dialog', reloaded === 
 // be gone with the reload
 alerts.length = 0;
 reloaded = 0;
-fire( restoreButton('2024-05-03'), 'click' );
+pressRestore('2024-05-03');
 answer( 200, { ok : true, restoredDate : '2024-05-03', notice : { code : 'backups_restored_other_version', params : [ '1.8.0', '1.9.0' ] } } );
 check( 'a restore of a backup from another version says where it comes from, in the message of the restore, and reloads only on the choice', dialogs.length === 2 && reloaded === 0 && alerts.length === 0
 	&& dialogText( dialogs[1] ) === text('/_admin/backups/msg/restored').replace( '%s', '2024-05-03' ) + ' '+ text('/_admin/error/backups_restored_other_version').replace( '%s', '1.8.0' ).replace( '%s', '1.9.0' ) );
@@ -245,10 +260,10 @@ answer( 200, { dates : [ '2024-05-03' ] } );
 const asked = [];
 Nino.admin.dirty = { guard : function( names, proceed ) { asked.push( { names : names, proceed : proceed } ) } };
 confirmAnswer = false;
-fire( restoreButton('2024-05-03'), 'click' );
+pressRestore('2024-05-03');
 check( 'a restore that was not confirmed asks the shell nothing', asked.length === 0 && requests.length === 1 );
 confirmAnswer = true;
-fire( restoreButton('2024-05-03'), 'click' );
+pressRestore('2024-05-03');
 check( 'a confirmed restore asks about unsaved input anywhere in the workbench before it is sent', asked.length === 1 && asked[0].names === null && requests.length === 1 );
 asked[0].proceed();
 check( '...and is sent once the question is answered', requests.length === 2 && requests[1].action === 'backups/restore' );

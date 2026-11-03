@@ -846,14 +846,15 @@ function callDev( array &$appData, string $class, string $method, array $data = 
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiList' );
 check( 'apiList succeeds', $status === 200 );
 check( 'apiList returns the field schema in render order', array_column( $body['fields'], 'key' ) === [
+	'/nino/mode',
 	'/nino/error/log', '/nino/error/display', '/nino/session/force-secure-cookie', '/nino/http/proxies',
 	'/nino/admin/backups', '/nino/admin/logs',
 	'/nino/cache/status', '/nino/cache/ttl', '/nino/cache/blacklist',
 ] );
 check( 'every field carries the type its editor renders from', array_column( $body['fields'], 'type' ) === [
-	'bool', 'bool', 'bool', 'lines', 'bool', 'bool', 'bool', 'int', 'lines',
+	'select', 'bool', 'bool', 'bool', 'lines', 'bool', 'bool', 'bool', 'int', 'lines',
 ] );
-check( 'apiList returns the group headings', array_keys( $body['groups'] ) === [ 'diagnostics', 'editor', 'cache' ] );
+check( 'apiList returns the group headings, the mode before the rest', array_keys( $body['groups'] ) === [ 'mode', 'diagnostics', 'editor', 'cache' ] );
 check( 'every field belongs to a declared group', array_diff( array_unique( array_column( $body['fields'], 'group' ) ), array_keys( $body['groups'] ) ) === [] );
 
 $byKey = array_column( $body['fields'], null, 'key' );
@@ -864,6 +865,9 @@ check( 'an int field carries the bounds its editor and apiSave share', $byKey['/
 // A missing key must report the same default the runtime itself applies, or the
 // form shows a value the site is not actually running with
 check( 'a key absent from config.php reports the runtime default', $byKey['/nino/admin/backups']['value'] === true );
+check( 'the mode of a config.php that does not name one is production, and the field offers both modes, each with the fill key of its word', $byKey['/nino/mode']['value'] === 'production'
+	&& array_column( $byKey['/nino/mode']['options'], 'value' ) === [ 'production', 'development' ]
+	&& array_filter( array_column( $byKey['/nino/mode']['options'], 'label' ), static fn( string $label ): bool => str_starts_with( $label, '/_admin/config/option/' ) === false ) === [] );
 
 echo "\n";
 echo "Language - the site's languages, and the Translations tab beside them\n";
@@ -1053,6 +1057,54 @@ check( 'an emptied proxy list saves as the empty list that trusts nothing', $sta
 $beforePartial = $appData['/nino/error/display'];
 [ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/error/display' => true, '/nino/cache/ttl' => 'nope' ] ] );
 check( 'a rejected field leaves the valid ones in the same request unwritten', $status === 400 && $appData['/nino/error/display'] === $beforePartial );
+
+/*	The mode. Switching it writes the four keys a site in that mode wants,
+	over what the form sent for them; saving the mode as it is writes what
+	the form sent and nothing else */
+$modeKeys = [ '/nino/error/display', '/nino/error/log', '/nino/cache/status', '/nino/cache/ttl' ];
+$modeStored = static fn(): array => \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+
+callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/admin/logs' => false ] ] );
+$formSent = [ '/nino/error/display' => false, '/nino/error/log' => false, '/nino/cache/status' => true, '/nino/cache/ttl' => '7200' ];
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/mode' => 'development' ] + $formSent ] );
+$written = $modeStored();
+check( 'saving the mode development answers with the mode held now', $status === 200 && ( $body['mode'] ?? '' ) === 'development' && $written['/nino/mode'] === 'development' );
+check( '...and writes the four keys of that mode into config.php, with the types it needs, though the form sent others for them',
+	$written['/nino/error/display'] === true && $written['/nino/error/log'] === true && $written['/nino/cache/status'] === false && $written['/nino/cache/ttl'] === 60
+	&& $appData['/nino/error/display'] === true && $appData['/nino/cache/ttl'] === 60 );
+check( '...and names all five as saved', $status === 200 && array_diff( array_merge( $modeKeys, [ '/nino/mode' ] ), $body['saved'] ?? [] ) === [] );
+check( '...and leaves what a switch has no business with: the audit trail stays as it was', $written['/nino/admin/logs'] === false );
+
+[ , $body ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiList' );
+$byKey = array_column( $body['fields'], null, 'key' );
+check( 'the form read again shows the mode and the four values the switch wrote', $byKey['/nino/mode']['value'] === 'development' && $byKey['/nino/error/display']['value'] === true && $byKey['/nino/cache/status']['value'] === false && $byKey['/nino/cache/ttl']['value'] === 60 );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/mode' => 'development', '/nino/error/display' => false, '/nino/cache/ttl' => '900' ] ] );
+$written = $modeStored();
+check( 'saving the mode as it is writes what the form sent and does not write the mode\'s four keys again', $status === 200 && ( $body['mode'] ?? '' ) === 'development'
+	&& $written['/nino/error/display'] === false && $written['/nino/cache/ttl'] === 900 && $written['/nino/cache/status'] === false && $written['/nino/mode'] === 'development' );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/cache/ttl' => '1200' ] ] );
+check( 'a form that does not send the mode leaves it alone, and the answer still names it', $status === 200 && ( $body['mode'] ?? '' ) === 'development' && $modeStored()['/nino/mode'] === 'development' && $modeStored()['/nino/cache/ttl'] === 1200 );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/mode' => 'production', '/nino/error/display' => true, '/nino/cache/status' => false, '/nino/cache/ttl' => '120' ] ] );
+$written = $modeStored();
+check( 'switching back to production writes its four keys again, over the form\'s', $status === 200 && ( $body['mode'] ?? '' ) === 'production' && $written['/nino/mode'] === 'production'
+	&& $written['/nino/error/display'] === false && $written['/nino/error/log'] === true && $written['/nino/cache/status'] === true && $written['/nino/cache/ttl'] === 3600 );
+
+// Refused whole: config.php is as it was, the valid fields of the same request included
+$beforeRefusal = $modeStored();
+foreach( [ 'staging', '', 'Development', [ 'development' ], true, null ] as $refused ) {
+	[ $status, $body ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/mode' => $refused, '/nino/cache/ttl' => '777' ] ] );
+	check( 'a mode that is none of the two ('. json_encode( $refused ). ') is a 400 with the code and the field, and writes nothing', $status === 400 && ( $body['code'] ?? '' ) === 'invalid_value' && ( $body['field'] ?? '' ) === '/nino/mode'
+		&& $modeStored() === $beforeRefusal );
+}
+
+// A mode nobody can have chosen in the form is a production site: saving production is no switch
+\Nino\Filesystem::mutate( $appData, '/config.php', static function( array $content ): array { $content['/nino/mode'] = 'staging'; $content['/nino/error/display'] = true; return $content; } );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/mode' => 'production' ] ] );
+check( 'a hand-edited mode reads as production: saving production over it is not a switch, and the answer says production', $status === 200 && ( $body['mode'] ?? '' ) === 'production' && $modeStored()['/nino/mode'] === 'production' && $modeStored()['/nino/error/display'] === true );
 
 // The login throttle: two ints on a tab of the Users panel, validated the
 // way Config validates - a maxtries of 0 would lock every account out, a

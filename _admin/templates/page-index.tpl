@@ -1,6 +1,6 @@
 [template /_admin/templates/html-header]
 		[csrf]
-		<div id="admin-page-wrap" class="nino-admin nino-admin-shell nino-admin-shell--rail" data-dir="[[/nino/dir]]" data-public="[[/nino/public]]" data-upload-bytes="[[/_admin/upload/bytes]]" data-upload-pixels="[[/_admin/upload/pixels]]">
+		<div id="admin-page-wrap" class="nino-admin nino-admin-shell nino-admin-shell--rail" data-dir="[[/nino/dir]]" data-public="[[/nino/public]]" data-upload-bytes="[[/_admin/upload/bytes]]" data-upload-pixels="[[/_admin/upload/pixels]]" data-mode="[[/_admin/mode]]" data-maintenance="[[/_admin/maintenance]]">
 			<a class="nino-admin-skip" href="#admin-content-wrap">[[/_admin/label/skip]]</a>
 			<aside id="admin-bar-wrap" class="nino-admin-rail" aria-label="[[/_admin/label/rail]]">
 				<!-- Brand and account sit on one row on a phone and stack in the
@@ -14,6 +14,7 @@
 						<span class="nino-admin-brand-copy"><strong>Nino</strong><small>Admin</small></span>
 						<button type="button" id="admin-rail-toggle" class="nino-admin-rail-toggle" aria-label="[[/_admin/user/rail]]" title="[[/_admin/user/rail]]" aria-pressed="false"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg></button>
 					</div>
+					<a id="admin-mode-chip" class="nino-admin-mode-chip" href="#config"></a>
 					<div id="admin-user" class="nino-admin-rail-user">
 						<span id="admin-user-email">[[/nino/auth/user]]</span>
 						<button type="button" id="admin-user-logout" class="nino-admin-linkbutton nino-admin-rail-danger">[[/_admin/user/logout]]</button>

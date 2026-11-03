@@ -13,7 +13,7 @@ namespace Nino\Modules\Config {
 	/**
 	 *	Nino							A compact filesystembased php framework
 	 *	Config						The project's settings, as a form rather than as raw json:
-	 *												error handling, the workbench features that can be
+	 *												the mode, error handling, the workbench features that can be
 	 *												switched off, and the page cache. Deliberately excludes
 	 *												"hard" values a wrong edit could brick the whole site
 	 *												over - modules, filesystem/dir - those
@@ -48,6 +48,34 @@ namespace Nino\Modules\Config {
 
 		public const string MANAGE_PERM = '/_admin/config/manage';
 
+		// What switching the mode writes: the four keys a site in that mode
+		// wants, and nothing else. They are values of the form's own fields,
+		// so a project that wants one of them differently changes that field
+		// afterwards and the mode stays what it was; only a switch to a mode
+		// the project is not in sets them again. A development site shows
+		// errors and renders every page afresh, because it is being worked on
+		// and a stale page or a hidden error costs more than the render; a
+		// production site never shows an error and serves stored pages for an
+		// hour, which is the cache's own default lifetime. Both log: an error
+		// nobody sees on the page still has to be findable. How long the
+		// workbench keeps its logs ('/nino/admin/logs') is not the mode's
+		// business and is left alone. The lifetimes lie within the bounds of
+		// the 'ttl' field below.
+		public const array MODES = [
+			'production' 	=> [
+				'/nino/error/display'	=> false,
+				'/nino/error/log' 		=> true,
+				'/nino/cache/status' 	=> true,
+				'/nino/cache/ttl' 		=> 3600,
+			],
+			'development' => [
+				'/nino/error/display'	=> true,
+				'/nino/error/log' 		=> true,
+				'/nino/cache/status' 	=> false,
+				'/nino/cache/ttl' 		=> 60,
+			],
+		];
+
 		public static function perm(): string {
 			return self::MANAGE_PERM;
 		}
@@ -67,6 +95,19 @@ namespace Nino\Modules\Config {
 		// A key without a stored value shows \Nino\AppData::DEFAULTS[$key], so
 		// every key here has to have one there.
 		private const array FIELDS = [
+			// One of a fixed list: 'options' are the values it may have, each
+			// with the fill key of its word. Switching it writes the keys of
+			// MODES (see apiSave())
+			'/nino/mode' => [
+				'type' 		=> 'select',
+				'options'	=> [
+					'production' 	=> '/_admin/config/option/production',
+					'development'	=> '/_admin/config/option/development',
+				],
+				'group'		=> 'mode',
+				'label'		=> '/_admin/config/label/mode',
+				'hint' 		=> '/_admin/config/hint/mode',
+			],
 			'/nino/error/log' => [
 				'type' 	=> 'bool',
 				'group'	=> 'diagnostics',
@@ -135,6 +176,7 @@ namespace Nino\Modules\Config {
 
 		// Group key -> heading + intro (fill keys), in render order
 		private const array GROUPS = [
+			'mode' 				=> [ '/_admin/config/group/mode', '/_admin/config/intro/mode' ],
 			'diagnostics'	=> [ '/_admin/config/group/diagnostics', '/_admin/config/intro/diagnostics' ],
 			'editor' 			=> [ '/_admin/config/group/editor', '/_admin/config/intro/editor' ],
 			'cache' 			=> [ '/_admin/config/group/cache', '/_admin/config/intro/cache' ],
@@ -164,7 +206,7 @@ namespace Nino\Modules\Config {
 
 		// The entries of the manual its "?" opens, in the order they are shown (see \Nino\Admin\Admin::manual())
 		public static function manual(): array {
-			return [ 'intro', 'error', 'backup', 'log', 'cache' ];
+			return [ 'intro', 'mode', 'error', 'backup', 'log', 'cache' ];
 		}
 
 		public static function icon(): string {
@@ -219,6 +261,10 @@ namespace Nino\Modules\Config {
 			$fields = [];
 			foreach( self::FIELDS as $key => $field ) {
 
+				// A list of values is sent as the form draws it, a value and its word
+				if( isset( $field['options'] ) === true )
+					$field['options'] = array_map( static fn( string $value, string $label ): array => [ 'value' => $value, 'label' => $label ], array_keys( $field['options'] ), $field['options'] );
+
 				$fields[] = $field + [
 					'key' 		=> $key,
 					'value'		=> array_key_exists( $key, $stored ) === true ? $stored[$key] : \Nino\AppData::DEFAULTS[$key],
@@ -238,6 +284,12 @@ namespace Nino\Modules\Config {
 		 *	writeContentData() call for all of them: a settings form is saved
 		 *	as a unit. Nothing is written until every field validates, so a
 		 *	single bad value leaves config.php exactly as it was.
+		 *
+		 *	A mode that differs from the one config.php holds is a switch, and a
+		 *	switch writes the four keys of MODES with it - over what the form sent
+		 *	for them, which are the values of the mode that is being left. A mode
+		 *	that is saved as it was writes only what the form sent, so the four
+		 *	fields stay a project's own to change.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -280,12 +332,23 @@ namespace Nino\Modules\Config {
 				return;
 			}
 
+			// Read as apiList() reads it: by what the project decided, not by
+			// what this request runs with
+			$stored = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+			$before = self::_mode( $stored['/nino/mode'] ?? null );
+
+			if( array_key_exists( '/nino/mode', $clean ) === true && $clean['/nino/mode'] !== $before )
+				$clean = self::MODES[$clean['/nino/mode']] + $clean;
+
 			foreach( $clean as $key => $value )
 				$appData[$key] = $value;
 
 			\Nino\AppData::writeContentData( $appData, array_keys( $clean ) );
 
-			\Nino\Http::ok( $request, [ 'saved' => array_keys( $clean ) ] );
+			\Nino\Http::ok( $request, [
+				'saved'	=> array_keys( $clean ),
+				'mode' 	=> self::_mode( $clean['/nino/mode'] ?? $before ),
+			] );
 		}
 
 		/**
@@ -316,10 +379,26 @@ namespace Nino\Modules\Config {
 
 				'int' => \Nino\Admin\Admin::cleanInt( $value, $field ),
 
+				'select' => is_string( $value ) === true && in_array( $value, array_keys( $field['options'] ), true ) === true ? $value : null,
+
 				'lines' => self::_cleanLines( $value, $field['entry'] ?? '' ),
 
 				default => null,
 			};
+		}
+
+		/**
+		 *	The mode a stored value names: one of MODES, else production - a
+		 *	config.php without the key, or with a value nobody can have chosen
+		 *	in the form, is a production site
+		 *
+		 *	@param		mixed			$value				As config.php holds it
+		 *
+		 *	@return 	string
+		 */
+		private static function _mode( mixed $value ): string {
+
+			return is_string( $value ) === true && isset( self::MODES[$value] ) === true ? $value : 'production';
 		}
 
 		/**

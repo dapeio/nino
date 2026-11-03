@@ -305,6 +305,67 @@ a {
 	text-transform: uppercase;
 }
 
+/* The mode the project is in, as one word in the head of the rail: a pill
+   like the badge below, and a link to where it is switched. Production is
+   quiet, in the colour of the rail's other secondary text; development is
+   the warning colour - the one the unsaved state is painted in - on a tint
+   of it, so that a site that is being built is never mistaken for a live
+   one. The word says it as well: the colour is never the only signal. Until
+   the shell has written the word there is nothing to show, and an account
+   without the panel that switches it gets the word without the link */
+:where(.nino-admin) .nino-admin-mode-chip {
+	display: inline-flex;
+	flex: 0 0 auto;
+	align-items: center;
+	align-self: flex-start;
+	min-height: 1.6rem;
+	padding: .1rem .6rem;
+	border: 1px solid currentColor;
+	border-radius: 999px;
+	color: var(--nino-admin-rail-muted);
+	font-size: .72rem;
+	font-weight: 650;
+	line-height: 1.4;
+	white-space: nowrap;
+	text-decoration: none;
+}
+
+:where(.nino-admin) .nino-admin-mode-chip:empty {
+	display: none;
+}
+
+:where(.nino-admin) .nino-admin-mode-chip[href]:hover {
+	text-decoration: underline;
+}
+
+:where(.nino-admin) .nino-admin-mode-chip--development {
+	background: color-mix(in srgb, var(--editor-orange) 5%, transparent);
+	color: var(--editor-orange-ink);
+}
+
+/* On a phone the rail is a row, and the whole word took the room of the account
+   beside it: the chip keeps to its first letter in a round, as on a folded
+   rail, and the word is its title */
+@media (max-width: 38rem) {
+	:where(.nino-admin) .nino-admin-mode-chip {
+		display: grid;
+		place-items: center;
+		align-self: center;
+		width: 1.7rem;
+		height: 1.7rem;
+		min-height: 0;
+		padding: 0;
+		font-size: 0;
+	}
+
+	:where(.nino-admin) .nino-admin-mode-chip::before {
+		content: attr(data-initial);
+		content: attr(data-initial) / "";
+		font-size: .78rem;
+		line-height: 1;
+	}
+}
+
 :where(.nino-admin) .nino-admin-rail-user {
 	justify-content: flex-end;
 	gap: .75rem;
@@ -2654,6 +2715,11 @@ a {
 		box-shadow: none;
 	}
 
+	/* Under the brand row, in the column the head is */
+	.nino-admin .nino-admin-rail-head > .nino-admin-mode-chip {
+		margin-block: .65rem .15rem;
+	}
+
 	.nino-admin .nino-admin-rail-user {
 		padding: .3rem .5rem .1rem 1.4rem;
 		border-color: var(--nino-admin-rail-border);
@@ -2868,6 +2934,27 @@ a {
 		clip-path: inset(50%);
 		border: 0;
 		white-space: nowrap;
+	}
+
+	/* The chip keeps to its first letter, in a round of its own: its word is
+	   read out as it was, and the letter is not (the empty alternative) */
+	.nino-admin-shell--folded .nino-admin-rail-head > .nino-admin-mode-chip {
+		display: grid;
+		place-items: center;
+		align-self: center;
+		width: 1.7rem;
+		height: 1.7rem;
+		/* Under the fold button, which is fixed to the column below the brand mark */
+		margin-block: 2.15rem 0;
+		padding: 0;
+		font-size: 0;
+	}
+
+	.nino-admin-shell--folded .nino-admin-rail-head > .nino-admin-mode-chip::before {
+		content: attr(data-initial);
+		content: attr(data-initial) / "";
+		font-size: .78rem;
+		line-height: 1;
 	}
 
 	.nino-admin-shell--folded .nino-admin-rail-toggle {

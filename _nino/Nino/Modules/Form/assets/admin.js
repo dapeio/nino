@@ -485,14 +485,22 @@
 		 */
 		_delete : function( entry ) {
 
-			if( wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/submissions/confirm/delete'), entry.date || '' ) ) === false )
-				return;
+			Nino.adminUi.confirm( 'destructive', {
+				message		: Nino.adminUi.format( Nino.content.getText('/_admin/submissions/confirm/delete'), entry.date || '' ),
+				yes				: Nino.content.getText('/_admin/common/label/delete'),
+				no				: Nino.content.getText('/_admin/common/label/cancel'),
+				onChoose	: function( ok ) {
 
-			Nino.admin.submissions._apiCall( 'delete', { id : entry.id }, function( status, response ) {
-				if( status !== 200 || response === null )
-					return Nino.admin.submissions._showError( status, response );
+					if( ok === false )
+						return;
 
-				Nino.admin.submissions.init();
+					Nino.admin.submissions._apiCall( 'delete', { id : entry.id }, function( status, response ) {
+						if( status !== 200 || response === null )
+							return Nino.admin.submissions._showError( status, response );
+
+						Nino.admin.submissions.init();
+					} );
+				},
 			} );
 		},
 

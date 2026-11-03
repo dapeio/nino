@@ -118,6 +118,11 @@
 		 */
 		_banner : function( on ) {
 
+			// The workbench asks less before a change visitors see while they
+			// see the maintenance page instead (see Nino.admin.mode.policy())
+			if( typeof Nino.admin.mode === 'object' )
+				Nino.admin.mode.maintenance( on === true );
+
 			const before = dc.getElementById('maintenance-banner');
 
 			if( on !== true ) {

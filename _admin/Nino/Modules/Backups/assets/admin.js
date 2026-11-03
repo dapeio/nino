@@ -231,52 +231,60 @@
 		 */
 		_confirmRestore : function( date ) {
 
-			if( wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/backups/confirm/restore'), date ) ) === false )
-				return;
+			Nino.adminUi.confirm( 'destructive', {
+				message		: Nino.adminUi.format( Nino.content.getText('/_admin/backups/confirm/restore'), date ),
+				yes				: Nino.content.getText('/_admin/common/label/restore'),
+				no				: Nino.content.getText('/_admin/common/label/cancel'),
+				onChoose	: function( ok ) {
 
-			// Whatever a previous attempt left there is about that attempt
-			const message = dc.getElementById('backups-message');
-			if( message !== null )
-				message.textContent = '';
+					if( ok === false )
+						return;
 
-			// The restore ends in a reload of the page and every form on it, and
-			// has put other files in their place by then: unsaved input is asked
-			// about first (see Nino.admin.dirty.guard())
-			const restore = function() {
+					// Whatever a previous attempt left there is about that attempt
+					const message = dc.getElementById('backups-message');
+					if( message !== null )
+						message.textContent = '';
 
-				Nino.admin.backups._apiCall( 'restore', { date : date }, function( status, response ) {
-					if( status !== 200 || response === null || response.ok !== true )
-						return Nino.admin.backups._showRestoreError( status, response );
+					// The restore ends in a reload of the page and every form on it, and
+					// has put other files in their place by then: unsaved input is asked
+					// about first (see Nino.admin.dirty.guard())
+					const restore = function() {
 
-					let said = Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/restored'), date );
+						Nino.admin.backups._apiCall( 'restore', { date : date }, function( status, response ) {
+							if( status !== 200 || response === null || response.ok !== true )
+								return Nino.admin.backups._showRestoreError( status, response );
 
-					// A backup of another version of Nino restores all the same, and
-					// its notice - a code and its params, worded as a failure's is - is
-					// said with the restore in the one message the page shows before it
-					// reloads: a line in the panel would be gone with the reload
-					if( typeof response.notice === 'object' && response.notice !== null )
-						said += ' '+ Nino.adminUi.api.errorText( status, response.notice );
+							let said = Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/restored'), date );
 
-					// The restore ended the session - the sessions are part of what was
-					// restored, and the one that ran it is ended either way (see
-					// apiRestore()) - so the reload lands on the login page. The message
-					// is read in a dialog before that, and the dialog's one choice is the
-					// way there - a reload of its own accord would be the page changing
-					// under the person's eyes
-					if( Nino.adminUi.choiceDialog( {
-						title		: Nino.content.getText('/_admin/nav/backups'),
-						message	: said,
-						choices	: [ { value : 'login', label : Nino.content.getText('/_admin/backups/label/login'), kind : 'primary' } ],
-						onChoose : function() { wn.location.reload() },
-					} ) === false )
-						wn.location.reload();
-				} );
-			};
+							// A backup of another version of Nino restores all the same, and
+							// its notice - a code and its params, worded as a failure's is - is
+							// said with the restore in the one message the page shows before it
+							// reloads: a line in the panel would be gone with the reload
+							if( typeof response.notice === 'object' && response.notice !== null )
+								said += ' '+ Nino.adminUi.api.errorText( status, response.notice );
 
-			if( typeof Nino.admin.dirty === 'object' )
-				Nino.admin.dirty.guard( null, restore );
-			else
-				restore();
+							// The restore ended the session - the sessions are part of what was
+							// restored, and the one that ran it is ended either way (see
+							// apiRestore()) - so the reload lands on the login page. The message
+							// is read in a dialog before that, and the dialog's one choice is the
+							// way there - a reload of its own accord would be the page changing
+							// under the person's eyes
+							if( Nino.adminUi.choiceDialog( {
+								title		: Nino.content.getText('/_admin/nav/backups'),
+								message	: said,
+								choices	: [ { value : 'login', label : Nino.content.getText('/_admin/backups/label/login'), kind : 'primary' } ],
+								onChoose : function() { wn.location.reload() },
+							} ) === false )
+								wn.location.reload();
+						} );
+					};
+
+					if( typeof Nino.admin.dirty === 'object' )
+						Nino.admin.dirty.guard( null, restore );
+					else
+						restore();
+				},
+			} );
 		},
 	};
 

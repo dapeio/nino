@@ -228,6 +228,13 @@ namespace Nino\Admin {
 			// file against before it is sent (see Nino.adminUi.limits())
 			$limits = \Nino\Images::limits();
 
+			// The two facts the shell asks how much to ask by (see
+			// Nino.admin.mode): the project's mode - one of the two, whatever
+			// else a hand-edited config.php holds - and whether the site shows
+			// its maintenance page, which is what makes a change that visitors
+			// see safe to make
+			$mode = ( $appData['/nino/mode'] ?? '' ) === 'development' ? 'development' : 'production';
+
 			// Only the panels this account may use are rendered at all - the
 			// permission checks in every action stay authoritative, this keeps
 			// the navigation honest and the page free of predictable 403s
@@ -236,6 +243,8 @@ namespace Nino\Admin {
 				'[[/_admin/panes]]'					=> self::panesHtml( $appData ),
 				'[[/_admin/upload/bytes]]'	=> (string) $limits['bytes'],
 				'[[/_admin/upload/pixels]]'	=> (string) $limits['pixels'],
+				'[[/_admin/mode]]'					=> $mode,
+				'[[/_admin/maintenance]]'		=> ( $appData['/nino/maintenance/status'] ?? false ) === true ? '1' : '0',
 			], '*' );
 		}
 

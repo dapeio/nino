@@ -573,6 +573,20 @@ foreach( [ 'en_US', 'de_DE' ] as $locale ) {
 check( 'every word a panel asks for, in its scripts and in its markup, is a fill both interface languages define'. ( $missingFills === [] ? '' : ' - missing: '. implode( ', ', array_slice( $missingFills, 0, 8 ) ) ), $missingFills === []
 	&& count( array_unique( array_merge( $askedByPanels, $askedOutside ) ) ) > 200 );
 
+// The chip says its mode in words the script builds the key of from the mode
+// (Nino.admin.mode), so the scan above cannot see them: each mode has its word
+// and its sentence, and the warning a big change in a live site carries, in both
+// languages
+foreach( [ 'en_US', 'de_DE' ] as $locale ) {
+	$modeFills = (array) include dirname( __DIR__ ). '/_admin/text/'. $locale. '.php';
+	$modeWords = [];
+	foreach( [ 'production', 'development' ] as $mode )
+		foreach( [ 'word', 'hint' ] as $part )
+			$modeWords[] = trim( (string) ( $modeFills['[[/_admin/mode/'. $part. '/'. $mode. ']]'] ?? '' ) );
+	$modeWords[] = trim( (string) ( $modeFills['[[/_admin/mode/confirm/live]]'] ?? '' ) );
+	check( $locale. ': the shell has a word and a sentence for each mode and the warning of a live site, none of them empty and the two modes not worded alike', in_array( '', $modeWords, true ) === false && $modeWords[0] !== $modeWords[2] );
+}
+
 // The two languages of a text family declare the same keys. A key in one file
 // and not in the other renders as an empty string in the second language -
 // a blank where the reason should be, with no error anywhere. A family is the
@@ -746,6 +760,30 @@ check( 'an icon a panel answers reaches the rail only as an inline svg with noth
 $getRequest = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[template /_admin/templates/page-index]' ] ];
 \Nino\Admin\Admin::handleGet( $withModule, $getRequest );
 \Nino\Admin\Admin::init( $withModule );
+
+/*	The two facts the shell asks how much to ask by (Nino.admin.mode): the
+	project's mode - one of two, whatever a hand-edited config.php holds - and
+	whether the site shows its maintenance page. The page carries them on the
+	shell's root, where script.js reads them	*/
+$stateFills = static function( array $state ): array {
+	$request = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[template /_admin/templates/page-index]' ] ];
+	\Nino\Admin\Admin::handleGet( $state, $request );
+	return [ \Nino\Html::renderTextfill( $state, '/_admin/mode' ), \Nino\Html::renderTextfill( $state, '/_admin/maintenance' ) ];
+};
+$stateOf = static function( mixed $mode, mixed $maintenance ) use ( $withModule, $stateFills ): array {
+	$state = $withModule;
+	$state['/nino/mode'] = $mode;
+	$state['/nino/maintenance/status'] = $maintenance;
+	return $stateFills( $state );
+};
+check( 'a signed-in page is filled with production and an open site where config.php names neither', $stateFills( $withModule ) === [ 'production', '0' ] );
+check( '...with the mode and the maintenance page the project is in', $stateOf( 'development', true ) === [ 'development', '1' ] && $stateOf( 'production', false ) === [ 'production', '0' ] );
+check( '...and a mode that is neither of the two - a hand-edited file - reads as production, whatever its type', array_unique( array_map( static fn( mixed $mode ): string => $stateOf( $mode, false )[0], [ 'staging', '', 'Development', true, 1, [ 'development' ], null ] ) ) === [ 'production' ] );
+check( '...and only a maintenance status that is true is a maintenance page', $stateOf( 'production', 'yes' )[1] === '0' && $stateOf( 'production', 1 )[1] === '0' && $stateOf( 'production', true )[1] === '1' );
+$indexTemplate = (string) file_get_contents( dirname( __DIR__ ). '/_admin/templates/page-index.tpl' );
+check( 'the template hands both to the shell root, and the rail has the chip as a link to the Config panel for the shell to fill',
+	preg_match( '/<div id="admin-page-wrap"[^>]* data-mode="\[\[\/_admin\/mode\]\]"[^>]* data-maintenance="\[\[\/_admin\/maintenance\]\]"/', $indexTemplate ) === 1
+	&& preg_match( '/<a id="admin-mode-chip"[^>]* href="#config"[^>]*><\/a>/', $indexTemplate ) === 1 );
 check( 'init bundles every panel script, the module\'s included, after the shell\'s own', in_array( '/app/Dummy/assets/admin.js', $withModule['/nino/html/assets']['/_admin/.cache/script.js'], true ) === true && in_array( '/_nino/Nino/Modules/Navigation/assets/admin.js', $withModule['/nino/html/assets']['/_admin/.cache/script.js'], true ) === true && $withModule['/nino/html/assets']['/_admin/.cache/script.js'][0] === '/_nino/Nino.js' );
 check( 'and every panel stylesheet', in_array( '/app/Dummy/assets/admin.css', $withModule['/nino/html/assets']['/_admin/.cache/style.css'], true ) === true );
 // The login page is no workbench: the kit the panels are built with

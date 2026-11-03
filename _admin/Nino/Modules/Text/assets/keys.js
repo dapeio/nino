@@ -815,32 +815,44 @@
 
 			const formats = Nino.admin.keys.FORMATS;
 
-			if( format !== 'auto' && format !== entry.format && formats.indexOf( format ) < formats.indexOf( entry.format ) ) {
+			const save = function() {
 
-				const question = Nino.adminUi.format( Nino.content.getText('/_admin/keys/confirm/format'),
+				const group = Nino.admin.keys._currentGroup;
+				const posted = { key : entry.key, global : isGlobal, blacklisted : blacklisted, format : format, maxlength : limit === '' ? null : Number( limit ) };
+
+				Nino.admin.keys._guard( function() {
+					Nino.admin.keys._apiCall( 'save', posted, function( status, response ) {
+						if( status !== 200 || response === null ) {
+							wn.alert( Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' ) );
+							return;
+						}
+						Nino.admin.touch( 'texts' );
+						Nino.admin.keys._reopen = group;
+						Nino.admin.keys.init();
+					} );
+				} );
+			};
+
+			if( format === 'auto' || format === entry.format || formats.indexOf( format ) >= formats.indexOf( entry.format ) ) {
+				save();
+				return;
+			}
+
+			// A format that holds less than the one it replaces drops what does not
+			// fit: said first, with what happens to the text
+			Nino.adminUi.confirm( 'big', {
+				message		: Nino.adminUi.format( Nino.content.getText('/_admin/keys/confirm/format'),
 					entry.key,
 					Nino.content.getText('/_admin/keys/format/'+ entry.format ),
 					Nino.content.getText('/_admin/keys/format/'+ format ),
 					Nino.content.getText('/_admin/keys/convert/'+ format )
-				);
-
-				if( wn.confirm( question ) === false )
-					return;
-			}
-
-			const group = Nino.admin.keys._currentGroup;
-			const posted = { key : entry.key, global : isGlobal, blacklisted : blacklisted, format : format, maxlength : limit === '' ? null : Number( limit ) };
-
-			Nino.admin.keys._guard( function() {
-				Nino.admin.keys._apiCall( 'save', posted, function( status, response ) {
-					if( status !== 200 || response === null ) {
-						wn.alert( Nino.adminUi.api.errorText( status, response, '/_admin/common/error/save' ) );
-						return;
-					}
-					Nino.admin.touch( 'texts' );
-					Nino.admin.keys._reopen = group;
-					Nino.admin.keys.init();
-				} );
+				),
+				yes				: Nino.content.getText('/_admin/common/label/save'),
+				no				: Nino.content.getText('/_admin/common/label/cancel'),
+				onChoose	: function( ok ) {
+					if( ok === true )
+						save();
+				},
 			} );
 		},
 
@@ -903,18 +915,26 @@
 		 */
 		_deleteKey : function( key ) {
 
-			if( wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/keys/confirm/delete'), key ) ) === false )
-				return;
+			Nino.adminUi.confirm( 'destructive', {
+				message		: Nino.adminUi.format( Nino.content.getText('/_admin/keys/confirm/delete'), key ),
+				yes				: Nino.content.getText('/_admin/common/label/delete'),
+				no				: Nino.content.getText('/_admin/common/label/cancel'),
+				onChoose	: function( ok ) {
 
-			Nino.admin.keys._guard( function() {
-				Nino.admin.keys._apiCall( 'delete', { key : key }, function( status, response ) {
-					if( status !== 200 || response === null ) {
-						wn.alert( Nino.adminUi.api.errorText( status, response, '/_admin/common/error/delete' ) );
+					if( ok === false )
 						return;
-					}
-					Nino.admin.touch( 'texts' );
-					Nino.admin.keys.init();
-				} );
+
+					Nino.admin.keys._guard( function() {
+						Nino.admin.keys._apiCall( 'delete', { key : key }, function( status, response ) {
+							if( status !== 200 || response === null ) {
+								wn.alert( Nino.adminUi.api.errorText( status, response, '/_admin/common/error/delete' ) );
+								return;
+							}
+							Nino.admin.touch( 'texts' );
+							Nino.admin.keys.init();
+						} );
+					} );
+				},
 			} );
 		},
 

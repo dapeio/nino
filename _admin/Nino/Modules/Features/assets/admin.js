@@ -961,31 +961,40 @@
 		 */
 		_remove : function( feature, btn, msg ) {
 
-			if( wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/features/confirm/remove'), feature.name ) ) === false )
-				return;
+			Nino.adminUi.confirm( 'destructive', {
+				message		: Nino.adminUi.format( Nino.content.getText('/_admin/features/confirm/remove'), feature.name ),
+				yes				: Nino.content.getText('/_admin/features/label/remove'),
+				no				: Nino.content.getText('/_admin/common/label/cancel'),
+				opener		: btn,
+				onChoose	: function( ok ) {
 
-			btn.disabled = true;
-			msg.textContent = Nino.content.getText('/_admin/features/msg/removing');
+					if( ok === false )
+						return;
 
-			Nino.admin.features._apiCall( 'remove', { key : feature.key }, function( status, response ) {
+					btn.disabled = true;
+					msg.textContent = Nino.content.getText('/_admin/features/msg/removing');
 
-				if( status !== 200 || response === null ) {
-					btn.disabled = false;
-					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/features/error/remove' );
-					return;
-				}
+					Nino.admin.features._apiCall( 'remove', { key : feature.key }, function( status, response ) {
 
-				// What the privacy policy still says about it, before the list
-				// is drawn again: removing the feature deleted none of it
-				const said = Nino.admin.features._privacyText( response.privacy );
+						if( status !== 200 || response === null ) {
+							btn.disabled = false;
+							msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/features/error/remove' );
+							return;
+						}
 
-				if( said !== '' )
-					wn.alert( said );
+						// What the privacy policy still says about it, before the list
+						// is drawn again: removing the feature deleted none of it
+						const said = Nino.admin.features._privacyText( response.privacy );
 
-				// The whole list again rather than the row taken off screen:
-				// a removed feature may have been what another one required,
-				// and that row now says something different
-				Nino.admin.features.init();
+						if( said !== '' )
+							wn.alert( said );
+
+						// The whole list again rather than the row taken off screen:
+						// a removed feature may have been what another one required,
+						// and that row now says something different
+						Nino.admin.features.init();
+					} );
+				},
 			} );
 		},
 
@@ -1097,17 +1106,31 @@
 		 */
 		_switch : function( feature, what, btn, msg, guarded ) {
 
+			// The reload this ends in builds every form of the workbench again
+			const unsaved = function() {
+				Nino.admin.features._guard( function() { Nino.admin.features._switch( feature, what, btn, msg, true ) } );
+			};
+
 			// Switching off is asked about, as removing is: it leaves the shortcodes
 			// on the pages, the sections of the privacy policy and what the feature
 			// installed, which the dialog afterwards names, too late to decide
 			// against it. Asked once, before the question about unsaved input
-			if( guarded !== true && what === 'deactivate'
-				&& wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/features/confirm/deactivate'), feature.name ) ) === false )
+			if( guarded !== true && what === 'deactivate' ) {
+				Nino.adminUi.confirm( 'big', {
+					message		: Nino.adminUi.format( Nino.content.getText('/_admin/features/confirm/deactivate'), feature.name ),
+					yes				: Nino.content.getText('/_admin/features/label/deactivate'),
+					no				: Nino.content.getText('/_admin/common/label/cancel'),
+					opener		: btn,
+					onChoose	: function( ok ) {
+						if( ok === true )
+							unsaved();
+					},
+				} );
 				return;
+			}
 
-			// The reload this ends in builds every form of the workbench again
 			if( guarded !== true ) {
-				Nino.admin.features._guard( function() { Nino.admin.features._switch( feature, what, btn, msg, true ) } );
+				unsaved();
 				return;
 			}
 

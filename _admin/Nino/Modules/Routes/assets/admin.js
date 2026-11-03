@@ -1269,19 +1269,27 @@
 
 			const entry = Nino.admin.routes._currentEntry();
 
-			if( wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/routes/confirm/delete-left'), entry === undefined ? Nino.admin.routes._currentUri : Nino.admin.routes._paths( entry ), Nino.admin.routes._staysLine() ) ) === false )
-				return;
+			Nino.adminUi.confirm( 'destructive', {
+				message		: Nino.adminUi.format( Nino.content.getText('/_admin/routes/confirm/delete-left'), entry === undefined ? Nino.admin.routes._currentUri : Nino.admin.routes._paths( entry ), Nino.admin.routes._staysLine() ),
+				yes				: Nino.content.getText('/_admin/common/label/delete'),
+				no				: Nino.content.getText('/_admin/common/label/cancel'),
+				onChoose	: function( ok ) {
 
-			const line = Nino.admin.routes._line;
-			line.idle( Nino.content.getText('/_admin/common/msg/deleting') );
+					if( ok === false )
+						return;
 
-			Nino.admin.routes._apiCall( 'delete', { uri : Nino.admin.routes._currentUri }, function( status, response ) {
-				if( status !== 200 || response === null ) {
-					line.error( status, response, '/_admin/common/error/delete' );
-					return;
-				}
-				Nino.admin.touch( 'routes' );
-				Nino.admin.routes.init();
+					const line = Nino.admin.routes._line;
+					line.idle( Nino.content.getText('/_admin/common/msg/deleting') );
+
+					Nino.admin.routes._apiCall( 'delete', { uri : Nino.admin.routes._currentUri }, function( status, response ) {
+						if( status !== 200 || response === null ) {
+							line.error( status, response, '/_admin/common/error/delete' );
+							return;
+						}
+						Nino.admin.touch( 'routes' );
+						Nino.admin.routes.init();
+					} );
+				},
 			} );
 		},
 	};

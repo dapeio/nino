@@ -870,27 +870,42 @@
 			const user = Nino.admin.users._currentUser;
 			const active = user.status === 'disabled';
 
-			if( active === false && wn.confirm( Nino.content.getText('/_admin/users/confirm/deactivate') ) === false )
+			const send = function() {
+
+				const button = dc.getElementById('users-form-status-toggle');
+				button.disabled = true;
+
+				Nino.admin.users._apiCall( 'status', { username : user.mail, active : active }, function( status, response ) {
+
+					button.disabled = false;
+
+					if( status !== 200 || response === null ) {
+						Nino.admin.users._status.error( status, response, '/_admin/users/error/save' );
+						return;
+					}
+
+					user.status = response.status;
+
+					button.textContent = Nino.content.getText( active === true ? '/_admin/users/label/deactivate' : '/_admin/users/label/activate' );
+					dc.getElementById('users-form-state').textContent = Nino.admin.users._stateParts( user ).join(' · ');
+					Nino.admin.users._renderList( Nino.admin.users._users );
+					Nino.admin.users._status.idle( Nino.content.getText( active === true ? '/_admin/users/msg/activated' : '/_admin/users/msg/deactivated' ) );
+				} );
+			};
+
+			if( active === true ) {
+				send();
 				return;
+			}
 
-			const button = dc.getElementById('users-form-status-toggle');
-			button.disabled = true;
-
-			Nino.admin.users._apiCall( 'status', { username : user.mail, active : active }, function( status, response ) {
-
-				button.disabled = false;
-
-				if( status !== 200 || response === null ) {
-					Nino.admin.users._status.error( status, response, '/_admin/users/error/save' );
-					return;
-				}
-
-				user.status = response.status;
-
-				button.textContent = Nino.content.getText( active === true ? '/_admin/users/label/deactivate' : '/_admin/users/label/activate' );
-				dc.getElementById('users-form-state').textContent = Nino.admin.users._stateParts( user ).join(' · ');
-				Nino.admin.users._renderList( Nino.admin.users._users );
-				Nino.admin.users._status.idle( Nino.content.getText( active === true ? '/_admin/users/msg/activated' : '/_admin/users/msg/deactivated' ) );
+			Nino.adminUi.confirm( 'big', {
+				message		: Nino.content.getText('/_admin/users/confirm/deactivate'),
+				yes				: Nino.content.getText('/_admin/users/label/deactivate'),
+				no				: Nino.content.getText('/_admin/common/label/cancel'),
+				onChoose	: function( ok ) {
+					if( ok === true )
+						send();
+				},
 			} );
 		},
 
@@ -900,17 +915,26 @@
 		 *	@return		void
 		 */
 		_delete : function() {
-			if( wn.confirm( Nino.content.getText('/_admin/users/confirm/delete') ) === false )
-				return;
-			const user = Nino.admin.users._currentUser;
-			Nino.admin.users._apiCall( 'delete', { username : user.mail }, function( status, response ) {
-				if( status !== 200 ) {
-					Nino.admin.users._status.error( status, response, '/_admin/users/error/save' );
-					return;
-				}
-				Nino.admin.users._users = Nino.admin.users._users.filter( function( u ) { return u.mail !== user.mail } );
-				Nino.admin.users._renderList( Nino.admin.users._users );
-				Nino.admin.users._showList();
+			Nino.adminUi.confirm( 'destructive', {
+				message		: Nino.content.getText('/_admin/users/confirm/delete'),
+				yes				: Nino.content.getText('/_admin/common/label/delete'),
+				no				: Nino.content.getText('/_admin/common/label/cancel'),
+				onChoose	: function( ok ) {
+
+					if( ok === false )
+						return;
+
+					const user = Nino.admin.users._currentUser;
+					Nino.admin.users._apiCall( 'delete', { username : user.mail }, function( status, response ) {
+						if( status !== 200 ) {
+							Nino.admin.users._status.error( status, response, '/_admin/users/error/save' );
+							return;
+						}
+						Nino.admin.users._users = Nino.admin.users._users.filter( function( u ) { return u.mail !== user.mail } );
+						Nino.admin.users._renderList( Nino.admin.users._users );
+						Nino.admin.users._showList();
+					} );
+				},
 			} );
 		},
 		/**
@@ -920,36 +944,44 @@
 		 */
 		_logoutAll : function() {
 
-			if( wn.confirm( Nino.content.getText('/_admin/users/confirm/logoutall') ) === false )
-				return;
+			Nino.adminUi.confirm( 'big', {
+				message		: Nino.content.getText('/_admin/users/confirm/logoutall'),
+				yes				: Nino.content.getText('/_admin/users/label/logoutall'),
+				no				: Nino.content.getText('/_admin/common/label/cancel'),
+				onChoose	: function( ok ) {
 
-			const user = Nino.admin.users._currentUser;
-
-			// Ending your own sessions ends this page's, and with it every form
-			// on it: the unsaved input of all of them is asked about first
-			const request = function() {
-
-				Nino.admin.users._apiCall( 'logoutall', { username : user.mail }, function( status, response ) {
-
-					if( status !== 200 ) {
-						Nino.admin.users._status.error( status, response, '/_admin/users/error/save' );
+					if( ok === false )
 						return;
-					}
 
-					// Logging out yourself invalidates the current session - reload straight to the login form
-					if( response.loggedOutSelf === true ) {
-						wn.location.replace( '[[/nino/dir]]/_admin' );
-						return;
-					}
+					const user = Nino.admin.users._currentUser;
 
-					Nino.admin.users._status.idle( Nino.content.getText('/_admin/users/msg/loggedout') );
-				} );
-			};
+					// Ending your own sessions ends this page's, and with it every form
+					// on it: the unsaved input of all of them is asked about first
+					const request = function() {
 
-			if( user.isSelf === true && typeof Nino.admin.dirty === 'object' )
-				Nino.admin.dirty.guard( null, request );
-			else
-				request();
+						Nino.admin.users._apiCall( 'logoutall', { username : user.mail }, function( status, response ) {
+
+							if( status !== 200 ) {
+								Nino.admin.users._status.error( status, response, '/_admin/users/error/save' );
+								return;
+							}
+
+							// Logging out yourself invalidates the current session - reload straight to the login form
+							if( response.loggedOutSelf === true ) {
+								wn.location.replace( '[[/nino/dir]]/_admin' );
+								return;
+							}
+
+							Nino.admin.users._status.idle( Nino.content.getText('/_admin/users/msg/loggedout') );
+						} );
+					};
+
+					if( user.isSelf === true && typeof Nino.admin.dirty === 'object' )
+						Nino.admin.dirty.guard( null, request );
+					else
+						request();
+				},
+			} );
 		},
 	};
 

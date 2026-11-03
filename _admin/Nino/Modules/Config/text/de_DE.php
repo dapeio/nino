@@ -4,6 +4,12 @@
 // Schlüssel und dieselbe Form wie text/<locale>.php der Workbench
 return [
 	'[[/_admin/nav/config]]'						=> 'Konfiguration',
+	'[[/_admin/config/group/mode]]'			=> 'Modus',
+	'[[/_admin/config/intro/mode]]'			=> 'Ob diese Website gebaut wird oder live ist. Der Wechsel setzt die vier Werte, die er nennt; sie bleiben danach Deine zum Ändern.',
+	'[[/_admin/config/label/mode]]'			=> 'Modus',
+	'[[/_admin/config/hint/mode]]'			=> 'Entwicklung zeigt Fehler auf der Seite, cacht nichts und fragt nur, bevor etwas gelöscht wird. Produktion verbirgt Fehler, cacht Seiten eine Stunde und fragt vor jeder Löschung und jeder größeren Änderung.',
+	'[[/_admin/config/option/production]]'	=> 'Produktion',
+	'[[/_admin/config/option/development]]'	=> 'Entwicklung',
 	'[[/_admin/config/group/diagnostics]]'	=> 'Fehler und Diagnose',
 	'[[/_admin/config/intro/diagnostics]]'	=> 'Was passiert, wenn PHP einen Fehler meldet, wie das Session-Cookie gesetzt wird und als welche Adresse ein Besucher zählt.',
 	'[[/_admin/config/group/editor]]'		=> 'Workbench',
@@ -31,6 +37,7 @@ return [
 
 	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
 	'[[/_admin/config/manual/intro]]'	=> 'Einstellungen, die für das ganze Projekt gelten und sich selten ändern – meist für Entwickler.',
+	'[[/_admin/config/manual/mode]]'	=> '„Modus“ sagt, ob die Website gebaut wird oder live ist. Der Wechsel zu Entwicklung zeigt Fehler, protokolliert sie, schaltet den Seiten-Cache aus und setzt seine Lebensdauer auf 60 Sekunden; der Wechsel zu Produktion verbirgt Fehler, protokolliert sie, schaltet den Cache ein und setzt die Lebensdauer auf 3600 Sekunden. Die vier bleiben Felder weiter unten und sind einzeln änderbar.',
 	'[[/_admin/config/manual/error]]'	=> '„Fehler und Diagnose“ bestimmt, ob PHP-Fehler in ein Log geschrieben oder auf der Website gezeigt werden, wie das Sitzungs-Cookie ausgestellt wird und welche Proxys vor der Website stehen. Eine Live-Website zeigt nie Fehler.',
 	'[[/_admin/config/manual/backup]]'	=> '„Tägliche verschlüsselte Sicherung“ schaltet die automatische Sicherung ein oder aus. Zurückgespielt werden die Backups unter Backups.',
 	'[[/_admin/config/manual/log]]'	=> '„Aktivitätsprotokoll führen“ schaltet das Log ein oder aus: eine Zeile je Anmeldung und je Änderung, vierzehn Tage aufgehoben.',

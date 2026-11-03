@@ -3,7 +3,7 @@
 /**
  *	Nino										A compact filesystembased php framework
  *	admin.js								"Config" module: the project's settings as one form -
- *													error handling, the _admin features that can be
+ *													the mode, error handling, the _admin features that can be
  *													switched off, and the page cache. See
  *													Admin/Admin.php beside it for the field schema this
  *													renders and validates against; the shape of every
@@ -213,7 +213,30 @@
 			if( field.type === 'lines' )
 				return Nino.admin.config._renderLines( field );
 
+			if( field.type === 'select' )
+				return Nino.admin.config._renderSelect( field );
+
 			return null;
+		},
+
+		/**
+		 *	A setting picked from a fixed list, as the design system's select.
+		 *	The server sends each option as its value and the fill key of its
+		 *	word (see Config::apiList()), so the list reads in the interface
+		 *	language
+		 *
+		 *	@param		{Object}	field
+		 *
+		 *	@return		{Element}
+		 */
+		_renderSelect : function( field ) {
+			return Nino.adminUi.selectField( {
+				key 			: field.key,
+				value 		: field.value,
+				label 		: Nino.adminUi.text( field.label ),
+				hint 			: Nino.adminUi.text( field.hint ),
+				options 	: field.options.map( function( option ) { return { value : option.value, label : Nino.adminUi.text( option.label ) } } ),
+			} );
 		},
 
 		/**
@@ -336,8 +359,14 @@
 				if( typeof Nino.admin.dirty === 'object' )
 					Nino.admin.dirty.snapshot( 'config' );
 
+				// The chip in the rail and the questions the workbench asks
+				// follow the mode the server now holds (see Nino.admin.mode)
+				if( typeof Nino.admin.mode === 'object' )
+					Nino.admin.mode.set( response.mode );
+
 				// Reloaded rather than left as typed: the number fields come
-				// back as the ints config.php now holds
+				// back as the ints config.php now holds - and, after a switch
+				// of the mode, the four values the switch wrote
 				Nino.admin.config.init();
 				report( true );
 			} );

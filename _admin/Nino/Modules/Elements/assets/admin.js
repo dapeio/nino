@@ -3078,36 +3078,45 @@
 		 */
 		_removeImage : function( key, name, hiddenInput, preview, msg, removeBtn ) {
 
-			if( wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/elements/confirm/image-remove'), name ) ) === false )
-				return;
+			Nino.adminUi.confirm( 'destructive', {
+				message		: Nino.adminUi.format( Nino.content.getText('/_admin/elements/confirm/image-remove'), name ),
+				yes				: Nino.content.getText('/_admin/common/label/remove'),
+				no				: Nino.content.getText('/_admin/common/label/cancel'),
+				opener		: removeBtn,
+				onChoose	: function( ok ) {
 
-			removeBtn.disabled = true;
-			msg.className = 'nino-admin-field-image-msg';
-			msg.textContent = Nino.content.getText('/_admin/elements/msg/pending');
+					if( ok === false )
+						return;
 
-			// The record is taken now, as for an upload: the person may step to
-			// another element or language while the request is on its way
-			Nino.admin.elements._apiCall( 'removeimage', {
-				type 		: Nino.admin.elements._currentType,
-				uri 		: Nino.admin.elements._currentUri,
-				locale 	: Nino.admin.elements._selectedLocale,
-				key 		: key,
-			}, function( status, response ) {
+					removeBtn.disabled = true;
+					msg.className = 'nino-admin-field-image-msg';
+					msg.textContent = Nino.content.getText('/_admin/elements/msg/pending');
 
-				removeBtn.disabled = false;
+					// The record is taken now, as for an upload: the person may step to
+					// another element or language while the request is on its way
+					Nino.admin.elements._apiCall( 'removeimage', {
+						type 		: Nino.admin.elements._currentType,
+						uri 		: Nino.admin.elements._currentUri,
+						locale 	: Nino.admin.elements._selectedLocale,
+						key 		: key,
+					}, function( status, response ) {
 
-				if( status !== 200 || response === null ) {
-					msg.className = 'nino-admin-field-image-msg is-error';
-					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/elements/error/image-remove' );
-					return;
-				}
+						removeBtn.disabled = false;
 
-				Nino.admin.touch( 'elements' );
+						if( status !== 200 || response === null ) {
+							msg.className = 'nino-admin-field-image-msg is-error';
+							msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/elements/error/image-remove' );
+							return;
+						}
 
-				hiddenInput.value = '';
-				preview.hidden = true;
-				removeBtn.hidden = true;
-				msg.textContent = Nino.content.getText('/_admin/elements/msg/image-removed');
+						Nino.admin.touch( 'elements' );
+
+						hiddenInput.value = '';
+						preview.hidden = true;
+						removeBtn.hidden = true;
+						msg.textContent = Nino.content.getText('/_admin/elements/msg/image-removed');
+					} );
+				},
 			} );
 		},
 
@@ -3202,25 +3211,33 @@
 			if( Nino.admin.elements._saving === true )
 				return;
 
-			if( wn.confirm( Nino.content.getText('/_admin/elements/confirm/delete') ) === false )
-				return;
+			Nino.adminUi.confirm( 'destructive', {
+				message		: Nino.content.getText('/_admin/elements/confirm/delete'),
+				yes				: Nino.content.getText('/_admin/common/label/delete'),
+				no				: Nino.content.getText('/_admin/common/label/cancel'),
+				onChoose	: function( ok ) {
 
-			const type = Nino.admin.elements._currentType;
-			const model = Nino.admin.elements._currentModel;
-			const title = Nino.admin.elements._currentTypeTitle;
-			Nino.admin.elements._saving = true;
-			Nino.admin.elements._setFormPending( true );
+					if( ok === false )
+						return;
 
-			Nino.admin.elements._apiCall( 'delete', { type : type, uri : Nino.admin.elements._currentUri }, function( status, response ) {
-				if( status !== 200 ) {
-					Nino.admin.elements._saving = false;
-					Nino.admin.elements._setFormPending( false );
-					Nino.admin.elements._status.error( status, response, '/_admin/elements/error/save' );
-					return;
-				}
-				Nino.admin.touch( 'elements' );
-				Nino.admin.elements._saving = false;
-				Nino.admin.elements._selectType( type, model, title, true );
+					const type = Nino.admin.elements._currentType;
+					const model = Nino.admin.elements._currentModel;
+					const title = Nino.admin.elements._currentTypeTitle;
+					Nino.admin.elements._saving = true;
+					Nino.admin.elements._setFormPending( true );
+
+					Nino.admin.elements._apiCall( 'delete', { type : type, uri : Nino.admin.elements._currentUri }, function( status, response ) {
+						if( status !== 200 ) {
+							Nino.admin.elements._saving = false;
+							Nino.admin.elements._setFormPending( false );
+							Nino.admin.elements._status.error( status, response, '/_admin/elements/error/save' );
+							return;
+						}
+						Nino.admin.touch( 'elements' );
+						Nino.admin.elements._saving = false;
+						Nino.admin.elements._selectType( type, model, title, true );
+					} );
+				},
 			} );
 		},
 	};

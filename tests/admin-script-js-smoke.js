@@ -11,7 +11,7 @@
 const fs 	= require('fs');
 const path 	= require('path');
 const vm 		= require('vm');
-const { check, done, load, element, findAll } = require( './harness.js' );
+const { check, done, load, element, findAll, fills } = require( './harness.js' );
 
 const sandbox = {
 	console : console,
@@ -1924,9 +1924,280 @@ function manualWorld() {
 	check( 'after every one of them the "?" can ask again', m.asked.length === 9 );
 }
 
+/*	The mode the project is in, and what the shell makes of it: the chip, the
+	weight a question has to have to be asked (Nino.admin.mode.policy()), and
+	Ctrl+S, which saves what is on screen through the registry. A context of its
+	own: a page with the shell's root, its chip and a document that keeps the
+	listeners it is given	*/
+{
+	const words = fills('_admin/text/en_US.php');
+	const modeNodes = {};
+	const modeDialog = { open : null };
+	const modeListeners = {};
+	const modeNode = function( id, dataset ) {
+		const created = node( id, dataset );
+		created.textContent = '';
+		created.title = '';
+		created.setAttribute = function( name, value ) { created.attributes[name] = String( value ); if( name === 'title' ) created.title = String( value ) };
+		created.removeAttribute = function( name ) { delete created.attributes[name] };
+		modeNodes[id] = created;
+		return created;
+	};
+	const modeWrap = modeNode( 'admin-page-wrap', { mode : 'production', maintenance : '0' } );
+	const chip = modeNode( 'admin-mode-chip', {} );
+	chip.setAttribute( 'href', '#config' );
+	const modeContent = node( 'admin-content-wrap', {} );
+	modeContent.addEventListener = function() {};
+	modeNodes['admin-content-wrap'] = modeContent;
+	const modeHash = { hash : '#users' };
+	const modeCtx = {
+		console : console,
+		location : modeHash,
+		history : { replaceState : function() {} },
+		addEventListener : function() {},
+		removeEventListener : function() {},
+		document : {
+			documentElement : null, body : null,
+			getElementById : function( id ) { return modeNodes[id] ?? null },
+			// The dialog of a question, where one is open
+			querySelector : function( selector ) { return selector === 'dialog[open]' ? modeDialog.open : null },
+			createElement : function() { return node( '', {} ) },
+			addEventListener : function( type, fn ) { ( modeListeners[type] = modeListeners[type] ?? [] ).push( fn ) },
+		},
+	};
+	modeCtx.window = modeCtx;
+	modeCtx.Nino = { events : { bindCallback : function() {} }, content : { getText : function( key ) { return words[key] ?? key } } };
+	const modeContext = vm.createContext( modeCtx );
+	load( '_admin/assets/Nino.admin.js', modeContext );
+	load( '_admin/assets/script.js', modeContext );
+	const mode = modeCtx.Nino.admin.mode;
+
+	// A page without the shell's root answers production and writes nothing anywhere
+	const rootless = modeCtx.document.getElementById;
+	modeCtx.document.getElementById = function() { return null };
+	mode.set( 'development' );
+	check( 'a page without the shell\'s root is a production page, and set() has nothing to write to', mode.current() === 'production' );
+	modeCtx.document.getElementById = rootless;
+
+	modeNodes['admin-content-config'] = node( 'admin-content-config', {} );
+	mode.init();
+	check( 'init() draws the chip: the word of the mode and the sentence of the mode as its title, and no class of a mode that is not on', chip.textContent === words['/_admin/mode/word/production'] && chip.title === words['/_admin/mode/hint/production']
+		&& chip.classList.contains('nino-admin-mode-chip--development') === false && chip.dataset.initial === chip.textContent.charAt(0) );
+	check( '...and keeps the link to the Config panel where the account has the panel', chip.getAttribute('href') === '#config' );
+
+	delete modeNodes['admin-content-config'];
+	mode.init();
+	check( 'an account without the Config panel gets the chip without the link', chip.getAttribute('href') === null );
+	chip.setAttribute( 'href', '#config' );
+
+	mode.set( 'development' );
+	check( 'set() writes the mode on the shell and draws the chip again: its word, its sentence, its colour class', modeWrap.dataset.mode === 'development' && mode.current() === 'development'
+		&& chip.textContent === words['/_admin/mode/word/development'] && chip.title === words['/_admin/mode/hint/development'] && chip.classList.contains('nino-admin-mode-chip--development') === true
+		&& chip.dataset.initial === chip.textContent.charAt(0) && chip.textContent !== words['/_admin/mode/word/production'] );
+	mode.set( 'staging' );
+	mode.set( undefined );
+	mode.set( '' );
+	mode.set( 'Production' );
+	check( 'a value that is no mode is ignored by set(): the mode, the chip and the class stay', modeWrap.dataset.mode === 'development' && mode.current() === 'development' && chip.textContent === words['/_admin/mode/word/development'] && chip.classList.contains('nino-admin-mode-chip--development') === true );
+	mode.set( 'production' );
+	check( 'set() takes the class off with the mode', mode.current() === 'production' && chip.classList.contains('nino-admin-mode-chip--development') === false && chip.textContent === words['/_admin/mode/word/production'] );
+	modeWrap.dataset.mode = 'staging';
+	check( 'a shell that says anything but development is production', mode.current() === 'production' );
+	modeWrap.dataset.mode = 'production';
+
+	// The matrix: the three weights, a weight nobody named, the two modes, the maintenance page up and down
+	const live = words['/_admin/mode/confirm/live'];
+	const expected = {
+		production : { routine : [ true, '' ], big : [ true, live ], destructive : [ true, '' ], nonsense : [ true, '' ] },
+		development : { routine : [ false, '' ], big : [ false, '' ], destructive : [ true, '' ], nonsense : [ true, '' ] },
+	};
+	const wrong = [];
+	[ 'production', 'development' ].forEach( function( kind ) {
+		[ false, true ].forEach( function( maintenance ) {
+			mode.set( kind );
+			mode.maintenance( maintenance );
+			Object.keys( expected[kind] ).forEach( function( level ) {
+				const policy = mode.policy( level );
+				const note = kind === 'production' && level === 'big' && maintenance === true ? '' : expected[kind][level][1];
+				if( policy.ask !== expected[kind][level][0] || policy.note !== note )
+					wrong.push( kind+ '/'+ ( maintenance ? 'maintenance' : 'live' )+ '/'+ level+ ' '+ JSON.stringify( policy ) );
+			} );
+		} );
+	} );
+	check( 'policy() answers the matrix of weight, mode and maintenance page: a site being built asks only before what cannot be undone, a live one asks about everything and warns before a big change unless the maintenance page is up'+ ( wrong.length === 0 ? '' : ' - '+ wrong.join( '; ' ) ), wrong.length === 0 );
+	check( '...and the warning is a sentence the shell has', live !== undefined && live !== '' );
+	mode.set( 'production' );
+	modeWrap.dataset.maintenance = '1';
+	mode.init();
+	check( 'init() takes the maintenance state the page was drawn with: no warning on a big question while the maintenance page is up', mode.policy( 'big' ).note === '' );
+	mode.maintenance( false );
+	check( 'maintenance( false ) brings the warning back, and only true is a maintenance page', mode.policy( 'big' ).note === live && ( mode.maintenance( 'yes' ), mode.policy( 'big' ).note === live ) );
+	modeWrap.dataset.maintenance = '0';
+	mode.init();
+
+	// --- Ctrl+S --------------------------------------------------------------
+	const dirty = modeCtx.Nino.admin.dirty;
+	dirty.init( function() {} );
+	check( 'the registry listens for the key on the document, from its init()', ( modeListeners.keydown ?? [] ).length === 1 && modeListeners.keydown[0] === dirty.shortcut );
+
+	const key = function( init ) {
+		let prevented = 0;
+		const ev = Object.assign( { key : 's', ctrlKey : true, metaKey : false, altKey : false, shiftKey : false, preventDefault : function() { prevented++ } }, init );
+		modeListeners.keydown.forEach( function( fn ) { fn( ev ) } );
+		return prevented;
+	};
+	const log = [];
+	const state = { users : true };
+	let finish = null;
+	let refreshed = 0;
+	const realRefresh = dirty.refresh;
+	dirty.refresh = function() { refreshed++; return realRefresh() };
+	dirty._entries = {};
+	dirty.register( 'users', {
+		isDirty : function() { return state.users },
+		save : function( done ) { log.push( 'save' ); state.users = false; done( true ) },
+		discard : function() {},
+	} );
+	modeHash.hash = '#users';
+	mode.set( 'production' );
+
+	let prevented = key( {} );
+	check( 'Ctrl+S saves the panel that is on screen when it holds unsaved input', JSON.stringify( log ) === '["save"]' && prevented === 1 );
+	check( '...and the registry is free again, and the markers follow', dirty._saving === 0 && dirty._inSave === false && dirty._asking === false && refreshed >= 1 );
+	prevented = key( {} );
+	check( 'a panel that holds nothing unsaved has nothing saved - and the browser still does not get the key', JSON.stringify( log ) === '["save"]' && prevented === 1 );
+
+	state.users = true;
+	prevented = key( { ctrlKey : false, metaKey : true } );
+	check( 'Cmd+S does what Ctrl+S does', JSON.stringify( log ) === '["save","save"]' && prevented === 1 );
+	state.users = true;
+	key( { key : 'S' } );
+	check( '...and so does the capital letter, where caps lock is on', log.length === 3 );
+
+	state.users = true;
+	const before = log.length;
+	const refused = [ key( { shiftKey : true } ), key( { altKey : true } ), key( { ctrlKey : false } ), key( { key : 'a' } ), key( { key : 'Enter' } ) ];
+	check( 'Ctrl+Shift+S, Alt+S, a bare S and another key do nothing, and leave the browser its answer to them', log.length === before && refused.every( function( n ) { return n === 0 } ) );
+	check( '...Ctrl+Alt+S does nothing either', ( key( { altKey : true, metaKey : true } ), log.length === before ) );
+	state.users = false;
+
+	// no entry for what is on screen
+	modeHash.hash = '#nobody';
+	prevented = key( {} );
+	check( 'a panel that registered nothing has nothing saved, and the key is still taken from the browser', log.length === before && prevented === 1 );
+	modeHash.hash = '';
+	check( '...and so is an address that names no panel', key( {} ) === 1 && log.length === before );
+	modeHash.hash = '#users';
+
+	// a Save that is still running
+	let saves = 0;
+	dirty._entries.users.save = function( done ) { saves++; finish = done };
+	state.users = true;
+	key( {} );
+	check( 'while the save runs the registry is busy', saves === 1 && dirty._saving === 1 && dirty._asking === true );
+	prevented = key( {} );
+	check( '...a second press is the same press arriving twice: nothing is saved again, and the browser still does not save the page', saves === 1 && prevented === 1 );
+	let stayed = 0;
+	dirty.guard( [ 'users' ], function() { stayed += 10 }, function() { stayed++ } );
+	check( '...and an exit that comes meanwhile - a link, the log out - asks nothing and is told to stay', stayed === 1 && dirty._saving === 1 );
+	finish( true );
+	check( 'done( true ) hands the registry back', dirty._saving === 0 && dirty._asking === false && dirty._inSave === false );
+	finish( true );
+	check( '...once, however often it is called', dirty._saving === 0 );
+	key( {} );
+	check( '...and the next press saves again', saves === 2 );
+	finish( false );
+	check( 'a save that fails hands it back too', dirty._saving === 0 && dirty._asking === false );
+
+	// a question that is open, a Save the shell answered to one that runs, a save being called
+	state.users = true;
+	dirty._asking = true;
+	key( {} );
+	check( 'nothing is saved while a question is open', saves === 2 );
+	dirty._asking = false;
+	dirty._saving = 1;
+	key( {} );
+	check( '...nor while a Save answered to a question runs', saves === 2 );
+	dirty._saving = 0;
+	dirty._inSave = true;
+	key( {} );
+	check( '...nor from inside a save that is being called', saves === 2 );
+	dirty._inSave = false;
+
+	// a dialog stands over the page: a question of the shell or a panel's own
+	modeDialog.open = {};
+	state.users = true;
+	prevented = key( {} );
+	check( 'nothing is saved while a dialog is open, whoever asked it, and the browser still does not get the key', saves === 2 && prevented === 1 );
+	modeDialog.open = null;
+
+	// a failure of a nested save leaves its mark until the run that saw it ends
+	dirty._entries.users.save = function( done ) { saves++; finish = done };
+	dirty._failShown = true;
+	key( {} );
+	finish( false );
+	check( 'a run ends as a Save answered to a question does: the mark of a nested failure does not outlive it, so that a later failed save brings its form on screen', dirty._failShown === false && dirty._saving === 0 );
+
+	// a function that throws
+	dirty._entries.users.save = function() { throw new Error( 'broken' ) };
+	let thrown = '';
+	try { key( {} ) } catch( error ) { thrown = error.message }
+	check( 'a save that throws is not swallowed, and does not leave the registry shut', thrown === 'broken' && dirty._saving === 0 && dirty._asking === false && dirty._inSave === false );
+
+	// the entry's own function for the mode
+	const ran = [];
+	state.users = false;
+	dirty.register( 'users', {
+		isDirty : function() { return state.users },
+		save : function( done ) { ran.push( 'save' ); done( true ) },
+		discard : function() {},
+		shortcut : {
+			development : function( done ) { ran.push( 'development' ); done( true ) },
+			production : function( done ) { ran.push( 'production' ); finish = done },
+		},
+	} );
+	mode.set( 'production' );
+	key( {} );
+	check( 'an entry\'s function for the mode the project is in is what Ctrl+S calls - also when nothing is unsaved - and its save is not', JSON.stringify( ran ) === '["production"]' && dirty._saving === 1 );
+	key( {} );
+	check( '...and a run of it is a run: a second press meanwhile does nothing', ran.length === 1 );
+	finish( true );
+	check( '...which ends with done( ok )', dirty._saving === 0 && dirty._asking === false );
+	mode.set( 'development' );
+	key( {} );
+	check( 'the other mode calls the other function', JSON.stringify( ran ) === '["production","development"]' && dirty._saving === 0 );
+	state.users = true;
+	key( {} );
+	check( '...whether the entry holds unsaved input or not', JSON.stringify( ran ) === '["production","development","development"]' );
+
+	dirty.register( 'users', {
+		isDirty : function() { return state.users },
+		save : function( done ) { ran.push( 'save' ); state.users = false; done( true ) },
+		discard : function() {},
+		shortcut : { production : function( done ) { ran.push( 'production' ); done( true ) } },
+	} );
+	state.users = false;
+	key( {} );
+	check( 'an entry with no function for this mode saves, as an entry with none does: nothing while it is clean', JSON.stringify( ran ) === '["production","development","development"]' );
+	state.users = true;
+	key( {} );
+	check( '...and its save while it holds unsaved input', ran[ran.length - 1] === 'save' && dirty._saving === 0 );
+	dirty.refresh = realRefresh;
+
+	// watchForm() hands the function on
+	const form = node( 'a-form', {} );
+	form.querySelector = function() { return null };
+	form.querySelectorAll = function() { return [] };
+	const given = { production : function() {} };
+	dirty.watchForm( 'with', function() { return form }, function() {}, undefined, given );
+	dirty.watchForm( 'without', function() { return form }, function() {} );
+	check( 'watchForm() registers the functions it is given for Ctrl+S with the entry, and none where it is given none', dirty._entries.with.shortcut === given && dirty._entries.without.shortcut === undefined );
+}
+
 // the wiring in the shell's source
 const shellSource = fs.readFileSync( path.join( __dirname, '../_admin/assets/script.js' ), 'utf8' );
 check( 'the shell wires the registry up from onReady()', /Nino\.admin\.dirty\.init\(\s*function\( name \)/.test( shellSource ) === true );
+check( 'the shell draws the chip of the mode from onReady() too', /onReady : function\(\) \{[\s\S]*?Nino\.admin\.mode\.init\(\);/.test( shellSource ) === true );
 check( 'the shell wires the "?" of the panes up from onReady() too', /Nino\.admin\.onReady = |onReady : function\(\) \{[\s\S]*?Nino\.admin\.manual\.init\(\);/.test( shellSource ) === true );
 
 // the stylesheet's two rules that depend on what the script puts into the nav and the bar

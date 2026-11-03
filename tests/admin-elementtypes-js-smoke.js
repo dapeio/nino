@@ -223,10 +223,23 @@ check( '...and a field added in the form has none', elementTypes._fields.find( f
 	sandbox.document.getElementById = id => nodes[id] ?? null;
 	sandbox.document.querySelector = () => ( { checked : false } );
 	sandbox.Nino.content = { getText : key => key === '/_admin/types/confirm/rename' ? 'Rename %s?' : ( key === '/_admin/types/notice/references' ? 'Still using the old name: %s' : ( key === '/_admin/types/reference/template' ? 'template %s (%s)' : key ) ) };
-	sandbox.Nino.adminUi = { api : { errorText : status => 'error '+ status }, format : ( text, ...params ) => { let at = 0; return String( text ).replace( /%[sdn]/g, token => at < params.length ? String( params[at++] ) : token ) } };
 	const questions = [];
+	const levels = [];
 	let answer = true;
-	sandbox.confirm = question => { questions.push( question ); return answer };
+	// Another question open: the design system answers false and calls nothing back
+	let busy = false;
+	sandbox.Nino.adminUi = {
+		api : { errorText : status => 'error '+ status },
+		format : ( text, ...params ) => { let at = 0; return String( text ).replace( /%[sdn]/g, token => at < params.length ? String( params[at++] ) : token ) },
+		confirm : ( level, options ) => {
+			if( busy === true )
+				return false;
+			levels.push( level );
+			questions.push( options.message );
+			options.onChoose( answer );
+			return true;
+		},
+	};
 	const sent = [];
 	elementTypes._apiCall = ( endpoint, payload, callback ) => sent.push( { endpoint : endpoint, payload : payload, callback : callback } );
 	elementTypes._isNew = false;
@@ -237,11 +250,16 @@ check( '...and a field added in the form has none', elementTypes._fields.find( f
 	let outcome = null;
 	answer = false;
 	elementTypes._save( ok => { outcome = ok } );
-	check( 'a save with a rename asks first, naming it, and a No sends nothing and says so', questions.length === 1 && questions[0] === 'Rename title \u2192 headline?' && sent.length === 0 && outcome === false );
+	check( 'a save with a rename asks first, naming it, as a big question, and a No sends nothing and says so', questions.length === 1 && questions[0] === 'Rename title \u2192 headline?' && levels.join() === 'big' && sent.length === 0 && outcome === false );
+	busy = true;
+	outcome = null;
+	elementTypes._save( ok => { outcome = ok } );
+	check( '...a question that could not be asked, another being open, ends the save as a No does', questions.length === 1 && sent.length === 0 && outcome === false );
+	busy = false;
 	answer = true;
 	questions.length = 0;
 	elementTypes._save();
-	check( '...a Yes sends it, with the renames beside the model', sent.length === 1 && sent[0].endpoint === 'save' && JSON.stringify( sent[0].payload.renames ) === '{"title":"headline"}' );
+	check( '...a Yes sends it, with the renames beside the model - once, and asked once', questions.length === 1 && sent.length === 1 && sent[0].endpoint === 'save' && JSON.stringify( sent[0].payload.renames ) === '{"title":"headline"}' );
 
 	elementTypes._init = elementTypes.init;
 	elementTypes.init = () => {};
@@ -267,7 +285,6 @@ check( '...and a field added in the form has none', elementTypes._fields.find( f
 	check( 'creating a type posts no renames', sent.length === 1 && sent[0].endpoint === 'create' && 'renames' in sent[0].payload === false );
 	elementTypes._isNew = false;
 	elementTypes.init = elementTypes._init;
-	delete sandbox.confirm;
 }
 
 

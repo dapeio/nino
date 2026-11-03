@@ -417,6 +417,11 @@
 		 *	one where there is none), Cancel the 'secondary' one: nothing is
 		 *	thrown away by agreeing to the question as it is worded
 		 *
+		 *	A `note` is a second paragraph under the message - what the caller
+		 *	has to add to the question without making it another one (see
+		 *	confirm()); a browser without <dialog> is asked the two with a blank
+		 *	line between them
+		 *
 		 *	The same dialog holds a text that is read rather than answered, a
 		 *	manual (see manualDialog()): `content` is drawn in place of the
 		 *	message, and the dialog keeps its title and its answers in view while
@@ -427,6 +432,7 @@
 		 *	@param		{string}		options.message				The question - what a browser without <dialog> is asked, with a `content`
 		 *	@param		{Element}		[options.content]			Drawn in place of the message
 		 *	@param		{string}		[options.className]		Added to the dialog's own class
+		 *	@param		{string}		[options.note]				A second paragraph under the message
 		 *	@param		{Element}		[options.opener]			What gets the focus back when the dialog closes, where it is not what had it when the dialog opened: a button that was clicked has the focus in Chromium and Firefox and not in Safari
 		 *	@param		{Array}			options.choices				[ { value, label, kind } ], kind 'primary', 'danger' or 'secondary'
 		 *	@param		{Function}	options.onChoose			Called once with the chosen value
@@ -441,10 +447,11 @@
 			const choices = options.choices;
 			const cancel 	= choices.find( function( choice ) { return choice.kind === 'secondary' } ) ?? choices[choices.length - 1];
 			const dialog 	= dc.createElement('dialog');
+			const hasNote = typeof options.note === 'string' && options.note !== '' && ( options.content === undefined || options.content === null );
 
 			if( typeof dialog.showModal !== 'function' ) {
 				const yes = choices.find( function( choice ) { return choice.kind === 'primary' } ) ?? choices.find( function( choice ) { return choice.kind === 'danger' } ) ?? cancel;
-				options.onChoose( wn.confirm( options.message ) === true ? yes.value : cancel.value );
+				options.onChoose( wn.confirm( hasNote === true ? options.message+ '\n\n'+ options.note : options.message ) === true ? yes.value : cancel.value );
 				return true;
 			}
 
@@ -459,7 +466,7 @@
 			// A message is what the dialog is about and is read out with it; a
 			// manual is as long as it is and is read when it is looked at
 			if( hasContent === false )
-				dialog.setAttribute( 'aria-describedby', 'nino-admin-choice-text' );
+				dialog.setAttribute( 'aria-describedby', hasNote === true ? 'nino-admin-choice-text nino-admin-choice-note' : 'nino-admin-choice-text' );
 
 			const body = dc.createElement('div');
 			body.className = 'nino-admin-dialog-body';
@@ -484,6 +491,13 @@
 				text.id = 'nino-admin-choice-text';
 				text.textContent = options.message;
 				body.appendChild( text );
+
+				if( hasNote === true ) {
+					const note = dc.createElement('p');
+					note.id = 'nino-admin-choice-note';
+					note.textContent = options.note;
+					body.appendChild( note );
+				}
 			}
 
 			const actions = dc.createElement('div');
@@ -519,6 +533,58 @@
 			dialog.showModal();
 
 			return true;
+		},
+
+		/**
+		 *	A question with two answers, asked as heavily as the workbench's mode
+		 *	asks it. `level` says what the action is worth - 'routine' is done all
+		 *	day, 'big' reaches visitors or many records at once, 'destructive'
+		 *	cannot be taken back - and the shell, which is the policy
+		 *	(Nino.admin.mode.policy()), answers whether the question is asked at
+		 *	all and what has to be added to it. A site that is being built asks
+		 *	only before a destructive action, and onChoose( true ) comes at once,
+		 *	before confirm() returns, where the answer is not asked for. Where
+		 *	there is no shell with a policy - the setup wizard, a test, a shell
+		 *	older than the policy - every question is asked, as confirm() always
+		 *	asked.
+		 *
+		 *	The question is choiceDialog()'s and owns no words: `yes` and `no`
+		 *	are what the answers are called, in the interface language. The note
+		 *	the policy adds is drawn under the message as a paragraph of its own.
+		 *
+		 *	@param		{string}		level									'routine', 'big' or 'destructive'; anything else is taken for the last
+		 *	@param		{Object}		options
+		 *	@param		{string}		[options.title]
+		 *	@param		{string}		options.message					The question
+		 *	@param		{string}		options.yes							The label of the answer that goes on
+		 *	@param		{string}		options.no							The label of the answer that does not
+		 *	@param		{string}		[options.kind]					'danger' or 'primary' for the answer that goes on: 'danger' for a destructive level, else 'primary'
+		 *	@param		{Element}		[options.opener]				See choiceDialog()
+		 *	@param		{Function}	options.onChoose				Called once with true or false - not at all when false is returned
+		 *
+		 *	@return		{boolean}												false when another question is already open and this one was not asked, which is the same click arriving twice
+		 */
+		confirm : function( level, options ) {
+
+			const mode 		= shell().mode;
+			const policy 	= typeof mode === 'object' && mode !== null && typeof mode.policy === 'function' ? mode.policy( level ) : { ask : true, note : '' };
+
+			if( policy.ask === false ) {
+				options.onChoose( true );
+				return true;
+			}
+
+			return Nino.adminUi.choiceDialog( {
+				title			: options.title,
+				message		: options.message,
+				note			: policy.note,
+				opener		: options.opener,
+				choices		: [
+					{ value : 'yes', label : options.yes, kind : options.kind ?? ( level === 'routine' || level === 'big' ? 'primary' : 'danger' ) },
+					{ value : 'no', label : options.no, kind : 'secondary' },
+				],
+				onChoose	: function( value ) { options.onChoose( value === 'yes' ) },
+			} );
 		},
 
 		/**
@@ -2929,7 +2995,7 @@
 		 *	  - boot     'lazy' (the default): the first showCurrent() starts the
 		 *	             panel; 'ready': the ready event does, and a showCurrent()
 		 *	             that comes first starts it too, once
-		 *	  - dirty    { isDirty, save, discard, bar }, registered under the uri at
+		 *	  - dirty    { isDirty, save, discard, bar, shortcut }, registered under the uri at
 		 *	             the first init() where the shell has its registry
 		 *	  - error    the fill key of a failed load, '/_admin/<uri>/error/load'
 		 *	             unless it is given

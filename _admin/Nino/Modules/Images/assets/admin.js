@@ -787,29 +787,38 @@
 		 */
 		_removeImage : function( slot, preview, msg, removeBtn ) {
 
-			if( wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/images/confirm/remove'), slot.label ) ) === false )
-				return;
+			Nino.adminUi.confirm( 'destructive', {
+				message		: Nino.adminUi.format( Nino.content.getText('/_admin/images/confirm/remove'), slot.label ),
+				yes				: Nino.content.getText('/_admin/common/label/remove'),
+				no				: Nino.content.getText('/_admin/common/label/cancel'),
+				opener		: removeBtn,
+				onChoose	: function( ok ) {
 
-			removeBtn.disabled = true;
-			msg.className = 'nino-admin-field-image-msg';
-			msg.textContent = Nino.content.getText('/_admin/images/msg/pending');
+					if( ok === false )
+						return;
 
-			Nino.admin.images._apiCall( 'remove', { uri : slot.uri }, function( status, response ) {
+					removeBtn.disabled = true;
+					msg.className = 'nino-admin-field-image-msg';
+					msg.textContent = Nino.content.getText('/_admin/images/msg/pending');
 
-				removeBtn.disabled = false;
+					Nino.admin.images._apiCall( 'remove', { uri : slot.uri }, function( status, response ) {
 
-				if( status !== 200 || response === null ) {
-					msg.className = 'nino-admin-field-image-msg is-error';
-					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/images/error/remove' );
-					return;
-				}
+						removeBtn.disabled = false;
 
-				Nino.admin.touch( 'slots' );
+						if( status !== 200 || response === null ) {
+							msg.className = 'nino-admin-field-image-msg is-error';
+							msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/images/error/remove' );
+							return;
+						}
 
-				slot.url = null;
-				preview.hidden = true;
-				removeBtn.hidden = true;
-				msg.textContent = Nino.content.getText('/_admin/images/msg/removed');
+						Nino.admin.touch( 'slots' );
+
+						slot.url = null;
+						preview.hidden = true;
+						removeBtn.hidden = true;
+						msg.textContent = Nino.content.getText('/_admin/images/msg/removed');
+					} );
+				},
 			} );
 		},
 

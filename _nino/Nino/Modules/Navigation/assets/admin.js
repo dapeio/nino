@@ -708,20 +708,28 @@
 		 */
 		_delete : function() {
 
-			if( wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/navs/confirm/delete'), Nino.admin.navs._currentKey ) ) === false )
-				return;
+			Nino.adminUi.confirm( 'destructive', {
+				message		: Nino.adminUi.format( Nino.content.getText('/_admin/navs/confirm/delete'), Nino.admin.navs._currentKey ),
+				yes				: Nino.content.getText('/_admin/common/label/delete'),
+				no				: Nino.content.getText('/_admin/common/label/cancel'),
+				onChoose	: function( ok ) {
 
-			const msg = dc.getElementById('navs-form-msg');
-			msg.textContent = Nino.content.getText('/_admin/common/msg/deleting');
+					if( ok === false )
+						return;
 
-			Nino.admin.navs._apiCall( 'delete', { key : Nino.admin.navs._currentKey }, function( status, response ) {
-				if( status !== 200 || response === null ) {
-					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/delete' );
-					return;
-				}
-				Nino.admin.touch( 'navigations' );
-				Nino.admin.navs._showList();
-				Nino.admin.navs._apply( response );
+					const msg = dc.getElementById('navs-form-msg');
+					msg.textContent = Nino.content.getText('/_admin/common/msg/deleting');
+
+					Nino.admin.navs._apiCall( 'delete', { key : Nino.admin.navs._currentKey }, function( status, response ) {
+						if( status !== 200 || response === null ) {
+							msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/common/error/delete' );
+							return;
+						}
+						Nino.admin.touch( 'navigations' );
+						Nino.admin.navs._showList();
+						Nino.admin.navs._apply( response );
+					} );
+				},
 			} );
 		},
 	};

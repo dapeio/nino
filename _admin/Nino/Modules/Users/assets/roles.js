@@ -515,13 +515,28 @@
 				const after = roles.scopeState( value, scopes );
 				const leaving = scopes.filter( function( scope ) { return before[scope.scope] === true && after[scope.scope] !== true } );
 
-				if( leaving.length > 0 && wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/roles/scope/warning-leave'), Nino.adminUi.text( leaving[0].label ) ) ) === false ) {
-					rebuildPicker();
+				const apply = function() {
+					chosen = value;
+					refresh();
+				};
+
+				if( leaving.length === 0 ) {
+					apply();
 					return;
 				}
 
-				chosen = value;
-				refresh();
+				if( Nino.adminUi.confirm( 'big', {
+					message		: Nino.adminUi.format( Nino.content.getText('/_admin/roles/scope/warning-leave'), Nino.adminUi.text( leaving[0].label ) ),
+					yes				: Nino.content.getText('/_admin/common/label/remove'),
+					no				: Nino.content.getText('/_admin/common/label/cancel'),
+					onChoose	: function( ok ) {
+						if( ok === true )
+							apply();
+						else
+							rebuildPicker();
+					},
+				} ) === false )
+					rebuildPicker();
 			}
 
 			function buildPicker() {
@@ -666,11 +681,25 @@
 				const after = roles.scopeState( chosen.concat( [ perm ] ), scopes );
 				const entering = scopes.filter( function( scope ) { return before[scope.scope] !== true && after[scope.scope] === true } );
 
-				if( entering.length > 0 && wn.confirm( Nino.adminUi.format( Nino.content.getText('/_admin/roles/scope/warning'), Nino.adminUi.text( entering[0].label ) ) ) === false )
-					return;
+				const apply = function() {
+					chosen = chosen.concat( [ perm ] );
+					rebuildPicker();
+				};
 
-				chosen = chosen.concat( [ perm ] );
-				rebuildPicker();
+				if( entering.length === 0 ) {
+					apply();
+					return;
+				}
+
+				Nino.adminUi.confirm( 'big', {
+					message		: Nino.adminUi.format( Nino.content.getText('/_admin/roles/scope/warning'), Nino.adminUi.text( entering[0].label ) ),
+					yes				: Nino.content.getText('/_admin/common/label/add'),
+					no				: Nino.content.getText('/_admin/common/label/cancel'),
+					onChoose	: function( ok ) {
+						if( ok === true )
+							apply();
+					},
+				} );
 			}
 
 			// What the role may do, in words, and which panels are in detail mode
@@ -1069,23 +1098,31 @@
 		 */
 		_delete : function() {
 
-			if( wn.confirm( Nino.content.getText('/_admin/roles/confirm/delete') ) === false )
-				return;
+			Nino.adminUi.confirm( 'destructive', {
+				message		: Nino.content.getText('/_admin/roles/confirm/delete'),
+				yes				: Nino.content.getText('/_admin/common/label/delete'),
+				no				: Nino.content.getText('/_admin/common/label/cancel'),
+				onChoose	: function( ok ) {
 
-			const role = Nino.admin.roles._current;
-			const msg 	= dc.getElementById('roles-form-msg');
+					if( ok === false )
+						return;
 
-			Nino.admin.roles._apiCall( 'delete', { id : role.id }, function( status, response ) {
+					const role = Nino.admin.roles._current;
+					const msg 	= dc.getElementById('roles-form-msg');
 
-				if( status !== 200 ) {
-					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/roles/error/save' );
-					return;
-				}
+					Nino.admin.roles._apiCall( 'delete', { id : role.id }, function( status, response ) {
 
-				Nino.admin.roles._roles = Nino.admin.roles._roles.filter( function( r ) { return r.id !== role.id } );
-				Nino.admin.roles._current = null;
-				Nino.admin.roles._renderList();
-				Nino.admin.roles._showList();
+						if( status !== 200 ) {
+							msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/roles/error/save' );
+							return;
+						}
+
+						Nino.admin.roles._roles = Nino.admin.roles._roles.filter( function( r ) { return r.id !== role.id } );
+						Nino.admin.roles._current = null;
+						Nino.admin.roles._renderList();
+						Nino.admin.roles._showList();
+					} );
+				},
 			} );
 		},
 	};

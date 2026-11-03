@@ -196,23 +196,41 @@
 					return Nino.admin.translations._setMessage( Nino.adminUi.format( Nino.content.getText('/_admin/translations/error/json'), error.message ), true );
 				}
 
-				if( localeSelect.value === info.nativeLocale && wn.confirm( Nino.content.getText('/_admin/translations/confirm/native') ) === false )
+				const send = function() {
+
+					importBtn.disabled = true;
+					importBtn.textContent = Nino.content.getText('/_admin/translations/msg/importing');
+					Nino.admin.translations._apiCall( 'import', { targetLocale : localeSelect.value, translation : translation }, function( status, response ) {
+						importBtn.disabled = false;
+						importBtn.textContent = Nino.content.getText('/_admin/translations/label/importbtn');
+						if( status !== 200 || response === null )
+							return Nino.admin.translations._setMessage( Nino.adminUi.api.errorText( status, response, '/_admin/translations/error/import' ), true );
+
+						const imported = response.text.imported+ response.elements.imported;
+						const skipped = response.text.skipped+ response.elements.skipped;
+						let message = Nino.adminUi.format( Nino.content.getText('/_admin/translations/msg/imported'), imported, response.targetLocale, skipped );
+						if( response.errors.length > 0 )
+							message += ' '+ response.errors.join(' ');
+						Nino.admin.translations._setMessage( message, response.errors.length > 0 );
+					} );
+				};
+
+				// Importing into the native language overwrites the source the other
+				// languages are translated from: that is asked first
+				if( localeSelect.value !== info.nativeLocale ) {
+					send();
 					return;
+				}
 
-				importBtn.disabled = true;
-				importBtn.textContent = Nino.content.getText('/_admin/translations/msg/importing');
-				Nino.admin.translations._apiCall( 'import', { targetLocale : localeSelect.value, translation : translation }, function( status, response ) {
-					importBtn.disabled = false;
-					importBtn.textContent = Nino.content.getText('/_admin/translations/label/importbtn');
-					if( status !== 200 || response === null )
-						return Nino.admin.translations._setMessage( Nino.adminUi.api.errorText( status, response, '/_admin/translations/error/import' ), true );
-
-					const imported = response.text.imported+ response.elements.imported;
-					const skipped = response.text.skipped+ response.elements.skipped;
-					let message = Nino.adminUi.format( Nino.content.getText('/_admin/translations/msg/imported'), imported, response.targetLocale, skipped );
-					if( response.errors.length > 0 )
-						message += ' '+ response.errors.join(' ');
-					Nino.admin.translations._setMessage( message, response.errors.length > 0 );
+				Nino.adminUi.confirm( 'big', {
+					message		: Nino.content.getText('/_admin/translations/confirm/native'),
+					yes				: Nino.content.getText('/_admin/translations/label/importbtn'),
+					no				: Nino.content.getText('/_admin/common/label/cancel'),
+					opener		: importBtn,
+					onChoose	: function( ok ) {
+						if( ok === true )
+							send();
+					},
 				} );
 			} );
 

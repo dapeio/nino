@@ -239,10 +239,26 @@ check( '...and Back returns to the New user button', focusedNow() === addButton 
 
 fire( linkOf('c@example.com'), 'click' );
 byId('users-form-mail').focus();
+confirmAnswer = false;
+const beforeDelete = requests.length;
+panel._delete();
+check( 'a delete that is answered No sends nothing', requests.length === beforeDelete );
 confirmAnswer = true;
 panel._delete();
+check( '...and a Yes sends it', requests.length === beforeDelete + 1 && requests[beforeDelete].action === 'users/delete' );
 answer( 200, {} );
 check( 'a deleted account leaves the focus nothing to stand on in the form: it goes to the name of the panel', list.classList.contains('admin-hidden') === false && focusedNow() === paneTitle );
+
+// --- logging an account out everywhere ----------------------------------------
+
+panel._currentUser = { mail : 'd@example.com', isSelf : false };
+confirmAnswer = false;
+const beforeLogout = requests.length;
+panel._logoutAll();
+check( 'logging out everywhere is asked about first - and sends nothing when the answer is no', requests.length === beforeLogout );
+confirmAnswer = true;
+panel._logoutAll();
+check( '...and a Yes sends users/logoutall for that account', requests.length === beforeLogout + 1 && requests[beforeLogout].action === 'users/logoutall' && requests[beforeLogout].payload.username === 'd@example.com' );
 
 // --- where the shell's "unsaved" marker goes -----------------------------------
 

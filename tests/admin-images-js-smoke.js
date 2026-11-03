@@ -521,7 +521,8 @@ const slotsNino = {
 	content : { getText : text },
 };
 const slotsSandbox = { console : console, document : { createElement : element, getElementById : slotsNode, documentElement : null, body : null }, Nino : slotsNino };
-slotsSandbox.window = { Nino : slotsNino, confirm : () => true, alert : () => {} };
+let slotsConfirm = true;
+slotsSandbox.window = { Nino : slotsNino, confirm : () => slotsConfirm, alert : () => {} };
 const slotsContext = vm.createContext( slotsSandbox );
 load( '_admin/assets/Nino.admin.js', slotsContext );
 load( '_admin/Nino/Modules/Images/assets/slots.js', slotsContext );
@@ -547,6 +548,11 @@ slotsPanel._save();
 slotsAnswer( 200, {} );
 check( 'a slot that was saved does too', slotsSent[slotsSent.length - 1].endpoint === 'save' && slotsTouched.join() === 'slots,slots' );
 
+slotsConfirm = false;
+const slotsBefore = slotsSent.length;
+slotsPanel._delete();
+check( 'a delete that is answered No sends nothing', slotsSent.length === slotsBefore );
+slotsConfirm = true;
 slotsPanel._delete();
 slotsAnswer( 403, null );
 check( 'a delete that was refused does not', slotsSent[slotsSent.length - 1].endpoint === 'delete' && slotsTouched.length === 2 );

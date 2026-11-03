@@ -348,7 +348,8 @@ console.log('\nAdmin Roles - the drill-down');
 		},
 		Nino : page,
 	};
-	box.window = { Nino : page, confirm : function() { return true } };
+	let deleteAnswer = true;
+	box.window = { Nino : page, confirm : function() { return deleteAnswer } };
 	const drillContext = vm.createContext( box );
 	load( '_admin/assets/Nino.admin.js', drillContext );
 	page.adminUi.elementList = function() { return element('div') };
@@ -383,7 +384,13 @@ console.log('\nAdmin Roles - the drill-down');
 
 	fire( linkOf('author'), 'click' );
 	findAll( form, function( el ) { return el.id === 'roles-form-name' } )[0].focus();
+	deleteAnswer = false;
+	const sentBefore = sent.length;
 	drilled._delete();
+	check( 'a role delete that is answered No sends nothing and leaves the form', sent.length === sentBefore && list.classList.contains('admin-hidden') === true );
+	deleteAnswer = true;
+	drilled._delete();
+	check( '...and a Yes sends it', sent.length === sentBefore + 1 && sent[sent.length - 1].action === 'roles/delete' );
 	sent[sent.length - 1].callback( { status : 200, responseJSON : {} } );
 	check( 'a deleted role leaves the focus nothing to stand on in the form: it goes to the name of the panel', list.classList.contains('admin-hidden') === false && focusedNow() === paneTitle );
 }

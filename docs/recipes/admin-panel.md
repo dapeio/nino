@@ -574,7 +574,7 @@ and the shell calls `showCurrent()` on it. The spec:
   `'ready'`, which starts it at the ready event too. A request that is out is
   asked for once, so a `'ready'` panel that the shell shows first - as it does on
   a page opened at the panel's hash - no longer asks twice.
-- `dirty` is `{ isDirty, save, discard, bar }`, registered under the uri with
+- `dirty` is `{ isDirty, save, discard, bar, shortcut }`, registered under the uri with
   `Nino.admin.dirty` at the first load where the shell has the registry (see
   [Unsaved input](#unsaved-input)).
 - `error` is the fill key of a failed load, `/_admin/<uri>/error/load` unless
@@ -961,6 +961,46 @@ shell as `data-upload-bytes` and `data-upload-pixels`): put
 `Nino.adminUi.checkImage( file, done )` first, which refuses one that cannot
 work in the server's own words without sending it.
 
+A question before an action is `Nino.adminUi.confirm( level, { title, message,
+yes, no, kind, opener, onChoose } )`, never `window.confirm()`: the project is in
+a mode (`Nino.admin.mode.current()`, the chip in the rail), and the mode decides
+how much the workbench asks. `level` says what the action is worth:
+
+| Level | Is | Development | Production |
+|---|---|---|---|
+| `'routine'` | what is done all day | not asked | asked |
+| `'big'` | what reaches visitors or many records at once - a rename, a change of the native language, a scope, a deactivation | not asked | asked, with a line that the site is live and not in maintenance, unless the maintenance page is up |
+| `'destructive'` | what cannot be taken back - a delete, a restore | asked | asked |
+
+A level nobody named counts as `'destructive'`. The policy is the shell's
+(`Nino.admin.mode.policy( level )`, answering `{ ask, note }`): the design system
+owns no rule about when to ask, and asks every question where there is no shell
+or the shell has no policy - the setup wizard, a test, a shell older than the
+policy. `message` is the question; `yes` and `no` are what the two answers are
+called, in the interface language - the labels of `/_admin/common/label/*` serve
+for most - and `kind` is `'danger'` or `'primary'` for the answer that goes on,
+`'danger'` for a destructive level and `'primary'` otherwise. `onChoose( ok )` is
+called once with `true` or `false`, and **before `confirm()` returns** where
+nothing is asked, so what follows the question goes into it. When another
+question is open `confirm()` answers `false` and calls nobody back: a save that
+asked ends with `done( false )` then, as it does for a No.
+
+```js
+Nino.adminUi.confirm( 'destructive', {
+	message		: Nino.adminUi.format( Nino.content.getText('/_admin/catalog/confirm/delete'), name ),
+	yes				: Nino.content.getText('/_admin/common/label/delete'),
+	no				: Nino.content.getText('/_admin/common/label/cancel'),
+	onChoose	: function( ok ) {
+		if( ok === true )
+			Nino.admin.catalog._send( 'delete', { id : id } );
+	},
+} );
+```
+
+A feature whose `nino` constraint still admits kernels before this one checks
+`typeof Nino.adminUi.confirm === 'function'` and asks with `window.confirm()`
+where it is not there, until its constraint requires the release that brought it.
+
 Do not copy the skeleton blindly if an existing panel already solves the same
 list, locale, upload, rich-text, reorder, relationship, or confirmation
 problem. Reuse its exact public helper and adapt the nearest implementation.
@@ -993,19 +1033,20 @@ if( typeof Nino.admin.dirty === 'object' )
 ```
 
 A panel built on `Nino.adminUi.panel()` passes a `register()` entry -
-`{ isDirty, save, discard, bar }`, described below - as the `dirty` of its spec
+`{ isDirty, save, discard, bar, shortcut }`, described below - as the `dirty` of its spec
 and is registered behind the same check at its first load; a panel that watches
 its form calls `watchForm()` itself.
 
-`watchForm( name, formGetter, save, bar )` serialises the plain fields of the form
+`watchForm( name, formGetter, save, bar, shortcut )` serialises the plain fields of the form
 the getter answers and compares them with what `snapshot( name )` saw - `bar`
 is optional, a function answering the action bar that carries the "unsaved"
-marker, for a pane in which the first bar of the form is not the form's own: call
+marker, for a pane in which the first bar of the form is not the form's own, and
+`shortcut` is what Ctrl+S does here (see below): call
 `snapshot( 'catalog' )` after the form is drawn and after a save went through.
 A file input, a search box, a password the browser may fill in and a field with
 `data-dirty="ignore"` are not input. A form whose state is not its plain fields
 (rich text read back as other markup, edits kept in the model, a copy nobody
-saved) registers with `register( name, { isDirty, save, discard, bar } )` and
+saved) registers with `register( name, { isDirty, save, discard, bar, shortcut } )` and
 answers `isDirty()` itself - compared with what the controls held when they
 were drawn, never with the stored string. `name` is the uri of the panel or tab:
 the shell finds the pane by `admin-tab-<name>`, else `admin-content-<name>`.
@@ -1064,6 +1105,18 @@ every form gets the word *Unsaved changes* in its action bar from
 the style sheet hides it in a bar that has a status line, except below 38 rem,
 where the status line is hidden. While a save of the form runs, its `discard()`
 leaves the model alone and its links are inert.
+
+**Ctrl+S**, or Cmd+S, saves what is on screen, and the shell does it through the
+registry: the entry of the panel or tab the address names - `Nino.admin.router.current().panel` -
+has its `save( done )` called where it holds unsaved input, and nothing happens where it
+does not, or where no entry is registered, a save is running or a question is open. A
+panel that saves something other than a form, or does one thing in development and
+another in production, gives its entry a `shortcut`, `{ development : fn( done ), production : fn( done ) }`:
+the function for the mode the project is in is called whether the entry is unsaved or not -
+it decides that itself - and an entry with none for that mode falls back to `save()`.
+`done( ok )` ends the run, as it ends a Save the shell asked for, and a second press
+before it does is ignored. The shell always takes the key from the browser, whose
+answer is to save the page as a file, also where there is nothing to do.
 
 A required field is marked the same way everywhere: the asterisk
 (`.nino-admin-required`, `aria-hidden`) after its name, `aria-required` on its

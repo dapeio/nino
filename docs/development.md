@@ -768,9 +768,12 @@ $request = \Nino\request( $appData, $_SERVER );
 The behavior is controlled in `config.php`:
 
 ```php
+'/nino/mode'          => 'production',
 '/nino/error/log'     => true,
 '/nino/error/display' => false,
 ```
+
+`/nino/mode` is `'production'` or `'development'` and `'production'` where `config.php` does not name it. It decides nothing here: the two keys below it are what the runtime reads. The workbench's Config panel writes them, with the cache's two, when the mode is switched, and shows the mode in the rail; a project that edits the file by hand sets what it wants of the four.
 
 With active logging, Nino writes monthly files under `/data/logs.<Y-m>.php` and removes entries outside the three-month retention period. Display should only be activated in a protected development environment. Even there, the backtrace hides function arguments so that passwords, session tokens, and request headers do not accidentally appear on the error page.
 

@@ -256,6 +256,7 @@ Check in `config.php` or via the workbench's Config panel at least the following
 
 | Key | Production Value | Effect |
 |---|---|---|
+| `/nino/mode` | `production` | says which of the two modes the project is in; the workbench asks before every deletion and every larger change, and the Config panel writes the four keys below with it when the mode is switched - nothing reads it at runtime, so the keys below are what decides |
 | `/nino/error/display` | `false` | suppresses technical error details in the browser |
 | `/nino/error/log` | `true` | writes errors for later diagnosis to the log |
 | `/nino/session/force-secure-cookie` | `true` if TLS terminates before PHP | enforces secure session cookies behind an HTTPS proxy |

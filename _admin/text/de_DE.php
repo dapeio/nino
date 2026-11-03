@@ -34,6 +34,13 @@ return [
 	'[[/_admin/nav/group/features]]'	=> 'Features',
 	'[[/_admin/nav/group/system]]'		=> 'System',
 
+	// The chip in the rail that says which mode the project is in (see Nino.admin.mode)
+	'[[/_admin/mode/word/production]]'		=> 'Produktion',
+	'[[/_admin/mode/word/development]]'	=> 'Entwicklung',
+	'[[/_admin/mode/hint/production]]'		=> 'Modus Produktion: Die Workbench fragt vor jeder Löschung und jeder größeren Änderung.',
+	'[[/_admin/mode/hint/development]]'	=> 'Modus Entwicklung: Fehler werden angezeigt, nichts wird gecacht, und die Workbench fragt nur vor einer Löschung.',
+	'[[/_admin/mode/confirm/live]]'			=> 'Die Website ist live und nicht in Wartung: Besucher sehen diese Änderung sofort.',
+
 	'[[/_admin/htmleditor/label/strong]]'	=> 'Fett',
 	'[[/_admin/htmleditor/label/em]]'			=> 'Kursiv',
 	'[[/_admin/htmleditor/label/span]]'		=> 'Hervorheben',

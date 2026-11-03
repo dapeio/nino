@@ -614,14 +614,15 @@
 		 *
 		 *	A name is the panel's or the tab's uri, the id of its pane without
 		 *	the admin-content- or admin-tab- in front. An entry is
-		 *	{ isDirty(), save( done ), discard(), bar() }: save() reports with
+		 *	{ isDirty(), save( done ), discard(), bar(), shortcut }: save() reports with
 		 *	done( true ) or done( false ) on every way it can end, discard()
 		 *	forgets the input (the form is about to be left or drawn again; the
 		 *	fields of a watched form are put back, see watchForm()), bar()
 		 *	answers the action bar that carries the marker, if the first one in
 		 *	the pane is not it. The rail leaves a pane standing in memory, so a
 		 *	Discard there is followed by the back link of the form: the shell
-		 *	presses it (see _close()).
+		 *	presses it (see _close()). shortcut is what Ctrl+S or Cmd+S does in
+		 *	the pane, see shortcut().
 		 *
 		 *	Every listener is installed by init(), from onReady(): a shell
 		 *	script loaded without a dom (a test's first context) has none.
@@ -668,7 +669,7 @@
 			 *	a name that is registered already replaces it
 			 *
 			 *	@param		{string}		name
-			 *	@param		{Object}		entry				{ isDirty, save, discard, bar }
+			 *	@param		{Object}		entry				{ isDirty, save, discard, bar, shortcut }
 			 *
 			 *	@return		void
 			 */
@@ -1180,14 +1181,16 @@
 			 *	@param		{Function}	[bar]						Answers the action bar that carries the marker, where the
 			 *																			first one in the form is not the form's own (a pane that
 			 *																			holds more than one form, or more than one bar)
+			 *	@param		{Object}		[shortcut]			What Ctrl+S does here, a function for each mode (see shortcut())
 			 *
 			 *	@return		void
 			 */
-			watchForm : function( name, formGetter, save, bar ) {
+			watchForm : function( name, formGetter, save, bar, shortcut ) {
 
 				Nino.admin.dirty._forms[name] = formGetter;
 				Nino.admin.dirty.register( name, {
 					bar			: typeof bar === 'function' ? bar : undefined,
+					shortcut : typeof shortcut === 'object' && shortcut !== null ? shortcut : undefined,
 					isDirty : function() {
 						const form = formGetter();
 						return form !== null && form !== undefined && Nino.admin.dirty._baseline[name] !== undefined && Nino.admin.dirty._hasFields( form ) === true && Nino.admin.dirty._shown( form ) === true && Nino.admin.dirty._serialize( form ) !== Nino.admin.dirty._baseline[name];
@@ -1198,6 +1201,97 @@
 						Nino.admin.dirty.snapshot( name );
 					},
 				} );
+			},
+
+			/**
+			 *	Ctrl+S, or Cmd+S: save what is on screen. The browser's own answer
+			 *	to the key - a page saved to disk - is no use in the workbench and
+			 *	is always taken away, also when there is nothing to do. What is
+			 *	done is the entry's of the panel or tab on screen:
+			 *
+			 *	- its shortcut for the mode the project is in, called whether the
+			 *	  entry holds unsaved input or not, since a panel that saves
+			 *	  something other than a form (a template, a draft) decides that
+			 *	  itself, and a panel can do one thing in development and
+			 *	  another in production
+			 *	- else its save(), and only while it holds unsaved input
+			 *
+			 *	Nothing is done while a Save is running or a question is open, so
+			 *	that a second press is the same press arriving twice. The run is
+			 *	kept like a Save answered to a question (see guard()): every exit
+			 *	meanwhile finds the registry busy and is told to stay, and a
+			 *	function that ends with done( ok ) hands it back. The function
+			 *	hears done( true ) or done( false ) as save() does; a panel on
+			 *	screen shows its own errors, so nothing is brought on screen here.
+			 *
+			 *	It lives with the registry because the registry is what it reads
+			 *	and keeps: the entries and the busy state. It asks the router for
+			 *	the panel on screen and the mode for the mode, both by their
+			 *	public members
+			 *
+			 *	@param		{Event}			ev
+			 *
+			 *	@return		void
+			 */
+			shortcut : function( ev ) {
+
+				if( ( ev.ctrlKey !== true && ev.metaKey !== true ) || ev.altKey === true || ev.shiftKey === true || String( ev.key ).toLowerCase() !== 's' )
+					return;
+
+				ev.preventDefault();
+
+				// A question stands over the page - the shell's, or a panel's own
+				// dialog - and what is behind it is not what Ctrl+S is for
+				if( typeof dc.querySelector === 'function' && dc.querySelector('dialog[open]') !== null )
+					return;
+
+				const dirty = Nino.admin.dirty;
+				const entry = dirty._entries[Nino.admin.router.current().panel];
+
+				if( entry === undefined || dirty._asking === true || dirty._saving > 0 || dirty._inSave === true )
+					return;
+
+				const named = typeof entry.shortcut === 'object' && entry.shortcut !== null ? entry.shortcut[Nino.admin.mode.current()] : undefined;
+				let run;
+
+				if( typeof named === 'function' )
+					run = named;
+				else if( typeof entry.save === 'function' && entry.isDirty() === true )
+					run = entry.save;
+				else
+					return;
+
+				let over = false;
+
+				const end = function() {
+					if( over === true )
+						return;
+					over = true;
+					dirty._saving--;
+					dirty._asking = false;
+					// As a Save answered to a question leaves it: a nested save that failed
+					// has had its form brought on screen, and a later one may bring its own
+					dirty._failShown = dirty._saving > 0;
+					dirty.refresh();
+				};
+
+				dirty._saving++;
+				dirty._asking = true;
+
+				const was = dirty._inSave;
+				dirty._inSave = true;
+
+				try {
+					run.call( typeof named === 'function' ? entry.shortcut : entry, end );
+				}
+				catch( error ) {
+					// Not swallowed - but the exits must not stay shut
+					end();
+					throw error;
+				}
+				finally {
+					dirty._inSave = was;
+				}
 			},
 
 			/**
@@ -1277,6 +1371,9 @@
 				};
 
 				[ 'input', 'change', 'click' ].forEach( function( type ) { wrap.addEventListener( type, later ) } );
+
+				if( typeof dc.addEventListener === 'function' )
+					dc.addEventListener( 'keydown', Nino.admin.dirty.shortcut );
 			},
 		},
 
@@ -1939,6 +2036,143 @@
 		},
 
 		/**
+		 *	The mode the project is in, 'production' or 'development', and what
+		 *	the workbench makes of it: the chip in the rail says it, and policy()
+		 *	says whether a question of a given weight is asked at all (see
+		 *	Nino.adminUi.confirm(), which is the one that asks it). The shell is
+		 *	the policy - the design system owns no rule about when to ask - and
+		 *	nothing here decides anything else: what the mode does to the site is
+		 *	written into config.php by the Config panel when it is switched, and
+		 *	read from there.
+		 *
+		 *	The page carries the mode and the state of the maintenance page as
+		 *	data-mode and data-maintenance on the shell (see Admin::handleGet()).
+		 *	The Config panel says when the mode changed, the Maintenance panel
+		 *	when the maintenance page was switched, so that the answer follows
+		 *	what the person just did and not what the page was drawn with
+		 */
+		mode : {
+
+			MODES : [ 'production', 'development' ],
+
+			// Whether the site shows its maintenance page, as far as this page knows
+			_maintenance : false,
+
+			/**
+			 *	Read the maintenance state off the shell and draw the chip. The chip
+			 *	is a link to the Config panel, where the mode is switched; an account
+			 *	without that panel gets the chip without the link
+			 *
+			 *	@return		void
+			 */
+			init : function() {
+
+				const wrap = dc.getElementById('admin-page-wrap');
+
+				if( wrap === null || wrap === undefined )
+					return;
+
+				Nino.admin.mode._maintenance = wrap.dataset !== undefined && wrap.dataset.maintenance === '1';
+
+				const chip = dc.getElementById('admin-mode-chip');
+
+				if( chip !== null && chip !== undefined && dc.getElementById('admin-content-config') === null ) {
+					chip.removeAttribute('href');
+				}
+
+				Nino.admin.mode._draw();
+			},
+
+			/**
+			 *	@return		{string}									'production' or 'development'; production where the page has no shell or says anything else
+			 */
+			current : function() {
+
+				const wrap = dc.getElementById('admin-page-wrap');
+
+				return wrap !== null && wrap !== undefined && wrap.dataset !== undefined && wrap.dataset.mode === 'development' ? 'development' : 'production';
+			},
+
+			/**
+			 *	The mode was switched: the shell and the chip say the new one. A
+			 *	value that is no mode is ignored
+			 *
+			 *	@param		{string}		value
+			 *
+			 *	@return		void
+			 */
+			set : function( value ) {
+
+				const wrap = dc.getElementById('admin-page-wrap');
+
+				if( Nino.admin.mode.MODES.indexOf( value ) === -1 || wrap === null || wrap === undefined || wrap.dataset === undefined )
+					return;
+
+				wrap.dataset.mode = value;
+				Nino.admin.mode._draw();
+			},
+
+			/**
+			 *	The maintenance page was switched on or off
+			 *
+			 *	@param		{boolean}		on
+			 *
+			 *	@return		void
+			 */
+			maintenance : function( on ) {
+				Nino.admin.mode._maintenance = on === true;
+			},
+
+			/**
+			 *	Whether a question of this weight is asked, and what is added to it.
+			 *	Three weights: 'routine' is what is done all day, 'big' reaches
+			 *	visitors or many records at once, 'destructive' cannot be taken
+			 *	back. A site that is being built asks only before the last; a live
+			 *	one asks before all three, and before a big one tells that the change
+			 *	is seen at once unless the maintenance page is up. A weight nobody
+			 *	named is the heaviest
+			 *
+			 *	@param		{string}		level
+			 *
+			 *	@return		{Object}									{ ask : boolean, note : string }
+			 */
+			policy : function( level ) {
+
+				const live = Nino.admin.mode.current() === 'production';
+
+				if( level === 'routine' )
+					return { ask : live, note : '' };
+
+				if( level === 'big' )
+					return { ask : live, note : live === true && Nino.admin.mode._maintenance === false ? Nino.content.getText('/_admin/mode/confirm/live') : '' };
+
+				return { ask : true, note : '' };
+			},
+
+			/**
+			 *	Write the mode into the chip: its word, the sentence that is its
+			 *	title, its colour and, for a folded rail, the letter it is reduced to
+			 *
+			 *	@return		void
+			 */
+			_draw : function() {
+
+				const chip = dc.getElementById('admin-mode-chip');
+
+				if( chip === null || chip === undefined )
+					return;
+
+				const mode = Nino.admin.mode.current();
+				const word = Nino.content.getText( '/_admin/mode/word/'+ mode );
+
+				chip.textContent = word;
+				chip.dataset.initial = word.charAt(0);
+				chip.setAttribute( 'title', Nino.content.getText( '/_admin/mode/hint/'+ mode ) );
+				chip.classList.toggle( 'nino-admin-mode-chip--development', mode === 'development' );
+			},
+		},
+
+		/**
 		 *	Build a url to a file the framework itself serves (eg. an uploaded
 		 *	image) - reads the site's deploy-path prefix from #admin-page-wrap's
 		 *	data-dir (filled server-side from /nino/dir), since
@@ -2075,6 +2309,7 @@
 			Nino.admin.theme.init();
 			Nino.admin.navUi.init();
 			Nino.admin.rail.init();
+			Nino.admin.mode.init();
 			Nino.admin.sessionDialog.init();
 			Nino.admin.manual.init();
 
