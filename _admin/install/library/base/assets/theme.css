@@ -2050,15 +2050,17 @@ footer {
 }
 
 
-/* ==== 11. buttons: regular (size default, spread default, space default, corners default, hover default, case default) ==== */
+/* ==== 11. buttons: regular (size default, spread default, tracking default, space default, corners default, outline default, hover default, case default) ==== */
 /*	@name			Regular
  *	@description	The framework as it is: the middle of every ladder. Every .nino-btn variant and the link that looks like one.
  *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Jede .nino-btn-Variante und der Link, der wie eine aussieht.
  *
  *	@knob	size		Size of a button
  *	@knob	spread		How far a small and a big button stand from it
+ *	@knob	tracking	Letter-spacing of the label
  *	@knob	space		Space around the label
  *	@knob	corners		Corner radius
+ *	@knob	outline		Weight of the line of the outline button
  *	@knob	hover		What a button does under the pointer
  *	@knob	case		Capitals in the label of a button
  *
@@ -2082,6 +2084,14 @@ footer {
  *	multiplied by. The variants are that size times a number, in Nino.css as
  *	here: a small button is the size times 1 less the spread, a big one the
  *	size times 1 plus it.
+ *
+ *	The tracking is the letter-spacing of the label, in em, so that a small and a
+ *	big button space their letters in proportion; none at the middle, as Nino.css
+ *	has it. The outline is the weight of the line of the outline button, times the
+ *	size: 1px at the middle, which is Nino.css's, none at the least, a hairline
+ *	below the middle and two and three pixels above it. Corners, tracking and
+ *	outline at the most are a pill; corners at the least, the tracking at the most
+ *	and the outline above the middle are a square, wide-set button.
  *
  *	The hover is a choice of three: nothing, which is the button as Nino.css
  *	has it and also what this set does by itself, so the middle is the first
@@ -2121,12 +2131,28 @@ footer {
 	--buttons-space--more: 			var(--space-3);
 	--buttons-space--most: 			var(--space-4);
 
+	/*	The letter-spacing of the label: tighter below the middle, wider above it	*/
+	--buttons-tracking--least: 		-.02em;
+	--buttons-tracking--less: 			-.01em;
+	--buttons-tracking--default: 	0em;
+	--buttons-tracking--more: 			.05em;
+	--buttons-tracking--most: 			.1em;
+
 	/*	A pill is no large number but a radius past half the height, where it stops growing	*/
 	--buttons-corners--least: 		0rem;
 	--buttons-corners--less: 		var(--radius-small);
 	--buttons-corners--default: var(--radius);
 	--buttons-corners--more: 		var(--radius-large);
 	--buttons-corners--most: 		999rem;
+
+	/*	The weight of the line of the outline button: the framework's 1px at the middle, none
+		at the least, half a pixel below the middle where the screen can draw one, and 2px
+		and 3px above	*/
+	--buttons-outline--least: 		0px;
+	--buttons-outline--less: 			.5px;
+	--buttons-outline--default: 	1px;
+	--buttons-outline--more: 			2px;
+	--buttons-outline--most: 			3px;
 
 	/*	What a button does under the pointer: nothing, as Nino.css has it - and as this
 		set has it, so the middle is the first position -, or lifted: a rise of one pixel
@@ -2155,6 +2181,7 @@ footer {
 .nino-btn {
 	font-size: calc( var(--font-button-size) * var(--buttons-size) );
 	border-radius: calc( var(--buttons-corners) * var(--buttons-size) );
+	letter-spacing: var(--buttons-tracking);
 	text-transform: var(--buttons-case);
 }
 .nino-btn--small:where(:not([class*="nino-pt-"], [class*="nino-pb-"], [class*="nino-p-"])) {
@@ -2170,6 +2197,11 @@ footer {
 .nino-btn--big {
 	font-size: calc( var(--font-button-size) * var(--buttons-size) * ( 1 + var(--buttons-spread) ) );
 	border-radius: calc( var(--buttons-corners) * var(--buttons-size) * ( 1 + var(--buttons-spread) ) );
+}
+
+/*	The line of the outline button, times the size	*/
+.nino-btn--outline {
+	border-width: calc( var(--buttons-outline) * var(--buttons-size) );
 }
 
 /*	The hover, as the ladder says it. Only where the visitor has not asked for less
@@ -2555,9 +2587,11 @@ footer {
 	--buttons-corners: var(--buttons-corners--default);
 	--buttons-hover: var(--buttons-hover--default);
 	--buttons-hover-shadow: var(--buttons-hover-shadow--default);
+	--buttons-outline: var(--buttons-outline--default);
 	--buttons-size: var(--buttons-size--default);
 	--buttons-space: var(--buttons-space--default);
 	--buttons-spread: var(--buttons-spread--default);
+	--buttons-tracking: var(--buttons-tracking--default);
 	--card-align: var(--card-align--default);
 	--card-align-button: var(--card-align-button--default);
 	--card-align-margin: var(--card-align-margin--default);
