@@ -1673,9 +1673,22 @@ check( 'nothing below features/ is offered by the wizard', array_filter( $module
 check( 'the forms unit takes its key from its manifest - its directory is "Form"', basename( dirname( $moduleUnits['forms'] ) ) === 'Form' && isset( $moduleUnits['form'] ) === false );
 check( '...the others from their directory\'s lowercased name', basename( dirname( $moduleUnits['navigation'] ) ) === 'Navigation' && basename( dirname( $moduleUnits['localepicker'] ) ) === 'Localepicker' );
 // ...and each unit activates the module it sits in, or the wizard would
-// switch one module on and copy another's templates
-check( 'each unit activates the module it ships with', array_filter( $moduleUnits, static fn( string $unitDir ): bool =>
-	( ( include $unitDir. '/manifest.php' )['moduleClass'] ?? '' ) !== '\\Nino\\Modules\\'. basename( dirname( $unitDir ) ) ) === [] );
+// switch one module on and copy another's templates. A unit has two homes:
+// below _nino/Nino/Modules/<Name>/install the class is \Nino\Modules\<Name>;
+// anywhere else - the app dir - the class's short name, the part after the
+// last backslash, is the name of the directory the install/ sits in, which is
+// what "beside the module's class file" means for a project module
+$unitFits = static function( string $unitDir ): bool {
+
+	$class = (string) ( ( include $unitDir. '/manifest.php' )['moduleClass'] ?? '' );
+	$name = basename( dirname( $unitDir ) );
+
+	return str_contains( $unitDir, '/_nino/Nino/Modules/' ) === true
+		? $class === '\\Nino\\Modules\\'. $name
+		: ( $class !== '' && substr( $class, (int) strrpos( $class, '\\' ) + 1 ) === $name );
+};
+
+check( 'each unit activates the module it ships with', array_filter( $moduleUnits, static fn( string $unitDir ): bool => $unitFits( $unitDir ) === false ) === [] );
 // Everything the always-on half does not cover is a unit somebody can decline
 check( 'the always-on module list carries no unit the wizard offers', array_intersect(
 	array_map( static fn( string $unitDir ): string => (string) ( ( include $unitDir. '/manifest.php' )['moduleClass'] ?? '' ), $moduleUnits ),
@@ -1898,6 +1911,9 @@ if( defined( 'NINO_APP_DIR' ) === true ) {
 		'/Acme/Forms/install' 				=> [ 'label' => 'Shadow', 'moduleClass' => '\\Acme\\Forms' ],
 		// Not a slug: dropped
 		'/Acme/Bad/install' 					=> [ 'label' => 'Bad', 'moduleClass' => '\\Acme\\Bad', 'key' => 'Not A Slug' ],
+		// Found, but its directory is not the class's short name: the check
+		// "each unit activates the module it ships with" refuses it below
+		'/Acme/Other/install' 				=> [ 'label' => 'Other', 'moduleClass' => '\\Acme\\Widget' ],
 	] as $unitPath => $unitManifest ) {
 		$unitTemplate = 'page-'. strtolower( basename( dirname( $unitPath ) ) ). '.tpl';
 		@mkdir( $appDir. $unitPath. '/templates', 0755, true );
@@ -1917,6 +1933,10 @@ if( defined( 'NINO_APP_DIR' ) === true ) {
 	$sortedKeys = array_keys( $foundUnits );
 	sort( $sortedKeys );
 	check( 'the map is sorted by key', array_keys( $foundUnits ) === $sortedKeys );
+
+	// The check of the units, over the app dir's too: the module whose class is named like its directory passes, one that names another's class does not
+	$misfits = array_keys( array_filter( $foundUnits, static fn( string $unitDir ): bool => $unitFits( $unitDir ) === false ) );
+	check( 'a unit below the app dir activates the module whose class is named like its directory - Widget, Deep and the second claim of forms pass - and one named after another class is the only one refused', $misfits === [ 'other' ] && isset( $foundUnits['widget'], $foundUnits['deep-unit'] ) === true );
 
 	// The picker offers it like any other unit, and applying it activates
 	// the class and copies the template - with its requirement pulled in
