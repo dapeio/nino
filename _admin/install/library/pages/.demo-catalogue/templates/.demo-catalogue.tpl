@@ -1749,9 +1749,9 @@
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-mb-2">
 			<h3 class="nino-section-title nino-text-left" id="raster-title">Grid</h3>
-			<p class="nino-section-subtitle nino-text-left">Six width levels, each also available per breakpoint — plus four row alignments, the width and the place of a row, and a section that turns its row around.</p>
+			<p class="nino-section-subtitle nino-text-left">Six width levels, each also available per breakpoint — plus four row alignments, the width and the place of a row, a row turned round for each width, and a section that turns its row around.</p>
 		</div>
-		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-grid-row</span> <span class="nino-badge nino-badge--pill">.nino-grid-row--narrow</span> <span class="nino-badge nino-badge--pill">.nino-grid-row--wide</span> <span class="nino-badge nino-badge--pill">.nino-grid-row--full</span> <span class="nino-badge nino-badge--pill">.nino-grid-row--left</span> <span class="nino-badge nino-badge--pill">.nino-grid-row--right</span> <span class="nino-badge nino-badge--pill">.nino-section--mirrored</span> <span class="nino-badge nino-badge--pill">.nino-grid-25 … -100</span> <span class="nino-badge nino-badge--pill">.nino-grid-s|m|l|xl-*</span> <span class="nino-badge nino-badge--pill">.nino-grid-top</span> <span class="nino-badge nino-badge--pill">.nino-grid-middle</span> <span class="nino-badge nino-badge--pill">.nino-grid-bottom</span> <span class="nino-badge nino-badge--pill">.nino-grid-center</span> <span class="nino-badge nino-badge--pill">.nino-grid--fullwidth</span> <span class="nino-badge nino-badge--pill">.nino-grid--fullheight</span> <span class="nino-badge nino-badge--pill">.nino-grid--alt|tint|dark|black|primary|brand-alt</span> <span class="nino-badge nino-badge--pill">.nino-grid--counter</span> <span class="nino-badge nino-badge--pill">.nino-grid--dim</span> <span class="nino-badge nino-badge--pill">.nino-grid-bg</span></div>
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-grid-row</span> <span class="nino-badge nino-badge--pill">.nino-grid-row--narrow</span> <span class="nino-badge nino-badge--pill">.nino-grid-row--wide</span> <span class="nino-badge nino-badge--pill">.nino-grid-row--full</span> <span class="nino-badge nino-badge--pill">.nino-grid-row--left</span> <span class="nino-badge nino-badge--pill">.nino-grid-row--right</span> <span class="nino-badge nino-badge--pill">.nino-section--mirrored</span> <span class="nino-badge nino-badge--pill">.nino-grid-row--reverse</span> <span class="nino-badge nino-badge--pill">.nino-grid-row--s|m|l|xl-reverse</span> <span class="nino-badge nino-badge--pill">.nino-grid-row--s|m|l|xl-forward</span> <span class="nino-badge nino-badge--pill">.nino-grid-25 … -100</span> <span class="nino-badge nino-badge--pill">.nino-grid-s|m|l|xl-*</span> <span class="nino-badge nino-badge--pill">.nino-grid-top</span> <span class="nino-badge nino-badge--pill">.nino-grid-middle</span> <span class="nino-badge nino-badge--pill">.nino-grid-bottom</span> <span class="nino-badge nino-badge--pill">.nino-grid-center</span> <span class="nino-badge nino-badge--pill">.nino-grid--fullwidth</span> <span class="nino-badge nino-badge--pill">.nino-grid--fullheight</span> <span class="nino-badge nino-badge--pill">.nino-grid--alt|tint|dark|black|primary|brand-alt</span> <span class="nino-badge nino-badge--pill">.nino-grid--counter</span> <span class="nino-badge nino-badge--pill">.nino-grid--dim</span> <span class="nino-badge nino-badge--pill">.nino-grid-bg</span></div>
 		<div class="nino-grid-100 nino-grid-m-25 nino-p-1"><p class="nino-alert nino-text-center">nino-grid-25</p></div>
 		<div class="nino-grid-100 nino-grid-m-33 nino-p-1"><p class="nino-alert nino-text-center">nino-grid-33</p></div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-p-1"><p class="nino-alert nino-text-center">nino-grid-50</p></div>
@@ -1779,6 +1779,24 @@
 		</div>
 		<div class="nino-grid-100 nino-mt-2">
 			<div class="nino-grid-row nino-grid-row--full nino-grid-row--alt nino-pl-0 nino-pr-0"><div class="nino-grid-100"><p class="nino-section-text">nino-grid-row--full — no maximum width; with nino-pl-0 and nino-pr-0 the content stands at the edge of the row.</p></div></div>
+		</div>
+		<div class="nino-grid-100 nino-mt-2">
+			<div class="nino-grid-row nino-grid-row--reverse nino-grid-row--alt"><div class="nino-grid-100 nino-grid-m-50 nino-p-1"><p class="nino-alert nino-alert--info">first in the markup</p></div><div class="nino-grid-100 nino-grid-m-50 nino-p-1"><p class="nino-alert">nino-grid-row--reverse — the columns stand in the opposite order on every width: this second one is first, at the left, and on a phone the stack reads from the last column to the first.</p></div></div>
+		</div>
+		<div class="nino-grid-100 nino-mt-2">
+			<div class="nino-grid-row nino-grid-row--reverse nino-grid-row--m-forward nino-grid-row--alt"><div class="nino-grid-100 nino-grid-m-50 nino-p-1"><p class="nino-alert nino-alert--info">first in the markup</p></div><div class="nino-grid-100 nino-grid-m-50 nino-p-1"><p class="nino-alert">nino-grid-row--reverse nino-grid-row--m-forward — turned round on a phone only; from 768px the order of the markup is back.</p></div></div>
+		</div>
+		<div class="nino-grid-100 nino-mt-2">
+			<div class="nino-grid-row nino-grid-row--m-reverse nino-grid-row--l-forward nino-grid-row--alt"><div class="nino-grid-100 nino-grid-m-50 nino-p-1"><p class="nino-alert nino-alert--info">first in the markup</p></div><div class="nino-grid-100 nino-grid-m-50 nino-p-1"><p class="nino-alert">nino-grid-row--m-reverse nino-grid-row--l-forward — turned round from 768px, and back from 1024px.</p></div></div>
+		</div>
+		<div class="nino-grid-100 nino-mt-2">
+			<div class="nino-grid-row nino-grid-row--s-reverse nino-grid-row--m-forward nino-grid-row--alt"><div class="nino-grid-100 nino-grid-m-50 nino-p-1"><p class="nino-alert nino-alert--info">first in the markup</p></div><div class="nino-grid-100 nino-grid-m-50 nino-p-1"><p class="nino-alert">nino-grid-row--s-reverse nino-grid-row--m-forward — a tier is a width and up: turned round from 640px, back from 768px.</p></div></div>
+		</div>
+		<div class="nino-grid-100 nino-mt-2">
+			<div class="nino-grid-row nino-grid-row--l-reverse nino-grid-row--xl-forward nino-grid-row--alt"><div class="nino-grid-100 nino-grid-m-50 nino-p-1"><p class="nino-alert nino-alert--info">first in the markup</p></div><div class="nino-grid-100 nino-grid-m-50 nino-p-1"><p class="nino-alert">nino-grid-row--l-reverse nino-grid-row--xl-forward — turned round from 1024px, back from 1280px.</p></div></div>
+		</div>
+		<div class="nino-grid-100 nino-mt-2">
+			<div class="nino-grid-row nino-grid-row--reverse nino-grid-row--s-forward nino-grid-row--xl-reverse nino-grid-row--alt"><div class="nino-grid-100 nino-grid-m-50 nino-p-1"><p class="nino-alert nino-alert--info">first in the markup</p></div><div class="nino-grid-100 nino-grid-m-50 nino-p-1"><p class="nino-alert">nino-grid-row--reverse nino-grid-row--s-forward nino-grid-row--xl-reverse — a later tier wins: turned round below 640px, back from 640px, round again from 1280px.</p></div></div>
 		</div>
 		<div class="nino-grid-100 nino-mt-2 nino-section--mirrored">
 			<div class="nino-grid-row nino-grid-row--alt"><div class="nino-grid-100 nino-grid-m-50 nino-p-1"><p class="nino-alert nino-alert--info">first in the markup</p></div><div class="nino-grid-100 nino-grid-m-50 nino-p-1"><p class="nino-alert">nino-section--mirrored — on a section, the columns of its row stand the other way round from 768px: this second one is at the left.</p></div></div>
@@ -1830,6 +1848,13 @@
 <section id="kacheln-21-9" class="nino-section nino-tiles nino-tiles--21-9 nino-mt-0 nino-mb-0" aria-label="Tiles, 21 : 9"><div class="nino-grid-row"><div class="nino-grid-100 nino-grid--dark nino-text-center"><h3 class="nino-section-title">21 : 9</h3></div></div></section>
 <section id="kacheln-4-1" class="nino-section nino-tiles nino-tiles--4-1 nino-mt-0 nino-mb-0" aria-label="Tiles, 4 : 1"><div class="nino-grid-row"><div class="nino-grid-100 nino-grid--primary nino-text-center"><h3 class="nino-section-title">4 : 1</h3></div></div></section>
 <section id="kacheln-5-1" class="nino-section nino-tiles nino-tiles--5-1 nino-mt-0 nino-mb-0" aria-label="Tiles, 5 : 1"><div class="nino-grid-row"><div class="nino-grid-100 nino-grid--black nino-text-center"><h3 class="nino-section-title">5 : 1</h3></div></div></section>
+<section id="kacheln-umgekehrt" class="nino-section nino-tiles nino-tiles--4-3 nino-mt-0 nino-mb-0" aria-label="Tiles, reversed on a phone">
+	<div class="nino-grid-row nino-grid-row--reverse nino-grid-row--m-forward">
+		<div class="nino-grid-100 nino-grid-m-33 nino-grid--alt nino-text-center"><h3 class="nino-section-title">First</h3><p class="nino-section-text">First in the markup; on a phone, with nino-grid-row--reverse, the last of the stack.</p></div>
+		<div class="nino-grid-100 nino-grid-m-33 nino-grid--primary nino-text-center"><h3 class="nino-section-title">Second</h3></div>
+		<div class="nino-grid-100 nino-grid-m-33 nino-grid--dark nino-text-center"><h3 class="nino-section-title">Third</h3><p class="nino-section-text">First on a phone; nino-grid-row--m-forward gives the order of the markup back from 768px.</p></div>
+	</div>
+</section>
 <section id="kacheln-ohne-verhaeltnis" class="nino-section nino-tiles nino-whitespace--more nino-mt-0 nino-mb-0" aria-label="Tiles without a ratio">
 	<div class="nino-grid-row">
 		<div class="nino-grid-100 nino-grid-m-33 nino-grid--alt nino-text-left"><h3 class="nino-section-title">No ratio</h3><p class="nino-section-text">Without a ratio class a tile is as high as its words, and with nino-whitespace--more it has more room.</p></div>

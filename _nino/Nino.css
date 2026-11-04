@@ -726,6 +726,7 @@ h1, h2, h3, h4, h5, h6 {
  *
  *			.nino-grid-row(--narrow, --wide, --full, --left, --right), .nino-grid(-25, -33, -50, -66, -75, -100)
  *			.nino-grid(-top, -middle, -bottom, -center)
+ *			.nino-grid-row(--reverse, --s-reverse, --s-forward, --m-reverse, --m-forward, --l-reverse, --l-forward, --xl-reverse, --xl-forward)
  *			.nino-grid(-s,-m, -l, -xl)(-25, -33, -50, -66, -75, -100)
  *			.nino-grid-gap-0...6
  *			.nino-tiles > .nino-grid-row
@@ -803,6 +804,28 @@ h1, h2, h3, h4, h5, h6 {
 .nino-grid-bottom { align-items: flex-end; }
 .nino-grid-center { justify-content: center; }
 
+/*	The order of a row turned round, for a width and up. --reverse is the row in
+	the opposite order on every width, --<tier>-reverse from that tier's
+	breakpoint up, and --<tier>-forward turns it back from there - the tiers
+	stand in the order of the width classes below and a later one wins over an
+	earlier one, as they do.
+	row-reverse alone would leave the lines in their order and put the last
+	column of a line first; wrap-reverse as well puts the last line first, so
+	that the stack of one column a line, which a phone has, reads from the last
+	column to the first - the whole reading order, turned round.
+	A turned row would carry its alignment with it, so each rule says again what
+	the alignment classes mean: row-reverse packs the columns of a line that is
+	not full at the end, and a row that is not centred says flex-end for them to
+	stand at the left, as they did; wrap-reverse turns the cross axis round, so
+	that top says flex-end and bottom flex-start. Middle and centre are the
+	same either way. The justify rule asks for a row that is not centred, which
+	makes it weigh two classes and no more than the alignment rules after it:
+	nino-grid-center is not turned by it, and nothing else of the row is	*/
+.nino-grid-row--reverse { flex-direction: row-reverse; flex-wrap: wrap-reverse; }
+.nino-grid-row--reverse:not(.nino-grid-center) { justify-content: flex-end; }
+.nino-grid-row--reverse.nino-grid-top { align-items: flex-end; }
+.nino-grid-row--reverse.nino-grid-bottom { align-items: flex-start; }
+
 .nino-grid-row > * {
 	min-width: 0;
 	box-sizing: border-box;
@@ -815,6 +838,14 @@ h1, h2, h3, h4, h5, h6 {
 	.nino-grid-s-66 { width: calc(100% / 1.5 - var(--nino-grid-gap, 0px) / 3); --nino-grid-share: calc( 2 / 3 ); }
 	.nino-grid-s-75 { width: calc(75% - .25 * var(--nino-grid-gap, 0px)); --nino-grid-share: .75; }
 	.nino-grid-s-100 { width: 100%; --nino-grid-share: 1; }
+	.nino-grid-row--s-reverse { flex-direction: row-reverse; flex-wrap: wrap-reverse; }
+	.nino-grid-row--s-reverse:not(.nino-grid-center) { justify-content: flex-end; }
+	.nino-grid-row--s-reverse.nino-grid-top { align-items: flex-end; }
+	.nino-grid-row--s-reverse.nino-grid-bottom { align-items: flex-start; }
+	.nino-grid-row--s-forward { flex-direction: row; flex-wrap: wrap; }
+	.nino-grid-row--s-forward:not(.nino-grid-center) { justify-content: flex-start; }
+	.nino-grid-row--s-forward.nino-grid-top { align-items: flex-start; }
+	.nino-grid-row--s-forward.nino-grid-bottom { align-items: flex-end; }
 }
 
 @media (min-width: 768px) {
@@ -824,6 +855,14 @@ h1, h2, h3, h4, h5, h6 {
 	.nino-grid-m-66 { width: calc(100% / 1.5 - var(--nino-grid-gap, 0px) / 3); --nino-grid-share: calc( 2 / 3 ); }
 	.nino-grid-m-75 { width: calc(75% - .25 * var(--nino-grid-gap, 0px)); --nino-grid-share: .75; }
 	.nino-grid-m-100 { width: 100%; --nino-grid-share: 1; }
+	.nino-grid-row--m-reverse { flex-direction: row-reverse; flex-wrap: wrap-reverse; }
+	.nino-grid-row--m-reverse:not(.nino-grid-center) { justify-content: flex-end; }
+	.nino-grid-row--m-reverse.nino-grid-top { align-items: flex-end; }
+	.nino-grid-row--m-reverse.nino-grid-bottom { align-items: flex-start; }
+	.nino-grid-row--m-forward { flex-direction: row; flex-wrap: wrap; }
+	.nino-grid-row--m-forward:not(.nino-grid-center) { justify-content: flex-start; }
+	.nino-grid-row--m-forward.nino-grid-top { align-items: flex-start; }
+	.nino-grid-row--m-forward.nino-grid-bottom { align-items: flex-end; }
 }
 
 @media (min-width: 1024px) {
@@ -833,6 +872,14 @@ h1, h2, h3, h4, h5, h6 {
 	.nino-grid-l-66 { width: calc(100% / 1.5 - var(--nino-grid-gap, 0px) / 3); --nino-grid-share: calc( 2 / 3 ); }
 	.nino-grid-l-75 { width: calc(75% - .25 * var(--nino-grid-gap, 0px)); --nino-grid-share: .75; }
 	.nino-grid-l-100 { width: 100%; --nino-grid-share: 1; }
+	.nino-grid-row--l-reverse { flex-direction: row-reverse; flex-wrap: wrap-reverse; }
+	.nino-grid-row--l-reverse:not(.nino-grid-center) { justify-content: flex-end; }
+	.nino-grid-row--l-reverse.nino-grid-top { align-items: flex-end; }
+	.nino-grid-row--l-reverse.nino-grid-bottom { align-items: flex-start; }
+	.nino-grid-row--l-forward { flex-direction: row; flex-wrap: wrap; }
+	.nino-grid-row--l-forward:not(.nino-grid-center) { justify-content: flex-start; }
+	.nino-grid-row--l-forward.nino-grid-top { align-items: flex-start; }
+	.nino-grid-row--l-forward.nino-grid-bottom { align-items: flex-end; }
 }
 
 @media (min-width: 1280px) {
@@ -842,6 +889,14 @@ h1, h2, h3, h4, h5, h6 {
 	.nino-grid-xl-66 { width: calc(100% / 1.5 - var(--nino-grid-gap, 0px) / 3); --nino-grid-share: calc( 2 / 3 ); }
 	.nino-grid-xl-75 { width: calc(75% - .25 * var(--nino-grid-gap, 0px)); --nino-grid-share: .75; }
 	.nino-grid-xl-100 { width: 100%; --nino-grid-share: 1; }
+	.nino-grid-row--xl-reverse { flex-direction: row-reverse; flex-wrap: wrap-reverse; }
+	.nino-grid-row--xl-reverse:not(.nino-grid-center) { justify-content: flex-end; }
+	.nino-grid-row--xl-reverse.nino-grid-top { align-items: flex-end; }
+	.nino-grid-row--xl-reverse.nino-grid-bottom { align-items: flex-start; }
+	.nino-grid-row--xl-forward { flex-direction: row; flex-wrap: wrap; }
+	.nino-grid-row--xl-forward:not(.nino-grid-center) { justify-content: flex-start; }
+	.nino-grid-row--xl-forward.nino-grid-top { align-items: flex-start; }
+	.nino-grid-row--xl-forward.nino-grid-bottom { align-items: flex-end; }
 }
 
 /*	Visibility per viewport - what a section written by the Builder says of a

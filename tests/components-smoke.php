@@ -3400,6 +3400,60 @@ check( 'the row of a mirrored section is turned around by one rule - row-reverse
 	&& $groundConditions( '.nino-section--mirrored > .nino-grid-row' ) === [ [ '@media (min-width: 768px)' ] ]
 	&& $outsideMirrorQuery !== null && substr_count( $outsideMirrorQuery, 'nino-section--mirrored' ) === 0 );
 
+/*	The order of a row turned round, per width. --reverse is the base (every width) and --<tier>-reverse / --<tier>-forward are in the media query of the tier's breakpoint, the tiers in the order
+	of the width classes and each tier's pair after that tier's width classes and before the next tier's. A reversed row says row-reverse AND wrap-reverse (the whole reading order turned round),
+	a forward one row and wrap. Each of the nine says again what the alignment classes mean: a row that is not centred packs its lines at the end under row-reverse (flex-end) and at the start
+	under forward, and under wrap-reverse top is flex-end and bottom flex-start (forward: the other way round) - the rules weigh two classes, every one the same, so that the order decides and a
+	later tier wins; the justify rule asks for a row that is not centred, so that nino-grid-center is not touched and keeps its centre	*/
+$turnTiers = [ '' => [], 's' => [ '@media (min-width: 640px)' ], 'm' => [ '@media (min-width: 768px)' ], 'l' => [ '@media (min-width: 1024px)' ], 'xl' => [ '@media (min-width: 1280px)' ] ];
+$turnWrong = [];
+$turnLastAt = $groundLastOf( [ '.nino-grid-center' ], 'justify-content' );
+$turnPrevious = max( $groundLastOf( [ '.nino-grid-row' ], 'flex-wrap' ), $turnLastAt, $groundLastOf( [ '.nino-grid-top' ] ), $groundLastOf( [ '.nino-grid-bottom' ] ) );
+foreach( $turnTiers as $turnTier => $turnConditions ) {
+	$turnPrefix = '.nino-grid-row--'. ( $turnTier === '' ? '' : $turnTier. '-' );
+	$turnDirections = $turnTier === '' ? [ 'reverse' ] : [ 'reverse', 'forward' ];
+	foreach( $turnDirections as $turnDirection ) {
+		$turnReverse = $turnDirection === 'reverse';
+		$turnClass = $turnPrefix. $turnDirection;
+		$turnExpected = [
+			$turnClass => [ [ 'flex-direction', $turnReverse ? 'row-reverse' : 'row' ], [ 'flex-wrap', $turnReverse ? 'wrap-reverse' : 'wrap' ] ],
+			$turnClass. ':not(.nino-grid-center)' => [ [ 'justify-content', $turnReverse ? 'flex-end' : 'flex-start' ] ],
+			$turnClass. '.nino-grid-top' => [ [ 'align-items', $turnReverse ? 'flex-end' : 'flex-start' ] ],
+			$turnClass. '.nino-grid-bottom' => [ [ 'align-items', $turnReverse ? 'flex-start' : 'flex-end' ] ],
+		];
+		foreach( $turnExpected as $turnSelector => $turnDeclarations ) {
+			$turnBody = $groundOf( $turnSelector );
+			if( count( $groundEach[$turnSelector] ?? [] ) !== 1 )
+				$turnWrong[] = $turnSelector. ' is not one rule';
+			foreach( $turnDeclarations as [ $turnProperty, $turnValue ] )
+				if( $groundSets( $turnBody, $turnProperty, $turnValue ) === false )
+					$turnWrong[] = $turnSelector. ' does not say '. $turnProperty. ': '. $turnValue;
+			if( preg_match_all( '/;/', $turnBody ) !== count( $turnDeclarations ) )
+				$turnWrong[] = $turnSelector. ' says more or less than it should';
+			if( $groundConditions( $turnSelector ) !== [ $turnConditions ] )
+				$turnWrong[] = $turnSelector. ' is not in '. ( $turnConditions === [] ? 'no query' : $turnConditions[0] );
+			$turnAt = $groundLastOf( [ $turnSelector ] );
+			if( $turnAt <= $turnPrevious )
+				$turnWrong[] = $turnSelector. ' is not after the rules before it';
+			$turnPrevious = $turnAt;
+		}
+	}
+	if( $turnTier !== '' && $groundLastOf( [ $turnPrefix. 'reverse' ] ) <= $groundLastOf( [ '.nino-grid-'. $turnTier. '-100' ] ) )
+		$turnWrong[] = $turnTier. ' tier stands before its width classes';
+	if( $turnTier !== '' && $groundLastOf( [ $turnPrefix. 'forward.nino-grid-bottom' ] ) >= $groundLastOf( [ '.nino-grid-'. [ 's' => 'm', 'm' => 'l', 'l' => 'xl', 'xl' => 'zz' ][$turnTier]. '-25' ] ) && $turnTier !== 'xl' )
+		$turnWrong[] = $turnTier. ' tier stands after the width classes of the next';
+	$turnPrevious = max( $turnPrevious, $turnTier === '' ? 0 : $groundLastOf( [ '.nino-grid-'. $turnTier. '-100' ] ) );
+}
+$turnNames = array_values( array_filter( array_keys( $groundEach ), static fn( mixed $selector ): bool => str_contains( (string) $selector, 'reverse' ) === true || str_contains( (string) $selector, 'forward' ) === true ) );
+check( 'a row is turned round by nine classes and their rules - --reverse on every width, --s|m|l|xl-reverse and --s|m|l|xl-forward from their breakpoint - each with the stack and the lines, the packing and the cross axis'
+	. ( $turnWrong === [] ? '' : ' - '. implode( '; ', $turnWrong ) ),
+	$turnWrong === [] && count( $turnNames ) === 4 + 4 * 8 && $turnLastAt > 0 );
+check( '...the alignment classes themselves are as they were - top, middle, bottom and centre say their one declaration and nothing about the direction - and nothing turns a row through a class that is not its own',
+	$groundSets( $groundOf( '.nino-grid-top' ), 'align-items', 'flex-start' ) && $groundSets( $groundOf( '.nino-grid-middle' ), 'align-items', 'center' ) && $groundSets( $groundOf( '.nino-grid-bottom' ), 'align-items', 'flex-end' )
+	&& $groundSets( $groundOf( '.nino-grid-center' ), 'justify-content', 'center' ) && preg_match( '/direction|reverse/', $groundOf( '.nino-grid-center' ). $groundOf( '.nino-grid-top' ). $groundOf( '.nino-grid-bottom' ). $groundOf( '.nino-grid-middle' ) ) !== 1
+	&& $groundOf( '.nino-grid-row--reverse.nino-grid-middle' ) === '' && $groundOf( '.nino-grid-row--reverse.nino-grid-center' ) === '' && preg_match( '/\.nino-grid-row--(?:[a-z]+-)?(?:reverse|forward)(?![\w:.-])[^{]*,/', $hookCss ) !== 1
+	&& substr_count( $hookCss, 'nino-section--mirrored' ) === 1 );
+
 // A project's own component replaces the one of the kernel, and nothing else answers for it
 \Nino\Modules\Components::addComponent( $appData, 'title', static function( array &$appData, array $args ): string {
 	return '<'. $args['tag']. ' class="mine">'. $args['value']. '</'. $args['tag']. '>';
