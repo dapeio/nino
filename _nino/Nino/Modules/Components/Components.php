@@ -419,7 +419,7 @@ namespace Nino\Modules {
 			// renderer reads no context, so a title is the same in a card and out of one. Its
 			// icon is the shape ICONS names, as the parts SHAPES holds, and 'link' whether a
 			// link may wrap what it draws
-			$stretched = [ 'card-title' ];
+			$stretched = [ 'card-title', 'title' ];
 
 			foreach( $components as [ $name, $en, $de, $preview, $source, $attributes, $in, $draws, $holds, $link, $group ] )
 				self::addComponent( $appData, $name, [ self::class, 'component'. str_replace( ' ', '', ucwords( str_replace( '-', ' ', $name ) ) ) ], [

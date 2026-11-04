@@ -1786,6 +1786,58 @@
 	</div>
 </section>
 
+<section class="nino-section nino-section--alt nino-mt-0 nino-mb-0" id="kacheln" aria-labelledby="kacheln-title">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100 nino-mb-2">
+			<h3 class="nino-section-title nino-text-left" id="kacheln-title">Tiles</h3>
+			<p class="nino-section-subtitle nino-text-left">The second kind of section, for graphic tiles across the full width: the row has no maximum width and the section no padding, and each column is a tile with room of its own, a height from the ratio the section names, its words placed in it and a radius of its own kind. The sections below show them, one ratio after the other.</p>
+		</div>
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left"><span class="nino-badge nino-badge--pill">.nino-tiles</span> <span class="nino-badge nino-badge--pill">.nino-tiles--1-1|4-3|3-2|16-9|21-9|4-1|5-1</span> <span class="nino-badge nino-badge--pill">.nino-grid--linked</span> <span class="nino-badge nino-badge--pill">.nino-grid-gap-1</span> <span class="nino-badge nino-badge--pill">.nino-radius-alt</span> <span class="nino-badge nino-badge--pill">.nino-grid--counter</span> <span class="nino-badge nino-badge--pill">.nino-whitespace--more</span></div>
+	</div>
+</section>
+<section id="kacheln-16-9" class="nino-section nino-tiles nino-tiles--16-9 nino-section--alt nino-mt-0 nino-mb-0" aria-label="Tiles, 16 : 9">
+	<div class="nino-grid-row nino-grid-gap-1">
+		<div class="nino-grid-100 nino-grid-m-50 nino-grid--dim nino-grid--linked nino-stack-end nino-text-left">
+			<div class="nino-grid-bg nino-img-focus--5"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy"></div>
+			<a class="nino-stretch" href="#kacheln-16-9"><h3 class="nino-section-title">A linked tile</h3></a>
+		</div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-grid--primary nino-text-center">
+			<h3 class="nino-section-title">A tile on a ground</h3>
+			<p class="nino-section-subtitle">With a subtitle</p>
+			<p class="nino-section-text">The tile is as high as its ratio, or as high as its words need.</p>
+			<a class="nino-btn" href="#kacheln-16-9">A button</a>
+		</div>
+	</div>
+</section>
+<section id="kacheln-1-1" class="nino-section nino-tiles nino-tiles--1-1 nino-section--alt nino-mt-0 nino-mb-0" aria-label="Tiles, 1 : 1">
+	<div class="nino-grid-row nino-grid-gap-1">
+		<div class="nino-grid-100 nino-grid-m-50 nino-grid-l-25 nino-grid--tint nino-text-center"><h3 class="nino-section-title">1 : 1</h3><p class="nino-section-text">A square tile, 25 from 1024px, 50 from 768px.</p></div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-grid-l-25 nino-grid--counter nino-text-center"><h3 class="nino-section-title">Counter</h3><p class="nino-section-text">The counter ground of the section.</p></div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-grid-l-25 nino-grid--dark nino-radius-alt nino-text-center"><h3 class="nino-section-title">Radius</h3><p class="nino-section-text">A tile with the other strength of the radius.</p></div>
+		<div class="nino-grid-100 nino-grid-m-50 nino-grid-l-25 nino-hide-s nino-grid--black nino-text-center"><h3 class="nino-section-title">Not on a phone</h3><p class="nino-section-text">nino-hide-s.</p></div>
+	</div>
+</section>
+<section id="kacheln-4-3" class="nino-section nino-tiles nino-tiles--4-3 nino-mt-0 nino-mb-0" aria-label="Tiles, 4 : 3">
+	<div class="nino-grid-row">
+		<div class="nino-grid-100 nino-grid-m-66 nino-grid--dim nino-stack-end nino-text-left"><div class="nino-grid-bg nino-img-focus--5"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="" loading="lazy"></div><h3 class="nino-section-title">Two thirds</h3></div>
+		<div class="nino-grid-100 nino-grid-m-33 nino-grid--alt nino-text-center"><h3 class="nino-section-title">One third</h3><p class="nino-section-text">The tiles of one line are as high as the highest: a 33 beside a 66 takes the height of the 66, the highest in the line.</p></div>
+		<div class="nino-grid-100 nino-grid-m-33 nino-grid--primary nino-text-center"><h3 class="nino-section-title">33</h3></div>
+		<div class="nino-grid-100 nino-grid-m-33 nino-grid--dark nino-text-center"><h3 class="nino-section-title">33</h3></div>
+		<div class="nino-grid-100 nino-grid-m-33 nino-grid--tint nino-text-center"><h3 class="nino-section-title">33</h3></div>
+	</div>
+</section>
+<section id="kacheln-3-2" class="nino-section nino-tiles nino-tiles--3-2 nino-mt-0 nino-mb-0" aria-label="Tiles, 3 : 2"><div class="nino-grid-row"><div class="nino-grid-100 nino-grid--dim nino-stack-center nino-text-center"><div class="nino-grid-bg nino-img-focus--5"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="" loading="lazy"></div><h3 class="nino-section-title">3 : 2</h3></div></div></section>
+<section id="kacheln-21-9" class="nino-section nino-tiles nino-tiles--21-9 nino-mt-0 nino-mb-0" aria-label="Tiles, 21 : 9"><div class="nino-grid-row"><div class="nino-grid-100 nino-grid--dark nino-text-center"><h3 class="nino-section-title">21 : 9</h3></div></div></section>
+<section id="kacheln-4-1" class="nino-section nino-tiles nino-tiles--4-1 nino-mt-0 nino-mb-0" aria-label="Tiles, 4 : 1"><div class="nino-grid-row"><div class="nino-grid-100 nino-grid--primary nino-text-center"><h3 class="nino-section-title">4 : 1</h3></div></div></section>
+<section id="kacheln-5-1" class="nino-section nino-tiles nino-tiles--5-1 nino-mt-0 nino-mb-0" aria-label="Tiles, 5 : 1"><div class="nino-grid-row"><div class="nino-grid-100 nino-grid--black nino-text-center"><h3 class="nino-section-title">5 : 1</h3></div></div></section>
+<section id="kacheln-ohne-verhaeltnis" class="nino-section nino-tiles nino-whitespace--more nino-mt-0 nino-mb-0" aria-label="Tiles without a ratio">
+	<div class="nino-grid-row">
+		<div class="nino-grid-100 nino-grid-m-33 nino-grid--alt nino-text-left"><h3 class="nino-section-title">No ratio</h3><p class="nino-section-text">Without a ratio class a tile is as high as its words, and with nino-whitespace--more it has more room.</p></div>
+		<div class="nino-grid-100 nino-grid-m-33 nino-grid--tint nino-text-left"><h3 class="nino-section-title">Words only</h3><p class="nino-section-text">Three text tiles, 33 each from 768px.</p></div>
+		<div class="nino-grid-100 nino-grid-m-33 nino-grid--primary nino-text-left"><h3 class="nino-section-title">Room</h3><p class="nino-section-text">The room of a tile is its padding times the whitespace.</p></div>
+	</div>
+</section>
+
 <section class="nino-section nino-section--alt nino-mt-0 nino-mb-0" id="typografie" aria-labelledby="typografie-title">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-mb-2">
@@ -2745,7 +2797,7 @@
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-mb-2">
 			<h3 class="nino-section-title nino-text-left" id="radius-title">Radius of a surface</h3>
-			<p class="nino-section-subtitle nino-text-left">Two strengths for the whole page, the standard and the alternative, and a default for each kind of surface: a padded cover, a row, a column, a card and a picture. A class on one element takes the other strength; what stands in it follows.</p>
+			<p class="nino-section-subtitle nino-text-left">Two strengths for the whole page, the standard and the alternative, and a default for each kind of surface: a padded cover, a row, a column, a tile, a card and a picture. A class on one element takes the other strength; what stands in it follows.</p>
 		</div>
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-radius</span> <span class="nino-badge nino-badge--pill">.nino-radius-alt</span></div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-grid-l-25 nino-p-1">

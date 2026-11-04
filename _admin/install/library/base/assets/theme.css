@@ -5,7 +5,7 @@
  *									assets/style.css comes after it and overrules it.
  *
  *									Everything below this comment is what the catalogue's
- *									Design feature compiles at its defaults: the fifteen
+ *									Design feature compiles at its defaults: the sixteen
  *									numbered sections, every part on the set the first
  *									shipped theme names - Nino, the default construction
  *									of each tab -, every knob where that theme puts it: the middle,
@@ -765,6 +765,8 @@
 	--radius-row-default: standard;
 	--radius-column: var(--radius-surface);
 	--radius-column-default: standard;
+	--radius-tile: var(--radius-surface);
+	--radius-tile-default: standard;
 	--radius-card: var(--radius-surface);
 	--radius-card-default: standard;
 	--radius-image: var(--radius-surface);
@@ -1518,11 +1520,14 @@ footer {
 	does - --whitespace-scale for an area, --whitespace-text for the room under
 	a text, and 1 where the framework says none - since a rule that came after
 	Nino.css and said the space without the factor would stop the whitespace
-	of the page at the set	*/
-.nino-section:where(:not([class*="nino-pt-"], [class*="nino-p-"])) {
+	of the page at the set. A section of tiles (.nino-tiles) is the other kind
+	of section and has no padding of its own - its tiles have the room, and
+	the tiles set says how much - so it is left alone as well. The exclusion
+	stands in :where(), which has no weight	*/
+.nino-section:where(:not(.nino-tiles, [class*="nino-pt-"], [class*="nino-p-"])) {
 	padding-top: calc( var(--section-space) * var(--whitespace-scale, 1) );
 }
-.nino-section:where(:not([class*="nino-pb-"], [class*="nino-p-"])) {
+.nino-section:where(:not(.nino-tiles, [class*="nino-pb-"], [class*="nino-p-"])) {
 	padding-bottom: calc( var(--section-space) * var(--whitespace-scale, 1) );
 }
 
@@ -1712,7 +1717,160 @@ footer {
 }
 
 
-/* ==== 10. card: regular (title default, subtitle default, title-tracking default, space default, border default, shadow default, tone default, title-ground default, hover default, align default, title-case default, subtitle-case default) ==== */
+/* ==== 10. tiles: regular (title default, subtitle default, text default, title-tracking default, space default, gap default, place default, dim default, hover default) ==== */
+/*	@name			Regular
+ *	@description	The tiles of a section of tiles as Nino.css draws them: the room inside a tile, no gap between tiles, the words in the middle. The middle of every ladder.
+ *	@description-de	Die Kacheln einer Kachel-Sektion, wie Nino.css sie zeichnet: der Platz in einer Kachel, kein Abstand zwischen den Kacheln, die Worte in der Mitte. Die Mitte jeder Leiter.
+ *
+ *	@knob	title			Size of the title of a tile
+ *	@knob	subtitle		Size of the subtitle of a tile
+ *	@knob	text			Size of the words of a tile
+ *	@knob	title-tracking	Letter-spacing of the title of a tile
+ *	@knob	space			Room inside a tile
+ *	@knob	gap				Gap between the tiles
+ *	@knob	place			Where the words of a tile stand in it
+ *	@knob	dim				How dark the scrim of a dimmed tile is
+ *	@knob	hover			What the picture of a linked tile does under the pointer
+ *
+ *	A tiles section is the second kind of section: full-width tiles, each a picture or a colour with a few words on it
+ *	(.nino-tiles in the markup, the columns of its row the tiles). This is the starting point for it, as library/section/regular.css is
+ *	for the content kind: every value it declares is the framework's own, so that a page under it looks as it does under Nino.css
+ *	alone, and every one of them is a ladder, so each knob has something to reach. The middle of a ladder is Nino.css, the others are the
+ *	steps to each side of it, and where Nino.css changes a number at 768px the ladder does the same, in a media query of its own.
+ *
+ *	The set touches the classes of a tile and of a section of tiles only - nothing of the content section, the card or the hero. A title
+ *	in a tile is a section title, and what the section set says of a title stands; what is said here is said inside .nino-tiles, one class
+ *	heavier. The sizes, the room, the gap and where the words stand are what Nino.css reads by name (--tiles-title-scale, --tiles-padding,
+ *	--tiles-gap and --tiles-place): the set points them at the ladders, and the gap and the place are selected by the compiler under
+ *	the very names Nino.css reads, so that the set declares neither. What it has rules for is the letter-spacing of the title, the scrim of
+ *	a dimmed tile and the hover of a linked tile, which is a zoom of its picture - the framework's gentle zoom at the middle, none at the
+ *	first position and, at the third, the zoom and a lift of the tile - only where the visitor has not asked for less motion. The lift is the
+ *	hover knob (--tiles-hover) and the zoom an aspect of it (--tiles-hover-zoom).
+ *
+ *	Copy this file under a name of your own and start there.
+ */
+
+:root {
+	/*	The size of the title, the subtitle and the words of a tile, times its role: 1 each, as Nino.css has them. The steps run from .8 to 1.3 for a title,
+		from .85 to 1.2 for a subtitle and for the words	*/
+	--tiles-title--least: 		.8;
+	--tiles-title--less: 			.9;
+	--tiles-title--default: 	1;
+	--tiles-title--more: 			1.15;
+	--tiles-title--most: 			1.3;
+
+	--tiles-subtitle--least: 		.85;
+	--tiles-subtitle--less: 		.92;
+	--tiles-subtitle--default: 	1;
+	--tiles-subtitle--more: 		1.1;
+	--tiles-subtitle--most: 		1.2;
+
+	--tiles-text--least: 		.85;
+	--tiles-text--less: 			.92;
+	--tiles-text--default: 	1;
+	--tiles-text--more: 			1.1;
+	--tiles-text--most: 			1.2;
+
+	/*	The letter-spacing of the title of a tile, as a step from what the template gives it: nothing at the middle. Tighter on the two steps below it,
+		looser on the two above	*/
+	--tiles-title-tracking--least: 	-.03em;
+	--tiles-title-tracking--less: 		-.015em;
+	--tiles-title-tracking--default: 0em;
+	--tiles-title-tracking--more: 		.04em;
+	--tiles-title-tracking--most: 		.1em;
+
+	/*	The room inside a tile: --space-3, and --space-4 from 768px, as Nino.css has it. Two steps of the scale to either side	*/
+	--tiles-space--least: 		var(--space-1);
+	--tiles-space--less: 			var(--space-2);
+	--tiles-space--default: 	var(--space-3);
+	--tiles-space--more: 			var(--space-4);
+	--tiles-space--most: 			var(--space-5);
+
+	/*	The gap between the tiles, where the row names none: none, as Nino.css has it, up to the middle, then a step of the scale and two. The colour of
+		the section shows in it. Selected by the compiler as --tiles-gap, the property Nino.css reads	*/
+	--tiles-gap--least: 		0px;
+	--tiles-gap--less: 			0px;
+	--tiles-gap--default: 	0px;
+	--tiles-gap--more: 			var(--space-1);
+	--tiles-gap--most: 			var(--space-2);
+
+	/*	Where the words of a tile stand in it, which has the room: at the start, in the middle - as Nino.css has it - or at the end. A class of the tile
+		(nino-stack-start, -center, -end) says otherwise. Selected by the compiler as --tiles-place, the property Nino.css reads	*/
+	--tiles-place--less: 			start;
+	--tiles-place--default: 	center;
+	--tiles-place--more: 			end;
+
+	/*	The scrim over the picture of a dimmed tile. The middle is the one the palette solves for it (--color-background-dim): the lightest scrim that
+		still carries the ink on the lightest picture there could be. The two steps under it let more of the picture through - the scrim at three quarters
+		and at half of its strength - and the two over it deepen it toward the black of the palette, by a quarter and by a half	*/
+	--tiles-dim--least: 		color-mix( in srgb, var(--color-background-dim) 50%, transparent );
+	--tiles-dim--less: 		color-mix( in srgb, var(--color-background-dim) 75%, transparent );
+	--tiles-dim--default: 	var(--color-background-dim);
+	--tiles-dim--more: 		color-mix( in srgb, var(--color-background-dim) 75%, var(--color-section-black-bg) );
+	--tiles-dim--most: 		color-mix( in srgb, var(--color-background-dim) 50%, var(--color-section-black-bg) );
+
+	/*	What a linked tile does under the pointer: its picture grows - the framework's gentle zoom, the number it gives a picture that asks for a hover, at
+		the middle and at the third position, and not at all at the first - and at the third the tile rises by a quarter of a rem. The rise is the knob and the
+		zoom an aspect of it	*/
+	--tiles-hover--less: 			0 0;
+	--tiles-hover--default: 	0 0;
+	--tiles-hover--more: 			0 -.25rem;
+
+	--tiles-hover-zoom--less: 			1;
+	--tiles-hover-zoom--default: 		1.04;
+	--tiles-hover-zoom--more: 			1.04;
+}
+
+@media (min-width: 768px) {
+	:root {
+		--tiles-space--least: 	var(--space-2);
+		--tiles-space--less: 		var(--space-3);
+		--tiles-space--default: var(--space-4);
+		--tiles-space--more: 		var(--space-5);
+		--tiles-space--most: 		var(--space-6);
+	}
+}
+
+/*	The numbers Nino.css reads by name. The gap and the place are selected under their own names by the compiler	*/
+:root {
+	--tiles-title-scale: var(--tiles-title);
+	--tiles-subtitle-scale: var(--tiles-subtitle);
+	--tiles-text-scale: var(--tiles-text);
+	--tiles-padding: var(--tiles-space);
+}
+
+/*	The letter-spacing of the title of a tile	*/
+.nino-tiles :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud) {
+	letter-spacing: var(--tiles-title-tracking);
+}
+
+/*	The scrim over the picture of a dimmed tile, as the ladder of the dimming says it	*/
+.nino-tiles .nino-grid--dim > .nino-grid-bg::after {
+	background-color: var(--tiles-dim);
+}
+
+/*	The hover of the picture of a linked tile: it grows inside the block that cuts it, and at the third position the tile rises - the pointer is the
+	tile's, and not the picture's, which the words cover. The transition of the tile carries the animation's three properties with the time and the
+	easing Nino.css gives them, so that a tile hovered while it arrives goes on arriving. Only where the visitor has not asked for less motion	*/
+@media (prefers-reduced-motion: no-preference) {
+	.nino-tiles .nino-grid--linked > .nino-grid-bg img {
+		transition: transform .3s ease;
+	}
+	.nino-tiles .nino-grid--linked:hover > .nino-grid-bg img,
+	.nino-tiles .nino-grid--linked:has(a.nino-stretch:focus-visible) > .nino-grid-bg img {
+		transform: scale(var(--tiles-hover-zoom));
+	}
+	.nino-tiles .nino-grid--linked:hover {
+		translate: var(--tiles-hover);
+		transition: translate .2s ease,
+			opacity var(--vpa-duration) cubic-bezier(0.5, 0, 0.7, 1),
+			transform var(--vpa-duration) cubic-bezier(0.5, 0, 0.7, 1),
+			filter var(--vpa-duration) cubic-bezier(0.5, 0, 0.7, 1);
+	}
+}
+
+
+/* ==== 11. card: regular (title default, subtitle default, title-tracking default, space default, border default, shadow default, tone default, title-ground default, hover default, align default, title-case default, subtitle-case default) ==== */
 /*	@name			Regular
  *	@description	The framework as it is: the middle of every ladder. Cards as Nino.css draws them.
  *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Karten, wie Nino.css sie zeichnet.
@@ -2038,7 +2196,7 @@ footer {
 }
 
 
-/* ==== 11. buttons: regular (size default, spread default, tracking default, space default, corners default, outline default, hover default, case default) ==== */
+/* ==== 12. buttons: regular (size default, spread default, tracking default, space default, corners default, outline default, hover default, case default) ==== */
 /*	@name			Regular
  *	@description	The framework as it is: the middle of every ladder. Every .nino-btn variant and the link that looks like one.
  *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Jede .nino-btn-Variante und der Link, der wie eine aussieht.
@@ -2214,7 +2372,7 @@ footer {
 }
 
 
-/* ==== 12. lists: regular (scale default, space default, marker default) ==== */
+/* ==== 13. lists: regular (scale default, space default, marker default) ==== */
 /*	@name			Regular
  *	@description	The framework as it is: the middle of every ladder. Plain lists, lists with a check and numbered lists.
  *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Einfache Listen, Listen mit Haken und nummerierte Listen.
@@ -2339,7 +2497,7 @@ footer {
 }
 
 
-/* ==== 13. tables: regular (scale default, space default, border default, zebra default, stripes default) ==== */
+/* ==== 14. tables: regular (scale default, space default, border default, zebra default, stripes default) ==== */
 /*	@name			Regular
  *	@description	The framework as it is: the middle of every ladder. Tables, their cells, their lines and the stripes of one that asks for them.
  *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Tabellen, ihre Zellen, ihre Linien und die Streifen einer, die danach fragt.
@@ -2446,7 +2604,7 @@ footer {
 }
 
 
-/* ==== 14. forms: regular (scale default, space default, corners default, line default, labels default, edge default, label default, label-case default) ==== */
+/* ==== 15. forms: regular (scale default, space default, corners default, line default, labels default, edge default, label default, label-case default) ==== */
 /*	@name			Regular
  *	@description	The form as the kernel draws it: a line round the field, the label above it, the middle of every ladder.
  *	@description-de	Das Formular, wie der Kernel es zeichnet: eine Linie um das Feld, die Beschriftung darüber, die Mitte jeder Leiter.
@@ -2569,7 +2727,7 @@ footer {
 }
 
 
-/* ==== 15. the knob positions ==== */
+/* ==== 16. the knob positions ==== */
 :root {
 	--buttons-case: var(--buttons-case--default);
 	--buttons-corners: var(--buttons-corners--default);
@@ -2694,6 +2852,16 @@ footer {
 	--tables-stripes: var(--tables-stripes--default);
 	--tables-zebra: var(--tables-zebra--default);
 	--tables-zebra-ink: var(--tables-zebra-ink--default);
+	--tiles-dim: var(--tiles-dim--default);
+	--tiles-gap: var(--tiles-gap--default);
+	--tiles-hover: var(--tiles-hover--default);
+	--tiles-hover-zoom: var(--tiles-hover-zoom--default);
+	--tiles-place: var(--tiles-place--default);
+	--tiles-space: var(--tiles-space--default);
+	--tiles-subtitle: var(--tiles-subtitle--default);
+	--tiles-text: var(--tiles-text--default);
+	--tiles-title: var(--tiles-title--default);
+	--tiles-title-tracking: var(--tiles-title-tracking--default);
 }
 
 :root, :root * {

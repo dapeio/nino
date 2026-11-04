@@ -917,11 +917,13 @@ $whitespaceWhere = [
 		'.nino-card--grid.nino-grid-m-25', '.nino-card--grid.nino-grid-m-33', '.nino-card--grid.nino-grid-m-50', '.nino-cover--padded',
 		'.nino-parallex:not(.nino-cover--padded, .nino-pl-0) > .nino-grid-row:not(.nino-pl-0, .nino-grid-row--full), .nino-cover:not(.nino-cover--padded, .nino-pl-0) > .nino-grid-row:not(.nino-pl-0, .nino-grid-row--full)',
 		'.nino-parallex:not(.nino-cover--padded, .nino-pr-0) > .nino-grid-row:not(.nino-pr-0, .nino-grid-row--full), .nino-cover:not(.nino-cover--padded, .nino-pr-0) > .nino-grid-row:not(.nino-pr-0, .nino-grid-row--full)',
+		':where(.nino-tiles) > .nino-grid-row > *',
 	],
 	'--whitespace-gap' => [
 		'.nino-grid-row > .nino-stack-start, .nino-grid-row > .nino-stack-center, .nino-grid-row > .nino-stack-end, .nino-grid-row > [class*="nino-stack-gap-"]:not(.nino-stack)',
 		'.nino-stack', '.nino-stack > *',
 		'.nino-grid-gap-1', '.nino-grid-gap-2', '.nino-grid-gap-3', '.nino-grid-gap-4', '.nino-grid-gap-5', '.nino-grid-gap-6',
+		':where(.nino-tiles) > .nino-grid-row > *',
 	],
 	'--whitespace-text' => [
 		'.nino-hero-title', '.nino-hero-subtitle', '.nino-section-title', '.nino-section-subtitle', '.nino-section-text', '.nino-richtext p, .nino-richtext ul, .nino-richtext ol',
@@ -936,7 +938,7 @@ foreach( $whitespaceWhere as $whitespaceToken => $whitespaceExpected ) {
 	if( $whitespaceFound !== $whitespaceExpected )
 		$whitespaceWrong[] = $whitespaceToken. ' - read where it should not be: '. implode( ' | ', array_diff( $whitespaceFound, $whitespaceExpected ) ). '; not read where it should be: '. implode( ' | ', array_diff( $whitespaceExpected, $whitespaceFound ) );
 }
-check( 'the areas read --whitespace-scale itself - the padding of a section, the margin and the padding of a card and of its content, the gap between the columns of a row of cards, the widths that give a card\'s margin up, the sides of the row of a cover - the stack its gap, the row of a section the gap between its columns and the texts theirs, and no other rule reads any of the three'
+check( 'the areas read --whitespace-scale itself - the padding of a section and of a tile, the margin and the padding of a card and of its content, the gap between the columns of a row of cards, the widths that give a card\'s margin up, the sides of the row of a cover - the stack its gap, a tile the gap of its words, the row of a section the gap between its columns and the texts theirs, and no other rule reads any of the three'
 	. ( $whitespaceWrong === [] ? '' : ' - '. implode( '; ', $whitespaceWrong ) ), $whitespaceWrong === [] );
 $whitespaceMay = [ '--whitespace-scale' => [ 'padding', 'padding-top', 'margin', 'column-gap', 'width', 'left', 'right', '--cover-padding-y', '--cover-padding-x' ], '--whitespace-gap' => [ 'gap', '--nino-stack-gap-scaled', '--nino-grid-gap' ], '--whitespace-text' => [ 'margin', 'margin-top', 'margin-bottom' ] ];
 $whitespaceUsed = [];
@@ -1137,7 +1139,7 @@ foreach( $groundEach as $zeroSelector => $zeroBodies )
 	}
 $zeroWrong = [];
 foreach( [ 'cover-x' => [ '.nino-cover--padded', $frameSides ], 'cover-y' => [ $frameAbove ],
-	'section' => [ '.nino-section', '.nino-section:has(> .nino-grid-row.nino-pl-0)', '.nino-section:has(> .nino-grid-row.nino-pr-0)' ], 'row' => [ '.nino-grid-row--full' ] ] as $zeroKey => $zeroList ) {
+	'section' => [ '.nino-section', '.nino-section:has(> .nino-grid-row.nino-pl-0)', '.nino-section:has(> .nino-grid-row.nino-pr-0)' ], 'row' => [ '.nino-grid-row--full', ':where(.nino-tiles) > .nino-grid-row' ] ] as $zeroKey => $zeroList ) {
 	$zeroGot = $zeroFound[$zeroKey];
 	sort( $zeroGot );
 	sort( $zeroList );
@@ -1151,7 +1153,7 @@ foreach( [ 'cover-x' => [ '.nino-cover--padded', $frameSides ], 'cover-y' => [ $
 		$zeroWrong[] = $zeroKey. ' - also: '. implode( ' | ', $zeroMore ). '; not: '. implode( ' | ', array_diff( $zeroList, $zeroGot ) );
 	}
 }
-check( '...and nothing else takes a section or its cover to the edge: a distance of the cover that is 0 is its own below 768px and the two frames, a side of a section\'s padding that is 0 is the section\'s own below 768px and the edge rule of each side, and the one row with no maximum width is .nino-grid-row--full'
+check( '...and nothing else takes a section or its cover to the edge: a distance of the cover that is 0 is its own below 768px and the two frames, a side of a section\'s padding that is 0 is the section\'s own below 768px and the edge rule of each side, and the rows with no maximum width are .nino-grid-row--full and the row of a section of tiles'
 	. ( $zeroWrong === [] ? '' : ' - '. implode( '; ', $zeroWrong ) ), $zeroWrong === [] );
 check( '...and the content stands over the picture as it does in any cover: the row and the content of a hand-written cover keep to the picture\'s width - the row as wide as the two offsets leave it, not the 100% every row says - and to its top or its bottom edge where the cover says so',
 	$groundSets( $groundOf( '.nino-cover--padded > .nino-grid-row' ), 'left', 'var(--cover-padding-x)' ) === true && $groundSets( $groundOf( '.nino-cover--padded > .nino-grid-row' ), 'right', 'var(--cover-padding-x)' ) === true
@@ -1479,10 +1481,10 @@ echo "\n";
 
 echo "Nino.css - the radius of a surface: two strengths, a token and a marker for each kind, and a class that takes the other\n";
 
-/*	The corners of a surface are the page's: two strengths for the whole page and five kinds of surface, each with a token that points at one of them and a marker that
+/*	The corners of a surface are the page's: two strengths for the whole page and six kinds of surface, each with a token that points at one of them and a marker that
 	says which, as a word - for a tool that wants the default of a kind without resolving a length. What reads a token and what the class of one element sets is pinned by
 	selector and never by a length: a design layer says the lengths	*/
-$radiusKinds = [ 'cover', 'row', 'column', 'card', 'image' ];
+$radiusKinds = [ 'cover', 'row', 'column', 'tile', 'card', 'image' ];
 $radiusPoints = [ 'standard' => 'var(--radius-surface)', 'alternative' => 'var(--radius-surface-alt)' ];
 // A length of the root in rem, a var() followed through the declarations of the root
 $radiusLength = static function( string $property ) use ( &$radiusLength, $hookRoot, $hookValue ): ?float {
@@ -1503,7 +1505,7 @@ foreach( $radiusKinds as $radiusKind ) {
 	if( ( $radiusPoints[$radiusMarker] ?? null ) !== $radiusToken )
 		$radiusWrong[] = '--radius-'. $radiusKind. '-default does not say which strength the token points at';
 }
-check( ':root declares the two strengths of the radius of a surface - lengths, the alternative the larger - and for each of the five kinds, cover, row, column, card and image, a token that points at one of them and a marker that says which, as the word standard or alternative'
+check( ':root declares the two strengths of the radius of a surface - lengths, the alternative the larger - and for each of the six kinds, cover, row, column, tile, card and image, a token that points at one of them and a marker that says which, as the word standard or alternative'
 	. ( $radiusWrong === [] ? '' : ' - '. implode( '; ', $radiusWrong ) ), $radiusWrong === [] && $radiusLength( '--radius-surface' ) < $radiusLength( '--radius-surface-alt' ) );
 check( '...and a marker draws nothing: no rule of the stylesheet reads one',
 	preg_match( '/var\(\s*--radius-(?:'. implode( '|', $radiusKinds ). ')-default/', $hookCss ) !== 1 );
@@ -1514,6 +1516,7 @@ $radiusReaders = [
 	'cover'		=> [ '.nino-cover--padded > .nino-section-bg', '.nino-cover--padded.nino-cover--dim::before', '.nino-cover--padded.nino-parallex--dim::before', '.nino-cover--padded:not(.nino-parallex) > img' ],
 	'row'			=> array_merge( array_map( static fn( string $ground ): string => '.nino-grid-row--'. $ground, $radiusGrounds ), [ '.nino-grid-row:where(:has(> .nino-grid-row-bg))' ] ),
 	'column'	=> array_merge( array_map( static fn( string $ground ): string => '.nino-grid--'. $ground, $radiusGrounds ), [ '.nino-grid-bg', ':has(> .nino-grid-bg)' ] ),
+	'tile'		=> [ ':where(.nino-tiles) > .nino-grid-row > *', ':where(.nino-tiles) > .nino-grid-row > * > .nino-grid-bg' ],
 	'card'		=> [ '.nino-card', '.nino-card-img', '.nino-card--fullwidth .nino-card-img' ],
 	'image'		=> [ '.nino-image:not(.nino-card-img)' ],
 ];
@@ -1528,7 +1531,7 @@ foreach( $radiusReaders as $radiusKind => $radiusExpected ) {
 	if( $radiusFound !== $radiusExpected )
 		$radiusWrong[] = '--radius-'. $radiusKind. ' is read where it should not be: '. implode( ' | ', array_diff( $radiusFound, $radiusExpected ) ). '; not read where it should be: '. implode( ' | ', array_diff( $radiusExpected, $radiusFound ) );
 }
-check( 'every surface reads the token of its kind as its border-radius - the picture, the box of a parallax and the scrim of a padded cover, a row that paints a ground or holds a picture, a column that paints a ground or holds a picture and its picture, a card and its picture, the frame of the image component - and no other rule reads one'
+check( 'every surface reads the token of its kind as its border-radius - the picture, the box of a parallax and the scrim of a padded cover, a row that paints a ground or holds a picture, a column that paints a ground or holds a picture and its picture, a tile and its picture, a card and its picture, the frame of the image component - and no other rule reads one'
 	. ( $radiusWrong === [] ? '' : ' - '. implode( '; ', $radiusWrong ) ), $radiusWrong === [] );
 
 // The exception of one element: two classes, and a rule for each kind and each class, on the element of its kind and setting the token of that kind and no other
@@ -1536,6 +1539,7 @@ $radiusElement = [
 	'cover'		=> [ '.nino-cover--padded' ],
 	'row'			=> [ '.nino-grid-row' ],
 	'column'	=> array_merge( array_map( static fn( string $ground ): string => '.nino-grid--'. $ground, $radiusGrounds ), [ ':has(> .nino-grid-bg)' ] ),
+	'tile'		=> [ '.nino-tiles' ],
 	'card'		=> [ '.nino-card' ],
 	'image'		=> [ '.nino-image' ],
 ];
@@ -1569,15 +1573,15 @@ foreach( $radiusKinds as $radiusKind ) {
 	if( $radiusOnes !== [ '.nino-radius', '.nino-radius-alt' ] )
 		$radiusWrong[] = '--radius-'. $radiusKind. ' has the classes: '. implode( ' ', $radiusOnes );
 }
-check( 'the exception of one element is two classes, nino-radius and nino-radius-alt: ten rules, one for each of the five kinds and each class, on the element of its kind - a column is one that paints any ground or holds a picture - setting the token of that kind and no other - to the strength the class names - so that a class on a column reaches no card in it'
-	. ( $radiusWrong === [] ? '' : ' - '. implode( '; ', $radiusWrong ) ), $radiusWrong === [] && count( $radiusRules ) === 10 );
+check( 'the exception of one element is two classes, nino-radius and nino-radius-alt: twelve rules, one for each of the six kinds and each class, on the element of its kind - a column is one that paints any ground or holds a picture, a tile is a column of a section of tiles - setting the token of that kind and no other - to the strength the class names - so that a class on a column reaches no card in it'
+	. ( $radiusWrong === [] ? '' : ' - '. implode( '; ', $radiusWrong ) ), $radiusWrong === [] && count( $radiusRules ) === 12 );
 $radiusWrong = [];
 foreach( $groundBlocks as [ , $radiusList, $radiusBody ] )
 	if( preg_match( '/var\(\s*--radius-surface(?:-alt)?\s*\)/', $radiusBody ) === 1 )
 		foreach( $groundSplit( $radiusList ) as $radiusSelector )
 			if( $radiusSelector !== ':root' && preg_match( '/\.nino-radius(?:-alt)?$/', $radiusSelector ) !== 1 )
 				$radiusWrong[] = $radiusSelector;
-check( '...a surface reads its kind and never a strength: the two strengths are read by the tokens of the kinds in :root and by the ten rules of the exception, and by no other rule'
+check( '...a surface reads its kind and never a strength: the two strengths are read by the tokens of the kinds in :root and by the twelve rules of the exception, and by no other rule'
 	. ( $radiusWrong === [] ? '' : ' - '. implode( ' | ', $radiusWrong ) ), $radiusWrong === [] );
 
 // The frame of the image component has the corners of its kind and no other: a rule that names it, or a modifier of it, and says a radius says the token of the image kind
@@ -1647,6 +1651,109 @@ check( 'the picture behind a row, a column or a card starts and ends where a cla
 // The slider says its width: the track is out of the flow, so a box that sizes the slider by its content - an item of a flex row, a grid that places its content at the start - made it as wide as nothing
 check( 'a slider is as wide as the box it stands in: width 100%, min-width 0 so that nothing holds it wider, and stretched in a flex column - its track is out of the flow, and Nino.ui.js measures the slider to size the slides',
 	$groundSets( $groundOf( '.nino-slider' ), 'width', '100%' ) === true && $groundSets( $groundOf( '.nino-slider' ), 'min-width', '0' ) === true && $groundSets( $groundOf( '.nino-slider' ), 'align-self', 'stretch' ) === true );
+
+echo "\n";
+
+
+// --- A section of tiles -----------------------------------------------------
+
+echo "Nino.css - a section of tiles: six tokens, a section without padding, a row at the whole width, a tile with a padding, a height and a radius of its own, and a link over the whole of a column\n";
+
+/*	The tiles are the second kind of section: .nino-tiles on a section, its row the whole width and its columns tiles. What wins over what is pinned by weight and by place in the file, as for the
+	other surfaces: every rule is one class heavy - the selectors that name more of the chain say it in :where() - and stands where the order decides, so that the spacing classes of chapter 09 win
+	over the padding of the section, the row and a tile, and a ground or a picture of a column does not take a tile's padding or radius back. The tile itself says no overflow: a grid item that is not
+	visible loses the automatic minimum size that lets it grow past its ratio, and the one block that is cut at the radius of a tile is its picture	*/
+$tileRoot = [ '--tiles-padding' => 'var(--space-3)', '--tiles-gap' => '0px', '--tiles-place' => 'center', '--tiles-title-scale' => '1', '--tiles-subtitle-scale' => '1', '--tiles-text-scale' => '1' ];
+$tileWrong = [];
+foreach( $tileRoot as $tileProperty => $tileValue )
+	if( $hookValue( $hookRoot, $tileProperty ) !== $tileValue )
+		$tileWrong[] = $tileProperty;
+check( ':root declares the six tokens of the tiles: the padding of a tile, the gap between tiles - none -, where the words stand - in the middle -, and the title, the subtitle and the text of a tile at the size of their role'
+	. ( $tileWrong === [] ? '' : ' - not: '. implode( ', ', $tileWrong ) ), $tileWrong === [] );
+check( '...the padding of a tile is a step wider from 768px, and nothing else of the tiles moves there',
+	$hookValue( $hookRootWide, '--tiles-padding' ) === 'var(--space-4)' && preg_match_all( '/--tiles-/', $hookRootWide ) === 1 );
+$tileSelectors = [];
+foreach( array_keys( $groundEach ) as $tileSelector )
+	if( str_contains( (string) $tileSelector, 'nino-tiles' ) === true )
+		$tileSelectors[] = (string) $tileSelector;
+sort( $tileSelectors );
+$tileExpected = [ ':is(.nino-tiles > .nino-grid-row > *).nino-radius', ':is(.nino-tiles > .nino-grid-row > *).nino-radius-alt', '.nino-tiles', ':where(.nino-tiles) > .nino-grid-row', ':where(.nino-tiles) > .nino-grid-row > *',
+	':where(.nino-tiles) > .nino-grid-row > * > .nino-btn', ':where(.nino-tiles) > .nino-grid-row > * > .nino-grid-bg',
+	':where(.nino-tiles) > .nino-grid-row > * > .nino-section-text:where(:not(.nino-section-text--quiet, .nino-section-text--loud))', ':where(.nino-tiles) > .nino-grid-row > .nino-text-center > .nino-btn',
+	':where(.nino-tiles) > .nino-grid-row > .nino-text-right > .nino-btn' ];
+foreach( [ '1-1', '4-3', '3-2', '16-9', '21-9', '4-1', '5-1' ] as $tileRatio )
+	$tileExpected[] = '.nino-tiles--'. $tileRatio. ' > .nino-grid-row > *';
+sort( $tileExpected );
+check( 'nothing in Nino.css addresses a section of tiles but these rules: the section, its row, a tile, its words and its button, its picture, the seven ratios and the radius classes of a tile',
+	$tileSelectors === $tileExpected );
+
+$tileFirstUtility = -1;
+foreach( $groundMembers as $groundAt => $groundList )
+	foreach( $groundList as $groundMember )
+		if( preg_match( '/^\.nino-p[tblr]?-\d$/', $groundMember ) === 1 && ( $tileFirstUtility < 0 || $groundAt < $tileFirstUtility ) )
+			$tileFirstUtility = $groundAt;
+$tileAt = static function( string $selector ) use ( $groundMembers ): int {
+	foreach( $groundMembers as $groundAt => $groundList )
+		if( in_array( $selector, $groundList, true ) === true )
+			return $groundAt;
+	return -1;
+};
+// The section: no padding on any side, one class heavy, after every padding the section has - the base rule and the one of the 768px query - and ahead of the utilities
+check( 'a section of tiles has no padding on any side: .nino-tiles says padding 0, once, one class heavy, after the section\'s own padding rules - the base rule and the one of the 768px query - and ahead of the first padding class of chapter 09, so that nino-pt-<n> on it says what it says',
+	$groundSets( $groundOf( '.nino-tiles' ), 'padding', '0' ) === true && count( $groundEach['.nino-tiles'] ) === 1 && $innerWeight( '.nino-tiles' ) === 1 && $groundConditions( '.nino-tiles' ) === [ [] ]
+	&& $tileAt( '.nino-tiles' ) > $groundLastOf( [ '.nino-section' ], 'padding' ) && $groundLastOf( [ '.nino-section' ], 'padding' ) > 0 && $tileAt( '.nino-tiles' ) < $tileFirstUtility && $tileFirstUtility > 0 );
+// The row: the whole width, the gap of the section where the row names none
+$tileRowSelector = ':where(.nino-tiles) > .nino-grid-row';
+$tileRowAt = $tileAt( $tileRowSelector );
+$tileRowBody = $groundOf( $tileRowSelector );
+check( 'the row of a section of tiles has no maximum width, no place and no padding, and its gap is the section\'s: one class heavy, after nino-grid-row--full and the other width classes of the row, which say nothing on it, and ahead of the gap classes, which win over --tiles-gap',
+	$groundSets( $tileRowBody, 'max-width', 'none' ) === true && $groundSets( $tileRowBody, 'margin', '0' ) === true && $groundSets( $tileRowBody, 'padding', '0' ) === true && $groundSets( $tileRowBody, '--nino-grid-gap', 'var(--tiles-gap)' ) === true
+	&& count( $groundEach[$tileRowSelector] ) === 1 && $innerWeight( $tileRowSelector ) === 1
+	&& $tileRowAt > max( $tileAt( '.nino-grid-row' ), $tileAt( '.nino-grid-row--narrow' ), $tileAt( '.nino-grid-row--wide' ), $tileAt( '.nino-grid-row--full' ), $tileAt( '.nino-grid-row--left' ), $tileAt( '.nino-grid-row--right' ) )
+	&& $tileRowAt < min( array_map( static fn( int $step ): int => $tileAt( '.nino-grid-gap-'. $step ), [ 0, 1, 2, 3, 4, 5, 6 ] ) ) && $tileAt( '.nino-grid-gap-0' ) > 0 );
+// A tile: its padding, its stack, its radius - no overflow of its own
+$tileSelector = ':where(.nino-tiles) > .nino-grid-row > *';
+$tileBody = $groundOf( $tileSelector );
+$tileGrounds = array_map( static fn( string $ground ): string => '.nino-grid--'. $ground, $radiusGrounds );
+$tileGroundsAt = max( array_map( $tileAt, array_merge( $tileGrounds, [ ':has(> .nino-grid-bg)', '.nino-grid-bg' ] ) ) );
+check( 'a tile is a column of the row with a padding of its own: --tiles-padding times the whitespace, one class heavy, after every ground of a column, its picture and its radius - which would take it back - and ahead of the first padding class, so that nino-p-<n> says what it says',
+	$groundSets( $tileBody, 'padding', 'calc(var(--tiles-padding) * var(--whitespace-scale))' ) === true && $groundSets( $tileBody, 'border-radius', 'var(--radius-tile)' ) === true
+	&& count( $groundEach[$tileSelector] ) === 1 && $innerWeight( $tileSelector ) === 1 && $tileAt( $tileSelector ) > $tileGroundsAt && $tileGroundsAt > 0 && $tileAt( $tileSelector ) < $tileFirstUtility );
+check( '...it is a stack by default - a grid whose words stand at --tiles-place, a gap of a stack apart - the box the stretched link and the picture are placed in, and it sets the scales of the title and the subtitle on itself, the size of the words being its own times --tiles-text-scale',
+	$groundSets( $tileBody, 'display', 'grid' ) === true && $groundSets( $tileBody, 'align-content', 'var(--tiles-place)' ) === true && $groundSets( $tileBody, 'position', 'relative' ) === true && $groundSets( $tileBody, 'isolation', 'isolate' ) === true
+	&& $groundSets( $tileBody, 'gap', 'calc(var(--nino-stack-gap, var(--space-2)) * var(--whitespace-gap))' ) === true
+	&& $groundSets( $tileBody, '--section-title-scale', 'var(--tiles-title-scale)' ) === true && $groundSets( $tileBody, '--section-subtitle-scale', 'var(--tiles-subtitle-scale)' ) === true
+	&& $groundSets( $tileBody, 'font-size', 'calc(var(--font-text-size) * var(--tiles-text-scale))' ) === true );
+check( '...the tile says no overflow of its own, and the rule of its picture block says overflow clip and the radius of the tile: a tile with an aspect ratio keeps the automatic minimum size that lets it grow past it for words that need more room, and the zoomed picture of a linked tile stays inside its corners',
+	preg_match( '/(?<![\w-])overflow/', $tileBody ) !== 1 && preg_match( '/(?<![\w-])overflow/', $groundOf( '.nino-tiles' ) ) !== 1 && preg_match( '/(?<![\w-])overflow/', $tileRowBody ) !== 1
+	&& $groundSets( $groundOf( ':where(.nino-tiles) > .nino-grid-row > * > .nino-grid-bg' ), 'overflow', 'clip' ) === true && $groundSets( $groundOf( ':where(.nino-tiles) > .nino-grid-row > * > .nino-grid-bg' ), 'border-radius', 'var(--radius-tile)' ) === true
+	&& $innerWeight( ':where(.nino-tiles) > .nino-grid-row > * > .nino-grid-bg' ) === 2 && $tileAt( ':where(.nino-tiles) > .nino-grid-row > * > .nino-grid-bg' ) > $tileAt( '.nino-grid-bg' ) );
+// The height: the ratio of the section on every tile of its row, the rows of a line stretched
+$tileHeightWrong = [];
+foreach( [ '1-1' => '1 / 1', '4-3' => '4 / 3', '3-2' => '3 / 2', '16-9' => '16 / 9', '21-9' => '21 / 9', '4-1' => '4 / 1', '5-1' => '5 / 1' ] as $tileRatio => $tileValue )
+	if( $groundSets( $groundOf( '.nino-tiles--'. $tileRatio. ' > .nino-grid-row > *' ), 'aspect-ratio', $tileValue ) !== true )
+		$tileHeightWrong[] = $tileRatio;
+check( 'the height of a tile is the ratio its section names, for every tile of its row: the seven ratio classes say aspect-ratio and nothing else, and no rule of a tile or its row sets a height or aligns the items of the row - the tiles of a line stay stretched, as high as the highest'
+	. ( $tileHeightWrong === [] ? '' : ' - not: '. implode( ', ', $tileHeightWrong ) ),
+	$tileHeightWrong === [] && preg_match( '/(?<![\w-])(?:height|min-height|max-height|align-items|align-self)\s*:/', $tileBody. ' '. $tileRowBody ) !== 1
+	&& $groundSets( $groundOf( '.nino-grid-row' ), 'display', 'flex' ) === true && preg_match( '/align-items/', $groundOf( '.nino-grid-row' ) ) !== 1 );
+// The linked column: the rules of the linked card, selector for selector
+$linkedCard = [];
+foreach( $groundEach as $linkedSelector => $linkedBodies )
+	if( str_starts_with( (string) $linkedSelector, '.nino-card--linked' ) === true && str_contains( (string) $linkedSelector, '.nino-image' ) === false )
+		$linkedCard[(string) $linkedSelector] = $linkedBodies;
+$linkedWrong = [];
+foreach( $linkedCard as $linkedSelector => $linkedBodies ) {
+	$linkedMirror = str_replace( '.nino-card--linked', '.nino-grid--linked', $linkedSelector );
+	if( ( $groundEach[$linkedMirror] ?? null ) !== $linkedBodies )
+		$linkedWrong[] = $linkedMirror;
+}
+$linkedColumn = array_values( array_filter( array_keys( $groundEach ), static fn( mixed $selector ): bool => str_starts_with( (string) $selector, '.nino-grid--linked' ) === true ) );
+check( 'a column can be a link the way a card can: the rules of .nino-grid--linked are those of .nino-card--linked selector for selector and declaration for declaration - the stretched link over the whole column, everything else interactive above it, the ring on the column - and there are as many'
+	. ( $linkedWrong === [] ? '' : ' - not: '. implode( ', ', $linkedWrong ) ), $linkedWrong === [] && count( $linkedCard ) === 5 && count( $linkedColumn ) === 5 );
+// The class of a link is the one place: nothing but these rules reads nino-stretch
+check( '...and a title that is a link draws the class they stretch, and in a column outside a linked one it means nothing: no other rule of the stylesheet reads nino-stretch',
+	count( array_filter( array_keys( $groundEach ), static fn( mixed $selector ): bool => str_contains( (string) $selector, 'nino-stretch' ) === true && str_contains( (string) $selector, '--linked' ) === false ) ) === 0 );
 
 echo "\n";
 
@@ -2130,6 +2237,11 @@ sort( $imageModifiers );
 sort( $imageRatios );
 check( '...and the modifiers of its frame in Nino.css are the ratios it can write, no more and no fewer: the stylesheet and the registry say the same words'
 	. ( $imageModifiers === $imageRatios ? '' : ' - the stylesheet says '. implode( ' ', $imageModifiers ). ', the registry '. implode( ' ', $imageRatios ) ), $imageRatios !== [] && $imageModifiers === $imageRatios );
+preg_match_all( '/\.nino-tiles--([\w-]+) > \.nino-grid-row > \*/', $hookCss, $tileModifiers );
+$tileModifiers = array_values( array_unique( $tileModifiers[1] ) );
+sort( $tileModifiers );
+check( '...and so are the ratio classes of a section of tiles: .nino-tiles--<ratio> for the words of the ratio attribute, no more and no fewer',
+	$imageRatios !== [] && $tileModifiers === $imageRatios );
 // The ratio of a frame is the ratio of the picture in it: the picture fills the frame at a height of 100%, which is worked out against the height the frame has from its ratio, and where it is not worked out
 // - a frame in a box that sizes it by its content - the picture would have the ratio of its own, in a frame of another. So the <img> directly in the frame says the ratio as the frame does
 $ratioWrong = [];
@@ -2189,13 +2301,14 @@ check( 'the card is declared as the registry says: a label in both languages, th
 	$cardSchema['label'] === [ 'en_US' => 'Card', 'de_DE' => 'Karte' ] && $cardSchema['source'] === 'content' && $cardSchema['loop'] === true && $cardSchema['preview'] === 'block'
 	&& $cardSchema['in'] === [ 'section', 'hero' ] && $cardSchema['draws'] === 'article .nino-card' && $cardSchema['holds'] === 'card'
 	&& array_keys( $cardSchema ) === [ 'label', 'source', 'loop', 'preview', 'icon', 'attributes', 'in', 'draws', 'holds', 'stretched', 'link', 'by', 'group' ] );
-check( '...it says stretched itself no more than a holder can - false, and the registry gives it back in json - and its schema has no key for the component whose address it takes: the title says that of itself, \'card-title\' is the only component of the kernel that does',
+check( '...it says stretched itself no more than a holder can - false, and the registry gives it back in json - and its schema has no key for the component whose address it takes: the title says that of itself, \'card-title\' and \'title\' are the two components of the kernel that do',
 	$cardSchema['stretched'] === false && ( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), true ) )['card']['stretched'] === false
 	&& array_key_exists( 'stretches', $cardSchema ) === false
 	&& ( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), true ) )['card-title']['stretched'] === true
-	&& array_keys( array_filter( \Nino\Modules\Components::components( $appData ), static fn( array $schema ): bool => $schema['stretched'] === true ) ) === [ 'card-title' ]
+	&& array_keys( array_filter( \Nino\Modules\Components::components( $appData ), static fn( array $schema ): bool => $schema['stretched'] === true ) ) === [ 'title', 'card-title' ]
 	&& array_filter( \Nino\Modules\Components::components( $appData ), static fn( array $schema ): bool => array_key_exists( 'stretched', $schema ) === false ) === []
-	&& \Nino\Modules\Components::components( $appData )['card-title']['link'] === true && \Nino\Modules\Components::components( $appData )['card-title']['in'] === [ 'card' ] );
+	&& \Nino\Modules\Components::components( $appData )['card-title']['link'] === true && \Nino\Modules\Components::components( $appData )['card-title']['in'] === [ 'card' ]
+	&& \Nino\Modules\Components::components( $appData )['title']['link'] === true && \Nino\Modules\Components::components( $appData )['title']['stretched'] === true );
 check( '...its attributes are ten, in the order the form shows them: whether it fills, the padding, where its content stands, how it is aligned, the ground, the border, whether the whole card is the link of its title, the picture, its focus and the dim',
 	array_keys( $cardSchema['attributes'] ) === [ 'fill', 'padding', 'vertical', 'align', 'ground', 'borderless', 'linked', 'background', 'focus', 'dim' ] );
 $cardTypes = [ 'ground' => 'select', 'padding' => 'select', 'fill' => 'bool', 'vertical' => 'select', 'align' => 'select', 'background' => 'image', 'focus' => 'select', 'dim' => 'bool', 'borderless' => 'bool', 'linked' => 'bool' ];
@@ -2580,7 +2693,7 @@ check( '...a token of a field no language has a value for is nothing in a call a
 	$fillOf( '[button text="Go" href="/n/[[note]]"]|[[note]]|' ) === $fillCells( '<a class="nino-btn" href="/n/">Go</a>||', '<a class="nino-btn" href="/n/">Go</a>||' ) );
 check( '...a [ in a field is written &#91; and a ] &#93; whether it stands in text or in a call, so that a value an editor wrote opens no fill and no shortcode and ends no call',
 	str_contains( $fillOf( '[[title]]' ), 'a&amp;b &quot;c&quot; &#91;x&#93;' ) === true && str_contains( $fillOf( '[[title]]' ), '[' ) === false
-	&& str_contains( $fillOf( '[title title href="/t/[[title]]"]' ), '<a href="/t/a&amp;b &quot;c&quot; &#91;x]">' ) === true
+	&& str_contains( $fillOf( '[title title href="/t/[[title]]"]' ), '<a class="nino-stretch" href="/t/a&amp;b &quot;c&quot; &#91;x]">' ) === true
 	&& substr_count( $fillOf( '[title title href="/t/[[title]]"]' ), '</a>' ) === 2 && str_contains( $fillOf( '[title title href="/t/[[title]]"]' ), '"]' ) === false );
 check( '...the page\'s fills come first: a key of the page between double brackets is the page\'s in the cell, a token that is the element\'s is the element\'s, and what neither knows stays as it is',
 	$fillOf( '[[/_nino/webpage/contact/uri]]|[[.uri]]|[[nothing]]' ) === $fillCells( '/contact|/fillbox/one|[[nothing]]', '/contact|/fillbox/two|[[nothing]]' ) );
@@ -3152,7 +3265,7 @@ foreach( $linkOpens as $linkName => $linkOpen ) {
 	$linkPlain = $render( $linkOpen. ']' );
 	if( $linkPlain === '' || in_array( $linkName, $kernelLinked, true ) === false )
 		$linkWrong[] = $linkName. ' is no link or draws nothing';
-	$linkClass = $linkName === 'card-title' ? ' class="nino-stretch"' : '';
+	$linkClass = in_array( $linkName, [ 'card-title', 'title' ], true ) ? ' class="nino-stretch"' : '';
 	if( $render( $linkOpen. ' href="/_nino/webpage/contact/uri"]' ) !== '<a'. $linkClass. ' href="/contact">'. $linkPlain. '</a>' )
 		$linkWrong[] = $linkName. ' with the key of an address';
 	if( $render( $linkOpen. ' href="https://example.com/a" target="_blank"]' ) !== '<a'. $linkClass. ' href="https://example.com/a" target="_blank" rel="noopener">'. $linkPlain. '</a>' )
@@ -3162,15 +3275,15 @@ foreach( $linkOpens as $linkName => $linkOpen ) {
 	if( $render( $linkOpen. ' target="_blank"]' ) !== $linkPlain || $render( $linkOpen. ' href=""]' ) !== $linkPlain || str_contains( $linkPlain, 'nino-stretch' ) === true )
 		$linkWrong[] = $linkName. ' without an address';
 }
-check( 'each of the ten components that can be a link draws what it draws in an <a> that has the address of its href - a key is its text, an address is itself, a scheme that is none a #, and _blank says the new window has no business with the opener - and without an address it is no link, with a target alone either; the <a> of the one that says stretched, the card\'s title, has the class nino-stretch before its address, the other nine none'
+check( 'each of the ten components that can be a link draws what it draws in an <a> that has the address of its href - a key is its text, an address is itself, a scheme that is none a #, and _blank says the new window has no business with the opener - and without an address it is no link, with a target alone either; the <a> of the two that say stretched, the title and the card\'s title, has the class nino-stretch before its address, the other eight none'
 	. ( $linkWrong === [] ? '' : ' - '. implode( ', ', $linkWrong ) ), $linkWrong === [] && count( $linkOpens ) === 10 );
 check( '...the address is written as it is made safe, once: the & of a query is &amp;, not &amp;amp; - what it holds written as a key\'s value is what it is - and what a link wraps is the frame of a picture, not its <img>',
-	$render( '[title /template/page-home/hero/title href="/template/page-home/stored/link"]' ) === '<a href="/a?b=&quot;c&quot;&amp;d=1"><h3 class="nino-section-title">Hi &#91;there]</h3></a>'
+	$render( '[title /template/page-home/hero/title href="/template/page-home/stored/link"]' ) === '<a class="nino-stretch" href="/a?b=&quot;c&quot;&amp;d=1"><h3 class="nino-section-title">Hi &#91;there]</h3></a>'
 	&& $render( '[image /template/page-home/hero/background ratio="4-3" href="#x"]' ) === '<a href="#x"><div class="nino-image nino-image--4-3">'. $slotImg. '</div></a>'
 	&& $render( '[card-image /template/page-home/hero/background class="x" href="#x"]' ) === '<a href="#x"><div class="nino-image nino-card-img x">'. $slotImg. '</div></a>' );
 check( '...a source that resolves to nothing is nothing, not an empty link, and in a stack the address is a field of the element or the place in the loop, drawn once per element',
 	$render( '[title /template/page-home/nope/title href="#x"]' ) === '' && $render( '[image /template/page-home/hero/empty href="#x"]' ) === ''
-	&& $render( '[stack /services sort="title" limit="1"][title title href=".uri" target="_blank"][/stack]' ) === '<div class="nino-grid-row nino-stack nino-stack-gap-2"><div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><a href="/services/app" target="_blank" rel="noopener"><h3 class="nino-section-title">App</h3></a></div></div>' );
+	&& $render( '[stack /services sort="title" limit="1"][title title href=".uri" target="_blank"][/stack]' ) === '<div class="nino-grid-row nino-stack nino-stack-gap-2"><div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33"><a class="nino-stretch" href="/services/app" target="_blank" rel="noopener"><h3 class="nino-section-title">App</h3></a></div></div>' );
 check( '...the others take no link: the card holds buttons, the button has an address of its own, and the html, the spacer and the scroll hint do not name one - an href on them is an attribute nobody declared, and ignored',
 	$render( '[card href="#x" target="_blank"]x[/card]' ) === '<article class="nino-card"><div class="nino-card-content">x</div></article>' && $render( '[spacer href="#x"]' ) === '<div class="nino-spacer nino-spacer-2"></div>'
 	&& $render( '[html href="#x"]<p>Hi</p>[/html]' ) === '<p>Hi</p>' && $render( '[button text="Go" href="#x" target="_blank"]' ) === '<a class="nino-btn" href="#x" target="_blank" rel="noopener">Go</a>'

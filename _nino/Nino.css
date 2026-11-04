@@ -380,7 +380,8 @@
 		it, each exactly 1 where the number is 1:
 			--whitespace-scale  the areas, whole: the padding of a section, the
 			                    margin and the padding of a card and of what is in
-			                    it, the gap between the columns of a row of cards
+			                    it, the gap between the columns of a row of cards,
+			                    the padding of a tile
 			--whitespace-gap    the room between pieces: the gap of a stack, of its
 			                    cells and of a column that is a stack - the number
 			                    moved .8 of the way
@@ -409,6 +410,19 @@
 	/*	The space between the viewport and a row - the row's own padding, which
 		is one step wider from 768px (see below)	*/
 	--grid-gutter: var(--space-2);
+	/*	A section of tiles (.nino-tiles, chapter 04): its columns are tiles, and a
+		tile is a surface of its own. The room inside a tile is one step wider from
+		768px, both times --whitespace-scale; the gap between the tiles is what the
+		row names none of, the grout the section's ground shows in; --tiles-place is
+		where the words of a tile stand in it - start, center or end - and the three
+		scales are times the roles, the title, the subtitle and the words of a tile.
+		The corners of a tile are a kind of surface, --radius-tile, below	*/
+	--tiles-padding: var(--space-3);
+	--tiles-gap: 0px;
+	--tiles-place: center;
+	--tiles-title-scale: 1;
+	--tiles-subtitle-scale: 1;
+	--tiles-text-scale: 1;
 	--radius: .2rem;
 	--radius-small: .1rem;
 	/*	The third step the scale always implied and never named: .1 / .2 / .4
@@ -417,7 +431,7 @@
 	--radius-large: .4rem;
 	/*	The radius of a surface is the page's, not a template's: two strengths for
 		the whole page - --radius-surface, the standard, and --radius-surface-alt,
-		the alternative - and five kinds of surface, each with a token that points
+		the alternative - and six kinds of surface, each with a token that points
 		at one of the two and a marker, --radius-<kind>-default, that says which as
 		a plain word, standard or alternative. The marker draws nothing: it is for a
 		tool that wants the default of a kind without resolving a length, and reads
@@ -426,6 +440,8 @@
 			                 the scrim of a dimmed cover
 			--radius-row     a row that paints a ground or holds a picture
 			--radius-column  a column that paints a ground or holds a picture
+			--radius-tile    a tile, a column of a section of tiles: its ground and its
+			                 picture
 			--radius-card    a card, and the picture in it at .7 of its corner
 			--radius-image   the frame of the image component
 		One element takes the other strength with a class of its own, nino-radius or
@@ -443,6 +459,8 @@
 	--radius-row-default: standard;
 	--radius-column: var(--radius-surface);
 	--radius-column-default: standard;
+	--radius-tile: var(--radius-surface);
+	--radius-tile-default: standard;
 	--radius-card: var(--radius-surface);
 	--radius-card-default: standard;
 	--radius-image: var(--radius-surface);
@@ -461,6 +479,7 @@
     --text-6: calc(var(--font-text-size) * 3);
 		--card-title-scale: calc(25 / 32);
 		--grid-gutter: var(--space-3);
+		--tiles-padding: var(--space-4);
   }
 }
 
@@ -496,13 +515,16 @@
 	component, below), so the parts inside a surface - the picture of a card, the
 	scrim of a cover - follow the class as they follow the default, and so does
 	a surface of the same kind inside it, as a custom property is inherited. A
-	column is one that paints a ground or holds a picture	*/
+	column is one that paints a ground or holds a picture; a tile is a column of
+	a section of tiles	*/
 .nino-cover--padded.nino-radius { --radius-cover: var(--radius-surface); }
 .nino-cover--padded.nino-radius-alt { --radius-cover: var(--radius-surface-alt); }
 .nino-grid-row.nino-radius { --radius-row: var(--radius-surface); }
 .nino-grid-row.nino-radius-alt { --radius-row: var(--radius-surface-alt); }
 :is(.nino-grid--alt, .nino-grid--tint, .nino-grid--dark, .nino-grid--black, .nino-grid--primary, .nino-grid--brand-alt, .nino-grid--counter, .nino-grid--dim, :has(> .nino-grid-bg)).nino-radius { --radius-column: var(--radius-surface); }
 :is(.nino-grid--alt, .nino-grid--tint, .nino-grid--dark, .nino-grid--black, .nino-grid--primary, .nino-grid--brand-alt, .nino-grid--counter, .nino-grid--dim, :has(> .nino-grid-bg)).nino-radius-alt { --radius-column: var(--radius-surface-alt); }
+:is(.nino-tiles > .nino-grid-row > *).nino-radius { --radius-tile: var(--radius-surface); }
+:is(.nino-tiles > .nino-grid-row > *).nino-radius-alt { --radius-tile: var(--radius-surface-alt); }
 .nino-card.nino-radius { --radius-card: var(--radius-surface); }
 .nino-card.nino-radius-alt { --radius-card: var(--radius-surface-alt); }
 .nino-image.nino-radius { --radius-image: var(--radius-surface); }
@@ -706,6 +728,7 @@ h1, h2, h3, h4, h5, h6 {
  *			.nino-grid(-top, -middle, -bottom, -center)
  *			.nino-grid(-s,-m, -l, -xl)(-25, -33, -50, -66, -75, -100)
  *			.nino-grid-gap-0...6
+ *			.nino-tiles > .nino-grid-row
  *			.nino-hide-(s, m, l), .nino-stack(-start, -center, -end, -gap-0...6)
  *
  *
@@ -733,6 +756,19 @@ h1, h2, h3, h4, h5, h6 {
 	at the other side gets all the room that is left - one side is enough	*/
 .nino-grid-row--left { margin-left: 0; }
 .nino-grid-row--right { margin-right: 0; }
+/*	The row of a section of tiles (.nino-tiles, chapter 04) is the section's whole
+	width: no maximum width, no place in it, no gutter - the tiles carry the room.
+	Asked for in :where() so that the rule is one class heavy, like the classes
+	above, and stands after them: --narrow, --wide, --left and --right say nothing
+	on it. Its gap is the section's, --tiles-gap, where it names none - the gap
+	classes below come after, and win - and the padding classes of chapter 09 win
+	over its padding	*/
+:where(.nino-tiles) > .nino-grid-row {
+	--nino-grid-gap: var(--tiles-gap);
+	max-width: none;
+	margin: 0;
+	padding: 0;
+}
 
 .nino-grid--fullwidth {
 	padding-left: 0;
@@ -1156,6 +1192,7 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
  *			.nino-grid-row(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim), .nino-grid-row-bg
  *			.nino-grid(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim)
  *			.nino-card(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim, --fill, --middle, --bottom, --last-bottom, --linked, --fullwidth), .nino-card(-content, -title, -subtitle, -descr, -img, -price, -bg)
+ *			.nino-tiles(--1-1, --4-3, --3-2, --16-9, --21-9, --4-1, --5-1), .nino-grid--linked
  *			.nino-ink(--muted, --accent)
  *
  *			Three rules that reach beyond the class they stand at: a section is the box
@@ -2007,6 +2044,34 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	outline: none;
 }
 .nino-card--linked:has(a.nino-stretch:focus-visible) {
+	outline: 2px solid var(--color-focus);
+	outline-offset: -2px;
+}
+
+/*	A column that is a link the same way, a tile for one: the rules of the linked
+	card above, for a column - the one a.nino-stretch in it covers the column,
+	every other link, button and field stays above it, and the keyboard's ring
+	is drawn on the column. A section of tiles is where the Builder writes it;
+	the rules address the class wherever it stands. One linked title per linked
+	surface: with two stretched links in one column the later one lies on top	*/
+.nino-grid--linked {
+	position: relative;
+	isolation: isolate;
+}
+.nino-grid--linked a.nino-stretch::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: 1;
+}
+.nino-grid--linked :where(a, button, iframe, input, label, select, summary, textarea, [contenteditable], [controls], [tabindex]):where(:not(.nino-stretch)) {
+	position: relative;
+	z-index: 2;
+}
+.nino-grid--linked a.nino-stretch:focus-visible {
+	outline: none;
+}
+.nino-grid--linked:has(a.nino-stretch:focus-visible) {
 	outline: 2px solid var(--color-focus);
 	outline-offset: -2px;
 }
@@ -4418,6 +4483,69 @@ header .nino-headernav-logo:empty {
 .nino-bg-pr-1 > :is(.nino-grid-bg, .nino-card-bg, .nino-grid-row-bg) { right: var(--space-1); }
 .nino-bg-pr-2 > :is(.nino-grid-bg, .nino-card-bg, .nino-grid-row-bg) { right: var(--space-2); }
 .nino-bg-pr-3 > :is(.nino-grid-bg, .nino-card-bg, .nino-grid-row-bg) { right: var(--space-3); }
+
+/*	A section of tiles: the second kind of section, for graphic tiles across the
+	whole width where the first, the content section, is for editorial content
+	with a reading width. The class stands after nino-section and says what the
+	section is; its row is the section's whole width (chapter 02) and its columns
+	are tiles. The section carries no padding - the tiles carry the room - and its
+	ground, and its border, show between the tiles as grout. The rules come here,
+	after the grounds of a column, its picture and the section's own padding, and
+	ahead of the utilities of chapter 09, and each is one class heavy, asked for
+	in :where() where it names more, so that the order decides: nino-pt-<n> on the
+	section, nino-p-<n> on a tile and the grounds of a tile are what they say.
+	The tile rule says no overflow of its own, so that a tile with an aspect
+	ratio grows past it for the words that need more room; only the picture block
+	is cut, at the radius of the tile, so that a zoomed picture stays inside the
+	corners	*/
+.nino-tiles {
+	padding: 0;
+}
+/*	A tile is a column of the row, a stack by default: the words in it one below
+	the other, a gap apart, placed at the start, the middle or the end by
+	--tiles-place; nino-stack-start|center|end and nino-stack-gap-<n> keep their
+	meaning, being two classes heavy. The title, the subtitle, their variants and
+	the rule under a title follow the scales of the tile through the properties
+	set here, with no rule of their own	*/
+:where(.nino-tiles) > .nino-grid-row > * {
+	--section-title-scale: var(--tiles-title-scale);
+	--section-subtitle-scale: var(--tiles-subtitle-scale);
+	position: relative;
+	isolation: isolate;
+	display: grid;
+	align-content: var(--tiles-place);
+	gap: calc(var(--nino-stack-gap, var(--space-2)) * var(--whitespace-gap));
+	padding: calc(var(--tiles-padding) * var(--whitespace-scale));
+	border-radius: var(--radius-tile);
+	font-size: calc(var(--font-text-size) * var(--tiles-text-scale));
+}
+/*	The text of a tile has the size of the tile; the quiet and the loud variant
+	state their own, from the role	*/
+:where(.nino-tiles) > .nino-grid-row > * > .nino-section-text:where(:not(.nino-section-text--quiet, .nino-section-text--loud)) {
+	font-size: inherit;
+}
+/*	A button in a tile is as wide as its label and follows the text alignment, as
+	in a stack column	*/
+:where(.nino-tiles) > .nino-grid-row > * > .nino-btn { justify-self: start; }
+:where(.nino-tiles) > .nino-grid-row > .nino-text-center > .nino-btn { justify-self: center; }
+:where(.nino-tiles) > .nino-grid-row > .nino-text-right > .nino-btn { justify-self: end; }
+/*	The picture of a tile is cut at the radius of the tile and not at that of a
+	column, which its own rule above would cut it at	*/
+:where(.nino-tiles) > .nino-grid-row > * > .nino-grid-bg {
+	overflow: clip;
+	border-radius: var(--radius-tile);
+}
+/*	The height of the tiles: one ratio for all of them, the words of the image
+	component's ratios. A tile grows past its ratio for the words that need more,
+	and the tiles of one line are as high as the highest of them, since the row
+	stretches its columns. Without a ratio class a tile is as high as its words	*/
+.nino-tiles--1-1 > .nino-grid-row > * { aspect-ratio: 1 / 1; }
+.nino-tiles--4-3 > .nino-grid-row > * { aspect-ratio: 4 / 3; }
+.nino-tiles--3-2 > .nino-grid-row > * { aspect-ratio: 3 / 2; }
+.nino-tiles--16-9 > .nino-grid-row > * { aspect-ratio: 16 / 9; }
+.nino-tiles--21-9 > .nino-grid-row > * { aspect-ratio: 21 / 9; }
+.nino-tiles--4-1 > .nino-grid-row > * { aspect-ratio: 4 / 1; }
+.nino-tiles--5-1 > .nino-grid-row > * { aspect-ratio: 5 / 1; }
 
 /* Contentslider */
 /*	content-box against the page's own border-box: Nino.ui.js measures the
