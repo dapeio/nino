@@ -1350,7 +1350,9 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 
 /* Fullscreen hero without an image - nino-cover/nino-parallex size themselves
    via data-cover-height (JS), this is the CSS-only equivalent for a plain
-   nino-hero section with no image to size against */
+   nino-hero section with no image to size against. A nino-parallex with no
+   data-cover-height is not JS-sized either, and needs no such help: it is at
+   least 60vh high and grows with what it holds */
 .nino-hero--fullscreen {
 	min-height: 100vh;
 	display: flex;
@@ -1911,7 +1913,7 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	their colour from the page, and on a dimmed photograph the page's ink is
 	dark ink on a dark ground. A plain section with a picture behind it and a
 	row with one are dimmed the same way, and have the same ink	*/
-.nino-cover--dim, .nino-section--dim, .nino-grid-row--dim {
+.nino-cover--dim, .nino-parallex--dim, .nino-section--dim, .nino-grid-row--dim {
 	color: var(--color-section-black-text);
 	--color-ground: var(--color-section-black-bg);
 	--color-ink: var(--color-section-black-text);
@@ -4142,8 +4144,13 @@ header .nino-headernav-logo:empty {
  ****************************************************************************************************/
 
 
-/* Cover / Parallax - JS-driven sizing (see Nino.ui.js), this only
-   provides the structural CSS the JS behavior depends on */
+/* Cover / Parallax - two shapes. A cover, and a parallax that is a cover as
+   well (it says nino-cover and a data-cover-height), has the height the JS
+   gives it (see Nino.ui.js) and its content placed over it: this provides the
+   structural CSS that behavior depends on. A parallax that is no cover has no
+   height but the 60vh it asks for, and the JS sizes covers only: it sizes
+   itself to what it holds, its row stands in the flow and grows it (see
+   "A parallax that is no cover", below) */
 .nino-parallex,
 .nino-cover {
 	position: relative;
@@ -4151,6 +4158,11 @@ header .nino-headernav-logo:empty {
 }
 .nino-parallex {
 	min-height: 60vh;
+}
+/*	A fullscreen hero that is a parallax is a screen high: the rule of the hero
+	comes earlier in the file and would lose to the minimum above	*/
+.nino-parallex.nino-hero--fullscreen {
+	min-height: 100vh;
 }
 .nino-parallex > img,
 .nino-cover > img {
@@ -4313,15 +4325,12 @@ header .nino-headernav-logo:empty {
 	padding-top: var(--space-3);
 }
 @media (min-width: 768px) {
-	.nino-parallex > .nino-grid-row,
 	.nino-cover > .nino-grid-row {
 		width: auto;
 	}
-	.nino-parallex:not(.nino-cover--padded, .nino-pl-0) > .nino-grid-row:not(.nino-pl-0, .nino-grid-row--full),
 	.nino-cover:not(.nino-cover--padded, .nino-pl-0) > .nino-grid-row:not(.nino-pl-0, .nino-grid-row--full) {
 		left: calc(var(--space-3) * var(--whitespace-scale));
 	}
-	.nino-parallex:not(.nino-cover--padded, .nino-pr-0) > .nino-grid-row:not(.nino-pr-0, .nino-grid-row--full),
 	.nino-cover:not(.nino-cover--padded, .nino-pr-0) > .nino-grid-row:not(.nino-pr-0, .nino-grid-row--full) {
 		right: calc(var(--space-3) * var(--whitespace-scale));
 	}
@@ -4427,6 +4436,67 @@ header .nino-headernav-logo:empty {
 	side padding with it, and so the inset at the sides: both, since the two sides
 	are one property, and asked of the row because the classes are its own	*/
 .nino-cover--padded:has(> .nino-grid-row.nino-pl-0.nino-pr-0) { --cover-padding-x: 0px; }
+
+/*	A parallax that is no cover. The height of a cover comes from the JS, which
+	sizes .nino-cover and nothing else, and the rules above place its content
+	over that height, in the middle of it. A parallax with no cover height has
+	none of that: it is 60vh high at least, and a row placed over it, taller than
+	that, hung out of the section and was cut by its overflow while the section
+	stayed as it was. It sizes itself to what it holds instead, as a section
+	with a picture behind it does (see .nino-section-bg): a flex column that
+	keeps its row in the middle of at least 60vh, or at the top or the bottom of
+	it with nino-cover-top and nino-cover-bottom, and that grows with the row.
+	The row - and the content of a hand-written one - stands in the flow and is
+	still over the picture and the scrim: position: relative for the z-index of
+	the content, 101, and none of the offsets and the centring of the placed
+	one. The picture and the scrim stay placed, and the picture is still 180%
+	high behind it: the section is the box it moves in, whatever the height of
+	that box is. A parallax that says nino-cover as well is a cover and has every
+	rule above as it had; these come after the placed ones and take their
+	offsets back, the padded cover's included.
+	From 768px the section has a side padding of its own, the space step times
+	the whitespace, which a placed box does not stand in and which the row of a
+	cover is given as an offset: the row in the flow stands inside that padding
+	without being told, and where the section gives it up - for a row at the edge,
+	nino-pl-0 or nino-pr-0, or by a padding of its own, the padded one's - it is
+	given up for this row as for every other. A row with no maximum width,
+	nino-grid-row--full, goes to the edge, as it did placed: the section gives up
+	its side padding for it, as it does for a row that says nino-pl-0 (see the
+	768px rules of the sections), and the padded one keeps its own. The section keeps its padding above
+	and below as well, which a placed row ignored and a row that grows the
+	section needs for room; the centred row does not see it, the padding being
+	the same on both sides. The width is 100% of what the padding leaves, which
+	the auto of a padded cover would shrink to the content of the row, since the
+	margins of a row with a maximum width are auto. The content of a
+	hand-written one has the padding of the section by inheritance, to span the padding
+	box it was placed in, and in the flow it stands inside that padding already: it has
+	none of its own	*/
+.nino-parallex:not(.nino-cover) {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+}
+.nino-parallex:not(.nino-cover).nino-cover-top { justify-content: flex-start; }
+.nino-parallex:not(.nino-cover).nino-cover-bottom { justify-content: flex-end; }
+.nino-parallex:not(.nino-cover) > .nino-grid-row,
+.nino-parallex:not(.nino-cover) > .nino-cover-content {
+	position: relative;
+	top: auto;
+	bottom: auto;
+	left: 0;
+	right: auto;
+	translate: none;
+	z-index: 101;
+}
+.nino-parallex:not(.nino-cover) > .nino-grid-row { width: 100%; }
+.nino-parallex:not(.nino-cover, .nino-cover--padded):has(> .nino-grid-row--full) {
+	padding-left: 0;
+	padding-right: 0;
+}
+.nino-parallex:not(.nino-cover) > .nino-cover-content {
+	padding-left: 0;
+	padding-right: 0;
+}
 
 /*	The picture behind a column, in a block of its own that the content of the
 	column follows: what .nino-section-bg is to a section, for a column. It

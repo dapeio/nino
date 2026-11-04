@@ -828,7 +828,7 @@ foreach( [
 		$groundWrong[] = $groundSelector. ' does not set '. $groundProperty. ' to '. $groundValue;
 // A dimmed cover and a dimmed picture are the dark ground for what stands in them, the subtitle included: that is what lets them go without a rule for each thing in them -
 // and a plain section and a row with a picture dimmed are the same
-foreach( [ '.nino-cover--dim', '.nino-section--dim', '.nino-grid-row--dim', '.nino-img-background--dim' ] as $groundSelector )
+foreach( [ '.nino-cover--dim', '.nino-parallex--dim', '.nino-section--dim', '.nino-grid-row--dim', '.nino-img-background--dim' ] as $groundSelector )
 	foreach( [ '--color-title', '--color-subtitle' ] as $groundProperty )
 		if( $groundSets( $groundOf( $groundSelector ), $groundProperty, 'var(--color-section-black-text)' ) === false )
 			$groundWrong[] = $groundSelector. ' does not set '. $groundProperty;
@@ -842,6 +842,7 @@ $groundRestores = [
 	'.nino-nav-burger > button[aria-expanded="true"] ~ .nino-nav-content'	=> $groundPage,
 	'.nino-localepicker-wrap input:checked + div'				=> $groundPage,
 	'.nino-cover--dim'													=> $groundSource['black'],
+	'.nino-parallex--dim'											=> $groundSource['black'],
 	'.nino-section--dim'												=> $groundSource['black'],
 	'.nino-grid-row--dim'												=> $groundSource['black'],
 	'.nino-img-background--dim'									=> $groundSource['black'],
@@ -915,8 +916,8 @@ $whitespaceWhere = [
 		'.nino-grid-row--alt, .nino-grid-row--tint, .nino-grid-row--dark, .nino-grid-row--black, .nino-grid-row--primary, .nino-grid-row--brand-alt, .nino-grid-row--counter, .nino-grid-row--dim, .nino-grid-row:where(:has(> .nino-grid-row-bg))',
 		'.nino-card-cols', '.nino-card-cols-s', '.nino-card-cols-m', '.nino-card-cols-l', '.nino-card-cols-xl',
 		'.nino-card--grid.nino-grid-m-25', '.nino-card--grid.nino-grid-m-33', '.nino-card--grid.nino-grid-m-50', '.nino-cover--padded',
-		'.nino-parallex:not(.nino-cover--padded, .nino-pl-0) > .nino-grid-row:not(.nino-pl-0, .nino-grid-row--full), .nino-cover:not(.nino-cover--padded, .nino-pl-0) > .nino-grid-row:not(.nino-pl-0, .nino-grid-row--full)',
-		'.nino-parallex:not(.nino-cover--padded, .nino-pr-0) > .nino-grid-row:not(.nino-pr-0, .nino-grid-row--full), .nino-cover:not(.nino-cover--padded, .nino-pr-0) > .nino-grid-row:not(.nino-pr-0, .nino-grid-row--full)',
+		'.nino-cover:not(.nino-cover--padded, .nino-pl-0) > .nino-grid-row:not(.nino-pl-0, .nino-grid-row--full)',
+		'.nino-cover:not(.nino-cover--padded, .nino-pr-0) > .nino-grid-row:not(.nino-pr-0, .nino-grid-row--full)',
 		':where(.nino-tiles) > .nino-grid-row > *',
 	],
 	'--whitespace-gap' => [
@@ -1043,13 +1044,73 @@ foreach( [ 'left' => 'pl', 'right' => 'pr' ] as $insetSide => $insetClass ) {
 	foreach( [ 'cover' => [ '.nino-cover--padded', '.nino-'. $insetClass. '-0' ], 'row' => [ '.nino-'. $insetClass. '-0', '.nino-grid-row--full' ] ] as $insetPart => $insetKept )
 		if( array_diff( $insetKept, $inset[$insetPart] ) !== [] )
 			$insetWrong[] = $insetSide. ' does not leave out '. implode( ', ', array_diff( $insetKept, $inset[$insetPart] ) );
-	if( $groundConditions( '.nino-parallex'. substr( $inset['selector'], strlen( '.nino-cover' ) ). ', '. $inset['selector'] ) !== [ [ '@media (min-width: 768px)' ] ] )
-		$insetWrong[] = $insetSide. ' is not for the parallax and the cover from 768px alone';
+	if( $groundConditions( $inset['selector'] ) !== [ [ '@media (min-width: 768px)' ] ] )
+		$insetWrong[] = $insetSide. ' is not for the cover from 768px alone';
 }
-check( 'from 768px the row of a cover and of a parallax stands inside the side padding of the section - the space step times the whitespace on the left and on the right, as wide as the two leave it - and a side keeps the edge it had where the section says nino-pl-0 or nino-pr-0 and where the row does, for the row with no maximum width and for the padded cover'
+check( 'from 768px the row of a cover - a parallax with a cover height is one - stands inside the side padding of the section - the space step times the whitespace on the left and on the right, as wide as the two leave it - and a side keeps the edge it had where the section says nino-pl-0 or nino-pr-0 and where the row does, for the row with no maximum width and for the padded cover'
 	. ( $insetWrong === [] ? '' : ' - '. implode( '; ', $insetWrong ) ),
 	$insetWrong === [] && count( $coverInset ) === 2 && $groundSets( $groundOf( '.nino-cover > .nino-grid-row' ), 'width', 'auto' ) === true
-	&& in_array( [ '@media (min-width: 768px)' ], $groundConditions( '.nino-parallex > .nino-grid-row, .nino-cover > .nino-grid-row' ), true ) === true );
+	&& in_array( [ '@media (min-width: 768px)' ], $groundConditions( '.nino-cover > .nino-grid-row' ), true ) === true );
+
+/*	A parallax that is no cover - no cover height, so no JS height - sizes itself to what it holds: a flex column that centres its row in the 60vh it asks for at least, and keeps it at the top or at
+	the bottom with nino-cover-top and nino-cover-bottom, as the section with a picture behind it does. Its row and the content of a hand-written one stand in the flow, over the picture and the scrim -
+	position: relative for the z-index, 101 - and take back every offset, centring and bottom of the placed ones, the padded cover's included, which is why the rule stands after the last of them. From
+	768px the row stands in the side padding of the section, which is the inset the placed row had as an offset, and the offsets of the placed row are the cover's alone. A parallax that is
+	a cover as well is a cover: its row stays placed, absolute and centred by translate, and the cover is no flex box. The old rule took the row out of the flow of a section that has no height but its
+	minimum, and a row taller than that was cut (measured: a row of 1140px in a section of 60vh = 540px at 900px of window, 600px of the row gone)	*/
+$flowSection = '.nino-parallex:not(.nino-cover)';
+$flowInsetWrong = [];
+foreach( array_keys( $groundEach ) as $flowEach )
+	if( str_contains( (string) $flowEach, '.nino-parallex' ) === true && $groundConditions( (string) $flowEach ) === [ [ '@media (min-width: 768px)' ] ] )
+		$flowInsetWrong[] = $flowEach. ' is a rule of the parallax from 768px';
+foreach( [ 'left', 'right' ] as $flowSide )
+	if( preg_match( '/(?<![\w-])'. $flowSide. '\s*:\s*calc\(/', implode( ' ', array_map( $groundOf, array_filter( array_keys( $groundEach ), static fn( mixed $selector ): bool => str_contains( (string) $selector, '.nino-parallex' ) === true ) ) ) ) === 1 )
+		$flowInsetWrong[] = 'a rule of the parallax says '. $flowSide. ' by a calculation, an offset of the placed row';
+$flowFull = '.nino-parallex:not(.nino-cover, .nino-cover--padded):has(> .nino-grid-row--full)';
+if( $groundSets( $groundOf( $flowFull ), 'padding-left', '0' ) === false || $groundSets( $groundOf( $flowFull ), 'padding-right', '0' ) === false )
+	$flowInsetWrong[] = 'a row with no maximum width does not go to the edge of a parallax that is no cover: the section does not give up its side padding for it';
+if( $groundSets( $groundOf( '.nino-parallex.nino-hero--fullscreen' ), 'min-height', '100vh' ) === false || $groundLastOf( [ '.nino-parallex.nino-hero--fullscreen' ] ) <= $groundLastOf( [ '.nino-parallex' ], 'min-height' ) )
+	$flowInsetWrong[] = 'a fullscreen hero that is a parallax is not a screen high: its minimum height does not come after the 60vh of the parallax';
+$flowRows = [ $flowSection. ' > .nino-grid-row', $flowSection. ' > .nino-cover-content' ];
+$flowWrong = [];
+foreach( [ '' => 'center', '.nino-cover-top' => 'flex-start', '.nino-cover-bottom' => 'flex-end' ] as $flowVariant => $flowJustify )
+	if( $groundSets( $groundOf( $flowSection. $flowVariant ), 'justify-content', $flowJustify ) === false )
+		$flowWrong[] = $flowSection. $flowVariant. ' does not say justify-content: '. $flowJustify;
+foreach( [ 'display' => 'flex', 'flex-direction' => 'column' ] as $flowProperty => $flowValue )
+	if( $groundSets( $groundOf( $flowSection ), $flowProperty, $flowValue ) === false )
+		$flowWrong[] = $flowSection. ' does not say '. $flowProperty. ': '. $flowValue;
+foreach( $flowRows as $flowRow ) {
+	foreach( [ 'position' => 'relative', 'top' => 'auto', 'bottom' => 'auto', 'left' => '0', 'translate' => 'none', 'z-index' => '101' ] as $flowProperty => $flowValue )
+		if( $groundSets( $groundOf( $flowRow ), $flowProperty, $flowValue ) === false )
+			$flowWrong[] = $flowRow. ' does not say '. $flowProperty. ': '. $flowValue;
+	if( $groundLastOf( [ $flowRow ], 'position' ) <= $groundLastOf( [ '.nino-cover--padded.nino-cover-bottom > .nino-cover-content', '.nino-cover--padded.nino-cover-bottom > .nino-grid-row' ], 'bottom' ) )
+		$flowWrong[] = $flowRow. ' does not stand after the last rule that places a row';
+}
+if( $groundSets( $groundOf( $flowSection. ' > .nino-cover-content' ), 'padding-left', '0' ) === false || $groundSets( $groundOf( $flowSection. ' > .nino-cover-content' ), 'padding-right', '0' ) === false )
+	$flowWrong[] = 'the content of a hand-written one keeps the padding of the section it inherits, which it stands inside already';
+if( $groundSets( $groundOf( $flowSection. ' > .nino-grid-row' ), 'width', '100%' ) === false )
+	$flowWrong[] = 'the row of the flow has no width of 100% to set against the auto of the padded cover';
+if( $groundConditions( $flowSection ) !== [ [] ] || $groundConditions( $flowSection. ' > .nino-grid-row' ) !== [ [] ] )
+	$flowWrong[] = 'the section and its row are not for every width';
+check( 'a parallax that is no cover sizes itself to what it holds - a flex column that centres its row, nino-cover-top and nino-cover-bottom at the start and the end - and its row and its content stand in the flow, relative and over the picture, with the offsets, the centring and the bottom of the placed ones taken back by rules that stand after them'
+	. ( $flowWrong === [] ? '' : ' - '. implode( '; ', $flowWrong ) ), $flowWrong === [] );
+check( '...and it takes no part in the offsets of the placed row from 768px, which would shift a row in the flow by them: the side padding of the section is the inset it stands in, and the rules of the offsets name the cover alone - a row with no maximum width goes to the edge, the section giving its side padding up for it, and a fullscreen hero that is a parallax is a screen high'
+	. ( $flowInsetWrong === [] ? '' : ' - '. implode( '; ', $flowInsetWrong ) ), $flowInsetWrong === [] );
+$coverStays = [ 'position' => 'absolute', 'top' => '50%', 'translate' => '0 -50%', 'z-index' => '101' ];
+$coverWrong = [];
+foreach( $coverStays as $coverProperty => $coverValue )
+	if( $groundSets( $groundOf( '.nino-cover > .nino-grid-row' ), $coverProperty, $coverValue ) === false )
+		$coverWrong[] = 'the row of a cover does not say '. $coverProperty. ': '. $coverValue;
+if( preg_match( '/(?<![\w-])display\s*:/', $groundOf( '.nino-cover' ) ) === 1 || preg_match( '/(?<![\w-])display\s*:/', $groundOf( '.nino-parallex' ) ) === 1 )
+	$coverWrong[] = 'a cover or the parallax itself is a flex box';
+if( $groundSets( $groundOf( '.nino-parallex' ), 'min-height', '60vh' ) === false || $groundSets( $groundOf( '.nino-parallex' ), 'overflow', 'hidden' ) === false && $groundSets( $groundOf( '.nino-parallex, .nino-cover' ), 'overflow', 'hidden' ) === false )
+	$coverWrong[] = 'the parallax lost its minimum height or its overflow';
+check( '...and a cover - a parallax that says nino-cover is one - is unchanged: its row is placed, absolute at the middle and centred by translate over the height the JS gives it, and neither it nor the parallax as such is a flex box'
+	. ( $coverWrong === [] ? '' : ' - '. implode( '; ', $coverWrong ) ), $coverWrong === [] );
+$demoPage = (string) file_get_contents( __DIR__. '/../_admin/install/library/pages/.demo-catalogue/templates/.demo-catalogue.tpl' );
+check( '...and the demo shows both shapes: a parallax with a cover height - nino-cover and data-cover-height, placed and sized by the script - and one without, which has neither and whose row stands in the flow of a section that grows with it',
+	preg_match( '/<section id="hero-parallax" class="[^"]*\bnino-parallex\b[^"]*\bnino-cover\b[^"]*" data-cover-height="100"/', $demoPage ) === 1
+	&& preg_match( '/<section id="parallax-grows" class="(?![^"]*\bnino-cover\b)[^"]*(?<![\w-])nino-parallex(?![\w-])[^"]*"(?![^>]*data-cover-height)[^>]*>\s*<img [^>]*>\s*<div class="nino-grid-row/', $demoPage ) === 1 );
 
 /*	A section is the containing block of what is placed in it - the arrow at its foot, the picture behind it - whichever kind of section it is. A plain section and one whose picture stands in its row had
 	none, so that the arrow lay at the foot of the first screen of the page (measured: 788px to 828px at 390px, under a section that begins 1177px down), as the cover, the parallax and the section with a
@@ -1199,7 +1260,7 @@ check( 'a dimmed row darkens the picture of its block with the scrim of a dimmed
 	&& $groundBgBody( '.nino-grid-row--dim > .nino-grid-row-bg::after' ) === $groundBgBody( '.nino-grid--dim > .nino-grid-bg::after' )
 	&& $groundSets( $groundOf( '.nino-section--dim > .nino-section-bg::after' ), 'background-color', 'var(--color-background-dim)' ) === true
 	&& $groundBgBody( '.nino-section--dim > .nino-section-bg::after' ) === $groundBgBody( '.nino-grid--dim > .nino-grid-bg::after' )
-	&& $groundInkRule( '.nino-cover--dim' ) !== [] && $groundInkRule( '.nino-cover--dim' ) === $groundInkRule( '.nino-section--dim' ) && $groundInkRule( '.nino-cover--dim' ) === $groundInkRule( '.nino-grid-row--dim' ) );
+	&& $groundInkRule( '.nino-cover--dim' ) !== [] && $groundInkRule( '.nino-cover--dim' ) === $groundInkRule( '.nino-section--dim' ) && $groundInkRule( '.nino-cover--dim' ) === $groundInkRule( '.nino-grid-row--dim' ) && $groundInkRule( '.nino-parallex--dim' ) === $groundInkRule( '.nino-cover--dim' ) );
 
 /*	A row says its maximum width, its place and its padding in classes. --full has no maximum width and keeps the gutter; --left and --right say the margin at one side 0 and
 	nothing else, since the row has an auto margin at both sides and the one at the other side takes the room that is left; and the three come after the rule of the row, a rule

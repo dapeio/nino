@@ -143,6 +143,20 @@
 	</div>
 </section>
 
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-parallax-grows" data-demo-preset="hero-fullscreen-image" data-demo-layout="parallax-grows">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
+			<span class="nino-badge nino-badge--primary">fullscreen-image</span> <span class="nino-badge nino-badge--pill">Layout: parallax without a cover height — grows with its content</span> <span class="nino-badge nino-badge--pill">Overlay: dim</span>
+		</div>
+	</div>
+</section>
+<section id="parallax-grows" class="nino-section nino-section--black nino-parallex nino-parallex--dim nino-img-focus--5 nino-mt-0 nino-mb-0" aria-labelledby="parallax-grows-title">
+	<img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100 nino-text-left"><h2 class="nino-hero-title" id="parallax-grows-title">A parallax that sizes itself</h2><p class="nino-section-text">Without a cover height the section is 60vh high at least and grows with what it holds: the row stands in the flow, centred, and the picture moves behind it.</p><p class="nino-section-text">With a cover height (data-cover-height) it keeps the height the script gives it, and the row is placed over it.</p><p class="nino-section-text">Content taller than the screen stretches the section and is never cut: a long text, a list of arguments or a table stands over the picture as it does on any other section, and the picture covers all of it while it moves.</p><p class="nino-section-text">The row sits where the section's padding puts it, so that a long text has air above and below it.</p><p class="nino-section-text">One more paragraph, so that the example is taller than 60vh on a phone and on a desktop screen up to full HD: the section is as high as the row and its padding, and no higher than that when the row is taller.</p><p class="nino-section-text">Resize the window to see it: the picture keeps moving behind the row, whatever the height of the section is.</p><a href="#katalog-presets" class="nino-btn nino-btn--primary">View workshop</a></div>
+	</div>
+</section>
+
 <section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-image-banner-plain" data-demo-preset="image-banner" data-demo-layout="plain">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
