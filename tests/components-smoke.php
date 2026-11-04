@@ -1711,7 +1711,7 @@ check( 'the row of a section of tiles has no maximum width, no place and no padd
 	&& count( $groundEach[$tileRowSelector] ) === 1 && $innerWeight( $tileRowSelector ) === 1
 	&& $tileRowAt > max( $tileAt( '.nino-grid-row' ), $tileAt( '.nino-grid-row--narrow' ), $tileAt( '.nino-grid-row--wide' ), $tileAt( '.nino-grid-row--full' ), $tileAt( '.nino-grid-row--left' ), $tileAt( '.nino-grid-row--right' ) )
 	&& $tileRowAt < min( array_map( static fn( int $step ): int => $tileAt( '.nino-grid-gap-'. $step ), [ 0, 1, 2, 3, 4, 5, 6 ] ) ) && $tileAt( '.nino-grid-gap-0' ) > 0 );
-// A tile: its padding, its stack, its radius - no overflow of its own
+// A tile: its padding, its stack, its radius, its minimum height and its overflow
 $tileSelector = ':where(.nino-tiles) > .nino-grid-row > *';
 $tileBody = $groundOf( $tileSelector );
 $tileGrounds = array_map( static fn( string $ground ): string => '.nino-grid--'. $ground, $radiusGrounds );
@@ -1724,18 +1724,39 @@ check( '...it is a stack by default - a grid whose words stand at --tiles-place,
 	&& $groundSets( $tileBody, 'gap', 'calc(var(--nino-stack-gap, var(--space-2)) * var(--whitespace-gap))' ) === true
 	&& $groundSets( $tileBody, '--section-title-scale', 'var(--tiles-title-scale)' ) === true && $groundSets( $tileBody, '--section-subtitle-scale', 'var(--tiles-subtitle-scale)' ) === true
 	&& $groundSets( $tileBody, 'font-size', 'calc(var(--font-text-size) * var(--tiles-text-scale))' ) === true );
-check( '...the tile says no overflow of its own, and the rule of its picture block says overflow clip and the radius of the tile: a tile with an aspect ratio keeps the automatic minimum size that lets it grow past it for words that need more room, and the zoomed picture of a linked tile stays inside its corners',
-	preg_match( '/(?<![\w-])overflow/', $tileBody ) !== 1 && preg_match( '/(?<![\w-])overflow/', $groundOf( '.nino-tiles' ) ) !== 1 && preg_match( '/(?<![\w-])overflow/', $tileRowBody ) !== 1
+$tileFormula = 'calc( ( 100cqw * var(--nino-grid-share, 1) - var(--nino-grid-gap, 0px) * ( 1 - var(--nino-grid-share, 1) ) ) * var(--nino-tile-ratio, 0) )';
+check( '...the tile says its own minimum height - the width the width classes give it (the row\'s 100cqw times the share, less the share of the gap that the width classes give back) times --nino-tile-ratio, 0 without a ratio class - and overflow visible, once each, and no aspect-ratio: a flex item with an aspect ratio has no content-based minimum on WebKit and keeps its ratio height, its centred words cut by the clip of a column with a ground or a picture',
+	$groundSets( $tileBody, 'min-height', $tileFormula ) === true && preg_match_all( '/(?<![\w-])min-height\s*:/', $tileBody ) === 1
+	&& $groundSets( $tileBody, 'overflow', 'visible' ) === true && preg_match_all( '/(?<![\w-])overflow\s*:/', $tileBody ) === 1
+	&& preg_match( '/aspect-ratio/', $tileBody ) !== 1 && preg_match( '/aspect-ratio/', $groundOf( '.nino-tiles' ) ) !== 1 && preg_match( '/aspect-ratio/', $tileRowBody ) !== 1
+	&& preg_match( '/(?<![\w-])overflow/', $groundOf( '.nino-tiles' ) ) !== 1 && preg_match( '/(?<![\w-])overflow/', $tileRowBody ) !== 1 );
+check( '...the row of a section of tiles is a size container, container-type inline-size, so that 100cqw in the tile is the width of the row, and the picture block alone is cut: overflow clip and the radius of the tile, so that the zoomed picture of a linked tile stays inside its corners',
+	$groundSets( $tileRowBody, 'container-type', 'inline-size' ) === true && preg_match_all( '/(?<![\w-])container-type\s*:/', $tileRowBody ) === 1
 	&& $groundSets( $groundOf( ':where(.nino-tiles) > .nino-grid-row > * > .nino-grid-bg' ), 'overflow', 'clip' ) === true && $groundSets( $groundOf( ':where(.nino-tiles) > .nino-grid-row > * > .nino-grid-bg' ), 'border-radius', 'var(--radius-tile)' ) === true
 	&& $innerWeight( ':where(.nino-tiles) > .nino-grid-row > * > .nino-grid-bg' ) === 2 && $tileAt( ':where(.nino-tiles) > .nino-grid-row > * > .nino-grid-bg' ) > $tileAt( '.nino-grid-bg' ) );
-// The height: the ratio of the section on every tile of its row, the rows of a line stretched
+// The share: every width class says its share of the row in its tier, the minimum height of a tile reads it
+$shareWords = [ '25' => '.25', '33' => 'calc( 1 / 3 )', '50' => '.5', '66' => 'calc( 2 / 3 )', '75' => '.75', '100' => '1' ];
+$shareWrong = [];
+$shareCount = 0;
+foreach( [ '', 's-', 'm-', 'l-', 'xl-' ] as $shareTier )
+	foreach( $shareWords as $shareWidth => $shareValue ) {
+		$shareFound = preg_match_all( '/^[ \t]*\.nino-grid-'. $shareTier. $shareWidth. '\s*\{([^{}]*)\}/m', $hookCss, $shareRules );
+		$shareOk = $shareFound === 1 && preg_match_all( '/(?<![\w-])width\s*:/', $shareRules[1][0] ) === 1 && preg_match( '/(?<![\w-])--nino-grid-share:\s*'. preg_quote( $shareValue, '/' ). '\s*;/', $shareRules[1][0] ) === 1;
+		$shareCount += $shareOk ? 1 : 0;
+		if( !$shareOk )
+			$shareWrong[] = $shareTier. $shareWidth;
+	}
+check( 'every width class of the grid says its share of the row beside its width, in its own tier - 25, 33, 50, 66, 75 and 100 in the base rules and in the s, m, l and xl queries, thirty rules - so that the share follows the active tier as the width does'
+	. ( $shareWrong === [] ? '' : ' - not: '. implode( ', ', $shareWrong ) ),
+	$shareWrong === [] && $shareCount === 30 );
+// The height: the ratio of the section on every tile of its row as a number, the rows of a line stretched
 $tileHeightWrong = [];
-foreach( [ '1-1' => '1 / 1', '4-3' => '4 / 3', '3-2' => '3 / 2', '16-9' => '16 / 9', '21-9' => '21 / 9', '4-1' => '4 / 1', '5-1' => '5 / 1' ] as $tileRatio => $tileValue )
-	if( $groundSets( $groundOf( '.nino-tiles--'. $tileRatio. ' > .nino-grid-row > *' ), 'aspect-ratio', $tileValue ) !== true )
+foreach( [ '1-1' => '1', '4-3' => '.75', '3-2' => 'calc( 2 / 3 )', '16-9' => 'calc( 9 / 16 )', '21-9' => 'calc( 9 / 21 )', '4-1' => '.25', '5-1' => '.2' ] as $tileRatio => $tileValue )
+	if( $groundSets( $groundOf( '.nino-tiles--'. $tileRatio. ' > .nino-grid-row > *' ), '--nino-tile-ratio', $tileValue ) !== true || preg_match( '/aspect-ratio/', $groundOf( '.nino-tiles--'. $tileRatio. ' > .nino-grid-row > *' ) ) === 1 )
 		$tileHeightWrong[] = $tileRatio;
-check( 'the height of a tile is the ratio its section names, for every tile of its row: the seven ratio classes say aspect-ratio and nothing else, and no rule of a tile or its row sets a height or aligns the items of the row - the tiles of a line stay stretched, as high as the highest'
+check( 'the height of a tile is the ratio its section names, for every tile of its row: the seven ratio classes say --nino-tile-ratio, height over width, and nothing else, and no rule of a tile or its row sets a height or aligns the items of the row - the tiles of a line stay stretched, as high as the highest'
 	. ( $tileHeightWrong === [] ? '' : ' - not: '. implode( ', ', $tileHeightWrong ) ),
-	$tileHeightWrong === [] && preg_match( '/(?<![\w-])(?:height|min-height|max-height|align-items|align-self)\s*:/', $tileBody. ' '. $tileRowBody ) !== 1
+	$tileHeightWrong === [] && preg_match( '/(?<![\w-])(?:height|max-height|align-items|align-self)\s*:/', $tileBody. ' '. $tileRowBody ) !== 1 && preg_match( '/(?<![\w-])min-height\s*:/', $tileRowBody ) !== 1
 	&& $groundSets( $groundOf( '.nino-grid-row' ), 'display', 'flex' ) === true && preg_match( '/align-items/', $groundOf( '.nino-grid-row' ) ) !== 1 );
 // The linked column: the rules of the linked card, selector for selector
 $linkedCard = [];
