@@ -147,6 +147,33 @@ manifest that names one. A component should carry `draws`, `in` and `icon`, opti
 are ([component recipe](recipes/component.md)): they are how the Builder shows it
 in a section, places it where it may stand and offers it with a picture.
 
+A stack says what its cell is with `cell` and may take a field of the element as
+an attribute with the type `field`. `cell` is one of `components` (the default:
+what stands between the tags, drawn once for each element), `section` (a whole
+section), `columns` (the `[col]`s and nothing else, as the kernel's table has them)
+or `row` (one field or one line of text, the row of a list); a manifest that names
+another word is refused, naming the stack, and a tool such as the Builder reads the
+word to know what it may put between the tags. A stack may declare a `text` attribute, of the type `string` only: it arrives as the call wrote it, a line the cells fill. A `field` attribute is the name of a
+field of the type the stack loops - letters, digits, hyphens and underscores,
+starting with a letter - and its default is empty or such a name; the kernel reads
+a value that is none as the default, and a tool draws a choice of the type's
+fields for it. The renderer draws the cell through `renderStack()`, whose cell
+function runs with the element as the context, so `Components::element()` and
+`Components::value()` answer for it there:
+
+```php
+'stacks' => [
+	'team' => [
+		'label'      => [ 'en_US' => 'Team', 'de_DE' => 'Team' ],
+		'cell'       => 'components',
+		'attributes' => [
+			'name' => [ 'type' => 'field', 'default' => 'title', 'label' => [ 'en_US' => 'Name field', 'de_DE' => 'Namensfeld' ] ],
+		],
+		'preview'    => 'block',
+	],
+],
+```
+
 A schema that says `'link' => true` (**1.9**) makes a component a link where it is
 given one: it has an `href` and a `target` without declaring them, and what the
 renderer made is wrapped in the `<a>` they say. A schema that says

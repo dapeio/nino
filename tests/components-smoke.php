@@ -1930,7 +1930,7 @@ echo "Modules\\Components - the registry, the sources, the stacks\n";
 
 // The registry the module's own init() fills, read before the test adds to it
 $kernelAll = [ 'title', 'subtitle', 'text', 'line', 'card-title', 'card-subtitle', 'card-text', 'card-image', 'hero-title', 'hero-subtitle', 'card', 'button', 'image', 'logo', 'html', 'spacer', 'scroll-hint', 'col' ];
-$kernelStacks = [ 'stack', 'slider', 'filter', 'list', 'table', 'sections' ];
+$kernelStacks = [ 'stack', 'repeat', 'slider', 'filter', 'tabs', 'accordion', 'list', 'table', 'sections' ];
 check( 'the module registers the components of the kernel in the order a column offers them: the title, the subtitle, the text and the line of a section, the title, the subtitle, the text and the image of a card, the title and the subtitle of a hero, then the card, the button, the image, the logo, the html, the spacer and the scroll hint, and the column of a table last', array_keys( \Nino\Modules\Components::components( $appData ) ) === $kernelAll );
 check( '...and a tool is answered in that order: the registry as json is an object keyed by name, which read again lists the same eighteen in the same order',
 	str_starts_with( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), '{"title":{' ) === true
@@ -2183,7 +2183,7 @@ check( '...and one whose assets climb out of the project', count( $schemaErrors 
 check( 'the registry was left alone by every refusal', array_keys( \Nino\Modules\Components::components( $appData ) ) === $kernelAll
 	&& array_keys( \Nino\Modules\Components::stacks( $appData ) ) === $kernelStacks );
 check( 'a schema that validates is returned complete, a stack with its assets', \Nino\Modules\Components::validate( 'rows', [ 'label' => 'Rows', 'grid' => true, 'assets' => [ 'css' => [ '/features/Rows/assets/rows.css' ] ] ], true ) === [
-	'label' => 'Rows', 'grid' => true, 'preview' => 'cells', 'attributes' => [], 'assets' => [ 'css' => [ '/features/Rows/assets/rows.css' ] ],
+	'label' => 'Rows', 'grid' => true, 'cell' => 'components', 'preview' => 'cells', 'attributes' => [], 'assets' => [ 'css' => [ '/features/Rows/assets/rows.css' ] ],
 ] );
 $placed = [ 'label' => 'x', 'source' => 'text', 'group' => 'global', 'attributes' => [ 'tag' => [ 'type' => 'select', 'options' => [ 'div', 'h3' ], 'default' => 'h3' ] ] ];
 check( 'validate() takes the places a component stands in and what it draws, and carries them in the clean schema; a schema that says neither has neither',
@@ -2468,6 +2468,7 @@ $tabRest = [
 	'key'			=> [ 'default' => '' ],
 	'image'		=> [ 'default' => '' ],
 	'href'		=> [ 'default' => '' ],
+	'field'		=> [ 'default' => '' ],
 ];
 $tabWrong = [];
 foreach( \Nino\Modules\Components::TYPES as $tabType )
@@ -2506,7 +2507,7 @@ check( 'validate() takes whether a component can be a link and who registered it
 	array_keys( \Nino\Modules\Components::validate( 'probe', $linkable + [ 'in' => [ 'card' ], 'draws' => '{tag} .x', 'link' => true, 'by' => 'hello' ] ) ) === [ 'label', 'source', 'loop', 'preview', 'attributes', 'in', 'draws', 'stretched', 'link', 'by' ]
 	&& ( \Nino\Modules\Components::validate( 'probe', $linkable + [ 'link' => true, 'by' => 'hello' ] )['link'] ?? null ) === true && ( \Nino\Modules\Components::validate( 'probe', $linkable + [ 'link' => true, 'by' => 'hello' ] )['by'] ?? null ) === 'hello'
 	&& ( \Nino\Modules\Components::validate( 'probe', $linkable + [ 'group' => 'global' ] )['link'] ?? null ) === false && ( \Nino\Modules\Components::validate( 'probe', $linkable + [ 'group' => 'global' ] )['by'] ?? null ) === 'nino'
-	&& array_diff_key( (array) \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'link' => true, 'by' => 'hello' ], true ), [ 'label' => 1, 'grid' => 1, 'preview' => 1, 'attributes' => 1 ] ) === []
+	&& array_diff_key( (array) \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'link' => true, 'by' => 'hello' ], true ), [ 'label' => 1, 'grid' => 1, 'cell' => 1, 'preview' => 1, 'attributes' => 1 ] ) === []
 	&& \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'link' => 'yes', 'by' => 'Not A Slug' ], true ) === \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x' ], true ) );
 $linkAttributes = (array) ( new ReflectionClassConstant( '\Nino\Modules\Components', 'LINK' ) )->getValue();
 \Nino\Modules\Components::addComponent( $appData, 'linkprobe', static fn( array &$appData, array $args ): string => '<i>'. $args['value']. '</i>', $linkable + [ 'link' => true, 'by' => 'hello', 'source' => 'text' ] );
@@ -3743,6 +3744,214 @@ check( '...the label of the first button is the attribute, else the key /templat
 	} )() );
 check( '...and without a field to filter by there are the cells and no row of buttons', str_contains( $render( '[filter /services][probe][/filter]' ), 'nino-filter-nav' ) === false
 	&& str_contains( $render( '[filter /services][probe][/filter]' ), 'nino-filter-item' ) === true );
+
+// What a stack's cell is, and the loops that say it: a repetition with no shell, tabs, an accordion - and a column with a content
+echo "\nModules\\Components - the cell of a stack: [repeat], [tabs], [accordion] and a [col] with a content\n";
+
+check( 'every stack of the kernel says what its cell is, one of CELLS, in the registry and in the json a tool reads: what stands between the tags for the grid, the repetition, the slider, the filter, the tabs and the accordion - a whole section for the sections, the columns and nothing else for the table, one field or one line for the list',
+	array_map( static fn( array $stack ): string => $stack['cell'], array_intersect_key( \Nino\Modules\Components::stacks( $appData ), array_flip( $kernelStacks ) ) ) === [
+		'stack' => 'components', 'repeat' => 'components', 'slider' => 'components', 'filter' => 'components', 'tabs' => 'components', 'accordion' => 'components',
+		'list' => 'row', 'table' => 'columns', 'sections' => 'section',
+	]
+	&& array_column( (array) json_decode( (string) json_encode( \Nino\Modules\Components::stacks( $appData ) ), true ), 'cell' ) === array_column( \Nino\Modules\Components::stacks( $appData ), 'cell' )
+	&& \Nino\Modules\Components::CELLS === [ 'components', 'section', 'columns', 'row' ] );
+
+$cellOfSchema = static fn( mixed $cell ): array|string => \Nino\Modules\Components::validate( 'cellprobe', [ 'label' => 'x' ] + ( $cell === null ? [] : [ 'cell' => $cell ] ), true );
+check( 'validate() gives a stack that says no cell the content between its tags, takes the four there are and keeps them in the clean schema after the grid - and a component has none',
+	( $cellOfSchema( null )['cell'] ?? null ) === 'components' && array_keys( (array) $cellOfSchema( null ) ) === [ 'label', 'grid', 'cell', 'preview', 'attributes' ]
+	&& array_filter( \Nino\Modules\Components::CELLS, static fn( string $cell ): bool => ( $cellOfSchema( $cell )['cell'] ?? null ) !== $cell ) === []
+	&& array_key_exists( 'cell', (array) \Nino\Modules\Components::validate( 'cellprobe', [ 'label' => 'x', 'source' => 'text', 'group' => 'global', 'cell' => 'row' ] ) ) === false );
+check( '...and refuses a word that is none of them, and a cell that is no word, naming what it can be',
+	array_filter( [ 'page', 'Row', 'cells', '', 5, true, [ 'row' ] ], static fn( mixed $wrong ): bool => str_contains( (string) $cellOfSchema( $wrong ), '"cell" must be one of components, section, columns, row' ) === false ) === [] );
+$schemaErrors = $errorsOf( function() use ( &$appData, $noop ) { \Nino\Modules\Components::addStack( $appData, 'badcell', $noop, [ 'label' => 'x', 'cell' => 'page' ] ); } );
+\Nino\Modules\Components::addStack( $appData, 'rowcell', $noop, [ 'label' => 'x', 'cell' => 'row' ] );
+\Nino\Modules\Components::addStack( $appData, 'nocell', $noop, [ 'label' => 'x' ] );
+check( '...addStack() refuses it with an E_USER_ERROR and registers nothing, and registers the stack that names a cell with it and the one that names none with the content between its tags',
+	count( $schemaErrors ) === 1 && $schemaErrors[0][0] === E_USER_ERROR && isset( \Nino\Modules\Components::stacks( $appData )['badcell'] ) === false
+	&& \Nino\Modules\Components::stacks( $appData )['rowcell']['cell'] === 'row' && \Nino\Modules\Components::stacks( $appData )['nocell']['cell'] === 'components'
+	&& \Nino\Modules\Components::validate( 'rowcell', \Nino\Modules\Components::stacks( $appData )['rowcell'], true ) === \Nino\Modules\Components::stacks( $appData )['rowcell'] );
+
+// The type of an attribute that names a field of the element
+$fieldSeen = [];
+$fieldAttribute = static fn( mixed $default ): array|string => \Nino\Modules\Components::validate( 'fieldprobe', [ 'label' => 'x', 'attributes' => [ 'by' => [ 'type' => 'field', 'default' => $default ] ] ], true );
+\Nino\Modules\Components::addStack( $appData, 'fieldnamed', static function( array &$appData, array $args ) use ( &$fieldSeen ): string { $fieldSeen = $args; return ''; }, [ 'label' => 'x', 'attributes' => [ 'by' => [ 'type' => 'field', 'default' => 'title' ] ] ] );
+\Nino\Modules\Components::addStack( $appData, 'fieldnone', static function( array &$appData, array $args ) use ( &$fieldSeen ): string { $fieldSeen = $args; return ''; }, [ 'label' => 'x', 'attributes' => [ 'by' => [ 'type' => 'field', 'default' => '' ] ] ] );
+$fieldRead = static function( string $stack, string $written ) use ( $render, &$fieldSeen ): string {
+	$fieldSeen = [];
+	$render( '[' . $stack . ' /tabbed'. ( $written === '' ? '' : ' by="'. $written. '"' ). ']x[/'. $stack. ']' );
+	return (string) ( $fieldSeen['by'] ?? 'not rendered' );
+};
+check( 'an attribute of the type field is taken by validate() with an empty default or the name of a field, and refused with a default that is neither or no string; the type is one of TYPES',
+	in_array( 'field', \Nino\Modules\Components::TYPES, true ) === true
+	&& ( $fieldAttribute( '' )['attributes']['by']['type'] ?? null ) === 'field' && ( $fieldAttribute( 'imageAlt' )['attributes']['by']['default'] ?? null ) === 'imageAlt'
+	&& array_filter( [ 'my field', '9a', '-a', 'a.b', 'a"b', 5, null ], static fn( mixed $wrong ): bool => str_contains( (string) $fieldAttribute( $wrong ), 'the default of a field is empty or the name of a field' ) === false && is_string( $fieldAttribute( $wrong ) ) === false ) === []
+	&& \Nino\Modules\Components::defaults( $appData, 'fieldnamed', true )['by'] === 'title' && \Nino\Modules\Components::defaults( $appData, 'fieldnone', true )['by'] === '' );
+check( '...and a shortcode that writes it is read as that name - a name with capitals included - and anything that is no name is the default: empty, a number first, a space, a quote, a dot, a bracket',
+	$fieldRead( 'fieldnamed', 'head' ) === 'head' && $fieldRead( 'fieldnamed', 'imageAlt' ) === 'imageAlt' && $fieldRead( 'fieldnamed', 'a-b_c1' ) === 'a-b_c1'
+	&& array_filter( [ '', '9a', 'a b', 'a&quot;b', 'a.b', 'a&#91;b', '-a' ], static fn( string $wrong ): bool => $fieldRead( 'fieldnamed', $wrong ) !== 'title' ) === []
+	&& array_filter( [ '9a', 'a b', 'a.b' ], static fn( string $wrong ): bool => $fieldRead( 'fieldnone', $wrong ) !== '' ) === [] && $fieldRead( 'fieldnone', '' ) === '' );
+
+$textOf = static fn( array $declared ): array|string => \Nino\Modules\Components::validate( 'textprobe', [ 'label' => 'x', 'attributes' => [ 'text' => $declared ] ], true );
+check( 'a stack may declare a text, and it is a line of the type string: a choice of words or a number is refused, since the stack is handed the text as the call wrote it - a component still cannot declare one',
+	( $textOf( [ 'type' => 'string', 'default' => '' ] )['attributes']['text']['type'] ?? null ) === 'string'
+	&& str_contains( (string) $textOf( [ 'type' => 'select', 'options' => [ 'a', 'b' ], 'default' => 'a' ] ), 'a stack\'s text is a line, of the type string' ) === true
+	&& str_contains( (string) $textOf( [ 'type' => 'int', 'max' => 9, 'default' => 0 ] ), 'a stack\'s text is a line' ) === true
+	&& str_contains( (string) $textOf( [ 'type' => 'field', 'default' => '' ] ), 'a stack\'s text is a line' ) === true
+	&& str_contains( (string) \Nino\Modules\Components::validate( 'textprobe', [ 'label' => 'x', 'source' => 'text', 'group' => 'global', 'attributes' => [ 'text' => [ 'type' => 'string', 'default' => '' ] ] ] ), 'cannot be an attribute' ) === true );
+check( 'the field of a column is an attribute of the type field, as the title of the tabs and the accordion is, so that a tool sees one type for the field of an element',
+	\Nino\Modules\Components::components( $appData )['col']['attributes']['field']['type'] === 'field' && \Nino\Modules\Components::stacks( $appData )['tabs']['attributes']['title']['type'] === 'field'
+	&& \Nino\Modules\Components::defaults( $appData, 'col' ) === [ 'field' => '', 'align' => '', 'class' => '' ] );
+
+// Three elements to run the new loops over, the second with an empty field and the third with a field full of markup and fills
+\Nino\Elements::insertElementType( $appData, '/tabbed', [ 'title' => [ 'type' => 'string', 'locale' => true ], 'head' => [ 'type' => 'string' ], 'body' => [ 'type' => 'string' ], 'n' => [ 'type' => 'integer' ], 'photo' => [ 'type' => 'image', 'width' => 400, 'height' => 300 ], 'tags' => [ 'type' => 'array' ], 'rich' => [ 'type' => 'string', 'html' => true ], 'blocks' => [ 'type' => 'string', 'html' => true, 'blocks' => true ] ] );
+\Nino\Elements::insertElement( $appData, '/tabbed/t1', [ 'title' => 'One', 'head' => 'Alpha <i>&"', 'body' => 'b1', 'n' => 5, 'photo' => 'tabbed/t1/photo.webp', 'tags' => [ 'x' ], 'rich' => '<em>Hi</em> &amp; <strong>x</strong>', 'blocks' => '<p>One.</p><p>Two &amp; three</p>' ], 'de_DE' );
+\Nino\Elements::insertElement( $appData, '/tabbed/t2', [ 'title' => 'Two', 'head' => '', 'body' => 'b2', 'n' => 6 ], 'de_DE' );
+\Nino\Elements::insertElement( $appData, '/tabbed/t3', [ 'title' => 'Three', 'head' => 'Gamma [x] [[title]]', 'body' => 'b3', 'n' => 7 ], 'de_DE' );
+
+check( 'the grid is called Raster in German and Grid in English, and the new loops are labelled in both languages: a plain repeat, tabs, an accordion',
+	\Nino\Modules\Components::stacks( $appData )['stack']['label'] === [ 'en_US' => 'Grid', 'de_DE' => 'Raster' ]
+	&& \Nino\Modules\Components::stacks( $appData )['repeat']['label'] === [ 'en_US' => 'Plain repeat', 'de_DE' => 'Einfache Wiederholung' ]
+	&& \Nino\Modules\Components::stacks( $appData )['tabs']['label'] === [ 'en_US' => 'Tabs', 'de_DE' => 'Tabs' ]
+	&& \Nino\Modules\Components::stacks( $appData )['accordion']['label'] === [ 'en_US' => 'Accordion', 'de_DE' => 'Accordion' ]
+	&& \Nino\Modules\Components::stacks( $appData )['stack']['grid'] === true );
+$titleField = \Nino\Modules\Components::stacks( $appData )['tabs']['attributes']['title'];
+check( 'the repetition has no attribute of its own and draws no grid, the tabs have a title field and a title line, the accordion those two and whether one panel is open at a time and which is open at the start - each with its words in both languages for a tool to draw it by',
+	\Nino\Modules\Components::stacks( $appData )['repeat']['grid'] === false && \Nino\Modules\Components::stacks( $appData )['repeat']['attributes'] === [] && \Nino\Modules\Components::stacks( $appData )['repeat']['preview'] === 'cells'
+	&& array_keys( \Nino\Modules\Components::defaults( $appData, 'repeat', true ) ) === [ 'sort', 'offset', 'limit', 'query', 'callback', 'locale', 'id', 'class' ]
+	&& \Nino\Modules\Components::stacks( $appData )['tabs']['grid'] === false && \Nino\Modules\Components::stacks( $appData )['tabs']['preview'] === 'block'
+	&& \Nino\Modules\Components::defaults( $appData, 'tabs', true ) === [ 'sort' => '', 'offset' => '0', 'limit' => '0', 'query' => '', 'callback' => '', 'locale' => '', 'id' => '', 'title' => '', 'text' => '', 'class' => '' ]
+	&& $titleField['type'] === 'field' && \Nino\Modules\Components::stacks( $appData )['tabs']['attributes']['text']['type'] === 'string'
+	&& \Nino\Modules\Components::stacks( $appData )['accordion']['preview'] === 'block'
+	&& array_keys( \Nino\Modules\Components::stacks( $appData )['accordion']['attributes'] ) === [ 'title', 'text', 'exclusive', 'open' ]
+	&& \Nino\Modules\Components::defaults( $appData, 'accordion', true )['exclusive'] === '1' && \Nino\Modules\Components::defaults( $appData, 'accordion', true )['open'] === ''
+	&& \Nino\Modules\Components::stacks( $appData )['accordion']['attributes']['open']['options'] === [ '', 'first' ]
+	&& array_filter( [ 'tabs', 'accordion' ], static fn( string $name ): bool => array_filter( \Nino\Modules\Components::stacks( $appData )[$name]['attributes'], static fn( array $declared ): bool => array_keys( (array) $declared['label'] ) !== [ 'en_US', 'de_DE' ] || in_array( '', $declared['label'], true ) === true ) !== [] ) === [] );
+
+// [repeat]
+$repeated = '<i>[[title]]</i>';
+check( '[repeat] draws the content once for each element, one after the other and in the order of the loop, with nothing round them: no row, no cell, no grid',
+	$render( '[repeat /tabbed sort="uri"]'. $repeated. '[/repeat]' ) === '<i>One</i><i>Two</i><i>Three</i>'
+	&& $render( '<p>a</p>[repeat /tabbed sort="-title" limit="2" offset="1"]'. $repeated. '[/repeat]<p>b</p>' ) === '<p>a</p><i>Three</i><i>One</i><p>b</p>'
+	&& $render( '[repeat /tabbed sort="uri" cols="50" gap="4" autoheight="1"]'. $repeated. '[/repeat]' ) === '<i>One</i><i>Two</i><i>Three</i>' );
+check( '...a [card] in it is the element itself, drawn once for each, and a card does not meet a cell',
+	substr_count( $render( '[repeat /tabbed][card][card-title title][/card][/repeat]' ), '<article class="nino-card">' ) === 3
+	&& str_contains( $render( '[repeat /tabbed][card][card-title title][/card][/repeat]' ), 'nino-grid' ) === false && str_contains( $render( '[repeat /tabbed][card][card-title title][/card][/repeat]' ), 'nino-stack' ) === false );
+check( '...it is nothing for a type without elements, a query nothing matches and a call without a type, and the element it drew for is not the context afterwards',
+	$render( '[repeat /nothing]x[/repeat]' ) === '' && $render( '[repeat /tabbed query="title=Nobody"]x[/repeat]' ) === '' && $render( '[repeat]x[/repeat]' ) === '' && $render( '[repeat /tabbed id="r"]x[/repeat][repeat /nothing id="r"]x[/repeat]' ) === '<div id="r">xxx</div>'
+	&& \Nino\Modules\Components::element( $appData ) === null );
+check( '...an id or a class is what gives it a shell: a div of that id and class round all the cells - an id that is none and no class leaves it with none',
+	$render( '[repeat /tabbed sort="uri" id="team"]'. $repeated. '[/repeat]' ) === '<div id="team"><i>One</i><i>Two</i><i>Three</i></div>'
+	&& $render( '[repeat /tabbed sort="uri" id="team" class="a b"]'. $repeated. '[/repeat]' ) === '<div class="a b" id="team"><i>One</i><i>Two</i><i>Three</i></div>'
+	&& $render( '[repeat /tabbed sort="uri" id="9 x"]'. $repeated. '[/repeat]' ) === '<i>One</i><i>Two</i><i>Three</i>'
+	&& $render( '[repeat /tabbed sort="uri" class="a"]'. $repeated. '[/repeat]' ) === '<div class="a"><i>One</i><i>Two</i><i>Three</i></div>' && $render( '[repeat /tabbed sort="uri" id="9 x" class="a"]'. $repeated. '[/repeat]' ) === '<div class="a"><i>One</i><i>Two</i><i>Three</i></div>'
+	&& $render( '[repeat /nothing class="a"]x[/repeat]' ) === '' );
+
+// [tabs]
+$tabsOf = static fn( string $call, string $content = '<i>[[title]]</i>' ): string => $render( '[tabs /tabbed sort="uri" '. $call. ']'. $content. '[/tabs]' );
+check( '[tabs] is the markup Nino.ui.js turns into a tablist: a nav of buttons, a panel for each element after it, the first tab and the first panel active, the other panels hidden - and the target of each button is the id of its panel, made from the id of the call and the number of the element',
+	$render( '[tabs /tabbed sort="uri" limit="2" id="faq" title="head" class="x"]<i>[[title]]</i>[/tabs]' )
+		=== '<div class="nino-tabs x" id="faq"><nav class="nino-tabs-nav"><button type="button" class="nino-tabs-tab nino-is-active" data-tabs-target="faq-1">Alpha &lt;i&gt;&amp;&quot;</button><button type="button" class="nino-tabs-tab" data-tabs-target="faq-2">2</button></nav>'
+		. '<div class="nino-tabs-panel nino-is-active" id="faq-1"><i>One</i></div><div class="nino-tabs-panel" id="faq-2" hidden><i>Two</i></div></div>' );
+$tabs = $tabsOf( 'id="faq"' );
+preg_match_all( '/<button type="button" class="nino-tabs-tab[^"]*" data-tabs-target="([^"]+)">/', $tabs, $targets );
+preg_match_all( '/<div class="nino-tabs-panel[^"]*" id="([^"]+)"/', $tabs, $panelIds );
+check( '...a button for each element and a panel for each, the targets the ids of the panels one by one in order, and exactly one tab and one panel active, the first',
+	count( $targets[1] ) === 3 && $targets[1] === $panelIds[1] && count( array_unique( $panelIds[1] ) ) === 3 && $targets[1] === [ 'faq-1', 'faq-2', 'faq-3' ]
+	&& substr_count( $tabs, 'nino-tabs-tab nino-is-active' ) === 1 && substr_count( $tabs, 'nino-tabs-panel nino-is-active' ) === 1 && substr_count( $tabs, ' hidden>' ) === 2
+	&& str_contains( $tabs, 'nino-tabs-tab nino-is-active" data-tabs-target="faq-1"' ) === true && str_contains( $tabs, 'nino-tabs-panel nino-is-active" id="faq-1">' ) === true );
+check( '...the roles, aria-* and tabindex are the script\'s and are not written; the cell is the content of the panel, with the fields of its element in it',
+	preg_match( '/ (?:role|aria-[a-z]+|tabindex)=/', $tabs ) !== 1 && str_contains( $tabs, '<div class="nino-tabs-panel" id="faq-3" hidden><i>Three</i></div>' ) === true );
+check( '...a tab\'s title is the field the call names, written escaped with its [ as &#91; - the number of the element where the field is empty, names no field of the type or an image, or the call names none - and no other field is looked at',
+	array_map( static fn( string $title ): string => $title, ( static function() use ( $tabsOf ): array { preg_match_all( '#data-tabs-target="[^"]+">(.*?)</button>#', $tabsOf( 'title="head"' ), $found ); return $found[1]; } )() ) === [ 'Alpha &lt;i&gt;&amp;&quot;', '2', 'Gamma &#91;x] &#91;&#91;title]]' ]
+	&& str_contains( $tabsOf( 'title="body"' ), '>b1</button><button type="button" class="nino-tabs-tab" data-tabs-target="tabs-' ) === true
+	&& array_filter( [ '', 'nope', 'photo', 'Head', '9a', 'a b' ], static fn( string $field ): bool => preg_match_all( '#data-tabs-target="[^"]+">([^<]*)</button>#', $tabsOf( 'title="'. $field. '"' ), $found ) !== 3 || $found[1] !== [ '1', '2', '3' ] ) === []
+	&& preg_replace( '/tabs-\d+/', 'tabs-N', $tabsOf( '' ) ) === preg_replace( '/tabs-\d+/', 'tabs-N', $tabsOf( 'title=""' ) ) );
+check( '...a line of text takes the place of the field and fills the fields of the element, which the tag of the call can only write with their brackets as entities - escaped, a site text of it filled, and the number where it comes out empty',
+	preg_match_all( '#data-tabs-target="[^"]+">([^<]*)</button>#', $tabsOf( 'title="head" text="&#91;&#91;title&#93;&#93; (&#91;&#91;n&#93;&#93;)"' ), $found ) === 3 && $found[1] === [ 'One (5)', 'Two (6)', 'Three (7)' ]
+	&& preg_match_all( '#data-tabs-target="[^"]+">([^<]*)</button>#', $tabsOf( 'text="<b>&#91;&#91;head&#93;&#93;</b>"' ), $found ) === 3 && $found[1] === [ '&lt;b&gt;Alpha &lt;i&gt;&amp;&quot;&lt;/b&gt;', '&lt;b&gt;&lt;/b&gt;', '&lt;b&gt;Gamma &#91;x] &#91;&#91;title]]&lt;/b&gt;' ]
+	&& preg_match_all( '#data-tabs-target="[^"]+">([^<]*)</button>#', $tabsOf( 'text="&#91;&#91;head&#93;&#93;"' ), $found ) === 3 && $found[1] === [ 'Alpha &lt;i&gt;&amp;&quot;', '2', 'Gamma &#91;x] &#91;&#91;title]]' ]
+	&& preg_match_all( '#data-tabs-target="[^"]+">([^<]*)</button>#', $tabsOf( 'text="&#91;&#91;/template/page-home/prices/head&#93;&#93;: &#91;&#91;nope&#93;&#93;"' ), $found ) === 3 && $found[1] === [ 'Price list: &#91;&#91;nope]]', 'Price list: &#91;&#91;nope]]', 'Price list: &#91;&#91;nope]]' ]
+	&& preg_match_all( '#data-tabs-target="[^"]+">([^<]*)</button>#', $tabsOf( 'text="&#91;&#91;photo&#93;&#93;"' ), $found ) === 3 && $found[1] === [ '1', '2', '3' ] );
+$directTabs = ( static fn( array $args ): string => (string) \Nino\Callbacks::doCallbacks( $appData, '/nino/html/shortcode/tabs', $args ) )( [ '/tabbed', 'sort' => 'uri', 'text' => '[[title]]! [[/template/page-home/prices/head]]', 'content' => 'x' ] );
+check( '...a call that comes from elsewhere than a page - a tool calling the shortcode itself - hands the line with its fields in brackets, and they are filled for each element and not taken for site texts that are none',
+	preg_match_all( '#data-tabs-target="[^"]+">([^<]*)</button>#', $directTabs, $found ) === 3 && $found[1] === [ 'One! Price list', 'Two! Price list', 'Three! Price list' ] );
+check( '...the id of the call is the start of the ids of the panels; a call without one, or with an id that is none, is given a running number of the request, the same for its buttons and its panels, and another for the next set',
+	( static function() use ( $tabsOf ): bool {
+		$first = $tabsOf( '' );
+		$second = $tabsOf( 'id="1 x"' );
+		preg_match_all( '/data-tabs-target="(tabs-\d+)-(\d)"/', $first, $one );
+		preg_match_all( '/data-tabs-target="(tabs-\d+)-(\d)"/', $second, $two );
+		return count( $one[0] ) === 3 && count( array_unique( $one[1] ) ) === 1 && $one[2] === [ '1', '2', '3' ] && count( $two[0] ) === 3 && $two[1][0] !== $one[1][0]
+			&& substr_count( $first, 'id="'. $one[1][0]. '-' ) === 3 && str_contains( $second, '<div class="nino-tabs"><nav' ) === true;
+	} )() );
+check( '...it is nothing for no element, the context is the element only while a cell is drawn, and a [ in a field opens nothing',
+	$render( '[tabs /nothing]x[/tabs]' ) === '' && $render( '[tabs]x[/tabs]' ) === '' && \Nino\Modules\Components::element( $appData ) === null
+	&& str_contains( $tabsOf( 'title="head"', '<i>[[head]]</i>' ), '[' ) === false && str_contains( $tabsOf( 'title="head"', '<i>[[head]]</i>' ), '<i>Gamma &#91;x&#93; &#91;&#91;title&#93;&#93;</i>' ) === true );
+
+check( '...a field that holds html is its text in a tab, tags dropped and entities read - a field that holds a list is no title, and a class with a quote in it stays inside its attribute on the tabs, the accordion and the repetition',
+	preg_match_all( '#data-tabs-target="[^"]+">([^<]*)</button>#', $tabsOf( 'title="rich"' ), $found ) === 3 && $found[1] === [ 'Hi &amp; x', '2', '3' ]
+	&& preg_match_all( '#data-tabs-target="[^"]+">([^<]*)</button>#', $tabsOf( 'title="tags"' ), $found ) === 3 && $found[1] === [ '1', '2', '3' ]
+	&& preg_match_all( '#data-tabs-target="[^"]+">([^<]*)</button>#', $tabsOf( 'title="blocks"' ), $found ) === 3 && $found[1] === [ 'One. Two &amp; three', '2', '3' ]
+	&& preg_match_all( '#data-tabs-target="[^"]+">([^<]*)</button>#', $tabsOf( 'text="&#91;&#91;rich&#93;&#93; / &#91;&#91;blocks&#93;&#93;"' ), $found ) === 3 && $found[1] === [ 'Hi &amp; x / One. Two &amp; three', ' / ', ' / ' ]
+	&& str_contains( $render( '[repeat /tabbed class=" "]x[/repeat]' ), '<div' ) === false
+	&& str_starts_with( $tabsOf( 'class="a&quot;b"' ), '<div class="nino-tabs a&amp;quot;b">' ) === true
+	&& str_contains( $render( '[accordion /tabbed class="a&quot;b"]x[/accordion]' ), '<details class="nino-accordion a&amp;quot;b"' ) === true
+	&& str_starts_with( $render( '[repeat /tabbed class="a&quot;b"]x[/repeat]' ), '<div class="a&amp;quot;b">' ) === true );
+
+// [accordion]
+$accordionOf = static fn( string $call, string $content = '<i>[[title]]</i>' ): string => $render( '[accordion /tabbed sort="uri" '. $call. ']'. $content. '[/accordion]' );
+check( '[accordion] is a details for each element in a div of the class nino-accordion-group - its summary the title, its panel the cell - and the details share one name, so that the browser closes the others when one opens',
+	$accordionOf( 'id="faq" title="head" limit="2" class="x"' )
+		=== '<div class="nino-accordion-group" id="faq"><details class="nino-accordion x" name="faq"><summary class="nino-accordion-trigger">Alpha &lt;i&gt;&amp;&quot;</summary><div class="nino-accordion-panel"><i>One</i></div></details>'
+		. '<details class="nino-accordion x" name="faq"><summary class="nino-accordion-trigger">2</summary><div class="nino-accordion-panel"><i>Two</i></div></details></div>' );
+check( '...three elements are three details with one name and none open; a call without an id names them with a running number of the request, and two sets without an id have two names',
+	substr_count( $accordionOf( '' ), '<details class="nino-accordion" name="accordion-' ) === 3 && substr_count( $accordionOf( '' ), ' open' ) === 0 && str_contains( $accordionOf( '' ), 'class="nino-accordion-group">' ) === true
+	&& count( array_unique( ( static function() use ( $accordionOf ): array { preg_match_all( '/ name="([^"]+)"/', $accordionOf( '' ). $accordionOf( '' ), $found ); return $found[1]; } )() ) ) === 2 );
+check( '...exclusive off writes no name, open as first opens the first and no other, a word that is none of the options opens none',
+	str_contains( $accordionOf( 'exclusive="0"' ), ' name=' ) === false && substr_count( $accordionOf( 'exclusive="0"' ), '<details class="nino-accordion">' ) === 3
+	&& substr_count( $accordionOf( 'open="first" id="a"' ), '<details class="nino-accordion" name="a" open>' ) === 1 && str_starts_with( explode( '<details', $accordionOf( 'open="first" id="a"' ) )[1], ' class="nino-accordion" name="a" open>' ) === true
+	&& substr_count( $accordionOf( 'open="first" exclusive="0"' ), ' open>' ) === 1 && substr_count( $accordionOf( 'open="all"' ), ' open>' ) === 0 && substr_count( $accordionOf( 'open="second"' ), ' open' ) === 0 );
+check( '...the title is the field, the line or the number as the tabs have it - escaped - and a cell is the content of the panel with its fields filled',
+	( static function() use ( $accordionOf ): array { preg_match_all( '#<summary class="nino-accordion-trigger">(.*?)</summary>#', $accordionOf( 'title="head"' ), $found ); return $found[1]; } )() === [ 'Alpha &lt;i&gt;&amp;&quot;', '2', 'Gamma &#91;x] &#91;&#91;title]]' ]
+	&& ( static function() use ( $accordionOf ): array { preg_match_all( '#<summary class="nino-accordion-trigger">(.*?)</summary>#', $accordionOf( 'title="head" text="&#91;&#91;title&#93;&#93; / &#91;&#91;n&#93;&#93;"' ), $found ); return $found[1]; } )() === [ 'One / 5', 'Two / 6', 'Three / 7' ]
+	&& ( static function() use ( $accordionOf ): array { preg_match_all( '#<summary class="nino-accordion-trigger">(.*?)</summary>#', $accordionOf( 'title="nope"' ), $found ); return $found[1]; } )() === [ '1', '2', '3' ]
+	&& str_contains( $accordionOf( '', '<i>[[head]]</i>' ), '<div class="nino-accordion-panel"><i>Gamma &#91;x&#93; &#91;&#91;title&#93;&#93;</i></div>' ) === true && str_contains( $accordionOf( '', '<i>[[head]]</i>' ), '[' ) === false );
+check( '...an id that is none is no id of the group either, and the details are named by a number of the request instead',
+	str_starts_with( $accordionOf( 'id="9 x"' ), '<div class="nino-accordion-group"><details class="nino-accordion" name="accordion-' ) === true
+	&& str_contains( $accordionOf( 'id="9 x"' ), ' id=' ) === false && str_starts_with( $accordionOf( 'id="a b"', '' ), '<div class="nino-accordion-group">' ) === true
+	&& preg_match_all( '#<summary class="nino-accordion-trigger">(.*?)</summary>#', $accordionOf( 'title="tags"' ), $found ) === 3 && $found[1] === [ '1', '2', '3' ]
+	&& preg_match_all( '#<summary class="nino-accordion-trigger">(.*?)</summary>#', $accordionOf( 'title="rich"' ), $found ) === 3 && $found[1] === [ 'Hi &amp; x', '2', '3' ]);
+check( '...it is nothing for no element, and tabs and an accordion beside each other in one template do not share a name or an id',
+	$render( '[accordion /nothing]x[/accordion]' ) === '' && \Nino\Modules\Components::element( $appData ) === null
+	&& ( static function() use ( $render ): bool {
+		$page = $render( '[tabs /tabbed]x[/tabs][accordion /tabbed]y[/accordion][tabs /tabbed]z[/tabs]' );
+		preg_match_all( '/id="(tabs-\d+-\d)"/', $page, $ids );
+		preg_match_all( '/ name="(accordion-\d+)"/', $page, $names );
+		return count( $ids[1] ) === 6 && count( array_unique( $ids[1] ) ) === 6 && count( array_unique( $names[1] ) ) === 1 && in_array( $names[1][0], $ids[1], true ) === false;
+	} )() );
+
+// A [col] with a content
+$colCell = static fn( string $col, string $element = 'Alpha' ): string => (string) preg_replace( '#^.*?<tr><td[^>]*>(.*?)</td></tr>.*$#s', '$1', $render( '[table /prices sort="title" '. ( $element === 'Beta' ? 'offset="1" ' : '' ). 'limit="1"]'. $col. '[/table]' ) );
+check( '[col]...[/col] is a cell of what stands between its tags: html+ with the fields of the element in it, escaped, and the components in it drawn for the element - for each row its own',
+	$colCell( '[col]<b>[[title]]</b> / [[price]][/col]' ) === '<b>Alpha &lt;i&gt;&amp;&quot;</b> / 12.5' && $colCell( '[col]<b>[[title]]</b> / [[price]][/col]', 'Beta' ) === '<b>Beta</b> / 3'
+	&& $colCell( '[col][line text="[[price]],- EUR"][/col]' ) === '<p class="nino-line">12.5,- EUR</p>' && $colCell( '[col][text title format="inline"][/col]', 'Beta' ) === '<p class="nino-section-text">Beta</p>'
+	&& $colCell( '[col]  padded  [/col]' ) === 'padded' );
+check( '...a field holding markup or a bracket is text in it, and what it holds opens nothing: the fill is not read again',
+	$colCell( '[col][[note]][/col]' ) === 'x &#91;&#91;title&#93;&#93; &lt;b&gt;' && $colCell( '[col]<i>[[title]]</i>[/col]' ) === '<i>Alpha &lt;i&gt;&amp;&quot;</i>'
+	&& str_contains( $render( '[table /prices][col][[note]][/col][/table]' ), '<b>' ) === false && str_contains( $render( '[table /prices][col][[note]][/col][/table]' ), '[' ) === false );
+check( '...a text wins over it and so does a field, the cell has nothing where it has none of the three, and the alignment and the title of the column are the column\'s as they were',
+	$colCell( '[col text="T"]content[/col]' ) === 'T' && $colCell( '[col field="price"]content[/col]' ) === '12.5' && $colCell( '[col text=""]content[/col]' ) === ''
+	&& $colCell( '[col][/col]' ) === '' && $colCell( '[col]   [/col]' ) === ''
+	&& str_contains( $render( '[table /prices][col align="right"]x[/col][/table]' ), '<td class="nino-table__cell--right">x</td>' ) === true
+	&& str_contains( $render( '[table /prices][col /template/page-home/prices/head]x[/col][/table]' ), '<thead><tr><th>Price list</th></tr></thead>' ) === true );
+check( '...a bare column and a column with a content stand side by side in one table, in either order: the bare one is no holder of the next',
+	$render( '[table /prices sort="title" limit="1"][col field="title"][col]<i>[[price]]</i>[/col][col field="since"][/table]' )
+		=== '<div class="nino-table-wrap"><table class="nino-table"><tbody><tr><td>Alpha &lt;i&gt;&amp;&quot;</td><td><i>12.5</i></td><td>2026-01-05</td></tr></tbody></table></div>'
+	&& $render( '[table /prices sort="title" limit="1"][col]<i>[[price]]</i>[/col][col field="title"][col text="[[price]]!"][/table]' )
+		=== '<div class="nino-table-wrap"><table class="nino-table"><tbody><tr><td><i>12.5</i></td><td>Alpha &lt;i&gt;&amp;&quot;</td><td>12.5!</td></tr></tbody></table></div>' );
+check( '...it draws a cell in a table and nothing anywhere else - outside any loop, in a stack, in a card - and what stands between the tags of a table besides its columns is still not drawn',
+	$render( '[col]x[/col]' ) === '' && $render( '[stack /prices][col]x[/col][/stack]' ) === $render( '[stack /prices][/stack]' ) && str_contains( $render( '[card][col]x[/col][/card]' ), 'x' ) === false
+	&& $render( '[table /prices sort="title" limit="1"]stray [col]<i>[[price]]</i>[/col] more[/table]' ) === '<div class="nino-table-wrap"><table class="nino-table"><tbody><tr><td><i>12.5</i></td></tr></tbody></table></div>' );
 
 // The page of the Builder, as the Builder feature would write it, rendered by the kernel alone
 $home = (string) file_get_contents( __DIR__. '/fixtures/builder-page-home.tpl' );

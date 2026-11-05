@@ -12,7 +12,7 @@ be written by hand. A shortcode without a schema stays a shortcode - for
 behaviour that needs no tool, the [runtime module recipe](runtime-module.md)
 is enough. A **stack** is a component that loops the elements of one type
 around its content (`[slider]`, `[filter]`, `[list]` are three the kernel
-brings); an element type is the [element types recipe](element-types.md)'s
+brings, with `[repeat]`, `[tabs]` and `[accordion]` among the others); an element type is the [element types recipe](element-types.md)'s
 business, not this one's. The contract this recipe writes against is
 `\Nino\Modules\Components`, described in the
 [Developer Manual](../development.md#components).
@@ -186,6 +186,7 @@ and `'person' => '<dd>[[inner]]</dd>'` beside the other fragment:
 \Nino\Modules\Components::addStack( $appData, 'people', [ self::class, 'stackPeople' ], [
 	'label'      => [ 'en_US' => 'People', 'de_DE' => 'Personen' ],
 	'grid'       => false,
+	'cell'       => 'components',   // components | section | columns | row
 	'attributes' => [],
 	'preview'    => 'block',
 ] );
@@ -198,6 +199,19 @@ public static function stackPeople( array &$appData, array $args ): string {
 	return $items === '' ? '' : str_replace( '[[items]]', $items, self::$html['people'] );
 }
 ```
+
+`cell` says what stands between the tags: `components` (the default), the
+components drawn once for each element; `section`, a whole section for each
+(the kernel's `[sections]`); `columns`, the `[col]`s of a table and nothing else;
+`row`, one field or one line of text (`[list]`). A tool reads it to know what it
+may offer inside the loop, so a stack names it where it is not `components`.
+A stack may declare a `text` of the type `string` and no other: it arrives as the call wrote it, a line of fields for the cells to fill - written with its brackets as entities in the call of a stack (`&#91;&#91;title&#93;&#93;`), where the tag ends at its first `]` and no field has been filled yet, and as plain brackets in a `[col]` or `[line]` in the content of a loop. An attribute of the type `field` is the name of a field of the element's type
+(`'by' => [ 'type' => 'field', 'default' => '' ]`), which a tool draws as a choice
+of the type's fields; the kernel reads a value that is none as the default. A loop
+that draws something of the element besides its content - the title of a tab - does
+it in the cell function, where the element is still the context
+(`Components::element()`, `Components::value()`); `[tabs]` and `[accordion]`
+are the kernel's two to read.
 
 `renderStack()` runs the loop of `[elements]` with the same `sort`, `offset`,
 `limit`, `query` and `callback`, renders the content once per element with the
@@ -288,6 +302,6 @@ own test, then the syntax checks and the static analysis of the
 - [ ] The renderer has the signature `( array &$appData, array $args ): string` and returns nothing it did not escape or make itself.
 - [ ] Nothing in `$args['value']` is escaped a second time, and nothing outside it is written unescaped. For `image` the value is an escaped reference, to look the picture up by `$args['source']`, never a filename to write; for `content` it is the template's own markup.
 - [ ] A source that resolves to nothing renders nothing; a hand-written shortcode with a wrong attribute still renders.
-- [ ] A stack renders through `renderStack()`, never by filling `[[fields]]` of its content itself.
+- [ ] A stack renders through `renderStack()`, never by filling `[[fields]]` of its content itself, and says its `cell` where that is not the components between its tags.
 - [ ] Registered one way: manifest or `init()`.
 - [ ] The cases above are in a smoke test and the suite named in the guide passes.
