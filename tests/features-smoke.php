@@ -180,8 +180,9 @@ check( 'a manifest that declares them is read complete, the schemas normalized; 
 	&& \Nino\Features::manifest( $manifestDir. '/WithComponents' )['components']['probe']['attributes']['tone']['options'] === [ 'a', 'b' ]
 	&& \Nino\Features::manifest( $manifestDir. '/WithComponents' )['stacks']['rows'] === [ 'label' => 'Rows', 'grid' => true, 'cell' => 'components', 'preview' => 'cells', 'attributes' => [] ]
 	&& \Nino\Features::manifest( $manifestDir. '/Mini' )['components'] === [] && \Nino\Features::manifest( $manifestDir. '/Mini' )['stacks'] === [] && ninoWarnings() === [] );
-check( 'a stack of a manifest says what its cell is, one of the kernel\'s four - and the manifest of a stack whose cell is none of them is refused, naming the stack',
-	\Nino\Features::manifest( writeManifest( $manifestDir, 'WithCell', [ 'name' => 'x', 'version' => '1.0.0', 'stacks' => [ 'lines' => [ 'label' => 'Lines', 'cell' => 'row' ], 'rows' => [ 'label' => 'Rows' ] ] ] ) )['stacks']['lines']['cell'] === 'row'
+check( 'a stack of a manifest says what its cell is, one of the kernel\'s five - none, a loop with no content, among them - and the manifest of a stack whose cell is none of them is refused, naming the stack',
+	\Nino\Features::manifest( writeManifest( $manifestDir, 'WithCell', [ 'name' => 'x', 'version' => '1.0.0', 'stacks' => [ 'lines' => [ 'label' => 'Lines', 'cell' => 'row' ], 'logos' => [ 'label' => 'Logos', 'cell' => 'none' ], 'rows' => [ 'label' => 'Rows' ] ] ] ) )['stacks']['lines']['cell'] === 'row'
+	&& \Nino\Features::manifest( $manifestDir. '/WithCell' )['stacks']['logos']['cell'] === 'none'
 	&& \Nino\Features::manifest( $manifestDir. '/WithCell' )['stacks']['rows']['cell'] === 'components'
 	&& manifestFails( $manifestDir, 'BadCell', [ 'name' => 'x', 'version' => '1.0.0', 'stacks' => [ 'rows' => [ 'label' => 'x', 'cell' => 'page' ] ] ], 'stack "rows": "cell"' ) );
 // ...and so are the two keys that say where a component may stand and what it draws: the manifest is read by the same

@@ -127,9 +127,11 @@ namespace Nino\Modules {
 		// What the cell of a stack is, as the stack's schema says in 'cell': what
 		// stands between its tags, drawn once for each element ('components'); a
 		// whole section ('section'); the columns of a table and nothing else
-		// ('columns'); or one field or one line of text ('row'). A tool reads it to
+		// ('columns'); one field or one line of text ('row'); or nothing at all
+		// ('none'): the stack draws its cell itself, from the fields its attributes
+		// of the type field name, and the call is a single tag. A tool reads it to
 		// know what it may put between the tags
-		public const array CELLS = [ 'components', 'section', 'columns', 'row' ];
+		public const array CELLS = [ 'components', 'section', 'columns', 'row', 'none' ];
 
 		// How a tool may draw an attribute, by the type that takes the hint -
 		// the 'input' of an attribute: a choice of words as a select, as a row of
@@ -925,7 +927,8 @@ namespace Nino\Modules {
 		 *	and holds no [. One that does not is the image field of the element
 		 *	in a stack, which is nobody's slot. A call that leaves such an attribute
 		 *	out names the slot its default names: [logo] is the entry of /logo and
-		 *	of /logo/dark
+		 *	of /logo/dark. What stands between the tags of a stack of the cell none
+		 *	is not read, as the stack does not read it
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$content			html+, eg. a template
@@ -941,7 +944,10 @@ namespace Nino\Modules {
 			// rendering puts in
 			$named = static fn( string $source ): bool => $source !== '' && $source[0] === '/' && str_contains( $source, '[' ) === false;
 
-			foreach( \Nino\Html::shortcodeCalls( $appData, $content ) as $call ) {
+			// A stack of the cell none reads no content, so the keys and slots written between its tags are nobody's
+			$unread = array_keys( array_filter( self::registered( $appData, true ), static fn( array $stack ): bool => $stack['cell'] === 'none' ) );
+
+			foreach( \Nino\Html::shortcodeCalls( $appData, $content, $unread ) as $call ) {
 
 				$kind = (string) ( $components[ $call['name'] ]['source'] ?? '' );
 
@@ -1044,6 +1050,9 @@ namespace Nino\Modules {
 
 					if( is_string( $schema['holds'] ) === false || in_array( $schema['holds'], self::PLACES, true ) === false )
 						return $what. ': "holds" names a place: '. implode( ', ', array_slice( self::PLACES, 0, -1 ) ). ' or '. self::PLACES[count( self::PLACES ) - 1];
+
+					if( $cell === 'none' )
+						return $what. ': "holds" is for a stack with content, and the cell none has none';
 
 					$clean['holds'] = $schema['holds'];
 				}
@@ -1686,6 +1695,11 @@ namespace Nino\Modules {
 
 			$source		= (string) ( $args[0] ?? '' );
 			$content	= (string) ( $args['content'] ?? '' );
+
+			// A stack whose cell is none has no content: its renderer draws each cell from the
+			// fields its attributes name, and what stands between the tags of a pair is not read
+			if( $stack === true && $schema['cell'] === 'none' )
+				$content = '';
 
 			// A fixed text says what it says with its fills put in, before anything is done with it.
 			// The text of a line is the exception: it fills what it can, its site texts and the

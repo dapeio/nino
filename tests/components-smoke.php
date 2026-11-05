@@ -3782,7 +3782,7 @@ check( 'every stack of the kernel says what its cell is, one of CELLS, in the re
 		'list' => 'row', 'table' => 'columns', 'sections' => 'section',
 	]
 	&& array_column( (array) json_decode( (string) json_encode( \Nino\Modules\Components::stacks( $appData ) ), true ), 'cell' ) === array_column( \Nino\Modules\Components::stacks( $appData ), 'cell' )
-	&& \Nino\Modules\Components::CELLS === [ 'components', 'section', 'columns', 'row' ] );
+	&& \Nino\Modules\Components::CELLS === [ 'components', 'section', 'columns', 'row', 'none' ] );
 
 $cellOfSchema = static fn( mixed $cell ): array|string => \Nino\Modules\Components::validate( 'cellprobe', [ 'label' => 'x' ] + ( $cell === null ? [] : [ 'cell' => $cell ] ), true );
 check( 'validate() gives a stack that says no cell the content between its tags, takes the four there are and keeps them in the clean schema after the grid - and a component has none',
@@ -3798,6 +3798,87 @@ check( '...addStack() refuses it with an E_USER_ERROR and registers nothing, and
 	count( $schemaErrors ) === 1 && $schemaErrors[0][0] === E_USER_ERROR && isset( \Nino\Modules\Components::stacks( $appData )['badcell'] ) === false
 	&& \Nino\Modules\Components::stacks( $appData )['rowcell']['cell'] === 'row' && \Nino\Modules\Components::stacks( $appData )['nocell']['cell'] === 'components'
 	&& \Nino\Modules\Components::validate( 'rowcell', \Nino\Modules\Components::stacks( $appData )['rowcell'], true ) === \Nino\Modules\Components::stacks( $appData )['rowcell'] );
+
+// The cell none: a loop with no content, whose renderer draws each cell from the fields its attributes name. The probe is a
+// feature's stack - the logos of a site - that draws the picture of each element and, where the link field holds an address, a link
+\Nino\Elements::insertElementType( $appData, '/badged', [
+	'title'	=> [ 'type' => 'string' ],
+	'image'	=> [ 'type' => 'image', 'width' => 200, 'height' => 100 ],
+	'url'		=> [ 'type' => 'string' ],
+] );
+\Nino\Elements::insertElement( $appData, '/badged/a', [ 'title' => 'A', 'image' => 'badged/a/image.webp', 'url' => 'https://example.com/a?b=1&c=2' ], 'de_DE' );
+\Nino\Elements::insertElement( $appData, '/badged/b', [ 'title' => 'B', 'image' => 'badged/b/image.webp', 'url' => '' ], 'de_DE' );
+\Nino\Elements::insertElement( $appData, '/badged/c', [ 'title' => 'C', 'image' => '', 'url' => 'https://example.com/c' ], 'de_DE' );
+\Nino\Elements::insertElement( $appData, '/badged/d', [ 'title' => 'D', 'image' => 'badged/d/image.webp', 'url' => 'javascript:alert(1)' ], 'de_DE' );
+$badgesSeen = [];
+\Nino\Modules\Components::addStack( $appData, 'badges', static function( array &$appData, array $args ) use ( &$badgesSeen ): string {
+
+	$badgesSeen = $args;
+
+	return \Nino\Modules\Components::renderStack( $appData, $args, static function( string $inner, array $element, int $index ) use ( &$appData, $args ): string {
+
+		$picture = \Nino\Modules\Components::componentImage( $appData, [ 'source' => $args['image'], 'alt' => '', 'content' => '', 'focus' => '', 'ratio' => '', 'class' => '' ] );
+
+		if( $picture === '' )
+			return '';
+
+		// value() reads a name that is no field as an address of its own, so the field is looked up first
+		$href = $args['link'] !== '' && isset( \Nino\Modules\Components::element( $appData )['model'][$args['link']] ) === true ? \Nino\Modules\Components::value( $appData, $args['link'], 'href' ) : null;
+
+		return '<li class="badge">'. ( $href !== null && $href !== '' ? '<a href="'. $href. '">'. $picture. '</a>' : $picture ). '</li>';
+	} );
+}, [
+	'label'			=> 'Badges',
+	'cell'			=> 'none',
+	'attributes'	=> [
+		'image'	=> [ 'type' => 'field', 'default' => 'image', 'label' => 'Picture' ],
+		'link'	=> [ 'type' => 'field', 'default' => '', 'label' => 'Link' ],
+	],
+] );
+$badges = static fn( string $call ): string => $render( $call );
+$badgesCall = '[badges /badged image="image" link="url" sort="uri"]';
+check( 'validate() takes the cell none and stacks() hands it out, in the registry and in the json a tool reads, with the field attributes that say what is drawn - and CELLS lists it last',
+	\Nino\Modules\Components::CELLS === [ 'components', 'section', 'columns', 'row', 'none' ]
+	&& ( $cellOfSchema( 'none' )['cell'] ?? null ) === 'none' && str_contains( (string) $cellOfSchema( 'nones' ), '"cell" must be one of components, section, columns, row, none' ) === true
+	&& \Nino\Modules\Components::stacks( $appData )['badges']['cell'] === 'none'
+	&& ( (array) json_decode( (string) json_encode( \Nino\Modules\Components::stacks( $appData ) ), true ) )['badges']['cell'] === 'none'
+	&& array_column( \Nino\Modules\Components::stacks( $appData )['badges']['attributes'], 'type' ) === [ 'field', 'field' ]
+	&& array_diff_key( array_map( static fn( array $stack ): string => $stack['cell'], \Nino\Modules\Components::stacks( $appData ) ), array_flip( $kernelStacks ) )['badges'] === 'none'
+	&& array_filter( $kernelStacks, static fn( string $name ): bool => \Nino\Modules\Components::stacks( $appData )[$name]['cell'] === 'none' ) === [] );
+$badgesHtml = $badges( $badgesCall );
+check( 'a stack of the cell none draws each element from the fields its attributes name: the picture, and a link round it where the link field holds an address - an address that is no link a page may take is a #, an element without a picture is left out',
+	$badgesHtml === $badges( $badgesCall ) && substr_count( $badgesHtml, '<li class="badge">' ) === 3
+	&& preg_match_all( '#<li class="badge">(<a href="([^"]*)">)?<img [^>]*src="([^"]+)"[^>]*>(</a>)?</li>#', $badgesHtml, $found, PREG_SET_ORDER ) === 3
+	&& array_map( static fn( array $badge ): string => $badge[2] ?? '', $found ) === [ 'https://example.com/a?b=1&amp;c=2', '', '#' ]
+	&& array_map( static fn( array $badge ): bool => str_contains( $badge[3], 'badged/' ), $found ) === [ true, true, true ]
+	&& str_contains( $badgesHtml, 'badged/c' ) === false && str_contains( $badgesHtml, '[' ) === false );
+check( 'the call is a single tag: the stack is handed no content, whatever stands around it, and the attributes arrive as written - the defaults where the call names none',
+	$badgesSeen['content'] === '' && $badgesSeen['image'] === 'image' && $badgesSeen['link'] === 'url' && $badgesSeen['source'] === '/badged'
+	&& preg_match( '#^<p>a</p><li class="badge"><img [^>]*></li><p>b</p>$#', $badges( '<p>a</p>[badges /badged sort="uri" limit="1"]<p>b</p>' ) ) === 1
+	&& $badgesSeen['link'] === '' && $badgesSeen['image'] === 'image' );
+$badgesPair = $badges( $badgesCall. '<b>[[title]]</b> [button x][/badges]' );
+check( 'a pair is the same stack: what stands between the tags is not read - the stack is handed none of it, no cell is drawn from it and no component in it runs',
+	$badgesSeen['content'] === '' && $badgesPair === $badgesHtml && str_contains( $badgesPair, 'nino-btn' ) === false && str_contains( $badgesPair, '<b>' ) === false
+	&& $badges( '[badges /badged image="image" sort="uri"]x[/badges]' ) === $badges( '[badges /badged image="image" sort="uri"]' ) );
+check( 'a link field that names no field of the type draws no link, and a pair whose content holds no bracket is handed none either',
+	str_contains( $badges( '[badges /badged image="image" link="nofield" sort="uri"]' ), '<a ' ) === false && substr_count( $badges( '[badges /badged image="image" link="nofield" sort="uri"]' ), '<li class="badge">' ) === 3
+	&& ( static function() use ( $badges, &$badgesSeen ): bool { $badges( '[badges /badged image="image"]x[/badges]' ); return $badgesSeen['content'] === ''; } )() );
+$noneHolds = [ 'label' => 'x', 'cell' => 'none', 'holds' => 'card' ];
+check( 'a stack of the cell none holds nothing: validate() refuses holds with it, naming the stack, and takes it with the other cells',
+	str_contains( (string) \Nino\Modules\Components::validate( 'holder', $noneHolds, true ), 'stack with content' ) === true
+	&& is_array( \Nino\Modules\Components::validate( 'holder', [ 'cell' => 'components' ] + $noneHolds, true ) ) === true
+	&& is_array( \Nino\Modules\Components::validate( 'holder', [ 'label' => 'x', 'cell' => 'none' ], true ) ) === true );
+$noneSources = \Nino\Modules\Components::sources( $appData, '[badges /badged image="image"][title /template/page-home/hero/title][image /template/page-home/hero/background][/badges][title /template/page-home/services/title]' );
+check( 'sources() and shortcodeCalls() do not read the content of a pair of the cell none: no key and no slot between its tags is reported as used - the calls outside it and the stack itself are',
+	array_column( $noneSources, 'source' ) === [ '/template/page-home/services/title' ]
+	&& array_column( \Nino\Html::shortcodeCalls( $appData, '[badges /badged][title /k][/badges][title /j]', [ 'badges' ] ), 'name' ) === [ 'badges', 'title' ]
+	&& array_column( \Nino\Html::shortcodeCalls( $appData, '[badges /badged][title /k][/badges][title /j]' ), 'name' ) === [ 'badges', 'title', 'title' ]
+	&& array_column( \Nino\Modules\Components::sources( $appData, '[repeat /badged][title /template/page-home/hero/title][/repeat]' ), 'source' ) === [ '/template/page-home/hero/title' ]
+	&& array_column( \Nino\Html::shortcodeCalls( $appData, '[card][badges /b][title /k][/badges][/card]', [ 'badges' ] ), 'name' ) === [ 'card', 'badges' ]
+	&& \Nino\Modules\Components::sources( $appData, '[card][badges /badged][title /template/page-home/hero/title][/badges][/card]' ) === [] );
+check( 'a stack of the cell components reads what stands between its tags',
+	str_contains( $render( '[repeat /badged sort="uri" limit="1"]<i>[[title]]</i>[/repeat]' ), '<i>A</i>' ) === true );
+
 
 // The type of an attribute that names a field of the element
 $fieldSeen = [];

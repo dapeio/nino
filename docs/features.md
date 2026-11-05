@@ -150,10 +150,13 @@ in a section, places it where it may stand and offers it with a picture.
 A stack says what its cell is with `cell` and may take a field of the element as
 an attribute with the type `field`. `cell` is one of `components` (the default:
 what stands between the tags, drawn once for each element), `section` (a whole
-section), `columns` (the `[col]`s and nothing else, as the kernel's table has them)
-or `row` (one field or one line of text, the row of a list); a manifest that names
-another word is refused, naming the stack, and a tool such as the Builder reads the
-word to know what it may put between the tags. A stack may declare a `text` attribute, of the type `string` only: it arrives as the call wrote it, a line the cells fill. A `field` attribute is the name of a
+section), `columns` (the `[col]`s and nothing else, as the kernel's table has them),
+`row` (one field or one line of text, the row of a list) or `none` (no content: the
+renderer draws each cell from the fields its `field` attributes name, and the call is
+a single tag, `[logos /logo image="image" link="url"]`; what stands between a pair of
+tags is not read; a single tag that is followed later by a `[/name]` is paired with it, and everything between the two, a second row of the call included, becomes content that is not drawn - so write it as a single tag and close it nowhere); a manifest that names another word is refused, naming the stack,
+and a tool such as the Builder reads the word to know what it may put between the
+tags - for `none` it offers nothing and shows the `field` attributes as the choice. A stack may declare a `text` attribute, of the type `string` only: it arrives as the call wrote it, a line the cells fill. A `field` attribute is the name of a
 field of the type the stack loops - letters, digits, hyphens and underscores,
 starting with a letter - and its default is empty or such a name; the kernel reads
 a value that is none as the default, and a tool draws a choice of the type's

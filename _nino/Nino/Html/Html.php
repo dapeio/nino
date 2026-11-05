@@ -683,14 +683,17 @@ namespace Nino {
 		 *	calls as well - its output is rendered again, so they will run - and
 		 *	they follow the call that holds them. A name nobody registered is no
 		 *	call, as it is none to the rendering. What a fill would put into a
-		 *	call is not known here: a scan reads the source as it stands
+		 *	call is not known here: a scan reads the source as it stands. A call
+		 *	named in $unread is found, and what stands between its tags is not
+		 *	looked into: that call does not read it either
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$html					html+, eg. a template
+		 *	@param		array			$unread				The names of the calls whose content is not read for calls
 		 *
 		 *	@return 	array										[ [ 'name' => 'card-text', 'args' => [ '/template/page-home/cards/one-text', 'format' => 'inline' ] ], ... ], in the order the calls stand
 		 */
-		public static function shortcodeCalls( array &$appData, string $html ): array {
+		public static function shortcodeCalls( array &$appData, string $html, array $unread = [] ): array {
 
 			if( $html === '' || strpos( $html, '[' ) === false || empty( $appData['./nino/html/shortcodes'] ) === true )
 				return [];
@@ -705,7 +708,10 @@ namespace Nino {
 				$content = $match[3] ?? '';
 				$calls[] = [ 'name' => $match[1], 'args' => self::_shortcodeArguments( $match[2] ?? '', $content ) ];
 
-				foreach( self::shortcodeCalls( $appData, $content ) as $inner )
+				if( in_array( $match[1], $unread, true ) === true )
+					continue;
+
+				foreach( self::shortcodeCalls( $appData, $content, $unread ) as $inner )
 					$calls[] = $inner;
 			}
 
