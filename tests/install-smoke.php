@@ -133,6 +133,9 @@ echo "Checks::apiRun\n";
 
 check( 'reports the running php version', $checksBody['php']['version'] === PHP_VERSION );
 check( 'gd is reported as loaded (required by CI)', $checksBody['extensions']['gd']['ok'] === true );
+check( 'dom is reported as loaded (required by CI)', $checksBody['extensions']['dom']['ok'] === true );
+check( 'xmlwriter is reported as loaded (required by CI)', $checksBody['extensions']['xmlwriter']['ok'] === true );
+check( 'every extension of the list carries a reason', array_filter( $checksBody['extensions'], fn( $e ) => !is_string( $e['reason'] ?? null ) || trim( $e['reason'] ) === '' ) === [] );
 check( 'the project root is reported as writable', $checksBody['directories']['.']['ok'] === true );
 check( 'the canonical private directory is reported as private', isset( $checksBody['directories']['private'] ) === true && isset( $checksBody['directories']['content'] ) === false );
 check( 'the public root is reported too', ( $checksBody['directories']['public']['ok'] ?? null ) === true );

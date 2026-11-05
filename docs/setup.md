@@ -39,7 +39,7 @@ This distinction protects your own changes. Deselecting a module may remove its 
 The first step checks only the environment and writes no files. The following are controlled:
 
 - the running PHP version;
-- the required PHP extensions;
+- the required PHP extensions (`dom`, `gd`, `mbstring`, `session`, `xmlwriter` and the `PharData` class);
 - the writability of the project root and already existing runtime paths.
 
 Project directories that do not yet exist are expected. The decisive factor is that PHP is allowed to create them later. "Recheck" only repeats the same diagnoses.

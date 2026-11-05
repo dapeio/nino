@@ -195,9 +195,11 @@ namespace Nino\Install {
 
 		// extension name -> why it's needed, shown next to a failed check
 		private const array EXTENSIONS = [
+			'dom' 				=> 'reading and cleaning rich text (the sanitizer of html fields)',
 			'gd' 				=> 'image cropping/resizing for uploaded images',
 			'mbstring' 	=> 'multibyte-safe string handling (mail headers, admin exports)',
 			'session' 	=> 'admin/dev login sessions',
+			'xmlwriter' => 'writing xml documents (the e-invoices of a project)',
 		];
 
 		// Virtual paths, resolved per entry - the private one lands under the

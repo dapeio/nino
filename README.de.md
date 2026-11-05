@@ -104,7 +104,7 @@ Durch den Verzicht auf ein offenes Plugin-System und fremde Laufzeitpakete reduz
 
 ## Schnellstart
 
-Nino benötigt **PHP 8.4 oder neuer** mit den Erweiterungen `gd`, `mbstring` und `session` sowie der von `Phar` bereitgestellten Klasse `PharData`. Es wird ohne Paketmanager oder Build-Schritt gestartet:
+Nino benötigt **PHP 8.4 oder neuer** mit den Erweiterungen `dom`, `gd`, `mbstring`, `session` und `xmlwriter` sowie der von `Phar` bereitgestellten Klasse `PharData`. Es wird ohne Paketmanager oder Build-Schritt gestartet:
 
 ```bash
 git clone https://github.com/dapeio/nino.git my-website
