@@ -1137,6 +1137,11 @@ namespace Nino\Modules {
 				$clean['attributes'][$attribute] = $result;
 			}
 
+			// A field that is required while a bool is on names a bool attribute of this schema
+			foreach( $clean['attributes'] as $attribute => $result )
+				if( is_string( $result['required'] ?? false ) === true && ( $clean['attributes'][$result['required']]['type'] ?? '' ) !== 'bool' )
+					return $what. ', attribute "'. $attribute. '": "required" names "'. $result['required']. '", which is no bool attribute of the schema';
+
 			// Where a tool offers the component, what it draws and what it holds, all
 			// three optional: left out of the clean schema where the schema leaves them
 			// out - no 'in' is everywhere, no 'draws' is nothing to show, no 'holds' is
@@ -1345,6 +1350,23 @@ namespace Nino\Modules {
 
 			if( isset( $declared['prefix'] ) === true && $type !== 'variant' )
 				return $where. 'only a variant has a "prefix"';
+
+			// Whether a field of the element must be chosen, a statement for a tool and
+			// nothing the renderer enforces: true, false, or the name of a bool attribute
+			// of the same schema that makes it so while it is on (validate() looks the name
+			// up, since the attributes stand in any order). Always in the clean schema of a
+			// field, false where the schema says nothing
+			if( array_key_exists( 'required', $declared ) === true ) {
+
+				if( $type !== 'field' )
+					return $where. 'only a field has "required"';
+
+				if( is_bool( $declared['required'] ) === false && ( is_string( $declared['required'] ) === false || preg_match( '/^[a-z][a-zA-Z0-9]*$/D', $declared['required'] ) !== 1 ) )
+					return $where. '"required" must be true, false or the name of a bool attribute';
+			}
+
+			if( $type === 'field' )
+				$clean['required'] = $declared['required'] ?? false;
 
 			$default = $declared['default'];
 
@@ -1655,8 +1677,12 @@ namespace Nino\Modules {
 						return '1';
 					return in_array( strtolower( $raw ), self::OFF, true ) === true ? '0' : $default;
 
-				// An empty name is the default, and so is anything that cannot be a field
+				// An attribute the call writes empty names no field, whatever the default is: that
+				// is the way to say none. An attribute the call does not write is the default
+				// (dispatch() hands null for it), and so is anything that cannot be a field
 				case 'field':
+					if( $raw === '' )
+						return '';
 					return preg_match( self::FIELD, $raw ) === 1 ? $raw : $default;
 			}
 

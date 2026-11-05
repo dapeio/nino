@@ -211,7 +211,7 @@ inside the loop, so a stack names it where it is not `components`; for `none` it
 offers no content and shows the `field` attributes as the choice.
 A stack may declare a `text` of the type `string` and no other: it arrives as the call wrote it, a line of fields for the cells to fill - written with its brackets as entities in the call of a stack (`&#91;&#91;title&#93;&#93;`), where the tag ends at its first `]` and no field has been filled yet, and as plain brackets in a `[col]` or `[line]` in the content of a loop. An attribute of the type `field` is the name of a field of the element's type
 (`'by' => [ 'type' => 'field', 'default' => '' ]`), which a tool draws as a choice
-of the type's fields; the kernel reads a value that is none as the default. A loop
+of the type's fields; the kernel reads a value that is none as the default, and one the call writes empty (`link=""`) as no field, so a renderer draws nothing for an empty field attribute. `'required' => true`, or the name of a `bool` attribute of the stack (`'required' => 'links'`), tells a tool the field must be chosen, while that bool is on in the second case. A loop
 that draws something of the element besides its content - the title of a tab - does
 it in the cell function, where the element is still the context
 (`Components::element()`, `Components::value()`); `[tabs]` and `[accordion]`

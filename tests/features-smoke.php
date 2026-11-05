@@ -180,6 +180,19 @@ check( 'a manifest that declares them is read complete, the schemas normalized; 
 	&& \Nino\Features::manifest( $manifestDir. '/WithComponents' )['components']['probe']['attributes']['tone']['options'] === [ 'a', 'b' ]
 	&& \Nino\Features::manifest( $manifestDir. '/WithComponents' )['stacks']['rows'] === [ 'label' => 'Rows', 'grid' => true, 'cell' => 'components', 'panels' => false, 'preview' => 'cells', 'attributes' => [] ]
 	&& \Nino\Features::manifest( $manifestDir. '/Mini' )['components'] === [] && \Nino\Features::manifest( $manifestDir. '/Mini' )['stacks'] === [] && ninoWarnings() === [] );
+$requiredStack = static fn( array $attributes ): array => [ 'name' => 'x', 'version' => '1.0.0', 'stacks' => [ 'logos' => [ 'label' => 'Logos', 'cell' => 'none', 'attributes' => $attributes ] ] ];
+check( 'a manifest stack says required on a field attribute - true, false or the name of a bool attribute of the stack - and the manifest as read carries it, false where it says nothing; a field that names no bool attribute, and required on another type, refuse the manifest',
+	\Nino\Features::manifest( writeManifest( $manifestDir, 'WithRequired', $requiredStack( [
+		'image'	=> [ 'type' => 'field', 'default' => 'image', 'required' => true ],
+		'link'	=> [ 'type' => 'field', 'default' => '', 'required' => 'links' ],
+		'name'	=> [ 'type' => 'field', 'default' => '' ],
+		'links'	=> [ 'type' => 'bool', 'default' => false ],
+	] ) ) )['stacks']['logos']['attributes']['link']['required'] === 'links'
+	&& \Nino\Features::manifest( $manifestDir. '/WithRequired' )['stacks']['logos']['attributes']['image']['required'] === true
+	&& \Nino\Features::manifest( $manifestDir. '/WithRequired' )['stacks']['logos']['attributes']['name']['required'] === false
+	&& manifestFails( $manifestDir, 'BadRequired', $requiredStack( [ 'link' => [ 'type' => 'field', 'default' => '', 'required' => 'links' ] ] ), 'attribute "link": "required" names "links"' )
+	&& manifestFails( $manifestDir, 'BadRequiredType', $requiredStack( [ 'link' => [ 'type' => 'string', 'default' => '', 'required' => true ] ] ), 'attribute "link": only a field has "required"' )
+	&& manifestFails( $manifestDir, 'BadRequiredValue', $requiredStack( [ 'link' => [ 'type' => 'field', 'default' => '', 'required' => 1 ] ] ), 'attribute "link": "required" must be true, false or the name of a bool attribute' ) );
 check( 'a stack of a manifest says what its cell is, one of the kernel\'s five - none, a loop with no content, among them - and the manifest of a stack whose cell is none of them is refused, naming the stack',
 	\Nino\Features::manifest( writeManifest( $manifestDir, 'WithCell', [ 'name' => 'x', 'version' => '1.0.0', 'stacks' => [ 'lines' => [ 'label' => 'Lines', 'cell' => 'row' ], 'logos' => [ 'label' => 'Logos', 'cell' => 'none' ], 'rows' => [ 'label' => 'Rows' ] ] ] ) )['stacks']['lines']['cell'] === 'row'
 	&& \Nino\Features::manifest( $manifestDir. '/WithCell' )['stacks']['logos']['cell'] === 'none'

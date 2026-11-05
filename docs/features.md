@@ -160,7 +160,7 @@ tags - for `none` it offers nothing and shows the `field` attributes as the choi
 field of the type the stack loops - letters, digits, hyphens and underscores,
 starting with a letter - and its default is empty or such a name; the kernel reads
 a value that is none as the default, and a tool draws a choice of the type's
-fields for it. The renderer draws the cell through `renderStack()`, whose cell
+fields for it. A call that writes the attribute empty (`link=""`) says no field and the renderer is handed the empty string, where a call that leaves it out is handed the default. A field says `required`: `true`, `false` (the default) or the name of a `bool` attribute of the same stack, which makes the field required while that attribute is on (`'link' => [ 'type' => 'field', 'default' => '', 'required' => 'links' ]`); a manifest that names another value, `required` on another type or a bool attribute the stack does not have is refused. The kernel enforces nothing with it and the registry hands it out: a tool shows a required field as a choice that must be made, and a field without `required` with the entry none, which it writes as an empty attribute. The renderer draws the cell through `renderStack()`, whose cell
 function runs with the element as the context, so `Components::element()` and
 `Components::value()` answer for it there:
 

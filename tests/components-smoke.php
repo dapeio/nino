@@ -3831,8 +3831,9 @@ $badgesSeen = [];
 	'label'			=> 'Badges',
 	'cell'			=> 'none',
 	'attributes'	=> [
-		'image'	=> [ 'type' => 'field', 'default' => 'image', 'label' => 'Picture' ],
-		'link'	=> [ 'type' => 'field', 'default' => '', 'label' => 'Link' ],
+		'image'	=> [ 'type' => 'field', 'default' => 'image', 'required' => true, 'label' => 'Picture' ],
+		'link'	=> [ 'type' => 'field', 'default' => '', 'required' => 'links', 'label' => 'Link' ],
+		'links'	=> [ 'type' => 'bool', 'default' => false, 'label' => 'Links' ],
 	],
 ] );
 $badges = static fn( string $call ): string => $render( $call );
@@ -3842,7 +3843,7 @@ check( 'validate() takes the cell none and stacks() hands it out, in the registr
 	&& ( $cellOfSchema( 'none' )['cell'] ?? null ) === 'none' && str_contains( (string) $cellOfSchema( 'nones' ), '"cell" must be one of components, section, columns, row, none' ) === true
 	&& \Nino\Modules\Components::stacks( $appData )['badges']['cell'] === 'none'
 	&& ( (array) json_decode( (string) json_encode( \Nino\Modules\Components::stacks( $appData ) ), true ) )['badges']['cell'] === 'none'
-	&& array_column( \Nino\Modules\Components::stacks( $appData )['badges']['attributes'], 'type' ) === [ 'field', 'field' ]
+	&& array_column( \Nino\Modules\Components::stacks( $appData )['badges']['attributes'], 'type' ) === [ 'field', 'field', 'bool' ]
 	&& array_diff_key( array_map( static fn( array $stack ): string => $stack['cell'], \Nino\Modules\Components::stacks( $appData ) ), array_flip( $kernelStacks ) )['badges'] === 'none'
 	&& array_filter( $kernelStacks, static fn( string $name ): bool => \Nino\Modules\Components::stacks( $appData )[$name]['cell'] === 'none' ) === [] );
 $badgesHtml = $badges( $badgesCall );
@@ -3885,9 +3886,9 @@ $fieldSeen = [];
 $fieldAttribute = static fn( mixed $default ): array|string => \Nino\Modules\Components::validate( 'fieldprobe', [ 'label' => 'x', 'attributes' => [ 'by' => [ 'type' => 'field', 'default' => $default ] ] ], true );
 \Nino\Modules\Components::addStack( $appData, 'fieldnamed', static function( array &$appData, array $args ) use ( &$fieldSeen ): string { $fieldSeen = $args; return ''; }, [ 'label' => 'x', 'attributes' => [ 'by' => [ 'type' => 'field', 'default' => 'title' ] ] ] );
 \Nino\Modules\Components::addStack( $appData, 'fieldnone', static function( array &$appData, array $args ) use ( &$fieldSeen ): string { $fieldSeen = $args; return ''; }, [ 'label' => 'x', 'attributes' => [ 'by' => [ 'type' => 'field', 'default' => '' ] ] ] );
-$fieldRead = static function( string $stack, string $written ) use ( $render, &$fieldSeen ): string {
+$fieldRead = static function( string $stack, ?string $written ) use ( $render, &$fieldSeen ): string {
 	$fieldSeen = [];
-	$render( '[' . $stack . ' /tabbed'. ( $written === '' ? '' : ' by="'. $written. '"' ). ']x[/'. $stack. ']' );
+	$render( '[' . $stack . ' /tabbed'. ( $written === null ? '' : ' by="'. $written. '"' ). ']x[/'. $stack. ']' );
 	return (string) ( $fieldSeen['by'] ?? 'not rendered' );
 };
 check( 'an attribute of the type field is taken by validate() with an empty default or the name of a field, and refused with a default that is neither or no string; the type is one of TYPES',
@@ -3895,11 +3896,51 @@ check( 'an attribute of the type field is taken by validate() with an empty defa
 	&& ( $fieldAttribute( '' )['attributes']['by']['type'] ?? null ) === 'field' && ( $fieldAttribute( 'imageAlt' )['attributes']['by']['default'] ?? null ) === 'imageAlt'
 	&& array_filter( [ 'my field', '9a', '-a', 'a.b', 'a"b', 5, null ], static fn( mixed $wrong ): bool => str_contains( (string) $fieldAttribute( $wrong ), 'the default of a field is empty or the name of a field' ) === false && is_string( $fieldAttribute( $wrong ) ) === false ) === []
 	&& \Nino\Modules\Components::defaults( $appData, 'fieldnamed', true )['by'] === 'title' && \Nino\Modules\Components::defaults( $appData, 'fieldnone', true )['by'] === '' );
-check( '...and a shortcode that writes it is read as that name - a name with capitals included - and anything that is no name is the default: empty, a number first, a space, a quote, a dot, a bracket',
+check( '...and a shortcode that writes it is read as that name - a name with capitals included - and anything that is no name is the default: a number first, a space, a quote, a dot, a bracket, a hyphen first; an attribute the call leaves out is the default too',
 	$fieldRead( 'fieldnamed', 'head' ) === 'head' && $fieldRead( 'fieldnamed', 'imageAlt' ) === 'imageAlt' && $fieldRead( 'fieldnamed', 'a-b_c1' ) === 'a-b_c1'
-	&& array_filter( [ '', '9a', 'a b', 'a&quot;b', 'a.b', 'a&#91;b', '-a' ], static fn( string $wrong ): bool => $fieldRead( 'fieldnamed', $wrong ) !== 'title' ) === []
-	&& array_filter( [ '9a', 'a b', 'a.b' ], static fn( string $wrong ): bool => $fieldRead( 'fieldnone', $wrong ) !== '' ) === [] && $fieldRead( 'fieldnone', '' ) === '' );
+	&& array_filter( [ '9a', 'a b', 'a&quot;b', 'a.b', 'a&#91;b', '-a' ], static fn( string $wrong ): bool => $fieldRead( 'fieldnamed', $wrong ) !== 'title' ) === []
+	&& array_filter( [ '9a', 'a b', 'a.b' ], static fn( string $wrong ): bool => $fieldRead( 'fieldnone', $wrong ) !== '' ) === []
+	&& $fieldRead( 'fieldnamed', null ) === 'title' && $fieldRead( 'fieldnone', null ) === '' && $fieldRead( 'fieldnone', 'head' ) === 'head' );
+check( 'an attribute of the type field that the call writes empty is no field, whatever the default is - missing and empty are told apart; the empty one is the empty string for a default of none as well',
+	$fieldRead( 'fieldnamed', '' ) === '' && $fieldRead( 'fieldnone', '' ) === ''
+	&& $fieldRead( 'fieldnamed', '' ) !== $fieldRead( 'fieldnamed', null )
+	&& $fieldRead( 'fieldnamed', ' ' ) === 'title' );
 
+// What a field says it is required for
+$requiredOf = static fn( mixed $required, array $more = [] ): array|string => \Nino\Modules\Components::validate( 'requiredprobe', [ 'label' => 'x', 'attributes' => [
+	'pic' => [ 'type' => 'field', 'default' => '', 'required' => $required ],
+] + $more ], true );
+$requiredBool = [ 'links' => [ 'type' => 'bool', 'default' => false ] ];
+check( 'validate() takes required on a field as true, false or the name of a bool attribute of the schema - wherever that attribute stands in the order - and hands it out; a field that says nothing is required: false',
+	( $requiredOf( true )['attributes']['pic']['required'] ?? null ) === true && ( $requiredOf( false )['attributes']['pic']['required'] ?? null ) === false
+	&& ( $requiredOf( 'links', $requiredBool )['attributes']['pic']['required'] ?? null ) === 'links'
+	&& ( \Nino\Modules\Components::validate( 'requiredprobe', [ 'label' => 'x', 'attributes' => [ 'links' => $requiredBool['links'], 'pic' => [ 'type' => 'field', 'default' => '', 'required' => 'links' ] ] ], true )['attributes']['pic']['required'] ?? null ) === 'links'
+	&& ( $fieldAttribute( '' )['attributes']['by']['required'] ?? null ) === false
+	&& is_array( \Nino\Modules\Components::validate( 'requiredprobe', $requiredOf( 'links', $requiredBool ), true ) ) === true );
+check( '...and refuses it on any other type, as a string that names no attribute or no bool attribute, as another type of value, and a name that is no attribute name',
+	array_filter( [ 'string', 'int', 'bool', 'select', 'href' ], static fn( string $type ): bool => str_contains( (string) \Nino\Modules\Components::validate( 'requiredprobe', [ 'label' => 'x', 'attributes' => [ 'a' => [ 'type' => $type, 'default' => $type === 'int' ? 0 : ( $type === 'bool' ? false : ( $type === 'select' ? 'x' : '' ) ), 'required' => true ] + ( $type === 'select' ? [ 'options' => [ 'x' ] ] : [] ) ] ], true ), 'only a field has "required"' ) === false ) === []
+	&& str_contains( (string) $requiredOf( 'nope' ), 'which is no bool attribute' ) === true
+	&& str_contains( (string) $requiredOf( 'pic', [] ), 'which is no bool attribute' ) === true
+	&& str_contains( (string) $requiredOf( 'text', [ 'text' => [ 'type' => 'string', 'default' => '' ] ] ), 'which is no bool attribute' ) === true
+	&& array_filter( [ 1, 0, null, [], 'Links', 'a b', '' ], static fn( mixed $wrong ): bool => is_string( $requiredOf( $wrong, $requiredBool ) ) === false ) === []
+	&& array_filter( [ 'Links', 'a b', '' ], static fn( string $wrong ): bool => str_contains( (string) $requiredOf( $wrong, $requiredBool ), 'must be true, false or the name of a bool attribute' ) === false ) === []
+	&& str_contains( (string) \Nino\Modules\Components::validate( 'requiredprobe', [ 'label' => 'x', 'attributes' => [ 'a' => [ 'type' => 'bool', 'default' => false, 'required' => 'a' ] ] ], true ), 'only a field has "required"' ) === true );
+$badgeAttributes = \Nino\Modules\Components::stacks( $appData )['badges']['attributes'];
+check( 'stacks() hands required out: the probe stack says true for its picture and the bool that makes its link required, in the registry and in the json a tool reads, the fields of the kernel say false - a component\'s too - and a field of a manifest or a call of addStack() that says nothing says false',
+	$badgeAttributes['image']['required'] === true && $badgeAttributes['link']['required'] === 'links' && array_key_exists( 'required', $badgeAttributes['links'] ) === false
+	&& ( (array) json_decode( (string) json_encode( \Nino\Modules\Components::stacks( $appData ) ), true ) )['badges']['attributes']['link']['required'] === 'links'
+	&& \Nino\Modules\Components::stacks( $appData )['tabs']['attributes']['title']['required'] === false && \Nino\Modules\Components::stacks( $appData )['accordion']['attributes']['title']['required'] === false
+	&& \Nino\Modules\Components::components( $appData )['col']['attributes']['field']['required'] === false
+	&& \Nino\Modules\Components::stacks( $appData )['fieldnamed']['attributes']['by']['required'] === false
+	&& \Nino\Modules\Components::validate( 'badges', \Nino\Modules\Components::stacks( $appData )['badges'], true ) === \Nino\Modules\Components::stacks( $appData )['badges'] );
+\Nino\Modules\Components::addStack( $appData, 'linked', static fn( array &$appData, array $args ): string => \Nino\Modules\Components::renderStack( $appData, $args, static function( string $inner ) use ( &$appData, $args ): string {
+	$href = $args['link'] !== '' && isset( \Nino\Modules\Components::element( $appData )['model'][$args['link']] ) === true ? \Nino\Modules\Components::value( $appData, $args['link'], 'href' ) : null;
+	return '<li>'. ( $href !== null && $href !== '' ? '<a href="'. $href. '">x</a>' : '' ). '</li>';
+} ), [ 'label' => 'x', 'cell' => 'none', 'attributes' => [ 'link' => [ 'type' => 'field', 'default' => 'url', 'label' => 'Link' ] ] ] );
+$linkCount = static fn( string $call ): int => substr_count( $render( $call ), '<a ' );
+check( 'a field attribute that the call writes empty is drawn as none and one it leaves out as the default: link="" draws no link where the default url would draw three, no link attribute draws the default, and a name that is no field is the default',
+	$linkCount( '[linked /badged sort="uri"]' ) === 3 && $linkCount( '[linked /badged sort="uri" link=""]' ) === 0 && $linkCount( '[linked /badged sort="uri" link="9a"]' ) === 3
+	&& $linkCount( '[linked /badged sort="uri" link="url"]' ) === 3 );
 $textOf = static fn( array $declared ): array|string => \Nino\Modules\Components::validate( 'textprobe', [ 'label' => 'x', 'attributes' => [ 'text' => $declared ] ], true );
 check( 'a stack may declare a text, and it is a line of the type string: a choice of words or a number is refused, since the stack is handed the text as the call wrote it - a component still cannot declare one',
 	( $textOf( [ 'type' => 'string', 'default' => '' ] )['attributes']['text']['type'] ?? null ) === 'string'
@@ -3957,6 +3998,11 @@ check( '...an id or a class is what gives it a shell: a div of that id and class
 
 // [tabs]
 $tabsOf = static fn( string $call, string $content = '<i>[[title]]</i>' ): string => $render( '[tabs /tabbed sort="uri" '. $call. ']'. $content. '[/tabs]' );
+$titleNumbers = static fn( string $call ): string => implode( ',', array_map( 'trim', (array) ( preg_match_all( '#<(?:button|summary)[^>]*>(.*?)</(?:button|summary)>#s', $render( $call ), $found ) === false ? [] : $found[1] ) ) );
+check( 'the tabs and the accordion read a title field written empty as the numbers 1, 2, 3 - the same as with the field missing - and a title field that names a field as its values',
+	$titleNumbers( '[tabs /tabbed sort="uri" title=""]x[/tabs]' ) === '1,2,3' && $titleNumbers( '[tabs /tabbed sort="uri"]x[/tabs]' ) === '1,2,3'
+	&& $titleNumbers( '[accordion /tabbed sort="uri" title=""]x[/accordion]' ) === '1,2,3' && $titleNumbers( '[accordion /tabbed sort="uri"]x[/accordion]' ) === '1,2,3'
+	&& $titleNumbers( '[tabs /tabbed sort="uri" title="body"]x[/tabs]' ) === 'b1,b2,b3' && $titleNumbers( '[accordion /tabbed sort="uri" title="body"]x[/accordion]' ) === 'b1,b2,b3' );
 check( '[tabs] is the markup Nino.ui.js turns into a tablist: a nav of buttons, a panel for each element after it, the first tab and the first panel active, the other panels hidden - and the target of each button is the id of its panel, made from the id of the call and the number of the element',
 	$render( '[tabs /tabbed sort="uri" limit="2" id="faq" title="head" class="x"]<i>[[title]]</i>[/tabs]' )
 		=== '<div class="nino-tabs x" id="faq"><nav class="nino-tabs-nav"><button type="button" class="nino-tabs-tab nino-is-active" data-tabs-target="faq-1">Alpha &lt;i&gt;&amp;&quot;</button><button type="button" class="nino-tabs-tab" data-tabs-target="faq-2">2</button></nav>'
