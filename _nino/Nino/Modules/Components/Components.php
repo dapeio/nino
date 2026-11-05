@@ -73,7 +73,7 @@ namespace Nino\Modules {
 				'repeat'			=> '<div[[class]][[id]]>[[cells]]</div>',
 				'tabs'				=> '<div class="nino-tabs[[class]]"[[id]]><nav class="nino-tabs-nav">[[tabs]]</nav>[[panels]]</div>',
 				'tab'					=> '<button type="button" class="nino-tabs-tab[[active]]" data-tabs-target="[[panel]]">[[title]]</button>',
-				'tab-panel'		=> '<div class="nino-tabs-panel[[active]]" id="[[panel]]"[[hidden]]>[[inner]]</div>',
+				'tab-panel'		=> '<div class="nino-tabs-panel[[active]][[class]]" id="[[panel]]"[[hidden]]>[[inner]]</div>',
 				'accordion'		=> '<div class="nino-accordion-group"[[id]]>[[cells]]</div>',
 				'accordion-item'	=> '<details class="nino-accordion[[class]]"[[name]][[open]]><summary class="nino-accordion-trigger">[[title]]</summary><div class="nino-accordion-panel">[[inner]]</div></details>',
 			];
@@ -169,9 +169,10 @@ namespace Nino\Modules {
 		// Where a component stands, and so where a tool offers it - see validate():
 		// directly in a column of a section (the cell of a stack that holds no
 		// card is such a column), in a [card], directly in a column of the
-		// hero, or between the tags of a [table], which holds its [col]s and
-		// nothing else
-		public const array PLACES = [ 'section', 'card', 'hero', 'table' ];
+		// hero, between the tags of a [table], which holds its [col]s and
+		// nothing else, or between the tags of a stack that says 'panels', which
+		// holds its [panel]s and nothing else
+		public const array PLACES = [ 'section', 'card', 'hero', 'table', 'panels' ];
 
 		// The group a tool offers a component under, the one word of its schema's
 		// 'group' - see validate(): the components of a section, of the hero and
@@ -335,6 +336,7 @@ namespace Nino\Modules {
 			'scroll-hint'	=> 'chevron-down',
 			'line'			=> 'text-align-start',
 			'col'				=> 'panel-top',
+			'panel'			=> 'panel-top',
 		];
 
 		/**
@@ -462,6 +464,14 @@ namespace Nino\Modules {
 						'hint' => [ 'en_US' => 'The field of the element the cell shows. A line of text, if the column has one, is shown instead.', 'de_DE' => 'Das Feld des Elements, das die Zelle zeigt. Hat die Spalte eine Textzeile, steht sie an dessen Stelle.' ] ],
 					'align' => [ 'type' => 'select', 'options' => [ '', 'right', 'center' ], 'default' => '', 'label' => [ 'en_US' => 'Alignment', 'de_DE' => 'Ausrichtung' ] ],
 				], [ 'table' ], null, null, false, 'global' ],
+				// A panel of a fixed [tabs] or [accordion]: standing between the tags of a
+				// stack that says 'panels' and nowhere else, where it is read by the stack
+				// and not drawn by itself (see panels()). Its content is the content of
+				// the panel, html+ like a card's
+				[ 'panel', 'Panel', 'Panel', 'block', 'content', [
+					'title' => [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Title', 'de_DE' => 'Titel' ],
+						'hint' => [ 'en_US' => 'The tab or the summary. Empty numbers the panels 1, 2, 3.', 'de_DE' => 'Der Tab oder die Überschrift. Leer nummeriert die Panels 1, 2, 3.' ] ],
+				], [ 'panels' ], null, null, false, 'global' ],
 			];
 
 			// Each class is a component of its own, and the schema says where a tool
@@ -513,14 +523,15 @@ namespace Nino\Modules {
 				] ],
 				// A tab for each element, its panel the cell: the title is a field, a line of
 				// text or the number, see _heading()
-				[ 'tabs', 'Tabs', 'Tabs', 'block', false, [ 'title' => $title, 'text' => $text ] ],
+				// Without a type they take [panel]s for their panels, see panels()
+				[ 'tabs', 'Tabs', 'Tabs', 'block', false, [ 'title' => $title, 'text' => $text ], null, 'components', true ],
 				[ 'accordion', 'Accordion', 'Accordion', 'block', false, [
 					'title' => $title,
 					'text' => $text,
 					'exclusive' => [ 'type' => 'bool', 'default' => true, 'label' => [ 'en_US' => 'One open at a time', 'de_DE' => 'Nur eines offen' ],
 						'hint' => [ 'en_US' => 'The panels share a name, and the browser closes the others when one opens.', 'de_DE' => 'Die Panels teilen einen Namen, und der Browser schließt die anderen, wenn eines aufgeht.' ] ],
 					'open' => [ 'type' => 'select', 'options' => [ '', 'first' ], 'default' => '', 'input' => 'segment', 'label' => [ 'en_US' => 'Open at the start', 'de_DE' => 'Beim Laden offen' ] ],
-				] ],
+				], null, 'components', true ],
 				[ 'list', 'List', 'Liste', 'block', false, [
 					'style' => [ 'type' => 'select', 'options' => [ '', 'check', 'numbered', 'columns' ], 'default' => '', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ] ],
 				], null, 'row' ],
@@ -539,16 +550,18 @@ namespace Nino\Modules {
 				], null, 'section' ],
 			];
 
-			// The seventh entry of a stack is what it holds, where it holds something, and
-			// the eighth its cell, the components between its tags where it says nothing
+			// The seventh entry of a stack is what it holds, where it holds something, the
+			// eighth its cell, the components between its tags where it says nothing, and
+			// the ninth whether it takes [panel]s where it has no type
 			foreach( $stacks as $stack ) {
 
-				[ $name, $en, $de, $preview, $grid, $attributes, $holds, $cell ] = $stack + [ 6 => null, 7 => 'components' ];
+				[ $name, $en, $de, $preview, $grid, $attributes, $holds, $cell, $panels ] = $stack + [ 6 => null, 7 => 'components', 8 => false ];
 
 				self::addStack( $appData, $name, [ self::class, 'stack'. ucfirst( $name ) ], [
 					'label'				=> [ 'en_US' => $en, 'de_DE' => $de ],
 					'grid'				=> $grid,
 					'cell'				=> $cell,
+					'panels'			=> $panels,
 					'attributes'	=> $attributes,
 					'preview'			=> $preview,
 				] + ( $holds !== null ? [ 'holds' => $holds ] : [] ) );
@@ -993,7 +1006,7 @@ namespace Nino\Modules {
 		 *
 		 *	@param		string		$name					The shortcode, a slug
 		 *	@param		mixed			$schema				label, source (not for a stack), loop, attributes, preview;
-		 *																	icon, in, draws, holds, stretched, link, by and group for a component, grid, cell, holds and assets for a stack.
+		 *																	icon, in, draws, holds, stretched, link, by and group for a component, grid, cell, panels, holds and assets for a stack.
 		 *																	See docs/development.md, "Components"
 		 *	@param		bool			$stack				Read it as a stack's
 		 *	@param		string|null	$feature			The key of the feature whose manifest the schema is read from, null for a module's: its components are the feature's own, whatever 'by' they say
@@ -1043,6 +1056,19 @@ namespace Nino\Modules {
 					return $what. ': "cell" must be one of '. implode( ', ', self::CELLS );
 
 				$clean['cell'] = $cell;
+
+				// Whether it takes [panel]s for its panels where its call names no type -
+				// the fixed tabs and the fixed accordion. Always in the clean schema, false
+				// where the schema says nothing, so that a tool reads it without knowing a
+				// stack by name. The renderer of a stack that says it reads them with
+				// panels()
+				if( isset( $schema['panels'] ) === true && is_bool( $schema['panels'] ) === false )
+					return $what. ': "panels" must be true or false';
+
+				$clean['panels'] = ( $schema['panels'] ?? false ) === true;
+
+				if( $clean['panels'] === true && $cell === 'none' )
+					return $what. ': "panels" is for a stack with content, and the cell none has none';
 
 				// What stands between its tags, as a component's 'holds' says it: the place
 				// of the components it holds, none where the key is left out
@@ -2149,9 +2175,27 @@ namespace Nino\Modules {
 			$parts	= [];
 			$at			= 0;
 
+			$fixed	= array_keys( array_filter( self::stacks( $appData ), static fn( array $stack ): bool => ( $stack['panels'] ?? false ) === true ) );
+
 			foreach( $found as $call ) {
 
 				[ $inner, $start ] = $call[2];
+
+				// A group of [panel]s that names no type holds what the cell holds, as a [card] does:
+				// its content is the cell's and is filled with the element. The tag is read as the
+				// rendering reads it: the first word without a value is the type
+				if( in_array( $call[1][0], $fixed, true ) === true ) {
+
+					$tag = (string) preg_replace( '/^ /', '', substr( substr( $call[0][0], 0, $start - $call[0][1] ), strlen( $call[1][0] ) + 1, -1 ) );
+
+					preg_match_all( '/\ ([^\ \=]*)(\=[\"]([^\"]*)[\"])?/i', ' '. $tag. ' ', $words );
+
+					$bare = array_values( array_filter( $words[1], static fn( string $word, int $at ): bool => $words[2][$at] === '', ARRAY_FILTER_USE_BOTH ) );
+					array_pop( $bare );
+
+					if( ( $bare[0] ?? '' ) === '' )
+						continue;
+				}
 
 				$parts[] = [ substr( $content, $at, $start - $at ), false ];
 				$parts[] = [ $inner, true ];
@@ -3263,6 +3307,116 @@ namespace Nino\Modules {
 		}
 
 		/**
+		 *	The panels a fixed [tabs] or [accordion] - or a stack of a feature that
+		 *	says 'panels' - draws: the calls of [panel] that stand directly in the
+		 *	content of the call, read with \Nino\Html::shortcodeCalls() as the
+		 *	rendering reads them, in the order they stand. Nothing else in the
+		 *	content is read, as a table reads its [col]s and nothing else: text
+		 *	between the panels is not a panel, and neither is a [panel] inside
+		 *	another call (a card) or inside a panel. The content of a panel is not
+		 *	rendered here: it is html+ like the content of a card, handed back as it
+		 *	stands, and the rendering that follows runs the components in it - with the
+		 *	element as their context where the stack stands in the cell of another
+		 *	stack, since the output of a shortcode is rendered where the shortcode
+		 *	stood
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$content			The content of the call, $args['content']
+		 *
+		 *	@return 	array										[ [ 'title' => ..., 'class' => ..., 'content' => ... ], ... ] - the title as text,
+		 *																	its entities read and its tags dropped, written safe for html with its [ as &#91;
+		 *																	(the number of the panel counted from 1 where it comes out empty), the class
+		 *																	written safe the same way, '' for none, and the content as it stands between the
+		 *																	tags. [] where there is no panel
+		 */
+		public static function panels( array &$appData, string $content ): array {
+
+			$panels = [];
+
+			foreach( \Nino\Html::shortcodeParts( $appData, $content ) as $part ) {
+
+				if( $part['name'] !== 'panel' )
+					continue;
+
+				// The first call of the part is the panel itself; what stands in it is not looked into
+				$args = \Nino\Html::shortcodeCalls( $appData, $part['text'], [ 'panel' ] )[0]['args'] ?? [];
+
+				$title = is_string( $args['title'] ?? null ) === true ? $args['title'] : '';
+				$title = trim( (string) preg_replace( '/\s+/', ' ', html_entity_decode( strip_tags( $title ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) );
+
+				$panels[] = [
+					'title'		=> $title !== '' ? self::escape( $title ) : (string) ( count( $panels ) + 1 ),
+					'class'		=> is_string( $args['class'] ?? null ) === true ? self::escape( trim( $args['class'] ) ) : '',
+					'content'	=> is_string( $args['content'] ?? null ) === true ? $args['content'] : '',
+				];
+			}
+
+			return $panels;
+		}
+
+		/**
+		 *	Whether a stack's call names no type: the form of [tabs] and [accordion]
+		 *	whose panels stand in the template as [panel]s, see panels(). The test
+		 *	renderStack() makes before it draws nothing
+		 *
+		 *	@param		array			$args					The arguments made ready by dispatch()
+		 *
+		 *	@return 	bool
+		 */
+		private static function _fixed( array $args ): bool {
+			return (string) ( $args['source'] ?? $args[0] ?? '' ) === '';
+		}
+
+		/**
+		 *	One tab and its panel, in the markup Nino.ui.js turns into a tablist: the
+		 *	part of [tabs] the loop and the fixed form share, so that the two cannot
+		 *	differ. The first one is active and the other panels hidden
+		 *
+		 *	@param		string		$group				The id of the call or its running number
+		 *	@param		int				$index				The number of the panel in the group, from 0
+		 *	@param		string		$title				Written safe
+		 *	@param		string		$class				A class of the panel, written safe, '' for none
+		 *	@param		string		$inner				The content of the panel
+		 *	@param		string		&$tabs				(reference) The nav, to which the tab is added
+		 *
+		 *	@return 	string										The panel
+		 */
+		private static function _tabPanel( string $group, int $index, string $title, string $class, string $inner, string &$tabs ): string {
+
+			$panel	= $group. '-'. ( $index + 1 );
+			$active	= $index === 0 ? ' nino-is-active' : '';
+
+			$tabs .= str_replace( [ '[[active]]', '[[panel]]', '[[title]]' ], [ $active, $panel, $title ], self::$html['tab'] );
+
+			return str_replace(
+				[ '[[active]]', '[[class]]', '[[hidden]]', '[[panel]]', '[[inner]]' ],
+				[ $active, $class !== '' ? ' '. $class : '', $index === 0 ? '' : ' hidden', $panel, $inner ],
+				self::$html['tab-panel']
+			);
+		}
+
+		/**
+		 *	One <details> of [accordion], shared by the loop and the fixed form
+		 *
+		 *	@param		array			$args					The arguments made ready by dispatch()
+		 *	@param		string		$name					The name the items share, '' for none
+		 *	@param		int				$index				The number of the item in the group, from 0
+		 *	@param		string		$title				Written safe
+		 *	@param		string		$class				A class of the panel, written safe, '' for none
+		 *	@param		string		$inner				The content of the panel
+		 *
+		 *	@return 	string
+		 */
+		private static function _accordionItem( array $args, string $name, int $index, string $title, string $class, string $inner ): string {
+
+			return str_replace(
+				[ '[[class]]', '[[name]]', '[[open]]', '[[title]]', '[[inner]]' ],
+				[ self::_modifier( '', $args['class'] ). ( $class !== '' ? ' '. $class : '' ), self::_attribute( 'name', $name ), $args['open'] === 'first' && $index === 0 ? ' open' : '', $title, $inner ],
+				self::$html['accordion-item']
+			);
+		}
+
+		/**
 		 *	Replace [tabs]: a tab for each element and its cell as the panel of it, in
 		 *	the markup Nino.ui.js turns into a tablist - the script sets the roles,
 		 *	aria-selected, aria-controls, the focus order, the arrow keys and the
@@ -3271,6 +3425,11 @@ namespace Nino\Modules {
 		 *	data-tabs-target is the id of its panel, the id of the call and the number
 		 *	of the element behind it (faq-1, faq-2), or a running number of the request
 		 *	(tabs-1-1) where the call has none. The title is _heading()'s
+		 *
+		 *	A call that names no type has its panels in the template: the [panel]s
+		 *	between its tags (see panels()), a tab and a panel each, in the same
+		 *	markup and with the same ids. The title and the text of the call, and
+		 *	the loop, play no part there; nothing where there is no panel
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments made ready by dispatch()
@@ -3282,18 +3441,26 @@ namespace Nino\Modules {
 			$group	= '';
 			$tabs		= '';
 
-			$panels = self::renderStack( $appData, $args, static function( string $inner, array $element, int $index ) use ( &$appData, &$group, &$tabs, $args ): string {
+			if( self::_fixed( $args ) === true ) {
 
-				if( $group === '' )
-					$group = self::_group( $appData, $args['id'], 'tabs' );
+				$panels = '';
 
-				$panel	= $group. '-'. ( $index + 1 );
-				$active	= $index === 0 ? ' nino-is-active' : '';
+				foreach( self::panels( $appData, (string) $args['content'] ) as $index => $panel ) {
 
-				$tabs .= str_replace( [ '[[active]]', '[[panel]]', '[[title]]' ], [ $active, $panel, self::_heading( $appData, $args, $index ) ], self::$html['tab'] );
+					if( $group === '' )
+						$group = self::_group( $appData, $args['id'], 'tabs' );
 
-				return str_replace( [ '[[active]]', '[[hidden]]', '[[panel]]', '[[inner]]' ], [ $active, $index === 0 ? '' : ' hidden', $panel, $inner ], self::$html['tab-panel'] );
-			} );
+					$panels .= self::_tabPanel( $group, $index, $panel['title'], $panel['class'], $panel['content'], $tabs );
+				}
+			}
+			else
+				$panels = self::renderStack( $appData, $args, static function( string $inner, array $element, int $index ) use ( &$appData, &$group, &$tabs, $args ): string {
+
+					if( $group === '' )
+						$group = self::_group( $appData, $args['id'], 'tabs' );
+
+					return self::_tabPanel( $group, $index, self::_heading( $appData, $args, $index ), '', $inner, $tabs );
+				} );
 
 			return $panels === '' ? '' : str_replace(
 				[ '[[class]]', '[[id]]', '[[tabs]]', '[[panels]]' ],
@@ -3310,6 +3477,11 @@ namespace Nino\Modules {
 		 *	others when one opens; 'open' as first has the first one open at the start.
 		 *	No script is needed, and the class of the call is the class of each item
 		 *
+		 *	A call that names no type has its panels in the template, as [tabs] has:
+		 *	the [panel]s between its tags (see panels()), a <details> each in the same
+		 *	markup, the class of the panel after the class of the call. 'exclusive' and
+		 *	'open' work as they do in a loop
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments made ready by dispatch()
 		 *
@@ -3319,17 +3491,26 @@ namespace Nino\Modules {
 
 			$name = '';
 
-			$items = self::renderStack( $appData, $args, static function( string $inner, array $element, int $index ) use ( &$appData, &$name, $args ): string {
+			if( self::_fixed( $args ) === true ) {
 
-				if( $name === '' && $args['exclusive'] === '1' )
-					$name = self::_group( $appData, $args['id'], 'accordion' );
+				$items = '';
 
-				return str_replace(
-					[ '[[class]]', '[[name]]', '[[open]]', '[[title]]', '[[inner]]' ],
-					[ self::_modifier( '', $args['class'] ), self::_attribute( 'name', $name ), $args['open'] === 'first' && $index === 0 ? ' open' : '', self::_heading( $appData, $args, $index ), $inner ],
-					self::$html['accordion-item']
-				);
-			} );
+				foreach( self::panels( $appData, (string) $args['content'] ) as $index => $panel ) {
+
+					if( $name === '' && $args['exclusive'] === '1' )
+						$name = self::_group( $appData, $args['id'], 'accordion' );
+
+					$items .= self::_accordionItem( $args, $name, $index, $panel['title'], $panel['class'], $panel['content'] );
+				}
+			}
+			else
+				$items = self::renderStack( $appData, $args, static function( string $inner, array $element, int $index ) use ( &$appData, &$name, $args ): string {
+
+					if( $name === '' && $args['exclusive'] === '1' )
+						$name = self::_group( $appData, $args['id'], 'accordion' );
+
+					return self::_accordionItem( $args, $name, $index, self::_heading( $appData, $args, $index ), '', $inner );
+				} );
 
 			return $items === '' ? '' : str_replace(
 				[ '[[id]]', '[[cells]]' ],
@@ -3484,6 +3665,20 @@ namespace Nino\Modules {
 				[ self::_attribute( 'class', $args['align'] !== '' ? 'nino-table__cell--'. $args['align'] : '' ), $cell ],
 				self::$html['td']
 			);
+		}
+
+		/**
+		 *	Replace [panel]: nothing. A panel is read by the stack it stands in - a fixed
+		 *	[tabs] or [accordion], see panels() - which draws it as a tab and a panel or
+		 *	as a <details>; a panel with no such stack is none, as a [col] with no table
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$args					The arguments made ready by dispatch()
+		 *
+		 *	@return 	string
+		 */
+		public static function componentPanel( array &$appData, array $args ): string {
+			return '';
 		}
 
 		/**

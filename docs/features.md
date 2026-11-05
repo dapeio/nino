@@ -177,6 +177,20 @@ function runs with the element as the context, so `Components::element()` and
 ],
 ```
 
+A stack that says `'panels' => true` takes, where its call names no type, the
+`[panel title="..." class="..."]...[/panel]` calls between its tags for its panels,
+one cell each, instead of looping a type; the kernel's `[tabs]` and `[accordion]`
+are two. The key is a bool, `false` where the schema says nothing, and a manifest
+that names another value, or `true` with the cell `none`, is refused, naming the stack. A tool such as the Builder
+reads it to offer the stack as a group of panels on a section without knowing one by
+name. The renderer reads the panels itself: `\Nino\Modules\Components::panels( $appData, $args['content'] )`
+answers `[ [ 'title' => ..., 'class' => ..., 'content' => ... ], ... ]` for the `[panel]`s
+directly in a content, the title as text written safe (the number of the panel where
+it comes out empty), the class written safe, and the content as it stands - html+ that
+the rendering after the renderer runs, so it is put into the markup as it is. An empty
+`$args['source']` is the fixed form; a call with a type is a loop, which the renderer
+draws through `renderStack()` as any stack ([Components](development.md#components)).
+
 A schema that says `'link' => true` (**1.9**) makes a component a link where it is
 given one: it has an `href` and a `target` without declaring them, and what the
 renderer made is wrapped in the `<a>` they say. A schema that says
@@ -381,7 +395,7 @@ The kernel classes a feature calls, by home:
 | `\Nino\Images` | `getUrl()`, `getSlot()`, `getSlots()`, `setSlotFilename()`, `setSlotAlt()`, `cleanAlt()`, `process()`, `fit()`, `limits()`, `reject()`, `read()`, `restore()`, `delete()` |
 | `\Nino\Mail` | `send()`; `rateLimited()` **1.8** whether the last send was refused by the cap per address |
 | `\Nino\Locales` | `getCurrentLocale()`, `getNativeLocale()`, `getAvailableLocales()`, `verifyLocale()`, `useLocale()` for the rest of the request; `getVisitorLocale()` the language the site shows the visitor of this browser, `getTextLocales()` the languages that have a text file, `languageTag()` a locale id as the tag of a `lang` attribute, all **1.9** |
-| `\Nino\Modules\Components` | `components()`, `stacks()`, `defaults()`, `addComponent()`; `registered()` **1.9** the registry as it was registered; `escape()` a value into html or an attribute; `renderStack()` - it fills the cell with the fills of its element **1.9** -, `cell()`, `element()` for a stack |
+| `\Nino\Modules\Components` | `components()`, `stacks()`, `defaults()`, `addComponent()`; `registered()` **1.9** the registry as it was registered; `escape()` a value into html or an attribute; `renderStack()` - it fills the cell with the fills of its element **1.9** -, `panels()` the `[panel]`s of a fixed group, `cell()`, `element()` for a stack |
 | `\Nino\Admin\Admin` | `guardPerm()`; `postData()` the json of the posted `data`; `postString()` **1.8** one posted value as a string, never a cast; `cleanInt()`, `failType()`, `uploadError()`; `sessionLocale()` the language the workbench speaks, `contentLocale()` **1.9** the language a panel edits in - its own value of the session, which the select above a panel's screen sets and nothing else does; `textFills()`; `\Nino\Admin\Panels::relative()` |
 | beside them | `\Nino\Callbacks::registerCallback()`; `\Nino\Elements::queryElements()`, `getElement()`, `getElementModel()`; `getElementWithFallback()` **1.9** an element in the language asked, else from another one, with its `.lang`; `\Nino\Modules\Elements::fills()` and `slug()` **1.9** the fills of one element in a loop and its name alone; `\Nino\Auth::getCurrentUser()`, `checkPermission()`; `\Nino\Fetch::get()`, the one way to the network; `\Nino\Modules\Jstext::publish()` fills for a public script; `\Nino\Modules::callModules()` |
 

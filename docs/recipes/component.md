@@ -215,7 +215,10 @@ of the type's fields; the kernel reads a value that is none as the default. A lo
 that draws something of the element besides its content - the title of a tab - does
 it in the cell function, where the element is still the context
 (`Components::element()`, `Components::value()`); `[tabs]` and `[accordion]`
-are the kernel's two to read.
+are the kernel's two to read. A stack that says `panels => true` takes `[panel]`s
+between its tags where its call names no type: its renderer reads them with
+`Components::panels( $appData, $args['content'] )` and puts the html+ of each as it is
+into its markup (see [Developing a feature](../features.md#components-and-stacks)).
 
 `renderStack()` runs the loop of `[elements]` with the same `sort`, `offset`,
 `limit`, `query` and `callback`, renders the content once per element with the

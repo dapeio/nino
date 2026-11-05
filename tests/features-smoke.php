@@ -178,13 +178,18 @@ check( 'a component whose schema does not validate refuses the manifest and name
 check( 'a manifest that declares them is read complete, the schemas normalized; one that does not has none', \Nino\Features::manifest( writeManifest( $manifestDir, 'WithComponents', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent ], 'stacks' => [ 'rows' => [ 'label' => 'Rows', 'grid' => true ] ] ] ) ) === \Nino\Features::manifest( $manifestDir. '/WithComponents' )
 	&& \Nino\Features::manifest( $manifestDir. '/WithComponents' )['components']['probe']['preview'] === 'block'
 	&& \Nino\Features::manifest( $manifestDir. '/WithComponents' )['components']['probe']['attributes']['tone']['options'] === [ 'a', 'b' ]
-	&& \Nino\Features::manifest( $manifestDir. '/WithComponents' )['stacks']['rows'] === [ 'label' => 'Rows', 'grid' => true, 'cell' => 'components', 'preview' => 'cells', 'attributes' => [] ]
+	&& \Nino\Features::manifest( $manifestDir. '/WithComponents' )['stacks']['rows'] === [ 'label' => 'Rows', 'grid' => true, 'cell' => 'components', 'panels' => false, 'preview' => 'cells', 'attributes' => [] ]
 	&& \Nino\Features::manifest( $manifestDir. '/Mini' )['components'] === [] && \Nino\Features::manifest( $manifestDir. '/Mini' )['stacks'] === [] && ninoWarnings() === [] );
 check( 'a stack of a manifest says what its cell is, one of the kernel\'s five - none, a loop with no content, among them - and the manifest of a stack whose cell is none of them is refused, naming the stack',
 	\Nino\Features::manifest( writeManifest( $manifestDir, 'WithCell', [ 'name' => 'x', 'version' => '1.0.0', 'stacks' => [ 'lines' => [ 'label' => 'Lines', 'cell' => 'row' ], 'logos' => [ 'label' => 'Logos', 'cell' => 'none' ], 'rows' => [ 'label' => 'Rows' ] ] ] ) )['stacks']['lines']['cell'] === 'row'
 	&& \Nino\Features::manifest( $manifestDir. '/WithCell' )['stacks']['logos']['cell'] === 'none'
 	&& \Nino\Features::manifest( $manifestDir. '/WithCell' )['stacks']['rows']['cell'] === 'components'
 	&& manifestFails( $manifestDir, 'BadCell', [ 'name' => 'x', 'version' => '1.0.0', 'stacks' => [ 'rows' => [ 'label' => 'x', 'cell' => 'page' ] ] ], 'stack "rows": "cell"' ) );
+check( 'a stack of a manifest may say it takes [panel]s for panels, true or false, the manifest carries it and a stack that says nothing has false - anything but a bool is refused, naming the stack',
+	\Nino\Features::manifest( writeManifest( $manifestDir, 'WithPanels', [ 'name' => 'x', 'version' => '1.0.0', 'stacks' => [ 'steps' => [ 'label' => 'Steps', 'panels' => true ], 'plain' => [ 'label' => 'Plain', 'panels' => false ], 'rows' => [ 'label' => 'Rows' ] ] ] ) )['stacks']['steps']['panels'] === true
+	&& \Nino\Features::manifest( $manifestDir. '/WithPanels' )['stacks']['plain']['panels'] === false && \Nino\Features::manifest( $manifestDir. '/WithPanels' )['stacks']['rows']['panels'] === false
+	&& array_filter( [ 'yes', 1, 0, 'true', [ true ] ], static fn( mixed $wrong ): bool => manifestFails( $manifestDir, 'BadPanels', [ 'name' => 'x', 'version' => '1.0.0', 'stacks' => [ 'steps' => [ 'label' => 'x', 'panels' => $wrong ] ] ], 'stack "steps": "panels" must be true or false' ) === false ) === []
+	&& manifestFails( $manifestDir, 'NonePanels', [ 'name' => 'x', 'version' => '1.0.0', 'stacks' => [ 'steps' => [ 'label' => 'x', 'cell' => 'none', 'panels' => true ] ] ], 'stack "steps": "panels" is for a stack with content' ) );
 // ...and so are the two keys that say where a component may stand and what it draws: the manifest is read by the same
 // validate() the kernel's own components are, so a wrong word is refused here with the name of the component
 check( 'the places a component may stand in, and what it draws, are carried by the manifest when good',
@@ -205,7 +210,7 @@ check( 'what a component holds is carried by the manifest when good, and a schem
 	&& array_key_exists( 'holds', \Nino\Features::manifest( writeManifest( $manifestDir, 'NoHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent ] ] ) )['components']['box'] ) === false
 	&& array_key_exists( 'holds', \Nino\Features::manifest( $manifestDir. '/WithComponents' )['components']['probe'] ) === false && ninoWarnings() === [] );
 check( '...so a place that is none, a list, a number, an empty word, and a component whose source is not its content are refused',
-	manifestFails( $manifestDir, 'BadHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => 'page' ] ] ], 'component "box": "holds" names a place: section, card, hero or table' )
+	manifestFails( $manifestDir, 'BadHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => 'page' ] ] ], 'component "box": "holds" names a place: section, card, hero, table or panels' )
 	&& manifestFails( $manifestDir, 'ListHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => [ 'card' ] ] ] ], 'component "box": "holds" names a place' )
 	&& manifestFails( $manifestDir, 'IntHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => 5 ] ] ], 'component "box": "holds" names a place' )
 	&& manifestFails( $manifestDir, 'EmptyHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => '' ] ] ], 'component "box": "holds" names a place' )
