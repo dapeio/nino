@@ -897,6 +897,51 @@
 	</div>
 </section>
 
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-loop-table-striped-columns" data-demo-preset="loop-table" data-demo-layout="striped-columns">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
+			<span class="nino-badge nino-badge--primary">loop-table</span> <span class="nino-badge nino-badge--pill">Layout: striped-columns — a loop as a table</span> <span class="nino-badge nino-badge--pill">Beispieldaten statt &#91;table&#93;</span>
+		</div>
+	</div>
+</section>
+<section id="tabelle-loop-columns" class="nino-section nino-mt-0 nino-mb-0" aria-labelledby="tabelle-loop-columns-title">
+	<div class="nino-grid-row">
+		<div class="nino-grid-100 nino-mb-3 nino-text-left"><h2 class="nino-section-title" id="tabelle-loop-columns-title">Workshops</h2><p class="nino-section-subtitle">A &#91;table&#93; with a &#91;col&#93; for each column: a titled text field, a date, and a free line with a price.</p></div>
+		<div class="nino-grid-100 nino-table-wrap">
+			<table class="nino-table nino-table--striped">
+				<thead>
+					<tr><th>Workshop</th><th></th><th></th></tr>
+				</thead>
+				<tbody>
+					<tr><td>Concept workshop</td><td>2026-03-12</td><td>480,- EUR</td></tr>
+					<tr><td>Design review</td><td>2026-04-02</td><td>260,- EUR</td></tr>
+					<tr><td>Launch day</td><td>2026-05-20</td><td>1.200,- EUR</td></tr>
+				</tbody>
+			</table>
+		</div>
+	</div>
+</section>
+
+<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-loop-line-list-lines" data-demo-preset="loop-line" data-demo-layout="list-lines">
+	<div class="nino-grid-row nino-grid-row--wide">
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
+			<span class="nino-badge nino-badge--primary">loop-line</span> <span class="nino-badge nino-badge--pill">Layout: list-lines — a list whose row is a line of fields</span> <span class="nino-badge nino-badge--pill">Beispieldaten statt &#91;list&#93;</span>
+		</div>
+	</div>
+</section>
+<section id="liste-loop-lines" class="nino-section nino-mt-0 nino-mb-0" aria-labelledby="liste-loop-lines-title">
+	<div class="nino-grid-row">
+		<div class="nino-grid-100 nino-mb-3 nino-text-left"><h2 class="nino-section-title" id="liste-loop-lines-title">Prices</h2></div>
+		<div class="nino-grid-100 nino-text-left">
+			<ul class="nino-list nino-list--check">
+				<li><p class="nino-line">Concept workshop: 480,- EUR</p></li>
+				<li><p class="nino-line">Design review: 260,- EUR</p></li>
+				<li><p class="nino-line">Launch day: 1.200,- EUR</p></li>
+			</ul>
+		</div>
+	</div>
+</section>
+
 <section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-static-table-default-elements" data-demo-preset="static-table" data-demo-layout="default-elements">
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">

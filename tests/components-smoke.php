@@ -1929,10 +1929,10 @@ echo "Modules\\Components - the registry, the sources, the stacks\n";
 \Nino\Modules\Elements::init( $appData );
 
 // The registry the module's own init() fills, read before the test adds to it
-$kernelAll = [ 'title', 'subtitle', 'text', 'card-title', 'card-subtitle', 'card-text', 'card-image', 'hero-title', 'hero-subtitle', 'card', 'button', 'image', 'logo', 'html', 'spacer', 'scroll-hint' ];
-$kernelStacks = [ 'stack', 'slider', 'filter', 'list', 'sections' ];
-check( 'the module registers the components of the kernel in the order a column offers them: the title, the subtitle and the text of a section, the title, the subtitle, the text and the image of a card, the title and the subtitle of a hero, then the card, the button, the image, the logo, the html, the spacer and the scroll hint', array_keys( \Nino\Modules\Components::components( $appData ) ) === $kernelAll );
-check( '...and a tool is answered in that order: the registry as json is an object keyed by name, which read again lists the same sixteen in the same order',
+$kernelAll = [ 'title', 'subtitle', 'text', 'line', 'card-title', 'card-subtitle', 'card-text', 'card-image', 'hero-title', 'hero-subtitle', 'card', 'button', 'image', 'logo', 'html', 'spacer', 'scroll-hint', 'col' ];
+$kernelStacks = [ 'stack', 'slider', 'filter', 'list', 'table', 'sections' ];
+check( 'the module registers the components of the kernel in the order a column offers them: the title, the subtitle, the text and the line of a section, the title, the subtitle, the text and the image of a card, the title and the subtitle of a hero, then the card, the button, the image, the logo, the html, the spacer and the scroll hint, and the column of a table last', array_keys( \Nino\Modules\Components::components( $appData ) ) === $kernelAll );
+check( '...and a tool is answered in that order: the registry as json is an object keyed by name, which read again lists the same eighteen in the same order',
 	str_starts_with( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), '{"title":{' ) === true
 	&& array_keys( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), true ) ) === $kernelAll );
 check( '...and its stacks', array_keys( \Nino\Modules\Components::stacks( $appData ) ) === $kernelStacks );
@@ -2091,7 +2091,7 @@ $badSchemas = [
 	'a place twice'												=> [ 'twiceplace', [ 'label' => 'x', 'source' => 'text', 'in' => [ 'card', 'card' ] ], '"in" names a place twice' ],
 	'no place at all'											=> [ 'noplace', [ 'label' => 'x', 'source' => 'text', 'in' => [] ], '"in" must be a non-empty list' ],
 	'a place that is no list'							=> [ 'wordplace', [ 'label' => 'x', 'source' => 'text', 'in' => 'card' ], '"in" must be a non-empty list' ],
-	'a holding of a place that is none'		=> [ 'badholds', [ 'label' => 'x', 'source' => 'content', 'holds' => 'page' ], '"holds" names a place: section, card or hero' ],
+	'a holding of a place that is none'		=> [ 'badholds', [ 'label' => 'x', 'source' => 'content', 'holds' => 'page' ], '"holds" names a place: section, card, hero or table' ],
 	'a holding of a list of places'				=> [ 'listholds', [ 'label' => 'x', 'source' => 'content', 'holds' => [ 'card' ] ], '"holds" names a place' ],
 	'a holding that is a number'					=> [ 'intholds', [ 'label' => 'x', 'source' => 'content', 'holds' => 5 ], '"holds" names a place' ],
 	'a holding that is empty'							=> [ 'emptyholds', [ 'label' => 'x', 'source' => 'content', 'holds' => '' ], '"holds" names a place' ],
@@ -2197,21 +2197,23 @@ check( '...and gives the sentence of the first thing wrong with them: a place ou
 		[ 'draws', 'P .x' ], [ 'draws', 'p > .x' ], [ 'draws', 'p .x_y' ], [ 'draws', '' ], [ 'draws', 'p .'. str_repeat( 'x', 62 ) ], [ 'draws', 'h{nope} .x' ], [ 'draws', 'h{} .x' ], [ 'draws', '{{tag}}' ], [ 'draws', 'p .x{' ], [ 'draws', 5 ], [ 'draws', [ 'p' ] ],
 	], static fn( array $wrong ): bool => is_string( \Nino\Modules\Components::validate( 'probe', $placed + [ $wrong[0] => $wrong[1] ] ) ) === false
 		|| str_contains( \Nino\Modules\Components::validate( 'probe', $placed + [ $wrong[0] => $wrong[1] ] ), '"'. $wrong[0]. '"' ) === false ) === [] );
-check( '...a stack is not a place a component stands in, and holds nothing: its clean schema has none of the three keys',
+check( '...a stack is not a place a component stands in: its clean schema has neither \'in\' nor \'draws\' - and it holds what its schema says, one of the places, and nothing where it says nothing',
 	array_key_exists( 'in', \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'in' => [ 'card' ], 'draws' => 'p .x', 'holds' => 'card' ], true ) ) === false
 	&& array_key_exists( 'draws', \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'in' => [ 'card' ], 'draws' => 'p .x', 'holds' => 'card' ], true ) ) === false
-	&& array_key_exists( 'holds', \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'in' => [ 'card' ], 'draws' => 'p .x', 'holds' => 'card' ], true ) ) === false );
+	&& \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'holds' => 'table' ], true )['holds'] === 'table'
+	&& array_key_exists( 'holds', \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x' ], true ) ) === false
+	&& str_contains( (string) \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'holds' => 'page' ], true ), '"holds" names a place' ) === true );
 // What a component holds: one of the places, which is what its content is the calls of - and only where its source is its content
 $holding = [ 'label' => 'x', 'source' => 'content', 'group' => 'global', 'attributes' => [ 'tag' => [ 'type' => 'select', 'options' => [ 'div', 'h3' ], 'default' => 'h3' ] ] ];
 $holdsAnswer = static function( array $schema ): string {
 	$answer = \Nino\Modules\Components::validate( 'box', $schema );
 	return is_string( $answer ) === true ? $answer : '';
 };
-check( 'validate() takes what a component holds - one of the three places, with the source content - and carries it in the clean schema; a schema that says nothing holds nothing',
-	array_filter( [ 'section', 'card', 'hero' ], static fn( string $place ): bool => ( \Nino\Modules\Components::validate( 'box', $holding + [ 'holds' => $place ] )['holds'] ?? null ) !== $place ) === []
+check( 'validate() takes what a component holds - one of the four places, with the source content - and carries it in the clean schema; a schema that says nothing holds nothing',
+	array_filter( [ 'section', 'card', 'hero', 'table' ], static fn( string $place ): bool => ( \Nino\Modules\Components::validate( 'box', $holding + [ 'holds' => $place ] )['holds'] ?? null ) !== $place ) === []
 	&& array_key_exists( 'holds', \Nino\Modules\Components::validate( 'box', $holding ) ) === false );
 check( '...and gives the sentence of the first thing wrong with it: a place that is none (the cell of a loop is not one any more), a list, a number, an empty word - and a source that is not the content',
-	array_filter( [ 'page', 'cell', 'Card', [ 'card' ], 5, '', true ], static fn( mixed $wrong ): bool => str_contains( $holdsAnswer( $holding + [ 'holds' => $wrong ] ), '"holds" names a place: section, card or hero' ) === false ) === []
+	array_filter( [ 'page', 'cell', 'Card', [ 'card' ], 5, '', true ], static fn( mixed $wrong ): bool => str_contains( $holdsAnswer( $holding + [ 'holds' => $wrong ] ), '"holds" names a place: section, card, hero or table' ) === false ) === []
 	&& array_filter( [ 'text', 'image', 'href', 'none' ], static fn( string $source ): bool => str_contains( $holdsAnswer( [ 'source' => $source, 'holds' => 'card' ] + $holding ), '"holds" needs the source content' ) === false ) === []
 	&& $holdsAnswer( [ 'holds' => 'weird', 'source' => 'text' ] + $holding ) !== '' && str_contains( $holdsAnswer( [ 'holds' => 'weird', 'source' => 'text' ] + $holding ), 'names a place' ) === true );
 check( 'validate() carries stretched in the clean schema: true where a component that draws a link says so - with link and without - and false where the schema says nothing or says false',
@@ -2422,9 +2424,9 @@ check( '...the focus is the focus of [image], word for word, and the other label
 	&& $cardSchema['attributes']['fill']['label'] === [ 'en_US' => 'Full height', 'de_DE' => 'Volle Höhe' ] && $cardSchema['attributes']['vertical']['label'] === [ 'en_US' => 'Vertical element alignment', 'de_DE' => 'Vertikale Element-Ausrichtung' ]
 	&& $cardSchema['attributes']['align']['label'] === [ 'en_US' => 'Horizontal text alignment', 'de_DE' => 'Horizontale Text-Ausrichtung' ] && $cardSchema['attributes']['background']['label'] === [ 'en_US' => 'Background picture', 'de_DE' => 'Hintergrund-Bild' ]
 	&& $cardSchema['attributes']['dim']['label'] === [ 'en_US' => 'Dim the picture', 'de_DE' => 'Bild abdunkeln' ] && $cardSchema['attributes']['borderless']['label'] === [ 'en_US' => 'Without border', 'de_DE' => 'Ohne Rahmen' ] );
-check( '...the card is the one component of the kernel that holds components, and no stack does',
+check( '...the card is the one component of the kernel that holds components, and the table the one stack - which holds the place table',
 	array_keys( array_filter( \Nino\Modules\Components::components( $appData ), static fn( array $schema ): bool => array_key_exists( 'holds', $schema ) === true ) ) === [ 'card' ]
-	&& array_filter( \Nino\Modules\Components::stacks( $appData ), static fn( array $stack ): bool => array_key_exists( 'holds', $stack ) === true ) === []
+	&& array_keys( array_filter( \Nino\Modules\Components::stacks( $appData ), static fn( array $stack ): bool => array_key_exists( 'holds', $stack ) === true ) ) === [ 'table' ]
 	&& \Nino\Modules\Components::defaults( $appData, 'card' ) === [ 'fill' => '0', 'padding' => '', 'vertical' => '', 'align' => '', 'ground' => '', 'borderless' => '0', 'linked' => '0', 'background' => '', 'focus' => '', 'dim' => '0', 'class' => '' ] );
 // The variants are factors of the role (Nino.css), and the label of the style says it all: none of the seven carries a hint
 check( '...and the style of the six titles and of the two texts has no hint under its name, in neither language',
@@ -3595,6 +3597,131 @@ check( '...a width that is no size is left out, and a slider with no elements is
 check( '[list] is a .nino-list of items, in the style it names, with no grid',
 	$render( '[list /services sort="title" style="check" id="faq"][title title tag="h4"][/list]' ) === '<ul class="nino-list nino-list--check" id="faq"><li><h4 class="nino-section-title">App</h4></li><li><h4 class="nino-section-title">Web &lt;b&gt;&#91;x]&lt;/b&gt;</h4></li></ul>'
 	&& $render( '[list /services sort="title" limit="1" style="weird"][probe][/list]' ) === '<ul class="nino-list"><li>inside:/services#0#/services/app#string</li></ul>' );
+
+// A loop as a table and a line of fields: [table] with a [col] for each column, and [line]
+echo "\nModules\\Components - a loop as a table: [table], [col] and [line]\n";
+
+\Nino\Elements::insertElementType( $appData, '/prices', [
+	'title'			=> [ 'type' => 'string', 'locale' => true ],
+	'price'			=> [ 'type' => 'double' ],
+	'since'			=> [ 'type' => 'date' ],
+	'live'			=> [ 'type' => 'boolean' ],
+	'note'			=> [ 'type' => 'string' ],
+	'photo'			=> [ 'type' => 'image', 'width' => 400, 'height' => 300, 'alt' => 'photoAlt' ],
+	'photoAlt'	=> [ 'type' => 'string', 'locale' => true ],
+] );
+\Nino\Elements::insertElement( $appData, '/prices/a', [ 'title' => 'Alpha <i>&"', 'price' => 12.5, 'since' => '2026-01-05', 'live' => true, 'note' => 'x [[title]] <b>', 'photo' => 'prices/a/photo.webp', 'photoAlt' => 'Alt "p"' ], 'de_DE' );
+\Nino\Elements::insertElement( $appData, '/prices/b', [ 'title' => 'Beta', 'price' => 3, 'since' => '2025-12-31', 'live' => false, 'note' => '' ], 'de_DE' );
+\Nino\Html::addFills( $appData, [ '/template/page-home/prices/head' => 'Price list', '/template/page-home/prices/unit' => 'EUR &amp; &quot;more&quot; &#91;1&#93;', '/template/page-home/prices/markup' => '<b>Bold</b> & "q"' ], '*' );
+
+$tableStack = \Nino\Modules\Components::stacks( $appData )['table'];
+check( 'the stack table is registered with the style as its one attribute, no grid, the preview table and the place table as what it holds - and the style is a select of none, striped, bordered and both',
+	$tableStack['grid'] === false && $tableStack['preview'] === 'table' && $tableStack['holds'] === 'table' && array_keys( $tableStack['attributes'] ) === [ 'style' ]
+	&& $tableStack['attributes']['style']['type'] === 'select' && $tableStack['attributes']['style']['options'] === [ '', 'striped', 'bordered', 'striped-bordered' ]
+	&& in_array( 'table', \Nino\Modules\Components::PREVIEWS, true ) === true && in_array( 'table', \Nino\Modules\Components::PLACES, true ) === true );
+$colSchema = \Nino\Modules\Components::components( $appData )['col'];
+$lineSchema = \Nino\Modules\Components::components( $appData )['line'];
+check( '...[col] stands in a table and nowhere else, has no source, a field and an alignment and is a global component; [line] stands wherever [text] does, takes a text as [text] does and has a tag of p, span or div',
+	$colSchema['in'] === [ 'table' ] && $colSchema['source'] === 'none' && array_keys( $colSchema['attributes'] ) === [ 'field', 'align' ] && $colSchema['attributes']['align']['options'] === [ '', 'right', 'center' ]
+	&& $colSchema['group'] === 'global' && array_key_exists( 'holds', $colSchema ) === false
+	&& array_key_exists( 'in', $lineSchema ) === false && array_key_exists( 'in', \Nino\Modules\Components::components( $appData )['text'] ) === false
+	&& $lineSchema['source'] === 'text' && $lineSchema['attributes']['tag']['options'] === [ 'p', 'span', 'div' ] && $lineSchema['attributes']['tag']['default'] === 'p' && $lineSchema['group'] === 'global' );
+check( '...validate() takes the place table for what a component is in and refuses the places there are none of',
+	( \Nino\Modules\Components::validate( 'probecol', [ 'label' => 'x', 'source' => 'none', 'group' => 'global', 'in' => [ 'table' ] ] )['in'] ?? null ) === [ 'table' ]
+	&& str_contains( (string) \Nino\Modules\Components::validate( 'probecol', [ 'label' => 'x', 'source' => 'none', 'group' => 'global', 'in' => [ 'row' ] ] ), '"in" lists only section, card, hero, table' ) === true );
+
+$tableCols = '[col /template/page-home/prices/head field="title"][col field="price" align="right"][col field="since"]';
+check( '[table] is the wrap, the table, a header row of th and a body row of td for each element - in the order of the loop, with the classes of the style and the id and the class of the call',
+	$render( '[table /prices sort="title" style="striped-bordered" id="pl" class="x"]'. $tableCols. '[/table]' ) === '<div class="nino-table-wrap"><table class="nino-table nino-table--striped nino-table--bordered x" id="pl">'
+		. '<thead><tr><th>Price list</th><th></th><th></th></tr></thead><tbody>'
+		. '<tr><td>Alpha &lt;i&gt;&amp;&quot;</td><td class="nino-table__cell--right">12.5</td><td>2026-01-05</td></tr>'
+		. '<tr><td>Beta</td><td class="nino-table__cell--right">3</td><td>2025-12-31</td></tr></tbody></table></div>'
+	&& $render( '[table /prices sort="-title" limit="1"][col field="title"][/table]' ) === '<div class="nino-table-wrap"><table class="nino-table"><tbody><tr><td>Beta</td></tr></tbody></table></div>' );
+check( '...the style is none, striped, bordered or both and any other word is none',
+	array_map( static fn( string $style ): string => (string) preg_match( '/<table class="([^"]*)"/', $render( '[table /prices style="'. $style. '"][col field="title"][/table]' ), $found ) . $found[1], [ '', 'striped', 'bordered', 'striped-bordered', 'weird' ] )
+		=== [ '1nino-table', '1nino-table nino-table--striped', '1nino-table nino-table--bordered', '1nino-table nino-table--striped nino-table--bordered', '1nino-table' ] );
+check( '...the header row is written when one column has a title and not otherwise, a column with none has an empty th; the number of th and of td in a row is the number of columns',
+	str_contains( $render( '[table /prices][col field="title"][/table]' ), '<thead>' ) === false
+	&& str_contains( $render( '[table /prices][col field="title"][col /template/page-home/prices/nokey field="price"][/table]' ), '<thead>' ) === false
+	&& str_contains( $render( '[table /prices][col field="title"][col /template/page-home/prices/head field="price"][/table]' ), '<thead><tr><th></th><th>Price list</th></tr></thead>' ) === true
+	&& substr_count( $render( '[table /prices][col field="title"][col field="price"][col][/table]' ), '<td' ) === 6
+	&& substr_count( $render( '[table /prices][col field="title"][col field="price"][col][/table]' ), '<tr>' ) === 2 );
+check( '...the title of a column is text in the th: a key whose text holds markup, an ampersand and quotes is written escaped',
+	str_contains( $render( '[table /prices limit="1"][col /template/page-home/prices/markup field="title"][/table]' ), '<thead><tr><th>&lt;b&gt;Bold&lt;/b&gt; &amp; &quot;q&quot;</th></tr></thead>' ) === true );
+check( '...the loop is the loop of every stack: the query and the offset are honoured, an empty loop and a table with no column are nothing, and what stands between the tags besides the columns is not drawn',
+	$render( '[table /prices sort="title" query="live=0"][col field="title"][/table]' ) === '<div class="nino-table-wrap"><table class="nino-table"><tbody><tr><td>Beta</td></tr></tbody></table></div>'
+	&& $render( '[table /prices sort="title" offset="1"][col field="title"][/table]' ) === '<div class="nino-table-wrap"><table class="nino-table"><tbody><tr><td>Beta</td></tr></tbody></table></div>'
+	&& $render( '[table /prices query="title=Nobody"][col field="title"][/table]' ) === ''
+	&& $render( '[table /prices][/table]' ) === '' && $render( '[table /prices]just text[/table]' ) === ''
+	&& $render( '[table /prices limit="1"]stray [title /template/page-home/prices/head][col field="title"]more[/table]' ) === '<div class="nino-table-wrap"><table class="nino-table"><tbody><tr><td>Alpha &lt;i&gt;&amp;&quot;</td></tr></tbody></table></div>' );
+$cellOf = static fn( string $col, string $element = 'Alpha' ): string => (string) preg_replace( '#^.*?<tr><td[^>]*>(.*?)</td></tr>.*$#s', '$1', $render( '[table /prices sort="title" '. ( $element === 'Beta' ? 'offset="1" ' : '' ). 'limit="1"]'. $col. '[/table]' ) );
+check( 'a cell shows a field as [text] shows it: a string escaped, a number as it is, a date and a boolean as the kernel writes them - the same characters [text] puts in a stack',
+	$cellOf( '[col field="title"]' ) === 'Alpha &lt;i&gt;&amp;&quot;' && $cellOf( '[col field="price"]' ) === '12.5' && $cellOf( '[col field="price"]', 'Beta' ) === '3'
+	&& $cellOf( '[col field="since"]' ) === '2026-01-05' && $cellOf( '[col field="live"]' ) === '1' && $cellOf( '[col field="live"]', 'Beta' ) === ''
+	&& array_filter( [ 'title', 'price', 'since', 'live', 'note' ], static fn( string $field ): bool => str_contains( $render( '[stack /prices sort="title" limit="1"][text '. $field. ' format="inline"][/stack]' ), '>'. $cellOf( '[col field="'. $field. '"]' ). '<' ) === false ) === []
+	&& $cellOf( '[col field="note"]' ) === 'x &#91;&#91;title]] &lt;b&gt;' && $cellOf( '[col field="nothere"]' ) === '' && $cellOf( '[col]' ) === '' );
+check( '...an image field is the picture as [image] draws it, in the class nino-table__img and with the alt text the type names for it; an element that has no picture has an empty cell',
+	$cellOf( '[col field="photo"]' ) === '<div class="nino-image nino-table__img"><img src="/public/images/prices/a/photo.webp" width="400" height="300" alt="Alt &quot;p&quot;"></div>'
+	&& $cellOf( '[col field="photo"]', 'Beta' ) === '' );
+check( '...a text is the cell instead of the field, with the fields of the element in it: filled escaped, the characters of the text itself escaped, a [[name]] of no field kept as it was written, a site text filled',
+	$cellOf( '[col text="[[price]],- EUR"]' ) === '12.5,- EUR'
+	&& $cellOf( '[col field="title" text="[[title]] / [[price]]"]' ) === 'Alpha &lt;i&gt;&amp;&quot; / 12.5'
+	&& $cellOf( '[col text="a < b & c"]' ) === 'a &lt; b &amp; c'
+	&& $cellOf( '[col text="[[note]]"]' ) === 'x &#91;&#91;title]] &lt;b&gt;'
+	&& $cellOf( '[col text="[[nope]] and [[.slug]]"]' ) === '&#91;&#91;nope]] and a'
+	&& $cellOf( '[col text="[[/template/page-home/prices/unit]]"]' ) === 'EUR &amp; &quot;more&quot; &#91;1]'
+	&& $cellOf( '[col text="[[/template/page-home/prices/gone]]!"]' ) === '&#91;&#91;/template/page-home/prices/gone]]!'
+	&& $cellOf( '[col text=""]' ) === '' );
+check( '...a field that is markup is text in the cell, the free text is never read as markup or as a shortcode, and a value holding a fill or a bracket is not filled again',
+	$cellOf( '[col text="<b>[[title]]</b> {{x}}"]' ) === '&lt;b&gt;Alpha &lt;i&gt;&amp;&quot;&lt;/b&gt; {{x}}'
+	&& $cellOf( '[col text="&lt;i&gt;"]' ) === '&lt;i&gt;'
+	&& str_contains( $render( '[table /prices][col text="[[note]]"][/table]' ), '<b>' ) === false );
+check( '...text wins where a column has both a text and a field, the alignment is a class of the cell and a word that is none is none, and a cell stands in a table and nowhere else',
+	$cellOf( '[col field="title" text="T"]' ) === 'T'
+	&& str_contains( $render( '[table /prices][col field="title" align="center"][/table]' ), '<td class="nino-table__cell--center">' ) === true
+	&& str_contains( $render( '[table /prices][col field="title" align="left"][/table]' ), '<td>' ) === true
+	&& $render( '[col field="title"]' ) === '' && $render( '[stack /prices][col field="title"][/stack]' ) === $render( '[stack /prices][/stack]' )
+	&& $render( '[table /prices limit="1"][col field="title"][/table]|[col field="title"]' ) === '<div class="nino-table-wrap"><table class="nino-table"><tbody><tr><td>Alpha &lt;i&gt;&amp;&quot;</td></tr></tbody></table></div>|' );
+
+$lineOf = static fn( string $line ): string => $render( '[stack /prices sort="title" limit="1" cols="100"]'. $line. '[/stack]' );
+check( '[line] is a p of the class nino-line with the text of the call - span and div on the tag, the class of the call after its own - and the fields of the element filled in',
+	$lineOf( '[line text="[[price]],- EUR"]' ) === '<div class="nino-grid-row nino-stack nino-stack-gap-2"><div class="nino-grid-s-100 nino-grid-m-100 nino-grid-l-100"><p class="nino-line">12.5,- EUR</p></div></div>'
+	&& str_contains( $lineOf( '[line text="[[title]]" tag="span" class="x"]' ), '<span class="nino-line x">Alpha &lt;i&gt;&amp;&quot;</span>' ) === true
+	&& str_contains( $lineOf( '[line text="a" tag="div"]' ), '<div class="nino-line">a</div>' ) === true
+	&& str_contains( $lineOf( '[line text="a" tag="h1"]' ), '<p class="nino-line">a</p>' ) === true );
+check( '...the fields of the element are filled escaped and a [[name]] of no field stays as it is; the text itself is escaped, a site text is filled, and the same code serves a column',
+	str_contains( $lineOf( '[line text="<b>[[note]]</b>"]' ), '<p class="nino-line">&lt;b&gt;x &#91;&#91;title]] &lt;b&gt;&lt;/b&gt;</p>' ) === true
+	&& str_contains( $lineOf( '[line text="[[nope]]|[[.id]]|[[since]]"]' ), '<p class="nino-line">&#91;&#91;nope]]|0|2026-01-05</p>' ) === true
+	&& str_contains( $lineOf( '[line text="[[/template/page-home/prices/head]]: [[title]]"]' ), '<p class="nino-line">Price list: Alpha &lt;i&gt;&amp;&quot;</p>' ) === true
+	&& str_contains( $lineOf( '[line text="[[price]] / [[/template/page-home/prices/unit]] <i>"]' ), '<p class="nino-line">12.5 / EUR &amp; &quot;more&quot; &#91;1] &lt;i&gt;</p>' ) === true
+	&& $cellOf( '[col text="[[price]] / [[/template/page-home/prices/unit]] <i>"]' ) === '12.5 / EUR &amp; &quot;more&quot; &#91;1] &lt;i&gt;' );
+check( '...outside a loop it is its text with the fills only: the site texts are in, a field means nothing and the line is nothing where it comes out empty; with no text it shows its first argument as [text] does',
+	$render( '[line text="Cost: [[/template/page-home/prices/head]] <b>"]' ) === '<p class="nino-line">Cost: Price list &lt;b&gt;</p>'
+	&& $render( '[line text=""]' ) === '' && $render( '[line /template/page-home/prices/head]' ) === '<p class="nino-line">Price list</p>' && $render( '[line /template/page-home/prices/gone]' ) === ''
+	&& str_contains( $lineOf( '[line price]' ), '<p class="nino-line">12.5</p>' ) === true );
+check( '...it is the row of a list: one item to an element, the line in it',
+	$render( '[list /prices sort="title" style="check"][line text="[[title]]: [[price]]"][/list]' ) === '<ul class="nino-list nino-list--check"><li><p class="nino-line">Alpha &lt;i&gt;&amp;&quot;: 12.5</p></li><li><p class="nino-line">Beta: 3</p></li></ul>'
+	&& str_contains( $render( '[stack /prices limit="1"][card][line text="[[price]]"][/card][/stack]' ), '<div class="nino-card-content"><p class="nino-line">12.5</p></div>' ) === true );
+$appData[\Nino\Modules\Components::CONTEXT] = [ 'uri' => '/prices', 'id' => 0, 'element' => [ 'title' => 'T<b>', 'price' => 2, 'tags' => [ 'a' ], 'photo' => 'f.webp' ], 'model' => [ 'title' => [], 'price' => [], 'tags' => [], 'photo' => [ 'type' => 'image' ] ] ];
+$directLine = ( static fn( array $args ): string => (string) \Nino\Callbacks::doCallbacks( $appData, '/nino/html/shortcode/line', $args ) )(  [ 'text' => '[[title]]|[[price]]|[[nope]]|[[tags]]|[[photo]]|[[/template/page-home/prices/unit]]|[[/template/page-home/prices/gone]]|<i>' ] );
+$directEmpty = ( static fn( array $args ): string => (string) \Nino\Callbacks::doCallbacks( $appData, '/nino/html/shortcode/line', $args ) )( [ 'text' => '[[photo]]' ] );
+unset( $appData[\Nino\Modules\Components::CONTEXT] );
+check( '...a call that comes from elsewhere than a page - a tool calling the shortcode itself - is filled by the line alone: the fields of the element escaped, the site texts of the language, and whatever is no fill of either - a field there is none of, a key nobody wrote, a field that holds no scalar - as it was written, escaped',
+	$directLine === '<p class="nino-line">T&lt;b&gt;|2|&#91;&#91;nope]]|&#91;&#91;tags]]||EUR &amp; &quot;more&quot; &#91;1]|&#91;&#91;/template/page-home/prices/gone]]|&lt;i&gt;</p>' );
+check( 'the demo page shows a loop as a table - the striped table of three columns, a header row and three rows of three cells - and a list whose row is a line of the class nino-line',
+	preg_match( '#<section id="tabelle-loop-columns".*?<table class="nino-table nino-table--striped">\s*<thead>\s*<tr>(?:<th>[^<]*</th>){3}</tr>\s*</thead>\s*<tbody>((?:\s*<tr>(?:<td>[^<]*</td>){3}</tr>){3})\s*</tbody>#s', $demoPage ) === 1
+	&& preg_match( '#<p class="nino-section-subtitle">A &\#91;table&\#93; with a &\#91;col&\#93; for each column#', $demoPage ) === 1 && str_contains( $demoPage, '<p class="nino-section-subtitle">A [table]' ) === false
+	&& preg_match( '#<section id="liste-loop-lines".*?<ul class="nino-list nino-list--check">(?:\s*<li><p class="nino-line">[^<]*</p></li>){3}\s*</ul>#s', $demoPage ) === 1 );
+check( '...an image field prints nothing in a line or a cell - the path of a file is no text - and a line that comes out empty is nothing, no empty p',
+	$lineOf( '[line text="[[photo]]"]' ) === $render( '[stack /prices sort="title" limit="1" cols="100"][/stack]' )
+	&& str_contains( $lineOf( '[line text="a [[photo]]b"]' ), '<p class="nino-line">a b</p>' ) === true && str_contains( $lineOf( '[line text="[[photo]]"]' ), 'nino-line' ) === false
+	&& $cellOf( '[col text="x[[photo]]y"]' ) === 'xy' && str_contains( $cellOf( '[col text="[[photo]]"]' ), 'photo' ) === false
+	&& str_contains( $directLine, 'photo' ) === false && $directEmpty === '' );
+check( 'Nino.css has the three rules a table needs besides the ones it has: the cell aligned right, the cell aligned centre, and a picture in a cell 6rem wide, which a table that scrolls does not squeeze to nothing',
+	$hookRules( '.nino-table__cell--right' ) !== '' && $hookValue( $hookRules( '.nino-table__cell--right' ), 'text-align' ) === 'right'
+	&& $hookValue( $hookRules( '.nino-table__cell--center' ), 'text-align' ) === 'center'
+	&& $hookValue( $hookRules( '.nino-table__img' ), 'width' ) === '6rem' && $hookValue( $hookRules( '.nino-table__img' ), 'height' ) === 'auto' );
+
 $filter = $render( '[filter /services sort="title" by="category" id="f"][title title tag="h4"][/filter]' );
 check( '[filter] is a .nino-filter: the buttons, the first of them for everything, and the cells that carry the value they are filtered by',
 	str_starts_with( $filter, '<div class="nino-filter" id="f"><nav class="nino-filter-nav" aria-label="Filter">' )

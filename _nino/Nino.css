@@ -3323,6 +3323,18 @@ body.nino-scroll-btf .nino-back-to-top {
 .nino-table--bordered td {
 	border: 1px solid var(--color-border);
 }
+/* What the cells of a [table] set apart: the alignment of a column and the
+   thumbnail of an image field */
+.nino-table__cell--right {
+	text-align: right;
+}
+.nino-table__cell--center {
+	text-align: center;
+}
+.nino-table__img {
+	width: 6rem;
+	height: auto;
+}
 
 /* Pricing table - card per pricelist entry (via the "elements" shortcode) */
 .nino-pricing-row {

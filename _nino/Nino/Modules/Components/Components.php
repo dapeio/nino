@@ -63,6 +63,12 @@ namespace Nino\Modules {
 				'filter-btn'	=> '<button type="button" class="nino-filter-btn" data-filter-value="[[.value]]" aria-pressed="false">[[.value]] <span class="nino-filter-count">([[.count]])</span></button>',
 				'list'				=> '<ul class="nino-list[[style]][[class]]"[[id]]>[[cells]]</ul>',
 				'item'				=> '<li>[[inner]]</li>',
+				'table'				=> '<div class="nino-table-wrap"><table class="nino-table[[style]][[class]]"[[id]]>[[head]]<tbody>[[cells]]</tbody></table></div>',
+				'table-head'	=> '<thead><tr>[[titles]]</tr></thead>',
+				'th'					=> '<th>[[value]]</th>',
+				'row'					=> '<tr>[[inner]]</tr>',
+				'td'					=> '<td[[class]]>[[value]]</td>',
+				'line'				=> '<[[tag]] class="nino-line[[class]]"[[lang]]>[[value]]</[[tag]]>',
 				'sections'		=> '<section[[id]] class="nino-section[[class]]">[[inner]]</section>',
 			];
 
@@ -137,13 +143,14 @@ namespace Nino\Modules {
 
 		// The pictures the Builder draws a component or a stack as - a fixed
 		// list, so that no feature can break the preview with one of its own
-		public const array PREVIEWS = [ 'title', 'text', 'image', 'button', 'block', 'cells' ];
+		public const array PREVIEWS = [ 'title', 'text', 'image', 'button', 'block', 'cells', 'table' ];
 
 		// Where a component stands, and so where a tool offers it - see validate():
 		// directly in a column of a section (the cell of a stack that holds no
-		// card is such a column), in a [card], or directly in a column of the
-		// hero
-		public const array PLACES = [ 'section', 'card', 'hero' ];
+		// card is such a column), in a [card], directly in a column of the
+		// hero, or between the tags of a [table], which holds its [col]s and
+		// nothing else
+		public const array PLACES = [ 'section', 'card', 'hero', 'table' ];
 
 		// The group a tool offers a component under, the one word of its schema's
 		// 'group' - see validate(): the components of a section, of the hero and
@@ -180,6 +187,13 @@ namespace Nino\Modules {
 
 		// The widths a cell may have in a grid, as Nino.css has them
 		private const array WIDTHS = [ '25', '33', '50', '66', '75', '100' ];
+
+		// The components whose text is a line of free text with [[field]] in it, and
+		// not a fixed text: dispatch() leaves its fills to _line()
+		private const array LINES = [ 'line', 'col' ];
+
+		// Set while a table renders its rows: the one place a [col] draws something
+		private const string TABLE = './nino/components/table';
 
 		// What a slot of a stack's grid is, when the shortcode does not say
 		private const string COLS = '100 50 33';
@@ -298,6 +312,8 @@ namespace Nino\Modules {
 			'html'			=> 'code',
 			'spacer'		=> 'separator-horizontal',
 			'scroll-hint'	=> 'chevron-down',
+			'line'			=> 'text-align-start',
+			'col'				=> 'panel-top',
 		];
 
 		/**
@@ -337,6 +353,11 @@ namespace Nino\Modules {
 					'style' => self::_style(),
 					'color' => self::_color(),
 				], null, null, null, true, 'global' ],
+				// A line of text that fills the fields of the element it stands for: the
+				// text is free text with [[field]] in it, see _line(). It is the row of a list
+				[ 'line', 'Line of fields', 'Zeile aus Feldern', 'text', 'text', [
+					'tag' => self::_tag( [ 'p', 'span', 'div' ], 'p' ),
+				], null, null, null, false, 'global' ],
 				[ 'card-title', 'Title (Card)', 'Titel (Karte)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'h3', 'h4' ], 'h4' ), 'style' => self::_style(), 'color' => self::_color() ], [ 'card' ], '{tag} .nino-card-title', null, true, 'card' ],
 				[ 'card-subtitle', 'Subtitle (Card)', 'Untertitel (Karte)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'p', 'h5', 'h6' ], 'p' ), 'style' => self::_style(), 'color' => self::_color() ], [ 'card' ], '{tag} .nino-card-subtitle', null, true, 'card' ],
 				[ 'card-text', 'Text (Card)', 'Text (Karte)', 'text', 'text', [
@@ -410,6 +431,16 @@ namespace Nino\Modules {
 					'to' => [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Target', 'de_DE' => 'Ziel' ],
 						'hint' => [ 'en_US' => 'The id of the section to scroll to. Empty scrolls to the next section.', 'de_DE' => 'Die Id der Sektion, zu der gescrollt wird. Leer scrollt zur nächsten Sektion.' ] ],
 				], [ 'hero', 'section' ], 'a .nino-hero-arrowdown', null, false, 'hero' ],
+				// A column of a table: standing between the tags of a [table] and nowhere
+				// else. Its first argument is the text key of the title of the column, none
+				// for no title, and what a cell shows is a field of the element or a line of
+				// free text, see componentCol(). It has no source of its own, which is why
+				// the call is read by the table as well as drawn by itself
+				[ 'col', 'Column', 'Spalte', 'block', 'none', [
+					'field' => [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Field', 'de_DE' => 'Feld' ],
+						'hint' => [ 'en_US' => 'The field of the element the cell shows. A line of text, if the column has one, is shown instead.', 'de_DE' => 'Das Feld des Elements, das die Zelle zeigt. Hat die Spalte eine Textzeile, steht sie an dessen Stelle.' ] ],
+					'align' => [ 'type' => 'select', 'options' => [ '', 'right', 'center' ], 'default' => '', 'label' => [ 'en_US' => 'Alignment', 'de_DE' => 'Ausrichtung' ] ],
+				], [ 'table' ], null, null, false, 'global' ],
 			];
 
 			// Each class is a component of its own, and the schema says where a tool
@@ -450,6 +481,12 @@ namespace Nino\Modules {
 				[ 'list', 'List', 'Liste', 'block', false, [
 					'style' => [ 'type' => 'select', 'options' => [ '', 'check', 'numbered', 'columns' ], 'default' => '', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ] ],
 				] ],
+				// The elements as the rows of a table, and what stands between its tags
+				// are its columns, the calls of [col] and nothing else: a column is a
+				// title and what its cells show, see stackTable()
+				[ 'table', 'Table', 'Tabelle', 'table', false, [
+					'style' => [ 'type' => 'select', 'options' => [ '', 'striped', 'bordered', 'striped-bordered' ], 'default' => '', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ] ],
+				], 'table' ],
 				// What the stack loops is a whole section each: no grid, no cell, the
 				// sections one after the other where the call stands. 'alternate' has
 				// every second of them mirrored, see stackSections()
@@ -459,13 +496,18 @@ namespace Nino\Modules {
 				] ],
 			];
 
-			foreach( $stacks as [ $name, $en, $de, $preview, $grid, $attributes ] )
+			// The seventh entry of a stack is what it holds, where it holds something
+			foreach( $stacks as $stack ) {
+
+				[ $name, $en, $de, $preview, $grid, $attributes, $holds ] = $stack + [ 6 => null ];
+
 				self::addStack( $appData, $name, [ self::class, 'stack'. ucfirst( $name ) ], [
 					'label'				=> [ 'en_US' => $en, 'de_DE' => $de ],
 					'grid'				=> $grid,
 					'attributes'	=> $attributes,
 					'preview'			=> $preview,
-				] );
+				] + ( $holds !== null ? [ 'holds' => $holds ] : [] ) );
+			}
 
 			\Nino\Features::registerComponents( $appData );
 		}
@@ -902,7 +944,7 @@ namespace Nino\Modules {
 		 *
 		 *	@param		string		$name					The shortcode, a slug
 		 *	@param		mixed			$schema				label, source (not for a stack), loop, attributes, preview;
-		 *																	icon, in, draws, holds, stretched, link, by and group for a component, grid and assets for a stack.
+		 *																	icon, in, draws, holds, stretched, link, by and group for a component, grid, holds and assets for a stack.
 		 *																	See docs/development.md, "Components"
 		 *	@param		bool			$stack				Read it as a stack's
 		 *	@param		string|null	$feature			The key of the feature whose manifest the schema is read from, null for a module's: its components are the feature's own, whatever 'by' they say
@@ -941,6 +983,16 @@ namespace Nino\Modules {
 					return $what. ': "grid" must be true or false';
 
 				$clean['grid'] = ( $schema['grid'] ?? false ) === true;
+
+				// What stands between its tags, as a component's 'holds' says it: the place
+				// of the components it holds, none where the key is left out
+				if( isset( $schema['holds'] ) === true ) {
+
+					if( is_string( $schema['holds'] ) === false || in_array( $schema['holds'], self::PLACES, true ) === false )
+						return $what. ': "holds" names a place: '. implode( ', ', array_slice( self::PLACES, 0, -1 ) ). ' or '. self::PLACES[count( self::PLACES ) - 1];
+
+					$clean['holds'] = $schema['holds'];
+				}
 			}
 
 			$preview = $schema['preview'] ?? ( $stack === true ? 'cells' : 'block' );
@@ -1565,8 +1617,10 @@ namespace Nino\Modules {
 			$source		= (string) ( $args[0] ?? '' );
 			$content	= (string) ( $args['content'] ?? '' );
 
-			// A fixed text says what it says with its fills put in, before anything is done with it
-			$fixed		= is_string( $args['text'] ?? null ) === true ? self::_fills( $appData, $args['text'] ) : null;
+			// A fixed text says what it says with its fills put in, before anything is done with it.
+			// The text of a line is the exception: it fills what it can, its site texts and the
+			// fields of the element, and leaves the rest as it stands (see _line())
+			$fixed		= is_string( $args['text'] ?? null ) === true ? ( in_array( $name, self::LINES, true ) === true ? $args['text'] : self::_fills( $appData, $args['text'] ) ) : null;
 
 			$prepared = [ 'source' => $source, 'content' => $content ];
 
@@ -1958,6 +2012,8 @@ namespace Nino\Modules {
 
 			$html		= '';
 			$parts	= self::_cellParts( $appData, $content );
+			// The tokens of the image fields: a line has no use for the path of a file, and prints nothing for one
+			$images	= array_map( static fn( int|string $field ): string => '[['. $field. ']]', array_keys( array_filter( $model, static fn( array $declared ): bool => ( $declared['type'] ?? '' ) === 'image' ) ) );
 
 			foreach( array_values( $elements ) as $index => $element ) {
 
@@ -1971,7 +2027,7 @@ namespace Nino\Modules {
 				);
 
 				try {
-					$inner = \Nino\Html::renderHtml( $appData, self::_fillCell( $parts, $fills ) );
+					$inner = \Nino\Html::renderHtml( $appData, self::_fillCell( $parts, $fills, $images ) );
 				}
 				finally {
 					if( $previous === null )
@@ -2038,16 +2094,59 @@ namespace Nino\Modules {
 		 *
 		 *	@return 	string
 		 */
-		private static function _fillCell( array $parts, array $fills ): string {
+		private static function _fillCell( array $parts, array $fills, array $images = [] ): string {
 
 			$tokens	= array_keys( $fills );
 			$values	= array_values( $fills );
 			$html		= '';
 
 			foreach( $parts as [ $text, $own ] )
-				$html .= $own === true ? $text : str_replace( $tokens, $values, $text );
+				$html .= $own === true ? $text : self::_keepTokens( str_replace( $tokens, $values, self::_dropTokens( $text, $images ) ) );
 
 			return $html;
+		}
+
+		/**
+		 *	The tokens of the image fields taken out of the text of the [line]s and [col]s of a cell: a path of a file is no text
+		 *
+		 *	@param		string		$html					The content of a cell
+		 *	@param		array			$tokens				'[[field]]' of every image field of the type
+		 *
+		 *	@return 	string
+		 */
+		private static function _dropTokens( string $html, array $tokens ): string {
+
+			if( $tokens === [] || strpos( $html, '[[' ) === false )
+				return $html;
+
+			return (string) preg_replace_callback(
+				'/\[('. implode( '|', self::LINES ). ')(?: ((?>\[\[[^\[\]]+\]\]|[^\]])*+))?\]/',
+				static fn( array $call ): string => '['. $call[1]. ( isset( $call[2] ) === true ? ' '. str_replace( $tokens, '', $call[2] ) : '' ). ']',
+				$html
+			);
+		}
+
+		/**
+		 *	The fills a cell has left in the text of its [line]s and [col]s, written as
+		 *	entities: a [[name]] that is no field of the element is the text it was
+		 *	written as, and a call is read up to its first closing bracket - the one of
+		 *	the token would end it there. _line() reads the entities back as the
+		 *	characters they are and writes them escaped
+		 *
+		 *	@param		string		$html					The content of a cell, its fields filled in
+		 *
+		 *	@return 	string
+		 */
+		private static function _keepTokens( string $html ): string {
+
+			if( strpos( $html, '[[' ) === false )
+				return $html;
+
+			return (string) preg_replace_callback(
+				'/\[('. implode( '|', self::LINES ). ')(?: ((?>\[\[[^\[\]]+\]\]|[^\]])*+))?\]/',
+				static fn( array $call ): string => '['. $call[1]. ( isset( $call[2] ) === true ? ' '. strtr( $call[2], [ '[[' => '&#91;&#91;', ']]' => '&#93;&#93;' ] ) : '' ). ']',
+				$html
+			);
 		}
 
 		/**
@@ -2998,6 +3097,189 @@ namespace Nino\Modules {
 				[ self::_modifier( 'nino-list--', $args['style'] ), self::_modifier( '', $args['class'] ), self::_attribute( 'id', self::_id( $args['id'] ) ), $cells ],
 				self::$html['list']
 			);
+		}
+
+		/**
+		 *	Replace [table]: the elements as the rows of a table, and its columns the
+		 *	calls of [col] between its tags - nothing else is read, what stands
+		 *	between them is not drawn. Each row is a <tr> of the cells the columns make
+		 *	for its element (see componentCol()); the header row is written when at
+		 *	least one column has a title, and a column without one has an empty <th>.
+		 *	'style' is striped, bordered or both, written with a hyphen. The table is
+		 *	inside a wrap that scrolls where the viewport is too narrow. A table with no
+		 *	column and one with no element is nothing
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$args					The arguments made ready by dispatch()
+		 *
+		 *	@return 	string
+		 */
+		public static function stackTable( array &$appData, array $args ): string {
+
+			preg_match_all( '/\[col(?: ((?>\[\[[^\[\]]+\]\]|[^\]])*+))?\]/', (string) $args['content'], $calls, PREG_SET_ORDER );
+
+			if( $calls === [] )
+				return '';
+
+			// The titles are the text keys the columns name, the first argument of each
+			$titles = [];
+			$titled = false;
+
+			foreach( $calls as $call ) {
+
+				$key = '';
+
+				preg_match_all( '/\ ([^\ \=]*)(\=[\"]([^\"]*)[\"])?/i', ' '. ( $call[1] ?? '' ). ' ', $found );
+
+				foreach( $found[1] as $position => $word )
+					if( $found[2][$position] === '' && $word !== '' ) {
+						$key = $word;
+						break;
+					}
+
+				$title = $key !== '' ? self::value( $appData, $key, 'text' ) : null;
+				$titled = $titled === true || ( $title !== null && $title !== '' );
+				$titles[] = str_replace( '[[value]]', (string) $title, self::$html['th'] );
+			}
+
+			// The columns alone are the content, so that nothing else is drawn in a row
+			$args['content'] = implode( '', array_column( $calls, 0 ) );
+
+			$previous = $appData[self::TABLE] ?? null;
+			$appData[self::TABLE] = true;
+
+			try {
+				$rows = self::renderStack( $appData, $args, static function( string $inner ): string {
+					return str_replace( '[[inner]]', $inner, self::$html['row'] );
+				} );
+			}
+			finally {
+				if( $previous === null )
+					unset( $appData[self::TABLE] );
+				else
+					$appData[self::TABLE] = $previous;
+			}
+
+			if( $rows === '' )
+				return '';
+
+			return str_replace(
+				[ '[[style]]', '[[class]]', '[[id]]', '[[head]]', '[[cells]]' ],
+				[
+					( str_contains( $args['style'], 'striped' ) === true ? ' nino-table--striped' : '' ). ( str_contains( $args['style'], 'bordered' ) === true ? ' nino-table--bordered' : '' ),
+					self::_modifier( '', $args['class'] ),
+					self::_attribute( 'id', self::_id( $args['id'] ) ),
+					$titled === true ? str_replace( '[[titles]]', implode( '', $titles ), self::$html['table-head'] ) : '',
+					$rows,
+				],
+				self::$html['table']
+			);
+		}
+
+		/**
+		 *	Replace [col]: one cell of a row of a table - nothing anywhere else, since
+		 *	a cell with no table is none. What it shows is, in this order: the line of
+		 *	text="" with its fields filled in (see _line()), the field="" of the element
+		 *	as [text] shows a field, or - for a field of the type image - the picture as
+		 *	[image] draws it, in the class nino-table__img; and nothing, an empty cell,
+		 *	where it has neither. align is right or center. The first argument, the text
+		 *	key of the title, is read by the table and not here
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$args					The arguments made ready by dispatch()
+		 *
+		 *	@return 	string
+		 */
+		public static function componentCol( array &$appData, array $args ): string {
+
+			if( ( $appData[self::TABLE] ?? false ) !== true )
+				return '';
+
+			$field = (string) $args['field'];
+
+			if( isset( $args['text'] ) === true )
+				$cell = self::_line( $appData, (string) $args['text'] );
+			elseif( $field !== '' && ( self::element( $appData )['model'][$field]['type'] ?? '' ) === 'image' )
+				$cell = self::_image( $appData, 'image', 'nino-image', [ 'source' => $field, 'alt' => '', 'content' => '', 'focus' => '', 'ratio' => '', 'class' => 'nino-table__img' ] );
+			else
+				$cell = $field !== '' ? (string) self::value( $appData, $field, 'text' ) : '';
+
+			return str_replace(
+				[ '[[class]]', '[[value]]' ],
+				[ self::_attribute( 'class', $args['align'] !== '' ? 'nino-table__cell--'. $args['align'] : '' ), $cell ],
+				self::$html['td']
+			);
+		}
+
+		/**
+		 *	Replace [line]: a line of text - a p, a span or a div of the class nino-line,
+		 *	after it the class of the call - that is text="" with its fields filled in
+		 *	(see _line()): [line text="[[price]],- EUR"]. Outside a loop only its site
+		 *	texts are filled. Without a text="" it shows what its first argument is, as
+		 *	[text] does. Nothing where the line comes out empty
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$args					The arguments made ready by dispatch()
+		 *
+		 *	@return 	string
+		 */
+		public static function componentLine( array &$appData, array $args ): string {
+
+			$value = isset( $args['text'] ) === true ? self::_line( $appData, (string) $args['text'] ) : (string) $args['value'];
+
+			return $value === '' ? '' : str_replace(
+				[ '[[tag]]', '[[class]]', '[[lang]]', '[[value]]' ],
+				[ $args['tag'], self::_modifier( '', $args['class'] ), self::_lang( $appData, $args ), $value ],
+				self::$html['line']
+			);
+		}
+
+		/**
+		 *	A line of free text with its fields filled in, written safe: the one place
+		 *	that fills the text of a [col] and of a [line]. A [[name]] is a field of the
+		 *	element the line is drawn for, filled as the element's value is written
+		 *	everywhere - escaped, a plain text whatever it holds - and a [[name]] that
+		 *	begins with a slash is the site text of that key; a token that is neither
+		 *	stays as it was written.
+		 *	Every character of the text itself is escaped, so that a '<' of it is text.
+		 *	A stack has put the fields of its element into the call by the time it is
+		 *	drawn, as entities, and they are read back as the characters they stand for
+		 *	before the text is escaped once
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$text					As written, or as a stack has filled it
+		 *
+		 *	@return 	string
+		 */
+		private static function _line( array &$appData, string $text ): string {
+
+			$context	= self::element( $appData );
+			$decode		= static fn( string $value ): string => html_entity_decode( $value, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+			$html			= '';
+
+			foreach( preg_split( '/(\[\[[^\[\]]+\]\])/', $text, -1, PREG_SPLIT_DELIM_CAPTURE ) ?: [] as $index => $part ) {
+
+				if( $index % 2 === 0 ) {
+					$html .= self::escape( $decode( $part ) );
+					continue;
+				}
+
+				$name = substr( $part, 2, -2 );
+
+				if( $name[0] === '/' ) {
+
+					$fill = \Nino\Html::resolveTextfill( $appData, $name );
+					$html .= self::escape( $fill === null ? $part : $decode( $fill ) );
+				}
+				else if( $context !== null && ( $context['model'][$name]['type'] ?? '' ) === 'image' )
+					continue;
+				else if( $context !== null && isset( $context['model'][$name] ) === true && is_scalar( $context['element'][$name] ?? '' ) === true )
+					$html .= self::escape( (string) ( $context['element'][$name] ?? '' ) );
+				else
+					$html .= self::escape( $part );
+			}
+
+			return $html;
 		}
 
 		/**

@@ -200,7 +200,7 @@ check( 'what a component holds is carried by the manifest when good, and a schem
 	&& array_key_exists( 'holds', \Nino\Features::manifest( writeManifest( $manifestDir, 'NoHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent ] ] ) )['components']['box'] ) === false
 	&& array_key_exists( 'holds', \Nino\Features::manifest( $manifestDir. '/WithComponents' )['components']['probe'] ) === false && ninoWarnings() === [] );
 check( '...so a place that is none, a list, a number, an empty word, and a component whose source is not its content are refused',
-	manifestFails( $manifestDir, 'BadHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => 'page' ] ] ], 'component "box": "holds" names a place: section, card or hero' )
+	manifestFails( $manifestDir, 'BadHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => 'page' ] ] ], 'component "box": "holds" names a place: section, card, hero or table' )
 	&& manifestFails( $manifestDir, 'ListHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => [ 'card' ] ] ] ], 'component "box": "holds" names a place' )
 	&& manifestFails( $manifestDir, 'IntHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => 5 ] ] ], 'component "box": "holds" names a place' )
 	&& manifestFails( $manifestDir, 'EmptyHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => '' ] ] ], 'component "box": "holds" names a place' )
