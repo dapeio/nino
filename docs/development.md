@@ -958,6 +958,21 @@ The hooks the kernel and the integrated modules fire are the call sites of `\Nin
 
 Most hooks say that something happened. `/nino/mail/send` and `/nino/images/render` are the two that replace a kernel action instead: `\Nino\Mail::TRANSPORT` and `\Nino\Images::RENDER` document what a handler receives and what it sets to take the job over. Both are fired after the checks that keep an endpoint safe - the per-address mail cap, the byte cap, the image type and the pixel cap - so that a feature cannot switch them off by registering.
 
+### `/nino/navigation/lines`
+
+`\Nino\Modules\Navigation::routeLines()` fires it once per call, after the lines of a menu are collected and ordered and before they are returned - for a menu without lines too, then with `[]`. Every `[navigation nav="..."]` asks for its lines that way, so the hook is where a module decides which pages a menu offers to the visitor at hand. `Legal` asks `routeLines()` too, for every language, menu and page it checks in the workbench, so that its check sees the menu a visitor sees.
+
+The argument is `[ 'nav' => 'main', 'lines' => [ '/:Start', '/members:Members' ] ]`: the key of the menu and its lines, `<uri>:<title>`, in menu order. A callback changes `lines` in place, or returns an array that replaces the argument. `routeLines()` answers the strings of `lines`, in their order and numbered from zero; a callback that sets `lines` to anything but an array, removes it or returns a value that is not an array leaves a menu with no lines. The lines an author wrote between the tags of `[navigation]` are not in the argument and are drawn as written; what a callback leaves in `lines` is drawn as text, with a colon or without one.
+
+```php
+\Nino\Callbacks::registerCallback( $appData, '/nino/navigation/lines', static function( array &$appData, mixed &$args ): void {
+    if( ( $args['nav'] ?? '' ) !== 'main' || \Project\Members::isSignedIn( $appData ) )
+        return;
+
+    $args['lines'] = array_values( array_filter( $args['lines'], static fn( mixed $line ): bool => is_string( $line ) === true && str_starts_with( $line, '/members:' ) === false ) );
+} );
+```
+
 ### Two extension surfaces, one idea
 
 A module reaches the framework in two ways, and the difference is not events

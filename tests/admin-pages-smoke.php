@@ -1068,6 +1068,129 @@ check( 'deleting the menu takes the page out of it', array_key_exists( '/nino/ht
 $appData['/nino/http/routes'] = $persistedRoutes;
 unset( $appData['/nino/html/navroutes'] );
 
+/*	The hook the shortcode's lines pass through before they are drawn. Three
+	pages in 'main', none in 'side'; every registration is taken away again by
+	its name, so that nothing after this block is called by it	*/
+echo "Navigation - /nino/navigation/lines\n";
+
+$appData['/nino/http/routes'] = [
+	'GET://alpha' => [ 'uri' => '/alpha', 'body' => '', 'navs' => [ 'main' => 3 ] ],
+	'GET://beta' 	=> [ 'uri' => '/beta', 'body' => '', 'navs' => [ 'main' => 1 ] ],
+	'GET://gamma' => [ 'uri' => '/gamma', 'body' => '', 'navs' => [ 'main' => 2 ] ],
+];
+\Nino\Html::addFills( $appData, [ '/_nino/webpage/alpha/name' => 'Alpha', '/_nino/webpage/beta/name' => 'Beta', '/_nino/webpage/gamma/name' => 'Gamma' ], 'de_DE' );
+\Nino\Locales::setCurrentLocale( $appData, 'de_DE' );
+$appData['/nino/dir'] = '';
+
+$hook = '/nino/navigation/lines';
+ninoWarnings();
+check( 'nothing answers the hook before the block registers', \Nino\Callbacks::registered( $appData, $hook ) === [] );
+
+$plainLines	= \Nino\Modules\Navigation::routeLines( $appData, 'main' );
+$plainHtml	= \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main', 'content' => '/hand:Hand' ] );
+check( 'without a callback the lines are the three pages in menu order', $plainLines === [ '/beta:Beta', '/gamma:Gamma', '/alpha:Alpha' ] );
+
+$seen = [];
+\Nino\Callbacks::registerCallback( $appData, $hook, static function( array &$appData, mixed &$args ) use ( &$seen ): void {
+	$seen[] = $args;
+} );
+$watchedLines = \Nino\Modules\Navigation::routeLines( $appData, 'main' );
+\Nino\Callbacks::removeCallbacks( $appData, $hook );
+check( 'the hook fires once per call, with the key of the menu and its lines in menu order', $seen === [ [ 'nav' => 'main', 'lines' => [ '/beta:Beta', '/gamma:Gamma', '/alpha:Alpha' ] ] ] );
+check( '...and a callback that does nothing leaves the lines as they are', $watchedLines === $plainLines );
+
+$seen = [];
+\Nino\Callbacks::registerCallback( $appData, $hook, static function( array &$appData, mixed &$args ) use ( &$seen ): void {
+	$seen[] = $args;
+} );
+$watchedHtml	= \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main', 'content' => '/hand:Hand' ] );
+$emptyLines		= \Nino\Modules\Navigation::routeLines( $appData, 'side' );
+\Nino\Callbacks::removeCallbacks( $appData, $hook );
+check( '...and the rendered shortcode is byte for byte the one without it', $watchedHtml === $plainHtml );
+check( 'the hand-written lines of the shortcode are not in the argument', count( $seen ) === 2 && $seen[0]['lines'] === $plainLines && str_contains( $watchedHtml, '>Hand<' ) === true );
+check( 'a menu without lines fires it with an empty list', $seen[1] === [ 'nav' => 'side', 'lines' => [] ] && $emptyLines === [] );
+
+\Nino\Callbacks::registerCallback( $appData, $hook, static function( array &$appData, mixed &$args ): void {
+	$args['lines'] = array_values( array_filter( $args['lines'], static fn( string $line ): bool => str_starts_with( $line, '/beta:' ) === false ) );
+} );
+$removedLines = \Nino\Modules\Navigation::routeLines( $appData, 'main' );
+$removedHtml	= \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main', 'content' => '/hand:Hand' ] );
+\Nino\Callbacks::removeCallbacks( $appData, $hook );
+check( 'a callback that takes a line away takes it out of the result', $removedLines === [ '/gamma:Gamma', '/alpha:Alpha' ] );
+check( '...and out of the menu the shortcode draws, which keeps the others and the hand-written line', str_contains( $removedHtml, '>Beta<' ) === false
+	&& str_contains( $removedHtml, '>Alpha<' ) === true && str_contains( $removedHtml, '>Gamma<' ) === true && str_contains( $removedHtml, '>Hand<' ) === true );
+
+\Nino\Callbacks::registerCallback( $appData, $hook, static function( array &$appData, mixed &$args ): void {
+	$args['lines'][] = '/delta:Delta';
+} );
+$addedLines = \Nino\Modules\Navigation::routeLines( $appData, 'main' );
+$addedHtml	= \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main' ] );
+\Nino\Callbacks::removeCallbacks( $appData, $hook );
+check( 'a callback that appends a line brings it into the result, last', $addedLines === [ '/beta:Beta', '/gamma:Gamma', '/alpha:Alpha', '/delta:Delta' ] );
+check( '...and into the menu the shortcode draws', str_contains( $addedHtml, '>Delta<' ) === true );
+
+\Nino\Callbacks::registerCallback( $appData, $hook, static function( array &$appData, mixed &$args ): array {
+	return [ 'nav' => $args['nav'], 'lines' => [ '/gamma:Gamma', '/alpha:Alpha' ] ];
+} );
+$returnedLines = \Nino\Modules\Navigation::routeLines( $appData, 'main' );
+\Nino\Callbacks::removeCallbacks( $appData, $hook );
+check( 'an array a callback returns takes the place of the argument', $returnedLines === [ '/gamma:Gamma', '/alpha:Alpha' ] );
+
+foreach( [ 'a string' => 'x', 'null' => null, 'an integer' => 5, 'an array of arrays' => [ 'other' => [ '/alpha:Alpha' ] ] ] as $what => $value ) {
+	\Nino\Callbacks::registerCallback( $appData, $hook, static function( array &$appData, mixed &$args ) use ( $value ): void {
+		$args['lines'] = $value;
+	} );
+	$brokenLines	= \Nino\Modules\Navigation::routeLines( $appData, 'main' );
+	$brokenHtml		= \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main' ] );
+	\Nino\Callbacks::removeCallbacks( $appData, $hook );
+	check( 'a callback that sets lines to '. $what. ' ends in no lines, and a shortcode that draws nothing', $brokenLines === [] && $brokenHtml === '' );
+}
+
+\Nino\Callbacks::registerCallback( $appData, $hook, static function( array &$appData, mixed &$args ): void {
+	unset( $args['lines'] );
+} );
+$unsetLines = \Nino\Modules\Navigation::routeLines( $appData, 'main' );
+\Nino\Callbacks::removeCallbacks( $appData, $hook );
+check( 'a callback that removes lines ends in no lines', $unsetLines === [] );
+
+\Nino\Callbacks::registerCallback( $appData, $hook, static function( array &$appData, mixed &$args ): string {
+	return 'not an argument';
+} );
+$stringLines = \Nino\Modules\Navigation::routeLines( $appData, 'main' );
+\Nino\Callbacks::removeCallbacks( $appData, $hook );
+check( 'a callback that replaces the argument by a string ends in no lines', $stringLines === [] );
+
+\Nino\Callbacks::registerCallback( $appData, $hook, static function( array &$appData, mixed &$args ): void {
+	$args['lines'] = [ 7 => '/alpha:Alpha', 'k' => [ '/beta:Beta' ], 9 => null, 10 => 3, 11 => '/gamma:Gamma', 12 => false ];
+} );
+$mixedLines = \Nino\Modules\Navigation::routeLines( $appData, 'main' );
+\Nino\Callbacks::removeCallbacks( $appData, $hook );
+check( 'what is no string in lines falls away and the rest is numbered from zero', $mixedLines === [ '/alpha:Alpha', '/gamma:Gamma' ] && array_is_list( $mixedLines ) === true );
+
+/*	What a callback leaves in the lines is drawn as text. The page is rendered
+	the way a visitor's is, so a '<' that became an element or a fill that was
+	filled shows	*/
+\Nino\Html::addFills( $appData, [ '/template/common/probe/word' => 'FILLED' ], 'de_DE' );
+\Nino\Modules\Navigation::init( $appData );
+$hostile = [ 'with a colon' => '/x:T<i>y</i> [[/template/common/probe/word]] [navigation nav="side"]', 'without a colon' => 'NOCOLON<i>y</i> [[/template/common/probe/word]] [navigation nav="side"]' ];
+
+foreach( $hostile as $what => $line ) {
+	\Nino\Callbacks::registerCallback( $appData, $hook, static function( array &$appData, mixed &$args ) use ( $line ): void {
+		$args['lines'][] = $line;
+	} );
+	$hostileHtml = \Nino\Html::renderHtml( $appData, '[navigation nav="main"][/navigation]' );
+	\Nino\Callbacks::removeCallbacks( $appData, $hook );
+	check( 'a line from a callback '. $what. ' is text: no element, no filled fill, no shortcode run', str_contains( $hostileHtml, '&lt;i&gt;y&lt;/i&gt;' ) === true
+		&& str_contains( $hostileHtml, '<i>' ) === false && str_contains( $hostileHtml, 'FILLED' ) === false && str_contains( $hostileHtml, '&#91;navigation' ) === true );
+}
+
+check( 'the block raised no warning', ninoWarnings() === [] );
+check( 'the registrations are gone again', \Nino\Callbacks::registered( $appData, $hook ) === [] );
+$appData['/nino/http/routes'] = $persistedRoutes;
+unset( $appData['/nino/dir'] );
+
+echo "\n";
+
 \Nino\Auth::logoutUser( $appData );
 [ $status ] = callDev( $appData, \Nino\Modules\Navigation\Admin::class, 'apiList' );
 check( 'Navigations actions require an authed _admin session too', $status === 401 );

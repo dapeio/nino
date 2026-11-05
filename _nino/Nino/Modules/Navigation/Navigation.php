@@ -14,7 +14,10 @@ namespace Nino\Modules {
 	/**
 	 *	Nino								A compact filesystembased php framework
 	 *	Modules							All optional modules
-	 *	Navigation					A quick & dirty nav renderer
+	 *	Navigation					A quick & dirty nav renderer - routeLines() fires
+	 *											'/nino/navigation/lines' with the menu's key and
+	 *											its lines, so that a module can change which
+	 *											entries a menu shows
 	 *
 	 *	@package						Dape/Nino
 	 *	@author							David Perchermeier <mail@dape.io>
@@ -130,6 +133,12 @@ namespace Nino\Modules {
 					continue;
 
 				if( strpos( $line, ':' ) === false ) {
+
+					// A line a callback left behind is text, whether it has a
+					// colon or not: it is escaped the way a generated title is
+					if( $authored === false )
+						$line = str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ], htmlspecialchars( $line, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ) );
+
 					$html .= str_replace( '[[content]]', $line, self::$html['div'] );
 					continue;
 				}
@@ -215,6 +224,17 @@ namespace Nino\Modules {
 		 *	write (see their apiApply()/apiMove()), so reordering pages there
 		 *	reorders every menu they appear in without touching a priority.
 		 *
+		 *	Once the lines are collected and ordered, '/nino/navigation/lines' is
+		 *	fired - once per call, for a menu without lines too - with
+		 *	[ 'nav' =&gt; the menu's key, 'lines' =&gt; the lines above ]. It is how a
+		 *	module takes a page out of a menu for the visitor at hand, or adds
+		 *	one, without a shortcode of its own: a callback changes 'lines' in
+		 *	place, or returns an array that replaces the argument. What comes back
+		 *	is the strings of 'lines' in their order; a callback that leaves
+		 *	anything else behind - or removes 'lines' - ends in no lines at all.
+		 *	The lines a template's author wrote between the tags are not part of
+		 *	it: doShortcode() appends them afterwards.
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$nav					Navigation key, eg. "main"
 		 *
@@ -277,7 +297,15 @@ namespace Nino\Modules {
 
 			ksort( $buckets );
 
-			return count( $buckets ) === 0 ? [] : array_merge( ...array_values( $buckets ) );
+			$args = [ 'nav' => $nav, 'lines' => count( $buckets ) === 0 ? [] : array_merge( ...array_values( $buckets ) ) ];
+
+			\Nino\Callbacks::doCallbacks( $appData, '/nino/navigation/lines', $args );
+
+			// What a callback leaves behind is read as untrusted: the lines go
+			// on to doShortcode(), which splits and prints strings only
+			$lines = is_array( $args ) === true && is_array( $args['lines'] ?? null ) === true ? $args['lines'] : [];
+
+			return array_values( array_filter( $lines, 'is_string' ) );
 		}
 
 		/**
