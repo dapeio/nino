@@ -24,6 +24,15 @@ return [
 	'[[/_admin/user/settings]]'			=> 'Einstellungen',
 	'[[/_admin/user/rail]]'					=> 'Navigation ein- oder ausklappen',
 
+	'[[/_admin/follow/label/back]]'	=> 'Workbench',
+	'[[/_admin/follow/label/path]]'	=> 'Angezeigte Seite',
+	'[[/_admin/follow/label/reload]]'	=> 'Neu laden',
+	'[[/_admin/follow/label/switch]]'	=> 'Der Seite folgen',
+	'[[/_admin/follow/label/frame]]'	=> 'Die Website',
+	'[[/_admin/follow/label/open]]'	=> 'Website-Fenster',
+	'[[/_admin/follow/hint/switch]]'	=> 'An: Das Fenster wechselt zu der Seite, die Du gespeichert hast. Aus: Es lädt die Seite neu, die es zeigt.',
+	'[[/_admin/follow/hint/open]]'	=> 'Öffnet die Website in einem eigenen Fenster, das Du neben die Workbench legen kannst. Es lädt nach jedem Speichern neu.',
+
 	'[[/_admin/label/rail]]'			=> 'Navigation der Workbench',
 	'[[/_admin/label/nav]]'			=> 'Bereiche der Workbench',
 	'[[/_admin/label/skip]]'		=> 'Zum Inhalt springen',

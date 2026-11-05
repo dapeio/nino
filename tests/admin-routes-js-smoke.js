@@ -118,13 +118,15 @@ let confirmAnswer = false;
 // The shell's counters (see Nino.admin.touch()): what the panel says it wrote,
 // and the stamp of the templates it reads back
 const touched = [];
+// ...and what each said it was about: the address of the page, where the writer has one
+const touchedUris = [];
 const stamps = { templates : 0 };
 
 const Nino = {
 	admin : {
 		assetUrl : function( path ) { return '/site'+ path },
 		formToolbar : function( backLink ) { const bar = element('div'); bar.appendChild( backLink ); return bar },
-		touch : function( topic ) { touched.push( topic ) },
+		touch : function( topic, uri ) { touched.push( topic ); touchedUris.push( uri ) },
 		stamp : function( topic ) { return stamps[topic] ?? 0 },
 	},
 	events : { bindCallback : function() {} },
@@ -210,7 +212,7 @@ check( 'the move is sent for the row whose arrow was pressed', requests.length =
 answer( 200, { pages : listing( [ '/', '/contact', '/about' ] ).pages } );
 check( 'an accepted move redraws the list in the order the server answers with', rowLabels().join(',') === '/,/contact,/about' );
 check( '...and says nothing, because nothing went wrong', messageText() === '' );
-check( '...and tells the other panels that routes were written', touched.join() === 'routes' );
+check( '...and tells the other panels that routes were written, of no page in particular', touched.join() === 'routes' && touchedUris.length === 1 && touchedUris[0] === undefined );
 
 /*	A move the server refuses. It used to end in a bare return: the row did
 	not move, nothing appeared anywhere, and the arrow read as a button that
@@ -376,9 +378,10 @@ field('routes-form-http-uri').focus();
 save();
 check( 'a complete form is sent, an empty description with it', requests.length === before + 1 && requests[before].action === 'routes/save'
 	&& requests[before].payload.template === 'page-blank' && requests[before].payload.text.en_US.description === '' && requests[before].payload.originalUri === '' );
-touched.length = 0;
+touched.length = 0; touchedUris.length = 0;
 answer( 200, {} );
 check( 'a save that went through tells the other panels that routes were written', touched.join() === 'routes' );
+check( '...and names the page it saved by its address, which is what a window beside the workbench goes to', touchedUris.join() === '/new' );
 answer( 200, listing( [ '/', '/about', '/contact' ], { templates : [ 'page-about', 'page-blank', 'page-contact' ] } ) );
 check( 'a save returns to the list, and the focus that stood in the form goes to the name of the panel', mount.classList.contains('admin-hidden') === false && form.classList.contains('admin-hidden') === true && active === paneTitle );
 
@@ -450,9 +453,20 @@ confirms.length = 0;
 fire( deleteButton(), 'click' );
 check( 'a confirmed question deletes the route', requests[requests.length - 1].action === 'routes/delete' && requests[requests.length - 1].payload.uri === '/site-about' );
 confirmAnswer = false;
-touched.length = 0;
+touched.length = 0; touchedUris.length = 0;
 answer( 200, {} );
 check( '...and a delete that went through tells the other panels that routes were written', touched.join() === 'routes' );
+check( '...with no address: the page is gone, and a move or a delete is no page to go to', touchedUris.length === 1 && touchedUris[0] === undefined );
+
+/*	The address a window beside the workbench goes to: that of the language the panel edits,
+	else the one of every language, else the first there is - always a path with its slash	*/
+const selectedBefore = panel._selectedLocale;
+panel._selectedLocale = 'en_US';
+check( 'the address of a page is the one of the language the panel is working in', panel._publicPath( { de_DE : '/ueber-uns', en_US : '/about' } ) === '/about' );
+check( '...else the one of every language', panel._publicPath( { de_DE : '/ueber-uns', '' : '/shared' } ) === '/shared' );
+check( '...else the first there is, an empty one passed over', panel._publicPath( { de_DE : '  ', fr_FR : '/accueil' } ) === '/accueil' );
+check( '...with the slash it lacks, and none for a page that has no address', panel._publicPath( { en_US : ' about ' } ) === '/about' && panel._publicPath( {} ) === '' && panel._publicPath( { en_US : '' } ) === '' );
+panel._selectedLocale = selectedBefore;
 answer( 200, listing( [ '/', '/contact' ] ) );
 
 // A route that picks its template at runtime has no template to choose: the
@@ -513,11 +527,11 @@ answer( 200, addressed );
 check( 'a page with an address per language is one row, and the row names every address - the one several languages share too', rowLabels().join(' | ') === '/ | /ueber-uns, /about | /contact, /kontakt' );
 check( '...and the link out goes to the address the server gave the page as its own', openLink( '/ueber-uns, /about' ).href === '/site/ueber-uns' && openLink( '/contact, /kontakt' ).href === '/site/kontakt' );
 
-touched.length = 0;
+touched.length = 0; touchedUris.length = 0;
 fire( moveButton( '/ueber-uns, /about', 'down' ), 'click' );
 check( 'a move names the page by its Element URI and not by one of its addresses', JSON.stringify( requests[requests.length - 1].payload ) === '{"uri":"/about","direction":"down"}' );
 answer( 200, { pages : addressed.pages } );
-touched.length = 0;
+touched.length = 0; touchedUris.length = 0;
 
 openRoute( '/' );
 check( 'a page with one address for every language opens with the switch on and the one field', oneBox().checked === true && addressInputs().length === 1 && addressInputs()[0].dataset.address === ''
@@ -701,7 +715,7 @@ check( 'a confirmed question deletes the page by its Element URI - one request, 
 confirmAnswer = false;
 answer( 200, {} );
 answer( 200, listing( [ '/', '/contact' ] ) );
-touched.length = 0;
+touched.length = 0; touchedUris.length = 0;
 
 /*	The pages a feature routes at runtime: listed under the persisted ones, with
 	no arrows and no way to delete, and a form of the path - read only - and the
@@ -709,7 +723,7 @@ touched.length = 0;
 	draws nothing for them	*/
 const featurePages = listing( [ '/', '/contact' ], { runtime : [
 	{ uri : '/blog/post', httpUri : '/blog/*', body : '[template /templates/page-post]', text : { de_DE : { name : 'Beitrag', title : '', description : '' }, en_US : { name : '', title : '', description : '' } } },
-	{ uri : '/.newsletter', httpUri : '/.newsletter', body : '[template /templates/page-newsletter]', text : { de_DE : { name : '', title : '', description : '' }, en_US : { name : '', title : '', description : '' } } },
+	{ uri : '/newsletter', httpUri : '/.newsletter', body : '[template /templates/page-newsletter]', text : { de_DE : { name : '', title : '', description : '' }, en_US : { name : '', title : '', description : '' } } },
 ] } );
 panel._pages = featurePages.pages;
 panel._runtime = [];
@@ -741,13 +755,23 @@ check( 'a name and a title are required in every language here as well', request
 localeInput( 'de_DE', 'description' ).value = 'Alle drei Monate.';
 save();
 check( 'a complete form is sent as routes/savetexts for the Element-URI, and only that', requests.length === beforeRuntime + 1 && requests[beforeRuntime].action === 'routes/savetexts'
-	&& requests[beforeRuntime].payload.uri === '/.newsletter' && Object.keys( requests[beforeRuntime].payload ).sort().join() === 'text,uri'
+	&& requests[beforeRuntime].payload.uri === '/newsletter' && Object.keys( requests[beforeRuntime].payload ).sort().join() === 'text,uri'
 	&& requests[beforeRuntime].payload.text.de_DE.description === 'Alle drei Monate.' && requests[beforeRuntime].payload.text.en_US.title === 'Abonnieren' );
-touched.length = 0;
+touched.length = 0; touchedUris.length = 0;
 answer( 200, { runtime : [] } );
 check( 'the texts of a feature route are written like a page: the other panels are told', touched.join() === 'routes' );
+check( '...and the page is the address the feature routes it at', touchedUris.join() === '/.newsletter' );
 answer( 200, listing( [ '/', '/contact' ], { templates : [ 'page-contact' ] } ) );
 check( 'once saved the list is read again', requests[requests.length - 1].action === 'routes/list' );
+
+// A page a feature routes by a pattern is no address a window can go to: saved, it is written and says no page
+touched.length = 0; touchedUris.length = 0;
+panel._currentRuntime = { uri : '/blog/post', httpUri : '/blog/*' };
+panel._saveRuntime( { de_DE : { name : 'B', title : 'T', description : '' }, en_US : { name : 'B', title : 'T', description : '' } }, function() {} );
+answer( 200, { runtime : [] } );
+check( 'a feature page routed by a pattern is saved and names no page: /blog/* is no address', touched.join() === 'routes' && touchedUris.length === 1 && ! touchedUris[0] );
+answer( 200, listing( [ '/', '/contact' ], { templates : [ 'page-contact' ] } ) );
+panel._currentRuntime = null;
 
 // After a feature's form the next page opened is a page again: the form of a
 // persisted route saves as routes/save

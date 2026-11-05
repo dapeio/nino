@@ -61,6 +61,72 @@ check( 'a kind that is none of them is ignored by touch() and reads 0 - whatever
 	&& Object.keys( editor._stamps ).sort().join() === kinds.slice().sort().join() && editor.stamp( 'templates' ) === 2 );
 check( 'the stamps are numbers a panel compares by being unequal: a second touch is a different stamp from the first', ( function() { const before = editor.stamp( 'slots' ); editor.touch( 'slots' ); return typeof before === 'number' && editor.stamp( 'slots' ) !== before } )() );
 
+/*	touch( kind, uri ) tells the windows beside the page: { kind, uri, at } on a
+	channel named after the directory the installation is in (see
+	Nino.admin.touch()). Each case is a page of its own, so that what one case
+	opened is not what the next one finds	*/
+function channelPage( dir, channel ) {
+
+	const world = { posted : [], opened : [] };
+	const page = {
+		console : console,
+		location : { hash : '' },
+		history : { replaceState : function() {} },
+		document : { documentElement : null, body : null, getElementById : function( id ) { return id === 'admin-page-wrap' && dir !== null ? { dataset : { dir : dir } } : null } },
+	};
+	page.window = page;
+	page.Nino = { events : { bindCallback : function() {} } };
+
+	if( channel === 'works' )
+		page.BroadcastChannel = function( name ) {
+			world.opened.push( name );
+			this.postMessage = function( message ) { world.posted.push( JSON.parse( JSON.stringify( message ) ) ) };
+		};
+	else if( channel === 'closed' )
+		page.BroadcastChannel = function() {
+			this.postMessage = function() { throw new Error( 'InvalidStateError' ) };
+		};
+
+	load( '_admin/assets/script.js', vm.createContext( page ) );
+	world.admin = page.Nino.admin;
+
+	return world;
+}
+
+const told = channelPage( '', 'works' );
+const touchedAt = Date.now();
+told.admin.touch( 'routes', '/blog/post' );
+check( 'touch( kind, uri ) posts { kind, uri, at } - and nothing else - on the channel',
+	told.posted.length === 1 && Object.keys( told.posted[0] ).join() === 'kind,uri,at' && told.posted[0].kind === 'routes' && told.posted[0].uri === '/blog/post'
+	&& typeof told.posted[0].at === 'number' && told.posted[0].at >= touchedAt && told.posted[0].at <= Date.now() );
+check( '...and counts the stamp of its kind as the one-argument form does', told.admin.stamp( 'routes' ) === 1 );
+told.admin.touch( 'texts' );
+check( 'the one-argument form posts too, with no uri', told.posted.length === 2 && told.posted[1].kind === 'texts' && told.posted[1].uri === null );
+[ 'blog', '', ' /blog', null, undefined, 42, true, {}, [ '/blog' ] ].forEach( function( bad ) { told.admin.touch( 'slots', bad ) } );
+check( 'a uri that is not a string starting with a slash goes out as null, whatever else it is',
+	told.posted.length === 11 && told.posted.slice( 2 ).every( function( message ) { return message.kind === 'slots' && message.uri === null } ) );
+told.admin.touch( 'elements', '//evil.example/x' );
+check( '...and the shell does not judge a path: the window does, it is the one that goes there', told.posted[11].uri === '//evil.example/x' );
+told.admin.touch( 'nope', '/blog' );
+told.admin.touch( 'toString', '/blog' );
+told.admin.touch( '__proto__', '/blog' );
+check( 'a kind that is none of the six counts nothing and posts nothing', told.posted.length === 12 && told.admin.stamp( 'nope' ) === 0 );
+check( 'the channel is opened by the first touch, once, and held', told.opened.length === 1 && told.admin._channel !== null );
+check( 'its name is the directory of the installation: empty at the root', told.opened[0] === 'nino-admin:' );
+check( '...and that directory in a subdirectory, so that two installations of one origin do not hear each other',
+	( function() { const sub = channelPage( '/sites/a', 'works' ); sub.admin.touch( 'routes' ); return sub.opened.join() === 'nino-admin:/sites/a' } )() );
+check( '...and the root where the page has no shell root to ask', ( function() { const bare = channelPage( null, 'works' ); bare.admin.touch( 'routes' ); return bare.opened.join() === 'nino-admin:' } )() );
+check( 'a page without BroadcastChannel counts and throws nothing', ( function() {
+	const mute = channelPage( '', 'none' );
+	try { mute.admin.touch( 'routes', '/blog' ); mute.admin.touch( 'routes', '/blog' ) } catch( e ) { return false }
+	return mute.admin.stamp( 'routes' ) === 2 && mute.admin._channel === null;
+} )() );
+check( 'a channel that refuses the message - one that was closed - costs the writer nothing', ( function() {
+	const shut = channelPage( '', 'closed' );
+	try { shut.admin.touch( 'routes', '/blog' ) } catch( e ) { return false }
+	return shut.admin.stamp( 'routes' ) === 1;
+} )() );
+
 editor.decodeEntities = function( value ) { return value };
 check( 'a leading equals sign is exported as explicit text', editor.csvCell('=2+2') === "'=2+2" );
 check( 'a formula marker hidden behind whitespace is neutralized too', editor.csvCell(' \t+SUM(A1:A2)') === "' \t+SUM(A1:A2)" );

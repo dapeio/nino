@@ -45,6 +45,15 @@ namespace Nino\Admin {
 		// panel's assets against it
 		public const string ROOT = __DIR__. '/..';
 
+		// What a page of the website must look like to be shown in the follow
+		// window (see handleFollow()): a path below this site, so no scheme, no
+		// host and no '//', which a browser reads as one; not the workbench's
+		// own (/_admin and below, or the window would show itself); and
+		// nothing that ends an attribute, starts a tag or is a control
+		// character. follow.js holds the same rule for the address a message
+		// names and the one it remembers
+		public const string FOLLOW_PATH = '/^\/(?!\/)(?!_admin(?:[\/?#]|$))[^\s<>"\'\\\\\x00-\x1f\x7f]*$/iD';
+
 		/*	The language switcher, the one fragment this class renders itself -
 			declared once rather than concatenated inside _localePickerHtml().
 			Being a property is the point: a project that wants a different
@@ -104,6 +113,16 @@ namespace Nino\Admin {
 				return;
 			}
 
+			// The window that shows the website next to the workbench (see
+			// handleFollow()): a screen of its own and no pane of the rail, so
+			// it is a route and not a panel. Only a set-up project has one -
+			// the wizard answers /_admin by itself and returns above
+			$appData['/nino/http/routes']['GET://_admin/follow'] = [
+				'uri' 				=> '/_admin/follow',
+				'body'				=> '[template /_admin/templates/page-follow]',
+				'statusCode'	=> 200
+			];
+
 			// Both bundles are built from the panel registry, so every panel
 			// ships its own script and stylesheet (see panels()) and nothing
 			// here has to know which ones exist. What is listed here is the
@@ -133,6 +152,13 @@ namespace Nino\Admin {
 			$appData['/nino/html/assets']['/_admin/.cache/login.js'] = [
 				'/_nino/Nino.js',
 				'/_admin/assets/login.js',
+			];
+			// The follow window is no workbench either: no rail, no panels, so
+			// the kit its switch is built with and its own script, nothing else
+			$appData['/nino/html/assets']['/_admin/.cache/follow.js'] = [
+				'/_nino/Nino.js',
+				'/_admin/assets/Nino.admin.js',
+				'/_admin/assets/follow.js',
 			];
 
 			// A GET ?locale=xx (used by the UI-chrome picker) works even
@@ -189,6 +215,7 @@ namespace Nino\Admin {
 
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/GET://_admin', 	[ self::class, 'handleGet' ] );
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://_admin', [ self::class, 'handlePost' ] );
+			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/GET://_admin/follow', [ self::class, 'handleFollow' ] );
 		}
 
 		/**
@@ -245,6 +272,38 @@ namespace Nino\Admin {
 				'[[/_admin/upload/pixels]]'	=> (string) $limits['pixels'],
 				'[[/_admin/mode]]'					=> $mode,
 				'[[/_admin/maintenance]]'		=> ( $appData['/nino/maintenance/status'] ?? false ) === true ? '1' : '0',
+			], '*' );
+		}
+
+		/**
+		 *	Fill the GET /_admin/follow response: the window that shows the
+		 *	website and loads it anew after every write of the workbench. Logged
+		 *	out it is the login page, as /_admin is; with an account it is the
+		 *	frame, at the page ?uri= names or at the home page
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function handleFollow( array &$appData, array &$request ): void {
+
+			self::_logLoginOnce( $appData );
+
+			if( \Nino\Auth::getCurrentUser( $appData ) === false ) {
+				$request['/nino/http/response']['body'] = '[template /_admin/templates/page-login]';
+				return;
+			}
+
+			$uri = is_string( $_GET['uri'] ?? null ) === true && preg_match( self::FOLLOW_PATH, $_GET['uri'] ) === 1 ? $_GET['uri'] : '/';
+
+			// The uri goes into an attribute of a template the kernel renders
+			// as HTML+: escaped for the attribute, and a '[' written as the
+			// entity, which a browser reads back as the character but the fill
+			// pass does not take for the start of a shortcode (AGENTS.md,
+			// "Rendering and escaping rules")
+			\Nino\Html::addFills( $appData, [
+				'[[/_admin/follow/uri]]' => str_replace( '[', '&#91;', htmlspecialchars( $uri, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ) ),
 			], '*' );
 		}
 

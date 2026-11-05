@@ -784,6 +784,67 @@ $indexTemplate = (string) file_get_contents( dirname( __DIR__ ). '/_admin/templa
 check( 'the template hands both to the shell root, and the rail has the chip as a link to the Config panel for the shell to fill',
 	preg_match( '/<div id="admin-page-wrap"[^>]* data-mode="\[\[\/_admin\/mode\]\]"[^>]* data-maintenance="\[\[\/_admin\/maintenance\]\]"/', $indexTemplate ) === 1
 	&& preg_match( '/<a id="admin-mode-chip"[^>]* href="#config"[^>]*><\/a>/', $indexTemplate ) === 1 );
+/*	The window that shows the website next to the workbench (/_admin/follow):
+	a route of its own, the login page without an account, and a frame whose
+	address is a path of this site and nothing else - the address is read from
+	a query anybody can send	*/
+$followRoute = $withModule['/nino/http/routes']['GET://_admin/follow'] ?? [];
+check( 'init registers GET /_admin/follow with its own template next to GET /_admin, and a callback that fills it',
+	( $followRoute['uri'] ?? '' ) === '/_admin/follow' && ( $followRoute['body'] ?? '' ) === '[template /_admin/templates/page-follow]' && ( $followRoute['statusCode'] ?? 0 ) === 200
+	&& in_array( [ \Nino\Admin\Admin::class, 'handleFollow' ], \Nino\Callbacks::registered( $withModule, '/nino/http/response/GET://_admin/follow' ), true ) );
+check( 'its bundle is the framework, the kit its switch is built with and its own script - no panel, no shell script',
+	( $withModule['/nino/html/assets']['/_admin/.cache/follow.js'] ?? [] ) === [ '/_nino/Nino.js', '/_admin/assets/Nino.admin.js', '/_admin/assets/follow.js' ] );
+
+$followOf = static function( array $state, ?string $uri ): array {
+	if( $uri === null )
+		unset( $_GET['uri'] );
+	else
+		$_GET['uri'] = $uri;
+	$request = [ '/nino/http/response' => [ 'statusCode' => 200, 'body' => '[template /_admin/templates/page-follow]' ] ];
+	\Nino\Admin\Admin::handleFollow( $state, $request );
+	unset( $_GET['uri'] );
+	return [ $request['/nino/http/response']['body'], \Nino\Html::renderTextfill( $state, '/_admin/follow/uri' ) ];
+};
+$followSignedOut = $withModule;
+unset( $followSignedOut['./nino/auth/current'] );
+check( 'without an account it answers the login page, whatever the query asks', $followOf( $followSignedOut, '/blog/post' )[0] === '[template /_admin/templates/page-login]' && $followOf( $followSignedOut, '/blog/post' )[1] === '' );
+check( 'with an account it keeps its own template, at the home page where no address is asked for', $followOf( $withModule, null ) === [ '[template /_admin/templates/page-follow]', '/' ] );
+check( '...and at the path ?uri= names, a query on it as it is', $followOf( $withModule, '/blog/post' )[1] === '/blog/post' && $followOf( $withModule, '/a/b?x=1&y=2' )[1] === '/a/b?x=1&amp;y=2' && $followOf( $withModule, '/' )[1] === '/' );
+$followRefused = [ '/_admin', '/_admin/', '/_admin/follow', '/_admin/follow?uri=/x', '/_admin?x=1', '/_admin#x', '/_ADMIN/x', "/a\x01b", "/a\x1fb", "/a\x7fb", "/a\x00b", '//evil', '//evil.example/x', 'http://x', 'https://x/', 'javascript:alert(1)', '<x>', '/a<b', '/a"b', "/a'b", '/a b', "/a\nb", "/a\n", '/a\\b', 'blog', '', '\\\\x' ];
+check( 'anything that is not a path of this site opens the home page: a scheme, a host, a double slash, the address of the workbench itself, a tag, a quote, a space, a line break, a control character, a backslash',
+	array_values( array_unique( array_map( static fn( string $uri ): string => $followOf( $withModule, $uri )[1], $followRefused ) ) ) === [ '/' ] );
+$followArray = static function() use ( $withModule ): array {
+	ninoWarnings();
+	$_GET['uri'] = [ '/x' ];
+	$request = [ '/nino/http/response' => [ 'statusCode' => 200 ] ];
+	$state = $withModule;
+	\Nino\Admin\Admin::handleFollow( $state, $request );
+	unset( $_GET['uri'] );
+	return [ \Nino\Html::renderTextfill( $state, '/_admin/follow/uri' ), ninoWarnings() ];
+};
+check( '...and so does a ?uri[]= that parses to an array, without an "Array to string conversion" on the way', $followArray() === [ '/', [] ] );
+check( '...while a page that merely starts like the workbench\'s address is a page', $followOf( $withModule, '/_administrator' )[1] === '/_administrator' && $followOf( $withModule, '/blog/_admin' )[1] === '/blog/_admin' && $followOf( $withModule, "/a\xc3\xa4b" )[1] === "/a\xc3\xa4b" );
+check( 'a "[" in the path cannot open a fill of its own: it is written as the entity the browser reads back',
+	$followOf( $withModule, '/a[[/_admin/mode]]b' )[1] === '/a&#91;&#91;/_admin/mode]]b' );
+
+$followTemplate = (string) file_get_contents( dirname( __DIR__ ). '/_admin/templates/page-follow.tpl' );
+check( 'the template is a page of its own: the directory on the root, a frame with a title whose address waits in data-src - the script gives it its first one, so that no request goes out for a page it replaces - and the way back into the workbench',
+	preg_match( '/<div id="admin-follow-wrap"[^>]* class="nino-admin [^"]*"[^>]* data-dir="\[\[\/nino\/dir\]\]"/', $followTemplate ) === 1
+	&& preg_match( '/<iframe id="admin-follow-frame"[^>]* title="\[\[[^\]]+\]\]"[^>]* data-src="\[\[\/nino\/dir\]\]\[\[\/_admin\/follow\/uri\]\]"/', $followTemplate ) === 1
+	&& preg_match( '/<iframe\b[^>]*\ssrc=/', $followTemplate ) === 0
+	&& preg_match( '/<a [^>]*href="\[\[\/nino\/dir\]\]\/_admin\/"/', $followTemplate ) === 1
+	&& str_contains( $followTemplate, '[assets /_admin/.cache/follow.js]' ) && str_contains( $followTemplate, '[jstext]' ) );
+check( 'the rail\'s account block opens it in a window of its own that a second click finds again - a link, not a script',
+	preg_match( '/<div id="admin-user"[^>]*>.*?<a id="admin-user-follow"[^>]* href="\[\[\/nino\/dir\]\]\/_admin\/follow"[^>]* target="nino-follow"[^>]* rel="opener"[^>]*>/s', $indexTemplate ) === 1
+	&& preg_match( '/<a id="admin-user-follow"[^>]* title="\[\[[^\]]+\]\]"/', $indexTemplate ) === 1 );
+preg_match_all( '/\[\[(\/_admin\/follow\/[a-z\/-]+)\]\]/', $followTemplate. $indexTemplate, $followKeys );
+foreach( [ 'en_US', 'de_DE' ] as $locale ) {
+	$followFills = (array) include dirname( __DIR__ ). '/_admin/text/'. $locale. '.php';
+	// What the templates ask for, and the two words the script asks for in the bar
+	$followAsked = array_unique( array_merge( $followKeys[1], [ '/_admin/follow/label/switch', '/_admin/follow/hint/switch' ] ) );
+	$followMissing = array_filter( $followAsked, static fn( string $key ): bool => $key !== '/_admin/follow/uri' && trim( (string) ( $followFills['[['. $key. ']]'] ?? '' ) ) === '' );
+	check( $locale. ': every word the follow window asks for is there, in the templates and in the script', $followKeys[1] !== [] && $followMissing === [] );
+}
 check( 'init bundles every panel script, the module\'s included, after the shell\'s own', in_array( '/app/Dummy/assets/admin.js', $withModule['/nino/html/assets']['/_admin/.cache/script.js'], true ) === true && in_array( '/_nino/Nino/Modules/Navigation/assets/admin.js', $withModule['/nino/html/assets']['/_admin/.cache/script.js'], true ) === true && $withModule['/nino/html/assets']['/_admin/.cache/script.js'][0] === '/_nino/Nino.js' );
 check( 'and every panel stylesheet', in_array( '/app/Dummy/assets/admin.css', $withModule['/nino/html/assets']['/_admin/.cache/style.css'], true ) === true );
 // The login page is no workbench: the kit the panels are built with

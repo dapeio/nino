@@ -23,6 +23,15 @@ return [
 	'[[/_admin/user/settings]]'			=> 'Settings',
 	'[[/_admin/user/rail]]'					=> 'Fold or unfold the navigation',
 
+	'[[/_admin/follow/label/back]]'	=> 'Workbench',
+	'[[/_admin/follow/label/path]]'	=> 'The page shown',
+	'[[/_admin/follow/label/reload]]'	=> 'Reload',
+	'[[/_admin/follow/label/switch]]'	=> 'Follow the page',
+	'[[/_admin/follow/label/frame]]'	=> 'The website',
+	'[[/_admin/follow/label/open]]'	=> 'Website window',
+	'[[/_admin/follow/hint/switch]]'	=> 'On, the window goes to the page you saved; off, it loads again the page it shows.',
+	'[[/_admin/follow/hint/open]]'	=> 'Opens the website in a window of its own to put next to the workbench. It loads again after every save.',
+
 	'[[/_admin/label/rail]]'			=> 'Workbench navigation',
 	'[[/_admin/label/nav]]'			=> 'Workbench sections',
 	'[[/_admin/label/skip]]'		=> 'Skip to content',

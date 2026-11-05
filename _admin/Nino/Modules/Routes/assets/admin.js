@@ -333,6 +333,34 @@
 		},
 
 		/**
+		 *	The address a page is reached at on the website, for a window that
+		 *	follows what is saved (see Nino.admin.touch()): the one of the
+		 *	language the panel is editing, else the one of every language, else
+		 *	the first there is. A path with its leading slash, or '' where the
+		 *	page has none or is routed by a pattern, which no window can go to
+		 *
+		 *	@param		{Object}	httpUris			Language => address, '' for the address of every language
+		 *
+		 *	@return		{string}
+		 */
+		_publicPath : function( httpUris ) {
+
+			const wanted = [ Nino.admin.routes._selectedLocale, '' ].concat( Object.keys( httpUris ) );
+			const found = wanted.find( function( key ) { return typeof httpUris[key] === 'string' && httpUris[key].trim() !== '' } );
+
+			if( found === undefined )
+				return '';
+
+			const address = httpUris[found].trim();
+
+			// A page a feature routes by a pattern - /blog/* - is no address
+			if( address.indexOf('*') !== -1 )
+				return '';
+
+			return address.charAt(0) === '/' ? address : '/'+ address;
+		},
+
+		/**
 		 *	What a page is called in the list: its name in the language the
 		 *	workbench is on, else in the first language that has one, else its
 		 *	path - a page with no name at all is still a row somebody can open
@@ -1124,7 +1152,8 @@
 					report( false );
 					return;
 				}
-				Nino.admin.touch( 'routes' );
+				// The page that was saved is the one a window beside this one goes to
+				Nino.admin.touch( 'routes', Nino.admin.routes._publicPath( addressed.httpUris ) );
 				line.saved();
 				if( typeof Nino.admin.dirty === 'object' )
 					Nino.admin.dirty.snapshot( 'routes' );
@@ -1170,14 +1199,15 @@
 		_saveRuntime : function( text, report ) {
 
 			const line = Nino.admin.routes._line;
+			const page = Nino.admin.routes._currentRuntime;
 
-			Nino.admin.routes._apiCall( 'savetexts', { uri : Nino.admin.routes._currentRuntime.uri, text : text }, function( status, response ) {
+			Nino.admin.routes._apiCall( 'savetexts', { uri : page.uri, text : text }, function( status, response ) {
 				if( status !== 200 || response === null ) {
 					line.error( status, response, '/_admin/common/error/save' );
 					report( false );
 					return;
 				}
-				Nino.admin.touch( 'routes' );
+				Nino.admin.touch( 'routes', Nino.admin.routes._publicPath( { '' : page.httpUri } ) );
 				line.saved();
 				if( typeof Nino.admin.dirty === 'object' )
 					Nino.admin.dirty.snapshot( 'routes' );

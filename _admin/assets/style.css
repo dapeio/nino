@@ -2664,6 +2664,99 @@ a {
 	letter-spacing: -.035em;
 }
 
+/* ------------------------------------------------------ The follow window */
+
+/*	A bar and the frame below it, the frame taking what is left of the height:
+ *	the window is meant to stand beside the workbench, so it is a screen of its
+ *	own and scrolls nowhere itself - the website scrolls in its frame. The bar
+ *	keeps to one line on every width: the address gives way (it ends in an
+ *	ellipsis) before anything else does. */
+.nino-admin-follow {
+	display: flex;
+	flex-direction: column;
+	height: 100dvh;
+	min-width: 20rem;
+}
+
+.nino-admin-follow-bar {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: .6rem;
+	min-height: var(--nino-admin-head-height);
+	padding: .35rem 1rem;
+	border-bottom: 1px solid var(--editor-separator);
+	background: var(--editor-bar-bg);
+}
+
+.nino-admin-follow-back,
+.nino-admin-follow-bar > button {
+	flex: none;
+	white-space: nowrap;
+}
+
+.nino-admin-follow-path {
+	flex: 1 1 0;
+	min-width: 0;
+	overflow: hidden;
+	color: var(--editor-text-secondary);
+	font-size: .84rem;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.nino-admin-follow-switch {
+	flex: none;
+}
+
+.nino-admin-follow-switch .nino-admin-switch {
+	min-height: 0;
+	padding-block: 0;
+	white-space: nowrap;
+}
+
+.nino-admin-follow-switch .nino-admin-switch-copy {
+	flex: none;
+}
+
+.nino-admin-follow-switch .nino-admin-switch-state {
+	min-width: 1.6rem;
+	margin-top: 0;
+	text-align: left;
+}
+
+.nino-admin-follow-main {
+	display: flex;
+	flex: 1 1 0;
+	min-height: 0;
+}
+
+.nino-admin-follow-frame {
+	flex: 1 1 auto;
+	width: 100%;
+	height: 100%;
+	border: 0;
+	background: var(--editor-bg);
+}
+
+@media (max-width: 38rem) {
+	.nino-admin-follow-bar {
+		gap: .45rem;
+		padding-inline: .6rem;
+	}
+
+	.nino-admin-follow-switch .nino-admin-switch {
+		gap: .45rem;
+	}
+
+	/* The word beside the knob gives way on a phone, as does the label (see
+	   the workbench's own rules below): the bar has no second line, and the
+	   address is what is left to give */
+	.nino-admin-follow-switch .nino-admin-switch-state {
+		display: none;
+	}
+}
+
 /* --------------------------------------------------------- Shared sidebars */
 
 @media (min-width: 64rem) {
@@ -3291,6 +3384,63 @@ a {
 #admin-user-logout {
 	flex: 0 0 auto;
 }
+/*	The window of the website, beside "Log out" (see templates/page-follow.tpl):
+ *	an icon and its word. Where the account block has no room for the word - the
+ *	top bar of a phone, and the folded rail, which keeps this one link of the
+ *	block - the word stays for a screen reader and the icon is the link */
+#admin-user-follow {
+	display: inline-flex;
+	flex: 0 0 auto;
+	align-items: center;
+	gap: .3rem;
+	min-width: 24px;
+	min-height: 24px;
+	margin-left: .75rem;
+	white-space: nowrap;
+}
+#admin-user-follow svg {
+	width: 16px;
+	height: 16px;
+}
+@media (max-width: 63.99rem) {
+	#admin-user-follow {
+		justify-content: center;
+		margin-left: 0;
+	}
+}
+/*	What gives way to a narrow place stays for a screen reader (the rule of
+ *	.nino-admin-sr-only, once for everything here that does): the word of the
+ *	link until the rail is wide and open, the label of the follow window's
+ *	switch until the bar has room for it */
+#admin-user-follow span,
+#admin-follow-wrap .nino-admin-switch-copy {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+}
+@media (min-width: 64rem) {
+	#admin-page-wrap:not(.nino-admin-shell--folded) #admin-user-follow span {
+		position: static;
+		width: auto;
+		height: auto;
+		margin: 0;
+		overflow: visible;
+		clip-path: none;
+	}
+}
+@media (min-width: 38.01rem) {
+	#admin-follow-wrap .nino-admin-switch-copy {
+		position: static;
+		width: auto;
+		height: auto;
+		margin: 0;
+		overflow: visible;
+		clip-path: none;
+	}
+}
 /*	Click/tap-toggled (see script.js), not :hover - touch devices have no real
  *	hover state and a :hover-only menu is unreachable by keyboard entirely.
  *	Open/closed is the same .admin-hidden utility every drill-down uses. */
@@ -3486,6 +3636,22 @@ body.theme-dark #admin-theme-toggle .admin-theme-toggle-dark {
 	#admin-page-wrap.nino-admin-shell--folded .admin-brand {
 		flex-direction: column;
 		gap: .45rem;
+	}
+	/*	The account block waits for the unfold, and the window of the website
+	 *	is the one thing in it that stays: its icon, in the middle of the column */
+	#admin-page-wrap.nino-admin-shell--folded #admin-user {
+		display: flex;
+		justify-content: center;
+		margin: 0;
+		padding: .4rem 0;
+		background: none;
+	}
+	#admin-page-wrap.nino-admin-shell--folded #admin-user > :not(#admin-user-follow) {
+		display: none;
+	}
+	#admin-page-wrap.nino-admin-shell--folded #admin-user-follow {
+		justify-content: center;
+		margin: 0;
 	}
 }
 

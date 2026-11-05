@@ -879,6 +879,23 @@ form offers a page template the Builder has just created; Text and Images read
 `show: 'keep'` with `stamps: [ 'templates' ]`. The counters live as long as the
 page does: a page that is loaded anew asks the server for everything.
 
+`touch()` has a second form, `Nino.admin.touch( topic, uri )`, for a writer that
+knows which page of the website the write was about. The first argument raises
+the counter of the kind, as above; besides, `touch()` posts `{ kind, uri, at }` on a
+`BroadcastChannel` named `nino-admin:` and the directory the installation is in
+(`data-dir` of the shell, empty at the root, so that two installations on one
+origin do not hear each other): `kind` is the topic, `at` the time in
+milliseconds, and `uri` the address given - a path of the website, which starts
+with a slash - or `null` where there is none, or where it is anything else. A
+name that is none of the six kinds counts nothing and posts nothing, and a browser
+without `BroadcastChannel` posts nothing and throws nothing. Whoever listens is
+another window: the [follow window](../_admin.md#following-the-website) loads the
+website anew after every message, and goes to the `uri` when it has one. The
+`uri` is the address of the page *the writer knows* - the path the Routes panel
+has just saved a page at - and nothing the writer would have to look up; a panel
+that cannot name a page calls `touch( topic )`, and the window loads the page it
+shows.
+
 ```js
 // A catalogue of the page templates, drawn from what the server holds: when the
 // Builder (or any panel) touched the templates since, showing the panel asks again
@@ -892,6 +909,9 @@ Nino.admin.catalog = Nino.adminUi.panel( {
 
 // ...and the write of the panel that creates one
 Nino.admin.touch( 'templates' );
+
+// A write that was about one page of the website says which
+Nino.admin.touch( 'routes', '/blog/hello' );
 ```
 
 ## Saying what happened

@@ -442,6 +442,10 @@
 		// panels write, none of them ever lower than it was
 		_stamps : { templates : 0, texts : 0, elements : 0, slots : 0, routes : 0, navigations : 0 },
 
+		// The channel touch() tells the other windows of this installation on,
+		// opened by the first touch and kept (see _broadcast())
+		_channel : null,
+
 		/**
 		 *	Say that data of a kind was written. A panel that writes something
 		 *	another panel shows calls this after the write has succeeded - a
@@ -451,16 +455,53 @@
 		 *	when it is shown again, by comparing the stamp it was loaded with to
 		 *	the one the kind has by then (see stamp(), and the stamps option of
 		 *	Nino.adminUi.panel()). A counter and a comparison: nothing is
-		 *	listening, nothing is told, and a panel nobody opens costs nothing.
+		 *	listening in the page, nothing is told, and a panel nobody opens
+		 *	costs nothing. A window next to the page is told, on a channel (see
+		 *	_broadcast()): the follow window loads the website anew.
 		 *	A kind that is not in the list is nobody's, and is ignored
 		 *
 		 *	@param		{string}	topic					templates, texts, elements, slots, routes or navigations
+		 *	@param		{string}	[uri]					The address of the page the write was about, where the writer knows it: a path of the website, which starts with a slash
 		 *
 		 *	@return		void
 		 */
-		touch : function( topic ) {
-			if( Object.prototype.hasOwnProperty.call( Nino.admin._stamps, topic ) === true )
-				Nino.admin._stamps[topic]++;
+		touch : function( topic, uri ) {
+			if( Object.prototype.hasOwnProperty.call( Nino.admin._stamps, topic ) === false )
+				return;
+
+			Nino.admin._stamps[topic]++;
+			Nino.admin._broadcast( topic, uri );
+		},
+
+		/**
+		 *	Tell the other windows of this installation that data of a kind was
+		 *	written: { kind, uri, at } on the channel 'nino-admin:' and the
+		 *	directory the installation is in (data-dir of the shell, empty at the
+		 *	root), so that two installations on one origin do not hear each
+		 *	other. A uri is the address of a page and carries only if it is a
+		 *	string that starts with a slash, otherwise it is null. A browser
+		 *	without BroadcastChannel tells nobody, and nothing throws: the
+		 *	stamps are what a page keeps, this is for the window beside it
+		 *
+		 *	@param		{string}	kind
+		 *	@param		{*}				uri
+		 *
+		 *	@return		void
+		 */
+		_broadcast : function( kind, uri ) {
+			try {
+				if( Nino.admin._channel === null ) {
+					if( typeof wn.BroadcastChannel !== 'function' )
+						return;
+					const wrap = dc.getElementById('admin-page-wrap');
+					const dir = wrap !== null && wrap !== undefined && wrap.dataset !== undefined && typeof wrap.dataset.dir === 'string' ? wrap.dataset.dir : '';
+					Nino.admin._channel = new wn.BroadcastChannel( 'nino-admin:'+ dir );
+				}
+				Nino.admin._channel.postMessage( { kind : kind, uri : typeof uri === 'string' && uri.charAt(0) === '/' ? uri : null, at : Date.now() } );
+			}
+			catch( e ) {
+				// A channel that cannot be opened or written to is a window that is not told
+			}
 		},
 
 		/**
