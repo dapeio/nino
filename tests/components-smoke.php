@@ -3190,6 +3190,34 @@ check( '[image] in a stack: an image field is the file it holds, its size is the
 check( '...a slot still works there, and a name that is neither a field nor a slot renders nothing', str_contains( $image, '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="">' ) === true && substr_count( $image, '<img' ) === 2 );
 check( '...and an image field with no file renders nothing', substr_count( $render( '[stack /services sort="title" limit="1"][image image][/stack]' ), '<img' ) === 0 );
 
+// An image field that fits holds a file of its own proportions, so the size written is the file's; a field that crops holds the box
+$fitPng = static function( int $width, int $height ): string {
+	$canvas = imagecreatetruecolor( $width, $height );
+	ob_start();
+	imagepng( $canvas );
+	$bytes = (string) ob_get_clean();
+	imagedestroy( $canvas );
+	return $bytes;
+};
+\Nino\Elements::insertElementType( $appData, '/marks', [
+	'mark'			=> [ 'type' => 'image', 'width' => 400, 'height' => 300, 'fit' => true ],
+	'photo'			=> [ 'type' => 'image', 'width' => 400, 'height' => 300 ],
+	'lost'			=> [ 'type' => 'image', 'width' => 400, 'height' => 300, 'fit' => true ],
+] );
+\Nino\Filesystem::putFileContent( $appData, '/images/marks/a-mark.fit400x300.png', $fitPng( 300, 50 ) );
+\Nino\Filesystem::putFileContent( $appData, '/images/marks/a-photo.400x300.png', $fitPng( 400, 300 ) );
+\Nino\Elements::insertElement( $appData, '/marks/a', [ 'mark' => 'marks/a-mark.fit400x300.png', 'photo' => 'marks/a-photo.400x300.png', 'lost' => 'marks/gone.fit400x300.png' ], 'de_DE' );
+\Nino\Filesystem::putFileContent( $appData, '/images/marks/a-old.fit400x300.png', $fitPng( 80, 120 ) );
+\Nino\Elements::insertElement( $appData, '/marks/b', [ 'photo' => 'marks/a-old.fit400x300.png', 'mark' => "marks/a\0.fit400x300.png" ], 'de_DE' );
+$marks = $render( '[stack /marks][image mark][image photo][image lost][/stack]' );
+$marksB = $render( '[stack /marks sort="title" offset="1" limit="1"][image mark][image photo][/stack]' );
+check( '[image] of a field that fits writes the width and height of its file, not of the box', str_contains( $marks, '<img src="/public/images/marks/a-mark.fit400x300.png" width="300" height="50" alt="">' ) === true );
+check( '...a field that crops still writes the box, and a fit field whose file cannot be read the box as well', str_contains( $marks, '<img src="/public/images/marks/a-photo.400x300.png" width="400" height="300" alt="">' ) === true
+	&& str_contains( $marks, '<img src="/public/images/marks/gone.fit400x300.png" width="400" height="300" alt="">' ) === true );
+check( '...a file named like a fit keeps its own size under a field that does not fit, as it was drawn before the field lost the key, and a name with a null byte draws its box and no exception',
+	str_contains( $marksB, '<img src="/public/images/marks/a-old.fit400x300.png" width="80" height="120" alt="">' ) === true
+	&& substr_count( $marksB, '<img' ) === 2 && str_contains( $marksB, 'height="300"' ) === true );
+
 // [logo]: the pictures of two slots in one set, the ground says which is seen
 $logoUrl = '/public/images/logo.500x100.png';
 $logoDarkUrl = '/public/images/logo-dark.500x100.png';

@@ -311,6 +311,21 @@ ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiSave' ], [ 'uri' 
 ] ] );
 check( 'a link whose target stopped being a per-language field is dropped on the next save', array_key_exists( 'alt', \Nino\Filesystem::getFileContent( $appData, '/elements/alttype.php', false )['model']['photo'] ?? [ 'alt' => 1 ] ) === false );
 
+// An image field may be set into its box instead of cut to it. 'fit' is a boolean on an image
+// and nothing else: whatever else is posted is dropped, and so is it from a field that is no image
+[ $status ] = ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiCreate' ], [ 'uri' => 'fittype', 'title' => 'Fit Type', 'model' => [
+	'logo' 		=> [ 'type' => 'image', 'width' => 200, 'height' => 100, 'fit' => true ],
+	'plain' 	=> [ 'type' => 'image', 'width' => 200, 'height' => 100 ],
+	'off' 		=> [ 'type' => 'image', 'width' => 200, 'height' => 100, 'fit' => false ],
+	'text' 		=> [ 'type' => 'image', 'width' => 200, 'height' => 100, 'fit' => 'true' ],
+	'number' 	=> [ 'type' => 'image', 'width' => 200, 'height' => 100, 'fit' => 1 ],
+	'title' 	=> [ 'type' => 'string', 'fit' => true ],
+] ] );
+$fitModel = \Nino\Filesystem::getFileContent( $appData, '/elements/fittype.php', false )['model'] ?? [];
+check( 'an image field keeps fit as a boolean true, next to its box', $status === 200 && ( $fitModel['logo'] ?? null ) === [ 'type' => 'image', 'width' => 200, 'height' => 100, 'fit' => true ] );
+check( '...and writes nothing for a field without it, with false, or with anything that is not a boolean', array_filter( [ 'plain', 'off', 'text', 'number' ], static fn( string $key ): bool => array_key_exists( 'fit', $fitModel[$key] ?? [ 'fit' => 'missing field' ] ) ) === [] );
+check( '...and a field that is no image never carries it', array_key_exists( 'fit', $fitModel['title'] ?? [ 'fit' => 1 ] ) === false );
+
 echo "\n";
 
 

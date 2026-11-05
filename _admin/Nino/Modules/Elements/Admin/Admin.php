@@ -330,7 +330,8 @@ namespace Nino\Modules\Elements {
 		 *	itself changed, eg. jpeg -> png) is cleaned up once the new file is
 		 *	safely written and the element record actually updated. The answer
 		 *	says how large the picture is as it is shown and whether that is
-		 *	smaller than the field's target size, which crop mode scales up
+		 *	smaller than the field's target size, which crop mode scales up and
+		 *	a field that fits does not
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -420,7 +421,12 @@ namespace Nino\Modules\Elements {
 			if( $isLocaleField === true )
 				$basePath .= '-'. $locale;
 
-			$filename = \Nino\Images::process( $appData, $bytes, $width, $height, $basePath );
+			// A field that fits sets the whole picture into its box, a field that
+			// does not cuts the picture to it
+			$fit			= ( $model[$key]['fit'] ?? false ) === true;
+			$filename = $fit === true
+				? \Nino\Images::fit( $appData, $bytes, $width, $height, $basePath )
+				: \Nino\Images::process( $appData, $bytes, $width, $height, $basePath );
 
 			// The bytes are an image the kernel accepts, so this is gd or a
 			// render callback giving up on one - or the file not being written,
@@ -453,7 +459,8 @@ namespace Nino\Modules\Elements {
 			$shown = \Nino\Images::size( $bytes );
 			if( $shown !== false ) {
 				$body['source']				= [ 'width' => $shown['width'], 'height' => $shown['height'] ];
-				$body['belowTarget']	= $shown['width'] < $width || $shown['height'] < $height;
+				// Only a crop is scaled up; a fit keeps the size a small picture has
+				$body['belowTarget']	= $fit === false && ( $shown['width'] < $width || $shown['height'] < $height );
 			}
 
 			\Nino\Http::ok( $request, $body );
@@ -522,7 +529,9 @@ namespace Nino\Modules\Elements {
 			}
 
 			// The exact name apiUploadImage() writes, "-key" and "-locale" only
-			// where it adds them: elements/<type>/<uri>[-<key>][-<locale>].<w>x<h>.<ext>
+			// where it adds them: elements/<type>/<uri>[-<key>][-<locale>].<w>x<h>.<ext>,
+			// or .fit<w>x<h>.<ext> for a picture set into its box - a picture
+			// cut to the box, under a field that has no 'fit' or lost it, is as much its own
 			$imageFieldCount = 0;
 			foreach( $model as $modelField )
 				if( ( $modelField['type'] ?? '' ) === 'image' )
@@ -534,7 +543,7 @@ namespace Nino\Modules\Elements {
 			if( $isLocaleField === true )
 				$basePath .= '-'. $locale;
 
-			$owned = preg_match( '#^'. preg_quote( $basePath, '#' ). '\.\d+x\d+\.[a-z0-9]+$#', $old ) === 1;
+			$owned = preg_match( '#^'. preg_quote( $basePath, '#' ). '\.(?:fit)?\d+x\d+\.[a-z0-9]+$#', $old ) === 1;
 
 			if( $owned === true && in_array( $old, self::imageFilenames( $appData, $type, $elementUri ), true ) === false )
 				\Nino\Images::delete( $appData, $old );

@@ -207,7 +207,7 @@ namespace Nino\Modules\Elements {
 		 *	Validate a posted model definition, dropping anything malformed -
 		 *	same rules as \Nino\Elements::insertElementType(), plus width/height for
 		 *	image fields, maxlength and inputsize for string fields, the referenced type for
-		 *	element fields, a fixed unit suffix for every type but boolean/
+		 *	element fields, 'fit' for an image that is set into its box, a fixed unit suffix for every type but boolean/
 		 *	image/element, a plain string list for options, for an image
 		 *	field the string field that holds its alt text (see below), and for
 		 *	a string field what goes with its html - 'blocks' for paragraphs and
@@ -264,6 +264,12 @@ namespace Nino\Modules\Elements {
 				if( $data['type'] === 'image' ) {
 					$field['width'] 	= max( 1, (int) ( $data['width'] ?? 0 ) );
 					$field['height'] 	= max( 1, (int) ( $data['height'] ?? 0 ) );
+
+					// The picture is set into the box instead of cut to it (see
+					// \Nino\Images::fit()); written only when wanted, a field
+					// without it is cut to its box
+					if( ( $data['fit'] ?? false ) === true )
+						$field['fit'] = true;
 
 					// The field that holds this picture's alt text, per language.
 					// Only kept as the name here: whether it names a field that can

@@ -2575,10 +2575,16 @@ namespace Nino\Modules {
 				$link		= $context['model'][$reference]['alt'] ?? null;
 				$stored	= is_string( $link ) === true ? ( $context['element'][$link] ?? '' ) : '';
 
+				// The field's box is the size of a picture cut to it; one set into
+				// the box (fit) has the size its file has - the field's, or a file
+				// that carries the name of one, whatever the field says today
+				$fits = ( $context['model'][$reference]['fit'] ?? false ) === true || preg_match( '/\.fit\d+x\d+\.[a-z0-9]+$/D', $filename ) === 1;
+				$size = $fits === true ? \Nino\Images::dimensions( $appData, $filename ) : false;
+
 				return [
 					'url'			=> \Nino\Images::getUrl( $appData, $filename ),
-					'width'		=> (int) ( $context['model'][$reference]['width'] ?? 0 ),
-					'height'	=> (int) ( $context['model'][$reference]['height'] ?? 0 ),
+					'width'		=> $size !== false ? $size['width'] : (int) ( $context['model'][$reference]['width'] ?? 0 ),
+					'height'	=> $size !== false ? $size['height'] : (int) ( $context['model'][$reference]['height'] ?? 0 ),
 					'alt'			=> is_string( $stored ) === true ? $stored : '',
 				];
 			}

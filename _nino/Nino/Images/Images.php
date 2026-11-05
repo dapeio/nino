@@ -643,6 +643,28 @@ namespace Nino {
 		}
 
 		/**
+		 *	The size a stored image really has, read off its header - for a
+		 *	picture set into a box by fit() it is not the box. A filename that
+		 *	is empty, absolute, climbs out with '..' or holds a null byte is refused
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$filename			A filename below /images/, as process() and fit() answered it
+		 *
+		 *	@return 	array|false						[ 'width', 'height' ], or false for a file that is not there or no image
+		 */
+		public static function dimensions( array &$appData, string $filename ): array|false {
+
+			// A null byte makes the path '' and getimagesize() throw on it; the
+			// name is a stored value, which a save can set to any string
+			if( $filename === '' || str_contains( $filename, '..' ) === true || str_starts_with( $filename, '/' ) === true || str_contains( $filename, "\0" ) === true )
+				return false;
+
+			$info = @getimagesize( \Nino\Filesystem::path( $appData, self::UPLOAD_DIR. '/'. $filename ) );
+
+			return $info === false ? false : [ 'width' => $info[0], 'height' => $info[1] ];
+		}
+
+		/**
 		 *	Read a previously processed image for a short-lived rollback snapshot.
 		 *	Element image replacement normally overwrites a deterministic filename
 		 *	in place; if the following metadata update is vetoed, the panel must be

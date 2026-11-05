@@ -671,11 +671,13 @@ $appData['/nino/images/webp'] = false;
  *	outside a real http upload context
  *
  *	@param		bool	$alpha		Encode as png (with transparency) instead of jpeg
+ *	@param		int		$width		The picture's size, 300 x 150 unless said
+ *	@param		int		$height
  *
  *	@return		string	The temp file path
  */
-function fakeUploadedFile( bool $alpha = false, int $variant = 0 ): string {
-	$img = imagecreatetruecolor( 300, 150 );
+function fakeUploadedFile( bool $alpha = false, int $variant = 0, int $width = 300, int $height = 150 ): string {
+	$img = imagecreatetruecolor( $width, $height );
 	if( $alpha === true ) {
 		imagealphablending( $img, false );
 		imagesavealpha( $img, true );
@@ -698,8 +700,8 @@ function fakeUploadedFile( bool $alpha = false, int $variant = 0 ): string {
  *
  *	@return		array			[ statusCode, body, request ]
  */
-function callUploadImage( array &$appData, array $data, bool $alpha = false, int $variant = 0 ): array {
-	$path = fakeUploadedFile( $alpha, $variant );
+function callUploadImage( array &$appData, array $data, bool $alpha = false, int $variant = 0, int $width = 300, int $height = 150 ): array {
+	$path = fakeUploadedFile( $alpha, $variant, $width, $height );
 	$_FILES['file'] = [ 'tmp_name' => $path, 'error' => UPLOAD_ERR_OK, 'name' => 'test.jpg', 'size' => filesize( $path ) ];
 	$response = ninoCall( $appData, [ \Nino\Modules\Elements\Admin::class, 'apiUploadImage' ], $data );
 	@unlink( $path );
@@ -878,6 +880,49 @@ check( 'a hand-set name that starts like the element\'s own, with a suffix its u
 \Nino\Elements::updateElement( $appData, '/imageremove/item1', [ 'photo' => $otherBody['filename'] ], 'de_DE' );
 callRemoveImage( $appData, [ 'type' => 'imageremove', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ] );
 check( 'a file named like another element\'s upload is not taken for this element\'s own', is_file( \Nino\Filesystem::path( $appData, '/images/'. $otherBody['filename'] ) ) === true );
+
+// An image field that fits sets the whole picture into its box: the file keeps the
+// proportions of the source, stays inside the box, and has a name of its own
+\Nino\Elements::insertElementType( $appData, '/imagefit', [
+	'logo' 	=> [ 'type' => 'image', 'width' => 100, 'height' => 60, 'fit' => true ],
+	'crop' 	=> [ 'type' => 'image', 'width' => 100, 'height' => 60 ],
+] );
+\Nino\Elements::insertElement( $appData, '/imagefit/item1', [], 'de_DE' );
+$fitData = [ 'type' => 'imagefit', 'uri' => 'item1', 'locale' => 'de_DE' ];
+
+[ $status, $body ] = callUploadImage( $appData, $fitData + [ 'key' => 'logo' ], false, 0, 800, 100 );
+$wideFile = \Nino\Filesystem::path( $appData, '/images/'. ( $body['filename'] ?? '-' ) );
+check( 'an upload to a field that fits is named for the box it fits - ".fit<W>x<H>" - and sits in the box with the proportions of its source', $status === 200
+	&& ( $body['filename'] ?? null ) === 'elements/imagefit/item1-logo.fit100x60.jpg' && is_file( $wideFile ) === true
+	&& array_slice( getimagesize( $wideFile ), 0, 2 ) === [ 100, 13 ] );
+check( '...and it says nothing of a size below the target, which a fit never scales up', ( $body['belowTarget'] ?? null ) === false && ( $body['source'] ?? null ) === [ 'width' => 800, 'height' => 100 ] );
+
+[ $status, $body ] = callUploadImage( $appData, $fitData + [ 'key' => 'logo' ], false, 0, 200, 300 );
+check( 'a tall source of the same field is as high as the box and as wide as its proportions say, and replaces the first file', $status === 200 && ( $body['filename'] ?? null ) === 'elements/imagefit/item1-logo.fit100x60.jpg'
+	&& array_slice( getimagesize( $wideFile ), 0, 2 ) === [ 40, 60 ] );
+
+[ $status, $body ] = callUploadImage( $appData, $fitData + [ 'key' => 'logo' ], false, 0, 40, 20 );
+check( 'a source smaller than the box keeps its own size, and the upload does not call that scaled up', $status === 200 && array_slice( getimagesize( $wideFile ), 0, 2 ) === [ 40, 20 ] && ( $body['belowTarget'] ?? null ) === false );
+
+[ $status, $body ] = callUploadImage( $appData, $fitData + [ 'key' => 'crop' ], false, 0, 800, 100 );
+$cropFile = \Nino\Filesystem::path( $appData, '/images/'. ( $body['filename'] ?? '-' ) );
+check( 'a field without fit is cut to its box: the exact size, and the name without fit', $status === 200 && ( $body['filename'] ?? null ) === 'elements/imagefit/item1-crop.100x60.jpg'
+	&& array_slice( getimagesize( $cropFile ), 0, 2 ) === [ 100, 60 ] && ( $body['belowTarget'] ?? null ) === false );
+
+[ $status, $body ] = callRemoveImage( $appData, $fitData + [ 'key' => 'logo' ] );
+check( 'removing the image of a field that fits deletes its file and no other of the element', $status === 200 && is_file( $wideFile ) === false && is_file( $cropFile ) === true
+	&& ( \Nino\Elements::getElement( $appData, '/imagefit/item1', '*' )['logo'] ?? 'x' ) === '' );
+
+// A picture the field cut before it was given fit is the field's own as well, and goes with its removal
+\Nino\Filesystem::putFileContent( $appData, '/images/elements/imagefit/item1-logo.100x60.jpg', 'a picture cut before' );
+\Nino\Elements::updateElement( $appData, '/imagefit/item1', [ 'logo' => 'elements/imagefit/item1-logo.100x60.jpg' ], 'de_DE' );
+callRemoveImage( $appData, $fitData + [ 'key' => 'logo' ] );
+check( 'a picture cut before the field fitted is deleted by its removal', \Nino\Filesystem::fileExists( $appData, '/images/elements/imagefit/item1-logo.100x60.jpg' ) === false );
+
+// ...and the name of another element, or of the other field, is not the field's own
+\Nino\Elements::updateElement( $appData, '/imagefit/item1', [ 'logo' => 'elements/imagefit/item1-crop.100x60.jpg' ], 'de_DE' );
+callRemoveImage( $appData, $fitData + [ 'key' => 'logo' ] );
+check( 'a fit field whose value names the other field\'s file clears the value but leaves the file', is_file( $cropFile ) === true );
 
 echo "\n";
 

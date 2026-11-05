@@ -5,6 +5,7 @@
 return [
 	'[[/_admin/nav/elements]]'			=> 'Elemente',
 	'[[/_admin/elements/label/add]]'				=> 'Neues Element',
+	'[[/_admin/elements/label/image-largest]]'	=> 'Höchstmaße:',
 	'[[/_admin/elements/label/uri]]'				=> 'Uri',
 	'[[/_admin/elements/label/uri-hint]]'	=> 'Eindeutige Zeichenfolge (a-z, -, _) zur Identifikation, z. B. „offene-workshops“.',
 	'[[/_admin/elements/label/uri-numbered]]'	=> 'Dieser Typ nummeriert seine Elemente. Beim Speichern entsteht',
@@ -91,6 +92,7 @@ return [
 	'[[/_admin/error/types_referenced]]'	=> 'Andere Elementtypen verweisen noch auf diesen (%s). Entferne zuerst diese Felder.',
 	'[[/_admin/types/label/blocks]]'	=> 'Absätze und Listen',
 	'[[/_admin/types/label/breaks]]'	=> 'Zeilenumbrüche behalten',
+	'[[/_admin/types/label/fit]]'	=> 'Einpassen statt zuschneiden',
 	'[[/_admin/types/hint/renamed]]'	=> 'Die gespeicherten Werte ziehen mit dem Speichern unter den neuen Namen um.',
 	'[[/_admin/types/confirm/rename]]'	=> '%s umbenennen? Die unter den alten Namen gespeicherten Werte ziehen unter die neuen um. Nicht geändert werden Templates, die den alten Namen verwenden, Rechte für das Feld und sein Bezeichnungstext – sie werden nach dem Speichern aufgelistet.',
 	'[[/_admin/types/notice/references]]'	=> 'Umbenannt. Den alten Namen verwenden noch, ungeändert: %s.',

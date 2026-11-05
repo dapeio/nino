@@ -5,6 +5,7 @@
 return [
 	'[[/_admin/nav/elements]]'			=> 'Elements',
 	'[[/_admin/elements/label/add]]'				=> 'New element',
+	'[[/_admin/elements/label/image-largest]]'	=> 'Largest size:',
 	'[[/_admin/elements/label/uri]]'				=> 'Uri',
 	'[[/_admin/elements/label/uri-hint]]'	=> 'Unique string (a-z, -, _) used to identify this element, e.g. “open-workshops”.',
 	'[[/_admin/elements/label/uri-numbered]]'	=> 'This type numbers its elements. Saving creates',
@@ -91,6 +92,7 @@ return [
 	'[[/_admin/error/types_referenced]]'	=> 'Other element types still refer to this one (%s). Remove those fields first.',
 	'[[/_admin/types/label/blocks]]'	=> 'Paragraphs and lists',
 	'[[/_admin/types/label/breaks]]'	=> 'Keep line breaks',
+	'[[/_admin/types/label/fit]]'	=> 'Fit instead of crop',
 	'[[/_admin/types/hint/renamed]]'	=> 'The stored values move to the new name when this is saved.',
 	'[[/_admin/types/confirm/rename]]'	=> 'Rename %s? The values stored under the old names move to the new ones. Not changed: templates that use the old name, permissions granted for the field, and its label text – they are listed after saving.',
 	'[[/_admin/types/notice/references]]'	=> 'Renamed. Still using the old name, and not changed: %s.',

@@ -1404,7 +1404,8 @@ a {
 	max-height: 12rem;
 	border-radius: var(--editor-radius-sm);
 	box-shadow: inset 0 0 0 1px var(--editor-border);
-	object-fit: cover;
+	align-self: flex-start;
+	object-fit: contain;
 }
 
 :where(.nino-admin) .nino-admin-field-image input[type="file"] {

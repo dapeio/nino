@@ -62,6 +62,7 @@ function fakeRow( field ) {
 		'.admin-field-select-options' : field.type === 'string' ? { value : ( field.options ?? [] ).join(', ') } : null,
 		'.admin-field-width' 					: field.type === 'image' ? { value : field.width ?? '' } : null,
 		'.admin-field-height' 				: field.type === 'image' ? { value : field.height ?? '' } : null,
+		'.admin-field-fit' 						: field.type === 'image' ? { checked : field.fit === true } : null,
 		'.admin-field-alt' 						: field.type === 'image' ? { value : field.alt ?? '' } : null,
 		'.admin-field-suffix' 				: [ 'boolean', 'image', 'element' ].indexOf( field.type ) === -1 ? { value : field.suffix ?? '' } : null,
 		'.admin-field-element-type' 	: field.type === 'element' ? { value : field.elementType ?? '' } : null,
@@ -174,6 +175,43 @@ mountRows( elementTypes._fields );
 const formatBuilt = elementTypes._buildModel();
 check( 'a rich field\'s blocks and a plain field\'s breaks are read back and sent', formatBuilt.body.blocks === true && formatBuilt.body.breaks === false && formatBuilt.note.breaks === true && formatBuilt.note.blocks === false );
 check( 'a row without either control reads as neither', formatBuilt.count.blocks === false && formatBuilt.count.breaks === false && formatBuilt.plain.blocks === false );
+
+
+// --- an image that fits ------------------------------------------------------
+//
+// The switch of an image row is read back from its checkbox and reaches the
+// payload; a row of any other type, which has none, reads as off.
+
+elementTypes._fields = [
+	{ key : 'logo', type : 'image', width : '200', height : '100', fit : true },
+	{ key : 'photo', type : 'image', width : '200', height : '100' },
+	{ key : 'title', type : 'string' },
+];
+mountRows( elementTypes._fields );
+const fitBuilt = elementTypes._buildModel();
+check( 'an image row\'s fit switch is read back and sent, on or off', fitBuilt.logo.fit === true && fitBuilt.photo.fit === false );
+check( 'a row without the switch reads as off', fitBuilt.title.fit === false );
+
+// The row itself draws the switch: one on an image row, showing the field's setting, none on any other row
+const rowBox = { console : console, document : { getElementById : () => null, createElement : element, createTextNode : text => ( { textContent : text } ), querySelectorAll : () => [], documentElement : element( 'html' ), body : element( 'body' ) }, Event : function() {} };
+rowBox.window = rowBox;
+rowBox.Nino = { admin : {}, events : { bindCallback : function() {} }, content : { getText : key => key }, adminUi : { switchField : function() { return element( 'div' ) } } };
+load( '_admin/Nino/Modules/Elements/assets/types.js', vm.createContext( rowBox ), 'elementtypes-rows.js' );
+const rowTypes = rowBox.Nino.admin.types;
+rowTypes._fields = [];
+rowTypes._fieldTypes = [ 'string', 'image' ];
+// The fake select does not know which option is selected: the type is set on it and the change it would fire is fired
+const fitRow = function( field ) {
+	const row = rowTypes._renderFieldRow( field, 0 );
+	const typeSelect = findAll( row, node => String( node.className ).split(/\s+/).indexOf('admin-field-type') !== -1 )[0];
+	typeSelect.value = field.type;
+	fire( typeSelect, 'change' );
+	return row;
+};
+const fitControls = field => findAll( fitRow( field ), node => String( node.className ).split(/\s+/).indexOf('admin-field-fit') !== -1 );
+const fitOn = fitControls( { key : 'a', type : 'image', fit : true } ), fitOff = fitControls( { key : 'b', type : 'image' } ), fitNone = fitControls( { key : 'c', type : 'string' } );
+check( 'an image row draws exactly one fit switch, checked as the field says, and a string row none',
+	fitOn.length === 1 && fitOn[0].checked === true && fitOff.length === 1 && fitOff[0].checked === false && fitNone.length === 0 );
 
 
 // --- renaming a field --------------------------------------------------------

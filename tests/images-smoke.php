@@ -88,6 +88,14 @@ check( 'process() overwrites the same deterministic path on a repeat upload, not
 \Nino\Images::delete( $appData, $squareFilename );
 check( 'delete() removes the file', is_file( $squarePath ) === false );
 
+// dimensions() answers what a stored picture really is, and refuses a name that is no file of the images
+$boxFile = \Nino\Images::fit( $appData, makeTestImage( 400, 200 ), 100, 100, 'elements/demo/box' );
+check( 'dimensions() answers the size of the file, which for a fit is not its box', $boxFile === 'elements/demo/box.fit100x100.jpg' && \Nino\Images::dimensions( $appData, $boxFile ) === [ 'width' => 100, 'height' => 50 ] );
+check( '...false for a file that is not there', \Nino\Images::dimensions( $appData, 'elements/demo/gone.fit100x100.jpg' ) === false );
+check( '...and false, without an exception, for an empty name, an absolute one, one that climbs out and one that holds a null byte',
+	array_filter( [ '', '/'. $boxFile, 'elements/../'. $boxFile, "elements/demo/box\0.fit100x100.jpg" ], static fn( string $name ): bool => \Nino\Images::dimensions( $appData, $name ) !== false ) === [] );
+\Nino\Images::delete( $appData, $boxFile );
+
 // A png or gif is re-encoded as png: the format is the guess at the content
 // too, and what arrives as one is usually line art that jpeg would soften
 $alphaSource = makeTestImage( 100, 100, true );

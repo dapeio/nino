@@ -1305,7 +1305,8 @@
 				if( field.width && field.height ) {
 					const dimensions = dc.createElement('p');
 					dimensions.className = 'nino-admin-field-image-dimensions';
-					dimensions.textContent = Nino.content.getText('/_admin/common/label/image-target')+ ' '+ field.width+ ' × '+ field.height+ ' px';
+					// The box of a field that fits is the largest size it stores, not a size to meet
+					dimensions.textContent = Nino.content.getText( field.fit === true ? '/_admin/elements/label/image-largest' : '/_admin/common/label/image-target' )+ ' '+ field.width+ ' × '+ field.height+ ' px';
 					label.appendChild( dimensions );
 				}
 

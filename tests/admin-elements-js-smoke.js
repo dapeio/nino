@@ -1155,6 +1155,8 @@ function fakeDom() {
 	// An image field that names the field holding its alt text says so, and that field says whose it is
 	elements._currentModel = { photo : { type : 'image', width : 40, height : 30, alt : 'caption' }, caption : { type : 'string', locale : true }, plain : { type : 'image', width : 40, height : 30 } };
 	texts['/_admin/elements/hint/image-alt'] = 'ALT IN %s';
+	texts['/_admin/common/label/image-target'] = 'TARGET';
+	texts['/_admin/elements/label/image-largest'] = 'LARGEST';
 	texts['/_admin/elements/hint/alt'] = 'ALT OF %s';
 	texts['/_admin/elements/label/image-remove'] = 'Remove image';
 	const hintsOf = el => el.querySelectorAll('.nino-admin-field-hint').map( h => h.textContent );
@@ -1162,6 +1164,10 @@ function fakeDom() {
 	check( '...and the linked field names the image it is the alt text of', hintsOf( elements._renderField( 'caption', elements._currentModel.caption, 'x' ) ).join() === 'ALT OF Photo' );
 	check( 'an image without the link, and a field nobody links to, carry no such hint', hintsOf( elements._renderField( 'plain', elements._currentModel.plain, '' ) ).length === 0
 		&& hintsOf( elements._renderField( 'other', { type : 'string' }, 'x' ) ).length === 0 );
+	const dimensionsOf = el => el.querySelector('.nino-admin-field-image-dimensions').textContent;
+	check( 'an image field that crops names its box as the target size, one that fits as the largest size it stores',
+		dimensionsOf( elements._renderField( 'photo', elements._currentModel.photo, 'a.jpg' ) ) === 'TARGET 40 × 30 px'
+		&& dimensionsOf( elements._renderField( 'logo', { type : 'image', width : 40, height : 30, fit : true }, 'a.jpg' ) ) === 'LARGEST 40 × 30 px' );
 	const withImage = elements._renderField( 'photo', elements._currentModel.photo, 'a.jpg' );
 	const withoutImage = elements._renderField( 'photo', elements._currentModel.photo, '' );
 	const removeOf = el => el.querySelectorAll('button').filter( b => b.className === 'nino-admin-btn-danger' )[0];

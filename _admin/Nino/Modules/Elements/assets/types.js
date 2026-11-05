@@ -270,7 +270,7 @@
 		 *	width+height and the field holding the alt text for image; the referenced type for element; suffix for
 		 *	the types the server names, see _suffixTypes; options for a fixed value list)
 		 *
-		 *	@param		{Object}	field					{ key, originalKey, type, locale, html, blocks, breaks, required, maxlength, inputsize, width, height, alt, elementType, suffix, options }
+		 *	@param		{Object}	field					{ key, originalKey, type, locale, html, blocks, breaks, required, maxlength, inputsize, width, height, fit, alt, elementType, suffix, options }
 		 *	@param		{number}	index					Index into _fields, for the remove button
 		 *
 		 *	@return		{Element}
@@ -587,6 +587,17 @@
 					heightInput.value = field.height ?? '';
 					optionsWrap.appendChild( heightInput );
 
+					// Set the picture into the box instead of cutting it to the
+					// box (Types.php's cleanModel() keeps it for an image only)
+					const fitLabel = dc.createElement('label');
+					const fitCheck = dc.createElement('input');
+					fitCheck.type = 'checkbox';
+					fitCheck.className = 'admin-field-fit';
+					fitCheck.checked = field.fit === true;
+					fitLabel.appendChild( fitCheck );
+					fitLabel.appendChild( dc.createTextNode( ' '+ Nino.content.getText('/_admin/types/label/fit') ) );
+					optionsWrap.appendChild( fitLabel );
+
 					// Which string field holds this picture's alt text. Only a field
 					// that can: written per language, plain text, and not the image
 					// itself (Types.php's cleanModel() decides the same on save).
@@ -766,6 +777,8 @@
 					inputsize : row.querySelector('.admin-field-inputsize')?.value,
 					width 		: row.querySelector('.admin-field-width')?.value,
 					height 		: row.querySelector('.admin-field-height')?.value,
+					// Absent on every row but an image
+					fit 			: ( row.querySelector('.admin-field-fit')?.checked ) ?? false,
 					// The string field that holds an image's alt text - absent on every row but an image
 					alt 			: ( row.querySelector('.admin-field-alt')?.value ) ?? '',
 					suffix 		: ( row.querySelector('.admin-field-suffix')?.value ) ?? '',
@@ -1238,6 +1251,7 @@
 					inputsize 	: field.inputsize,
 					width 			: field.width,
 					height 			: field.height,
+					fit 				: field.fit,
 					alt 				: field.alt,
 					suffix 			: field.suffix,
 					elementType : field.elementType,
