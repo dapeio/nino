@@ -305,20 +305,23 @@ a {
 	text-transform: uppercase;
 }
 
-/* The mode the project is in, as one word in the head of the rail: a pill
-   like the badge below, and a link to where it is switched. Production is
-   quiet, in the colour of the rail's other secondary text; development is
-   the warning colour - the one the unsaved state is painted in - on a tint
-   of it, so that a site that is being built is never mistaken for a live
-   one. The word says it as well: the colour is never the only signal. Until
-   the shell has written the word there is nothing to show, and an account
-   without the panel that switches it gets the word without the link */
+/* A site that is being built says so, as one word at the end of the account
+   block in the head of the rail: a pill like the badge below, and a link to
+   where the mode is switched. It is the warning colour - the one the unsaved
+   state is painted in - on a tint of it over the surface of a card, which keeps
+   the word readable on the grey of the block, so that a site that is being
+   built is never mistaken for a live one; the word says it as well, the colour
+   is never the only signal. A live site says nothing: until the shell has
+   written the word, and while the mode is production, there is nothing to
+   show. An account without the panel that switches it gets the word without
+   the link */
 :where(.nino-admin) .nino-admin-mode-chip {
 	display: inline-flex;
 	flex: 0 0 auto;
 	align-items: center;
-	align-self: flex-start;
+	align-self: center;
 	min-height: 1.6rem;
+	margin-left: auto;
 	padding: .1rem .6rem;
 	border: 1px solid currentColor;
 	border-radius: 999px;
@@ -339,13 +342,13 @@ a {
 }
 
 :where(.nino-admin) .nino-admin-mode-chip--development {
-	background: color-mix(in srgb, var(--editor-orange) 5%, transparent);
+	background: color-mix(in srgb, var(--editor-orange) 5%, var(--editor-bg-elevated));
 	color: var(--editor-orange-ink);
 }
 
 /* On a phone the rail is a row, and the whole word took the room of the account
    beside it: the chip keeps to its first letter in a round, as on a folded
-   rail, and the word is its title */
+   rail; its word is read out and the sentence of the mode is its title */
 @media (max-width: 38rem) {
 	:where(.nino-admin) .nino-admin-mode-chip {
 		display: grid;
@@ -2809,11 +2812,6 @@ a {
 		box-shadow: none;
 	}
 
-	/* Under the brand row, in the column the head is */
-	.nino-admin .nino-admin-rail-head > .nino-admin-mode-chip {
-		margin-block: .65rem .15rem;
-	}
-
 	.nino-admin .nino-admin-rail-user {
 		padding: .3rem .5rem .1rem 1.4rem;
 		border-color: var(--nino-admin-rail-border);
@@ -3032,19 +3030,22 @@ a {
 
 	/* The chip keeps to its first letter, in a round of its own: its word is
 	   read out as it was, and the letter is not (the empty alternative) */
-	.nino-admin-shell--folded .nino-admin-rail-head > .nino-admin-mode-chip {
+	.nino-admin-shell--folded .nino-admin-rail-user > .nino-admin-mode-chip {
 		display: grid;
 		place-items: center;
 		align-self: center;
 		width: 1.7rem;
 		height: 1.7rem;
-		/* Under the fold button, which is fixed to the column below the brand mark */
-		margin-block: 2.15rem 0;
+		margin: 0;
 		padding: 0;
 		font-size: 0;
 	}
 
-	.nino-admin-shell--folded .nino-admin-rail-head > .nino-admin-mode-chip::before {
+	.nino-admin-shell--folded .nino-admin-rail-user > .nino-admin-mode-chip:empty {
+		display: none;
+	}
+
+	.nino-admin-shell--folded .nino-admin-rail-user > .nino-admin-mode-chip::before {
 		content: attr(data-initial);
 		content: attr(data-initial) / "";
 		font-size: .78rem;
@@ -3338,8 +3339,9 @@ a {
 	gap: .65rem;
 	min-width: 0;
 }
-/*	On the desktop the head of the rail is the brand row: the account row
- *	under it is the first thing in the rail's body, not part of the head. The
+/*	On the desktop the head of the rail is the brand row: the account block
+ *	under it is the first thing in the rail's body, not part of the head, and
+ *	it starts at the line that closes the brand row, with no space between. The
  *	row is as high as a panel's head and closed by the same line, bled through
  *	the padding of the rail and of its head to both edges, so that the two
  *	lines are one line across the workbench (see the head of a panel above).
@@ -3354,7 +3356,7 @@ a {
 		padding-top: 0;
 	}
 	#admin-page-wrap .nino-admin-rail-head {
-		gap: .5rem;
+		gap: 0;
 	}
 	/* The bleed is the rail's inline padding plus the head's own */
 	#admin-page-wrap .nino-admin-rail-head > .admin-brand {
@@ -3376,44 +3378,52 @@ a {
 		top: calc(var(--nino-admin-head-height) + .25rem);
 	}
 }
+/*	On a phone the brand and the account share one row, and the address is what
+ *	gives way: the brand keeps the room of its words */
+@media (max-width: 38rem) {
+	#admin-page-wrap .nino-admin-rail-head > .admin-brand {
+		flex-shrink: 0;
+	}
+}
 #admin-user-email {
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
+/*	The two actions of the block are icons: the window of the website (see
+ *	templates/page-follow.tpl) and "Log out", each named by its aria-label. The
+ *	title of "Log out" is its word, the title of the window says what it does,
+ *	for a mouse. They are a box of the size of the settings button
+ *	beside them, the icon painted in the middle of it, and the hover is the
+ *	soft surface that button has; "Log out" keeps its red on the icon */
+#admin-user-follow,
 #admin-user-logout {
+	display: inline-grid;
 	flex: 0 0 auto;
-}
-/*	The window of the website, beside "Log out" (see templates/page-follow.tpl):
- *	an icon and its word. Where the account block has no room for the word - the
- *	top bar of a phone, and the folded rail, which keeps this one link of the
- *	block - the word stays for a screen reader and the icon is the link */
-#admin-user-follow {
-	display: inline-flex;
-	flex: 0 0 auto;
-	align-items: center;
-	gap: .3rem;
+	place-items: center;
+	width: 2rem;
+	height: 2rem;
 	min-width: 24px;
 	min-height: 24px;
-	margin-left: .75rem;
-	white-space: nowrap;
+	border-radius: var(--editor-radius-sm);
 }
-#admin-user-follow svg {
+#admin-user-follow:hover {
+	background: var(--editor-blue-soft);
+	text-decoration: none;
+}
+#admin-user-logout:hover:not(:disabled) {
+	background: var(--editor-red-soft);
+	text-decoration: none;
+}
+#admin-user-follow svg,
+#admin-user-logout svg {
 	width: 16px;
 	height: 16px;
 }
-@media (max-width: 63.99rem) {
-	#admin-user-follow {
-		justify-content: center;
-		margin-left: 0;
-	}
-}
 /*	What gives way to a narrow place stays for a screen reader (the rule of
- *	.nino-admin-sr-only, once for everything here that does): the word of the
- *	link until the rail is wide and open, the label of the follow window's
- *	switch until the bar has room for it */
-#admin-user-follow span,
+ *	.nino-admin-sr-only, once for everything here that does): the label of the
+ *	follow window's switch until the bar has room for it */
 #admin-follow-wrap .nino-admin-switch-copy {
 	position: absolute;
 	width: 1px;
@@ -3421,16 +3431,6 @@ a {
 	margin: -1px;
 	overflow: hidden;
 	clip-path: inset(50%);
-}
-@media (min-width: 64rem) {
-	#admin-page-wrap:not(.nino-admin-shell--folded) #admin-user-follow span {
-		position: static;
-		width: auto;
-		height: auto;
-		margin: 0;
-		overflow: visible;
-		clip-path: none;
-	}
 }
 @media (min-width: 38.01rem) {
 	#admin-follow-wrap .nino-admin-switch-copy {
@@ -3623,14 +3623,18 @@ body.theme-dark #admin-theme-toggle .admin-theme-toggle-dark {
 	}
 	#admin-user-email {
 		flex: 1 0 100%;
+		/* The focus ring of the icons under it does not touch the box */
+		margin-bottom: .35rem;
 		font-size: .78rem;
 	}
-	#admin-nav-ui {
-		margin-left: auto;
-	}
+	/*	The icons stand under the address, in the same place whichever mode the
+	 *	project is in, and the word of the mode, where there is one, at the
+	 *	other end of the row. The menu opens towards the pane from the settings
+	 *	button, which is no longer the last thing in the row */
 	#admin-nav-ui-menu {
 		top: calc(100% + .25rem);
-		right: -.25rem;
+		right: auto;
+		left: -.25rem;
 	}
 	/*	Folded (see Nino.admin.rail in script.js), the brand row stacks: the
 	 *	mark above the fold button, both centred in the icon column */
@@ -3638,21 +3642,22 @@ body.theme-dark #admin-theme-toggle .admin-theme-toggle-dark {
 		flex-direction: column;
 		gap: .45rem;
 	}
-	/*	The account block waits for the unfold, and the window of the website
-	 *	is the one thing in it that stays: its icon, in the middle of the column */
+	/*	The account block waits for the unfold, and two things in it stay, one
+	 *	under the other in the middle of the column: the icon of the window of
+	 *	the website, and in development the letter of the mode */
 	#admin-page-wrap.nino-admin-shell--folded #admin-user {
 		display: flex;
-		justify-content: center;
+		flex-direction: column;
+		flex-wrap: nowrap;
+		align-items: center;
+		gap: .25rem;
 		margin: 0;
-		padding: .4rem 0;
+		/* Under the fold button, which is fixed to the column below the brand mark */
+		padding: 2.4rem 0 .4rem;
 		background: none;
 	}
-	#admin-page-wrap.nino-admin-shell--folded #admin-user > :not(#admin-user-follow) {
+	#admin-page-wrap.nino-admin-shell--folded #admin-user > :not(#admin-user-follow, #admin-mode-chip) {
 		display: none;
-	}
-	#admin-page-wrap.nino-admin-shell--folded #admin-user-follow {
-		justify-content: center;
-		margin: 0;
 	}
 }
 

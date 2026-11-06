@@ -104,6 +104,11 @@ group, always, since the group a `nav()` names is read for the kernel's own and
 
 ## 4. Repository map
 
+A directory with a leading underscore (`_nino`, `_admin`) belongs to Nino and is
+replaced by a kernel update, as are `docs/`, `tests/` and `history/`; `app/`,
+`features/`, `private/` and `public/` belong to the project, and an update
+replaces none of them (see [Updates and Rollback](docs/deployment.md#updates-and-rollback)).
+
 | Path | What it is |
 | --- | --- |
 | `_nino/` | The kernel: `Nino.php` (boot and autoloader), one class per file in `_nino/Nino/<Class>/`, the modules Nino ships in `_nino/Nino/Modules/<Name>/` - each with its own `Admin/`, `assets/`, `text/`, `templates/` and `install/` - and the public `Nino.css`, `Nino.js` and `Nino.ui.js` |

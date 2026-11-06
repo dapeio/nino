@@ -2005,7 +2005,7 @@ function manualWorld() {
 		created.textContent = '';
 		created.title = '';
 		created.setAttribute = function( name, value ) { created.attributes[name] = String( value ); if( name === 'title' ) created.title = String( value ) };
-		created.removeAttribute = function( name ) { delete created.attributes[name] };
+		created.removeAttribute = function( name ) { delete created.attributes[name]; if( name === 'title' ) created.title = '' };
 		modeNodes[id] = created;
 		return created;
 	};
@@ -2047,8 +2047,8 @@ function manualWorld() {
 
 	modeNodes['admin-content-config'] = node( 'admin-content-config', {} );
 	mode.init();
-	check( 'init() draws the chip: the word of the mode and the sentence of the mode as its title, and no class of a mode that is not on', chip.textContent === words['/_admin/mode/word/production'] && chip.title === words['/_admin/mode/hint/production']
-		&& chip.classList.contains('nino-admin-mode-chip--development') === false && chip.dataset.initial === chip.textContent.charAt(0) );
+	check( 'init() in production draws nothing: the chip is empty, has no title, no letter and no class of a mode that is not on', chip.textContent === '' && chip.title === '' && chip.getAttribute('title') === null && chip.dataset.initial === ''
+		&& chip.classList.contains('nino-admin-mode-chip--development') === false );
 	check( '...and keeps the link to the Config panel where the account has the panel', chip.getAttribute('href') === '#config' );
 
 	delete modeNodes['admin-content-config'];
@@ -2057,16 +2057,17 @@ function manualWorld() {
 	chip.setAttribute( 'href', '#config' );
 
 	mode.set( 'development' );
-	check( 'set() writes the mode on the shell and draws the chip again: its word, its sentence, its colour class', modeWrap.dataset.mode === 'development' && mode.current() === 'development'
-		&& chip.textContent === words['/_admin/mode/word/development'] && chip.title === words['/_admin/mode/hint/development'] && chip.classList.contains('nino-admin-mode-chip--development') === true
-		&& chip.dataset.initial === chip.textContent.charAt(0) && chip.textContent !== words['/_admin/mode/word/production'] );
+	check( 'set() writes the mode on the shell and draws the chip: in development its word, its sentence as the title, its letter and its colour class', modeWrap.dataset.mode === 'development' && mode.current() === 'development'
+		&& chip.textContent === words['/_admin/mode/word/development'] && chip.title === words['/_admin/mode/hint/development'] && chip.getAttribute('title') === words['/_admin/mode/hint/development']
+		&& chip.classList.contains('nino-admin-mode-chip--development') === true && chip.dataset.initial === chip.textContent.charAt(0) && chip.dataset.initial !== '' );
 	mode.set( 'staging' );
 	mode.set( undefined );
 	mode.set( '' );
 	mode.set( 'Production' );
 	check( 'a value that is no mode is ignored by set(): the mode, the chip and the class stay', modeWrap.dataset.mode === 'development' && mode.current() === 'development' && chip.textContent === words['/_admin/mode/word/development'] && chip.classList.contains('nino-admin-mode-chip--development') === true );
 	mode.set( 'production' );
-	check( 'set() takes the class off with the mode', mode.current() === 'production' && chip.classList.contains('nino-admin-mode-chip--development') === false && chip.textContent === words['/_admin/mode/word/production'] );
+	check( 'set() takes the class, the word, the title and the letter off with the mode: production is an empty chip', mode.current() === 'production' && chip.classList.contains('nino-admin-mode-chip--development') === false
+		&& chip.textContent === '' && chip.title === '' && chip.getAttribute('title') === null && chip.dataset.initial === '' );
 	modeWrap.dataset.mode = 'staging';
 	check( 'a shell that says anything but development is production', mode.current() === 'production' );
 	modeWrap.dataset.mode = 'production';

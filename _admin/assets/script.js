@@ -2191,8 +2191,10 @@
 			},
 
 			/**
-			 *	Write the mode into the chip: its word, the sentence that is its
-			 *	title, its colour and, for a folded rail, the letter it is reduced to
+			 *	Write the mode into the chip, the last thing of the account block: in
+			 *	development its word, the sentence that is its title, its colour and, for
+			 *	a folded rail, the letter it is reduced to; in production nothing, and
+			 *	the chip, empty, is not drawn
 			 *
 			 *	@return		void
 			 */
@@ -2204,11 +2206,16 @@
 					return;
 
 				const mode = Nino.admin.mode.current();
-				const word = Nino.content.getText( '/_admin/mode/word/'+ mode );
+				const word = mode === 'development' ? Nino.content.getText( '/_admin/mode/word/development' ) : '';
 
 				chip.textContent = word;
 				chip.dataset.initial = word.charAt(0);
-				chip.setAttribute( 'title', Nino.content.getText( '/_admin/mode/hint/'+ mode ) );
+
+				if( word === '' )
+					chip.removeAttribute('title');
+				else
+					chip.setAttribute( 'title', Nino.content.getText( '/_admin/mode/hint/development' ) );
+
 				chip.classList.toggle( 'nino-admin-mode-chip--development', mode === 'development' );
 			},
 		},

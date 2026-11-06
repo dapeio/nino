@@ -983,7 +983,7 @@ work in the server's own words without sending it.
 
 A question before an action is `Nino.adminUi.confirm( level, { title, message,
 yes, no, kind, opener, onChoose } )`, never `window.confirm()`: the project is in
-a mode (`Nino.admin.mode.current()`, the chip in the rail), and the mode decides
+a mode (`Nino.admin.mode.current()`; the rail's chip says Development), and the mode decides
 how much the workbench asks. `level` says what the action is worth:
 
 | Level | Is | Development | Production |

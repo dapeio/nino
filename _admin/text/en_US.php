@@ -43,9 +43,7 @@ return [
 	'[[/_admin/nav/group/system]]'		=> 'System',
 
 	// The chip in the rail that says which mode the project is in (see Nino.admin.mode)
-	'[[/_admin/mode/word/production]]'		=> 'Production',
 	'[[/_admin/mode/word/development]]'	=> 'Development',
-	'[[/_admin/mode/hint/production]]'		=> 'Production mode: the workbench asks before every deletion and every larger change.',
 	'[[/_admin/mode/hint/development]]'	=> 'Development mode: errors are shown, nothing is cached, and the workbench asks only before a deletion.',
 	'[[/_admin/mode/confirm/live]]'			=> 'The website is live and not in maintenance: visitors see this change at once.',
 

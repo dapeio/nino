@@ -14,13 +14,12 @@
 						<span class="nino-admin-brand-copy"><strong>Nino</strong><small>Admin</small></span>
 						<button type="button" id="admin-rail-toggle" class="nino-admin-rail-toggle" aria-label="[[/_admin/user/rail]]" title="[[/_admin/user/rail]]" aria-pressed="false"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg></button>
 					</div>
-					<a id="admin-mode-chip" class="nino-admin-mode-chip" href="#config"></a>
 					<div id="admin-user" class="nino-admin-rail-user">
 						<span id="admin-user-email">[[/nino/auth/user]]</span>
-						<button type="button" id="admin-user-logout" class="nino-admin-linkbutton nino-admin-rail-danger">[[/_admin/user/logout]]</button>
-						<a id="admin-user-follow" class="nino-admin-linkbutton" href="[[/nino/dir]]/_admin/follow" target="nino-follow" rel="opener" title="[[/_admin/follow/hint/open]]"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg><span>[[/_admin/follow/label/open]]</span></a>
+						<a id="admin-user-follow" class="nino-admin-linkbutton" href="[[/nino/dir]]/_admin/follow" target="nino-follow" rel="opener" title="[[/_admin/follow/hint/open]]" aria-label="[[/_admin/follow/label/open]]"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg></a>
+						<button type="button" id="admin-user-logout" class="nino-admin-linkbutton nino-admin-rail-danger" title="[[/_admin/user/logout]]" aria-label="[[/_admin/user/logout]]"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="lucide lucide-log-out-icon lucide-log-out"><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></svg></button>
 						<div id="admin-nav-ui">
-							<button type="button" id="admin-nav-ui-toggle" aria-expanded="false" aria-label="[[/_admin/user/settings]]"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings-icon lucide-settings"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg></button>
+							<button type="button" id="admin-nav-ui-toggle" aria-expanded="false" aria-label="[[/_admin/user/settings]]" title="[[/_admin/user/settings]]"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings-icon lucide-settings"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg></button>
 							<div id="admin-nav-ui-menu" class="admin-hidden">
 								<button type="button" id="admin-theme-toggle" aria-label="[[/_admin/user/theme]]">
 									<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="admin-theme-toggle-system lucide lucide-sun-moon-icon lucide-sun-moon"><path d="M12 2v2"/><path d="M14.837 16.385a6 6 0 1 1-7.223-7.222c.624-.147.97.66.715 1.248a4 4 0 0 0 5.26 5.259c.589-.255 1.396.09 1.248.715"/><path d="M16 12a4 4 0 0 0-4-4"/><path d="m19 5-1.256 1.256"/><path d="M20 12h2"/></svg>
@@ -30,6 +29,7 @@
 								[[/_admin/localepicker]]
 							</div>
 						</div>
+						<a id="admin-mode-chip" class="nino-admin-mode-chip" href="#config"></a>
 					</div>
 				</div>
 

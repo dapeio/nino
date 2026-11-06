@@ -573,20 +573,6 @@ foreach( [ 'en_US', 'de_DE' ] as $locale ) {
 check( 'every word a panel asks for, in its scripts and in its markup, is a fill both interface languages define'. ( $missingFills === [] ? '' : ' - missing: '. implode( ', ', array_slice( $missingFills, 0, 8 ) ) ), $missingFills === []
 	&& count( array_unique( array_merge( $askedByPanels, $askedOutside ) ) ) > 200 );
 
-// The chip says its mode in words the script builds the key of from the mode
-// (Nino.admin.mode), so the scan above cannot see them: each mode has its word
-// and its sentence, and the warning a big change in a live site carries, in both
-// languages
-foreach( [ 'en_US', 'de_DE' ] as $locale ) {
-	$modeFills = (array) include dirname( __DIR__ ). '/_admin/text/'. $locale. '.php';
-	$modeWords = [];
-	foreach( [ 'production', 'development' ] as $mode )
-		foreach( [ 'word', 'hint' ] as $part )
-			$modeWords[] = trim( (string) ( $modeFills['[[/_admin/mode/'. $part. '/'. $mode. ']]'] ?? '' ) );
-	$modeWords[] = trim( (string) ( $modeFills['[[/_admin/mode/confirm/live]]'] ?? '' ) );
-	check( $locale. ': the shell has a word and a sentence for each mode and the warning of a live site, none of them empty and the two modes not worded alike', in_array( '', $modeWords, true ) === false && $modeWords[0] !== $modeWords[2] );
-}
-
 // The two languages of a text family declare the same keys. A key in one file
 // and not in the other renders as an empty string in the second language -
 // a blank where the reason should be, with no error anywhere. A family is the
@@ -781,9 +767,19 @@ check( '...with the mode and the maintenance page the project is in', $stateOf( 
 check( '...and a mode that is neither of the two - a hand-edited file - reads as production, whatever its type', array_unique( array_map( static fn( mixed $mode ): string => $stateOf( $mode, false )[0], [ 'staging', '', 'Development', true, 1, [ 'development' ], null ] ) ) === [ 'production' ] );
 check( '...and only a maintenance status that is true is a maintenance page', $stateOf( 'production', 'yes' )[1] === '0' && $stateOf( 'production', 1 )[1] === '0' && $stateOf( 'production', true )[1] === '1' );
 $indexTemplate = (string) file_get_contents( dirname( __DIR__ ). '/_admin/templates/page-index.tpl' );
-check( 'the template hands both to the shell root, and the rail has the chip as a link to the Config panel for the shell to fill',
+check( 'the template hands both to the shell root, and the account block of the rail has the chip as a link to the Config panel for the shell to fill',
 	preg_match( '/<div id="admin-page-wrap"[^>]* data-mode="\[\[\/_admin\/mode\]\]"[^>]* data-maintenance="\[\[\/_admin\/maintenance\]\]"/', $indexTemplate ) === 1
-	&& preg_match( '/<a id="admin-mode-chip"[^>]* href="#config"[^>]*><\/a>/', $indexTemplate ) === 1 );
+	&& preg_match( '/<div id="admin-user"[^>]*>(?:(?!<div id="admin-user"|<nav ).)*<a id="admin-mode-chip" class="nino-admin-mode-chip"[^>]* href="#config"[^>]*><\/a>/s', $indexTemplate ) === 1
+	&& substr_count( $indexTemplate, 'id="admin-mode-chip"' ) === 1 );
+$headOffset = strpos( $indexTemplate, 'id="admin-bar-head"' );
+$userOffset = strpos( $indexTemplate, 'id="admin-user"' );
+$chipOffset = strpos( $indexTemplate, 'id="admin-mode-chip"' );
+$brandBlock = substr( $indexTemplate, $headOffset, $userOffset - $headOffset );
+check( 'nothing stands between the brand row and the account block of the rail but the brand row: no chip, no link', $headOffset !== false && $userOffset !== false && $chipOffset > $userOffset && str_contains( $brandBlock, 'class="admin-brand"' ) && str_contains( $brandBlock, 'id="admin-rail-toggle"' ) && preg_match( '/<(?:a|button)\b(?![^>]* id="admin-rail-toggle")/', $brandBlock ) === 0 );
+$userOrder = array_map( static fn( string $id ): int|false => strpos( $indexTemplate, 'id="'. $id. '"' ), [ 'admin-user-email', 'admin-user-follow', 'admin-user-logout', 'admin-nav-ui-toggle', 'admin-mode-chip' ] );
+$userSorted = $userOrder;
+sort( $userSorted );
+check( 'the account block reads the address, the window of the website, "Log out", the settings and last the mode: the order of the Tab key and of the eye', !in_array( false, $userOrder, true ) && $userOrder === $userSorted );
 /*	The window that shows the website next to the workbench (/_admin/follow):
 	a route of its own, the login page without an account, and a frame whose
 	address is a path of this site and nothing else - the address is read from
@@ -837,6 +833,37 @@ check( 'the template is a page of its own: the directory on the root, a frame wi
 check( 'the rail\'s account block opens it in a window of its own that a second click finds again - a link, not a script',
 	preg_match( '/<div id="admin-user"[^>]*>.*?<a id="admin-user-follow"[^>]* href="\[\[\/nino\/dir\]\]\/_admin\/follow"[^>]* target="nino-follow"[^>]* rel="opener"[^>]*>/s', $indexTemplate ) === 1
 	&& preg_match( '/<a id="admin-user-follow"[^>]* title="\[\[[^\]]+\]\]"/', $indexTemplate ) === 1 );
+// The two actions of the block are icons: an element that is only an svg, named by its title and its aria-label and by nothing a person reads
+$iconAction = static function( string $template, string $tag, string $id ): ?array {
+	if( preg_match( '/<'. $tag. '\b([^>]* id="'. $id. '"[^>]*)>(.*?)<\/'. $tag. '>/s', $template, $found ) !== 1 )
+		return null;
+	preg_match( '/ title="(\[\[[^\]]+\]\])"/', $found[1], $title );
+	preg_match( '/ aria-label="(\[\[[^\]]+\]\])"/', $found[1], $aria );
+	return [ 'attributes' => $found[1], 'title' => $title[1] ?? '', 'aria' => $aria[1] ?? '', 'inner' => $found[2], 'text' => trim( strip_tags( preg_replace( '/<svg\b.*?<\/svg>/s', '', $found[2] ) ) ) ];
+};
+$followIcon = $iconAction( $indexTemplate, 'a', 'admin-user-follow' );
+$logoutIcon = $iconAction( $indexTemplate, 'button', 'admin-user-logout' );
+check( 'the window of the website is an icon without a word on the page, named by its aria-label, the word of the key that names it, and its title is the sentence that says what it does',
+	$followIcon !== null && $followIcon['text'] === '' && substr_count( $followIcon['inner'], '<svg' ) === 1 && str_contains( $followIcon['inner'], 'aria-hidden="true"' )
+	&& $followIcon['title'] === '[[/_admin/follow/hint/open]]' && $followIcon['aria'] === '[[/_admin/follow/label/open]]' );
+check( '"Log out" is an icon button without a word on the page, named by its title and its aria-label, and the icon keeps the red of the danger class',
+	$logoutIcon !== null && $logoutIcon['text'] === '' && substr_count( $logoutIcon['inner'], '<svg' ) === 1 && str_contains( $logoutIcon['inner'], 'aria-hidden="true"' )
+	&& $logoutIcon['title'] === '[[/_admin/user/logout]]' && $logoutIcon['aria'] === '[[/_admin/user/logout]]'
+	&& preg_match( '/ class="[^"]*\bnino-admin-rail-danger\b[^"]*"/', $logoutIcon['attributes'] ) === 1 && str_contains( $logoutIcon['attributes'], 'type="button"' ) );
+$railCss = (string) file_get_contents( dirname( __DIR__ ). '/_admin/assets/style.css' );
+check( 'both icons are a box of at least 24 px, the floor of the pointer target',
+	preg_match( '/#admin-user-follow,\s*#admin-user-logout\s*\{[^}]*\bmin-width:\s*24px;[^}]*\bmin-height:\s*24px;/', $railCss ) === 1 );
+check( 'the settings button has a title as well as its name',
+	preg_match( '/<button\b[^>]* id="admin-nav-ui-toggle"[^>]* title="\[\[\/_admin\/user\/settings\]\]"/', $indexTemplate ) === 1 );
+check( 'an empty mode chip is not drawn, in the design system and on the folded rail',
+	preg_match( '/:where\(\.nino-admin\) \.nino-admin-mode-chip:empty\s*\{\s*display: none;/', $railCss ) === 1
+	&& preg_match( '/--folded \.nino-admin-rail-user > \.nino-admin-mode-chip:empty\s*\{\s*display: none;/', $railCss ) === 1 );
+check( 'on a phone the brand keeps the room of its words, so that the address is what gives way',
+	preg_match( '/@media \(max-width: 38rem\) \{\s*#admin-page-wrap \.nino-admin-rail-head > \.admin-brand \{\s*flex-shrink: 0;/', $railCss ) === 1 );
+check( 'the address leaves room under it for the focus ring of the icons',
+	preg_match( '/#admin-user-email \{\s*flex: 1 0 100%;[^}]*margin-bottom: \.35rem;/', $railCss ) === 1 );
+check( 'on the desktop the head of the rail has no gap between the brand row and the account block',
+	preg_match( '/@media \(min-width: 64rem\) \{\s*#admin-page-wrap \.nino-admin-rail \{[^}]*\}\s*#admin-page-wrap \.nino-admin-rail-head \{\s*gap: 0;/', $railCss ) === 1 );
 preg_match_all( '/\[\[(\/_admin\/follow\/[a-z\/-]+)\]\]/', $followTemplate. $indexTemplate, $followKeys );
 foreach( [ 'en_US', 'de_DE' ] as $locale ) {
 	$followFills = (array) include dirname( __DIR__ ). '/_admin/text/'. $locale. '.php';
