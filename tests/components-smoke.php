@@ -3621,7 +3621,10 @@ check( '...and the callback, which sees the sorted hits before the window is cut
 check( '[slider] is a .nino-slider around a list of its cells, which is what Nino.ui.js wires up',
 	$render( '[slider /services sort="title" width="60%" min="240px" id="sl"][title title tag="h4"][/slider]' ) === '<div class="nino-slider" id="sl" data-slider-width="60%" data-slider-min="240px"><ul>'
 		. '<li><h4 class="nino-section-title">App</h4></li><li><h4 class="nino-section-title">Web &lt;b&gt;&#91;x]&lt;/b&gt;</h4></li></ul></div>' );
+check( '...a bare number is a size in pixels, as the script reads it, so a least width written without a unit reaches the page',
+	$render( '[slider /services sort="title" limit="1" width="35%" min="450"][probe][/slider]' ) === '<div class="nino-slider" data-slider-width="35%" data-slider-min="450"><ul><li>inside:/services#0#/services/app#string</li></ul></div>' );
 check( '...a width that is no size is left out, and a slider with no elements is nothing', $render( '[slider /services sort="title" limit="1" width="12em"][probe][/slider]' ) === '<div class="nino-slider"><ul><li>inside:/services#0#/services/app#string</li></ul></div>'
+	&& $render( '[slider /services sort="title" limit="1" width="450px\n"][probe][/slider]' ) === '<div class="nino-slider"><ul><li>inside:/services#0#/services/app#string</li></ul></div>'
 	&& $render( '[slider /nothing][probe][/slider]' ) === '' );
 check( '[list] is a .nino-list of items, in the style it names, with no grid',
 	$render( '[list /services sort="title" style="check" id="faq"][title title tag="h4"][/list]' ) === '<ul class="nino-list nino-list--check" id="faq"><li><h4 class="nino-section-title">App</h4></li><li><h4 class="nino-section-title">Web &lt;b&gt;&#91;x]&lt;/b&gt;</h4></li></ul>'

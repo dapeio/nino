@@ -511,7 +511,7 @@ namespace Nino\Modules {
 				[ 'repeat', 'Plain repeat', 'Einfache Wiederholung', 'cells', false, [] ],
 				[ 'slider', 'Slider', 'Slider', 'cells', false, [
 					'width' => [ 'type' => 'string', 'default' => '75%', 'label' => [ 'en_US' => 'Slide width', 'de_DE' => 'Breite einer Folie' ],
-						'hint' => [ 'en_US' => 'In percent of the slider or in pixels: 60% or 320px.', 'de_DE' => 'In Prozent des Sliders oder in Pixeln: 60% oder 320px.' ] ],
+						'hint' => [ 'en_US' => 'In percent of the slider or in pixels: 60%, 320px or 320.', 'de_DE' => 'In Prozent des Sliders oder in Pixeln: 60%, 320px oder 320.' ] ],
 					'min' => [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Least slide width', 'de_DE' => 'Kleinste Breite einer Folie' ],
 						'hint' => [ 'en_US' => 'Written like the width; empty sets none.', 'de_DE' => 'Geschrieben wie die Breite; leer setzt keine.' ] ],
 				] ],
@@ -3179,7 +3179,8 @@ namespace Nino\Modules {
 		 *	Replace [slider]: the cells as the slides of a .nino-slider, which
 		 *	Nino.ui.js gives its controls and its touch. The slides are list
 		 *	items, as it expects them; the width of one is 'width', a share of
-		 *	the slider or pixels, and none is narrower than 'min'
+		 *	the slider or pixels, a bare number being pixels as the script reads
+		 *	it, and none is narrower than 'min'
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments made ready by dispatch()
@@ -3192,7 +3193,7 @@ namespace Nino\Modules {
 				return str_replace( '[[inner]]', $inner, self::$html['slide'] );
 			} );
 
-			$size = static fn( string $value ): string => preg_match( '/^\d{1,4}(?:%|px)$/', $value ) === 1 ? $value : '';
+			$size = static fn( string $value ): string => preg_match( '/^\d{1,4}(?:%|px)?$/D', $value ) === 1 ? $value : '';
 
 			return $cells === '' ? '' : str_replace(
 				[ '[[class]]', '[[id]]', '[[width]]', '[[min]]', '[[cells]]' ],
