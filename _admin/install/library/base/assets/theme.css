@@ -5,7 +5,7 @@
  *									assets/style.css comes after it and overrules it.
  *
  *									Everything below this comment is what the catalogue's
- *									Design feature compiles at its defaults: the sixteen
+ *									Design feature compiles at its defaults: the eighteen
  *									numbered sections, every part on the set the first
  *									shipped theme names - Nino, the default construction
  *									of each tab -, every knob where that theme puts it: the middle,
@@ -2854,8 +2854,239 @@ footer {
 }
 
 
-/* ==== 16. the knob positions ==== */
+/* ==== 16. tabs: regular (scale default, space default, line default, active default) ==== */
+/*	@name			Regular
+ *	@description	The framework as it is: the middle of every ladder. A line under the bar, and a line under the tab that is open.
+ *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Eine Linie unter der Leiste und eine unter dem offenen Tab.
+ *
+ *	@knob	scale		Type size of the tabs
+ *	@knob	space		Space inside a tab
+ *	@knob	line		Weight of the line under the bar and under the open tab
+ *	@knob	active		Colour of the open tab
+ *
+ *	Regular is the starting point, not a design. Every value it declares is the
+ *	framework's own, so a group of tabs under it looks as it does under Nino.css
+ *	alone - and every one of them is a ladder, so each knob has something to
+ *	reach: the five values of a scale, the middle of them Nino.css and the others
+ *	two steps to each side, and for an ink the tone Nino.css gives it.
+ *
+ *	Two rules for a set:
+ *
+ *	  - Only the classes of this template: the bar, its tabs, the tab that is
+ *	    open and the panels. A set of buttons does not touch a tab, however
+ *	    tempting.
+ *	  - Colours through the roles, never as literals. Nor the font: the face
+ *	    and the weight of the text are the roles of the type tab.
+ *
+ *	The size of the tabs is the size of the text round them, times the scale.
+ *	The space is half the padding of a tab across, and all of it above and
+ *	below - the proportion Nino.css has, which is one step and two. The line is
+ *	the weight of the rule under the bar; the rule under the open tab is a
+ *	ladder beside it, named after the knob and an aspect of it
+ *	(--tabs-line-open--less ...), as long as the knob's own: they move together,
+ *	the compiler selects every ladder of a knob where it stands. The colour of
+ *	the open tab is the text and the rule under it: an ink, written on every
+ *	element, so that on a dark section it is the accent of that section.
+ *
+ *	Nino.css has the classes the script and the markup use; a set changes how
+ *	they look and nothing of what they do. Copy this file under a name of your
+ *	own and start there.
+ */
+
 :root {
+	/*	The type size of the tabs is the size of the text around them, times this	*/
+	--tabs-scale--least: 		.8;
+	--tabs-scale--less: 		.9;
+	--tabs-scale--default: 		1;
+	--tabs-scale--more: 		1.15;
+	--tabs-scale--most: 		1.3;
+
+	/*	Half the padding of a tab across. A tab's space is finer than a card's, so the
+		steps are fractions of the middle and not steps of the scale	*/
+	--tabs-space--least: 		calc( var(--space-1) * .4 );
+	--tabs-space--less: 		calc( var(--space-1) * .7 );
+	--tabs-space--default: 		var(--space-1);
+	--tabs-space--more: 		calc( var(--space-1) * 1.5 );
+	--tabs-space--most: 		calc( var(--space-1) * 2.2 );
+
+	/*	The rule under the bar. The half pixel is a hairline where the screen can draw one, and 1px where it cannot	*/
+	--tabs-line--least: 		0px;
+	--tabs-line--less: 			.5px;
+	--tabs-line--default: 		1px;
+	--tabs-line--more: 			2px;
+	--tabs-line--most: 			3px;
+
+	/*	The rule under the open tab: twice the rule under the bar at the middle, as Nino.css has it	*/
+	--tabs-line-open--least: 	0px;
+	--tabs-line-open--less: 	1px;
+	--tabs-line-open--default: 	2px;
+	--tabs-line-open--more: 	3px;
+	--tabs-line-open--most: 	4px;
+}
+
+/*	The colour of the open tab is the accent of the ground it stands on, so the rung of the ink is declared on every element
+	(see Nino.css): the accent of the roles is the page's on :root, and on a dark section the tab would keep the one of a light
+	one. The rung is the tone this set gives; the knob selects it, or a tone of its own	*/
+:root, :root * {
+	--tabs-active--default: 	var(--color-accent);
+}
+
+.nino-tabs-nav {
+	font-size: calc( 1em * var(--tabs-scale) );
+	border-bottom-width: var(--tabs-line);
+}
+.nino-tabs-tab {
+	padding: var(--tabs-space) calc( var(--tabs-space) * 2 );
+	border-bottom-width: var(--tabs-line-open);
+}
+.nino-tabs-tab.nino-is-active {
+	color: var(--tabs-active);
+	border-bottom-color: var(--tabs-active);
+}
+
+
+/* ==== 17. accordion: regular (scale default, space default, line default, marker default, marker-ink default, weight default) ==== */
+/*	@name			Regular
+ *	@description	The framework as it is: the middle of every ladder. A line under each entry, a plus that turns into a minus.
+ *	@description-de	Das Framework, wie es ist: die Mitte jeder Leiter. Eine Linie unter jedem Eintrag, ein Plus, das zum Minus wird.
+ *
+ *	@knob	scale		Type size of the entries
+ *	@knob	space		Space above and below the title and under the open entry
+ *	@knob	line		Weight of the line under an entry
+ *	@knob	marker		The sign in front of the title
+ *	@knob	marker-ink	Colour of the sign
+ *	@knob	weight		The titles in the weight of the text instead of bold
+ *
+ *	Regular is the starting point, not a design. Every value it declares is the
+ *	framework's own, so an accordion under it looks as it does under Nino.css
+ *	alone - and every one of them is a ladder, so each knob has something to
+ *	reach: the five values of a scale, the middle of them Nino.css and the others
+ *	two steps to each side, the three of a choice, the two of a toggle, and for an
+ *	ink the tone Nino.css gives it.
+ *
+ *	Two rules for a set:
+ *
+ *	  - Only the classes of this template: the group, an entry, its title and its
+ *	    panel. A set of lists does not touch an entry, however tempting.
+ *	  - Colours through the roles, never as literals. Nor the font: the face of
+ *	    the text is a role of the type tab, and the weight of the title the
+ *	    toggle of this knob.
+ *
+ *	The size of the entries is the size of the text round them, times the scale.
+ *	The space is the padding of the title above and below and the room under the
+ *	words of an open entry; the line is the rule under an entry.
+ *
+ *	The marker is a choice of three: none, the middle, which is Nino.css (a plus
+ *	that turns into a minus when the entry is open), and an arrow that is turned
+ *	down when it is open. The knob's own ladder is the glyph of a closed entry. A
+ *	sign is more than that - the glyph when the entry is open, the turn of the
+ *	open one, where the glyph stands in its room (the arrow in the middle, so
+ *	that it turns about its own centre) and the room it stands in, which the
+ *	words of the panel are indented by -, so the knob declares one more ladder
+ *	for each, named after the knob and the aspect (--accordion-marker-open--less ...), as long as the knob's own.
+ *	They move together: the compiler selects every ladder of a knob where it
+ *	stands. The colour of the sign is an ink of its own, marker-ink, written on
+ *	every element, so that on a dark section it is the accent of that section. A
+ *	choice is declared under less, default and more; a toggle under default and
+ *	more.
+ *
+ *	The weight is a toggle whose first rung is bold, which is what Nino.css
+ *	draws, and whose second is the weight of the text.
+ *
+ *	Copy this file under a name of your own and start there.
+ */
+
+:root {
+	/*	The type size of the entries is the size of the text around them, times this	*/
+	--accordion-scale--least: 		.8;
+	--accordion-scale--less: 		.9;
+	--accordion-scale--default: 	1;
+	--accordion-scale--more: 		1.15;
+	--accordion-scale--most: 		1.3;
+
+	/*	The padding of the title above and below, and the room under the panel: --space-2, with steps in fractions of it
+		since the room round a line of text is finer than a step of the scale	*/
+	--accordion-space--least: 		calc( var(--space-2) * .4 );
+	--accordion-space--less: 		calc( var(--space-2) * .7 );
+	--accordion-space--default: 	var(--space-2);
+	--accordion-space--more: 		calc( var(--space-2) * 1.5 );
+	--accordion-space--most: 		calc( var(--space-2) * 2.2 );
+
+	/*	The rule under an entry. The half pixel is a hairline where the screen can draw one, and 1px where it cannot	*/
+	--accordion-line--least: 		0px;
+	--accordion-line--less: 		.5px;
+	--accordion-line--default: 		1px;
+	--accordion-line--more: 		2px;
+	--accordion-line--most: 		3px;
+
+	/*	The sign: none, a plus and a minus, or an arrow turned a quarter when the entry is open. The room is the one the
+		sign stands in and the panel is indented by, none where there is no sign	*/
+	--accordion-marker--less: 		"";
+	--accordion-marker--default: 		"+";
+	--accordion-marker--more: 		"\203A";
+
+	--accordion-marker-open--less: 			"";
+	--accordion-marker-open--default: 		"\2212";
+	--accordion-marker-open--more: 			"\203A";
+
+	--accordion-marker-turn--less: 			0deg;
+	--accordion-marker-turn--default: 		0deg;
+	--accordion-marker-turn--more: 			90deg;
+
+	--accordion-marker-align--less: 		match-parent;
+	--accordion-marker-align--default: 	match-parent;
+	--accordion-marker-align--more: 		center;
+
+	--accordion-marker-box--less: 			0em;
+	--accordion-marker-box--default: 		1em;
+	--accordion-marker-box--more: 			1em;
+
+	/*	The weight of the title: bold, or the weight of the text	*/
+	--accordion-weight--default: 			bold;
+	--accordion-weight--more: 				normal;
+}
+
+/*	The colour of the sign is the accent of the ground it stands on, so the rung of the ink is declared on every element (see
+	Nino.css): the accent of the roles is the page's on :root, and on a dark section the sign would keep the one of a light one	*/
+:root, :root * {
+	--accordion-marker-ink--default: 		var(--color-accent);
+}
+
+.nino-accordion {
+	font-size: calc( 1em * var(--accordion-scale) );
+	border-bottom-width: var(--accordion-line);
+}
+.nino-accordion-trigger {
+	padding: var(--accordion-space) 0;
+	font-weight: var(--accordion-weight);
+}
+.nino-accordion-trigger::before {
+	content: var(--accordion-marker);
+	width: var(--accordion-marker-box);
+	text-align: var(--accordion-marker-align);
+	color: var(--accordion-marker-ink);
+	transition: transform .2s ease;
+}
+.nino-accordion[open] > .nino-accordion-trigger::before {
+	content: var(--accordion-marker-open);
+	transform: rotate( var(--accordion-marker-turn) );
+}
+.nino-accordion-panel {
+	padding: 0 0 var(--accordion-space) var(--accordion-marker-box);
+}
+
+
+/* ==== 18. the knob positions ==== */
+:root {
+	--accordion-line: var(--accordion-line--default);
+	--accordion-marker: var(--accordion-marker--default);
+	--accordion-marker-align: var(--accordion-marker-align--default);
+	--accordion-marker-box: var(--accordion-marker-box--default);
+	--accordion-marker-open: var(--accordion-marker-open--default);
+	--accordion-marker-turn: var(--accordion-marker-turn--default);
+	--accordion-scale: var(--accordion-scale--default);
+	--accordion-space: var(--accordion-space--default);
+	--accordion-weight: var(--accordion-weight--default);
 	--buttons-case: var(--buttons-case--default);
 	--buttons-corners: var(--buttons-corners--default);
 	--buttons-hover: var(--buttons-hover--default);
@@ -2979,6 +3210,10 @@ footer {
 	--tables-stripes: var(--tables-stripes--default);
 	--tables-zebra: var(--tables-zebra--default);
 	--tables-zebra-ink: var(--tables-zebra-ink--default);
+	--tabs-line: var(--tabs-line--default);
+	--tabs-line-open: var(--tabs-line-open--default);
+	--tabs-scale: var(--tabs-scale--default);
+	--tabs-space: var(--tabs-space--default);
 	--tiles-dim: var(--tiles-dim--default);
 	--tiles-gap: var(--tiles-gap--default);
 	--tiles-hover: var(--tiles-hover--default);
@@ -3000,4 +3235,6 @@ footer {
 	--card-subtitle-ink: var(--card-subtitle-ink--default);
 	--forms-edge: var(--forms-edge--default);
 	--forms-label: var(--forms-label--default);
+	--tabs-active: var(--tabs-active--default);
+	--accordion-marker-ink: var(--accordion-marker-ink--default);
 }
