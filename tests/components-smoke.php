@@ -1280,7 +1280,7 @@ foreach( $groundEach as $zeroSelector => $zeroBodies )
 	}
 $zeroWrong = [];
 foreach( [ 'cover-x' => [ '.nino-cover--padded', $frameSides ], 'cover-y' => [ $frameAbove ],
-	'section' => [ '.nino-section', '.nino-section:has(> .nino-grid-row.nino-pl-0)', '.nino-section:has(> .nino-grid-row.nino-pr-0)' ], 'row' => [ '.nino-grid-row--full', ':where(.nino-tiles) > .nino-grid-row' ] ] as $zeroKey => $zeroList ) {
+	'section' => [ '.nino-section', '.nino-section:has(> .nino-grid-row.nino-pl-0):not([class*="nino-pl-"], [class*="nino-p-"])', '.nino-section:has(> .nino-grid-row.nino-pr-0):not([class*="nino-pr-"], [class*="nino-p-"])' ], 'row' => [ '.nino-grid-row--full', ':where(.nino-tiles) > .nino-grid-row' ] ] as $zeroKey => $zeroList ) {
 	$zeroGot = $zeroFound[$zeroKey];
 	sort( $zeroGot );
 	sort( $zeroList );
@@ -1378,13 +1378,13 @@ check( 'the sides of a padding are .nino-pl-<n> and .nino-pr-<n>, 0 to 6, the sc
 	the 768px query or in none: in a query of another width a row at the edge would keep the padding of its section from 768px up to that width	*/
 $edgeWrong = [];
 foreach( [ 'pl' => 'left', 'pr' => 'right' ] as $edgeKey => $edgeName ) {
-	$edgeSelector = '.nino-section:has(> .nino-grid-row.nino-'. $edgeKey. '-0)';
+	$edgeSelector = '.nino-section:has(> .nino-grid-row.nino-'. $edgeKey. '-0):not([class*="nino-'. $edgeKey. '-"], [class*="nino-p-"])';
 	if( $groundBgBody( $edgeSelector ) !== 'padding-'. $edgeName. ': 0;' )
 		$edgeWrong[] = $edgeSelector. ' does not say padding-'. $edgeName. ': 0';
 	if( in_array( $groundConditions( $edgeSelector ), $sideConditions, true ) === false )
 		$edgeWrong[] = $edgeSelector. ' does not stand once, in the 768px query or in none';
 }
-check( 'a row at the edge takes the section\'s side padding with it: the section with a row that says nino-pl-0 has no padding at the left, the one with nino-pr-0 none at the right, at every width it has one'
+check( 'a row at the edge takes the section\'s side padding with it: the section with a row that says nino-pl-0 has no padding at the left, the one with nino-pr-0 none at the right, at every width it has one, unless the section says a padding of its own on that side (nino-pl-<n>, nino-pr-<n>) or on all of them (nino-p-<n>), which is then what it has'
 	. ( $edgeWrong === [] ? '' : ' - '. implode( '; ', $edgeWrong ) ), $edgeWrong === [] );
 
 /*	The padding of a row with a picture behind it is the rule of the grounds, and no rule that gives it padding is heavier than one class: the base rule of the row, the grounds in the list and the

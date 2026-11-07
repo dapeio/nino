@@ -179,7 +179,11 @@
 		 *	see. That is every element beside the wrapper and beside each of its
 		 *	ancestors up to the body - the logo and the skip link in front of the
 		 *	button as well as the main part and the footer behind the list. What was
-		 *	inert before stays inert when the menu closes
+		 *	inert before stays inert when the menu closes. The document does not
+		 *	scroll while any menu is open (Nino.css locks it by the aria-expanded
+		 *	this function sets and takes back, the one place every way of closing a
+		 *	menu goes through), so the page keeps its place and the header, which
+		 *	folds away on the way down, keeps the button that closes the menu
 		 *
 		 *	@param		{Element}		wrap					The .nino-nav-burger
 		 *	@param		{boolean}		open					Whether the menu is to be open
@@ -954,6 +958,25 @@
 
 					if( slider.lis.length === 0 )
 						continue;
+
+					// The focus brings its slide to the middle: a slide that stands
+					// out of the picture is a slide the keyboard cannot see. The
+					// active slide has nothing to move to, and a focus in it moves
+					// nothing
+					slider.stage.addEventListener( 'focusin', function( ev ) {
+
+						let li = ev.target;
+
+						// The slide is the child of the list the focus is inside of, whatever it holds
+						while( li !== null && typeof li !== 'undefined' && li.parentNode !== slider.stage )
+							li = li.parentNode;
+
+						const at = li === null || typeof li === 'undefined' ? -1 : Array.prototype.indexOf.call( slider.lis, li );
+
+						if( at > -1 && at !== slider.pos )
+							sliderMove( slider, at );
+					} );
+
 					// Not `parseInt(...) ?? fallback`: a missing or unparsable
 					// attribute makes parseInt() answer NaN, and NaN is not nullish,
 					// so that fallback never ran - a slider without data-slider-pos

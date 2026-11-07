@@ -15,6 +15,8 @@
 'use strict';
 
 const vm = require('vm');
+const fs = require('fs');
+const path = require('path');
 const { check, done, load, element, fire } = require( './harness.js' );
 
 /**
@@ -177,6 +179,16 @@ computedDisplay = 'none';
 ( windowListeners.resize || [] ).forEach( function( fn ) { fn( {} ) } );
 check( '...and one that becomes wide - where the button is gone, and nothing is left to close the menu with - closes it and gives the page back',
 	toggle.getAttribute( 'aria-expanded' ) === 'false' && [ skip, logo, main, footer ].some( inert ) === false );
+
+// --- what the stylesheet does with the lock ---------------------------------
+
+const css = fs.readFileSync( path.join( __dirname, '../_nino/Nino.css' ), 'utf8' );
+const lockRule = ( css.match( /^html:has\(\.nino-nav-burger > button\[aria-expanded="true"\]\)\s*\{([^}]*)\}/m ) || [ '', '' ] )[1];
+check( 'while the button of any burger says aria-expanded the document does not scroll: html:has(.nino-nav-burger > button[aria-expanded="true"]) says overflow hidden and a stable scrollbar gutter',
+	/overflow:\s*hidden\s*;/.test( lockRule ) && /scrollbar-gutter:\s*stable\s*;/.test( lockRule ));
+const openRule = ( css.match( /^\.nino-nav-burger > button\[aria-expanded="true"\] ~ \.nino-nav-content\s*\{([^}]*)\}/m ) || [ '', '' ] )[1];
+check( '...and the open menu scrolls by itself, without handing the scroll on to the page behind it: overflow-y auto and overscroll-behavior contain',
+	/overflow-y:\s*auto\s*;/.test( openRule ) && /overscroll-behavior:\s*contain\s*;/.test( openRule ) );
 
 // --- the language picker ---------------------------------------------------
 

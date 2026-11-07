@@ -1878,6 +1878,10 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 /*	One section of the imprint or the privacy policy (Modules\Legal): its heading
  *	over a .nino-richtext, and a gap before the next section - the reset has
  *	taken the heading's own margins away */
+.nino-legal-section {
+	max-width: 40rem;
+	margin-inline: auto;
+}
 .nino-legal-section > h3 {
 	margin-bottom: calc(var(--space-1) * var(--whitespace-text));
 }
@@ -1962,9 +1966,11 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 		section has a side padding of its own, the room between the page and its
 		row, and a row that says nino-pl-0 or nino-pr-0 - its content at the edge -
 		would still stand that far from it. So the section that holds such a row
-		gives up the padding on that side; below 768px it has none	*/
-	.nino-section:has(> .nino-grid-row.nino-pl-0) { padding-left: 0; }
-	.nino-section:has(> .nino-grid-row.nino-pr-0) { padding-right: 0; }
+		gives up the padding on that side, unless the section says a padding of
+		its own (nino-pl-*, nino-pr-*, nino-p-*), which is then what it has; below
+		768px it has none	*/
+	.nino-section:has(> .nino-grid-row.nino-pl-0):not([class*="nino-pl-"], [class*="nino-p-"]) { padding-left: 0; }
+	.nino-section:has(> .nino-grid-row.nino-pr-0):not([class*="nino-pr-"], [class*="nino-p-"]) { padding-right: 0; }
 	/*	A mirrored section has the columns of its row in the opposite order - the
 		first one at the right - so that a loop that says alternate="1" puts the
 		picture on the other side from one section to the next. [sections] writes
@@ -3862,6 +3868,14 @@ body.nino-scroll-btf .nino-back-to-top {
 	display:none;
 }
 
+/*	While a menu is open - any burger whose button says aria-expanded - the document stays where it is, so the header keeps the button that closes
+	the menu and the page is where it was when the menu closes. The overlay
+	scrolls by itself when its list is longer than the window	*/
+html:has(.nino-nav-burger > button[aria-expanded="true"]) {
+	overflow: hidden;
+	scrollbar-gutter: stable;
+}
+
 /*	Open, the overlay paints the page ground over whatever the header frame
 	paints, so it restores that ground's ink and roles with it - a frame
 	drawing its bar on the deepest surface otherwise handed its own white ink
@@ -3869,6 +3883,8 @@ body.nino-scroll-btf .nino-back-to-top {
 	screen and has to keep inheriting the bar's	*/
 .nino-nav-burger > button[aria-expanded="true"] ~ .nino-nav-content {
 	max-height: 100vh;
+	overflow-y: auto;
+	overscroll-behavior: contain;
 	visibility: visible;
 	transition: max-height .4s;
 	color: var(--color-text);
@@ -4354,10 +4370,10 @@ header .nino-headernav-logo:empty {
 	height: 180%;
 	will-change: transform;
 }
-@media (prefers-reduced-motion: reduce), (pointer: coarse) {
+@media (prefers-reduced-motion: reduce), (pointer: coarse), (max-width: 767.98px) {
 	.nino-parallex > img { top: 0 !important; height: 100%; transform: none !important; will-change: auto; animation: none; }
 }
-@media (prefers-reduced-motion: reduce), (pointer: coarse) {
+@media (prefers-reduced-motion: reduce), (pointer: coarse), (max-width: 767.98px) {
 	.nino-parallex > .nino-section-bg > img { top: 0 !important; height: 100%; transform: none !important; will-change: auto; animation: none; }
 }
 

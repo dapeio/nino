@@ -15,6 +15,7 @@ const slides = [ element('LI'), element('LI'), element('LI') ];
 const stage = element('UL');
 stage.getElementsByTagName = function( tagName ) { return tagName === 'li' ? slides : []; };
 stage.getBoundingClientRect = function() { return { height : 180 }; };
+slides.forEach( function( slide ) { stage.appendChild( slide ); } );
 
 const slider = element('DIV');
 slider.attributes = { 'data-slider-pos' : '0' };
@@ -121,6 +122,32 @@ check( '...each one saying which slide it goes to', ( dotList.children[1].childr
 const dotState = dotList.children.map( function( li ) { return li.children[0].attributes['aria-current'] } );
 check( '...and exactly the one showing says that it is', dotState.filter( function( v ) { return v === 'true' } ).length === 1
 	&& dotState[ slider.pos ] === 'true' );
+
+// The focus brings its slide into the picture: a slide that the keyboard
+// reaches while it stands out of the window is a slide nobody sees
+const inside = element('A');
+slides[2].appendChild( inside );
+const dotNow = function() { return dotList.children.map( function( li ) { return li.children[0].attributes['aria-current'] } ).join(); };
+fire( dotList.children[0].children[0], 'click' );
+check( 'the slider stands on the first slide', slider.pos === 0 && slides[0].classList.contains('nino-is-active') );
+
+fire( stage, 'focusin', { target : inside } );
+check( 'the focus entering something inside another slide moves the slider to that slide: the position, the active slide and the dot that says it is current',
+	slider.pos === 2 && slides[2].classList.contains('nino-is-active') && slides[0].classList.contains('nino-is-active') === false && dotNow() === 'false,false,true' );
+check( '...and the track follows it', stage.style.left === slider.posLeft +'px' && slider.posLeft === 0 - ( 320 * 0.75 * 2 - ( 320 - 320 * 0.75 ) / 2 ) );
+
+const leftAtTwo = stage.style.left;
+slides[2].classList.remove('nino-is-active');
+fire( stage, 'focusin', { target : inside } );
+check( 'the focus moving inside the active slide moves nothing: neither the track nor the marks are touched again', slider.pos === 2 && stage.style.left === leftAtTwo && slides[2].classList.contains('nino-is-active') === false );
+slides[2].classList.add('nino-is-active');
+
+fire( stage, 'focusin', { target : slides[0] } );
+check( 'the focus on the first slide brings the slider back to it',
+	slider.pos === 0 && slides[0].classList.contains('nino-is-active') && slides[2].classList.contains('nino-is-active') === false && dotNow() === 'true,false,false' );
+
+fire( stage, 'focusin', { target : element('A') } );
+check( 'a focus that is in none of the slides moves nothing', slider.pos === 0 && dotNow() === 'true,false,false' );
 
 // The page's own language decides the word, where the project has none of
 // its own

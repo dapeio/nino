@@ -390,6 +390,16 @@ check( 'the module answers a request for the page: the route is found for the la
 $templateImprint = (string) \Nino\Filesystem::getFileContent( $appData, '/templates/page-legal-imprint.tpl', '' );
 check( 'the page template draws the shortcode in a section of the page', str_contains( $templateImprint, '[legal]' ) && str_contains( $templateImprint, '<section class="nino-section">' ) );
 
+// The reading width: the stylesheet gives a section its measure and centres it, which reaches a project whose templates are copied already, and both page templates stand in the narrow row
+$legalCss = (string) file_get_contents( dirname( __DIR__ ). '/_nino/Nino.css' );
+preg_match( '/^\.nino-legal-section\s*\{([^}]*)\}/m', $legalCss, $legalRule );
+check( 'a section of a legal page has a reading width of its own - at most 40rem - and stands in the middle of its row, under a title that is centred',
+	preg_match( '/max-width:\s*40rem\s*;/', $legalRule[1] ?? '' ) === 1 && preg_match( '/margin-inline:\s*auto\s*;/', $legalRule[1] ?? '' ) === 1 );
+foreach( [ 'imprint', 'privacy' ] as $legalKind ) {
+	$legalTemplate = (string) file_get_contents( dirname( __DIR__ ). '/_nino/Nino/Modules/Legal/install/templates/page-legal-'. $legalKind. '.tpl' );
+	check( '...and the template of the '. $legalKind. ' page stands in a narrow row', str_contains( $legalTemplate, '<div class="nino-grid-row nino-grid-row--narrow">' ) );
+}
+
 // A path that is not free, invalid, shared or missing
 $planWith = static function( array $paths, array $locales = [ 'de_DE', 'en_US' ], array $routesBefore = [] ) use ( &$appData ): array {
 	$copy = $appData;

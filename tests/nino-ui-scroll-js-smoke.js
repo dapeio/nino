@@ -354,6 +354,14 @@ check( '...and the three that move on their own are still stopped outright, afte
 	reduceBlock.indexOf('animation: none !important;') > reduceBlock.indexOf('transition-duration: .01ms !important;')
 	&& reduceBlock.includes('.nino-hero-arrowdown') && reduceBlock.includes('.nino-fx-vertical-bounce') );
 
+/*	The picture of a parallax stands at 180% of the section, room for the travel. In a window under
+	768px that is a picture many times wider than the screen and a few percent of it in view, so the
+	return to the size of the section - the one a visitor who asked for less motion, or a touch screen,
+	has - holds for the narrow window too, for the image of the section and for the one in its background	*/
+const parallaxReturns = publicCss.match( /@media ([^{]*)\{\s*\.nino-parallex > (?:\.nino-section-bg > )?img \{[^}]*height: 100%/g ) || [];
+check( 'both rules that give a parallax picture its own size back - the picture of the section and the one in its background - are asked for in a window under 768px as well as for reduced motion and a touch screen',
+	parallaxReturns.length === 2 && parallaxReturns.every( function( rule ) { return rule.includes( 'prefers-reduced-motion: reduce' ) && rule.includes( 'pointer: coarse' ) && rule.includes( 'max-width: 767.98px' ) } ) );
+
 /*	The base site ships no cookie banner. Consent is the Consent feature's job:
 	it owns the choice, its storage and the event. A kernel that kept a second
 	copy of that state would answer a question the feature is there to answer	*/
