@@ -2386,7 +2386,6 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
  *			.nino-pricing-row, .nino-pricing-item(--featured), .nino-pricing-title, .nino-pricing-price
  *			.nino-accordion, .nino-accordion-trigger, .nino-accordion-panel
  *			.nino-pagination
- *			.nino-logos, .nino-logos-item
  *			.nino-gallery, .nino-gallery-item(--wide, --tall)
  *			.nino-feature-list, .nino-feature-item
  *			.nino-timeline, .nino-timeline-step, .nino-timeline-number
@@ -3475,33 +3474,6 @@ body.nino-scroll-btf .nino-back-to-top {
 	color: var(--color-primary-text);
 }
 
-
-/* Logo/Partner strip - text placeholders standing in for real logo
-   images (SVG/PNG), grayscale-to-color on hover */
-.nino-logos {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	justify-content: center;
-	gap: var(--space-4);
-}
-.nino-logos-item {
-	font-size: 1.25rem;
-	font-weight: 700;
-	opacity: .5;
-	filter: grayscale(1);
-	transition: opacity .2s ease, filter .2s ease;
-}
-.nino-logos-item:hover {
-	opacity: 1;
-	filter: grayscale(0);
-}
-.nino-logos-item img {
-	display: block;
-	max-width: 9rem;
-	max-height: 3.5rem;
-	object-fit: contain;
-}
 
 /* Gallery/Mosaic grid - fixed row height, items span extra columns/rows
    via --wide/--tall to break up the grid */

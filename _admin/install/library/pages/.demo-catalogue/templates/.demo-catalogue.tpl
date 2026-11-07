@@ -68,7 +68,6 @@
 				<a href="#ablauf" class="nino-btn nino-btn--outline nino-btn--small">Features and process</a>
 				<a href="#kennzahlen" class="nino-btn nino-btn--outline nino-btn--small">Metrics</a>
 				<a href="#navigation" class="nino-btn nino-btn--outline nino-btn--small">In-content navigation</a>
-				<a href="#partner" class="nino-btn nino-btn--outline nino-btn--small">Partners</a>
 				<a href="#profil" class="nino-btn nino-btn--outline nino-btn--small">Profile, contact, quote</a>
 				<a href="#video" class="nino-btn nino-btn--outline nino-btn--small">Video</a>
 				<a href="#tabs" class="nino-btn nino-btn--outline nino-btn--small">Tabs and filters</a>
@@ -380,44 +379,6 @@
 	<div class="nino-grid-row nino-grid-row--wide">
 		<div class="nino-grid-100 nino-grid-m-50 nino-p-2 nino-text-left"><h2 class="nino-section-title" id="medien-media-right-title">The workshop</h2><div class="nino-section-text">Four hundred square metres, two workbenches and an extraction system you can hear in the next village.</div><a href="#v-contact-form-split" class="nino-btn nino-btn--primary">Book an appointment</a></div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-img-cover"><div class="nino-img-cover"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="" loading="lazy"></div></div>
-	</div>
-</section>
-
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-logo-bar-row" data-demo-preset="items-logos" data-demo-layout="row">
-	<div class="nino-grid-row nino-grid-row--wide">
-		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
-			<span class="nino-badge nino-badge--primary">logo-bar</span> <span class="nino-badge nino-badge--pill">Layout: row — heading above the row</span> <span class="nino-badge nino-badge--pill">Logos from Elements</span> <span class="nino-badge nino-badge--pill">Padding: small</span>
-		</div>
-	</div>
-</section>
-<section id="logos-row" class="nino-section nino-section--alt nino-pt-2 nino-pb-2 nino-mt-0 nino-mb-0">
-	<div class="nino-grid-row">
-		<div class="nino-grid-100 nino-mb-3 nino-mb-3 nino-text-center"><p class="nino-section-subtitle">Clients we have built for</p></div>
-		<div class="nino-grid-100">
-			<div class="nino-logos">
-				<span class="nino-logos-item"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="Nordlicht Studio" loading="lazy"></span><span class="nino-logos-item"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="Werkhaus" loading="lazy"></span><span class="nino-logos-item"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="Blauklee" loading="lazy"></span><span class="nino-logos-item"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="Hof & Feld" loading="lazy"></span><span class="nino-logos-item"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="Papierform" loading="lazy"></span><span class="nino-logos-item"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="Seewerk" loading="lazy"></span>
-			</div>
-		</div>
-	</div>
-</section>
-
-<section class="nino-section nino-section--black nino-pt-1 nino-pb-1 nino-mt-0 nino-mb-0" id="v-logo-bar-aside" data-demo-preset="items-logos" data-demo-layout="aside">
-	<div class="nino-grid-row nino-grid-row--wide">
-		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left">
-			<span class="nino-badge nino-badge--primary">logo-bar</span> <span class="nino-badge nino-badge--pill">Layout: aside — heading beside the row</span> <span class="nino-badge nino-badge--pill">Logos from Elements</span> <span class="nino-badge nino-badge--pill">Padding: small</span>
-		</div>
-	</div>
-</section>
-<section id="logos-aside" class="nino-section nino-section--alt nino-pt-2 nino-pb-2 nino-mt-0 nino-mb-0">
-	<div class="nino-grid-row">
-		<div class="nino-grid-100 nino-grid-m-25">
-			<div class="nino-grid-100 nino-mb-3 nino-mb-3 nino-text-left"><p class="nino-section-subtitle">Clients we have built for</p></div>
-		</div>
-		<div class="nino-grid-100 nino-grid-m-75">
-			<div class="nino-logos">
-				<span class="nino-logos-item"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="Nordlicht Studio" loading="lazy"></span><span class="nino-logos-item"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="Werkhaus" loading="lazy"></span><span class="nino-logos-item"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="Blauklee" loading="lazy"></span><span class="nino-logos-item"><img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="Hof & Feld" loading="lazy"></span><span class="nino-logos-item"><img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="Papierform" loading="lazy"></span><span class="nino-logos-item"><img src="[[/nino/public]]/images/.demo/demo-02.svg" alt="Seewerk" loading="lazy"></span>
-			</div>
-		</div>
 	</div>
 </section>
 
@@ -2452,25 +2413,6 @@
 				<li><a href="#navigation">3</a></li>
 				<li><a href="#navigation">&raquo;</a></li>
 			</ul>
-		</div>
-	</div>
-</section>
-
-<section class="nino-section nino-mt-0 nino-mb-0" id="partner" aria-labelledby="partner-title">
-	<div class="nino-grid-row nino-grid-row--wide">
-		<div class="nino-grid-100 nino-mb-2">
-			<h3 class="nino-section-title nino-text-left" id="partner-title">Partners</h3>
-			<p class="nino-section-subtitle nino-text-left">A logo bar for the page content.</p>
-		</div>
-		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-logos</span> <span class="nino-badge nino-badge--pill">.nino-logos-item</span></div>
-		<div class="nino-grid-100">
-			<div class="nino-logos">
-				<span class="nino-logos-item">Nordlicht</span>
-				<span class="nino-logos-item">Werkhaus</span>
-				<span class="nino-logos-item">Blauklee</span>
-				<span class="nino-logos-item">Hof & Feld</span>
-				<span class="nino-logos-item">Papierform</span>
-			</div>
 		</div>
 	</div>
 </section>
