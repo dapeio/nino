@@ -689,6 +689,86 @@ check( '...the block pads the content only where the card does not pad it - a ca
 	&& $groundSets( $groundOf( '.nino-text-center > .nino-card-content > .nino-btn' ), 'margin-left', 'calc(var(--space-1) / 2)' ) === true
 	&& $groundSets( $groundOf( '.nino-text-right > .nino-card-content > .nino-btn' ), 'margin-left', 'var(--space-1)' ) === true );
 
+// The alignment of the text from a width up: every tier brings what the class without a tier brings, in a block of its width, after the class without a tier.
+// Rules are compared whole - the list of selectors and the body - and not by fragments: the comma inside a :is() would part the list of a stack column
+$alignNorm = static fn( string $text ): string => trim( (string) preg_replace( '/\s+/', ' ', $text ) );
+$alignCss = (string) preg_replace( '/@media[^{]*\{(?:[^{}]*\{[^{}]*\})*\s*\}/', '', $hookCss );
+$alignRules = [];
+preg_match_all( '/([^{}]+)\{([^{}]*)\}/', $alignCss, $alignBaseMatches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE );
+$alignBaseLast = 0;
+foreach( $alignBaseMatches as $alignMatch )
+	if( preg_match( '/\.nino-text-(?:left|center|right)(?![\w-])/', $alignMatch[1][0] ) === 1 ) {
+
+		$alignRules[] = [ 'list' => $alignNorm( $alignMatch[1][0] ), 'body' => $alignNorm( $alignMatch[2][0] ) ];
+		// The offsets are those of the css without its media blocks: the rule as it stands in the file - after a comment before it - is looked up in the whole file, and the last base rule is the one every block has to follow; a rule that is not found puts the last one past the end, which fails the order
+		$alignRaw = ltrim( (string) preg_replace( '#^.*\*/#s', '', $alignMatch[1][0] ) ). '{'. $alignMatch[2][0]. '}';
+		$alignBaseLast = max( $alignBaseLast, strrpos( $hookCss, $alignRaw ) === false ? PHP_INT_MAX : (int) strrpos( $hookCss, $alignRaw ) );
+	}
+$alignTiers = [ 's' => '640', 'm' => '768', 'l' => '1024', 'xl' => '1280' ];
+$alignBlocks = [];
+preg_match_all( '/@media \(min-width: (\d+)px\)\s*\{((?:[^{}]*\{[^{}]*\})*)\s*\}/', $hookCss, $alignMatches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE );
+foreach( $alignMatches as $alignMatch )
+	foreach( $alignTiers as $alignTier => $alignWidth )
+		if( $alignMatch[1][0] === $alignWidth && str_contains( $alignMatch[2][0], '.nino-text-'. $alignTier. '-left' ) === true )
+		{
+			preg_match_all( '/([^{}]+)\{([^{}]*)\}/', $alignMatch[2][0], $alignInner, PREG_SET_ORDER );
+			$alignBlocks[$alignTier] = [ 'at' => $alignMatch[0][1], 'rules' => array_map( static fn( array $rule ): array => [ $alignNorm( $rule[1] ), $alignNorm( $rule[2] ) ], $alignInner ) ];
+		}
+// What a tier says, rule by rule: {T} is the tier, {A} the alignment
+$alignStackList = '.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-{T}-{A} > .nino-btn';
+$alignCardList = ':is(.nino-card--middle, .nino-card--bottom, .nino-card--last-bottom).nino-text-{T}-{A} > .nino-btn, .nino-card--last-bottom.nino-text-{T}-{A} > .nino-card-content > .nino-btn';
+$alignExpected = [
+	[ '.nino-text-{T}-{A}', 'text-align: {A};' ],
+	[ '.nino-text-{T}-{A} :is(.nino-section-title, .nino-section-subtitle, .nino-hero-title, .nino-hero-subtitle)', 'text-align: {A};' ],
+	[ '.nino-text-{T}-{A} > .nino-btn, .nino-text-{T}-{A} > .nino-card-content > .nino-btn', '{margin}' ],
+	[ '.nino-text-{T}-{A} > .nino-section-text--loud', '{loud}' ],
+	[ $alignStackList, 'justify-self: {js};' ],
+	[ $alignCardList, 'align-self: {as};' ],
+	[ ':where(.nino-tiles) > .nino-grid-row > .nino-text-{T}-{A} > .nino-btn', 'justify-self: {js};' ] ];
+$alignValues = [
+	'left' => [ 'margin' => 'margin-right: 0; margin-left: 0;', 'loud' => 'margin-right: 0; margin-left: 0;', 'js' => 'start', 'as' => 'flex-start' ],
+	'center' => [ 'margin' => 'margin-right: calc(var(--space-1) / 2); margin-left: calc(var(--space-1) / 2);', 'loud' => 'margin-right: auto; margin-left: auto;', 'js' => 'center', 'as' => 'center' ],
+	'right' => [ 'margin' => 'margin-right: 0; margin-left: var(--space-1);', 'loud' => 'margin-right: 0; margin-left: 0;', 'js' => 'end', 'as' => 'flex-end' ] ];
+$alignWrong = [];
+$alignLastAt = 0;
+$alignCount = 0;
+foreach( $alignTiers as $alignTier => $alignWidth )
+{
+	if( isset( $alignBlocks[$alignTier] ) === false ) { $alignWrong[] = $alignTier. ': no block of '. $alignWidth. 'px'; continue; }
+	if( $alignBlocks[$alignTier]['at'] < $alignBaseLast || $alignBlocks[$alignTier]['at'] < $alignLastAt )
+		$alignWrong[] = $alignTier. ': block out of order';
+	$alignLastAt = $alignBlocks[$alignTier]['at'];
+	$alignHave = $alignBlocks[$alignTier]['rules'];
+	// every rule of the class without a tier has its twin: the same list, the same body, for the tier
+	foreach( $alignRules as $alignRule )
+		foreach( [ 'left', 'center', 'right' ] as $alignName )
+		{
+			$alignList = (string) preg_replace( '/\.nino-text-'. $alignName. '(?![\w-])/', '.nino-text-'. $alignTier. '-'. $alignName, $alignRule['list'] );
+			if( $alignList === $alignRule['list'] || preg_match( '/\.nino-text-(?!'. $alignName. '(?![\w-]))(?:left|center|right)(?![\w-])/', $alignRule['list'] ) === 1 )
+				continue;
+			$alignCount++;
+			// the margins of a button in the class without a tier are said for the right side alone: the tier gives the other one back
+			$alignBody = $alignName === 'right' && str_contains( $alignRule['list'], '> .nino-btn' ) && str_contains( $alignRule['body'], 'margin-left' ) ? 'margin-right: 0; '. $alignRule['body'] : $alignRule['body'];
+			if( in_array( [ $alignList, $alignBody ], $alignHave, true ) === false )
+				$alignWrong[] = $alignTier. ': '. $alignList;
+		}
+	// and the tier says what it says for each alignment, whole
+	foreach( $alignValues as $alignName => $alignValue )
+		foreach( $alignExpected as [ $alignList, $alignBody ] )
+		{
+			$alignMap = [ '{T}' => $alignTier, '{A}' => $alignName, '{margin}' => $alignValue['margin'], '{loud}' => $alignValue['loud'], '{js}' => $alignValue['js'], '{as}' => $alignValue['as'] ];
+			if( in_array( [ strtr( $alignList, $alignMap ), strtr( $alignBody, $alignMap ) ], $alignHave, true ) === false )
+				$alignWrong[] = $alignTier. '-'. $alignName. ': '. strtr( $alignList, $alignMap );
+		}
+	if( count( $alignHave ) !== 21 )
+		$alignWrong[] = $alignTier. ': '. count( $alignHave ). ' rules, not 21';
+}
+check( 'the text alignment has a tier for each width of the grid - .nino-text-<s|m|l|xl>-<left|center|right> - in a min-width block of 640, 768, 1024 and 1280px in that order, after every rule of the class without a tier; each rule of that class has its twin for the tier with the same list of selectors and the same body, and the tier says in full what it says for each alignment: the titles, the margins of a button and of the loud text, and where a button stands in a stack, a card and a tile'
+	. ( $alignWrong === [] ? '' : ' - missing: '. implode( '; ', $alignWrong ) ),
+	$alignWrong === [] && $alignBaseLast > 0 && count( $alignRules ) >= 14 && $alignCount >= 14 * 4
+	&& preg_match( '/(?<![\w-])!important/', implode( ' ', array_map( static fn( array $block ): string => implode( ' ', array_column( $block['rules'], 1 ) ), $alignBlocks ) ) ) !== 1 );
+
+
 // The picture behind a card, after the pattern of the one behind a column: the same rules but for the radius - the column's picture reads the column's kind, the card's and the row's take
 // the corners of the card and of the row they lie in - and the rule that makes the parent the box it is placed in is one for both
 $groundBgBody = static fn( string $selector ): string => trim( (string) preg_replace( '/\s+/', ' ', (string) preg_replace( '/(?<![\w-])border-radius\s*:[^;]*;/', '', $groundOf( $selector ) ) ) );
@@ -1742,6 +1822,9 @@ $tileExpected = [ ':is(.nino-tiles > .nino-grid-row > *).nino-radius', ':is(.nin
 	':where(.nino-tiles) > .nino-grid-row > * > .nino-btn', ':where(.nino-tiles) > .nino-grid-row > * > .nino-grid-bg',
 	':where(.nino-tiles) > .nino-grid-row > * > .nino-section-text:where(:not(.nino-section-text--quiet, .nino-section-text--loud))', ':where(.nino-tiles) > .nino-grid-row > .nino-text-center > .nino-btn',
 	':where(.nino-tiles) > .nino-grid-row > .nino-text-right > .nino-btn' ];
+foreach( [ 's', 'm', 'l', 'xl' ] as $tileTier )
+	foreach( [ 'left', 'center', 'right' ] as $tileAlign )
+		$tileExpected[] = ':where(.nino-tiles) > .nino-grid-row > .nino-text-'. $tileTier. '-'. $tileAlign. ' > .nino-btn';
 foreach( [ '1-1', '4-3', '3-2', '16-9', '21-9', '4-1', '5-1' ] as $tileRatio )
 	$tileExpected[] = '.nino-tiles--'. $tileRatio. ' > .nino-grid-row > *';
 sort( $tileExpected );
