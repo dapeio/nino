@@ -995,7 +995,9 @@ body.nino-scroll-down .nino-frame-header .nino-scroll-header:where(:not(:has(:fo
 	width: calc( clamp(7.5rem, 10vw, 10rem) * var(--header-logo) );
 	height: auto;
 	min-width: 0;
-	min-height: 0;
+	min-height: 24px;
+	display: flex;
+	align-items: center;
 	margin: 0;
 	background-image: none;
 }
@@ -1250,12 +1252,21 @@ footer {
 }
 .nino-footer-nav {
 	display:flex;
+	flex-wrap: wrap;
 	gap: calc( var(--space-3) * var(--footer-space) );
+	row-gap: var(--space-1);
 	align-items: center;
 }
 .nino-footer-copyright {
 	display:flex;
 	align-items: center;
+}
+
+@media (max-width: 767.98px) {
+	.nino-footer-nav {
+		flex-direction: column;
+		align-items: flex-start;
+	}
 }
 
 
@@ -1651,73 +1662,109 @@ footer {
 :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-right {
 	background-position: right bottom;
 }
-/*	A class that aligns from a breakpoint moves the words of a title only on the title itself - a title carries its own text-align, and Nino.css has the
-	ancestor form for the classes that align at every width alone. The box and the rule follow the words, so the mirrors name the title, and a class on
-	what the title stands in leaves it where the alignment of the template puts it	*/
+/*	A class that aligns from a breakpoint moves the boxes the way the class alone does: Nino.css has the ancestor form for every step, so the mirrors follow it - the boxes of the titles, the
+	subtitles, the texts and the hero stand where the words stand, and the rule under a title with them, whether the class is on the element or on what it stands in. Each step names the elements of
+	the rule above and what they stand in; a step that says left takes the boxes back to the margin of the left edge, and its rules come in the order of Nino.css, left, centre, right	*/
 @media (min-width: 640px) {
-	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-s-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+	.nino-text-s-left :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud).nino-text-s-left:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: 0;
+	}
+	.nino-text-s-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud).nino-text-s-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
 		margin-inline: auto;
 	}
-	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-s-right:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+	.nino-text-s-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud).nino-text-s-right:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
 		margin-inline: auto 0;
 	}
+	.nino-text-s-left :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-s-left {
 		background-position: left bottom;
 	}
+	.nino-text-s-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-s-center {
 		background-position: center bottom;
 	}
+	.nino-text-s-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-s-right {
 		background-position: right bottom;
 	}
 }
 @media (min-width: 768px) {
-	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-m-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+	.nino-text-m-left :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud).nino-text-m-left:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: 0;
+	}
+	.nino-text-m-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud).nino-text-m-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
 		margin-inline: auto;
 	}
-	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-m-right:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+	.nino-text-m-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud).nino-text-m-right:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
 		margin-inline: auto 0;
 	}
+	.nino-text-m-left :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-m-left {
 		background-position: left bottom;
 	}
+	.nino-text-m-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-m-center {
 		background-position: center bottom;
 	}
+	.nino-text-m-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-m-right {
 		background-position: right bottom;
 	}
 }
 @media (min-width: 1024px) {
-	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-l-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+	.nino-text-l-left :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud).nino-text-l-left:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: 0;
+	}
+	.nino-text-l-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud).nino-text-l-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
 		margin-inline: auto;
 	}
-	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-l-right:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+	.nino-text-l-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud).nino-text-l-right:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
 		margin-inline: auto 0;
 	}
+	.nino-text-l-left :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-l-left {
 		background-position: left bottom;
 	}
+	.nino-text-l-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-l-center {
 		background-position: center bottom;
 	}
+	.nino-text-l-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-l-right {
 		background-position: right bottom;
 	}
 }
 @media (min-width: 1280px) {
-	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-xl-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+	.nino-text-xl-left :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud).nino-text-xl-left:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: 0;
+	}
+	.nino-text-xl-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud).nino-text-xl-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
 		margin-inline: auto;
 	}
-	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-xl-right:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+	.nino-text-xl-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-text, .nino-section-text--quiet, .nino-section-text--loud, .nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud, .nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud).nino-text-xl-right:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
 		margin-inline: auto 0;
 	}
+	.nino-text-xl-left :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-xl-left {
 		background-position: left bottom;
 	}
+	.nino-text-xl-center :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-xl-center {
 		background-position: center bottom;
 	}
+	.nino-text-xl-right :is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud),
 	:is(.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud).nino-text-xl-right {
 		background-position: right bottom;
 	}
@@ -2180,6 +2227,10 @@ footer {
 	margin-inline: auto 0;
 }
 @media (min-width: 640px) {
+	.nino-text-s-left :is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud).nino-text-s-left:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: 0;
+	}
 	.nino-text-s-center :is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
 	:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud).nino-text-s-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
 		margin-inline: auto;
@@ -2190,6 +2241,10 @@ footer {
 	}
 }
 @media (min-width: 768px) {
+	.nino-text-m-left :is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud).nino-text-m-left:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: 0;
+	}
 	.nino-text-m-center :is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
 	:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud).nino-text-m-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
 		margin-inline: auto;
@@ -2200,6 +2255,10 @@ footer {
 	}
 }
 @media (min-width: 1024px) {
+	.nino-text-l-left :is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud).nino-text-l-left:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: 0;
+	}
 	.nino-text-l-center :is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
 	:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud).nino-text-l-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
 		margin-inline: auto;
@@ -2210,6 +2269,10 @@ footer {
 	}
 }
 @media (min-width: 1280px) {
+	.nino-text-xl-left :is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
+	:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud).nino-text-xl-left:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
+		margin-inline: 0;
+	}
 	.nino-text-xl-center :is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud):where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])),
 	:is(.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud).nino-text-xl-center:where(:not([class*="nino-m-"], [class*="nino-mx-"], [class*="nino-ml-"], [class*="nino-mr-"])) {
 		margin-inline: auto;
@@ -2292,8 +2355,8 @@ footer {
  *
  *	The size is what the padding, the type and the radius of a button are
  *	multiplied by. The variants are that size times a number, in Nino.css as
- *	here: a small button is the size times 1 less the spread, a big one the
- *	size times 1 plus it.
+ *	here: a small button is the size times 1 less the spread - its type never under
+ *	.75rem - a big one the size times 1 plus it.
  *
  *	The tracking is the letter-spacing of the label, in em, so that a small and a
  *	big button space their letters in proportion; none at the middle, as Nino.css
@@ -2398,7 +2461,7 @@ footer {
 	padding: calc( var(--buttons-space) / 2 * var(--buttons-size) * ( 1 - var(--buttons-spread) ) ) calc( var(--buttons-space) * var(--buttons-size) * ( 1 - var(--buttons-spread) ) );
 }
 .nino-btn--small {
-	font-size: calc( var(--font-button-size) * var(--buttons-size) * ( 1 - var(--buttons-spread) ) );
+	font-size: max( calc( var(--font-button-size) * var(--buttons-size) * ( 1 - var(--buttons-spread) ) ), .75rem );
 	border-radius: calc( var(--buttons-corners) * var(--buttons-size) * ( 1 - var(--buttons-spread) ) );
 }
 .nino-btn--big:where(:not([class*="nino-pt-"], [class*="nino-pb-"], [class*="nino-p-"])) {
