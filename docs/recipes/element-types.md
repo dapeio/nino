@@ -40,6 +40,16 @@ Common model properties:
 An image MUST NOT be required: the element must exist before its deterministic
 upload path can be created.
 
+A number field (`integer`, `double`) left empty in the element form is saved
+without a value: the form sends `null`, and `\Nino\Elements::updateElement()` and
+`insertElement()` take a stored number away on `null`. The element then reads as one
+that never had the field, and `sort` puts it last; a field with a model default
+takes the default instead, and the form shows it once the save is answered. `0` is
+a number and stays `0`; a `required` number given `null` is refused as a missing
+field, and any other text for a number field as the wrong type. A number control
+that holds something that is no number (`validity.badInput`) holds the save back
+at the field, so a stored number is never taken away by a mistyped one.
+
 An `element` field references another element. Its value is that element's full
 uri (`/<type>/<slug>`) — exactly what `\Nino\Elements::getElement()` takes, so a
 template never re-joins it with the model. The element form renders it as a

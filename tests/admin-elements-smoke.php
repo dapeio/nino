@@ -647,6 +647,72 @@ check( 'apiSave rejects a new uri that is not a plain slug', $status === 400 );
 ] );
 check( 'apiSave updates a second locale of the same element', $status === 200 );
 
+// --- a number field left empty ----------------------------------------------
+//
+// The form sends null for an integer or a double with nothing in it. The element
+// is then saved as if the field had never been set: no key in its bucket, no 0 -
+// 0 is a position of its own and sorts before 10. 0 typed stays 0.
+
+\Nino\Filesystem::putFileContent( $appData, '/elements/numbers.php', [
+	'title'	=> 'Numbers',
+	'model'	=> [
+		'title'		=> [ 'type' => 'string', 'locale' => true ],
+		'order'		=> [ 'type' => 'integer' ],
+		'weight'	=> [ 'type' => 'double', 'locale' => true ],
+		'count'		=> [ 'type' => 'integer', 'required' => true ],
+		'views'		=> [ 'type' => 'integer', 'default' => 5 ],
+	],
+	'*'			=> [ '*' => [ 'views' => 5 ] ],
+] );
+
+$saveNumbers = static function( string $uri, array $fields, bool $isNew = true, string $locale = 'de_DE' ) use ( &$appData ): array {
+	[ $status, $body ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiSave', [ 'type' => 'numbers', 'uri' => $uri, 'locale' => $locale, 'isNew' => $isNew, 'fields' => $fields ] );
+	return [ $status, $body ];
+};
+$numbersOnDisk = static fn(): array => \Nino\Filesystem::getFileContent( $appData, '/elements/numbers.php', false );
+
+[ $status, $body ] = $saveNumbers( 'blank', [ 'title' => 'Blank', 'order' => null, 'weight' => null, 'count' => 1 ] );
+$disk = $numbersOnDisk();
+check( 'a new element with its empty number fields sent as null is saved', $status === 200 );
+check( '...without a value for them: no key in the global bucket, none in the translation', array_key_exists( 'order', $disk['*']['blank'] ) === false && array_key_exists( 'weight', $disk['de_DE']['blank'] ) === false );
+check( '...and the element answered has no such field, so nothing reads as 0', array_key_exists( 'order', $body['element'] ) === false && array_key_exists( 'weight', $body['element'] ) === false );
+[ , $body ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiGet', [ 'type' => 'numbers', 'uri' => 'blank' ] );
+check( '...and get answers the field without a value, not 0', array_key_exists( 'order', $body['global'] ) === true && $body['global']['order'] === null && array_key_exists( 'weight', $body['locales']['de_DE'] ) === true && $body['locales']['de_DE']['weight'] === null );
+
+[ $status, $body ] = $saveNumbers( 'ten', [ 'title' => 'Ten', 'order' => 10, 'weight' => 2, 'count' => 1 ] );
+check( 'a number is saved as that number, a whole double as a float', $status === 200 && ( $numbersOnDisk()['*']['ten']['order'] ?? null ) === 10 && ( $numbersOnDisk()['de_DE']['ten']['weight'] ?? null ) === 2.0 );
+[ $status ] = $saveNumbers( 'zero', [ 'title' => 'Zero', 'order' => 0, 'weight' => 0, 'count' => 0 ] );
+check( '0 typed stays 0, in both kinds of field and in a required one', $status === 200 && ( $numbersOnDisk()['*']['zero']['order'] ?? null ) === 0 && ( $numbersOnDisk()['de_DE']['zero']['weight'] ?? null ) === 0.0 && ( $numbersOnDisk()['*']['zero']['count'] ?? null ) === 0 );
+
+[ $status ] = $saveNumbers( 'ten', [ 'order' => null, 'weight' => null ], false );
+$disk = $numbersOnDisk();
+check( 'emptying a field that held a number takes the value away', $status === 200 && array_key_exists( 'order', $disk['*']['ten'] ) === false && array_key_exists( 'weight', $disk['de_DE']['ten'] ) === false );
+check( '...and leaves the element\'s other fields where they are', ( $disk['de_DE']['ten']['title'] ?? null ) === 'Ten' && ( $disk['*']['ten']['count'] ?? null ) === 1 );
+
+[ $status ] = $saveNumbers( 'zero', [ 'order' => null ], false );
+check( 'a stored 0 is emptied like any other number', $status === 200 && array_key_exists( 'order', $numbersOnDisk()['*']['zero'] ) === false && ( $numbersOnDisk()['de_DE']['zero']['weight'] ?? null ) === 0.0 );
+
+$before = $numbersOnDisk();
+[ $status, $body ] = $saveNumbers( 'zero', [ 'order' => '' ], false );
+check( 'an empty text is no number: refused with the wrong type, and nothing is written', $status === 400 && str_contains( (string) ( $body['error'] ?? $body['message'] ?? '' ), 'Wrong var type' ) === true && $numbersOnDisk() === $before );
+[ $status ] = $saveNumbers( 'zero', [ 'order' => 'abc' ], false );
+check( '...as is any other text', $status === 400 && $numbersOnDisk() === $before );
+
+[ $status, $body ] = $saveNumbers( 'nocount', [ 'title' => 'x', 'count' => null ] );
+check( 'a required number sent as null is a missing field on insert', $status === 400 && str_contains( (string) ( $body['error'] ?? $body['message'] ?? '' ), 'Missing required element key \'count\'' ) === true && isset( $numbersOnDisk()['*']['nocount'] ) === false );
+[ $status ] = $saveNumbers( 'ten', [ 'count' => null ], false );
+check( '...and on update, where the number it held stays', $status === 400 && ( $numbersOnDisk()['*']['ten']['count'] ?? null ) === 1 );
+
+[ $status ] = $saveNumbers( 'ten', [ 'views' => 9 ], false );
+check( 'a field with a model default holds a number of its own', $status === 200 && ( $numbersOnDisk()['*']['ten']['views'] ?? null ) === 9 );
+[ $status, $body ] = $saveNumbers( 'ten', [ 'views' => null ], false );
+check( '...emptied, it has no value of its own again and the element shows the default', $status === 200 && array_key_exists( 'views', $numbersOnDisk()['*']['ten'] ) === false && ( $body['element']['views'] ?? null ) === 5 );
+
+$saveNumbers( 'solo', [ 'count' => 1, 'weight' => 1.5 ], true, 'en_US' );
+check( 'an element whose only field in a translation is a number has an entry there', ( $numbersOnDisk()['en_US']['solo']['weight'] ?? null ) === 1.5 );
+[ $status ] = $saveNumbers( 'solo', [ 'weight' => null ], false, 'en_US' );
+check( 'emptying that number leaves no empty entry in the translation\'s bucket', $status === 200 && array_key_exists( 'solo', $numbersOnDisk()['en_US'] ?? [] ) === false && ( $numbersOnDisk()['*']['solo']['count'] ?? null ) === 1 );
+
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiList', [ 'type' => 'contenttype' ] );
 check( 'apiList succeeds', $status === 200 );
 check( 'apiList finds the element across locales', count( $body['elements'] ) === 1 && $body['elements'][0]['uri'] === 'first' );

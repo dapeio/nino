@@ -48,6 +48,7 @@ return [
 	'[[/_admin/elements/error/load]]'			=> 'Laden fehlgeschlagen.',
 	'[[/_admin/elements/error/required]]'	=> 'Bitte fülle die markierten Pflichtfelder aus.',
 	'[[/_admin/elements/error/json]]'	=> 'Kein gültiges JSON – erwartet wird eine Liste oder ein Objekt.',
+	'[[/_admin/elements/error/number]]'	=> 'Das ist keine Zahl.',
 	'[[/_admin/elements/label/locale-open]]'	=> '%s – %d offen',
 	'[[/_admin/elements/confirm/delete]]'	=> 'Dieses Element wirklich löschen?',
 	'[[/_admin/elements/label/raw]]'		=> 'Rohdaten',

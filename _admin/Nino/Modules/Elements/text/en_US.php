@@ -48,6 +48,7 @@ return [
 	'[[/_admin/elements/error/load]]'			=> 'Failed to load.',
 	'[[/_admin/elements/error/required]]'	=> 'Please fill in the marked required fields.',
 	'[[/_admin/elements/error/json]]'	=> 'Not valid JSON – a list or an object is expected.',
+	'[[/_admin/elements/error/number]]'	=> 'Not a number.',
 	'[[/_admin/elements/label/locale-open]]'	=> '%s – %d open',
 	'[[/_admin/elements/confirm/delete]]'	=> 'Really delete this element?',
 	'[[/_admin/elements/label/raw]]'		=> 'Raw storage',

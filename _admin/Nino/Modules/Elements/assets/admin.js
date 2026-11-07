@@ -51,6 +51,10 @@
 		// from it; the text is what the field shows when it comes back and what
 		// the save is held back for (see _storeVisibleLocaleFields())
 		_invalidArrays	: {},
+		// The same for a number control that holds something that is no number
+		// (its value reads '', like an empty one): the stored number stays, the
+		// slot - locale|key - is what the save is held back for
+		_invalidNumbers	: {},
 		// A save was refused: from now on the marks follow what is typed and
 		// every freshly drawn translation carries them (see _showProblems())
 		_validated			: false,
@@ -1727,9 +1731,9 @@
 
 		/**
 		 *	Whether a required field is currently empty - reads the raw dom
-		 *	value rather than _readFieldByKey()'s parsed one: integer/double
-		 *	coerce an empty input to 0 there, which would make "required"
-		 *	unable to ever catch a blank number/date field. Boolean is never
+		 *	value rather than _readFieldByKey()'s parsed one, so a blank
+		 *	number or date field and one that only holds spaces count alike.
+		 *	Boolean is never
 		 *	considered empty (a radio choice always has a value), and a list or
 		 *	object text that is not valid JSON is not empty either: it is
 		 *	reported for what it is (see _validate()).
@@ -1770,11 +1774,10 @@
 		 *	stored value instead of the dom, because the only locale with
 		 *	controls to read is the visible one.
 		 *
-		 *	The one case it cannot see is a blank number field: _readField()
-		 *	turned that into 0 when the locale was stored, and 0 is a number.
-		 *	For the visible locale _isFieldEmpty() still reads the raw input,
-		 *	and for a locale that came from the server the value is whatever
-		 *	was actually written.
+		 *	A blank number field is stored as null (see _readField()), and 0
+		 *	is a number. For the visible locale _isFieldEmpty() still reads the
+		 *	raw input, and for a locale that came from the server the value is
+		 *	whatever was actually written.
 		 *
 		 *	@param		{Object}	field					Model field definition ({ type, html, required, ... })
 		 *	@param		{*}				value					The stored value for one locale
@@ -1840,7 +1843,18 @@
 
 				let kind = null;
 
-				if( definition.type === 'array' ) {
+				// A number control with something typed that is no number answers
+				// value '' - the same as an empty one - and would be saved as no
+				// value, taking the stored number away. The control on screen says
+				// so itself; a translation that was left remembered it
+				// (see _storeVisibleLocaleFields())
+				if( definition.type === 'integer' || definition.type === 'double' ) {
+					const control = visible === true ? dc.getElementById('elements-form')?.querySelector( '[data-field="'+ CSS.escape( key )+ '"]' ) : null;
+					if( visible === true ? ( control !== null && control !== undefined && control.validity?.badInput === true ) : Nino.admin.elements._invalidNumbers[locale+ '|'+ key] === true )
+						kind = 'number';
+				}
+
+				if( kind === null && definition.type === 'array' ) {
 					const typed = visible === true ? Nino.admin.elements._rawText( key ) : Nino.admin.elements._invalidArrays[locale+ '|'+ key];
 					if( typeof typed === 'string' && Nino.admin.elements._parseArray( typed ).ok === false )
 						kind = 'json';
@@ -1920,7 +1934,7 @@
 				// The sentence is the control's description and goes after its label, not
 				// in it (see Nino.adminUi.fieldError()); an editor marks itself
 				const id = ( problem.key === '.uri' ? 'elements-error-uri' : 'elements-error-field-'+ problem.key );
-				Nino.adminUi.fieldError( target.wrapper, target.handle === null ? target.control : null, id, Nino.content.getText( problem.key === '.uri' ? '/_admin/elements/error/uri' : ( problem.kind === 'json' ? '/_admin/elements/error/json' : '/_admin/common/error/required' ) ) );
+				Nino.adminUi.fieldError( target.wrapper, target.handle === null ? target.control : null, id, Nino.content.getText( problem.key === '.uri' ? '/_admin/elements/error/uri' : ( problem.kind === 'json' ? '/_admin/elements/error/json' : ( problem.kind === 'number' ? '/_admin/elements/error/number' : '/_admin/common/error/required' ) ) ) );
 
 				if( target.handle !== null )
 					target.handle.mark( { invalid : true, describedBy : id } );
@@ -1936,7 +1950,7 @@
 
 			// One sentence, in the status line, which announces it once. A list that does not parse
 			// is not an empty required field, so its own words stand for it
-			Nino.admin.elements._status.fail( Nino.content.getText( problems.some( function( problem ) { return problem.kind === 'required' } ) ? '/_admin/elements/error/required' : '/_admin/elements/error/json' ) );
+			Nino.admin.elements._status.fail( Nino.content.getText( problems.some( function( problem ) { return problem.kind === 'required' } ) ? '/_admin/elements/error/required' : ( problems.some( function( problem ) { return problem.kind === 'json' } ) ? '/_admin/elements/error/json' : '/_admin/elements/error/number' ) ) );
 
 			if( first === null )
 				return;
@@ -2053,10 +2067,19 @@
 			// is true by definition, so the answer is its value
 			if( input.dataset.type === 'boolean' )
 				return input.value === 'true';
-			if( input.dataset.type === 'integer' )
-				return parseInt( input.value, 10 ) || 0;
-			if( input.dataset.type === 'double' )
-				return parseFloat( input.value ) || 0;
+			// A number field left empty has no value - null, which the server
+			// saves as a field that was never set - and 0 is only what is
+			// typed as 0. A control that holds something that is no number reads
+			// as empty as well (its value is ''), which is why _validate() holds
+			// the save back for it; a text that reaches here goes on as it is,
+			// for the server to refuse as the wrong type
+			if( input.dataset.type === 'integer' || input.dataset.type === 'double' ) {
+				const text = input.value.trim();
+				if( text === '' )
+					return null;
+				const number = ( input.dataset.type === 'integer' ) ? parseInt( text, 10 ) : parseFloat( text );
+				return Number.isNaN( number ) ? text : number;
+			}
 			if( input.dataset.type === 'array' )
 				return Nino.admin.elements._parseArray( input.value ).value;
 
@@ -2078,6 +2101,11 @@
 		 *	_invalidArrays (what the field shows again, and what the save is held
 		 *	back for), and the translation counts as edited either way - or
 		 *	nothing would write it, ask about it or warn that it is about to be lost.
+		 *
+		 *	A number control that holds no number (validity.badInput) is the same
+		 *	case: its value reads '', which would take the stored number away. The
+		 *	previous value stays, the slot goes to _invalidNumbers, and the
+		 *	translation counts as edited.
 		 *
 		 *	A translation counts as edited when a control differs from what it held
 		 *	when it was drawn, not from the stored value: a rich-text field
@@ -2111,6 +2139,17 @@
 						return;
 					}
 					delete Nino.admin.elements._invalidArrays[slot];
+				}
+
+				if( field.type === 'integer' || field.type === 'double' ) {
+					const control = dc.getElementById('elements-form')?.querySelector( '[data-field="'+ CSS.escape( key )+ '"]' );
+					if( control !== null && control !== undefined && control.validity?.badInput === true ) {
+						Nino.admin.elements._invalidNumbers[slot] = true;
+						values[key] = previous[key];
+						changed = true;
+						return;
+					}
+					delete Nino.admin.elements._invalidNumbers[slot];
 				}
 
 				values[key] = Nino.admin.elements._readFieldByKey( key, field );
@@ -2175,7 +2214,7 @@
 				if( field.type === 'boolean' )
 					return false;
 				if( field.type === 'integer' || field.type === 'double' )
-					return 0;
+					return null;
 				return '';
 			}
 
@@ -2192,6 +2231,7 @@
 		 */
 		_resetEdits : function() {
 			Nino.admin.elements._invalidArrays	= {};
+			Nino.admin.elements._invalidNumbers	= {};
 			Nino.admin.elements._validated			= false;
 			Nino.admin.elements._copy						= false;
 			Nino.admin.elements._baseline				= { uri : null, global : {}, locale : {} };
@@ -2273,7 +2313,7 @@
 			if( form === null || Nino.admin.elements._currentType === null || form.classList.contains('admin-hidden') === true || dc.getElementById('elements-edit-form') === null )
 				return false;
 
-			if( Nino.admin.elements._copy === true || Object.keys( Nino.admin.elements._invalidArrays ).length > 0 )
+			if( Nino.admin.elements._copy === true || Object.keys( Nino.admin.elements._invalidArrays ).length > 0 || Object.keys( Nino.admin.elements._invalidNumbers ).length > 0 )
 				return true;
 
 			const uri = dc.getElementById('elements-form-uri');
@@ -2897,6 +2937,23 @@
 					Nino.admin.elements._globalKeys.forEach( function( key ) { Nino.admin.elements._globalValues[key] = response.element[key] ?? null } );
 					Nino.admin.elements._localeValues[locale] = Nino.admin.elements._localeValues[locale] ?? {};
 					Nino.admin.elements._localeKeys.forEach( function( key ) { Nino.admin.elements._localeValues[locale][key] = response.element[key] ?? null } );
+
+					// A number field that was sent empty comes back with the model's
+					// default where it has one, so its control shows what the server
+					// holds before the baseline is taken (a translation that is not on
+					// screen has no control to show it)
+					Object.keys( fields ).forEach( function( key ) {
+
+						const definition = Nino.admin.elements._currentModel[key];
+						if( fields[key] !== null || definition === undefined || ( definition.type !== 'integer' && definition.type !== 'double' ) )
+							return;
+						if( Nino.admin.elements._localeKeys.indexOf( key ) !== -1 && locale !== Nino.admin.elements._selectedLocale )
+							return;
+
+						const control = dc.getElementById('elements-form')?.querySelector( '[data-field="'+ CSS.escape( key )+ '"]' );
+						if( control !== null && control !== undefined )
+							control.value = String( response.element[key] ?? '' );
+					} );
 
 					// What the server holds now: what discard() goes back to
 					Nino.admin.elements._pristine.global = Nino.admin.elements._clone( Nino.admin.elements._globalValues );

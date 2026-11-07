@@ -1218,7 +1218,15 @@ namespace Nino {
 					// Check key. A whole-number 'double' round-trips through JSON as
 					// an integer; coerce it before the default comparison as well, so
 					// posting 5 can genuinely reset an inherited default of 5.0.
-					if( isset( $data[$key] ) === false )
+					//
+					// A number field given null is a number field left empty: the
+					// value it held is taken away, so the field reads as one that
+					// was never set (and sorts last), where 0 would be a position
+					// of its own. Any other field given null is not written.
+					$cleared = array_key_exists( $key, $data ) === true && $data[$key] === null
+						&& in_array( $field['type'], [ 'integer', 'double' ], true ) === true;
+
+					if( isset( $data[$key] ) === false && $cleared === false )
 						continue;
 
 					if( $field['type'] === 'double' && gettype( $data[$key] ) === 'integer' )
@@ -1229,8 +1237,9 @@ namespace Nino {
 					// A model default is inherited from ['*']['*']; writing the same
 					// value is unnecessary. On update, however, an older explicit
 					// override must be removed or the reset appears to save but the
-					// stale value wins again on the next read.
-					if( isset( $field['default'] ) === true && isset( $data[$key] ) === true && $field['default'] === $data[$key] ) {
+					// stale value wins again on the next read. An emptied number
+					// field is removed the same way.
+					if( $cleared === true || ( isset( $field['default'] ) === true && isset( $data[$key] ) === true && $field['default'] === $data[$key] ) ) {
 						unset( $typeData[$targetArray][$elementUri][$key] );
 						if( $targetArray !== '*' && ( $typeData[$targetArray][$elementUri] ?? null ) === [] ) {
 							unset( $typeData[$targetArray][$elementUri] );

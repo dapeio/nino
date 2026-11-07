@@ -710,6 +710,30 @@ check( 'sort and query combine: filtered first, then ordered', sortedUris( $appD
 	&& implode( ',', array_map( static fn( array $e ): string => basename( (string) $e['.uri'] ), \Nino\Elements::queryElements( $appData, '/sorttest', [ 'group' => 'b' ], 'de_DE', [], [ 'sort' => '-weight' ] ) ) ) === 'd,a' );
 check( 'sortElements() tolerates what is not an element: it sorts last', \Nino\Elements::sortElements( [ 'x', [ 'title' => 'b' ], [ 'title' => 'a' ] ], 'title' ) === [ [ 'title' => 'a' ], [ 'title' => 'b' ], 'x' ] );
 
+check( 'sortElements() puts 0 before 10 and an element without the number, or with null, after both - in either direction',
+	array_column( \Nino\Elements::sortElements( [ [ 'id' => 'ten', 'order' => 10 ], [ 'id' => 'none' ], [ 'id' => 'zero', 'order' => 0 ], [ 'id' => 'null', 'order' => null ] ], 'order' ), 'id' ) === [ 'zero', 'ten', 'none', 'null' ]
+	&& array_column( \Nino\Elements::sortElements( [ [ 'id' => 'ten', 'order' => 10 ], [ 'id' => 'none' ], [ 'id' => 'zero', 'order' => 0 ], [ 'id' => 'null', 'order' => null ] ], '-order' ), 'id' ) === [ 'ten', 'zero', 'none', 'null' ] );
+
+\Nino\Filesystem::putFileContent( $appData, '/elements/nulltype.php', [
+	'title'	=> 'Null Type',
+	'model'	=> [ 'weight' => [ 'type' => 'integer' ], 'ratio' => [ 'type' => 'double' ], 'level' => [ 'type' => 'integer', 'required' => true ], 'note' => [ 'type' => 'string' ] ],
+	'*'			=> [ '*' => [] ],
+] );
+$nullInserted = \Nino\Elements::insertElement( $appData, '/nulltype/one', [ 'weight' => null, 'ratio' => null, 'level' => 0, 'note' => null ], '*' );
+$nullDisk = \Nino\Filesystem::getFileContent( $appData, '/elements/nulltype.php', false );
+check( 'a number field given null is inserted without a value: no key in the element, none on disk', is_array( $nullInserted ) === true
+	&& array_key_exists( 'weight', $nullInserted ) === false && array_key_exists( 'ratio', $nullInserted ) === false && $nullDisk['*']['one'] === [ 'level' => 0 ] );
+\Nino\Elements::updateElement( $appData, '/nulltype/one', [ 'weight' => 3, 'note' => 'n' ], '*' );
+check( '...a number is then written', ( \Nino\Elements::getElement( $appData, '/nulltype/one', '*' )['weight'] ?? null ) === 3 );
+$nullUpdated = \Nino\Elements::updateElement( $appData, '/nulltype/one', [ 'weight' => null, 'note' => null ], '*' );
+check( '...null on update takes the number away, as a field that was never set', is_array( $nullUpdated ) === true && array_key_exists( 'weight', $nullUpdated ) === false
+	&& array_key_exists( 'weight', \Nino\Filesystem::getFileContent( $appData, '/elements/nulltype.php', false )['*']['one'] ) === false );
+check( '...while null for a field that is no number changes nothing', ( $nullUpdated['note'] ?? null ) === 'n' );
+$nullRefused = null;
+$nullErrors = ninoErrors( static function() use ( &$appData, &$nullRefused ): void { $nullRefused = \Nino\Elements::updateElement( $appData, '/nulltype/one', [ 'level' => null ], '*' ); } );
+check( 'null for a required number is a missing field, and the number stays', $nullRefused === false && str_contains( $nullErrors[0][1] ?? '', 'Missing required element key \'level\'' ) === true
+	&& ( \Nino\Elements::getElement( $appData, '/nulltype/one', '*' )['level'] ?? null ) === 0 );
+
 check( '[elements] takes sort, offset and limit; ids count from 0 after the cut',
 	\Nino\Html::renderHtml( $appData, '[elements /sorttest sort="-weight" offset="1" limit="2"][[.id]]:[[title]];[/elements]' ) === '0:Item 10;1:item 9;' );
 

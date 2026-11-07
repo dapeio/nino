@@ -276,6 +276,16 @@ check( 'a list reference is read back as the array it holds',
 	JSON.stringify( elements._readField( { dataset : { type : 'element', multiple : '0' }, value : '["/tag/php","/tag/css"]' } ) ) === '["/tag/php","/tag/css"]' );
 check( 'a single reference is still read back as its plain uri',
 	elements._readField( { dataset : { type : 'element' }, value : '/tag/php' } ) === '/tag/php' );
+check( 'a blank number input has no value: null for an integer and for a double, spaces included',
+	elements._readField( { dataset : { type : 'integer' }, value : '' } ) === null && elements._readField( { dataset : { type : 'double' }, value : '  ' } ) === null );
+check( 'a typed number is that number, and 0 is 0',
+	elements._readField( { dataset : { type : 'integer' }, value : '20' } ) === 20 && elements._readField( { dataset : { type : 'integer' }, value : '0' } ) === 0
+	&& elements._readField( { dataset : { type : 'double' }, value : '2.5' } ) === 2.5 && elements._readField( { dataset : { type : 'double' }, value : '0' } ) === 0 );
+check( 'text that is no number stays text, for the server to refuse',
+	elements._readField( { dataset : { type : 'integer' }, value : 'abc' } ) === 'abc' && elements._readField( { dataset : { type : 'double' }, value : '-' } ) === '-' );
+check( 'an empty number field is not the same as 0 when a stored value is compared with the control',
+	elements._fieldValuesEqual( { type : 'integer' }, null, null ) === true && elements._fieldValuesEqual( { type : 'integer' }, undefined, null ) === true
+	&& elements._fieldValuesEqual( { type : 'integer' }, 0, null ) === false && elements._fieldValuesEqual( { type : 'double' }, null, 0 ) === false );
 // A half-written value must not take the whole save down with it
 check( 'unreadable json falls back to an empty list rather than throwing',
 	JSON.stringify( elements._readField( { dataset : { type : 'element', multiple : '2' }, value : '[' } ) ) === '[]' );
@@ -1062,13 +1072,15 @@ function fakeDom() {
 		let classes = new Set();
 		const node = {
 			tagName : tag, children : [], parentNode : null, attrs : {}, dataset : {}, listeners : {}, style : {},
-			id : '', value : '', checked : false, disabled : false, hidden : false, type : '', textContent : '', focused : false,
+			id : '', _value : '', checked : false, disabled : false, hidden : false, type : '', textContent : '', focused : false,
 			classList : {
 				add : ( ...k ) => k.forEach( c => classes.add( c ) ), remove : ( ...k ) => k.forEach( c => classes.delete( c ) ),
 				contains : k => classes.has( k ), toggle : ( k, on ) => { if( on === undefined ? ! classes.has( k ) : on ) classes.add( k ); else classes.delete( k ); return classes.has( k ) },
 			},
 			get className() { return [ ...classes ].join(' ') }, set className( v ) { classes = new Set( String( v ).split( /\s+/ ).filter( Boolean ) ) },
 			get contentEditable() { return this.attrs.contenteditable ?? 'inherit' }, set contentEditable( v ) { this.attrs.contenteditable = String( v ) },
+			// A control's value is a string in a browser, whatever was assigned
+			get value() { return this._value }, set value( v ) { this._value = String( v ) },
 			get firstChild() { return this.children[0] ?? null },
 			get innerHTML() { return '' }, set innerHTML( v ) { this.children.forEach( c => c.parentNode = null ); this.children = [] },
 			attr( name ) { return name in this.attrs ? this.attrs[name] : ( name === 'type' ? ( this.type || null ) : ( this[name] === undefined || this[name] === '' ? ( name.startsWith('data-') ? this.dataset[name.slice(5)] ?? null : null ) : this[name] ) ) },
@@ -1112,7 +1124,7 @@ function fakeDom() {
 	sandbox.CSS = { escape : value => String( value ) };
 
 	const texts = {
-		'/_admin/elements/error/required' : 'REQ', '/_admin/common/error/required' : 'FIELD', '/_admin/elements/error/json' : 'JSON',
+		'/_admin/elements/error/required' : 'REQ', '/_admin/common/error/required' : 'FIELD', '/_admin/elements/error/json' : 'JSON', '/_admin/elements/error/number' : 'NUMBER',
 		'/_admin/elements/error/uri' : 'URI', '/_admin/elements/error/save' : 'SAVEFAIL', '/_admin/elements/label/locale-open' : '%s - %d open',
 		'/_admin/elements/label/uri' : 'Uri', '/_admin/elements/msg/duplicated' : 'COPY',
 		'/_admin/common/msg/dirty' : 'Unsaved changes', '/_admin/common/msg/savedat' : 'Saved at %s.', '/_admin/common/msg/saving' : 'Saving',
@@ -1504,6 +1516,148 @@ check( 'the sentences are not alerts - the status line says it once, in its own 
 	sent[1].callback( 200, { element : { '.uri' : '/post/one', slug : 'new slug', tags : [ 'x' ], pic : 'a.jpg', name : 'Name', body : 'EN-RACE', ltags : [], rich : '' } } );
 	check( '...and when it is done the link works again, and discarding goes back to what was written',
 		backLink.getAttribute('aria-disabled') === 'false' && backLink.style.pointerEvents === '' && ( elements.discard(), elements._localeValues.en_US.body === 'EN-RACE' && elements._localeValues.de_DE.body === 'DE-RACE' ) );
+
+	// ---- a number field left empty is sent as no value, and 0 as the number it is
+	elements._currentModel.order = { type : 'integer' };
+	elements._currentModel.weight = { type : 'double', locale : true };
+	elements._globalKeys.push( 'order' );
+	elements._localeKeys.push( 'weight' );
+	elements._globalValues.order = null;
+	elements._localeValues.en_US.weight = null;
+	elements._localeValues.de_DE.weight = null;
+	elements._resetEdits();
+	elements._remember();
+	elements._renderForm();
+	elements._switchLocale( 'de_DE' );
+	elements._switchLocale( 'en_US' );
+	type( 'slug', 'number save' );
+	const answered = ( payload ) => ( { element : Object.assign( { '.uri' : '/post/one', slug : 'number save', tags : [ 'x' ], pic : 'a.jpg', name : 'Name', body : 'Body', ltags : [], rich : '' }, payload.fields ) } );
+	check( 'an untouched empty number field is not an edit', field('order').value === '' && field('weight').value === '' && elements._dirtyLocales.length === 0 );
+	sent.length = 0;
+	elements._save( report );
+	check( 'a number field left empty is sent as null, the integer and the double alike - not 0, not an empty text',
+		sent.length === 1 && sent[0].payload.fields.order === null && sent[0].payload.fields.weight === null && JSON.stringify( sent[0].payload.fields ).indexOf('"order":null') !== -1 );
+	sent[0].callback( 200, answered( sent[0].payload ) );
+	type( 'order', '20' );
+	type( 'weight', '1.5' );
+	sent.length = 0;
+	elements._save( report );
+	check( 'what is typed goes as the number', sent[0].payload.fields.order === 20 && sent[0].payload.fields.weight === 1.5 );
+	sent[0].callback( 200, answered( sent[0].payload ) );
+	type( 'order', '0' );
+	type( 'weight', '0' );
+	sent.length = 0;
+	elements._save( report );
+	check( '0 typed is 0', sent[0].payload.fields.order === 0 && sent[0].payload.fields.weight === 0 );
+	sent[0].callback( 200, answered( sent[0].payload ) );
+	type( 'order', 'abc' );
+	sent.length = 0;
+	elements._save( report );
+	check( 'text that is no number is sent as it is, for the server to refuse, and is not made a 0', sent[0].payload.fields.order === 'abc' );
+	sent[0].callback( 400, null );
+	type( 'order', '' );
+	elements._globalValues.order = '0';
+	elements._localeValues.en_US.weight = null;
+	elements._localeValues.de_DE.weight = null;
+	elements._resetEdits();
+	elements._remember();
+	elements._renderForm();
+	check( 'a stored 0 is shown as 0 and stays an untouched field', field('order').value === '0' && elements.isDirty() === false );
+	type( 'order', '' );
+	check( '...and emptying it is an edit, because empty is not 0', elements.isDirty() === true );
+	elements._dirtyLocales = [];
+	delete elements._currentModel.order;
+	delete elements._currentModel.weight;
+	elements._globalKeys.pop();
+	elements._localeKeys.pop();
+	delete elements._globalValues.order;
+	delete elements._localeValues.en_US.weight;
+	delete elements._localeValues.de_DE.weight;
+	elements._resetEdits();
+	elements._remember();
+	elements._renderForm();
+
+	// ---- a number field with a model default: emptied, it shows what the server answers
+	elements._currentModel.prio = { type : 'integer', default : 50 };
+	elements._currentModel.order = { type : 'integer' };
+	elements._globalKeys.push( 'prio', 'order' );
+	elements._globalValues.prio = '9';
+	elements._globalValues.order = '3';
+	elements._resetEdits();
+	elements._remember();
+	elements._renderForm();
+	check( 'a stored number is shown and is no edit', field('prio').value === '9' && elements.isDirty() === false );
+	type( 'prio', '' );
+	sent.length = 0;
+	elements._save( report );
+	check( 'the emptied field is sent as null', sent.length === 1 && sent[0].payload.fields.prio === null && Number( sent[0].payload.fields.order ) === 3 );
+	sent[0].callback( 200, { element : Object.assign( answered( sent[0].payload ).element, { prio : 50, order : 3 } ) } );
+	check( '...and once the save is answered its control shows the default the server holds - not empty, which the next load would contradict',
+		field('prio').value === '50' && elements._globalValues.prio === 50 && elements._status.state === 'saved' );
+	check( '...as what is saved: the form is clean, and a field that is not number-emptied is left alone', elements.isDirty() === false && field('order').value === '3' );
+	type( 'prio', '' );
+	check( 'emptying it again is an edit', elements.isDirty() === true );
+
+	// a number control that holds what is no number reads as empty - the save is held back for it
+	field('prio').value = '50';
+	field('order').value = '';
+	field('order').validity = { badInput : true };
+	sent.length = 0;
+	let held = null;
+	elements._save( ok => { held = ok } );
+	check( 'a number control with badInput holds the save back, marked at its field, and sends nothing', sent.length === 0 && held === false
+		&& elements._validate().some( p => p.key === 'order' && p.kind === 'number' ) === true && field('order').getAttribute('aria-invalid') === 'true' );
+	check( '...in the words of the number refusal', d.doc.getElementById('elements-error-field-order').textContent === 'NUMBER' && elements._status.state === 'error' && d.doc.getElementById('elements-form-msg').textContent === 'NUMBER' );
+	field('order').validity = { badInput : false };
+	check( '...and an empty control without it is just empty', elements._validate().every( p => p.key !== 'order' ) === true );
+	// ...also in a translation that was left: its number stays, and the save is held back for it
+	elements._currentModel.rank = { type : 'integer', locale : true };
+	elements._localeKeys.push( 'rank' );
+	elements._localeValues.de_DE.rank = '10';
+	elements._localeValues.en_US.rank = '20';
+	elements._globalValues.prio = '50';
+	elements._globalValues.order = '3';
+	elements._resetEdits();
+	elements._remember();
+	elements._renderForm();
+	elements._switchLocale( 'de_DE' );
+	check( 'a stored number of the translation on screen is shown', field('rank').value === '10' );
+	field('rank').value = '';
+	field('rank').validity = { badInput : true };
+	elements._switchLocale( 'en_US' );
+	check( 'leaving a translation whose number control holds no number keeps the stored number and remembers the slot',
+		elements._localeValues.de_DE.rank === '10' && elements._invalidNumbers['de_DE|rank'] === true && elements._dirtyLocales.indexOf('de_DE') !== -1 && elements.isDirty() === true );
+	check( 'the problem is a number in the translation that was left, though its control is not on screen',
+		elements._validate().some( p => p.key === 'rank' && p.locale === 'de_DE' && p.kind === 'number' ) === true && elements._selectedLocale === 'en_US' );
+	sent.length = 0;
+	held = null;
+	elements._save( ok => { held = ok } );
+	check( 'the save sends nothing, reports false and comes back to that translation', sent.length === 0 && held === false && elements._selectedLocale === 'de_DE' );
+	check( '...marked at its field in the words of the number refusal, and the status line says it',
+		field('rank').getAttribute('aria-invalid') === 'true' && d.doc.getElementById('elements-error-field-rank').textContent === 'NUMBER' && d.doc.getElementById('elements-form-msg').textContent === 'NUMBER' );
+	field('rank').validity = { badInput : false };
+	type( 'rank', '12' );
+	check( 'a number typed in its place lets the save go: the problem and the slot are gone',
+		elements._validate().length === 0 && Object.keys( elements._invalidNumbers ).length === 0 );
+	sent.length = 0;
+	elements._save( report );
+	check( '...and what is sent is the number typed', sent.length >= 1 && sent.some( r => r.payload.locale === 'de_DE' && r.payload.fields.rank === 12 ) );
+	while( sent.length > 0 )
+		sent.shift().callback( 400, null );
+	delete elements._currentModel.rank;
+	elements._localeKeys.pop();
+	delete elements._localeValues.de_DE.rank;
+	delete elements._localeValues.en_US.rank;
+	elements._dirtyLocales = [];
+	delete elements._currentModel.prio;
+	delete elements._currentModel.order;
+	elements._globalKeys.pop();
+	elements._globalKeys.pop();
+	delete elements._globalValues.prio;
+	delete elements._globalValues.order;
+	elements._resetEdits();
+	elements._remember();
+	elements._renderForm();
 
 	// ---- the exits the form guards
 	const guards = [];
