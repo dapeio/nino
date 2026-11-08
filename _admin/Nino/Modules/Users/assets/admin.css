@@ -5,8 +5,8 @@
  *	Modules\Users			Accounts, roles and login protection
  *	admin.css								What the module's /_admin panel needs beyond the design
  *													system in _admin/assets/style.css: the three lists that
- *													add a finer permission to a role, and the summary of
- *													what the role may do. Bundled while the module is there
+ *													add a finer permission to a role, the summary of
+ *													what the role may do and the name column of the list. Bundled while the module is there
  *													(see the panel's assets()), so the same layer rules
  *													apply - the shell's stylesheet fixes the layer order,
  *													this one only ever adds to nino.tool, and every selector
@@ -19,6 +19,25 @@
  */
 
 @layer nino.tool {
+
+/* -------------------------------------------------------- The name column */
+
+/* The name of an account in the list, between the row's text and its chevron:
+   as wide as it is, and shortened with an ellipsis before it pushes the
+   address out of the row */
+#users-list .admin-users-name {
+	flex: 0 1 auto;
+	max-width: 40%;
+	margin-left: auto;
+	overflow: hidden;
+	color: var(--editor-text-secondary);
+	font-size: .8rem;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+#users-list a:has(.admin-users-name)::after {
+	margin-left: 0;
+}
 
 /* -------------------------------------------- Adding a finer permission ---- */
 

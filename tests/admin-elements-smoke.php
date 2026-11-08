@@ -398,6 +398,7 @@ check( 'the type is gone from the list too', in_array( 'deletable', \Nino\Module
 
 [ $status ] = ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiDelete' ], [ 'uri' => 'deletable', 'confirm' => 'deletable' ] );
 check( 'deleting it a second time is a plain 404, not a crash', $status === 404 );
+pinTypeDeleteIsRemembered( $appData );
 
 echo "\n";
 
@@ -1194,3 +1195,21 @@ check( 'every one of these writes is described by the class that runs it'. ( $si
 echo "\n";
 
 ninoDone( $appData );
+
+/** A type the editors delete is on the list of what was removed - with no element named - in config.php, once, and that list is what a module that puts a type in place when it is missing reads */
+function pinTypeDeleteIsRemembered( array &$appData ): void {
+
+	$removed = static fn(): array => (array) ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )[\Nino\Elements::REMOVED] ?? [] );
+
+	check( 'the deleted type is on the list of what was removed, with no element named', ( $removed()['deletable'] ?? null ) === [] );
+	check( '...and what was removed of another type stays', ( static function() use ( &$appData, $removed ): bool {
+		\Nino\Elements::insertElementType( $appData, '/memorable', [ 'title' => [ 'type' => 'string' ] ] );
+		\Nino\Filesystem::mutate( $appData, '/config.php', static function( mixed $config ): array { $config = is_array( $config ) === true ? $config : []; $config[\Nino\Elements::REMOVED]['other'] = [ 'one' ]; return $config; }, [] );
+		ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiDelete' ], [ 'uri' => 'memorable', 'confirm' => 'memorable' ] );
+		return ( $removed()['other'] ?? null ) === [ 'one' ] && ( $removed()['memorable'] ?? null ) === [] && ( $removed()['deletable'] ?? null ) === [];
+	} )() );
+	check( 'a refused deletion leaves no mark', ( static function() use ( &$appData, $removed ): bool {
+		ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiDelete' ], [ 'uri' => 'refholder', 'confirm' => 'wrong' ] );
+		return isset( $removed()['refholder'] ) === false;
+	} )() );
+}

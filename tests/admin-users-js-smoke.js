@@ -281,4 +281,102 @@ form.children.length = 0;
 check( '...and none while no form is drawn', panel._bar() === null );
 check( 'it is handed to the registry with the form', /Nino\.admin\.dirty\.watchForm\( 'users', function\(\) \{ return dc\.getElementById\('users-form'\) \}, Nino\.admin\.users\._saveOpen, Nino\.admin\.users\._bar \)/.test( source('_admin/Nino/Modules/Users/assets/admin.js') ) === true );
 
+// The accounts the name pins draw, two of them with a name
+const NAMED = [
+	{ mail : 'me@example.com', name : 'Mia', isSelf : true, role : 'dev', perms : [], status : 'active', locked : '', lastLogin : '' },
+	{ mail : 'b@example.com', name : 'Bo <i>B</i> [[/nino/dir]]', isSelf : false, role : 'editor', perms : [], status : 'active', locked : '', lastLogin : '' },
+	{ mail : 'c@example.com', isSelf : false, role : 'editor', perms : [], status : 'active', locked : '', lastLogin : '' },
+];
+
+pinUsersNameColumn();
+pinUsersNameCreate();
+pinUsersNameEdit();
+
 done();
+
+
+// --- the name of an account --------------------------------------------------
+
+/** The span of a row that holds the name, null where the row has none */
+function nameOfRow( mail ) {
+	const row = findAll( list, function( el ) { return el.tagName === 'LI' } ).find( function( li ) {
+		return findAll( li, function( el ) { return el.tagName === 'STRONG' && el.textContent.indexOf( mail ) === 0 } ).length === 1;
+	} );
+	const spans = row === undefined ? [] : findAll( row, function( el ) { return el.className === 'admin-users-name' } );
+	return spans.length === 1 ? spans[0] : null;
+}
+
+/** The list has a column for the name: where there is one, text, beside the address and before the chevron */
+function pinUsersNameColumn() {
+	panel._users = JSON.parse( JSON.stringify( NAMED ) );
+	panel._canManage = true;
+	panel._renderList( panel._users );
+
+	check( 'an account with a name shows it in a column of its own in the row', nameOfRow('me@example.com') !== null && nameOfRow('me@example.com').textContent === 'Mia' );
+	check( '...an account without one has none - no empty column', nameOfRow('c@example.com') === null );
+	check( '...a name with markup in it is only text', nameOfRow('b@example.com').textContent === 'Bo <i>B</i> [[/nino/dir]]' && nameOfRow('b@example.com').children.length === 0 );
+	check( '...and the address is still the line of the row, the name not mixed into it', rowText('me@example.com') === 'Developer · Never logged in' );
+}
+
+/** The new-account form asks for the name beside the address, says what it is for, and sends it trimmed */
+function pinUsersNameCreate() {
+	panel._renderCreateForm();
+	const input = byId('users-create-name');
+
+	check( 'the form that creates an account has a name field, optional, of at most sixty characters', input !== null && input.required !== true && input.maxLength === 60 && input.dataset.field === 'name' );
+	check( '...with the line that says what the name is for, which the field is described by', byId('users-create-name-hint') !== null && byId('users-create-name-hint').textContent === text('/_admin/users/label/name-hint')
+		&& text('/_admin/users/label/name-hint') !== '' && input.getAttribute('aria-describedby') === 'users-create-name-hint' );
+
+	byId('users-create-mail').value = 'new@example.com';
+	byId('users-create-pw').value = 'a-new-password';
+	input.value = '  Nina  ';
+	const before = requests.length;
+	fire( byId('users-create-form'), 'submit' );
+	check( 'it is sent with the rest, trimmed', requests.length === before + 1 && requests[before].action === 'users/create' && requests[before].payload.name === 'Nina' && requests[before].payload.mail === 'new@example.com' );
+
+	answer( 400, { error : 'a name has at most 60 characters', code : 'users_name_long', params : [ 60 ], field : 'name' } );
+	check( 'a refusal is shown in the line of the form, and does not leave the form', byId('users-form-msg').dataset.state === 'error' && byId('users-create-form') !== null );
+}
+
+/** The edit form shows the stored name; only a changed name is sent, and an emptied one as '' */
+function pinUsersNameEdit() {
+	panel._users = JSON.parse( JSON.stringify( NAMED ) );
+	panel._canManage = true;
+	panel._renderList( panel._users );
+	panel._openUser( 'b@example.com' );
+	const input = byId('users-form-name');
+
+	check( 'the edit form holds the name the account has, in a field that is no more than a field', input !== null && input.value === 'Bo <i>B</i> [[/nino/dir]]' && input.maxLength === 60 && input.dataset.field === 'name'
+		&& byId('users-form-name-hint').textContent === text('/_admin/users/label/name-hint') );
+	check( '...untouched it is no change', panel._nameChanged() === false );
+
+	const before = requests.length;
+	fire( byId('users-edit-form'), 'submit' );
+	check( 'a save that leaves the name alone does not send it', requests[before].action === 'users/save' && 'name' in requests[before].payload === false );
+	answer( 200, { mail : 'b@example.com', role : 'editor' } );
+	answer( 200, { users : JSON.parse( JSON.stringify( NAMED ) ), canManage : true, roles : ROLES } );
+
+	panel._openUser( 'b@example.com' );
+	byId('users-form-name').value = '  Bea  ';
+	check( 'a changed name is a change of the form, so the form is unsaved', panel._nameChanged() === true );
+	const saved = requests.length;
+	let ended = null;
+	panel._saveOpen( function( ok ) { ended = ok } );
+	check( '...it is sent trimmed, alone', requests[saved].action === 'users/save' && requests[saved].payload.name === 'Bea' && requests[saved].payload.username === 'b@example.com' && 'role' in requests[saved].payload === false );
+	answer( 200, { mail : 'b@example.com', role : 'editor', name : 'Bea' } );
+	check( '...and the account and the field follow what the server answers, the save ends well', ended === true && panel._currentUser.name === 'Bea' && byId('users-form-name').value === 'Bea' && panel._nameChanged() === false );
+	answer( 200, { users : [ Object.assign( {}, NAMED[1], { name : 'Bea' } ) ], canManage : true, roles : ROLES } );
+
+	byId('users-form-name').value = '';
+	const emptied = requests.length;
+	fire( byId('users-edit-form'), 'submit' );
+	check( 'an emptied name is sent as an empty text: that takes it away', requests[emptied].payload.name === '' );
+	answer( 200, { mail : 'b@example.com', role : 'editor', name : '' } );
+	check( '...and the account has none then', panel._currentUser.name === '' );
+
+	byId('users-form-name').value = 'x'.repeat( 61 );
+	const refused = requests.length;
+	fire( byId('users-edit-form'), 'submit' );
+	answer( 400, { error : 'a name has at most 60 characters', code : 'users_name_long', params : [ 60 ], field : 'name' } );
+	check( 'a refusal of the server stays on the form with what was typed in it', byId('users-form-msg').dataset.state === 'error' && byId('users-form-name').value.length === 61 && requests.length === refused + 1 );
+}

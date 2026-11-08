@@ -761,6 +761,15 @@ namespace Nino\Install {
 				return;
 			}
 
+			// The sentences the dashboard greets with, an element type of the
+			// workbench's own, added like the elements of a unit: the project
+			// has them from its first login on
+			$greetings = \Nino\Modules\Dashboard\Admin::seedGreetings( $appData, $locales );
+			if( $greetings !== true ) {
+				\Nino\Http::fail( $request, 500, 'the base unit could not be applied: '. $greetings );
+				return;
+			}
+
 			foreach( $modules as $key ) {
 				$applied = \Nino\Features::applyUnit( $appData, $units[$key], $locales, $routes, $blacklist, $config, true );
 				if( $applied !== true ) {

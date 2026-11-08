@@ -25,6 +25,8 @@ namespace Nino\Modules\Users {
 	 *											grants is the Roles tab of this same pane (see Roles), the
 	 *											login throttle - and lifting a lock - the Lockout tab, the
 	 *											password recovery.php asks for the RecoveryPassword tab.
+	 *											An account may carry a name, the one the dashboard greets it
+	 *											by (cleanName()).
 	 *											Every session an account holds is ended from here too
 	 *											(users/logoutall). The permissions an account may hold
 	 *											beside its role are written into config.php by hand
@@ -36,6 +38,9 @@ namespace Nino\Modules\Users {
 	class Admin {
 
 		public const string MANAGE_PERM = '/_admin/users/manage';
+
+		// The longest name an account may carry, in characters
+		public const int NAME_MAX = 60;
 
 		public static function actions(): array {
 			return [
@@ -68,7 +73,7 @@ namespace Nino\Modules\Users {
 
 		// The entries of the manual its "?" opens, in the order they are shown (see \Nino\Admin\Admin::manual())
 		public static function manual(): array {
-			return [ 'intro', 'account', 'role', 'password', 'deactivate', 'lockout', 'recovery' ];
+			return [ 'intro', 'account', 'name', 'role', 'password', 'deactivate', 'lockout', 'recovery' ];
 		}
 
 		public static function icon(): string {
@@ -109,6 +114,52 @@ namespace Nino\Modules\Users {
 				'users/role' 			=> 'Set Role '. ( $data['username'] ?? '' ). ' '. ( $data['role'] ?? '' ),
 				default 					=> '',
 			};
+		}
+
+		/**
+		 *	The name an account may carry, as it is stored: what the dashboard
+		 *	greets it by, so one line of text - no control or format character
+		 *	of any kind (a null byte, a line break, a right-to-left mark), at
+		 *	most NAME_MAX characters, a blank around it, a no-break space among them, taken off. Nothing is
+		 *	cut to fit: a name that is too long is refused. '' is no name
+		 *
+		 *	@param		mixed			$raw					What was posted
+		 *	@param		string|null	&$problem		(reference) Why it is refused, 'invalid' or 'long'; null where it is not
+		 *
+		 *	@return 	string|null							The name, null when it is refused
+		 */
+		public static function cleanName( mixed $raw, ?string &$problem = null ): ?string {
+
+			$problem = null;
+
+			if( is_string( $raw ) === false || preg_match( '/^[^\p{Cc}\p{Cf}\p{Zl}\p{Zp}]*$/u', $raw ) !== 1 ) {
+				$problem = 'invalid';
+				return null;
+			}
+
+			$name = (string) preg_replace( '/^[\s\p{Z}]+|[\s\p{Z}]+$/u', '', $raw );
+
+			if( mb_strlen( $name ) > self::NAME_MAX ) {
+				$problem = 'long';
+				return null;
+			}
+
+			return $name;
+		}
+
+		/**
+		 *	Say why a name is refused - see cleanName()
+		 *
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$problem			'long' or 'invalid'
+		 *
+		 *	@return 	void
+		 */
+		private static function _refuseName( array &$request, string $problem ): void {
+
+			$long = $problem === 'long';
+
+			\Nino\Http::fail( $request, 400, $long ? 'a name has at most '. self::NAME_MAX. ' characters' : 'a name is one line of text', $long ? 'users_name_long' : 'users_name_invalid', $long ? [ self::NAME_MAX ] : [], 'name' );
 		}
 
 		/**
@@ -339,6 +390,7 @@ namespace Nino\Modules\Users {
 					'mail' 		=> $mail,
 					'isSelf' 	=> $mail === $current['mail'],
 					'role' 		=> (string) ( $user['role'] ?? '' ),
+					'name' 		=> is_array( $user ) === true && is_string( $user['name'] ?? null ) === true ? $user['name'] : '',
 					'status' 	=> ( $user['status'] ?? 0 ) === \Nino\Auth::STATUS_ACTIVE ? 'active' : 'disabled',
 					'locked' 	=> isset( $locked[$mail] ) === true ? date( 'Y-m-d H:i', $locked[$mail] ) : '',
 					'lastLogin' => $lastLogin > 0 ? date( 'Y-m-d H:i', $lastLogin ) : '',
@@ -391,6 +443,13 @@ namespace Nino\Modules\Users {
 				return;
 			}
 
+			$name = self::cleanName( $data['name'] ?? '', $problem );
+
+			if( $name === null ) {
+				self::_refuseName( $request, (string) $problem );
+				return;
+			}
+
 			// A new account with a role wider than the one creating it is
 			// the account its creator signs in as next (see Roles::notHeld())
 			$missing = $role !== '' ? Roles::notHeld( $appData, Roles::all( $appData )[$role]['perms'] ) : '';
@@ -400,12 +459,12 @@ namespace Nino\Modules\Users {
 				return;
 			}
 
-			if( \Nino\Auth::insertUser( $appData, $mail, $pw, [], $role ) === false ) {
+			if( \Nino\Auth::insertUser( $appData, $mail, $pw, [], $role, $name ) === false ) {
 				\Nino\Http::fail( $request, 409, 'mail already in use', 'users_mail_in_use', [], 'mail' );
 				return;
 			}
 
-			\Nino\Http::ok( $request, [ 'mail' => $mail, 'role' => $role ] );
+			\Nino\Http::ok( $request, [ 'mail' => $mail, 'role' => $role, 'name' => $name ] );
 		}
 
 		/**
@@ -453,7 +512,7 @@ namespace Nino\Modules\Users {
 		}
 
 		/**
-		 *	Update a user's mail, password and - for a manager - role, in one
+		 *	Update a user's mail, password, name and - for a manager - role, in one
 		 *	save. Everything is checked before anything is written. The role
 		 *	counts only when it differs from the stored one: a manager who
 		 *	changes just the address of an account wider than their own role
@@ -498,6 +557,20 @@ namespace Nino\Modules\Users {
 			if( $pw !== '' && strlen( $pw ) < \Nino\Admin\Recovery::MIN_PW_LENGTH ) {
 				\Nino\Http::fail( $request, 400, 'password must be at least '. \Nino\Admin\Recovery::MIN_PW_LENGTH. ' characters', 'users_password_short', [ \Nino\Admin\Recovery::MIN_PW_LENGTH ], 'pw' );
 				return;
+			}
+
+			// The name is changed only where the request names one, and is
+			// refused rather than cut
+			$postedName = null;
+
+			if( array_key_exists( 'name', $data ) === true ) {
+
+				$postedName = self::cleanName( $data['name'], $problem );
+
+				if( $postedName === null ) {
+					self::_refuseName( $request, (string) $problem );
+					return;
+				}
 			}
 
 			// Changing your own account requires re-confirming your current password -
@@ -561,9 +634,14 @@ namespace Nino\Modules\Users {
 				return;
 			}
 
+			if( $postedName !== null && $stored !== false && $postedName !== (string) ( $stored['name'] ?? '' ) && \Nino\Auth::setName( $appData, $mail, $postedName ) === false ) {
+				\Nino\Http::fail( $request, 500, 'could not save' );
+				return;
+			}
+
 			$saved = \Nino\Auth::getUser( $appData, $mail );
 
-			\Nino\Http::ok( $request, [ 'mail' => $mail, 'role' => $saved === false ? '' : (string) ( $saved['role'] ?? '' ) ] );
+			\Nino\Http::ok( $request, [ 'mail' => $mail, 'role' => $saved === false ? '' : (string) ( $saved['role'] ?? '' ) ] + ( $postedName === null ? [] : [ 'name' => $saved === false ? '' : (string) ( $saved['name'] ?? '' ) ] ) );
 		}
 
 		/**

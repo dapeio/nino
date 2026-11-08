@@ -606,7 +606,10 @@ namespace Nino {
 		 *	- an element in none of the type's buckets and not on the type's
 		 *	  tombstone list (REMOVED, [ '<type>' => [ '<id>' ]
 		 *	  ], written by a module that lets others contribute to its type
-		 *	  when somebody deletes one of its elements for good): created, in
+		 *	  when somebody deletes one of its elements for good; deleting a whole
+		 *	  type in the Elements panel leaves '<type>' => [] there, which this
+		 *	  method does not read - a deleted type is put in place again by the
+		 *	  next seed - and which the dashboard reads for its greetings): created, in
 		 *	  '*' and in every language of $locales the unit has a version for
 		 *	- an element that is there without the version of a language of
 		 *	  $locales the unit has: that version is added

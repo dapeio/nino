@@ -1050,6 +1050,26 @@ namespace Nino\Modules\Elements {
 			foreach( array_keys( $filenames ) as $filename )
 				\Nino\Images::delete( $appData, $filename );
 
+			// A type that was deleted is on the list of what was removed
+			// (\Nino\Elements::REMOVED), with no element named: whoever puts a type
+			// in place when it is missing - the dashboard does for its greetings -
+			// leaves it alone then. The elements it held are gone with the file
+			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === true ) {
+
+				try {
+					$removed = \Nino\AppData::stored( $appData, \Nino\Elements::REMOVED, [] );
+					$removed = is_array( $removed ) === true ? $removed : [];
+
+					if( isset( $removed[$typeUri] ) === false ) {
+						$removed[$typeUri] = [];
+						$appData[ \Nino\Elements::REMOVED ] = $removed;
+						\Nino\AppData::writeContentData( $appData, [ \Nino\Elements::REMOVED ] );
+					}
+				} finally {
+					\Nino\Filesystem::unlockFile( $appData, '/config.php' );
+				}
+			}
+
 			// Recorded here rather than through log(), which is handed the posted
 			// body and could only ever say "with ? element(s)" - the counts exist
 			// at this point and nowhere else

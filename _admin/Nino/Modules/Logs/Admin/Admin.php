@@ -189,6 +189,45 @@ namespace Nino\Modules\Logs {
 		}
 
 		/**
+		 *	How many lines were recorded after a point in time - what the
+		 *	dashboard says has happened since the account's last visit. A line
+		 *	carries its minute and nothing finer, so the minute of $since is
+		 *	over: a line of that minute is not counted, the login that opened
+		 *	the visit before among them. The sign-in the account made at $visit
+		 *	is the visit itself and is not counted either. Only what the
+		 *	retention window still holds can be counted
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		int				$since				Timestamp of the earlier visit
+		 *	@param		string		$actor				The account's mail, '' for none
+		 *	@param		int				$visit				Timestamp of the sign-in now, 0 for none
+		 *
+		 *	@return 	int
+		 */
+		public static function countSince( array &$appData, int $since, string $actor = '', int $visit = 0 ): int {
+
+			// A line starts with its minute, in a fixed format that sorts as time does
+			$over 	= date( 'Y-m-d H:i', $since );
+			$opened = date( 'Y-m-d H:i', $visit );
+			$count 	= 0;
+
+			foreach( self::_allLines( $appData ) as $line ) {
+
+				$parts = explode( '  ', $line, 3 );
+
+				if( count( $parts ) !== 3 || preg_match( '/^\d{4}-\d\d-\d\d \d\d:\d\d$/', $parts[0] ) !== 1 || $parts[0] <= $over )
+					continue;
+
+				if( $actor !== '' && $visit > 0 && $parts[1] === $actor && $parts[2] === 'Login' && $parts[0] >= $opened )
+					continue;
+
+				$count++;
+			}
+
+			return $count;
+		}
+
+		/**
 		 *	Read every recorded line within the retention window, oldest
 		 *	first (as stored)
 		 *

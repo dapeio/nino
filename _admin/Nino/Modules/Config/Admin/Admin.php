@@ -164,6 +164,26 @@ namespace Nino\Modules\Config {
 				'label'	=> '/_admin/config/label/logs',
 				'hint' 	=> '/_admin/config/hint/logs',
 			],
+			// The three lines of the card the dashboard opens with (see
+			// \Nino\Modules\Dashboard\Admin::apiSummary()); all three off and the card is not drawn
+			'/nino/admin/greeting/hello' => [
+				'type' 	=> 'bool',
+				'group'	=> 'dashboard',
+				'label'	=> '/_admin/config/label/greetinghello',
+				'hint' 	=> '/_admin/config/hint/greetinghello',
+			],
+			'/nino/admin/greeting/sentence' => [
+				'type' 	=> 'bool',
+				'group'	=> 'dashboard',
+				'label'	=> '/_admin/config/label/greetingsentence',
+				'hint' 	=> '/_admin/config/hint/greetingsentence',
+			],
+			'/nino/admin/greeting/facts' => [
+				'type' 	=> 'bool',
+				'group'	=> 'dashboard',
+				'label'	=> '/_admin/config/label/greetingfacts',
+				'hint' 	=> '/_admin/config/hint/greetingfacts',
+			],
 			'/nino/cache/status' => [
 				'type' 	=> 'bool',
 				'group'	=> 'cache',
@@ -192,6 +212,7 @@ namespace Nino\Modules\Config {
 			'mode' 				=> [ '/_admin/config/group/mode', '/_admin/config/intro/mode' ],
 			'diagnostics'	=> [ '/_admin/config/group/diagnostics', '/_admin/config/intro/diagnostics' ],
 			'editor' 			=> [ '/_admin/config/group/editor', '/_admin/config/intro/editor' ],
+			'dashboard' 	=> [ '/_admin/config/group/dashboard', '/_admin/config/intro/dashboard' ],
 			'cache' 			=> [ '/_admin/config/group/cache', '/_admin/config/intro/cache' ],
 		];
 

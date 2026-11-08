@@ -72,6 +72,12 @@ namespace Nino {
 			'/nino/cache/blacklist'	=> [],
 			'/nino/admin/backups'		=> true,
 			'/nino/admin/logs'			=> true,
+			// The three lines of the greeting the dashboard opens with (see
+			// \Nino\Modules\Dashboard\Admin): the hello, the sentence, the facts.
+			// Each is switched off on its own in the workbench's Config panel
+			'/nino/admin/greeting/hello'		=> true,
+			'/nino/admin/greeting/sentence'	=> true,
+			'/nino/admin/greeting/facts'		=> true,
 			'/nino/dir'					=> '',
 			// Log by default, never display: a site that wants a stack trace on
 			// the page has to ask for it, and asking is a decision worth writing

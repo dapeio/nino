@@ -205,6 +205,9 @@ check( 'apply succeeds', $status === 200 );
 check( 'reports back every always-on unit and nothing else, and each of them has a unit', $applyBody['modules'] === \Nino\Install\Setup::ALWAYS_MODULES
 	&& array_diff( \Nino\Install\Setup::ALWAYS_MODULES, array_keys( \Nino\Install\Setup::units() ) ) === [] );
 
+pinSetupSeedsGreetings( $appData );
+pinSetupFailsWithoutGreetings( $appData );
+
 $configAfterApply = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 
 check( 'picking only the already-native de_DE does not pull in en_US too', $configAfterApply['/nino/locales/available'] === [ 'de_DE' ] );
@@ -1999,4 +2002,31 @@ function pinHeaderNamesTheSetWithItsStamp( string $header, string $baseUnit ): v
 	check( 'every address of the set in the header carries the stamp, and the header names every raster icon and the manifest the base unit ships'. ( $unstamped === [] ? '' : ' - without: '. implode( ', ', array_column( $unstamped, 1 ) ) ),
 		$unstamped === [] && array_diff( array_column( $named, 1 ), array_values( array_diff( scandir( $baseUnit. '/favicon' ), [ '.', '..' ] ) ) ) === []
 		&& array_diff( [ 'favicon.ico', 'apple-touch-icon.png', 'favicon-32x32.png', 'favicon-16x16.png', 'site.webmanifest' ], array_column( $named, 1 ) ) === [] );
+}
+
+/** A new project has the sentences the dashboard greets with from its first login on: the type is put in place by the setup, in the languages the project has */
+function pinSetupSeedsGreetings( array &$appData ): void {
+
+	$seed = include dirname( __DIR__ ). '/_admin/Nino/Modules/Dashboard/install/elements/greetings.php';
+	$german = \Nino\Elements::queryElements( $appData, '/greetings', [], 'de_DE', [] );
+
+	check( 'the setup puts the type of the greetings in place, with every sentence in the language of the project', is_array( $german ) === true && count( $german ) === count( $seed['de_DE'] )
+		&& is_file( ninoSandboxDir( $appData ). '/private/elements/greetings.php' ) === true );
+	check( '...and only in that language: the other has no version yet', array_filter( (array) ( \Nino\Filesystem::getFileContent( $appData, '/elements/greetings.php', [] )['en_US'] ?? [] ) ) === [] );
+}
+
+/** The setup says so when the sentences of the dashboard cannot be put in place: a 500 that names the step, and nothing is reported as applied */
+function pinSetupFailsWithoutGreetings( array &$appData ): void {
+
+	$dir = ninoSandboxDir( $appData ). '/private/elements';
+	rename( $dir, $dir. '-aside' );
+	file_put_contents( $dir, 'not a directory' );
+
+	[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE' ], 'modules' => [] ] );
+	check( 'where the type of the greetings cannot be written, the apply is a 500 that names the base unit', $status === 500 && str_contains( (string) ( $body['error'] ?? '' ), 'the base unit could not be applied' ) );
+
+	unlink( $dir );
+	rename( $dir. '-aside', $dir );
+	[ $status ] = ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE' ], 'modules' => [] ] );
+	check( '...and applies once the place is there again', $status === 200 );
 }

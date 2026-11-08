@@ -2104,4 +2104,28 @@ check( 'the sentences are not alerts - the status line says it once, in its own 
 	} ) );
 }
 
+pinOptionWords();
+
 done();
+
+// --- the words of an option --------------------------------------------------
+//
+// A field with a fixed set of values is a select. Each option is worded by a fill
+// of the type's own (/_admin/elements/option/<type>/<key>/<value>), which a
+// module or a project may bring; without one the option is its value
+
+function pinOptionWords() {
+	const words = { '/_admin/elements/option/greetings/phase/any' : 'Any', '/_admin/elements/option/greetings/phase/early' : 'Early (5-7)' };
+	sandbox.Nino.content = { getText : key => words[key] ?? '' };
+	elements._currentType = 'greetings';
+	elements._currentModel = { phase : { type : 'string', options : [ 'any', 'early', 'noon' ] } };
+	const options = elements._renderField( 'phase', { type : 'string', options : [ 'any', 'early', 'noon' ] }, 'early' ).querySelector('select').querySelectorAll('option');
+
+	check( 'an option is worded by the fill of the type, the value stays what is sent', options.map( o => o.textContent ).slice( 0, 2 ).join() === 'Any,Early (5-7)' && options.map( o => o.value ).join() === 'any,early,noon' );
+	check( '...an option with no fill is its value', options[2].textContent === 'noon' );
+	check( '...and the stored one is the one selected', options[1].selected === true && options[0].selected === false );
+
+	elements._currentType = 'other';
+	const plain = elements._renderField( 'phase', { type : 'string', options : [ 'any', 'early' ] }, 'any' ).querySelector('select').querySelectorAll('option');
+	check( 'a type that has none of the fills shows the values', plain.map( o => o.textContent ).join() === 'any,early' );
+}

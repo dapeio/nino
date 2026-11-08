@@ -252,6 +252,12 @@ namespace Nino {
 			if( $newHash !== null )
 				$user['pw'] = $newHash;
 
+			// The login before this one, kept for the session that opens now: the
+			// record is about to carry this login's time, and what the
+			// workbench's dashboard says of the last visit is the one before it
+			// (0 for an account that never signed in, see lastLogin())
+			\Nino\Runtime::setSessionValue( $appData, './nino/auth/previous', self::lastLogin( $user ) );
+
 			// Issue a fresh, unguessable session token - this (not the client ip)
 			// is the key under which the session lives in $user['sessions'], so
 			// the login stays valid across ip changes. The ip is still recorded,
@@ -419,7 +425,38 @@ namespace Nino {
 			return true;
 		}
 
-		public static function insertUser( array &$appData, string $username, string $pw, array $perms = [], string $role = '' ): bool {
+		/**
+		 *	Give an account the name the workbench addresses it by, or take it
+		 *	away with '' - the field leaves the record then, so an account
+		 *	without a name has the record any account has. The caller has checked
+		 *	the name (see \Nino\Modules\Users\Admin::cleanName()); the session's
+		 *	copy of the record follows, as in setRole()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$username			The account's mail
+		 *	@param		string		$name					The name, '' for none
+		 *
+		 *	@return 	bool										False for an unknown account
+		 */
+		public static function setName( array &$appData, string $username, string $name ): bool {
+
+			if( self::getUser( $appData, $username ) === false )
+				return false;
+
+			if( $name === '' )
+				unset( $appData['/nino/auth/user'][$username]['name'] );
+			else
+				$appData['/nino/auth/user'][$username]['name'] = $name;
+
+			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
+
+			if( ( $appData['./nino/auth/current']['mail'] ?? '' ) === $username )
+				$appData['./nino/auth/current'] = self::getUser( $appData, $username );
+
+			return true;
+		}
+
+		public static function insertUser( array &$appData, string $username, string $pw, array $perms = [], string $role = '', string $name = '' ): bool {
 
 			if( self::getUser( $appData, $username ) !== false )
 				return false;
@@ -436,6 +473,12 @@ namespace Nino {
 				'perms'			=> $perms,
 				'role'			=> $role,
 			];
+
+			// The name the workbench addresses the account by: a field of the
+			// record only where there is one, so an account without it is the
+			// record any account has
+			if( $name !== '' )
+				$appData['/nino/auth/user'][$username]['name'] = $name;
 
 			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/user' ] );
 

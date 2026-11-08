@@ -318,6 +318,42 @@
 		},
 
 		/**
+		 *	The name field of the create and the edit form and the line under it
+		 *	that says what the name is for. The input holds at most what the server
+		 *	accepts (it refuses a longer one, it does not cut), and carries
+		 *	data-field so that a refusal names it
+		 *
+		 *	@param		{string}	id
+		 *	@param		{string}	value					The name stored, '' for none
+		 *
+		 *	@return		{Object}									{ label, hint, input }
+		 */
+		_nameField : function( id, value ) {
+
+			const label = dc.createElement('label');
+			label.className = 'nino-admin-field';
+			const span = dc.createElement('span');
+			span.textContent = Nino.content.getText('/_admin/users/label/name');
+			label.appendChild( span );
+			const input = dc.createElement('input');
+			input.type = 'text';
+			input.id = id;
+			input.dataset.field = 'name';
+			input.maxLength = 60;
+			input.autocomplete = 'off';
+			input.value = value;
+			input.setAttribute( 'aria-describedby', id+ '-hint' );
+			label.appendChild( input );
+
+			const hint = dc.createElement('p');
+			hint.id = id+ '-hint';
+			hint.className = 'nino-admin-field-hint';
+			hint.textContent = Nino.content.getText('/_admin/users/label/name-hint');
+
+			return { label : label, hint : hint, input : input };
+		},
+
+		/**
 		 *	Render the user list: every account with the role it holds, whether
 		 *	it is deactivated or locked, and its last login
 		 *
@@ -349,6 +385,14 @@
 				copy.appendChild( mail );
 				copy.appendChild( role );
 				link.appendChild( copy );
+
+				// The name the dashboard greets the account by, a column of its own
+				if( typeof user.name === 'string' && user.name !== '' ) {
+					const name = dc.createElement('span');
+					name.className = 'admin-users-name';
+					name.textContent = user.name;
+					link.appendChild( name );
+				}
 
 				link.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'users', [ user.mail ] ); Nino.admin.users._openUser( user.mail, true ) } );
 				li.appendChild( link );
@@ -404,6 +448,9 @@
 			mailInput.autocomplete = 'off';
 			mailLabel.appendChild( mailInput );
 			fieldset.appendChild( mailLabel );
+			const nameField = Nino.admin.users._nameField( 'users-create-name', '' );
+			fieldset.appendChild( nameField.label );
+			fieldset.appendChild( nameField.hint );
 			const pwLabel = dc.createElement('label');
 			pwLabel.className = 'nino-admin-field';
 			const pwSpan = dc.createElement('span');
@@ -451,7 +498,7 @@
 				};
 
 				line.saving();
-				Nino.admin.users._apiCall( 'create', { mail : mailInput.value.trim(), pw : pwInput.value, role : roleSelect.value }, function( status, response ) {
+				Nino.admin.users._apiCall( 'create', { mail : mailInput.value.trim(), name : nameField.input.value.trim(), pw : pwInput.value, role : roleSelect.value }, function( status, response ) {
 					if( status !== 200 ) {
 						line.error( status, response, '/_admin/users/error/create' );
 						report( false );
@@ -561,6 +608,10 @@
 			mailInput.value = user.mail;
 			mailLabel.appendChild( mailInput );
 			form.appendChild( mailLabel );
+
+			const nameField = Nino.admin.users._nameField( 'users-form-name', user.name || '' );
+			form.appendChild( nameField.label );
+			form.appendChild( nameField.hint );
 
 			form.appendChild( Nino.admin.users._roleField() );
 
@@ -681,10 +732,13 @@
 				return;
 			}
 
-			const typed = { mail : mail.value, pw : pw.value, role : role === null ? null : role.value };
+			const name = dc.getElementById('users-form-name');
+			const typed = { mail : mail.value, name : name === null ? null : name.value, pw : pw.value, role : role === null ? null : role.value };
 
 			mail.value = user.mail;
 			pw.value = '';
+			if( name !== null )
+				name.value = user.name || '';
 			if( role !== null )
 				role.value = role.dataset.saved;
 
@@ -694,6 +748,8 @@
 			finally {
 				mail.value = typed.mail;
 				pw.value = typed.pw;
+				if( name !== null )
+					name.value = typed.name;
 				if( role !== null )
 					role.value = typed.role;
 			}
@@ -718,7 +774,7 @@
 
 			const user = Nino.admin.users._currentUser;
 
-			if( dc.getElementById('users-form-mail').value.trim() !== user.mail || dc.getElementById('users-form-pw').value !== '' || Nino.admin.users._roleChanged() === true )
+			if( dc.getElementById('users-form-mail').value.trim() !== user.mail || dc.getElementById('users-form-pw').value !== '' || Nino.admin.users._roleChanged() === true || Nino.admin.users._nameChanged() === true )
 				return Nino.admin.users._save( done );
 
 			// Nothing differed from what is stored (a blank around the mail, a
@@ -727,6 +783,19 @@
 				Nino.admin.dirty.snapshot( 'users' );
 
 			done( true );
+		},
+
+		/**
+		 *	Whether the name field holds another name than the one stored
+		 *
+		 *	@return		{boolean}
+		 */
+		_nameChanged : function() {
+
+			const name = dc.getElementById('users-form-name');
+			const user = Nino.admin.users._currentUser;
+
+			return name !== null && user !== null && name.value.trim() !== ( user.name || '' );
 		},
 
 		/**
@@ -800,6 +869,11 @@
 			if( Nino.admin.users._roleChanged() === true )
 				payload.role = role.value;
 
+			// ...and so is a name: sent when it changed, '' to take it away
+			const nameInput = dc.getElementById('users-form-name');
+			if( Nino.admin.users._nameChanged() === true )
+				payload.name = nameInput.value.trim();
+
 			if( user.isSelf === true )
 				payload.currentPassword = dc.getElementById('users-form-currentpw').value;
 
@@ -815,6 +889,11 @@
 				}
 
 				user.mail = response.mail;
+
+				if( typeof response.name === 'string' ) {
+					user.name = response.name;
+					nameInput.value = response.name;
+				}
 
 				if( typeof response.role === 'string' ) {
 					user.role = response.role;

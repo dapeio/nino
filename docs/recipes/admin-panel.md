@@ -1229,6 +1229,7 @@ Reach for an existing class first; only invent one when no role fits.
 | List of rows that are read, not opened | `.nino-admin-list-dense` |
 | List whose rows are `button`s | `.nino-admin-list-buttons` |
 | Dashboard tiles | `.nino-admin-tiles`, `.nino-admin-tile` |
+| The card a screen opens with, in lines of different weight | `.nino-admin-card` with the lines of the Dashboard's greeting as the model: `#admin-dashboard-greeting`, `.nino-admin-greeting-hello`, `-sentence`, `-facts` |
 | Share-of-total bar under a label | `.nino-admin-meter-row` + `-label`/`-count`, `.nino-admin-meter-track` + `-fill` |
 | Labelled form field | `.nino-admin-field` (`.nino-admin-field-wide` opts out of the two-column desktop grid), built with `Nino.adminUi.textField()`, `selectField()`, `switchField()` or `numberField()` |
 | Container whose fields share that grid | `.nino-admin-fieldgrid` |

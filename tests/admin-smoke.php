@@ -2019,6 +2019,303 @@ foreach( [ 'de_DE', 'en_US' ] as $locale )
 		check( $locale. ' carries /_admin/common/'. $key, trim( (string) ( $shellText[$locale]['[[/_admin/common/'. $key. ']]'] ?? '' ) ) !== '' );
 
 
+// --- The greeting the dashboard opens with -----------------------------------
+
+echo "Dashboard greeting and the name of an account\n";
+
+pinGreetingPreviousLogin( $appData );
+pinGreetingActivity( $appData );
+pinGreetingBackup( $appData );
+pinGreetingSentences( $appData );
+pinGreetingSwitches( $appData );
+pinAccountName( $appData );
+pinAccountNameNotLogged( $appData );
+
+echo "\n";
+
+
 // --- Cleanup ---------------------------------------------------------------
 
 ninoDone( $appData );
+
+/** The greeting of the summary, or null where the answer has none */
+function greetingOf( array &$appData ): ?array {
+	[ $status, $body ] = callAdminPost( $appData, 'dashboard/summary' );
+	return $status === 200 && is_array( $body['greeting'] ?? null ) === true ? $body['greeting'] : null;
+}
+
+/** Make the logins of an account older, as if they had been that many seconds ago */
+function ageLogins( array &$appData, string $mail, int $seconds ): void {
+
+	$appData['/nino/auth/user'][$mail]['lastLogin'] = ( $appData['/nino/auth/user'][$mail]['lastLogin'] ?? time() ) - $seconds;
+
+	foreach( $appData['/nino/auth/user'][$mail]['sessions'] ?? [] as $token => $session )
+		$appData['/nino/auth/user'][$mail]['sessions'][$token]['time'] = $session['time'] - $seconds;
+}
+
+/** The login before this one is told, and stays what it was for the whole session: 0 for the first login of an account */
+function pinGreetingPreviousLogin( array &$appData ): void {
+
+	\Nino\Auth::insertUser( $appData, 'visits@example.com', 'visits password', [ '/*' ], '', 'Vera' );
+	\Nino\Auth::loginUser( $appData, 'visits@example.com', 'visits password' );
+
+	$greeting = greetingOf( $appData );
+	check( 'the summary carries a greeting, with the name the account has', $greeting !== null && $greeting['name'] === 'Vera' );
+	check( '...and for the first login of an account the login before it is 0', ( $greeting['previousLogin'] ?? null ) === 0 );
+
+	$first = \Nino\Auth::lastLogin( \Nino\Auth::getUser( $appData, 'visits@example.com' ) );
+	ageLogins( $appData, 'visits@example.com', 5000 );
+	\Nino\Auth::loginUser( $appData, 'visits@example.com', 'visits password' );
+
+	check( 'a second login tells the time of the first one: the login before the running one', ( greetingOf( $appData )['previousLogin'] ?? null ) === $first - 5000 );
+	check( '...the same in the next request of the session', ( greetingOf( $appData )['previousLogin'] ?? null ) === $first - 5000 );
+
+	$second = \Nino\Auth::lastLogin( \Nino\Auth::getUser( $appData, 'visits@example.com' ) );
+	\Nino\Auth::loginUser( $appData, 'visits@example.com', 'visits password' );
+	check( '...and after a third login it is the second', ( greetingOf( $appData )['previousLogin'] ?? null ) === $second );
+
+	\Nino\Runtime::unsetSessionValue( $appData, './nino/auth/previous' );
+	check( 'a session that holds none says null, not 0 - nobody is told it is their first visit', array_key_exists( 'previousLogin', greetingOf( $appData ) ?? [] ) === true && greetingOf( $appData )['previousLogin'] === null );
+}
+
+/** The log lines since the last visit are counted for whoever may read the log, and for nobody else */
+function pinGreetingActivity( array &$appData ): void {
+
+	\Nino\Auth::loginUser( $appData, 'visits@example.com', 'visits password' );
+	ageLogins( $appData, 'visits@example.com', 5000 );
+	\Nino\Auth::loginUser( $appData, 'visits@example.com', 'visits password' );
+
+	$before = greetingOf( $appData )['activitySince'] ?? null;
+	check( 'an account that may read the log is told how many lines it holds since the last visit', is_int( $before ) === true && $before >= 0 );
+
+	\Nino\Modules\Logs\Admin::record( $appData, 'other@example.com', 'Edit Something' );
+	\Nino\Modules\Logs\Admin::record( $appData, 'other@example.com', 'Edit Something else' );
+	check( '...two lines more are two more', ( greetingOf( $appData )['activitySince'] ?? null ) === $before + 2 );
+
+	\Nino\Modules\Logs\Admin::record( $appData, 'visits@example.com', 'Login' );
+	check( '...the sign-in of the account itself is the visit and is not counted', ( greetingOf( $appData )['activitySince'] ?? null ) === $before + 2 );
+	check( '...a line of its own that is none of the sign-in is', ( static function() use ( &$appData, $before ): bool {
+		\Nino\Modules\Logs\Admin::record( $appData, 'visits@example.com', 'Edit Something' );
+		return ( greetingOf( $appData )['activitySince'] ?? null ) === $before + 3;
+	} )() );
+	check( 'nothing after a time that has not come yet', \Nino\Modules\Logs\Admin::countSince( $appData, time() + 7200 ) === 0 );
+	\Nino\Modules\Logs\Admin::record( $appData, 'other@example.com', 'Edit Minute' );
+	check( 'the minute of the earlier visit is over: a line of that minute is not counted, one of the minute before it is', \Nino\Modules\Logs\Admin::countSince( $appData, time() ) === 0
+		&& \Nino\Modules\Logs\Admin::countSince( $appData, time() - 60 ) >= 1 );
+
+	$first = greetingOf( $appData )['activitySince'];
+	\Nino\Modules\Logs\Admin::record( $appData, 'other@example.com', "Edit\nLogin" );
+	check( 'a line with a break in it is one line', ( greetingOf( $appData )['activitySince'] ?? null ) === $first + 1 );
+
+	\Nino\Auth::insertUser( $appData, 'nologs@example.com', 'nologs password', [ \Nino\Modules\Elements\Admin::MANAGE_PERM ] );
+	\Nino\Auth::loginUser( $appData, 'nologs@example.com', 'nologs password' );
+	ageLogins( $appData, 'nologs@example.com', 5000 );
+	\Nino\Auth::loginUser( $appData, 'nologs@example.com', 'nologs password' );
+	$greeting = greetingOf( $appData );
+	check( 'an account that may not read the log is told nothing of it - the key is left out', $greeting !== null && array_key_exists( 'activitySince', $greeting ) === false && $greeting['previousLogin'] > 0 );
+
+	\Nino\Auth::loginUser( $appData, 'visits@example.com', 'visits password' );
+}
+
+/** The age of the last backup is told while there is one, and left out when there is none */
+function pinGreetingBackup( array &$appData ): void {
+
+	check( 'the backup of today is 0 days old', ( greetingOf( $appData )['backupDays'] ?? null ) === 0 );
+
+	$dir = \Nino\Modules\Backups::dir( $appData );
+	rename( $dir, $dir. '-aside' );
+	mkdir( $dir, 0755, true );
+	$appData['/nino/admin/backups'] = false;
+
+	check( 'with no backup at all the key is left out', array_key_exists( 'backupDays', greetingOf( $appData ) ?? [ 'backupDays' => 0 ] ) === false );
+
+	file_put_contents( $dir. '/'. date( 'Y-m-d', strtotime( '-10 days' ) ). '.php', '' );
+	file_put_contents( $dir. '/'. date( 'Y-m-d', strtotime( '-30 days' ) ). '.php', '' );
+	check( 'the newest backup counts: ten days', ( greetingOf( $appData )['backupDays'] ?? null ) === 10 );
+
+	foreach( glob( $dir. '/*' ) ?: [] as $file )
+		unlink( $file );
+	rmdir( $dir );
+	rename( $dir. '-aside', $dir );
+	$appData['/nino/admin/backups'] = true;
+}
+
+/** The sentences are the elements of the type /greetings, put in once, in the language of the interface, hidden ones left out */
+function pinGreetingSentences( array &$appData ): void {
+
+	$seed = include dirname( __DIR__ ). '/_admin/Nino/Modules/Dashboard/install/elements/greetings.php';
+	$ids = array_keys( $seed['de_DE'] );
+
+	check( 'the type exists once the dashboard has been asked, with the model of the unit file', is_file( ninoSandboxDir( $appData ). '/private/elements/greetings.php' ) === true
+		&& \Nino\Elements::getElementModel( $appData, '/greetings' )['phase']['options'] === [ 'any', 'early', 'morning', 'noon', 'afternoon', 'evening', 'night' ]
+		&& \Nino\Elements::getElementModel( $appData, '/greetings' )['day']['options'] === [ 'any', 'monday', 'friday', 'weekend' ]
+		&& \Nino\Elements::getElementModel( $appData, '/greetings' )['occasion']['options'] === [ 'none', 'christmas', 'newyear' ]
+		&& \Nino\Elements::getElementModel( $appData, '/greetings' )['text']['locale'] === true );
+
+	\Nino\Runtime::setSessionValue( $appData, './admin/locale', 'en_US' );
+	$greeting = greetingOf( $appData );
+	check( 'the answer holds every sentence of the unit, each with its text and when it fits', $greeting !== null && count( $greeting['sentences'] ) === count( $ids )
+		&& array_diff( array_column( $greeting['sentences'], 'phase' ), [ 'any', 'early', 'morning', 'noon', 'afternoon', 'evening', 'night' ] ) === []
+		&& array_diff( array_column( $greeting['sentences'], 'day' ), [ 'any', 'monday', 'friday', 'weekend' ] ) === []
+		&& array_diff( array_column( $greeting['sentences'], 'occasion' ), [ 'none', 'christmas', 'newyear' ] ) === []
+		&& count( array_filter( $greeting['sentences'], static fn( array $sentence ): bool => $sentence['text'] !== '' ) ) === count( $ids ) );
+	check( '...in English for an English interface', in_array( $seed['en_US']['early-01']['text'], array_column( $greeting['sentences'], 'text' ), true ) === true
+		&& in_array( $seed['de_DE']['early-01']['text'], array_column( $greeting['sentences'], 'text' ), true ) === false );
+
+	\Nino\Runtime::setSessionValue( $appData, './admin/locale', 'de_DE' );
+	check( '...and in German for a German one', in_array( $seed['de_DE']['early-01']['text'], array_column( greetingOf( $appData )['sentences'], 'text' ), true ) === true );
+
+	check( 'an element carries the three fields as the unit wrote them', ( static function() use ( $greeting ): bool {
+		$christmas = array_values( array_filter( $greeting['sentences'], static fn( array $sentence ): bool => $sentence['occasion'] === 'christmas' ) );
+		$monday = array_values( array_filter( $greeting['sentences'], static fn( array $sentence ): bool => $sentence['day'] === 'monday' ) );
+		$night = array_values( array_filter( $greeting['sentences'], static fn( array $sentence ): bool => $sentence['phase'] === 'night' ) );
+		return count( $christmas ) >= 4 && count( $monday ) >= 6 && count( $night ) >= 10;
+	} )() );
+
+	\Nino\Elements::updateElement( $appData, '/greetings/early-01', [ 'hidden' => true ] );
+	$texts = array_column( greetingOf( $appData )['sentences'], 'text' );
+	check( 'a hidden element is not delivered', in_array( $seed['de_DE']['early-01']['text'], $texts, true ) === false && count( $texts ) === count( $ids ) - 1 );
+
+	\Nino\Elements::updateElement( $appData, '/greetings/early-02', [ 'text' => 'Mein eigener Satz.' ], 'de_DE' );
+	check( 'a sentence an editor changed is the editor\'s', in_array( 'Mein eigener Satz.', array_column( greetingOf( $appData )['sentences'], 'text' ), true ) === true );
+
+	// A file edited by hand can hold a word the model does not offer: it is delivered as 'any', never as it stands
+	$typeFile = ninoSandboxDir( $appData ). '/private/elements/greetings.php';
+	$type = include $typeFile;
+	$type['*']['early-04']['phase'] = 'bogus';
+	$type['*']['early-04']['day'] = [ 'x' ];
+	$type['*']['early-05']['occasion'] = 'bogus';
+	file_put_contents( $typeFile, '<?php return '. var_export( $type, true ). ';' );
+	unset( $appData['./nino/elements/cache'] );
+	$odd = array_column( greetingOf( $appData )['sentences'], null, 'text' );
+	check( 'a word of phase, day or occasion that is none of the options is delivered as any or none', ( $odd[ $seed['de_DE']['early-04']['text'] ] ?? [] )['phase'] === 'any' && ( $odd[ $seed['de_DE']['early-04']['text'] ] ?? [] )['day'] === 'any'
+		&& ( $odd[ $seed['de_DE']['early-05']['text'] ] ?? [] )['occasion'] === 'none' );
+
+	\Nino\Elements::deleteElement( $appData, '/greetings/early-03', '*' );
+	$count = count( greetingOf( $appData )['sentences'] );
+	check( 'an element an editor deleted does not come back with the next summary - the unit only adds', $count === count( $ids ) - 2 && count( greetingOf( $appData )['sentences'] ) === $count );
+
+	$file = ninoSandboxDir( $appData ). '/private/elements/greetings.php';
+	$bytes = (string) file_get_contents( $file );
+	greetingOf( $appData );
+	check( 'a type that is there is not written again', (string) file_get_contents( $file ) === $bytes );
+
+	$removed = static fn(): array => (array) ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )[\Nino\Elements::REMOVED] ?? [] );
+	[ $status ] = ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiDelete' ], [ 'uri' => 'greetings', 'confirm' => 'greetings' ] );
+	check( 'the editors delete the type', $status === 200 && is_file( $file ) === false && isset( $removed()['greetings'] ) === true );
+	$greeting = greetingOf( $appData );
+	check( '...and it does not come back: no sentences, no type file, and the card is there', $greeting !== null && $greeting['sentences'] === [] && is_file( $file ) === false );
+
+	// A project that never had the type gets it with its first summary - seeded in both languages
+	$fresh = ninoSandbox( 'greetings' );
+	$fresh['/nino/modules'] = [];
+	check( 'a project with no type and no tombstone is given the type', \Nino\Modules\Dashboard\Admin::seedGreetings( $fresh, [ 'de_DE', 'en_US' ] ) === true
+		&& count( \Nino\Elements::queryElements( $fresh, '/greetings', [], 'de_DE', [] ) ) === count( $ids )
+		&& count( \Nino\Elements::queryElements( $fresh, '/greetings', [], 'en_US', [] ) ) === count( $ids ) );
+	$bytes = (string) file_get_contents( ninoSandboxDir( $fresh ). '/private/elements/greetings.php' );
+	check( '...a second run writes nothing', \Nino\Modules\Dashboard\Admin::seedGreetings( $fresh, [ 'de_DE', 'en_US' ] ) === true && (string) file_get_contents( ninoSandboxDir( $fresh ). '/private/elements/greetings.php' ) === $bytes );
+	exec( 'rm -rf '. escapeshellarg( ninoSandboxDir( $fresh ) ) );
+}
+
+/** Each of the three lines is switched in the Config panel; with all three off the answer has no greeting at all */
+function pinGreetingSwitches( array &$appData ): void {
+
+	$defaults = \Nino\AppData::DEFAULTS;
+	check( 'the three switches are on by default', ( $defaults['/nino/admin/greeting/hello'] ?? null ) === true && ( $defaults['/nino/admin/greeting/sentence'] ?? null ) === true && ( $defaults['/nino/admin/greeting/facts'] ?? null ) === true );
+
+	$greeting = greetingOf( $appData );
+	check( 'the answer says which lines are on', $greeting !== null && $greeting['show'] === [ 'hello' => true, 'sentence' => true, 'facts' => true ] );
+
+	$appData['/nino/admin/greeting/facts'] = false;
+	$greeting = greetingOf( $appData );
+	check( 'with the facts off the log is not counted and the backup not read - and the rest is there', $greeting['show']['facts'] === false && array_key_exists( 'activitySince', $greeting ) === false
+		&& array_key_exists( 'backupDays', $greeting ) === false && array_key_exists( 'sentences', $greeting ) === true );
+
+	$appData['/nino/admin/greeting/sentence'] = false;
+	$greeting = greetingOf( $appData );
+	check( 'with the sentence off the elements are not sent', $greeting['show'] === [ 'hello' => true, 'sentence' => false, 'facts' => false ] && array_key_exists( 'sentences', $greeting ) === false );
+
+	$appData['/nino/admin/greeting/hello'] = false;
+	[ $status, $body ] = callAdminPost( $appData, 'dashboard/summary' );
+	check( 'with all three off there is no greeting in the answer, and everything else is', $status === 200 && array_key_exists( 'greeting', $body ) === false && array_key_exists( 'tiles', $body ) === true && array_key_exists( 'notices', $body ) === true );
+
+	foreach( [ 'hello', 'sentence', 'facts' ] as $line )
+		unset( $appData['/nino/admin/greeting/'. $line] );
+	check( 'a switch that is not set is on', greetingOf( $appData )['show'] === [ 'hello' => true, 'sentence' => true, 'facts' => true ] );
+}
+
+/** The name of an account: optional, one line of at most 60 characters, never cut and never in the log */
+function pinAccountName( array &$appData ): void {
+
+	$call = static function( string $method, array $data ) use ( &$appData ): array {
+		return callUsers( $appData, $method, $data );
+	};
+
+	[ $status, $body ] = $call( 'apiCreate', [ 'mail' => 'named@example.com', 'pw' => 'named password', 'role' => '', 'name' => '  Nele <b>N</b> [[/nino/dir]]  ' ] );
+	check( 'an account is created with a name, trimmed, the rest as typed', $status === 200 && $body['name'] === 'Nele <b>N</b> [[/nino/dir]]'
+		&& \Nino\Auth::getUser( $appData, 'named@example.com' )['name'] === 'Nele <b>N</b> [[/nino/dir]]' );
+	[ , $list ] = $call( 'apiList', [] );
+	check( '...and the list says it', array_column( array_column( $list['users'], null, 'mail' ), 'name', 'mail' )['named@example.com'] === 'Nele <b>N</b> [[/nino/dir]]' );
+
+	[ $status ] = $call( 'apiCreate', [ 'mail' => 'unnamed@example.com', 'pw' => 'unnamed password', 'role' => '' ] );
+	check( 'an account without a name has no name field in its record', $status === 200 && array_key_exists( 'name', $appData['/nino/auth/user']['unnamed@example.com'] ) === false );
+	[ , $list ] = $call( 'apiList', [] );
+	check( '...and is listed with an empty name', array_column( array_column( $list['users'], null, 'mail' ), 'name', 'mail' )['unnamed@example.com'] === '' );
+	[ $status, $body ] = $call( 'apiSave', [ 'username' => 'unnamed@example.com', 'mail' => 'unnamed2@example.com' ] );
+	check( 'an account the record of which has no name stays valid: it is saved without one, and the answer does not mention it', $status === 200 && array_key_exists( 'name', $body ) === false
+		&& array_key_exists( 'name', $appData['/nino/auth/user']['unnamed2@example.com'] ) === false );
+
+	[ $status, $body ] = $call( 'apiSave', [ 'username' => 'unnamed2@example.com', 'mail' => 'unnamed2@example.com', 'name' => 'Uli' ] );
+	check( 'a save sets a name', $status === 200 && $body['name'] === 'Uli' && \Nino\Auth::getUser( $appData, 'unnamed2@example.com' )['name'] === 'Uli' );
+	[ $status, $body ] = $call( 'apiSave', [ 'username' => 'unnamed2@example.com', 'mail' => 'unnamed2@example.com', 'pw' => 'another password' ] );
+	check( '...a save that does not mention it leaves it', $status === 200 && \Nino\Auth::getUser( $appData, 'unnamed2@example.com' )['name'] === 'Uli' );
+	[ $status, $body ] = $call( 'apiSave', [ 'username' => 'unnamed2@example.com', 'mail' => 'unnamed2@example.com', 'name' => '' ] );
+	check( '...and an empty one takes it away, the field with it', $status === 200 && $body['name'] === '' && array_key_exists( 'name', $appData['/nino/auth/user']['unnamed2@example.com'] ) === false );
+
+	[ $status, $body ] = $call( 'apiSave', [ 'username' => 'unnamed2@example.com', 'mail' => 'unnamed2@example.com', 'name' => "\u{A0}\u{A0}" ] );
+	check( 'a name of two no-break spaces is no name: it takes the field away', $status === 200 && $body['name'] === '' && array_key_exists( 'name', $appData['/nino/auth/user']['unnamed2@example.com'] ) === false );
+	[ , $body ] = $call( 'apiSave', [ 'username' => 'unnamed2@example.com', 'mail' => 'unnamed2@example.com', 'name' => "\u{A0} Uli\u{2003}" ] );
+	check( '...and one around a name is taken off', $body['name'] === 'Uli' );
+
+	$sixty = str_repeat( 'ä', 60 );
+	[ $status ] = $call( 'apiSave', [ 'username' => 'unnamed2@example.com', 'mail' => 'unnamed2@example.com', 'name' => $sixty ] );
+	check( 'sixty characters are allowed, bytes are not counted', $status === 200 && \Nino\Auth::getUser( $appData, 'unnamed2@example.com' )['name'] === $sixty );
+	[ $status, $body, $request ] = $call( 'apiSave', [ 'username' => 'unnamed2@example.com', 'mail' => 'unnamed2@example.com', 'name' => $sixty. 'x' ] );
+	check( 'sixty-one are refused with 400, a code with words and the field - and nothing is cut', $status === 400 && ( $body['code'] ?? '' ) === 'users_name_long' && ( $body['field'] ?? '' ) === 'name' && ( $body['params'] ?? [] ) === [ 60 ]
+		&& \Nino\Auth::getUser( $appData, 'unnamed2@example.com' )['name'] === $sixty );
+	[ $status, $body ] = $call( 'apiCreate', [ 'mail' => 'toolong@example.com', 'pw' => 'toolong password', 'role' => '', 'name' => $sixty. 'x' ] );
+	check( '...on creating as well, and no account is made', $status === 400 && ( $body['code'] ?? '' ) === 'users_name_long' && \Nino\Auth::getUser( $appData, 'toolong@example.com' ) === false );
+
+	foreach( [ "Nele\0", "Ne\0le", "Ne\nle", "Ne\tle", "\x7fNele", "Ne\u{202E}le", "Ne\u{200B}le", "Ne\u{2028}le" ] as $bad ) {
+		[ $status, $body ] = $call( 'apiSave', [ 'username' => 'unnamed2@example.com', 'mail' => 'unnamed2@example.com', 'name' => $bad ] );
+		check( 'a name with a control, format or line character - '. bin2hex( $bad ). ' - is refused with 400 and is not stored', $status === 400 && ( $body['code'] ?? '' ) === 'users_name_invalid'
+			&& \Nino\Auth::getUser( $appData, 'unnamed2@example.com' )['name'] === $sixty );
+	}
+	foreach( [ [ 'a' ], 7, true ] as $bad ) {
+		[ $status, $body ] = $call( 'apiSave', [ 'username' => 'unnamed2@example.com', 'mail' => 'unnamed2@example.com', 'name' => $bad ] );
+		check( 'a name that is no string - '. json_encode( $bad ). ' - is refused as well', $status === 400 && ( $body['code'] ?? '' ) === 'users_name_invalid' );
+	}
+	[ $status ] = $call( 'apiCreate', [ 'mail' => 'ctl@example.com', 'pw' => 'ctl password', 'role' => '', 'name' => "A\nB" ] );
+	check( 'creating with a control character is refused too', $status === 400 && \Nino\Auth::getUser( $appData, 'ctl@example.com' ) === false );
+
+	// Only the account itself or a manager: a plain account cannot name another
+	ninoUser( $appData, 'plainname@example.com', [], 'plainname password' );
+	[ $status ] = $call( 'apiSave', [ 'username' => 'unnamed2@example.com', 'mail' => 'unnamed2@example.com', 'name' => 'Mallory' ] );
+	check( 'an account without the permission cannot name another account', $status === 403 && \Nino\Auth::getUser( $appData, 'unnamed2@example.com' )['name'] === $sixty );
+	[ $status, $body ] = $call( 'apiSave', [ 'username' => 'plainname@example.com', 'mail' => 'plainname@example.com', 'name' => 'Pia', 'currentPassword' => 'plainname password' ] );
+	check( 'it names itself, and the session sees the name at once', $status === 200 && $body['name'] === 'Pia' && ( $appData['./nino/auth/current']['name'] ?? '' ) === 'Pia' && ( greetingOf( $appData )['name'] ?? '' ) === 'Pia' );
+
+	\Nino\Auth::loginUser( $appData, 'visits@example.com', 'visits password' );
+}
+
+/** The log names who did what - and never the name an account carries */
+function pinAccountNameNotLogged( array &$appData ): void {
+
+	check( 'the log line of creating and of saving an account names the address and the role, not the name',
+		\Nino\Modules\Users\Admin::log( 'users/create', [ 'mail' => 'a@example.com', 'name' => 'Geheimname', 'pw' => 'x', 'role' => 'editor' ] ) === 'Create User a@example.com'
+		&& \Nino\Modules\Users\Admin::log( 'users/save', [ 'username' => 'a@example.com', 'mail' => 'a@example.com', 'name' => 'Geheimname' ] ) === 'Edit User a@example.com' );
+
+	callUsers( $appData, 'apiCreate', [ 'mail' => 'logged@example.com', 'pw' => 'logged password', 'role' => '', 'name' => 'Geheimname' ] );
+	\Nino\Admin\Admin::record( $appData, 'visits@example.com', \Nino\Modules\Users\Admin::log( 'users/create', [ 'mail' => 'logged@example.com', 'name' => 'Geheimname' ] ) );
+	check( 'no line of the log holds the name', array_filter( \Nino\Modules\Logs\Admin::recentLines( $appData, 500 ), static fn( string $line ): bool => str_contains( $line, 'Geheimname' ) ) === [] );
+}

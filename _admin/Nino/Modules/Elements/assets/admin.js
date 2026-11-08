@@ -1178,7 +1178,10 @@
 				field.options.forEach( function( opt ) {
 					const option = dc.createElement('option');
 					option.value = opt;
-					option.textContent = opt;
+					// The word of an option is a fill of the type's own
+					// (/_admin/elements/option/<type>/<key>/<value>), which a
+					// feature or a project may bring; without one it is the value
+					option.textContent = Nino.content.getText('/_admin/elements/option/'+ Nino.admin.elements._currentType+ '/'+ key+ '/'+ opt) || opt;
 					option.selected = ( value !== null && String( value ) === String( opt ) );
 					select.appendChild( option );
 				} );
