@@ -616,8 +616,79 @@ check( '...and the session that was live is still the one that is', ( \Nino\Auth
 \Nino\Auth::deleteUser( $appData, $csrfUser );
 unset( $_POST['_csrf'] );
 
+authResumeChecks( $appData );
+
 echo "\n";
 
 // --- Cleanup ------------------------------------------------------------
 
 ninoDone( $appData );
+
+/**
+ *	Auth::resumeUser() opens the session of an account the way loginUser() does after the password, and asks for no password: the session id and the token rotate, a session of an
+ *	earlier sign-in ends, a token is kept with the ip, the callback '/nino/auth/login' runs, the time of the login is written - for an account that is active and none other
+ *
+ *	@param		array 		&$appData
+ *
+ *	@return 	void
+ */
+function authResumeChecks( array &$appData ): void {
+
+	echo "\nAuth::resumeUser\n";
+
+	$logins = [];
+	\Nino\Callbacks::registerCallback( $appData, '/nino/auth/login', static function( array &$appData, array &$user ) use ( &$logins ): void { $logins[] = $user['mail']; } );
+
+	foreach( [ 'back@example.com', 'by-password@example.com', 'off-resume@example.com', 'other@example.com' ] as $mail )
+		\Nino\Auth::insertUser( $appData, $mail, 'correct horse battery staple' );
+
+	$logouts = [];
+	\Nino\Callbacks::registerCallback( $appData, '/nino/auth/logout', static function( array &$appData, array &$user ) use ( &$logouts ): void { $logouts[] = $user['mail']; } );
+
+	\Nino\Auth::loginUser( $appData, 'by-password@example.com', 'correct horse battery staple' );
+	$csrfBefore = \Nino\Csrf::getToken( $appData );
+	$byPassword = \Nino\Auth::getUser( $appData, 'by-password@example.com' );
+	$passwordLogins = $logins;
+	$logins = [];
+	$tokenBefore = \Nino\Runtime::getSessionValue( $appData, './nino/auth/token', '' );
+
+	// An account with an outdated hash: nothing on this path touches the password
+	$appData['/nino/auth/user']['back@example.com']['pw'] = password_hash( 'correct horse battery staple', PASSWORD_BCRYPT, [ 'cost' => 4 ] );
+	$hashBefore = $appData['/nino/auth/user']['back@example.com']['pw'];
+	$resumed = \Nino\Auth::resumeUser( $appData, 'back@example.com' );
+	$stored = \Nino\Auth::getUser( $appData, 'back@example.com' );
+	$token = \Nino\Runtime::getSessionValue( $appData, './nino/auth/token', '' );
+	$csrfAfter = \Nino\Csrf::getToken( $appData );
+
+	check( 'resumeUser opens a session for an active account with no password: the user comes back and is the current one', is_array( $resumed ) === true && $resumed['mail'] === 'back@example.com' && ( \Nino\Auth::getCurrentUser( $appData )['mail'] ?? '' ) === 'back@example.com' );
+	check( '...with a token of its own in the session and in the record of the account, with the client ip - and the token is not the one of the sign-in before', is_string( $token ) === true && strlen( $token ) === 64 && $token !== $tokenBefore && array_keys( $stored['sessions'] ) === [ $token ]
+		&& $stored['sessions'][$token]['ip'] === '127.0.0.1' && abs( $stored['sessions'][$token]['time'] - time() ) < 5 );
+	check( '...the time of the login is written, the callback of a login ran once for the account, and the password hash is left as it was (no rehash)', abs( $stored['lastLogin'] - time() ) < 5 && $logins === [ 'back@example.com' ] && $stored['pw'] === $hashBefore );
+	check( '...the sign-in that was there is ended by it - its logout callback ran once for that account, as for a login - and the csrf token is a new one', $logouts === [ 'by-password@example.com' ] && $csrfBefore !== $csrfAfter && strlen( $csrfAfter ) > 0 );
+	$endedByResume = count( \Nino\Auth::getUser( $appData, 'by-password@example.com' )['sessions'] );
+
+	// Byte for byte the same record as a login makes
+	\Nino\Auth::loginUser( $appData, 'other@example.com', 'correct horse battery staple' );
+	$other = \Nino\Auth::getUser( $appData, 'other@example.com' );
+	check( '...what happens to the session of the account that was signed in before is what a login does: the same number of sessions are left', count( \Nino\Auth::getUser( $appData, 'back@example.com' )['sessions'] ) === $endedByResume );
+	check( 'loginUser still makes the record it made: the same keys as a resumed one, a session with time and ip, the time of the login, the callback once', array_keys( $other ) === array_keys( $stored ) && array_keys( array_values( $other['sessions'] )[0] ) === array_keys( array_values( $stored['sessions'] )[0] )
+		&& is_int( $other['lastLogin'] ) === true && $passwordLogins === [ 'by-password@example.com' ] && array_keys( $byPassword['sessions'] ) !== [] && array_keys( $byPassword ) === array_keys( $stored ) );
+
+	// With no sign-in before it the token of the session is a new one too (session fixation)
+	\Nino\Auth::logoutUser( $appData );
+	$csrfVisitor = \Nino\Csrf::getToken( $appData );
+	\Nino\Auth::resumeUser( $appData, 'back@example.com' );
+	check( '...and where nobody was signed in the csrf token of the session is replaced as well, so that a token known before the sign-in is of no use after it', \Nino\Csrf::getToken( $appData ) !== $csrfVisitor );
+	\Nino\Auth::loginUser( $appData, 'other@example.com', 'correct horse battery staple' );
+
+	// Not an account to resume
+	\Nino\Auth::setStatus( $appData, 'off-resume@example.com', false );
+	$logins = [];
+	$sessionBefore = \Nino\Auth::getUser( $appData, 'other@example.com' )['sessions'];
+	check( 'an unknown account and an account that is switched off are false: no session, no callback, nothing written, the session that was there stays', \Nino\Auth::resumeUser( $appData, 'nobody-at-all@example.com' ) === false && \Nino\Auth::resumeUser( $appData, 'off-resume@example.com' ) === false
+		&& $logins === [] && \Nino\Auth::getUser( $appData, 'off-resume@example.com' )['sessions'] === [] && ( \Nino\Auth::getCurrentUser( $appData )['mail'] ?? '' ) === 'other@example.com' && \Nino\Auth::getUser( $appData, 'other@example.com' )['sessions'] === $sessionBefore );
+
+	\Nino\Auth::logoutUser( $appData );
+	foreach( [ 'back@example.com', 'by-password@example.com', 'off-resume@example.com', 'other@example.com' ] as $mail )
+		\Nino\Auth::deleteUser( $appData, $mail );
+}

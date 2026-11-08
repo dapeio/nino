@@ -194,6 +194,42 @@ namespace Nino {
 			// only ever punishes the neighbours sharing it
 			self::_clearTries( $appData, array_merge( $ipKeys, [ $username ] ) );
 
+			// Rotate the hash if it was created with an outdated algorithm/cost -
+			// computed now (while $user still holds the verified pw context),
+			// applied in _openSession() to the freshly re-read $user
+			$newHash	= ( password_needs_rehash( $user['pw'], PASSWORD_DEFAULT ) === true ) ? password_hash( $pw, PASSWORD_DEFAULT ) : null;
+
+			return self::_openSession( $appData, $username, $newHash );
+		}
+
+
+		// Open the session of an account whose identity something else has
+		// proven - a remembered device, say, that holds a token only this
+		// account's owner was given. It is the part of loginUser() that follows
+		// the password: the session id and the csrf token rotate, the session
+		// of a previous sign-in ends, a session token is issued and kept, the
+		// callback '/nino/auth/login' runs, the time of the login is written.
+		// Nothing here asks for a password and no tries are counted: the caller
+		// has to have checked what lets the account in. The cooldown of failed
+		// logins does not apply either, on purpose: it belongs to guessing a
+		// password, and a holder of a token is not guessing - otherwise anyone
+		// could lock the owner out of a remembered device with a few wrong
+		// passwords. An account that is unknown or not active is none to resume.
+		public static function resumeUser( array &$appData, string $username ): array|false {
+
+			$user = self::getUser( $appData, $username );
+
+			if( $user === false || $user['status'] !== self::STATUS_ACTIVE )
+				return false;
+
+			return self::_openSession( $appData, $username, null );
+		}
+
+
+		// The shared end of loginUser() and resumeUser(); $newHash is the
+		// password hash loginUser() has made for an outdated one, null for none
+		private static function _openSession( array &$appData, string $username, ?string $newHash ): array|false {
+
 			// Rotate the session id + csrf token now that the session's identity
 			// is changing (session-fixation defense). startSession() rather
 			// than a status check: a login is one of the writes that starts
@@ -202,12 +238,6 @@ namespace Nino {
 			if( \Nino\Runtime::startSession( $appData ) === true )
 				session_regenerate_id( true );
 			\Nino\Csrf::rotateToken( $appData );
-
-			// Rotate the hash if it was created with an outdated algorithm/cost -
-			// computed now (while $user still holds the verified pw context),
-			// applied further down to the freshly re-read $user
-			$rehash 	= password_needs_rehash( $user['pw'], PASSWORD_DEFAULT );
-			$newHash	= ( $rehash === true ) ? password_hash( $pw, PASSWORD_DEFAULT ) : null;
 
 			// Login - logoutUser() removes the previous session's token from
 			// this same user's persisted 'sessions' entry, so $user has to be
@@ -219,7 +249,7 @@ namespace Nino {
 			$user = self::getUser( $appData, $username );
 			if( $user === false )
 				return false;
-			if( $rehash === true )
+			if( $newHash !== null )
 				$user['pw'] = $newHash;
 
 			// Issue a fresh, unguessable session token - this (not the client ip)
