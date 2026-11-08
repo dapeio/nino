@@ -1,0 +1,62 @@
+/*	Favicon tab of the Images panel: the set as a row of pictures at their own size, each with its caption */
+
+:where(.nino-admin) .admin-favicon-preview {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 1rem 1.5rem;
+	margin: .5rem 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+:where(.nino-admin) .admin-favicon-item {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: .375rem;
+	max-width: 100%;
+}
+
+:where(.nino-admin) .admin-favicon-image {
+	display: block;
+	max-width: 100%;
+	height: auto;
+	/* A transparent icon is seen on a ground that shows it is transparent */
+	background: repeating-conic-gradient(color-mix(in srgb, currentColor 12%, transparent) 0 25%, transparent 0 50%) 0 0 / 12px 12px;
+	border-radius: 2px;
+}
+
+:where(.nino-admin) .admin-favicon-caption,
+:where(.nino-admin) .admin-favicon-missing {
+	font-size: .8125rem;
+	color: var(--editor-text-secondary);
+}
+
+:where(.nino-admin) .admin-favicon-item .admin-favicon-missing {
+	min-width: 4rem;
+	padding: .5rem;
+	border: 1px dashed var(--editor-border);
+	border-radius: 4px;
+	text-align: center;
+}
+
+:where(.nino-admin) #favicon-set .nino-admin-field > small {
+	display: block;
+	margin-top: .22rem;
+	color: var(--editor-text-secondary);
+	font-size: .72rem;
+	line-height: 1.45;
+}
+
+:where(.nino-admin) .admin-favicon-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: .5rem;
+	margin-top: 1rem;
+}
+
+:where(.nino-admin) .admin-favicon-actions[hidden],
+:where(.nino-admin) .admin-favicon-actions > [hidden] {
+	display: none;
+}

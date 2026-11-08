@@ -1847,6 +1847,7 @@ foreach( scandir( $baseUnit. '/favicon' ) as $iconFile )
 	if( $iconFile !== '.' && $iconFile !== '..' && $iconFile !== 'site.webmanifest' && str_contains( $headerTemplate, '/favicon/'. $iconFile ) === false && in_array( $iconFile, $manifestIcons, true ) === false )
 		$unreachableIcons[] = $iconFile;
 check( 'every icon the base unit ships is named by its header template or its manifest'. ( $unreachableIcons === [] ? '' : ' - unreachable: '. implode( ', ', $unreachableIcons ) ), $unreachableIcons === [] );
+pinHeaderNamesTheSetWithItsStamp( $headerTemplate, $baseUnit );
 
 /*	robots.txt is delivered content, and a Disallow line names a path a
 	crawler could otherwise reach. Two of the three the base unit named,
@@ -1976,3 +1977,26 @@ foreach( [ '/featured', '/apps' ] as $servedAddress ) {
 // --- Cleanup ---------------------------------------------------------------
 
 ninoDone( $appData );
+
+
+// --- The pins ----------------------------------------------------------------
+
+/**
+ *	The header the base unit ships names the vector icon through its fill and puts the stamp of the set on
+ *	every address of it - the stamp is what makes a browser fetch an icon again once the Favicon tab wrote it
+ *
+ *	@param		string		$header				The text of html-header.tpl
+ *	@param		string		$baseUnit			The directory of the base unit
+ *
+ *	@return		void
+ */
+function pinHeaderNamesTheSetWithItsStamp( string $header, string $baseUnit ): void {
+
+	preg_match_all( '#(?:href)="\[\[/nino/public\]\]/favicon/([a-z0-9.-]+)([^"]*)"#', $header, $named, PREG_SET_ORDER );
+	$unstamped = array_filter( $named, static fn( array $link ): bool => $link[2] !== '?v=[[/nino/favicon/stamp]]' );
+
+	check( 'the header names the vector icon through the fill that is empty without one, right behind the ico link - no line of its own to leave empty', preg_match( '#favicon\.ico[^"]*" sizes="any">\[\[/nino/favicon/svg\]\]\n#', $header ) === 1 && preg_match( '#^\s*\[\[/nino/favicon/svg\]\]#m', $header ) === 0 );
+	check( 'every address of the set in the header carries the stamp, and the header names every raster icon and the manifest the base unit ships'. ( $unstamped === [] ? '' : ' - without: '. implode( ', ', array_column( $unstamped, 1 ) ) ),
+		$unstamped === [] && array_diff( array_column( $named, 1 ), array_values( array_diff( scandir( $baseUnit. '/favicon' ), [ '.', '..' ] ) ) ) === []
+		&& array_diff( [ 'favicon.ico', 'apple-touch-icon.png', 'favicon-32x32.png', 'favicon-16x16.png', 'site.webmanifest' ], array_column( $named, 1 ) ) === [] );
+}

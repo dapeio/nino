@@ -305,6 +305,8 @@ namespace Nino {
 				'[[/nino/dir]]'					=> \Nino\Filesystem::getDir( $appData ),
 				'[[/nino/public]]'			=> \Nino\Filesystem::getPublicDir( $appData ),
 				'[[/nino/date/year]]'				=> date('Y'),
+				'[[/nino/favicon/stamp]]'		=> (string) \Nino\Images::faviconStamp( $appData ),
+				'[[/nino/favicon/svg]]'			=> \Nino\Images::faviconSvgLink( $appData ),
 			];
 		}
 

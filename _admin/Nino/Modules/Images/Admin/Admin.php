@@ -43,7 +43,7 @@ namespace Nino\Modules\Images {
 
 		// The entries of the manual its "?" opens, in the order they are shown (see \Nino\Admin\Admin::manual())
 		public static function manual(): array {
-			return [ 'intro', 'slot', 'upload', 'alt', 'remove', 'scan' ];
+			return [ 'intro', 'slot', 'upload', 'alt', 'remove', 'scan', 'icon' ];
 		}
 
 		public static function icon(): string {
@@ -69,9 +69,10 @@ namespace Nino\Modules\Images {
 		}
 
 		// The slots these images fill are edited on a tab of this same
-		// pane (see \Nino\Admin\Panels::collect()), with its own permission
+		// pane (see \Nino\Admin\Panels::collect()), with its own permission;
+		// the icon set of the site is made on the other one, with this panel's
 		public static function tabs(): array {
-			return [ Slots::class ];
+			return [ Slots::class, Favicon::class ];
 		}
 
 		public static function log( string $action, array $data ): string {

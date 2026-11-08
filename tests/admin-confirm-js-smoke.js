@@ -262,6 +262,7 @@ console.log('Nino.adminUi.confirm');
 		'/_admin/users/confirm/logoutall' : 'big',
 		'/_admin/slots/confirm/delete' : 'destructive',
 		'/_admin/images/confirm/remove' : 'destructive',
+		'/_admin/favicon/confirm/reset' : 'big',
 		'/_admin/keys/confirm/format' : 'big',
 		'/_admin/keys/confirm/delete' : 'destructive',
 		'/_admin/features/confirm/remove' : 'destructive',

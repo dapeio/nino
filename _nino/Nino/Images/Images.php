@@ -74,6 +74,20 @@ namespace Nino {
 		public const int MAX_SOURCE_PIXELS 		= 20 * 1000 * 1000;
 		private const string UPLOAD_DIR 				= '/images';
 
+		// The favicon set below /favicon (see Modules\Images\Favicon): the files
+		// the page header names, and the one a page may add for browsers that
+		// draw a vector. Public because the workbench writes them and the base
+		// unit ships the first six
+		public const string FAVICON_DIR 		= '/favicon';
+		public const array FAVICON_FILES 		= [ 'favicon.ico', 'favicon-16x16.png', 'favicon-32x32.png', 'favicon-192x192.png', 'favicon-512x512.png', 'apple-touch-icon.png', 'site.webmanifest' ];
+		public const string FAVICON_SVG 		= 'favicon.svg';
+
+		// The fragment [[/nino/favicon/svg]] stands for while the site has a
+		// vector icon (see faviconSvgLink()): a line of its own, so that the
+		// fill can stand right behind another link and leave no empty line
+		// where there is none
+		public static string $faviconSvgHtml = "\n\t\t\t<link rel=\"icon\" type=\"image/svg+xml\" href=\"[[href]]\">";
+
 		/**
 		 *	Validate, turn upright, center-crop and resize raw uploaded image bytes
 		 *	to exactly $targetWidth x $targetHeight, then store the result at $basePath
@@ -640,6 +654,136 @@ namespace Nino {
 				'VP8X'	=> ( ord( $bytes[20] ) & 0x10 ) !== 0,
 				default	=> true,
 			};
+		}
+
+		/**
+		 *	The picture upright and set on a transparent square of $side pixels:
+		 *	the whole of it, scaled to fit and centred, never cropped - what an
+		 *	icon wants from a picture that is not square itself. The checks of
+		 *	reject() are the caller's (the pixel cap is what keeps the decode in
+		 *	memory); a picture a camera stored on its side is turned first, as
+		 *	process() turns it. Only the small canvas is turned, never the source
+		 *
+		 *	@param		string		$bytes				The validated source
+		 *	@param		int				$side					The edge of the square, 1 to 4096
+		 *
+		 *	@return 	\GdImage|false						A truecolor image with an alpha channel, or false where the bytes are no image this server decodes
+		 */
+		public static function square( string $bytes, int $side ): \GdImage|false {
+
+			if( $side < 1 || $side > 4096 )
+				return false;
+
+			[ $info ] = self::_inspect( $bytes );
+			if( $info === null )
+				return false;
+
+			$orientation = $info[2] === IMAGETYPE_JPEG ? self::_jpegOrientation( $bytes ) : 1;
+
+			$source = @imagecreatefromstring( $bytes );
+			if( $source === false )
+				return false;
+
+			$sourceWidth	= imagesx( $source );
+			$sourceHeight	= imagesy( $source );
+			$turned				= $orientation >= 5;
+			$shownWidth		= $turned ? $sourceHeight : $sourceWidth;
+			$shownHeight	= $turned ? $sourceWidth : $sourceHeight;
+			$scale				= $side / max( $shownWidth, $shownHeight );
+			$pictureWidth	= max( 1, (int) round( $shownWidth * $scale ) );
+			$pictureHeight= max( 1, (int) round( $shownHeight * $scale ) );
+
+			// Drawn the way the pixels are stored, turned upright afterwards
+			$picture = self::transparent( $turned ? $pictureHeight : $pictureWidth, $turned ? $pictureWidth : $pictureHeight );
+			if( $picture === false ) {
+				imagedestroy( $source );
+				return false;
+			}
+
+			imagecopyresampled( $picture, $source, 0, 0, 0, 0, imagesx( $picture ), imagesy( $picture ), $sourceWidth, $sourceHeight );
+			imagedestroy( $source );
+
+			if( $orientation > 1 ) {
+				$picture = self::_orient( $picture, $orientation );
+				if( $picture === false )
+					return false;
+			}
+
+			$square = self::transparent( $side, $side );
+			if( $square === false ) {
+				imagedestroy( $picture );
+				return false;
+			}
+
+			// Blending is off on $square: the alpha of the picture is copied as it is
+			imagecopy( $square, $picture, intdiv( $side - imagesx( $picture ), 2 ), intdiv( $side - imagesy( $picture ), 2 ), 0, 0, imagesx( $picture ), imagesy( $picture ) );
+			imagedestroy( $picture );
+
+			return $square;
+		}
+
+		/**
+		 *	An empty truecolor canvas that keeps its alpha channel: blending off, every pixel fully transparent.
+		 *	Public beside square() because the Favicon tab draws its sizes on such canvases too
+		 *
+		 *	@param		int				$width
+		 *	@param		int				$height
+		 *
+		 *	@return 	\GdImage|false
+		 */
+		public static function transparent( int $width, int $height ): \GdImage|false {
+
+			$canvas = @imagecreatetruecolor( $width, $height );
+			if( $canvas === false )
+				return false;
+
+			imagealphablending( $canvas, false );
+			imagesavealpha( $canvas, true );
+			imagefill( $canvas, 0, 0, imagecolorallocatealpha( $canvas, 0, 0, 0, 127 ) );
+
+			return $canvas;
+		}
+
+		/**
+		 *	The stamp of the favicon set: the newest modification time of the
+		 *	files a page header names, 0 for a site that has none. What
+		 *	[[/nino/favicon/stamp]] is - appended to an icon's address it makes
+		 *	a browser fetch the file again once the set was written
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	int
+		 */
+		public static function faviconStamp( array &$appData ): int {
+
+			$stamp = 0;
+			foreach( [ 'favicon.ico', 'apple-touch-icon.png', 'site.webmanifest', self::FAVICON_SVG ] as $name ) {
+				$path = \Nino\Filesystem::path( $appData, self::FAVICON_DIR. '/'. $name );
+				clearstatcache( true, $path );
+				$time = is_file( $path ) === true ? @filemtime( $path ) : false;
+				if( $time !== false && $time > $stamp )
+					$stamp = $time;
+			}
+
+			return $stamp;
+		}
+
+		/**
+		 *	The <link> of the vector icon, or '' while the site has none -
+		 *	what [[/nino/favicon/svg]] stands for
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string
+		 */
+		public static function faviconSvgLink( array &$appData ): string {
+
+			if( is_file( \Nino\Filesystem::path( $appData, self::FAVICON_DIR. '/'. self::FAVICON_SVG ) ) === false )
+				return '';
+
+			$href = \Nino\Filesystem::url( $appData, self::FAVICON_DIR. '/'. self::FAVICON_SVG ). '?v='. self::faviconStamp( $appData );
+
+			return str_replace( '[[href]]', htmlspecialchars( $href, ENT_QUOTES, 'UTF-8' ), self::$faviconSvgHtml );
 		}
 
 		/**

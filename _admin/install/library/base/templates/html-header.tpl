@@ -22,11 +22,11 @@
 			<meta name="twitter:description" content="[[/_nino/webpage[[/nino/http/response/uri]]/description]]">
 			[image /logo]<meta name="twitter:image" content="[[url]]">[/image]
 
-			<link rel="icon" href="[[/nino/public]]/favicon/favicon.ico" sizes="any">
-			<link rel="apple-touch-icon" sizes="180x180" href="[[/nino/public]]/favicon/apple-touch-icon.png">
-			<link rel="icon" type="image/png" sizes="32x32" href="[[/nino/public]]/favicon/favicon-32x32.png">
-			<link rel="icon" type="image/png" sizes="16x16" href="[[/nino/public]]/favicon/favicon-16x16.png">
-			<link rel="manifest" href="[[/nino/public]]/favicon/site.webmanifest">
+			<link rel="icon" href="[[/nino/public]]/favicon/favicon.ico?v=[[/nino/favicon/stamp]]" sizes="any">[[/nino/favicon/svg]]
+			<link rel="apple-touch-icon" sizes="180x180" href="[[/nino/public]]/favicon/apple-touch-icon.png?v=[[/nino/favicon/stamp]]">
+			<link rel="icon" type="image/png" sizes="32x32" href="[[/nino/public]]/favicon/favicon-32x32.png?v=[[/nino/favicon/stamp]]">
+			<link rel="icon" type="image/png" sizes="16x16" href="[[/nino/public]]/favicon/favicon-16x16.png?v=[[/nino/favicon/stamp]]">
+			<link rel="manifest" href="[[/nino/public]]/favicon/site.webmanifest?v=[[/nino/favicon/stamp]]">
 			[assets /.cache/style.css]
 
 			<!-- The preloader is a full-screen overlay that only Nino.ui.js
