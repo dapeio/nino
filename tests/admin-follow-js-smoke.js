@@ -1,6 +1,6 @@
 /**
  *	Nino									A compact filesystembased php framework
- *	admin-follow-js-smoke.js	The follow window (/_admin/follow, _admin/assets/follow.js):
+ *	admin-follow-js-smoke.js	The follow window (/_admin/?follow, _admin/assets/follow.js):
  *										the website in a frame that loads anew when the workbench
  *										tells it on the channel something was written - once for
  *										the messages of one save, at the page a message names when
@@ -269,7 +269,7 @@ w = windowOf( { dataSrc : '/', uriStored : '/blog/post' } );
 check( 'opened without an address, the frame starts at the page it showed last - one assignment, so one request', w.started.join() === '/blog/post' );
 w = windowOf( { dir : '/sites/a', dataSrc : '/sites/a/', uriStored : '/blog/post' } );
 check( '...below the directory the installation is in', w.started.join() === '/sites/a/blog/post' );
-w = windowOf( { dataSrc : '/contact', uriStored : '/blog/post', search : '?uri=/contact' } );
+w = windowOf( { dataSrc : '/contact', uriStored : '/blog/post', search : '?follow&uri=/contact' } );
 check( 'an address that was asked for wins over the page shown last', w.started.join() === '/contact' );
 w = windowOf( { dataSrc : '/', uriStored : '/blog/post', search : '?x=1&uri=/' } );
 check( '...wherever the query holds it, and the home page is an address too', w.started.join() === '/' );

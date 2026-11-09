@@ -46,7 +46,7 @@ namespace Nino\Admin {
 		public const string ROOT = __DIR__. '/..';
 
 		// What a page of the website must look like to be shown in the follow
-		// window (see handleFollow()): a path below this site, so no scheme, no
+		// window (see handleGet()): a path below this site, so no scheme, no
 		// host and no '//', which a browser reads as one; not the workbench's
 		// own (/_admin and below, or the window would show itself); and
 		// nothing that ends an attribute, starts a tag or is a control
@@ -112,16 +112,6 @@ namespace Nino\Admin {
 				$appData['/nino/http/routes']['GET://_admin']['body'] = '[template /_admin/templates/page-locked]';
 				return;
 			}
-
-			// The window that shows the website next to the workbench (see
-			// handleFollow()): a screen of its own and no pane of the rail, so
-			// it is a route and not a panel. Only a set-up project has one -
-			// the wizard answers /_admin by itself and returns above
-			$appData['/nino/http/routes']['GET://_admin/follow'] = [
-				'uri' 				=> '/_admin/follow',
-				'body'				=> '[template /_admin/templates/page-follow]',
-				'statusCode'	=> 200
-			];
 
 			// Both bundles are built from the panel registry, so every panel
 			// ships its own script and stylesheet (see panels()) and nothing
@@ -215,7 +205,6 @@ namespace Nino\Admin {
 
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/GET://_admin', 	[ self::class, 'handleGet' ] );
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://_admin', [ self::class, 'handlePost' ] );
-			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/GET://_admin/follow', [ self::class, 'handleFollow' ] );
 		}
 
 		/**
@@ -251,6 +240,29 @@ namespace Nino\Admin {
 				return;
 			}
 
+			// The window that shows the website and loads it anew after every
+			// write of the workbench: /_admin/?follow&uri=<page>, a query of the
+			// one address every server setup forwards to the workbench - a path
+			// of its own is no file, and a server that forwards what is no file
+			// to the site's index.php never reaches the workbench's routes. A
+			// screen of its own and no pane of the rail, so no fills of the
+			// rail. The frame is at the page uri names, or at the home page
+			if( isset( $_GET['follow'] ) === true ) {
+
+				$uri = is_string( $_GET['uri'] ?? null ) === true && preg_match( self::FOLLOW_PATH, $_GET['uri'] ) === 1 ? $_GET['uri'] : '/';
+
+				// The uri goes into an attribute of a template the kernel
+				// renders as HTML+: escaped for the attribute, and a '[' written
+				// as the entity, which a browser reads back as the character
+				// but the fill pass does not take for the start of a shortcode
+				// (AGENTS.md, "Rendering and escaping rules")
+				\Nino\Html::addFills( $appData, [
+					'[[/_admin/follow/uri]]' => str_replace( '[', '&#91;', htmlspecialchars( $uri, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ) ),
+				], '*' );
+				$request['/nino/http/response']['body'] = '[template /_admin/templates/page-follow]';
+				return;
+			}
+
 			// The limits an image upload runs into, for the browser to check a
 			// file against before it is sent (see Nino.adminUi.limits())
 			$limits = \Nino\Images::limits();
@@ -272,38 +284,6 @@ namespace Nino\Admin {
 				'[[/_admin/upload/pixels]]'	=> (string) $limits['pixels'],
 				'[[/_admin/mode]]'					=> $mode,
 				'[[/_admin/maintenance]]'		=> ( $appData['/nino/maintenance/status'] ?? false ) === true ? '1' : '0',
-			], '*' );
-		}
-
-		/**
-		 *	Fill the GET /_admin/follow response: the window that shows the
-		 *	website and loads it anew after every write of the workbench. Logged
-		 *	out it is the login page, as /_admin is; with an account it is the
-		 *	frame, at the page ?uri= names or at the home page
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		&$request			(reference) Current server request
-		 *
-		 *	@return 	void
-		 */
-		public static function handleFollow( array &$appData, array &$request ): void {
-
-			self::_logLoginOnce( $appData );
-
-			if( \Nino\Auth::getCurrentUser( $appData ) === false ) {
-				$request['/nino/http/response']['body'] = '[template /_admin/templates/page-login]';
-				return;
-			}
-
-			$uri = is_string( $_GET['uri'] ?? null ) === true && preg_match( self::FOLLOW_PATH, $_GET['uri'] ) === 1 ? $_GET['uri'] : '/';
-
-			// The uri goes into an attribute of a template the kernel renders
-			// as HTML+: escaped for the attribute, and a '[' written as the
-			// entity, which a browser reads back as the character but the fill
-			// pass does not take for the start of a shortcode (AGENTS.md,
-			// "Rendering and escaping rules")
-			\Nino\Html::addFills( $appData, [
-				'[[/_admin/follow/uri]]' => str_replace( '[', '&#91;', htmlspecialchars( $uri, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ) ),
 			], '*' );
 		}
 

@@ -1803,7 +1803,7 @@ foreach( array_merge( glob( $checkout. '/*.md' ) ?: [], glob( $checkout. '/*.neo
 $served = [ '/_nino/Nino.css', '/_nino/Nino.js', '/_nino/Nino.ui.js' ];
 foreach( array_merge( glob( $checkout. '/_admin/templates/*.tpl' ) ?: [], glob( $checkout. '/_admin/install/templates/*.tpl' ) ?: [] ) as $template ) {
 	$source = (string) file_get_contents( $template );
-	preg_match_all( '~(?:src|href)="\[\[/nino/dir\]\](/[^"]*[^/"])"~', $source, $linked );
+	preg_match_all( '~(?:src|href)="\[\[/nino/dir\]\](/[^"?#]*[^/"?#])(?:[?#][^"]*)?"~', $source, $linked );
 	preg_match_all( '~\[assets (/[^\]\s]+)\]~', $source, $bundled );
 	$served = array_merge( $served, $linked[1], $bundled[1] );
 }
