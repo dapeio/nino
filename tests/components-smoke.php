@@ -734,9 +734,17 @@ foreach( $alignMatches as $alignMatch )
 // What a tier says, rule by rule: {T} is the tier, {A} the alignment
 $alignStackList = '.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-{T}-{A} > .nino-btn';
 $alignCardList = ':is(.nino-card--middle, .nino-card--bottom, .nino-card--last-bottom).nino-text-{T}-{A} > .nino-btn, .nino-card--last-bottom.nino-text-{T}-{A} > .nino-card-content > .nino-btn';
+// A title or a subtitle with an alignment of its own is left out of the reach of the container, by the fifteen classes in a :where(), which adds no weight
+$alignOwn = [];
+foreach( [ '', 's-', 'm-', 'l-', 'xl-' ] as $alignOwnTier )
+	foreach( [ 'left', 'center', 'right' ] as $alignOwnName )
+		$alignOwn[] = '.nino-text-'. $alignOwnTier. $alignOwnName;
+// ...graded by width: the reach of a width lists the own classes of that width and of the narrower ones - three for the class without a tier, six for s, nine for m, twelve for l, fifteen for xl
+$alignOutOf = static fn( string $tier ): string => ':where(:not('. implode( ', ', array_slice( $alignOwn, 0, 3 * ( 1 + array_search( $tier, [ '', 's', 'm', 'l', 'xl' ], true ) ) ) ). '))';
 $alignExpected = [
 	[ '.nino-text-{T}-{A}', 'text-align: {A};' ],
-	[ '.nino-text-{T}-{A} :is(.nino-section-title, .nino-section-subtitle)', 'text-align: {A};' ],
+	[ '.nino-text-{T}-{A} :is(.nino-section-title, .nino-section-subtitle){OUT}', 'text-align: {A};' ],
+	[ ':is(.nino-section-title, .nino-section-subtitle).nino-text-{T}-{A}', 'text-align: {A};' ],
 	[ '.nino-text-{T}-{A} > .nino-btn, .nino-text-{T}-{A} > .nino-card-content > .nino-btn', '{margin}' ],
 	[ '.nino-text-{T}-{A} > .nino-section-text--loud', '{loud}' ],
 	[ $alignStackList, 'justify-self: {js};' ],
@@ -773,17 +781,21 @@ foreach( $alignTiers as $alignTier => $alignWidth )
 	foreach( $alignValues as $alignName => $alignValue )
 		foreach( $alignExpected as [ $alignList, $alignBody ] )
 		{
-			$alignMap = [ '{T}' => $alignTier, '{A}' => $alignName, '{margin}' => $alignValue['margin'], '{loud}' => $alignValue['loud'], '{js}' => $alignValue['js'], '{as}' => $alignValue['as'] ];
+			$alignMap = [ '{T}' => $alignTier, '{A}' => $alignName, '{margin}' => $alignValue['margin'], '{loud}' => $alignValue['loud'], '{js}' => $alignValue['js'], '{as}' => $alignValue['as'], '{OUT}' => $alignOutOf( $alignTier ) ];
 			if( in_array( [ strtr( $alignList, $alignMap ), strtr( $alignBody, $alignMap ) ], $alignHave, true ) === false )
 				$alignWrong[] = $alignTier. '-'. $alignName. ': '. strtr( $alignList, $alignMap );
 		}
-	if( count( $alignHave ) !== 21 )
-		$alignWrong[] = $alignTier. ': '. count( $alignHave ). ' rules, not 21';
+	if( count( $alignHave ) !== 24 )
+		$alignWrong[] = $alignTier. ': '. count( $alignHave ). ' rules, not 24';
 }
 check( 'the text alignment has a tier for each width of the grid - .nino-text-<s|m|l|xl>-<left|center|right> - in a min-width block of 640, 768, 1024 and 1280px in that order, after every rule of the class without a tier; each rule of that class has its twin for the tier with the same list of selectors and the same body, and the tier says in full what it says for each alignment: the titles, the margins of a button and of the loud text, and where a button stands in a stack, a card and a tile'
 	. ( $alignWrong === [] ? '' : ' - missing: '. implode( '; ', $alignWrong ) ),
-	$alignWrong === [] && $alignBaseLast > 0 && count( $alignRules ) >= 14 && $alignCount >= 14 * 4
+	$alignWrong === [] && $alignBaseLast > 0 && count( $alignRules ) >= 14 && $alignCount >= 11 * 4
 	&& preg_match( '/(?<![\w-])!important/', implode( ' ', array_map( static fn( array $block ): string => implode( ' ', array_column( $block['rules'], 1 ) ), $alignBlocks ) ) ) !== 1 );
+check( '...and the reach of the container into a title and a subtitle - the class without a tier and each tier - leaves out one that carries an alignment class of its own: the own classes of its width and of the narrower ones in a :where( :not() ), three to fifteen, so that the element falls to its own class',
+	array_filter( [ 'left', 'center', 'right' ], static fn( string $name ): bool => in_array( [ '.nino-text-'. $name. ' :is(.nino-section-title, .nino-section-subtitle)'. $alignOutOf( '' ), 'text-align: '. $name. ';' ], array_map( static fn( array $rule ): array => [ $rule['list'], $rule['body'] ], $alignRules ), true ) === false ) === []
+	&& substr_count( $hookCss, ' :is(.nino-section-title, .nino-section-subtitle):where(:not(' ) === 15
+	&& substr_count( $hookCss, ' :is(.nino-section-title, .nino-section-subtitle) { text-align:' ) === 0 );
 
 
 // The picture behind a card, after the pattern of the one behind a column: the same rules but for the radius - the column's picture reads the column's kind, the card's and the row's take
@@ -2963,6 +2975,9 @@ check( '...and what stands between the tags of a component is still the cell\'s,
 check( '[title] is a heading with the class of a section title, a tag and a style', $render( '[title /template/page-home/hero/title tag="h4" style="loud"]' ) === '<h4 class="nino-section-title nino-section-title--loud">Hi &#91;there]</h4>'
 	&& $render( '[title /template/page-home/hero/title]' ) === '<h3 class="nino-section-title">Hi &#91;there]</h3>'
 	&& $render( '[title /template/page-home/hero/title tag="div"]' ) === '<div class="nino-section-title">Hi &#91;there]</div>' );
+check( '[title] with an alignment class of its own inside a column that aligns otherwise draws the class on the title, which the reach of the column leaves out',
+	$render( '<div class="nino-grid-100 nino-text-left">[title /template/page-home/hero/title class="nino-text-center"]</div>' ) === '<div class="nino-grid-100 nino-text-left"><h3 class="nino-section-title nino-text-center">Hi &#91;there]</h3></div>'
+	&& $render( '[subtitle /template/page-home/hero/subtitle class="nino-text-m-right"]' ) === '<div class="nino-section-subtitle nino-text-m-right">Sub</div>' );
 check( '[title] takes a class of its own at the end of its classes, escaped', $render( '[title /template/page-home/hero/title class="a b&c"]' ) === '<h3 class="nino-section-title a b&amp;c">Hi &#91;there]</h3>' );
 check( '[subtitle] is a div with the class of a subtitle, and the tag it is told to be', $render( '[subtitle /template/page-home/hero/subtitle style="quiet"]' ) === '<div class="nino-section-subtitle nino-section-subtitle--quiet">Sub</div>'
 	&& $render( '[subtitle /template/page-home/hero/subtitle tag="p"]' ) === '<p class="nino-section-subtitle">Sub</p>'

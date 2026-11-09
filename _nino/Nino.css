@@ -5265,10 +5265,17 @@ header .nino-headernav-logo:empty {
 .nino-text-right { text-align: right; }
 /* nino-section-title and its siblings center themselves, so an alignment set on
    the block around them has to reach in - otherwise "left" moves everything
-   except the heading */
-.nino-text-left :is(.nino-section-title, .nino-section-subtitle) { text-align: left; }
-.nino-text-center :is(.nino-section-title, .nino-section-subtitle) { text-align: center; }
-.nino-text-right :is(.nino-section-title, .nino-section-subtitle) { text-align: right; }
+   except the heading. A title or a subtitle that carries an alignment class of
+   its own is left out of the reach, by an explicit list in :where(), which adds
+   no weight: the reach of a width lists the classes of its own width and of the
+   narrower ones, three for the class without a tier up to fifteen for xl, so
+   that a title with a tier class alone is moved by the container below that
+   tier. The excluded element falls to its own class: the plain rule above, and
+   in each tier a rule of its own, which keeps the alignment the page gave it
+   inside a column that aligns otherwise */
+.nino-text-left :is(.nino-section-title, .nino-section-subtitle):where(:not(.nino-text-left, .nino-text-center, .nino-text-right)) { text-align: left; }
+.nino-text-center :is(.nino-section-title, .nino-section-subtitle):where(:not(.nino-text-left, .nino-text-center, .nino-text-right)) { text-align: center; }
+.nino-text-right :is(.nino-section-title, .nino-section-subtitle):where(:not(.nino-text-left, .nino-text-center, .nino-text-right)) { text-align: right; }
 .nino-text-center > .nino-btn, .nino-text-center > .nino-card-content > .nino-btn { margin-right: calc(var(--space-1) / 2); margin-left: calc(var(--space-1) / 2); }
 .nino-text-right > .nino-btn, .nino-text-right > .nino-card-content > .nino-btn { margin-left: var(--space-1); }
 
@@ -5280,7 +5287,8 @@ header .nino-headernav-logo:empty {
 	without a tier	*/
 @media (min-width: 640px) {
 	.nino-text-s-left { text-align: left; }
-	.nino-text-s-left :is(.nino-section-title, .nino-section-subtitle) { text-align: left; }
+	.nino-text-s-left :is(.nino-section-title, .nino-section-subtitle):where(:not(.nino-text-left, .nino-text-center, .nino-text-right, .nino-text-s-left, .nino-text-s-center, .nino-text-s-right)) { text-align: left; }
+	:is(.nino-section-title, .nino-section-subtitle).nino-text-s-left { text-align: left; }
 	.nino-text-s-left > .nino-btn, .nino-text-s-left > .nino-card-content > .nino-btn { margin-right: 0; margin-left: 0; }
 	.nino-text-s-left > .nino-section-text--loud { margin-right: 0; margin-left: 0; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-s-left > .nino-btn { justify-self: start; }
@@ -5288,7 +5296,8 @@ header .nino-headernav-logo:empty {
 	.nino-card--last-bottom.nino-text-s-left > .nino-card-content > .nino-btn { align-self: flex-start; }
 	:where(.nino-tiles) > .nino-grid-row > .nino-text-s-left > .nino-btn { justify-self: start; }
 	.nino-text-s-center { text-align: center; }
-	.nino-text-s-center :is(.nino-section-title, .nino-section-subtitle) { text-align: center; }
+	.nino-text-s-center :is(.nino-section-title, .nino-section-subtitle):where(:not(.nino-text-left, .nino-text-center, .nino-text-right, .nino-text-s-left, .nino-text-s-center, .nino-text-s-right)) { text-align: center; }
+	:is(.nino-section-title, .nino-section-subtitle).nino-text-s-center { text-align: center; }
 	.nino-text-s-center > .nino-btn, .nino-text-s-center > .nino-card-content > .nino-btn { margin-right: calc(var(--space-1) / 2); margin-left: calc(var(--space-1) / 2); }
 	.nino-text-s-center > .nino-section-text--loud { margin-right: auto; margin-left: auto; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-s-center > .nino-btn { justify-self: center; }
@@ -5296,7 +5305,8 @@ header .nino-headernav-logo:empty {
 	.nino-card--last-bottom.nino-text-s-center > .nino-card-content > .nino-btn { align-self: center; }
 	:where(.nino-tiles) > .nino-grid-row > .nino-text-s-center > .nino-btn { justify-self: center; }
 	.nino-text-s-right { text-align: right; }
-	.nino-text-s-right :is(.nino-section-title, .nino-section-subtitle) { text-align: right; }
+	.nino-text-s-right :is(.nino-section-title, .nino-section-subtitle):where(:not(.nino-text-left, .nino-text-center, .nino-text-right, .nino-text-s-left, .nino-text-s-center, .nino-text-s-right)) { text-align: right; }
+	:is(.nino-section-title, .nino-section-subtitle).nino-text-s-right { text-align: right; }
 	.nino-text-s-right > .nino-btn, .nino-text-s-right > .nino-card-content > .nino-btn { margin-right: 0; margin-left: var(--space-1); }
 	.nino-text-s-right > .nino-section-text--loud { margin-right: 0; margin-left: 0; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-s-right > .nino-btn { justify-self: end; }
@@ -5306,7 +5316,8 @@ header .nino-headernav-logo:empty {
 }
 @media (min-width: 768px) {
 	.nino-text-m-left { text-align: left; }
-	.nino-text-m-left :is(.nino-section-title, .nino-section-subtitle) { text-align: left; }
+	.nino-text-m-left :is(.nino-section-title, .nino-section-subtitle):where(:not(.nino-text-left, .nino-text-center, .nino-text-right, .nino-text-s-left, .nino-text-s-center, .nino-text-s-right, .nino-text-m-left, .nino-text-m-center, .nino-text-m-right)) { text-align: left; }
+	:is(.nino-section-title, .nino-section-subtitle).nino-text-m-left { text-align: left; }
 	.nino-text-m-left > .nino-btn, .nino-text-m-left > .nino-card-content > .nino-btn { margin-right: 0; margin-left: 0; }
 	.nino-text-m-left > .nino-section-text--loud { margin-right: 0; margin-left: 0; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-m-left > .nino-btn { justify-self: start; }
@@ -5314,7 +5325,8 @@ header .nino-headernav-logo:empty {
 	.nino-card--last-bottom.nino-text-m-left > .nino-card-content > .nino-btn { align-self: flex-start; }
 	:where(.nino-tiles) > .nino-grid-row > .nino-text-m-left > .nino-btn { justify-self: start; }
 	.nino-text-m-center { text-align: center; }
-	.nino-text-m-center :is(.nino-section-title, .nino-section-subtitle) { text-align: center; }
+	.nino-text-m-center :is(.nino-section-title, .nino-section-subtitle):where(:not(.nino-text-left, .nino-text-center, .nino-text-right, .nino-text-s-left, .nino-text-s-center, .nino-text-s-right, .nino-text-m-left, .nino-text-m-center, .nino-text-m-right)) { text-align: center; }
+	:is(.nino-section-title, .nino-section-subtitle).nino-text-m-center { text-align: center; }
 	.nino-text-m-center > .nino-btn, .nino-text-m-center > .nino-card-content > .nino-btn { margin-right: calc(var(--space-1) / 2); margin-left: calc(var(--space-1) / 2); }
 	.nino-text-m-center > .nino-section-text--loud { margin-right: auto; margin-left: auto; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-m-center > .nino-btn { justify-self: center; }
@@ -5322,7 +5334,8 @@ header .nino-headernav-logo:empty {
 	.nino-card--last-bottom.nino-text-m-center > .nino-card-content > .nino-btn { align-self: center; }
 	:where(.nino-tiles) > .nino-grid-row > .nino-text-m-center > .nino-btn { justify-self: center; }
 	.nino-text-m-right { text-align: right; }
-	.nino-text-m-right :is(.nino-section-title, .nino-section-subtitle) { text-align: right; }
+	.nino-text-m-right :is(.nino-section-title, .nino-section-subtitle):where(:not(.nino-text-left, .nino-text-center, .nino-text-right, .nino-text-s-left, .nino-text-s-center, .nino-text-s-right, .nino-text-m-left, .nino-text-m-center, .nino-text-m-right)) { text-align: right; }
+	:is(.nino-section-title, .nino-section-subtitle).nino-text-m-right { text-align: right; }
 	.nino-text-m-right > .nino-btn, .nino-text-m-right > .nino-card-content > .nino-btn { margin-right: 0; margin-left: var(--space-1); }
 	.nino-text-m-right > .nino-section-text--loud { margin-right: 0; margin-left: 0; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-m-right > .nino-btn { justify-self: end; }
@@ -5332,7 +5345,8 @@ header .nino-headernav-logo:empty {
 }
 @media (min-width: 1024px) {
 	.nino-text-l-left { text-align: left; }
-	.nino-text-l-left :is(.nino-section-title, .nino-section-subtitle) { text-align: left; }
+	.nino-text-l-left :is(.nino-section-title, .nino-section-subtitle):where(:not(.nino-text-left, .nino-text-center, .nino-text-right, .nino-text-s-left, .nino-text-s-center, .nino-text-s-right, .nino-text-m-left, .nino-text-m-center, .nino-text-m-right, .nino-text-l-left, .nino-text-l-center, .nino-text-l-right)) { text-align: left; }
+	:is(.nino-section-title, .nino-section-subtitle).nino-text-l-left { text-align: left; }
 	.nino-text-l-left > .nino-btn, .nino-text-l-left > .nino-card-content > .nino-btn { margin-right: 0; margin-left: 0; }
 	.nino-text-l-left > .nino-section-text--loud { margin-right: 0; margin-left: 0; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-l-left > .nino-btn { justify-self: start; }
@@ -5340,7 +5354,8 @@ header .nino-headernav-logo:empty {
 	.nino-card--last-bottom.nino-text-l-left > .nino-card-content > .nino-btn { align-self: flex-start; }
 	:where(.nino-tiles) > .nino-grid-row > .nino-text-l-left > .nino-btn { justify-self: start; }
 	.nino-text-l-center { text-align: center; }
-	.nino-text-l-center :is(.nino-section-title, .nino-section-subtitle) { text-align: center; }
+	.nino-text-l-center :is(.nino-section-title, .nino-section-subtitle):where(:not(.nino-text-left, .nino-text-center, .nino-text-right, .nino-text-s-left, .nino-text-s-center, .nino-text-s-right, .nino-text-m-left, .nino-text-m-center, .nino-text-m-right, .nino-text-l-left, .nino-text-l-center, .nino-text-l-right)) { text-align: center; }
+	:is(.nino-section-title, .nino-section-subtitle).nino-text-l-center { text-align: center; }
 	.nino-text-l-center > .nino-btn, .nino-text-l-center > .nino-card-content > .nino-btn { margin-right: calc(var(--space-1) / 2); margin-left: calc(var(--space-1) / 2); }
 	.nino-text-l-center > .nino-section-text--loud { margin-right: auto; margin-left: auto; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-l-center > .nino-btn { justify-self: center; }
@@ -5348,7 +5363,8 @@ header .nino-headernav-logo:empty {
 	.nino-card--last-bottom.nino-text-l-center > .nino-card-content > .nino-btn { align-self: center; }
 	:where(.nino-tiles) > .nino-grid-row > .nino-text-l-center > .nino-btn { justify-self: center; }
 	.nino-text-l-right { text-align: right; }
-	.nino-text-l-right :is(.nino-section-title, .nino-section-subtitle) { text-align: right; }
+	.nino-text-l-right :is(.nino-section-title, .nino-section-subtitle):where(:not(.nino-text-left, .nino-text-center, .nino-text-right, .nino-text-s-left, .nino-text-s-center, .nino-text-s-right, .nino-text-m-left, .nino-text-m-center, .nino-text-m-right, .nino-text-l-left, .nino-text-l-center, .nino-text-l-right)) { text-align: right; }
+	:is(.nino-section-title, .nino-section-subtitle).nino-text-l-right { text-align: right; }
 	.nino-text-l-right > .nino-btn, .nino-text-l-right > .nino-card-content > .nino-btn { margin-right: 0; margin-left: var(--space-1); }
 	.nino-text-l-right > .nino-section-text--loud { margin-right: 0; margin-left: 0; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-l-right > .nino-btn { justify-self: end; }
@@ -5358,7 +5374,8 @@ header .nino-headernav-logo:empty {
 }
 @media (min-width: 1280px) {
 	.nino-text-xl-left { text-align: left; }
-	.nino-text-xl-left :is(.nino-section-title, .nino-section-subtitle) { text-align: left; }
+	.nino-text-xl-left :is(.nino-section-title, .nino-section-subtitle):where(:not(.nino-text-left, .nino-text-center, .nino-text-right, .nino-text-s-left, .nino-text-s-center, .nino-text-s-right, .nino-text-m-left, .nino-text-m-center, .nino-text-m-right, .nino-text-l-left, .nino-text-l-center, .nino-text-l-right, .nino-text-xl-left, .nino-text-xl-center, .nino-text-xl-right)) { text-align: left; }
+	:is(.nino-section-title, .nino-section-subtitle).nino-text-xl-left { text-align: left; }
 	.nino-text-xl-left > .nino-btn, .nino-text-xl-left > .nino-card-content > .nino-btn { margin-right: 0; margin-left: 0; }
 	.nino-text-xl-left > .nino-section-text--loud { margin-right: 0; margin-left: 0; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-xl-left > .nino-btn { justify-self: start; }
@@ -5366,7 +5383,8 @@ header .nino-headernav-logo:empty {
 	.nino-card--last-bottom.nino-text-xl-left > .nino-card-content > .nino-btn { align-self: flex-start; }
 	:where(.nino-tiles) > .nino-grid-row > .nino-text-xl-left > .nino-btn { justify-self: start; }
 	.nino-text-xl-center { text-align: center; }
-	.nino-text-xl-center :is(.nino-section-title, .nino-section-subtitle) { text-align: center; }
+	.nino-text-xl-center :is(.nino-section-title, .nino-section-subtitle):where(:not(.nino-text-left, .nino-text-center, .nino-text-right, .nino-text-s-left, .nino-text-s-center, .nino-text-s-right, .nino-text-m-left, .nino-text-m-center, .nino-text-m-right, .nino-text-l-left, .nino-text-l-center, .nino-text-l-right, .nino-text-xl-left, .nino-text-xl-center, .nino-text-xl-right)) { text-align: center; }
+	:is(.nino-section-title, .nino-section-subtitle).nino-text-xl-center { text-align: center; }
 	.nino-text-xl-center > .nino-btn, .nino-text-xl-center > .nino-card-content > .nino-btn { margin-right: calc(var(--space-1) / 2); margin-left: calc(var(--space-1) / 2); }
 	.nino-text-xl-center > .nino-section-text--loud { margin-right: auto; margin-left: auto; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-xl-center > .nino-btn { justify-self: center; }
@@ -5374,7 +5392,8 @@ header .nino-headernav-logo:empty {
 	.nino-card--last-bottom.nino-text-xl-center > .nino-card-content > .nino-btn { align-self: center; }
 	:where(.nino-tiles) > .nino-grid-row > .nino-text-xl-center > .nino-btn { justify-self: center; }
 	.nino-text-xl-right { text-align: right; }
-	.nino-text-xl-right :is(.nino-section-title, .nino-section-subtitle) { text-align: right; }
+	.nino-text-xl-right :is(.nino-section-title, .nino-section-subtitle):where(:not(.nino-text-left, .nino-text-center, .nino-text-right, .nino-text-s-left, .nino-text-s-center, .nino-text-s-right, .nino-text-m-left, .nino-text-m-center, .nino-text-m-right, .nino-text-l-left, .nino-text-l-center, .nino-text-l-right, .nino-text-xl-left, .nino-text-xl-center, .nino-text-xl-right)) { text-align: right; }
+	:is(.nino-section-title, .nino-section-subtitle).nino-text-xl-right { text-align: right; }
 	.nino-text-xl-right > .nino-btn, .nino-text-xl-right > .nino-card-content > .nino-btn { margin-right: 0; margin-left: var(--space-1); }
 	.nino-text-xl-right > .nino-section-text--loud { margin-right: 0; margin-left: 0; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-xl-right > .nino-btn { justify-self: end; }
