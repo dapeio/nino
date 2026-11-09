@@ -2803,6 +2803,16 @@ check( '...and the other formats are sanitized as they stand: an entity in a fix
 check( 'the loop context: a component in a stack sees its element, its place and the type\'s model', $render( '[stack /services sort="title" gap="1"][probe][/stack]' ) === '<div class="nino-grid-row nino-stack nino-stack-gap-1">'
 	. '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33">inside:/services#0#/services/app#string</div>'
 	. '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33">inside:/services#1#/services/web#string</div></div>' );
+$randomStack = $render( '[stack /services sort="random"][probe][/stack]' );
+check( 'a stack with sort="random" renders every cell, whatever the order', substr_count( $randomStack, '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-33">' ) === 2
+	&& str_contains( $randomStack, 'inside:/services#0#/services/' ) === true && str_contains( $randomStack, 'inside:/services#1#/services/' ) === true
+	&& str_contains( $randomStack, '/services/app#' ) === true && str_contains( $randomStack, '/services/web#' ) === true );
+$randomStackOrders = [];
+for( $run = 0; $run < 30; $run++ ) {
+	$rendered = $render( '[stack /services sort="random"][probe][/stack]' );
+	$randomStackOrders[ strpos( $rendered, '/services/app#' ) < strpos( $rendered, '/services/web#' ) ? 'app,web' : 'web,app' ] = true;
+}
+check( '...and the shuffle reaches the stack: both orders of its two cells appear over 30 renders', count( $randomStackOrders ) === 2 );
 check( '...and after the stack it does not: the context is gone, and a component outside sees none', \Nino\Modules\Components::element( $appData ) === null && $render( '[probe]' ) === 'outside' );
 
 \Nino\Filesystem::putFileContent( $appData, '/templates/probe-stack.tpl', '[stack /services sort="title" limit="1"][probe][/stack]' );

@@ -708,6 +708,25 @@ check( 'offset skips, limit cuts, both together page', sortedUris( $appData, [ '
 check( 'a negative offset or limit means none', sortedUris( $appData, [ 'offset' => -3, 'limit' => -1 ] ) === 'a,b,c,d' );
 check( 'sort and query combine: filtered first, then ordered', sortedUris( $appData, [ 'sort' => '-weight' ] ) === 'd,a,b,c'
 	&& implode( ',', array_map( static fn( array $e ): string => basename( (string) $e['.uri'] ), \Nino\Elements::queryElements( $appData, '/sorttest', [ 'group' => 'b' ], 'de_DE', [], [ 'sort' => '-weight' ] ) ) ) === 'd,a' );
+$randomSix = [ 'a', 'b', 'c', 'd', 'e', 'f' ];
+$randomList = array_map( static fn( string $t ): array => [ 'title' => $t, 'random' => 'z' ], $randomSix );
+$randomOrders = [];
+$randomKept = true;
+for( $run = 0; $run < 30; $run++ ) {
+	$shuffled = \Nino\Elements::sortElements( $randomList, 'random' );
+	$titles = array_column( $shuffled, 'title' );
+	$randomOrders[implode( '', $titles )] = true;
+	$sortedTitles = $titles;
+	sort( $sortedTitles );
+	if( $sortedTitles !== $randomSix || count( $shuffled ) !== 6 )
+		$randomKept = false;
+}
+check( "sort 'random' keeps every element and only reorders", $randomKept === true );
+check( "sort 'random' gives at least two distinct orders over 30 runs of six", count( $randomOrders ) >= 2 );
+check( "'random' among fields is a field name as ever: sorted by it, then by title", implode( '', array_column( \Nino\Elements::sortElements( [ [ 'title' => 'b', 'random' => 2 ], [ 'title' => 'c', 'random' => 1 ], [ 'title' => 'a', 'random' => 2 ] ], 'random,title' ), 'title' ) ) === 'cab'
+	&& implode( '', array_column( \Nino\Elements::sortElements( [ [ 'title' => 'b' ], [ 'title' => 'a' ] ], 'title,random' ), 'title' ) ) === 'ab' );
+check( "[elements sort=\"random\"] draws every element", substr_count( \Nino\Html::renderHtml( $appData, '[elements /sorttest sort="random"][[.id]];[/elements]' ), ';' ) === 4 );
+
 check( 'sortElements() tolerates what is not an element: it sorts last', \Nino\Elements::sortElements( [ 'x', [ 'title' => 'b' ], [ 'title' => 'a' ] ], 'title' ) === [ [ 'title' => 'a' ], [ 'title' => 'b' ], 'x' ] );
 
 check( 'sortElements() puts 0 before 10 and an element without the number, or with null, after both - in either direction',

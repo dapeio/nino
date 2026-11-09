@@ -231,8 +231,14 @@ namespace Nino {
 		// naturally and without regard to case ("Item 9" before "Item 10");
 		// an element without the field, or with one that is not a scalar,
 		// comes last in either direction. Stable: what compares equal keeps
-		// its order. '' leaves the list as it is
+		// its order. '' leaves the list as it is; 'random', the whole value,
+		// shuffles it - one entry among several is a field of that name
 		static public function sortElements( array $elements, string $sort ): array {
+
+			if( trim( $sort ) === 'random' ) {
+				shuffle( $elements );
+				return $elements;
+			}
 
 			$keys = [];
 			foreach( explode( ',', $sort ) as $field ) {
