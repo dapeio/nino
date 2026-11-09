@@ -2052,6 +2052,10 @@ footer {
 	--card-space--more: 		var(--space-3);
 	--card-space--most: 		var(--space-4);
 
+	/*	A column that paints a ground and a card have one inset: Nino.css reads --surface-inset for it and for the card, and the set binds it to the card-space the
+		knob selects, so that the two stand side by side with one inset	*/
+	--surface-inset: var(--card-space);
+
 	/*	The line round a card that names a ground - a plain card has none. The
 		half pixel is a hairline where the screen can draw one, and a line of
 		1px where it cannot	*/

@@ -384,7 +384,8 @@
 			--whitespace-scale  the areas, whole: the padding of a section, the
 			                    margin and the padding of a card and of what is in
 			                    it, the gap between the columns of a row of cards,
-			                    the padding of a tile
+			                    the padding of a tile, the padding of a column
+			                    that paints a ground
 			--whitespace-gap    the room between pieces: the gap of a stack, of its
 			                    cells and of a column that is a stack - the number
 			                    moved .8 of the way
@@ -406,6 +407,14 @@
 	--whitespace-scale: 1;
 	--whitespace-gap: calc( 1 + ( var(--whitespace-scale) - 1 ) * .8 );
 	--whitespace-text: calc( 1 + ( var(--whitespace-scale) - 1 ) * .6 );
+
+	/*	The inset of a surface that holds content: the column that paints a ground
+		or is dimmed, and the card, before --whitespace-scale is applied. It has
+		no value here: both read var(--surface-inset, var(--space-2)), so that
+		it is --space-2 until a design layer sets it, and a painted column and a
+		card side by side have one inset at every width. The Design feature
+		binds it to the space of the card. The padding utilities (nino-p-<n>)
+		and the padding of a [card] stand after both and win	*/
 
 	--card-img-max-width: 12vw;
 	--card-img-max-height: 20vh;
@@ -1645,9 +1654,10 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	is in it at that radius: a picture or a ground of a child that reaches its edge
 	(nino-p-0) would otherwise stand out of the corner. clip, not hidden: nothing
 	scrolls in it, and it makes no box of its own for the margins and the floats
-	inside. The cards in it take the counter of its ground	*/
+	inside. Its inset is --surface-inset, --space-2 where a design sets none, times
+	--whitespace-scale. The cards in it take the counter of its ground	*/
 .nino-grid--alt, .nino-grid--tint, .nino-grid--dark, .nino-grid--black, .nino-grid--primary, .nino-grid--brand-alt, .nino-grid--counter, .nino-grid--dim {
-	padding: var(--space-2);
+	padding: calc(var(--surface-inset, var(--space-2)) * var(--whitespace-scale));
 	border-radius: var(--radius-column);
 	overflow: clip;
 }
@@ -1972,10 +1982,13 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 /*	A card has the radius of its kind and cuts what is in it at it: the picture of
 	a card that reaches the edge (nino-p-0) is cut at the corner of the card and
 	not at its own, which is the smaller one, and so are a ground and a picture
-	behind the content. clip, not hidden, as for a column	*/
+	behind the content. clip, not hidden, as for a column. The padding of a card
+	is the inset of a surface, --surface-inset times --whitespace-scale, at every
+	width, as a painted column has it; the content of a card [card] draws has
+	none of its own (see below)	*/
 .nino-card {
 	margin: 0 0 calc(var(--space-1) * var(--whitespace-scale));
-	padding: 0 0 calc(var(--space-1) * var(--whitespace-scale));
+	padding: calc(var(--surface-inset, var(--space-2)) * var(--whitespace-scale));
 	box-sizing: border-box;
 	border-radius: var(--radius-card);
 	box-shadow: var(--shadow-card);
@@ -1985,6 +1998,7 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	padding-left: 0;
 	padding-right: 0;
 	padding-top: 0;
+	padding-bottom: calc(var(--space-1) * var(--whitespace-scale));
 }
 /*	A card is a surface of its own, so it takes a solved pair rather than a
 	wash: rgba(0,0,0,.05) over the page ground darkened it just enough that
@@ -1996,7 +2010,6 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	stand out of its section says so with counter	*/
 .nino-card--alt, .nino-card--tint, .nino-card--dark, .nino-card--black, .nino-card--primary, .nino-card--brand-alt, .nino-card--counter, .nino-card--dim {
 	border: 1px solid var(--color-border);
-	padding: calc(var(--space-1) * var(--whitespace-scale));
 }
 .nino-card--borderless { border: 0; background: transparent; box-shadow: none; }
 /*	After the borderless card: a card that names a ground is painted with it also
@@ -2028,10 +2041,8 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	so the last one wins - and a card that says --dim and --alt or --counter is
 	not dark ink on a darkened picture. A card holds no card, so it hands no
 	counter family on. --color-text is the page's ink also where a rule reads
-	that (an icon, a legend). Its border and its padding are those of a card of a
-	ground: it is in the list of the rule that gives them, as .nino-grid--dim is
-	in the column's, and without them a dimmed card below 768px writes its title
-	flush against the edge of the dark card	*/
+	that (an icon, a legend). Its border is that of a card of a ground: it is in
+	the list of the rule that gives it, as .nino-grid--dim is in the column's	*/
 .nino-card--dim {
 	--color-ground: var(--color-section-dark-bg);
 	--color-ink: var(--color-section-dark-text);
@@ -2134,12 +2145,12 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	box-sizing: border-box;
 }
 /*	The block pads the content only where the card does not pad it: a card with
-	no padding of its own (nino-p-0), a fullwidth card, whose sides and top are 0,
-	and a counter card, whose block stands beside its counter. In every other
-	card the padding of the card is the inset of its content, so that a card
-	[card] draws stands as it stood before it drew the block. :where() keeps the
-	weight at the two classes of the path	*/
-.nino-card:where(:not(.nino-p-0, .nino-card--fullwidth, .nino-card--counter)) > .nino-card-content { padding: 0; }
+	no padding of its own (nino-p-0) and a fullwidth card, whose sides and top are
+	0. In every other card, the counter card and the cards of a ground included,
+	the padding of the card is the inset of its content, --surface-inset, so that
+	the block adds none to it. :where() keeps the weight at the two classes of
+	the path	*/
+.nino-card:where(:not(.nino-p-0, .nino-card--fullwidth)) > .nino-card-content { padding: 0; }
 
 .nino-card-title {
 	font-family: var(--fontfamily-title);
@@ -2266,7 +2277,7 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	.nino-card-cols-s > .nino-card-img { max-height: none; max-width: var(--card-img-max-width); }
 }
 @media (min-width: 768px) {
-	.nino-card { margin: calc(var(--space-1) * var(--whitespace-scale)); padding: calc(var(--space-1) * var(--whitespace-scale)); }
+	.nino-card { margin: calc(var(--space-1) * var(--whitespace-scale)); }
 	/* nino-card adds horizontal margins from here on. Account for those
 	   gutters when the card itself is also the grid column, and give back
 	   its share of the gap of the row as the width classes do */
@@ -2281,8 +2292,6 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	.nino-card-cols-l > .nino-card-img { max-height: none; max-width: var(--card-img-max-width); }
 }
 @media (min-width: 1280px) {
-	.nino-card { padding: calc(var(--space-2) * var(--whitespace-scale)); }
-	.nino-card--wide { padding: calc(var(--space-1) * var(--whitespace-scale)); }
 	.nino-card--fullwidth { padding:0; }
 	.nino-card--fullwidth .nino-card-content { padding: calc(var(--space-1) * var(--whitespace-scale)) calc(var(--space-2) * var(--whitespace-scale)); }
 	.nino-card-cols-xl { display: flex; flex-direction: row; justify-content: center; column-gap: calc(var(--space-2) * var(--whitespace-scale)); }

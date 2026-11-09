@@ -477,17 +477,17 @@ check( 'no rule compares the ground of a thing with the ground it sits on: no se
 // A column that paints keeps its content off the colour
 $groundWrong = [];
 foreach( [ 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt', 'counter', 'dim' ] as $ground )
-	if( $groundSets( $groundOf( '.nino-grid--'. $ground ), 'padding', 'var(--space-2)' ) === false )
+	if( $groundSets( $groundOf( '.nino-grid--'. $ground ), 'padding', 'calc(var(--surface-inset, var(--space-2)) * var(--whitespace-scale))' ) === false )
 		$groundWrong[] = '.nino-grid--'. $ground;
-check( 'a column that paints a ground, the counter and a dimmed one have padding of one step'. ( $groundWrong === [] ? '' : ' - not: '. implode( ', ', $groundWrong ) ), $groundWrong === [] );
+check( 'a column that paints a ground, the counter and a dimmed one have an inset of --surface-inset - one step, --space-2, where a design sets none - times --whitespace-scale, and --surface-inset has no value in :root of its own'. ( $groundWrong === [] ? '' : ' - not: '. implode( ', ', $groundWrong ) ), $groundWrong === [] && preg_match( '/--surface-inset\s*:/', $hookCss ) !== 1 );
 
 // A card of any ground has the chrome the alt card had, and the borderless one still has none
 $groundWrong = [];
 foreach( [ 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt', 'counter' ] as $ground )
-	if( $groundSets( $groundOf( '.nino-card--'. $ground ), 'border', '1px solid var(--color-border)' ) === false || $groundSets( $groundOf( '.nino-card--'. $ground ), 'padding', 'calc(var(--space-1) * var(--whitespace-scale))' ) === false )
+	if( $groundSets( $groundOf( '.nino-card--'. $ground ), 'border', '1px solid var(--color-border)' ) === false || preg_match( '/(?<![\w-])padding\s*:/', $groundOf( '.nino-card--'. $ground ) ) === 1 )
 		$groundWrong[] = '.nino-card--'. $ground;
-check( 'a card of any ground, the counter included, has the border and the padding the alt card had - the space step times the whitespace'. ( $groundWrong === [] ? '' : ' - not: '. implode( ', ', $groundWrong ) ),
-	$groundWrong === [] && $groundSets( $groundOf( '.nino-card' ), 'padding', '0 0 calc(var(--space-1) * var(--whitespace-scale))' ) === true && str_contains( $groundOf( '.nino-card--borderless' ), 'border: 0' ) === true );
+check( 'a card of any ground, the counter included, has the border the alt card had and says no padding of its own: the card has the inset of a surface, --surface-inset - --space-2 where a design sets none - times the whitespace, at every width'. ( $groundWrong === [] ? '' : ' - not: '. implode( ', ', $groundWrong ) ),
+	$groundWrong === [] && $groundSets( $groundOf( '.nino-card' ), 'padding', 'calc(var(--surface-inset, var(--space-2)) * var(--whitespace-scale))' ) === true && str_contains( $groundOf( '.nino-card--borderless' ), 'border: 0' ) === true );
 
 /*	A borderless card has no border, no shadow and no surface of its own - and a card that names a ground is painted with it all the same: the
 	fill of every .nino-card--<ground> is declared after .nino-card--borderless, a rule of the same specificity, so it is the one that wins.
@@ -701,8 +701,8 @@ check( '...a card that [card] draws holds its picture and a div of the content: 
 	&& $groundSets( $groundOf( '.nino-card--last-bottom > .nino-card-content > .nino-btn' ), 'align-self', 'flex-start' ) === true
 	&& $groundSets( $groundOf( '.nino-card--last-bottom.nino-text-center > .nino-card-content > .nino-btn' ), 'align-self', 'center' ) === true
 	&& $groundSets( $groundOf( '.nino-card--last-bottom.nino-text-right > .nino-card-content > .nino-btn' ), 'align-self', 'flex-end' ) === true );
-check( '...the block pads the content only where the card does not pad it - a card with no padding, a fullwidth card, a counter card - and the margins of a button in a centred or right-aligned card reach the button inside the block',
-	$groundSets( $groundOf( '.nino-card:where(:not(.nino-p-0, .nino-card--fullwidth, .nino-card--counter)) > .nino-card-content' ), 'padding', '0' ) === true
+check( '...the block pads the content only where the card does not pad it - a card with no padding and a fullwidth card - and the margins of a button in a centred or right-aligned card reach the button inside the block',
+	$groundSets( $groundOf( '.nino-card:where(:not(.nino-p-0, .nino-card--fullwidth)) > .nino-card-content' ), 'padding', '0' ) === true
 	&& $groundSets( $groundOf( '.nino-text-center > .nino-card-content > .nino-btn' ), 'margin-left', 'calc(var(--space-1) / 2)' ) === true
 	&& $groundSets( $groundOf( '.nino-text-right > .nino-card-content > .nino-btn' ), 'margin-left', 'var(--space-1)' ) === true );
 
@@ -836,19 +836,16 @@ $groundDimListed = array_filter( $groundDimGrounds, static fn( array $groundList
 check( '...it comes after every ground of a card, after the counter and after the borderless card, in a block of its own'. ( $groundWrong === [] ? '' : ' - before: '. implode( ', ', $groundWrong ) ),
 	$groundWrong === [] && $groundDimAt > 0 && $groundDimListed === [] && count( $groundDimGrounds ) === 1 );
 
-/*	A dimmed card has the border and the padding of a card of a ground, as a dimmed column has the padding and the radius of a column of a ground: .nino-card--dim is in the list
-	of the rule that gives them. Without them it was the one card of a dark surface that had neither - below 768px, where nothing else gives a card its padding, a [card dim] with a
-	picture wrote its title flush against the edge of the dark card (0px in from it, measured at 375px; 9px now, the padding of 8px and the 1px border of the dark ground). The rule is the
-	same block as the other grounds', and comes before .nino-card--borderless, so that a dimmed borderless card has the padding and no border, and before the padding of .nino-p-<n>, which wins	*/
+/*	A dimmed card has the border of a card of a ground, as a dimmed column has the radius of a column of a ground: .nino-card--dim is in the list of the rule that gives it. The
+	rule is the same block as the other grounds', and comes before .nino-card--borderless, so that a dimmed borderless card has no border; its padding is the card's	*/
 $groundChrome = array_filter( $groundMembers, static fn( array $groundList ): bool => in_array( '.nino-card--dim', $groundList, true ) === true && in_array( '.nino-card--alt', $groundList, true ) === true );
 $groundChromeAt = array_key_first( $groundChrome ) ?? -1;
 $groundWrong = [];
 foreach( [ 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt', 'counter' ] as $groundName )
 	if( in_array( '.nino-card--'. $groundName, $groundMembers[$groundChromeAt] ?? [], true ) === false )
 		$groundWrong[] = '.nino-card--'. $groundName;
-check( 'a dimmed card has the border and the padding of a card of a ground: .nino-card--dim is in the list of the rule that gives them, with the seven grounds'. ( $groundWrong === [] ? '' : ' - not in it: '. implode( ', ', $groundWrong ) ),
+check( 'a dimmed card has the border of a card of a ground: .nino-card--dim is in the list of the rule that gives them, with the seven grounds'. ( $groundWrong === [] ? '' : ' - not in it: '. implode( ', ', $groundWrong ) ),
 	count( $groundChrome ) === 1 && $groundWrong === [] && $groundSets( $groundOf( '.nino-card--dim' ), 'border', '1px solid var(--color-border)' ) === true
-	&& $groundSets( $groundOf( '.nino-card--dim' ), 'padding', 'calc(var(--space-1) * var(--whitespace-scale))' ) === true
 	&& $groundChromeAt > 0 && $groundLastOf( [ '.nino-card--borderless' ] ) > $groundChromeAt );
 
 // Full width, a dimmed card drops its side paddings as a card of a ground does: the :is() list of the full-width rule names it with the seven grounds
@@ -903,7 +900,7 @@ check( '...the one stop of the keyboard shows on the card, inside it, and the li
 	&& $groundSets( $groundOf( '.nino-card--linked:has(a.nino-stretch:focus-visible)' ), 'outline', '2px solid var(--color-focus)' ) === true
 	&& (int) $hookValue( $groundOf( '.nino-card--linked:has(a.nino-stretch:focus-visible)' ), 'outline-offset' ) < 0 );
 
-// The padding of a card is a utility's to say: .nino-p-<n> is the last chapter of the file, after the rules that give a card its own - the base, the 768px and the 1280px ones, and the ground's
+// The padding of a card is a utility's to say: .nino-p-<n> is the last chapter of the file, after the rules that give a card its own - the one of the card, which no width changes
 $groundCardPaddingAt = -1;
 foreach( $groundMembers as $groundAt => $groundList )
 	if( array_intersect( [ '.nino-card', '.nino-card--alt', '.nino-card--tint', '.nino-card--dark', '.nino-card--black', '.nino-card--primary', '.nino-card--brand-alt', '.nino-card--counter' ], $groundList ) !== []
@@ -915,6 +912,28 @@ foreach( [ '0', '1', '2', '3', '4', '5', '6' ] as $groundStep )
 		$groundWrong[] = '.nino-p-'. $groundStep;
 check( 'the padding of a card is a step of the space scale or what its ground gives: .nino-p-<n> comes after every rule that gives a card its own padding, so it is the one that wins'. ( $groundWrong === [] ? '' : ' - before it: '. implode( ', ', $groundWrong ) ),
 	$groundWrong === [] && $groundCardPaddingAt > 0 && $groundSets( $groundOf( '.nino-p-0' ), 'padding', '0' ) === true && $groundSets( $groundOf( '.nino-p-6' ), 'padding', 'var(--space-6)' ) === true );
+$groundColumnAt = $groundLastOf( [ '.nino-grid--alt' ], 'padding' );
+$groundUtilityWrong = [];
+foreach( [ 'alt', 'tint', 'dark', 'black', 'primary', 'brand-alt', 'counter', 'dim' ] as $groundName ) {
+	if( $groundLastOf( [ '.nino-grid--'. $groundName ], 'padding' ) !== $groundColumnAt )
+		$groundUtilityWrong[] = '.nino-grid--'. $groundName. ' says another padding after the column rule';
+	foreach( [ '0', '1', '2', '3', '4', '5', '6' ] as $groundStep )
+		if( $groundLastOf( [ '.nino-p-'. $groundStep ], 'padding' ) <= $groundLastOf( [ '.nino-grid--'. $groundName ], 'padding' ) || $groundLastOf( [ '.nino-p-'. $groundStep ], 'padding' ) <= $groundLastOf( [ '.nino-card--'. $groundName ], 'padding' ) )
+			$groundUtilityWrong[] = '.nino-p-'. $groundStep. ' before .nino-grid--'. $groundName;
+}
+foreach( [ '0', '1', '2', '3', '4', '5', '6' ] as $groundStep )
+	if( $groundLastOf( [ '.nino-p-'. $groundStep ], 'padding' ) <= $groundLastOf( [ '.nino-card' ], 'padding' ) )
+		$groundUtilityWrong[] = '.nino-p-'. $groundStep. ' before .nino-card';
+check( '...and so is the padding of a column that paints a ground, in each of the eight grounds and every step from 0 to 6: the column rule is the last padding of the ground, and .nino-p-<n> comes after it and after the rule of the card, so that the utility wins'. ( $groundUtilityWrong === [] ? '' : ' - '. implode( ', ', array_slice( $groundUtilityWrong, 0, 3 ) ) ),
+	$groundColumnAt > 0 && $groundUtilityWrong === [] );
+// The card has the inset of a surface at every width: no width says another padding for it, the card with a ground says none of its own, and the ones that step out of it say what they say
+check( 'a card takes its padding from --surface-inset at every width: there is one padding of .nino-card, and no media query gives it another - a fullwidth card says what it says, a wide card and a card of a ground say none',
+	count( array_filter( $groundEach['.nino-card'] ?? [], static fn( string $groundBody ): bool => preg_match( '/(?<![\w-])padding\s*:/', $groundBody ) === 1 ) ) === 1 && preg_match_all( '/@media[^{]*\{((?:[^{}]*\{[^{}]*\})*)\s*\}/', $hookCss, $groundMedia ) > 0
+	&& preg_match( '/(?<![\w-])\.nino-card\s*\{[^{}]*padding\s*:/', implode( ' ', $groundMedia[1] ) ) !== 1
+	&& preg_match( '/\.nino-card--wide[^{}]*\{[^{}]*padding\s*:/', $hookCss ) !== 1 );
+// ...and the rule that zeroes the padding of the content of a card [card] draws covers every card but the one with no padding of its own and the fullwidth one: the counter card and the cards of a ground have the one inset
+check( 'the content of a card has no padding of its own where the card pads it: the rule that zeroes it leaves out nothing but nino-p-0 and the fullwidth card - the counter card and every ground are covered',
+	$groundSets( $groundOf( '.nino-card:where(:not(.nino-p-0, .nino-card--fullwidth)) > .nino-card-content' ), 'padding', '0' ) === true && str_contains( $hookCss, '.nino-card--counter)) > .nino-card-content' ) === false );
 
 /*	What a role carries is not said again by a rule of the ground a thing sits on: the title and the subtitle of a section, the arrow of a hero, the outline button and the
 	filter button take the colours of the nearest ground - a column, a card, a dimmed cover - because they read its roles, and a rule of a section above them would reach past a
@@ -1020,8 +1039,8 @@ foreach( $groundBlocks as [ , $whitespaceSelectors, $whitespaceBody ] ) {
 }
 $whitespaceWhere = [
 	'--whitespace-scale' => [
-		'.nino-section', '.nino-card', '.nino-card--alt, .nino-card--tint, .nino-card--dark, .nino-card--black, .nino-card--primary, .nino-card--brand-alt, .nino-card--counter, .nino-card--dim',
-		'.nino-card--wide', '.nino-card-content', '.nino-card--fullwidth .nino-card-content',
+		'.nino-section', '.nino-grid--alt, .nino-grid--tint, .nino-grid--dark, .nino-grid--black, .nino-grid--primary, .nino-grid--brand-alt, .nino-grid--counter, .nino-grid--dim', '.nino-card',
+		'.nino-card--fullwidth, .nino-card--fullwidth:is(.nino-card--alt, .nino-card--tint, .nino-card--dark, .nino-card--black, .nino-card--primary, .nino-card--brand-alt, .nino-card--counter, .nino-card--dim)', '.nino-card-content', '.nino-card--fullwidth .nino-card-content',
 		'.nino-grid-row--alt, .nino-grid-row--tint, .nino-grid-row--dark, .nino-grid-row--black, .nino-grid-row--primary, .nino-grid-row--brand-alt, .nino-grid-row--counter, .nino-grid-row--dim, .nino-grid-row:where(:has(> .nino-grid-row-bg))',
 		'.nino-card-cols', '.nino-card-cols-s', '.nino-card-cols-m', '.nino-card-cols-l', '.nino-card-cols-xl',
 		'.nino-card--grid.nino-grid-m-25', '.nino-card--grid.nino-grid-m-33', '.nino-card--grid.nino-grid-m-50', '.nino-cover--padded',
@@ -1050,7 +1069,7 @@ foreach( $whitespaceWhere as $whitespaceToken => $whitespaceExpected ) {
 }
 check( 'the areas read --whitespace-scale itself - the padding of a section and of a tile, the margin and the padding of a card and of its content, the gap between the columns of a row of cards, the widths that give a card\'s margin up, the sides of the row of a cover - the stack its gap, a tile the gap of its words, the row of a section the gap between its columns and the texts theirs, and no other rule reads any of the three'
 	. ( $whitespaceWrong === [] ? '' : ' - '. implode( '; ', $whitespaceWrong ) ), $whitespaceWrong === [] );
-$whitespaceMay = [ '--whitespace-scale' => [ 'padding', 'padding-top', 'margin', 'column-gap', 'width', 'left', 'right', '--cover-padding-y', '--cover-padding-x' ], '--whitespace-gap' => [ 'gap', '--nino-stack-gap-scaled', '--nino-grid-gap' ], '--whitespace-text' => [ 'margin', 'margin-top', 'margin-bottom' ] ];
+$whitespaceMay = [ '--whitespace-scale' => [ 'padding', 'padding-top', 'padding-bottom', 'margin', 'column-gap', 'width', 'left', 'right', '--cover-padding-y', '--cover-padding-x' ], '--whitespace-gap' => [ 'gap', '--nino-stack-gap-scaled', '--nino-grid-gap' ], '--whitespace-text' => [ 'margin', 'margin-top', 'margin-bottom' ] ];
 $whitespaceUsed = [];
 foreach( $whitespaceReads as $whitespaceToken => $whitespaceRules )
 	foreach( $whitespaceRules as $whitespaceSelectors => $whitespaceProperties )
