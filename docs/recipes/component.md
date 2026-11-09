@@ -99,11 +99,11 @@ The rules the module keeps for you, and the ones it leaves to the renderer:
 - A schema that cannot be worked with is an `E_USER_ERROR` at registration - a
   name that is no slug, an unknown `source` or type, a `select` without options
   or with a default outside them, an attribute without a default, a `group`
-  that is missing or none of the four.
+  that is missing or none of the three.
 - `draws`, `in` and `holds` are optional and change nothing about the
   rendering: the tag and the class the renderer draws (`'p .project-countdown'`,
   with a name in braces for an attribute of the schema), where a tool offers the
-  component (a list of the places `section`, `card` and `hero`) and, for a
+  component (a list of the places `section` and `card`) and, for a
   component whose source is `content`, the place whose components its content
   is the calls of (`'holds' => 'card'` is the kernel's `[card]`), and
   `stretched` is a bool, `true` for a component whose one link may be the link
@@ -117,11 +117,11 @@ The rules the module keeps for you, and the ones it leaves to the renderer:
   is another component. A container does not render its content itself: the
   engine renders the output of a shortcode again, so what it returns inside its
   own markup is rendered when it is - with a stack's element still the context.
-- `group` is the word a tool offers a component under: `section`, `hero`,
+- `group` is the word a tool offers a component under: `section`,
   `card` or `global`, the last for what stands anywhere, as the countdown does.
   A component a module registers has to declare one. It says nothing about where
-  the component may stand, which `in` does: the title of a hero may stand in a
-  section as well and is offered with the hero. A feature's component declares
+  the component may stand, which `in` does: the scroll hint stands in a
+  section only and is offered under `global`. A feature's component declares
   none (section 3): a tool offers it under the feature.
 - `icon` is optional as well, and as little a matter of rendering: the picture a
   tool shows the component by, where a tool without it shows one of its own. It

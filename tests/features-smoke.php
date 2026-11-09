@@ -206,12 +206,13 @@ check( 'a stack of a manifest may say it takes [panel]s for panels, true or fals
 // ...and so are the two keys that say where a component may stand and what it draws: the manifest is read by the same
 // validate() the kernel's own components are, so a wrong word is refused here with the name of the component
 check( 'the places a component may stand in, and what it draws, are carried by the manifest when good',
-	\Nino\Features::manifest( writeManifest( $manifestDir, 'WithPlaces', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'in' => [ 'section', 'hero' ], 'draws' => 'p .x-probe-{tone}' ] ] ] ) )['components']['probe']['in'] === [ 'section', 'hero' ]
+	\Nino\Features::manifest( writeManifest( $manifestDir, 'WithPlaces', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'in' => [ 'section', 'card' ], 'draws' => 'p .x-probe-{tone}' ] ] ] ) )['components']['probe']['in'] === [ 'section', 'card' ]
 	&& \Nino\Features::manifest( $manifestDir. '/WithPlaces' )['components']['probe']['draws'] === 'p .x-probe-{tone}'
 	&& array_key_exists( 'in', \Nino\Features::manifest( $manifestDir. '/WithComponents' )['components']['probe'] ) === false
 	&& array_key_exists( 'draws', \Nino\Features::manifest( $manifestDir. '/WithComponents' )['components']['probe'] ) === false && ninoWarnings() === [] );
-check( '...so a place outside section, card and hero, a place twice, none and not a list are refused',
-	manifestFails( $manifestDir, 'BadIn', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'in' => [ 'page' ] ] ] ], 'component "probe": "in"' )
+check( '...so a place outside section and card - the hero is none -, a place twice, none and not a list are refused',
+	manifestFails( $manifestDir, 'HeroIn', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'in' => [ 'section', 'hero' ] ] ] ], 'component "probe": "in" lists only section, card, table, panels' )
+	&& manifestFails( $manifestDir, 'BadIn', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'in' => [ 'page' ] ] ] ], 'component "probe": "in"' )
 	&& manifestFails( $manifestDir, 'TwiceIn', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'in' => [ 'card', 'card' ] ] ] ], 'component "probe": "in"' )
 	&& manifestFails( $manifestDir, 'NoIn', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'in' => [] ] ] ], 'component "probe": "in"' )
 	&& manifestFails( $manifestDir, 'StringIn', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'probe' => $goodComponent + [ 'in' => 'card' ] ] ], 'component "probe": "in"' ) );
@@ -219,11 +220,11 @@ check( '...so a place outside section, card and hero, a place twice, none and no
 $holdingComponent = [ 'label' => 'Box', 'source' => 'content', 'attributes' => [ 'tone' => [ 'type' => 'select', 'options' => [ 'a', 'b' ], 'default' => 'a' ] ] ];
 check( 'what a component holds is carried by the manifest when good, and a schema that says nothing has none',
 	\Nino\Features::manifest( writeManifest( $manifestDir, 'WithHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => 'card' ] ] ] ) )['components']['box']['holds'] === 'card'
-	&& \Nino\Features::manifest( writeManifest( $manifestDir, 'WithHoldsHero', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => 'hero' ] ] ] ) )['components']['box']['holds'] === 'hero'
+	&& \Nino\Features::manifest( writeManifest( $manifestDir, 'WithHoldsSection', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => 'section' ] ] ] ) )['components']['box']['holds'] === 'section'
 	&& array_key_exists( 'holds', \Nino\Features::manifest( writeManifest( $manifestDir, 'NoHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent ] ] ) )['components']['box'] ) === false
 	&& array_key_exists( 'holds', \Nino\Features::manifest( $manifestDir. '/WithComponents' )['components']['probe'] ) === false && ninoWarnings() === [] );
 check( '...so a place that is none, a list, a number, an empty word, and a component whose source is not its content are refused',
-	manifestFails( $manifestDir, 'BadHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => 'page' ] ] ], 'component "box": "holds" names a place: section, card, hero, table or panels' )
+	manifestFails( $manifestDir, 'BadHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => 'page' ] ] ], 'component "box": "holds" names a place: section, card, table or panels' )
 	&& manifestFails( $manifestDir, 'ListHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => [ 'card' ] ] ] ], 'component "box": "holds" names a place' )
 	&& manifestFails( $manifestDir, 'IntHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => 5 ] ] ], 'component "box": "holds" names a place' )
 	&& manifestFails( $manifestDir, 'EmptyHolds', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'box' => $holdingComponent + [ 'holds' => '' ] ] ], 'component "box": "holds" names a place' )

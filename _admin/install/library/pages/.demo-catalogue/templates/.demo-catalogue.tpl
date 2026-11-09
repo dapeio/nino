@@ -121,7 +121,7 @@
 	<img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="">
 	<div class="nino-cover-content">
 		<div class="nino-grid-row nino-grid-row--wide">
-			<div class="nino-grid-100 nino-text-left"><h2 class="nino-hero-title nino-hero-title--loud" id="hero-cover-title">Workshop for fine craftsmanship</h2><p class="nino-hero-subtitle">Furniture made to last — designed and built in Regensburg.</p><div class="nino-section-text">Solid wood from the region, delivery throughout Bavaria.</div><a href="#katalog-presets" class="nino-btn nino-btn--primary">View workshop</a></div>
+			<div class="nino-grid-100 nino-text-left"><h2 class="nino-section-title nino-section-title--hero" id="hero-cover-title">Workshop for fine craftsmanship</h2><p class="nino-section-subtitle nino-section-subtitle--hero">Furniture made to last — designed and built in Regensburg.</p><div class="nino-section-text">Solid wood from the region, delivery throughout Bavaria.</div><a href="#katalog-presets" class="nino-btn nino-btn--primary">View workshop</a></div>
 		</div>
 	</div>
 </section>
@@ -137,7 +137,7 @@
 	<img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="">
 	<div class="nino-cover-content">
 		<div class="nino-grid-row nino-grid-row--wide">
-			<div class="nino-grid-100 nino-text-left"><h2 class="nino-hero-title nino-hero-title--loud" id="hero-parallax-title">Workshop for fine craftsmanship</h2><p class="nino-hero-subtitle">Furniture made to last — designed and built in Regensburg.</p><div class="nino-section-text">Solid wood from the region, delivery throughout Bavaria.</div><a href="#katalog-presets" class="nino-btn nino-btn--primary">View workshop</a></div>
+			<div class="nino-grid-100 nino-text-left"><h2 class="nino-section-title nino-section-title--hero" id="hero-parallax-title">Workshop for fine craftsmanship</h2><p class="nino-section-subtitle nino-section-subtitle--hero">Furniture made to last — designed and built in Regensburg.</p><div class="nino-section-text">Solid wood from the region, delivery throughout Bavaria.</div><a href="#katalog-presets" class="nino-btn nino-btn--primary">View workshop</a></div>
 		</div>
 	</div>
 </section>
@@ -152,7 +152,7 @@
 <section id="parallax-grows" class="nino-section nino-section--black nino-parallex nino-parallex--dim nino-img-focus--5 nino-mt-0 nino-mb-0" aria-labelledby="parallax-grows-title">
 	<img src="[[/nino/public]]/images/.demo/demo-00.svg" alt="">
 	<div class="nino-grid-row nino-grid-row--wide">
-		<div class="nino-grid-100 nino-text-left"><h2 class="nino-hero-title" id="parallax-grows-title">A parallax that sizes itself</h2><p class="nino-section-text">Without a cover height the section is 60vh high at least and grows with what it holds: the row stands in the flow, centred, and the picture moves behind it.</p><p class="nino-section-text">With a cover height (data-cover-height) it keeps the height the script gives it, and the row is placed over it.</p><p class="nino-section-text">Content taller than the screen stretches the section and is never cut: a long text, a list of arguments or a table stands over the picture as it does on any other section, and the picture covers all of it while it moves.</p><p class="nino-section-text">The row sits where the section's padding puts it, so that a long text has air above and below it.</p><p class="nino-section-text">One more paragraph, so that the example is taller than 60vh on a phone and on a desktop screen up to full HD: the section is as high as the row and its padding, and no higher than that when the row is taller.</p><p class="nino-section-text">Resize the window to see it: the picture keeps moving behind the row, whatever the height of the section is.</p><a href="#katalog-presets" class="nino-btn nino-btn--primary">View workshop</a></div>
+		<div class="nino-grid-100 nino-text-left"><h2 class="nino-section-title nino-section-title--hero" id="parallax-grows-title">A parallax that sizes itself</h2><p class="nino-section-text">Without a cover height the section is 60vh high at least and grows with what it holds: the row stands in the flow, centred, and the picture moves behind it.</p><p class="nino-section-text">With a cover height (data-cover-height) it keeps the height the script gives it, and the row is placed over it.</p><p class="nino-section-text">Content taller than the screen stretches the section and is never cut: a long text, a list of arguments or a table stands over the picture as it does on any other section, and the picture covers all of it while it moves.</p><p class="nino-section-text">The row sits where the section's padding puts it, so that a long text has air above and below it.</p><p class="nino-section-text">One more paragraph, so that the example is taller than 60vh on a phone and on a desktop screen up to full HD: the section is as high as the row and its padding, and no higher than that when the row is taller.</p><p class="nino-section-text">Resize the window to see it: the picture keeps moving behind the row, whatever the height of the section is.</p><a href="#katalog-presets" class="nino-btn nino-btn--primary">View workshop</a></div>
 	</div>
 </section>
 
@@ -167,7 +167,7 @@
 	<img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="">
 	<div class="nino-img-background-content">
 		<div class="nino-grid-row">
-			<div class="nino-grid-100 nino-text-center"><h2 class="nino-hero-title" id="banner-plain-title">Twelve years, not a single return</h2><p class="nino-hero-subtitle">We maintain what we build — for as long as it stands.</p><a href="#katalog-presets" class="nino-btn nino-btn--outline">References</a></div>
+			<div class="nino-grid-100 nino-text-center"><h2 class="nino-section-title nino-section-title--hero" id="banner-plain-title">Twelve years, not a single return</h2><p class="nino-section-subtitle nino-section-subtitle--hero">We maintain what we build — for as long as it stands.</p><a href="#katalog-presets" class="nino-btn nino-btn--outline">References</a></div>
 		</div>
 	</div>
 </section>
@@ -185,7 +185,7 @@
 		<div class="nino-grid-row">
 			<div class="nino-grid-100 nino-grid-m-66 nino-grid-center">
 				<div class="nino-card nino-card--alt nino-p-2">
-					<div class="nino-grid-100 nino-text-left"><h2 class="nino-hero-title" id="banner-card-title">Twelve years, not a single return</h2><p class="nino-hero-subtitle">We maintain what we build — for as long as it stands.</p><a href="#katalog-presets" class="nino-btn nino-btn--outline">References</a></div>
+					<div class="nino-grid-100 nino-text-left"><h2 class="nino-section-title nino-section-title--hero" id="banner-card-title">Twelve years, not a single return</h2><p class="nino-section-subtitle nino-section-subtitle--hero">We maintain what we build — for as long as it stands.</p><a href="#katalog-presets" class="nino-btn nino-btn--outline">References</a></div>
 				</div>
 			</div>
 		</div>
@@ -1889,25 +1889,19 @@
 			<h3 class="nino-section-title nino-text-left" id="typografie-title">Typography</h3>
 			<p class="nino-section-subtitle nino-text-left">Title, subtitle and body text — each one level quieter and louder. Sizes are not utilities, but variants of the class.</p>
 		</div>
-		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-section-title</span> <span class="nino-badge nino-badge--pill">.nino-section-subtitle</span> <span class="nino-badge nino-badge--pill">.nino-section-text</span> <span class="nino-badge nino-badge--pill">.nino-hero-title</span> <span class="nino-badge nino-badge--pill">.nino-hero-subtitle</span> <span class="nino-badge nino-badge--pill">--quiet</span> <span class="nino-badge nino-badge--pill">--loud</span></div>
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-section-title</span> <span class="nino-badge nino-badge--pill">.nino-section-subtitle</span> <span class="nino-badge nino-badge--pill">.nino-section-text</span> <span class="nino-badge nino-badge--pill">--quiet</span> <span class="nino-badge nino-badge--pill">--loud</span> <span class="nino-badge nino-badge--pill">--hero</span></div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-pr-2 nino-mb-3">
+			<p class="nino-section-title nino-section-title--hero nino-text-left">.nino-section-title--hero</p>
 			<p class="nino-section-title--loud nino-text-left">.nino-section-title--loud</p>
 			<p class="nino-section-title nino-text-left">.nino-section-title</p>
 			<p class="nino-section-title--quiet nino-text-left">.nino-section-title--quiet</p>
+			<p class="nino-section-subtitle nino-section-subtitle--hero nino-text-left">.nino-section-subtitle--hero</p>
 			<p class="nino-section-subtitle--loud nino-text-left">.nino-section-subtitle--loud</p>
 			<p class="nino-section-subtitle nino-text-left">.nino-section-subtitle</p>
 			<p class="nino-section-subtitle--quiet nino-text-left">.nino-section-subtitle--quiet</p>
 			<div class="nino-section-text--loud nino-text-left">.nino-section-text--loud — the same sentence in three levels, making the difference visible.</div>
 			<div class="nino-section-text nino-text-left">.nino-section-text — the same sentence in three levels, making the difference visible.</div>
 			<div class="nino-section-text--quiet nino-text-left">.nino-section-text--quiet — the same sentence in three levels, making the difference visible.</div>
-		</div>
-		<div class="nino-grid-100 nino-grid-m-50 nino-mb-3">
-			<p class="nino-hero-title nino-text-left">.nino-hero-title</p>
-			<p class="nino-hero-title--loud nino-text-left">.nino-hero-title--loud</p>
-			<p class="nino-hero-title--quiet nino-text-left">.nino-hero-title--quiet</p>
-			<p class="nino-hero-subtitle nino-text-left">.nino-hero-subtitle</p>
-			<p class="nino-hero-subtitle--loud nino-text-left">.nino-hero-subtitle--loud</p>
-			<p class="nino-hero-subtitle--quiet nino-text-left">.nino-hero-subtitle--quiet</p>
 		</div>
 		<div class="nino-grid-100 nino-mb-3">
 			<p class="nino-badge-cloud nino-badge-cloud--left nino-mb-1"><span class="nino-badge nino-badge--pill">.nino-richtext</span></p>
@@ -2295,8 +2289,8 @@
 			<div class="nino-img-background nino-img-background--dim">
 				<img src="[[/nino/public]]/images/.demo/demo-01.svg" alt="" loading="lazy">
 				<div class="nino-img-background-content nino-text-center">
-					<p class="nino-hero-title">.nino-img-background</p>
-					<p class="nino-hero-subtitle">Full-bleed image with overlay, without scroll effect</p>
+					<p class="nino-section-title nino-section-title--hero">.nino-img-background</p>
+					<p class="nino-section-subtitle nino-section-subtitle--hero">Full-bleed image with overlay, without scroll effect</p>
 				</div>
 			</div>
 		</div>
@@ -2896,8 +2890,8 @@
 <section class="nino-hero nino-hero--fullscreen nino-section nino-section--dark nino-mt-0 nino-mb-0 nino-pt-0 nino-pb-0" id="hero-fullscreen" aria-labelledby="hero-fullscreen-title">
 	<div class="nino-grid-row nino-grid-row--full nino-grid-middle nino-pl-0 nino-pr-0 nino-grid--fullwidth nino-grid--fullheight">
 		<div class="nino-grid-100 nino-text-center">
-			<h3 class="nino-hero-title" id="hero-fullscreen-title">Fullscreen hero</h3>
-			<p class="nino-hero-subtitle">.nino-hero--fullscreen fills the first viewport and centres the content, and the arrow at the bottom scrolls to the next section.</p>
+			<h3 class="nino-section-title nino-section-title--hero" id="hero-fullscreen-title">Fullscreen hero</h3>
+			<p class="nino-section-subtitle nino-section-subtitle--hero">.nino-hero--fullscreen fills the first viewport and centres the content, and the arrow at the bottom scrolls to the next section.</p>
 			<p class="nino-badge-cloud"><span class="nino-badge nino-badge--pill">.nino-hero</span> <span class="nino-badge nino-badge--pill">.nino-hero--fullscreen</span> <span class="nino-badge nino-badge--pill">.nino-pt-0</span> <span class="nino-badge nino-badge--pill">.nino-pb-0</span> <span class="nino-badge nino-badge--pill">.nino-grid-row--full</span> <span class="nino-badge nino-badge--pill">.nino-pl-0</span> <span class="nino-badge nino-badge--pill">.nino-pr-0</span> <span class="nino-badge nino-badge--pill">.nino-grid-middle</span> <span class="nino-badge nino-badge--pill">.nino-grid--fullwidth</span> <span class="nino-badge nino-badge--pill">.nino-grid--fullheight</span> <span class="nino-badge nino-badge--pill">.nino-hero-arrowdown</span></p>
 		</div>
 	</div>

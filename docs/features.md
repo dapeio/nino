@@ -77,7 +77,7 @@ return [
 		'longest'		=> [ 'type' => 'int', 'label' => 'Longest name', 'min' => 1, 'max' => 60, 'unit' => 'characters', 'default' => 40 ],
 	],
 	// A shortcode with a schema; the class has no componentHello(), so doShortcode() renders it
-	'components'	=> [ 'hello' => [ 'label' => 'Greeting', 'source' => 'none', 'preview' => 'text', 'draws' => 'p .nino-hello', 'in' => [ 'section', 'card', 'hero' ],
+	'components'	=> [ 'hello' => [ 'label' => 'Greeting', 'source' => 'none', 'preview' => 'text', 'draws' => 'p .nino-hello', 'in' => [ 'section', 'card' ],
 		'icon' => [
 			[ 'path', [ 'd' => 'M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2' ] ],
 			[ 'path', [ 'd' => 'M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2' ] ],

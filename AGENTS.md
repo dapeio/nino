@@ -279,7 +279,7 @@ HTML+ is processed as textfills, then shortcodes, then final render callbacks.
 - Absolute textfill: `[[/template/page-home/main-hero/title]]`
 - Reusable template: `[template /templates/html-header]`
 - Image slot: `[image /template/page-home/main-hero/image alt=""]`
-- Component: `[hero-title /template/page-home/main-hero/title tag="h3"]` - a shortcode with a schema, its first argument the source of its value
+- Component: `[title /template/page-home/main-hero/title tag="h3"]` - a shortcode with a schema, its first argument the source of its value
 - Stack: `[stack /services sort="title"]...[/stack]` - a component for a loop, its components reading the fields of the element
 - Element-local field: `[[title]]` only inside `[element]`, `[elements]` or the cell of a stack; `[[.id]]` is the number in the loop, `[[.uri]]` the element's uri `/<type>/<name>`, `[[.slug]]` the name alone - the last segment of the uri, what a link to a page of the element (`/blog/[[.slug]]`) needs; `[[.lang]]`, in `[elements]` and nothing in the cell of a stack, is the lang attribute of the language the text was taken from
 - CSRF field: `[csrf]`

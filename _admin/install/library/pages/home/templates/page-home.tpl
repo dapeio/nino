@@ -6,8 +6,8 @@
 	<div class="nino-section-bg nino-img-focus--5">[image /template/page-home/hero/background alt=""]</div>
 	<div class="nino-grid-row nino-grid-row--wide nino-vpa">
 		<div class="nino-grid-100 nino-text-left">
-			[hero-title /template/page-home/hero/title style="loud"]
-			[hero-subtitle /template/page-home/hero/subtitle]
+			[title /template/page-home/hero/title tag="h2" style="hero"]
+			[subtitle /template/page-home/hero/subtitle tag="p" style="hero"]
 			[button /_nino/webpage/contact/name href="/_nino/webpage/contact/uri" style="primary"]
 		</div>
 	</div>

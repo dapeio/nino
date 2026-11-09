@@ -4,9 +4,9 @@ declare(strict_types=1);
 /**
  *	Nino								A compact filesystembased php framework
  *	components-smoke.php	Dependency-free smoke test for \Nino\Modules\Components - the
- *											registry, the schemas, the six titles, the card, the stacks, cell(),
+ *											registry, the schemas, the four titles, the card, the stacks, cell(),
  *											escape() and the lang attribute of a text that is another language's
- *											- and for what Nino.css hands a design layer: the hero,
+ *											- and for what Nino.css hands a design layer: the hero style of the section's title,
  *											the font roles, the scale, the hooks and the grounds on three
  *											levels, and the radius of a surface. Runs against an isolated
  *											sandbox directory, never touches the real project data.
@@ -25,7 +25,7 @@ echo "Sandbox: $sandbox\n\n";
 
 // --- What Nino.css hands a design layer -----------------------------------
 
-echo "Nino.css - the hero is the hero, the font roles, the scale and the hooks\n";
+echo "Nino.css - the hero style, the font roles, the scale and the hooks\n";
 
 $hookCss = (string) preg_replace( '#/\*.*?\*/#s', '', (string) file_get_contents( __DIR__. '/../_nino/Nino.css' ) );
 check( 'the fold keeps its name: body.nino-scroll-atf is still what Nino.css and Nino.ui.js say', str_contains( $hookCss, 'body.nino-scroll-atf ' ) === true
@@ -76,10 +76,10 @@ $hookReads = [
 	'h1, h2, h3, h4, h5, h6'		=> [ '--font-title-weight', '--font-title-transform' ],
 	'.nino-section-title'				=> [ '--fontfamily-title', '--font-title-size', '--font-title-transform', '--section-title-scale' ],
 	'.nino-card-title'					=> [ '--fontfamily-title', '--font-title-size', '--font-title-transform', '--card-title-scale' ],
-	'.nino-hero-title'					=> [ '--fontfamily-title', '--font-title-size', '--font-title-transform', '--scale-loud' ],
+	'.nino-section-title--hero'	=> [ '--font-title-size', '--scale-loud' ],
 	'.nino-section-subtitle'		=> [ '--fontfamily-subtitle', '--font-subtitle-size', '--font-subtitle-weight', '--font-subtitle-transform', '--section-subtitle-scale' ],
 	'.nino-card-subtitle'			=> [ '--fontfamily-subtitle', '--font-subtitle-size', '--font-subtitle-weight', '--font-subtitle-transform', '--card-subtitle-scale' ],
-	'.nino-hero-subtitle'				=> [ '--fontfamily-subtitle', '--font-subtitle-size', '--font-subtitle-weight', '--font-subtitle-transform', '--scale-loud' ],
+	'.nino-section-subtitle--hero'	=> [ '--font-subtitle-size', '--scale-loud' ],
 	'.nino-btn'									=> [ '--fontfamily-button', '--font-button-size', '--font-button-weight', '--font-button-transform' ],
 	'.nino-code'								=> [ '--fontfamily-code', '--font-code-size', '--font-code-weight', '--font-code-transform' ],
 ];
@@ -100,15 +100,17 @@ check( '...and the page reads the size of the text role on body, which the code,
 	&& preg_match( '/(?<![\w-])font-size\s*:\s*\.8125em\s*;/', $hookRules( ':is(code, kbd, samp, pre):not(:is(code, kbd, samp, pre) *)' ) ) === 1
 	&& preg_match_all( '/\.8125em/', $hookCss ) === 1 );
 /*	The quirk is the browser's, and it stops where an element states its size in a length: the kernel's own sized classes for text, titles, prices, counts and labels - the text and the
-	description, the titles and the subtitles of a section, a card and a hero, the title and the price of the pricing table, each with its variants, the price of a card,
+	description, the titles and the subtitles of a section and a card, the title and the price of the pricing table, each with its variants (a section's with its hero style), the price of a card,
 	the stat counter, the message of a form, the button and the filter button - have the size of their text for a bare code, kbd, samp and pre, 1em (measured: a code in a [text]
 	is 16px beside text of 16px, not 13, and one in a form message 14px beside 14, not 11.4). One rule says it, after the one above and with the same guard for the ones inside
 	another of the four, and :where() keeps the classes out of its specificity, so that it is as specific as the one above and a class with a size of its own (.nino-code)
 	still wins over both	*/
 $hookSized = [ '.nino-btn', '.nino-filter-btn', '.nino-form-message', '.nino-stat-counter', '.nino-card-price' ];
-foreach( [ 'section-text', 'card-descr', 'section-title', 'card-title', 'hero-title', 'section-subtitle', 'card-subtitle', 'hero-subtitle', 'pricing-title', 'pricing-price' ] as $hookClass )
+foreach( [ 'section-text', 'card-descr', 'section-title', 'card-title', 'section-subtitle', 'card-subtitle', 'pricing-title', 'pricing-price' ] as $hookClass )
 	foreach( [ '', '--quiet', '--loud' ] as $hookVariant )
 		$hookSized[] = '.nino-'. $hookClass. $hookVariant;
+$hookSized[] = '.nino-section-title--hero';
+$hookSized[] = '.nino-section-subtitle--hero';
 $hookGuard	= ':is(code, kbd, samp, pre):not(:is(code, kbd, samp, pre) *)';
 $hookFirst	= preg_match( '/(?:^|[{}])\s*'. preg_quote( $hookGuard, '/' ). '\s*\{[^{}]*\}/', $hookCss, $hookFirstRule, PREG_OFFSET_CAPTURE ) === 1 ? $hookFirstRule[0][1] : -1;
 $hookKeeps	= preg_match_all( '/(?:^|[{}])\s*:where\(([^()]*)\)\s*'. preg_quote( $hookGuard, '/' ). '\s*\{([^{}]*)\}/', $hookCss, $hookKept, PREG_SET_ORDER | PREG_OFFSET_CAPTURE ) === 1 ? $hookKept[0] : [];
@@ -120,7 +122,7 @@ check( '...and the kernel\'s sized classes - the text and the description, the t
 check( '...the arrow of a hero is no text and is not in it, and the rule says nothing but the size',
 	in_array( '.nino-hero-arrowdown', $hookNamed, true ) === false && substr_count( $hookKeeps[2][0] ?? '', ':' ) === 1 );
 $hookUnsized = array_filter( $hookSized, static fn( string $class ): bool => preg_match( '/(?<![\w-])font-size\s*:/', $hookRules( $class ) ) !== 1 );
-check( '...and every class it names states a size of its own, so that none of them is a name nothing sets any more'. ( $hookUnsized === [] ? '' : ' - none: '. implode( ', ', $hookUnsized ) ), $hookUnsized === [] && count( $hookSized ) === 35 );
+check( '...and every class it names states a size of its own, so that none of them is a name nothing sets any more'. ( $hookUnsized === [] ? '' : ' - none: '. implode( ', ', $hookUnsized ) ), $hookUnsized === [] && count( $hookSized ) === 31 );
 check( '...and the code block keeps the size of the code role, and its code the font it inherits',
 	str_contains( $hookRules( '.nino-code' ), 'var(--font-code-size)' ) === true && preg_match( '/font\s*:\s*inherit/', $hookRules( '.nino-code code' ) ) === 1 );
 
@@ -132,9 +134,9 @@ foreach( [ 4 => '1.6', 5 => '2', 6 => '3' ] as $hookStep => $hookFactor )
 	$hookScale = $hookScale && $hookValue( $hookRootWide, '--text-'. $hookStep ) === 'calc(var(--font-text-size) * '. $hookFactor. ')';
 check( '--text-1 is the text size, and --text-2 to --text-6 are factors of it - the ones from 768px their own', $hookScale );
 
-// The hero is the loud variant of a section's title and subtitle, and the variants are numbers a design layer moves
+// The hero style is the size of the loud variant, without the number of the section's own, and the variants are numbers a design layer moves
 $hookHeroWrong = [];
-foreach( [ '.nino-hero-title' => '--font-title-size', '.nino-hero-subtitle' => '--font-subtitle-size' ] as $hookHeroClass => $hookHeroRole ) {
+foreach( [ '.nino-section-title--hero' => '--font-title-size', '.nino-section-subtitle--hero' => '--font-subtitle-size' ] as $hookHeroClass => $hookHeroRole ) {
 	preg_match_all( '/(?<![\w-])font-size\s*:\s*([^;]+?)\s*;/', $hookRules( $hookHeroClass ), $hookHeroSizes );
 	if( count( $hookHeroSizes[1] ) < 1 )
 		$hookHeroWrong[] = $hookHeroClass. ' states no size';
@@ -142,15 +144,32 @@ foreach( [ '.nino-hero-title' => '--font-title-size', '.nino-hero-subtitle' => '
 		if( preg_replace( '/\s+/', '', $hookHeroSize ) !== 'calc(var('. $hookHeroRole. ')*var(--scale-loud))' )
 			$hookHeroWrong[] = $hookHeroClass. ' is '. $hookHeroSize;
 }
-check( 'the hero is the loud variant of a section\'s title and subtitle: wherever it states its size, below 768px and from there, it is the size of the title or of the subtitle role times --scale-loud, and no number of its own'
+check( 'the hero style of a section\'s title and subtitle is the size of the title or of the subtitle role times --scale-loud, and no number of its own'
 	. ( $hookHeroWrong === [] ? '' : ' - '. implode( ', ', $hookHeroWrong ) ), $hookHeroWrong === [] );
+// The leading keeps its ratio to the size: 1.3 / 1.2 below 768px, 1.2 from there
+$hookHeroLeading = [];
+foreach( [ '.nino-section-title--hero' => '--font-title-size', '.nino-section-subtitle--hero' => '--font-subtitle-size' ] as $hookHeroClass => $hookHeroRole ) {
+	preg_match_all( '/(?<![\w-])line-height\s*:\s*([^;]+?)\s*;/', $hookRules( $hookHeroClass ), $hookHeroLines );
+	$hookHeroLines = array_map( static fn( string $line ): string => (string) preg_replace( '/\s+/', '', $line ), $hookHeroLines[1] );
+	if( $hookHeroLines !== [ 'calc(var('. $hookHeroRole. ')*var(--scale-loud)*1.3/1.2)', 'calc(var('. $hookHeroRole. ')*var(--scale-loud)*1.2)' ] )
+		$hookHeroLeading[] = $hookHeroClass. ' is '. implode( ' then ', $hookHeroLines );
+}
+check( '...its leading is 1.3 / 1.2 of its size below 768px and 1.2 of it from there'. ( $hookHeroLeading === [] ? '' : ' - '. implode( ', ', $hookHeroLeading ) ), $hookHeroLeading === [] );
+// It draws no rule under the title, the air under it is the space-3 the hero had, and the subtitle keeps the colour of its role: no opacity
+$hookHeroTitle		= $hookRules( '.nino-section-title--hero' );
+$hookHeroSubtitle	= $hookRules( '.nino-section-subtitle--hero' );
+check( '...the title has no air above it, no rule and no air for one under it, both titles have the space-3 under them, and the subtitle has no opacity',
+	preg_match( '/(?<![\w-])border-bottom\s*:\s*0\s*;/', $hookHeroTitle ) === 1 && preg_match( '/(?<![\w-])padding-bottom\s*:\s*0\s*;/', $hookHeroTitle ) === 1
+	&& preg_match( '/(?<![\w-])margin-bottom\s*:\s*calc\(var\(--space-3\) \* var\(--whitespace-text\)\)\s*;/', $hookHeroTitle ) === 1
+	&& preg_match( '/(?<![\w-])margin-bottom\s*:\s*calc\(var\(--space-3\) \* var\(--whitespace-text\)\)\s*;/', $hookHeroSubtitle ) === 1
+	&& str_contains( $hookHeroSubtitle, 'opacity' ) === false && str_contains( $hookRules( '.nino-section-subtitle' ), 'opacity' ) === false
+	&& preg_match( '/(?<![\w-])margin-top\s*:\s*0\s*;/', $hookHeroTitle ) === 1 );
 preg_match_all( '/(?<![\w-])(--[\w-]+)\s*:/', $hookCss, $hookDeclared );
 $hookHeroReads = [];
-foreach( [ '.nino-hero-title', '.nino-hero-subtitle' ] as $hookHeroClass )
-	foreach( [ '', '--quiet', '--loud' ] as $hookHeroVariant )
-		if( preg_match_all( '/var\((--[\w-]+)/', $hookRules( $hookHeroClass. $hookHeroVariant ), $hookHeroFound ) > 0 )
-			$hookHeroReads = array_merge( $hookHeroReads, $hookHeroFound[1] );
-check( '...and every custom property the rules of the hero read is one that Nino.css declares'. ( array_diff( $hookHeroReads, $hookDeclared[1] ) === [] ? '' : ' - not: '. implode( ', ', array_unique( array_diff( $hookHeroReads, $hookDeclared[1] ) ) ) ),
+foreach( [ '.nino-section-title--hero', '.nino-section-subtitle--hero' ] as $hookHeroClass )
+	if( preg_match_all( '/var\((--[\w-]+)/', $hookRules( $hookHeroClass ), $hookHeroFound ) > 0 )
+		$hookHeroReads = array_merge( $hookHeroReads, $hookHeroFound[1] );
+check( '...and every custom property the rules of the hero style read is one that Nino.css declares'. ( array_diff( $hookHeroReads, $hookDeclared[1] ) === [] ? '' : ' - not: '. implode( ', ', array_unique( array_diff( $hookHeroReads, $hookDeclared[1] ) ) ) ),
 	count( $hookHeroReads ) > 0 && array_diff( $hookHeroReads, $hookDeclared[1] ) === [] );
 check( 'a card title takes the title role times a number of its own: 5 / 6, what --text-3 was of --text-4, and 25 / 32 from 768px, where --text-4 steps up and --text-3 does not',
 	$hookValue( $hookRoot, '--card-title-scale' ) === 'calc(5 / 6)' && $hookValue( $hookRootWide, '--card-title-scale' ) === 'calc(25 / 32)' );
@@ -165,8 +184,8 @@ foreach( [ '.nino-section-title', '.nino-section-title--quiet', '.nino-section-t
 			$hookUnruled[] = $hookTitle. ' does not say '. $hookDeclaration;
 check( 'a section title draws a rule of --section-line under itself, with six times that much air, and so do its quiet and its loud variant'. ( $hookUnruled === [] ? '' : ' - '. implode( '; ', $hookUnruled ) ), $hookUnruled === [] );
 /*	A variant is a factor of its role: the size is the size of the class it varies - the role, and for every title and subtitle of a
-	section, a card and a hero the scale that class has, the hero's being --scale-loud itself - times --scale-quiet or --scale-loud, and so
-	is the leading where the variant states one: a loud hero title is the role times --scale-loud twice. The variants of the pricing table
+	section and a card the scale that class has - times --scale-quiet or --scale-loud, and so
+	is the leading where the variant states one. The variants of the pricing table
 	are not: they stay on the ladder	*/
 $hookVariants = [
 	'.nino-section-title'			=> [ 'var(--font-title-size)', 'var(--section-title-scale)' ],
@@ -175,8 +194,6 @@ $hookVariants = [
 	'.nino-card-title'				=> [ 'var(--font-title-size)', 'var(--card-title-scale)' ],
 	'.nino-card-subtitle'		=> [ 'var(--font-subtitle-size)', 'var(--card-subtitle-scale)' ],
 	'.nino-card-descr'				=> [ 'var(--font-text-size)' ],
-	'.nino-hero-title'				=> [ 'var(--font-title-size)', 'var(--scale-loud)' ],
-	'.nino-hero-subtitle'			=> [ 'var(--font-subtitle-size)', 'var(--scale-loud)' ],
 ];
 $hookUnscaled = [];
 foreach( $hookVariants as $hookBase => $hookFactors )
@@ -192,11 +209,11 @@ foreach( $hookVariants as $hookBase => $hookFactors )
 				if( substr_count( $hookSize, (string) $hookFactor ) < $hookTimes )
 					$hookUnscaled[] = $hookBase. '--'. $hookKind. ' does not read '. $hookFactor. ( $hookTimes > 1 ? ' '. $hookTimes. ' times' : '' );
 	}
-check( 'the quiet and the loud variants of a section, a card and a hero are their role times the number of their class, where it has one, times --scale-quiet and --scale-loud, which are .85 and 1.2'. ( $hookUnscaled === [] ? '' : ' - not: '. implode( ', ', $hookUnscaled ) ),
+check( 'the quiet and the loud variants of a section and a card are their role times the number of their class, where it has one, times --scale-quiet and --scale-loud, which are .85 and 1.2'. ( $hookUnscaled === [] ? '' : ' - not: '. implode( ', ', $hookUnscaled ) ),
 	$hookUnscaled === [] && $hookValue( $hookRoot, '--scale-quiet' ) === '.85' && $hookValue( $hookRoot, '--scale-loud' ) === '1.2' );
-// The classes that took a number of their own are the same factors themselves: the size, and the leading of the two section classes and of the hero, which moves with it
+// The classes that took a number of their own are the same factors themselves: the size, and the leading of the two section classes, which moves with it
 $hookUnscaledBase = [];
-foreach( [ '.nino-section-title', '.nino-section-subtitle', '.nino-card-subtitle', '.nino-hero-title', '.nino-hero-subtitle' ] as $hookBase ) {
+foreach( [ '.nino-section-title', '.nino-section-subtitle', '.nino-card-subtitle' ] as $hookBase ) {
 	preg_match_all( '/(?<![\w-])(?:font-size|line-height)\s*:([^;]*);/', $hookRules( $hookBase ), $hookSizes );
 	if( count( $hookSizes[1] ) < 1 )
 		$hookUnscaledBase[] = $hookBase;
@@ -205,11 +222,11 @@ foreach( [ '.nino-section-title', '.nino-section-subtitle', '.nino-card-subtitle
 			if( str_contains( $hookSize, $hookFactor ) === false )
 				$hookUnscaledBase[] = $hookBase. ' does not read '. $hookFactor;
 }
-check( '...and so are a section title, a section subtitle, a card subtitle and the title and the subtitle of a hero themselves - the leading of the two section classes and of the hero with their size'. ( $hookUnscaledBase === [] ? '' : ' - not: '. implode( ', ', $hookUnscaledBase ) ), $hookUnscaledBase === [] );
+check( '...and so are a section title, a section subtitle and a card subtitle themselves - the leading of the two section classes with their size'. ( $hookUnscaledBase === [] ? '' : ' - not: '. implode( ', ', $hookUnscaledBase ) ), $hookUnscaledBase === [] );
 $hookVariantRules = '';
 foreach( array_keys( $hookVariants ) as $hookBase )
 	$hookVariantRules .= $hookRules( $hookBase. '--quiet' ). ' '. $hookRules( $hookBase. '--loud' ). ' ';
-check( '...none of the sixteen stands on a step of the ladder any more, and the pricing table\'s four still do',
+check( '...none of the twelve stands on a step of the ladder any more, and the pricing table\'s four still do',
 	preg_match( '/var\(--text-\d\)/', $hookVariantRules ) !== 1
 	&& str_contains( $hookRules( '.nino-pricing-title--quiet' ), 'var(--text-1)' ) === true && str_contains( $hookRules( '.nino-pricing-title--loud' ), 'var(--text-4)' ) === true
 	&& str_contains( $hookRules( '.nino-pricing-price--quiet' ), 'var(--text-4)' ) === true && str_contains( $hookRules( '.nino-pricing-price--loud' ), 'var(--text-6)' ) === true );
@@ -719,7 +736,7 @@ $alignStackList = '.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .
 $alignCardList = ':is(.nino-card--middle, .nino-card--bottom, .nino-card--last-bottom).nino-text-{T}-{A} > .nino-btn, .nino-card--last-bottom.nino-text-{T}-{A} > .nino-card-content > .nino-btn';
 $alignExpected = [
 	[ '.nino-text-{T}-{A}', 'text-align: {A};' ],
-	[ '.nino-text-{T}-{A} :is(.nino-section-title, .nino-section-subtitle, .nino-hero-title, .nino-hero-subtitle)', 'text-align: {A};' ],
+	[ '.nino-text-{T}-{A} :is(.nino-section-title, .nino-section-subtitle)', 'text-align: {A};' ],
 	[ '.nino-text-{T}-{A} > .nino-btn, .nino-text-{T}-{A} > .nino-card-content > .nino-btn', '{margin}' ],
 	[ '.nino-text-{T}-{A} > .nino-section-text--loud', '{loud}' ],
 	[ $alignStackList, 'justify-self: {js};' ],
@@ -887,20 +904,20 @@ foreach( [ '0', '1', '2', '3', '4', '5', '6' ] as $groundStep )
 check( 'the padding of a card is a step of the space scale or what its ground gives: .nino-p-<n> comes after every rule that gives a card its own padding, so it is the one that wins'. ( $groundWrong === [] ? '' : ' - before it: '. implode( ', ', $groundWrong ) ),
 	$groundWrong === [] && $groundCardPaddingAt > 0 && $groundSets( $groundOf( '.nino-p-0' ), 'padding', '0' ) === true && $groundSets( $groundOf( '.nino-p-6' ), 'padding', 'var(--space-6)' ) === true );
 
-/*	What a role carries is not said again by a rule of the ground a thing sits on: the title and the subtitle of a section and of a hero, its arrow, the outline button and the
+/*	What a role carries is not said again by a rule of the ground a thing sits on: the title and the subtitle of a section, the arrow of a hero, the outline button and the
 	filter button take the colours of the nearest ground - a column, a card, a dimmed cover - because they read its roles, and a rule of a section above them would reach past a
 	column or a card of another ground in between and write the ink of the section on it (measured: white on the alt ground of a column in a dark section, 1.08:1). So no selector
 	has a ground of a section, a column, a card, a dimmed cover or a dimmed picture above one of them	*/
 $groundSaid = [];
 foreach( array_keys( $groundEach ) as $groundSelector )
-	if( preg_match( '/\.nino-(?:section|grid|card|cover|img-background)--(?:alt|tint|dark|black|primary|brand-alt|counter|dim)(?![\w-])[^,]*[\s>+~]\.nino-(?:section-title|section-subtitle|hero-title|hero-subtitle|hero-arrowdown|btn--outline|filter-btn)(?![\w-])/', (string) $groundSelector ) === 1 )
+	if( preg_match( '/\.nino-(?:section|grid|card|cover|img-background)--(?:alt|tint|dark|black|primary|brand-alt|counter|dim)(?![\w-])[^,]*[\s>+~]\.nino-(?:section-title|section-subtitle|hero-arrowdown|btn--outline|filter-btn)(?![\w-])/', (string) $groundSelector ) === 1 )
 		$groundSaid[] = (string) $groundSelector;
-check( 'no rule of a section, a column, a card or a dimmed cover says again what a role carries: no selector has a ground above a title or a subtitle of a section or a hero, the arrow of a hero, an outline button or a filter button'. ( $groundSaid === [] ? '' : ' - '. implode( ' | ', $groundSaid ) ),
-	$groundSaid === [] && isset( $groundEach['.nino-hero-title'], $groundEach['.nino-btn--outline'], $groundEach['.nino-filter-btn'], $groundEach['.nino-hero-arrowdown'] ) === true );
+check( 'no rule of a section, a column, a card or a dimmed cover says again what a role carries: no selector has a ground above a title or a subtitle of a section, the arrow of a hero, an outline button or a filter button'. ( $groundSaid === [] ? '' : ' - '. implode( ' | ', $groundSaid ) ),
+	$groundSaid === [] && isset( $groundEach['.nino-section-subtitle'], $groundEach['.nino-btn--outline'], $groundEach['.nino-filter-btn'], $groundEach['.nino-hero-arrowdown'] ) === true );
 $groundWrong = [];
 foreach( [
-	[ '.nino-section-title', 'color', 'var(--color-title)' ], [ '.nino-hero-title', 'color', 'var(--color-title)' ],
-	[ '.nino-section-subtitle', 'color', 'var(--color-subtitle)' ], [ '.nino-hero-subtitle', 'color', 'var(--color-subtitle)' ],
+	[ '.nino-section-title', 'color', 'var(--color-title)' ],
+	[ '.nino-section-subtitle', 'color', 'var(--color-subtitle)' ],
 	[ '.nino-btn--outline', 'color', 'var(--color-accent)' ], [ '.nino-btn--outline', 'border', '1px solid var(--color-accent)' ],
 	[ '.nino-hero-arrowdown', 'color', 'inherit' ], [ '.nino-filter-btn', 'color', 'inherit' ],
 ] as [ $groundSelector, $groundProperty, $groundValue ] )
@@ -1007,7 +1024,7 @@ $whitespaceWhere = [
 		':where(.nino-tiles) > .nino-grid-row > *',
 	],
 	'--whitespace-text' => [
-		'.nino-hero-title', '.nino-hero-subtitle', '.nino-section-title', '.nino-section-subtitle', '.nino-section-text', '.nino-richtext p, .nino-richtext ul, .nino-richtext ol',
+		'.nino-section-title--hero', '.nino-section-subtitle--hero', '.nino-section-title', '.nino-section-subtitle', '.nino-section-text', '.nino-richtext p, .nino-richtext ul, .nino-richtext ol',
 		'.nino-legal-section > h3', '.nino-legal-section + .nino-legal-section', '.nino-card-title', '.nino-card-subtitle', '.nino-card-descr', '.nino-card-img',
 	],
 ];
@@ -1408,8 +1425,8 @@ check( 'a row with a picture has its padding of a rule one class heavy, as the r
 	&& $groundLastOf( [ '.nino-grid-row' ], 'padding' ) > 0 && $innerAt > $groundLastOf( [ '.nino-grid-row' ], 'padding' ) && $innerClassAt > $innerAt );
 
 // The ink of a text: two classes, the inks a ground resolves, after every rule that sets the colour of a title, a subtitle or a text
-$inkAfter = $groundLastOf( [ '.nino-section-title', '.nino-section-subtitle', '.nino-section-text', '.nino-card-title', '.nino-card-subtitle', '.nino-card-descr', '.nino-hero-title', '.nino-hero-subtitle',
-	'.nino-section-title--quiet', '.nino-section-title--loud', '.nino-hero-title--quiet', '.nino-hero-subtitle--quiet', '.nino-card-title--quiet' ], 'color' );
+$inkAfter = $groundLastOf( [ '.nino-section-title', '.nino-section-subtitle', '.nino-section-text', '.nino-card-title', '.nino-card-subtitle', '.nino-card-descr',
+	'.nino-section-title--quiet', '.nino-section-title--loud', '.nino-section-title--hero', '.nino-section-subtitle--hero', '.nino-card-title--quiet' ], 'color' );
 check( 'the colour of a text is one of two inks - .nino-ink--muted is the ink the text inherits at four fifths of its strength, mixed with nothing, which fades the colour and not the box as an opacity would, and .nino-ink--accent the accent of the ground, a role - and no light, no dark and no status colour is among them; both come after every rule that sets the colour of a title, a subtitle or a text, so that they win'
 	. ( $inkAfter > 0 ? '' : ' - no rule to come after' ),
 	$groundSets( $groundOf( '.nino-ink--muted' ), 'color', 'color-mix(in srgb, currentColor 80%, transparent)' ) === true && preg_match( '/(?<![\w-])opacity\s*:/', $groundOf( '.nino-ink--muted' ) ) !== 1
@@ -2024,10 +2041,10 @@ echo "Modules\\Components - the registry, the sources, the stacks\n";
 \Nino\Modules\Elements::init( $appData );
 
 // The registry the module's own init() fills, read before the test adds to it
-$kernelAll = [ 'title', 'subtitle', 'text', 'line', 'card-title', 'card-subtitle', 'card-text', 'card-image', 'hero-title', 'hero-subtitle', 'card', 'button', 'image', 'logo', 'html', 'spacer', 'scroll-hint', 'col', 'panel' ];
+$kernelAll = [ 'title', 'subtitle', 'text', 'line', 'card-title', 'card-subtitle', 'card-text', 'card-image', 'card', 'button', 'image', 'logo', 'html', 'spacer', 'scroll-hint', 'col', 'panel' ];
 $kernelStacks = [ 'stack', 'repeat', 'slider', 'filter', 'tabs', 'accordion', 'list', 'table', 'sections' ];
-check( 'the module registers the components of the kernel in the order a column offers them: the title, the subtitle, the text and the line of a section, the title, the subtitle, the text and the image of a card, the title and the subtitle of a hero, then the card, the button, the image, the logo, the html, the spacer and the scroll hint, the column of a table and the panel of a fixed group last', array_keys( \Nino\Modules\Components::components( $appData ) ) === $kernelAll );
-check( '...and a tool is answered in that order: the registry as json is an object keyed by name, which read again lists the same nineteen in the same order',
+check( 'the module registers the components of the kernel in the order a column offers them: the title, the subtitle, the text and the line of a section, the title, the subtitle, the text and the image of a card, then the card, the button, the image, the logo, the html, the spacer and the scroll hint, the column of a table and the panel of a fixed group last', array_keys( \Nino\Modules\Components::components( $appData ) ) === $kernelAll );
+check( '...and a tool is answered in that order: the registry as json is an object keyed by name, which read again lists the same seventeen in the same order',
 	str_starts_with( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), '{"title":{' ) === true
 	&& array_keys( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), true ) ) === $kernelAll );
 check( '...and its stacks', array_keys( \Nino\Modules\Components::stacks( $appData ) ) === $kernelStacks );
@@ -2040,14 +2057,12 @@ check( 'a registered schema is complete and carries its label in both languages'
 	&& \Nino\Modules\Components::components( $appData )['title']['preview'] === 'title'
 	&& \Nino\Modules\Components::components( $appData )['title']['loop'] === true
 	&& array_keys( \Nino\Modules\Components::components( $appData )['title']['attributes'] ) === [ 'tag', 'style', 'color' ] );
-check( '...the six titles are labelled by what they are and where they stand, and the card by its name, in both languages',
-	array_map( static fn( array $schema ): array => $schema['label'], array_intersect_key( \Nino\Modules\Components::components( $appData ), array_flip( [ 'title', 'subtitle', 'card-title', 'card-subtitle', 'hero-title', 'hero-subtitle', 'card' ] ) ) ) === [
+check( '...the four titles are labelled by what they are and where they stand, and the card by its name, in both languages',
+	array_map( static fn( array $schema ): array => $schema['label'], array_intersect_key( \Nino\Modules\Components::components( $appData ), array_flip( [ 'title', 'subtitle', 'card-title', 'card-subtitle', 'card' ] ) ) ) === [
 		'title'			=> [ 'en_US' => 'Title (Section)', 'de_DE' => 'Titel (Sektion)' ],
 		'subtitle'		=> [ 'en_US' => 'Subtitle (Section)', 'de_DE' => 'Untertitel (Sektion)' ],
 		'card-title'	=> [ 'en_US' => 'Title (Card)', 'de_DE' => 'Titel (Karte)' ],
 		'card-subtitle'	=> [ 'en_US' => 'Subtitle (Card)', 'de_DE' => 'Untertitel (Karte)' ],
-		'hero-title'	=> [ 'en_US' => 'Title (Hero)', 'de_DE' => 'Titel (Hero)' ],
-		'hero-subtitle'	=> [ 'en_US' => 'Subtitle (Hero)', 'de_DE' => 'Untertitel (Hero)' ],
 		'card'			=> [ 'en_US' => 'Card', 'de_DE' => 'Karte' ],
 	] );
 check( 'a stack\'s schema says whether it draws a grid', \Nino\Modules\Components::stacks( $appData )['stack']['grid'] === true
@@ -2181,12 +2196,12 @@ $badSchemas = [
 	'a bool whose default is no bool'						=> [ 'badbool', [ 'label' => 'x', 'source' => 'text', 'attributes' => [ 'on' => [ 'type' => 'bool', 'default' => 'yes' ] ] ], 'true or false' ],
 	'an attribute the kernel reads itself'			=> [ 'reserved', [ 'label' => 'x', 'source' => 'text', 'attributes' => [ 'content' => [ 'type' => 'string', 'default' => '' ] ] ], 'reads itself' ],
 	'an attribute that is no identifier'				=> [ 'badname', [ 'label' => 'x', 'source' => 'text', 'attributes' => [ 'Not-Camel' => [ 'type' => 'string', 'default' => '' ] ] ], 'lowerCamel' ],
-	'a place that is none of the three'				=> [ 'badplace', [ 'label' => 'x', 'source' => 'text', 'in' => [ 'page' ] ], '"in" lists only section, card, hero' ],
-	'a place that was the cell of a loop'			=> [ 'cellplace', [ 'label' => 'x', 'source' => 'text', 'in' => [ 'cell' ] ], '"in" lists only section, card, hero' ],
+	'a place that is none of the two'				=> [ 'badplace', [ 'label' => 'x', 'source' => 'text', 'in' => [ 'page' ] ], '"in" lists only section, card' ],
+	'a place that was the cell of a loop'			=> [ 'cellplace', [ 'label' => 'x', 'source' => 'text', 'in' => [ 'cell' ] ], '"in" lists only section, card' ],
 	'a place twice'												=> [ 'twiceplace', [ 'label' => 'x', 'source' => 'text', 'in' => [ 'card', 'card' ] ], '"in" names a place twice' ],
 	'no place at all'											=> [ 'noplace', [ 'label' => 'x', 'source' => 'text', 'in' => [] ], '"in" must be a non-empty list' ],
 	'a place that is no list'							=> [ 'wordplace', [ 'label' => 'x', 'source' => 'text', 'in' => 'card' ], '"in" must be a non-empty list' ],
-	'a holding of a place that is none'		=> [ 'badholds', [ 'label' => 'x', 'source' => 'content', 'holds' => 'page' ], '"holds" names a place: section, card, hero, table or panels' ],
+	'a holding of a place that is none'		=> [ 'badholds', [ 'label' => 'x', 'source' => 'content', 'holds' => 'page' ], '"holds" names a place: section, card, table or panels' ],
 	'a holding of a list of places'				=> [ 'listholds', [ 'label' => 'x', 'source' => 'content', 'holds' => [ 'card' ] ], '"holds" names a place' ],
 	'a holding that is a number'					=> [ 'intholds', [ 'label' => 'x', 'source' => 'content', 'holds' => 5 ], '"holds" names a place' ],
 	'a holding that is empty'							=> [ 'emptyholds', [ 'label' => 'x', 'source' => 'content', 'holds' => '' ], '"holds" names a place' ],
@@ -2250,10 +2265,10 @@ $badSchemas = [
 	'a link of a component that has a target of its own'	=> [ 'targetlink', [ 'label' => 'x', 'source' => 'text', 'link' => true, 'attributes' => [ 'target' => [ 'type' => 'string', 'default' => '' ] ] ], 'and the schema declares "target" itself' ],
 	'a registrar that is no slug'								=> [ 'badby', [ 'label' => 'x', 'source' => 'text', 'by' => 'Not A Slug' ], '"by" is a slug' ],
 	'a registrar that is no string'							=> [ 'intby', [ 'label' => 'x', 'source' => 'text', 'by' => 5 ], '"by" is a slug' ],
-	'a component of the kernel or of a project that names no group'	=> [ 'nogroup', [ 'label' => 'x', 'source' => 'text' ], '"group" must be one of section, hero, card, global' ],
-	'a group that is none of the four'					=> [ 'fifthgroup', [ 'label' => 'x', 'source' => 'text', 'group' => 'footer' ], '"group" must be one of section, hero, card, global' ],
-	'a group that is a list'										=> [ 'listgroup', [ 'label' => 'x', 'source' => 'text', 'group' => [ 'section' ] ], '"group" must be one of section, hero, card, global' ],
-	'a component that says nino itself and names no group'	=> [ 'ninogroup', [ 'label' => 'x', 'source' => 'text', 'by' => 'nino' ], '"group" must be one of section, hero, card, global' ],
+	'a component of the kernel or of a project that names no group'	=> [ 'nogroup', [ 'label' => 'x', 'source' => 'text' ], '"group" must be one of section, card, global' ],
+	'a group that is none of the three'					=> [ 'fifthgroup', [ 'label' => 'x', 'source' => 'text', 'group' => 'footer' ], '"group" must be one of section, card, global' ],
+	'a group that is a list'										=> [ 'listgroup', [ 'label' => 'x', 'source' => 'text', 'group' => [ 'section' ] ], '"group" must be one of section, card, global' ],
+	'a component that says nino itself and names no group'	=> [ 'ninogroup', [ 'label' => 'x', 'source' => 'text', 'by' => 'nino' ], '"group" must be one of section, card, global' ],
 	'a group named by the component of a feature'	=> [ 'ownedgroup', [ 'label' => 'x', 'source' => 'text', 'by' => 'hello', 'group' => 'section' ], 'a feature\'s components are offered under the feature, not under a group' ],
 	'a tab that is none of the words'						=> [ 'badtab', $withAttribute( [ 'type' => 'string', 'default' => '', 'tab' => 'sidebar' ] ), '"tab" must be one of '. implode( ', ', \Nino\Modules\Components::TABS ) ],
 	'a tab that is an empty word'							=> [ 'emptytab', $withAttribute( [ 'type' => 'string', 'default' => '', 'tab' => '' ] ), '"tab" must be one of' ],
@@ -2282,7 +2297,7 @@ check( 'a schema that validates is returned complete, a stack with its assets', 
 ] );
 $placed = [ 'label' => 'x', 'source' => 'text', 'group' => 'global', 'attributes' => [ 'tag' => [ 'type' => 'select', 'options' => [ 'div', 'h3' ], 'default' => 'h3' ] ] ];
 check( 'validate() takes the places a component stands in and what it draws, and carries them in the clean schema; a schema that says neither has neither',
-	( \Nino\Modules\Components::validate( 'probe', $placed + [ 'in' => [ 'section', 'card', 'hero' ], 'draws' => '{tag} .nino-probe' ] )['in'] ?? null ) === [ 'section', 'card', 'hero' ]
+	( \Nino\Modules\Components::validate( 'probe', $placed + [ 'in' => [ 'section', 'card' ], 'draws' => '{tag} .nino-probe' ] )['in'] ?? null ) === [ 'section', 'card' ]
 	&& ( \Nino\Modules\Components::validate( 'probe', $placed + [ 'in' => [ 'card' ], 'draws' => '{tag} .nino-probe' ] )['draws'] ?? null ) === '{tag} .nino-probe'
 	&& ( \Nino\Modules\Components::validate( 'probe', $placed + [ 'draws' => 'p .'. str_repeat( 'x', 61 ) ] )['draws'] ?? null ) === 'p .'. str_repeat( 'x', 61 )
 	&& array_key_exists( 'in', \Nino\Modules\Components::validate( 'probe', $placed ) ) === false && array_key_exists( 'draws', \Nino\Modules\Components::validate( 'probe', $placed ) ) === false );
@@ -2304,11 +2319,11 @@ $holdsAnswer = static function( array $schema ): string {
 	$answer = \Nino\Modules\Components::validate( 'box', $schema );
 	return is_string( $answer ) === true ? $answer : '';
 };
-check( 'validate() takes what a component holds - one of the five places, with the source content - and carries it in the clean schema; a schema that says nothing holds nothing',
-	array_filter( [ 'section', 'card', 'hero', 'table', 'panels' ], static fn( string $place ): bool => ( \Nino\Modules\Components::validate( 'box', $holding + [ 'holds' => $place ] )['holds'] ?? null ) !== $place ) === []
+check( 'validate() takes what a component holds - one of the four places, with the source content - and carries it in the clean schema; a schema that says nothing holds nothing',
+	array_filter( [ 'section', 'card', 'table', 'panels' ], static fn( string $place ): bool => ( \Nino\Modules\Components::validate( 'box', $holding + [ 'holds' => $place ] )['holds'] ?? null ) !== $place ) === []
 	&& array_key_exists( 'holds', \Nino\Modules\Components::validate( 'box', $holding ) ) === false );
 check( '...and gives the sentence of the first thing wrong with it: a place that is none (the cell of a loop is not one any more), a list, a number, an empty word - and a source that is not the content',
-	array_filter( [ 'page', 'cell', 'Card', [ 'card' ], 5, '', true ], static fn( mixed $wrong ): bool => str_contains( $holdsAnswer( $holding + [ 'holds' => $wrong ] ), '"holds" names a place: section, card, hero, table or panels' ) === false ) === []
+	array_filter( [ 'page', 'cell', 'Card', [ 'card' ], 5, '', true ], static fn( mixed $wrong ): bool => str_contains( $holdsAnswer( $holding + [ 'holds' => $wrong ] ), '"holds" names a place: section, card, table or panels' ) === false ) === []
 	&& array_filter( [ 'text', 'image', 'href', 'none' ], static fn( string $source ): bool => str_contains( $holdsAnswer( [ 'source' => $source, 'holds' => 'card' ] + $holding ), '"holds" needs the source content' ) === false ) === []
 	&& $holdsAnswer( [ 'holds' => 'weird', 'source' => 'text' ] + $holding ) !== '' && str_contains( $holdsAnswer( [ 'holds' => 'weird', 'source' => 'text' ] + $holding ), 'names a place' ) === true );
 check( 'validate() carries stretched in the clean schema: true where a component that draws a link says so - with link and without - and false where the schema says nothing or says false',
@@ -2365,14 +2380,13 @@ check( 'a component registered with an icon carries it in the registry as it was
 check( '...and in the json of the registry, which a tool reads: the parts are lists and the attributes of a part maps, in the order given',
 	str_contains( (string) json_encode( \Nino\Modules\Components::components( $appData )['pictured'] ), '"icon":[["circle",{"cx":"12","cy":"12","r":"4"}],["path",{"d":"M4 12h16"}],["rect",{"rx":"2","x":"3","y":"3","width":"18","height":"18"}]]' ) === true
 	&& ( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), true ) )['pictured']['icon'] === $pictured );
-// Where a tool offers the six titles, and what each of them draws: the title and the subtitle of a section are offered in the hero as well, and the hero's own in a section
-$kernelPlaces = [ 'title' => [ 'hero', 'section' ], 'card-title' => [ 'card' ], 'hero-title' => [ 'hero', 'section' ], 'subtitle' => [ 'hero', 'section' ], 'card-subtitle' => [ 'card' ], 'hero-subtitle' => [ 'hero', 'section' ] ];
-$kernelDraws = [ 'title' => '{tag} .nino-section-title', 'card-title' => '{tag} .nino-card-title', 'hero-title' => '{tag} .nino-hero-title',
-	'subtitle' => '{tag} .nino-section-subtitle', 'card-subtitle' => '{tag} .nino-card-subtitle', 'hero-subtitle' => '{tag} .nino-hero-subtitle', 'button' => 'a .nino-btn' ];
-// The tags each of the six may be drawn as, with the one it is where the shortcode names none first: a title in a hero is an h2, a section's an h3, a card's an h4
-$sixTags = [ 'title' => [ 'h3', [ 'div', 'h2', 'h3', 'h4' ] ], 'subtitle' => [ 'div', [ 'div', 'p', 'h4', 'h5' ] ], 'card-title' => [ 'h4', [ 'div', 'h3', 'h4' ] ], 'card-subtitle' => [ 'p', [ 'div', 'p', 'h5', 'h6' ] ],
-	'hero-title' => [ 'h2', [ 'div', 'h2', 'h3' ] ], 'hero-subtitle' => [ 'p', [ 'div', 'p', 'h3', 'h4' ] ] ];
-check( 'the registry says where each of the six titles is offered, and what it draws - the class is the one the component is named for',
+// Where a tool offers the four titles, and what each of them draws: the title and the subtitle of a section are offered in a section, the card's in a card
+$kernelPlaces = [ 'title' => [ 'section' ], 'card-title' => [ 'card' ], 'subtitle' => [ 'section' ], 'card-subtitle' => [ 'card' ] ];
+$kernelDraws = [ 'title' => '{tag} .nino-section-title', 'card-title' => '{tag} .nino-card-title',
+	'subtitle' => '{tag} .nino-section-subtitle', 'card-subtitle' => '{tag} .nino-card-subtitle', 'button' => 'a .nino-btn' ];
+// The tags each of the four may be drawn as, with the one it is where the shortcode names none first: a section's is an h3, a card's an h4
+$sixTags = [ 'title' => [ 'h3', [ 'div', 'h2', 'h3', 'h4' ] ], 'subtitle' => [ 'div', [ 'div', 'p', 'h4', 'h5' ] ], 'card-title' => [ 'h4', [ 'div', 'h3', 'h4' ] ], 'card-subtitle' => [ 'p', [ 'div', 'p', 'h5', 'h6' ] ] ];
+check( 'the registry says where each of the four titles is offered, and what it draws - the class is the one the component is named for',
 	array_filter( $kernelPlaces, static fn( array $places, string $name ): bool => ( \Nino\Modules\Components::components( $appData )[$name]['in'] ?? null ) !== $places, ARRAY_FILTER_USE_BOTH ) === []
 	&& array_filter( $kernelDraws, static fn( string $draws, string $name ): bool => ( \Nino\Modules\Components::components( $appData )[$name]['draws'] ?? null ) !== $draws, ARRAY_FILTER_USE_BOTH ) === [] );
 check( '...the button draws and is offered everywhere; text, image, html and spacer declare neither, and neither does a stack',
@@ -2388,6 +2402,19 @@ check( '...and every title has a tag of its own - the tags it may be drawn as, a
 		|| \Nino\Modules\Components::components( $appData )[$name]['attributes']['tag']['label'] !== [ 'en_US' => 'HTML tag', 'de_DE' => 'HTML-Tag' ], ARRAY_FILTER_USE_BOTH ) === []
 	&& array_filter( array_keys( $kernelPlaces ), static fn( string $name ): bool => \Nino\Modules\Components::components( $appData )[$name]['label'] === \Nino\Modules\Components::components( $appData )['title']['label']
 		|| \Nino\Modules\Components::components( $appData )[$name]['preview'] !== 'title' || \Nino\Modules\Components::components( $appData )[$name]['source'] !== 'text' ) === [ 'title' ] );
+// The hero is a style of the title and the subtitle of a section, and of no other component: the word is among the options of those two alone, after loud
+check( 'the style of the title and of the subtitle of a section has the word hero after loud, and no other component has it - not the card\'s titles, not the texts',
+	\Nino\Modules\Components::components( $appData )['title']['attributes']['style']['options'] === [ '', 'loud', 'hero', 'quiet' ]
+	&& \Nino\Modules\Components::components( $appData )['subtitle']['attributes']['style']['options'] === [ '', 'loud', 'hero', 'quiet' ]
+	&& array_filter( array_diff_key( array_intersect_key( \Nino\Modules\Components::components( $appData ), array_flip( $kernelAll ) ), [ 'title' => 1, 'subtitle' => 1 ] ),
+		static fn( array $schema ): bool => in_array( 'hero', $schema['attributes']['style']['options'] ?? [], true ) === true ) === [] );
+// The hero is no place, no group and no component of the kernel's any more: what was offered there is offered where a section, a card or everyone has it
+check( 'the places are the section, the card, the table and the panels, the groups the section, the card and global - there is no hero among them, no component of the kernel stands in one or is offered under one, and the scroll hint is global',
+	\Nino\Modules\Components::PLACES === [ 'section', 'card', 'table', 'panels' ] && \Nino\Modules\Components::GROUPS === [ 'section', 'card', 'global' ]
+	&& array_filter( \Nino\Modules\Components::components( $appData ), static fn( array $schema ): bool => in_array( 'hero', $schema['in'] ?? [], true ) === true || ( $schema['group'] ?? '' ) === 'hero' ) === []
+	&& \Nino\Modules\Components::components( $appData )['scroll-hint']['group'] === 'global' && \Nino\Modules\Components::components( $appData )['scroll-hint']['in'] === [ 'section' ]
+	&& array_diff( [ 'hero-title', 'hero-subtitle' ], array_keys( \Nino\Modules\Components::components( $appData ) ) ) === [ 'hero-title', 'hero-subtitle' ]
+	&& array_intersect( [ 'hero-title', 'hero-subtitle' ], \Nino\Html::shortcodes( $appData ) ) === [] );
 // The text and the image of a card: offered in a card alone, drawing the class a card styles them by, and made as the text and the image are
 $registryOf = static fn( string $name ): array => \Nino\Modules\Components::components( $appData )[$name];
 check( 'the registry has the text of a card: labelled in both languages, a text read from a key or a field, offered in a card alone, drawing the <div> of nino-card-descr',
@@ -2430,7 +2457,7 @@ foreach( $imageRatios as $imageRatio )
 			$ratioWrong[] = $ratioSelector;
 check( 'every ratio of the frame is said by the frame and by the <img> directly in it - .nino-image--<x>-<y> and .nino-image--<x>-<y> > img, aspect-ratio: x / y - so that the picture has the ratio of the frame whether or not its height of 100% is worked out'
 	. ( $ratioWrong === [] ? '' : ' - not: '. implode( ', ', $ratioWrong ) ), $ratioWrong === [] && $imageRatios !== [] );
-// The icons of the sixteen: each component of the kernel is shown by the parts of a 24 by 24 icon of Lucide, which the registry hands to a tool
+// The icons of the fourteen: each component of the kernel is shown by the parts of a 24 by 24 icon of Lucide, which the registry hands to a tool
 $iconTags = [ 'path' => [ [ 'd' ], [] ], 'circle' => [ [ 'cx', 'cy', 'r' ], [] ], 'ellipse' => [ [ 'cx', 'cy', 'rx', 'ry' ], [] ], 'rect' => [ [ 'x', 'y', 'width', 'height' ], [ 'rx', 'ry' ] ],
 	'line' => [ [ 'x1', 'y1', 'x2', 'y2' ], [] ], 'polyline' => [ [ 'points' ], [] ], 'polygon' => [ [ 'points' ], [] ] ];
 $iconOf = static fn( string $name ): mixed => \Nino\Modules\Components::components( $appData )[$name]['icon'] ?? null;
@@ -2450,15 +2477,15 @@ foreach( $kernelAll as $iconName ) {
 			$iconWrong[] = $iconName. ' part '. ( $iconNumber + 1 ). ' is no complete part of an icon';
 	}
 }
-check( 'each of the sixteen components of the kernel carries an icon: a list of one to five parts, each a tag among the seven and a map of strings that holds the attributes of that tag'. ( $iconWrong === [] ? '' : ' - '. implode( ', ', $iconWrong ) ), $iconWrong === [] );
+check( 'each of the fourteen components of the kernel carries an icon: a list of one to five parts, each a tag among the seven and a map of strings that holds the attributes of that tag'. ( $iconWrong === [] ? '' : ' - '. implode( ', ', $iconWrong ) ), $iconWrong === [] );
 check( '...the title is drawn by the three paths of the heading of Lucide, the card by a rect and a path, the image by a rect, a circle and a path and the logo by a circle and a path, the circle half filled',
 	$iconOf( 'title' ) === [ [ 'path', [ 'd' => 'M6 12h12' ] ], [ 'path', [ 'd' => 'M6 20V4' ] ], [ 'path', [ 'd' => 'M18 20V4' ] ] ]
 	&& array_column( (array) $iconOf( 'card' ), 0 ) === [ 'rect', 'path' ] && array_column( (array) $iconOf( 'image' ), 0 ) === [ 'rect', 'circle', 'path' ]
 	&& array_column( (array) $iconOf( 'logo' ), 0 ) === [ 'circle', 'path' ] );
 $iconKinds = [ 'title', 'subtitle', 'text', 'card', 'button', 'image', 'logo', 'html', 'spacer', 'scroll-hint' ];
-check( '...the three titles are drawn alike and so are the three subtitles, the two texts and the two images, and the title, the subtitle, the text, the card, the button, the image, the logo, the html, the spacer and the scroll hint each have a picture of their own',
-	$iconOf( 'title' ) === $iconOf( 'card-title' ) && $iconOf( 'title' ) === $iconOf( 'hero-title' )
-	&& $iconOf( 'subtitle' ) === $iconOf( 'card-subtitle' ) && $iconOf( 'subtitle' ) === $iconOf( 'hero-subtitle' )
+check( '...the two titles are drawn alike and so are the two subtitles, the two texts and the two images, and the title, the subtitle, the text, the card, the button, the image, the logo, the html, the spacer and the scroll hint each have a picture of their own',
+	$iconOf( 'title' ) === $iconOf( 'card-title' )
+	&& $iconOf( 'subtitle' ) === $iconOf( 'card-subtitle' )
 	&& $iconOf( 'text' ) === $iconOf( 'card-text' ) && $iconOf( 'image' ) === $iconOf( 'card-image' )
 	&& count( array_unique( array_map( static fn( string $name ): string => (string) json_encode( $iconOf( $name ) ), $iconKinds ) ) ) === count( $iconKinds ) );
 // Which icon of Lucide a component carries shows in the first part of it: the ten icons begin with ten different parts
@@ -2468,17 +2495,17 @@ $iconFirst = [
 	'image' => [ 'rect', [ 'width' => '18', 'height' => '18', 'x' => '3', 'y' => '3', 'rx' => '2', 'ry' => '2' ] ], 'logo' => [ 'circle', [ 'cx' => '12', 'cy' => '12', 'r' => '10' ] ], 'html' => [ 'path', [ 'd' => 'm16 18 6-6-6-6' ] ], 'spacer' => [ 'path', [ 'd' => 'm16 16-4 4-4-4' ] ],
 	'scroll-hint' => [ 'path', [ 'd' => 'm6 9 6 6 6-6' ] ],
 ];
-$iconKindOf = [ 'title' => 'title', 'card-title' => 'title', 'hero-title' => 'title', 'subtitle' => 'subtitle', 'card-subtitle' => 'subtitle', 'hero-subtitle' => 'subtitle',
+$iconKindOf = [ 'title' => 'title', 'card-title' => 'title', 'subtitle' => 'subtitle', 'card-subtitle' => 'subtitle',
 	'text' => 'text', 'card-text' => 'text', 'card' => 'card', 'button' => 'button', 'image' => 'image', 'card-image' => 'image', 'logo' => 'logo', 'html' => 'html', 'spacer' => 'spacer', 'scroll-hint' => 'scroll-hint' ];
 check( '...the titles are drawn as the heading of Lucide, the subtitles as its type, the texts as lines, the card as a panel, the button as a pointer, the images as a picture, the logo as a half-filled circle, the html as code, the spacer as a separator and the scroll hint as a chevron',
 	array_filter( $iconKindOf, static fn( string $kind, string $name ): bool => ( $iconOf( $name )[0] ?? null ) !== $iconFirst[$kind], ARRAY_FILTER_USE_BOTH ) === [] && $iconOf( 'scroll-hint' ) === [ $iconFirst['scroll-hint'] ] );
-check( '...and the json of the registry gives each of the sixteen back as it is: the parts as lists and the attributes of a part as maps',
+check( '...and the json of the registry gives each of the fourteen back as it is: the parts as lists and the attributes of a part as maps',
 	array_filter( $kernelAll, static fn( string $name ): bool => ( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), true ) )[$name]['icon'] !== $iconOf( $name ) ) === [] );
 // The card: a component that holds components. What the registry says of it, and of nothing else of the kernel
 $cardSchema = \Nino\Modules\Components::components( $appData )['card'];
-check( 'the card is declared as the registry says: a label in both languages, the source content, the picture of a block, its icon, offered in a section and a hero, drawing the <article> with its class, and holding the components of a card',
+check( 'the card is declared as the registry says: a label in both languages, the source content, the picture of a block, its icon, offered in a section, drawing the <article> with its class, and holding the components of a card',
 	$cardSchema['label'] === [ 'en_US' => 'Card', 'de_DE' => 'Karte' ] && $cardSchema['source'] === 'content' && $cardSchema['loop'] === true && $cardSchema['preview'] === 'block'
-	&& $cardSchema['in'] === [ 'section', 'hero' ] && $cardSchema['draws'] === 'article .nino-card' && $cardSchema['holds'] === 'card'
+	&& $cardSchema['in'] === [ 'section' ] && $cardSchema['draws'] === 'article .nino-card' && $cardSchema['holds'] === 'card'
 	&& array_keys( $cardSchema ) === [ 'label', 'source', 'loop', 'preview', 'icon', 'attributes', 'in', 'draws', 'holds', 'stretched', 'link', 'by', 'group' ] );
 check( '...it says stretched itself no more than a holder can - false, and the registry gives it back in json - and its schema has no key for the component whose address it takes: the title says that of itself, \'card-title\' and \'title\' are the two components of the kernel that do',
 	$cardSchema['stretched'] === false && ( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), true ) )['card']['stretched'] === false
@@ -2524,8 +2551,8 @@ check( '...the card is the one component of the kernel that holds components, an
 	&& array_keys( array_filter( \Nino\Modules\Components::stacks( $appData ), static fn( array $stack ): bool => array_key_exists( 'holds', $stack ) === true ) ) === [ 'table' ]
 	&& \Nino\Modules\Components::defaults( $appData, 'card' ) === [ 'fill' => '0', 'padding' => '', 'vertical' => '', 'align' => '', 'ground' => '', 'borderless' => '0', 'linked' => '0', 'background' => '', 'focus' => '', 'dim' => '0', 'class' => '' ] );
 // The variants are factors of the role (Nino.css), and the label of the style says it all: none of the seven carries a hint
-check( '...and the style of the six titles and of the two texts has no hint under its name, in neither language',
-	array_filter( [ 'title', 'card-title', 'hero-title', 'subtitle', 'card-subtitle', 'hero-subtitle', 'text', 'card-text' ], static fn( string $name ): bool => ( \Nino\Modules\Components::components( $appData )[$name]['attributes']['style']['hint'] ?? '' ) !== '' ) === [] );
+check( '...and the style of the four titles and of the two texts has no hint under its name, in neither language',
+	array_filter( [ 'title', 'card-title', 'subtitle', 'card-subtitle', 'text', 'card-text' ], static fn( string $name ): bool => ( \Nino\Modules\Components::components( $appData )[$name]['attributes']['style']['hint'] ?? '' ) !== '' ) === [] );
 // A variant: a select whose words are the modifiers of a class - the style of the text and of the pictures, the colour of a text
 $lookOf = static fn( array $declared ): array|string => \Nino\Modules\Components::validate( 'probe', [ 'label' => 'x', 'source' => 'text', 'group' => 'global', 'attributes' => [ 'look' => $declared ] ] );
 $lookGood = [ 'type' => 'variant', 'options' => [ '', 'big', 'extra-big' ], 'default' => 'big' ];
@@ -2611,21 +2638,21 @@ check( 'a component that says link has the address and the window of a link afte
 	&& array_keys( \Nino\Modules\Components::components( $appData )['linkprobe']['attributes'] ) === [ 'tag' ] && \Nino\Modules\Components::components( $appData )['linkprobe']['by'] === 'hello'
 	&& array_keys( $linkAttributes ) === [ 'href', 'target' ] && $linkAttributes['href']['type'] === 'href' && $linkAttributes['target']['options'] === [ '', '_blank' ] );
 
-// The group a tool offers a component under follows from who registered it: one of the four words from the kernel's own and from a project's, none from a feature's
+// The group a tool offers a component under follows from who registered it: one of the three words from the kernel's own and from a project's, none from a feature's
 $ungrouped = array_diff_key( $placed, [ 'group' => 1 ] );
-$groupSentence = 'component "probe": "group" must be one of section, hero, card, global';
+$groupSentence = 'component "probe": "group" must be one of section, card, global';
 $featureSentence = 'component "probe": a feature\'s components are offered under the feature, not under a group';
-check( 'validate() takes the group a component is offered under, one of the four words, and the clean schema carries it as its last key, after who registered it; a stack has none, whatever it says',
+check( 'validate() takes the group a component is offered under, one of the three words, and the clean schema carries it as its last key, after who registered it; a stack has none, whatever it says',
 	array_filter( \Nino\Modules\Components::GROUPS, static fn( string $group ): bool => ( \Nino\Modules\Components::validate( 'probe', $ungrouped + [ 'group' => $group ] )['group'] ?? null ) !== $group ) === []
 	&& array_keys( \Nino\Modules\Components::validate( 'probe', $placed ) ) === [ 'label', 'source', 'loop', 'preview', 'attributes', 'stretched', 'link', 'by', 'group' ]
 	&& array_key_exists( 'group', (array) \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'group' => 'section' ], true ) ) === false
 	&& \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'group' => 'footer' ], true ) === \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x' ], true ) );
-check( '...and gives the sentence for a component of the kernel or of a project that names none, says nino and none, or names a word that is none of the four: a fifth word, one in capitals, one with a space, an empty word, a number, a list',
+check( '...and gives the sentence for a component of the kernel or of a project that names none, says nino and none, or names a word that is none of the three: a fourth word, one in capitals, one with a space, an empty word, a number, a list',
 	array_filter( [ [], [ 'by' => 'nino' ], [ 'group' => 'footer' ], [ 'group' => 'Section' ], [ 'group' => ' section' ], [ 'group' => '' ], [ 'group' => null ], [ 'group' => 5 ], [ 'group' => true ], [ 'group' => [ 'section' ] ] ],
 		static fn( array $wrong ): bool => \Nino\Modules\Components::validate( 'probe', $ungrouped + $wrong ) !== $groupSentence ) === [] );
-check( '...a feature\'s components are offered under the feature: one that is registered by another than nino has no group in its clean schema, and a schema that names one - a word of the four or not - is refused with the sentence for it',
+check( '...a feature\'s components are offered under the feature: one that is registered by another than nino has no group in its clean schema, and a schema that names one - a word of the three or not - is refused with the sentence for it',
 	array_key_exists( 'group', (array) \Nino\Modules\Components::validate( 'probe', $ungrouped + [ 'by' => 'hello' ] ) ) === false && is_array( \Nino\Modules\Components::validate( 'probe', $ungrouped + [ 'by' => 'hello' ] ) ) === true
-	&& array_filter( [ 'section', 'hero', 'card', 'global', 'footer', '', 5, [ 'section' ] ], static fn( mixed $group ): bool => \Nino\Modules\Components::validate( 'probe', $ungrouped + [ 'by' => 'hello', 'group' => $group ] ) !== $featureSentence ) === [] );
+	&& array_filter( [ 'section', 'card', 'global', 'footer', '', 5, [ 'section' ] ], static fn( mixed $group ): bool => \Nino\Modules\Components::validate( 'probe', $ungrouped + [ 'by' => 'hello', 'group' => $group ] ) !== $featureSentence ) === [] );
 check( '...and the manifest of a feature is read for the feature: handed its key, validate() makes the component the feature\'s own whatever by the schema says and offers it under no group - a schema that names one is refused - while the by the schema says is read all the same, and a stack is read as before',
 	( \Nino\Modules\Components::validate( 'probe', $ungrouped, false, 'hello' )['by'] ?? null ) === 'hello' && array_key_exists( 'group', (array) \Nino\Modules\Components::validate( 'probe', $ungrouped, false, 'hello' ) ) === false
 	&& ( \Nino\Modules\Components::validate( 'probe', $ungrouped + [ 'by' => 'nino' ], false, 'hello' )['by'] ?? null ) === 'hello'
@@ -2633,17 +2660,17 @@ check( '...and the manifest of a feature is read for the feature: handed its key
 	&& str_contains( (string) \Nino\Modules\Components::validate( 'probe', $ungrouped + [ 'by' => 'Not A Slug' ], false, 'hello' ), '"by" is a slug' ) === true
 	&& \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'group' => 'section' ], true, 'hello' ) === \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x' ], true ) );
 $groupApp = $appData;
-\Nino\Modules\Components::addComponent( $groupApp, 'grouped', $noop, $ungrouped + [ 'group' => 'hero' ] );
+\Nino\Modules\Components::addComponent( $groupApp, 'grouped', $noop, $ungrouped + [ 'group' => 'card' ] );
 \Nino\Modules\Components::addComponent( $groupApp, 'featured', $noop, $ungrouped + [ 'by' => 'hello' ] );
 check( '...the registry has the group a component said and none for a feature\'s, as the registry and as the json a tool reads, where the two are told apart by who registered them',
-	( \Nino\Modules\Components::components( $groupApp )['grouped']['group'] ?? null ) === 'hero' && array_key_exists( 'group', \Nino\Modules\Components::components( $groupApp )['featured'] ) === false
-	&& ( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $groupApp ) ), true ) )['grouped']['group'] === 'hero'
+	( \Nino\Modules\Components::components( $groupApp )['grouped']['group'] ?? null ) === 'card' && array_key_exists( 'group', \Nino\Modules\Components::components( $groupApp )['featured'] ) === false
+	&& ( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $groupApp ) ), true ) )['grouped']['group'] === 'card'
 	&& array_key_exists( 'group', (array) ( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $groupApp ) ), true ) )['featured'] ) === false
 	&& \Nino\Modules\Components::components( $groupApp )['grouped']['by'] === 'nino' && \Nino\Modules\Components::components( $groupApp )['featured']['by'] === 'hello' );
 
-// What the kernel says with them: ten components can be a link, every one is the kernel's, and four attributes say how they are drawn
-$kernelLinked = [ 'title', 'subtitle', 'text', 'card-title', 'card-subtitle', 'card-text', 'card-image', 'hero-title', 'hero-subtitle', 'image' ];
-check( 'ten components of the kernel can be a link - the titles, the subtitles, the texts and the two pictures - and the card, the button, the html, the spacer and the scroll hint cannot: the button has an address of its own, the card holds buttons, and no link stands in another',
+// What the kernel says with them: eight components can be a link, every one is the kernel's, and four attributes say how they are drawn
+$kernelLinked = [ 'title', 'subtitle', 'text', 'card-title', 'card-subtitle', 'card-text', 'card-image', 'image' ];
+check( 'eight components of the kernel can be a link - the titles, the subtitles, the texts and the two pictures - and the card, the button, the html, the spacer and the scroll hint cannot: the button has an address of its own, the card holds buttons, and no link stands in another',
 	array_keys( array_filter( \Nino\Modules\Components::components( $appData ), static fn( array $schema, string $name ): bool => $schema['link'] === true && in_array( $name, $kernelAll, true ) === true, ARRAY_FILTER_USE_BOTH ) ) === $kernelLinked );
 check( '...every component of the kernel is its own - by nino - and a stack has neither key',
 	array_filter( array_intersect_key( \Nino\Modules\Components::components( $appData ), array_flip( $kernelAll ) ), static fn( array $schema ): bool => $schema['by'] !== 'nino' ) === []
@@ -2663,20 +2690,20 @@ foreach( array_intersect_key( \Nino\Modules\Components::components( $appData ), 
 check( '...and on which tab where it matters: the colour, the picture, the focus and the dimming of a card on the tab of the background - and says nothing else',
 	$kernelTabs === [ 'card.ground' => 'background', 'card.background' => 'background', 'card.focus' => 'background', 'card.dim' => 'background' ]
 	&& array_diff( $kernelTabs, \Nino\Modules\Components::TABS ) === [] );
-$eightTexts = [ 'title', 'subtitle', 'text', 'card-title', 'card-subtitle', 'card-text', 'hero-title', 'hero-subtitle' ];
-check( 'the style of the eight text components is a variant - none, loud or quiet - of the class each is named for, and their colour another, the last attribute after the style: none, muted or accent, written as nino-ink--<word>, the ink of the ground the text stands on',
-	array_filter( $eightTexts, static fn( string $name ): bool => ( $registryOf( $name )['attributes']['style'] ?? null ) !== [ 'type' => 'variant', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ], 'hint' => '', 'options' => [ '', 'loud', 'quiet' ], 'default' => '' ]
+$sixTexts = [ 'title', 'subtitle', 'text', 'card-title', 'card-subtitle', 'card-text' ];
+check( 'the style of the six text components is a variant - none, loud or quiet, and for the title and the subtitle of a section hero as well - of the class each is named for, and their colour another, the last attribute after the style: none, muted or accent, written as nino-ink--<word>, the ink of the ground the text stands on',
+	array_filter( $sixTexts, static fn( string $name ): bool => ( $registryOf( $name )['attributes']['style'] ?? null ) !== [ 'type' => 'variant', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ], 'hint' => '', 'options' => in_array( $name, [ 'title', 'subtitle' ], true ) === true ? [ '', 'loud', 'hero', 'quiet' ] : [ '', 'loud', 'quiet' ], 'default' => '' ]
 		|| ( $registryOf( $name )['attributes']['color'] ?? null ) !== [ 'type' => 'variant', 'label' => [ 'en_US' => 'Text colour', 'de_DE' => 'Text-Farbe' ], 'hint' => '', 'options' => [ '', 'muted', 'accent' ], 'prefix' => 'nino-ink--', 'default' => '' ]
 		|| array_slice( array_keys( $registryOf( $name )['attributes'] ), -2 ) !== [ 'style', 'color' ] ) === []
-	&& array_keys( array_filter( array_intersect_key( \Nino\Modules\Components::components( $appData ), array_flip( $kernelAll ) ), static fn( array $schema ): bool => isset( $schema['attributes']['color'] ) === true ) ) === $eightTexts );
+	&& array_keys( array_filter( array_intersect_key( \Nino\Modules\Components::components( $appData ), array_flip( $kernelAll ) ), static fn( array $schema ): bool => isset( $schema['attributes']['color'] ) === true ) ) === $sixTexts );
 check( '...the width of a button comes after its size, none or full, and the button has its address and its target from the one place the link of a component is declared: word for word what a link gives a component',
 	array_keys( $registryOf( 'button' )['attributes'] ) === [ 'href', 'style', 'size', 'width', 'target' ]
 	&& $registryOf( 'button' )['attributes']['width'] === [ 'type' => 'select', 'label' => [ 'en_US' => 'Width', 'de_DE' => 'Breite' ], 'hint' => '', 'input' => 'segment', 'options' => [ '', 'full' ], 'default' => '' ]
 	&& array_diff_key( $registryOf( 'button' )['attributes']['href'], [ 'label' => 1, 'hint' => 1 ] ) === [ 'type' => 'href', 'default' => '' ] && $registryOf( 'button' )['attributes']['href']['label'] === $linkAttributes['href']['label'] && $registryOf( 'button' )['attributes']['href']['hint'] === $linkAttributes['href']['hint']
 	&& $registryOf( 'button' )['attributes']['target']['label'] === $linkAttributes['target']['label'] && $registryOf( 'button' )['attributes']['target']['options'] === $linkAttributes['target']['options'] );
-check( 'the scroll hint is the arrow of a hero: labelled in both languages, no source, offered in a hero and a section, drawing the <a> of nino-hero-arrowdown, with the id of the section to scroll to as its one attribute - and the registry says it is the kernel\'s and no link',
+check( 'the scroll hint is the arrow of a hero: labelled in both languages, no source, offered in a section and under global, drawing the <a> of nino-hero-arrowdown, with the id of the section to scroll to as its one attribute - and the registry says it is the kernel\'s and no link',
 	$registryOf( 'scroll-hint' )['label'] === [ 'en_US' => 'Scroll hint', 'de_DE' => 'Scroll-Hinweis' ] && $registryOf( 'scroll-hint' )['source'] === 'none' && $registryOf( 'scroll-hint' )['preview'] === 'block'
-	&& $registryOf( 'scroll-hint' )['in'] === [ 'hero', 'section' ] && $registryOf( 'scroll-hint' )['draws'] === 'a .nino-hero-arrowdown' && array_key_exists( 'holds', $registryOf( 'scroll-hint' ) ) === false
+	&& $registryOf( 'scroll-hint' )['in'] === [ 'section' ] && $registryOf( 'scroll-hint' )['group'] === 'global' && $registryOf( 'scroll-hint' )['draws'] === 'a .nino-hero-arrowdown' && array_key_exists( 'holds', $registryOf( 'scroll-hint' ) ) === false
 	&& array_keys( $registryOf( 'scroll-hint' )['attributes'] ) === [ 'to' ] && $registryOf( 'scroll-hint' )['attributes']['to']['type'] === 'string' && $registryOf( 'scroll-hint' )['attributes']['to']['default'] === ''
 	&& $registryOf( 'scroll-hint' )['link'] === false && \Nino\Modules\Components::defaults( $appData, 'scroll-hint' ) === [ 'to' => '', 'class' => '' ] );
 check( 'the sections are a stack with a loop and no grid: a section to an element, so that it has the attributes of every loop and none of a grid - cols, gap and autoheight are left to the stacks that draw cells',
@@ -2689,7 +2716,7 @@ check( '...and the one attribute it has of its own is alternate, a bool that is 
 
 check( 'a clean schema validates again as it is - what a manifest hands over after Features::manifest() has read it', \Nino\Modules\Components::validate( 'title', \Nino\Modules\Components::components( $appData )['title'] ) === \Nino\Modules\Components::components( $appData )['title']
 	&& \Nino\Modules\Components::validate( 'filter', \Nino\Modules\Components::stacks( $appData )['filter'], true ) === \Nino\Modules\Components::stacks( $appData )['filter'] );
-check( '...icon and all: each of the sixteen, and a component registered with an icon of its own, validates again as it is, the parts and the maps of the icon in the order they were in',
+check( '...icon and all: each of the fourteen, and a component registered with an icon of its own, validates again as it is, the parts and the maps of the icon in the order they were in',
 	array_filter( array_merge( $kernelAll, [ 'pictured' ] ), static fn( string $name ): bool => \Nino\Modules\Components::validate( $name, \Nino\Modules\Components::components( $appData )[$name] ) !== \Nino\Modules\Components::components( $appData )[$name] ) === [] );
 \Nino\Callbacks::registerCallback( $appData, '/test/removable', static fn( array &$appData, mixed &$args ): string => 'x' );
 \Nino\Callbacks::registerCallback( $appData, '/test/removable', static fn( array &$appData, mixed &$args ): string => 'y' );
@@ -2940,27 +2967,36 @@ check( '[title] takes a class of its own at the end of its classes, escaped', $r
 check( '[subtitle] is a div with the class of a subtitle, and the tag it is told to be', $render( '[subtitle /template/page-home/hero/subtitle style="quiet"]' ) === '<div class="nino-section-subtitle nino-section-subtitle--quiet">Sub</div>'
 	&& $render( '[subtitle /template/page-home/hero/subtitle tag="p"]' ) === '<p class="nino-section-subtitle">Sub</p>'
 	&& $render( '[subtitle /template/page-home/hero/subtitle tag="h5" style="quiet"]' ) === '<h5 class="nino-section-subtitle nino-section-subtitle--quiet">Sub</h5>' );
-check( '[card-title] and [hero-title] are headings of their own class, with a tag, a style and a class of their own, as [title] is',
+check( '[card-title] is a heading of its own class, with a tag, a style and a class of their own, as [title] is',
 	$render( '[card-title /template/page-home/hero/title]' ) === '<h4 class="nino-card-title">Hi &#91;there]</h4>'
 	&& $render( '[card-title /template/page-home/hero/title tag="h3" style="quiet"]' ) === '<h3 class="nino-card-title nino-card-title--quiet">Hi &#91;there]</h3>'
 	&& $render( '[card-title /template/page-home/hero/title style="loud" class="a b&c"]' ) === '<h4 class="nino-card-title nino-card-title--loud a b&amp;c">Hi &#91;there]</h4>'
-	&& $render( '[hero-title /template/page-home/hero/title]' ) === '<h2 class="nino-hero-title">Hi &#91;there]</h2>'
-	&& $render( '[hero-title /template/page-home/hero/title tag="h3" style="loud"]' ) === '<h3 class="nino-hero-title nino-hero-title--loud">Hi &#91;there]</h3>'
-	&& $render( '[hero-title /template/page-home/hero/title style="quiet" class="x"]' ) === '<h2 class="nino-hero-title nino-hero-title--quiet x">Hi &#91;there]</h2>' );
-check( '[card-subtitle] and [hero-subtitle] are paragraphs of their own class, with a tag, a style and a class of their own, as [subtitle] is',
+	&& $render( '[card-title /template/page-home/hero/title tag="h3" style="hero"]' ) === '<h3 class="nino-card-title">Hi &#91;there]</h3>' );
+// The hero is a style of the title and of the subtitle of a section: the class of the variant beside the class it varies, in the tag the call says, and of no other component
+check( '[title] and [subtitle] in the style hero are the section\'s title and subtitle with the class nino-section-title--hero beside the base class, in the tag they are told to be, with a colour and a class of their own behind it',
+	$render( '[title /template/page-home/hero/title style="hero"]' ) === '<h3 class="nino-section-title nino-section-title--hero">Hi &#91;there]</h3>'
+	&& $render( '[title /template/page-home/hero/title tag="h2" style="hero" color="muted" class="x"]' ) === '<h2 class="nino-section-title nino-section-title--hero nino-ink--muted x">Hi &#91;there]</h2>'
+	&& $render( '[subtitle /template/page-home/hero/subtitle style="hero"]' ) === '<div class="nino-section-subtitle nino-section-subtitle--hero">Sub</div>'
+	&& $render( '[subtitle /template/page-home/hero/subtitle tag="p" style="hero"]' ) === '<p class="nino-section-subtitle nino-section-subtitle--hero">Sub</p>'
+	&& $render( '[card-subtitle /template/page-home/hero/subtitle style="hero"]' ) === '<p class="nino-card-subtitle">Sub</p>'
+	&& str_contains( $render( '[text /template/page-home/hero/title style="hero"]' ), 'hero' ) === false
+	&& str_contains( $render( '[card-text /template/page-home/hero/title style="hero"]' ), 'hero' ) === false );
+// [hero-title] and [hero-subtitle] are no components: no shortcode is registered, and the call is what an unknown shortcode is
+check( '[hero-title] and [hero-subtitle] are no shortcodes: the call renders as that of a name nobody registered does, a heading and a line of it are not drawn',
+	$render( '[hero-title /template/page-home/hero/title]' ) === str_replace( 'nosuchshortcode', 'hero-title', $render( '[nosuchshortcode /template/page-home/hero/title]' ) )
+	&& $render( '[hero-subtitle /template/page-home/hero/subtitle style="hero"]' ) === str_replace( 'nosuchshortcode', 'hero-subtitle', $render( '[nosuchshortcode /template/page-home/hero/subtitle style="hero"]' ) )
+	&& str_contains( $render( '[hero-title /template/page-home/hero/title]' ), 'class=' ) === false && str_contains( $render( '[hero-title /template/page-home/hero/title]' ), 'Hi' ) === false );
+check( '[card-subtitle] is a paragraph of its own class, with a tag, a style and a class of their own, as [subtitle] is',
 	$render( '[card-subtitle /template/page-home/hero/subtitle]' ) === '<p class="nino-card-subtitle">Sub</p>'
 	&& $render( '[card-subtitle /template/page-home/hero/subtitle style="quiet"]' ) === '<p class="nino-card-subtitle nino-card-subtitle--quiet">Sub</p>'
 	&& $render( '[card-subtitle /template/page-home/hero/subtitle tag="h6"]' ) === '<h6 class="nino-card-subtitle">Sub</h6>'
-	&& $render( '[hero-subtitle /template/page-home/hero/subtitle]' ) === '<p class="nino-hero-subtitle">Sub</p>'
-	&& $render( '[hero-subtitle /template/page-home/hero/subtitle tag="h3"]' ) === '<h3 class="nino-hero-subtitle">Sub</h3>'
-	&& $render( '[hero-subtitle /template/page-home/hero/subtitle style="loud" class="x"]' ) === '<p class="nino-hero-subtitle nino-hero-subtitle--loud x">Sub</p>'
 	&& $render( '[subtitle /template/page-home/hero/subtitle class="x"]' ) === '<div class="nino-section-subtitle x">Sub</div>' );
-// Each of the six draws the class it is named for and the two variants of it, in the tag it is by default and in every tag it offers, and Nino.css
+// Each of the four draws the class it is named for and the variants of it, in the tag it is by default and in every tag it offers, and Nino.css
 // styles the class and both variants of each - a style that names a class no rule styles would be a choice in a tool that does nothing
-$sixClasses = [ 'title' => 'nino-section-title', 'card-title' => 'nino-card-title', 'hero-title' => 'nino-hero-title', 'subtitle' => 'nino-section-subtitle', 'card-subtitle' => 'nino-card-subtitle', 'hero-subtitle' => 'nino-hero-subtitle' ];
+$sixClasses = [ 'title' => 'nino-section-title', 'card-title' => 'nino-card-title', 'subtitle' => 'nino-section-subtitle', 'card-subtitle' => 'nino-card-subtitle' ];
 $sixWrong = [];
 foreach( $sixClasses as $sixName => $sixClass ) {
-	foreach( [ '' => '', 'quiet' => '--quiet', 'loud' => '--loud' ] as $sixStyle => $sixModifier ) {
+	foreach( [ '' => '', 'quiet' => '--quiet', 'loud' => '--loud' ] + ( in_array( $sixName, [ 'title', 'subtitle' ], true ) === true ? [ 'hero' => '--hero' ] : [] ) as $sixStyle => $sixModifier ) {
 		$sixHtml = $render( '['. $sixName. ' /template/page-home/hero/title style="'. $sixStyle. '"]' );
 		$sixExpected = '<'. $sixTags[$sixName][0]. ' class="'. $sixClass. ( $sixModifier !== '' ? ' '. $sixClass. $sixModifier : '' ). '">Hi &#91;there]</'. $sixTags[$sixName][0]. '>';
 		if( $sixHtml !== $sixExpected )
@@ -2974,21 +3010,21 @@ foreach( $sixClasses as $sixName => $sixClass ) {
 	if( preg_match( '/(?<![\w-])\.'. preg_quote( $sixClass, '/' ). '\s*[,{]/', $hookCss ) !== 1 )
 		$sixWrong[] = $sixClass. ' has no rule in Nino.css';
 }
-check( 'each of the six titles draws the class it is named for, with its quiet and its loud variant, in the tag it is by default and in every tag it offers, and Nino.css has the class and both variants of each'. ( $sixWrong === [] ? '' : ' - '. implode( ' | ', $sixWrong ) ), $sixWrong === [] );
-check( '...a tag or a style outside what a title offers is the default one, and a source that resolves to nothing renders nothing, for each of the six',
+check( 'each of the four titles draws the class it is named for, with its quiet and its loud variant - and the section\'s with its hero variant -, in the tag it is by default and in every tag it offers, and Nino.css has the class and both variants of each'. ( $sixWrong === [] ? '' : ' - '. implode( ' | ', $sixWrong ) ), $sixWrong === [] );
+check( '...a tag or a style outside what a title offers is the default one, and a source that resolves to nothing renders nothing, for each of the four',
 	$render( '[card-title /template/page-home/hero/title tag="h9" style="weird"]' ) === '<h4 class="nino-card-title">Hi &#91;there]</h4>'
-	&& $render( '[hero-title /template/page-home/hero/title tag="h0" style="weird"]' ) === '<h2 class="nino-hero-title">Hi &#91;there]</h2>'
-	&& $render( '[hero-subtitle /template/page-home/hero/subtitle style="weird"]' ) === '<p class="nino-hero-subtitle">Sub</p>'
-	&& array_filter( [ 'title', 'card-title', 'hero-title', 'subtitle', 'card-subtitle', 'hero-subtitle' ], static fn( string $name ): bool => $render( '['. $name. ' /template/page-home/nope/title]' ) !== ''
+	&& $render( '[title /template/page-home/hero/title tag="h0" style="weirdhero"]' ) === '<h3 class="nino-section-title">Hi &#91;there]</h3>'
+	&& $render( '[subtitle /template/page-home/hero/subtitle style="Hero"]' ) === '<div class="nino-section-subtitle">Sub</div>'
+	&& array_filter( [ 'title', 'card-title', 'subtitle', 'card-subtitle' ], static fn( string $name ): bool => $render( '['. $name. ' /template/page-home/nope/title]' ) !== ''
 		|| $render( '['. $name. ' /template/page-home/empty/title]' ) !== '' || $render( '['. $name. ']' ) !== '' ) === [] );
 // A tag is written into the markup as it stands, so nothing but the options of its select may reach it: another heading level, another case, another element,
-// markup, a tag with an attribute behind it and none at all are each the default one - for each of the six
+// markup, a tag with an attribute behind it and none at all are each the default one - for each of the four
 $tagWrong = [];
 foreach( $sixTags as $tagName => [ $tagDefault, $tagOptions ] )
 	foreach( [ 'h1', 'h2', 'h7', 'H3', 'DIV', 'span', 'script', '<script>', 'h3 onclick=x', 'h3>', '' ] as $tagUnknown )
 		if( in_array( $tagUnknown, $tagOptions, true ) === false && $render( '['. $tagName. ' /template/page-home/hero/title tag="'. $tagUnknown. '"]' ) !== '<'. $tagDefault. ' class="'. $sixClasses[$tagName]. '">Hi &#91;there]</'. $tagDefault. '>' )
 			$tagWrong[] = $tagName. ' tag="'. $tagUnknown. '"';
-check( 'a tag a title does not offer is the default one, for each of the six - another heading level, the wrong case, another element, markup, a tag with an attribute behind it, none - so that nothing but the options of the select reaches the markup'. ( $tagWrong === [] ? '' : ' - '. implode( ', ', $tagWrong ) ), $tagWrong === [] );
+check( 'a tag a title does not offer is the default one, for each of the four - another heading level, the wrong case, another element, markup, a tag with an attribute behind it, none - so that nothing but the options of the select reaches the markup'. ( $tagWrong === [] ? '' : ' - '. implode( ', ', $tagWrong ) ), $tagWrong === [] );
 check( 'the title of a section may be an h2 as well as an h3 - the h3 it is where the call names no tag - which is what a page needs under the h1 of its header',
 	$render( '[title /template/page-home/hero/title tag="h2"]' ) === '<h2 class="nino-section-title">Hi &#91;there]</h2>' && $render( '[title /template/page-home/hero/title]' ) === '<h3 class="nino-section-title">Hi &#91;there]</h3>'
 	&& in_array( 'h2', \Nino\Modules\Components::components( $appData )['title']['attributes']['tag']['options'], true ) === true );
@@ -3035,7 +3071,7 @@ check( '...in a stack it reads the field of its element, as [text] does, and the
 	of the titles	*/
 $linkTexts = array_map( static fn( string $call ): string => preg_match( '/^<[a-z]+ class="([a-z-]+)[" ]/', $render( $call ), $linkFound ) === 1 ? $linkFound[1] : '', [ '[text text="x"]', '[card-text text="x"]' ] );
 $linkRule = ':where(.'. implode( ', .', $linkTexts ). ') a:where(:not(.nino-btn))';
-$linkTitles = array_filter( array_keys( $groundEach ), static fn( string $selector ): bool => preg_match( '/\.nino-(?:section|card|hero)-(?:title|subtitle)(?![\w-]).*\sa(?![\w-])/', $selector ) === 1 );
+$linkTitles = array_filter( array_keys( $groundEach ), static fn( string $selector ): bool => preg_match( '/\.nino-(?:section|card)-(?:title|subtitle)(?![\w-]).*\sa(?![\w-])/', $selector ) === 1 );
 check( 'a link in a text takes the accent ink of its ground: one rule for the classes [text] and [card-text] write, which leaves out a link that is a button and says color: var(--color-accent) and nothing else'
 	. ( count( array_filter( $linkTexts ) ) === 2 ? '' : ' - the two texts write no class' ),
 	count( array_filter( $linkTexts ) ) === 2 && $linkTexts[0] !== $linkTexts[1] && count( $groundEach[$linkRule] ?? [] ) === 1
@@ -3329,9 +3365,9 @@ $logoDarkUrl = '/public/images/logo-dark.500x100.png';
 $appData['/nino/html/images']['/logo'] = [ 'label' => 'Logo', 'width' => 500, 'height' => 100, 'filename' => 'logo.500x100.png' ];
 $appData['/nino/html/images']['/logo/dark'] = [ 'label' => 'Logo, dark', 'width' => 500, 'height' => 100, 'filename' => 'logo-dark.500x100.png' ];
 $logoImg = static fn( string $url, string $ground, string $alt = '' ): string => '<img src="'. $url. '" width="500" height="100" alt="'. $alt. '" class="nino-logo-'. $ground. '">';
-check( 'the logo is a component of the kernel: labelled in both languages, no source of its own, the picture of a block, offered in a section and a hero and under global, drawing the set, no link - and a half-filled circle as its icon',
+check( 'the logo is a component of the kernel: labelled in both languages, no source of its own, the picture of a block, offered in a section and under global, drawing the set, no link - and a half-filled circle as its icon',
 	$registryOf( 'logo' )['label'] === [ 'en_US' => 'Logo', 'de_DE' => 'Logo' ] && $registryOf( 'logo' )['source'] === 'none' && $registryOf( 'logo' )['preview'] === 'block'
-	&& $registryOf( 'logo' )['in'] === [ 'hero', 'section' ] && $registryOf( 'logo' )['group'] === 'global' && $registryOf( 'logo' )['draws'] === 'span .nino-logo-set'
+	&& $registryOf( 'logo' )['in'] === [ 'section' ] && $registryOf( 'logo' )['group'] === 'global' && $registryOf( 'logo' )['draws'] === 'span .nino-logo-set'
 	&& array_key_exists( 'holds', $registryOf( 'logo' ) ) === false && $registryOf( 'logo' )['link'] === false && $registryOf( 'logo' )['stretched'] === false && $registryOf( 'logo' )['by'] === 'nino'
 	&& array_column( (array) $registryOf( 'logo' )['icon'], 0 ) === [ 'circle', 'path' ] );
 check( '...its attributes are the two slots and the alt text, in that order: light and dark are of the type image and default to /logo and /logo/dark, the alt text is a string that is empty, and the defaults are those, with the class',
@@ -3451,7 +3487,7 @@ check( '...and that check can see one: a fragment that writes the attribute whet
 	array_filter( $mutated, $emptyClass ) === $mutated && $emptyClass( $render( '[image /template/page-home/hero/background]' ) ) === false );
 
 // The colour of a text, the ink of the ground it stands on: a variant, the class nino-ink--<word> behind the class of the style and before the class of its own
-$colourBase = [ 'title' => 'nino-section-title', 'subtitle' => 'nino-section-subtitle', 'card-title' => 'nino-card-title', 'card-subtitle' => 'nino-card-subtitle', 'hero-title' => 'nino-hero-title', 'hero-subtitle' => 'nino-hero-subtitle' ];
+$colourBase = [ 'title' => 'nino-section-title', 'subtitle' => 'nino-section-subtitle', 'card-title' => 'nino-card-title', 'card-subtitle' => 'nino-card-subtitle' ];
 $colourWrong = [];
 foreach( $colourBase as $colourName => $colourClass ) {
 	$colourTag = $sixTags[$colourName][0];
@@ -3465,17 +3501,17 @@ foreach( $colourBase as $colourName => $colourClass ) {
 		if( $render( '['. $colourName. ' /template/page-home/hero/title color="'. $colourOther. '"]' ) !== $render( '['. $colourName. ' /template/page-home/hero/title]' ) )
 			$colourWrong[] = $colourName. ' '. $colourOther;
 }
-check( 'the colour of a title or a subtitle is the class nino-ink--<word> behind the class of the style and before the class of its own, for each of the six: muted and accent are the words, and any other - light, dark or a status among them - is none'. ( $colourWrong === [] ? '' : ' - '. implode( ', ', $colourWrong ) ), $colourWrong === [] );
+check( 'the colour of a title or a subtitle is the class nino-ink--<word> behind the class of the style and before the class of its own, for each of the four: muted and accent are the words, and any other - light, dark or a status among them - is none'. ( $colourWrong === [] ? '' : ' - '. implode( ', ', $colourWrong ) ), $colourWrong === [] );
 check( '...and so is the colour of the two texts: behind the style, before the class of its own, and a word outside the options is none',
 	$render( '[text /template/page-home/services/text style="loud" color="muted" class="x"]' ) === '<div class="nino-section-text nino-richtext nino-section-text--loud nino-ink--muted x"><p>One</p><ul><li>a</li></ul></div>'
 	&& $render( '[card-text /template/page-home/services/text format="inline" color="accent"]' ) === '<div class="nino-card-descr nino-ink--accent">One a</div>'
 	&& $render( '[text /template/page-home/services/text color="light"]' ) === $render( '[text /template/page-home/services/text]' ) && $render( '[card-text /template/page-home/services/text color="dark"]' ) === $render( '[card-text /template/page-home/services/text]' ) );
 
-// A link: what a component that says so drew, in the <a> of its address - for each of the ten
+// A link: what a component that says so drew, in the <a> of its address - for each of the eight
 $linkOpens = [
 	'title' => '[title /template/page-home/hero/title', 'subtitle' => '[subtitle /template/page-home/hero/subtitle', 'text' => '[text /template/page-home/services/text',
 	'card-title' => '[card-title /template/page-home/hero/title', 'card-subtitle' => '[card-subtitle /template/page-home/hero/subtitle', 'card-text' => '[card-text /template/page-home/services/text',
-	'card-image' => '[card-image /template/page-home/hero/background', 'hero-title' => '[hero-title /template/page-home/hero/title', 'hero-subtitle' => '[hero-subtitle /template/page-home/hero/subtitle',
+	'card-image' => '[card-image /template/page-home/hero/background',
 	'image' => '[image /template/page-home/hero/background',
 ];
 $linkWrong = [];
@@ -3493,8 +3529,8 @@ foreach( $linkOpens as $linkName => $linkOpen ) {
 	if( $render( $linkOpen. ' target="_blank"]' ) !== $linkPlain || $render( $linkOpen. ' href=""]' ) !== $linkPlain || str_contains( $linkPlain, 'nino-stretch' ) === true )
 		$linkWrong[] = $linkName. ' without an address';
 }
-check( 'each of the ten components that can be a link draws what it draws in an <a> that has the address of its href - a key is its text, an address is itself, a scheme that is none a #, and _blank says the new window has no business with the opener - and without an address it is no link, with a target alone either; the <a> of the two that say stretched, the title and the card\'s title, has the class nino-stretch before its address, the other eight none'
-	. ( $linkWrong === [] ? '' : ' - '. implode( ', ', $linkWrong ) ), $linkWrong === [] && count( $linkOpens ) === 10 );
+check( 'each of the eight components that can be a link draws what it draws in an <a> that has the address of its href - a key is its text, an address is itself, a scheme that is none a #, and _blank says the new window has no business with the opener - and without an address it is no link, with a target alone either; the <a> of the two that say stretched, the title and the card\'s title, has the class nino-stretch before its address, the other eight none'
+	. ( $linkWrong === [] ? '' : ' - '. implode( ', ', $linkWrong ) ), $linkWrong === [] && count( $linkOpens ) === 8 );
 check( '...the address is written as it is made safe, once: the & of a query is &amp;, not &amp;amp; - what it holds written as a key\'s value is what it is - and what a link wraps is the frame of a picture, not its <img>',
 	$render( '[title /template/page-home/hero/title href="/template/page-home/stored/link"]' ) === '<a class="nino-stretch" href="/a?b=&quot;c&quot;&amp;d=1"><h3 class="nino-section-title">Hi &#91;there]</h3></a>'
 	&& $render( '[image /template/page-home/hero/background ratio="4-3" href="#x"]' ) === '<a href="#x"><div class="nino-image nino-image--4-3">'. $slotImg. '</div></a>'
@@ -3765,7 +3801,7 @@ check( '...[col] stands in a table and nowhere else, has no source, a field and 
 	&& $lineSchema['source'] === 'text' && $lineSchema['attributes']['tag']['options'] === [ 'p', 'span', 'div' ] && $lineSchema['attributes']['tag']['default'] === 'p' && $lineSchema['group'] === 'global' );
 check( '...validate() takes the place table for what a component is in and refuses the places there are none of',
 	( \Nino\Modules\Components::validate( 'probecol', [ 'label' => 'x', 'source' => 'none', 'group' => 'global', 'in' => [ 'table' ] ] )['in'] ?? null ) === [ 'table' ]
-	&& str_contains( (string) \Nino\Modules\Components::validate( 'probecol', [ 'label' => 'x', 'source' => 'none', 'group' => 'global', 'in' => [ 'row' ] ] ), '"in" lists only section, card, hero, table' ) === true );
+	&& str_contains( (string) \Nino\Modules\Components::validate( 'probecol', [ 'label' => 'x', 'source' => 'none', 'group' => 'global', 'in' => [ 'row' ] ] ), '"in" lists only section, card, table' ) === true );
 
 $tableCols = '[col /template/page-home/prices/head field="title"][col field="price" align="right"][col field="since"]';
 check( '[table] is the wrap, the table, a header row of th and a body row of td for each element - in the order of the loop, with the classes of the style and the id and the class of the call',
@@ -4353,6 +4389,21 @@ check( '...the stack is two cells for the two elements, in the order of sort, wi
 	&& str_contains( $page, '<a class="nino-btn" href="/services/web">Mehr</a>' ) === true && str_contains( $page, 'FILLED' ) === false );
 check( '...and the block of somebody\'s own is untouched, byte for byte', str_contains( $page, $foreign ) === true );
 check( '...and it renders the same each time', preg_replace( '/stack-\d+/', 'stack-N', $render( $home ) ) === preg_replace( '/stack-\d+/', 'stack-N', $page ) );
+
+// The library pages draw the heading and the line of their hero through [title] and [subtitle] in the style hero, and the section id hero is the id it was
+$libraryHero = [];
+foreach( [ 'home', 'contact', '404' ] as $libraryName ) {
+	$libraryTemplate = (string) file_get_contents( __DIR__. '/../_admin/install/library/pages/'. $libraryName. '/templates/page-'. $libraryName. '.tpl' );
+	if( preg_match( '/\[title \/template\/page-'. $libraryName. '\/hero\/title[^\]]* style="hero"[^\]]*\]/', $libraryTemplate ) !== 1
+		|| preg_match( '/\[subtitle \/template\/page-'. $libraryName. '\/hero\/subtitle[^\]]* style="hero"[^\]]*\]/', $libraryTemplate ) !== 1
+		|| str_contains( $libraryTemplate, '<section id="hero"' ) === false )
+		$libraryHero[] = $libraryName;
+}
+check( 'the library pages home, contact and 404 draw the title and the subtitle of their hero as [title] and [subtitle] with style="hero", over the keys they had, in the section whose id is hero'. ( $libraryHero === [] ? '' : ' - not: '. implode( ', ', $libraryHero ) ), $libraryHero === [] );
+$libraryHome = $render( (string) file_get_contents( __DIR__. '/../_admin/install/library/pages/home/templates/page-home.tpl' ) );
+check( '...and rendered they are the section\'s title and subtitle with the class of the hero style beside the base class, an h2 and a p',
+	str_contains( $libraryHome, '<h2 class="nino-section-title nino-section-title--hero">Hi &#91;there]</h2>' ) === true
+	&& str_contains( $libraryHome, '<p class="nino-section-subtitle nino-section-subtitle--hero">Sub</p>' ) === true );
 
 check( '...a [button] in a stack whose href field holds a control character before a scheme is a #', ( static function() use ( $render, &$appData ): bool {
 	\Nino\Elements::insertElementType( $appData, '/links', [ 'title' => [ 'type' => 'string' ], 'link' => [ 'type' => 'string' ] ] );

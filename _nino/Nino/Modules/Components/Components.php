@@ -37,10 +37,8 @@ namespace Nino\Modules {
 			$html = [
 				'title'				=> '<[[tag]] class="nino-section-title[[style]][[color]][[class]]"[[lang]]>[[value]]</[[tag]]>',
 				'card-title'	=> '<[[tag]] class="nino-card-title[[style]][[color]][[class]]"[[lang]]>[[value]]</[[tag]]>',
-				'hero-title'	=> '<[[tag]] class="nino-hero-title[[style]][[color]][[class]]"[[lang]]>[[value]]</[[tag]]>',
 				'subtitle'		=> '<[[tag]] class="nino-section-subtitle[[style]][[color]][[class]]"[[lang]]>[[value]]</[[tag]]>',
 				'card-subtitle'	=> '<[[tag]] class="nino-card-subtitle[[style]][[color]][[class]]"[[lang]]>[[value]]</[[tag]]>',
-				'hero-subtitle'	=> '<[[tag]] class="nino-hero-subtitle[[style]][[color]][[class]]"[[lang]]>[[value]]</[[tag]]>',
 				'text'				=> '<[[tag]] class="[[base]][[richtext]][[style]][[color]][[class]]"[[lang]]>[[value]]</[[tag]]>',
 				'img'					=> '<img src="[[src]]" width="[[width]]" height="[[height]]" alt="[[alt]]"[[class]]>',
 				'image'				=> '<div class="nino-image[[ratio]][[focus]][[class]]">[[img]]</div>',
@@ -168,19 +166,16 @@ namespace Nino\Modules {
 
 		// Where a component stands, and so where a tool offers it - see validate():
 		// directly in a column of a section (the cell of a stack that holds no
-		// card is such a column), in a [card], directly in a column of the
-		// hero, between the tags of a [table], which holds its [col]s and
-		// nothing else, or between the tags of a stack that says 'panels', which
-		// holds its [panel]s and nothing else
-		public const array PLACES = [ 'section', 'card', 'hero', 'table', 'panels' ];
+		// card is such a column), in a [card], between the tags of a [table],
+		// which holds its [col]s and nothing else, or between the tags of a stack
+		// that says 'panels', which holds its [panel]s and nothing else
+		public const array PLACES = [ 'section', 'card', 'table', 'panels' ];
 
 		// The group a tool offers a component under, the one word of its schema's
-		// 'group' - see validate(): the components of a section, of the hero and
-		// of a card, and those that stand anywhere, in the order a tool lists
-		// them. A place says where a component may stand and a group where it is
-		// offered: the title of a hero may stand in a section as well, and is
-		// offered with the hero
-		public const array GROUPS = [ 'section', 'hero', 'card', 'global' ];
+		// 'group' - see validate(): the components of a section and of a card,
+		// and those that stand anywhere, in the order a tool lists them. A place
+		// says where a component may stand and a group where it is offered
+		public const array GROUPS = [ 'section', 'card', 'global' ];
 
 		// What an icon is made of - see validate(): the tags a part may be, each
 		// with the attributes it takes (a part holds all of them and none other;
@@ -313,8 +308,8 @@ namespace Nino\Modules {
 			],
 		];
 
-		// Which of them each component carries: the three titles are one heading,
-		// the three subtitles one line of type, the two texts the lines of a text,
+		// Which of them each component carries: the two titles are one heading,
+		// the two subtitles one line of type, the two texts the lines of a text,
 		// the two images one picture, the logo the circle that is half light and
 		// half dark and the scroll hint the chevron it draws
 		private const array ICONS = [
@@ -324,8 +319,6 @@ namespace Nino\Modules {
 			'card-subtitle'	=> 'type',
 			'card-text'		=> 'text-align-start',
 			'card-image'	=> 'image',
-			'hero-title'	=> 'heading',
-			'hero-subtitle'	=> 'type',
 			'text'			=> 'text-align-start',
 			'card'			=> 'panel-top',
 			'button'		=> 'mouse-pointer-click',
@@ -349,16 +342,15 @@ namespace Nino\Modules {
 		 *	it stands, and a tool that lists what can be added to a column knows no
 		 *	component by name. So the title, the subtitle and the text of a section
 		 *	come first, then the title, the subtitle, the text and the image of a
-		 *	card, then the title and the subtitle of a hero, and then the card, the
-		 *	button, the image, the logo, the html, the spacer and the scroll hint - and for any
-		 *	one place ('in') that is the order its column has. The components of a
-		 *	feature follow these.
+		 *	card, and then the card, the button, the image, the logo, the html, the
+		 *	spacer and the scroll hint - and for any one place ('in') that is the
+		 *	order its column has. The components of a feature follow these.
 		 *
 		 *	Each of the kernel's components carries an icon, so that the registry that
 		 *	lists them hands a tool the picture to show each by: ICONS names the shape
-		 *	it takes and SHAPES holds the parts of it. A stack has none. Ten of them
+		 *	it takes and SHAPES holds the parts of it. A stack has none. Eight of them
 		 *	can be a link ('link', see _linked()); each is the kernel's ('by') and is
-		 *	offered under one of the four groups ('group', see GROUPS), as a
+		 *	offered under one of the three groups ('group', see GROUPS), as a
 		 *	feature's are its own and are offered under the feature.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
@@ -368,8 +360,8 @@ namespace Nino\Modules {
 		public static function init( array &$appData ): void {
 
 			$components = [
-				[ 'title', 'Title (Section)', 'Titel (Sektion)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'h2', 'h3', 'h4' ], 'h3' ), 'style' => self::_style(), 'color' => self::_color() ], [ 'hero', 'section' ], '{tag} .nino-section-title', null, true, 'section' ],
-				[ 'subtitle', 'Subtitle (Section)', 'Untertitel (Sektion)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'p', 'h4', 'h5' ], 'div' ), 'style' => self::_style(), 'color' => self::_color() ], [ 'hero', 'section' ], '{tag} .nino-section-subtitle', null, true, 'section' ],
+				[ 'title', 'Title (Section)', 'Titel (Sektion)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'h2', 'h3', 'h4' ], 'h3' ), 'style' => self::_style( true ), 'color' => self::_color() ], [ 'section' ], '{tag} .nino-section-title', null, true, 'section' ],
+				[ 'subtitle', 'Subtitle (Section)', 'Untertitel (Sektion)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'p', 'h4', 'h5' ], 'div' ), 'style' => self::_style( true ), 'color' => self::_color() ], [ 'section' ], '{tag} .nino-section-subtitle', null, true, 'section' ],
 				[ 'text', 'Text', 'Text', 'text', 'text', [
 					'format' => [ 'type' => 'select', 'options' => [ 'inline', 'lines', 'blocks' ], 'default' => 'blocks', 'input' => 'segment', 'label' => [ 'en_US' => 'Format', 'de_DE' => 'Format' ] ],
 					'tag' => self::_tag( [ 'p', 'div', 'span' ], 'p' ) + [ 'hint' => [ 'en_US' => 'In the format blocks, which holds paragraphs and lists, the text is always a div.', 'de_DE' => 'Im Format blocks, das Absätze und Listen enthält, ist der Text immer ein div.' ] ],
@@ -396,8 +388,6 @@ namespace Nino\Modules {
 						'hint' => [ 'en_US' => 'Which part of the picture survives a crop, as one of nine positions.', 'de_DE' => 'Welcher Teil des Bildes beim Zuschneiden bleibt, als eine von neun Positionen.' ] ],
 					'ratio' => [ 'type' => 'select', 'options' => [ '', '1-1', '4-3', '3-2', '16-9', '21-9', '4-1', '5-1' ], 'default' => '', 'label' => [ 'en_US' => 'Ratio', 'de_DE' => 'Seitenverhältnis' ] ],
 				], [ 'card' ], 'img .nino-card-img', null, true, 'card' ],
-				[ 'hero-title', 'Title (Hero)', 'Titel (Hero)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'h2', 'h3' ], 'h2' ), 'style' => self::_style(), 'color' => self::_color() ], [ 'hero', 'section' ], '{tag} .nino-hero-title', null, true, 'hero' ],
-				[ 'hero-subtitle', 'Subtitle (Hero)', 'Untertitel (Hero)', 'title', 'text', [ 'tag' => self::_tag( [ 'div', 'p', 'h3', 'h4' ], 'p' ), 'style' => self::_style(), 'color' => self::_color() ], [ 'hero', 'section' ], '{tag} .nino-hero-subtitle', null, true, 'hero' ],
 				// The card is the one component that holds components: what stands between
 				// its tags is the calls of the components of a card, which are rendered
 				// when its output is (see componentCard()), and 'holds' says so to a
@@ -418,7 +408,7 @@ namespace Nino\Modules {
 					'focus' => [ 'type' => 'select', 'options' => [ '', '1', '2', '3', '4', '5', '6', '7', '8', '9' ], 'default' => '', 'tab' => 'background', 'label' => [ 'en_US' => 'Focus', 'de_DE' => 'Fokus' ],
 						'hint' => [ 'en_US' => 'Which part of the picture survives a crop, as one of nine positions.', 'de_DE' => 'Welcher Teil des Bildes beim Zuschneiden bleibt, als eine von neun Positionen.' ] ],
 					'dim' => [ 'type' => 'bool', 'default' => false, 'tab' => 'background', 'label' => [ 'en_US' => 'Dim the picture', 'de_DE' => 'Bild abdunkeln' ] ],
-				], [ 'section', 'hero' ], 'article .nino-card', 'card', false, 'card' ],
+				], [ 'section' ], 'article .nino-card', 'card', false, 'card' ],
 				[ 'button', 'Button', 'Button', 'button', 'text', [
 					'href' => self::LINK['href'],
 					'style' => [ 'type' => 'select', 'options' => [ '', 'primary', 'outline', 'light', 'dark', 'brand-alt' ], 'default' => '', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ] ],
@@ -443,7 +433,7 @@ namespace Nino\Modules {
 						'hint' => [ 'en_US' => 'A slot, or in a loop an image field of the element. Empty leaves the picture out.', 'de_DE' => 'Ein Slot oder in einem Loop ein Bildfeld des Elements. Leer lässt das Bild weg.' ] ],
 					'alt' => [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Alternative text', 'de_DE' => 'Alternativtext' ],
 						'hint' => [ 'en_US' => 'Used where the slot has no text of its own. Empty marks the picture as decoration.', 'de_DE' => 'Gilt, wo der Slot keinen eigenen Text hat. Leer kennzeichnet das Bild als Dekoration.' ] ],
-				], [ 'hero', 'section' ], 'span .nino-logo-set', null, false, 'global' ],
+				], [ 'section' ], 'span .nino-logo-set', null, false, 'global' ],
 				[ 'html', 'HTML', 'HTML', 'block', 'content', [], null, null, null, false, 'global' ],
 				[ 'spacer', 'Spacer', 'Abstand', 'block', 'none', [
 					'size' => [ 'type' => 'select', 'options' => [ '1', '2', '3', '4', '5', '6' ], 'default' => '2', 'label' => [ 'en_US' => 'Size', 'de_DE' => 'Größe' ] ],
@@ -453,7 +443,7 @@ namespace Nino\Modules {
 				[ 'scroll-hint', 'Scroll hint', 'Scroll-Hinweis', 'block', 'none', [
 					'to' => [ 'type' => 'string', 'default' => '', 'label' => [ 'en_US' => 'Target', 'de_DE' => 'Ziel' ],
 						'hint' => [ 'en_US' => 'The id of the section to scroll to. Empty scrolls to the next section.', 'de_DE' => 'Die Id der Sektion, zu der gescrollt wird. Leer scrollt zur nächsten Sektion.' ] ],
-				], [ 'hero', 'section' ], 'a .nino-hero-arrowdown', null, false, 'hero' ],
+				], [ 'section' ], 'a .nino-hero-arrowdown', null, false, 'global' ],
 				// A column of a table: standing between the tags of a [table] and nowhere
 				// else. Its first argument is the text key of the title of the column, none
 				// for no title, and what a cell shows is a field of the element or a line of
@@ -572,12 +562,16 @@ namespace Nino\Modules {
 
 		/**
 		 *	The style the text components share: a variant of the class each is
-		 *	named for, which is what a variant's prefix is where it declares none
+		 *	named for, which is what a variant's prefix is where it declares none.
+		 *	The title and the subtitle of a section have a fourth style, hero: the
+		 *	size of the heading that opens a page
+		 *
+		 *	@param		bool			$hero					Whether the style has the word hero
 		 *
 		 *	@return 	array										The attribute's schema
 		 */
-		private static function _style(): array {
-			return [ 'type' => 'variant', 'options' => [ '', 'loud', 'quiet' ], 'default' => '', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ] ];
+		private static function _style( bool $hero = false ): array {
+			return [ 'type' => 'variant', 'options' => $hero === true ? [ '', 'loud', 'hero', 'quiet' ] : [ '', 'loud', 'quiet' ], 'default' => '', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ] ];
 		}
 
 		/**
@@ -593,9 +587,9 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	The tag select of the six titles and subtitles: the tags one of them may
-		 *	be drawn as, and the one it is where the shortcode names none - a title
-		 *	in a hero is an h2, a section's an h3, a card's an h4
+		 *	The tag select of the four titles and subtitles: the tags one of them may
+		 *	be drawn as, and the one it is where the shortcode names none - a
+		 *	section's is an h3, a card's an h4
 		 *
 		 *	@param		array			$options			The tags it may be, a list
 		 *	@param		string		$default			The tag it is where the shortcode names none, one of the options
@@ -2452,7 +2446,7 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	The part of the six titles they share: the fragment of the one that
+		 *	The part of the four titles they share: the fragment of the one that
 		 *	is rendered, filled with its tag, its style and its colour as variants
 		 *	of the class it is named for and of the ink, its own class and its value
 		 *
@@ -2548,18 +2542,6 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	Replace [hero-title]: the heading of a hero
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array			$args					The arguments made ready by dispatch()
-		 *
-		 *	@return 	string
-		 */
-		public static function componentHeroTitle( array &$appData, array $args ): string {
-			return self::_title( $appData, 'hero-title', 'nino-hero-title', $args );
-		}
-
-		/**
 		 *	Replace [subtitle]: the line under a heading
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
@@ -2581,18 +2563,6 @@ namespace Nino\Modules {
 		 */
 		public static function componentCardSubtitle( array &$appData, array $args ): string {
 			return self::_title( $appData, 'card-subtitle', 'nino-card-subtitle', $args );
-		}
-
-		/**
-		 *	Replace [hero-subtitle]: the line under the heading of a hero
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array			$args					The arguments made ready by dispatch()
-		 *
-		 *	@return 	string
-		 */
-		public static function componentHeroSubtitle( array &$appData, array $args ): string {
-			return self::_title( $appData, 'hero-subtitle', 'nino-hero-subtitle', $args );
 		}
 
 		/**

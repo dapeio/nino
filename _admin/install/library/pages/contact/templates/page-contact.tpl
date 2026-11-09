@@ -5,8 +5,8 @@
 <section id="hero" class="nino-section nino-section--dark nino-cover nino-mt-0 nino-mb-0 nino-pt-6 nino-pb-6" data-cover-height="50">
 	<div class="nino-grid-row nino-vpa">
 		<div class="nino-grid-100 nino-text-left">
-			[hero-title /template/page-contact/hero/title]
-			[hero-subtitle /template/page-contact/hero/subtitle]
+			[title /template/page-contact/hero/title tag="h2" style="hero"]
+			[subtitle /template/page-contact/hero/subtitle tag="p" style="hero"]
 		</div>
 	</div>
 </section>

@@ -280,11 +280,11 @@
 
 	/*	The rest of the five font roles - a weight, a transform and a size each;
 		with the family above that is everything a rule in this file reads of a
-		role. The title role is read by .nino-section-title,
-		.nino-card-title and .nino-hero-title, and its weight and transform
+		role. The title role is read by .nino-section-title and
+		.nino-card-title, and its weight and transform
 		by every h1 to h6 as well: a heading without a class keeps the face of
 		the text and the size the browser gives it. The subtitle role is read
-		by the three subtitles, the text role by the page (size, weight and
+		by the two subtitles, the text role by the page (size, weight and
 		transform), the button role by .nino-btn and the code role by
 		.nino-code.
 
@@ -340,13 +340,14 @@
 	--text-5: calc(var(--font-text-size) * 1.8);
 	--text-6: calc(var(--font-text-size) * 2.5);
 
-	/*	What a design layer scales without choosing a size. The hero takes the
+	/*	What a design layer scales without choosing a size. The hero style
+		(.nino-section-title--hero, .nino-section-subtitle--hero) takes the
 		size of the title and of the subtitle role times --scale-loud and has no
-		number of its own: it is the loud variant of a section's title and
-		subtitle, and a design layer that moves --scale-loud moves the hero with
-		it. A card title takes the size of the title role times a number of its
-		own, 5 / 6, because it stood on --text-3 where the title role stood on
-		--text-4, and keeps that ratio to it; it is another number from 768px,
+		number of its own, not even the section's: a design layer that moves
+		--scale-loud moves it with the loud style. A card title takes the size
+		of the title role times a number of its own, 5 / 6, because it stood on
+		--text-3 where the title role stood on --text-4, and keeps that ratio to
+		it; it is another number from 768px,
 		where the scale above steps up (see below). A section title, a section
 		subtitle and a card subtitle have a number of their own too, 1 at every
 		width, and a section title has a rule under it, none until a design layer
@@ -355,7 +356,7 @@
 			--section-subtitle-scale  times the subtitle role: a section subtitle
 			--card-subtitle-scale     times the subtitle role: a card subtitle
 			--section-line            the thickness of the rule under a section title
-		The --quiet and --loud variants of a section, a card and a hero are
+		The --quiet and --loud variants of a section and a card are
 		the size of the class they vary - the role times its number, where the
 		class has one - times --scale-quiet or --scale-loud: a title that is
 		made larger has a quiet and a loud variant that follow it.	*/
@@ -670,8 +671,9 @@ pre {
 	length ends the chain, so a code in such an element had the size of that
 	element. The kernel's sized classes for text, titles, prices, counts and
 	labels are such elements - the text and the description, the titles and the
-	subtitles of a section, a card and a hero, and the title and the price
-	of the pricing table, each with its --quiet and --loud, the price of a
+	subtitles of a section and a card, and the title and the price
+	of the pricing table, each with its --quiet and --loud (a section's also
+	its --hero), the price of a
 	card, the stat counter, the message of a form, the button and the filter
 	button - so a code in one of them says 1em, and is not made 13px beside 16,
 	19.5px beside 24 or 11.4px beside 14. :where() adds no specificity: the
@@ -680,12 +682,10 @@ pre {
 :where(
 	.nino-section-text, .nino-section-text--quiet, .nino-section-text--loud,
 	.nino-card-descr, .nino-card-descr--quiet, .nino-card-descr--loud,
-	.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud,
+	.nino-section-title, .nino-section-title--quiet, .nino-section-title--loud, .nino-section-title--hero,
 	.nino-card-title, .nino-card-title--quiet, .nino-card-title--loud,
-	.nino-hero-title, .nino-hero-title--quiet, .nino-hero-title--loud,
-	.nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud,
+	.nino-section-subtitle, .nino-section-subtitle--quiet, .nino-section-subtitle--loud, .nino-section-subtitle--hero,
 	.nino-card-subtitle, .nino-card-subtitle--quiet, .nino-card-subtitle--loud,
-	.nino-hero-subtitle, .nino-hero-subtitle--quiet, .nino-hero-subtitle--loud,
 	.nino-pricing-title, .nino-pricing-title--quiet, .nino-pricing-title--loud,
 	.nino-pricing-price, .nino-pricing-price--quiet, .nino-pricing-price--loud,
 	.nino-card-price, .nino-stat-counter, .nino-form-message,
@@ -705,7 +705,7 @@ p {
 
 /*	A heading takes two things of the title role, its weight and its
 	transform. Its family and its size are the title classes' own
-	(.nino-section-title, .nino-card-title, .nino-hero-title): a heading
+	(.nino-section-title, .nino-card-title): a heading
 	with no class has always had the face of the text and the size of the
 	browser, and keeps both. The weight is not on the classes because a title
 	class on a p - the catalogue shows them so - has never been bold	*/
@@ -1247,7 +1247,7 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
  *			04 Content
  *
  *
- *			.nino-hero(--fullscreen), .nino-hero(-title, -subtitle, -arrowdown)
+ *			.nino-hero(--fullscreen), .nino-hero-arrowdown
  *			.nino-section(--alt, --tint, --dark, --black, --primary, --brand-alt, --dim, --border-1/2/3, --mirrored), .nino-section(-title, -subtitle, -text)
  *			.nino-grid-row(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim), .nino-grid-row-bg
  *			.nino-grid(--alt, --tint, --dark, --black, --primary, --brand-alt, --counter, --dim)
@@ -1269,36 +1269,6 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 .nino-hero {
 	position: relative;
 }
-/*	The hero takes the face of the title and of the subtitle role, and their
-	size times --scale-loud: it is the loud variant of a section's title and
-	subtitle and has no number of its own. The leading keeps its ratio to the
-	size - 1.3 / 1.2 below 768px, 1.2 from there - and moves with it	*/
-.nino-hero-title {
-	font-family: var(--fontfamily-title);
-	font-size: calc( var(--font-title-size) * var(--scale-loud) );
-	text-transform: var(--font-title-transform);
-	color: var(--color-title);
-	margin-bottom: calc(var(--space-3) * var(--whitespace-text));
-	line-height: calc( var(--font-title-size) * var(--scale-loud) *1.3 / 1.2 );
-}
-.nino-hero-subtitle {
-	font-family: var(--fontfamily-subtitle);
-	font-size: calc( var(--font-subtitle-size) * var(--scale-loud) );
-	font-weight: var(--font-subtitle-weight);
-	text-transform: var(--font-subtitle-transform);
-	color: var(--color-subtitle);
-	opacity: .8;
-	line-height: calc( var(--font-subtitle-size) * var(--scale-loud) *1.3 / 1.2 );
-	margin-bottom: calc(var(--space-3) * var(--whitespace-text));
-}
-/*	The variants are the size the hero has - the role times --scale-loud -
-	times --scale-quiet or --scale-loud again, and the leading keeps its ratio
-	to the size: 1.3 / 1.2 for a quiet title, 1 for a loud one, 1.4 / 1.2 and
-	1.3 / 1.2 for the subtitles	*/
-.nino-hero-title--quiet { font-size: calc( var(--font-title-size) * var(--scale-loud) * var(--scale-quiet) ); line-height: calc( var(--font-title-size) * var(--scale-loud) * var(--scale-quiet) *1.3 / 1.2 ); }
-.nino-hero-title--loud { font-size: calc( var(--font-title-size) * var(--scale-loud) * var(--scale-loud) ); line-height: calc( var(--font-title-size) * var(--scale-loud) * var(--scale-loud) ); }
-.nino-hero-subtitle--quiet { font-size: calc( var(--font-subtitle-size) * var(--scale-loud) * var(--scale-quiet) ); line-height: calc( var(--font-subtitle-size) * var(--scale-loud) * var(--scale-quiet) *1.4 / 1.2 ); opacity: .7; }
-.nino-hero-subtitle--loud { font-size: calc( var(--font-subtitle-size) * var(--scale-loud) * var(--scale-loud) ); line-height: calc( var(--font-subtitle-size) * var(--scale-loud) * var(--scale-loud) *1.3 / 1.2 ); opacity: 1; }
 /*	Self-contained: the chevron is a mask over currentColor, so it always
  *	matches the text color around it - dark hero, light hero, whatever - and
  *	using it is just <a class="nino-hero-arrowdown" href="#some-id"
@@ -1400,7 +1370,7 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	the ground of a thing with the ground it sits on - there is no
 	.nino-section--alt .nino-card--alt - and an author who names a ground
 	twice gets it twice. That goes for what is written on a ground as well: the title and
-	the subtitle of a section and of a hero read --color-title and
+	the subtitle of a section read --color-title and
 	--color-subtitle, the outline button --color-accent, and the filter button
 	and the arrow of a hero take the ink the ground paints. No rule of a
 	section stands above them, because it would reach past a column or a card
@@ -1895,8 +1865,8 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 /*	--quiet and --loud are the size of the class they vary, smaller and larger,
  *	per class: the size of the title role times --section-title-scale for a
  *	section title, of the subtitle role times --section-subtitle-scale for a
- *	section subtitle, of the text role for the text - and for a card title, a
- *	card subtitle and a hero the size their base class has - times
+ *	section subtitle, of the text role for the text - and for a card title and
+ *	a card subtitle the size their base class has - times
  *	--scale-quiet or --scale-loud (.85 and 1.2). Each states its own size
  *	rather than scaling with em: an em font-size replaces the size the class
  *	sets for itself instead of adjusting it, so "loud" on a 1.5rem title used
@@ -1909,12 +1879,24 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 .nino-section-title--loud { font-size: calc( var(--font-title-size) * var(--section-title-scale) * var(--scale-loud) ); line-height: calc( var(--font-title-size) * var(--section-title-scale) * var(--scale-loud) *1.2 ); border-bottom: var(--section-line) solid var(--color-border); padding-bottom: calc( var(--section-line) * 6 ); }
 .nino-section-subtitle--quiet { font-size: calc( var(--font-subtitle-size) * var(--section-subtitle-scale) * var(--scale-quiet) ); line-height: calc( var(--font-subtitle-size) * var(--section-subtitle-scale) * var(--scale-quiet) *1.4 ); }
 .nino-section-subtitle--loud { font-size: calc( var(--font-subtitle-size) * var(--section-subtitle-scale) * var(--scale-loud) ); line-height: calc( var(--font-subtitle-size) * var(--section-subtitle-scale) * var(--scale-loud) *1.3 ); opacity: 1; }
+/*	The hero style of a section's title and subtitle, the heading that opens a
+	page: the size of the role times --scale-loud, with no number of the
+	section's in it, and the leading keeps its ratio to the size - 1.3 / 1.2
+	below 768px, 1.2 from there (the rule at the foot of this chapter's
+	768px block). It draws no rule under the title, whatever --section-line
+	is, and no air for one. The subtitle keeps the colour of its role and no
+	opacity: the role is solved to 4.5:1 against its ground, as the section
+	subtitle's is, and an opacity would take the words under it. The title
+	has no air above it either: the section title's margin-top is the room
+	between titles of a column, and the opening of a page has none to leave	*/
+.nino-section-title--hero { margin-top: 0; font-size: calc( var(--font-title-size) * var(--scale-loud) ); line-height: calc( var(--font-title-size) * var(--scale-loud) *1.3 / 1.2 ); margin-bottom: calc(var(--space-3) * var(--whitespace-text)); border-bottom: 0; padding-bottom: 0; }
+.nino-section-subtitle--hero { font-size: calc( var(--font-subtitle-size) * var(--scale-loud) ); line-height: calc( var(--font-subtitle-size) * var(--scale-loud) *1.3 / 1.2 ); margin-bottom: calc(var(--space-3) * var(--whitespace-text)); }
 .nino-section-text--quiet { font-size: calc( var(--font-text-size) * var(--scale-quiet) ); }
 .nino-section-text--loud { font-size: calc( var(--font-text-size) * var(--scale-loud) ); line-height: calc( var(--font-text-size) * var(--scale-loud) *1.4 ); max-width: 52rem; }
 .nino-text-center > .nino-section-text--loud { margin-right: auto; margin-left: auto; }
 /*	The scrim is a dark ground like any other, so the roles follow it - the
 	ink itself included, and the title and the subtitle: the titles and
-	subtitles of a section and of a hero, the outline button, the filter button
+	subtitles of a section, the outline button, the filter button
 	and the arrow of a hero take the colours of the scrim without a rule of the
 	cover's own. Body copy, icons and anything else placed in a cover take
 	their colour from the page, and on a dimmed photograph the page's ink is
@@ -1958,12 +1940,9 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 }
 
 @media (min-width: 768px) {
-	/*	From 768px the hero states its size and its leading again, after the
-		--quiet and --loud rules above: an element with the base class and a
-		variant gets the base size there, so the variant only acts below
-		768px on it	*/
-	.nino-hero-title { font-size: calc( var(--font-title-size) * var(--scale-loud) ); line-height: calc( var(--font-title-size) * var(--scale-loud) *1.2 );}
-	.nino-hero-subtitle { font-size: calc( var(--font-subtitle-size) * var(--scale-loud) ); line-height: calc( var(--font-subtitle-size) * var(--scale-loud) *1.2 );}
+	/*	From 768px the hero style has the leading 1.2 of its size	*/
+	.nino-section-title--hero { line-height: calc( var(--font-title-size) * var(--scale-loud) *1.2 ); }
+	.nino-section-subtitle--hero { line-height: calc( var(--font-subtitle-size) * var(--scale-loud) *1.2 ); }
 	.nino-section { padding: calc(var(--space-5) * var(--whitespace-scale)) calc(var(--space-3) * var(--whitespace-scale)); }
 	/*	A row at the edge takes the section's side padding with it. From 768px the
 		section has a side padding of its own, the room between the page and its
@@ -5287,9 +5266,9 @@ header .nino-headernav-logo:empty {
 /* nino-section-title and its siblings center themselves, so an alignment set on
    the block around them has to reach in - otherwise "left" moves everything
    except the heading */
-.nino-text-left :is(.nino-section-title, .nino-section-subtitle, .nino-hero-title, .nino-hero-subtitle) { text-align: left; }
-.nino-text-center :is(.nino-section-title, .nino-section-subtitle, .nino-hero-title, .nino-hero-subtitle) { text-align: center; }
-.nino-text-right :is(.nino-section-title, .nino-section-subtitle, .nino-hero-title, .nino-hero-subtitle) { text-align: right; }
+.nino-text-left :is(.nino-section-title, .nino-section-subtitle) { text-align: left; }
+.nino-text-center :is(.nino-section-title, .nino-section-subtitle) { text-align: center; }
+.nino-text-right :is(.nino-section-title, .nino-section-subtitle) { text-align: right; }
 .nino-text-center > .nino-btn, .nino-text-center > .nino-card-content > .nino-btn { margin-right: calc(var(--space-1) / 2); margin-left: calc(var(--space-1) / 2); }
 .nino-text-right > .nino-btn, .nino-text-right > .nino-card-content > .nino-btn { margin-left: var(--space-1); }
 
@@ -5301,7 +5280,7 @@ header .nino-headernav-logo:empty {
 	without a tier	*/
 @media (min-width: 640px) {
 	.nino-text-s-left { text-align: left; }
-	.nino-text-s-left :is(.nino-section-title, .nino-section-subtitle, .nino-hero-title, .nino-hero-subtitle) { text-align: left; }
+	.nino-text-s-left :is(.nino-section-title, .nino-section-subtitle) { text-align: left; }
 	.nino-text-s-left > .nino-btn, .nino-text-s-left > .nino-card-content > .nino-btn { margin-right: 0; margin-left: 0; }
 	.nino-text-s-left > .nino-section-text--loud { margin-right: 0; margin-left: 0; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-s-left > .nino-btn { justify-self: start; }
@@ -5309,7 +5288,7 @@ header .nino-headernav-logo:empty {
 	.nino-card--last-bottom.nino-text-s-left > .nino-card-content > .nino-btn { align-self: flex-start; }
 	:where(.nino-tiles) > .nino-grid-row > .nino-text-s-left > .nino-btn { justify-self: start; }
 	.nino-text-s-center { text-align: center; }
-	.nino-text-s-center :is(.nino-section-title, .nino-section-subtitle, .nino-hero-title, .nino-hero-subtitle) { text-align: center; }
+	.nino-text-s-center :is(.nino-section-title, .nino-section-subtitle) { text-align: center; }
 	.nino-text-s-center > .nino-btn, .nino-text-s-center > .nino-card-content > .nino-btn { margin-right: calc(var(--space-1) / 2); margin-left: calc(var(--space-1) / 2); }
 	.nino-text-s-center > .nino-section-text--loud { margin-right: auto; margin-left: auto; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-s-center > .nino-btn { justify-self: center; }
@@ -5317,7 +5296,7 @@ header .nino-headernav-logo:empty {
 	.nino-card--last-bottom.nino-text-s-center > .nino-card-content > .nino-btn { align-self: center; }
 	:where(.nino-tiles) > .nino-grid-row > .nino-text-s-center > .nino-btn { justify-self: center; }
 	.nino-text-s-right { text-align: right; }
-	.nino-text-s-right :is(.nino-section-title, .nino-section-subtitle, .nino-hero-title, .nino-hero-subtitle) { text-align: right; }
+	.nino-text-s-right :is(.nino-section-title, .nino-section-subtitle) { text-align: right; }
 	.nino-text-s-right > .nino-btn, .nino-text-s-right > .nino-card-content > .nino-btn { margin-right: 0; margin-left: var(--space-1); }
 	.nino-text-s-right > .nino-section-text--loud { margin-right: 0; margin-left: 0; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-s-right > .nino-btn { justify-self: end; }
@@ -5327,7 +5306,7 @@ header .nino-headernav-logo:empty {
 }
 @media (min-width: 768px) {
 	.nino-text-m-left { text-align: left; }
-	.nino-text-m-left :is(.nino-section-title, .nino-section-subtitle, .nino-hero-title, .nino-hero-subtitle) { text-align: left; }
+	.nino-text-m-left :is(.nino-section-title, .nino-section-subtitle) { text-align: left; }
 	.nino-text-m-left > .nino-btn, .nino-text-m-left > .nino-card-content > .nino-btn { margin-right: 0; margin-left: 0; }
 	.nino-text-m-left > .nino-section-text--loud { margin-right: 0; margin-left: 0; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-m-left > .nino-btn { justify-self: start; }
@@ -5335,7 +5314,7 @@ header .nino-headernav-logo:empty {
 	.nino-card--last-bottom.nino-text-m-left > .nino-card-content > .nino-btn { align-self: flex-start; }
 	:where(.nino-tiles) > .nino-grid-row > .nino-text-m-left > .nino-btn { justify-self: start; }
 	.nino-text-m-center { text-align: center; }
-	.nino-text-m-center :is(.nino-section-title, .nino-section-subtitle, .nino-hero-title, .nino-hero-subtitle) { text-align: center; }
+	.nino-text-m-center :is(.nino-section-title, .nino-section-subtitle) { text-align: center; }
 	.nino-text-m-center > .nino-btn, .nino-text-m-center > .nino-card-content > .nino-btn { margin-right: calc(var(--space-1) / 2); margin-left: calc(var(--space-1) / 2); }
 	.nino-text-m-center > .nino-section-text--loud { margin-right: auto; margin-left: auto; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-m-center > .nino-btn { justify-self: center; }
@@ -5343,7 +5322,7 @@ header .nino-headernav-logo:empty {
 	.nino-card--last-bottom.nino-text-m-center > .nino-card-content > .nino-btn { align-self: center; }
 	:where(.nino-tiles) > .nino-grid-row > .nino-text-m-center > .nino-btn { justify-self: center; }
 	.nino-text-m-right { text-align: right; }
-	.nino-text-m-right :is(.nino-section-title, .nino-section-subtitle, .nino-hero-title, .nino-hero-subtitle) { text-align: right; }
+	.nino-text-m-right :is(.nino-section-title, .nino-section-subtitle) { text-align: right; }
 	.nino-text-m-right > .nino-btn, .nino-text-m-right > .nino-card-content > .nino-btn { margin-right: 0; margin-left: var(--space-1); }
 	.nino-text-m-right > .nino-section-text--loud { margin-right: 0; margin-left: 0; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-m-right > .nino-btn { justify-self: end; }
@@ -5353,7 +5332,7 @@ header .nino-headernav-logo:empty {
 }
 @media (min-width: 1024px) {
 	.nino-text-l-left { text-align: left; }
-	.nino-text-l-left :is(.nino-section-title, .nino-section-subtitle, .nino-hero-title, .nino-hero-subtitle) { text-align: left; }
+	.nino-text-l-left :is(.nino-section-title, .nino-section-subtitle) { text-align: left; }
 	.nino-text-l-left > .nino-btn, .nino-text-l-left > .nino-card-content > .nino-btn { margin-right: 0; margin-left: 0; }
 	.nino-text-l-left > .nino-section-text--loud { margin-right: 0; margin-left: 0; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-l-left > .nino-btn { justify-self: start; }
@@ -5361,7 +5340,7 @@ header .nino-headernav-logo:empty {
 	.nino-card--last-bottom.nino-text-l-left > .nino-card-content > .nino-btn { align-self: flex-start; }
 	:where(.nino-tiles) > .nino-grid-row > .nino-text-l-left > .nino-btn { justify-self: start; }
 	.nino-text-l-center { text-align: center; }
-	.nino-text-l-center :is(.nino-section-title, .nino-section-subtitle, .nino-hero-title, .nino-hero-subtitle) { text-align: center; }
+	.nino-text-l-center :is(.nino-section-title, .nino-section-subtitle) { text-align: center; }
 	.nino-text-l-center > .nino-btn, .nino-text-l-center > .nino-card-content > .nino-btn { margin-right: calc(var(--space-1) / 2); margin-left: calc(var(--space-1) / 2); }
 	.nino-text-l-center > .nino-section-text--loud { margin-right: auto; margin-left: auto; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-l-center > .nino-btn { justify-self: center; }
@@ -5369,7 +5348,7 @@ header .nino-headernav-logo:empty {
 	.nino-card--last-bottom.nino-text-l-center > .nino-card-content > .nino-btn { align-self: center; }
 	:where(.nino-tiles) > .nino-grid-row > .nino-text-l-center > .nino-btn { justify-self: center; }
 	.nino-text-l-right { text-align: right; }
-	.nino-text-l-right :is(.nino-section-title, .nino-section-subtitle, .nino-hero-title, .nino-hero-subtitle) { text-align: right; }
+	.nino-text-l-right :is(.nino-section-title, .nino-section-subtitle) { text-align: right; }
 	.nino-text-l-right > .nino-btn, .nino-text-l-right > .nino-card-content > .nino-btn { margin-right: 0; margin-left: var(--space-1); }
 	.nino-text-l-right > .nino-section-text--loud { margin-right: 0; margin-left: 0; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-l-right > .nino-btn { justify-self: end; }
@@ -5379,7 +5358,7 @@ header .nino-headernav-logo:empty {
 }
 @media (min-width: 1280px) {
 	.nino-text-xl-left { text-align: left; }
-	.nino-text-xl-left :is(.nino-section-title, .nino-section-subtitle, .nino-hero-title, .nino-hero-subtitle) { text-align: left; }
+	.nino-text-xl-left :is(.nino-section-title, .nino-section-subtitle) { text-align: left; }
 	.nino-text-xl-left > .nino-btn, .nino-text-xl-left > .nino-card-content > .nino-btn { margin-right: 0; margin-left: 0; }
 	.nino-text-xl-left > .nino-section-text--loud { margin-right: 0; margin-left: 0; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-xl-left > .nino-btn { justify-self: start; }
@@ -5387,7 +5366,7 @@ header .nino-headernav-logo:empty {
 	.nino-card--last-bottom.nino-text-xl-left > .nino-card-content > .nino-btn { align-self: flex-start; }
 	:where(.nino-tiles) > .nino-grid-row > .nino-text-xl-left > .nino-btn { justify-self: start; }
 	.nino-text-xl-center { text-align: center; }
-	.nino-text-xl-center :is(.nino-section-title, .nino-section-subtitle, .nino-hero-title, .nino-hero-subtitle) { text-align: center; }
+	.nino-text-xl-center :is(.nino-section-title, .nino-section-subtitle) { text-align: center; }
 	.nino-text-xl-center > .nino-btn, .nino-text-xl-center > .nino-card-content > .nino-btn { margin-right: calc(var(--space-1) / 2); margin-left: calc(var(--space-1) / 2); }
 	.nino-text-xl-center > .nino-section-text--loud { margin-right: auto; margin-left: auto; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-xl-center > .nino-btn { justify-self: center; }
@@ -5395,7 +5374,7 @@ header .nino-headernav-logo:empty {
 	.nino-card--last-bottom.nino-text-xl-center > .nino-card-content > .nino-btn { align-self: center; }
 	:where(.nino-tiles) > .nino-grid-row > .nino-text-xl-center > .nino-btn { justify-self: center; }
 	.nino-text-xl-right { text-align: right; }
-	.nino-text-xl-right :is(.nino-section-title, .nino-section-subtitle, .nino-hero-title, .nino-hero-subtitle) { text-align: right; }
+	.nino-text-xl-right :is(.nino-section-title, .nino-section-subtitle) { text-align: right; }
 	.nino-text-xl-right > .nino-btn, .nino-text-xl-right > .nino-card-content > .nino-btn { margin-right: 0; margin-left: var(--space-1); }
 	.nino-text-xl-right > .nino-section-text--loud { margin-right: 0; margin-left: 0; }
 	.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)).nino-text-xl-right > .nino-btn { justify-self: end; }
