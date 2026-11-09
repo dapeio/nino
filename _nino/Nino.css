@@ -368,12 +368,14 @@
 	--scale-quiet: .85;
 	--scale-loud: 1.2;
 
+	/*	The space scale: steps 1 to 3 are the same at every width, the three upper
+		steps are shorter below 768px (2.5, 3.5 and 5rem) and 3, 5 and 8rem from there	*/
 	--space-1: .5rem;
 	--space-2: 1rem;
 	--space-3: 2rem;
-	--space-4: 3rem;
-	--space-5: 5rem;
-	--space-6: 8rem;
+	--space-4: 2.5rem;
+	--space-5: 3.5rem;
+	--space-6: 5rem;
 
 	/*	How much air a layout has, from one number. --whitespace-scale is 1, and
 		1 is the layout of every page that never heard of it, to the pixel: .75
@@ -481,6 +483,9 @@
 		--card-title-scale: calc(25 / 32);
 		--grid-gutter: var(--space-3);
 		--tiles-padding: var(--space-4);
+		--space-4: 3rem;
+		--space-5: 5rem;
+		--space-6: 8rem;
   }
 }
 
@@ -3102,11 +3107,14 @@ textarea:disabled {
 .nino-list--numbered {
 	counter-reset: nino-list-numbered;
 }
+/*	The text of an item stands off the number by the width of the badge, the third
+	step, and the second step: the indent is those two and does not move with the
+	fourth step, which is shorter on a phone	*/
 .nino-list--numbered li {
 	counter-increment: nino-list-numbered;
 	position: relative;
 	min-height: var(--space-3);
-	padding-left: var(--space-4);
+	padding-left: calc(var(--space-3) + var(--space-2));
 	display: flex;
 	align-items: center;
 }

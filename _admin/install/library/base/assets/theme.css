@@ -149,9 +149,10 @@
 	--nino-space-1: 0.5rem;
 	--nino-space-2: 1rem;
 	--nino-space-3: 2rem;
-	--nino-space-4: 3rem;
-	--nino-space-5: 5rem;
-	--nino-space-6: 8rem;
+	/* The three upper steps are shorter below 768px, as the kernel's are */
+	--nino-space-4: 2.5rem;
+	--nino-space-5: 3.5rem;
+	--nino-space-6: 5rem;
 	--nino-radius-1: 0.1rem;
 	--nino-radius-2: 0.2rem;
 	--nino-radius-3: 0.4rem;
@@ -161,6 +162,9 @@
 @media (min-width: 768px) {
 	:root {
 		--nino-base-size: 112.5%;
+		--nino-space-4: 3rem;
+		--nino-space-5: 5rem;
+		--nino-space-6: 8rem;
 	}
 }
 
@@ -2608,9 +2612,11 @@ footer {
 	color: var(--lists-marker-check-ink);
 	font-weight: var(--lists-marker);
 }
+/*	The text of an item stands off its number by the badge and the second step, as in Nino.css: the indent does not move with the fourth step,
+	which is shorter on a phone	*/
 .nino-list--numbered li {
 	min-height: calc( var(--space-3) * var(--lists-scale) );
-	padding-left: calc( var(--space-4) * var(--lists-scale) );
+	padding-left: calc( ( var(--space-3) + var(--space-2) ) * var(--lists-scale) );
 }
 .nino-list--numbered li::before {
 	width: calc( var(--space-3) * var(--lists-scale) );

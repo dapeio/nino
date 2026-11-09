@@ -1854,6 +1854,11 @@ check( ':root declares the six tokens of the tiles: the padding of a tile, the g
 	. ( $tileWrong === [] ? '' : ' - not: '. implode( ', ', $tileWrong ) ), $tileWrong === [] );
 check( '...the padding of a tile is a step wider from 768px, and nothing else of the tiles moves there',
 	$hookValue( $hookRootWide, '--tiles-padding' ) === 'var(--space-4)' && preg_match_all( '/--tiles-/', $hookRootWide ) === 1 );
+check( 'the text of an item of a numbered list stands off its number by the badge and the second step - the third and the second step of the space scale, not the fourth, which is shorter on a phone',
+	preg_match( '/\.nino-list--numbered li \{[^{}]*padding-left\s*:\s*calc\(var\(--space-3\) \+ var\(--space-2\)\)\s*;/', $hookCss ) === 1 && preg_match( '/\.nino-list--numbered li \{[^{}]*padding-left\s*:[^;]*--space-4/', $hookCss ) !== 1 );
+check( 'the three upper steps of the space scale are 2.5, 3.5 and 5rem in :root and 3, 5 and 8rem from 768px, and the three lower steps are declared once, the same at every width',
+	array_map( static fn( string $step ): ?string => $hookValue( $hookRoot, '--space-'. $step ), [ '1', '2', '3', '4', '5', '6' ] ) === [ '.5rem', '1rem', '2rem', '2.5rem', '3.5rem', '5rem' ]
+	&& array_map( static fn( string $step ): ?string => $hookValue( $hookRootWide, '--space-'. $step ), [ '1', '2', '3', '4', '5', '6' ] ) === [ null, null, null, '3rem', '5rem', '8rem' ] );
 $tileSelectors = [];
 foreach( array_keys( $groundEach ) as $tileSelector )
 	if( str_contains( (string) $tileSelector, 'nino-tiles' ) === true )
