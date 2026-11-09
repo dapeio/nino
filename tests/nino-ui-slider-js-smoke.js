@@ -134,7 +134,7 @@ check( 'the slider stands on the first slide', slider.pos === 0 && slides[0].cla
 fire( stage, 'focusin', { target : inside } );
 check( 'the focus entering something inside another slide moves the slider to that slide: the position, the active slide and the dot that says it is current',
 	slider.pos === 2 && slides[2].classList.contains('nino-is-active') && slides[0].classList.contains('nino-is-active') === false && dotNow() === 'false,false,true' );
-check( '...and the track follows it', stage.style.left === slider.posLeft +'px' && slider.posLeft === 0 - ( 320 * 0.75 * 2 - ( 320 - 320 * 0.75 ) / 2 ) );
+check( '...and the track follows it, the last slide flush at the right edge', stage.style.left === slider.posLeft +'px' && slider.posLeft === 320 - 720 );
 
 const leftAtTwo = stage.style.left;
 slides[2].classList.remove('nino-is-active');
@@ -148,6 +148,16 @@ check( 'the focus on the first slide brings the slider back to it',
 
 fire( stage, 'focusin', { target : element('A') } );
 check( 'a focus that is in none of the slides moves nothing', slider.pos === 0 && dotNow() === 'true,false,false' );
+
+// A short drag past an end bounces: the track follows the finger and goes
+// back to the flush position when the finger lifts before the 50 px that
+// change the slide
+fire( dotList.children[0].children[0], 'click' );
+touch( 'touchstart', 100, 100 );
+touch( 'touchmove', 130, 103 );
+check( 'a short drag past the first slide pulls the track along with the finger', slider.pos === 0 && stage.style.left === '30px' );
+touch( 'touchend', 130, 103 );
+check( '...and the lifted finger puts the first slide back flush at the left edge', slider.pos === 0 && slider.posLeft === 0 && stage.style.left === '0px' && slider.classList.contains('nino-is-touch') === false );
 
 // The page's own language decides the word, where the project has none of
 // its own
@@ -253,6 +263,28 @@ const placed = sized( { 'data-slider-width' : '50%', 'data-slider-pos' : '1' }, 
 resized( [ placed ] );
 check( 'the track is as wide as all its slides, stands with the active slide in the middle of the slider, and the slider is as tall as the track',
 	placed.track.style.width === '800px' && placed.posLeft === 0 - ( 200 * 1 - ( 400 - 200 ) / 2 ) && placed.track.style.left === placed.posLeft + 'px' && placed.style.height === '90px' );
+
+// The ends stand flush: five slides of 75% in a slider of 1000px, the track is 3750px wide. The first slide stands at the left edge, the last at the right edge, the ones between are centred.
+// Few slides: a track narrower than the slider stands in the middle as a whole, whichever slide is active, and a resize keeps the rule
+function leftAt( count, pos, attributes, width ) {
+	const wrap = sized( Object.assign( { 'data-slider-pos' : String( pos ) }, attributes ?? {} ), width ?? 1000, count );
+	resized( [ wrap ] );
+	return wrap.track.style.left;
+}
+check( 'the first slide stands flush at the left edge, the last flush at the right edge, and the one between is centred',
+	leftAt( 5, 0 ) === '0px' && leftAt( 5, 4 ) === '-2750px' && leftAt( 5, 2 ) === '-1375px' );
+check( '...the slides next to an end that are not in view wholly are centred as the active slide of any other position is',
+	leftAt( 5, 1 ) === '-625px' && leftAt( 5, 3 ) === '-2125px' );
+check( '...and with narrow slides, ten of 30%, the track stays where the end put it as long as the active slide is in view wholly - the second slide flush too, the ninth too - and moves with the active slide between',
+	leftAt( 10, 1, { 'data-slider-width' : '30%' } ) === '0px' && leftAt( 10, 8, { 'data-slider-width' : '30%' } ) === '-2000px' && leftAt( 10, 4, { 'data-slider-width' : '30%' } ) === '-850px' );
+check( 'a track narrower than the slider stands in the middle as a whole, whatever slide is active',
+	[ 0, 1 ].every( function( pos ) { return leftAt( 2, pos, { 'data-slider-width' : '300', 'data-slider-min' : '300' } ) === '200px'; } ) );
+const flush = sized( { 'data-slider-pos' : '4' }, 1000, 5 );
+resized( [ flush ] );
+flush.measured = 800;
+ui._onResize[ ui._onResize.length - 1 ]();
+check( 'a resize keeps the rule: the last slide stays flush at the right edge of the new width, and the track is as wide as its slides',
+	flush.track.style.left === ( 800 - 5 * 600 ) +'px' && flush.track.style.width === '3000px' && flush.posLeft === 800 - 3000 );
 
 // A slider that measures 0 wide - hidden, or not laid out yet - keeps the sizes it has, and is measured when the window resizes after it was shown
 const hidden = sized( {}, 400 );

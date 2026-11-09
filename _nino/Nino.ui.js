@@ -798,7 +798,11 @@
 
 					/**
 					 *	Recalculate slide widths and re-position each .nino-slider track
-					 *	around its currently active slide. A slider that was not wired - no list,
+					 *	around its currently active slide: the active slide stands in the middle,
+					 *	but the track stops as soon as its first or its last slide is wholly in
+					 *	view, so that these two stand flush at the left and the right edge and
+					 *	leave no empty band; a track narrower than the slider stands in the
+					 *	middle as a whole. A slider that was not wired - no list,
 					 *	or none with a slide in it - has nothing to size and is left out, and so is
 					 *	one that measures 0 wide, hidden or not laid out yet: it keeps the sizes it
 					 *	has and is measured when the window resizes after it was shown
@@ -825,9 +829,12 @@
 							for( let lii=0, lil = e.slider[i].lis.length; lii<lil; lii++ )
 								e.slider[i].lis[lii].style.width = liW + 'px';
 
-							e.slider[i].posLeft 						= 0 - ( ( liW * e.slider[i].pos ) - ((wW-liW)/2)  );
+							const stageW = liW * e.slider[i].lis.length;
+							const centred = 0 - ( ( liW * e.slider[i].pos ) - ((wW-liW)/2)  );
+
+							e.slider[i].posLeft 						= stageW <= wW ? ( wW - stageW ) / 2 : Math.min( 0, Math.max( wW - stageW, centred ) );
 							e.slider[i].stage.style.left 		= e.slider[i].posLeft + 'px';
-							e.slider[i].stage.style.width 	= (liW * e.slider[i].lis.length) + 'px';
+							e.slider[i].stage.style.width 	= stageW + 'px';
 							e.slider[i].style.height 				= e.slider[i].stage.getBoundingClientRect().height + 'px';
 						}
 					},
