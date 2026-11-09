@@ -915,21 +915,24 @@ h1, h2, h3, h4, h5, h6 {
 	.nino-hide-l { display: none !important; }
 }
 
-/*	The stack a column is: its components one below the other with one gap
-	between them, and the room they leave in the column placed at the start,
-	the middle or the end of it. A column opts in with a class of its own - the
-	gap or the placement - rather than every child of a row becoming a grid,
-	which would change what a page that never heard of it looks like: grid
-	items do not collapse their margins, and a link beside a word is two of
-	them. --nino-stack-gap is what the classes set and what a nested stack
-	reads, with the space the theme calls 2 where nobody chose; the gap the
-	column draws is that times --whitespace-gap	*/
+/*	The stack a column is: its components one below the other, and the room
+	they leave in the column placed at the start, the middle or the end of it.
+	A column opts in with a class of its own - the gap or the placement -
+	rather than every child of a row becoming a grid, which would change what
+	a page that never heard of it looks like: grid items do not collapse their
+	margins, and a link beside a word is two of them. --nino-stack-gap is what
+	the nino-stack-gap-<n> classes set (a nested .nino-stack sets its own);
+	where no class sets one it is 0px, so a column that only places its
+	components has the rhythm of a plain column, whose margins sit the same
+	distances apart (measured at 390 and 1280px, a title, a subtitle, two
+	texts and a button: the same distances in both). The gap the column draws
+	is the variable times --whitespace-gap	*/
 .nino-grid-row > .nino-stack-start,
 .nino-grid-row > .nino-stack-center,
 .nino-grid-row > .nino-stack-end,
 .nino-grid-row > [class*="nino-stack-gap-"]:not(.nino-stack) {
 	display: grid;
-	gap: calc(var(--nino-stack-gap, var(--space-2)) * var(--whitespace-gap));
+	gap: calc(var(--nino-stack-gap, 0px) * var(--whitespace-gap));
 	align-content: start;
 }
 .nino-grid-row > .nino-stack-center { align-content: center; }
@@ -4629,11 +4632,12 @@ header .nino-headernav-logo:empty {
 	padding: 0;
 }
 /*	A tile is a column of the row, a stack by default: the words in it one below
-	the other, a gap apart, placed at the start, the middle or the end by
-	--tiles-place; nino-stack-start|center|end and nino-stack-gap-<n> keep their
-	meaning, being two classes heavy. The title, the subtitle, their variants and
-	the rule under a title follow the scales of the tile through the properties
-	set here, with no rule of their own.
+	the other with no gap of their own, as in a plain column, placed at the
+	start, the middle or the end by --tiles-place; nino-stack-gap-<n> sets a gap
+	and nino-stack-start|center|end keep their meaning, being two classes
+	heavy. The title, the subtitle, their variants and the rule under a title
+	follow the scales of the tile through the properties set here, with no
+	rule of their own.
 	The height of a tile is a length and not an aspect-ratio: a flex item with an
 	aspect-ratio has the automatic minimum size in the axis of the ratio on
 	Chromium and none on WebKit, where the tile kept its ratio height and cut its
@@ -4657,7 +4661,7 @@ header .nino-headernav-logo:empty {
 	isolation: isolate;
 	display: grid;
 	align-content: var(--tiles-place);
-	gap: calc(var(--nino-stack-gap, var(--space-2)) * var(--whitespace-gap));
+	gap: calc(var(--nino-stack-gap, 0px) * var(--whitespace-gap));
 	padding: calc(var(--tiles-padding) * var(--whitespace-scale));
 	border-radius: var(--radius-tile);
 	font-size: calc(var(--font-text-size) * var(--tiles-text-scale));

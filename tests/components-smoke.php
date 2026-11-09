@@ -1571,6 +1571,18 @@ foreach( [ 0, 1, 2, 3, 4, 5, 6 ] as $gapStep ) {
 	elseif( $groundLastOf( [ $gapClass ] ) <= $groundLastOf( [ '.nino-grid-row' ] ) || $groundLastOf( [ $gapClass ] ) <= $groundLastOf( [ '.nino-stack' ] ) || $groundLastOf( [ $gapClass ] ) <= $groundLastOf( [ '.nino-stack-gap-6' ] ) )
 		$gapWrong[] = $gapClass. ' is not after the row, the stack and the gap classes of a stack';
 }
+$columnStacks = [ '.nino-grid-row > .nino-stack-start', '.nino-grid-row > .nino-stack-center', '.nino-grid-row > .nino-stack-end', '.nino-grid-row > [class*="nino-stack-gap-"]:not(.nino-stack)' ];
+$columnDrawn = true;
+foreach( $columnStacks as $columnStack )
+	if( $groundSets( $groundOf( $columnStack ), 'gap', 'calc(var(--nino-stack-gap, 0px) * var(--whitespace-gap))' ) === false )
+		$columnDrawn = false;
+$columnGapWrong = [];
+foreach( [ 0 => '0px', 1 => 'var(--space-1)', 2 => 'var(--space-2)', 3 => 'var(--space-3)', 4 => 'var(--space-4)', 5 => 'var(--space-5)', 6 => 'var(--space-6)' ] as $columnStep => $columnValue )
+	if( $groundSets( $groundOf( '.nino-stack-gap-'. $columnStep ), '--nino-stack-gap', $columnValue ) === false )
+		$columnGapWrong[] = '.nino-stack-gap-'. $columnStep;
+check( 'a column that is a stack draws the gap the --nino-stack-gap classes set, times --whitespace-gap, and 0px where no class set one - the alignment alone adds no gap'
+	. ( $columnGapWrong === [] ? '' : ' - not: '. implode( ', ', $columnGapWrong ) ),
+	$columnDrawn === true && $columnGapWrong === [] );
 check( '.nino-grid-gap-0 to -6 set --nino-grid-gap to 0px and to the step of the space scale times --whitespace-gap, once each and nothing else, after the row, the stack and the classes of the gap of a stack'
 	. ( $gapWrong === [] ? '' : ' - not: '. implode( ', ', $gapWrong ) ), $gapWrong === [] && $groundLastOf( [ '.nino-stack-gap-6' ] ) > 0 );
 
@@ -1863,9 +1875,9 @@ $tileGroundsAt = max( array_map( $tileAt, array_merge( $tileGrounds, [ ':has(> .
 check( 'a tile is a column of the row with a padding of its own: --tiles-padding times the whitespace, one class heavy, after every ground of a column, its picture and its radius - which would take it back - and ahead of the first padding class, so that nino-p-<n> says what it says',
 	$groundSets( $tileBody, 'padding', 'calc(var(--tiles-padding) * var(--whitespace-scale))' ) === true && $groundSets( $tileBody, 'border-radius', 'var(--radius-tile)' ) === true
 	&& count( $groundEach[$tileSelector] ) === 1 && $innerWeight( $tileSelector ) === 1 && $tileAt( $tileSelector ) > $tileGroundsAt && $tileGroundsAt > 0 && $tileAt( $tileSelector ) < $tileFirstUtility );
-check( '...it is a stack by default - a grid whose words stand at --tiles-place, a gap of a stack apart - the box the stretched link and the picture are placed in, and it sets the scales of the title and the subtitle on itself, the size of the words being its own times --tiles-text-scale',
+check( '...it is a stack by default - a grid whose words stand at --tiles-place, a gap of 0px unless a gap class sets one - the box the stretched link and the picture are placed in, and it sets the scales of the title and the subtitle on itself, the size of the words being its own times --tiles-text-scale',
 	$groundSets( $tileBody, 'display', 'grid' ) === true && $groundSets( $tileBody, 'align-content', 'var(--tiles-place)' ) === true && $groundSets( $tileBody, 'position', 'relative' ) === true && $groundSets( $tileBody, 'isolation', 'isolate' ) === true
-	&& $groundSets( $tileBody, 'gap', 'calc(var(--nino-stack-gap, var(--space-2)) * var(--whitespace-gap))' ) === true
+	&& $groundSets( $tileBody, 'gap', 'calc(var(--nino-stack-gap, 0px) * var(--whitespace-gap))' ) === true
 	&& $groundSets( $tileBody, '--section-title-scale', 'var(--tiles-title-scale)' ) === true && $groundSets( $tileBody, '--section-subtitle-scale', 'var(--tiles-subtitle-scale)' ) === true
 	&& $groundSets( $tileBody, 'font-size', 'calc(var(--font-text-size) * var(--tiles-text-scale))' ) === true );
 $tileFormula = 'calc( ( 100cqw * var(--nino-grid-share, 1) - var(--nino-grid-gap, 0px) * ( 1 - var(--nino-grid-share, 1) ) ) * var(--nino-tile-ratio, 0) )';
