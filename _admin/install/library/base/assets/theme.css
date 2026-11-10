@@ -823,11 +823,11 @@
  *	logo is a factor on the width of the logo, and shadow the shadow the bar casts on the
  *	page: none at the middle, a soft one and a strong one beyond it, in the palette's colour
  *	for a shadow. behaviour is a choice of three for what the bar does when the page is
- *	scrolled: it goes with the page, it is fixed and folds away on the way down - as
- *	Nino.css has it - or it is fixed and stays. Its rungs are the position of the header
- *	(--header-behaviour), and beside them stand the greatest height the bar has once the page
- *	is scrolled down (-collapse), a factor on the height it keeps there (-keep) and a factor
- *	on the room main leaves under it (-clear): a bar that goes with the page needs none.
+ *	scrolled: it goes with the page, it is fixed and its frame slides up out of the window
+ *	on the way down, or it is fixed and stays. Its rungs are the position of the header
+ *	(--header-behaviour), and beside it the translate of the frame on the way down (-fold),
+ *	the shadow the bar keeps there (-shadow) and a factor on the room main leaves under it
+ *	(-clear): a bar that goes with the page needs none.
  *
  *	The twelfth, nav-case, is a toggle: two rungs, none and uppercase, and the links
  *	of the navigation - in the bar, and in the menu that opens over the page - are
@@ -941,16 +941,16 @@
 	--header-cta-scale--default: .7;
 	--header-cta-scale--more: 1;
 
-	/*	What the bar does when the page is scrolled: it goes with the page, it is fixed and folds away on the way down - as Nino.css has it - or it is fixed and stays. The rung is the position of the header; beside it stand what follows from it: the greatest height of the bar once the page is scrolled down, how much of its height it keeps there (a factor, 0 being folded) and a factor on the room main leaves under it, which a bar in the flow of the page needs none of	*/
+	/*	What the bar does when the page is scrolled: it goes with the page, it is fixed and slides up out of the window on the way down - the frame of the header moves as a whole - or it is fixed and stays. The rung is the position of the header; beside it stand what follows from it: the translate the frame takes on the way down (none where there is nothing to fold, and never 0 0: any value but none makes the frame the containing block of the fixed elements in it, the ground of the menu that opens over the page among them), the shadow the bar keeps there (none where the frame leaves, since a shadow lies outside the box and would stay at the top of the window) and a factor on the room main leaves under it, which a bar in the flow of the page needs none of	*/
 	--header-behaviour--less:	relative;
 	--header-behaviour--default:	fixed;
 	--header-behaviour--more:	fixed;
-	--header-behaviour-collapse--less:	none;
-	--header-behaviour-collapse--default:	0;
-	--header-behaviour-collapse--more:	none;
-	--header-behaviour-keep--less:	1;
-	--header-behaviour-keep--default:	0;
-	--header-behaviour-keep--more:	1;
+	--header-behaviour-fold--less:	none;
+	--header-behaviour-fold--default:	0 -100%;
+	--header-behaviour-fold--more:	none;
+	--header-behaviour-shadow--less:	var(--header-shadow);
+	--header-behaviour-shadow--default:	none;
+	--header-behaviour-shadow--more:	var(--header-shadow);
 	--header-behaviour-clear--less:	0;
 	--header-behaviour-clear--default:	1;
 	--header-behaviour-clear--more:	1;
@@ -962,6 +962,7 @@
 
 .nino-frame-header {
 	position: var(--header-behaviour);
+	transition: translate .4s;
 	border-bottom: solid var(--header-border-color) var(--header-border-size);
 	--color-title: var(--header-ground-title);
 	--color-accent: var(--header-ground-accent);
@@ -982,6 +983,7 @@
 	color: var(--header-ground-ink);
 	background-color: var(--header-ground);
 	box-shadow: var(--header-shadow);
+	transition: box-shadow .4s;
 	display: flex;
 }
 
@@ -989,10 +991,16 @@ body.nino-scroll-atf .nino-frame-header .nino-scroll-header {
 	background-color: var(--header-ground);
 }
 
-/*	What Nino.css folds away on the way down - the bar's height, its room and its line - this set takes back, or says again, as the behaviour has it. One rule more specific than the kernel's, with the same exception: not while the focus is in the bar	*/
+/*	The frame of the header slides up out of the window as a whole on the way down, and comes back on the way up (--header-behaviour-fold: none where the bar goes with the page or stays). With the exception Nino.css has: not while the focus is in the bar	*/
+body.nino-scroll-down .nino-frame-header:where(:not(:has(:focus-visible))) {
+	translate: var(--header-behaviour-fold);
+}
+
+/*	Nino.css folds the bar itself on the way down - its height, its room and its line - and this set leaves the bar whole: it is the frame that moves. One rule more specific than the kernel's, with the same exception: not while the focus is in the bar. The shadow goes with the frame (--header-behaviour-shadow)	*/
 body.nino-scroll-down .nino-frame-header .nino-scroll-header:where(:not(:has(:focus-visible))) {
-	max-height: var(--header-behaviour-collapse);
-	min-height: calc( var(--header-height) * var(--header-behaviour-keep) );
+	max-height: none;
+	min-height: var(--header-height);
+	box-shadow: var(--header-behaviour-shadow);
 }
 
 .nino-frame-header .nino-logo {
@@ -1037,13 +1045,6 @@ body main {
 	padding-top: calc( ( var(--header-height) + var(--nino-header-grow, 0px) ) * var(--header-behaviour-clear) );
 }
 
-body main:has(> .nino-cover:first-child),
-body main:has(> .nino-wrap > .nino-cover:first-child),
-body main:has(> .nino-parallex:first-child),
-body main:has(> .nino-wrap > .nino-parallex:first-child) {
-	padding-top: 0;
-}
-
 @media (min-width: 768px) {
 	.nino-frame-header .nino-nav-content li a {
 		position: relative;
@@ -1078,6 +1079,10 @@ body main:has(> .nino-wrap > .nino-parallex:first-child) {
 }
 
 @media (prefers-reduced-motion: reduce) {
+	.nino-frame-header,
+	.nino-frame-header .nino-scroll-header {
+		transition: none;
+	}
 	.nino-frame-header .nino-nav-content li a::after {
 		transition: none;
 	}
@@ -1264,6 +1269,14 @@ footer {
 .nino-footer-copyright {
 	display:flex;
 	align-items: center;
+}
+
+/*	A link of the footer says it can be followed: an underline under the pointer and under the keyboard (not after a click, which :focus would leave behind), the colour as it is. This footer is the kernel's own, <footer> without the class the other sets carry, so the rule is named after the element	*/
+footer a:hover,
+footer a:focus-visible {
+	color: inherit;
+	text-decoration: underline;
+	text-underline-offset: .25em;
 }
 
 @media (max-width: 767.98px) {
@@ -2014,10 +2027,11 @@ footer {
  *	card the pointer can mean as a whole: a card that is a link (.nino-card--linked),
  *	of which Nino.css stretches the link of its title over the whole card. A card
  *	whose title alone is a link is not stretched, the pointer means its title, and
- *	it does not move. This set does nothing under the pointer by itself, so the
- *	middle is as little as the first position; the third lifts the card by a
- *	quarter of a rem with the strongest step of the shadow, and only where the
- *	visitor has not asked for less motion. The two cases are toggles of two rungs,
+ *	it does not move. The first position does nothing under the pointer; the
+ *	middle lifts the card by an eighth of a rem and leaves its shadow as it is, so
+ *	that a card which is a link says so; the third lifts it by a quarter of a rem
+ *	with the strongest step of the shadow. All of it only where the visitor has
+ *	not asked for less motion. The two cases are toggles of two rungs,
  *	none and uppercase, read by a rule each: the title and the subtitle of a card.
  *	The section family has the same
  *	names, but for Box, and a theme names a sensible pair.
@@ -2080,13 +2094,11 @@ footer {
 	--card-tone--default: 	var(--nino-default-shadow);
 	--card-tone--more: 			color-mix( in srgb, var(--color-secondary) 30%, transparent );
 
-	/*	What a card does under the pointer: nothing, as the framework has it - and as
-		this set has it, so the middle is the first position -, and lifted: a rise of a
-		quarter of a rem (the translate, which lies beside the transform of an animation
-		and not over it) and the strongest step of the shadow. The shadow of the first
-		two positions is the card's own at rest, so that nothing changes under the pointer	*/
+	/*	What a card does under the pointer: nothing at the first position; at the middle a rise of an eighth of a rem, the hint that
+		the card is a link; and lifted: a rise of a quarter of a rem (the translate, which lies beside the transform of an animation and
+		not over it) and the strongest step of the shadow. The shadow of the first two positions is the card's own at rest	*/
 	--card-hover--less: 			none;
-	--card-hover--default: 		none;
+	--card-hover--default: 		0 -.125rem;
 	--card-hover--more: 			0 -.25rem;
 
 	--card-hover-shadow--less: 			var(--shadow-card);
@@ -2201,6 +2213,15 @@ footer {
 	}
 	.nino-card--linked:where(:not(.nino-card--borderless)):hover {
 		box-shadow: var(--card-hover-shadow);
+	}
+}
+
+/*	Under reduced motion nothing rises (the hover above is for visitors who have not asked for less), so the card that is a link says so by an underline under its
+	title: it moves nothing, keeps every contrast - on a title ground and on a card whose title is the accent already - and needs no colour of its own	*/
+@media (prefers-reduced-motion: reduce) {
+	.nino-card--linked:hover .nino-card-title {
+		text-decoration: underline;
+		text-underline-offset: .15em;
 	}
 }
 
@@ -2949,6 +2970,11 @@ footer {
 	border-bottom-color: var(--tabs-active);
 }
 
+/*	A tab that is not open says it can be opened: under the pointer and under the keyboard it takes the colour of the open one, without its line - the hover is half the answer of the open tab	*/
+.nino-tabs-tab:where(:not(.nino-is-active)):is(:hover, :focus-visible) {
+	color: var(--tabs-active);
+}
+
 
 /* ==== 17. accordion: regular (scale default, space default, line default, marker default, marker-ink default, weight default) ==== */
 /*	@name			Regular
@@ -3154,8 +3180,8 @@ footer {
 	--forms-space: var(--forms-space--default);
 	--header-behaviour: var(--header-behaviour--default);
 	--header-behaviour-clear: var(--header-behaviour-clear--default);
-	--header-behaviour-collapse: var(--header-behaviour-collapse--default);
-	--header-behaviour-keep: var(--header-behaviour-keep--default);
+	--header-behaviour-fold: var(--header-behaviour-fold--default);
+	--header-behaviour-shadow: var(--header-behaviour-shadow--default);
 	--header-border-color: var(--header-border-color--default);
 	--header-border-size: var(--header-border-size--default);
 	--header-cta: var(--header-cta--less);

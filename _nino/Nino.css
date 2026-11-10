@@ -1067,6 +1067,12 @@ header .nino-grid-100 {
 	background-repeat:no-repeat;
 	background-size:contain;
 	background-position:center;
+	transition: opacity .2s;
+}
+/*	The logo is a link and says so by a veil of the pointer or the keyboard: it is
+	a picture or a name, with no colour of a link and no underline to draw	*/
+a.nino-logo:where(:hover, :focus-visible) {
+	opacity: .8;
 }
 .nino-logo img,
 .nino-logo svg {
@@ -1313,6 +1319,15 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	color: inherit;
 	cursor: pointer;
 	animation: nino-hero-arrowdown-bounce 1.8s ease-in-out 2;
+	transition: opacity .2s;
+}
+/*	The arrow veils under the pointer and the keyboard once the bounce has come
+	to rest. The bounce moves transform and the centring translate, so the
+	opacity is free of both. An arrow that carries .nino-vpa itself loses the veil,
+	since .nino-vpa--visible has the same weight and comes later; inside a .nino-vpa
+	row the opacities multiply and nothing conflicts	*/
+.nino-hero-arrowdown:where(:hover, :focus-visible) {
+	opacity: .7;
 }
 /*	Two runs of 1.8s are 3.6s - an arrow that bounced for good moved on its own
 	for as long as the page was open, where SC 2.2.2 allows five seconds	*/
@@ -2237,6 +2252,22 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 :where(.nino-section-text, .nino-card-descr) a:where(:not(.nino-btn)):is(:hover, :focus-visible) {
 	text-decoration: underline;
 }
+/*	Every other link in a section, a card or a list - one in a paragraph that is
+	no [text], in a span, in a title, in the list of a contact page - answers the
+	pointer and the keyboard with the line alone. The colour stays with what the
+	link stands in, so that a title stays a title, and the colour of a link in a
+	running text is the rule above: the two are apart so that this one can reach
+	every link and that one only the words. The forms that have an answer of
+	their own are left out: the button, the stretched link of a linked card (the
+	card lifts itself), the arrow, the logo, the breadcrumbs, the pagination and
+	the picker. A link with nothing but a picture in it draws no line, there is
+	no text to draw it under. The rule weighs no more than a bare a, so that a
+	class of a feature's own link - one that draws its own line - wins over it,
+	and it stands after the reset of a's underline and wins over that	*/
+:where(.nino-section, .nino-card, .nino-list) a:where(:not(.nino-btn, .nino-stretch, .nino-hero-arrowdown, .nino-logo, .nino-breadcrumbs a, .nino-pagination a, .nino-localepicker-wrap a)):where(:hover, :focus-visible) {
+	text-decoration: underline;
+	text-underline-offset: .15em;
+}
 
 /*	The cap of the height of a card's picture holds the frame as it holds the
 	bare <img>, and the picture in the frame as well: capped itself, the picture
@@ -2473,6 +2504,14 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 .nino-btn--outline:hover, .nino-btn--outline:focus {
 	background-color: var(--color-primary);
 	color: var(--color-primary-text);
+}
+/*	A button without a colour of its own - the text button, whatever its size -
+	has no ground to change under the pointer, so it draws a line under the
+	label. The five colours listed are the ones that have a rule of their own, and a
+	disabled button answers nothing	*/
+.nino-btn:where(:not(.nino-btn--light, .nino-btn--dark, .nino-btn--primary, .nino-btn--brand-alt, .nino-btn--outline, :disabled, [aria-disabled="true"])):where(:hover, :focus-visible) {
+	text-decoration: underline;
+	text-underline-offset: .25em;
 }
 /*	The scaled-down padding put a small button at 22px, just under WCAG 2.2 SC
 	2.5.8's 24px, and two of them side by side are too
@@ -3431,6 +3470,12 @@ body.nino-scroll-btf .nino-back-to-top {
 	cursor: pointer;
 	font-weight: bold;
 	list-style: none;
+	transition: color .2s;
+}
+/*	The question takes the accent under the pointer and the keyboard, as the
+	marker in front of it has it already	*/
+.nino-accordion-trigger:where(:hover, :focus-visible) {
+	color: var(--color-accent);
 }
 .nino-accordion-trigger::-webkit-details-marker {
 	display: none;
@@ -3823,8 +3868,16 @@ body.nino-scroll-btf .nino-back-to-top {
 .nino-nav-burger svg {
 	width: 32px;
 	height: 32px;
-	transition: transform .3s;
+	transition: transform .3s, opacity .2s;
 	fill: var(--color-title);
+}
+/*	The burger veils under the pointer and the keyboard, as the logo does. It is
+	not the accent: a bar writes its title in the accent as often as not, and a
+	design layer sets the fill of the button itself with more weight than this
+	rule has, while the veil is the opacity of the picture and no layer sets it.
+	The button keeps its full strength, and with it the ring	*/
+.nino-nav-burger > button:where(:hover, :focus-visible) > svg {
+	opacity: .7;
 }
 /*	Folded away the list is invisible, and not only squeezed to no height: a
 	link that nobody can see is still a stop of the Tab key, and the focus
@@ -4002,6 +4055,16 @@ header .nino-headernav-logo:empty {
 	margin-right:var(--space-1);
 	position:relative;
 	top:3px;
+	transition:color .2s;
+}
+/*	The label is the control the pointer is on - the list inside it answers with
+	a pointer of its own once open - and the globe takes the accent under the
+	pointer and while the input has the focus. The open list stays as it is	*/
+.nino-localepicker-wrap > label {
+	cursor:pointer;
+}
+.nino-localepicker-wrap > label:where(:hover, :focus-within) > svg {
+	color:var(--color-accent);
 }
 .nino-localepicker-wrap input {
 	/* Not display:none: a control that is not rendered cannot be focused, and
@@ -4775,6 +4838,10 @@ header .nino-headernav-logo:empty {
 	border: 0;
 	color: inherit;
 	font-family: inherit;
+	transition: color .2s;
+}
+.nino-slider-button:where(:hover, :focus-visible) {
+	color: var(--color-accent);
 }
 /* Specificity note: .nino-slider ul (above) matches this too since it's
    still a <ul> descendant of .nino-slider - needs the extra .nino-slider-controls
@@ -4807,6 +4874,12 @@ header .nino-headernav-logo:empty {
 }
 .nino-slider-points li.nino-is-active {
 	background-color: var(--color-secondary);
+}
+/*	The button is laid over the dot, so the dot answers for it: the ink of the
+	ground, the colour of the ring, under the pointer and the keyboard. The dot
+	of the current slide is marked already	*/
+.nino-slider-points li:where(:not(.nino-is-active)):where(:has(.nino-slider-point:where(:hover, :focus-visible))) {
+	background-color: var(--color-ink);
 }
 /*	The button inside the dot is what a visitor presses, and it is 24px round
 	the 12px dot - the size of a target, WCAG 2.2 SC 2.5.8 - with the dot in its
@@ -4987,6 +5060,12 @@ header .nino-headernav-logo:empty {
 	font: inherit;
 	color: inherit;
 	border-bottom: 2px solid transparent;
+	transition: color .2s ease, background-color .2s ease;
+}
+/*	A tab that is not the current one takes the accent under the pointer and the
+	keyboard; the current one is marked already	*/
+.nino-tabs-tab:where(:not(.nino-is-active)):where(:hover, :focus-visible) {
+	color: var(--color-accent);
 }
 .nino-tabs-tab.nino-is-active {
 	color: var(--color-accent);

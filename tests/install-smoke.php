@@ -685,14 +685,18 @@ check( 'the contact form says what its two fields are - autocomplete name and em
 	&& preg_match( '/<form class="nino-form"[^>]* novalidate>/', $contactPage ) === 1 );
 check( 'and the delivered frame gives its bar no height the collapsed state cannot take back'. ( $fixedHeight === [] ? '' : ' - '. implode( ', ', array_unique( $fixedHeight ) ) ), $fixedHeight === [] );
 
-// The Builder writes a div.nino-wrap around a page's sections, and its hero
-// carries no nino-hero - so the rule that takes main's top padding away for a
-// first-child cover or parallax is the frame's own, and it has to know the wrap
-$heroRule 	= preg_match( '/body main:has\(> \.nino-cover:first-child\)([^{}]*)\{\s*padding-top:\s*0;/', $frameStyle, $match ) === 1 ? $match[1] : '';
+// The delivered bar is a ground of its own at every rung, so a cover or a parallax hero
+// that begins the page - in main or in the wrap the Builder writes around a page's
+// sections - starts under it: the one rule of the delivered styles that sets the top
+// padding of a main is the room under the bar, whatever form a rule for a cover would take
+$mainPadding = [];
 
-check( 'the delivered frame takes main\'s top padding away for a cover and a parallax hero', $heroRule !== '' );
-check( '...also when the Builder\'s wrap stands between main and the hero', str_contains( $heroRule, 'main:has(> .nino-wrap > .nino-cover:first-child)' ) === true
-	&& str_contains( $heroRule, 'main:has(> .nino-wrap > .nino-parallex:first-child)' ) === true );
+if( preg_match_all( '/([^{}]*)\{([^{}]*)\}/', $frameStyle, $mainRules, PREG_SET_ORDER ) !== false )
+	foreach( $mainRules as $mainRule )
+		if( preg_match( '/\bmain\b/', $mainRule[1] ) === 1 && preg_match( '/(?<![\w-])padding(?:-top)?\s*:/', $mainRule[2] ) === 1 )
+			$mainPadding[] = trim( (string) preg_replace( '/\s+/', ' ', $mainRule[1] ) );
+
+check( 'the delivered frame leaves main its room under the bar for a cover and a parallax hero, in main and in the wrap of the Builder alike: the only rule that sets the padding of a main is the room under the bar'. ( count( $mainPadding ) === 1 ? '' : ' - found: '. implode( ' | ', $mainPadding ) ), $mainPadding === [ 'body main' ] );
 // ...and below a header that grew a row it starts under the whole bar: the padding is the bar's min-height and what the script says the bar has grown by, times the factor
 // the behaviour of the bar gives it - one where the bar stands fixed, nought where it goes with the page and needs no room. Design's regular header set writes the same line,
 // and its suite compares the delivered file with its own compile of it

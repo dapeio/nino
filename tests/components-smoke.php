@@ -1585,6 +1585,44 @@ $dotMargin = preg_match( '/^0 (\d+)px$/', (string) $hookValue( $groundOf( '.nino
 check( 'the dot of a slider is a target of 24px round a dot of 12px, its neighbours leave it the room, and the ring of its button is drawn with a line of ink inside it and in full strength: the opacity of an inactive slide does not reach it',
 	$dotSize === 12 && $dotSize + 2 * $dotInset >= 24 && $dotSize + 2 * $dotMargin >= $dotSize + 2 * $dotInset && $groundSets( $groundOf( '.nino-slider-points li' ), 'opacity', '1' ) === true
 	&& $groundSets( $groundOf( '.nino-slider-point:focus-visible' ), 'box-shadow', 'inset 0 0 0 2px var(--color-ink)' ) === true );
+// Every element a visitor can click says so under the pointer and the keyboard, by the rule at the foot of the element: a veil, the accent, a line - nothing moves. Each rule is in :where() and so as light as the element's own, and each element has the transition it needs
+$hintRules = [
+	'a.nino-logo:where(:hover, :focus-visible)'																																										=> [ 'opacity', '.8' ],
+	'.nino-nav-burger > button:where(:hover, :focus-visible) > svg'																																=> [ 'opacity', '.7' ],
+	'.nino-btn:where(:not(.nino-btn--light, .nino-btn--dark, .nino-btn--primary, .nino-btn--brand-alt, .nino-btn--outline, :disabled, [aria-disabled="true"])):where(:hover, :focus-visible)'	=> [ 'text-decoration', 'underline' ],
+	'.nino-tabs-tab:where(:not(.nino-is-active)):where(:hover, :focus-visible)'																										=> [ 'color', 'var(--color-accent)' ],
+	'.nino-slider-button:where(:hover, :focus-visible)'																																						=> [ 'color', 'var(--color-accent)' ],
+	'.nino-slider-points li:where(:not(.nino-is-active)):where(:has(.nino-slider-point:where(:hover, :focus-visible)))'																=> [ 'background-color', 'var(--color-ink)' ],
+	'.nino-accordion-trigger:where(:hover, :focus-visible)'																																				=> [ 'color', 'var(--color-accent)' ],
+	'.nino-hero-arrowdown:where(:hover, :focus-visible)'																																					=> [ 'opacity', '.7' ],
+	'.nino-localepicker-wrap > label'																																															=> [ 'cursor', 'pointer' ],
+	'.nino-localepicker-wrap > label:where(:hover, :focus-within) > svg'																													=> [ 'color', 'var(--color-accent)' ],
+];
+$hintMissing = [];
+foreach( $hintRules as $hintSelector => [ $hintProperty, $hintValue ] )
+	if( $groundSets( $groundOf( $hintSelector ), $hintProperty, $hintValue ) === false )
+		$hintMissing[] = $hintSelector;
+check( 'the ten answers to the pointer and the keyboard of the logo, the burger, the text button, the tab, the two kinds of slider control, the question of an accordion, the arrow, the label of the picker and its globe are rules of their own'. ( $hintMissing === [] ? '' : ' - missing: '. implode( ' | ', $hintMissing ) ), $hintMissing === [] );
+
+$hintTransitions = [
+	'.nino-logo' => 'opacity', '.nino-nav-burger svg' => 'opacity', '.nino-tabs-tab' => 'color', '.nino-slider-button' => 'color',
+	'.nino-accordion-trigger' => 'color', '.nino-hero-arrowdown' => 'opacity', '.nino-localepicker-wrap svg' => 'color',
+];
+$hintSlow = array_filter( array_keys( $hintTransitions ), static fn( string $selector ): bool => preg_match( '/(?<![\w-])'. preg_quote( $hintTransitions[$selector], '/' ). '\b/', (string) $hookValue( $groundOf( $selector ), 'transition' ) ) !== 1 );
+check( 'the property each of those rules changes is one its element transitions, so that the answer is a short fade and not a jump'. ( $hintSlow === [] ? '' : ' - not: '. implode( ', ', $hintSlow ) ), $hintSlow === [] );
+
+// The veil of the arrow is opacity, which neither the bounce (transform) nor the centring (translate) takes
+check( 'the arrow\'s answer to the pointer leaves transform and translate alone',
+	preg_match( '/(?<![\w-])(?:transform|translate)\s*:/', $groundOf( '.nino-hero-arrowdown:where(:hover, :focus-visible)' ) ) !== 1 && $groundOf( '.nino-hero-arrowdown:where(:hover, :focus-visible)' ) !== '' );
+
+// A link in a section, a card or a list gets the line and nothing else, bar the forms that answer for themselves
+$linkSelector = ':where(.nino-section, .nino-card, .nino-list) a:where(:not(.nino-btn, .nino-stretch, .nino-hero-arrowdown, .nino-logo, .nino-breadcrumbs a, .nino-pagination a, .nino-localepicker-wrap a)):where(:hover, :focus-visible)';
+$linkBody = $groundOf( $linkSelector );
+check( 'every link in a section, a card or a list but the forms that answer for themselves - button, stretched link, arrow, logo, breadcrumbs, pagination, picker - draws a line under its words when the pointer or the keyboard is on it, and takes no colour with it',
+	$groundSets( $linkBody, 'text-decoration', 'underline' ) === true && $hookValue( $linkBody, 'color' ) === null
+	&& $groundSets( $groundOf( ':where(.nino-section-text, .nino-card-descr) a:where(:not(.nino-btn)):is(:hover, :focus-visible)' ), 'text-decoration', 'underline' ) === true
+	&& $groundSets( $groundOf( ':where(.nino-section-text, .nino-card-descr) a:where(:not(.nino-btn))' ), 'color', 'var(--color-accent)' ) === true );
+
 check( 'the close button of a dialog is a target of 24px each way at least (SC 2.5.8), where it was as wide as the cross it draws',
 	preg_match( '/^(\d+)px$/', (string) $hookValue( $groundOf( '.nino-modal-close' ), 'min-width' ), $dotFound ) === 1 && (int) $dotFound[1] >= 24
 	&& preg_match( '/^(\d+)px$/', (string) $hookValue( $groundOf( '.nino-modal-close' ), 'min-height' ), $dotFound ) === 1 && (int) $dotFound[1] >= 24 );
@@ -2000,8 +2038,8 @@ $linkedColumn = array_values( array_filter( array_keys( $groundEach ), static fn
 check( 'a column can be a link the way a card can: the rules of .nino-grid--linked are those of .nino-card--linked selector for selector and declaration for declaration - the stretched link over the whole column, everything else interactive above it, the ring on the column - and there are as many'
 	. ( $linkedWrong === [] ? '' : ' - not: '. implode( ', ', $linkedWrong ) ), $linkedWrong === [] && count( $linkedCard ) === 5 && count( $linkedColumn ) === 5 );
 // The class of a link is the one place: nothing but these rules reads nino-stretch
-check( '...and a title that is a link draws the class they stretch, and in a column outside a linked one it means nothing: no other rule of the stylesheet reads nino-stretch',
-	count( array_filter( array_keys( $groundEach ), static fn( mixed $selector ): bool => str_contains( (string) $selector, 'nino-stretch' ) === true && str_contains( (string) $selector, '--linked' ) === false ) ) === 0 );
+check( '...and a title that is a link draws the class they stretch, and in a column outside a linked one it means nothing: no other rule of the stylesheet reads nino-stretch, but the line under a link, which leaves the stretched one out',
+	count( array_filter( array_keys( $groundEach ), static fn( mixed $selector ): bool => str_contains( (string) $selector, 'nino-stretch' ) === true && str_contains( (string) $selector, '--linked' ) === false && str_starts_with( (string) $selector, ':where(.nino-section, .nino-card, .nino-list) a:where(:not(' ) === false ) ) === 0 );
 
 echo "\n";
 
