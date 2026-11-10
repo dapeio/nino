@@ -62,13 +62,25 @@ backgroundCover.querySelector = function( selector ) {
 };
 const covers = [ railCover, partialCover, detachedCover, backgroundCover ];
 
+// A page whose main leaves 90px under an opaque bar. A cover that opens it - the
+// first child of main, or the first child of the .nino-wrap that is main's first
+// child (the Builder's form) - is a percentage of what is left of the viewport;
+// a cover further down is a percentage of the whole of it.
+const openingCover = cover( { 'data-cover-height' : '100' }, paddedMain, {}, 0 );
+const wrappedCover = cover( { 'data-cover-height' : '100' }, paddedMain, {}, 0 );
+const wrappedHalfCover = cover( { 'data-cover-height' : '50' }, paddedMain, {}, 0 );
+const laterCover = cover( { 'data-cover-height' : '100' }, paddedMain, {}, 0 );
+const wrap = { classList : classList( null, [ 'nino-wrap' ] ), firstElementChild : wrappedCover };
+const main = { computed : { 'padding-top' : '90px' }, firstElementChild : openingCover };
+let mainInPage = null;
+
 const documentElement = { clientHeight : 800, clientWidth : 1440, scrollLeft : 0, scrollTop : 0, style : {} };
 const body = { classList : classList(), scrollLeft : 0, scrollTop : 0 };
 const document = {
 	body : body,
 	documentElement : documentElement,
 	getElementById : function() { return null; },
-	querySelector : function() { return null; },
+	querySelector : function( selector ) { return selector === 'main' ? mainInPage : null; },
 	querySelectorAll : function( selector ) { return selector === '.nino-cover' ? covers : []; },
 };
 
@@ -115,5 +127,30 @@ railMain.clientWidth = 980;
 documentElement.clientWidth = 1600;
 ui.onResize();
 check( 'a later resize follows the changed container rather than the wider viewport', railCover.style.width === '980px' );
+
+// The page is built after the first four, which have no main
+covers.push( openingCover, wrappedCover, wrappedHalfCover, laterCover );
+sandbox.Nino.ui._onResize.length = 0;
+mainInPage = main;
+ui.onReady();
+ui.onResize();
+
+check( 'a cover that is the first child of main is a viewport less the padding of main high', openingCover.style.height === '710px' );
+main.firstElementChild = wrap;
+wrap.firstElementChild = wrappedCover;
+ui.onResize();
+check( 'a cover that is the first child of the wrap that opens main is as high', wrappedCover.style.height === '710px' );
+wrap.firstElementChild = wrappedHalfCover;
+ui.onResize();
+check( 'half a cover that opens the page is half of the space under the bar', wrappedHalfCover.style.height === '355px' );
+check( 'a cover that does not open the page is a whole viewport high', laterCover.style.height === '800px' );
+check( 'a cover further down the page keeps the whole viewport as well', railCover.style.height === '800px' );
+wrap.classList.remove( 'nino-wrap' );
+ui.onResize();
+check( 'a first child of main that is no .nino-wrap opens nothing for the cover in it', wrappedHalfCover.style.height === '400px' );
+wrap.classList.add( 'nino-wrap' );
+mainInPage = null;
+ui.onResize();
+check( 'without main there is nothing to take off', wrappedHalfCover.style.height === '400px' );
 
 done();

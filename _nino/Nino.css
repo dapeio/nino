@@ -4226,7 +4226,10 @@ header .nino-headernav-logo:empty {
    structural CSS that behavior depends on. A parallax that is no cover has no
    height but the 60vh it asks for, and the JS sizes covers only: it sizes
    itself to what it holds, its row stands in the flow and grows it (see
-   "A parallax that is no cover", below) */
+   "A parallax that is no cover", below). A cover that opens the page, the
+   first child of main or of its .nino-wrap, takes the padding-top of main off
+   the viewport it is a percentage of: 100 fills what the bar leaves of the
+   first screen, any other cover is a percentage of the whole viewport */
 .nino-parallex,
 .nino-cover {
 	position: relative;

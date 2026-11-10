@@ -439,12 +439,32 @@
 			/*
 			 *	nino-cover
 			 */
+			// Named, because the part of the bar above its min-height is written
+			// onto :root after it was measured (headerMeasure, below), which moves
+			// the padding of main without a resize: the header calls this again
+			let coverSize = null;
+
 			if( e.cover.length > 0 ) {
 				// Height is a percentage of the viewport. Width is a percentage of
 				// the containing content box: a persistent side navigation (Header
 				// v6) already removes its rail from <main>, so adding 100vw inside
 				// that narrower main would overflow by exactly the rail width.
-				ui._onResize.push( function( wH, wW ) {
+				// A cover that opens the page - the first child of <main>, or of the
+				// .nino-wrap the Builder puts round the sections - starts where the
+				// padding of <main> ends, below an opaque bar: its height is a
+				// percentage of the viewport that is left there, so that 100 fills
+				// the rest of the first screen. The padding of <main> is the one
+				// place where the design says what stays free under the bar, and it
+				// carries --nino-header-grow already. Any other cover is a percentage
+				// of the whole viewport: that is the decision, since by the time it
+				// is reached the bar has folded away or lies over it as the page
+				// says it should
+				coverSize = function( wH, wW ) {
+					const
+						main	= dc.querySelector( 'main' ),
+						first	= main?.firstElementChild ?? null,
+						top		= parseFloat( main === null ? 0 : wn.getComputedStyle( main ).getPropertyValue( 'padding-top' ) ) || 0;
+
 					for( let i=0, l=e.cover.length; i<l; i++ ) {
 						let
 							w 			= e.cover[i].getAttribute( 'data-cover-width' ) ?? 100,
@@ -453,7 +473,8 @@
 							marginH		= ( parseFloat( style.getPropertyValue('margin-top') ) || 0 ) + ( parseFloat( style.getPropertyValue('margin-bottom') ) || 0 ),
 							marginW		= ( parseFloat( style.getPropertyValue('margin-left') ) || 0 ) + ( parseFloat( style.getPropertyValue('margin-right') ) || 0 ),
 							contW		= ui._coverContainingWidth( e.cover[i], wW ),
-							wrap		= e.cover[i].querySelector('div');
+							wrap		= e.cover[i].querySelector('div'),
+							opens		= first !== null && ( first === e.cover[i] || ( first.classList?.contains( 'nino-wrap' ) === true && first.firstElementChild === e.cover[i] ) );
 
 						// The background block of a section the Builder wrote is a div as
 						// well, and it lies over the whole cover: its height is the cover's
@@ -463,10 +484,11 @@
 
 						let wrapH = wrap?.offsetHeight ?? 0;
 
-						e.cover[i].style.height = Math.max( ( ( wH / 100 * h ) - marginH ), 50 + wrapH ) + 'px';
+						e.cover[i].style.height = Math.max( ( ( ( opens === true ? wH - top : wH ) / 100 * h ) - marginH ), 50 + wrapH ) + 'px';
 						e.cover[i].style.width = ( ( contW * w / 100 ) - marginW ) + 'px';
 					}
-				} );
+				};
+				ui._onResize.push( coverSize );
 			}
 			/*
 			 *	nino-parallex
@@ -714,6 +736,11 @@
 
 						written = grow;
 						dE.style.setProperty( '--nino-header-grow', grow );
+
+						if( coverSize !== null ) {
+							const [ wH, wW ] = ui._metrics();
+							coverSize( wH, wW );
+						}
 					},
 					headerGrow = function() {
 
