@@ -173,6 +173,22 @@ foreach( [ '.nino-section-title--hero', '.nino-section-subtitle--hero' ] as $hoo
 		$hookHeroReads = array_merge( $hookHeroReads, $hookHeroFound[1] );
 check( '...and every custom property the rules of the hero style read is one that Nino.css declares'. ( array_diff( $hookHeroReads, $hookDeclared[1] ) === [] ? '' : ' - not: '. implode( ', ', array_unique( array_diff( $hookHeroReads, $hookDeclared[1] ) ) ) ),
 	count( $hookHeroReads ) > 0 && array_diff( $hookHeroReads, $hookDeclared[1] ) === [] );
+// The label of a form follows the field: the size of the text of a field, 1rem times --forms-scale, less a quarter of the lift of a label that floats - not 1em, the text of the page, which a design's text knob moves and the field does not follow
+$hookFormsRoot = preg_match( '/:where\(:root\)\s*\{([^{}]*--forms-scale[^{}]*)\}/', $hookCss, $found ) === 1 ? $found[1] : '';
+check( 'the label of a form is the size of the text of its field, 1rem times --forms-scale, less a quarter of --forms-labels-lift, and not 1em',
+	preg_replace( '/\s+/', '', (string) $hookValue( $hookFormsRoot, '--forms-label-size' ) ) === 'calc(1rem*var(--forms-scale)-var(--forms-labels-lift)*.25)'
+	&& str_contains( (string) $hookValue( $hookFormsRoot, '--forms-label-size' ), '1em' ) === false
+	&& preg_match( '/font-size\s*:\s*max\(\s*var\(--forms-floor\),\s*calc\(\s*1rem\s*\*\s*var\(--forms-scale\)\s*\)\s*\)\s*;/', $hookRules( '.nino-form-input, .nino-form-textarea, .nino-form-select' ) ) === 1 );
+// The note under the fields is the size of the field's text times .85 in the ink of a label, in a :where() so that a rule of the project's own wins, and in the grid it takes the whole row as the status line does
+$hookNote = $hookRules( ':where(.nino-form-note)' );
+check( 'the note under the fields of a form (.nino-form-note) is .85 of the size of the text of a field - --forms-scale and the floor in it - in the ink of a label, from a :where() rule with the margin the status line has above it and as much below',
+	preg_replace( '/\s+/', '', (string) $hookValue( $hookNote, 'font-size' ) ) === 'calc(.85*max(var(--forms-floor),calc(1rem*var(--forms-scale))))'
+	&& $hookValue( $hookNote, 'color' ) === 'var(--forms-label)'
+	&& $hookValue( $hookNote, 'margin-top' ) === $hookValue( $hookRules( '.nino-form-message' ), 'margin-top' ) && $hookValue( $hookNote, 'margin-top' ) !== null
+	&& $hookValue( $hookNote, 'margin-bottom' ) === $hookValue( $hookNote, 'margin-top' ) );
+$hookGridWide = preg_match( '/:where\(\.nino-form:not\([^()]*\) > :not\(\s*label:not\(\.nino-forms-check, \.nino-sr-only\),\s*label:not\(\.nino-forms-check, \.nino-sr-only\) \+ :is\(\.nino-form-input, \.nino-form-select, \.nino-form-textarea\),\s*\.nino-form-trap, \.nino-sr-only\s*\)\)\s*\{([^{}]*)\}/', $hookCss, $found ) === 1 ? $found[1] : '';
+check( '...and in the grid of a form in rows the note, a p, is not a label or the field after one, so it takes the whole row (--forms-labels-wide)',
+	$hookValue( $hookGridWide, 'grid-column' ) === 'var(--forms-labels-wide)' );
 check( 'a card title takes the title role times a number of its own: 5 / 6, what --text-3 was of --text-4, and 25 / 32 from 768px, where --text-4 steps up and --text-3 does not',
 	$hookValue( $hookRoot, '--card-title-scale' ) === 'calc(5 / 6)' && $hookValue( $hookRootWide, '--card-title-scale' ) === 'calc(25 / 32)' );
 check( 'a section title, a section subtitle and a card subtitle take their role times a number of their own, 1 at every width, and the rule under a section title is 0px until a design layer gives it a thickness',

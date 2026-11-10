@@ -38,7 +38,7 @@
 				<input type="text" name="location" value="" tabindex="-1" autocomplete="off" aria-hidden="true" class="nino-form-trap">
 		
 				<p class="nino-form-message" aria-live="polite"></p>
-				<p><small>* [[/template/common/form/required]]</small></p>
+				<p class="nino-form-note">* [[/template/common/form/required]]</p>
 				<button type="submit" class="nino-btn nino-btn--primary nino-form-submit">[[/template/common/form/submit]]</button>
 			</form>
 		</div>

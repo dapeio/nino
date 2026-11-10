@@ -592,7 +592,7 @@
 				<input type="text" name="location" value="" tabindex="-1" autocomplete="off" aria-hidden="true" class="nino-form-trap">
 
 				<p class="nino-form-message"></p>
-				<p><small>[[/template/common/form/required]]</small></p>
+				<p class="nino-form-note">[[/template/common/form/required]]</p>
 				<button type="submit" class="nino-btn nino-btn--primary nino-form-submit">[[/template/common/form/submit]]</button>
 			</form>
 		</div>
@@ -624,7 +624,7 @@
 				<input type="text" name="location" value="" tabindex="-1" autocomplete="off" aria-hidden="true" class="nino-form-trap">
 
 				<p class="nino-form-message"></p>
-				<p><small>[[/template/common/form/required]]</small></p>
+				<p class="nino-form-note">[[/template/common/form/required]]</p>
 				<button type="submit" class="nino-btn nino-btn--primary nino-form-submit">[[/template/common/form/submit]]</button>
 			</form>
 		</div>
@@ -2237,7 +2237,7 @@
 			<h3 class="nino-section-title nino-text-left" id="formulare-title">Forms</h3>
 			<p class="nino-section-subtitle nino-text-left">Field styling is independent of what the form submits. Feedback is controlled by a state class on the form itself.</p>
 		</div>
-		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-form</span> <span class="nino-badge nino-badge--pill">.nino-form-input</span> <span class="nino-badge nino-badge--pill">.nino-form-textarea</span> <span class="nino-badge nino-badge--pill">.nino-form-select</span> <span class="nino-badge nino-badge--pill">.nino-form-message</span> <span class="nino-badge nino-badge--pill">.nino-form-submit</span> <span class="nino-badge nino-badge--pill">.nino-form--inline</span> <span class="nino-badge nino-badge--pill">.nino-form-trap</span> <span class="nino-badge nino-badge--pill">.nino-is-error</span> <span class="nino-badge nino-badge--pill">.nino-is-success</span> <span class="nino-badge nino-badge--pill">.nino-is-pending</span></div>
+		<div class="nino-grid-100 nino-badge-cloud nino-badge-cloud--left nino-mb-3"><span class="nino-badge nino-badge--pill">.nino-form</span> <span class="nino-badge nino-badge--pill">.nino-form-input</span> <span class="nino-badge nino-badge--pill">.nino-form-textarea</span> <span class="nino-badge nino-badge--pill">.nino-form-select</span> <span class="nino-badge nino-badge--pill">.nino-form-message</span> <span class="nino-badge nino-badge--pill">.nino-form-note</span> <span class="nino-badge nino-badge--pill">.nino-form-submit</span> <span class="nino-badge nino-badge--pill">.nino-form--inline</span> <span class="nino-badge nino-badge--pill">.nino-form-trap</span> <span class="nino-badge nino-badge--pill">.nino-is-error</span> <span class="nino-badge nino-badge--pill">.nino-is-success</span> <span class="nino-badge nino-badge--pill">.nino-is-pending</span></div>
 		<div class="nino-grid-100 nino-grid-m-50 nino-pr-2 nino-mb-3">
 			<form class="nino-form" action="#formulare">
 				<label for="katalog-name">Name</label>

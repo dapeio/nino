@@ -2610,8 +2610,10 @@ textarea:disabled {
 		in focus, the ring in focus and how far it stands off, the padding of a
 		field, the space under a field, a check and a group, the padding and
 		the corners of the status line, the case, the tracking and the size of a
-		label - which a label that floats takes smaller - and the floor of the
-		size of a field	*/
+		label - which follows the size of the field and a label that floats takes
+		smaller - and the floor of the size of a field. The floor is the field's
+		and not the label's: only a field makes the browser of a phone zoom,
+		and a label that stays under 1rem on a touch screen does no harm	*/
 	--forms-width: var(--forms-line);
 	--forms-width-focus: var(--forms-width);
 	--forms-ring: 2px;
@@ -2622,7 +2624,7 @@ textarea:disabled {
 	--forms-message-corners: var(--radius);
 	--forms-label-case: none;
 	--forms-label-tracking: normal;
-	--forms-label-size: calc( 1em - var(--forms-labels-lift) * .25 );
+	--forms-label-size: calc( 1rem * var(--forms-scale) - var(--forms-labels-lift) * .25 );
 	--forms-floor: 0rem;
 }
 
@@ -2701,6 +2703,17 @@ textarea:disabled {
 	background-position: right .5rem center;
 	background-size: 1.5rem;
 	padding-right: 2.5rem;
+}
+/*	The note under the fields ("* required"): the size of the text of a field
+	times .85, a little smaller than the field and about the status line, in the
+	ink of a label and with the room the status line has above it and as much
+	below it, between the note and the button. :where() so that a rule of the
+	project's own wins	*/
+:where(.nino-form-note) {
+	font-size: calc( .85 * max( var(--forms-floor), calc( 1rem * var(--forms-scale) ) ) );
+	color: var(--forms-label);
+	margin-top: .5rem;
+	margin-bottom: .5rem;
 }
 .nino-form-message {
 	font-size: .875rem;
