@@ -700,11 +700,13 @@ check( 'the delivered frame clears the bar as it is, not as it is at its least: 
 	preg_match( '/\nbody main\s*\{\s*padding-top:\s*calc\( \( var\(--header-height\) \+ var\(--nino-header-grow, 0px\) \) \* var\(--header-behaviour-clear\) \);\s*\}/', $frameStyle ) === 1 );
 
 // The rule under a section title is the line Nino.css draws as the border of the title, drawn by the delivered stylesheet as a background of it - as high as the rule, as long as the
-// length - with the border taken to nothing and the room under the title the line and six times it, up to 1.25rem, so that it can be short. Design's section sets write the same
+// length - with the border taken to nothing and the room under the title the line and twice it, up to .375rem, so that it can be short, the hero style of the title among the titles that carry it. Design's section sets write the same
 // rule, and its suite compares the delivered file with its own compile of it
-check( 'the delivered stylesheet draws the rule under a section title as a background as high as the rule and as long as its length, with no border of its own and room under the title of the line and six times it, to 1.25rem',
+check( 'the delivered stylesheet draws the rule under a section title as a background as high as the rule and as long as its length, with no border of its own and room under the title of the line and twice it, to .375rem, the hero title among them',
 	preg_match( '/\.nino-section-title[^{}]*\{[^}]*border-bottom-width:\s*0;[^}]*background-size:\s*var\(--section-rule-length\) var\(--section-rule\);/', $frameStyle ) === 1
-	&& preg_match( '/\.nino-section-title[^{}]*\{[^}]*padding-bottom:\s*calc\( [^;]*var\(--section-rule\) \+ min\( var\(--section-rule\) \* 6, 1\.25rem \) \);/', $frameStyle ) === 1 );
+	&& preg_match( '/\.nino-section-title[^{}]*\{[^}]*padding-bottom:\s*calc\( [^;]*var\(--section-rule\) \+ min\( var\(--section-rule\) \* 2, \.375rem \) \);/', $frameStyle ) === 1
+	&& preg_match( '/:is\([^()]*\.nino-section-title--hero\)\s*\{[^}]*background-size:\s*var\(--section-rule-length\) var\(--section-rule\);/', $frameStyle ) === 1
+	&& preg_match( '/:not\([^()]*\.nino-section-title--hero[^{]*\{[^}]*(?:background-size|padding-bottom\s*:[^;]*--section-rule)/', $frameStyle ) === 0 );
 
 echo "\n";
 

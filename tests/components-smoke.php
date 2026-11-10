@@ -155,11 +155,13 @@ foreach( [ '.nino-section-title--hero' => '--font-title-size', '.nino-section-su
 		$hookHeroLeading[] = $hookHeroClass. ' is '. implode( ' then ', $hookHeroLines );
 }
 check( '...its leading is 1.3 / 1.2 of its size below 768px and 1.2 of it from there'. ( $hookHeroLeading === [] ? '' : ' - '. implode( ', ', $hookHeroLeading ) ), $hookHeroLeading === [] );
-// It draws no rule under the title, the air under it is the space-3 the hero had, and the subtitle keeps the colour of its role: no opacity
+// It draws the rule of a title - --section-line thick and six times that much air, nothing at the default -, the air under it is the space-3 the hero had, and the subtitle keeps the colour of its role: no opacity
 $hookHeroTitle		= $hookRules( '.nino-section-title--hero' );
 $hookHeroSubtitle	= $hookRules( '.nino-section-subtitle--hero' );
-check( '...the title has no air above it, no rule and no air for one under it, both titles have the space-3 under them, and the subtitle has no opacity',
-	preg_match( '/(?<![\w-])border-bottom\s*:\s*0\s*;/', $hookHeroTitle ) === 1 && preg_match( '/(?<![\w-])padding-bottom\s*:\s*0\s*;/', $hookHeroTitle ) === 1
+check( '...the title has no air above it, draws the rule of a title (--section-line, six times that much air) and not a rule of nothing, both titles have the space-3 under them, and the subtitle has no opacity',
+	preg_match( '/(?<![\w-])border-bottom\s*:\s*var\(--section-line\) solid var\(--color-border\)\s*;/', $hookHeroTitle ) === 1
+	&& preg_match( '/(?<![\w-])padding-bottom\s*:\s*calc\(\s*var\(--section-line\)\s*\*\s*6\s*\)\s*;/', $hookHeroTitle ) === 1
+	&& preg_match( '/(?<![\w-])(?:border-bottom|padding-bottom)\s*:\s*0\s*;/', $hookHeroTitle ) === 0
 	&& preg_match( '/(?<![\w-])margin-bottom\s*:\s*calc\(var\(--space-3\) \* var\(--whitespace-text\)\)\s*;/', $hookHeroTitle ) === 1
 	&& preg_match( '/(?<![\w-])margin-bottom\s*:\s*calc\(var\(--space-3\) \* var\(--whitespace-text\)\)\s*;/', $hookHeroSubtitle ) === 1
 	&& str_contains( $hookHeroSubtitle, 'opacity' ) === false && str_contains( $hookRules( '.nino-section-subtitle' ), 'opacity' ) === false
