@@ -52,6 +52,7 @@ const document = {
 	querySelectorAll : function( selector ) { return selector === '.nino-autoheight' ? cards : []; },
 };
 
+const timers = [];
 const sandbox = {
 	console : console,
 	document : document,
@@ -59,7 +60,7 @@ const sandbox = {
 	innerWidth : 390,
 	location : { hash : '' },
 	requestAnimationFrame : function() {},
-	setTimeout : function() {},
+	setTimeout : function( fn, delay ) { timers.push( { fn : fn, delay : delay } ) },
 	addEventListener : function() {},
 	getComputedStyle : function() {
 		return { getPropertyValue : function() { return '0px'; } };
@@ -85,6 +86,35 @@ check( 'the tallest measured card of the group sets the height of the group', sh
 check( 'the element that opted out of mobile is left without a height', typeof optedOut.style.height === 'undefined' );
 check( '...and is not measured into its group either', short.style.height !== '180px' );
 check( 'an opted-out element alone in its group is not handed its empty group', typeof alone.style.height === 'undefined' );
+
+// A phone rotated: the width changed, the text wraps otherwise, the rows are measured again
+short.style.height = 'stale';
+sandbox.innerWidth = 844;
+documentElement.clientWidth = 844;
+documentElement.clientHeight = 390;
+tall.style.height = 'stale';
+ui.onResize();
+check( 'a width change on a phone equalizes the rows again', tall.style.height === '150px' && short.style.height === '150px' );
+
+// The address bar of a phone showing or hiding changes the height alone
+short.style.height = 'stale';
+documentElement.clientHeight = 450;
+ui.onResize();
+check( 'a height change alone on a phone leaves the rows as they are', short.style.height === 'stale' );
+documentElement.clientHeight = 390;
+
+// ...and back to portrait: a narrower screen is a width change too
+short.style.height = 'stale';
+sandbox.innerWidth = 390;
+documentElement.clientWidth = 390;
+ui.onResize();
+check( 'a width change to a narrower screen equalizes the rows as well', short.style.height === '150px' );
+
+// The measurement that settles after the ready event (late layout: fonts, images) runs although a resize has recorded the width by then
+const settle = timers.filter( function( timer ) { return timer.delay === 200 } )[0];
+short.style.height = 'stale';
+settle.fn();
+check( 'the settled measurement after ready sizes the rows on a phone although the width has been seen', short.style.height === '150px' );
 
 // The same page above the mobile break: the opt-out is per element and per
 // client, so nothing it protects on a phone may be skipped on a desktop

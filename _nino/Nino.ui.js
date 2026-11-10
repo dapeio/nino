@@ -29,7 +29,7 @@
 	wn.Nino.ui = {
 
 		_onResize			: [],
-		_onResizeDone 		: false,
+		_onResizeWidth		: null,
 		_onScroll			: [],
 		_onScrollTicking	: false,
 		_onViewable			: [],
@@ -1599,6 +1599,8 @@
 			}
 
 			setTimeout( () => {
+				// The measurement after late layout (fonts, images) is not skipped for a width a resize has recorded
+				ui._onResizeWidth = null;
 				ui.onResize();
 				ui.onScroll();
 				ui.onViewable();
@@ -1806,17 +1808,25 @@
 
 		/**
 		 *	Notify all registered resize callbacks with the current viewport/
-		 *	scroll metrics. Runs once only on mobile after the first call.
+		 *	scroll metrics. A phone's address bar shows and hides while the page
+		 *	scrolls, and each time the window resizes in height alone: there the
+		 *	callbacks run when the width changed - the first call, a rotation -
+		 *	so that the sizes they set (a cover is a share of the height of the
+		 *	screen it was last sized for) do not jump under the reader's finger.
 		 *
 		 *	@return		void
 		 */
 		onResize : function() {
-			if( Nino.ui._onResize.length === 0 || ( Nino.client.isMobile === true && Nino.ui._onResizeDone === true ) )
+			if( Nino.ui._onResize.length === 0 )
 				return;
 
 			const [ wH, wW, st, sl ] = Nino.ui._metrics();
+
+			if( Nino.client.isMobile === true && Nino.ui._onResizeWidth === wW )
+				return;
+
 			Nino.ui._onResize.forEach( ( cb ) => { cb( wH, wW, st, sl ) } );
-			Nino.ui._onResizeDone = true;
+			Nino.ui._onResizeWidth = wW;
 		},
 
 		/**

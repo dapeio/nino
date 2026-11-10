@@ -253,10 +253,11 @@
 					dc.addEventListener( 'DOMContentLoaded', cbReady );
 
 				// onResize
-				const resizeEvent = ( Nino.client.isMobile === false ) ? 'resize' : 'deviceorientation';
-				// Throttle native resize/orientation events and notify registered 'resize' callbacks.
+				// Throttle native resize events and notify registered 'resize' callbacks. A
+				// phone fires the same event when it is rotated; what the address bar does
+				// to the height is sorted out by the callbacks (Nino.ui.onResize).
 				// Passive, like the scroll listener below
-				wn.addEventListener( resizeEvent, ( e ) => {
+				wn.addEventListener( 'resize', ( e ) => {
 					if( Nino.events._calls['resize'] !== false )
 						return;
 

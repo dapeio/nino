@@ -153,4 +153,18 @@ mainInPage = null;
 ui.onResize();
 check( 'without main there is nothing to take off', wrappedHalfCover.style.height === '400px' );
 
+// A phone: the address bar changes the height alone and the cover stands; a rotation changes the width and sizes it again
+sandbox.Nino.client.isMobile = true;
+sandbox.Nino.ui._onResizeWidth = null;
+documentElement.clientWidth = 390;
+documentElement.clientHeight = 800;
+ui.onResize();
+const phoneHeight = laterCover.style.height;
+documentElement.clientHeight = 700;
+ui.onResize();
+check( 'a height change alone on a phone does not size a cover again', laterCover.style.height === phoneHeight );
+documentElement.clientWidth = 844;
+ui.onResize();
+check( '...a width change does, by the height the screen has then', laterCover.style.height === '700px' );
+
 done();

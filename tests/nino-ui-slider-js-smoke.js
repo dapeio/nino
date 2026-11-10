@@ -328,4 +328,19 @@ check( 'a slider without a list is left out of the resize rather than throwing o
 check( '...and one with a list with no slide in it too, whose list is not given a left or a width of NaN',
 	skipThrew === null && noSlides.lis.length === 0 && emptyList.style.left === undefined && emptyList.style.width === undefined && noSlides.style.height === undefined );
 
+// A phone rotated: the slider is as wide as the new screen, so its slides are sized again; the address bar alone changes nothing
+const turning = sized( {}, 400 );
+document.querySelectorAll = function( selector ) { return selector === '.nino-slider' ? [ turning ] : []; };
+ui._onResize.length = 0;
+ui._onResizeWidth = null;
+ui.onReady();
+ui.onResize();
+turning.measured = 800;
+documentElement.clientHeight = 500;
+ui.onResize();
+check( 'a height change alone on a phone does not size the slides again', turning.slides[0].style.width === '300px' );
+documentElement.clientWidth = 640;
+ui.onResize();
+check( '...a width change does', turning.slides[0].style.width === '600px' );
+
 done();

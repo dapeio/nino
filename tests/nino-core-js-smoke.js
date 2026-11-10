@@ -126,7 +126,14 @@ check( 'the scroll and the resize listeners are passive: no callback of theirs c
 
 const phone = page( { navigator : { userAgent : 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)', language : 'en-US' } } );
 const phoneListens = function( type ) { return phone.registered.filter( function( entry ) { return entry.type === type } ) };
-check( '...on a phone the orientation listener is passive too, and stands in for the resize one', phoneListens('deviceorientation').length === 1 && phoneListens('deviceorientation')[0].options.passive === true && phoneListens('resize').length === 0 );
+check( '...on a phone the resize listener is the same passive one, so a rotation reaches the callbacks', phoneListens('resize').length === 1 && phoneListens('resize')[0].options.passive === true );
+check( 'no client listens to the sensor event of the device orientation', listenersOf('deviceorientation').length === 0 && phoneListens('deviceorientation').length === 0 );
+
+let phoneResizes = 0;
+phone.Nino.events.bindCallback( 'resize', function() { phoneResizes++ } );
+phone.fire( 'resize', { type : 'resize' } );
+phone.runFrames();
+check( 'a resize of a phone runs the resize callbacks', phoneResizes === 1 );
 
 
 // --- A callback that throws ------------------------------------------------
