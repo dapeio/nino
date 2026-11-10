@@ -249,8 +249,15 @@ namespace Nino {
 			$user = self::getUser( $appData, $username );
 			if( $user === false )
 				return false;
-			if( $newHash !== null )
+			if( $newHash !== null ) {
+
 				$user['pw'] = $newHash;
+
+				// Tell the merge in AppData::writeContentData() that the new hash is
+				// no change of the account's own - it must not bring back an account
+				// that was deleted in the meantime
+				$appData['./nino/auth/rehashed'][$username] = true;
+			}
 
 			// The login before this one, kept for the session that opens now: the
 			// record is about to carry this login's time, and what the

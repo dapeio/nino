@@ -384,6 +384,139 @@ $adminCopy['/nino/auth/user']['merge@example.com']['lastLogin'] = $loginAt - 500
 $adminCopy['/nino/auth/user']['merge@example.com']['role'] = '';
 \Nino\AppData::writeContentData( $adminCopy, [ '/nino/auth/user' ] );
 check( 'a record written with an older login time does not turn the clock back', ( $record()['lastLogin'] ?? null ) === $loginAt );
+
+/*	A request that booted before another one ended a session must not write
+	that session back, whatever else it changed about the account, and a login
+	that verified a password or a status the file no longer holds opens no
+	session. Two copies booted from the same file, in both orders	*/
+$sessionsOf		= function() use ( $record ): array { return is_array( $record()['sessions'] ?? null ) === true ? $record()['sessions'] : []; };
+$seed			= function( array $tokens ) use ( $appData, $accounts ): void {
+	$seeded = $appData;
+	$seeded['./nino/auth/baseline'] = $accounts();
+	foreach( $tokens as $token )
+		$seeded['/nino/auth/user']['merge@example.com']['sessions'][$token] = [ 'time' => time(), 'ip' => '10.0.0.8' ];
+	\Nino\AppData::writeContentData( $seeded, [ '/nino/auth/user' ] );
+};
+$weakHash		= function() use ( $appData ): void {
+	$weak = $appData;
+	$weak['/nino/auth/user']['merge@example.com']['pw'] = password_hash( 'correct horse battery staple', PASSWORD_BCRYPT, [ 'cost' => 4 ] );
+	\Nino\AppData::writeContentData( $weak, [ '/nino/auth/user' ] );
+};
+$signedIn		= function( array $booted ) use ( $buildAppData ): bool {
+	$next = $buildAppData();
+	\Nino\Runtime::setSessionValue( $next, './nino/auth/current', 'merge@example.com' );
+	\Nino\Runtime::setSessionValue( $next, './nino/auth/token', (string) \Nino\Runtime::getSessionValue( $booted, './nino/auth/token', '' ) );
+	\Nino\Auth::init( $next );
+	return \Nino\Auth::getCurrentUser( $next ) !== false;
+};
+
+// "Log out everywhere" first, the older copy writing a change of its own after
+$seed( [ 'tokenOld' ] );
+[ $adminCopy, $loginCopy ] = $bootBoth();
+\Nino\Auth::logoutAllSessions( $adminCopy, 'merge@example.com' );
+$loginCopy['/nino/auth/user']['merge@example.com']['marker'] = 'WRITTEN_LATE';
+\Nino\AppData::writeContentData( $loginCopy, [ '/nino/auth/user' ] );
+check( 'a session another request ended is not written back by a request that changed the account', $sessionsOf() === [] && ( $record()['marker'] ?? null ) === 'WRITTEN_LATE' );
+
+// ...and the other order
+$seed( [ 'tokenOld' ] );
+[ $adminCopy, $loginCopy ] = $bootBoth();
+$loginCopy['/nino/auth/user']['merge@example.com']['marker'] = 'WRITTEN_EARLY';
+\Nino\AppData::writeContentData( $loginCopy, [ '/nino/auth/user' ] );
+\Nino\Auth::logoutAllSessions( $adminCopy, 'merge@example.com' );
+check( '...whichever of the two writes first', $sessionsOf() === [] );
+
+// A request that ends one session leaves the others, and one that opened a
+// session of its own keeps it beside a parallel login of another device
+$seed( [ 'tokenOne', 'tokenTwo' ] );
+[ $adminCopy, $loginCopy ] = $bootBoth();
+$doLogin( $adminCopy, 'tokenOther' );
+unset( $loginCopy['/nino/auth/user']['merge@example.com']['sessions']['tokenOne'] );
+$loginCopy['/nino/auth/user']['merge@example.com']['sessions']['tokenMine'] = [ 'time' => time(), 'ip' => '10.0.0.7' ];
+\Nino\AppData::writeContentData( $loginCopy, [ '/nino/auth/user' ] );
+$kept = array_keys( $sessionsOf() );
+sort( $kept );
+check( 'a logout in this request removes its own token and no other', $kept === [ 'tokenMine', 'tokenOther', 'tokenTwo' ] );
+
+// A login that verified the old password, the password changed meanwhile
+\Nino\Auth::logoutAllSessions( $appData, 'merge@example.com' );
+[ $adminCopy, $loginCopy ] = $bootBoth();
+\Nino\Auth::updateUser( $adminCopy, 'merge@example.com', 'merge@example.com', 'the administrator chose this one' );
+$opened = \Nino\Auth::loginUser( $loginCopy, 'merge@example.com', 'correct horse battery staple' );
+check( 'a login that verified a password changed meanwhile opens no session', is_array( $opened ) === true && $sessionsOf() === [] );
+check( '...and the password stays the one chosen meanwhile', password_verify( 'the administrator chose this one', (string) ( $record()['pw'] ?? '' ) ) === true );
+check( '...so its next request is signed out, without an error', $signedIn( $loginCopy ) === false );
+
+// The same login rehashing an outdated hash must not write that hash over the new one
+\Nino\Auth::updateUser( $appData, 'merge@example.com', 'merge@example.com', 'correct horse battery staple' );
+$weakHash();
+[ $adminCopy, $loginCopy ] = $bootBoth();
+\Nino\Auth::updateUser( $adminCopy, 'merge@example.com', 'merge@example.com', 'chosen while the login rehashed' );
+\Nino\Auth::loginUser( $loginCopy, 'merge@example.com', 'correct horse battery staple' );
+check( 'a login that rehashes does not write its hash over a password changed meanwhile', password_verify( 'chosen while the login rehashed', (string) ( $record()['pw'] ?? '' ) ) === true && $sessionsOf() === [] );
+
+// An account switched off after the login booted gains no session
+\Nino\Auth::updateUser( $appData, 'merge@example.com', 'merge@example.com', 'correct horse battery staple' );
+[ $adminCopy, $loginCopy ] = $bootBoth();
+\Nino\Auth::setStatus( $adminCopy, 'merge@example.com', false );
+\Nino\Auth::loginUser( $loginCopy, 'merge@example.com', 'correct horse battery staple' );
+check( 'a login that booted before a deactivation opens no session', ( $record()['status'] ?? null ) === \Nino\Auth::STATUS_DISABLED && $sessionsOf() === [] );
+
+// ...also when that login rehashes, which changes the record it writes
+\Nino\Auth::setStatus( $appData, 'merge@example.com', true );
+$weakHash();
+[ $adminCopy, $loginCopy ] = $bootBoth();
+\Nino\Auth::setStatus( $adminCopy, 'merge@example.com', false );
+\Nino\Auth::loginUser( $loginCopy, 'merge@example.com', 'correct horse battery staple' );
+check( 'a rehashing login does not switch the account back on', ( $record()['status'] ?? null ) === \Nino\Auth::STATUS_DISABLED && $sessionsOf() === [] );
+
+// Nothing moved on disk: the login keeps its session
+\Nino\Auth::setStatus( $appData, 'merge@example.com', true );
+[ $adminCopy, $loginCopy ] = $bootBoth();
+\Nino\Auth::loginUser( $loginCopy, 'merge@example.com', 'correct horse battery staple' );
+check( 'a login with nothing changed meanwhile keeps its session', count( $sessionsOf() ) === 1 && $signedIn( $loginCopy ) === true );
+
+// The literal case: the login that writes last is one of another account
+$seed( [ 'tokenOld' ] );
+[ $adminCopy, $loginCopy ] = $bootBoth();
+\Nino\Auth::logoutAllSessions( $adminCopy, 'merge@example.com' );
+\Nino\Auth::loginUser( $loginCopy, 'bystander@example.com', 'correct horse battery staple' );
+check( 'a login of another account does not bring back a session that was ended meanwhile', $sessionsOf() === [] && count( $accounts()['bystander@example.com']['sessions'] ?? [] ) === 1 );
+
+// One request that deletes an account, creates it again and signs it in (the
+// setup wizard run twice for one address) keeps the session it opened
+$again = $buildAppData();
+$again['./nino/auth/baseline'] = $again['/nino/auth/user'] ?? [];
+\Nino\Auth::deleteUser( $again, 'merge@example.com' );
+\Nino\Auth::insertUser( $again, 'merge@example.com', 'correct horse battery staple' );
+\Nino\Auth::loginUser( $again, 'merge@example.com', 'correct horse battery staple' );
+check( 'an account deleted, created and signed in within one request keeps the session', count( $sessionsOf() ) === 1 && $signedIn( $again ) === true );
+
+// An account another request deleted is not written back by a login that rehashes
+$weakHash();
+[ $adminCopy, $loginCopy ] = $bootBoth();
+\Nino\Auth::deleteUser( $adminCopy, 'merge@example.com' );
+\Nino\Auth::loginUser( $loginCopy, 'merge@example.com', 'correct horse battery staple' );
+check( 'a login that rehashes does not bring back an account deleted meanwhile', isset( $accounts()['merge@example.com'] ) === false );
+
+
+// ...nor by a "log out everywhere", nor by a rehash and a password change of one request
+\Nino\Auth::insertUser( $appData, 'gone@example.com', 'correct horse battery staple' );
+[ $adminCopy, $loginCopy ] = $bootBoth();
+\Nino\Auth::deleteUser( $adminCopy, 'gone@example.com' );
+\Nino\Auth::logoutAllSessions( $loginCopy, 'gone@example.com' );
+check( 'an account deleted meanwhile is not brought back by log out everywhere', isset( $accounts()['gone@example.com'] ) === false );
+
+\Nino\Auth::insertUser( $appData, 'gone@example.com', 'correct horse battery staple' );
+$weak = $appData;
+$weak['/nino/auth/user']['gone@example.com']['pw'] = password_hash( 'correct horse battery staple', PASSWORD_BCRYPT, [ 'cost' => 4 ] );
+\Nino\AppData::writeContentData( $weak, [ '/nino/auth/user' ] );
+[ $adminCopy, $loginCopy ] = $bootBoth();
+\Nino\Auth::deleteUser( $adminCopy, 'gone@example.com' );
+\Nino\Auth::loginUser( $loginCopy, 'gone@example.com', 'correct horse battery staple' );
+\Nino\Auth::updateUser( $loginCopy, 'gone@example.com', 'gone@example.com', 'a password set after the rehash' );
+check( '...nor by a password change that follows a rehashing login in the same request', isset( $accounts()['gone@example.com'] ) === false );
+
 \Nino\Auth::deleteUser( $appData, 'merge@example.com' );
 
 // Regression: mutate()'s return value used to be silently discarded here -

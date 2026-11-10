@@ -394,7 +394,7 @@ namespace Nino {
 					}
 
 					$content[$key] = ( $key === '/nino/auth/user' )
-						? self::_mergeAuthUsers( $appData['./nino/auth/baseline'] ?? [], $content[$key] ?? [], $appData[$key] ?? [], $appData['./nino/auth/revoked'] ?? [] )
+						? self::_mergeAuthUsers( $appData['./nino/auth/baseline'] ?? [], $content[$key] ?? [], $appData[$key] ?? [], $appData['./nino/auth/revoked'] ?? [], $appData['./nino/auth/rehashed'] ?? [] )
 						: ( $appData[$key] ?? null );
 				}
 
@@ -456,15 +456,48 @@ namespace Nino {
 		//   stale copy - which is what used to write a login's boot-time copy
 		//   of every account over an administrator's change.
 		//
-		// Sessions are merged on top of whichever record won: a token on disk
-		// but missing from both baseline and memory is someone else's parallel
-		// login and is kept; one that was in the baseline and is gone from
-		// memory was deliberately removed and stays removed. $revoked
-		// (mail => true) overrides the "keep what we never saw" rule for a
-		// request that means to end every session - a password change or
+		// Sessions are merged on top of whichever record won, three-way like
+		// the records:
+		//
+		// - a token this request created (in memory, not in the baseline) is
+		//   kept;
+		// - a token on disk that this request never saw is someone else's
+		//   parallel login and is kept;
+		// - a token in the baseline and in memory but gone from the file was
+		//   ended by another request - a "log out everywhere", a password
+		//   change, a logout - and is not written back, whatever else this
+		//   request changed about the account;
+		// - a token this request removed from memory stays removed.
+		//
+		// $revoked (mail => true) overrides the "keep what we never saw" rule
+		// for a request that means to end every session - a password change or
 		// "log out everywhere" (Auth::updateUser()/logoutAllSessions()/
 		// setStatus()) must not resurrect a token a parallel login created in
 		// the meantime.
+		//
+		// A session must not outlive what it was opened with. A request that
+		// booted before the password of an account was changed may verify the
+		// old password and write afterwards, and one that booted before the
+		// account was switched off may still log it in: where the file's
+		// password differs from the baseline's, is not the one this request holds
+		// itself (its own earlier write) and this request did not mean
+		// to change it, or the file's status is no longer active and this
+		// request did not set it, the tokens this request is the first to write
+		// for that account are not written (a token it wrote in an earlier write
+		// of its own is the file's by then and stays) - its next request finds
+		// no session and is signed out. The password and the status are then
+		// the file's, so a login that rehashes the password
+		// (password_needs_rehash) cannot write its boot-time hash over the new
+		// one, nor its boot-time status over a deactivation. A password changed
+		// on purpose in this request ($revoked) is its own: of two such changes
+		// of one account the later write wins, and the device of the earlier
+		// one is signed out, since the later change ended its session.
+		//
+		// An account the file no longer has - deleted by another request - is
+		// written back only for a change this request meant (a role, a status,
+		// a password it set); a login that only adds its session, its time or
+		// a rehashed password ($rehashed), and a "log out everywhere", leave it
+		// deleted.
 		//
 		// 'lastLogin' is the one field a login writes beside its session, and
 		// it is merged like the sessions rather than compared like the rest:
@@ -472,11 +505,8 @@ namespace Nino {
 		// a login running in parallel with an administrator's change - a
 		// deactivation, a new role - neither brings the account back to the
 		// state it booted with nor loses its own timestamp. The later of the
-		// two is kept, whichever record won. One window stays: a login that
-		// rehashes the password (password_needs_rehash) does change the record,
-		// so it writes its boot-time status over a deactivation that landed in
-		// the same moment.
-		private static function _mergeAuthUsers( array $baseline, array $onDisk, array $inMemory, array $revoked = [] ): array {
+		// two is kept, whichever record won.
+		private static function _mergeAuthUsers( array $baseline, array $onDisk, array $inMemory, array $revoked = [], array $rehashed = [] ): array {
 
 			$merged = [];
 
@@ -495,18 +525,54 @@ namespace Nino {
 				// included: it meant to write this), the file's where it did not
 				$record = ( $changed === true || $disk === null ) ? $user : $disk;
 
-				if( $changed === false && $disk === null )
+				// A record the file no longer has comes back only for a change
+				// this request meant: a login that rehashes the password, or only
+				// adds its session and time, does not undo a deletion
+				if( $disk === null && $base !== null && self::_deliberate( $user, $rehashed[$mail] ?? false ) === self::_deliberate( $base, $rehashed[$mail] ?? false ) )
 					continue;
 
 				$sessions = is_array( $user['sessions'] ?? null ) === true ? $user['sessions'] : ( $record['sessions'] ?? null );
 
-				if( is_array( $sessions ) === true && ( $revoked[$mail] ?? false ) !== true && is_array( $disk['sessions'] ?? null ) === true ) {
+				// What the file did to the account since this request booted,
+				// where this request did not mean to do the same
+				$known	= is_array( $base ) === true && is_array( $disk ) === true && is_array( $user ) === true;
+				$stale	= false;
 
-					$baseSessions = $baseline[$mail]['sessions'] ?? [];
+				if( $known === true ) {
 
-					foreach( $disk['sessions'] as $token => $session )
-						if( isset( $baseSessions[$token] ) === false && isset( $sessions[$token] ) === false )
-							$sessions[$token] = $session;
+					$ownPw = ( $user['pw'] ?? null ) !== ( $base['pw'] ?? null );
+
+					if( ( $disk['pw'] ?? null ) !== ( $base['pw'] ?? null ) && ( $disk['pw'] ?? null ) !== ( $user['pw'] ?? null ) && ( $ownPw === false || ( $revoked[$mail] ?? false ) !== true ) ) {
+
+						$stale = true;
+
+						if( is_array( $record ) === true && array_key_exists( 'pw', $disk ) === true )
+							$record['pw'] = $disk['pw'];
+					}
+
+					if( ( $disk['status'] ?? null ) !== ( $base['status'] ?? null ) && ( $user['status'] ?? null ) === ( $base['status'] ?? null ) ) {
+
+						if( ( $disk['status'] ?? null ) !== \Nino\Auth::STATUS_ACTIVE )
+							$stale = true;
+
+						if( is_array( $record ) === true && array_key_exists( 'status', $disk ) === true )
+							$record['status'] = $disk['status'];
+					}
+				}
+
+				if( is_array( $sessions ) === true && is_array( $disk ) === true ) {
+
+					$baseSessions = is_array( $base['sessions'] ?? null ) === true ? $base['sessions'] : [];
+					$diskSessions = is_array( $disk['sessions'] ?? null ) === true ? $disk['sessions'] : [];
+
+					foreach( $sessions as $token => $session )
+						if( ( isset( $baseSessions[$token] ) === true && isset( $diskSessions[$token] ) === false ) || ( $stale === true && isset( $baseSessions[$token] ) === false ) )
+							unset( $sessions[$token] );
+
+					if( ( $revoked[$mail] ?? false ) !== true )
+						foreach( $diskSessions as $token => $session )
+							if( isset( $baseSessions[$token] ) === false && isset( $sessions[$token] ) === false )
+								$sessions[$token] = $session;
 				}
 
 				if( is_array( $record ) === true && is_array( $sessions ) === true )
@@ -527,6 +593,25 @@ namespace Nino {
 			}
 
 			return $merged;
+		}
+
+		// What an account record holds that a request means to write: without
+		// its sessions and last login and the mail getUser() adds - and, for a
+		// login that rehashed the outdated hash (Auth::_openSession()), without
+		// the password, which that login rewrites by itself
+		private static function _deliberate( mixed $user, bool $rehashed ): mixed {
+
+			$user = self::_sessionless( $user );
+
+			if( is_array( $user ) === true ) {
+
+				unset( $user['mail'] );
+
+				if( $rehashed === true )
+					unset( $user['pw'] );
+			}
+
+			return $user;
 		}
 
 		// One account record without its sessions and its last login - what
