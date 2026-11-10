@@ -1966,6 +1966,138 @@ check( 'a role it may not widen it may still rename - only what a role gains is 
 callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'developer', 'label' => 'Developer', 'perms' => [ '/*' ] ] );
 \Nino\Auth::deleteUser( $appData, 'detour@example.com' );
 
+// Holding fewer permissions is not always holding less: a panel permission
+// with no scoped one beside it allows the whole panel, one with a scoped
+// one only what that names (see \Nino\Admin\Admin::isScoped()). So a set
+// that opens a panel without describing it in detail may not come into
+// being at the hands of an account that is described in detail for it -
+// as a role, as an account's role, or as an account's password
+$elementsDoor = '/_admin/elements/manage';
+$elementsOne 	= '/_admin/elements/testtype/insert';
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'lead', 'label' => 'Lead', 'perms' => [ \Nino\Modules\Users\Admin::MANAGE_PERM, $elementsDoor, $elementsOne ] ] );
+callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'plainlead', 'label' => 'Plain lead', 'perms' => [ \Nino\Modules\Users\Admin::MANAGE_PERM, $elementsDoor ] ] );
+callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'wide', 'label' => 'Wide', 'perms' => [ $elementsDoor ] ] );
+callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'described', 'label' => 'Described', 'perms' => [ $elementsDoor, $elementsOne ] ] );
+\Nino\Auth::insertUser( $appData, 'lead@example.com', 'lead password', [], 'lead' );
+\Nino\Auth::insertUser( $appData, 'plainlead@example.com', 'plainlead password', [], 'plainlead' );
+\Nino\Auth::insertUser( $appData, 'widehold@example.com', 'widehold password', [], 'wide' );
+\Nino\Auth::insertUser( $appData, 'describedhold@example.com', 'describedhold password', [], 'described' );
+$storedRoles = static fn(): array => \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/auth/roles'] ?? [];
+$rolesBefore = $storedRoles();
+
+\Nino\Auth::loginUser( $appData, 'lead@example.com', 'lead password' );
+check( 'the fixture: the lead is described in detail for the elements panel, the plain lead is not', \Nino\Admin\Admin::isScoped( $appData, '/_admin/elements/' ) === true
+	&& \Nino\Auth::checkPermission( $appData, '/_admin/elements/other/insert' ) === false );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'lead', 'label' => 'Lead', 'perms' => [ \Nino\Modules\Users\Admin::MANAGE_PERM, $elementsDoor ] ] );
+check( 'a role may not drop its own scoped entry - the door alone allows the whole panel', $status === 403 && ( $body['code'] ?? '' ) === 'roles_grant_too_wide_scoped' );
+check( '...and the stored roles are as they were', $storedRoles() === $rolesBefore );
+check( '...the refusal names the panel', str_contains( (string) ( $body['error'] ?? '' ), '/_admin/elements/' ) );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'door', 'label' => 'Door', 'perms' => [ $elementsDoor ] ] );
+check( 'nor write a new role holding only the door it holds', $status === 403 && ( $body['code'] ?? '' ) === 'roles_grant_too_wide_scoped' && isset( $storedRoles()['door'] ) === false );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'door', 'label' => 'Door', 'perms' => [ $elementsDoor, '/_admin/elements/*' ] ] );
+check( '...nor with a blanket the lead does not hold', $status === 403 && isset( $storedRoles()['door'] ) === false );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'door', 'label' => 'Door', 'perms' => [ '/*' ] ] );
+check( '...nor full access', $status === 403 && isset( $storedRoles()['door'] ) === false );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'door', 'label' => 'Door', 'perms' => [ $elementsDoor, $elementsOne ] ] );
+check( 'a role described in detail within what the lead holds is written', $status === 200 && $storedRoles()['door']['perms'] === [ $elementsDoor, $elementsOne ] );
+callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiDelete', [ 'id' => 'door' ] );
+
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'wide', 'label' => 'Wide, relabelled', 'perms' => [ $elementsDoor ] ] );
+check( 'a role that already was wide is relabelled by the lead - nothing widens', $status === 200 && $storedRoles()['wide']['label'] === 'Wide, relabelled' );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'described', 'label' => 'Described', 'perms' => [ $elementsDoor ] ] );
+check( 'a described role is not widened by the lead, whoever holds it', $status === 403 && $storedRoles()['described']['perms'] === [ $elementsDoor, $elementsOne ] );
+
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiCreate', [ 'mail' => 'viawide@example.com', 'pw' => 'a-long-enough-password', 'role' => 'wide' ] );
+check( 'the lead creates no account with a role that allows the whole panel', $status === 403 && ( $body['code'] ?? '' ) === 'users_role_too_wide_scoped' && \Nino\Auth::getUser( $appData, 'viawide@example.com' ) === false );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiCreate', [ 'mail' => 'viadescribed@example.com', 'pw' => 'a-long-enough-password', 'role' => 'described' ] );
+check( '...while a role described within its own is handed out', $status === 200 );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiSetRole', [ 'username' => 'viadescribed@example.com', 'role' => 'wide' ] );
+check( 'nor sets such a role on an account', $status === 403 && ( $body['code'] ?? '' ) === 'users_role_too_wide_scoped' && \Nino\Auth::getUser( $appData, 'viadescribed@example.com' )['role'] === 'described' );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiSave', [ 'username' => 'widehold@example.com', 'mail' => 'widehold@example.com', 'pw' => 'a password of my choosing' ] );
+check( 'nor sets the password of an account that holds it', $status === 403 && ( $body['code'] ?? '' ) === 'users_password_too_wide_scoped' && password_verify( 'widehold password', \Nino\Auth::getUser( $appData, 'widehold@example.com' )['pw'] ) === true );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiSave', [ 'username' => 'describedhold@example.com', 'mail' => 'describedhold@example.com', 'pw' => 'a password of my choosing' ] );
+check( '...while the password of an account described within its own is set', $status === 200 );
+
+// A role is not the account's only source of permissions: taking it away
+// leaves what the account holds of its own
+$appData['/nino/auth/user']['viadescribed@example.com']['perms'] = [ $elementsDoor ];
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiSetRole', [ 'username' => 'viadescribed@example.com', 'role' => '' ] );
+check( 'a role is not taken from an account whose own permissions are then wide', $status === 403 && ( $body['code'] ?? '' ) === 'users_role_too_wide_scoped' && \Nino\Auth::getUser( $appData, 'viadescribed@example.com' )['role'] === 'described' );
+$appData['/nino/auth/user']['viadescribed@example.com']['perms'] = [];
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiSetRole', [ 'username' => 'viadescribed@example.com', 'role' => '' ] );
+check( '...and is taken from one that is then holding nothing', $status === 200 );
+
+// A door and a blanket describe nothing in detail; a scoped entry does
+check( 'isDescribed asks the definition of a list: the door and a blanket do not describe a panel, a scoped entry does', \Nino\Admin\Admin::isDescribed( [ $elementsDoor, '/_admin/elements/*' ], '/_admin/elements/' ) === false
+	&& \Nino\Admin\Admin::isDescribed( [ $elementsDoor, $elementsOne ], '/_admin/elements/' ) === true );
+
+// Only an account that holds the whole panel widens a role for it: not one
+// that lost the door (a lead narrowed to managing users), nor a manager who
+// never had it
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'sock', 'label' => 'Sock', 'perms' => [ $elementsDoor, $elementsOne ] ] );
+callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'lead', 'label' => 'Lead', 'perms' => [ \Nino\Modules\Users\Admin::MANAGE_PERM ] ] );
+\Nino\Auth::loginUser( $appData, 'lead@example.com', 'lead password' );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'sock', 'label' => 'Sock', 'perms' => [ $elementsDoor ] ] );
+check( 'a manager without the panel turns a described role into the whole panel - refused', $status === 403 && ( $body['code'] ?? '' ) === 'roles_grant_too_wide_scoped' && $storedRoles()['sock']['perms'] === [ $elementsDoor, $elementsOne ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'sock', 'label' => 'Sock, relabelled', 'perms' => [ $elementsDoor, $elementsOne ] ] );
+check( '...while relabelling it is open', $status === 200 );
+
+// A blanket lifts the limit: the account holds the whole panel
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'lead', 'label' => 'Lead', 'perms' => [ \Nino\Modules\Users\Admin::MANAGE_PERM, $elementsDoor, '/_admin/elements/*', $elementsOne ] ] );
+\Nino\Auth::loginUser( $appData, 'lead@example.com', 'lead password' );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'sock', 'label' => 'Sock', 'perms' => [ $elementsDoor ] ] );
+check( 'an account holding a blanket of the panel beside a scoped entry writes the door-only role', $status === 200 && $storedRoles()['sock']['perms'] === [ $elementsDoor ] );
+
+// A panel with nothing to offer right now is a panel all the same: the
+// guards read its prefix, not its list
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'lead', 'label' => 'Lead', 'perms' => [ \Nino\Modules\Users\Admin::MANAGE_PERM, $elementsDoor, $elementsOne ] ] );
+callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'sock', 'label' => 'Sock', 'perms' => [ $elementsDoor, $elementsOne ] ] );
+rename( $sandbox. '/private/elements/testtype.php', $sandbox. '/private/elements/testtype.off' );
+check( 'the fixture: the elements panel offers no scope without a type, and the guards\' list keeps it', in_array( '/_admin/elements/', array_column( \Nino\Modules\Users\Admin::scopeOptions( $appData ), 'scope' ), true ) === false
+	&& in_array( '/_admin/elements/', array_column( \Nino\Modules\Users\Admin::scopeOptions( $appData, true ), 'scope' ), true ) === true );
+\Nino\Auth::loginUser( $appData, 'lead@example.com', 'lead password' );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'sock', 'label' => 'Sock', 'perms' => [ $elementsDoor ] ] );
+check( 'a door-only role is refused although the panel has no type to name', $status === 403 && ( $body['code'] ?? '' ) === 'roles_grant_too_wide_scoped' && $storedRoles()['sock']['perms'] === [ $elementsDoor, $elementsOne ] );
+rename( $sandbox. '/private/elements/testtype.off', $sandbox. '/private/elements/testtype.php' );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+// The same for the text panel: another scope, the same behaviour
+$textDoor = \Nino\Modules\Text\Admin::MANAGE_PERM;
+$textOne 	= '/_admin/text/update/template/page-home/*';
+$scopes 	= array_column( \Nino\Modules\Users\Admin::scopeOptions( $appData ), 'scope' );
+check( 'the scopes there are come from the panels, and the text panel is one of them', in_array( '/_admin/text/', $scopes, true ) === true && in_array( '/_admin/elements/', $scopes, true ) === true );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'textlead', 'label' => 'Text lead', 'perms' => [ \Nino\Modules\Users\Admin::MANAGE_PERM, $textDoor, $textOne ] ] );
+\Nino\Auth::insertUser( $appData, 'textlead@example.com', 'textlead password', [], 'textlead' );
+\Nino\Auth::loginUser( $appData, 'textlead@example.com', 'textlead password' );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'textdoor', 'label' => 'Text door', 'perms' => [ $textDoor ] ] );
+check( 'a role holding only the door of the text panel is refused the same way, naming that panel', $status === 403 && ( $body['code'] ?? '' ) === 'roles_grant_too_wide_scoped' && str_contains( (string) ( $body['error'] ?? '' ), '/_admin/text/' ) );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'textdoor', 'label' => 'Text door', 'perms' => [ \Nino\Modules\Users\Admin::MANAGE_PERM, $textDoor, $textOne ] ] );
+check( '...and one described within what it holds is written', $status === 200 );
+
+// An account that is not described in detail for a panel holds all of it,
+// and may hand out all of it; full access is never limited
+\Nino\Auth::loginUser( $appData, 'plainlead@example.com', 'plainlead password' );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'door', 'label' => 'Door', 'perms' => [ $elementsDoor ] ] );
+check( 'a manager with no scoped permission writes the door-only role', $status === 200 && $storedRoles()['door']['perms'] === [ $elementsDoor ] );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiCreate', [ 'mail' => 'viadoor@example.com', 'pw' => 'a-long-enough-password', 'role' => 'door' ] );
+check( '...creates an account with it', $status === 200 );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'door', 'label' => 'Door', 'perms' => [ $elementsDoor, $elementsOne ] ] );
+check( '...but describes none in detail, which is a permission it does not hold', $status === 403 && ( $body['code'] ?? '' ) === 'roles_grant_too_wide' );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'door', 'label' => 'Door', 'perms' => [ $elementsDoor ] ] );
+check( 'full access widens any role, as before', $status === 200 && $storedRoles()['door']['perms'] === [ $elementsDoor ] );
+foreach( [ 'viadoor@example.com', 'viadescribed@example.com', 'lead@example.com', 'plainlead@example.com', 'widehold@example.com', 'describedhold@example.com', 'textlead@example.com' ] as $mail )
+	\Nino\Auth::deleteUser( $appData, $mail );
+foreach( [ 'door', 'sock', 'lead', 'plainlead', 'wide', 'described', 'textlead', 'textdoor' ] as $role )
+	callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiDelete', [ 'id' => $role ] );
+
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiDelete', [ 'id' => 'nope' ] );
 check( 'apiDelete 404s for an unknown role', $status === 404 );
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiDelete', [ 'id' => 'editor' ] );

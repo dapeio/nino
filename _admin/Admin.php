@@ -887,9 +887,25 @@ namespace Nino\Admin {
 			if( $user === false )
 				return false;
 
-			foreach( \Nino\Auth::permissions( $appData, $user ) as $held ) {
+			return self::isDescribed( \Nino\Auth::permissions( $appData, $user ), $prefix );
+		}
 
-				if( str_starts_with( $held, $prefix ) === false )
+		/**
+		 *	Whether a list of permissions describes a panel in detail - the
+		 *	test isScoped() makes of the current account, asked of any list, so
+		 *	that a role that is about to be saved is measured by the very
+		 *	definition the guards enforce (see \Nino\Modules\Users\Roles::notHeld())
+		 *
+		 *	@param		array 		$perms				Permission strings
+		 *	@param		string		$prefix				The panel's scope, with its slash
+		 *
+		 *	@return 	bool
+		 */
+		public static function isDescribed( array $perms, string $prefix ): bool {
+
+			foreach( $perms as $held ) {
+
+				if( is_string( $held ) === false || str_starts_with( $held, $prefix ) === false )
 					continue;
 
 				$rest = substr( $held, strlen( $prefix ) );

@@ -261,6 +261,21 @@ scoped permissions sends what the current account may do along with its data
 (see `Elements\Admin::rights()`, `Text\Admin::apiKeys()`) so its form can draw
 itself accordingly - the enforcement stays in the action methods.
 
+Handing out is bounded by holding (`Roles::notHeld()`): a role may not be given a
+permission its author lacks, and neither an account's role nor an account's
+password may be set beyond the account setting it. Scoping is opt-in, and so a
+smaller set is not always less: a panel permission with no scoped one beside it
+allows the whole panel. So there is one more condition for every panel
+`scopeOptions()` lists, with the prefix `isScoped()` reads (a panel that grows
+`scopes()` is covered with no change here): a set of permissions that opens a
+panel and is not described in detail for it - `isDescribed()` is `isScoped()`
+asked of a list - may not be written, handed out or set as a password by an
+account that does not hold the whole panel - a blanket of it, or the door with no
+scoped entry. A role that is wide may still be edited by such an account as long
+as nothing widens. The panels are asked of every `scopes()`, including one that
+offers no area at the moment (`scopeOptions( $appData, true )`). The refusal is a `403` with the codes `roles_grant_too_wide_scoped`,
+`users_role_too_wide_scoped` and `users_password_too_wide_scoped`, which name the panel's scope.
+
 The roles tab does not ask anybody to type a scoped permission: a panel that has
 them lists them in an optional `scopes( &$appData )`, and the tab offers them as
 three lists that depend on each other - area, action, field - from what

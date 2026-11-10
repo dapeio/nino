@@ -235,10 +235,11 @@ namespace Nino\Modules\Users {
 		 *	derived from a request
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		bool			$bare					Keep a scope that has no area right now - the guards read the prefix whether or not anything is offered under it (see Roles::notHeld())
 		 *
 		 *	@return 	array										The tree, as above
 		 */
-		public static function scopeOptions( array &$appData ): array {
+		public static function scopeOptions( array &$appData, bool $bare = false ): array {
 
 			$scopes = [];
 
@@ -253,7 +254,7 @@ namespace Nino\Modules\Users {
 
 				foreach( is_array( $offered ) === true ? $offered : [] as $scope ) {
 
-					$clean = is_array( $scope ) === true ? self::_cleanScope( $scope ) : null;
+					$clean = is_array( $scope ) === true ? self::_cleanScope( $scope, $bare ) : null;
 
 					if( $clean !== null )
 						$scopes[] = $clean;
@@ -271,7 +272,7 @@ namespace Nino\Modules\Users {
 		 *
 		 *	@return 	array|null								Null when nothing usable is left
 		 */
-		private static function _cleanScope( array $scope ): ?array {
+		private static function _cleanScope( array $scope, bool $bare = false ): ?array {
 
 			$prefix = $scope['scope'] ?? null;
 			$door 	= $scope['door'] ?? null;
@@ -322,7 +323,7 @@ namespace Nino\Modules\Users {
 				$areas[] = $cleanArea;
 			}
 
-			return $areas === [] ? null : [ 'scope' => $prefix, 'door' => $door, 'label' => $label, 'areas' => $areas ];
+			return $areas === [] && $bare === false ? null : [ 'scope' => $prefix, 'door' => $door, 'label' => $label, 'areas' => $areas ];
 		}
 
 		/**
@@ -455,7 +456,7 @@ namespace Nino\Modules\Users {
 			$missing = $role !== '' ? Roles::notHeld( $appData, Roles::all( $appData )[$role]['perms'] ) : '';
 
 			if( $missing !== '' ) {
-				\Nino\Http::fail( $request, 403, 'cannot hand out a role holding a permission your own account does not: '. $missing, 'users_role_too_wide', [ $missing ], 'role' );
+				\Nino\Http::fail( $request, 403, 'cannot hand out a role holding a permission your own account does not: '. $missing, Roles::isScope( $missing ) === true ? 'users_role_too_wide_scoped' : 'users_role_too_wide', [ $missing ], 'role' );
 				return;
 			}
 
@@ -594,7 +595,7 @@ namespace Nino\Modules\Users {
 				$missing	= ( $target !== false ) ? Roles::notHeld( $appData, \Nino\Auth::permissions( $appData, $target ) ) : '';
 
 				if( $missing !== '' ) {
-					\Nino\Http::fail( $request, 403, 'cannot set the password of an account holding a permission your own account does not: '. $missing, 'users_password_too_wide', [ $missing ], 'pw' );
+					\Nino\Http::fail( $request, 403, 'cannot set the password of an account holding a permission your own account does not: '. $missing, Roles::isScope( $missing ) === true ? 'users_password_too_wide_scoped' : 'users_password_too_wide', [ $missing ], 'pw' );
 					return;
 				}
 			}
@@ -808,8 +809,14 @@ namespace Nino\Modules\Users {
 			// The same bound as on creating an account (see Roles::notHeld())
 			$missing = $role !== '' ? Roles::notHeld( $appData, Roles::all( $appData )[$role]['perms'] ) : '';
 
+			// A role is not the account's only source (see \Nino\Auth::permissions()):
+			// taking one away, or swapping it, can leave the permissions the
+			// account holds itself wide for a panel the role described
+			if( $missing === '' )
+				$missing = Roles::notHeld( $appData, \Nino\Auth::permissions( $appData, $next ), \Nino\Auth::permissions( $appData, $user ) );
+
 			if( $missing !== '' ) {
-				\Nino\Http::fail( $request, 403, 'cannot hand out a role holding a permission your own account does not: '. $missing, 'users_role_too_wide', [ $missing ], 'role' );
+				\Nino\Http::fail( $request, 403, 'cannot hand out a role holding a permission your own account does not: '. $missing, Roles::isScope( $missing ) === true ? 'users_role_too_wide_scoped' : 'users_role_too_wide', [ $missing ], 'role' );
 				return true;
 			}
 

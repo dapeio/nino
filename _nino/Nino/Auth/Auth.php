@@ -783,6 +783,22 @@ namespace Nino {
 			// is, ie. silently grants everything
 			$perms = self::permissions( $appData, $user );
 
+			return self::holds( $perms, $perm );
+		}
+
+		/**
+		 *	Whether a list of permission strings allows one permission: the
+		 *	string itself, or a '/*' of any ancestor. What checkPermission()
+		 *	asks of an account, asked of a list - a set of permissions a role
+		 *	would hold, say - so the two cannot differ
+		 *
+		 *	@param		array 		$perms				Permission strings
+		 *	@param		string		$perm					A permission, eg. '/_admin/hello/manage'
+		 *
+		 *	@return 	bool
+		 */
+		public static function holds( array $perms, string $perm ): bool {
+
 			// Check exact perm
 			if( in_array( $perm, $perms, true ) === true )
 				return true;

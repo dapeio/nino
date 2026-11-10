@@ -219,33 +219,95 @@ namespace Nino\Modules\Users {
 		}
 
 		/**
-		 *	The first of these permissions the signed-in account does not
-		 *	hold itself, or '' when it holds every one. Granting is bounded by
-		 *	holding: a role may not be given a permission its author lacks
-		 *	(apiSave()), an account may not be handed a role wider than the
-		 *	one handing it out (\Nino\Modules\Users\Admin::apiCreate(),
-		 *	apiSetRole()), and a password may not be set on an account wider
-		 *	than the one setting it (\Nino\Modules\Users\Admin::apiSave()).
-		 *	Without all three, an account that may manage users writes a
-		 *	full-access role, creates an account holding it with a password
-		 *	of its choosing - or gives one to an account that already holds
-		 *	it - and signs in as that: "manage users" would silently mean
-		 *	"everything". Checked with the same
+		 *	The first thing in these permissions the signed-in account may not
+		 *	hand out, or '' when there is none. Granting is bounded by holding:
+		 *	a role may not be given a permission its author lacks (apiSave()),
+		 *	an account may not be handed a role wider than the one handing it
+		 *	out (\Nino\Modules\Users\Admin::apiCreate(), apiSetRole()), and a
+		 *	password may not be set on an account wider than the one setting
+		 *	it (\Nino\Modules\Users\Admin::apiSave()). Without all three, an
+		 *	account that may manage users writes a full-access role, creates an
+		 *	account holding it with a password of its choosing - or gives one to
+		 *	an account that already holds it - and signs in as that: "manage
+		 *	users" would silently mean "everything".
+		 *
+		 *	Two things are measured. Every permission, with the same
 		 *	\Nino\Auth::checkPermission() every action uses, so '/*' alone
-		 *	covers '/*', and a blanket covers what is under it.
+		 *	covers '/*', and a blanket covers what is under it. And the
+		 *	panels that describe themselves in detail (see
+		 *	\Nino\Admin\Admin::scoped()): holding fewer permissions is not
+		 *	always holding less, because a panel permission with no scoped one
+		 *	beside it allows the whole panel, and one with a scoped one allows
+		 *	only what that names. So a set that opens a panel without
+		 *	describing it in detail may not be handed out by an account that
+		 *	does not hold the whole panel - one without its door, or described
+		 *	in detail for it - every permission of the set
+		 *	could be held by the account and the set would still allow what
+		 *	the account is not allowed. The panels are those
+		 *	\Nino\Modules\Users\Admin::scopeOptions() lists, the very prefixes
+		 *	the guards read, a panel with nothing to offer right now included.
+		 *
+		 *	With $stored, the set is a change of a set that exists: only what it
+		 *	gains is measured per permission, and a panel only when the set
+		 *	becomes wide for it - a role that already was wide may be edited by
+		 *	an account that could not have written it, as long as nothing
+		 *	widens
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$perms				Permission strings
+		 *	@param		array|null	$stored				The set these replace, null for one that comes into being
 		 *
-		 *	@return 	string										The first one not held, else ''
+		 *	@return 	string										The first permission not held, or the scope (ends with '/') of the first panel the set widens, else ''
 		 */
-		public static function notHeld( array &$appData, array $perms ): string {
+		public static function notHeld( array &$appData, array $perms, ?array $stored = null ): string {
 
-			foreach( $perms as $perm )
+			foreach( $stored === null ? $perms : array_diff( $perms, $stored ) as $perm )
 				if( is_string( $perm ) === true && \Nino\Auth::checkPermission( $appData, $perm ) === false )
 					return $perm;
 
+			if( $perms === [] )
+				return '';
+
+			foreach( \Nino\Modules\Users\Admin::scopeOptions( $appData, true ) as $scope ) {
+
+				if( self::_isWide( $perms, $scope ) === false || ( $stored !== null && self::_isWide( $stored, $scope ) === true ) )
+					continue;
+
+				// A set that allows the whole panel needs an account that holds
+				// the whole panel: a blanket, or the door with no scoped entry.
+				// One without the door, or described in detail, does not
+				if( \Nino\Auth::checkPermission( $appData, $scope['scope']. '*' ) === false
+					&& ( \Nino\Auth::checkPermission( $appData, $scope['door'] ) === false || \Nino\Admin\Admin::isScoped( $appData, $scope['scope'] ) === true ) )
+					return $scope['scope'];
+			}
+
 			return '';
+		}
+
+		/**
+		 *	Whether a set opens a panel without describing it in detail - and so
+		 *	allows all of it (see notHeld())
+		 *
+		 *	@param		array 		$perms				Permission strings
+		 *	@param		array			$scope				One of \Nino\Modules\Users\Admin::scopeOptions()
+		 *
+		 *	@return 	bool
+		 */
+		private static function _isWide( array $perms, array $scope ): bool {
+			return \Nino\Auth::holds( $perms, $scope['door'] ) === true && \Nino\Admin\Admin::isDescribed( $perms, $scope['scope'] ) === false;
+		}
+
+		/**
+		 *	Whether what notHeld() answered is a panel rather than a permission -
+		 *	a scope ends with a slash, which no permission does (PERM_PATTERN) -
+		 *	for a caller whose refusal has words of its own for it
+		 *
+		 *	@param		string		$missing			What notHeld() answered
+		 *
+		 *	@return 	bool
+		 */
+		public static function isScope( string $missing ): bool {
+			return str_ends_with( $missing, '/' );
 		}
 
 		/**
@@ -348,10 +410,10 @@ namespace Nino\Modules\Users {
 			// Only what the role gains is measured against the account making
 			// the change (see notHeld()): taking a permission it does not hold
 			// away from a role narrows somebody else and widens nobody
-			$missing = self::notHeld( $appData, array_values( array_diff( $perms, self::all( $appData )[$id]['perms'] ?? [] ) ) );
+			$missing = self::notHeld( $appData, $perms, self::all( $appData )[$id]['perms'] ?? [] );
 
 			if( $missing !== '' ) {
-				\Nino\Http::fail( $request, 403, 'cannot grant a permission your own account does not hold: '. $missing, 'roles_grant_too_wide', [ $missing ] );
+				\Nino\Http::fail( $request, 403, 'cannot grant a permission your own account does not hold: '. $missing, self::isScope( $missing ) === true ? 'roles_grant_too_wide_scoped' : 'roles_grant_too_wide', [ $missing ] );
 				return;
 			}
 
