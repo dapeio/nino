@@ -90,7 +90,13 @@ namespace Nino {
 
 			$given = self::_extractToken( $request );
 
-			if( $given !== '' && hash_equals( self::getToken( $appData ), $given ) === true )
+			// Compared with the token the session holds, not with getToken():
+			// a post that arrives with no session has nothing to match, and
+			// minting a token (and with it a session and a cookie) only to
+			// refuse it in the next line would make every stray post a visitor
+			$token = \Nino\Runtime::getSessionValue( $appData, './nino/csrf/token' );
+
+			if( $given !== '' && is_string( $token ) === true && $token !== '' && hash_equals( $token, $given ) === true )
 				return;
 
 			$request['./nino/csrf/blocked']									= true;

@@ -388,6 +388,21 @@ $fakeRequest = [ '/nino/http/request' => [ 'method' => 'POST' ], '/nino/http/res
 \Nino\Csrf::callbackResponse( $appData, $fakeRequest );
 check( 'callbackResponse accepts the current token', $fakeRequest['/nino/http/response']['statusCode'] === 200 );
 
+// A post from a visitor with no session holds nothing to match: it is refused,
+// and refusing it does not give the visitor a token, a session and a cookie
+$sessionOfCsrf = $_SESSION[ $appData['./nino/uid'] ] ?? [];
+unset( $_SESSION[ $appData['./nino/uid'] ] );
+$_POST['_csrf'] = 'wrong-token';
+$fakeRequest = [ '/nino/http/request' => [ 'method' => 'POST' ], '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Csrf::callbackResponse( $appData, $fakeRequest );
+check( 'a wrong token from a visitor with no session is refused', $fakeRequest['/nino/http/response']['statusCode'] === 403 );
+check( '...without minting a token for them', \Nino\Runtime::getSessionValue( $appData, './nino/csrf/token' ) === null );
+$_POST['_csrf'] = '';
+$fakeRequest = [ '/nino/http/request' => [ 'method' => 'POST' ], '/nino/http/response' => [ 'statusCode' => 200 ] ];
+\Nino\Csrf::callbackResponse( $appData, $fakeRequest );
+check( '...nor does a post with no token at all', $fakeRequest['/nino/http/response']['statusCode'] === 403 && \Nino\Runtime::getSessionValue( $appData, './nino/csrf/token' ) === null );
+$_SESSION[ $appData['./nino/uid'] ] = $sessionOfCsrf;
+
 check( 'Modules\Csrf::doShortcode renders a hidden input with the current token, reading the kernel token', str_contains( \Nino\Modules\Csrf::doShortcode( $appData, [] ), 'value="'. $token2. '"' ) === true );
 
 // Same as the [image] fragment in images-smoke.php: the hidden input is a property, so a

@@ -163,7 +163,12 @@ namespace Nino\Modules {
 			// Locales::response() right after this callback round - which
 			// answering here skips. Without this a visit to a locale-bound page
 			// would stop switching the session over as soon as it was cached.
-			if( is_string( $entry['locale'] ?? null ) === true && $entry['locale'] !== '' )
+			//
+			// Only where it differs from the one the visitor is served in, as
+			// Locales::response() has it: every entry names a locale, the
+			// page of a route with none of its own that of the visitor, and
+			// writing that into the session would give each hit a cookie
+			if( is_string( $entry['locale'] ?? null ) === true && $entry['locale'] !== '' && $entry['locale'] !== \Nino\Locales::getCurrentLocale( $appData ) )
 				\Nino\Locales::setCurrentLocale( $appData, $entry['locale'] );
 
 			// The policy the page was sent with, widened by whatever the
@@ -251,12 +256,26 @@ namespace Nino\Modules {
 		 */
 		private static function _stamp( array &$appData, string $html, bool $store ): string {
 
-			$csrf 	= \Nino\Csrf::getToken( $appData );
 			$nonce	= (string) ( $appData['./nino/jstext/nonce'] ?? '' );
+
+			// The token is looked up where it can be in the text: stored, the
+			// one this visitor's session already holds - a page that rendered
+			// no form has none in it, and minting one here would hand every
+			// anonymous hit a session and a cookie for nothing -, and served,
+			// only where the page carries the marker. A page with a form gets
+			// its token for this visitor right here, as it always did
+			$csrf		= '';
+
+			if( $store === true )
+				$csrf = (string) \Nino\Runtime::getSessionValue( $appData, './nino/csrf/token', '' );
+			elseif( str_contains( $html, self::CSRF_MARK ) === true )
+				$csrf = \Nino\Csrf::getToken( $appData );
 
 			// An absent nonce (Jstext not enabled) must not become an empty
 			// needle - str_replace() with one is a no-op, but pairing it with a
 			// marker on the way out would put the marker into the page
+			// A token that is not there is an empty needle, which replaces
+			// nothing, and the marker is not in a page that has none to give
 			$live 	= [ $csrf ];
 			$marks	= [ self::CSRF_MARK ];
 

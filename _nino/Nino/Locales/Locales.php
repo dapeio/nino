@@ -188,7 +188,10 @@ namespace Nino {
 
 			// setCurrentLocale() also persists into the session, same as the
 			// query switches above - visiting a locale-specific
-			// page is a locale choice like any other
+			// page is a locale choice like any other. It is what the next
+			// request on a route with no locale of its own, a form's
+			// endpoint or a page that serves every language, is served in; a
+			// visitor who only reads such pages carries the session for that
 			$request['/nino/http/response']['locale'] = \Nino\Locales::setCurrentLocale( $appData, $locale );
 		}
 
@@ -358,9 +361,14 @@ namespace Nino {
 		 */
 		public static function setCurrentLocale( array &$appData, string $locale ): string {
 
-			$locale = \Nino\Locales::useLocale( $appData, $locale );
+			$verified = \Nino\Locales::verifyLocale( $appData, $locale );
+			$locale 	= \Nino\Locales::useLocale( $appData, $locale );
 
-			\Nino\Runtime::setSessionValue( $appData, './nino/locales/current', $locale );
+			// Only a locale the project has is a choice: the fallback of a
+			// request for one it has not is what the visitor was served
+			// anyway, and pinning it would start a session for a query string
+			if( $verified === true )
+				\Nino\Runtime::setSessionValue( $appData, './nino/locales/current', $locale );
 
 			return $locale;
 		}

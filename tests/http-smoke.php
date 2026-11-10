@@ -123,6 +123,26 @@ $chosenSessionAppData['/nino/locales/available']	= [ 'en_US', 'de_DE' ];
 check( 'a session locale the project does have still wins over the native default', \Nino\Locales::getCurrentLocale( $chosenSessionAppData ) === 'de_DE'
 	&& \Nino\Runtime::getSessionValue( $chosenSessionAppData, './nino/locales/current' ) === 'de_DE' );
 
+// A language the project does not have is no choice: asking for one changes
+// nothing for the request and writes nothing into the session
+$noChoiceAppData = [ './nino/uid' => $sandbox. '-no-choice-session' ];
+\Nino\AppData::prepare( $noChoiceAppData );
+$noChoiceAppData['./nino/filesystem/path']		= $sandbox;
+$noChoiceAppData['/nino/locales/native']			= 'en_US';
+$noChoiceAppData['/nino/locales/available']	= [ 'en_US', 'de_DE' ];
+\Nino\Locales::init( $noChoiceAppData );
+
+check( 'asking for a language the project does not have answers with the current one', \Nino\Locales::setCurrentLocale( $noChoiceAppData, 'zz_ZZ' ) === 'en_US' );
+check( '...and writes nothing into the session', \Nino\Runtime::getSessionValue( $noChoiceAppData, './nino/locales/current' ) === null );
+
+$noChoiceRequest = ninoVisit( $noChoiceAppData, '/?/_nino/locales/current=zz_ZZ' );
+$noChoiceRequest['/nino/http/response']['uri'] = '/';
+\Nino\Locales::switchFromQuery( $noChoiceAppData, $noChoiceRequest, '/_nino/locales/current' );
+check( '...also through the query that asks for it', \Nino\Runtime::getSessionValue( $noChoiceAppData, './nino/locales/current' ) === null );
+
+check( 'a language the project has is written, as a choice', \Nino\Locales::setCurrentLocale( $noChoiceAppData, 'de_DE' ) === 'de_DE'
+	&& \Nino\Runtime::getSessionValue( $noChoiceAppData, './nino/locales/current' ) === 'de_DE' );
+
 /*	Runtime's session, which is started on demand rather than on every
 	request: an anonymous GET of a page that renders no form and signs
 	nobody in used to leave a session file and a PHPSESSID cookie behind
@@ -2216,6 +2236,40 @@ check( '...carrying this request\'s token and nonce, with no marker left in it',
 	&& str_contains( $hit['/nino/http/response']['body'], '@@nino-cache' ) === false );
 check( '...and saying so in the header', ( $hit['/nino/http/response']['header']['X-Nino-Cache'] ?? '' ) === 'hit' );
 check( '...with the locale the page was rendered in applied to the session', \Nino\Locales::getCurrentLocale( $appData ) === 'de_DE' );
+
+// --- a visitor who has nothing to remember ------------------------------------
+//
+// Storing a page and serving one are no reason for a session: the token is
+// looked up only where the page carries it. A page with a form still gets a
+// token for the visitor it is served to.
+
+$cacheUid = $appData['./nino/uid'];
+$cacheSessionBefore = $_SESSION[ $cacheUid ] ?? [];
+$appData['./nino/locales/current'] = 'de_DE';
+
+\Nino\Modules\Cache::_invalidate( $appData );
+unset( $_SESSION[ $cacheUid ] );
+$plainRender = cacheRequest( '/home', 'GET', [ 'body' => '<html>no form here</html>' ] );
+\Nino\Modules\Cache::callbackOutput( $appData, $plainRender );
+check( 'storing a page that rendered no form gives the visitor no token', ( $_SESSION[ $cacheUid ]['./nino/csrf/token'] ?? null ) === null && cacheEntryCount( $appData ) === 1 );
+
+$plainHit = cacheRequest( '/home', 'GET', [ 'body' => '' ] );
+check( 'a stored page without the mark is served', \Nino\Modules\Cache::_prepare( $appData, $plainHit ) === true && $plainHit['/nino/http/response']['body'] === '<html>no form here</html>' );
+check( '...to a visitor who is given no token by it, and no locale to remember', ( $_SESSION[ $cacheUid ]['./nino/csrf/token'] ?? null ) === null && ( $_SESSION[ $cacheUid ]['./nino/locales/current'] ?? null ) === null );
+
+\Nino\Modules\Cache::_invalidate( $appData );
+unset( $_SESSION[ $cacheUid ] );
+$formRender = cacheRequest( '/home', 'GET', [ 'body' => '<form><input name="_csrf" value="'. \Nino\Csrf::getToken( $appData ). '"></form>' ] );
+\Nino\Modules\Cache::callbackOutput( $appData, $formRender );
+$renderedToken = \Nino\Csrf::getToken( $appData );
+unset( $_SESSION[ $cacheUid ] );
+$formHit = cacheRequest( '/home', 'GET', [ 'body' => '' ] );
+check( 'a stored page with the mark is served', \Nino\Modules\Cache::_prepare( $appData, $formHit ) === true );
+$hitToken = $_SESSION[ $cacheUid ]['./nino/csrf/token'] ?? '';
+check( '...to a visitor who is given a token for it, which is the one in the page and not the one it was stored with',
+	strlen( $hitToken ) === 64 && $hitToken !== $renderedToken && str_contains( $formHit['/nino/http/response']['body'], 'value="'. $hitToken. '"' ) === true );
+
+$_SESSION[ $cacheUid ] = $cacheSessionBefore;
 
 // --- the policy a feature widened -------------------------------------------
 //

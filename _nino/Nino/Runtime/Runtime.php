@@ -127,8 +127,40 @@ namespace Nino {
 			// request writes to it - Auth reads its token to resume a login,
 			// and a deferred start would be a second cookie for the same
 			// visitor
-			if( isset( $_COOKIE[ session_name() ] ) === true )
-				self::startSession( $appData );
+			if( isset( $_COOKIE[ session_name() ] ) === true && self::startSession( $appData ) === true )
+				self::_dropStrangerSession();
+		}
+
+		/**
+		 *	Let go of the session the cookie of this request did not name.
+		 *
+		 *	With strict mode on php answers an id it does not know - a
+		 *	cookie of a session that was collected, one a crawler made up -
+		 *	with a new session: a file, and a Set-Cookie with a new id. For a
+		 *	request that goes on to write nothing that is a file per hit and
+		 *	a cookie nobody asked for, exactly what init() exists to avoid.
+		 *	The new session is destroyed again and its cookie withdrawn; a
+		 *	write later in the request starts one in the usual way.
+		 *
+		 *	@return 	void
+		 */
+		private static function _dropStrangerSession(): void {
+
+			// An array cookie (name[x]=...) names no session either; it is not a string to compare
+			$sent = $_COOKIE[ session_name() ] ?? null;
+
+			if( session_status() !== PHP_SESSION_ACTIVE || ( is_string( $sent ) === true && session_id() === $sent ) )
+				return;
+
+			session_destroy();
+
+			// Only the header of the session goes: one set earlier in the request stays
+			$others = array_filter( headers_list(), static fn( string $line ): bool => stripos( $line, 'Set-Cookie:' ) === 0 && stripos( ltrim( substr( $line, 11 ) ), session_name(). '=' ) !== 0 );
+
+			header_remove( 'Set-Cookie' );
+
+			foreach( $others as $line )
+				header( $line, false );
 		}
 
 		/**

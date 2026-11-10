@@ -1098,6 +1098,9 @@ $sessionOkRoot = $sandbox. '/session-ok';
 mkdir( $sessionOkRoot. '/sessions', 0777, true );
 file_put_contents( $sessionOkRoot. '/config.php', '<?php return '. var_export( [ '/nino/modules' => [] ], true ). ';' );
 
+// The cookie names a session that exists: its file is there
+file_put_contents( $sessionOkRoot. '/sessions/sess_0123456789abcdef0123456789abcdef', '' );
+
 $sessionOk = runIsolated(
 	'$appData = \Nino\init();
 	echo json_encode( [ "status" => session_status() ] );',
@@ -1108,6 +1111,191 @@ $sessionOk = runIsolated(
 
 check( 'a session that can start is started as it always was', ( json_decode( $sessionOk['stdout'], true )['status'] ?? null ) === PHP_SESSION_ACTIVE );
 check( '...and that boot logs nothing', glob( $sessionOkRoot. '/data/logs.*.php' ) === [] );
+
+/*	A cookie that names no session - one a crawler made up, one whose session
+	was collected - is no session: nothing is started for it, no file is made
+	and no cookie is sent for a request that writes nothing. A write starts one
+	in the usual way, under an id of its own, and never adopts the one sent	*/
+$strangerRoot = $sandbox. '/session-stranger';
+mkdir( $strangerRoot. '/sessions', 0777, true );
+file_put_contents( $strangerRoot. '/config.php', '<?php return '. var_export( [ '/nino/modules' => [] ], true ). ';' );
+$strangerBefore = 'define( "NINO_PRIVATE_DIR", '. var_export( $strangerRoot, true ). ' );
+	ini_set( "session.save_path", '. var_export( $strangerRoot. '/sessions', true ). ' );
+	$_COOKIE[ session_name() ] = "ffffffffffffffffffffffffffffffff";';
+
+$strangerRead = runIsolated(
+	'$appData = \Nino\init();
+	echo json_encode( [ "status" => session_status(), "value" => \Nino\Runtime::getSessionValue( $appData, "./nino/anything", "none" ) ] );',
+	$strangerBefore
+);
+check( 'a session cookie that names no session starts none', ( json_decode( $strangerRead['stdout'], true )['status'] ?? null ) === PHP_SESSION_NONE
+	&& ( json_decode( $strangerRead['stdout'], true )['value'] ?? null ) === 'none' );
+check( '...and leaves no session file behind', glob( $strangerRoot. '/sessions/sess_*' ) === [] );
+
+$strangerWrite = runIsolated(
+	'$appData = \Nino\init();
+	\Nino\Runtime::setSessionValue( $appData, "./nino/anything", "kept" );
+	echo json_encode( [ "status" => session_status(), "id" => session_id(), "value" => \Nino\Runtime::getSessionValue( $appData, "./nino/anything" ) ] );',
+	$strangerBefore
+);
+$strangerData = json_decode( $strangerWrite['stdout'], true );
+check( 'a write after it starts a session, with an id of its own and not the one sent', ( $strangerData['status'] ?? null ) === PHP_SESSION_ACTIVE
+	&& ( $strangerData['value'] ?? null ) === 'kept' && is_string( $strangerData['id'] ?? null ) === true && $strangerData['id'] !== 'ffffffffffffffffffffffffffffffff'
+	&& glob( $strangerRoot. '/sessions/sess_*' ) === [ $strangerRoot. '/sessions/sess_'. ( $strangerData['id'] ?? '' ) ] );
+
+echo "\n";
+
+
+// --- A visitor who has nothing to remember gets no session -------------------
+
+echo "Sessions - over http, a page with no form answers without a cookie and a session file\n";
+
+/*	Measured on the wire, with php -S: the cli keeps no response headers, and
+	what is asserted is the Set-Cookie a browser would be given and the files
+	under the session save path. Every request that only reads, whatever it
+	carries - a page from the cache, a wrong token, a language that does not
+	exist, a cookie that names no session -, answers with neither; a page with
+	a form gets its cookie and a token that its post is accepted with, with the
+	cache on and off	*/
+$wireRoot = $sandbox. '/wire';
+mkdir( $wireRoot. '/sessions', 0777, true );
+file_put_contents( $wireRoot. '/router.php', '<?php
+declare(strict_types=1);
+define( "NINO_PRIVATE_DIR", getenv( "WIRE_PRIVATE" ) );
+ini_set( "session.save_path", getenv( "WIRE_SESSIONS" ) );
+require getenv( "WIRE_ROOT" ). "/_nino/Nino.php";
+if( isset( $_GET["early"] ) )
+	setcookie( "early", "kept" );
+$appData = \Nino\init();
+$request = \Nino\request( $appData, $_SERVER );
+\Nino\output( $appData, $request );
+' );
+
+$wirePort = null;
+
+for( $try = 0; $try < 20 && $wirePort === null; $try++ ) {
+	$probe = @stream_socket_server( 'tcp://127.0.0.1:0' );
+	if( $probe === false )
+		continue;
+	$wirePort = (int) substr( (string) stream_socket_get_name( $probe, false ), strrpos( (string) stream_socket_get_name( $probe, false ), ':' ) + 1 );
+	fclose( $probe );
+}
+
+$wireTemp = $sandbox. '/wire-tmp';
+mkdir( $wireTemp );
+$wireProcess = $wirePort === null ? false : proc_open(
+	[ PHP_BINARY, '-d', 'sys_temp_dir='. $wireTemp, '-S', '127.0.0.1:'. $wirePort, $wireRoot. '/router.php' ],
+	[ 0 => [ 'file', '/dev/null', 'r' ], 1 => [ 'file', '/dev/null', 'w' ], 2 => [ 'file', '/dev/null', 'w' ] ],
+	$wirePipes,
+	$wireRoot,
+	[ 'WIRE_PRIVATE' => $wireRoot, 'WIRE_SESSIONS' => $wireRoot. '/sessions', 'WIRE_ROOT' => realpath( __DIR__. '/..' ), 'PATH' => (string) getenv( 'PATH' ) ]
+);
+
+/** One request to that server: status, the cookie it was given if any, the body */
+$wire = static function( string $method, string $uri, string $cookie = '', string $post = '', string $rawCookie = '' ) use ( $wirePort ): array {
+
+	$headers = ( $cookie !== '' ? "Cookie: PHPSESSID=$cookie\r\n" : '' ). ( $rawCookie !== '' ? "Cookie: $rawCookie\r\n" : '' ). ( $method === 'POST' ? "Content-Type: application/x-www-form-urlencoded\r\n" : '' );
+	$body		 = @file_get_contents( 'http://127.0.0.1:'. $wirePort. $uri, false, stream_context_create( [ 'http' => [
+		'method' => $method, 'header' => $headers, 'content' => $post, 'ignore_errors' => true, 'follow_location' => 0, 'timeout' => 10,
+	] ] ) );
+	$status	 = 0;
+	$given	 = null;
+	$all		 = [];
+
+	foreach( $http_response_header ?? [] as $line ) {
+		if( preg_match( '#^HTTP/\S+ (\d+)#', $line, $m ) === 1 )
+			$status = (int) $m[1];
+		if( stripos( $line, 'Set-Cookie:' ) === 0 )
+			$all[] = $line;
+		if( preg_match( '#^Set-Cookie: PHPSESSID=([^;]*)#i', $line, $m ) === 1 )
+			$given = $m[1];
+	}
+
+	return [ 'status' => $status, 'cookie' => $given, 'all' => $all, 'body' => (string) $body ];
+};
+$wireFiles = static fn(): int => count( glob( $wireRoot. '/sessions/sess_*' ) ?: [] );
+$wireToken = static fn( array $answer ): string => preg_match( '#name="_csrf" value="([0-9a-f]{64})"#', $answer['body'], $m ) === 1 ? $m[1] : '';
+
+$wireUp = false;
+
+for( $i = 0; $i < 50 && $wireProcess !== false && $wireUp === false; $i++ ) {
+	$probe = @fsockopen( '127.0.0.1', $wirePort, $errno, $errstr, 0.2 );
+	if( $probe !== false ) {
+		fclose( $probe );
+		$wireUp = true;
+	} else {
+		usleep( 100000 );
+	}
+}
+
+check( 'the server for the wire checks is up', $wireUp === true );
+
+foreach( [ 'the cache off' => false, 'the cache on' => true ] as $wireLabel => $wireCache ) {
+
+	file_put_contents( $wireRoot. '/config.php', '<?php return '. var_export( [
+		'/nino/cache/status'			=> $wireCache,
+		'/nino/locales/native'		=> 'de_DE',
+		'/nino/locales/available'	=> [ 'de_DE', 'en_US' ],
+		'/nino/http/routes'				=> [
+			'GET://'				=> [ 'uri' => '/', 'body' => '<p>a page without a form</p>' ],
+			'GET://form'		=> [ 'uri' => '/form', 'body' => '<form method="post">[csrf]</form>' ],
+			'POST://form'		=> [ 'uri' => '/form', 'body' => 'accepted' ],
+			'GET://en/about'	=> [ 'uri' => '/about', 'body' => '<p>about</p>', 'locale' => 'en_US' ],
+			'GET://contact'	=> [ 'uri' => '/contact', 'body' => '<p>contact</p>' ],
+		],
+	], true ). ';' );
+	foreach( glob( $wireRoot. '/data/cache/*.php' ) ?: [] as $stale )
+		unlink( $stale );
+	foreach( glob( $wireRoot. '/sessions/sess_*' ) ?: [] as $stale )
+		unlink( $stale );
+
+	$anonymous = [ $wire( 'GET', '/' ), $wire( 'GET', '/' ), $wire( 'GET', '/' ) ];
+	check( "$wireLabel: three visits of a page without a form are answered, and none is given a cookie", array_column( $anonymous, 'status' ) === [ 200, 200, 200 ]
+		&& array_column( $anonymous, 'cookie' ) === [ null, null, null ] );
+	check( "$wireLabel: ...and none leaves a session file", $wireFiles() === 0 );
+
+	$wrongToken = $wire( 'POST', '/form', '', '_csrf=not-the-token' );
+	check( "$wireLabel: a post with a wrong token and no cookie is refused with no cookie", $wrongToken['status'] === 403 && $wrongToken['cookie'] === null );
+	check( "$wireLabel: ...and no session file", $wireFiles() === 0 );
+
+	$invalidLanguage = $wire( 'GET', '/?/_nino/locales/current=zz_ZZ' );
+	check( "$wireLabel: a language the site does not have is answered with no cookie", $invalidLanguage['status'] === 302 && $invalidLanguage['cookie'] === null && $wireFiles() === 0 );
+
+	$madeUp = $wire( 'GET', '/', 'ffffffffffffffffffffffffffffffff' );
+	check( "$wireLabel: a cookie that names no session is answered with no new cookie", $madeUp['status'] === 200 && $madeUp['cookie'] === null && $wireFiles() === 0 );
+	$arrayCookie = $wire( 'GET', '/', '', '', 'PHPSESSID[x]=abc' );
+	check( "$wireLabel: a cookie that is an array is answered with no cookie and no file", $arrayCookie['status'] === 200 && $arrayCookie['cookie'] === null && $wireFiles() === 0 );
+	$earlyCookie = $wire( 'GET', '/?early=1', 'ffffffffffffffffffffffffffffffff' );
+	check( "$wireLabel: a cookie another part set earlier in the request is kept when a stray session is dropped", $earlyCookie['status'] === 200 && $earlyCookie['cookie'] === null
+		&& count( array_filter( $earlyCookie['all'], static fn( string $l ): bool => stripos( $l, 'Set-Cookie: early=kept' ) === 0 ) ) === 1 && $wireFiles() === 0 );
+	$madeUpTwice = $wire( 'GET', '/', 'ffffffffffffffffffffffffffffffff' );
+	check( "$wireLabel: ...on every request, and with no file", $madeUpTwice['cookie'] === null && $wireFiles() === 0 );
+
+	// A page with a form: twice, so that with the cache on one of the two is a hit
+	$forms = [ $wire( 'GET', '/form' ), $wire( 'GET', '/form' ) ];
+	check( "$wireLabel: a page with a form gives its visitor a cookie and a token, each time", is_string( $forms[0]['cookie'] ) === true && is_string( $forms[1]['cookie'] ) === true
+		&& $wireToken( $forms[0] ) !== '' && $wireToken( $forms[1] ) !== '' && $wireToken( $forms[0] ) !== $wireToken( $forms[1] ) && $wireFiles() === 2 );
+	$posted = $wire( 'POST', '/form', (string) $forms[1]['cookie'], '_csrf='. $wireToken( $forms[1] ) );
+	check( "$wireLabel: ...and the post with that token is accepted", $posted['status'] === 200 && $posted['body'] === 'accepted' );
+	$refused = $wire( 'POST', '/form', (string) $forms[1]['cookie'], '_csrf='. $wireToken( $forms[0] ) );
+	check( "$wireLabel: ...and one with the token of another visitor is not", $refused['status'] === 403 );
+
+	// The same page after a cookie that names no session: the form starts a session of its own
+	$formAfterMadeUp = $wire( 'GET', '/form', 'ffffffffffffffffffffffffffffffff' );
+	check( "$wireLabel: a form after a cookie that names no session starts a session under a new id", is_string( $formAfterMadeUp['cookie'] ) === true
+		&& $formAfterMadeUp['cookie'] !== 'ffffffffffffffffffffffffffffffff' && $wireToken( $formAfterMadeUp ) !== '' );
+	$postedAfterMadeUp = $wire( 'POST', '/form', (string) $formAfterMadeUp['cookie'], '_csrf='. $wireToken( $formAfterMadeUp ) );
+	check( "$wireLabel: ...and its post is accepted", $postedAfterMadeUp['status'] === 200 );
+
+	// A page of a route that names a language keeps that language for the visitor's next request on a route that names none
+	$aboutAnswer = $wire( 'GET', '/en/about' );
+	check( "$wireLabel: a route that names another language is the visitor's choice, and holds a session for it", is_string( $aboutAnswer['cookie'] ) === true );
+}
+
+if( $wireProcess !== false ) {
+	proc_terminate( $wireProcess );
+	proc_close( $wireProcess );
+}
 
 echo "\n";
 
