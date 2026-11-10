@@ -228,6 +228,26 @@
 		},
 
 		/**
+		 *	Switch the buttons of the list - every restore, and Back up now - off
+		 *	while a restore runs, on again where it was refused. After one that
+		 *	succeeded they stay off: the page reloads
+		 *
+		 *	@param		{boolean}		busy
+		 *
+		 *	@return		void
+		 */
+		_setBusy : function( busy ) {
+
+			const wrap = dc.getElementById('backups-list');
+			if( wrap === null )
+				return;
+
+			Array.prototype.forEach.call( wrap.querySelectorAll('button'), function( button ) {
+				button.disabled = busy;
+			} );
+		},
+
+		/**
 		 *	Confirm, then restore the given backup date. A safety snapshot of
 		 *	the current state is taken server-side before anything is
 		 *	overwritten (see apiRestore() in Admin/Admin.php beside it)
@@ -257,9 +277,15 @@
 					// about first (see Nino.admin.dirty.guard())
 					const restore = function() {
 
+						// One restore at a time: the server refuses a second with a 409, and
+						// the list does not offer one while this runs
+						Nino.admin.backups._setBusy( true );
+
 						Nino.admin.backups._apiCall( 'restore', { date : date }, function( status, response ) {
-							if( status !== 200 || response === null || response.ok !== true )
+							if( status !== 200 || response === null || response.ok !== true ) {
+								Nino.admin.backups._setBusy( false );
 								return Nino.admin.backups._showRestoreError( status, response );
+							}
 
 							let said = Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/restored'), date );
 

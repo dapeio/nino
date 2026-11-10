@@ -923,8 +923,8 @@ namespace Nino\Modules\Elements {
 		 */
 		public static function log( string $action, array $data ): string {
 			return match( $action ) {
-				'types/save' 		=> 'Edit Element Type /'. ( $data['uri'] ?? '' ). self::_renamedLog( $data['renames'] ?? null ),
-				'types/create' 	=> 'Add Element Type /'. ( $data['uri'] ?? '' ),
+				'types/save' 		=> 'Edit Element Type /'. \Nino\Admin\Admin::postString( $data, 'uri' ). self::_renamedLog( $data['renames'] ?? null ),
+				'types/create' 	=> 'Add Element Type /'. \Nino\Admin\Admin::postString( $data, 'uri' ),
 				// Not types/delete: what makes that line worth reading is how many
 				// elements went with the type, and this hook only ever sees the
 				// posted body - uri and confirm. apiDelete() writes its own line

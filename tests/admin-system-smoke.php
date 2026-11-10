@@ -214,6 +214,16 @@ echo "\n";
 
 echo "Restore - reads Backup's output independently, doesn't call into _admin/Admin.php\n";
 
+/** The activity log's lines that hold all of the given pieces, newest first */
+$logLines = static function( string ...$pieces ) use ( &$appData ): array {
+	return array_values( array_filter( \Nino\Modules\Logs\Admin::recentLines( $appData, 200 ), static function( string $line ) use ( $pieces ): bool {
+		foreach( $pieces as $piece )
+			if( str_contains( $line, $piece ) === false )
+				return false;
+		return true;
+	} ) );
+};
+
 mkdir( $sandbox. '/_admin', 0777, true );
 mkdir( $sandbox. '/_admin', 0777, true );
 
@@ -678,6 +688,7 @@ check( '...and no file of the manifest is called that, since the note is no file
 \Nino\Filesystem::putFileContent( $appData, '/templates/page-late.tpl', 'probe page, written after the archive' );
 \Nino\Filesystem::putFileContent( $appData, '/assets/late.css', '.late { color: #111111; }' );
 
+$restoreActor = \Nino\Auth::getCurrentUser( $appData )['mail'] ?? '';
 [ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $pagesId ] );
 $pageSnapshots = array_values( array_diff( glob( $nowDir. '/pre-restore-*.php' ) ?: [], $snapshotsBefore ) );
 check( 'a restore brings the templates and the assets back as they were archived, nested ones too', $status === 200 && ( $body['ok'] ?? false ) === true
@@ -688,6 +699,13 @@ check( '...and leaves a template and an asset that were written after the archiv
 check( '...and the note of where the archive comes from is none of the files it puts back: nothing named nino.php is left in the project\'s root', is_file( $sandbox. '/nino.php' ) === false );
 check( '...an archive of the version that runs carries no notice, in the answer or in the activity log', isset( $body['notice'] ) === false
 	&& str_contains( implode( "\n", \Nino\Modules\Logs\Admin::recentLines( $appData, 20 ) ), 'comes from Nino' ) === false );
+
+// The most powerful action of the workbench leaves its line, with who did it and
+// which archive: the session it ends is the one the shell would ask for the
+// actor, and the activity log is none of what an archive holds
+check( 'a restore writes its line to the activity log - the account that ran it, the archive - and it is there after the files were put back',
+	$restoreActor !== '' && count( $logLines( $restoreActor, 'Restore Backup '. $pagesId ) ) === 1
+	&& str_contains( $logLines( 'Restore Backup '. $pagesId )[0], 'failed' ) === false );
 
 // The safety snapshot a restore makes holds what an archive holds: the state it
 // replaced, templates and assets with it, and the note
@@ -722,6 +740,59 @@ check( 'an archive whose note names the version that runs has no notice, whateve
 [ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $noNoteId ] );
 check( '...and an archive with no note at all restores as it always did, with nothing to say', $status === 200 && ( $body['ok'] ?? false ) === true && isset( $body['notice'] ) === false && is_file( $sandbox. '/nino.php' ) === false );
 
+// A restore that fails writes its line as well, and one that cannot start
+// because another is running answers 409 and copies nothing
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+$failActor = \Nino\Auth::getCurrentUser( $appData )['mail'] ?? '';
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => '2001-02-03' ] );
+check( 'a restore of a date that has no archive is 404 and its line is in the activity log, marked as failed', $status === 404
+	&& count( $logLines( $failActor, 'Restore Backup 2001-02-03', 'failed (404)' ) ) === 1 );
+
+\Nino\Filesystem::putFileContent( $appData, '/templates/page-probe.tpl', 'changed while a restore runs' );
+$snapshotsHeld	= glob( $nowDir. '/pre-restore-*.php' ) ?: [];
+$holder					= $appData;
+$holder['./nino/filesystem/locks'] = [];
+check( 'the lock of the restore can be held by another process', \Nino\Filesystem::lockFile( $holder, \Nino\Modules\Backups::LOCK_PATH ) === true );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $pagesId ] );
+check( 'a restore while another runs is 409 with a code, and copies nothing and makes no snapshot', $status === 409 && ( $body['code'] ?? '' ) === 'backups_busy'
+	&& file_get_contents( $pagesDir. '/page-probe.tpl' ) === 'changed while a restore runs' && ( glob( $nowDir. '/pre-restore-*.php' ) ?: [] ) === $snapshotsHeld );
+check( '...the session of the account stays, and the line says it failed', \Nino\Auth::getCurrentUser( $appData ) !== false && count( $logLines( $failActor, 'Restore Backup '. $pagesId, 'failed (409)' ) ) === 1 );
+\Nino\Runtime::setSessionValue( $appData, \Nino\Admin\Recovery::SESSION_KEY, true );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Recovery::class, 'handlePost' ], [ 'date' => $pagesId ], 'recovery/restore' );
+check( 'the recovery page takes the same lock: 409, and nothing copied', $status === 409 && ( $body['code'] ?? '' ) === 'backups_busy'
+	&& file_get_contents( $pagesDir. '/page-probe.tpl' ) === 'changed while a restore runs' );
+\Nino\Runtime::unsetSessionValue( $appData, \Nino\Admin\Recovery::SESSION_KEY );
+// The daily run does not start in the middle of a restore: the same lock, and it
+// is not waited for (a request that waited would restore a second time)
+$appData['./nino/backups/today'] = '2099-01-01';
+ninoWarnings();
+\Nino\Modules\Backups::maybeRun( $appData );
+check( 'the daily backup does not start while a restore holds the lock', is_file( $nowDir. '/2099-01-01.php' ) === false );
+check( '...and a lock that is merely taken is nothing to log', ninoWarnings() === [] );
+\Nino\Filesystem::unlockFile( $holder, \Nino\Modules\Backups::LOCK_PATH );
+[ $status ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $pagesId ] );
+\Nino\Modules\Backups::maybeRun( $appData );
+check( '...and makes the day\'s archive as soon as it is free', is_file( $nowDir. '/2099-01-01.php' ) === true );
+unlink( $nowDir. '/2099-01-01.php' );
+
+// A lock that cannot be had at all is not "taken": the directory of the locks is
+// a file, the run fails and says so in the log
+$locksDir = \Nino\Filesystem::path( $appData, '/data/.locks' );
+rename( $locksDir, $locksDir. '-aside' );
+file_put_contents( $locksDir, 'not a directory' );
+$unlockable = $appData;
+unset( $unlockable['./nino/filesystem/locks'] );
+ninoWarnings();
+\Nino\Modules\Backups::maybeRun( $unlockable );
+$lockWarnings = ninoWarnings();
+unlink( $locksDir );
+rename( $locksDir. '-aside', $locksDir );
+check( 'a lock the daily backup cannot have at all is a failure in the log, and no archive', count( $lockWarnings ) === 1 && str_contains( $lockWarnings[0], 'daily backup could not be locked' ) === true && is_file( $nowDir. '/2099-01-01.php' ) === false );
+unset( $appData['./nino/backups/today'] );
+check( '...and with the lock free again the restore runs', $status === 200 && file_get_contents( $pagesDir. '/page-probe.tpl' ) === 'probe page, as archived' );
+check( '...and gives the lock back, so the next one is not turned away', \Nino\Filesystem::lockFile( $holder, \Nino\Modules\Backups::LOCK_PATH, false ) === true );
+\Nino\Filesystem::unlockFile( $holder, \Nino\Modules\Backups::LOCK_PATH );
+
 // The recovery page restores through the same function and answers the same way
 \Nino\Runtime::setSessionValue( $appData, \Nino\Admin\Recovery::SESSION_KEY, true );
 [ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Recovery::class, 'handlePost' ], [ 'date' => $otherId ], 'recovery/restore' );
@@ -729,6 +800,8 @@ check( 'the recovery page carries the notice in its answer too', $status === 200
 	&& ( $body['notice'] ?? null ) === [ 'code' => 'backups_restored_other_version', 'params' => [ '0.9.1', \Nino\VERSION ] ] );
 [ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Recovery::class, 'handlePost' ], [ 'date' => $sameId ], 'recovery/restore' );
 check( '...and none for an archive of the version that runs', $status === 200 && ( $body['restoredDate'] ?? null ) === $sameId && isset( $body['notice'] ) === false );
+check( 'the recovery page writes the line of its restore too, with the door as the actor', count( $logLines( 'recovery.php', 'Restore Backup '. $otherId ) ) === 1
+	&& count( $logLines( 'recovery.php', 'Restore Backup '. $pagesId, 'failed (409)' ) ) === 1 );
 \Nino\Runtime::unsetSessionValue( $appData, \Nino\Admin\Recovery::SESSION_KEY );
 
 // What this block wrote is taken away again: the archives, the snapshots its
@@ -1664,6 +1737,9 @@ $recoveryCall = static function( string $action, array $data, bool $open = true 
 	return ninoCall( $appData, [ \Nino\Admin\Recovery::class, 'handlePost' ], $data, $action );
 };
 
+// The Config checks above switched the activity log off: it is what these read
+$logSwitch = $appData['/nino/admin/logs'] ?? true;
+$appData['/nino/admin/logs'] = true;
 ninoUser( $appData, 'resetme@example.com', [ '/_admin/text/manage' ], 'the old password' );
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
 $accountsBefore = array_keys( $appData['/nino/auth/user'] );
@@ -1715,6 +1791,27 @@ check( 'create with the confirmation is 200, created true', $status === 200 && (
 check( '...an account with full access and the Developer role', $fresh !== false && $fresh['perms'] === [ '/*' ] && $fresh['role'] === 'developer' && $fresh['status'] === \Nino\Auth::STATUS_ACTIVE );
 check( '...that can log in', is_array( \Nino\Auth::loginUser( $appData, 'fresh@example.com', 'a fresh password' ) ) === true );
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+
+// Each of the two leaves one line, with the door as the actor - and no password in it;
+// the ones that were refused above left none
+check( 'a reset writes one line to the activity log, naming the account', count( $logLines( 'recovery.php', 'Reset Password resetme@example.com' ) ) === 2 );
+check( '...and a create one', count( $logLines( 'recovery.php', 'Create User fresh@example.com' ) ) === 1 );
+check( '...nothing about an address the door refused, and no password in the log', $logLines( 'typo@example.com' ) === []
+	&& array_filter( [ 'a new password', 'a second password', 'a fresh password', 'the old password' ], static fn( string $secret ): bool => $logLines( $secret ) !== [] ) === [] );
+
+// A reset that set the password and could not lift the lock answers 500 and has
+// left its line: the account is changed, and the log says who changed it
+$lockKey	= (string) ( new ReflectionMethod( '\Nino\Filesystem', '_canonicalPath' ) )->invokeArgs( null, [ &$appData, '/data/auth-tries.php' ] );
+$lockFile	= \Nino\Filesystem::path( $appData, '/data' ). '/.locks/'. sha1( $lockKey ). '.lock';
+unset( $appData['./nino/filesystem/locks'] );
+@unlink( $lockFile );
+@mkdir( $lockFile );
+[ $status ] = $recoveryCall( 'recovery/reset', [ 'mail' => 'fresh@example.com', 'pw' => 'a fresh password' ] );
+@rmdir( $lockFile );
+unset( $appData['./nino/filesystem/locks'], $appData['./nino/filesystem/cache'] );
+check( 'a reset that could not lift the lock is 500 and has written its line', $status === 500 && count( $logLines( 'recovery.php', 'Reset Password fresh@example.com' ) ) === 1 );
+
+$appData['/nino/admin/logs'] = $logSwitch;
 
 $accountsAfter = array_keys( $appData['/nino/auth/user'] );
 [ $status ] = $recoveryCall( 'recovery/reset', [ 'mail' => 'resetme@example.com', 'pw' => 'yet another password' ], false );
@@ -1856,6 +1953,38 @@ check( 'apiDelete 404s for an already-gone user', $status === 404 );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiCreate', [ 'mail' => 'permsdev@example.com', 'pw' => 'a-long-enough-password' ] );
 check( 'apiCreate creates an account without a role - one that may only edit its own profile', $status === 200 && \Nino\Auth::getUser( $appData, 'permsdev@example.com' )['role'] === '' && \Nino\Auth::checkPermission( $appData, '/_admin/elements/manage', 'permsdev@example.com' ) === false );
+
+// A name that is no string is a refusal, not a 500: the activity log asked for the
+// raw value and concatenated an array
+ninoWarnings();
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiLogoutAll', [ 'username' => [ 'dev@example.com' ] ] );
+check( 'users/logoutall with an array for the name is 400', $status === 400 );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiLogoutAll', [ 'username' => [ 'a' => [ 'b' ] ] ] );
+check( '...whatever the array holds', $status === 400 );
+[ $status ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiLogoutAll', [ 'username' => 5 ] );
+check( '...and a number for the name', $status === 400 );
+$conversions = static fn( array $posted ): array => array_filter( ninoWarnings(), static fn( string $message ): bool => str_contains( $message, 'Array to string conversion' ) );
+\Nino\Modules\Users\Admin::log( 'users/logoutall', [ 'username' => [ 'x' ] ] );
+check( '...and the line the log asks for is made of it without a conversion', $conversions( [] ) === [] );
+$logged = [];
+$bait = [ 'username' => [ 'x' ], 'role' => [ 'x' ], 'type' => [ 'x' ], 'uri' => [ 'x' ], 'key' => [ 'x' ], 'newKey' => [ 'x' ], 'id' => [ 'x' ], 'originalKey' => [ 'x' ], 'locale' => [ 'x' ], 'targetLocale' => [ 'x' ], 'renames' => [ 'x' ] ];
+foreach( [
+	\Nino\Modules\Users\Admin::class 							=> [ 'users/create', 'users/delete', 'users/save', 'users/status', 'users/role' ],
+	\Nino\Modules\Users\Lockout::class 						=> [ 'lockout/unlock' ],
+	\Nino\Modules\Users\Roles::class 							=> [ 'roles/save', 'roles/delete' ],
+	\Nino\Modules\Elements\Admin::class 						=> [ 'elements/save', 'elements/uploadimage', 'elements/removeimage', 'elements/delete' ],
+	\Nino\Modules\Elements\Types::class 						=> [ 'types/save', 'types/create' ],
+	\Nino\Modules\Images\Admin::class 							=> [ 'images/upload', 'images/remove', 'images/alt' ],
+	\Nino\Modules\Images\Slots::class 							=> [ 'slots/create', 'slots/save', 'slots/delete' ],
+	\Nino\Modules\Language\Admin::class 						=> [ 'language/addlocale' ],
+	\Nino\Modules\Language\Translations::class 			=> [ 'translations/import' ],
+	\Nino\Modules\Routes\Admin::class 							=> [ 'routes/savetexts' ],
+	\Nino\Modules\Text\Keys::class 								=> [ 'keys/create', 'keys/save', 'keys/rename', 'keys/delete' ],
+	\Nino\Modules\Navigation\Admin::class 					=> [ 'navs/save', 'navs/delete' ],
+] as $class => $actions )
+	foreach( $actions as $action )
+		$logged[] = $class::log( $action, $bait + ( $action === 'keys/save' ? [ 'format' => 'x' ] : [] ) );
+check( '...as is that of every other panel that names a posted value in it', $conversions( [] ) === [] && count( $logged ) === 29 );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiSetRole', [ 'username' => 'unknown@example.com', 'role' => 'editor' ] );
 check( 'apiSetRole 404s for an unknown user', $status === 404 );

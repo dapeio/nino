@@ -175,7 +175,7 @@ namespace Nino\Modules\Routes {
 				'routes/save'		=> ( \Nino\Admin\Admin::postString( $data, 'originalUri' ) === '' ? 'Add Route ' : 'Edit Route ' ). \Nino\Admin\Admin::postString( $data, 'uri' ),
 				'routes/delete'	=> 'Delete Route '. \Nino\Admin\Admin::postString( $data, 'uri' ),
 				'routes/move'		=> 'Move Route '. \Nino\Admin\Admin::postString( $data, 'uri' ). ' '. \Nino\Admin\Admin::postString( $data, 'direction' ),
-				'routes/savetexts' => 'Edit Feature Route '. ( $data['uri'] ?? '' ),
+				'routes/savetexts' => 'Edit Feature Route '. \Nino\Admin\Admin::postString( $data, 'uri' ),
 				default	=> '',
 			};
 		}

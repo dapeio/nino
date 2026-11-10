@@ -78,7 +78,7 @@ namespace Nino\Modules\Language {
 
 		public static function log( string $action, array $data ): string {
 			return match( $action ) {
-				'translations/import'	=> 'Import Translation '. ( $data['targetLocale'] ?? '' ),
+				'translations/import'	=> 'Import Translation '. \Nino\Admin\Admin::postString( $data, 'targetLocale' ),
 				default	=> '',
 			};
 		}

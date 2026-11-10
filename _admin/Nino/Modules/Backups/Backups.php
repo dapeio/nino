@@ -75,7 +75,10 @@ namespace Nino\Modules {
 		// How many of the archives somebody asked for (see now()) are kept,
 		// the newest ones: the daily ones are bounded by their days alone
 		private const int MANUAL_KEEP = 10;
-		private const string LOCK_PATH = '/_admin/backup-daily';
+
+		// Held by the daily run and by a restore (see \Nino\Modules\Backups\Admin::restore()):
+		// the one never starts in the middle of the other
+		public const string LOCK_PATH = '/_admin/backup-daily';
 
 		// The note of the day's one attempt (see maybeRun()), in the archive
 		// directory behind the same exit-stub as an archive. Its name is no
@@ -178,9 +181,22 @@ namespace Nino\Modules {
 				// A stable, virtual lock path rather than the archive directory:
 				// it serializes the first-use key generation in _bootstrap() and
 				// the once-a-day existence check alike.
-				$locked = \Nino\Filesystem::lockFile( $appData, self::LOCK_PATH );
-				if( $locked === false )
-					throw new \RuntimeException( 'daily backup could not be locked' );
+				//
+				// Not waited for: a restore holds it for as long as it runs, and a
+				// request that waited here would then run as a second restore of its
+				// own. The run that finds it taken is skipped, and the next request
+				// makes it. A lock that cannot be had at all - the directory of the
+				// locks is missing or not writable - is a failure and is logged
+				$locked = \Nino\Filesystem::lockFile( $appData, self::LOCK_PATH, false );
+				if( $locked === false ) {
+
+					$locks = \Nino\Filesystem::path( $appData, '/data/.locks' );
+
+					if( is_dir( $locks ) === false || is_writable( $locks ) === false )
+						throw new \RuntimeException( 'daily backup could not be locked' );
+
+					return;
+				}
 
 				self::_bootstrap( $appData );
 

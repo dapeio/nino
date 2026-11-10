@@ -77,9 +77,9 @@ namespace Nino\Modules\Images {
 
 		public static function log( string $action, array $data ): string {
 			return match( $action ) {
-				'images/upload'	=> 'Upload Image '. ( $data['uri'] ?? '' ),
-				'images/remove'	=> 'Remove Image '. ( $data['uri'] ?? '' ),
-				'images/alt'		=> 'Edit Image Alt '. ( $data['uri'] ?? '' ),
+				'images/upload'	=> 'Upload Image '. \Nino\Admin\Admin::postString( $data, 'uri' ),
+				'images/remove'	=> 'Remove Image '. \Nino\Admin\Admin::postString( $data, 'uri' ),
+				'images/alt'		=> 'Edit Image Alt '. \Nino\Admin\Admin::postString( $data, 'uri' ),
 				default	=> '',
 			};
 		}

@@ -96,7 +96,7 @@ namespace Nino\Modules\Users {
 		public static function log( string $action, array $data ): string {
 			return match( $action ) {
 				'lockout/save' 		=> 'Edit Login Protection',
-				'lockout/unlock' 	=> 'Lift Lock '. ( $data['username'] ?? '' ),
+				'lockout/unlock' 	=> 'Lift Lock '. \Nino\Admin\Admin::postString( $data, 'username' ),
 				default 					=> '',
 			};
 		}

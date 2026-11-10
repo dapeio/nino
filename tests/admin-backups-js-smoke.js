@@ -314,4 +314,27 @@ fire( dialogButtons( dialogs[2] )[0], 'click' );
 check( '...which is the one that reloads', reloaded === 1 );
 delete Nino.admin.dirty;
 
+// One restore at a time: while one runs nothing on the list can start another,
+// a refusal gives the list back, and the 409 of a restore already running says
+// so in the words of the module
+function listButtons() {
+	return findAll( mount, function( el ) { return el.tagName === 'BUTTON' } );
+}
+
+mount.innerHTML = '';
+requests.length = 0;
+panel.init();
+answer( 200, { dates : [ '2024-05-03', '2024-05-02' ] } );
+pressRestore('2024-05-03');
+check( 'while a restore runs every button of the list is off', requests.length === 2 && requests[1].action === 'backups/restore'
+	&& listButtons().length === 3 && listButtons().every( function( button ) { return button.disabled === true } ) );
+answer( 409, { error : 'a backup or a restore is running', code : 'backups_busy' } );
+check( '...and a refusal gives them back', listButtons().every( function( button ) { return button.disabled !== true } ) );
+check( '...saying that one is running, in the words of the module', text('/_admin/error/backups_busy') !== ''
+	&& messageText().indexOf( text('/_admin/error/backups_busy') ) !== -1 && messageClass() === 'nino-admin-error' );
+
+pressRestore('2024-05-02');
+answer( 200, { ok : true, restoredDate : '2024-05-02' } );
+check( 'a restore that went through leaves them off for the reload', listButtons().every( function( button ) { return button.disabled === true } ) );
+
 done();

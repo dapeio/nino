@@ -224,7 +224,7 @@ namespace Nino\Modules\Backups {
 
 		public static function log( string $action, array $data ): string {
 			return match( $action ) {
-				'backups/restore'	=> 'Restore Backup '. ( $data['date'] ?? '' ),
+				'backups/restore'	=> 'Restore Backup '. \Nino\Admin\Admin::postString( $data, 'date' ),
 				'backups/now'			=> 'Create Backup',
 				default						=> '',
 			};
@@ -289,6 +289,12 @@ namespace Nino\Modules\Backups {
 		 *	of its own, written here: log() is handed the posted body alone and
 		 *	could not know.
 		 *
+		 *	The line of the restore itself is written here too, for a failed one
+		 *	as well (see recordRestore()): the shell writes a line for an answer
+		 *	of 200 only, and asks the account that is signed in then - which
+		 *	this restore has just ended. The activity log is none of what an
+		 *	archive holds, so the line is there after the files were put back.
+		 *
 		 *	The session of the account that ran it ends here. The accounts and
 		 *	their sessions are part of config.php, so an archive older than the
 		 *	login would have ended it on the next request anyway and a younger
@@ -314,15 +320,19 @@ namespace Nino\Modules\Backups {
 				return;
 			}
 
+			// Taken before the restore: the accounts and their sessions are part
+			// of what it puts back, and the line is the actor's to be written
+			$actor = \Nino\Auth::getCurrentUser( $appData );
 			$notice = null;
 			$result = self::restore( $appData, $date, $notice );
 
+			if( $actor !== false )
+				self::recordRestore( $appData, $actor['mail'], $date, $result );
+
 			if( $result !== true ) {
-				\Nino\Http::fail( $request, $result[0], $result[1] );
+				\Nino\Http::fail( $request, $result[0], $result[1], $result[2] ?? '' );
 				return;
 			}
-
-			$actor = \Nino\Auth::getCurrentUser( $appData );
 
 			if( $notice !== null && $actor !== false )
 				\Nino\Admin\Admin::record( $appData, $actor['mail'], 'Backup '. $date. ' comes from Nino '. $notice['params'][0]. ', this is '. $notice['params'][1]. ' ('. $notice['code']. ')' );
@@ -339,17 +349,60 @@ namespace Nino\Modules\Backups {
 		}
 
 		/**
+		 *	Write the line of a restore into the activity log, for the one that
+		 *	succeeded and for the one that did not - shared with recovery.php,
+		 *	which has no account to name
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$actor				Who did it - an account's mail address, or the door recovery.php
+		 *	@param		string		$date					The archive that was asked for
+		 *	@param		true|array	$result				What restore() answered
+		 *
+		 *	@return 	void
+		 */
+		public static function recordRestore( array &$appData, string $actor, string $date, true|array $result ): void {
+			\Nino\Admin\Admin::record( $appData, $actor, 'Restore Backup '. $date. ( $result === true ? '' : ' failed ('. $result[0]. ')' ) );
+		}
+
+		/**
 		 *	Restore one dated archive over the live project - the whole
 		 *	operation, shared with recovery.php, which is what runs it when
 		 *	nobody can log in any more. The caller has validated the date
+		 *
+		 *	One at a time, and not while the daily backup is being made: both
+		 *	take the same lock, and a restore that does not get it at once
+		 *	answers 409 and touches nothing - two of them would interleave two
+		 *	copies of the files and two safety snapshots
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$date					"Y-m-d", "Y-m-d-His" or "pre-restore-Y-m-d-His" (see ID_PATTERN)
 		 *	@param		array|null	&$notice			(reference) Set where the archive comes from another version of Nino than the one that runs: [ 'code' => 'backups_restored_other_version', 'params' => [ from, to ] ]; left as it was otherwise
 		 *
-		 *	@return 	true|array								True, or [ http status, message ]
+		 *	@return 	true|array								True, or [ http status, message ] - and, where a person can cause it, the code of the failure as a third element
 		 */
 		public static function restore( array &$appData, string $date, ?array &$notice = null ): true|array {
+
+			if( \Nino\Filesystem::lockFile( $appData, \Nino\Modules\Backups::LOCK_PATH, false ) === false )
+				return [ 409, 'a backup or a restore is running', 'backups_busy' ];
+
+			try {
+				return self::_restoreArchive( $appData, $date, $notice );
+			}
+			finally {
+				\Nino\Filesystem::unlockFile( $appData, \Nino\Modules\Backups::LOCK_PATH );
+			}
+		}
+
+		/**
+		 *	The restore itself, under the lock of restore()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$date					See restore()
+		 *	@param		array|null	&$notice			(reference) See restore()
+		 *
+		 *	@return 	true|array								See restore()
+		 */
+		private static function _restoreArchive( array &$appData, string $date, ?array &$notice ): true|array {
 
 			$dir = self::_backupDir( $appData );
 			$key = self::_key( $appData );

@@ -127,7 +127,7 @@ namespace Nino\Modules\Language {
 		public static function log( string $action, array $data ): string {
 			return match( $action ) {
 				'language/save' 			=> 'Edit Languages',
-				'language/addlocale'	=> 'Add Language '. ( $data['locale'] ?? '' ),
+				'language/addlocale'	=> 'Add Language '. \Nino\Admin\Admin::postString( $data, 'locale' ),
 				default 							=> '',
 			};
 		}

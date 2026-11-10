@@ -132,6 +132,15 @@ catch( \Throwable $e ) {
 check( 'a .php file that no longer parses throws from inside the lock', $parseError instanceof \ParseError );
 check( 'and that lock is released as well', probeLockFree( $sandbox, '/data/unparseable.php' ) === true );
 
+// A caller that answers "busy" rather than queues asks for the lock without waiting
+$other = $appData;
+$other['./nino/filesystem/locks'] = [];
+check( 'lockFile takes a free lock without waiting', \Nino\Filesystem::lockFile( $other, '/data/nowait.php', false ) === true );
+check( '...and answers false at once, instead of queueing, while another holds it', \Nino\Filesystem::lockFile( $appData, '/data/nowait.php', false ) === false );
+\Nino\Filesystem::unlockFile( $other, '/data/nowait.php' );
+check( '...and takes it when it is free again', \Nino\Filesystem::lockFile( $appData, '/data/nowait.php', false ) === true );
+\Nino\Filesystem::unlockFile( $appData, '/data/nowait.php' );
+
 echo "\n";
 
 

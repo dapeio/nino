@@ -13,6 +13,7 @@ return [
 	'[[/_admin/backups/msg/missed]]'		=> 'Today’s automatic backup did not run: %s. Nino does not try again by itself today; Back up now makes one once the cause is out of the way.',
 	'[[/_admin/backups/msg/interrupted]]'	=> 'Today’s automatic backup did not finish: the request that was making it ended, most likely because the server ran out of memory or time. Nino does not try again by itself today; Back up now makes one.',
 	'[[/_admin/error/backups_restored_other_version]]'	=> 'The backup comes from Nino %s; this is %s.',
+	'[[/_admin/error/backups_busy]]'	=> 'A backup or a restore is running. Try again in a moment.',
 
 	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
 	'[[/_admin/backups/manual/intro]]'	=> 'A backup is a copy of your website’s content as it was on one day. Nino takes one by itself every day and keeps fourteen days; Config switches that off.',

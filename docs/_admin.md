@@ -191,6 +191,8 @@ The page a visitor gets is the project's own `templates/page-maintenance.tpl` wh
 - **Set a password** for an account that exists, picked from a list: it gets the new password, is logged out everywhere, and is unlocked and activated again if it was locked or deactivated - so a recovered developer account gets in. A typo cannot name an account, there is none to name;
 - **Create a full-access account** - for when no account is left. It is its own action, asks to confirm before anything is written, and refuses an address that already has an account.
 
+Each of the three leaves one line in the activity log, with `recovery.php` as the one who did it - nobody is signed in here - and never a password; a reset or a create the page refused leaves none, a reset that set the password and then failed to lift the lock leaves its line, a restore that failed leaves its line marked as failed.
+
 Five wrong attempts lock it for an hour, the wrong current passwords typed into the Recovery password tab among them. The secret's hash lives in `private/.auth/pw.php` – outside `config.php`, so a restore cannot roll it back, and outside every tool directory, so an update cannot take it along. Only the wizard's last step and the Recovery password tab write that file. A secret that is forgotten, so that the tab has no current password to ask for, is written by hand - it is a php stub that refuses to be served, with the hash inside it:
 
 ```bash

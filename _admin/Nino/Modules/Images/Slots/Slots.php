@@ -149,9 +149,9 @@ namespace Nino\Modules\Images {
 
 		public static function log( string $action, array $data ): string {
 			return match( $action ) {
-				'slots/create'	=> 'Add Image Slot '. ( $data['uri'] ?? '' ),
-				'slots/save'		=> 'Edit Image Slot '. ( $data['uri'] ?? '' ),
-				'slots/delete'	=> 'Delete Image Slot '. ( $data['uri'] ?? '' ),
+				'slots/create'	=> 'Add Image Slot '. \Nino\Admin\Admin::postString( $data, 'uri' ),
+				'slots/save'		=> 'Edit Image Slot '. \Nino\Admin\Admin::postString( $data, 'uri' ),
+				'slots/delete'	=> 'Delete Image Slot '. \Nino\Admin\Admin::postString( $data, 'uri' ),
 				default	=> '',
 			};
 		}

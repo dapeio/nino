@@ -257,7 +257,9 @@ namespace Nino {
 		// data file is replaced by rename() (see _writeFile()), and a lock
 		// held on the replaced inode stops serializing anything the moment
 		// that happens. The lock file is only ever created, never replaced.
-		public static function lockFile( array &$appData, string $filename ): bool {
+		// $wait false is for the caller that answers "busy" rather than queues:
+		// it gets false at once while another holds the lock
+		public static function lockFile( array &$appData, string $filename, bool $wait = true ): bool {
 
 			// The lock's own file name is a sha1, so a traversal could not have
 			// escaped through it - but a caller that may not read or write this
@@ -292,7 +294,7 @@ namespace Nino {
 			if( $handle === false )
 				return false;
 
-			if( flock( $handle, LOCK_EX ) === false ) {
+			if( flock( $handle, $wait === true ? LOCK_EX : LOCK_EX | LOCK_NB ) === false ) {
 				fclose( $handle );
 				return false;
 			}

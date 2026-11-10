@@ -2380,6 +2380,10 @@ namespace Nino\Admin {
 		// The session flag recovery.php sets once the secret was verified
 		public const string SESSION_KEY = './nino/admin/recovery';
 
+		// Who the activity log names for what this door does: nobody is signed in
+		// here, the secret is what opened it
+		private const string LOG_ACTOR = 'recovery.php';
+
 		// The shortest password the workbench accepts, for every account and for
 		// this secret - the wizard and the Users panel read it from here
 		public const int MIN_PW_LENGTH = 8;
@@ -2504,8 +2508,9 @@ namespace Nino\Admin {
 					}
 					$notice = null;
 					$result = \Nino\Modules\Backups\Admin::restore( $appData, $date, $notice );
+					\Nino\Modules\Backups\Admin::recordRestore( $appData, self::LOG_ACTOR, $date, $result );
 					if( $result !== true ) {
-						\Nino\Http::fail( $request, $result[0], $result[1] );
+						\Nino\Http::fail( $request, $result[0], $result[1], $result[2] ?? '' );
 						return;
 					}
 					// A backup of another version of Nino comes with the notice the
@@ -2575,6 +2580,10 @@ namespace Nino\Admin {
 
 			\Nino\Auth::logoutAllSessions( $appData, $mail );
 
+			// Written before the unlock: the password is set from here on, and
+			// so is the line, whatever the unlock answers
+			Admin::record( $appData, self::LOG_ACTOR, 'Reset Password '. $mail );
+
 			if( \Nino\Auth::unlock( $appData, $mail ) === false ) {
 				\Nino\Http::fail( $request, 500, 'the password was set and every session ended, but the lock of the account could not be lifted' );
 				return;
@@ -2626,6 +2635,8 @@ namespace Nino\Admin {
 				\Nino\Http::fail( $request, 500, 'could not create the account' );
 				return;
 			}
+
+			Admin::record( $appData, self::LOG_ACTOR, 'Create User '. $mail. ' with full access' );
 
 			\Nino\Http::ok( $request, [ 'mail' => $mail, 'created' => true ] );
 		}

@@ -107,11 +107,11 @@ namespace Nino\Modules\Users {
 		public static function log( string $action, array $data ): string {
 			return match( $action ) {
 				'users/create' 		=> 'Create User '. trim( \Nino\Admin\Admin::postString( $data, 'mail' ) ),
-				'users/delete' 		=> 'Delete User '. ( $data['username'] ?? '' ),
-				'users/save' 			=> 'Edit User '. ( trim( \Nino\Admin\Admin::postString( $data, 'mail' ) ) !== '' ? $data['mail'] : ( $data['username'] ?? '' ) ). ( is_string( $data['role'] ?? null ) === true ? ' Role '. $data['role'] : '' ),
-				'users/status' 		=> ( ( $data['active'] ?? false ) === true ? 'Activate User ' : 'Deactivate User ' ). ( $data['username'] ?? '' ),
-				'users/logoutall' => 'Logout-All '. ( $data['username'] ?? '' ),
-				'users/role' 			=> 'Set Role '. ( $data['username'] ?? '' ). ' '. ( $data['role'] ?? '' ),
+				'users/delete' 		=> 'Delete User '. \Nino\Admin\Admin::postString( $data, 'username' ),
+				'users/save' 			=> 'Edit User '. ( trim( \Nino\Admin\Admin::postString( $data, 'mail' ) ) !== '' ? $data['mail'] : \Nino\Admin\Admin::postString( $data, 'username' ) ). ( is_string( $data['role'] ?? null ) === true ? ' Role '. $data['role'] : '' ),
+				'users/status' 		=> ( ( $data['active'] ?? false ) === true ? 'Activate User ' : 'Deactivate User ' ). \Nino\Admin\Admin::postString( $data, 'username' ),
+				'users/logoutall' => 'Logout-All '. \Nino\Admin\Admin::postString( $data, 'username' ),
+				'users/role' 			=> 'Set Role '. \Nino\Admin\Admin::postString( $data, 'username' ). ' '. \Nino\Admin\Admin::postString( $data, 'role' ),
 				default 					=> '',
 			};
 		}
@@ -660,6 +660,13 @@ namespace Nino\Modules\Users {
 
 			$data 		= \Nino\Admin\Admin::postData();
 			$username = \Nino\Admin\Admin::postString( $data, 'username' );
+
+			// An array or a number is no name: read as '' it would pass for the
+			// account nobody holds and be answered like any other
+			if( isset( $data['username'] ) === true && is_string( $data['username'] ) === false ) {
+				\Nino\Http::fail( $request, 400, 'invalid username' );
+				return;
+			}
 
 			[ $allowed, $isSelf ] = self::_authorize( $appData, $username );
 

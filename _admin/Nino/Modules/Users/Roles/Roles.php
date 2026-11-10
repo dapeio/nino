@@ -121,8 +121,8 @@ namespace Nino\Modules\Users {
 
 		public static function log( string $action, array $data ): string {
 			return match( $action ) {
-				'roles/save' 		=> 'Edit Role '. ( $data['id'] ?? '' ),
-				'roles/delete' 	=> 'Delete Role '. ( $data['id'] ?? '' ),
+				'roles/save' 		=> 'Edit Role '. \Nino\Admin\Admin::postString( $data, 'id' ),
+				'roles/delete' 	=> 'Delete Role '. \Nino\Admin\Admin::postString( $data, 'id' ),
 				default 				=> '',
 			};
 		}

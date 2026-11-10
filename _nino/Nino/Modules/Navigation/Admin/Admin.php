@@ -124,8 +124,8 @@ namespace Nino\Modules\Navigation {
 
 		public static function log( string $action, array $data ): string {
 			return match( $action ) {
-				'navs/save'			=> ( ( $data['originalKey'] ?? '' ) === '' ? 'Add Navigation ' : 'Edit Navigation ' ). ( $data['key'] ?? '' ),
-				'navs/delete'		=> 'Delete Navigation '. ( $data['key'] ?? '' ),
+				'navs/save'			=> ( \Nino\Admin\Admin::postString( $data, 'originalKey' ) === '' ? 'Add Navigation ' : 'Edit Navigation ' ). \Nino\Admin\Admin::postString( $data, 'key' ),
+				'navs/delete'		=> 'Delete Navigation '. \Nino\Admin\Admin::postString( $data, 'key' ),
 				default	=> '',
 			};
 		}

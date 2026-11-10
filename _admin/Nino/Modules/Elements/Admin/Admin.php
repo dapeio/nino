@@ -106,10 +106,10 @@ namespace Nino\Modules\Elements {
 
 		public static function log( string $action, array $data ): string {
 			return match( $action ) {
-				'elements/save' 			=> ( ( $data['isNew'] ?? false ) === true ? 'Add Element /' : 'Edit Element /' ). ( $data['type'] ?? '' ). '/'. ( $data['uri'] ?? '' ),
-				'elements/uploadimage' => 'Upload Element Image /'. ( $data['type'] ?? '' ). '/'. ( $data['uri'] ?? '' ). ' '. ( $data['key'] ?? '' ),
-				'elements/removeimage' => 'Remove Element Image /'. ( $data['type'] ?? '' ). '/'. ( $data['uri'] ?? '' ). ' '. ( $data['key'] ?? '' ),
-				'elements/delete' 		=> 'Delete Element /'. ( $data['type'] ?? '' ). '/'. ( $data['uri'] ?? '' ),
+				'elements/save' 			=> ( ( $data['isNew'] ?? false ) === true ? 'Add Element /' : 'Edit Element /' ). \Nino\Admin\Admin::postString( $data, 'type' ). '/'. \Nino\Admin\Admin::postString( $data, 'uri' ),
+				'elements/uploadimage' => 'Upload Element Image /'. \Nino\Admin\Admin::postString( $data, 'type' ). '/'. \Nino\Admin\Admin::postString( $data, 'uri' ). ' '. \Nino\Admin\Admin::postString( $data, 'key' ),
+				'elements/removeimage' => 'Remove Element Image /'. \Nino\Admin\Admin::postString( $data, 'type' ). '/'. \Nino\Admin\Admin::postString( $data, 'uri' ). ' '. \Nino\Admin\Admin::postString( $data, 'key' ),
+				'elements/delete' 		=> 'Delete Element /'. \Nino\Admin\Admin::postString( $data, 'type' ). '/'. \Nino\Admin\Admin::postString( $data, 'uri' ),
 				default 							=> '',
 			};
 		}

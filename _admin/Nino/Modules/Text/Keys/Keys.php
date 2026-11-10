@@ -64,17 +64,17 @@ namespace Nino\Modules\Text {
 		 */
 		public static function log( string $action, array $data ): string {
 			return match( $action ) {
-				'keys/create' 		=> 'Add Text Key '. ( $data['key'] ?? '' ),
+				'keys/create' 		=> 'Add Text Key '. \Nino\Admin\Admin::postString( $data, 'key' ),
 				// Only when the format or the limit is posted: the other thing
 				// this action does, the shape and the hidden flag, is not logged
 				'keys/save' 			=> ( array_key_exists( 'format', $data ) === true || array_key_exists( 'maxlength', $data ) === true )
-					? 'Edit Text Key '. ( $data['key'] ?? '' ). ' ('. implode( ', ', array_filter( [
+					? 'Edit Text Key '. \Nino\Admin\Admin::postString( $data, 'key' ). ' ('. implode( ', ', array_filter( [
 						array_key_exists( 'format', $data ) === true ? 'format '. ( is_string( $data['format'] ) === true ? $data['format'] : '?' ) : '',
 						array_key_exists( 'maxlength', $data ) === true ? 'limit '. ( $data['maxlength'] === null ? 'automatic' : ( is_int( $data['maxlength'] ) === true ? (string) $data['maxlength'] : '?' ) ) : '',
 					] ) ). ')'
 					: '',
-				'keys/rename' 		=> 'Rename Text Key '. ( $data['key'] ?? '' ). ' to '. ( $data['newKey'] ?? '' ),
-				'keys/delete' 		=> 'Delete Text Key '. ( $data['key'] ?? '' ),
+				'keys/rename' 		=> 'Rename Text Key '. \Nino\Admin\Admin::postString( $data, 'key' ). ' to '. \Nino\Admin\Admin::postString( $data, 'newKey' ),
+				'keys/delete' 		=> 'Delete Text Key '. \Nino\Admin\Admin::postString( $data, 'key' ),
 				// The one action that retires keys in bulk, and the reason this
 				// module has a log() at all: an ignored key leaves the scan and
 				// the Text panel for good, which is worth a line naming who did it
