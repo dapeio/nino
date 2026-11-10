@@ -47,7 +47,11 @@ function field() {
 
 	const classes = [];
 	const node = {
-		value : '', innerHTML : '',
+		value : '', textContent : '',
+		// A message is text a person typed in the Text panel; the form writes it
+		// as a text node, and the stub notes the day it is written as markup
+		markup : false,
+		set innerHTML( html ) { this.markup = true; this.textContent = html },
 		// A refused field says so twice: the outline the stylesheet paints and
 		// the aria-invalid a screen reader reads out, so the stub carries
 		// attributes as well as classes
@@ -160,9 +164,9 @@ function attempt( status, policy ) {
 			},
 		} );
 	};
-	el['form-message'].innerHTML = '';
+	el['form-message'].textContent = '';
 	el['form-login'].handler( { preventDefault : function() {} } );
-	return el['form-message'].innerHTML;
+	return el['form-message'].textContent;
 }
 
 check( 'a 401 is the one answer that means the password was wrong', attempt( 401 ) === WRONG );
@@ -246,6 +250,10 @@ check( '...and says the request is pending, and nothing else', el['form-message'
 // ...and once the answer is in, the request is over with it
 attempt( 401 );
 check( 'the answer replaces the pending state rather than joining it', el['form-message'].className === 'error' );
+
+// Every message above - a missing field, the pending state, each answer - was
+// written as text
+check( '...and no message of the form is written as markup', el['form-message'].markup === false );
 
 // Nino.js leaves its ready callback behind, one millisecond out, and that one
 // reaches for an Event this context has not got: the suite ends here

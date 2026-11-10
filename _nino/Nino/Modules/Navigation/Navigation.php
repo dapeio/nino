@@ -271,7 +271,10 @@ namespace Nino\Modules {
 				// the setup wizard and the Routes panel already write per webpage. A route
 				// nobody named has nothing to show in a menu, so it stays out
 				// rather than appearing as a raw uri or an empty link
-				$title = \Nino\Html::renderTextfill( $appData, '/_nino/webpage'. ( $route['uri'] ?? '' ). '/name' );
+				// ...as text: it is stored with its quotes and brackets as entities
+				// (\Nino\Text::sanitizeValue()), so it is decoded here and escaped
+				// once, where it is drawn, as Components::value() does for a plain text
+				$title = html_entity_decode( \Nino\Html::renderTextfill( $appData, '/_nino/webpage'. ( $route['uri'] ?? '' ). '/name' ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 
 				if( $title === '' )
 					continue;

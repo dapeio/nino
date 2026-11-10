@@ -577,6 +577,55 @@ check( 'the table carries no nonce - the script tag is the one place in the bloc
 	&& substr_count( $jstextBlock, (string) $appData['./nino/jstext/nonce'] ) === 1
 	&& str_starts_with( $jstextBlock, '<script nonce="'. $appData['./nino/jstext/nonce']. '">' ) === true );
 
+// The script writes a text with textContent, so what the table carries is the
+// text, not the entities it is stored as: the quotes and brackets of a plain
+// value are entities on disk (\Nino\Text::sanitizeValue()) and would show as
+// 'couldn&#039;t'. A fill inside a text is filled in, as the page does, and
+// nothing in the table can end the script element
+$jstextStored = [
+	'apostrophe'	=> [ '/module/form/info/apostrophe',	\Nino\Text::sanitizeValue( 'We couldn\'t send "this" & that', 'plain' ),	'We couldn\'t send "this" & that' ],
+	'bracket'		=> [ '/module/form/info/bracket',		\Nino\Text::sanitizeValue( 'Wir [x] senden {x}', 'plain' ),						'Wir [x] senden {x}' ],
+	'entity'			=> [ '/module/form/info/apos',			'it&apos;s &#x5B;y&#93;',														'it\'s [y]' ],
+	'script'			=> [ '/module/form/info/script',		'a &lt;/script&gt;&lt;!-- b</script><!-- c',					'a </script><!-- b</script><!-- c' ],
+	'separator'		=> [ '/module/form/info/separator',	"x\u{2028}y\u{2029}z \u{202E}bidi\0nul",						"x\u{2028}y\u{2029}z \u{202E}bidi\0nul" ],
+	'nested'			=> [ '/module/form/info/nested',		\Nino\Text::sanitizeValue( 'Hallo [[/module/form/info/apostrophe]]', 'plain' ),	'Hallo We couldn\'t send "this" & that' ],
+];
+foreach( $jstextStored as $row )
+	\Nino\Html::addFills( $appData, [ $row[0] => $row[1] ], '*' );
+$jstextBlock = \Nino\Modules\Jstext::doShortcode( $appData, [] );
+$jstextText = jstextTable( $appData );
+foreach( $jstextStored as $name => $row )
+	check( 'the table carries the text of a stored value: '. $name, ( $jstextText[ $row[0] ] ?? null ) === $row[2] );
+check( '...and the block ends only at its own closing tag, with no comment opener in it', substr_count( $jstextBlock, '</script' ) === 1
+	&& str_contains( $jstextBlock, '<!--' ) === false && str_contains( $jstextBlock, "\u{2028}" ) === false && str_contains( $jstextBlock, "\u{2029}" ) === false );
+
+// The page renders the output of a shortcode once more, so a bracket in the
+// text must not reach it: a stored '[jstext]', '[navigation]' or '[json]' stays
+// the text an editor typed, in one script element and a table that parses
+$jstextLive = $appData;
+\Nino\Html::addShortcode( $jstextLive, 'jstext', [ \Nino\Modules\Jstext::class, 'doShortcode' ] );
+\Nino\Html::addShortcode( $jstextLive, 'navigation', [ \Nino\Modules\Navigation::class, 'doShortcode' ] );
+\Nino\Html::addShortcode( $jstextLive, 'json', [ \Nino\Html::class, 'doJsonShortcode' ] );
+$jstextLiveText = [
+	'/module/form/info/live'	=> 'Hi [navigation nav=main] and [jstext] and [json /module/form/info/other] [[/module/form/info/apostrophe]]',
+	'/module/form/info/utf8'	=> "bad \xC3 byte",
+];
+$jstextLiveStored = [];
+foreach( $jstextLiveText as $key => $value )
+	$jstextLiveStored[$key] = \Nino\Text::sanitizeValue( $value, 'plain' );
+$jstextLiveStored['/module/form/info/utf8'] = "bad \xC3 byte";
+\Nino\Html::addFills( $jstextLive, $jstextLiveStored, '*' );
+$jstextLivePage = \Nino\Html::renderHtml( $jstextLive, '[jstext]' );
+$jstextLiveRows = [];
+if( preg_match( '/NinoJstext=(.*);<\/script>/', $jstextLivePage, $found ) === 1 )
+	$jstextLiveRows = json_decode( $found[1], true ) ?? [];
+check( 'a bracket in a stored text is no shortcode in the page: one script element', substr_count( $jstextLivePage, '<script' ) === 1 && substr_count( $jstextLivePage, '</script' ) === 1 );
+check( '...and the table parses with the text as typed', ( $jstextLiveRows['/module/form/info/live'] ?? null ) === 'Hi [navigation nav=main] and [jstext] and [json /module/form/info/other] We couldn\'t send "this" & that' );
+check( 'a byte that is no UTF-8 is a replacement character, not a table that is lost', ( $jstextLiveRows['/module/form/info/utf8'] ?? null ) === "bad \u{FFFD} byte" );
+$jstextEmpty = $appData;
+unset( $jstextEmpty['./nino/html/fills'] );
+check( 'a table with no text is an object a script reads', str_contains( \Nino\Modules\Jstext::doShortcode( $jstextEmpty, [] ), 'NinoJstext={};' ) === true );
+
 // A project or a feature whose own script reads a fill says so
 $appData[ \Nino\Modules\Jstext::KEYS ] = [ '/project/company/' ];
 $jstextConfigured = jstextTable( $appData );
@@ -1205,6 +1254,20 @@ $navBracket = \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main'
 check( 'a bracket in a page name is an entity, so the render pass after the shortcode cannot fill it',
 	str_contains( $navBracket, 'Angebot &#91;&#91;/_nino/webpage/home/name&#93;&#93; &#91;navigation nav=&quot;main&quot;&#93;' ) === true
 	&& str_contains( $navBracket, '[[/_nino/webpage/home/name]]' ) === false );
+
+// A name is stored with its quotes and brackets as entities, and the menu
+// escapes it once: the visitor reads the name that was typed
+\Nino\Html::addFills( $appData, [ '/_nino/webpage/top/name' => \Nino\Text::sanitizeValue( 'Tom\'s "Caf\u{e9}" & [[x]]', 'plain' ) ], 'en_US' );
+$navStored = \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main' ] );
+check( 'a stored name is escaped once in the menu: quotes, apostrophe and ampersand', str_contains( $navStored, '>Tom&#039;s &quot;Caf\u{e9}&quot; &amp; ' ) === true
+	&& str_contains( $navStored, '&amp;#' ) === false && str_contains( $navStored, '&amp;quot;' ) === false );
+check( '...and a bracket in it is still an entity, so no pass after the shortcode fills it', str_contains( $navStored, '&#91;&#91;x&#93;&#93;' ) === true && str_contains( $navStored, '[[x]]' ) === false );
+check( '...while the lines a callback sees carry the name as text', in_array( '/top:Tom\'s "Caf\u{e9}" & [[x]]', \Nino\Modules\Navigation::routeLines( $appData, 'main' ), true ) === true );
+// ...also one a hand-edited text file holds, entities of markup included
+\Nino\Html::addFills( $appData, [ '/_nino/webpage/top/name' => '&lt;script&gt;alert(1)&lt;/script&gt;[[x]]' ], 'en_US' );
+$navBait = \Nino\Modules\Navigation::doShortcode( $appData, [ 'nav' => 'main' ] );
+check( 'a bait in a stored name does not become markup, and is escaped once', str_contains( $navBait, '<script' ) === false
+	&& str_contains( $navBait, '&lt;script&gt;alert(1)&lt;/script&gt;&#91;&#91;x&#93;&#93;' ) === true );
 
 // A hand-written line is the page author's own - three fields, the third of
 // them attributes for the tag, and written as typed. That is what it has

@@ -88,20 +88,20 @@
 
 				if(el.inputUser.value.length === 0) {
 					mark( el.inputUser, true );
-					el.formMsg.innerHTML = Nino.content.getText('/_admin/login/error/user');
+					el.formMsg.textContent = Nino.content.getText('/_admin/login/error/user');
 					el.inputUser.focus();
 					return;
 				}
 				if(el.inputPw.value.length === 0) {
 					mark( el.inputPw, true );
-					el.formMsg.innerHTML = Nino.content.getText('/_admin/login/error/pw');
+					el.formMsg.textContent = Nino.content.getText('/_admin/login/error/pw');
 					el.inputPw.focus();
 					return;
 				}
 
 				// Login
 				el.formMsg.className = 'pending';
-				el.formMsg.innerHTML = Nino.content.getText('/_admin/login/msg/pending');
+				el.formMsg.textContent = Nino.content.getText('/_admin/login/msg/pending');
 				Nino.auth.login( el.inputUser.value, el.inputPw.value, null, function( xhr ){
 
 					// Replaced rather than added: the request is over, so 'pending'
@@ -132,7 +132,7 @@
 					// The %s is filled through a function and never a string, which
 					// String.replace() reads a '$&' in - Nino.adminUi.format() does it that
 					// way, but this page loads without Nino.admin.js
-					el.formMsg.innerHTML = xhr.status === 401
+					el.formMsg.textContent = xhr.status === 401
 						? Nino.content.getText('/_admin/login/error/wrong')
 						: ( xhr.status === 403 && fromKernel
 							? Nino.content.getText('/_admin/login/error/csrf')

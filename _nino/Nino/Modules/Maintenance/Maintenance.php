@@ -351,14 +351,17 @@ namespace Nino\Modules {
 			foreach( \Nino\Modules\Legal::PAGES as $page => $definition ) {
 
 				$url	= \Nino\Modules\Legal::url( $appData, $page );
-				$name	= \Nino\Html::renderTextfill( $appData, '/_nino/webpage'. $definition['uri']. '/name' );
+				// The name is stored with its quotes and brackets as entities; decoded
+				// here, so that the escaping below is the only one - and a bracket is
+				// written as an entity again, as the page is rendered once more
+				$name	= html_entity_decode( \Nino\Html::renderTextfill( $appData, '/_nino/webpage'. $definition['uri']. '/name' ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 
 				if( $url === '' || $name === '' )
 					continue;
 
 				$links[] = strtr( self::$legalHtml['link'], [
 					'[[href]]'	=> htmlspecialchars( $url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ),
-					'[[label]]'	=> htmlspecialchars( $name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ),
+					'[[label]]'	=> str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ], htmlspecialchars( $name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ) ),
 				] );
 			}
 

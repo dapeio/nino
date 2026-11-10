@@ -178,6 +178,21 @@ check( 'a project\'s /module/maintenance/page/title and /module/maintenance/page
 	&& str_contains( $filledPage['/nino/http/response']['body'], '<p>Line one<br />' ) === true && str_contains( $filledPage['/nino/http/response']['body'], 'Line &lt;two&gt;' ) === true );
 check( '...and no markup of theirs reaches the page', str_contains( $filledPage['/nino/http/response']['body'], '<b>' ) === false && str_contains( $filledPage['/nino/http/response']['body'], '<two>' ) === false );
 
+// The links to the legal pages carry the pages' names, stored with their quotes
+// and brackets as entities: escaped once, and no bracket left for the render
+// pass that follows
+$moduleApp['/nino/modules'][] = '\\Nino\\Modules\\Legal';
+$moduleApp['/nino/dir'] = '';
+\Nino\Modules\Legal::routes( $moduleApp );
+\Nino\Html::addFills( $moduleApp, [ '/_nino/webpage/legal/imprint/name' => \Nino\Text::sanitizeValue( 'Tom\'s "Impressum" [[x]]', 'plain' ) ], '*' );
+$legalLinks = maintenanceRequest( '/' );
+\Nino\Modules\Maintenance::_prepare( $moduleApp, $legalLinks );
+check( 'a legal page named with a quote and an apostrophe is escaped once in the maintenance page', str_contains( $legalLinks['/nino/http/response']['body'], '>Tom&#039;s &quot;Impressum&quot; ' ) === true
+	&& str_contains( $legalLinks['/nino/http/response']['body'], '&amp;#' ) === false && str_contains( $legalLinks['/nino/http/response']['body'], '&amp;quot;' ) === false );
+check( '...and its brackets are entities', str_contains( $legalLinks['/nino/http/response']['body'], '&#91;&#91;x&#93;&#93;' ) === true && str_contains( $legalLinks['/nino/http/response']['body'], '[[x]]' ) === false );
+\Nino\Html::addFills( $moduleApp, [ '/_nino/webpage/legal/imprint/name' => '' ], '*' );
+$moduleApp['/nino/modules'] = array_values( array_filter( $moduleApp['/nino/modules'], static fn( string $class ): bool => $class !== '\\Nino\\Modules\\Legal' ) );
+
 // A project's own template keeps the language of the route: it wears the
 // site's design, and the site is in the visitor's language
 $moduleApp['/nino/locales/native'] = 'de_DE';

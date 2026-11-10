@@ -122,13 +122,28 @@ namespace Nino\Modules {
 			$keys		= self::keys( $appData );
 			$fills	= [];
 
-			foreach( \Nino\Html::getFills( $appData ) AS $key => $value ) {
+			foreach( array_keys( \Nino\Html::getFills( $appData ) ) AS $key ) {
 
 				$key = substr( $key, 2, -2 );
 
 				foreach( $keys as $prefix )
 					if( str_starts_with( $key, $prefix ) === true ) {
-						$fills[$key] = $value;
+
+						/*	The script writes the text with textContent, so it needs the
+							text and not its entities: a plain value is stored with its
+							quotes and brackets as entities (\Nino\Text::sanitizeValue()),
+							and 'couldn&#039;t' is what a visitor would read. It is
+							resolved as the page resolves it, a fill inside it filled in,
+							and decoded once, as Components::value() does for a plain
+							text. The block is a shortcode's output and the page renders
+							that output once more, so the brackets of the decoded text
+							are escaped in the JSON below, where a '[' is no fill and no
+							shortcode	*/
+						$text = \Nino\Html::resolveTextfill( $appData, $key );
+
+						if( $text !== null )
+							$fills[$key] = html_entity_decode( $text, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+
 						break;
 					}
 			}
@@ -143,8 +158,12 @@ namespace Nino\Modules {
 					// happens to neutralize a '</script>' today, but that is a side
 					// effect, not a guarantee - one JSON_UNESCAPED_SLASHES away from
 					// being a stored xss. JSON_HEX_TAG & co. encode the characters
-					// that matter (<>&'") explicitly instead.
-					json_encode( $fills, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT ),
+					// that matter (<>&'") explicitly instead; U+2028 and U+2029 are
+					// escaped by json_encode() itself, and a byte that is no UTF-8
+					// is a replacement character rather than a json_encode() that
+					// fails; an empty table is written as an object, since '[]' with
+					// its brackets escaped would be no script.
+					str_replace( [ '[', ']' ], [ '\u005B', '\u005D' ], json_encode( $fills, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE | JSON_FORCE_OBJECT ) ),
 					$appData['./nino/jstext/nonce'],
 				],
 				self::$_tpl['script'] );

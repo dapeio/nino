@@ -1271,11 +1271,13 @@ How a request goes to the server and how a failure is worded is [Saying what hap
 
 A workspace panel's markup (`templates/panel.tpl`) is the other place a
 sentence hides, and reads ordinary `[[fills]]`. A fill's *value* is substituted
-into the page before the shortcode pass runs, and `[jstext]` ships the same
-stored value, so a value must never contain a live shortcode token: escape the
-bracket (`&#91;template]`) in a value that is only ever markup, and put a `%s`
-in one a script renders, filling it from the script's own source - a `.js` file
-is a static asset and is never rendered.
+into the page before the shortcode pass runs, so a value must never contain a
+live shortcode token (`[jstext]` ships the text of a value, its entities decoded
+and the fills in it filled in, for a script to write with `textContent`; the
+brackets of that text are escaped in the shipped JSON, so it can carry no live
+shortcode): escape the bracket (`&#91;template]`) in a value that is only ever
+markup, and put a `%s` in one a script renders, filling it from the script's own
+source - a `.js` file is a static asset and is never rendered.
 `tests/admin-lists-js-smoke.js` fails on a literal sentence in a panel script
 or in that markup, and `tests/admin-shell-smoke.php` twice over: statically on
 a key a panel's scripts or markup ask for that either language lacks, and end to
