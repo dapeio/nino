@@ -1180,8 +1180,10 @@ footer .nino-localepicker-wrap li :is(a, span) {
 }
 
 /* header is position:fixed, so main needs top padding to avoid its content
-   being covered - except when the page opens with a cover/parallax hero,
-   which is designed to sit flush behind the (semi-transparent) header */
+   being covered. How much, and whether a cover that opens the page starts at
+   the top of the window under a see-through bar or at the lower edge of a bar
+   that is a ground of its own, is the header set's to say (the Design feature
+   writes the rule for main): nothing here takes the room away for a hero */
 main {
 	/* Takes the leftover column height, which is what pushes `footer` down
 	   to the bottom edge on a page too short to fill the viewport. flex-basis
@@ -1202,19 +1204,10 @@ main {
 main[tabindex="-1"]:focus-visible {
 	outline: none;
 }
-/* The Builder writes a div.nino-wrap around a page's sections, which puts the
-   hero one level down - the second selector of each pair is that form. A wrap
-   with the class .nino-wrap--vpa says the sections of the page animate: a
-   marker the Builder reads and no rule styles, the animation is the nino-vpa
-   classes of the rows */
-main:has(> .nino-cover.nino-hero:first-child),
-main:has(> .nino-wrap > .nino-cover.nino-hero:first-child),
-main:has(> .nino-parallex.nino-hero:first-child),
-main:has(> .nino-wrap > .nino-parallex.nino-hero:first-child),
-main:has(> .nino-hero--fullscreen:first-child),
-main:has(> .nino-wrap > .nino-hero--fullscreen:first-child) {
-	padding-top: 0;
-}
+/* The Builder writes a div.nino-wrap around a page's sections. A wrap with the
+   class .nino-wrap--vpa says the sections of the page animate: a marker the
+   Builder reads and no rule styles, the animation is the nino-vpa classes of
+   the rows */
 /* Scroll-driven header show/hide, opt-in via .nino-scroll-header */
 .nino-scroll-header {
 	overflow: hidden;

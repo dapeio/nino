@@ -196,14 +196,13 @@ preg_match_all( '/(--[a-zA-Z0-9-]+)\s*:/', $ninoCss, $declaredProperties );
 $undeclaredProperties = array_values( array_diff( array_unique( $consumedProperties[1] ), $declaredProperties[1] ) );
 check( 'every custom property Nino.css reads without a fallback is declared in Nino.css itself'. ( $undeclaredProperties === [] ? '' : ' - missing: '. implode( ', ', $undeclaredProperties ) ), $undeclaredProperties === [] );
 
-/*	A page that opens with a hero loses main's top padding - also when the
-	Builder's div.nino-wrap puts the hero one level down	*/
-$heroSelectors = [];
-foreach( [ '.nino-cover.nino-hero', '.nino-parallex.nino-hero', '.nino-hero--fullscreen' ] as $hero )
-	foreach( [ 'main:has(> ', 'main:has(> .nino-wrap > ' ] as $head )
-		$heroSelectors[] = $head. $hero. ':first-child)';
-check( 'Nino.css takes main\'s top padding away for a hero, directly below main and inside the Builder\'s wrap', preg_match( '/((?:main:has\([^)]*\)\)?,\s*){5}main:has\([^)]*\)\)?)\s*\{\s*padding-top:\s*0;/', $ninoCss, $heroRule ) === 1
-	&& array_filter( $heroSelectors, static fn( string $selector ): bool => str_contains( $heroRule[1], $selector ) === false ) === [] );
+/*	How much room main leaves under the bar, and whether a cover that opens the
+	page starts at the top of the window or at the lower edge of the bar, is the
+	header set's to say: Nino.css itself takes the room away for no hero - every
+	rule of its that sets the padding of a main leaves the first child out of it	*/
+preg_match_all( '/([^{}]*\bmain\b[^{}]*)\{[^{}]*(?<![\w-])padding(?:-top)?\s*:[^{}]*\}/', $ninoCss, $mainPaddingRules );
+$heroRules = array_values( array_filter( $mainPaddingRules[1], static fn( string $selectors ): bool => preg_match( '/main[^{]*:first-child/', $selectors ) === 1 ) );
+check( 'Nino.css takes no room of main away for a hero that opens the page: no rule that sets the padding of a main names a first child'. ( $heroRules === [] ? '' : ' - '. implode( ' | ', array_map( 'trim', $heroRules ) ) ), $heroRules === [] && count( $mainPaddingRules[1] ) > 0 );
 
 // Nino.css uses one for .nino-hero-arrowdown, ie. the framework's own default
 // policy used to block the framework's own icon
