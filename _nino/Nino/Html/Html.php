@@ -866,26 +866,46 @@ namespace Nino {
 		 *	What comes out of any of them is stable: sanitizing it again changes
 		 *	nothing
 		 *
+		 *	$literalBrackets is for markup that is the template's own and is
+		 *	rendered again: a '[' or ']' the source has as a character stays one,
+		 *	and every one that exists only because the parser decoded something
+		 *	to one of the two characters (an entity, whatever its spelling) is
+		 *	written as &#91; or &#93;, so that an editor's text, which the fills
+		 *	put in with every '[' as an entity, is not read as a shortcode the
+		 *	second time
+		 *
 		 *	@param		string		$html				What the client sent
 		 *	@param		string		$format				inline, lines or blocks
+		 *	@param		bool			$literalBrackets	Keep the brackets of the source, encode the rest
 		 *
 		 *	@return 	string							The rebuilt value
 		 */
-		public static function sanitizeHtml( string $html, string $format = 'inline' ): string {
+		public static function sanitizeHtml( string $html, string $format = 'inline', bool $literalBrackets = false ): string {
+
+			$html = self::_utf8( $html );
+
+			if( $literalBrackets === true ) {
+
+				// While the parser runs, the brackets of the source are two tokens
+				// drawn for this call: no entity and no byte sequence of the input
+				// can spell them, so a token in the output stands for a bracket
+				// the source wrote, and every bracket left is one the parser made
+				$decoded = html_entity_decode( $html, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+
+				do {
+					$open 	= "\u{E000}". bin2hex( random_bytes( 8 ) ). "\u{E000}";
+					$close 	= "\u{E001}". bin2hex( random_bytes( 8 ) ). "\u{E001}";
+				} while( str_contains( $html. $decoded, $open ) === true || str_contains( $html. $decoded, $close ) === true );
+
+				return str_replace(
+					[ '[', ']', $open, $close ],
+					[ '&#91;', '&#93;', '[', ']' ],
+					self::sanitizeHtml( str_replace( [ '[', ']' ], [ $open, $close ], $html ), $format )
+				);
+			}
 
 			if( trim( $html ) === '' )
 				return '';
-
-			// A byte that is not utf-8 must not reach the parser: libxml 2.13 ends
-			// the text node at it and drops the rest of the value, silently,
-			// where 2.9 carried it on. It becomes the replacement character, the
-			// way a string field's does (see _sanitizeChildren())
-			if( preg_match( '//u', $html ) !== 1 ) {
-				$substitute = mb_substitute_character();
-				mb_substitute_character( 0xFFFD );
-				$html = mb_convert_encoding( $html, 'UTF-8', 'UTF-8' );
-				mb_substitute_character( $substitute );
-			}
 
 			$doc = new \DOMDocument();
 
@@ -910,6 +930,23 @@ namespace Nino {
 
 			// A break at either end of a value is not a line of it
 			return $format === 'lines' ? self::_trimBreaks( $out ) : $out;
+		}
+
+		// A byte that is not utf-8 must not reach the parser: libxml 2.13 ends
+		// the text node at it and drops the rest of the value, silently,
+		// where 2.9 carried it on. It becomes the replacement character, the
+		// way a string field's does (see _sanitizeChildren())
+		private static function _utf8( string $html ): string {
+
+			if( preg_match( '//u', $html ) === 1 )
+				return $html;
+
+			$substitute = mb_substitute_character();
+			mb_substitute_character( 0xFFFD );
+			$html = mb_convert_encoding( $html, 'UTF-8', 'UTF-8' );
+			mb_substitute_character( $substitute );
+
+			return $html;
 		}
 
 		// Recursively rebuild a node's children, keeping only whitelisted

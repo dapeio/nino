@@ -152,6 +152,30 @@ foreach( array_merge( array_keys( $blocks ), [ "Street 1\n12345 City", 'Thank yo
 	}
 check( 'every profile is idempotent'. ( $unstable === [] ? '' : ' - '. implode( ' | ', $unstable ) ), $unstable === [] );
 check( 'a bracket survives the sanitizer - the callers swap it - and nothing becomes a tag', \Nino\Html::sanitizeHtml( '<p>[[/a/key]] [x]</p>', 'blocks' ) === '<p>[[/a/key]] [x]</p>' );
+check( 'literalBrackets: a bracket of the source stays, one that an entity decoded to is written as an entity again - in text and in a link, in every format',
+	\Nino\Html::sanitizeHtml( '<p>[a] &#91;b&#93; &#x5B;d&#X5d;</p>', 'blocks', true ) === '<p>[a] &#91;b&#93; &#91;d&#93;</p>'
+	&& preg_match( '/[\[\]]/', \Nino\Html::sanitizeHtml( '&lbrack;x&rbrack; &lsqb;y&rsqb;', 'inline', true ) ) === 0
+	&& \Nino\Html::sanitizeHtml( '[a] &#91;b&#93;', 'inline', true ) === '[a] &#91;b&#93;'
+	&& \Nino\Html::sanitizeHtml( "[a]\n&#91;b&#93;", 'lines', true ) === '[a]<br>&#91;b&#93;'
+	&& \Nino\Html::sanitizeHtml( '<a href="/x?a[]=1&#91;">go [x]</a>', 'inline', true ) === '<a href="/x?a[]=1&#91;">go [x]</a>'
+	&& \Nino\Html::sanitizeHtml( '<p>[a] &#91;b&#93;</p>', 'blocks' ) === '<p>[a] [b]</p>' );
+check( '...the stand-ins are no input: no entity of the private use area, no split byte sequence and no private use character is read as a bracket, and the characters a template wrote itself come out as they went in',
+	\Nino\Html::sanitizeHtml( '<p>&#xE000;x&#xE001; &#57344;y&#57345; &#xe000;z</p>', 'blocks', true ) === "<p>\u{E000}x\u{E001} \u{E000}y\u{E001} \u{E000}z</p>"
+	&& \Nino\Html::sanitizeHtml( "<p>\xEE\x80\xEE\x80\x81\x80 x</p>", 'blocks', true ) === \Nino\Html::sanitizeHtml( "<p>\xEE\x80\xEE\x80\x81\x80 x</p>", 'blocks' )
+	&& str_contains( \Nino\Html::sanitizeHtml( "<p>\xEE\x80\xEE\x80\x81\x80 x</p>", 'blocks', true ), ']' ) === false
+	&& \Nino\Html::sanitizeHtml( "<p>\xEE\x80[a]\xEE\x80</p>", 'blocks', true ) === \Nino\Html::sanitizeHtml( "<p>\xEE\x80[a]\xEE\x80</p>", 'blocks' )
+	&& \Nino\Html::sanitizeHtml( "<p>\u{E000}x\u{E001} [a]</p>", 'blocks', true ) === "<p>\u{E000}x\u{E001} [a]</p>"
+	&& \Nino\Html::sanitizeHtml( '[]', 'inline', true ) === '[]'
+	&& \Nino\Html::sanitizeHtml( \Nino\Html::sanitizeHtml( '<p>[a] &#91;b&#93;</p>', 'blocks', true ), 'blocks', true ) === '<p>[a] &#91;b&#93;</p>' );
+check( '...the stand-ins are unpredictable: what a token without its random part would be, spelled as entities or as characters, is no bracket, and the characters come out as they went in',
+	\Nino\Html::sanitizeHtml( '<p>&#xE000;&#xE000;template /templates/x&#xE001;&#xE001;</p>', 'blocks', true ) === "<p>\u{E000}\u{E000}template /templates/x\u{E001}\u{E001}</p>"
+	&& \Nino\Html::sanitizeHtml( "<p>\u{E000}\u{E000}template /templates/x\u{E001}\u{E001} [a]</p>", 'blocks', true ) === "<p>\u{E000}\u{E000}template /templates/x\u{E001}\u{E001} [a]</p>" );
+check( '...a token of the call survives every format: a bracket at the edge of a value, between blocks, in a link, after a line break',
+	\Nino\Html::sanitizeHtml( "[a]\n\n[b]", 'blocks', true ) === '<p>[a]</p><p>[b]</p>'
+	&& \Nino\Html::sanitizeHtml( "<br>[a]<br>\n[b]", 'lines', true ) === '[a]<br>[b]'
+	&& \Nino\Html::sanitizeHtml( '<p>x</p>[a]<ul><li>[b]</li></ul>', 'blocks', true ) === '<p>x</p><p>[a]</p><ul><li>[b]</li></ul>'
+	&& \Nino\Html::sanitizeHtml( '<a href="[x]">go</a> [y]', 'inline', true ) === 'go [y]'
+	&& \Nino\Html::sanitizeHtml( '<a href="/[x]">go</a>', 'inline', true ) === '<a href="/[x]">go</a>' );
 
 // detectFormat(): the widest thing a value holds
 check( 'detectFormat reads plain text, the inline tags, a break and paragraphs or lists',

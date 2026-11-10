@@ -2908,8 +2908,12 @@ namespace Nino\Modules {
 		 *	Replace [html]: the content between [html] and [/html], as rich
 		 *	text - paragraphs, lists and the inline tags, what
 		 *	\Nino\Html::sanitizeHtml() keeps of it in the format blocks. The
-		 *	content is the template's own, not a value somebody entered, so
-		 *	its '[' stay: a shortcode written in it is rendered with the rest
+		 *	content is the template's own, not a value somebody entered, so a
+		 *	'[' or ']' written in it stays: a shortcode written in it is rendered
+		 *	with the rest. What the fills put into it is an editor's text, whose
+		 *	'[' is an entity that the parser decodes - a bracket that exists
+		 *	only because the parser made it is written as &#91; or &#93;, so that
+		 *	it is text on the page and no shortcode in the next rendering
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments made ready by dispatch()
@@ -2917,7 +2921,7 @@ namespace Nino\Modules {
 		 *	@return 	string
 		 */
 		public static function componentHtml( array &$appData, array $args ): string {
-			return \Nino\Html::sanitizeHtml( (string) $args['value'], 'blocks' );
+			return \Nino\Html::sanitizeHtml( (string) $args['value'], 'blocks', true );
 		}
 
 		/**

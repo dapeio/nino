@@ -3373,6 +3373,60 @@ check( '...and nothing else of a call is read like that: the attributes are take
 	&& $direct( 'title', [ '/template/page-home/probe/key' ] ) === '<h3 class="nino-section-title">/template/page-home/hero/title</h3>'
 	&& $direct( 'html', [ 'content' => '<p>[[/template/page-home/hero/title]]</p>' ] ) === '<p>[[/template/page-home/hero/title]]</p>' );
 
+// [html] is the template's own markup, rendered again after the fills went in: the '[' an editor's text holds - an entity in a stored value, whatever form it is written in - is text on the page, and a shortcode the template wrote itself is still rendered
+\Nino\Filesystem::putFileContent( $appData, '/templates/probe-private.tpl', 'PRIVATE-TEMPLATE' );
+\Nino\Html::addFills( $appData, [
+	'/template/page-home/leak/decimal'	=> '&#91;template /templates/probe-private&#93;',
+	'/template/page-home/leak/padded'		=> '&#091;template /templates/probe-private&#093;',
+	'/template/page-home/leak/hex'			=> '&#x5b;template /templates/probe-private&#x5D;',
+	'/template/page-home/leak/hexcap'		=> '&#X5B;template /templates/probe-private&#X5d;',
+	'/template/page-home/leak/named'		=> '&lbrack;template /templates/probe-private&rbrack;',
+	'/template/page-home/leak/short'		=> '&lsqb;template /templates/probe-private&rsqb;',
+	'/template/page-home/leak/double'		=> '&#91;&#91;/template/page-home/hero/title&#93;&#93;',
+], '*' );
+$leaks = [ 'decimal', 'padded', 'hex', 'hexcap', 'named', 'short' ];
+$leakClean = true;
+foreach( $leaks as $leak ) {
+	$out = $render( '[html][[/template/page-home/leak/'. $leak. ']][/html]' );
+	$leakClean = $leakClean && str_contains( $out, 'PRIVATE-TEMPLATE' ) === false && str_contains( $out, 'template /templates/probe-private' ) === true && str_contains( $out, '[' ) === false;
+}
+check( '[html]: the text of a key whose brackets are entities - decimal, padded, hex in either case, named - shows as text and renders no template', $leakClean === true );
+check( '...as the entity of the text, with the closing bracket as well',
+	$render( '[html][[/template/page-home/leak/decimal]][/html]' ) === '<p>&#91;template /templates/probe-private&#93;</p>' );
+check( '...in a paragraph and in a link of the content too, and a double bracket is not a fill',
+	str_contains( $render( '<div>[html]<p>a [[/template/page-home/leak/decimal]] b</p><ul><li>[[/template/page-home/leak/hex]]</li></ul>[/html]</div>' ), 'PRIVATE-TEMPLATE' ) === false
+	&& str_contains( $render( '[html]<a href="/x">[[/template/page-home/leak/named]]</a>[/html]' ), 'PRIVATE-TEMPLATE' ) === false
+	&& str_contains( $render( '[html][[/template/page-home/leak/double]][/html]' ), 'Hi' ) === false );
+check( '...the template\'s own shortcode and brackets in [html] are still its own: a shortcode is rendered, a bracket written as a character stays, also in an address',
+	$render( '[html]<p>[template /templates/probe-private]</p>[/html]' ) === '<p>PRIVATE-TEMPLATE</p>'
+	&& $render( '[html]<p>[1] and [[/template/page-home/hero/subtitle]]</p>[/html]' ) === '<p>[1] and Sub</p>'
+	&& $render( '[html]<a href="/x?a[]=1">go</a>[/html]' ) === '<p><a href="/x?a[]=1">go</a></p>' );
+// The text of a plain key keeps its '&': saved by the real path, the value that spells the stand-ins of the sanitizer as entities or splits their bytes is text, and no template
+foreach( [ 'de_DE', 'en_US' ] as $leakLocale )
+	\Nino\Filesystem::putFileContent( $appData, '/text/'. $leakLocale. '.php', array_merge( \Nino\Filesystem::getFileContent( $appData, '/text/'. $leakLocale. '.php', [] ), [ '[[/template/page-home/leak/pua-hex]]' => '', '[[/template/page-home/leak/pua-dec]]' => '', '[[/template/page-home/leak/pua-split]]' => '' ] ) );
+$puaSaved = true;
+foreach( [ '/template/page-home/leak/pua-hex' => '&#xE000;template /templates/probe-private&#xE001;', '/template/page-home/leak/pua-dec' => '&#57344;template /templates/probe-private&#57345;', '/template/page-home/leak/pua-split' => "\xEE\x80\xEE\x80\x81\x80template /templates/probe-private\xEE\x80\xEE\x80\x80\x80" ] as $leakKey => $leakValue )
+	$puaSaved = $puaSaved && ( \Nino\Text::saveBatch( $appData, [ [ 'key' => $leakKey, 'locale' => 'de_DE', 'value' => $leakValue ] ], false )[$leakKey]['ok'] ?? false ) === true;
+$puaClean = true;
+foreach( [ 'pua-hex', 'pua-dec', 'pua-split' ] as $leak ) {
+	$out = $render( '[html][[/template/page-home/leak/'. $leak. ']][/html]' );
+	$puaClean = $puaClean && str_contains( $out, 'PRIVATE-TEMPLATE' ) === false && str_contains( $out, '[' ) === false;
+}
+check( '...a value that spells the private use characters of the sanitizer as entities or splits their bytes is no way to a bracket either, saved as a plain key and shown in [html]', $puaSaved === true && $puaClean === true );
+check( '...and what a token without its random part would be, spelled as entities in a text, is no bracket in [html] either',
+	str_contains( $render( '[html]&#xE000;&#xE000;template /templates/probe-private&#xE001;&#xE001;[/html]' ), 'PRIVATE-TEMPLATE' ) === false );
+check( '...and the private use characters a template writes itself in [html] come out as they went in',
+	$render( "[html]<p>\u{E000}x\u{E001}</p>[/html]" ) === "<p>\u{E000}x\u{E001}</p>" );
+\Nino\Elements::insertElementType( $appData, '/htmlprobe', [ 'title' => [ 'type' => 'string', 'locale' => true ], 'body' => [ 'type' => 'string', 'locale' => true, 'html' => true, 'blocks' => true ] ] );
+\Nino\Elements::insertElement( $appData, '/htmlprobe/one', [ 'title' => '[template /templates/probe-private]', 'body' => '<p>[template /templates/probe-private]</p>' ], 'de_DE' );
+check( '...an element field in a stack cell and in [elements] is the same: the editor\'s brackets are text, the template\'s are not',
+	str_contains( $render( '[stack /htmlprobe][html][[title]][/html][/stack]' ), 'PRIVATE-TEMPLATE' ) === false
+	&& str_contains( $render( '[stack /htmlprobe][html]<p>[[title]]</p>[/html][/stack]' ), 'template /templates/probe-private' ) === true
+	&& str_contains( $render( '[elements /htmlprobe][html][[title]][/html][/elements]' ), 'PRIVATE-TEMPLATE' ) === false
+	&& str_contains( $render( '[elements /htmlprobe][html][[body]][/html][/elements]' ), 'PRIVATE-TEMPLATE' ) === false
+	&& str_contains( $render( '[elements /htmlprobe][html][[title]][/html][/elements]' ), 'template /templates/probe-private' ) === true
+	&& str_contains( $render( '[stack /htmlprobe][html][template /templates/probe-private][/html][/stack]' ), 'PRIVATE-TEMPLATE' ) === true );
+
 // [image] is a component now, and what it did it still does
 check( '[image] of a slot: the same <img> as before', $render( '[image /template/page-home/hero/background alt="A"]' ) === '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="A">' );
 check( '[image] as before in the named form, with the alt of the template', $render( '[image uri="/template/page-home/hero/background" alt="B"]' ) === '<img src="/public/images/bg.1600x900.jpg" width="1600" height="900" alt="B">' );
