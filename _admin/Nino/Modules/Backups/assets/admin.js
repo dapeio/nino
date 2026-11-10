@@ -38,7 +38,7 @@
 					return Nino.admin.backups._showError( status, response );
 
 				// A missing 'enabled' is an answer from before there was one
-				Nino.admin.backups._renderList( response.dates, response.enabled !== false );
+				Nino.admin.backups._renderList( response.dates, response.enabled !== false, response.missed );
 				Nino.admin.backups._ready = true;
 			} );
 		},
@@ -117,13 +117,20 @@
 		 *
 		 *	@param		{string[]}	dates
 		 *	@param		{boolean}		enabled				Whether backups are on
+		 *	@param		{Object=}		missed				Set while today's automatic backup did not run: { reason }, the reason empty where it ended without one
 		 *
 		 *	@return		void
 		 */
-		_renderList : function( dates, enabled ) {
+		_renderList : function( dates, enabled, missed ) {
 
 			const wrap = dc.getElementById('backups-list');
 			wrap.innerHTML = '';
+
+			// The one thing to do about it is the button below
+			if( enabled !== false && typeof missed === 'object' && missed !== null )
+				wrap.appendChild( Nino.adminUi.notice( typeof missed.reason === 'string' && missed.reason !== ''
+					? Nino.adminUi.format( Nino.content.getText('/_admin/backups/msg/missed'), missed.reason )
+					: Nino.content.getText('/_admin/backups/msg/interrupted') ) );
 
 			if( dates.length === 0 )
 				wrap.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/backups/empty') ) );
@@ -214,7 +221,7 @@
 						return;
 					}
 
-					Nino.admin.backups._renderList( body.dates, body.enabled !== false );
+					Nino.admin.backups._renderList( body.dates, body.enabled !== false, body.missed );
 					dc.getElementById('backups-message').textContent = created;
 				} );
 			} );

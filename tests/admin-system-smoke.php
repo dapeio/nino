@@ -41,6 +41,25 @@ if( ( $argv[1] ?? '' ) === 'restore-without-backups' ) {
 	exit;
 }
 
+// Run as a child of itself (see "The daily backup makes one attempt a day"
+// below): the first authenticated request of the day over a project directory
+// the parent made, with no memory pre-check and a memory limit its archive
+// cannot stay under. Prints "survived" when it comes back; the fatal error of
+// the limit is what the parent expects of the first run
+if( ( $argv[1] ?? '' ) === 'daily-backup' ) {
+	require __DIR__. '/harness.php';
+	$appData = [ './nino/uid' => $argv[2] ];
+	\Nino\AppData::prepare( $appData );
+	$appData['./nino/filesystem/path']				= $argv[2];
+	$appData['./nino/filesystem/configpath']	= $argv[2]. '/private';
+	$appData['./nino/filesystem/contentpath']	= $argv[2]. '/private';
+	$appData['./nino/filesystem/publicpath']	= $argv[2]. '/public';
+	$appData['./nino/backups/memory']					= -1;
+	\Nino\Modules\Backups::maybeRun( $appData );
+	echo 'survived';
+	exit;
+}
+
 require __DIR__. '/harness.php';
 
 $appData = ninoSandbox( 'admin-system' );
@@ -327,6 +346,242 @@ check( 'a failing run is a 500 with its reason, writes no archive and leaves no 
 $appData['/nino/backup/key'] = $goodKey;
 [ $status ] = $nowCall( $appData );
 check( '...and the next one, with the key back, is fine', $status === 200 );
+
+/*	The daily backup makes one attempt a day. An archive the request cannot
+	hold ends that request with a fatal error no catch sees, and every later
+	request found today's archive missing and died the same way - the
+	workbench was out of reach until somebody edited config.php. The attempt
+	is on disk before it starts now. Today's archive is put aside for these
+	checks and comes back after them	*/
+rename( $dailyFile, $dailyFile. '.kept' );
+$attemptFile	= $nowDir. '/attempt.php';
+$attemptNote	= static function( string $date, string $reason ): void {
+	global $attemptFile;
+	file_put_contents( $attemptFile, \Nino\Admin\Recovery::STUB_PREFIX. base64_encode( (string) json_encode( [ 'date' => $date, 'reason' => $reason ] ) ). \Nino\Admin\Recovery::STUB_SUFFIX );
+};
+$yesterday		= date( 'Y-m-d', strtotime( '-1 day' ) );
+@unlink( $attemptFile );
+ninoWarnings();
+
+// A run that fails leaves its note, with the reason it logged
+\Nino\Filesystem::putFileContent( $appData, '/config.php', [ '/nino/backup/key' => 'not a key' ] + $config );
+$appData['/nino/backup/key'] = 'not a key';
+\Nino\Modules\Backups::maybeRun( $appData );
+$failWarnings = ninoWarnings();
+\Nino\Filesystem::putFileContent( $appData, '/config.php', [ '/nino/backup/key' => $goodKey ] + $config );
+$appData['/nino/backup/key'] = $goodKey;
+check( 'a failing automatic run is logged and leaves a note of the attempt, but no archive', count( $failWarnings ) === 1 && str_contains( (string) $failWarnings[0], 'Backup failed' ) === true
+	&& is_file( $attemptFile ) === true && is_file( $dailyFile ) === false );
+check( '...the note says why, for the panel', ( \Nino\Modules\Backups::missed( $appData ) ?? [] ) === [ 'reason' => 'backup encryption key is invalid' ] );
+[ , $listBody ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiList' ] );
+check( '...and apiList carries it', ( $listBody['missed'] ?? null ) === [ 'reason' => 'backup encryption key is invalid' ] );
+
+// The key is back, the next request is the same day: no second attempt
+\Nino\Modules\Backups::maybeRun( $appData );
+check( 'the next request of the day does not try again, though nothing is in its way any more', is_file( $dailyFile ) === false && ninoWarnings() === [] );
+
+// A request that died in the attempt wrote the note before it began, without a reason
+$attemptNote( date( 'Y-m-d' ), '' );
+\Nino\Modules\Backups::maybeRun( $appData );
+check( '...nor after a note that carries no reason, which is what a request that ended inside the attempt leaves', is_file( $dailyFile ) === false
+	&& ( \Nino\Modules\Backups::missed( $appData ) ?? [] ) === [ 'reason' => '' ] );
+
+// The next day it tries again
+$attemptNote( $yesterday, 'backup encryption key is invalid' );
+check( 'the note of an earlier day says nothing is missed today', \Nino\Modules\Backups::missed( $appData ) === null );
+\Nino\Modules\Backups::maybeRun( $appData );
+check( 'the next day the attempt is made, and with it done the note is gone', is_file( $dailyFile ) === true && is_file( $attemptFile ) === false && \Nino\Modules\Backups::missed( $appData ) === null );
+
+// A run by hand always tries, and a success makes the state healthy again
+unlink( $dailyFile );
+$attemptNote( date( 'Y-m-d' ), 'backup encryption key is invalid' );
+$handId = \Nino\Modules\Backups::now( $appData );
+check( 'Backup now works while the day is marked, and clears the mark', is_string( $handId ) === true && is_file( $nowDir. '/'. $handId. '.php' ) === true && is_file( $attemptFile ) === false
+	&& \Nino\Modules\Backups::missed( $appData ) === null );
+\Nino\Modules\Backups::maybeRun( $appData );
+check( '...after which the automatic one is tried again', is_file( $dailyFile ) === true );
+
+// The note is no archive: not offered, not swept, not readable as php output
+$attemptNote( date( 'Y-m-d' ), 'x' );
+unlink( $dailyFile );
+$listed = \Nino\Modules\Backups\Admin::dates( $appData );
+( new ReflectionMethod( '\Nino\Modules\Backups', '_prune' ) )->invoke( null, $nowDir );
+$noteStub = (string) file_get_contents( $attemptFile );
+check( 'the note of the attempt is not listed as an archive', in_array( 'attempt', $listed, true ) === false && \Nino\Modules\Backups::lastDate( $appData ) !== 'attempt'
+	&& preg_match( \Nino\Modules\Backups\Admin::ID_PATTERN, 'attempt' ) === 0 );
+check( '...is left alone by the sweep of the archives', is_file( $attemptFile ) === true && $noteStub !== '' );
+check( '...and is behind the stub that ends a request for it', str_starts_with( $noteStub, \Nino\Admin\Recovery::STUB_PREFIX ) === true && str_ends_with( $noteStub, \Nino\Admin\Recovery::STUB_SUFFIX ) === true );
+[ $status ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => 'attempt' ] );
+check( '...nor can it be asked for as a restore', $status === 400 );
+unlink( $attemptFile );
+
+// What a step holds of memory, set against the limit where its size is known:
+// the largest file before the archive is built, the compressed archive before
+// it is read. What compresses costs nothing; the sources are never held together
+$imageDir = $sandbox. '/public/images';
+$formsDir = $sandbox. '/private/data';
+@mkdir( $imageDir, 0777, true );
+@mkdir( $formsDir, 0777, true );
+$mb = 1048576;
+$withLimit = static function( int $limit ) use ( &$appData ): array|string {
+	$appData['./nino/backups/memory'] = $limit;
+	$result = \Nino\Modules\Backups::now( $appData );
+	unset( $appData['./nino/backups/memory'] );
+	return $result;
+};
+$tempLeft = static fn(): int => count( glob( sys_get_temp_dir(). '/ninobackup*' ) ?: [] );
+$dropNew = static function( array $before ) use ( $timedFiles, $nowDir ): void {
+	foreach( array_diff( $timedFiles(), $before ) as $name )
+		unlink( $nowDir. '/'. $name );
+};
+
+// Compressible sources many times the limit: a backup that works carries on
+$wide = [];
+for( $i = 0; $i < 8; $i++ ) {
+	$wide[] = $formsDir. '/forms.wide'. $i. '.php';
+	file_put_contents( $wide[$i], str_repeat( 'a submission, much alike the next one. ', (int) ( 6 * $mb / 39 ) ) );
+}
+$timedBefore = $timedFiles();
+$tempBefore = $tempLeft();
+$carried = $withLimit( memory_get_usage() + 16 * $mb + 6 * $mb + 3 * $mb );
+check( 'sources several times the limit that compress away are archived: it is the archive that costs memory, not its sources', is_string( $carried ) === true && $tempLeft() === $tempBefore );
+$dropNew( $timedBefore );
+array_map( 'unlink', $wide );
+
+// Incompressible ones: refused once the compressed archive is known, with nothing left behind
+$noise = [ $imageDir. '/noise-a.bin', $imageDir. '/noise-b.bin' ];
+foreach( $noise as $file )
+	file_put_contents( $file, random_bytes( 6 * $mb ) );
+$timedBefore = $timedFiles();
+$tempBefore = $tempLeft();
+$refused = $withLimit( memory_get_usage() + 30 * $mb );
+check( 'incompressible sources are refused once the compressed archive is in the way, as the 500 now() answers, with the sizes', is_array( $refused ) === true && $refused[0] === 500
+	&& preg_match( '/\d+ MB for the compressed archive, \d+ MB in use\) and the limit is \d+ MB/', (string) $refused[1] ) === 1 );
+check( '...naming no path, writing no archive and leaving no temporary file', str_contains( (string) $refused[1], $sandbox ) === false && str_contains( (string) $refused[1], sys_get_temp_dir() ) === false
+	&& $timedFiles() === $timedBefore && $tempLeft() === $tempBefore && glob( $nowDir. '/*.tmp' ) === [] );
+check( '...and the same sources are carried by a limit that holds the archive twice', is_string( $withLimit( memory_get_usage() + 80 * $mb ) ) === true );
+$dropNew( $timedBefore );
+
+// One file larger than the limit leaves: refused before anything is built
+$timedBefore = $timedFiles();
+$tooBig = $withLimit( memory_get_usage() + 10 * $mb );
+check( 'a single file the limit cannot read whole is refused before a temporary file is made', is_array( $tooBig ) === true && $tooBig[0] === 500
+	&& preg_match( '/\d+ MB for the largest file, \d+ MB in use\) and the limit is \d+ MB/', (string) $tooBig[1] ) === 1 && $tempLeft() === $tempBefore && $timedFiles() === $timedBefore );
+$tooBig = $withLimit( memory_get_usage() + 16 * $mb + 3 * $mb );
+check( 'the file alone makes the refusal: a limit above the overhead and the use, but below them and the largest file, is refused at that stage', is_array( $tooBig ) === true
+	&& preg_match( '/\d+ MB for the largest file/', (string) $tooBig[1] ) === 1 );
+check( '...and the same sources pass once the limit is above that', is_string( $withLimit( memory_get_usage() + 80 * $mb ) ) === true );
+$dropNew( $timedBefore );
+check( '-1 is no limit at all, and so is a huge one; a limit that is no int is not one', is_string( $withLimit( -1 ) ) === true && is_string( $withLimit( 1 << 40 ) ) === true );
+$appData['./nino/backups/memory'] = '1';
+$stringLimit = \Nino\Modules\Backups::now( $appData );
+unset( $appData['./nino/backups/memory'] );
+check( '...the string "1" left to php\'s own limit', is_string( $stringLimit ) === true );
+$dropNew( $timedBefore );
+
+// An archive larger than one piece of the reader opens whole
+$bigId = \Nino\Modules\Backups::now( $appData );
+$noiseBytes = (string) file_get_contents( $noise[0] );
+file_put_contents( $noise[0], 'replaced' );
+$snapshotsHad = glob( $nowDir. '/pre-restore-*.php' ) ?: [];
+[ $status ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $bigId ] );
+check( 'an archive of several pieces of the reader restores byte for byte', is_string( $bigId ) === true && filesize( $nowDir. '/'. $bigId. '.php' ) > 3 * 786432 && $status === 200 && (string) file_get_contents( $noise[0] ) === $noiseBytes );
+foreach( array_diff( glob( $nowDir. '/pre-restore-*.php' ) ?: [], $snapshotsHad ) as $file )
+	unlink( $file );
+unlink( $nowDir. '/'. $bigId. '.php' );
+array_map( 'unlink', $noise );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+// The request of the restore was one of the workbench: it made today's archive
+@unlink( $dailyFile );
+$dropNew( $timedBefore );
+
+// The parked archive of a restore is the plain archive, config.php among it: only its owner reads it
+if( DIRECTORY_SEPARATOR === '/' ) {
+	$parkedId = \Nino\Modules\Backups::now( $appData );
+	$parkedMode = null;
+	$probe = new class( $parkedMode ) implements ArrayAccess {
+		public bool $armed = false;
+		public function __construct( public ?int &$mode ) {}
+		public function offsetExists( mixed $key ): bool { return true; }
+		public function offsetSet( mixed $key, mixed $value ): void {}
+		public function offsetUnset( mixed $key ): void {}
+		public function offsetGet( mixed $key ): mixed {
+			$parked = glob( sys_get_temp_dir(). '/ninorestore*.tar.gz' ) ?: [];
+			if( $this->armed === true && $parked !== [] ) {
+				usort( $parked, static fn( string $a, string $b ): int => filemtime( $b ) <=> filemtime( $a ) );
+				$this->mode = fileperms( $parked[0] ) & 0777;
+				throw new \RuntimeException( 'probe' );
+			}
+			return $key === 'data' ? [] : ( $key === 'active' ? false : '' );
+		}
+	};
+	$appData['./nino/features/all'] = [ 'probe' => $probe ];
+	$probe->armed = true;
+	[ $status ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $parkedId ] );
+	unset( $appData['./nino/features/all'] );
+	check( 'the archive a restore parks in the temp directory across the safety snapshot is readable by its owner alone', $status === 500 && $parkedMode === 0600 );
+	unlink( $nowDir. '/'. $parkedId. '.php' );
+	@unlink( $dailyFile );
+}
+
+// The note: what it reports, the day it names, what it is read as
+$reason = new ReflectionMethod( '\Nino\Modules\Backups', '_reason' );
+check( 'the reason in the note is the message of an exception of the class itself, and nothing of any other - a path never reaches it',
+	$reason->invoke( null, new \RuntimeException( 'backup encryption key is invalid' ) ) === 'backup encryption key is invalid'
+	&& $reason->invoke( null, new \UnexpectedValueException( 'internal corruption of phar "'. sys_get_temp_dir(). '/ninobackup1.tar"' ) ) === ''
+	&& $reason->invoke( null, new \PharException( $sandbox ) ) === '' && $reason->invoke( null, new \LogicException( 'x' ) ) === '' );
+// A run that fails notes the day it began - the pre-note and the note of its failure alike
+$appData['./nino/backups/today'] = '2000-01-01';
+\Nino\Filesystem::putFileContent( $appData, '/config.php', [ '/nino/backup/key' => 'not a key' ] + $config );
+$appData['/nino/backup/key'] = 'not a key';
+\Nino\Modules\Backups::maybeRun( $appData );
+\Nino\Filesystem::putFileContent( $appData, '/config.php', [ '/nino/backup/key' => $goodKey ] + $config );
+$appData['/nino/backup/key'] = $goodKey;
+unset( $appData['./nino/backups/today'] );
+ninoWarnings();
+$began = ( new ReflectionMethod( '\Nino\Modules\Backups', '_readAttempt' ) )->invoke( null, $nowDir );
+check( 'the note of a failed run carries the day the run began', $began === [ 'date' => '2000-01-01', 'reason' => 'backup encryption key is invalid' ] );
+unlink( $attemptFile );
+( new ReflectionMethod( '\Nino\Modules\Backups', '_noteAttempt' ) )->invoke( null, $nowDir, $yesterday, 'late' );
+$late = (string) file_get_contents( $attemptFile );
+check( 'the note carries the day the attempt began, not the day it is written on', ( \Nino\Modules\Backups::missed( $appData ) ) === null
+	&& str_contains( base64_decode( substr( $late, strlen( \Nino\Admin\Recovery::STUB_PREFIX ), -strlen( \Nino\Admin\Recovery::STUB_SUFFIX ) ), true ) ?: '', $yesterday ) === true );
+$forged = str_repeat( 'X', strlen( \Nino\Admin\Recovery::STUB_PREFIX ) ). base64_encode( (string) json_encode( [ 'date' => date( 'Y-m-d' ), 'reason' => 'forged' ] ) ). \Nino\Admin\Recovery::STUB_SUFFIX;
+file_put_contents( $attemptFile, $forged );
+check( 'a file that is no stub is no note', \Nino\Modules\Backups::missed( $appData ) === null );
+$attemptNote( date( 'Y-m-d' ), 'x' );
+$appData['/nino/admin/backups'] = false;
+[ , $listBody ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiList' ] );
+unset( $appData['/nino/admin/backups'] );
+check( 'apiList says nothing is missed while backups are switched off', array_key_exists( 'missed', $listBody ?? [] ) === true && $listBody['missed'] === null );
+unlink( $attemptFile );
+
+// The same, for real: a child whose memory limit the archive does not fit in
+// (and with the check that would have turned it away left out) ends in the
+// fatal error. The request after it comes back, and today's archive is not made
+file_put_contents( $imageDir. '/dies.bin', random_bytes( 40 * 1048576 ) );
+@mkdir( $sandbox. '/tmp', 0777, true );
+$childCommand = escapeshellarg( PHP_BINARY ). ' -d memory_limit=48M -d sys_temp_dir='. escapeshellarg( $sandbox. '/tmp' ). ' '. escapeshellarg( __FILE__ ). ' daily-backup '. escapeshellarg( $sandbox ). ' 2>&1';
+$first = (string) shell_exec( $childCommand );
+check( 'a request that runs out of memory in the daily backup ends, and leaves its note', str_contains( $first, 'survived' ) === false && is_file( $attemptFile ) === true
+	&& is_file( $dailyFile ) === false && ( \Nino\Modules\Backups::missed( $appData ) ?? [] ) === [ 'reason' => '' ] );
+$second = (string) shell_exec( $childCommand );
+check( 'the request after it is answered - the workbench is not out of reach - and does not make the attempt again', str_contains( $second, 'survived' ) === true && is_file( $dailyFile ) === false );
+unlink( $imageDir. '/dies.bin' );
+// What the child left in its own temp directory goes with the sandbox, not into the system's
+@unlink( $attemptFile );
+rename( $dailyFile. '.kept', $dailyFile );
+
+/*	An archive of this writer is the one the readers always had: the stub is
+	the prefix, the base64 of iv, tag and ciphertext, the suffix - cut into
+	pieces to write, not changed	*/
+$pieceCheck = true;
+foreach( [ 0, 1, 2, 3, 4, 5, 100, 786432, 786433, 786434, 786435, 786437, 2 * 786432 + 7 ] as $length ) {
+	$iv = random_bytes( 12 ); $tag = random_bytes( 16 ); $body = $length === 0 ? '' : random_bytes( $length );
+	if( implode( '', iterator_to_array( \Nino\Admin\Recovery::stubPieces( $iv, $tag, $body ), false ) ) !== \Nino\Admin\Recovery::STUB_PREFIX. base64_encode( $iv. $tag. $body ). \Nino\Admin\Recovery::STUB_SUFFIX )
+		$pieceCheck = false;
+}
+check( 'the stub in pieces is the stub in one, for every length around the size of a piece', $pieceCheck === true );
 
 \Nino\Auth::logoutUser( $appData );
 $timedBefore = $timedFiles();

@@ -138,13 +138,45 @@ namespace Nino\Modules\Backups {
 		 */
 		private static function _decrypt( string $path, string $key ): string|false {
 
-			$raw 			= file_get_contents( $path );
-			$payload 	= base64_decode( substr( $raw, strlen( \Nino\Admin\Recovery::STUB_PREFIX ), -strlen( \Nino\Admin\Recovery::STUB_SUFFIX ) ) );
-			$iv 			= substr( $payload, 0, 12 );
-			$tag 			= substr( $payload, 12, 16 );
-			$cipher 	= substr( $payload, 28 );
+			// Read and decoded piece by piece: the file is the base64 of the
+			// payload, and as one string next to its decoding and its parts it
+			// took more memory to open an archive than it took to make it. A
+			// piece is a multiple of four characters, so it decodes on its own
+			$handle = @fopen( $path, 'rb' );
+			if( $handle === false )
+				return false;
 
-			return openssl_decrypt( $cipher, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag );
+			$remaining 	= (int) @filesize( $path ) - strlen( \Nino\Admin\Recovery::STUB_PREFIX ) - strlen( \Nino\Admin\Recovery::STUB_SUFFIX );
+			$header 		= '';
+			$cipher 		= '';
+
+			fseek( $handle, strlen( \Nino\Admin\Recovery::STUB_PREFIX ) );
+
+			while( $remaining > 0 ) {
+
+				$piece = fread( $handle, min( 786432, $remaining ) );
+				if( $piece === false || $piece === '' )
+					break;
+
+				$remaining -= strlen( $piece );
+				$bytes 			= (string) base64_decode( $piece );
+
+				// iv and tag come first, 28 bytes, and are not part of the ciphertext
+				if( strlen( $header ) < 28 ) {
+					$take 		= 28 - strlen( $header );
+					$header .= substr( $bytes, 0, $take );
+					$bytes 		= substr( $bytes, $take );
+				}
+
+				$cipher .= $bytes;
+			}
+
+			fclose( $handle );
+
+			if( strlen( $header ) !== 28 )
+				return false;
+
+			return openssl_decrypt( $cipher, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, substr( $header, 0, 12 ), substr( $header, 12, 16 ) );
 		}
 
 		// What an archive's id may look like: a dated backup, one made on
@@ -214,6 +246,9 @@ namespace Nino\Modules\Backups {
 			\Nino\Http::ok( $request, [
 				'dates' 	=> self::dates( $appData ),
 				'enabled' => ( $appData['/nino/admin/backups'] ?? true ) !== false,
+				// Why today's automatic backup is missing, while it is (see
+				// \Nino\Modules\Backups::missed())
+				'missed' 	=> ( $appData['/nino/admin/backups'] ?? true ) !== false ? \Nino\Modules\Backups::missed( $appData ) : null,
 			] );
 		}
 
@@ -335,15 +370,6 @@ namespace Nino\Modules\Backups {
 				return [ 500, 'decryption failed' ];
 			}
 
-			// The way back out, before anything is touched - and a snapshot
-			// that cannot be made is a restore that does not start
-			try {
-				self::_safetySnapshot( $appData, $dir, $key );
-			}
-			catch( \RuntimeException $e ) {
-				return [ 500, 'the safety snapshot could not be made: '. $e->getMessage() ];
-			}
-
 			/*	tempnam() creates the file it names, and the archive was written
 				beside it under that name plus '.tar.gz' - so the file tempnam()
 				made stayed behind, one per restore, for the life of the server
@@ -362,7 +388,36 @@ namespace Nino\Modules\Backups {
 			$staging	= sys_get_temp_dir(). '/ninorestore-'. bin2hex( random_bytes( 8 ) );
 
 			try {
-				return self::_restoreFrom( $appData, $gz, $tmpGz, $staging, $notice );
+				// Not held in memory across the snapshot: that one needs as much
+				// again while it is made, and the two together are more than
+				// either needs. It waits in the file PharData is to read, which
+				// only its owner may read: it is the plain archive, config.php
+				// among it. The archive itself is not decrypted again: a snapshot
+				// made in the second the archive was (a restore of a snapshot)
+				// replaces it
+				$handle = @fopen( $tmpGz, 'xb' );
+				if( $handle === false )
+					return [ 500, 'the backup could not be written for unpacking' ];
+
+				@chmod( $tmpGz, 0600 );
+				$put = @fwrite( $handle, $gz );
+				@fclose( $handle );
+
+				if( $put !== strlen( $gz ) )
+					return [ 500, 'the backup could not be written for unpacking' ];
+
+				unset( $gz );
+
+				// The way back out, before anything is touched - and a snapshot
+				// that cannot be made is a restore that does not start
+				try {
+					self::_safetySnapshot( $appData, $dir, $key );
+				}
+				catch( \RuntimeException $e ) {
+					return [ 500, 'the safety snapshot could not be made: '. $e->getMessage() ];
+				}
+
+				return self::_restoreFrom( $appData, '', $tmpGz, $staging, $notice, true );
 			}
 			finally {
 				@unlink( $tmpBase );
@@ -378,16 +433,17 @@ namespace Nino\Modules\Backups {
 		 *	files it works on removed by restore() whichever way this leaves
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$gz						The decrypted .tar.gz bytes
+		 *	@param		string		$gz						The decrypted .tar.gz bytes; not read where $written says they are in $tmpGz
 		 *	@param		string		$tmpGz				Where to write them for PharData
 		 *	@param		string		$staging			Where to unpack them, not existing yet
 		 *	@param		array|null	&$notice			(reference) See restore()
+		 *	@param		bool			$written			Whether $tmpGz holds the archive already
 		 *
 		 *	@return 	true|array							true, or [ http status, message ]
 		 */
-		private static function _restoreFrom( array &$appData, string $gz, string $tmpGz, string $staging, ?array &$notice = null ): true|array {
+		private static function _restoreFrom( array &$appData, string $gz, string $tmpGz, string $staging, ?array &$notice = null, bool $written = false ): true|array {
 
-			if( @file_put_contents( $tmpGz, $gz ) !== strlen( $gz ) )
+			if( $written === false && @file_put_contents( $tmpGz, $gz ) !== strlen( $gz ) )
 				return [ 500, 'the backup could not be written for unpacking' ];
 
 			if( @mkdir( $staging, 0755, true ) === false )
@@ -544,6 +600,7 @@ namespace Nino\Modules\Backups {
 					if( $bytes === false )
 						throw new \RuntimeException( 'a file could not be read: '. $archiveName );
 					$phar->addFromString( $archiveName, $bytes );
+					unset( $bytes );
 				}
 
 				$phar->addFromString( 'nino.php', \Nino\Backup::stamp( $appData ) );
@@ -557,19 +614,16 @@ namespace Nino\Modules\Backups {
 				$iv 		= random_bytes( 12 );
 				$tag 		= '';
 				$cipher = openssl_encrypt( $gz, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag );
+				unset( $gz );
 				if( $cipher === false )
 					throw new \RuntimeException( 'the snapshot could not be encrypted' );
 
 				$snapshot	= $dir. '/pre-restore-'. date( 'Y-m-d-His' ). '.php';
-				$stub			= \Nino\Admin\Recovery::STUB_PREFIX. base64_encode( $iv. $tag. $cipher ). \Nino\Admin\Recovery::STUB_SUFFIX;
-				$temp			= $snapshot. '.'. bin2hex( random_bytes( 6 ) ). '.tmp';
 
 				// Renamed into place like a backup itself: a snapshot the list
 				// offers is a whole one or none
-				if( @file_put_contents( $temp, $stub ) !== strlen( $stub ) || @rename( $temp, $snapshot ) === false ) {
-					@unlink( $temp );
+				if( \Nino\Admin\Admin::writeFileAtomic( $snapshot, \Nino\Admin\Recovery::stubPieces( $iv, $tag, $cipher ) ) === false )
 					throw new \RuntimeException( 'the snapshot could not be written' );
-				}
 			}
 			finally {
 				@unlink( $tmpBase );

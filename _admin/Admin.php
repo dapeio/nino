@@ -1359,11 +1359,11 @@ namespace Nino\Admin {
 		 *	hash, the activity log's day files
 		 *
 		 *	@param		string		$path
-		 *	@param		string		$content
+		 *	@param		string|iterable	$content		The bytes, or the pieces of them in order (see Recovery::stubPieces())
 		 *
 		 *	@return 	bool										False when the file could not be written
 		 */
-		public static function writeFileAtomic( string $path, string $content ): bool {
+		public static function writeFileAtomic( string $path, string|iterable $content ): bool {
 
 			$temp 	= $path. '.'. bin2hex( random_bytes( 6 ) ). '.tmp';
 			$handle = @fopen( $temp, 'wb' );
@@ -1371,7 +1371,19 @@ namespace Nino\Admin {
 			if( $handle === false )
 				return false;
 
-			$written = fwrite( $handle, $content );
+			$written	= 0;
+			$expected	= 0;
+
+			foreach( is_string( $content ) === true ? [ $content ] : $content as $piece ) {
+				$expected += strlen( $piece );
+				$put = fwrite( $handle, $piece );
+				if( $put === false ) {
+					$written = false;
+					break;
+				}
+				$written += $put;
+			}
+
 			$flushed = fflush( $handle );
 			fclose( $handle );
 
@@ -1379,7 +1391,7 @@ namespace Nino\Admin {
 			// the fflush() a rename() can win the race against the bytes ever
 			// reaching disk - either way the result is a truncated file, and
 			// for the recovery hash one that would lock the operator out
-			if( $written === false || $written !== strlen( $content ) || $flushed === false ) {
+			if( $written === false || $written !== $expected || $flushed === false ) {
 				@unlink( $temp );
 				return false;
 			}
@@ -2313,6 +2325,38 @@ namespace Nino\Admin {
 		// and the activity log (\Nino\Modules\Logs\Admin) are wrapped in it too
 		public const string STUB_PREFIX = "<?php http_response_code(403); exit; return '";
 		public const string STUB_SUFFIX = "';\n";
+
+		// How much of an archive's ciphertext is base64-encoded at a time (see
+		// stubPieces()): a multiple of three, so every piece but the last
+		// encodes to the same characters as it does inside the whole
+		private const int STUB_CHUNK = 786432;
+
+		/**
+		 *	An archive's stub as pieces, to be written one after the other: the
+		 *	prefix, the base64 of iv, tag and ciphertext, the suffix. The bytes
+		 *	are those of STUB_PREFIX. base64_encode( iv. tag. cipher ). STUB_SUFFIX,
+		 *	without a second and a third copy of the ciphertext in memory
+		 *
+		 *	@param		string		$iv						The 12 bytes of the initialisation vector
+		 *	@param		string		$tag					The 16 bytes of the authentication tag
+		 *	@param		string		$cipher				The ciphertext
+		 *
+		 *	@return 	\Generator<int, string>
+		 */
+		public static function stubPieces( string $iv, string $tag, string $cipher ): \Generator {
+
+			yield self::STUB_PREFIX;
+
+			// iv and tag are 28 bytes, one short of a multiple of three: the
+			// first two bytes of the ciphertext complete the first piece, and
+			// every one after it starts on a boundary of three
+			yield base64_encode( $iv. $tag. substr( $cipher, 0, 2 ) );
+
+			for( $offset = 2, $length = strlen( $cipher ); $offset < $length; $offset += self::STUB_CHUNK )
+				yield base64_encode( substr( $cipher, $offset, self::STUB_CHUNK ) );
+
+			yield self::STUB_SUFFIX;
+		}
 
 		private const int MAX_TRIES = 5;
 		private const int COOLDOWN = 3600;

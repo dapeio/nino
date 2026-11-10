@@ -10,6 +10,8 @@ return [
 	'[[/_admin/backups/msg/restored]]'	=> 'Das Backup vom %s wurde wiederhergestellt.',
 	'[[/_admin/backups/label/now]]'			=> 'Jetzt sichern',
 	'[[/_admin/backups/msg/created]]'		=> 'Backup erstellt: %s',
+	'[[/_admin/backups/msg/missed]]'		=> 'Das automatische Backup von heute wurde nicht angelegt: %s. Nino versucht es heute nicht von selbst noch einmal; „Jetzt sichern“ legt eines an, sobald die Ursache behoben ist.',
+	'[[/_admin/backups/msg/interrupted]]'	=> 'Das automatische Backup von heute wurde nicht fertig: Die Anfrage, die es angelegt hat, wurde beendet, meist weil dem Server der Speicher oder die Zeit ausging. Nino versucht es heute nicht von selbst noch einmal; „Jetzt sichern“ legt eines an.',
 	'[[/_admin/error/backups_restored_other_version]]'	=> 'Das Backup stammt aus Nino %s, hier läuft %s.',
 
 	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names

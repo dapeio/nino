@@ -249,6 +249,47 @@ check( 'a list that could not be loaded is replaced by the error, having nothing
 	mount.children.length === 1 && mount.children[0].className === 'nino-admin-error'
 	&& mount.children[0].textContent === '(403) no permission' );
 
+// Today's automatic backup did not run: the panel says so above the list, with the
+// reason the server logged, and the button that makes one is still there
+const noticeOf = function() {
+	return findAll( mount, function( el ) { return el.className === 'nino-admin-notice' } );
+};
+const bait = '<script>x</script> [[/a/b/c/d]] {x}';
+mount.innerHTML = '';
+requests.length = 0;
+panel.init();
+answer( 200, { dates : [ '2024-05-03' ], enabled : true, missed : { reason : bait } } );
+check( 'a missed daily backup is a notice above the list, with the reason as text', noticeOf().length === 1 && noticeOf()[0].textContent.includes( bait )
+	&& noticeOf()[0].children.length === 0 && nowButton() !== null && dateRows().join(',') === '2024-05-03' );
+
+mount.innerHTML = '';
+requests.length = 0;
+panel.init();
+answer( 200, { dates : [], enabled : true, missed : { reason : '' } } );
+check( 'a missed one that ended without a reason still says something', noticeOf().length === 1 && noticeOf()[0].textContent !== ''
+	&& nowButton() !== null );
+
+mount.innerHTML = '';
+requests.length = 0;
+panel.init();
+answer( 200, { dates : [ '2024-05-03' ], enabled : true, missed : null } );
+check( 'with nothing missed there is no notice', noticeOf().length === 0 );
+
+mount.innerHTML = '';
+requests.length = 0;
+panel.init();
+answer( 200, { dates : [ '2024-05-03' ], enabled : true, missed : { reason : 'x' } } );
+fire( nowButton(), 'click' );
+answer( 200, { id : '2024-05-03-120000' } );
+answer( 200, { dates : [ '2024-05-03-120000', '2024-05-03' ], enabled : true, missed : null } );
+check( 'a backup made by hand takes the notice away with the list it re-reads', noticeOf().length === 0 && dateRows().length === 2 );
+
+mount.innerHTML = '';
+requests.length = 0;
+panel.init();
+answer( 200, { dates : [], enabled : false, missed : { reason : 'x' } } );
+check( 'while backups are switched off nothing is said to be missed', noticeOf().length === 0 );
+
 // A restore ends in a reload of the page and every form on it: whatever the
 // workbench holds unsaved is asked about first, after the restore was confirmed
 mount.innerHTML = '';
