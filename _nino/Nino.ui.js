@@ -1203,6 +1203,12 @@
 
 						this.form.classList.remove('nino-is-pending');
 
+						// Every way the request can end - an answer, a dead connection,
+						// a timeout, an abort - lands here, so the button is given back
+						// on all of them; a delivered message locks it again below
+						if( this.form.btn )
+							this.form.btn.disabled = false;
+
 						const ok = ( xhr.status === 200 );
 
 						this.form.classList.remove( ok === true ? 'nino-is-error' : 'nino-is-success' );
@@ -1242,7 +1248,8 @@
 						if( ok === false )
 							return;
 
-						this.form.btn.disabled = true;
+						if( this.form.btn )
+							this.form.btn.disabled = true;
 						for( let i = 0, l = this.form.fields.length; i<l; i++ )
 							this.form.fields[i].disabled = true;
 					},
@@ -1258,7 +1265,10 @@
 					formSubmit = function( e ){
 						e.preventDefault();
 
-						if( this.classList.contains('nino-is-success') === true )
+						/*	One request at a time. A second click or another Enter before
+							the answer would post the form again - two mails, two stored
+							entries - and the pending mark is exactly "a request is out"	*/
+						if( this.classList.contains('nino-is-success') === true || this.classList.contains('nino-is-pending') === true )
 							return;
 
 						/*	Every attempt starts from a clean slate. The mark belongs to
@@ -1344,8 +1354,10 @@
 							// native validation and Form.php both pass. The
 							// dot-plus-tld tail is kept - it is stricter than the spec,
 							// deliberately, because a contact form typo'd to "@localhost"
-							// helps nobody
-							if( error === false && this.fields[i].type === 'email' && ( /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/.test(this.fields[i].value) === false ) ) {
+							// helps nobody. An empty value is the required rule's to refuse,
+							// as the url and number branch below has it: an address the form
+							// does not ask for may stay empty
+							if( error === false && this.fields[i].type === 'email' && this.fields[i].value.length > 0 && ( /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/.test(this.fields[i].value) === false ) ) {
 								Nino.ui._markField( this.fields[i], true );
 								firstRefused = firstRefused ?? this.fields[i];
 								error = formText( this, 'email' );
@@ -1414,6 +1426,8 @@
 						// ...), and a bound function's `this` survives that
 						const boundResponse = formResponse.bind( { form : this } );
 						this.classList.add('nino-is-pending');
+						if( this.btn )
+							this.btn.disabled = true;
 
 						// Without an action a form posts to its own kind's endpoint,
 						// below the project's directory

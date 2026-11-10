@@ -98,6 +98,15 @@ function respond( index, status ) {
 	entry.callback.call( entry.callback, { status : status } );
 }
 
+// A form that submitted and was not answered is still waiting, and a waiting
+// form refuses the next submit. The checks below that submit one form again
+// and again stand in for the visitor who came back after the answer
+function settled( f ) {
+	f.classList.remove('nino-is-success');
+	f.classList.remove('nino-is-pending');
+	f.btn.disabled = false;
+}
+
 const documentElement = { clientHeight : 640, clientWidth : 1024, scrollLeft : 0, scrollTop : 0, style : {} };
 const body = { classList : classList(), scrollLeft : 0, scrollTop : 0 };
 const document = {
@@ -211,14 +220,14 @@ const consentOn  = field( 'consent', 'checkbox', 'yes', false, true );
 forms[0].fieldList.push( consentOff );
 forms[0].fields = forms[0].fieldList;
 sent.length = 0;
-forms[0].classList.remove('nino-is-success');
+settled( forms[0] );
 forms[0].submit();
 check( 'an unticked checkbox is posted as empty, not as its value', sent.length === 1 && sent[0].data.consent === '' );
 
 forms[0].fieldList[ forms[0].fieldList.length - 1 ] = consentOn;
 forms[0].fields = forms[0].fieldList;
 sent.length = 0;
-forms[0].classList.remove('nino-is-success');
+settled( forms[0] );
 forms[0].submit();
 check( 'a ticked one is posted as the value it carries', sent.length === 1 && sent[0].data.consent === 'yes' );
 
@@ -239,7 +248,7 @@ const planHuge  = field( 'plan', 'radio', 'huge',  true, false );
 forms[0].fieldList.push( planSmall, planLarge, planHuge );
 forms[0].fields = forms[0].fieldList;
 sent.length = 0;
-forms[0].classList.remove('nino-is-success');
+settled( forms[0] );
 forms[0].submit();
 check( 'the ticked radio is posted, not the last one of its group', sent.length === 1 && sent[0].data.plan === 'large' );
 
@@ -248,7 +257,7 @@ forms[0].fieldList[ forms[0].fieldList.length - 3 ] = field( 'plan', 'radio', 's
 forms[0].fieldList[ forms[0].fieldList.length - 2 ] = field( 'plan', 'radio', 'large', true, false );
 forms[0].fields = forms[0].fieldList;
 sent.length = 0;
-forms[0].classList.remove('nino-is-success');
+settled( forms[0] );
 forms[0].submit();
 check( '...and a group whose first member is the ticked one posts that one', sent.length === 1 && sent[0].data.plan === 'small' );
 
@@ -257,7 +266,7 @@ check( '...and a group whose first member is the ticked one posts that one', sen
 forms[0].fieldList[ forms[0].fieldList.length - 3 ] = field( 'plan', 'radio', 'small', true, false );
 forms[0].fields = forms[0].fieldList;
 sent.length = 0;
-forms[0].classList.remove('nino-is-success');
+settled( forms[0] );
 forms[0].submit();
 check( 'a required radio group nobody answered is refused rather than sent', sent.length === 0 && forms[0].msg.textContent === 'Please fill in every required field.' );
 
@@ -267,7 +276,7 @@ forms[0].fieldList[ forms[0].fieldList.length - 2 ] = field( 'plan', 'radio', 'l
 forms[0].fieldList[ forms[0].fieldList.length - 1 ] = field( 'plan', 'radio', 'huge',  false, false );
 forms[0].fields = forms[0].fieldList;
 sent.length = 0;
-forms[0].classList.remove('nino-is-success');
+settled( forms[0] );
 forms[0].msg.textContent = '';
 forms[0].submit();
 check( '...while an optional one nobody answered is posted as empty', sent.length === 1 && sent[0].data.plan === '' );
@@ -277,7 +286,7 @@ forms[0].fieldList.pop();
 forms[0].fieldList.pop();
 forms[0].fields = forms[0].fieldList;
 sent.length = 0;
-forms[0].classList.remove('nino-is-success');
+settled( forms[0] );
 forms[0].msg.textContent = '';
 forms[0].fill( { name : typedName, email : typedEmail, message : typedMessage } );
 forms[0].submit();
@@ -378,7 +387,7 @@ check( '...an empty date posts as empty', sent[0].data.since === '' );
 // The browser's verdict on a date nobody finished typing: value '', badInput
 since.validity = { typeMismatch : false, badInput : true };
 sent.length = 0;
-typedForm.classList.remove('nino-is-success');
+settled( typedForm );
 typedForm.submit();
 check( 'a date with no value and badInput is refused as invalid, not sent', sent.length === 0 && typedForm.msg.textContent === 'Please check your entries.' );
 check( '...and marked', since.getAttribute('aria-invalid') === 'true' && since.focused === true );
@@ -393,14 +402,14 @@ const budget = field( 'budget', 'number', '', false, false );
 budget.validity = { typeMismatch : false, badInput : true };
 typedForm.fieldList.push( budget );
 sent.length = 0;
-typedForm.classList.remove('nino-is-success');
+settled( typedForm );
 typedForm.submit();
 check( 'letters in a number field, which read as no value, are refused too', sent.length === 0 && budget.getAttribute('aria-invalid') === 'true' );
 typedForm.fieldList.pop();
 
 // A 400 on a form carrying either is not the address
 typedForm.msg.textContent = '';
-typedForm.classList.remove('nino-is-success');
+settled( typedForm );
 typedForm.submit();
 respond( sent.length - 1, 400 );
 check( 'a 400 on a form with a checkbox or a date asks to check the entries, not the address', typedForm.msg.textContent === 'Please check your entries.' );
@@ -426,6 +435,85 @@ plain.fill( { name : 'Someone', email : 'someone@example.com', message : 'Hello.
 plain.submit();
 respond( sent.length - 1, 400 );
 check( '...while one with neither still says it is the address', plain.msg.textContent === 'Please enter a valid email address.' );
+
+
+// --- A form goes out once, and an address the form does not ask for may stay empty
+
+/*	The handler refused a second submit only after a success, so a second click
+	or another Enter before the answer posted the form again - two mails, two
+	stored entries - and the button stayed live under the visitor's finger.
+	The pending mark is "a request is out", and the button is given back on
+	every way the request can end: an answer, a dead connection, a timeout and
+	an abort	*/
+const once = form();
+forms.push( once );
+sandbox.Nino.ui.onReady();
+once.fill( { name : 'Someone', email : 'someone@example.com', message : 'Hello.' } );
+
+sent.length = 0;
+once.submit();
+once.submit();
+check( 'two submits before the answer send one request', sent.length === 1 );
+check( '...and the button is disabled while the request is out', once.btn.disabled === true && once.classList.contains('nino-is-pending') === true );
+
+[ [ 400, 'a refusal of the server' ], [ 500, 'a dead connection' ], [ 408, 'a timeout' ], [ 499, 'an abort' ], [ 429, 'a throttled one' ] ].forEach( function( ending ) {
+	respond( sent.length - 1, ending[0] );
+	check( 'after '+ ending[1] +' the button is given back and the form is no longer pending', once.btn.disabled === false && once.classList.contains('nino-is-pending') === false );
+	const before = sent.length;
+	once.submit();
+	check( '...and the visitor can send it again', sent.length === before + 1 && once.btn.disabled === true );
+} );
+
+respond( sent.length - 1, 200 );
+check( 'a delivered message locks the button as it did', once.btn.disabled === true && once.classList.contains('nino-is-success') === true );
+const delivered = sent.length;
+once.submit();
+check( '...and a submit after it sends nothing', sent.length === delivered );
+
+// A form without a button is driven by Enter alone
+const buttonless = form();
+const withButton = buttonless.querySelectorAll;
+buttonless.querySelectorAll = function( selector ) { return selector === 'button' ? [] : withButton.call( buttonless, selector ) };
+forms.push( buttonless );
+sandbox.Nino.ui.onReady();
+buttonless.fill( { name : 'Someone', email : 'someone@example.com', message : 'Hello.' } );
+sent.length = 0;
+buttonless.submit();
+check( 'a form without a button still posts once', sent.length === 1 );
+buttonless.submit();
+check( '...and not twice', sent.length === 1 );
+respond( sent.length - 1, 200 );
+check( 'a delivered message on a form without a button locks its fields', buttonless.classList.contains('nino-is-success') === true && buttonless.fieldList.every( function( f ) { return f.disabled === true } ) );
+
+// The address field: the pattern is for a value, not for none
+const optional = form();
+forms.push( optional );
+sandbox.Nino.ui.onReady();
+optional.fieldList[2].required = false;
+optional.fill( { name : 'Someone', email : '', message : 'Hello.' } );
+sent.length = 0;
+optional.submit();
+check( 'an optional address left empty is no error', sent.length === 1 && optional.msg.textContent === '' && optional.fieldList[2].getAttribute('aria-invalid') === null );
+check( '...and is posted as empty', sent.length === 1 && sent[0].data.email === '' );
+
+settled( optional );
+optional.fill( { email : 'nope' } );
+optional.submit();
+check( 'an optional address that is not one is refused', sent.length === 1 && optional.msg.textContent === 'Please enter a valid email address.' && optional.fieldList[2].getAttribute('aria-invalid') === 'true' );
+
+// Whitespace is a value like any other here: it is not empty, so the pattern refuses it
+settled( optional );
+optional.fill( { email : '  ' } );
+optional.submit();
+check( 'an optional address of only blanks is refused', sent.length === 1 && optional.msg.textContent === 'Please enter a valid email address.' && optional.fieldList[2].getAttribute('aria-invalid') === 'true' );
+
+const mandatory = form();
+forms.push( mandatory );
+sandbox.Nino.ui.onReady();
+mandatory.fill( { name : 'Someone', email : '', message : 'Hello.' } );
+sent.length = 0;
+mandatory.submit();
+check( 'a required address left empty is refused by the required rule', sent.length === 0 && mandatory.msg.textContent === 'Please fill in every required field.' && mandatory.fieldList[2].getAttribute('aria-invalid') === 'true' );
 
 
 // --- Editor-authored text is never treated as markup --------------------
