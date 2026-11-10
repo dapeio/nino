@@ -981,6 +981,14 @@ The argument is `[ 'nav' => 'main', 'lines' => [ '/:Start', '/members:Members' ]
 } );
 ```
 
+### `/nino/http/request`
+
+`Http::request()` fires it once per request, after the request is composed and the response is seeded with the default headers and before the request is put on the stack that `Http::getRequest()` reads. The argument is the whole `$request`, with `/nino/http/request` and `/nino/http/response` in it. A callback that changes `uri` in both - a module that maps the path of a request by its host, say - changes it for routing and for everything that reads the request later, such as the current page of a navigation and the `return` field of a form, because `getRequest()` answers the copy taken after the last callback ran. A callback therefore reads the request it was given and not `getRequest()`, which has not seen it yet.
+
+### `/nino/html/absolute-url`
+
+`\Nino\Html::absoluteUrl()` fires it once per call, after the address is composed and before it is returned, for a website without an address too. The argument is `[ 'path' => '/page', 'url' => 'https://example.com/page' ]`: the path as it was given and the answer it would otherwise be, `''` where the website has no address. A callback sets `url` to give the path an address of its own, eg. another host for the pages of a module, and leaves `path` as it is; the string in `url` after the last callback is the answer, and anything else is `''`. Without a callback the answer is the one the website has.
+
 ### Two extension surfaces, one idea
 
 A module reaches the framework in two ways, and the difference is not events

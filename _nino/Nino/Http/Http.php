@@ -163,9 +163,14 @@ namespace Nino {
 				'statusCode'	=> 200,
 			];
 
-			array_unshift( $appData['./nino/http/requests'], $request );
-
 			\Nino\Callbacks::doCallbacks( $appData, '/nino/http/request', $request );
+
+			// The copy getRequest() answers is taken after the callbacks ran,
+			// so a callback that changes the uri (a module that maps the path
+			// of a request by its host) changes it for everything that reads
+			// the request later - the navigation's current page, the return
+			// field of a form - not only for routing
+			array_unshift( $appData['./nino/http/requests'], $request );
 		}
 
 		public static function response( array &$appData, array &$request ): void {

@@ -2249,6 +2249,45 @@ $appData['/nino/cache/status'] = false;
 
 echo "\n";
 
+// --- /nino/http/request - what getRequest() answers is what the callbacks left ---
+
+echo "Http::request - the copy getRequest() answers is taken after the /nino/http/request callbacks\n";
+
+/**
+ *	A callback on /nino/http/request that changes the uri changes it for
+ *	getRequest() too, and with no callback the copy is the request as it
+ *	was composed
+ */
+function requestCopyAfterCallbacks( array &$appData ): void {
+
+	$saved = $appData['./nino/callbacks']['/nino/http/request'] ?? null;
+	unset( $appData['./nino/callbacks']['/nino/http/request'] );
+
+	$plain = [ 'REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '/portal/start' ];
+	\Nino\Http::request( $appData, $plain );
+	check( 'without a callback getRequest() answers the request as composed', \Nino\Http::getRequest( $appData )['/nino/http/request']['uri'] === '/portal/start'
+		&& \Nino\Http::getRequest( $appData ) === $plain );
+
+	\Nino\Callbacks::registerCallback( $appData, '/nino/http/request', static function( array &$appData, mixed &$request ): void {
+		$request['/nino/http/request']['uri'] = '/portal-mapped'. $request['/nino/http/request']['uri'];
+		$request['/nino/http/response']['uri'] = $request['/nino/http/request']['uri'];
+	} );
+
+	$mapped = [ 'REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '/portal/start' ];
+	\Nino\Http::request( $appData, $mapped );
+	check( 'a callback that changes the uri changes it for the request it was given', $mapped['/nino/http/request']['uri'] === '/portal-mapped/portal/start' );
+	check( '...and for what getRequest() answers after it, response uri included', \Nino\Http::getRequest( $appData )['/nino/http/request']['uri'] === '/portal-mapped/portal/start'
+		&& \Nino\Http::getRequest( $appData )['/nino/http/response']['uri'] === '/portal-mapped/portal/start' && \Nino\Http::getRequest( $appData ) === $mapped );
+	check( '...and the request before it is kept below it', \Nino\Http::getRequest( $appData, 1 )['/nino/http/request']['uri'] === '/portal/start' );
+
+	if( $saved === null )
+		unset( $appData['./nino/callbacks']['/nino/http/request'] );
+	else
+		$appData['./nino/callbacks']['/nino/http/request'] = $saved;
+}
+
+requestCopyAfterCallbacks( $appData );
+
 // --- Cleanup ------------------------------------------------------------
 
 ninoDone( $appData );

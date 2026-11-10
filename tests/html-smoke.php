@@ -552,6 +552,50 @@ check( '...nothing for an empty text, one part of no name for a text with no cal
 echo "\n";
 
 
+// --- Html::absoluteUrl - the callback that may give an address its own host ----
+
+echo "Html::absoluteUrl - /nino/html/absolute-url, fired with the path and the address, a replaced address is the answer\n";
+
+/**
+ *	absoluteUrl() fires /nino/html/absolute-url with the path as given and
+ *	the address it composed; a callback that sets url is the answer, none
+ *	leaves the answer as it is, and a site without an address fires it too
+ */
+function absoluteUrlHook(): void {
+
+	$hooked = ninoSandbox( 'html-absolute-url' );
+	\Nino\Html::addFills( $hooked, [ '/project/website/general/url' => 'example.com/shop/' ], '*' );
+
+	$plain = [ \Nino\Html::absoluteUrl( $hooked, '/page' ), \Nino\Html::absoluteUrl( $hooked ) ];
+	check( 'without a callback the answer is https:// and the address of the website and the path', $plain === [ 'https://example.com/shop/page', 'https://example.com/shop' ] );
+
+	$seen = [];
+	\Nino\Callbacks::registerCallback( $hooked, '/nino/html/absolute-url', static function( array &$appData, mixed &$args ) use ( &$seen ): void {
+		$seen[] = $args;
+		if( str_starts_with( $args['path'], '/portal' ) === true )
+			$args['url'] = 'https://portal.example.com'. substr( $args['path'], 7 );
+	} );
+
+	check( 'a callback that sets url is the answer', \Nino\Html::absoluteUrl( $hooked, '/portal/login' ) === 'https://portal.example.com/login' );
+	check( '...it receives the path as given and the address the website composed', $seen[0] === [ 'path' => '/portal/login', 'url' => 'https://example.com/shop/portal/login' ] );
+	check( '...and one that leaves url alone leaves the answer as it is', \Nino\Html::absoluteUrl( $hooked, '/page?a=1#b' ) === 'https://example.com/shop/page?a=1#b' && $seen[1]['path'] === '/page?a=1#b' );
+
+	\Nino\Html::addFills( $hooked, [ '/project/website/general/url' => '' ], '*' );
+	$seen = [];
+	check( 'a website without an address fires it too, with an empty url, and a callback may give the path a host', \Nino\Html::absoluteUrl( $hooked, '/portal/x' ) === 'https://portal.example.com/x'
+		&& $seen === [ [ 'path' => '/portal/x', 'url' => '' ] ] && \Nino\Html::absoluteUrl( $hooked, '/page' ) === '' );
+
+	$hooked['./nino/callbacks']['/nino/html/absolute-url'] = [ [ static function( array &$appData, mixed &$args ): void { $args['url'] = 42; } ] ];
+	check( 'a url that is no string is no address', \Nino\Html::absoluteUrl( $hooked, '/page' ) === '' );
+
+	\Nino\Filesystem::removeDir( ninoSandboxDir( $hooked ) );
+}
+
+absoluteUrlHook();
+
+echo "\n";
+
+
 // --- Cleanup ------------------------------------------------------------
 
 ninoDone( $appData );

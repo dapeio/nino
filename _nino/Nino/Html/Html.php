@@ -496,6 +496,12 @@ namespace Nino {
 		 *	A site without an address has no absolute one: the answer is '' and
 		 *	the caller decides what a link without a host is worth.
 		 *
+		 *	The answer is offered to `/nino/html/absolute-url` as
+		 *	`[ 'path' => $path, 'url' => $url ]` before it is returned; a callback
+		 *	may replace `url`, eg. with the address of a path that is served
+		 *	under another host. The hook is fired for a site without an address
+		 *	too, then with an empty `url`.
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$path					Starts with '/' or is '', eg. '/.newsletter/unsubscribe'
 		 *
@@ -505,7 +511,13 @@ namespace Nino {
 
 			$url = trim( (string) self::resolveTextfill( $appData, '/project/website/general/url' ), '/' );
 
-			return $url === '' ? '' : 'https://'. $url. $path;
+			$args = [ 'path' => $path, 'url' => $url === '' ? '' : 'https://'. $url. $path ];
+
+			// Fired for a site without an address too: a module that gives
+			// the path a host of its own does not need the site to have one
+			\Nino\Callbacks::doCallbacks( $appData, '/nino/html/absolute-url', $args );
+
+			return is_string( $args['url'] ?? null ) === true ? $args['url'] : '';
 		}
 
 		private static function _renderShortcodes( array &$appData, string $html ): string {
