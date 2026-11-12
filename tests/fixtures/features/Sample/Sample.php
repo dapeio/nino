@@ -13,6 +13,7 @@ namespace Nino\Modules {
 			// A file the class puts into a bundle by itself, as a feature had to before its
 			// manifest could: it lands behind the ones the manifest names
 			\Nino\Html::addAsset( $appData, '/.cache/script.js', '/features/Sample/assets/late.js' );
+			\Nino\Html::addAsset( $appData, '/.cache/style.css', '/features/Sample/assets/late.css' );
 		}
 
 		// A shortcode answered by a closure written in this class: its scope is

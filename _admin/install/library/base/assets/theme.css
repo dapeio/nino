@@ -2,7 +2,10 @@
  *	theme.css				The look every Nino project starts from. Copied into the
  *									project by the base install unit, first of the two
  *									stylesheets in the css bundle - the project's own
- *									assets/style.css comes after it and overrules it.
+ *									assets/style.css comes after it and overrules it. The
+ *									stylesheets of the features come before it, between
+ *									Nino.css and this file, so a rule here overrules a rule
+ *									of a feature of the same specificity.
  *
  *									Everything below this comment is what the catalogue's
  *									Design feature compiles at its defaults: the eighteen

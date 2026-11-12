@@ -397,6 +397,12 @@ or the recovery page.
 
 - Maintain keyboard focus, labels, error text, small viewports, coarse pointers,
   and `prefers-reduced-motion`; do not encode meaning only by color or hover.
+- The style bundle has one order: `Nino.css`, the stylesheets of features and
+  modules, then the project's `assets/theme.css` and `assets/style.css`
+  (`\Nino\Html::addAsset()` keeps it, see [Assets](docs/features.md#assets)). A
+  rule of the theme or of the project overrules a rule of a feature of the same
+  specificity. That is what the kernel does; a feature SHOULD NOT build on where
+  its stylesheet stands in relation to the theme.
 - A design layer turns `_nino/Nino.css` through the custom properties its
   `:root` declares, and the comments there are the reference. A new default is
   declared in `Nino.css`; the delivered `theme.css` is the body the catalogue's

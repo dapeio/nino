@@ -490,7 +490,7 @@ The respective target names are then included as shortcodes:
 
 Only if the target name ends with `.min` is it additionally minified. The cache considers path, size, and modification time of the source files.
 
-A feature does not write that array. It names its files under `assets` in its manifest, and `\Nino\Features::registerAssets()` adds every `.css` to `/.cache/style.css` and every `.js` to `/.cache/script.js` while the feature is active - see [Assets](features.md#assets).
+A feature does not write that array. It names its files under `assets` in its manifest, and `\Nino\Features::registerAssets()` adds every `.css` to `/.cache/style.css` and every `.js` to `/.cache/script.js` while the feature is active - see [Assets](features.md#assets). What a feature or a module adds with `\Nino\Html::addAsset()` stands behind the kernel's files and in front of the project's own files below `/assets/`, whatever order the files come in, so that `assets/theme.css` and `assets/style.css` are the last of the stylesheet bundle and overrule the rules of a feature that have the same weight.
 
 Assets deliberately **do not** go through the full HTML+ engine. Only the two secure directory fills are replaced: `[[/nino/dir]]` and `[[/nino/public]]`. This prevents editorial textfills or shortcodes from inadvertently generating executable CSS or JavaScript code. Both are needed - `Nino.ui.js` falls back to `[[/nino/dir]]/.form` for a form that carries no action of its own, and the base unit's `theme.css` addresses its three webfonts through `[[/nino/public]]`.
 

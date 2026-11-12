@@ -169,13 +169,31 @@ namespace Nino {
 		}
 
 		/**
-		 *	Put a file into one of the bundles of the site, once: it is added
-		 *	behind the files the bundle holds, and a file that is in the list
-		 *	already is not added again. The [assets] shortcode of a template
-		 *	builds a bundle from its list; a feature's manifest key 'assets' does
-		 *	this at every boot for the files it names (see
-		 *	\Nino\Features::registerAssets()), and a feature that wants another
-		 *	bundle calls this in its init().
+		 *	Put a file into one of the bundles of the site, once, in the one order
+		 *	every bundle has: the files of the kernel ('/_nino/...') first, then what
+		 *	features and modules add, in the order they add it, and the project's
+		 *	own files last - the ones below '/assets/' (private/assets/), theme.css
+		 *	and style.css among them, in the order the list holds them. So a rule of
+		 *	the theme or of the project overrules a rule of a feature of the same
+		 *	weight, and a rule of a feature overrules one of the kernel's.
+		 *
+		 *	A file of the project is added at the end. Any other file goes in front
+		 *	of the first file of the project that stands after the last file of the
+		 *	kernel in the list, and at the end of a bundle that has no such file. A
+		 *	file the list holds already is not added again, and the list that
+		 *	config.php holds is never reordered.
+		 *
+		 *	A file is the file \Nino\Filesystem::path() resolves its path to, so
+		 *	'/assets/x.css', '/private/assets/x.css', 'assets/x.css' and
+		 *	'//assets/x.css' are one file, one of the project, and stand once. Paths
+		 *	are compared as they resolve, letter for letter: write a path in the
+		 *	case of its directory. The whole name of a directory counts, never the
+		 *	beginning of one ('/private/assetsx/a.css' is no file of the project).
+		 *
+		 *	The [assets] shortcode of a template builds a bundle from its list; a
+		 *	feature's manifest key 'assets' does this at every boot for the files it
+		 *	names (see \Nino\Features::registerAssets()), and a feature that wants
+		 *	another bundle calls this in its init().
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$library			The bundle, named by the file it is written to: '/.cache/style.css' or '/.cache/script.js'
@@ -185,10 +203,59 @@ namespace Nino {
 		 */
 		public static function addAsset( array &$appData, string $library, string $assetfile ): void {
 
-			$appData['/nino/html/assets'][$library] = $appData['/nino/html/assets'][$library] ?? [];
+			// What is no string in a list a person wrote names no file: it is left out, as the bundle leaves it out
+			$files	= array_values( array_filter( (array) ( $appData['/nino/html/assets'][$library] ?? [] ), 'is_string' ) );
+			$new		= self::_assetPath( $appData, $assetfile );
 
-			if( in_array( $assetfile, $appData['/nino/html/assets'][$library] ) === false )
-				$appData['/nino/html/assets'][$library][] = $assetfile;
+			// Each path of the list is resolved once: this runs for every file of every feature at every boot
+			$paths = [];
+			foreach( $files as $index => $file )
+				$paths[$index] = self::_assetPath( $appData, $file );
+
+			foreach( $files as $index => $file )
+				if( $file === $assetfile || ( $new !== '' && $paths[$index] === $new ) ) {
+					$appData['/nino/html/assets'][$library] = $files;
+					return;
+				}
+
+			$position	= count( $files );
+			$project	= \Nino\Filesystem::path( $appData, '/assets' ). '/';
+
+			if( $new === '' || str_starts_with( $new, $project ) === false ) {
+
+				// After the last file of the kernel, the first file of the project
+				$kernel			= \Nino\Filesystem::path( $appData, '/_nino' ). '/';
+				$lastKernel	= -1;
+				foreach( $paths as $index => $path )
+					if( $path !== '' && str_starts_with( $path, $kernel ) === true )
+						$lastKernel = $index;
+
+				for( $index = $lastKernel + 1; $index < count( $files ); $index++ )
+					if( $paths[$index] !== '' && str_starts_with( $paths[$index], $project ) === true ) {
+						$position = $index;
+						break;
+					}
+			}
+
+			array_splice( $files, $position, 0, [ $assetfile ] );
+			$appData['/nino/html/assets'][$library] = $files;
+		}
+
+		/**
+		 *	The file a path in a bundle's list is: the absolute path the file
+		 *	system resolves it to, '' for a path it refuses ('..', a NUL byte)
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$assetfile			A path of a bundle's list
+		 *
+		 *	@return 	string
+		 */
+		private static function _assetPath( array &$appData, string $assetfile ): string {
+
+			if( $assetfile === '' || str_contains( $assetfile, '..' ) === true || str_contains( $assetfile, "\0" ) === true )
+				return '';
+
+			return \Nino\Filesystem::path( $appData, $assetfile );
 		}
 
 		/**

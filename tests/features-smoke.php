@@ -761,8 +761,146 @@ require '. var_export( dirname( __DIR__ ). '/_nino/Nino.php', true ). ';
 $appData = \\Nino\\init();
 echo json_encode( [ $appData[\'/nino/html/assets\'], \\Nino\\Html::shortcodes( $appData ) ] );' );
 $booted = json_decode( (string) shell_exec( escapeshellarg( PHP_BINARY ). ' '. escapeshellarg( $bootDir. '/boot.php' ). ' 2>/dev/null' ), true ) ?? [];
-check( 'a boot lists the files of an active feature in the two bundles - behind the kernel\'s own, ahead of what its class adds itself, once each - and has its components registered', ( $booted[0]['/.cache/style.css'] ?? [] ) === [ '/_nino/Nino.css', '/features/Sample/assets/sample.css' ]
+check( 'a boot lists the files of an active feature in the two bundles - behind the kernel\'s own, ahead of what its class adds itself, once each - and has its components registered', ( $booted[0]['/.cache/style.css'] ?? [] ) === [ '/_nino/Nino.css', '/features/Sample/assets/sample.css', '/features/Sample/assets/late.css' ]
 	&& ( $booted[0]['/.cache/script.js'] ?? [] ) === [ '/_nino/Nino.js', '/_nino/Nino.ui.js', '/features/Sample/assets/sample.js', '/features/Sample/assets/late.js' ] && array_diff( [ 'greeting', 'caption', 'sample' ], $booted[1] ?? [] ) === [] );
+
+echo "\n";
+
+// --- The order of a bundle ---------------------------------------------------
+
+echo "Html::addAsset - the kernel's files first, what features and modules add next, the project's own last\n";
+
+/*	One order for every bundle of the site, kept by addAsset() wherever a file comes from. The files of the project are
+	the ones below /assets/ (private/assets/): theme.css and style.css, and what else a project lists there	*/
+$ordered = ninoSandbox( 'assets-order' );
+$ordered['/nino/dir'] = '';
+$ordered['/nino/html/assets'] = [
+	'/.cache/style.css'	=> [ '/_nino/Nino.css', '/assets/theme.css', '/assets/style.css' ],
+	'/.cache/script.js'	=> [ '/_nino/Nino.js', '/assets/site.js' ],
+	'/.cache/plain.css'	=> [ '/_nino/Nino.css' ],
+];
+\Nino\Html::addAsset( $ordered, '/.cache/style.css', '/features/First/assets/first.css' );
+\Nino\Html::addAsset( $ordered, '/.cache/style.css', '/features/Second/assets/second.css' );
+\Nino\Html::addAsset( $ordered, '/.cache/style.css', '/features/First/assets/first.css' );
+check( 'a file that is not the project\'s goes in front of the first file of the project, after the files added before it, and a second registration adds nothing',
+	$ordered['/nino/html/assets']['/.cache/style.css'] === [ '/_nino/Nino.css', '/features/First/assets/first.css', '/features/Second/assets/second.css', '/assets/theme.css', '/assets/style.css' ] );
+
+\Nino\Html::addAsset( $ordered, '/.cache/style.css', '/assets/extra.css' );
+\Nino\Html::addAsset( $ordered, '/.cache/style.css', '/assets/extra.css' );
+\Nino\Html::addAsset( $ordered, '/.cache/style.css', '/assets/theme.css' );
+check( 'a file of the project is added at the end, once, and one the list holds already keeps its place',
+	$ordered['/nino/html/assets']['/.cache/style.css'] === [ '/_nino/Nino.css', '/features/First/assets/first.css', '/features/Second/assets/second.css', '/assets/theme.css', '/assets/style.css', '/assets/extra.css' ] );
+
+\Nino\Html::addAsset( $ordered, '/.cache/style.css', '/features/Third/assets/third.css' );
+check( '...and a file added after it still goes in front of all of the project\'s',
+	array_slice( $ordered['/nino/html/assets']['/.cache/style.css'], 3, 2 ) === [ '/features/Third/assets/third.css', '/assets/theme.css' ] );
+
+\Nino\Html::addAsset( $ordered, '/.cache/script.js', '/features/First/assets/first.js' );
+\Nino\Html::addAsset( $ordered, '/.cache/plain.css', '/features/First/assets/first.css' );
+\Nino\Html::addAsset( $ordered, '/.cache/plain.css', '/features/Second/assets/second.css' );
+\Nino\Html::addAsset( $ordered, '/.cache/new.css', '/features/First/assets/first.css' );
+check( 'the script bundle follows the same rule as the style bundle',
+	$ordered['/nino/html/assets']['/.cache/script.js'] === [ '/_nino/Nino.js', '/features/First/assets/first.js', '/assets/site.js' ] );
+check( 'a bundle with no file of the project gets what is added at the end, in the order of the calls, and a bundle that was not there starts with it',
+	$ordered['/nino/html/assets']['/.cache/plain.css'] === [ '/_nino/Nino.css', '/features/First/assets/first.css', '/features/Second/assets/second.css' ]
+	&& $ordered['/nino/html/assets']['/.cache/new.css'] === [ '/features/First/assets/first.css' ] );
+
+// The list a project wrote itself is read as it is: a file of a feature that config.php lists behind the project's own stays there
+$ordered['/nino/html/assets']['/.cache/mixed.css'] = [ '/assets/a.css', '/features/Own/assets/own.css' ];
+\Nino\Html::addAsset( $ordered, '/.cache/mixed.css', '/features/Other/assets/other.css' );
+check( 'a list that config.php wrote is never reordered: the new file goes in front of the first file of the project and the rest stays where it was',
+	$ordered['/nino/html/assets']['/.cache/mixed.css'] === [ '/features/Other/assets/other.css', '/assets/a.css', '/features/Own/assets/own.css' ] );
+
+// A file of the project in front of the kernel's own: the features go behind the last file of the kernel, not in front of everything
+$ordered['/nino/html/assets']['/.cache/lead.css'] = [ '/assets/fonts.css', '/_nino/Nino.css', '/assets/theme.css', '/assets/style.css' ];
+\Nino\Html::addAsset( $ordered, '/.cache/lead.css', '/features/First/assets/first.css' );
+\Nino\Html::addAsset( $ordered, '/.cache/lead.css', '/features/Second/assets/second.css' );
+check( 'a file of the project in front of the kernel\'s own stays there, and what is added goes behind the last file of the kernel, in front of the first file of the project after it',
+	$ordered['/nino/html/assets']['/.cache/lead.css'] === [ '/assets/fonts.css', '/_nino/Nino.css', '/features/First/assets/first.css', '/features/Second/assets/second.css', '/assets/theme.css', '/assets/style.css' ] );
+$ordered['/nino/html/assets']['/.cache/lead-only.css'] = [ '/assets/fonts.css', '/_nino/Nino.css' ];
+\Nino\Html::addAsset( $ordered, '/.cache/lead-only.css', '/features/First/assets/first.css' );
+check( '...and with no file of the project behind the kernel\'s it goes to the end',
+	$ordered['/nino/html/assets']['/.cache/lead-only.css'] === [ '/assets/fonts.css', '/_nino/Nino.css', '/features/First/assets/first.css' ] );
+
+// The spellings of one file of the project, and the names that only look like its directory
+$ordered['/nino/html/assets']['/.cache/spell.css'] = [ '/_nino/Nino.css', '/assets/theme.css' ];
+foreach( [ '/private/assets/theme.css', 'assets/theme.css', '//assets/theme.css' ] as $spelling )
+	\Nino\Html::addAsset( $ordered, '/.cache/spell.css', $spelling );
+check( 'a file of the project under another spelling is the file the list holds already, and stands once',
+	$ordered['/nino/html/assets']['/.cache/spell.css'] === [ '/_nino/Nino.css', '/assets/theme.css' ] );
+foreach( [ '/private/assets/own.css', 'assets/own2.css', '//assets/own3.css' ] as $spelling )
+	\Nino\Html::addAsset( $ordered, '/.cache/spell.css', $spelling );
+\Nino\Html::addAsset( $ordered, '/.cache/spell.css', '/features/First/assets/first.css' );
+check( '...and under each spelling it is a file of the project: added at the end, with a file of a feature in front of it',
+	$ordered['/nino/html/assets']['/.cache/spell.css'] === [ '/_nino/Nino.css', '/features/First/assets/first.css', '/assets/theme.css', '/private/assets/own.css', 'assets/own2.css', '//assets/own3.css' ] );
+foreach( [ '/private/assetsx/x.css', '/Assets/y.css' ] as $lookalike )
+	\Nino\Html::addAsset( $ordered, '/.cache/spell.css', $lookalike );
+check( 'a path that only starts like the directory (a folder assetsx beside it, another case) is no file of the project: it goes in front of the project\'s, not behind',
+	array_slice( $ordered['/nino/html/assets']['/.cache/spell.css'], 2, 2 ) === [ '/private/assetsx/x.css', '/Assets/y.css' ] );
+$ordered['/nino/html/assets']['/.cache/odd.css'] = [ '/_nino/Nino.css', [ 'nested' ], 7, null, '/assets/theme.css' ];
+$odd = ninoErrors( static function() use ( &$ordered ): void { \Nino\Html::addAsset( $ordered, '/.cache/odd.css', '/features/First/assets/first.css' ); } );
+check( 'what is no string in a list a person wrote is left out and raises nothing: the file goes between the kernel\'s and the project\'s',
+	$ordered['/nino/html/assets']['/.cache/odd.css'] === [ '/_nino/Nino.css', '/features/First/assets/first.css', '/assets/theme.css' ] && $odd === [] );
+$ordered['/nino/html/assets']['/.cache/two.css'] = [ '/_nino/Nino.css', '/assets/theme.css', '/_nino/Nino.ui.css', '/assets/style.css' ];
+\Nino\Html::addAsset( $ordered, '/.cache/two.css', '/features/First/assets/first.css' );
+check( '...and with files of the kernel at two places it is the last of them the file goes behind',
+	$ordered['/nino/html/assets']['/.cache/two.css'] === [ '/_nino/Nino.css', '/assets/theme.css', '/_nino/Nino.ui.css', '/features/First/assets/first.css', '/assets/style.css' ] );
+\Nino\Filesystem::removeDir( ninoSandboxDir( $ordered ) );
+
+/*	The boot itself, in a process of its own, over a project whose config.php lists both bundles with the files of the
+	project in them, the feature Sample on and its module adding a style sheet and a script in init(). The cascade of the
+	site is the bundle that is built, so the check reads the file under .cache: the contents stand in the order of the list	*/
+$orderDir = $sandbox. '/order';
+mkdir( $orderDir. '/private/assets', 0755, true );
+file_put_contents( $orderDir. '/private/assets/theme.css', '/* theme */ .sample-greeting { font-weight: 300; }' );
+file_put_contents( $orderDir. '/private/assets/style.css', '/* project */ .sample-greeting { font-weight: 200; }' );
+file_put_contents( $orderDir. '/private/assets/site.js', '/* project script */' );
+file_put_contents( $orderDir. '/private/config.php', '<?php return '. var_export( [
+	'/nino/modules'							=> [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Sample', '\\Nino\\Modules\\Boxy' ],
+	'/nino/locales/available'		=> [ 'de_DE', 'en_US' ],
+	'/nino/locales/native'			=> 'de_DE',
+	'/nino/install/completed'		=> true,
+	'/nino/html/assets'					=> [
+		'/.cache/style.css'	=> [ '/_nino/Nino.css', '/assets/theme.css', '/assets/style.css' ],
+		'/.cache/script.js'	=> [ '/_nino/Nino.js', '/_nino/Nino.ui.js', '/assets/site.js' ],
+	],
+], true ). ';' );
+file_put_contents( $orderDir. '/boot.php', '<?php declare(strict_types=1);
+define( \'NINO_FEATURES_DIR\', '. var_export( __DIR__. '/fixtures/features', true ). ' );
+define( \'NINO_PRIVATE_DIR\', '. var_export( $orderDir. '/private', true ). ' );
+require '. var_export( dirname( __DIR__ ). '/_nino/Nino.php', true ). ';
+$appData = \\Nino\\init();
+echo json_encode( $appData[\'/nino/html/assets\'] );' );
+$ordered = json_decode( (string) shell_exec( escapeshellarg( PHP_BINARY ). ' '. escapeshellarg( $orderDir. '/boot.php' ). ' 2>/dev/null' ), true ) ?? [];
+check( 'a boot with the project\'s files in config.php lists the kernel\'s files, then the feature\'s and the module\'s in the order they were added, then the project\'s own in the order of the list - in both bundles, with two features listed in the order of the list',
+	( $ordered['/.cache/style.css'] ?? [] ) === [ '/_nino/Nino.css', '/features/Sample/assets/sample.css', '/features/Boxy/assets/boxy.css', '/features/Sample/assets/late.css', '/assets/theme.css', '/assets/style.css' ]
+	&& ( $ordered['/.cache/script.js'] ?? [] ) === [ '/_nino/Nino.js', '/_nino/Nino.ui.js', '/features/Sample/assets/sample.js', '/features/Sample/assets/late.js', '/assets/site.js' ] );
+
+// The bundle on disk holds the files in that order: the lists the boot answered, built by the Assets module in a project of its own
+$built = ninoSandbox( 'assets-built' );
+$built['/nino/dir'] = '';
+$built['/nino/html/assets'] = $ordered;
+foreach( [ 'theme.css', 'style.css', 'site.js' ] as $projectFile )
+	\Nino\Filesystem::putFileContent( $built, '/assets/'. $projectFile, (string) file_get_contents( $orderDir. '/private/assets/'. $projectFile ) );
+\Nino\Modules\Assets::doShortcode( $built, [ '/.cache/style.css' ] );
+\Nino\Modules\Assets::doShortcode( $built, [ '/.cache/script.js' ] );
+$builtStyle	= (string) @file_get_contents( \Nino\Filesystem::path( $built, '/.cache/style.css' ) );
+$builtShort	= (string) @file_get_contents( \Nino\Filesystem::path( $built, '/.cache/script.js' ) );
+\Nino\Filesystem::removeDir( ninoSandboxDir( $built ) );
+$where			= static fn( string $bundle, array $needles ): array => array_map( static fn( string $needle ): int|false => strpos( $bundle, $needle ), $needles );
+$styleAt		= $where( $builtStyle, [ '.sample-greeting { font-weight: 600; }', '.sample-greeting { font-weight: 700; }', '/* theme */', '/* project */' ] );
+$scriptAt		= $where( $builtShort, [ 'data-sample', '// Added to the script bundle', '/* project script */' ] );
+check( 'the style bundle built under .cache has the content of the files in that order: the feature, the module, the theme, the project\'s stylesheet',
+	in_array( false, $styleAt, true ) === false && $styleAt === array_values( $styleAt ) && $styleAt[0] < $styleAt[1] && $styleAt[1] < $styleAt[2] && $styleAt[2] < $styleAt[3] );
+check( '...and the script bundle the feature\'s script, the module\'s, the project\'s',
+	in_array( false, $scriptAt, true ) === false && $scriptAt[0] < $scriptAt[1] && $scriptAt[1] < $scriptAt[2] );
+
+/*	A rule of the project with the weight of a rule of a feature wins: the same selector, the same specificity, and the one
+	that comes later in the bundle is the one the browser takes. The last declaration of the property for the selector, read
+	off the built bundle, is the project's	*/
+preg_match_all( '/\.sample-greeting\s*\{\s*font-weight:\s*(\d+)\s*;?\s*\}/', $builtStyle, $greetingWeights );
+check( 'of the rules of the same weight for one selector in the built bundle the last is the project\'s own, after the feature\'s and the module\'s and after the theme\'s',
+	( $greetingWeights[1] ?? [] ) === [ '600', '700', '300', '200' ] );
 
 echo "\n";
 

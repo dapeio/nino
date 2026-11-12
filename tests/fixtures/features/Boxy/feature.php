@@ -7,6 +7,8 @@ return [
 	'name'				=> 'Boxy',
 	'version'			=> '0.1.0',
 	'nino'				=> '^1.0',
+	// A stylesheet of its own: tests/features-smoke.php lists the feature after Sample and reads where the file lands
+	'assets'			=> [ '/features/Boxy/assets/boxy.css' ],
 	'components'	=> [
 		'boxy-link'		=> [
 			'label'				=> 'Link',

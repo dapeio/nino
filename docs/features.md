@@ -116,6 +116,26 @@ feature is listed in `/nino/modules`, `\Nino\Features::registerAssets()` adds ev
 of any module's `init()`, once each and in the order listed. A file for another
 bundle goes through `\Nino\Html::addAsset()`.
 
+A bundle has one order, whichever file it holds and whoever adds it: the kernel's
+files first (`Nino.css`, `Nino.js`), then what features and modules add, in the order
+they add it, then the project's own files - the ones below `/assets/`
+(`private/assets/`), `theme.css` and `style.css` among them - in the order
+`/nino/html/assets` lists them. For the stylesheet that is `Nino.css`, the features,
+`theme.css`, `style.css`: a rule of a feature overrules a rule of `Nino.css` of the
+same specificity, and a rule of the theme or of the project's own `style.css`
+overrules a rule of a feature of the same specificity.
+`\Nino\Html::addAsset()` keeps it. A file of the project goes to the end; any other
+file goes in front of the first file of the project that stands after the last file
+of the kernel in the list, and to the end of a bundle that has none. A file that is
+listed already stays where it is, whatever way its path is written
+(`/assets/x.css`, `/private/assets/x.css`, `assets/x.css` are one file), and the
+list in `config.php` is read as it stands and never reordered. A script of the
+project runs after the scripts of the features. The bundles of the workbench
+(`/_admin/.cache/...`) hold no file of the project and are not touched by the rule.
+
+That is what the kernel does, not a promise to a feature: a feature SHOULD NOT build
+on where its stylesheet stands in relation to the theme.
+
 ### Components and stacks
 
 A shortcode a feature brings stays a shortcode, and a builder cannot offer it. Give

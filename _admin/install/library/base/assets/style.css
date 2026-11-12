@@ -1,7 +1,9 @@
 /**
  *	style.css						This site's own stylesheet - the last thing the css bundle
  *												loads, so a rule here wins over the design tokens, the
- *												theme and the header/footer frame alike.
+ *												theme, the header/footer frame and the stylesheets of
+ *												the features alike (a file of the project that a
+ *												module adds later stands behind this one).
  *
  *												It ships empty on purpose. The delivered look is one
  *												file of its own, assets/theme.css - the design tokens,

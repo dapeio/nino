@@ -98,11 +98,12 @@ The order in the css bundle is the whole contract, and each layer owns one slot 
 
 ```
 _nino/Nino.css              framework defaults
+features and modules        the stylesheets they add, in the order they add them
 assets/theme.css            the look - tokens, roles, fonts, both frames
 assets/style.css            the project's own, shipped empty
 ```
 
-Setup seeds `/nino/html/assets`' bundle with the two project entries if they are not in it yet, and appends rather than replaces - whatever a project added itself keeps its place. `assets/style.css` is written once, empty, and never touched again, so a rule put there overrules everything above it.
+Setup seeds `/nino/html/assets`' bundle with the two project entries if they are not in it yet, and appends rather than replaces - whatever a project added itself keeps its place. The stylesheets of the features and modules are not in that list: they are put into the bundle at every boot, in front of the project's files (see [Assets](features.md#assets)). `assets/style.css` is written once, empty, and never touched again, so a rule put there overrules everything above it, a feature's stylesheet and the theme included. A file of the project that a module adds later is listed behind `style.css`. A feature SHOULD NOT build on where its stylesheet stands in relation to the theme.
 
 Up to Nino 1.1 the wizard asked four questions here - a theme from a catalogue of ten, a header and a footer from thirteen frames, and the design values compiled out of them. It does not any more. The look is changed afterwards by the **Design** feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features/blob/main/features/Design/feature.php), which compiles its own `assets/theme.css` and frame templates over the delivered ones - and asks before it replaces a file it did not write. The delivered `assets/theme.css` is the body of what that compiler writes at its defaults, regenerated from it with each kernel release, so the look a project starts from and the first look Design compiles are one: its file carries the kernel's header and no stamp of the compiler's, which is why Design asks.
 

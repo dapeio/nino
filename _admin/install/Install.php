@@ -693,7 +693,9 @@ namespace Nino\Install {
 			/*	The css bundle of a fresh project, in the one order that makes it
 				work: the framework first, then the look the base unit just
 				delivered, then the project's own - which ships empty and is never
-				touched again, so a rule put there overrules both.
+				touched again, so a rule put there overrules both. The stylesheets
+				of features and modules are not listed here: \Nino\Html::addAsset()
+				puts them in at every boot, in front of these two.
 
 				A kernel on its own carries '/_nino/Nino.css' and nothing else
 				(\Nino\AppData::DEFAULTS), which is the honest default: the two

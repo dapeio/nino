@@ -637,8 +637,12 @@ namespace Nino {
 		 *
 		 *	Asked at every boot by \Nino\init(), ahead of the init() of every module,
 		 *	and so what a feature adds to a bundle itself comes after the files
-		 *	of its manifest. Only the manifests of the features listed in
-		 *	'/nino/modules' are read, as registerComponents() reads them.
+		 *	of its manifest. All of them stand behind the kernel's files and in front
+		 *	of the project's own files below '/assets/' in the list (see
+		 *	\Nino\Html::addAsset()).
+		 *
+		 *	Only the manifests of the features listed in '/nino/modules' are read,
+		 *	as registerComponents() reads them.
 		 *
 		 *	Not the 'assets' of a stack's schema (\Nino\Modules\Components::validate()),
 		 *	which is a note for a tool about the files a stack needs and adds nothing
