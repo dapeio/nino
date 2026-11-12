@@ -133,18 +133,14 @@ namespace Nino {
 		 */
 		public static function add( array &$appData, string $name, callable $callback, mixed $label ): void {
 
-			if( preg_match( '/^[a-z][a-z0-9-]*$/D', $name ) !== 1 ) {
+			if( preg_match( '/^[a-z][a-z0-9-]*$/D', $name ) !== 1 )
 				trigger_error( 'Format::add(): a name is a slug of lower case letters, digits and hyphens, a letter first', E_USER_ERROR );
-				return;
-			}
-
-			if( \Nino\Features::localizedValid( $label ) === false ) {
+			elseif( \Nino\Features::localizedValid( $label ) === false )
 				trigger_error( 'Format::add(): formatter "'. $name. '": "label" must be a string or a locale => string map', E_USER_ERROR );
-				return;
+			else {
+				$appData[self::REGISTRY][$name] = [ 'callback' => $callback, 'label' => $label ];
+				unset( $appData[self::WARNED][$name] );
 			}
-
-			$appData[self::REGISTRY][$name] = [ 'callback' => $callback, 'label' => $label ];
-			unset( $appData[self::WARNED][$name] );
 		}
 
 		/**
