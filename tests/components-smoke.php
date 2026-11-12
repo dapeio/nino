@@ -2148,7 +2148,7 @@ check( 'a registered schema is complete and carries its label in both languages'
 	&& \Nino\Modules\Components::components( $appData )['title']['source'] === 'text'
 	&& \Nino\Modules\Components::components( $appData )['title']['preview'] === 'title'
 	&& \Nino\Modules\Components::components( $appData )['title']['loop'] === true
-	&& array_keys( \Nino\Modules\Components::components( $appData )['title']['attributes'] ) === [ 'tag', 'style', 'color' ] );
+	&& array_keys( \Nino\Modules\Components::components( $appData )['title']['attributes'] ) === [ 'tag', 'style', 'color', 'as', 'prefix', 'suffix' ] );
 check( '...the four titles are labelled by what they are and where they stand, and the card by its name, in both languages',
 	array_map( static fn( array $schema ): array => $schema['label'], array_intersect_key( \Nino\Modules\Components::components( $appData ), array_flip( [ 'title', 'subtitle', 'card-title', 'card-subtitle', 'card' ] ) ) ) === [
 		'title'			=> [ 'en_US' => 'Title (Section)', 'de_DE' => 'Titel (Sektion)' ],
@@ -2167,7 +2167,7 @@ check( 'the module registers again without registering twice - a second init lea
 	&& count( \Nino\Callbacks::registered( $appData, '/nino/html/shortcode/image' ) ) === 1 );
 
 // Defaults come from the schema and nowhere else, as the strings a shortcode carries
-check( 'defaults() are the schema\'s, as strings, with the link of a component that says so before the class every component takes', \Nino\Modules\Components::defaults( $appData, 'title' ) === [ 'tag' => 'h3', 'style' => '', 'color' => '', 'href' => '', 'target' => '', 'class' => '' ]
+check( 'defaults() are the schema\'s, as strings, with the link of a component that says so before the class every component takes', \Nino\Modules\Components::defaults( $appData, 'title' ) === [ 'tag' => 'h3', 'style' => '', 'color' => '', 'as' => '', 'prefix' => '', 'suffix' => '', 'href' => '', 'target' => '', 'class' => '' ]
 	&& \Nino\Modules\Components::defaults( $appData, 'text' )['format'] === 'blocks'
 	&& \Nino\Modules\Components::defaults( $appData, 'spacer' ) === [ 'size' => '2', 'class' => '' ] );
 check( '...a stack has those of the loop, of its grid where it has one, and its own - and none that says what a cell looks like: the card is a component in its content', \Nino\Modules\Components::defaults( $appData, 'stack', true ) === [ 'sort' => '', 'offset' => '0', 'limit' => '0', 'query' => '', 'callback' => '', 'locale' => '', 'id' => '', 'cols' => '100 50 33', 'gap' => '2', 'autoheight' => '0', 'class' => '' ]
@@ -2487,7 +2487,7 @@ check( '...the button draws and is offered everywhere; text, image, html and spa
 		|| array_key_exists( 'draws', \Nino\Modules\Components::components( $appData )[$name] ) === true ) === []
 	&& array_filter( \Nino\Modules\Components::stacks( $appData ), static fn( array $stack ): bool => array_key_exists( 'in', $stack ) === true || array_key_exists( 'draws', $stack ) === true ) === [] );
 check( '...and every title has a tag of its own - the tags it may be drawn as, and the one it is - a style and a colour, and nothing else',
-	array_filter( $sixTags, static fn( array $tags, string $name ): bool => array_keys( \Nino\Modules\Components::components( $appData )[$name]['attributes'] ) !== [ 'tag', 'style', 'color' ]
+	array_filter( $sixTags, static fn( array $tags, string $name ): bool => array_keys( \Nino\Modules\Components::components( $appData )[$name]['attributes'] ) !== [ 'tag', 'style', 'color', 'as', 'prefix', 'suffix' ]
 		|| \Nino\Modules\Components::components( $appData )[$name]['attributes']['tag']['type'] !== 'select'
 		|| \Nino\Modules\Components::components( $appData )[$name]['attributes']['tag']['options'] !== $tags[1]
 		|| \Nino\Modules\Components::components( $appData )[$name]['attributes']['tag']['default'] !== $tags[0]
@@ -2513,8 +2513,8 @@ check( 'the registry has the text of a card: labelled in both languages, a text 
 	$registryOf( 'card-text' )['label'] === [ 'en_US' => 'Text (Card)', 'de_DE' => 'Text (Karte)' ] && $registryOf( 'card-text' )['source'] === 'text' && $registryOf( 'card-text' )['preview'] === 'text'
 	&& $registryOf( 'card-text' )['in'] === [ 'card' ] && $registryOf( 'card-text' )['draws'] === 'div .nino-card-descr' && array_key_exists( 'holds', $registryOf( 'card-text' ) ) === false );
 check( '...with the attributes of [text], format, style and colour, word for word - [text] has the tag besides, after the format, which a text in a card has none of - and [text] is still offered everywhere and draws nothing',
-	array_keys( $registryOf( 'card-text' )['attributes'] ) === [ 'format', 'style', 'color' ] && $registryOf( 'card-text' )['attributes'] === array_diff_key( $registryOf( 'text' )['attributes'], [ 'tag' => 1 ] )
-	&& array_keys( $registryOf( 'text' )['attributes'] ) === [ 'format', 'tag', 'style', 'color' ]
+	array_keys( $registryOf( 'card-text' )['attributes'] ) === [ 'format', 'style', 'color', 'as', 'prefix', 'suffix' ] && $registryOf( 'card-text' )['attributes'] === array_diff_key( $registryOf( 'text' )['attributes'], [ 'tag' => 1 ] )
+	&& array_keys( $registryOf( 'text' )['attributes'] ) === [ 'format', 'tag', 'style', 'color', 'as', 'prefix', 'suffix' ]
 	&& array_key_exists( 'in', $registryOf( 'text' ) ) === false && array_key_exists( 'draws', $registryOf( 'text' ) ) === false );
 check( 'the registry has the image of a card: labelled in both languages, a picture of a slot or an image field, offered in a card alone, drawing the <img> of nino-card-img',
 	$registryOf( 'card-image' )['label'] === [ 'en_US' => 'Image (Card)', 'de_DE' => 'Bild (Karte)' ] && $registryOf( 'card-image' )['source'] === 'image' && $registryOf( 'card-image' )['preview'] === 'image'
@@ -2598,7 +2598,7 @@ $cardSchema = \Nino\Modules\Components::components( $appData )['card'];
 check( 'the card is declared as the registry says: a label in both languages, the source content, the picture of a block, its icon, offered in a section, drawing the <article> with its class, and holding the components of a card',
 	$cardSchema['label'] === [ 'en_US' => 'Card', 'de_DE' => 'Karte' ] && $cardSchema['source'] === 'content' && $cardSchema['loop'] === true && $cardSchema['preview'] === 'block'
 	&& $cardSchema['in'] === [ 'section' ] && $cardSchema['draws'] === 'article .nino-card' && $cardSchema['holds'] === 'card'
-	&& array_keys( $cardSchema ) === [ 'label', 'source', 'loop', 'preview', 'icon', 'attributes', 'in', 'draws', 'holds', 'stretched', 'link', 'by', 'group' ] );
+	&& array_keys( $cardSchema ) === [ 'label', 'source', 'loop', 'preview', 'icon', 'attributes', 'in', 'draws', 'holds', 'stretched', 'link', 'formatted', 'by', 'group' ] );
 check( '...it says stretched itself no more than a holder can - false, and the registry gives it back in json - and its schema has no key for the component whose address it takes: the title says that of itself, \'card-title\' and \'title\' are the two components of the kernel that do',
 	$cardSchema['stretched'] === false && ( (array) json_decode( (string) json_encode( \Nino\Modules\Components::components( $appData ) ), true ) )['card']['stretched'] === false
 	&& array_key_exists( 'stretches', $cardSchema ) === false
@@ -2718,7 +2718,7 @@ check( '...a clean schema with a tab validates again as it is, and the component
 // A link on a component, who registered it: the clean schema says both, after the keys of its place, and a stack has neither
 $linkable = [ 'label' => 'x', 'source' => 'text', 'attributes' => [ 'tag' => [ 'type' => 'select', 'options' => [ 'div', 'h3' ], 'default' => 'h3' ] ] ];
 check( 'validate() takes whether a component can be a link and who registered it - false and nino where the schema says nothing - and the clean schema has the two last, after holds; a stack has neither, whatever it says',
-	array_keys( \Nino\Modules\Components::validate( 'probe', $linkable + [ 'in' => [ 'card' ], 'draws' => '{tag} .x', 'link' => true, 'by' => 'hello' ] ) ) === [ 'label', 'source', 'loop', 'preview', 'attributes', 'in', 'draws', 'stretched', 'link', 'by' ]
+	array_keys( \Nino\Modules\Components::validate( 'probe', $linkable + [ 'in' => [ 'card' ], 'draws' => '{tag} .x', 'link' => true, 'by' => 'hello' ] ) ) === [ 'label', 'source', 'loop', 'preview', 'attributes', 'in', 'draws', 'stretched', 'link', 'formatted', 'by' ]
 	&& ( \Nino\Modules\Components::validate( 'probe', $linkable + [ 'link' => true, 'by' => 'hello' ] )['link'] ?? null ) === true && ( \Nino\Modules\Components::validate( 'probe', $linkable + [ 'link' => true, 'by' => 'hello' ] )['by'] ?? null ) === 'hello'
 	&& ( \Nino\Modules\Components::validate( 'probe', $linkable + [ 'group' => 'global' ] )['link'] ?? null ) === false && ( \Nino\Modules\Components::validate( 'probe', $linkable + [ 'group' => 'global' ] )['by'] ?? null ) === 'nino'
 	&& array_diff_key( (array) \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'link' => true, 'by' => 'hello' ], true ), [ 'label' => 1, 'grid' => 1, 'cell' => 1, 'panels' => 1, 'preview' => 1, 'attributes' => 1 ] ) === []
@@ -2736,7 +2736,7 @@ $groupSentence = 'component "probe": "group" must be one of section, card, globa
 $featureSentence = 'component "probe": a feature\'s components are offered under the feature, not under a group';
 check( 'validate() takes the group a component is offered under, one of the three words, and the clean schema carries it as its last key, after who registered it; a stack has none, whatever it says',
 	array_filter( \Nino\Modules\Components::GROUPS, static fn( string $group ): bool => ( \Nino\Modules\Components::validate( 'probe', $ungrouped + [ 'group' => $group ] )['group'] ?? null ) !== $group ) === []
-	&& array_keys( \Nino\Modules\Components::validate( 'probe', $placed ) ) === [ 'label', 'source', 'loop', 'preview', 'attributes', 'stretched', 'link', 'by', 'group' ]
+	&& array_keys( \Nino\Modules\Components::validate( 'probe', $placed ) ) === [ 'label', 'source', 'loop', 'preview', 'attributes', 'stretched', 'link', 'formatted', 'by', 'group' ]
 	&& array_key_exists( 'group', (array) \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'group' => 'section' ], true ) ) === false
 	&& \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'group' => 'footer' ], true ) === \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x' ], true ) );
 check( '...and gives the sentence for a component of the kernel or of a project that names none, says nino and none, or names a word that is none of the three: a fourth word, one in capitals, one with a space, an empty word, a number, a list',
@@ -2775,7 +2775,7 @@ foreach( array_intersect_key( \Nino\Modules\Components::components( $appData ), 
 check( 'the kernel says how a tool draws an attribute where it matters: the alignment of a card as icons, the format of a text and the size and the width of a button as a row of buttons - and says nothing else',
 	$kernelInputs === [ 'text.format' => 'segment', 'card-text.format' => 'segment', 'card.vertical' => 'icons', 'card.align' => 'icons', 'button.size' => 'segment', 'button.width' => 'segment' ] );
 $kernelTabs = [];
-foreach( array_intersect_key( \Nino\Modules\Components::components( $appData ), array_flip( $kernelAll ) ) as $kernelTabName => $kernelTabSchema )
+foreach( array_intersect_key( \Nino\Modules\Components::registered( $appData ), array_flip( $kernelAll ) ) as $kernelTabName => $kernelTabSchema )
 	foreach( $kernelTabSchema['attributes'] as $kernelTabAttribute => $kernelTabDeclared )
 		if( isset( $kernelTabDeclared['tab'] ) === true )
 			$kernelTabs[$kernelTabName. '.'. $kernelTabAttribute] = $kernelTabDeclared['tab'];
@@ -2786,10 +2786,10 @@ $sixTexts = [ 'title', 'subtitle', 'text', 'card-title', 'card-subtitle', 'card-
 check( 'the style of the six text components is a variant - none, loud or quiet, and for the title and the subtitle of a section hero as well - of the class each is named for, and their colour another, the last attribute after the style: none, muted or accent, written as nino-ink--<word>, the ink of the ground the text stands on',
 	array_filter( $sixTexts, static fn( string $name ): bool => ( $registryOf( $name )['attributes']['style'] ?? null ) !== [ 'type' => 'variant', 'label' => [ 'en_US' => 'Style', 'de_DE' => 'Stil' ], 'hint' => '', 'options' => in_array( $name, [ 'title', 'subtitle' ], true ) === true ? [ '', 'loud', 'hero', 'quiet' ] : [ '', 'loud', 'quiet' ], 'default' => '' ]
 		|| ( $registryOf( $name )['attributes']['color'] ?? null ) !== [ 'type' => 'variant', 'label' => [ 'en_US' => 'Text colour', 'de_DE' => 'Text-Farbe' ], 'hint' => '', 'options' => [ '', 'muted', 'accent' ], 'prefix' => 'nino-ink--', 'default' => '' ]
-		|| array_slice( array_keys( $registryOf( $name )['attributes'] ), -2 ) !== [ 'style', 'color' ] ) === []
+		|| array_slice( array_keys( array_diff_key( $registryOf( $name )['attributes'], [ 'as' => 1, 'prefix' => 1, 'suffix' => 1 ] ) ), -2 ) !== [ 'style', 'color' ] ) === []
 	&& array_keys( array_filter( array_intersect_key( \Nino\Modules\Components::components( $appData ), array_flip( $kernelAll ) ), static fn( array $schema ): bool => isset( $schema['attributes']['color'] ) === true ) ) === $sixTexts );
 check( '...the width of a button comes after its size, none or full, and the button has its address and its target from the one place the link of a component is declared: word for word what a link gives a component',
-	array_keys( $registryOf( 'button' )['attributes'] ) === [ 'href', 'style', 'size', 'width', 'target' ]
+	array_keys( $registryOf( 'button' )['attributes'] ) === [ 'href', 'style', 'size', 'width', 'target', 'as', 'prefix', 'suffix' ]
 	&& $registryOf( 'button' )['attributes']['width'] === [ 'type' => 'select', 'label' => [ 'en_US' => 'Width', 'de_DE' => 'Breite' ], 'hint' => '', 'input' => 'segment', 'options' => [ '', 'full' ], 'default' => '' ]
 	&& array_diff_key( $registryOf( 'button' )['attributes']['href'], [ 'label' => 1, 'hint' => 1 ] ) === [ 'type' => 'href', 'default' => '' ] && $registryOf( 'button' )['attributes']['href']['label'] === $linkAttributes['href']['label'] && $registryOf( 'button' )['attributes']['href']['hint'] === $linkAttributes['href']['hint']
 	&& $registryOf( 'button' )['attributes']['target']['label'] === $linkAttributes['target']['label'] && $registryOf( 'button' )['attributes']['target']['options'] === $linkAttributes['target']['options'] );
@@ -2806,10 +2806,10 @@ check( '...and the one attribute it has of its own is alternate, a bool that is 
 	array_keys( \Nino\Modules\Components::stacks( $appData )['sections']['attributes'] ) === [ 'alternate' ] && ( $sectionsAlternate['type'] ?? '' ) === 'bool' && ( $sectionsAlternate['default'] ?? null ) === false
 	&& array_filter( [ 'label', 'hint' ], static fn( string $words ): bool => array_keys( (array) ( $sectionsAlternate[$words] ?? [] ) ) !== [ 'en_US', 'de_DE' ] || in_array( '', $sectionsAlternate[$words], true ) === true ) === [] );
 
-check( 'a clean schema validates again as it is - what a manifest hands over after Features::manifest() has read it', \Nino\Modules\Components::validate( 'title', \Nino\Modules\Components::components( $appData )['title'] ) === \Nino\Modules\Components::components( $appData )['title']
+check( 'a clean schema validates again as it is - what a manifest hands over after Features::manifest() has read it', \Nino\Modules\Components::validate( 'title', \Nino\Modules\Components::registered( $appData )['title'] ) === \Nino\Modules\Components::registered( $appData )['title']
 	&& \Nino\Modules\Components::validate( 'filter', \Nino\Modules\Components::stacks( $appData )['filter'], true ) === \Nino\Modules\Components::stacks( $appData )['filter'] );
 check( '...icon and all: each of the fourteen, and a component registered with an icon of its own, validates again as it is, the parts and the maps of the icon in the order they were in',
-	array_filter( array_merge( $kernelAll, [ 'pictured' ] ), static fn( string $name ): bool => \Nino\Modules\Components::validate( $name, \Nino\Modules\Components::components( $appData )[$name] ) !== \Nino\Modules\Components::components( $appData )[$name] ) === [] );
+	array_filter( array_merge( $kernelAll, [ 'pictured' ] ), static fn( string $name ): bool => \Nino\Modules\Components::validate( $name, \Nino\Modules\Components::registered( $appData )[$name] ) !== \Nino\Modules\Components::registered( $appData )[$name] ) === [] );
 \Nino\Callbacks::registerCallback( $appData, '/test/removable', static fn( array &$appData, mixed &$args ): string => 'x' );
 \Nino\Callbacks::registerCallback( $appData, '/test/removable', static fn( array &$appData, mixed &$args ): string => 'y' );
 check( 'Callbacks::removeCallbacks() takes every callable under a name away, and only those', count( \Nino\Callbacks::registered( $appData, '/test/removable' ) ) === 2
@@ -3133,7 +3133,7 @@ $textTag = $registryOf( 'text' )['attributes']['tag'] ?? [];
 check( '[text] has a tag, a choice of p, div and span, the p where the call names none: the labelled select of the registry, with a hint that says what the format blocks does with it - and the text of a card has none',
 	( $textTag['type'] ?? null ) === 'select' && ( $textTag['options'] ?? null ) === [ 'p', 'div', 'span' ] && ( $textTag['default'] ?? null ) === 'p'
 	&& ( $textTag['label'] ?? null ) === [ 'en_US' => 'HTML tag', 'de_DE' => 'HTML-Tag' ] && array_keys( (array) ( $textTag['hint'] ?? null ) ) === [ 'en_US', 'de_DE' ]
-	&& \Nino\Modules\Components::defaults( $appData, 'text' ) === [ 'format' => 'blocks', 'tag' => 'p', 'style' => '', 'color' => '', 'href' => '', 'target' => '', 'class' => '' ]
+	&& \Nino\Modules\Components::defaults( $appData, 'text' ) === [ 'format' => 'blocks', 'tag' => 'p', 'style' => '', 'color' => '', 'as' => '', 'prefix' => '', 'suffix' => '', 'href' => '', 'target' => '', 'class' => '' ]
 	&& array_key_exists( 'tag', $registryOf( 'card-text' )['attributes'] ) === false );
 check( '...the format inline and the format lines are written in the element that was asked for - the p by default - with the classes they always had, the colour and the class of its own behind them',
 	$render( '[text /template/page-home/services/text format="inline"]' ) === '<p class="nino-section-text">One a</p>'
@@ -3944,7 +3944,7 @@ check( 'the stack table is registered with the style as its one attribute, no gr
 $colSchema = \Nino\Modules\Components::components( $appData )['col'];
 $lineSchema = \Nino\Modules\Components::components( $appData )['line'];
 check( '...[col] stands in a table and nowhere else, has no source, a field and an alignment and is a global component; [line] stands wherever [text] does, takes a text as [text] does and has a tag of p, span or div',
-	$colSchema['in'] === [ 'table' ] && $colSchema['source'] === 'none' && array_keys( $colSchema['attributes'] ) === [ 'field', 'align' ] && $colSchema['attributes']['align']['options'] === [ '', 'right', 'center' ]
+	$colSchema['in'] === [ 'table' ] && $colSchema['source'] === 'none' && array_keys( $colSchema['attributes'] ) === [ 'field', 'align', 'as', 'prefix', 'suffix' ] && $colSchema['attributes']['align']['options'] === [ '', 'right', 'center' ]
 	&& $colSchema['group'] === 'global' && array_key_exists( 'holds', $colSchema ) === false
 	&& array_key_exists( 'in', $lineSchema ) === false && array_key_exists( 'in', \Nino\Modules\Components::components( $appData )['text'] ) === false
 	&& $lineSchema['source'] === 'text' && $lineSchema['attributes']['tag']['options'] === [ 'p', 'span', 'div' ] && $lineSchema['attributes']['tag']['default'] === 'p' && $lineSchema['group'] === 'global' );
@@ -4243,7 +4243,7 @@ check( 'a stack may declare a text, and it is a line of the type string: a choic
 	&& str_contains( (string) \Nino\Modules\Components::validate( 'textprobe', [ 'label' => 'x', 'source' => 'text', 'group' => 'global', 'attributes' => [ 'text' => [ 'type' => 'string', 'default' => '' ] ] ] ), 'cannot be an attribute' ) === true );
 check( 'the field of a column is an attribute of the type field, as the title of the tabs and the accordion is, so that a tool sees one type for the field of an element',
 	\Nino\Modules\Components::components( $appData )['col']['attributes']['field']['type'] === 'field' && \Nino\Modules\Components::stacks( $appData )['tabs']['attributes']['title']['type'] === 'field'
-	&& \Nino\Modules\Components::defaults( $appData, 'col' ) === [ 'field' => '', 'align' => '', 'class' => '' ] );
+	&& \Nino\Modules\Components::defaults( $appData, 'col' ) === [ 'field' => '', 'align' => '', 'as' => '', 'prefix' => '', 'suffix' => '', 'class' => '' ] );
 
 // Three elements to run the new loops over, the second with an empty field and the third with a field full of markup and fills
 \Nino\Elements::insertElementType( $appData, '/tabbed', [ 'title' => [ 'type' => 'string', 'locale' => true ], 'head' => [ 'type' => 'string' ], 'body' => [ 'type' => 'string' ], 'n' => [ 'type' => 'integer' ], 'photo' => [ 'type' => 'image', 'width' => 400, 'height' => 300 ], 'tags' => [ 'type' => 'array' ], 'rich' => [ 'type' => 'string', 'html' => true ], 'blocks' => [ 'type' => 'string', 'html' => true, 'blocks' => true ] ] );
@@ -4914,6 +4914,289 @@ check( 'the language is the one the text was taken from, and it is the page\'s w
 } )() === true && \Nino\Html::fillOrigin( $tag, '/template/page-lang/probe/other' ) === 'de_DE' && \Nino\Html::fillOrigin( $tag, '/template/page-lang/probe/french' ) === 'fr_FR' );
 
 \Nino\Filesystem::removeDir( ninoSandboxDir( $tag ) );
+
+echo "\n";
+
+
+// --- Formatting: as, prefix and suffix -----------------------------------------------------
+
+echo "Modules\\Components - a text component writes its value by a formatter, between a text before it and one after it\n";
+
+$nb = "\u{00A0}";
+
+// A fresh project: German is the page, a formatter of the project is added before any tool or any render asks for the options of "as"
+$fm = ninoSandbox( 'components-format' );
+$fm['/nino/dir'] = '';
+\Nino\Format::add( $fm, 'echo', static fn( array &$appData, mixed $value ): ?string => is_scalar( $value ) === true ? (string) $value : null, 'Echo' );
+\Nino\Format::add( $fm, 'markup', static fn( array &$appData, mixed $value ): ?string => '<b>"x"</b> [[/project/company/contact/email]] [image /logo] [template /templates/mail-owner]', 'Markup' );
+\Nino\Format::add( $fm, 'nights', static function( array &$appData, mixed $value ): ?string {
+	$number = \Nino\Format::number( $appData, $value );
+	return $number === null ? null : $number. ' Nächte';
+}, [ 'en_US' => 'Nights', 'de_DE' => 'Nächte' ] );
+\Nino\Format::add( $fm, 'blank', static fn( array &$appData, mixed $value ): ?string => '', 'Blank' );
+\Nino\Format::add( $fm, 'broken', static fn( array &$appData, mixed $value ): mixed => 42, 'Broken' );
+$fmTally = 0;
+\Nino\Format::add( $fm, 'tally', static function( array &$appData, mixed $value ) use ( &$fmTally ): ?string { $fmTally++; return null; }, 'Tally' );
+\Nino\Format::add( $fm, 'kind', static fn( array &$appData, mixed $value ): ?string => is_int( $value ) === true ? 'i' : null, 'Kind' );
+\Nino\Modules\Components::init( $fm );
+\Nino\Elements::insertElementType( $fm, '/fmt', [
+	'name'	=> [ 'type' => 'string', 'locale' => true ], 'price' => [ 'type' => 'double' ], 'count' => [ 'type' => 'integer' ], 'day' => [ 'type' => 'date' ], 'stamp' => [ 'type' => 'datetime' ],
+	'body'	=> [ 'type' => 'string', 'html' => true, 'blocks' => true ], 'flag' => [ 'type' => 'boolean' ], 'unit' => [ 'type' => 'string' ], 'plain' => [ 'type' => 'string' ], 'rich' => [ 'type' => 'string', 'html' => true ],
+] );
+\Nino\Elements::insertElement( $fm, '/fmt/one', [ 'name' => 'abc', 'price' => 89.0, 'count' => 3, 'day' => '2026-11-11', 'stamp' => '2026-03-05T09:05', 'body' => '<p>Eins</p><p>Zwei</p>', 'flag' => true, 'unit' => 'Nacht', 'rich' => '<b>Fett</b> x', 'plain' => '<script>"[[/template/x]]"</script> [template /templates/mail-owner]' ], 'de_DE' );
+\Nino\Elements::insertElement( $fm, '/fmt/two', [ 'name' => 'xyz', 'price' => 12.5, 'count' => 1, 'day' => '2026-02-30', 'stamp' => '2026-03-05', 'body' => '<ul><li>a</li></ul>', 'flag' => false, 'unit' => '', 'rich' => '', 'plain' => '' ], 'de_DE' );
+// What a text key holds is stored with its quotes and brackets as entities
+$fmStored = static fn( string $value ): string => \Nino\Text::sanitizeValue( $value, 'plain' );
+\Nino\Html::addFills( $fm, [
+	'/k'		=> '1234.5', '/e' => '', '/k2' => $fmStored( 'pro "Nacht" [x]' ), '/ke' => '12,50', '/ksp' => ' 12.5', '/kt' => '&lt;b&gt;5&lt;/b&gt;',
+	'/kb'		=> $fmStored( '<script>alert(1)</script> [template /templates/mail-owner] &#91; "q" \'a\' '. "\u{2028}\u{202E}" ),
+	'/kp'		=> '<p>Eins</p><p>Zwei</p>', '/kl' => '<ul><li>a</li></ul>', '/kn' => '<p>1234.5</p>', '/kx' => "Eins<br>Zwei",
+	'/project/company/contact/email' => 'secret@example.test',
+], '*' );
+$fm['./nino/locales/current'] = 'de_DE';
+$fmRender = static function( string $html ) use ( &$fm ): string {
+	return \Nino\Html::renderHtml( $fm, $html );
+};
+$fmTitle = static fn( string $inner ): string => '<h3 class="nino-section-title">'. $inner. '</h3>';
+$fmStack = static fn( string $call ): string => $fmRender( '[repeat /fmt limit="1"]'. $call. '[/repeat]' );
+
+echo "  the schema - the flag, the three attributes, the list of the formatters\n";
+
+$formatted = [ 'title', 'subtitle', 'card-title', 'card-subtitle', 'text', 'card-text', 'line', 'button', 'col' ];
+$fmComponents = \Nino\Modules\Components::components( $fm );
+$fmRegistered = \Nino\Modules\Components::registered( $fm );
+check( 'the components of the kernel with a text, and the column of a table, say formatted - no other does',
+	array_keys( array_filter( $fmRegistered, static fn( array $schema ): bool => $schema['formatted'] === true ) ) === array_values( array_intersect( array_keys( $fmRegistered ), $formatted ) ) && count( array_filter( $fmRegistered, static fn( array $schema ): bool => $schema['formatted'] === true ) ) === 9
+	&& array_filter( $fmRegistered, static fn( array $schema ): bool => array_key_exists( 'formatted', $schema ) === false ) === [] );
+check( '...the registry as it was registered has the flag and not the three attributes; the registry handed to a tool has them at the end of the attributes, in that order, after what the schema declares',
+	array_filter( $formatted, static fn( string $name ): bool => array_intersect( [ 'as', 'prefix', 'suffix' ], array_keys( $fmRegistered[$name]['attributes'] ) ) !== [] ) === []
+	&& array_filter( $formatted, static fn( string $name ): bool => array_slice( array_keys( $fmComponents[$name]['attributes'] ), -3 ) !== [ 'as', 'prefix', 'suffix' ] ) === []
+	&& array_filter( array_diff( array_keys( $fmComponents ), $formatted ), static fn( string $name ): bool => array_intersect( [ 'as', 'prefix', 'suffix' ], array_keys( $fmComponents[$name]['attributes'] ) ) !== [] ) === []
+	&& array_keys( $fmComponents['button']['attributes'] ) === [ 'href', 'style', 'size', 'width', 'target', 'as', 'prefix', 'suffix' ] );
+$fmAs = $fmComponents['title']['attributes']['as'];
+check( '..."as" is a select of the empty word and the formatters by name - the one of the project among them - labelled in both languages, on the tab of the content; the two texts are strings on that tab with a hint',
+	$fmAs['type'] === 'select' && $fmAs['options'] === [ '', 'number', 'currency', 'percent', 'date', 'date-long', 'datetime', 'time', 'echo', 'markup', 'nights', 'blank', 'broken', 'tally', 'kind' ] && $fmAs['default'] === '' && $fmAs['tab'] === 'content'
+	&& array_keys( $fmAs['optionLabels'] ) === $fmAs['options'] && $fmAs['optionLabels']['nights'] === [ 'en_US' => 'Nights', 'de_DE' => 'Nächte' ] && $fmAs['optionLabels']['currency'] === [ 'en_US' => 'Currency', 'de_DE' => 'Währung' ]
+	&& array_filter( [ 'prefix', 'suffix' ], static fn( string $name ): bool => array_diff_key( $fmComponents['title']['attributes'][$name], [ 'label' => 1, 'hint' => 1 ] ) !== [ 'type' => 'string', 'default' => '', 'tab' => 'content' ]
+		|| array_keys( $fmComponents['title']['attributes'][$name]['label'] ) !== [ 'en_US', 'de_DE' ] || array_keys( $fmComponents['title']['attributes'][$name]['hint'] ) !== [ 'en_US', 'de_DE' ] ) === []
+	&& in_array( 'content', \Nino\Modules\Components::TABS, true ) === true );
+check( '...defaults() have the three, empty, between the declared attributes and the link, and the same for a component with no link',
+	\Nino\Modules\Components::defaults( $fm, 'title' ) === [ 'tag' => 'h3', 'style' => '', 'color' => '', 'as' => '', 'prefix' => '', 'suffix' => '', 'href' => '', 'target' => '', 'class' => '' ]
+	&& \Nino\Modules\Components::defaults( $fm, 'col' ) === [ 'field' => '', 'align' => '', 'as' => '', 'prefix' => '', 'suffix' => '', 'class' => '' ]
+	&& array_filter( [ 'card', 'image', 'html', 'spacer', 'logo', 'panel', 'scroll-hint', 'card-image' ], static fn( string $name ): bool => $fmRegistered[$name]['formatted'] !== false
+		|| array_intersect( [ 'as', 'prefix', 'suffix' ], array_keys( \Nino\Modules\Components::defaults( $fm, $name ) ) ) !== [] ) === [] );
+check( '...a stack has none of the three, and the json a tool reads carries them', array_filter( \Nino\Modules\Components::stacks( $fm ), static fn( array $schema ): bool => array_key_exists( 'formatted', $schema ) === true || isset( $schema['attributes']['as'] ) === true ) === []
+	&& ( (array) json_decode( (string) json_encode( $fmComponents ), true ) )['title']['attributes']['as']['options'] === $fmAs['options'] && ninoWarnings() === [] );
+
+$fmSchema = [ 'label' => 'Probe', 'source' => 'text', 'group' => 'global', 'attributes' => [ 'tone' => [ 'type' => 'select', 'options' => [ 'a', 'b' ], 'default' => 'a' ] ] ];
+check( 'validate() takes the flag as a bool, false where the schema says nothing, and refuses a flag that is none',
+	( \Nino\Modules\Components::validate( 'probe', $fmSchema )['formatted'] ?? null ) === false && ( \Nino\Modules\Components::validate( 'probe', $fmSchema + [ 'formatted' => true ] )['formatted'] ?? null ) === true
+	&& \Nino\Modules\Components::validate( 'probe', $fmSchema + [ 'formatted' => 'yes' ] ) === 'component "probe": "formatted" must be true or false'
+	&& \Nino\Modules\Components::validate( 'probe', $fmSchema + [ 'formatted' => 1 ] ) === 'component "probe": "formatted" must be true or false' );
+check( '...the source of a formatted component is a text, or none: image, href and content are refused, the sentence naming the component',
+	array_filter( [ 'image', 'href', 'content' ], static fn( string $source ): bool => \Nino\Modules\Components::validate( 'probe', [ 'source' => $source ] + $fmSchema + [ 'formatted' => true ] ) !== 'component "probe": "formatted" is for a component whose source is text or none' ) === []
+	&& is_array( \Nino\Modules\Components::validate( 'probe', [ 'source' => 'none' ] + $fmSchema + [ 'formatted' => true ] ) ) === true
+	&& is_array( \Nino\Modules\Components::validate( 'probe', [ 'source' => 'image' ] + $fmSchema ) ) === true );
+check( '...a schema that says it declares none of the three itself - and one that does not say it may: a component of its own with a prefix of its own',
+	array_filter( [ 'as', 'prefix', 'suffix' ], static fn( string $name ): bool => \Nino\Modules\Components::validate( 'probe', [ 'attributes' => [ $name => [ 'type' => 'string', 'default' => '' ] ] ] + $fmSchema + [ 'formatted' => true ] )
+		!== 'component "probe": "formatted" gives the component "as", "prefix" and "suffix", and the schema declares "'. $name. '" itself' ) === []
+	&& is_array( \Nino\Modules\Components::validate( 'probe', [ 'attributes' => [ 'as' => [ 'type' => 'string', 'default' => '' ], 'prefix' => [ 'type' => 'string', 'default' => '' ], 'suffix' => [ 'type' => 'string', 'default' => '' ] ] ] + $fmSchema ) ) === true );
+check( '...a stack does not read the key, as it does not read "link"', \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x', 'formatted' => 'yes' ], true ) === \Nino\Modules\Components::validate( 'rows', [ 'label' => 'x' ], true ) );
+check( '...the tab "content" is a word of the registry for an attribute of its own; a word that is none is refused',
+	is_array( \Nino\Modules\Components::validate( 'probe', [ 'attributes' => [ 'note' => [ 'type' => 'string', 'default' => '', 'tab' => 'content' ] ] ] + $fmSchema ) ) === true
+	&& str_contains( (string) \Nino\Modules\Components::validate( 'probe', [ 'attributes' => [ 'note' => [ 'type' => 'string', 'default' => '', 'tab' => 'contents' ] ] ] + $fmSchema ), '"tab" must be one of' ) === true );
+$fmErrors = ninoErrors( static function() use ( &$fm, $fmSchema ): void {
+	\Nino\Modules\Components::addComponent( $fm, 'refused', static fn( array &$appData, array $args ): string => '', [ 'source' => 'content', 'formatted' => true ] + $fmSchema );
+} );
+check( '...and a component registered with it is refused as a bad schema is refused today: an E_USER_ERROR naming the component, and nothing registered', count( $fmErrors ) === 1 && $fmErrors[0][0] === E_USER_ERROR
+	&& str_contains( $fmErrors[0][1], 'component "refused"' ) === true && isset( \Nino\Modules\Components::registered( $fm )['refused'] ) === false );
+\Nino\Modules\Components::addComponent( $fm, 'priced', static fn( array &$appData, array $args ): string => '<i>'. $args['value']. '</i>', [ 'formatted' => true ] + $fmSchema );
+\Nino\Modules\Components::addComponent( $fm, 'plainprobe', static fn( array &$appData, array $args ): string => '<i>'. $args['value']. '|'. $args['prefix']. '</i>', [ 'attributes' => [ 'prefix' => [ 'type' => 'string', 'default' => 'dflt' ] ] ] + $fmSchema );
+\Nino\Modules\Components::addComponent( $fm, 'priced', static fn( array &$appData, array $args ): string => '<i>'. $args['value']. '</i>', \Nino\Modules\Components::registered( $fm )['priced'] );
+check( 'a component of a project says formatted and is handed out with the three - the list of "as" the formatters of the project - and registered() as it was registered re-registers it, as a feature does',
+	ninoWarnings() === [] && array_slice( array_keys( \Nino\Modules\Components::components( $fm )['priced']['attributes'] ), -3 ) === [ 'as', 'prefix', 'suffix' ] && \Nino\Modules\Components::components( $fm )['priced']['attributes']['as']['options'] === $fmAs['options']
+	&& \Nino\Modules\Components::registered( $fm )['priced']['formatted'] === true && isset( \Nino\Modules\Components::registered( $fm )['priced']['attributes']['as'] ) === false );
+
+echo "  rendering - a text key, a fixed text, the value of a field\n";
+
+$fmDe = [
+	'[title /k as="currency"]'																				=> $fmTitle( "1.234,50{$nb}€" ),
+	'[title /k as="currency" prefix="ab " suffix=" pro Nacht"]'				=> $fmTitle( "ab 1.234,50{$nb}€ pro Nacht" ),
+	'[title /k prefix="ab " suffix=" pro Nacht"]'											=> $fmTitle( 'ab 1234.5 pro Nacht' ),
+	'[title /k as=""]'																								=> $fmTitle( '1234.5' ),
+	'[title text="1234.5" as="number"]'																=> $fmTitle( '1.234,5' ),
+	'[title text="0.19" as="percent" suffix=" MwSt"]'									=> $fmTitle( "0,19{$nb}% MwSt" ),
+	'[subtitle /k as="number"]'																				=> '<div class="nino-section-subtitle">1.234,5</div>',
+	'[card][card-title /k as="currency"][card-subtitle /k as="number" prefix="ca. "][/card]'	=> '<article class="nino-card"><div class="nino-card-content"><h4 class="nino-card-title">'. "1.234,50{$nb}€". '</h4><p class="nino-card-subtitle">ca. 1.234,5</p></div></article>',
+	'[text /k as="currency" format="inline" prefix="ab "]'						=> "<p class=\"nino-section-text\">ab 1.234,50{$nb}€</p>",
+	'[text /kn as="number" format="blocks"]'													=> '<div class="nino-section-text nino-richtext">1.234,5</div>',
+	'[button /k as="currency" href="#x"]'															=> "<a class=\"nino-btn\" href=\"#x\">1.234,50{$nb}€</a>",
+	'[button /k as="currency" prefix="ab "]'													=> "<span class=\"nino-btn\">ab 1.234,50{$nb}€</span>",
+	'[line /k as="currency" suffix="!"]'															=> "<p class=\"nino-line\">1.234,50{$nb}€!</p>",
+	'[line text="1234.5 EUR" as="currency" prefix="x" suffix="y"]'		=> '<p class="nino-line">x1234.5 EURy</p>',
+	'[priced /k as="percent" suffix="!"]'															=> "<i>1.234,5{$nb}%!</i>",
+];
+$wrong = [];
+foreach( $fmDe as $call => $expected )
+	if( $fmRender( $call ) !== $expected )
+		$wrong[] = $call;
+check( 'a text key and a fixed text are written by the formatter, between the text before and the text after, in the element of the component as it is written without them'. ( $wrong === [] ? '' : ' - '. implode( ' | ', $wrong ) ), $wrong === [] );
+check( '...in American English the same page is written the American way', ( static function() use ( &$fm, $fmRender, $nb ): bool {
+	$fm['./nino/locales/current'] = 'en_US';
+	$ok = $fmRender( '[title /k as="currency" prefix="ab "]' ) === '<h3 class="nino-section-title">ab €1,234.50</h3>' && $fmRender( '[title text="2026-03-05T09:05" as="datetime"]' ) === "<h3 class=\"nino-section-title\">3/5/2026, 9:05{$nb}AM</h3>";
+	$fm['./nino/locales/current'] = 'de_DE';
+	return $ok;
+} )() );
+check( '...a value that is nothing writes nothing - not the text before it, not the text after it - for an empty text, a key nobody wrote and a fixed text that is empty',
+	$fmRender( '[title /e as="currency" prefix="ab " suffix="!"]' ) === '' && $fmRender( '[title /nope as="currency" prefix="ab " suffix="!"]' ) === '' && $fmRender( '[title text="" prefix="ab " suffix="!"]' ) === ''
+	&& $fmRender( '[line /e prefix="ab "]' ) === '' && $fmRender( '[button /e prefix="ab "]' ) === '' );
+check( '...a value the formatter cannot read is shown as it is shown without one, the texts around it still written: a comma number, a name, a date that is none',
+	$fmRender( '[title /ke as="currency" prefix="ab "]' ) === $fmTitle( 'ab 12,50' ) && $fmRender( '[title text="abc" as="date"]' ) === $fmTitle( 'abc' ) && $fmRender( '[title text="2026-02-30" as="date" suffix="!"]' ) === $fmTitle( '2026-02-30!' ) );
+check( '...the formatter is handed the text of a plain key as it is stored: a space in front of the number or a tag around it is no number, and is shown as it is',
+	$fmRender( '[title /ksp as="number"]' ) === $fmTitle( ' 12.5' ) && $fmRender( '[title /kt as="number"]' ) === $fmTitle( '&lt;b&gt;5&lt;/b&gt;' ) && $fmRender( '[title text=" 12.5" as="number"]' ) === $fmTitle( ' 12.5' )
+	&& $fmRender( '[text /kn as="number" format="inline"]' ) === '<p class="nino-section-text">1.234,5</p>' );
+check( '...a name that is no formatter of the registry formats nothing, whatever php function or method it is - the value is shown as it is',
+	array_filter( [ 'system', 'strtoupper', '\Nino\Format::number', 'Nino\Format::number', 'Number', 'number ', ' number', 'phpinfo', 'number()', '../x', 'currency,number' ], static fn( string $name ): bool => $fmRender( '[title /k as="'. $name. '"]' ) !== $fmTitle( '1234.5' ) ) === []
+	&& $fmRender( '[title /k as=" currency"]' ) === $fmTitle( '1234.5' ) );
+check( '...a line with a text of its own is a template of its own: its formatter is not asked, where the formatter of a title with a text is', ( static function() use ( $fmRender, &$fmTally ): bool {
+	$fmTally = 0;
+	$fmRender( '[line text="1234.5" as="tally"]' );
+	$line = $fmTally;
+	$fmRender( '[title text="1234.5" as="tally"]' );
+	return $line === 0 && $fmTally === 1;
+} )() === true );
+check( '...the formatter of a project formats, and one that answers no string leaves the value as it is with one warning', $fmRender( '[title /k as="nights"]' ) === $fmTitle( '1.234,5 Nächte' )
+	&& $fmRender( '[title /k as="broken"]' ) === $fmTitle( '1234.5' ) && $fmRender( '[title /k as="broken"]' ) === $fmTitle( '1234.5' ) && count( ninoWarnings() ) === 1 );
+
+echo "  rendering - a field of the element in a stack\n";
+
+$fmStackCases = [
+	'[title price as="currency" prefix="ab " suffix=" pro Nacht"]'		=> $fmTitle( "ab 89,00{$nb}€ pro Nacht" ),
+	'[title price as="number"]'																				=> $fmTitle( '89' ),
+	'[title count as="number"]'																				=> $fmTitle( '3' ),
+	'[title count as="currency"]'																			=> $fmTitle( "3,00{$nb}€" ),
+	'[title day as="date-long"]'																			=> $fmTitle( '11. November 2026' ),
+	'[title stamp as="datetime"]'																			=> $fmTitle( '05.03.2026, 09:05' ),
+	'[title stamp as="time"]'																					=> $fmTitle( '09:05' ),
+	'[title name as="currency"]'																			=> $fmTitle( 'abc' ),
+	'[title flag as="number"]'																				=> $fmTitle( '1' ),
+	'[title .id as="number" prefix="Nr. "]'														=> $fmTitle( 'Nr. 0' ),
+	'[title price suffix=" [[unit]]"]'																=> $fmTitle( '89 Nacht' ),
+	'[line price as="currency"]'																			=> "<p class=\"nino-line\">89,00{$nb}€</p>",
+	'[line text="[[price]] EUR" prefix="x" suffix="y"]'								=> '<p class="nino-line">x89 EURy</p>',
+	'[line text="[[price]] EUR" as="currency"]'												=> '<p class="nino-line">89 EUR</p>',
+	'[text body as="number" prefix="A" suffix="Z"]'										=> '<div class="nino-section-text nino-richtext"><p>AEins</p><p>ZweiZ</p></div>',
+	'[title unit as="echo" prefix="[[unit]] "]'												=> $fmTitle( 'Nacht Nacht' ),
+	'[priced price as="currency"]'																		=> "<i>89,00{$nb}€</i>",
+];
+$wrong = [];
+foreach( $fmStackCases as $call => $expected )
+	if( $fmStack( $call ) !== $expected )
+		$wrong[] = $call. ' => '. $fmStack( $call );
+check( 'the value of a field is the raw value the formatter reads: a double, an integer, a date, a date and time, the number of the element - and a field that holds no number stays what it is'. ( $wrong === [] ? '' : ' - '. implode( ' | ', $wrong ) ), $wrong === [] );
+check( '...a field of html in a stack is handed to the formatter without its tags, a fixed text of the format inline is too, and a formatter that answers an empty text leaves the value as it is',
+	$fmStack( '[title body as="echo"]' ) === $fmTitle( 'Eins Zwei' ) && $fmRender( '[text text="<b>12.5</b>" format="inline" as="echo"]' ) === '<p class="nino-section-text">12.5</p>'
+	&& $fmRender( '[title /k as="blank"]' ) === $fmTitle( '1234.5' ) && $fmRender( '[title /k as="blank" prefix="ab "]' ) === $fmTitle( 'ab 1234.5' ) );
+check( '...a field of html in the format inline is handed over without its tags too, and the number of an element is handed over as a number',
+	$fmStack( '[title rich as="echo"]' ) === $fmTitle( 'Fett x' ) && $fmStack( '[title .id as="kind"]' ) === $fmTitle( 'i' ) );
+check( '...a date that is none (30 February) is shown as stored, a value that is nothing writes nothing around it, and a text of blocks with a list has the texts before and after it as text in front of and behind the list',
+	$fmRender( '[repeat /fmt query="name=xyz"][title day as="date" prefix="am "][/repeat]' ) === $fmTitle( 'am 2026-02-30' ) && $fmRender( '[repeat /fmt query="name=xyz"][title unit prefix="am " suffix="!"][/repeat]' ) === ''
+	&& $fmRender( '[repeat /fmt query="name=xyz"][text body prefix="A" suffix="Z"][/repeat]' ) === '<div class="nino-section-text nino-richtext">A<ul><li>a</li></ul>Z</div>' );
+check( '...the same call in two elements writes each its own value', $fmRender( '[repeat /fmt sort="name"][title price as="currency"][/repeat]' ) === $fmTitle( "89,00{$nb}€" ). $fmTitle( "12,50{$nb}€" ) && ninoWarnings() === [] );
+
+echo "  rendering - the format of a text\n";
+
+check( 'a text of blocks has the text before it in its first paragraph and the text after it in its last; a list has them in front of and behind it, as text; inline and lines have them in front and behind',
+	$fmRender( '[text /kp prefix="A" suffix="Z"]' ) === '<div class="nino-section-text nino-richtext"><p>AEins</p><p>ZweiZ</p></div>'
+	&& $fmRender( '[text /kl prefix="A" suffix="Z"]' ) === '<div class="nino-section-text nino-richtext">A<ul><li>a</li></ul>Z</div>'
+	&& $fmRender( '[text /kp format="inline" prefix="A" suffix="Z"]' ) === '<p class="nino-section-text">AEins ZweiZ</p>'
+	&& $fmRender( '[text /kx format="lines" prefix="A" suffix="Z"]' ) === '<p class="nino-section-text">AEins<br>ZweiZ</p>'
+	&& $fmRender( '[card][card-text /kp prefix="A" suffix="Z"][/card]' ) === '<article class="nino-card"><div class="nino-card-content"><div class="nino-card-descr nino-richtext"><p>AEins</p><p>ZweiZ</p></div></div></article>' );
+check( '...a text of blocks that holds a number is written by the formatter as text - the paragraph is gone - and the formatter reads the number of the html key', $fmRender( '[text /kn as="currency" format="blocks" prefix="A"]' ) === "<div class=\"nino-section-text nino-richtext\">A1.234,50{$nb}€</div>"
+	&& $fmRender( '[text /kn as="currency" format="inline"]' ) === "<p class=\"nino-section-text\">1.234,50{$nb}€</p>" );
+
+echo "  rendering - [col] of a table\n";
+
+$fmTable = static fn( string $cols ): string => $fmRender( '[table /fmt limit="1"]'. $cols. '[/table]' );
+$fmCell = static fn( string $cell ): string => '<div class="nino-table-wrap"><table class="nino-table"><tbody><tr><td>'. $cell. '</td></tr></tbody></table></div>';
+check( 'a column writes the value of its field by the formatter and between the texts, as the others do; a column with a line of text has the texts around the line and no formatter; a column with a content has neither',
+	$fmTable( '[col field="price" as="currency" prefix="ab " suffix=" pro Nacht"]' ) === $fmCell( "ab 89,00{$nb}€ pro Nacht" )
+	&& $fmTable( '[col field="price"]' ) === $fmCell( '89' ) && $fmTable( '[col field="price" prefix="ab "]' ) === $fmCell( 'ab 89' )
+	&& $fmTable( '[col field="day" as="date"]' ) === $fmCell( '11.11.2026' ) && $fmTable( '[col field="name" as="currency" prefix="ab "]' ) === $fmCell( 'ab abc' )
+	&& $fmTable( '[col text="[[price]] €" as="currency" prefix="ab "]' ) === $fmCell( 'ab 89 €' ) && $fmTable( '[col text="[[price]] €" suffix="!"]' ) === $fmCell( '89 €!' )
+	&& $fmTable( '[col as="currency" prefix="ab "]x[/col]' ) === $fmCell( 'x' ) && $fmTable( '[col field="body" as="number" prefix="A" suffix="Z"]' ) === $fmCell( '<p>AEins</p><p>ZweiZ</p>' ) );
+check( '...a column with no value asks no formatter, and one whose formatter answers an empty text is as stored', $fmRender( '[table /fmt query="name=xyz"][col field="unit" as="markup"][/table]' ) === $fmCell( '' )
+	&& $fmTable( '[col field="price" as="blank"]' ) === $fmCell( '89' ) );
+check( '...and so is a text component: a formatter that answers an empty text leaves the value as stored, between its texts', $fmRender( '[title /k as="blank" prefix="p "]' ) === $fmTitle( 'p 1234.5' ) );
+check( '...a field with no value writes no text around it, an unreadable one is as stored, and a field that is a picture has no texts', $fmRender( '[table /fmt query="name=xyz"][col field="unit" prefix="ab " suffix="!"][/table]' ) === $fmCell( '' )
+	&& $fmRender( '[table /fmt query="name=xyz"][col field="day" as="date" prefix="ab "][/table]' ) === $fmCell( 'ab 2026-02-30' ) );
+check( '...a column does not take the field of its call as its title: the key a column names first is its title, and the texts of the call are not a title', $fmRender( '[table /fmt limit="1"][col /k field="price" as="currency" prefix="ab "][/table]' )
+	=== '<div class="nino-table-wrap"><table class="nino-table"><thead><tr><th>1234.5</th></tr></thead><tbody><tr><td>'. "ab 89,00{$nb}€". '</td></tr></tbody></table></div>' );
+
+echo "  a component that does not say formatted\n";
+
+check( 'a component without the flag ignores the three attributes - the markup is the one of the call without them - and one with an attribute "prefix" of its own reads that',
+	$fmRender( '[spacer as="currency" prefix="x" suffix="y"]' ) === $fmRender( '[spacer]' ) && $fmRender( '[card as="currency" prefix="x" suffix="y"][card-title /k][/card]' ) === $fmRender( '[card][card-title /k][/card]' )
+	&& $fmRender( '[plainprobe /k prefix="own" as="currency" suffix="y"]' ) === '<i>1234.5|own</i>' && $fmRender( '[plainprobe /k]' ) === '<i>1234.5|dflt</i>'
+	&& $fmRender( '[html]<p>x</p>[/html]' ) === $fmRender( '[html as="currency" prefix="x" suffix="y"]<p>x</p>[/html]' ) );
+
+echo "  the baits - nothing the editor writes is rendered a second time\n";
+
+$fmBaits = [ '<script>alert(1)</script>', '[[/template/x]]', '[template /templates/mail-owner]', '[[/project/company/contact/email]]', '&#91;&#91;/project/company/contact/email&#93;&#93;', '"q" \'a\'', "\u{2028}", "\u{202E}", '{x}', "a\0b", "a\xC3\x28b", '[image /logo]', '[title /k]' ];
+$wrong = [];
+foreach( $fmBaits as $index => $bait ) {
+
+	// The bait as a text before and after, as the value of a text key, of a fixed text and of a field of an element, and as the answer of a formatter
+	$fm['./nino/locales/current'] = 'de_DE';
+	\Nino\Html::addFills( $fm, [ '/bait' => $fmStored( $bait ), '/baitraw' => $bait ], '*' );
+	$entity = str_replace( [ '&', '"', "'", '[', ']', '<', '>' ], [ '&amp;', '&quot;', '&#39;', '&#91;', '&#93;', '&lt;', '&gt;' ], $bait );
+
+	$pages = [
+		'prefix'			=> '[title /k prefix="'. $entity. '"]',
+		'suffix'			=> '[title /k suffix="'. $entity. '"]',
+		'key'					=> '[title /bait as="echo" prefix="<"]',
+		'key plain'		=> '[title /bait prefix="<"]',
+		'fixed'				=> '[title text="'. $entity. '" as="echo" suffix=">"]',
+		'stack'				=> '[repeat /fmt limit="1"][title plain as="echo" prefix="<" suffix="[[name]]"][/repeat]',
+		'cell'				=> '[repeat /fmt limit="1"][card][card-title plain as="echo" prefix="<"][/card][/repeat]',
+		'col'					=> '[table /fmt limit="1"][col field="plain" as="echo" prefix="'. $entity. '" suffix="'. $entity. '"][/table]',
+		'col line'		=> '[table /fmt limit="1"][col text="'. $entity. '" prefix="'. $entity. '"][/table]',
+		'line'				=> '[line text="'. $entity. '" prefix="'. $entity. '" suffix="'. $entity. '"]',
+		'formatter'		=> '[title /k as="markup" prefix="'. $entity. '"]',
+	];
+
+	foreach( $pages as $label => $page ) {
+
+		$once = $fmRender( $page );
+
+		// Nothing of it is markup or a fill: no bracket, no tag, and a second rendering finds nothing to do
+		// A text key may name another fill - that one is put in by the page, by design, for any component - so the mail is looked for where no key is the source
+		if( str_contains( $once, '[' ) === true || str_contains( $once, '<script' ) === true || str_contains( $once, '<b>' ) === true || ( str_starts_with( $label, 'key' ) === false && str_contains( $once, 'secret@example.test' ) === true ) || $fmRender( $once ) !== $once )
+			$wrong[] = $index. ' '. $label;
+	}
+
+	if( $fmRender( '[title /k prefix="'. $entity. '"]' ) !== $fmTitle( \Nino\Modules\Components::escape( $bait ). '1234.5' ) )
+		$wrong[] = $index. ' prefix is not the text itself';
+}
+check( 'baits in a text before, a text after, a text key, a fixed text, a field of an element in a stack and in a cell, a column, a line and the answer of a formatter come out as text, with no bracket left - and a second rendering of the page finds nothing to render'. ( $wrong === [] ? '' : ' - '. implode( ', ', $wrong ) ), $wrong === [] );
+check( '...the text before is text: markup is shown, an entity is the character it stands for and is escaped once, a quote and an apostrophe do not break the call, and a slash at its start is a slash and no key',
+	$fmRender( '[title /k prefix="<b>"]' ) === $fmTitle( '&lt;b&gt;1234.5' ) && $fmRender( '[title /k prefix="&lt;script&gt;"]' ) === $fmTitle( '&lt;script&gt;1234.5' )
+	&& $fmRender( '[title /k prefix="&#39;s "]' ) === $fmTitle( '&#039;s 1234.5' ) && $fmRender( '[title /k prefix="&quot;"]' ) === $fmTitle( '&quot;1234.5' ) && $fmRender( '[title /k prefix="&amp;lt;"]' ) === $fmTitle( '&amp;lt;1234.5' )
+	&& $fmRender( '[title /k suffix="/Monat"]' ) === $fmTitle( '1234.5/Monat' ) && $fmRender( '[title /k suffix="/project/company/contact/email"]' ) === $fmTitle( '1234.5/project/company/contact/email' ) );
+check( '...a fill in the text before is put in as a text of its own, whatever it holds: its quotes and brackets are the characters they stand for, and the call is not broken',
+	$fmRender( '[title /k suffix=" [[/k2]]"]' ) === $fmTitle( '1234.5 pro &quot;Nacht&quot; &#91;x]' ) && $fmRender( '[title /k prefix="[[/kb]]"]' ) !== '' && str_contains( $fmRender( '[title /k prefix="[[/kb]]"]' ), 'secret@example.test' ) === false
+	&& str_contains( $fmRender( '[title /k prefix="[[/kb]]"]' ), '<script' ) === false );
+check( '...the same call made by a renderer, with no page to put the fills in first, puts them in', ( static function() use ( &$fm, $fmTitle ): bool {
+	$callback = static function( array &$appData, array $args ): string { return \Nino\Modules\Components::affix( $appData, [ 'prefix' => $args['prefix'] ?? '', 'suffix' => $args['suffix'] ?? '' ], 'v' ); };
+	return $callback( $fm, [ 'suffix' => ' [[/k2]]', 'prefix' => '&lt;' ] ) === '&lt;v pro &quot;Nacht&quot; &#91;x]'
+		&& \Nino\Modules\Components::affix( $fm, [ 'prefix' => 'a' ], '' ) === '' && \Nino\Modules\Components::affix( $fm, [], 'v' ) === 'v'
+		&& \Nino\Modules\Components::affix( $fm, [ 'prefix' => 'a', 'suffix' => 'b' ], '<p>x</p><p>y</p>' ) === '<p>ax</p><p>yb</p>' && \Nino\Modules\Components::affix( $fm, [ 'prefix' => 'a', 'suffix' => 'b' ], '<ul><li>x</li></ul>' ) === 'a<ul><li>x</li></ul>b';
+} )() );
+check( '...a formatter that writes markup and a fill is read as text, [ as &#91;, and is not rendered again', $fmRender( '[title /k as="markup"]' ) === $fmTitle( '&lt;b&gt;&quot;x&quot;&lt;/b&gt; &#91;&#91;/project/company/contact/email]] &#91;image /logo] &#91;template /templates/mail-owner]' )
+	&& $fmRender( $fmRender( '[title /k as="markup"]' ) ) === $fmRender( '[title /k as="markup"]' ) );
+check( '...the page of a call that uses none of the attributes is the one it always was, and nothing in the block raised a warning', $fmRender( '[title /k]' ) === $fmTitle( '1234.5' ) && $fmRender( '[text /kp]' ) === '<div class="nino-section-text nino-richtext"><p>Eins</p><p>Zwei</p></div>' && ninoWarnings() === [] );
+
+\Nino\Filesystem::removeDir( ninoSandboxDir( $fm ) );
 
 echo "\n";
 

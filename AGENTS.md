@@ -315,7 +315,7 @@ renderer treats them as such: for `image` it is the *reference* to the picture,
 escaped like text - to look up through `\Nino\Images` by `$args['source']`
 (the uri of a slot) or by the image field of the element, and never to write
 as it is; for `content` it is the template's own markup between the tags,
-which is not an editor's value and keeps its `[`. A stack renders each cell itself through
+which is not an editor's value and keeps its `[`. A formatter (`\Nino\Format`, chosen by the `as` of a component by its registry name) answers plain text for the raw value and never html: the kernel escapes it with the same rule, as it escapes the `prefix` and the `suffix` of a formatted component. A stack renders each cell itself through
 `Components::renderStack()` and returns html with no shortcode in it - the content of the
 `[panel]`s of a fixed `[tabs]` or `[accordion]` is the one exception, handed back as html+
 for the rendering that follows; it does not

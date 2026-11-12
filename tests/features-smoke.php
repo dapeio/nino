@@ -180,6 +180,29 @@ check( 'a manifest that declares them is read complete, the schemas normalized; 
 	&& \Nino\Features::manifest( $manifestDir. '/WithComponents' )['components']['probe']['attributes']['tone']['options'] === [ 'a', 'b' ]
 	&& \Nino\Features::manifest( $manifestDir. '/WithComponents' )['stacks']['rows'] === [ 'label' => 'Rows', 'grid' => true, 'cell' => 'components', 'panels' => false, 'preview' => 'cells', 'attributes' => [] ]
 	&& \Nino\Features::manifest( $manifestDir. '/Mini' )['components'] === [] && \Nino\Features::manifest( $manifestDir. '/Mini' )['stacks'] === [] && ninoWarnings() === [] );
+// A component of a manifest says 'formatted' as it says 'link': the clean schema carries it, the registry hands the component out with the three attributes of a formatted
+// text, and a manifest that declares one of them itself, or says it of a component that has no text, is refused with the name of the component
+$formattedComponent = [ 'label' => 'Price', 'source' => 'text', 'formatted' => true, 'attributes' => [ 'tone' => [ 'type' => 'select', 'options' => [ 'a', 'b' ], 'default' => 'a' ] ] ];
+check( 'a manifest whose component says formatted is read, the flag in the clean schema and the three attributes in none',
+	\Nino\Features::manifest( writeManifest( $manifestDir, 'WithFormatted', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'price' => $formattedComponent, 'plain' => $goodComponent ] ] ) )['components']['price']['formatted'] === true
+	&& array_keys( \Nino\Features::manifest( $manifestDir. '/WithFormatted' )['components']['price']['attributes'] ) === [ 'tone' ] && \Nino\Features::manifest( $manifestDir. '/WithFormatted' )['components']['plain']['formatted'] === false && ninoWarnings() === [] );
+check( '...handed to the registry as it was read, it is issued with "as", "prefix" and "suffix" after its own attributes - the list of "as" the formatters there are - and the component without the flag has none',
+	( static function() use ( $manifestDir ): bool {
+		$formatted = ninoSandbox( 'features-formatted' );
+		$components = \Nino\Features::manifest( $manifestDir. '/WithFormatted' )['components'];
+		\Nino\Modules\Components::addComponent( $formatted, 'price', static fn( array &$appData, array $args ): string => '<i>'. $args['value']. '</i>', $components['price'] );
+		\Nino\Modules\Components::addComponent( $formatted, 'plain', static fn( array &$appData, array $args ): string => '<i>'. $args['value']. '</i>', $components['plain'] );
+		$issued = \Nino\Modules\Components::components( $formatted );
+		$ok = array_keys( $issued['price']['attributes'] ) === [ 'tone', 'as', 'prefix', 'suffix' ] && array_keys( $issued['plain']['attributes'] ) === [ 'tone' ]
+			&& $issued['price']['attributes']['as']['options'] === [ '', 'number', 'currency', 'percent', 'date', 'date-long', 'datetime', 'time' ];
+		\Nino\Filesystem::removeDir( ninoSandboxDir( $formatted ) );
+		return $ok;
+	} )() === true && ninoWarnings() === [] );
+check( '...a component that says it of a source that is no text, declares one of the three itself, or says it is no bool is refused, naming the component',
+	manifestFails( $manifestDir, 'FormattedContent', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'price' => [ 'source' => 'content' ] + $formattedComponent ] ], 'component "price": "formatted" is for a component whose source is text or none' )
+	&& manifestFails( $manifestDir, 'FormattedImage', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'price' => [ 'source' => 'image' ] + $formattedComponent ] ], 'component "price": "formatted" is for a component whose source is text or none' )
+	&& manifestFails( $manifestDir, 'FormattedPrefix', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'price' => [ 'attributes' => [ 'prefix' => [ 'type' => 'string', 'default' => '' ] ] ] + $formattedComponent ] ], 'the schema declares "prefix" itself' )
+	&& manifestFails( $manifestDir, 'FormattedFlag', [ 'name' => 'x', 'version' => '1.0.0', 'components' => [ 'price' => [ 'formatted' => 'yes' ] + $formattedComponent ] ], 'component "price": "formatted" must be true or false' ) );
 $requiredStack = static fn( array $attributes ): array => [ 'name' => 'x', 'version' => '1.0.0', 'stacks' => [ 'logos' => [ 'label' => 'Logos', 'cell' => 'none', 'attributes' => $attributes ] ] ];
 check( 'a manifest stack says required on a field attribute - true, false or the name of a bool attribute of the stack - and the manifest as read carries it, false where it says nothing; a field that names no bool attribute, and required on another type, refuse the manifest',
 	\Nino\Features::manifest( writeManifest( $manifestDir, 'WithRequired', $requiredStack( [

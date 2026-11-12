@@ -130,6 +130,10 @@ namespace Nino {
 			// for a project that has to serve a client older than webp, or a
 			// pipeline downstream that expects those two names
 			'/nino/images/webp'		=> true,
+			// The currency \Nino\Format writes an amount in: a code of three capital
+			// letters, EUR where it is none. A project that writes two on one page adds
+			// a formatter of its own with \Nino\Format::add()
+			'/nino/format/currency'	=> 'EUR',
 			'/nino/auth/user'			=> [],
 			'/nino/auth/roles'		=> [],
 			// What the Features panel records per installed feature: the

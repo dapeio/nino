@@ -144,10 +144,11 @@ namespace Nino\Modules {
 		// The tabs of a tool's dialog an attribute may ask to be drawn on - the 'tab' of an
 		// attribute, where the others stand among the properties: the colour of a card,
 		// its picture, the focus and the dimming of that picture belong on the tab of the
-		// background. The registry owns the list, so that a tool draws the attributes of
-		// a tab together and knows no component by name. A hint for the tool and nothing
-		// the rendering reads
-		public const array TABS = [ 'background' ];
+		// background, and the formatting of a text with the text before and after it on
+		// that of the content. The registry owns the list, so that a tool draws the
+		// attributes of a tab together and knows no component by name. A hint for the
+		// tool and nothing the rendering reads
+		public const array TABS = [ 'background', 'content' ];
 
 		// The words a tool has an icon for, by alignment: where a text stands,
 		// where the content stands in a box - last-bottom is the card's, the
@@ -248,6 +249,21 @@ namespace Nino\Modules {
 			'href'				=> [ 'type' => 'href', 'default' => '', 'label' => [ 'en_US' => 'Link', 'de_DE' => 'Ziel' ],
 				'hint' => [ 'en_US' => 'A text key, an address, or in a loop a field of the element.', 'de_DE' => 'Ein Textschlüssel, eine Adresse oder in einem Loop ein Feld des Elements.' ] ],
 			'target'			=> [ 'type' => 'select', 'options' => [ '', '_blank' ], 'default' => '', 'label' => [ 'en_US' => 'Opens in', 'de_DE' => 'Öffnet in' ] ],
+		];
+
+		// The three attributes of a component that says 'formatted' => true, written as
+		// a schema's attributes are: how the value is written (a formatter of \Nino\Format,
+		// by its name), the text before it and the text after it. They stand after the
+		// attributes the schema declares and before the link and the class. A tool is
+		// handed them by components() - the list of 'as' is the formatters of the
+		// project - and not by registered()
+		private const array FORMAT = [
+			'as'					=> [ 'type' => 'select', 'options' => '\Nino\Format::options', 'default' => '', 'tab' => 'content', 'label' => [ 'en_US' => 'Formatting', 'de_DE' => 'Formatierung' ],
+				'hint' => [ 'en_US' => 'How a number or a date of the value is written. A value that is none is shown as it is.', 'de_DE' => 'Wie eine Zahl oder ein Datum des Werts geschrieben wird. Ein Wert, der keines ist, erscheint unverändert.' ] ],
+			'prefix'			=> [ 'type' => 'string', 'default' => '', 'tab' => 'content', 'label' => [ 'en_US' => 'Text before', 'de_DE' => 'Text davor' ],
+				'hint' => [ 'en_US' => 'Plain text in front of the value, only where there is a value.', 'de_DE' => 'Reiner Text vor dem Wert, nur wenn es einen Wert gibt.' ] ],
+			'suffix'			=> [ 'type' => 'string', 'default' => '', 'tab' => 'content', 'label' => [ 'en_US' => 'Text after', 'de_DE' => 'Text danach' ],
+				'hint' => [ 'en_US' => 'Plain text after the value, only where there is a value.', 'de_DE' => 'Reiner Text nach dem Wert, nur wenn es einen Wert gibt.' ] ],
 		];
 
 		// The icons of the kernel's components: ten icons of Lucide 0.577.0
@@ -473,6 +489,11 @@ namespace Nino\Modules {
 			// link may wrap what it draws
 			$stretched = [ 'card-title', 'title' ];
 
+			// The ones whose value is written by a formatter between a text before it and a text
+			// after it, as the schema's 'formatted' says: the components with a text, and [col],
+			// which writes its cells itself (see componentCol())
+			$formatted = [ 'title', 'subtitle', 'card-title', 'card-subtitle', 'text', 'card-text', 'line', 'button', 'col' ];
+
 			foreach( $components as [ $name, $en, $de, $preview, $source, $attributes, $in, $draws, $holds, $link, $group ] )
 				self::addComponent( $appData, $name, [ self::class, 'component'. str_replace( ' ', '', ucwords( str_replace( '-', ' ', $name ) ) ) ], [
 					'label'				=> [ 'en_US' => $en, 'de_DE' => $de ],
@@ -483,6 +504,7 @@ namespace Nino\Modules {
 					'icon'				=> self::SHAPES[ self::ICONS[$name] ],
 					'link'				=> $link,
 					'group'				=> $group,
+					'formatted'		=> in_array( $name, $formatted, true ),
 				] + ( $in !== null ? [ 'in' => $in ] : [] ) + ( $draws !== null ? [ 'draws' => $draws ] : [] ) + ( $holds !== null ? [ 'holds' => $holds ] : [] ) + ( in_array( $name, $stretched, true ) === true ? [ 'stretched' => true ] : [] ) );
 
 			// Each stack says what its cell is ('cell', one of CELLS) besides its grid,
@@ -755,8 +777,14 @@ namespace Nino\Modules {
 		 */
 		private static function _issued( array &$appData, array $schemas, bool $stack ): array {
 
-			foreach( $schemas as $name => $schema )
-				foreach( (array) ( $schema['attributes'] ?? [] ) as $attribute => $declared )
+			foreach( $schemas as $name => $schema ) {
+
+				// The attributes of a formatted component are not declared by its schema: a tool is
+				// handed them here, the list of the formatters among them
+				if( ( $schema['formatted'] ?? false ) === true )
+					$schemas[$name]['attributes'] = (array) ( $schema['attributes'] ?? [] ) + self::FORMAT;
+
+				foreach( (array) ( $schemas[$name]['attributes'] ?? [] ) as $attribute => $declared )
 					if( is_string( $declared['options'] ?? null ) === true ) {
 
 						$schemas[$name]['attributes'][$attribute] = self::_resolve( $appData, (string) $name, $stack, (string) $attribute, $declared );
@@ -764,6 +792,7 @@ namespace Nino\Modules {
 						// A mark for _normalize() and nobody else's
 						unset( $schemas[$name]['attributes'][$attribute]['words'] );
 					}
+			}
 
 			return $schemas;
 		}
@@ -1000,7 +1029,7 @@ namespace Nino\Modules {
 		 *
 		 *	@param		string		$name					The shortcode, a slug
 		 *	@param		mixed			$schema				label, source (not for a stack), loop, attributes, preview;
-		 *																	icon, in, draws, holds, stretched, link, by and group for a component, grid, cell, panels, holds and assets for a stack.
+		 *																	icon, in, draws, holds, stretched, link, formatted, by and group for a component, grid, cell, panels, holds and assets for a stack.
 		 *																	See docs/development.md, "Components"
 		 *	@param		bool			$stack				Read it as a stack's
 		 *	@param		string|null	$feature			The key of the feature whose manifest the schema is read from, null for a module's: its components are the feature's own, whatever 'by' they say
@@ -1223,6 +1252,26 @@ namespace Nino\Modules {
 				foreach( array_keys( self::LINK ) as $linked )
 					if( $clean['link'] === true && array_key_exists( $linked, $clean['attributes'] ) === true )
 						return $what. ': "link" gives the component "href" and "target", and the schema declares "'. $linked. '" itself';
+
+				// Whether its value is written by a formatter and set between a text before
+				// and a text after it: the component then has the attributes 'as', 'prefix'
+				// and 'suffix' without declaring them (see _attributes()), and dispatch()
+				// writes the value with them - or, for a source none, the renderer does,
+				// with Components::affix(). Always in the clean schema, false where the schema
+				// says nothing. Only a component whose value is a text, or which has none and
+				// writes its own, has a value to format; a schema that declares one of the
+				// three itself has its own, and is refused
+				if( isset( $schema['formatted'] ) === true && is_bool( $schema['formatted'] ) === false )
+					return $what. ': "formatted" must be true or false';
+
+				$clean['formatted'] = ( $schema['formatted'] ?? false ) === true;
+
+				if( $clean['formatted'] === true && in_array( $clean['source'], [ 'text', 'none' ], true ) === false )
+					return $what. ': "formatted" is for a component whose source is text or none';
+
+				foreach( array_keys( self::FORMAT ) as $formatted )
+					if( $clean['formatted'] === true && array_key_exists( $formatted, $clean['attributes'] ) === true )
+						return $what. ': "formatted" gives the component "as", "prefix" and "suffix", and the schema declares "'. $formatted. '" itself';
 
 				// Who registered it, for a tool that groups what it offers: the kernel's
 				// own components and everything a module of the project registers are
@@ -1619,10 +1668,10 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	The attributes a shortcode reads: what its schema declares, the link of
-		 *	a component that says 'link' after them, 'class' where it does not
-		 *	declare it, and for a stack its loop and, with a grid, its cells in
-		 *	front of its own
+		 *	The attributes a shortcode reads: what its schema declares, the
+		 *	formatting of a component that says 'formatted' and the link of one that
+		 *	says 'link' after them, 'class' where it does not declare it, and for a
+		 *	stack its loop and, with a grid, its cells in front of its own
 		 *
 		 *	@param		array 		$schema				A clean schema
 		 *	@param		bool			$stack
@@ -1633,7 +1682,7 @@ namespace Nino\Modules {
 
 			$attributes = $stack === true ? self::LOOP + ( ( $schema['grid'] ?? false ) === true ? self::GRID : [] ) : [];
 
-			return $attributes + (array) ( $schema['attributes'] ?? [] ) + ( ( $schema['link'] ?? false ) === true ? self::LINK : [] ) + [ 'class' => [ 'type' => 'string', 'default' => '' ] ];
+			return $attributes + (array) ( $schema['attributes'] ?? [] ) + ( ( $schema['formatted'] ?? false ) === true ? self::FORMAT : [] ) + ( ( $schema['link'] ?? false ) === true ? self::LINK : [] ) + [ 'class' => [ 'type' => 'string', 'default' => '' ] ];
 		}
 
 		/**
@@ -1721,7 +1770,8 @@ namespace Nino\Modules {
 		 *	in (see _fills()), the first argument is resolved over value(), the
 		 *	missing attributes are filled from the schema and the ones outside
 		 *	their options are reset, and a component that has no value renders
-		 *	nothing. The fixed text is the one static value: the other attributes
+		 *	nothing. A formatted component's text is written as its 'as', 'prefix' and
+		 *	'suffix' say, from the raw value (see _raw() and affix()). The fixed text is the one static value: the other attributes
 		 *	are taken as they stand, a fill in the first argument is not a source
 		 *	and the content is left to the rendering that follows. Public because
 		 *	the closure that stands for the callback in the shortcodes has to
@@ -1785,6 +1835,23 @@ namespace Nino\Modules {
 			// piece anyway
 			if( $value === null || ( $value === '' && $kind !== 'none' ) )
 				return '';
+
+			// A formatted component with a text writes it as 'as', 'prefix' and 'suffix' say; one with no
+			// source (a [col]) is left to its renderer, which writes through the same helpers. A line
+			// with a text of its own is its own template: 'as' is not read, and the renderer sets
+			// the text before and after around what it made of it (see componentLine())
+			if( $kind === 'text' && ( $schema['formatted'] ?? false ) === true && ( in_array( $name, self::LINES, true ) === false || $fixed === null ) ) {
+
+				if( $prepared['as'] !== '' ) {
+
+					$text = \Nino\Format::apply( $appData, $prepared['as'], self::_raw( $appData, $source, $fixed, $format ) );
+
+					if( $text !== null && $text !== '' )
+						$value = self::escape( $text );
+				}
+
+				$value = self::affix( $appData, $prepared, $value );
+			}
 
 			$prepared['value'] = $value;
 
@@ -1964,6 +2031,107 @@ namespace Nino\Modules {
 				return self::_href( html_entity_decode( $source, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
 
 			return null;
+		}
+
+		/**
+		 *	What value() resolves a source to, as it is stored and before it is made
+		 *	safe: the raw value a formatter is handed. A fixed text and the text of a key
+		 *	are read as value() reads them - the entities decoded, and for a key that holds
+		 *	html the tags dropped, as _plain() reads a field - a field of the element in a
+		 *	stack is what the element holds, a float still a float, and .id is the number
+		 *	in the loop. Null where value() has no source for it. Nothing it answers is
+		 *	written anywhere without escape()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$source				The first argument of the shortcode
+		 *	@param		string|null	$fixed				The text="..." attribute, null where there is none
+		 *	@param		string		$format				What a text key's value may hold: plain, inline, lines or blocks
+		 *
+		 *	@return 	mixed
+		 */
+		private static function _raw( array &$appData, string $source, ?string $fixed, string $format = 'plain' ): mixed {
+
+			$decode = static fn( string $value ): string => html_entity_decode( $value, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+			$tags		= static fn( string $value ): string => trim( (string) preg_replace( '/\s+/', ' ', html_entity_decode( strip_tags( \Nino\Html::breaksToNewlines( $value ) ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) );
+
+			if( $fixed !== null )
+				return $format === 'plain' ? $decode( $fixed ) : $tags( $fixed );
+
+			if( $source === '' )
+				return null;
+
+			if( $source[0] === '/' ) {
+
+				$fill = \Nino\Html::resolveTextfill( $appData, $source );
+
+				return $fill === null ? null : ( $format === 'plain' ? $decode( $fill ) : $tags( $fill ) );
+			}
+
+			$context = self::element( $appData );
+
+			if( $context === null )
+				return null;
+
+			if( $source === '.id' )
+				return $context['id'];
+
+			if( $source === '.uri' )
+				return (string) ( $context['element']['.uri'] ?? '' );
+
+			if( $source === '.slug' )
+				return \Nino\Modules\Elements::slug( is_array( $context['element'] ) === true ? $context['element'] : [] );
+
+			if( isset( $context['model'][$source] ) === false )
+				return null;
+
+			$field = $context['element'][$source] ?? '';
+
+			if( is_scalar( $field ) === false )
+				return null;
+
+			// A field that holds html is its text, as _plain() reads it
+			if( is_string( $field ) === true && in_array( \Nino\Html::fieldFormat( is_array( $context['model'][$source] ) === true ? $context['model'][$source] : [] ), [ 'inline', 'blocks' ], true ) === true )
+				return $tags( $field );
+
+			return $field;
+		}
+
+		/**
+		 *	A written value between the text before it and the text after it, the
+		 *	'prefix' and 'suffix' of a component that says 'formatted'. Public for
+		 *	a renderer of a component whose source is none, which writes its value
+		 *	itself ([col]); a component with a text has it done by dispatch(). Both
+		 *	are plain text: the fills in them are put in as a fixed text's are (see
+		 *	_fills()), then the entities are read as the characters they stand for
+		 *	and the text is escaped once, with every '[' as &#91; - so that nothing
+		 *	an editor wrote opens a fill or a shortcode in the next rendering pass,
+		 *	and a '/' at its start is a character and no key. An empty value stays
+		 *	empty: there is nothing to set the texts around. A value of paragraphs
+		 *	(the format blocks) has the text before in its first paragraph, the text
+		 *	after in its last
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$args					The arguments made ready by dispatch(), 'prefix' and 'suffix' among them
+		 *	@param		string		$html					The value, as it is written
+		 *
+		 *	@return 	string
+		 */
+		public static function affix( array &$appData, array $args, string $html ): string {
+
+			if( $html === '' )
+				return '';
+
+			$plain = static fn( string $text ): string => self::escape( html_entity_decode( self::_fills( $appData, $text ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+			$prefix = $plain( (string) ( $args['prefix'] ?? '' ) );
+			$suffix = $plain( (string) ( $args['suffix'] ?? '' ) );
+
+			if( $prefix !== '' )
+				$html = str_starts_with( $html, '<p>' ) === true ? '<p>'. $prefix. substr( $html, 3 ) : $prefix. $html;
+
+			if( $suffix !== '' )
+				$html = str_ends_with( $html, '</p>' ) === true ? substr( $html, 0, -4 ). $suffix. '</p>' : $html. $suffix;
+
+			return $html;
 		}
 
 		/**
@@ -3653,11 +3821,21 @@ namespace Nino\Modules {
 			$field = (string) $args['field'];
 
 			if( isset( $args['text'] ) === true )
-				$cell = self::_line( $appData, (string) $args['text'] );
+				$cell = self::affix( $appData, $args, self::_line( $appData, (string) $args['text'] ) );
 			elseif( $field !== '' && ( self::element( $appData )['model'][$field]['type'] ?? '' ) === 'image' )
 				$cell = self::_image( $appData, 'image', 'nino-image', [ 'source' => $field, 'alt' => '', 'content' => '', 'focus' => '', 'ratio' => '', 'class' => 'nino-table__img' ] );
-			else if( $field !== '' )
+			else if( $field !== '' ) {
+
 				$cell = (string) self::value( $appData, $field, 'text' );
+
+				// The formatter reads the raw value and, where it cannot, leaves the cell as it was
+				$text = ( $args['as'] ?? '' ) !== '' && $cell !== '' ? \Nino\Format::apply( $appData, (string) $args['as'], self::_raw( $appData, $field, null ) ) : null;
+
+				if( $text !== null && $text !== '' )
+					$cell = self::escape( $text );
+
+				$cell = self::affix( $appData, $args, $cell );
+			}
 			else
 				$cell = trim( (string) $args['content'] );
 
@@ -3696,7 +3874,7 @@ namespace Nino\Modules {
 		 */
 		public static function componentLine( array &$appData, array $args ): string {
 
-			$value = isset( $args['text'] ) === true ? self::_line( $appData, (string) $args['text'] ) : (string) $args['value'];
+			$value = isset( $args['text'] ) === true ? self::affix( $appData, $args, self::_line( $appData, (string) $args['text'] ) ) : (string) $args['value'];
 
 			return $value === '' ? '' : str_replace(
 				[ '[[tag]]', '[[class]]', '[[lang]]', '[[value]]' ],

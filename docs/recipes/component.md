@@ -174,6 +174,21 @@ The rules the module keeps for you, and the ones it leaves to the renderer:
   of its own would be a link inside a link. `by` is the slug of who registered a
   component: a feature's manifest has it set to the feature's key, and a module
   of a project that says nothing is `nino`.
+- `formatted => true` (**1.12**) gives a component whose source is `text` or `none`
+  three attributes without declaring them: `as`, a formatter of
+  `\Nino\Format` by its name (the options are the formatters of the project),
+  `prefix` and `suffix`, plain texts set before and after the value. For a
+  source `text` the kernel does it - `$args['value']` already holds the written
+  value with the texts around it, escaped. For a source `none` the renderer writes
+  its value itself: `\Nino\Format::apply( $appData, $args['as'], $raw )` answers
+  plain text or `null` (then write the value as you did), `Components::escape()`
+  makes it safe and `Components::affix( $appData, $args, $html )` sets the texts
+  around it, nothing where the value is empty. A schema that declares `as`,
+  `prefix` or `suffix` itself is refused; one that does not say `formatted` may
+  keep an attribute of such a name. Register a formatter of your own with
+  `\Nino\Format::add( $appData, 'name', $callback, $label )` in `init()` - the
+  callback is `( array &$appData, mixed $value ): ?string`, gets the raw value
+  and answers plain text, never html ([Formatting a value](../development.md#formatting-a-value)).
 
 ## 2. A stack from the project
 
