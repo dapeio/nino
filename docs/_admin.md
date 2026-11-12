@@ -187,7 +187,7 @@ The page a visitor gets is the project's own `templates/page-maintenance.tpl` wh
 
 `/_admin/recovery.php` is the way back in when the accounts themselves are what is broken: every developer password forgotten, or a restore gone wrong. It asks for the **recovery password** set in the wizard's last step – not a login; the workbench asks for it in one place only, the **Recovery password** tab of Users, which changes it – and offers three things:
 
-- **Restore a backup**, from the list of dates, after snapshotting the current state;
+- **Restore a backup**, from the list of dates, after snapshotting the current state. It is the restore of the Backups panel, so what an archive holds - the templates in the folders of `templates/` among it - and what a restore refuses are the ones described under [Backups and Restoration](deployment.md#backups-and-restoration);
 - **Set a password** for an account that exists, picked from a list: it gets the new password, is logged out everywhere, and is unlocked and activated again if it was locked or deactivated - so a recovered developer account gets in. A typo cannot name an account, there is none to name;
 - **Create a full-access account** - for when no account is left. It is its own action, asks to confirm before anything is written, and refuses an address that already has an account.
 

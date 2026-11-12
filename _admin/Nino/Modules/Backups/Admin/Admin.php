@@ -461,6 +461,23 @@ namespace Nino\Modules\Backups {
 
 				unset( $gz );
 
+				// Read before the snapshot and before anything is unpacked: the
+				// names of its entries as the tar holds them, which the
+				// unpacking would normalize into something harmless-looking (see
+				// \Nino\Backup::refusal()). A refused archive costs nothing
+				$refused = \Nino\Backup::refusal( $tmpGz );
+				if( $refused !== null )
+					return [ 422, $refused ];
+
+				// Unpacked into the staging directory before the snapshot, which
+				// is the first thing that touches the project: what the unpacking
+				// really made is read there (\Nino\Backup::staged()), so an
+				// archive that got past the headers is refused without costing a
+				// snapshot either
+				$unpacked = self::_unpack( $tmpGz, $staging );
+				if( $unpacked !== true )
+					return $unpacked;
+
 				// The way back out, before anything is touched - and a snapshot
 				// that cannot be made is a restore that does not start
 				try {
@@ -470,7 +487,7 @@ namespace Nino\Modules\Backups {
 					return [ 500, 'the safety snapshot could not be made: '. $e->getMessage() ];
 				}
 
-				return self::_restoreFrom( $appData, '', $tmpGz, $staging, $notice, true );
+				return self::_restoreFrom( $appData, '', $tmpGz, $staging, $notice, true, true );
 			}
 			finally {
 				@unlink( $tmpBase );
@@ -478,6 +495,34 @@ namespace Nino\Modules\Backups {
 				if( is_dir( $staging ) === true )
 					\Nino\Filesystem::removeDir( $staging );
 			}
+		}
+
+		/**
+		 *	Unpack the archive into the staging directory and read what came out
+		 *
+		 *	@param		string		$tmpGz				The .tar.gz
+		 *	@param		string		$staging			Where to unpack it, not existing yet
+		 *
+		 *	@return 	true|array							true, or [ http status, message ]: 500 for an archive that cannot be unpacked, 422 for one that holds what a restore must not take
+		 */
+		private static function _unpack( string $tmpGz, string $staging ): true|array {
+
+			if( @mkdir( $staging, 0700, true ) === false )
+				return [ 500, 'the restore staging directory could not be created' ];
+
+			// PharData throws for an archive it cannot read - a file somebody
+			// truncated or replaced that still decrypts - and a throw here was
+			// a 500 the panel could not explain
+			try {
+				( new \PharData( $tmpGz ) )->extractTo( $staging, null, true );
+			}
+			catch( \Throwable $e ) {
+				return [ 500, 'the backup could not be unpacked: '. $e->getMessage() ];
+			}
+
+			$refused = \Nino\Backup::staged( $staging );
+
+			return $refused === null ? true : [ 422, $refused ];
 		}
 
 		/**
@@ -491,25 +536,19 @@ namespace Nino\Modules\Backups {
 		 *	@param		string		$staging			Where to unpack them, not existing yet
 		 *	@param		array|null	&$notice			(reference) See restore()
 		 *	@param		bool			$written			Whether $tmpGz holds the archive already
+		 *	@param		bool			$unpacked			Whether the archive is unpacked into $staging already (see _unpack())
 		 *
 		 *	@return 	true|array							true, or [ http status, message ]
 		 */
-		private static function _restoreFrom( array &$appData, string $gz, string $tmpGz, string $staging, ?array &$notice = null, bool $written = false ): true|array {
+		private static function _restoreFrom( array &$appData, string $gz, string $tmpGz, string $staging, ?array &$notice = null, bool $written = false, bool $unpacked = false ): true|array {
 
 			if( $written === false && @file_put_contents( $tmpGz, $gz ) !== strlen( $gz ) )
 				return [ 500, 'the backup could not be written for unpacking' ];
 
-			if( @mkdir( $staging, 0755, true ) === false )
-				return [ 500, 'the restore staging directory could not be created' ];
-
-			// PharData throws for an archive it cannot read - a file somebody
-			// truncated or replaced that still decrypts - and a throw here was
-			// a 500 the panel could not explain
-			try {
-				( new \PharData( $tmpGz ) )->extractTo( $staging, null, true );
-			}
-			catch( \Throwable $e ) {
-				return [ 500, 'the backup could not be unpacked: '. $e->getMessage() ];
+			if( $unpacked === false ) {
+				$result = self::_unpack( $tmpGz, $staging );
+				if( $result !== true )
+					return $result;
 			}
 
 			// The note of where the archive comes from (see \Nino\Backup::stamp())
@@ -581,8 +620,9 @@ namespace Nino\Modules\Backups {
 			// time rather than as a single tree, so each lands wherever this
 			// project actually keeps it. What a directory of the archive holds
 			// replaces the file of the same name on disk, and a file on disk
-			// that the archive has not is left alone - for the templates and the
-			// assets as for the texts and the elements
+			// that the archive has not is left alone - for the templates, in a
+			// folder of templates/ as well, and the assets as for the texts and
+			// the elements; the folder is made where it is missing
 			foreach( glob( $staging. '/*' ) ?: [] as $entry ) {
 
 				$target = \Nino\Filesystem::path( $appData, '/'. basename( $entry ) );

@@ -53,14 +53,15 @@ namespace Nino {
 
 		// Absolute path -> archive name, for every file the admin panel
 		// writes to at runtime: config.php, the text files, every element
-		// type/image, the pages and the look - the templates/*.tpl the Builder
+		// type/image, the pages and the look - the templates the Builder
 		// writes (page-*.tpl) and Design writes (frame-header.tpl and
 		// frame-footer.tpl), the assets/ Design writes its theme.css into -
 		// and the /data/ content a project actually accumulates (newsletter
 		// subscribers, form submissions, the php error log logs.<month>.php,
 		// and what an installed feature's manifest declares it owns below
 		// /data/). A template is editorial content once the Builder exists, so
-		// every one of them is in: a developer's own, which git versions as
+		// every one of them is in, in a folder of templates/ as well as
+		// directly in it: a developer's own, which git versions as
 		// well, is not hurt by being in an archive - a restore brings it back
 		// as it was archived. Deliberately not developer code (_nino/,
 		// _admin/ itself, ...) - that's already versioned in git and would
@@ -113,21 +114,17 @@ namespace Nino {
 			foreach( glob( $elements. '/*.php' ) ?: [] as $file )
 				$files[$file] = 'elements/'. basename( $file );
 
-			// Every *.tpl directly in templates/ - the pages of the Builder
-			// and the frames of Design among them, and which of the others a
-			// person wrote is not something a file says. Files only: a
-			// directory that is called x.tpl is no template, and a link is not
-			// followed out of the private directory
-			foreach( glob( $templates. '/*.tpl' ) ?: [] as $file )
-				if( is_file( $file ) === true && is_link( $file ) === false )
-					$files[$file] = 'templates/'. basename( $file );
-
 			// Element images are deliberately nested (images/elements/type/...)
-			// and so are the stylesheet sources of assets/. Walk the complete
+			// and so are the stylesheet sources of assets/ and the templates of
+			// a module or a feature that keeps its own in a folder of
+			// templates/ (templates/<folder>/<name>.tpl). Walk the complete
 			// tree of each and preserve each relative archive path; never
 			// follow symlinks out of the public image directory or the
-			// private asset one.
-			foreach( [ 'images' => $images, 'assets' => $assets ] as $archive => $root ) {
+			// private asset and template ones. Of templates/ only the
+			// templates are taken, at any depth (see template()): the pages of
+			// the Builder and the frames of Design among them, and which of the
+			// others a person wrote is not something a file says
+			foreach( [ 'templates' => $templates, 'images' => $images, 'assets' => $assets ] as $archive => $root ) {
 
 				if( is_dir( $root ) === false )
 					continue;
@@ -143,8 +140,12 @@ namespace Nino {
 					if( $file->isFile() === false || is_link( $path ) === true )
 						continue;
 
-					$relative = substr( $path, strlen( rtrim( $root, DIRECTORY_SEPARATOR ) ) + 1 );
-					$files[$path] = $archive. '/'. str_replace( DIRECTORY_SEPARATOR, '/', $relative );
+					$relative = str_replace( DIRECTORY_SEPARATOR, '/', substr( $path, strlen( rtrim( $root, DIRECTORY_SEPARATOR ) ) + 1 ) );
+
+					if( $archive === 'templates' && self::template( $relative ) === false )
+						continue;
+
+					$files[$path] = $archive. '/'. $relative;
 				}
 			}
 
@@ -238,6 +239,244 @@ namespace Nino {
 			}
 
 			return $files;
+		}
+
+		// The top-level entries of an archive: manifest() makes no others, and
+		// nino.php is stamp()'s. A restore copies each one into the project, so
+		// an archive that names another would plant a file next to index.php
+		private const array ARCHIVE_DIRS = [ 'text', 'elements', 'templates', 'assets', 'images', 'data' ];
+		private const array ARCHIVE_FILES = [ 'config.php', 'nino.php' ];
+
+		/**
+		 *	Whether a path below templates/ is a template: a file that is called
+		 *	*.tpl, in whatever depth, and in no directory that is called like one.
+		 *	A name that starts with a dot is none, as glob( '*.tpl' ) never
+		 *	answered it. The one rule of what a backup collects and of what a
+		 *	restore takes
+		 *
+		 *	@param		string		$relative			eg. 'page-home.tpl' or 'crm-portal/list.tpl'
+		 *
+		 *	@return 	bool
+		 */
+		public static function template( string $relative ): bool {
+
+			$segments = explode( '/', $relative );
+			$name 		= (string) array_pop( $segments );
+
+			if( $name === '' || $name[0] === '.' || str_ends_with( $name, '.tpl' ) === false )
+				return false;
+
+			foreach( $segments as $segment )
+				if( $segment === '' || str_ends_with( $segment, '.tpl' ) === true )
+					return false;
+
+			return true;
+		}
+
+		/**
+		 *	Whether an archive holds an entry a restore must not take, read from
+		 *	the headers of the tar itself and before anything is unpacked: the
+		 *	unpacking normalizes a name ('templates/../x.tpl' becomes 'x.tpl' in
+		 *	the staged copy, an absolute one is made relative), and what is
+		 *	copied from there into the project is the normalized name. Refused
+		 *	are a link or any kind of entry but a file and a directory (the long
+		 *	names of the GNU tar among them, which PharData does not write: it
+		 *	splits a name over the two fields of the header), a name with a NUL
+		 *	byte in it, an absolute one, one with '..' in it, one that
+		 *	starts anywhere but at a directory of manifest() or at config.php or
+		 *	nino.php, and below templates/ a file that is no template or a
+		 *	directory that is called like one (see template()). Every entry up to
+		 *	where the tar ends or cannot be read is judged
+		 *
+		 *	@param		string		$tarGz				Absolute path of the .tar.gz
+		 *
+		 *	@return 	string|null							Why the archive is refused, or null where every entry may be restored
+		 */
+		public static function refusal( string $tarGz ): ?string {
+
+			// What cannot be read as a tar at all - a file that is cut short or is
+			// none - is not judged here: nothing in it is an entry, and the
+			// unpacking says so itself
+			$handle = @gzopen( $tarGz, 'rb' );
+			if( $handle === false )
+				return null;
+
+			try {
+				while( ( $block = gzread( $handle, 512 ) ) !== false && $block !== '' ) {
+
+					if( strlen( $block ) !== 512 )
+						return null;
+
+					// The end of the archive: nothing but zeros follows. Whatever
+					// follows it that is not a zero is read by no tar, but a reader
+					// that went on would find it
+					if( $block === str_repeat( "\0", 512 ) ) {
+
+						while( ( $rest = gzread( $handle, 8192 ) ) !== false && $rest !== '' )
+							if( trim( $rest, "\0" ) !== '' )
+								return 'the backup holds data after its end';
+
+						return null;
+					}
+
+					$sum = array_sum( array_map( 'ord', str_split( substr( $block, 0, 148 ). '        '. substr( $block, 156 ) ) ) );
+					if( preg_match( '/^[0-7]+$/', trim( substr( $block, 148, 8 ), "\0 " ) ) !== 1 || octdec( trim( substr( $block, 148, 8 ), "\0 " ) ) !== $sum )
+						return 'the backup is not a tar archive';
+
+					$size = trim( substr( $block, 124, 12 ), "\0 " );
+					if( preg_match( '/^[0-7]*$/', $size ) !== 1 )
+						return 'the backup is not a tar archive';
+
+					$size = (int) octdec( $size === '' ? '0' : $size );
+					$type = $block[156];
+
+					// A NUL byte is the end of a name in the header; one with bytes
+					// after it is a name that reads differently to whoever stops at
+					// it and whoever does not
+					$name 	= self::_field( $block, 0, 100 );
+					// The prefix is read whatever the magic of the header says: PharData
+					// joins it to the name without looking at the magic
+					$prefix = self::_field( $block, 345, 155 );
+
+					if( $name === null || $prefix === null )
+						return self::_refuse( rtrim( substr( $block, 0, 100 ), "\0" ), 'a name with a NUL byte' );
+
+					if( $prefix !== '' )
+						$name = $prefix. '/'. $name;
+
+					$reason = self::_entry( $name, $type );
+					if( $reason !== null )
+						return self::_refuse( $name, $reason );
+
+					// The blocks of the data are those of a file and of nothing else:
+					// the size in the header of a directory is ignored by PharData
+					// and by every tar, which reads the next block as the next
+					// header. A reader that jumped over them would not see an
+					// entry hidden there. Of the kinds accepted here, '0' and the
+					// old "\0" carry data, '5' carries none
+					$skip = $type === '5' ? 0 : (int) ( ceil( $size / 512 ) * 512 );
+					if( $skip > 0 && gzseek( $handle, $skip, SEEK_CUR ) !== 0 )
+						return null;
+				}
+			}
+			finally {
+				gzclose( $handle );
+			}
+
+			return null;
+		}
+
+		/**
+		 *	Whether the unpacked copy of an archive holds something a restore must
+		 *	not copy into the project, read from the staging directory itself and
+		 *	so from what was really unpacked, whatever the headers said (see
+		 *	refusal()): a link, anything that is neither a file nor a directory, a
+		 *	top-level entry outside the ones a backup makes, and below templates/
+		 *	what template() does not take. The same rule as the headers' (_place())
+		 *
+		 *	@param		string		$staging			Absolute path of the directory the archive was unpacked into
+		 *
+		 *	@return 	string|null							Why the archive is refused, or null where everything staged may be copied
+		 */
+		public static function staged( string $staging ): ?string {
+
+			$iterator = new \RecursiveIteratorIterator(
+				new \RecursiveDirectoryIterator( $staging, \FilesystemIterator::SKIP_DOTS ),
+				\RecursiveIteratorIterator::SELF_FIRST
+			);
+
+			foreach( $iterator as $item ) {
+
+				$relative = str_replace( DIRECTORY_SEPARATOR, '/', substr( $item->getPathname(), strlen( rtrim( $staging, DIRECTORY_SEPARATOR ) ) + 1 ) );
+
+				if( $item->isLink() === true )
+					return self::_refuse( $relative, 'a link' );
+
+				if( $item->isFile() === false && $item->isDir() === false )
+					return self::_refuse( $relative, 'an entry that is no file and no directory' );
+
+				$reason = self::_place( explode( '/', $relative ), $item->isDir() );
+				if( $reason !== null )
+					return self::_refuse( $relative, $reason );
+			}
+
+			return null;
+		}
+
+		// A header field up to its first NUL byte, or null where bytes follow that
+		private static function _field( string $block, int $from, int $length ): ?string {
+
+			$field = substr( $block, $from, $length );
+			$end 	 = strpos( $field, "\0" );
+
+			if( $end === false )
+				return $field;
+
+			return trim( substr( $field, $end ), "\0" ) === '' ? substr( $field, 0, $end ) : null;
+		}
+
+		/**
+		 *	The reason one entry of an archive is not restored, or null
+		 *
+		 *	@param		string		$name					The entry's name as the tar holds it
+		 *	@param		string		$type					The tar's type flag
+		 *
+		 *	@return 	string|null
+		 */
+		private static function _entry( string $name, string $type ): ?string {
+
+			if( $type !== '0' && $type !== "\0" && $type !== '5' )
+				return $type === '1' || $type === '2' ? 'a link' : 'an entry that is no file and no directory';
+
+			// No rule of its own for an absolute path: its first segment is empty,
+			// which no directory of the allowlist is
+			$segments = explode( '/', rtrim( $name, '/' ) );
+
+			if( in_array( '..', $segments, true ) === true )
+				return 'a path that leaves the project';
+
+			return self::_place( $segments, $type === '5' );
+		}
+
+		/**
+		 *	Whether a file or a directory may lie where an archive puts it: the one
+		 *	rule of the header reader (refusal()) and of the staged copy
+		 *	(staged()), so that a difference between the two readings cannot
+		 *	bring anything into the project that one of them would refuse
+		 *
+		 *	@param		array 		$segments			The path in the archive, split at '/'
+		 *	@param		bool			$dir					Whether it is a directory
+		 *
+		 *	@return 	string|null
+		 */
+		private static function _place( array $segments, bool $dir ): ?string {
+
+			// A directory is one of the top-level ones or below one; a file is
+			// config.php or nino.php, or below a directory
+			$known = count( $segments ) === 1 && $dir === false ? self::ARCHIVE_FILES : self::ARCHIVE_DIRS;
+
+			if( in_array( $segments[0], $known, true ) === false )
+				return 'a path that is none of the project\'s';
+
+			if( $segments[0] === 'templates' && count( $segments ) > 1 ) {
+
+				$below = array_slice( $segments, 1 );
+
+				if( $dir === true ) {
+					foreach( $below as $segment )
+						if( str_ends_with( $segment, '.tpl' ) === true )
+							return 'a directory that is called like a template';
+				}
+				else if( self::template( implode( '/', $below ) ) === false )
+					return 'a file that is no template';
+			}
+
+			return null;
+		}
+
+		// The reason, with a name that cannot break a line or a log: printable ascii, cut
+		private static function _refuse( string $name, string $reason ): string {
+			return 'the backup holds '. $reason. ': '. substr( (string) preg_replace( '/[^\x20-\x7e]/', '?', $name ), 0, 80 );
 		}
 
 		/**

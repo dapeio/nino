@@ -804,6 +804,266 @@ check( 'the recovery page writes the line of its restore too, with the door as t
 	&& count( $logLines( 'recovery.php', 'Restore Backup '. $pagesId, 'failed (409)' ) ) === 1 );
 \Nino\Runtime::unsetSessionValue( $appData, \Nino\Admin\Recovery::SESSION_KEY );
 
+// --- Templates in the folders of templates/ -------------------------------
+//
+// A module or a feature keeps its templates in a folder of its own
+// (templates/<folder>/<name>.tpl). The archive carries them at their relative
+// path, a restore makes the folder where it is missing and puts the bytes back,
+// and the rules of the top level - a directory called x.tpl, a link, a file
+// that is no template - hold in every depth. What a restore refuses is read
+// from the tar itself: the unpacking would turn 'templates/../x.tpl' into a
+// plain 'x.tpl' and copy that into the project
+echo "Templates in folders of templates/\n";
+
+$tarEntry = static function( string $name, string $content = '', string $type = '0', string $link = '', ?int $size = null, string $prefix = '', string $magic = "ustar\0". '00' ): string {
+
+	$header = str_pad( $name, 100, "\0" ). sprintf( '%07o', 0644 ). "\0". sprintf( '%07o', 0 ). "\0". sprintf( '%07o', 0 ). "\0"
+		. sprintf( '%011o', $size ?? strlen( $content ) ). "\0". sprintf( '%011o', 0 ). "\0". '        '. $type. str_pad( $link, 100, "\0" )
+		. $magic. str_repeat( "\0", 32 + 32 + 16 ). str_pad( $prefix, 155, "\0" ). str_repeat( "\0", 12 );
+	$sum = array_sum( array_map( 'ord', str_split( $header ) ) );
+
+	return substr( $header, 0, 148 ). sprintf( '%06o', $sum ). "\0 ". substr( $header, 156 ). $content. str_repeat( "\0", ( 512 - strlen( $content ) % 512 ) % 512 );
+};
+$tarLong = static fn( string $name ): string => $tarEntry( '././@LongLink', $name. "\0", 'L' );
+
+$writeTar = static function( string $id, string $tar ) use ( $nowDir, $stubPrefix, $stubSuffix, $archiveKey ): void {
+
+	$iv			= random_bytes( 12 );
+	$tag		= '';
+	$cipher	= openssl_encrypt( gzencode( $tar. str_repeat( "\0", 1024 ) ), 'aes-256-gcm', (string) $archiveKey, OPENSSL_RAW_DATA, $iv, $tag );
+	file_put_contents( $nowDir. '/'. $id. '.php', $stubPrefix. base64_encode( $iv. $tag. (string) $cipher ). $stubSuffix );
+};
+
+/** Every file below the sandbox, by relative path, without what a restore writes in passing: the archives, the log and the locks */
+$projectFiles = static function() use ( $sandbox ): array {
+
+	$names = [];
+	foreach( new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $sandbox, FilesystemIterator::SKIP_DOTS ) ) as $file ) {
+		$relative = substr( $file->getPathname(), strlen( $sandbox ) + 1 );
+		if( preg_match( '#^private/(\.backups|\.logs|data/\.locks)/#', $relative ) !== 1 )
+			$names[] = $relative;
+	}
+	sort( $names );
+
+	return $names;
+};
+
+$folderTemplates = [
+	'crm-portal/list.tpl'						=> "list \xff\xfe bytes\r\n<p>[[/template/crm-portal/list/title]]</p>\n",
+	'crm-portal/deep/card.tpl'			=> "card, two levels down\0with a NUL byte\n",
+	'crm-portal/'. str_repeat( 'long-', 19 ). '.tpl'	=> 'a name of a hundred characters with its folder, which the tar splits into two fields',
+	'crm-portal/page.tpl'						=> str_repeat( "five thousand bytes, so that the entry after this one is found past its blocks\n", 64 ),
+	'crm-mail/mail.tpl'							=> "mail body\n",
+];
+
+foreach( $folderTemplates as $name => $bytes ) {
+	mkdir( dirname( $pagesDir. '/'. $name ), 0755, true );
+	file_put_contents( $pagesDir. '/'. $name, $bytes );
+}
+
+// What is none of them, in a folder: a link, a directory called x.tpl with a
+// template in it, a file with another extension, a hidden one, and a link to
+// the folder itself
+mkdir( $pagesDir. '/crm-portal/folder.tpl' );
+file_put_contents( $pagesDir. '/crm-portal/folder.tpl/inner.tpl', 'below a directory that is called like a template' );
+file_put_contents( $pagesDir. '/crm-portal/notes.txt', 'not a template' );
+file_put_contents( $pagesDir. '/crm-portal/.hidden.tpl', 'hidden' );
+$folderLink = @symlink( '../page-probe.tpl', $pagesDir. '/crm-portal/link.tpl' );
+$folderDirLink = @symlink( 'crm-portal', $pagesDir. '/linked-folder' );
+
+$folderId		= \Nino\Modules\Backups::now( $appData );
+$entries		= is_string( $folderId ) === true ? $readArchive( $folderId ) : [];
+$templateEntries = array_values( array_filter( array_keys( $entries ), static fn( string $name ): bool => str_starts_with( $name, 'templates/' ) ) );
+sort( $templateEntries );
+$expected		= array_merge( [ 'templates/page-late.tpl', 'templates/page-probe.tpl' ], array_map( static fn( string $name ): string => 'templates/'. $name, array_keys( $folderTemplates ) ) );
+sort( $expected );
+
+check( 'an archive carries the templates of a folder of templates/ at their relative path, in one and in two levels of depth', $templateEntries === $expected
+	&& ( $entries['templates/crm-portal/list.tpl'] ?? null ) === $folderTemplates['crm-portal/list.tpl'] && ( $entries['templates/crm-portal/deep/card.tpl'] ?? null ) === $folderTemplates['crm-portal/deep/card.tpl'] );
+check( '...a path longer than a hundred characters, and a template that fills several blocks of the tar, with the entry after it',
+	( $entries['templates/crm-portal/'. str_repeat( 'long-', 19 ). '.tpl'] ?? null ) === $folderTemplates['crm-portal/'. str_repeat( 'long-', 19 ). '.tpl']
+	&& ( $entries['templates/crm-portal/page.tpl'] ?? null ) === $folderTemplates['crm-portal/page.tpl'] && ( $entries['templates/crm-mail/mail.tpl'] ?? null ) === $folderTemplates['crm-mail/mail.tpl'] );
+check( '...but not, in a folder, a link, a directory that is called x.tpl and what is in it, a file that is no .tpl, a hidden one, or the folder through a link'. ( $folderLink === true && $folderDirLink === true ? '' : ' (no link could be made here)' ),
+	count( array_filter( array_keys( $entries ), static fn( string $name ): bool => preg_match( '#(link\.tpl|folder\.tpl|inner\.tpl|notes\.txt|hidden|linked-folder)#', $name ) === 1 ) ) === 0 );
+check( 'what is a template is one rule for a collection and a restore: a file called *.tpl, in a folder that is not called like one, and not a hidden one',
+	\Nino\Backup::template( 'page-home.tpl' ) === true && \Nino\Backup::template( 'crm-portal/deep/card.tpl' ) === true
+	&& \Nino\Backup::template( 'notes.txt' ) === false && \Nino\Backup::template( 'folder.tpl/inner.tpl' ) === false && \Nino\Backup::template( 'crm-portal/.hidden.tpl' ) === false
+	&& \Nino\Backup::template( '.tpl' ) === false && \Nino\Backup::template( 'crm-portal/' ) === false && \Nino\Backup::template( '' ) === false );
+
+// The state after the archive: a template changed, a folder gone altogether,
+// and one more written into a folder that stays
+file_put_contents( $pagesDir. '/crm-portal/list.tpl', 'changed after the archive' );
+file_put_contents( $pagesDir. '/crm-portal/deep/card.tpl', 'changed after the archive' );
+\Nino\Filesystem::removeDir( $pagesDir. '/crm-mail' );
+file_put_contents( $pagesDir. '/crm-portal/late.tpl', 'written after the archive' );
+
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $folderId ] );
+$identical = true;
+foreach( $folderTemplates as $name => $bytes )
+	if( @file_get_contents( $pagesDir. '/'. $name ) !== $bytes )
+		$identical = false;
+check( 'a restore puts the templates of the folders back byte for byte, in one and in two levels of depth', $status === 200 && ( $body['ok'] ?? false ) === true && $identical === true );
+check( '...makes the folder where it is gone', is_dir( $pagesDir. '/crm-mail' ) === true && file_get_contents( $pagesDir. '/crm-mail/mail.tpl' ) === $folderTemplates['crm-mail/mail.tpl'] );
+check( '...and leaves a template of a folder that the archive has not, as it leaves one directly in templates/', file_get_contents( $pagesDir. '/crm-portal/late.tpl' ) === 'written after the archive' );
+
+// The recovery page runs the same restore
+file_put_contents( $pagesDir. '/crm-portal/list.tpl', 'changed again' );
+\Nino\Filesystem::removeDir( $pagesDir. '/crm-portal/deep' );
+\Nino\Runtime::setSessionValue( $appData, \Nino\Admin\Recovery::SESSION_KEY, true );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Admin\Recovery::class, 'handlePost' ], [ 'date' => $folderId ], 'recovery/restore' );
+check( 'the recovery page restores the templates of the folders the same way, a missing folder made', $status === 200 && ( $body['restoredDate'] ?? null ) === $folderId
+	&& file_get_contents( $pagesDir. '/crm-portal/list.tpl' ) === $folderTemplates['crm-portal/list.tpl'] && file_get_contents( $pagesDir. '/crm-portal/deep/card.tpl' ) === $folderTemplates['crm-portal/deep/card.tpl'] );
+\Nino\Runtime::unsetSessionValue( $appData, \Nino\Admin\Recovery::SESSION_KEY );
+
+// An archive made before there were folders in it: the same format with fewer
+// entries
+$flatId = date( 'Y-m-d' ). '-100001';
+$writeArchive( $flatId, array_filter( $entries, static fn( string $name ): bool => $name === 'nino.php' || preg_match( '#^templates/[^/]+$|^assets/#', $name ) === 1, ARRAY_FILTER_USE_KEY ) );
+file_put_contents( $pagesDir. '/page-probe.tpl', 'changed after the flat archive' );
+file_put_contents( $pagesDir. '/crm-portal/list.tpl', 'a folder the flat archive knows nothing of' );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $flatId ] );
+check( 'an archive that has no folder in it restores as it did, and touches no template of a folder', $status === 200 && ( $body['ok'] ?? false ) === true
+	&& file_get_contents( $pagesDir. '/page-probe.tpl' ) === 'probe page, as archived' && file_get_contents( $pagesDir. '/crm-portal/list.tpl' ) === 'a folder the flat archive knows nothing of' );
+
+// An archive somebody with the key made by hand. Each one carries a good
+// template before the entry that is refused: it is refused as a whole, nothing
+// of it is written, and no snapshot is made for it
+$good = $tarEntry( 'templates/crm-portal/list.tpl', 'from the archive that is refused' );
+$flawed = $tarEntry( 'templates/crm-portal/flawed.tpl', 'flawed' );
+$flawed = substr_replace( $flawed, '0000000', 148, 7 );
+// A directory carries no data, whatever its size field says: PharData reads the
+// next block as the next header. An entry hidden in the "data" of a directory
+$dirHiding = static fn( string $hidden ): string => $tarEntry( 'images', '', '5', '', strlen( $hidden ) ). $hidden;
+$hostile = [
+	'a path with .. in a folder'					=> $good. $tarEntry( 'templates/crm-portal/../../x.tpl', 'x' ),
+	'a path with .. at the top'						=> $good. $tarEntry( 'templates/../x.tpl', 'x' ),
+	'an absolute path'										=> $good. $tarEntry( $sandbox. '/private/templates/abs-probe.tpl', 'x' ),
+	'an absolute path in a long name'			=> $good. $tarLong( $sandbox. '/private/templates/abs-probe.tpl' ). $tarEntry( 'x', 'x' ),
+	'a .. in a long name'									=> $good. $tarLong( 'templates/crm-portal/../../x.tpl' ). $tarEntry( 'x', 'x' ),
+	'a NUL byte in a name, a template before it'	=> $good. $tarEntry( "templates/crm-portal/ok.tpl\0evil", 'x' ),
+	'a NUL byte in a long name'						=> $good. $tarLong( "templates/crm-portal/n\0ul.tpl" ). $tarEntry( 'x', 'x' ),
+	'a symbolic link'											=> $good. $tarEntry( 'templates/crm-portal/sym.tpl', '', '2', '/etc/hostname' ),
+	'a hard link'													=> $good. $tarEntry( 'templates/crm-portal/hard.tpl', '', '1', 'templates/crm-portal/list.tpl' ),
+	'a file that is no template in a folder'	=> $good. $tarEntry( 'templates/crm-portal/evil.php', '<?php' ),
+	'a file that is no template at the top'		=> $good. $tarEntry( 'templates/evil.php', '<?php' ),
+	'a hidden file'												=> $good. $tarEntry( 'templates/crm-portal/.hidden.tpl', 'x' ),
+	'a directory called like a template'	=> $good. $tarEntry( 'templates/crm-portal/dir.tpl/', '', '5' ),
+	'a template below such a directory'		=> $good. $tarEntry( 'templates/crm-portal/dir.tpl/inner.tpl', 'x' ),
+	'an entry beside the project\'s own'	=> $good. $tarEntry( 'index.php', '<?php' ),
+	'a file where a directory belongs'		=> $good. $tarEntry( 'templates', 'x' ),
+	'a header that is none'								=> $good. $flawed,
+	'a directory whose size hides index.php'			=> $dirHiding( $tarEntry( 'index.php', '<?php' ) ),
+	'a directory whose size hides templates/evil.php'	=> $dirHiding( $tarEntry( 'templates/evil.php', '<?php' ) ),
+	'a directory whose size hides a link'				=> $dirHiding( $tarEntry( 'templates/crm-portal/hid.tpl', '', '2', '/etc/hostname' ) ),
+	'a directory whose size hides an absolute path'		=> $dirHiding( $tarEntry( $sandbox. '/private/templates/abs-probe.tpl', 'x' ) ),
+	'a directory whose size hides it behind a template'	=> $good. $dirHiding( $tarEntry( 'index.php', '<?php' ) ),
+	'a name prefix in a header with no ustar magic'		=> $good. $tarEntry( 'templates/crm-portal/pre.tpl', 'x', '0', '', null, 'zz', str_repeat( "\0", 8 ) ),
+	'a name prefix that leaves the project'				=> $good. $tarEntry( 'x.tpl', 'x', '0', '', null, '../..' ),
+	'data after the end of the tar'						=> $good. str_repeat( "\0", 1024 ). $tarEntry( 'index.php', '<?php' ),
+];
+
+$hostileN = 0;
+foreach( $hostile as $what => $tar ) {
+
+	$id = date( 'Y-m-d' ). '-1001'. sprintf( '%02d', ++$hostileN );
+	$writeTar( $id, $tar );
+
+	$filesBefore		= $projectFiles();
+	$snapshotsNow		= glob( $nowDir. '/pre-restore-*.php' ) ?: [];
+	$listBefore			= file_get_contents( $pagesDir. '/crm-portal/list.tpl' );
+	$tempBefore			= count( glob( sys_get_temp_dir(). '/ninorestore*' ) ?: [] );
+
+	\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+	[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Backups\Admin::class, 'apiRestore' ], [ 'date' => $id ] );
+
+	check( 'an archive with '. $what. ' is refused with 422, as a whole: nothing is written, no snapshot is made, no temporary file is left',
+		$status === 422 && is_string( $body['error'] ?? null ) === true && $projectFiles() === $filesBefore && file_get_contents( $pagesDir. '/crm-portal/list.tpl' ) === $listBefore
+		&& ( glob( $nowDir. '/pre-restore-*.php' ) ?: [] ) === $snapshotsNow && count( glob( sys_get_temp_dir(). '/ninorestore*' ) ?: [] ) === $tempBefore );
+	unlink( $nowDir. '/'. $id. '.php' );
+}
+
+check( '...and the answer names what is wrong without the bytes of the name', is_string( $body['error'] ?? null ) === true && preg_match( '/^[\x20-\x7e]+$/', (string) $body['error'] ) === 1 );
+check( '...nothing a hostile archive named is on disk', is_file( $sandbox. '/x.tpl' ) === false && is_file( $pagesDir. '/abs-probe.tpl' ) === false && is_file( $sandbox. '/private/x.tpl' ) === false
+	&& is_file( $sandbox. '/index.php' ) === false && is_file( $pagesDir. '/crm-portal/evil.php' ) === false && is_file( $pagesDir. '/evil.php' ) === false );
+
+// The two readings on their own. The header reader alone: the archives above that
+// hide an entry in a directory are refused from the headers, and a link entry is
+// only to be seen there, since PharData unpacks it as a plain file. The staged
+// copy alone: the unpacking of an archive the header reader would refuse is read
+// for what it made, through the step of the restore that does it
+$tmpTar = sys_get_temp_dir(). '/ninotest-reader-'. bin2hex( random_bytes( 6 ) ). '.tar.gz';
+$readers = [];
+foreach( [ 'a directory whose size hides index.php', 'a directory whose size hides a link', 'a directory whose size hides it behind a template', 'data after the end of the tar', 'a name prefix in a header with no ustar magic' ] as $what ) {
+	file_put_contents( $tmpTar, gzencode( $hostile[$what]. str_repeat( "\0", 1024 ) ) );
+	$readers[$what] = \Nino\Backup::refusal( $tmpTar );
+}
+file_put_contents( $tmpTar, gzencode( $good. $tarEntry( 'templates/crm-portal/ok.tpl', 'ok' ). str_repeat( "\0", 1024 ) ) );
+$readers['good'] = \Nino\Backup::refusal( $tmpTar );
+unlink( $tmpTar );
+check( 'the header reader alone refuses an entry hidden in the size of a directory, a link hidden there, data after the end of the tar and a name prefix that has no magic to go with it, and passes a good archive',
+	count( array_filter( array_diff_key( $readers, [ 'good' => 1 ] ), 'is_string' ) ) === 5 && $readers['good'] === null );
+
+$unpack = new ReflectionMethod( '\Nino\Modules\Backups\Admin', '_unpack' );
+$unpackOf = static function( string $tar ) use ( $unpack ): array {
+	// A name of its own each time: PharData keeps the tar it makes of a .tar.gz beside it
+	$base		= sys_get_temp_dir(). '/ninotest-unpack-'. bin2hex( random_bytes( 6 ) );
+	$staging = $base. '-staging';
+	file_put_contents( $base. '.tar.gz', gzencode( $tar. str_repeat( "\0", 1024 ) ) );
+	$result = $unpack->invoke( null, $base. '.tar.gz', $staging );
+	$left = is_dir( $staging );
+	\Nino\Filesystem::removeDir( $staging );
+	array_map( 'unlink', glob( $base. '.*' ) ?: [] );
+	return [ $result, $left ];
+};
+[ $stagedIndex ] = $unpackOf( $hostile['a directory whose size hides index.php'] );
+[ $stagedEvil ] = $unpackOf( $hostile['a directory whose size hides templates/evil.php'] );
+[ $stagedOk, $stagedLeft ] = $unpackOf( $good. $tarEntry( 'templates/crm-portal/ok.tpl', 'ok' ) );
+check( 'the staged copy alone refuses what was really unpacked - a top-level entry outside the project\'s, a file below templates/ that is no template - with 422, and passes a good one',
+	is_array( $stagedIndex ) === true && $stagedIndex[0] === 422 && is_array( $stagedEvil ) === true && $stagedEvil[0] === 422 && $stagedOk === true && $stagedLeft === true );
+
+// A tree of its own for each case: one with a link in it is not removed by removeDir()
+$stageRoot = sys_get_temp_dir(). '/ninotest-stage-'. bin2hex( random_bytes( 6 ) );
+$stageN = 0;
+$stageCase = static function( callable $make ) use ( $stageRoot, &$stageN ): ?string {
+	$stage = $stageRoot. '/'. ++$stageN;
+	mkdir( $stage. '/templates/crm-portal', 0755, true );
+	file_put_contents( $stage. '/templates/crm-portal/ok.tpl', 'ok' );
+	$make( $stage );
+	return \Nino\Backup::staged( $stage );
+};
+$fifo = function_exists( 'posix_mkfifo' ) === true;
+check( 'the rule of the staged copy: a good tree passes; a link, a fifo, a top-level file or directory outside the project\'s, a file that is no template, a directory called x.tpl and a template in one are refused',
+	$stageCase( static function( string $dir ): void {} ) === null
+	&& $stageCase( static function( string $dir ): void { file_put_contents( $dir. '/config.php', '<?php return [];' ); mkdir( $dir. '/data/a', 0755, true ); file_put_contents( $dir. '/data/a/b.php', 'x' ); } ) === null
+	&& is_string( $stageCase( static function( string $dir ): void { file_put_contents( $dir. '/index.php', 'x' ); } ) )
+	&& is_string( $stageCase( static function( string $dir ): void { mkdir( $dir. '/app' ); } ) )
+	&& is_string( $stageCase( static function( string $dir ): void { mkdir( $dir. '/templates/crm-portal/d.tpl' ); } ) )
+	&& is_string( $stageCase( static function( string $dir ): void { file_put_contents( $dir. '/templates/crm-portal/evil.php', 'x' ); } ) )
+	&& is_string( $stageCase( static function( string $dir ): void { @symlink( '/etc/hostname', $dir. '/templates/crm-portal/l.tpl' ); } ) )
+	&& is_string( $stageCase( static function( string $dir ): void { @symlink( '/etc', $dir. '/text' ); } ) )
+	&& ( $fifo === false || is_string( $stageCase( static function( string $dir ): void { posix_mkfifo( $dir. '/templates/f.tpl', 0600 ); } ) ) ) );
+shell_exec( 'rm -rf '. escapeshellarg( $stageRoot ) );
+
+// The recovery page has no way of its own: the same refusal, the line marked as failed
+$id = date( 'Y-m-d' ). '-100199';
+$writeTar( $id, $good. $tarEntry( 'templates/../x.tpl', 'x' ) );
+\Nino\Runtime::setSessionValue( $appData, \Nino\Admin\Recovery::SESSION_KEY, true );
+[ $status ] = ninoCall( $appData, [ \Nino\Admin\Recovery::class, 'handlePost' ], [ 'date' => $id ], 'recovery/restore' );
+check( 'the recovery page refuses it the same way, writes nothing and marks its line as failed', $status === 422 && is_file( $sandbox. '/x.tpl' ) === false
+	&& file_get_contents( $pagesDir. '/crm-portal/list.tpl' ) === $listBefore && count( $logLines( 'recovery.php', 'Restore Backup '. $id, 'failed (422)' ) ) === 1 );
+unlink( $nowDir. '/'. $id. '.php' );
+\Nino\Runtime::unsetSessionValue( $appData, \Nino\Admin\Recovery::SESSION_KEY );
+
+// What this block wrote is taken away again
+unlink( $nowDir. '/'. $folderId. '.php' );
+unlink( $nowDir. '/'. $flatId. '.php' );
+foreach( [ 'crm-portal', 'crm-mail' ] as $name )
+	\Nino\Filesystem::removeDir( $pagesDir. '/'. $name );
+if( $folderDirLink === true )
+	unlink( $pagesDir. '/linked-folder' );
+
 // What this block wrote is taken away again: the archives, the snapshots its
 // restores made, the files and the directories
 foreach( [ $pagesId, $otherId, $sameId, $noNoteId ] as $name )

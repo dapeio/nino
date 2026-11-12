@@ -722,7 +722,9 @@ not go backwards - registers a callback of `'/nino/admin/restore'` in `init()`
 (`\Nino\Callbacks::registerCallback()`). The Backups panel and the recovery page
 call it, while the feature is active, with `{ dataDir, staging }`, the live `data/`
 directory and the extracted backup; it rewrites its own files in the staged copy
-before that is copied over the live one.
+before that is copied over the live one. The templates a feature keeps in a folder of the project's `templates/`
+(`templates/<folder>/<name>.tpl`) are carried by the backup like the ones directly in it,
+and a restore makes the folder where it is missing.
 [`Newsletter::callbackRestore()`](https://github.com/dapeio/nino-features/blob/main/features/Newsletter/Newsletter.php)
 of the catalogue is the reference.
 
