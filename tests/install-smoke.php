@@ -789,9 +789,8 @@ check( 'the contact page\'s module is the one the wizard always applies', in_arr
 foreach( [ 'page-home.tpl', 'page-contact.tpl', 'page-404.tpl' ] as $starterTemplate )
 	check( 'copies '. $starterTemplate. ' into the project', \Nino\Filesystem::fileExists( $appData, '/templates/'. $starterTemplate ) === true );
 check( 'copies a page unit\'s declared files into the project', is_file( $sandbox. '/public/images/template/page-home/hero/background.svg' ) === true );
-check( 'the templates of the units that claim no position are not copied, but for the empty page: the one the Routes panel starts a new route on, without a route of its own',
-	array_filter( [ 'page-services.tpl', 'page-about-me.tpl' ], static fn( string $file ): bool => \Nino\Filesystem::fileExists( $appData, '/templates/'. $file ) === true ) === []
-	&& \Nino\Filesystem::fileExists( $appData, '/templates/page-blank.tpl' ) === true && array_filter( $starterRoutes, static fn( array $route ): bool => str_contains( (string) $route['body'], 'page-blank' ) ) === [] );
+check( 'the one unit that claims no position puts its template in place, the empty page the Routes panel starts a new route on, and no route of its own',
+	\Nino\Filesystem::fileExists( $appData, '/templates/page-blank.tpl' ) === true && array_filter( $starterRoutes, static fn( array $route ): bool => str_contains( (string) $route['body'], 'page-blank' ) ) === [] );
 
 // The hero is the slot the page template names, and nothing is literal in it
 $heroSlot = $configAfterStarter['/nino/html/images']['/template/page-home/hero/background'] ?? [];
@@ -1828,44 +1827,40 @@ foreach( scandir( $realRoot. '/_admin/install/library/pages' ) ?: [] as $pageEnt
 		each seeded with a file it ships under 'files' - and none of its
 		templates carries a literal <img> of the public images directory, which
 		is a picture nobody can replace without editing code	*/
-	if( str_starts_with( $pageEntry, '.' ) === false ) {
+	$declared = $pageManifest['imageSlots'] ?? [];
 
-		$declared = $pageManifest['imageSlots'] ?? [];
+	foreach( glob( $pageDir. '/templates/*.tpl' ) ?: [] as $pageFile ) {
 
-		foreach( glob( $pageDir. '/templates/*.tpl' ) ?: [] as $pageFile ) {
+		$pageSource = (string) file_get_contents( $pageFile );
 
-			$pageSource = (string) file_get_contents( $pageFile );
+		if( preg_match( '#<img\b[^>]*src="\[\[/nino/public\]\]/images/#i', $pageSource ) === 1 )
+			$pageFailures[] = $pageEntry. ': '. basename( $pageFile ). ' has a literal <img> of the images directory';
 
-			if( preg_match( '#<img\b[^>]*src="\[\[/nino/public\]\]/images/#i', $pageSource ) === 1 )
-				$pageFailures[] = $pageEntry. ': '. basename( $pageFile ). ' has a literal <img> of the images directory';
+		if( preg_match_all( '#\[image (/[^\s\]]+)#', $pageSource, $pageImages ) > 0 )
+			foreach( $pageImages[1] as $pageImage )
+				if( isset( $declared[$pageImage] ) === false )
+					$pageFailures[] = $pageEntry. ': '. basename( $pageFile ). ' shows the slot '. $pageImage. ', which the manifest does not declare';
+	}
 
-			if( preg_match_all( '#\[image (/[^\s\]]+)#', $pageSource, $pageImages ) > 0 )
-				foreach( $pageImages[1] as $pageImage )
-					if( isset( $declared[$pageImage] ) === false )
-						$pageFailures[] = $pageEntry. ': '. basename( $pageFile ). ' shows the slot '. $pageImage. ', which the manifest does not declare';
-		}
+	foreach( $declared as $slotUri => $slot ) {
 
-		foreach( $declared as $slotUri => $slot ) {
+		$slotFile = (string) ( $slot['filename'] ?? '' );
 
-			$slotFile = (string) ( $slot['filename'] ?? '' );
-
-			if( preg_match( '#^/[a-z][a-z0-9_-]*(/[a-z][a-z0-9_-]*)*$#', (string) $slotUri ) !== 1 )
-				$pageFailures[] = $pageEntry. ': the slot '. $slotUri. ' is not a slot uri';
-			if( \Nino\Features::localized( $slot['label'] ?? '', 'en_US' ) === '' || \Nino\Features::localized( $slot['label'] ?? '', 'de_DE' ) === '' )
-				$pageFailures[] = $pageEntry. ': the slot '. $slotUri. ' has no label';
-			if( (int) ( $slot['width'] ?? 0 ) < 1 || (int) ( $slot['height'] ?? 0 ) < 1 || (int) $slot['width'] * (int) $slot['height'] > \Nino\Images::MAX_SOURCE_PIXELS )
-				$pageFailures[] = $pageEntry. ': the slot '. $slotUri. ' has a size no upload could fill';
-			if( $slotFile === '' || is_file( $pageDir. '/images/'. $slotFile ) === false || in_array( 'images/'. $slotFile, $pageManifest['files'] ?? [], true ) === false && in_array( 'images', $pageManifest['files'] ?? [], true ) === false )
-				$pageFailures[] = $pageEntry. ': the slot '. $slotUri. ' names a seed file the unit does not ship under \'files\'';
-		}
+		if( preg_match( '#^/[a-z][a-z0-9_-]*(/[a-z][a-z0-9_-]*)*$#', (string) $slotUri ) !== 1 )
+			$pageFailures[] = $pageEntry. ': the slot '. $slotUri. ' is not a slot uri';
+		if( \Nino\Features::localized( $slot['label'] ?? '', 'en_US' ) === '' || \Nino\Features::localized( $slot['label'] ?? '', 'de_DE' ) === '' )
+			$pageFailures[] = $pageEntry. ': the slot '. $slotUri. ' has no label';
+		if( (int) ( $slot['width'] ?? 0 ) < 1 || (int) ( $slot['height'] ?? 0 ) < 1 || (int) $slot['width'] * (int) $slot['height'] > \Nino\Images::MAX_SOURCE_PIXELS )
+			$pageFailures[] = $pageEntry. ': the slot '. $slotUri. ' has a size no upload could fill';
+		if( $slotFile === '' || is_file( $pageDir. '/images/'. $slotFile ) === false || in_array( 'images/'. $slotFile, $pageManifest['files'] ?? [], true ) === false && in_array( 'images', $pageManifest['files'] ?? [], true ) === false )
+			$pageFailures[] = $pageEntry. ': the slot '. $slotUri. ' names a seed file the unit does not ship under \'files\'';
 	}
 
 	/*	The body is what ties a route to a file on disk. A route naming a
 		template no unit ships is the one failure this whole block exists for.
-		Every route is checked, not only the page routes: the demo units
-		deliberately register something the Routes panel's page list does not
-		recognise (so the Routes editor leaves them alone), and their
-		templates still have to exist.	*/
+		Every route is checked, not only the page routes: a unit may register
+		something the Routes panel's page list does not recognise, and its
+		template still has to exist.	*/
 	foreach( ( $pageManifest['routes'] ?? [] ) as $routeKey => $route ) {
 
 		if( preg_match( '#\[template /templates/([a-z0-9._-]+)#i', (string) ( $route['body'] ?? '' ), $routeTemplate ) !== 1 )
@@ -1890,7 +1885,7 @@ check( 'every page unit ships the templates its own routes render'. ( $pageFailu
 $shapeFailures	= [];
 $shapeTemplates	= 0;
 
-foreach( glob( $realRoot. '/_admin/install/library/pages/[!.]*/templates/*.tpl' ) ?: [] as $shapeFile ) {
+foreach( glob( $realRoot. '/_admin/install/library/pages/*/templates/*.tpl' ) ?: [] as $shapeFile ) {
 
 	$shapeSource = (string) file_get_contents( $shapeFile );
 
@@ -1918,7 +1913,7 @@ foreach( glob( $realRoot. '/_admin/install/library/pages/[!.]*/templates/*.tpl' 
 	}
 }
 
-check( 'the pages of the library are written in the form the Builder reads ('. $shapeTemplates. ' templates)'. ( $shapeFailures === [] ? '' : ' - '. implode( ' | ', $shapeFailures ) ), $shapeFailures === [] && $shapeTemplates >= 5 );
+check( 'the pages of the library are written in the form the Builder reads ('. $shapeTemplates. ' templates)'. ( $shapeFailures === [] ? '' : ' - '. implode( ' | ', $shapeFailures ) ), $shapeFailures === [] && $shapeTemplates >= 3 );
 
 // The three a starter site is normally built from have to be among them, or
 // the starter pages have nothing to create on a fresh install
@@ -2072,9 +2067,7 @@ check( '...and every one of them ends in a bare generic family'. ( $withoutBacku
 /*	An address a shipped template writes is the project's, and a site may sit
 	in a subdirectory: a form that posts to "/.newsletter" posts beside a site
 	at /shop. [[/nino/dir]] is what the library's own templates put in front
-	of every address - page-contact.tpl's action, frame-header.tpl's links -
-	and the demo catalogue page, assembled from the Templates feature's
-	presets, was the one template that did not	*/
+	of every address - page-contact.tpl's action, frame-header.tpl's links	*/
 $rootAbsoluteTemplates = [];
 $libraryTemplates = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( __DIR__. '/../_admin/install/library', FilesystemIterator::SKIP_DOTS ) );
 foreach( $libraryTemplates as $libraryTemplate )
@@ -2140,8 +2133,7 @@ echo "\n";
 	keep their keys against a project unit claiming the same one.	*/
 echo "A starter site leaves no text key missing\n";
 
-// The pages the wizard creates when it ends, the three modules it always applies and - for the
-// units that claim no position - the two finished pages the library keeps beside them. The Missing
+// The pages the wizard creates when it ends and the three modules it always applies. The Missing
 // text keys tile counts every [[/...]] a template names that no file has - a comment is no exception,
 // and a placeholder in one is a row the Text panel cannot clear: it names a key the system writes,
 // and there is no field for it
@@ -2156,12 +2148,7 @@ foreach( [ '/private/templates', '/public/images', '/private/text', '/private/as
 \Nino\Filesystem::putFileContent( $keysApp, '/config.php', [ '/nino/locales/native' => 'de_DE', '/nino/locales/available' => [ 'de_DE', 'en_US' ] ] );
 ninoCall( $keysApp, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
 $starterApplied = \Nino\Install\StarterPages::apply( $keysApp );
-$otherPages = true;
-foreach( [ 'services', 'about-me' ] as $otherUnit ) {
-	$otherRoutes = $otherBlacklist = $otherConfig = [];
-	$otherPages = \Nino\Features::applyUnit( $keysApp, __DIR__. '/../_admin/install/library/pages/'. $otherUnit, [ 'de_DE', 'en_US' ], $otherRoutes, $otherBlacklist, $otherConfig, true ) === true && $otherPages;
-}
-check( 'the whole library applies', $starterApplied === true && $otherPages === true && \Nino\Filesystem::fileExists( $keysApp, '/templates/page-about-me.tpl' ) === true );
+check( 'the starter pages apply', $starterApplied === true && \Nino\Filesystem::fileExists( $keysApp, '/templates/page-contact.tpl' ) === true );
 $starterMissing = ( new ReflectionMethod( \Nino\Modules\Text\Keys::class, '_scanMissing' ) )->invokeArgs( null, [ &$keysApp ] );
 check( 'on a fresh install the Missing text keys tile reads 0 - no template names a key nobody writes'
 	. ( $starterMissing === [] ? '' : ' - '. implode( ', ', array_column( $starterMissing, 'key' ) ) ), \Nino\Modules\Text\Keys::missingCount( $keysApp ) === 0 );

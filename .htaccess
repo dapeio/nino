@@ -53,9 +53,9 @@ SetEnv NINO_HTACCESS 1
 # Without that condition this denied Nino's own dot *routes* as well - and a
 # route is not a file at all. Measured against Apache 2.4.58 with this file:
 # POST /.nino/auth/login answered 403 before php ever saw it, and so did
-# /.form, /.newsletter, /.protected and /.demo-catalogue. That is the
-# workbench login, the contact form, the newsletter and the protected area,
-# on every Apache install this file applies to.
+# /.form, /.newsletter and /.protected. That is the workbench login, the
+# contact form, the newsletter and the protected area, on every Apache install
+# this file applies to.
 #
 # The error log names the mechanism: "client denied by server configuration:
 # <docroot>/.nino". Apache stops the directory walk at the first component
@@ -80,7 +80,7 @@ SetEnv NINO_HTACCESS 1
 # requires the equivalent for nginx.
 # Conditioned on the request actually resolving to something on disk, which is
 # the same line router.php draws on the dev server: dot-uris that are routes
-# rather than files (/.form, /.newsletter, /.demo-catalogue) never touch the
+# rather than files (/.form, /.newsletter, /.protected) never touch the
 # filesystem and have to keep falling through to index.php.
 # .cache/ (the generated css+js bundles) and .demo/ (the demo images) are
 # served deliberately - the two exceptions router.php makes as well.

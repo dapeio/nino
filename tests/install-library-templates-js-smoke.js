@@ -46,12 +46,10 @@ const moduleUnitFiles = MODULE_ROOTS.flatMap( function( MODULES ) {
 } );
 
 /* Mail has its own inline design and the three text/XML templates are not
- * HTML. The dot-prefixed catalogue is an intentionally generated specimen,
- * not one of the finished units offered as a starter page. */
+ * HTML. */
 const publicTemplates = filesBelow( LIBRARY ).concat( moduleUnitFiles ).filter( function( file ) {
 	const name = path.basename( file );
 	return name.endsWith('.tpl')
-		&& relative( file ).includes('/.demo-') === false
 		&& name.startsWith('mail-') === false
 		&& [ 'llms-txt.tpl', 'robots.tpl', 'sitemap-xml.tpl' ].includes( name ) === false;
 } ).sort();

@@ -303,7 +303,7 @@ namespace Nino\Modules\Text {
 		 *	as a body that picks its file by language has) and the
 		 *	name the template gives itself - the pages the Routes panel lists,
 		 *	asked of it, and the ones it does not: a route to a template that has
-		 *	no category (the demo catalogue's), with neither
+		 *	no category (a name with a dot), with neither
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -333,7 +333,7 @@ namespace Nino\Modules\Text {
 			}
 
 			// A page the Routes panel does not list - no page-* template, and a
-			// name that is no word of a key: the demo catalogue's - is still a
+			// name that is no word of a key, one with a dot - is still a
 			// page of the site, and its details are its own
 			foreach( $routes as $routeKey => $route ) {
 

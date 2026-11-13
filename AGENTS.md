@@ -201,9 +201,9 @@ Routes live under `/nino/http/routes` and are keyed
 `METHOD://public-uri`:
 
 ```php
-'GET://services' => [
-	'uri'  => '/services',
-	'body' => '[template /templates/page-services]',
+'GET://team' => [
+	'uri'  => '/team',
+	'body' => '[template /templates/page-team]',
 ],
 ```
 
@@ -211,7 +211,7 @@ The key is the public request; `uri` is the stable internal response identity.
 Route-specific callbacks use the internal identity:
 
 ```text
-/nino/http/response/GET://services
+/nino/http/response/GET://team
 ```
 
 Technical endpoints owned by a module MAY be registered in its `init()`.
@@ -530,9 +530,10 @@ PHPStan and ESLint MUST report nothing new: a finding listed in
 never added to the baseline. Report a check whose interpreter, extension,
 browser capability or fixture was unavailable as not run, with the reason.
 
-A change to what a catalogue feature reads from the kernel - the demo page and
-its `data-demo-preset` marks, `Nino.css`, the base unit's templates and keys, the
-feature contract - is also checked by the catalogue itself, before the push:
+A change to what a catalogue feature reads from the kernel - the specimen page
+`tests/fixtures/demo-catalogue` and its `data-demo-preset` marks, `Nino.css`,
+the base unit's templates and keys, the feature contract - is also checked by
+the catalogue itself, before the push:
 `NINO_ROOT=$PWD ../nino-features/bin/check.sh`, with
 [dapeio/nino-features](https://github.com/dapeio/nino-features) cloned beside
 it. A rename that spans both repositories is a coupled pair (section 2).

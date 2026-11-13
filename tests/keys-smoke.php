@@ -48,7 +48,7 @@ const KEYS_SYSTEM_LOCALE 		= '#^/_nino/locale/[a-z]{2}_[A-Z]{2}/name$#';
 const KEYS_LEGAL_PAGES 	= '#^/_nino/webpage/legal/(imprint|privacy)/(name|title|description)$#';
 const KEYS_LEGAL_ADMIN 	= '#^/_admin/elements/(field/(legal|privacy)/(title|text|order|hidden)|type/(legal|privacy)/hint)$#';
 
-// The one key of a feature a page unit delivers: the demo catalogue's
+// The one key of a feature a page unit delivers: the specimen page's
 // newsletter specimen shows the label the Newsletter feature ships for
 // markup any template writes
 const KEYS_NAMED_EXCEPTION = [ 'page:.demo-catalogue' => [ '/feature/newsletter/label/submit' ] ];
@@ -125,6 +125,9 @@ foreach( scandir( $libraryDir. '/pages' ) ?: [] as $page )
 foreach( glob( $root. '/_nino/Nino/Modules/*/install', GLOB_ONLYDIR ) ?: [] as $installDir )
 	$unitDirs['module:'. strtolower( basename( dirname( $installDir ) ) )] = $installDir;
 
+// The specimen page of the tests is read like a unit of the library: it is the one template that draws every building block
+$unitDirs['page:.demo-catalogue'] = $root. '/tests/fixtures/demo-catalogue';
+
 $units = [];
 foreach( $unitDirs as $id => $dir ) {
 
@@ -177,7 +180,7 @@ foreach( $units as $unit )
 
 echo "A. Text fragments of the units\n";
 
-check( 'the library has its base unit, the page units and the modules\' units', isset( $units['base'] ) === true && count( $units ) >= 12 && isset( $units['module:form'], $units['module:localepicker'], $units['module:maintenance'], $units['page:home'] ) === true );
+check( 'the library has its base unit, the page units and the modules\' units', isset( $units['base'] ) === true && count( $units ) >= 11 && isset( $units['module:form'], $units['module:localepicker'], $units['module:maintenance'], $units['page:home'] ) === true );
 
 $badShape = [];
 foreach( $units as $unit )

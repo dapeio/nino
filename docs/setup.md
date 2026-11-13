@@ -198,7 +198,7 @@ the project already has - label, size and image - is left as it is, and the
 first unit to name a uri wins. A seed file that cannot be copied or a slot that
 cannot be declared fails the call by name before any route is written.
 
-The units of that folder that claim no position (`about-me`, `services`, `blank`) are not applied by the wizard, and no interface offers them: they are material. Of `blank` only its template is put in place, as above. The Routes panel only wires an existing `templates/page-*.tpl` to a path.
+The one unit of that folder that claims no position, `blank`, is not applied by the wizard: only its template is put in place, as above. The Routes panel only wires an existing `templates/page-*.tpl` to a path.
 
 ## Verify the Result and Remove the Wizard
 

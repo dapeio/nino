@@ -1,4 +1,8 @@
-<?php return [
+<?php
+// The specimen page of the tests: it draws every building block of Nino.css and
+// is read by the tests of the kernel and of the catalogue, never delivered, never
+// applied by the wizard or a panel
+return [
 	'label' 		=> 'Demo: Catalogue',
 	// The contact form preset on the page is the working form, with the
 	// messages its module ships - without it the specimen would render its

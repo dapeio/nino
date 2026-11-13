@@ -1253,7 +1253,7 @@ if( $groundSets( $groundOf( '.nino-parallex' ), 'min-height', '60vh' ) === false
 	$coverWrong[] = 'the parallax lost its minimum height or its overflow';
 check( '...and a cover - a parallax that says nino-cover is one - is unchanged: its row is placed, absolute at the middle and centred by translate over the height the JS gives it, and neither it nor the parallax as such is a flex box'
 	. ( $coverWrong === [] ? '' : ' - '. implode( '; ', $coverWrong ) ), $coverWrong === [] );
-$demoPage = (string) file_get_contents( __DIR__. '/../_admin/install/library/pages/.demo-catalogue/templates/.demo-catalogue.tpl' );
+$demoPage = (string) file_get_contents( __DIR__. '/fixtures/demo-catalogue/templates/.demo-catalogue.tpl' );
 check( '...and the demo shows both shapes: a parallax with a cover height - nino-cover and data-cover-height, placed and sized by the script - and one without, which has neither and whose row stands in the flow of a section that grows with it',
 	preg_match( '/<section id="hero-parallax" class="[^"]*\bnino-parallex\b[^"]*\bnino-cover\b[^"]*" data-cover-height="100"/', $demoPage ) === 1
 	&& preg_match( '/<section id="parallax-grows" class="(?![^"]*\bnino-cover\b)[^"]*(?<![\w-])nino-parallex(?![\w-])[^"]*"(?![^>]*data-cover-height)[^>]*>\s*<img [^>]*>\s*<div class="nino-grid-row/', $demoPage ) === 1 );

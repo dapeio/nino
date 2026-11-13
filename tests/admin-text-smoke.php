@@ -727,7 +727,7 @@ $slugCovered = static function( string $slug ) use ( $words, &$slugCovered ): bo
 	return false;
 };
 $shippedKeys = [];
-foreach( array_merge( glob( dirname( __DIR__ ). '/_admin/install/library/*/text/*.php' ) ?: [], glob( dirname( __DIR__ ). '/_admin/install/library/pages/*/text/*.php' ) ?: [], glob( dirname( __DIR__ ). '/_admin/install/library/pages/.*/text/*.php' ) ?: [], glob( dirname( __DIR__ ). '/_nino/Nino/Modules/*/install/text/*.php' ) ?: [] ) as $fragment )
+foreach( array_merge( glob( dirname( __DIR__ ). '/_admin/install/library/*/text/*.php' ) ?: [], glob( dirname( __DIR__ ). '/_admin/install/library/pages/*/text/*.php' ) ?: [], glob( dirname( __DIR__ ). '/_nino/Nino/Modules/*/install/text/*.php' ) ?: [] ) as $fragment )
 	foreach( array_keys( (array) include $fragment ) as $bracketKey )
 		$shippedKeys[trim( $bracketKey, '[]' )] = true;
 $uncovered = [];
