@@ -705,10 +705,10 @@ namespace Nino\Install {
 				they are not there yet.	*/
 			// The persisted bundle, or the kernel's default when there is none to
 			// persist yet - the same reading the routes above take, and for the
-			// same reason: until this step has run there is no config.php, and
-			// starting from the empty runtime value would drop Nino.css itself
+			// same reason: the runtime value holds what the features and modules
+			// switched on added at this boot, and none of that belongs in config.php
 			$assets = \Nino\AppData::stored( $appData, '/nino/html/assets' );
-			$assets = is_array( $assets ) === true ? $assets : $appData['/nino/html/assets'] ?? \Nino\AppData::DEFAULTS['/nino/html/assets'];
+			$assets = is_array( $assets ) === true ? $assets : \Nino\AppData::DEFAULTS['/nino/html/assets'];
 			$bundle = array_map( 'strval', $assets[self::BUNDLE_KEY] ?? \Nino\AppData::DEFAULTS['/nino/html/assets'][self::BUNDLE_KEY] );
 
 			foreach( self::BASE_STYLESHEETS as $stylesheet )

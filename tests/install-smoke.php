@@ -1162,6 +1162,8 @@ check( 'a config.php that holds the routes and the bundles as null is a project 
 	&& is_array( $nullConfig['/nino/http/routes'] ?? null ) === true && isset( $nullConfig['/nino/html/assets']['/.cache/script.js'] ) === true );
 \Nino\Filesystem::removeDir( $nulledDir );
 
+pinSetupLeavesTheStylesheetsOfFeaturesOut();
+
 echo "\n";
 
 
@@ -2035,4 +2037,61 @@ function pinSetupFailsWithoutGreetings( array &$appData ): void {
 	rename( $dir. '-aside', $dir );
 	[ $status ] = ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE' ], 'modules' => [] ] );
 	check( '...and applies once the place is there again', $status === 200 );
+}
+
+/**
+ *	The css bundle the setup writes is the kernel's and the setup's, never what a switched-on feature put in the runtime list at boot: its stylesheet
+ *	reaches the page at run time, once, and a config.php that holds a list already is left to that list. A process of its own, since the features
+ *	directory is a constant that has to be there before the kernel loads
+ */
+function pinSetupLeavesTheStylesheetsOfFeaturesOut(): void {
+
+	$dir = sys_get_temp_dir(). '/nino-install-features-'. uniqid();
+	mkdir( $dir, 0755, true );
+	file_put_contents( $dir. '/run.php', '<?php declare(strict_types=1);
+define( \'NINO_FEATURES_DIR\', '. var_export( __DIR__. '/fixtures/features', true ). ' );
+require '. var_export( __DIR__. '/harness.php', true ). ';
+require '. var_export( dirname( __DIR__ ). '/_admin/install/Install.php', true ). ';
+$css = \'/features/Sample/assets/sample.css\';
+$out = [];
+foreach( [ \'absent\' => null, \'held\' => [ \'/.cache/style.css\' => [ \'/_nino/Nino.css\', \'/assets/theme.css\', \'/assets/style.css\', \'/assets/own.css\' ] ] ] as $case => $held ) {
+	$appData = ninoSandbox( \'install-features\' );
+	$sandbox = ninoSandboxDir( $appData );
+	$appData[\'/nino/dir\'] = \'\';
+	foreach( [ \'/private/templates\', \'/public/images\', \'/private/text\', \'/private/assets\' ] as $sub )
+		mkdir( $sandbox. $sub, 0777, true );
+	$config = [ \'/nino/locales/native\' => \'de_DE\', \'/nino/locales/available\' => [ \'de_DE\' ] ];
+	if( $held !== null )
+		$config[\'/nino/html/assets\'] = $held;
+	\\Nino\\Filesystem::putFileContent( $appData, \'/config.php\', $config );
+	$appData[\'/nino/html/assets\'] = \\Nino\\AppData::DEFAULTS[\'/nino/html/assets\'];
+	$appData[\'/nino/modules\'] = [ \'\\\\Nino\\\\Modules\\\\Assets\', \'\\\\Nino\\\\Modules\\\\Sample\' ];
+	\\Nino\\Features::registerAssets( $appData );
+	[ $status ] = ninoCall( $appData, [ \\Nino\\Install\\Setup::class, \'apiApply\' ], [ \'locales\' => [ \'de_DE\' ], \'modules\' => [] ] );
+	$written = \\Nino\\Filesystem::getFileContent( $appData, \'/config.php\', [] )[\'/nino/html/assets\'][\'/.cache/style.css\'] ?? [];
+	// The next request: the list of the file, the feature switched on again
+	$page = ninoSandbox( \'install-features-page\' );
+	$page[\'./nino/filesystem/configpath\'] = $sandbox. \'/private\';
+	$page[\'./nino/filesystem/contentpath\'] = $sandbox. \'/private\';
+	$page[\'/nino/dir\'] = \'\';
+	$page[\'/nino/html/assets\'] = \\Nino\\Filesystem::getFileContent( $page, \'/config.php\', [] )[\'/nino/html/assets\'];
+	$page[\'./nino/filesystem/publicpath\'] = $sandbox. \'/public\';
+	$page[\'./nino/filesystem/path\'] = $sandbox;
+	$page[\'/nino/modules\'] = [ \'\\\\Nino\\\\Modules\\\\Assets\', \'\\\\Nino\\\\Modules\\\\Sample\' ];
+	\\Nino\\Features::registerAssets( $page );
+	\\Nino\\Modules\\Assets::doShortcode( $page, [ \'/.cache/style.css\' ] );
+	$bundle = (string) file_get_contents( \\Nino\\Filesystem::path( $page, \'/.cache/style.css\' ) );
+	$out[$case] = [ \'status\' => $status, \'written\' => $written, \'runtime\' => $page[\'/nino/html/assets\'][\'/.cache/style.css\'], \'times\' => substr_count( $bundle, trim( (string) file_get_contents( '. var_export( __DIR__. '/fixtures/features/Sample/assets/sample.css', true ). ' ) ) ) ];
+}
+echo json_encode( $out );' );
+	$out = json_decode( (string) shell_exec( escapeshellarg( PHP_BINARY ). ' '. escapeshellarg( $dir. '/run.php' ). ' 2>/dev/null | tail -n 1' ), true ) ?? [];
+	\Nino\Filesystem::removeDir( $dir );
+
+	$css = '/features/Sample/assets/sample.css';
+	check( 'with a feature switched on and no list in config.php, the setup writes the kernel\'s stylesheet and the two of the base unit, and not the one of the feature',
+		( $out['absent']['status'] ?? null ) === 200 && ( $out['absent']['written'] ?? [] ) === [ '/_nino/Nino.css', '/assets/theme.css', '/assets/style.css' ] );
+	check( '...and the page still carries the stylesheet of the feature, listed once and bundled once',
+		( array_count_values( $out['absent']['runtime'] ?? [] )[$css] ?? 0 ) === 1 && ( $out['absent']['times'] ?? null ) === 1 );
+	check( 'where config.php holds a list already, the setup leaves it as it is, with nothing of the feature in it',
+		( $out['held']['status'] ?? null ) === 200 && ( $out['held']['written'] ?? [] ) === [ '/_nino/Nino.css', '/assets/theme.css', '/assets/style.css', '/assets/own.css' ] );
 }
