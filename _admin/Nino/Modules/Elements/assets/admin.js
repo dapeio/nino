@@ -58,6 +58,10 @@
 		// A save was refused: from now on the marks follow what is typed and
 		// every freshly drawn translation carries them (see _showProblems())
 		_validated			: false,
+		// The fields a save was refused for by the server - a veto of a callback
+		// names them - [ { key, locale, text } ], drawn at their fields until
+		// what is typed into one lets it go (see _refuse())
+		_refused				: [],
 		// What the form's controls held when they were drawn or last saved, as
 		// compared strings: the uri, the global fields, the translation on
 		// screen. isDirty() asks whether they still do
@@ -1977,7 +1981,20 @@
 
 			if( problem.key === '.uri' ) {
 				const input = dc.getElementById('elements-form-uri');
-				return input === null ? null : { wrapper : input.parentNode, control : input, handle : null };
+				if( input === null )
+					return null;
+
+				// An element that is saved shows its uri as a line of text and keeps the input
+				// hidden: the sentence stands at the line, which takes the focus
+				if( input.type === 'hidden' ) {
+					const line = dc.getElementById('elements-form')?.querySelector('.main-uri') ?? null;
+					if( line === null )
+						return null;
+					line.setAttribute( 'tabindex', '-1' );
+					return { wrapper : line, control : line, handle : null, after : line };
+				}
+
+				return { wrapper : input.parentNode, control : input, handle : null };
 			}
 
 			const wrapper = Nino.admin.elements._fieldNodes[problem.key];
@@ -2028,7 +2045,11 @@
 		 *
 		 *	@return		void
 		 */
-		_revalidate : function() {
+		_revalidate : function( ev ) {
+
+			// What the server refused a field for is let go when that field is typed into
+			if( Nino.admin.elements._refused.length > 0 && ev !== undefined && ev !== null && ev.target !== null && typeof ev.target === 'object' )
+				Nino.admin.elements._clearRefusals( ev.target );
 
 			if( Nino.admin.elements._validated === false || Nino.admin.elements._currentModel === null )
 				return;
@@ -2037,11 +2058,165 @@
 
 			const problems = Nino.admin.elements._validate();
 			Nino.admin.elements._showProblems( problems, false );
+			Nino.admin.elements._drawRefusals( false );
 
 			// Nothing marked and nothing left to save: the refusal no longer
 			// names anything, so the line goes back to idle
 			if( problems.length === 0 && Nino.admin.elements._status !== null && Nino.admin.elements._status.state === 'error' && Nino.admin.elements.isDirty() === false )
 				Nino.admin.elements._status.idle();
+		},
+
+		/**
+		 *	The server refused a save for fields - the answer's `fields`, which a
+		 *	callback of the write names (\Nino\Elements::refuse()): each is marked
+		 *	at its field like a problem the form found itself - the sentence under
+		 *	the field, aria-invalid, aria-describedby - and the focus goes to the
+		 *	first. The status line says the first sentence as it does for every
+		 *	failed request, and on a phone, where that line is not shown, the
+		 *	sentences under the fields are what tells the person. A field of
+		 *	another translation than the one on screen switches the form to it.
+		 *
+		 *	@param		{*}					response			Parsed response body of the refused save
+		 *	@param		{string}		locale				The translation the refused request wrote
+		 *
+		 *	@return		void
+		 */
+		_refuse : function( response, locale ) {
+
+			Nino.admin.elements._clearRefusals();
+
+			const fields = response !== null && typeof response === 'object' && Array.isArray( response.fields ) === true ? response.fields : [];
+
+			fields.forEach( function( item ) {
+
+				if( item === null || typeof item !== 'object' || typeof item.field !== 'string' || typeof item.error !== 'string' || item.error === '' )
+					return;
+
+				// The words of the workbench for a code it knows, the callback's own sentence otherwise
+				const known = typeof item.code === 'string' && /^[a-z][a-z0-9_]*$/.test( item.code ) === true ? Nino.content.getText( '/_admin/error/'+ item.code ) : '';
+
+				Nino.admin.elements._refused.push( {
+					key		 : item.field,
+					locale : Nino.admin.elements._localeKeys.indexOf( item.field ) !== -1 ? locale : null,
+					text	 : known !== '' ? known : item.error,
+				} );
+			} );
+
+			if( Nino.admin.elements._refused.length === 0 )
+				return;
+
+			const first = Nino.admin.elements._refused[0];
+			if( first.locale !== null && first.locale !== Nino.admin.elements._selectedLocale )
+				Nino.admin.elements._switchLocale( first.locale );
+
+			Nino.admin.elements._drawRefusals( true );
+		},
+
+		/**
+		 *	Put the refusals of the server at their fields, those the translation
+		 *	on screen holds; one that stands already is left as it is
+		 *
+		 *	@param		{boolean}		[focus]		Move the focus to the first field that is marked
+		 *
+		 *	@return		void
+		 */
+		_drawRefusals : function( focus ) {
+
+			let first = null;
+
+			Nino.admin.elements._refused.forEach( function( refusal ) {
+
+				if( refusal.locale !== null && refusal.locale !== Nino.admin.elements._selectedLocale )
+					return;
+
+				const target = Nino.admin.elements._problemTarget( { key : refusal.key } );
+				if( target === null )
+					return;
+
+				const id = refusal.key === '.uri' ? 'elements-error-uri' : 'elements-error-field-'+ refusal.key;
+
+				if( dc.getElementById( id ) === null ) {
+					const sentence = Nino.adminUi.fieldError( target.wrapper, target.handle === null ? target.control : null, id, refusal.text );
+
+					// The line of a saved element's name is no container: the sentence goes after it
+					if( target.after !== undefined )
+						target.after.after( sentence );
+
+					if( target.handle !== null )
+						target.handle.mark( { invalid : true, describedBy : id } );
+				}
+
+				if( first === null )
+					first = target;
+			} );
+
+			if( focus !== true || first === null )
+				return;
+
+			if( first.handle !== null )
+				first.handle.focus();
+			else if( typeof first.control.focus === 'function' )
+				first.control.focus();
+		},
+
+		/**
+		 *	Whether a node stands in an element, the element itself included
+		 *
+		 *	@param		{Object}		ancestor
+		 *	@param		{Object}		node
+		 *
+		 *	@return		{boolean}
+		 */
+		_within : function( ancestor, node ) {
+
+			for( let at = node; at !== null && at !== undefined; at = at.parentNode )
+				if( at === ancestor )
+					return true;
+
+			return false;
+		},
+
+		/**
+		 *	Let go of the refusals of the server: the sentences, and the marks
+		 *	they put on the controls. With a control, only the refusals of the
+		 *	field it belongs to - the field has been changed, so what the server
+		 *	said of its value no longer says anything about it
+		 *
+		 *	@param		{Element}		[control]		What was typed into; none for all of them
+		 *
+		 *	@return		void
+		 */
+		_clearRefusals : function( control ) {
+
+			const kept = [];
+
+			Nino.admin.elements._refused.forEach( function( refusal ) {
+
+				const id = refusal.key === '.uri' ? 'elements-error-uri' : 'elements-error-field-'+ refusal.key;
+				const target = Nino.admin.elements._problemTarget( { key : refusal.key } );
+				const wrapper = target === null ? null : target.wrapper;
+
+				// What is typed into a field is the translation on screen: another translation's refusal of the same field stays
+				if( control !== undefined && ( wrapper === null || Nino.admin.elements._within( wrapper, control ) === false || ( refusal.locale !== null && refusal.locale !== Nino.admin.elements._selectedLocale ) ) ) {
+					kept.push( refusal );
+					return;
+				}
+
+				const sentence = dc.getElementById( id );
+				if( sentence !== null )
+					sentence.remove();
+
+				if( wrapper !== null ) {
+					[ wrapper ].concat( [ ...wrapper.querySelectorAll('[aria-describedby="'+ id+ '"]') ] ).filter( function( el ) { return el.getAttribute('aria-describedby') === id } ).forEach( function( el ) {
+						el.removeAttribute('aria-invalid');
+						el.removeAttribute('aria-describedby');
+					} );
+					if( Nino.admin.elements._htmlEditors[refusal.key] !== undefined && typeof Nino.admin.elements._htmlEditors[refusal.key].mark === 'function' )
+						Nino.admin.elements._htmlEditors[refusal.key].mark( { invalid : false, describedBy : '' } );
+				}
+			} );
+
+			Nino.admin.elements._refused = kept;
 		},
 
 		/**
@@ -2236,6 +2411,7 @@
 			Nino.admin.elements._invalidArrays	= {};
 			Nino.admin.elements._invalidNumbers	= {};
 			Nino.admin.elements._validated			= false;
+			Nino.admin.elements._refused				= [];
 			Nino.admin.elements._copy						= false;
 			Nino.admin.elements._baseline				= { uri : null, global : {}, locale : {} };
 		},
@@ -2493,6 +2669,8 @@
 			// A fresh translation carries the marks of the refused save too
 			if( Nino.admin.elements._validated === true )
 				Nino.admin.elements._showProblems( Nino.admin.elements._validate(), false );
+
+			Nino.admin.elements._drawRefusals( false );
 		},
 
 		/**
@@ -2843,6 +3021,7 @@
 			}
 
 			Nino.admin.elements._storeVisibleLocaleFields();
+			Nino.admin.elements._clearRefusals();
 
 			// Nothing is sent while something holds the save back: the problems are
 			// marked at their fields, with the focus on the first (see _validate())
@@ -2911,6 +3090,7 @@
 						Nino.admin.elements._saving = false;
 						Nino.admin.elements._setFormPending( false );
 						Nino.admin.elements._status.error( status, response, '/_admin/elements/error/save' );
+						Nino.admin.elements._refuse( response, locale );
 						report( false );
 						return;
 					}

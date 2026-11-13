@@ -109,6 +109,37 @@ namespace Nino\Modules {
 		}
 
 		/**
+		 *	Say, while a page renders, that the page must not live in the cache
+		 *	past a moment: a shortcode whose output depends on the clock ("open
+		 *	today", "until tomorrow") calls it with the moment its output stops
+		 *	being true, and the page that is stored carries the earliest moment
+		 *	any call named, if that is before the configured lifetime ends. It
+		 *	never extends a lifetime, and several calls keep the smallest.
+		 *
+		 *	The moment is measured against the clock the cache itself reads,
+		 *	time(): code that keeps a clock of its own works out the seconds left
+		 *	on it and passes time() + that, not a moment taken from its own clock.
+		 *
+		 *	It is a runtime value of the request being rendered ('./nino/cache/until'),
+		 *	so nothing a visitor sends and nothing the workbench writes reaches
+		 *	it, and it is not stored in a configuration. Where the cache is off, or
+		 *	the page is not one the cache stores, it does nothing. A moment that has
+		 *	passed already means the page is not stored at all.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		int				$until				A unix timestamp: the page is good until then
+		 *
+		 *	@return 	void
+		 */
+		public static function limit( array &$appData, int $until ): void {
+
+			$set = $appData['./nino/cache/until'] ?? null;
+
+			if( is_int( $set ) === false || $until < $set )
+				$appData['./nino/cache/until'] = $until;
+		}
+
+		/**
 		 *	Answer from the cache if there is a fresh copy, otherwise fall
 		 *	through and let the request render normally
 		 *
@@ -231,6 +262,19 @@ namespace Nino\Modules {
 				|| isset( $request['/nino/http/response']['file'] ) === true || isset( $request['./nino/http/stream'] ) === true )
 				return;
 
+			// The lifetime the configuration gives, cut short by a shortcode that
+			// said where its output stops being true (see limit()); a moment that
+			// has passed leaves nothing worth storing, and a page that is not
+			// stored is not marked as one that was
+			$expires = time() + self::_ttl( $appData );
+			$until	 = $appData['./nino/cache/until'] ?? null;
+
+			if( is_int( $until ) === true && $until < $expires )
+				$expires = $until;
+
+			if( $expires <= time() )
+				return;
+
 			// Says so on the way out as well as on a hit: without both, whether
 			// the cache is doing anything is only visible by timing the request
 			$request['/nino/http/response']['header']['X-Nino-Cache'] = 'miss';
@@ -238,7 +282,7 @@ namespace Nino\Modules {
 			$policy = $request['/nino/http/response']['header']['Content-Security-Policy'] ?? '';
 
 			\Nino\Filesystem::putFileContent( $appData, self::DIR. '/'. self::_key( $request ). '.php', [
-				'expires'	=> time() + self::_ttl( $appData ),
+				'expires'	=> $expires,
 				'locale'	=> (string) ( $request['/nino/http/response']['locale'] ?? '' ),
 				'body' 		=> self::_stamp( $appData, $body, true ),
 				'csp' 		=> is_string( $policy ) === true ? self::_stamp( $appData, $policy, true ) : '',

@@ -1176,6 +1176,176 @@ check( 'deleteElement releases the type file lock after a callback veto', probeL
 
 echo "\n";
 
+// --- What a callback of a write is told, and how it refuses a field ------
+
+echo "The write a callback is told about, and a refusal that names a field\n";
+
+\Nino\Elements::insertElementType( $appData, '/refusable', [
+	'name'	=> [ 'type' => 'string', 'locale' => true ],
+	'size'	=> [ 'type' => 'integer' ],
+	'note'	=> [ 'type' => 'string', 'default' => 'plain' ],
+] );
+
+$told = [];
+$legacy = [];
+
+// A listener written for the type file alone: its two arguments, nothing else
+\Nino\Callbacks::registerCallback( $appData, '/nino/elements/refusable/insert', function( &$appData, &$typeData ) use ( &$legacy ) { $legacy[] = array_keys( $typeData ); return $typeData; } );
+\Nino\Callbacks::registerCallback( $appData, '/nino/elements/refusable/insert', function( &$appData, &$typeData ) use ( &$told ) { $told[] = \Nino\Elements::writing( $appData ); return $typeData; } );
+\Nino\Callbacks::registerCallback( $appData, '/nino/elements/refusable/update', function( &$appData, &$typeData ) use ( &$told ) { $told[] = \Nino\Elements::writing( $appData ); return $typeData; } );
+
+check( 'outside a write there is nothing to be told', \Nino\Elements::writing( $appData ) === null );
+
+\Nino\Elements::insertElement( $appData, '/refusable/one', [ 'name' => 'Eins', 'size' => 3 ], 'de_DE' );
+$insert = $told[0] ?? [];
+check( 'a callback of an insert is told which write it is', ( $insert['operation'] ?? null ) === 'insert' && ( $insert['type'] ?? null ) === '/refusable' && ( $insert['uri'] ?? null ) === '/refusable/one' && ( $insert['locale'] ?? null ) === 'de_DE' && array_key_exists( 'previousUri', $insert ) && $insert['previousUri'] === null );
+check( '...the fields the caller wrote', $insert['fields'] === [ 'name', 'size' ] );
+check( '...no old element for an insert, the new one as it will read - the model\'s default among it', $insert['old'] === null && ( $insert['new']['name'] ?? null ) === 'Eins' && ( $insert['new']['size'] ?? null ) === 3 && ( $insert['new']['.uri'] ?? null ) === '/refusable/one' && ( $insert['new']['.locale'] ?? null ) === 'de_DE' );
+check( '...and nothing is told once the write is over', \Nino\Elements::writing( $appData ) === null );
+check( 'a listener that takes the type file alone is called as it always was', count( $legacy ) === 1 && in_array( 'model', $legacy[0], true ) === true );
+
+\Nino\Elements::updateElement( $appData, '/refusable/one', [ 'size' => 5 ], 'de_DE' );
+$update = $told[1] ?? [];
+check( 'a callback of an update is told the keys the update names only', ( $update['operation'] ?? null ) === 'update' && $update['fields'] === [ 'size' ] );
+check( '...the element as it stood and as it will stand', ( $update['old']['size'] ?? null ) === 3 && ( $update['old']['name'] ?? null ) === 'Eins' && ( $update['new']['size'] ?? null ) === 5 && ( $update['new']['name'] ?? null ) === 'Eins' );
+
+\Nino\Elements::updateElement( $appData, '/refusable/one', [ 'name' => 'One' ], 'en_US' );
+$other = $told[2] ?? [];
+check( 'a write of another language is told in that language, the old element being what that language held', ( $other['locale'] ?? null ) === 'en_US' && ( $other['old']['size'] ?? null ) === 5 && ( $other['new']['name'] ?? null ) === 'One' );
+
+// A field callback that renames the element: the callback of the write is told where it came from
+\Nino\Elements::insertElementType( $appData, '/renaming', [ 'name' => [ 'type' => 'string', 'callbacks' => [ '/test/renaming' ] ] ] );
+\Nino\Callbacks::registerCallback( $appData, '/test/renaming', function( &$appData, &$data ) { if( $data['name'] === 'move' ) $data['.uri'] = '/renaming/moved'; return $data; } );
+$renamed = [];
+\Nino\Callbacks::registerCallback( $appData, '/nino/elements/renaming/update', function( &$appData, &$typeData ) use ( &$renamed ) { $renamed = \Nino\Elements::writing( $appData ); return $typeData; } );
+\Nino\Elements::insertElement( $appData, '/renaming/first', [ 'name' => 'stay' ], 'de_DE' );
+\Nino\Elements::updateElement( $appData, '/renaming/first', [ 'name' => 'move' ], 'de_DE' );
+check( 'a write that renames the element tells the callback the uri it had and the uri it has', ( $renamed['previousUri'] ?? null ) === '/renaming/first' && ( $renamed['uri'] ?? null ) === '/renaming/moved' && ( $renamed['new']['.uri'] ?? null ) === '/renaming/moved' && ( $renamed['old']['.uri'] ?? null ) === '/renaming/first' );
+
+// A veto that names the fields
+$named = [];
+$refuser = function( &$appData, &$typeData ) use ( &$named ) {
+	$write = \Nino\Elements::writing( $appData );
+	if( ( $write['new']['size'] ?? 0 ) < 10 )
+		return $typeData;
+	\Nino\Elements::refuse( $appData, 'size', 'Size must stay below ten.' );
+	\Nino\Elements::refuse( $appData, 'name', 'The name is taken.', 'taken_name' );
+	\Nino\Elements::refuse( $appData, "bad\nfield", 'dropped for its name' );
+	\Nino\Elements::refuse( $appData, 'note', '   ' );
+	return \Nino\Elements::refuse( $appData, '.uri', 'No such address.', 'Bad Code' );
+};
+\Nino\Callbacks::registerCallback( $appData, '/nino/elements/refusable/insert', $refuser, 9 );
+\Nino\Callbacks::registerCallback( $appData, '/nino/elements/refusable/update', $refuser, 9 );
+
+$refused = \Nino\Elements::insertElement( $appData, '/refusable/two', [ 'name' => 'Zwei', 'size' => 11 ], 'de_DE' );
+check( 'an insert whose callback refuses is vetoed: null, and nothing is written', $refused === null && \Nino\Elements::getElement( $appData, '/refusable/two', 'de_DE' ) === false );
+check( '...the fields it named are kept in the order it named them, with the sentence and a code of lower-case words', \Nino\Elements::refusals( $appData ) === [
+	[ 'field' => 'size', 'error' => 'Size must stay below ten.', 'code' => '' ],
+	[ 'field' => 'name', 'error' => 'The name is taken.', 'code' => 'taken_name' ],
+	[ 'field' => '.uri', 'error' => 'No such address.', 'code' => '' ],
+] );
+check( '...a refusal outside a write is recorded nowhere', ( static function() use ( &$appData ): bool { $before = \Nino\Elements::refusals( $appData ); $answer = \Nino\Elements::refuse( $appData, 'size', 'nope' ); return $answer === false && \Nino\Elements::refusals( $appData ) === $before; } )() );
+check( '...and the type file is not left locked', probeLockFree( $sandbox, '/elements/refusable.php' ) === true );
+
+$refused = \Nino\Elements::updateElement( $appData, '/refusable/one', [ 'size' => 12 ], 'de_DE' );
+check( 'an update is refused the same way', $refused === null && count( \Nino\Elements::refusals( $appData ) ) === 3 && \Nino\Elements::getElement( $appData, '/refusable/one', 'de_DE' )['size'] === 5 );
+
+\Nino\Elements::updateElement( $appData, '/refusable/one', [ 'size' => 12 ], 'de_DE' );
+\Nino\Elements::updateElement( $appData, '/refusable/nothing', [ 'size' => 1 ], 'de_DE' );
+check( 'a write that fails before its callbacks are asked carries no refusal of the write before', \Nino\Elements::refusals( $appData ) === [] );
+\Nino\Elements::updateElement( $appData, '/refusable/one', [ 'size' => 12 ], 'de_DE' );
+\Nino\Elements::insertElement( $appData, '/refusable/one', [ 'name' => 'again' ], 'de_DE' );
+check( '...an insert that finds the element there included', \Nino\Elements::refusals( $appData ) === [] );
+
+$written = \Nino\Elements::updateElement( $appData, '/refusable/one', [ 'size' => 6 ], 'de_DE' );
+check( 'a write that is let through carries no refusal of the one before', is_array( $written ) === true && \Nino\Elements::refusals( $appData ) === [] );
+
+// A callback that names a field and lets the write through refuses nothing
+\Nino\Callbacks::registerCallback( $appData, '/nino/elements/refusable/update', function( &$appData, &$typeData ) { \Nino\Elements::refuse( $appData, 'name', 'only a remark' ); return $typeData; }, 8 );
+$written = \Nino\Elements::updateElement( $appData, '/refusable/one', [ 'size' => 7 ], 'de_DE' );
+check( 'a callback that names a field and does not veto leaves the write standing, and nothing refused', is_array( $written ) === true && $written['size'] === 7 && \Nino\Elements::refusals( $appData ) === [] );
+
+// --- refusals belong to one write; the write belongs to its callbacks ---------
+
+\Nino\Elements::insertElementType( $appData, '/inner', [ 'name' => [ 'type' => 'string' ], 'size' => [ 'type' => 'integer' ], 'Öff nung' => [ 'type' => 'string' ] ] );
+\Nino\Elements::insertElementType( $appData, '/outer', [ 'name' => [ 'type' => 'string', 'locale' => true ], 'size' => [ 'type' => 'integer' ], 'Öff nung' => [ 'type' => 'string' ] ] );
+$mode = '';
+$kept = [];
+\Nino\Callbacks::registerCallback( $appData, '/nino/elements/inner/insert', function( &$appData, &$typeData ) {
+	$write = \Nino\Elements::writing( $appData );
+	return ( $write['new']['size'] ?? 0 ) === 99 ? \Nino\Elements::refuse( $appData, 'size', 'The sentence of the inner type.' ) : $typeData;
+} );
+\Nino\Callbacks::registerCallback( $appData, '/nino/elements/outer/insert', function( &$appData, &$typeData ) use ( &$mode, &$kept ) {
+	if( $mode === 'throw' )
+		throw new RuntimeException( 'a callback that throws' );
+	if( $mode === 'writes-then-refuses' ) {
+		\Nino\Elements::refuse( $appData, 'size', 'The outer sentence.' );
+		\Nino\Elements::insertElement( $appData, '/inner/fine-'. uniqid(), [ 'name' => 'fine' ], 'de_DE' );
+		$kept = [ \Nino\Elements::writing( $appData )['uri'], \Nino\Elements::writing( $appData )['type'], \Nino\Elements::refusals( $appData ) ];
+		return false;
+	}
+	if( $mode === 'foreign-veto' ) {
+		\Nino\Elements::insertElement( $appData, '/inner/vetoed', [ 'size' => 99 ], 'de_DE' );
+		$kept = [ \Nino\Elements::refusals( $appData ) ];
+		return false;
+	}
+	if( $mode === 'normalizes' ) {
+		$kept = [ \Nino\Elements::writing( $appData )['new']['name'] ?? null ];
+		foreach( $typeData['de_DE'] as $key => $element )
+			if( isset( $element['name'] ) === true )
+				$typeData['de_DE'][$key]['name'] = strtoupper( $element['name'] );
+		return $typeData;
+	}
+	if( $mode === 'names' )
+		return \Nino\Elements::refuse( $appData, 'Öff nung', 'A field the model spells with a space and an umlaut.' );
+	return $typeData;
+} );
+\Nino\Callbacks::registerCallback( $appData, '/nino/elements/outer/insert', function( &$appData, &$typeData ) use ( &$mode, &$kept ) {
+	if( $mode === 'normalizes' )
+		$kept[] = \Nino\Elements::writing( $appData )['new']['name'] ?? null;
+	return $typeData;
+}, 7 );
+
+$mode = 'writes-then-refuses';
+$answer = \Nino\Elements::insertElement( $appData, '/outer/one', [ 'name' => 'x' ], 'de_DE' );
+check( 'a callback that refuses and then writes another element successfully keeps its own refusals', $answer === null && \Nino\Elements::refusals( $appData ) === [ [ 'field' => 'size', 'error' => 'The outer sentence.', 'code' => '' ] ] && $kept[2] === \Nino\Elements::refusals( $appData ) );
+check( '...and is told its own write again once the other is over, not the other\'s', $kept[0] === '/outer/one' && $kept[1] === '/outer' );
+
+$mode = 'foreign-veto';
+$answer = \Nino\Elements::insertElement( $appData, '/outer/two', [ 'name' => 'x' ], 'de_DE' );
+check( 'what the callback of another write refuses is the answer of that write: the write that wrote it and vetoed without a field has none', $answer === null && \Nino\Elements::refusals( $appData ) === [] && $kept[0] === [] );
+check( '...the other write was refused, whoever asked', \Nino\Elements::getElement( $appData, '/inner/vetoed', 'de_DE' ) === false );
+
+$mode = 'throw';
+try {
+	\Nino\Elements::insertElement( $appData, '/outer/three', [ 'name' => 'x' ], 'de_DE' );
+	$thrown = false;
+} catch( RuntimeException ) {
+	$thrown = true;
+}
+check( 'a callback that throws leaves no write running: nothing is told, nothing is recorded outside one', $thrown === true && \Nino\Elements::writing( $appData ) === null && \Nino\Elements::refuse( $appData, 'size', 'outside' ) === false && \Nino\Elements::refusals( $appData ) === [] );
+check( '...the type file is not left locked', probeLockFree( $sandbox, '/elements/outer.php' ) === true );
+$mode = '';
+$answer = \Nino\Elements::insertElement( $appData, '/outer/four', [ 'name' => 'x' ], 'de_DE' );
+check( '...and the next write is clean', is_array( $answer ) === true && \Nino\Elements::writing( $appData ) === null && \Nino\Elements::refusals( $appData ) === [] );
+
+$mode = 'normalizes';
+\Nino\Elements::insertElement( $appData, '/outer/five', [ 'name' => 'lower' ], 'de_DE' );
+check( 'a callback that normalizes a value in the type file is seen by the callbacks after it - what one asked before is not what the other is told', $kept === [ 'lower', 'LOWER' ] );
+
+$mode = 'names';
+\Nino\Elements::insertElement( $appData, '/outer/six', [ 'name' => 'x' ], 'de_DE' );
+check( 'a field the model spells with a space and an umlaut is a field to refuse', \Nino\Elements::refusals( $appData ) === [ [ 'field' => 'Öff nung', 'error' => 'A field the model spells with a space and an umlaut.', 'code' => '' ] ] );
+
+$mode = '';
+$fieldsSeen = null;
+\Nino\Callbacks::registerCallback( $appData, '/nino/elements/outer/update', function( &$appData, &$typeData ) use ( &$fieldsSeen ) { $fieldsSeen = \Nino\Elements::writing( $appData )['fields']; return $typeData; } );
+\Nino\Elements::updateElement( $appData, '/outer/four', [ 'size' => 2, 'not-in-the-model' => 'x' ], 'de_DE' );
+check( 'the keys a write is told it wrote are the keys of the model: not the uri, not the language, not a key the model does not have', $fieldsSeen === [ 'size' ] );
+
+
+echo "\n";
+
 // --- Cleanup ------------------------------------------------------------
 
 ninoDone( $appData );

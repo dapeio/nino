@@ -368,6 +368,8 @@ namespace Nino {
 		// Update an element
 		static public function updateElement( array &$appData, string $uri, array $data, string $locale = '' ): mixed {
 
+			self::_forgetRefused( $appData );
+
 			$element = \Nino\Elements::getElement( $appData, $uri, $locale );
 
 			if( $element === false )
@@ -379,10 +381,160 @@ namespace Nino {
 		// Update an element
 		static public function insertElement( array &$appData, string $uri, array $data, string $locale = '' ): mixed {
 
+			self::_forgetRefused( $appData );
+
 			if( \Nino\Elements::getElement( $appData, $uri, $locale ) !== false )
 				return ! trigger_error( 'Element \''. $uri. '\' already exists.' );
 
 			return self::_writeElementData( $appData, $uri, $data, $locale );
+		}
+
+		/**
+		 *	The write a callback of '/nino/elements/<type>/insert' or '/update' is
+		 *	called for. The callback is handed the type file alone, and cannot
+		 *	change that; what it needs to judge the element - which one, in which
+		 *	language, what it held and what it will hold - is read here while the
+		 *	callback runs, and is nothing before or after it. A callback that writes
+		 *	another element has its own write while that runs, and is told its own
+		 *	once that is over.
+		 *
+		 *	  operation		'insert' or 'update'
+		 *	  type				The type, '/<type>'
+		 *	  uri					The element as it is written, '/<type>/<slug>'
+		 *	  previousUri	The uri it held before, where this write renames it; null otherwise
+		 *	  locale			The language written, or '*'
+		 *	  fields			The keys of the type's model the caller wrote - an update writes the keys it names only
+		 *	  old					The element as getElement() answers it before the write; null for an insert
+		 *	  new					The element as the write stands when it is asked: the values placed in the type file and
+		 *								whatever the callbacks that ran before changed in it, with the defaults, '.locale' and '.uri'
+		 *
+		 *	The element is read from the type file in hand at the moment of the
+		 *	question, so a callback that normalizes a value in the type file is seen
+		 *	by the callbacks after it. A write nobody listens to builds none of this.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array|null								null where no callback of a write is running
+		 */
+		static public function writing( array &$appData ): ?array {
+
+			$frame = self::_frame( $appData );
+
+			if( $frame === null )
+				return null;
+
+			return $frame['write'] + [ 'old' => $frame['old'](), 'new' => $frame['new']() ];
+		}
+
+		/**
+		 *	Refuse the write a callback of '/nino/elements/<type>/insert' or '/update'
+		 *	is asked about, and say which field and why: the callback answers
+		 *	`return \Nino\Elements::refuse( $appData, 'from', $sentence );`, which is
+		 *	false, the veto. The workbench's Elements panel shows the sentence at
+		 *	the field it names - on a phone as well as on a desktop - and not in
+		 *	the status line alone.
+		 *
+		 *	A callback that refuses several fields calls it once for each, in the
+		 *	order it wants them read. A refusal belongs to the write whose callback
+		 *	made it, and to none other: a callback that writes another element
+		 *	leaves its own refusals as they are, and what a callback of that other
+		 *	write refuses is the answer of that write. When a write is vetoed, what
+		 *	any of its callbacks refused is what refusals() answers.
+		 *
+		 *	The sentence is the callback's own, in the language of the person who
+		 *	saves (the workbench session's, \Nino\Admin\Admin::sessionLocale()). A
+		 *	field is a key of the type's model, or '.uri' for the element's name,
+		 *	spelled as the model spells it; one the model does not have is a
+		 *	sentence without a field. A code is for a refusal that has its sentence
+		 *	in the workbench's own words ('/_admin/error/<code>'); a feature has none
+		 *	and leaves it out. A refusal outside such a callback is not recorded.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$field				The key of the field in the model, or '.uri'
+		 *	@param		string		$sentence			Why, for the person who saved
+		 *	@param		string		$code					Lower-case letters, digits and underscores; '' for none
+		 *
+		 *	@return 	false											Always: the veto
+		 */
+		static public function refuse( array &$appData, string $field, string $sentence, string $code = '' ): false {
+
+			if( self::_frame( $appData ) === null || $field === '' || strlen( $field ) > 200 || preg_match( '/[\x00-\x1f\x7f]/', $field ) === 1 || trim( $sentence ) === '' )
+				return false;
+
+			$last = array_key_last( $appData['./nino/elements/writes'] );
+
+			$appData['./nino/elements/writes'][$last]['refusals'][] = [
+				'field'	=> $field,
+				'error'	=> $sentence,
+				'code'	=> preg_match( '/^[a-z][a-z0-9_]*$/', $code ) === 1 ? $code : '',
+			];
+
+			return false;
+		}
+
+		/**
+		 *	What the write that was asked refused, in the order its callbacks named
+		 *	it (see refuse()). While a callback runs it is what the write it is
+		 *	called for has refused so far; after the write it is what the last write
+		 *	refused that the caller made - a write a callback made in between is
+		 *	none of them. Empty for a write that went through, for one that failed
+		 *	before its callbacks were asked, and for a veto that named no field.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array											A list of [ 'field' => , 'error' => , 'code' => ]
+		 */
+		static public function refusals( array &$appData ): array {
+
+			$frame = self::_frame( $appData );
+
+			return array_values( (array) ( $frame !== null ? $frame['refusals'] : ( $appData['./nino/elements/refused'] ?? [] ) ) );
+		}
+
+		/**
+		 *	The element as the type file stands in the hands of the callbacks of its
+		 *	write; where a callback answered something that is no type file, the last
+		 *	element that was read from one
+		 *
+		 *	@param		mixed			$typeData			What the callbacks hold of the type file
+		 *	@param		array			$last					The element as it was read last
+		 *	@param		string		$locale
+		 *	@param		string		$elementUri
+		 *	@param		string		$uri
+		 *
+		 *	@return 	array
+		 */
+		static private function _current( mixed $typeData, array $last, string $locale, string $elementUri, string $uri ): array {
+
+			return is_array( $typeData ) === true ? self::_combine( $typeData, $locale, $elementUri, $uri ) : $last;
+		}
+
+		/**
+		 *	The write whose callbacks are running, the innermost one
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array|null
+		 */
+		static private function _frame( array &$appData ): ?array {
+
+			$writes = $appData['./nino/elements/writes'] ?? [];
+
+			return is_array( $writes ) === true && $writes !== [] ? $writes[ array_key_last( $writes ) ] : null;
+		}
+
+		/**
+		 *	A write the caller makes starts with nothing refused - unless it is made
+		 *	by a callback of another write, whose refusals are its own
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		static private function _forgetRefused( array &$appData ): void {
+
+			if( self::_frame( $appData ) === null )
+				unset( $appData['./nino/elements/refused'] );
 		}
 
 		// Delete an element
@@ -1062,6 +1214,10 @@ namespace Nino {
 				if( is_array( $typeData ) === false )
 					return null;
 
+				// The file as the lock found it: the callback of the write is
+				// told what the element held before
+				$stored = $typeData;
+
 				// A numbered type assigns the uri itself: insert into '/gallery/'
 				// - the type with an empty slug - and the next number is
 				// allocated here, inside the lock this mutation already holds,
@@ -1299,10 +1455,63 @@ namespace Nino {
 				// Run callback - lets a module react to (or veto, by returning
 				// false) a save, same veto-capable shape as deleteElement()'s
 				// own '/nino/elements/delete<typeUri>' callback above
+				//
+				// The write itself is told to the callback beside the type file
+				// (see writing()), and a veto may name the fields it refuses
+				// (see refuse())
 				$callbackName = '/nino/elements'. $typeUri. ( $update === true ? '/update' : '/insert' );
-				if( \Nino\Callbacks::doCallbacks( $appData, $callbackName, $typeData ) === false ) {
-					$outcome = 'veto';
-					return null;
+
+				// Nobody listens: there is nothing to tell and nothing to refuse
+				if( isset( $appData['./nino/callbacks'][$callbackName] ) === true ) {
+
+					$oldFrom	= $update === true && ( isset( $stored[ $data['.locale'] ][$oldElementUri] ) === true || isset( $stored['*'][$oldElementUri] ) === true )
+						? [ $stored, $oldElementUri, $uri ]
+						: null;
+					$last			= [];
+
+					$appData['./nino/elements/writes'][] = [
+						'write'			=> [
+							'operation'		=> $update === true ? 'update' : 'insert',
+							'type'				=> $typeUri,
+							'uri'					=> $data['.uri'],
+							'previousUri'	=> $uri !== $data['.uri'] ? $uri : null,
+							'locale'			=> $data['.locale'],
+							'fields'			=> array_values( array_filter( array_keys( $writeKeys ), fn( $key ): bool => isset( $typeData['model'][$key] ) === true ) ),
+						],
+						'old'				=> static fn(): ?array => $oldFrom === null ? null : self::_combine( $oldFrom[0], $data['.locale'], $oldFrom[1], $oldFrom[2] ),
+						// The type file as the callbacks have it now; a callback that answers
+						// something that is no type file leaves the last one that was
+						'new'				=> static function() use ( &$typeData, &$last, $data, $elementUri ): array {
+							$last = self::_current( $typeData, $last, $data['.locale'], $elementUri, $data['.uri'] );
+							return $last;
+						},
+						'refusals'	=> [],
+					];
+
+					$vetoed = false;
+
+					// Whatever a callback does - throw included - its write is over with it
+					try {
+						$vetoed = \Nino\Callbacks::doCallbacks( $appData, $callbackName, $typeData ) === false;
+					} finally {
+						$frame = array_pop( $appData['./nino/elements/writes'] );
+
+						if( $appData['./nino/elements/writes'] === [] ) {
+							unset( $appData['./nino/elements/writes'] );
+
+							// What the caller's own write refused stays for it to ask; a write
+							// a callback made leaves nothing behind
+							if( $vetoed === true )
+								$appData['./nino/elements/refused'] = $frame['refusals'];
+							else
+								unset( $appData['./nino/elements/refused'] );
+						}
+					}
+
+					if( $vetoed === true ) {
+						$outcome = 'veto';
+						return null;
+					}
 				}
 
 				$outcome 		= 'success';
@@ -1442,6 +1651,30 @@ namespace Nino {
 			return $value === null || $value === [] || ( is_string( $value ) === true && trim( $value ) === '' );
 		}
 
+		/**
+		 *	An element as the type file holds it in one language: the fields of
+		 *	that language's bucket, then the global ones, then the defaults of
+		 *	the type, with '.locale' and '.uri' beside them - what getElement()
+		 *	answers, read from a type file in hand
+		 *
+		 *	@param		array			$typeData			The type file
+		 *	@param		string		$locale				The language bucket
+		 *	@param		string		$elementUri		The element's name in the file
+		 *	@param		string		$uri					The element, '/<type>/<slug>'
+		 *
+		 *	@return 	array
+		 */
+		static private function _combine( array $typeData, string $locale, string $elementUri, string $uri ): array {
+
+			$defaults 				= [ '.locale' => $locale, '.uri' => $uri ];
+			$localeDefaults		= $typeData[$locale]['*'] ?? [];
+			$globalDefaults		= $typeData['*']['*'] ?? [];
+			$localeData 			= $typeData[$locale][$elementUri] ?? [];
+			$globalData				= $typeData['*'][$elementUri] ?? [];
+
+			return $localeData + $globalData + $localeDefaults + $globalDefaults + $defaults;
+		}
+
 		// Load an element into app cache. Resolves '*' to the actual locale
 		// it found data in (reference), so the caller can look up that same
 		// cache slot afterwards.
@@ -1489,16 +1722,9 @@ namespace Nino {
 				return;
 
 			// Create element
-			$defaults 				= [ '.locale' => $locale, '.uri' => $uri ];
-			$localeDefaults		= $typeData[$locale]['*'] ?? [];
-			$globalDefaults		= $typeData['*']['*'] ?? [];
-			$localeData 			= $typeData[$locale][$elementUri] ?? [];
-			$globalData				= $typeData['*'][$elementUri] ?? [];
-
-
 			// Combine data
 			$appData['./nino/elements/cache']['elements'][$uri] = $appData['./nino/elements/cache']['elements'][$uri] ?? [];
-			$appData['./nino/elements/cache']['elements'][$uri][$locale] = $localeData + $globalData + $localeDefaults + $globalDefaults + $defaults;
+			$appData['./nino/elements/cache']['elements'][$uri][$locale] = self::_combine( $typeData, $locale, $elementUri, $uri );
 
 			// What a '*' read resolves to, for the next one - '*' itself where
 			// the element is global-only, which is an answer like any other.

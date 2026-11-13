@@ -447,7 +447,8 @@ namespace Nino\Modules\Elements {
 					\Nino\Images::restore( $appData, $filename, $oldBytes );
 				else
 					\Nino\Images::delete( $appData, $filename );
-				\Nino\Http::fail( $request, 400, 'save failed' );
+				if( self::_refused( $appData, $request, $model ) === false )
+					\Nino\Http::fail( $request, 400, 'save failed' );
 				return;
 			}
 
@@ -524,7 +525,8 @@ namespace Nino\Modules\Elements {
 			}
 
 			if( is_array( \Nino\Elements::updateElement( $appData, $elementUri, [ $key => '' ], $locale ) ) === false ) {
-				\Nino\Http::fail( $request, 400, 'save failed' );
+				if( self::_refused( $appData, $request, $model ) === false )
+					\Nino\Http::fail( $request, 400, 'save failed' );
 				return;
 			}
 
@@ -737,6 +739,10 @@ namespace Nino\Modules\Elements {
 			restore_error_handler();
 
 			if( is_array( $result ) === false ) {
+
+				if( self::_refused( $appData, $request, $model ) === true )
+					return;
+
 				\Nino\Http::fail( $request, 400, $errorMsg ?? 'save failed' );
 				return;
 			}
@@ -750,6 +756,55 @@ namespace Nino\Modules\Elements {
 				'element' => $result,
 				'nextUri' => ( $next === null ) ? '' : \Nino\Elements::autoincrementUri( $next ),
 			] );
+		}
+
+		/**
+		 *	Answer a write of the panel that a callback vetoed and refused fields
+		 *	for (see \Nino\Elements::refuse()), in the one form every write of the
+		 *	panel uses: 400, with
+		 *
+		 *	  fields	every refusal whose field the type has (a key of its model, or
+		 *						'.uri'), as [ 'field' => , 'error' => , 'code' => ], in the order
+		 *						the callbacks named them
+		 *	  field		the first of those, which is the one the shell marks and focuses
+		 *	  error		the sentences that name no field of the type, all of them in their
+		 *						order - they have no field to stand at, so the status line says
+		 *						them; where every sentence has its field, the first sentence
+		 *	  code		the code of the one sentence the error is, if it has a code
+		 *
+		 *	So every sentence a callback gave reaches the person: at its field, or in
+		 *	the status line.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		array 		$model				The type's model
+		 *
+		 *	@return 	bool										Whether the write was refused for named reasons and the response is set
+		 */
+		private static function _refused( array &$appData, array &$request, array $model ): bool {
+
+			$refusals = \Nino\Elements::refusals( $appData );
+
+			if( $refusals === [] )
+				return false;
+
+			$named		= [];
+			$general	= [];
+
+			foreach( $refusals as $refusal )
+				if( $refusal['field'] === '.uri' || isset( $model[ $refusal['field'] ] ) === true )
+					$named[] = $refusal;
+				else
+					$general[] = $refusal;
+
+			$said = $general === [] ? [ $named[0] ] : $general;
+
+			\Nino\Http::fail( $request, 400, implode( ' ', array_column( $said, 'error' ) ), count( $said ) === 1 ? $said[0]['code'] : '', [], $named === [] ? '' : $named[0]['field'] );
+
+			if( $named !== [] )
+				$request['/nino/http/response']['body']['fields'] = $named;
+
+			return true;
 		}
 
 		/**

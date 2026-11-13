@@ -1838,6 +1838,131 @@ check( 'the sentences are not alerts - the status line says it once, in its own 
 		check( '...it is shown the way a new element is, as the level of the pane', d.doc.getElementById('elements-form').classList.contains('admin-hidden') === false );
 		check( '...and the focus is in its first field, where the next element is typed, and not on the way back', d.doc.activeElement === d.doc.getElementById('elements-form-uri') && d.doc.activeElement.closest('.nino-admin-back-link') === null );
 
+		// a save the server refuses for fields: the sentence stands at each field it names
+		{
+			const refused = { error : 'FIRST SENTENCE', field : 'slug', fields : [ { field : 'slug', error : 'FIRST SENTENCE', code : '' }, { field : 'name', error : 'SECOND SENTENCE', code : '' }, { field : '.uri', error : 'URI SENTENCE', code : '' } ] };
+			const mark = key => ( { sentence : d.doc.getElementById('elements-error-field-'+ key), control : field( key ) } );
+
+			blank();
+			fillIn();
+			sent.length = 0;
+			elements._save( () => {} );
+			sent[0].callback( 400, refused );
+			check( 'a save the server refused for fields says the first sentence in the status line, as every failed request does', elements._status.state === 'error' && d.doc.getElementById('elements-form-msg').textContent.indexOf( 'FIRST SENTENCE' ) !== -1 );
+			check( '...and each field it names carries its sentence next to it, aria-invalid, and aria-describedby naming that sentence',
+				[ 'slug', 'name' ].every( key => { const m = mark( key ); return m.sentence !== null && m.sentence.className === 'nino-admin-field-error' && m.control.getAttribute('aria-invalid') === 'true' && m.control.getAttribute('aria-describedby') === m.sentence.id } )
+				&& mark('slug').sentence.textContent === 'FIRST SENTENCE' && mark('name').sentence.textContent === 'SECOND SENTENCE' );
+			check( '...the element\'s name is a field like the others', d.doc.getElementById('elements-error-uri').textContent === 'URI SENTENCE' && d.doc.getElementById('elements-form-uri').getAttribute('aria-describedby') === 'elements-error-uri' );
+			check( '...the focus is on the first, and the form is given back', d.doc.activeElement === field('slug') && elements._saving === false && again().disabled === false );
+
+			field('slug').value = 'fixed';
+			d.doc.getElementById('elements-edit-form').fire( 'input', { target : field('slug') } );
+			check( 'typing into a field lets its refusal go, the others stay',
+				d.doc.getElementById('elements-error-field-slug') === null && field('slug').getAttribute('aria-invalid') === null && field('slug').getAttribute('aria-describedby') === null
+				&& mark('name').sentence !== null && mark('name').control.getAttribute('aria-invalid') === 'true' );
+
+			sent.length = 0;
+			elements._save( () => {} );
+			check( 'the next save starts without the refusals of the one before', sent.length === 1 && d.doc.getElementById('elements-error-field-name') === null && field('name').getAttribute('aria-invalid') === null );
+			sent[0].callback( 400, { error : 'ONLY A SENTENCE' } );
+			check( 'a refusal without fields is the status line alone', d.doc.getElementById('elements-form-msg').textContent.indexOf( 'ONLY A SENTENCE' ) !== -1 && d.doc.getElementById('elements-form').querySelectorAll('.nino-admin-field-error').length === 0 );
+			sent.length = 0;
+			elements._save( () => {} );
+			sent[0].callback( 400, { error : 'UNKNOWN', field : 'nothere', fields : [ { field : 'nothere', error : 'UNKNOWN' } ] } );
+			check( 'a field the form does not have draws nothing and breaks nothing', d.doc.getElementById('elements-form').querySelectorAll('.nino-admin-field-error').length === 0 && elements._status.state === 'error' );
+			elements._resetEdits();
+			check( 'a form that is reset forgets what was refused', elements._refused.length === 0 );
+
+			// the focus is the form's own where the answer names the fields only
+			blank();
+			fillIn();
+			sent.length = 0;
+			elements._save( () => {} );
+			sent[0].callback( 400, { error : 'ONLY IN THE LIST', fields : [ { field : 'name', error : 'ONLY IN THE LIST' } ] } );
+			check( 'the focus goes to the first field of the list, whether or not the answer names it as its field', d.doc.activeElement === field('name') && field('name').getAttribute('aria-invalid') === 'true' );
+
+			// drawn again, a sentence stands once
+			elements._drawRefusals( false );
+			elements._drawRefusals( false );
+			check( 'a refusal that is drawn twice has one sentence', d.doc.getElementById('elements-form').querySelectorAll('.nino-admin-field-error').filter( e => e.id === 'elements-error-field-name' ).length === 1 );
+
+			// the marks of a rich text are its editor's: they go when the sentence goes
+			{
+				const marks = [];
+				elements._clearRefusals();
+				elements._htmlEditors.name = { mark : o => marks.push( o ), focus(){}, destroy(){} };
+				elements._refused = [ { key : 'name', locale : 'en_US', text : 'EDITOR SENTENCE' } ];
+				elements._drawRefusals( false );
+				check( 'a refused rich text is marked invalid through its editor, pointed at its sentence', marks.length === 1 && marks[0].invalid === true && marks[0].describedBy === 'elements-error-field-name' );
+				d.doc.getElementById('elements-edit-form').fire( 'input', { target : field('name') } );
+				check( '...and typing into it marks it valid again through the editor', marks.length === 2 && marks[1].invalid === false && marks[1].describedBy === '' && d.doc.getElementById('elements-error-field-name') === null );
+				delete elements._htmlEditors.name;
+			}
+
+			// a refusal survives the revalidation a refused save starts: only the field typed into lets go
+			elements._refused = [ { key : 'slug', locale : null, text : 'SLUG' }, { key : 'name', locale : 'en_US', text : 'NAME' } ];
+			elements._drawRefusals( false );
+			elements._validated = true;
+			field('slug').value = 'typed';
+			d.doc.getElementById('elements-edit-form').fire( 'input', { target : field('slug') } );
+			check( 'the revalidation after a refused save keeps the refusal of the field that was not typed into drawn', d.doc.getElementById('elements-error-field-slug') === null && d.doc.getElementById('elements-error-field-name') !== null && d.doc.getElementById('elements-error-field-name').textContent === 'NAME' );
+			elements._validated = false;
+			elements._clearRefusals();
+
+			// a code the workbench has words for is said in them
+			texts['/_admin/error/probe_code'] = 'WORDS OF THE WORKBENCH';
+			blank();
+			fillIn();
+			sent.length = 0;
+			elements._save( () => {} );
+			sent[0].callback( 400, { error : 'ENGLISH', field : 'slug', fields : [ { field : 'slug', error : 'ENGLISH', code : 'probe_code' } ] } );
+			check( 'a refusal with a code the workbench knows is said in the workbench\'s words, one without in the callback\'s own', d.doc.getElementById('elements-error-field-slug').textContent === 'WORDS OF THE WORKBENCH' );
+			delete texts['/_admin/error/probe_code'];
+
+			// the name of a saved element: its line carries the sentence and can take the focus
+			elements._isNew = false;
+			elements._currentUri = 'one';
+			elements._globalValues = { slug : 'hello' };
+			elements._localeValues = { en_US : { name : 'Name' } };
+			elements._renderForm();
+			elements._refused = [ { key : '.uri', locale : null, text : 'URI SENTENCE' } ];
+			elements._drawRefusals( true );
+			check( 'a refusal of the name of a saved element stands at the line that shows it, and the line takes the focus', d.doc.getElementById('elements-error-uri').textContent === 'URI SENTENCE' && d.doc.activeElement.className === 'main-uri' && d.doc.activeElement.getAttribute('aria-describedby') === 'elements-error-uri' );
+			check( '...as a paragraph after the line, not inside the text of the address', d.doc.getElementById('elements-error-uri').parentNode === d.doc.querySelector('.main-uri').parentNode && d.doc.getElementById('elements-error-uri').parentNode !== d.doc.querySelector('.main-uri') );
+			d.doc.getElementById('elements-edit-form').fire( 'input', { target : field('slug') } );
+			check( '...typing into another field leaves it', d.doc.getElementById('elements-error-uri') !== null );
+			elements._clearRefusals();
+			check( '...and it goes with the others', d.doc.getElementById('elements-error-uri') === null );
+			blank();
+
+			// a refusal of a translation that is not on screen does not go when the same field of the one on screen is typed into
+			elements._localeValues = { de_DE : { name : 'Name de' }, en_US : { name : 'Name en' } };
+			elements._selectedLocale = 'en_US';
+			elements._refused = [ { key : 'name', locale : 'de_DE', text : 'GERMAN ONLY' } ];
+			elements._drawRefusals( false );
+			d.doc.getElementById('elements-edit-form').fire( 'input', { target : field('name') } );
+			check( 'typing into a field of the translation on screen leaves the refusal of that field in another translation', elements._refused.length === 1 );
+			elements._clearRefusals();
+
+			// a translation that is not on screen: the form goes to it, and a translation left and come back to shows it again
+			blank();
+			fillIn();
+			elements._localeValues = { de_DE : { name : 'Name de' }, en_US : { name : 'Name en' } };
+			elements._dirtyLocales = [ 'de_DE', 'en_US' ];
+			elements._selectedLocale = 'en_US';
+			sent.length = 0;
+			elements._save( () => {} );
+			check( 'a save of two translations asks for the first', sent.length === 1 && sent[0].payload.locale === 'de_DE' );
+			sent[0].callback( 400, { error : 'GERMAN', field : 'name', fields : [ { field : 'name', error : 'GERMAN' } ] } );
+			check( 'a refusal of a translation that is not on screen switches the form to that translation and marks the field there',
+				elements._selectedLocale === 'de_DE' && d.doc.getElementById('elements-error-field-name') !== null && d.doc.getElementById('elements-error-field-name').textContent === 'GERMAN' && d.doc.activeElement === field('name') );
+			elements._switchLocale( 'en_US' );
+			check( '...the other translation is not marked', d.doc.getElementById('elements-error-field-name') === null && field('name').getAttribute('aria-invalid') === null );
+			elements._switchLocale( 'de_DE' );
+			check( '...and coming back to the refused one shows the sentence at its field again', d.doc.getElementById('elements-error-field-name') !== null && field('name').getAttribute('aria-describedby') === 'elements-error-field-name' );
+			elements._selectedLocale = 'en_US';
+		}
+
 		// a locked field takes no focus: the first one that can be typed into does
 		blank();
 		d.doc.getElementById('elements-form-uri').disabled = true;

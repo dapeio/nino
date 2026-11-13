@@ -326,6 +326,71 @@ changes the rename tests the buckets, the refusals and the answer.
 An `array` field whose value is a list of strings is edited as rows
 (`Nino.adminUi.stringList()`); a list of anything else keeps the JSON field.
 
+## Refusing a write, and saying which field
+
+A callback of `/nino/elements/<type>/insert` or `/update` runs under the lock of the
+type file, after the values are placed in it, and refuses the write by returning
+`false`. It is handed the type file and nothing else, and a refusal that is only
+`false` answers the Elements panel with the kernel's own sentence. Two public
+calls give it the rest:
+
+```php
+\Nino\Elements::writing( array &$appData ): ?array
+\Nino\Elements::refuse( array &$appData, string $field, string $sentence, string $code = '' ): false
+```
+
+`writing()` is the write the callback is called for, readable while it runs and
+`null` before and after: `operation` (`insert` or `update`), `type` (`/<type>`),
+`uri` (`/<type>/<slug>`, the number a numbered type assigned included),
+`previousUri` (where a field callback renamed the element, else `null`), `locale`
+(the language written, or `*`), `fields` (the keys of the type's model the caller
+wrote - an update names the keys it changes only; `.uri` and `.locale` are not among
+them), `old` (the element as `getElement()` answers it before the write, `null` for
+an insert) and `new` (the element as the write stands when `writing()` is asked: the
+values placed in the type file and whatever the callbacks before it changed in it,
+defaults and `.uri` and `.locale` among its keys). A callback that normalizes a
+value in the type file is therefore seen by the callbacks after it. A callback
+compares `old` and `new` to judge what changed, and reads `locale` to word its
+sentence for the language that is written. Its arguments are the two they always
+were: a callback written for the type file alone is called as it is. A callback
+that writes another element has that write's `writing()` while it runs, and is told
+its own when it is over; a callback that throws ends its write all the same. A write
+nobody listens to builds none of this.
+
+`refuse()` records a field and a sentence and answers `false`, so the veto is one
+line: `return \Nino\Elements::refuse( $appData, 'until', $sentence );`. The
+field is the key of the model as the model spells it, or `.uri` for the element's
+name; one the model does not have is a sentence without a field. The sentence is
+the callback's own, in the language of the person who saves (for the workbench,
+`\Nino\Admin\Admin::sessionLocale()`); the code is optional, lower-case words
+joined by underscores, and is only for a sentence the workbench has in its own
+words (`/_admin/error/<code>`). A callback that refuses several fields calls it
+once for each, in the order it wants them read. Nothing is recorded outside such
+a callback.
+
+Who sees which refusals: a refusal belongs to the write whose callback made it.
+`\Nino\Elements::refusals( $appData )` answers, while a callback runs, what that
+write has refused so far, and after a write what the last write refused that the
+caller made - a write a callback made in between is none of them, and a write
+that went through, or failed before its callbacks were asked, has none. When a
+write is vetoed, what any of its callbacks refused is what it answers, a
+callback that refused and let the write through included.
+
+The Elements panel answers a refused write - saving, uploading an image and
+removing one - with `400` and: `fields`, every refusal whose field the type has, as
+`[ 'field' => , 'error' => , 'code' => ]` in the order they were named; `field`, the
+first of those, which the shell marks; and `error`, the sentences that name no field
+of the type, all of them in their order, or the first sentence where every sentence
+has its field. So every sentence reaches the person, at its field or in the status
+line, and `code` is the code of the sentence `error` is when it is one. The panel
+puts each sentence next to its field, with `aria-invalid` on the control and
+`aria-describedby` naming the sentence, and moves the focus to the first; typing
+into a field lets its sentence go. The sentences stand at the fields on a phone,
+where the status line is not shown, and a sentence that cannot be broken is broken
+at the edge of the field. The status line says `error` - it is the one summary, as
+it is for the problems the form finds itself. This holds for every write the panel
+makes: a new element, a change, a copy and the version in another language.
+
 ## Element tests
 
 Use `tests/elements-smoke.php` for model/runtime behavior,

@@ -648,6 +648,121 @@ check( 'apiSave rejects a new uri that is not a plain slug', $status === 400 );
 ] );
 check( 'apiSave updates a second locale of the same element', $status === 200 );
 
+// --- a veto that names the fields it refuses ---------------------------------
+//
+// The panel answers the callback's sentence at the field, for every way the
+// panel writes: a new element, a change, a copy (a new element again) and
+// another language. A veto that names nothing is answered as it ever was.
+
+echo "Elements::apiSave - a veto that names fields\n";
+
+\Nino\Filesystem::putFileContent( $appData, '/elements/vetotype.php', [
+	'title'	=> 'Veto Type',
+	'model'	=> [
+		'title'	=> [ 'type' => 'string', 'locale' => true ],
+		'start'	=> [ 'type' => 'integer' ],
+		'stop'	=> [ 'type' => 'integer' ],
+	],
+	'*'			=> [ '*' => [] ],
+] );
+
+$vetoMode = 'fields';
+$vetoSeen = [];
+$veto = function( &$appData, &$typeData ) use ( &$vetoMode, &$vetoSeen ) {
+
+	$write = \Nino\Elements::writing( $appData );
+	$vetoSeen[] = [ $write['operation'], $write['uri'], $write['locale'] ];
+	$new = $write['new'];
+
+	// Refused only what ends before it starts
+	if( $vetoMode === 'none' || ( $new['start'] ?? 0 ) <= ( $new['stop'] ?? PHP_INT_MAX ) )
+		return $typeData;
+
+	if( $vetoMode === 'plain' )
+		return false;
+
+	if( $vetoMode === 'unknown' )
+		return \Nino\Elements::refuse( $appData, 'nothere', 'A field the type does not have.' );
+
+	if( $vetoMode === 'unknown-first' ) {
+		\Nino\Elements::refuse( $appData, 'nothere', 'A sentence for no field.', 'vetotype_general' );
+		\Nino\Elements::refuse( $appData, 'also-nothere', 'And another for none.' );
+		return \Nino\Elements::refuse( $appData, 'stop', 'The sentence of a field.', 'vetotype_order' );
+	}
+
+	if( $vetoMode === 'uri' )
+		return \Nino\Elements::refuse( $appData, '.uri', 'The address is taken.' );
+
+	if( $vetoMode === 'three' ) {
+		\Nino\Elements::refuse( $appData, 'title', 'First of three.' );
+		\Nino\Elements::refuse( $appData, 'stop', 'Second of three.' );
+		return \Nino\Elements::refuse( $appData, 'start', 'Third of three.' );
+	}
+
+	\Nino\Elements::refuse( $appData, 'stop', 'The end lies before the start.', 'vetotype_order' );
+
+	if( $vetoMode === 'two' )
+		\Nino\Elements::refuse( $appData, 'start', 'The start lies after the end.' );
+
+	return false;
+};
+foreach( [ 'insert', 'update' ] as $operation )
+	\Nino\Callbacks::registerCallback( $appData, '/nino/elements/vetotype/'. $operation, $veto );
+
+$save = static fn( array $data ): array => callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiSave', $data + [ 'type' => 'vetotype', 'locale' => 'de_DE', 'isNew' => true ] );
+
+[ $status ] = $save( [ 'uri' => 'good', 'fields' => [ 'title' => 'Gut', 'start' => 1, 'stop' => 2 ] ] );
+check( 'a save the veto lets through is answered as ever', $status === 200 );
+
+[ $status, $body ] = $save( [ 'uri' => 'bad', 'fields' => [ 'title' => 'Schlecht', 'start' => 5, 'stop' => 2 ] ] );
+check( 'a new element the veto refuses is a 400 that says the sentence, the field and the code', $status === 400 && $body['error'] === 'The end lies before the start.' && $body['field'] === 'stop' && $body['code'] === 'vetotype_order' );
+check( '...with the field in a list of fields, each with its sentence and code', $body['fields'] === [ [ 'field' => 'stop', 'error' => 'The end lies before the start.', 'code' => 'vetotype_order' ] ] );
+check( '...and nothing written', \Nino\Elements::getElement( $appData, '/vetotype/bad', 'de_DE' ) === false );
+
+[ $status, $body ] = $save( [ 'uri' => 'good', 'isNew' => false, 'fields' => [ 'start' => 9 ] ] );
+check( 'a change the veto refuses names the field too - judged against the element as it will stand', $status === 400 && $body['field'] === 'stop' && \Nino\Elements::getElement( $appData, '/vetotype/good', 'de_DE' )['start'] === 1 );
+
+[ $status, $body ] = $save( [ 'uri' => 'copy-of-good', 'fields' => [ 'title' => 'Gut', 'start' => 9, 'stop' => 2 ] ] );
+check( 'a copy, which the panel sends as a new element, is refused the same way', $status === 400 && $body['field'] === 'stop' && ( $vetoSeen[ array_key_last( $vetoSeen ) ][0] ?? '' ) === 'insert' );
+
+[ $status, $body ] = $save( [ 'uri' => 'good', 'isNew' => false, 'locale' => 'en_US', 'fields' => [ 'title' => 'Good', 'start' => 9 ] ] );
+check( 'the version in another language is refused the same way, and the veto is told the language', $status === 400 && $body['field'] === 'stop' && ( $vetoSeen[ array_key_last( $vetoSeen ) ][2] ?? '' ) === 'en_US' );
+
+[ $status, $body ] = $save( [ 'uri' => 'good', 'fields' => [ 'title' => 'Gut', 'start' => 1, 'stop' => 2 ] ] );
+check( 'a failure that is no veto is answered as itself - the refusals of the save before are not its answer', $status === 400 && array_keys( $body ) === [ 'error' ] && in_array( $body['error'], [ 'The end lies before the start.', 'The start lies after the end.' ], true ) === false );
+
+$vetoMode = 'two';
+[ $status, $body ] = $save( [ 'uri' => 'bad', 'fields' => [ 'start' => 5, 'stop' => 2 ] ] );
+check( 'a veto that refuses two fields: the answer says the first as its sentence and field, and lists both in the order named',
+	$status === 400 && $body['error'] === 'The end lies before the start.' && $body['field'] === 'stop' && array_column( $body['fields'], 'field' ) === [ 'stop', 'start' ] && $body['fields'][1]['error'] === 'The start lies after the end.' );
+
+$vetoMode = 'unknown';
+[ $status, $body ] = $save( [ 'uri' => 'bad', 'fields' => [ 'start' => 5, 'stop' => 2 ] ] );
+check( 'a field the type does not have is a sentence without a field: nothing for the panel to mark', $status === 400 && $body['error'] === 'A field the type does not have.' && isset( $body['field'] ) === false && isset( $body['fields'] ) === false );
+
+$vetoMode = 'unknown-first';
+[ $status, $body ] = $save( [ 'uri' => 'bad', 'fields' => [ 'start' => 5, 'stop' => 2 ] ] );
+check( 'a sentence for a field the type does not have is said in the status line, all of them in their order, whatever comes after it', $status === 400 && $body['error'] === 'A sentence for no field. And another for none.' && $body['field'] === 'stop' );
+check( '...the list holds the field the type has - and the code is the code of one sentence only, so the sentences of two have none', $body['fields'] === [ [ 'field' => 'stop', 'error' => 'The sentence of a field.', 'code' => 'vetotype_order' ] ] && isset( $body['code'] ) === false );
+
+$vetoMode = 'uri';
+[ $status, $body ] = $save( [ 'uri' => 'bad', 'fields' => [ 'start' => 5, 'stop' => 2 ] ] );
+check( 'the name of the element is a field a veto may refuse', $status === 400 && $body['field'] === '.uri' && $body['error'] === 'The address is taken.' && array_column( $body['fields'], 'field' ) === [ '.uri' ] );
+
+$vetoMode = 'three';
+[ $status, $body ] = $save( [ 'uri' => 'bad', 'fields' => [ 'start' => 5, 'stop' => 2 ] ] );
+check( 'three refusals are three fields, the first of them the field and the sentence', $status === 400 && array_column( $body['fields'], 'field' ) === [ 'title', 'stop', 'start' ] && $body['field'] === 'title' && $body['error'] === 'First of three.' );
+
+$vetoMode = 'plain';
+[ $status, $body ] = $save( [ 'uri' => 'bad', 'fields' => [ 'start' => 5, 'stop' => 2 ] ] );
+check( 'a veto that names no field is answered with a sentence of the kernel alone - the body is the error and nothing else', $status === 400 && array_keys( $body ) === [ 'error' ] && is_string( $body['error'] ) === true && $body['error'] !== '' );
+
+$vetoMode = 'none';
+[ $status, $body ] = $save( [ 'uri' => 'free', 'fields' => [ 'title' => 'Frei', 'start' => 5, 'stop' => 2 ] ] );
+check( 'a save nobody refuses is answered without a trace of an earlier refusal', $status === 200 && array_keys( $body ) === [ 'element', 'nextUri' ] );
+
+echo "\n";
+
 // --- a number field left empty ----------------------------------------------
 //
 // The form sends null for an integer or a double with nothing in it. The element

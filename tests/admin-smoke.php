@@ -739,6 +739,17 @@ check( 'a same-format replacement overwrites the same deterministic path, not a 
 check( 'switching output format succeeds and yields a differently-named file', $status3 === 200 && ( $body3['filename'] ?? null ) === 'elements/imagedemo/item1.40x40.png' );
 check( 'the old .jpg is deleted once the new .png is committed (no orphan across a format change)', is_file( $uploadPath ) === false );
 
+// A veto of the element write that names a field answers the image routes of the
+// panel in the form of a save: the field, the sentence, the list
+\Nino\Callbacks::registerCallback( $appData, '/nino/elements/imagedemo/update', static fn( array &$appData, mixed &$typeData ): bool => \Nino\Elements::refuse( $appData, 'plain', 'The image veto sentence.' ) );
+$before = \Nino\Elements::getElement( $appData, '/imagedemo/item1', '*' )['photo'] ?? null;
+[ $status, $body ] = callUploadImage( $appData, [ 'type' => 'imagedemo', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ] );
+check( 'an upload whose write is refused for a field is answered with the field, the sentence and the list', $status === 400 && $body['field'] === 'plain' && $body['error'] === 'The image veto sentence.' && $body['fields'] === [ [ 'field' => 'plain', 'error' => 'The image veto sentence.', 'code' => '' ] ] );
+check( '...and the element keeps its picture', ( \Nino\Elements::getElement( $appData, '/imagedemo/item1', '*' )['photo'] ?? null ) === $before );
+[ $status, $body ] = ninoCall( $appData, [ \Nino\Modules\Elements\Admin::class, 'apiRemoveImage' ], [ 'type' => 'imagedemo', 'uri' => 'item1', 'locale' => 'de_DE', 'key' => 'photo' ] );
+check( 'removing the picture is answered the same way when its write is refused', $status === 400 && $body['field'] === 'plain' && count( $body['fields'] ) === 1 );
+\Nino\Callbacks::removeCallbacks( $appData, '/nino/elements/imagedemo/update' );
+
 /*	With webp on there is no format change left to orphan anything: the branch
 	that used to pick between png and jpeg now picks between two webp encodings
 	under one name, so a replacement always overwrites in place	*/

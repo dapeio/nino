@@ -2139,6 +2139,72 @@ $entry 			= include $entryPath;
 check( 'a stored entry carries an expiry from the configured ttl', ( $entry['expires'] - time() ) > 50 && ( $entry['expires'] - time() ) <= 60 );
 check( '...and the locale it rendered in, which serving has to re-apply', ( $entry['locale'] ?? '' ) === 'de_DE' );
 
+// --- a page that says how long it is good for ------------------------------
+//
+// Code that renders a page can cut its lifetime short, never lengthen it
+// (Modules\Cache::limit()): an output that depends on the clock is only true
+// until the clock moves on.
+
+$expiresOf = static function( array &$appData, array $request ): ?int {
+	\Nino\Modules\Cache::_invalidate( $appData );
+	\Nino\Modules\Cache::callbackOutput( $appData, $request );
+	$stored = glob( \Nino\Filesystem::path( $appData, '/data/cache' ). '/*.php' ) ?: [];
+	return $stored === [] ? null : (int) ( include $stored[0] )['expires'];
+};
+
+$appData['/nino/cache/ttl'] = 60;
+unset( $appData['./nino/cache/until'] );
+$now = time();
+$plain = $expiresOf( $appData, cacheRequest( '/home' ) );
+check( 'a page nobody limited lives for the configured lifetime', $plain !== null && $plain - $now >= 59 && $plain - $now <= 61 );
+
+\Nino\Modules\Cache::limit( $appData, time() + 20 );
+$limited = $expiresOf( $appData, cacheRequest( '/home' ) );
+check( 'a page limited to a moment before the lifetime ends is stored until that moment', $limited !== null && $limited - $now >= 19 && $limited - $now <= 21 );
+
+unset( $appData['./nino/cache/until'] );
+\Nino\Modules\Cache::limit( $appData, time() + 5000 );
+$longer = $expiresOf( $appData, cacheRequest( '/home' ) );
+check( 'a limit beyond the lifetime lengthens nothing', $longer !== null && $longer - $now >= 59 && $longer - $now <= 61 );
+
+unset( $appData['./nino/cache/until'] );
+\Nino\Modules\Cache::limit( $appData, time() + 40 );
+\Nino\Modules\Cache::limit( $appData, time() + 10 );
+\Nino\Modules\Cache::limit( $appData, time() + 30 );
+$several = $expiresOf( $appData, cacheRequest( '/home' ) );
+check( 'several limits keep the earliest, whatever order they come in', $several !== null && $several - $now >= 9 && $several - $now <= 11 );
+
+unset( $appData['./nino/cache/until'] );
+\Nino\Modules\Cache::limit( $appData, time() - 1 );
+check( 'a moment that has passed leaves a page that is not stored', $expiresOf( $appData, cacheRequest( '/home' ) ) === null );
+
+unset( $appData['./nino/cache/until'] );
+\Nino\Modules\Cache::limit( $appData, time() );
+check( '...and so does this very second: a page that is good until now is not good', $expiresOf( $appData, cacheRequest( '/home' ) ) === null );
+
+$unstored = cacheRequest( '/home' );
+\Nino\Modules\Cache::_invalidate( $appData );
+\Nino\Modules\Cache::callbackOutput( $appData, $unstored );
+check( '...and is not marked as a page that was stored', isset( $unstored['/nino/http/response']['header']['X-Nino-Cache'] ) === false );
+$stored = cacheRequest( '/home' );
+unset( $appData['./nino/cache/until'] );
+\Nino\Modules\Cache::_invalidate( $appData );
+\Nino\Modules\Cache::callbackOutput( $appData, $stored );
+check( '...where a page that is stored is', ( $stored['/nino/http/response']['header']['X-Nino-Cache'] ?? '' ) === 'miss' );
+
+unset( $appData['./nino/cache/until'] );
+$appData['/nino/cache/status'] = false;
+\Nino\Modules\Cache::limit( $appData, time() + 20 );
+\Nino\Modules\Cache::_invalidate( $appData );
+$off = cacheRequest( '/home' );
+\Nino\Modules\Cache::callbackOutput( $appData, $off );
+check( 'without the cache a limit does nothing: nothing is stored and the page is not marked', cacheEntryCount( $appData ) === 0 && isset( $off['/nino/http/response']['header']['X-Nino-Cache'] ) === false && $appData['/nino/cache/ttl'] === 60 );
+$appData['/nino/cache/status'] = true;
+
+unset( $appData['./nino/cache/until'] );
+ninoVisit( $appData, '/home?until=1&%2E%2Fnino%2Fcache%2Funtil=1', 'GET', [ 'HTTP_X_NINO_CACHE_UNTIL' => '1' ] );
+check( 'nothing a request carries limits a page: not its query, not a header', isset( $appData['./nino/cache/until'] ) === false );
+
 // --- a write through a tool drops everything ------------------------------
 
 foreach( [ '/_admin' ] as $tool ) {

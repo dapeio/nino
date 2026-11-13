@@ -1281,6 +1281,7 @@ a {
 	color: var(--editor-red-ink);
 	font-size: .74rem;
 	line-height: 1.45;
+	overflow-wrap: anywhere;
 }
 
 /* A control holding something that is not yet a value - a half-typed colour,

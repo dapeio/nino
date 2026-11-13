@@ -444,6 +444,8 @@ The output of a shortcode is sent through `renderHtml()` again. Therefore, templ
 
 What a template calls can be read without running it: `\Nino\Html::shortcodeCalls( $appData, $html )` answers the calls of the registered shortcodes in a piece of html+, in the order they stand - `[ 'name' => 'example', 'args' => [ 'first', 'limit' => '3', 'content' => 'Content' ] ]` for `[example first limit="3"]Content[/example]` - found with the pattern and the argument splitting of the rendering, so that a scan sees what the page will run. The calls between the tags of a call follow the one that holds them, and a name nobody registered is no call. A third argument, a list of names (`[]` by default), names calls whose content is not looked into: the call itself is found and what stands between its tags is not, which is how `Components::sources()` passes the stacks of the cell `none`.
 
+A shortcode whose output depends on the clock tells the page cache how long the page it is on stays true, with `\Nino\Modules\Cache::limit()` (see [the page cache and the clock](#the-page-cache-and-the-clock)).
+
 A shortcode that says what it takes - a source for its value and attributes with a type and a default - is a **component**, and one that loops the elements of a type around its content a **stack**: see [Components](#components).
 
 ### Elements in Templates
@@ -1022,6 +1024,28 @@ The argument is `[ 'nav' => 'main', 'lines' => [ '/:Start', '/members:Members' ]
 ### `/nino/html/absolute-url`
 
 `\Nino\Html::absoluteUrl()` fires it once per call, after the address is composed and before it is returned, for a website without an address too. The argument is `[ 'path' => '/page', 'url' => 'https://example.com/page' ]`: the path as it was given and the answer it would otherwise be, `''` where the website has no address. A callback sets `url` to give the path an address of its own, eg. another host for the pages of a module, and leaves `path` as it is; the string in `url` after the last callback is the answer, and anything else is `''`. Without a callback the answer is the one the website has.
+
+### `/nino/elements/<type>/insert` and `/nino/elements/<type>/update`
+
+`\Nino\Elements::insertElement()` and `updateElement()` fire them under the lock of the type file, after the values are placed in the type file and before it is written. The argument is the type file, which a callback may change; a callback returns `false` to refuse the write, and nothing is written. While it runs, `\Nino\Elements::writing( $appData )` answers the write it is called for - operation, type, uri, previous uri, language, the keys written, the element before and as it will stand - and `\Nino\Elements::refuse( $appData, $field, $sentence )` refuses it and names the field, which the Elements panel shows at the field. A write a callback makes has its own `writing()` and its own refusals while it runs, and the callback is told its own once it is over. The two calls, the keys of `writing()` and what the panel answers are in the [element types recipe](recipes/element-types.md#refusing-a-write-and-saying-which-field).
+
+### The page cache and the clock
+
+`\Nino\Modules\Cache::limit( array &$appData, int $until ): void` says, while a page renders, that the page is good until a moment - a unix timestamp. A shortcode whose output depends on the clock calls it with the moment its output stops being true, and the page the cache stores gets the earlier of that moment and the configured lifetime (`/nino/cache/ttl`). It never lengthens a lifetime, several calls keep the earliest, and with the cache off or on a page the cache does not store it does nothing. A moment that has passed - or is this very second - means the page is not stored, and its response carries no `X-Nino-Cache` header, as every page the cache does not store. The moment is a runtime value of the request being rendered (`./nino/cache/until`): nothing a visitor sends and nothing the workbench writes reaches it, and it is written to no configuration.
+
+The moment is measured against `time()`, the clock the cache reads to store the page and to judge it fresh. Code that keeps a clock of its own - a zone, a held clock in a test - works out the seconds left on it and passes `time()` plus that, never a moment it took from its own clock:
+
+```php
+public static function shortcode( array &$appData, array $args ): string {
+    // "Open today" is true until midnight of the project's zone
+    $zone     = new \DateTimeZone( 'Europe/Berlin' );
+    $now      = new \DateTimeImmutable( 'now', $zone );
+    $midnight = $now->modify( 'tomorrow' );
+    \Nino\Modules\Cache::limit( $appData, time() + ( $midnight->getTimestamp() - $now->getTimestamp() ) );
+
+    return self::openToday( $appData );
+}
+```
 
 ### Two extension surfaces, one idea
 
