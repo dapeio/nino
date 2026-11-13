@@ -173,9 +173,34 @@ namespace Nino {
 		 *	@param		array 		$catalogue		A parsed catalogue, believed by the caller
 		 *	@param		string		$key					The feature, which the caller has taken from an application of that catalogue
 		 *
-		 *	@return 	array										{ placed, activated, reason, status }: reason is '' and status 200 where it went through, else the kernel's sentence and 400 (the feature could not be applied) or 500 (a placed feature is not there)
+		 *	@return 	array										{ placed, activated, reason, status }: reason is '' and status 200 where it went through, else the kernel's sentence and 400 (the feature could not be applied), 409 (another change of the features is running) or 500 (a placed feature is not there, or the lock cannot be had: the reason is \Nino\Features::UNLOCKABLE then)
 		 */
 		public static function place( array &$appData, array $catalogue, string $key ): array {
+
+			// One lock for the whole step - looking, placing and switching on - so
+			// that no other change of the features slips in between the two
+			$locked = \Nino\Features::lock( $appData );
+			if( $locked !== true )
+				return [ 'placed' => false, 'activated' => false, 'reason' => $locked, 'status' => $locked === \Nino\Features::BUSY ? 409 : 500 ];
+
+			try {
+				return self::_place( $appData, $catalogue, $key );
+			}
+			finally {
+				\Nino\Features::unlock( $appData );
+			}
+		}
+
+		/**
+		 *	The step of place(), under the lock of the features
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$catalogue		A parsed catalogue, believed by the caller
+		 *	@param		string		$key					The feature
+		 *
+		 *	@return 	array										See place()
+		 */
+		private static function _place( array &$appData, array $catalogue, string $key ): array {
 
 			$offer	= \Nino\Catalogue::offers( $appData, $catalogue )[$key] ?? null;
 			$placed	= false;

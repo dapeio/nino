@@ -647,6 +647,38 @@ namespace Nino\Install {
 		 */
 		public static function apiApply( array &$appData, array &$request ): void {
 
+			// It writes the module list from the features that are on, so where
+			// there are features it is a change of the features like the panel's:
+			// one at a time, on the file. Before the first feature there is
+			// nothing to lock against - and nothing may create private/ ahead of
+			// the base unit's deny rule (see \Nino\Features::applyUnit())
+			$took		= glob( \Nino\Features::dir(). '/*/'. \Nino\Features::MANIFEST ) !== [];
+			$locked = $took === true ? \Nino\Features::lock( $appData ) : true;
+
+			if( $locked !== true ) {
+				\Nino\Install\Applications::refuse( $request, $locked === \Nino\Features::BUSY ? 409 : 500, $locked === \Nino\Features::BUSY ? 'install_busy' : 'install_lock' );
+				return;
+			}
+
+			try {
+				self::_apply( $appData, $request );
+			}
+			finally {
+				if( $took === true )
+					\Nino\Features::unlock( $appData );
+			}
+		}
+
+		/**
+		 *	The step of apiApply(), under the lock of the features
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		private static function _apply( array &$appData, array &$request ): void {
+
 			$data 		= \Nino\Install\Install::postData();
 			$locales 	= array_values( array_intersect( (array) ( $data['locales'] ?? [] ), self::_locales() ) );
 			$units 		= self::units();
@@ -1317,6 +1349,8 @@ namespace Nino\Install {
 			'install_unknown_feature'			=> 'not a feature of the chosen applications',
 			'install_unresolved'					=> 'the catalogue the applications came from is not kept - open the Applications step',
 			'install_feature'							=> 'the feature could not be applied',
+			'install_busy'								=> 'another change of the features is running',
+			'install_lock'								=> 'the features cannot be locked for a change - check data/.locks of the project and the log',
 		];
 
 		/**
@@ -1456,6 +1490,12 @@ namespace Nino\Install {
 			}
 
 			$result = \Nino\Applications::place( $appData, $plan['catalogue'], $key );
+
+			// Another change of the features holds the lock, or the lock cannot be taken at all: nothing was touched
+			if( $result['status'] === 409 || $result['reason'] === \Nino\Features::UNLOCKABLE ) {
+				self::refuse( $request, $result['status'], $result['status'] === 409 ? 'install_busy' : 'install_lock' );
+				return;
+			}
 
 			if( $result['status'] === 500 ) {
 				\Nino\Http::fail( $request, 500, $result['reason'] );

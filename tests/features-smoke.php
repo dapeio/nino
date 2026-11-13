@@ -1795,10 +1795,10 @@ foreach( [ 'no manual' => '', 'a manual with nothing in it' => [ 'shortcodes' =>
 // Activation through the action
 [ $status, $body ] = callFeatures( $appData, 'apiActivate', [ 'key' => 'old' ] );
 check( 'activating an incompatible feature is a 400 carrying the kernel\'s reason', $status === 400 && str_starts_with( $body['error'], 'feature "old" cannot be activated: requires Nino ^0.9' ) );
-check( 'an unknown, a malformed or a missing key is a 400 before the kernel is asked', callFeatures( $appData, 'apiActivate', [ 'key' => 'nope' ] ) === [ 400, [ 'error' => 'unknown feature' ] ]
-	&& callFeatures( $appData, 'apiActivate', [ 'key' => [ 'sample' ] ] ) === [ 400, [ 'error' => 'unknown feature' ] ]
-	&& callFeatures( $appData, 'apiActivate', [ 'key' => '../etc' ] ) === [ 400, [ 'error' => 'unknown feature' ] ]
-	&& callFeatures( $appData, 'apiDeactivate', [] ) === [ 400, [ 'error' => 'unknown feature' ] ] );
+check( 'an unknown, a malformed or a missing key is a 400 before the kernel is asked', callFeatures( $appData, 'apiActivate', [ 'key' => 'nope' ] ) === [ 400, [ 'error' => 'unknown feature', 'code' => 'features_unknown' ] ]
+	&& callFeatures( $appData, 'apiActivate', [ 'key' => [ 'sample' ] ] ) === [ 400, [ 'error' => 'unknown feature', 'code' => 'features_unknown' ] ]
+	&& callFeatures( $appData, 'apiActivate', [ 'key' => '../etc' ] ) === [ 400, [ 'error' => 'unknown feature', 'code' => 'features_unknown' ] ]
+	&& callFeatures( $appData, 'apiDeactivate', [] ) === [ 400, [ 'error' => 'unknown feature', 'code' => 'features_unknown' ] ] );
 check( 'none of that wrote anything', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'] === [ '\\Nino\\Modules\\Helper', '\\Nino\\Modules\\Sample' ] );
 
 [ $status, $body ] = callFeatures( $appData, 'apiDeactivate', [ 'key' => 'helper' ] );
@@ -1868,6 +1868,7 @@ callFeatures( $appData, 'apiActivate', [ 'key' => 'sample' ] );
 check( 'while the Legal module is not on, nothing is said about the privacy policy', callFeatures( $appData, 'apiDeactivate', [ 'key' => 'sample' ] )[1]['privacy'] === [] );
 callFeatures( $appData, 'apiActivate', [ 'key' => 'sample' ] );
 $appData['/nino/modules'][] = '\\Nino\\Modules\\Legal';
+\Nino\AppData::writeContentData( $appData, [ '/nino/modules' ] );
 \Nino\Elements::updateElement( $appData, '/privacy/sample-more', [ 'hidden' => true ], '*' );
 [ $status, $body ] = callFeatures( $appData, 'apiDeactivate', [ 'key' => 'sample' ] );
 check( 'with it on, switching a feature off names the sections of the policy that still describe it - not the hidden one', $status === 200 && $body['privacy'] === [ 'Mein Beispiel' ] );
@@ -1902,8 +1903,8 @@ check( '...and the same for the next post, the order of the fields being the pos
 unset( $appData['./nino/callbacks']['/nino/admin/action'], $_POST['action'] );
 
 check( 'fields has to be an array, the key a known feature', callFeatures( $appData, 'apiSettings', [ 'key' => 'sample', 'fields' => 'limit=1' ] ) === [ 400, [ 'error' => 'no fields posted' ] ]
-	&& callFeatures( $appData, 'apiSettings', [ 'key' => 'nope', 'fields' => [] ] ) === [ 400, [ 'error' => 'unknown feature' ] ]
-	&& callFeatures( $appData, 'apiSettings', [ 'fields' => [] ] ) === [ 400, [ 'error' => 'unknown feature' ] ] );
+	&& callFeatures( $appData, 'apiSettings', [ 'key' => 'nope', 'fields' => [] ] ) === [ 400, [ 'error' => 'unknown feature', 'code' => 'features_unknown' ] ]
+	&& callFeatures( $appData, 'apiSettings', [ 'fields' => [] ] ) === [ 400, [ 'error' => 'unknown feature', 'code' => 'features_unknown' ] ] );
 check( 'the activity log names the feature, and a read logs nothing', \Nino\Modules\Features\Admin::log( 'features/activate', [ 'key' => 'sample' ] ) === 'Activate feature "sample"'
 	&& \Nino\Modules\Features\Admin::log( 'features/settings', [ 'key' => 'sample' ] ) === 'Edit settings of feature "sample"' && \Nino\Modules\Features\Admin::log( 'features/list', [] ) === ''
 	&& \Nino\Modules\Features\Admin::log( 'features/install', [ 'key' => 'sample', 'version' => '1.3.0' ] ) === 'Install feature "sample" 1.3.0' && \Nino\Modules\Features\Admin::log( 'features/catalogue', [] ) === '' );

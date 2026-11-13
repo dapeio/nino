@@ -155,11 +155,11 @@ namespace Nino {
 
 			$json = \Nino\Fetch::get( $appData, $url, [ 'maxBytes' => self::MAX_CATALOGUE_BYTES ] );
 			if( $json['ok'] === false )
-				return 'the catalogue could not be fetched: '. $json['error'];
+				return 'the catalogue could not be fetched: '. self::_transport( $json['error'] );
 
 			$signature = \Nino\Fetch::get( $appData, self::_signatureUrl( $url ), [ 'maxBytes' => 4096 ] );
 			if( $signature['ok'] === false )
-				return 'the catalogue signature could not be fetched: '. $signature['error'];
+				return 'the catalogue signature could not be fetched: '. self::_transport( $signature['error'] );
 
 			if( self::verify( $json['body'], $signature['body'], $key ) === false )
 				return 'the catalogue signature does not verify';
@@ -441,9 +441,35 @@ namespace Nino {
 		 *	@param		string		$key					Feature key
 		 *	@param		string		$version			The version to install, as the catalogue names it
 		 *
-		 *	@return 	true|string							True, or why not
+		 *	@return 	true|string							True, or why not - \Nino\Features::BUSY while another change of the features holds the lock, UNLOCKABLE where the lock cannot be had
 		 */
 		public static function install( array &$appData, string $key, string $version ): true|string {
+
+			// Under the lock of the features: what is placed below features/
+			// is not taken away, or switched on over, by another process while
+			// this one swaps the directory
+			$locked = \Nino\Features::lock( $appData );
+			if( $locked !== true )
+				return $locked;
+
+			try {
+				return self::_install( $appData, $key, $version );
+			}
+			finally {
+				\Nino\Features::unlock( $appData );
+			}
+		}
+
+		/**
+		 *	The steps of install(), under the lock of the features
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					Feature key
+		 *	@param		string		$version			The version to install
+		 *
+		 *	@return 	true|string
+		 */
+		private static function _install( array &$appData, string $key, string $version ): true|string {
 
 			$catalogue = self::fetch( $appData );
 			if( is_string( $catalogue ) === true )
@@ -553,6 +579,29 @@ namespace Nino {
 		}
 
 		/**
+		 *	What the transport said about a failed download, as it may go to the
+		 *	browser: curl names what it could not open - a certificate file the
+		 *	php.ini points at - by its path on this server. An answer that holds
+		 *	a path of the filesystem is left to the log of the house and the
+		 *	sentence says so; every other (a host that does not resolve, a
+		 *	certificate that does not verify, an http status) is the operator's
+		 *	to read as it is
+		 *
+		 *	@param		string		$error				Fetch's error
+		 *
+		 *	@return 	string
+		 */
+		private static function _transport( string $error ): string {
+
+			if( preg_match( '#(?<![\w:/.-])/(?:[\w.-]+/)*[\w.-]+|\b[A-Za-z]:\\\\#', $error ) !== 1 )
+				return $error;
+
+			trigger_error( 'Catalogue: the download failed: '. $error, E_USER_WARNING );
+
+			return 'the transfer failed - the reason is in the log';
+		}
+
+		/**
 		 *	Download one entry's archive, check it against what the signed
 		 *	catalogue promised, and put the directory in place
 		 *
@@ -565,7 +614,7 @@ namespace Nino {
 
 			$archive = \Nino\Fetch::get( $appData, $entry['archive'], [ 'maxBytes' => $entry['size'], 'timeout' => 60 ] );
 			if( $archive['ok'] === false )
-				return 'the archive could not be fetched: '. $archive['error'];
+				return 'the archive could not be fetched: '. self::_transport( $archive['error'] );
 
 			if( strlen( $archive['body'] ) !== $entry['size'] || hash( 'sha256', $archive['body'] ) !== $entry['sha256'] )
 				return 'the archive does not match what the catalogue promised';
@@ -599,8 +648,13 @@ namespace Nino {
 		private static function _unpackAndPlace( array &$appData, string $bytes, array $entry, string $staging ): true|string {
 
 			$archivePath = $staging. '/archive.tar.gz';
-			if( file_put_contents( $archivePath, $bytes ) !== strlen( $bytes ) )
+			// Silenced, as the directory above is: php's own warning names the
+			// path and ends the request, and the sentence below is the answer.
+			// What php said goes to the log of the house
+			if( @file_put_contents( $archivePath, $bytes ) !== strlen( $bytes ) ) {
+				trigger_error( 'Catalogue: could not write the archive of "'. $entry['key']. '" to '. $archivePath. ': '. ( error_get_last()['message'] ?? 'no reason given' ), E_USER_WARNING );
 				return 'could not write the archive to the staging directory';
+			}
 
 			$unpacked = self::_unpack( $archivePath, $entry['directory'], $staging. '/unpacked' );
 			if( $unpacked !== true )
@@ -778,7 +832,11 @@ namespace Nino {
 						return 'the archive unpacked to "'. substr( (string) $file->getPathname(), strlen( $into ) + 1 ). '", which is neither a file nor a directory';
 			}
 			catch( \Throwable $e ) {
-				return 'the archive could not be read: '. $e->getMessage();
+				// What phar and the filesystem say names the staging path of this
+				// server. The log of the house gets all of it; the browser gets
+				// the sentence
+				trigger_error( 'Catalogue: the archive of "'. $directory. '" could not be read: '. $e->getMessage(), E_USER_WARNING );
+				return 'the archive could not be read - load it once more, the log has the details';
 			}
 
 			return true;

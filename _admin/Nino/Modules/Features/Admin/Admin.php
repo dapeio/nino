@@ -260,10 +260,33 @@ namespace Nino\Modules\Features {
 			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
 				return;
 
+			// Under the lock of the features from the first look at the directory
+			// to the last: see _changing()
+			self::_changing( $appData, $request, [ self::class, '_remove' ] );
+		}
+
+		/**
+		 *	The step of apiRemove(), under the lock of the features
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		private static function _remove( array &$appData, array &$request ): void {
+
 			$key = self::_key( \Nino\Admin\Admin::postData() );
 
-			if( $key === null || \Nino\Features::get( $appData, $key ) === null ) {
-				\Nino\Http::fail( $request, 400, 'unknown feature' );
+			$feature = $key === null ? null : \Nino\Features::get( $appData, $key );
+
+			if( $feature === null ) {
+				self::_unknown( $request );
+				return;
+			}
+
+			// An active feature is not a directory that cannot be removed: its own code
+			if( $feature['active'] === true ) {
+				\Nino\Http::fail( $request, 400, 'feature "'. $key. '" is active - switch it off before removing it', 'features_remove_active' );
 				return;
 			}
 
@@ -273,11 +296,71 @@ namespace Nino\Modules\Features {
 			$result = \Nino\Features::remove( $appData, $key );
 
 			if( $result !== true ) {
-				\Nino\Http::fail( $request, 400, $result );
+				\Nino\Http::fail( $request, 400, $result, 'features_remove_failed', [ $result ] );
 				return;
 			}
 
 			\Nino\Http::ok( $request, [ 'removed' => $key, 'privacy' => $privacy ] );
+		}
+
+		/**
+		 *	The refusal of a change that did not get the lock: 409 and
+		 *	'features_busy' while another change holds it, 500 and
+		 *	'features_lock_failed' where the lock file cannot be opened
+		 *
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$reason				What \Nino\Features::lock() answered
+		 *
+		 *	@return 	void
+		 */
+		private static function _notLocked( array &$request, string $reason ): void {
+
+			if( $reason === \Nino\Features::BUSY )
+				\Nino\Http::fail( $request, 409, $reason, 'features_busy' );
+			else
+				\Nino\Http::fail( $request, 500, $reason, 'features_lock_failed' );
+		}
+
+		/**
+		 *	The refusal for a key that names no feature that is there
+		 *
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		private static function _unknown( array &$request ): void {
+
+			\Nino\Http::fail( $request, 400, 'unknown feature', 'features_unknown' );
+		}
+
+		/**
+		 *	Run one change of a feature's state under the lock of the features
+		 *	(\Nino\Features::lock()): the look at what is there and the
+		 *	write that follows it are one step, whichever other change - from
+		 *	another session, another request - is under way. One that finds
+		 *	the lock taken is answered 409, 'features_busy', and does nothing
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		callable	$change				function( array &$appData, array &$request ): void
+		 *
+		 *	@return 	void
+		 */
+		private static function _changing( array &$appData, array &$request, callable $change ): void {
+
+			$locked = \Nino\Features::lock( $appData );
+
+			if( $locked !== true ) {
+				self::_notLocked( $request, $locked );
+				return;
+			}
+
+			try {
+				$change( $appData, $request );
+			}
+			finally {
+				\Nino\Features::unlock( $appData );
+			}
 		}
 
 		/**
@@ -296,12 +379,26 @@ namespace Nino\Modules\Features {
 			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
 				return;
 
+			// The record of the versions is written on the file under the lock
+			self::_changing( $appData, $request, [ self::class, '_settings' ] );
+		}
+
+		/**
+		 *	The step of apiSettings(), under the lock of the features
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		private static function _settings( array &$appData, array &$request ): void {
+
 			$data 	= \Nino\Admin\Admin::postData();
 			$key 		= self::_key( $data );
 			$fields	= $data['fields'] ?? null;
 
 			if( $key === null || \Nino\Features::get( $appData, $key ) === null ) {
-				\Nino\Http::fail( $request, 400, 'unknown feature' );
+				self::_unknown( $request );
 				return;
 			}
 
@@ -392,12 +489,26 @@ namespace Nino\Modules\Features {
 			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
 				return;
 
+			// What is placed and what is switched on after it are one change
+			self::_changing( $appData, $request, [ self::class, '_install' ] );
+		}
+
+		/**
+		 *	The step of apiInstall(), under the lock of the features
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		private static function _install( array &$appData, array &$request ): void {
+
 			$data 		= \Nino\Admin\Admin::postData();
 			$key 			= self::_key( $data );
 			$version	= self::_version( $data );
 
 			if( $key === null || $version === null ) {
-				\Nino\Http::fail( $request, 400, 'no feature key and version posted' );
+				\Nino\Http::fail( $request, 400, 'no feature key and version posted', 'features_invalid' );
 				return;
 			}
 
@@ -415,7 +526,7 @@ namespace Nino\Modules\Features {
 			$result = \Nino\Catalogue::install( $appData, $key, $version );
 
 			if( $result !== true ) {
-				\Nino\Http::fail( $request, 400, $result );
+				\Nino\Http::fail( $request, 400, $result, 'features_install_failed', [ $result ] );
 				return;
 			}
 
@@ -459,7 +570,7 @@ namespace Nino\Modules\Features {
 					if( $actor !== false )
 						\Nino\Admin\Admin::record( $appData, $actor['mail'], self::log( 'features/install', [ 'key' => $key, 'version' => $version ] ). ' (not activated: '. $result. ')' );
 
-					\Nino\Http::fail( $request, 400, self::_say( $appData, '/_admin/features/error/activate-after-install', $result ) );
+					\Nino\Http::fail( $request, 400, self::_say( $appData, '/_admin/features/error/activate-after-install', $result ), 'features_install_inactive', [ $result ] );
 					return;
 				}
 			}
@@ -467,7 +578,7 @@ namespace Nino\Modules\Features {
 			$feature = \Nino\Features::get( $appData, $key );
 
 			if( $feature === null ) {
-				\Nino\Http::fail( $request, 500, 'feature "'. $key. '" disappeared' );
+				\Nino\Http::fail( $request, 500, 'feature "'. $key. '" disappeared', 'features_unknown' );
 				return;
 			}
 
@@ -562,6 +673,12 @@ namespace Nino\Modules\Features {
 			}
 
 			$result = \Nino\Applications::place( $appData, $context['catalogue'], $key );
+
+			// Another change of the features holds the lock: nothing was touched
+			if( $result['status'] === 409 || $result['reason'] === \Nino\Features::UNLOCKABLE ) {
+				self::_notLocked( $request, $result['reason'] );
+				return;
+			}
 
 			if( $result['status'] !== 200 ) {
 
@@ -718,10 +835,26 @@ namespace Nino\Modules\Features {
 		 */
 		private static function _switch( array &$appData, array &$request, bool $on ): void {
 
+			self::_changing( $appData, $request, static function( array &$appData, array &$request ) use ( $on ): void {
+				self::_switchLocked( $appData, $request, $on );
+			} );
+		}
+
+		/**
+		 *	The step of _switch(), under the lock of the features
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		bool			$on						Activate (true) or deactivate
+		 *
+		 *	@return 	void
+		 */
+		private static function _switchLocked( array &$appData, array &$request, bool $on ): void {
+
 			$key = self::_key( \Nino\Admin\Admin::postData() );
 
 			if( $key === null || \Nino\Features::get( $appData, $key ) === null ) {
-				\Nino\Http::fail( $request, 400, 'unknown feature' );
+				self::_unknown( $request );
 				return;
 			}
 
@@ -733,7 +866,7 @@ namespace Nino\Modules\Features {
 			$result = $on === true ? \Nino\Features::activate( $appData, $key ) : \Nino\Features::deactivate( $appData, $key );
 
 			if( $result !== true ) {
-				\Nino\Http::fail( $request, 400, $result );
+				\Nino\Http::fail( $request, 400, $result, $on === true ? 'features_activate_failed' : 'features_deactivate_failed', [ $result ] );
 				return;
 			}
 
@@ -919,7 +1052,7 @@ namespace Nino\Modules\Features {
 			$feature = \Nino\Features::get( $appData, $key );
 
 			if( $feature === null ) {
-				\Nino\Http::fail( $request, 500, 'feature "'. $key. '" disappeared' );
+				\Nino\Http::fail( $request, 500, 'feature "'. $key. '" disappeared', 'features_unknown' );
 				return;
 			}
 

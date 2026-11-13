@@ -143,6 +143,16 @@ return [
 	'[[/_admin/error/features_application_catalogue]]'	=> 'Der Katalog konnte nicht geladen werden: %s',
 	'[[/_admin/error/features_application_feature]]'	=> 'Dieses Feature gehört nicht zur Anwendung.',
 	'[[/_admin/error/features_application_failed]]'	=> 'Das Feature konnte nicht eingerichtet werden: %s',
+	'[[/_admin/error/features_busy]]'	=> 'Eine andere Änderung an den Features läuft gerade. Versuche es gleich noch einmal.',
+	'[[/_admin/error/features_install_failed]]'	=> 'Das Feature konnte nicht installiert werden: %s',
+	'[[/_admin/error/features_remove_failed]]'	=> 'Das Verzeichnis konnte nicht entfernt werden: %s',
+	'[[/_admin/error/features_unknown]]'	=> 'Dieses Feature gibt es in diesem Projekt nicht.',
+	'[[/_admin/error/features_invalid]]'	=> 'Die Anfrage nennt kein Feature oder keine Version.',
+	'[[/_admin/error/features_remove_active]]'	=> 'Das Feature ist eingeschaltet. Schalte es aus, bevor sein Verzeichnis entfernt wird.',
+	'[[/_admin/error/features_activate_failed]]'	=> 'Das Feature konnte nicht eingeschaltet werden: %s',
+	'[[/_admin/error/features_deactivate_failed]]'	=> 'Das Feature konnte nicht ausgeschaltet werden: %s',
+	'[[/_admin/error/features_install_inactive]]'	=> 'Das Feature liegt im Projekt, konnte aber nicht eingeschaltet werden: %s',
+	'[[/_admin/error/features_lock_failed]]'	=> 'Die Features lassen sich für eine Änderung nicht sperren. Prüfe, ob das Verzeichnis data/.locks des Projekts existiert, der Webserver dort schreiben darf und die Dateien darin keinem anderen Benutzer gehören. Das Log hat die Einzelheiten.',
 
 	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
 	'[[/_admin/features/manual/intro]]'	=> 'Features sind Zusatzpakete: Werkzeuge und Funktionen, die als Verzeichnis kommen und hier eingeschaltet werden. Dieser Bereich listet sie auf, installiert sie und schaltet sie ein und aus.',

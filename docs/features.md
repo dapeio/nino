@@ -733,7 +733,10 @@ a cycle of requirements ends where it began. The unit is applied to the routes
 `config.php` holds, not this request's own, so a route `init()` registers is not
 written; activating again at the same version changes only what the unit adds back.
 `deactivate( $appData, $key )` is refused while an active feature requires the one,
-and changes nothing for a feature that is off.
+and changes nothing for a feature that is off. `activate()`, `deactivate()`, `remove()`, `saveSettings()` and the catalogue's
+`install()` run under one lock of the features (`\Nino\Features::lock()`, not waited
+for): a change that finds it taken answers `\Nino\Features::BUSY` (or `UNLOCKABLE` where the lock file cannot be opened) and has done
+nothing; what they write to `config.php` they read from it first.
 
 - Migrate only what the feature owns: its `data/` files and its own config keys,
   through `\Nino\Filesystem::mutate()` as `Hello`'s hook does, returning its result:

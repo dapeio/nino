@@ -311,6 +311,35 @@ namespace Nino {
 			return true;
 		}
 
+		/**
+		 *	Whether the lock file of a path can be opened at all - which is what
+		 *	tells a lock that is taken (lockFile() answers false at once, $wait
+		 *	false) from one that cannot be had: a directory of the locks that is
+		 *	missing or not writable, a file of another owner, a directory in the
+		 *	place of the file. Nothing is locked
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$filename			A virtual path, see lockFile()
+		 *
+		 *	@return 	bool
+		 */
+		public static function lockUsable( array &$appData, string $filename ): bool {
+
+			if( self::_unusablePath( $filename ) === true )
+				return false;
+
+			self::forceDir( $appData, '/data/.locks' );
+
+			$handle = @fopen( self::path( $appData, '/data' ). '/.locks/'. sha1( self::_canonicalPath( $appData, $filename ) ). '.lock', 'c' );
+
+			if( $handle === false )
+				return false;
+
+			fclose( $handle );
+
+			return true;
+		}
+
 		public static function unlockFile( array &$appData, string $filename ): bool {
 
 			// The key lockFile() stored it under, not what this caller happened

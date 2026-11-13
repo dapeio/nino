@@ -898,27 +898,173 @@ namespace Nino {
 		 */
 		public static function saveSettings( array &$appData, string $key, array $posted ): array {
 
+			$locked = self::lock( $appData );
+			if( $locked !== true )
+				return [ '' => $locked ];
+
+			try {
+				return self::_saveSettings( $appData, $key, $posted );
+			}
+			finally {
+				self::unlock( $appData );
+			}
+		}
+
+		/**
+		 *	The step of saveSettings(), under the lock of the features. The
+		 *	record is read, changed for this one feature and written on the file
+		 *	itself: the versions another process recorded meanwhile are not
+		 *	written back as this request booted with them
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					Feature key
+		 *	@param		array 		$posted				name => posted value
+		 *
+		 *	@return 	array										name => message for every rejected setting; [] when saved
+		 */
+		private static function _saveSettings( array &$appData, string $key, array $posted ): array {
+
 			$feature = self::get( $appData, $key );
 			if( $feature === null )
 				return [ '' => 'unknown feature "'. $key. '"' ];
 
-			$state	= is_array( $appData[ self::STATE_KEY ] ?? null ) ? $appData[ self::STATE_KEY ] : [];
-			$current = is_array( $state[$key]['settings'] ?? null ) ? $state[$key]['settings'] : [];
+			$errors = [];
 
-			$result = self::validateSettings( $feature['settings'], $posted, $current );
-			if( $result['errors'] !== [] )
-				return $result['errors'];
+			$written = \Nino\Filesystem::mutate( $appData, '/config.php', function( array $content ) use ( $feature, $key, $posted, &$errors ): ?array {
 
-			$state[$key] = [
-				'version'		=> $state[$key]['version'] ?? $feature['installed'],
-				'settings'	=> $result['values'],
-			];
-			$appData[ self::STATE_KEY ] = $state;
+				$state	= is_array( $content[ self::STATE_KEY ] ?? null ) ? $content[ self::STATE_KEY ] : [];
+				$current = is_array( $state[$key]['settings'] ?? null ) ? $state[$key]['settings'] : [];
 
-			if( \Nino\AppData::writeContentData( $appData, [ self::STATE_KEY ] ) === false )
+				$result = self::validateSettings( $feature['settings'], $posted, $current );
+				if( $result['errors'] !== [] ) {
+					$errors = $result['errors'];
+					return null;
+				}
+
+				$state[$key] = [
+					'version'		=> $state[$key]['version'] ?? $feature['installed'],
+					'settings'	=> $result['values'],
+				];
+				$content[ self::STATE_KEY ] = $state;
+
+				return $content;
+			} );
+
+			if( $errors !== [] )
+				return $errors;
+
+			if( $written === false )
 				return [ '' => 'could not write config.php' ];
 
+			$persisted = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+			$appData[ self::STATE_KEY ] = is_array( $persisted ) === true && is_array( $persisted[ self::STATE_KEY ] ?? null ) === true ? $persisted[ self::STATE_KEY ] : [];
+
 			return [];
+		}
+
+		/*	Where the lock every change of a feature's state is made under lives:
+			a virtual path in the shape \Nino\Modules\Backups::LOCK_PATH has, whose
+			side-car file in data/.locks is what is locked (see
+			\Nino\Filesystem::lockFile())	*/
+		public const string LOCK_PATH = '/nino/features/lock';
+
+		// What a change answers where another one holds the lock
+		public const string BUSY = 'another change of the features is running';
+
+		// What a change answers where the lock cannot be had at all
+		public const string UNLOCKABLE = 'the features cannot be locked for a change';
+
+		/**
+		 *	Take the lock every change of a feature's state is made under -
+		 *	placing a directory, switching on, switching off, removing, applying
+		 *	an update, saving settings - so that between "the directory is there"
+		 *	and "config.php lists its class" no other process removes it, and the
+		 *	other way round. One lock for all of them, and not waited for: a
+		 *	change that finds it taken answers busy at once (the caller's 409)
+		 *	instead of queueing behind a download. It is released when the process
+		 *	ends, however it ends.
+		 *
+		 *	Taken again by the same request it counts up and is given back when
+		 *	every taker has called unlock(): activate() takes it for the feature
+		 *	and for each requirement, the panel for an install that activates.
+		 *
+		 *	What this request knew about the features when it booted may be
+		 *	older than the lock: another process can have switched a feature on,
+		 *	updated it or taken a directory away in between. So when the lock is
+		 *	taken the module list and the record of the versions are read from
+		 *	config.php again and the registry is forgotten. That is the state a
+		 *	change reads, changes and writes (Filesystem::mutate() on the file):
+		 *	nothing this request booted with that the file does not carry is
+		 *	written back. A module in the list of this request that config.php
+		 *	does not list is not kept - it is either one that was taken out
+		 *	meanwhile or one that only this request registered, and neither is a
+		 *	thing a change of the features may write.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	true|string							True, BUSY while another change holds the lock, UNLOCKABLE when the lock file cannot be opened at all (the reason is in the log)
+		 */
+		public static function lock( array &$appData ): true|string {
+
+			$depth = (int) ( $appData['./nino/features/lock'] ?? 0 );
+
+			if( $depth > 0 ) {
+				$appData['./nino/features/lock'] = $depth + 1;
+				return true;
+			}
+
+			if( \Nino\Filesystem::lockFile( $appData, self::LOCK_PATH, false ) === false ) {
+
+				// Busy is the lock being taken. A lock file that cannot be opened -
+				// the directory of the locks missing or not writable, a file of
+				// another owner, a directory in its place - is not busy, and asking
+				// again does not help: its own answer, and the log has where
+				if( \Nino\Filesystem::lockUsable( $appData, self::LOCK_PATH ) === false ) {
+					trigger_error( 'Features::lock(): the lock file of the features cannot be opened - check the owner and the permissions of '. \Nino\Filesystem::path( $appData, '/data' ). '/.locks and of the file in it', E_USER_WARNING );
+					return self::UNLOCKABLE;
+				}
+
+				return self::BUSY;
+			}
+
+			$appData['./nino/features/lock'] = 1;
+
+			$appData['./nino/filesystem/cache']['/config.php']['fstat'] = [];
+			$stored = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+
+			if( is_array( $stored ) === true ) {
+
+				if( is_array( $stored['/nino/modules'] ?? null ) === true )
+					$appData['/nino/modules'] = array_values( $stored['/nino/modules'] );
+
+				$appData[ self::STATE_KEY ] = is_array( $stored[ self::STATE_KEY ] ?? null ) === true ? $stored[ self::STATE_KEY ] : [];
+			}
+
+			unset( $appData['./nino/features/all'] );
+
+			return true;
+		}
+
+		/**
+		 *	Give the lock of lock() back; the last taker of a request releases it
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		public static function unlock( array &$appData ): void {
+
+			$depth = (int) ( $appData['./nino/features/lock'] ?? 0 );
+
+			if( $depth > 1 ) {
+				$appData['./nino/features/lock'] = $depth - 1;
+				return;
+			}
+
+			if( $depth === 1 ) {
+				unset( $appData['./nino/features/lock'] );
+				\Nino\Filesystem::unlockFile( $appData, self::LOCK_PATH );
+			}
 		}
 
 		/**
@@ -929,14 +1075,38 @@ namespace Nino {
 		 *	feature is how an update is applied: the unit adds what is new,
 		 *	and a module that implements upgrade( &$appData, $fromVersion )
 		 *	gets to migrate its own data before the new version is recorded.
+		 *	Made under the lock of the features (see lock()).
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$key					Feature key
 		 *	@param		array 		$chain				Keys already being activated, against a requirement cycle
 		 *
-		 *	@return 	true|string							True, or why not
+		 *	@return 	true|string							True, or why not - BUSY while another change of the features holds the lock
 		 */
 		public static function activate( array &$appData, string $key, array $chain = [] ): true|string {
+
+			$locked = self::lock( $appData );
+			if( $locked !== true )
+				return $locked;
+
+			try {
+				return self::_activate( $appData, $key, $chain );
+			}
+			finally {
+				self::unlock( $appData );
+			}
+		}
+
+		/**
+		 *	The step of activate(), under the lock of the features
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					Feature key
+		 *	@param		array 		$chain				Keys already being activated
+		 *
+		 *	@return 	true|string
+		 */
+		private static function _activate( array &$appData, string $key, array $chain ): true|string {
 
 			$feature = self::get( $appData, $key );
 			if( $feature === null )
@@ -1118,14 +1288,37 @@ namespace Nino {
 		 *	Switch a feature off: its class leaves '/nino/modules', and that
 		 *	is all - settings, data, copied templates and texts stay, so
 		 *	switching it back on finds everything as it was. Refused while
-		 *	another active feature requires it.
+		 *	another active feature requires it. Made under the lock of the features
+		 *	(see lock()).
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$key					Feature key
 		 *
-		 *	@return 	true|string							True, or why not
+		 *	@return 	true|string							True, or why not - BUSY while another change of the features holds the lock
 		 */
 		public static function deactivate( array &$appData, string $key ): true|string {
+
+			$locked = self::lock( $appData );
+			if( $locked !== true )
+				return $locked;
+
+			try {
+				return self::_deactivate( $appData, $key );
+			}
+			finally {
+				self::unlock( $appData );
+			}
+		}
+
+		/**
+		 *	The step of deactivate(), under the lock of the features
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					Feature key
+		 *
+		 *	@return 	true|string
+		 */
+		private static function _deactivate( array &$appData, string $key ): true|string {
 
 			$feature = self::get( $appData, $key );
 			if( $feature === null )
@@ -1138,13 +1331,31 @@ namespace Nino {
 			if( $feature['active'] === false )
 				return true;
 
-			$appData['/nino/modules'] = array_values( array_filter(
-				(array) ( $appData['/nino/modules'] ?? [] ),
-				static fn( mixed $class ): bool => '\\'. ltrim( (string) $class, '\\' ) !== $feature['module']
-			) );
+			$class = $feature['module'];
 
-			if( \Nino\AppData::writeContentData( $appData, [ '/nino/modules' ] ) === false )
+			// Read, changed and written on the file, under the lock: the list of
+			// this request is the one it booted with or read when it took the lock
+			// (see lock()), and a list written from memory is a list that can bring
+			// back a class somebody took out
+			$written = \Nino\Filesystem::mutate( $appData, '/config.php', static function( array $content, array &$appData ) use ( $class ): array {
+
+				$list = is_array( $content['/nino/modules'] ?? null ) === true ? $content['/nino/modules'] : (array) ( $appData['/nino/modules'] ?? [] );
+
+				$content['/nino/modules'] = array_values( array_filter(
+					$list,
+					static fn( mixed $listed ): bool => '\\'. ltrim( (string) $listed, '\\' ) !== $class
+				) );
+
+				return $content;
+			} );
+
+			if( $written === false ) {
+				trigger_error( 'Features::deactivate(): failed to write config.php.', E_USER_WARNING );
 				return 'could not write config.php';
+			}
+
+			$persisted = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+			$appData['/nino/modules'] = array_values( (array) ( is_array( $persisted ) === true ? ( $persisted['/nino/modules'] ?? [] ) : [] ) );
 
 			unset( $appData['./nino/features/all'] );
 
@@ -1167,14 +1378,38 @@ namespace Nino {
 		 *	Refused for an active feature. Its class is listed in
 		 *	'/nino/modules', so removing the directory would leave the
 		 *	autoloader looking for a class that is not there - switch it off
-		 *	first, which is one click and says what it is doing.
+		 *	first, which is one click and says what it is doing. Made under the
+		 *	lock of the features (see lock()), so that no switching on slips in
+		 *	between the look at the directory and its deletion.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$key					The feature's key
 		 *
-		 *	@return 	true|string							true, or why not
+		 *	@return 	true|string							true, or why not - BUSY while another change of the features holds the lock
 		 */
 		public static function remove( array &$appData, string $key ): true|string {
+
+			$locked = self::lock( $appData );
+			if( $locked !== true )
+				return $locked;
+
+			try {
+				return self::_remove( $appData, $key );
+			}
+			finally {
+				self::unlock( $appData );
+			}
+		}
+
+		/**
+		 *	The step of remove(), under the lock of the features
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$key					The feature's key
+		 *
+		 *	@return 	true|string
+		 */
+		private static function _remove( array &$appData, string $key ): true|string {
 
 			$feature = self::get( $appData, $key );
 			if( $feature === null )
@@ -1207,8 +1442,11 @@ namespace Nino {
 			else
 				\Nino\Filesystem::removeDir( $dir );
 
-			if( is_dir( $dir ) === true )
-				return 'could not remove '. $dir. ' - the web server may not write there';
+			// The path is for the log of the house: the sentence goes to the browser
+			if( is_dir( $dir ) === true ) {
+				trigger_error( 'Features::remove(): could not remove '. $dir, E_USER_WARNING );
+				return 'could not remove the directory of feature "'. $key. '" - the web server may not write there';
+			}
 
 			unset( $appData['./nino/features/all'] );
 

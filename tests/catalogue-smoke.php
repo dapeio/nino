@@ -743,9 +743,15 @@ check( 'an archive whose digest is not what the catalogue says', $result === 'th
 $result = tryInstall( $appData, $remote, $features, $privateKey, entry( 'helper', '1.2.0', $helper120, [ 'archive' => 'https://catalogue.test/features/gone.tar.gz' ] ), null );
 check( 'an archive that cannot be fetched', $result === 'the archive could not be fetched: http 404' );
 
+ninoWarnings();
 $bytes = 'this is not a tar.gz';
 $result = tryInstall( $appData, $remote, $features, $privateKey, entry( 'helper', '1.2.0', $bytes ), $bytes );
+$logged = ninoWarnings();
 check( 'bytes that are not an archive', str_starts_with( (string) $result, 'the archive could not be read' ) === true );
+// What phar says names the staging file on this server: the log of the house gets it, the answer does not
+check( '...the answer holds no path of this server, and the log does - once, with what phar said',
+	is_string( $result ) === true && str_contains( $result, $sandbox ) === false && str_contains( $result, sys_get_temp_dir() ) === false && str_contains( $result, 'phar' ) === false
+	&& count( $logged ) === 1 && str_contains( $logged[0], $staging ) === true );
 
 $bytes = tarGz( [] );
 $result = tryInstall( $appData, $remote, $features, $privateKey, entry( 'helper', '1.2.0', $bytes ), $bytes );
@@ -867,6 +873,14 @@ function callFeatures( array &$appData, string $method, array $data = [] ): arra
 }
 
 /**
+ *	What the panel answers where the kernel refuses an install or a removal: the kernel's
+ *	reason for a log or a developer, and the code the browser says it by with the reason in it
+ */
+function failedWith( string $code, string $reason ): array {
+	return [ 400, [ 'error' => $reason, 'code' => $code, 'params' => [ $reason ] ] ];
+}
+
+/**
  *	One of the panel's own words, as its text file has it - what the panel
  *	answers where it phrases a message itself
  *
@@ -982,18 +996,18 @@ check( '...a catalogue that is not there included', callFeatures( $appData, 'api
 publish( $appData, $remote, $features, null, $privateKey );
 
 $requests = [];
-check( 'a malformed or missing key or version is a 400 before the kernel is asked', callFeatures( $appData, 'apiInstall', [ 'key' => 'Helper', 'version' => '1.1.0' ] ) === [ 400, [ 'error' => 'no feature key and version posted' ] ]
-	&& callFeatures( $appData, 'apiInstall', [ 'key' => '../etc', 'version' => '1.1.0' ] ) === [ 400, [ 'error' => 'no feature key and version posted' ] ]
-	&& callFeatures( $appData, 'apiInstall', [ 'key' => 'helper', 'version' => '1.1' ] ) === [ 400, [ 'error' => 'no feature key and version posted' ] ]
-	&& callFeatures( $appData, 'apiInstall', [ 'key' => 'helper', 'version' => '1.1.0; rm' ] ) === [ 400, [ 'error' => 'no feature key and version posted' ] ]
-	&& callFeatures( $appData, 'apiInstall', [ 'key' => 'helper' ] ) === [ 400, [ 'error' => 'no feature key and version posted' ] ]
-	&& callFeatures( $appData, 'apiInstall', [ 'version' => '1.1.0' ] ) === [ 400, [ 'error' => 'no feature key and version posted' ] ]
-	&& callFeatures( $appData, 'apiInstall', [ 'key' => [ 'helper' ], 'version' => [ '1.1.0' ] ] ) === [ 400, [ 'error' => 'no feature key and version posted' ] ]
+check( 'a malformed or missing key or version is a 400 before the kernel is asked', callFeatures( $appData, 'apiInstall', [ 'key' => 'Helper', 'version' => '1.1.0' ] ) === [ 400, [ 'error' => 'no feature key and version posted', 'code' => 'features_invalid' ] ]
+	&& callFeatures( $appData, 'apiInstall', [ 'key' => '../etc', 'version' => '1.1.0' ] ) === [ 400, [ 'error' => 'no feature key and version posted', 'code' => 'features_invalid' ] ]
+	&& callFeatures( $appData, 'apiInstall', [ 'key' => 'helper', 'version' => '1.1' ] ) === [ 400, [ 'error' => 'no feature key and version posted', 'code' => 'features_invalid' ] ]
+	&& callFeatures( $appData, 'apiInstall', [ 'key' => 'helper', 'version' => '1.1.0; rm' ] ) === [ 400, [ 'error' => 'no feature key and version posted', 'code' => 'features_invalid' ] ]
+	&& callFeatures( $appData, 'apiInstall', [ 'key' => 'helper' ] ) === [ 400, [ 'error' => 'no feature key and version posted', 'code' => 'features_invalid' ] ]
+	&& callFeatures( $appData, 'apiInstall', [ 'version' => '1.1.0' ] ) === [ 400, [ 'error' => 'no feature key and version posted', 'code' => 'features_invalid' ] ]
+	&& callFeatures( $appData, 'apiInstall', [ 'key' => [ 'helper' ], 'version' => [ '1.1.0' ] ] ) === [ 400, [ 'error' => 'no feature key and version posted', 'code' => 'features_invalid' ] ]
 	&& $requests === [] );
-check( 'a version the catalogue does not list is a 400 carrying the kernel\'s reason', callFeatures( $appData, 'apiInstall', [ 'key' => 'helper', 'version' => '1.0.1' ] ) === [ 400, [ 'error' => 'the catalogue does not list "helper" in version 1.0.1' ] ]
-	&& callFeatures( $appData, 'apiInstall', [ 'key' => 'nope', 'version' => '1.0.0' ] ) === [ 400, [ 'error' => 'the catalogue does not list "nope" in version 1.0.0' ] ] );
-check( 'so is one that does not fit this kernel', callFeatures( $appData, 'apiInstall', [ 'key' => 'helper', 'version' => '9.0.0' ] ) === [ 400, [ 'error' => '"helper" 9.0.0 requires Nino ^9.0' ] ]
-	&& callFeatures( $appData, 'apiInstall', [ 'key' => 'needy', 'version' => '1.0.0' ] ) === [ 400, [ 'error' => '"needy" 1.0.0 requires Nino ^1.0 and the php extensions no_such_extension' ] ] );
+check( 'a version the catalogue does not list is a 400 carrying the kernel\'s reason', callFeatures( $appData, 'apiInstall', [ 'key' => 'helper', 'version' => '1.0.1' ] ) === failedWith( 'features_install_failed', 'the catalogue does not list "helper" in version 1.0.1' )
+	&& callFeatures( $appData, 'apiInstall', [ 'key' => 'nope', 'version' => '1.0.0' ] ) === failedWith( 'features_install_failed', 'the catalogue does not list "nope" in version 1.0.0' ) );
+check( 'so is one that does not fit this kernel', callFeatures( $appData, 'apiInstall', [ 'key' => 'helper', 'version' => '9.0.0' ] ) === failedWith( 'features_install_failed', '"helper" 9.0.0 requires Nino ^9.0' )
+	&& callFeatures( $appData, 'apiInstall', [ 'key' => 'needy', 'version' => '1.0.0' ] ) === failedWith( 'features_install_failed', '"needy" 1.0.0 requires Nino ^1.0 and the php extensions no_such_extension' ) );
 check( 'none of that downloaded anything', array_filter( $requests, static fn( array $r ): bool => str_ends_with( $r['url'], '.tar.gz' ) ) === [] );
 
 rename( NINO_FEATURES_DIR, NINO_FEATURES_DIR. '.away' );
@@ -1001,7 +1015,7 @@ unset( $appData['./nino/features/all'] );
 $result = callFeatures( $appData, 'apiInstall', [ 'key' => 'sample', 'version' => '3.0.0' ] );
 rename( NINO_FEATURES_DIR. '.away', NINO_FEATURES_DIR );
 unset( $appData['./nino/features/all'] );
-check( 'without a writable features directory the kernel\'s refusal, naming the archive for the manual way, passes through', $result === [ 400, [ 'error' => 'the features directory is not writable - download https://catalogue.test/features/sample-3.0.0.tar.gz and unpack it there by hand' ] ] );
+check( 'without a writable features directory the kernel\'s refusal, naming the archive for the manual way, passes through', $result === failedWith( 'features_install_failed', 'the features directory is not writable - download https://catalogue.test/features/sample-3.0.0.tar.gz and unpack it there by hand' ) );
 
 // A feature that is not on disk yet: placed, and switched on with it
 $extra100 = tarGz( featureFiles( 'Extra', 'extra', '1.0.0' ) );
@@ -1224,7 +1238,7 @@ publish( $appData, $remote, array_merge( $chained, [ entry( 'orphan', '1.0.0', $
 
 $requests = [];
 $result = callFeatures( $appData, 'apiInstall', [ 'key' => 'orphan', 'version' => '1.0.0' ] );
-check( 'a requirement the catalogue does not list refuses the whole install, naming it', $result === [ 400, [ 'error' => 'required feature "nowhere": the catalogue lists no "nowhere" this kernel can run' ] ]
+check( 'a requirement the catalogue does not list refuses the whole install, naming it', $result === failedWith( 'features_install_failed', 'required feature "nowhere": the catalogue lists no "nowhere" this kernel can run' )
 	&& is_dir( NINO_FEATURES_DIR. '/Orphan' ) === false
 	&& array_filter( $requests, static fn( array $r ): bool => str_ends_with( (string) $r['url'], '.tar.gz' ) ) === [] );
 
@@ -1253,10 +1267,10 @@ echo "\n";
 
 echo "Features::remove - the step deactivating leaves out\n";
 
-check( 'an active feature is refused, and its directory stays', callFeatures( $appData, 'apiRemove', [ 'key' => 'top' ] ) === [ 400, [ 'error' => 'feature "top" is active - switch it off before removing it' ] ]
+check( 'an active feature is refused, and its directory stays', callFeatures( $appData, 'apiRemove', [ 'key' => 'top' ] ) === [ 400, [ 'error' => 'feature "top" is active - switch it off before removing it', 'code' => 'features_remove_active' ] ]
 	&& is_dir( NINO_FEATURES_DIR. '/Top' ) === true );
-check( 'a key nothing carries is a 400 before the kernel is asked', callFeatures( $appData, 'apiRemove', [ 'key' => 'nowhere' ] ) === [ 400, [ 'error' => 'unknown feature' ] ]
-	&& callFeatures( $appData, 'apiRemove', [ 'key' => '../../etc' ] ) === [ 400, [ 'error' => 'unknown feature' ] ] );
+check( 'a key nothing carries is a 400 before the kernel is asked', callFeatures( $appData, 'apiRemove', [ 'key' => 'nowhere' ] ) === [ 400, [ 'error' => 'unknown feature', 'code' => 'features_unknown' ] ]
+	&& callFeatures( $appData, 'apiRemove', [ 'key' => '../../etc' ] ) === [ 400, [ 'error' => 'unknown feature', 'code' => 'features_unknown' ] ] );
 
 \Nino\Features::deactivate( $appData, 'top' );
 
@@ -1311,6 +1325,7 @@ check( 'the feature that brings a section is switched on, and the section is the
 
 check( 'while the Legal module is not on, nothing is said of the policy', \Nino\Modules\Legal::contributions( $appData, 'described' ) === [] );
 $appData['/nino/modules'][] = '\\Nino\\Modules\\Legal';
+\Nino\AppData::writeContentData( $appData, [ '/nino/modules' ] );
 [ $status, $body ] = callFeatures( $appData, 'apiRemove', [ 'key' => 'described' ] );
 check( 'with it on, removing the feature names the sections of the policy that still describe it, and they stay', $status === 200 && $body === [ 'removed' => 'described', 'privacy' => [ 'Beschrieben' ] ]
 	&& is_dir( $described ) === false && ( \Nino\Elements::getElement( $appData, '/privacy/described', 'de_DE' )['title'] ?? '' ) === 'Beschrieben' );

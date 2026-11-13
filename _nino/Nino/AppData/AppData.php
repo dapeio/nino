@@ -284,8 +284,8 @@ namespace Nino {
 				no default - a project's module that registers a component of
 				a kernel name has to boot after the kernel's own, and an
 				appended one would replace it. Named here rather than migrated
-				into the file; only switching a feature off writes the list
-				back as it stands, and from then on it is the file's	*/
+				into the file: a change of the features writes its own entry
+				and leaves the rest of the list as the file has it	*/
 			$modules = array_values( (array) ( $appData['/nino/modules'] ?? [] ) );
 			$name = static fn( mixed $class ): string => '\\'. ltrim( (string) $class, '\\' );
 			$listed = array_map( $name, $modules );

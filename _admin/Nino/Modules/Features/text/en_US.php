@@ -143,6 +143,16 @@ return [
 	'[[/_admin/error/features_application_catalogue]]'	=> 'The catalogue could not be loaded: %s',
 	'[[/_admin/error/features_application_feature]]'	=> 'This feature does not belong to the application.',
 	'[[/_admin/error/features_application_failed]]'	=> 'The feature could not be set up: %s',
+	'[[/_admin/error/features_busy]]'	=> 'Another change of the features is running. Try again in a moment.',
+	'[[/_admin/error/features_install_failed]]'	=> 'The feature could not be installed: %s',
+	'[[/_admin/error/features_remove_failed]]'	=> 'The directory could not be removed: %s',
+	'[[/_admin/error/features_unknown]]'	=> 'There is no such feature in this project.',
+	'[[/_admin/error/features_invalid]]'	=> 'The request names no feature or no version.',
+	'[[/_admin/error/features_remove_active]]'	=> 'The feature is switched on. Switch it off before removing its directory.',
+	'[[/_admin/error/features_activate_failed]]'	=> 'The feature could not be switched on: %s',
+	'[[/_admin/error/features_deactivate_failed]]'	=> 'The feature could not be switched off: %s',
+	'[[/_admin/error/features_install_inactive]]'	=> 'The feature is in place, but it could not be switched on: %s',
+	'[[/_admin/error/features_lock_failed]]'	=> 'The features cannot be locked for a change. Check that the directory data/.locks of the project exists and that the web server may write there, and that no other user owns the files in it. The log has the details.',
 
 	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
 	'[[/_admin/features/manual/intro]]'	=> 'Features are add-ons – tools and functions that come as a directory and are switched on here. This panel lists, installs and switches them.',
