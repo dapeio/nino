@@ -171,6 +171,7 @@ return [
 	'[[/_admin/common/word/after]]'	=> 'Nachher',
 	'[[/_admin/common/word/alt]]'	=> 'Alternativtext',
 	'[[/_admin/common/word/anchor]]'	=> 'Ankerlink',
+	'[[/_admin/common/word/application]]'	=> 'Anwendung',
 	'[[/_admin/common/word/april]]'	=> 'April',
 	'[[/_admin/common/word/august]]'	=> 'August',
 	'[[/_admin/common/word/author]]'	=> 'Autor',

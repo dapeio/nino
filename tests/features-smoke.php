@@ -1605,11 +1605,13 @@ $panelActions = [
 	'apiSettings' 	=> [ 'key' => 'sample', 'fields' => [] ],
 	'apiCatalogue'	=> [],
 	'apiInstall' 		=> [ 'key' => 'helper', 'version' => '1.0.0' ],
+	'apiApplicationPlan' 	=> [ 'application' => 'site' ],
+	'apiApplicationApply' => [ 'application' => 'site', 'feature' => 'helper' ],
 ];
 
 check( 'the panel is a system entry between Backups (10) and Config (20), with its two mount points and its permission', \Nino\Modules\Features\Admin::nav() === [ 'features', '/_admin/nav/features', 15, 'system' ]
 	&& \Nino\Modules\Features\Admin::panes() === [ 'features-list', 'features-detail' ] && \Nino\Modules\Features\Admin::perm() === '/_admin/features/manage' );
-check( 'it offers exactly the seven actions', array_keys( \Nino\Modules\Features\Admin::actions() ) === [ 'features/list', 'features/activate', 'features/deactivate', 'features/settings', 'features/remove', 'features/catalogue', 'features/install' ] );
+check( 'it offers exactly the nine actions', array_keys( \Nino\Modules\Features\Admin::actions() ) === [ 'features/list', 'features/activate', 'features/deactivate', 'features/settings', 'features/remove', 'features/catalogue', 'features/install', 'features/application-plan', 'features/application-apply' ] );
 check( 'the workbench finds it by reading the directory, nothing registered', in_array( \Nino\Modules\Features\Admin::class, \Nino\Admin\Admin::modules(), true ) === true && isset( \Nino\Admin\Admin::panels( $appData )['features'] ) === true );
 
 // Nobody is signed in: every action is a 401
@@ -1722,12 +1724,12 @@ check( 'the roles list offers the Features permission once, as it always did', (
 	$offers = array_filter( \Nino\Modules\Users\Admin::permOptions( $appData ), static fn( array $o ): bool => $o['perm'] === '/_admin/features/manage' );
 	return count( $offers ) === 1 && array_values( $offers )[0] === [ 'perm' => '/_admin/features/manage', 'label' => '/_admin/nav/features', 'group' => 'system', 'offered' => true ];
 } )() );
-check( 'every tab of the registry has its action map: the Settings tab brings none, so the seven actions stay the Features panel\'s', ( static function() use ( $appData ): bool {
+check( 'every tab of the registry has its action map: the Settings tab brings none, so the nine actions stay the Features panel\'s', ( static function() use ( $appData ): bool {
 	// The tab's entry is built by hand, and a key actions() reads that it lacks
 	// is a warning of php's - only recorded here, fatal in the runtime
 	ninoWarnings();
 	$actions = \Nino\Admin\Admin::actions( $appData );
-	return $actions['features/settings'] === [ \Nino\Modules\Features\Admin::class, 'apiSettings' ] && count( array_filter( array_keys( $actions ), static fn( string $a ): bool => str_starts_with( $a, 'features/' ) ) ) === 7 && ninoWarnings() === [];
+	return $actions['features/settings'] === [ \Nino\Modules\Features\Admin::class, 'apiSettings' ] && count( array_filter( array_keys( $actions ), static fn( string $a ): bool => str_starts_with( $a, 'features/' ) ) ) === 9 && ninoWarnings() === [];
 } )() );
 check( 'the dashboard shows one Features tile, not one per tab', ( static function() use ( $appData ): bool {
 	[ , $body ] = ninoCall( $appData, [ \Nino\Modules\Dashboard\Admin::class, 'apiSummary' ] );

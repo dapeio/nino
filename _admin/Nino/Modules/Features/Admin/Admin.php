@@ -32,7 +32,12 @@ namespace Nino\Modules\Features {
 	 *
 	 *												Two panes and one script-built tab strip: Available (what
 	 *												the catalogue offers that is not already current -
-	 *												install or update), Inactive and Active. apiList()
+	 *												install or update), Inactive, Active and Applications
+	 *												(the named sets of features the catalogue offers, set up
+	 *												as a whole by \Nino\Applications - the one code the setup
+	 *												wizard sets them up with, here for the catalogue this
+	 *												project reads and with no page, route or start page of
+	 *												the project touched). apiList()
 	 *												answers the installed features and, alongside them,
 	 *												the catalogue as \Nino\Catalogue::cached() last left
 	 *												it on disk - so the Available tab fills without a
@@ -76,6 +81,8 @@ namespace Nino\Modules\Features {
 				'features/remove'			=> [ self::class, 'apiRemove' ],
 				'features/catalogue' 	=> [ self::class, 'apiCatalogue' ],
 				'features/install' 		=> [ self::class, 'apiInstall' ],
+				'features/application-plan' 	=> [ self::class, 'apiApplicationPlan' ],
+				'features/application-apply' 	=> [ self::class, 'apiApplicationApply' ],
 			];
 		}
 
@@ -93,7 +100,7 @@ namespace Nino\Modules\Features {
 		// Their lines are /_admin/features/manual/<handle>, where the headings of a feature's manual stand too
 		// (\Nino\Features::MANUAL_SECTIONS and 'none'): a handle is never named like one of them
 		public static function manual(): array {
-			return [ 'intro', 'available', 'inactive', 'active' ];
+			return [ 'intro', 'available', 'inactive', 'active', 'application' ];
 		}
 
 		public static function icon(): string {
@@ -144,6 +151,8 @@ namespace Nino\Modules\Features {
 
 			$key 		 = \Nino\Admin\Admin::postString( $data, 'key' );
 			$version = \Nino\Admin\Admin::postString( $data, 'version' );
+			$application = \Nino\Admin\Admin::postString( $data, 'application' );
+			$feature = \Nino\Admin\Admin::postString( $data, 'feature' );
 
 			return match( $action ) {
 				'features/activate' 	=> 'Activate feature "'. $key. '"',
@@ -151,6 +160,7 @@ namespace Nino\Modules\Features {
 				'features/settings' 	=> 'Edit settings of feature "'. $key. '"',
 				'features/remove'			=> 'Remove the directory of feature "'. $key. '"',
 				'features/install' 		=> 'Install feature "'. $key. '" '. $version,
+				'features/application-apply' 	=> 'Set up application "'. $application. '": feature "'. $feature. '"',
 				default 							=> '',
 			};
 		}
@@ -356,9 +366,10 @@ namespace Nino\Modules\Features {
 			$cached	= \Nino\Catalogue::cached( $appData );
 
 			\Nino\Http::ok( $request, [
-				'fetched'		=> self::_fetched( $cached['fetched'] ?? time() ),
-				'writable'	=> \Nino\Catalogue::writable(),
-				'offers'		=> self::_offers( $appData, $catalogue, $locale ),
+				'fetched'				=> self::_fetched( $cached['fetched'] ?? time() ),
+				'writable'			=> \Nino\Catalogue::writable(),
+				'offers'				=> self::_offers( $appData, $catalogue, $locale ),
+				'applications'	=> self::_applications( $appData, $catalogue, $locale ),
 			] );
 		}
 
@@ -480,6 +491,218 @@ namespace Nino\Modules\Features {
 				// placed and is switched on all the same
 				'switchedOn'	=> $isNew === true ? self::_switchedOn( $appData, $wasOn, $key ) : [],
 			] );
+		}
+
+		/**
+		 *	What setting an application up comes to, before anything is loaded:
+		 *	the application as the catalogue lists it, and which of its features
+		 *	are not on - in the order they are applied. Refuses what loading
+		 *	needs and this server lacks, a catalogue that is off, unreadable or
+		 *	not signed with the key config.php names, and an application that
+		 *	catalogue does not list for this kernel. Answers nothing about the
+		 *	project's pages, routes or start page: setting an application up
+		 *	changes none of them
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiApplicationPlan( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			$context = self::_application( $appData, $request );
+
+			if( $context === null )
+				return;
+
+			\Nino\Http::ok( $request, [
+				'application'	=> self::_applicationEntry( $appData, $context['catalogue'], $context['application'], \Nino\Admin\Admin::sessionLocale( $appData ) ),
+				'todo'				=> \Nino\Applications::notOn( $appData, $context['application'] ),
+			] );
+		}
+
+		/**
+		 *	Set up one feature of an application: the one step the setup wizard
+		 *	takes as well (\Nino\Applications::place()) - placed below features/
+		 *	where it is not there, switched on where it is not on, with what it
+		 *	requires. One feature to a request, so the script can show every one
+		 *	as it happens and, where one fails, say which and go on from there:
+		 *	what is on stays on, and a second round skips it. Only a feature the
+		 *	application lists, from the catalogue config.php names, believed
+		 *	after its signature; the key of anything else is a 400 before any
+		 *	archive is downloaded (the signed index and its signature are read
+		 *	first, for a key that is a slug). Answers the application as the list would show
+		 *	it now and whether it is set up
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiApplicationApply( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			$context = self::_application( $appData, $request );
+
+			if( $context === null )
+				return;
+
+			$key = self::_slug( \Nino\Admin\Admin::postData(), 'feature' );
+
+			// Only a feature of this application - not one the request made up,
+			// and not one of another application of the catalogue
+			if( $key === null || in_array( $key, $context['application']['features'], true ) === false ) {
+				\Nino\Http::fail( $request, 400, 'not a feature of this application', 'features_application_feature' );
+				return;
+			}
+
+			$result = \Nino\Applications::place( $appData, $context['catalogue'], $key );
+
+			if( $result['status'] !== 200 ) {
+
+				// The files are in the project, and the shell records an action
+				// only where it answered 200 (see apiInstall())
+				if( $result['placed'] === true ) {
+					$actor = \Nino\Auth::getCurrentUser( $appData );
+					if( $actor !== false )
+						\Nino\Admin\Admin::record( $appData, $actor['mail'], self::log( 'features/application-apply', [ 'application' => $context['application']['key'], 'feature' => $key ] ). ' (not activated: '. $result['reason']. ')' );
+				}
+
+				\Nino\Http::fail( $request, $result['status'], $result['reason'], 'features_application_failed', [ $result['reason'] ] );
+				return;
+			}
+
+			\Nino\Http::ok( $request, [
+				'feature'			=> $key,
+				'placed'			=> $result['placed'],
+				'activated'		=> $result['activated'],
+				'application'	=> self::_applicationEntry( $appData, $context['catalogue'], $context['application'], \Nino\Admin\Admin::sessionLocale( $appData ) ),
+			] );
+		}
+
+		/**
+		 *	What a request about an application has to hold before it changes
+		 *	anything: what loading needs, the catalogue config.php names read and
+		 *	believed (its signature, with the key config.php names), and an
+		 *	application of it that fits this kernel. Answers the refusal itself
+		 *	where one of them does not hold
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	array|null							{ catalogue, application }, null where the request was answered
+		 */
+		private static function _application( array &$appData, array &$request ): ?array {
+
+			$key = self::_slug( \Nino\Admin\Admin::postData(), 'application' );
+
+			if( $key === null ) {
+				\Nino\Http::fail( $request, 400, 'unknown application', 'features_application_unknown' );
+				return null;
+			}
+
+			if( \Nino\Catalogue::url( $appData ) === '' ) {
+				\Nino\Http::fail( $request, 400, 'the catalogue is switched off', 'features_application_off' );
+				return null;
+			}
+
+			$missing = \Nino\Applications::missing();
+
+			if( $missing !== [] ) {
+
+				$phrases = [];
+				foreach( $missing as $name => $phrase )
+					$phrases[] = self::_say( $appData, '/_admin/features/missing/'. $name, $phrase );
+
+				\Nino\Http::fail( $request, 409, 'setting up an application needs what this server lacks: '. implode( ', ', array_values( $missing ) ), 'features_application_missing', [ implode( ', ', $phrases ) ] );
+				return null;
+			}
+
+			$catalogue = \Nino\Catalogue::fetch( $appData );
+
+			if( is_string( $catalogue ) === true ) {
+				\Nino\Http::fail( $request, 400, $catalogue, 'features_application_catalogue', [ $catalogue ] );
+				return null;
+			}
+
+			foreach( \Nino\Catalogue::applications( $appData, $catalogue ) as $application )
+				if( $application['key'] === $key )
+					return [ 'catalogue' => $catalogue, 'application' => $application ];
+
+			\Nino\Http::fail( $request, 400, 'unknown application', 'features_application_unknown' );
+
+			return null;
+		}
+
+		/**
+		 *	The applications of a parsed catalogue this kernel can offer, phrased
+		 *	for the browser: names and descriptions localized, each feature with
+		 *	whether it is on, and the state of the whole - 'applied' when every
+		 *	feature is on, 'partial' when some are, 'none'. Recomputed against
+		 *	the features on disk every time, like the offers: an application is
+		 *	no state that is stored
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$catalogue		A parsed catalogue
+		 *	@param		string		$locale				The interface language
+		 *
+		 *	@return 	array										[ { key, name, description, start, next, features: [ { key, name, on, state } ], state } ]
+		 */
+		private static function _applications( array &$appData, array $catalogue, string $locale ): array {
+
+			$list = [];
+
+			foreach( \Nino\Catalogue::applications( $appData, $catalogue ) as $application )
+				$list[] = self::_applicationEntry( $appData, $catalogue, $application, $locale );
+
+			return $list;
+		}
+
+		/**
+		 *	One application the way the script renders it
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$catalogue		A parsed catalogue
+		 *	@param		array 		$application	One application of it
+		 *	@param		string		$locale				The interface language
+		 *
+		 *	@return 	array
+		 */
+		private static function _applicationEntry( array &$appData, array $catalogue, array $application, string $locale ): array {
+
+			$offers		= \Nino\Catalogue::offers( $appData, $catalogue );
+			$features	= [];
+			$on				= 0;
+
+			foreach( $application['features'] as $key ) {
+
+				$have	= \Nino\Features::get( $appData, $key );
+				$isOn	= \Nino\Applications::isOn( $have );
+				$on		+= $isOn === true ? 1 : 0;
+
+				// 'update': switched on, and its directory carries a version the record
+				// does not - setting up applies that update, which is not the same as
+				// loading and switching on what is off
+				$state = $isOn === true ? 'on' : ( $have !== null && $have['active'] === true && $have['problems'] === [] ? 'update' : 'off' );
+
+				$features[] = [ 'key' => $key, 'name' => \Nino\Features::localized( $offers[$key]['name'], $locale ), 'on' => $isOn, 'state' => $state ];
+			}
+
+			return [
+				'key'					=> $application['key'],
+				'name'				=> \Nino\Features::localized( $application['name'], $locale ),
+				'description'	=> \Nino\Features::localized( $application['description'], $locale ),
+				'start'				=> $application['start'],
+				// A path of this project or nothing: the script links to it as it is
+				'next'				=> \Nino\Applications::entry( $application ),
+				'features'		=> $features,
+				'state'				=> $on === count( $features ) ? 'applied' : ( $on === 0 ? 'none' : 'partial' ),
+			];
 		}
 
 		/**
@@ -722,8 +945,9 @@ namespace Nino\Modules\Features {
 				return null;
 
 			return [
-				'fetched'	=> self::_fetched( $cached['fetched'] ),
-				'offers'	=> self::_offers( $appData, $cached, $locale ),
+				'fetched'				=> self::_fetched( $cached['fetched'] ),
+				'offers'				=> self::_offers( $appData, $cached, $locale ),
+				'applications'	=> self::_applications( $appData, $cached, $locale ),
 			];
 		}
 
@@ -901,6 +1125,22 @@ namespace Nino\Modules\Features {
 
 			// Checked here before the kernel is asked, so a stray value never
 			// reaches an error message
+			return is_string( $key ) === true && preg_match( \Nino\Features::KEY_PATTERN, $key ) === 1 ? $key : null;
+		}
+
+		/**
+		 *	A posted key that is a slug - the shape of a feature's or an
+		 *	application's key - or null when it is not one
+		 *
+		 *	@param		array 		$data					The posted payload
+		 *	@param		string		$name					The field
+		 *
+		 *	@return 	string|null
+		 */
+		private static function _slug( array $data, string $name ): ?string {
+
+			$key = $data[$name] ?? null;
+
 			return is_string( $key ) === true && preg_match( \Nino\Features::KEY_PATTERN, $key ) === 1 ? $key : null;
 		}
 

@@ -169,6 +169,7 @@ return [
 	'[[/_admin/common/word/after]]'	=> 'After',
 	'[[/_admin/common/word/alt]]'	=> 'Alt text',
 	'[[/_admin/common/word/anchor]]'	=> 'Anchor link',
+	'[[/_admin/common/word/application]]'	=> 'Application',
 	'[[/_admin/common/word/april]]'	=> 'April',
 	'[[/_admin/common/word/august]]'	=> 'August',
 	'[[/_admin/common/word/author]]'	=> 'Author',

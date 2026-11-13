@@ -230,8 +230,8 @@ const CATALOGUE_URL = 'https://catalogue.getnino.dev/catalogue.json';
 const CACHE = { fetched : '2026-09-07 12:00', offers : OFFERS };
 
 // features/catalogue's own shape - the cache's, and 'writable' beside it
-function catalogueAnswer( writable, offers, fetched ) {
-	return { fetched : fetched || CACHE.fetched, writable : writable, offers : offers || OFFERS };
+function catalogueAnswer( writable, offers, fetched, applications ) {
+	return { fetched : fetched || CACHE.fetched, writable : writable, offers : offers || OFFERS, applications : applications || [] };
 }
 
 console.log('Features panel');
@@ -241,10 +241,10 @@ check( 'and binds its ready callback', callbacks.length === 1 && callbacks[0] ==
 
 // The backend half of the same contract, read from the class
 const admin = source('_admin/Nino/Modules/Features/Admin/Admin.php');
-check( 'the panel is a system entry with the nav uri the script speaks, two mount points and seven actions',
+check( 'the panel is a system entry with the nav uri the script speaks, two mount points and nine actions',
 	admin.includes( "return [ 'features', '/_admin/nav/features', 15, 'system' ];" ) && admin.includes( "return [ 'features-list', 'features-detail' ];" )
 	&& script.includes( "'features-list'" ) && script.includes( "'features-detail'" )
-	&& [ 'features/list', 'features/activate', 'features/deactivate', 'features/settings', 'features/catalogue', 'features/install', 'features/remove' ].every( function( action ) { return admin.includes( "'"+ action+ "'" ) } ) );
+	&& [ 'features/list', 'features/activate', 'features/deactivate', 'features/settings', 'features/catalogue', 'features/install', 'features/remove', 'features/application-plan', 'features/application-apply' ].every( function( action ) { return admin.includes( "'"+ action+ "'" ) } ) );
 // The one thing the module's own stylesheet is for: the script builds a
 // card's buttons as siblings with no whitespace between them, so the row
 // carries its gap itself
@@ -259,11 +259,12 @@ check( 'the panel bundles a stylesheet of its own, in the workbench\'s layer, sp
 check( 'the head that carries the tabs and the filter stays at the top of the list pane, scoped to that pane',
 	/#features-list \.admin-features-head \{[^}]*position: sticky;/s.test( moduleCss )
 	&& /\.admin-panel-tabs \{[^}]*position: sticky;/s.test( source('_admin/assets/style.css') ) === false );
-check( 'every action method guards itself with the panel\'s permission', ( admin.match( /guardPerm\( \$appData, \$request, self::MANAGE_PERM \)/g ) || [] ).length === 7 );
-check( 'the script posts those seven actions and no other',
+check( 'every action method guards itself with the panel\'s permission', ( admin.match( /guardPerm\( \$appData, \$request, self::MANAGE_PERM \)/g ) || [] ).length === 9 );
+check( 'the script posts those nine actions and no other - the list is read once more where a set-up stops',
 	script.includes( "Nino.adminUi.api.call( 'features/'+ endpoint" ) && script.includes( "_apiCall( 'list'" ) && script.includes( "_apiCall( 'settings'" )
 	&& script.includes( "? 'deactivate' : 'activate'" ) && script.includes( "_apiCall( 'catalogue'" ) && script.includes( "_apiCall( 'install'" )
-	&& script.includes( "_apiCall( 'remove'" ) && ( script.match( /_apiCall\( /g ) || [] ).length === 6 );
+	&& script.includes( "_apiCall( 'remove'" ) && script.includes( "_apiCall( 'application-plan'" ) && script.includes( "_apiCall( 'application-apply'" )
+	&& ( script.match( /_apiCall\( /g ) || [] ).length === 9 );
 
 // --- one language, one text system
 
@@ -273,7 +274,12 @@ let match;
 while( ( match = keyRe.exec( script ) ) )
 	if( keys.indexOf( match[1] ) === -1 )
 		keys.push( match[1] );
-check( 'the three tab labels and the reload hint are among the words the script asks for by a literal', [ 'available', 'inactive', 'active' ].every( function( t ) { return keys.indexOf( '/_admin/features/tab/'+ t ) !== -1 } ) && keys.indexOf( '/_admin/features/msg/reload' ) !== -1 );
+const workbenchDe = fills('_admin/text/de_DE.php');
+const wordless = keys.filter( function( key ) {
+	return ( moduleEn[key] === undefined && workbenchEn[key] === undefined ) || ( moduleDe[key] === undefined && workbenchDe[key] === undefined );
+} );
+check( 'every word the script asks for by a literal is a fill in both interface languages'+ ( wordless.length ? ' - missing: '+ wordless.join(', ') : '' ), keys.length > 60 && wordless.length === 0 );
+check( 'the four tab labels and the reload hint are among the words the script asks for by a literal', [ 'available', 'inactive', 'active', 'applications' ].every( function( t ) { return keys.indexOf( '/_admin/features/tab/'+ t ) !== -1 } ) && keys.indexOf( '/_admin/features/msg/reload' ) !== -1 );
 
 // The words the class phrases itself - a catalogue refusal, an update that
 // did not apply, a feature that would not switch on - are fills too, read
@@ -338,8 +344,9 @@ check( 'the filter is labelled and placeheld from the text system, and reuses th
 	&& filter.placeholder === text('/_admin/features/label/filter') && filter.attributes['aria-label'] === text('/_admin/features/label/filter') );
 
 const tabs = byTag( strip, 'button' );
-check( 'three tabs, Active first, each labelled with its count - Active 2 (plain, sample), Inactive 2 (old, fresh)', tabs.length === 3
-	&& tabs[0].textContent === text('/_admin/features/tab/active')+ ' (2)' && tabs[1].textContent === text('/_admin/features/tab/inactive')+ ' (2)' && tabs[2].textContent === text('/_admin/features/tab/available')+ ' (0)' );
+check( 'four tabs, Active first and Applications last, each labelled with its count - Active 2 (plain, sample), Inactive 2 (old, fresh)', tabs.length === 4
+	&& tabs[0].textContent === text('/_admin/features/tab/active')+ ' (2)' && tabs[1].textContent === text('/_admin/features/tab/inactive')+ ' (2)' && tabs[2].textContent === text('/_admin/features/tab/available')+ ' (0)'
+	&& tabs[3].textContent === text('/_admin/features/tab/applications')+ ' (0)' );
 check( 'Active is the tab a panel opens on, role=tab/tablist throughout, aria-selected in step with it', tabs.every( function( t ) { return t.attributes.role === 'tab' } )
 	&& hasClass( tabs[0], 'is-active' ) && tabs[0].attributes['aria-selected'] === 'true' && hasClass( tabs[1], 'is-active' ) === false && tabs[1].attributes['aria-selected'] === 'false' );
 
@@ -1068,6 +1075,289 @@ check( 'and with nothing to narrow the category is not drawn at all - a select w
 panel.init();
 answer( 500, null );
 check( 'a failed load is reported through the workbench\'s words', mount.children.length === 1 && hasClass( mount.children[0], 'nino-admin-error' ) && mount.children[0].textContent === '(500) '+ text('/_admin/common/error/load') );
+
+// --- the Applications tab: named sets of features, set up as a whole
+
+{
+	const feature = function( key, name, on, state ) { return { key : key, name : name, on : on, state : on === true ? 'on' : ( state || 'off' ) } };
+	const APPLICATIONS = [
+		{ key : 'site', name : 'Webseite', description : 'Eine Webseite zum Selbstbauen.', start : 'starter', next : '/_admin/#builder', state : 'partial',
+			features : [ feature( 'builder', 'Builder', true ), feature( 'forms', 'Formulare', false ), feature( 'seo', 'SEO', false ) ] },
+		{ key : 'vcard', name : 'vCard', description : '', start : 'own', next : '/_admin/#vcard', state : 'none', features : [ feature( 'vcard', 'vCard', false ) ] },
+		{ key : 'blog', name : 'Blog', description : 'Beiträge.', start : null, next : null, state : 'applied', features : [ feature( 'posts', 'Beiträge', true ) ] },
+		{ key : 'crm', name : 'CRM', description : 'Kontakte.', start : null, next : '/_admin/#crm', state : 'applied', features : [ feature( 'contacts', 'Kontakte', true ) ] },
+		// A path the server would never have let through: the script links to nothing that does not start with a single slash
+		{ key : 'wild', name : 'Wild', description : '', start : null, next : 'javascript:alert(1)', state : 'applied', features : [ feature( 'posts', 'Beiträge', true ) ] },
+		{ key : 'wild2', name : 'Wild two', description : '', start : null, next : '//evil.test/', state : 'applied', features : [ feature( 'posts', 'Beiträge', true ) ] },
+		{ key : 'wild3', name : 'Wild three', description : '', start : null, next : '/\\evil.test/', state : 'applied', features : [ feature( 'posts', 'Beiträge', true ) ] },
+	];
+	const withApplications = function( applications ) { return Object.assign( {}, CACHE, { applications : applications } ) };
+	const strip4 = function() { return byTag( paneHead.children[1], 'button' ) };
+	const appRow = function( key ) { return findAll( mount, function( el ) { return el.dataset.application === key } )[0] };
+	const appButton = function( key ) { return byTag( appRow( key ), 'button' )[0] };
+	const appLine = function( key ) { return byTag( appRow( key ), 'p' ).filter( function( el ) { return el.attributes['aria-live'] === 'polite' } )[0] };
+	const appNotes = function( key ) { return notes( appRow( key ) ) };
+
+	panel._applicationMsg = {};
+	panel._tab = 'active';
+	panel.init();
+	answer( 200, listAnswer( CATALOGUE_URL, true, withApplications( APPLICATIONS ) ) );
+
+	check( 'the Applications tab is the fourth, labelled with how many applications the catalogue offers', strip4().length === 4 && strip4()[3].textContent === text('/_admin/features/tab/applications')+ ' (7)'
+		&& strip4()[3].attributes.role === 'tab' && strip4()[3].attributes['aria-controls'] === 'features-tabpanel' );
+
+	fire( strip4()[3], 'click' );
+	check( 'pressing it opens it in the shared tabpanel, named by the tab, and leaves the other tabs\' counts as they were', hasClass( strip4()[3], 'is-active' ) && strip4()[3].attributes['aria-selected'] === 'true'
+		&& tabContent().id === 'features-tabpanel' && tabContent().attributes['aria-labelledby'] === 'features-tabbutton-applications' && strip4()[0].textContent === text('/_admin/features/tab/active')+ ' (2)' );
+	check( 'one row per application, in the order the catalogue gives them, none of the rows of the other tabs', rowKeys( mount, 'application' ) === 'site,vcard,blog,crm,wild,wild2,wild3' && rowKeys( mount, 'feature' ) === '' && rowKeys( mount, 'offer' ) === '' );
+	check( 'the tab says what an application is and what setting one up leaves alone, once', byTag( tabContent(), 'p' ).filter( function( el ) { return el.textContent === text('/_admin/features/hint/applications') } ).length === 1 );
+	check( 'there is no category to narrow by on this tab: an application has none', byTag( mount.children[0], 'select' ).length === 0 && mount.children[0].children.length === 1 );
+
+	const states = function( key ) { return findAll( appRow( key ), function( el ) { return hasClass( el, 'admin-features-badge' ) } ).map( function( el ) { return el.textContent } ).join('|') };
+	check( 'how far each is set up is a word after its name: set up, partly set up, not set up', states( 'blog' ) === text('/_admin/features/state/applied') && states( 'site' ) === text('/_admin/features/state/partial') && states( 'vcard' ) === text('/_admin/features/state/none')
+		&& appRow( 'site' ).dataset.state === 'partial' );
+	check( 'the three words are three', new Set( [ 'applied', 'partial', 'none' ].map( function( s ) { return text('/_admin/features/state/'+ s) } ) ).size === 3 );
+	check( 'each row names the features it switches on by name, and a partly set up one which of them are still off', appNotes( 'site' ).indexOf( text('/_admin/features/label/application-features').replace( '%s', 'Builder, Formulare, SEO' ) ) !== -1
+		&& appNotes( 'site' ).indexOf( text('/_admin/features/label/application-off').replace( '%s', 'Formulare, SEO' ) ) !== -1
+		&& appNotes( 'vcard' ).some( function( line ) { return line.indexOf( text('/_admin/features/label/application-off').split('%s')[0] ) === 0 } ) === false );
+	check( 'its description is a line of its own, and an application without one has none', appNotes( 'site' ).indexOf( 'Eine Webseite zum Selbstbauen.' ) !== -1 && appNotes( 'vcard' ).length === 2 );
+	check( 'what the start statement means is said for the two that make one, and for no other: the project keeps its start page, no starter pages are made', appNotes( 'vcard' ).indexOf( text('/_admin/features/hint/application-start-own') ) !== -1
+		&& appNotes( 'site' ).indexOf( text('/_admin/features/hint/application-start-starter') ) !== -1 && appNotes( 'blog' ).indexOf( text('/_admin/features/hint/application-start-own') ) === -1 && appNotes( 'blog' ).indexOf( text('/_admin/features/hint/application-start-starter') ) === -1 );
+	check( 'Set up is offered while a feature is off, and the link to the place of the application once all are on', appButton( 'site' ).textContent === text('/_admin/features/label/application-setup') && appButton( 'vcard' ).textContent === text('/_admin/features/label/application-setup')
+		&& appButton( 'blog' ) === undefined && byTag( appRow( 'site' ), 'a' ).length === 0 && byTag( appRow( 'vcard' ), 'a' ).length === 0 );
+	const crmLink = byTag( appRow( 'crm' ), 'a' )[0];
+	check( 'the link is named for the application, leads to its path below the project and is a real link', crmLink.textContent === text('/_admin/features/label/application-next').replace( '%s', 'CRM' ) && crmLink.href === Nino.dir+ '/_admin/#crm'
+		&& crmLink.dataset.action === 'application-next' );
+	check( 'an application without an entry point has no link, and one whose path is no path of the site - a scheme, a second slash - none either', byTag( appRow( 'blog' ), 'a' ).length === 0 && byTag( appRow( 'wild' ), 'a' ).length === 0 && byTag( appRow( 'wild2' ), 'a' ).length === 0 && byTag( appRow( 'wild3' ), 'a' ).length === 0 );
+	check( 'the link to the place of an application is drawn as the button that set it up is: the module\'s stylesheet gives the anchor the height and the padding a button has',
+		/#features-list \.admin-features-actions > a\.nino-admin-btn-primary \{[^}]*min-height: var\(--nino-admin-control-height\);[^}]*padding:/s.test( moduleCss ) );
+	check( 'the row carries no handler in its markup and names itself to the keyboard: real buttons and links only', findAll( mount, function( el ) { return el.attributes !== undefined && Object.keys( el.attributes ).some( function( name ) { return /^on/i.test( name ) } ) } ).length === 0 );
+
+	// The search box finds an application by what it is called or says
+	const search = findAll( mount, function( el ) { return el.id === 'features-filter' } )[0];
+	search.value = 'kontakte';
+	fire( search, 'input' );
+	check( 'the search box narrows the applications by name, key or description, and the count with it', rowKeys( mount, 'application' ) === 'crm' && strip4()[3].textContent === text('/_admin/features/tab/applications')+ ' (1)' );
+	const search1 = findAll( mount, function( el ) { return el.id === 'features-filter' } )[0];
+	search1.value = 'zzz';
+	fire( search1, 'input' );
+	check( 'and says so when it finds none', rowKeys( mount, 'application' ) === '' && findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/nomatch') );
+	const search2 = findAll( mount, function( el ) { return el.id === 'features-filter' } )[0];
+	search2.value = '';
+	fire( search2, 'input' );
+
+	// --- every way there is nothing to show
+
+	panel.init();
+	answer( 200, listAnswer( '', true, null ) );
+	panel._tab = 'applications';
+	panel._renderPanel();
+	check( 'the catalogue switched off is said on this tab as on Available, naming the directory', findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/catalogue-off').replace( '%s', '/features' ) );
+	panel.init();
+	answer( 200, listAnswer( CATALOGUE_URL, true, null ) );
+	check( 'a catalogue that was never loaded says to refresh it', findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/applications-unloaded') );
+	panel.init();
+	answer( 200, listAnswer( CATALOGUE_URL, true, withApplications( [] ) ) );
+	check( 'one that offers none for this kernel says so', findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/applications-empty') && strip4()[3].textContent === text('/_admin/features/tab/applications')+ ' (0)' );
+	panel.init();
+	answer( 200, listAnswer( CATALOGUE_URL, true, Object.assign( {}, CACHE ) ) );
+	check( 'a cache from before the catalogue carried applications is the same, not an error', findAll( tabContent(), function( el ) { return hasClass( el, 'nino-admin-empty' ) } )[0].textContent === text('/_admin/features/hint/applications-empty') );
+
+	panel.init();
+	answer( 200, listAnswer( CATALOGUE_URL, false, withApplications( APPLICATIONS ) ) );
+	check( 'where features/ cannot be written the tab says so and offers no Set up, the links stay', byTag( tabContent(), 'p' ).some( function( el ) { return hasClass( el, 'nino-admin-error' ) && el.textContent === text('/_admin/features/hint/catalogue-readonly').replace( '%s', '/features' ) } )
+		&& appButton( 'site' ) === undefined && appButton( 'vcard' ) === undefined && byTag( appRow( 'crm' ), 'a' ).length === 1 );
+
+	// What Refresh catalogue answers carries the applications as the list does: the tab fills from the refresh as it does from the cache
+	panel.init();
+	answer( 200, listAnswer( CATALOGUE_URL, true, null ) );
+	panel._tab = 'applications';
+	fire( byTag( catalogueBar(), 'button' )[0], 'click' );
+	answer( 200, catalogueAnswer( true, OFFERS, '2026-09-09 10:00', APPLICATIONS ) );
+	check( 'a refresh fills the Applications tab from its own answer, without a list read', rowKeys( mount, 'application' ) === 'site,vcard,blog,crm,wild,wild2,wild3' && requests[requests.length - 1].action === 'features/catalogue' );
+	panel._tab = 'applications';
+
+	// --- setting one up
+
+	panel.init();
+	answer( 200, listAnswer( CATALOGUE_URL, true, withApplications( APPLICATIONS ) ) );
+	const appSite = APPLICATIONS[0];
+	const planFor = function( application, todo ) { return { application : application, todo : todo } };
+
+	let sent = requests.length;
+	let confirmed = confirms.length;
+	fire( appButton( 'site' ), 'click' );
+	check( 'Set up asks the server what it comes to first - the plan, with the key and nothing else - holds the button and says it is checking', requests.length === sent + 1 && requests[requests.length - 1].action === 'features/application-plan'
+		&& JSON.stringify( requests[requests.length - 1].payload ) === '{"application":"site"}' && appButton( 'site' ).disabled === true && appLine( 'site' ).textContent === text('/_admin/features/msg/application-checking') );
+
+	answer( 409, { error : 'x', code : 'features_application_missing', params : [ 'ein features/-Verzeichnis' ] } );
+	check( 'a refusal of the plan is told in its words as an error, frees the button, asks no question and loads nothing', requests.length === sent + 1 && appButton( 'site' ).disabled === false && hasClass( appLine( 'site' ), 'nino-admin-error' ) && appLine( 'site' ).textContent !== '' && confirms.length === confirmed );
+
+	fire( appButton( 'site' ), 'click' );
+	answer( 200, planFor( appSite, [] ) );
+	check( 'a plan with nothing left to load says so and reads the list again, without a question', appLine( 'site' ) !== undefined && confirms.length === confirmed && requests[requests.length - 1].action === 'features/list' );
+	answer( 200, listAnswer( CATALOGUE_URL, true, withApplications( APPLICATIONS ) ) );
+
+	confirmAnswer = false;
+	fire( appButton( 'site' ), 'click' );
+	answer( 200, planFor( appSite, [ 'forms', 'seo' ] ) );
+	check( 'the question names the application and what is about to be loaded and switched on, and that no page, route or start page changes', confirms.length === confirmed + 1
+		&& confirms[confirms.length - 1] === text('/_admin/features/confirm/application').replace( '%s', 'Webseite' ).replace( '%s', text('/_admin/features/confirm/application-loads').replace( '%s', 'Formulare, SEO' ) ) );
+	check( 'declining it loads nothing: no request after the plan, the button is free and has the focus back', requests[requests.length - 1].action === 'features/application-plan' && appButton( 'site' ).disabled === false && appLine( 'site' ).textContent === '' && focused() === appButton( 'site' ) );
+	confirmAnswer = true;
+
+	// The run: one feature to a request, the next only after the answer
+	const reloadsBefore = reloads;
+	const alertsBefore = alerts.length;
+	fire( appButton( 'site' ), 'click' );
+	answer( 200, planFor( appSite, [ 'forms', 'seo' ] ) );
+	check( 'once agreed the first feature goes out alone, with the application and the feature, and the line says which of how many', requests[requests.length - 1].action === 'features/application-apply'
+		&& JSON.stringify( requests[requests.length - 1].payload ) === '{"application":"site","feature":"forms"}' && appLine( 'site' ).textContent === text('/_admin/features/msg/application-step').replace( '%s', 'Webseite' ).replace( '%s', 'Formulare' ).replace( '%s', '1' ).replace( '%s', '2' ) );
+	const afterFirst = requests.length;
+	answer( 200, { feature : 'forms', placed : true, activated : true, application : appSite } );
+	check( '...the second only after the first is answered, and the page is not reloaded in between', requests.length === afterFirst + 1 && JSON.stringify( requests[requests.length - 1].payload ) === '{"application":"site","feature":"seo"}' && reloads === reloadsBefore
+		&& appLine( 'site' ).textContent === text('/_admin/features/msg/application-step').replace( '%s', 'Webseite' ).replace( '%s', 'SEO' ).replace( '%s', '2' ).replace( '%s', '2' ) );
+	answer( 200, { feature : 'seo', placed : true, activated : true, application : appSite } );
+	check( 'after the last the result is said in a dialog, before the reload, and the workbench is built again on the Applications tab',
+		reloads === reloadsBefore + 1 && alerts.length === alertsBefore + 1 && alertsAt[alertsAt.length - 1] === reloadsBefore
+		&& alerts[alerts.length - 1] === text('/_admin/features/msg/application-done').replace( '%s', 'Webseite' ).replace( '%s', 'Formulare, SEO' ) && sandbox.window.location.hash === '#features/applications' );
+
+	// A failure in the middle stops the run, says what is on and goes on from there
+	panel.init();
+	answer( 200, listAnswer( CATALOGUE_URL, true, withApplications( APPLICATIONS ) ) );
+	fire( appButton( 'site' ), 'click' );
+	answer( 200, planFor( appSite, [ 'forms', 'seo' ] ) );
+	answer( 200, { feature : 'forms', placed : true, activated : true, application : appSite } );
+	const reloadsAtFailure = reloads;
+	answer( 400, { error : 'the archive does not match', code : 'features_application_failed', params : [ 'the archive does not match' ] } );
+	check( 'the first feature that fails stops the run: no third request, no reload, and the list is read again so the cards are the project\'s', requests[requests.length - 1].action === 'features/list' && reloads === reloadsAtFailure );
+	const afterFailure = JSON.parse( JSON.stringify( APPLICATIONS ) );
+	afterFailure[0].features[1].on = true;
+	answer( 200, listAnswer( CATALOGUE_URL, true, withApplications( afterFailure ) ) );
+	const stopped = appLine( 'site' );
+	check( 'the card says at which feature it stopped, why, and what is on already - by name', hasClass( stopped, 'nino-admin-error' )
+		&& stopped.textContent === text('/_admin/features/msg/application-stopped').replace( '%s', 'Webseite' ).replace( '%s', 'SEO' ).replace( '%s', function() { return text('/_admin/error/features_application_failed').replace( '%s', 'the archive does not match' ) } ).replace( '%s', 'Builder, Formulare' ) );
+	check( '...and the button goes on from there: it reads Try again, and is free', appButton( 'site' ).textContent === text('/_admin/features/label/application-retry') && appButton( 'site' ).disabled === false );
+	check( 'the words differ', text('/_admin/features/label/application-retry') !== text('/_admin/features/label/application-setup') );
+	check( 'the card was drawn again and the focus went with the button that held it: it is on the one that goes on from here, so a keyboard has not lost its place', focused() === appButton( 'site' ) && focused() !== null );
+
+	fire( appButton( 'site' ), 'click' );
+	check( 'pressing it asks for the plan again, and the message of the failure is gone while it runs', requests[requests.length - 1].action === 'features/application-plan' && appLine( 'site' ).textContent === text('/_admin/features/msg/application-checking') );
+	answer( 200, planFor( afterFailure[0], [ 'seo' ] ) );
+	check( 'which now lists the feature that is still off alone, and the run starts with it', JSON.stringify( requests[requests.length - 1].payload ) === '{"application":"site","feature":"seo"}' );
+	answer( 200, { feature : 'seo', placed : true, activated : true, application : afterFailure[0] } );
+	check( 'and ends as a run does', reloads === reloadsAtFailure + 1 && alerts[alerts.length - 1] === text('/_admin/features/msg/application-done').replace( '%s', 'Webseite' ).replace( '%s', 'SEO' ) );
+
+	// Nothing on at all after a failure: the dialog says so by the word for none
+	panel._applicationMsg = {};
+	panel.init();
+	answer( 200, listAnswer( CATALOGUE_URL, true, withApplications( APPLICATIONS ) ) );
+	fire( appButton( 'vcard' ), 'click' );
+	answer( 200, planFor( APPLICATIONS[1], [ 'vcard' ] ) );
+	answer( 500, null );
+	answer( 200, listAnswer( CATALOGUE_URL, true, withApplications( APPLICATIONS ) ) );
+	check( 'a failure after which nothing is on says none', appLine( 'vcard' ).textContent.indexOf( text('/_admin/features/label/none') ) !== -1 && hasClass( appLine( 'vcard' ), 'nino-admin-error' ) );
+	panel._applicationMsg = {};
+
+	// An application's words are text, whatever they contain: the name, the description and the names of its features
+	// go into the card, the question, the progress line, the card of a failure and the link as text, never as markup
+	{
+		const nasty = { name : '<b>N</b>', description : '<i>d</i>', off : '<u>f1</u>', update : '<s>f2</s>' };
+		const html = { key : 'html', name : nasty.name, description : nasty.description, start : null, next : '/x', state : 'partial',
+			features : [ feature( 'f0', 'Zero', true ), feature( 'f1', nasty.off, false ), feature( 'f2', nasty.update, false, 'update' ) ] };
+		const done = Object.assign( {}, html, { key : 'htmldone', state : 'applied', features : [ feature( 'f0', nasty.off, true ) ] } );
+		const keep = confirmAnswer;
+		confirmAnswer = true;
+		panel._applicationMsg = {};
+		panel.init();
+		answer( 200, listAnswer( CATALOGUE_URL, true, withApplications( [ html, done ] ) ) );
+		const plain = function( el ) { return el !== undefined && el.children.length === 0 };
+		const card = appRow( 'html' );
+		check( 'an application\'s name is text, whatever it contains, and the description and the names of its features too: no element is made of them',
+			byTag( card, 'strong' )[0].textContent.indexOf( nasty.name ) === 0 && byTag( card, 'strong' )[0].children.length === 1 && hasClass( byTag( card, 'strong' )[0].children[0], 'admin-features-badge' )
+			&& appNotes( 'html' ).indexOf( nasty.description ) !== -1 && appNotes( 'html' ).indexOf( text('/_admin/features/label/application-off').replace( '%s', nasty.off ) ) !== -1
+			&& appNotes( 'html' ).indexOf( text('/_admin/features/label/application-update').replace( '%s', nasty.update ) ) !== -1
+			&& byTag( card, 'small' ).every( plain ) && findAll( card, function( el ) { return [ 'B', 'I', 'U', 'S' ].indexOf( el.tagName ) !== -1 } ).length === 0 );
+		check( 'a feature that is off and one with an update waiting are told apart on the card, each in a line of its own', appNotes( 'html' ).filter( function( line ) { return line.indexOf( nasty.off ) !== -1 } ).length === 2
+			&& appNotes( 'html' ).filter( function( line ) { return line.indexOf( nasty.update ) !== -1 } ).length === 2 && text('/_admin/features/label/application-off') !== text('/_admin/features/label/application-update') );
+		const linkOf = byTag( appRow( 'htmldone' ), 'a' )[0];
+		check( 'the link named for the application is text as well', linkOf.textContent === text('/_admin/features/label/application-next').replace( '%s', nasty.name ) && linkOf.children.length === 0 );
+
+		const askedBefore = confirms.length;
+		fire( appButton( 'html' ), 'click' );
+		answer( 200, { application : html, todo : [ 'f1', 'f2' ] } );
+		check( 'the question names what is loaded and what is updated by name, in a sentence each, as text', confirms.length === askedBefore + 1
+			&& confirms[confirms.length - 1] === text('/_admin/features/confirm/application').replace( '%s', nasty.name ).replace( '%s', text('/_admin/features/confirm/application-loads').replace( '%s', nasty.off )+ ' '+ text('/_admin/features/confirm/application-updates').replace( '%s', nasty.update ) ) );
+		check( '...and the progress line carries the names as text', appLine( 'html' ).textContent === text('/_admin/features/msg/application-step').replace( '%s', nasty.name ).replace( '%s', nasty.off ).replace( '%s', '1' ).replace( '%s', '2' ) && appLine( 'html' ).children.length === 0 );
+		answer( 400, { error : 'boom', code : 'features_application_failed', params : [ '<em>boom</em>' ] } );
+		answer( 200, listAnswer( CATALOGUE_URL, true, withApplications( [ html, done ] ) ) );
+		check( 'the card of a failure names feature, reason and the features that are on as text', appLine( 'html' ).textContent.indexOf( nasty.off ) !== -1 && appLine( 'html' ).textContent.indexOf( '<em>boom</em>' ) !== -1 && appLine( 'html' ).children.length === 0 );
+
+		// Only an update waiting: the question says that and nothing is "loaded"
+		const upd = { key : 'upd', name : 'Upd', description : '', start : null, next : null, state : 'partial', features : [ feature( 'u0', 'Eins', true ), feature( 'u1', 'Zwei', false, 'update' ) ] };
+		panel._applicationMsg = {};
+		panel.init();
+		answer( 200, listAnswer( CATALOGUE_URL, true, withApplications( [ upd ] ) ) );
+		fire( appButton( 'upd' ), 'click' );
+		answer( 200, { application : upd, todo : [ 'u1' ] } );
+		check( 'an application that has only an update waiting asks to apply it, and says nothing of loading', confirms[confirms.length - 1] === text('/_admin/features/confirm/application').replace( '%s', 'Upd' ).replace( '%s', text('/_admin/features/confirm/application-updates').replace( '%s', 'Zwei' ) ) );
+		check( 'the state of a feature in the answer is one of three, and the three words differ', [ 'on', 'update', 'off' ].length === 3 && upd.features.map( function( f ) { return f.state } ).join() === 'on,update' );
+		confirmAnswer = keep;
+		panel._applicationMsg = {};
+		panel.init();
+		answer( 200, listAnswer( CATALOGUE_URL, true, withApplications( APPLICATIONS ) ) );
+	}
+
+	// The link to the place of an application
+	panel._switchedOn = true;
+	panel.init();
+	answer( 200, listAnswer( CATALOGUE_URL, true, withApplications( APPLICATIONS ) ) );
+	sandbox.URL = URL;
+	sandbox.window.location.href = 'http://project.test/site/_admin/#features';
+	sandbox.window.location.pathname = '/site/_admin/';
+	sandbox.window.location.search = '';
+	let prevented = 0;
+	const reloadsBeforeLink = reloads;
+	const link = byTag( appRow( 'crm' ), 'a' )[0];
+	fire( link, 'click', { preventDefault : function() { prevented++ } } );
+	check( 'where this page switched features on, a link into the workbench loads it anew - the panel of the new feature is not in the page it holds', prevented === 1 && reloads === reloadsBeforeLink + 1 );
+	panel._switchedOn = false;
+	prevented = 0;
+	fire( link, 'click', { preventDefault : function() { prevented++ } } );
+	check( 'otherwise it is an ordinary link', prevented === 0 && reloads === reloadsBeforeLink + 1 );
+	panel._switchedOn = true;
+	fire( byTag( appRow( 'crm' ), 'a' )[0], 'click', { preventDefault : function() { prevented++ } } );
+	sandbox.window.location.pathname = '/other/';
+	prevented = 0;
+	fire( byTag( appRow( 'crm' ), 'a' )[0], 'click', { preventDefault : function() { prevented++ } } );
+	check( 'and a link that leaves the page is never held back', prevented === 0 );
+	panel._switchedOn = false;
+
+	// The tab is part of the address, where the shell has a router
+	const written = [];
+	let current = { panel : 'features', parts : [ 'applications' ] };
+	Nino.admin.router = { current : function() { return current }, set : function( name, parts ) { written.push( [ name, parts ] ) } };
+	panel._tab = 'active';
+	panel._tabFromAddress();
+	check( 'the address #features/applications opens the Applications tab', panel._tab === 'applications' );
+	current = { panel : 'features', parts : [] };
+	panel._tab = 'active';
+	panel._tabFromAddress();
+	check( '...and #features or another panel\'s address leaves the tab as it is', panel._tab === 'active' );
+	current = { panel : 'images', parts : [ 'applications' ] };
+	panel._tabFromAddress();
+	check( '...even when it says "applications" for another panel', panel._tab === 'active' );
+	panel.init();
+	answer( 200, listAnswer( CATALOGUE_URL, true, withApplications( APPLICATIONS ) ) );
+	fire( strip4()[3], 'click' );
+	fire( strip4()[1], 'click' );
+	check( 'a tab press writes the address: #features/applications for this tab, #features for the others', JSON.stringify( written.slice( -2 ) ) === '[["features",["applications"]],["features",[]]]' );
+	delete Nino.admin.router;
+	fire( strip4()[3], 'click' );
+	check( 'a shell without the router goes on without it', panel._tab === 'applications' );
+	panel._tab = 'active';
+	panel._renderPanel();
+}
 
 /*	Switching a feature on or off and installing one end in a reload of the page
 	(or a list read that builds the open settings screen again): the unsaved

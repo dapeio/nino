@@ -136,6 +136,36 @@
 	overflow: visible;
 }
 
+/*	An application is a row that says more than a feature does - what it is
+	for, the features it switches on, which are still off, what it leaves alone
+	- and each of those lines is read, so they stand a little apart. */
+#features-list li[data-application] .admin-features-note {
+	margin-top: .2rem;
+}
+
+/*	What a set-up reports is a sentence or two - which feature stopped it, why,
+	and what is on - and is read from the left like any paragraph. */
+#features-list li[data-application] .admin-features-actions > p {
+	flex: 1 1 18rem;
+	text-align: left;
+}
+
+/*	Where an application leads once it is set up is a link and looks like the
+	button that set it up: the same control, an anchor for what it does. */
+#features-list .admin-features-actions > a.nino-admin-btn-primary {
+	display: inline-flex;
+	align-items: center;
+	box-sizing: border-box;
+	min-height: var(--nino-admin-control-height);
+	padding: .48rem .82rem;
+	border-radius: var(--editor-radius-sm);
+	font-size: .84rem;
+	font-weight: 650;
+	line-height: 1.4rem;
+	text-decoration: none;
+	white-space: nowrap;
+}
+
 /*	Activate on an inactive feature; Install or the archive link on an offer.
 	The script builds them as siblings with no whitespace between them, so
 	without a gap of their own they touch. */

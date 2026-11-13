@@ -45,8 +45,10 @@ key, a name and a description per language, the keys of its features, a `next`
 path to continue in and a `start` that says who provides the start page
 ([the catalogue](_admin.md#the-catalogue)). The setup wizard offers the
 applications of the official catalogue and places and switches on their features
-([Applications](setup.md#5-applications)); a feature does not know of the
-applications it is part of.
+([Applications](setup.md#5-applications)), and so does the Features panel's
+**Applications** tab later, for the catalogue the project reads
+([the panel](_admin.md#the-panel)); a feature does not know of the applications
+it is part of, and setting one up changes no page or route of the project.
 
 `features/` is server-side source: `.htaccess` and `router.php` deny it
 ([deployment](deployment.md#nginx-and-other-web-servers)), and a feature's browser

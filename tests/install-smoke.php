@@ -1297,9 +1297,23 @@ $project = $appProject( 'install-applications' );
 [ $status, $body ] = $appCall( $project, 'applications/list' );
 check( 'the list answers the applications of the signed catalogue that fit this kernel, in its order', $status === 200 && array_column( $body['applications'], 'key' ) === [ 'site', 'shop', 'card', 'blog' ] && $body['message'] === '' && $body['missing'] === [] );
 check( '...one that lists a feature the catalogue does not has no place in it', in_array( 'ghost', array_column( $body['applications'], 'key' ), true ) === false );
-check( '...with the name and the description in the language of the project (de_DE here), else English, and the features it switches on by name',
-	$body['applications'][0]['name'] === 'Seite' && $body['applications'][0]['description'] === 'Eine Seite' && $body['applications'][1]['name'] === 'Shop'
-	&& $body['applications'][0]['features'] === [ [ 'key' => 'alpha', 'name' => 'Alpha Funktion' ], [ 'key' => 'beta', 'name' => 'Beta Funktion' ] ] );
+check( '...with the name and the description in the language of the wizard, English, whatever the language of the project is (de_DE here), and the features it switches on by name in it',
+	$body['applications'][0]['name'] === 'Site' && $body['applications'][0]['description'] === 'A site' && $body['applications'][1]['name'] === 'Shop'
+	&& $body['applications'][0]['features'] === [ [ 'key' => 'alpha', 'name' => 'Alpha feature' ], [ 'key' => 'beta', 'name' => 'Beta feature' ] ] );
+$requestsBefore = $appRequests;
+[ , $planBody ] = $appCall( $project, 'applications/plan', [ 'applications' => [ 'site', 'shop' ] ] );
+check( '...the plan names the features in the language of the wizard as well', array_column( $planBody['features'], 'name' ) === [ 'Alpha feature', 'Beta feature', 'Gamma feature' ] );
+$englishProject = $appProject( 'install-applications-english' );
+$englishProject['/nino/locales/native'] = 'en_US';
+[ , $englishBody ] = $appCall( $englishProject, 'applications/list' );
+check( '...and a project whose own language is English is answered the same, byte for byte', json_encode( $englishBody ) === json_encode( $body ) );
+$onlyGerman = $appList;
+$onlyGerman[0]['name'] = [ 'de_DE' => 'Nur Deutsch' ];
+$appPublish( null, $onlyGerman );
+[ , $germanBody ] = $appCall( $appProject( 'install-applications-fallback' ), 'applications/list' );
+check( '...a text without an English version falls back as the catalogue does everywhere: to the first it has', $germanBody['applications'][0]['name'] === 'Nur Deutsch' );
+$appPublish();
+$appRequests = $requestsBefore;
 check( '...and whether it provides the start page', array_column( $body['applications'], 'start' ) === [ 'starter', null, 'own', 'starter' ] );
 check( 'the answer carries no address, no key and no archive of the catalogue', preg_match( '#https?://|PUBLIC KEY|sha256|archive#', json_encode( $body ) ) === 0 );
 check( 'the catalogue was asked for twice and nothing else: its index and its signature, at the official address', $appRequests === [ \Nino\Catalogue::DEFAULT_URL, \Nino\Catalogue::DEFAULT_URL. '.sig' ] );
@@ -1431,7 +1445,7 @@ $swapped['/nino/catalogue/key'] = $appPublicKey;
 unset( $swapped[ \Nino\Install\Applications::KEY_OVERRIDE ] );
 check( 'a kept catalogue is not believed once the project names another key: the end refuses with the code of that', \Nino\Install\Applications::applied( $swapped, [ 'site' ] ) === 'install_not_official' );
 $targets = \Nino\Install\Applications::targets( $project, $applied );
-check( 'the entry points are the paths of the applied applications that have one, in order, named in the language of the project', $targets === [ [ 'key' => 'site', 'name' => 'Seite', 'next' => '/_admin/#alpha' ], [ 'key' => 'shop', 'name' => 'Shop', 'next' => '/shop' ] ] );
+check( 'the entry points are the paths of the applied applications that have one, in order, named in the language of the wizard, whatever the language of the project is', $targets === [ [ 'key' => 'site', 'name' => 'Site', 'next' => '/_admin/#alpha' ], [ 'key' => 'shop', 'name' => 'Shop', 'next' => '/shop' ] ] );
 check( '...an application without one adds none, and a path that is none is not led to',
 	\Nino\Install\Applications::targets( $project, [ [ 'key' => 'x', 'name' => 'X', 'next' => null ], [ 'key' => 'y', 'name' => 'Y', 'next' => 'https://evil.test/' ], [ 'key' => 'z', 'name' => 'Z', 'next' => '//evil.test' ] ] ) === [] );
 
@@ -1561,7 +1575,7 @@ $withSite = $appProject( 'install-finish-site' );
 $appApplyAll( $withSite, [ 'site' ] );
 [ $status, $body ] = $appFinish( $withSite, [ 'applications' => [ 'site' ] ] );
 check( 'with an application that has an entry point the end creates the starter pages and names the entry point', $status === 200 && $starterOf( $withSite ) === [ 'GET://', 'GET://contact', 'GET://404' ]
-	&& $body === [ 'login' => true, 'targets' => [ [ 'key' => 'site', 'name' => 'Seite', 'next' => '/_admin/#alpha' ] ] ] );
+	&& $body === [ 'login' => true, 'targets' => [ [ 'key' => 'site', 'name' => 'Site', 'next' => '/_admin/#alpha' ] ] ] );
 
 // Several applications: all their entry points
 $appReset();

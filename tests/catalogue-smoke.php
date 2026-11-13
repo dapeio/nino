@@ -918,7 +918,7 @@ publish( $appData, $remote, $features, null, $privateKey );
 $requests = [];
 [ $status, $body ] = callFeatures( $appData, 'apiCatalogue' );
 check( 'apiCatalogue reads the catalogue - two requests - and answers when it was fetched, whether features/ is writable, and one offer per key, sorted: what the script reads, and nothing else', $status === 200
-	&& array_keys( $body ) === [ 'fetched', 'writable', 'offers' ] && $body['writable'] === true
+	&& array_keys( $body ) === [ 'fetched', 'writable', 'offers', 'applications' ] && $body['writable'] === true
 	&& is_string( $body['fetched'] ) && $body['fetched'] !== '' && preg_match( '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $body['fetched'] ) === 1
 	&& array_column( $requests, 'url' ) === [ \Nino\Catalogue::DEFAULT_URL, \Nino\Catalogue::DEFAULT_URL. '.sig' ] && array_column( $body['offers'], 'key' ) === [ 'ancient', 'helper', 'needy', 'sample' ] );
 $offers = array_column( $body['offers'], null, 'key' );
@@ -928,7 +928,7 @@ $offers = array_column( $body['offers'], null, 'key' );
 $requests = [];
 [ $listStatus, $listBody ] = callFeatures( $appData, 'apiList' );
 check( 'apiList carries the cached catalogue too - fetched and the same offers, phrased the same way - with no request of its own', $listStatus === 200 && $requests === []
-	&& is_array( $listBody['catalogue'] ) && array_keys( $listBody['catalogue'] ) === [ 'fetched', 'offers' ]
+	&& is_array( $listBody['catalogue'] ) && array_keys( $listBody['catalogue'] ) === [ 'fetched', 'offers', 'applications' ]
 	&& $listBody['catalogue']['fetched'] === $body['fetched'] && $listBody['catalogue']['offers'] === $body['offers'] );
 check( 'every offer has the same keys, the extension list flattened to ext - the members the script reads, and no other', array_keys( $offers['helper'] ) === [ 'key', 'name', 'description', 'category', 'maturity', 'version', 'nino', 'ext', 'requires', 'archive', 'released', 'state', 'local' ] );
 check( 'the maturity arrives localized like the name, empty for an offer that names none', $offers['helper']['maturity'] === 'Stabil' && $offers['sample']['maturity'] === '' );

@@ -267,6 +267,7 @@ console.log('Nino.adminUi.confirm');
 		'/_admin/keys/confirm/delete' : 'destructive',
 		'/_admin/features/confirm/remove' : 'destructive',
 		'/_admin/features/confirm/deactivate' : 'big',
+		'/_admin/features/confirm/application' : 'big',
 		'/_admin/navs/confirm/delete' : 'destructive',
 		'/_admin/submissions/confirm/delete' : 'destructive',
 	};

@@ -1275,6 +1275,12 @@ namespace Nino\Install {
 	 *												It needs an account first: an index is fetched and a package
 	 *												unpacked only once somebody has proved to be able to log in.
 	 *
+	 *												What decides how an application is set up - the order of the
+	 *												features, what loading needs, when a feature is on and the one
+	 *												step that places a feature and switches it on - is
+	 *												\Nino\Applications, which the Features panel uses as well to set
+	 *												one up later: the wizard is deletable, the panel is not.
+	 *
 	 *												A request applies one feature, so the page can show every one
 	 *												of them as it happens and, where one fails, name it and offer
 	 *												to go on from there: what is switched on stays, and a second
@@ -1366,7 +1372,7 @@ namespace Nino\Install {
 				return;
 			}
 
-			$missing = self::_missing();
+			$missing = \Nino\Applications::missing();
 			if( $missing !== [] ) {
 				self::_offline( $appData, $answer );
 				$answer['missing'] = array_map( static fn( string $key, string $text ): array => [ 'key' => $key, 'text' => $text ], array_keys( $missing ), array_values( $missing ) );
@@ -1413,7 +1419,7 @@ namespace Nino\Install {
 			if( $plan === null )
 				return;
 
-			$locale	= \Nino\Locales::getNativeLocale( $appData );
+			$locale	= \Nino\Applications::LOCALE;
 			$offers	= \Nino\Catalogue::offers( $appData, $plan['catalogue'] );
 
 			\Nino\Http::ok( $request, [ 'features' => array_map(
@@ -1449,40 +1455,19 @@ namespace Nino\Install {
 				return;
 			}
 
-			$offer	= \Nino\Catalogue::offers( $appData, $plan['catalogue'] )[$key];
-			$placed	= false;
+			$result = \Nino\Applications::place( $appData, $plan['catalogue'], $key );
 
-			if( \Nino\Features::get( $appData, $key ) === null ) {
-
-				$result = \Nino\Catalogue::install( $appData, $key, $offer['version'] );
-				if( $result !== true ) {
-					self::refuse( $request, 400, 'install_feature', $result );
-					return;
-				}
-
-				$placed = true;
-			}
-
-			$feature = \Nino\Features::get( $appData, $key );
-			if( $feature === null ) {
-				\Nino\Http::fail( $request, 500, 'feature "'. $key. '" is not there after it was placed' );
+			if( $result['status'] === 500 ) {
+				\Nino\Http::fail( $request, 500, $result['reason'] );
 				return;
 			}
 
-			$activated = false;
-
-			if( self::_isOn( $feature ) === false ) {
-
-				$result = \Nino\Features::activate( $appData, $key );
-				if( $result !== true ) {
-					self::refuse( $request, 400, 'install_feature', $result );
-					return;
-				}
-
-				$activated = true;
+			if( $result['status'] !== 200 ) {
+				self::refuse( $request, 400, 'install_feature', $result['reason'] );
+				return;
 			}
 
-			\Nino\Http::ok( $request, [ 'feature' => $key, 'placed' => $placed, 'activated' => $activated ] );
+			\Nino\Http::ok( $request, [ 'feature' => $key, 'placed' => $result['placed'], 'activated' => $result['activated'] ] );
 		}
 
 		/**
@@ -1554,11 +1539,11 @@ namespace Nino\Install {
 		 */
 		public static function targets( array &$appData, array $applied ): array {
 
-			$locale		= \Nino\Locales::getNativeLocale( $appData );
+			$locale		= \Nino\Applications::LOCALE;
 			$targets	= [];
 
 			foreach( $applied as $application )
-				if( is_string( $application['next'] ) === true && \Nino\Http::isSitePath( $application['next'] ) === true )
+				if( \Nino\Applications::entry( $application ) !== null )
 					$targets[] = [ 'key' => $application['key'], 'name' => \Nino\Features::localized( $application['name'], $locale ), 'next' => $application['next'] ];
 
 			return $targets;
@@ -1585,7 +1570,7 @@ namespace Nino\Install {
 				return null;
 			}
 
-			$missing = self::_missing();
+			$missing = \Nino\Applications::missing();
 			if( $missing !== [] ) {
 				self::refuse( $request, 409, 'install_missing', implode( ', ', array_values( $missing ) ) );
 				return null;
@@ -1614,7 +1599,7 @@ namespace Nino\Install {
 				}
 
 			// In the order of the catalogue, whatever order or repetition was posted
-			$chosen = array_values( array_filter( $offered, static fn( array $application ): bool => in_array( $application['key'], $posted, true ) ) );
+			$chosen = \Nino\Applications::chosen( $offered, $posted );
 
 			if( count( array_filter( $chosen, static fn( array $application ): bool => $application['start'] !== null ) ) > 1 ) {
 				self::refuse( $request, 400, 'install_start_exclusive' );
@@ -1626,13 +1611,7 @@ namespace Nino\Install {
 				return null;
 			}
 
-			$features = [];
-			foreach( $chosen as $application )
-				foreach( $application['features'] as $feature )
-					if( in_array( $feature, $features, true ) === false )
-						$features[] = $feature;
-
-			return [ 'catalogue' => $catalogue, 'features' => $features ];
+			return [ 'catalogue' => $catalogue, 'features' => \Nino\Applications::features( $chosen ) ];
 		}
 
 		/**
@@ -1643,11 +1622,7 @@ namespace Nino\Install {
 		 */
 		private static function _isApplied( array &$appData, array $application ): bool {
 
-			foreach( $application['features'] as $feature )
-				if( self::_isOn( \Nino\Features::get( $appData, $feature ) ) === false )
-					return false;
-
-			return true;
+			return \Nino\Applications::isApplied( $appData, $application );
 		}
 
 		/**
@@ -1708,7 +1683,7 @@ namespace Nino\Install {
 		 */
 		private static function _describe( array &$appData, array $catalogue, array $offered ): array {
 
-			$locale	= \Nino\Locales::getNativeLocale( $appData );
+			$locale	= \Nino\Applications::LOCALE;
 			$offers	= \Nino\Catalogue::offers( $appData, $catalogue );
 			$list		= [];
 
@@ -1716,7 +1691,7 @@ namespace Nino\Install {
 				$list[] = [
 					'key'					=> $application['key'],
 					'applied'			=> self::_isApplied( $appData, $application ),
-					'entry'				=> is_string( $application['next'] ) === true && \Nino\Http::isSitePath( $application['next'] ) === true,
+					'entry'				=> \Nino\Applications::entry( $application ) !== null,
 					'name'				=> \Nino\Features::localized( $application['name'], $locale ),
 					'description'	=> \Nino\Features::localized( $application['description'], $locale ),
 					'features'		=> array_map( static fn( string $key ): array => [ 'key' => $key, 'name' => \Nino\Features::localized( $offers[$key]['name'], $locale ) ], $application['features'] ),
@@ -1792,40 +1767,6 @@ namespace Nino\Install {
 			$appData['/nino/catalogue/key'] = $official;
 
 			return true;
-		}
-
-		/**
-		 *	What loading an application needs and this server lacks
-		 *
-		 *	@return 	array										key => phrase, [] when nothing is missing
-		 */
-		private static function _missing(): array {
-
-			$missing = [];
-
-			if( function_exists( 'openssl_verify' ) === false )
-				$missing['openssl'] = 'the openssl extension, which checks the signature of the catalogue';
-
-			if( class_exists( 'PharData' ) === false || extension_loaded( 'zlib' ) === false )
-				$missing['unpack'] = 'the Phar and zlib extensions, which unpack what is downloaded';
-
-			if( function_exists( 'curl_init' ) === false && filter_var( ini_get( 'allow_url_fopen' ), FILTER_VALIDATE_BOOLEAN ) === false )
-				$missing['http'] = 'the curl extension or allow_url_fopen, which download the catalogue';
-
-			if( \Nino\Catalogue::writable() === false )
-				$missing['features'] = 'a features/ directory the web server can write to';
-
-			return $missing;
-		}
-
-		/**
-		 *	@param		array|null	$feature			A feature as Features::get() answers it
-		 *
-		 *	@return 	bool											Whether it is on at the version its directory carries, with nothing against it
-		 */
-		private static function _isOn( ?array $feature ): bool {
-
-			return $feature !== null && $feature['active'] === true && $feature['problems'] === [] && $feature['installed'] === $feature['version'];
 		}
 	}
 

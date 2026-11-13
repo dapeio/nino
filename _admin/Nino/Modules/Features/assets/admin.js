@@ -3,7 +3,8 @@
  *	admin.js								"Features" module: every feature installed under
  *													features/, sorted into three tabs - Available (what
  *													the catalogue offers that is not already current, so
- *													an install or an update), Inactive and Active - a
+ *													an install or an update), Inactive and Active - and a
+ *													fourth beside them, Applications; a
  *													shared action bar above them holding the one Refresh
  *													catalogue button. An active feature has a screen of
  *													its own, behind its chevron and left again through the
@@ -39,6 +40,19 @@
  *													the feature's shortcodes still stand, the same way:
  *													the answer carries both, and the page that could
  *													show them is the one being reloaded.
+ *
+ *													A fourth tab, Applications, lists the applications the
+ *													catalogue offers - named sets of features that belong
+ *													together - with how far each is set up: all of its
+ *													features on, some, or none. Set up loads what is missing
+ *													and switches it on, one feature to a request so every
+ *													one shows as it happens; where one fails it stops and
+ *													says what is on already, and pressing again goes on from
+ *													there. It asks first (a question of the workbench's
+ *													modes, as a deactivation does), changes no page, route
+ *													or start page, and ends in a reload like every switch.
+ *													Once an application is set up it links to the place the
+ *													catalogue names for it.
  *
  *													features/list answers the catalogue exactly as
  *													\Nino\Catalogue::cached() last left it on disk, so the
@@ -95,6 +109,12 @@
 		// across a re-render for the same reason, and dropped by _renderHead()
 		// when the category it names is no longer among the ones on offer
 		_category 	: '',
+		// application key => { text, error }: what the last set-up of each said, kept
+		// across the re-render a failed one ends in (the card is built fresh each time)
+		_applicationMsg : {},
+		// Whether this page switched a feature on: the workbench it holds was built
+		// before that, so a link into a panel that feature brings needs it built again
+		_switchedOn : false,
 		// The key of the feature whose own screen is open, '' while the list
 		// is - as state, so the reload a save ends in comes back to the same
 		// screen rather than dropping to the list
@@ -153,6 +173,8 @@
 				Nino.admin.features._writable			= response.writable === true;
 				Nino.admin.features._cache 				= response.catalogue || null;
 				Nino.admin.features._features			= response.features || [];
+				if( Nino.admin.features._ready === false )
+					Nino.admin.features._tabFromAddress();
 				Nino.admin.features._renderPanel();
 				Nino.admin.features._ready = true;
 
@@ -221,6 +243,12 @@
 
 			wrap.appendChild( Nino.admin.features._renderHead() );
 
+			// Four tabs are more than a phone's strip holds, and it scrolls: the one that
+			// is open - from the address, after a reload - is brought into view
+			const open = dc.getElementById( 'features-tabbutton-'+ Nino.admin.features._tab );
+			if( open !== null && typeof open.scrollIntoView === 'function' )
+				open.scrollIntoView( { block : 'nearest', inline : 'nearest' } );
+
 			Nino.admin.features._renderTabContent( wrap );
 
 			if( Nino.admin.features._catalogueUrl !== '' )
@@ -247,7 +275,7 @@
 		 *	the filter lets through, so a search says which tab the match is
 		 *	on rather than how much is being hidden
 		 *
-		 *	@return		{Object}							{ active, inactive, available }
+		 *	@return		{Object}							{ active, inactive, available, applications }
 		 */
 		_counts : function() {
 			const matches = Nino.admin.features._matches;
@@ -255,6 +283,7 @@
 				active		: Nino.admin.features._features.filter( function( f ) { return f.active === true && matches( f ) } ).length,
 				inactive	: Nino.admin.features._features.filter( function( f ) { return f.active === false && matches( f ) } ).length,
 				available	: Nino.admin.features._availableOffers().filter( matches ).length,
+				applications	: Nino.admin.features._applications().filter( Nino.admin.features._matchesApplication ).length,
 			};
 		},
 
@@ -348,6 +377,50 @@
 		},
 
 		/**
+		 *	The applications the cached catalogue offers this kernel, as the panel
+		 *	phrased them
+		 *
+		 *	@return		{Array}
+		 */
+		_applications : function() {
+			const cache = Nino.admin.features._cache;
+			return cache === null || Array.isArray( cache.applications ) === false ? [] : cache.applications;
+		},
+
+		/**
+		 *	Whether one application is what the search box is looking for: its
+		 *	name, its key or its description. The category narrows features and
+		 *	offers, and an application has none
+		 *
+		 *	@param		{Object}	application
+		 *
+		 *	@return		{boolean}
+		 */
+		_matchesApplication : function( application ) {
+
+			const query = Nino.admin.features._filter.trim().toLowerCase();
+
+			return query === '' || [ application.name, application.key, application.description ].join( ' ' ).toLowerCase().indexOf( query ) !== -1;
+		},
+
+		/**
+		 *	The tab the address names: #features/applications opens the
+		 *	Applications tab, which is where a set-up ends after its reload
+		 *
+		 *	@return		void
+		 */
+		_tabFromAddress : function() {
+
+			if( typeof Nino.admin.router !== 'object' || Nino.admin.router === null || typeof Nino.admin.router.current !== 'function' )
+				return;
+
+			const hash = Nino.admin.router.current();
+
+			if( hash.panel === 'features' && hash.parts[0] === 'applications' )
+				Nino.admin.features._tab = 'applications';
+		},
+
+		/**
 		 *	The head of the list: the two filters over everything the tabs
 		 *	hold - the search box and the category - in a row that stays at
 		 *	the top of a long list (see assets/admin.css). The tab strip
@@ -420,7 +493,7 @@
 
 			// Nothing to narrow when everything on screen shares one category -
 			// a select with a single option is a control that cannot be used
-			if( categories.length > 1 )
+			if( categories.length > 1 && Nino.admin.features._tab !== 'applications' )
 				head.appendChild( Nino.admin.features._renderCategoryFilter( categories ) );
 
 			return head;
@@ -472,7 +545,7 @@
 		},
 
 		/**
-		 *	The tab strip: three tabs, each labelled with its count, wired
+		 *	The tab strip: four tabs, each labelled with its count, wired
 		 *	through the shared button row so the active one is underlined and
 		 *	a click switches the panel below without reloading anything.
 		 *	Active first: what this installation runs is what a panel opens on
@@ -487,7 +560,7 @@
 
 			const counts	= Nino.admin.features._counts();
 
-			// Three literal lookups rather than one built from a key: a fill
+			// Literal lookups rather than one built from a key: a fill
 			// that only a concatenated argument ever names is invisible to
 			// the static check every panel script is held to (see
 			// tests/admin-shell-smoke.php and tests/admin-features-js-smoke.js)
@@ -495,15 +568,16 @@
 				available	: Nino.content.getText('/_admin/features/tab/available'),
 				inactive	: Nino.content.getText('/_admin/features/tab/inactive'),
 				active		: Nino.content.getText('/_admin/features/tab/active'),
+				applications	: Nino.content.getText('/_admin/features/tab/applications'),
 			};
 			const buttons	= {};
 
-			[ 'active', 'inactive', 'available' ].forEach( function( key ) {
+			[ 'active', 'inactive', 'available', 'applications' ].forEach( function( key ) {
 				const btn = dc.createElement('button');
 				btn.type = 'button';
 				btn.id = 'features-tabbutton-'+ key;
 				btn.setAttribute( 'role', 'tab' );
-				// The one panel below the strip, which the three tabs share -
+				// The one panel below the strip, which the four tabs share -
 				// a tab that controls nothing is a tab a screen reader can say
 				// nothing about, see _renderTabContent()
 				btn.setAttribute( 'aria-controls', 'features-tabpanel' );
@@ -515,6 +589,7 @@
 
 			Nino.adminUi.buttonRow( buttons, Nino.admin.features._tab, function( key ) {
 				Nino.admin.features._tab = key;
+				Nino.admin.features._address();
 				Nino.admin.features._renderPanel();
 			}, 'aria-selected' );
 
@@ -592,7 +667,7 @@
 					return;
 				}
 
-				Nino.admin.features._cache 				= { fetched : response.fetched, offers : response.offers };
+				Nino.admin.features._cache 				= { fetched : response.fetched, offers : response.offers, applications : response.applications || [] };
 				Nino.admin.features._writable			= response.writable === true;
 				Nino.admin.features._catalogueMsg	= { text : '', error : false, busy : false };
 				Nino.admin.features._renderPanel( Nino.admin.features._holdsInput() );
@@ -613,7 +688,7 @@
 			panel.className = 'nino-admin-tabpanel';
 			panel.id = 'features-tabpanel';
 			panel.setAttribute( 'role', 'tabpanel' );
-			// The three tabs draw into this one panel rather than into three,
+			// The four tabs draw into this one panel rather than into four,
 			// so the panel names whichever of them is open - and each of them
 			// names the panel (see _renderTabs())
 			panel.setAttribute( 'aria-labelledby', 'features-tabbutton-'+ Nino.admin.features._tab );
@@ -623,6 +698,8 @@
 				return Nino.admin.features._fillInstalled( panel, false );
 			if( Nino.admin.features._tab === 'active' )
 				return Nino.admin.features._fillInstalled( panel, true );
+			if( Nino.admin.features._tab === 'applications' )
+				return Nino.admin.features._fillApplications( panel );
 			return Nino.admin.features._fillAvailable( panel );
 		},
 
@@ -726,6 +803,421 @@
 			rows.className = 'nino-admin-list';
 			shown.forEach( function( offer ) { rows.appendChild( Nino.admin.features._renderOffer( offer, Nino.admin.features._writable === true ) ) } );
 			panel.appendChild( rows );
+		},
+
+		/**
+		 *	Write the tab into the address - #features/applications for the
+		 *	Applications tab, #features for the others - where the shell has a
+		 *	router, so a reload comes back to the tab it was pressed on
+		 *
+		 *	@return		void
+		 */
+		_address : function() {
+
+			if( typeof Nino.admin.router !== 'object' || Nino.admin.router === null || typeof Nino.admin.router.set !== 'function' )
+				return;
+
+			Nino.admin.router.set( 'features', Nino.admin.features._tab === 'applications' ? [ 'applications' ] : [] );
+		},
+
+		/**
+		 *	The Applications tab: why there is nothing to show, in order - the
+		 *	catalogue is off, it was never loaded, it offers no application
+		 *	for this kernel, the search matched none of them - else what an
+		 *	application is and what setting one up leaves alone, the readonly
+		 *	notice where it applies, then one row per application
+		 *
+		 *	@param		{Element}	panel
+		 *
+		 *	@return		void
+		 */
+		_fillApplications : function( panel ) {
+
+			if( Nino.admin.features._catalogueUrl === '' ) {
+				panel.appendChild( Nino.adminUi.emptyState( Nino.adminUi.format( Nino.content.getText('/_admin/features/hint/catalogue-off'), Nino.admin.features._dir ) ) );
+				return;
+			}
+
+			if( Nino.admin.features._cache === null ) {
+				panel.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/features/hint/applications-unloaded') ) );
+				return;
+			}
+
+			const all = Nino.admin.features._applications();
+
+			if( all.length === 0 ) {
+				panel.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/features/hint/applications-empty') ) );
+				return;
+			}
+
+			const shown = all.filter( Nino.admin.features._matchesApplication );
+
+			if( shown.length === 0 ) {
+				panel.appendChild( Nino.adminUi.emptyState( Nino.content.getText('/_admin/features/hint/nomatch') ) );
+				return;
+			}
+
+			const intro = dc.createElement('p');
+			intro.className = 'nino-admin-hint';
+			intro.textContent = Nino.content.getText('/_admin/features/hint/applications');
+			panel.appendChild( intro );
+
+			if( Nino.admin.features._writable === false ) {
+				const readonly = dc.createElement('p');
+				readonly.className = 'nino-admin-error';
+				readonly.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/features/hint/catalogue-readonly'), Nino.admin.features._dir );
+				panel.appendChild( readonly );
+			}
+
+			const rows = dc.createElement('ul');
+			rows.className = 'nino-admin-list';
+			shown.forEach( function( application ) { rows.appendChild( Nino.admin.features._renderApplication( application, Nino.admin.features._writable === true ) ) } );
+			panel.appendChild( rows );
+		},
+
+		/**
+		 *	One application as a row: its name and how far it is set up - a word,
+		 *	never a colour alone -, what it is for, the features it switches on and
+		 *	which of them are still off, what it leaves alone, and the button its
+		 *	state allows: Set up while a feature is off, the link to its place once
+		 *	all are on
+		 *
+		 *	@param		{Object}	application	An entry of the cached catalogue's applications
+		 *	@param		{boolean}	writable		Whether the features directory can be written
+		 *
+		 *	@return		{Element}							<li>
+		 */
+		_renderApplication : function( application, writable ) {
+
+			const row = dc.createElement('li');
+			row.dataset.application = application.key;
+			row.dataset.state = application.state;
+
+			const copy = dc.createElement('div');
+			copy.className = 'nino-admin-list-copy';
+
+			const title = dc.createElement('strong');
+			title.textContent = application.name;
+			copy.appendChild( title );
+
+			const labels = {
+				applied	: Nino.content.getText('/_admin/features/state/applied'),
+				partial	: Nino.content.getText('/_admin/features/state/partial'),
+				none		: Nino.content.getText('/_admin/features/state/none'),
+			};
+
+			Nino.admin.features._badge( title, labels[ application.state ] || '' );
+
+			if( application.description !== '' )
+				copy.appendChild( Nino.admin.features._note( application.description, false ) );
+
+			const names = function( state ) {
+				return application.features.filter( function( feature ) { return feature.state === state } ).map( function( feature ) { return feature.name } ).join( ', ' );
+			};
+
+			copy.appendChild( Nino.admin.features._note( Nino.adminUi.format( Nino.content.getText('/_admin/features/label/application-features'), application.features.map( function( feature ) { return feature.name } ).join( ', ' ) ), false ) );
+
+			// Which are off, by name: what Set up is about to load and switch on
+			// ...and which have an update waiting, which setting up applies: another thing than being off
+			if( application.state === 'partial' && names( 'off' ) !== '' )
+				copy.appendChild( Nino.admin.features._note( Nino.adminUi.format( Nino.content.getText('/_admin/features/label/application-off'), names( 'off' ) ), false ) );
+			if( names( 'update' ) !== '' )
+				copy.appendChild( Nino.admin.features._note( Nino.adminUi.format( Nino.content.getText('/_admin/features/label/application-update'), names( 'update' ) ), false ) );
+
+			// Who provides the start page: this never changes it, and for an
+			// application that brings one of its own the feature offers it itself
+			if( application.start === 'own' )
+				copy.appendChild( Nino.admin.features._note( Nino.content.getText('/_admin/features/hint/application-start-own'), false ) );
+			else if( application.start === 'starter' )
+				copy.appendChild( Nino.admin.features._note( Nino.content.getText('/_admin/features/hint/application-start-starter'), false ) );
+
+			row.appendChild( copy );
+			row.appendChild( Nino.admin.features._renderApplicationActions( application, writable ) );
+
+			return row;
+		},
+
+		/**
+		 *	What an application offers: Set up while a feature of it is off and
+		 *	features/ can be written - Try again where the last attempt stopped -,
+		 *	the link to its place once every feature is on, and the line the
+		 *	progress and the failures are written into
+		 *
+		 *	@param		{Object}	application
+		 *	@param		{boolean}	writable
+		 *
+		 *	@return		{Element}							<div>
+		 */
+		_renderApplicationActions : function( application, writable ) {
+
+			const actions = dc.createElement('div');
+			actions.className = 'admin-features-actions';
+
+			const msg = dc.createElement('p');
+			msg.className = 'nino-admin-hint';
+			msg.setAttribute( 'aria-live', 'polite' );
+
+			const kept = Nino.admin.features._applicationMsg[ application.key ];
+
+			if( kept !== undefined ) {
+				msg.textContent = kept.text;
+				if( kept.error === true )
+					msg.classList.add('nino-admin-error');
+			}
+
+			if( application.state !== 'applied' && writable === true ) {
+
+				const setup = dc.createElement('button');
+				setup.type = 'button';
+				setup.className = 'nino-admin-btn-primary';
+				setup.dataset.action = 'application-setup';
+				setup.textContent = kept !== undefined && kept.error === true
+					? Nino.content.getText('/_admin/features/label/application-retry')
+					: Nino.content.getText('/_admin/features/label/application-setup');
+				setup.addEventListener( 'click', function() { Nino.admin.features._setUp( application, setup, msg ) } );
+				actions.appendChild( setup );
+			}
+
+			// The server answers a path of the site and nothing else; a script that links to a
+			// string does not take that on trust: one slash first, never a second or a backslash
+			if( application.state === 'applied' && typeof application.next === 'string' && /^\/(?![\/\\])/.test( application.next ) === true ) {
+
+				const link = dc.createElement('a');
+				link.className = 'nino-admin-btn-primary';
+				link.dataset.action = 'application-next';
+				link.href = Nino.dir+ application.next;
+				link.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/features/label/application-next'), application.name );
+				link.addEventListener( 'click', function( ev ) { Nino.admin.features._follow( ev, link ) } );
+				actions.appendChild( link );
+			}
+
+			actions.appendChild( msg );
+
+			return actions;
+		},
+
+		/**
+		 *	Follow the link to an application's place. A place in the workbench
+		 *	differs from this page in the fragment alone, which is no navigation:
+		 *	where this page switched features on, the workbench it holds was built
+		 *	before and has no panel for them, so the page is loaded anew
+		 *
+		 *	@param		{Event}		ev
+		 *	@param		{Element}	link
+		 *
+		 *	@return		void
+		 */
+		_follow : function( ev, link ) {
+
+			if( Nino.admin.features._switchedOn !== true )
+				return;
+
+			const target = new URL( link.href, wn.location.href );
+
+			if( target.pathname+ target.search !== wn.location.pathname+ wn.location.search || target.hash === '' )
+				return;
+
+			ev.preventDefault();
+			wn.location.href = target.href;
+			wn.location.reload();
+		},
+
+		/**
+		 *	Set an application up. Asks first what the unsaved input of the page
+		 *	is worth (the reload this ends in builds every form again), then the
+		 *	server what it comes to - what loading needs, the catalogue believed,
+		 *	which features are off - and then the person, in the words of the
+		 *	workbench's modes; only then does the first feature load
+		 *
+		 *	@param		{Object}	application
+		 *	@param		{Element}	btn
+		 *	@param		{Element}	msg
+		 *	@param		{boolean}	[guarded]		The unsaved input of the page was asked about already
+		 *
+		 *	@return		void
+		 */
+		_setUp : function( application, btn, msg, guarded ) {
+
+			if( guarded !== true ) {
+				Nino.admin.features._guard( function() { Nino.admin.features._setUp( application, btn, msg, true ) } );
+				return;
+			}
+
+			btn.disabled = true;
+			msg.classList.remove('nino-admin-error');
+			msg.textContent = Nino.content.getText('/_admin/features/msg/application-checking');
+			delete Nino.admin.features._applicationMsg[ application.key ];
+
+			Nino.admin.features._apiCall( 'application-plan', { application : application.key }, function( status, response ) {
+
+				if( status !== 200 || response === null ) {
+					btn.disabled = false;
+					btn.focus();
+					msg.classList.add('nino-admin-error');
+					msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/features/error/application-plan' );
+					return;
+				}
+
+				const todo = response.todo || [];
+				const named = function( state ) {
+					return response.application.features.filter( function( feature ) { return todo.indexOf( feature.key ) !== -1 && feature.state === state } ).map( function( feature ) { return feature.name } ).join( ', ' );
+				};
+				const loads = named( 'off' );
+				const updates = named( 'update' );
+				// What it comes to, in a sentence for each kind: loaded and switched on, and updated
+				const comes = [
+					loads !== '' ? Nino.adminUi.format( Nino.content.getText('/_admin/features/confirm/application-loads'), loads ) : '',
+					updates !== '' ? Nino.adminUi.format( Nino.content.getText('/_admin/features/confirm/application-updates'), updates ) : '',
+				].filter( Boolean ).join( ' ' );
+
+				// Nothing left to load: the list was a step behind the project
+				if( todo.length === 0 ) {
+					btn.disabled = false;
+					msg.textContent = Nino.content.getText('/_admin/features/msg/application-nothing');
+					Nino.admin.features.init();
+					return;
+				}
+
+				Nino.adminUi.confirm( 'big', {
+					message		: Nino.adminUi.format( Nino.content.getText('/_admin/features/confirm/application'), application.name, comes ),
+					yes				: Nino.content.getText('/_admin/features/label/application-setup'),
+					no				: Nino.content.getText('/_admin/common/label/cancel'),
+					kind			: 'primary',
+					opener		: btn,
+					onChoose	: function( ok ) {
+
+						// The button was held while the plan was read, and a button that is
+						// held cannot take the focus back from the question that closes
+						if( ok === false ) {
+							btn.disabled = false;
+							btn.focus();
+							msg.textContent = '';
+							return;
+						}
+
+						Nino.admin.features._runApplication( response.application, todo, 0, btn, msg );
+					},
+				} );
+			} );
+		},
+
+		/**
+		 *	Load and switch on the features still off, one request each, and say
+		 *	which is under way. The first that fails stops the run: it is named
+		 *	with what is on already, and the button goes on from there. When the
+		 *	last is on, the answer is said in a dialog and the workbench is built
+		 *	again, as every switch does, on the tab the set-up was made on
+		 *
+		 *	@param		{Object}	application	As the plan answered it
+		 *	@param		{Array}		todo				Feature keys, in the order they are applied
+		 *	@param		{number}	index				Which of them is next
+		 *	@param		{Element}	btn
+		 *	@param		{Element}	msg
+		 *
+		 *	@return		void
+		 */
+		_runApplication : function( application, todo, index, btn, msg ) {
+
+			const nameOf = function( key ) {
+				const feature = application.features.filter( function( f ) { return f.key === key } )[0];
+				return feature === undefined ? key : feature.name;
+			};
+
+			if( index >= todo.length ) {
+
+				const said = Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/application-done'), application.name, todo.map( nameOf ).join( ', ' ) );
+
+				msg.textContent = said+ ' '+ Nino.content.getText('/_admin/features/msg/reload');
+				wn.alert( said );
+
+				wn.location.hash = '#features/applications';
+				wn.location.reload();
+				return;
+			}
+
+			msg.classList.remove('nino-admin-error');
+			msg.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/application-step'), application.name, nameOf( todo[ index ] ), index + 1, todo.length );
+
+			Nino.admin.features._apiCall( 'application-apply', { application : application.key, feature : todo[ index ] }, function( status, response ) {
+
+				if( status !== 200 || response === null ) {
+
+					const reason = Nino.adminUi.api.errorText( status, response, '/_admin/features/error/application-apply' );
+
+					// What is on now, from the project and not from the count: a
+					// feature that was placed and not switched on is not among them
+					Nino.admin.features._applicationStopped( application, nameOf( todo[ index ] ), reason, btn );
+					return;
+				}
+
+				Nino.admin.features._switchedOn = true;
+				Nino.admin.features._runApplication( application, todo, index + 1, btn, msg );
+			} );
+		},
+
+		/**
+		 *	A set-up that stopped: read the list again, so the cards and the
+		 *	state of the features are the project's, and write on the card of
+		 *	the application which feature failed, why, and which of its features
+		 *	are on
+		 *
+		 *	@param		{Object}	application
+		 *	@param		{string}	failed			The name of the feature that stopped it
+		 *	@param		{string}	reason			The sentence of the failure
+		 *	@param		{Element}	btn
+		 *
+		 *	@return		void
+		 */
+		_applicationStopped : function( application, failed, reason, btn ) {
+
+			Nino.admin.features._apiCall( 'list', {}, function( status, response ) {
+
+				let on = [];
+
+				if( status === 200 && response !== null ) {
+
+					Nino.admin.features._dir 					= response.dir || '';
+					Nino.admin.features._catalogueUrl	= response.catalogueUrl || '';
+					Nino.admin.features._writable			= response.writable === true;
+					Nino.admin.features._cache 				= response.catalogue || null;
+					Nino.admin.features._features			= response.features || [];
+
+					const now = Nino.admin.features._applications().filter( function( a ) { return a.key === application.key } )[0];
+
+					if( now !== undefined )
+						on = now.features.filter( function( feature ) { return feature.on === true } ).map( function( feature ) { return feature.name } );
+				}
+
+				Nino.admin.features._applicationMsg[ application.key ] = {
+					text	: Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/application-stopped'), application.name, failed, reason, on.length === 0 ? Nino.content.getText('/_admin/features/label/none') : on.join( ', ' ) ),
+					error	: true,
+				};
+
+				btn.disabled = false;
+				Nino.admin.features._renderPanel( Nino.admin.features._holdsInput() );
+
+				// The card was drawn again, and the focus went with the button that
+				// held it: it goes to the one that goes on from here
+				const retry = Nino.admin.features._applicationButton( application.key );
+
+				if( retry !== null )
+					retry.focus();
+			} );
+		},
+
+		/**
+		 *	The Set up button of one application's card, where it is drawn
+		 *
+		 *	@param		{string}	key
+		 *
+		 *	@return		{Element|null}
+		 */
+		_applicationButton : function( key ) {
+
+			const wrap = dc.getElementById('features-list');
+			const row = wrap === null ? null : Array.prototype.filter.call( wrap.querySelectorAll('li[data-application]'), function( li ) { return li.dataset.application === key } )[0];
+
+			return row === undefined || row === null ? null : row.querySelector('button[data-action="application-setup"]');
 		},
 
 		/**
@@ -1640,7 +2132,7 @@
 			bar.setAttribute( 'role', 'tablist' );
 
 			// Two literal lookups rather than one built from the key, for the
-			// reason _renderTabs() spells its three out: a fill that only a
+			// reason _renderTabs() spells its four out: a fill that only a
 			// concatenated argument ever names is invisible to the static check
 			// every panel script is held to
 			const labels = {
