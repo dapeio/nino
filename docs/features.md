@@ -20,7 +20,7 @@ project holds it with a version, settings in `config.php` and files under `data/
 | Kind | Where | Switched on by |
 |---|---|---|
 | **Kernel module** | `_nino/Nino/Modules/<Name>/`, Nino's own | the setup wizard, or `/nino/modules` by hand |
-| **Feature** | `features/<Name>/` with `feature.php`: from outside, held by the project | the Features panel |
+| **Feature** | `features/<Name>/` with `feature.php`: from outside, held by the project | the Features panel, or an application of the setup wizard |
 | **Project module** | `app/<Vendor>/...` under a namespace of its own, the project's | `/nino/modules` by hand |
 
 "Module" is a class listed in `/nino/modules` whose `init()` the kernel calls;
@@ -38,6 +38,15 @@ directory `Nino/Modules/<Name>` in `_nino/` or `_admin/`: `Components`, `Element
 `\Nino\Modules\<Name>\Admin` among them, would be the kernel's. `NINO_FEATURES_DIR`, defined
 before `_nino/Nino.php` loads (the entry points carry the line commented out),
 replaces the directory as a whole.
+
+A set of features that only works together is offered as an **application**: an
+entry of the catalogue's index (`applications`), not a package of its own - a
+key, a name and a description per language, the keys of its features, a `next`
+path to continue in and a `start` that says who provides the start page
+([the catalogue](_admin.md#the-catalogue)). The setup wizard offers the
+applications of the official catalogue and places and switches on their features
+([Applications](setup.md#5-applications)); a feature does not know of the
+applications it is part of.
 
 `features/` is server-side source: `.htaccess` and `router.php` deny it
 ([deployment](deployment.md#nginx-and-other-web-servers)), and a feature's browser
@@ -847,7 +856,8 @@ JavaScript tests carry a stand-in of their own and run with any Nino.
   key or a text key the project has.
 - It does not reach the network on a page request, and never but through
   `\Nino\Fetch`; Nino itself makes no outbound request unless someone presses
-  **Refresh catalogue** or **Install** ([the workbench manual](_admin.md#features)).
+  **Refresh catalogue** or **Install** ([the workbench manual](_admin.md#features)),
+  or reaches the Applications step of the setup wizard.
 - It does not write output (no `echo`, `header()`, `http_response_code()` or `exit`;
   the response is `Http::ok()`, `fail()` or `redirect()`) and does not build markup
   in PHP: a template, read by `\Nino\Feature::template()`, holds it (an icon and a

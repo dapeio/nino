@@ -1,17 +1,19 @@
 <?php return [
-	// Part of the starter site the Routes step opens on, at this position
-	// in the list. A proposal the operator edits or removes - not a default
-	// underneath config.php, which could never be removed at all
+	// Part of the starter site the wizard creates when it ends, at this
+	// position in the list - and only where the project has no page route
+	// yet. From then on the page is the project's, to edit or remove in the
+	// Routes panel: not a default underneath config.php, which could never be
+	// removed at all
 	'preset' 		=> 1,
 	'label' 		=> 'Home',
 	'routes' 		=> [
 		'GET://' => [ 'uri' => '/home', 'body' => '[template /templates/page-home]', 'navs' => [ 'main' => 5, 'footer' => 5 ] ],
 	],
 	'templates' => [ 'page-home.tpl' ],
-	// What the Webpages step starts this page's name, title and description
+	// What the starter pages start this page's name, title and description
 	// from: a string, or a string per locale. They are not text fragments -
-	// a [[/_nino/webpage/...]] key is the system's, written by that step under
-	// the Element-URI the page is mounted at, not under this folder's name
+	// a [[/_nino/webpage/...]] key is the system's, written by the wizard
+	// under the Element-URI the page is mounted at, not under this folder's name
 	'suggest' => [
 		'uri' 				=> '/',
 		'name' 				=> [ 'en_US' => 'Home', 'de_DE' => 'Startseite' ],

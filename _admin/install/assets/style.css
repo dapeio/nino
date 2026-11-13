@@ -3,8 +3,8 @@
 /**
  *	Nino										A compact filesystembased php framework
  *	style.css								What is genuinely local to the setup wizard: the step
- *													switcher, the environment report, the route list and
- *													the finish screen.
+ *													switcher, the environment report, the applications
+ *													and the finish screen.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -57,7 +57,7 @@
 #install-content-wrap > div {
 	display: none;
 }
-#install-page-wrap.show-checks #install-content-checks, #install-page-wrap.show-setup #install-content-setup, #install-page-wrap.show-webpages #install-content-webpages, #install-page-wrap.show-personalinfos #install-content-personalinfos, #install-page-wrap.show-accounts #install-content-accounts, #install-page-wrap.show-finish #install-content-finish {
+#install-page-wrap.show-checks #install-content-checks, #install-page-wrap.show-setup #install-content-setup, #install-page-wrap.show-personalinfos #install-content-personalinfos, #install-page-wrap.show-accounts #install-content-accounts, #install-page-wrap.show-applications #install-content-applications, #install-page-wrap.show-finish #install-content-finish {
 	display: block;
 }
 
@@ -85,6 +85,14 @@
 	color: var(--editor-text-secondary);
 	font-size: .76rem;
 }
+/*	The green of a word on the light page or on the tint of its own colour, one step
+ *	towards the text: the tokens' green is a surface and an ink at once and measured
+ *	4.4 to 4.5:1 as a small word on its own soft ground. In the dark scheme the same
+ *	mix is a step towards the light text, which is what a word on a dark ground wants */
+#install-page-wrap {
+	--install-green-ink: color-mix(in srgb, var(--editor-green) 72%, var(--editor-text));
+}
+
 /*	Both a word and a colour: "OK"/"FAIL" has to survive a colour-blind reader
  *	and a greyscale screenshot */
 .install-check-status {
@@ -96,72 +104,54 @@
 }
 .install-check-status--ok {
 	background: var(--editor-green-soft);
-	color: var(--editor-green);
+	color: var(--install-green-ink);
 }
 .install-check-status--fail {
 	background: var(--editor-red-soft);
 	color: var(--editor-red-ink);
 }
 
-/* ----------------------------------------------------------- Routes step */
+/* ------------------------------------------------------- Applications step */
 
-/*	List + drill-down form, the same shape /_admin's Routes module has: the list
- *	is a shared .nino-admin-list (see webpages.js) and the form is bare
- *	<fieldset>s the design system already styles. Only the reorder cluster and
- *	the per-locale row are local. */
-
-#webpages-list .nino-admin-list > li {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
+/*	A row of the checklist that says more than a name: the name, what the
+ *	application is for and which features it switches on, stacked beside the
+ *	box. The shared checklist centres a one-line row; this one starts at the
+ *	top, where the box and the name meet. */
+.install-apps label {
+	align-items: flex-start;
 }
-#webpages-list .nino-admin-list > li > a {
-	flex: 1 1 auto;
+.install-apps input {
+	margin-top: .2rem;
+}
+.install-app-copy {
+	display: flex;
+	flex-direction: column;
+	gap: .15rem;
 	min-width: 0;
-	font: .78rem/1.4 var(--nino-admin-mono);
 }
-.install-webpage-move {
-	display: flex;
-	flex: 0 0 auto;
-	gap: .25rem;
-	padding: 0 .65rem;
-}
-.install-webpage-move button {
-	display: inline-grid;
-	place-items: center;
-	width: 1.85rem;
-	height: 1.85rem;
-	min-height: 0;
-	padding: 0;
-	border-radius: var(--editor-radius-sm);
-	box-shadow: inset 0 0 0 1px var(--editor-border);
-	font-size: .76rem;
-	line-height: 1;
-}
-.install-webpage-move button:disabled {
-	opacity: .32;
-}
-.install-webpage-requires {
-	margin: .5rem 0 0;
-}
-.install-webpage-locale-row {
-	display: grid;
-	grid-template-columns: 3.2rem 1fr 1fr;
-	align-items: start;
-	gap: .5rem;
-	padding: .5rem 0;
-	border-top: 1px solid var(--editor-separator);
-}
-.install-webpage-locale-row:first-child {
-	border-top: 0;
-}
-.install-webpage-locale-label {
-	padding-top: .5rem;
+.install-app-copy small {
 	color: var(--editor-text-secondary);
-	font: .7rem/1.4 var(--nino-admin-mono);
+	font-size: .76rem;
+	line-height: 1.45;
 }
-.install-webpage-locale-row textarea {
-	grid-column: 2 / -1;
+#applications-notice-text {
+	margin: 0;
+	font-size: .88rem;
+}
+.install-apps-missing {
+	margin: .5rem 0;
+	padding-left: 1.1rem;
+	font-size: .84rem;
+}
+.install-apps-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: .5rem;
+	margin: .6rem 0 .4rem;
+}
+.install-check-status--idle {
+	background: var(--nino-admin-surface-muted);
+	color: var(--editor-text-secondary);
 }
 
 /* ------------------------------------------ Personal Infos and Accounts */
@@ -199,22 +189,11 @@
 }
 
 #install-page-wrap.show-setup #setup-msg,
-#install-page-wrap.show-webpages #webpages-msg,
 #install-page-wrap.show-personalinfos #personalinfos-msg,
 #install-page-wrap.show-accounts #accounts-add-msg,
+#install-page-wrap.show-applications #applications-msg,
 #install-page-wrap.show-finish #finish-msg {
 	display: block;
-}
-
-/* ------------------------------------------------------------- Responsive */
-
-@media (max-width: 36rem) {
-	.install-webpage-locale-row {
-		grid-template-columns: 1fr;
-	}
-	.install-webpage-locale-label, .install-webpage-locale-row textarea {
-		grid-column: 1;
-	}
 }
 
 }
@@ -262,7 +241,7 @@
 	color: var(--editor-text-secondary);
 }
 #install-page-wrap .install-finish-eyebrow {
-	color: var(--editor-green);
+	color: var(--install-green-ink);
 }
 #install-page-wrap .install-next-steps {
 	display: grid;
@@ -294,6 +273,14 @@
 	border-color: color-mix(in srgb, var(--install-next-accent) 48%, var(--editor-border));
 	box-shadow: var(--editor-shadow);
 }
+/*	An application's entry point has no picture of its own: the name and an arrow */
+#install-page-wrap .install-next-step--application {
+	grid-template-columns: minmax(0, 1fr) auto;
+}
+#install-page-wrap .install-next-step--application::after {
+	content: "\2192";
+	color: var(--install-next-accent);
+}
 #install-page-wrap .install-next-step-icon {
 	display: grid;
 	place-items: center;
@@ -312,6 +299,19 @@
 	flex-direction: column;
 	gap: .28rem;
 	min-width: 0;
+}
+/*	A name the catalogue wrote has no say over where it breaks: a long word wraps on the
+ *	button, in the link, in the rows and in the choice instead of pushing the page wide */
+#install-page-wrap #finish-submit {
+	max-width: 100%;
+	height: auto;
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+#install-page-wrap .install-next-step-copy,
+#install-page-wrap .install-app-copy,
+#install-page-wrap .install-check-row-name {
+	overflow-wrap: anywhere;
 }
 #install-page-wrap .install-next-step-copy strong {
 	font-size: .92rem;
@@ -346,23 +346,10 @@
 	color: var(--editor-red-ink);
 }
 
-/* Screen-level chrome that only one step wants */
-#install-context-action {
-	display: none;
-}
-#install-page-wrap.show-webpages:not(.is-editing-webpage) #install-context-action {
-	display: inline-block;
-}
-/* #install-actions-wrap, not a bare descendant .nino-admin-actionbar: the
-   webpage form builds an action bar of its own (see webpages.js) and mounts
-   it inside #webpages-form, ie. inside #install-page-wrap - a descendant
-   selector took that one down too, hiding the form's own Save/Delete
-   buttons exactly while a route was being edited. */
-#install-page-wrap.show-webpages.is-editing-webpage #install-actions-wrap,
+/* The finished wizard has nothing left to go back or forward to */
 #install-page-wrap.show-finish.is-complete #install-actions-wrap {
 	display: none;
 }
-#install-page-wrap.show-webpages.is-editing-webpage #install-content-webpages > .nino-admin-hint,
 #install-page-wrap.show-finish.is-complete #install-content-finish > .nino-admin-hint {
 	display: none;
 }

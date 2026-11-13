@@ -1927,7 +1927,7 @@ namespace Nino\Modules {
 		 *	attribute or in a fixed text, is read as a text is: an entity in it - the
 		 *	&amp; that a fill of a field puts there - is the character it stands for,
 		 *	so that it is escaped once. An address that is a key under /_nino/webpage/ -
-		 *	a page's own, which the Routes step writes without the directory the
+		 *	a page's own, which the wizard and the Routes panel write without the directory the
 		 *	project is served from - is written with that directory in front of it,
 		 *	as the navigation writes it.
 		 *

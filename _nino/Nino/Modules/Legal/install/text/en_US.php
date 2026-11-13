@@ -1,7 +1,7 @@
 <?php
 // _nino/Nino/Modules/Legal/install/text/en_US.php - the names, titles and descriptions of the two pages (the
-// system's /_nino/webpage keys of their Element-URIs, which the wizard's
-// Routes step and the Routes panel write for any other page) and the Elements
+// system's /_nino/webpage keys of their Element-URIs, which the starter pages
+// of the wizard and the Routes panel write for any other page) and the Elements
 // panel's words for the two types. The words of the workbench are on the
 // unit's blacklist, so the Text panel leaves them out
 return [

@@ -11,10 +11,10 @@ Until its last step has been completed, `/_admin` answers with the wizard instea
 - checks PHP and write permissions;
 - sets languages and modules;
 - creates the project directories from its library, the site's look among them;
-- sets up the first web pages;
 - records central website information;
 - creates the first developer accounts of the workbench;
-- sets the recovery password.
+- offers the applications of Nino's official catalogue and, when asked, places and switches on their features;
+- creates the starter pages and sets the recovery password.
 
 The wizard is not an update tool for a running project. After successful completion, it locks itself out for good and `_admin/install/` can be removed from production delivery.
 
@@ -28,7 +28,8 @@ Three different rules apply:
 
 | Data Type | Behavior When Reapplying |
 |---|---|
-| Languages, modules, generated routes, and page list | the visible selection replaces the previously managed state by the assistant |
+| Languages and modules | the visible selection replaces the previously managed state by the assistant; a feature an application switched on stays on |
+| Applications | the features of the applications picked are placed and switched on; what is on already is left as it is, and nothing is switched off by picking less |
 | Templates, texts, and element types | are supplemented or updated but not automatically deleted |
 | The look - `assets/theme.css` and the two frame templates | files with the same name are overwritten |
 
@@ -107,54 +108,7 @@ Setup seeds `/nino/html/assets`' bundle with the two project entries if they are
 
 Up to Nino 1.1 the wizard asked four questions here - a theme from a catalogue of ten, a header and a footer from thirteen frames, and the design values compiled out of them. It does not any more. The look is changed afterwards by the **Design** feature from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features/blob/main/features/Design/feature.php), which compiles its own `assets/theme.css` and frame templates over the delivered ones - and asks before it replaces a file it did not write. The delivered `assets/theme.css` is the body of what that compiler writes at its defaults, regenerated from it with each kernel release, so the look a project starts from and the first look Design compiles are one: its file carries the kernel's header and no stamp of the compiler's, which is why Design asks.
 
-## 3. Routes
-
-This step creates the public page structure. The list can be supplemented, edited, deleted, and sorted. With "Continue", the entire visible list is applied as the new state.
-
-Each page requires:
-
-- an **Element URI** as a stable internal identity;
-- an **HTTP URI** as the publicly accessible path;
-- a **Template** from the page library, or the route's existing project template;
-- **Navigation Name**, **Page Title**, and **Description** for each active language;
-- one checkbox per navigation registered in `/nino/html/navs`.
-
-The step keeps no list of its own: it writes `/nino/http/routes` and the `/_nino/webpage<uri>/*` text keys — `name`, `title` and `description` per locale, plus `uri` (the page's reachable path) once in `text/global.php`, blacklisted as a technical value — and reads the list back out of them the next time it runs. Menu membership goes onto the page's own route as `'navs' => [ 'main' => 1, ... ]`, using the page's position in the list as its priority — sorting the list here is what orders the menus.
-
-The Element URI is the anchor for page texts like `/_nino/webpage<uri>/title`. The HTTP URI is the path visible in the browser. This separation allows the internal identity to remain stable even if the public path changes.
-
-A new page starts from the selected library template's own suggestions: its HTTP URI, plus Navigation Name, Page Title, and Description in **every** active language, read from the unit's `suggest` entry in its manifest - a string or one string per language each, `'uri'`, `'name'`, `'title'` and `'description'`. They are no text keys: a `/_nino/webpage<uri>/*` key is the system's, and the step writes it under the Element URI the page is mounted at. Switching the template only updates fields that are still untouched — anything typed by hand survives the switch. A field left empty still falls back to the generic placeholder ("Page", "Page Title").
-
-Of the one route in a page unit's `routes`, the step reads the `body`, the `statusCode`, the `navs` it proposes and a `locale` that limits the unit to one language. The key and the `uri` are the step's to write: it keys the route by the HTTP URI of the page and sets `uri` to its Element URI. The library's units spell out what that gives by default - `GET:/` plus the suggested URI (`GET://404` for `/404`, `GET://` for `/`), and `/<unit folder>` - and changing either in a manifest moves nothing.
-
-A page unit may also declare unit-relative `files`. They are copied to the same
-virtual project paths, so `images/template/page-home/hero/background.svg`
-becomes the project's public `images/template/page-home/hero/background.svg`.
-
-A unit that shows a picture declares it as an **image slot** with
-`imageSlots`, keyed by the slot uri - `'/template/page-home/hero/background'
-=> [ 'label' => [ 'en_US' => 'Home – hero image', 'de_DE' => 'Startseite –
-Titelbild' ], 'width' => 1920, 'height' => 1080, 'filename' =>
-'template/page-home/hero/background.svg' ]` - and its template shows it with
-`[image /template/page-home/hero/background alt=""]` instead of a literal
-`<img>`. The starter site's home hero is seeded with a neutral placeholder
-drawing, a small SVG Nino ships; it carries the slot's own name, so an upload
-replaces it and **Remove image** deletes it, and the library keeps the source.
-A `filename` is a file the unit ships under `files` and is checked once the files
-are copied; without one the slot starts empty, which is how the base unit
-declares `/logo` and `/logo/dark`. The label is one string for the project, in its native
-language. The Routes step - and the Setup step, for the base unit - only **adds** slots: a slot
-the project already has - label, size and image - is left as it is, and the
-first unit to name a uri wins. A seed file that cannot be copied or a slot that
-cannot be declared fails the step by name before any route is written.
-
-A route on the **Blank** template gets its own copy of that template, named after its Element URI: a `/team` route is created as `templates/page-team.tpl` and rendered by `[template /templates/page-team]`. Blank is the empty starting point, so every route picking it needs a page of its own — a shared file would mean editing one blank page rewrote all of them. A nested Element URI flattens into a single name (`/jobs/open` → `page-jobs-open.tpl`), because that is the shape the template pickers list. An existing file is never overwritten, so re-running this step leaves work already done in such a page alone. From then on the route owns its template and reads back as its own page rather than as the Blank unit — the same thing a page created in `/_admin` is. Every other template is a finished page and stays shared. One name it cannot take: an Element URI whose template name a library page already owns — `/home`, `/contact` and the other finished pages — is refused, naming the page that has it, because both would write the same `templates/page-*.tpl`.
-
-The reserved paths `/_admin`, `/_nino`, `/private`, `/public`, `/app`, `/tests`, `/features`, `/docs` and `/history` cannot be used as a public page, nor a path below one of them (`/features/x`), whatever the case or the number of slashes: the router never hands them to a page, or they are the kernel's and the workbench's own trees. `/docs` and `/history` are reserved for as long as their directory is in the checkout - a project with a page of its own there deletes it, as [Deployment](deployment.md) says. The Routes panel refuses them the same way (`\Nino\Http::RESERVED_URIS`). `/featured` and `/apps` are no such paths. Neither can the two Element URIs `/legal/imprint` and `/legal/privacy`: the Legal module owns them with their routes, their names and their menu entries, and a page of your own with one of them is refused with a 409 - whatever unit or template it picks. A page on the Blank template whose name would write the module's own `page-legal-imprint.tpl` is refused too, naming the unit `legal`.
-
-The step offers every registered navigation as a checkbox, `legal` the third beside `main` and `footer`; the starter pages are in none of them for it. The imprint and the privacy policy are not part of this list: the module registers their routes at runtime, one per language, and the Legal pages are in the navigation `legal` from the first run on.
-
-## 4. Personal Information
+## 3. Personal Information
 
 This step records central company and website values as textfills. It edits nothing else: of the keys the base unit ships, only those under `/project/company/` and `/project/website/general/` - the technical `/project/website/html/` values and the look of the mails are outside both - each labelled by its category and its name ("Company › Address", "Website › URL"), in English like the whole wizard. All of them can be edited later in the workbench's Text panel.
 
@@ -174,7 +128,7 @@ These textfills are used in templates, meta tags, and possibly in the footer or 
 
 The links to the site's profiles elsewhere - Instagram, YouTube and the like - are not asked for here: they are the catalogue feature [Social links](https://github.com/dapeio/nino-features/blob/main/features/Social/feature.php), an element type the editors keep under Elements once it is switched on.
 
-## 5. Accounts
+## 4. Accounts
 
 This step creates the root account of the workbench: the **Developer** role, full access over `/*`, the account you sign in to `/_admin` with. Submit again for a second one, then continue. Editor accounts with fewer rights are created later, in the workbench's **Users** panel, from the **Editor** role - both roles are written by the Setup step and edited on the Users panel's roles tab.
 
@@ -187,9 +141,27 @@ Both can be changed later under **Users**. The accounts live in `config.php` und
 
 Each account is signed in to your browser as you create it. Whether that sign-in outlives the wizard is decided by the last step: with exactly one account, finishing opens the workbench as that account; with several, finishing ends the session and `/_admin` asks which one you are.
 
+## 5. Applications
+
+An **application** is a short, named set of features from Nino's [catalogue](_admin.md#the-catalogue) with a place to continue in: *Website*, *Blog*, later others - each one only worth having as a whole. The step is the one place the wizard reaches the network, and only when you reach it, which is not before the first account exists: an index is fetched and a package unpacked once somebody has proved to be able to log in.
+
+*Without an application* is the default, and the way ahead whatever the catalogue answers. What the step offers is the applications of the **official** catalogue - the address and the key built into the kernel - that fit this version of Nino, each with its name, what it is for and the features it switches on. A project whose `config.php` names another catalogue address or key, or switches the catalogue off (`/nino/catalogue/url`, `/nino/catalogue/key`), gets none, and the step says so in a sentence; the Features panel is where such a catalogue is used. Nothing a request carries changes which catalogue the step reads.
+
+An application says who provides the start page of the site (`start` in the index): `starter` - the starter pages the wizard creates, see [Finish](#6-finish) -, `own` - the application brings its own through a feature - or nothing. Those that say something exclude each other and are a radio group (*None*, then one of them); the others are checkboxes, and any number of them goes with the one chosen above. The Website and the vCard, say, cannot both own the start page, and a Website and a CRM can share one instance.
+
+Once a start application is set up the choice is taken: coming back to the step, the group is fixed on it and disabled, with a sentence that says its features can be switched off, and others switched on, later in the Features panel; the applications of the checkboxes that are set up are checked and fixed, the others stay open. The server holds the same line: a plan, an apply or the end of the wizard with another start application than the one that is set up - or with none - is a 409 (`install_start_applied`). Where the catalogue cannot be reached, a step back or a new load still shows what is set up: the answer carries the applications of the catalogue that was kept (`data/catalogue.php`) when one of them is in, the group is fixed on the start application, nothing further can be chosen - the step says the catalogue is not reachable - and *Next* and the end of the wizard go on with what is set up. Without a kept catalogue or an application that is in, it is a sentence and *Try again* as ever. Until one is complete the choice stays open, and so does *None* and *Continue without an application* after a failure. A larger application being applied, a blog on top of the website's features, has the smaller one on half way; that is no other choice.
+
+The index it fetched is kept in `data/catalogue.php`, where the Features panel finds it as well; the last step reads what it needs to know about the applications picked from there and asks nobody for the network.
+
+Before it loads anything the step checks what loading needs and names what is missing instead of failing in the middle: the `openssl` extension (the signature), `Phar` and `zlib` (unpacking the archives), `curl` or `allow_url_fopen` (the download), and a `features/` directory the web server can write to. A catalogue that cannot be reached, or whose signature does not hold, is a sentence and *Try again*; the way without an application stays open.
+
+*Next* applies what is picked: the plan lists the features of the chosen applications, each once - the applications in the order of the catalogue, the features of each in the order it lists them - and each of them is downloaded, checked against the signed catalogue (size and SHA-256 of the archive), placed below `features/` and switched on in a request of its own, so that every one shows as it happens. The features a feature requires come along, as in the Features panel. Where one fails, the wizard stays in the step: it names the feature and says why, *Try again* goes on from there - what is switched on is skipped -, and *Continue without an application* leaves what is on, on, and says so. Pages a feature brings through its install unit are kept as they are.
+
+Going back to the Languages step and applying it again leaves the features that are switched on switched on; picking fewer applications later switches nothing off - that is done in the Features panel.
+
 ## 6. Finish
 
-The last step sets the **recovery password** and locks the wizard. It is not a login: `/_admin/recovery.php` asks for it when the accounts themselves are what is broken - to restore a backup, set a password or create an account with full access - and the workbench asks for it in one place only, the Recovery password tab of Users, which changes it (see [Recovery](_admin.md#recovery)).
+The last step creates the starter pages, sets the **recovery password** and locks the wizard. It is not a login: `/_admin/recovery.php` asks for it when the accounts themselves are what is broken - to restore a backup, set a password or create an account with full access - and the workbench asks for it in one place only, the Recovery password tab of Users, which changes it (see [Recovery](_admin.md#recovery)).
 
 Provide:
 
@@ -197,7 +169,36 @@ Provide:
 
 Its hash is written to `private/.auth/pw.php` and the project is marked installed via `/nino/install/completed` in `config.php`. Either of those alone keeps the wizard locked, so losing the password file does not hand it back. Neither lives in a tool folder, which is what lets an update replace `_nino/`, `_admin/` and the modules wholesale.
 
-If completion fails, check the write permissions of the `private/` directory. After this step the wizard is locked and cannot be reopened short of clearing `/nino/install/completed` and removing the stored secret. A setup with one account continues straight into the workbench, signed in as that account; with several accounts the wizard shows where to continue and `/_admin` serves the login.
+If completion fails, check the write permissions of the `private/` directory. After this step the wizard is locked and cannot be reopened short of clearing `/nino/install/completed` and removing the stored secret.
+
+Where it continues depends on the applications that went through. The end takes only what is really applied: an application reported whose features are not all on is a 409 (`install_not_applied`), like a key the catalogue does not list. The wizard names the button that ends it after what it leads to: with exactly one application that went through and has an entry point (`next`, a path of the project, an anchor allowed) the button is *Set up <name>* - the name as the step shows it, in the language of the project - and a setup with one account continues straight into that entry point, signed in as that account; without one it ends the wizard and continues into the workbench. With several applications that have an entry point the button stays *Finish installation* and the final page offers a *Set up <name>* link for each of them among the next steps; the same holds where the session is ended because there are several accounts, and `/_admin` then serves the login. The entry point is a path of the project: a scheme, a second leading slash or a control character makes the catalogue drop it.
+
+### The starter pages
+
+There is no step for pages: a project builds its structure in the workbench's **Routes** panel, which reads and writes the same routes and `/_nino/webpage<uri>/*` text keys. What the wizard does create, when it ends, is the **starter pages** - Start, Contact and the 404 page, the page units of `_admin/install/library/pages/` whose manifest claims a `'preset'` position, in the order of that position. It does so silently and only when the project has no page route yet (a `GET` route whose body is a `templates/page-*.tpl` template) and no application that went through says `start` is `own`, in which case the application's start page is the only one.
+
+Whatever the project has, the empty page template `templates/page-blank.tpl` is put in place - the template alone, no route, never over a file that is there: it is the one the Routes panel starts **New route** on. Where an applied application provides the start page itself, the 404 page is the one starter page that is made, and only where no route answers with the status 404 yet: no start page, no contact page, no menu entry. Its link to the start page is the fill `/_nino/webpage/home/uri`, which the starter page *Start* would write; here it is written as `/` (blacklisted like the others), unless something has written it.
+
+A starter page is created like the page unit of a module, with the unit's own suggestions: its route is keyed by the unit's suggested HTTP URI (`GET://` for `/`, `GET://404` for `/404`) and carries the Element URI `/<unit folder>` as its `uri`, the unit's `statusCode` and - where the Navigation module is on - the menus the unit's route proposes, with the page's position in the list as its priority. The unit's `suggest` entry gives the HTTP URI, the name, title and description in **every** active language, a string or one string per language each; they are no text keys - a `/_nino/webpage<uri>/*` key is the system's, written under the Element URI the page is mounted at, together with `uri` (the page's reachable path) once in `text/global.php`, blacklisted as a technical value. A language the unit has no wording for falls back to English. Templates, `elementTypes`, the unit's text and unit-relative `files` are copied the way a module's unit is; a file or a seed the unit names and does not carry fails the step by name, before a route is written, and the wizard stays open.
+
+A unit that shows a picture declares it as an **image slot** with
+`imageSlots`, keyed by the slot uri - `'/template/page-home/hero/background'
+=> [ 'label' => [ 'en_US' => 'Home – hero image', 'de_DE' => 'Startseite –
+Titelbild' ], 'width' => 1920, 'height' => 1080, 'filename' =>
+'template/page-home/hero/background.svg' ]` - and its template shows it with
+`[image /template/page-home/hero/background alt=""]` instead of a literal
+`<img>`. The starter site's home hero is seeded with a neutral placeholder
+drawing, a small SVG Nino ships; it carries the slot's own name, so an upload
+replaces it and **Remove image** deletes it, and the library keeps the source.
+A `filename` is a file the unit ships under `files` and is checked once the files
+are copied; without one the slot starts empty, which is how the base unit
+declares `/logo` and `/logo/dark`. The label is one string for the project, in its native
+language. The starter pages - and the Setup step, for the base unit - only **add** slots: a slot
+the project already has - label, size and image - is left as it is, and the
+first unit to name a uri wins. A seed file that cannot be copied or a slot that
+cannot be declared fails the call by name before any route is written.
+
+The units of that folder that claim no position (`about-me`, `services`, `blank`) are not applied by the wizard, and no interface offers them: they are material. Of `blank` only its template is put in place, as above. The Routes panel only wires an existing `templates/page-*.tpl` to a path.
 
 ## Verify the Result and Remove the Wizard
 
@@ -214,15 +215,15 @@ Everything the wizard copies from is one-time installer source, in one of four s
 | `_admin/install/library/base/` | always-applied routes, templates, texts, and assets |
 | `_nino/Nino/Modules/<Module>/install/`, `app/…/<Module>/install/` | a module's own unit, beside the class it activates - applied on every run for Nino's own (`ALWAYS_MODULES`), a choice for a project's |
 | `_admin/install/library/modules/<key>/` | a selectable unit without a runtime class of its own |
-| `_admin/install/library/pages/<key>/` | starting point for one concrete page |
+| `_admin/install/library/pages/<key>/` | one concrete page; the units that claim a `'preset'` position are the starter pages |
 
 Everything below `_admin/install/` is removed together with the wizard after completion; a module's `install/` directory stays with its module, and only the wizard reads it. The library is setup material, not a runtime plugin system.
 
 Module units are found, not listed: the wizard scans `_nino/Nino/Modules/*/install/` - Nino's own optional modules - and then the whole application directory (`app/`, or `NINO_APP_DIR`) up to four levels deep, plus `_admin/install/library/modules/`. A unit's key - what the picker posts and what `requiresModules` names - is the manifest's `key` or, without one, the module directory's lowercased name; it must be a slug and unique, and the first unit to claim a key keeps it, so Nino's own modules keep theirs.
 
-The manifest keys of a unit - what each does, and which of them a page unit's `requiresModules` reaches - are listed in the [installer package recipe](recipes/installer-package.md), which is also the step-by-step for writing one. The two keys that carry content, `elements` and `navs`, are applied add-only by the same `applyUnit()` that a feature's activation uses; see [Legal](development.md#legal) for `\Nino\Elements::seed()`.
+The manifest keys of a unit - what each does - are listed in the [installer package recipe](recipes/installer-package.md), which is also the step-by-step for writing one. The two keys that carry content, `elements` and `navs`, are applied add-only by the same `applyUnit()` that a feature's activation uses; see [Legal](development.md#legal) for `\Nino\Elements::seed()`.
 
-Not scanned: `features/`. A feature carries an `install/` unit of the same shape, but `\Nino\Features::activate()` applies it when the feature is switched on in the workbench - through the same `applyUnit()` the wizard uses, with overwrite on here and add-only there, so that the unit application survives the removal of `_admin/install/`. See [the install unit of a feature](features.md#the-install-unit).
+Not scanned: `features/`. A feature carries an `install/` unit of the same shape, but `\Nino\Features::activate()` applies it when the feature is switched on - in the workbench, or by the wizard's Applications step - through the same `applyUnit()` the wizard uses for a module, with overwrite on here and add-only there, so that the unit application survives the removal of `_admin/install/`. See [the install unit of a feature](features.md#the-install-unit).
 
 `Maintenance` ships with the kernel and has no unit to pick: `\Nino\Install\Setup` lists it in `/nino/modules` on every run, so its panel is in the workbench from the first `config.php` on.
 

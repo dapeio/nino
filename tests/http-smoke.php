@@ -1024,6 +1024,11 @@ foreach( [ '//evil.example.com/x', '/\\evil.example.com/x', 'javascript:alert(1)
 }
 check( 'anything but a path of the site or an http(s) url is a warning and changes nothing: another host written as a path, a scheme that runs, a relative path, a header split', $redirectRefused === [] );
 
+// The same question, asked on its own: a catalogue entry point is checked by it
+check( 'isSitePath() answers for a path of the site - a query and an anchor belong to it - and for nothing that leaves it',
+	array_filter( [ '/', '/shop', '/_admin/#builder', '/crm?tab=1#list' ], static fn( string $path ): bool => \Nino\Http::isSitePath( $path ) === false ) === []
+	&& array_filter( [ '//evil.example.com/x', '/\\evil.example.com/x', 'javascript:alert(1)', 'relative/path', '', 'https://example.org/', '/a:b', "/x\r\ny", '/x y' ], static fn( string $path ): bool => \Nino\Http::isSitePath( $path ) === true ) === [] );
+
 $redirectStatus = [];
 foreach( [ 301, 302, 303, 307, 308 ] as $status ) {
 	$redirectRequest = $redirected();

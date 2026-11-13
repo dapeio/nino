@@ -2,7 +2,7 @@
 
 /**
  *	Nino										A compact filesystembased php framework
- *	Install									Step 4: bulk-fill the /project/company/* and
+ *	Install									Step 3: bulk-fill the /project/company/* and
  *													/project/website/general/* text keys every project
  *													has (global.php + per-locale
  *													text/<locale>.php) in one form instead of clicking through

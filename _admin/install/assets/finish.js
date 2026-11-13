@@ -5,8 +5,10 @@
  *	Install									Step 6, the last one: set the recovery password. Success
  *													here is what locks the wizard back out for good - see
  *													_admin/install/Install.php's Finish class. A one-account
- *													setup goes straight on into the workbench, signed in as
- *													that account; any other shows where to continue.
+ *													setup goes straight on - into the entry point of the one
+ *													application that has one, else into the workbench - signed
+ *													in as that account; any other, and one with several entry
+ *													points, shows where to continue.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -19,7 +21,83 @@
 
 	Nino.install.finish = {
 
-		showCurrent : function() {},
+		/**
+		 *	The button that ends the wizard is named for what it leads to: with exactly one
+		 *	application that went through and has an entry point it is "Set up <name>", the
+		 *	name as the applications step shows it, and it leads there; otherwise it ends the
+		 *	wizard and says so
+		 *
+		 *	@return		void
+		 */
+		showCurrent : function() {
+
+			const button = dc.getElementById('finish-submit');
+			if( button === null )
+				return;
+
+			const entries = Nino.install.applications !== undefined ? Nino.install.applications.appliedEntries() : [];
+
+			if( entries.length === 1 ) {
+				button.textContent = 'Set up '+ entries[0].name;
+				button.dataset.application = entries[0].key;
+			}
+			else {
+				button.textContent = 'Finish installation';
+				delete button.dataset.application;
+			}
+		},
+
+		/**
+		 *	Go to a path of the project. The wizard is at /_admin/, and an entry
+		 *	point that differs from it in the fragment alone (/_admin/#builder) is
+		 *	no navigation - the page would stay where it is - so it is loaded anew
+		 *
+		 *	@param		{string}	path
+		 *
+		 *	@return		void
+		 */
+		_go : function( path ) {
+
+			const target = new URL( path, wn.location.href );
+			const sameDocument = target.pathname+ target.search === wn.location.pathname+ wn.location.search;
+
+			wn.location.href = target.href;
+
+			if( sameDocument === true && target.hash !== '' )
+				wn.location.reload();
+		},
+
+		/**
+		 *	One more next step per application that has an entry point, beside
+		 *	the two the page always offers
+		 *
+		 *	@param		{Array}		targets			[ { key, name, next } ]
+		 *
+		 *	@return		void
+		 */
+		_targets : function( targets ) {
+
+			const wrap = dc.getElementById('finish-next-steps');
+
+			targets.forEach( function( target ) {
+
+				const link = dc.createElement('a');
+				link.className = 'install-next-step install-next-step--application';
+				link.href = Nino.dir+ target.next;
+				link.target = '_blank';
+
+				const copy = dc.createElement('span');
+				copy.className = 'install-next-step-copy';
+
+				const name = dc.createElement('strong');
+				name.textContent = 'Set up '+ target.name;
+				copy.appendChild( name );
+				link.dataset.application = target.key;
+
+				link.appendChild( copy );
+				wrap.appendChild( link );
+			} );
+		},
 
 		_submit : function( ev ) {
 
@@ -36,21 +114,31 @@
 
 			msg.textContent = 'Saving …';
 
-			Nino.install.apiCall( 'finish/complete', { password : pw.value }, function( status, response ) {
+			// The applications that went through the last step: the server believes
+			// them only as far as their features are on
+			const applications = Nino.install.applications !== undefined ? Nino.install.applications.applied() : [];
+
+			Nino.install.apiCall( 'finish/complete', { password : pw.value, applications : applications }, function( status, response ) {
 				if( status !== 200 || response === null ) {
 					msg.textContent = '('+ status+ ') '+ ( ( response && response.error ) ? response.error : 'Failed to finish.' );
 					return;
 				}
 
+				const targets = Array.isArray( response.targets ) ? response.targets : [];
+
 				// The server kept this session signed in - the one account the
-				// wizard created - so the workbench is the next page, not a
-				// choice. With several accounts it ended the session, and the
-				// panel below offers the login among the next steps
-				if( response.login === true ) {
-					msg.textContent = 'Opening the workbench …';
-					wn.location.href = Nino.dir+ '/_admin/';
+				// wizard created - so the next page is not a choice: the entry point
+				// of the one application that has one, else the workbench. With
+				// several accounts it ended the session, and with several entry
+				// points there is a choice; the panel below offers them, and the
+				// login, among the next steps
+				if( response.login === true && targets.length <= 1 ) {
+					msg.textContent = targets.length === 1 ? '' : 'Opening the workbench …';
+					Nino.install.finish._go( Nino.dir+ ( targets.length === 1 ? targets[0].next : '/_admin/' ) );
 					return;
 				}
+
+				Nino.install.finish._targets( targets );
 
 				// Cleared, not left on "Saving …" - the done panel below replaces
 				// the form but not this line, so the finished wizard used to show

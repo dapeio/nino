@@ -96,7 +96,7 @@ Supported unit keys in the current installer:
 | --- | --- |
 | `key` | Unit key; default is the module directory's lowercased name |
 | `label` | Picker label |
-| `preset` | `true` pre-checks the unit on a project that has never applied Setup |
+| `preset` | `true` pre-checks the unit on a project that has never applied Setup. On a page unit it is a number instead: the position of a starter page, see [the starter pages](../setup.md#the-starter-pages) |
 | `moduleClass` | Full runtime class added to `/nino/modules` |
 | `requiresModules` | Other units' keys |
 | `routes` | Installer-owned route map |
@@ -126,21 +126,18 @@ unit answers to is skipped with a warning, never applied. Keep the dependency
 graph small and acyclic even though the resolver terminates cycles. A cycle
 usually indicates mixed responsibilities.
 
-A page unit that requires this module names the same installer slug:
+A page unit names the modules its templates use the same way:
 
 ```php
 'requiresModules' => [ 'catalog' ],
 ```
 
-Test installing both through the module picker and through a page that
-auto-requires it. The current Webpages auto-require path activates the class and
-applies module templates, text, blacklist, and config; it does not apply a
-module manifest's own `requiresModules`, `routes`, `files`, `elementTypes`,
-`elements` or `navs`.
-List the complete required-module closure on the page when needed. If the page
-depends on the other resources, either put a supported resource in the page
-unit, ensure it is shipped independently, or extend `Install.php` symmetrically
-and test both application paths. Do not assume the two paths are identical.
+The wizard applies a page unit only as one of the starter pages, after its
+always-on modules, and does not read the list: it documents what the page needs,
+and `tests/keys-smoke.php` reads it to know whose texts the page's keys may
+come from. A starter page can therefore name only a module the wizard always
+applies (`ALWAYS_MODULES`). If a page depends on other resources, put a supported
+resource in the page unit or ensure it is shipped independently.
 
 ## Templates and locale gating
 
@@ -208,7 +205,7 @@ type, every value, every element the file does not name. It does so whatever
 the caller's overwrite flag says, which is the difference to `templates` and
 text: elements are the editors' content, so a second wizard run never resets
 one. The key is read by `\Nino\Features::applyUnit()` - the wizard's and a
-feature's activation - and not by the auto-require path of a page. A path
+feature's activation. A path
 that leaves the unit, is absolute or is no file fails the step by name; a
 value that does not fit the model is left out and logged. See
 [Developing a feature](../features.md#the-install-unit) for a feature's use of it and
@@ -220,8 +217,8 @@ value that does not fit the model is left out and logged. See
 'navs' => [ 'legal' => [ '/legal/imprint', '/legal/privacy' ] ],
 ```
 
-Only the wizard's apply step reads it - a feature's activation and the page
-auto-require path do not, since a feature brings no menu. A key the project
+Only the wizard's apply step reads it - a feature's activation does not, since a
+feature brings no menu. A key the project
 does not have under `/nino/html/navs` is added to it, and the Element-URIs
 become its members, priority 1, 2, ... in that order, under
 `/nino/html/navroutes`. The entries are Element-URIs - the `uri` of a
@@ -326,7 +323,7 @@ Extend `tests/install-smoke.php`. Test:
 - config defaults are created but an existing custom value survives reapply;
 - deselection updates the module list but does not delete copied project files;
 - unrelated routes and config survive;
-- and any page requiring the module produces a working installed project.
+- and a starter page that uses the module produces a working installed project.
 
 Run:
 

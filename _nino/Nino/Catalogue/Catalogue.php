@@ -51,6 +51,20 @@ namespace Nino {
 	 *										An archive is a .tar.gz holding one directory named after
 	 *										the feature's class, exactly what lands below features/.
 	 *
+	 *										The index may also name applications - a few named sets of
+	 *										features with an entry point, which the setup wizard offers:
+	 *
+	 *										"applications": [ { "key": "website",
+	 *											"name": { "en_US": ... }, "description": { "en_US": ... },
+	 *											"features": [ "builder", "design" ],
+	 *											"next": "/_admin/#builder", "start": "starter" } ]
+	 *
+	 *										"next" is a path of the project or null, "start" says who
+	 *										provides the home page: "starter" the pages the wizard creates,
+	 *										"own" the application itself, null nothing. The key is optional
+	 *										and, like "category", did not raise the format number; an
+	 *										application of the wrong shape is dropped and the rest is kept.
+	 *
 	 *										A successful fetch() is kept under data/catalogue.php - see
 	 *										cached(), which reads it back without ever making a
 	 *										request. The panel's Available tab fills from that cache on
@@ -260,7 +274,7 @@ namespace Nino {
 		 *
 		 *	@param		string		$json
 		 *
-		 *	@return 	array|string						{ format, generated, features: [ entry, ... ] } or why not
+		 *	@return 	array|string						{ format, generated, features: [ entry, ... ], applications: [ application, ... ] } or why not
 		 */
 		public static function parse( string $json ): array|string {
 
@@ -291,11 +305,57 @@ namespace Nino {
 				$features[] = $clean;
 			}
 
+			// Dropped one by one, unlike a feature: an application is a convenience
+			// laid over features that are listed on their own, so one of the wrong
+			// shape - or one this reader predates - costs that application and not
+			// the catalogue. A document without the key has none
+			$applications	= [];
+			$known				= [];
+
+			foreach( is_array( $document['applications'] ?? null ) === true ? $document['applications'] : [] as $entry ) {
+
+				$clean = self::_application( $entry );
+				if( $clean === null || isset( $known[ $clean['key'] ] ) === true )
+					continue;
+				$known[ $clean['key'] ] = true;
+
+				$applications[] = $clean;
+			}
+
 			return [
-				'format'		=> self::FORMAT,
-				'generated'	=> is_string( $document['generated'] ?? null ) ? $document['generated'] : '',
-				'features'	=> $features,
+				'format'				=> self::FORMAT,
+				'generated'			=> is_string( $document['generated'] ?? null ) ? $document['generated'] : '',
+				'features'			=> $features,
+				'applications'	=> $applications,
 			];
+		}
+
+		/**
+		 *	The applications of a parsed catalogue this kernel can offer: those
+		 *	whose features all have a version it can run - the rule offers()
+		 *	applies to a feature, so an application is never half offered. In the
+		 *	order the catalogue lists them.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$catalogue		A parsed catalogue
+		 *
+		 *	@return 	array										The applications, as parse() returns them
+		 */
+		public static function applications( array &$appData, array $catalogue ): array {
+
+			$offers = self::offers( $appData, $catalogue );
+			$fitting = [];
+
+			foreach( (array) ( $catalogue['applications'] ?? [] ) as $application ) {
+
+				foreach( $application['features'] as $feature )
+					if( ( $offers[$feature]['fits'] ?? false ) !== true )
+						continue 2;
+
+				$fitting[] = $application;
+			}
+
+			return $fitting;
 		}
 
 		/**
@@ -827,6 +887,60 @@ namespace Nino {
 				'sha256'			=> $sha256,
 				'size'				=> $size,
 				'released'		=> is_string( $entry['released'] ?? null ) ? substr( $entry['released'], 0, 32 ) : '',
+			];
+		}
+
+		/**
+		 *	Validate and normalize one application of the index
+		 *
+		 *	@param		mixed			$entry
+		 *
+		 *	@return 	array|null							The clean application, null when it is not of the shape
+		 */
+		private static function _application( mixed $entry ): ?array {
+
+			if( is_array( $entry ) === false )
+				return null;
+
+			$key = $entry['key'] ?? null;
+			if( is_string( $key ) === false || preg_match( \Nino\Features::KEY_PATTERN, $key ) !== 1 )
+				return null;
+
+			if( \Nino\Features::localizedValid( $entry['name'] ?? '' ) === false )
+				return null;
+
+			if( isset( $entry['description'] ) === true && \Nino\Features::localizedValid( $entry['description'] ) === false )
+				return null;
+
+			$features = $entry['features'] ?? null;
+			if( is_array( $features ) === false || $features === [] || array_is_list( $features ) === false )
+				return null;
+
+			foreach( $features as $feature )
+				if( is_string( $feature ) === false || preg_match( \Nino\Features::KEY_PATTERN, $feature ) !== 1 )
+					return null;
+
+			if( count( array_unique( $features ) ) !== count( $features ) )
+				return null;
+
+			// Where the wizard leads once the application is in: a path of this
+			// project, an anchor allowed. Anything else is no entry point - the
+			// application is still worth offering, so it has none
+			$next = $entry['next'] ?? null;
+			if( is_string( $next ) === false || strlen( $next ) > 255 || \Nino\Http::isSitePath( $next ) === false )
+				$next = null;
+
+			$start = $entry['start'] ?? null;
+			if( $start !== null && in_array( $start, [ 'starter', 'own' ], true ) === false )
+				return null;
+
+			return [
+				'key'					=> $key,
+				'name'				=> $entry['name'],
+				'description'	=> $entry['description'] ?? '',
+				'features'		=> $features,
+				'next'				=> $next,
+				'start'				=> $start,
 			];
 		}
 

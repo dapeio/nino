@@ -87,7 +87,7 @@ Do not use “page”, “template”, “module”, and “admin module” inte
 | Make a kernel or project module selectable and copyable during the setup wizard | Installer module package, see the [installer package recipe](docs/recipes/installer-package.md) |
 | Package an installable feature - a module with a manifest, settings and a version, switched on in the workbench after setup | Feature - `features/<Name>/` with `feature.php`, see the [feature manual](docs/features.md) |
 | Compose a page template out of sections, columns and components in the workbench | The Builder - the feature `features/Builder` of the catalogue, panel Builder in the Features group, not here |
-| Add a complete starting page to the installation library | Page library unit |
+| Add a complete starting page to the installation library | Page library unit - the wizard creates the ones that claim a `preset` position as its starter pages, see the [setup manual](docs/setup.md#the-starter-pages) |
 | Add reusable HTML+ included by other templates | Reusable `.tpl` template |
 | Map a public HTTP URL to output | Route |
 | Store repeated structured content | Element type and Elements, see the [Element types recipe](docs/recipes/element-types.md) |
@@ -116,7 +116,7 @@ replaces none of them (see [Updates and Rollback](docs/deployment.md#updates-and
 | `app/` | The project's own PHP classes and runtime modules, under namespaces of their own |
 | `features/` | Installed features, one directory each with a `feature.php` manifest; the `nino` constraint it names is the kernel whose vocabulary the feature uses. A checkout ships none: they come from the catalogue [dapeio/nino-features](https://github.com/dapeio/nino-features) |
 | `docs/` | The manuals - among them [`docs/features.md`](docs/features.md), the one manual of a feature - and the five extension recipes in `docs/recipes/` |
-| `tests/` | Standalone contract tests, one suite per module or panel (`*-smoke.php`, `*-js-smoke.js`), `harness.php` (`check()`, `ninoSandbox()`, `ninoSandboxDir()`, `ninoWarnings()`, `ninoErrors()`, `ninoCall()`, `ninoUser()`, `ninoVisit()`, `ninoDone()`), its JS counterpart `harness.js` for the forty-eight JS suites, and `fixtures/` |
+| `tests/` | Standalone contract tests, one suite per module or panel (`*-smoke.php`, `*-js-smoke.js`), `harness.php` (`check()`, `ninoSandbox()`, `ninoSandboxDir()`, `ninoWarnings()`, `ninoErrors()`, `ninoCall()`, `ninoUser()`, `ninoVisit()`, `ninoDone()`), its JS counterpart `harness.js` for the fifty-one JS suites, and `fixtures/` |
 | `history/` | The frozen `CHANGELOG.md` up to 1.7.0; from there the history is the git log and the tags |
 | `private/`, `public/` | One installation's own state, written by the wizard and tracked by nobody. `private/` is never served: `config.php`, `templates/`, `text/`, `elements/`, `assets/`, `data/`, `.auth/`, `.logs/`, `.backups/`. `public/` is what a browser loads directly: `images/`, `fonts/`, `favicon/` and the generated `.cache/` |
 

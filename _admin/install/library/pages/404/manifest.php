@@ -1,7 +1,9 @@
 <?php return [
-	// Part of the starter site the Routes step opens on, at this position
-	// in the list. A proposal the operator edits or removes - not a default
-	// underneath config.php, which could never be removed at all
+	// Part of the starter site the wizard creates when it ends, at this
+	// position in the list - and only where the project has no page route
+	// yet. From then on the page is the project's, to edit or remove in the
+	// Routes panel: not a default underneath config.php, which could never be
+	// removed at all
 	'preset' 		=> 3,
 	'label' 		=> '404',
 	'routes' 		=> [

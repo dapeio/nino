@@ -13,9 +13,8 @@
  *													project module with an install unit is found (see
  *													#setup-modules-card) - nothing in a fresh checkout,
  *													which is why the step is named for the half that is
- *													always there. Pages have their own step (see
- *													webpages.js); this one only ever touches base + the
- *													picked module units. Driven by the shared Back/Next bar
+ *													always there. Pages are no step of the wizard; this
+ *													one only ever touches base + the picked module units. Driven by the shared Back/Next bar
  *													(script.js) rather than its own save button - apply()
  *													is exposed for Next to call, not wired to a button.
  *
@@ -237,14 +236,14 @@
 
 				msg.textContent = 'Applied - modules: '+ ( response.modules.join( ', ' ) || 'none' )+ '.';
 
-				// This step's own active state, Webpages' available
-				// templates/module hints and PersonalInfos' key list are
-				// all potentially stale now - reload on next visit
+				// This step's own active state, PersonalInfos' key list and the
+				// applications' names (in the native language) are all
+				// potentially stale now - reload on next visit
 				Nino.install.setup._ready = false;
-				if( Nino.install.webpages !== undefined )
-					Nino.install.webpages._ready = false;
 				if( Nino.install.personalinfos !== undefined )
 					Nino.install.personalinfos._ready = false;
+				if( Nino.install.applications !== undefined )
+					Nino.install.applications._ready = false;
 
 				callback( true );
 			} );

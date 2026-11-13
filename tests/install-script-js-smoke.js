@@ -1,7 +1,7 @@
 /**
  *	Nino							A compact filesystembased php framework
- *	install-script-js-smoke.js	DOM-light checks for wizard navigation and
- *								open Webpage form commits.
+ *	install-script-js-smoke.js	DOM-light checks for the wizard's step list, the rail and
+ *								the Back and Next of the shared script.
  *
  *	Usage: node tests/install-script-js-smoke.js
  */
@@ -27,10 +27,10 @@ const elements = {
 	'install-back' : { disabled : false, classList : classList() },
 	'install-next' : { disabled : false, classList : classList() },
 	'install-actions-msg' : { textContent : '' },
-	'webpages-msg' : { textContent : '' },
+	'applications-msg' : { textContent : '' },
 	'install-page-wrap' : { classList : classList() },
 };
-[ 'checks', 'setup', 'webpages', 'personalinfos', 'accounts', 'finish' ].forEach( function( key ) {
+[ 'checks', 'setup', 'personalinfos', 'accounts', 'applications', 'finish' ].forEach( function( key ) {
 	elements['install-nav-'+ key] = navSpan();
 } );
 
@@ -61,7 +61,7 @@ const install = sandbox.Nino.install;
 	steps that used to pick a theme, a header, a footer and a palette are gone
 	from the wizard, and the Design feature is where that choice comes back. */
 const stepKeys = install.STEPS.map( function( step ) { return step.key; } );
-check( 'the wizard is the six steps that install a site', stepKeys.join(',') === 'checks,setup,webpages,personalinfos,accounts,finish' );
+check( 'the wizard is the six steps that install a site', stepKeys.join(',') === 'checks,setup,personalinfos,accounts,applications,finish' );
 
 // The rail is read top to bottom, so it has to number the steps in the order
 // they actually run
@@ -81,8 +81,8 @@ install.showStep( 0 );
 check( 'the wizard says which step it is on, not only paints it', navOf('checks').getAttribute('aria-current') === 'step' );
 check( '...and no other step claims to be the current one', stepKeys.slice( 1 ).every( function( key ) { return navOf( key ).getAttribute('aria-current') === null } ) );
 install.showStep( 2 );
-check( 'the mark moves with the step', navOf('webpages').getAttribute('aria-current') === 'step' && navOf('checks').getAttribute('aria-current') === null );
-check( '...and the class the stylesheet paints moves with it', navOf('webpages').classList.contains('active') === true && navOf('checks').classList.contains('active') === false );
+check( 'the mark moves with the step', navOf('personalinfos').getAttribute('aria-current') === 'step' && navOf('checks').getAttribute('aria-current') === null );
+check( '...and the class the stylesheet paints moves with it', navOf('personalinfos').classList.contains('active') === true && navOf('checks').classList.contains('active') === false );
 install.showStep( 0 );
 
 /*	A step is a nav span, a content pane, a script tag and a _commitStep branch.
@@ -114,18 +114,13 @@ install.back();
 check( 'Back cannot move the wizard while a commit is pending', shown === null );
 
 install._setBusy( false );
-let beforeLeaveCalls = 0;
-install.webpages = { beforeLeave : function() { beforeLeaveCalls++; return false } };
-// Looked up rather than hardcoded: a step inserted ahead of Routes would
-// otherwise turn this into a test of whichever step landed on index 3
-const webpagesIndex = install.STEPS.findIndex( function( step ) { return step.key === 'webpages' } );
-install._index = webpagesIndex;
+install._index = 3;
 install.back();
-check( 'a step can stop Back when its open editor is invalid', beforeLeaveCalls === 1 && shown === null );
-
-install.webpages.beforeLeave = function() { beforeLeaveCalls++; return true };
+check( 'Back moves one step towards the first', shown === 2 );
+install._index = 0;
+shown = null;
 install.back();
-check( 'Back advances only after the current step has preserved its local state', beforeLeaveCalls === 2 && shown === webpagesIndex - 1 );
+check( '...and not before it', shown === null );
 
 let commitCallback = null;
 install._index = 1;
@@ -140,58 +135,20 @@ commitCallback( true );
 check( 'a successful callback advances from its captured starting index', shown === 2 );
 check( 'navigation unlocks after the commit callback', install._busy === false && elements['install-back'].disabled === false && elements['install-next'].disabled === false );
 
-load( '_admin/install/assets/webpages.js', context );
-
-const webpages = sandbox.Nino.install.webpages;
-let apiCalls = 0;
-let callbackResult = null;
-webpages.beforeLeave = function() { return true };
-sandbox.Nino.install.apiCall = function() { apiCalls++ };
-webpages.apply( function( ok ) { callbackResult = ok } );
-check( 'Next cannot post an empty list before Webpages has finished loading', apiCalls === 0 && callbackResult === false );
-
-webpages._ready = true;
-webpages.beforeLeave = function() { return false };
-sandbox.Nino.install.apiCall = function() { apiCalls++ };
-webpages.apply( function( ok ) { callbackResult = ok } );
-check( 'Next does not post an older page list while the open form is invalid', apiCalls === 0 && callbackResult === false );
-
-webpages.beforeLeave = function() { return true };
-sandbox.Nino.install.apiCall = function( action, payload, callback ) {
-	apiCalls++;
-	callback( 200, { webpages : payload.webpages } );
-};
-webpages.apply( function( ok ) { callbackResult = ok } );
-check( 'a preserved open form is included before the page list is posted', apiCalls === 1 && callbackResult === true );
-
-/*	A route's per-locale row is a grid of a locale code and three boxes, with
-	no room for a label over each of them - so all three carried a placeholder
-	and nothing else. A placeholder is not a name: it is gone on the first
-	keystroke and never reaches the accessibility tree as one, so a step with
-	four locales on it offered twelve boxes a screen reader could only call
-	"edit text". The locale is part of each name, because "Name" four times
-	over says nothing about which language it is the name in	*/
-const localeRow = webpages._localeRow( 'de_DE', { name : 'Start' } );
-const boxes = localeRow.children.filter( function( child ) { return child.tagName === 'INPUT' || child.tagName === 'TEXTAREA' } );
-check( 'a locale row draws its three boxes', boxes.length === 3 && boxes.map( function( b ) { return b.dataset.field } ).join(',') === 'name,title,description' );
-check( '...each of them named, and named for its locale', boxes.every( function( b ) { return ( b.getAttribute('aria-label') || '' ).endsWith(' (de_DE)') } )
-	&& boxes[0].getAttribute('aria-label') === 'Name (de_DE)' );
-check( '...with the placeholder still there as the hint it always was, and the value untouched',
-	boxes[0].placeholder === 'Name e.g. "Home"' && boxes[0].value === 'Start' && boxes[1].value === '' );
-
-/*	"New Route" is a list action, and Next is the one action that moves the
-	wizard on. Two buttons painted as primary on the same bar leave the eye
-	without an answer to which one it is, so the shared bar carries exactly one
-	primary - and the list action, which only adds to a step that is still
-	being edited, is the secondary one	*/
-elements['webpages-list'] = element('div');
-elements['install-actions-wrap'] = { insertBefore : function( node ) { elements[ node.id ] = node } };
-webpages._entries = [];
-webpages._renderList();
-const contextAction = elements['install-context-action'];
-check( 'the list renders its "New Route" action into the shared bottom bar', contextAction !== undefined && contextAction.textContent === 'New Route' );
-check( '...as a secondary action, not a second primary one', contextAction.className === 'nino-admin-btn-secondary' && contextAction.className.includes('primary') === false );
-check( '...and the bar still has exactly one primary action, Next', ( wizardTemplate.match( /nino-admin-btn-primary/g ) || [] ).length === 1
+/*	The bar carries one primary action: Next. Two buttons painted as primary on the
+	same bar leave the eye without an answer to which one moves the wizard on	*/
+check( 'the shared bar has exactly one primary action, Next', ( wizardTemplate.match( /nino-admin-btn-primary/g ) || [] ).length === 1
 	&& /id="install-next" class="nino-admin-btn-primary"/.test( wizardTemplate ) === true );
+
+/*	The step for applications has its four parts, as every step has: the rail, the pane, the script and the
+	branch of the shared script that commits it	*/
+check( 'the step for applications has its four: rail, pane, script and branch', wizardTemplate.includes( 'id="install-nav-applications"' ) && wizardTemplate.includes( 'id="install-content-applications"' )
+	&& wizardTemplate.includes( 'assets/applications.js' ) && wizardScript.includes( "key === 'applications'" ) );
+/*	A name the catalogue wrote may have no place to break: what shows one wraps it, or the page grows wide.
+	By rule and by selector, in the stylesheet of the wizard	*/
+const wrapping = ( installStyle.match( /([^{}]+)\{[^{}]*overflow-wrap:\s*anywhere[^{}]*\}/g ) || [] ).join( ' ' );
+check( 'the button that ends the wizard, the links of the next steps, the rows of the choice and of the progress wrap a name that has no place to break',
+	[ '#finish-submit', '.install-next-step-copy', '.install-app-copy', '.install-check-row-name' ].every( function( selector ) { return wrapping.includes( selector ) } ) );
+check( 'the script tags of the template are the steps\' modules and nothing else', ( wizardTemplate.match( /install\/assets\/([a-z]+)\.js/g ) || [] ).map( function( src ) { return src.replace( /^.*\/|\.js$/g, '' ) } ).join( ',' ) === 'script,checks,setup,personalinfos,accounts,applications,finish' );
 
 done();

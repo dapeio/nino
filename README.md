@@ -58,7 +58,7 @@ The workbench provides full access for development, diagnostics and corrections,
        width="49%">
 </a>
 
-Every fresh checkout is configured through the wizard, which is what `/_admin` shows until it is done. It checks the environment, guides you through the languages (and the modules a project added itself, if any), copies the theme the base unit delivers along with the required assets, creates initial pages and basic information, creates the first developer accounts and sets the recovery password. Afterwards it locks itself out, and `_admin/install/` can be removed from a production delivery.
+Every fresh checkout is configured through the wizard, which is what `/_admin` shows until it is done. It checks the environment, guides you through the languages (and the modules a project added itself, if any), copies the theme the base unit delivers along with the required assets, records basic information, creates the first developer accounts, offers the applications of the official catalogue (sets of features with a place to continue in), creates the starter pages and sets the recovery password. Afterwards it locks itself out, and `_admin/install/` can be removed from a production delivery.
 
 #### The Builder - a feature
 
@@ -120,10 +120,10 @@ A fresh checkout is not a project yet. The setup wizard, which `/_admin` shows u
 |---|---|
 | [1. Environment](docs/setup.md#1-environment) | Are PHP, extensions, and write permissions ready for use? |
 | [2. Languages](docs/setup.md#2-languages) | Which languages does the project require - and which modules, where the project added any of its own? |
-| [3. Routes](docs/setup.md#3-routes) | Which first pages, public paths, and metadata are created? |
-| [4. Personal Information](docs/setup.md#4-personal-information) | Which central company and website values are available as textfills? |
-| [5. Accounts](docs/setup.md#5-accounts) | Which developer account(s) sign in to the workbench with full access? |
-| [6. Finish](docs/setup.md#6-finish) | Which recovery password opens `/_admin/recovery.php` when the accounts are broken - and locks the wizard? |
+| [3. Personal Information](docs/setup.md#3-personal-information) | Which central company and website values are available as textfills? |
+| [4. Accounts](docs/setup.md#4-accounts) | Which developer account(s) sign in to the workbench with full access? |
+| [5. Applications](docs/setup.md#5-applications) | Which applications of the official catalogue - sets of features with a place to continue in - are placed and switched on, if any? |
+| [6. Finish](docs/setup.md#6-finish) | Which recovery password opens `/_admin/recovery.php` when the accounts are broken - and locks the wizard? The starter pages are created here. |
 
 The look is not among its questions: the base unit delivers one theme and the two frame templates it is drawn against ([The Look](docs/setup.md#the-look)). Editor accounts are created later, in the workbench's Users panel.
 

@@ -26,9 +26,9 @@
 				<div id="install-nav-wrap" class="nino-admin-nav">
 					<span id="install-nav-checks" class="active">1. Environment</span>
 					<span id="install-nav-setup">2. Languages</span>
-					<span id="install-nav-webpages">3. Routes</span>
-					<span id="install-nav-personalinfos">4. Personal Infos</span>
-					<span id="install-nav-accounts">5. Accounts</span>
+					<span id="install-nav-personalinfos">3. Personal Infos</span>
+					<span id="install-nav-accounts">4. Accounts</span>
+					<span id="install-nav-applications">5. Applications</span>
 					<span id="install-nav-finish">6. Finish</span>
 				</div>
 			</aside>
@@ -64,12 +64,6 @@
 					</div>
 				</div>
 
-				<div id="install-content-webpages">
-					<p class="nino-admin-hint nino-admin-hint-lead">Build the project's actual routes: click a row to open it, or "New Route" to add one - an Element URI (a stable identifier, eg. <code>/home</code>), the real Http URI it's reachable at (eg. <code>/</code>), a starting template from <code>_admin/install/library/pages</code>, and each active locale's name/title/description - name is also what a menu shows for the page, in every navigation whose "Show in ... navigation" box is checked. Click ↑/↓ to reorder, "Next" batch-generates routes/templates/text/blacklist from the list below.</p>
-					<div id="webpages-list"></div>
-					<div id="webpages-form" class="install-hidden"></div>
-				</div>
-
 				<div id="install-content-personalinfos">
 					<p class="nino-admin-hint nino-admin-hint-lead">Fill in the site's company/website info (contact details, author, hosting) - the handful of keys that are always there no matter what step 2 picked. Everything else is fine as the library's generic default; edit it in the Text panel (or Text Keys for technical keys) afterward if it isn't.</p>
 					<div id="personalinfos-list"></div>
@@ -86,12 +80,45 @@
 					</form>
 				</div>
 
+				<div id="install-content-applications">
+					<p class="nino-admin-hint nino-admin-hint-lead">Applications are ready-made sets of features from Nino's official catalogue, each with a place to continue in. Without one the project keeps what the steps before made of it; with one, its features are downloaded, checked against the catalogue's signature and switched on. Anything can be added later in the Features panel.</p>
+					<div id="applications-lists">
+						<div class="nino-admin-card install-hidden" id="applications-start-card">
+							<h2>Start page</h2>
+							<p class="nino-admin-hint">Choose at most one. An application that brings its own start page leaves the starter pages out.</p>
+							<p id="applications-start-locked" class="nino-admin-hint install-hidden"></p>
+							<div id="applications-start" class="nino-admin-checklist install-apps" role="radiogroup" aria-label="Start page"></div>
+						</div>
+						<div class="nino-admin-card install-hidden" id="applications-more-card">
+							<h2>Further applications</h2>
+							<div id="applications-more" class="nino-admin-checklist install-apps"></div>
+						</div>
+					</div>
+					<div id="applications-notice" class="nino-admin-card install-hidden">
+						<p id="applications-notice-text"></p>
+						<ul id="applications-missing" class="install-apps-missing install-hidden"></ul>
+						<button type="button" id="applications-reload" class="nino-admin-btn-secondary install-hidden">Try again</button>
+					</div>
+					<div id="applications-progress-card" class="nino-admin-card install-hidden">
+						<h2>Applying</h2>
+						<ul id="applications-progress" class="nino-admin-list nino-admin-list-dense"></ul>
+						<div id="applications-failure" class="install-hidden">
+							<p id="applications-failure-text" class="nino-admin-error" role="alert"></p>
+							<div class="install-apps-actions">
+								<button type="button" id="applications-retry">Try again</button>
+								<button type="button" id="applications-skip" class="nino-admin-btn-secondary">Continue without an application</button>
+							</div>
+							<p class="nino-admin-hint">Features that are switched on already stay switched on.</p>
+						</div>
+					</div>
+				</div>
+
 				<div id="install-content-finish">
 					<p class="nino-admin-hint nino-admin-hint-lead">Set the recovery password. It is not a login: <code>/_admin/recovery.php</code> asks for it when the accounts themselves are what is broken - to restore a backup or reset a password. This is the last step - once set, the wizard locks itself out for good (no way back short of clearing <code>/nino/install/completed</code> in <code>config.php</code> and removing the stored secret).</p>
 					<form id="finish-form" class="nino-admin-card">
 						<label class="nino-admin-field" for="finish-pw"><span>New recovery password (at least 8 characters)</span><input id="finish-pw" type="password" autocomplete="new-password" minlength="8" required></label>
 						<label class="nino-admin-field" for="finish-pw2"><span>Repeat password</span><input id="finish-pw2" type="password" autocomplete="new-password" minlength="8" required></label>
-						<button type="submit">Finish installation</button>
+						<button type="submit" id="finish-submit">Finish installation</button>
 					</form>
 					<div id="finish-done" class="install-hidden">
 						<div class="install-finish-intro">
@@ -102,7 +129,7 @@
 								<p>Choose where you would like to continue.</p>
 							</div>
 						</div>
-						<div class="install-next-steps" aria-label="Next steps">
+						<div class="install-next-steps" id="finish-next-steps" aria-label="Next steps">
 							<a class="install-next-step install-next-step--frontend" href="[[/nino/dir]]/" target="_blank">
 								<span class="install-next-step-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 0 20M12 2a15.3 15.3 0 0 0 0 20"/></svg></span>
 								<span class="install-next-step-copy"><strong>View the Frontend</strong><small>Open the new website and see the result.</small></span>
@@ -110,7 +137,7 @@
 							</a>
 							<a class="install-next-step install-next-step--editor" href="[[/nino/dir]]/_admin/" target="_blank">
 								<span class="install-next-step-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5Z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15h6M9 11h1"/></svg></span>
-								<span class="install-next-step-copy"><strong>Build your website</strong><small>Open _admin, create routes, build templates and fill your content.</small></span>
+								<span class="install-next-step-copy"><strong>Build your website</strong><small>Open _admin, shape the pages, build templates and fill your content.</small></span>
 								<svg class="install-next-step-arrow" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
 							</a>
 						</div>
@@ -136,9 +163,9 @@
 				<div id="install-actions-status" class="nino-admin-actionbar-status">
 					<p id="install-actions-msg" role="status" aria-live="polite"></p>
 					<p id="setup-msg" class="install-step-msg" role="status" aria-live="polite"></p>
-					<p id="webpages-msg" class="install-step-msg" role="status" aria-live="polite"></p>
 					<p id="personalinfos-msg" class="install-step-msg" role="status" aria-live="polite"></p>
 					<p id="accounts-add-msg" class="install-step-msg" role="status" aria-live="polite"></p>
+					<p id="applications-msg" class="install-step-msg" role="status" aria-live="polite"></p>
 					<p id="finish-msg" class="install-step-msg" role="status" aria-live="polite"></p>
 				</div>
 				<button type="button" id="install-back" class="nino-admin-btn-secondary">Back</button>
@@ -151,9 +178,9 @@
 		<script src="[[/nino/dir]]/_admin/install/assets/script.js"></script>
 		<script src="[[/nino/dir]]/_admin/install/assets/checks.js"></script>
 		<script src="[[/nino/dir]]/_admin/install/assets/setup.js"></script>
-		<script src="[[/nino/dir]]/_admin/install/assets/webpages.js"></script>
 		<script src="[[/nino/dir]]/_admin/install/assets/personalinfos.js"></script>
 		<script src="[[/nino/dir]]/_admin/install/assets/accounts.js"></script>
+		<script src="[[/nino/dir]]/_admin/install/assets/applications.js"></script>
 		<script src="[[/nino/dir]]/_admin/install/assets/finish.js"></script>
 	</body>
 </html>

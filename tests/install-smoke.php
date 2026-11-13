@@ -14,8 +14,15 @@ declare(strict_types=1);
  *	Usage: php tests/install-smoke.php
  */
 
+// Before the kernel loads: the features the applications place land in a directory of this
+// run's own, never in the checkout's features/
+define( 'NINO_FEATURES_DIR', sys_get_temp_dir(). '/nino-install-applications-'. uniqid() );
+mkdir( NINO_FEATURES_DIR, 0755, true );
+
 require __DIR__. '/harness.php';
 require __DIR__. '/../_admin/install/Install.php';
+
+register_shutdown_function( static fn() => \Nino\Filesystem::removeDir( NINO_FEATURES_DIR ) );
 
 $appData = ninoSandbox( 'install' );
 $sandbox = ninoSandboxDir( $appData );
@@ -715,168 +722,79 @@ check( 'the delivered stylesheet draws the rule under a section title as a backg
 echo "\n";
 
 
-// --- Webpages::apiList / apiApply ------------------------------------------
+// --- StarterPages::apply ----------------------------------------------------
 
-echo "Webpages::apiList / apiApply\n";
+echo "StarterPages::apply\n";
 
 // Back to a clean, known Setup state - de_DE + en_US, no content modules
 ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
 
-[ , $wpLibraryBody ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiList' ] );
-
-check( 'lists every page template, one per _admin/install/library/pages/<key>', in_array( 'home', array_keys( $wpLibraryBody['templates'] ), true ) === true && in_array( 'blank', array_keys( $wpLibraryBody['templates'] ), true ) === true && in_array( 'contact', array_keys( $wpLibraryBody['templates'] ), true ) === true );
-// What a page template requires is its manifest's business - every listed
-// template has to answer with exactly what its manifest declares
 $pagesLibrary = __DIR__. '/../_admin/install/library/pages';
-check( 'every page template lists exactly the modules its manifest requires', count( $wpLibraryBody['templates'] ) > 0
-	&& array_filter( $wpLibraryBody['templates'], static fn( array $t, string $key ): bool => $t['requiresModules'] !== (array) ( ( include $pagesLibrary. '/'. $key. '/manifest.php' )['requiresModules'] ?? [] ), ARRAY_FILTER_USE_BOTH ) === [] );
-/*	A project that has written no page yet opens on the starter site the
-	library declares - the pages a site is normally built from, already
-	filled in. A proposal in a list nothing has been written from yet, not a
-	default underneath config.php: see Webpages::_presetPages()	*/
-$presetUnits = array_values( array_filter( array_map(
-	static fn( string $entry ): array => [ $entry, ( @include __DIR__. '/../_admin/install/library/pages/'. $entry. '/manifest.php' ) ?: [] ],
-	array_values( array_diff( scandir( __DIR__. '/../_admin/install/library/pages' ) ?: [], [ '.', '..' ] ) ) ),
-	static fn( array $unit ): bool => isset( $unit[1]['preset'] ) ) );
-usort( $presetUnits, static fn( array $a, array $b ): int => $a[1]['preset'] <=> $b[1]['preset'] );
-$presetKeys = array_map( static fn( array $unit ): string => $unit[0], $presetUnits );
+$pageRoutes = static function( array $config ): array {
+	return array_filter( $config['/nino/http/routes'] ?? [], static fn( mixed $route, string $key ): bool => str_starts_with( $key, 'GET://' ) === true && is_array( $route ) === true
+		&& preg_match( '~^\[template /templates/page-~', (string) ( $route['body'] ?? '' ) ) === 1, ARRAY_FILTER_USE_BOTH );
+};
 
-check( 'starts on the starter site the library declares, in the order its units claim',
-	array_column( $wpLibraryBody['webpages'], 'libraryKey' ) === $presetKeys );
-// Derived from the units rather than restated here: a page added to or
-// dropped from the starter set is one manifest key, not an edit in two places
-check( '...which is the handful a site is normally built from', count( array_intersect( [ 'home', 'contact', '404' ], $presetKeys ) ) === 3 && in_array( 'legal', $presetKeys, true ) === false );
-check( '...each carrying its own suggested Http-URI, not its folder name', ( $wpLibraryBody['webpages'][0]['httpUri'] ?? null ) === '/'
-	&& ( $wpLibraryBody['webpages'][0]['uri'] ?? null ) === '/home' );
-check( '...its own per-locale wording rather than the generic fallback', ( $wpLibraryBody['webpages'][0]['text']['de_DE']['name'] ?? null ) === 'Startseite'
-	&& ( $wpLibraryBody['webpages'][0]['text']['en_US']['name'] ?? null ) === 'Home' );
-// The one field no form offers and apiApply() takes straight off the entry -
-// and the address Http::response() falls back to, GET://404
-$preset404 = array_values( array_filter( $wpLibraryBody['webpages'], static fn( array $e ): bool => $e['libraryKey'] === '404' ) )[0] ?? [];
-check( '...and the status code its manifest route declares, at the Http-URI the 404 fallback looks up', ( $preset404['statusCode'] ?? null ) === 404
-	&& ( $preset404['httpUri'] ?? null ) === '/404' );
-check( 'navigations are offered - the menus the config holds, since Navigation is always active', $wpLibraryBody['navs'] === $expectedNavs );
-// ...so a preset page proposes whatever menus its own manifest route
-// suggests, intersected with what the project actually registers - home/
-// contact suggest both, 404 none - the imprint is no page of the starter site, the Legal module has it
-check( '...and each proposed page carries the menu membership its own unit suggests', array_column( $wpLibraryBody['webpages'], 'navs' ) === [ [ 'main', 'footer' ], [ 'main', 'footer' ], [] ] );
+check( 'the wizard has no step for pages: no action of it names them', array_filter( array_keys( array_merge( ...array_map( static fn( string $class ): array => $class::actions(), [
+	\Nino\Install\Checks::class, \Nino\Install\Setup::class, \Nino\Install\PersonalInfos::class, \Nino\Install\Accounts::class, \Nino\Install\Applications::class, \Nino\Install\Finish::class,
+] ) ) ), static fn( string $action ): bool => str_contains( $action, 'webpage' ) === true ) === [] );
 
-// Each template also reports the starter wording its own text fragments
-// ship, so the form can prefill a new entry per locale instead of leaving
-// every locale nobody hand-typed on DEFAULT_TEXT (see _suggestions())
-check( 'reports "home"\'s own suggested wording for every picked locale, not just one', array_keys( $wpLibraryBody['templates']['home']['text'] ) === [ 'de_DE', 'en_US' ] );
-check( '...with de_DE\'s wording read from the unit\'s own de_DE fragment', $wpLibraryBody['templates']['home']['text']['de_DE']['name'] === 'Startseite' );
-check( '...and en_US\'s from its own en_US fragment - the locale that used to end up generic', $wpLibraryBody['templates']['home']['text']['en_US']['name'] === 'Home' && $wpLibraryBody['templates']['home']['text']['en_US']['title'] === 'Welcome.' );
-check( 'reports the Http-URI "home" suggests for itself, which is not its folder name', $wpLibraryBody['templates']['home']['uri'] === '/' );
-check( '...and "contact"\'s, which is', $wpLibraryBody['templates']['contact']['uri'] === '/contact' );
-check( 'the blank template starts every locale with useful page metadata', $wpLibraryBody['templates']['blank']['text']['de_DE']['name'] === 'Neue Webseite' && $wpLibraryBody['templates']['blank']['text']['en_US']['name'] === 'New webpage' );
-check( 'the blank template suggests a stable Http-URI and its own page template', $wpLibraryBody['templates']['blank']['uri'] === '/new-webpage' && $wpLibraryBody['templates']['blank']['body'] === '[template /templates/page-blank]' );
-check( 'the blank page template deliberately has no section', strpos( (string) file_get_contents( __DIR__. '/../_admin/install/library/pages/blank/templates/page-blank.tpl' ), '<section' ) === false );
-
-[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [ [ 'uri' => '../etc/passwd', 'httpUri' => '/x', 'libraryKey' => 'home', 'text' => [] ] ] ] );
-check( 'rejects an unsafe Element-URI with 400', $status === 400 );
-
-[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [ [ 'uri' => '/x', 'httpUri' => '../etc/passwd', 'libraryKey' => 'home', 'text' => [] ] ] ] );
-check( 'rejects an unsafe Http-URI with 400', $status === 400 );
-
-[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [ [ 'uri' => '/x', 'httpUri' => '/x', 'libraryKey' => 'does-not-exist', 'text' => [] ] ] ] );
-check( 'rejects an unknown library key with 400', $status === 400 );
-
-// The two Element-URIs of the Legal module's pages are its: a page of the
-// project's own cannot take them, whatever route it brings
-foreach( [ '/legal/imprint', '/legal/privacy' ] as $reservedElementUri ) {
-	[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [ [ 'uri' => $reservedElementUri, 'httpUri' => '/my-page', 'libraryKey' => 'blank', 'text' => [] ] ] ] );
-	check( 'rejects the Legal module\'s Element-URI '. $reservedElementUri. ' with 409', $status === 409 && isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://my-page'] ) === false );
+$presetKeys = [];
+foreach( array_diff( scandir( $pagesLibrary ) ?: [], [ '.', '..' ] ) as $entry ) {
+	$unitManifest = ( @include $pagesLibrary. '/'. $entry. '/manifest.php' ) ?: [];
+	if( isset( $unitManifest['preset'] ) === true )
+		$presetKeys[$entry] = (int) $unitManifest['preset'];
 }
+asort( $presetKeys );
+$presetKeys = array_map( 'strval', array_keys( $presetKeys ) );
+check( 'the units that claim a position are Start, Contact and 404, in that order', $presetKeys === [ 'home', 'contact', '404' ] );
 
-[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [ [ 'uri' => '/installer-shadow', 'httpUri' => '/_admin', 'libraryKey' => 'home', 'text' => [] ] ] ] );
-check( 'rejects a Webpage mounted on the installer\'s own runtime uri', $status === 409 );
+check( 'before anything is created the project has no page route', $pageRoutes( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] ) ) === [] );
 
-// ...and so are the addresses the router never serves, as the address and as a
-// path below it - a page there would be accepted and never reached
-foreach( [ '/features', '/features/x', '/docs', '/_nino/x', '/private/a', '//features', '/Features', '/DOCS/x' ] as $neverServed ) {
-	[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [ [ 'uri' => '/never-served', 'httpUri' => $neverServed, 'libraryKey' => 'home', 'text' => [] ] ] ] );
-	check( 'rejects a Webpage mounted on '. $neverServed. ', which the router never serves, with 409', $status === 409 && isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET:/'. $neverServed] ) === false );
-}
-
-[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [ [ 'uri' => '/custom-page', 'httpUri' => '/custom', 'libraryKey' => 'home', 'text' => [] ] ] ] );
-check( 'rejects an Http-URI already owned by a non-Webpages route', $status === 409 );
-check( 'the colliding hand-written route remains untouched', ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://custom']['body'] ?? null ) === 'hand-written route' );
-
-[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [
-	[ 'uri' => '/x', 'httpUri' => '/x', 'libraryKey' => 'home', 'text' => [] ],
-	[ 'uri' => '/x', 'httpUri' => '/y', 'libraryKey' => 'contact', 'text' => [] ],
-] ] );
-check( 'rejects a duplicate Element-URI with 400', $status === 400 );
-
-[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [
-	[ 'uri' => '/x', 'httpUri' => '/x', 'libraryKey' => 'home', 'text' => [] ],
-	[ 'uri' => '/y', 'httpUri' => '/x', 'libraryKey' => 'contact', 'text' => [] ],
-] ] );
-check( 'rejects a duplicate Http-URI with 400, even when the Element-URIs differ', $status === 400 );
-
-// The actual, first real apply: home at Element-URI "/site-home" / Http-URI
-// "/" + contact at "/site-contact" / "/kontakt" (drags in
-// forms via requiresModules) - Element-URI deliberately differs from
-// Http-URI throughout, and from the template's own folder name too, to
-// prove the class uses the entry's own uri, not the request path or the
-// template name, for the meta namespace (see _routeKeys()'s docblock).
-// Only de_DE's text is posted for one field, proving the missing en_US/
-// other fields fall back to the generic placeholder rather than failing
-$firstApply = [ 'webpages' => [
-	[ 'uri' => '/site-home', 'httpUri' => '/', 'libraryKey' => 'home', 'navs' => [ 'main' ], 'text' => [
-		'de_DE' => [ 'name' => 'Start', 'title' => 'Willkommen', 'description' => 'Startseite' ],
-		'en_US' => [ 'name' => 'Home', 'title' => 'Welcome', 'description' => 'Home page' ],
-	] ],
-	[ 'uri' => '/site-contact', 'httpUri' => '/kontakt', 'libraryKey' => 'contact', 'navs' => [ 'main' ], 'text' => [
-		'de_DE' => [ 'name' => 'Kontakt' ],
-		'en_US' => [ 'name' => '<script>alert(1)</script>Contact', 'title' => 'Say "hello" to <b>us</b>' ],
-	] ],
-] ];
-/*	A copy the step cannot make is the step's failure, not a success over a
-	route that renders a file that is not there. The Routes step kept its own
-	copy of the unit helpers, and that copy swallowed a failed write - here a
-	directory stands where contact's template has to go, so the write fails
-	the way a permission or a full disk would	*/
+/*	A copy the starter pages cannot make is their failure, not a success over a
+	route that renders a file that is not there: here a directory stands where
+	contact's template has to go, so the write fails the way a permission or a
+	full disk would	*/
 mkdir( $sandbox. '/private/templates/page-contact.tpl', 0755, true );
-[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], $firstApply );
-check( 'a template the step cannot write fails the apply and names the file', $status === 500 && str_contains( (string) ( $body['error'] ?? '' ), '/templates/page-contact.tpl' ) === true );
-check( '...before any route is written', isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://kontakt'] ) === false );
+$failed = \Nino\Install\StarterPages::apply( $appData );
+check( 'a template that cannot be written fails the call and names the file', is_string( $failed ) === true && str_contains( $failed, '/templates/page-contact.tpl' ) === true );
+check( '...before any route is persisted', $pageRoutes( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] ) ) === [] );
 rmdir( $sandbox. '/private/templates/page-contact.tpl' );
 
 /*	The home unit's hero is an image slot seeded with its shipped placeholder.
-	A picture the step cannot put in place fails the step by name, the way the
+	A picture that cannot be put in place fails the call by name, the way the
 	template above did - and no slot is seeded for a file that is not there	*/
 $seedFile = $sandbox. '/public/images/template/page-home/hero/background.svg';
 if( is_file( $seedFile ) === true )
 	unlink( $seedFile );
 mkdir( $seedFile, 0755, true );
-[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], $firstApply );
-check( 'a seed file the step cannot copy fails the apply and names the file', $status === 500 && str_contains( (string) ( $body['error'] ?? '' ), '/images/template/page-home/hero/background.svg' ) === true );
+$failed = \Nino\Install\StarterPages::apply( $appData );
+check( 'a seed file that cannot be copied fails the call and names the file', is_string( $failed ) === true && str_contains( $failed, '/images/template/page-home/hero/background.svg' ) === true );
 check( '...and no page image slot is seeded', array_keys( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/images'] ?? [] ) === [ '/logo', '/logo/dark' ] );
 rmdir( $seedFile );
 
-[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], $firstApply );
-check( 'apply succeeds', $status === 200 );
-check( 'response echoes both entries back', count( $body['webpages'] ) === 2 );
+check( 'where nothing is in the way the call succeeds', \Nino\Install\StarterPages::apply( $appData ) === true );
 
-$configAfterWpApply = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+$configAfterStarter = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+$starterRoutes = $pageRoutes( $configAfterStarter );
 
-check( 'registers a route at "/" for the home entry, keyed by its Http-URI', isset( $configAfterWpApply['/nino/http/routes']['GET://'] ) === true );
-check( 'the route\'s own "uri" data field is the Element-URI, not the Http-URI', $configAfterWpApply['/nino/http/routes']['GET://']['uri'] === '/site-home' );
-check( 'registers a route at "/kontakt" for the contact entry, keyed by its Http-URI', isset( $configAfterWpApply['/nino/http/routes']['GET://kontakt'] ) === true );
-check( 'auto-pulls "forms" (contact\'s requiresModules)', in_array( '\\Nino\\Modules\\Form', $configAfterWpApply['/nino/modules'], true ) === true );
-check( 'the routes are the whole persisted list - no second copy of it anywhere in config.php', isset( $configAfterWpApply['/nino/install/webpages'] ) === false );
-check( 'the page routes stand in the posted order, Element-URI', array_values( array_map( fn( array $r ): string => $r['uri'], array_filter( $configAfterWpApply['/nino/http/routes'], fn( array $r, string $k ): bool => \Nino\Install\Webpages::isPageRoute( $k, $r ), ARRAY_FILTER_USE_BOTH ) ) ) === [ '/site-home', '/site-contact' ] );
-check( '...and Http-URI (the route keys themselves)', array_keys( array_filter( $configAfterWpApply['/nino/http/routes'], fn( array $r, string $k ): bool => \Nino\Install\Webpages::isPageRoute( $k, $r ), ARRAY_FILTER_USE_BOTH ) ) === [ 'GET://', 'GET://kontakt' ] );
-check( 'a hand-written route outside the library still survives Webpages apply too', isset( $configAfterWpApply['/nino/http/routes']['GET://custom'] ) === true );
+check( 'Start, Contact and 404 are routed at the address their unit suggests, in the order of their positions', array_keys( $starterRoutes ) === [ 'GET://', 'GET://contact', 'GET://404' ] );
+check( '...each route\'s own "uri" is the Element-URI "/<folder>", not the address', array_column( $starterRoutes, 'uri' ) === [ '/home', '/contact', '/404' ] );
+check( '...the 404 carries its status code, the others none', ( $starterRoutes['GET://404']['statusCode'] ?? null ) === 404 && isset( $starterRoutes['GET://']['statusCode'] ) === false && isset( $starterRoutes['GET://contact']['statusCode'] ) === false );
+check( '...Start and Contact are in the menus their unit proposes at their own position in the list - main and footer, the legal menu is not one of them - and 404 in none',
+	( $starterRoutes['GET://']['navs'] ?? null ) === [ 'main' => 1, 'footer' => 1 ] && ( $starterRoutes['GET://contact']['navs'] ?? null ) === [ 'main' => 2, 'footer' => 2 ] && isset( $starterRoutes['GET://404']['navs'] ) === false );
+check( 'a hand-written route outside the library survives', ( $configAfterStarter['/nino/http/routes']['GET://custom']['body'] ?? null ) === 'hand-written route' );
+check( 'the contact page\'s module is the one the wizard always applies', in_array( '\\Nino\\Modules\\Form', $configAfterStarter['/nino/modules'], true ) === true );
 
-check( 'copies "forms"\'s own mail-header/footer templates too, auto-pulled in by "contact"', \Nino\Filesystem::fileExists( $appData, '/templates/mail-header.tpl' ) === true );
-check( 'copies "contact"\'s own template', \Nino\Filesystem::fileExists( $appData, '/templates/page-contact.tpl' ) === true );
+foreach( [ 'page-home.tpl', 'page-contact.tpl', 'page-404.tpl' ] as $starterTemplate )
+	check( 'copies '. $starterTemplate. ' into the project', \Nino\Filesystem::fileExists( $appData, '/templates/'. $starterTemplate ) === true );
 check( 'copies a page unit\'s declared files into the project', is_file( $sandbox. '/public/images/template/page-home/hero/background.svg' ) === true );
+check( 'the templates of the units that claim no position are not copied, but for the empty page: the one the Routes panel starts a new route on, without a route of its own',
+	array_filter( [ 'page-services.tpl', 'page-about-me.tpl' ], static fn( string $file ): bool => \Nino\Filesystem::fileExists( $appData, '/templates/'. $file ) === true ) === []
+	&& \Nino\Filesystem::fileExists( $appData, '/templates/page-blank.tpl' ) === true && array_filter( $starterRoutes, static fn( array $route ): bool => str_contains( (string) $route['body'], 'page-blank' ) ) === [] );
 
 // The hero is the slot the page template names, and nothing is literal in it
-$heroSlot = $configAfterWpApply['/nino/html/images']['/template/page-home/hero/background'] ?? [];
+$heroSlot = $configAfterStarter['/nino/html/images']['/template/page-home/hero/background'] ?? [];
 // The native locale of this run is en_US (the steps above moved it), so the label is that one
 check( 'seeds the unit\'s image slot into config.php: the native-locale label, 1920x1080 and the shipped placeholder', ( $heroSlot['label'] ?? null ) === 'Home – hero image'
 	&& ( $heroSlot['width'] ?? null ) === 1920 && ( $heroSlot['height'] ?? null ) === 1080 && ( $heroSlot['filename'] ?? null ) === 'template/page-home/hero/background.svg'
@@ -959,303 +877,102 @@ check( 'the copied home template names the slot and has no literal <img> of the 
 // A fresh install is the thing the dashboard's "Missing image slots" tile counts: with the logo and the hero both slots, no template has an <img> of the images directory left
 check( 'on a fresh install the Missing image slots tile reads 0 - every picture of the starter site is a slot', \Nino\Modules\Images\Slots::missingCount( $appData ) === 0 );
 
-$deAfterWpApply = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
-$enAfterWpApply = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
+$deAfterStarter = \Nino\Filesystem::getFileContent( $appData, '/text/de_DE.php', [] );
+$enAfterStarter = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
 
-check( 'writes the home entry\'s own de_DE meta, keyed by its Element-URI (not its Http-URI or the "home" template name)', $deAfterWpApply['[[/_nino/webpage/site-home/name]]'] === 'Start' && $deAfterWpApply['[[/_nino/webpage/site-home/title]]'] === 'Willkommen' );
-check( 'writes the home entry\'s own en_US meta too', $enAfterWpApply['[[/_nino/webpage/site-home/name]]'] === 'Home' );
-check( 'a field left blank in the post (contact\'s en_US) falls back to the generic placeholder, not the "contact" template\'s own wording', $enAfterWpApply['[[/_nino/webpage/site-contact/description]]'] === 'Page description.' );
-check( 'a page name, title and description are filtered like the Routes panel filters them: markup stripped, a quote written as an entity', $enAfterWpApply['[[/_nino/webpage/site-contact/name]]'] === 'alert(1)Contact'
-	&& $enAfterWpApply['[[/_nino/webpage/site-contact/title]]'] === 'Say &quot;hello&quot; to us' && str_contains( $enAfterWpApply['[[/_nino/webpage/site-contact/name]]'], '<' ) === false );
-check( 'a field that was posted (contact\'s de_DE name) is used as-is', $deAfterWpApply['[[/_nino/webpage/site-contact/name]]'] === 'Kontakt' );
-check( 'no key named for a library folder is in the project - only the Element-URI-keyed one this class writes itself', isset( $deAfterWpApply['[[/_nino/webpage/home/name]]'] ) === false );
+check( 'writes each page\'s details in every language, from what its unit suggests and under its Element-URI - not under the folder name of an earlier layout',
+	$deAfterStarter['[[/_nino/webpage/home/name]]'] === 'Startseite' && $enAfterStarter['[[/_nino/webpage/home/name]]'] === 'Home' && $enAfterStarter['[[/_nino/webpage/home/title]]'] === 'Welcome.'
+	&& ( $deAfterStarter['[[/_nino/webpage/contact/name]]'] ?? '' ) !== '' && ( $enAfterStarter['[[/_nino/webpage/404/title]]'] ?? '' ) !== '' );
+check( '...none of them the generic placeholder', in_array( 'Page', [ $deAfterStarter['[[/_nino/webpage/404/name]]'], $enAfterStarter['[[/_nino/webpage/404/name]]'] ], true ) === false );
 // The system's own form is a key of the system's: the only /_nino keys the
 // texts of a project hold are the ones written after an Element-URI or a
 // language code. A unit that delivered another would be a unit writing what
 // is not its to write (tests/keys-smoke.php checks the library for it)
-$systemKeys = array_filter( array_merge( array_keys( $deAfterWpApply ), array_keys( $enAfterWpApply ), array_keys( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] ) ) ), static fn( string $key ): bool => str_starts_with( $key, '[[/_nino/' ) );
+$systemKeys = array_filter( array_merge( array_keys( $deAfterStarter ), array_keys( $enAfterStarter ), array_keys( \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] ) ) ), static fn( string $key ): bool => str_starts_with( $key, '[[/_nino/' ) );
 check( 'the only /_nino keys of the project texts are the pages\' details (the two legal pages among them) and the languages\' names', $systemKeys !== []
-	&& array_filter( $systemKeys, static fn( string $key ): bool => preg_match( '#^\[\[/_nino/(webpage/(site-(home|contact)|legal\/(imprint|privacy))/(name|title|description|uri)|locale/(de_DE|en_US)/name)\]\]$#', $key ) !== 1 ) === [] );
-$globalAfterWpApply = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
-$blacklistAfterWpApply = \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] );
-check( 'writes every page\'s reachable Http-URI as one global fill, so a template can link to it by name', ( $globalAfterWpApply['[[/_nino/webpage/site-home/uri]]'] ?? null ) === '/'
-	&& ( $globalAfterWpApply['[[/_nino/webpage/site-contact/uri]]'] ?? null ) === '/kontakt'
-	&& isset( $deAfterWpApply['[[/_nino/webpage/site-home/uri]]'], $enAfterWpApply['[[/_nino/webpage/site-home/uri]]'] ) === false );
-check( 'a page uri is a technical value, blacklisted out of the Text panel like every other route key', in_array( '/_nino/webpage/site-home/uri', $blacklistAfterWpApply, true )
-	&& in_array( '/_nino/webpage/site-contact/uri', $blacklistAfterWpApply, true )
-	&& count( array_unique( $blacklistAfterWpApply ) ) === count( $blacklistAfterWpApply ) );
-check( 'a template\'s own deeper content (unprefixed, shared across instances) still merges in', isset( $deAfterWpApply['[[/template/page-home/hero/title]]'] ) === true );
+	&& array_filter( $systemKeys, static fn( string $key ): bool => preg_match( '#^\[\[/_nino/(webpage/(home|contact|404|legal\/(imprint|privacy))/(name|title|description|uri)|locale/(de_DE|en_US)/name)\]\]$#', $key ) !== 1 ) === [] );
+$globalAfterStarter = \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] );
+$blacklistAfterStarter = \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] );
+check( 'writes every page\'s reachable address as one global fill, so a template can link to it by name', ( $globalAfterStarter['[[/_nino/webpage/home/uri]]'] ?? null ) === '/'
+	&& ( $globalAfterStarter['[[/_nino/webpage/contact/uri]]'] ?? null ) === '/contact' && ( $globalAfterStarter['[[/_nino/webpage/404/uri]]'] ?? null ) === '/404'
+	&& isset( $deAfterStarter['[[/_nino/webpage/home/uri]]'], $enAfterStarter['[[/_nino/webpage/home/uri]]'] ) === false );
+check( 'a page address is a technical value, blacklisted out of the Text panel like every other route key', in_array( '/_nino/webpage/home/uri', $blacklistAfterStarter, true )
+	&& in_array( '/_nino/webpage/contact/uri', $blacklistAfterStarter, true ) && count( array_unique( $blacklistAfterStarter ) ) === count( $blacklistAfterStarter ) );
+check( 'a template\'s own deeper content (unprefixed, shared across instances) merges in', isset( $deAfterStarter['[[/template/page-home/hero/title]]'] ) === true );
 
-[ , $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiList' ] );
-check( 'apiList now reflects the persisted, current list', array_column( $body['webpages'], 'httpUri' ) === [ '/', '/kontakt' ] );
-
-// --- a 'templatePerRoute' unit gets one template per route ----------------
-//
-// "blank" is the empty starting point, so every route picking it has to get
-// its own file: with one shared page-blank.tpl, building a second blank page
-// silently rewrote the first one. A finished unit (home, contact, ...) is a
-// one-off and keeps sharing - that is what its template is for
-// An editor has replaced the hero's image and renamed the slot since: applying
-// the step again only adds, it never puts the shipped state back
+/*	A second call changes nothing: the project has pages now, and what an editor
+	did to them since is not the wizard's to put back	*/
 $appData['/nino/html/images']['/template/page-home/hero/background']['label'] = 'Mein Titelbild';
-$appData['/nino/html/images']['/template/page-home/hero/background']['filename'] = 'template/page-home/hero/background.1920x1080.jpg';
 \Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
+$beforeAgain = (string) file_get_contents( $sandbox. '/private/config.php' );
+check( 'a project that has a page route gets no starter page: the call changes nothing, an editor\'s label stays', \Nino\Install\StarterPages::apply( $appData ) === true
+	&& (string) file_get_contents( $sandbox. '/private/config.php' ) === $beforeAgain && \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/images']['/template/page-home/hero/background']['label'] === 'Mein Titelbild' );
 
-$perRoute = [ 'webpages' => [
-	[ 'uri' => '/site-home', 'httpUri' => '/', 'libraryKey' => 'home', 'text' => [] ],
-	[ 'uri' => '/site-contact', 'httpUri' => '/kontakt', 'libraryKey' => 'contact', 'text' => [] ],
-	[ 'uri' => '/team', 'httpUri' => '/team', 'libraryKey' => 'blank', 'text' => [] ],
-	[ 'uri' => '/jobs/open', 'httpUri' => '/jobs', 'libraryKey' => 'blank', 'text' => [] ],
-] ];
-[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], $perRoute );
-check( 'applying two blank routes succeeds', $status === 200 );
+// The empty page is put in place whatever the project has, and never over a file that is there
+file_put_contents( $sandbox. '/private/templates/page-blank.tpl', 'the editors\' own' );
+check( 'a template of the project\'s own at the name of the empty page is left as it is', \Nino\Install\StarterPages::apply( $appData ) === true && file_get_contents( $sandbox. '/private/templates/page-blank.tpl' ) === 'the editors\' own' );
+\Nino\Filesystem::putFileContent( $appData, '/templates/page-blank.tpl', (string) file_get_contents( $pagesLibrary. '/blank/templates/page-blank.tpl' ) );
 
-$configPerRoute = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+/*	One page of the project's own is enough to keep the starter pages away:
+	a project of its own, so that the state above stays as it is	*/
+$owned = ninoSandbox( 'install-owned' );
+$ownedDir = ninoSandboxDir( $owned );
+$owned['/nino/dir'] = '';
+foreach( [ '/private/templates', '/public/images', '/private/text', '/private/assets' ] as $ownedSub )
+	mkdir( $ownedDir. $ownedSub, 0777, true );
+\Nino\Filesystem::putFileContent( $owned, '/config.php', [ '/nino/locales/native' => 'de_DE', '/nino/locales/available' => [ 'de_DE' ], '/nino/http/routes' => [ 'GET://about' => [ 'uri' => '/about', 'body' => '[template /templates/page-about]' ] ] ] );
+$owned['/nino/locales/available'] = [ 'de_DE' ];
+// The menus are registered, the module that draws them is not on
+$owned['/nino/html/navs'] = \Nino\AppData::DEFAULTS['/nino/html/navs'];
+check( 'one page route of the project\'s own keeps the starter pages away: nothing is written', \Nino\Install\StarterPages::apply( $owned ) === true
+	&& array_keys( \Nino\Filesystem::getFileContent( $owned, '/config.php', [] )['/nino/http/routes'] ) === [ 'GET://about' ] && \Nino\Filesystem::fileExists( $owned, '/templates/page-home.tpl' ) === false );
 
-$heroAfterSecondApply = $configPerRoute['/nino/html/images']['/template/page-home/hero/background'] ?? [];
-check( 'a second apply keeps a slot the project already has - its label and its changed image', ( $heroAfterSecondApply['label'] ?? null ) === 'Mein Titelbild'
-	&& ( $heroAfterSecondApply['filename'] ?? null ) === 'template/page-home/hero/background.1920x1080.jpg' && array_keys( $configPerRoute['/nino/html/images'] ) === [ '/logo', '/logo/dark', '/template/page-home/hero/background' ] );
-
-check( 'each blank route gets its own template file, named after its Element-URI', \Nino\Filesystem::fileExists( $appData, '/templates/page-team.tpl' ) === true && \Nino\Filesystem::fileExists( $appData, '/templates/page-jobs-open.tpl' ) === true );
-check( '...and renders it, rather than the unit\'s shared one', ( $configPerRoute['/nino/http/routes']['GET://team']['body'] ?? null ) === '[template /templates/page-team]'
-	&& ( $configPerRoute['/nino/http/routes']['GET://jobs']['body'] ?? null ) === '[template /templates/page-jobs-open]' );
-check( 'a nested Element-URI flattens into one page-*.tpl, which is the only shape the template pickers glob for', \Nino\Filesystem::fileExists( $appData, '/templates/page-jobs/open.tpl' ) === false );
-check( 'the unit\'s own page-blank.tpl is never copied in as a shared file', \Nino\Filesystem::fileExists( $appData, '/templates/page-blank.tpl' ) === false );
-check( 'a unit without the flag still shares one template', \Nino\Filesystem::fileExists( $appData, '/templates/page-contact.tpl' ) === true
-	&& ( $configPerRoute['/nino/http/routes']['GET://kontakt']['body'] ?? null ) === '[template /templates/page-contact]' );
-
-// Re-applying must not undo work done in a per-route template since - it is
-// that route's page now, not a copy of the library's starting point
-\Nino\Filesystem::putFileContent( $appData, '/templates/page-team.tpl', 'edited by hand' );
-ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], $perRoute );
-check( 're-applying leaves an edited per-route template alone', trim( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/page-team.tpl', '' ) ) === 'edited by hand' );
-
-// Reading the list back: the route no longer carries the unit's body, so it
-// reports as a page of its own - the same thing an /_admin-created page is,
-// and exactly what it has become
-[ , $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiList' ] );
-$teamEntry = array_values( array_filter( $body['webpages'], fn( array $e ): bool => $e['httpUri'] === '/team' ) )[0] ?? [];
-check( 'a per-route page reads back as owning its template rather than as the library unit', ( $teamEntry['libraryKey'] ?? null ) === '' && ( $teamEntry['body'] ?? null ) === '[template /templates/page-team]' );
-
-// A page of your own whose Element-URI is the name of a library unit: its own
-// copy would be written to templates/page-home.tpl, which is the file the
-// home unit owns - and its body would be the home unit's body to the byte, so
-// the wizard read the page back as that unit and the next apply wrote the
-// library's home page over whatever had been built in it. Refused where it is
-// typed, naming the page of the library that has the name
-[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [
-	[ 'uri' => '/home', 'httpUri' => '/eigene-startseite', 'libraryKey' => 'blank', 'text' => [] ],
-] ] );
-check( 'a page of your own cannot take a library page\'s template name', $status === 409
-	&& str_contains( (string) ( $body['error'] ?? '' ), '"home"' ) === true );
-$configAfterCollision = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-check( '...and nothing of it was written - no route for it, and the library page\'s template as it was', isset( $configAfterCollision['/nino/http/routes']['GET://eigene-startseite'] ) === false
-	&& trim( (string) \Nino\Filesystem::getFileContent( $appData, '/templates/page-home.tpl', '' ) ) !== '' );
-
-// The same for a module's unit: /legal-imprint would be given the Legal
-// module's own page-legal-imprint.tpl as its copy
-[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [
-	[ 'uri' => '/legal-imprint', 'httpUri' => '/eigenes-impressum', 'libraryKey' => 'blank', 'text' => [] ],
-] ] );
-check( 'a page of your own cannot take the template name of a module\'s unit, and the answer names the unit - not a page of the library', $status === 409
-	&& str_contains( (string) ( $body['error'] ?? '' ), '"legal" unit' ) === true
-	&& isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://eigenes-impressum'] ) === false );
-
-// A name no unit owns is one more page of your own, as before
-[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [
-	[ 'uri' => '/team', 'httpUri' => '/team', 'libraryKey' => 'blank', 'text' => [] ],
-	[ 'uri' => '/startseite', 'httpUri' => '/eigene-startseite', 'libraryKey' => 'blank', 'text' => [] ],
-] ] );
-check( 'a name no library page owns is a page of your own like any other', $status === 200
-	&& \Nino\Filesystem::fileExists( $appData, '/templates/page-startseite.tpl' ) === true );
-
-// A template's file name is its category (see \Nino\Modules\Template::category()),
-// and every page of your own is page-<slug>: a slug that is the name of a
-// category elsewhere - /footer, /common - or begins with a digit - /2026-home -
-// is a page like any other, with a category of its own and none to collide with
-[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [
-	[ 'uri' => '/footer', 'httpUri' => '/footer', 'libraryKey' => 'blank', 'text' => [] ],
-	[ 'uri' => '/common', 'httpUri' => '/common', 'libraryKey' => 'blank', 'text' => [] ],
-	[ 'uri' => '/2026-home', 'httpUri' => '/2026-home', 'libraryKey' => 'blank', 'text' => [] ],
-] ] );
-check( 'pages named /footer, /common and /2026-home are accepted', $status === 200 );
-check( '...and get page-footer.tpl, page-common.tpl and page-2026-home.tpl, each of which has a category', \Nino\Filesystem::fileExists( $appData, '/templates/page-footer.tpl' ) === true
-	&& \Nino\Filesystem::fileExists( $appData, '/templates/page-common.tpl' ) === true && \Nino\Filesystem::fileExists( $appData, '/templates/page-2026-home.tpl' ) === true
-	&& \Nino\Modules\Template::category( 'page-footer.tpl' ) === 'page-footer' && \Nino\Modules\Template::category( 'page-common.tpl' ) === 'page-common'
-	&& \Nino\Modules\Template::category( 'page-2026-home.tpl' ) === 'page-2026-home' );
-
-// Navigation: always active now (see ALWAYS_MODULES above). Membership is
-// posted explicitly per entry and stored on its route.
-ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
-
-ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [
-	[ 'uri' => '/site-home', 'httpUri' => '/', 'libraryKey' => 'home', 'navs' => [ 'main' ], 'text' => [ 'de_DE' => [ 'name' => 'Start' ], 'en_US' => [ 'name' => 'Home' ] ] ],
-	[ 'uri' => '/site-contact', 'httpUri' => '/kontakt', 'libraryKey' => 'contact', 'navs' => [ 'main' ], 'text' => [ 'de_DE' => [ 'name' => 'Kontakt' ], 'en_US' => [ 'name' => 'Contact' ] ] ],
-	[ 'uri' => '/site-rules', 'httpUri' => '/impressum', 'libraryKey' => 'blank', 'navs' => [], 'text' => [ 'de_DE' => [ 'name' => 'Recht' ], 'en_US' => [ 'name' => 'Rules' ] ] ],
-] ] );
-
-// Menu membership lives on the route each entry owns, not in a generated
-// textfill - see \Nino\Modules\Navigation::routeLines(). Nothing is written
-// per locale here at all: the menu is built per request, from the same
-// /_nino/webpage<uri>/name keys the entries already carry
-$routesAfterNav = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
-
-check( 'the Navigation module registers the menus the editors offer, the Legal unit\'s among them', \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/html/navs'] === $expectedNavs );
-check( 'an entry explicitly assigned to main joins that menu at its own position in the list', ( $routesAfterNav['GET://']['navs'] ?? null ) === [ 'main' => 1 ] );
-check( '...and so does the second one, one position further down', ( $routesAfterNav['GET://kontakt']['navs'] ?? null ) === [ 'main' => 2 ] );
-check( 'an entry that is in no menu carries no membership at all', isset( $routesAfterNav['GET://impressum']['navs'] ) === false );
-
-// The routes stand in list order, which is what equal priorities fall back
-// to - reordering pages is what reorders the menus
-check( 'the applied routes stand in the list\'s own order', array_slice( array_keys( $routesAfterNav ), -3 ) === [ 'GET://', 'GET://kontakt', 'GET://impressum' ] );
-
-// A page is registered at whatever Http-URI the entry picked
-check( 'registers an entry at its own picked Http-URI', isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://impressum'] ) === true );
-
-// Dropping pages narrows the routes (replace semantics)
-ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [
-	[ 'uri' => '/site-home', 'httpUri' => '/', 'libraryKey' => 'home', 'navs' => [ 'main' ], 'text' => [ 'de_DE' => [ 'name' => 'Start' ], 'en_US' => [ 'name' => 'Home' ] ] ],
-] ] );
-
-$configAfterDrop = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-check( 'dropping "kontakt"/"impressum" removes their routes (replace, not merge)', isset( $configAfterDrop['/nino/http/routes']['GET://kontakt'] ) === false && isset( $configAfterDrop['/nino/http/routes']['GET://impressum'] ) === false );
-check( 'the home route survives, still keyed the same way', isset( $configAfterDrop['/nino/http/routes']['GET://'] ) === true );
-check( 'a hand-written route still survives this replace too', isset( $configAfterDrop['/nino/http/routes']['GET://custom'] ) === true );
-check( 'the legal menu and its two Element-URIs are not touched by a replace of the pages', ( $configAfterDrop['/nino/html/navroutes']['/legal/privacy']['legal'] ?? null ) === 1 && ( $configAfterDrop['/nino/html/navroutes']['/legal/imprint']['legal'] ?? null ) === 2 );
-
-/*	...and the starter site stays gone. The one property that separates a
-	proposal in the step's list from a default underneath config.php: this
-	project has decided which pages it has, so reopening the step shows that
-	decision rather than putting the four back. Seeded in AppData::DEFAULTS
-	the dropped pages would be merged in again on the very next boot	*/
-[ , $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiList' ] );
-$reopened = $body['webpages'] ?? [];
-
-check( 'reopening the step shows the pages this project kept, not the starter site again',
-	array_column( $reopened, 'httpUri' ) === [ '/' ] );
-
-// One step earlier, re-applying with nothing posted still leaves navigation,
-// the locale picker and the contact form active - there is no "opening
-// position" to decline any more, nor a choice that could outlive it
-ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
-
-$configAfterDecline = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-
-check( '...and the three always-on modules are still there, unaffected by posting nothing',
-	in_array( '\\Nino\\Modules\\Navigation', $configAfterDecline['/nino/modules'], true ) === true
-	&& in_array( '\\Nino\\Modules\\Form', $configAfterDecline['/nino/modules'], true ) === true
-	&& in_array( '\\Nino\\Modules\\Localepicker', $configAfterDecline['/nino/modules'], true ) === true );
-
-// A config.php that holds the routes and the bundles as null - a hand edit - is a project that has none, as the readers
-// took it before they read through AppData::stored(): the list of pages answers, and the apply goes through and writes
-// both again, the kernel's script bundle with them. A project of its own, so that the state above stays as it is
-$nulled = ninoSandbox( 'install-null' );
-$nulledDir = ninoSandboxDir( $nulled );
-$nulled['/nino/dir'] = '';
-foreach( [ '/private/templates', '/public/images', '/private/text', '/private/assets' ] as $nulledSub )
-	mkdir( $nulledDir. $nulledSub, 0777, true );
-\Nino\Filesystem::putFileContent( $nulled, '/config.php', [ '/nino/http/routes' => null, '/nino/html/assets' => null, '/nino/locales/native' => 'de_DE', '/nino/locales/available' => [ 'de_DE' ] ] );
-[ $nullListStatus ] = ninoCall( $nulled, [ \Nino\Install\Webpages::class, 'apiList' ] );
-[ $nullApplyStatus ] = ninoCall( $nulled, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE' ], 'modules' => [] ] );
-$nullConfig = \Nino\Filesystem::getFileContent( $nulled, '/config.php', [] );
-check( 'a config.php that holds the routes and the bundles as null is a project that has none: the list of pages answers and the apply writes both again, the script bundle with them', $nullListStatus === 200 && $nullApplyStatus === 200
-	&& is_array( $nullConfig['/nino/http/routes'] ?? null ) === true && isset( $nullConfig['/nino/html/assets']['/.cache/script.js'] ) === true );
-\Nino\Filesystem::removeDir( $nulledDir );
-
-pinSetupLeavesTheStylesheetsOfFeaturesOut();
-
-echo "\n";
+// A route that is no page - the sitemap's, a technical one - is not a page of the project
+\Nino\Filesystem::putFileContent( $owned, '/config.php', [ '/nino/locales/native' => 'de_DE', '/nino/locales/available' => [ 'de_DE' ], '/nino/http/routes' => [ 'GET://sitemap.xml' => [ 'uri' => '/sitemap.xml', 'body' => '[sitemap]' ], 'POST://.form' => [ 'uri' => '/.form', 'body' => '[template /templates/page-form]' ] ] ] );
+unset( $owned['./nino/filesystem/cache'] );
+check( '...while routes that are no page do not - a route of another method that renders a page template among them', \Nino\Install\StarterPages::apply( $owned ) === true
+	&& array_keys( $pageRoutes( \Nino\Filesystem::getFileContent( $owned, '/config.php', [] ) ) ) === [ 'GET://', 'GET://contact', 'GET://404' ] );
+// No Navigation module on: the pages are in no menu, and the languages the project has are the ones written
+check( '...and without the Navigation module the pages are in no menu, in the one language the project has',
+	array_filter( \Nino\Filesystem::getFileContent( $owned, '/config.php', [] )['/nino/http/routes'], static fn( array $route ): bool => isset( $route['navs'] ) === true ) === []
+	&& isset( \Nino\Filesystem::getFileContent( $owned, '/text/en_US.php', [] )['[[/_nino/webpage/home/name]]'] ) === false
+	&& ( \Nino\Filesystem::getFileContent( $owned, '/text/de_DE.php', [] )['[[/_nino/webpage/home/name]]'] ?? '' ) === 'Startseite' );
+\Nino\Filesystem::removeDir( $ownedDir );
 
 
-// --- Webpages <-> _admin's Routes module share one source of truth ------------
-
-echo "Webpages <-> _admin's Routes module share one source of truth\n";
-
-// Neither tool keeps a list of its own: both derive one from
-// /nino/http/routes plus the /_nino/webpage<uri>/* keys in the text files (see
-// Webpages::pages() and Admin.php's PageEditor::pages()). That only works if
-// the route really carries everything either side needs to reopen an entry -
-// its Element-URI, its body and its status code. Without that, every shipped
-// page is unopenable in /_admin, and saving the 404 page there quietly turns
-// it into a 200.
-[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [
-	[ 'uri' => '/site-home', 'httpUri' => '/', 'libraryKey' => 'home', 'navs' => [ 'main' ], 'text' => [ 'de_DE' => [ 'name' => 'Start' ] ] ],
-	[ 'uri' => '/site-404', 'httpUri' => '/404', 'libraryKey' => '404', 'navs' => [], 'text' => [ 'de_DE' => [ 'name' => 'Weg' ] ] ],
-	[ 'uri' => '/site-legal', 'httpUri' => '/legal', 'libraryKey' => '', 'body' => '[template /templates/page-legal.[[/nino/http/response/locale]]]', 'navs' => [], 'text' => [ 'de_DE' => [ 'name' => 'Recht' ] ] ],
-] ] );
-check( 'apply succeeds', $status === 200 );
-
-$sharedConfig = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-$sharedList 	= $body['webpages'];
-
-check( 'reports "template" as the on-disk template file /_admin selects from', array_column( $sharedList, 'template' ) === [ 'page-home', 'page-404', '' ] );
-check( 'resolves each entry back to the library unit it came from, from its route body alone', array_column( $sharedList, 'libraryKey' ) === [ 'home', '404', '' ] );
-check( 'reports each entry\'s status code, read back off its route', array_column( $sharedList, 'statusCode' ) === [ 200, 404, 200 ] );
-check( 'the 404 entry really is a 404 in the route too', ( $sharedConfig['/nino/http/routes']['GET://404']['statusCode'] ?? 200 ) === 404 );
-check( 'a body that resolves one template per locale reports no single template', $sharedList[2]['body'] === '[template /templates/page-legal.[[/nino/http/response/locale]]]' );
-
-// Now the other direction: open one of those entries in /_admin's Routes module
-// and save it back unchanged, exactly as the Routes panel's admin.js posts it
+// Neither the Routes panel nor the starter pages keep a list of their own: both
+// derive one from /nino/http/routes plus the /_nino/webpage<uri>/* keys in the text
+// files. That only works if the route really carries everything the panel needs to
+// reopen a page - its Element-URI, its body and its status code. Without that,
+// every page the wizard made is unopenable in /_admin, and saving the 404 page
+// there quietly turns it into a 200.
+\Nino\Auth::logoutUser( $appData );
 ninoUser( $appData, 'dev@example.com' );
 
 [ , $body ] = ninoCall( $appData, [ \Nino\Modules\Routes\Admin::class, 'apiList' ] );
 $adminPages = $body['pages'];
 $adminTemplates = $body['templates'];
 
-check( 'every Webpages-made entry names a template /_admin actually offers', count( array_filter(
-	$adminPages,
-	fn( array $entry ): bool => $entry['template'] !== '' && in_array( $entry['template'], $adminTemplates, true ) === false
-) ) === 0 );
+check( 'the Routes panel lists the starter pages as its own, each on the template its route renders', array_column( $adminPages, 'uri' ) === [ '/home', '/contact', '/404' ]
+	&& array_column( $adminPages, 'template' ) === [ 'page-home', 'page-contact', 'page-404' ] && array_column( $adminPages, 'statusCode' ) === [ 200, 200, 404 ] );
+check( '...every one on a template the panel offers', array_filter( $adminPages, static fn( array $entry ): bool => in_array( $entry['template'], $adminTemplates, true ) === false ) === [] );
+check( '...and with the empty page to start a new route on, which is the one the Routes panel proposes', ( $body['defaultTemplate'] ?? null ) === 'page-blank' && in_array( 'page-blank', $adminTemplates, true ) === true );
 
 [ $status ] = ninoCall( $appData, [ \Nino\Modules\Routes\Admin::class, 'apiSave' ], [
-	'originalUri' => '/site-404', 'uri' => '/site-404', 'httpUris' => [ '' => '/404' ],
-	'template' => $adminPages[1]['template'], 'navs' => [],
-	'statusCode' => $adminPages[1]['statusCode'], 'text' => $adminPages[1]['text'],
+	'originalUri' => '/404', 'uri' => '/404', 'httpUris' => [ '' => '/404' ],
+	'template' => $adminPages[2]['template'], 'navs' => [],
+	'statusCode' => $adminPages[2]['statusCode'], 'text' => $adminPages[2]['text'],
 ] );
-check( 'saving a Webpages-made entry from /_admin succeeds', $status === 200 );
+check( 'saving a starter page from /_admin succeeds', $status === 200 );
+check( '...and does not quietly reset its 404 to a 200', ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://404']['statusCode'] ?? 200 ) === 404 );
 
-$afterDevSave = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-check( 'saving it there does not quietly reset its 404 to a 200', ( $afterDevSave['/nino/http/routes']['GET://404']['statusCode'] ?? 200 ) === 404 );
-check( 'the entry still resolves to /_install\'s own "404" unit after a save made in /_admin', ( \Nino\Install\Webpages::pages( $appData, $afterDevSave['/nino/http/routes'], [ 'de_DE' ], [] )[1]['libraryKey'] ?? null ) === '404' );
-
-// The locale-resolving body (a hand-made entry: no library unit has one any
-// more) the template <select> can't spell: saving that
-// entry from /_admin keeps the body it already has rather than flattening it
-// into whichever option the disabled select happened to preselect
-[ $status ] = ninoCall( $appData, [ \Nino\Modules\Routes\Admin::class, 'apiSave' ], [
-	'originalUri' => '/site-legal', 'uri' => '/site-legal', 'httpUris' => [ '' => '/legal' ],
-	'template' => '', 'navs' => [], 'statusCode' => 200, 'text' => $adminPages[2]['text'],
-] );
-check( 'saving the locale-resolving entry from /_admin succeeds', $status === 200 );
-
-$afterLegalSave = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-check( 'its runtime-resolved body is kept, not flattened to one locale\'s file', $afterLegalSave['/nino/http/routes']['GET://legal']['body'] === '[template /templates/page-legal.[[/nino/http/response/locale]]]' );
-check( '...and the derived list claims no template for it', ( \Nino\Install\Webpages::pages( $appData, $afterLegalSave['/nino/http/routes'], [ 'de_DE' ], [] )[2]['template'] ?? null ) === '' );
-
-// An entry /_admin created has no library unit at all - Webpages has to carry
-// it through its own replace rather than reject it as an unknown template
 [ $status ] = ninoCall( $appData, [ \Nino\Modules\Routes\Admin::class, 'apiSave' ], [
 	'originalUri' => '', 'uri' => '/dev-made', 'httpUris' => [ '' => '/dev-made' ],
 	'template' => 'page-home', 'navs' => [], 'statusCode' => 201,
-	// A name and a title in every active language are required there
 	'text' => array_fill_keys( \Nino\Locales::getAvailableLocales( $appData ), [ 'name' => 'Dev made', 'title' => 'Dev made' ] ),
 ] );
-check( 'creating a page in /_admin succeeds', $status === 200 );
-
-$beforeReapply = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => \Nino\Install\Webpages::pages( $appData, $beforeReapply['/nino/http/routes'], [ 'de_DE' ], [] ) ] );
-check( 'Webpages re-applies a list containing a /_admin-made entry', $status === 200 );
-
-$afterReapply = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-check( 'the /_admin-made entry keeps its route through that replace', isset( $afterReapply['/nino/http/routes']['GET://dev-made'] ) === true );
-check( '...including its own status code', ( $afterReapply['/nino/http/routes']['GET://dev-made']['statusCode'] ?? 200 ) === 201 );
-check( 'the library-backed entries still resolve their own units too', ( $afterReapply['/nino/http/routes']['GET://404']['statusCode'] ?? 200 ) === 404 );
-
-[ $status ] = ninoCall( $appData, [ \Nino\Modules\Routes\Admin::class, 'apiSave' ], [
-	'originalUri' => '/site-404', 'uri' => '/site-404', 'httpUris' => [ '' => '/404' ],
-	'template' => 'page-nope', 'navs' => [], 'statusCode' => 404, 'text' => [],
-] );
-check( 'a genuinely unknown template is still rejected', $status === 400 );
+check( 'creating a page in /_admin succeeds, beside the starter pages', $status === 200 && isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://dev-made'] ) === true
+	&& ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET://dev-made']['statusCode'] ?? 200 ) === 201 );
 
 // Saving, deleting and moving a route all read the routes, decide against
 // what they find and write the whole key back - so two editors saving two
@@ -1285,6 +1002,35 @@ check( 'every route write decides and writes under one lock'. ( $unlocked === []
 \Nino\Auth::logoutUser( $appData );
 \Nino\Auth::deleteUser( $appData, 'dev@example.com' );
 
+// One step earlier, re-applying with nothing posted still leaves navigation,
+// the locale picker and the contact form active - there is no "opening
+// position" to decline any more, nor a choice that could outlive it
+ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
+
+$configAfterDecline = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+
+check( '...and the three always-on modules are still there, unaffected by posting nothing',
+	in_array( '\\Nino\\Modules\\Navigation', $configAfterDecline['/nino/modules'], true ) === true
+	&& in_array( '\\Nino\\Modules\\Form', $configAfterDecline['/nino/modules'], true ) === true
+	&& in_array( '\\Nino\\Modules\\Localepicker', $configAfterDecline['/nino/modules'], true ) === true );
+
+// A config.php that holds the routes and the bundles as null - a hand edit - is a project that has none, as the readers
+// took it before they read through AppData::stored(): the apply goes through and writes
+// both again, the kernel's script bundle with them. A project of its own, so that the state above stays as it is
+$nulled = ninoSandbox( 'install-null' );
+$nulledDir = ninoSandboxDir( $nulled );
+$nulled['/nino/dir'] = '';
+foreach( [ '/private/templates', '/public/images', '/private/text', '/private/assets' ] as $nulledSub )
+	mkdir( $nulledDir. $nulledSub, 0777, true );
+\Nino\Filesystem::putFileContent( $nulled, '/config.php', [ '/nino/http/routes' => null, '/nino/html/assets' => null, '/nino/locales/native' => 'de_DE', '/nino/locales/available' => [ 'de_DE' ] ] );
+[ $nullApplyStatus ] = ninoCall( $nulled, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE' ], 'modules' => [] ] );
+$nullConfig = \Nino\Filesystem::getFileContent( $nulled, '/config.php', [] );
+check( 'a config.php that holds the routes and the bundles as null is a project that has none: the apply writes both again, the script bundle with them', $nullApplyStatus === 200
+	&& is_array( $nullConfig['/nino/http/routes'] ?? null ) === true && isset( $nullConfig['/nino/html/assets']['/.cache/script.js'] ) === true );
+\Nino\Filesystem::removeDir( $nulledDir );
+
+pinSetupLeavesTheStylesheetsOfFeaturesOut();
+
 echo "\n";
 
 
@@ -1292,14 +1038,14 @@ echo "\n";
 
 echo "PersonalInfos::apiList / apiSaveBatch\n";
 
-// Deliberately overwrites whatever the Webpages section left behind above -
+// Deliberately overwrites whatever the starter pages section left behind above -
 // this section is independently scoped, only real
 // _admin/install/library/base key *names* matter here (apiList() filters
 // against the real library on disk, not anything sandboxed), plus a
 // couple of made-up, clearly-out-of-scope keys to prove both "not
 // /company or /website" and "webpage meta, even though it looks similar"
 // content stays out of this step. Locales/available is reset too, back to
-// both - the Webpages section above deliberately ends on a narrowed list
+// both - an earlier section may end on a narrowed list
 \Nino\Filesystem::mutate( $appData, '/config.php', function( array $config ): array {
 	$config['/nino/locales/available'] = [ 'de_DE', 'en_US' ];
 	return $config;
@@ -1436,6 +1182,512 @@ check( '...and one of exactly that length is accepted', $status === 200 );
 echo "\n";
 
 
+// --- Applications::apiList / apiPlan / apiApply -----------------------------
+
+echo "Applications::apiList / apiPlan / apiApply\n";
+
+/*	The official catalogue is replaced the way catalogue-smoke.php replaces it: a
+	callable under './nino/fetch/stub' answers from a map of urls, a key pair of
+	this run signs, and the archives are built here byte by byte. The one thing the
+	wizard does not take from the project - the key it verifies with - is put under
+	Applications::KEY_OVERRIDE, a runtime key nothing but a test sets	*/
+$appKeypair = openssl_pkey_new( [ 'private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1' ] );
+openssl_pkey_export( $appKeypair, $appPrivateKey );
+$appPublicKey = openssl_pkey_get_details( $appKeypair )['key'];
+
+$strangerKeypair = openssl_pkey_new( [ 'private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1' ] );
+openssl_pkey_export( $strangerKeypair, $strangerPrivateKey );
+
+$appTar = static function( array $entries ): string {
+	$out = '';
+	foreach( $entries as $name => $content ) {
+		$header  = str_pad( $name, 100, "\0" ). "0000644\0". "0000000\0". "0000000\0";
+		$header .= str_pad( decoct( $content === null ? 0 : strlen( $content ) ), 11, '0', STR_PAD_LEFT ). "\0". str_pad( decoct( 1700000000 ), 11, '0', STR_PAD_LEFT ). "\0";
+		$header .= '        '. ( $content === null ? '5' : '0' ). str_pad( '', 100, "\0" ). "ustar\0". '00';
+		$header  = str_pad( $header, 512, "\0" );
+		$sum = 0;
+		for( $i = 0; $i < 512; $i++ )
+			$sum += ord( $header[$i] );
+		$header = substr( $header, 0, 148 ). str_pad( decoct( $sum ), 6, '0', STR_PAD_LEFT ). "\0 ". substr( $header, 156 );
+		$out .= $header. ( $content === null ? '' : str_pad( $content, (int) ( ceil( strlen( $content ) / 512 ) * 512 ), "\0" ) );
+	}
+	return gzencode( $out. str_repeat( "\0", 1024 ), 6 );
+};
+
+$appRemote		= [];
+$appRequests	= [];
+$appArchives	= [];
+
+$appFeature = static function( string $key ) use ( $appTar, &$appRemote, &$appArchives ): array {
+	$directory = ucfirst( $key );
+	$bytes = $appTar( [
+		$directory. '/'									=> null,
+		$directory. '/feature.php'			=> '<?php return [ \'key\' => \''. $key. '\', \'name\' => \''. $directory. '\', \'version\' => \'1.0.0\' ];',
+		$directory. '/'. $directory. '.php'	=> '<?php namespace Nino\\Modules { class '. $directory. ' { public const string VERSION = \'1.0.0\'; } }',
+	] );
+	$url = 'https://catalogue.test/features/'. $key. '-1.0.0.tar.gz';
+	$appRemote[$url] = $bytes;
+	$appArchives[$key] = $bytes;
+	return [ 'key' => $key, 'name' => [ 'en_US' => $directory. ' feature', 'de_DE' => $directory. ' Funktion' ], 'description' => 'The '. $key, 'version' => '1.0.0', 'nino' => '^1.0', 'php' => [ 'ext' => [] ],
+		'requires' => [], 'directory' => $directory, 'archive' => $url, 'sha256' => hash( 'sha256', $bytes ), 'size' => strlen( $bytes ), 'released' => '2026-11-13' ];
+};
+
+$appFeatureList = [ $appFeature( 'alpha' ), $appFeature( 'beta' ), $appFeature( 'gamma' ), $appFeature( 'delta' ) ];
+$appList = [
+	[ 'key' => 'site', 'name' => [ 'en_US' => 'Site', 'de_DE' => 'Seite' ], 'description' => [ 'en_US' => 'A site', 'de_DE' => 'Eine Seite' ], 'features' => [ 'alpha', 'beta' ], 'next' => '/_admin/#alpha', 'start' => 'starter' ],
+	[ 'key' => 'shop', 'name' => [ 'en_US' => 'Shop' ], 'description' => [ 'en_US' => 'A shop' ], 'features' => [ 'beta', 'gamma' ], 'next' => '/shop', 'start' => null ],
+	[ 'key' => 'card', 'name' => [ 'en_US' => 'Card', 'de_DE' => 'Karte' ], 'description' => [ 'en_US' => 'A card' ], 'features' => [ 'delta' ], 'next' => '/card', 'start' => 'own' ],
+	[ 'key' => 'blog', 'name' => [ 'en_US' => 'Blog' ], 'description' => [ 'en_US' => 'A blog' ], 'features' => [ 'alpha', 'gamma' ], 'next' => null, 'start' => 'starter' ],
+	[ 'key' => 'ghost', 'name' => [ 'en_US' => 'Ghost' ], 'description' => [ 'en_US' => 'Not offered' ], 'features' => [ 'alpha', 'unlisted' ], 'next' => '/ghost', 'start' => null ],
+];
+
+$appPublish = static function( ?string $signWith = null, ?array $applications = null ) use ( &$appRemote, $appFeatureList, $appList, $appPrivateKey, $appArchives ): void {
+	foreach( $appFeatureList as $feature )
+		$appRemote[ $feature['archive'] ] = $appArchives[ $feature['key'] ];
+	$json = json_encode( [ 'format' => 1, 'generated' => '2026-11-13T12:00:00Z', 'features' => $appFeatureList, 'applications' => $applications ?? $appList ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+	openssl_sign( $json, $signature, $signWith ?? $appPrivateKey, OPENSSL_ALGO_SHA256 );
+	$appRemote[ \Nino\Catalogue::DEFAULT_URL ]					= $json;
+	$appRemote[ \Nino\Catalogue::DEFAULT_URL. '.sig' ]	= base64_encode( $signature );
+};
+$appPublish();
+
+/*	A project the wizard has taken as far as the accounts: the setup applied, one account
+	signed in, the network replaced. The features directory is the run's own	*/
+$appProject = static function( string $name, bool $account = true ) use ( &$appRemote, &$appRequests, $appPublicKey ): array {
+
+	$app = ninoSandbox( $name );
+	$dir = ninoSandboxDir( $app );
+	$app['/nino/dir']								= '';
+	$app['/nino/locales/available']	= [ 'de_DE', 'en_US' ];
+	$app['/nino/html/navs']					= \Nino\AppData::DEFAULTS['/nino/html/navs'];
+	$app['/nino/modules']						= [ '\\Nino\\Modules\\Assets', '\\Nino\\Modules\\Elements', '\\Nino\\Modules\\Template', '\\Nino\\Modules\\Jstext', '\\Nino\\Modules\\Csrf', '\\Nino\\Modules\\Components' ];
+	foreach( [ '/private/templates', '/public/images', '/private/text', '/private/assets' ] as $sub )
+		mkdir( $dir. $sub, 0777, true );
+	\Nino\Filesystem::putFileContent( $app, '/config.php', [ '/nino/locales/native' => 'de_DE', '/nino/locales/available' => [ 'de_DE', 'en_US' ] ] );
+	ninoCall( $app, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
+
+	if( $account === true )
+		ninoCall( $app, [ \Nino\Install\Accounts::class, 'apiCreate' ], [ 'mail' => 'owner@example.com', 'pw' => 'a long enough password' ] );
+
+	$app[ \Nino\Install\Applications::KEY_OVERRIDE ] = $appPublicKey;
+	$app['./nino/fetch/stub'] = static function( string $url, array $options ) use ( &$appRemote, &$appRequests ): array {
+		$appRequests[] = $url;
+		if( isset( $appRemote[$url] ) === false )
+			return [ 'ok' => false, 'status' => 404, 'error' => 'http 404' ];
+		return [ 'ok' => true, 'status' => 200, 'body' => $appRemote[$url] ];
+	};
+
+	return $app;
+};
+
+$appReset = static function() use ( &$appRequests ): void {
+	foreach( glob( \Nino\Features::dir(). '/*', GLOB_ONLYDIR ) ?: [] as $featureDir )
+		\Nino\Filesystem::removeDir( $featureDir );
+	$appRequests = [];
+};
+
+$appCall = static function( array &$app, string $action, array $data = [] ): array {
+	return ninoCall( $app, [ \Nino\Install\Install::class, 'handlePost' ], $data, $action );
+};
+
+$appReset();
+$project = $appProject( 'install-applications' );
+
+// --- what is offered
+
+[ $status, $body ] = $appCall( $project, 'applications/list' );
+check( 'the list answers the applications of the signed catalogue that fit this kernel, in its order', $status === 200 && array_column( $body['applications'], 'key' ) === [ 'site', 'shop', 'card', 'blog' ] && $body['message'] === '' && $body['missing'] === [] );
+check( '...one that lists a feature the catalogue does not has no place in it', in_array( 'ghost', array_column( $body['applications'], 'key' ), true ) === false );
+check( '...with the name and the description in the language of the project (de_DE here), else English, and the features it switches on by name',
+	$body['applications'][0]['name'] === 'Seite' && $body['applications'][0]['description'] === 'Eine Seite' && $body['applications'][1]['name'] === 'Shop'
+	&& $body['applications'][0]['features'] === [ [ 'key' => 'alpha', 'name' => 'Alpha Funktion' ], [ 'key' => 'beta', 'name' => 'Beta Funktion' ] ] );
+check( '...and whether it provides the start page', array_column( $body['applications'], 'start' ) === [ 'starter', null, 'own', 'starter' ] );
+check( 'the answer carries no address, no key and no archive of the catalogue', preg_match( '#https?://|PUBLIC KEY|sha256|archive#', json_encode( $body ) ) === 0 );
+check( 'the catalogue was asked for twice and nothing else: its index and its signature, at the official address', $appRequests === [ \Nino\Catalogue::DEFAULT_URL, \Nino\Catalogue::DEFAULT_URL. '.sig' ] );
+check( 'nothing was placed by looking', glob( \Nino\Features::dir(). '/*', GLOB_ONLYDIR ) === [] );
+
+// --- the plan
+
+[ $status, $body ] = $appCall( $project, 'applications/plan', [ 'applications' => [ 'shop', 'site' ] ] );
+check( 'the plan of two applications that share a feature lists it once, in the order of the catalogue and of each application\'s list - however they were posted',
+	$status === 200 && array_column( $body['features'], 'key' ) === [ 'alpha', 'beta', 'gamma' ] );
+[ , $body ] = $appCall( $project, 'applications/plan', [ 'applications' => [ 'site', 'site', 'shop' ] ] );
+check( '...a key twice counts once', array_column( $body['features'], 'key' ) === [ 'alpha', 'beta', 'gamma' ] );
+[ , $body ] = $appCall( $project, 'applications/plan', [ 'applications' => [] ] );
+check( 'nothing chosen is a plan of nothing', $body === [ 'features' => [] ] );
+
+[ $status ] = $appCall( $project, 'applications/plan', [ 'applications' => [ 'site', 'card' ] ] );
+check( 'two applications that both provide the start page exclude each other: 400', $status === 400 );
+[ $status ] = $appCall( $project, 'applications/plan', [ 'applications' => [ 'site', 'blog' ] ] );
+check( '...whichever they are', $status === 400 );
+[ $status ] = $appCall( $project, 'applications/plan', [ 'applications' => [ 'shop', 'card' ] ] );
+check( 'one that provides it and one that does not go together', $status === 200 );
+foreach( [ 'ghost' => [ 'ghost' ], 'a key nobody offers' => [ 'nope' ], 'a key that is no key' => [ '../x' ], 'a number' => [ 5 ], 'a string, not a list' => 'site', 'an object' => [ 'a' => 'site' ] ] as $why => $wrong ) {
+	[ $status ] = $appCall( $project, 'applications/plan', [ 'applications' => $wrong ] );
+	check( 'a plan of '. $why. ' is refused with 400', $status === 400 );
+}
+
+// --- applying one feature at a time
+
+[ $status ] = $appCall( $project, 'applications/apply', [ 'applications' => [ 'shop' ], 'feature' => 'alpha' ] );
+check( 'a feature of another application than the chosen ones is refused: 400, and nothing is placed', $status === 400 && glob( \Nino\Features::dir(). '/*', GLOB_ONLYDIR ) === [] );
+foreach( [ 'unlisted', 'Alpha', '../etc', '', 'delta' ] as $wrongFeature ) {
+	[ $status ] = $appCall( $project, 'applications/apply', [ 'applications' => [ 'site', 'shop' ], 'feature' => $wrongFeature ] );
+	check( 'the feature "'. $wrongFeature. '" is not one of the plan: 400', $status === 400 );
+}
+check( '...and still nothing is placed', glob( \Nino\Features::dir(). '/*', GLOB_ONLYDIR ) === [] );
+
+[ $status, $body ] = $appCall( $project, 'applications/apply', [ 'applications' => [ 'site', 'shop' ], 'feature' => 'alpha' ] );
+check( 'a feature of the plan is placed below features/ and switched on', $status === 200 && $body === [ 'feature' => 'alpha', 'placed' => true, 'activated' => true ]
+	&& is_file( \Nino\Features::dir(). '/Alpha/feature.php' ) === true && in_array( '\\Nino\\Modules\\Alpha', \Nino\Filesystem::getFileContent( $project, '/config.php', [] )['/nino/modules'], true ) === true );
+[ , $body ] = $appCall( $project, 'applications/apply', [ 'applications' => [ 'site', 'shop' ], 'feature' => 'alpha' ] );
+check( 'a feature that is on is left as it is: nothing placed, nothing activated', $body === [ 'feature' => 'alpha', 'placed' => false, 'activated' => false ] );
+
+// A feature that is placed and not on (switched off by hand, or left by an interrupted round) is switched on, not placed again
+\Nino\Features::deactivate( $project, 'alpha' );
+[ , $body ] = $appCall( $project, 'applications/apply', [ 'applications' => [ 'site' ], 'feature' => 'alpha' ] );
+check( 'one that is placed and not on is switched on, not placed again', $body === [ 'feature' => 'alpha', 'placed' => false, 'activated' => true ] );
+
+// --- an archive that does not match fails in the middle, and the second round goes on from there
+
+$appRemote[ $appFeatureList[2]['archive'] ] = 'not what the catalogue promised';
+[ , $body ] = $appCall( $project, 'applications/apply', [ 'applications' => [ 'site', 'shop' ], 'feature' => 'beta' ] );
+check( 'beta goes through', $body['activated'] === true );
+[ $status, $body ] = $appCall( $project, 'applications/apply', [ 'applications' => [ 'site', 'shop' ], 'feature' => 'gamma' ] );
+check( 'an archive that is not what the signed catalogue promised fails its feature: the answer says why', $status === 400 && ( $body['code'] ?? '' ) === 'install_feature' );
+check( '...nothing of it is on the disk, and what went through before stays on',
+	is_dir( \Nino\Features::dir(). '/Gamma' ) === false && \Nino\Features::get( $project, 'alpha' )['active'] === true && \Nino\Features::get( $project, 'beta' )['active'] === true );
+$appRemote[ $appFeatureList[2]['archive'] ] = $appArchives['gamma'];
+$appRequests = [];
+[ , $body ] = $appCall( $project, 'applications/apply', [ 'applications' => [ 'site', 'shop' ], 'feature' => 'beta' ] );
+check( 'the second round skips what is on', $body === [ 'feature' => 'beta', 'placed' => false, 'activated' => false ] );
+[ , $body ] = $appCall( $project, 'applications/apply', [ 'applications' => [ 'site', 'shop' ], 'feature' => 'gamma' ] );
+check( '...and places what failed', $body === [ 'feature' => 'gamma', 'placed' => true, 'activated' => true ] );
+
+// What the setup does when it is applied again after a step back: a feature that is on stays on
+ninoCall( $project, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
+$modulesAfterBack = \Nino\Filesystem::getFileContent( $project, '/config.php', [] )['/nino/modules'];
+check( 'applying the languages step again leaves the features of the applications switched on', array_diff( [ '\\Nino\\Modules\\Alpha', '\\Nino\\Modules\\Beta', '\\Nino\\Modules\\Gamma' ], $modulesAfterBack ) === []
+	&& in_array( '\\Nino\\Modules\\Maintenance', $modulesAfterBack, true ) === true && count( $modulesAfterBack ) === count( array_unique( $modulesAfterBack ) ) );
+
+// --- a start application that is set up stays the one
+
+[ , $body ] = $appCall( $project, 'applications/list' );
+check( 'the list says which start application is set up, and which applications are set up and have an entry point', $body['startApplied'] === 'site'
+	&& array_column( $body['applications'], 'applied', 'key' ) === [ 'site' => true, 'shop' => true, 'card' => false, 'blog' => true ]
+	&& array_column( $body['applications'], 'entry', 'key' ) === [ 'site' => true, 'shop' => true, 'card' => true, 'blog' => false ] );
+$swaps = [ 'another start application' => [ [ 'card' ], 409, 'install_start_applied' ], 'none of them, the other chosen' => [ [ 'shop' ], 409, 'install_start_applied' ],
+	'two of them' => [ [ 'site', 'card' ], 400, 'install_start_exclusive' ], 'the one that is set up and another' => [ [ 'site', 'shop' ], 200, '' ] ];
+foreach( $swaps as $why => [ $chosen, $expected, $code ] ) {
+	[ $status, $body ] = $appCall( $project, 'applications/plan', [ 'applications' => $chosen ] );
+	check( 'a plan with '. $why. ' is a '. $expected. ( $code === '' ? '' : ' with the code that says so' ), $status === $expected && ( $body['code'] ?? '' ) === $code );
+}
+[ $status, $body ] = $appCall( $project, 'applications/apply', [ 'applications' => [ 'card' ], 'feature' => 'delta' ] );
+check( 'a feature of another start application is refused, and not placed', $status === 409 && ( $body['code'] ?? '' ) === 'install_start_applied' && is_dir( \Nino\Features::dir(). '/Delta' ) === false );
+// An application whose features are all on because a larger one was applied is not the one that was chosen: of two that are on, the larger is the start application
+$appPublish( null, [ $appList[0], [ 'key' => 'big', 'name' => 'Big', 'description' => 'Big', 'features' => [ 'alpha', 'beta', 'gamma' ], 'next' => null, 'start' => 'starter' ] ] );
+$larger = $appProject( 'install-applications-larger' );
+foreach( [ 'alpha', 'beta', 'gamma' ] as $largerFeature )
+	$appCall( $larger, 'applications/apply', [ 'applications' => [ 'big' ], 'feature' => $largerFeature ] );
+[ , $body ] = $appCall( $larger, 'applications/list' );
+check( 'where a smaller start application is on as well because a larger was applied, the larger is the one that is set up', $body['startApplied'] === 'big' && array_column( $body['applications'], 'applied', 'key' ) === [ 'site' => true, 'big' => true ] );
+$appPublish();
+$open = $appProject( 'install-applications-open' );
+$appCall( $open, 'applications/apply', [ 'applications' => [ 'site' ], 'feature' => 'alpha' ] );
+[ , $body ] = $appCall( $open, 'applications/list' );
+[ $status ] = $appCall( $open, 'applications/plan', [ 'applications' => [ 'card' ] ] );
+[ $statusNone ] = $appCall( $open, 'applications/plan', [ 'applications' => [] ] );
+check( 'while no start application is complete the choice stays open: another one, or none, is planned', $body['startApplied'] === null && $status === 200 && $statusNone === 200 );
+
+// --- what the end of the wizard believes
+
+unset( $project['./nino/features/all'] );
+$applied = \Nino\Install\Applications::applied( $project, [ 'site', 'shop' ] );
+check( 'the applications whose features are all on are applied, as the catalogue lists them', is_array( $applied ) && array_column( $applied, 'key' ) === [ 'site', 'shop' ] && $applied[0]['start'] === 'starter' );
+check( '...with a start application set up a choice without it is the choice of another, and a refusal that says so', \Nino\Install\Applications::applied( $project, [] ) === 'install_start_applied'
+	&& \Nino\Install\Applications::applied( $project, [ 'shop' ] ) === 'install_start_applied' && \Nino\Install\Applications::applied( $project, [ 'card', 'shop' ] ) === 'install_start_applied'
+	&& \Nino\Install\Applications::applied( $project, [ 'site', 'card' ] ) === 'install_start_applied' );
+check( '...a key the catalogue does not list is refused', \Nino\Install\Applications::applied( $project, [ 'nope' ] ) === 'install_unknown_application' );
+check( '...as is one the kernel cannot offer', \Nino\Install\Applications::applied( $project, [ 'ghost' ] ) === 'install_unknown_application' );
+
+// A project where only the first of the two features of an application is on: the application is not in
+$halfway = $appProject( 'install-applications-halfway' );
+$appCall( $halfway, 'applications/apply', [ 'applications' => [ 'site' ], 'feature' => 'alpha' ] );
+unset( $halfway['./nino/features/all'] );
+$appRequests = [];
+check( 'an application reported with a feature that is not on is refused, with a code, whatever is posted', \Nino\Install\Applications::applied( $halfway, [ 'site' ] ) === 'install_not_applied' );
+check( '...no application chosen is none applied where no start application is set up, and asks nobody', \Nino\Install\Applications::applied( $halfway, [] ) === [] && $appRequests === [] );
+$appCall( $halfway, 'applications/apply', [ 'applications' => [ 'site' ], 'feature' => 'beta' ] );
+unset( $halfway['./nino/features/all'] );
+check( '...and in once the second is on', array_column( (array) \Nino\Install\Applications::applied( $halfway, [ 'site' ] ), 'key' ) === [ 'site' ] );
+// A feature that is switched on at another version than its directory carries is not on: an update is still to be applied
+$halfway[ \Nino\Features::STATE_KEY ]['alpha']['version'] = '0.0.1';
+unset( $halfway['./nino/features/all'] );
+check( '...as is one while a feature of it is recorded at another version than its directory has', \Nino\Install\Applications::applied( $halfway, [ 'site' ] ) === 'install_not_applied' );
+
+// The catalogue that was kept is only believed for the project that reads the official one
+$swapped = $appProject( 'install-applications-swapped' );
+$appCall( $swapped, 'applications/list' );
+$swapped['/nino/catalogue/key'] = $appPublicKey;
+unset( $swapped[ \Nino\Install\Applications::KEY_OVERRIDE ] );
+check( 'a kept catalogue is not believed once the project names another key: the end refuses with the code of that', \Nino\Install\Applications::applied( $swapped, [ 'site' ] ) === 'install_not_official' );
+$targets = \Nino\Install\Applications::targets( $project, $applied );
+check( 'the entry points are the paths of the applied applications that have one, in order, named in the language of the project', $targets === [ [ 'key' => 'site', 'name' => 'Seite', 'next' => '/_admin/#alpha' ], [ 'key' => 'shop', 'name' => 'Shop', 'next' => '/shop' ] ] );
+check( '...an application without one adds none, and a path that is none is not led to',
+	\Nino\Install\Applications::targets( $project, [ [ 'key' => 'x', 'name' => 'X', 'next' => null ], [ 'key' => 'y', 'name' => 'Y', 'next' => 'https://evil.test/' ], [ 'key' => 'z', 'name' => 'Z', 'next' => '//evil.test' ] ] ) === [] );
+
+// --- what is kept for the end when the catalogue is gone
+
+$appRemote = [];
+$appRequests = [];
+$kept = \Nino\Install\Applications::applied( $project, [ 'site' ] );
+check( 'the end of the wizard does not ask the network: it reads what the step kept', is_array( $kept ) && $appRequests === [] );
+
+// --- a catalogue that cannot be reached, or that does not verify
+
+$appRemote = [];
+$appPublish();
+unset( $appRemote[ \Nino\Catalogue::DEFAULT_URL ] );
+$unreachable = $appProject( 'install-applications-down' );
+$appRequests = [];
+[ $status, $body ] = $appCall( $unreachable, 'applications/list' );
+check( 'a catalogue that cannot be reached is a sentence, "retry" and no application - and a 200: the way without an application stays open', $status === 200 && $body['applications'] === [] && $body['retry'] === true
+	&& $body['reason'] === 'install_catalogue' && $body['message'] !== '' && $appRequests === [ \Nino\Catalogue::DEFAULT_URL ] );
+[ $status ] = $appCall( $unreachable, 'applications/plan', [ 'applications' => [ 'site' ] ] );
+check( '...and a plan of it is refused', $status === 400 );
+
+$appPublish( $strangerPrivateKey );
+$appReset();
+$forged = $appProject( 'install-applications-forged' );
+$appRequests = [];
+[ $status, $body ] = $appCall( $forged, 'applications/list' );
+check( 'a catalogue signed with another key is not believed: a sentence and "retry"', $status === 200 && $body['applications'] === [] && $body['retry'] === true && $body['reason'] === 'install_catalogue' && $body['message'] !== '' );
+check( '...it was read and its signature asked for, and then not believed: both requests went out, which a catalogue that is not there does not get to', $appRequests === [ \Nino\Catalogue::DEFAULT_URL, \Nino\Catalogue::DEFAULT_URL. '.sig' ] );
+[ $status ] = $appCall( $forged, 'applications/apply', [ 'applications' => [ 'site' ], 'feature' => 'alpha' ] );
+check( '...and nothing is applied from it', $status === 400 && glob( \Nino\Features::dir(). '/*', GLOB_ONLYDIR ) === [] );
+
+$appPublish();
+$unreachable[ \Nino\Install\Applications::KEY_OVERRIDE ] = $appPublicKey;
+[ , $body ] = $appCall( $unreachable, 'applications/list' );
+check( 'asking again once it is there lists the applications', count( $body['applications'] ) === 4 );
+
+// --- the official catalogue and no other
+
+$appReset();
+foreach( [
+	'another address'		=> [ '/nino/catalogue/url' => 'https://elsewhere.test/catalogue.json' ],
+	'no address at all'	=> [ '/nino/catalogue/url' => '' ],
+	'another key'				=> [ '/nino/catalogue/key' => $appPublicKey ],
+] as $why => $settings ) {
+
+	$foreign = $appProject( 'install-applications-foreign' );
+	foreach( $settings as $settingKey => $settingValue )
+		$foreign[$settingKey] = $settingValue;
+	if( isset( $settings['/nino/catalogue/key'] ) === true )
+		unset( $foreign[ \Nino\Install\Applications::KEY_OVERRIDE ] );
+	$appRequests = [];
+
+	[ $status, $body ] = $appCall( $foreign, 'applications/list' );
+	check( 'a project that names '. $why. ' gets no application from the wizard, and a sentence that says so', $status === 200 && $body['applications'] === [] && $body['message'] !== '' && $body['retry'] === false );
+	[ $status ] = $appCall( $foreign, 'applications/plan', [ 'applications' => [ 'site' ] ] );
+	[ $statusApply ] = $appCall( $foreign, 'applications/apply', [ 'applications' => [ 'site' ], 'feature' => 'alpha' ] );
+	check( '...plans and applies nothing: 409 each - and no request was made for any of it', $status === 409 && $statusApply === 409 && $appRequests === [] && glob( \Nino\Features::dir(). '/*', GLOB_ONLYDIR ) === [] );
+	check( '...and none of what it holds is believed at the end: the applications posted are refused', is_string( \Nino\Install\Applications::applied( $foreign, [ 'site' ] ) ) );
+}
+
+// --- nothing is asked of a project that has no account, or that is done
+
+$appReset();
+$bare = $appProject( 'install-applications-bare', false );
+foreach( [ 'applications/list' => [], 'applications/plan' => [ 'applications' => [ 'site' ] ], 'applications/apply' => [ 'applications' => [ 'site' ], 'feature' => 'alpha' ] ] as $action => $payload ) {
+	[ $status ] = $appCall( $bare, $action, $payload );
+	check( $action. ' before there is an account: 409', $status === 409 );
+}
+check( '...and not one request went out, not one file was placed', $appRequests === [] && glob( \Nino\Features::dir(). '/*', GLOB_ONLYDIR ) === [] );
+
+$appReset();
+$done = $appProject( 'install-applications-done' );
+$done['/nino/install/completed'] = true;
+$appRequests = [];
+foreach( [ 'applications/list' => [], 'applications/plan' => [ 'applications' => [ 'site' ] ], 'applications/apply' => [ 'applications' => [ 'site' ], 'feature' => 'alpha' ] ] as $action => $payload ) {
+	[ $status ] = $appCall( $done, $action, $payload );
+	check( $action. ' after the wizard is done: 423', $status === 423 );
+}
+check( '...and not one request went out, not one file was placed', $appRequests === [] && glob( \Nino\Features::dir(). '/*', GLOB_ONLYDIR ) === [] );
+
+// --- what loading needs, said before it fails
+
+$appReset();
+$lacking = $appProject( 'install-applications-lacking' );
+rename( \Nino\Features::dir(), \Nino\Features::dir(). '-aside' );
+$appRequests = [];
+[ $status, $body ] = $appCall( $lacking, 'applications/list' );
+check( 'where features/ cannot be written the step says so and asks for nothing', $status === 200 && $body['applications'] === [] && $body['retry'] === true && $body['reason'] === 'install_missing' && array_column( $body['missing'], 'key' ) === [ 'features' ] && $appRequests === [] );
+[ $status ] = $appCall( $lacking, 'applications/apply', [ 'applications' => [ 'site' ], 'feature' => 'alpha' ] );
+check( '...and applies nothing: 409', $status === 409 && $appRequests === [] );
+rename( \Nino\Features::dir(). '-aside', \Nino\Features::dir() );
+[ , $body ] = $appCall( $lacking, 'applications/list' );
+check( '...and lists the applications once it is there', $body['missing'] === [] && count( $body['applications'] ) === 4 );
+
+// --- the end of the wizard
+
+echo "\n";
+echo "Finish::apiComplete with applications\n";
+
+$appFinish = static function( array &$app, array $payload = [] ): array {
+	return ninoCall( $app, [ \Nino\Install\Finish::class, 'apiComplete' ], [ 'password' => 'a brand new dev password' ] + $payload );
+};
+$starterOf = static function( array &$app ): array {
+	return array_keys( array_filter( \Nino\Filesystem::getFileContent( $app, '/config.php', [] )['/nino/http/routes'] ?? [], static fn( mixed $route, string $key ): bool => str_starts_with( $key, 'GET://' ) === true && is_array( $route ) === true
+		&& preg_match( '~^\[template /templates/page-~', (string) ( $route['body'] ?? '' ) ) === 1, ARRAY_FILTER_USE_BOTH ) );
+};
+$appApplyAll = static function( array &$app, array $keys ) use ( $appCall ): void {
+	[ , $plan ] = $appCall( $app, 'applications/plan', [ 'applications' => $keys ] );
+	foreach( $plan['features'] as $feature )
+		$appCall( $app, 'applications/apply', [ 'applications' => $keys, 'feature' => $feature['key'] ] );
+};
+
+// No application: the starter pages, and the way ahead as it always was
+$appReset();
+$plain = $appProject( 'install-finish-plain' );
+[ $status, $body ] = $appFinish( $plain );
+check( 'without an application the end of the wizard creates the starter pages: Start, Contact and 404', $status === 200 && $starterOf( $plain ) === [ 'GET://', 'GET://contact', 'GET://404' ] );
+check( '...answers where it leads to: nowhere in particular', $body === [ 'login' => true, 'targets' => [] ] );
+check( '...and the empty page, which the Routes panel starts a new route on, is in the project beside them', \Nino\Filesystem::fileExists( $plain, '/templates/page-blank.tpl' ) === true );
+check( '...and the project is done', \Nino\Admin\Admin::isInstalled( $plain ) === true );
+
+// An application whose starter pages are the wizard's
+$appReset();
+$withSite = $appProject( 'install-finish-site' );
+$appApplyAll( $withSite, [ 'site' ] );
+[ $status, $body ] = $appFinish( $withSite, [ 'applications' => [ 'site' ] ] );
+check( 'with an application that has an entry point the end creates the starter pages and names the entry point', $status === 200 && $starterOf( $withSite ) === [ 'GET://', 'GET://contact', 'GET://404' ]
+	&& $body === [ 'login' => true, 'targets' => [ [ 'key' => 'site', 'name' => 'Seite', 'next' => '/_admin/#alpha' ] ] ] );
+
+// Several applications: all their entry points
+$appReset();
+$withTwo = $appProject( 'install-finish-two' );
+$appApplyAll( $withTwo, [ 'site', 'shop' ] );
+[ , $body ] = $appFinish( $withTwo, [ 'applications' => [ 'shop', 'site' ] ] );
+check( 'with several, every entry point is named, in the order of the catalogue', array_column( $body['targets'], 'key' ) === [ 'site', 'shop' ] );
+
+// An application that brings the start page itself
+$appReset();
+$own = $appProject( 'install-finish-own' );
+$appApplyAll( $own, [ 'card' ] );
+[ $status, $body ] = $appFinish( $own, [ 'applications' => [ 'card' ] ] );
+$ownRoutes = \Nino\Filesystem::getFileContent( $own, '/config.php', [] )['/nino/http/routes'] ?? [];
+check( 'an application that provides the start page leaves the starter pages out: no start page, no contact page, no menu entry', $status === 200 && $starterOf( $own ) === [ 'GET://404' ]
+	&& \Nino\Filesystem::fileExists( $own, '/templates/page-home.tpl' ) === false && \Nino\Filesystem::fileExists( $own, '/templates/page-contact.tpl' ) === false
+	&& isset( $ownRoutes['GET://'] ) === false && isset( $ownRoutes['GET://contact'] ) === false && isset( $ownRoutes['GET://404']['navs'] ) === false && \Nino\Admin\Admin::isInstalled( $own ) === true );
+check( '...the page for an address that is not there is made all the same, with its status code and its words in both languages', ( $ownRoutes['GET://404']['statusCode'] ?? null ) === 404
+	&& isset( \Nino\Filesystem::getFileContent( $own, '/text/de_DE.php', [] )['[[/_nino/webpage/404/name]]'], \Nino\Filesystem::getFileContent( $own, '/text/en_US.php', [] )['[[/_nino/webpage/404/name]]'] ) );
+$ownTemplate = (string) \Nino\Filesystem::getFileContent( $own, '/templates/page-404.tpl', '' );
+$ownGlobal = \Nino\Filesystem::getFileContent( $own, '/text/global.php', [] );
+preg_match_all( '#href="(/_nino/webpage/[^"]+)"#', $ownTemplate, $ownLinks );
+check( '...and every address the 404 page links to by name is written, so that no link of it leads nowhere', $ownLinks[1] !== [] && array_filter( $ownLinks[1], static fn( string $link ): bool => ( $ownGlobal['[['. $link. ']]'] ?? '' ) === '' ) === []
+	&& in_array( '/_nino/webpage/home/uri', \Nino\Filesystem::getFileContent( $own, '/text/blacklist.php', [] ), true ) );
+check( '...and the empty page is in the project, with no route of its own', \Nino\Filesystem::fileExists( $own, '/templates/page-blank.tpl' ) === true );
+check( '...and names its entry point', array_column( $body['targets'], 'next' ) === [ '/card' ] );
+
+// ...but only one that is really in: posting it is not enough
+$appReset();
+$claimed = $appProject( 'install-finish-claimed' );
+$appCall( $claimed, 'applications/list' );
+[ $status, $body ] = $appFinish( $claimed, [ 'applications' => [ 'card' ] ] );
+check( 'an application reported whose features are not on is refused with the code of that: 409, the wizard stays open and no page is made', $status === 409 && ( $body['code'] ?? '' ) === 'install_not_applied'
+	&& \Nino\Admin\Admin::isInstalled( $claimed ) === false && $starterOf( $claimed ) === [] );
+
+// The start application that is set up stays the one at the end too
+$appReset();
+$swap = $appProject( 'install-finish-swap' );
+$appApplyAll( $swap, [ 'card' ] );
+foreach( [ 'another start application' => [ 'site' ], 'none' => [] ] as $why => $chosen ) {
+	[ $status, $body ] = $appFinish( $swap, [ 'applications' => $chosen ] );
+	check( 'the end with '. $why. ' where a start application is set up is a 409 with the code that says so, and the wizard stays open and makes no page', $status === 409 && ( $body['code'] ?? '' ) === 'install_start_applied'
+		&& \Nino\Admin\Admin::isInstalled( $swap ) === false && $starterOf( $swap ) === [] );
+}
+[ $status ] = $appFinish( $swap, [ 'applications' => [ 'card' ] ] );
+check( '...and with the one that is set up it ends', $status === 200 && \Nino\Admin\Admin::isInstalled( $swap ) === true );
+
+// An application of which only a smaller one is complete is reported: refused, the wizard stays open
+$appReset();
+$appPublish( null, [ $appList[0], [ 'key' => 'big', 'name' => 'Big', 'description' => 'Big', 'features' => [ 'alpha', 'beta', 'gamma' ], 'next' => null, 'start' => 'starter' ] ] );
+$partialBig = $appProject( 'install-finish-partial-big' );
+$appApplyAll( $partialBig, [ 'site' ] );
+[ $status, $body ] = $appFinish( $partialBig, [ 'applications' => [ 'big' ] ] );
+check( 'the end takes what is really applied: a larger application reported while only the smaller is complete is a 409 with the code of that, as a key nobody lists is',
+	$status === 409 && ( $body['code'] ?? '' ) === 'install_not_applied' && \Nino\Admin\Admin::isInstalled( $partialBig ) === false );
+$appPublish();
+
+// Without the network what is set up is still known: a step back, a new load, and the end all go on
+$appReset();
+$offline = $appProject( 'install-finish-offline' );
+$appApplyAll( $offline, [ 'site', 'shop' ] );
+$appRemote = [];
+$appRequests = [];
+unset( $offline['./nino/catalogue'] );
+[ $status, $body ] = $appCall( $offline, 'applications/list' );
+check( 'where the catalogue cannot be reached the list still says what is set up, from the catalogue that was kept: the start choice it fixes and the applications that are in, marked offline, with the reason of the failure and a retry',
+	$status === 200 && $body['offline'] === true && $body['startApplied'] === 'site' && $body['reason'] === 'install_catalogue' && $body['retry'] === true
+	&& array_column( $body['applications'], 'applied', 'key' )['site'] === true && array_column( $body['applications'], 'applied', 'key' )['shop'] === true );
+[ $status, $body ] = $appFinish( $offline, [ 'applications' => [ 'site', 'shop' ] ] );
+check( '...and the end, which asks nobody, goes through with them and names their entry points', $status === 200 && array_column( $body['targets'], 'key' ) === [ 'site', 'shop' ] );
+$appPublish();
+$noneYet = $appProject( 'install-applications-none-yet' );
+$appCall( $noneYet, 'applications/list' );
+$appRemote = [];
+unset( $noneYet['./nino/catalogue'] );
+[ , $body ] = $appCall( $noneYet, 'applications/list' );
+check( 'with a catalogue that was kept and nothing set up, an unreachable one is a sentence and a retry and no application, as it is without a kept one', $body['offline'] === false && $body['applications'] === [] && $body['retry'] === true );
+$appPublish();
+
+// A route that answers 404 already is the page for an address that is not there
+$appReset();
+$answers404 = $appProject( 'install-finish-404' );
+\Nino\AppData::writeContentData( $answers404, [] );
+\Nino\Filesystem::mutate( $answers404, '/config.php', static function( array $config ): array { $config['/nino/http/routes']['GET://gone'] = [ 'uri' => '/gone', 'body' => 'x', 'statusCode' => 404 ]; return $config; } );
+$answers404['/nino/http/routes']['GET://gone'] = [ 'uri' => '/gone', 'body' => 'x', 'statusCode' => 404 ];
+$appApplyAll( $answers404, [ 'card' ] );
+$appFinish( $answers404, [ 'applications' => [ 'card' ] ] );
+check( 'where a route answers with the status 404 an application that provides the start page adds no page for it', $starterOf( $answers404 ) === [] && isset( \Nino\Filesystem::getFileContent( $answers404, '/config.php', [] )['/nino/http/routes']['GET://404'] ) === false );
+
+// What cannot be believed ends nothing
+$appReset();
+$refused = $appProject( 'install-finish-refused' );
+foreach( [ 'a key as a string' => [ 'site', 400, 'install_shape' ], 'a number in the list' => [ [ 5 ], 400, 'install_shape' ], 'an object' => [ [ 'a' => 'site' ], 400, 'install_shape' ],
+	'a key nobody kept in the catalogue' => [ [ 'nope' ], 409, 'install_unresolved' ] ] as $why => [ $wrong, $expected, $code ] ) {
+	[ $status, $body ] = $appFinish( $refused, [ 'applications' => $wrong ] );
+	check( 'the end with '. $why. ' is a '. $expected. ' with the code that says so', $status === $expected && ( $body['code'] ?? '' ) === $code );
+}
+$appCall( $refused, 'applications/list' );
+[ $status, $body ] = $appFinish( $refused, [ 'applications' => [ 'nope' ] ] );
+check( 'the end with a key the catalogue does not list is a 409 with the code of that', $status === 409 && ( $body['code'] ?? '' ) === 'install_unknown_application' );
+check( '...and the wizard is still open, with no page made', \Nino\Admin\Admin::isInstalled( $refused ) === false && $starterOf( $refused ) === [] );
+
+// The catalogue the keys came from is not there any more: the end says so instead of guessing at the start page
+$appReset();
+$nothingKept = $appProject( 'install-finish-nothing-kept' );
+$appApplyAll( $nothingKept, [ 'card' ] );
+unlink( \Nino\Filesystem::path( $nothingKept, '/data/catalogue.php' ) );
+[ $status ] = $appFinish( $nothingKept, [ 'applications' => [ 'card' ] ] );
+check( 'where the catalogue the applications came from is not kept the end is refused, the wizard stays open and no starter page is made', $status === 409 && \Nino\Admin\Admin::isInstalled( $nothingKept ) === false && $starterOf( $nothingKept ) === [] );
+
+// A starter page that cannot be written ends nothing either
+$appReset();
+$blocked = $appProject( 'install-finish-blocked' );
+mkdir( ninoSandboxDir( $blocked ). '/private/templates/page-contact.tpl', 0755, true );
+[ $status, $body ] = $appFinish( $blocked );
+check( 'a starter page that cannot be written ends the call with the file named - the wizard stays open and no password is stored', $status === 500 && str_contains( (string) ( $body['error'] ?? '' ), '/templates/page-contact.tpl' ) === true
+	&& \Nino\Admin\Admin::isInstalled( $blocked ) === false && \Nino\Admin\Recovery::hash( $blocked ) === null );
+rmdir( ninoSandboxDir( $blocked ). '/private/templates/page-contact.tpl' );
+[ $status ] = $appFinish( $blocked );
+check( '...and ends once the place is there again', $status === 200 && \Nino\Admin\Admin::isInstalled( $blocked ) === true && $starterOf( $blocked ) === [ 'GET://', 'GET://contact', 'GET://404' ] );
+
+$appReset();
+echo "\n";
+
+
 // --- Finish::apiComplete / Recovery::set ------------------------------------
 
 echo "Finish::apiComplete / Recovery::set\n";
@@ -1459,7 +1711,7 @@ check( 'apiComplete succeeds once an editor account exists', $status === 200 );
 	apiCreate() left boundary@ signed in. Which of the two stays signed in
 	is the login page's decision, not the wizard's: the session is ended
 	and the wizard is told so	*/
-check( 'with several accounts the wizard answers login: false', $body === [ 'login' => false ] );
+check( 'with several accounts the wizard answers login: false', $body === [ 'login' => false, 'targets' => [] ] );
 check( '...and the session the Accounts step opened is ended', \Nino\Auth::getCurrentUser( $appData ) === false );
 
 /*	The one-account case: the person who just typed the only password is
@@ -1467,14 +1719,14 @@ check( '...and the session the Accounts step opened is ended', \Nino\Auth::getCu
 \Nino\Auth::deleteUser( $appData, 'boundary@example.com' );
 \Nino\Auth::loginUser( $appData, 'admin@example.com', 'a-different-password' );
 [ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Finish::class, 'apiComplete' ], [ 'password' => 'a brand new dev password' ] );
-check( 'with exactly one account, the one signed in, it answers login: true', $status === 200 && $body === [ 'login' => true ] );
+check( 'with exactly one account, the one signed in, it answers login: true', $status === 200 && $body === [ 'login' => true, 'targets' => [] ] );
 check( '...and leaves that session signed in', ( \Nino\Auth::getCurrentUser( $appData )['mail'] ?? '' ) === 'admin@example.com' );
 
 // One account, but nobody signed in (a cooled-down ip, a session that did
 // not survive): the login page is the way in, as before
 \Nino\Auth::logoutUser( $appData );
 [ , $body ] = ninoCall( $appData, [ \Nino\Install\Finish::class, 'apiComplete' ], [ 'password' => 'a brand new dev password' ] );
-check( 'with one account and no session it answers login: false', $body === [ 'login' => false ] );
+check( 'with one account and no session it answers login: false', $body === [ 'login' => false, 'targets' => [] ] );
 
 check( 'the real _admin/Admin.php was not touched', file_get_contents( __DIR__. '/../_admin/Admin.php' ) === $adminBefore );
 
@@ -1611,7 +1863,7 @@ foreach( scandir( $realRoot. '/_admin/install/library/pages' ) ?: [] as $pageEnt
 	/*	The body is what ties a route to a file on disk. A route naming a
 		template no unit ships is the one failure this whole block exists for.
 		Every route is checked, not only the page routes: the demo units
-		deliberately register something Webpages::isPageRoute() does not
+		deliberately register something the Routes panel's page list does not
 		recognise (so the Routes editor leaves them alone), and their
 		templates still have to exist.	*/
 	foreach( ( $pageManifest['routes'] ?? [] ) as $routeKey => $route ) {
@@ -1669,9 +1921,8 @@ foreach( glob( $realRoot. '/_admin/install/library/pages/[!.]*/templates/*.tpl' 
 check( 'the pages of the library are written in the form the Builder reads ('. $shapeTemplates. ' templates)'. ( $shapeFailures === [] ? '' : ' - '. implode( ' | ', $shapeFailures ) ), $shapeFailures === [] && $shapeTemplates >= 5 );
 
 // The three a starter site is normally built from have to be among them, or
-// the Routes step has nothing to offer on a fresh install
+// the starter pages have nothing to create on a fresh install
 check( 'the page library offers the three a starter site is built from', count( array_intersect( [ 'home', 'contact', '404' ], $pageUnits ) ) === 3 );
-check( '...and a blank one to start a page of your own from', in_array( 'blank', $pageUnits, true ) === true );
 
 // The optional modules a page can pull in with it are units too, so a page
 // declaring one nobody ships would be a dead requirement. A unit travels
@@ -1829,7 +2080,7 @@ $libraryTemplates = new RecursiveIteratorIterator( new RecursiveDirectoryIterato
 foreach( $libraryTemplates as $libraryTemplate )
 	if( str_ends_with( $libraryTemplate->getFilename(), '.tpl' ) === true ) {
 
-		// The href of a component's call that begins with the namespace of a text key names that key - the address of a page a template links to is the Routes step's fill,
+		// The href of a component's call that begins with the namespace of a text key names that key - the address of a page a template links to is the fill of the starter pages and the Routes panel,
 		// /_nino/webpage/contact/uri - and a call is looked at without it. What the key holds is the page's address within the project, without the directory a project in
 		// a subdirectory is served from, and a component puts the directory in front of the address such a key resolves to (Components::value(), as the navigation does): which
 		// is why the key is the right form of the address of a page, and why this pin sees the address a template writes and not the one a key resolves to
@@ -1889,19 +2140,32 @@ echo "\n";
 	keep their keys against a project unit claiming the same one.	*/
 echo "A starter site leaves no text key missing\n";
 
-// Every page of the wizard's presets, each at the Element-URI and Http-URI its manifest names, with
-// the three modules the wizard always applies. The Missing text keys tile counts every [[/...]] a
-// template names that no file has - a comment is no exception, and a placeholder in one is a row
-// the Text panel cannot clear: it names a key the system writes, and there is no field for it
-ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
-$starterEntries = [];
-foreach( [ 'home' => [ '/home', '/' ], 'contact' => [ '/contact', '/contact' ], 'services' => [ '/services', '/services' ], 'about-me' => [ '/about-me', '/about-me' ], '404' => [ '/404', '/404' ] ] as $starterKey => [ $starterUri, $starterHttpUri ] )
-	$starterEntries[] = [ 'uri' => $starterUri, 'httpUri' => $starterHttpUri, 'libraryKey' => (string) $starterKey, 'navs' => [], 'text' => [ 'de_DE' => [ 'name' => 'Seite '. $starterKey ], 'en_US' => [ 'name' => 'Page '. $starterKey ] ] ];
-[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => $starterEntries ] );
-check( 'the whole starter site applies', $status === 200 && count( $body['webpages'] ?? [] ) === 5 );
-$starterMissing = ( new ReflectionMethod( \Nino\Modules\Text\Keys::class, '_scanMissing' ) )->invokeArgs( null, [ &$appData ] );
+// The pages the wizard creates when it ends, the three modules it always applies and - for the
+// units that claim no position - the two finished pages the library keeps beside them. The Missing
+// text keys tile counts every [[/...]] a template names that no file has - a comment is no exception,
+// and a placeholder in one is a row the Text panel cannot clear: it names a key the system writes,
+// and there is no field for it
+$keysApp = ninoSandbox( 'install-keys' );
+$keysDir = ninoSandboxDir( $keysApp );
+$keysApp['/nino/dir'] = '';
+$keysApp['/nino/locales/available'] = [ 'de_DE', 'en_US' ];
+$keysApp['/nino/html/navs'] = \Nino\AppData::DEFAULTS['/nino/html/navs'];
+$keysApp['/nino/modules'] = $appData['/nino/modules'];
+foreach( [ '/private/templates', '/public/images', '/private/text', '/private/assets' ] as $keysSub )
+	mkdir( $keysDir. $keysSub, 0777, true );
+\Nino\Filesystem::putFileContent( $keysApp, '/config.php', [ '/nino/locales/native' => 'de_DE', '/nino/locales/available' => [ 'de_DE', 'en_US' ] ] );
+ninoCall( $keysApp, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE', 'en_US' ], 'modules' => [] ] );
+$starterApplied = \Nino\Install\StarterPages::apply( $keysApp );
+$otherPages = true;
+foreach( [ 'services', 'about-me' ] as $otherUnit ) {
+	$otherRoutes = $otherBlacklist = $otherConfig = [];
+	$otherPages = \Nino\Features::applyUnit( $keysApp, __DIR__. '/../_admin/install/library/pages/'. $otherUnit, [ 'de_DE', 'en_US' ], $otherRoutes, $otherBlacklist, $otherConfig, true ) === true && $otherPages;
+}
+check( 'the whole library applies', $starterApplied === true && $otherPages === true && \Nino\Filesystem::fileExists( $keysApp, '/templates/page-about-me.tpl' ) === true );
+$starterMissing = ( new ReflectionMethod( \Nino\Modules\Text\Keys::class, '_scanMissing' ) )->invokeArgs( null, [ &$keysApp ] );
 check( 'on a fresh install the Missing text keys tile reads 0 - no template names a key nobody writes'
-	. ( $starterMissing === [] ? '' : ' - '. implode( ', ', array_column( $starterMissing, 'key' ) ) ), \Nino\Modules\Text\Keys::missingCount( $appData ) === 0 );
+	. ( $starterMissing === [] ? '' : ' - '. implode( ', ', array_column( $starterMissing, 'key' ) ) ), \Nino\Modules\Text\Keys::missingCount( $keysApp ) === 0 );
+\Nino\Filesystem::removeDir( $keysDir );
 
 echo "\n";
 
@@ -1972,16 +2236,6 @@ if( defined( 'NINO_APP_DIR' ) === true ) {
 	file_put_contents( $appDir. '/Acme/Widget/install/manifest.php', '<?php return '. var_export( [ 'label' => 'Widget', 'moduleClass' => '\\Acme\\Widget', 'requiresModules' => [ 'nonexistent' ] ], true ). ';' );
 	[ , $body ] = ninoCall( $appData, [ \Nino\Install\Setup::class, 'apiApply' ], [ 'locales' => [ 'de_DE' ], 'modules' => [ 'widget' ] ] );
 	check( 'a requirement no unit answers to is left out of the applied set - only the always-on four plus what was actually picked remain', ( $body['modules'] ?? null ) === [ 'forms', 'navigation', 'localepicker', 'legal', 'widget' ] );
-}
-
-
-// --- Addresses that only start like a reserved one -------------------------
-
-// Such a name is no reserved address. Run last: a page applied here stays in
-// the project, and the checks above read it as it was
-foreach( [ '/featured', '/apps' ] as $servedAddress ) {
-	[ $status ] = ninoCall( $appData, [ \Nino\Install\Webpages::class, 'apiApply' ], [ 'webpages' => [ [ 'uri' => '/served-anyway', 'httpUri' => $servedAddress, 'libraryKey' => 'home', 'text' => [] ] ] ] );
-	check( 'accepts a Webpage mounted on '. $servedAddress. ', which only starts like a reserved one', $status === 200 && isset( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes']['GET:/'. $servedAddress] ) === true );
 }
 
 

@@ -635,7 +635,7 @@ namespace Nino {
 		 */
 		public static function redirect( array &$appData, array &$request, string $to, int $status = 303 ): void {
 
-			if( self::_isSitePath( $to ) === true )
+			if( self::isSitePath( $to ) === true )
 				$location = rtrim( \Nino\Filesystem::getDir( $appData ), '/' ). $to;
 			else if( \Nino\Fetch::isHttpsUrl( $to ) === true || ( preg_match( '#^http://#i', $to ) === 1 && \Nino\Fetch::isHttpsUrl( 'https'. substr( $to, 4 ) ) === true ) )
 				$location = $to;
@@ -656,11 +656,14 @@ namespace Nino {
 		}
 
 		/**
+		 *	Whether a string is a path of this site, safe to put in a Location header or to link to without
+		 *	the directory in front: no scheme, no host, no control character. A query and an anchor belong to it
+		 *
 		 *	@param		string		$path
 		 *
 		 *	@return 	bool										Whether it is a path of this site that is safe to put in a Location header
 		 */
-		private static function _isSitePath( string $path ): bool {
+		public static function isSitePath( string $path ): bool {
 
 			// A single slash first: '//host' is protocol-relative, and a browser
 			// reads '/\host' as the same. Whitespace or a control character has no

@@ -435,6 +435,53 @@ check( 'every wrong field refuses the whole catalogue, naming the entry and the 
 check( 'an oversized archive is refused', is_string( \Nino\Catalogue::parse( json_encode( [ 'format' => 1, 'features' => [ array_merge( $good, [ 'size' => 20 * 1024 * 1024 + 1 ] ) ] ] ) ) ) );
 check( 'an entry that is not an object is refused', \Nino\Catalogue::parse( '{"format":1,"features":["helper"]}' ) === 'catalogue entry 0: must be an object' );
 
+/*	The applications of the index: an optional key above the features. A catalogue
+	without it has none; an application of the wrong shape is dropped on its own and
+	the rest of the document is read	*/
+$application = [ 'key' => 'site', 'name' => [ 'en_US' => 'Site', 'de_DE' => 'Seite' ], 'description' => [ 'en_US' => 'A site' ], 'features' => [ 'helper', 'sample' ], 'next' => '/_admin/#builder', 'start' => 'starter' ];
+$withApplications = static fn( mixed ...$applications ): array|string => \Nino\Catalogue::parse( json_encode( [ 'format' => 1, 'features' => [ $good ], 'applications' => $applications ] ) );
+
+$parsed = \Nino\Catalogue::parse( json_encode( [ 'format' => 1, 'features' => [ $good ] ] ) );
+check( 'an index without the key has no applications and is valid', is_array( $parsed ) && $parsed['applications'] === [] );
+$parsed = \Nino\Catalogue::parse( json_encode( [ 'format' => 1, 'features' => [ $good ], 'applications' => 'site' ] ) );
+check( '...and so has one whose key is no list', is_array( $parsed ) && $parsed['applications'] === [] );
+$parsed = $withApplications( $application );
+check( 'an application is read with exactly the fields the wizard uses', is_array( $parsed ) && $parsed['applications'] === [ $application ] );
+$parsed = $withApplications( [ 'key' => 'bare', 'name' => 'Bare', 'features' => [ 'helper' ] ] );
+check( '...description, next and start are optional', is_array( $parsed ) && $parsed['applications'] === [ [ 'key' => 'bare', 'name' => 'Bare', 'description' => '', 'features' => [ 'helper' ], 'next' => null, 'start' => null ] ] );
+
+$wrongApplications = [
+	'a key that is no slug'													=> [ 'key' => 'Site' ],
+	'a name that is empty'													=> [ 'name' => '' ],
+	'a description of the wrong type'								=> [ 'description' => [ 'en_US' => 5 ] ],
+	'no features'																		=> [ 'features' => [] ],
+	'features that are no list'											=> [ 'features' => [ 'a' => 'helper' ] ],
+	'a feature key that is no slug'									=> [ 'features' => [ 'helper', 'No' ] ],
+	'a feature twice'																=> [ 'features' => [ 'helper', 'helper' ] ],
+	'a start that is none of the three'							=> [ 'start' => 'always' ],
+];
+$allDropped = true;
+foreach( $wrongApplications as $why => $wrong ) {
+	$parsed = $withApplications( array_merge( $application, $wrong ), [ 'key' => 'other' ] + $application );
+	if( is_array( $parsed ) === false || array_column( $parsed['applications'], 'key' ) !== [ 'other' ] ) {
+		$allDropped = false;
+		echo "        not dropped: ". $why. "\n";
+	}
+}
+check( 'an application of the wrong shape is dropped and the one beside it is kept', $allDropped === true );
+$parsed = $withApplications( $application, 'not an object', array_merge( $application, [ 'name' => 'Same key' ] ) );
+check( '...a value that is no object too, and a key twice counts once, the first', is_array( $parsed ) && count( $parsed['applications'] ) === 1 && $parsed['applications'][0]['name'] === $application['name'] );
+
+$allNone = true;
+foreach( [ 'https://evil.test/x', '//evil.test/x', '/\\evil.test', 'relative', '/with space', "/a\nb", 'javascript:alert(1)', '/javascript:alert(1)', '', 5, str_repeat( '/a', 200 ) ] as $wrongNext ) {
+	$parsed = $withApplications( array_merge( $application, [ 'next' => $wrongNext ] ) );
+	if( is_array( $parsed ) === false || count( $parsed['applications'] ) !== 1 || $parsed['applications'][0]['next'] !== null )
+		$allNone = false;
+}
+check( 'an entry point that is no path of the project - a scheme, a second slash, a space, a control character - is dropped and the application stays', $allNone === true );
+$parsed = $withApplications( array_merge( $application, [ 'next' => '/crm?tab=1#list' ] ) );
+check( '...while a query and an anchor belong to a path', is_array( $parsed ) && $parsed['applications'][0]['next'] === '/crm?tab=1#list' );
+
 echo "\n";
 
 
@@ -529,9 +576,9 @@ check( 'the file holds when it was fetched, the configured url and the parsed do
 $requests = [];
 $cached = \Nino\Catalogue::cached( $appData );
 check( 'cached() answers it without any request', $requests === [] && is_array( $cached ) );
-check( 'the same shape fetch() returns, plus fetched', array_keys( $cached ) === [ 'format', 'generated', 'features', 'url', 'fetched' ]
+check( 'the same shape fetch() returns, plus fetched', array_keys( $cached ) === [ 'format', 'generated', 'features', 'applications', 'url', 'fetched' ]
 	&& $cached['url'] === \Nino\Catalogue::DEFAULT_URL && $cached['fetched'] === $stored['fetched'] && count( $cached['features'] ) === 6
-	&& $cached['format'] === $catalogue['format'] && $cached['generated'] === $catalogue['generated'] && $cached['features'] === $catalogue['features'] );
+	&& $cached['format'] === $catalogue['format'] && $cached['generated'] === $catalogue['generated'] && $cached['features'] === $catalogue['features'] && $cached['applications'] === [] );
 
 /*	A private catalogue behind a token: url() takes it (isHttpsUrl() has no
 	opinion on a query string), and the signature belongs beside the
@@ -586,6 +633,22 @@ check( 'nothing on disk: available', $offers['helper']['state'] === 'available' 
 check( 'a feature no version of which fits is incompatible, shown with its newest version and what it asks for', $offers['ancient']['state'] === 'incompatible' && $offers['ancient']['fits'] === false && $offers['ancient']['nino'] === '^0.9'
 	&& $offers['needy']['state'] === 'incompatible' && $offers['needy']['php']['ext'] === [ 'no_such_extension' ] );
 check( 'the offer is the catalogue entry plus fits, local, active and state', array_keys( $offers['helper'] ) === [ 'key', 'name', 'description', 'category', 'maturity', 'version', 'nino', 'php', 'requires', 'directory', 'archive', 'sha256', 'size', 'released', 'fits', 'local', 'active', 'state' ] );
+
+/*	An application is offered whole or not at all: every one of its features has a
+	version this kernel can run (the rule of offers()), or it stays out	*/
+$catalogueOfApplications = $catalogue;
+$catalogueOfApplications['applications'] = [
+	[ 'key' => 'fine', 'name' => 'Fine', 'description' => '', 'features' => [ 'helper', 'sample' ], 'next' => null, 'start' => null ],
+	[ 'key' => 'old', 'name' => 'Old', 'description' => '', 'features' => [ 'helper', 'ancient' ], 'next' => null, 'start' => null ],
+	[ 'key' => 'ext', 'name' => 'Ext', 'description' => '', 'features' => [ 'needy' ], 'next' => null, 'start' => null ],
+	[ 'key' => 'ghost', 'name' => 'Ghost', 'description' => '', 'features' => [ 'helper', 'unlisted' ], 'next' => null, 'start' => null ],
+	[ 'key' => 'last', 'name' => 'Last', 'description' => '', 'features' => [ 'sample' ], 'next' => null, 'start' => null ],
+];
+check( 'applications() keeps the ones whose features all fit, in the catalogue\'s order',
+	array_column( \Nino\Catalogue::applications( $appData, $catalogueOfApplications ), 'key' ) === [ 'fine', 'last' ] );
+check( '...one with a feature no version of which fits, with a missing php extension, or that the catalogue does not list is left out',
+	array_diff( [ 'old', 'ext', 'ghost' ], array_column( \Nino\Catalogue::applications( $appData, $catalogueOfApplications ), 'key' ) ) === [ 'old', 'ext', 'ghost' ] );
+check( '...and a catalogue read before the key existed offers none', \Nino\Catalogue::applications( $appData, [ 'features' => $catalogue['features'] ] ) === [] );
 
 echo "\n";
 

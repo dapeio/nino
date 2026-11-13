@@ -15,27 +15,26 @@ namespace Nino\Modules\Routes {
 	 *	Routes						The Routes panel: create/edit/delete the site's actual page
 	 *												routes without hand-editing /nino/http/routes as raw json
 	 *												(the Config panel no longer edits that key, see its own
-	 *												docblock). A friendlier continuation of the wizard's
-	 *												Webpages step (see _admin/install/Install.php's Webpages class -
-	 *												not depended on here, the same standalone-module reasoning
-	 *												every panel under _admin/Nino/Modules/ follows) for once the wizard
-	 *												has been deleted: template selection is restricted to
-	 *												whichever templates/page-*.tpl files already exist on
-	 *												disk - no copying, no library units, just wiring an
+	 *												docblock). The only place pages are made once the
+	 *												setup wizard is done - the wizard has no step for them, it
+	 *												only creates the starter pages when it ends (see
+	 *												_admin/install/Install.php's StarterPages class - not
+	 *												depended on here, the same standalone-module reasoning every
+	 *												panel under _admin/Nino/Modules/ follows): template selection
+	 *												is restricted to whichever templates/page-*.tpl files already
+	 *												exist on disk - no copying, no library units, just wiring an
 	 *												existing template up to a uri.
 	 *
-	 *												Same Element-URI/Http-URI split Webpages introduced (see
+	 *												The Element-URI/Http-URI split (see
 	 *												_routeKey()'s docblock for why), and the same single
 	 *												source of truth: /nino/http/routes plus the
 	 *												/_nino/webpage&lt;uri&gt;/* keys in /text/*.php. There is no
 	 *												second list to keep in sync - pages() derives the whole
 	 *												thing from the routes on every request, so a route
-	 *												written here, in the wizard or by hand in config.php is
-	 *												the same page to all three. apiMove() swaps one page
-	 *												with its neighbor, the same ↑/↓ reordering Webpages' own
-	 *												list does while the wizard is still around; the route
-	 *												order is also what breaks a tie between two equal menu
-	 *												priorities (see Modules\Navigation).
+	 *												written here, by the wizard's starter pages or by hand in
+	 *												config.php is the same page to all three. apiMove() swaps one
+	 *												page with its neighbor; the route order is also what breaks a
+	 *												tie between two equal menu priorities (see Modules\Navigation).
 	 *
 	 *												A page has one address for every language, or one for
 	 *												each. The first is one route; the second is a route for
@@ -86,10 +85,10 @@ namespace Nino\Modules\Routes {
 			return self::MANAGE_PERM;
 		}
 
-		// The template a new route starts on, when the project has it: the
-		// wizard's blank page. Never another one - the templates a project has
-		// are finished pages (a contact page, the 404), and one of them
-		// preselected would publish a copy of it under the new path
+		// The template a new route starts on, when the project has it: a blank
+		// page of its own. Never another one - the templates a project has are
+		// finished pages (a contact page, the 404), and one of them preselected
+		// would publish a copy of it under the new path
 		private const string DEFAULT_TEMPLATE = 'page-blank';
 
 		/**
@@ -244,8 +243,7 @@ namespace Nino\Modules\Routes {
 		/**
 		 *	The page list, derived from the routes and the text files rather
 		 *	than from a second, parallel array that could drift against
-		 *	them - the wizard's Webpages step builds the very same shape from
-		 *	the very same places (see its own pages()).
+		 *	them.
 		 *
 		 *	The route key is the Http-URI, the route's own 'uri' data field
 		 *	the Element-URI, 'navs' the menu membership, and the per-locale
@@ -413,9 +411,6 @@ namespace Nino\Modules\Routes {
 		 *	while the Navigation module is inactive, which is what tells the
 		 *	frontend to offer no menu fields at all.
 		 *
-		 *	Own copy of the wizard's Webpages::navKeys(), same standalone-per-
-		 *	area reasoning every other helper in this class duplicates
-		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
 		 *	@return 	array										Nav keys, eg. [ 'main', 'footer' ]
@@ -469,9 +464,7 @@ namespace Nino\Modules\Routes {
 		 *	'/foo', '/foo/', 'foo' all normalize to '/foo'; '/' stays '/'.
 		 *	Rejects anything empty, without a leading slash once normalized
 		 *	is impossible anyway, or containing '..'/characters outside a
-		 *	plain path - same rules _admin/install/Install.php's
-		 *	Webpages::_normalizeUri() enforces, duplicated rather than
-		 *	depended on (this folder stays standalone, see class docblock)
+		 *	plain path
 		 *
 		 *	@param		string		$uri
 		 *
@@ -501,11 +494,10 @@ namespace Nino\Modules\Routes {
 		 *	data field and this entry's /_nino/webpage&lt;uri&gt;/* text meta):
 		 *	\Nino\Http::requestRoute() matches a route by looking up
 		 *	'&lt;METHOD&gt;:/'.$httpUri as a literal array key, not by scanning
-		 *	for a route whose own 'uri' field matches - see
-		 *	_admin/install/Install.php's Webpages::_routeKeys() docblock for the
-		 *	full reasoning (identical here, just GET-only and without that
-		 *	class's multi-route-manifest case, since a page here is always
-		 *	exactly one template)
+		 *	for a route whose own 'uri' field matches. So a page can only
+		 *	be reached at the single path its httpUri names, and its uri stays
+		 *	decoupled from it: the home page keeps a stable '/home' identifier
+		 *	while it lives at '/'. A page here is always exactly one template
 		 *
 		 *	@param		string		$httpUri
 		 *

@@ -14,10 +14,10 @@
  *													step module in assets/<key>.js.
  *
  *													"Next" both commits the current step's data (if it has any -
- *													Setup applies its picker, Webpages applies its page list,
- *													PersonalInfos saves its fields, Accounts just checks an
- *													account exists) and advances, replacing what used to be
- *													each step's own save button. A step with nothing to commit
+ *													Setup applies its picker, PersonalInfos saves its fields,
+ *													Accounts just checks an account exists, Applications
+ *													places the applications picked) and advances, replacing
+ *													what used to be each step's own save button. A step with nothing to commit
  *													(Checks) just advances.
  *
  *	@package								Dape/Nino
@@ -33,9 +33,9 @@
 		STEPS : [
 			{ key : 'checks', 				paneClass : 'show-checks' 				},
 			{ key : 'setup', 					paneClass : 'show-setup' 				},
-			{ key : 'webpages', 			paneClass : 'show-webpages' 			},
 			{ key : 'personalinfos', paneClass : 'show-personalinfos' },
 			{ key : 'accounts', 			paneClass : 'show-accounts' 		},
+			{ key : 'applications', 	paneClass : 'show-applications' 	},
 			{ key : 'finish', 				paneClass : 'show-finish' 				},
 		],
 
@@ -121,14 +121,6 @@
 			if( Nino.install._busy === true )
 				return;
 
-			const step = Nino.install.STEPS[Nino.install._index];
-			const mod 	= step !== undefined ? Nino.install[step.key] : undefined;
-
-			// A step may have an open, purely client-side editor whose values
-			// must be folded into its in-memory model before leaving it.
-			if( mod !== undefined && typeof mod.beforeLeave === 'function' && mod.beforeLeave() === false )
-				return;
-
 			if( Nino.install._index > 0 )
 				Nino.install.showStep( Nino.install._index - 1 );
 		},
@@ -174,14 +166,14 @@
 			if( key === 'setup' && Nino.install.setup !== undefined )
 				return Nino.install.setup.apply( function( ok ) { callback( ok ) } );
 
-			if( key === 'webpages' && Nino.install.webpages !== undefined )
-				return Nino.install.webpages.apply( function( ok ) { callback( ok ) } );
-
 			if( key === 'personalinfos' && Nino.install.personalinfos !== undefined )
 				return Nino.install.personalinfos.save( function( ok ) { callback( ok ) } );
 
 			if( key === 'accounts' && Nino.install.accounts !== undefined )
 				return Nino.install.accounts.checkCanAdvance( callback );
+
+			if( key === 'applications' && Nino.install.applications !== undefined )
+				return Nino.install.applications.apply( callback );
 
 			callback( true );
 		},
