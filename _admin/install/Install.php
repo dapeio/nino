@@ -1467,7 +1467,10 @@ namespace Nino\Install {
 		 *	switch it on where it is not - with the features it requires, which
 		 *	come along. A feature that is on, at the version its directory
 		 *	carries, is left as it is: that is what makes a second round after a
-		 *	failure go on from there
+		 *	failure go on from there. Where a chosen application starts with the
+		 *	starter pages ('start' => 'starter') the route of the start page is
+		 *	reserved for the request (\Nino\Features::RESERVED): the install unit of
+		 *	a feature that takes it where the project has none leaves it to them
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -1489,7 +1492,17 @@ namespace Nino\Install {
 				return;
 			}
 
-			$result = \Nino\Applications::place( $appData, $plan['catalogue'], $key );
+			// Where a chosen application starts with the starter pages the start page is its own: the
+			// wizard makes them when it ends, and until then no feature takes it where the project has none
+			if( $plan['starter'] === true )
+				$appData[ \Nino\Features::RESERVED ] = [ StarterPages::START_ROUTE ];
+
+			try {
+				$result = \Nino\Applications::place( $appData, $plan['catalogue'], $key );
+			}
+			finally {
+				unset( $appData[ \Nino\Features::RESERVED ] );
+			}
 
 			// Another change of the features holds the lock, or the lock cannot be taken at all: nothing was touched
 			if( $result['status'] === 409 || $result['reason'] === \Nino\Features::UNLOCKABLE ) {
@@ -1599,7 +1612,7 @@ namespace Nino\Install {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
 		 *
-		 *	@return 	array|null							{ catalogue, features }, null where the request was answered
+		 *	@return 	array|null							{ catalogue, features, starter }, starter being whether a chosen application starts with the starter pages; null where the request was answered
 		 */
 		private static function _plan( array &$appData, array &$request ): ?array {
 
@@ -1652,7 +1665,11 @@ namespace Nino\Install {
 				return null;
 			}
 
-			return [ 'catalogue' => $catalogue, 'features' => \Nino\Applications::features( $chosen ) ];
+			return [
+				'catalogue'	=> $catalogue,
+				'features'	=> \Nino\Applications::features( $chosen ),
+				'starter'		=> count( array_filter( $chosen, static fn( array $application ): bool => $application['start'] === 'starter' ) ) > 0,
+			];
 		}
 
 		/**
@@ -1820,7 +1837,10 @@ namespace Nino\Install {
 	 *												the wizard is about to end. There is no step for the pages: a
 	 *												project builds the rest in the workbench's Routes panel, which
 	 *												reads and writes the very same routes and /_nino/webpage&lt;uri&gt;/*
-	 *												text keys.
+	 *												text keys. While the features of an application that starts with
+	 *												the starter pages are switched on, the route of the start page
+	 *												is reserved (\Nino\Features::RESERVED), so that no feature takes
+	 *												it before the pages are made.
 	 *
 	 *												Nothing here asks anybody. A project that already has a page
 	 *												route keeps it and gets no starter page; one that has none gets
@@ -1837,6 +1857,9 @@ namespace Nino\Install {
 	class StarterPages {
 
 		private const string LIBRARY = __DIR__. '/library';
+
+		/**	The key of the route of the start page, which a feature may take where the project has none	*/
+		public const string START_ROUTE = 'GET://';
 
 		/**
 		 *	Create the starter pages, unless the project has a page route already.
@@ -2195,6 +2218,24 @@ namespace Nino\Install {
 			if( $pages !== true ) {
 				\Nino\Http::fail( $request, 500, $pages );
 				return;
+			}
+
+			// What an application that does not start with the starter pages switched on has its install units applied
+			// add-only once more: a round of another application may have reserved the start page and left it out of
+			// a feature that is on, and the project is not to end without one
+			foreach( $applied as $application ) {
+
+				if( $application['start'] === 'starter' )
+					continue;
+
+				foreach( \Nino\Applications::features( [ $application ] ) as $featureKey ) {
+
+					$replayed = \Nino\Features::activate( $appData, $featureKey );
+					if( $replayed !== true ) {
+						\Nino\Http::fail( $request, 500, 'could not apply the feature "'. $featureKey. '": '. $replayed );
+						return;
+					}
+				}
 			}
 
 			if( \Nino\Admin\Recovery::set( $appData, $pw ) === false ) {

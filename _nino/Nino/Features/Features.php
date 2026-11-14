@@ -81,6 +81,9 @@ namespace Nino {
 			arrived on their site; Modules\Search::getElements() is a question
 			for the class's own docblock, and mixing the two makes both harder
 			to scan.	*/
+		/**	Runtime key: route keys a unit applied without overwriting treats as taken, set by the setup wizard for the one request that places a feature	*/
+		public const string RESERVED = './nino/features/reserved';
+
 		public const array MANUAL_SECTIONS = [ 'shortcodes', 'markup', 'routes', 'panel', 'callbacks', 'install' ];
 
 		// One manual entry is a handle and a line about it - not a paragraph,
@@ -1516,7 +1519,7 @@ namespace Nino {
 		 *	re-applied unit replaces what it copied before. Without it the
 		 *	project wins - a route, a file, a text key that exists stays as it
 		 *	is and only what is missing is added. That is what a feature
-		 *	activation and an update want. 'elements' are the exception to
+		 *	activation and an update want. A route key under self::RESERVED counts as one the project has: the setup wizard sets it for the request that places a feature of an application whose start page is the wizard's own. 'elements' are the exception to
 		 *	"the unit wins": they are content, so they are added in both cases
 		 *	and never replaced - a re-run of the wizard keeps what an editor
 		 *	wrote (see \Nino\Elements::seed()).
@@ -1541,7 +1544,7 @@ namespace Nino {
 			foreach( ( $manifest['routes'] ?? [] ) as $routeKey => $route ) {
 				if( isset( $route['locale'] ) === true && in_array( $route['locale'], $locales, true ) === false )
 					continue;
-				if( $overwrite === false && isset( $routes[$routeKey] ) === true )
+				if( $overwrite === false && ( isset( $routes[$routeKey] ) === true || in_array( $routeKey, (array) ( $appData[self::RESERVED] ?? [] ), true ) === true ) )
 					continue;
 				$routes[$routeKey] = $route;
 			}

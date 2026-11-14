@@ -1217,13 +1217,13 @@ $appRemote		= [];
 $appRequests	= [];
 $appArchives	= [];
 
-$appFeature = static function( string $key ) use ( $appTar, &$appRemote, &$appArchives ): array {
+$appFeature = static function( string $key, array $files = [] ) use ( $appTar, &$appRemote, &$appArchives ): array {
 	$directory = ucfirst( $key );
 	$bytes = $appTar( [
 		$directory. '/'									=> null,
 		$directory. '/feature.php'			=> '<?php return [ \'key\' => \''. $key. '\', \'name\' => \''. $directory. '\', \'version\' => \'1.0.0\' ];',
 		$directory. '/'. $directory. '.php'	=> '<?php namespace Nino\\Modules { class '. $directory. ' { public const string VERSION = \'1.0.0\'; } }',
-	] );
+	] + $files );
 	$url = 'https://catalogue.test/features/'. $key. '-1.0.0.tar.gz';
 	$appRemote[$url] = $bytes;
 	$appArchives[$key] = $bytes;
@@ -1231,7 +1231,15 @@ $appFeature = static function( string $key ) use ( $appTar, &$appRemote, &$appAr
 		'requires' => [], 'directory' => $directory, 'archive' => $url, 'sha256' => hash( 'sha256', $bytes ), 'size' => strlen( $bytes ), 'released' => '2026-11-13' ];
 };
 
-$appFeatureList = [ $appFeature( 'alpha' ), $appFeature( 'beta' ), $appFeature( 'gamma' ), $appFeature( 'delta' ) ];
+/*	A feature whose install unit takes the start page where the project has no route for it, the way
+	a card or a landing page does: add-only, the address of its own page as the unit's Element-URI	*/
+$probeFiles = [
+	'Probe/install/'								=> null,
+	'Probe/install/manifest.php'		=> '<?php return [ \'routes\' => [ \'GET://\' => [ \'uri\' => \'/probe\', \'body\' => \'[template /templates/page-probe]\' ] ], \'templates\' => [ \'page-probe.tpl\' ] ];',
+	'Probe/install/templates/'			=> null,
+	'Probe/install/templates/page-probe.tpl'	=> 'probe',
+];
+$appFeatureList = [ $appFeature( 'alpha' ), $appFeature( 'beta' ), $appFeature( 'gamma' ), $appFeature( 'delta' ), $appFeature( 'probe', $probeFiles ) ];
 $appList = [
 	[ 'key' => 'site', 'name' => [ 'en_US' => 'Site', 'de_DE' => 'Seite' ], 'description' => [ 'en_US' => 'A site', 'de_DE' => 'Eine Seite' ], 'features' => [ 'alpha', 'beta' ], 'next' => '/_admin/#alpha', 'start' => 'starter' ],
 	[ 'key' => 'shop', 'name' => [ 'en_US' => 'Shop' ], 'description' => [ 'en_US' => 'A shop' ], 'features' => [ 'beta', 'gamma' ], 'next' => '/shop', 'start' => null ],
@@ -1701,6 +1709,74 @@ rmdir( ninoSandboxDir( $blocked ). '/private/templates/page-contact.tpl' );
 [ $status ] = $appFinish( $blocked );
 check( '...and ends once the place is there again', $status === 200 && \Nino\Admin\Admin::isInstalled( $blocked ) === true && $starterOf( $blocked ) === [ 'GET://', 'GET://contact', 'GET://404' ] );
 
+// A feature that takes the start page where the project has none
+$probeApplications = [
+	[ 'key' => 'probeplain', 'name' => 'Probe plain', 'description' => 'No start page of its own', 'features' => [ 'probe' ], 'next' => null, 'start' => null ],
+	[ 'key' => 'probecard', 'name' => 'Probe card', 'description' => 'Brings its own start page', 'features' => [ 'probe' ], 'next' => null, 'start' => 'own' ],
+	[ 'key' => 'probesite', 'name' => 'Probe site', 'description' => 'A site', 'features' => [ 'alpha', 'probe' ], 'next' => null, 'start' => 'starter' ],
+];
+$routesOf = static fn( array &$app ): array => \Nino\Filesystem::getFileContent( $app, '/config.php', [] )['/nino/http/routes'] ?? [];
+$appPublish( null, $probeApplications );
+
+$appReset();
+$probeSite = $appProject( 'install-finish-probe-site' );
+$appCall( $probeSite, 'applications/apply', [ 'applications' => [ 'probesite' ], 'feature' => 'alpha' ] );
+[ $status, $body ] = $appCall( $probeSite, 'applications/apply', [ 'applications' => [ 'probesite' ], 'feature' => 'probe' ] );
+check( 'a feature that takes the start page where there is none leaves it to an application that starts with the starter pages: it is on, its template is placed and no route of its own is written',
+	$status === 200 && $body['activated'] === true && isset( $routesOf( $probeSite )['GET://'] ) === false && \Nino\Filesystem::fileExists( $probeSite, '/templates/page-probe.tpl' ) === true );
+$appCall( $probeSite, 'applications/apply', [ 'applications' => [ 'probesite' ], 'feature' => 'probe' ] );
+check( '...also where the feature is on already and the round goes on: the route stays out', isset( $routesOf( $probeSite )['GET://'] ) === false );
+check( '...the reservation is kept to the request: nothing of it stays in the state of the project', isset( $probeSite[ \Nino\Features::RESERVED ] ) === false );
+[ $status ] = $appFinish( $probeSite, [ 'applications' => [ 'probesite' ] ] );
+check( 'the end of the wizard makes the starter pages, the start page among them', $status === 200 && $starterOf( $probeSite ) === [ 'GET://', 'GET://contact', 'GET://404' ] && ( $routesOf( $probeSite )['GET://']['uri'] ?? '' ) === '/home' );
+
+// A round that reserved the start page is abandoned and an application that brings its own start page is chosen: the feature is on, its route was left out
+$appReset();
+$probeSwitch = $appProject( 'install-finish-probe-switch' );
+$appCall( $probeSwitch, 'applications/apply', [ 'applications' => [ 'probesite' ], 'feature' => 'probe' ] );
+[ $status, $body ] = $appCall( $probeSwitch, 'applications/apply', [ 'applications' => [ 'probecard' ], 'feature' => 'probe' ] );
+check( 'a feature that is on already is answered as one that is on', $status === 200 && $body === [ 'feature' => 'probe', 'placed' => false, 'activated' => false ] );
+[ $status ] = $appFinish( $probeSwitch, [ 'applications' => [ 'probecard' ] ] );
+check( 'the end of the wizard gives the route a reserving round left out to an application that brings its own start page: the project has a start page, and no starter page beside it', $status === 200
+	&& ( $routesOf( $probeSwitch )['GET://']['uri'] ?? '' ) === '/probe' && array_diff( $starterOf( $probeSwitch ), [ 'GET://', 'GET://404' ] ) === [] && isset( $routesOf( $probeSwitch )['GET://contact'] ) === false );
+
+// What the project has stays: a start page of its own is not replaced by the route that was left out
+$appReset();
+$probeOwn = $appProject( 'install-finish-probe-own' );
+$appCall( $probeOwn, 'applications/apply', [ 'applications' => [ 'probesite' ], 'feature' => 'probe' ] );
+\Nino\Filesystem::mutate( $probeOwn, '/config.php', static function( array $config ): array { $config['/nino/http/routes']['GET://'] = [ 'uri' => '/mine', 'body' => '[template /templates/page-mine]' ]; return $config; } );
+$appCall( $probeOwn, 'applications/apply', [ 'applications' => [ 'probecard' ], 'feature' => 'probe' ] );
+$appFinish( $probeOwn, [ 'applications' => [ 'probecard' ] ] );
+check( 'the route that was left out is added where the project has none and no other: a start page of the project\'s own stays', ( $routesOf( $probeOwn )['GET://']['uri'] ?? '' ) === '/mine' );
+
+// The starter application is not the first of the applications chosen
+$appReset();
+$probeTwo = $appProject( 'install-finish-probe-two' );
+foreach( [ 'alpha', 'probe' ] as $probeFeature )
+	$appCall( $probeTwo, 'applications/apply', [ 'applications' => [ 'probesite', 'probeplain' ], 'feature' => $probeFeature ] );
+check( 'one of several chosen applications that starts with the starter pages reserves the start page, whichever place it has in the list', isset( $routesOf( $probeTwo )['GET://'] ) === false );
+
+// A request that is refused writes nothing and reserves nothing
+$appReset();
+$probeRefused = $appProject( 'install-finish-probe-refused' );
+[ $status ] = $appCall( $probeRefused, 'applications/apply', [ 'applications' => [ 'probesite' ], 'feature' => 'unlisted' ] );
+check( 'a feature that is not of the plan is refused and leaves no reservation, no route and no feature', $status === 400 && isset( $probeRefused[ \Nino\Features::RESERVED ] ) === false
+	&& isset( $routesOf( $probeRefused )['GET://'] ) === false && glob( \Nino\Features::dir(). '/*', GLOB_ONLYDIR ) === [] );
+[ $status ] = $appCall( $probeRefused, 'applications/apply', [ 'applications' => [ 'probecard' ], 'feature' => 'probe' ] );
+check( '...so that the feature of an application that brings its own start page takes the start page where the project has none', $status === 200 && ( $routesOf( $probeRefused )['GET://']['uri'] ?? '' ) === '/probe' );
+
+// A round of a starter application that failed before the feature was placed leaves nothing behind
+$appReset();
+$probeFailed = $appProject( 'install-finish-probe-failed' );
+$appRemote[ $appFeatureList[0]['archive'] ] = 'not what the catalogue promised';
+[ $status ] = $appCall( $probeFailed, 'applications/apply', [ 'applications' => [ 'probesite' ], 'feature' => 'alpha' ] );
+$appRemote[ $appFeatureList[0]['archive'] ] = $appArchives['alpha'];
+[ $statusProbe ] = $appCall( $probeFailed, 'applications/apply', [ 'applications' => [ 'probecard' ], 'feature' => 'probe' ] );
+[ $statusEnd ] = $appFinish( $probeFailed, [ 'applications' => [ 'probecard' ] ] );
+check( 'a starter application whose first feature fails, and then an application that brings its own start page: the feature takes the start page and the end leaves it',
+	$status === 400 && $statusProbe === 200 && $statusEnd === 200 && ( $routesOf( $probeFailed )['GET://']['uri'] ?? '' ) === '/probe' && array_diff( $starterOf( $probeFailed ), [ 'GET://', 'GET://404' ] ) === [] );
+
+$appPublish();
 $appReset();
 echo "\n";
 
