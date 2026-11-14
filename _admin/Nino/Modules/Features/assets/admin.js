@@ -588,9 +588,35 @@
 			} );
 
 			Nino.adminUi.buttonRow( buttons, Nino.admin.features._tab, function( key ) {
-				Nino.admin.features._tab = key;
-				Nino.admin.features._address();
-				Nino.admin.features._renderPanel();
+
+				// The strip stands in the pane's head, above both levels: a tab picked
+				// while a feature's screen is open leaves that screen, else the list
+				// the tab shows is drawn under it and the screen stays on top. Where the
+				// screen holds input nobody saved, the shell asks first, and a Cancel
+				// puts the strip back on the tab that was on. The strip is drawn again
+				// either way, so the focus goes to the tab that is on afterwards - the
+				// next arrow key starts from there
+				const focusTab = function() {
+					const tab = dc.getElementById( 'features-tabbutton-'+ Nino.admin.features._tab );
+					if( tab !== null )
+						tab.focus();
+				};
+
+				const show = function() {
+					Nino.admin.features._openFeature = '';
+					Nino.admin.features._tab = key;
+					Nino.admin.features._address();
+					Nino.admin.features._renderPanel();
+					focusTab();
+				};
+
+				if( Nino.admin.features._holdsInput() === true )
+					Nino.admin.dirty.guard( [ 'features' ], show, function() {
+						Nino.admin.features._renderPanel( true );
+						focusTab();
+					} );
+				else
+					show();
 			}, 'aria-selected' );
 
 			return bar;

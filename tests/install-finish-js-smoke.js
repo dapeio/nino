@@ -13,7 +13,7 @@
 'use strict';
 
 const vm = require('vm');
-const { check, done, load, element, findAll, documentOf } = require( './harness.js' );
+const { check, done, load, element, findAll, fire, documentOf, source } = require( './harness.js' );
 
 const mount = element('div');
 const byId = function( id ) { return mount.children.find( function( el ) { return el.id === id } ) };
@@ -24,7 +24,14 @@ const byId = function( id ) { return mount.children.find( function( el ) { retur
 } );
 
 const location = { href : 'http://example.test/_admin/', pathname : '/_admin/', search : '', reloads : 0, reload : function() { location.reloads++ } };
-const sandbox = { console : console, URL : URL, document : documentOf( mount ), location : location };
+// The browser's storage, which holds a value or throws where the browser keeps it shut
+const stored = {};
+let shut = false;
+const localStorage = {
+	getItem : function( key ) { if( shut === true ) throw new Error('blocked'); return Object.prototype.hasOwnProperty.call( stored, key ) ? stored[key] : null },
+	setItem : function( key, value ) { if( shut === true ) throw new Error('blocked'); stored[key] = String( value ) },
+};
+const sandbox = { console : console, URL : URL, document : documentOf( mount ), location : location, localStorage : localStorage };
 sandbox.document.createElement = element;
 sandbox.window = sandbox;
 sandbox.Nino = { dir : '', install : {}, events : { bindCallback : function( name, fn ) { fn() } } };
@@ -98,5 +105,40 @@ check( '...and with none the page offers what it always offered', byId('finish-d
 submit( { login : false, targets : [ { key : 'x', name : '<img src=x onerror=alert(1)>', next : '/x' } ] } );
 const hostile = findAll( byId('finish-next-steps'), function( el ) { return el.tagName === 'STRONG' } )[0];
 check( 'the name of an application is written as text', hostile.textContent.includes( '<img src=x onerror=alert(1)>' ) && hostile.children.length === 0 );
+
+/*	An application that starts the workbench with its menu folded: the state the
+	workbench keeps for it (Nino.admin.rail) is set to folded where nobody has
+	chosen yet, once, and only for the application that is opened	*/
+const RAIL = sandbox.Nino.install.finish.RAIL_KEY;
+const folded = { key : 'vcard', name : 'vCard', next : '/_admin/#vcard', menu : 'folded' };
+const plainTarget = { key : 'website', name : 'Website', next : '/_admin/#dashboard' };
+
+submit( { login : true, targets : [ plainTarget ] } );
+check( 'an application that says nothing about the menu leaves the browser\'s state alone', Object.keys( stored ).length === 0 );
+
+submit( { login : true, targets : [ folded ] } );
+check( 'one account and an application that folds the menu: the menu is folded before the page leaves, and the page leads to the entry point as for any other', stored[RAIL] === 'folded' && location.href === 'http://example.test/_admin/#vcard' );
+
+stored[RAIL] = 'open';
+submit( { login : true, targets : [ folded ] } );
+check( '...a state somebody pinned is theirs and is not overwritten', stored[RAIL] === 'open' );
+delete stored[RAIL];
+
+submit( { login : false, targets : [ folded, plainTarget ] } );
+check( 'where the page lists the entry points, nothing is folded before one of them is opened', Object.keys( stored ).length === 0 );
+const listed = findAll( byId('finish-next-steps'), function( el ) { return el.tagName === 'A' } );
+fire( listed[1], 'click' );
+check( '...and opening one that says nothing leaves the state alone', Object.keys( stored ).length === 0 );
+fire( listed[0], 'click' );
+check( '...opening the one that folds the menu folds it', stored[RAIL] === 'folded' );
+
+delete stored[RAIL];
+shut = true;
+submit( { login : true, targets : [ folded ] } );
+check( 'a browser that keeps its storage shut still leads to the entry point', location.href === 'http://example.test/_admin/#vcard' );
+shut = false;
+
+// The key is the one the workbench keeps its menu under
+check( 'the wizard names the key the workbench stores the menu state under', source('_admin/assets/script.js').includes( "STORAGE_KEY : '"+ RAIL+ "'" ) );
 
 done();

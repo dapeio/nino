@@ -65,6 +65,12 @@ namespace Nino {
 	 *										and, like "category", did not raise the format number; an
 	 *										application of the wrong shape is dropped and the rest is kept.
 	 *
+	 *										An application may also name "menu": "folded" - the workbench
+	 *										opens on its entry point with the menu folded, once, when the
+	 *										wizard leads there (see \Nino\Applications::menu()). Any
+	 *										other value is no statement, and the parsed application
+	 *										carries the key only where it is "folded".
+	 *
 	 *										A successful fetch() is kept under data/catalogue.php - see
 	 *										cached(), which reads it back without ever making a
 	 *										request. The panel's Available tab fills from that cache on
@@ -992,7 +998,7 @@ namespace Nino {
 			if( $start !== null && in_array( $start, [ 'starter', 'own' ], true ) === false )
 				return null;
 
-			return [
+			$application = [
 				'key'					=> $key,
 				'name'				=> $entry['name'],
 				'description'	=> $entry['description'] ?? '',
@@ -1000,6 +1006,11 @@ namespace Nino {
 				'next'				=> $next,
 				'start'				=> $start,
 			];
+
+			if( ( $entry['menu'] ?? null ) === \Nino\Applications::MENU_FOLDED )
+				$application['menu'] = \Nino\Applications::MENU_FOLDED;
+
+			return $application;
 		}
 
 		/**

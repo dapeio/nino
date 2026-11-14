@@ -122,7 +122,7 @@ Ein frischer Checkout ist noch kein Projekt. Der Einrichtungsassistent, den `/_a
 | [2. Languages](docs/setup.md#2-languages) | Welche Sprachen braucht das Projekt – und welche Module, falls das Projekt eigene mitbringt? |
 | [3. Personal Information](docs/setup.md#3-personal-information) | Welche zentralen Firmen- und Webseitenwerte stehen als Textfills bereit? |
 | [4. Accounts](docs/setup.md#4-accounts) | Welche Entwicklerkonten melden sich mit vollem Zugriff an der Workbench an? |
-| [5. Applications](docs/setup.md#5-applications) | Welche Anwendungen des offiziellen Katalogs – Verbünde von Features mit einem Einstieg – werden angelegt und eingeschaltet, falls überhaupt? |
+| [5. Application](docs/setup.md#5-application) | Welche Anwendungen des offiziellen Katalogs – Verbünde von Features mit einem Einstieg – werden angelegt und eingeschaltet, falls überhaupt? |
 | [6. Finish](docs/setup.md#6-finish) | Welches Recovery-Passwort öffnet `/_admin/recovery.php`, wenn die Konten kaputt sind – und sperrt den Assistenten? Hier entstehen die Starter-Seiten. |
 
 Das Erscheinungsbild gehört nicht zu seinen Fragen: Die Base-Einheit liefert ein Theme und die beiden Rahmen-Templates, gegen die es gezeichnet ist ([The Look](docs/setup.md#the-look)). Redakteurskonten entstehen später im Panel Users der Workbench.

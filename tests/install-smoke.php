@@ -1449,6 +1449,10 @@ check( 'the entry points are the paths of the applied applications that have one
 check( '...an application without one adds none, and a path that is none is not led to',
 	\Nino\Install\Applications::targets( $project, [ [ 'key' => 'x', 'name' => 'X', 'next' => null ], [ 'key' => 'y', 'name' => 'Y', 'next' => 'https://evil.test/' ], [ 'key' => 'z', 'name' => 'Z', 'next' => '//evil.test' ] ] ) === [] );
 
+check( 'an application that starts the workbench with the menu folded says so in its entry point, one that says nothing leaves the key out',
+	\Nino\Install\Applications::targets( $project, [ [ 'key' => 'x', 'name' => 'X', 'next' => '/x', 'menu' => 'folded' ], [ 'key' => 'y', 'name' => 'Y', 'next' => '/y' ], [ 'key' => 'z', 'name' => 'Z', 'next' => '/z', 'menu' => 'open' ] ] )
+	=== [ [ 'key' => 'x', 'name' => 'X', 'next' => '/x', 'menu' => 'folded' ], [ 'key' => 'y', 'name' => 'Y', 'next' => '/y' ], [ 'key' => 'z', 'name' => 'Z', 'next' => '/z' ] ] );
+
 // --- what is kept for the end when the catalogue is gone
 
 $appRemote = [];

@@ -122,7 +122,7 @@ A fresh checkout is not a project yet. The setup wizard, which `/_admin` shows u
 | [2. Languages](docs/setup.md#2-languages) | Which languages does the project require - and which modules, where the project added any of its own? |
 | [3. Personal Information](docs/setup.md#3-personal-information) | Which central company and website values are available as textfills? |
 | [4. Accounts](docs/setup.md#4-accounts) | Which developer account(s) sign in to the workbench with full access? |
-| [5. Applications](docs/setup.md#5-applications) | Which applications of the official catalogue - sets of features with a place to continue in - are placed and switched on, if any? |
+| [5. Application](docs/setup.md#5-application) | Which applications of the official catalogue - sets of features with a place to continue in - are placed and switched on, if any? |
 | [6. Finish](docs/setup.md#6-finish) | Which recovery password opens `/_admin/recovery.php` when the accounts are broken - and locks the wizard? The starter pages are created here. |
 
 The look is not among its questions: the base unit delivers one theme and the two frame templates it is drawn against ([The Look](docs/setup.md#the-look)). Editor accounts are created later, in the workbench's Users panel.

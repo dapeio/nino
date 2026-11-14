@@ -724,7 +724,7 @@ namespace Nino\Install {
 			// picker could offer, so it is listed on every run - see its docblock
 			$moduleClasses[] = '\\Nino\\Modules\\Maintenance';
 
-			// A feature the Applications step switched on is not a choice of this
+			// A feature the Application step switched on is not a choice of this
 			// step and stays on when it is applied again after a step back
 			foreach( \Nino\Features::all( $appData ) as $feature )
 				if( $feature['active'] === true )
@@ -1347,7 +1347,7 @@ namespace Nino\Install {
 			'install_start_exclusive'			=> 'applications that provide the start page exclude each other',
 			'install_start_applied'				=> 'an application that provides the start page is set up and stays the one',
 			'install_unknown_feature'			=> 'not a feature of the chosen applications',
-			'install_unresolved'					=> 'the catalogue the applications came from is not kept - open the Applications step',
+			'install_unresolved'					=> 'the catalogue the applications came from is not kept - open the Application step',
 			'install_feature'							=> 'the feature could not be applied',
 			'install_busy'								=> 'another change of the features is running',
 			'install_lock'								=> 'the features cannot be locked for a change - check data/.locks of the project and the log',
@@ -1575,7 +1575,7 @@ namespace Nino\Install {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$applied			Applications as applied() answers them
 		 *
-		 *	@return 	array										[ { key, name, next } ]
+		 *	@return 	array										[ { key, name, next [, menu] } ] - menu is there where the application starts the workbench with the menu folded, and absent otherwise
 		 */
 		public static function targets( array &$appData, array $applied ): array {
 
@@ -1584,7 +1584,8 @@ namespace Nino\Install {
 
 			foreach( $applied as $application )
 				if( \Nino\Applications::entry( $application ) !== null )
-					$targets[] = [ 'key' => $application['key'], 'name' => \Nino\Features::localized( $application['name'], $locale ), 'next' => $application['next'] ];
+					$targets[] = [ 'key' => $application['key'], 'name' => \Nino\Features::localized( $application['name'], $locale ), 'next' => $application['next'] ]
+						+ ( \Nino\Applications::menu( $application ) === null ? [] : [ 'menu' => \Nino\Applications::MENU_FOLDED ] );
 
 			return $targets;
 		}
@@ -2143,7 +2144,7 @@ namespace Nino\Install {
 		 *	far as the catalogue it fetched lists them and every feature of
 		 *	them is on (Applications::applied()).
 		 *
-		 *	Answers { login: bool, targets: [ { key, name, next } ] }: whether
+		 *	Answers { login: bool, targets: [ { key, name, next [, menu] } ] }: whether
 		 *	this session walks into the workbench, and the entry point of each
 		 *	application that has one. It walks when the wizard created exactly
 		 *	one account and that is the one Accounts::apiCreate() signed in -

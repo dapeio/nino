@@ -8,7 +8,10 @@
  *													setup goes straight on - into the entry point of the one
  *													application that has one, else into the workbench - signed
  *													in as that account; any other, and one with several entry
- *													points, shows where to continue.
+ *													points, shows where to continue. An application
+ *													that starts the workbench with its menu folded
+ *													(menu: folded) leaves the menu folded where the
+ *													browser has no choice of its own yet.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -20,6 +23,9 @@
 	wn.Nino.install = wn.Nino.install || {};
 
 	Nino.install.finish = {
+
+		// The key the workbench keeps the state of its menu under (Nino.admin.rail.STORAGE_KEY)
+		RAIL_KEY : 'nino-admin-rail',
 
 		/**
 		 *	The button that ends the wizard is named for what it leads to: with exactly one
@@ -68,10 +74,33 @@
 		},
 
 		/**
+		 *	Fold the workbench's menu for the application that is about to be
+		 *	opened, where it asks for that - once, as the state the workbench
+		 *	starts in. The wizard and the workbench are one origin, and the
+		 *	menu's state is the one value the workbench keeps in the browser
+		 *	(Nino.admin.rail, _admin/assets/script.js): a person's own choice,
+		 *	which is there already, stays
+		 *
+		 *	@param		{Object}	target			{ key, name, next [, menu] }
+		 *
+		 *	@return		void
+		 */
+		_menu : function( target ) {
+
+			if( target.menu !== 'folded' )
+				return;
+
+			try {
+				if( !wn.localStorage.getItem( Nino.install.finish.RAIL_KEY ) )
+					wn.localStorage.setItem( Nino.install.finish.RAIL_KEY, 'folded' );
+			} catch(e) {}
+		},
+
+		/**
 		 *	One more next step per application that has an entry point, beside
 		 *	the two the page always offers
 		 *
-		 *	@param		{Array}		targets			[ { key, name, next } ]
+		 *	@param		{Array}		targets			[ { key, name, next [, menu] } ]
 		 *
 		 *	@return		void
 		 */
@@ -85,6 +114,7 @@
 				link.className = 'install-next-step install-next-step--application';
 				link.href = Nino.dir+ target.next;
 				link.target = '_blank';
+				link.addEventListener( 'click', function() { Nino.install.finish._menu( target ) } );
 
 				const copy = dc.createElement('span');
 				copy.className = 'install-next-step-copy';
@@ -134,6 +164,8 @@
 				// login, among the next steps
 				if( response.login === true && targets.length <= 1 ) {
 					msg.textContent = targets.length === 1 ? '' : 'Opening the workbench …';
+					if( targets.length === 1 )
+						Nino.install.finish._menu( targets[0] );
 					Nino.install.finish._go( Nino.dir+ ( targets.length === 1 ? targets[0].next : '/_admin/' ) );
 					return;
 				}

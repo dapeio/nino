@@ -16,7 +16,7 @@ namespace Nino {
 	 *										index lists (see \Nino\Catalogue::applications()). It is
 	 *										no state of its own: it is set up when every feature of it
 	 *										is on, and partly set up when some are. Two places set one
-	 *										up - the setup wizard's Applications step, for the official
+	 *										up - the setup wizard's Application step, for the official
 	 *										catalogue, and the Features panel, for the catalogue the
 	 *										project reads - and both do it here: the order of the
 	 *										features, what loading needs, when a feature counts as on,
@@ -49,6 +49,12 @@ namespace Nino {
 		 *	it falls back as \Nino\Features::localized() does everywhere
 		 */
 		public const string LOCALE = 'en_US';
+
+		/**
+		 *	What an application's "menu" says when the workbench is to open on it with the
+		 *	menu folded: the one statement there is
+		 */
+		public const string MENU_FOLDED = 'folded';
 
 		/**
 		 *	What loading an application needs and this server lacks
@@ -160,6 +166,21 @@ namespace Nino {
 		public static function entry( array $application ): ?string {
 
 			return is_string( $application['next'] ?? null ) === true && \Nino\Http::isSitePath( $application['next'] ) === true ? $application['next'] : null;
+		}
+
+		/**
+		 *	The state the workbench's menu starts in when the setup wizard leads to the
+		 *	application's entry point: folded where the application says so, else nothing -
+		 *	the workbench then decides as it does for everybody. The wizard hands it on to
+		 *	the browser once; what a person pins afterwards is theirs
+		 *
+		 *	@param		array 		$application	One application of the catalogue
+		 *
+		 *	@return 	string|null
+		 */
+		public static function menu( array $application ): ?string {
+
+			return ( $application['menu'] ?? null ) === self::MENU_FOLDED ? self::MENU_FOLDED : null;
 		}
 
 		/**

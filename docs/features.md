@@ -45,7 +45,7 @@ key, a name and a description per language, the keys of its features, a `next`
 path to continue in and a `start` that says who provides the start page
 ([the catalogue](_admin.md#the-catalogue)). The setup wizard offers the
 applications of the official catalogue and places and switches on their features
-([Applications](setup.md#5-applications)), and so does the Features panel's
+([Applications](setup.md#5-application)), and so does the Features panel's
 **Applications** tab later, for the catalogue the project reads
 ([the panel](_admin.md#the-panel)); a feature does not know of the applications
 it is part of, and setting one up changes no page or route of the project.
@@ -862,7 +862,7 @@ JavaScript tests carry a stand-in of their own and run with any Nino.
 - It does not reach the network on a page request, and never but through
   `\Nino\Fetch`; Nino itself makes no outbound request unless someone presses
   **Refresh catalogue** or **Install** ([the workbench manual](_admin.md#features)),
-  or reaches the Applications step of the setup wizard.
+  or reaches the Application step of the setup wizard.
 - It does not write output (no `echo`, `header()`, `http_response_code()` or `exit`;
   the response is `Http::ok()`, `fail()` or `redirect()`) and does not build markup
   in PHP: a template, read by `\Nino\Feature::template()`, holds it (an icon and a

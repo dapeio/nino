@@ -450,6 +450,13 @@ check( 'an application is read with exactly the fields the wizard uses', is_arra
 $parsed = $withApplications( [ 'key' => 'bare', 'name' => 'Bare', 'features' => [ 'helper' ] ] );
 check( '...description, next and start are optional', is_array( $parsed ) && $parsed['applications'] === [ [ 'key' => 'bare', 'name' => 'Bare', 'description' => '', 'features' => [ 'helper' ], 'next' => null, 'start' => null ] ] );
 
+$parsed = $withApplications( $application + [ 'menu' => 'folded' ] );
+check( 'an application that starts the workbench with the menu folded carries that, and one that says nothing carries no key for it', is_array( $parsed ) && $parsed['applications'] === [ $application + [ 'menu' => 'folded' ] ]
+	&& array_key_exists( 'menu', ( $withApplications( $application )['applications'] ?? [ [] ] )[0] ) === false );
+$parsed = $withApplications( $application + [ 'menu' => null ], [ 'key' => 'a' ] + $application + [ 'menu' => 'open' ], [ 'key' => 'b' ] + $application + [ 'menu' => true ] );
+check( '...any other statement is no statement: the application is kept and the key is not', is_array( $parsed ) && count( $parsed['applications'] ) === 3
+	&& array_filter( $parsed['applications'], static fn( array $one ): bool => array_key_exists( 'menu', $one ) ) === [] );
+
 $wrongApplications = [
 	'a key that is no slug'													=> [ 'key' => 'Site' ],
 	'a name that is empty'													=> [ 'name' => '' ],

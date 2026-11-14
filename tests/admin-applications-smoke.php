@@ -636,6 +636,8 @@ check( 'a feature is on when it is switched on at the version its directory carr
 check( 'the entry point of an application is its "next" where that is a path of the site', \Nino\Applications::entry( [ 'next' => '/_admin/#a' ] ) === '/_admin/#a' && \Nino\Applications::entry( [ 'next' => null ] ) === null
 	&& \Nino\Applications::entry( [ 'next' => '//evil.test' ] ) === null && \Nino\Applications::entry( [ 'next' => 'https://evil.test' ] ) === null && \Nino\Applications::entry( [ 'next' => '/\\evil.test' ] ) === null
 	&& \Nino\Applications::entry( [ 'next' => "/a\nb" ] ) === null && \Nino\Applications::entry( [ 'next' => 5 ] ) === null && \Nino\Applications::entry( [] ) === null );
+check( 'an application opens the workbench with its menu folded only where it says folded', \Nino\Applications::menu( [ 'menu' => 'folded' ] ) === 'folded'
+	&& \Nino\Applications::menu( [ 'menu' => 'open' ] ) === null && \Nino\Applications::menu( [ 'menu' => true ] ) === null && \Nino\Applications::menu( [ 'menu' => null ] ) === null && \Nino\Applications::menu( [] ) === null );
 check( 'what loading needs is named by key, and nothing on a server that has it all', \Nino\Applications::missing() === [] );
 rename( NINO_FEATURES_DIR, NINO_FEATURES_DIR. '.away' );
 check( '...a features directory that cannot be written to among them', array_keys( \Nino\Applications::missing() ) === [ 'features' ] );

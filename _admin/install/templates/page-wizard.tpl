@@ -28,7 +28,7 @@
 					<span id="install-nav-setup">2. Languages</span>
 					<span id="install-nav-personalinfos">3. Personal Infos</span>
 					<span id="install-nav-accounts">4. Accounts</span>
-					<span id="install-nav-applications">5. Applications</span>
+					<span id="install-nav-applications">5. Application</span>
 					<span id="install-nav-finish">6. Finish</span>
 				</div>
 			</aside>
@@ -81,7 +81,7 @@
 				</div>
 
 				<div id="install-content-applications">
-					<p class="nino-admin-hint nino-admin-hint-lead">Applications are ready-made sets of features from Nino's official catalogue, each with a place to continue in. Without one the project keeps what the steps before made of it; with one, its features are downloaded, checked against the catalogue's signature and switched on. Anything can be added later in the Features panel.</p>
+					<p class="nino-admin-hint nino-admin-hint-lead">Select the primary task for Nino. You can add further areas of application later.</p>
 					<div id="applications-lists">
 						<div class="nino-admin-card install-hidden" id="applications-start-card">
 							<h2>Start page</h2>

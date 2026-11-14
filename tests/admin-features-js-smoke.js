@@ -146,6 +146,7 @@ const sandbox = {
 			// tree the panel just drew. The filter's own re-focus reads it
 			return findAll( mount, function( node ) { return node.id === id } )[0]
 				?? findAll( screen, function( node ) { return node.id === id } )[0]
+				?? findAll( paneHead, function( node ) { return node.id === id } )[0]
 				?? null;
 		},
 		documentElement : null,
@@ -717,6 +718,59 @@ check( 'an active feature that declares no setting gets the same screen, without
 	&& byTag( plainBar, 'button' ).every( function( el ) { return el.type === 'button' } ) );
 fire( byTag( screen.children[0], 'a' )[0], 'click' );
 check( 'Back shows the list and puts the focus on the row of the feature that was open', mount.classList.contains('admin-hidden') === false && screen.classList.contains('admin-hidden') === true && focused() === row( mount, 'plain' ) && focused() !== null );
+
+/*	The strip of the four tabs stands above both levels, so it is still there
+	with a feature's screen open: a tab picked then leaves the screen and shows
+	its own list, whichever tab it is	*/
+{
+	panel.init();
+	answer( 200, listAnswer( CATALOGUE_URL, true, null ) );
+
+	const strip = function() { return byTag( paneHead.children[1], 'button' ) };
+	const selected = function() { return strip().filter( function( el ) { return el.attributes['aria-selected'] === 'true' } ).map( function( el ) { return el.id } ).join() };
+
+	[ 'inactive', 'available', 'applications', 'active' ].forEach( function( tab ) {
+		fire( row( mount, 'plain' ), 'click' );
+		fire( strip().filter( function( el ) { return el.id === 'features-tabbutton-'+ tab } )[0], 'click' );
+		check( 'the '+ tab +' tab picked over an open screen leaves it and shows that tab: list in, screen empty and hidden, no feature open',
+			mount.classList.contains('admin-hidden') === false && screen.classList.contains('admin-hidden') === true && screen.children.length === 0
+			&& panel._openFeature === '' && panel._tab === tab && selected() === 'features-tabbutton-'+ tab && tabContent().attributes['aria-labelledby'] === 'features-tabbutton-'+ tab );
+	} );
+
+	// The strip is drawn again with every pick, so the focus is on the tab that
+	// is on afterwards, and the arrow keys walk the strip a tab at a time
+	fire( strip()[0], 'click' );
+	check( 'the focus is on the tab that was picked, also over a list', focused() === strip()[0] && focused() !== null );
+	fire( strip()[0], 'keydown', { key : 'ArrowRight', preventDefault : function() {} } );
+	check( 'an arrow key picks the next tab and the focus is on it', selected() === 'features-tabbutton-inactive' && focused() === strip()[1] );
+	fire( focused(), 'keydown', { key : 'ArrowRight', preventDefault : function() {} } );
+	check( '...and a second one the one after it, since the focus did not go to the page', selected() === 'features-tabbutton-available' && focused() === strip()[2] );
+	fire( strip()[0], 'click' );
+
+	// Typed into: the shell asks first. Cancel keeps the screen, the form and
+	// what was typed in it, and the tab it was on, with the focus on that tab;
+	// the answer leaves
+	const asked = [];
+	Nino.admin.dirty = { isDirty : function() { return true }, guard : function( names, proceed, onCancel ) { asked.push( { names : names, proceed : proceed, onCancel : onCancel } ) }, snapshot : function() {} };
+	fire( row( mount, 'sample' ), 'click' );
+	const typedForm = byTag( screen, 'form' )[0];
+	const typedInto = typedForm.querySelectorAll('[data-key]').filter( function( el ) { return el.dataset.key === 'title' } )[0];
+	typedInto.value = 'typed and not saved';
+	fire( strip()[1], 'click' );
+	check( 'a tab picked over a screen with unsaved input asks the shell about the feature panel and changes nothing before the answer',
+		asked.length === 1 && JSON.stringify( asked[0].names ) === '["features"]' && screen.classList.contains('admin-hidden') === false && panel._openFeature === 'sample' && panel._tab === 'active' );
+	if( asked[0] !== undefined )
+		asked[0].onCancel();
+	check( '...a Cancel leaves the screen open and puts the strip back on the tab that was on, with the focus on it', screen.classList.contains('admin-hidden') === false && panel._openFeature === 'sample' && selected() === 'features-tabbutton-active' && focused() === strip()[0] );
+	check( '...and it is the same form with the same input in it, not one drawn again from the saved values', byTag( screen, 'form' )[0] === typedForm && typedInto.value === 'typed and not saved' );
+	fire( strip()[1], 'click' );
+	if( asked[1] !== undefined )
+		asked[1].proceed();
+	check( '...and the answer leaves the screen for the tab', screen.classList.contains('admin-hidden') === true && mount.classList.contains('admin-hidden') === false && panel._openFeature === '' && selected() === 'features-tabbutton-inactive' );
+	delete Nino.admin.dirty;
+
+	fire( strip()[0], 'click' );
+}
 
 /*	A feature that has a panel of its own edits its settings in a tab of that
 	panel (see settings.js): its screen here draws no form and no Save for
