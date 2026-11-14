@@ -69,6 +69,7 @@ namespace Nino\Modules {
 				'line'				=> '<[[tag]] class="nino-line[[class]]"[[lang]]>[[value]]</[[tag]]>',
 				'sections'		=> '<section[[id]] class="nino-section[[class]]">[[inner]]</section>',
 				'repeat'			=> '<div[[class]][[id]]>[[cells]]</div>',
+				'html'				=> '<div[[class]] data-html>[[value]]</div>',
 				'tabs'				=> '<div class="nino-tabs[[class]]"[[id]]><nav class="nino-tabs-nav">[[tabs]]</nav>[[panels]]</div>',
 				'tab'					=> '<button type="button" class="nino-tabs-tab[[active]]" data-tabs-target="[[panel]]">[[title]]</button>',
 				'tab-panel'		=> '<div class="nino-tabs-panel[[active]][[class]]" id="[[panel]]"[[hidden]]>[[inner]]</div>',
@@ -3081,7 +3082,12 @@ namespace Nino\Modules {
 		 *	with the rest. What the fills put into it is an editor's text, whose
 		 *	'[' is an entity that the parser decodes - a bracket that exists
 		 *	only because the parser made it is written as &#91; or &#93;, so that
-		 *	it is text on the page and no shortcode in the next rendering
+		 *	it is text on the page and no shortcode in the next rendering. A call
+		 *	with a 'class' - the spacing classes of the Builder - is wrapped in a div
+		 *	of that class and with the attribute data-html, the one element a rule can address the whole
+		 *	content by (Nino.css hands the grid of a column on to it, so that the
+		 *	room between the blocks stays what it is without the div); without a
+		 *	class, or where the content comes out empty, there is no element
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments made ready by dispatch()
@@ -3089,7 +3095,11 @@ namespace Nino\Modules {
 		 *	@return 	string
 		 */
 		public static function componentHtml( array &$appData, array $args ): string {
-			return \Nino\Html::sanitizeHtml( (string) $args['value'], 'blocks', true );
+
+			$value = \Nino\Html::sanitizeHtml( (string) $args['value'], 'blocks', true );
+			$class = trim( $args['class'] );
+
+			return $value === '' || $class === '' ? $value : str_replace( [ '[[class]]', '[[value]]' ], [ self::_attribute( 'class', $class ), $value ], self::$html['html'] );
 		}
 
 		/**
@@ -3806,7 +3816,8 @@ namespace Nino\Modules {
 		 *	has filled the fields of the element into it and the rendering that follows
 		 *	runs the components in it with the element as their context; and nothing, an
 		 *	empty cell, where it has none of them. align is right or center. The first
-		 *	argument, the text key of the title, is read by the table and not here
+		 *	argument, the text key of the title, is read by the table and not here.
+		 *	The class of the call is on the cell, after the one of the alignment
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					The arguments made ready by dispatch()
@@ -3841,7 +3852,7 @@ namespace Nino\Modules {
 
 			return str_replace(
 				[ '[[class]]', '[[value]]' ],
-				[ self::_attribute( 'class', $args['align'] !== '' ? 'nino-table__cell--'. $args['align'] : '' ), $cell ],
+				[ self::_attribute( 'class', trim( ( $args['align'] !== '' ? 'nino-table__cell--'. $args['align'] : '' ). ' '. $args['class'] ) ), $cell ],
 				self::$html['td']
 			);
 		}

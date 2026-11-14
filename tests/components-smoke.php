@@ -667,6 +667,58 @@ foreach( [ 1, 2, 3, 4, 5, 6 ] as $groundStep ) {
 check( 'the room of a [spacer] is a height of its own: .nino-spacer-1 to -6 say height: var(--space-<n>), the step the margin class of that number has, once each and with no margin'
 	. ( $groundWrong === [] ? '' : ' - not: '. implode( ', ', $groundWrong ) ), $groundWrong === [] );
 
+// A section that says a margin at its left or its right is as wide as the room the margin leaves: its width is the block's own and not the 100% every section has, which is a box that
+// stands out of the page by the margin. The cover is left out - it sets its width itself, less its margins - and the rule has no weight of its own, so that it is the order that decides.
+// The rule is read as it is written: one rule at the top of the sheet, its selector the section, the three margin classes by their attribute and the cover out, one declaration
+$sectionSelector = '.nino-section:where([class*="nino-m-"], [class*="nino-ml-"], [class*="nino-mr-"]):where(:not(.nino-cover))';
+$sectionBase = $groundLastOf( [ '.nino-section' ], 'width' );
+$sectionKeys = array_values( array_filter( array_keys( $groundEach ), static fn( $key ): bool => str_contains( (string) $key, 'nino-m-' ) === true && str_starts_with( (string) $key, '.nino-section' ) === true ) );
+check( 'a section with a margin class at a side is as wide as the block it stands in leaves it: one rule at the top of the sheet, after the width of 100% of every section, that says width auto and nothing else, for nino-m-<n>, nino-ml-<n> and nino-mr-<n> by attribute, and not for the cover',
+	$sectionKeys === [ $sectionSelector ] && count( $groundEach[$sectionSelector] ) === 1 && trim( $groundEach[$sectionSelector][0] ) === 'width: auto;'
+	&& $groundConditions( $sectionSelector ) === [ [] ] && $sectionBase > 0 && $groundLastOf( [ $sectionSelector ] ) > $sectionBase && $groundSets( $groundOf( '.nino-section' ), 'width', '100%' ) === true );
+
+// The padding of a button at its left or its right is what the class says even where a look writes the padding of a button as one line of one class after this sheet: nino-pl-<n> and nino-pr-<n>
+// on .nino-btn are two classes, each says its own side and no other, in no query, with the step of the padding class of that number - and there is no other rule that names .nino-btn with a padding class
+$btnWrong = [];
+$btnKeys = array_values( array_filter( array_keys( $groundEach ), static fn( $key ): bool => preg_match( '/^\.nino-btn[.\w-]*\.nino-p/', (string) $key ) === 1 || preg_match( '/\.nino-p[lr]?-\d.*\.nino-btn(?![\w-])/', (string) $key ) === 1 ) );
+foreach( [ 'pl' => 'left', 'pr' => 'right' ] as $btnKey => $btnSide )
+	foreach( [ 0, 1, 2, 3, 4, 5, 6 ] as $btnStep ) {
+		$btnSelector = '.nino-btn.nino-'. $btnKey. '-'. $btnStep;
+		$btnValue = $btnStep === 0 ? '0' : 'var(--space-'. $btnStep. ')';
+		if( count( $groundEach[$btnSelector] ?? [] ) !== 1 || trim( $groundEach[$btnSelector][0] ) !== 'padding-'. $btnSide. ': '. $btnValue. ';' || $groundConditions( $btnSelector ) !== [ [] ]
+			|| trim( $groundOf( '.nino-'. $btnKey. '-'. $btnStep ) ) !== 'padding-'. $btnSide. ': '. $btnValue. ';' )
+			$btnWrong[] = $btnSelector;
+	}
+check( 'a button with nino-pl-<n> or nino-pr-<n> has that side as the padding class says, in a rule of two classes that sets that side alone and stands in no query - and these fourteen rules are all the sheet has for a button and a padding class'
+	. ( $btnWrong === [] ? '' : ' - not: '. implode( ', ', $btnWrong ) ), $btnWrong === [] && count( $btnKeys ) === 14 );
+
+// A cell of a table with a padding class, [col class="nino-pl-3"]: the table's own rule names the element, td, so a class alone would lose to it and to a theme that writes it again. Thirty-five rules, a td with
+// the class - the four sides and the one for all of them - each saying that padding alone, at the top of the sheet, the one for all four first so that a side after it is what it says
+$cellWrong = [];
+$cellKeys = array_values( array_filter( array_keys( $groundEach ), static fn( $key ): bool => preg_match( '/^\.nino-table td\./', (string) $key ) === 1 ) );
+$cellAt = [];
+foreach( [ '' => 'padding', 't' => 'padding-top', 'b' => 'padding-bottom', 'l' => 'padding-left', 'r' => 'padding-right' ] as $cellKey => $cellProperty )
+	foreach( [ 0, 1, 2, 3, 4, 5, 6 ] as $cellStep ) {
+		$cellSelector = '.nino-table td.nino-p'. $cellKey. '-'. $cellStep;
+		$cellValue = $cellStep === 0 ? '0' : 'var(--space-'. $cellStep. ')';
+		$cellAt[$cellKey][] = $groundLastOf( [ $cellSelector ] );
+		if( count( $groundEach[$cellSelector] ?? [] ) !== 1 || trim( $groundEach[$cellSelector][0] ) !== $cellProperty. ': '. $cellValue. ';' || $groundConditions( $cellSelector ) !== [ [] ] )
+			$cellWrong[] = $cellSelector;
+	}
+check( 'a td with nino-p-<n>, nino-pt-<n>, nino-pb-<n>, nino-pl-<n> or nino-pr-<n> has that padding, in a rule of the table cell with the class that says it alone and stands in no query - the rule for all four sides before those for a side - and these thirty-five are all the sheet has for a cell and a padding class'
+	. ( $cellWrong === [] ? '' : ' - not: '. implode( ', ', $cellWrong ) ),
+	$cellWrong === [] && count( $cellKeys ) === 35 && max( $cellAt[''] ) < min( $cellAt['t'], $cellAt['b'], $cellAt['l'], $cellAt['r'] ) );
+
+// The content of [html] with a class is one div, marked data-html: in a column that is a grid it is a grid with the gap of the column, so that the blocks in it are as far apart as they are with no div
+$htmlGridSelector = '.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)) > [data-html]';
+$htmlTileSelector = ':where(.nino-tiles) > .nino-grid-row > * > [data-html]';
+$htmlBlocks = [];
+foreach( $groundMembers as $htmlAt => $htmlList )
+	if( array_filter( $htmlList, static fn( string $member ): bool => str_contains( $member, '[data-html]' ) ) !== [] )
+		$htmlBlocks[] = [ $htmlList, trim( (string) preg_replace( '/\s+/', ' ', $groundBlocks[$htmlAt][2] ) ) ];
+check( 'the div of [html] takes the grid and the gap of the column it stands in - the stack and placement classes, and a tile - and nothing else: one rule for both selectors, display grid and gap inherit, in no query',
+	$htmlBlocks === [ [ [ $htmlGridSelector, $htmlTileSelector ], 'display: grid; gap: inherit;' ] ] && $groundConditions( $htmlGridSelector. ', '. $htmlTileSelector ) === [ [] ] );
+
 /*	The cells of a stack on a phone: the classes of the grid are the only width a cell has - the -s- widths from 640px, the -m- ones from 768px, the -l- ones from 1024px - so below
 	640px a cell was as wide as its content, and a loop of cards with short texts drew narrow cards side by side at 375px (55, 55 and 68px wide, measured). The cells are one below the
 	other there, as wide as the row the stack is. The query ends where the -s- widths begin	*/
@@ -1940,7 +1992,7 @@ foreach( array_keys( $groundEach ) as $tileSelector )
 		$tileSelectors[] = (string) $tileSelector;
 sort( $tileSelectors );
 $tileExpected = [ ':is(.nino-tiles > .nino-grid-row > *).nino-radius', ':is(.nino-tiles > .nino-grid-row > *).nino-radius-alt', '.nino-tiles', ':where(.nino-tiles) > .nino-grid-row', ':where(.nino-tiles) > .nino-grid-row > *',
-	':where(.nino-tiles) > .nino-grid-row > * > .nino-btn', ':where(.nino-tiles) > .nino-grid-row > * > .nino-grid-bg',
+	':where(.nino-tiles) > .nino-grid-row > * > .nino-btn', ':where(.nino-tiles) > .nino-grid-row > * > .nino-grid-bg', ':where(.nino-tiles) > .nino-grid-row > * > [data-html]',
 	':where(.nino-tiles) > .nino-grid-row > * > .nino-section-text:where(:not(.nino-section-text--quiet, .nino-section-text--loud))', ':where(.nino-tiles) > .nino-grid-row > .nino-text-center > .nino-btn',
 	':where(.nino-tiles) > .nino-grid-row > .nino-text-right > .nino-btn' ];
 foreach( [ 's', 'm', 'l', 'xl' ] as $tileTier )
@@ -3181,6 +3233,14 @@ check( '[spacer] is an empty box of a class of its own, the step of the size it 
 check( '...and the markup it is made from has no margin class: the margin a column writes on it is room beside its height and does not compete with its size',
 	str_contains( \Nino\Modules\Components::$html['spacer'], 'nino-mt-' ) === false && str_contains( $render( '[spacer size="3" class="nino-mt-2"]' ), 'nino-spacer-3 nino-mt-2"' ) === true );
 check( '[html] is its content as rich text, and nothing without content', $render( '[html]<p>Hi</p><script>alert(1)</script>[/html]' ) === '<p>Hi</p>' && $render( '[html][/html]' ) === '' );
+check( '[html] carries the class it is given - the spacing classes of the Builder - on one div, marked data-html, round its content, and is its content with no element round it where it has none, and nothing where it has no content',
+	$render( '[html class="nino-mt-3 nino-pl-2"]<p>Hi</p><ul><li>a</li></ul>[/html]' ) === '<div class="nino-mt-3 nino-pl-2" data-html><p>Hi</p><ul><li>a</li></ul></div>'
+	&& $render( '[html class=""]<p>Hi</p>[/html]' ) === $render( '[html]<p>Hi</p>[/html]' ) && $render( '[html]<p>Hi</p>[/html]' ) === '<p>Hi</p>'
+	&& $render( '[html class=" "]<p>Hi</p>[/html]' ) === '<p>Hi</p>'
+	&& $render( '[html class="nino-mt-3"][/html]' ) === '' && $render( '[html class="nino-mt-3"]<script>a()</script>[/html]' ) === '' );
+check( '...the class is escaped: the characters that close a tag or open one are entities in the attribute, and there is the one attribute',
+	$render( '[html class="x>y<z"]<p>Hi</p>[/html]' ) === '<div class="x&gt;y&lt;z" data-html><p>Hi</p></div>'
+	&& $render( '[html class="a\'b"]<p>Hi</p>[/html]' ) === '<div class="a&quot;b" data-html><p>Hi</p></div>' );
 check( '[button] is a link drawn as one: label from a key, address from a key, a style', $render( '[button /_nino/webpage/contact/name href="/_nino/webpage/contact/uri" style="primary"]' ) === '<a class="nino-btn nino-btn--primary" href="/contact">Contact us</a>' );
 check( '[button] takes a fixed label, a size, a target - and a target that is another window says it is no concern of the opener', $render( '[button text="Go" href="https://example.com" size="big" target="_blank"]' ) === '<a class="nino-btn nino-btn--big" href="https://example.com" target="_blank" rel="noopener">Go</a>' );
 check( '[button] with a fixed label reads its first argument as the address', $render( '[button /_nino/webpage/contact/uri text="Mehr"]' ) === '<a class="nino-btn" href="/contact">Mehr</a>' );
@@ -3953,6 +4013,11 @@ check( '...validate() takes the place table for what a component is in and refus
 	&& str_contains( (string) \Nino\Modules\Components::validate( 'probecol', [ 'label' => 'x', 'source' => 'none', 'group' => 'global', 'in' => [ 'row' ] ] ), '"in" lists only section, card, table' ) === true );
 
 $tableCols = '[col /template/page-home/prices/head field="title"][col field="price" align="right"][col field="since"]';
+$colPlain = $render( '[table /prices sort="title" limit="1"][col field="title"][col field="price" align="right"][col field="since"][/table]' );
+$colClass = $render( '[table /prices sort="title" limit="1"][col field="title" class="nino-pl-3"][col field="price" align="right" class="nino-pt-2 nino-pb-2"][col field="since" class=" "][/table]' );
+check( '[col] carries the class of its call on its td, after the one of the alignment - and a call without a class, or with white space, is the cell it was',
+	$colClass === str_replace( [ '<td>Alpha', '<td class="nino-table__cell--right">' ], [ '<td class="nino-pl-3">Alpha', '<td class="nino-table__cell--right nino-pt-2 nino-pb-2">' ], $colPlain )
+	&& str_contains( $colClass, '<td class="nino-pl-3">Alpha' ) === true && str_contains( $colPlain, 'class="nino-pl-3"' ) === false );
 check( '[table] is the wrap, the table, a header row of th and a body row of td for each element - in the order of the loop, with the classes of the style and the id and the class of the call',
 	$render( '[table /prices sort="title" style="striped-bordered" id="pl" class="x"]'. $tableCols. '[/table]' ) === '<div class="nino-table-wrap"><table class="nino-table nino-table--striped nino-table--bordered x" id="pl">'
 		. '<thead><tr><th>Price list</th><th></th><th></th></tr></thead><tbody>'

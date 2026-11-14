@@ -950,6 +950,16 @@ h1, h2, h3, h4, h5, h6 {
 	align-content: start;
 }
 .nino-grid-row > .nino-stack-center { align-content: center; }
+/*	The content of [html] with a class stands in one div, marked data-html. In a column that
+	is a grid - the stack and the placement classes, and a tile - the blocks of the
+	content were the grid's own items and had its gap between them; the div takes the
+	grid and the gap of the column on, so that they have it still. In any other box
+	it is a block, whose children's margins run through it as they do without it	*/
+.nino-grid-row > :is(.nino-stack-start, .nino-stack-center, .nino-stack-end, [class*="nino-stack-gap-"]:not(.nino-stack)) > [data-html],
+:where(.nino-tiles) > .nino-grid-row > * > [data-html] {
+	display: grid;
+	gap: inherit;
+}
 .nino-grid-row > .nino-stack-end { align-content: end; }
 /*	A grid item stretches over its column; a button is as wide as its label,
 	and sits where the column's text does	*/
@@ -1374,6 +1384,15 @@ body.nino-scroll-down .nino-scroll-header:where(:not(:has(:focus-visible))) {
 	color: var(--color-section-default-text);
 	box-sizing: border-box;
 	width: 100%;
+}
+/*	A section that says a margin at its left or its right is narrower by it: a
+	width of 100% and a margin beside it is a box that stands out of the page, or
+	- at the right - one that has no room to take the margin from. The width of a
+	block is what is left after its margins. The cover takes its margins off in
+	Nino.ui.js, where it sets its width, and is left alone. Written in :where(),
+	which has no weight, so that the order decides	*/
+.nino-section:where([class*="nino-m-"], [class*="nino-ml-"], [class*="nino-mr-"]):where(:not(.nino-cover)) {
+	width: auto;
 }
 /*	Grounds. A section, a row, a column and a card paint a ground with the
 	same words - alt, tint, dark, black, primary and brand-alt, written
@@ -5364,6 +5383,67 @@ header .nino-headernav-logo:empty {
 .nino-pr-4 { padding-right: var(--space-4); }
 .nino-pr-5 { padding-right: var(--space-5); }
 .nino-pr-6 { padding-right: var(--space-6); }
+/* The padding a button has at the left or at the right is what its class says. The
+   theme writes the padding of a button as one line of one class, after this sheet,
+   which a button gives up where it names its top, its bottom or all four and not
+   where it names a side: two classes here are heavier than that line, so that the
+   side the class names is the class's and the three others are the look's. A rule
+   of a project with two classes or more that stands after this sheet is heavier
+   or equal and wins */
+.nino-btn.nino-pl-0 { padding-left: 0; }
+.nino-btn.nino-pl-1 { padding-left: var(--space-1); }
+.nino-btn.nino-pl-2 { padding-left: var(--space-2); }
+.nino-btn.nino-pl-3 { padding-left: var(--space-3); }
+.nino-btn.nino-pl-4 { padding-left: var(--space-4); }
+.nino-btn.nino-pl-5 { padding-left: var(--space-5); }
+.nino-btn.nino-pl-6 { padding-left: var(--space-6); }
+.nino-btn.nino-pr-0 { padding-right: 0; }
+.nino-btn.nino-pr-1 { padding-right: var(--space-1); }
+.nino-btn.nino-pr-2 { padding-right: var(--space-2); }
+.nino-btn.nino-pr-3 { padding-right: var(--space-3); }
+.nino-btn.nino-pr-4 { padding-right: var(--space-4); }
+.nino-btn.nino-pr-5 { padding-right: var(--space-5); }
+.nino-btn.nino-pr-6 { padding-right: var(--space-6); }
+/* The padding of a cell of a table, [col class="nino-pl-3"]. The rule that pads the
+   cells of a table names an element, .nino-table td, and so does the one of a theme:
+   a padding class alone is lighter than both. A td with the class is heavier than
+   both. The rule for all four sides comes first and the sides after it, as the
+   classes above do. A margin means nothing to a table cell, so there is none */
+.nino-table td.nino-p-0 { padding: 0; }
+.nino-table td.nino-p-1 { padding: var(--space-1); }
+.nino-table td.nino-p-2 { padding: var(--space-2); }
+.nino-table td.nino-p-3 { padding: var(--space-3); }
+.nino-table td.nino-p-4 { padding: var(--space-4); }
+.nino-table td.nino-p-5 { padding: var(--space-5); }
+.nino-table td.nino-p-6 { padding: var(--space-6); }
+.nino-table td.nino-pt-0 { padding-top: 0; }
+.nino-table td.nino-pt-1 { padding-top: var(--space-1); }
+.nino-table td.nino-pt-2 { padding-top: var(--space-2); }
+.nino-table td.nino-pt-3 { padding-top: var(--space-3); }
+.nino-table td.nino-pt-4 { padding-top: var(--space-4); }
+.nino-table td.nino-pt-5 { padding-top: var(--space-5); }
+.nino-table td.nino-pt-6 { padding-top: var(--space-6); }
+.nino-table td.nino-pb-0 { padding-bottom: 0; }
+.nino-table td.nino-pb-1 { padding-bottom: var(--space-1); }
+.nino-table td.nino-pb-2 { padding-bottom: var(--space-2); }
+.nino-table td.nino-pb-3 { padding-bottom: var(--space-3); }
+.nino-table td.nino-pb-4 { padding-bottom: var(--space-4); }
+.nino-table td.nino-pb-5 { padding-bottom: var(--space-5); }
+.nino-table td.nino-pb-6 { padding-bottom: var(--space-6); }
+.nino-table td.nino-pl-0 { padding-left: 0; }
+.nino-table td.nino-pl-1 { padding-left: var(--space-1); }
+.nino-table td.nino-pl-2 { padding-left: var(--space-2); }
+.nino-table td.nino-pl-3 { padding-left: var(--space-3); }
+.nino-table td.nino-pl-4 { padding-left: var(--space-4); }
+.nino-table td.nino-pl-5 { padding-left: var(--space-5); }
+.nino-table td.nino-pl-6 { padding-left: var(--space-6); }
+.nino-table td.nino-pr-0 { padding-right: 0; }
+.nino-table td.nino-pr-1 { padding-right: var(--space-1); }
+.nino-table td.nino-pr-2 { padding-right: var(--space-2); }
+.nino-table td.nino-pr-3 { padding-right: var(--space-3); }
+.nino-table td.nino-pr-4 { padding-right: var(--space-4); }
+.nino-table td.nino-pr-5 { padding-right: var(--space-5); }
+.nino-table td.nino-pr-6 { padding-right: var(--space-6); }
 
 /* Text alignment */
 .nino-text-left { text-align: left; }
