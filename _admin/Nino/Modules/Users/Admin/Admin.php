@@ -25,7 +25,7 @@ namespace Nino\Modules\Users {
 	 *											grants is the Roles tab of this same pane (see Roles), the
 	 *											login throttle - and lifting a lock - the Lockout tab, the
 	 *											password recovery.php asks for the RecoveryPassword tab.
-	 *											An account may carry a name, the one the dashboard greets it
+	 *											An account may carry a name, the one a feature addresses it
 	 *											by (cleanName()).
 	 *											Every session an account holds is ended from here too
 	 *											(users/logoutall). The permissions an account may hold
@@ -117,8 +117,8 @@ namespace Nino\Modules\Users {
 		}
 
 		/**
-		 *	The name an account may carry, as it is stored: what the dashboard
-		 *	greets it by, so one line of text - no control or format character
+		 *	The name an account may carry, as it is stored: what a feature addresses
+		 *	it by, so one line of text - no control or format character
 		 *	of any kind (a null byte, a line break, a right-to-left mark), at
 		 *	most NAME_MAX characters, a blank around it, a no-break space among them, taken off. Nothing is
 		 *	cut to fit: a name that is too long is refused. '' is no name

@@ -1611,124 +1611,35 @@ check( 'both languages take the same number of params'. ( $placeholders === [] ?
 	&& str_contains( (string) $wordFiles['en_US']['[[/_admin/error/upload_too_large]]'], '%s' ) === true && str_contains( (string) $wordFiles['en_US']['[[/_admin/error/image_too_large]]'], '%s' ) === true );
 check( 'no word carries a live shortcode - the page substitutes a value before the shortcodes run', array_filter( $wordFiles['en_US'] + $wordFiles['de_DE'], fn( $v, $k ) => str_starts_with( $k, '[[/_admin/error/' ) && preg_match( '/[\\[\\]]/', (string) $v ) === 1, ARRAY_FILTER_USE_BOTH ) === [] );
 
-echo "The greeting of the dashboard - its words and the sentences it ships\n";
+echo "The name of an account - its words\n";
 
-pinGreetingWords();
-pinGreetingSentencesShipped();
+pinAccountNameWords();
 
 echo "\n";
 
 ninoDone( $appData );
 
 /** The words of one module of the workbench in one language, as its text() directory delivers them */
-function greetingModuleWords( string $module, string $locale ): array {
+function moduleWords( string $module, string $locale ): array {
 	return (array) require dirname( __DIR__ ). '/_admin/Nino/Modules/'. $module. '/text/'. $locale. '.php';
 }
 
-/** Every word the greeting, the name of an account and the three switches use is there in both interface languages - the keys of a pool are no key, the sentences are elements */
-function pinGreetingWords(): void {
+/** Every word the name of an account uses is there in both interface languages, and the Users panel's manual has its line */
+function pinAccountNameWords(): void {
 
-	$seed = include dirname( __DIR__ ). '/_admin/Nino/Modules/Dashboard/install/elements/greetings.php';
-
-	$keys = [ 'dashboard' => [], 'users' => [], 'config' => [] ];
-	foreach( [ 'early', 'morning', 'noon', 'afternoon', 'evening', 'night' ] as $phase )
-		$keys['dashboard'][] = '/_admin/dashboard/greet/hello/'. $phase;
-	foreach( [ 'first', 'today', 'yesterday', 'days', 'activity', 'activity-one', 'backup' ] as $fact )
-		$keys['dashboard'][] = '/_admin/dashboard/greet/fact/'. $fact;
-	$keys['dashboard'][] = '/_admin/dashboard/manual/greeting';
-	$keys['dashboard'][] = '/_admin/elements/type/greetings/hint';
-	foreach( array_keys( $seed['model'] ) as $field )
-		$keys['dashboard'][] = '/_admin/elements/field/greetings/'. $field;
-	foreach( $seed['model'] as $field => $definition )
-		foreach( $definition['options'] ?? [] as $option )
-			$keys['dashboard'][] = '/_admin/elements/option/greetings/'. $field. '/'. $option;
-
+	$keys = [];
 	foreach( [ 'label/name', 'label/name-hint', 'manual/name' ] as $part )
-		$keys['users'][] = '/_admin/users/'. $part;
+		$keys[] = '/_admin/users/'. $part;
 	foreach( [ 'users_name_long', 'users_name_invalid' ] as $code )
-		$keys['users'][] = '/_admin/error/'. $code;
-
-	foreach( [ 'group/dashboard', 'intro/dashboard', 'label/greetinghello', 'hint/greetinghello', 'label/greetingsentence', 'hint/greetingsentence', 'label/greetingfacts', 'hint/greetingfacts' ] as $part )
-		$keys['config'][] = '/_admin/config/'. $part;
+		$keys[] = '/_admin/error/'. $code;
 
 	$missing = [];
-	$words = [];
-	foreach( [ 'en_US', 'de_DE' ] as $locale )
-		foreach( $keys as $module => $asked ) {
-			$words[$locale][$module] = greetingModuleWords( ucfirst( $module ), $locale );
-			foreach( $asked as $key )
-				if( trim( (string) ( $words[$locale][$module]['[['. $key. ']]'] ?? '' ) ) === '' )
-					$missing[] = $key. ' ('. $locale. ')';
-		}
-	check( 'every word of the greeting, of the name field and of the three switches is there in both interface languages'. ( $missing === [] ? '' : ' - missing: '. implode( ', ', array_slice( $missing, 0, 6 ) ) ), $missing === [] && count( $keys['dashboard'] ) > 30 );
-
-	$blanks = [];
 	foreach( [ 'en_US', 'de_DE' ] as $locale ) {
-		$dashboard = $words[$locale]['dashboard'];
-		foreach( [ 'days', 'activity', 'backup' ] as $fact )
-			if( substr_count( (string) $dashboard['[[/_admin/dashboard/greet/fact/'. $fact. ']]'], '%s' ) !== 1 )
-				$blanks[] = $fact. ' ('. $locale. ')';
-		foreach( [ 'first', 'today', 'yesterday', 'activity-one' ] as $fact )
-			if( str_contains( (string) $dashboard['[[/_admin/dashboard/greet/fact/'. $fact. ']]'], '%s' ) === true )
-				$blanks[] = $fact. ' ('. $locale. ')';
+		$words = moduleWords( 'Users', $locale );
+		foreach( $keys as $key )
+			if( trim( (string) ( $words['[['. $key. ']]'] ?? '' ) ) === '' )
+				$missing[] = $key. ' ('. $locale. ')';
 	}
-	check( 'the facts that take a number have one blank each, the ones that do not have none'. ( $blanks === [] ? '' : ' - '. implode( ', ', $blanks ) ), $blanks === [] );
-
-	check( 'the formula of a time of day is no sentence of a pool: the pools are not text keys any more', array_filter( array_keys( $words['en_US']['dashboard'] + $words['de_DE']['dashboard'] ), static fn( string $key ): bool => preg_match( '#^\[\[/_admin/dashboard/greet/(early|morning|noon|afternoon|evening|night|monday|friday|weekend|christmas|newyear)/\d+\]\]$#', $key ) === 1 ) === [] );
-
-	check( 'the Dashboard names its new manual entry and the Users panel its own, and each has its line', in_array( 'greeting', \Nino\Modules\Dashboard\Admin::manual(), true ) === true && in_array( 'name', \Nino\Modules\Users\Admin::manual(), true ) === true );
-}
-
-/** The sentences the unit file ships: how many in each pool, in both languages, and what a sentence may be */
-function pinGreetingSentencesShipped(): void {
-
-	$seed = include dirname( __DIR__ ). '/_admin/Nino/Modules/Dashboard/install/elements/greetings.php';
-
-	$model = $seed['model'];
-	check( 'the model has the fields of the type, the three of them with their options and the default the pool is read as', array_keys( $model ) === [ 'text', 'phase', 'day', 'occasion', 'hidden' ]
-		&& $model['text']['locale'] === true && $model['text']['required'] === true && $model['text']['maxlength'] === 200 && isset( $model['text']['html'] ) === false
-		&& $model['phase']['options'] === [ 'any', 'early', 'morning', 'noon', 'afternoon', 'evening', 'night' ] && $model['phase']['default'] === 'any'
-		&& $model['day']['options'] === [ 'any', 'monday', 'friday', 'weekend' ] && $model['day']['default'] === 'any'
-		&& $model['occasion']['options'] === [ 'none', 'christmas', 'newyear' ] && $model['occasion']['default'] === 'none' && $model['hidden']['type'] === 'boolean' );
-	check( '...the type has a title in both languages', trim( (string) ( $seed['title']['de_DE'] ?? '' ) ) !== '' && trim( (string) ( $seed['title']['en_US'] ?? '' ) ) !== '' );
-
-	$ids = array_keys( $seed['de_DE'] );
-	check( 'both languages carry the same elements, each once, named as a slug', $ids === array_keys( $seed['en_US'] ) && count( $ids ) === count( array_unique( $ids ) )
-		&& count( array_filter( $ids, static fn( string $id ): bool => preg_match( '/^[a-z0-9]+-[0-9]{2}$/', $id ) !== 1 ) ) === 0 );
-
-	$pools = [];
-	foreach( $ids as $id ) {
-		$when = $seed['*'][$id] ?? [];
-		$field = array_keys( $when );
-		$pool = $field === [ 'phase' ] ? 'phase:'. $when['phase'] : ( $field === [ 'day' ] ? 'day:'. $when['day'] : ( $field === [ 'occasion' ] ? 'occasion:'. $when['occasion'] : '?' ) );
-		$pools[$pool][] = $id;
-	}
-
-	$short = [];
-	foreach( [ 'phase:early' => 10, 'phase:morning' => 10, 'phase:noon' => 10, 'phase:afternoon' => 10, 'phase:evening' => 10, 'phase:night' => 10, 'day:monday' => 6, 'day:friday' => 6, 'day:weekend' => 6, 'occasion:christmas' => 4, 'occasion:newyear' => 4 ] as $pool => $least ) {
-		$count = count( $pools[$pool] ?? [] );
-		if( $count < $least )
-			$short[] = $pool. ' '. $count;
-		foreach( [ 'de_DE', 'en_US' ] as $locale ) {
-			$without = count( array_filter( $pools[$pool] ?? [], static fn( string $id ): bool => str_contains( $seed[$locale][$id]['text'], '%s' ) === false ) );
-			if( $without < 4 )
-				$short[] = $pool. ' without a name in '. $locale. ' '. $without;
-		}
-	}
-	check( 'every pool has its least number of sentences: ten for an hour, six for a weekday, four for an occasion, and four of them need no name'. ( $short === [] ? '' : ' - '. implode( ', ', $short ) ), $short === [] && array_keys( $pools ) !== [ '?' ] && isset( $pools['?'] ) === false && count( $pools ) === 11 );
-
-	$bad = [];
-	foreach( $ids as $id ) {
-		foreach( [ 'de_DE', 'en_US' ] as $locale ) {
-			$text = $seed[$locale][$id]['text'] ?? '';
-			if( $text === '' || mb_strlen( $text ) > 200 || substr_count( $text, '%s' ) > 1 || preg_match( '/[<>\[\]&#\n]/', $text ) === 1 )
-				$bad[] = $id. ' '. $locale;
-		}
-		if( str_contains( $seed['de_DE'][$id]['text'], '%s' ) !== str_contains( $seed['en_US'][$id]['text'], '%s' ) )
-			$bad[] = $id. ' blank';
-		foreach( $seed['*'][$id] ?? [] as $field => $value )
-			if( in_array( $value, $model[$field]['options'] ?? [], true ) === false || $value === $model[$field]['default'] )
-				$bad[] = $id. ' '. $field;
-	}
-	check( 'a sentence is one line of text of at most 200 characters, with a blank for the name at most once, the same in both languages, and says when it fits in words the model has'. ( $bad === [] ? '' : ' - '. implode( ', ', array_slice( $bad, 0, 5 ) ) ), $bad === [] );
+	check( 'every word of the name field is there in both interface languages'. ( $missing === [] ? '' : ' - missing: '. implode( ', ', array_slice( $missing, 0, 6 ) ) ), $missing === [] );
+	check( 'the Users panel names its manual entry for the name', in_array( 'name', \Nino\Modules\Users\Admin::manual(), true ) === true );
 }

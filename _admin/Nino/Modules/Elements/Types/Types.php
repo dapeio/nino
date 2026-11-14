@@ -1052,8 +1052,8 @@ namespace Nino\Modules\Elements {
 
 			// A type that was deleted is on the list of what was removed
 			// (\Nino\Elements::REMOVED), with no element named: whoever puts a type
-			// in place when it is missing - the dashboard does for its greetings -
-			// leaves it alone then. The elements it held are gone with the file
+			// in place when it is missing leaves it alone then. The elements it
+			// held are gone with the file
 			if( \Nino\Filesystem::lockFile( $appData, '/config.php' ) === true ) {
 
 				try {

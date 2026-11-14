@@ -9,7 +9,7 @@ return [
 	'[[/_admin/nav/recoverypw]]'			=> 'Recovery-Passwort',
 	'[[/_admin/users/label/mail]]'					=> 'E-Mail-Adresse',
 	'[[/_admin/users/label/name]]'	=> 'Name',
-	'[[/_admin/users/label/name-hint]]'	=> 'So spricht Dich das Dashboard an',
+	'[[/_admin/users/label/name-hint]]'	=> 'So wirst Du angesprochen',
 	'[[/_admin/users/label/newpw]]'				=> 'Neues Passwort (leer lassen, um es nicht zu ändern)',
 	'[[/_admin/users/label/currentpw]]'		=> 'Aktuelles Passwort zur Bestätigung',
 	'[[/_admin/users/label/you]]'					=> 'Du',
@@ -134,7 +134,7 @@ return [
 	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
 	'[[/_admin/users/manual/intro]]'	=> 'Wer sich in der Workbench anmelden darf und was jedes Konto dort tun darf.',
 	'[[/_admin/users/manual/account]]'	=> 'Ein neuer Nutzer braucht eine E-Mail-Adresse, ein Passwort mit mindestens acht Zeichen und eine Rolle. Die Liste zeigt, wann sich jedes Konto zuletzt angemeldet hat und welche gesperrt oder deaktiviert sind.',
-	'[[/_admin/users/manual/name]]'	=> 'Der Name ist freiwillig und hat höchstens 60 Zeichen. Das Dashboard spricht das Konto damit an; ohne Namen begrüßt es nur zur Tageszeit.',
+	'[[/_admin/users/manual/name]]'	=> 'Der Name ist freiwillig und hat höchstens 60 Zeichen. Ein Feature, das das Konto anspricht, tut es mit diesem Namen.',
 	'[[/_admin/users/manual/role]]'	=> 'Eine Rolle ist ein Bündel von Rechten: welche Bereiche ein Konto sieht und was es dort ändern darf. Im Reiter Nutzerrollen legst Du Rollen an und bearbeitest sie, „Vollzugriff“ öffnet alles.',
 	'[[/_admin/users/manual/password]]'	=> 'Lass „Neues Passwort“ leer, um das alte zu behalten. Im eigenen Konto fragt das Speichern nach dem aktuellen Passwort.',
 	'[[/_admin/users/manual/deactivate]]'	=> '„Konto deaktivieren“ sperrt die Anmeldung und behält das Konto – nicht Dein eigenes. „Überall abmelden“ beendet jede Sitzung des Kontos.',

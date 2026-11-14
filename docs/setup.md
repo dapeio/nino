@@ -75,7 +75,6 @@ The step writes:
 - templates to `templates/`;
 - global and language-dependent texts to `text/`;
 - provided element types to `elements/` - and the elements a unit brings in its `elements` key, which are only ever added to a type, never replaced: the sections of the legal texts stay as an editor left them when the step is applied again;
-- the element type `/greetings`, the sentences the Dashboard greets an account with, added the same way - see [The Greeting of the Dashboard](_admin.md#the-greeting-of-the-dashboard);
 - the menus a unit asks for in its `navs` key - a menu the project does not have yet, with its first entries by Element URI (`legal` with the imprint and the privacy policy) - to `/nino/html/navs` and `/nino/html/navroutes`; where the project has the menu already, a second run leaves it and its entries as the editors set them;
 - other declared files to their project paths.
 

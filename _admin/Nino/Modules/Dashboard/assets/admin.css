@@ -4,10 +4,9 @@
  *	Nino										A compact filesystembased php framework
  *	Modules\Dashboard		The overview, one number per panel
  *	admin.css								What the module's /_admin panel needs beyond the design
- *													system in _admin/assets/style.css: the greeting card that
- *													opens the panel, the two lists the panel draws itself -
- *													elements by type, recent activity - and the "show all"
- *													link under the second of them. Bundled while
+ *													system in _admin/assets/style.css: the two lists the panel
+ *													draws itself - elements by type, recent activity - and
+ *													the "show all" link under the second of them. Bundled while
  *													the module is there (see the panel's assets()), so the
  *													same layer rules apply - the shell's stylesheet fixes the
  *													layer order, this one only ever adds to nino.tool, scoped
@@ -21,35 +20,6 @@
 @layer nino.tool {
 
 /* --------------------------------------------------------------- Dashboard */
-
-/* The greeting: a large line, a sentence and a small line of facts, one under
-   the other on the card, in the shell's own text colours so both themes keep
-   their contrast. It is static text - nothing here moves */
-#admin-dashboard-greeting {
-	display: grid;
-	gap: .3rem;
-}
-#admin-dashboard-greeting p {
-	margin: 0;
-	overflow-wrap: anywhere;
-}
-#admin-dashboard-greeting .nino-admin-greeting-hello {
-	color: var(--editor-text);
-	font-size: 1.5rem;
-	font-weight: 650;
-	line-height: 1.25;
-}
-#admin-dashboard-greeting .nino-admin-greeting-sentence {
-	color: var(--editor-text);
-	font-size: .95rem;
-	line-height: 1.45;
-}
-#admin-dashboard-greeting .nino-admin-greeting-facts {
-	margin-top: .15rem;
-	color: var(--editor-text-secondary);
-	font-size: .8rem;
-	line-height: 1.4;
-}
 
 #admin-dashboard-elements, #admin-dashboard-activity {
 	display: flex;

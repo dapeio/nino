@@ -321,6 +321,7 @@ function element( tag ) {
 
 	const el = {
 		tagName : String( tag ).toUpperCase(),
+		nodeType : 1,
 		className : '',
 		textContent : '',
 		type : '',

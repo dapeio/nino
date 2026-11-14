@@ -9,7 +9,7 @@ return [
 	'[[/_admin/nav/recoverypw]]'			=> 'Recovery password',
 	'[[/_admin/users/label/mail]]'					=> 'Email address',
 	'[[/_admin/users/label/name]]'	=> 'Name',
-	'[[/_admin/users/label/name-hint]]'	=> 'How the dashboard addresses you',
+	'[[/_admin/users/label/name-hint]]'	=> 'How you are addressed',
 	'[[/_admin/users/label/newpw]]'				=> 'New password (leave blank to keep it unchanged)',
 	'[[/_admin/users/label/currentpw]]'		=> 'Current password to confirm',
 	'[[/_admin/users/label/you]]'					=> 'you',
@@ -134,7 +134,7 @@ return [
 	// The manual the "?" of the panel opens (see \Nino\Admin\Admin::manual()): the line of each handle its manual() names
 	'[[/_admin/users/manual/intro]]'	=> 'Who may log in to the workbench, and what each account may do there.',
 	'[[/_admin/users/manual/account]]'	=> 'New user needs an email address, a password of at least eight characters and a role. The list shows when each account last logged in, and which are locked or deactivated.',
-	'[[/_admin/users/manual/name]]'	=> 'The name is optional and has at most 60 characters. The dashboard addresses the account by it; without one it greets by the time of day alone.',
+	'[[/_admin/users/manual/name]]'	=> 'The name is optional and has at most 60 characters. A feature that addresses the account does so by it.',
 	'[[/_admin/users/manual/role]]'	=> 'A role is a set of permissions: which panels an account sees and what it may change in them. The User roles tab creates and edits roles; Full access opens everything.',
 	'[[/_admin/users/manual/password]]'	=> 'Leave New password empty to keep the old one. In your own account, saving asks for your current password.',
 	'[[/_admin/users/manual/deactivate]]'	=> 'Deactivate account blocks the login and keeps the account – not your own. Log out everywhere ends every session of the account.',

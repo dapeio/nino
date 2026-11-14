@@ -2240,9 +2240,9 @@ done();
 // module or a project may bring; without one the option is its value
 
 function pinOptionWords() {
-	const words = { '/_admin/elements/option/greetings/phase/any' : 'Any', '/_admin/elements/option/greetings/phase/early' : 'Early (5-7)' };
+	const words = { '/_admin/elements/option/tickets/phase/any' : 'Any', '/_admin/elements/option/tickets/phase/early' : 'Early (5-7)' };
 	sandbox.Nino.content = { getText : key => words[key] ?? '' };
-	elements._currentType = 'greetings';
+	elements._currentType = 'tickets';
 	elements._currentModel = { phase : { type : 'string', options : [ 'any', 'early', 'noon' ] } };
 	const options = elements._renderField( 'phase', { type : 'string', options : [ 'any', 'early', 'noon' ] }, 'early' ).querySelector('select').querySelectorAll('option');
 

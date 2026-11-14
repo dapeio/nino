@@ -1437,13 +1437,12 @@ check( 'apiList returns the field schema in render order', array_column( $body['
 	'/nino/mode',
 	'/nino/error/log', '/nino/error/display', '/nino/session/force-secure-cookie', '/nino/http/proxies', '/nino/mail/cap',
 	'/nino/admin/backups', '/nino/admin/logs',
-	'/nino/admin/greeting/hello', '/nino/admin/greeting/sentence', '/nino/admin/greeting/facts',
 	'/nino/cache/status', '/nino/cache/ttl', '/nino/cache/blacklist',
 ] );
 check( 'every field carries the type its editor renders from', array_column( $body['fields'], 'type' ) === [
-	'select', 'bool', 'bool', 'bool', 'lines', 'int', 'bool', 'bool', 'bool', 'bool', 'bool', 'bool', 'int', 'lines',
+	'select', 'bool', 'bool', 'bool', 'lines', 'int', 'bool', 'bool', 'bool', 'int', 'lines',
 ] );
-check( 'apiList returns the group headings, the mode before the rest', array_keys( $body['groups'] ) === [ 'mode', 'diagnostics', 'editor', 'dashboard', 'cache' ] );
+check( 'apiList returns the group headings, the mode before the rest', array_keys( $body['groups'] ) === [ 'mode', 'diagnostics', 'editor', 'cache' ] );
 check( 'every field belongs to a declared group', array_diff( array_unique( array_column( $body['fields'], 'group' ) ), array_keys( $body['groups'] ) ) === [] );
 
 $byKey = array_column( $body['fields'], null, 'key' );
@@ -1608,8 +1607,6 @@ check( 'apiSave coerces a posted "true"', $appData['/nino/admin/logs'] === true 
 
 [ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/cache/ttl' => '5.5' ] ] );
 check( 'apiSave rejects a non-integer rather than casting it', $status === 400 && $appData['/nino/cache/ttl'] === 600 );
-
-pinGreetingSwitchesInConfig( $appData );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/cache/ttl' => 1 ] ] );
 check( 'apiSave rejects an int below its minimum', $status === 400 );
@@ -2514,37 +2511,3 @@ check( 'apiList requires an authed _admin session, same as every other module', 
 check( '...apiNow too', $status === 401 );
 
 ninoDone( $appData );
-
-/** The three lines of the dashboard's greeting are three switches of the Config panel, in a group of their own, on by default, each saved on its own */
-function pinGreetingSwitchesInConfig( array &$appData ): void {
-
-	[ , $body ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiList' );
-	$byKey = array_column( $body['fields'], null, 'key' );
-	$keys = [ '/nino/admin/greeting/hello', '/nino/admin/greeting/sentence', '/nino/admin/greeting/facts' ];
-
-	check( 'the panel offers the three switches of the greeting, as booleans of the group Dashboard, on without a stored value',
-		count( array_intersect( $keys, array_keys( $byKey ) ) ) === 3
-		&& count( array_filter( $keys, static fn( string $key ): bool => $byKey[$key]['type'] === 'bool' && $byKey[$key]['group'] === 'dashboard' && $byKey[$key]['value'] === true && \Nino\AppData::DEFAULTS[$key] === true ) ) === 3 );
-	check( '...the group has its heading and its line, and every switch its label and its hint, in both interface languages', ( static function() use ( $body, $keys, $byKey ): bool {
-		foreach( [ 'en_US', 'de_DE' ] as $locale ) {
-			$words = (array) require dirname( __DIR__ ). '/_admin/Nino/Modules/Config/text/'. $locale. '.php';
-			$asked = $body['groups']['dashboard'];
-			foreach( $keys as $key )
-				$asked = array_merge( $asked, [ $byKey[$key]['label'], $byKey[$key]['hint'] ] );
-			foreach( $asked as $word )
-				if( trim( (string) ( $words['[['. $word. ']]'] ?? '' ) ) === '' )
-					return false;
-		}
-		return true;
-	} )() );
-
-	[ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/admin/greeting/sentence' => false ] ] );
-	$stored = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
-	check( 'switching one off writes that one, and the other two are left as they are', $status === 200 && $stored['/nino/admin/greeting/sentence'] === false
-		&& array_key_exists( '/nino/admin/greeting/hello', $stored ) === false && array_key_exists( '/nino/admin/greeting/facts', $stored ) === false );
-
-	[ $status ] = callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/admin/greeting/facts' => 'yes' ] ] );
-	check( 'a value that is no boolean is refused', $status === 400 && ( \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/admin/greeting/facts'] ?? null ) === null );
-
-	callDev( $appData, \Nino\Modules\Config\Admin::class, 'apiSave', [ 'fields' => [ '/nino/admin/greeting/sentence' => true ] ] );
-}

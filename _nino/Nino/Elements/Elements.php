@@ -767,7 +767,8 @@ namespace Nino {
 		 *	  when somebody deletes one of its elements for good; deleting a whole
 		 *	  type in the Elements panel leaves '<type>' => [] there, which this
 		 *	  method does not read - a deleted type is put in place again by the
-		 *	  next seed - and which the dashboard reads for its greetings): created, in
+		 *	  next seed, and a caller that wants it left alone reads that list
+		 *	  itself): created, in
 		 *	  '*' and in every language of $locales the unit has a version for
 		 *	- an element that is there without the version of a language of
 		 *	  $locales the unit has: that version is added

@@ -189,8 +189,8 @@ namespace Nino\Modules\Logs {
 		}
 
 		/**
-		 *	How many lines were recorded after a point in time - what the
-		 *	dashboard says has happened since the account's last visit. A line
+		 *	How many lines were recorded after a point in time - what has
+		 *	happened since the account's last visit, for a feature that says so. A line
 		 *	carries its minute and nothing finer, so the minute of $since is
 		 *	over: a line of that minute is not counted, the login that opened
 		 *	the visit before among them. The sign-in the account made at $visit

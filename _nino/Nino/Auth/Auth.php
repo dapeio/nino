@@ -260,8 +260,9 @@ namespace Nino {
 			}
 
 			// The login before this one, kept for the session that opens now: the
-			// record is about to carry this login's time, and what the
-			// workbench's dashboard says of the last visit is the one before it
+			// record is about to carry this login's time, and whoever wants to say
+			// when the account was last here, a feature on the Dashboard, reads the
+			// one before it
 			// (0 for an account that never signed in, see lastLogin())
 			\Nino\Runtime::setSessionValue( $appData, './nino/auth/previous', self::lastLogin( $user ) );
 

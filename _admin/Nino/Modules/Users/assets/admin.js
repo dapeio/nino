@@ -386,7 +386,7 @@
 				copy.appendChild( role );
 				link.appendChild( copy );
 
-				// The name the dashboard greets the account by, a column of its own
+				// The name a feature addresses the account by, a column of its own
 				if( typeof user.name === 'string' && user.name !== '' ) {
 					const name = dc.createElement('span');
 					name.className = 'admin-users-name';
