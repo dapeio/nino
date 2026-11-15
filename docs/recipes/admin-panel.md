@@ -211,11 +211,18 @@ treats `data` as sensitive. The activity log is not a
 listener on it but a direct call, deliberately - an audit line that can be lost
 by not registering a callback is not an audit line.
 
-Actions are the panel's slug plus a verb, and every action method guards
-itself with `\Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM )`
-even though `handlePost()` dispatches through the registry: the method-level
-guard protects direct calls in tests and future dispatch changes, and it is
-what answers `401` without an account and `403` without the permission.
+Actions are the panel's slug plus a verb. `handlePost()` dispatches through
+the registry and checks two things before it calls an action: the session
+token (`403`, code `csrf`) and that an account is signed in (`401`, code
+`session`, the answer `guard()` gives). A page of the site hands a token to
+every visitor, so the token proves nothing about who sends the request, and no
+action is reachable without an account; the kernel keeps no list of open
+actions and a feature cannot add one. The kernel does not check the
+permission: every action method guards itself with
+`\Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM )` as
+its first line, and that is what answers `403` without the permission. An
+action that leaves the line out is open to every signed-in account, an
+editor's included.
 Core actions are merged first; a module action reusing a core action's name is
 ignored.
 

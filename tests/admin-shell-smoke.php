@@ -60,6 +60,22 @@ echo "Sandbox: $sandbox\n\n";
 
 echo "\nAdmin::panels - a module's panel joins the shell without a shell change\n";
 
+/** A panel whose action forgets guardPerm(): what runs is counted, so a refused request is told from one that was let through */
+class AdminSmokeProbePanel {
+	public static int $ran = 0;
+	public static function actions(): array { return [ 'probe/run' => [ self::class, 'apiRun' ] ]; }
+	public static function nav(): array { return [ 'probe', 'Probe', 56 ]; }
+	public static function apiRun( array &$appData, array &$request ): void {
+		self::$ran++;
+		\Nino\Http::ok( $request, [ 'ran' => self::$ran ] );
+	}
+}
+
+/** The module contributing it */
+class AdminSmokeProbeModule {
+	public static function adminPanels( array &$appData ): array { return [ 'AdminSmokeProbePanel' ]; }
+}
+
 /** A minimal /_admin panel: actions() and nav() required, the rest optional (see \Nino\Panels) */
 class AdminSmokeDummyPanel {
 	public static function actions(): array { return [ 'dummy/list' => [ self::class, 'apiList' ] ]; }
@@ -920,6 +936,44 @@ check( 'the nav and the panes reach the template as fills', str_contains( \Nino\
 
 [ $status, $body ] = ninoCall( $withModule, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'dummy/list' );
 check( 'handlePost dispatches the module\'s action', $status === 200 && ( $body['dummies'] ?? null ) === 3 );
+
+/*	What the kernel itself requires before it hands an action on: an account. A
+	page of the site gives its visitor a session token, so the token alone proves
+	nothing; an action that forgets guardPerm() is then open to every signed-in
+	account and to nobody else. The permission stays the action's to check	*/
+$probeApp = $appData;
+$probeApp['/nino/modules'] = [ 'AdminSmokeProbeModule' ];
+ninoUser( $probeApp, 'probe-editor@example.com', [] );
+
+[ $status, $body ] = ninoCall( $probeApp, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'probe/run' );
+check( 'an action that checks nothing runs for a signed-in account without any permission - the permission is the action\'s to check', $status === 200 && AdminSmokeProbePanel::$ran === 1 );
+
+\Nino\Auth::logoutUser( $probeApp );
+[ $status, $body ] = ninoCall( $probeApp, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'probe/run' );
+check( 'the same action is not called without a session: the answer guard() gives, and nothing ran', $status === 401 && ( $body['code'] ?? '' ) === 'session' && AdminSmokeProbePanel::$ran === 1 );
+
+$guarded = $probeApp;
+[ $guardStatus, $guardBody ] = ninoCall( $guarded, [ \Nino\Modules\Config\Admin::class, 'apiList' ] );
+check( '...which is the answer a guarded action gives without a session', $guardStatus === $status && ( $guardBody['code'] ?? '' ) === ( $body['code'] ?? 'x' ) && $guardBody === $body );
+
+// Every action there is, in the kernel's registry and the probe's: none answers a request without a session but with 401
+$anonymous = [];
+foreach( array_keys( \Nino\Admin\Admin::actions( $probeApp ) ) as $actionName ) {
+	[ $actionStatus, $actionBody ] = ninoCall( $probeApp, [ \Nino\Admin\Admin::class, 'handlePost' ], [], $actionName );
+	if( $actionStatus !== 401 || ( $actionBody['code'] ?? '' ) !== 'session' )
+		$anonymous[] = $actionName;
+}
+check( 'no action of the registry answers a request without a session but with 401', count( \Nino\Admin\Admin::actions( $probeApp ) ) > 50 && $anonymous === [] && AdminSmokeProbePanel::$ran === 1 );
+
+// An action that is no action is the unknown one for everybody - the registry is asked first
+[ $status ] = ninoCall( $probeApp, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'no/such-action' );
+check( '...and a name no panel registered stays the 404 it is', $status === 404 );
+
+// The refusal is announced like any answer of an action
+$announced = new ArrayObject();
+\Nino\Callbacks::registerCallback( $probeApp, '/nino/admin/action', static function( array &$appData, array &$event ) use ( $announced ): void { $announced[] = $event['status']. ':'. $event['action']; } );
+ninoCall( $probeApp, [ \Nino\Admin\Admin::class, 'handlePost' ], [], 'probe/run' );
+check( '...and it is announced with its status, like every answer of an action', $announced->getArrayCopy() === [ '401:probe/run' ] );
 
 /*	The registry keeps a panel whatever actions it names - only a taken uri
 	drops one - so a name two panels claim is settled by the action map. The

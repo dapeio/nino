@@ -561,9 +561,20 @@ namespace Nino\Admin {
 				return;
 			}
 
+			[ $class, $method ] = $actions[$action];
+
+			// A page of the site hands its token to every visitor, so the token
+			// says nothing about who sends the request: an account is required
+			// before any action is called. What that account may do is the
+			// action's to say (guardPerm()). The refusal is announced like any
+			// other answer of an action, for a listener that counts them
+			if( self::_requireSession( $appData, $request ) === false ) {
+				self::_announce( $appData, $class, $action, $request );
+				return;
+			}
+
 			// call_user_func() can't pass $appData/$request by reference, so dispatch via a
 			// dynamic static call instead - same pattern as Callbacks::doCallbacks()
-			[ $class, $method ] = $actions[$action];
 			$class::{$method}( $appData, $request );
 
 			// Deliberately not a listener on the event below: an audit line that
@@ -721,6 +732,33 @@ namespace Nino\Admin {
 		}
 
 		/**
+		 *	Require a signed-in account: the answer guard() gives, 401 with the
+		 *	code 'session', and the one handlePost() gives before it hands an
+		 *	action on. A locked or deactivated account, a session that has
+		 *	ended or been revoked has no current user, so it is refused here
+		 *	the way no session is
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	bool										If an account is signed in
+		 */
+		private static function _requireSession( array &$appData, array &$request ): bool {
+
+			self::_logLoginOnce( $appData );
+
+			// The code is what tells a session that ended from a refusal of
+			// somebody who is still signed in (see Nino.adminUi.api) - 401 alone
+			// does not, the Users panel answers one for a wrong password
+			if( \Nino\Auth::getCurrentUser( $appData ) === false ) {
+				\Nino\Http::fail( $request, 401, 'not logged in', 'session' );
+				return false;
+			}
+
+			return true;
+		}
+
+		/**
 		 *	Require an authenticated admin user and a request not already
 		 *	rejected by an earlier global callback (eg. Csrf). Shared by every
 		 *	domain class (Elements, Text, ...) that fills a POST /_admin response.
@@ -735,15 +773,8 @@ namespace Nino\Admin {
 			if( $request['/nino/http/response']['statusCode'] !== 200 )
 				return false;
 
-			self::_logLoginOnce( $appData );
-
-			// The code is what tells a session that ended from a refusal of
-			// somebody who is still signed in (see Nino.adminUi.api) - 401 alone
-			// does not, the Users panel answers one for a wrong password
-			if( \Nino\Auth::getCurrentUser( $appData ) === false ) {
-				\Nino\Http::fail( $request, 401, 'not logged in', 'session' );
+			if( self::_requireSession( $appData, $request ) === false )
 				return false;
-			}
 
 			// Same as the activity log: the daily backup belongs to the
 			// Backups module, and a workbench delivered without it simply

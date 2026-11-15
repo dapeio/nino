@@ -47,6 +47,8 @@ A permission is one string per panel or tab; `/*` matches every path below it, s
 
 A feature's panel brings its permission along - the catalogue's Newsletter feature `/_admin/newsletter/manage`, its Forms feature `/_admin/forms/manage`, and so on - and the roles tab of the Users panel offers it while the feature is active.
 
+Every action of a panel travels through `POST /_admin` with the name of the action in the field `action`, and two checks stand before it. The kernel checks the session token and that an account is signed in: a request with no valid token is refused with `403`, and a request with a token and without an account - no session, an ended or revoked one, a locked or deactivated account - is answered `401` with the code `session`, before the action is called. Every page of the site hands a token to whoever opens it, so the token says nothing about who sends the request, and no action of the workbench is open to a visitor. What the account may do is not the kernel's to say: the action checks the permission itself, with `\Nino\Admin\Admin::guardPerm()` as its first line, and answers `403` where the account lacks it. An action without that line is open to every signed-in account, an editor's included.
+
 ### Finer permissions inside a panel
 
 The permissions above are doors: they say which panels an account may open. Inside Elements and Text, a role can also be described action by action and field by field – for editors who may change texts but not add entries, or who own one type and see the rest.
