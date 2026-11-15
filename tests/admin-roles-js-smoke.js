@@ -393,6 +393,35 @@ console.log('\nAdmin Roles - the drill-down');
 	check( '...and a Yes sends it', sent.length === sentBefore + 1 && sent[sent.length - 1].action === 'roles/delete' );
 	sent[sent.length - 1].callback( { status : 200, responseJSON : {} } );
 	check( 'a deleted role leaves the focus nothing to stand on in the form: it goes to the name of the panel', list.classList.contains('admin-hidden') === false && focusedNow() === paneTitle );
+
+	// A role that holds what the signed-in account does not is shown, not
+	// edited: no field, no button, what it may do in words, and why
+	drilled._roles.push( { id : 'wide', label : 'Wide', users : 2, perms : [ '/*' ], canChange : false } );
+	drilled._renderList();
+	drilled._showList();
+	fire( linkOf('wide'), 'click' );
+	check( 'a role the account may not change has no field and no button in its form', findAll( form, function( el ) { return el.tagName === 'INPUT' || el.tagName === 'BUTTON' || el.tagName === 'SELECT' } ).length === 0
+		&& findAll( form, function( el ) { return el.id === 'roles-form-name' } ).length === 0 );
+	check( '...it says what the role may do and why it is not editable', findAll( form, function( el ) { return el.tagName === 'LI' } ).map( function( el ) { return el.textContent } ).join('|') === text('/_admin/roles/summary/full')
+		&& findAll( form, function( el ) { return el.textContent === text('/_admin/roles/label/beyond') } ).length === 1 );
+	drilled._showList();
+	fire( linkOf('editor'), 'click' );
+	drilled._roles.push( { id : 'carried', label : 'Carried', users : 1, perms : [ '/_admin/text/manage' ], canChange : false, heldBeyond : true } );
+	drilled._renderList();
+	drilled._showList();
+	fire( linkOf('carried'), 'click' );
+	check( 'a role that is beyond only through an account that holds it says so, and not that the role holds the permission', findAll( form, function( el ) { return el.textContent === text('/_admin/roles/label/held-beyond') } ).length === 1
+		&& findAll( form, function( el ) { return el.textContent === text('/_admin/roles/label/beyond') } ).length === 0 );
+	drilled._showList();
+	fire( linkOf('wide'), 'click' );
+	check( '...and the one that holds it itself says that', findAll( form, function( el ) { return el.textContent === text('/_admin/roles/label/beyond') } ).length === 1 );
+	check( '...and what it says is said in both languages', [ 'en_US', 'de_DE' ].every( function( locale ) {
+		const words = fills('_admin/Nino/Modules/Users/text/'+ locale+ '.php');
+		return [ '/_admin/roles/label/beyond', '/_admin/roles/label/held-beyond', '/_admin/error/roles_role_beyond', '/_admin/error/roles_role_beyond_scoped', '/_admin/error/roles_role_held_beyond', '/_admin/error/roles_role_held_beyond_scoped' ].every( function( key ) { return typeof words[key] === 'string' && words[key] !== '' } );
+	} ) );
+	drilled._showList();
+	fire( linkOf('editor'), 'click' );
+	check( '...and a role that may be changed keeps its form', findAll( form, function( el ) { return el.id === 'roles-form-name' } ).length === 1 && findAll( form, function( el ) { return el.tagName === 'BUTTON' } ).length > 0 );
 }
 
 done();

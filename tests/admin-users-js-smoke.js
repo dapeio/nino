@@ -292,6 +292,42 @@ pinUsersNameColumn();
 pinUsersNameCreate();
 pinUsersNameEdit();
 
+// --- an account that holds what the signed-in one does not -------------------
+
+{
+	const BEYOND = { mail : 'w@example.com', isSelf : false, role : 'dev', name : 'Wide', perms : [], status : 'active', locked : '', lastLogin : '', canChange : false };
+	panel._users = [ ...panel._users, BEYOND ];
+
+	panel._openUser( 'w@example.com' );
+	const shown = byId('users-edit-form');
+	check( 'an account the signed-in one may not change has no field, no select and no button in its form', shown !== null
+		&& findAll( shown, function( el ) { return el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'BUTTON' } ).length === 0
+		&& byId('users-form-mail') === null && byId('users-form-pw') === null && byId('users-form-role-select') === null && byId('users-form-status-toggle') === null );
+	const lines = findAll( shown, function( el ) { return el.tagName === 'P' } ).map( function( el ) { return el.textContent } );
+	check( '...it says its name, its role and why nothing can be pressed', lines.includes( text('/_admin/users/label/name')+ ': Wide' ) && lines.includes( text('/_admin/users/label/role')+ ': Developer' )
+		&& lines.includes( text('/_admin/users/label/beyond') ) && lines.some( function( line ) { return line.indexOf( text('/_admin/users/label/role-self') ) !== -1 } ) === false );
+
+	// A role the signed-in account may not hand out is no option, the role an account holds stays one
+	panel._roles = [ { id : 'dev', label : 'Developer', canGrant : false }, { id : 'editor', label : 'Editor', canGrant : true }, { id : 'other', label : 'Other' } ];
+	const optionsOf = function( id ) { return findAll( byId( id ), function( el ) { return el.tagName === 'OPTION' } ).map( function( el ) { return el.value } ) };
+	panel._openUser( 'b@example.com' );
+	check( 'the role select offers the roles that may be handed out and the one held', optionsOf('users-form-role-select').join() === 'editor,other' );
+	panel._users = panel._users.map( function( u ) { return u.mail === 'b@example.com' ? Object.assign( {}, u, { role : 'dev' } ) : u } );
+	panel._openUser( 'b@example.com' );
+	check( '...a held role that may not be handed out stays an option', optionsOf('users-form-role-select').join() === 'dev,editor,other' );
+	panel._renderCreateForm();
+	check( '...and the new account starts with the first role that may be handed out', optionsOf('users-create-role').join() === 'editor,other' && byId('users-create-role').value === 'editor' );
+	panel._roles = ROLES;
+	panel._users = panel._users.map( function( u ) { return u.mail === 'b@example.com' ? Object.assign( {}, u, { role : 'editor' } ) : u } );
+
+	panel._openUser( 'b@example.com' );
+	check( 'an account that may be changed has its form as before', byId('users-form-mail') !== null && byId('users-form-pw') !== null && byId('users-form-status-toggle') !== null );
+
+	check( 'the words of the refusal and of the form are both languages\'', [ 'users_account_beyond', 'users_account_beyond_scoped' ].every( function( code ) {
+		return [ 'en_US', 'de_DE' ].every( function( locale ) { return fills('_admin/Nino/Modules/Users/text/'+ locale+ '.php')['/_admin/error/'+ code] !== undefined } );
+	} ) && [ 'en_US', 'de_DE' ].every( function( locale ) { return fills('_admin/Nino/Modules/Users/text/'+ locale+ '.php')['/_admin/users/label/beyond'] !== undefined } ) );
+}
+
 done();
 
 

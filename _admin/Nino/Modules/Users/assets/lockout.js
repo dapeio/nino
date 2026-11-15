@@ -213,14 +213,25 @@
 					until.textContent = Nino.adminUi.format( Nino.content.getText('/_admin/lockout/locked/until'), account.until );
 					copy.appendChild( mail );
 					copy.appendChild( until );
+
+					if( account.canChange === false ) {
+						const why = dc.createElement('small');
+						why.textContent = Nino.content.getText('/_admin/lockout/label/beyond');
+						copy.appendChild( why );
+					}
+
 					li.appendChild( copy );
 
-					const button = dc.createElement('button');
-					button.type = 'button';
-					button.className = 'nino-admin-btn-secondary';
-					button.textContent = Nino.content.getText('/_admin/lockout/label/unlock');
-					button.addEventListener( 'click', function() { Nino.admin.lockout._unlock( account.mail, button, status ) } );
-					li.appendChild( button );
+					// An account that holds what the signed-in one does not is not theirs
+					// to open (see Users\Admin::beyond()): listed, with no button
+					if( account.canChange !== false ) {
+						const button = dc.createElement('button');
+						button.type = 'button';
+						button.className = 'nino-admin-btn-secondary';
+						button.textContent = Nino.content.getText('/_admin/lockout/label/unlock');
+						button.addEventListener( 'click', function() { Nino.admin.lockout._unlock( account.mail, button, status ) } );
+						li.appendChild( button );
+					}
 
 					ul.appendChild( li );
 				} );

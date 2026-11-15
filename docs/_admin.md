@@ -19,6 +19,8 @@ There are no separate passwords for developer and editor work any more. An accou
 
 A permission is one string per panel or tab; `/*` matches every path below it, so `/_admin/*` would also open every panel, and `/*` opens every panel of every future module as well.
 
+An account that may manage users still stays within what it holds itself: it hands out no role and sets no password, and it renames, deactivates, deletes, logs out, unlocks or gives another role to no account - and it renames, empties or deletes no role - that holds a permission its own account does not. The Developer holds everything and so changes everything; the form of an account or a role beyond the signed-in one shows what it holds and offers nothing to press.
+
 | Panel | Permission |
 |---|---|
 | Dashboard | none – every account |

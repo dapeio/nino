@@ -1334,7 +1334,8 @@ check( 'renaming to a mail already in use is rejected', $status === 400 );
 
 // Whoever sets a password signs in with it - so a manager may set one only
 // on an account no wider than their own, the same bound as handing out a
-// role (see Roles::notHeld()). A rename grants nothing and stays open
+// role (see Roles::notHeld()). Every other change of such an account is
+// refused the same way (see Users\Admin::beyond())
 \Nino\Auth::insertUser( $appData, 'wide@example.com', 'wide password', [ '/*' ] );
 \Nino\Auth::insertUser( $appData, 'narrow@example.com', 'narrow password', [ \Nino\Modules\Text\Admin::MANAGE_PERM ] );
 ninoUser( $appData, 'usersonly@example.com', [ \Nino\Modules\Users\Admin::MANAGE_PERM, \Nino\Modules\Text\Admin::MANAGE_PERM ], 'users only password' );
@@ -1343,13 +1344,13 @@ ninoUser( $appData, 'usersonly@example.com', [ \Nino\Modules\Users\Admin::MANAGE
 check( 'a manager cannot set the password of an account holding a permission their own does not', $status === 403 );
 check( '...and that account\'s stored password is untouched', password_verify( 'wide password', \Nino\Auth::getUser( $appData, 'wide@example.com' )['pw'] ) === true );
 
-[ $status, $body ] = callUsers( $appData, 'apiSave', [ 'username' => 'wide@example.com', 'mail' => 'wide2@example.com' ] );
-check( 'renaming that account stays open - a new address grants nothing', $status === 200 && $body['mail'] === 'wide2@example.com' );
+[ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'wide@example.com', 'mail' => 'wide2@example.com' ] );
+check( 'nor rename it', $status === 403 && \Nino\Auth::getUser( $appData, 'wide@example.com' ) !== false && \Nino\Auth::getUser( $appData, 'wide2@example.com' ) === false );
 
 [ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'narrow@example.com', 'mail' => 'narrow@example.com', 'pw' => 'a password of my choosing' ] );
 check( 'a manager can set the password of an account no wider than their own', $status === 200 && password_verify( 'a password of my choosing', \Nino\Auth::getUser( $appData, 'narrow@example.com' )['pw'] ) === true );
 
-\Nino\Auth::deleteUser( $appData, 'wide2@example.com' );
+\Nino\Auth::deleteUser( $appData, 'wide@example.com' );
 \Nino\Auth::deleteUser( $appData, 'narrow@example.com' );
 \Nino\Auth::deleteUser( $appData, 'usersonly@example.com' );
 
@@ -1457,19 +1458,19 @@ check( 'a refused address writes no role either: the checks come before the writ
 [ $status, $body ] = callUsers( $appData, 'apiSave', [ 'username' => 'onesave3@example.com', 'mail' => 'onesave3@example.com', 'role' => '' ] );
 check( 'a role can be taken away in the same call', $status === 200 && $body['role'] === '' && \Nino\Auth::getUser( $appData, 'onesave3@example.com' )['role'] === '' );
 
-// A manager who is no developer: the address of a wider account stays theirs
-// to change with the role as it is, the role itself does not
+// A manager who is no developer: neither the address of a wider account nor
+// its role is theirs to change
 \Nino\Auth::insertUser( $appData, 'devacct@example.com', 'dev account password', [], 'developer' );
 ninoUser( $appData, 'usersonly@example.com', [ \Nino\Modules\Users\Admin::MANAGE_PERM, \Nino\Modules\Text\Admin::MANAGE_PERM ], 'users only password' );
-[ $status, $body ] = callUsers( $appData, 'apiSave', [ 'username' => 'devacct@example.com', 'mail' => 'devacct2@example.com', 'role' => 'developer' ] );
-check( 'a manager without full access renames a Developer account with the role as it is', $status === 200 && $body === [ 'mail' => 'devacct2@example.com', 'role' => 'developer' ] );
+[ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'devacct@example.com', 'mail' => 'devacct2@example.com', 'role' => 'developer' ] );
+check( 'a manager without full access does not rename a Developer account, with the role as it is or not', $status === 403 && \Nino\Auth::getUser( $appData, 'devacct@example.com' ) !== false && \Nino\Auth::getUser( $appData, 'devacct2@example.com' ) === false );
 [ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'onesave3@example.com', 'mail' => 'onesave5@example.com', 'role' => 'developer' ] );
 check( '...but may not hand out a role wider than their own - and nothing of that save is written', $status === 403
 	&& \Nino\Auth::getUser( $appData, 'onesave3@example.com' ) !== false && \Nino\Auth::getUser( $appData, 'onesave5@example.com' ) === false && \Nino\Auth::getUser( $appData, 'onesave3@example.com' )['role'] === '' );
 [ $status ] = callUsers( $appData, 'apiSave', [ 'username' => 'usersonly@example.com', 'mail' => 'usersonly@example.com', 'currentPassword' => 'users only password', 'role' => 'developer' ] );
 check( 'nor their own role', $status === 400 );
 
-\Nino\Auth::deleteUser( $appData, 'devacct2@example.com' );
+\Nino\Auth::deleteUser( $appData, 'devacct@example.com' );
 \Nino\Auth::deleteUser( $appData, 'usersonly@example.com' );
 \Nino\Auth::deleteUser( $appData, 'onesave3@example.com' );
 \Nino\Auth::deleteUser( $appData, 'toggle@example.com' );

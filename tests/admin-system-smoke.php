@@ -2321,6 +2321,7 @@ check( 'the signed-in account now holds full access through its role only', \Nin
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'developer', 'label' => 'Developer', 'perms' => [ '/_admin/elements/manage' ] ] );
 check( 'a change that would take the manage permission from your own account is refused', $status === 409 && $appData['/nino/auth/roles']['developer']['perms'] === [ '/*' ] );
 
+callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'reviewer', 'label' => 'Reviewer', 'perms' => [ '/_admin/text/manage' ] ] );
 ninoUser( $appData, 'mgr@example.com', [ '/_admin/users/manage', '/_admin/text/manage' ], 'a-long-enough-password' );
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'developer', 'label' => 'Developer', 'perms' => [ '/_admin/elements/manage', '/_admin/users/manage' ] ] );
 check( 'a change that would leave no account with full access is refused', $status === 409 && $appData['/nino/auth/roles']['developer']['perms'] === [ '/*' ] );
@@ -2329,7 +2330,7 @@ check( 'nor may the last full access be handed away through a role change', $sta
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiDelete', [ 'username' => 'dev@example.com' ] );
 check( 'nor deleted - the role counts, not just the account\'s own permissions', $status === 409 );
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'reviewer', 'label' => 'Reviewer', 'perms' => [ '/_admin/text/manage' ] ] );
-check( 'a manager without full access still edits any other role', $status === 200 );
+check( 'a manager without full access still edits a role it holds in full', $status === 200 );
 
 // Granting is bounded by holding (see Roles::notHeld()). The detour a manager
 // could take to full access - write a full-access role, create an account
@@ -2348,8 +2349,7 @@ check( '...while one holding only what the manager holds is created', $status ==
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Admin::class, 'apiSetRole', [ 'username' => 'detour@example.com', 'role' => 'developer' ] );
 check( 'nor move an account onto such a role', $status === 403 && \Nino\Auth::getUser( $appData, 'detour@example.com' )['role'] === 'reviewer' );
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'developer', 'label' => 'Developers', 'perms' => [ '/*' ] ] );
-check( 'a role it may not widen it may still rename - only what a role gains is measured', $status === 200 && $appData['/nino/auth/roles']['developer']['label'] === 'Developers' && $appData['/nino/auth/roles']['developer']['perms'] === [ '/*' ] );
-callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'developer', 'label' => 'Developer', 'perms' => [ '/*' ] ] );
+check( 'a role it may not widen it may not rename either - it holds what the manager does not', $status === 403 && $appData['/nino/auth/roles']['developer']['label'] === 'Developer' && $appData['/nino/auth/roles']['developer']['perms'] === [ '/*' ] );
 \Nino\Auth::deleteUser( $appData, 'detour@example.com' );
 
 // Holding fewer permissions is not always holding less: a panel permission
@@ -2392,7 +2392,7 @@ check( 'a role described in detail within what the lead holds is written', $stat
 callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiDelete', [ 'id' => 'door' ] );
 
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'wide', 'label' => 'Wide, relabelled', 'perms' => [ $elementsDoor ] ] );
-check( 'a role that already was wide is relabelled by the lead - nothing widens', $status === 200 && $storedRoles()['wide']['label'] === 'Wide, relabelled' );
+check( 'a role that is wide for a panel the lead holds in detail only is not the lead\'s to relabel', $status === 403 && $storedRoles()['wide']['label'] === 'Wide' );
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'described', 'label' => 'Described', 'perms' => [ $elementsDoor ] ] );
 check( 'a described role is not widened by the lead, whoever holds it', $status === 403 && $storedRoles()['described']['perms'] === [ $elementsDoor, $elementsOne ] );
 
@@ -2430,7 +2430,7 @@ callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'lead'
 [ $status, $body ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'sock', 'label' => 'Sock', 'perms' => [ $elementsDoor ] ] );
 check( 'a manager without the panel turns a described role into the whole panel - refused', $status === 403 && ( $body['code'] ?? '' ) === 'roles_grant_too_wide_scoped' && $storedRoles()['sock']['perms'] === [ $elementsDoor, $elementsOne ] );
 [ $status ] = callDev( $appData, \Nino\Modules\Users\Roles::class, 'apiSave', [ 'id' => 'sock', 'label' => 'Sock, relabelled', 'perms' => [ $elementsDoor, $elementsOne ] ] );
-check( '...while relabelling it is open', $status === 200 );
+check( '...nor is relabelling it, with a panel that is not the lead\'s', $status === 403 && $storedRoles()['sock']['label'] === 'Sock' );
 
 // A blanket lifts the limit: the account holds the whole panel
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );

@@ -13,7 +13,9 @@
  *													list says which accounts are deactivated or locked and
  *													when each logged in last. What a role grants is the
  *													roles tab beside this one (roles.js), lifting a lock
- *													the login protection tab (lockout.js).
+ *													the login protection tab (lockout.js). An account that
+ *													holds a permission the signed-in one does not is shown
+ *													without a field or a button: it is not theirs to change.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -256,7 +258,7 @@
 		},
 
 		/**
-		 *	A select over every role there is, plus "no role" whenever the
+		 *	A select over every role there is that the signed-in account may hand out, plus "no role" whenever the
 		 *	current value is not among them (an account without one, or a
 		 *	project without any yet) - so what is stored is always an option
 		 *
@@ -271,7 +273,11 @@
 			select.id = id;
 			select.name = 'role';
 
-			if( Nino.admin.users._roles.some( function( r ) { return r.id === current } ) === false ) {
+			// Only a role the signed-in account may hand out (see Roles::notHeld()),
+			// and the one the account holds, which has to stay an option
+			const offered = Nino.admin.users._roles.filter( function( r ) { return r.canGrant !== false || r.id === current } );
+
+			if( offered.some( function( r ) { return r.id === current } ) === false ) {
 				const none = dc.createElement('option');
 				none.value = '';
 				none.textContent = Nino.content.getText('/_admin/users/label/norole');
@@ -279,7 +285,7 @@
 				current = '';
 			}
 
-			Nino.admin.users._roles.forEach( function( role ) {
+			offered.forEach( function( role ) {
 				const option = dc.createElement('option');
 				option.value = role.id;
 				option.textContent = role.label;
@@ -470,7 +476,8 @@
 			const roleSpan = dc.createElement('span');
 			roleSpan.textContent = Nino.content.getText('/_admin/users/label/role');
 			roleLabel.appendChild( roleSpan );
-			const roleSelect = Nino.admin.users._roleSelect( 'users-create-role', Nino.admin.users._roles.length > 0 ? Nino.admin.users._roles[0].id : '' );
+			const firstGrantable = Nino.admin.users._roles.find( function( r ) { return r.canGrant !== false } );
+			const roleSelect = Nino.admin.users._roleSelect( 'users-create-role', firstGrantable ? firstGrantable.id : '' );
 			roleLabel.appendChild( roleSelect );
 			fieldset.appendChild( roleLabel );
 			form.appendChild( fieldset );
@@ -595,6 +602,11 @@
 			state.textContent = Nino.admin.users._stateParts( user ).join(' · ');
 			form.appendChild( state );
 
+			// An account that holds what the signed-in one does not is not theirs
+			// to change (see Users\Admin::beyond()): shown, with nothing to press
+			if( user.canChange === false )
+				return Nino.admin.users._renderBeyond( form, usersWrap, user );
+
 			const mailLabel = dc.createElement('label');
 			mailLabel.className = 'nino-admin-field';
 			const mailSpan = dc.createElement('span');
@@ -688,6 +700,47 @@
 			Nino.admin.users._status = Nino.adminUi.status( msg );
 			Nino.admin.users._status.bind( form );
 
+			usersWrap.appendChild( form );
+
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.snapshot( 'users' );
+		},
+
+		/**
+		 *	The form of an account the signed-in one may not change: what the
+		 *	account holds as text, the reason, and the status line - no field, no
+		 *	button. Drawn into the form _renderForm() began
+		 *
+		 *	@param		{Element}	form				The edit form, with the state line in it
+		 *	@param		{Element}	usersWrap	The fieldset the form goes into
+		 *	@param		{Object}		user				The account
+		 *
+		 *	@return		void
+		 */
+		_renderBeyond : function( form, usersWrap, user ) {
+
+			const line = function( text ) {
+				const p = dc.createElement('p');
+				p.className = 'nino-admin-hint';
+				p.textContent = text;
+				form.appendChild( p );
+			};
+
+			if( typeof user.name === 'string' && user.name !== '' )
+				line( Nino.content.getText('/_admin/users/label/name')+ ': '+ user.name );
+
+			form.appendChild( Nino.admin.users._roleField() );
+			line( Nino.content.getText('/_admin/users/label/beyond') );
+
+			const msg = dc.createElement('p');
+			msg.id = 'users-form-msg';
+			msg.className = 'nino-admin-actionbar-status';
+			const actions = dc.createElement('div');
+			actions.className = 'nino-admin-actionbar';
+			actions.appendChild( msg );
+			form.appendChild( actions );
+
+			Nino.admin.users._status = Nino.adminUi.status( msg );
 			usersWrap.appendChild( form );
 
 			if( typeof Nino.admin.dirty === 'object' )
@@ -825,10 +878,10 @@
 
 			const user = Nino.admin.users._currentUser;
 
-			if( Nino.admin.users._canManage !== true || user.isSelf === true ) {
+			if( Nino.admin.users._canManage !== true || user.isSelf === true || user.canChange === false ) {
 				const current = dc.createElement('p');
 				current.className = 'nino-admin-hint';
-				current.textContent = Nino.content.getText('/_admin/users/label/role')+ ': '+ Nino.admin.users._roleLabel( user )+ ( Nino.admin.users._canManage === true ? ' – '+ Nino.content.getText('/_admin/users/label/role-self') : '' );
+				current.textContent = Nino.content.getText('/_admin/users/label/role')+ ': '+ Nino.admin.users._roleLabel( user )+ ( Nino.admin.users._canManage === true && user.isSelf === true ? ' – '+ Nino.content.getText('/_admin/users/label/role-self') : '' );
 				return current;
 			}
 
@@ -863,8 +916,7 @@
 			const payload = { username : user.mail, mail : mail, pw : pw };
 
 			// Only a change is sent: a role posted unchanged would ask the
-			// server for the checks of a role change, which a manager editing
-			// just the address of a wider account must not meet
+			// server for the checks of a role change it is not making
 			const role = dc.getElementById('users-form-role-select');
 			if( Nino.admin.users._roleChanged() === true )
 				payload.role = role.value;

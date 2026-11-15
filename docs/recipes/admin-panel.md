@@ -283,6 +283,16 @@ as nothing widens. The panels are asked of every `scopes()`, including one that
 offers no area at the moment (`scopeOptions( $appData, true )`). The refusal is a `403` with the codes `roles_grant_too_wide_scoped`,
 `users_role_too_wide_scoped` and `users_password_too_wide_scoped`, which name the panel's scope.
 
+Changing is bounded by the same holding. `\Nino\Modules\Users\Admin::beyond()` asks
+`Roles::notHeld()` of what an account other than the signed-in one holds, role and own permissions together,
+and `Roles::beyond()` of what a role holds: an account or a role that holds what the
+signed-in account does not is not its to rename, deactivate, delete, log out, give another role, lift the lock
+of, empty or change. It is the last check an action makes before it writes, so every other answer an action gave
+stays, and the refusal is a `403` with the codes `users_account_beyond`, `users_account_beyond_scoped`,
+`roles_role_beyond` and `roles_role_beyond_scoped` (`Roles::refuseBeyond()`); a role that an account beyond the signed-in one holds is refused the same way, with `roles_role_held_beyond` and `roles_role_held_beyond_scoped` (`Roles::refuseChange()`). A panel that adds an
+action changing an account or a role asks the same function. `users/list`, `roles/list` and the locked accounts of `lockout/list`
+carry `canChange` per row, which the forms read to leave out the fields and buttons the request would be refused for.
+
 The roles tab does not ask anybody to type a scoped permission: a panel that has
 them lists them in an optional `scopes( &$appData )`, and the tab offers them as
 three lists that depend on each other - area, action, field - from what

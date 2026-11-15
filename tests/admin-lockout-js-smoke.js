@@ -150,6 +150,15 @@ check( '...and redraws only the locked accounts', rows().length === 1 && lockedT
 	&& mount.querySelector('[data-key="/nino/auth/maxtries"]') === maxtries && maxtries.value === '9' );
 check( 'the numbers\' inputs are the same two as before', numberInputs().length >= 2 );
 
+// A lock on an account the signed-in one may not change is listed and cannot be lifted
+tab.showCurrent();
+answer( 200, { fields : FIELDS, locked : [ { mail : 'w@example.com', until : '2026-10-05 16:00', canChange : false }, { mail : 'c@example.com', until : '2026-10-05 16:00', canChange : true } ] } );
+check( 'a lock on an account that is not the account\'s to open has no button, the other has one', rows().length === 2
+	&& findAll( rows()[0], function( el ) { return el.tagName === 'BUTTON' } ).length === 0
+	&& findAll( rows()[1], function( el ) { return el.tagName === 'BUTTON' } ).length === 1 && lockedText().includes( 'w@example.com' ) );
+const whyIn = function( row ) { return findAll( row, function( el ) { return el.textContent === text('/_admin/lockout/label/beyond') } ).length };
+check( '...and the one without says why', text('/_admin/lockout/label/beyond') !== '' && whyIn( rows()[0] ) === 1 && whyIn( rows()[1] ) === 0 );
+
 check( 'the tab answers every word it says in both languages', [ 'locked/title', 'locked/empty', 'locked/until', 'label/unlock', 'msg/unlocked', 'error/unlock' ].every( function( key ) {
 	return [ 'en_US', 'de_DE' ].every( function( locale ) { return fills('_admin/Nino/Modules/Users/text/'+ locale+ '.php')['/_admin/lockout/'+ key] !== undefined } );
 } ) );

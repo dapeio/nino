@@ -32,7 +32,9 @@ namespace Nino\Modules\Users {
 	 *
 	 *											Manager-only, under the same permission as the accounts
 	 *											themselves: whoever may hand out a role may say what it
-	 *											grants. Two changes are refused outright rather than
+	 *											grants - of a role that holds nothing beyond their own
+	 *											account, since one that does is not theirs to change (see
+	 *											beyond()). Two changes are refused outright rather than
 	 *											guarded against afterwards - one that would take the
 	 *											manage permission from the account making it, and one
 	 *											that would leave no account with full access, since a
@@ -298,6 +300,101 @@ namespace Nino\Modules\Users {
 		}
 
 		/**
+		 *	Whether the signed-in account may change a role that exists - rename
+		 *	it, change what it grants, empty it, delete it: the same bound as
+		 *	every other change of a set of permissions (see notHeld()), asked of
+		 *	the set the role holds now. A role that holds what the account does
+		 *	not is not the account's to change, however little the change itself
+		 *	grants - nor is one that an account beyond it holds (heldBeyond())
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$id						The role
+		 *
+		 *	@return 	string										What the account does not hold of it, as notHeld() says; '' when it may change the role or there is no such role
+		 */
+		public static function beyond( array &$appData, string $id ): string {
+
+			$role = self::all( $appData )[$id] ?? null;
+
+			if( $role === null )
+				return '';
+
+			return self::notHeld( $appData, $role['perms'] );
+		}
+
+		/**
+		 *	What the signed-in account does not hold of the accounts that hold a
+		 *	role: an account holds more than its role where its own permissions add
+		 *	to it, and changing the role changes that account. '' where every
+		 *	holder is within the account, or nobody holds the role
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$id						The role
+		 *
+		 *	@return 	string										What the account does not hold of the first holder beyond it, as notHeld() says
+		 */
+		public static function heldBeyond( array &$appData, string $id ): string {
+
+			foreach( $appData['/nino/auth/user'] ?? [] as $mail => $user ) {
+
+				if( is_array( $user ) === false || (string) ( $user['role'] ?? '' ) !== $id )
+					continue;
+
+				$missing = \Nino\Modules\Users\Admin::beyond( $appData, (string) $mail );
+
+				if( $missing !== '' )
+					return $missing;
+			}
+
+			return '';
+		}
+
+		/**
+		 *	Answer 403 when a role is not the signed-in account's to change: it
+		 *	holds what the account does not (beyond()), or an account beyond the
+		 *	account holds it (heldBeyond()) - each with the code that says which
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$id						The role
+		 *
+		 *	@return 	bool											True when the change is refused and the response set
+		 */
+		public static function refuseChange( array &$appData, array &$request, string $id ): bool {
+
+			return self::refuseBeyond( $appData, $request, self::beyond( $appData, $id ), 'role' ) === true
+				|| self::refuseBeyond( $appData, $request, self::heldBeyond( $appData, $id ), 'holder' ) === true;
+		}
+
+		/**
+		 *	Answer 403 when what an account or a role holds lies beyond the
+		 *	signed-in account (see beyond() and \Nino\Modules\Users\Admin::beyond()):
+		 *	the one refusal every action that changes an account or a role
+		 *	gives, with the permission or the panel it names
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$missing			What beyond() answered
+		 *	@param		string		$kind					'account', 'role' or 'holder' - a role that an account beyond the signed-in one holds
+		 *
+		 *	@return 	bool											True when the change is refused and the response set
+		 */
+		public static function refuseBeyond( array &$appData, array &$request, string $missing, string $kind ): bool {
+
+			if( $missing === '' )
+				return false;
+
+			if( $kind === 'holder' )
+				\Nino\Http::fail( $request, 403, 'cannot change a role that an account holds that holds a permission your own account does not: '. $missing, self::isScope( $missing ) === true ? 'roles_role_held_beyond_scoped' : 'roles_role_held_beyond', [ $missing ] );
+			elseif( $kind === 'role' )
+				\Nino\Http::fail( $request, 403, 'cannot change a role that holds a permission your own account does not: '. $missing, self::isScope( $missing ) === true ? 'roles_role_beyond_scoped' : 'roles_role_beyond', [ $missing ] );
+			else
+				\Nino\Http::fail( $request, 403, 'cannot change an account that holds a permission your own account does not: '. $missing, self::isScope( $missing ) === true ? 'users_account_beyond_scoped' : 'users_account_beyond', [ $missing ] );
+
+			return true;
+		}
+
+		/**
 		 *	Whether what notHeld() answered is a panel rather than a permission -
 		 *	a scope ends with a slash, which no permission does (PERM_PATTERN) -
 		 *	for a caller whose refusal has words of its own for it
@@ -330,7 +427,7 @@ namespace Nino\Modules\Users {
 
 			$roles = [];
 			foreach( self::all( $appData ) as $id => $role )
-				$roles[] = [ 'id' => $id, 'label' => $role['label'], 'perms' => $role['perms'], 'users' => self::holders( $appData, $id ) ];
+				$roles[] = [ 'id' => $id, 'label' => $role['label'], 'perms' => $role['perms'], 'users' => self::holders( $appData, $id ), 'canChange' => self::beyond( $appData, $id ) === '' && self::heldBeyond( $appData, $id ) === '', 'heldBeyond' => self::beyond( $appData, $id ) === '' && self::heldBeyond( $appData, $id ) !== '' ];
 
 			\Nino\Http::ok( $request, [
 				'roles' 				=> $roles,
@@ -417,6 +514,11 @@ namespace Nino\Modules\Users {
 				return;
 			}
 
+			// A role that holds what the account does not is not its to change -
+			// not to rename, not to empty
+			if( self::refuseChange( $appData, $request, $id ) === true )
+				return;
+
 			$appData['/nino/auth/roles'] = $next['/nino/auth/roles'];
 			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/roles' ] );
 
@@ -450,6 +552,9 @@ namespace Nino\Modules\Users {
 				\Nino\Http::fail( $request, 409, $holders. ( $holders === 1 ? ' account holds' : ' accounts hold' ). ' this role - give them another one first', 'roles_in_use', [ $holders ] );
 				return;
 			}
+
+			if( self::refuseChange( $appData, $request, $id ) === true )
+				return;
 
 			unset( $appData['/nino/auth/roles'][$id] );
 			\Nino\AppData::writeContentData( $appData, [ '/nino/auth/roles' ] );

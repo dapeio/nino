@@ -151,6 +151,9 @@ namespace Nino\Modules\Users {
 				return;
 			}
 
+			if( Roles::refuseBeyond( $appData, $request, Admin::beyond( $appData, $username ), 'account' ) === true )
+				return;
+
 			if( \Nino\Auth::unlock( $appData, $username ) === false ) {
 				\Nino\Http::fail( $request, 500, 'could not lift the lock' );
 				return;
@@ -224,7 +227,7 @@ namespace Nino\Modules\Users {
 
 			$rows = [];
 			foreach( $locked as $mail => $until )
-				$rows[] = [ 'mail' => (string) $mail, 'until' => date( 'Y-m-d H:i', $until ) ];
+				$rows[] = [ 'mail' => (string) $mail, 'until' => date( 'Y-m-d H:i', $until ), 'canChange' => Admin::beyond( $appData, (string) $mail ) === '' ];
 
 			return $rows;
 		}

@@ -399,12 +399,15 @@ namespace Nino\Modules\Users {
 					// editable here, but what tells a "no role" apart from a
 					// recovery-created account with full access of its own
 					'perms' 	=> array_values( array_filter( (array) ( $user['perms'] ?? [] ), 'is_string' ) ),
+					// Whether the signed-in account may change this one (see beyond()):
+					// the form offers nothing a request would be refused for
+					'canChange' => self::beyond( $appData, (string) $mail ) === '',
 				];
 			}
 
 			$roles = [];
 			foreach( Roles::all( $appData ) as $id => $role )
-				$roles[] = [ 'id' => $id, 'label' => $role['label'] ];
+				$roles[] = [ 'id' => $id, 'label' => $role['label'], 'canGrant' => Roles::notHeld( $appData, $role['perms'] ) === '' ];
 
 			\Nino\Http::ok( $request, [ 'users' => $users, 'canManage' => $canManage, 'roles' => $roles ] );
 		}
@@ -504,6 +507,9 @@ namespace Nino\Modules\Users {
 				return;
 			}
 
+			if( Roles::refuseBeyond( $appData, $request, self::beyond( $appData, $username ), 'account' ) === true )
+				return;
+
 			if( \Nino\Auth::deleteUser( $appData, $username ) === false ) {
 				\Nino\Http::fail( $request, 500, 'could not delete' );
 				return;
@@ -515,11 +521,11 @@ namespace Nino\Modules\Users {
 		/**
 		 *	Update a user's mail, password, name and - for a manager - role, in one
 		 *	save. Everything is checked before anything is written. The role
-		 *	counts only when it differs from the stored one: a manager who
-		 *	changes just the address of an account wider than their own role
-		 *	keeps being allowed to (a rename grants nothing, see below), and the
-		 *	checks of apiSetRole() - not your own, one that exists, not the last
-		 *	full access, not wider than yours - run for a change only
+		 *	counts only when it differs from the stored one, and the checks of
+		 *	apiSetRole() - not your own, one that exists, not the last full
+		 *	access, not wider than yours - run for a change only. Whatever is
+		 *	changed, an account other than your own that holds a permission yours
+		 *	does not is refused (see beyond())
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -586,9 +592,8 @@ namespace Nino\Modules\Users {
 
 			// Whoever sets a password signs in with it - so a manager may set
 			// one only on an account no wider than their own, the same bound as
-			// handing out a role (see Roles::notHeld()). The address stays
-			// changeable: a rename grants nothing. An account editing itself
-			// has proven its current password above
+			// handing out a role (see Roles::notHeld()), and with the words of its
+			// own. An account editing itself has proven its current password above
 			if( $isSelf === false && $pw !== '' ) {
 
 				$target		= \Nino\Auth::getUser( $appData, $username );
@@ -615,6 +620,11 @@ namespace Nino\Modules\Users {
 				if( self::_refuseRoleChange( $appData, $request, $username, $postedRole ) === true )
 					return;
 			}
+
+			// Nor may any other change be made to an account that holds what the
+			// signed-in one does not: its address, its name, its role
+			if( Roles::refuseBeyond( $appData, $request, self::beyond( $appData, $username ), 'account' ) === true )
+				return;
 
 			$mail = $username;
 
@@ -675,6 +685,9 @@ namespace Nino\Modules\Users {
 				return;
 			}
 
+			if( Roles::refuseBeyond( $appData, $request, self::beyond( $appData, $username ), 'account' ) === true )
+				return;
+
 			$ok = \Nino\Auth::logoutAllSessions( $appData, $username );
 
 			\Nino\Http::ok( $request, [ 'ok' => $ok, 'loggedOutSelf' => $isSelf ] );
@@ -704,6 +717,9 @@ namespace Nino\Modules\Users {
 			$role 		= \Nino\Admin\Admin::postString( $data, 'role' );
 
 			if( self::_refuseRoleChange( $appData, $request, $username, $role ) === true )
+				return;
+
+			if( Roles::refuseBeyond( $appData, $request, self::beyond( $appData, $username ), 'account' ) === true )
 				return;
 
 			if( \Nino\Auth::setRole( $appData, $username, $role ) === false ) {
@@ -758,6 +774,9 @@ namespace Nino\Modules\Users {
 				\Nino\Http::fail( $request, 409, 'the last active account with full access cannot be deactivated', 'users_last_admin_status' );
 				return;
 			}
+
+			if( Roles::refuseBeyond( $appData, $request, self::beyond( $appData, $username ), 'account' ) === true )
+				return;
 
 			if( \Nino\Auth::setStatus( $appData, $username, $active ) === false ) {
 				\Nino\Http::fail( $request, 500, 'could not save' );
@@ -828,6 +847,28 @@ namespace Nino\Modules\Users {
 			}
 
 			return false;
+		}
+
+		/**
+		 *	Whether the signed-in account may change $username - rename it, switch
+		 *	it on or off, delete it, end its sessions, lift its lock, give it
+		 *	another role: the bound that already holds for setting its password
+		 *	and for handing out a role (see Roles::notHeld()), asked of what the
+		 *	account holds now, its role's permissions and its own. An account
+		 *	that holds what the signed-in one does not is not its to change - which
+		 *	leaves one's own account always one's own - and an account that does
+		 *	not exist is the caller's to refuse
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$username			The account
+		 *
+		 *	@return 	string										What the signed-in account does not hold of it, as Roles::notHeld() says; '' when it may change the account
+		 */
+		public static function beyond( array &$appData, string $username ): string {
+
+			$user = \Nino\Auth::getUser( $appData, $username );
+
+			return $user === false ? '' : Roles::notHeld( $appData, \Nino\Auth::permissions( $appData, $user ) );
 		}
 
 		/**

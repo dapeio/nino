@@ -15,7 +15,9 @@
  *													lists out of the tree the panels offer (scopes()),
  *													and a summary says in plain words what the role may
  *													do. Manager-only, same gate the backend enforces
- *													independently (see Roles/Roles.php beside it).
+ *													independently (see Roles/Roles.php beside it). A role
+ *													that holds a permission the signed-in account does not
+ *													is shown in words, without a field or a button.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -317,6 +319,11 @@
 			backLink.addEventListener( 'click', function( ev ) { ev.preventDefault(); Nino.admin.router.go( 'roles', [] ); Nino.admin.roles._showList( Nino.admin.roles._backTarget() ) } );
 			wrap.appendChild( Nino.admin.formToolbar( backLink ) );
 
+			// A role that holds what the signed-in account does not is not theirs
+			// to change (see Roles::beyond()): shown, with nothing to press
+			if( role !== null && role.canChange === false )
+				return Nino.admin.roles._renderBeyond( wrap, role );
+
 			const form = dc.createElement('form');
 			form.id = 'roles-edit-form';
 
@@ -412,6 +419,52 @@
 				idInput.focus();
 
 			// What the form holds now is what is saved
+			if( typeof Nino.admin.dirty === 'object' )
+				Nino.admin.dirty.snapshot( 'roles' );
+		},
+
+		/**
+		 *	The form of a role the signed-in account may not change: its name, the
+		 *	accounts that hold it, what it may do in words, and the reason - no
+		 *	field, no button. Drawn below the toolbar _renderForm() began
+		 *
+		 *	@param		{Element}	wrap				The form's container
+		 *	@param		{Object}		role				The role
+		 *
+		 *	@return		void
+		 */
+		_renderBeyond : function( wrap, role ) {
+
+			const roles = Nino.admin.roles;
+
+			const fieldset = dc.createElement('fieldset');
+			const legend = dc.createElement('legend');
+			legend.textContent = role.label;
+			fieldset.appendChild( legend );
+
+			const line = function( text ) {
+				const p = dc.createElement('p');
+				p.className = 'nino-admin-hint';
+				p.textContent = text;
+				fieldset.appendChild( p );
+			};
+
+			line( Nino.content.getText('/_admin/roles/label/id')+ ': '+ role.id );
+			line( Nino.content.getText('/_admin/roles/label/users')+ ': '+ role.users );
+			line( Nino.content.getText('/_admin/roles/summary/title') );
+
+			const list = dc.createElement('ul');
+			roles.summarize( role.perms, roles._permOptions, roles._scopes ).forEach( function( text ) {
+				const item = dc.createElement('li');
+				item.textContent = text;
+				list.appendChild( item );
+			} );
+			fieldset.appendChild( list );
+
+			line( Nino.content.getText( role.heldBeyond === true ? '/_admin/roles/label/held-beyond' : '/_admin/roles/label/beyond' ) );
+
+			wrap.appendChild( fieldset );
+
 			if( typeof Nino.admin.dirty === 'object' )
 				Nino.admin.dirty.snapshot( 'roles' );
 		},
