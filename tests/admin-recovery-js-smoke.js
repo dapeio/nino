@@ -24,7 +24,7 @@ const { check, done, source, load, element, fire } = require( './harness.js' );
 const ids = [
 	'recovery-login', 'recovery-login-msg', 'recovery-input-pw', 'recovery-tools', 'recovery-dates', 'recovery-restore-msg', 'recovery-reset', 'recovery-reset-mail', 'recovery-reset-pw',
 	'recovery-reset-msg', 'recovery-reset-submit', 'recovery-create', 'recovery-create-mail', 'recovery-create-pw', 'recovery-create-repeat',
-	'recovery-create-msg', 'recovery-logout',
+	'recovery-create-msg', 'recovery-logout', 'recovery-key', 'recovery-key-show', 'recovery-file', 'recovery-file-input',
 ];
 const page = {};
 ids.forEach( function( id ) {
@@ -32,6 +32,9 @@ ids.forEach( function( id ) {
 	page[id].id = id;
 } );
 page['recovery-tools'].dataset.open = '1';
+page['recovery-key'].type = 'password';
+page['recovery-key-show'].checked = false;
+page['recovery-file-input'].files = [];
 
 const template = source('_admin/templates/page-recovery.tpl');
 
@@ -44,7 +47,7 @@ const Nino = {
 	dir : '',
 	events : { bindCallback : function( name, fn ) { if( name === 'ready' ) ready = fn } },
 	http : { sendRequest : function( uri, method, callback, data ) {
-		requests.push( { action : data.action, payload : JSON.parse( data.data ), callback : callback } );
+		requests.push( { action : data.action, payload : JSON.parse( data.data ), file : data.file, callback : callback } );
 	} },
 };
 const sandbox = {
@@ -84,11 +87,13 @@ console.log('Recovery page');
 check( 'the template has a select, not a free text input, for the account a password is set for', /<select id="recovery-reset-mail"/.test( template ) && /id="recovery-reset-mail" type=/.test( template ) === false && template.indexOf('datalist') === -1 );
 check( '...and a form of its own to create an account with full access, with a message paragraph that is a status', /id="recovery-create"/.test( template ) && /<p id="recovery-create-msg" role="status" aria-live="polite">/.test( template ) );
 check( '...no inline handler anywhere', /\son[a-z]+=/.test( template ) === false );
+check( 'the recovery key is typed into a masked field with no name and no autofill, which a box shows on request', /<input id="recovery-key" type="password" autocomplete="off"(?![^>]*\sname=)/.test( template ) && /id="recovery-key-show"/.test( template ) );
+check( '...and the archive of a file has a form of its own with a file input and a button that submits', /<form id="recovery-file">/.test( template ) && /<input id="recovery-file-input" type="file"/.test( template ) && /<button type="submit" id="recovery-file-submit"/.test( template ) );
 
 ready();
 check( 'the page asks for the backups and the accounts when the gate is open', sent('recovery/list').length === 1 );
 
-answer( 'recovery/list', 200, { dates : [ '2026-10-02' ], users : [ 'a@example.com', 'b@example.com' ] } );
+answer( 'recovery/list', 200, { dates : [ '2026-10-02' ], users : [ 'a@example.com', 'b@example.com' ], uploadLimit : 2097152 } );
 check( 'the select is filled from the list the server sent', options().join(',') === 'a@example.com,b@example.com' && page['recovery-reset-submit'].disabled === false );
 
 // Restore: after the question, and the page says what the server said - and, for a
@@ -104,6 +109,50 @@ check( '...and with the notice of a backup from another version: where it comes 
 fire( restoreButton, 'click' );
 answer( 'recovery/restore', 500, { error : 'decryption failed' } );
 check( 'a refused restore shows the status and the reason', page['recovery-restore-msg'].textContent === '(500) decryption failed' );
+confirms.length = 0;
+
+// The key of an archive of another project: typed once, sent with the restore of the row, gone from the page where it was used
+const key = 'A'.repeat( 43 )+ '=';
+page['recovery-key'].value = key;
+fire( restoreButton, 'click' );
+check( 'a restore from the list sends the key that was typed', sent('recovery/restore').slice( -1 )[0].payload.key === key && sent('recovery/restore').slice( -1 )[0].payload.date === '2026-10-02' );
+answer( 'recovery/restore', 422, { error : 'the key does not open the archive', code : 'backups_key_wrong' } );
+check( '...a key that did not open it stays in the field to be corrected, and the page says why', page['recovery-key'].value === key && page['recovery-restore-msg'].textContent === '(422) the key does not open the archive' );
+fire( restoreButton, 'click' );
+answer( 'recovery/restore', 200, { restoredDate : '2026-10-02' } );
+check( '...and a restore that went through empties it', page['recovery-key'].value === '' );
+confirms.length = 0;
+fire( page['recovery-key-show'], 'change', { target : { checked : true } } );
+check( 'the box shows the key as text', page['recovery-key'].type === 'text' );
+fire( page['recovery-key-show'], 'change', { target : { checked : false } } );
+check( '...and, off again, hides it', page['recovery-key'].type === 'password' );
+
+// An archive from a file: the file and the key in one request
+const submitFile = function() { fire( page['recovery-file'], 'submit', { preventDefault : function() {} } ) };
+const before = requests.length;
+submitFile();
+check( 'no file chosen: nothing is sent, and the page says so', requests.length === before && /file/.test( page['recovery-restore-msg'].textContent ) );
+page['recovery-file-input'].files = [ { name : 'backup.php', size : 4096 } ];
+submitFile();
+check( 'no key typed: nothing is sent, and the page says so', requests.length === before && /key/.test( page['recovery-restore-msg'].textContent ) );
+page['recovery-key'].value = key;
+page['recovery-file-input'].files = [ { name : 'backup.php', size : 2097152 } ];
+submitFile();
+check( 'a file over what the server takes: nothing is sent, and the page names the limit and the way round it', requests.length === before && /2 MB/.test( page['recovery-restore-msg'].textContent ) && /SFTP/.test( page['recovery-restore-msg'].textContent ) );
+page['recovery-file-input'].files = [ { name : 'backup.php', size : 4096 } ];
+confirmAnswer = false;
+submitFile();
+check( 'asked first, and not sent on no', confirms.length === 1 && requests.length === before );
+confirmAnswer = true;
+const chosen = page['recovery-file-input'].files[0];
+submitFile();
+const fileRequest = sent('recovery/restore-file')[0];
+check( 'sent as one request with the file and the key', fileRequest !== undefined && fileRequest.file === chosen && fileRequest.payload.key === key );
+answer( 'recovery/restore-file', 422, { error : 'the key does not open the archive' } );
+check( '...a refusal shows the status and the reason and keeps key and file for another try', page['recovery-restore-msg'].textContent === '(422) the key does not open the archive' && page['recovery-key'].value === key );
+submitFile();
+answer( 'recovery/restore-file', 200, { restoredDate : 'uploaded archive' } );
+check( '...a restore that went through says so and empties the key and the file', page['recovery-restore-msg'].textContent === 'Restored the archive.' && page['recovery-key'].value === '' && page['recovery-file-input'].value === '' );
 confirms.length = 0;
 
 // Set a password: the account is the one that is selected

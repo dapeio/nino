@@ -550,6 +550,36 @@ namespace Nino\Modules {
 		}
 
 		/**
+		 *	The archive key as the person who installs the project is to keep it, made now where the project has
+		 *	none yet: the setup wizard's last step shows it once (see \Nino\Install\Finish::apiComplete()). It is
+		 *	the key _bootstrap() makes on the first request of the workbench, and that one leaves a key
+		 *	that is there alone, so what is shown is what the archives are made with
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string|false							The key, base64 of 32 bytes, or false where it could not be made or written
+		 */
+		public static function recoveryKey( array &$appData ): string|false {
+
+			if( \Nino\Filesystem::lockFile( $appData, self::LOCK_PATH, false ) === false )
+				return false;
+
+			try {
+				self::_bootstrap( $appData );
+			}
+			catch( \RuntimeException ) {
+				return false;
+			}
+			finally {
+				\Nino\Filesystem::unlockFile( $appData, self::LOCK_PATH );
+			}
+
+			$key = $appData['/nino/backup/key'] ?? null;
+
+			return is_string( $key ) === true && strlen( (string) base64_decode( $key, true ) ) === 32 ? $key : false;
+		}
+
+		/**
 		 *	Generate the encryption key on first use - a project that never
 		 *	opens the workbench never gets that config.php key at all. The
 		 *	random directory name this used to generate beside it is gone:

@@ -160,7 +160,7 @@ Going back to the Languages step and applying it again leaves the features that 
 
 ## 6. Finish
 
-The last step creates the starter pages, sets the **recovery password** and locks the wizard. It is not a login: `/_admin/recovery.php` asks for it when the accounts themselves are what is broken - to restore a backup, set a password or create an account with full access - and the workbench asks for it in one place only, the Recovery password tab of Users, which changes it (see [Recovery](_admin.md#recovery)).
+The last step creates the starter pages, sets the **recovery password**, makes the project's backup key and locks the wizard. The recovery password is not a login: `/_admin/recovery.php` asks for it when the accounts themselves are what is broken - to restore a backup, set a password or create an account with full access - and the workbench asks for it in one place only, the Recovery password tab of Users, which changes it (see [Recovery](_admin.md#recovery)). The backup key is shown once as the **recovery key**: a button copies it, another saves it as a text file made in the browser, and the wizard goes on only after "I have saved the recovery key" is ticked. Nothing shows it again; keep it apart from the backups (see [Backups and Restoration](deployment.md#backups-and-restoration)).
 
 Provide:
 

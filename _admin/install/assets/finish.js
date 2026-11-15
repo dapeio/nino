@@ -11,7 +11,10 @@
  *													points, shows where to continue. An application
  *													that starts the workbench with its menu folded
  *													(menu: folded) leaves the menu folded where the
- *													browser has no choice of its own yet.
+ *													browser has no choice of its own yet. Where the server
+ *													answers with the recovery key - the key the project's
+ *													backups are encrypted with - the page shows it first,
+ *													once, and goes on only after it was confirmed saved.
  *
  *	@package								Dape/Nino
  *	@author									David Perchermeier <mail@dape.io>
@@ -129,6 +132,82 @@
 			} );
 		},
 
+		/**
+		 *	Show the recovery key, once, and hand over to the end of the wizard only after the person
+		 *	said it is saved. Nothing of it is kept anywhere but on this screen: not in the storage
+		 *	of the browser, not in an address, not in a field that is sent. The text file is made
+		 *	here, in the browser, from the text on the screen. When the person goes on the key leaves
+		 *	the page, and until then a page that is closed or left asks first
+		 *
+		 *	@param		{string}		key							The key as the server answered it
+		 *	@param		{Function}	proceed					What the end of the wizard does once the key is saved
+		 *
+		 *	@return		void
+		 */
+		_showKey : function( key, proceed ) {
+
+			const panel 	= dc.getElementById('finish-key');
+			const value 	= dc.getElementById('finish-key-value');
+			const note 		= dc.getElementById('finish-key-msg');
+			const ack 		= dc.getElementById('finish-key-ack');
+			const go 			= dc.getElementById('finish-key-continue');
+			const copy 		= dc.getElementById('finish-key-copy');
+			const save 		= dc.getElementById('finish-key-save');
+
+			value.textContent = key;
+			note.textContent = '';
+			ack.checked = false;
+			go.disabled = true;
+			panel.classList.remove('install-hidden');
+			dc.getElementById('install-page-wrap').classList.add('is-complete');
+
+			wn.onbeforeunload = function( ev ) {
+				ev.preventDefault();
+				ev.returnValue = '';
+				return '';
+			};
+
+			ack.addEventListener( 'change', function() { go.disabled = ack.checked !== true } );
+
+			copy.addEventListener( 'click', function() {
+
+				const failed = 'Could not copy - select the key and copy it by hand.';
+
+				if( wn.navigator && wn.navigator.clipboard && typeof wn.navigator.clipboard.writeText === 'function' )
+					wn.navigator.clipboard.writeText( key ).then( function() { note.textContent = 'Copied.' }, function() { note.textContent = failed } );
+				else
+					note.textContent = failed;
+			} );
+
+			save.addEventListener( 'click', function() {
+
+				// Made in the browser from what is on the screen; the link is gone again at once
+				const url = wn.URL.createObjectURL( new wn.Blob( [ key+ '\n' ], { type : 'text/plain' } ) );
+				const link = dc.createElement('a');
+				link.href = url;
+				link.download = 'nino-recovery-key-'+ ( wn.location.hostname || 'project' ).replace( /[^a-z0-9.-]/gi, '' )+ '.txt';
+				link.click();
+				wn.URL.revokeObjectURL( url );
+				note.textContent = 'Saved as a text file. Keep it apart from your backups.';
+			} );
+
+			panel.addEventListener( 'submit', function( ev ) {
+
+				ev.preventDefault();
+
+				if( ack.checked !== true )
+					return;
+
+				// Gone from the page, and from what the clipboard and the file buttons would give
+				wn.onbeforeunload = null;
+				value.textContent = '';
+				panel.classList.add('install-hidden');
+				proceed();
+			} );
+
+			go.focus();
+		},
+
 		_submit : function( ev ) {
 
 			ev.preventDefault();
@@ -156,30 +235,42 @@
 
 				const targets = Array.isArray( response.targets ) ? response.targets : [];
 
-				// The server kept this session signed in - the one account the
-				// wizard created - so the next page is not a choice: the entry point
-				// of the one application that has one, else the workbench. With
-				// several accounts it ended the session, and with several entry
-				// points there is a choice; the panel below offers them, and the
-				// login, among the next steps
-				if( response.login === true && targets.length <= 1 ) {
-					msg.textContent = targets.length === 1 ? '' : 'Opening the workbench …';
-					if( targets.length === 1 )
-						Nino.install.finish._menu( targets[0] );
-					Nino.install.finish._go( Nino.dir+ ( targets.length === 1 ? targets[0].next : '/_admin/' ) );
+				const proceed = function() {
+					// The server kept this session signed in - the one account the
+					// wizard created - so the next page is not a choice: the entry point
+					// of the one application that has one, else the workbench. With
+					// several accounts it ended the session, and with several entry
+					// points there is a choice; the panel below offers them, and the
+					// login, among the next steps
+					if( response.login === true && targets.length <= 1 ) {
+						msg.textContent = targets.length === 1 ? '' : 'Opening the workbench …';
+						if( targets.length === 1 )
+							Nino.install.finish._menu( targets[0] );
+						Nino.install.finish._go( Nino.dir+ ( targets.length === 1 ? targets[0].next : '/_admin/' ) );
+						return;
+					}
+
+					Nino.install.finish._targets( targets );
+
+					// Cleared, not left on "Saving …" - the done panel below replaces
+					// the form but not this line, so the finished wizard used to show
+					// "Installation complete" and "Saving …" at the same time
+					msg.textContent = '';
+
+					dc.getElementById('finish-form').classList.add('install-hidden');
+					dc.getElementById('finish-done').classList.remove('install-hidden');
+					dc.getElementById('install-page-wrap').classList.add('is-complete');
+				};
+
+				// The recovery key comes first: the end of the wizard, whichever it is, waits for it
+				if( typeof response.recoveryKey === 'string' && response.recoveryKey !== '' ) {
+					msg.textContent = '';
+					dc.getElementById('finish-form').classList.add('install-hidden');
+					Nino.install.finish._showKey( response.recoveryKey, proceed );
 					return;
 				}
 
-				Nino.install.finish._targets( targets );
-
-				// Cleared, not left on "Saving …" - the done panel below replaces
-				// the form but not this line, so the finished wizard used to show
-				// "Installation complete" and "Saving …" at the same time
-				msg.textContent = '';
-
-				dc.getElementById('finish-form').classList.add('install-hidden');
-				dc.getElementById('finish-done').classList.remove('install-hidden');
-				dc.getElementById('install-page-wrap').classList.add('is-complete');
+				proceed();
 			} );
 		},
 	};

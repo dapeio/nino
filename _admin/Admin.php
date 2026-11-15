@@ -2323,7 +2323,9 @@ namespace Nino\Admin {
 	 *											it back, and outside every tool folder, so an update cannot
 	 *											take it along. _admin/recovery.php verifies it (rate-limited,
 	 *											one shared counter) and offers three things: restoring a
-	 *											backup, setting the password of an account that exists, and
+	 *											backup - from the list or from a file; the one place that takes
+	 *											the key of an archive of another project, typed for that restore
+	 *											alone -, setting the password of an account that exists, and
 	 *											creating an account with full access. The workbench asks
 	 *											for it in one place only: the Recovery password tab of the
 	 *											Users pane changes it, with the old one (see change()), on
@@ -2456,8 +2458,8 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	Dispatch recovery.php's six actions: login opens the gate, the
-		 *	other five need it open. Same one-route/$_POST['action'] shape as
+		 *	Dispatch recovery.php's seven actions: login opens the gate, the
+		 *	other six need it open. Same one-route/$_POST['action'] shape as
 		 *	Admin::handlePost(), deliberately without the panel registry -
 		 *	this runs when config.php may be the very thing that is broken
 		 *
@@ -2516,7 +2518,9 @@ namespace Nino\Admin {
 					// need nothing but this file (see \Nino\Admin\Admin::record())
 					\Nino\Http::ok( $request, [
 						'dates' => class_exists( '\\Nino\\Modules\\Backups\\Admin' ) === true ? \Nino\Modules\Backups\Admin::dates( $appData ) : [],
-						'users' => array_keys( $appData['/nino/auth/user'] ?? [] )
+						'users' => array_keys( $appData['/nino/auth/user'] ?? [] ),
+						// The largest file the server takes in an upload, 0 where php names none
+						'uploadLimit' => \Nino\Images::limits()['php']
 					] );
 					return;
 
@@ -2537,16 +2541,39 @@ namespace Nino\Admin {
 						\Nino\Http::fail( $request, 400, 'invalid date' );
 						return;
 					}
+					// An archive of another project is opened with the key it was made with, which is typed
+					// here and nowhere else: the key of this project opens the rest
+					$typed = self::_typedKey( $appData, $request, $data );
+					if( $typed === false )
+						return;
 					$notice = null;
-					$result = \Nino\Modules\Backups\Admin::restore( $appData, $date, $notice );
-					\Nino\Modules\Backups\Admin::recordRestore( $appData, self::LOG_ACTOR, $date, $result );
-					if( $result !== true ) {
-						\Nino\Http::fail( $request, $result[0], $result[1], $result[2] ?? '' );
+					$result = \Nino\Modules\Backups\Admin::restore( $appData, $date, $notice, $typed );
+					self::_restored( $appData, $request, $date, $typed, $result, $notice );
+					return;
+
+				case 'recovery/restore-file':
+					// The archive itself and its key, in one request: nothing of either is kept after it. The
+					// way for a project that has no archive of its own to restore - the one that was installed
+					// to take the place of a lost one - without a way to put a file where the list can see it
+					if( class_exists( '\\Nino\\Modules\\Backups\\Admin' ) === false ) {
+						\Nino\Http::fail( $request, 501, 'no backups module' );
 						return;
 					}
-					// A backup of another version of Nino comes with the notice the
-					// panel's answer has (see \Nino\Modules\Backups\Admin::apiRestore())
-					\Nino\Http::ok( $request, [ 'restoredDate' => $date ] + ( $notice !== null ? [ 'notice' => $notice ] : [] ) );
+					$failure = Admin::uploadError( $_FILES['file'] ?? null );
+					if( $failure !== null ) {
+						\Nino\Http::fail( $request, $failure['status'], $failure['error'], $failure['code'], $failure['params'] );
+						return;
+					}
+					$typed = self::_typedKey( $appData, $request, $data );
+					if( $typed === false )
+						return;
+					if( $typed === null ) {
+						\Nino\Http::fail( $request, 400, 'the recovery key is missing', 'backups_key_missing' );
+						return;
+					}
+					$notice = null;
+					$result = \Nino\Modules\Backups\Admin::restoreFile( $appData, (string) $_FILES['file']['tmp_name'], $typed, $notice );
+					self::_restored( $appData, $request, 'uploaded archive', $typed, $result, $notice );
 					return;
 
 				case 'recovery/reset':
@@ -2559,6 +2586,80 @@ namespace Nino\Admin {
 			}
 
 			\Nino\Http::fail( $request, 404, 'unknown action' );
+		}
+
+		// The key attempts: the one counter of a typed archive key, for every client together. A key is
+		// 256 bits and is not guessed; what the counter holds back is the work of a wrong one, which is
+		// reading an archive whole, and a door that has been opened to somebody who is not the owner
+		private const string KEY_COUNTER = 'recovery-key';
+		private const int KEY_TRIES = 10;
+		private const int KEY_WINDOW = 3600;
+
+		/**
+		 *	The key somebody typed for an archive, as the 32 bytes it is, or nothing where none was posted.
+		 *	Spaces and line breaks are ignored - it is copied from a file or from a screen - and what is left
+		 *	must be what the key is made of: 44 characters of base64, ending in '='. A key that is none is
+		 *	refused with 400 and costs no attempt; a key that is one is counted (KEY_COUNTER) before it is
+		 *	tried, and the answer for too many is 429. The typed key is never kept, never written to the
+		 *	activity log and never answered
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		array 		$data					The posted payload
+		 *
+		 *	@return 	string|null|false						The raw key; null where none was posted; false where it answered (400 or 429)
+		 */
+		private static function _typedKey( array &$appData, array &$request, array $data ): string|null|false {
+
+			$typed = (string) preg_replace( '/\s+/', '', Admin::postString( $data, 'key' ) );
+
+			if( $typed === '' )
+				return null;
+
+			$raw = preg_match( '~^[A-Za-z0-9+/]{43}=$~D', $typed ) === 1 ? base64_decode( $typed, true ) : false;
+
+			if( $raw === false || strlen( $raw ) !== 32 ) {
+				\Nino\Http::fail( $request, 400, 'this is no recovery key: it is 44 characters long and ends in =', 'backups_key_format' );
+				return false;
+			}
+
+			if( \Nino\Feature::count( $appData, self::KEY_COUNTER, 'recovery', self::KEY_TRIES, self::KEY_WINDOW ) === false ) {
+				\Nino\Http::fail( $request, 429, 'too many attempts with a recovery key - try again later', 'backups_key_tries' );
+				return false;
+			}
+
+			return $raw;
+		}
+
+		/**
+		 *	What a restore answers, for the one that was made from the list and for the one from a file: the
+		 *	line of the activity log (the archive's name, never the key), then the failure or the success. A
+		 *	key that opened the archive and restored it lets the counter go
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *	@param		string		$name					What the line says was restored
+		 *	@param		string|null	$typed				The key that was typed, or null
+		 *	@param		true|array	$result				What restore() answered
+		 *	@param		array|null	$notice				The notice of an archive of another version of Nino
+		 *
+		 *	@return 	void
+		 */
+		private static function _restored( array &$appData, array &$request, string $name, ?string $typed, true|array $result, ?array $notice ): void {
+
+			\Nino\Modules\Backups\Admin::recordRestore( $appData, self::LOG_ACTOR, $name, $result );
+
+			if( $result !== true ) {
+				\Nino\Http::fail( $request, $result[0], $result[1], $result[2] ?? '', $result[3] ?? [] );
+				return;
+			}
+
+			if( $typed !== null )
+				\Nino\Feature::forget( $appData, self::KEY_COUNTER, 'recovery' );
+
+			// A backup of another version of Nino comes with the notice the
+			// panel's answer has (see \Nino\Modules\Backups\Admin::apiRestore())
+			\Nino\Http::ok( $request, [ 'restoredDate' => $name ] + ( $notice !== null ? [ 'notice' => $notice ] : [] ) );
 		}
 
 		/**

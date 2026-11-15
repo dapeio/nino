@@ -1,8 +1,10 @@
 /**
  *	Nino										A compact filesystembased php framework
  *	recovery.js							The break-glass page (_admin/recovery.php): one secret, then
- *													a list of backups to restore, a form to give an account
- *													a password and one to create an account with full access.
+ *													a list of backups to restore - and an archive of another
+ *													project from a file, with the key that archive was made
+ *													with - a form to give an account a password and one to
+ *													create an account with full access.
  *													Plain tags and literal text on purpose - this
  *													has to work when the project's own text and bundles do not.
  *
@@ -129,9 +131,67 @@
 					Nino.recovery._load();
 				} );
 			} );
+			dc.getElementById('recovery-key-show').addEventListener( 'change', function( ev ) {
+				dc.getElementById('recovery-key').type = ev.target.checked === true ? 'text' : 'password';
+			} );
+			dc.getElementById('recovery-file').addEventListener( 'submit', Nino.recovery._restoreFile );
 			dc.getElementById('recovery-logout').addEventListener( 'click', function() {
 				Nino.recovery._apiCall( 'logout', {}, function() { wn.location.reload() } );
 			} );
+		},
+		// The largest file the server takes in an upload, in bytes, as the last list said; 0 where php names none
+		_limit : 0,
+		// What the request carries besides the file: the other fields of the form, a little
+		_OVERHEAD : 16384,
+		/**
+		 *	The key that was typed is used up by the one request it was typed for: the field is emptied
+		 *	where the restore went through, so that nothing of it stays on a page that is left open
+		 *
+		 *	@param		{number}		status				What the restore answered
+		 *
+		 *	@return		void
+		 */
+		_keyDone : function( status ) {
+			if( status === 200 )
+				dc.getElementById('recovery-key').value = '';
+		},
+		/**
+		 *	Restore the archive of a file with the key above: the file and the key go in one request, and
+		 *	nothing is kept of either on the server afterwards. A file the server would turn away
+		 *	for its size is turned away here, with the way round it
+		 *
+		 *	@param		{Event}		ev
+		 *
+		 *	@return		void
+		 */
+		_restoreFile : function( ev ) {
+			ev.preventDefault();
+			const msg = dc.getElementById('recovery-restore-msg');
+			const input = dc.getElementById('recovery-file-input');
+			const key = dc.getElementById('recovery-key').value;
+			if( input.files.length === 0 ) {
+				msg.textContent = 'Choose the archive file first.';
+				return;
+			}
+			if( key.trim() === '' ) {
+				msg.textContent = 'Type the recovery key of the archive first.';
+				return;
+			}
+			const file = input.files[0];
+			if( Nino.recovery._limit > 0 && file.size > Nino.recovery._limit - Nino.recovery._OVERHEAD ) {
+				msg.textContent = 'The file is larger than this server takes in an upload ('+ Math.floor( Nino.recovery._limit / 1048576 )+ ' MB). Put it into private/.backups by SFTP, under its date as the name, and restore it from the list with the key.';
+				return;
+			}
+			if( wn.confirm( 'Restore the archive from this file? The current state is snapshotted first.' ) === false )
+				return;
+			msg.textContent = 'Uploading and restoring …';
+			Nino.http.sendRequest( Nino.dir+ '/_admin/recovery.php', 'POST', function( xhr ) {
+				const response = xhr.responseJSON;
+				msg.textContent = xhr.status === 200 ? 'Restored the archive.'+ Nino.recovery._notice( response ) : Nino.recovery._error( xhr.status, response, 'Restore failed.' );
+				Nino.recovery._keyDone( xhr.status );
+				if( xhr.status === 200 )
+					input.value = '';
+			}, { action : 'recovery/restore-file', data : JSON.stringify( { key : key } ), file : file } );
 		},
 		/**
 		 *	Ask for the backup dates and the accounts, and draw both: the
@@ -147,6 +207,7 @@
 					restoreMsg.textContent = Nino.recovery._error( status, response, 'Could not load the backups.' );
 					return;
 				}
+				Nino.recovery._limit = typeof response.uploadLimit === 'number' && response.uploadLimit > 0 ? response.uploadLimit : 0;
 				list.innerHTML = '';
 				if( response.dates.length === 0 ) {
 					const li = dc.createElement('li');
@@ -166,8 +227,9 @@
 						if( wn.confirm( 'Restore the backup of '+ date+ '? The current state is snapshotted first.' ) === false )
 							return;
 						restoreMsg.textContent = 'Restoring …';
-						Nino.recovery._apiCall( 'restore', { date : date }, function( status, response ) {
+						Nino.recovery._apiCall( 'restore', { date : date, key : dc.getElementById('recovery-key').value }, function( status, response ) {
 							restoreMsg.textContent = status === 200 ? 'Restored '+ response.restoredDate+ '.'+ Nino.recovery._notice( response ) : Nino.recovery._error( status, response, 'Restore failed.' );
+							Nino.recovery._keyDone( status );
 						} );
 					} );
 					li.appendChild( btn );

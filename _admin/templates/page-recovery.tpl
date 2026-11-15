@@ -28,7 +28,17 @@
 				<section>
 					<h2>Restore a backup</h2>
 					<p class="nino-admin-hint">Every restore first snapshots the current state, so a wrong pick can itself be undone.</p>
+					<label class="nino-admin-field" for="recovery-key"><span>Recovery key of the archive (only for an archive of another project)</span><input id="recovery-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="100"></label>
+					<label class="nino-admin-checkbox-field" for="recovery-key-show"><input type="checkbox" id="recovery-key-show"><span>Show the key</span></label>
+					<p class="nino-admin-hint">The key is the one the setup wizard showed when that project was installed. It is used for this one restore: it is not stored and not logged. An archive of this project needs none.</p>
+					<h3>Archives on this server</h3>
 					<ul id="recovery-dates" class="nino-admin-list"></ul>
+					<h3>An archive from a file</h3>
+					<form id="recovery-file">
+						<label class="nino-admin-field" for="recovery-file-input"><span>Archive file</span><input id="recovery-file-input" type="file" accept=".php,application/octet-stream"></label>
+						<p id="recovery-file-hint" class="nino-admin-hint">Needs the recovery key above. The file is used for this restore alone and is deleted afterwards. A file larger than the server takes in an upload goes into private/.backups by SFTP, under its date as the name (2026-11-15-120000-manual.php), and is restored from the list above.</p>
+						<button type="submit" id="recovery-file-submit" class="nino-admin-btn-danger">Restore from the file</button>
+					</form>
 					<p id="recovery-restore-msg" role="status" aria-live="polite"></p>
 				</section>
 				<section>

@@ -120,6 +120,20 @@
 						<label class="nino-admin-field" for="finish-pw2"><span>Repeat password</span><input id="finish-pw2" type="password" autocomplete="new-password" minlength="8" required></label>
 						<button type="submit" id="finish-submit">Finish installation</button>
 					</form>
+					<form id="finish-key" class="nino-admin-card install-hidden" aria-labelledby="finish-key-title">
+						<span class="nino-admin-eyebrow">One last thing</span>
+						<h2 id="finish-key-title">Save your recovery key</h2>
+						<p>Your backups are encrypted with this key. A backup that is kept somewhere else cannot be opened without it, and it is shown only now - not in the workbench and not again. Keep it apart from the backups, in a password manager for example.</p>
+						<p class="install-key-label" id="finish-key-label">Recovery key</p>
+						<code id="finish-key-value" class="install-key-value" tabindex="0" aria-labelledby="finish-key-label"></code>
+						<div class="install-key-actions">
+							<button type="button" id="finish-key-copy" class="nino-admin-btn-secondary">Copy</button>
+							<button type="button" id="finish-key-save" class="nino-admin-btn-secondary">Save as text file</button>
+						</div>
+						<p id="finish-key-msg" class="install-key-msg" role="status" aria-live="polite"></p>
+						<label class="nino-admin-checkbox-field" for="finish-key-ack"><input type="checkbox" id="finish-key-ack"><span>I have saved the recovery key</span></label>
+						<button type="submit" id="finish-key-continue" disabled>Continue</button>
+					</form>
 					<div id="finish-done" class="install-hidden">
 						<div class="install-finish-intro">
 							<span class="install-finish-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>

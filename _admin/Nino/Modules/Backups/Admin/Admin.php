@@ -27,13 +27,18 @@ namespace Nino\Modules\Backups {
 	 *											the recovery page boots through the same kernel bootstrap as the workbench
 	 *											and can't survive that either - that's a manual recovery.
 	 *
-	 *											An archive is opened with the key of this project only, which
-	 *											is the one in config.php and, as a copy, under private/.auth/
-	 *											- the copy follows config.php at every request of the
-	 *											workbench (see \Nino\Modules\Backups::_bootstrap()). The
-	 *											workbench neither shows nor exports the key: an archive that
-	 *											is downloaded is of use with a copy of the key file kept by
-	 *											the person who downloaded it.
+	 *											The panel opens an archive with the key of this project only,
+	 *											which is the one in config.php and, as a copy, under
+	 *											private/.auth/ - the copy follows config.php at every request
+	 *											of the workbench (see \Nino\Modules\Backups::_bootstrap()).
+	 *											The workbench neither shows nor exports the key: the setup
+	 *											wizard shows it once, as the recovery key, and an archive that
+	 *											is downloaded is of use with that key kept by the person who
+	 *											downloaded it. An archive of another project is restored on
+	 *											recovery.php, where its key is typed (see restore() and
+	 *											restoreFile()) - never here: an account with full access that
+	 *											could type a key could restore an archive of its own making,
+	 *											and a restore puts files into the project that php runs.
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -773,18 +778,69 @@ namespace Nino\Modules\Backups {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$date					"Y-m-d", "Y-m-d-His" or "pre-restore-Y-m-d-His" (see ID_PATTERN)
 		 *	@param		array|null	&$notice			(reference) Set where the archive comes from another version of Nino than the one that runs: [ 'code' => 'backups_restored_other_version', 'params' => [ from, to ] ]; left as it was otherwise
+		 *	@param		string|null	$key					Raw (not base64) 32-byte key that somebody typed: the archive is opened with it and not with this project's own, and is then judged for what it holds (see _restoreArchive()). Only recovery.php passes one - behind its own secret, and on purpose not the panel
 		 *
 		 *	@return 	true|array								True, or [ http status, message ] - and, where a person can cause it, the code of the failure as a third element
 		 */
-		public static function restore( array &$appData, string $date, ?array &$notice = null ): true|array {
+		public static function restore( array &$appData, string $date, ?array &$notice = null, ?string $key = null ): true|array {
 
 			if( \Nino\Filesystem::lockFile( $appData, \Nino\Modules\Backups::LOCK_PATH, false ) === false )
 				return [ 409, 'a backup or a restore is running', 'backups_busy' ];
 
 			try {
-				return self::_restoreArchive( $appData, $date, $notice );
+				$dir = self::_backupDir( $appData );
+
+				return self::_restoreArchive( $appData, $dir, $dir === false ? '' : $dir. '/'. $date. '.php', $notice, $key );
 			}
 			finally {
+				\Nino\Filesystem::unlockFile( $appData, \Nino\Modules\Backups::LOCK_PATH );
+			}
+		}
+
+		/**
+		 *	Restore the archive somebody uploaded to recovery.php, in one go with the key it comes with: the
+		 *	file is kept for this restore alone, in the archive directory under a name no list offers, and is
+		 *	gone when the restore ends, whichever way it ends. The same stub check as an upload to the panel
+		 *	(_stage()), the same lock and the same restore as for an archive of the list, with the key that
+		 *	was typed - see restore()
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$uploaded			The uploaded file (php's temporary file)
+		 *	@param		string		$key					Raw (not base64) 32-byte AES key, the one that was typed
+		 *	@param		array|null	&$notice			(reference) See restore()
+		 *
+		 *	@return 	true|array								See restore(); a refusal for the memory carries the values of its sentence as a fourth element
+		 */
+		public static function restoreFile( array &$appData, string $uploaded, string $key, ?array &$notice = null ): true|array {
+
+			if( \Nino\Filesystem::lockFile( $appData, \Nino\Modules\Backups::LOCK_PATH, false ) === false )
+				return [ 409, 'a backup or a restore is running', 'backups_busy' ];
+
+			$temp = '';
+
+			try {
+
+				$dir = \Nino\Filesystem::getContentPath( $appData ). '/.backups';
+
+				if( is_dir( $dir ) === false && @mkdir( $dir, 0755, true ) === false && is_dir( $dir ) === false )
+					return [ 500, 'the backup directory could not be created', 'backups_write' ];
+
+				$temp 		= $dir. '/upload-'. bin2hex( random_bytes( 6 ) ). '.tmp';
+				$staged 	= self::_stage( $uploaded, $temp );
+
+				if( $staged !== true )
+					return $staged;
+
+				$short = \Nino\Modules\Backups::openShort( $appData, (int) @filesize( $temp ) );
+
+				if( $short !== null )
+					return [ 413, 'the memory limit does not carry opening the archive', 'backups_upload_memory', $short ];
+
+				return self::_restoreArchive( $appData, $dir, $temp, $notice, $key );
+			}
+			finally {
+				if( $temp !== '' )
+					@unlink( $temp );
 				\Nino\Filesystem::unlockFile( $appData, \Nino\Modules\Backups::LOCK_PATH );
 			}
 		}
@@ -793,21 +849,21 @@ namespace Nino\Modules\Backups {
 		 *	The restore itself, under the lock of restore()
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$date					See restore()
+		 *	@param		string|false	$dir				The archive directory, false where there is none
+		 *	@param		string		$path					The archive's file
 		 *	@param		array|null	&$notice			(reference) See restore()
+		 *	@param		string|null	$entered			The key somebody typed, or null for this project's own
 		 *
 		 *	@return 	true|array								See restore()
 		 */
-		private static function _restoreArchive( array &$appData, string $date, ?array &$notice ): true|array {
+		private static function _restoreArchive( array &$appData, string|false $dir, string $path, ?array &$notice, ?string $entered ): true|array {
 
-			$dir = self::_backupDir( $appData );
-			$key = self::_key( $appData );
+			$projectKey = self::_key( $appData );
+			$key 				= $entered ?? $projectKey;
 
 			if( $dir === false || $key === false ) {
 				return [ 404, 'no backup available' ];
 			}
-
-			$path = $dir. '/'. $date. '.php';
 
 			if( is_file( $path ) === false ) {
 				return [ 404, 'unknown backup date' ];
@@ -816,7 +872,10 @@ namespace Nino\Modules\Backups {
 			$gz = self::_decrypt( $path, $key );
 
 			if( $gz === false ) {
-				return [ 500, 'decryption failed' ];
+				// Not a server fault: the key does not open it. The sentence of the code says which key and what to do
+				return $entered === null
+					? [ 422, 'the archive cannot be opened with this project\'s key', 'backups_key' ]
+					: [ 422, 'the key does not open the archive', 'backups_key_wrong' ];
 			}
 
 			/*	tempnam() creates the file it names, and the archive was written
@@ -881,10 +940,23 @@ namespace Nino\Modules\Backups {
 				if( $unpacked !== true )
 					return $unpacked;
 
+				// A key that was typed proves nothing about what the archive holds, where the
+				// project's own key proves that this project made it: so of an archive that was opened
+				// with a typed key nothing is read or copied before it is known to be data and
+				// pictures (see \Nino\Backup::codeRefusal()) - nino.php is read by php in _restoreFrom()
+				if( $entered !== null ) {
+					$refused = \Nino\Backup::codeRefusal( $staging );
+					if( $refused !== null )
+						return [ 422, $refused ];
+				}
+
 				// The way back out, before anything is touched - and a snapshot
-				// that cannot be made is a restore that does not start
+				// that cannot be made is a restore that does not start. Made with the key the project
+				// has now: after an archive of another project's key it is the one key that is not in
+				// the project any more, and the snapshot is then opened with it typed in at recovery.php
+				// (a project that has no key of its own makes it with the one that was typed)
 				try {
-					self::_safetySnapshot( $appData, $dir, $key );
+					self::_safetySnapshot( $appData, $dir, $projectKey !== false && strlen( $projectKey ) === 32 ? $projectKey : $key );
 				}
 				catch( \RuntimeException $e ) {
 					return [ 500, 'the safety snapshot could not be made: '. $e->getMessage() ];

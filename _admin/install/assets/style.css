@@ -346,6 +346,39 @@
 	color: var(--editor-red-ink);
 }
 
+/* The recovery key, shown once: the text itself, broken wherever the line ends so that it is
+   seen whole at any width, and selected by one click */
+#install-page-wrap #finish-key {
+	max-width: 40rem;
+	margin: clamp(1.5rem, 5vh, 3.5rem) auto 0;
+}
+#install-page-wrap .install-key-label {
+	margin: 1rem 0 .3rem;
+	font-weight: 600;
+}
+#install-page-wrap .install-key-value {
+	display: block;
+	padding: .75rem .85rem;
+	border: 1px solid var(--editor-border);
+	border-radius: var(--editor-radius-sm);
+	background: var(--nino-admin-surface-muted);
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 1rem;
+	line-height: 1.5;
+	overflow-wrap: anywhere;
+	user-select: all;
+}
+#install-page-wrap .install-key-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: .5rem;
+	margin: .75rem 0 0;
+}
+#install-page-wrap .install-key-msg {
+	display: block;
+	min-height: 1.4em;
+}
+
 /* The finished wizard has nothing left to go back or forward to */
 #install-page-wrap.show-finish.is-complete #install-actions-wrap {
 	display: none;

@@ -1578,9 +1578,22 @@ $appReset();
 $plain = $appProject( 'install-finish-plain' );
 [ $status, $body ] = $appFinish( $plain );
 check( 'without an application the end of the wizard creates the starter pages: Start, Contact and 404', $status === 200 && $starterOf( $plain ) === [ 'GET://', 'GET://contact', 'GET://404' ] );
-check( '...answers where it leads to: nowhere in particular', $body === [ 'login' => true, 'targets' => [] ] );
+check( '...answers where it leads to: nowhere in particular', array_diff_key( $body, [ 'recoveryKey' => 1 ] ) === [ 'login' => true, 'targets' => [] ] );
 check( '...and the empty page, which the Routes panel starts a new route on, is in the project beside them', \Nino\Filesystem::fileExists( $plain, '/templates/page-blank.tpl' ) === true );
 check( '...and the project is done', \Nino\Admin\Admin::isInstalled( $plain ) === true );
+
+// A key that cannot be made leaves the wizard open: nothing is shown that is not kept, and the project does not count as installed
+$appReset();
+$noKey = $appProject( 'install-finish-nokey' );
+$holder = $noKey;
+$holder['./nino/filesystem/locks'] = [];
+\Nino\Filesystem::lockFile( $holder, \Nino\Modules\Backups::LOCK_PATH );
+[ $status, $body ] = $appFinish( $noKey );
+\Nino\Filesystem::unlockFile( $holder, \Nino\Modules\Backups::LOCK_PATH );
+check( 'where the recovery key cannot be made the end of the wizard fails with a 500 and shows no key', $status === 500 && isset( $body['recoveryKey'] ) === false );
+check( '...and the project is not installed and has no recovery password yet: the wizard is still open', \Nino\Admin\Admin::isInstalled( $noKey ) === false && \Nino\Admin\Recovery::hash( $noKey ) === null );
+[ $status, $body ] = $appFinish( $noKey );
+check( '...and the end that follows, with the lock free, makes the key and shows it', $status === 200 && preg_match( '~^[A-Za-z0-9+/]{43}=$~D', (string) ( $body['recoveryKey'] ?? '' ) ) === 1 );
 
 // An application whose starter pages are the wizard's
 $appReset();
@@ -1588,7 +1601,7 @@ $withSite = $appProject( 'install-finish-site' );
 $appApplyAll( $withSite, [ 'site' ] );
 [ $status, $body ] = $appFinish( $withSite, [ 'applications' => [ 'site' ] ] );
 check( 'with an application that has an entry point the end creates the starter pages and names the entry point', $status === 200 && $starterOf( $withSite ) === [ 'GET://', 'GET://contact', 'GET://404' ]
-	&& $body === [ 'login' => true, 'targets' => [ [ 'key' => 'site', 'name' => 'Site', 'next' => '/_admin/#alpha' ] ] ] );
+	&& array_diff_key( $body, [ 'recoveryKey' => 1 ] ) === [ 'login' => true, 'targets' => [ [ 'key' => 'site', 'name' => 'Site', 'next' => '/_admin/#alpha' ] ] ] );
 
 // Several applications: all their entry points
 $appReset();
@@ -1798,14 +1811,25 @@ check( '...also one character below the rule the Finish form shows', $status ===
 // docblock)
 $adminBefore = file_get_contents( __DIR__. '/../_admin/Admin.php' );
 
-[ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Finish::class, 'apiComplete' ], [ 'password' => 'a brand new dev password' ] );
+[ $status, $body, $completed ] = ninoCall( $appData, [ \Nino\Install\Finish::class, 'apiComplete' ], [ 'password' => 'a brand new dev password' ] );
 check( 'apiComplete succeeds once an editor account exists', $status === 200 );
+
+/*	The recovery key: the key the archives are made with, made by the end of the wizard so that
+	it stands when it is shown, and handed out in this one answer	*/
+$shown 			= $body['recoveryKey'] ?? null;
+$storedKey 	= \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/backup/key'] ?? null;
+$keyCopy 		= (string) @file_get_contents( $sandbox. '/private/.auth/backup-key.php' );
+check( 'the end of the wizard answers with the recovery key: base64 of 32 bytes', is_string( $shown ) === true && preg_match( '~^[A-Za-z0-9+/]{43}=$~D', $shown ) === 1 && strlen( (string) base64_decode( $shown, true ) ) === 32 );
+check( '...which is the key the archives are encrypted with: the one in config.php', $shown === $storedKey );
+check( '...and its copy under .auth is that key behind the exit stub, written before the project counts as installed', $keyCopy === \Nino\Admin\Recovery::STUB_PREFIX. $shown. \Nino\Admin\Recovery::STUB_SUFFIX && \Nino\Admin\Admin::isInstalled( $appData ) === true );
+check( '...the answer is not to be kept by a cache', ( $completed['/nino/http/response']['header']['Cache-Control'] ?? '' ) === 'private, no-store' );
+check( '...and no other key of config.php holds it: it is under /nino/backup/key alone', substr_count( (string) file_get_contents( $sandbox. '/private/config.php' ), (string) $shown ) === 1 );
 
 /*	Two accounts were created above (admin@ and boundary@), and the last
 	apiCreate() left boundary@ signed in. Which of the two stays signed in
 	is the login page's decision, not the wizard's: the session is ended
 	and the wizard is told so	*/
-check( 'with several accounts the wizard answers login: false', $body === [ 'login' => false, 'targets' => [] ] );
+check( 'with several accounts the wizard answers login: false', array_diff_key( $body, [ 'recoveryKey' => 1 ] ) === [ 'login' => false, 'targets' => [] ] );
 check( '...and the session the Accounts step opened is ended', \Nino\Auth::getCurrentUser( $appData ) === false );
 
 /*	The one-account case: the person who just typed the only password is
@@ -1813,14 +1837,15 @@ check( '...and the session the Accounts step opened is ended', \Nino\Auth::getCu
 \Nino\Auth::deleteUser( $appData, 'boundary@example.com' );
 \Nino\Auth::loginUser( $appData, 'admin@example.com', 'a-different-password' );
 [ $status, $body ] = ninoCall( $appData, [ \Nino\Install\Finish::class, 'apiComplete' ], [ 'password' => 'a brand new dev password' ] );
-check( 'with exactly one account, the one signed in, it answers login: true', $status === 200 && $body === [ 'login' => true, 'targets' => [] ] );
+check( 'with exactly one account, the one signed in, it answers login: true', $status === 200 && array_diff_key( $body, [ 'recoveryKey' => 1 ] ) === [ 'login' => true, 'targets' => [] ] );
+check( 'a later end of the wizard shows the same key: a key that exists is never made again', ( $body['recoveryKey'] ?? '' ) === $shown );
 check( '...and leaves that session signed in', ( \Nino\Auth::getCurrentUser( $appData )['mail'] ?? '' ) === 'admin@example.com' );
 
 // One account, but nobody signed in (a cooled-down ip, a session that did
 // not survive): the login page is the way in, as before
 \Nino\Auth::logoutUser( $appData );
 [ , $body ] = ninoCall( $appData, [ \Nino\Install\Finish::class, 'apiComplete' ], [ 'password' => 'a brand new dev password' ] );
-check( 'with one account and no session it answers login: false', $body === [ 'login' => false, 'targets' => [] ] );
+check( 'with one account and no session it answers login: false', array_diff_key( $body, [ 'recoveryKey' => 1 ] ) === [ 'login' => false, 'targets' => [] ] );
 
 check( 'the real _admin/Admin.php was not touched', file_get_contents( __DIR__. '/../_admin/Admin.php' ) === $adminBefore );
 

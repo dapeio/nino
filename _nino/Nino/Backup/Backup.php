@@ -408,6 +408,179 @@ namespace Nino {
 			return null;
 		}
 
+		// The names a file below images/ may have: what Images writes (webp, png, jpg) and the other
+		// formats a browser draws as a picture. Nothing a webserver hands to an interpreter, which is
+		// what the directory is open to
+		private const string IMAGE_NAME = '/^[A-Za-z0-9_][A-Za-z0-9_.-]*\.(?:jpe?g|png|webp|gif|avif|ico|svg)$/D';
+
+		// One token of a data file's body: what var_export() writes for an array of strings, numbers,
+		// booleans and null - and the same in the short form of an array, which a file written by hand has -
+		// and nothing else. Anything that is no token of it is no data: a name, a variable, a call, a
+		// '(' that does not belong to array(
+		private const string DATA_TOKEN = '/\G(?:\s++|array\s*+\(|[\[\]),;]|=>|\.(?!\.)|-?(?:\d++(?:\.\d++)?(?:[eE][+-]?\d++)?|INF)|NAN|(?i:true|false|null)(?![A-Za-z0-9_])|\'(?:[^\'\\\\]++|\\\\.)*+\'|"\\\\0")/';
+
+		// A comment, which the element type files of the install units and of the catalogue's features
+		// carry at their head and which a person writes between the lines of a file of their own. A line
+		// comment ends where php ends it: at any of the three line breaks (a lone carriage return is
+		// one) and at a closing tag, which is left standing for the pattern to refuse; '#[' is an
+		// attribute and no comment
+		private const string COMMENT = '~\G(?://|#(?!\[))(?:(?!\?>)[^\r\n])*+|\G/\*(?:(?!\*/)[\s\S])*+\*/~';
+
+		// The one statement ahead of the return that is data: the declaration the install units' files start with
+		private const string DECLARE = '/\Gdeclare\s*+\(\s*+strict_types\s*+=\s*+1\s*+\)\s*+;/';
+
+		/**
+		 *	Whether the text of a php file is data and nothing else: <?php, comments and one
+		 *	declare(strict_types=1); where there are any, return, then what var_export() writes (see
+		 *	DATA_TOKEN) with comments between its tokens, then the semicolon and nothing but blanks and
+		 *	comments. It is read token by token with patterns of its own and not by the tokenizer, so that
+		 *	a file of any size costs the file and no token list; whatever they do not name - and a pattern
+		 *	that fails - is no data
+		 *
+		 *	@param		string		$source				The file's bytes
+		 *
+		 *	@return 	bool
+		 */
+		private static function _isData( string $source ): bool {
+
+			if( preg_match( '/^<\?php\s/', $source ) !== 1 )
+				return false;
+
+			$at 			= 5;
+			$length 	= strlen( $source );
+			$phase 		= 0;
+			$declared = false;
+
+			while( $at < $length ) {
+
+				if( preg_match( self::COMMENT, $source, $token, 0, $at ) === 1 ) {
+					$at += strlen( $token[0] );
+					continue;
+				}
+
+				// Ahead of the return: blanks, one declare, then the return itself
+				if( $phase === 0 ) {
+
+					if( preg_match( '/\G\s++/', $source, $token, 0, $at ) === 1 )
+						$at += strlen( $token[0] );
+					else if( $declared === false && preg_match( self::DECLARE, $source, $token, 0, $at ) === 1 ) {
+						$declared = true;
+						$at += strlen( $token[0] );
+					}
+					else if( preg_match( '/\Greturn(?=\s)/', $source, $token, 0, $at ) === 1 ) {
+						$phase = 1;
+						$at += 6;
+					}
+					else
+						return false;
+
+					continue;
+				}
+
+				if( preg_match( self::DATA_TOKEN, $source, $token, 0, $at ) !== 1 )
+					return false;
+
+				// After the one semicolon only blanks and comments may follow
+				if( $phase === 2 && trim( $token[0] ) !== '' )
+					return false;
+
+				if( $token[0] === ';' )
+					$phase = 2;
+
+				$at += strlen( $token[0] );
+			}
+
+			return $phase === 2;
+		}
+
+		/**
+		 *	Whether an svg is a drawing and nothing that runs: a file the browser opens as a document when
+		 *	it is asked for by its address runs the script that is in it, and the pages the installer
+		 *	brings have svg pictures, so the format cannot be refused outright. What is refused is what
+		 *	makes an svg more than shapes: a script, an element that embeds or fetches another document
+		 *	or animates an attribute, an event attribute, a reference that is not to the file itself, a
+		 *	document type or an entity, and css that fetches or hides what it fetches. A check of the text and no parser: it is the one place of the
+		 *	rule that is a judgement and not a grammar, and it errs on the side of refusing
+		 *
+		 *	@param		string		$source				The file's bytes
+		 *
+		 *	@return 	bool
+		 */
+		private static function _isPlainSvg( string $source ): bool {
+
+			if( preg_match( '/^(?:\xEF\xBB\xBF)?\s*(?:<\?xml[^>]*\?>\s*)?(?:<!--.*?-->\s*)*<svg[\s>]/is', $source ) !== 1 )
+				return false;
+
+			if( preg_match( '/<\s*(?:script|foreignObject|iframe|embed|object|animate|set|handler|listener)\b|<!(?:DOCTYPE|ENTITY)|[\s"\'\/]on[a-z]+\s*=|(?:xlink:)?href\s*=\s*["\']?\s*(?!#)|javascript\s*:/i', $source ) === 1 )
+				return false;
+
+			// Style is css, and css fetches: an import, a font, an image set, a url that is no reference to
+			// the file itself. What is written in an escape or an entity is not read as what it says, so a
+			// style that has either is refused whole
+			preg_match_all( '~<style\b[^>]*>(.*?)</style\s*>|\sstyle\s*=\s*"([^"]*)"|\sstyle\s*=\s*\'([^\']*)\'~is', $source, $styles, PREG_SET_ORDER );
+
+			foreach( $styles as $style ) {
+
+				$css = $style[1] !== '' ? $style[1] : ( ( $style[2] ?? '' ) !== '' ? $style[2] : ( $style[3] ?? '' ) );
+
+				if( preg_match( '/[\\\\&]|@import|@font-face|image-set|-moz-binding|expression\s*\(|\bsrc\s*\(|url\s*\((?!\s*["\']?\s*#)/i', $css ) === 1 )
+					return false;
+			}
+
+			return true;
+		}
+
+		/**
+		 *	Whether the unpacked copy of an archive holds code. For an archive that was opened with a key
+		 *	somebody TYPED: the project's own key proves that the archive was made by this project, a key
+		 *	that is typed proves nothing about what is in it, and what a restore puts into the project is
+		 *	read by php - config.php at every request, the texts, elements and data files, nino.php the
+		 *	moment the restore reads it - or served by the webserver as it is, the pictures. So every
+		 *	.php file must be data (_isData()), and what lies below images/ a picture with a name that
+		 *	is none of a script's. Read from the staging directory, after staged() and before anything
+		 *	of it is read or copied
+		 *
+		 *	@param		string		$staging			Absolute path of the directory the archive was unpacked into
+		 *
+		 *	@return 	string|null							Why the archive is refused, or null where it holds data and pictures alone
+		 */
+		public static function codeRefusal( string $staging ): ?string {
+
+			$iterator = new \RecursiveIteratorIterator(
+				new \RecursiveDirectoryIterator( $staging, \FilesystemIterator::SKIP_DOTS ),
+				\RecursiveIteratorIterator::LEAVES_ONLY
+			);
+
+			foreach( $iterator as $item ) {
+
+				$relative = str_replace( DIRECTORY_SEPARATOR, '/', substr( $item->getPathname(), strlen( rtrim( $staging, DIRECTORY_SEPARATOR ) ) + 1 ) );
+				$name 		= $item->getFilename();
+
+				if( str_starts_with( $relative, 'images/' ) === true && ( preg_match( self::IMAGE_NAME, $name ) !== 1 || preg_match( '/\.(?:php|phtml|phar|pht|phps)(?:\d|\.|$)/i', $name ) === 1 ) )
+					return self::_refuse( $relative, 'a file that is no picture' );
+
+				if( str_starts_with( $relative, 'images/' ) === true && preg_match( '/\.svg$/', $name ) === 1 ) {
+
+					$drawing = @file_get_contents( $item->getPathname() );
+
+					if( $drawing === false || self::_isPlainSvg( $drawing ) === false )
+						return self::_refuse( $relative, 'a drawing that is more than shapes' );
+				}
+
+				if( preg_match( '/\.(?:php|phtml|phar|pht|phps)\d?$/i', $name ) !== 1 )
+					continue;
+
+				// A php file by its name is data or it is refused; the extension is read as php reads it,
+				// whatever the case
+				$source = @file_get_contents( $item->getPathname() );
+
+				if( $source === false || self::_isData( $source ) === false )
+					return self::_refuse( $relative, 'code' );
+			}
+
+			return null;
+		}
+
 		// A header field up to its first NUL byte, or null where bytes follow that
 		private static function _field( string $block, int $from, int $length ): ?string {
 

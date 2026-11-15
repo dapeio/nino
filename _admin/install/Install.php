@@ -2107,7 +2107,7 @@ namespace Nino\Install {
 		 *	far as the catalogue it fetched lists them and every feature of
 		 *	them is on (Applications::applied()).
 		 *
-		 *	Answers { login: bool, targets: [ { key, name, next [, menu] } ] }: whether
+		 *	Answers { login: bool, targets: [ { key, name, next [, menu] } ] [, recoveryKey] }: whether
 		 *	this session walks into the workbench, and the entry point of each
 		 *	application that has one. It walks when the wizard created exactly
 		 *	one account and that is the one Accounts::apiCreate() signed in -
@@ -2116,6 +2116,12 @@ namespace Nino\Install {
 		 *	which of them stays signed in is nobody's decision but the login
 		 *	page's. The page decides where to: the one target there is, or the
 		 *	list of them
+		 *
+		 *	recoveryKey is the key the project's backup archives are encrypted
+		 *	with (see \Nino\Modules\Backups::recoveryKey()), made here so that it
+		 *	stands when it is shown. This answer is the one place it is handed
+		 *	out: the page shows it once and drops it, and an archive that is
+		 *	kept elsewhere is of use to nobody without it
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -2178,6 +2184,21 @@ namespace Nino\Install {
 				}
 			}
 
+			// The recovery key, which the answer carries and nothing else does: it has to stand before the project
+			// counts as installed (a failure leaves the wizard open), and it is the key the archives are made with.
+			// A delivery without the Backups module has no archives and so none to show
+			$recoveryKey = false;
+
+			if( class_exists( '\\Nino\\Modules\\Backups' ) === true ) {
+
+				$recoveryKey = \Nino\Modules\Backups::recoveryKey( $appData );
+
+				if( $recoveryKey === false ) {
+					\Nino\Http::fail( $request, 500, 'the backup key could not be created - check the file permissions of config.php and the private directory' );
+					return;
+				}
+			}
+
 			if( \Nino\Admin\Recovery::set( $appData, $pw ) === false ) {
 				\Nino\Http::fail( $request, 500, 'could not write '. \Nino\Admin\Recovery::PASSWORD_PATH. ' under the private directory - check its file permissions' );
 				return;
@@ -2193,7 +2214,11 @@ namespace Nino\Install {
 			if( $login === false && $current !== false )
 				\Nino\Auth::logoutUser( $appData );
 
-			\Nino\Http::ok( $request, [ 'login' => $login, 'targets' => \Nino\Install\Applications::targets( $appData, $applied ) ] );
+			// Shown once and kept by nobody: not cached, not stored under any other name
+			if( $recoveryKey !== false )
+				$request['/nino/http/response']['header']['Cache-Control'] = 'private, no-store';
+
+			\Nino\Http::ok( $request, [ 'login' => $login, 'targets' => \Nino\Install\Applications::targets( $appData, $applied ) ] + ( $recoveryKey !== false ? [ 'recoveryKey' => $recoveryKey ] : [] ) );
 		}
 	}
 }

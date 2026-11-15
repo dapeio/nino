@@ -1638,8 +1638,8 @@ foreach( $source as $file ) {
 // the images the kernel refuses - named by variable at the call - and the one
 // a restore carries in its answer, where nothing failed and so no Http::fail()
 // names it: the notice of a backup that comes from another version of Nino -
-// and the one a restore that cannot start hands its callers, who pass it on
-foreach( [ 'int_range', 'bool', 'lines', 'lines_ip', 'invalid_value', 'upload_too_large', 'upload_partial', 'upload_missing', 'upload_server', 'image_too_large', 'image_type', 'image_too_many_pixels', 'image_unreadable', 'post_too_large', 'csrf', 'session', 'already_top', 'already_bottom', 'backups_restored_other_version', 'backups_busy' ] as $code )
+// and the ones a restore that cannot start or cannot open its archive hands its callers, who pass them on
+foreach( [ 'int_range', 'bool', 'lines', 'lines_ip', 'invalid_value', 'upload_too_large', 'upload_partial', 'upload_missing', 'upload_server', 'image_too_large', 'image_type', 'image_too_many_pixels', 'image_unreadable', 'post_too_large', 'csrf', 'session', 'already_top', 'already_bottom', 'backups_restored_other_version', 'backups_busy', 'backups_key', 'backups_key_wrong' ] as $code )
 	$codes[$code] = true;
 
 $wordFiles = [];
