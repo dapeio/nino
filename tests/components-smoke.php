@@ -55,6 +55,38 @@ foreach( $hookRoles as $hookRole )
 		if( $hookValue( $hookRoot, $hookProperty ) === null )
 			$hookMissing[] = $hookProperty;
 check( 'Nino.css declares the five font roles in :root, each with a family, a weight, a transform and a size'. ( $hookMissing === [] ? '' : ' - missing: '. implode( ', ', $hookMissing ) ), $hookMissing === [] );
+// A title never leaves its box: three rules, all in :where() with no !important - the cut of a word that does not fit, the same at the root of a tile and of a table cell, and the hyphens of long words
+$hookTitleRule = static function( string $selector ) use ( $hookCss ): array {
+	preg_match_all( '/(?:^|[{}])\s*'. preg_quote( $selector, '/' ). '\s*\{([^{}]*)\}/', $hookCss, $found );
+	return $found[1];
+};
+$hookHeadings	= 'h1, h2, h3, h4, h5, h6, .nino-section-title, .nino-card-title, .nino-pricing-title, .nino-footer-title';
+$hookTitles		= $hookHeadings. ', .nino-section-subtitle, .nino-card-subtitle';
+$hookCut			= $hookTitleRule( ':where( '. $hookTitles. ' )' );
+$hookCutRoot	= $hookTitleRule( ':where( .nino-tiles, td, th ) :where( '. $hookTitles. ' )' );
+$hookHyphens	= $hookTitleRule( ':where( '. $hookHeadings. ' )' );
+check( 'Nino.css lets no title leave its box: overflow-wrap break-word on h1 to h6 and on the title and subtitle classes, in one :where() rule that a design layer overrules with an ordinary rule',
+	count( $hookCut ) === 1 && $hookValue( $hookCut[0], 'overflow-wrap' ) === 'break-word' && str_contains( $hookCut[0], '!important' ) === false );
+check( '...and anywhere under the tiles of a section and in a table cell, where the content alone sizes the column: the same titles, after the rule above, one :where() of ancestors and one of titles',
+	count( $hookCutRoot ) === 1 && $hookValue( $hookCutRoot[0], 'overflow-wrap' ) === 'anywhere' && str_contains( $hookCutRoot[0], '!important' ) === false
+	&& strpos( $hookCss, ':where( .nino-tiles, td, th ) :where( ' ) > strpos( $hookCss, ':where( '. $hookTitles. ' ) {' ) );
+check( '...and the headings and the title classes - the subtitles left out - are hyphenated by the language of the page, auto, with a limit of letters that keeps a short word whole, in the one @supports rule of that limit and nowhere outside it',
+	count( $hookHyphens ) === 1 && preg_match( '/@supports\s*\(\s*hyphenate-limit-chars:\s*12 4 4\s*\)\s*\{\s*:where\( '. preg_quote( $hookHeadings, '/' ). ' \)\s*\{[^{}]*\}\s*\}/', $hookCss ) === 1 && $hookValue( $hookHyphens[0], 'hyphens' ) === 'auto' && str_contains( $hookHyphens[0], '!important' ) === false
+	&& preg_match( '/^(\d+) (\d+) (\d+)$/', (string) $hookValue( $hookHyphens[0], 'hyphenate-limit-chars' ), $hookLimit ) === 1 && (int) $hookLimit[1] >= 12 && (int) $hookLimit[2] >= 4 && (int) $hookLimit[3] >= 4 );
+// ...and the three blocks carry the declarations they are meant for and no other
+$hookDeclared = static fn( string $block ): array => array_map( static fn( string $declaration ): string => trim( explode( ':', $declaration )[0] ), array_filter( array_map( 'trim', explode( ';', $block ) ), static fn( string $declaration ): bool => $declaration !== '' ) );
+check( '...and each of the three blocks says only what it is for: the two cuts overflow-wrap and nothing else, the hyphens hyphens and hyphenate-limit-chars',
+	( $hookCut[0] ?? null ) !== null && $hookDeclared( $hookCut[0] ) === [ 'overflow-wrap' ]
+	&& ( $hookCutRoot[0] ?? null ) !== null && $hookDeclared( $hookCutRoot[0] ) === [ 'overflow-wrap' ]
+	&& ( $hookHyphens[0] ?? null ) !== null && $hookDeclared( $hookHyphens[0] ) === [ 'hyphens', 'hyphenate-limit-chars' ] );
+// ...and no other rule of the sheet takes the cut or the hyphens of a title back
+$hookReset = [];
+preg_match_all( '/([^{}]+)\{([^{}]*(?:overflow-wrap|hyphens|word-break)[^{}]*)\}/', $hookCss, $hookRulesFound, PREG_SET_ORDER );
+foreach( $hookRulesFound as $hookRule )
+	if( in_array( trim( $hookRule[1] ), [ ':where( '. $hookTitles. ' )', ':where( .nino-tiles, td, th ) :where( '. $hookTitles. ' )', ':where( '. $hookHeadings. ' )' ], true ) === false
+		&& preg_match( '/(?<![\w-])h[1-6](?![\w-])|-title(?![\w-])|-subtitle(?![\w-])/', $hookRule[1] ) === 1 )
+		$hookReset[] = trim( $hookRule[1] );
+check( '...and no later rule of Nino.css sets overflow-wrap, hyphens or word-break on a heading or a title class'. ( $hookReset === [] ? '' : ' - found: '. implode( ' | ', $hookReset ) ), $hookReset === [] );
 check( '...no role transforms anything until a design layer says so, and the button has the face of the text',
 	array_filter( $hookRoles, static fn( string $role ): bool => $hookValue( $hookRoot, '--font-'. $role. '-transform' ) !== 'none' ) === []
 	&& $hookValue( $hookRoot, '--fontfamily-button' ) === 'var(--fontfamily-text)' );
@@ -1994,14 +2026,15 @@ sort( $tileSelectors );
 $tileExpected = [ ':is(.nino-tiles > .nino-grid-row > *).nino-radius', ':is(.nino-tiles > .nino-grid-row > *).nino-radius-alt', '.nino-tiles', ':where(.nino-tiles) > .nino-grid-row', ':where(.nino-tiles) > .nino-grid-row > *',
 	':where(.nino-tiles) > .nino-grid-row > * > .nino-btn', ':where(.nino-tiles) > .nino-grid-row > * > .nino-grid-bg', ':where(.nino-tiles) > .nino-grid-row > * > [data-html]',
 	':where(.nino-tiles) > .nino-grid-row > * > .nino-section-text:where(:not(.nino-section-text--quiet, .nino-section-text--loud))', ':where(.nino-tiles) > .nino-grid-row > .nino-text-center > .nino-btn',
-	':where(.nino-tiles) > .nino-grid-row > .nino-text-right > .nino-btn' ];
+	':where(.nino-tiles) > .nino-grid-row > .nino-text-right > .nino-btn',
+	':where( .nino-tiles, td, th ) :where( h1, h2, h3, h4, h5, h6, .nino-section-title, .nino-card-title, .nino-pricing-title, .nino-footer-title, .nino-section-subtitle, .nino-card-subtitle )' ];
 foreach( [ 's', 'm', 'l', 'xl' ] as $tileTier )
 	foreach( [ 'left', 'center', 'right' ] as $tileAlign )
 		$tileExpected[] = ':where(.nino-tiles) > .nino-grid-row > .nino-text-'. $tileTier. '-'. $tileAlign. ' > .nino-btn';
 foreach( [ '1-1', '4-3', '3-2', '16-9', '21-9', '4-1', '5-1' ] as $tileRatio )
 	$tileExpected[] = '.nino-tiles--'. $tileRatio. ' > .nino-grid-row > *';
 sort( $tileExpected );
-check( 'nothing in Nino.css addresses a section of tiles but these rules: the section, its row, a tile, its words and its button, its picture, the seven ratios and the radius classes of a tile',
+check( 'nothing in Nino.css addresses a section of tiles but these rules: the section, its row, a tile, its words and its button, the cut of its titles, its picture, the seven ratios and the radius classes of a tile',
 	$tileSelectors === $tileExpected );
 
 $tileFirstUtility = -1;

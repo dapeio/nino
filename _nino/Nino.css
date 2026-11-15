@@ -728,6 +728,27 @@ h1, h2, h3, h4, h5, h6 {
 	text-transform: var(--font-title-transform);
 }
 
+/*	The headings h1 to h6 and the title and subtitle classes cut a word the line
+	cannot hold (break-word). Under the tiles of a section and in a table cell,
+	where the content alone sizes the column, they cut at any letter (anywhere),
+	which keeps a long word from widening the row past the screen. Headings and
+	title classes hyphenate words of twelve letters or more by the lang of the
+	page, inside @supports because a browser without hyphenate-limit-chars
+	hyphenates short words too. :where() adds no specificity: a design layer or
+	a project overrules each rule with an ordinary one	*/
+:where( h1, h2, h3, h4, h5, h6, .nino-section-title, .nino-card-title, .nino-pricing-title, .nino-footer-title, .nino-section-subtitle, .nino-card-subtitle ) {
+	overflow-wrap: break-word;
+}
+:where( .nino-tiles, td, th ) :where( h1, h2, h3, h4, h5, h6, .nino-section-title, .nino-card-title, .nino-pricing-title, .nino-footer-title, .nino-section-subtitle, .nino-card-subtitle ) {
+	overflow-wrap: anywhere;
+}
+@supports ( hyphenate-limit-chars: 12 4 4 ) {
+	:where( h1, h2, h3, h4, h5, h6, .nino-section-title, .nino-card-title, .nino-pricing-title, .nino-footer-title ) {
+		hyphens: auto;
+		hyphenate-limit-chars: 12 4 4;
+	}
+}
+
 
 /****************************************************************************************************
  *
