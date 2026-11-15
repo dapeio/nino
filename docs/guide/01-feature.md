@@ -64,10 +64,10 @@ namespace Nino\Modules {
 			\Nino\Feature::shortcode( $appData, 'meetup-date', [ self::class, 'doShortcode' ] );
 		}
 
-		// [meetup-date 2026-12-24]
+		// [meetup-date date="2026-12-24"]
 		public static function doShortcode( array &$appData, array $args ): string {
 
-			$date = (string) ( $args[0] ?? '' );
+			$date = (string) ( $args['date'] ?? '' );
 
 			// Only a date of this exact shape is written, so nothing needs escaping
 			if( preg_match( '/^\d{4}-\d{2}-\d{2}$/D', $date ) !== 1 )
@@ -85,7 +85,7 @@ namespace Nino\Modules {
 
 - Nino ruft `init()` bei jeder Anfrage auf, solange das Feature eingeschaltet ist. `init()` meldet nur Shortcodes, Routen und Callbacks an. Es gibt nichts aus.
 - `\Nino\Feature::shortcode()` meldet den Shortcode `[meetup-date]` an.
-- `doShortcode()` bekommt die Argumente des Shortcodes. `$args[0]` ist das erste Argument ohne Namen.
+- `doShortcode()` bekommt die Argumente des Shortcodes. `$args['date']` ist das Argument mit dem Namen `date`.
 - `\Nino\Feature::template()` liest die Vorlage des Features. PHP ersetzt darin die Platzhalter `[[iso]]` und `[[text]]`.
 
 ### 4. Die Vorlage
@@ -107,7 +107,7 @@ Nino trägt die Klasse jetzt in `private/config.php` unter `/nino/modules` ein u
 Öffne `private/templates/page-home.tpl`. Das ist die Vorlage der Startseite. Schreibe diese Zeile vor die letzte Zeile `[template /templates/html-footer]`:
 
 ```html
-<p>Next meeting: [meetup-date 2026-12-24]</p>
+<p>Next meeting: [meetup-date date="2026-12-24"]</p>
 ```
 
 ## Prüfen
@@ -118,13 +118,13 @@ Nino trägt die Klasse jetzt in `private/config.php` unter `/nino/modules` ein u
 <p>Next meeting: <time class="meetups-date" datetime="2026-12-24">2026-12-24</time></p>
 ```
 
-Schreibe zur Probe `[meetup-date morgen]`. Die Ausgabe ist leer, denn `morgen` ist kein Datum.
+Schreibe zur Probe `[meetup-date date="morgen"]`. Die Ausgabe ist leer, denn `morgen` ist kein Datum.
 
 ## Häufige Fehler
 
 - **Das Feature steht nicht im Bereich Features.** Das Verzeichnis heißt `meetups` statt `Meetups`, oder die Datei `Meetups.php` fehlt. Nino überspringt das Manifest dann ganz. Den Grund schreibt Nino als Warnung in `private/data/logs.<Jahr>-<Monat>.php`, siehe [Beim Entwickeln](README.md#beim-entwickeln).
 - **Der Name ist vergeben.** Ein Feature darf nicht heißen wie ein Modul von Nino, zum Beispiel `Elements` oder `Users`.
-- **Auf der Seite steht `[meetup-date 2026-12-24]` als Text.** Das Feature ist nicht eingeschaltet. Der Shortcode eines ausgeschalteten Features bleibt als Text stehen.
+- **Die Zeile zeigt kein Datum.** Das Feature ist nicht eingeschaltet. Ein Name, den kein Feature anmeldet, zeichnet nichts, und auch nichts von dem, was zwischen seinen Marken steht. Das Log nennt den Namen einmal je Anfrage.
 - **`init()` gibt etwas aus.** Ein `echo` in `init()` zerstört die Antwort. `init()` meldet nur Shortcodes, Routen und Callbacks an.
 
 ## Nachschlagen

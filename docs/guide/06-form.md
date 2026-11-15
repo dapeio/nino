@@ -59,7 +59,7 @@ Lege `features/Meetups/templates/meetups-signup.tpl` an:
 - Die Auswahl der Treffen ist dieselbe Schleife wie in Tutorial 5. `[[.slug]]` ist der Name des Elements, zum Beispiel `christmas`.
 - `[[message]]` füllt PHP. Die anderen Platzhalter sind Textfills.
 
-Die Vorlage eines Features darf Textfills und Shortcodes enthalten. Nino liest die Ausgabe einer Komponente noch einmal und ersetzt auch darin Textfills und Shortcodes.
+Die Vorlage eines Features darf Textfills und Shortcodes enthalten. Nino liest die Ausgabe einer Komponente aber nicht noch einmal: Was die Methode zurückgibt, ist fertig, und ein `[csrf]` darin bliebe als Text im Formular stehen. Die Komponente zeichnet ihre Vorlage deshalb selbst (Schritt 4).
 
 ### 3. Die Worte
 
@@ -100,15 +100,20 @@ Füge in `features/Meetups/Meetups.php` diese Methode in die Klasse ein, direkt 
 			// One of three fixed words picks the text key. Nothing of the request is written
 			$message = in_array( $state, [ 'success', 'invalid', 'error' ], true ) === true ? '[[/feature/meetups/signup/'. $state. ']]' : '';
 
-			return str_replace(
+			$source = str_replace(
 				[ '[[classes]]', '[[message]]' ],
 				[ \Nino\Feature::classes( $args ), $message ],
 				\Nino\Feature::template( $appData, self::TEMPLATES, 'meetups-signup' )
 			);
+
+			// The template is html+: [csrf], [elements] and the textfills are drawn here, as the page draws them
+			return \Nino\Html::renderSource( $appData, $source, \Nino\Html::context( $appData ) );
 		}
 ```
 
 - Die Methode heißt nach der Komponente: `meetups-signup` wird `componentMeetupsSignup()`.
+- Die Vorlage ist HTML+. Die Methode setzt zuerst die Platzhalter ein und lässt das Ergebnis dann von `\Nino\Html::renderSource()` zeichnen. `\Nino\Html::context()` sagt, wo der Aufruf auf der Seite steht, damit die Vorlage dort so wirkt, als stünde sie in der Seite.
+- Was Du vor dem Zeichnen einsetzt, wird mitgelesen. Setze deshalb nur Sicheres ein: `Feature::classes()` schreibt jedes `[` als `&#91;`, und die Meldung ist einer von drei festen Schlüsseln.
 - `$appData['./meetups/signup']` ist ein Wert, der nur für diese Anfrage gilt. Schlüssel mit `./` am Anfang speichert Nino nie. Tutorial 7 setzt den Wert.
 - Der Satz im Formular ist ein Textfill. Die Methode wählt seinen Schlüssel aus drei festen Worten. Sie schreibt nichts aus der Anfrage ins HTML. Der Satz ist für einen Besucher ohne JavaScript: Das Skript schreibt seine Sätze selbst in die Meldung.
 
@@ -155,7 +160,7 @@ Sende das Formular ab, erst ohne Namen: Unter dem Knopf steht „Bitte gib Deine
 
 ## Häufige Fehler
 
-- **`[csrf]` fehlt im Formular.** Jede Anfrage endet später mit dem Status `403`.
+- **`[csrf]` fehlt im Formular oder steht darin als Text.** Jede Anfrage endet später mit dem Status `403`. Steht `[csrf]` im Quelltext der Seite als Text, hat die Methode ihre Vorlage nicht mit `renderSource()` gezeichnet.
 - **`data-form-texts` fehlt.** Das Skript spricht dann die Sätze des Kontaktformulars. Auch ein Schlüssel, der nicht freigegeben ist (Schritt 5), zeigt nichts an.
 - **Ein Feld ohne `label`.** Jedes Feld braucht eine Beschriftung, die mit `for` auf seine `id` zeigt.
 - **Die Adresse ohne `[[/nino/dir]]`.** Das Formular geht dann ins Leere, sobald das Projekt in einem Unterverzeichnis läuft.

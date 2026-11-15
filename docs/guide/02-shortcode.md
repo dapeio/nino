@@ -12,15 +12,17 @@ Ein Shortcode kennt drei Arten von Argumenten:
 
 | Im Template | In PHP |
 |---|---|
-| `[meetup-date 2026-12-24]` | `$args[0]` – ein Argument ohne Namen |
-| `[meetup-date … time="19:30"]` | `$args['time']` – ein Argument mit Namen |
+| `[meetup-date date="2026-12-24"]` | `$args['date']` – ein Argument mit Namen, sein Wert steht in Anführungszeichen |
 | `[meetup-date … long]` | ein bloßes Wort, ein Schalter |
+| `[meetup-date /template/page-home/next/date]` | `$args[0]` – die Quelle: ein Wort ohne Namen, das mit `/`, `~` oder `.` beginnt |
+
+Ein Wort ohne Namen ist die Quelle, wenn es mit `/`, `~` oder `.` beginnt. Sonst ist es ein Schalter, und das nur, wenn es als Name eines Attributs taugt: Buchstaben und Ziffern, ein Buchstabe am Anfang. Ein Datum ist weder das eine noch das andere. `[meetup-date 2026-12-24]` ist für Nino keine Marke, sondern Text, und die Seite zeigt es so, wie es dasteht. Deshalb bekommt das Datum den Namen `date`. Tutorial 3 zeigt, wie eine Komponente ihren Wert aus einer Quelle holt.
 
 Der Shortcode soll das können:
 
 ```html
-[meetup-date 2026-12-24 time="19:30" label="Christmas party" class="highlight"]
-[meetup-date 2027-01-09 long]
+[meetup-date date="2026-12-24" time="19:30" label="Christmas party" class="highlight"]
+[meetup-date date="2027-01-09" long]
 ```
 
 ### 2. Die Methode
@@ -28,10 +30,10 @@ Der Shortcode soll das können:
 Ersetze in `features/Meetups/Meetups.php` die Methode `doShortcode()` samt ihrem Kommentar:
 
 ```php features/Meetups/Meetups.php
-		// [meetup-date 2026-12-24 time="19:30" label="Christmas party" long class="highlight"]
+		// [meetup-date date="2026-12-24" time="19:30" label="Christmas party" long class="highlight"]
 		public static function doShortcode( array &$appData, array $args ): string {
 
-			$date = (string) ( $args[0] ?? '' );
+			$date = (string) ( $args['date'] ?? '' );
 			$time = (string) ( $args['time'] ?? '' );
 
 			// A date that is none draws nothing
@@ -75,7 +77,7 @@ Was hier neu ist:
 - **Die Sprache der Seite.** `\Nino\Format::date()`, `dateLong()` und `datetime()` schreiben ein Datum so, wie die Sprache der Seite es schreibt. Für ein Datum, das es nicht gibt, antworten sie `null`.
 - **Der Schalter.** `\Nino\Feature::flag()` liest ein bloßes Wort wie `long`. Es versteht auch `long="yes"` und `long="no"`.
 - **Die Klasse.** Jeder Shortcode darf `class="…"` tragen. `\Nino\Feature::classes()` gibt die Klassen maskiert zurück, mit einem Leerzeichen davor.
-- **Maskieren.** `label` ist freier Text. `\Nino\Modules\Components::escape()` maskiert ihn für HTML. Die Funktion schreibt auch `[` als `&#91;`. Das ist nötig, weil Nino die Ausgabe eines Shortcodes noch einmal liest und darin Textfills und Shortcodes ersetzt. Ein `[` im Wert könnte sonst einen neuen Shortcode öffnen.
+- **Maskieren.** `label` ist freier Text. `\Nino\Modules\Components::escape()` maskiert ihn für HTML. Die Funktion schreibt auch `[` als `&#91;`. Nino liest die Ausgabe eines Shortcodes nicht noch einmal: Was Du zurückgibst, ist fertig, und ein `[` darin öffnet nichts. Das `&#91;` schützt trotzdem, und zwar dort, wo ein Wert in eine Vorlage kommt, die ein Shortcode selbst zeichnet (Tutorial 6). Es kostet nichts, und der Wert bleibt überall derselbe Text.
 
 ### 3. Die Vorlage
 
@@ -90,11 +92,11 @@ Die Vorlage bekommt zwei neue Platzhalter. Ersetze den Inhalt von `features/Meet
 Ersetze in `private/templates/page-home.tpl` die Zeile aus Tutorial 1 durch diese Zeilen:
 
 ```html
-<p>Next meeting: [meetup-date 2026-12-24]</p>
-<p>[meetup-date 2026-12-24 time="19:30" label="Christmas party" class="highlight"]</p>
-<p>[meetup-date 2027-01-09 long]</p>
-<p>[meetup-date 2027-02-30 label="No such day"]</p>
-<p>[meetup-date 2027-03-01 label="<b>Bold</b>"]</p>
+<p>Next meeting: [meetup-date date="2026-12-24"]</p>
+<p>[meetup-date date="2026-12-24" time="19:30" label="Christmas party" class="highlight"]</p>
+<p>[meetup-date date="2027-01-09" long]</p>
+<p>[meetup-date date="2027-02-30" label="No such day"]</p>
+<p>[meetup-date date="2027-03-01" label="<b>Bold</b>"]</p>
 ```
 
 ## Prüfen
@@ -113,14 +115,16 @@ Wechsle die Sprache: Öffne `/?/_nino/localepicker/current=en_US` oder nimm die 
 
 ## Häufige Fehler
 
-- **Einen Wert unmaskiert ausgeben.** Auch ein Attribut aus einer Vorlage ist fremd: Texte lassen sich in der Workbench ändern, und ein Attribut kann einen Textfill enthalten. Maskiere alles, was Du nicht selbst erzeugt oder streng geprüft hast.
-- **`htmlspecialchars()` allein benutzen.** Es maskiert `[` nicht. Nimm `Components::escape()`.
-- **Eine eckige Klammer im Attribut.** Der Shortcode endet an der ersten `]`. `label="a ] b"` schneidet den Aufruf ab.
+- **Einen Wert unmaskiert ausgeben.** Auch ein Attribut aus einer Vorlage ist fremd: Texte lassen sich in der Workbench ändern, und ein Attribut kann einen Textfill enthalten. Maskiere alles, was Du nicht selbst erzeugt oder streng geprüft hast, mit `Components::escape()` und nicht mit `htmlspecialchars()` allein: Das lässt ein `[` stehen.
+- **Eine Marke, die Nino nicht liest.** Sie steht dann als Text auf der Seite oder fehlt ganz. Eine Marke über zwei Zeilen ist Text, ebenso ein Wort, das weder Quelle noch Name eines Attributs ist (`[meetup-date 2026-12-24]`), und ein Wert in Anführungszeichen, die nie schließen. Ein Wert ohne Anführungszeichen (`time=19:30`) oder in einfachen (`time='19:30'`) fällt weg, und der Shortcode läuft ohne ihn. Ein Name, den niemand anmeldet, zeichnet nichts.
+- **Beide Formen eines Namens mischen.** Steht `[meetup-date …]` in einer Datei einmal mit `[/meetup-date]` und einmal ohne, hält Nino das erste für einen Behälter und verschluckt den Rest. Das Blatt schreibst Du dann `[meetup-date … /]`, mit einem Leerzeichen vor dem `/`.
 - **Markup in PHP bauen.** `'<span>'. $text. '</span>'` in der Methode ist nicht erlaubt. Das Markup gehört in die Vorlage.
 
 ## Nachschlagen
 
-- [Shortcodes](../development.md#shortcodes): Argumente, Verschachtelung, Rendertiefe
+- [HTML+ - the notation](../development.md#html---the-notation): welche Marke Nino liest und was Text bleibt
+- [Shortcodes](../development.md#shortcodes): Argumente und Inhalt
+- [Drawing a page](../development.md#drawing-a-page): was ein Shortcode zurückgibt, wie er eigenen Quelltext zeichnet
 - [Shortcode contract](../recipes/runtime-module.md#shortcode-contract): die Regeln für einen Shortcode
 - [Rendering and escaping rules](../../AGENTS.md#rendering-and-escaping-rules): wo was maskiert wird
 - [Formatting a value](../development.md#formatting-a-value): `\Nino\Format`

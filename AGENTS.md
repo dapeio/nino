@@ -83,7 +83,7 @@ Do not use “page”, “template”, “module”, and “admin module” inte
 | --- | --- |
 | Add a screen to the workbench `/_admin` | Panel - answered by a runtime module's `adminPanels()`, or a module directory under `_admin/Nino/Modules/`, see the [panel recipe](docs/recipes/admin-panel.md) |
 | Add behavior to public requests or a new shortcode | Runtime module, see the [runtime module recipe](docs/recipes/runtime-module.md) |
-| Add a shortcode that a tool can offer - a source for its value and typed attributes with defaults - or one that loops the elements of a type around its content | Component or stack - `\Nino\Modules\Components::addComponent()` and `addStack()` from a module's `init()`, or the `components` and `stacks` keys of a feature manifest, see the [component recipe](docs/recipes/component.md) |
+| Add a shortcode that a tool can offer - a source for its value and typed attributes with defaults - or one that loops the elements of a type around its content | Component or stack - `\Nino\Modules\Components::addComponent()` and `addStack()` from a module's `init()`, or the `components` and `stacks` keys of a feature manifest; a component that the kernel draws from its schema and template is registered with `\Nino\Components::addComponent()`, see the [component recipe](docs/recipes/component.md) |
 | Make a kernel or project module selectable and copyable during the setup wizard | Installer module package, see the [installer package recipe](docs/recipes/installer-package.md) |
 | Package an installable feature - a module with a manifest, settings and a version, switched on in the workbench after setup | Feature - `features/<Name>/` with `feature.php`, see the [feature manual](docs/features.md) |
 | Compose a page template out of sections, columns and components in the workbench | The Builder - the feature `features/Builder` of the catalogue, panel Builder in the Features group, not here |
@@ -274,7 +274,13 @@ concurrent changes.
 
 ### Rendering and escaping rules
 
-HTML+ is read once into a tree and drawn from it - textfills and shortcodes in the order they stand - and then the final render callbacks run once.
+HTML+ is read once into a tree (`\Nino\Markup`) and drawn from it - textfills and shortcodes in the order they stand - and then the final render callbacks run once. What the reader takes for a mark is in [HTML+ - the notation](docs/development.md#html---the-notation); in short:
+
+- A mark stands in one line: `[name]`, `[name /source attr="value" switch]`, a leaf `[name ... /]`, a container `[name]...[/name]`, a textfill `[[key]]`. A name is lower case words joined by hyphens, an attribute is lowerCamel, a source begins with `~`, `/` or `.` and stands first, a value is in double quotes (`\"` and `\\` inside). A mark that holds anything else - another word, a line break, a value never closed - is text, and a value without quotes falls away.
+- `\[` writes a `[` that is no mark, and `<script>`, `<style>` and comments are read like the rest: `list[i]` in a script is the call `[i]`.
+- A name nobody registered draws nothing, nor what it holds.
+
+The forms a template writes:
 
 - Absolute textfill: `[[/template/page-home/main-hero/title]]`
 - Reusable template: `[template /templates/html-header]`
@@ -316,8 +322,8 @@ and answers the result: `[template]`, `[elements]`, `[navigation]` and `[card]` 
 the scope, the element and the tokens of a loop. A name nobody registered draws
 nothing, nor what it holds, and is said once in the log.
 
-A component is a shortcode with a schema (`\Nino\Modules\Components`), and
-the rules above apply to it unchanged. The kernel resolves its first argument
+A component of the module `\Nino\Modules\Components` is a shortcode with that
+module's schema, and the rules above apply to it unchanged. The kernel resolves its first argument
 through `Components::value()` before the renderer runs, and what that returns is
 escaped for its context and has every `[` written as `&#91;`: **`[` in a
 resolved value is always `&#91;`**, for a text key, a fixed `text="..."`, a field
@@ -332,6 +338,12 @@ which is not an editor's value and keeps its `[`. A formatter (`\Nino\Format`, c
 through `Components::renderStack()`, and so does a component that holds components: the
 content of the `[panel]`s of a fixed `[tabs]` or `[accordion]` and the children of a
 `[card]` are drawn by the stack and the card with `renderSource()`, in the order they stand.
+A component that is new is registered by schema, `\Nino\Components::addComponent()`
+([the register](docs/development.md#the-register-of-components)): the kernel resolves the
+source, makes the attributes ready, writes the classes and fills the template in one pass,
+escaping each value for its place and leaving its `[` as it is, since nothing a value holds is
+read. A renderer of such a component answers finished markup; the module's components are not
+in that register.
 A shortcode says whether it has an end - `Html::addShortcode( ..., $container )`: `true` a
 container, `false` a leaf, `null` a container exactly where its end stands in the
 document - and a document that writes both forms of a name writes the leaf `[name ... /]`.
@@ -530,6 +542,7 @@ convenience: repeat it on the server.
 | --- | --- |
 | Bind an Elements image to a textfill or a fixed value | An Elements image binds to a `field` of the collection's model |
 | Prefix reusable includes with `page-`, or add metadata below markup | Reserve `page-*` for full page templates; put the `nino:template-name` comment at byte zero |
+| Return html+ from a shortcode - a `[csrf]`, a textfill, a `[template ...]` - and expect the page to draw it | What a shortcode answers is finished and shows as the text it is. Draw the source in the shortcode, with `\Nino\Html::renderSource()` |
 
 ## 10. Tests and validation
 
@@ -569,7 +582,8 @@ and the tests named in section 10 pass. In addition:
 - [ ] Every panel action carries the panel's slug and guards itself with `Admin::guardPerm()` and the panel's permission; payload, IDs, enums, lengths and paths are validated; persistence is atomic and failures are returned.
 - [ ] A technical route has one owner and the right callback identity; shortcode and response output is context-safe; a write enforces CSRF, auth, validation and a rate limit as applicable; shared files use atomic mutation and bounded retention.
 - [ ] A panel's `assets()` names project-relative `.js`/`.css` only (through `Panels::relative()` for a module), its JS namespace equals the nav uri, and its `template()` is a fragment with no head, link or script of its own. It uses the existing UI primitives and safe DOM construction, sends requests through `Nino.adminUi.api.call()`, gives a failure a person can cause a code with text in both languages, and reports unsaved input to `Nino.admin.dirty` (feature-detected), with a save that ends in `done( ok )` on every way it can end.
-- [ ] A component's schema validates - every attribute has a `default`, every `select` its `options` with the default among them (or the name of a static method that answers them, see the [component recipe](docs/recipes/component.md)), a component of a project its `group` and a component of a feature none - and its renderer has the signature `( array &$appData, array $args ): string` and keeps the rendering rules of section 5: it returns what it made itself and `$args['value']`, and escapes everything else through `Components::escape()`. A source that resolves to nothing renders nothing, and a hand-written shortcode with an unknown attribute still renders. A stack renders through `renderStack()`, and the content of a `[panel]` of a fixed group is drawn by the stack; a component that holds components declares `holds` and draws its content with `\Nino\Html::renderSource()` inside its own markup. What a renderer returns is finished: nobody reads it again. A component or stack is registered one way, by `init()` or by manifest, not both.
+- [ ] A component's schema validates - every attribute has a `default`, every `select` its `options` with the default among them (or the name of a static method that answers them, see the [component recipe](docs/recipes/component.md)), a component of a project its `group` and a component of a feature none - and its renderer has the signature `( array &$appData, array $args ): string` and keeps the rendering rules of section 5: it returns what it made itself and `$args['value']`, and escapes everything else through `Components::escape()`. A source that resolves to nothing renders nothing, and a hand-written shortcode with an unknown attribute still renders. A stack renders through `renderStack()`, and the content of a `[panel]` of a fixed group is drawn by the stack; a component that holds components declares `holds` and draws its content with `\Nino\Html::renderSource()` inside its own markup. What a renderer returns is finished: nobody reads it again. A component or stack is registered one way, by `init()` or by manifest, not both. A component by schema, `\Nino\Components::addComponent()`, passes `\Nino\Components::validate()`, has an `in` where it is to be offered, draws nothing where its source resolves to nothing, and its renderer, if it has one, answers finished markup.
+- [ ] A shortcode that has html+ of its own to draw - a template, the content between its tags - draws it with `\Nino\Html::renderSource()` and `\Nino\Html::context()`, and a value it puts into that text has every `[` written as `&#91;` (`\Nino\Modules\Components::escape()`, `\Nino\Feature::classes()`): what is put in before the drawing is read with it. Its answer is finished.
 - [ ] An installer unit is the module's own `install/` directory with a unique slug as its key; the manifest uses recognized keys and installer slugs for requirements; templates, files, types and text land in exact paths; config defaults preserve existing custom values; a reapply is idempotent and a deselect deletes no copied file. `elements` only adds (a deleted section stays deleted where the module keeps a tombstone) and `navs` creates a menu only in the wizard's apply step and only while the project has none.
 - [ ] A feature's `key` is a unique slug, `version` is `major.minor.patch`, `nino` names the constraint it was written against - its floor is the kernel whose vocabulary the feature uses - `requires` lists feature keys and `data` the `/data/` files it owns. Every setting has a known type and a validating default (no default on a `secret`) and is read through `\Nino\Features::setting()` with a default. The unit is add-only safe: nothing relies on overwriting, no uninstall is promised, runtime routes live in `init()`; `upgrade()` migrates only the feature's own data and is idempotent, and an owner of `data/` registers `/nino/admin/restore`.
 - [ ] A page unit keeps route and template separate, with one owner each; its `page-*.tpl` filename and display metadata are valid; sections have unique semantic IDs and stable fill paths; includes omit `.tpl` and resolve to shipped or copied files; required text, modules, image slots and Element types are supplied. Every key it delivers follows the grammar: `/template/<file name without .tpl>/<part>/<name>`, `/template/common/...` only in the base unit, no `/project` or `/_nino` key, the same keys in every language, and a template whose name has a dot or an upper-case letter carries no key of its own. A page's name, title and description are proposed by the manifest's `suggest`, never by a `/_nino` key in a text file. A page template the Builder reads is written back byte for byte.

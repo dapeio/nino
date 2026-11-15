@@ -207,14 +207,21 @@ public static function doShortcode(
 	$limit = min( 24, max( 1, (int) ( $args['limit'] ?? 6 ) ) );
 	$content = (string) ( $args['content'] ?? '' );
 
-	// Build and return markup. Never echo it.
-	return $content;
+	// Build and return markup. Never echo it. The content is html+ as it was
+	// written between the tags, and what is returned is finished: draw the
+	// content, or leave it out
+	return \Nino\Html::renderSource( $appData, $content, \Nino\Html::context( $appData ) );
 }
 ```
 
-Arguments can be positional, named, or enclosed as `content`. Treat all of them
-as untrusted even when the shortcode normally comes from a developer-authored
-template; templates and stored HTML can be edited.
+Arguments are the source and the switches by position (`$args[0]`, `$args[1]`,
+...), the attributes by name (`$args['limit']`) and what stands between the
+tags as `content`, the text of the children with its fills still in it. Treat
+all of them as untrusted even when the shortcode normally comes from a
+developer-authored template; templates and stored HTML can be edited. What the
+shortcode returns is finished: nobody reads it for calls or fills, so html+ that
+the shortcode wants drawn is drawn by the shortcode, with `renderSource()` as
+above (see [Drawing a page](../development.md#drawing-a-page)).
 
 When placing any dynamic string into returned HTML:
 

@@ -178,6 +178,8 @@ manifest that names one. A component should carry `draws`, `in` and `icon`, opti
 are ([component recipe](recipes/component.md)): they are how the Builder shows it
 in a section, places it where it may stand and offers it with a picture.
 
+The manifest's `components` and `stacks` are the Components module's. A component that the kernel draws from its schema and template is not declared in a manifest: a feature registers it in its `init()` with `\Nino\Components::addComponent()` ([The Register of Components](development.md#the-register-of-components)).
+
 A stack says what its cell is with `cell` and may take a field of the element as
 an attribute with the type `field`. `cell` is one of `components` (the default:
 what stands between the tags, drawn once for each element), `section` (a whole
@@ -218,7 +220,8 @@ name. The renderer reads the panels itself: `\Nino\Modules\Components::panels( $
 answers `[ [ 'title' => ..., 'class' => ..., 'content' => ... ], ... ]` for the `[panel]`s
 directly in a content, the title as text written safe (the number of the panel where
 it comes out empty), the class written safe, and the content as it stands - html+ that
-the rendering after the renderer runs, so it is put into the markup as it is. An empty
+the renderer draws itself, with `\Nino\Html::renderSource()`, before it puts it into its markup, as the
+kernel's `[tabs]` do: nobody reads what a renderer returns. An empty
 `$args['source']` is the fixed form; a call with a type is a loop, which the renderer
 draws through `renderStack()` as any stack ([Components](development.md#components)).
 
@@ -418,7 +421,7 @@ the helpers of a feature's own code, static methods that render no markup:
 | `template( $appData, $directory, $name )` | the `<name>.tpl` of a templates directory (`'/features/Hello/templates'`), ready for `str_replace()` over its `[[tokens]]`; one that is missing or empty is a warning and `''` |
 | `classes( $args )` | the `class` attribute of a component's markup, from the argument every shortcode may carry: `''`, or a space and the classes, escaped |
 | `flag( $args, $name, $default )` | a flag of a shortcode without a schema: a bare word is on, `name="no"` is read by the words a component's bool is |
-| `shortcode( $appData, $name, $callback )` | a plain shortcode, unless the Components module owns the name (the manifest declared a component or a stack): then `false` |
+| `shortcode( $appData, $name, $callback, $container )` | a plain shortcode, unless the Components module owns the name (the manifest declared a component or a stack): then `false`. `$container` is `Html::addShortcode()`'s: `true` a container with an end, `false` a leaf, `null` (the default) a container where its end stands in the document |
 | `origin( $url )`, `allowOrigin( $request, $directive, $url )` | an address as a Content-Security-Policy source - https, no credentials, no ip literal - and the call that adds it to one directive of this response |
 | `count( $appData, $name, $key, $limit, $window )`, `spent()`, `forget()` | tries per client in the window, kept in `/data/<name>.php` under a hashed key, an IPv6 address as its /64: count one and learn whether it is within budget; ask without counting; let a client go |
 | `slug( $text, $max )` | a name made into a slug, the letters ascii lacks written as `TRANSLITERATIONS` says; `Nino.slug()` is its twin |
@@ -431,7 +434,8 @@ The kernel classes a feature calls, by home:
 | `\Nino\Filesystem` | `getFileContent()`, `putFileContent()` a whole file by its virtual path; `mutate( $appData, $path, $fn, $default )` every read-modify-write: it locks, reads, calls `$fn( $state )` and writes what that answers, `null` aborts and `mutate()` answers `false` - a file whose shape may change carries a `format` key; `fileExists()`; `path()`, the real path, to `glob()` a directory; `forceDir()`, `removeDir()`; `getDir()`, `getPublicDir()`, `getPublicPath()` |
 | `\Nino\AppData` | `writeContentData( $appData, $keys )` persists the given top-level keys of `config.php`; `stored()` **1.8** reads one as the file holds it |
 | `\Nino\Http` | `fail( $request, $status, $error, $code, $params, $field )` and `ok( $request, $body )` end a handler; `redirect()`, `allowSource()` a policy directive widened by one source, `pages()`, `matchesPath()`, `answersHtml()` for a sitemap or a protected area, all **1.8**; `isReservedUri( $uri )` **1.9** whether an address is one a page cannot have, `/_nino` or `/features` and what lies below; `requestRoute()`, `getRequest()`, `getClientIp()`; `afterResponse( $appData, $work )` (from the kernel that has it) work that runs once the response is out and the client let go - by `fastcgi_finish_request()` where php has it, else by the `Content-Length` the kernel tells for a body that goes out as it is, counted after every callback of `/nino/http/output` and after the body was encoded; for a file, a stream, a length or an encoding somebody else set, or a page php compresses itself, the work does not run in that request, and a response without asked-for work is sent byte for byte as it was |
-| `\Nino\Html` | `renderHtml()` a string as a page is rendered - read once into a tree and drawn from it - and `renderSource()` html+ drawn with the context of a call, `context()` that context, for a shortcode that has html+ of its own to draw, `renderTextfill()`, `resolveTextfill()` one fill; `addShortcode()` - a fourth argument says whether the name has an end -, `addAsset()`; `addFills()`; `getFills( $appData, $locale )` every fill of a language, the argument **1.8**; `removeFill()`, `absoluteUrl()` **1.8**; `sanitizeHtml()`; `shortcodeCalls()` the calls a template makes, `shortcodeParts()` a piece of html cut into its calls and the text between, `fillOrigin()` the language a fill's text was taken from, all **1.9** |
+| `\Nino\Html` | `renderHtml()` a string as a page is rendered - read once into a tree and drawn from it - and `renderSource()` html+ drawn with the context of a call, `context()` that context, `tree()` the nodes of a source and `putFills()` a text with its fills put in, for a shortcode that has html+ of its own to draw (see [Drawing a page](development.md#drawing-a-page)), `renderTextfill()`, `resolveTextfill()` one fill; `addShortcode()` - a fourth argument says whether the name has an end -, `addAsset()`; `addFills()`; `getFills( $appData, $locale )` every fill of a language, the argument **1.8**; `removeFill()`, `absoluteUrl()` **1.8**; `sanitizeHtml()`; `shortcodeCalls()` the calls a template makes, `shortcodeParts()` a piece of html cut into its calls and the text between, `fillOrigin()` the language a fill's text was taken from, all **1.9** |
+| `\Nino\Components` | `addComponent( $appData, $name, $schema, $renderer )` a component by schema, `validate()`, `components()`, `allowed()` (see [The Register of Components](development.md#the-register-of-components)) |
 | `\Nino\Text` | `entries()`, `entry()`, `isGrammarKey()`, `sanitizeValue()`: the project's texts and their keys |
 | `\Nino\Form` | `forms()`, `form()`, `posted()`, `validate()`, `entries()`; `blocked()` **1.8** whether the CSRF guard refused the request |
 | `\Nino\Images` | `getUrl()`, `getSlot()`, `getSlots()`, `setSlotFilename()`, `setSlotAlt()`, `cleanAlt()`, `process()`, `fit()`, `limits()`, `reject()`, `read()`, `restore()`, `delete()` |

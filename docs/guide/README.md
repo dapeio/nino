@@ -110,11 +110,11 @@ Eine Vorlage ist eine `.tpl`-Datei. Sie enthält HTML+. HTML+ ist HTML mit zwei 
 
 Eine Vorlage enthält nie PHP. Umgekehrt gilt: PHP enthält kein Markup. Das Markup liegt in einer Vorlage, PHP füllt sie.
 
-Nino setzt zuerst die Textfills ein, dann die Shortcodes. Nino liest die Ausgabe eines Shortcodes noch einmal und ersetzt auch darin Textfills und Shortcodes. Dieses Ersetzen heißt in diesem Handbuch „rendern“.
+Nino liest eine Vorlage einmal und setzt dann der Reihe nach ein, was dasteht: Text bleibt Text, ein Textfill wird durch seinen Text ersetzt, ein Shortcode durch seine Ausgabe. Was ein Shortcode zurückgibt, ist fertig. Nino liest es nicht noch einmal, und der Wert eines Textfills wird nie als Shortcode gelesen. Dieses Einsetzen heißt in diesem Handbuch „rendern“.
 
 Eine **Komponente** ist ein Shortcode mit Schema. Das Schema sagt, woher der Wert kommt und welche Attribute es gibt. Werkzeuge wie der Builder können eine Komponente deshalb anbieten.
 
-Nachschlagen: [Rendering](../development.md#rendering-from-html-to-html), [Components](../development.md#components).
+Nachschlagen: [Rendering](../development.md#rendering-from-html-to-html), [HTML+ - the notation](../development.md#html---the-notation), [Components](../development.md#components).
 
 ## Texte und Sprachen
 
