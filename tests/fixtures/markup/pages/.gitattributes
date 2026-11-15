@@ -1,0 +1,2 @@
+# Byte copies of the starter pages: their blank lines keep the tabs they were written with
+*.tpl -whitespace
