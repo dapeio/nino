@@ -1,0 +1,9 @@
+# Installed features are server-side source, like app/: a feature's runtime
+# class, its workbench panel, its install unit - manifests, mail and page
+# templates, text files. Nothing in here is ever requested by a browser; a
+# feature's browser-facing assets are read off disk and bundled into
+# public/.cache/ or _admin/.cache/ like everything else (see
+# \Nino\Modules\Assets and \Nino\Admin\Admin::init()).
+Require all denied
+
+Options -Indexes
