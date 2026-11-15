@@ -128,7 +128,7 @@ Füge diese drei Methoden in die Klasse ein, direkt nach `init()` und vor `compo
 
 Die Reihenfolge in `callbackSignup()` ist wichtig:
 
-1. **CSRF.** Der Kernel hat das Token schon geprüft, aber der Callback läuft auch nach einer Ablehnung. `\Nino\Form::blocked()` sagt, ob er abgelehnt hat. Dann kehrt der Callback sofort um. Ohne diese Zeile speichert die Route einen gefälschten Post.
+1. **CSRF.** Der Kernel hat das Token schon geprüft, aber der Callback läuft auch nach einer Ablehnung. `\Nino\Form::blocked()` sagt, ob er abgelehnt hat. Dann kehrt der Callback sofort um. Ohne diese Zeile speichert die Route einen gefälschten Post. Hat keiner der Callbacks einer Route `\Nino\Form::blocked()` gefragt und beantworten sie einen abgelehnten Post mit Erfolg oder Umleitung, verwirft der Kernel die Antwort, antwortet mit der `403` und schreibt eine Warnung ins Log. Ersetzt wird nur die Antwort: Was ein Callback direkt getan hat (Header oder Cookie sofort gesendet, Sitzung, Dateien, Ausgabe), bleibt. Gespeichert hat die Route dann schon: Die Warnung macht den Fehler sichtbar, sie verhindert ihn nicht.
 2. **Eingabe lesen.** `\Nino\Form::posted()` liefert nur Texte, gekürzt und ohne Leerraum am Rand.
 3. **Drosseln.** `\Nino\Feature::count()` zählt die Versuche je Besucher in einem Zeitfenster, hier 3600 Sekunden. Den Besucher erkennt es an seiner IP-Adresse. Über der Grenze antwortet es `false`. Der Zähler liegt in `private/data/meetups-signup-tries.php`. Die IP-Adresse steht dort nicht lesbar, sondern als Hash: eine Prüfsumme, aus der sich die Adresse nicht zurückrechnen lässt.
 4. **Prüfen.** Der Name hat eine Länge, das Treffen gibt es, und es liegt nicht in der Vergangenheit.

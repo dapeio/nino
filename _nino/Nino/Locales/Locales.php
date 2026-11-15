@@ -142,6 +142,11 @@ namespace Nino {
 		 */
 		public static function switchFromQuery( array &$appData, array &$request, string $queryKey ): void {
 
+			// A request the csrf guard refused is answered with its 403 and
+			// changes nothing, a switch asked for in its query string included
+			if( \Nino\Form::blocked( $request ) === true )
+				return;
+
 			// Catch locale change. parse_str() legitimately creates arrays for a
 			// query such as current[]=de_DE; only scalar locale ids are valid.
 			$requestedLocale = $request['/nino/http/request']['query'][$queryKey] ?? null;

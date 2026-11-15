@@ -103,6 +103,97 @@ check( 'a POST without a token is refused by the guard, and Form::blocked() read
 check( '...a GET is not blocked, whatever else it came to', $getVisit['/nino/http/response']['statusCode'] !== 403 && \Nino\Form::blocked( $getVisit ) === false );
 check( '...nor is a request nothing has looked at', \Nino\Form::blocked( [] ) === false );
 
+// A route callback runs after the guard refused a post and answers the refusal itself. One that answers
+// with a success or a redirect without asking Form::blocked() is overruled by the guard's 403 and named in the log
+final class RefusalProbe {
+
+	public static function silent( array &$appData, array &$request ): void {
+		$request['/nino/http/response']['statusCode'] = 303;
+		$request['/nino/http/response']['header']['Location'] = '/done';
+	}
+
+	public static function asking( array &$appData, array &$request ): void {
+		if( \Nino\Form::blocked( $request ) === true ) {
+			$request['/nino/http/response']['statusCode'] = 303;
+			$request['/nino/http/response']['header']['Location'] = '/expired';
+		}
+	}
+
+	public static function notFound( array &$appData, array &$request ): void {
+		$request['/nino/http/response']['statusCode'] = 404;
+	}
+
+	public static function global( array &$appData, array &$request ): void {
+		if( \Nino\Form::blocked( $request ) === true && str_contains( (string) ( $request['/nino/http/response']['uri'] ?? '' ), 'refusal-idle' ) === true || str_contains( (string) ( $request['/nino/http/response']['uri'] ?? '' ), 'refusal-gs' ) === true )
+			$request['/nino/http/response']['statusCode'] = 303;
+	}
+}
+
+$routes = [
+	'POST://refusal-silent'	=> [ [], [ [ RefusalProbe::class, 'silent' ] ] ],
+	'POST://refusal-asking'	=> [ [], [ [ RefusalProbe::class, 'asking' ] ] ],
+	'POST://refusal-both'		=> [ [], [ [ RefusalProbe::class, 'silent' ], [ RefusalProbe::class, 'asking' ] ] ],
+	'POST://refusal-notfound'	=> [ [], [ [ RefusalProbe::class, 'notFound' ] ] ],
+	'POST://refusal-idle'		=> [ [], [] ],
+	'POST://refusal-gs'			=> [ [], [ [ RefusalProbe::class, 'silent' ] ] ],
+	'POST://refusal-open'		=> [ [ 'csrf' => false ], [ [ RefusalProbe::class, 'silent' ] ] ],
+];
+foreach( $routes as $routeKey => [ $extra, $callbacks ] ) {
+	$guardedAppData['/nino/http/routes'][$routeKey] = [ 'uri' => '/'. explode( '//', $routeKey )[1] ] + $extra;
+	foreach( $callbacks as $callback )
+		\Nino\Callbacks::registerCallback( $guardedAppData, '/nino/http/response/'. $routeKey, $callback );
+}
+
+$_POST['_csrf'] = 'wrong-token';
+ninoWarnings();
+$silent = ninoVisit( $guardedAppData, '/refusal-silent', 'POST' );
+\Nino\Http::response( $guardedAppData, $silent );
+$warned = ninoWarnings();
+check( 'a post the guard refused, answered by a route without asking Form::blocked(), is answered with the guard\'s 403', $silent['/nino/http/response']['statusCode'] === 403 && $silent['/nino/http/response']['body'] === false && isset( $silent['/nino/http/response']['header']['Location'] ) === false );
+check( '...the log has one warning, naming the method, the route and the registrant of the callbacks', count( $warned ) === 1 && str_contains( $warned[0], 'POST /refusal-silent' ) && str_contains( $warned[0], '('. \Nino\Callbacks::owners( $guardedAppData, '/nino/http/response/POST://refusal-silent' ). ')' ) && \Nino\Callbacks::owners( $guardedAppData, '/nino/http/response/POST://refusal-silent' ) === RefusalProbe::class );
+
+$asking = ninoVisit( $guardedAppData, '/refusal-asking', 'POST' );
+\Nino\Http::response( $guardedAppData, $asking );
+check( 'a route that asks Form::blocked() keeps its own answer to the refusal, and nothing is logged', $asking['/nino/http/response']['statusCode'] === 303 && ( $asking['/nino/http/response']['header']['Location'] ?? '' ) === '/expired' && ninoWarnings() === [] );
+
+$both = ninoVisit( $guardedAppData, '/refusal-both', 'POST' );
+\Nino\Http::response( $guardedAppData, $both );
+check( 'a route of two callbacks of which one asks is asked: its answer stays and nothing is logged', ( $both['/nino/http/response']['header']['Location'] ?? '' ) === '/expired' && ninoWarnings() === [] );
+
+$notFound = ninoVisit( $guardedAppData, '/refusal-notfound', 'POST' );
+\Nino\Http::response( $guardedAppData, $notFound );
+check( 'an error status of the route\'s own is left alone, and nothing is logged', $notFound['/nino/http/response']['statusCode'] === 404 && ninoWarnings() === [] );
+
+\Nino\Callbacks::registerCallback( $guardedAppData, '/nino/http/response', [ RefusalProbe::class, 'global' ], 3 );
+$gs = ninoVisit( $guardedAppData, '/refusal-gs', 'POST' );
+\Nino\Http::response( $guardedAppData, $gs );
+check( 'a silent route behind a global callback that answered 303 is still answered with the guard\'s 403, not the 303 of the global callback', $gs['/nino/http/response']['statusCode'] === 403 && $gs['/nino/http/response']['body'] === false && count( ninoWarnings() ) === 1 );
+$idle = ninoVisit( $guardedAppData, '/refusal-idle', 'POST' );
+\Nino\Http::response( $guardedAppData, $idle );
+check( 'an answer a global callback gave behind the guard is not the route\'s: no warning, the answer is the global callback\'s', $idle['/nino/http/response']['statusCode'] === 303 && ninoWarnings() === [] );
+
+$exempt = ninoVisit( $guardedAppData, '/refusal-open', 'POST' );
+\Nino\Http::response( $guardedAppData, $exempt );
+check( 'a route that sets \'csrf\' => false is not refused, runs as it did and logs nothing', $exempt['/nino/http/response']['statusCode'] === 303 && ( $exempt['/nino/http/response']['header']['Location'] ?? '' ) === '/done' && ninoWarnings() === [] );
+
+$_POST['_csrf'] = \Nino\Csrf::getToken( $guardedAppData );
+$passed = ninoVisit( $guardedAppData, '/refusal-silent', 'POST' );
+\Nino\Http::response( $guardedAppData, $passed );
+check( 'a post with the session\'s token is answered by its route without a word in the log', $passed['/nino/http/response']['statusCode'] === 303 && ninoWarnings() === [] );
+
+// A switch of the locale asked for in the query of a refused post changes nothing and does not redirect
+$guardedAppData['/nino/http/routes']['GET://refusal-asking'] = [ 'uri' => '/refusal-asking' ];
+\Nino\Callbacks::registerCallback( $guardedAppData, '/nino/http/response', [ \Nino\Locales::class, 'callbackResponse' ] );
+$_POST['_csrf'] = 'wrong-token';
+$localeBefore = \Nino\Locales::getCurrentLocale( $guardedAppData );
+$switched = ninoVisit( $guardedAppData, '/refusal-asking?/_nino/locales/current=en_US', 'POST' );
+\Nino\Http::response( $guardedAppData, $switched );
+check( 'a locale switch in the query of a refused post is not made', ( $switched['/nino/http/response']['header']['Location'] ?? '' ) === '/expired' && \Nino\Locales::getCurrentLocale( $guardedAppData ) === $localeBefore );
+$switchedGet = ninoVisit( $guardedAppData, '/refusal-asking?/_nino/locales/current=en_US' );
+\Nino\Http::response( $guardedAppData, $switchedGet );
+check( '...while the same switch in a GET is made and redirects', $switchedGet['/nino/http/response']['statusCode'] === 302 );
+unset( $_POST['_csrf'] );
+
 // A post that is not a flat map of strings. Casting one raised an engine
 // warning Runtime::handleError() treats as fatal - an unauthenticated 500
 // from the one endpoint the whole internet may post to

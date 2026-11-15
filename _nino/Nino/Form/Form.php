@@ -43,6 +43,9 @@ namespace Nino {
 	 */
 	class Form {
 
+		// How often blocked() answered true since watched( true ) - see there
+		private static int $_asked = 0;
+
 		// What one posted value may carry - a field is a line or a message,
 		// never an upload
 		public const int MAX_FIELD_LENGTH = 1000;
@@ -521,7 +524,9 @@ namespace Nino {
 		 *	'./nino/csrf/blocked' beside the 403 it answers, and it stays set -
 		 *	a later callback that resets the status leaves the flag standing,
 		 *	which is what it is for. Every callback that writes or sends on a
-		 *	state-changing request asks it first. The status check beside it is
+		 *	state-changing request asks it first; \Nino\Http::response() notes
+		 *	whether a route callback did, and overrules and logs one that
+		 *	answered a refused post without. The status check beside it is
 		 *	another question: it says whether an earlier callback refused for
 		 *	any reason at all.
 		 *
@@ -533,7 +538,29 @@ namespace Nino {
 		 */
 		public static function blocked( array $request ): bool {
 
-			return ( $request['./nino/csrf/blocked'] ?? false ) === true;
+			$refused = ( $request['./nino/csrf/blocked'] ?? false ) === true;
+
+			if( $refused === true )
+				self::$_asked++;
+
+			return $refused;
+		}
+
+		/**
+		 *	Start counting the asks of blocked() about a refused request, and
+		 *	say whether it has been asked since: for \Nino\Http::response(),
+		 *	which watches the callbacks of a route that a refused post reaches
+		 *
+		 *	@param		bool			$start				True to start over, false to read
+		 *
+		 *	@return 	bool										Whether blocked() was asked about a refused request since the start
+		 */
+		public static function watched( bool $start ): bool {
+
+			if( $start === true )
+				self::$_asked = 0;
+
+			return self::$_asked > 0;
 		}
 
 		/**

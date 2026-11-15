@@ -196,7 +196,33 @@ namespace Nino {
 			$request['/nino/http/response'] = array_merge( $request['/nino/http/response'], $routeData );
 
 			\Nino\Callbacks::doCallbacks( $appData, '/nino/http/response', $request );
-			\Nino\Callbacks::doCallbacks( $appData, '/nino/http/response/'. $request['/nino/http/request']['method']. ':/'. $request['/nino/http/response']['uri'], $request );
+
+			$hook		= '/nino/http/response/'. $request['/nino/http/request']['method']. ':/'. $request['/nino/http/response']['uri'];
+			$guards	= \Nino\Form::blocked( $request ) === true;
+			$before	= $request['/nino/http/response'];
+
+			if( $guards === true )
+				\Nino\Form::watched( true );
+
+			\Nino\Callbacks::doCallbacks( $appData, $hook, $request );
+
+			/*	The callbacks of a route run after the csrf guard refused the
+				request, and one of them is to ask \Nino\Form::blocked() and
+				answer the refusal itself. When none of them asked and they
+				changed the answer to a success or a redirect, the route has
+				most likely done what the post said: the answer is the guard's
+				403 and the log names the route. Only the answer is replaced.
+				What a callback did directly - a header() or cookie sent at
+				once, the session, a file, output - stays, so this does not
+				undo a write, it makes the missing question visible. Asked is
+				the route, not a callback: one callback asking is enough. An
+				error status is a refusal of the route's own (404 for a
+				visitor, say) and is left alone. An answer a global callback
+				gave before the route's callbacks ran is not the route's	*/
+			if( $guards === true && $request['/nino/http/response'] !== $before && \Nino\Form::watched( false ) === false && (int) ( $request['/nino/http/response']['statusCode'] ?? 0 ) < 400 ) {
+				$request['/nino/http/response'] = [ 'statusCode' => 403, 'body' => false ] + $before;
+				trigger_error( 'Http: '. $request['/nino/http/request']['method']. ' '. $request['/nino/http/response']['uri']. ' ('. \Nino\Callbacks::owners( $appData, $hook ). ') answered a post the CSRF guard refused without asking Form::blocked() - the answer was replaced by the guard\'s 403, the callbacks may have written already', E_USER_WARNING );
+			}
 		}
 
 
