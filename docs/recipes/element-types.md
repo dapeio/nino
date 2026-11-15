@@ -29,6 +29,7 @@ Common model properties:
 | `breaks` | string without `html` | Keep the line breaks of the plain text on the page, as `<br>`, after escaping. Dropped on save from a field with `html` |
 | `maxlength` | string | Editing limit/hint |
 | `inputsize` | string | Rows the editing area opens with: the textarea's rows, or the rich-text area's minimum height in lines. A hint for the form, not a limit on the value |
+| `label` | all | What the element form calls the field: a string, or a `locale => string` map of which the form takes the language of the workbench, else `en_US`, else the first entry. Without it the form shows the workbench's word for the key (`title`, `date`) or the key itself. A project overrides it with the text `/_admin/elements/field/<type>/<key>`. The Element Types tab has no control for it and keeps it on save |
 | `suffix` | non-boolean, non-image, non-element | Fixed UI unit such as `€` or `%` |
 | `options` | supported controls, never element | Fixed choices presented by the editing UI |
 | `width`, `height` | image | Required generated image dimensions |
@@ -240,6 +241,7 @@ lowercase hyphenated IDs.
 - `[[.id]]` is the internal record ID.
 - `[[.uri]]` is the uri of the element, `/<type>/<name>`, and `[[.slug]]` is the name alone - the last segment of the uri, nothing where the element has no uri: the token of a link to a page of the element, `href="/blog/[[.slug]]"`; the type is in `[[.uri]]`.
 - In `[elements]`, `[[.lang]]` is ` lang="<tag>"` - the attribute with its space in front - where the block shows text of another language than the page's, and nothing where the page's language had it all: put it on the element that holds the text. A per-language field that the page's language has no value for - no version of the element at all, or an empty field - takes its value from the native language, then the other languages of the site in their order, then the other languages the type file holds (`\Nino\Elements::getElementWithFallback()`); the element is listed in every language the query lists it for.
+- `empty="<name>"` on `[elements]` is the template of the project, `private/templates/<name>.tpl`, that stands in the page where the loop finds no element: `[elements /services empty="services-none"]`. Without it a list with no element is nothing. A stack does not take it.
 - `[[field]]` is local to the current Elements block, and to the cell of a stack. A field of the model that no language has a value for is empty: the placeholder never stays standing.
 - normal field output is HTML-escaped;
 - `html: true` fields are sanitized by the Elements renderer, to the inline tags, or - with `blocks: true` - to paragraphs and lists as well; a `breaks: true` field is escaped and its newlines become `<br>`. The rule is `\Nino\Html::fieldValue( $value, $field )`, which `[element]` and `[elements]` call and a feature that draws a field itself calls instead of a copy. `[elementvalues]` lists values and always escapes them;

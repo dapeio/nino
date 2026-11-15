@@ -248,6 +248,10 @@ check( '...and so are the fonts it @font-faces: the three files of Open Sans and
 $bundled = array_merge( ...array_values( array_map( 'array_values', $configAfterApply['/nino/html/assets'] + \Nino\AppData::DEFAULTS['/nino/html/assets'] ) ) );
 $unbundled = array_filter( glob( $sandbox. '/private/assets/*.js' ) ?: [], static fn( string $file ): bool => in_array( '/assets/'. basename( $file ), $bundled, true ) === false );
 check( 'the Setup step copies no script into the project that no bundle loads', $unbundled === [] );
+// The order config.php is written in is part of what a project's diff shows: the picture places keep their place
+$configKeys = array_keys( $configAfterApply );
+check( 'the Setup step writes the picture places of the units where it always did: behind the roles and in front of the menus', array_search( '/nino/html/images', $configKeys, true ) === array_search( '/nino/auth/roles', $configKeys, true ) + 1
+	&& array_search( '/nino/html/navs', $configKeys, true ) === array_search( '/nino/html/images', $configKeys, true ) + 1 );
 // The logo is two slots with nothing in them: the frames and the navigation show
 // them with [logo], the mails and the page head ask the light one with [image /logo],
 // and none ships a picture of its own

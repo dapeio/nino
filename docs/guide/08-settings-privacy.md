@@ -79,7 +79,7 @@ return [
 	'routes'       => [
 		'GET://meetups' => [ 'uri' => '/meetups', 'body' => '[template /templates/page-meetups]' ],
 	],
-	'templates'    => [ 'page-meetups.tpl' ],
+	'templates'    => [ 'page-meetups.tpl', 'meetups-none.tpl' ],
 	'elementTypes' => [ 'meetups.php' ],
 	// The feature stores names, so it adds its section to the privacy policy
 	'elements'     => [ 'privacy' => 'elements/privacy.php' ],

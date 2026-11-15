@@ -623,8 +623,8 @@ template and icon are the [panel recipe](recipes/admin-panel.md).
 [Library Format](setup.md#library-format) the files). An activation reads `routes`,
 `templates`, `files`, `elementTypes`, `elements`, `blacklist` and `config` from it,
 and `text/global.php` and `text/<locale>.php` for every available locale; `key`,
-`label`, `moduleClass`, `requiresModules`, `preset`, `navs` and `imageSlots` are the
-wizard's alone. The unit of `Hello`, `features/Hello/install/manifest.php`, copies
+`imageSlots` besides; `label`, `moduleClass`, `requiresModules`, `preset` and
+`navs` are the wizard's alone. The unit of `Hello`, `features/Hello/install/manifest.php`, copies
 the template of the page `/hello` and adds a section of the privacy policy:
 
 ```php features/Hello/install/manifest.php
@@ -653,6 +653,32 @@ that every key of the unit exists in every active language: the page shows the
 native text where a language has none of its own (the [fills
 chain](development.md#textfills)), and the Dashboard counts what is left to
 translate. A language the unit has words of keeps them.
+
+**The words of a page.** A route of the unit is a page, and a template's `<title>`, a menu and
+the description read its name, title and description - the system's keys
+`/_nino/webpage<uri>/name|title|description`, `<uri>` the `uri` of the route. The text files of the
+unit carry them like any other word, as the Legal module's do:
+`'[[/_nino/webpage/hello/title]]' => 'Hello World'` in `install/text/en_US.php` and in every
+language the unit ships. They are the one exception to the four parts of a key
+([the key grammar](development.md#the-key-grammar)), and they are written for the page the unit
+routes: a project that holds the route key for another address has another page, and the words
+name a page it does not have. Where the unit brings none, somebody names the page in the Routes
+panel, and its `<title>` shows the key until then.
+
+**Picture places.** `imageSlots` declares the places a template shows with `[image <uri>]`, as it does
+for the wizard's own units: `uri => [ 'label' => string or locale map, 'width', 'height' ]`, and
+`'filename'` for a picture the unit ships in a directory it lists under `files`. A place is added to
+`/nino/html/images` where the project has none under that uri, in every activation; one the
+project has - with the picture an editor uploaded - is not touched, and switching the feature off
+or removing it leaves the places where they are, as it leaves the templates and the words.
+
+**Labels of the fields.** The element form names a field by its key. An element type of the unit
+(`elementTypes`) says what to call each field where it describes it, in the model:
+`'time' => [ 'type' => 'string', 'label' => [ 'en_US' => 'Time (HH:MM)', 'de_DE' => 'Uhrzeit (HH:MM)' ] ]`
+([element types](recipes/element-types.md)). The form takes the language of the workbench, else
+English, else the first. A type file that is in the project is the project's - the copy is
+add-only - and a project names a field in a language of its own with the text
+`/_admin/elements/field/<type>/<key>`, which comes first.
 
 A feature that processes personal data brings its own section of the privacy policy
 with the `elements` key, a map of an element type's uri to a file of the unit. The

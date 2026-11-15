@@ -570,6 +570,10 @@ file_put_contents( \Nino\Filesystem::path( $appData, '/templates/page-sample.tpl
 check( 'an unknown feature cannot be activated', \Nino\Features::activate( $appData, 'nope' ) === 'unknown feature "nope"' );
 check( 'an incompatible feature is refused with its problems', str_starts_with( (string) \Nino\Features::activate( $appData, 'old' ), 'feature "old" cannot be activated: requires Nino ^0.9' ) );
 
+// ...and a picture place of its own, under a uri the unit names as well
+$appData['/nino/html/images'] = [ '/logo' => [ 'label' => 'Logo', 'width' => 300, 'height' => 100, 'filename' => 'logo.png' ] ];
+\Nino\AppData::writeContentData( $appData, [ '/nino/html/images' ] );
+
 $result = \Nino\Features::activate( $appData, 'sample' );
 $stored = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 check( 'activation succeeds', $result === true );
@@ -584,6 +588,8 @@ check( 'the unit\'s text keys are added, an existing key kept', \Nino\Filesystem
 	&& \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] )['[[/feature/sample/intro/text]]'] === 'Welcome to the sample.'
 	&& \Nino\Filesystem::getFileContent( $appData, '/text/global.php', [] )['[[/feature/sample/intro/label]]'] === 'Sample label' );
 check( 'the unit\'s blacklist and config default are applied', in_array( '/feature/sample/intro/hidden', \Nino\Filesystem::getFileContent( $appData, '/text/blacklist.php', [] ), true ) === true && $stored['/sample/config'] === 'unit-default' );
+check( 'the unit\'s picture places are added to the project\'s, one it has under the uri kept, and written to config.php with the rest', $stored['/nino/html/images']['/sample/banner'] === [ 'label' => 'Beispielbanner', 'width' => 800, 'height' => 300, 'filename' => null ]
+	&& $stored['/nino/html/images']['/logo']['label'] === 'Logo' && $appData['/nino/html/images'] === $stored['/nino/html/images'] );
 check( 'the unit\'s "elements" are added: the type is created, its title in the native language, its sections in both available languages', ( static function() use ( $appData ): bool {
 	$privacy = \Nino\Filesystem::getFileContent( $appData, '/elements/privacy.php', [] );
 	return ( $privacy['title'] ?? '' ) === 'Datenschutzerklärung' && array_keys( $privacy['*'] ?? [] ) === [ '*', 'sample', 'sample-more' ] && ( $privacy['de_DE']['sample']['title'] ?? '' ) === 'Beispiel' && ( $privacy['en_US']['sample']['title'] ?? '' ) === 'Sample';
@@ -1470,6 +1476,34 @@ check( 'a unit without a manifest applies nothing', ( static function() use ( $a
 	\Nino\Features::applyUnit( $appData, $sandbox. '/no-unit', [ 'de_DE' ], $r, $b, $c );
 	return $r === [ 'a' => 1 ] && $b === [] && $c === [] && \Nino\Features::readUnitManifest( $sandbox. '/no-unit' ) === null;
 } )() );
+
+// The words of a page and the picture places of a unit: read as the manifest says, refused where it is wrong, added where the project has none
+// The picture places of a unit: read as the manifest says, refused where it is wrong, added where the project has none
+$pu = ninoSandbox( 'unit-pages' );
+$puUnit = static function( string $name, array $manifest ) use ( $pu ): string {
+	$dir = ninoSandboxDir( $pu ). '/'. $name;
+	mkdir( $dir, 0755, true );
+	file_put_contents( $dir. '/manifest.php', '<?php return '. var_export( $manifest, true ). ';' );
+	return $dir;
+};
+$puApply = static function( string $name, array $manifest ) use ( &$pu, $puUnit ): string|true {
+	$routes = []; $blacklist = []; $config = [];
+	return \Nino\Features::applyUnit( $pu, $puUnit( $name, $manifest ), [ 'de_DE', 'en_US' ], $routes, $blacklist, $config, false );
+};
+
+$slot = [ 'label' => 'Banner', 'width' => 200, 'height' => 100 ];
+$pu['/nino/html/images'] = [ '/mine' => [ 'label' => 'Mine', 'width' => 10, 'height' => 10, 'filename' => null ] ];
+$slotRoutes = []; $slotBlacklist = []; $slotConfig = [];
+check( 'the picture places of a unit are added to the live ones and handed back as what is new, one the project has under the uri left as it is',
+	\Nino\Features::applyUnit( $pu, $puUnit( 'slots', [ 'imageSlots' => [ '/banner' => $slot, '/mine' => $slot ] ] ), [ 'de_DE' ], $slotRoutes, $slotBlacklist, $slotConfig, false ) === true
+	&& array_keys( $pu['/nino/html/images'] ) === [ '/mine', '/banner' ] && $pu['/nino/html/images']['/mine']['label'] === 'Mine'
+	&& $slotConfig === [ '/nino/html/images' => [ '/banner' => $slot + [ 'filename' => null ] ] ] );
+check( '...a place that names a picture the unit did not bring, a place without a size or with a uri that is no uri is refused, each with its uri, and nothing of the unit is added',
+	$puApply( 'slot-file', [ 'imageSlots' => [ '/shot' => $slot + [ 'filename' => 'missing.png' ] ] ] ) === 'could not seed image slot /shot'
+	&& $puApply( 'slot-size', [ 'imageSlots' => [ '/flat' => [ 'label' => 'x', 'width' => 0, 'height' => 5 ] ] ] ) === 'could not seed image slot /flat'
+	&& $puApply( 'slot-uri', [ 'imageSlots' => [ '/Bad Uri' => $slot ] ] ) === 'could not seed image slot /Bad Uri'
+	&& $puApply( 'slot-list', [ 'imageSlots' => [ '/odd' => 'x' ] ] ) === 'could not seed image slot /odd'
+	&& array_keys( $pu['/nino/html/images'] ) === [ '/mine', '/banner' ] );
 
 // A language the unit has no words of gets its keys - empty - from one it has: the native language's, else English, else the first by its code
 $ut = ninoSandbox( 'unit-texts' );

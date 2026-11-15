@@ -2209,7 +2209,7 @@ check( 'the sentences are not alerts - the status line says it once, in its own 
 // --- the name of a field: a fill, a word, the key -----------------------------------
 //
 // A field is named by the fill of its type (/_admin/elements/field/<type>/<key>,
-// which Social brings), else by the word of the vocabulary its key is, else by
+// which Social brings), else by the label the model gives it, else by the word of the vocabulary its key is, else by
 // the key with a capital first letter - the key as written, so "price_default"
 // stays "Price_default" where the Text panel would say "Price default". The
 // labels the shipped demo types used to carry are gone: they were a table of
@@ -2223,6 +2223,12 @@ check( 'the sentences are not alerts - the status line says it once, in its own 
 	elements._currentType = 'services';
 	check( '...then the word of the vocabulary', elements._fieldLabel( 'title' ) === 'Titel' && elements._fieldLabel( 'price' ) === 'Preis' );
 	check( '...then the key with a capital first letter, as written', elements._fieldLabel( 'price_default' ) === 'Price_default' && elements._fieldLabel( 'tasks' ) === 'Tasks' );
+	elements._currentModel = { title : { type : 'string', label : 'Heading' }, price : { type : 'double', label : '' }, tasks : { type : 'string', label : 5 }, social : { type : 'string' } };
+	check( '...the label the model gives the field comes after the fill of the type and before the word of the vocabulary', elements._fieldLabel( 'title' ) === 'Heading'
+		&& ( elements._currentType = 'social', elements._fieldLabel( 'title' ) === 'Netzwerk' ) );
+	elements._currentType = 'services';
+	check( '...a label that is no text, or none, is no label', elements._fieldLabel( 'price' ) === 'Preis' && elements._fieldLabel( 'tasks' ) === 'Tasks' && elements._fieldLabel( 'social' ) === 'Social' );
+	elements._currentModel = null;
 	check( 'the demo labels of the shipped types are gone from both languages', [ 'en_US', 'de_DE' ].every( locale => {
 		const fills = fs.readFileSync( path.join( __dirname, '../_admin/Nino/Modules/Elements/text/'+ locale+ '.php' ), 'utf8' );
 		return /\[\[\/_admin\/elements\/field\//.test( fills ) === false && fills.includes( '[[/_admin/types/label/ownkey]]' );

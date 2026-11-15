@@ -127,6 +127,9 @@ namespace Nino {
 		public const string DIRECTORY_PATTERN = '/^[A-Z][A-Za-z0-9]*$/D';
 		public const string EXTENSION_PATTERN = '/^[a-z][a-z0-9_]*$/iD';
 
+		// Where the image slots of a project are kept in config.php: uri => slot
+		private const string IMAGES_KEY = '/nino/html/images';
+
 		private const string SETTING_PATTERN = '/^[a-z][a-zA-Z0-9]*$/D';
 
 		// A file below a feature's assets/ directory the bundles of the site may
@@ -1255,7 +1258,9 @@ namespace Nino {
 				// applyUnit() decided that against $appData, and the file is what
 				// it has to hold against
 				foreach( $config as $configKey => $configValue )
-					if( isset( $content[$configKey] ) === false )
+					if( $configKey === self::IMAGES_KEY )
+						$content[$configKey] = ( is_array( $content[$configKey] ?? null ) === true ? $content[$configKey] : [] ) + $configValue;
+					elseif( isset( $content[$configKey] ) === false )
 						$content[$configKey] = $configValue;
 
 				return $content;
@@ -1524,6 +1529,11 @@ namespace Nino {
 		 *	and never replaced - a re-run of the wizard keeps what an editor
 		 *	wrote (see \Nino\Elements::seed()).
 		 *
+		 *	'imageSlots' gives the unit's templates their picture places (see
+		 *	imageSlots()). A place is added to the project's where it has none of that uri, and handed back in $config
+		 *	under '/nino/html/images' as the places it adds, which a caller adds to
+		 *	the file the way it adds the rest of $config.
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$unitDir			Absolute path to the unit
 		 *	@param		array 		$locales			The locales to apply for
@@ -1574,6 +1584,24 @@ namespace Nino {
 					if( self::copyFile( $unitDir. '/templates/'. $file, \Nino\Filesystem::path( $appData, '/templates/'. $file ), $overwrite ) === false )
 						return 'could not copy /templates/'. $file;
 				}
+			}
+
+			/*	The picture places the unit's templates show, checked once its files
+				are in place: only the ones the project has no place of that uri for
+				are added, and the places that are new travel in $config - the caller
+				adds them to the file as it adds the rest, place by place	*/
+			$slots = [];
+			$seeded = self::imageSlots( $appData, $manifest, $slots );
+
+			if( $seeded !== true )
+				return $seeded;
+
+			$have = is_array( $appData[self::IMAGES_KEY] ?? null ) === true ? $appData[self::IMAGES_KEY] : [];
+			$new = array_diff_key( $slots, $have );
+
+			if( $new !== [] ) {
+				$appData[self::IMAGES_KEY] = $have + $new;
+				$config[self::IMAGES_KEY] = ( is_array( $config[self::IMAGES_KEY] ?? null ) === true ? $config[self::IMAGES_KEY] : [] ) + $new;
 			}
 
 			if( count( $manifest['elementTypes'] ?? [] ) > 0 ) {
@@ -1630,6 +1658,47 @@ namespace Nino {
 			$texts = self::applyUnitTexts( $appData, $unitDir, $locales, $overwrite );
 
 			return is_string( $texts ) === true ? 'could not write '. $texts : true;
+		}
+
+		/**
+		 *	The image slots a unit declares, 'imageSlots' in its manifest -
+		 *	uri => [ 'label' => string or locale map, 'width', 'height' and
+		 *	optionally 'filename' ] - checked and collected into $into for the
+		 *	caller to add to the project's slots. 'imageSlots' and not 'images':
+		 *	that is the directory 'files' copies from. A slot with a 'filename'
+		 *	is seeded with that file, which has to be there once the unit's files
+		 *	are copied; one without is an empty slot, which renders nothing until
+		 *	somebody uploads a picture. The label is one string for the project,
+		 *	in its native language: a slot has a single label, not one per locale.
+		 *	The first unit to name a uri is the one that counts. The wizard asks
+		 *	for the slots of its page units, applyUnit() for those of every other
+		 *	unit - a feature's among them
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$manifest			The unit's manifest
+		 *	@param		array 		&$into				(reference) uri => slot, collected across units
+		 *
+		 *	@return 	true|string							true, or 'could not seed image slot <uri>'
+		 */
+		public static function imageSlots( array &$appData, array $manifest, array &$into ): true|string {
+
+			foreach( ( $manifest['imageSlots'] ?? [] ) as $slotUri => $slot ) {
+
+				$label 		= self::localized( is_array( $slot ) === true ? ( $slot['label'] ?? '' ) : '', \Nino\Locales::getNativeLocale( $appData ) );
+				$width 		= is_array( $slot ) === true ? (int) ( $slot['width'] ?? 0 ) : 0;
+				$height 	= is_array( $slot ) === true ? (int) ( $slot['height'] ?? 0 ) : 0;
+				$filename = is_array( $slot ) === true ? ( $slot['filename'] ?? null ) : null;
+
+				if( is_string( $slotUri ) === false || preg_match( '#^/[a-z][a-z0-9_-]*(/[a-z][a-z0-9_-]*)*$#', $slotUri ) !== 1
+					|| $label === '' || $width < 1 || $height < 1 || $width * $height > \Nino\Images::MAX_SOURCE_PIXELS
+					|| ( $filename !== null && ( is_string( $filename ) === false || $filename === '' || str_contains( $filename, '..' ) === true || str_starts_with( $filename, '/' ) === true
+						|| is_file( \Nino\Filesystem::path( $appData, '/images/'. $filename ) ) === false ) ) )
+					return 'could not seed image slot '. ( is_string( $slotUri ) === true ? $slotUri : '' );
+
+				$into[$slotUri] ??= [ 'label' => $label, 'width' => $width, 'height' => $height, 'filename' => $filename ];
+			}
+
+			return true;
 		}
 
 		/**

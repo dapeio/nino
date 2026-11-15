@@ -139,7 +139,7 @@ Nachschlagen: [Textfills](../development.md#textfills), [The key grammar](../dev
 
 Ein **Bildplatz** (image slot) ist ein benannter Platz für ein Bild mit fester Größe. Die Vorlage schreibt `[image /template/page-home/hero/background alt=""]`. Die Redaktion lädt das Bild im Bereich **Bilder** hoch. Nino schneidet es auf die Größe des Platzes zu.
 
-Die Bildplätze stehen in `config.php` unter `/nino/html/images`. Die Bilder liegen in `public/images/`.
+Die Bildplätze stehen in `config.php` unter `/nino/html/images`. Die Bilder liegen in `public/images/`. Ein Feature legt seine Plätze mit `imageSlots` im Manifest seiner Einheit an: `'/template/page-meetups/intro/banner' => [ 'label' => [ 'en_US' => 'Meetups banner', 'de_DE' => 'Banner der Treffen' ], 'width' => 1200, 'height' => 400 ]`. Nino fügt den Platz hinzu, wo das Projekt keinen unter dieser Adresse hat. Ein Platz, den das Projekt hat, mit dem Bild der Redaktion, bleibt, wie er ist.
 
 Nachschlagen: [The starter pages](../setup.md#the-starter-pages).
 

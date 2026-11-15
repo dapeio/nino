@@ -138,7 +138,7 @@ namespace Nino\Modules\Elements {
 					'type' 					=> $type,
 					'title' 				=> $typeData['title'] ?? $type,
 					'descr' 				=> self::typeDescr( $appData, $type ),
-					'model' 				=> $typeData['model'] ?? [],
+					'model' 				=> self::_labelled( $appData, $typeData['model'] ?? [] ),
 					// What this account may do here - the form draws itself from
 					// it rather than offering controls the save would refuse
 					'rights' 				=> self::rights( $appData, $type, $typeData['model'] ?? [] ),
@@ -148,6 +148,37 @@ namespace Nino\Modules\Elements {
 			}
 
 			\Nino\Http::ok( $request, [ 'types' => $types, 'locales' => \Nino\Locales::getAvailableLocales( $appData ), 'selectedLocale' => \Nino\Admin\Admin::contentLocale( $appData, true ) ] );
+		}
+
+		/**
+		 *	A model as the form is drawn from it: the 'label' a type gives a field
+		 *	- a string or a locale => string map - is the one string for the language
+		 *	of the workbench (see \Nino\Features::localized()), and a label that is
+		 *	neither is none
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$model				The model of a type
+		 *
+		 *	@return 	array										The model, each label a string
+		 */
+		private static function _labelled( array &$appData, array $model ): array {
+
+			$locale = null;
+
+			foreach( $model as $key => $field ) {
+
+				if( is_array( $field ) === false || array_key_exists( 'label', $field ) === false )
+					continue;
+
+				$locale ??= \Nino\Admin\Admin::sessionLocale( $appData );
+
+				if( \Nino\Features::localizedValid( $field['label'] ) === true )
+					$model[$key]['label'] = \Nino\Features::localized( $field['label'], $locale );
+				else
+					unset( $model[$key]['label'] );
+			}
+
+			return $model;
 		}
 
 		/**

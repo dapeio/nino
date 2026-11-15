@@ -795,15 +795,6 @@ namespace Nino\Install {
 				return;
 			}
 
-			// The base unit's own image slots - the logo its frames show - added
-			// below to the project's, never replacing one
-			$imageSlots = [];
-			$seeded = self::imageSlots( $appData, \Nino\Features::readUnitManifest( self::LIBRARY. '/base' ) ?? [], $imageSlots );
-			if( $seeded !== true ) {
-				\Nino\Http::fail( $request, 500, 'the base unit could not be applied: '. $seeded );
-				return;
-			}
-
 			foreach( $modules as $key ) {
 				$applied = \Nino\Features::applyUnit( $appData, $units[$key], $locales, $routes, $blacklist, $config, true );
 				if( $applied !== true ) {
@@ -825,18 +816,15 @@ namespace Nino\Install {
 
 			$appData['/nino/http/routes'] = $routes;
 
-			// Only added to, like the starter pages do: applying this step
-			// again never takes a logo somebody uploaded or a size somebody
-			// set away from the slot
-			if( count( $imageSlots ) > 0 )
-				$appData['/nino/html/images'] = ( $appData['/nino/html/images'] ?? [] ) + $imageSlots;
-
 			$navKeys = self::_applyNavs( $appData, $modules, $units );
 
 			// The units' config defaults go with the keys this step writes
 			// anyway - applyUnit() collects them now instead of writing one
-			// full config.php rewrite per unit that brings any
-			\Nino\AppData::writeContentData( $appData, array_merge( [ '/nino/locales/available', '/nino/locales/native', '/nino/modules', '/nino/auth/roles', '/nino/http/routes', '/nino/html/assets' ], count( $imageSlots ) > 0 ? [ '/nino/html/images' ] : [], $navKeys, array_keys( $config ) ) );
+			// full config.php rewrite per unit that brings any. The image slots
+			// of the units, the base unit's logo among them, are among them:
+			// only added to, so that applying this step again never takes a
+			// logo somebody uploaded or a size somebody set away from the slot
+			\Nino\AppData::writeContentData( $appData, array_merge( [ '/nino/locales/available', '/nino/locales/native', '/nino/modules', '/nino/auth/roles', '/nino/http/routes', '/nino/html/assets' ], isset( $config['/nino/html/images'] ) === true ? [ '/nino/html/images' ] : [], $navKeys, array_keys( $config ) ) );
 
 			if( count( $blacklist ) > 0 )
 				\Nino\Filesystem::mutate( $appData, '/text/blacklist.php', function( array $list ) use ( $blacklist ): array {
@@ -909,45 +897,6 @@ namespace Nino\Install {
 			$appData['/nino/html/navroutes']	= $navroutes;
 
 			return [ '/nino/html/navs', '/nino/html/navroutes' ];
-		}
-
-		/**
-		 *	The image slots a unit declares, 'imageSlots' in its manifest -
-		 *	uri => [ 'label' => string or locale map, 'width', 'height' and
-		 *	optionally 'filename' ] - checked and collected into $into for the
-		 *	caller to add to the project's slots. 'imageSlots' and not 'images':
-		 *	that is the directory 'files' copies from. A slot with a 'filename'
-		 *	is seeded with that file, which has to be there once the unit's files
-		 *	are copied; one without is an empty slot, which renders nothing until
-		 *	somebody uploads a picture. The label is one string for the project,
-		 *	in its native language: a slot has a single label, not one per locale.
-		 *	The first unit to name a uri is the one that counts
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		array 		$manifest			The unit's manifest
-		 *	@param		array 		&$into				(reference) uri => slot, collected across units
-		 *
-		 *	@return 	true|string							true, or 'could not seed image slot <uri>'
-		 */
-		public static function imageSlots( array &$appData, array $manifest, array &$into ): true|string {
-
-			foreach( ( $manifest['imageSlots'] ?? [] ) as $slotUri => $slot ) {
-
-				$label 		= \Nino\Features::localized( $slot['label'] ?? '', \Nino\Locales::getNativeLocale( $appData ) );
-				$width 		= (int) ( $slot['width'] ?? 0 );
-				$height 	= (int) ( $slot['height'] ?? 0 );
-				$filename = $slot['filename'] ?? null;
-
-				if( is_string( $slotUri ) === false || preg_match( '#^/[a-z][a-z0-9_-]*(/[a-z][a-z0-9_-]*)*$#', $slotUri ) !== 1
-					|| $label === '' || $width < 1 || $height < 1 || $width * $height > \Nino\Images::MAX_SOURCE_PIXELS
-					|| ( $filename !== null && ( is_string( $filename ) === false || $filename === '' || str_contains( $filename, '..' ) === true || str_starts_with( $filename, '/' ) === true
-						|| is_file( \Nino\Filesystem::path( $appData, '/images/'. $filename ) ) === false ) ) )
-					return 'could not seed image slot '. ( is_string( $slotUri ) === true ? $slotUri : '' );
-
-				$into[$slotUri] ??= [ 'label' => $label, 'width' => $width, 'height' => $height, 'filename' => $filename ];
-			}
-
-			return true;
 		}
 
 		/**
@@ -2066,7 +2015,7 @@ namespace Nino\Install {
 					return 'could not copy /'. $file;
 
 			// The image slots the unit's templates show, checked once the files are in place
-			$seeded = Setup::imageSlots( $appData, $manifest, $imageSlots );
+			$seeded = \Nino\Features::imageSlots( $appData, $manifest, $imageSlots );
 			if( $seeded !== true )
 				return $seeded;
 

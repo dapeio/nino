@@ -620,6 +620,44 @@ check( 'apiTypes carries each type\'s model along', ( $body['types'][array_searc
 check( 'apiTypes reports the currently available locales', $body['locales'] === \Nino\Locales::getAvailableLocales( $appData ) );
 check( 'apiTypes seeds the locale select with the native locale', $body['selectedLocale'] === 'de_DE' );
 
+// The label a type gives a field - a string, or one per language - reaches the form as one string
+// in the language of the workbench; what is no label is none, and nothing else of the model is touched
+file_put_contents( $sandbox. '/private/elements/labelled.php', '<?php return [
+	\'title\'	=> \'Labelled\',
+	\'model\'	=> [
+		\'title\'	=> [ \'type\' => \'string\', \'locale\' => true, \'label\' => [ \'en_US\' => \'Heading\', \'de_DE\' => \'Überschrift\' ] ],
+		\'place\'	=> [ \'type\' => \'string\', \'label\' => [ \'en_US\' => \'Where\' ] ],
+		\'seats\'	=> [ \'type\' => \'integer\', \'label\' => \'Seats\' ],
+		\'odd\'		=> [ \'type\' => \'string\', \'label\' => [ \'de_DE\' => \'\' ] ],
+		\'plain\'	=> [ \'type\' => \'string\' ],
+	],
+];' );
+[ $status, $body ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiTypes' );
+$labelled = $body['types'][array_search( 'labelled', array_column( $body['types'], 'type' ), true )]['model'] ?? [];
+check( 'apiTypes gives each field the label in the language of the workbench, else English, a plain string as it is', ( $labelled['title']['label'] ?? null ) === 'Überschrift' && ( $labelled['place']['label'] ?? null ) === 'Where' && ( $labelled['seats']['label'] ?? null ) === 'Seats' );
+check( '...a label with nothing in it is none, a field without one stays without, the rest of the model is as it is', array_key_exists( 'label', $labelled['odd'] ) === false && array_key_exists( 'label', $labelled['plain'] ) === false
+	&& $labelled['title']['locale'] === true && $labelled['seats']['type'] === 'integer' && array_keys( $labelled ) === [ 'title', 'place', 'seats', 'odd', 'plain' ] );
+\Nino\Runtime::setSessionValue( $appData, './admin/locale', 'en_US' );
+[ , $body ] = callDev( $appData, \Nino\Modules\Elements\Admin::class, 'apiTypes' );
+check( '...and in English where the workbench speaks it', ( $body['types'][array_search( 'labelled', array_column( $body['types'], 'type' ), true )]['model']['title']['label'] ?? null ) === 'Heading' );
+\Nino\Runtime::setSessionValue( $appData, './admin/locale', 'de_DE' );
+
+// The editor of the types has no control for a label: saving a type from it leaves the labels of the file where they are, a renamed field keeps its own
+ninoCall( $appData, [ \Nino\Modules\Elements\Types::class, 'apiSave' ], [
+	'uri' 		=> 'labelled',
+	'title' 	=> 'Labelled',
+	'renames' => [ 'place' => 'venue' ],
+	'model' 	=> [
+		'title' 	=> [ 'type' => 'string', 'locale' => true ],
+		'venue' 	=> [ 'type' => 'string' ],
+		'seats' 	=> [ 'type' => 'integer' ],
+		'extra' 	=> [ 'type' => 'string' ],
+	],
+] );
+$kept = \Nino\Filesystem::getFileContent( $appData, '/elements/labelled.php', false )['model'] ?? [];
+check( 'saving a type in the editor keeps the label of each field, one that is renamed with it, and gives none to a field that had none', ( $kept['title']['label']['de_DE'] ?? null ) === 'Überschrift' && ( $kept['venue']['label']['en_US'] ?? null ) === 'Where'
+	&& ( $kept['seats']['label'] ?? null ) === 'Seats' && array_key_exists( 'label', $kept['extra'] ) === false && array_key_exists( 'odd', $kept ) === false );
+
 // The line under a type names its elements and is cut at 150 bytes. An
 // element uri may hold any character the kernel api accepts, so the cut could
 // land inside a multibyte one - and json_encode() answers a string that is

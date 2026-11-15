@@ -524,6 +524,12 @@ namespace Nino\Modules\Elements {
 						self::_migrateFieldShape( $appData, $typeData, $key, $isLocale );
 				}
 
+				// The editor has no control for the label a type gives a field, so
+				// the save does not hear of it: what the type file holds stays
+				foreach( $newModel as $key => $field )
+					if( is_array( $oldModel[$key] ?? null ) === true && array_key_exists( 'label', $oldModel[$key] ) === true )
+						$newModel[$key]['label'] = $oldModel[$key]['label'];
+
 				$typeData['title'] = ( $title !== '' ) ? $title : ( $typeData['title'] ?? $typeUri );
 				$typeData['model'] = $newModel;
 

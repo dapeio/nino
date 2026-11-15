@@ -306,6 +306,9 @@ namespace Nino\Modules {
 		 *	language its [[field]] is replaced by nothing, so that the block never
 		 *	shows a leftover and the shortcode pass never makes "[]" of one.
 		 *
+		 *	A list with no element is nothing, or - with empty="<name>" - the
+		 *	project's template of that name (see _empty()).
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					Shortcode arguments
 		 *
@@ -318,7 +321,7 @@ namespace Nino\Modules {
 
 			$result = self::queryLoop( $appData, $args, true );
 			if( $result === [] )
-				return '';
+				return self::_empty( $args );
 
 			$html = '';
 
@@ -336,6 +339,35 @@ namespace Nino\Modules {
 			}
 
 			return $html;
+		}
+
+		/**
+		 *	What stands there when the list has no element: the template of the
+		 *	project that empty="<name>" names, as the [template] the kernel
+		 *	resolves - what a shortcode returns is rendered again, so the template
+		 *	holds fills and shortcodes of its own. Held to a name below /templates
+		 *	- slugs, with a slash between them - because the one thing the value
+		 *	could otherwise do is climb out of that directory; a value that is not
+		 *	one renders nothing and says so. The form of the empty attribute of the
+		 *	catalogue's [search-results]
+		 *
+		 *	@param		array 		$args					Shortcode arguments
+		 *
+		 *	@return 	string								'[template ...]', or ''
+		 */
+		private static function _empty( array $args ): string {
+
+			$empty = trim( (string) ( $args['empty'] ?? '' ) );
+
+			if( $empty === '' )
+				return '';
+
+			if( preg_match( '/^[a-z0-9][a-z0-9_-]*(?:\/[a-z0-9][a-z0-9_-]*)*$/iD', $empty ) !== 1 ) {
+				trigger_error( 'Nino: [elements empty="'. $empty. '"] does not name a template below /templates.', E_USER_WARNING );
+				return '';
+			}
+
+			return '[template /templates/'. $empty. ']';
 		}
 
 		/**

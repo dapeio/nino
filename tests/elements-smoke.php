@@ -764,6 +764,22 @@ check( '[elements] takes sort, offset and limit; ids count from 0 after the cut'
 check( '[elements] with a callback: sorted before it, offset and limit after it',
 	\Nino\Html::renderHtml( $appData, '[elements /sorttest sort="-weight" callback="sorttest-drop-first" offset="1" limit="1"][[title]];[/elements]' ) === 'item 9;' );
 
+// empty="<name>" is the project's template for a list with no element, as the empty of [search-results] is
+\Nino\Filesystem::forceDir( $appData, '/templates' );
+file_put_contents( \Nino\Filesystem::path( $appData, '/templates/none-here.tpl' ), '<p>none &amp; [meet-nobody]</p>' );
+\Nino\Modules\Template::init( $appData );
+\Nino\Html::addShortcode( $appData, 'meet-nobody', static fn( array &$appData, array $args ): string => 'rendered' );
+$loop = '[elements /sorttest sort="weight" limit="2" empty="none-here"]<li>[[title]]</li>[/elements]';
+check( '[elements empty=""] with elements renders its content as it does without the attribute', \Nino\Html::renderHtml( $appData, $loop ) === '<li>item 9</li><li>Item 10</li>'
+	&& \Nino\Html::renderHtml( $appData, str_replace( ' empty="none-here"', '', $loop ) ) === '<li>item 9</li><li>Item 10</li>' );
+check( '[elements] that finds nothing is the template empty names, rendered as the page is rendered', \Nino\Html::renderHtml( $appData, str_replace( '/sorttest ', '/sorttest query="group=nowhere" ', $loop ) ) === '<p>none &amp; rendered</p>' );
+check( '...the same for a type that is not there', \Nino\Html::renderHtml( $appData, '[elements /no-such-type empty="none-here"]<li>[[title]]</li>[/elements]' ) === '<p>none &amp; rendered</p>' );
+check( '[elements] without the attribute, or with an empty one, is nothing for a list with no element, as it was', \Nino\Html::renderHtml( $appData, '[elements /sorttest query="group=nowhere"]<li>[[title]]</li>[/elements]' ) === ''
+	&& \Nino\Html::renderHtml( $appData, '[elements /sorttest query="group=nowhere" empty=""]<li>[[title]]</li>[/elements]' ) === '' );
+ninoWarnings();
+check( 'a value that names no template below /templates renders nothing and says so, a way out of the directory included', \Nino\Html::renderHtml( $appData, '[elements /sorttest query="group=nowhere" empty="../private/config"]x[/elements]' ) === ''
+	&& \Nino\Html::renderHtml( $appData, '[elements /sorttest query="group=nowhere" empty="a b"]x[/elements]' ) === '' && count( ninoWarnings() ) === 2 );
+
 /*	Fills are replaced until nothing changes, because a fill's value may name
 	another fill (a mail subject carrying [[/project/website/general/url]], say). Proving that
 	the pass just made was the final one meant running a whole further

@@ -1638,7 +1638,8 @@
 		/**
 		 *	Resolve a model field's admin-facing label, in this order: a fill of
 		 *	the type's own for the field (/_admin/elements/field/<type>/<key>,
-		 *	which a feature or a project may bring), else the word of the
+		 *	which a project may bring), else the label the type's model gives the
+		 *	field (the server has chosen the language of the workbench), else the word of the
 		 *	vocabulary the key is (/_admin/common/word/<key>: "title" is "Titel"),
 		 *	else the key itself with a capital first letter - "price_default"
 		 *	is "Price_default"
@@ -1653,6 +1654,11 @@
 
 			if( translated !== '' )
 				return translated;
+
+			const declared = ( ( Nino.admin.elements._currentModel || {} )[key] || {} ).label;
+
+			if( typeof declared === 'string' && declared !== '' )
+				return declared;
 
 			const word = Nino.content.getText('/_admin/common/word/'+ key);
 

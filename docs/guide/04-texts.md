@@ -74,6 +74,11 @@ declare(strict_types=1);
 return [
 	'[[/template/page-meetups/intro/title]]' => 'Meetups',
 	'[[/template/page-meetups/intro/text]]'  => 'Here is when our club meets.',
+
+	// What the page is called in the menu, in the title of the browser and in its description
+	'[[/_nino/webpage/meetups/name]]'        => 'Meetups',
+	'[[/_nino/webpage/meetups/title]]'       => 'Meetups of the club',
+	'[[/_nino/webpage/meetups/description]]' => 'When the club meets.',
 ];
 ```
 
@@ -87,8 +92,14 @@ declare(strict_types=1);
 return [
 	'[[/template/page-meetups/intro/title]]' => 'Treffen',
 	'[[/template/page-meetups/intro/text]]'  => 'Hier trifft sich unser Verein.',
+
+	'[[/_nino/webpage/meetups/name]]'        => 'Treffen',
+	'[[/_nino/webpage/meetups/title]]'       => 'Treffen des Vereins',
+	'[[/_nino/webpage/meetups/description]]' => 'Wann sich der Verein trifft.',
 ];
 ```
+
+Die drei Schlüssel unter `/_nino/webpage/meetups/` sind die Ausnahme von der Regel mit den vier Teilen. Sie gehören dem System: Es liest Name, Titel und Beschreibung einer Seite unter der `uri` ihrer Route. Der Name steht im Menü, der Titel im Reiter des Browsers, die Beschreibung im `<meta>` der Seite. Fehlen sie, steht im Reiter der rohe Schlüssel. Hat das Projekt unter `GET://meetups` schon eine Route mit einer anderen `uri`, ist das eine andere Seite. Dann sind die Schlüssel falsch benannt. Trage Name und Titel in diesem Fall im Bereich **Routen** ein.
 
 Liefere in jeder Sprache dieselben Schlüssel. Hat das Projekt eine Sprache, für die Du keine Datei hast, legt Nino die Schlüssel dort leer an. Die Seite zeigt dann den Text der Hauptsprache.
 
@@ -102,20 +113,16 @@ Liefere in jeder Sprache dieselben Schlüssel. Hat das Projekt eine Sprache, fü
 
 Öffne den Bereich **Features** und klicke auf „Treffen“. Dort steht jetzt „Version 0.2.0 – installiert als 0.1.0“. Klicke **Auf 0.2.0 aktualisieren**. Nino wendet dabei die Einheit an.
 
-### 5. Der Seite einen Namen geben
-
-Der Name und der Titel einer Seite sind Texte des Systems. Eine Einheit kann sie nicht liefern. Du trägst sie in der Workbench ein:
-
-Öffne den Bereich **Routen** und klicke auf `/meetups`. Trage unter **Inhalt** für jede Sprache Name und Titel ein: für Deutsch beide Male „Treffen“, für Englisch beide Male „Meetups“. Der Name steht im Menü, der Titel im Reiter des Browsers. Wähle „In der Navigation „main“ zeigen“, wenn die Seite im Menü stehen soll. Klicke **Speichern**.
-
 ## Prüfen
 
-Öffne `/meetups`. Die Seite zeigt die Überschrift „Treffen“, den Satz „Hier trifft sich unser Verein.“ und das Datum. Auf Englisch steht dort „Meetups“ und „Here is when our club meets.“.
+Öffne `/meetups`. Die Seite zeigt die Überschrift „Treffen“, den Satz „Hier trifft sich unser Verein.“ und das Datum. Im Reiter des Browsers steht „Treffen des Vereins“. Auf Englisch steht dort „Meetups“, „Here is when our club meets.“ und „Meetups of the club“.
+
+Die Seite steht noch in keinem Menü. Welche Seite in welches Menü kommt, entscheidet das Projekt: Öffne den Bereich **Routen**, klicke auf `/meetups` und wähle „In der Navigation „main“ zeigen“. Der Eintrag heißt dann „Treffen“.
 
 In `private/` findest Du jetzt:
 
 - `private/templates/page-meetups.tpl`
-- in `private/text/de_DE.php` und `en_US.php` die zwei Schlüssel
+- in `private/text/de_DE.php` und `en_US.php` die zwei Schlüssel der Vorlage und die drei Schlüssel der Seite, `/_nino/webpage/meetups/name`, `title` und `description`
 - in `private/config.php` die Route `GET://meetups`
 
 Prüfe „nur hinzufügen“: Ändere im Bereich **Texte** die Überschrift in „Unsere Treffen“. Lösche die Datei `private/templates/page-meetups.tpl`. Schalte das Feature aus (**Deaktivieren**) und wieder ein (**Aktivieren**). Die Überschrift heißt weiter „Unsere Treffen“. Die gelöschte Vorlage ist wieder da.
@@ -124,7 +131,7 @@ Prüfe „nur hinzufügen“: Ändere im Bereich **Texte** die Überschrift in �
 
 - **Die Einheit ändern und auf das Update warten.** Ein Update ersetzt nichts, was das Projekt schon hat. Änderst Du später `install/templates/page-meetups.tpl`, bleibt die Kopie in `private/templates/` alt. Lösche beim Entwickeln die Kopie, oder ändere sie von Hand mit.
 - **Die Version nicht erhöhen.** Ohne neue Version bietet die Workbench kein Update an. Dann wendest Du die Einheit an, indem Du das Feature aus- und wieder einschaltest.
-- **Im Titel des Browsers steht `[[/_nino/webpage/meetups/title]]`.** Der Seite fehlen Name und Titel. Trage sie im Bereich **Routen** ein (Schritt 5).
+- **Im Titel des Browsers steht `[[/_nino/webpage/meetups/title]]`.** Der Seite fehlen Name und Titel. Die Schlüssel `/_nino/webpage/<uri>/…` heißen anders als die `uri` der Route, oder die Textdateien der Einheit haben sie nicht. Trage Name und Titel im Bereich **Routen** ein.
 - **Ein Schlüssel mit drei oder fünf Teilen.** Ein Textschlüssel hat genau vier Teile aus Kleinbuchstaben, Ziffern und Bindestrichen. Eine Einheit liefert nie einen Schlüssel unter `/project/`.
 
 ## Nachschlagen
