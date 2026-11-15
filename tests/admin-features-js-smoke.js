@@ -142,6 +142,8 @@ const sandbox = {
 				return mount;
 			if( id === 'features-detail' )
 				return screen;
+			if( id === 'admin-user-email' )
+				return accountEl;
 			// Anything else is looked up where a browser would look: in the
 			// tree the panel just drew. The filter's own re-focus reads it
 			return findAll( mount, function( node ) { return node.id === id } )[0]
@@ -155,17 +157,35 @@ const sandbox = {
 	Nino : Nino,
 };
 let confirmAnswer = true;
+// The rail's line with the account's name, where a page has one
+let accountEl = null;
 // ...and what the dialog was asked, in order
 const confirms = [];
-// What an install said before it reloaded, in order - the dialog is where an
-// install's word goes, because the offer it was pressed on is gone afterwards
-const alerts = [];
-// ...and how many reloads there were when it was said: a dialog after the reload
+// What the panel said for the page that follows a reload, in order: it is kept
+// in the session, because the row it could be written on is gone afterwards
+// and a dialog of the browser would hold the reload. A window without alert(),
+// so that a call of it is an error the suite sees
+const saidList = [];
+// ...and how many reloads there were when it was said: said after the reload
 // would be said to a page that is gone
-const alertsAt = [];
+const saidAt = [];
+const stored = {};
 sandbox.window = {
 	Nino : Nino,
-	alert : function( said ) { alerts.push( said ); alertsAt.push( reloads ) },
+	sessionStorage : {
+		getItem : function( key ) { return stored[key] ?? null },
+		removeItem : function( key ) { delete stored[key] },
+		setItem : function( key, value ) {
+			stored[key] = value;
+			const kept = JSON.parse( value );
+			if( kept.text !== '' ) {
+				saidList.push( kept.text );
+				saidAt.push( reloads );
+			}
+		},
+	},
+	// The line above the list is filled a moment after it is drawn; here at once, so that what it holds can be read
+	setTimeout : function( run ) { run() },
 	confirm : function( asked ) { confirms.push( asked ); return confirmAnswer },
 	location : { hash : '', reload : function() { reloads++ } },
 };
@@ -242,10 +262,10 @@ check( 'and binds its ready callback', callbacks.length === 1 && callbacks[0] ==
 
 // The backend half of the same contract, read from the class
 const admin = source('_admin/Nino/Modules/Features/Admin/Admin.php');
-check( 'the panel is a system entry with the nav uri the script speaks, two mount points and nine actions',
+check( 'the panel is a system entry with the nav uri the script speaks, two mount points and eleven actions',
 	admin.includes( "return [ 'features', '/_admin/nav/features', 15, 'system' ];" ) && admin.includes( "return [ 'features-list', 'features-detail' ];" )
 	&& script.includes( "'features-list'" ) && script.includes( "'features-detail'" )
-	&& [ 'features/list', 'features/activate', 'features/deactivate', 'features/settings', 'features/catalogue', 'features/install', 'features/remove', 'features/application-plan', 'features/application-apply' ].every( function( action ) { return admin.includes( "'"+ action+ "'" ) } ) );
+	&& [ 'features/list', 'features/activate', 'features/deactivate', 'features/settings', 'features/catalogue', 'features/install', 'features/remove', 'features/application-plan', 'features/application-apply', 'features/deactivate-refused', 'features/reapply' ].every( function( action ) { return admin.includes( "'"+ action+ "'" ) } ) );
 // The one thing the module's own stylesheet is for: the script builds a
 // card's buttons as siblings with no whitespace between them, so the row
 // carries its gap itself
@@ -260,12 +280,12 @@ check( 'the panel bundles a stylesheet of its own, in the workbench\'s layer, sp
 check( 'the head that carries the tabs and the filter stays at the top of the list pane, scoped to that pane',
 	/#features-list \.admin-features-head \{[^}]*position: sticky;/s.test( moduleCss )
 	&& /\.admin-panel-tabs \{[^}]*position: sticky;/s.test( source('_admin/assets/style.css') ) === false );
-check( 'every action method guards itself with the panel\'s permission', ( admin.match( /guardPerm\( \$appData, \$request, self::MANAGE_PERM \)/g ) || [] ).length === 9 );
-check( 'the script posts those nine actions and no other - the list is read once more where a set-up stops',
+check( 'every action method guards itself with the panel\'s permission', ( admin.match( /guardPerm\( \$appData, \$request, self::MANAGE_PERM \)/g ) || [] ).length === 11 );
+check( 'the script posts those eleven actions and no other - the list is read once more where a set-up stops',
 	script.includes( "Nino.adminUi.api.call( 'features/'+ endpoint" ) && script.includes( "_apiCall( 'list'" ) && script.includes( "_apiCall( 'settings'" )
 	&& script.includes( "? 'deactivate' : 'activate'" ) && script.includes( "_apiCall( 'catalogue'" ) && script.includes( "_apiCall( 'install'" )
 	&& script.includes( "_apiCall( 'remove'" ) && script.includes( "_apiCall( 'application-plan'" ) && script.includes( "_apiCall( 'application-apply'" )
-	&& ( script.match( /_apiCall\( /g ) || [] ).length === 9 );
+	&& script.includes( "_apiCall( 'deactivate-refused'" ) && script.includes( "_apiCall( 'reapply'" ) && ( script.match( /_apiCall\( /g ) || [] ).length === 11 );
 
 // --- one language, one text system
 
@@ -860,11 +880,11 @@ check( 'Activate posts features/activate with the key', requests[requests.length
 answer( 400, { error : 'feature "fresh" cannot be activated: nope' } );
 check( 'a refusal shows the kernel\'s reason and reloads nothing', reloads === 0 && activate.disabled === false && hasClass( freshMsg, 'nino-admin-error' ) && freshMsg.textContent === '(400) feature "fresh" cannot be activated: nope' );
 fire( activate, 'click' );
-const alertsBeforeActivate = alerts.length;
+const alertsBeforeActivate = saidList.length;
 answer( 200, { feature : FEATURES[3], switchedOn : [ { key : 'fresh', name : 'Fresh' } ] } );
-check( 'success says so, keeps the hash on the panel and reloads the workbench', reloads === 1 && sandbox.window.location.hash === '#features' && freshMsg.textContent === text('/_admin/features/msg/activated')+ ' '+ text('/_admin/features/msg/reload') );
-check( '...and names what it switched on in a dialog, which is said before the reload and not after', alerts.length === alertsBeforeActivate + 1 && alerts[alerts.length - 1] === 'Switched on: Fresh.'
-	&& alerts[alerts.length - 1] === text('/_admin/features/msg/switched-on').replace( '%s', 'Fresh' ) && alertsAt[alertsAt.length - 1] === 0 );
+check( 'success says so, keeps the hash on the tab it was pressed on and reloads the workbench', reloads === 1 && sandbox.window.location.hash === '#features/inactive' && freshMsg.textContent === text('/_admin/features/msg/activated')+ ' '+ text('/_admin/features/msg/reload') );
+check( '...and names what it switched on in the line the page shows after the reload, kept in the session before it - no dialog of the browser, which has no alert() here', saidList.length === alertsBeforeActivate + 1 && saidList[saidList.length - 1] === 'Switched on: Fresh.'
+	&& saidList[saidList.length - 1] === text('/_admin/features/msg/switched-on').replace( '%s', 'Fresh' ) && saidAt[saidAt.length - 1] === 0 );
 
 // --- removing the directory, which deactivating deliberately does not do
 
@@ -888,13 +908,17 @@ check( 'a refusal shows the kernel\'s reason and frees the button', removeBtn.di
 	&& oldMsg.textContent === '(400) could not remove /features/Old - the web server may not write there' );
 
 fire( removeBtn, 'click' );
-const dialogsBeforePrivacy = alerts.length;
+const dialogsBeforePrivacy = saidList.length;
 answer( 200, { removed : 'old', privacy : [ 'Old', 'Old, too' ] } );
-check( 'a removal that leaves sections of the privacy policy behind says which, in a dialog, before the list is drawn again', alerts.length === dialogsBeforePrivacy + 1
-	&& alerts[alerts.length - 1] === text('/_admin/features/msg/deactivated-privacy').replace( '%s', 'Old, Old, too' ) );
+check( 'a removal that leaves sections of the privacy policy behind says which, in the line above the list, which the list drawn again keeps', saidList.length === dialogsBeforePrivacy
+	&& panel._said === text('/_admin/features/msg/deactivated-privacy').replace( '%s', 'Old, Old, too' ) );
 check( 'a removal reads the whole list again - what it took away may be what another row was waiting for', requests[requests.length - 1].action === 'features/list' );
 answer( 200, listAnswer( CATALOGUE_URL, true, null, FEATURES.filter( function( f ) { return f.key !== 'old' } ) ) );
 check( '...and the row is gone with no page reload: no rail entry changes when an inactive feature leaves', rowKeys( mount, 'feature' ) === 'fresh' && reloads === 1 );
+check( '...and the line stands above the list, as text, until the next tab press says something else', findAll( mount, function( el ) { return el.id === 'features-note' } ).length === 1
+	&& findAll( mount, function( el ) { return el.id === 'features-note' } )[0].attributes.role === 'status' );
+fire( tabs[1], 'click' );
+check( '...and a tab press takes it away', findAll( mount, function( el ) { return el.id === 'features-note' } ).length === 0 && panel._said === '' );
 
 panel.init();
 answer( 200, listAnswer( CATALOGUE_URL, true, null ) );
@@ -990,7 +1014,7 @@ const reloadsBeforeInstall = reloads;
 fire( install, 'click' );
 answer( 200, { feature : EXTRA, updated : false, required : [ 'helper', 'a$&b' ] } );
 answer( 200, listAnswer( CATALOGUE_URL, true, CACHE, FEATURES_WITH_EXTRA ) );
-check( 'an install that brought a requirement along says which one', alerts[alerts.length - 1] === text('/_admin/features/msg/installed-with').replace( '%s', function() { return 'helper, a$&b' } ) );
+check( 'an install that brought a requirement along says which one', panel._said === text('/_admin/features/msg/installed-with').replace( '%s', function() { return 'helper, a$&b' } ) );
 check( '...and, having switched nothing on, reads the list again rather than building the workbench anew', reloads === reloadsBeforeInstall && requests[requests.length - 1].action === 'features/list' );
 
 /*	And what it says when the install switched the feature on, which is what
@@ -1000,15 +1024,15 @@ fire( byTag( paneHead.children[1], 'button' )[2], 'click' );
 fire( offerButton( mount, 'extra' ), 'click' );
 const requestsBeforeActivating = requests.length;
 answer( 200, { feature : EXTRA, updated : false, activated : true, required : [], switchedOn : [ { key : 'extra', name : 'Extra' } ] } );
-check( 'an install that switched the feature on says that, not only that it installed', alerts[alerts.length - 1] === text('/_admin/features/msg/installed-active') );
-check( '...and builds the whole workbench again, because a feature that is on brings a panel, assets and words the page was built without', reloads === reloadsBeforeInstall + 1 && sandbox.window.location.hash === '#features' && requests.length === requestsBeforeActivating );
+check( 'an install that switched the feature on says that, not only that it installed', saidList[saidList.length - 1] === text('/_admin/features/msg/installed-active') );
+check( '...and builds the whole workbench again, because a feature that is on brings a panel, assets and words the page was built without', reloads === reloadsBeforeInstall + 1 && sandbox.window.location.hash === '#features/available' && requests.length === requestsBeforeActivating );
 
 fire( offerButton( mount, 'extra' ), 'click' );
 // What came with it is what was switched on, by name - not what was placed:
 // a requirement that was in the directory already but off is placed by nothing,
 // and is switched on all the same
 answer( 200, { feature : EXTRA, updated : false, activated : true, required : [], switchedOn : [ { key : 'extra', name : 'Extra' }, { key : 'helper', name : 'Helper' } ] } );
-check( '...and names what came with it in the same line, by name and without the feature itself, even where nothing was placed for it', alerts[alerts.length - 1] === text('/_admin/features/msg/installed-active-with').replace( '%s', 'Helper' ) && reloads === reloadsBeforeInstall + 2 );
+check( '...and names what came with it in the same line, by name and without the feature itself, even where nothing was placed for it', saidList[saidList.length - 1] === text('/_admin/features/msg/installed-active-with').replace( '%s', 'Helper' ) && reloads === reloadsBeforeInstall + 2 );
 
 /*	An update to a feature that is already running: the files are in place,
 	and the answer says the update is pending - the request that placed them
@@ -1320,7 +1344,7 @@ check( 'a failed load is reported through the workbench\'s words', mount.childre
 
 	// The run: one feature to a request, the next only after the answer
 	const reloadsBefore = reloads;
-	const alertsBefore = alerts.length;
+	const alertsBefore = saidList.length;
 	fire( appButton( 'site' ), 'click' );
 	answer( 200, planFor( appSite, [ 'forms', 'seo' ] ) );
 	check( 'once agreed the first feature goes out alone, with the application and the feature, and the line says which of how many', requests[requests.length - 1].action === 'features/application-apply'
@@ -1331,8 +1355,8 @@ check( 'a failed load is reported through the workbench\'s words', mount.childre
 		&& appLine( 'site' ).textContent === text('/_admin/features/msg/application-step').replace( '%s', 'Webseite' ).replace( '%s', 'SEO' ).replace( '%s', '2' ).replace( '%s', '2' ) );
 	answer( 200, { feature : 'seo', placed : true, activated : true, application : appSite } );
 	check( 'after the last the result is said in a dialog, before the reload, and the workbench is built again on the Applications tab',
-		reloads === reloadsBefore + 1 && alerts.length === alertsBefore + 1 && alertsAt[alertsAt.length - 1] === reloadsBefore
-		&& alerts[alerts.length - 1] === text('/_admin/features/msg/application-done').replace( '%s', 'Webseite' ).replace( '%s', 'Formulare, SEO' ) && sandbox.window.location.hash === '#features/applications' );
+		reloads === reloadsBefore + 1 && saidList.length === alertsBefore + 1 && saidAt[saidAt.length - 1] === reloadsBefore
+		&& saidList[saidList.length - 1] === text('/_admin/features/msg/application-done').replace( '%s', 'Webseite' ).replace( '%s', 'Formulare, SEO' ) && sandbox.window.location.hash === '#features/applications' );
 
 	// A failure in the middle stops the run, says what is on and goes on from there
 	panel.init();
@@ -1358,7 +1382,7 @@ check( 'a failed load is reported through the workbench\'s words', mount.childre
 	answer( 200, planFor( afterFailure[0], [ 'seo' ] ) );
 	check( 'which now lists the feature that is still off alone, and the run starts with it', JSON.stringify( requests[requests.length - 1].payload ) === '{"application":"site","feature":"seo"}' );
 	answer( 200, { feature : 'seo', placed : true, activated : true, application : afterFailure[0] } );
-	check( 'and ends as a run does', reloads === reloadsAtFailure + 1 && alerts[alerts.length - 1] === text('/_admin/features/msg/application-done').replace( '%s', 'Webseite' ).replace( '%s', 'SEO' ) );
+	check( 'and ends as a run does', reloads === reloadsAtFailure + 1 && saidList[saidList.length - 1] === text('/_admin/features/msg/application-done').replace( '%s', 'Webseite' ).replace( '%s', 'SEO' ) );
 
 	// The list read after a set-up that stopped brings the refused manifests as they are now, not as they were
 	panel._rejected = [ { dir : 'Stale', reason : 'old' } ];
@@ -1463,6 +1487,13 @@ check( 'a failed load is reported through the workbench\'s words', mount.childre
 	panel._tab = 'active';
 	panel._tabFromAddress();
 	check( '...and #features or another panel\'s address leaves the tab as it is', panel._tab === 'active' );
+	current = { panel : 'features', parts : [ 'inactive' ] };
+	panel._tabFromAddress();
+	check( '...#features/inactive and #features/available open theirs', panel._tab === 'inactive' && ( current = { panel : 'features', parts : [ 'available' ] }, panel._tabFromAddress(), panel._tab === 'available' ) );
+	current = { panel : 'features', parts : [ 'nowhere' ] };
+	panel._tab = 'active';
+	panel._tabFromAddress();
+	check( '...and a word that names no tab leaves it as it is', panel._tab === 'active' );
 	current = { panel : 'images', parts : [ 'applications' ] };
 	panel._tabFromAddress();
 	check( '...even when it says "applications" for another panel', panel._tab === 'active' );
@@ -1470,7 +1501,9 @@ check( 'a failed load is reported through the workbench\'s words', mount.childre
 	answer( 200, listAnswer( CATALOGUE_URL, true, withApplications( APPLICATIONS ) ) );
 	fire( strip4()[3], 'click' );
 	fire( strip4()[1], 'click' );
-	check( 'a tab press writes the address: #features/applications for this tab, #features for the others', JSON.stringify( written.slice( -2 ) ) === '[["features",["applications"]],["features",[]]]' );
+	check( 'a tab press writes the address: the tab after #features, and #features alone for Active', JSON.stringify( written.slice( -2 ) ) === '[["features",["applications"]],["features",["inactive"]]]' );
+	fire( strip4()[0], 'click' );
+	check( '...Active being the one the bare address means', JSON.stringify( written[written.length - 1] ) === '["features",[]]' );
 	delete Nino.admin.router;
 	fire( strip4()[3], 'click' );
 	check( 'a shell without the router goes on without it', panel._tab === 'applications' );
@@ -1531,19 +1564,19 @@ check( 'a failed load is reported through the workbench\'s words', mount.childre
 	const button = { disabled : false };
 	const line = { textContent : '', classList : { add : function() {}, remove : function() {} } };
 	const reloadsBefore = reloads;
-	const dialogs = alerts.length;
+	const dialogs = saidList.length;
 
 	panel._switch( { key : 'plain' }, 'update', button, line, true );
 	answer( 200, { feature : FEATURES[1], switchedOn : [] } );
-	check( 'an update that switched nothing on says nothing, and still reloads', alerts.length === dialogs && reloads === reloadsBefore + 1 );
+	check( 'an update that switched nothing on says nothing, and still reloads', saidList.length === dialogs && reloads === reloadsBefore + 1 );
 
 	panel._switch( { key : 'plain' }, 'update', button, line, true );
 	answer( 200, { feature : FEATURES[1], switchedOn : [ { key : 'newer', name : 'Newer' }, { key : 'newest', name : 'Newest' } ] } );
-	check( 'an update that switched a requirement on says so - the new version asked for something that was off', alerts.length === dialogs + 1 && alerts[alerts.length - 1] === 'Switched on: Newer, Newest.' && reloads === reloadsBefore + 2 && alertsAt[alertsAt.length - 1] === reloadsBefore + 1 );
+	check( 'an update that switched a requirement on says so - the new version asked for something that was off', saidList.length === dialogs + 1 && saidList[saidList.length - 1] === 'Switched on: Newer, Newest.' && reloads === reloadsBefore + 2 && saidAt[saidAt.length - 1] === reloadsBefore + 1 );
 
 	panel._switch( { key : 'fresh' }, 'activate', button, line, true );
 	answer( 200, { feature : FEATURES[3] } );
-	check( 'an answer without the list says nothing, as an older server\'s does', alerts.length === dialogs + 1 && reloads === reloadsBefore + 3 );
+	check( 'an answer without the list says nothing, as an older server\'s does', saidList.length === dialogs + 1 && reloads === reloadsBefore + 3 );
 
 	// A deactivation says where the feature's shortcodes still stand
 	const found = [
@@ -1554,8 +1587,8 @@ check( 'a failed load is reported through the workbench\'s words', mount.childre
 	];
 	panel._switch( { key : 'sample' }, 'deactivate', button, line, true );
 	answer( 200, { feature : FEATURES[2], found : found } );
-	const said = alerts[alerts.length - 1];
-	check( 'a deactivation that leaves shortcodes behind shows one dialog, before the reload, with a line for each', alerts.length === dialogs + 2 && alertsAt[alertsAt.length - 1] === reloadsBefore + 3 && reloads === reloadsBefore + 4
+	const said = saidList[saidList.length - 1];
+	check( 'a deactivation that leaves shortcodes behind shows one dialog, before the reload, with a line for each', saidList.length === dialogs + 2 && saidAt[saidAt.length - 1] === reloadsBefore + 3 && reloads === reloadsBefore + 4
 		&& said.split('\n').length === 3 && said.indexOf( text('/_admin/features/msg/deactivated-found').split('%s')[0] ) === 0 );
 	check( '...the brackets written by the script, the places in the words of the fills, and what does not fit counted instead of listed', said.split('\n')[1] === '[sample] '
 		+ text('/_admin/features/label/found-template').replace( '%s', 'page-x.tpl' )+ ', '+ text('/_admin/features/label/found-text').replace( '%s', '/found/raw (de_DE)' )+ ', '
@@ -1564,24 +1597,252 @@ check( 'a failed load is reported through the workbench\'s words', mount.childre
 
 	panel._switch( { key : 'sample' }, 'deactivate', button, line, true );
 	answer( 200, { feature : FEATURES[2], found : [] } );
-	check( 'a deactivation that leaves nothing behind says nothing', alerts.length === dialogs + 2 && reloads === reloadsBefore + 5 );
+	check( 'a deactivation that leaves nothing behind says nothing', saidList.length === dialogs + 2 && reloads === reloadsBefore + 5 );
 
 	// ...and which sections of the privacy policy still describe it: no switch deletes them
 	panel._switch( { key : 'sample' }, 'deactivate', button, line, true );
 	answer( 200, { feature : FEATURES[2], found : [], privacy : [ 'Sample', 'a$&b' ] } );
-	check( 'a deactivation that leaves sections of the privacy policy behind names them in a dialog, before the reload', alerts.length === dialogs + 3 && alertsAt[alertsAt.length - 1] === reloadsBefore + 5 && reloads === reloadsBefore + 6
-		&& alerts[alerts.length - 1] === text('/_admin/features/msg/deactivated-privacy').replace( '%s', function() { return 'Sample, a$&b' } ) );
+	check( 'a deactivation that leaves sections of the privacy policy behind names them in a dialog, before the reload', saidList.length === dialogs + 3 && saidAt[saidAt.length - 1] === reloadsBefore + 5 && reloads === reloadsBefore + 6
+		&& saidList[saidList.length - 1] === text('/_admin/features/msg/deactivated-privacy').replace( '%s', function() { return 'Sample, a$&b' } ) );
 
 	panel._switch( { key : 'sample' }, 'deactivate', button, line, true );
 	answer( 200, { feature : FEATURES[2], found : found, privacy : [ 'Sample' ] } );
-	const both = alerts[alerts.length - 1].split('\n\n');
-	check( 'shortcodes left behind and sections left behind are two paragraphs of one dialog', alerts.length === dialogs + 4 && both.length === 2 && both[0].indexOf( text('/_admin/features/msg/deactivated-found').split('%s')[0] ) === 0
+	const both = saidList[saidList.length - 1].split('\n\n');
+	check( 'shortcodes left behind and sections left behind are two paragraphs of one dialog', saidList.length === dialogs + 4 && both.length === 2 && both[0].indexOf( text('/_admin/features/msg/deactivated-found').split('%s')[0] ) === 0
 		&& both[1] === text('/_admin/features/msg/deactivated-privacy').replace( '%s', 'Sample' ) );
 
 	panel._switch( { key : 'sample' }, 'deactivate', button, line, true );
 	answer( 200, { feature : FEATURES[2], found : [], privacy : [] } );
-	check( 'an empty list of sections says nothing', alerts.length === dialogs + 4 );
+	check( 'an empty list of sections says nothing', saidList.length === dialogs + 4 );
 }
+
+/*	Nothing of this panel is said by the browser: its dialogs hold a reload, cannot be styled, are not read in the panel's
+	language and are the one place the panel could not be reached by a test. The window above has no alert(), so a call of
+	it is an error the suite stops on; this is the same said of the source	*/
+check( 'the script calls no alert() and no confirm() of the browser', /\b(wn|window)\.(alert|confirm)\s*\(/.test( script ) === false && /(^|[^.\w])(alert|confirm)\s*\(/.test( script.replace( /\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '' ) ) === false );
+
+{
+panel._features = FEATURES;
+panel._rejected = [ { dir : 'Running', reason : 'why', active : true }, { dir : 'Idle', reason : 'other', active : false } ];
+panel._said = '';
+panel._tab = 'active';
+panel._renderPanel();
+// The one that runs has the one action nothing else of the panel reaches: it takes the class out of the modules
+fire( byTag( paneHead.children[1], 'button' )[0], 'click' );
+const runningRow2 = findAll( mount, function( el ) { return el.dataset.rejected === 'Running' } )[0];
+const runningOff = byTag( runningRow2, 'button' );
+check( 'a refused manifest of a feature that runs has one button, Deactivate, in the danger class - the one that is off has none', runningOff.length === 1
+	&& runningOff[0].textContent === text('/_admin/features/label/deactivate') && hasClass( runningOff[0], 'nino-admin-btn-danger' )
+	&& byTag( findAll( mount, function( el ) { return el.dataset.rejected === 'Idle' } )[0] || runningRow2, 'button' ).length === ( findAll( mount, function( el ) { return el.dataset.rejected === 'Idle' } )[0] ? 0 : 1 ) );
+const confirmsBeforeRefused = confirms.length;
+const reloadsAtRefused = reloads;
+const requestsBeforeRefused = requests.length;
+confirmAnswer = false;
+fire( runningOff[0], 'click' );
+check( 'it asks first, naming the directory and what does not happen for want of a manifest - and declining sends nothing', confirms.length === confirmsBeforeRefused + 1
+	&& confirms[confirms.length - 1] === text('/_admin/features/confirm/deactivate-refused').replace( '%s', 'Running' ) && requests.length === requestsBeforeRefused && runningOff[0].disabled === false );
+confirmAnswer = true;
+fire( runningOff[0], 'click' );
+check( 'accepted, it posts features/deactivate-refused with the directory alone, holds the button and says so', requests[requests.length - 1].action === 'features/deactivate-refused'
+	&& JSON.stringify( requests[requests.length - 1].payload ) === '{"dir":"Running"}' && runningOff[0].disabled === true
+	&& byTag( runningRow2, 'p' )[0].textContent === text('/_admin/features/msg/deactivating') );
+answer( 400, { error : 'unknown feature', code : 'features_unknown' } );
+check( 'a refusal is said in its own words, frees the button and reloads nothing', runningOff[0].disabled === false && hasClass( byTag( runningRow2, 'p' )[0], 'nino-admin-error' ) && reloads === reloadsAtRefused );
+const refusedReloads = reloads;
+fire( runningOff[0], 'click' );
+answer( 200, { deactivated : 'Running' } );
+check( 'answered, it builds the workbench again - the panel it brought leaves the rail - and says where the feature stands now, in the line of the page that follows',
+	reloads === refusedReloads + 1 && saidList[saidList.length - 1] === text('/_admin/features/msg/deactivated-refused').replace( '%s', 'Running' ) && saidAt[saidAt.length - 1] === refusedReloads
+	&& sandbox.window.location.hash === '#features' );
+}
+
+// --- the page that follows a reload: where the person was, and what was said
+
+{
+	const KEY = panel._afterKey;
+	let current = { panel : 'features', parts : [ 'inactive' ] };
+	Nino.admin.router = { current : function() { return current }, set : function() {} };
+	panel._rejected = [];
+	panel._features = FEATURES;
+	panel._said = '';
+	panel._filter = '';
+	panel._category = '';
+	panel._tab = 'inactive';
+	panel._renderPanel();
+
+	// Pressed on the row of 'fresh', which is the one that leaves; 'old' has problems and offers no Activate
+	check( 'the row the focus goes to is the next one that offers Activate, else the nearest above, else none', panel._nextToActivate( 'fresh' ) === ''
+		&& panel._nextToActivate( 'old' ) === 'fresh' && ( panel._tab = 'active', panel._nextToActivate( 'fresh' ) === '' ) );
+	panel._tab = 'inactive';
+
+	// What a switch keeps for the page that is built next
+	panel._filter = 'fre';
+	panel._reload( 'Switched on: Fresh.\nTwo lines.', 'fresh' );
+	const kept = JSON.parse( stored[KEY] );
+	check( 'a switch keeps the sentence, the filters and the row the focus goes to in the session, and lands on its tab', kept.text === 'Switched on: Fresh.\nTwo lines.' && kept.filter === 'fre' && kept.category === '' && kept.focus === 'fresh'
+		&& sandbox.window.location.hash === '#features/inactive' );
+
+	// The page that is built: first list, first drawing
+	panel._ready = false;
+	panel._filter = '';
+	panel._said = '';
+	panel._tab = 'active';
+	panel.init();
+	answer( 200, listAnswer( CATALOGUE_URL, true, null ) );
+	check( 'it opens on the tab the address names, with the filter it had, and takes what was kept out of the session', panel._tab === 'inactive' && panel._filter === 'fre' && stored[KEY] === undefined );
+	const noteLine = findAll( mount, function( el ) { return el.id === 'features-note' } )[0];
+	check( '...the sentence stands above the list as a status line, the browser\'s dialog being none', noteLine !== undefined && noteLine.attributes.role === 'status' && mount.children[1] === noteLine && panel._said === 'Switched on: Fresh.\nTwo lines.' );
+	check( '...and the focus is on the Activate of the row it was sent to', focused() !== null && focused().textContent === text('/_admin/features/label/activate') && focused().parentNode.parentNode.dataset.feature === 'fresh' );
+
+	// A page that has nothing kept says nothing and keeps nothing
+	panel._ready = false;
+	panel._said = '';
+	panel._filter = '';
+	panel.init();
+	answer( 200, listAnswer( CATALOGUE_URL, true, null ) );
+	check( 'without anything kept the page opens with no line and the filter empty', findAll( mount, function( el ) { return el.id === 'features-note' } ).length === 0 && panel._filter === '' );
+
+	// ...and a session that holds something that is not ours
+	stored[KEY] = 'not json';
+	panel._ready = false;
+	panel.init();
+	answer( 200, listAnswer( CATALOGUE_URL, true, null ) );
+	check( 'a kept value that cannot be read is dropped without a word', panel._said === '' && stored[KEY] === undefined );
+	delete Nino.admin.router;
+}
+
+// --- apply the content of an active feature again
+
+{
+	const sample = Object.assign( {}, FEATURES[2], { unit : true } );
+	// What the sample requires, on and in order: the button is only drawn for a feature the kernel would apply the unit of without switching or updating anything
+	const helperOn = Object.assign( {}, FEATURES[3], { key : 'helper', name : 'Helper', active : true, update : false, problems : [], requires : [], settings : [] } );
+	panel._features = [ FEATURES[0], FEATURES[1], sample, FEATURES[3], helperOn ];
+	panel._tab = 'active';
+	panel._said = '';
+	panel._renderPanel();
+	fire( row( mount, 'sample' ), 'click' );
+	const block = findAll( screen, function( el ) { return hasClass( el, 'admin-features-reapply' ) } )[0];
+	check( 'the screen of a feature that brings a unit has the block, above the tabs: a button, what it does, and an empty line for the answer', block !== undefined
+		&& byTag( block, 'button' ).length === 1 && byTag( block, 'button' )[0].textContent === text('/_admin/features/label/reapply') && hasClass( byTag( block, 'button' )[0], 'nino-admin-btn-secondary' )
+		&& byTag( block, 'p' )[0].textContent === text('/_admin/features/hint/reapply') && byTag( block, 'p' )[1].textContent === '' && byTag( block, 'p' )[1].attributes.role === 'status'
+		&& byTag( block, 'button' )[0].attributes['aria-describedby'] === byTag( block, 'p' )[0].id );
+	check( '...and the screen of one that brings none has no block', ( function() {
+		panel._features = FEATURES;
+		panel._renderDetail();
+		return findAll( screen, function( el ) { return hasClass( el, 'admin-features-reapply' ) } ).length === 0;
+	} )() );
+	panel._features = [ FEATURES[0], FEATURES[1], sample, FEATURES[3], helperOn ];
+	panel._renderDetail();
+	const withState = function( changes, helperChanges ) { return [ FEATURES[0], FEATURES[1], Object.assign( {}, sample, changes ), FEATURES[3], Object.assign( {}, helperOn, helperChanges ) ] };
+	panel._features = withState( {}, {} );
+	check( 'the button is drawn for a feature with a unit whose requirements are on, current and able to run', panel._canReapply( panel._features[2] ) === true );
+	panel._features = withState( {}, { active : false } );
+	check( '...not while a requirement is off - an activation would switch it on', panel._canReapply( panel._features[2] ) === false );
+	panel._features = withState( {}, { update : true } );
+	check( '...nor while a requirement has an update waiting - an activation would apply it', panel._canReapply( panel._features[2] ) === false );
+	panel._features = withState( {}, { problems : [ 'x' ] } );
+	check( '...nor while a requirement cannot run, nor with one that is not there at all', panel._canReapply( panel._features[2] ) === false && ( panel._features = [ panel._features[2] ], panel._canReapply( panel._features[0] ) === false ) );
+	panel._features = withState( { update : true }, {} );
+	check( '...nor for a feature with an update waiting, which the update applies', panel._canReapply( panel._features[2] ) === false );
+	panel._features = withState( { problems : [ 'x' ] }, {} );
+	check( '...nor for one that cannot run here', panel._canReapply( panel._features[2] ) === false );
+	panel._features = withState( { unit : false }, {} );
+	check( '...nor for one that brings no unit', panel._canReapply( panel._features[2] ) === false );
+	panel._features = withState( {}, { active : false } );
+	panel._renderDetail();
+	check( '...and the screen of one that is refused has no block', findAll( screen, function( el ) { return hasClass( el, 'admin-features-reapply' ) } ).length === 0 );
+	panel._features = withState( {}, {} );
+	panel._renderDetail();
+	const again = findAll( screen, function( el ) { return hasClass( el, 'admin-features-reapply' ) } )[0];
+	const againBtn = byTag( again, 'button' )[0];
+	const againNote = byTag( again, 'p' )[1];
+	const reloadsBeforeAgain = reloads;
+	const requestsBeforeAgain = requests.length;
+	fire( againBtn, 'click' );
+	check( 'it posts features/reapply with the key alone, holds the button and says so - and asks nothing: it only adds', requests.length === requestsBeforeAgain + 1 && requests[requests.length - 1].action === 'features/reapply'
+		&& JSON.stringify( requests[requests.length - 1].payload ) === '{"key":"sample"}' && againBtn.attributes['aria-disabled'] === 'true' && againBtn.disabled !== true && againNote.textContent === text('/_admin/features/msg/reapplying') );
+	fire( againBtn, 'click' );
+	check( '...held with aria-disabled and not disabled, so the keyboard keeps its place - and a second press while it is held sends nothing', requests.length === requestsBeforeAgain + 1 );
+	answer( 400, { error : 'x', code : 'features_reapply_update' } );
+	check( 'a refusal is said in its own words, as an error, and frees the button', againBtn.attributes['aria-disabled'] === undefined && againBtn.disabled !== true && hasClass( againNote, 'nino-admin-error' ) && againNote.textContent === text('/_admin/error/features_reapply_update') );
+	fire( againBtn, 'click' );
+	answer( 200, { feature : sample, applied : { routes : { added : 0, present : 1 }, files : { added : 0, present : 0 }, templates : { added : 1, present : 2 }, types : { added : 0, present : 0 },
+		slots : { added : 0, present : 0 }, elements : { added : 3, present : 0 }, texts : { added : 5, present : 40 } } } );
+	check( 'the answer says what was placed and what was there already, kind by kind, and leaves out the kinds with nothing to say', againBtn.attributes['aria-disabled'] === undefined && hasClass( againNote, 'nino-admin-error' ) === false
+		&& againNote.textContent === text('/_admin/features/msg/reapplied').replace( '%s', function() { return 'templates: 1, elements: 3, texts: 5' } ).replace( '%s', function() { return 'routes: 1, templates: 2, texts: 40' } ) );
+	check( '...and nothing is reloaded: a unit adds no panel to the rail', reloads === reloadsBeforeAgain );
+	fire( againBtn, 'click' );
+	answer( 200, { feature : sample, applied : {} } );
+	check( 'an answer with nothing in it says "nothing" on both sides rather than leaving a gap', againNote.textContent === text('/_admin/features/msg/reapplied').replace( '%s', text('/_admin/features/label/unit-nothing') ).replace( '%s', text('/_admin/features/label/unit-nothing') ) );
+}
+
+// --- the line above the list: drawn once, set as text, and bound to the account that made the change
+
+{
+	panel._features = FEATURES;
+	panel._rejected = [];
+	panel._tab = 'inactive';
+	panel._said = '<img src=x onerror=boom()> two\nlines';
+	panel._noteLine = null;
+	panel._renderPanel();
+	const first = findAll( mount, function( el ) { return el.id === 'features-note' } )[0];
+	check( 'the sentence is set as text, whatever it holds - a tag in it is characters, not an element', first !== undefined && first.textContent === '<img src=x onerror=boom()> two\nlines' && first.children.length === 0 );
+	const takenOut = [];
+	const removeWas = mount.removeChild;
+	mount.removeChild = function( child ) { takenOut.push( child ); return removeWas.call( mount, child ) };
+	panel._renderPanel();
+	panel._filter = 'o';
+	panel._renderPanel();
+	panel._filter = '';
+	panel._renderPanel();
+	mount.removeChild = removeWas;
+	check( 'drawn again with every keystroke of the filter, it is the same line and it is not taken out of the page: one that is built anew, or put back, is announced anew', findAll( mount, function( el ) { return el.id === 'features-note' } )[0] === first
+		&& takenOut.indexOf( first ) === -1 && takenOut.length > 0 && mount.children[1] === first );
+	panel._say( 'Another.' );
+	panel._renderPanel();
+	const second = findAll( mount, function( el ) { return el.id === 'features-note' } )[0];
+	check( '...and a different sentence is a line of its own', second !== first && second.textContent === 'Another.' );
+	panel._say( '' );
+	panel._renderPanel();
+	check( '...and none while there is nothing to say', findAll( mount, function( el ) { return el.id === 'features-note' } ).length === 0 );
+
+	// Kept for the page after the reload: of the account that pressed, within moments
+	const KEY = panel._afterKey;
+	const keep = function( over ) {
+		stored[KEY] = JSON.stringify( Object.assign( { text : 'Kept.', filter : '', category : '', focus : '', user : 'a@example.com', at : Date.now() }, over ) );
+		panel._ready = false;
+		panel._said = '';
+		panel.init();
+		answer( 200, listAnswer( CATALOGUE_URL, true, null ) );
+	};
+	accountEl = Object.assign( element('span'), { textContent : 'a@example.com' } );
+	panel._reload( 'Mine.' );
+	const made = JSON.parse( stored[KEY] );
+	check( 'what a switch keeps is marked with the account and the time', made.user === 'a@example.com' && typeof made.at === 'number' && Math.abs( Date.now() - made.at ) < 5000 );
+	keep( {} );
+	check( 'the same account within moments gets it', panel._said === 'Kept.' );
+	accountEl.textContent = 'b@example.com';
+	keep( {} );
+	check( 'another account signed in in the same tab does not - it is dropped, and gone from the session', panel._said === '' && stored[KEY] === undefined );
+	accountEl.textContent = 'a@example.com';
+	keep( { at : Date.now() - 10 * 60 * 1000 } );
+	check( 'nor does the same one after minutes: that is no reload, that is a visit', panel._said === '' && stored[KEY] === undefined );
+	keep( { user : undefined } );
+	check( 'nor does one without a mark', panel._said === '' );
+	accountEl = null;
+}
+
+// The two questions that switch a feature off are asked in the form of what they do, as the removal is
+check( 'the questions that deactivate a feature - the ordinary one and the one for a refused manifest - are answered with the destructive button',
+	/confirm\/deactivate'\)[^}]*?kind\s*:\s*'danger'/.test( script ) && /confirm\/deactivate-refused'\)[^}]*?kind\s*:\s*'danger'/.test( script ) );
+
+// The line above the list keeps the lines it was written with (where a feature's shortcodes stand, one a line) and is not drawn
+// empty; the block that applies a unit is drawn in the screen of the feature, where the answer is read at every width
+const moduleCssNow = source('_admin/Nino/Modules/Features/assets/admin.css');
+check( 'the line above the list keeps its line breaks and is not drawn while it is empty, the block of Apply content again is the screen\'s, wraps and has its answer under it',
+	/#features-list \.admin-features-note-line \{[^}]*white-space: pre-line;/s.test( moduleCssNow ) && /#features-list \.admin-features-note-line:empty \{[^}]*display: none;/s.test( moduleCssNow )
+	&& /#features-detail \.admin-features-reapply \{[^}]*flex-wrap: wrap;/s.test( moduleCssNow ) && /\.admin-features-reapply > \.admin-features-reapply-note \{[^}]*flex-basis: 100%;/s.test( moduleCssNow ) );
 
 // The badge is drawn in the tool layer under the ids of the panel's own panes, like the rest of the module's rules
 const css = source('_admin/Nino/Modules/Features/assets/admin.css');

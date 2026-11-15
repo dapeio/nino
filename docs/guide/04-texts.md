@@ -125,12 +125,12 @@ In `private/` findest Du jetzt:
 - in `private/text/de_DE.php` und `en_US.php` die zwei Schlüssel der Vorlage und die drei Schlüssel der Seite, `/_nino/webpage/meetups/name`, `title` und `description`
 - in `private/config.php` die Route `GET://meetups`
 
-Prüfe „nur hinzufügen“: Ändere im Bereich **Texte** die Überschrift in „Unsere Treffen“. Lösche die Datei `private/templates/page-meetups.tpl`. Schalte das Feature aus (**Deaktivieren**) und wieder ein (**Aktivieren**). Die Überschrift heißt weiter „Unsere Treffen“. Die gelöschte Vorlage ist wieder da.
+Prüfe „nur hinzufügen“: Ändere im Bereich **Texte** die Überschrift in „Unsere Treffen“. Lösche die Datei `private/templates/page-meetups.tpl`. Öffne im Bereich **Features** den Reiter **Aktiv**, klicke auf „Treffen“ und dann auf **Inhalte neu anwenden**. Die Meldung nennt, was Nino angelegt hat und was schon da war: die Vorlage ist neu angelegt, die Texte sind schon da. Die Überschrift heißt weiter „Unsere Treffen“. Die gelöschte Vorlage ist wieder da.
 
 ## Häufige Fehler
 
-- **Die Einheit ändern und auf das Update warten.** Ein Update ersetzt nichts, was das Projekt schon hat. Änderst Du später `install/templates/page-meetups.tpl`, bleibt die Kopie in `private/templates/` alt. Lösche beim Entwickeln die Kopie, oder ändere sie von Hand mit.
-- **Die Version nicht erhöhen.** Ohne neue Version bietet die Workbench kein Update an. Dann wendest Du die Einheit an, indem Du das Feature aus- und wieder einschaltest.
+- **Die Einheit ändern und auf das Update warten.** Ein Update ersetzt nichts, was das Projekt schon hat. Änderst Du später `install/templates/page-meetups.tpl`, bleibt die Kopie in `private/templates/` alt. Lösche beim Entwickeln die Kopie in `private/templates/` und klicke im Feature auf **Inhalte neu anwenden**, oder ändere sie von Hand mit.
+- **Die Version nicht erhöhen.** Ohne neue Version bietet die Workbench kein Update an. Dann wendest Du die Einheit an, indem Du im Bereich **Features** das Feature öffnest und auf **Inhalte neu anwenden** klickst. Auch das fügt nur hinzu: Eine Datei oder ein Text, den das Projekt schon hat, bleibt unverändert. Elemente eines Typs, den das Projekt hat, kommen nicht zurück.
 - **Im Titel des Browsers steht `[[/_nino/webpage/meetups/title]]`.** Der Seite fehlen Name und Titel. Die Schlüssel `/_nino/webpage/<uri>/…` heißen anders als die `uri` der Route, oder die Textdateien der Einheit haben sie nicht. Trage Name und Titel im Bereich **Routen** ein.
 - **Ein Schlüssel mit drei oder fünf Teilen.** Ein Textschlüssel hat genau vier Teile aus Kleinbuchstaben, Ziffern und Bindestrichen. Eine Einheit liefert nie einen Schlüssel unter `/project/`.
 

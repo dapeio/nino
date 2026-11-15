@@ -250,6 +250,8 @@ $before = $snapshot( $app );
 $answers = [
 	'activate'		=> $call( $app, 'apiActivate', [ 'key' => 'alpha' ] ),
 	'deactivate'	=> $call( $app, 'apiDeactivate', [ 'key' => 'alpha' ] ),
+	'deactivate-refused'	=> $call( $app, 'apiDeactivateRefused', [ 'dir' => 'Alpha' ] ),
+	'reapply'			=> $call( $app, 'apiReapply', [ 'key' => 'alpha' ] ),
 	'remove'			=> $call( $app, 'apiRemove', [ 'key' => 'alpha' ] ),
 	'install'			=> $call( $app, 'apiInstall', [ 'key' => 'gamma', 'version' => '1.0.0' ] ),
 	'apply'				=> $apply( $app, 'solo', 'alpha' ),
@@ -692,7 +694,7 @@ unlink( NINO_FEATURES_DIR. '/Alpha/link' );
 // The sentences exist in both languages of the workbench
 $missing = [];
 foreach( [ 'en_US', 'de_DE' ] as $locale )
-	foreach( [ 'features_busy', 'features_lock_failed', 'features_unknown', 'features_invalid', 'features_install_failed', 'features_install_inactive', 'features_remove_failed', 'features_remove_active', 'features_activate_failed', 'features_deactivate_failed' ] as $code )
+	foreach( [ 'features_busy', 'features_lock_failed', 'features_unknown', 'features_invalid', 'features_install_failed', 'features_install_inactive', 'features_remove_failed', 'features_remove_active', 'features_activate_failed', 'features_deactivate_failed', 'features_reapply_inactive', 'features_reapply_update', 'features_reapply_unit', 'features_reapply_problems', 'features_reapply_requires' ] as $code )
 		if( $word( $locale, '/_admin/error/'. $code, 'x' ) === '' )
 			$missing[] = $locale. ' '. $code;
 check( 'the codes this panel answers a change with have a sentence in both interface languages', $missing === [] );

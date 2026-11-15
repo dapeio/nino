@@ -789,10 +789,13 @@ namespace Nino {
 		 *	@param		string		$typeUri			The type, with or without its leading slash
 		 *	@param		array 		$data					What the unit brings, see above
 		 *	@param		array 		$locales			The languages to add versions for
+		 *	@param		array 		&$counted		(reference) [ elements created, elements the unit names that were there already ]
 		 *
 		 *	@return 	true|string							true, or why the type file could not be written
 		 */
-		static public function seed( array &$appData, string $typeUri, array $data, array $locales ): true|string {
+		static public function seed( array &$appData, string $typeUri, array $data, array $locales, array &$counted = [] ): true|string {
+
+			$counted = [ 0, 0 ];
 
 			$name = trim( $typeUri, '/' );
 
@@ -809,7 +812,7 @@ namespace Nino {
 			$removed 	= array_map( 'strval', (array) ( $appData[ self::REMOVED ][$name] ?? [] ) );
 			$changes 	= [];
 
-			$written = \Nino\Filesystem::mutate( $appData, $typeFile, function( mixed $typeData, array &$appData ) use ( $data, $locales, $removed, $typeUri, $typeFile, &$changes ): ?array {
+			$written = \Nino\Filesystem::mutate( $appData, $typeFile, function( mixed $typeData, array &$appData ) use ( $data, $locales, $removed, $typeUri, $typeFile, &$changes, &$counted ): ?array {
 
 				if( is_array( $typeData ) === false ) {
 
@@ -856,6 +859,8 @@ namespace Nino {
 
 					if( $exists === false && in_array( $id, $removed, true ) === true )
 						continue;
+
+					$counted[ $exists === true ? 1 : 0 ]++;
 
 					if( $exists === false ) {
 						$typeData['*'][$id] = self::_seedValues( $model, $typeUri, $id, $data, '*', $locales );

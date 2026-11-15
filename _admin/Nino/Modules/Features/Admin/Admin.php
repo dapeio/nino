@@ -77,6 +77,8 @@ namespace Nino\Modules\Features {
 				'features/list' 			=> [ self::class, 'apiList' ],
 				'features/activate' 	=> [ self::class, 'apiActivate' ],
 				'features/deactivate'	=> [ self::class, 'apiDeactivate' ],
+				'features/deactivate-refused'	=> [ self::class, 'apiDeactivateRefused' ],
+				'features/reapply'		=> [ self::class, 'apiReapply' ],
 				'features/settings' 	=> [ self::class, 'apiSettings' ],
 				'features/remove'			=> [ self::class, 'apiRemove' ],
 				'features/catalogue' 	=> [ self::class, 'apiCatalogue' ],
@@ -153,10 +155,13 @@ namespace Nino\Modules\Features {
 			$version = \Nino\Admin\Admin::postString( $data, 'version' );
 			$application = \Nino\Admin\Admin::postString( $data, 'application' );
 			$feature = \Nino\Admin\Admin::postString( $data, 'feature' );
+			$dir		 = \Nino\Admin\Admin::postString( $data, 'dir' );
 
 			return match( $action ) {
 				'features/activate' 	=> 'Activate feature "'. $key. '"',
 				'features/deactivate'	=> 'Deactivate feature "'. $key. '"',
+				'features/deactivate-refused'	=> 'Deactivate refused feature directory "'. $dir. '"',
+				'features/reapply'		=> 'Apply the unit of feature "'. $key. '" again',
 				'features/settings' 	=> 'Edit settings of feature "'. $key. '"',
 				'features/remove'			=> 'Remove the directory of feature "'. $key. '"',
 				'features/install' 		=> 'Install feature "'. $key. '" '. $version,
@@ -250,6 +255,127 @@ namespace Nino\Modules\Features {
 				return;
 
 			self::_switch( $appData, $request, false );
+		}
+
+		/**
+		 *	Switch off a feature whose manifest is refused and whose class is still
+		 *	listed in the modules - the one the list shows under Active with the
+		 *	reason, and which apiDeactivate() does not know by any key. Its class
+		 *	leaves '/nino/modules' and nothing else happens: what a feature's
+		 *	deactivation reads from its manifest - the shortcodes it leaves in pages, the sections of
+		 *	the privacy policy that still describe it, whether another one requires it - is not known of a manifest
+		 *	nobody can read, so the answer carries none of it. Nothing is deleted. Asked for by directory name, and only for one
+		 *	that \Nino\Features::rejectedActive() lists
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiDeactivateRefused( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			self::_changing( $appData, $request, static function( array &$appData, array &$request ): void {
+
+				$directory = \Nino\Admin\Admin::postString( \Nino\Admin\Admin::postData(), 'dir' );
+
+				if( isset( \Nino\Features::rejectedActive( $appData )[$directory] ) === false ) {
+					self::_unknown( $request );
+					return;
+				}
+
+				$result = \Nino\Features::deactivateRefused( $appData, $directory );
+
+				if( $result !== true ) {
+					\Nino\Http::fail( $request, 400, $result, 'features_deactivate_failed', [ $result ] );
+					return;
+				}
+
+				\Nino\Http::ok( $request, [ 'deactivated' => $directory ] );
+			} );
+		}
+
+		/**
+		 *	Apply the install unit of an active feature again, which is what an
+		 *	activation does and an update with it (see \Nino\Features::activate()):
+		 *	add-only, so a route, a file, a template, an element type, a text or an
+		 *	element the project has stays as it is and only what is missing is
+		 *	placed. Answers 'applied', for each kind of thing what was added and
+		 *	what was there already. Refused for a feature that is off - Activate is
+		 *	its way - for one that brings no unit, for one that has an update waiting,
+		 *	which the update applies with the migration its new version may bring, and
+		 *	for one that cannot run or whose requirement is off, has an update waiting
+		 *	or cannot run: an activation would switch it on or update it, which this
+		 *	does not say. Elements the project deleted from a type it has do not come
+		 *	back; a type it does not have comes with its elements
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request
+		 *
+		 *	@return 	void
+		 */
+		public static function apiReapply( array &$appData, array &$request ): void {
+
+			if( \Nino\Admin\Admin::guardPerm( $appData, $request, self::MANAGE_PERM ) === false )
+				return;
+
+			self::_changing( $appData, $request, static function( array &$appData, array &$request ): void {
+
+				$key			= self::_key( \Nino\Admin\Admin::postData() );
+				$feature	= $key === null ? null : \Nino\Features::get( $appData, $key );
+
+				if( $feature === null ) {
+					self::_unknown( $request );
+					return;
+				}
+
+				if( $feature['active'] === false ) {
+					\Nino\Http::fail( $request, 400, 'feature "'. $key. '" is off - switch it on instead', 'features_reapply_inactive' );
+					return;
+				}
+
+				if( is_dir( $feature['dir']. '/install' ) === false ) {
+					\Nino\Http::fail( $request, 400, 'feature "'. $key. '" brings no install unit', 'features_reapply_unit' );
+					return;
+				}
+
+				if( $feature['update'] === true ) {
+					\Nino\Http::fail( $request, 400, 'feature "'. $key. '" has an update waiting - apply it first', 'features_reapply_update' );
+					return;
+				}
+
+				if( $feature['problems'] !== [] ) {
+					$reason = implode( '; ', $feature['problems'] );
+					\Nino\Http::fail( $request, 400, 'feature "'. $key. '" cannot be activated: '. $reason, 'features_reapply_problems', [ $reason ] );
+					return;
+				}
+
+				// The unit is applied as an activation applies it, and an activation switches on a requirement that is off and applies the
+				// update that waits for one: neither is what this asks for, so it is not asked while one of them would happen
+				$blocking = [];
+				foreach( $feature['requires'] as $required ) {
+					$have = \Nino\Features::get( $appData, $required );
+					if( $have === null || $have['active'] === false || $have['update'] === true || $have['problems'] !== [] )
+						$blocking[] = $have === null ? $required : \Nino\Features::localized( $have['name'], \Nino\Admin\Admin::sessionLocale( $appData ) );
+				}
+
+				if( $blocking !== [] ) {
+					\Nino\Http::fail( $request, 400, 'feature "'. $key. '" requires '. implode( ', ', $blocking ). ', which is off, has an update waiting or cannot run', 'features_reapply_requires', [ implode( ', ', $blocking ) ] );
+					return;
+				}
+
+				$report	= [];
+				$result	= \Nino\Features::activate( $appData, $key, [], $report, true );
+
+				if( $result !== true ) {
+					\Nino\Http::fail( $request, 400, $result, 'features_activate_failed', [ $result ] );
+					return;
+				}
+
+				self::_answer( $appData, $request, $key, [ 'applied' => $report ] );
+			} );
 		}
 
 		/**
@@ -1251,6 +1377,8 @@ namespace Nino\Modules\Features {
 				'update'			=> $feature['update'],
 				'requires'		=> $feature['requires'],
 				'problems'		=> $feature['problems'],
+				// Whether it brings an install unit, which is what the Apply again action works on
+				'unit'				=> is_dir( $feature['dir']. '/install' ),
 				'settings'		=> $settings,
 				'settingsTab'	=> $settingsTab,
 			];

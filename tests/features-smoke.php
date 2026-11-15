@@ -1682,6 +1682,8 @@ $panelActions = [
 	'apiList' 			=> [],
 	'apiActivate' 	=> [ 'key' => 'helper' ],
 	'apiDeactivate'	=> [ 'key' => 'helper' ],
+	'apiDeactivateRefused'	=> [ 'dir' => 'Broken' ],
+	'apiReapply'		=> [ 'key' => 'sample' ],
 	'apiSettings' 	=> [ 'key' => 'sample', 'fields' => [] ],
 	'apiCatalogue'	=> [],
 	'apiInstall' 		=> [ 'key' => 'helper', 'version' => '1.0.0' ],
@@ -1691,7 +1693,7 @@ $panelActions = [
 
 check( 'the panel is a system entry between Backups (10) and Config (20), with its two mount points and its permission', \Nino\Modules\Features\Admin::nav() === [ 'features', '/_admin/nav/features', 15, 'system' ]
 	&& \Nino\Modules\Features\Admin::panes() === [ 'features-list', 'features-detail' ] && \Nino\Modules\Features\Admin::perm() === '/_admin/features/manage' );
-check( 'it offers exactly the nine actions', array_keys( \Nino\Modules\Features\Admin::actions() ) === [ 'features/list', 'features/activate', 'features/deactivate', 'features/settings', 'features/remove', 'features/catalogue', 'features/install', 'features/application-plan', 'features/application-apply' ] );
+check( 'it offers exactly the eleven actions', array_keys( \Nino\Modules\Features\Admin::actions() ) === [ 'features/list', 'features/activate', 'features/deactivate', 'features/deactivate-refused', 'features/reapply', 'features/settings', 'features/remove', 'features/catalogue', 'features/install', 'features/application-plan', 'features/application-apply' ] );
 check( 'the workbench finds it by reading the directory, nothing registered', in_array( \Nino\Modules\Features\Admin::class, \Nino\Admin\Admin::modules(), true ) === true && isset( \Nino\Admin\Admin::panels( $appData )['features'] ) === true );
 
 // Nobody is signed in: every action is a 401
@@ -1737,8 +1739,44 @@ $appData['/nino/modules'] = [ 'Nino\\Modules\\Broken' ];
 check( '...a class written without the separator counts as well', array_keys( \Nino\Features::rejectedActive( $appData ) ) === [ 'Broken' ] );
 $appData['/nino/modules'] = $modulesBefore;
 check( '...and with none listed there is none', \Nino\Features::rejectedActive( $appData ) === [] );
+
+// Switching off one that runs although its manifest is refused: its class leaves the modules, and nothing else happens
+echo "\nfeatures/deactivate-refused - the way out of a feature nobody can read\n";
+
+$listedBefore = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'];
+\Nino\Filesystem::mutate( $appData, '/config.php', static function( array $content ): array { $content['/nino/modules'][] = '\\Nino\\Modules\\Broken'; $content['/nino/modules'][] = '\\Nino\\Modules\\Elements'; return $content; } );
+$appData['/nino/modules'] = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'];
+unset( $appData['./nino/features/all'] );
+$listedWith = $appData['/nino/modules'];
+
+check( 'a backup is refused while it runs, which is the state the action is for', array_keys( \Nino\Features::rejectedActive( $appData ) ) === [ 'Broken' ] && is_string( \Nino\Backup::featureRefusal( $appData ) ) === true );
+check( 'only a directory the list names as running is accepted: not one that is off, not one named like a module of the kernel, not a feature that is on, no path, no list, no key at all',
+	callFeatures( $appData, 'apiDeactivateRefused', [ 'dir' => 'Twin' ] ) === [ 400, [ 'error' => 'unknown feature', 'code' => 'features_unknown' ] ]
+	&& callFeatures( $appData, 'apiDeactivateRefused', [ 'dir' => 'Elements' ] )[1]['code'] === 'features_unknown' && callFeatures( $appData, 'apiDeactivateRefused', [ 'dir' => 'Sample' ] )[1]['code'] === 'features_unknown'
+	&& callFeatures( $appData, 'apiDeactivateRefused', [ 'dir' => '../Broken' ] )[1]['code'] === 'features_unknown' && callFeatures( $appData, 'apiDeactivateRefused', [ 'dir' => [ 'Broken' ] ] )[1]['code'] === 'features_unknown'
+	&& callFeatures( $appData, 'apiDeactivateRefused', [ 'dir' => 'broken' ] )[1]['code'] === 'features_unknown' && callFeatures( $appData, 'apiDeactivateRefused', [] )[1]['code'] === 'features_unknown'
+	&& \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'] === $listedWith );
+
+check( 'the kernel\'s step asks the same question for itself: only a refused directory that runs, and a module of the kernel listed under the name of a directory is not taken out',
+	is_string( \Nino\Features::deactivateRefused( $appData, 'Elements' ) ) === true && is_string( \Nino\Features::deactivateRefused( $appData, 'Sample' ) ) === true && is_string( \Nino\Features::deactivateRefused( $appData, 'Twin' ) ) === true
+	&& \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'] === $listedWith );
+[ $refStatus, $refBody ] = callFeatures( $appData, 'apiDeactivateRefused', [ 'dir' => 'Broken' ] );
+$listedAfter = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'];
+check( 'the directory it is asked for is taken out of the modules, in the file, and the rest stays as it was, in its order', $refStatus === 200 && $refBody === [ 'deactivated' => 'Broken' ]
+	&& $listedAfter === array_values( array_diff( $listedWith, [ '\\Nino\\Modules\\Broken' ] ) ) && in_array( '\\Nino\\Modules\\Elements', $listedAfter, true ) === true && $appData['/nino/modules'] === $listedAfter );
+check( '...nothing is deleted: the directory and its manifest are where they were', is_file( \Nino\Features::dir(). '/Broken/feature.php' ) === true );
+[ , $afterList ] = callFeatures( $appData, 'apiList' );
+check( '...the list names it as one that is off now, with its reason, and the backup runs again', array_column( $afterList['rejected'], 'active', 'dir' )['Broken'] === false && \Nino\Features::rejectedActive( $appData ) === [] && \Nino\Backup::featureRefusal( $appData ) === null );
+check( 'asked again it is no longer running, and the answer says so the way every unknown key is answered', callFeatures( $appData, 'apiDeactivateRefused', [ 'dir' => 'Broken' ] ) === [ 400, [ 'error' => 'unknown feature', 'code' => 'features_unknown' ] ] );
+// Left as the sections after it found it - the lock, for which see admin-features-change-smoke
+\Nino\Filesystem::mutate( $appData, '/config.php', static function( array $content ) use ( $listedBefore ): array { $content['/nino/modules'] = $listedBefore; return $content; } );
+$appData['/nino/modules'] = $listedBefore;
+unset( $appData['./nino/features/all'] );
 $byKey = array_column( $body['features'], null, 'key' );
-check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'manual', 'manualSections', 'category', 'maturity', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'settings', 'settingsTab' ] );
+check( 'every entry has the same keys', array_keys( $byKey['sample'] ) === [ 'key', 'name', 'description', 'manual', 'manualSections', 'category', 'maturity', 'version', 'installed', 'active', 'update', 'requires', 'problems', 'unit', 'settings', 'settingsTab' ] );
+$units = array_column( $body['features'], 'unit', 'key' );
+ksort( $units );
+check( 'every entry says whether the feature brings an install unit - the two that have a directory of it do, the others do not', $units === [ 'boxy' => false, 'helper' => true, 'mute' => false, 'old' => false, 'sample' => true, 'strict' => false ] );
 check( 'names and descriptions arrive in the session locale - de_DE, the native language, since none was chosen', $byKey['sample']['name'] === 'Beispiel-Feature' && $byKey['sample']['description'] === 'Prüft den ganzen Feature-Vertrag.'
 	&& $byKey['helper']['name'] === 'Helper' && $byKey['helper']['description'] === '' );
 // The slug, not a word: the categories are named in the panel's own fills, so
@@ -1819,12 +1857,12 @@ check( 'the roles list offers the Features permission once, as it always did', (
 	$offers = array_filter( \Nino\Modules\Users\Admin::permOptions( $appData ), static fn( array $o ): bool => $o['perm'] === '/_admin/features/manage' );
 	return count( $offers ) === 1 && array_values( $offers )[0] === [ 'perm' => '/_admin/features/manage', 'label' => '/_admin/nav/features', 'group' => 'system', 'offered' => true ];
 } )() );
-check( 'every tab of the registry has its action map: the Settings tab brings none, so the nine actions stay the Features panel\'s', ( static function() use ( $appData ): bool {
+check( 'every tab of the registry has its action map: the Settings tab brings none, so the eleven actions stay the Features panel\'s', ( static function() use ( $appData ): bool {
 	// The tab's entry is built by hand, and a key actions() reads that it lacks
 	// is a warning of php's - only recorded here, fatal in the runtime
 	ninoWarnings();
 	$actions = \Nino\Admin\Admin::actions( $appData );
-	return $actions['features/settings'] === [ \Nino\Modules\Features\Admin::class, 'apiSettings' ] && count( array_filter( array_keys( $actions ), static fn( string $a ): bool => str_starts_with( $a, 'features/' ) ) ) === 9 && ninoWarnings() === [];
+	return $actions['features/settings'] === [ \Nino\Modules\Features\Admin::class, 'apiSettings' ] && count( array_filter( array_keys( $actions ), static fn( string $a ): bool => str_starts_with( $a, 'features/' ) ) ) === 11 && ninoWarnings() === [];
 } )() );
 check( 'the dashboard shows one Features tile, not one per tab', ( static function() use ( $appData ): bool {
 	[ , $body ] = ninoCall( $appData, [ \Nino\Modules\Dashboard\Admin::class, 'apiSummary' ] );
@@ -1947,6 +1985,176 @@ check( 'a refused activation is a 400 without switchedOn', ( static function() u
 	[ $status, $body ] = callFeatures( $appData, 'apiActivate', [ 'key' => 'old' ] );
 	return $status === 400 && isset( $body['switchedOn'] ) === false;
 } )() );
+
+// Apply the content of an active feature again: what an activation does - the unit, add-only - said kind by kind
+echo "\nfeatures/reapply - the unit once more, add-only, and what it did\n";
+
+$unitTemplate = \Nino\Filesystem::path( $appData, '/templates/page-sample.tpl' );
+$unitSource		= file_get_contents( __DIR__. '/fixtures/features/Sample/install/templates/page-sample.tpl' );
+$ownSource		= file_get_contents( $unitTemplate );
+$kinds 				= [ 'routes', 'files', 'templates', 'types', 'slots', 'elements', 'texts' ];
+
+[ $status, $body ] = callFeatures( $appData, 'apiReapply', [ 'key' => 'sample' ] );
+check( 'it answers the feature as the list shows it, and for every kind of thing of a unit what was added and what was there', $status === 200 && array_keys( $body ) === [ 'feature', 'applied' ] && $body['feature']['key'] === 'sample'
+	&& array_keys( $body['applied'] ) === $kinds && array_values( array_unique( array_map( static fn( array $kind ): array => array_keys( $kind ), $body['applied'] ), SORT_REGULAR ) ) === [ [ 'added', 'present' ] ] );
+check( '...a unit that was placed adds nothing: the template, the texts and the routes it names are counted as there, the elements of a type the project has are not looked at', array_sum( array_column( $body['applied'], 'added' ) ) === 0
+	&& $body['applied']['templates'] === [ 'added' => 0, 'present' => 1 ] && $body['applied']['elements'] === [ 'added' => 0, 'present' => 0 ] && $body['applied']['texts']['present'] > 0 && $body['applied']['routes']['present'] >= 1 );
+
+unlink( $unitTemplate );
+$textBefore = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
+$textKey		= '[[/feature/sample/intro/text]]';
+$withoutKey = $textBefore;
+unset( $withoutKey[$textKey] );
+\Nino\Filesystem::putFileContent( $appData, '/text/en_US.php', $withoutKey );
+[ $status, $body ] = callFeatures( $appData, 'apiReapply', [ 'key' => 'sample' ] );
+check( 'a template the project deleted is placed again, and a text key it deleted with it: both are said as added, the rest as there', $status === 200 && is_file( $unitTemplate ) === true && file_get_contents( $unitTemplate ) === $unitSource
+	&& $body['applied']['templates'] === [ 'added' => 1, 'present' => 0 ] && $body['applied']['texts']['added'] === 1
+	&& ( \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] )[$textKey] ?? null ) === 'Welcome to the sample.' );
+
+$privacyFile = \Nino\Filesystem::path( $appData, '/elements/privacy.php' );
+$privacyOwn = file_get_contents( $privacyFile );
+unlink( $privacyFile );
+unset( $appData['./nino/elements/cache'] );
+[ $status, $body ] = callFeatures( $appData, 'apiReapply', [ 'key' => 'sample' ] );
+check( 'elements the project does not have are placed and counted, as the sections of the policy a unit brings', $status === 200 && $body['applied']['elements'] === [ 'added' => 2, 'present' => 0 ] && is_file( $privacyFile ) === true );
+file_put_contents( $privacyFile, $privacyOwn );
+unset( $appData['./nino/elements/cache'] );
+
+file_put_contents( $unitTemplate, 'the project\'s own' );
+$ownText = \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] );
+$ownText[$textKey] = 'Mine';
+\Nino\Filesystem::putFileContent( $appData, '/text/en_US.php', $ownText );
+$routesBefore = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'];
+[ $status, $body ] = callFeatures( $appData, 'apiReapply', [ 'key' => 'sample' ] );
+check( 'a template and a text the project changed stay as it changed them - nothing is replaced, and nothing is added', $status === 200 && file_get_contents( $unitTemplate ) === 'the project\'s own'
+	&& \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] )[$textKey] === 'Mine' && array_sum( array_column( $body['applied'], 'added' ) ) === 0
+	&& \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/http/routes'] === $routesBefore );
+check( '...and the project\'s own route under a key of the unit is left, said as there', $routesBefore['GET://sample']['uri'] === '/sample-mine' && $body['applied']['routes']['present'] >= 1 );
+file_put_contents( $unitTemplate, $ownSource );
+
+check( 'it is logged by the name of the feature, and reads as a change', \Nino\Modules\Features\Admin::log( 'features/reapply', [ 'key' => 'sample' ] ) === 'Apply the unit of feature "sample" again'
+	&& \Nino\Modules\Features\Admin::log( 'features/deactivate-refused', [ 'dir' => 'Broken' ] ) === 'Deactivate refused feature directory "Broken"' );
+
+$modulesWithSample = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'];
+$versionBefore = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/features']['sample']['version'];
+check( 'it changes neither the module list nor the recorded version', $modulesWithSample === [ '\\Nino\\Modules\\Helper', '\\Nino\\Modules\\Sample' ] && $versionBefore === '1.2.0' );
+
+check( 'a feature that is off is refused, in a code of its own - Activate is its way', ( static function() use ( &$appData ): bool {
+	callFeatures( $appData, 'apiDeactivate', [ 'key' => 'sample' ] );
+	[ $status, $body ] = callFeatures( $appData, 'apiReapply', [ 'key' => 'sample' ] );
+	callFeatures( $appData, 'apiActivate', [ 'key' => 'sample' ] );
+	return $status === 400 && $body['code'] === 'features_reapply_inactive' && isset( $body['applied'] ) === false;
+} )() );
+check( 'an unknown, a malformed or a missing key is the refusal every action of the panel gives', callFeatures( $appData, 'apiReapply', [ 'key' => 'nope' ] ) === [ 400, [ 'error' => 'unknown feature', 'code' => 'features_unknown' ] ]
+	&& callFeatures( $appData, 'apiReapply', [ 'key' => '../etc' ] ) === [ 400, [ 'error' => 'unknown feature', 'code' => 'features_unknown' ] ] && callFeatures( $appData, 'apiReapply', [] )[1]['code'] === 'features_unknown' );
+
+// Elements are content: those of a type the project has do not come back, a type it lacks comes with its elements
+$privacyData = \Nino\Filesystem::getFileContent( $appData, '/elements/privacy.php', [] );
+$privacyCut = $privacyData;
+unset( $privacyCut['*']['sample'], $privacyCut['de_DE']['sample'], $privacyCut['en_US']['sample'] );
+\Nino\Filesystem::putFileContent( $appData, '/elements/privacy.php', $privacyCut );
+unset( $appData['./nino/elements/cache'] );
+[ $status, $body ] = callFeatures( $appData, 'apiReapply', [ 'key' => 'sample' ] );
+check( 'an element of a type the project has, which it lacks, is not brought back - and the report says nothing was added of them', $status === 200 && $body['applied']['elements'] === [ 'added' => 0, 'present' => 0 ]
+	&& isset( \Nino\Filesystem::getFileContent( $appData, '/elements/privacy.php', [] )['*']['sample'] ) === false );
+\Nino\Filesystem::putFileContent( $appData, '/elements/privacy.php', $privacyData );
+unset( $appData['./nino/elements/cache'] );
+check( 'an activation, which an update and a first switch-on are, still seeds the elements of a type the project has', ( static function() use ( &$appData, $privacyCut ): bool {
+	\Nino\Filesystem::putFileContent( $appData, '/elements/privacy.php', $privacyCut );
+	unset( $appData['./nino/elements/cache'] );
+	\Nino\Features::activate( $appData, 'sample' );
+	return isset( \Nino\Filesystem::getFileContent( $appData, '/elements/privacy.php', [] )['*']['sample'] ) === true;
+} )() );
+\Nino\Filesystem::putFileContent( $appData, '/elements/privacy.php', $privacyData );
+unset( $appData['./nino/elements/cache'] );
+
+// A unit that brings a type by 'elementTypes' and elements of it by 'elements': with the type file gone from the project the type is missing, and
+// it comes with both elements - whether the type is there is read before the unit's own copy of its file puts it there
+$zzUnit = $sandbox. '/zz-unit';
+mkdir( $zzUnit. '/elements', 0755, true );
+file_put_contents( $zzUnit. '/zz.php', "<?php return [ 'title' => 'Zz', 'model' => [ 'title' => [ 'type' => 'string', 'locale' => true ] ], '*' => [], 'de_DE' => [] ];" );
+file_put_contents( $zzUnit. '/manifest.php', "<?php return [ 'elementTypes' => [ 'zz.php' ], 'elements' => [ 'zz' => 'elements/zz.php' ] ];" );
+file_put_contents( $zzUnit. '/elements/zz.php', "<?php return [ '*' => [ 'a' => [], 'b' => [] ], 'de_DE' => [ 'a' => [ 'title' => 'A' ], 'b' => [ 'title' => 'B' ] ] ];" );
+$zzRoutes = [];
+$zzBlacklist = [];
+$zzConfig = [];
+$zzReport = [];
+$zzLocales = [ 'de_DE' ];
+$zzTypeFile = \Nino\Filesystem::path( $appData, '/elements/zz.php' );
+@unlink( $zzTypeFile );
+unset( $appData['./nino/elements/cache'] );
+$zzApplied = \Nino\Features::applyUnit( $appData, $zzUnit, $zzLocales, $zzRoutes, $zzBlacklist, $zzConfig, false, $zzReport, true );
+$zzData = \Nino\Filesystem::getFileContent( $appData, '/elements/zz.php', [] );
+check( 'a type the unit brings with elements, gone from the project, is back with both elements after applying the unit once more', $zzApplied === true && is_file( $zzTypeFile ) === true
+	&& isset( $zzData['*']['a'], $zzData['*']['b'] ) === true && $zzReport['elements']['added'] === 2 );
+\Nino\Filesystem::removeDir( $zzUnit );
+@unlink( $zzTypeFile );
+unset( $appData['./nino/elements/cache'] );
+
+// What an activation would do besides placing the unit is not what this asks for: it is refused, in a code of its own
+check( 'a feature without a unit is refused in a code of its own, not answered with an empty report', ( static function() use ( &$appData ): bool {
+	callFeatures( $appData, 'apiActivate', [ 'key' => 'boxy' ] );
+	[ $status, $body ] = callFeatures( $appData, 'apiReapply', [ 'key' => 'boxy' ] );
+	callFeatures( $appData, 'apiDeactivate', [ 'key' => 'boxy' ] );
+	return $status === 400 && $body['code'] === 'features_reapply_unit' && isset( $body['applied'] ) === false;
+} )() );
+$modulesNow = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/modules'];
+\Nino\Filesystem::mutate( $appData, '/config.php', static function( array $content ): array { $content['/nino/modules'] = array_values( array_diff( $content['/nino/modules'], [ '\\Nino\\Modules\\Helper' ] ) ); return $content; } );
+$appData['/nino/modules'] = array_values( array_diff( $modulesNow, [ '\\Nino\\Modules\\Helper' ] ) );
+unset( $appData['./nino/features/all'] );
+$treeBefore = [ \Nino\Filesystem::getFileContent( $appData, '/config.php', [] ), \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] ) ];
+[ $status, $body ] = callFeatures( $appData, 'apiReapply', [ 'key' => 'sample' ] );
+check( 'a requirement that is off is refused with its name, and nothing is switched on, placed or recorded', $status === 400 && $body['code'] === 'features_reapply_requires' && $body['params'] === [ 'Helper' ]
+	&& $treeBefore === [ \Nino\Filesystem::getFileContent( $appData, '/config.php', [] ), \Nino\Filesystem::getFileContent( $appData, '/text/en_US.php', [] ) ]
+	&& \Nino\Features::get( $appData, 'helper' )['active'] === false );
+\Nino\Filesystem::mutate( $appData, '/config.php', static function( array $content ) use ( $modulesNow ): array { $content['/nino/modules'] = $modulesNow; return $content; } );
+$appData['/nino/modules'] = $modulesNow;
+unset( $appData['./nino/features/all'] );
+$helperState = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/features']['helper'];
+\Nino\Filesystem::mutate( $appData, '/config.php', static function( array $content ): array { $content['/nino/features']['helper']['version'] = '0.0.1'; return $content; } );
+$appData['/nino/features']['helper']['version'] = '0.0.1';
+unset( $appData['./nino/features/all'] );
+[ $status, $body ] = callFeatures( $appData, 'apiReapply', [ 'key' => 'sample' ] );
+check( 'a requirement with an update waiting is refused the same way, and its migration does not run', $status === 400 && $body['code'] === 'features_reapply_requires' && \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/features']['helper']['version'] === '0.0.1' );
+\Nino\Filesystem::mutate( $appData, '/config.php', static function( array $content ) use ( $helperState ): array { $content['/nino/features']['helper'] = $helperState; return $content; } );
+$appData['/nino/features']['helper'] = $helperState;
+unset( $appData['./nino/features/all'] );
+$helperDir = \Nino\Features::dir(). '/Helper';
+rename( $helperDir, $helperDir. '.away' );
+unset( $appData['./nino/features/all'] );
+try {
+	[ $status, $body ] = callFeatures( $appData, 'apiReapply', [ 'key' => 'sample' ] );
+}
+finally {
+	rename( $helperDir. '.away', $helperDir );
+	unset( $appData['./nino/features/all'] );
+}
+check( 'a feature that cannot run here - its requirement is gone from the directory - is refused with the reason, and nothing is placed', $status === 400 && $body['code'] === 'features_reapply_problems' && str_contains( $body['params'][0] ?? '', 'helper' ) === true );
+check( '...and the codes have a sentence in both interface languages, with the names in it', ( static function(): bool {
+	foreach( [ 'en_US', 'de_DE' ] as $locale ) {
+		$words = require dirname( __DIR__ ). '/_admin/Nino/Modules/Features/text/'. $locale. '.php';
+		foreach( [ 'features_reapply_unit', 'features_reapply_problems', 'features_reapply_requires' ] as $code )
+			if( ( $words['[[/_admin/error/'. $code. ']]'] ?? '' ) === '' )
+				return false;
+		if( str_contains( $words['[[/_admin/error/features_reapply_requires]]'], '%s' ) === false || str_contains( $words['[[/_admin/error/features_reapply_problems]]'], '%s' ) === false )
+			return false;
+	}
+	return true;
+} )() );
+
+// An update that waits is applied by the update, which runs the new version's migration: this must not take its place
+$stateFile = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
+$stateWas = $stateFile['/nino/features']['sample'];
+\Nino\Filesystem::mutate( $appData, '/config.php', static function( array $content ): array { $content['/nino/features']['sample']['version'] = '1.1.0'; return $content; } );
+$appData['/nino/features']['sample']['version'] = '1.1.0';
+unset( $appData['./nino/features/all'] );
+[ $status, $body ] = callFeatures( $appData, 'apiReapply', [ 'key' => 'sample' ] );
+check( 'a feature with an update waiting is refused, and nothing is placed or recorded', $status === 400 && $body['code'] === 'features_reapply_update'
+	&& \Nino\Filesystem::getFileContent( $appData, '/config.php', [] )['/nino/features']['sample']['version'] === '1.1.0' );
+\Nino\Filesystem::mutate( $appData, '/config.php', static function( array $content ) use ( $stateWas ): array { $content['/nino/features']['sample'] = $stateWas; return $content; } );
+$appData['/nino/features']['sample'] = $stateWas;
+unset( $appData['./nino/features/all'] );
+check( '...and with the version recorded again it is not an update any more', callFeatures( $appData, 'apiReapply', [ 'key' => 'sample' ] )[0] === 200 );
 
 // A shortcode used everywhere is a list nobody reads to the end: ten places are
 // named and the total says how many there are

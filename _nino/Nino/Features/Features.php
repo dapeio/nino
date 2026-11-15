@@ -1128,17 +1128,19 @@ namespace Nino {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$key					Feature key
 		 *	@param		array 		$chain				Keys already being activated, against a requirement cycle
+		 *	@param		array|null	&$report		(reference) What the unit of this feature added and what the project had already, see applyUnit(); the requirements' units are not in it
+		 *	@param		bool			$reapply			The unit is applied once more to a feature that is on (the panel's Apply content): the elements of a type the project has are left alone, see applyUnit()
 		 *
 		 *	@return 	true|string							True, or why not - BUSY while another change of the features holds the lock
 		 */
-		public static function activate( array &$appData, string $key, array $chain = [] ): true|string {
+		public static function activate( array &$appData, string $key, array $chain = [], ?array &$report = null, bool $reapply = false ): true|string {
 
 			$locked = self::lock( $appData );
 			if( $locked !== true )
 				return $locked;
 
 			try {
-				return self::_activate( $appData, $key, $chain );
+				return self::_activate( $appData, $key, $chain, $report, $reapply );
 			}
 			finally {
 				self::unlock( $appData );
@@ -1151,10 +1153,12 @@ namespace Nino {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$key					Feature key
 		 *	@param		array 		$chain				Keys already being activated
+		 *	@param		array|null	&$report		(reference) See activate()
+		 *	@param		bool			$reapply			See activate()
 		 *
 		 *	@return 	true|string
 		 */
-		private static function _activate( array &$appData, string $key, array $chain ): true|string {
+		private static function _activate( array &$appData, string $key, array $chain, ?array &$report = null, bool $reapply = false ): true|string {
 
 			$feature = self::get( $appData, $key );
 			if( $feature === null )
@@ -1218,7 +1222,7 @@ namespace Nino {
 			// A unit file that could not be copied is a refusal, before
 			// anything is listed or recorded - see applyUnit()
 			if( is_dir( $feature['dir']. '/install' ) === true ) {
-				$applied = self::applyUnit( $appData, $feature['dir']. '/install', \Nino\Locales::getAvailableLocales( $appData ), $routes, $blacklist, $config, false );
+				$applied = self::applyUnit( $appData, $feature['dir']. '/install', \Nino\Locales::getAvailableLocales( $appData ), $routes, $blacklist, $config, false, $report, $reapply );
 				if( $applied !== true )
 					return 'feature "'. $key. '" could not be activated: '. $applied;
 			}
@@ -1383,10 +1387,30 @@ namespace Nino {
 
 			$class = $feature['module'];
 
-			// Read, changed and written on the file, under the lock: the list of
-			// this request is the one it booted with or read when it took the lock
-			// (see lock()), and a list written from memory is a list that can bring
-			// back a class somebody took out
+			$unlisted = self::_unlist( $appData, $class );
+
+			if( $unlisted !== true )
+				return $unlisted;
+
+			unset( $appData['./nino/features/all'] );
+
+			return true;
+		}
+
+		/**
+		 *	Take a class out of '/nino/modules', read, changed and written on the
+		 *	file under the lock: the list of this request is the one it booted with
+		 *	or read when it took the lock (see lock()), and a list written from
+		 *	memory is a list that can bring back a class somebody took out. The
+		 *	list of this request follows the file
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$class				The class with its leading separator
+		 *
+		 *	@return 	true|string							True, or why not
+		 */
+		private static function _unlist( array &$appData, string $class ): true|string {
+
 			$written = \Nino\Filesystem::mutate( $appData, '/config.php', static function( array $content, array &$appData ) use ( $class ): array {
 
 				$list = is_array( $content['/nino/modules'] ?? null ) === true ? $content['/nino/modules'] : (array) ( $appData['/nino/modules'] ?? [] );
@@ -1400,16 +1424,53 @@ namespace Nino {
 			} );
 
 			if( $written === false ) {
-				trigger_error( 'Features::deactivate(): failed to write config.php.', E_USER_WARNING );
+				trigger_error( 'Features: failed to write config.php.', E_USER_WARNING );
 				return 'could not write config.php';
 			}
 
 			$persisted = \Nino\Filesystem::getFileContent( $appData, '/config.php', [] );
 			$appData['/nino/modules'] = array_values( (array) ( is_array( $persisted ) === true ? ( $persisted['/nino/modules'] ?? [] ) : [] ) );
 
-			unset( $appData['./nino/features/all'] );
-
 			return true;
+		}
+
+		/**
+		 *	Switch off a feature that runs although its manifest is refused (see
+		 *	rejectedActive()): its class leaves '/nino/modules', and that is all.
+		 *	deactivate() does not know the key of such a directory, so it cannot be
+		 *	asked; what a switch-off otherwise reads from the manifest - whether another feature requires
+		 *	it - is not known here either, and nothing runs that belongs to a feature
+		 *	that is known. The directory stays, and with it what the feature kept.
+		 *	Made under the lock of the features (see lock()).
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$directory		The directory below features/, as rejectedActive() names it
+		 *
+		 *	@return 	true|string							True, or why not - BUSY while another change of the features holds the lock
+		 */
+		public static function deactivateRefused( array &$appData, string $directory ): true|string {
+
+			$locked = self::lock( $appData );
+			if( $locked !== true )
+				return $locked;
+
+			try {
+
+				if( isset( self::rejectedActive( $appData )[$directory] ) === false )
+					return 'unknown directory "'. $directory. '"';
+
+				$unlisted = self::_unlist( $appData, '\\Nino\\Modules\\'. $directory );
+
+				if( $unlisted !== true )
+					return $unlisted;
+
+				unset( $appData['./nino/features/all'] );
+
+				return true;
+			}
+			finally {
+				self::unlock( $appData );
+			}
 		}
 
 		/**
@@ -1583,21 +1644,33 @@ namespace Nino {
 		 *	@param		array 		&$blacklist		(reference) Collected blacklist keys, appended to
 		 *	@param		array 		&$config			(reference) Collected config defaults, key => value, for the caller to write
 		 *	@param		bool			$overwrite		Whether the unit replaces what the project has
+		 *	@param		array|null	&$report		(reference) What the unit added and what the project had already, kind by kind: 'routes', 'files', 'templates', 'types', 'slots', 'elements' and 'texts', each { added, present } - read before each is placed, so that a second run says it added nothing. What $overwrite replaces counts as added
+		 *	@param		bool			$reapply			The unit is applied to a feature that is on already: elements are content, and one the project deleted is not brought back, so the elements of a type the project had before this run are not seeded - a type it did not have comes with its elements
 		 *
 		 *	@return 	true|string							true, or the first file the unit could not
 		 *																	copy or write - named the way the project
 		 *																	sees it, eg. '/templates/page-x.tpl'
 		 */
-		public static function applyUnit( array &$appData, string $unitDir, array $locales, array &$routes, array &$blacklist, array &$config, bool $overwrite = true ): true|string {
+		public static function applyUnit( array &$appData, string $unitDir, array $locales, array &$routes, array &$blacklist, array &$config, bool $overwrite = true, ?array &$report = null, bool $reapply = false ): true|string {
 
 			$unitDir	= rtrim( $unitDir, '/' );
 			$manifest	= self::readUnitManifest( $unitDir ) ?? [];
 
+			// Which types of the unit's elements the project has before anything is placed: a type file the unit copies is no reason to seed it
+			$hadTypes = [];
+			foreach( array_keys( (array) ( $manifest['elements'] ?? [] ) ) as $typeName )
+				$hadTypes[ trim( (string) $typeName, '/' ) ] = \Nino\Filesystem::fileExists( $appData, '/elements/'. trim( (string) $typeName, '/' ). '.php' );
+
+			$report	= array_fill_keys( [ 'routes', 'files', 'templates', 'types', 'slots', 'elements', 'texts' ], [ 'added' => 0, 'present' => 0 ] );
+
 			foreach( ( $manifest['routes'] ?? [] ) as $routeKey => $route ) {
 				if( isset( $route['locale'] ) === true && in_array( $route['locale'], $locales, true ) === false )
 					continue;
-				if( $overwrite === false && ( isset( $routes[$routeKey] ) === true || in_array( $routeKey, (array) ( $appData[self::RESERVED] ?? [] ), true ) === true ) )
+				if( $overwrite === false && ( isset( $routes[$routeKey] ) === true || in_array( $routeKey, (array) ( $appData[self::RESERVED] ?? [] ), true ) === true ) ) {
+					$report['routes']['present']++;
 					continue;
+				}
+				$report['routes']['added']++;
 				$routes[$routeKey] = $route;
 			}
 
@@ -1614,15 +1687,18 @@ namespace Nino {
 				request on, a 500 with half the unit copied - or, under a handler
 				that carries on, nothing at all: the caller listed the class and
 				recorded the version over a template that was never written	*/
-			foreach( ( $manifest['files'] ?? [] ) as $file )
+			foreach( ( $manifest['files'] ?? [] ) as $file ) {
+				self::_tally( $report['files'], $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/'. $file ), $overwrite );
 				if( self::copyTree( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/'. $file ), $overwrite ) === false )
 					return 'could not copy /'. $file;
+			}
 
 			if( count( $manifest['templates'] ?? [] ) > 0 ) {
 				\Nino\Filesystem::forceDir( $appData, '/templates' );
 				foreach( $manifest['templates'] as $locale => $file ) {
 					if( is_string( $locale ) === true && in_array( $locale, $locales, true ) === false )
 						continue;
+					self::_tally( $report['templates'], $unitDir. '/templates/'. $file, \Nino\Filesystem::path( $appData, '/templates/'. $file ), $overwrite );
 					if( self::copyFile( $unitDir. '/templates/'. $file, \Nino\Filesystem::path( $appData, '/templates/'. $file ), $overwrite ) === false )
 						return 'could not copy /templates/'. $file;
 				}
@@ -1641,6 +1717,8 @@ namespace Nino {
 			$have = is_array( $appData[self::IMAGES_KEY] ?? null ) === true ? $appData[self::IMAGES_KEY] : [];
 			$new = array_diff_key( $slots, $have );
 
+			$report['slots'] = [ 'added' => count( $new ), 'present' => count( $slots ) - count( $new ) ];
+
 			if( $new !== [] ) {
 				$appData[self::IMAGES_KEY] = $have + $new;
 				$config[self::IMAGES_KEY] = ( is_array( $config[self::IMAGES_KEY] ?? null ) === true ? $config[self::IMAGES_KEY] : [] ) + $new;
@@ -1648,9 +1726,11 @@ namespace Nino {
 
 			if( count( $manifest['elementTypes'] ?? [] ) > 0 ) {
 				\Nino\Filesystem::forceDir( $appData, '/elements' );
-				foreach( $manifest['elementTypes'] as $file )
+				foreach( $manifest['elementTypes'] as $file ) {
+					self::_tally( $report['types'], $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/elements/'. $file ), $overwrite );
 					if( self::copyFile( $unitDir. '/'. $file, \Nino\Filesystem::path( $appData, '/elements/'. $file ), $overwrite ) === false )
 						return 'could not copy /elements/'. $file;
+				}
 			}
 
 			/*	Elements, which are content: added to a type, whatever $overwrite
@@ -1671,10 +1751,17 @@ namespace Nino {
 				if( is_array( $content ) === false )
 					return 'could not read the elements of "'. $typeUri. '"';
 
-				$seeded = \Nino\Elements::seed( $appData, $typeUri, $content, $locales );
+				if( $reapply === true && ( $hadTypes[ trim( $typeUri, '/' ) ] ?? false ) === true )
+					continue;
+
+				$counted = [ 0, 0 ];
+				$seeded = \Nino\Elements::seed( $appData, $typeUri, $content, $locales, $counted );
 
 				if( $seeded !== true )
 					return $seeded;
+
+				$report['elements']['added'] += $counted[0];
+				$report['elements']['present'] += $counted[1];
 			}
 
 			foreach( ( $manifest['blacklist'] ?? [] ) as $key )
@@ -1697,9 +1784,15 @@ namespace Nino {
 					$config[$configKey] = $configValue;
 				}
 
-			$texts = self::applyUnitTexts( $appData, $unitDir, $locales, $overwrite );
+			$present = 0;
+			$texts = self::applyUnitTexts( $appData, $unitDir, $locales, $overwrite, $present );
 
-			return is_string( $texts ) === true ? 'could not write '. $texts : true;
+			if( is_string( $texts ) === true )
+				return 'could not write '. $texts;
+
+			$report['texts'] = [ 'added' => $texts, 'present' => $present ];
+
+			return true;
 		}
 
 		/**
@@ -1762,19 +1855,24 @@ namespace Nino {
 		 *	@param		string		$unitDir			Absolute path to the unit
 		 *	@param		array 		$locales			The languages to merge for
 		 *	@param		bool			$overwrite			Whether the unit replaces what the project has
+		 *	@param		int				&$present			(reference) How many of the keys the project had already, which a merge without $overwrite leaves as they are; keys a language is given empty count as well
 		 *
 		 *	@return 	int|string							How many keys were new to the files, or the first file that could not be written - '/text/global.php'
 		 */
-		public static function applyUnitTexts( array &$appData, string $unitDir, array $locales, bool $overwrite = true ): int|string {
+		public static function applyUnitTexts( array &$appData, string $unitDir, array $locales, bool $overwrite = true, int &$present = 0 ): int|string {
 
 			$unitDir	= rtrim( $unitDir, '/' );
 			$added		= 0;
 			$empty		= null;
 
-			$merge = function( string $path, array $fragment, bool $replace ) use ( &$appData, &$added ): bool {
+			$present = 0;
+
+			$merge = function( string $path, array $fragment, bool $replace ) use ( &$appData, &$added, &$present ): bool {
 
 				$before = \Nino\Filesystem::getFileContent( $appData, $path, [] );
-				$added += count( array_diff_key( $fragment, is_array( $before ) === true ? $before : [] ) );
+				$new = count( array_diff_key( $fragment, is_array( $before ) === true ? $before : [] ) );
+				$added += $new;
+				$present += count( $fragment ) - $new;
 
 				return self::mergeText( $appData, $path, $fragment, $replace );
 			};
@@ -1845,6 +1943,34 @@ namespace Nino {
 				$content = is_array( $content ) ? $content : [];
 				return $overwrite === true ? array_merge( $content, $fragment ) : $content + $fragment;
 			} );
+		}
+
+		/**
+		 *	Count the files of a unit's file or directory into $tally: those the
+		 *	project has not got yet and those it has, as copyTree() is about to meet
+		 *	them. Under $overwrite every file is the unit's. A source that is not
+		 *	there counts nothing - copyTree() is the one that answers for it
+		 *
+		 *	@param		array 		&$tally			(reference) { added, present }
+		 *	@param		string		$from
+		 *	@param		string		$to
+		 *	@param		bool			$overwrite
+		 *
+		 *	@return 	void
+		 */
+		private static function _tally( array &$tally, string $from, string $to, bool $overwrite ): void {
+
+			if( is_file( $from ) === true ) {
+				$tally[ $overwrite === false && is_file( $to ) === true ? 'present' : 'added' ]++;
+				return;
+			}
+
+			if( is_dir( $from ) === false )
+				return;
+
+			foreach( scandir( $from ) ?: [] as $entry )
+				if( $entry !== '.' && $entry !== '..' )
+					self::_tally( $tally, $from. '/'. $entry, $to. '/'. $entry, $overwrite );
 		}
 
 		/**

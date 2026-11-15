@@ -32,14 +32,26 @@
  *													is rendered server-side, so the panel a feature brings
  *													- or takes away - is only there once the page is built
  *													again, and so are its assets and its words. The hash
- *													stays on this panel, so the workbench comes back where
- *													it was. An install says what it did in a dialog first:
- *													the offer it was pressed on is not an offer afterwards,
- *													so there is no row left to write it on. An activation
- *													says what it switched on, and a deactivation where
- *													the feature's shortcodes still stand, the same way:
- *													the answer carries both, and the page that could
- *													show them is the one being reloaded.
+ *													names the tab it was pressed on, so the workbench
+ *													comes back where it was - on that tab, with the
+ *													filters it had and the focus on the row that took
+ *													the place of the one that left. An install says what
+ *													it did in a line above the list: the offer it was
+ *													pressed on is not an offer afterwards, so there is no
+ *													row left to write it on. An activation says what it
+ *													switched on, and a deactivation where the feature's
+ *													shortcodes still stand, the same way: the answer
+ *													carries both, and the page that could show them is
+ *													the one being reloaded, so the sentence is kept in
+ *													the session for it (see _reload()). None of it is
+ *													said in a dialog of the browser.
+ *
+ *													An active feature that brings an install unit has
+ *													Apply content again on its screen: the unit, as an
+ *													activation applies it, add-only, and what it placed
+ *													and what was there. A refused manifest of a feature
+ *													that runs has Deactivate on its row, the one switch
+ *													the kernel has no key for.
  *
  *													A fourth tab, Applications, lists the applications the
  *													catalogue offers - named sets of features that belong
@@ -122,6 +134,8 @@
 		// is - as state, so the reload a save ends in comes back to the same
 		// screen rather than dropping to the list
 		_openFeature : '',
+		// The key of the row the focus goes to once the page that was built again is drawn - see _restored()
+		_focusAfter : '',
 		// Which of the two tabs of a feature's own screen is on. Kept across
 		// the re-render a save ends in, and reset to the first one when a
 		// different feature is opened. 'about' is where a screen opens:
@@ -137,6 +151,16 @@
 		// The open screen's feature, form, Save button and status line - what
 		// the shell's question about unsaved input saves through
 		_detailParts : null,
+		// What the last switch, install or set-up said - the sentence the person
+		// reads in the line above the list, where a dialog would stand in the
+		// way of the reload that follows. State, so that every drawing of the
+		// panel shows it, until the next tab or the next action replaces it
+		_said : '',
+		// The element that says it, and the sentence it was made for - see _renderNote()
+		_noteLine : null,
+		_noteFor : '',
+		// Where it is kept while the workbench is built again
+		_afterKey : 'nino-admin-features-after',
 
 		/**
 		 *	Load every feature with its state, settings and the cached
@@ -177,10 +201,18 @@
 				Nino.admin.features._cache 				= response.catalogue || null;
 				Nino.admin.features._features			= response.features || [];
 				Nino.admin.features._rejected			= response.rejected || [];
-				if( Nino.admin.features._ready === false )
+				const first = Nino.admin.features._ready === false;
+
+				if( first === true ) {
 					Nino.admin.features._tabFromAddress();
+					Nino.admin.features._restore();
+				}
+
 				Nino.admin.features._renderPanel();
 				Nino.admin.features._ready = true;
+
+				if( first === true )
+					Nino.admin.features._restored();
 
 				if( typeof then === 'function' )
 					then();
@@ -243,9 +275,29 @@
 		_renderPanel : function( keepDetail ) {
 
 			const wrap = dc.getElementById('features-list');
-			wrap.innerHTML = '';
 
-			wrap.appendChild( Nino.admin.features._renderHead() );
+			// The line that says what the last action did stays in the page while the rest
+			// is drawn again: taken out and put back, a status line is announced as often
+			// as the filter is typed into
+			const held = Nino.admin.features._noteLine !== null && Nino.admin.features._noteLine.parentNode === wrap && Nino.admin.features._noteFor === Nino.admin.features._said
+				? Nino.admin.features._noteLine : null;
+
+			Array.prototype.slice.call( wrap.children ).forEach( function( child ) {
+				if( child !== held )
+					wrap.removeChild( child );
+			} );
+
+			const head = Nino.admin.features._renderHead();
+
+			if( held === null )
+				wrap.appendChild( head );
+			else
+				wrap.insertBefore( head, held );
+
+			const note = Nino.admin.features._renderNote();
+
+			if( note !== null && note !== held )
+				wrap.appendChild( note );
 
 			// Four tabs are more than a phone's strip holds, and it scrolls: the one that
 			// is open - from the address, after a reload - is brought into view
@@ -260,6 +312,42 @@
 
 			if( keepDetail !== true )
 				Nino.admin.features._renderDetail();
+		},
+
+		/**
+		 *	The line under the head that says what the last switch, install or
+		 *	set-up did - a status line the screen reader announces when its
+		 *	words change, which is why it is drawn empty and filled a moment
+		 *	later. It stays until the next tab or the next action says something
+		 *	else, and is not there at all while there is nothing to say
+		 *
+		 *	@return		{?Element}						<p id="features-note">
+		 */
+		_renderNote : function() {
+
+			if( Nino.admin.features._said === '' ) {
+				Nino.admin.features._noteLine = null;
+				return null;
+			}
+
+			// The same element for the same sentence, drawn again with every
+			// keystroke of the filter: a status line that is built anew is
+			// announced anew, and the words are only added to a line the screen
+			// reader already knows the first time
+			if( Nino.admin.features._noteLine !== null && Nino.admin.features._noteFor === Nino.admin.features._said )
+				return Nino.admin.features._noteLine;
+
+			const line = dc.createElement('p');
+			line.id = 'features-note';
+			line.className = 'nino-admin-hint admin-features-note-line';
+			line.setAttribute( 'role', 'status' );
+
+			Nino.admin.features._noteLine	= line;
+			Nino.admin.features._noteFor	= Nino.admin.features._said;
+
+			wn.setTimeout( function() { line.textContent = Nino.admin.features._noteFor }, 60 );
+
+			return line;
 		},
 
 		/**
@@ -431,8 +519,10 @@
 		},
 
 		/**
-		 *	The tab the address names: #features/applications opens the
-		 *	Applications tab, which is where a set-up ends after its reload
+		 *	The tab the address names: #features/inactive opens the Inactive
+		 *	tab, #features/applications the Applications tab, and so on, which
+		 *	is where the reload an action ends in comes back to. Active is
+		 *	the one the bare #features means
 		 *
 		 *	@return		void
 		 */
@@ -443,8 +533,141 @@
 
 			const hash = Nino.admin.router.current();
 
-			if( hash.panel === 'features' && hash.parts[0] === 'applications' )
-				Nino.admin.features._tab = 'applications';
+			if( hash.panel === 'features' && [ 'inactive', 'available', 'applications' ].indexOf( hash.parts[0] ) !== -1 )
+				Nino.admin.features._tab = hash.parts[0];
+		},
+
+		/**
+		 *	What follows #features in the address of the tab that is on
+		 *
+		 *	@return		{Array}
+		 */
+		_tabParts : function() {
+			return Nino.admin.features._tab === 'active' ? [] : [ Nino.admin.features._tab ];
+		},
+
+		/**
+		 *	Build the workbench again on the tab that is on, and say something
+		 *	there. Every switch ends this way: the rail is rendered by the
+		 *	server, so the panel a feature brings, or takes away, is only
+		 *	there once the page is built again. The sentence, and where the
+		 *	person was - the filters, and the row the focus goes to now that
+		 *	the one it was on has left the tab - are kept in the session for
+		 *	the page that is coming, which shows the sentence in the panel's
+		 *	line and not in a dialog of the browser that would hold the reload
+		 *
+		 *	@param		{string}	text				What to say, '' for nothing
+		 *	@param		{string}	[focus]			The key of the row the focus goes to
+		 *
+		 *	@return		void
+		 */
+		_reload : function( text, focus ) {
+
+			try {
+				wn.sessionStorage.setItem( Nino.admin.features._afterKey, JSON.stringify( {
+					text			: text,
+					filter		: Nino.admin.features._filter,
+					category	: Nino.admin.features._category,
+					focus			: focus || '',
+					// Whose it is and when: a session that outlives a sign-out holds it for the next account
+					user			: Nino.admin.features._account(),
+					at				: Date.now(),
+				} ) );
+			}
+			catch( e ) {
+				// A browser that keeps nothing for the page reloads all the same
+			}
+
+			wn.location.hash = '#'+ [ 'features' ].concat( Nino.admin.features._tabParts() ).join('/');
+			wn.location.reload();
+		},
+
+		/**
+		 *	The account this page is of, as the rail says it - '' where the page has no rail
+		 *
+		 *	@return		{string}
+		 */
+		_account : function() {
+
+			const el = dc.getElementById('admin-user-email');
+
+			return el === null ? '' : String( el.textContent );
+		},
+
+		/**
+		 *	What _reload() kept, taken out of the session: the sentence and
+		 *	the filters are set before the first drawing, and the focus is
+		 *	asked for after it - see _restored()
+		 *
+		 *	@return		void
+		 */
+		_restore : function() {
+
+			let kept = null;
+
+			try {
+				const raw = wn.sessionStorage.getItem( Nino.admin.features._afterKey );
+				wn.sessionStorage.removeItem( Nino.admin.features._afterKey );
+				kept = JSON.parse( raw );
+			}
+			catch( e ) {
+				kept = null;
+			}
+
+			if( typeof kept !== 'object' || kept === null )
+				return;
+
+			// Kept for the page that followed the reload, which is made within moments by the account that pressed the button
+			if( kept.user !== Nino.admin.features._account() || typeof kept.at !== 'number' || Date.now() - kept.at > 120000 || Date.now() - kept.at < -5000 )
+				return;
+
+			Nino.admin.features._said				= typeof kept.text === 'string' ? kept.text : '';
+			Nino.admin.features._filter			= typeof kept.filter === 'string' ? kept.filter : '';
+			Nino.admin.features._category		= typeof kept.category === 'string' ? kept.category : '';
+			Nino.admin.features._focusAfter	= typeof kept.focus === 'string' ? kept.focus : '';
+		},
+
+		/**
+		 *	The focus after a reload: onto the Activate of the row that stands
+		 *	where the one just switched on stood, else onto the tab that is on
+		 *	- the element that had it is gone with the old page
+		 *
+		 *	@return		void
+		 */
+		_restored : function() {
+
+			const key = Nino.admin.features._focusAfter || '';
+
+			Nino.admin.features._focusAfter = '';
+
+			if( Nino.admin.features._said === '' && key === '' )
+				return;
+
+			const item = key === '' ? undefined : Array.prototype.filter.call( dc.getElementById('features-list').querySelectorAll('li'), function( li ) { return li.dataset.feature === key } )[0];
+			const row = item === undefined ? null : item.querySelector('button.nino-admin-btn-primary');
+			const tab = dc.getElementById( 'features-tabbutton-'+ Nino.admin.features._tab );
+			const target = row !== null ? row : tab;
+
+			if( target !== null )
+				target.focus();
+		},
+
+		/**
+		 *	Say something in the panel's line above the list, now
+		 *
+		 *	@param		{string}	text
+		 *
+		 *	@return		void
+		 */
+		_say : function( text ) {
+
+			Nino.admin.features._said = text;
+			Nino.admin.features._noteLine = null;
+
+			const line = dc.getElementById('features-note');
+
+			if( line !== null )
+				line.textContent = text;
 		},
 
 		/**
@@ -632,6 +855,7 @@
 				const show = function() {
 					Nino.admin.features._openFeature = '';
 					Nino.admin.features._tab = key;
+					Nino.admin.features._said = '';
 					Nino.admin.features._address();
 					Nino.admin.features._renderPanel();
 					focusTab();
@@ -814,8 +1038,10 @@
 		/**
 		 *	One directory whose manifest the kernel refused: its name, the line that says it is
 		 *	not loaded - or, for a feature that is switched on all the same, that it runs
-		 *	unfinished - and the reason as the kernel worded it - text, never markup. No actions:
-		 *	there is no feature to switch on, the manifest is to be mended
+		 *	unfinished - and the reason as the kernel worded it - text, never markup. One that is not
+		 *	loaded has no action: there is no feature to switch on, the manifest is to be mended. One that runs
+		 *	has the one that takes its class out of the modules, which is the way out of a state
+		 *	nothing else in the panel can reach
 		 *
 		 *	@param		{Object}	entry				An entry of 'rejected' in features/list
 		 *
@@ -834,7 +1060,77 @@
 			copy.appendChild( Nino.admin.features._note( entry.reason, true ) );
 			row.appendChild( copy );
 
+			if( entry.active === true ) {
+
+				const actions = dc.createElement('div');
+				actions.className = 'admin-features-actions';
+
+				const off = dc.createElement('button');
+				off.type = 'button';
+				off.className = 'nino-admin-btn-danger';
+				off.textContent = Nino.content.getText('/_admin/features/label/deactivate');
+				actions.appendChild( off );
+
+				const msg = dc.createElement('p');
+				msg.className = 'nino-admin-hint';
+				msg.setAttribute( 'aria-live', 'polite' );
+				actions.appendChild( msg );
+
+				off.addEventListener( 'click', function() { Nino.admin.features._deactivateRefused( entry, off, msg ) } );
+				row.appendChild( actions );
+			}
+
 			return row;
+		},
+
+		/**
+		 *	Switch off a feature whose manifest is refused and which runs all the same.
+		 *	Asked first, and the question says what does not happen: nothing
+		 *	that a feature's switch-off reads from its manifest can be done for
+		 *	one nobody can read - who requires it, where its shortcodes stand,
+		 *	which sections of the privacy policy describe it. Ends in a reload
+		 *	like every switch: the panel it brought leaves the rail
+		 *
+		 *	@param		{Object}	entry				An entry of 'rejected' in features/list
+		 *	@param		{Element}	btn
+		 *	@param		{Element}	msg
+		 *
+		 *	@return		void
+		 */
+		_deactivateRefused : function( entry, btn, msg ) {
+
+			Nino.adminUi.confirm( 'big', {
+				message		: Nino.adminUi.format( Nino.content.getText('/_admin/features/confirm/deactivate-refused'), entry.dir ),
+				yes				: Nino.content.getText('/_admin/features/label/deactivate'),
+				no				: Nino.content.getText('/_admin/common/label/cancel'),
+				kind			: 'danger',
+				opener		: btn,
+				onChoose	: function( ok ) {
+
+					if( ok !== true )
+						return;
+
+					Nino.admin.features._guard( function() {
+
+						btn.disabled = true;
+						msg.classList.remove('nino-admin-error');
+						msg.textContent = Nino.content.getText('/_admin/features/msg/deactivating');
+
+						Nino.admin.features._apiCall( 'deactivate-refused', { dir : entry.dir }, function( status, response ) {
+
+							if( status !== 200 || response === null ) {
+								btn.disabled = false;
+								msg.classList.add('nino-admin-error');
+								msg.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/features/error/deactivate' );
+								return;
+							}
+
+							msg.textContent = Nino.content.getText('/_admin/features/msg/deactivated')+ ' '+ Nino.content.getText('/_admin/features/msg/reload');
+							Nino.admin.features._reload( Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/deactivated-refused'), entry.dir ) );
+						} );
+					} );
+				},
+			} );
 		},
 
 		/**
@@ -895,9 +1191,9 @@
 		},
 
 		/**
-		 *	Write the tab into the address - #features/applications for the
-		 *	Applications tab, #features for the others - where the shell has a
-		 *	router, so a reload comes back to the tab it was pressed on
+		 *	Write the tab into the address - #features/inactive for the Inactive
+		 *	tab, #features for Active - where the shell has a router, so a
+		 *	reload comes back to the tab it was pressed on
 		 *
 		 *	@return		void
 		 */
@@ -906,7 +1202,7 @@
 			if( typeof Nino.admin.router !== 'object' || Nino.admin.router === null || typeof Nino.admin.router.set !== 'function' )
 				return;
 
-			Nino.admin.router.set( 'features', Nino.admin.features._tab === 'applications' ? [ 'applications' ] : [] );
+			Nino.admin.router.set( 'features', Nino.admin.features._tabParts() );
 		},
 
 		/**
@@ -1194,7 +1490,7 @@
 		 *	Load and switch on the features still off, one request each, and say
 		 *	which is under way. The first that fails stops the run: it is named
 		 *	with what is on already, and the button goes on from there. When the
-		 *	last is on, the answer is said in a dialog and the workbench is built
+		 *	last is on, the answer is said in the line above the list and the workbench is built
 		 *	again, as every switch does, on the tab the set-up was made on
 		 *
 		 *	@param		{Object}	application	As the plan answered it
@@ -1217,10 +1513,8 @@
 				const said = Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/application-done'), application.name, todo.map( nameOf ).join( ', ' ) );
 
 				msg.textContent = said+ ' '+ Nino.content.getText('/_admin/features/msg/reload');
-				wn.alert( said );
 
-				wn.location.hash = '#features/applications';
-				wn.location.reload();
+				Nino.admin.features._reload( said );
 				return;
 			}
 
@@ -1564,12 +1858,10 @@
 							return;
 						}
 
-						// What the privacy policy still says about it, before the list
-						// is drawn again: removing the feature deleted none of it
-						const said = Nino.admin.features._privacyText( response.privacy );
-
-						if( said !== '' )
-							wn.alert( said );
+						// What the privacy policy still says about it, in the line above
+						// the tabs, which the list drawn again keeps: removing the feature
+						// deleted none of it
+						Nino.admin.features._say( Nino.admin.features._privacyText( response.privacy ) );
 
 						// The whole list again rather than the row taken off screen:
 						// a removed feature may have been what another one required,
@@ -1673,6 +1965,33 @@
 		},
 
 		/**
+		 *	The inactive feature the focus goes to once this one has left the
+		 *	Inactive tab: the next row under it that offers Activate, else the
+		 *	nearest one above it. The rows are the ones the tab shows now, the
+		 *	filters included. Nothing from another tab
+		 *
+		 *	@param		{string}	key					The feature that is being switched on
+		 *
+		 *	@return		{string}							Its key, '' where there is none
+		 */
+		_nextToActivate : function( key ) {
+
+			if( Nino.admin.features._tab !== 'inactive' )
+				return '';
+
+			const rows = Nino.admin.features._features.filter( function( f ) { return f.active === false && Nino.admin.features._matches( f ) } );
+			const at = rows.map( function( f ) { return f.key } ).indexOf( key );
+			const can = function( f ) { return f.key !== key && f.problems.length === 0 };
+			const after = rows.slice( at + 1 ).filter( can );
+			const before = rows.slice( 0, Math.max( at, 0 ) ).filter( can );
+
+			if( after.length > 0 )
+				return after[0].key;
+
+			return before.length > 0 ? before[ before.length - 1 ].key : '';
+		},
+
+		/**
 		 *	Switch a feature on or off, or apply its update - the kernel's
 		 *	one step for an update is activating again, so the two post the
 		 *	same action. Ends in a reload: the rail is rendered server-side.
@@ -1702,6 +2021,7 @@
 					message		: Nino.adminUi.format( Nino.content.getText('/_admin/features/confirm/deactivate'), feature.name ),
 					yes				: Nino.content.getText('/_admin/features/label/deactivate'),
 					no				: Nino.content.getText('/_admin/common/label/cancel'),
+					kind			: 'danger',
 					opener		: btn,
 					onChoose	: function( ok ) {
 						if( ok === true )
@@ -1749,19 +2069,15 @@
 
 				msg.textContent = done+ ' '+ Nino.content.getText('/_admin/features/msg/reload');
 
-				// Said before the reload takes the screen it could be written on,
-				// and in a dialog for that reason - see _install()
+				// Kept for the page that is built next: the row it could be written
+				// on is gone by then, so it stands in the line above the list - see _reload()
 				const said = what === 'deactivate'
 					? [ Nino.admin.features._foundText( response.found || [] ), Nino.admin.features._privacyText( response.privacy ) ].filter( function( text ) { return text !== '' } ).join( '\n\n' )
 					: Nino.admin.features._switchedOnText( response.switchedOn || [] );
 
-				if( said !== '' )
-					wn.alert( said );
-
 				// The panel a feature brings only appears - or goes - once the
-				// shell is built again; the hash keeps the workbench on this panel
-				wn.location.hash = '#features';
-				wn.location.reload();
+				// shell is built again, on the tab it was pressed on
+				Nino.admin.features._reload( said, what === 'activate' ? Nino.admin.features._nextToActivate( feature.key ) : '' );
 			} );
 		},
 
@@ -1914,25 +2230,22 @@
 					? Nino.content.getText('/_admin/features/msg/'+ word )
 					: Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/'+ word+ '-with'), required.join( ', ' ) );
 
-				/*	Said in a dialog rather than written onto the row it was pressed
-					on, because that row is gone by the time anybody could read it:
-					an offer that is installed is no longer an offer, and the list
-					that follows leaves it out (see _offers()). A dialog is also what
-					restoring a backup uses, for the same reason - it is the last
-					word on an action whose screen does not survive it	*/
-				wn.alert( said );
+				/*	Said in the line above the list rather than written onto the row it
+					was pressed on, because that row is gone by the time anybody could
+					read it: an offer that is installed is no longer an offer, and the
+					list that follows leaves it out (see _offers())	*/
 
 				/*	Switched on by this install, and the page this was pressed in
 					was built before that: the feature's panel, its assets and its
-					words are only there once the shell is built again. The hash
-					keeps the workbench on this panel, exactly as _switch() does
-					when the same thing happens from the Inactive tab	*/
+					words are only there once the shell is built again, on the tab
+					this was pressed on, exactly as _switch() does when the same
+					thing happens from the Inactive tab	*/
 				if( response.activated === true ) {
-					wn.location.hash = '#features';
-					wn.location.reload();
+					Nino.admin.features._reload( said );
 					return;
 				}
 
+				Nino.admin.features._say( said );
 				Nino.admin.features.init();
 			} );
 		},
@@ -2092,6 +2405,12 @@
 				form.appendChild( where );
 			}
 
+			// What the unit brings, once more: a block of its own above the tabs, where
+			// the sentence it says is read at every width - the status line of the
+			// bar below is not drawn on a phone
+			if( Nino.admin.features._canReapply( feature ) === true )
+				form.appendChild( Nino.admin.features._renderReapply( feature ) );
+
 			const about		= Nino.admin.features._renderAbout( feature );
 			const settings	= feature.settings.length > 0 && !feature.settingsTab;
 			const panes		= {};
@@ -2206,6 +2525,140 @@
 			Nino.admin.features._detailParts = { feature : feature, form : form, save : save, msg : msg };
 			if( typeof Nino.admin.dirty === 'object' )
 				Nino.admin.dirty.snapshot( 'features' );
+		},
+
+		/**
+		 *	Whether the screen of a feature offers to apply its unit: it brings
+		 *	one, no update waits for it, nothing keeps it from running, and what
+		 *	it requires is on, up to date and able to run - the cases the kernel
+		 *	refuses (see Admin::apiReapply()), which the button would only
+		 *	answer with a refusal. An activation would switch a requirement on
+		 *	and apply a waiting update, which is not what this is for
+		 *
+		 *	@param		{Object}	feature			An entry of features/list
+		 *
+		 *	@return		{boolean}
+		 */
+		_canReapply : function( feature ) {
+
+			if( feature.unit !== true || feature.update === true || feature.problems.length > 0 )
+				return false;
+
+			return feature.requires.every( function( key ) {
+				const required = Nino.admin.features._features.filter( function( f ) { return f.key === key } )[0];
+				return required !== undefined && required.active === true && required.update === false && required.problems.length === 0;
+			} );
+		},
+
+		/**
+		 *	The block of a feature's screen that applies its install unit again:
+		 *	the button, the sentence that says what it does and does not, and the
+		 *	line the answer is written into. The unit is applied as an
+		 *	activation applies it, add-only - what the project lacks is placed,
+		 *	what it has stays as it is, a copy of a template it changed included
+		 *
+		 *	@param		{Object}	feature			An entry of features/list that brings a unit
+		 *
+		 *	@return		{Element}							<div class="admin-features-reapply">
+		 */
+		_renderReapply : function( feature ) {
+
+			const block = dc.createElement('div');
+			block.className = 'admin-features-reapply';
+
+			const btn = dc.createElement('button');
+			btn.type = 'button';
+			btn.className = 'nino-admin-btn-secondary';
+			btn.textContent = Nino.content.getText('/_admin/features/label/reapply');
+			block.appendChild( btn );
+
+			const hint = dc.createElement('p');
+			hint.className = 'nino-admin-hint';
+			hint.id = 'features-reapply-hint';
+			hint.textContent = Nino.content.getText('/_admin/features/hint/reapply');
+			btn.setAttribute( 'aria-describedby', hint.id );
+			block.appendChild( hint );
+
+			const note = dc.createElement('p');
+			note.className = 'nino-admin-hint admin-features-reapply-note';
+			note.setAttribute( 'role', 'status' );
+			block.appendChild( note );
+
+			btn.addEventListener( 'click', function() { Nino.admin.features._reapply( feature, btn, note ) } );
+
+			return block;
+		},
+
+		/**
+		 *	Apply the install unit of an active feature again and say what that
+		 *	did: for each kind of thing what was placed and what the project had
+		 *	already. Nothing is replaced, and nothing is reloaded - a unit adds
+		 *	no panel to the rail
+		 *
+		 *	@param		{Object}	feature
+		 *	@param		{Element}	btn
+		 *	@param		{Element}	note				Where the answer is written
+		 *
+		 *	@return		void
+		 */
+		_reapply : function( feature, btn, note ) {
+
+			// Held with aria-disabled and not with disabled: a button that is disabled
+			// drops the focus the keyboard is on, and the page goes on from the top
+			if( btn.getAttribute('aria-disabled') === 'true' )
+				return;
+
+			btn.setAttribute( 'aria-disabled', 'true' );
+			note.classList.remove('nino-admin-error');
+			note.textContent = Nino.content.getText('/_admin/features/msg/reapplying');
+
+			Nino.admin.features._apiCall( 'reapply', { key : feature.key }, function( status, response ) {
+
+				btn.removeAttribute('aria-disabled');
+
+				if( status !== 200 || response === null ) {
+					note.classList.add('nino-admin-error');
+					note.textContent = Nino.adminUi.api.errorText( status, response, '/_admin/features/error/reapply' );
+					return;
+				}
+
+				note.textContent = Nino.admin.features._appliedText( response.applied || {} );
+			} );
+		},
+
+		/**
+		 *	"... Placed: templates: 1, texts: 4. Already there: routes: 2." - what an
+		 *	application of the unit did, by the kinds that have anything to
+		 *	say on each side, in the words of the interface language
+		 *
+		 *	@param		{Object}	applied			kind => { added, present }, as the panel answered it
+		 *
+		 *	@return		{string}
+		 */
+		_appliedText : function( applied ) {
+
+			// Literal lookups, as the tabs have: a fill that only a built key
+			// names is invisible to the static check every panel script is held to
+			const kinds = {
+				routes		: Nino.content.getText('/_admin/features/label/unit-routes'),
+				files			: Nino.content.getText('/_admin/features/label/unit-files'),
+				templates	: Nino.content.getText('/_admin/features/label/unit-templates'),
+				types			: Nino.content.getText('/_admin/features/label/unit-types'),
+				slots			: Nino.content.getText('/_admin/features/label/unit-slots'),
+				elements	: Nino.content.getText('/_admin/features/label/unit-elements'),
+				texts			: Nino.content.getText('/_admin/features/label/unit-texts'),
+			};
+
+			const side = function( which ) {
+
+				const parts = Object.keys( kinds ).filter( function( kind ) {
+					return typeof applied[kind] === 'object' && applied[kind] !== null && applied[kind][which] > 0;
+				} ).map( function( kind ) { return kinds[kind]+ ': '+ applied[kind][which] } );
+
+				return parts.length === 0 ? Nino.content.getText('/_admin/features/label/unit-nothing') : parts.join( ', ' );
+			};
+
+			return Nino.adminUi.format( Nino.content.getText('/_admin/features/msg/reapplied'), side( 'added' ), side( 'present' ) );
 		},
 
 		/**

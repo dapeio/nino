@@ -247,4 +247,55 @@
 	max-width: 56rem;
 }
 
+
+/*	The line above the list that says what the last switch, install or set-up
+	did. It may hold several lines - where a feature's shortcodes still stand -
+	which are kept as they were written, and it is not drawn while it is empty. */
+#features-list .admin-features-note-line {
+	margin: 0 0 .85rem;
+	color: var(--editor-text);
+	font-size: .84rem;
+	white-space: pre-line;
+}
+
+#features-list .admin-features-note-line:empty {
+	display: none;
+}
+
+/*	Apply content again: the button, what it does and what it did, on a screen
+	of its own width. The sentences wrap and are read whole. */
+#features-detail .admin-features-reapply {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: .5rem 1rem;
+	max-width: 56rem;
+	margin: 0 0 1rem;
+}
+
+/*	Held while it works with aria-disabled, which keeps the focus where the keyboard is */
+#features-detail .admin-features-reapply button[aria-disabled="true"] {
+	opacity: .6;
+	cursor: progress;
+}
+
+#features-detail .admin-features-reapply > p {
+	flex: 1 1 18rem;
+	margin: 0;
+}
+
+#features-detail .admin-features-reapply > .admin-features-reapply-note {
+	flex-basis: 100%;
+	color: var(--editor-text);
+	font-size: .84rem;
+}
+
+#features-detail .admin-features-reapply > .admin-features-reapply-note.nino-admin-error {
+	color: var(--editor-red-ink);
+}
+
+#features-detail .admin-features-reapply > .admin-features-reapply-note:empty {
+	display: none;
+}
+
 }

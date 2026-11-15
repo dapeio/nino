@@ -1035,7 +1035,9 @@ check( 'a type that is not there and a unit with no model: nothing, and no failu
 check( 'a type name that is none is refused with the reason', is_string( \Nino\Elements::seed( $appData, '/Seed Test', $seedUnit, [ 'de_DE' ] ) ) === true
 	&& is_string( \Nino\Elements::seed( $appData, '/../x', $seedUnit, [ 'de_DE' ] ) ) === true && is_file( $sandbox. '/private/elements/seedtest.php' ) === false );
 
-check( 'with a model the type is created', \Nino\Elements::seed( $appData, '/seedtest', $seedUnit, [ 'de_DE' ] ) === true && is_file( $sandbox. '/private/elements/seedtest.php' ) === true );
+$seedCounted = [ 9, 9 ];
+check( 'with a model the type is created', \Nino\Elements::seed( $appData, '/seedtest', $seedUnit, [ 'de_DE' ], $seedCounted ) === true && is_file( $sandbox. '/private/elements/seedtest.php' ) === true );
+check( '...and it counts what it made: two elements created, none there before', $seedCounted === [ 2, 0 ] );
 $seedFile = \Nino\Filesystem::getFileContent( $appData, '/elements/seedtest.php', [] );
 check( '...with its title in the native language, the model cut to the field types the kernel knows and the defaults of the unit in the bucket every element inherits',
 	$seedFile['title'] === 'Abschnitte' && array_keys( $seedFile['model'] ) === [ 'title', 'text', 'order', 'hidden' ] && $seedFile['*']['*'] === [ 'hidden' => false ] );
@@ -1049,6 +1051,7 @@ $seedBefore = md5_file( $sandbox. '/private/elements/seedtest.php' );
 $seedCommitted = [];
 clearstatcache();
 $seedTime = filemtime( $sandbox. '/private/elements/seedtest.php' );
+check( 'a second run counts what is there, and nothing created', \Nino\Elements::seed( $appData, '/seedtest', $seedUnit, [ 'de_DE' ], $seedCounted ) === true && $seedCounted === [ 0, 2 ] );
 check( 'a second run answers true and writes nothing', \Nino\Elements::seed( $appData, '/seedtest', $seedUnit, [ 'de_DE' ] ) === true
 	&& md5_file( $sandbox. '/private/elements/seedtest.php' ) === $seedBefore && filemtime( $sandbox. '/private/elements/seedtest.php' ) === $seedTime && $seedCommitted === [] );
 
