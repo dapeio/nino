@@ -43,6 +43,16 @@ namespace Nino {
 		// How long a window of the cap lasts, in seconds - no key of its own
 		private const int WINDOW 		= 3600;
 
+		// The calls an hour the system may make for the whole site, see sendSystem()
+		public const int SYSTEM_CAP = 12;
+
+		// The two kinds of mail the system sends, each with a counter of its own under the prefix COUNTER_PREFIX - a name
+		// that no other counter of the toolset has - and the calls an hour it may make
+		public const string SYSTEM = 'system';
+		public const string TEST = 'test';
+		public const int TEST_CAP = 6;
+		private const string COUNTER_PREFIX = 'sysmail-';
+
 		// Where the last failed call is kept - see failure()
 		private const string STATUS_PATH = '/data/mail-status.php';
 
@@ -138,6 +148,56 @@ namespace Nino {
 				return false;
 			}
 
+			return self::_deliverAll( $appData, $mails );
+		}
+
+		/**
+		 *	Send mails that the system sends on its own account - a report to the owner of the site that a
+		 *	page request happened to set off - as sendAll() sends them, but not on the account of the client that
+		 *	made the request: they neither count against the per-address cap of that client nor are refused by it.
+		 *	The system has a cap of its own instead, SYSTEM_CAP calls an hour for the whole site, kept in a counter
+		 *	of its own, so that a loop in a feature cannot make a storm. All the mails of one call - one mail to
+		 *	several addresses - are one unit of it, and the first that is not delivered ends the call: what comes after
+		 *	it is not tried, and './nino/mail/results' holds a bool for each that was. Everything else is sendAll()'s:
+		 *	the refusal in rateLimited(), the transport, the failure record
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$mails				[ { to, subject, body, replyTo }, ... ]
+		 *	@param		string		$kind					SYSTEM, the report the system makes on its own, or TEST, a mail somebody asked for to see that it comes (TEST_CAP calls an hour of its own); any other value is refused and nothing is sent
+		 *
+		 *	@return 	bool										Whether every mail was delivered
+		 */
+		public static function sendSystem( array &$appData, array $mails, string $kind = self::SYSTEM ): bool {
+
+			$appData['./nino/mail/results']			= [];
+			$appData['./nino/mail/ratelimited']	= false;
+
+			if( $mails === [] )
+				return true;
+
+			if( in_array( $kind, [ self::SYSTEM, self::TEST ], true ) === false )
+				return false;
+
+			if( \Nino\Feature::count( $appData, self::COUNTER_PREFIX. $kind, 'site', $kind === self::SYSTEM ? self::SYSTEM_CAP : self::TEST_CAP, self::WINDOW ) === false ) {
+				$appData['./nino/mail/ratelimited'] = true;
+				return false;
+			}
+
+			return self::_deliverAll( $appData, $mails, true );
+		}
+
+		/**
+		 *	The deliveries of sendAll() and sendSystem(), past their caps: each mail, its result, and the
+		 *	failure record once for the call
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$mails
+		 *	@param		bool			$stop					End the call at the first mail that is not delivered
+		 *
+		 *	@return 	bool										Whether every mail was delivered
+		 */
+		private static function _deliverAll( array &$appData, array $mails, bool $stop = false ): bool {
+
 			$sent = true;
 
 			foreach( $mails as $mail ) {
@@ -150,6 +210,9 @@ namespace Nino {
 
 				$appData['./nino/mail/results'][] = $delivered;
 				$sent = $delivered && $sent;
+
+				if( $delivered === false && $stop === true )
+					break;
 			}
 
 			self::_recordOutcome( $appData, $sent );

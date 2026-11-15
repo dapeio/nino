@@ -83,7 +83,8 @@ namespace Nino\Modules\Dashboard {
 		 *	require.
 		 *
 		 *	'notices' are what needs somebody's attention, shown above the
-		 *	tiles: each is { text, values, link } - a fill key, what fills its
+		 *	tiles (worked out by notices(), which a caller without an account asks as
+		 *	well): each is { text, values, link } - a fill key, what fills its
 		 *	%s in order, and the #panel it leads to ('' for none). Mail that
 		 *	fails is one for everybody who opens the dashboard, like
 		 *	lastBackup: the record holds no address and no word a transport
@@ -114,28 +115,10 @@ namespace Nino\Modules\Dashboard {
 			// directory a delivery may not have brought: asked for, never
 			// assumed. What is missing is left out of the answer, and the
 			// script draws the card it has data for (see assets/admin.js)
-			$body = [ 'tiles' => [], 'notices' => [] ];
-
-			$failure = \Nino\Mail::failure( $appData );
-
-			if( $failure !== null )
-				$body['notices'][] = [ 'text' => '/_admin/dashboard/notice/mail', 'values' => [ $failure['since'], (string) $failure['count'] ], 'link' => '' ];
-
-			if( class_exists( '\\Nino\\Modules\\Text\\Admin' ) === true
-				&& \Nino\Auth::checkPermission( $appData, \Nino\Modules\Text\Admin::MANAGE_PERM ) === true )
-				foreach( \Nino\Modules\Text\Admin::untranslatedCounts( $appData ) as $locale => $count )
-					$body['notices'][] = [ 'text' => '/_admin/dashboard/notice/untranslated', 'values' => [ (string) $count, (string) $locale ], 'link' => '#text' ];
-
-			// What is wrong with the imprint and the privacy policy - a placeholder
-			// with no value, a language without a path, a page in no menu - is the
-			// business of whoever may edit elements, and only the module knows. At
-			// most eight lines (see \Nino\Modules\Legal::notices(), which has
-			// none where the module is not active). Read here, on the dashboard,
-			// and never by a page request
-			if( class_exists( '\\Nino\\Modules\\Legal' ) === true && class_exists( '\\Nino\\Modules\\Elements\\Admin' ) === true
-				&& \Nino\Auth::checkPermission( $appData, \Nino\Modules\Elements\Admin::MANAGE_PERM ) === true )
-				foreach( \Nino\Modules\Legal::notices( $appData ) as $notice )
-					$body['notices'][] = $notice;
+			//
+			// The notices are notices()'s, as the account that asks may see them; the
+			// key that names one for other callers is not the script's business
+			$body = [ 'tiles' => [], 'notices' => array_map( static fn( array $notice ): array => array_diff_key( $notice, [ 'key' => true ] ), self::notices( $appData ) ) ];
 
 			if( class_exists( '\\Nino\\Modules\\Backups' ) === true )
 				$body['lastBackup'] = \Nino\Modules\Backups::lastDate( $appData );
@@ -169,6 +152,104 @@ namespace Nino\Modules\Dashboard {
 				$body['recentActivity'] = \Nino\Modules\Logs\Admin::recentLines( $appData, 8 );
 
 			$request['/nino/http/response']['body'] = $body;
+		}
+
+		/**
+		 *	What needs attention, as data: the notices the Dashboard draws above its tiles, in
+		 *	their order, each { key, text, values, link } - the fill key of its sentence, what
+		 *	fills its %s in order, the #panel it leads to ('' for none) and a key that names it
+		 *	for as long as it is the same finding ('mail', 'untranslated:<locale>', 'legal-<kind>:<hash of its values>'):
+		 *	the numbers a notice counts are no part of it, so a count that moves is the one finding.
+		 *	apiSummary() answers these, and nothing else in the kernel works notices out.
+		 *
+		 *	By default what the account that is signed in may see: mail that fails is for everybody,
+		 *	texts still to translate for one that may open the Text panel, what is wrong with the
+		 *	legal texts for one that may edit elements. $everyone leaves those two questions out,
+		 *	for a caller that answers to no account - a feature that reports to the owner of the
+		 *	site - and has decided on its own who may read the answer. Reads only, writes nothing
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		bool			$everyone			Every notice, whatever the signed-in account may open
+		 *
+		 *	@return 	array										[ [ 'key', 'text', 'values', 'link' ], ... ]
+		 */
+		public static function notices( array &$appData, bool $everyone = false ): array {
+
+			$notices	= [];
+			$failure	= \Nino\Mail::failure( $appData );
+
+			if( $failure !== null )
+				$notices[] = [ 'key' => 'mail', 'text' => '/_admin/dashboard/notice/mail', 'values' => [ $failure['since'], (string) $failure['count'] ], 'link' => '' ];
+
+			if( class_exists( '\\Nino\\Modules\\Text\\Admin' ) === true
+				&& ( $everyone === true || \Nino\Auth::checkPermission( $appData, \Nino\Modules\Text\Admin::MANAGE_PERM ) === true ) )
+				foreach( \Nino\Modules\Text\Admin::untranslatedCounts( $appData ) as $locale => $count )
+					$notices[] = [ 'key' => 'untranslated:'. $locale, 'text' => '/_admin/dashboard/notice/untranslated', 'values' => [ (string) $count, (string) $locale ], 'link' => '#text' ];
+
+			// What is wrong with the imprint and the privacy policy - a placeholder
+			// with no value, a language without a path, a page in no menu - is the
+			// business of whoever may edit elements, and only the module knows. At
+			// most eight lines (see \Nino\Modules\Legal::notices(), which has
+			// none where the module is not active). Read for the dashboard, and
+			// for a feature that reports them after a page request - never by
+			// the page request itself
+			if( class_exists( '\\Nino\\Modules\\Legal' ) === true && class_exists( '\\Nino\\Modules\\Elements\\Admin' ) === true
+				&& ( $everyone === true || \Nino\Auth::checkPermission( $appData, \Nino\Modules\Elements\Admin::MANAGE_PERM ) === true ) )
+				foreach( \Nino\Modules\Legal::notices( $appData ) as $notice ) {
+
+					$kind = basename( (string) $notice['text'] );
+
+					// "and n more" counts, and a count is no part of a name
+					$notices[] = [ 'key' => $kind === 'legal-more' ? $kind : $kind. ':'. substr( sha1( (string) json_encode( $notice['values'] ) ), 0, 10 ) ] + $notice;
+				}
+
+			return $notices;
+		}
+
+		/**
+		 *	One notice as a sentence in a language - the words of this module's own text/<locale>.php
+		 *	with the values in place of the %s, in order, as the Dashboard's script sets them.
+		 *	For a caller that has no workbench session to read the words from: a mail, say. A language
+		 *	the module has no file for is said in English, and so is a notice whose text the file lacks;
+		 *	one that no file has is the empty string. Plain text, never markup
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		$notice				One of notices()
+		 *	@param		string		$locale				A language of the site, eg. 'de_DE'
+		 *
+		 *	@return 	string
+		 */
+		public static function sentence( array &$appData, array $notice, string $locale ): string {
+
+			$key = '[['. (string) ( $notice['text'] ?? '' ). ']]';
+			$sentence = '';
+
+			foreach( preg_match( '/^[a-z]{2,3}_[A-Z]{2}$/D', $locale ) === 1 ? [ $locale, 'en_US' ] : [ 'en_US' ] as $language ) {
+
+				$file = dirname( __DIR__ ). '/text/'. $language. '.php';
+				$words = is_file( $file ) === true ? include $file : [];
+
+				if( is_array( $words ) === true && is_string( $words[$key] ?? null ) === true && $words[$key] !== '' ) {
+					$sentence = $words[$key];
+					break;
+				}
+			}
+
+			// From where the last value ended: a value that holds a %s is text, not a place
+			$from = 0;
+
+			foreach( (array) ( $notice['values'] ?? [] ) as $value ) {
+
+				$at = strpos( $sentence, '%s', $from );
+
+				if( $at === false )
+					break;
+
+				$sentence	= substr_replace( $sentence, (string) $value, $at, 2 );
+				$from			= $at + strlen( (string) $value );
+			}
+
+			return $sentence;
 		}
 
 		/**

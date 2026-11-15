@@ -1325,6 +1325,7 @@ $minuteBefore = date( 'Y-m-d H:i' );
 $mailNotice = $noticesOf( $body, '/_admin/dashboard/notice/mail' );
 check( 'a failed mail raises one notice: since when, and how many calls failed - no link', count( $mailNotice ) === 1
 	&& in_array( $mailNotice[0]['values'], [ [ $minuteBefore, '1' ], [ date( 'Y-m-d H:i' ), '1' ] ], true ) && $mailNotice[0]['link'] === '' );
+check( 'the key of the mail notice is the one word, whatever the count says', array_column( array_filter( \Nino\Modules\Dashboard\Admin::notices( $appData ), static fn( array $notice ): bool => $notice['text'] === '/_admin/dashboard/notice/mail' ), 'key' ) === [ 'mail' ] );
 check( '...which holds no address', str_contains( json_encode( $body['notices'] ), 'example.com' ) === false );
 
 ninoUser( $appData, 'nopanels@example.com', [] );
@@ -1362,6 +1363,39 @@ check( '...and the notice follows the text being saved in that language', ( $aft
 \Nino\Filesystem::mutate( $appData, '/text/de_DE.php', fn( array $texts ): array => array_diff_key( $texts, [ '[[/notice-test/gap]]' => 1 ] ) );
 \Nino\Filesystem::mutate( $appData, '/text/en_US.php', fn( array $texts ): array => array_diff_key( $texts, [ '[[/notice-test/gap]]' => 1 ] ) );
 
+// The notices as data, for a caller that has no workbench session: the Dashboard's own list,
+// by key, and every notice for a caller that answers to no account
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', fn( array $texts ): array => $texts + [ '[[/notice-test/gap]]' => 'Eine Lücke' ] );
+[ , $body ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );
+$asked = \Nino\Modules\Dashboard\Admin::notices( $appData );
+check( 'notices() is what the summary answers, each with a key more, and the summary carries no key', array_map( static fn( array $notice ): array => array_diff_key( $notice, [ 'key' => 1 ] ), $asked ) === $body['notices']
+	&& $asked !== [] && array_filter( $body['notices'], static fn( array $notice ): bool => isset( $notice['key'] ) ) === [] );
+$gap = array_values( array_filter( $asked, static fn( array $notice ): bool => $notice['key'] === 'untranslated:en_US' ) );
+check( 'the key of a count names the finding, not the number: the language it is about', count( $gap ) === 1 && $gap[0]['values'][1] === 'en_US' );
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', fn( array $texts ): array => $texts + [ '[[/notice-test/gap2]]' => 'Noch eine Lücke' ] );
+$more = array_values( array_filter( \Nino\Modules\Dashboard\Admin::notices( $appData ), static fn( array $notice ): bool => $notice['key'] === 'untranslated:en_US' ) );
+check( '...so one text more is the same finding with another count', count( $more ) === 1 && $more[0]['values'][0] === (string) ( (int) $gap[0]['values'][0] + 1 ) );
+
+\Nino\Auth::loginUser( $appData, 'nopanels@example.com', 'correct horse battery staple' );
+check( 'an account that may not open the Text panel gets none of its notices from notices()...', array_filter( \Nino\Modules\Dashboard\Admin::notices( $appData ), static fn( array $notice ): bool => str_starts_with( $notice['key'], 'untranslated:' ) ) === [] );
+check( '...and a caller that answers to no account gets every one, the same whoever is signed in', \Nino\Modules\Dashboard\Admin::notices( $appData, true ) === \Nino\Modules\Dashboard\Admin::notices( $appData, true )
+	&& count( array_filter( \Nino\Modules\Dashboard\Admin::notices( $appData, true ), static fn( array $notice ): bool => $notice['key'] === 'untranslated:en_US' ) ) === 1 );
+\Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );
+check( '...which is the full account\'s own view as well', \Nino\Modules\Dashboard\Admin::notices( $appData, true ) === \Nino\Modules\Dashboard\Admin::notices( $appData ) );
+
+$notice = [ 'text' => '/_admin/dashboard/notice/untranslated', 'values' => [ '7', 'fr_FR' ] ];
+$german = \Nino\Modules\Dashboard\Admin::sentence( $appData, $notice, 'de_DE' );
+$english = \Nino\Modules\Dashboard\Admin::sentence( $appData, $notice, 'en_US' );
+check( 'sentence() fills the values in place of the %s, in order, in the language asked', str_contains( $german, '7' ) && str_contains( $german, 'fr_FR' ) && str_contains( $english, '7' ) && str_contains( $english, 'fr_FR' )
+	&& $german !== $english && str_contains( $german, '%s' ) === false && str_contains( $english, '%s' ) === false && strpos( $english, '7' ) < strpos( $english, 'fr_FR' ) );
+check( '...a language the module has no file for is said in English, and a locale that is none cannot reach a file', \Nino\Modules\Dashboard\Admin::sentence( $appData, $notice, 'xx_XX' ) === $english
+	&& \Nino\Modules\Dashboard\Admin::sentence( $appData, $notice, '../text/de_DE' ) === $english );
+check( '...and a notice no file has a text for is the empty string', \Nino\Modules\Dashboard\Admin::sentence( $appData, [ 'text' => '/_admin/dashboard/notice/none', 'values' => [ 'x' ] ], 'en_US' ) === ''
+	&& \Nino\Modules\Dashboard\Admin::sentence( $appData, [], 'en_US' ) === '' );
+check( '...a value that holds a %s itself is set as it stands, never read as a place', str_contains( \Nino\Modules\Dashboard\Admin::sentence( $appData, [ 'text' => '/_admin/dashboard/notice/untranslated', 'values' => [ '%s', '100%' ] ], 'en_US' ), '(%s) in 100%.' ) );
+
+\Nino\Filesystem::mutate( $appData, '/text/de_DE.php', fn( array $texts ): array => array_diff_key( $texts, [ '[[/notice-test/gap]]' => 1, '[[/notice-test/gap2]]' => 1 ] ) );
+
 // What is wrong with the legal texts: told to an account that may edit elements,
 // while the module is active - and to nobody else. What is told, and how much
 // of it, is the module's (\Nino\Modules\Legal::notices()); the summary carries it
@@ -1374,7 +1408,14 @@ $missingTypes = $legalNotices( $body );
 check( 'the module is active and its types are not there: the dashboard says so, once per type, with the file of the unit to copy back and a link to the type', count( array_filter( $missingTypes, static fn( array $notice ): bool => $notice['text'] === '/_admin/dashboard/notice/legal-nothing' ) ) === 2
 	&& $missingTypes[0]['values'][0] === 'legal' && str_ends_with( $missingTypes[0]['values'][1], 'install/elements/legal.php' ) && $missingTypes[0]['link'] === '#elements/legal' );
 
+$legalKeys = array_column( array_filter( \Nino\Modules\Dashboard\Admin::notices( $appData ), static fn( array $notice ): bool => str_starts_with( $notice['text'], '/_admin/dashboard/notice/legal-' ) ), 'key' );
+check( 'a notice about the legal texts has a key of its own - its kind and a hash of what names it, and for the count of the rest the kind alone - so that two notices of a kind are two keys', count( $legalKeys ) >= 2 && count( array_unique( $legalKeys ) ) === count( $legalKeys )
+	&& count( array_filter( $legalKeys, static fn( string $key ): bool => preg_match( '/^legal-[a-z-]+:[0-9a-f]{10}$/D', $key ) === 1 || $key === 'legal-more' ) ) === count( $legalKeys )
+	&& \Nino\Modules\Dashboard\Admin::notices( $appData ) === \Nino\Modules\Dashboard\Admin::notices( $appData ) );
+
 \Nino\Auth::loginUser( $appData, 'nopanels@example.com', 'correct horse battery staple' );
+check( 'notices() holds back the legal texts from an account that may not edit elements, and $everyone does not', array_filter( \Nino\Modules\Dashboard\Admin::notices( $appData ), static fn( array $notice ): bool => str_starts_with( $notice['text'], '/_admin/dashboard/notice/legal-' ) ) === []
+	&& count( array_filter( \Nino\Modules\Dashboard\Admin::notices( $appData, true ), static fn( array $notice ): bool => str_starts_with( $notice['text'], '/_admin/dashboard/notice/legal-' ) ) ) === count( $legalKeys ) );
 [ , $body ] = callDev( $appData, \Nino\Modules\Dashboard\Admin::class, 'apiSummary' );
 check( '...and an account that may not edit elements is told nothing of it', $legalNotices( $body ) === [] );
 \Nino\Auth::loginUser( $appData, 'dev@example.com', 'correct horse battery staple' );

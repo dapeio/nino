@@ -92,10 +92,17 @@ namespace Nino\Modules {
 		// upload could bring it from
 		public const string MANUAL_SUFFIX = '-manual';
 
+		// What a note, the archive key's copy and an archive begin and end with: the stub that ends a request for the
+		// file (\Nino\Admin\Recovery::STUB_PREFIX and STUB_SUFFIX, which a test holds equal). Here and not read from
+		// Recovery, a class that a request of the workbench has and a page request has not: missed() and stopped()
+		// are for a feature that reports from a page request too
+		public const string STUB_PREFIX = "<?php http_response_code(403); exit; return '";
+		public const string STUB_SUFFIX = "';\n";
+
 		// The note of the day's one attempt (see maybeRun()), in the archive
 		// directory behind the same exit-stub as an archive. Its name is no
 		// date, so no list offers it and no sweep touches it
-		private const string ATTEMPT_FILE = 'attempt.php';
+		public const string ATTEMPT_FILE = 'attempt.php';
 
 		// The record of the run that is going on (see _begin()), in the same
 		// place and behind the same stub. The run holds its lock for as long as
@@ -443,10 +450,10 @@ namespace Nino\Modules {
 
 			$raw = @file_get_contents( $path );
 
-			if( is_string( $raw ) === false || str_starts_with( $raw, \Nino\Admin\Recovery::STUB_PREFIX ) === false || str_ends_with( $raw, \Nino\Admin\Recovery::STUB_SUFFIX ) === false )
+			if( is_string( $raw ) === false || str_starts_with( $raw, self::STUB_PREFIX ) === false || str_ends_with( $raw, self::STUB_SUFFIX ) === false )
 				return null;
 
-			$json = base64_decode( substr( $raw, strlen( \Nino\Admin\Recovery::STUB_PREFIX ), -strlen( \Nino\Admin\Recovery::STUB_SUFFIX ) ), true );
+			$json = base64_decode( substr( $raw, strlen( self::STUB_PREFIX ), -strlen( self::STUB_SUFFIX ) ), true );
 			$note = is_string( $json ) === true ? json_decode( $json, true ) : null;
 
 			return is_array( $note ) === true ? $note : null;
@@ -467,7 +474,7 @@ namespace Nino\Modules {
 		 */
 		private static function _noteAttempt( string $dir, string $date, string $reason, string $code = '' ): void {
 
-			self::_writeRawAtomic( $dir. '/'. self::ATTEMPT_FILE, \Nino\Admin\Recovery::STUB_PREFIX. base64_encode( (string) json_encode( [ 'date' => $date, 'reason' => $reason ] + ( $code === '' ? [] : [ 'code' => $code ] ) ) ). \Nino\Admin\Recovery::STUB_SUFFIX );
+			self::_writeRawAtomic( $dir. '/'. self::ATTEMPT_FILE, self::STUB_PREFIX. base64_encode( (string) json_encode( [ 'date' => $date, 'reason' => $reason ] + ( $code === '' ? [] : [ 'code' => $code ] ) ) ). self::STUB_SUFFIX );
 		}
 
 		/**
@@ -613,7 +620,7 @@ namespace Nino\Modules {
 			\Nino\Filesystem::forceDir( $appData, dirname( self::KEY_PATH ) );
 
 			$keyPath 		= self::keyPath( $appData );
-			$keyContent = \Nino\Admin\Recovery::STUB_PREFIX. $appData['/nino/backup/key']. \Nino\Admin\Recovery::STUB_SUFFIX;
+			$keyContent = self::STUB_PREFIX. $appData['/nino/backup/key']. self::STUB_SUFFIX;
 
 			if( @file_get_contents( $keyPath ) !== $keyContent )
 				self::_writeRawAtomic( $keyPath, $keyContent );
@@ -702,7 +709,7 @@ namespace Nino\Modules {
 
 			ftruncate( $run->handle, 0 );
 			rewind( $run->handle );
-			fwrite( $run->handle, \Nino\Admin\Recovery::STUB_PREFIX. base64_encode( (string) json_encode( $run->note ) ). \Nino\Admin\Recovery::STUB_SUFFIX );
+			fwrite( $run->handle, self::STUB_PREFIX. base64_encode( (string) json_encode( $run->note ) ). self::STUB_SUFFIX );
 			fflush( $run->handle );
 		}
 

@@ -231,6 +231,11 @@ namespace Nino {
 
 			self::_finalizeResponse( $request );
 
+			// What a module asked to be done once the response is out (see afterResponse()): decided here, with the
+			// response finished - after every callback of '/nino/http/output' and after the body was encoded - since
+			// the length it may have to tell is that of the bytes that go out
+			$after = self::prepareAfter( $appData, $request );
+
 			// Output header
 			if( headers_sent() === false )
 				foreach( $request['/nino/http/response']['header'] AS $headerKey => $headerValue )
@@ -276,7 +281,145 @@ namespace Nino {
 					echo $request['/nino/http/response']['body'];
 			}
 
+			if( $after !== [] )
+				self::_runAfter( $after );
+
 			exit;
+		}
+
+		/**
+		 *	Ask for work to be done after the response has gone out to the client: a report mailed to the owner
+		 *	of the site, say, which the visitor who set it off has no business waiting for. The work is a callable
+		 *	without arguments; it runs in the request that asked, after output() has sent the last byte and
+		 *	let the client go, and a throwable it raises is a warning and nothing else.
+		 *
+		 *	It runs only where the response can be let go: where php-fpm or LiteSpeed end the connection themselves,
+		 *	or where the response is a body that goes out as it is - then the kernel tells its length, which a client
+		 *	stops reading at. A response it cannot let go - a file or a stream, a status without a body on a
+		 *	server that ends no connection, a length, an encoding or a chunking somebody else set, a page php compresses
+		 *	itself - is sent as it is and the work does not run in this request: whoever asked finds it undone and asks
+		 *	again with the next one. A response without asked-for work is sent byte for byte as it always was
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		callable	$work					function(): void
+		 *
+		 *	@return 	void
+		 */
+		public static function afterResponse( array &$appData, callable $work ): void {
+
+			$appData['./nino/http/after'][] = $work;
+		}
+
+		/**
+		 *	The part of output() that decides whether the asked-for work (see afterResponse()) runs in this request,
+		 *	and what the response has to tell for it: the Content-Length of a body that goes out as it is, where no server
+		 *	ends the connection by itself. Split out, since output() itself exit()s
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array 		&$request			(reference) Current server request, its response finished (see _finalizeResponse())
+		 *
+		 *	@return 	array										The work to run after the response, [] for none
+		 */
+		public static function prepareAfter( array &$appData, array &$request ): array {
+
+			$after = array_values( (array) ( $appData['./nino/http/after'] ?? [] ) );
+			unset( $appData['./nino/http/after'] );
+
+			if( $after === [] || isset( $request['./nino/http/stream'] ) === true )
+				return [];
+
+			// php-fpm and LiteSpeed let the client go themselves, whatever the response is
+			if( function_exists( 'fastcgi_finish_request' ) === true || function_exists( 'litespeed_finish_request' ) === true )
+				return $after;
+
+			$response = &$request['/nino/http/response'];
+
+			if( is_string( $response['body'] ?? null ) === false || isset( $response['file'] ) === true
+				|| in_array( (int) ( $response['statusCode'] ?? 200 ), [ 204, 205, 304 ], true ) === true )
+				return [];
+
+			// A page php compresses itself has no length that is the body's: for this response it is off, as for a stream, and
+			// where that cannot be done - the output has begun - the work is dropped, and the log says so
+			if( self::_compressing() === true ) {
+
+				if( @ini_set( 'zlib.output_compression', '0' ) === false )
+					return self::_dropped( $appData, 'php compresses the page itself' );
+			}
+
+			// A buffer with a handler of its own - a callback, an output_handler of the ini - changes what goes out after the length is told
+			// (the handler of php's own compression stays in the list when it is turned off: it passes what it gets)
+			foreach( ob_get_status( true ) as $buffer )
+				if( in_array( $buffer['name'] ?? '', [ 'default output handler', 'zlib output compression' ], true ) === false )
+					return self::_dropped( $appData, 'an output buffer has a handler of its own' );
+
+			foreach( array_keys( (array) ( $response['header'] ?? [] ) ) as $name )
+				if( in_array( strtolower( (string) $name ), [ 'content-length', 'content-encoding', 'transfer-encoding' ], true ) === true )
+					return [];
+
+			$response['header']['Content-Length'] = (string) strlen( $response['body'] );
+
+			return $after;
+		}
+
+		/**
+		 *	Whether php compresses its output itself
+		 *
+		 *	@return 	bool
+		 */
+		private static function _compressing(): bool {
+
+			return filter_var( ini_get( 'zlib.output_compression' ), FILTER_VALIDATE_BOOLEAN );
+		}
+
+		/**
+		 *	The work that is not done in this request, said once in the log
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$why
+		 *
+		 *	@return 	array										[]
+		 */
+		private static function _dropped( array &$appData, string $why ): array {
+
+			// Said once an hour: a server that drops the work of every request would fill the log with it
+			if( \Nino\Feature::count( $appData, 'after-response-dropped', 'site', 1, 3600 ) === true )
+				trigger_error( 'Work after the response is dropped for this request: '. $why, E_USER_WARNING );
+
+			return [];
+		}
+
+		/**
+		 *	Let the client go and do the asked-for work: the session is closed, so that the next request of the
+		 *	same browser does not queue behind it, the buffers are ended and the connection with them
+		 *
+		 *	@param		array 		$after				The callables of prepareAfter()
+		 *
+		 *	@return 	void
+		 */
+		private static function _runAfter( array $after ): void {
+
+			ignore_user_abort( true );
+
+			if( session_status() === PHP_SESSION_ACTIVE )
+				session_write_close();
+
+			if( function_exists( 'fastcgi_finish_request' ) === true )
+				fastcgi_finish_request();
+			else if( function_exists( 'litespeed_finish_request' ) === true )
+				litespeed_finish_request();
+			else {
+				while( ob_get_level() > 0 && @ob_end_flush() === true );
+				flush();
+			}
+
+			foreach( $after as $work ) {
+
+				try {
+					$work();
+				} catch( \Throwable $error ) {
+					trigger_error( 'Work after the response: '. get_class( $error ). ' - '. $error->getMessage(), E_USER_WARNING );
+				}
+			}
 		}
 
 		// json-encode a non-string body, answer the file a response names, then
