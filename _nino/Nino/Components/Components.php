@@ -107,7 +107,7 @@ namespace Nino {
 		private const array KEYS = [ 'label', 'group', 'in', 'offers', 'once', 'source', 'format', 'attributes', 'variants', 'template', 'icon', 'preview' ];
 		private const array ATTRIBUTE_KEYS = [ 'type', 'default', 'options', 'min', 'max', 'responsive', 'class', 'label', 'hint', 'input' ];
 
-		// A component's and a place's name; an attribute's name, as \Nino\Markup reads one (Markup::ATTRIBUTE);
+		// A component's and a place's name; an attribute's name, lowerCamel - \Nino\Markup reads more words than that (Markup::ATTRIBUTE);
 		// the word of a variant or of an option that is written as a class; the value of an id; a field of an element
 		private const string NAME = '/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/D';
 		private const string ATTRIBUTE = '/^[a-z][a-zA-Z0-9]*$/D';

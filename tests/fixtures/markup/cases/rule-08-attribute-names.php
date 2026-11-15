@@ -1,12 +1,13 @@
 <?php
 declare(strict_types=1);
 
-// An attribute name is [a-z][a-zA-Z0-9]*: a mark with another word is text
+// A word is [A-Za-z][A-Za-z0-9_-]*, the form of the name of a field: a mark with a word that starts otherwise is text
 return [
 	'containers'	=> [],
 	'tree'			=> [
-		[ 't' => '[a bC="x" d9 e-f="y"] [a g_h] ' ],
-		[ 'n' => 'a', 's' => '', 'a' => [ 'bC' => 'x', 'd9' => true ], 'c' => null, 'o' => 30 ],
+		[ 'n' => 'a', 's' => '', 'a' => [ 'bC' => 'x', 'd9' => true, 'e-f' => 'y', 'g_h' => true, 'Up' => true ], 'c' => null, 'o' => 0 ],
+		[ 't' => ' [a 9x] [a -x] ' ],
+		[ 'n' => 'a', 's' => '', 'a' => [ 'bC' => 'x' ], 'c' => null, 'o' => 43 ],
 	],
 	'notes'			=> [],
 ];

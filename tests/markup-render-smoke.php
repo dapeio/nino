@@ -297,4 +297,10 @@ check( '...and the pane that is the value of a fill is put into the page as it i
 
 $ignored = ninoWarnings();
 
+// The field a component of a cell reads is the first word of its call, and the name of a field may hold an underscore, a hyphen and a capital
+\Nino\Elements::insertElementType( $appData, '/render-fields', [ 'title' => [ 'type' => 'string' ], 'long_name' => [ 'type' => 'string' ], 'long-name' => [ 'type' => 'string' ], 'Camel' => [ 'type' => 'string' ] ] );
+\Nino\Elements::insertElement( $appData, '/render-fields/a', [ 'title' => 'plain', 'long_name' => 'underscored', 'long-name' => 'hyphenated', 'Camel' => 'capital' ], 'de_DE' );
+$html = \Nino\Html::renderHtml( $appData, '[stack /render-fields][text title][text long_name][text long-name][text Camel][/stack]' );
+check( 'a field named with an underscore, a hyphen or a capital is read as the first word of a call in a cell', str_contains( $html, 'plain' ) === true && str_contains( $html, 'underscored' ) === true && str_contains( $html, 'hyphenated' ) === true && str_contains( $html, 'capital' ) === true && str_contains( $html, '[text' ) === false );
+
 ninoDone( $appData );

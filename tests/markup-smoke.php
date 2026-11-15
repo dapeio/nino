@@ -581,7 +581,7 @@ $bad = [
 	'a name that is no string'					=> [ 'n' => 5, 's' => '', 'a' => [], 'c' => null, 'o' => 0 ],
 	'an attribute with a line feed in it'		=> [ 'n' => 'a', 's' => '', 'a' => [ 'v' => "x\ny" ], 'c' => null, 'o' => 0 ],
 	'an attribute with a carriage return'		=> [ 'n' => 'a', 's' => '', 'a' => [ 'v' => "x\ry" ], 'c' => null, 'o' => 0 ],
-	'an attribute name with a hyphen'			=> [ 'n' => 'a', 's' => '', 'a' => [ 'data-x' => '1' ], 'c' => null, 'o' => 0 ],
+	'an attribute name that starts with a digit'	=> [ 'n' => 'a', 's' => '', 'a' => [ '9x' => '1' ], 'c' => null, 'o' => 0 ],
 	'an attribute name that is a number'		=> [ 'n' => 'a', 's' => '', 'a' => [ 5 => '1' ], 'c' => null, 'o' => 0 ],
 	'an attribute that is false'					=> [ 'n' => 'a', 's' => '', 'a' => [ 'x' => false ], 'c' => null, 'o' => 0 ],
 	'an attribute that is a number'				=> [ 'n' => 'a', 's' => '', 'a' => [ 'x' => 5 ], 'c' => null, 'o' => 0 ],

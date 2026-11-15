@@ -116,10 +116,10 @@ namespace Nino {
 		// At least one character stands outside the inner one, so that [[[[x]]]] is [[, the textfill x and ]]
 		private const string KEY = '(?:'. self::KEY_CHAR. '++\[\['. self::KEY_CHAR. '++\]\]'. self::KEY_CHAR. '*+|\[\['. self::KEY_CHAR. '++\]\]'. self::KEY_CHAR. '++|'. self::KEY_CHAR. '++)';
 
-		// The name of an attribute: the 47 names the kernel's templates, docs and code write are all [a-z]+, and the
-		// register takes lowerCamel names (Components::validate(): [a-z][a-zA-Z0-9]*). A hyphen or an underscore
-		// stands in none, so a word with one is no attribute
-		private const string ATTRIBUTE = '[a-z][a-zA-Z0-9]*+';
+		// A word of a call - the name of an attribute, or a switch: the form of the name of a field of an element, since
+		// the field a component of a cell reads is written as the first word of its call ([text long_name]). The register
+		// takes fewer names for its attributes (Components::validate(): [a-z][a-zA-Z0-9]*)
+		private const string ATTRIBUTE = '[A-Za-z][A-Za-z0-9_-]*+';
 
 		// The source of a call, and a switch that is written like one: ~title, /a/b/c/d, .field, /templates/page-x.[[/nino/http/response/locale]].
 		// A key, the ~ of a relative one, and textfills, which a mark takes whole: their ]] is not the end of the mark.
