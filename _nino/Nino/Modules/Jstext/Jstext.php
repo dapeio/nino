@@ -34,7 +34,9 @@ namespace Nino\Modules {
 			contact form delivers to. The scripts reading it ask for three groups
 			(see Nino.ui.js: its form handler reads the Form module's words for a
 			.nino-form and the Newsletter feature's for a .nino-newsletter-form, its
-			.nino-slider the slider's), so those three are what it carries.
+			.nino-slider the slider's), so those three are what it carries. The
+			words of a form that names its own prefix in data-form-texts are the
+			feature's to publish().
 
 			A project whose own script reads another fill names its prefix under
 			'/nino/jstext/keys' in config.php; a module or a feature serving a
@@ -74,7 +76,9 @@ namespace Nino\Modules {
 		 *	Publish one or more text key prefixes to the inline block for this
 		 *	request - what a module or a feature calls in its own init() when
 		 *	its public script reads a fill. The workbench does it for its own
-		 *	words; a project does the same thing in config.php under KEYS
+		 *	words; a project does the same thing in config.php under KEYS.
+		 *	A prefix starts and ends with a slash with a name between; any other
+		 *	is refused with a warning and nothing is published for it
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$prefixes			Key prefixes, '/project/mine/info/' style
@@ -85,7 +89,20 @@ namespace Nino\Modules {
 
 			$published = is_array( $appData['./nino/jstext/keys'] ?? null ) === true ? $appData['./nino/jstext/keys'] : [];
 
-			$appData['./nino/jstext/keys'] = array_values( array_unique( array_merge( $published, array_values( array_filter( $prefixes, 'is_string' ) ) ) ) );
+			// A prefix names a group of keys: it starts and ends with a slash and has a name between.
+			// '' and '/' would hand the whole table to every visitor, and a prefix without the closing
+			// slash reaches the keys of every neighbour that starts with the same letters
+			$allowed = [];
+
+			foreach( $prefixes as $prefix ) {
+
+				if( is_string( $prefix ) === true && preg_match( '#^/[^/].*/$#D', $prefix ) === 1 )
+					$allowed[] = $prefix;
+				else
+					trigger_error( 'Jstext::publish(): "'. ( is_string( $prefix ) === true ? $prefix : gettype( $prefix ) ). '" is not a key prefix (it starts and ends with a slash, a name between) - nothing is published for it', E_USER_WARNING );
+			}
+
+			$appData['./nino/jstext/keys'] = array_values( array_unique( array_merge( $published, $allowed ) ) );
 		}
 
 		/**

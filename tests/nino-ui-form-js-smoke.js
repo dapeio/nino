@@ -154,6 +154,11 @@ sandbox.Nino = {
 			'/feature/newsletter/info/email'    : 'Please enter a valid address.',
 			'/feature/newsletter/info/success'  : 'You are signed up.',
 			'/feature/newsletter/info/error'    : 'The signup failed.',
+			// A feature's own form: five texts below a prefix it names itself
+			'/feature/meetups/signup/required' : 'Please fill in your name.',
+			'/feature/meetups/signup/invalid'  : 'Please pick a meetup and enter your name.',
+			'/feature/meetups/signup/success'  : 'You are signed up.',
+			'/feature/meetups/signup/error'    : 'That did not work.',
 		},
 		getText : function( key ) { return sandbox.Nino.content.text[key] || '' },
 	},
@@ -647,6 +652,103 @@ contactSite.submit();
 check( 'a contact form without that text refuses in the address text rather than an empty line', sent.length === 0 && contactSite.msg.textContent === 'Please enter a valid email address.' );
 sandbox.Nino.content.text['/module/form/info/invalid'] = 'Please check your entries.';
 
+
+// --- A form of a feature: the same handler, its own words and endpoint ---
+
+/*	A feature writes the form, names the prefix of its five texts in
+	data-form-texts and the endpoint in action. Nothing else tells the handler
+	what the form is: the contact form's words are not a fallback of it, and
+	the class of the signup is not needed	*/
+const meetup = form();
+meetup.attributes['data-form-texts'] = '/feature/meetups/signup/';
+meetup.attributes.action = '/meetups';
+meetup.fieldList.length = 0;
+const meetupName = field( 'name', 'text', '', true, false );
+const meetupPick = field( 'meetup', 'select', 'party', true, false );
+meetupPick.tagName = 'SELECT';
+meetup.fieldList.push( field( '_csrf', 'hidden', 'token-value', false ), field( 'website', 'text', '', false ), meetupPick, meetupName );
+forms.push( meetup );
+sandbox.Nino.ui.onReady();
+
+check( 'a form that names its texts is driven by the same handler', meetup.listeners.submit === forms[0].listeners.submit );
+
+sent.length = 0;
+meetup.submit();
+check( 'an empty required field is refused in the words of the prefix the form names, and marked',
+	sent.length === 0 && meetup.msg.textContent === 'Please fill in your name.' && meetupName.getAttribute('aria-invalid') === 'true' );
+
+meetupName.value = 'Ada';
+meetup.submit();
+check( 'it posts to its own action, with the csrf field and the honeypot of its own markup',
+	sent.length === 1 && sent[0].uri === '/meetups' && sent[0].data.name === 'Ada' && sent[0].data._csrf === 'token-value' && sent[0].data.website === '' );
+
+respond( sent.length - 1, 400 );
+check( 'a 400 reads the invalid text of its prefix, since a select is a typed field', meetup.msg.textContent === 'Please pick a meetup and enter your name.' && meetup.classList.contains('nino-is-error') === true );
+
+settled( meetup );
+meetup.submit();
+respond( sent.length - 1, 429 );
+check( 'any other status is its error text and tells nothing of the check that refused', meetup.msg.textContent === 'That did not work.' );
+
+settled( meetup );
+meetup.submit();
+respond( sent.length - 1, 200 );
+check( 'a 200 is its success text, and the form is locked', meetup.msg.textContent === 'You are signed up.'
+	&& meetup.classList.contains('nino-is-success') === true && meetupName.disabled === true && meetup.btn.disabled === true );
+
+/*	A key the feature did not write shows nothing: the words of the contact form
+	are for the contact form, and a line about an address in a form that asks
+	for none would only mislead	*/
+const meetupLate = form();
+meetupLate.attributes['data-form-texts'] = '/feature/meetups/other/';
+meetupLate.attributes.action = '/meetups';
+meetupLate.fieldList.length = 0;
+meetupLate.fieldList.push( field( 'name', 'text', '', true, false ) );
+forms.push( meetupLate );
+sandbox.Nino.ui.onReady();
+sent.length = 0;
+meetupLate.submit();
+check( 'a prefix without the texts shows an empty line, not the contact form\'s words', sent.length === 0 && meetupLate.msg.textContent === '' && meetupLate.fieldList[0].getAttribute('aria-invalid') === 'true' );
+
+
+/*	A 400 on a form that asks for no address cannot be about one: it reads the invalid text, typed field or none.
+	A form that asks for an address and has no typed field reads the address text, as the contact form does	*/
+const noAddress = form();
+noAddress.attributes['data-form-texts'] = '/feature/meetups/signup/';
+noAddress.attributes.action = '/meetups';
+noAddress.fieldList.length = 0;
+noAddress.fieldList.push( field( 'name', 'text', 'Ada', true, false ) );
+forms.push( noAddress );
+sandbox.Nino.ui.onReady();
+sent.length = 0;
+noAddress.submit();
+respond( sent.length - 1, 400 );
+check( 'a 400 on a form without an address field reads the invalid text', noAddress.msg.textContent === 'Please pick a meetup and enter your name.' );
+
+const addressOnly = form();
+addressOnly.attributes['data-form-texts'] = '/feature/newsletter/info/';
+addressOnly.attributes.action = '/x';
+addressOnly.fieldList.length = 0;
+addressOnly.fieldList.push( field( 'email', 'email', 'reader@example.com', true, false ) );
+forms.push( addressOnly );
+sandbox.Nino.ui.onReady();
+sent.length = 0;
+addressOnly.submit();
+respond( sent.length - 1, 400 );
+check( 'a 400 on a form with an address field and no typed one reads the address text', addressOnly.msg.textContent === 'Please enter a valid address.' );
+
+/*	Both the attribute and the class of the newsletter signup: the attribute names the texts, the action the endpoint	*/
+const bothSpellings = form();
+bothSpellings.classList = classList( null, [ 'nino-form', 'nino-newsletter-form' ] );
+bothSpellings.attributes['data-form-texts'] = '/feature/meetups/signup/';
+bothSpellings.attributes.action = '/meetups';
+bothSpellings.fieldList.length = 0;
+bothSpellings.fieldList.push( field( 'name', 'text', '', true, false ) );
+forms.push( bothSpellings );
+sandbox.Nino.ui.onReady();
+sent.length = 0;
+bothSpellings.submit();
+check( 'where a form carries the attribute and the class of the signup, the attribute wins', sent.length === 0 && bothSpellings.msg.textContent === 'Please fill in your name.' );
 
 // --- A toast nobody was told about --------------------------------------
 

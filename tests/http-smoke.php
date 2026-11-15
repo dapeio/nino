@@ -616,7 +616,13 @@ $jstextGroups = ( new ReflectionClassConstant( '\Nino\Modules\Jstext', 'DEFAULT_
 check( 'the three groups are the form\'s messages, the newsletter\'s and the slider\'s words - and a label like the phone\'s is none of them', ( $jstextTable['/template/common/slider/prev'] ?? null ) === 'Zurück'
 	&& ( $jstextTable['/feature/newsletter/info/success'] ?? null ) === 'Eingetragen' && isset( $jstextTable['/template/common/label/phone'] ) === false
 	&& $jstextGroups === [ '/module/form/info/', '/feature/newsletter/info/', '/template/common/slider/' ] );
-check( 'the public script asks for exactly those groups', preg_match_all( '/getText\(\s*\'(\/[^\']*)\'/', (string) file_get_contents( __DIR__. '/../_nino/Nino.ui.js' ), $jstextAsked ) > 0
+// ... in getText( '/group/...' ) and in the prefixes a form is given where its markup names none
+$jstextScript = (string) file_get_contents( __DIR__. '/../_nino/Nino.ui.js' );
+preg_match_all( '/getText\(\s*\'(\/[^\']*)\'/', $jstextScript, $jstextAsked );
+preg_match_all( '/\.texts\s*=[^;]*;/', $jstextScript, $jstextAssigned );
+preg_match_all( '/\'(\/[^\']*)\'/', implode( ' ', $jstextAssigned[0] ), $jstextPrefixes );
+$jstextAsked[1] = array_merge( $jstextAsked[1], $jstextPrefixes[1] );
+check( 'the public script asks for exactly those groups', $jstextPrefixes[1] !== []
 	&& array_filter( $jstextAsked[1], static fn( string $key ): bool => array_filter( $jstextGroups, static fn( string $group ): bool => str_starts_with( $key, $group ) ) === [] ) === [] );
 
 // The nonce belongs in the script tag and the policy, nowhere else: no script
@@ -685,6 +691,16 @@ unset( $appData[ \Nino\Modules\Jstext::KEYS ] );
 
 \Nino\Modules\Jstext::publish( $appData, [ '/project/mail/address/' ] );
 check( '...and a module registers one for the request it is serving', isset( jstextTable( $appData )['/project/mail/address/owner'] ) === true );
+unset( $appData['./nino/jstext/keys'] );
+
+// A prefix is a group: '' and '/' are the whole table, and one without its closing slash
+// reaches the neighbours that start with the same letters
+$ignored = ninoWarnings();
+\Nino\Modules\Jstext::publish( $appData, [ '', '/', '//', '/project/mail/address', 42 ] );
+$jstextRefused = ninoWarnings();
+check( 'a prefix that is empty, a bare slash or without its closing slash is refused with a warning and publishes nothing',
+	count( $jstextRefused ) === 5 && ( $appData['./nino/jstext/keys'] ?? [] ) === []
+	&& isset( jstextTable( $appData )['/project/mail/address/owner'] ) === false );
 unset( $appData['./nino/jstext/keys'] );
 
 // The last-resort 404 fallback, ie. a project without its own /404 route.

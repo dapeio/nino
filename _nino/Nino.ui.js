@@ -1164,15 +1164,20 @@
 
 
 			/*
-			 *	nino-form, nino-newsletter-form - one handler for both. A signup
-			 *	differs from a contact form in its words and its endpoint alone,
-			 *	both chosen per form by the .nino-newsletter-form class: the
-			 *	Newsletter feature's /feature/newsletter/info/ texts and
-			 *	/.newsletter, else the Form module's /module/form/info/ and
-			 *	/.form. The signup endpoint answers the same way whether or not
-			 *	the address was on the list already - anything else lets anyone
-			 *	test whether a given address is subscribed - so there is no
-			 *	outcome of its own to show for that case.
+			 *	nino-form - the one handler of every form that drives itself: the
+			 *	contact form, the newsletter signup and the form of a feature. A
+			 *	form differs from another in its words and its endpoint alone.
+			 *	The endpoint is the action of the form; the words are the five
+			 *	texts (required, email, invalid, success, error) below the key
+			 *	prefix in data-form-texts, the Form module's /module/form/info/
+			 *	where it says none. The class of the Newsletter feature's signup,
+			 *	.nino-newsletter-form, names the same two things for it -
+			 *	/feature/newsletter/info/ and /.newsletter - and the attribute
+			 *	wins where a form carries both. The signup
+			 *	endpoint answers the same way whether or not the address was on
+			 *	the list already - anything else lets anyone test whether a given
+			 *	address is subscribed - so there is no outcome of its own to show
+			 *	for that case.
 			 */
 			if( e.form.length > 0 ) {
 
@@ -1180,15 +1185,13 @@
 					/**
 					 *	One of the form's own texts
 					 *
-					 *	@param		{Element}	form						The form, its .newsletter set when it was bound
+					 *	@param		{Element}	form						The form, its .texts set when it was bound
 					 *	@param		{string}	which						required, email, invalid, success or error
 					 *
 					 *	@return		{string}							The text, '' where the site has none
 					 */
 					formText = function( form, which ) {
-						return form.newsletter === true
-							? Nino.content.getText('/feature/newsletter/info/'+ which)
-							: Nino.content.getText('/module/form/info/'+ which);
+						return Nino.content.getText( form.texts + which );
 					},
 
 					/**
@@ -1237,8 +1240,14 @@
 								|| field.type === 'radio' || field.type === 'checkbox' || field.tagName === 'SELECT';
 						} );
 
+						// A form that asks for no address cannot have been refused for
+						// one: its 400 reads the invalid text as well
+						const asksAddress = Array.prototype.some.call( this.form.fields, function( field ) {
+							return field.type === 'email';
+						} );
+
 						this.form.msg.textContent = ( xhr.status === 400 )
-							? ( ( typed === true ? formText( this.form, 'invalid' ) : '' ) || formText( this.form, 'email' ) )
+							? ( ( typed === true || asksAddress === false ? formText( this.form, 'invalid' ) : '' ) || formText( this.form, 'email' ) )
 							: formText( this.form, ok === true ? 'success' : 'error' );
 
 						// Only a delivered message locks the form down. Disabling every
@@ -1429,9 +1438,7 @@
 						if( this.btn )
 							this.btn.disabled = true;
 
-						// Without an action a form posts to its own kind's endpoint,
-						// below the project's directory
-						Nino.http.sendRequest( this.getAttribute('action') || ( this.newsletter === true ? '[[/nino/dir]]/.newsletter' : '[[/nino/dir]]/.form' ), 'POST', boundResponse, data );
+						Nino.http.sendRequest( this.endpoint, 'POST', boundResponse, data );
 					};
 
 				for( let i=0, l=e.form.length; i<l; i++ ) {
@@ -1439,7 +1446,13 @@
 					e.form[i].fields	= e.form[i].querySelectorAll('input, textarea, select');
 					e.form[i].msg 		= e.form[i].querySelectorAll('p')[0];
 					e.form[i].btn 		= e.form[i].querySelectorAll('button')[0];
-					e.form[i].newsletter	= e.form[i].classList.contains('nino-newsletter-form') === true;
+
+					// Where the words and the answer come from. Without an action a
+					// form posts to the endpoint of its own kind, below the
+					// project's directory
+					const signup = e.form[i].classList.contains('nino-newsletter-form') === true;
+					e.form[i].texts		= e.form[i].getAttribute('data-form-texts') || ( signup === true ? '/feature/newsletter/info/' : '/module/form/info/' );
+					e.form[i].endpoint	= e.form[i].getAttribute('action') || ( signup === true ? '[[/nino/dir]]/.newsletter' : '[[/nino/dir]]/.form' );
 
 					// Both the validation error and the server's verdict are
 					// written into that paragraph, and it is a project's own markup

@@ -35,7 +35,7 @@ Ersetze in `callbackSignup()` in `features/Meetups/Meetups.php` den Block der Dr
 			$limit = (int) \Nino\Features::setting( $appData, 'meetups', 'perHour', 10 );
 
 			if( \Nino\Feature::count( $appData, 'meetups-signup-tries', \Nino\Http::getClientIp( $appData ), $limit, 3600 ) === false ) {
-				self::_refuse( $appData, $request, 429, 'busy' );
+				self::_refuse( $appData, $request, 429, 'error' );
 				return;
 			}
 ```

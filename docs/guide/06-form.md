@@ -35,7 +35,7 @@ Setze die Version auf `0.4.0`:
 Lege `features/Meetups/templates/meetups-signup.tpl` an:
 
 ```html features/Meetups/templates/meetups-signup.tpl
-<form class="meetups-signup[[classes]]" method="post" action="[[/nino/dir]]/meetups">
+<form class="nino-form meetups-signup[[classes]]" method="post" action="[[/nino/dir]]/meetups" novalidate data-form-texts="/feature/meetups/signup/">
 	[csrf]
 	<input type="text" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true" class="nino-form-trap">
 	<label for="meetups-signup-meetup">[[/feature/meetups/signup/meetup]]</label>
@@ -45,13 +45,17 @@ Lege `features/Meetups/templates/meetups-signup.tpl` an:
 	<label for="meetups-signup-name">[[/feature/meetups/signup/name]]</label>
 	<input type="text" id="meetups-signup-name" name="name" class="nino-form-input" maxlength="80" autocomplete="name" required>
 	<button type="submit" class="nino-btn nino-btn--primary">[[/feature/meetups/signup/submit]]</button>
-	<p class="meetups-signup-message" role="status">[[message]]</p>
+	<p class="nino-form-message meetups-signup-message">[[message]]</p>
 </form>
 ```
 
 - `[csrf]` setzt ein verstecktes Feld mit dem Token der Sitzung ein. Ohne dieses Feld lehnt Nino jede Anfrage des Formulars ab.
 - `[[/nino/dir]]` ist das Verzeichnis, unter dem das Projekt läuft. Setze es vor jede Adresse.
 - Das Feld `website` ist eine Falle für Bots. Menschen sehen es nicht. Die Klasse `nino-form-trap` versteckt es.
+- `class="nino-form"` übergibt das Formular dem Skript von Nino. Es sendet ohne Neuladen ab, prüft die Pflichtfelder, markiert das falsche Feld und sagt in der Sprache der Seite, was fehlt. Eigenes JavaScript brauchst Du nicht.
+- `novalidate` schaltet die Meldung des Browsers ab, die in der Sprache des Browsers spräche. Die Prüfung macht das Skript.
+- `data-form-texts` nennt den Anfang der Schlüssel, unter denen die Sätze des Skripts liegen. Der Schlüssel endet mit `/`. Der nächste Schritt legt sie an.
+- Das erste `<p>` des Formulars ist die Meldung: Das Skript schreibt den Satz hinein und macht den Absatz zur Live-Region. Der erste `<button>` ist der Knopf, den es während der Anfrage sperrt.
 - Die Auswahl der Treffen ist dieselbe Schleife wie in Tutorial 5. `[[.slug]]` ist der Name des Elements, zum Beispiel `christmas`.
 - `[[message]]` füllt PHP. Die anderen Platzhalter sind Textfills.
 
@@ -59,16 +63,16 @@ Die Vorlage eines Features darf Textfills und Shortcodes enthalten. Nino liest d
 
 ### 3. Die Worte
 
-Diese Worte gibt das Feature selbst aus, nicht eine Vorlage des Projekts. Sie liegen deshalb unter `/feature/<schlüssel>/…`. Füge in `features/Meetups/install/text/en_US.php` vor der letzten Zeile `];` ein:
+Diese Worte gibt das Feature selbst aus, nicht eine Vorlage des Projekts. Sie liegen deshalb unter `/feature/<schlüssel>/…`. Die vier Schlüssel `required`, `invalid`, `success` und `error` sind die Sätze, die das Skript spricht: `required`, wenn ein Pflichtfeld leer ist, `invalid`, wenn die Auswahl oder die Eingabe abgelehnt wird (Status `400`), `success` bei Status `200` und `error` bei jedem anderen Status. Ein Schlüssel, den Du nicht anlegst, zeigt nichts an. `invalid` gilt auch für ein `400`, wenn das Formular kein Feld für eine E-Mail-Adresse hat. Ein Formular mit einem solchen Feld legt auch `email` an. Füge in `features/Meetups/install/text/en_US.php` vor der letzten Zeile `];` ein:
 
 ```php features/Meetups/install/text/en_US.php
 	'[[/feature/meetups/signup/meetup]]'     => 'Meetup',
 	'[[/feature/meetups/signup/name]]'       => 'Your name',
 	'[[/feature/meetups/signup/submit]]'     => 'Sign up',
-	'[[/feature/meetups/signup/done]]'       => 'Thank you. You are signed up.',
+	'[[/feature/meetups/signup/required]]'   => 'Please enter your name.',
 	'[[/feature/meetups/signup/invalid]]'    => 'Please pick a meetup and enter your name.',
-	'[[/feature/meetups/signup/busy]]'       => 'Too many tries. Please try again in an hour.',
-	'[[/feature/meetups/signup/failed]]'     => 'That did not work. Please try again later.',
+	'[[/feature/meetups/signup/success]]'    => 'Thank you. You are signed up.',
+	'[[/feature/meetups/signup/error]]'      => 'That did not work. Please try again later.',
 ```
 
 Und in `install/text/de_DE.php`:
@@ -77,10 +81,10 @@ Und in `install/text/de_DE.php`:
 	'[[/feature/meetups/signup/meetup]]'     => 'Treffen',
 	'[[/feature/meetups/signup/name]]'       => 'Dein Name',
 	'[[/feature/meetups/signup/submit]]'     => 'Anmelden',
-	'[[/feature/meetups/signup/done]]'       => 'Danke. Du bist angemeldet.',
+	'[[/feature/meetups/signup/required]]'   => 'Bitte gib Deinen Namen ein.',
 	'[[/feature/meetups/signup/invalid]]'    => 'Bitte wähle ein Treffen und gib Deinen Namen ein.',
-	'[[/feature/meetups/signup/busy]]'       => 'Zu viele Versuche. Bitte versuche es in einer Stunde noch einmal.',
-	'[[/feature/meetups/signup/failed]]'     => 'Das hat nicht geklappt. Bitte versuche es später noch einmal.',
+	'[[/feature/meetups/signup/success]]'    => 'Danke. Du bist angemeldet.',
+	'[[/feature/meetups/signup/error]]'      => 'Das hat nicht geklappt. Bitte versuche es später noch einmal.',
 ```
 
 ### 4. Die Komponente zeichnen
@@ -93,8 +97,8 @@ Füge in `features/Meetups/Meetups.php` diese Methode in die Klasse ein, direkt 
 
 			$state = $appData['./meetups/signup'] ?? '';
 
-			// One of four fixed words picks the text key. Nothing of the request is written
-			$message = in_array( $state, [ 'done', 'invalid', 'busy', 'failed' ], true ) === true ? '[[/feature/meetups/signup/'. $state. ']]' : '';
+			// One of three fixed words picks the text key. Nothing of the request is written
+			$message = in_array( $state, [ 'success', 'invalid', 'error' ], true ) === true ? '[[/feature/meetups/signup/'. $state. ']]' : '';
 
 			return str_replace(
 				[ '[[classes]]', '[[message]]' ],
@@ -106,9 +110,25 @@ Füge in `features/Meetups/Meetups.php` diese Methode in die Klasse ein, direkt 
 
 - Die Methode heißt nach der Komponente: `meetups-signup` wird `componentMeetupsSignup()`.
 - `$appData['./meetups/signup']` ist ein Wert, der nur für diese Anfrage gilt. Schlüssel mit `./` am Anfang speichert Nino nie. Tutorial 7 setzt den Wert.
-- Der Satz im Formular ist ein Textfill. Die Methode wählt seinen Schlüssel aus vier festen Worten. Sie schreibt nichts aus der Anfrage ins HTML.
+- Der Satz im Formular ist ein Textfill. Die Methode wählt seinen Schlüssel aus drei festen Worten. Sie schreibt nichts aus der Anfrage ins HTML. Der Satz ist für einen Besucher ohne JavaScript: Das Skript schreibt seine Sätze selbst in die Meldung.
 
-### 5. Das Formular auf die Seite setzen
+### 5. Die Worte der Seite mitgeben
+
+Das Skript liest seine Sätze aus dem Text, den die Seite im Kopf trägt, und dort stehen nur die Schlüssel, die jemand dafür freigibt. Ersetze in `features/Meetups/Meetups.php` die Methode `init()` samt ihrem Kommentar:
+
+```php features/Meetups/Meetups.php
+		// Called at every start of a request while the feature is on
+		public static function init( array &$appData ): void {
+			\Nino\Callbacks::registerCallback( $appData, '/meetups/upcoming', [ self::class, 'callbackUpcoming' ] );
+
+			// The words the sign-up form's script says are public: they stand in the source of the page
+			\Nino\Modules\Jstext::publish( $appData, [ '/feature/meetups/signup/' ] );
+		}
+```
+
+`Jstext::publish()` gibt den Anfang eines Schlüssels frei. Gib nur Sätze frei, die jeder Besucher lesen darf.
+
+### 6. Das Formular auf die Seite setzen
 
 Schreibe `[meetups-signup]` in beide Fassungen der Vorlage: in `features/Meetups/install/templates/page-meetups.tpl` und in die Kopie des Projekts `private/templates/page-meetups.tpl`. Die Zeile steht nach `</ul>`, mit einer Leerzeile dazwischen:
 
@@ -125,18 +145,18 @@ Klicke im Bereich **Features** bei „Treffen“ auf **Auf 0.4.0 aktualisieren**
 Öffne `/meetups`. Unter der Liste steht das Formular mit einer Auswahl der kommenden Treffen, einem Feld für den Namen und dem Knopf „Anmelden“. Der Quelltext zeigt:
 
 ```html
-<form class="meetups-signup" method="post" action="/meetups">
+<form class="nino-form meetups-signup" method="post" action="/meetups" novalidate data-form-texts="/feature/meetups/signup/">
 	<input type="hidden" name="_csrf" value="…">
 ```
 
 Der Wert von `_csrf` ist eine lange Zeichenfolge. In `private/text/de_DE.php` stehen die sieben neuen Schlüssel.
 
-Sende das Formular ab. Die Antwort ist die Seite „nicht gefunden“ mit dem Status `404`. Das ist richtig: Die Route für `POST /meetups` gibt es noch nicht. Sie kommt in Tutorial 7.
+Sende das Formular ab, erst ohne Namen: Unter dem Knopf steht „Bitte gib Deinen Namen ein.“, das Feld ist markiert, und der Cursor steht darin. Sende es dann mit einem Namen ab. Die Antwort ist der Status `404`, und das Skript sagt „Das hat nicht geklappt. …“. Das ist richtig: Die Route für `POST /meetups` gibt es noch nicht. Sie kommt in Tutorial 7.
 
 ## Häufige Fehler
 
 - **`[csrf]` fehlt im Formular.** Jede Anfrage endet später mit dem Status `403`.
-- **Die Klasse `nino-form` am Formular.** Das Skript von Nino übernimmt dann das Absenden und zeigt die Sätze des Kontaktformulars. Gib einem eigenen Formular eine eigene Klasse. Die Klassen der Felder wie `nino-form-input` darfst Du benutzen.
+- **`data-form-texts` fehlt.** Das Skript spricht dann die Sätze des Kontaktformulars. Auch ein Schlüssel, der nicht freigegeben ist (Schritt 5), zeigt nichts an.
 - **Ein Feld ohne `label`.** Jedes Feld braucht eine Beschriftung, die mit `for` auf seine `id` zeigt.
 - **Die Adresse ohne `[[/nino/dir]]`.** Das Formular geht dann ins Leere, sobald das Projekt in einem Unterverzeichnis läuft.
 
@@ -144,5 +164,6 @@ Sende das Formular ab. Die Antwort ist die Seite „nicht gefunden“ mit dem St
 
 - [Components and stacks](../features.md#components-and-stacks): Komponenten ohne Quelle
 - [CSRF](../development.md#csrf): wo Nino das Token liest
+- [A form of a feature](../development.md#a-form-of-a-feature): was das Skript voraussetzt und was die Route selbst tun muss
 - [Forms](../development.md#forms): das Kontaktformular von Nino und die Klassen für Formulare
 - [The key grammar](../development.md#the-key-grammar): wann ein Wort unter `/feature/` liegt

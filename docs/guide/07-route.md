@@ -11,6 +11,8 @@
 3. Ein Callback der Route prüft die Eingabe und speichert.
 4. Bei Erfolg leitet er auf `/meetups?signup=ok` weiter. Bei einem Fehler zeigt Nino die Seite noch einmal, mit einem Satz im Formular.
 
+Das Skript von Nino sendet das Formular ab und liest nur den Status der Antwort: `200` ist `success`, `400` ist `invalid`, jeder andere Status ist `error`. Es folgt der Weiterleitung, die Seite `/meetups?signup=ok` antwortet mit `200`. Ohne JavaScript sendet der Browser selbst und zeigt die Seite, die die Route liefert.
+
 ## Schritte
 
 ### 1. Konstanten
@@ -44,6 +46,9 @@ Ersetze die Methode `init()` samt ihrem Kommentar:
 
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/POST://meetups', [ self::class, 'callbackSignup' ] );
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response/GET://meetups', [ self::class, 'callbackSigned' ] );
+
+			// The words the sign-up form's script says are public: they stand in the source of the page
+			\Nino\Modules\Jstext::publish( $appData, [ '/feature/meetups/signup/' ] );
 		}
 ```
 
@@ -67,13 +72,13 @@ Füge diese drei Methoden in die Klasse ein, direkt nach `init()` und vor `compo
 
 			// A field no person sees. Whoever fills it is a bot
 			if( ( $posted['website'] ?? '' ) !== '' ) {
-				self::_refuse( $appData, $request, 418, 'failed' );
+				self::_refuse( $appData, $request, 418, 'error' );
 				return;
 			}
 
 			// Every try counts, also a wrong one
 			if( \Nino\Feature::count( $appData, 'meetups-signup-tries', \Nino\Http::getClientIp( $appData ), self::TRIES_PER_HOUR, 3600 ) === false ) {
-				self::_refuse( $appData, $request, 429, 'busy' );
+				self::_refuse( $appData, $request, 429, 'error' );
 				return;
 			}
 
@@ -98,7 +103,7 @@ Füge diese drei Methoden in die Klasse ein, direkt nach `init()` und vor `compo
 			}, [] );
 
 			if( $written === false ) {
-				self::_refuse( $appData, $request, 500, 'failed' );
+				self::_refuse( $appData, $request, 500, 'error' );
 				return;
 			}
 
@@ -110,7 +115,7 @@ Füge diese drei Methoden in die Klasse ein, direkt nach `init()` und vor `compo
 		public static function callbackSigned( array &$appData, array &$request ): void {
 
 			if( ( $request['/nino/http/request']['query']['signup'] ?? '' ) === 'ok' )
-				$appData['./meetups/signup'] = 'done';
+				$appData['./meetups/signup'] = 'success';
 		}
 
 		// The status of a refused sign-up. The page is drawn once more, and the form says why
@@ -123,12 +128,12 @@ Füge diese drei Methoden in die Klasse ein, direkt nach `init()` und vor `compo
 
 Die Reihenfolge in `callbackSignup()` ist wichtig:
 
-1. **CSRF.** Der Kernel hat das Token schon geprüft. `\Nino\Form::blocked()` sagt, ob er abgelehnt hat. Dann tut der Callback nichts.
+1. **CSRF.** Der Kernel hat das Token schon geprüft, aber der Callback läuft auch nach einer Ablehnung. `\Nino\Form::blocked()` sagt, ob er abgelehnt hat. Dann kehrt der Callback sofort um. Ohne diese Zeile speichert die Route einen gefälschten Post.
 2. **Eingabe lesen.** `\Nino\Form::posted()` liefert nur Texte, gekürzt und ohne Leerraum am Rand.
 3. **Drosseln.** `\Nino\Feature::count()` zählt die Versuche je Besucher in einem Zeitfenster, hier 3600 Sekunden. Den Besucher erkennt es an seiner IP-Adresse. Über der Grenze antwortet es `false`. Der Zähler liegt in `private/data/meetups-signup-tries.php`. Die IP-Adresse steht dort nicht lesbar, sondern als Hash: eine Prüfsumme, aus der sich die Adresse nicht zurückrechnen lässt.
 4. **Prüfen.** Der Name hat eine Länge, das Treffen gibt es, und es liegt nicht in der Vergangenheit.
 5. **Speichern.** `\Nino\Filesystem::mutate()` sperrt die Datei, liest sie, ruft Deine Funktion auf und schreibt das Ergebnis. Die Datei wächst nie über `MAX_SIGNUPS`.
-6. **Antworten.** `\Nino\Http::redirect()` leitet weiter. Bei einem Fehler setzt der Callback nur den Status: `400` für eine falsche Eingabe, `429` für zu viele Versuche, `500` für einen Fehler beim Schreiben.
+6. **Antworten.** `\Nino\Http::redirect()` leitet weiter. Bei einem Fehler setzt der Callback nur den Status: `400` für eine falsche Eingabe, `429` für zu viele Versuche, `500` für einen Fehler beim Schreiben. Die Falle, die Drossel und die Prüfung sind Sache der Route: Das Skript schickt das Feld `website` leer oder gefüllt mit und prüft nichts davon. Eine Falle oder eine Drossel antwortet mit einem anderen Status als `200` und `400`, und das Skript zeigt dann den allgemeinen Satz `error`, damit ein Bot nicht erfährt, welche Prüfung ihn abgewiesen hat.
 
 Die Route hat einen `body`. Nach einem Fehler setzt Nino deshalb die Seite aus ihrer Vorlage noch einmal zusammen. Die Komponente `[meetups-signup]` aus Tutorial 6 liest dabei `$appData['./meetups/signup']` und zeigt den passenden Satz.
 
@@ -138,8 +143,8 @@ Ein Update ist nicht nötig. Die Einheit hat sich nicht geändert.
 
 Öffne `/meetups`.
 
-- Wähle ein Treffen, gib einen Namen ein, sende ab. Der Browser landet auf `/meetups?signup=ok`. Im Formular steht „Danke. Du bist angemeldet.“ In `private/data/meetups-signups.php` steht die Anmeldung.
-- Sende eine Anmeldung ohne Namen und eine ohne Token. Im Browser verhindert `required` das. Nimm `curl`:
+- Wähle ein Treffen, gib einen Namen ein, sende ab. Die Seite bleibt stehen, im Formular steht „Danke. Du bist angemeldet.“, und das Formular ist gesperrt. In `private/data/meetups-signups.php` steht die Anmeldung. Ohne JavaScript landet der Browser auf `/meetups?signup=ok`.
+- Sende eine Anmeldung ohne Namen und eine ohne Token. Im Browser prüft das Skript den Namen (das Formular hat `novalidate`) und sendet nichts. Ohne JavaScript sendet der Browser das leere Formular ab und bekommt `400` mit dem Satz im Formular. Nimm `curl`:
 
 ```bash
 J=$(mktemp)
@@ -149,7 +154,7 @@ curl -s -b $J -o /dev/null -w "%{http_code}\n" -d "meetup=christmas" -d "name=Ad
 ```
 
   Die erste Antwort ist `400`, die zweite `403`. Bei `403` wird nichts gespeichert.
-- Wiederhole die Zeile mit `name=`, bis `429` kommt. Das ist nach acht Wiederholungen der Fall: Die Anmeldung im Browser und die erste Zeile zählen mit, die Anfrage ohne Token zählt nicht. Der elfte Versuch in einer Stunde ist der erste mit `429`. Im Browser steht dann „Zu viele Versuche. Bitte versuche es in einer Stunde noch einmal.“
+- Wiederhole die Zeile mit `name=`, bis `429` kommt. Das ist nach acht Wiederholungen der Fall: Die Anmeldung im Browser und die erste Zeile zählen mit, die Anfrage ohne Token zählt nicht. Der elfte Versuch in einer Stunde ist der erste mit `429`. Im Browser steht dann „Das hat nicht geklappt. Bitte versuche es später noch einmal.“ Das ist der allgemeine Satz für jeden Status außer `200` und `400`.
 
 Lösche `private/data/meetups-signup-tries.php`, um den Zähler zurückzusetzen.
 

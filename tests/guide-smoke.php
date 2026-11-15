@@ -189,6 +189,49 @@ else
 		check( "node --check takes every js block of $tutorial". ( $broken === [] ? '' : ' - not block '. implode( ', ', $broken ) ), $broken === [] );
 	}
 
+// ---- The sign-up form meets the agreement of the form script --------------------------------------
+
+/*	Tutorial 6 draws a form of a feature and tutorial 7 answers it. What the shared script needs from such a form
+	is structure - the class, the attribute that names the texts, no native check, an action - and the feature has
+	to publish those texts to the page and write the keys the script reads. No word of it is compared	*/
+$six		= (string) file_get_contents( $guide. '/06-form.md' );
+$seven	= (string) file_get_contents( $guide. '/07-route.md' );
+
+preg_match( '/^```html features\/Meetups\/templates\/meetups-signup\.tpl\n(.*?)^```/ms', $six, $template );
+preg_match( '/<form\b[^>]*>/', $template[1] ?? '', $tag );
+$tag		= $tag[0] ?? '';
+preg_match( '/\bdata-form-texts="([^"]+\/)"/', $tag, $prefix );
+$prefix	= $prefix[1] ?? '';
+
+check( 'the sign-up form of tutorial 6 carries what the shared form script needs: its class, the prefix of its texts, no native check and an action',
+	preg_match( '/\bclass="(?:[^"]* )?nino-form(?: [^"]*)?"/', $tag ) === 1 && $prefix !== '' && preg_match( '/\bnovalidate\b/', $tag ) === 1 && preg_match( '/\baction="[^"]+"/', $tag ) === 1 );
+
+$published = static fn( string $markdown ): bool => $prefix !== '' && str_contains( $markdown, '\\Nino\\Modules\\Jstext::publish( $appData, [ \''. $prefix. '\' ] )' );
+
+check( 'the prefix is published to the page where the feature starts, in tutorial 6 and again in the init() tutorial 7 replaces it with', $published( $six ) === true && $published( $seven ) === true );
+
+$keys = [];
+
+foreach( [ 'en_US', 'de_DE' ] as $locale ) {
+	preg_match( '/^```php features\/Meetups\/install\/text\/'. $locale. '\.php\n(.*?)^```/ms', $six, $texts );
+	preg_match_all( '/\'\[\['. preg_quote( $prefix, '/' ). '(\w+)\]\]\'/', $texts[1] ?? '', $found );
+	$keys[$locale] = $found[1];
+}
+
+check( 'both languages write the four texts the script says, below that prefix',
+	$prefix !== '' && array_diff( [ 'required', 'invalid', 'success', 'error' ], $keys['en_US'] ) === [] && array_diff( [ 'required', 'invalid', 'success', 'error' ], $keys['de_DE'] ) === [] );
+
+/*	Without JavaScript the page says the state a refusal or a sign-up left in $appData['./meetups/signup']. The
+	component of tutorial 6 knows a fixed list of them, and every word tutorials 7 and 8 set has to be in it	*/
+$eight	= (string) file_get_contents( $guide. '/08-settings-privacy.md' );
+preg_match( '/\$state, \[((?:\s*\'\w+\',?)+)\s*\], true/', $six, $listed );
+preg_match_all( '/\w+/', $listed[1] ?? '', $known );
+preg_match_all( '/_refuse\( \$appData, \$request, \d+, \'(\w+)\' \)|\[\'\.\/meetups\/signup\'\] = \'(\w+)\'/', $seven. $eight, $set );
+$set = array_values( array_filter( array_merge( $set[1], $set[2] ) ) );
+
+check( 'every state tutorials 7 and 8 leave for the page without JavaScript is in the list of the component of tutorial 6',
+	$known[0] !== [] && count( $set ) >= 5 && array_diff( $set, $known[0] ) === [] );
+
 // ---- The links ------------------------------------------------------------------------------------
 
 $known = [];
