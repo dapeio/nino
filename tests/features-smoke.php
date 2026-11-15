@@ -1189,6 +1189,22 @@ check( '...and carries them just the same while the feature is switched off, bec
 	return in_array( 'data/sample.php', $carried, true ) === true
 		&& in_array( 'data/sample-dir/deeper/two.php', $carried, true ) === true;
 } )( $appData ) );
+
+// The trees kept of the templates are tidied away where a feature is switched on, updated or off: they
+// are never wrong for being old (the time, the size and the stand of the register are compared), but the
+// templates of a feature come and go with it
+$treeFile = static fn(): string => \Nino\Filesystem::path( $appData, '/data/cache/trees' ). '/probe.php';
+\Nino\Filesystem::putFileContent( $appData, '/data/cache/trees/probe.php', [ 'kept' => true ] );
+$treeApp = $appData;
+$treeOn = \Nino\Features::activate( $treeApp, 'sample' );
+check( 'switching a feature on empties the folder of the trees', $treeOn === true && is_file( $treeFile() ) === false );
+\Nino\Filesystem::putFileContent( $appData, '/data/cache/trees/probe.php', [ 'kept' => true ] );
+$treeAgain = \Nino\Features::activate( $treeApp, 'sample', [], $treeReport, true );
+check( '...and so does the update of one that is on', $treeAgain === true && is_file( $treeFile() ) === false );
+\Nino\Filesystem::putFileContent( $appData, '/data/cache/trees/probe.php', [ 'kept' => true ] );
+$treeOff = \Nino\Features::deactivate( $treeApp, 'sample' );
+check( '...and switching it off', $treeOff === true && is_file( $treeFile() ) === false );
+unset( $treeReport, $treeApp );
 /*	And what a backup never carries, whatever asks for it. Backup's own
 	docblock calls auth-tries.php and ratelimit.php transient throttling
 	counters rather than data, and they were left out by not being listed -

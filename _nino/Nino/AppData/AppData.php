@@ -113,6 +113,9 @@ namespace Nino {
 		    'footer',
 			],
 			'/nino/http/routes'		=> [],
+			// The tree of a template file is kept in a php file below /data/cache/trees and a request that finds the
+			// file as it was does not open it. false: the file is read every time and nothing is written
+			'/nino/markup/cache'	=> true,
 			// Which peer addresses are a reverse proxy in front of this site,
 			// written as exact addresses or cidr ranges. Empty is "no proxy":
 			// the tcp peer is the visitor and X-Forwarded-For is ignored

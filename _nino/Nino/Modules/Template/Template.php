@@ -70,7 +70,8 @@ namespace Nino\Modules {
 		/**
 		 *	Replace template shortcode: the file drawn where the call stands. It is a
 		 *	leaf, and the file is read as a document of its own - one tree for the
-		 *	request - and drawn with the context of the call, the template set to
+		 *	request, from the tree kept of it where the file is as it was (see
+		 *	\Nino\Html::fileTree()) - and drawn with the context of the call, the template set to
 		 *	the file's own category, '' where it has none: the words of a template are
 		 *	the ones of /template/<its name>/..., whatever includes it. A source with
 		 *	a fill in it ([template /templates/page-x.[[/nino/http/response/locale]]]) has it put in
@@ -96,13 +97,8 @@ namespace Nino\Modules {
 				return '';
 			}
 
-			$html = \Nino\Filesystem::getFileContent( $appData, $file, '' );
-
-			if( is_string( $html ) === false || $html === '' )
-				return '';
-
 			// A name with no category has no words of its own, and reads none by ~name
-			return \Nino\Html::renderSource( $appData, $html, [ 'template' => self::category( $name ) ?? '' ] + \Nino\Html::context( $appData ) );
+			return \Nino\Html::renderFile( $appData, $file, [ 'template' => self::category( $name ) ?? '' ] + \Nino\Html::context( $appData ) );
 		}
 	}
 

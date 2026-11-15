@@ -49,7 +49,13 @@ namespace Nino {
 		 */
 		private static function _transient( string $relative ): bool {
 
-			foreach( explode( '/', $relative ) as $segment )
+			$segments = explode( '/', $relative );
+
+			// What is kept to be made again - the pages and the trees of the templates - is no content either
+			if( $segments[0] === 'cache' )
+				return true;
+
+			foreach( $segments as $segment )
 				if( str_starts_with( $segment, '.' ) === true )
 					return true;
 

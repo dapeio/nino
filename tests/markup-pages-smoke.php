@@ -164,6 +164,10 @@ function pagesBoot( string $sandbox, string $locale ): array {
 
 	$_SESSION = [];
 
+	// A cold request finds no tree kept of any template
+	if( ( $GLOBALS['pagesCold'] ?? false ) === true )
+		\Nino\Filesystem::removeDir( $sandbox. '/private/data/cache/trees' );
+
 	$appData = [ './nino/uid' => $sandbox ];
 	\Nino\AppData::prepare( $appData );
 
@@ -467,14 +471,35 @@ function pagesWorkbench( string $sandbox ): string {
 $record = getopt( '', [ 'record:' ] )['record'] ?? null;
 $dir = __DIR__. '/fixtures/markup/starter';
 
-// The pages of the site, without the tools of the workbench
+/**
+ *	The trees kept of the templates of a site: how many files the folder holds
+ *
+ *	@param		string		$sandbox
+ *
+ *	@return 	int
+ */
+function pagesTrees( string $sandbox ): int {
+	return count( glob( $sandbox. '/private/data/cache/trees/*.php' ) ?: [] );
+}
+
+// The pages of the site, without the tools of the workbench: drawn by a request that finds no tree kept of a
+// template (cold) and by one that finds them all (warm)
 $site = pagesSite( false );
+$GLOBALS['pagesCold'] = true;
 $outputs = pagesStarter( $site ) + pagesCaseFiles( $site ) + [ 'mail.txt' => pagesMail( $site ), 'maintenance.html' => pagesMaintenance( $site ) ];
+$kept = pagesTrees( $site );
+$GLOBALS['pagesCold'] = false;
+$warm = pagesStarter( $site ) + pagesCaseFiles( $site ) + [ 'mail.txt' => pagesMail( $site ), 'maintenance.html' => pagesMaintenance( $site ) ];
+$keptAgain = pagesTrees( $site );
 \Nino\Filesystem::removeDir( $site );
 
 // The workbench, with the tools of the kernel next to the project
 $site = pagesSite( true );
+$GLOBALS['pagesCold'] = true;
 $outputs['workbench.html'] = pagesWorkbench( $site );
+$GLOBALS['pagesCold'] = false;
+$keptWorkbench = pagesTrees( $site );
+$warm['workbench.html'] = pagesWorkbench( $site );
 \Nino\Filesystem::removeDir( $site );
 \Nino\Filesystem::removeDir( NINO_FEATURES_DIR );
 
@@ -509,6 +534,9 @@ foreach( $names as $name ) {
 		echo "      differs, the output is in $actual\n";
 	}
 }
+
+check( 'every request that found no tree kept a tree of the templates it drew', $kept > 0 && $keptWorkbench > 0 );
+check( 'the requests that found the trees drew the same pages, byte for byte, and the same trees stand', $warm === $outputs && $keptAgain >= $kept );
 
 foreach( $outputs as $name => $output )
 	if( str_ends_with( $name, '.html' ) === true && str_starts_with( $name, 'workbench' ) === false && str_starts_with( $name, 'components' ) === false && str_starts_with( $name, 'loop' ) === false )

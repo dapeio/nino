@@ -478,6 +478,9 @@ namespace Nino\Modules {
 				@unlink( $locks. '/'. sha1( self::DIR. '/'. basename( $entry ) ). '.lock' );
 
 			\Nino\Filesystem::removeDir( $dir );
+
+			// The trees kept of the templates are tidied away with the pages (see \Nino\Html::dropTrees())
+			\Nino\Html::dropTrees( $appData );
 		}
 	}
 

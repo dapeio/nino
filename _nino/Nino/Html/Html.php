@@ -54,6 +54,11 @@ namespace Nino {
 		// The content of the call that was drawn last, as the text it was handed and as the nodes it was made from
 		private const string NODES = './nino/html/nodes';
 
+		// Where the tree of a template file is kept between requests: a php file for each, below the private tree
+		// (never served) and not in a backup. The switch that turns it off is read from the configuration
+		private const string TREES = '/data/cache/trees';
+		public const string TREES_SWITCH = '/nino/markup/cache';
+
 		// The one fill that never falls back to another language: the lang
 		// attribute of a page. A text in the wrong language is still a text; a
 		// French page that says it is German is worse than a page that says
@@ -173,6 +178,55 @@ namespace Nino {
 			if( $source === '' )
 				return '';
 
+			$depth = self::_enter( $appData );
+
+			if( $depth === null )
+				return '';
+
+			try {
+				return \Nino\Components::render( $appData, self::_tree( $appData, $source, $keep ), $context );
+			}
+			finally {
+				$appData[self::DEPTH] = $depth;
+			}
+		}
+
+		/**
+		 *	Draw a template file: its tree is the one kept in a php file of its own from the last request that read it
+		 *	(fileTree()), so that a request that finds the file as it was does not open it. Drawn as renderSource()
+		 *	draws, with the same depth and the same context. The text of a file the tree is not kept for - a route's
+		 *	body, the content of a call - has no file and goes through renderSource().
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$file					A virtual path, eg. '/templates/page-home.tpl'
+		 *	@param		array			$context			See renderSource()
+		 *
+		 *	@return 	string										'' for a file that is not there or has no text
+		 */
+		public static function renderFile( array &$appData, string $file, array $context = [] ): string {
+
+			$depth = self::_enter( $appData );
+
+			if( $depth === null )
+				return '';
+
+			try {
+				return \Nino\Components::render( $appData, self::fileTree( $appData, $file ), $context );
+			}
+			finally {
+				$appData[self::DEPTH] = $depth;
+			}
+		}
+
+		/**
+		 *	One level deeper for renderSource() and renderFile(), or none where the sources stand too deep in one another
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	int|null									The depth to put back when the drawing is done, null where nothing is to be drawn
+		 */
+		private static function _enter( array &$appData ): ?int {
+
 			$depth = (int) ( $appData[self::DEPTH] ?? 0 );
 
 			if( $depth > self::MAX_SOURCE_DEPTH ) {
@@ -183,17 +237,12 @@ namespace Nino {
 					trigger_error( 'Html::renderSource(): sources stand '. self::MAX_SOURCE_DEPTH. ' deep in one another - a template that includes itself? - and the next one is not drawn', E_USER_WARNING );
 				}
 
-				return '';
+				return null;
 			}
 
 			$appData[self::DEPTH] = $depth + 1;
 
-			try {
-				return \Nino\Components::render( $appData, self::_tree( $appData, $source, $keep ), $context );
-			}
-			finally {
-				$appData[self::DEPTH] = $depth;
-			}
+			return $depth;
 		}
 
 		/**
@@ -242,7 +291,7 @@ namespace Nino {
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
-		 *	@return 	void										Leaves [ 'version' => ..., 'containers' => name => bool, 'trees' => sha1 => [ nodes, notes ] ] in the app data
+		 *	@return 	void										Leaves [ 'version' => ..., 'stand' => ..., 'containers' => name => bool, 'trees' => sha1 => [ nodes, notes ], 'files' => name => [ nodes, notes ] ] in the app data
 		 */
 		private static function _cache( array &$appData ): void {
 
@@ -262,7 +311,13 @@ namespace Nino {
 				if( is_bool( $container ) === true && isset( $containers[$name] ) === false )
 					$containers[(string) $name] = $container;
 
-			$appData[self::CACHE] = [ 'version' => $version, 'containers' => $containers, 'trees' => [] ];
+			// What a tree depends on is which names are containers, leaves or either: the register and the shortcodes
+			// without a schema say it together. The stand is what a tree kept in a file is compared with, and the
+			// version of the kernel is in it, since the grammar is the kernel's
+			$stand = $containers;
+			ksort( $stand );
+
+			$appData[self::CACHE] = [ 'version' => $version, 'stand' => sha1( \Nino\VERSION. serialize( $stand ) ), 'containers' => $containers, 'trees' => [], 'files' => [] ];
 		}
 
 		/**
@@ -283,15 +338,7 @@ namespace Nino {
 				return $appData[self::CACHE]['trees'][$key][0];
 
 			$notes = [];
-			$tree = \Nino\Markup::parse( $source, $appData[self::CACHE]['containers'], $notes );
-
-			// A document that was not read at all is the one thing worth the log: the page is one text then
-			foreach( $notes as $note )
-				if( in_array( $note['code'], [ 'pattern', 'limit' ], true ) === true && ( $appData[self::CACHE. '/said'][$note['code']] ?? false ) === false ) {
-
-					$appData[self::CACHE. '/said'][$note['code']] = true;
-					trigger_error( 'Html::renderSource(): a source of '. strlen( $source ). ' bytes is not read for its calls ('. $note['code']. '); it is drawn as the text it is', E_USER_WARNING );
-				}
+			$tree = self::_read( $appData, $source, $notes );
 
 			// The request keeps a number of trees and no more: a loop that draws a text of its own for each element would
 			// otherwise keep a tree for each. A source past that is read and drawn as often as it comes
@@ -299,6 +346,192 @@ namespace Nino {
 				$appData[self::CACHE]['trees'][$key] = [ $tree, $notes ];
 
 			return $tree;
+		}
+
+		/**
+		 *	Read a source with the names the request knows
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$source
+		 *	@param		array			&$notes				(reference) What the read says about the text
+		 *
+		 *	@return 	array
+		 */
+		private static function _read( array &$appData, string $source, array &$notes ): array {
+
+			$tree = \Nino\Markup::parse( $source, $appData[self::CACHE]['containers'], $notes );
+			self::_said( $appData, $notes, strlen( $source ) );
+
+			return $tree;
+		}
+
+		/**
+		 *	What the log hears of a read: a document that was not read at all is the one thing worth it, since the page is
+		 *	one text then. Once for a request and a kind
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$notes
+		 *	@param		int				$length				Bytes of the source
+		 *
+		 *	@return 	void
+		 */
+		private static function _said( array &$appData, array $notes, int $length ): void {
+
+			foreach( $notes as $note )
+				if( in_array( $note['code'], [ 'pattern', 'limit' ], true ) === true && ( $appData[self::CACHE. '/said'][$note['code']] ?? false ) === false ) {
+
+					$appData[self::CACHE. '/said'][$note['code']] = true;
+					trigger_error( 'Html::renderSource(): a source of '. $length. ' bytes is not read for its calls ('. $note['code']. '); it is drawn as the text it is', E_USER_WARNING );
+				}
+		}
+
+		/**
+		 *	The tree of a template file: the one kept in a php file from the last read where the file is as it was then,
+		 *	else read and kept. A file is looked at once in a request.
+		 *
+		 *	The file is as it was where its size and its modification time are, and the stand of the names the reader is
+		 *	told about (a component or a shortcode that came or went, an update of the kernel) is the one the tree was
+		 *	read with: then the template is not opened. That is the limit of the comparison, and it is the one every
+		 *	cache of the kernel has - a text of the same size written within the second of the one before it, by a tool
+		 *	that does not set the time, is not seen until the file changes again or the folder is emptied. Where only
+		 *	the time or the size differ, the text is read and its sha256 compared: a file that was touched is not read
+		 *	again, and a tree is made only for a text that is new.
+		 *
+		 *	What is kept is nothing the request needed: a folder that cannot be written, a disk that is full, a file in it
+		 *	that is not the shape of one - none of it is more than a tree that is made again, and none is said on the
+		 *	page. The switch '/nino/markup/cache' turns it off: the file is read as often as it is asked for, and nothing
+		 *	is written.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$file					A virtual path, eg. '/templates/page-home.tpl'
+		 *
+		 *	@return 	array										The nodes, as \Nino\Markup::parse() answers them; [] for a file that is not there or has no text
+		 */
+		public static function fileTree( array &$appData, string $file ): array {
+
+			self::_cache( $appData );
+
+			$name = (string) preg_replace( '#/+#', '/', '/'. $file );
+
+			if( isset( $appData[self::CACHE]['files'][$name] ) === true )
+				return $appData[self::CACHE]['files'][$name][0];
+
+			$path = \Nino\Filesystem::path( $appData, $name );
+
+			if( $path === '' )
+				return [];
+
+			clearstatcache( true, $path );
+			$stat = @stat( $path );
+
+			if( $stat === false || is_file( $path ) === false )
+				return [];
+
+			$on = ( $appData[self::TREES_SWITCH] ?? true ) !== false;
+			$stored = ( $on === true ) ? self::_stored( $appData, $name ) : null;
+			$stand = $appData[self::CACHE]['stand'];
+			$tree = null;
+			$notes = [];
+
+			if( $stored !== null && $stored['registry'] === $stand && $stored['mtime'] === $stat['mtime'] && $stored['size'] === $stat['size'] ) {
+
+				$tree = $stored['tree'];
+				$notes = $stored['notes'];
+				self::_said( $appData, $notes, $stat['size'] );
+			}
+			else {
+
+				$source = @file_get_contents( $path );
+
+				if( is_string( $source ) === false || $source === '' )
+					return [];
+
+				$hash = hash( 'sha256', $source );
+
+				if( $stored !== null && $stored['registry'] === $stand && $stored['source'] === $hash ) {
+
+					$tree = $stored['tree'];
+					$notes = $stored['notes'];
+					self::_said( $appData, $notes, strlen( $source ) );
+				}
+				else
+					$tree = self::_read( $appData, $source, $notes );
+
+				if( $on === true ) {
+
+					$kept = self::TREES. '/'. sha1( $name ). '.php';
+
+					// The write is atomic, and takes no lock: two requests that write the same file write the same tree.
+					// Nothing of it is held in the memory of the request
+					\Nino\Filesystem::putFileContent( $appData, $kept, [ 'source' => $hash, 'registry' => $stand, 'mtime' => $stat['mtime'], 'size' => $stat['size'], 'tree' => $tree, 'notes' => $notes ], true );
+					unset( $appData['./nino/filesystem/cache'][$kept] );
+				}
+			}
+
+			if( count( $appData[self::CACHE]['files'] ) < self::MAX_TREES )
+				$appData[self::CACHE]['files'][$name] = [ $tree, $notes ];
+
+			return $tree;
+		}
+
+		/**
+		 *	The tree a file was kept as, if what is in the file is one. The file is php that the kernel wrote from
+		 *	var_export() of an array of text, numbers and lists; what is found where it should be - nothing, text, another
+		 *	array, a file that does not parse, one that says something - is no tree and is written over. Whatever the
+		 *	file prints is dropped
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$name					The virtual path of the template
+		 *
+		 *	@return 	array|null								[ 'source' => ..., 'registry' => ..., 'mtime' => ..., 'size' => ..., 'tree' => ..., 'notes' => ... ]
+		 */
+		private static function _stored( array &$appData, string $name ): ?array {
+
+			$path = \Nino\Filesystem::path( $appData, self::TREES. '/'. sha1( $name ). '.php' );
+
+			if( $path === '' || is_file( $path ) === false )
+				return null;
+
+			ob_start();
+
+			try {
+				$value = ( static fn( string $path ): mixed => @include $path )( $path );
+			}
+			catch( \Throwable ) {
+				$value = null;
+			}
+			finally {
+				ob_end_clean();
+			}
+
+			if( is_array( $value ) === false || array_keys( $value ) !== [ 'source', 'registry', 'mtime', 'size', 'tree', 'notes' ]
+				|| is_string( $value['source'] ) === false || is_string( $value['registry'] ) === false
+				|| is_int( $value['mtime'] ) === false || is_int( $value['size'] ) === false
+				|| is_array( $value['tree'] ) === false || is_array( $value['notes'] ) === false )
+				return null;
+
+			foreach( $value['tree'] as $node )
+				if( is_array( $node ) === false )
+					return null;
+
+			return $value;
+		}
+
+		/**
+		 *	Forget every tree that is kept of a template file: the folder is emptied and the files a request has looked
+		 *	at are looked at again. Where the page cache is dropped and where a feature is switched on, off or updated.
+		 *	Nothing depends on it for being right - a tree that is out of date is not taken - it is the tidying
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void
+		 */
+		public static function dropTrees( array &$appData ): void {
+
+			\Nino\Filesystem::removeDir( \Nino\Filesystem::path( $appData, self::TREES ) );
+
+			if( isset( $appData[self::CACHE]['files'] ) === true )
+				$appData[self::CACHE]['files'] = [];
 		}
 
 		/**

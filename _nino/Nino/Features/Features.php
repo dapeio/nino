@@ -1143,6 +1143,7 @@ namespace Nino {
 				return self::_activate( $appData, $key, $chain, $report, $reapply );
 			}
 			finally {
+				\Nino\Html::dropTrees( $appData );
 				self::unlock( $appData );
 			}
 		}
@@ -1360,6 +1361,7 @@ namespace Nino {
 				return self::_deactivate( $appData, $key );
 			}
 			finally {
+				\Nino\Html::dropTrees( $appData );
 				self::unlock( $appData );
 			}
 		}
@@ -1469,6 +1471,7 @@ namespace Nino {
 				return true;
 			}
 			finally {
+				\Nino\Html::dropTrees( $appData );
 				self::unlock( $appData );
 			}
 		}
@@ -1508,6 +1511,7 @@ namespace Nino {
 				return self::_remove( $appData, $key );
 			}
 			finally {
+				\Nino\Html::dropTrees( $appData );
 				self::unlock( $appData );
 			}
 		}
