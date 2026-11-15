@@ -278,6 +278,131 @@ check( 'a submission the per-ip mail cap refuses is a 429, not ok - and neither 
 	&& isset( $cappedRequest['/nino/http/response']['body'] ) === false && $mailed === [] && count( \Nino\Filesystem::getFileContent( $appData, $formsFile, [] ) ) === $countBefore );
 \Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [] );
 
+// The two caps of the whole site. The mail cap counts per address, so a stream
+// of submissions from many addresses was never slowed by it, and the month's
+// file - which every submission and the panel read whole - grew with the
+// stream. A month's file takes MONTH_CAP entries and the site takes HOUR_CAP
+// submissions an hour; a submission over either is refused as the mail cap
+// refuses (429), before any mail, and the file is left as it was
+check( 'without settings the two caps are the built-in ones', \Nino\Form::monthCap( $appData ) === \Nino\Form::MONTH_CAP_DEFAULT && \Nino\Form::hourCap( $appData ) === \Nino\Form::HOUR_CAP_DEFAULT );
+check( '...a thousand entries a month and three hundred submissions an hour', \Nino\Form::MONTH_CAP_DEFAULT === 1000 && \Nino\Form::HOUR_CAP_DEFAULT === 300 );
+$appData[ \Nino\Form::MONTH_CAP ] = 0;
+$appData[ \Nino\Form::HOUR_CAP ] = 10001;
+check( 'a cap outside 1..10000 is a hand edit gone wrong and reads as the built-in one - neither can be switched off', \Nino\Form::monthCap( $appData ) === \Nino\Form::MONTH_CAP_DEFAULT && \Nino\Form::hourCap( $appData ) === \Nino\Form::HOUR_CAP_DEFAULT );
+$appData[ \Nino\Form::MONTH_CAP ] = 7;
+$appData[ \Nino\Form::HOUR_CAP ] = 8;
+check( 'a project sets its own caps', \Nino\Form::monthCap( $appData ) === 7 && \Nino\Form::hourCap( $appData ) === 8 );
+
+$hourFile			= '/data/form-hour.php';
+$freshWindow	= static function() use ( &$appData, $hourFile, $clientKey ): void {
+	\Nino\Filesystem::putFileContent( $appData, $hourFile, [] );
+	\Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [] );
+};
+$entryCount		= static fn(): int => count( \Nino\Filesystem::getFileContent( $appData, $formsFile, [] ) );
+
+$freshWindow();
+$appData[ \Nino\Form::HOUR_CAP ] = 1000;
+$appData[ \Nino\Form::MONTH_CAP ] = $entryCount() + 2;
+$mailed = [];
+$fits = [ submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'one' ] ), submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'two' ] ) ];
+check( 'the submissions a month still has room for are taken and recorded', $fits[0]['/nino/http/response']['statusCode'] === 200 && $fits[1]['/nino/http/response']['statusCode'] === 200 && $entryCount() === $appData[ \Nino\Form::MONTH_CAP ] );
+check( '...and the month then says it is full', \Nino\Form::capped( $appData ) === 'month' );
+$fullBefore	= file_get_contents( \Nino\Filesystem::path( $appData, $formsFile ) );
+$mailed			= [];
+$fullAnswer	= submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'three' ] );
+check( 'a mailed submission to a full month is taken like any other: 200 and ok', $fullAnswer['/nino/http/response']['statusCode'] === 200 && ( $fullAnswer['/nino/http/response']['body']['status'] ?? '' ) === 'ok' );
+check( '...its mail goes out and the month\'s file is byte for byte as it was', count( $mailed ) === 2 && file_get_contents( \Nino\Filesystem::path( $appData, $formsFile ) ) === $fullBefore );
+// Where the owner's mail does not go out either, nothing would have the inquiry
+$mailTransport = $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] ?? null;
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
+\Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ): void { $mail['sent'] = false; } );
+$lostAnswer = submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'four' ] );
+check( 'a submission to a full month whose owner mail does not go out is a 429, with no body - not a 500, nothing has it', $lostAnswer['/nino/http/response']['statusCode'] === 429 && isset( $lostAnswer['/nino/http/response']['body'] ) === false );
+check( '...and the file is still as it was', file_get_contents( \Nino\Filesystem::path( $appData, $formsFile ) ) === $fullBefore );
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
+if( $mailTransport !== null )
+	$appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] = $mailTransport;
+\Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [] );
+\Nino\Form::record( $appData, \Nino\Form::form( $appData ), [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'late' ] );
+check( 'record() itself takes no entry past the cap either - the one that lost the race for the last place is not written', file_get_contents( \Nino\Filesystem::path( $appData, $formsFile ) ) === $fullBefore );
+$appData[ \Nino\Form::STORE ] = false;
+check( 'with recording off there is no file to fill: the month is never full', \Nino\Form::capped( $appData ) === '' );
+unset( $appData[ \Nino\Form::STORE ] );
+$appData[ \Nino\Form::MONTH_CAP ] = $entryCount() + 1;
+check( 'a month with room for one more is not full', \Nino\Form::capped( $appData ) === '' );
+
+// The submission that takes the last place, its owner mail failing: answered as on
+// any month - a 500 - and recorded; the month being full afterwards is no reason to
+// call it a refusal
+$savedTransport = $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] ?? null;
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
+\Nino\Callbacks::registerCallback( $appData, \Nino\Mail::TRANSPORT, static function( array &$appData, array &$mail ): void { $mail['sent'] = false; } );
+$lastBefore	= $entryCount();
+$lastAnswer	= submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'last place' ] );
+check( 'the submission that takes the last place of a month, its owner mail failing, is a 500 and recorded', $lastAnswer['/nino/http/response']['statusCode'] === 500
+	&& $entryCount() === $lastBefore + 1 && \Nino\Form::capped( $appData ) === 'month' );
+unset( $appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] );
+if( $savedTransport !== null )
+	$appData['./nino/callbacks'][ \Nino\Mail::TRANSPORT ] = $savedTransport;
+
+// Over a full month the mailed submissions are the site's mail, and count against its hour
+$freshWindow();
+$appData[ \Nino\Form::HOUR_CAP ] = 2;
+$mailed = [];
+$fullMonthFits = [ submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'one' ] ), submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'two' ] ) ];
+$mailedBefore = count( $mailed );
+$_SERVER['REMOTE_ADDR'] = '198.51.100.78';
+$fullMonthOver = submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'three' ] );
+$_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+check( 'with the month full, mailed submissions count against the hour: two are taken, the third is a 429 and sends no mail',
+	$fullMonthFits[0]['/nino/http/response']['statusCode'] === 200 && $fullMonthFits[1]['/nino/http/response']['statusCode'] === 200 && $mailedBefore === 4
+	&& $fullMonthOver['/nino/http/response']['statusCode'] === 429 && count( $mailed ) === $mailedBefore );
+unset( $appData[ \Nino\Form::HOUR_CAP ] );
+
+$freshWindow();
+$appData[ \Nino\Form::MONTH_CAP ] = 10000;
+$appData[ \Nino\Form::HOUR_CAP ] = 2;
+$mailed = [];
+$hourTaken = [ submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'one' ] ), submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'two' ] ) ];
+check( 'the site takes as many submissions in an hour as the cap says', $hourTaken[0]['/nino/http/response']['statusCode'] === 200 && $hourTaken[1]['/nino/http/response']['statusCode'] === 200 && \Nino\Form::capped( $appData ) === 'hour' );
+// Another address: the mail cap has room for it, the site's hour has none
+$_SERVER['REMOTE_ADDR'] = '198.51.100.77';
+$hourBefore	= file_get_contents( \Nino\Filesystem::path( $appData, $formsFile ) );
+$mailed			= [];
+$hourAnswer	= submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'three' ] );
+$_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+check( 'a submission over the hour from an address of its own is a 429, with no body', $hourAnswer['/nino/http/response']['statusCode'] === 429 && isset( $hourAnswer['/nino/http/response']['body'] ) === false );
+check( '...it sends no mail and leaves the month\'s file byte for byte as it was', $mailed === [] && file_get_contents( \Nino\Filesystem::path( $appData, $formsFile ) ) === $hourBefore );
+check( '...the hour holds for a site that records nothing as well', ( function() use ( &$appData ): bool {
+	$appData[ \Nino\Form::STORE ] = false;
+	$answer = \Nino\Form::capped( $appData );
+	unset( $appData[ \Nino\Form::STORE ] );
+	return $answer === 'hour';
+} )() === true );
+$hourState = \Nino\Filesystem::getFileContent( $appData, $hourFile, [] );
+check( '...and the counter is one entry for the whole site, not one per address, that lasts an hour', count( $hourState ) === 1
+	&& ( reset( $hourState )['reset'] ?? 0 ) > time() + 3500 && ( reset( $hourState )['reset'] ?? 0 ) <= time() + 3600 );
+\Nino\Filesystem::putFileContent( $appData, $hourFile, [ hash( 'sha256', 'site' ) => [ 'tries' => 2, 'reset' => time() - 1 ] ] );
+check( 'an hour that is over takes submissions again', \Nino\Form::capped( $appData ) === '' );
+
+// What the mail cap refuses is no submission the site took: an address that is
+// over its own budget cannot use up the hour for everybody else
+$freshWindow();
+$appData[ \Nino\Form::HOUR_CAP ] = 1;
+\Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [ $clientKey => [ 'tries' => 5, 'reset' => time() + 3600 ] ] );
+for( $refusedTry = 0; $refusedTry < 3; $refusedTry++ )
+	submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'refused' ] );
+check( 'submissions the per-address mail cap refuses do not count against the site\'s hour', \Nino\Form::capped( $appData ) === '' );
+check( '...a submission that goes out does', ( function() use ( &$appData, $clientKey ): bool {
+	\Nino\Filesystem::putFileContent( $appData, '/data/ratelimit.php', [] );
+	submitForm( $appData, [ 'name' => 'Jo', 'email' => 'jo@example.com', 'message' => 'counted' ] );
+	return \Nino\Form::capped( $appData ) === 'hour';
+} )() === true );
+
+unset( $appData[ \Nino\Form::MONTH_CAP ], $appData[ \Nino\Form::HOUR_CAP ] );
+$freshWindow();
+@unlink( \Nino\Filesystem::path( $appData, $hourFile ) );
+
 // A mail that did not go out. The inquiry is recorded where a copy is kept -
 // it did happen, and it is in the panel - but the visitor is told it did not
 // arrive, whether or not a copy is kept: a 500 and no body, the generic

@@ -6,6 +6,8 @@ return [
 	'[[/_admin/nav/submissions]]'		=> 'Anfragen',
 	'[[/_admin/dashboard/label/submissions]]' => 'Anfragen',
 	'[[/_admin/submissions/error/load]]'		=> 'Laden fehlgeschlagen.',
+	'[[/_admin/submissions/capped/month]]'	=> 'Das Limit an Anfragen für diesen Monat ist erreicht. Weitere Anfragen dieses Monats werden nur per Mail zugestellt und nicht in diese Liste aufgenommen.',
+	'[[/_admin/submissions/capped/hour]]'	=> 'Das Limit an Anfragen pro Stunde ist erreicht. Neue Anfragen werden abgewiesen, bis die Stunde vorbei ist.',
 	'[[/_admin/submissions/empty]]'				=> 'Noch keine Anfragen.',
 	'[[/_admin/submissions/nomatch]]'			=> 'Keine Anfrage passt zum Filter.',
 	'[[/_admin/submissions/label/form]]'		=> 'Formular',

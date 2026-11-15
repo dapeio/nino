@@ -33,6 +33,9 @@
 		// key => { name, fields } for the forms they belong to
 		_entries : [],
 		_forms 	 : {},
+		// Which cap of \Nino\Form refuses submissions right now: 'month',
+		// 'hour' or '' - the list then says so above the cards
+		_capped  : '',
 		// Which form the list is narrowed to, '' for all of them, and what
 		// the search box holds - kept across a re-render, dropped by a reload
 		// that no longer knows the form
@@ -58,6 +61,7 @@
 
 				Nino.admin.submissions._entries = response.entries || [];
 				Nino.admin.submissions._forms 	= response.forms || {};
+				Nino.admin.submissions._capped	= response.capped || '';
 
 				// A form that is gone - renamed, or deleted in the builder -
 				// would otherwise hide every card with nothing on screen saying
@@ -252,6 +256,14 @@
 			wrap.innerHTML = '';
 
 			const all = Nino.admin.submissions._entries;
+
+			// A cap that refuses submissions, said before anything else: a full
+			// month's list is as long as it gets, and what is refused is not on it
+			if( Nino.admin.submissions._capped === 'month' || Nino.admin.submissions._capped === 'hour' ) {
+				const capped = Nino.adminUi.notice( Nino.content.getText( '/_admin/submissions/capped/'+ Nino.admin.submissions._capped ) );
+				capped.id = 'submissions-capped';
+				wrap.appendChild( capped );
+			}
 
 			// Nothing recorded at all, and nothing matching - two different
 			// things, and the second one must not read as the first. This is

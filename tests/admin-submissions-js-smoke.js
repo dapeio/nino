@@ -144,7 +144,35 @@ check( 'the script attaches under its nav uri with init and showCurrent', typeof
 panel.init();
 check( 'opening it asks the backend for the list, and nothing else', requests.length === 1 && requests[0].action === 'submissions/list' );
 
-answer( 200, { entries : ENTRIES, forms : FORMS } );
+answer( 200, { entries : ENTRIES, forms : FORMS, capped : '' } );
+
+// --- a cap that refuses submissions ----------------------------------------
+
+function cappedNotice() {
+	return sandbox.document.getElementById('submissions-capped');
+}
+
+check( 'with no cap reached the list carries no notice', cappedNotice() === null );
+
+panel.init();
+answer( 200, { entries : ENTRIES, forms : FORMS, capped : 'month' } );
+const monthNotice = cappedNotice();
+check( 'a full month is said above the cards, as the workbench says what needs attention', monthNotice !== null && hasClass( monthNotice, 'nino-admin-notice' )
+	&& monthNotice.textContent === text('/_admin/submissions/capped/month') && text('/_admin/submissions/capped/month') !== '' );
+check( '...and the cards are all still there', cardIds() === 'aaaaaaaaaaaaaaaa,bbbbbbbbbbbbbbbb,' );
+
+panel.init();
+answer( 200, { entries : ENTRIES, forms : FORMS, capped : 'hour' } );
+check( 'a full hour is said in words of its own', cappedNotice() !== null && cappedNotice().textContent === text('/_admin/submissions/capped/hour')
+	&& text('/_admin/submissions/capped/hour') !== '' && text('/_admin/submissions/capped/hour') !== text('/_admin/submissions/capped/month') );
+
+panel.init();
+answer( 200, { entries : [], forms : FORMS, capped : 'month' } );
+check( 'a cap is said on an empty list too', cappedNotice() !== null );
+
+panel.init();
+answer( 200, { entries : ENTRIES, forms : FORMS, capped : '' } );
+check( 'and the notice is gone once the cap is not reached', cappedNotice() === null );
 
 
 // --- a card is whatever the entry carries ---------------------------------

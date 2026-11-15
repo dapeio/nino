@@ -1881,6 +1881,20 @@ check( 'and the forms beside them, each with the fields and labels the panel ren
 	&& array_column( $body['forms']['contact']['fields'], 'type' ) === [ 'text', 'email', 'text', 'textarea' ]
 	&& array_column( $body['forms']['contact']['fields'], 'label' ) === [ 'Name', 'E-Mail', 'Subject', 'Message' ] );
 
+// A cap that refuses submissions is something the owner reads here - what
+// is refused leaves no trace of its own
+check( 'the list says no cap is reached while both have room', $body['capped'] === '' );
+$appData[ \Nino\Form::MONTH_CAP ] = 1;
+[ , $cappedBody ] = callAdminPost( $appData, 'submissions/list' );
+check( '...and that the month is full when it is', $cappedBody['capped'] === 'month' );
+unset( $appData[ \Nino\Form::MONTH_CAP ] );
+$appData[ \Nino\Form::HOUR_CAP ] = 1;
+\Nino\Feature::count( $appData, 'form-hour', 'site', 1, 3600 );
+[ , $cappedBody ] = callAdminPost( $appData, 'submissions/list' );
+check( '...or the hour', $cappedBody['capped'] === 'hour' );
+unset( $appData[ \Nino\Form::HOUR_CAP ] );
+@unlink( \Nino\Filesystem::path( $appData, '/data/form-hour.php' ) );
+
 // Deleting one - the request a person makes about their own inquiry, and
 // the one write this panel does
 [ $status ] = callAdminPost( $appData, 'submissions/delete', [ 'id' => str_repeat( 'f', 16 ) ] );

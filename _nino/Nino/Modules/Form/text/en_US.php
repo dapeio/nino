@@ -6,6 +6,8 @@ return [
 	'[[/_admin/nav/submissions]]'		=> 'Submissions',
 	'[[/_admin/dashboard/label/submissions]]' => 'Submissions',
 	'[[/_admin/submissions/error/load]]'		=> 'Failed to load.',
+	'[[/_admin/submissions/capped/month]]'	=> 'The submission limit for this month is reached. Further submissions this month are delivered by mail only and are not added to this list.',
+	'[[/_admin/submissions/capped/hour]]'	=> 'The hourly submission limit is reached. New submissions are refused until the hour is over.',
 	'[[/_admin/submissions/empty]]'				=> 'No submissions yet.',
 	'[[/_admin/submissions/nomatch]]'			=> 'No submission matches the filter.',
 	'[[/_admin/submissions/label/form]]'		=> 'Form',

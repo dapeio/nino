@@ -76,8 +76,10 @@ namespace Nino\Modules\Form {
 
 		/**
 		 *	List every recorded submission within the retention window
-		 *	(see \Nino\Form::retention()), most recent first, and the forms
-		 *	they belong to
+		 *	(see \Nino\Form::retention()), most recent first, the forms
+		 *	they belong to, and which cap is reached, if one is - 'month',
+		 *	'hour' or '' (see \Nino\Form::capped()): the submissions a full
+		 *	cap refuses leave no trace, so this is where the owner learns of it
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		&$request			(reference) Current server request
@@ -92,6 +94,7 @@ namespace Nino\Modules\Form {
 			\Nino\Http::ok( $request, [
 				'entries'	=> array_reverse( \Nino\Form::entries( $appData ) ),
 				'forms'		=> self::_forms( $appData ),
+				'capped'	=> \Nino\Form::capped( $appData ),
 			] );
 		}
 

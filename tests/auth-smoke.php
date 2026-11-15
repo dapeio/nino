@@ -67,11 +67,13 @@ check( 'loginUser locks out after maxtries failed attempts', \Nino\Auth::loginUs
 // plain invoke() would run against a copy of $appData and never see this
 // test's own prior writes)
 $register			= new ReflectionMethod( '\Nino\Auth', '_registerFailedAttemp' );
+// A counter is [ 'tries' => n, 'reset' => time ], a lock the negative time it ends: the number a bucket stands at
+$countOf			= static fn( mixed $entry ): int => is_array( $entry ) === true ? (int) $entry['tries'] : (int) $entry;
 $triesBefore	= \Nino\Filesystem::getFileContent( $appData, '/data/auth-tries.php', [] );
 $register->invokeArgs( null, [ &$appData, [ 'ip:127.0.0.1', 'test@example.com' ] ] );
 $triesAfter		= \Nino\Filesystem::getFileContent( $appData, '/data/auth-tries.php', [] );
 check( 'a failed attempt registered against a bucket a parallel request has just locked leaves the lock as it is', $triesBefore['test@example.com'] < 0 && $triesAfter['test@example.com'] === $triesBefore['test@example.com'] );
-check( '...and still counts the other buckets of the same attempt', $triesAfter['ip:127.0.0.1'] === $triesBefore['ip:127.0.0.1'] + 1 );
+check( '...and still counts the other buckets of the same attempt', $countOf( $triesAfter['ip:127.0.0.1'] ) === $countOf( $triesBefore['ip:127.0.0.1'] ) + 1 );
 check( '...so the account stays locked', \Nino\Auth::loginUser( $appData, 'test@example.com', 'correct horse battery staple' ) === false );
 
 check( 'deleteUser removes the user', \Nino\Auth::deleteUser( $appData, 'test@example.com' ) === true );
@@ -110,7 +112,10 @@ $seedTries	= static function( array $seed ) use ( &$appData, $triesFile ): void 
 		return $state;
 	} );
 };
-$readTries	= static fn( string $key ): ?int => \Nino\Filesystem::getFileContent( $appData, $triesFile, [] )[$key] ?? null;
+$readTries	= static function( string $key ) use ( &$appData, $triesFile, $countOf ): ?int {
+	$entry = \Nino\Filesystem::getFileContent( $appData, $triesFile, [] )[$key] ?? null;
+	return $entry === null ? null : $countOf( $entry );
+};
 
 \Nino\Auth::insertUser( $appData, 'bucket@example.com', 'correct horse battery staple' );
 
@@ -216,6 +221,91 @@ check( 'unlock is false when the tries file cannot be written', $blockedUnlock =
 check( '...and the lock is still there afterwards', $readTries( 'locked@example.com' ) < 0 );
 $seedTries( [ 'locked@example.com' => null ] );
 \Nino\Auth::deleteUser( $appData, 'locked@example.com' );
+
+/*	What a stream of failed attempts leaves in the file. An ip costs an
+	attacker nothing, so every wrong guess from a new address was an entry
+	that nothing ever removed: a counter below the threshold had no end, and
+	the number of entries had no bound. A counter now ends one cooldown after
+	the attempt that wrote it, what is over goes with the next write, and the
+	file keeps a fixed number of entries - the oldest counters leave first, and
+	a lock never does, since a flood that pushed a lock out would be a way to
+	lift it	*/
+$triesCap			= (int) ( new ReflectionClassConstant( '\Nino\Auth', 'TRIES_MAX_ENTRIES' ) )->getValue();
+$cooldown			= (int) $appData['/nino/auth/cooldown'];
+$fileHolds		= static fn(): array => \Nino\Filesystem::getFileContent( $appData, $triesFile, [] );
+$failFrom			= static function( string $key ) use ( $register, &$appData ): void { $register->invokeArgs( null, [ &$appData, [ $key ] ] ); };
+$seedTries( array_fill_keys( array_keys( $fileHolds() ), null ) );
+
+$failFrom( 'ip:203.0.113.1' );
+$written = $fileHolds()['ip:203.0.113.1'] ?? null;
+check( 'a counter written by a failed attempt has an end, one cooldown away', is_array( $written ) === true && $written['tries'] === 1
+	&& $written['reset'] > time() && $written['reset'] <= time() + $cooldown );
+
+$seedTries( [ 'ip:203.0.113.2' => [ 'tries' => 3, 'reset' => time() - 1 ], 'ip:203.0.113.3' => [ 'tries' => 3, 'reset' => time() + 600 ] ] );
+$failFrom( 'ip:203.0.113.4' );
+check( 'a counter whose window is over is dropped by the next write, one still running is kept', isset( $fileHolds()['ip:203.0.113.2'] ) === false
+	&& $countOf( $fileHolds()['ip:203.0.113.3'] ?? 0 ) === 3 );
+
+$seedTries( [ 'ip:203.0.113.5' => [ 'tries' => 2, 'reset' => time() + 600 ], 'ip:203.0.113.12' => [ 'tries' => 1, 'reset' => time() + 600 ] ] );
+$failFrom( 'ip:203.0.113.5' );
+check( 'another attempt against a counter counts on from it and moves its end', $countOf( $fileHolds()['ip:203.0.113.5'] ) === 3 && $fileHolds()['ip:203.0.113.5']['reset'] > time() + 600 );
+check( '...and the file is in the order of the last attempt, the counter just touched at its end', array_key_last( $fileHolds() ) === 'ip:203.0.113.5' );
+
+// What an earlier version wrote: a plain count that never ended
+$seedTries( [ 'ip:203.0.113.6' => 4, 'legacy@example.com' => $appData['/nino/auth/maxtries'] - 1 ] );
+$failFrom( 'ip:203.0.113.7' );
+$stamped = $fileHolds()['ip:203.0.113.6'] ?? null;
+check( 'a counter without an end gets one with the next write, and keeps its count', is_array( $stamped ) === true && $stamped['tries'] === 4
+	&& $stamped['reset'] > time() && $stamped['reset'] <= time() + $cooldown );
+$failFrom( 'legacy@example.com' );
+check( 'one that was one try short of the lock is locked by the next attempt, as it was', ( $fileHolds()['legacy@example.com'] ?? 0 ) < 0 );
+
+// The same entries, left alone for a cooldown: gone
+$seedTries( [ 'ip:203.0.113.6' => [ 'tries' => 4, 'reset' => time() - 1 ] ] );
+$failFrom( 'ip:203.0.113.8' );
+check( '...and once that end has passed the counter is dropped like any other', isset( $fileHolds()['ip:203.0.113.6'] ) === false );
+
+// A lock that has run out goes with the same write; one running stays
+$seedTries( [ 'ip:203.0.113.9' => 0 - time() + 5, 'ip:203.0.113.10' => 0 - time() - 600 ] );
+$failFrom( 'ip:203.0.113.11' );
+check( 'a lock that has run out is dropped, one that has not is kept', isset( $fileHolds()['ip:203.0.113.9'] ) === false && ( $fileHolds()['ip:203.0.113.10'] ?? 0 ) < 0 );
+
+// The flood. A running lock on an account and one on an ip are written into
+// a file that is full of counters, then more failures arrive from addresses
+// nobody has seen
+\Nino\Auth::insertUser( $appData, 'flooded@example.com', 'correct horse battery staple' );
+$seed = [ 'flooded@example.com' => 0 - time() - 3000, 'ip:127.0.0.1' => 0 - time() - 3000 ];
+
+for( $counter = 0; $counter < $triesCap + 40; $counter++ )
+	$seed[ 'ip:198.18.'. intdiv( $counter, 250 ). '.'. ( $counter % 250 ) ] = [ 'tries' => 1, 'reset' => time() + 600 ];
+
+\Nino\Filesystem::putFileContent( $appData, $triesFile, $seed );
+$_SERVER['REMOTE_ADDR'] = '203.0.113.200';
+
+for( $flood = 1; $flood <= 60; $flood++ )
+	$failFrom( 'ip:100.64.0.'. $flood );
+
+$afterFlood = $fileHolds();
+check( 'a flood of counters from new addresses leaves the file at the number it keeps', count( $afterFlood ) === $triesCap );
+check( '...the oldest counters went, the newest are there', isset( $afterFlood['ip:198.18.0.0'] ) === false && isset( $afterFlood['ip:100.64.0.60'] ) === true );
+check( '...and the running locks are still there, so a flood lifts none', ( $afterFlood['flooded@example.com'] ?? 0 ) < 0 && ( $afterFlood['ip:127.0.0.1'] ?? 0 ) < 0 );
+$_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+check( '...which is what holds: the right password is still refused', \Nino\Auth::loginUser( $appData, 'flooded@example.com', 'correct horse battery staple' ) === false );
+check( '...and the locked account is still listed as locked', isset( \Nino\Auth::lockedAccounts( $appData )['flooded@example.com'] ) === true );
+
+// Even when locks are all there is room for: they stay, the counters go
+$seed = [];
+
+for( $lockNo = 0; $lockNo < $triesCap + 5; $lockNo++ )
+	$seed[ 'ip:192.0.2.'. intdiv( $lockNo, 250 ). '.'. ( $lockNo % 250 ) ] = 0 - time() - 3000;
+
+\Nino\Filesystem::putFileContent( $appData, $triesFile, $seed );
+$failFrom( 'ip:100.64.1.1' );
+$onlyLocks = $fileHolds();
+check( 'more running locks than the file keeps are all kept - only counters are ever pushed out', count( $onlyLocks ) === $triesCap + 5 && isset( $onlyLocks['ip:100.64.1.1'] ) === false );
+
+$seedTries( array_fill_keys( array_keys( $fileHolds() ), null ) );
+\Nino\Auth::deleteUser( $appData, 'flooded@example.com' );
 
 // An account written by hand. Perms beside a role are written into config.php
 // by hand, and status was until the workbench could set it - so a record that is

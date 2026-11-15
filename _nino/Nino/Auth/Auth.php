@@ -33,7 +33,22 @@ namespace Nino {
 		// every single failure. The same kind of file below /data/ that
 		// \Nino\Feature::count() keeps for the counters of a feature and of
 		// Mail's send cap, with a number per key where those keep tries and a reset.
+		//
+		// An entry is a lock - a negative number, the time it ends, negated - or
+		// a counter: [ 'tries' => n, 'reset' => time ], which is over at 'reset',
+		// one cooldown after the attempt that wrote it. A plain number that is
+		// not negative is a counter an earlier version wrote, with no end: the
+		// next write gives it one (see _registerFailedAttemp())
 		private const string TRIES_PATH = '/data/auth-tries.php';
+
+		// How many entries the file keeps when it is written - an ip costs an
+		// attacker nothing, so what a stream of failures from many addresses
+		// leaves must stop somewhere. The oldest counters go first and a lock
+		// never does: one that was pushed out by a flood would lift the lock
+		// the flood was written to lift. A lock needs maxtries failures (ten
+		// times as many for an ip) and ends after the cooldown, so locks alone
+		// are far from this number
+		private const int TRIES_MAX_ENTRIES = 5000;
 
 		// Failed attempts are counted per account *and* per client ip. The
 		// account bucket on its own is a lockout weapon (five wrong guesses
@@ -872,7 +887,8 @@ namespace Nino {
 
 		// Current tries counter for an username - same negative-timestamp
 		// encoding _registerFailedAttemp() writes: zero/positive is a plain
-		// attempt count, negative means "still cooling down until -tries"
+		// attempt count (a counter, an array, reads as 1 here - a count and
+		// no lock either way), negative means "still cooling down until -tries"
 		private static function _getTries( array &$appData, string $username ): int {
 
 			$state = \Nino\Filesystem::getFileContent( $appData, self::TRIES_PATH, [] );
@@ -952,19 +968,36 @@ namespace Nino {
 			// than recorded unreliably - the caller gets false either way.
 			\Nino\Filesystem::mutate( $appData, self::TRIES_PATH, function( array $state, array &$appData ) use ( $keys ): array {
 
-				$now = time();
+				$now			= time();
+				$cooldown	= (int) $appData['/nino/auth/cooldown'];
 
-				// Drop buckets whose cooldown has already elapsed - with an ip
-				// bucket per attacking client this file would otherwise only ever
-				// grow. Same "clean up on the write we're doing anyway" idea as
-				// Feature::count() and loginUser()'s session pruning.
-				foreach( $state as $stateKey => $stateTries )
-					if( (int) $stateTries < 0 && 0 - (int) $stateTries <= $now )
+				// Drop what is over - with an ip bucket per attacking client this
+				// file would otherwise only ever grow: a lock whose cooldown has
+				// elapsed and a counter whose window has. A counter without an
+				// end is one an earlier version wrote, and it never ended: it
+				// gets one now, a window from this write, and is dropped when
+				// that has passed without another attempt against it. Same "clean
+				// up on the write we're doing anyway" idea as Feature::count()
+				// and loginUser()'s session pruning.
+				foreach( $state as $stateKey => $stateTries ) {
+
+					if( is_array( $stateTries ) === true )
+						$over = (int) ( $stateTries['reset'] ?? 0 ) <= $now;
+					elseif( (int) $stateTries < 0 )
+						$over = 0 - (int) $stateTries <= $now;
+					else {
+						$over = false;
+						$state[$stateKey] = [ 'tries' => (int) $stateTries, 'reset' => $now + $cooldown ];
+					}
+
+					if( $over === true )
 						unset( $state[$stateKey] );
+				}
 
 				foreach( $keys as $key ) {
 
-					$tries = (int) ( $state[$key] ?? 0 );
+					$entry	= $state[$key] ?? 0;
+					$tries	= is_array( $entry ) === true ? (int) ( $entry['tries'] ?? 0 ) : (int) $entry;
 
 					// A negative value that survived the sweep above is a lock
 					// still running - written by a parallel request between this
@@ -985,10 +1018,28 @@ namespace Nino {
 						? $appData['/nino/auth/maxtries'] * self::IP_TRIES_FACTOR
 						: $appData['/nino/auth/maxtries'];
 
-					if( $tries >= $maxTries )
-						$tries = 0 - $now - $appData['/nino/auth/cooldown'];
+					// At the end of the file, so that the file is in the order of
+					// the last attempt and the oldest counters are in front
+					unset( $state[$key] );
 
-					$state[$key] = $tries;
+					$state[$key] = ( $tries >= $maxTries )
+						? 0 - $now - $cooldown
+						: [ 'tries' => $tries, 'reset' => $now + $cooldown ];
+				}
+
+				// Over the number the file keeps: the oldest counters go, never
+				// a lock - see TRIES_MAX_ENTRIES
+				$excess = count( $state ) - self::TRIES_MAX_ENTRIES;
+
+				foreach( $state as $stateKey => $stateTries ) {
+
+					if( $excess <= 0 )
+						break;
+
+					if( is_array( $stateTries ) === true ) {
+						unset( $state[$stateKey] );
+						$excess--;
+					}
 				}
 
 				return $state;

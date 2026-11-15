@@ -67,6 +67,26 @@ namespace Nino {
 		public const string RETENTION	= '/nino/form/retention';
 		public const string STORE			= '/nino/form/store';
 
+		// How many submissions one month's file takes, and how many the whole
+		// site takes in an hour, whatever the addresses they come from. The
+		// mail cap counts per address, and an address costs a visitor nothing:
+		// without these two a stream of submissions from many addresses grows
+		// the month's file - which every submission and the panel read whole -
+		// until the request no longer fits in memory. Set like the keys above,
+		// by hand in config.php; a value outside 1..10000 is a hand edit gone
+		// wrong and reads as the default, since neither cap can be switched off
+		public const string MONTH_CAP	= '/nino/form/month-cap';
+		public const string HOUR_CAP	= '/nino/form/hour-cap';
+
+		public const int MONTH_CAP_DEFAULT	= 1000;
+		public const int HOUR_CAP_DEFAULT		= 300;
+
+		// The hour's counter: \Nino\Feature::count() under this name, one entry
+		// for the whole site under this key (see capped())
+		private const string HOUR_COUNTER	= 'form-hour';
+		private const string HOUR_KEY			= 'site';
+		private const int HOUR_WINDOW			= 3600;
+
 		// The field types a form may declare. 'textarea' and 'select' are not
 		// an <input type>, 'select' and 'radio' are the two that list
 		// 'options'.
@@ -142,6 +162,70 @@ namespace Nino {
 			$months = (int) ( $appData[ self::RETENTION ] ?? self::RETENTION_MONTHS );
 
 			return ( $months >= 1 && $months <= 60 ) ? $months : self::RETENTION_MONTHS;
+		}
+
+		/**
+		 *	The most submissions one month's file takes - '/nino/form/month-cap'
+		 *	where a project sets one, MONTH_CAP_DEFAULT otherwise
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	int
+		 */
+		public static function monthCap( array &$appData ): int {
+
+			$cap = (int) ( $appData[ self::MONTH_CAP ] ?? self::MONTH_CAP_DEFAULT );
+
+			return ( $cap >= 1 && $cap <= 10000 ) ? $cap : self::MONTH_CAP_DEFAULT;
+		}
+
+		/**
+		 *	The most submissions the whole site takes in an hour -
+		 *	'/nino/form/hour-cap' where a project sets one, HOUR_CAP_DEFAULT
+		 *	otherwise
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	int
+		 */
+		public static function hourCap( array &$appData ): int {
+
+			$cap = (int) ( $appData[ self::HOUR_CAP ] ?? self::HOUR_CAP_DEFAULT );
+
+			return ( $cap >= 1 && $cap <= 10000 ) ? $cap : self::HOUR_CAP_DEFAULT;
+		}
+
+		/**
+		 *	Which cap, if any, is reached right now - read, not counted. The
+		 *	hour's cap holds for every submission and refuses it. The month's
+		 *	is reached only where submissions are recorded, since a site that
+		 *	keeps none has no file to fill, and refuses none: a submission
+		 *	that is mailed is taken and not recorded (see handle())
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	string									'hour', 'month' or '' where both have room
+		 */
+		public static function capped( array &$appData ): string {
+
+			if( \Nino\Feature::spent( $appData, self::HOUR_COUNTER, self::HOUR_KEY, self::hourCap( $appData ) ) === true )
+				return 'hour';
+
+			return self::monthFull( $appData ) === true ? 'month' : '';
+		}
+
+		/**
+		 *	Whether this month's file has no place left for a submission -
+		 *	never where nothing is recorded
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	bool
+		 */
+		public static function monthFull( array &$appData ): bool {
+
+			return self::stores( $appData ) === true
+				&& count( \Nino\Filesystem::getFileContent( $appData, '/data/forms.'. date( 'Y-m' ). '.php', [] ) ) >= self::monthCap( $appData );
 		}
 
 		/**
@@ -508,6 +592,15 @@ namespace Nino {
 				return;
 			}
 
+			// The hour's cap of the site is reached: refused as the mail cap
+			// refuses, before any mail goes out - the owner's mailbox is what
+			// it protects, and the panel says it is reached. A full month does
+			// not close the form: the mail still goes out, see below
+			if( self::capped( $appData ) === 'hour' ) {
+				$request['/nino/http/response']['statusCode'] = 429;
+				return;
+			}
+
 			$sent = self::send( $appData, $form, $values );
 
 			// A submission whose mail the cap refused is not recorded - one
@@ -522,6 +615,10 @@ namespace Nino {
 				return;
 			}
 
+			// Counted once the mail layer has taken it, so that an address the
+			// per-address cap refuses cannot use up the site's hour
+			\Nino\Feature::count( $appData, self::HOUR_COUNTER, self::HOUR_KEY, self::hourCap( $appData ), self::HOUR_WINDOW );
+
 			// What the visitor is told rests on the owner's mail alone - the
 			// one that is the message. A confirmation nobody could deliver
 			// (a mistyped address) changes nothing about that: the owner has
@@ -532,8 +629,19 @@ namespace Nino {
 
 			// The inquiry is recorded whether or not its mail went out - it
 			// did happen, it is in the panel, and losing it would be worse
+			$monthFull = self::monthFull( $appData );
+
 			if( self::stores( $appData ) === true )
 				self::record( $appData, $form, $values );
+
+			// A full month records nothing (see record()), so where the owner's
+			// mail did not go out either nothing has the inquiry: refused as a
+			// throttled one is, for the visitor to try again later, rather
+			// than a 500 that reads as a failure of the mail alone
+			if( $ownerSent === false && $monthFull === true ) {
+				$request['/nino/http/response']['statusCode'] = 429;
+				return;
+			}
 
 			// But "sent" is not what the visitor is told when the owner's mail
 			// did not go out - it used to be, and nobody learned that a form
@@ -713,7 +821,15 @@ namespace Nino {
 
 				$entry['ip'] = \Nino\Http::getClientIp( $appData );
 
-				\Nino\Filesystem::mutate( $appData, '/data/forms.'. date( 'Y-m' ). '.php', function( array $entries ) use ( $entry ): array {
+				// A full month's file is left as it is: read under the lock, so
+				// that parallel submissions cannot both take the last place
+				$cap = self::monthCap( $appData );
+
+				\Nino\Filesystem::mutate( $appData, '/data/forms.'. date( 'Y-m' ). '.php', function( array $entries ) use ( $entry, $cap ): ?array {
+
+					if( count( $entries ) >= $cap )
+						return null;
+
 					$entries[] = $entry;
 					return $entries;
 				} );
