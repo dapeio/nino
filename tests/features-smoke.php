@@ -1028,6 +1028,21 @@ check( '...and a later try inside an open window counts without moving its end',
 check( 'another client has a budget of its own', \Nino\Feature::count( $toolset, 'tries', '203.0.113.8', 2, 3600 ) === true && \Nino\Feature::spent( $toolset, 'tries', '203.0.113.8', 2 ) === false && \Nino\Feature::spent( $toolset, 'tries', $toolClient, 2 ) === true );
 check( 'spent() of a limit of 0 or less is false, whatever has been tried', \Nino\Feature::spent( $toolset, 'tries', $toolClient, 0 ) === false && \Nino\Feature::spent( $toolset, 'tries', $toolClient, -1 ) === false );
 
+// An address is counted as its network: eight addresses of one IPv6 /64 are one client, another /64 and an IPv4 address are others
+$toolFolded = [];
+foreach( [ 'first', 'second', 'third' ] as $toolStep )
+	$toolFolded[] = \Nino\Feature::count( $toolset, 'folded', '2001:db8:1:1::'. dechex( count( $toolFolded ) + 1 ), 2, 3600 );
+check( 'the addresses of one /64 share a budget: count() answers true, true, false', $toolFolded === [ true, true, false ] );
+check( '...spent() reads it for any other address of the /64', \Nino\Feature::spent( $toolset, 'folded', '2001:db8:1:1:aaaa::1', 2 ) === true && \Nino\Feature::spent( $toolset, 'folded', '2001:db8:1:2::1', 2 ) === false );
+check( '...the counter holds one entry for them, under the hash of the /64 key', array_keys( \Nino\Filesystem::getFileContent( $toolset, '/data/folded.php', [] ) ) === [ hash( 'sha256', \Nino\Http::clientBucket( '2001:db8:1:1::1' ) ) ] );
+$toolOtherNet = \Nino\Feature::count( $toolset, 'folded', '2001:db8:1:2::1', 2, 3600 );
+$toolOtherV4 = \Nino\Feature::count( $toolset, 'folded', '198.51.100.7', 2, 3600 );
+check( 'another /64 and an IPv4 address have a budget of their own', $toolOtherNet === true && $toolOtherV4 === true );
+\Nino\Feature::forget( $toolset, 'folded', '2001:db8:1:1::99' );
+$toolSpentAfter = \Nino\Feature::spent( $toolset, 'folded', '2001:db8:1:1::1', 2 );
+$toolCountAfter = \Nino\Feature::count( $toolset, 'folded', '2001:db8:1:1::5', 2, 3600 );
+check( 'forget() lets the whole /64 go', $toolSpentAfter === false && $toolCountAfter === true );
+
 $toolState = \Nino\Filesystem::getFileContent( $toolset, $toolFile, [] );
 $toolState[$toolHash]['reset'] = time() - 1;
 \Nino\Filesystem::putFileContent( $toolset, $toolFile, $toolState );

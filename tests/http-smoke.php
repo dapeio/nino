@@ -349,6 +349,36 @@ $proxyAppData['/nino/http/proxies'] = [ 'cloudflare', '', '10.0.0.0/999', 42 ];
 $_SERVER['REMOTE_ADDR'] = '203.0.113.9';
 check( 'an unusable list entry trusts nothing', \Nino\Http::getClientIp( $proxyAppData ) === '203.0.113.9' );
 
+/*	Http::clientBucket() - the key every per-address counter keeps an address
+	under: an IPv4 address whole, an IPv6 address as its /64, an IPv4-mapped one
+	as the IPv4 address it carries, anything else as it is	*/
+check( 'an IPv4 address is its own key', \Nino\Http::clientBucket( '198.51.100.7' ) === '198.51.100.7' );
+check( 'the addresses of one /64 share one key, whatever notation they are written in', \Nino\Http::clientBucket( '2001:db8:1:1::1' ) === \Nino\Http::clientBucket( '2001:db8:1:1:ffff:ffff:ffff:ffff' )
+	&& \Nino\Http::clientBucket( '2001:db8:1:1::1' ) === \Nino\Http::clientBucket( '2001:0DB8:0001:0001:0:0:0:2' ) );
+check( '...and the neighbouring /64s, in either of the last two groups of the prefix, have keys of their own', \Nino\Http::clientBucket( '2001:db8:1:1::1' ) !== \Nino\Http::clientBucket( '2001:db8:1:2::1' )
+	&& \Nino\Http::clientBucket( '2001:db8:1:1::1' ) !== \Nino\Http::clientBucket( '2001:db8:2:1::1' ) );
+check( 'the key of an IPv6 address is not itself an address', str_ends_with( \Nino\Http::clientBucket( '2001:db8:1:1::1' ), '/64' ) === true && filter_var( \Nino\Http::clientBucket( '2001:db8:1:1::1' ), FILTER_VALIDATE_IP ) === false );
+check( 'an IPv4-mapped IPv6 address counts as the IPv4 address it carries', \Nino\Http::clientBucket( '::ffff:198.51.100.7' ) === '198.51.100.7' && \Nino\Http::clientBucket( '::FFFF:c633:6407' ) === '198.51.100.7' );
+check( 'an address that only begins like a mapped one is cut to its /64', \Nino\Http::clientBucket( '::fffe:198.51.100.7' ) === \Nino\Http::clientBucket( '::1' ) && \Nino\Http::clientBucket( '1::ffff:198.51.100.7' ) !== '198.51.100.7' );
+check( 'what is no address stays as it is: a mail, a name, an empty peer, a cidr range', \Nino\Http::clientBucket( 'user@example.com' ) === 'user@example.com' && \Nino\Http::clientBucket( 'c' ) === 'c'
+	&& \Nino\Http::clientBucket( '' ) === '' && \Nino\Http::clientBucket( '2001:db8::/32' ) === '2001:db8::/32' );
+check( 'only a bare address is folded: a key built around one stays whole', \Nino\Http::clientBucket( 'visitor|2001:db8::1' ) === 'visitor|2001:db8::1' && \Nino\Http::clientBucket( '198.51.100.7|x' ) === '198.51.100.7|x' );
+check( 'a string that only begins like an address, up to a NUL byte, stays whole', \Nino\Http::clientBucket( "::ffff:198.51.100.7\0junk" ) === "::ffff:198.51.100.7\0junk" && \Nino\Http::clientBucket( "2001:db8:1:1::1\0junk" ) === "2001:db8:1:1::1\0junk" );
+
+// What the request carries stays whole - it is shown and logged as it is
+$_SERVER['REMOTE_ADDR'] = '203.0.113.9';
+$_SERVER['HTTP_X_FORWARDED_FOR'] = '2001:db8:1:1::7';
+$proxyAppData['/nino/http/proxies'] = [ '203.0.113.9' ];
+$wholeBehindProxy = \Nino\Http::getClientIp( $proxyAppData );
+check( 'the client address behind a proxy is the whole address; only the counters fold it', $wholeBehindProxy === '2001:db8:1:1::7' && \Nino\Http::clientBucket( $wholeBehindProxy ) === \Nino\Http::clientBucket( '2001:db8:1:1::8' ) );
+// ...the peer itself, with no proxy listed...
+$_SERVER['REMOTE_ADDR'] = '2001:db8:1:1::9';
+check( 'the peer is the whole address where no proxy is listed', \Nino\Http::getClientIp( $noProxyAppData ) === '2001:db8:1:1::9' );
+// ...and the leftmost hop where every hop is a proxy of the site
+$proxyAppData['/nino/http/proxies'] = [ '2001:db8:1:1::/64' ];
+$_SERVER['HTTP_X_FORWARDED_FOR'] = '2001:db8:1:1::a, 2001:db8:1:1::b';
+check( 'the leftmost hop of a chain of proxies is the whole address', \Nino\Http::getClientIp( $proxyAppData ) === '2001:db8:1:1::a' );
+
 [ $_SERVER['REMOTE_ADDR'], $forwardedBefore ] = $proxyServer;
 if( $forwardedBefore === null )
 	unset( $_SERVER['HTTP_X_FORWARDED_FOR'] );

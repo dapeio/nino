@@ -139,6 +139,22 @@ $seedTries( [ 'ip:127.0.0.1' => null, 'bucket@example.com' => 0 - time() - 3600 
 \Nino\Auth::loginUser( $appData, 'bucket@example.com', 'wrong' );
 check( 'a guess against an account in cooldown moves no bucket, the ip\'s included', $readTries( 'ip:127.0.0.1' ) === null && $readTries( 'bucket@example.com' ) < 0 );
 
+// The ip bucket is the address as the counters take it: the /64 of an IPv6
+// client, so that guessing from its other addresses is one client's guessing
+$_SERVER['REMOTE_ADDR'] = '2001:db8:1:1::1';
+$seedTries( [ 'ip:127.0.0.1' => null, 'bucket@example.com' => null, 'ip:'. \Nino\Http::clientBucket( '2001:db8:1:1::1' ) => $appData['/nino/auth/maxtries'] * $ipFactor - 1 ] );
+\Nino\Auth::loginUser( $appData, 'nobody@example.com', 'wrong' );
+$_SERVER['REMOTE_ADDR'] = '2001:db8:1:1::2';
+$foldedLogin = \Nino\Auth::loginUser( $appData, 'bucket@example.com', 'correct horse battery staple' );
+check( 'a guess from another address of the /64 meets the cooldown the first one tripped', $readTries( 'ip:'. \Nino\Http::clientBucket( '2001:db8:1:1::1' ) ) < 0 && $foldedLogin === false );
+check( '...and the bucket holds no whole IPv6 address', array_filter( array_keys( \Nino\Filesystem::getFileContent( $appData, $triesFile, [] ) ), static fn( string $key ): bool => str_starts_with( $key, 'ip:2001:db8:1:1::' ) && str_ends_with( $key, '/64' ) === false ) === [] );
+$_SERVER['REMOTE_ADDR'] = '2001:db8:1:2::1';
+$otherLogin = \Nino\Auth::loginUser( $appData, 'bucket@example.com', 'correct horse battery staple' );
+check( 'another /64 is not in cooldown', $otherLogin !== false );
+check( 'the address a session is listed under is the whole address, not its /64', in_array( '2001:db8:1:2::1', array_column( \Nino\Auth::getUser( $appData, 'bucket@example.com' )['sessions'], 'ip' ), true ) === true );
+$_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+$seedTries( [ 'ip:'. \Nino\Http::clientBucket( '2001:db8:1:1::1' ) => null, 'ip:'. \Nino\Http::clientBucket( '2001:db8:1:2::1' ) => null, 'ip:127.0.0.1' => null, 'bucket@example.com' => null ] );
+
 // No client ip - the cli, a test - means no ip bucket, rather than one
 // shared empty bucket every such caller falls into
 $seedTries( [ 'ip:127.0.0.1' => null, 'ip:' => null, 'bucket@example.com' => null ] );

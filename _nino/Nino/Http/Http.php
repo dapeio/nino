@@ -1195,6 +1195,41 @@ namespace Nino {
 			return $hops[0];
 		}
 
+		/**
+		 *	The key a counter keeps an address under: what every rule that counts
+		 *	or refuses per client reads, so that one visitor is one entry. An IPv4
+		 *	address is its own key. An IPv6 address is cut to its /64, the network
+		 *	a single subscriber or server is given and can write any of 2^64
+		 *	addresses in - counted one by one, a limit would stop nobody who holds
+		 *	one. An IPv4-mapped IPv6 address ('::ffff:198.51.100.7') is the IPv4
+		 *	address it carries. What is no address (a mail, a name, an empty
+		 *	peer) is its own key.
+		 *
+		 *	For counting and refusing only: where an address is shown or logged,
+		 *	it is shown whole.
+		 *
+		 *	@param		string		$ip						An address as getClientIp() answers it, or any other key
+		 *
+		 *	@return 	string									The address, the IPv4 address it carries, the /64 as '2001:db8:1:1::/64', or $ip
+		 */
+		public static function clientBucket( string $ip ): string {
+
+			// inet_pton() reads up to the first NUL byte, so a string that
+			// only begins like an address is checked whole first
+			if( filter_var( $ip, FILTER_VALIDATE_IP ) === false )
+				return $ip;
+
+			$packed = @inet_pton( $ip );
+
+			if( $packed === false || strlen( $packed ) !== 16 )
+				return $ip;
+
+			if( strncmp( $packed, str_repeat( "\0", 10 ). "\xff\xff", 12 ) === 0 )
+				return (string) inet_ntop( substr( $packed, 12 ) );
+
+			return inet_ntop( substr( $packed, 0, 8 ). str_repeat( "\0", 8 ) ). '/64';
+		}
+
 		// One X-Forwarded-For entry down to a bare address: the spacing the
 		// header is written with goes, a port some proxies append goes
 		// ('198.51.100.7:53238', '[2001:db8::7]:53238'), and what is left has

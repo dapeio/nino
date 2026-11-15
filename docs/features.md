@@ -420,7 +420,7 @@ the helpers of a feature's own code, static methods that render no markup:
 | `flag( $args, $name, $default )` | a flag of a shortcode without a schema: a bare word is on, `name="no"` is read by the words a component's bool is |
 | `shortcode( $appData, $name, $callback )` | a plain shortcode, unless the Components module owns the name (the manifest declared a component or a stack): then `false` |
 | `origin( $url )`, `allowOrigin( $request, $directive, $url )` | an address as a Content-Security-Policy source - https, no credentials, no ip literal - and the call that adds it to one directive of this response |
-| `count( $appData, $name, $key, $limit, $window )`, `spent()`, `forget()` | tries per client in the window, kept in `/data/<name>.php` under a hashed key: count one and learn whether it is within budget; ask without counting; let a client go |
+| `count( $appData, $name, $key, $limit, $window )`, `spent()`, `forget()` | tries per client in the window, kept in `/data/<name>.php` under a hashed key, an IPv6 address as its /64: count one and learn whether it is within budget; ask without counting; let a client go |
 | `slug( $text, $max )` | a name made into a slug, the letters ascii lacks written as `TRANSLITERATIONS` says; `Nino.slug()` is its twin |
 
 The kernel classes a feature calls, by home:

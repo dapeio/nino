@@ -645,6 +645,31 @@ $_SERVER['REMOTE_ADDR'] = '203.0.113.2';
 check( 'a different client has its own independent budget, and the call after a refusal reads as not refused', \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' ) === true && \Nino\Mail::rateLimited( $appData ) === false );
 $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 
+// The cap counts an IPv6 client as its /64: its other addresses spend the same budget, another /64 has one of its own
+\Nino\Filesystem::putFileContent( $appData, $ratelimitPath, [] );
+$capMails = [];
+$capFolded = [];
+foreach( [ 1, 2, 3, 4, 5, 6 ] as $capNumber ) {
+	$_SERVER['REMOTE_ADDR'] = '2001:db8:1:1::'. dechex( $capNumber );
+	$capFolded[] = \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' );
+}
+$_SERVER['REMOTE_ADDR'] = '2001:db8:1:1::ff';
+$capFoldedBatch = \Nino\Mail::sendAll( $appData, [ [ 'to' => 'owner@example.org', 'subject' => 'a', 'body' => 'x', 'replyTo' => '' ] ] );
+check( 'six sends from six addresses of one /64 are five mails and one refusal, and sendAll() from a seventh is refused too', $capFolded === [ true, true, true, true, true, false ] && count( $capMails ) === 5
+	&& $capFoldedBatch === false && \Nino\Mail::rateLimited( $appData ) === true );
+$_SERVER['REMOTE_ADDR'] = '2001:db8:1:2::1';
+$capOtherNet = \Nino\Mail::send( $appData, 'to@example.org', 'x', 'y', '' );
+check( 'another /64 has a budget of its own', $capOtherNet === true );
+
+// The entry of a submission carries the whole address
+$capEntriesBefore = \Nino\Filesystem::getFileContent( $appData, '/data/forms.'. date( 'Y-m' ). '.php', [] );
+\Nino\Form::record( $appData, [ 'key' => 'ipwhole' ], [ 'name' => 'Jo' ] );
+$capEntriesAfter = \Nino\Filesystem::getFileContent( $appData, '/data/forms.'. date( 'Y-m' ). '.php', [] );
+check( 'the recorded entry keeps the whole address of an IPv6 client', ( end( $capEntriesAfter )['ip'] ?? '' ) === '2001:db8:1:2::1' );
+\Nino\Filesystem::putFileContent( $appData, '/data/forms.'. date( 'Y-m' ). '.php', $capEntriesBefore );
+$_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+\Nino\Filesystem::putFileContent( $appData, $ratelimitPath, $rateState );
+
 $capBatch = [ [ 'to' => 'owner@example.org', 'subject' => 'a', 'body' => 'x', 'replyTo' => '' ] ];
 check( 'sendAll() is refused over the same budget and flags it the same way', \Nino\Mail::sendAll( $appData, $capBatch ) === false && \Nino\Mail::rateLimited( $appData ) === true );
 check( '...and an empty batch is no action: it answers true and clears the flag', \Nino\Mail::sendAll( $appData, [] ) === true && \Nino\Mail::rateLimited( $appData ) === false );

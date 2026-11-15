@@ -263,6 +263,10 @@ namespace Nino {
 		 *	the kernel's own list - so a counter under a name of its own stays out
 		 *	of it.
 		 *
+		 *	An address is counted as \Nino\Http::clientBucket() says - an IPv6
+		 *	address as its /64 - so that a client who writes any address of its
+		 *	network is one entry; a key that is no address is counted as it is.
+		 *
 		 *	A read-modify-write under \Nino\Filesystem::mutate(), as every counter
 		 *	must be: two requests at once cannot read the same count. A file that
 		 *	holds anything but an array is a file that holds no tries.
@@ -295,7 +299,7 @@ namespace Nino {
 			if( $limit <= 0 )
 				return true;
 
-			$hash		= hash( 'sha256', $key );
+			$hash		= hash( 'sha256', \Nino\Http::clientBucket( $key ) );
 			$now		= time();
 			$tries	= 0;
 
@@ -339,7 +343,7 @@ namespace Nino {
 				return false;
 
 			$state = \Nino\Filesystem::getFileContent( $appData, $path, [] );
-			$entry = is_array( $state ) === true ? ( $state[ hash( 'sha256', $key ) ] ?? null ) : null;
+			$entry = is_array( $state ) === true ? ( $state[ hash( 'sha256', \Nino\Http::clientBucket( $key ) ) ] ?? null ) : null;
 
 			if( is_array( $entry ) === false || (int) ( $entry['reset'] ?? 0 ) <= time() )
 				return false;
@@ -366,7 +370,7 @@ namespace Nino {
 			if( $path === null )
 				return;
 
-			$hash	= hash( 'sha256', $key );
+			$hash	= hash( 'sha256', \Nino\Http::clientBucket( $key ) );
 			$now	= time();
 
 			\Nino\Filesystem::mutate( $appData, $path, static function( mixed $state ) use ( $hash, $now ): ?array {

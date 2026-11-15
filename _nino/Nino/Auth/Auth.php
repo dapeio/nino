@@ -133,7 +133,7 @@ namespace Nino {
 			// ip bucket rather than one shared '' bucket everything falls into
 			$user		= self::getUser( $appData, $username );
 			$ip			= \Nino\Http::getClientIp( $appData );
-			$ipKeys	= ( $ip !== '' ) ? [ self::IP_KEY_PREFIX. $ip ] : [];
+			$ipKeys	= ( $ip !== '' ) ? [ self::IP_KEY_PREFIX. \Nino\Http::clientBucket( $ip ) ] : [];
 
 			// Check cooldown - the ip bucket is checked regardless of whether
 			// the account exists, so guessing spread across many accounts hits
