@@ -45,12 +45,15 @@ namespace Nino {
 	 *
 	 *										Where a tree is drawn from: the context
 	 *
-	 *											[ 'template' => 'page-home', 'scope' => 'hero', 'place' => 'page', 'element' => null, 'depth' => 0 ]
+	 *											[ 'template' => 'page-home', 'scope' => 'hero', 'place' => 'page', 'element' => null, 'fills' => [], 'depth' => 0 ]
 	 *
 	 *										- the template whose words ~name reads, the id of the nearest
 	 *										ancestor that has one, the place the nodes stand in, the element
 	 *										of a loop (the shape \Nino\Modules\Components::element() answers:
-	 *										[ 'uri', 'id', 'element', 'model' ]) and how deep the nodes are.
+	 *										[ 'uri', 'id', 'element', 'model' ]), the tokens of the loops the nodes stand
+	 *										in ('fills', [ '[[token]]' => text ]: a textfill with no slash reads them before the
+	 *										element, and the call of a shortcode has them put into its arguments) and how
+	 *										deep the nodes are.
 	 *
 	 *	@package					Dape/Nino
 	 *	@author						David Perchermeier <mail@dape.io>
@@ -509,6 +512,7 @@ namespace Nino {
 				'scope'			=> is_string( $context['scope'] ?? null ) === true ? $context['scope'] : '',
 				'place'			=> is_string( $context['place'] ?? null ) === true ? $context['place'] : 'page',
 				'element'		=> is_array( $element ) === true ? $element : null,
+				'fills'			=> is_array( $context['fills'] ?? null ) === true ? $context['fills'] : [],
 				'depth'			=> is_int( $context['depth'] ?? null ) === true ? max( 0, $context['depth'] ) : 0,
 			];
 
@@ -594,6 +598,10 @@ namespace Nino {
 				return '';
 
 			if( $key[0] !== '/' ) {
+
+				// The tokens of a loop the call stands in, the innermost first; then the field of an element
+				if( isset( $context['fills']['[['. $key. ']]'] ) === true && is_scalar( $context['fills']['[['. $key. ']]'] ) === true )
+					return (string) $context['fills']['[['. $key. ']]'];
 
 				// What no element has a field for is written as it stands: the code that draws the page may fill it later
 				$element = self::_element( $context['element'] );
@@ -705,7 +713,7 @@ namespace Nino {
 			$schema = $run['registry'][$name] ?? null;
 
 			if( $schema === null )
-				return self::_unknown( $appData, $name );
+				return self::_unknown( $appData, $node, $context, $run );
 
 			$given = is_array( $node['a'] ?? null ) === true ? $node['a'] : [];
 			$source = is_string( $node['s'] ?? null ) === true ? $node['s'] : '';
@@ -819,7 +827,7 @@ namespace Nino {
 			}
 
 			// 7. The children - 6. an id gives them its scope
-			$inner = [ 'template' => $context['template'], 'scope' => $scope, 'place' => $name, 'element' => $context['element'], 'depth' => $context['depth'] + 1 ];
+			$inner = [ 'template' => $context['template'], 'scope' => $scope, 'place' => $name, 'element' => $context['element'], 'fills' => $context['fills'], 'depth' => $context['depth'] + 1 ];
 			$slots = $run['slots'][$name] ?? [];
 			$content = '';
 			$slotted = [];
@@ -878,15 +886,32 @@ namespace Nino {
 		}
 
 		/**
-		 *	A name nobody registered: nothing is drawn and nor are its children, and the log is told - once in
-		 *	a request for each name. The one place that knows what to do with a call that has no schema
+		 *	A name that has no schema: a shortcode that was registered with \Nino\Html::addShortcode() is
+		 *	called as it always was - its callbacks, with the arguments of the call - and what it answers
+		 *	is the end of it (\Nino\Html::drawShortcode()). A name that is none is nothing: nothing is drawn and nor are its
+		 *	children, and the log is told - once in a request for each name. The one place that knows what to
+		 *	do with a call that has no schema
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$name
+		 *	@param		array			$node					The call
+		 *	@param		array			$context			Whole: all keys
+		 *	@param		array			&$run					(reference)
 		 *
 		 *	@return 	string
 		 */
-		private static function _unknown( array &$appData, string $name ): string {
+		private static function _unknown( array &$appData, array $node, array $context, array &$run ): string {
+
+			$html = Html::drawShortcode( $appData, $node, $context );
+
+			if( $html !== null ) {
+
+				// A shortcode may have added a fill: the next node sees it
+				$run['fills'] = null;
+
+				return $html;
+			}
+
+			$name = (string) $node['n'];
 
 			self::_notice( $appData, 'unknown '. $name, 'Components: "'. self::_shown( $name ). '" is no component that is registered; it and what it holds are not drawn' );
 

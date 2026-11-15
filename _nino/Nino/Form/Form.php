@@ -705,7 +705,7 @@ namespace Nino {
 			// this runs - \Nino\request() registers them before
 			// Http::response(), precisely so a mail rendered in here resolves
 			// them instead of shipping the literal
-			$owner = $form['to'] !== '' ? $form['to'] : \Nino\Html::renderHtml( $appData, '[[/project/mail/address/owner]]' );
+			$owner = $form['to'] !== '' ? $form['to'] : \Nino\Html::putFills( $appData, '[[/project/mail/address/owner]]', [] );
 			$reply = self::_firstEmail( $form, $values );
 
 			/*	useLocale(), not setCurrentLocale(): the owner's mail goes out
@@ -725,8 +725,8 @@ namespace Nino {
 			$mails = [ [
 				'to'			=> $owner,
 				'subject'	=> $form['subject'] !== ''
-					? \Nino\Html::renderHtml( $appData, $form['subject'] )
-					: \Nino\Html::renderHtml( $appData, '[[/module/form/subject/owner]]' ),
+					? \Nino\Html::putFills( $appData, $form['subject'], [] )
+					: \Nino\Html::putFills( $appData, '[[/module/form/subject/owner]]', [] ),
 				'body'		=> self::render( $appData, $form, $values, $form['ownerTemplate'] ),
 				'replyTo'	=> $reply !== '' ? $reply : $owner,
 			] ];
@@ -736,7 +736,7 @@ namespace Nino {
 			if( $form['confirm'] === true && $reply !== '' )
 				$mails[] = [
 					'to'			=> $reply,
-					'subject'	=> \Nino\Html::renderHtml( $appData, '[[/module/form/subject/user]]' ),
+					'subject'	=> \Nino\Html::putFills( $appData, '[[/module/form/subject/user]]', [] ),
 					'body'		=> self::render( $appData, $form, $values, $form['userTemplate'] ),
 					'replyTo'	=> $owner,
 				];
@@ -774,7 +774,7 @@ namespace Nino {
 			$rows = '';
 
 			foreach( $form['fields'] as $field )
-				$rows .= '<tr><th>'. \Nino\Html::renderHtml( $appData, $field['label'] ). '</th><td>'
+				$rows .= '<tr><th>'. \Nino\Html::putFills( $appData, $field['label'], [] ). '</th><td>'
 					. nl2br( $safe( (string) ( $values[ $field['name'] ] ?? '' ) ) ). '</td></tr>';
 
 			$fills = [
@@ -786,6 +786,10 @@ namespace Nino {
 				'[[email]]'		=> $safe( (string) ( $values['email'] ?? '' ) ),
 				'[[message]]'	=> nl2br( $safe( (string) ( $values['message'] ?? '' ) ) ),
 			];
+
+			// The path stands in a call that is read: only the name of a template may stand there, whoever calls
+			if( self::_template( $template, '' ) === '' )
+				return '';
 
 			return strtr( \Nino\Html::renderHtml( $appData, '[template '. $template. ']' ), $fills );
 		}

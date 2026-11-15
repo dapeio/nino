@@ -520,7 +520,9 @@ $seen = [];
 	return '';
 } );
 \Nino\Html::addShortcode( $calls, 'wrap', static function( array &$appData, array $args ): string {
-	return (string) ( $args['content'] ?? '' );
+
+	// What a container holds is drawn by the container: nobody reads what a shortcode answers
+	return \Nino\Html::renderSource( $appData, (string) ( $args['content'] ?? '' ), \Nino\Html::context( $appData ) );
 } );
 
 $callsSource = '[probe /a/b name="x y" flag] text [wrap size="2"]inner [probe /c/d][/wrap] [unknown /e] [probe] [probe empty="" /f/g] [probe alt=""]';
@@ -539,6 +541,11 @@ check( '...the calls in the content of one follow it, and a name nobody register
 // What the rendering hands to the callbacks is what this reads: the same pattern, the same arguments
 \Nino\Html::renderHtml( $calls, $callsSource );
 check( 'the arguments are the ones the callback of a shortcode gets when the page is rendered', $seen === array_values( array_map( static fn( array $call ): array => $call['args'], array_filter( $found, static fn( array $call ): bool => $call['name'] === 'probe' ) ) ) && count( $seen ) === 5 );
+
+\Nino\Html::addFills( $calls, [ '/seed/calls/fill' => 'Y' ], '*' );
+check( '...a scan reads the source as it stands: the fill in a call is not put in, as the call of a page has it put in when the page is drawn',
+	\Nino\Html::shortcodeCalls( $calls, '[probe /a/b text="[[/seed/calls/fill]]"]' ) === [ [ 'name' => 'probe', 'args' => [ '/a/b', 'text' => '[[/seed/calls/fill]]' ] ] ]
+	&& ( static function() use ( &$calls, &$seen ): bool { $seen = []; \Nino\Html::renderHtml( $calls, '[probe /a/b text="[[/seed/calls/fill]]"]' ); return $seen === [ [ '/a/b', 'text' => 'Y' ] ]; } )() );
 
 check( '...nothing for a text with no bracket, an empty text and a bracket that opens no call', \Nino\Html::shortcodeCalls( $calls, '' ) === [] && \Nino\Html::shortcodeCalls( $calls, 'plain text' ) === []
 	&& \Nino\Html::shortcodeCalls( $calls, '[ probe ] [probes] [/probe]' ) === [] );
@@ -563,11 +570,13 @@ check( 'the parts are the calls and the text between and around them, in the ord
 	] );
 check( '...put one after the other they are the text again, byte for byte, whatever it holds - a name nobody registered, a bracket that opens no call, a line break and a tab, text behind the last call',
 	implode( '', array_column( $parts, 'text' ) ) === $callsSource
-	&& array_filter( [ '', 'plain text', '[ probe ] [probes] [/probe]', "a\n\t[probe x]\n[wrap]\n[probe y]\n[/wrap] tail [", '[[probe]] [probe]]' ],
+	&& array_filter( [ '', 'plain text', '[ probe ] [probes]', "a\n\t[probe x]\n[wrap]\n[probe y]\n[/wrap] tail [", '[[probe]] [probe]]' ],
 		static fn( string $source ): bool => implode( '', array_column( \Nino\Html::shortcodeParts( $calls, $source ), 'text' ) ) !== $source ) === [] );
+check( '...a text in the one form the notation has is the text again; an end that closes nothing is no part of any of them, and nor is the backslash of a bracket that is text',
+	implode( '', array_column( \Nino\Html::shortcodeParts( $calls, '[ probe ] [/probe] \\[probe]' ), 'text' ) ) === '[ probe ]  \\[probe]' );
 check( '...nothing for an empty text, one part of no name for a text with no call, and a name that is registered later is found by the next cut',
 	\Nino\Html::shortcodeParts( $calls, '' ) === [] && \Nino\Html::shortcodeParts( $calls, 'plain text' ) === [ [ 'name' => '', 'text' => 'plain text' ] ]
-	&& \Nino\Html::shortcodeParts( $calls, '[ probe ] [probes] [/probe]' ) === [ [ 'name' => '', 'text' => '[ probe ] [probes] [/probe]' ] ]
+	&& \Nino\Html::shortcodeParts( $calls, '[ probe ] [probes]' ) === [ [ 'name' => '', 'text' => '[ probe ] [probes]' ] ]
 	&& array_column( \Nino\Html::shortcodeParts( $calls, 'a [late x] b' ), 'name' ) === [ '', 'late', '' ]
 	&& \Nino\Html::shortcodeParts( $appData, '[probe /a/b]' ) === [ [ 'name' => '', 'text' => '[probe /a/b]' ] ] );
 

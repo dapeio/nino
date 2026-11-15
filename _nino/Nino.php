@@ -151,9 +151,10 @@ namespace Nino {
 		// against, and drawn as it stood it was a script in the shell of
 		// every account served that page.
 		// Brackets neutralized as well as escaped, the two steps
-		// Admin\Panels::label() takes: a fill is substituted before the
-		// shortcode pass runs over the finished document, so a '[' left
-		// standing in one would be read as syntax afterwards
+		// Admin\Panels::label() takes: a fill is put into the arguments of a
+		// call as well as into the page, and the shipped markup of the shell
+		// is drawn with it, so a '[' left standing in one would be one more
+		// character a reader could take for syntax
 		$userMail = str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ],
 			htmlspecialchars( ( $currentUser !== false ) ? (string) $currentUser['mail'] : '', ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8' ) );
 

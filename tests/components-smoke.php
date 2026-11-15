@@ -3273,7 +3273,7 @@ check( '[html] carries the class it is given - the spacing classes of the Builde
 	&& $render( '[html class="nino-mt-3"][/html]' ) === '' && $render( '[html class="nino-mt-3"]<script>a()</script>[/html]' ) === '' );
 check( '...the class is escaped: the characters that close a tag or open one are entities in the attribute, and there is the one attribute',
 	$render( '[html class="x>y<z"]<p>Hi</p>[/html]' ) === '<div class="x&gt;y&lt;z" data-html><p>Hi</p></div>'
-	&& $render( '[html class="a\'b"]<p>Hi</p>[/html]' ) === '<div class="a&quot;b" data-html><p>Hi</p></div>' );
+	&& $render( '[html class="a\'b"]<p>Hi</p>[/html]' ) === '<div class="a&#039;b" data-html><p>Hi</p></div>' );
 check( '[button] is a link drawn as one: label from a key, address from a key, a style', $render( '[button /_nino/webpage/contact/name href="/_nino/webpage/contact/uri" style="primary"]' ) === '<a class="nino-btn nino-btn--primary" href="/contact">Contact us</a>' );
 check( '[button] takes a fixed label, a size, a target - and a target that is another window says it is no concern of the opener', $render( '[button text="Go" href="https://example.com" size="big" target="_blank"]' ) === '<a class="nino-btn nino-btn--big" href="https://example.com" target="_blank" rel="noopener">Go</a>' );
 check( '[button] with a fixed label reads its first argument as the address', $render( '[button /_nino/webpage/contact/uri text="Mehr"]' ) === '<a class="nino-btn" href="/contact">Mehr</a>' );
@@ -3464,7 +3464,7 @@ check( '...and nothing else of a call is read like that: the attributes are take
 	&& $direct( 'title', [ '/template/page-home/hero/title', 'class' => 'a [[/template/page-home/probe/class]] b' ] ) === '<h3 class="nino-section-title a &#91;&#91;/template/page-home/probe/class]] b">Hi &#91;there]</h3>'
 	&& $direct( 'title', [ '[[/template/page-home/hero/title]]' ] ) === '' && $direct( 'title', [ '[[/template/page-home/probe/key]]' ] ) === ''
 	&& $direct( 'title', [ '/template/page-home/probe/key' ] ) === '<h3 class="nino-section-title">/template/page-home/hero/title</h3>'
-	&& $direct( 'html', [ 'content' => '<p>[[/template/page-home/hero/title]]</p>' ] ) === '<p>[[/template/page-home/hero/title]]</p>' );
+	&& $direct( 'html', [ 'content' => '<p>[[/template/page-home/hero/title]]</p>' ] ) === '<p>Hi [there]</p>' );
 
 // [html] is the template's own markup, rendered again after the fills went in: the '[' an editor's text holds - an entity in a stored value, whatever form it is written in - is text on the page, and a shortcode the template wrote itself is still rendered
 \Nino\Filesystem::putFileContent( $appData, '/templates/probe-private.tpl', 'PRIVATE-TEMPLATE' );
@@ -3841,9 +3841,10 @@ check( '...reads sort, offset, limit and query as every stack does, is nothing f
 check( '...a section draws no cell: the elements of the loop are the sections, with no div of a grid between them, and no attribute of a grid - cols, gap or autoheight - is heard',
 	$render( '[sections /posts sort="title" limit="1" cols="50" gap="4" autoheight="1"][title title][/sections]' ) === '<section class="nino-section"><h3 class="nino-section-title">One</h3></section>' );
 check( '...an id is a slug that starts with a letter, the whole of it: one with a line break behind it is none - for the sections, for a stack and for the arrow of a hero alike - and does not reach an attribute',
-	$render( "[sections /posts sort=\"title\" offset=\"2\" id=\"a\n\"][title title][/sections]" ) === '<section class="nino-section"><h3 class="nino-section-title">Two</h3></section>'
-	&& str_starts_with( $render( "[stack /services limit=\"1\" gap=\"3\" id=\"svc\n\"][probe][/stack]" ), '<div class="nino-grid-row nino-stack nino-stack-gap-3"><div class="nino-grid-s-100' ) === true
-	&& $render( "[scroll-hint to=\"a\n\"]" ) === $render( '[scroll-hint]' ) );
+	$direct( 'sections', [ '/posts', 'sort' => 'title', 'offset' => '2', 'id' => "a\n", 'content' => '[title title]' ] ) === '<section class="nino-section"><h3 class="nino-section-title">Two</h3></section>'
+	&& str_starts_with( $direct( 'stack', [ '/services', 'limit' => '1', 'gap' => '3', 'id' => "svc\n", 'content' => '[probe]' ] ), '<div class="nino-grid-row nino-stack nino-stack-gap-3"><div class="nino-grid-s-100' ) === true
+	&& $direct( 'scroll-hint', [ 'to' => "a\n" ] ) === $direct( 'scroll-hint', [] )
+	&& $render( "[sections /posts offset=\"2\" id=\"a\n\"][title title][/sections]" ) === '[sections /posts offset="2" id="a' . "\n". '"]' );
 
 // The sections that alternate: the class that turns the row of every second one around is written by the renderer, which counts the loop it draws
 $sectionOf = static fn( string $title, string $classes = '', string $id = '' ): string => '<section'. $id. ' class="nino-section'. $classes. '"><h3 class="nino-section-title">'. $title. '</h3></section>';
@@ -4663,7 +4664,7 @@ check( '...the stack is two cells for the two elements, in the order of sort, wi
 	&& str_contains( $page, '<h3 class="nino-section-title">Web &lt;b&gt;&#91;x]&lt;/b&gt;</h3>' ) === true && strpos( $page, '>App<' ) < strpos( $page, 'Web &lt;b&gt;' )
 	&& str_contains( $page, '<div class="nino-grid-s-100 nino-grid-m-50 nino-grid-l-50 nino-autoheight"' ) === true
 	&& str_contains( $page, '<a class="nino-btn" href="/services/web">Mehr</a>' ) === true && str_contains( $page, 'FILLED' ) === false );
-check( '...and the block of somebody\'s own is untouched, byte for byte', str_contains( $page, $foreign ) === true );
+check( '...and the block of somebody\'s own is untouched, byte for byte - but for the call of a shortcode nobody registered, which draws nothing (and is told once)', str_contains( $page, str_replace( '[osm lat="48.1" lon="11.5" zoom="12"]', '', $foreign ) ) === true && str_contains( $page, '[osm' ) === false );
 check( '...and it renders the same each time', preg_replace( '/stack-\d+/', 'stack-N', $render( $home ) ) === preg_replace( '/stack-\d+/', 'stack-N', $page ) );
 
 // The library pages draw the heading and the line of their hero through [title] and [subtitle] in the style hero, and the section id hero is the id it was
@@ -4706,7 +4707,7 @@ check( '[spacer] and the four stacks carry the class they are given on their out
 check( 'value(): the value of an image is escaped, and the slot is still found by its uri',
 	\Nino\Modules\Components::value( $appData, '"><x>[', 'image' ) === '&quot;&gt;&lt;x&gt;&#91;'
 	&& str_contains( $render( '[image /template/page-home/hero/background]' ), 'src="/public/images/bg.1600x900.jpg"' ) === true
-	&& $render( '[image "><x>]' ) === '' );
+	&& $direct( 'image', [ '"><x>' ] ) === '' && $render( '[image "><x>]' ) === '[image "><x>]' );
 
 // A stack that draws its cells itself is handed the dressing of the grid in the last argument of its cell function - the classes of the widths and the
 // attributes of the group - and nothing about a card: with a grid, and with none

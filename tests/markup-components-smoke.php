@@ -685,11 +685,11 @@ ksort( $args );
 check( 'the arguments: every attribute as a string - a bool 1 or 0, an int its digits, a string, a link and an image escaped, the value for every width of a responsive one - and value, source, class, variant and lang - the slug of the id as the attribute says it, the tag form is the token of a template', $args === [
 	'anchor' => 'z', 'class' => 'probe-echo probe-echo--mode-b probe-echo--size-50 probe-echo--m-size-25 probe-echo--on probe-echo--variant-soft', 'count' => '7', 'flag' => '1', 'href' => '/x', 'label' => 'L&lt;',
 	'lang' => '', 'mode' => 'b', 'on' => '1', 'pic' => '/template/page-x/a/photo', 'quiet' => '0', 'size' => '50', 'source' => '/project/company/general/name', 'tag' => 'h2', 'value' => 'ACME', 'variant' => 'soft' ] );
-check( 'the context it is given is the one the call stands in - the scope above the call and not the one it makes - and the children are drawn one deeper at its place', $given === [ 'template' => 'page-x', 'scope' => 'a', 'place' => 'section-wrap', 'element' => null, 'depth' => 1 ] );
+check( 'the context it is given is the one the call stands in - the scope above the call and not the one it makes - and the children are drawn one deeper at its place', $given === [ 'template' => 'page-x', 'scope' => 'a', 'place' => 'section-wrap', 'element' => null, 'fills' => [], 'depth' => 1 ] );
 $seen->exchangeArray( [] );
 $draw( '[probe-echo ~title][card][probe-echo .title][/card][/probe-echo]', [ 'template' => 'page-x', 'scope' => 'hero', 'place' => 'flow', 'depth' => 3, 'element' => $element ] );
-check( 'the children of a call have its name as their place, one more depth, the scope, the template and the element of the loop', count( $seen ) === 2 && $seen[0][2] === [ 'template' => 'page-x', 'scope' => 'hero', 'place' => 'card', 'element' => $element, 'depth' => 5 ]
-	&& $seen[1][2] === [ 'template' => 'page-x', 'scope' => 'hero', 'place' => 'flow', 'element' => $element, 'depth' => 3 ] && $seen[1][0]['source'] === '~title' && $seen[1][0]['value'] === 'Hallo &amp; &lt;Welt&gt; [sic]' );
+check( 'the children of a call have its name as their place, one more depth, the scope, the template and the element of the loop', count( $seen ) === 2 && $seen[0][2] === [ 'template' => 'page-x', 'scope' => 'hero', 'place' => 'card', 'element' => $element, 'fills' => [], 'depth' => 5 ]
+	&& $seen[1][2] === [ 'template' => 'page-x', 'scope' => 'hero', 'place' => 'flow', 'element' => $element, 'fills' => [], 'depth' => 3 ] && $seen[1][0]['source'] === '~title' && $seen[1][0]['value'] === 'Hallo &amp; &lt;Welt&gt; [sic]' );
 $seen->exchangeArray( [] );
 $draw( '[probe-echo /project/company/general/name size="m:25" /][probe-echo /project/company/general/name size="77 l:50" /]' );
 check( 'the argument of a responsive choice is the value for every width: the default where the call starts with a breakpoint or with a value that is none', $seen[0][0]['size'] === '100' && $seen[1][0]['size'] === '100' && $seen[0][0]['class'] === 'probe-echo probe-echo--m-size-25' && $seen[1][0]['class'] === 'probe-echo probe-echo--l-size-50' );
@@ -1100,8 +1100,8 @@ $seen->exchangeArray( [] );
 \Nino\Components::render( $appData, [ [ 'n' => 'probe-echo', 's' => '/project/company/general/name', 'a' => [], 'c' => null, 'o' => 0 ] ] );
 \Nino\Components::render( $appData, [ [ 'n' => 'probe-echo', 's' => '/project/company/general/name', 'a' => [], 'c' => null, 'o' => 0 ] ], [ 'template' => [ 'x' ], 'scope' => 5, 'place' => null, 'element' => 'x', 'depth' => 'deep' ] );
 \Nino\Components::render( $appData, [ [ 'n' => 'probe-echo', 's' => '/project/company/general/name', 'a' => [], 'c' => null, 'o' => 0 ] ], [ 'depth' => -4, 'element' => [ 'x' ] ] );
-check( 'a context with nothing in it is the page: no template, no scope, the place page, no element, depth 0 - and what is of the wrong type is the same', $seen[0][2] === [ 'template' => '', 'scope' => '', 'place' => 'page', 'element' => null, 'depth' => 0 ]
-	&& $seen[1][2] === $seen[0][2] && $seen[2][2] === [ 'template' => '', 'scope' => '', 'place' => 'page', 'element' => [ 'x' ], 'depth' => 0 ] );
+check( 'a context with nothing in it is the page: no template, no scope, the place page, no element, depth 0 - and what is of the wrong type is the same', $seen[0][2] === [ 'template' => '', 'scope' => '', 'place' => 'page', 'element' => null, 'fills' => [], 'depth' => 0 ]
+	&& $seen[1][2] === $seen[0][2] && $seen[2][2] === [ 'template' => '', 'scope' => '', 'place' => 'page', 'element' => [ 'x' ], 'fills' => [], 'depth' => 0 ] );
 check( 'a depth below nothing is none: the limit is the same', substr_count( \Nino\Components::render( $appData, [ [ 'n' => 'card', 's' => '', 'a' => [], 'c' => [ [ 'n' => 'card', 's' => '', 'a' => [], 'c' => null, 'o' => 0 ] ], 'o' => 0 ] ], [ 'depth' => -100 ] ), '<article' ) === 2 );
 check( 'a text is drawn as it is: markup, quotes, brackets and all - it is the template\'s own', \Nino\Components::render( $appData, [ [ 't' => '<b class="x">a & [b] [[c]] \\[d]</b>' ] ] ) === '<b class="x">a & [b] [[c]] \\[d]</b>' );
 

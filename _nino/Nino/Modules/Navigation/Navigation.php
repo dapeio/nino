@@ -60,7 +60,7 @@ namespace Nino\Modules {
 		 *	@return 	void
 		 */
 		public static function init( array &$appData ): void {
-			\Nino\Html::addShortcode( $appData, 'navigation', [ self::class, 'doShortcode' ] );
+			\Nino\Html::addShortcode( $appData, 'navigation', [ self::class, 'doShortcode' ], null );
 		}
 
 		/**
@@ -114,11 +114,26 @@ namespace Nino\Modules {
 			if( count( $lines ) === 0 )
 				return '';
 
+			// The counter runs before the lines are drawn: a menu inside a line of another is the second
+			$template = ( in_array( 'burger', $args ) === true ) ? 'burger' : 'regular';
+			$list			= '';
+
+			if( $template === 'burger' ) {
+				$appData[self::COUNTER] = (int) ( $appData[self::COUNTER] ?? 0 ) + 1;
+				$list = ( $id !== '' ? $id : 'nino-nav-'. $appData[self::COUNTER] ). '-list';
+			}
+
 			// A generated entry names its page the way the routes do, from the
 			// project's root; the page is reached under the directory the
 			// project is served from. A hand-written line that already names
 			// somewhere else (a full url, a fragment) is written as it stands
 			$dir = rtrim( \Nino\Filesystem::getDir( $appData ), '/' );
+
+			// A line the template's author wrote is html+ of the template, drawn where the menu stands
+			$context = \Nino\Html::context( $appData );
+			$draw = static function( string $source ) use ( &$appData, $context ): string {
+				return \Nino\Html::renderSource( $appData, $source, $context );
+			};
 
 			foreach( $lines as $entry ) {
 
@@ -138,6 +153,8 @@ namespace Nino\Modules {
 					// colon or not: it is escaped the way a generated title is
 					if( $authored === false )
 						$line = str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ], htmlspecialchars( $line, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ) );
+					else
+						$line = $draw( $line );
 
 					$html .= str_replace( '[[content]]', $line, self::$html['div'] );
 					continue;
@@ -155,15 +172,20 @@ namespace Nino\Modules {
 
 				// And a page's name is text: a '<' an editor typed is a '<' on
 				// the page, the same rule every other place their words reach one
-				// follows. A hand-written line stays what its author wrote
+				// follows. A hand-written line stays what its author wrote - drawn,
+				// each of its three parts as the source it is
 				if( $authored === false ) {
 					$title			= htmlspecialchars( $title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
 					$element[0]	= htmlspecialchars( $element[0], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
-					// ...and what a shortcode returns is rendered again, fills and
-					// shortcodes included, so a '[' is an entity on the way out - the
-					// same swap every other place an editor's words reach a page makes
+					// ...and a '[' is an entity on the way out, the same swap every
+					// other place an editor's words reach a page makes
 					$title			= str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ], $title );
 					$element[0]	= str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ], $element[0] );
+				}
+				else {
+					$title			= $draw( $title );
+					$element[0]	= $draw( $element[0] );
+					$attributes	= $draw( $attributes );
 				}
 
 				$attributes	.= ( $uri === $element[0] ) ? ' class="nino-is-active" aria-current="page"' : '';
@@ -172,17 +194,15 @@ namespace Nino\Modules {
 			}
 			$html .= str_replace( '[[content]]', $lis, self::$html['ul'] );
 
+			// The words of the fragment are fills of the site, put in here as the text they are and with every bracket an
+			// entity, as the words of a page are. What is filled in comes last, so that a bracket in it is never read again
+			$fragment = (string) preg_replace_callback( '/\[\[(\/[^\[\]]+)\]\]/', static function( array $found ) use ( &$appData ): string {
+				$text = \Nino\Html::resolveTextfill( $appData, $found[1] );
 
-			$template = ( in_array( 'burger', $args ) === true ) ? 'burger' : 'regular';
-			$list			= '';
+				return $text === null ? $found[0] : str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ], $text );
+			}, self::$html['nav-'. $template] );
 
-			if( $template === 'burger' ) {
-				$appData[self::COUNTER] = (int) ( $appData[self::COUNTER] ?? 0 ) + 1;
-				$list = ( $id !== '' ? $id : 'nino-nav-'. $appData[self::COUNTER] ). '-list';
-			}
-
-			// What is filled in comes last, so that a bracket in it is never read again
-			$result = str_replace( [ '[[id]]', '[[class]]', '[[list]]', '[[content]]' ], [ $id, $class, $list, $html ], self::$html['nav-'. $template] );
+			$result = str_replace( [ '[[id]]', '[[class]]', '[[list]]', '[[content]]' ], [ $id, $class, $list, $html ], $fragment );
 
 			if( $callback !== '' )
 				\Nino\Callbacks::doCallbacks( $appData, $callback, $result );

@@ -32,15 +32,16 @@ namespace Nino\Modules {
 		 *	@return 	void
 		 */
 		public static function init( array &$appData ): void {
-			\Nino\Html::addShortcode( $appData, 'element', [ self::class, 'doShortcodeElement' ] );
-			\Nino\Html::addShortcode( $appData, 'elements', [ self::class, 'doShortcodeElements' ] );
-			\Nino\Html::addShortcode( $appData, 'elementvalues', [ self::class, 'doShortcodeElementValues' ] );
+			\Nino\Html::addShortcode( $appData, 'element', [ self::class, 'doShortcodeElement' ], true );
+			\Nino\Html::addShortcode( $appData, 'elements', [ self::class, 'doShortcodeElements' ], true );
+			\Nino\Html::addShortcode( $appData, 'elementvalues', [ self::class, 'doShortcodeElementValues' ], true );
 		}
 
 
 		/**
-		 *	Replace element shortcode: the block with [[.id]] as 0, [[.uri]] and
-		 *	[[.slug]] of the element and [[<field>]] of each scalar key. [[.lang]]
+		 *	Replace element shortcode: the block drawn with [[.id]] as 0, [[.uri]] and
+		 *	[[.slug]] of the element and [[<field>]] of each scalar key as the tokens
+		 *	of its context (see _draw()). [[.lang]]
 		 *	is the fill of [elements] and is not made here
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
@@ -80,7 +81,28 @@ namespace Nino\Modules {
 
 			$fills['[[.slug]]'] = self::_escapeFieldValue( self::slug( $element ), [] );
 
-			return str_replace( array_keys( $fills ), array_values( $fills ), $content );
+			return self::_draw( $appData, $content, $fills );
+		}
+
+		/**
+		 *	The content of a loop drawn once, with the tokens of one round: they are fills of its context, read by the
+		 *	textfills of the content and put into the arguments of the calls in it - a field is never put into the
+		 *	text that is read for calls, so what an editor wrote in a field is the field's value and nothing else.
+		 *	Where the call stands in a loop already, the tokens of that loop stay visible to what is drawn here and
+		 *	the ones of this round win over them
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$content			html+, what stands between the tags
+		 *	@param		array			$fills				[ '[[token]]' => the text of the token ]
+		 *
+		 *	@return 	string
+		 */
+		private static function _draw( array &$appData, string $content, array $fills ): string {
+
+			$context = \Nino\Html::context( $appData );
+			$context['fills'] = array_map( 'strval', $fills ) + (array) ( $context['fills'] ?? [] );
+
+			return \Nino\Html::renderSource( $appData, $content, $context );
 		}
 
 		/**
@@ -120,13 +142,12 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	Escape a single element field value before it is substituted into a
-		 *	template. Values are editor content, not developer-authored markup -
+		 *	Escape a single element field value before it is made a token of a
+		 *	loop. Values are editor content, not developer-authored markup -
 		 *	htmlspecialchars() neutralizes raw HTML/script (matches
-		 *	Modules\Components::escape()'s pattern), and the extra '['
-		 *	swap stops an editor-supplied "[[...]]" or "[shortcode]" string from
-		 *	being interpreted when the surrounding content is re-rendered by
-		 *	Html::_doShortcode() right after this callback returns.
+		 *	Modules\Components::escape()'s pattern). The '[' is an entity as well,
+		 *	though nobody reads a value for calls: the token goes into the
+		 *	arguments of the calls of the content as it is, and into the page.
 		 *
 		 *	What a field keeps is its model's to say: 'html' => true keeps the
 		 *	whitelisted inline tags and drops everything else, which is what
@@ -307,7 +328,7 @@ namespace Nino\Modules {
 		 *	shows a leftover and the shortcode pass never makes "[]" of one.
 		 *
 		 *	A list with no element is nothing, or - with empty="<name>" - the
-		 *	project's template of that name (see _empty()).
+		 *	project's template of that name, drawn (see _empty()).
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					Shortcode arguments
@@ -321,7 +342,7 @@ namespace Nino\Modules {
 
 			$result = self::queryLoop( $appData, $args, true );
 			if( $result === [] )
-				return self::_empty( $args );
+				return self::_empty( $appData, $args );
 
 			$html = '';
 
@@ -331,9 +352,7 @@ namespace Nino\Modules {
 
 			foreach( $result as $element ) {
 
-				$fills = self::fills( $element, $model, $id );
-
-				$html .= str_replace( array_keys( $fills ), array_values( $fills ), $content );
+				$html .= self::_draw( $appData, $content, self::fills( $element, $model, $id ) );
 
 				$id++;
 			}
@@ -344,18 +363,19 @@ namespace Nino\Modules {
 		/**
 		 *	What stands there when the list has no element: the template of the
 		 *	project that empty="<name>" names, as the [template] the kernel
-		 *	resolves - what a shortcode returns is rendered again, so the template
-		 *	holds fills and shortcodes of its own. Held to a name below /templates
+		 *	resolves it, drawn where the list stands - it holds fills and shortcodes of
+		 *	its own. Held to a name below /templates
 		 *	- slugs, with a slash between them - because the one thing the value
 		 *	could otherwise do is climb out of that directory; a value that is not
 		 *	one renders nothing and says so. The form of the empty attribute of the
 		 *	catalogue's [search-results]
 		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array 		$args					Shortcode arguments
 		 *
-		 *	@return 	string								'[template ...]', or ''
+		 *	@return 	string								The template, drawn, or ''
 		 */
-		private static function _empty( array $args ): string {
+		private static function _empty( array &$appData, array $args ): string {
 
 			$empty = trim( (string) ( $args['empty'] ?? '' ) );
 
@@ -367,7 +387,7 @@ namespace Nino\Modules {
 				return '';
 			}
 
-			return '[template /templates/'. $empty. ']';
+			return \Nino\Html::renderSource( $appData, '[template /templates/'. $empty. ']', \Nino\Html::context( $appData ) );
 		}
 
 		/**
@@ -430,12 +450,11 @@ namespace Nino\Modules {
 
 			foreach( $rows as $row ) {
 
-				$fills = [
-					[ '[[.id]]', '[[.value]]', '[[.count]]' ],
-					[ (string) $id, self::_escapeFieldValue( $row['value'], [] ), (string) $row['count'] ],
-				];
-
-				$html .= str_replace( $fills[0], $fills[1], $content );
+				$html .= self::_draw( $appData, $content, [
+					'[[.id]]'			=> (string) $id,
+					'[[.value]]'	=> self::_escapeFieldValue( $row['value'], [] ),
+					'[[.count]]'	=> (string) $row['count'],
+				] );
 
 				$id++;
 			}

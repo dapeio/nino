@@ -81,7 +81,10 @@ namespace Nino\Modules {
 
 		// The callback a section's text goes through before it is drawn: it is
 		// given [ 'type', 'id', 'html' ] and may add to 'html' - what Consent
-		// does to put its settings button into its own section
+		// does to put its settings button into its own section. What it leaves in
+		// 'html' is finished html: nobody reads it again, so a call or a fill in it
+		// is the text it is. A listener that has html+ of its own to draw draws it
+		// first, with \Nino\Html::renderSource()
 		public const string SECTION = '/nino/legal/section';
 
 		// What a path of a page has to look like: lower case words, joined by a
@@ -114,8 +117,8 @@ namespace Nino\Modules {
 		 */
 		public static function init( array &$appData ): void {
 
-			\Nino\Html::addShortcode( $appData, 'legal', [ self::class, 'doLegalShortcode' ] );
-			\Nino\Html::addShortcode( $appData, 'privacy', [ self::class, 'doPrivacyShortcode' ] );
+			\Nino\Html::addShortcode( $appData, 'legal', [ self::class, 'doLegalShortcode' ], false );
+			\Nino\Html::addShortcode( $appData, 'privacy', [ self::class, 'doPrivacyShortcode' ], false );
 
 			self::routes( $appData );
 
@@ -159,9 +162,9 @@ namespace Nino\Modules {
 		 *	Title and text are made safe the way [element] makes a field safe,
 		 *	by the project's own model (\Nino\Html::fieldValue()), and only then
 		 *	do the placeholders go in - see placeholders() - so that a value
-		 *	can be no markup, and the Kernel's second pass over a shortcode's
-		 *	output finds no '[' to read. What a listener of SECTION adds is code
-		 *	of a feature and is not touched.
+		 *	can be no markup. The sections are finished html, and so is what a
+		 *	listener of SECTION adds: that is code of a feature, is not touched
+		 *	and is not read again.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$type					'legal' or 'privacy'

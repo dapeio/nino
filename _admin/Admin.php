@@ -300,7 +300,12 @@ namespace Nino\Admin {
 		}
 
 		/**
-		 *	The content panes for the current account - see Panels::panesHtml()
+		 *	The content panes for the current account - see Panels::panesHtml() -
+		 *	with the template of a panel that has one drawn: the panes are the value
+		 *	of a fill, and the value of a fill is put into the page as it is and read
+		 *	by nobody, so the calls in it are drawn here, where it is made. What
+		 *	Panels::panesHtml() writes is the shell's own markup, the words of a
+		 *	panel as fills and the literal ones with their brackets as entities
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *
@@ -308,7 +313,12 @@ namespace Nino\Admin {
 		 */
 		public static function panesHtml( array &$appData ): string {
 
-			return Panels::panesHtml( self::visiblePanels( $appData ) );
+			// Drawn here, in the init of the workbench, which runs before the request fills (\Nino\request(), the fills of the
+			// uri and the language) are added: a call in a panel template sees the fills of the site and of the text files in its
+			// arguments, not those of the request. The shell is a fill whose value is made once, and nothing between the
+			// response round and the page offers a place to draw it later without making the fill a callback
+
+			return \Nino\Html::renderSource( $appData, Panels::panesHtml( self::visiblePanels( $appData ) ) );
 		}
 
 		/**

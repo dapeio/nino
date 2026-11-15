@@ -31,9 +31,28 @@ namespace Nino {
 		// What the blocks format turns into a paragraph of its own
 		private const array PARAGRAPH_TAGS = [ 'p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote' ];
 
-		// How deep shortcode output may be re-rendered into more shortcodes
-		// before _doShortcode() stops unrolling - see there
-		private const int MAX_RENDER_DEPTH = 20;
+		// How many renderSource() calls may stand inside one another (the page
+		// itself is the first): the one after the last draws nothing: a template that includes itself, directly or
+		// through a second one, is one typo away in a project (the workbench edits
+		// templates), and this is far above what real nesting reaches - a page,
+		// its frame, the menu inside the frame is six
+		private const int MAX_SOURCE_DEPTH = 20;
+
+		// The depth of renderSource() calls, and the context of the call being
+		// drawn at the moment (see context())
+		private const string DEPTH = './nino/html/depth';
+		private const string CONTEXT = './nino/html/context';
+
+		// How many trees the request keeps: the templates of a page are a few dozen, and a text that is made for each
+		// element of a loop is read and drawn without being kept (measured: a stack of 1000 elements kept 2001 trees, 8 MB)
+		public const int MAX_TREES = 256;
+
+		// What the request keeps of the sources it has read: the trees by the sha1 of
+		// their text, and the names the reader is told are containers or leaves
+		private const string CACHE = './nino/html/cache';
+
+		// The content of the call that was drawn last, as the text it was handed and as the nodes it was made from
+		private const string NODES = './nino/html/nodes';
 
 		// The one fill that never falls back to another language: the lang
 		// attribute of a page. A text in the wrong language is still a text; a
@@ -60,7 +79,7 @@ namespace Nino {
 		// optional modules a project has enabled (or removed).
 		public static function init( array &$appData ): void {
 
-			self::addShortcode( $appData, 'json', [ self::class, 'doJsonShortcode' ] );
+			self::addShortcode( $appData, 'json', [ self::class, 'doJsonShortcode' ], false );
 		}
 
 		public static function response( array &$appData, array &$request ): void {
@@ -90,9 +109,9 @@ namespace Nino {
 		 *
 		 *	Nested fills are resolved before encoding (see resolveTextfill()), so
 		 *	a value that references another one ('[[/project/website/general/url]]'
-		 *	inside a subject line, say) still comes out as its final text - and
-		 *	the re-render Html::_doShortcode() runs on this return value then has
-		 *	nothing left to substitute back into the encoded string.
+		 *	inside a subject line, say) still comes out as its final text. What it
+		 *	answers is finished: a '[' in a value is a '[' of the string, and nobody
+		 *	reads the string for calls.
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					Shortcode arguments, $args[0] is the fill key
@@ -107,25 +126,179 @@ namespace Nino {
 		}
 
 		/**
-		 *	Render a piece of html+ the way a page is rendered: its fills first -
-		 *	every key between double brackets replaced by its value in the current
-		 *	language, again and again until nothing changes (at most ten passes),
-		 *	so that a value may hold fills of its own - then its shortcodes, then
-		 *	the callbacks of '/nino/html/render', which are handed the result.
+		 *	Render a piece of html+ the way a page is rendered: read once into a
+		 *	tree (\Nino\Markup) and drawn from it (renderSource()), then the
+		 *	callbacks of '/nino/html/render' are handed the result - once for a
+		 *	page, whatever it holds. What a shortcode answers is finished: it is not
+		 *	read again, and the value of a fill is put into the page as it is and is
+		 *	never read as a call
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *	@param		string		$html				html+, eg. a template that was read or the markup a shortcode built
+		 *	@param		string		$html				html+, eg. the body of a route
 		 *
 		 *	@return 	string							The html with every fill and shortcode resolved
 		 */
 		public static function renderHtml( array &$appData, string $html ): string {
 
-			$html = self::_renderFills( $appData, $html );
-			$html = self::_renderShortcodes( $appData, $html );
+			$html = self::renderSource( $appData, $html );
 
 			$html = \Nino\Callbacks::doCallbacks( $appData, '/nino/html/render', $html );
 
 			return $html;
+		}
+
+		/**
+		 *	Draw a piece of html+ and nothing else: read into a tree - once for a
+		 *	request and a text, kept under its sha1 - and drawn by
+		 *	\Nino\Components::render() with the context it is given. What a
+		 *	shortcode answers is never a source: a shortcode that has a template of
+		 *	its own to draw (a loop, an included file, the lines of a menu) draws it
+		 *	with this, with the context that context() gives it, and answers
+		 *	the finished html.
+		 *
+		 *	Sources that stand inside one another - a template that includes the
+		 *	next - may be MAX_SOURCE_DEPTH deep: one more draws nothing and says so
+		 *	once in a request (E_USER_WARNING), which is what stops a template that
+		 *	includes itself.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$source				html+
+		 *	@param		array			$context			See \Nino\Components; 'fills' is [ '[[token]]' => text ] for the tokens of a loop
+		 *	@param		bool			$keep					false for a text that is made for one drawing - the cell of one element - and read by nobody twice: its tree is not kept
+		 *
+		 *	@return 	string
+		 */
+		public static function renderSource( array &$appData, string $source, array $context = [], bool $keep = true ): string {
+
+			if( $source === '' )
+				return '';
+
+			$depth = (int) ( $appData[self::DEPTH] ?? 0 );
+
+			if( $depth > self::MAX_SOURCE_DEPTH ) {
+
+				if( ( $appData[self::DEPTH. '/said'] ?? false ) === false ) {
+
+					$appData[self::DEPTH. '/said'] = true;
+					trigger_error( 'Html::renderSource(): sources stand '. self::MAX_SOURCE_DEPTH. ' deep in one another - a template that includes itself? - and the next one is not drawn', E_USER_WARNING );
+				}
+
+				return '';
+			}
+
+			$appData[self::DEPTH] = $depth + 1;
+
+			try {
+				return \Nino\Components::render( $appData, self::_tree( $appData, $source, $keep ), $context );
+			}
+			finally {
+				$appData[self::DEPTH] = $depth;
+			}
+		}
+
+		/**
+		 *	The context of the call that is being drawn: where a shortcode stands when
+		 *	its callback runs - the template, the scope, the place, the element and
+		 *	the tokens of a loop it is in, and how deep - so that what it draws itself
+		 *	with renderSource() is drawn in the same place
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	array
+		 */
+		public static function context( array &$appData ): array {
+
+			return (array) ( $appData[self::CONTEXT] ?? [ 'template' => '', 'scope' => '', 'place' => 'page', 'element' => null, 'fills' => [], 'depth' => 0 ] );
+		}
+
+		/**
+		 *	The tree of a source, read once in a request as renderSource() reads it - with the same names, and kept in
+		 *	the same place unless $keep says not - for a shortcode that draws part of what it holds and has to look at
+		 *	the nodes first: a card sorts its children. What the nodes are drawn with is \Nino\Components::render()
+		 *	and the context of the call (context()); they are the nodes of the source's own text, so drawing them
+		 *	reads nothing that was not written in it
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$source				html+
+		 *	@param		bool			$keep					false where the tree is not to be kept for the request; the content a call was just handed is answered from the nodes it was made of
+		 *
+		 *	@return 	array										The nodes, as \Nino\Markup::parse() answers them
+		 */
+		public static function tree( array &$appData, string $source, bool $keep = true ): array {
+
+			if( $source === '' )
+				return [];
+
+			// The content of the call that is being drawn, as the call was handed it: the nodes it was written from
+			if( is_array( $appData[self::NODES] ?? null ) === true && $appData[self::NODES][0] === $source )
+				return $appData[self::NODES][1];
+
+			return self::_tree( $appData, $source, $keep );
+		}
+
+		/**
+		 *	The names \Nino\Markup is told about, and the trees read so far - made again
+		 *	when a shortcode or a component was registered since
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *
+		 *	@return 	void										Leaves [ 'version' => ..., 'containers' => name => bool, 'trees' => sha1 => [ nodes, notes ] ] in the app data
+		 */
+		private static function _cache( array &$appData ): void {
+
+			// The version of the register is kept in $appData once it is worked out, and unset where a component is registered
+			if( is_string( $appData[self::CACHE]['version'] ?? null ) === true && ( $appData[\Nino\Components::VERSION] ?? null ) === $appData[self::CACHE]['version'] )
+				return;
+
+			$version = \Nino\Components::version( $appData );
+
+			if( ( $appData[self::CACHE]['version'] ?? null ) === $version )
+				return;
+
+			$containers = \Nino\Components::containers( $appData );
+
+			// A name that was registered without saying: a container exactly if its end stands in the document
+			foreach( (array) ( $appData['./nino/html/shortcodes'] ?? [] ) as $name => $container )
+				if( is_bool( $container ) === true && isset( $containers[$name] ) === false )
+					$containers[(string) $name] = $container;
+
+			$appData[self::CACHE] = [ 'version' => $version, 'containers' => $containers, 'trees' => [] ];
+		}
+
+		/**
+		 *	The tree of a source, read once in a request
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$source
+		 *
+		 *	@return 	array
+		 */
+		private static function _tree( array &$appData, string $source, bool $keep ): array {
+
+			// Made ready here; what it answers is not held in a variable of this function, which would make a copy of every tree kept at each one added
+			self::_cache( $appData );
+			$key = sha1( $source );
+
+			if( isset( $appData[self::CACHE]['trees'][$key] ) === true )
+				return $appData[self::CACHE]['trees'][$key][0];
+
+			$notes = [];
+			$tree = \Nino\Markup::parse( $source, $appData[self::CACHE]['containers'], $notes );
+
+			// A document that was not read at all is the one thing worth the log: the page is one text then
+			foreach( $notes as $note )
+				if( in_array( $note['code'], [ 'pattern', 'limit' ], true ) === true && ( $appData[self::CACHE. '/said'][$note['code']] ?? false ) === false ) {
+
+					$appData[self::CACHE. '/said'][$note['code']] = true;
+					trigger_error( 'Html::renderSource(): a source of '. strlen( $source ). ' bytes is not read for its calls ('. $note['code']. '); it is drawn as the text it is', E_USER_WARNING );
+				}
+
+			// The request keeps a number of trees and no more: a loop that draws a text of its own for each element would
+			// otherwise keep a tree for each. A source past that is read and drawn as often as it comes
+			if( $keep === true && count( $appData[self::CACHE]['trees'] ) < self::MAX_TREES )
+				$appData[self::CACHE]['trees'][$key] = [ $tree, $notes ];
+
+			return $tree;
 		}
 
 		/**
@@ -261,10 +434,16 @@ namespace Nino {
 		/**
 		 *	Register a shortcode: [name] in html+ calls the callback with the app
 		 *	data and the arguments, and what the callback answers takes the place
-		 *	of the shortcode and is rendered once more. A named argument
-		 *	(name="value") is $args['name'], a bare word is a list entry, and what
-		 *	stands between [name] and [/name] is $args['content']. A callback that
-		 *	answers something that is no string renders nothing.
+		 *	of the shortcode and is finished: nobody reads it again, so what it
+		 *	holds is never a call or a fill. A named argument (name="value") is
+		 *	$args['name'], the source - the first word, when it begins with ~, / or . -
+		 *	is $args[0], a bare word is a list entry after it, and what stands between
+		 *	[name] and [/name] is $args['content'], as the source text it was written
+		 *	in. The textfills of the page that stand in the source and in a value are put
+		 *	in before the callback is called, as a page has always had them. A callback
+		 *	that answers something that is no string renders nothing, and one that has
+		 *	html+ of its own to draw - a template it includes, the content it loops -
+		 *	draws it with renderSource() and answers the result.
 		 *
 		 *	The callback is registered under '/nino/html/shortcode/<name>' (see
 		 *	\Nino\Callbacks::registerCallback()), so a second registration under
@@ -273,13 +452,21 @@ namespace Nino {
 		 *	\Nino\Modules\Components, a feature's plain one through
 		 *	\Nino\Feature::shortcode().
 		 *
+		 *	$container tells the reader whether the name has an end: true, a
+		 *	container, whose [/name] is needed; false, a leaf, which never has one;
+		 *	null, which a name that may be both says, a container in the documents
+		 *	where its end stands - [image] is a leaf in a page and a container in the
+		 *	head of it. A document that has both forms of a name writes the leaf
+		 *	[name ... /].
+		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$shortcode			The name, as it is written between the brackets
 		 *	@param		mixed		$callback			( array &$appData, array &$args ): string
+		 *	@param		bool|null	$container			true a container, false a leaf, null: a container where its end is in the document
 		 *
 		 *	@return 	void
 		 */
-		public static function addShortcode( array &$appData, string $shortcode, mixed $callback ): void {
+		public static function addShortcode( array &$appData, string $shortcode, mixed $callback, ?bool $container = null ): void {
 
 			// A name that is a component or a stack already, with its renderer registered: a plain
 			// shortcode joining it is handed the component's output as its arguments, which is
@@ -290,12 +477,12 @@ namespace Nino {
 				trigger_error( 'Html::addShortcode(): "'. $shortcode. '" is a component of '. $appData[\Nino\Modules\Components::OWNERS][$shortcode]
 					. ' already; the shortcode of '. ( \Nino\Callbacks::owner( $callback ) ?? 'a function' ). ' is handed its output', E_USER_WARNING );
 
-			// Add shortcode in appData
-			$appData['./nino/html/shortcodes'][$shortcode] = $shortcode;
+			// Add shortcode in appData, and let the reader be told again
+			$appData['./nino/html/shortcodes'][$shortcode] = $container;
+			unset( $appData[self::CACHE] );
 
-			// Add callback and clear cache
+			// Add callback
 			\Nino\Callbacks::registerCallback( $appData, '/nino/html/shortcode/'. $shortcode, $callback );
-			$appData['./nino/html/cache'] = false;
 		}
 
 		/**
@@ -596,49 +783,6 @@ namespace Nino {
 			return is_string( $args['url'] ?? null ) === true ? $args['url'] : '';
 		}
 
-		private static function _renderShortcodes( array &$appData, string $html ): string {
-
-			// Check html text for [ or [[
-			if( $html === '' || strpos( $html, '[' ) === false || empty( $appData['./nino/html/shortcodes'] ) === true )
-				return $html;
-
-			// A closure capturing $appData by reference, not the previous
-			// static-property-as-callback-target approach: preg_replace_callback()
-			// only accepts a callable, but binding $appData to a class property
-			// so the static _doShortcode() could reach it meant any addAsset()/
-			// addFills()/addShortcode() call a shortcode's own callback made
-			// was silently lost - the property held a copy, not the caller's
-			// actual array. The closure sidesteps that entirely: it's a real
-			// reference to $appData, exactly like passing it as a parameter
-			// anywhere else in this file.
-			$callback = function( array $pregArgs ) use ( &$appData ): string {
-				return self::_doShortcode( $appData, $pregArgs );
-			};
-			$html = preg_replace_callback( self::_shortcodePattern( $appData ), $callback, $html );
-
-			return $html;
-		}
-
-		/**
-		 *	What finds a shortcode in html+: [name], [name arguments], and where
-		 *	a [/name] follows, what stands between the two tags - the groups
-		 *	being the name, the arguments and the content. The names are the
-		 *	shortcodes registered, joined once and again after a registration
-		 *	(see addShortcode()). The one pattern of the rendering and of
-		 *	shortcodeCalls()
-		 *
-		 *	@param		array 		&$appData			(reference) Array with current app data
-		 *
-		 *	@return 	string
-		 */
-		private static function _shortcodePattern( array &$appData ): string {
-
-			if( $appData['./nino/html/cache'] === false )
-				$appData['./nino/html/cache'] = implode( '|', array_keys( ( $appData['./nino/html/shortcodes'] ?? [] ) ) );
-
-			return '/\[('. $appData['./nino/html/cache'] . ')(?: ([^\]]*))?\](?:([^\[]*+(?:\[(?!\/\1\])[^\[]*+)*+)(?:\[\/(?:\1)\]))?/';
-		}
-
 		private static function _renderFills( array &$appData, string $html ): string {
 
 			if( substr_count( $html, '[[' ) === 0 )
@@ -682,100 +826,148 @@ namespace Nino {
 			return $html;
 		}
 
-		private static function _doShortcode( array &$appData, array $pregArgs ): string {
+		/**
+		 *	Call the shortcode a call of a tree names, as \Nino\Components draws a name that has no
+		 *	schema: the callbacks of '/nino/html/shortcode/<name>' with the arguments of the call,
+		 *	and what they answer is the end of it. Null where the name is no shortcode either
+		 *
+		 *	The arguments are what the callbacks have always been handed (see addShortcode()): the
+		 *	source as entry 0, a switch as the next entry, name="value" under its name, and for a
+		 *	container 'content', the source text of what it holds - \Nino\Markup::write() of its
+		 *	children, which is the text they were written in where that was the one form the
+		 *	notation has, and nothing where it holds nothing. The fills of the site that stand in
+		 *	the source and in a value, and the tokens of the loop the call stands in, are put in
+		 *	first, as they were when the fills were read before the shortcodes: a value that is put
+		 *	in is a part of the argument and is read by nobody. The content keeps its fills, which
+		 *	are nodes of the tree for whoever draws it.
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$node					A call: n, s, a, c
+		 *	@param		array			$context			Whole: all keys of \Nino\Components::render() and 'fills'
+		 *
+		 *	@return 	string|null							The html, null for a name that is no shortcode
+		 */
+		public static function drawShortcode( array &$appData, array $node, array $context ): ?string {
 
-			// Read preg arguments
-			$shortcode	= $pregArgs[1];
-			$content		= $pregArgs[3] ?? '';
+			$name = (string) ( $node['n'] ?? '' );
 
-			// Check shortcode
-			if( isset( $appData['./nino/html/shortcodes'][$shortcode] ) === false )
-				return '';
+			if( array_key_exists( $name, (array) ( $appData['./nino/html/shortcodes'] ?? [] ) ) === false )
+				return null;
 
-			$args = self::_shortcodeArguments( $pregArgs[2] ?? '', $content );
+			$args = self::_arguments( $appData, $node, $context );
 
-			$value = \Nino\Callbacks::doCallbacks( $appData, '/nino/html/shortcode/'. $shortcode, $args );
+			// The content a call is handed is the text of its children, which the tree of the call has as nodes already: tree()
+			// answers them for the same text, and a callback that asks for the tree of its content does not read it again
+			$outer = $appData[self::NODES] ?? null;
+			$appData[self::NODES] = isset( $args['content'] ) === true && is_array( $node['c'] ?? null ) === true ? [ $args['content'], $node['c'] ] : null;
 
-			if( is_string( $value ) === false )
-				return '';
+			$previous = $appData[self::CONTEXT] ?? null;
+			$appData[self::CONTEXT] = $context;
 
-			// A shortcode's output is rendered again (its own fills/shortcodes),
-			// which is what makes [template] able to contain other shortcodes -
-			// and also what makes a template including itself, directly or
-			// through a second one, recurse until the memory limit kills the
-			// request. Templates and textfills are editable from the workbench, so
-			// that is one typo away. The depth cap stops the recursion without
-			// putting a rule on any single shortcode; MAX_RENDER_DEPTH is far
-			// above what real nesting (page -> section -> element) reaches.
-			$depth = $appData['./nino/html/depth'] ?? 0;
+			try {
+				$value = \Nino\Callbacks::doCallbacks( $appData, '/nino/html/shortcode/'. $name, $args );
+			}
+			finally {
 
-			if( $depth >= self::MAX_RENDER_DEPTH )
-				return $value;
+				$appData[self::NODES] = $outer;
 
-			$appData['./nino/html/depth'] = $depth + 1;
-			$value = self::renderHtml( $appData, $value );
-			$appData['./nino/html/depth'] = $depth;
+				if( $previous === null )
+					unset( $appData[self::CONTEXT] );
+				else
+					$appData[self::CONTEXT] = $previous;
+			}
 
-			return $value;
+			return is_string( $value ) === true ? $value : '';
 		}
 
 		/**
-		 *	The arguments of one shortcode call as the callback gets them: a
-		 *	named one under its name, a bare word as an entry of the list, and
-		 *	the content between the tags - where there is any - as 'content'
+		 *	The arguments of a call as its callback gets them
 		 *
-		 *	@param		string		$raw					What follows the name inside the tag, '' where nothing does
-		 *	@param		string		$content			What stands between [name] and [/name], '' where nothing does
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$node					A call
+		 *	@param		array|null	$context			The context whose fills are put in, null: none are put in (a scan reads the source as it stands)
 		 *
 		 *	@return 	array
 		 */
-		private static function _shortcodeArguments( string $raw, string $content ): array {
+		private static function _arguments( array &$appData, array $node, ?array $context ): array {
 
 			$args = [];
+			$put = static fn( string $text ): string => $context === null ? $text : self::putFills( $appData, $text, $context );
 
-			if( $raw !== '' ) {
-				// The assignment is a group of its own, so "was there a value?"
-				// is answerable: judged by the value alone, alt="" read as no
-				// value at all and arrived as the positional argument 'alt' -
-				// which is how a decorative picture is written, and how
-				// AGENTS.md writes one. A value that happens to equal its own
-				// name (name="name") went the same way
-				preg_match_all( '/\ ([^\ \=]*)(\=[\"]([^\"]*)[\"])?/i', ' '.$raw.' ', $attr );
+			if( is_string( $node['s'] ?? null ) === true && $node['s'] !== '' )
+				$args[] = $put( $node['s'] );
 
-				foreach( $attr[1] AS $id => $key ) {
+			foreach( (array) ( $node['a'] ?? [] ) as $key => $value ) {
 
-					if( $attr[2][$id] !== '' ) {
-						$args[$key] = str_replace( '\'', '"', $attr[3][$id] );
-						continue;
-					}
-
-					$args[] = $key;
-				}
-
-				// The trailing space this was given adds one empty positional
-				// match at the end, which is not an argument
-				array_pop( $args );
+				if( $value === true )
+					$args[] = (string) $key;
+				// 'content' is what stands between the tags and nothing else: an attribute of that name is a value, and
+				// the callbacks that draw their content would read it for calls
+				else if( is_string( $value ) === true && $key !== 'content' )
+					$args[(string) $key] = $put( $value );
 			}
 
-			// Modify arguments
-			if( strlen( $content ) > 0 )
-				$args['content'] = $content;
+			if( is_array( $node['c'] ?? null ) === true ) {
+
+				self::_cache( $appData );
+				$content = \Nino\Markup::write( $node['c'], $appData[self::CACHE]['containers'] );
+
+				if( $content !== '' )
+					$args['content'] = $content;
+			}
 
 			return $args;
 		}
 
 		/**
+		 *	The textfills of a text put in: every [[key]] that has a value, the value as it is - the text of a
+		 *	value of an argument of a call, which the page has always had its fills put into before its calls
+		 *	were made. A key with a slash in front is looked up in the fills of the language and resolved
+		 *	(resolveTextfill(), at most ten passes), one with a fill in its name has that put in first; a key
+		 *	without a slash is a token of the loop of the context. A key nobody has a value for stays
+		 *	written. What is put in is read by nobody: not for fills again, and not for calls
+		 *
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		string		$text
+		 *	@param		array			$context			With 'fills', [ '[[token]]' => text ], the tokens of the loops the text stands in; [] for a text that stands in none
+		 *
+		 *	@return 	string
+		 */
+		public static function putFills( array &$appData, string $text, array $context ): string {
+
+			if( strpos( $text, '[[' ) === false )
+				return $text;
+
+			$tokens = is_array( $context['fills'] ?? null ) === true ? $context['fills'] : [];
+
+			return (string) preg_replace_callback( '/\[\[((?:[^\[\]]++|\[\[[^\[\]]++\]\])++)\]\]/', function( array $found ) use ( &$appData, $tokens ): string {
+
+				$key = $found[1];
+
+				if( str_contains( $key, '[[' ) === true )
+					$key = (string) preg_replace_callback( '/\[\[([^\[\]]+)\]\]/', function( array $inner ) use ( &$appData, $tokens ): string {
+						return ( $inner[1][0] === '/' ? self::resolveTextfill( $appData, $inner[1] ) : ( isset( $tokens[$inner[0]] ) === true ? (string) $tokens[$inner[0]] : null ) ) ?? $inner[0];
+					}, $key );
+
+				if( $key === '' || $key[0] !== '/' )
+					return isset( $tokens['[['. $key. ']]'] ) === true ? (string) $tokens['[['. $key. ']]'] : '[['. $key. ']]';
+
+				return self::resolveTextfill( $appData, $key ) ?? '[['. $key. ']]';
+			}, $text );
+		}
+
+		/**
 		 *	The calls of the registered shortcodes a piece of html+ makes, found
-		 *	and read as the rendering does and run by nobody: the pattern of
-		 *	_renderShortcodes() and the arguments as _doShortcode() hands them
-		 *	to the callback, so that what a scan of a template sees is what the
-		 *	page will run. What stands between the tags of a call is read for
-		 *	calls as well - its output is rendered again, so they will run - and
+		 *	by reading it as a page is read, and run by nobody: the nodes of the
+		 *	tree and the arguments as drawShortcode() hands them to the callback,
+		 *	so that what a scan of a template sees is what the page will run.
+		 *	What stands between the tags of a call is read for calls as well and
 		 *	they follow the call that holds them. A name nobody registered is no
-		 *	call, as it is none to the rendering. What a fill would put into a
-		 *	call is not known here: a scan reads the source as it stands. A call
-		 *	named in $unread is found, and what stands between its tags is not
-		 *	looked into: that call does not read it either
+		 *	call, as it is none to the page - what stands between its tags is
+		 *	looked into all the same. What a fill would put into a call is not
+		 *	known here: a scan reads the source as it stands. A call named in
+		 *	$unread is found, and what stands between its tags is not looked
+		 *	into: that call does not read it either
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$html					html+, eg. a template
@@ -785,24 +977,39 @@ namespace Nino {
 		 */
 		public static function shortcodeCalls( array &$appData, string $html, array $unread = [] ): array {
 
-			if( $html === '' || strpos( $html, '[' ) === false || empty( $appData['./nino/html/shortcodes'] ) === true )
+			if( $html === '' || strpos( $html, '[' ) === false )
 				return [];
+
+			return self::_calls( $appData, self::_tree( $appData, $html, true ), $unread );
+		}
+
+		/**
+		 *	@param		array 		&$appData			(reference) Array with current app data
+		 *	@param		array			$nodes
+		 *	@param		array			$unread
+		 *
+		 *	@return 	array
+		 */
+		private static function _calls( array &$appData, array $nodes, array $unread ): array {
 
 			$calls = [];
 
-			if( preg_match_all( self::_shortcodePattern( $appData ), $html, $matches, PREG_SET_ORDER ) === false )
-				return $calls;
+			foreach( $nodes as $node ) {
 
-			foreach( $matches as $match ) {
-
-				$content = $match[3] ?? '';
-				$calls[] = [ 'name' => $match[1], 'args' => self::_shortcodeArguments( $match[2] ?? '', $content ) ];
-
-				if( in_array( $match[1], $unread, true ) === true )
+				if( isset( $node['n'] ) === false )
 					continue;
 
-				foreach( self::shortcodeCalls( $appData, $content, $unread ) as $inner )
-					$calls[] = $inner;
+				if( array_key_exists( (string) $node['n'], (array) ( $appData['./nino/html/shortcodes'] ?? [] ) ) === true ) {
+
+					$calls[] = [ 'name' => (string) $node['n'], 'args' => self::_arguments( $appData, $node, null ) ];
+
+					if( in_array( $node['n'], $unread, true ) === true )
+						continue;
+				}
+
+				if( is_array( $node['c'] ?? null ) === true )
+					foreach( self::_calls( $appData, $node['c'], $unread ) as $inner )
+						$calls[] = $inner;
 			}
 
 			return $calls;
@@ -811,11 +1018,12 @@ namespace Nino {
 		/**
 		 *	A piece of html+ cut into what stands at its top level: the calls of the
 		 *	registered shortcodes, each as the text it is written in, and the text
-		 *	between and around them. Found with the pattern of the rendering, as
-		 *	shortcodeCalls() finds them; what stands between the tags of a call is
-		 *	that call's and is not looked into. The pieces put one after the other
-		 *	are the html again, byte for byte - which is what a component that sorts
-		 *	its children, a card, relies on
+		 *	between and around them - a call nobody registered and a fill are text
+		 *	here. The text of a part is \Nino\Markup::write() of its nodes, which is
+		 *	the source where that stands in the one form the notation has (double quotes, single
+		 *	spaces, the source first) and its form where it does not. The pieces put
+		 *	one after the other are the html again - which is what a component that
+		 *	sorts its children, a card, relies on
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$html					html+, eg. the content of a call
@@ -827,24 +1035,40 @@ namespace Nino {
 			if( $html === '' )
 				return [];
 
-			$parts	= [];
-			$at			= 0;
+			$nodes = self::_tree( $appData, $html, true );
 
-			if( strpos( $html, '[' ) !== false && empty( $appData['./nino/html/shortcodes'] ) === false
-				&& preg_match_all( self::_shortcodePattern( $appData ), $html, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE ) !== false )
-				foreach( $matches as $match ) {
+			// A leaf is written [name ... /] where the name is a container anywhere in the document: the same in every part
+			self::_cache( $appData );
+			$containers = $appData[self::CACHE]['containers'];
+			$walk = static function( array $level ) use ( &$walk, &$containers ): void {
 
-					[ $text, $start ] = $match[0];
+				foreach( $level as $node )
+					if( isset( $node['n'] ) === true && is_array( $node['c'] ?? null ) === true ) {
+						$containers[(string) $node['n']] = true;
+						$walk( $node['c'] );
+					}
+			};
+			$walk( $nodes );
 
-					if( $start > $at )
-						$parts[] = [ 'name' => '', 'text' => substr( $html, $at, $start - $at ) ];
+			$parts = [];
+			$text = [];
 
-					$parts[] = [ 'name' => $match[1][0], 'text' => $text ];
-					$at = $start + strlen( $text );
+			foreach( $nodes as $node ) {
+
+				if( isset( $node['n'] ) === true && array_key_exists( (string) $node['n'], (array) ( $appData['./nino/html/shortcodes'] ?? [] ) ) === true ) {
+
+					if( $text !== [] )
+						$parts[] = [ 'name' => '', 'text' => \Nino\Markup::write( $text, $containers ) ];
+
+					$text = [];
+					$parts[] = [ 'name' => (string) $node['n'], 'text' => \Nino\Markup::write( [ $node ], $containers ) ];
 				}
+				else
+					$text[] = $node;
+			}
 
-			if( $at < strlen( $html ) )
-				$parts[] = [ 'name' => '', 'text' => substr( $html, $at ) ];
+			if( $text !== [] )
+				$parts[] = [ 'name' => '', 'text' => \Nino\Markup::write( $text, $containers ) ];
 
 			return $parts;
 		}
@@ -890,9 +1114,9 @@ namespace Nino {
 		// One element field value, made safe to substitute into a template:
 		// sanitized to the field's format, line breaks turned into <br> for a
 		// 'breaks' field, escaped for a plain one - and then every '[' swapped
-		// for its entity, because the surrounding content is rendered again
-		// right after this and an editor's '[[...]]' or '[shortcode]' must not
-		// be read as one. The one rule every renderer of a field applies, which
+		// for its entity - a field is never read as a call, and an editor's
+		// '[[...]]' or '[shortcode]' stands in the page as the text it is. The
+		// one rule every renderer of a field applies, which
 		// is why it is public: a feature that draws a field itself calls this
 		// instead of keeping a copy
 		public static function fieldValue( mixed $value, array $field ): string {
@@ -942,13 +1166,13 @@ namespace Nino {
 		 *	What comes out of any of them is stable: sanitizing it again changes
 		 *	nothing
 		 *
-		 *	$literalBrackets is for markup that is the template's own and is
-		 *	rendered again: a '[' or ']' the source has as a character stays one,
-		 *	and every one that exists only because the parser decoded something
-		 *	to one of the two characters (an entity, whatever its spelling) is
+		 *	$literalBrackets is for markup that is the template's own and is drawn
+		 *	after it was sanitized ([html]): a '[' or ']' the source has as a character
+		 *	stays one, and every one that exists only because the parser decoded
+		 *	something to one of the two characters (an entity, whatever its spelling) is
 		 *	written as &#91; or &#93;, so that an editor's text, which the fills
-		 *	put in with every '[' as an entity, is not read as a shortcode the
-		 *	second time
+		 *	put in with every '[' as an entity, is not read as a call when the
+		 *	block is drawn
 		 *
 		 *	@param		string		$html				What the client sent
 		 *	@param		string		$format				inline, lines or blocks

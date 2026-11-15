@@ -1246,7 +1246,7 @@ rmdir( $configLock );
 [ $status ] = callImagesAdmin( $appData, 'apiRemove', [ 'uri' => '/failing' ], 403 );
 check( 'a request whose status is already 403 (csrf) removes nothing', $status === 403 && $appData['/nino/html/images']['/failing']['filename'] === 'failing.60x40.jpg' && \Nino\Filesystem::fileExists( $appData, '/images/failing.60x40.jpg' ) === true );
 unset( $appData['./nino/html/shortcodes']['image'], $appData['./nino/callbacks']['/nino/html/shortcode/image'] );
-$appData['./nino/html/cache'] = false;
+unset( $appData['./nino/html/cache'] );
 
 // --- apiAlt: the alt text per language ---------------------------------------
 

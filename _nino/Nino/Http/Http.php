@@ -25,7 +25,7 @@ namespace Nino {
 			// was silently ignored, ie. no clickjacking protection at all).
 			// base-uri/form-action are not covered by default-src: without
 			// them an injected <base>/<form action> escapes the policy -
-			// and textfills (Html::_renderFills()) put admin-editable text
+			// and textfills (Html::resolveTextfill()) put admin-editable text
 			// into the page unescaped, so the csp is load-bearing here.
 			// img-src needs 'data:' spelled out: the '*' source covers
 			// network schemes only, so without it the browser refused

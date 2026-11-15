@@ -509,14 +509,14 @@ namespace Nino {
 		// From:/-f rather than passing something unchecked to sendmail.
 		private static function _getSender( array &$appData ): string {
 
-			$sender = self::_headerValue( \Nino\Html::renderHtml( $appData, '[[/project/mail/address/envelope]]' ) );
+			$sender = self::_headerValue( \Nino\Html::putFills( $appData, '[[/project/mail/address/envelope]]', [] ) );
 
 			if( filter_var( $sender, FILTER_VALIDATE_EMAIL ) === false ) {
 
 				if( $sender !== '' )
 					trigger_error( 'Mail: \''. $sender. '\' is no sender address - the mail went out as the owner address.', E_USER_WARNING );
 
-				$sender = self::_headerValue( \Nino\Html::renderHtml( $appData, '[[/project/mail/address/owner]]' ) );
+				$sender = self::_headerValue( \Nino\Html::putFills( $appData, '[[/project/mail/address/owner]]', [] ) );
 			}
 
 			return ( filter_var( $sender, FILTER_VALIDATE_EMAIL ) !== false ) ? $sender : '';

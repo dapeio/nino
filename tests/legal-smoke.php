@@ -250,11 +250,12 @@ $sawSection = null;
 \Nino\Callbacks::registerCallback( $appData, \Nino\Modules\Legal::SECTION, static function( array &$appData, array &$section ) use ( &$sawSection ): void {
 	if( $section['id'] === 'cookies' ) {
 		$sawSection = [ $section['type'], $section['id'], str_contains( $section['html'], '<p>' ) ];
-		$section['html'] .= '<p><button type="button">Settings</button></p>';
+		$section['html'] .= '<p><button type="button">Settings</button></p>[csrf] [[/project/company/general/name]]';
 	}
 } );
 $callbackHtml = \Nino\Html::renderHtml( $appData, '[privacy]' );
-check( 'a listener of /nino/legal/section gets type, id and the text, and may add to it', $sawSection === [ 'privacy', 'cookies', true ] && str_contains( $callbackHtml, '<button type="button">Settings</button></p></div></section>' ) );
+check( 'a listener of /nino/legal/section gets type, id and the text, and may add to it', $sawSection === [ 'privacy', 'cookies', true ] && str_contains( $callbackHtml, '<button type="button">Settings</button></p>' ) );
+check( '...what it adds is finished html: a call or a fill in it is the text it is, and is read by nobody', str_contains( $callbackHtml, '[csrf] [[/project/company/general/name]]</div></section>' ) && str_contains( $callbackHtml, 'name="_csrf"' ) === false );
 unset( $appData['./nino/callbacks'][ \Nino\Modules\Legal::SECTION ] );
 
 // A type that was deleted draws nothing, and is no section

@@ -66,8 +66,9 @@ namespace Nino {
 		 *	template, php decides what is shown (AGENTS.md, "Markup belongs in a
 		 *	template"). The newlines at its end are not part of the markup (an
 		 *	editor adds one), every other byte is - a space or a tab in front of
-		 *	them too. Nothing is rendered here: no fill, no shortcode - whatever a
-		 *	shortcode returns is rendered once more by \Nino\Html anyway.
+		 *	them too. Nothing is rendered here: no fill, no shortcode - and what a
+		 *	shortcode returns is finished: html+ that is to be drawn is drawn by the
+		 *	shortcode with \Nino\Html::renderSource().
 		 *
 		 *	The name is a slug and nothing else, so that it cannot name another
 		 *	directory. The directory is the feature's own as a virtual path,
@@ -444,15 +445,16 @@ namespace Nino {
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$name					The shortcode
 		 *	@param		callable	$callback			( array &$appData, array $args ): string
+		 *	@param		bool|null	$container			true a container - its end is needed -, false a leaf, null a container where its end stands in the document (see \Nino\Html::addShortcode())
 		 *
 		 *	@return 	bool											True if it registered the shortcode, false if the Components module owns the name and nothing was registered
 		 */
-		public static function shortcode( array &$appData, string $name, callable $callback ): bool {
+		public static function shortcode( array &$appData, string $name, callable $callback, ?bool $container = null ): bool {
 
 			if( isset( $appData[\Nino\Modules\Components::REGISTRY][$name] ) === true || isset( $appData[\Nino\Modules\Components::STACKS][$name] ) === true )
 				return false;
 
-			\Nino\Html::addShortcode( $appData, $name, $callback );
+			\Nino\Html::addShortcode( $appData, $name, $callback, $container );
 
 			return true;
 		}

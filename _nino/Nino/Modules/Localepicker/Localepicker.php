@@ -38,7 +38,7 @@ namespace Nino\Modules {
 		 *	@return 	void
 		 */
 		public static function init( array &$appData ): void {
-			\Nino\Html::addShortcode( $appData, 'localepicker', [ self::class, 'doShortcode' ] );
+			\Nino\Html::addShortcode( $appData, 'localepicker', [ self::class, 'doShortcode' ], false );
 			\Nino\Callbacks::registerCallback( $appData, '/nino/http/response', [ self::class, 'callbackResponse' ] );
 		}
 
@@ -59,7 +59,7 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	Replace shortcode
+		 *	Replace shortcode - a leaf, which answers finished html
 		 *
 		 *	The fold-out is presentation: Nino.css draws a checkbox and a list as an
 		 *	overlay, and underneath every language is a plain link - an <a> with lang
@@ -96,7 +96,11 @@ namespace Nino\Modules {
 					$htmlLi .= str_replace( [ '[[locale]]', '[[lang]]' ], $values, self::$_tpl['li'] );
 			}
 
-			$content = str_replace( [ '[[li]]' ], [ $actLi. $htmlLi ], self::$_tpl['ul'] );
+			// The words of the fragment - the title of the list, the name of each language - are fills of the site: put in
+			// here, as the text they are, since what a shortcode answers is read by nobody
+			$content = (string) preg_replace_callback( '/\[\[(\/[^\[\]]+)\]\]/', static function( array $found ) use ( &$appData ): string {
+				return \Nino\Html::resolveTextfill( $appData, $found[1] ) ?? $found[0];
+			}, str_replace( [ '[[li]]' ], [ $actLi. $htmlLi ], self::$_tpl['ul'] ) );
 
 			if( $callback !== '' )
 				\Nino\Callbacks::doCallbacks( $appData, $callback, $content );

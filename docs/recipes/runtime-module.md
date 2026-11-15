@@ -226,7 +226,7 @@ private static function escapeHtml( string $value ): string {
 		'UTF-8'
 	);
 
-	// Shortcode output is rendered again; prevent bracket syntax injection.
+	// A bracket in a value is no call, but a component writes every one as an entity all the same.
 	return str_replace(
 		[ '[', ']' ],
 		[ '&#91;', '&#93;' ],

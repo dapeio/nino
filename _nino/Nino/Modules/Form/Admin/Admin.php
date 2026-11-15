@@ -151,7 +151,7 @@ namespace Nino\Modules\Form {
 				foreach( $form['fields'] as $field )
 					$fields[] = [
 						'name'	=> $field['name'],
-						'label'	=> \Nino\Html::renderHtml( $appData, $field['label'] ),
+						'label'	=> \Nino\Html::putFills( $appData, $field['label'], [] ),
 						'type'	=> $field['type'],
 					];
 

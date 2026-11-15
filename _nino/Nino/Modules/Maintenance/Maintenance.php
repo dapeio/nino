@@ -353,7 +353,7 @@ namespace Nino\Modules {
 				$url	= \Nino\Modules\Legal::url( $appData, $page );
 				// The name is stored with its quotes and brackets as entities; decoded
 				// here, so that the escaping below is the only one - and a bracket is
-				// written as an entity again, as the page is rendered once more
+				// written as an entity again, as everywhere a name reaches a page
 				$name	= html_entity_decode( \Nino\Html::renderTextfill( $appData, '/_nino/webpage'. $definition['uri']. '/name' ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 
 				if( $url === '' || $name === '' )

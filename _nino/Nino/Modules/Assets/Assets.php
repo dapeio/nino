@@ -81,7 +81,7 @@ namespace Nino\Modules {
 		 *	@return 	void
 		 */
 		public static function init( array &$appData ): void {
-			\Nino\Html::addShortcode( $appData, 'assets', [ self::class, 'doShortcode' ] );
+			\Nino\Html::addShortcode( $appData, 'assets', [ self::class, 'doShortcode' ], false );
 		}
 
 

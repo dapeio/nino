@@ -24,6 +24,9 @@ namespace Nino\Modules {
 
 	class Template {
 
+		// The largest template that is drawn, in bytes: a page is a few KB
+		public const int MAX_BYTES = 1048576;
+
 		// A word of a text key: lower-case letters and digits, joined by hyphens
 		private const string SEGMENT = '#^[a-z0-9]+(?:-[a-z0-9]+)*$#D';
 
@@ -35,7 +38,7 @@ namespace Nino\Modules {
 		 *	@return 	void
 		 */
 		public static function init( array &$appData ): void {
-			\Nino\Html::addShortcode( $appData, 'template', [ self::class, 'doShortcode' ] );
+			\Nino\Html::addShortcode( $appData, 'template', [ self::class, 'doShortcode' ], false );
 		}
 
 
@@ -65,7 +68,15 @@ namespace Nino\Modules {
 		}
 
 		/**
-		 *	Replace template shortcode
+		 *	Replace template shortcode: the file drawn where the call stands. It is a
+		 *	leaf, and the file is read as a document of its own - one tree for the
+		 *	request - and drawn with the context of the call, the template set to
+		 *	the file's own category, '' where it has none: the words of a template are
+		 *	the ones of /template/<its name>/..., whatever includes it. A source with
+		 *	a fill in it ([template /templates/page-x.[[/nino/http/response/locale]]]) has it put in
+		 *	before the call is made. A file of more than MAX_BYTES is not drawn and
+		 *	the log says so; a template that includes itself ends where
+		 *	\Nino\Html::renderSource() ends it
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		array			$args					Shortcode arguments
@@ -74,13 +85,24 @@ namespace Nino\Modules {
 		 */
 		public static function doShortcode( array &$appData, array $args ): string {
 
-			$html = \Nino\Filesystem::getFileContent( $appData, ( $args[0] ?? '' ). '.tpl', '' );
+			$name = (string) ( $args[0] ?? '' );
+			$file = $name. '.tpl';
+			$path = \Nino\Filesystem::path( $appData, $file );
 
-			// No '/nino/html/render' callback here: Html::_doShortcode() passes
-			// every shortcode's return value through renderHtml() right after
-			// this returns, and that runs the same callback - so a template body
-			// went through the render pipeline twice, once for nothing
-			return is_string( $html ) === true ? $html : '';
+			if( is_file( $path ) === true && (int) filesize( $path ) > self::MAX_BYTES ) {
+
+				trigger_error( 'Template: "'. $name. '" is larger than '. self::MAX_BYTES. ' bytes and is not drawn', E_USER_WARNING );
+
+				return '';
+			}
+
+			$html = \Nino\Filesystem::getFileContent( $appData, $file, '' );
+
+			if( is_string( $html ) === false || $html === '' )
+				return '';
+
+			// A name with no category has no words of its own, and reads none by ~name
+			return \Nino\Html::renderSource( $appData, $html, [ 'template' => self::category( $name ) ?? '' ] + \Nino\Html::context( $appData ) );
 		}
 	}
 

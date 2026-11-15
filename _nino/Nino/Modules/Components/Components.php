@@ -215,6 +215,16 @@ namespace Nino\Modules {
 		// not a fixed text: dispatch() leaves its fills to _line()
 		private const array LINES = [ 'line', 'col' ];
 
+		// Whether a component has an end, as the reader of html+ is told (see \Nino\Html::addShortcode()): the ones
+		// that have a text to say and nothing between their tags are leaves, the ones that hold components are
+		// containers, and what is written both ways - [image] with and without the markup it draws, [col] in a table,
+		// a stack with no content - is a container where its end stands in the document. A stack is always the third
+		private const array CONTAINERS = [
+			'title' => false, 'subtitle' => false, 'card-title' => false, 'card-subtitle' => false, 'text' => false, 'card-text' => false,
+			'line' => false, 'button' => false, 'spacer' => false, 'scroll-hint' => false,
+			'card' => true, 'html' => true, 'panel' => true,
+		];
+
 		// Set while a table renders its rows: the one place a [col] draws something
 		private const string TABLE = './nino/components/table';
 
@@ -729,7 +739,7 @@ namespace Nino\Modules {
 			$appData[self::OWNERS][$name] = \Nino\Callbacks::owner( $callback ) ?? 'a function';
 
 			\Nino\Callbacks::removeCallbacks( $appData, '/nino/html/shortcode/'. $name );
-			\Nino\Html::addShortcode( $appData, $name, $wrapper );
+			\Nino\Html::addShortcode( $appData, $name, $wrapper, $stack === true ? null : ( self::CONTAINERS[$name] ?? null ) );
 		}
 
 		/**
@@ -1930,9 +1940,9 @@ namespace Nino\Modules {
 		 *	of a key is, an entity in it being the character it stands for.
 		 *
 		 *	Whatever it answers can be written into html as it is: escaped,
-		 *	and with every '[' as &#91;, because shortcode output is rendered
-		 *	once more and a value an editor wrote must not open a fill or a
-		 *	shortcode there. Two kinds of source are not text. An image's value
+		 *	and with every '[' as &#91;, so that a value an editor wrote is the
+		 *	same text wherever it is written - and a call or a fill in it is none,
+		 *	whoever were to read it. Two kinds of source are not text. An image's value
 		 *	is the reference to the picture - the uri of a slot, or in a stack
 		 *	the filename an image field holds - escaped like text, so that it
 		 *	is safe to write; the renderer looks the picture up through
@@ -2336,7 +2346,7 @@ namespace Nino\Modules {
 				);
 
 				try {
-					$inner = \Nino\Html::renderHtml( $appData, self::_fillCell( $parts, $fills, $images ) );
+					$inner = \Nino\Html::renderSource( $appData, self::_fillCell( $parts, $fills, $images ), \Nino\Html::context( $appData ), false );
 					$html .= $cell( $inner, is_array( $element ) === true ? $element : [], $index, $info );
 				}
 				finally {
@@ -2372,7 +2382,7 @@ namespace Nino\Modules {
 			$names = array_diff( \Nino\Html::shortcodes( $appData ), array_keys( self::components( $appData ) ) );
 
 			if( $names === [] || strpos( $content, '[/' ) === false
-				|| preg_match_all( '/\[('. implode( '|', array_map( static fn( string $name ): string => preg_quote( $name, '/' ), $names ) ). ')(?: (?>\[\[[^\[\]]+\]\]|[^\]])*+)?\]([^\[]*+(?:\[(?!\/\1\])[^\[]*+)*+)\[\/\1\]/', $content, $found, PREG_SET_ORDER | PREG_OFFSET_CAPTURE ) < 1 )
+				|| preg_match_all( '/\[('. implode( '|', array_map( static fn( string $name ): string => preg_quote( $name, '/' ), $names ) ). ')(?: (?>\[\[(?:[^\[\]]|\[\[[^\[\]]+\]\])++\]\]|[^\]])*+)?\]([^\[]*+(?:\[(?!\/\1\])[^\[]*+)*+)\[\/\1\]/', $content, $found, PREG_SET_ORDER | PREG_OFFSET_CAPTURE ) < 1 )
 				return [ [ $content, false ] ];
 
 			$parts	= [];
@@ -2446,7 +2456,7 @@ namespace Nino\Modules {
 				return $html;
 
 			return (string) preg_replace_callback(
-				'/\[('. implode( '|', self::LINES ). ')(?: ((?>\[\[[^\[\]]+\]\]|[^\]])*+))?\]/',
+				'/\[('. implode( '|', self::LINES ). ')(?: ((?>\[\[(?:[^\[\]]|\[\[[^\[\]]+\]\])++\]\]|[^\]])*+))?\]/',
 				static fn( array $call ): string => '['. $call[1]. ( isset( $call[2] ) === true ? ' '. str_replace( $tokens, '', $call[2] ) : '' ). ']',
 				$html
 			);
@@ -2457,7 +2467,8 @@ namespace Nino\Modules {
 		 *	entities: a [[name]] that is no field of the element is the text it was
 		 *	written as, and a call is read up to its first closing bracket - the one of
 		 *	the token would end it there. _line() reads the entities back as the
-		 *	characters they are and writes them escaped
+		 *	characters they are and writes them escaped. A fill of the site - a key with a
+		 *	slash in front - is no such token: the call puts it in itself, as the text it is
 		 *
 		 *	@param		string		$html					The content of a cell, its fields filled in
 		 *
@@ -2469,8 +2480,9 @@ namespace Nino\Modules {
 				return $html;
 
 			return (string) preg_replace_callback(
-				'/\[('. implode( '|', self::LINES ). ')(?: ((?>\[\[[^\[\]]+\]\]|[^\]])*+))?\]/',
-				static fn( array $call ): string => '['. $call[1]. ( isset( $call[2] ) === true ? ' '. strtr( $call[2], [ '[[' => '&#91;&#91;', ']]' => '&#93;&#93;' ] ) : '' ). ']',
+				'/\[('. implode( '|', self::LINES ). ')(?: ((?>\[\[(?:[^\[\]]|\[\[[^\[\]]+\]\])++\]\]|[^\]])*+))?\]/',
+				// A fill of the site - a key with a slash in front - is kept: the call puts it in itself, as the text it is
+				static fn( array $call ): string => '['. $call[1]. ( isset( $call[2] ) === true ? ' '. (string) preg_replace_callback( '/\[\[\/(?:[^\[\]]|\[\[[^\[\]]+\]\])++\]\]|\[\[|\]\]/', static fn( array $found ): string => strlen( $found[0] ) > 2 ? $found[0] : strtr( $found[0], [ '[[' => '&#91;&#91;', ']]' => '&#93;&#93;' ] ), $call[2] ) : '' ). ']',
 				$html
 			);
 		}
@@ -2752,7 +2764,7 @@ namespace Nino\Modules {
 		 *	Replace [text]: the rich text of a key or of a field, in the
 		 *	format the attribute names - a field keeps the one its type
 		 *	declares. The value is what \Nino\Html::sanitizeHtml() left of
-		 *	it, a text key's value read again as that format, so the wrapper
+		 *	it, a text key's value read as that format, so the wrapper
 		 *	carries .nino-richtext where it holds paragraphs and lists. The wrapper
 		 *	is the p, the div or the span that 'tag' says, and a div where the format
 		 *	is blocks, which holds paragraphs of its own
@@ -2871,9 +2883,8 @@ namespace Nino\Modules {
 		 *	own alt="...", and none - alt="", which is how a decorative picture
 		 *	is written. The slot's label is not an alt text and is not used as
 		 *	one. Whichever it is, it is output with '[' turned into &#91; as
-		 *	well as escaped: shortcode output is rendered once more, and an
-		 *	alt text an editor wrote must not be able to open a fill or a
-		 *	shortcode there.
+		 *	well as escaped, as every value this module writes is: an alt text
+		 *	an editor wrote is text wherever it ends up.
 		 *
 		 *	A focus, a ratio or a class of its own puts the <img> in a frame,
 		 *	<div class="nino-image ...">, which crops it as Nino.css has it. The class
@@ -3039,7 +3050,14 @@ namespace Nino\Modules {
 				$markup
 			);
 
-			if( $content !== null || $framed === false )
+			// The content form is html+ of the template: drawn where the picture stands, with its tokens put in. The
+			// values put in are the one place a value stands in a text that is read for calls: self::escape() writes
+			// every '[' of them as &#91;, which is what keeps them text - a reference, an address and an alt text
+			// of an editor are no calls
+			if( $content !== null )
+				return \Nino\Html::renderSource( $appData, $img, \Nino\Html::context( $appData ), false );
+
+			if( $framed === false )
 				return $img;
 
 			return str_replace(
@@ -3110,7 +3128,8 @@ namespace Nino\Modules {
 		 */
 		public static function componentHtml( array &$appData, array $args ): string {
 
-			$value = \Nino\Html::sanitizeHtml( (string) $args['value'], 'blocks', true );
+			// What stays standing of the calls in it - the brackets of the source are kept - is drawn here, where the block stands
+			$value = \Nino\Html::renderSource( $appData, \Nino\Html::sanitizeHtml( (string) $args['value'], 'blocks', true ), \Nino\Html::context( $appData ) );
 			$class = trim( $args['class'] );
 
 			return $value === '' || $class === '' ? $value : str_replace( [ '[[class]]', '[[value]]' ], [ self::_attribute( 'class', $class ), $value ], self::$html['html'] );
@@ -3151,10 +3170,15 @@ namespace Nino\Modules {
 			// A target that is no id is none: it goes into the address as it is
 			$to = self::_id( $args['to'] );
 
+			// The text of the fill is the label, put in as the text it is: a fragment of this module is read by nobody
+			$hint = (string) preg_replace_callback( '/\[\[(\/[^\[\]]+)\]\]/', static function( array $found ) use ( &$appData ): string {
+				return \Nino\Html::resolveTextfill( $appData, $found[1] ) ?? $found[0];
+			}, self::$html['scroll-hint'] );
+
 			return str_replace(
 				[ '[[class]]', '[[to]]', '[[next]]' ],
 				[ self::_modifier( '', $args['class'] ), $to, $to === '' ? ' data-arrow-next' : '' ],
-				self::$html['scroll-hint']
+				$hint
 			);
 		}
 
@@ -3169,20 +3193,16 @@ namespace Nino\Modules {
 		 *	stands once in a column - a card beside a picture - and in the content
 		 *	of a stack once per element: the cards of a loop.
 		 *
-		 *	The content is $args['value'], and it is not rendered here, only sorted
-		 *	(see _sorted()): the first child that is a picture stands first in the
+		 *	The content is $args['value'], sorted (see _sorted()) and drawn here with
+		 *	\Nino\Html::renderSource(): the first child that is a picture stands first in the
 		 *	<article>, and every other child stands behind it in a <div> of the class
 		 *	nino-card-content, in the order it was written in. A card with no padding
 		 *	of its own, nino-p-0, has its picture at its edges and its words in a room
 		 *	of their own; a card without a picture has the div alone, and one with
-		 *	nothing but a picture has no div. The engine renders the output of a
-		 *	shortcode again
-		 *	(\Nino\Html::_doShortcode(), to a depth it caps), which is what makes
-		 *	[template] work, so the components in the card are rendered as soon as
-		 *	this returns - in a stack with the element still their context,
-		 *	because renderStack() holds it around the \Nino\Html::renderHtml()
-		 *	this card is rendered in. That is why the renderer calls no
-		 *	renderHtml() of its own. A card with nothing between its tags renders
+		 *	nothing but a picture has no div. The children are drawn in the context
+		 *	of the card - in a stack with the element still their context, because
+		 *	renderStack() holds it around the drawing of the content this card stands in -
+		 *	the picture first, then the rest. A card with nothing between its tags renders
 		 *	nothing (dispatch() sees to that for a source of content); a card whose
 		 *	components all render nothing is an <article> with an empty div, as a
 		 *	section with nothing in it is a section.
@@ -3221,7 +3241,17 @@ namespace Nino\Modules {
 
 			[ $first, $rest ] = self::_sorted( $appData, $args['value'] );
 
-			$inner = $first. ( $rest === '' ? '' : str_replace( '[[inner]]', $rest, self::$html['card-content'] ) );
+			// The children are the nodes of the card's own content, read once, drawn in the order they stand in the card: the
+			// picture, then the rest. A card in a stack is still slower than the card of the kernel before the tree was read
+			// once (300 cards: 15 ms against 10.5 ms, median of 31 runs, three rounds): the cell of each element is read as
+			// text filled with its fields, because _fillCell(), _dropTokens() and _keepTokens() treat a token differently
+			// in each call, and the call of the card writes its content as the text it is handed. This module leaves the
+			// kernel in this form
+			$context	= \Nino\Html::context( $appData );
+			$inner		= $first === [] ? '' : \Nino\Components::render( $appData, $first, $context );
+			$drawn		= \Nino\Components::render( $appData, $rest, $context );
+
+			$inner .= $rest === [] ? '' : str_replace( '[[inner]]', $drawn, self::$html['card-content'] );
 
 			if( $picture !== null ) {
 
@@ -3261,32 +3291,44 @@ namespace Nino\Modules {
 		 *	What stands between the tags of a card, sorted: the call of its first
 		 *	picture - a component whose source is an image, wherever among the others
 		 *	it stands - and the rest as it was written, in its order and without the
-		 *	white space at its ends. The calls are found as the rendering finds them
-		 *	(\Nino\Html::shortcodeParts()), so a picture in the content of another call
-		 *	is that call's and not the card's. Nothing is rendered
+		 *	white space at its ends. The content is read once, into the nodes of its top
+		 *	level (\Nino\Html::tree()), so a picture in the content of another call
+		 *	is that call's and not the card's. Nothing is drawn here
 		 *
 		 *	@param		array 		&$appData			(reference) Array with current app data
 		 *	@param		string		$content			html+, the content of the card
 		 *
-		 *	@return 	array										[ the call of the picture or '' where there is none, the rest ]
+		 *	@return 	array										[ the nodes of the picture - [] where there is none -, the nodes of the rest ]
 		 */
 		private static function _sorted( array &$appData, string $content ): array {
 
 			$components	= self::registered( $appData, false );
-			$picture		= '';
-			$rest				= '';
+			$picture		= [];
+			$rest				= [];
 
-			foreach( \Nino\Html::shortcodeParts( $appData, $content ) as $part ) {
+			foreach( \Nino\Html::tree( $appData, $content ) as $node ) {
 
-				if( $picture === '' && $part['name'] !== '' && ( $components[$part['name']]['source'] ?? '' ) === 'image' ) {
-					$picture = $part['text'];
-					continue;
-				}
-
-				$rest .= $part['text'];
+				if( $picture === [] && isset( $node['n'] ) === true && ( $components[$node['n']]['source'] ?? '' ) === 'image' )
+					$picture = [ $node ];
+				else
+					$rest[] = $node;
 			}
 
-			return [ $picture, trim( $rest ) ];
+			// The white space at the ends of the rest goes, as far as it reaches: a text that is nothing but white space
+			// is gone and the one behind it is cut as well
+			while( $rest !== [] && isset( $rest[0]['t'] ) === true && trim( $rest[0]['t'] ) === '' )
+				array_shift( $rest );
+
+			while( $rest !== [] && isset( $rest[count( $rest ) - 1]['t'] ) === true && trim( $rest[count( $rest ) - 1]['t'] ) === '' )
+				array_pop( $rest );
+
+			if( $rest !== [] && isset( $rest[0]['t'] ) === true )
+				$rest[0]['t'] = ltrim( $rest[0]['t'] );
+
+			if( $rest !== [] && isset( $rest[count( $rest ) - 1]['t'] ) === true )
+				$rest[count( $rest ) - 1]['t'] = rtrim( $rest[count( $rest ) - 1]['t'] );
+
+			return [ $picture, $rest ];
 		}
 
 		/**
@@ -3534,12 +3576,13 @@ namespace Nino\Modules {
 				// The first call of the part is the panel itself; what stands in it is not looked into
 				$args = \Nino\Html::shortcodeCalls( $appData, $part['text'], [ 'panel' ] )[0]['args'] ?? [];
 
-				$title = is_string( $args['title'] ?? null ) === true ? $args['title'] : '';
+				// A scan reads the source as it stands: the fills of the site in a title and in a class are put in here
+				$title = is_string( $args['title'] ?? null ) === true ? \Nino\Html::putFills( $appData, $args['title'], \Nino\Html::context( $appData ) ) : '';
 				$title = trim( (string) preg_replace( '/\s+/', ' ', html_entity_decode( strip_tags( $title ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) );
 
 				$panels[] = [
 					'title'		=> $title !== '' ? self::escape( $title ) : (string) ( count( $panels ) + 1 ),
-					'class'		=> is_string( $args['class'] ?? null ) === true ? self::escape( trim( $args['class'] ) ) : '',
+					'class'		=> is_string( $args['class'] ?? null ) === true ? self::escape( trim( \Nino\Html::putFills( $appData, $args['class'], \Nino\Html::context( $appData ) ) ) ) : '',
 					'content'	=> is_string( $args['content'] ?? null ) === true ? $args['content'] : '',
 				];
 			}
@@ -3643,7 +3686,8 @@ namespace Nino\Modules {
 					if( $group === '' )
 						$group = self::_group( $appData, $args['id'], 'tabs' );
 
-					$panels .= self::_tabPanel( $group, $index, $panel['title'], $panel['class'], $panel['content'], $tabs );
+					// The group is named before the panels are drawn, as a counter of the request runs in the order the calls are met
+					$panels .= self::_tabPanel( $group, $index, $panel['title'], $panel['class'], \Nino\Html::renderSource( $appData, $panel['content'], \Nino\Html::context( $appData ) ), $tabs );
 				}
 			}
 			else
@@ -3693,7 +3737,7 @@ namespace Nino\Modules {
 					if( $name === '' && $args['exclusive'] === '1' )
 						$name = self::_group( $appData, $args['id'], 'accordion' );
 
-					$items .= self::_accordionItem( $args, $name, $index, $panel['title'], $panel['class'], $panel['content'] );
+					$items .= self::_accordionItem( $args, $name, $index, $panel['title'], $panel['class'], \Nino\Html::renderSource( $appData, $panel['content'], \Nino\Html::context( $appData ) ) );
 				}
 			}
 			else
@@ -3757,7 +3801,7 @@ namespace Nino\Modules {
 			// a table does not mean: a content that starts a column of its own is no content here,
 			// and the content below is written with the closing tag the rendering needs. The tag is
 			// read with a token in its arguments, as it stands before the cells are filled
-			preg_match_all( '/\[col(?: ((?>\[\[[^\[\]]+\]\]|[^\]])*+))?\](?:([^\[]*+(?:\[(?!\/col\]|col[ \]])[^\[]*+)*+)\[\/col\])?/', (string) $args['content'], $calls, PREG_SET_ORDER );
+			preg_match_all( '/\[col(?: ((?>\[\[(?:[^\[\]]|\[\[[^\[\]]+\]\])++\]\]|[^\]])*+))?\](?:([^\[]*+(?:\[(?!\/col\]|col[ \]])[^\[]*+)*+)\[\/col\])?/', (string) $args['content'], $calls, PREG_SET_ORDER );
 
 			if( $calls === [] )
 				return '';
@@ -3862,7 +3906,7 @@ namespace Nino\Modules {
 				$cell = self::affix( $appData, $args, $cell );
 			}
 			else
-				$cell = trim( (string) $args['content'] );
+				$cell = \Nino\Html::renderSource( $appData, trim( (string) $args['content'] ), \Nino\Html::context( $appData ) );
 
 			return str_replace(
 				[ '[[class]]', '[[value]]' ],

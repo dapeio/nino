@@ -712,7 +712,7 @@ check( '...a bare [image] ahead of the content form in one template is written [
 $appData['./nino/locales/current'] = 'de_DE';
 \Nino\Images::setSlotAlt( $appData, 'hero', [ 'de_DE' => '' ] );
 unset( $appData['./nino/html/shortcodes']['template'], $appData['./nino/callbacks']['/nino/html/shortcode/template'] );
-$appData['./nino/html/cache'] = false;
+unset( $appData['./nino/html/cache'] );
 
 echo "\n";
 

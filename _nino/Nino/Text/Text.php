@@ -451,8 +451,8 @@ namespace Nino {
 
 			// strip_tags() answers "no markup of its own", which is the whole
 			// requirement as long as a fill lands in text content. It does not
-			// survive an attribute though, and Html::_renderFills() is a blind
-			// str_replace over the finished document: the shipped templates put
+			// survive an attribute though, and a fill is put into the page, and into the arguments of a
+			// call, as it is: the shipped templates put
 			// plain-text fills inside href/src/alt/content/title (eg.
 			// '<meta name="author" content="[[/project/website/general/author]]">' in
 			// html-header.tpl), where a stored value of  x" onmouseover="...
@@ -470,10 +470,12 @@ namespace Nino {
 		/**
 		 *	A stored value may name another fill. It may not carry a shortcode.
 		 *
-		 *	\Nino\Html renders fills first and shortcodes after them, over the
-		 *	finished document - so whatever a value carries is read again as
-		 *	markup of the page. A fill naming another fill is deliberate and the
-		 *	shipped texts use it (see _renderFills()'s own loop), but a
+		 *	\Nino\Html puts the value of a fill into the page as it is and reads
+		 *	it for nothing but the fills inside it, so a call in a value is no
+		 *	call - but the same value is put into the arguments of calls, and
+		 *	what a shortcode of a feature makes of it is its own business. A
+		 *	fill naming another fill is deliberate and the
+		 *	shipped texts use it (see Html::resolveTextfill()), but a
 		 *	shortcode is not a word: '[template /templates/mail-owner]' stored
 		 *	in a heading puts a private template - its copy, the owner's address
 		 *	- on a public page, and '[elements /type]' empties a collection onto
@@ -481,8 +483,8 @@ namespace Nino {
 		 *	a page includes is a developer's decision.
 		 *
 		 *	So '[[/template/page-home/welcome/title]]' survives and every other bracket becomes an
-		 *	entity, which renders as itself and carries no meaning on the next
-		 *	pass. Neither entity contains a bracket, so re-saving a value that
+		 *	entity, which renders as itself and carries no meaning to a reader.
+		 *	Neither entity contains a bracket, so re-saving a value that
 		 *	went through here changes nothing - the same idempotence the quotes
 		 *	above rely on. AGENTS.md, "Rendering and escaping rules", is the
 		 *	standing rule; \Nino\Modules\Elements and the Search and

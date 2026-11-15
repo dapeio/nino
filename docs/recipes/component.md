@@ -89,7 +89,8 @@ The rules the module keeps for you, and the ones it leaves to the renderer:
   is the default, an attribute nobody declared is not there. All strings.
 - Anything the renderer writes that did not come from `$args['value']` is its
   own to escape. `Components::escape()` escapes and writes `[` as `&#91;`;
-  everything you return is rendered once more as a shortcode's output is.
+  everything you return is finished - nobody reads it again - and a renderer that has html+ of its own to
+  draw (the children of a container) draws it with `\Nino\Html::renderSource()`.
 - The markup is a fragment with `[[tokens]]`, declared as a property of the
   class (`public static $html`, as `Components::$html` is) and filled with
   `str_replace()`; what is filled in comes last in the list of tokens.

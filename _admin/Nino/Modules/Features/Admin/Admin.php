@@ -1090,9 +1090,10 @@ namespace Nino\Modules\Features {
 		 *	Where the given shortcodes still stand in the project's own files:
 		 *	templates, texts and elements. Read only, and a report - what a
 		 *	shortcode does once its feature is off is the renderer's business
-		 *	(it stays as text), and the scan only says where that will be seen.
-		 *	Opening tags only, the shape the renderer matches
-		 *	(\Nino\Html::_renderShortcodes()), so an enclosing pair counts once;
+		 *	(a name nobody registered draws nothing, and the log says so once),
+		 *	and the scan only says where that will be seen.
+		 *	Opening tags only, the shape the reader matches
+		 *	(\Nino\Markup), so an enclosing pair counts once;
 		 *	raw brackets only, so a shortcode the Text panel neutralized
 		 *	(&#91;...&#93;) is not reported - it never rendered. A shortcode
 		 *	typed into an element is neutralized when the page is drawn and

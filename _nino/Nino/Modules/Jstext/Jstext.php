@@ -62,7 +62,7 @@ namespace Nino\Modules {
 			// swaps it by its raw string, finds every copy of it
 			$appData['./nino/jstext/nonce'] = bin2hex( random_bytes( 16 ) );
 
-			\Nino\Html::addShortcode( $appData, 'jstext', [ self::class, 'doShortcode' ] );
+			\Nino\Html::addShortcode( $appData, 'jstext', [ self::class, 'doShortcode' ], false );
 
 			// Priority 0, ahead of everything that can end a request from inside
 			// this same callback: Modules\Maintenance answers at 1 and exits
@@ -152,9 +152,9 @@ namespace Nino\Modules {
 							and 'couldn&#039;t' is what a visitor would read. It is
 							resolved as the page resolves it, a fill inside it filled in,
 							and decoded once, as Components::value() does for a plain
-							text. The block is a shortcode's output and the page renders
-							that output once more, so the brackets of the decoded text
-							are escaped in the JSON below, where a '[' is no fill and no
+							text. The block is a shortcode's output and is finished,
+							and the brackets of the decoded text are written as
+							the JSON below has them, where a '[' is no fill and no
 							shortcode	*/
 						$text = \Nino\Html::resolveTextfill( $appData, $key );
 
